@@ -108,7 +108,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
               aoAbrirCardapio={aoAbrirCardapio}
               aoAjustar={(sku, delta) => ajustarQuantidade(selecionada.id, sku, delta)}
               aoAjustarObservacao={(sku, texto) => ajustarObservacao(selecionada.id, sku, texto)}
-              aoGerarPedido={(meio) => { escolherMeioPagamento(selecionada.id, meio); gerarPedido(selecionada.id, meio) }}
+              aoGerarPedido={(meio) => { escolherMeioPagamento(selecionada.id, meio); return gerarPedido(selecionada.id, meio) }}
               nomeCliente={selecionada.nome}
               endereco={cliente.endereco}
               faixa={faixa}

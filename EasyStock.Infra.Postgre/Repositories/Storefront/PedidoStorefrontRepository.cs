@@ -1,4 +1,5 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
 
@@ -70,22 +71,32 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
         await db.SaveChangesAsync(ct);
     }
 
-    public Task<IReadOnlyList<Pedido>> GetAguardandoPagamentoExpiradosAsync(
+    /// <summary>
+    /// Origens que passam pelo checkout em 3 fases (núcleo S10) e podem ficar em <c>AguardandoPagamento</c>
+    /// sem cobrança quando o Mercado Pago cai na fase 3 (#1291): site logado, site sem login e conversa.
+    /// </summary>
+    private static readonly string[] OrigensDoCheckout =
+        [OrigemPedido.Storefront, OrigemPedido.StorefrontGuest, OrigemPedido.WhatsApp];
+
+    public async Task<IReadOnlyList<Pedido>> GetAguardandoPagamentoExpiradosAsync(
         DateTime criadoAntesDe,
         int maxBatch = 50,
-        CancellationToken ct = default) =>
-        db.Pedidos
+        CancellationToken ct = default)
+    {
+        // Varredura do job: cross-tenant por natureza, bypass de RLS em escopo curto (#1291).
+        using var _ = db.UseRowLevelSecurityBypass();
+        return await db.Pedidos
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(p => p.Status == StatusPedidoMapper.AguardandoPagamento
-                     && p.Origem == "storefront"
+                     && OrigensDoCheckout.Contains(p.Origem)
                      && p.CriadoEm < criadoAntesDe
                      // S11: pedido com CobrancaPedido é do CobrancaPedidoJob (expira pelo link, não pela criação).
                      && !db.CobrancasPedido.IgnoreQueryFilters().Any(c => c.PedidoId == p.Id))
             .OrderBy(p => p.CriadoEm)
             .Take(maxBatch)
-            .ToListAsync(ct)
-            .ContinueWith<IReadOnlyList<Pedido>>(t => t.Result, ct, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            .ToListAsync(ct);
+    }
 
     public Task<IReadOnlyList<Pedido>> GetEntreguesElegiveisPraAvaliacaoAsync(
         DateTime entregueAntesDe,

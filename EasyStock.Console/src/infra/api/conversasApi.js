@@ -26,6 +26,10 @@ export async function listarTodasConversas() {
 export const listarMensagens = (id, { limite = 100 } = {}) =>
   chamarApi(`${BASE}/${id}/mensagens?limite=${limite}`)
 
+// Arquivo da mensagem (foto, áudio, documento) do storage privado, autenticado (#1287).
+export const baixarMidia = (conversaId, mensagemId) =>
+  chamarApi(`${BASE}/${conversaId}/mensagens/${mensagemId}/midia`, { arquivo: true })
+
 export const enviarTexto = (id, texto) =>
   chamarApi(`${BASE}/${id}/mensagens`, { metodo: 'POST', corpo: { texto } })
 

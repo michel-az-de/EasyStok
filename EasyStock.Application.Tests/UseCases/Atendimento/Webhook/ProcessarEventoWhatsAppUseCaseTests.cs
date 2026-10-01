@@ -1,7 +1,9 @@
 using EasyStock.Application.Tests.Services.Atendimento;
+using EasyStock.Application.Events.Atendimento;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
@@ -40,6 +42,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
     private readonly IConsentimentoContatoRepository _consentimentoRepository = Substitute.For<IConsentimentoContatoRepository>();
     private readonly ICanalMensageria _canalWhatsApp = Substitute.For<ICanalMensageria>();
     private readonly INotificadorService _notificador = Substitute.For<INotificadorService>();
+    private readonly IPublicadorEventoIntegracao _publicadorEventos = Substitute.For<IPublicadorEventoIntegracao>();
     private readonly Guid _empresaId = Guid.NewGuid();
     private readonly ProcessarEventoWhatsAppUseCase _useCase;
 
@@ -62,7 +65,8 @@ public class ProcessarEventoWhatsAppUseCaseTests
             new OptOutPorPalavra(_consentimentoRepository, _conversaRepository, new ResolvedorCanal([_canalWhatsApp]),
                 _unitOfWork, NullLogger<OptOutPorPalavra>.Instance),
             new EscalarConversaUseCase(_conversaRepository, _notificador, _eventPublisher),
-            NullLogger<ProcessarEventoWhatsAppUseCase>.Instance);
+            NullLogger<ProcessarEventoWhatsAppUseCase>.Instance,
+            _publicadorEventos);
 
         _cloudClient.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(new EnvioWhatsAppResult("wamid.saida"));
@@ -455,5 +459,55 @@ public class ProcessarEventoWhatsAppUseCaseTests
             Arg.Any<CancellationToken>());
         await _canalWhatsApp.Received(1).EnviarTextoAsync(ContatoWaId, OptOutPorPalavra.Confirmacao, Arg.Any<CancellationToken>());
         await _queueService.DidNotReceiveWithAnyArgs().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, default(ProcessarTurnoAgenteJob)!);
+    }
+
+    private static string PayloadTipo(string wamid, string tipo, string conteudoJson) => """
+        {"entry":[{"changes":[{"value":{
+            "metadata":{"phone_number_id":"__PHONE__"},
+            "contacts":[{"profile":{"name":"Fulano"},"wa_id":"__WAID__"}],
+            "messages":[{"from":"__WAID__","id":"__WAMID__","timestamp":"1700000000","type":"__TIPO__",__CONTEUDO__}]
+        }}]}]}
+        """
+        .Replace("__PHONE__", PhoneNumberId).Replace("__WAID__", ContatoWaId)
+        .Replace("__WAMID__", wamid).Replace("__TIPO__", tipo).Replace("__CONTEUDO__", conteudoJson);
+
+    [Theory]
+    [InlineData("reaction", "\"reaction\":{\"message_id\":\"wamid.saida\",\"emoji\":\"\ud83d\udc4d\"}")]
+    [InlineData("unsupported", "\"errors\":[{\"code\":131051,\"title\":\"Message type unknown\"}]")]
+    [InlineData("system", "\"system\":{\"body\":\"Cliente trocou de número\",\"type\":\"user_changed_number\"}")]
+    public async Task ReacaoSemSuporteOuSistemaGravaSemAcionarAgente(string tipo, string conteudoJson)
+    {
+        // Issue 1285: o LLM respondia a um emoji. Fica gravado para a dona ver, sem turno do agente
+        // e sem saudação ("já te respondo") que nada viria cumprir.
+        await _useCase.ExecuteAsync(PayloadTipo($"wamid.{tipo}", tipo, conteudoJson));
+
+        await _conversaRepository.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Direcao == DirecaoMensagem.Entrada && m.TipoConteudo == TipoConteudoMensagem.Outro),
+            Arg.Any<CancellationToken>());
+        await _queueService.DidNotReceive().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task ConversaNovaAbertaPorBotaoAcaoNaoSaudaNemPublicaConversaAberta()
+    {
+        // Issue 1285: botão "acao:" de template (ex.: avaliação) numa conversa nova saía com a
+        // saudação "já te respondo" e a automática de entrada, mas o agente nunca era enfileirado.
+        await _useCase.ExecuteAsync(PayloadBotaoAcao("wamid.botao-novo", "acao:confirmar_endereco:123"));
+
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+        await _publicadorEventos.DidNotReceiveWithAnyArgs().PublicarAsync<ConversaAbertaEvent>(
+            default, default!, default!, default, default!, default, default, default, default);
+        await _queueService.DidNotReceive().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+    }
+
+    [Fact]
+    public async Task ConversaNovaPorTextoPublicaConversaAberta()
+    {
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.texto-novo", "Oi"));
+
+        await _publicadorEventos.Received(1).PublicarAsync(
+            _empresaId, ConversaAbertaEvent.TipoEvento, "Conversa", Arg.Any<Guid>(), Arg.Any<ConversaAbertaEvent>(),
+            Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
     }
 }

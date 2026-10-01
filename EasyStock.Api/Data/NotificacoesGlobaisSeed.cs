@@ -99,7 +99,7 @@ public static class NotificacoesGlobaisSeed
         return adicionados;
     }
 
-    private static IEnumerable<TemplateNotificacao> BuildDefaultTemplates()
+    public static IEnumerable<TemplateNotificacao> BuildDefaultTemplates()
     {
         yield return TemplateNotificacao.Criar(
             codigo: "assinatura_expirando_email_v1",
@@ -549,6 +549,17 @@ public static class NotificacoesGlobaisSeed
             corpoTemplate: "{{ nome }}, o que achou do pedido nº {{ numero }}? É só tocar num botão."),
             """{"template":"avaliacao","idioma":"pt_BR","param1":"{{ nome }}","botao1":"acao:avaliacao:positiva:{{ pedidoId }}|Gostei","botao2":"acao:avaliacao:negativa:{{ pedidoId }}|Não gostei"}""");
 
+        // #1292: aviso de reembolso da ocorrencia (S27). Fora da janela de 24 h usa o modelo "reembolso_efetuado",
+        // que precisa ser aprovado no WhatsApp Manager como os da onda 0.3.
+        yield return ComMetadados(TemplateNotificacao.Criar(
+            codigo: "reembolso_efetuado_whatsapp_v1",
+            nome: "Reembolso Efetuado — WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.ReembolsoEfetuado,
+            assuntoTemplate: "",
+            corpoTemplate: "{{ nome }}, devolvemos {{ valor }} referente ao pedido nº {{ numero }}. O prazo para aparecer no seu extrato depende do banco. Desculpe o transtorno!"),
+            """{"template":"reembolso_efetuado","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ valor }}","param3":"{{ numero }}"}""");
+
         // ===== ADM-09 (#744): templates minimos SMS/WhatsApp p/ eventos criticos de cobranca/SLA.
         // Sem assunto (SMS/WhatsApp nao tem). Ficam inertes ate configurar provider Twilio/Meta e
         // ativar o canal em ConfiguracaoCanal (AtivoNoTenant); o objetivo aqui e cobrir o filtro
@@ -602,7 +613,7 @@ public static class NotificacoesGlobaisSeed
             corpoTemplate: "SLA {{ tipoSla }} violado: chamado \"{{ titulo }}\" da {{ empresaNome }} - prioridade {{ prioridade }}, nivel {{ nivel }}. Requer atencao.");
     }
 
-    private static IEnumerable<RotinaNotificacao> BuildDefaultRotinas()
+    public static IEnumerable<RotinaNotificacao> BuildDefaultRotinas()
     {
         var rotinaCobranca = RotinaNotificacao.Criar(
             codigo: "assinatura_expirando_global",
@@ -791,6 +802,11 @@ public static class NotificacoesGlobaisSeed
             CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
         yield return MakeRotina("avaliacao_solicitada_global", "Pedido de Avaliação — 30 min após a entrega",
             TipoEventoNotificacao.AvaliacaoSolicitada, "avaliacao_whatsapp_v1",
+            CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
+
+        // ===== Reembolso da ocorrencia (S27, #1292): transacional, so WhatsApp. Rollback: Ativa=false. =====
+        yield return MakeRotina("reembolso_efetuado_global", "Reembolso Efetuado — Aviso ao Cliente",
+            TipoEventoNotificacao.ReembolsoEfetuado, "reembolso_efetuado_whatsapp_v1",
             CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
     }
 

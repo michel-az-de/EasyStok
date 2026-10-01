@@ -71,6 +71,17 @@ export const NAO_LIGADAS = {
 
 export const textoNaoLigado = (rotulo) => `${rotulo}: ainda não ligado nesta versão.`
 
+// Variações do `enviar` (ligado só para texto livre) que a API ainda não tem (#1287): modelo
+// aprovado da Meta e mensagem automática disparada pela biblioteca. Mandar como texto livre
+// assumiria a conversa e cairia no 409 fora da janela, que é justamente onde o modelo serve.
+export const ENVIOS_NAO_LIGADOS = {
+  modelo: 'Modelo aprovado',
+  automatica: 'Mensagem automática pela biblioteca',
+}
+
+export const envioNaoLigado = (opcoes = {}) =>
+  Object.entries(ENVIOS_NAO_LIGADOS).find(([chave]) => opcoes[chave])?.[1] ?? null
+
 // Cada não ligada vira um aviso na faixa, sem despacho local e sem chamada à API.
 export function criarAvisosNaoLigadas(despachar) {
   return Object.fromEntries(Object.entries(NAO_LIGADAS).map(([nome, rotulo]) => [

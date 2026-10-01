@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.Storefront.Aprovacao;
 using EasyStock.Application.UseCases.Storefront.Aprovacao.Exceptions;
 using Swashbuckle.AspNetCore.Annotations;
@@ -85,19 +86,21 @@ public sealed class AprovacaoPedidoController(
 
     /// <summary>
     /// Recusa o pedido — transição <c>AguardandoAprovacaoBaba → Cancelado</c>
-    /// com <c>SELECT FOR UPDATE</c> + 3 eventos Outbox (cancelado, refund, notificação).
+    /// com <c>SELECT FOR UPDATE</c>, estorno do pagamento já feito, vaga liberada e <c>pedido.mudou_status</c>
+    /// no Outbox (#1289). Estorno recusado pelo Mercado Pago → 502 e o pedido continua aguardando.
     /// </summary>
     [SwaggerOperation(
         Summary = "Recusar pedido storefront",
         Description = "Lock pessimista no pedido + transição AguardandoAprovacaoBaba → Cancelado. " +
-                      "Enfileira PedidoCanceladoEvent (libera vaga), EstornarPagamentoAutomaticoEvent " +
-                      "(refund MP via dispatcher TASK-EZ-APROVAR-002) e NotificarClientePagamentoRecusadoEvent.")]
+                      "Estorna na hora a cobrança paga no Mercado Pago (chave idempotente), libera a vaga, " +
+                      "enfileira pedido.mudou_status e avisa o cliente na conversa. Estorno recusado: 502.")]
     [ProducesResponseType(typeof(ApiResponse<RecusarPedidoStorefrontResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(StatusCodes.Status502BadGateway)]
     [HttpPost("{id:guid}/recusar")]
     public async Task<IActionResult> Recusar(
         [FromRoute] Guid id,
@@ -137,6 +140,14 @@ public sealed class AprovacaoPedidoController(
         catch (PedidoJaResolvidoException ex)
         {
             return PedidoJaResolvido(ex);
+        }
+        catch (EstornoAutomaticoFalhouException)
+        {
+            // #1289: sem estorno nada foi gravado; a dona tenta de novo (mesma chave, sem estorno em dobro).
+            return StatusCode(StatusCodes.Status502BadGateway, new ApiErrorResponse(new ApiError(
+                "ESTORNO_NAO_CONCLUIDO",
+                "O Mercado Pago não aceitou o estorno do pagamento. O pedido continua aguardando a sua decisão; tente recusar de novo.",
+                null, null)));
         }
     }
 

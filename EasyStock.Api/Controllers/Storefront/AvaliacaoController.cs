@@ -17,6 +17,7 @@ namespace EasyStock.Api.Controllers.Storefront;
 [SwaggerTag("Storefront Avaliacao")]
 [ApiController]
 [AllowAnonymous]
+[TenantDoStorefront]
 public sealed class AvaliacaoController(
     AbrirPaginaAvaliacaoUseCase abrirUseCase,
     CriarAvaliacaoPedidoUseCase criarUseCase,

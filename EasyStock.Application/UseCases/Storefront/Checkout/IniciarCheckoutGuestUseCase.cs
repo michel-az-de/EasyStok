@@ -25,8 +25,8 @@ namespace EasyStock.Application.UseCases.Storefront.Checkout;
 /// <para>
 /// O que e so do guest: Cliente resolvido por <c>telefoneHash</c> em vez de cookie de sessao,
 /// snapshot de nome e telefone no pedido, endereco (CEP e numero) nas observacoes e token de
-/// acompanhamento sem login (#681). CEP fora da area e recusado como no logado: sem zona nao ha
-/// frete para cobrar.
+/// acompanhamento sem login (#681). CEP fora da area (zona ou raio) e recusado como no logado: sem
+/// frete cotado nao ha o que cobrar. Cliente bloqueado e recusado antes da vaga (#1291).
 /// </para>
 /// </summary>
 public sealed class IniciarCheckoutGuestUseCase(
@@ -75,7 +75,11 @@ public sealed class IniciarCheckoutGuestUseCase(
         // ── Resolver/criar Cliente por telefoneHash ──────────────────────
         var (cliente, clienteNovo) = await ResolverClienteAsync(storefront.EmpresaId, nome, telefoneE164, cep, ct);
 
-        // ── Fases 1 e 2: pedido, frete da zona e vaga (S10) ──────────────
+        // #1291: o bloqueio vale em todos os canais (S24); nada de vaga ocupada nem pedido.
+        if (cliente.Bloqueado)
+            throw new ClienteBloqueadoException(cliente.Id);
+
+        // ── Fases 1 e 2: pedido, frete cotado e vaga (S10) ───────────────
         var reservado = await checkoutCore.CriarPedidoComReservaAsync(
             new CheckoutCoreInput(
                 ClienteId: cliente.Id,
@@ -85,7 +89,8 @@ public sealed class IniciarCheckoutGuestUseCase(
                 Cep: cep,
                 Origem: OrigemPedido.StorefrontGuest,
                 Slug: input.Slug,
-                Observacoes: MontarObservacoes(input.Observacoes, cep, input.Numero)),
+                Observacoes: MontarObservacoes(input.Observacoes, cep, input.Numero),
+                Numero: input.Numero),
             ct);
 
         var pedido = reservado.Pedido;

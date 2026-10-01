@@ -214,5 +214,34 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    /// <summary>
+    /// #1259: a requisição do site é anônima. Sem o tenant fixado pelo slug, a sessão recém-criada
+    /// não era encontrada e "meus pedidos" devolvia 401 logo depois do login.
+    /// </summary>
+    [SkippableFact]
+    public async Task ValidarOtp_CookieDaSessao_AbreMeusPedidos()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+
+        await using var factory = CriarFactory();
+        await SeedDadosAsync(factory.Services, BCrypt.Net.BCrypt.HashPassword(CodigoValido));
+
+        using var client = factory.CreateClient();
+        var login = await client.PostAsJsonAsync(
+            $"/api/storefront/{SlugTeste}/auth/validar-otp",
+            new { Telefone = TelefoneE164, Codigo = CodigoValido });
+        login.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var cookie = login.Headers.GetValues("Set-Cookie")
+            .First(c => c.StartsWith("__Host-cdb_session=", StringComparison.Ordinal))
+            .Split(';')[0];
+
+        using var pedidos = new HttpRequestMessage(HttpMethod.Get, $"/api/storefront/{SlugTeste}/pedidos");
+        pedidos.Headers.Add("Cookie", cookie);
+        var response = await client.SendAsync(pedidos);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "a sessão criada no login precisa valer na requisição seguinte");
+    }
+
     private sealed record ValidarOtpResponseDto(string TelefoneOfuscado, string PrimeiroNome);
 }

@@ -8,6 +8,13 @@ namespace EasyStock.Application.Ports.Output.Atendimento;
 public interface IRemetenteWhatsApp
 {
     /// <summary>
+    /// <c>true</c> quando há empresa corrente. Com tenant e sem número vinculado o envio falha: o
+    /// número global só serve a chamadas sem tenant (diagnóstico), nunca ao cliente de outra empresa.
+    /// </summary>
+    bool HaTenantCorrente { get; }
+
+
+    /// <summary>
     /// <c>phone_number_id</c> da empresa corrente, ou <c>null</c> quando não há tenant ou a
     /// empresa ainda não tem número vinculado (o cliente decide o fallback).
     /// </summary>

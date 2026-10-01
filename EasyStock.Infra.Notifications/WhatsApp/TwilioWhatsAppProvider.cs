@@ -52,7 +52,7 @@ public sealed class TwilioWhatsAppProvider(
         catch (Exception ex)
         {
             sw.Stop();
-            logger.LogError(ex, "Falha Twilio WhatsApp para {Destinatario}", mensagem.Destinatario);
+            logger.LogError(ex, "Falha Twilio WhatsApp outbox={OutboxId}", mensagem.OutboxId); // sem telefone: LGPD (#1292)
             return new ResultadoEnvio(Sucesso: false, ProviderUsado: "twilio",
                 ErroDetalhado: ex.Message, DuracaoMs: sw.ElapsedMilliseconds);
         }

@@ -1,8 +1,15 @@
 using System.Diagnostics;
-using EasyStock.Application.Events.Storefront;
+using EasyStock.Application.Events.Pedidos;
+using EasyStock.Application.Events.Storefront.Handlers;
 using EasyStock.Application.Ports.Output.Integration;
+using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.Storefront.Aprovacao.Exceptions;
+using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Events.Storefront;
 using EasyStock.Domain.Sales;
 using PedidoEntity = EasyStock.Domain.Entities.Pedido;
@@ -10,7 +17,7 @@ using PedidoEntity = EasyStock.Domain.Entities.Pedido;
 namespace EasyStock.Application.UseCases.Storefront.Aprovacao;
 
 /// <summary>
-/// Use case <strong>Recusar Pedido Storefront</strong> (TASK-EZ-APROVAR-001, Fase 6 do plano v8.0).
+/// Use case <strong>Recusar Pedido Storefront</strong> (TASK-EZ-APROVAR-001, Fase 6 do plano v8.0; #1289).
 ///
 /// <para>
 /// Fluxo (single transaction via <see cref="IUnitOfWork.ExecuteInTransactionAsync"/>):
@@ -20,19 +27,25 @@ namespace EasyStock.Application.UseCases.Storefront.Aprovacao;
 ///   <item>Valida tenant — mismatch → <see cref="PedidoNaoEncontradoException"/> (404).</item>
 ///   <item>Valida status atual == <see cref="StatusPedido.AguardandoAprovacaoBaba"/>.</item>
 ///   <item>
+///     #1289: estorna na hora cada cobrança <c>Paga</c> do Mercado Pago (pedido <c>RequerAprovacao</c> já
+///     pago) com a chave <c>recusa-{pedido}-{pagamento}</c> e marca a cobrança <c>Estornada</c>. Estorno
+///     recusado lança <see cref="EstornoAutomaticoFalhouException"/> antes de qualquer mudança: o pedido
+///     continua aguardando a dona e a nova tentativa repete a mesma chave (sem estorno em dobro).
+///   </item>
+///   <item>
 ///     Atualiza Pedido: status = <see cref="StatusPedido.Cancelado"/>, <c>CanceladoEm</c>,
 ///     <c>RecusadoEm</c>, <c>RecusadoPorUsuarioId</c>, <c>MotivoRecusa</c>, <c>MensagemRecusaCliente</c>.
 ///   </item>
-///   <item>
-///     Enfileira <strong>3 eventos</strong> no Outbox (MESMA TX):
-///     <list type="bullet">
-///       <item><see cref="PedidoCanceladoEvent"/> — handler <c>LiberarVagaOnPedidoCanceladoHandler</c> libera vaga.</item>
-///       <item><see cref="EstornarPagamentoAutomaticoEvent"/> — dispatcher MP (TASK-EZ-APROVAR-002) chama refund.</item>
-///       <item><see cref="NotificarClientePagamentoRecusadoEvent"/> — handler WhatsApp envia mensagem.</item>
-///     </list>
-///   </item>
-///   <item>Commit transacional.</item>
+///   <item>Libera a vaga pelo <see cref="LiberarVagaOnPedidoCanceladoHandler"/> (mesmo uso do job de cobrança).</item>
+///   <item><c>pedido.mudou_status</c> no Outbox (MESMA TX) e trilha <c>recusado_storefront</c>.</item>
+///   <item>Commit; depois dele, aviso best-effort na conversa da cobrança paga.</item>
 /// </list>
+///
+/// <para>
+/// Antes do #1289 a recusa só enfileirava <c>storefront.pedido.cancelado</c>,
+/// <c>storefront.pagamento.estorno_solicitado</c> e <c>storefront.pedido.recusado_notificar_cliente</c>, que
+/// nunca tiveram handler: o dinheiro ficava retido e a vaga presa.
+/// </para>
 ///
 /// <para>
 /// <strong>Validação de motivo</strong> fica no controller (parse + 422); use case
@@ -41,11 +54,22 @@ namespace EasyStock.Application.UseCases.Storefront.Aprovacao;
 /// </summary>
 public sealed class RecusarPedidoStorefrontUseCase(
     IPedidoStorefrontRepository pedidoRepository,
+    ICobrancaPedidoRepository cobrancaRepository,
+    IEstornoPedidoGateway estorno,
+    LiberarVagaOnPedidoCanceladoHandler liberarVaga,
+    AvisoCobrancaConversa aviso,
     IPublicadorEventoIntegracao publicadorEventos,
     IUnitOfWork unitOfWork,
     ILogger<RecusarPedidoStorefrontUseCase> logger)
 {
     private const int MensagemClienteMaxChars = 280;
+    private const string Origem = "storefront";
+
+    /// <summary>Valor de <see cref="RefundEnfileirado.Evento"/> quando o pagamento foi estornado na recusa.</summary>
+    public const string RefundEstornado = "estorno_mercadopago";
+
+    /// <summary>Valor de <see cref="RefundEnfileirado.Evento"/> quando não havia pagamento a devolver.</summary>
+    public const string RefundSemPagamento = "sem_pagamento";
 
     public async Task<RecusarPedidoStorefrontResult> ExecuteAsync(
         RecusarPedidoStorefrontInput input,
@@ -73,8 +97,12 @@ public sealed class RecusarPedidoStorefrontUseCase(
         var sw = Stopwatch.StartNew();
         var motivoCanonical = input.Motivo.ToCanonicalString();
 
-        return await unitOfWork.ExecuteInTransactionAsync(async innerCt =>
+        // Conversa a avisar depois do commit; reatribuída a cada tentativa da transação.
+        Guid? conversaAviso = null;
+        var resultado = await unitOfWork.ExecuteInTransactionAsync(async innerCt =>
         {
+            conversaAviso = null;
+
             // 1. SELECT FOR UPDATE.
             var pedido = await pedidoRepository.GetForUpdateAsync(input.PedidoId, innerCt);
 
@@ -103,8 +131,13 @@ public sealed class RecusarPedidoStorefrontUseCase(
                     resolvidoEm);
             }
 
-            // 4. Aplicar transição + audit trail.
+            // 4. #1289: devolve o dinheiro antes de mudar qualquer coisa.
             var agora = DateTime.UtcNow;
+            var estornadas = await EstornarCobrancasPagasAsync(pedido, motivoCanonical, agora, innerCt);
+            conversaAviso = estornadas.Select(c => c.ConversaId).FirstOrDefault(c => c is not null);
+
+            // 5. Aplicar transição + audit trail.
+            var statusAntigo = pedido.Status;
             pedido.Status = StatusPedidoMapper.Cancelado;
             pedido.CanceladoEm = agora;
             pedido.RecusadoEm = agora;
@@ -114,62 +147,27 @@ public sealed class RecusarPedidoStorefrontUseCase(
             pedido.AlteradoEm = agora;
             await pedidoRepository.UpdateAsync(pedido, innerCt);
 
-            // 5. Outbox — 3 eventos na MESMA TX.
+            // 6. Vaga liberada na mesma transação (idempotente).
+            await liberarVaga.HandleAsync(
+                new PedidoCanceladoEvent(pedido.Id, Guid.Empty, $"recusado_baba: {motivoCanonical}"), innerCt);
 
-            // 5.1. PedidoCanceladoEvent (handler LiberarVaga libera VagaOcupada, idempotente).
-            var canceladoEvt = new PedidoCanceladoEvent(
-                PedidoId: pedido.Id,
-                StorefrontId: Guid.Empty, // não rastreamos StorefrontId no Pedido base; handler usa só PedidoId.
-                Motivo: $"recusado_baba: {motivoCanonical}");
+            // 7. Outbox: o evento de status que a esteira (log, automações, avisos) já consome.
             await publicadorEventos.PublicarAsync(
                 empresaId: pedido.EmpresaId,
-                tipoEvento: "storefront.pedido.cancelado",
+                tipoEvento: "pedido.mudou_status",
                 aggregateType: "pedido",
                 aggregateId: pedido.Id,
-                payload: canceladoEvt,
+                payload: new PedidoMudouStatusEvent(pedido.Id, pedido.EmpresaId, pedido.LojaId, statusAntigo,
+                    pedido.Status, Origem, input.UsuarioId, input.UsuarioNome, agora),
                 correlationId: pedido.Id.ToString(),
                 ct: innerCt);
 
-            // 5.2. EstornarPagamentoAutomaticoEvent (refund MP — TASK-EZ-APROVAR-002 dispatcher).
-            var refundEvt = new EstornarPagamentoAutomaticoEvent(
-                PedidoId: pedido.Id,
-                EmpresaId: pedido.EmpresaId,
-                ValorTotal: pedido.Total.Valor,
-                Motivo: motivoCanonical,
-                SolicitadoEm: agora);
-            await publicadorEventos.PublicarAsync(
-                empresaId: pedido.EmpresaId,
-                tipoEvento: "storefront.pagamento.estorno_solicitado",
-                aggregateType: "pedido",
-                aggregateId: pedido.Id,
-                payload: refundEvt,
-                correlationId: pedido.Id.ToString(),
-                ct: innerCt);
-
-            // 5.3. NotificarClientePagamentoRecusadoEvent.
-            var notificacao = new NotificarClientePagamentoRecusadoEvent(
-                PedidoId: pedido.Id,
-                EmpresaId: pedido.EmpresaId,
-                ClienteId: pedido.ClienteId,
-                ClienteNome: pedido.ClienteNome,
-                ClienteTelefone: pedido.ClienteTelefone,
-                Motivo: motivoCanonical,
-                MensagemCliente: input.MensagemCliente,
-                RecusadoEm: agora);
-            await publicadorEventos.PublicarAsync(
-                empresaId: pedido.EmpresaId,
-                tipoEvento: "storefront.pedido.recusado_notificar_cliente",
-                aggregateType: "pedido",
-                aggregateId: pedido.Id,
-                payload: notificacao,
-                correlationId: pedido.Id.ToString(),
-                ct: innerCt);
-
+            // 8. Trilha por último: o flush dela grava cobrança, vaga e outbox juntos.
             await PedidoEventoRecusado(pedido, input, motivoCanonical, agora, innerCt);
 
             logger.LogInformation(
-                "Recusar pedido sucesso pedidoId={PedidoId} empresaId={EmpresaId} usuarioId={UsuarioId} action=recusar motivo={Motivo} durationMs={Ms}",
-                pedido.Id, pedido.EmpresaId, input.UsuarioId, motivoCanonical, sw.ElapsedMilliseconds);
+                "Recusar pedido sucesso pedidoId={PedidoId} empresaId={EmpresaId} usuarioId={UsuarioId} action=recusar motivo={Motivo} estornos={Estornos} durationMs={Ms}",
+                pedido.Id, pedido.EmpresaId, input.UsuarioId, motivoCanonical, estornadas.Count, sw.ElapsedMilliseconds);
 
             return new RecusarPedidoStorefrontResult(
                 PedidoId: pedido.Id,
@@ -178,11 +176,54 @@ public sealed class RecusarPedidoStorefrontUseCase(
                 RecusadoPor: input.UsuarioNome ?? input.UsuarioId.ToString(),
                 Motivo: motivoCanonical,
                 VagaLiberada: true,
-                Refund: new RefundEnfileirado(true, nameof(EstornarPagamentoAutomaticoEvent)),
-                NotificacaoCliente: new NotificacaoCliente(
-                    Enfileirada: true,
-                    Evento: nameof(NotificarClientePagamentoRecusadoEvent)));
+                Refund: new RefundEnfileirado(
+                    estornadas.Count > 0,
+                    estornadas.Count > 0 ? RefundEstornado : RefundSemPagamento),
+                NotificacaoCliente: new NotificacaoCliente(Enfileirada: false, Evento: nameof(AvisoCobrancaConversa)));
         }, ct);
+
+        // Aviso ao cliente só depois do commit; best-effort, não desfaz a recusa se falhar.
+        if (conversaAviso is { } conversaId)
+        {
+            var enviado = await aviso.EnviarAsync(input.EmpresaId, conversaId,
+                AvisoCobrancaConversa.TextoPedidoRecusadoEstornado(input.MensagemCliente), DateTime.UtcNow, ct);
+            resultado = resultado with { NotificacaoCliente = resultado.NotificacaoCliente with { Enfileirada = enviado } };
+        }
+
+        return resultado;
+    }
+
+    /// <summary>
+    /// Estorna no gateway cada cobrança paga do Mercado Pago e a marca <c>Estornada</c>. A chave de idempotência
+    /// é estável por pedido e pagamento: repetir a recusa (retry da transação, nova tentativa da dona depois de
+    /// uma falha) não devolve duas vezes.
+    /// </summary>
+    private async Task<IReadOnlyList<CobrancaPedido>> EstornarCobrancasPagasAsync(
+        PedidoEntity pedido, string motivoCanonical, DateTime agora, CancellationToken ct)
+    {
+        var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(pedido.EmpresaId, pedido.Id, ct);
+        var pagas = cobrancas
+            .Where(c => c.Status == StatusCobrancaPedido.Paga && c.EhOnline && !string.IsNullOrWhiteSpace(c.PagamentoExternoId))
+            .ToList();
+
+        foreach (var paga in pagas)
+        {
+            var pagamentoId = paga.PagamentoExternoId!;
+            var valor = paga.ValorPago ?? paga.Valor;
+            var r = await estorno.EstornarAsync(pagamentoId, valor, $"recusa-{pedido.Id}-{pagamentoId}", ct);
+            if (!r.Sucesso)
+            {
+                logger.LogWarning("Recusar pedido: estorno recusado pedidoId={PedidoId} pagamento={Pagamento} erro={Erro}",
+                    pedido.Id, pagamentoId, r.Erro);
+                throw new EstornoAutomaticoFalhouException(pagamentoId, r.Erro);
+            }
+
+            paga.MarcarEstornada(
+                $"estorno_recusa: pagamento {pagamentoId} de {valor.ToString("F2", Cultura.PtBr)} devolvido na recusa " +
+                $"do pedido ({motivoCanonical}); estorno {r.IdSolicitacao}", agora);
+        }
+
+        return pagas;
     }
 
     private async Task PedidoEventoRecusado(
@@ -206,7 +247,7 @@ public sealed class RecusarPedidoStorefrontUseCase(
             Detalhes = detalhes,
             UsuarioId = input.UsuarioId,
             UsuarioNome = input.UsuarioNome,
-            Origem = "storefront",
+            Origem = Origem,
             OcorridoEm = quando,
         };
         await pedidoRepository.AddEventoAsync(evento, ct);

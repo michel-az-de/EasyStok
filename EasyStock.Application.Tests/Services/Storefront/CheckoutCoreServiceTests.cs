@@ -1,11 +1,13 @@
+using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.Tests.Helpers;
+using EasyStock.Application.UseCases.Storefront.Frete;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
-using EasyStock.Application.Tests.Helpers;
 using EasyStock.TestHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute.ExceptionExtensions;
@@ -32,6 +34,10 @@ public class CheckoutCoreServiceTests
         public IJanelaEntregaRepository JanelaRepo { get; } = Substitute.For<IJanelaEntregaRepository>();
         public IBloqueioEntregaRepository BloqueioRepo { get; } = Substitute.For<IBloqueioEntregaRepository>();
         public IFreteZonaRepository FreteZonaRepo { get; } = Substitute.For<IFreteZonaRepository>();
+
+        /// <summary>Geocode e rota do frete por raio (#1291); sem config de raio na loja, nem são chamados.</summary>
+        public IGeocodingClient Geocoding { get; } = Substitute.For<IGeocodingClient>();
+        public IRotaClient Rotas { get; } = Substitute.For<IRotaClient>();
         public IVagaOcupadaRepository VagaRepo { get; } = Substitute.For<IVagaOcupadaRepository>();
         public IPedidoStorefrontRepository PedidoRepo { get; } = Substitute.For<IPedidoStorefrontRepository>();
         public IExpedienteLojaRepository ExpedienteRepo { get; } = Substitute.For<IExpedienteLojaRepository>();
@@ -55,6 +61,11 @@ public class CheckoutCoreServiceTests
             Substitute.For<EasyStock.Application.Ports.Output.Persistence.Campanhas.ICampanhaRepository>();
 
         public EasyStock.Application.Services.Campanhas.AtribuicaoPedidoCampanha Atribuicao() => new(CampanhaRepo, Relogio);
+
+        /// <summary>A mesma cotação do site (<c>POST /frete/calcular</c>), que o checkout passa a cobrar (#1291).</summary>
+        public CalcularFreteUseCase Frete() => new(
+            StorefrontRepo, FreteZonaRepo, Substitute.For<ICepLookupClient>(), Geocoding, Rotas,
+            NullLogger<CalcularFreteUseCase>.Instance);
 
         public Cenario()
         {
@@ -98,6 +109,7 @@ public class CheckoutCoreServiceTests
                 cepFim: "01999999");
             FreteZonaRepo.GetAtivasDoStorefrontOrdenadasAsync(Storefront.Id, Arg.Any<CancellationToken>())
                 .Returns(new List<FreteZona> { zona });
+            FreteZonaRepo.BuscarZonaPelasAtivas();
 
             VagaRepo.OcuparAsync(CheckoutCoreServiceTests.JanelaId, CheckoutCoreServiceTests.DataEntrega,
                     Arg.Any<Guid>(), Arg.Any<CancellationToken>())
@@ -113,7 +125,7 @@ public class CheckoutCoreServiceTests
         }
 
         public CheckoutCoreService Servico() => new(
-            StorefrontRepo, CardapioRepo, JanelaRepo, BloqueioRepo, FreteZonaRepo, VagaRepo, PedidoRepo,
+            StorefrontRepo, CardapioRepo, JanelaRepo, BloqueioRepo, Frete(), VagaRepo, PedidoRepo,
             ExpedienteRepo, NullLogger<CheckoutCoreService>.Instance, Relogio);
 
         /// <summary>
@@ -237,5 +249,50 @@ public class CheckoutCoreServiceTests
         c.PedidosAdicionados.Should().BeEmpty("item esgotado não pode virar pedido");
         await c.VagaRepo.DidNotReceive().OcuparAsync(
             Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// Cozinha em (0,0): no equador, geocode em (0; 0,025) com rota medida de 1.800 m cai na faixa até 2 km
+    /// (R$ 15), diferente da zona do CEP (R$ 5).
+    /// </summary>
+    private static void ConfigurarRaio(Cenario c)
+    {
+        c.Storefront.ConfigurarFreteRaio(0, 0, 1.4, 500, 5000,
+            """[{"id":"ate-2km","ateMetros":2000,"valorCentavos":1500},{"id":"ate-5km","ateMetros":5000,"valorCentavos":2500}]""");
+        c.Geocoding.GeocodificarAsync(Arg.Any<GeocodeQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new GeocodeResultado(0, 0.025, Confiavel: true));
+        c.Rotas.MedirAsync(Arg.Any<RotaQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new RotaResultado(DistanciaMetros: 1800, DuracaoSegundos: 720));
+    }
+
+    [Fact]
+    public async Task FreteCobradoEhOMesmoDaCotacao_QuandoALojaTemRaio()
+    {
+        // #1291: a cotação usava o raio e o checkout cobrava a zona; a preferência saía com outro valor.
+        var c = new Cenario();
+        ConfigurarRaio(c);
+        var cotado = await c.Frete().ExecuteAsync(new CalcularFreteInput("casa-da-baba", Cep));
+
+        var reservado = await c.Servico().CriarPedidoComReservaAsync(Input(c));
+
+        cotado.Valor.Should().Be(1500, "pré-condição: o raio dá valor diferente da zona de R$ 5");
+        reservado.ItemFrete.PrecoUnitario.Should().Be(cotado.Valor / 100m);
+        reservado.ItemFrete.Subtotal.Should().Be(15m);
+        reservado.Total.Should().Be(35m, "2 x R$ 10 + frete de R$ 15");
+    }
+
+    [Fact]
+    public async Task LojaSoComRaio_FechaOCheckout()
+    {
+        // #1291: sem zona cadastrada, todo checkout de loja com raio dava 422 de CEP sem cobertura.
+        var c = new Cenario();
+        ConfigurarRaio(c);
+        c.FreteZonaRepo.GetAtivasDoStorefrontOrdenadasAsync(c.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new List<FreteZona>());
+
+        var reservado = await c.Servico().CriarPedidoComReservaAsync(Input(c));
+
+        reservado.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+        reservado.ItemFrete.PrecoUnitario.Should().Be(15m);
     }
 }

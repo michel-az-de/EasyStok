@@ -80,6 +80,22 @@ public class MetaCloudWhatsAppProviderTests
     }
 
     [Fact]
+    public async Task FalhaAoGravarHistoricoDepoisDoEnvioNaoViraReenvio()
+    {
+        // #1290: a Meta já entregou. Devolver falha faria o outbox reenviar a mesma mensagem ao cliente,
+        // e o pendente no change tracker derrubaria o commit seguinte do dispatcher no mesmo escopo.
+        ConversaComEntradaHa(TimeSpan.FromHours(1));
+        _canal.EnviarTextoAsync(Telefone, "Seu pedido #123 foi pago.", Arg.Any<CancellationToken>()).Returns("wamid.entregue");
+        _uow.CommitAsync().ThrowsAsync(new InvalidOperationException("banco indisponível"));
+
+        var resultado = await Provider().EnviarAsync(Mensagem());
+
+        resultado.Sucesso.Should().BeTrue();
+        resultado.FalhaPermanente.Should().BeFalse();
+        _uow.Received(1).DescartarAlteracoesPendentes();
+    }
+
+    [Fact]
     public async Task ConversaAssumidaAindaRecebeAvisoDeStatus()
     {
         // S13 (RN-05): a dona assumir a conversa silencia o agente, não o aviso de status do pedido.

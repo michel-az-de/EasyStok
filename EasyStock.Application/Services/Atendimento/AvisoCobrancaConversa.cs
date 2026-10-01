@@ -37,6 +37,16 @@ public sealed class AvisoCobrancaConversa(
         "Recebemos seu pagamento, mas o pedido já tinha sido cancelado porque o prazo para pagar acabou. " +
         "Já devolvemos o valor pelo Mercado Pago. Se ainda quiser, é só pedir de novo por aqui.";
 
+    /// <summary>#1289: segundo pagamento do mesmo pedido, devolvido automaticamente.</summary>
+    public const string TextoPagamentoDuplicadoEstornado =
+        "Recebemos um segundo pagamento para o mesmo pedido e já devolvemos esse valor pelo Mercado Pago. " +
+        "Seu pedido segue normalmente.";
+
+    /// <summary>#1289: a dona recusou o pedido já pago; o valor foi devolvido na hora.</summary>
+    public static string TextoPedidoRecusadoEstornado(string? mensagemDaLoja) =>
+        "Não vamos conseguir atender seu pedido desta vez e já devolvemos o valor pelo Mercado Pago." +
+        (string.IsNullOrWhiteSpace(mensagemDaLoja) ? string.Empty : $" {mensagemDaLoja.Trim()}");
+
     public const string TextoPedidoCancelado =
         "Seu pedido foi cancelado porque o pagamento não foi confirmado a tempo. Se ainda quiser, é só pedir de novo por aqui.";
 

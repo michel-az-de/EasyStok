@@ -23,6 +23,7 @@ namespace EasyStock.Api.Controllers.Storefront;
 [ApiController]
 [Route("api/storefront/{slug}/auth")]
 [AllowAnonymous]
+[TenantDoStorefront]
 public sealed class AuthController(
     SolicitarOtpUseCase solicitarOtpUseCase,
     ValidarOtpUseCase validarOtpUseCase,

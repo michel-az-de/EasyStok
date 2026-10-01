@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Infra.Integrations.Geocoding;
+using EasyStock.Infra.Integrations.Rotas;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -45,12 +46,19 @@ public static class GeocodingServiceCollectionExtensions
 
     public const string GoogleDefaultBaseUrl = "https://maps.googleapis.com/maps/api/";
 
+    public const string GoogleRoutesBaseUrl = "https://routes.googleapis.com/";
+
     public static IServiceCollection AddEasyStockGeocoding(
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        if (string.Equals(configuration[ProviderKey], "google", StringComparison.OrdinalIgnoreCase))
-            return AddGoogle(services, configuration);
+        var google = string.Equals(configuration[ProviderKey], "google", StringComparison.OrdinalIgnoreCase);
+        var googleKey = google ? ResolveGoogleKey(configuration) : null;
+
+        AddRotas(services, googleKey);
+
+        if (google)
+            return AddGoogle(services, googleKey);
 
         var enabled = ResolveEnabled(configuration);
         if (!enabled)
@@ -75,13 +83,9 @@ public static class GeocodingServiceCollectionExtensions
     /// <summary>
     /// Google sem chave cai em NoOp: o frete continua pela zona e nada bate na rede.
     /// </summary>
-    private static IServiceCollection AddGoogle(IServiceCollection services, IConfiguration configuration)
+    private static IServiceCollection AddGoogle(IServiceCollection services, string? apiKey)
     {
-        var apiKey = configuration[GoogleApiKeyKey];
-        if (string.IsNullOrWhiteSpace(apiKey))
-            apiKey = Environment.GetEnvironmentVariable(GoogleApiKeyEnvVar);
-
-        if (string.IsNullOrWhiteSpace(apiKey))
+        if (apiKey is null)
         {
             services.AddScoped<IGeocodingClient, NoOpGeocodingClient>();
             return services;
@@ -98,6 +102,37 @@ public static class GeocodingServiceCollectionExtensions
             sp.GetRequiredService<ILogger<GoogleGeocodingClient>>()));
 
         return services;
+    }
+
+    /// <summary>
+    /// Rota real (Routes API, issue #1274) usa a mesma chave do geocoding Google.
+    /// Sem Google completo, NoOp: o frete segue com <c>haversine × FatorRota</c>.
+    /// </summary>
+    private static void AddRotas(IServiceCollection services, string? googleKey)
+    {
+        if (googleKey is null)
+        {
+            services.AddScoped<IRotaClient, NoOpRotaClient>();
+            return;
+        }
+
+        services.AddHttpClient(nameof(GoogleRotasClient), client =>
+        {
+            client.BaseAddress = new Uri(GoogleRoutesBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(2);
+        });
+        services.AddScoped<IRotaClient>(sp => new GoogleRotasClient(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(GoogleRotasClient)),
+            googleKey,
+            sp.GetRequiredService<ILogger<GoogleRotasClient>>()));
+    }
+
+    private static string? ResolveGoogleKey(IConfiguration configuration)
+    {
+        var apiKey = configuration[GoogleApiKeyKey];
+        if (string.IsNullOrWhiteSpace(apiKey))
+            apiKey = Environment.GetEnvironmentVariable(GoogleApiKeyEnvVar);
+        return string.IsNullOrWhiteSpace(apiKey) ? null : apiKey;
     }
 
     private static bool ResolveEnabled(IConfiguration configuration)

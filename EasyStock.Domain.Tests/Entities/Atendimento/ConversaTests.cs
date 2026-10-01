@@ -116,6 +116,29 @@ public class ConversaTests
         act.Should().Throw<RegraDeDominioVioladaException>();
     }
 
+    [Theory]
+    [InlineData(CanalConversa.Instagram, "17841400000000001")]
+    [InlineData(CanalConversa.Messenger, "6543210987654321")]
+    [InlineData(CanalConversa.ChatSite, "sessao-abc")]
+    public void LiberarAutomatico_EmCanalSemAgente_Lanca(CanalConversa canal, string contato)
+    {
+        // #1288: sem agente no canal, "automatico" deixaria a conversa sem ninguem e fora do lembrete.
+        var conversa = Conversa.Abrir(Empresa, contato, Agora, canal: canal);
+        conversa.Assumir(Agora.AddMinutes(1), Guid.NewGuid());
+
+        var act = () => conversa.LiberarAutomatico();
+
+        act.Should().Throw<RegraDeDominioVioladaException>();
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+        conversa.TemAgente.Should().BeFalse();
+    }
+
+    [Fact]
+    public void TemAgente_SoNoWhatsApp()
+    {
+        Nova().TemAgente.Should().BeTrue();
+    }
+
     [Fact]
     public void Encerrar_EhIdempotenteEPreservaPrimeiroCarimbo()
     {

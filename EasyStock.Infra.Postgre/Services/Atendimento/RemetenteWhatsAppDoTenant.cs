@@ -14,6 +14,8 @@ public sealed class RemetenteWhatsAppDoTenant(EasyStockDbContext dbContext) : IR
     private Guid? _tenantResolvido;
     private string? _phoneNumberId;
 
+    public bool HaTenantCorrente => dbContext.CurrentTenantId != Guid.Empty;
+
     public async Task<string?> ObterPhoneNumberIdAsync(CancellationToken ct = default)
     {
         var tenant = dbContext.CurrentTenantId;
