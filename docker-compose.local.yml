@@ -78,6 +78,10 @@ services:
       Anthropic__Enabled: "false"
       OpenAI__Enabled: "false"
       FileStorage__Provider: Local
+      # KEK das chaves de integração (F16, #1246). Opcional em Development: sem ela, salvar
+      # chave pela tela responde 503. Gerar: openssl rand -base64 32 (nunca versionar o valor).
+      EZ_CRYPTO_KEK_ID: "${EZ_CRYPTO_KEK_ID:-}"
+      EZ_CRYPTO_KEK: "${EZ_CRYPTO_KEK:-}"
       # Seed limpo — zero dados, apenas 1 admin
       SEED_DEMO_DATA: "false"
       SEED_ADMIN_EMAIL: "${SEED_ADMIN_EMAIL:-admin@easystock.local}"

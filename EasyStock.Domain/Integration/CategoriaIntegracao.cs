@@ -16,6 +16,12 @@ public enum CategoriaIntegracao
     /// <summary>Marketplaces (Mercado Livre, iFood).</summary>
     Marketplace = 3,
 
-    /// <summary>Logística e transportadoras (99Entrega, Correios).</summary>
+    /// <summary>Logística e transportadoras (Lalamove, 99Entrega, Correios).</summary>
     Logistics = 4,
+
+    /// <summary>Canais de mensagem (WhatsApp da Meta). F16, #1246.</summary>
+    Mensageria = 5,
+
+    /// <summary>Mapas e geocodificação (Google Maps). F16, #1246.</summary>
+    Mapas = 6,
 }

@@ -12,5 +12,11 @@ public enum TipoLembrete
     PagamentoSemBaixa = 2,
 
     /// <summary>Conversa assumida com o cliente esperando resposta há 10 min ou mais.</summary>
-    ClienteSemResposta = 3
+    ClienteSemResposta = 3,
+
+    /// <summary>Teste de conexão de uma integração falhou (vigia da F16, #1246).</summary>
+    IntegracaoParada = 4,
+
+    /// <summary>A chave de uma integração vence em até 7 dias (vigia da F16, #1246).</summary>
+    IntegracaoVencendo = 5
 }

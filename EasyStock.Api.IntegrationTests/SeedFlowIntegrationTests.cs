@@ -90,6 +90,9 @@ public sealed class SeedFlowIntegrationTests : IAsyncLifetime
                         ["FileStorage:Provider"] = "Local",
                         // Forca startup a rodar migrations + seeds (default em prod e false).
                         ["RunMigrationsOnStartup"] = "true",
+                        // F16 (#1246): Production nao sobe sem KEK. Gerada aqui, so vale neste teste.
+                        ["Crypto:CurrentKekId"] = "kek-teste",
+                        ["Crypto:Keks:kek-teste"] = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
                     });
                 });
             });

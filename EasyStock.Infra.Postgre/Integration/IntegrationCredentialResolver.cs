@@ -32,8 +32,9 @@ namespace EasyStock.Infra.Postgre.Integration;
 ///
 /// <para>
 /// <b>Cache</b>: payload decifrado é cacheado em <see cref="IMemoryCache"/>
-/// por 5 minutos. Caller deve invalidar (via <see cref="SalvarAsync"/>)
-/// quando rotacionar credencial.
+/// por 5 minutos. A chave do cache carrega uma geração global: salvar, desativar e
+/// rotacionar a KEK sobem a geração, e tudo o que estava em cache deixa de ser achado
+/// (F16, #1246). <see cref="IMemoryCache"/> não tem <c>Clear</c>; salvar é raro.
 /// </para>
 ///
 /// <para>
@@ -53,6 +54,13 @@ public sealed class IntegrationCredentialResolver(
     private const int TagSizeBytes = 16;
     private const int KeySizeBytes = 32; // AES-256
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
+    private const string ChaveGeracao = "credencial:geracao";
+
+    /// <summary>Contador da geração do cache, compartilhado pelo singleton do <see cref="IMemoryCache"/>.</summary>
+    private sealed class GeracaoCache
+    {
+        public long Valor;
+    }
 
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
@@ -137,12 +145,15 @@ public sealed class IntegrationCredentialResolver(
         T payload,
         Guid criadoPorUsuarioId,
         DateTime? validoAte = null,
+        string? mascara = null,
         CancellationToken ct = default) where T : class
     {
         ArgumentNullException.ThrowIfNull(payload);
 
-        var currentKekId = config["Crypto:CurrentKekId"]
-            ?? throw new InvalidOperationException("Crypto:CurrentKekId não configurado.");
+        var currentKekId = config["Crypto:CurrentKekId"];
+        if (string.IsNullOrWhiteSpace(currentKekId))
+            throw new ChaveMestraAusenteException(
+                "Chave-mestra não configurada: defina EZ_CRYPTO_KEK_ID e EZ_CRYPTO_KEK (Crypto:CurrentKekId e Crypto:Keks).");
         var key = ResolveKek(currentKekId);
 
         byte[] plaintext = JsonSerializer.SerializeToUtf8Bytes(payload, JsonOpts);
@@ -178,13 +189,30 @@ public sealed class IntegrationCredentialResolver(
             iv: iv,
             tag: tag,
             criadoPorUsuarioId: criadoPorUsuarioId,
-            validoAte: validoAte);
+            validoAte: validoAte,
+            mascara: mascara);
 
         await repo.AddAsync(nova, ct);
         await uow.CommitAsync();
 
-        // Invalida cache da chave anterior (caller pode chamar Obter logo depois).
-        cache.Remove(BuildCacheKey<T>(empresaId, providerKey, ambiente));
+        // A chave anterior pode estar em cache em qualquer tipo T: sobe a geração.
+        InvalidarCache();
+    }
+
+    public async Task<int> DesativarAsync(Guid empresaId, string providerKey, CancellationToken ct = default)
+    {
+        var ativas = await repo.ListarAtivasDoProviderAsync(empresaId, providerKey, ct);
+        foreach (var credencial in ativas)
+        {
+            credencial.Desativar();
+            await repo.UpdateAsync(credencial, ct);
+        }
+
+        if (ativas.Count > 0)
+            await uow.CommitAsync();
+
+        InvalidarCache();
+        return ativas.Count;
     }
 
     public async Task RotacionarKekAsync(string novoKekId, CancellationToken ct = default)
@@ -244,10 +272,8 @@ public sealed class IntegrationCredentialResolver(
 
             await uow.CommitAsync();
 
-            // Invalida cache inteiro — payloads decifrados continuam válidos
-            // mas re-fetch é seguro (próximo Obter recifrar com a nova KEK).
-            // IMemoryCache não tem Clear nativo; melhor usar tokens de invalidação
-            // em produção. Aqui logamos pra forçar restart do worker se necessário.
+            // Payload decifrado em cache continua válido, mas a linha mudou: re-lê.
+            InvalidarCache();
             logger.LogInformation(
                 "Rotação de KEK concluída: {Rotacionadas} credenciais re-cifradas para {NovoKekId}.",
                 rotacionadas, novoKekId);
@@ -260,11 +286,20 @@ public sealed class IntegrationCredentialResolver(
 
     // ─── Helpers internos ────────────────────────────────────────────────
 
-    private static string BuildCacheKey<T>(Guid empresaId, string providerKey, AmbienteIntegracao ambiente)
+    private string BuildCacheKey<T>(Guid empresaId, string providerKey, AmbienteIntegracao ambiente)
     {
         var key = (providerKey ?? string.Empty).Trim().ToLowerInvariant();
-        return $"credencial:{empresaId:N}:{key}:{(int)ambiente}:{typeof(T).FullName}";
+        var geracao = Interlocked.Read(ref Geracao().Valor);
+        return $"credencial:{geracao}:{empresaId:N}:{key}:{(int)ambiente}:{typeof(T).FullName}";
     }
+
+    private GeracaoCache Geracao() => cache.GetOrCreate(ChaveGeracao, entrada =>
+    {
+        entrada.Priority = CacheItemPriority.NeverRemove;
+        return new GeracaoCache();
+    })!;
+
+    private void InvalidarCache() => Interlocked.Increment(ref Geracao().Valor);
 
     /// <summary>
     /// Resolve a KEK pelo id. Lança em ausência ou tamanho inválido.
@@ -275,9 +310,9 @@ public sealed class IntegrationCredentialResolver(
         var kekBase64 = config[$"Crypto:Keks:{kekId}"];
         if (string.IsNullOrWhiteSpace(kekBase64))
         {
-            throw new InvalidOperationException(
+            throw new ChaveMestraAusenteException(
                 $"KEK '{kekId}' não configurada em Crypto:Keks. " +
-                "Em produção, garantir que env var ou Secret Manager esteja injetando.");
+                "Defina EZ_CRYPTO_KEK (ou EZ_CRYPTO_KEK_ANTERIOR, se for a KEK antiga) no .env do ambiente.");
         }
 
         byte[] key;
@@ -287,13 +322,13 @@ public sealed class IntegrationCredentialResolver(
         }
         catch (FormatException ex)
         {
-            throw new InvalidOperationException($"KEK '{kekId}' não é Base64 válido.", ex);
+            throw new ChaveMestraAusenteException($"KEK '{kekId}' não é Base64 válido.", ex);
         }
 
         if (key.Length != KeySizeBytes)
         {
             CryptographicOperations.ZeroMemory(key);
-            throw new InvalidOperationException(
+            throw new ChaveMestraAusenteException(
                 $"KEK '{kekId}' tem {key.Length} bytes; esperado {KeySizeBytes} (AES-256).");
         }
 

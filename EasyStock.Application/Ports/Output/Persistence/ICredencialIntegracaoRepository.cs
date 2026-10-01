@@ -36,6 +36,20 @@ public interface ICredencialIntegracaoRepository
         string kekId,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Ativas do provider na empresa, em qualquer ambiente (F16: a tela mostra uma por provider).
+    /// Rastreadas, para desativar ou gravar o resultado do teste.
+    /// </summary>
+    Task<IReadOnlyList<CredencialIntegracao>> ListarAtivasDoProviderAsync(
+        Guid empresaId,
+        string providerKey,
+        CancellationToken ct = default);
+
+    /// <summary>Ativas da empresa, todas as providers. Rastreadas.</summary>
+    Task<IReadOnlyList<CredencialIntegracao>> ListarAtivasDaEmpresaAsync(
+        Guid empresaId,
+        CancellationToken ct = default);
+
     Task AddAsync(CredencialIntegracao credencial, CancellationToken ct = default);
     Task UpdateAsync(CredencialIntegracao credencial, CancellationToken ct = default);
 }
