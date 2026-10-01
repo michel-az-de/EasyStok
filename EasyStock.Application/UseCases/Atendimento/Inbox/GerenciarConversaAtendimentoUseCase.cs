@@ -56,12 +56,16 @@ public sealed class GerenciarConversaAtendimentoUseCase(
                 ct);
         }, ct);
 
-    /// <summary>Terminal: a próxima mensagem do contato abre outra conversa Automatica (S05).</summary>
+    /// <summary>
+    /// Terminal: a próxima mensagem do contato abre outra conversa Automatica (S05). Idempotente também no
+    /// evento: conversa já encerrada não publica de novo (a automática de encerramento sairia 2x, #1292).
+    /// </summary>
     public Task<ConversaSituacaoResult> EncerrarAsync(AcaoConversaCommand command, CancellationToken ct = default) =>
         ExecutarAsync(command, (conversa, agora) =>
         {
+            var estavaAberta = conversa.EstaAberta;
             conversa.Encerrar(agora);
-            return publicador is null
+            return publicador is null || !estavaAberta
                 ? Task.CompletedTask
                 : publicador.PublicarAsync(command.EmpresaId, ConversaEncerradaEvent.TipoEvento, "Conversa", conversa.Id,
                     new ConversaEncerradaEvent(conversa.Id, conversa.ClienteId), ct: ct);

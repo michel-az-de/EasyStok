@@ -48,7 +48,7 @@ public class AutomacoesHandlerTests
     }
 
     private DispararAutomacaoUseCase UseCase() =>
-        new(_regras, _conversas, _expedientes, new VariaveisAtendimento(_clientes, _pedidos),
+        new(_regras, _conversas, _clientes, _expedientes, new VariaveisAtendimento(_clientes, _pedidos),
             new PoliticaEnvioCliente(_consentimentos), new ResolvedorCanal([_whats]), _uow, _relogio,
             NullLogger<DispararAutomacaoUseCase>.Instance);
 
@@ -114,6 +114,23 @@ public class AutomacoesHandlerTests
         var resultado = await UseCase().ExecuteAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PosEntrega, _conversa.Id, null, null));
 
         resultado.Should().Be(ResultadoAutomacao.Desligada);
+        await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+        _uow.CommitCount.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(GatilhoAutomacao.Encerramento)]
+    [InlineData(GatilhoAutomacao.PagamentoConfirmado)]
+    [InlineData(GatilhoAutomacao.PosEntrega)]
+    public async Task ClienteBloqueadoNaoRecebeAutomatica(GatilhoAutomacao gatilho)
+    {
+        // #1292: bloqueio vale em todos os canais e mensagens (S24), não só na primeira entrada.
+        Regra(gatilho, "Mensagem automática.");
+        _cliente.Bloquear("calote", Agora);
+
+        var resultado = await UseCase().ExecuteAsync(new DisparoAutomacao(_empresaId, gatilho, _conversa.Id, null, null));
+
+        resultado.Should().Be(ResultadoAutomacao.ClienteBloqueado);
         await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
         _uow.CommitCount.Should().Be(0);
     }
