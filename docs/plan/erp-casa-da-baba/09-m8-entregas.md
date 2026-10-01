@@ -5,7 +5,7 @@ não estava no rascunho) · Data: 2026-10-01 · Base medida: master `b713263a`.
 Plano irmão (dono de S01–S53 e F01–F18): [10-console.md](../atendimento-whatsapp/10-console.md),
 [11-console-fechamento.md](../atendimento-whatsapp/11-console-fechamento.md). Fundação:
 [01-fundacao.md](01-fundacao.md) (M0.2 rotas `#/m/entregas/painel` = `#/entregas` e
-`#/m/entregas/minhas-viagens`; M0.3 perfil Entregador; D-05 sessão de dispositivo). Este documento não
+o entregador não loga: D8-01 decidiu link por viagem, sem perfil Entregador). Este documento não
 reescreve S nem F.
 
 ## 1. Veredito
@@ -157,10 +157,10 @@ de coordenadas por parada sem geocodificar a cada cotação.
 **Problema.** O motoboy próprio recebe a viagem por mensagem solta; a dona marca "entregue" por ele no fim do
 dia (US-044 quer isso automático). `Entregador` não tem usuário (`Entregador.cs:16-26`) e nenhuma rota lê
 "a viagem deste entregador".
-**Abordagem (conforme D8-01).**
+**Abordagem (D8-01 decidido: opção A).**
 - Tela de celular, uma coluna, fonte grande: a viagem atual com as paradas na ordem, para cada uma nome, endereço do pedido (M8.3), apto, telefone (ligar e WhatsApp), faixa prometida, observação de entrega, número do dia para conferir na retirada (S53), botões "Abrir no Maps" (`RotaMaps`) e **"Entregue"** (`POST viagens/{id}/paradas/{pedidoId}/entregue`, `AtendimentoEntregasController.cs:150`). Sem preço, sem histórico do cliente (LGPD: só o necessário para entregar).
 - Opção A (link): ao "Saiu para entrega", o EasyStok gera um link da viagem com token de uso limitado, no padrão do link do cardápio da conversa (`LinkCardapioConversa`: `TokenHash`, `ExpiraEm`, `Entities/Atendimento/LinkCardapioConversa.cs:16-21`), e a dona envia ao `Entregador.Telefone` pelo WhatsApp com um toque. Rotas anônimas `GET api/entregas/viagem/{token}` e `POST .../paradas/{pedidoId}/entregue`, só da viagem do token, expiram na conclusão da viagem ou em 12 h; rate limit como o da Meta.
-- Opção B (login): `Entregador.UsuarioId` (migration), perfil Entregador da M0.3 com porta `#/m/entregas/minhas-viagens`, sessão longa pela D-05; `GET api/atendimento/viagens/minhas`.
+- Opção B (login): descartada em 01/10 (D8-01).
 - Entregue pelo entregador dispara o mesmo aviso ao cliente (S13, US-045) e a dona pode desfazer pelo painel.
 **Aceite.**
 - [ ] Entregador abre a viagem no celular de 390 px e marca a parada entregue; o painel da dona atualiza pelo SSE.
@@ -210,7 +210,7 @@ F12 paridade do painel (plano irmão) · M8.5 relatórios (independente)
 
 ## 6. Decisões pendentes do Felipe
 
-**D8-01 · Como o entregador entra na tela dele**
+**D8-01 · Como o entregador entra na tela dele: DECIDIDO (01/10), opção A (link por viagem pelo WhatsApp, sem login; não existe perfil Entregador).**
 - A) (Recomendado) Link por viagem mandado pelo WhatsApp, sem login: o entregador é terceiro (persona, `02-ESTORIAS…md:38`), troca muito, e o padrão de link com token já existe (S48). O perfil Entregador da M0.3 deixa de ser necessário.
 - B) Perfil Entregador com login e "Minhas viagens", como no diagrama do README e na matriz da M0.3.
 - C) Os dois: link agora, login para quem for fixo da casa.
