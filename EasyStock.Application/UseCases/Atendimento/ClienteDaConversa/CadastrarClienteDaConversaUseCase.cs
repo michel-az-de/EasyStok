@@ -72,6 +72,9 @@ public sealed class CadastrarClienteDaConversaUseCase(
             conversa.VincularCliente(cliente.Id);
         }
 
+        // A inbox mostra o nome do contato: passa a ser o do cadastro (o do chat do site é genérico).
+        conversa.AtualizarContatoNome(cliente.Nome);
+
         // O endereço relê o cliente do banco: o cadastro novo precisa estar gravado antes.
         await unitOfWork.CommitAsync();
 

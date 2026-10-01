@@ -187,6 +187,19 @@ public class CadastrarClienteDaConversaUseCaseTests
     }
 
     [Fact]
+    public async Task NomeDoContatoNaInboxPassaASerODoCliente()
+    {
+        var existente = new Cliente { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Maria Cadastrada", Telefone = "+5511987654321" };
+        _clientes.FindByTelefoneAsync(_empresaId, "+5511987654321").Returns(existente);
+        _clientes.GetByIdWithDetailsAsync(_empresaId, existente.Id).Returns(existente);
+        var conversa = ConversaDoSite();
+
+        await UseCase().ExecuteAsync(Comando(conversa, nome: "Maria do chat"));
+
+        conversa.ContatoNome.Should().Be("Maria Cadastrada");
+    }
+
+    [Fact]
     public async Task ConversaInexistente_LancaNaoEncontrada()
     {
         var acao = () => UseCase().ExecuteAsync(new CadastrarClienteDaConversaCommand(_empresaId, Guid.NewGuid(), "Maria", "11987654321", null));
