@@ -75,6 +75,9 @@ public interface IConversaRepository
     /// <summary>Lookup pelo <c>wamid</c> (idempotencia do webhook e callbacks de status).</summary>
     Task<Mensagem?> ObterMensagemPorExternoIdAsync(Guid empresaId, string externoId, CancellationToken ct = default);
 
+    /// <summary>Mensagem da conversa na empresa (mídia do console, #1287); de outra empresa ou conversa, nula.</summary>
+    Task<Mensagem?> ObterMensagemAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default);
+
     Task AddAsync(Conversa conversa, CancellationToken ct = default);
 
     Task AddMensagemAsync(Mensagem mensagem, CancellationToken ct = default);

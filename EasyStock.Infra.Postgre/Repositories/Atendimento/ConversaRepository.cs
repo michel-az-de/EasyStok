@@ -174,6 +174,10 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
     public Task<Mensagem?> ObterMensagemPorExternoIdAsync(Guid empresaId, string externoId, CancellationToken ct = default) =>
         db.AtendimentoMensagens.FirstOrDefaultAsync(m => m.EmpresaId == empresaId && m.ExternoId == externoId, ct);
 
+    public Task<Mensagem?> ObterMensagemAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
+        db.AtendimentoMensagens.AsNoTracking().FirstOrDefaultAsync(
+            m => m.EmpresaId == empresaId && m.ConversaId == conversaId && m.Id == mensagemId, ct);
+
     public Task AddAsync(Conversa conversa, CancellationToken ct = default)
     {
         db.AtendimentoConversas.Add(conversa);
