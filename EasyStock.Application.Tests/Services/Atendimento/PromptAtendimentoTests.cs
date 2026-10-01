@@ -42,5 +42,17 @@ public class PromptAtendimentoTests
         Normalizar(prompt).Should().Be(Normalizar(snapshot));
     }
 
+    [Fact]
+    public void Alergia_SoComAFicha_NuncaGaranteAusencia()
+    {
+        var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));
+
+        // #1314: alergia responde só pela ficha; ausência de alérgeno nunca é garantida pelo agente.
+        prompt.Should().Contain("Alergia ou restrição alimentar")
+            .And.Contain("responda só com os campos alergenos e ingredientes que consultar_cardapio devolver")
+            .And.Contain("nunca garanta que o item não contém")
+            .And.Contain("use escalar_para_dona");
+    }
+
     private static string Normalizar(string texto) => texto.Replace("\r\n", "\n").Trim();
 }
