@@ -400,7 +400,7 @@ public class AtendimentoConversasControllerTests
         var storefronts = Substitute.For<IStorefrontRepository>();
         var cep = Substitute.For<ICepLookupClient>();
         var frete = new CalcularFreteUseCase(storefronts, Substitute.For<IFreteZonaRepository>(), cep,
-            Substitute.For<IGeocodingClient>(), NullLogger<CalcularFreteUseCase>.Instance);
+            Substitute.For<IGeocodingClient>(), Substitute.For<IRotaClient>(), NullLogger<CalcularFreteUseCase>.Instance);
         var useCase = new CadastrarClienteDaConversaUseCase(
             _repositorio, clientes, _unitOfWork,
             new IdentificarClientePorTelefoneUseCase(clientes, Substitute.For<IClienteStorefrontRepository>(),
