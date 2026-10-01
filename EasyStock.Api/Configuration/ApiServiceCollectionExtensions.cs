@@ -75,6 +75,7 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
         services.AddScoped<AdminAuditService>();
         services.AddScoped<GeradorNotificacoesAutomaticas>();
+        services.AddSingleton<EasyStock.Api.Services.Impressao.PedidoImpressoHtml>(); // S49: impresso do pedido
         services.AddScoped<EasyStock.Api.Services.IJwtTokenService, JwtTokenService>();
         services.AddScoped<EasyStock.Application.Ports.Output.IJwtTokenService>(sp =>
             sp.GetRequiredService<EasyStock.Api.Services.IJwtTokenService>());

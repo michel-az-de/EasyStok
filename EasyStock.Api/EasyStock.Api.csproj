@@ -81,6 +81,11 @@
     <EmbeddedResource Include="Data\Templates\Impressao\canhoto.css">
       <LogicalName>Impressao.canhoto.css</LogicalName>
     </EmbeddedResource>
+    <!-- S49: impressos da Casa da Baba (modelos Scriban por papel e CSS da marca), lidos por
+         Services\Impressao\PedidoImpressoHtml.cs via GetManifestResourceStream("Impressao.<arquivo>"). -->
+    <EmbeddedResource Include="Data\Templates\Impressao\*.sbn;Data\Templates\Impressao\impressos.css">
+      <LogicalName>Impressao.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>
