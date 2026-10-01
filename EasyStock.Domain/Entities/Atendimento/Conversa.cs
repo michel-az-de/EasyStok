@@ -158,6 +158,17 @@ public class Conversa
     public void AtualizarContatoNome(string? nome) => ContatoNome = NormalizarNome(nome);
 
     /// <summary>
+    /// #1332: a conversa pode ter sido achada pela outra grafia do celular (com/sem o nono dígito, #1290).
+    /// A resposta sai para <see cref="ContatoIdExterno"/>, então ele passa a ser o <c>wa_id</c> que escreveu,
+    /// o endereço que a Meta comprovadamente entrega. Só WhatsApp.
+    /// </summary>
+    public void AtualizarContatoWhatsApp(string waId)
+    {
+        if (Canal != CanalConversa.WhatsApp) return;
+        ContatoIdExterno = NormalizarContato(CanalConversa.WhatsApp, waId);
+    }
+
+    /// <summary>
     /// A dona assumiu (escreveu pelo console) ou o agente escalou. Idempotente.
     /// Em conversa encerrada e erro: quem quer falar de novo abre outra conversa.
     /// </summary>
