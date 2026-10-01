@@ -12,7 +12,12 @@ import {
 // O que a F03 não liga (confirmar à mão, estorno, cancelar, esteira, reenvio avulso) não
 // mexe na memória do navegador com pedido já criado: avisa e deixa como está, para a tela
 // nunca mostrar um estado que o EasyStok não tem.
+//
+// Sem pedido criado (#1271) vale o mesmo: só a comanda é rascunho local. Gerar ou reenviar a
+// cobrança cria o pedido (o EasyStok cobra e manda o resumo); pagamento e esteira avisam,
+// porque um rascunho "Pago" ou "Em preparo" nunca chega à cozinha.
 const NAO_LIGADO = 'ainda não está ligado ao EasyStok (F04 em diante). Use o EasyStok para isso.'
+const SEM_PEDIDO = 'o pedido ainda não está no EasyStok. Gere a cobrança ou envie ao cliente primeiro.'
 
 const EDITA_COMANDA = ['adicionarItem', 'removerItem', 'ajustarQuantidade', 'ajustarObservacao', 'escolherJanela', 'forcarEncaixe']
 const SO_NO_EASYSTOK = {
@@ -38,9 +43,14 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
     if (pedido) despachar({ tipo: acao.SINCRONIZAR_PEDIDO, id, pedido })
   }
 
-  const soSemPedidoCriado = (nome, rotulo) => (id, ...resto) => {
+  const soSemPedidoCriado = (nome) => (id, ...resto) => {
     if (!pedidoCriado(id)) return acoes[nome](id, ...resto)
-    avisar(`${rotulo}: o pedido já está no EasyStok e ${rotulo === 'Comanda' ? 'não muda por aqui.' : NAO_LIGADO}`)
+    avisar('Comanda: o pedido já está no EasyStok e não muda por aqui.')
+    return undefined
+  }
+
+  const soNoEasyStok = (rotulo) => (id) => {
+    avisar(`${rotulo}: ${pedidoCriado(id) ? NAO_LIGADO : SEM_PEDIDO}`)
     return undefined
   }
 
@@ -56,49 +66,49 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
       })
   }
 
+  // "Enviar ao cliente", ou gerar a cobrança antes dele: o EasyStok cria o pedido, cobra e
+  // manda o resumo pela conversa.
+  function criarPedido(id, meio = null) {
+    const pedido = pedidoDe(id)
+    if (!pedido || pedidoCriado(id)) return undefined
+    if (!janelaDoId(pedido.janela)) {
+      avisar('Escolha a janela de entrega antes de enviar ao cliente.')
+      return undefined
+    }
+    const corpo = corpoDoPedido({ ...pedido, meio: meio ?? pedido.meio })
+    return gerarPedido(id, corpo)
+      .then((gerado) => {
+        if (!gerado.enviadoAoCliente) {
+          avisar('Pedido criado no EasyStok, mas o resumo não saiu ao cliente (conversa fora da janela de 24 h ou canal fora do ar).')
+        }
+        return recarregar(id)
+      })
+      .catch((erro) => avisar(`Pedido não criado: ${erro.message}`))
+  }
+
+  // Com pedido criado, gerar ou reenviar a cobrança só troca a forma (S11); o link vencido é
+  // reemitido e enviado pelo próprio EasyStok (job de expiração).
+  const cobrar = (id, meio) => {
+    if (!pedidoCriado(id)) return criarPedido(id, meio)
+    const atual = pedidoDe(id)
+    if (meio && formaDoMeio(meio) !== formaDoMeio(atual?.meio)) return trocarForma(id, meio)
+    avisar('A cobrança já está no EasyStok. Link vencido é reemitido e enviado sozinho.')
+    return undefined
+  }
+
   return {
-    ...Object.fromEntries(EDITA_COMANDA.map((nome) => [nome, soSemPedidoCriado(nome, 'Comanda')])),
-    ...Object.fromEntries(Object.entries(SO_NO_EASYSTOK).map(([nome, rotulo]) => [nome, soSemPedidoCriado(nome, rotulo)])),
+    ...Object.fromEntries(EDITA_COMANDA.map((nome) => [nome, soSemPedidoCriado(nome)])),
+    ...Object.fromEntries(Object.entries(SO_NO_EASYSTOK).map(([nome, rotulo]) => [nome, soNoEasyStok(rotulo)])),
 
     // Janelas com vaga no prazo dos itens da comanda (S16). Promessa direta para a tela.
     carregarJanelasComanda: (itens) => listarJanelas({ itens }),
 
-    gerarPedido: (id, meio = null) => {
-      const pedido = pedidoDe(id)
-      if (!pedido || pedidoCriado(id)) return
-      if (!janelaDoId(pedido.janela)) {
-        avisar('Escolha a janela de entrega antes de enviar ao cliente.')
-        return
-      }
-      const corpo = corpoDoPedido({ ...pedido, meio: meio ?? pedido.meio })
-      gerarPedido(id, corpo)
-        .then((gerado) => {
-          if (!gerado.enviadoAoCliente) {
-            avisar('Pedido criado no EasyStok, mas o resumo não saiu ao cliente (conversa fora da janela de 24 h ou canal fora do ar).')
-          }
-          return recarregar(id)
-        })
-        .catch((erro) => avisar(`Pedido não criado: ${erro.message}`))
-    },
+    gerarPedido: (id, meio = null) => criarPedido(id, meio),
 
     // Com pedido criado, trocar o meio é a troca de forma da S11: online ↔ na entrega.
     alterarMeioPagamento: (id, meio) => (pedidoCriado(id) ? trocarForma(id, meio) : acoes.alterarMeioPagamento(id, meio)),
 
-    // Gerar ou reenviar cobrança com pedido criado: só a troca de forma é ligada. O link
-    // vencido é reemitido e enviado pelo próprio EasyStok (S11, job de expiração).
-    gerarCobranca: (id, pedido, meio = null) => {
-      if (!pedidoCriado(id)) return acoes.gerarCobranca(id, pedido, meio)
-      const atual = pedidoDe(id)
-      if (meio && formaDoMeio(meio) !== formaDoMeio(atual?.meio)) return trocarForma(id, meio)
-      avisar('A cobrança já está no EasyStok. Link vencido é reemitido e enviado sozinho.')
-      return undefined
-    },
-    reenviarCobranca: (id, pedido, valorForcado = null, meio = null) => {
-      if (!pedidoCriado(id)) return acoes.reenviarCobranca(id, pedido, valorForcado, meio)
-      const atual = pedidoDe(id)
-      if (meio && formaDoMeio(meio) !== formaDoMeio(atual?.meio)) return trocarForma(id, meio)
-      avisar('A cobrança já está no EasyStok. Link vencido é reemitido e enviado sozinho.')
-      return undefined
-    },
+    gerarCobranca: (id, pedido, meio = null) => cobrar(id, meio),
+    reenviarCobranca: (id, pedido, valorForcado = null, meio = null) => cobrar(id, meio),
   }
 }
