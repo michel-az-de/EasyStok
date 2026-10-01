@@ -31,6 +31,7 @@ public class AgenteAtendimentoServiceTests
     private readonly IUsoIaRepository _usoIaRepository = Substitute.For<IUsoIaRepository>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly IFerramentaAgente _consultarPedido = Substitute.For<IFerramentaAgente>();
+    private readonly ICadernoRepository _caderno = Substitute.For<ICadernoRepository>();
     private readonly List<RequisicaoLlm> _requisicoes = [];
     private readonly Conversa _conversa;
     private readonly List<Mensagem> _historico = [];
@@ -69,7 +70,7 @@ public class AgenteAtendimentoServiceTests
         _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
         [_consultarPedido], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
-        NullLogger<AgenteAtendimentoService>.Instance);
+        _caderno, NullLogger<AgenteAtendimentoService>.Instance);
 
     private static RespostaLlm Texto(string texto) =>
         new("end_turn", [new BlocoTextoLlm(texto)], 100, 20);
@@ -111,6 +112,32 @@ public class AgenteAtendimentoServiceTests
         await _usoIaRepository.Received(1).AddAsync(Arg.Is<UsoIa>(u =>
             u.EmpresaId == _empresaId && u.TotalGeracoes == 1 && u.TotalTokens == 210));
         await _unitOfWork.Received().CommitAsync();
+    }
+
+    [Fact]
+    public async Task CadernoEntraNoPromptAntesDoDossie()
+    {
+        var horario = TrechoCaderno.Criar(_empresaId, "Horário", "Abrimos de terça a sábado.", null, nucleo: true, Agora);
+        var troca = TrechoCaderno.Criar(_empresaId, "Troca", "Trocamos em até 24 h.", "troca", nucleo: false, Agora);
+        _caderno.ListarAsync(_empresaId, false, Arg.Any<CancellationToken>()).Returns([horario, troca]);
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        var system = _requisicoes[0].System;
+        system.Should().Contain("Abrimos de terça a sábado.").And.Contain($"[{troca.Codigo}] Troca");
+        system.IndexOf("Abrimos de terça a sábado.", StringComparison.Ordinal)
+            .Should().BeLessThan(system.IndexOf("Dossiê desta conversa", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task SemCadernoOPromptNaoMuda()
+    {
+        _caderno.ListarAsync(_empresaId, false, Arg.Any<CancellationToken>()).Returns([]);
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        _requisicoes[0].System.Should().NotContain("Caderno da loja")
+            .And.StartWith(PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(_empresaId)) + "\n\nDossiê desta conversa");
     }
 
     [Fact]

@@ -110,7 +110,7 @@ public class AtendimentoConversasControllerTests
             new ObterDossieClienteUseCase(
                 Substitute.For<IClienteRepository>(), Substitute.For<IClienteCrmRepository>(),
                 Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(), _repositorio),
-            NullLogger<AgenteAtendimentoService>.Instance);
+            Substitute.For<ICadernoRepository>(), NullLogger<AgenteAtendimentoService>.Instance);
 
         var turno = await agente.ProcessarTurnoAsync(_empresaId, conversa.Id, agora);
 
