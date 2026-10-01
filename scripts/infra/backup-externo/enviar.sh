@@ -94,7 +94,8 @@ main() {
   log "dump: $dump (${idade_h}h, $(du -h "$dump" | cut -f1))"
 
   tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' EXIT
+  # Expande agora: no EXIT a variavel local ja saiu de escopo (set -u).
+  trap "rm -rf '$tmp'" EXIT
   cp "$dump" "$tmp/"
   docker run --rm -v "$UPLOADS_VOLUME":/d:ro -v "$tmp":/out alpine \
     tar czf /out/uploads-"$hoje".tar.gz -C /d . \

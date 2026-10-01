@@ -54,6 +54,8 @@ if [ ! -s "$RCLONE_CONFIG" ]; then
   exit 2
 fi
 chmod 600 "$RCLONE_CONFIG"
+# rclone config no Windows grava CRLF; sem isto o awk abaixo nao casa a secao.
+sed -i 's/\r$//' "$RCLONE_CONFIG"
 # Le so as chaves 'type' e 'remote' de cada secao; nunca token nem senha.
 campo() { awk -v s="[$1]" -v k="$2" '$0==s{f=1;next} /^\[/{f=0} f && $1==k {sub(/^[^=]*=[ ]*/,""); print; exit}' "$RCLONE_CONFIG"; }
 [ "$(campo gdrive type)" = drive ] || { echo "ERRO: secao [gdrive] com type = drive ausente" >&2; exit 2; }
