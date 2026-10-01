@@ -66,6 +66,26 @@ public class CampanhaJobTests
     }
 
     [Fact]
+    public async Task LembreteNaoLevaAArte()
+    {
+        // #1226: o template campanha_lembrete não tem cabeçalho de imagem; a arte fica só na onda.
+        var encerramento = CenarioDisparoCampanha.Disparo.AddDays(3);
+        var campanha = _c.Campanha(encerramentoEm: encerramento, lembrete: true, imagemUrl: "https://cdn.test/arte.jpg");
+        _c.Pendente(campanha, "Bia");
+
+        _c.Relogio.SetUtcNow(CenarioDisparoCampanha.Disparo);
+        await _c.Job().ExecuteAsync(_c.EmpresaId, campanha.Id);
+        _c.OutboxProcessou();
+        _c.Relogio.Advance(TimeSpan.FromMinutes(1));
+        await _c.Job().ExecuteAsync(_c.EmpresaId, campanha.Id);
+        _c.Relogio.SetUtcNow(encerramento);
+        (await _c.Job().ExecuteAsync(_c.EmpresaId, campanha.Id)).Lembretes.Should().Be(1);
+
+        _c.Mensagens.First().LerMetadados().Should().ContainKey(EnfileiradorMensagensCampanha.ChaveImagem);
+        _c.Mensagens.Last().LerMetadados().Should().NotContainKey(EnfileiradorMensagensCampanha.ChaveImagem);
+    }
+
+    [Fact]
     public async Task EncerramentoSemLembreteSoEncerra()
     {
         var encerramento = CenarioDisparoCampanha.Disparo.AddDays(1);

@@ -1,3 +1,4 @@
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos;
 using EasyStock.Domain.Sales;
@@ -29,6 +30,7 @@ public class RegistrarPagamentoPedidoUseCase(
     IPedidoRepository repo,
     IUnitOfWork uow,
     ILogger<RegistrarPagamentoPedidoUseCase> logger,
+    CalculadoraInicioPrevistoPedido inicioPrevisto,
     ICaixaRepository? caixaRepo = null)
 {
     private static readonly HashSet<string> MetodosValidos = new(StringComparer.OrdinalIgnoreCase)
@@ -120,6 +122,12 @@ public class RegistrarPagamentoPedidoUseCase(
                 OcorridoEm = DateTime.UtcNow,
                 Detalhes = $"+{pag.Valor.ToString("C", Cultura.PtBr)} via {metodo}"
             });
+
+            // #1230: pagamento manual (Pix, dinheiro, cartão) em pedido da fila vira compromisso como no
+            // Mercado Pago: grava o início previsto (agregado rastreado, sai no flush abaixo). O pagamento do
+            // provedor chega do ConfirmarPagamentoPedidoUseCase, que já gravou antes de chamar este use case.
+            if (!cmd.ConfirmadoPeloProvedor)
+                await inicioPrevisto.AplicarNaFilaAsync(pedido, token);
 
             // Flush do pagamento+evento ANTES da tentativa de abertura (ver comentario acima
             // sobre savepoint automatico) — e o que garante que a abertura nunca pode derrubar

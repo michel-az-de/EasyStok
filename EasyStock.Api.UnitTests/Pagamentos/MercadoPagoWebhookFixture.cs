@@ -46,6 +46,7 @@ internal sealed class MercadoPagoWebhookFixture
     public Dictionary<string, PagamentoMercadoPago> Pagamentos { get; } = new();
 
     public IMercadoPagoClient MpClient { get; } = Substitute.For<IMercadoPagoClient>();
+    public IEstornoPedidoGateway Estorno { get; } = Substitute.For<IEstornoPedidoGateway>();
     public IPedidoRepository PedidoRepo { get; } = Substitute.For<IPedidoRepository>();
     public IPedidoStorefrontRepository PedidoStorefrontRepo { get; } = Substitute.For<IPedidoStorefrontRepository>();
     public ICobrancaPedidoRepository CobrancaRepo { get; } = Substitute.For<ICobrancaPedidoRepository>();
@@ -77,7 +78,7 @@ internal sealed class MercadoPagoWebhookFixture
         MpClient.ConsultarPagamentoAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(ci => Pagamentos.GetValueOrDefault(ci.Arg<string>()));
 
-        Uow.SetupExecuteInTransactionSemRetry<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?)>();
+        Uow.SetupExecuteInTransactionSemRetry<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?, Guid?)>();
         Uow.SetupExecuteInTransactionSemRetry<(SituacaoAtualizacaoCobranca, Guid?, string?)>();
         Uow.SetupExecuteInTransactionSemRetry<PedidoResult?>();
     }
@@ -95,13 +96,14 @@ internal sealed class MercadoPagoWebhookFixture
     {
         var tenant = Substitute.For<ITenantContextAccessor>();
         var relogio = new RelogioFixoMp(Agora);
-        var confirmar = new ConfirmarPagamentoPedidoUseCase(CobrancaRepo, PedidoStorefrontRepo,
-            new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance),
-            Publicador, Substitute.For<IOperacaoEventPublisher>(), Substitute.For<IImpressaoPendenteRepository>(), tenant, Uow, relogio,
-            NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance,
-            new CalculadoraInicioPrevistoPedido(Substitute.For<IPrazoPreparoPedidoQueries>()));
         var aviso = new AvisoCobrancaConversa(Substitute.For<IConversaRepository>(),
             new ResolvedorCanal(Array.Empty<ICanalMensageria>()), Uow, NullLogger<AvisoCobrancaConversa>.Instance);
+        var confirmar = new ConfirmarPagamentoPedidoUseCase(CobrancaRepo, PedidoStorefrontRepo,
+            new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance,
+                new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>())),
+            Publicador, Substitute.For<IOperacaoEventPublisher>(), Substitute.For<IImpressaoPendenteRepository>(), tenant, Uow, relogio,
+            NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance,
+            new CalculadoraInicioPrevistoPedido(Substitute.For<IPrazoPreparoPedidoQueries>()), Estorno, aviso);
         var atualizar = new AtualizarCobrancaPorPagamentoUseCase(CobrancaRepo, PedidoStorefrontRepo, aviso, tenant, Uow,
             relogio, NullLogger<AtualizarCobrancaPorPagamentoUseCase>.Instance);
         return new MercadoPagoWebhookProcessor(MpClient, confirmar, atualizar, NullLogger<MercadoPagoWebhookProcessor>.Instance);

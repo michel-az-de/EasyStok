@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Pagamentos;
@@ -46,6 +47,23 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
         r.Cobranca.LinkPagamento.Should().BeNull();
         f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando, "pagamento na entrega libera o pedido para a fila");
         f.Preferencias.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task OnlineParaNaEntrega_GravaInicioPrevisto()
+    {
+        // #1230: o pedido que vai pagar na entrega entra na fila; o início previsto vale como no Mercado Pago.
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        var entrega = new DateTime(2026, 10, 2, 15, 0, 0, DateTimeKind.Utc);
+        f.Pedido.AgendadoParaEm = entrega;
+        f.PrazoQueries.ObterAsync(f.EmpresaId, f.Pedido.Id, Arg.Any<CancellationToken>())
+            .Returns(new PrazoPreparoPedidoLeitura(null, null, [null], TempoPreparoPadraoMinutos: 60, RespiroMinutos: 40));
+
+        await f.Trocar().ExecuteAsync(
+            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega", Usuario, "Operadora"));
+
+        f.Pedido.InicioPrevistoEm.Should().Be(entrega.AddMinutes(-100));
     }
 
     [Fact]

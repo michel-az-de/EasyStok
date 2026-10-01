@@ -166,6 +166,34 @@ public class WhatsAppCloudClientTests
         handler.TodosComBearer.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task TemplateComImagemMandaOCabecalhoAntesDoCorpo()
+    {
+        // #1226: template com cabeçalho IMAGE exige o parâmetro de cabeçalho no envio.
+        var client = CreateClient(HttpStatusCode.OK, RespostaEnvioOk, out var handler);
+
+        await client.EnviarTemplateAsync("5511999998888", "campanha_generica", "pt_BR", ["Ana", "Oi"],
+            imagemCabecalho: "https://cdn.test/arte.jpg");
+
+        var json = System.Text.Json.JsonDocument.Parse(handler.UltimoCorpo!).RootElement;
+        var componentes = json.GetProperty("template").GetProperty("components");
+        componentes[0].GetProperty("type").GetString().Should().Be("header");
+        var parametro = componentes[0].GetProperty("parameters")[0];
+        parametro.GetProperty("type").GetString().Should().Be("image");
+        parametro.GetProperty("image").GetProperty("link").GetString().Should().Be("https://cdn.test/arte.jpg");
+        componentes[1].GetProperty("type").GetString().Should().Be("body");
+    }
+
+    [Fact]
+    public async Task TemplateSemImagemNaoTemCabecalho()
+    {
+        var client = CreateClient(HttpStatusCode.OK, RespostaEnvioOk, out var handler);
+
+        await client.EnviarTemplateAsync("5511999998888", "pedido_pago", "pt_BR", ["#123"]);
+
+        handler.UltimoCorpo.Should().NotContain("\"header\"");
+    }
+
     private sealed class SequenceHandler : HttpMessageHandler
     {
         private readonly Queue<(HttpStatusCode Status, string Body)> _respostas = new();

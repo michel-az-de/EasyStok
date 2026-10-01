@@ -1,13 +1,18 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Campanhas;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
+using EasyStock.Domain.Entities.Campanhas;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Entities.Storefront;
+using EasyStock.Domain.Enums.Campanhas;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
@@ -67,6 +72,10 @@ public class IniciarCheckoutUseCaseTests
         // S11: a fase 3 grava a CobrancaPedido pelo GerarCobrancaPedidoUseCase.
         public ICobrancaPedidoRepository CobrancaRepo { get; init; } = CobrancaRepoVazio();
         public IUnitOfWork Uow { get; init; } = Substitute.For<IUnitOfWork>();
+
+        /// <summary>Campanhas do cliente (#1226): sem envio recente, o pedido não é atribuído a nenhuma.</summary>
+        public ICampanhaRepository CampanhaRepo { get; } = Substitute.For<ICampanhaRepository>();
+        public ITenantContextAccessor Tenant { get; } = Substitute.For<ITenantContextAccessor>();
     }
 
     private static ICobrancaPedidoRepository CobrancaRepoVazio()
@@ -205,6 +214,9 @@ public class IniciarCheckoutUseCaseTests
             f.Uow,
             TimeProvider.System,
             NullLogger<GerarCobrancaPedidoUseCase>.Instance),
+        new AtribuicaoPedidoCampanha(f.CampanhaRepo, TimeProvider.System),
+        f.Tenant,
+        f.Uow,
         NullLogger<IniciarCheckoutUseCase>.Instance);
 
     private static IniciarCheckoutInput InputValido() => new(
@@ -449,6 +461,55 @@ public class IniciarCheckoutUseCaseTests
 
         await uc.Invoking(u => u.ExecuteAsync(InputValido()))
             .Should().ThrowAsync<MercadoPagoIndisponivelException>();
+    }
+
+    [Fact]
+    public async Task PedidoDoSiteMarcaDestinatarioDaCampanhaComoPediu()
+    {
+        // #1226: a mesma regra do pedido da conversa (S30): quem recebeu campanha na semana e pede pelo
+        // site conta como conversão. A requisição é anônima: o tenant da loja liga o filtro e a RLS.
+        var f = BuildFakes();
+        var destinatario = DestinatarioEnviado(f.Storefront.EmpresaId, ClienteId);
+        f.CampanhaRepo.ObterEnviadoParaAtribuirAsync(
+                f.Storefront.EmpresaId, ClienteId, Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(destinatario);
+
+        var result = await BuildUseCase(f).ExecuteAsync(InputValido());
+
+        destinatario.Status.Should().Be(StatusCampanhaDestinatario.Pediu);
+        destinatario.PedidoId.Should().Be(result.PedidoId);
+        f.Tenant.Received().SetCurrentTenant(f.Storefront.EmpresaId);
+    }
+
+    [Fact]
+    public async Task AtribuicaoDaCampanhaNaoDependeDoMercadoPago()
+    {
+        // #1226: o pedido já existe (AguardandoPagamento) quando a cobrança falha; a conversão é gravada antes.
+        var f = BuildFakes();
+        var destinatario = DestinatarioEnviado(f.Storefront.EmpresaId, ClienteId);
+        f.CampanhaRepo.ObterEnviadoParaAtribuirAsync(
+                f.Storefront.EmpresaId, ClienteId, Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(destinatario);
+        f.MpClient.CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync<OperationCanceledException>();
+
+        await BuildUseCase(f).Invoking(u => u.ExecuteAsync(InputValido()))
+            .Should().ThrowAsync<MercadoPagoIndisponivelException>();
+
+        destinatario.Status.Should().Be(StatusCampanhaDestinatario.Pediu);
+        await f.Uow.Received(1).CommitAsync();
+    }
+
+    private static CampanhaDestinatario DestinatarioEnviado(Guid empresaId, Guid clienteId)
+    {
+        var agora = DateTime.UtcNow;
+        var campanha = Campanha.Criar(empresaId, Guid.NewGuid(),
+            new DadosCampanha("Bolo de fubá", "Oi {{nome}}", null, null, FiltroCampanha.ParaTodos, [], null, false, null),
+            agora.AddDays(-3));
+        var destinatario = CampanhaDestinatario.Criar(campanha, clienteId);
+        destinatario.Enfileirar(1, Guid.NewGuid());
+        destinatario.MarcarEnviado(agora.AddDays(-2));
+        return destinatario;
     }
 
     [Fact]
