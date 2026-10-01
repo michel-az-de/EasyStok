@@ -34,6 +34,11 @@ export const liberarAutomatico = (id) => chamarApi(`${BASE}/${id}/liberar-automa
 export const encerrar = (id) => chamarApi(`${BASE}/${id}/encerrar`, { metodo: 'POST' })
 export const marcarLida = (id) => chamarApi(`${BASE}/${id}/marcar-lida`, { metodo: 'POST' })
 
+// Cliente da conversa (#1276): cadastra ou atualiza (`{ nome, telefone, endereco }`) e o dossiê (S25)
+// que a Ficha relê depois. Conversa sem cliente devolve o dossiê mínimo.
+export const cadastrarClienteDaConversa = (id, corpo) => chamarApi(`${BASE}/${id}/cliente`, { metodo: 'POST', corpo })
+export const obterDossie = (id) => chamarApi(`${BASE}/${id}/dossie`)
+
 // Foto da dona (S02): multipart com `file` e `legenda`. A imagem chega como data URL
 // (o Composer já leu o arquivo para a prévia) e volta a ser binário aqui.
 function arquivoDoDataUrl(dataUrl, nomeArquivo) {

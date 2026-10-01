@@ -211,13 +211,22 @@ function pedidoMesclado(local, doServidor) {
   }
 }
 
+// O resumo da inbox não traz o cadastro; o cliente lido do EasyStok (#1276) fica enquanto
+// a conversa seguir com o mesmo cliente.
+const clienteDaApiMantido = (local, doServidor) =>
+  local.cliente?.daApi && local.clienteId && local.clienteId === doServidor.clienteId
+
 function mesclarDoServidor(local, doServidor) {
   if (!local) return doServidor
   const doServidorIds = new Set(doServidor.mensagens.map((m) => m.id))
   const soLocais = local.mensagens.filter((m) => mensagemSoLocal(m) && !doServidorIds.has(m.id))
+  const mantido = clienteDaApiMantido(local, doServidor)
+  const rascunhoDoNome = local.nomeDaDona && !doServidor.clienteId
   return {
     ...local,
     ...doServidor,
+    ...(mantido ? { nome: local.nome, cliente: local.cliente } : {}),
+    ...(rascunhoDoNome ? { nome: local.nome, nomeDaDona: true } : {}),
     pedido: pedidoMesclado(local.pedido, doServidor.pedido),
     mensagens: [...doServidor.mensagens, ...soLocais],
   }
@@ -239,6 +248,19 @@ const CASOS_API = {
       sincronizacao: { estado: 'ok', mensagem: null, em: Date.now(), aviso: estado.sincronizacao?.aviso ?? null },
     }
   },
+
+  // #1276: cliente da conversa como o EasyStok tem (cadastro pelo console ou dossiê ao abrir).
+  [acao.CLIENTE_DA_API]: (estado, { id, clienteId, nome, cliente }) =>
+    mapear(estado, id, (c) => ({
+      ...c,
+      clienteId,
+      conta: 'cliente',
+      nome: nome || c.nome,
+      cliente: { ...c.cliente, ...cliente, enderecoCapturado: null, daApi: true },
+    })),
+
+  [acao.RENOMEAR_LEAD_API]: (estado, { id, nome }) =>
+    mapear(estado, id, (c) => ({ ...c, nome: nome?.trim() || c.nome, nomeDaDona: Boolean(nome?.trim()) })),
 
   [acao.SINCRONIZACAO_FALHOU]: (estado, { mensagem }) => ({
     ...estado, sincronizacao: { ...estado.sincronizacao, estado: 'erro', mensagem },

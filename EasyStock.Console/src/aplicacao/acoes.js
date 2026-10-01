@@ -269,3 +269,7 @@ export const SINCRONIZAR_CARDAPIO = 'sincronizar-cardapio'
 export const SINCRONIZAR_PEDIDO = 'sincronizar-pedido'
 // F06 (#1236): o aviso de ação fica na faixa até a dona fechar; a sincronização não o apaga.
 export const FECHAR_AVISO_API = 'fechar-aviso-api'
+// #1276: o cliente da conversa como o EasyStok tem (cadastro pelo console ou dossiê ao abrir).
+export const CLIENTE_DA_API = 'cliente-da-api'
+// #1276: nome que a dona escreveu para o lead ainda sem cadastro; vai junto no cadastro.
+export const RENOMEAR_LEAD_API = 'renomear-lead-api'
