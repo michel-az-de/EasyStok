@@ -55,6 +55,7 @@ public static partial class ServiceCollectionExtensions
 
         // S20: canhoto e fila de impressão (o pedido pago entra na fila dentro do ConfirmarPagamento).
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.MontarCanhotoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.MontarPedidoImpressoUseCase>(); // S49: impresso do pedido
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.ListarImpressoesPendentesUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.RegistrarRetornoImpressaoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.ReimprimirCanhotoUseCase>();
