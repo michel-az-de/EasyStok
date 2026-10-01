@@ -35,8 +35,9 @@ echo "==> [2/5] postgres descartavel ($PG_IMAGEM)"
 docker run -d --rm --name "$NOME" -p 127.0.0.1::5432 \
   -e POSTGRES_HOST_AUTH_METHOD=trust "$PG_IMAGEM" >/dev/null
 echo "porta: $(docker port "$NOME" 5432)"
-for _ in $(seq 1 60); do docker exec "$NOME" pg_isready -U postgres >/dev/null 2>&1 && break; sleep 1; done
-docker exec "$NOME" pg_isready -U postgres >/dev/null || { echo "ERRO: postgres descartavel nao subiu" >&2; exit 3; }
+# -h 127.0.0.1: o servidor temporario do init so escuta socket e reinicia logo depois.
+for _ in $(seq 1 60); do docker exec "$NOME" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1 && break; sleep 1; done
+docker exec "$NOME" pg_isready -h 127.0.0.1 -U postgres >/dev/null || { echo "ERRO: postgres descartavel nao subiu" >&2; exit 3; }
 docker cp "$dump" "$NOME:/tmp/$(basename "$dump")"
 alvo="/tmp/$(basename "$dump")"
 docker exec "$NOME" createdb -U postgres restore_teste

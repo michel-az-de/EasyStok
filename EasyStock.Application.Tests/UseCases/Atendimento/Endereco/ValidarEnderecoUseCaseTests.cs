@@ -37,7 +37,7 @@ public class ValidarEnderecoUseCaseTests
     {
         var geocoding = Substitute.For<IGeocodingClient>();
         geocoding.GeocodificarAsync(Arg.Any<GeocodeQuery>(), Arg.Any<CancellationToken>()).Returns((GeocodeResultado?)null);
-        var frete = new CalcularFreteUseCase(_storefronts, _zonas, _cep, geocoding, NullLogger<CalcularFreteUseCase>.Instance);
+        var frete = new CalcularFreteUseCase(_storefronts, _zonas, _cep, geocoding, Substitute.For<IRotaClient>(), NullLogger<CalcularFreteUseCase>.Instance);
         return new ValidarEnderecoUseCase(_storefronts, frete, _cep, _configuracao, NullLogger<ValidarEnderecoUseCase>.Instance);
     }
 

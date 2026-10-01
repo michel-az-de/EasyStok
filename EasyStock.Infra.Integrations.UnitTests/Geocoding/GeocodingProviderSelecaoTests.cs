@@ -54,4 +54,40 @@ public class GeocodingProviderSelecaoTests
 
         Assert.IsType<NoOpGeocodingClient>(client);
     }
+
+    private static IRotaClient ResolverRota(Dictionary<string, string?> config)
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(config).Build();
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+        services.AddEasyStockGeocoding(configuration);
+        return services.BuildServiceProvider().CreateScope().ServiceProvider.GetRequiredService<IRotaClient>();
+    }
+
+    [Fact]
+    public void Google_com_chave_mede_rota_pelo_google()
+    {
+        var rota = ResolverRota(new()
+        {
+            [GeocodingServiceCollectionExtensions.ProviderKey] = "google",
+            [GeocodingServiceCollectionExtensions.GoogleApiKeyKey] = "k",
+        });
+
+        Assert.IsType<EasyStock.Infra.Integrations.Rotas.GoogleRotasClient>(rota);
+    }
+
+    [Theory]
+    [InlineData("google", null)]
+    [InlineData(null, "k")]
+    public void Sem_google_completo_rota_eh_noop(string? provider, string? chave)
+    {
+        var rota = ResolverRota(new()
+        {
+            [GeocodingServiceCollectionExtensions.ProviderKey] = provider,
+            [GeocodingServiceCollectionExtensions.GoogleApiKeyKey] = chave,
+        });
+
+        Assert.IsType<EasyStock.Infra.Integrations.Rotas.NoOpRotaClient>(rota);
+    }
 }
