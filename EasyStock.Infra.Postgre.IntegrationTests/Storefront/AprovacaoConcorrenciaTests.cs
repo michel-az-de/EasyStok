@@ -1,5 +1,11 @@
-﻿using EasyStock.Application.UseCases.Storefront.Aprovacao;
+﻿using EasyStock.Application.Events.Storefront.Handlers;
+using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.UseCases.Storefront.Aprovacao;
 using EasyStock.Application.UseCases.Storefront.Aprovacao.Exceptions;
+using EasyStock.Infra.Postgre.Repositories.Atendimento;
+using EasyStock.Infra.Postgre.Repositories.Pagamentos;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Sales;
 using EasyStock.Domain.ValueObjects;
@@ -170,8 +176,17 @@ public sealed class AprovacaoConcorrenciaTests(PostgreSqlDatabaseFixture fixture
     private Task RecusarAsync(Guid empresaId, Guid pedidoId) =>
         ExecutarUseCaseAsync(async (pedidoRepo, publicador, uow) =>
         {
+            // #1289: pedido sem cobrança paga, então o estorno e o aviso não entram em jogo.
             var useCase = new RecusarPedidoStorefrontUseCase(
-                pedidoRepo, publicador, uow,
+                pedidoRepo,
+                new CobrancaPedidoRepository(uow),
+                NSubstitute.Substitute.For<IEstornoPedidoGateway>(),
+                new LiberarVagaOnPedidoCanceladoHandler(new VagaOcupadaRepository(uow),
+                    NullLogger<LiberarVagaOnPedidoCanceladoHandler>.Instance),
+                new AvisoCobrancaConversa(new ConversaRepository(uow),
+                    new ResolvedorCanal(Array.Empty<ICanalMensageria>()), uow,
+                    NullLogger<AvisoCobrancaConversa>.Instance),
+                publicador, uow,
                 NullLogger<RecusarPedidoStorefrontUseCase>.Instance);
 
             await useCase.ExecuteAsync(new RecusarPedidoStorefrontInput(
