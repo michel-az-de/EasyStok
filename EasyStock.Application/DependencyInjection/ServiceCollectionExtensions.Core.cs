@@ -73,6 +73,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Kds.AtualizarStatusPedidosEmLoteUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Esteira.LancarLotePapelUseCase>();
         // S21: início previsto do preparo e aviso de atraso (PedidoAtrasoJob)
+        services.AddScoped<EasyStock.Application.Services.Pedidos.NumeradorPedidoDoDia>(); // S53: número do dia
         services.AddScoped<EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido>();
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Atraso.NotificarAtrasoPedidoUseCase>();
         services.TryAddSingleton(TimeProvider.System);

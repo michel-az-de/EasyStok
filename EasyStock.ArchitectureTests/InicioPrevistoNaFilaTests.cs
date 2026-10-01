@@ -5,8 +5,9 @@ namespace EasyStock.ArchitectureTests;
 
 /// <summary>
 /// Guard (#1230, pendência da S21): todo caminho da Application que muda o status de um pedido ou cria um
-/// pedido precisa gravar o início previsto (<c>CalculadoraInicioPrevistoPedido.AplicarNaFilaAsync</c> ou
-/// <c>Pedido.DefinirInicioPrevisto</c>). Sem isso o pedido entra na fila sem início previsto, o KDS cai na
+/// pedido precisa gravar o início previsto (<c>CalculadoraInicioPrevistoPedido.AplicarNaFilaAsync</c>,
+/// <c>AplicarCompromissoAsync</c>, <c>RecalcularAsync</c> ou <c>Pedido.DefinirInicioPrevisto</c>). Os três primeiros
+/// também dão o número do dia (S53). Sem isso o pedido entra na fila sem início previsto, o KDS cai na
 /// regra provisória e o <c>PedidoAtrasoJob</c> nunca avisa o atraso.
 ///
 /// <para>
@@ -23,7 +24,7 @@ public class InicioPrevistoNaFilaTests
         RegexOptions.Compiled);
 
     private static readonly Regex GravaInicioPrevisto = new(
-        @"\.AplicarNaFilaAsync\(|\.DefinirInicioPrevisto\(",
+        @"\.AplicarNaFilaAsync\(|\.AplicarCompromissoAsync\(|\.RecalcularAsync\(|\.DefinirInicioPrevisto\(",
         RegexOptions.Compiled);
 
     /// <summary>Arquivos que mudam status ou criam pedido sem pôr o pedido em <c>Aguardando</c>. Caminho relativo à raiz.</summary>

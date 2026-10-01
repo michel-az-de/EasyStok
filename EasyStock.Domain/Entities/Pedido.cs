@@ -213,6 +213,34 @@ namespace EasyStock.Domain.Entities
             return true;
         }
 
+        // ── Número do dia (S53) ─────────────────────────────────────────
+
+        /// <summary>
+        /// Sequência do pedido no dia de produção (<see cref="DataNumero"/>), para falar na cozinha ("042").
+        /// Nulo até o pedido entrar na fila ou ser pago. Único por <c>(EmpresaId, DataNumero, NumeroDoDia)</c>.
+        /// </summary>
+        public int? NumeroDoDia { get; private set; }
+
+        /// <summary>Dia de produção (data civil de Brasília) a que <see cref="NumeroDoDia"/> pertence.</summary>
+        public DateOnly? DataNumero { get; private set; }
+
+        /// <summary>Já numerado para o <paramref name="dia"/>: um novo número só faz sentido se o dia mudou.</summary>
+        public bool TemNumeroDoDia(DateOnly dia) => NumeroDoDia is not null && DataNumero == dia;
+
+        /// <summary>
+        /// Grava o número do dia tirado do contador da empresa. Mesmo dia e mesmo número é no-op; dia novo
+        /// (reagendamento) troca os dois.
+        /// </summary>
+        public void DefinirNumeroDoDia(DateOnly dia, int numero)
+        {
+            if (numero <= 0)
+                throw new RegraDeDominioVioladaException($"Número do dia deve ser positivo (recebido: {numero}).");
+            if (NumeroDoDia == numero && DataNumero == dia) return;
+            NumeroDoDia = numero;
+            DataNumero = dia;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
         public Empresa? Empresa { get; set; }
         public Loja? Loja { get; set; }
 
@@ -352,6 +380,8 @@ namespace EasyStock.Domain.Entities
         public string? SkuSnapshot { get; set; }
         /// <summary>Linha do item do cardápio congelada no pedido (S15): "paraServir" | "prepararEmCasa". Null = sem cardápio (frete, ad-hoc).</summary>
         public string? LinhaSnapshot { get; set; }
+        /// <summary>Conservação do item do cardápio congelada no pedido (S53): "ambiente" | "refrigerado" | "congelado". Null = sem cardápio.</summary>
+        public string? ConservacaoSnapshot { get; set; }
 
         public Pedido? Pedido { get; set; }
         public Produto? Produto { get; set; }

@@ -275,6 +275,7 @@ namespace EasyStock.Infra.Postgre.Data
 
         // S20: fila de impressão do canhoto
         public DbSet<EasyStock.Domain.Entities.Operacao.ImpressaoPendente> ImpressoesPendentes { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Operacao.SequenciaDiariaPedido> SequenciasPedidoDia { get; set; } = null!; // S53
 
         // S27: ocorrência e reembolso
         public DbSet<EasyStock.Domain.Entities.Atendimento.Ocorrencia> Ocorrencias { get; set; } = null!;
