@@ -4,6 +4,7 @@ using EasyStock.Domain.Enums.Atendimento;
 namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
 /// <summary>Linha da inbox do console (S07).</summary>
+/// <param name="MotivoEscalada">Por que o agente passou para humano (#1238); nulo depois que alguém assume.</param>
 public sealed record ConversaResumoResult(
     Guid Id,
     CanalConversa Canal,
@@ -16,11 +17,13 @@ public sealed record ConversaResumoResult(
     string? UltimaMensagemTexto,
     Guid? PedidoEmAndamentoId,
     Guid? AssumidaPorUsuarioId,
-    bool DentroDaJanela)
+    bool DentroDaJanela,
+    string? MotivoEscalada = null)
 {
     internal static ConversaResumoResult De(Conversa c, string? ultimaMensagemTexto, DateTime agora) => new(
         c.Id, c.Canal, c.ContatoIdExterno, c.ContatoNome, c.ClienteId, c.Situacao, c.NaoLidas,
-        c.UltimaMensagemEm, ultimaMensagemTexto, c.PedidoEmAndamentoId, c.AssumidaPorUsuarioId, c.DentroDaJanela(agora));
+        c.UltimaMensagemEm, ultimaMensagemTexto, c.PedidoEmAndamentoId, c.AssumidaPorUsuarioId, c.DentroDaJanela(agora),
+        c.MotivoEscalada);
 }
 
 /// <summary>Mensagem como o console mostra. <c>MidiaChave</c> é interna: o arquivo é servido por endpoint autenticado.</summary>

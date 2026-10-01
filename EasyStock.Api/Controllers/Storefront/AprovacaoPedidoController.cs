@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using EasyStock.Application.UseCases.Storefront.Aprovacao;
 using EasyStock.Application.UseCases.Storefront.Aprovacao.Exceptions;
 using Swashbuckle.AspNetCore.Annotations;
@@ -10,9 +10,14 @@ namespace EasyStock.Api.Controllers.Storefront;
 /// Fase 6 do plano v8.0 / ADR-0014).
 ///
 /// <para>
-/// <strong>Auth:</strong> reuso do <c>[Authorize]</c> padrão do ERP — staff Babá já
-/// autenticada via Identity. Não usa cookie <c>__Host-cdb_session</c> (esse é do cliente
+/// <strong>Auth:</strong> policy <c>Operador</c> (#1238): <c>Visualizador</c> não aprova nem recusa, e
+/// recusar dispara estorno. Não usa cookie <c>__Host-cdb_session</c> (esse é do cliente
 /// storefront). <c>UsuarioId</c> e <c>EmpresaId</c> vêm do <see cref="ICurrentUserAccessor"/>.
+/// </para>
+///
+/// <para>
+/// <strong>Resposta:</strong> envelope padrão da Api (#1238), que o console e o Web desembrulham:
+/// sucesso em <c>{ data, meta }</c>, erro em <c>{ error: { code, message, details } }</c>.
 /// </para>
 ///
 /// <para>
@@ -24,7 +29,7 @@ namespace EasyStock.Api.Controllers.Storefront;
 [SwaggerTag("Storefront Aprovação Pedido")]
 [ApiController]
 [Route("api/storefront/pedidos")]
-[Authorize]
+[Authorize(Policy = "Operador")]
 public sealed class AprovacaoPedidoController(
     AprovarPedidoStorefrontUseCase aprovarUseCase,
     RecusarPedidoStorefrontUseCase recusarUseCase,
@@ -39,8 +44,9 @@ public sealed class AprovacaoPedidoController(
         Description = "Lock pessimista no pedido + transição AguardandoAprovacaoBaba → AprovadoBaba. " +
                       "Enfileira NotificarClientePedidoAprovadoEvent no Outbox (WhatsApp). " +
                       "Concorrência: 2 babás simultâneas → 1 sucesso (200), 1 falha (409).")]
-    [ProducesResponseType(typeof(AprovarPedidoStorefrontResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<AprovarPedidoStorefrontResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
@@ -54,16 +60,7 @@ public sealed class AprovacaoPedidoController(
             return authErr!;
 
         if (body?.Observacoes is { Length: > 500 })
-        {
-            return StatusCode(
-                StatusCodes.Status422UnprocessableEntity,
-                new ProblemDetails
-                {
-                    Status = StatusCodes.Status422UnprocessableEntity,
-                    Title = "Observações acima do limite",
-                    Detail = "observacoes deve ter no máximo 500 caracteres.",
-                });
-        }
+            return DataUnprocessable("As observações devem ter no máximo 500 caracteres.");
 
         var input = new AprovarPedidoStorefrontInput(
             PedidoId: id,
@@ -74,29 +71,15 @@ public sealed class AprovacaoPedidoController(
 
         try
         {
-            var result = await aprovarUseCase.ExecuteAsync(input, ct);
-            return Ok(result);
+            return DataOk(await aprovarUseCase.ExecuteAsync(input, ct));
         }
         catch (PedidoNaoEncontradoException)
         {
-            return NotFound(new ProblemDetails
-            {
-                Type = "https://easystok.app/errors/pedido-nao-encontrado",
-                Status = StatusCodes.Status404NotFound,
-                Title = "Pedido não encontrado",
-            });
+            return DataNotFound("Pedido não encontrado.");
         }
         catch (PedidoJaResolvidoException ex)
         {
-            return Conflict(new PedidoJaResolvidoProblemDetails
-            {
-                Type = "https://easystok.app/errors/pedido-ja-resolvido",
-                Status = StatusCodes.Status409Conflict,
-                Title = "Pedido já resolvido",
-                Detail = ex.Message,
-                StatusAtual = ex.StatusAtualString,
-                ResolvidoEm = ex.ResolvidoEm,
-            });
+            return PedidoJaResolvido(ex);
         }
     }
 
@@ -109,8 +92,9 @@ public sealed class AprovacaoPedidoController(
         Description = "Lock pessimista no pedido + transição AguardandoAprovacaoBaba → Cancelado. " +
                       "Enfileira PedidoCanceladoEvent (libera vaga), EstornarPagamentoAutomaticoEvent " +
                       "(refund MP via dispatcher TASK-EZ-APROVAR-002) e NotificarClientePagamentoRecusadoEvent.")]
-    [ProducesResponseType(typeof(RecusarPedidoStorefrontResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<RecusarPedidoStorefrontResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
@@ -124,40 +108,15 @@ public sealed class AprovacaoPedidoController(
             return authErr!;
 
         if (body is null)
-        {
-            return StatusCode(
-                StatusCodes.Status422UnprocessableEntity,
-                new ProblemDetails
-                {
-                    Status = StatusCodes.Status422UnprocessableEntity,
-                    Title = "Body obrigatório",
-                    Detail = "Body do POST /recusar não pode ser vazio (motivo é obrigatório).",
-                });
-        }
+            return DataUnprocessable("Informe o motivo da recusa.");
 
         if (!MotivoRecusaExtensions.TryParse(body.Motivo, out var motivo))
-        {
-            return StatusCode(
-                StatusCodes.Status422UnprocessableEntity,
-                new ProblemDetails
-                {
-                    Status = StatusCodes.Status422UnprocessableEntity,
-                    Title = "Motivo inválido",
-                    Detail = $"motivo deve ser um de: ESTOQUE_INSUFICIENTE, OPERACIONAL, OUTRO. Recebido: '{body.Motivo}'.",
-                });
-        }
+            return DataUnprocessable(
+                "Motivo inválido.",
+                $"motivo deve ser um de: ESTOQUE_INSUFICIENTE, OPERACIONAL, OUTRO. Recebido: '{body.Motivo}'.");
 
         if (body.MensagemCliente is { Length: > 280 })
-        {
-            return StatusCode(
-                StatusCodes.Status422UnprocessableEntity,
-                new ProblemDetails
-                {
-                    Status = StatusCodes.Status422UnprocessableEntity,
-                    Title = "Mensagem ao cliente acima do limite",
-                    Detail = "mensagemCliente deve ter no máximo 280 caracteres.",
-                });
-        }
+            return DataUnprocessable("A mensagem ao cliente deve ter no máximo 280 caracteres.");
 
         var input = new RecusarPedidoStorefrontInput(
             PedidoId: id,
@@ -169,29 +128,15 @@ public sealed class AprovacaoPedidoController(
 
         try
         {
-            var result = await recusarUseCase.ExecuteAsync(input, ct);
-            return Ok(result);
+            return DataOk(await recusarUseCase.ExecuteAsync(input, ct));
         }
         catch (PedidoNaoEncontradoException)
         {
-            return NotFound(new ProblemDetails
-            {
-                Type = "https://easystok.app/errors/pedido-nao-encontrado",
-                Status = StatusCodes.Status404NotFound,
-                Title = "Pedido não encontrado",
-            });
+            return DataNotFound("Pedido não encontrado.");
         }
         catch (PedidoJaResolvidoException ex)
         {
-            return Conflict(new PedidoJaResolvidoProblemDetails
-            {
-                Type = "https://easystok.app/errors/pedido-ja-resolvido",
-                Status = StatusCodes.Status409Conflict,
-                Title = "Pedido já resolvido",
-                Detail = ex.Message,
-                StatusAtual = ex.StatusAtualString,
-                ResolvidoEm = ex.ResolvidoEm,
-            });
+            return PedidoJaResolvido(ex);
         }
     }
 
@@ -205,17 +150,23 @@ public sealed class AprovacaoPedidoController(
 
         if (!currentUser.IsAuthenticated || usuarioId == Guid.Empty || empresaId == Guid.Empty)
         {
-            error = Unauthorized(new ProblemDetails
-            {
-                Status = StatusCodes.Status401Unauthorized,
-                Title = "Autenticação requerida",
-                Detail = "Usuário Babá precisa estar autenticado para aprovar/recusar pedidos.",
-            });
+            error = Unauthorized(new ApiErrorResponse(new ApiError(
+                "UNAUTHORIZED", "Entre de novo para aprovar ou recusar pedidos.", null, null)));
             return false;
         }
 
         return true;
     }
+
+    private UnprocessableEntityObjectResult DataUnprocessable(string mensagem, string? detalhe = null) =>
+        UnprocessableEntity(new ApiErrorResponse(new ApiError("VALIDATION_ERROR", mensagem, detalhe, null)));
+
+    /// <summary>409 com o estado atual em <c>details</c> (contrato da corrida entre duas babás).</summary>
+    private ConflictObjectResult PedidoJaResolvido(PedidoJaResolvidoException ex) =>
+        Conflict(new ApiErrorResponse(new ApiError("PEDIDO_JA_RESOLVIDO", ex.Message, null, null)
+        {
+            Details = new { statusAtual = ex.StatusAtualString, resolvidoEm = ex.ResolvidoEm },
+        }));
 
     private string? ObterNomeUsuario()
     {
@@ -233,10 +184,3 @@ public sealed record AprovarPedidoRequestBody(string? Observacoes);
 
 /// <summary>Body do POST <c>/recusar</c>.</summary>
 public sealed record RecusarPedidoRequestBody(string Motivo, string? MensagemCliente = null);
-
-/// <summary>ProblemDetails extendido com <c>statusAtual</c> + <c>resolvidoEm</c> (contrato 409).</summary>
-public sealed class PedidoJaResolvidoProblemDetails : ProblemDetails
-{
-    public string? StatusAtual { get; set; }
-    public DateTime? ResolvidoEm { get; set; }
-}

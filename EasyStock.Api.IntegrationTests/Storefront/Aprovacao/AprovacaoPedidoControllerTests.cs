@@ -58,7 +58,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_aprovacao_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                .WithPassword("senha-de-teste-descartavel")
                 .Build();
 
             await _pg.StartAsync();
@@ -76,7 +76,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
             await _pg.DisposeAsync();
     }
 
-    private WebApplicationFactory<Program> CriarFactory(bool autenticado = true)
+    private WebApplicationFactory<Program> CriarFactory(bool autenticado = true, NivelAcesso nivel = NivelAcesso.Admin)
     {
         if (_pg is null) throw new InvalidOperationException("Postgres test container indisponível.");
 
@@ -84,6 +84,10 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
             .WithWebHostBuilder(b =>
             {
                 b.UseEnvironment("Development");
+                // UseSetting entra antes do Program ler a configuração (o ConfigureAppConfiguration
+                // chega tarde demais para o DatabaseProviderResolver do startup).
+                b.UseSetting("Database:Provider", "PostgreSql");
+                b.UseSetting("ConnectionStrings:DefaultConnection", _pg!.GetConnectionString());
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
@@ -108,7 +112,8 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
                     services.AddSingleton<ICurrentUserAccessor>(new StubCurrentUserAccessor(
                         empresaId: autenticado ? EmpresaId : Guid.Empty,
                         usuarioId: autenticado ? UsuarioBabaId : Guid.Empty,
-                        isAuthenticated: autenticado));
+                        isAuthenticated: autenticado,
+                        nivel: nivel));
 
                     // Sobrescreve auth: scheme "TestAuth" sempre vence; sem token → 401.
                     services
@@ -120,7 +125,11 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
                         .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
                             TestAuthHandler.SchemeName, _ => { });
 
-                    services.Configure<TestAuthHandlerOptions>(o => o.Authenticated = autenticado);
+                    services.Configure<TestAuthHandlerOptions>(o =>
+                    {
+                        o.Authenticated = autenticado;
+                        o.Nivel = nivel;
+                    });
                 });
             });
     }
@@ -181,7 +190,8 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        // F08 item 6 (#1238): envelope padrão { data, meta } da EasyStock.Api, que o console desembrulha.
+        var body = (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
         body.GetProperty("pedidoId").GetGuid().Should().Be(pedidoId);
         body.GetProperty("status").GetString().Should().Be(StatusPedidoMapper.AprovadoBaba);
         body.GetProperty("notificacaoCliente").GetProperty("enfileirada").GetBoolean().Should().BeTrue();
@@ -215,7 +225,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        var body = (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
         body.GetProperty("pedidoId").GetGuid().Should().Be(pedidoId);
         body.GetProperty("status").GetString().Should().Be(StatusPedidoMapper.Cancelado);
         body.GetProperty("motivo").GetString().Should().Be("estoque_insuficiente");
@@ -259,6 +269,8 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
             new { observacoes = (string?)null });
 
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var erro = (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error");
+        erro.GetProperty("code").GetString().Should().Be("NOT_FOUND");
     }
 
     [SkippableFact]
@@ -296,8 +308,11 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
             new { observacoes = (string?)null });
 
         resp.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("statusAtual").GetString().Should().Be(StatusPedidoMapper.AprovadoBaba);
+        // Erro no envelope { error: { code, message, details } }: o console lê error.message.
+        var erro = (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error");
+        erro.GetProperty("code").GetString().Should().Be("PEDIDO_JA_RESOLVIDO");
+        erro.GetProperty("message").GetString().Should().NotBeNullOrWhiteSpace();
+        erro.GetProperty("details").GetProperty("statusAtual").GetString().Should().Be(StatusPedidoMapper.AprovadoBaba);
     }
 
     [SkippableFact]
@@ -315,6 +330,31 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
             new { motivo = "INVALIDO_XYZ", mensagemCliente = "qq" });
 
         resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var erro = (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error");
+        erro.GetProperty("code").GetString().Should().Be("VALIDATION_ERROR");
+    }
+
+    /// <summary>F08 item 2 (#1238): Visualizador não aprova nem recusa (recusar dispara estorno).</summary>
+    [SkippableTheory]
+    [InlineData("aprovar")]
+    [InlineData("recusar")]
+    public async Task Post_Visualizador_Retorna403SemMexerNoPedido(string acao)
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+
+        await using var factory = CriarFactory(nivel: NivelAcesso.Visualizador);
+        using var client = factory.CreateClient();
+
+        var pedidoId = await SeedPedidoAsync(factory);
+
+        var resp = await client.PostAsJsonAsync(
+            $"/api/storefront/pedidos/{pedidoId}/{acao}",
+            new { motivo = "OPERACIONAL", observacoes = (string?)null });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EasyStock.Infra.Postgre.Data.EasyStockDbContext>();
+        (await db.Pedidos.FindAsync(pedidoId))!.Status.Should().Be(StatusPedidoMapper.AguardandoAprovacaoBaba);
     }
 
     // ── Test infrastructure ─────────────────────────────────────────────────
@@ -322,12 +362,13 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
     private sealed class StubCurrentUserAccessor(
         Guid empresaId,
         Guid usuarioId,
-        bool isAuthenticated) : ICurrentUserAccessor
+        bool isAuthenticated,
+        NivelAcesso nivel) : ICurrentUserAccessor
     {
         public Guid EmpresaId { get; } = empresaId;
         public bool IsAuthenticated { get; } = isAuthenticated;
         public Guid UsuarioId { get; } = usuarioId;
-        public NivelAcesso Nivel => NivelAcesso.Admin;
+        public NivelAcesso Nivel { get; } = nivel;
 
         public bool TemPermissao(Permissao permissao) => true;
     }
@@ -335,6 +376,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
     public sealed class TestAuthHandlerOptions
     {
         public bool Authenticated { get; set; } = true;
+        public NivelAcesso Nivel { get; set; } = NivelAcesso.Admin;
     }
 
     private sealed class TestAuthHandler(
@@ -358,7 +400,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
                 new Claim(ClaimTypes.Name, UsuarioBabaNome),
                 new Claim("sub", UsuarioBabaId.ToString()),
                 new Claim("empresaId", EmpresaId.ToString()),
-                new Claim("nivel", NivelAcesso.Admin.ToString()),
+                new Claim("nivel", _testOptions.CurrentValue.Nivel.ToString()),
             };
             var identity = new ClaimsIdentity(claims, SchemeName);
             var principal = new ClaimsPrincipal(identity);

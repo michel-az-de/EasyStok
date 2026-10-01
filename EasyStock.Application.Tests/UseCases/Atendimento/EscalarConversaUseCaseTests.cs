@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.UseCases.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Notifications;
@@ -53,6 +54,27 @@ public class EscalarConversaUseCaseTests
 
         await _eventPublisher.Received(1).PublicarAsync(
             "conversa.escalada", _empresaId, Arg.Any<object>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GuardaOMotivoQueOResumoDaInboxMostra()
+    {
+        var conversa = NovaConversa();
+
+        await _useCase.EscalarAsync(_empresaId, conversa, "o agente não conseguiu responder", Agora);
+
+        conversa.MotivoEscalada.Should().Be("o agente não conseguiu responder");
+        (await ResumoDaInboxAsync(conversa)).MotivoEscalada.Should().Be("o agente não conseguiu responder");
+    }
+
+    private static async Task<ConversaResumoResult> ResumoDaInboxAsync(Conversa conversa)
+    {
+        var repo = Substitute.For<IConversaRepository>();
+        repo.ListarInboxAsync(default, default, default, default, default, default, default)
+            .ReturnsForAnyArgs([new ConversaInboxItem(conversa, null)]);
+        var itens = await new ListarConversasAtendimentoUseCase(repo)
+            .ExecuteAsync(new ListarConversasAtendimentoQuery(conversa.EmpresaId, null, null, 1, 10));
+        return itens.Single();
     }
 
     [Fact]

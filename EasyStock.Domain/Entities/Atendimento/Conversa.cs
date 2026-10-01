@@ -25,6 +25,7 @@ public class Conversa
     public const int ContatoWaIdTamanhoMaximo = 15;
     public const int ContatoIdExternoTamanhoMaximo = 256;
     public const int ContatoNomeTamanhoMaximo = 120;
+    public const int MotivoEscaladaTamanhoMaximo = 500;
 
     public Guid Id { get; private set; }
     public Guid EmpresaId { get; private set; }
@@ -55,6 +56,12 @@ public class Conversa
     public int NaoLidas { get; private set; }
     public DateTime? EncerradaEm { get; private set; }
     public Guid? AssumidaPorUsuarioId { get; private set; }
+
+    /// <summary>
+    /// Por que o agente (ou o escalador) passou a conversa para humano. Some quando alguém assume, recebe
+    /// a transferência ou devolve ao automático: aí deixa de ser pendência da fila "Precisa de você".
+    /// </summary>
+    public string? MotivoEscalada { get; private set; }
 
     public bool EstaAberta => Situacao != SituacaoConversa.Encerrada;
 
@@ -153,8 +160,22 @@ public class Conversa
         GarantirAberta("assumir");
         Situacao = SituacaoConversa.Assumida;
         if (usuarioId is { } u && u != Guid.Empty)
+        {
             AssumidaPorUsuarioId = u;
+            MotivoEscalada = null;
+        }
         UltimaMensagemEm = Max(UltimaMensagemEm, Utc(agora));
+    }
+
+    /// <summary>
+    /// O agente ou o escalador passou a conversa para a fila humana, sem responsável, guardando o motivo
+    /// (aparado e cortado em <see cref="MotivoEscaladaTamanhoMaximo"/>).
+    /// </summary>
+    public void Escalar(DateTime agora, string? motivo)
+    {
+        Assumir(agora);
+        var limpo = string.IsNullOrWhiteSpace(motivo) ? null : motivo.Trim();
+        MotivoEscalada = limpo is { Length: > MotivoEscaladaTamanhoMaximo } ? limpo[..MotivoEscaladaTamanhoMaximo] : limpo;
     }
 
     /// <summary>
@@ -168,6 +189,7 @@ public class Conversa
             throw new RegraDeDominioVioladaException("Destino da transferencia e obrigatorio.");
         Situacao = SituacaoConversa.Assumida;
         AssumidaPorUsuarioId = paraUsuarioId;
+        MotivoEscalada = null;
         UltimaMensagemEm = Max(UltimaMensagemEm, Utc(agora));
     }
 
@@ -177,6 +199,7 @@ public class Conversa
         GarantirAberta("liberar o automatico de");
         Situacao = SituacaoConversa.Automatica;
         AssumidaPorUsuarioId = null;
+        MotivoEscalada = null;
     }
 
     /// <summary>Terminal e idempotente: preserva o primeiro carimbo de encerramento.</summary>
