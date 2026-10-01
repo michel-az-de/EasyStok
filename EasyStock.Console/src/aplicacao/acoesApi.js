@@ -9,6 +9,7 @@ import { criarAcoesConfiguracaoApi } from './api/configuracao'
 import { criarAcoesAssistenteApi } from './api/assistente'
 import { criarAcoesConsentimentosApi } from './api/consentimentos'
 import { criarAcoesComandaApi } from './api/comanda'
+import { criarAcoesClienteApi } from './api/cliente'
 import { criarAcoesEncerramentoEMidiaApi } from './api/encerramentoEMidia'
 import { criarAvisosNaoLigadas, envioNaoLigado, textoNaoLigado } from './api/naoLigadas'
 
@@ -18,14 +19,15 @@ const motivoDaRecusa = (erro) => (erro.codigo === FORA_DA_JANELA
   ? 'Não enviada: passou a janela de 24 h. Só modelo aprovado sai até o cliente responder.'
   : `Não enviada: ${erro.message}`)
 
-// Modo API (F01, F02, F03, F06): as ações que a caixa de entrada, o expediente, a configuração,
-// o assistente, os avisos da Ficha, a comanda (pedido e cobrança), o encerramento e a foto
-// já ligam passam a valer no EasyStok.
+// Modo API (F01, F02, F03, F06, #1276): as ações que a caixa de entrada, o expediente, a
+// configuração, o assistente, os avisos da Ficha, a comanda (pedido e cobrança), o cadastro do
+// cliente, o encerramento e a foto já ligam passam a valer no EasyStok.
 // O despacho local vem antes, para a tela responder na hora; a próxima sincronização
 // traz o estado do servidor. As ações ainda não ligadas (lista única em
 // `api/naoLigadas.js`) não mexem na memória do navegador: só avisam na faixa.
 export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
   const avisar = (erro) => despachar({ tipo: acao.AVISO_API, mensagem: erro.message })
+  const clienteApi = criarAcoesClienteApi({ despachar, estadoRef })
 
   return {
     ...acoes,
@@ -37,6 +39,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     ...criarAcoesAssistenteApi(),
     ...criarAcoesConsentimentosApi(),
     ...criarAcoesComandaApi(acoes, { despachar, estadoRef }),
+    ...clienteApi,
     enviar: (id, texto, opcoes = {}) => {
       // #1287: texto vazio a API recusa (400); modelo e automática ainda não têm endpoint.
       if (!texto?.trim()) return
@@ -54,6 +57,9 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     selecionar: (id) => {
       despachar({ tipo: acao.SELECIONAR_CONVERSA, id })
       marcarLida(id).catch(() => {})
+      // Conversa com cliente e Ficha ainda não lida do EasyStok: o dossiê preenche (#1276).
+      const c = estadoRef.current.conversas.find((x) => x.id === id)
+      if (c?.clienteId && !c.cliente?.daApi) clienteApi.carregarClienteDaConversa(id)
     },
     assumirAtendimento: (id) => {
       despachar({ tipo: acao.ASSUMIR_ATENDIMENTO, id })

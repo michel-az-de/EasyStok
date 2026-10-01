@@ -8,9 +8,16 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
+using EasyStock.Application.Ports.Output.Lookup;
+using EasyStock.Application.UseCases.AdicionarClienteEndereco;
+using EasyStock.Application.UseCases.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.ClienteDaConversa;
+using EasyStock.Application.UseCases.Atendimento.Endereco;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Application.UseCases.GerenciarUploads;
+using EasyStock.Application.UseCases.Storefront.Frete;
+using ClienteEntity = EasyStock.Domain.Entities.Cliente;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Enums.Atendimento;
@@ -382,6 +389,82 @@ public class AtendimentoConversasControllerTests
         var lista = Dados<IReadOnlyList<AtendenteResult>>(await controller.Listar(default));
 
         lista.Select(a => a.Nome).Should().BeEquivalentTo(["Ana", "Duda"]);
+    }
+
+    // ── #1276: cadastro do cliente da conversa ──────────────────────────────────────────────
+
+    private (CadastrarClienteDaConversaUseCase UseCase, IClienteRepository Clientes) CadastroDoCliente()
+    {
+        var clientes = Substitute.For<IClienteRepository>();
+        clientes.AddAsync(Arg.Do<ClienteEntity>(c => clientes.GetByIdWithDetailsAsync(_empresaId, c.Id).Returns(c)));
+        var storefronts = Substitute.For<IStorefrontRepository>();
+        var cep = Substitute.For<ICepLookupClient>();
+        var frete = new CalcularFreteUseCase(storefronts, Substitute.For<IFreteZonaRepository>(), cep,
+            Substitute.For<IGeocodingClient>(), Substitute.For<IRotaClient>(), NullLogger<CalcularFreteUseCase>.Instance);
+        var useCase = new CadastrarClienteDaConversaUseCase(
+            _repositorio, clientes, _unitOfWork,
+            new IdentificarClientePorTelefoneUseCase(clientes, Substitute.For<IClienteStorefrontRepository>(),
+                NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
+            new ValidarEnderecoUseCase(storefronts, frete, cep, Substitute.For<IConfiguracaoAtendimentoRepository>(),
+                NullLogger<ValidarEnderecoUseCase>.Instance),
+            new ConfirmarEnderecoClienteUseCase(clientes, _unitOfWork,
+                new AdicionarClienteEnderecoUseCase(clientes, _unitOfWork, NullLogger<AdicionarClienteEnderecoUseCase>.Instance)));
+        return (useCase, clientes);
+    }
+
+    private Conversa ConversaDoSite()
+    {
+        var conversa = Conversa.Abrir(_empresaId, "visitante-1", DateTime.UtcNow.AddMinutes(-5), "Visitante do site", canal: CanalConversa.ChatSite);
+        _repositorio.Conversas.Add(conversa);
+        return conversa;
+    }
+
+    [Fact]
+    public async Task CadastrarClienteVinculaEDevolveNoEnvelope()
+    {
+        var conversa = ConversaDoSite();
+
+        var dados = Dados<ClienteDaConversaResult>(await _controller.CadastrarCliente(
+            conversa.Id, new CadastrarClienteConversaBody("Maria Souza", "(11) 98765-4321", null), CadastroDoCliente().UseCase, default));
+
+        dados.Nome.Should().Be("Maria Souza");
+        dados.Telefone.Should().Be("+5511987654321");
+        dados.Novo.Should().BeTrue();
+        conversa.ClienteId.Should().Be(dados.ClienteId);
+    }
+
+    [Fact]
+    public async Task CadastrarClienteSemTelefone400()
+    {
+        var conversa = ConversaDoSite();
+
+        var result = await _controller.CadastrarCliente(
+            conversa.Id, new CadastrarClienteConversaBody("Maria", null, null), CadastroDoCliente().UseCase, default);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        conversa.ClienteId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CadastrarClienteSemPermissaoDeAtender403()
+    {
+        _currentUser.TemPermissao(Permissao.AtenderConversas).Returns(false);
+        var conversa = ConversaDoSite();
+
+        var result = await _controller.CadastrarCliente(
+            conversa.Id, new CadastrarClienteConversaBody("Maria", "11987654321", null), CadastroDoCliente().UseCase, default);
+
+        result.Should().BeOfType<ForbidResult>();
+        conversa.ClienteId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CadastrarClienteConversaInexistente404()
+    {
+        var result = await _controller.CadastrarCliente(
+            Guid.NewGuid(), new CadastrarClienteConversaBody("Maria", "11987654321", null), CadastroDoCliente().UseCase, default);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
     }
 
     // #1287: mídia recebida do cliente sai do storage privado pelo endpoint autenticado.
