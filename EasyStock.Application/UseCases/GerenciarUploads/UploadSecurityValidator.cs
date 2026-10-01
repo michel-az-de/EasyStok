@@ -130,7 +130,7 @@ public static class UploadSecurityValidator
     /// com ContentType image/jpeg) que seria servido publico do bucket (XSS armazenado,
     /// content smuggling). So rejeita quando a assinatura do tipo e CONHECIDA e nao
     /// corresponde; tipos sem assinatura confiavel (ex.: text/csv) passam de proposito.
-    /// Chame APOS <see cref="EnsureValidMime"/>.
+    /// Chame APOS <see cref="EnsureValidMime(string?)"/>.
     /// </summary>
     public static void EnsureContentMatchesDeclaredType(byte[]? content, string? contentType)
     {
