@@ -192,7 +192,11 @@ export const tirarPeca = (pecas, id) => pecas.filter((p) => p.id !== id)
 // mesmo formato de mensagem sem duplicar a forma em três lugares.
 
 export function mensagemDeImagemAnexada({ nomeArquivo, dataUrl, legenda }) {
-  return { formato: 'imagem', arte: dataUrl, texto: legenda?.trim() || nomeArquivo }
+  // `nomeArquivo` e `legenda` separados (F06): no modo API a foto sobe com o nome e
+  // a legenda vai só se ela escreveu, nunca o nome do arquivo no lugar.
+  return {
+    formato: 'imagem', arte: dataUrl, texto: legenda?.trim() || nomeArquivo, nomeArquivo, legenda: legenda?.trim() ?? '',
+  }
 }
 
 export function mensagemDeArquivoAnexado({ nomeArquivo, tamanho, dataUrl }) {

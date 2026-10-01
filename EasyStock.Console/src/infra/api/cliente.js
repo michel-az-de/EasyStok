@@ -29,7 +29,8 @@ async function lerCorpo(resposta) {
 
 // Envelope da EasyStock.Api: sucesso em `{ data, meta }`; erro em `{ error: { code, message } }`,
 // exceto o 409 da janela de 24 h (`{ erro, sugestao }`) e os 401/403 de corpo vazio.
-export async function chamarApi(caminho, { metodo = 'GET', corpo, autenticado = true } = {}) {
+// `formulario` (FormData) vai como multipart: o navegador escreve o Content-Type com o boundary.
+export async function chamarApi(caminho, { metodo = 'GET', corpo, formulario, autenticado = true } = {}) {
   const cabecalhos = { Accept: 'application/json' }
   if (corpo !== undefined) cabecalhos['Content-Type'] = 'application/json'
   if (autenticado) {
@@ -41,7 +42,7 @@ export async function chamarApi(caminho, { metodo = 'GET', corpo, autenticado = 
     resposta = await fetch(API_BASE + caminho, {
       method: metodo,
       headers: cabecalhos,
-      body: corpo === undefined ? undefined : JSON.stringify(corpo),
+      body: formulario ?? (corpo === undefined ? undefined : JSON.stringify(corpo)),
     })
   } catch {
     throw new ErroApi(0, 'SEM_CONEXAO', 'Sem conexão com o EasyStok.')
