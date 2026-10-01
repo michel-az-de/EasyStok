@@ -35,6 +35,8 @@ namespace EasyStock.Application.UseCases.Storefront.Checkout;
 /// </summary>
 public sealed class IniciarCheckoutUseCase(
     CheckoutCoreService checkoutCore,
+    IStorefrontRepository storefrontRepository,
+    IClienteStorefrontRepository clienteRepository,
     CheckoutIdempotencyService idempotencyService,
     GerarCobrancaPedidoUseCase gerarCobranca,
     AtribuicaoPedidoCampanha atribuicaoCampanha,
@@ -64,6 +66,8 @@ public sealed class IniciarCheckoutUseCase(
             if (cached is not null)
                 return cached;
         }
+
+        await RecusarClienteBloqueadoAsync(input, ct);
 
         // ═══════════════════════════════════════════════════════════════════
         // FASES 1 e 2 — Pedido (Rascunho) + vaga → AguardandoPagamento (S10)
@@ -105,6 +109,9 @@ public sealed class IniciarCheckoutUseCase(
             await idempotencyService.RegistrarRespostaAsync(
                 input.IdempotencyKey.Value, input.ContentHash,
                 pedido.Id, initPointUrl, ct);
+            // #1291: o UpdateAsync do repositório só marca a entidade; sem este commit o retry com a mesma
+            // chave não encontra a resposta e recria pedido, vaga e link.
+            await unitOfWork.CommitAsync();
         }
 
         logger.LogInformation(
@@ -112,5 +119,22 @@ public sealed class IniciarCheckoutUseCase(
             pedido.Id, storefront.Id, sw.ElapsedMilliseconds);
 
         return new CheckoutCriadoDto(pedido.Id, initPointUrl, ExpiresInSeconds);
+    }
+
+    /// <summary>
+    /// #1291: o bloqueio vale em todos os canais (S24), antes de ocupar vaga. A sessão do cliente não carrega
+    /// o tenant do ERP: o da loja liga o filtro e a RLS para ler o cadastro. Loja inexistente segue para o
+    /// núcleo, que recusa com 404.
+    /// </summary>
+    private async Task RecusarClienteBloqueadoAsync(IniciarCheckoutInput input, CancellationToken ct)
+    {
+        var storefront = await storefrontRepository.GetBySlugAsync(input.Slug, ct);
+        if (storefront is null || !storefront.Ativo)
+            return;
+
+        tenantContext.SetCurrentTenant(storefront.EmpresaId);
+        var cliente = await clienteRepository.GetByIdAsync(input.ClienteId, ct);
+        if (cliente is { Bloqueado: true })
+            throw new ClienteBloqueadoException(cliente.Id);
     }
 }

@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
@@ -6,6 +7,8 @@ using EasyStock.Application.Ports.Output.Persistence.Campanhas;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.Tests.Helpers;
+using EasyStock.Application.UseCases.Storefront.Frete;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Domain.Entities.Campanhas;
@@ -47,6 +50,7 @@ public class IniciarCheckoutGuestUseCaseTests
         public IJanelaEntregaRepository JanelaRepo { get; } = Substitute.For<IJanelaEntregaRepository>();
         public IBloqueioEntregaRepository BloqueioRepo { get; } = Substitute.For<IBloqueioEntregaRepository>();
         public IFreteZonaRepository FreteZonaRepo { get; } = Substitute.For<IFreteZonaRepository>();
+        public IGeocodingClient Geocoding { get; } = Substitute.For<IGeocodingClient>();
         public IVagaOcupadaRepository VagaRepo { get; } = Substitute.For<IVagaOcupadaRepository>();
         public IPedidoStorefrontRepository PedidoRepo { get; } = Substitute.For<IPedidoStorefrontRepository>();
         public IExpedienteLojaRepository ExpedienteRepo { get; } = Substitute.For<IExpedienteLojaRepository>();
@@ -89,6 +93,7 @@ public class IniciarCheckoutGuestUseCaseTests
                 tempoEstimadoMinutos: 60, cepInicio: "01000000", cepFim: "01999999");
             FreteZonaRepo.GetAtivasDoStorefrontOrdenadasAsync(Storefront.Id, Arg.Any<CancellationToken>())
                 .Returns(new List<FreteZona> { zona });
+            FreteZonaRepo.BuscarZonaPelasAtivas();
 
             VagaRepo.OcuparAsync(JanelaId, DataEntrega, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
                 .Returns(ci => VagaOcupada.Ocupar(JanelaId, DataEntrega, ci.ArgAt<Guid>(2)));
@@ -118,7 +123,9 @@ public class IniciarCheckoutGuestUseCaseTests
                     ["Acompanhamento:JwtSecret"] = new string('s', 40),
                 })
                 .Build();
-            var core = new CheckoutCoreService(StorefrontRepo, CardapioRepo, JanelaRepo, BloqueioRepo, FreteZonaRepo,
+            var frete = new CalcularFreteUseCase(StorefrontRepo, FreteZonaRepo, Substitute.For<ICepLookupClient>(),
+                Geocoding, Substitute.For<IRotaClient>(), NullLogger<CalcularFreteUseCase>.Instance);
+            var core = new CheckoutCoreService(StorefrontRepo, CardapioRepo, JanelaRepo, BloqueioRepo, frete,
                 VagaRepo, PedidoRepo, ExpedienteRepo, NullLogger<CheckoutCoreService>.Instance, TimeProvider.System);
             var cobranca = new GerarCobrancaPedidoUseCase(Substitute.For<IPedidoRepository>(), StorefrontRepo, CobrancaRepo,
                 MpClient, Uow, TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
@@ -251,5 +258,40 @@ public class IniciarCheckoutGuestUseCaseTests
         resultado.PedidoId.Should().NotBeEmpty();
         f.Pedidos.Should().ContainSingle(p => p.Id == resultado.PedidoId);
         f.Cobrancas.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task ClienteBloqueadoNaoFechaPedidoNemOcupaVaga()
+    {
+        // #1291: o bloqueio vale em todos os canais (spec 05-crm-e-pos-venda); antes só a conversa conferia.
+        var f = new Fixture();
+        var bloqueado = DomainCliente.CriarParaStorefront(f.Storefront.EmpresaId, "hash", TimeProvider.System);
+        bloqueado.Bloquear("calote", DateTime.UtcNow);
+        f.ClienteRepo.GetByTelefoneHashAsync(f.Storefront.EmpresaId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(bloqueado);
+
+        var act = () => f.UseCase().ExecuteAsync(Input());
+
+        await act.Should().ThrowAsync<EasyStock.Domain.Exceptions.ClienteBloqueadoException>();
+        f.Pedidos.Should().BeEmpty();
+        await f.VagaRepo.DidNotReceiveWithAnyArgs().OcuparAsync(default, default, default, default);
+        await f.MpClient.DidNotReceiveWithAnyArgs().CriarPreferenceAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task NumeroDoEnderecoVaiParaOGeocodeDoFretePorRaio()
+    {
+        // #1291: o checkout cota o frete como o POST /frete/calcular, com o número no geocode.
+        var f = new Fixture();
+        f.Storefront.ConfigurarFreteRaio(0, 0, 1.4, 500, 5000,
+            """[{"id":"ate-5km","ateMetros":5000,"valorCentavos":2500}]""");
+        f.Geocoding.GeocodificarAsync(Arg.Any<GeocodeQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new GeocodeResultado(0, 0.025, Confiavel: true));
+
+        var r = await f.UseCase().ExecuteAsync(Input());
+
+        await f.Geocoding.Received().GeocodificarAsync(
+            Arg.Is<GeocodeQuery>(q => q.Numero == "120" && q.Cep == CepValido), Arg.Any<CancellationToken>());
+        r.FreteEstimado.Should().Be(25m);
     }
 }
