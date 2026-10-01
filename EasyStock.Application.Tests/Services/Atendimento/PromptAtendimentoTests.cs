@@ -54,5 +54,15 @@ public class PromptAtendimentoTests
             .And.Contain("use escalar_para_dona");
     }
 
+    [Fact]
+    public void Estilo_CurtoESemTravessao()
+    {
+        var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));
+
+        // #1330: o modelo imitava o travessão do próprio prompt e escrevia textos longos.
+        prompt.Should().NotContain("—").And.NotContain("–");
+        prompt.Should().Contain("no máximo 3 frases curtas").And.Contain("nunca use travessão");
+    }
+
     private static string Normalizar(string texto) => texto.Replace("\r\n", "\n").Trim();
 }

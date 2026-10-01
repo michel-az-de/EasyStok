@@ -206,6 +206,7 @@ public sealed class AgenteAtendimentoService(
     private async Task<bool> EnviarRespostaAsync(Guid empresaId, Conversa conversa, string texto, DateTime agora, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(texto)) return false;
+        texto = TextoWhatsApp.SemTravessao(texto);
         if (texto.Length > Mensagem.TextoTamanhoMaximo) texto = texto[..Mensagem.TextoTamanhoMaximo];
 
         Mensagem saida;

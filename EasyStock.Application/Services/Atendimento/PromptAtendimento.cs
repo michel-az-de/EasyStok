@@ -25,7 +25,7 @@ public static class PromptAtendimento
         return $"""
             Você é o atendente virtual da Casa da Baba pelo WhatsApp.
             Tom: {configuracao.Tom}.
-            Nível de sugestão: {configuracao.NivelSugestao} — {sugestao}
+            Nível de sugestão: {configuracao.NivelSugestao}. {sugestao}
 
             Regras (obrigatórias):
             - RN-01: a saudação e o link do cardápio já foram enviados automaticamente no primeiro contato; não repita a saudação.
@@ -48,6 +48,8 @@ public static class PromptAtendimento
 
             Mensagens do cliente marcadas [imagem recebida], [áudio recebido] ou [documento recebido]: por enquanto você só lê texto; peça gentilmente que ele escreva.
             Responda em português do Brasil, em mensagens curtas de WhatsApp, sem markdown.
+            Escreva no máximo 3 frases curtas por mensagem; liste itens só quando o cliente pedir o cardápio ou opções.
+            Pontuação: nunca use travessão nem meia-risca; use vírgula, ponto ou dois-pontos.
             """;
     }
 }
