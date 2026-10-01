@@ -415,4 +415,25 @@ public class ConversaTests
 
         conversa.MotivoEscalada.Should().BeNull();
     }
+
+    [Fact]
+    public void ContatoWhatsAppPassaParaOWaIdQueEscreveu()
+    {
+        // #1332: conversa aberta sem o nono dígito; a Meta só entrega no wa_id que escreveu.
+        var conversa = Conversa.Abrir(Guid.NewGuid(), "551182254398", DateTime.UtcNow, "Felipe");
+
+        conversa.AtualizarContatoWhatsApp("5511982254398");
+
+        conversa.ContatoIdExterno.Should().Be("5511982254398");
+    }
+
+    [Fact]
+    public void ContatoWhatsAppIgualNaoMuda()
+    {
+        var conversa = Conversa.Abrir(Guid.NewGuid(), "5511982254398", DateTime.UtcNow, "Felipe");
+
+        conversa.AtualizarContatoWhatsApp("+55 11 98225-4398");
+
+        conversa.ContatoIdExterno.Should().Be("5511982254398");
+    }
 }

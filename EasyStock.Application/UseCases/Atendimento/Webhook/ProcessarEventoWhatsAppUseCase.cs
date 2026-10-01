@@ -139,6 +139,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             var existenteConversa = await conversaRepository.ObterAbertaPorContatoAsync(empresaId, CanalConversa.WhatsApp, msg.De, ct);
             var nomePerfil = entrada.Contatos.FirstOrDefault(c => c.WaId == msg.De)?.Nome;
             conversa = existenteConversa ?? Conversa.Abrir(empresaId, msg.De, enviadaEm, nomePerfil);
+            // #1332: responder no wa_id que escreveu, não na grafia antiga com/sem o nono dígito.
+            existenteConversa?.AtualizarContatoWhatsApp(msg.De);
 
             if (existenteConversa is null)
             {
