@@ -103,7 +103,7 @@ internal sealed class MercadoPagoWebhookFixture
                 new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>())),
             Publicador, Substitute.For<IOperacaoEventPublisher>(), Substitute.For<IImpressaoPendenteRepository>(), tenant, Uow, relogio,
             NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance,
-            new CalculadoraInicioPrevistoPedido(Substitute.For<IPrazoPreparoPedidoQueries>()), Estorno, aviso);
+            new CalculadoraInicioPrevistoPedido(Substitute.For<IPrazoPreparoPedidoQueries>()), Estorno, aviso, PedidoRepo);
         var atualizar = new AtualizarCobrancaPorPagamentoUseCase(CobrancaRepo, PedidoStorefrontRepo, aviso, tenant, Uow,
             relogio, NullLogger<AtualizarCobrancaPorPagamentoUseCase>.Instance);
         return new MercadoPagoWebhookProcessor(MpClient, confirmar, atualizar, NullLogger<MercadoPagoWebhookProcessor>.Instance);
