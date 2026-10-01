@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoTexto } from '../../componentes/Campo'
+import { BotaoGoogle } from './BotaoGoogle'
 import css from './login.module.css'
 
 // Login do console no modo API (F01), em dois passos como o EasyStok (ADR-0047):
 // credenciais → empresa. Com uma empresa só, entra direto; superadmin é recusado.
-export function TelaLogin({ listarEmpresas, entrarNaEmpresa }) {
+export function TelaLogin({ listarEmpresas, entrarNaEmpresa, google }) {
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [empresas, setEmpresas] = useState(null)
@@ -23,6 +24,9 @@ export function TelaLogin({ listarEmpresas, entrarNaEmpresa }) {
       setOcupado(false)
     }
   }
+
+  const entrarComGoogle = useCallback((idToken) => tentar(() => google.entrar(idToken)), [google])
+  const falhaDoGoogle = useCallback((mensagem) => setErro(mensagem), [])
 
   const aoEnviar = (evento) => {
     evento.preventDefault()
@@ -76,6 +80,12 @@ export function TelaLogin({ listarEmpresas, entrarNaEmpresa }) {
               {ocupado ? 'Entrando…' : 'Entrar'}
             </Botao>
           </form>
+        )}
+
+        {!empresas && google && (
+          <div className={css.google}>
+            <BotaoGoogle buscarClientId={google.buscarClientId} aoReceberToken={entrarComGoogle} aoFalhar={falhaDoGoogle} />
+          </div>
         )}
 
         {erro && <p className={css.erro} role="alert">{erro}</p>}

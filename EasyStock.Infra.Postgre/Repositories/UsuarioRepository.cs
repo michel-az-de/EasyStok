@@ -51,17 +51,34 @@ namespace EasyStock.Infra.Postgre.Repositories
             // de login a visibilidade global que ela precisa antes do JWT existir.
             using (dbContext.UseRowLevelSecurityBypass())
             {
-                return await dbContext.Usuarios
-                    .AsNoTracking()
-                    .IgnoreQueryFilters()
-                    .Include(u => u.Empresas)
-                        .ThenInclude(ue => ue.Empresa) // carrega Nome da Empresa para ListarEmpresasParaLogin
-                    .Include(u => u.Perfis!)
-                        .ThenInclude(up => up.Perfil)
-                            .ThenInclude(p => p!.Permissoes)
-                    .FirstOrDefaultAsync(u => u.Email == email);
+                return await QueryDeLogin().FirstOrDefaultAsync(u => u.Email == email);
             }
         }
+
+        public async Task<IReadOnlyList<Usuario>> ListarPorAliasGmailAsync(string parteLocal)
+        {
+            var prefixo = parteLocal.Trim().ToLowerInvariant() + "+";
+            // Mesmo bypass do GetByEmailAsync: roda antes de existir tenant (#1324).
+            using (dbContext.UseRowLevelSecurityBypass())
+            {
+                return await QueryDeLogin()
+                    .Where(u => u.Email.ToLower().StartsWith(prefixo)
+                        && (u.Email.ToLower().EndsWith("@gmail.com") || u.Email.ToLower().EndsWith("@googlemail.com")))
+                    .Take(5)
+                    .ToListAsync();
+            }
+        }
+
+        /// <summary>Usuário com empresas (e nome delas) e perfis com permissões, sem filtro de tenant.</summary>
+        private IQueryable<Usuario> QueryDeLogin() =>
+            dbContext.Usuarios
+                .AsNoTracking()
+                .IgnoreQueryFilters()
+                .Include(u => u.Empresas)
+                    .ThenInclude(ue => ue.Empresa) // carrega Nome da Empresa para ListarEmpresasParaLogin
+                .Include(u => u.Perfis!)
+                    .ThenInclude(up => up.Perfil)
+                        .ThenInclude(p => p!.Permissoes);
 
         public async Task<(IEnumerable<Usuario> Usuarios, int Total)> GetByEmpresaAsync(Guid empresaId, int page, int pageSize)
         {

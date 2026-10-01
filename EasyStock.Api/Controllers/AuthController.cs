@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Auth;
 using EasyStock.Application.UseCases.AlterarSenha;
 using Microsoft.AspNetCore.RateLimiting;
 using EasyStock.Application.UseCases.AnonimizarMeusDados;
@@ -18,6 +19,8 @@ using Swashbuckle.AspNetCore.Annotations;
 using IJwtTokenService = EasyStock.Api.Services.IJwtTokenService;
 
 namespace EasyStock.Api.Controllers;
+
+public sealed record LoginGoogleRequest(string? IdToken, Guid? EmpresaId);
 
 public sealed record LoginRequest(
     [Required, EmailAddress] string Email,
@@ -62,6 +65,47 @@ public class AuthController(
         var resultado = await autenticarUseCase.ExecuteAsync(
             new AutenticarUsuarioCommand(request.Email, request.Senha, request.EmpresaId));
 
+        return await EmitirSessaoAsync(resultado, "login");
+    }
+
+    [SwaggerOperation(Summary = "Google sign-in settings", Description = "ClientId público do Google; 404 com o login Google desligado (#1324).")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpGet("google/config")]
+    [AllowAnonymous]
+    public IActionResult ConfigGoogle([FromServices] IGoogleIdTokenValidator google) =>
+        google.ClientId is { } clientId ? DataOk(new { clientId }) : DataNotFound("Login com Google desligado.");
+
+    [SwaggerOperation(Summary = "Sign in with a Google ID token",
+        Description = "Só usuário que já existe (e-mail do Google, ou alias do Gmail com uma conta só). Sem empresaId, entra na empresa ativa do usuário (#1324).")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [EnableRateLimiting("auth")]
+    [HttpPost("google/login")]
+    [AllowAnonymous]
+    public async Task<IActionResult> LoginGoogle(
+        [FromBody] LoginGoogleRequest request,
+        [FromServices] IGoogleIdTokenValidator google,
+        [FromServices] IdentificarUsuarioGoogleUseCase identificar,
+        CancellationToken ct)
+    {
+        if (google.ClientId is null) return DataNotFound("Login com Google desligado.");
+        try
+        {
+            var usuario = await identificar.ExecuteAsync(request.IdToken ?? string.Empty, ct);
+            var resultado = await autenticarUseCase.ConcluirLoginGoogleAsync(usuario, request.EmpresaId);
+            return await EmitirSessaoAsync(resultado, "login_google");
+        }
+        catch (CredenciaisInvalidasException ex)
+        {
+            return Unauthorized(new { error = new { code = "INVALID_CREDENTIALS", message = ex.Message } });
+        }
+    }
+
+    /// <summary>Revoga as sessões anteriores, emite JWT + refresh token e audita. Credencial já conferida.</summary>
+    private async Task<IActionResult> EmitirSessaoAsync(AutenticarUsuarioResult resultado, string acao)
+    {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
         var userAgent = HttpContext.Request.Headers.UserAgent.ToString();
 
@@ -86,7 +130,7 @@ public class AuthController(
 
         var auditLog = AuditLogEntity.Criar(
             resultado.UsuarioId,
-            "login",
+            acao,
             true,
             "Login realizado com sucesso",
             ip,

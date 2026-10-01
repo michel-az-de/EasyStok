@@ -255,9 +255,9 @@ const INICIO_DO_RELOGIO = FONTE_API ? Date.now() : INSTANTE_INICIAL
 
 function AppPrincipal() {
   const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: FONTE_API })
-  const { sessao, listarEmpresas, entrarNaEmpresa, encerrarSessao } = useSessaoApi()
+  const { sessao, listarEmpresas, entrarNaEmpresa, google, encerrarSessao } = useSessaoApi()
   if (FONTE_API && !sessao) {
-    return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} />
+    return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} google={google} />
   }
   return (
     // `key`: trocar de usuário ou empresa recomeça o estado, sem conversa de outra empresa na tela.
@@ -270,22 +270,22 @@ function AppPrincipal() {
 // Cozinha no modo API (F05): a fila vem do KDS, não do espelho do Balcão. Sem
 // sessão nesta aba, pede o login como a janela principal.
 function CozinhaApi() {
-  const { sessao, listarEmpresas, entrarNaEmpresa } = useSessaoApi()
-  if (!sessao) return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} />
+  const { sessao, listarEmpresas, entrarNaEmpresa, google } = useSessaoApi()
+  if (!sessao) return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} google={google} />
   return <TelaCozinhaApi key={sessao.token} />
 }
 
 // Cardápio por link no modo API (F06): sem canal entre janelas, e nada abre sem sessão.
 function CardapioLinkApi() {
-  const { sessao, listarEmpresas, entrarNaEmpresa } = useSessaoApi()
-  if (!sessao) return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} />
+  const { sessao, listarEmpresas, entrarNaEmpresa, google } = useSessaoApi()
+  if (!sessao) return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} google={google} />
   return <TelaCardapioLink />
 }
 
 // Entregas no modo API (F04): janela própria lê a API, sem espelho do Balcão.
 function EntregasApi() {
-  const { sessao, listarEmpresas, entrarNaEmpresa } = useSessaoApi()
-  if (!sessao) return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} />
+  const { sessao, listarEmpresas, entrarNaEmpresa, google } = useSessaoApi()
+  if (!sessao) return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} google={google} />
   return <TelaEntregasApi key={sessao.token} />
 }
 
