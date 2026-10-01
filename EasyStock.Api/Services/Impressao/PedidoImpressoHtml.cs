@@ -106,12 +106,13 @@ public sealed class PedidoImpressoHtml(IRendererTemplate renderer)
             ["itens"] = p.Itens.Select(i => new Dictionary<string, object?>
             {
                 ["quantidade"] = Quantidade(i.Quantidade),
+                ["unidade"] = T(i.Unidade),
                 ["nome"] = T(i.Nome),
                 ["observacao"] = T(i.Observacao),
                 ["unitario"] = Moeda(i.Unitario),
                 ["subtotal"] = Moeda(i.Subtotal),
             }).ToList(),
-            ["quantidade_total"] = Quantidade(p.QuantidadeTotal) + (p.QuantidadeTotal == 1 ? " item" : " itens"),
+            ["quantidade_total"] = p.QuantidadeItens + (p.QuantidadeItens == 1 ? " item" : " itens"),
             ["observacao"] = T(p.Observacao),
             ["nota"] = T(p.Nota),
             ["cobranca"] = new Dictionary<string, object?>

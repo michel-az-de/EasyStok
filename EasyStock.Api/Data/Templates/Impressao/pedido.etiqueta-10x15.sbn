@@ -10,7 +10,7 @@
 <div class="r"><div class="g"><span class="l">Cliente{{ if m.cliente.id }} · ID #{{ m.cliente.id }}{{ end }}</span><div class="nome">{{ m.cliente.nome }}</div>{{ if m.cliente.endereco }}<div class="end">{{ m.cliente.endereco }}</div>{{ end }}</div>{{ if m.cliente.telefone }}<div class="col" style="flex:none;width:36mm"><span class="l">Telefone</span><span class="tel">{{ m.cliente.telefone }}</span></div>{{ end }}</div>
 <div class="r itens">
 <table><thead><tr><th class="q">Qtd</th><th>Item</th><th class="v">Valor</th></tr></thead><tbody>
-{{ for i in m.itens }}<tr><td class="q"><span class="qn">{{ i.quantidade }}</span><span class="qx">un</span></td><td class="n">{{ i.nome }}{{ if i.observacao }}<div class="obs">{{ i.observacao }}</div>{{ end }}</td><td class="v">{{ i.subtotal }}</td></tr>
+{{ for i in m.itens }}<tr><td class="q"><span class="qn">{{ i.quantidade }}</span><span class="qx">{{ i.unidade }}</span></td><td class="n">{{ i.nome }}{{ if i.observacao }}<div class="obs">{{ i.observacao }}</div>{{ end }}</td><td class="v">{{ i.subtotal }}</td></tr>
 {{ end }}</tbody></table>
 {{ if m.observacao || m.nota }}<div class="notas">{{ if m.observacao }}<div><span class="l">Observação</span>{{ m.observacao }}</div>{{ end }}{{ if m.nota }}<div class="nota"><span class="l">Nota</span>{{ m.nota }}</div>{{ end }}</div>{{ end }}
 <div class="resto"></div>

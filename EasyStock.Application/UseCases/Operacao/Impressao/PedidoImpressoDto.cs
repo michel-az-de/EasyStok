@@ -9,6 +9,8 @@ namespace EasyStock.Application.UseCases.Operacao.Impressao;
 /// </summary>
 /// <param name="Numero">Número curto do pedido (8 hex maiúsculos), o mesmo do canhoto e do código de barras.</param>
 /// <param name="Nota">Texto curto digitado na hora da impressão.</param>
+/// <param name="QuantidadeItens">Volumes do pedido para o "7 itens" do total: produtos contados por unidade; item a
+/// peso ou volume (ou quantidade fracionada) conta 1; frete e taxa não contam.</param>
 public sealed record PedidoImpressoDto(
     PedidoImpressoCasaDto Casa,
     string Numero,
@@ -19,13 +21,10 @@ public sealed record PedidoImpressoDto(
     string? Observacao,
     string? Nota,
     PedidoImpressoCobrancaDto Cobranca,
+    int QuantidadeItens,
     DateTime SolicitadoEm,
     DateTime AlteradoEm,
-    DateTime ImpressoEm)
-{
-    /// <summary>Soma das quantidades, para o "7 itens" do total.</summary>
-    public decimal QuantidadeTotal => Itens.Sum(i => i.Quantidade);
-}
+    DateTime ImpressoEm);
 
 public sealed record PedidoImpressoCasaDto(string Nome, string? Documento, string? Site, string? WhatsApp, string? LogoUrl);
 
@@ -43,8 +42,9 @@ public sealed record PedidoImpressoClienteDto(string? IdCurto, string? Nome, str
 public sealed record PedidoImpressoEntregaDto(TipoEntregador? Tipo, string? Responsavel);
 
 /// <param name="Nome">Nome do item com a variação entre parênteses, quando houver.</param>
+/// <param name="Unidade">Unidade em minúsculas para o papel (<c>un</c> quando o pedido não informa).</param>
 public sealed record PedidoImpressoItemDto(
-    decimal Quantidade, string Nome, string? Observacao, decimal Unitario, decimal Subtotal);
+    decimal Quantidade, string Unidade, string Nome, string? Observacao, decimal Unitario, decimal Subtotal);
 
 /// <param name="Pago">Pagamentos somam o total.</param>
 /// <param name="Forma">Método da cobrança ou do último pagamento (<c>pix</c>, <c>cartao</c>...), cru.</param>

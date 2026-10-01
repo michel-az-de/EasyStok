@@ -65,10 +65,14 @@ public sealed record PedidoImpressoPagamentoLeitura(decimal Valor, DateTime Pago
 /// <param name="Nome">Nome do entregador (cadastro ou o digitado na parada).</param>
 public sealed record PedidoImpressoEntregaLeitura(TipoEntregador? Tipo, string? Nome);
 
+/// <param name="Unidade"><c>PedidoItem.Unidade</c> (<c>un</c>, <c>kg</c>...); nulo = unidade.</param>
+/// <param name="EhProduto">Tem linha, item de cardápio ou produto (mesma regra do canhoto); frete e taxa não.</param>
 public sealed record PedidoImpressoItemLeitura(
     string Nome,
     string? Variacao,
     decimal Quantidade,
+    string? Unidade,
     decimal PrecoUnitario,
     decimal Subtotal,
-    string? Observacao);
+    string? Observacao,
+    bool EhProduto);

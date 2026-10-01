@@ -16,6 +16,11 @@ public sealed class MontarPedidoImpressoUseCase(IPedidoImpressoQueries queries, 
     /// <summary>Folga entre o pronto e a entrega. Fixa até a S50 torná-la configurável por loja.</summary>
     public const int MinutosProntoAntesDaJanela = 30;
     public const int NotaTamanhoMaximo = 80;
+    public const string UnidadePadrao = "un";
+
+    /// <summary>Unidades de peso e volume: o item conta como 1 volume, não pela quantidade.</summary>
+    private static readonly HashSet<string> UnidadesDeMedida = new(StringComparer.OrdinalIgnoreCase)
+        { "kg", "g", "mg", "l", "lt", "ml", "m", "cm" };
 
     public async Task<PedidoImpressoDto?> ExecuteAsync(MontarPedidoImpressoInput input, CancellationToken ct = default)
     {
@@ -42,6 +47,7 @@ public sealed class MontarPedidoImpressoUseCase(IPedidoImpressoQueries queries, 
             p.Entrega is { } e ? new PedidoImpressoEntregaDto(e.Tipo, Limpo(e.Nome)) : null,
             p.Itens.Select(i => new PedidoImpressoItemDto(
                     i.Quantidade,
+                    Limpo(i.Unidade)?.ToLowerInvariant() ?? UnidadePadrao,
                     Limpo(i.Variacao) is { } v ? $"{i.Nome.Trim()} ({v})" : i.Nome.Trim(),
                     Limpo(i.Observacao),
                     i.PrecoUnitario,
@@ -50,6 +56,7 @@ public sealed class MontarPedidoImpressoUseCase(IPedidoImpressoQueries queries, 
             Limpo(p.Observacoes),
             Nota(input.Nota),
             new PedidoImpressoCobrancaDto(p.Total, pago, Limpo(p.FormaCobranca) ?? Limpo(ultimoPagamento?.Metodo)),
+            p.Itens.Where(i => i.EhProduto).Sum(Volumes),
             HorarioBrasil.ConverterParaBrasilia(p.CriadoEm),
             HorarioBrasil.ConverterParaBrasilia(p.AlteradoEm),
             HorarioBrasil.ConverterParaBrasilia(relogio.GetUtcNow().UtcDateTime));
@@ -72,6 +79,11 @@ public sealed class MontarPedidoImpressoUseCase(IPedidoImpressoQueries queries, 
             .AddMinutes(p.TempoPreparoPadraoMinutos);
         return new PedidoImpressoPrazoDto(false, pronto + folga, null, pronto);
     }
+
+    private static int Volumes(PedidoImpressoItemLeitura i) =>
+        Limpo(i.Unidade) is { } u && UnidadesDeMedida.Contains(u) || i.Quantidade != decimal.Truncate(i.Quantidade)
+            ? 1
+            : (int)i.Quantidade;
 
     private static string? Nota(string? nota) =>
         Limpo(nota) is { } n ? (n.Length > NotaTamanhoMaximo ? n[..NotaTamanhoMaximo] : n) : null;

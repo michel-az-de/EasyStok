@@ -18,7 +18,8 @@ public class PedidoImpressoHtmlTests
 {
     private const string BaseUrl = "https://api.test";
 
-    internal static PedidoImpressoDto Exemplo(bool agendado = true, string clienteNome = "Mariana Souza") => new(
+    internal static PedidoImpressoDto Exemplo(
+        bool agendado = true, string clienteNome = "Mariana Souza", IReadOnlyList<PedidoImpressoItemDto>? itens = null, int quantidadeItens = 7) => new(
         new PedidoImpressoCasaDto("Casa da Baba", "12345678000190", "https://casadababa.com.br/", "5511900000000", null),
         "A7F3C21B",
         agendado
@@ -26,15 +27,17 @@ public class PedidoImpressoHtmlTests
             : new PedidoImpressoPrazoDto(false, new DateTime(2026, 10, 2, 15, 10, 0), null, new DateTime(2026, 10, 2, 14, 40, 0)),
         new PedidoImpressoClienteDto("0412AB", clienteNome, "+5511987654412", "Rua das Laranjeiras, 214, ap 32 - Vila Mariana, São Paulo"),
         new PedidoImpressoEntregaDto(TipoEntregador.Motoboy, "João"),
+        itens ??
         [
-            new PedidoImpressoItemDto(2, "Pão de queijo recheado 500 g", null, 24.90m, 49.80m),
-            new PedidoImpressoItemDto(1, "Bolo de cenoura com cobertura de chocolate", "sem granulado", 42m, 42m),
-            new PedidoImpressoItemDto(3, "Coxinha de frango congelada", null, 8.50m, 25.50m),
-            new PedidoImpressoItemDto(1, "Torta de palmito média", null, 56m, 56m),
+            new PedidoImpressoItemDto(2, "un", "Pão de queijo recheado 500 g", null, 24.90m, 49.80m),
+            new PedidoImpressoItemDto(1, "un", "Bolo de cenoura com cobertura de chocolate", "sem granulado", 42m, 42m),
+            new PedidoImpressoItemDto(3, "un", "Coxinha de frango congelada", null, 8.50m, 25.50m),
+            new PedidoImpressoItemDto(1, "un", "Torta de palmito média", null, 56m, 56m),
         ],
         "Deixar na portaria, bloco B",
         "Embalar os pães separados",
         new PedidoImpressoCobrancaDto(173.30m, false, "pix"),
+        quantidadeItens,
         agendado ? new DateTime(2026, 9, 30, 14, 32, 0) : new DateTime(2026, 10, 2, 14, 32, 0),
         new DateTime(2026, 10, 1, 9, 12, 0),
         new DateTime(2026, 10, 2, 7, 40, 0));
@@ -82,6 +85,19 @@ public class PedidoImpressoHtmlTests
         var corpo = Corpo(await Renderizar(Exemplo(), PedidoImpressoHtml.A4));
 
         corpo.Should().ContainAll("Unitário", "R$ 24,90", "sex 02/10", "10:00–11:00", "qua 30/09 14:32", "Casa da Baba");
+    }
+
+    [Theory]
+    [InlineData(PedidoImpressoHtml.Etiqueta10x15, "<span class=\"qn\">0,5</span><span class=\"qx\">kg</span>")]
+    [InlineData(PedidoImpressoHtml.Cupom58, "<span class=\"qn\">0,5</span><span class=\"qx\">kg</span>")]
+    [InlineData(PedidoImpressoHtml.A4, "0,5<span class=\"eun\">kg</span>")]
+    public async Task UnidadeDoItemEContagem(string modelo, string esperado)
+    {
+        var dto = Exemplo(quantidadeItens: 1, itens: [new PedidoImpressoItemDto(0.5m, "kg", "Massa fresca", null, 60m, 30m)]);
+        var corpo = Corpo(await Renderizar(dto, modelo));
+
+        corpo.Should().Contain(esperado);
+        if (modelo != PedidoImpressoHtml.Cupom58) corpo.Should().Contain("· 1 item<");
     }
 
     [Theory]

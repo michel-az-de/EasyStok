@@ -26,7 +26,8 @@ public class MontarPedidoImpressoUseCaseTests
         DateTime? agendadoParaEm = null,
         IReadOnlyList<PedidoImpressoPagamentoLeitura>? pagamentos = null,
         string? formaCobranca = "pix",
-        PedidoImpressoEntregaLeitura? entrega = null) =>
+        PedidoImpressoEntregaLeitura? entrega = null,
+        IReadOnlyList<PedidoImpressoItemLeitura>? itens = null) =>
         new(
             Id: PedidoId,
             CriadoEm: new DateTime(2026, 9, 30, 17, 32, 0, DateTimeKind.Utc),
@@ -42,10 +43,10 @@ public class MontarPedidoImpressoUseCaseTests
             FormaCobranca: formaCobranca,
             Entrega: entrega,
             TempoPreparoPadraoMinutos: 45,
-            Itens:
+            Itens: itens ??
             [
-                new PedidoImpressoItemLeitura("Pão de queijo recheado", "500 g", 2, 24.90m, 49.80m, null),
-                new PedidoImpressoItemLeitura("Bolo de cenoura", null, 1, 42m, 42m, " sem granulado "),
+                new PedidoImpressoItemLeitura("Pão de queijo recheado", "500 g", 2, null, 24.90m, 49.80m, null, EhProduto: true),
+                new PedidoImpressoItemLeitura("Bolo de cenoura", null, 1, "UN", 42m, 42m, " sem granulado ", EhProduto: true),
             ]);
 
     private static async Task<PedidoImpressoDto?> Montar(PedidoImpressoLeitura? leitura, string? nota = null)
@@ -136,8 +137,25 @@ public class MontarPedidoImpressoUseCaseTests
 
         dto!.Itens.Select(i => i.Nome).Should().Equal("Pão de queijo recheado (500 g)", "Bolo de cenoura");
         dto.Itens[1].Observacao.Should().Be("sem granulado");
-        dto.QuantidadeTotal.Should().Be(3);
+        dto.QuantidadeItens.Should().Be(3);
+        dto.Itens.Select(i => i.Unidade).Should().Equal("un", "un");
         dto.Observacao.Should().Be("Deixar na portaria");
+    }
+
+    [Fact]
+    public async Task FreteNaoContaEPesoContaUm()
+    {
+        var dto = await Montar(Leitura(itens:
+        [
+            new PedidoImpressoItemLeitura("Coxinha", null, 3, "un", 8.5m, 25.5m, null, EhProduto: true),
+            new PedidoImpressoItemLeitura("Massa fresca", null, 0.5m, "kg", 60m, 30m, null, EhProduto: true),
+            new PedidoImpressoItemLeitura("Molho", null, 1.5m, null, 10m, 15m, null, EhProduto: true),
+            new PedidoImpressoItemLeitura("Frete", null, 1, null, 12m, 12m, null, EhProduto: false),
+        ]));
+
+        dto!.QuantidadeItens.Should().Be(5, "3 coxinhas + 1 massa a peso + 1 molho fracionado; frete fora");
+        dto.Itens.Select(i => i.Unidade).Should().Equal("un", "kg", "un", "un");
+        dto.Itens.Should().HaveCount(4, "o frete continua impresso como linha");
     }
 
     [Fact]

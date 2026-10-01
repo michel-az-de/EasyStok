@@ -111,7 +111,9 @@ public sealed class PedidoImpressoQueries(EasyStockDbContext db) : IPedidoImpres
             TempoPreparoPadraoMinutos: tempoPreparo,
             Itens: p.Itens
                 .OrderBy(i => i.CriadoEm)
-                .Select(i => new PedidoImpressoItemLeitura(i.Nome, i.VariacaoRotuloSnapshot, i.Quantidade, i.PrecoUnitario, i.Subtotal, i.Observacao))
+                .Select(i => new PedidoImpressoItemLeitura(
+                    i.Nome, i.VariacaoRotuloSnapshot, i.Quantidade, i.Unidade, i.PrecoUnitario, i.Subtotal, i.Observacao,
+                    EhProduto: !string.IsNullOrWhiteSpace(i.LinhaSnapshot) || i.CardapioItemId is not null || i.ProdutoId is not null))
                 .ToList());
     }
 }
