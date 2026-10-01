@@ -12,7 +12,10 @@ public sealed record EntradaWhatsApp(
 
 public sealed record ContatoWhatsApp(string WaId, string? Nome);
 
-/// <summary><see cref="Tipo"/> é o <c>type</c> bruto da Meta (text, image, audio, document, sticker, location, interactive, button, reaction, unsupported).</summary>
+/// <summary>
+/// <see cref="Tipo"/> é o <c>type</c> bruto da Meta (text, image, audio, document, sticker, video, location, interactive,
+/// button, reaction, unsupported, system). <see cref="TextoCorpo"/> é o texto, a legenda da mídia ou a localização.
+/// </summary>
 public sealed record MensagemRecebidaWhatsApp(
     string De,
     string Wamid,
