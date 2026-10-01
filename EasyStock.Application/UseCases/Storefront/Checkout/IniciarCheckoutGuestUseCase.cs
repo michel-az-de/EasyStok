@@ -7,7 +7,9 @@ using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Entities.Storefront;
+using EasyStock.Domain.Sales;
 using DomainCliente = EasyStock.Domain.Entities.Cliente;
+using DomainPedido = EasyStock.Domain.Entities.Pedido;
 
 namespace EasyStock.Application.UseCases.Storefront.Checkout;
 
@@ -27,6 +29,13 @@ namespace EasyStock.Application.UseCases.Storefront.Checkout;
 /// snapshot de nome e telefone no pedido, endereco (CEP e numero) nas observacoes e token de
 /// acompanhamento sem login (#681). CEP fora da area (zona ou raio) e recusado como no logado: sem
 /// frete cotado nao ha o que cobrar. Cliente bloqueado e recusado antes da vaga (#1291).
+/// </para>
+///
+/// <para>
+/// <strong>Ponte (#1306), temporaria:</strong> o site ainda nao manda janela. Sem <c>JanelaId</c> e
+/// <c>DataEntrega</c>, o guest segue o modo antigo (#680): pedido em <c>aguardando_aprovacao_baba</c>, sem
+/// vaga, sem frete e sem cobranca; a dona agenda e cobra pelo WhatsApp. So um dos dois e recusado. Sai
+/// quando o site publicar o passo de janela.
 /// </para>
 /// </summary>
 public sealed class IniciarCheckoutGuestUseCase(
@@ -67,6 +76,10 @@ public sealed class IniciarCheckoutGuestUseCase(
         var cep = CheckoutCoreService.ValidarEntrada(
             input.Cep, input.Items?.Select(i => (i.CardapioItemId, i.Qtd)).ToList());
 
+        if (input.JanelaId.HasValue != input.DataEntrega.HasValue)
+            throw new RegraDeDominioVioladaException(
+                "Informe a janela e a data de entrega juntas, ou nenhuma das duas.");
+
         // ── Resolver storefront ──────────────────────────────────────────
         var storefront = await storefrontRepository.GetBySlugAsync(input.Slug, ct);
         if (storefront is null || !storefront.Ativo)
@@ -79,13 +92,17 @@ public sealed class IniciarCheckoutGuestUseCase(
         if (cliente.Bloqueado)
             throw new ClienteBloqueadoException(cliente.Id);
 
+        if (input.JanelaId is not { } janelaId || input.DataEntrega is not { } dataEntrega)
+            return await CriarSemJanelaAsync(storefront.Id, storefront.EmpresaId, cliente, clienteNovo, nome, telefoneE164,
+                cep, input, sw, ct);
+
         // ── Fases 1 e 2: pedido, frete cotado e vaga (S10) ───────────────
         var reservado = await checkoutCore.CriarPedidoComReservaAsync(
             new CheckoutCoreInput(
                 ClienteId: cliente.Id,
                 Itens: input.Items!.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd)).ToList(),
-                JanelaId: input.JanelaId,
-                DataEntrega: input.DataEntrega,
+                JanelaId: janelaId,
+                DataEntrega: dataEntrega,
                 Cep: cep,
                 Origem: OrigemPedido.StorefrontGuest,
                 Slug: input.Slug,
@@ -118,6 +135,43 @@ public sealed class IniciarCheckoutGuestUseCase(
 
         return new IniciarCheckoutGuestResult(
             pedido.Id, numeroCurto, token, frete, cobranca.LinkPagamento, ExpiresInSeconds);
+    }
+
+    /// <summary>
+    /// Ponte #1306: modo antigo do guest (#680), sem vaga nem cobranca. O pedido vai para a aprovacao da dona,
+    /// que agenda e cobra pelo WhatsApp; o site monta a mensagem com o numero curto.
+    /// </summary>
+    private async Task<IniciarCheckoutGuestResult> CriarSemJanelaAsync(
+        Guid storefrontId, Guid empresaId, DomainCliente cliente, bool clienteNovo, string nome, string telefoneE164,
+        string cep, IniciarCheckoutGuestInput input, Stopwatch sw, CancellationToken ct)
+    {
+        var itensPedidos = input.Items!.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd)).ToList();
+        var cardapioItens = await checkoutCore.CarregarItensCardapioAsync(
+            storefrontId, itensPedidos.Select(i => i.CardapioItemId), ct);
+
+        var pedido = DomainPedido.Criar(empresaId: empresaId, cliente: cliente, origem: OrigemPedido.StorefrontGuest);
+        pedido.ClienteNome = nome;
+        pedido.ClienteTelefone = telefoneE164;
+        pedido.Status = StatusPedidoMapper.AguardandoAprovacaoBaba;
+        pedido.Observacoes = MontarObservacoes(input.Observacoes, cep, input.Numero);
+        await pedidoRepository.AddAsync(pedido, ct);
+
+        foreach (var item in await checkoutCore.AdicionarItensAsync(pedido, itensPedidos, cardapioItens, ct))
+            pedido.Itens.Add(item);
+        pedido.RecalcularTotal();
+        pedido.AlteradoEm = DateTime.UtcNow;
+        await pedidoRepository.UpdateAsync(pedido, ct);
+
+        tenantContext.SetCurrentTenant(empresaId);
+        await atribuicaoCampanha.AtribuirAsync(empresaId, cliente.Id, pedido.Id, ct);
+        await unitOfWork.CommitAsync();
+
+        var numeroCurto = pedido.Id.ToString("N")[..8].ToUpperInvariant();
+        logger.LogInformation(
+            "Checkout guest sem janela (ponte #1306) pedidoId={PedidoId} numeroCurto={Numero} storefrontId={StorefrontId} clienteNovo={Novo} elapsedMs={Ms}",
+            pedido.Id, numeroCurto, storefrontId, clienteNovo, sw.ElapsedMilliseconds);
+
+        return new IniciarCheckoutGuestResult(pedido.Id, numeroCurto, tokenService.Gerar(pedido.Id), FreteEstimado: null);
     }
 
     private async Task<(DomainCliente Cliente, bool Novo)> ResolverClienteAsync(
