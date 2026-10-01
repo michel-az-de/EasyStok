@@ -48,6 +48,7 @@ public sealed record PedidoImpressoCasaLeitura(
 /// <param name="Nome">Nome do pedido, senão do cadastro.</param>
 /// <param name="Telefone">Telefone do pedido, senão do cadastro.</param>
 /// <param name="Apt"><c>Pedido.ClienteApt</c>, usado quando o cadastro não tem complemento.</param>
+/// <param name="Alergias">Tags do cadastro que começam com <c>alergia_</c>, como gravadas (S52).</param>
 public sealed record PedidoImpressoClienteLeitura(
     Guid? Id,
     string? Nome,
@@ -57,7 +58,8 @@ public sealed record PedidoImpressoClienteLeitura(
     string? Apt,
     string? Bairro,
     string? Cidade,
-    string? Cep);
+    string? Cep,
+    IReadOnlyList<string>? Alergias = null);
 
 public sealed record PedidoImpressoPagamentoLeitura(decimal Valor, DateTime PagoEm, string Metodo);
 
@@ -67,6 +69,8 @@ public sealed record PedidoImpressoEntregaLeitura(TipoEntregador? Tipo, string? 
 
 /// <param name="Unidade"><c>PedidoItem.Unidade</c> (<c>un</c>, <c>kg</c>...); nulo = unidade.</param>
 /// <param name="EhProduto">Tem linha, item de cardápio ou produto (mesma regra do canhoto); frete e taxa não.</param>
+/// <param name="Linha"><c>PedidoItem.LinhaSnapshot</c> (<c>paraServir</c>, <c>prepararEmCasa</c>), para a comanda (S52).</param>
+/// <param name="Molho"><c>CardapioItem.SugestaoMolho</c> do item, como no canhoto.</param>
 public sealed record PedidoImpressoItemLeitura(
     string Nome,
     string? Variacao,
@@ -75,4 +79,6 @@ public sealed record PedidoImpressoItemLeitura(
     decimal PrecoUnitario,
     decimal Subtotal,
     string? Observacao,
-    bool EhProduto);
+    bool EhProduto,
+    string? Linha = null,
+    string? Molho = null);

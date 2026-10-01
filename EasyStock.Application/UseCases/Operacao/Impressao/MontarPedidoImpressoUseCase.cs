@@ -6,15 +6,13 @@ namespace EasyStock.Application.UseCases.Operacao.Impressao;
 public sealed record MontarPedidoImpressoInput(Guid EmpresaId, Guid PedidoId, string? Nota = null);
 
 /// <summary>
-/// Monta o <see cref="PedidoImpressoDto"/> (S49). Agendado: janela da vaga ativa, senão o horário agendado;
-/// pronto até = início − <see cref="MinutosProntoAntesDaJanela"/>. Imediato: pronto = último pagamento (ou
-/// criação) + tempo de preparo da loja; saída = pronto + <see cref="MinutosProntoAntesDaJanela"/>.
+/// Monta o <see cref="PedidoImpressoDto"/> (S49), com o prazo de <see cref="PrazoImpresso"/>.
 /// Devolve <c>null</c> para pedido inexistente ou de outra empresa.
 /// </summary>
 public sealed class MontarPedidoImpressoUseCase(IPedidoImpressoQueries queries, TimeProvider relogio)
 {
-    /// <summary>Folga entre o pronto e a entrega. Fixa até a S50 torná-la configurável por loja.</summary>
-    public const int MinutosProntoAntesDaJanela = 30;
+    /// <summary>Folga entre o pronto e a entrega; a regra mora em <see cref="PrazoImpresso"/>.</summary>
+    public const int MinutosProntoAntesDaJanela = PrazoImpresso.MinutosProntoAntesDaJanela;
     public const int NotaTamanhoMaximo = 80;
     public const string UnidadePadrao = "un";
 
@@ -38,7 +36,7 @@ public sealed class MontarPedidoImpressoUseCase(IPedidoImpressoQueries queries, 
         return new PedidoImpressoDto(
             new PedidoImpressoCasaDto(p.Casa.Nome, Limpo(p.Casa.Documento), Limpo(p.Casa.Site), Limpo(p.Casa.WhatsApp), Limpo(p.Casa.LogoUrl)),
             p.Id.ToString("N")[..8].ToUpperInvariant(),
-            Prazo(p, ultimoPagamento?.PagoEm),
+            PrazoImpresso.Calcular(p),
             new PedidoImpressoClienteDto(
                 c.Id is { } id ? id.ToString("N")[..6].ToUpperInvariant() : null,
                 Limpo(c.Nome),
@@ -60,24 +58,6 @@ public sealed class MontarPedidoImpressoUseCase(IPedidoImpressoQueries queries, 
             HorarioBrasil.ConverterParaBrasilia(p.CriadoEm),
             HorarioBrasil.ConverterParaBrasilia(p.AlteradoEm),
             HorarioBrasil.ConverterParaBrasilia(relogio.GetUtcNow().UtcDateTime));
-    }
-
-    private static PedidoImpressoPrazoDto Prazo(PedidoImpressoLeitura p, DateTime? ultimoPagamentoEm)
-    {
-        var folga = TimeSpan.FromMinutes(MinutosProntoAntesDaJanela);
-        if (p.Janela is { } j)
-        {
-            var inicio = j.Data.ToDateTime(j.Inicio);
-            return new PedidoImpressoPrazoDto(true, inicio, j.Data.ToDateTime(j.Fim), inicio - folga);
-        }
-        if (p.AgendadoParaEm is { } agendado)
-        {
-            var inicio = HorarioBrasil.ConverterParaBrasilia(agendado);
-            return new PedidoImpressoPrazoDto(true, inicio, null, inicio - folga);
-        }
-        var pronto = HorarioBrasil.ConverterParaBrasilia(ultimoPagamentoEm ?? p.CriadoEm)
-            .AddMinutes(p.TempoPreparoPadraoMinutos);
-        return new PedidoImpressoPrazoDto(false, pronto + folga, null, pronto);
     }
 
     private static int Volumes(PedidoImpressoItemLeitura i) =>
