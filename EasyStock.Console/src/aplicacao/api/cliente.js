@@ -20,6 +20,10 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
     const corpo = { nome: nome?.trim() || null, telefone: telefone || null, endereco: endereco ? enderecoParaApi(endereco) : null }
     return cadastrarClienteDaConversa(id, corpo)
       .then((salvo) => {
+        // O telefone já era de outro cadastro: a conversa foi ligada a ele, com o nome dele.
+        if (salvo && salvo.novo === false && corpo.nome && salvo.nome !== corpo.nome) {
+          avisar(`Este telefone já é de ${salvo.nome}: a conversa foi ligada a esse cadastro.`)
+        }
         if (salvo?.dentroDaArea === false) {
           avisar(`Cadastro salvo, mas o endereço está fora da área de entrega. ${salvo.mensagemForaArea ?? ''}`.trim())
         }

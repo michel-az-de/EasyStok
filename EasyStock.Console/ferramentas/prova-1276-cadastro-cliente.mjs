@@ -51,7 +51,7 @@ const dossie = {
 }
 
 // Rede falsa: guarda as chamadas e responde o POST do cadastro e o GET do dossiê.
-function rede({ statusPost = 200, dentroDaArea = true } = {}) {
+function rede({ statusPost = 200, dentroDaArea = true, existente = null } = {}) {
   const chamadas = []
   globalThis.fetch = async (url, { method = 'GET', body } = {}) => {
     chamadas.push({ metodo: method, url, corpo: body ? JSON.parse(body) : null })
@@ -59,7 +59,7 @@ function rede({ statusPost = 200, dentroDaArea = true } = {}) {
       if (statusPost >= 400) {
         return new Response(JSON.stringify({ error: { code: 'VALIDATION_ERROR', message: 'Informe o telefone do cliente para cadastrar.' } }), { status: statusPost })
       }
-      return new Response(JSON.stringify({ data: { clienteId: CLIENTE, nome: 'Maria Souza', telefone: '+5511987654321', novo: true, dentroDaArea, mensagemForaArea: dentroDaArea ? null : 'Ainda não entregamos aí.' } }), { status: 200 })
+      return new Response(JSON.stringify({ data: { clienteId: CLIENTE, nome: existente ?? 'Maria Souza', telefone: '+5511987654321', novo: !existente, dentroDaArea, mensagemForaArea: dentroDaArea ? null : 'Ainda não entregamos aí.' } }), { status: 200 })
     }
     if (url.endsWith('/dossie')) return new Response(JSON.stringify({ data: dossie }), { status: 200 })
     return new Response(JSON.stringify({ data: null }), { status: 200 })
@@ -184,6 +184,14 @@ await confere('Renomear lead sem cadastro é rascunho: sobrevive à sincronizaç
   depois.acoes.salvarCadastroRapido('conv-1', { nome: 'Visitante do site', telefone: '11987654321', endereco: null }, 0)
   await esperar()
   assert.equal(chamadas.find((c) => c.metodo === 'POST')?.corpo.nome, 'Joana Lima')
+})
+
+await confere('Telefone de outro cadastro: liga a ele e avisa o nome que ficou', async () => {
+  rede({ existente: 'Carla Verificação' })
+  const { acoes, despachados } = montar(lead({ nome: 'Débora', nomeDaDona: true }))
+  acoes.salvarCadastroRapido('conv-1', { nome: 'Débora', telefone: '11976543210', endereco: null }, 0)
+  await esperar()
+  assert.ok(despachados.some((a) => a.tipo === acao.AVISO_API && /Carla Verificação/.test(a.mensagem)), 'não avisou de quem é o telefone')
 })
 
 await confere('Cliente gravado sobrevive à sincronização de 5 s com o mesmo clienteId', () => {
