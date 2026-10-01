@@ -142,7 +142,14 @@ troca o link do Google Fonts para Lora 500/600 e Nunito Sans 400/700 (mesmo meca
 - [ ] Logo no topo e no login, derivada do canônico; bundle final menor que hoje + 150 KB.
 - [ ] Captura antes/depois do balcão, da cozinha e da gestão anexada ao PR.
 
-**Fora.** Modo escuro (ver D-03); ícones novos; mascote; impressos (S49–S53).
+**Modo escuro (D-03, DECIDIDO 01/10: entra em tudo).** Tema claro e escuro desde a v1, pelo
+`light-dark()` que o console já usa. Valores escuros: fundo `#1A120C`, texto `#F6EBDD` (15,71:1),
+Caramelo claro `#F0A960` (9,29:1) para títulos e ação; estados e canais ganham par escuro com a mesma
+regra de contraste. A logo, que só existe para fundo claro, fica dentro de uma **placa clara** (Papel
+`#FEFEFE`, cantos retos) no topo e no login. Aceite extra: o script de contraste confere os dois temas,
+e a captura antes/depois sai nos dois.
+
+**Fora.** Ícones novos; mascote; impressos (S49–S53).
 
 ---
 
@@ -213,7 +220,7 @@ só de URL bonita. `rotaDaHash` continua pura em `dominio/` e cresce com testes.
   módulo ainda sem tela no console mostra **Em breve** e não navega.
 - Busca no topo filtra módulos e telas pelo nome (lista estática do shell; nada de busca de dados).
 - Porta de entrada: depois do login, `portaDeEntrada` da M0.3 decide a rota (Atendimento → `#/m/atendimento`,
-  Cozinha → `#/m/cozinha/fila`, Entregador → `#/m/entregas/minhas-viagens`, Dona → `#/`).
+  Cozinha → `#/m/cozinha/fila`, Dona → `#/`; o entregador não loga, abre o link da viagem, D8-01).
 - **Cockpit intacto (D5):** `#/m/atendimento` monta exatamente a `Composicao` de hoje
   (`App.jsx:46`) dentro do `AtendimentoProvider`; o menu lateral do M3 é recolhido por padrão e o
   topo ganha só o botão "módulos". As janelas de Cozinha e Entregas continuam sem
@@ -224,9 +231,10 @@ só de URL bonita. `rotaDaHash` continua pura em `dominio/` e cresce com testes.
 
 | # | Lacuna | Onde | Correção |
 |---|---|---|---|
-| 1 | Tablet da cozinha perde a sessão ao fechar a aba (`sessionStorage`, sem refresh) | `sessao.js:1-4` | Fora desta fatia: decidir em D-05 |
-| 2 | Entregador não tem usuário: `Entregador` não referencia `Usuario` | `Domain/Entities/Atendimento/Entregador.cs:9-21` | Vínculo e "minhas viagens" ficam em `09-m8-entregas.md`; aqui só a porta de entrada |
-| 3 | Login com "EasyStok / Console de atendimento" | `TelaLogin.jsx:46-47` | Logo + nome de D-02 |
+| 1 | Tablet da cozinha perde a sessão ao fechar a aba (`sessionStorage`, sem refresh) | `sessao.js:1-4` | D-05 DECIDIDO: sessão longa (refresh token e "sair" explícito) só no perfil Cozinha; os demais seguem no `sessionStorage` |
+| 2 | Entregador não tem usuário: `Entregador` não referencia `Usuario` | `Domain/Entities/Atendimento/Entregador.cs:9-21` | Continua assim: D8-01 decidiu link por viagem, sem login (`09-m8-entregas.md`) |
+| 3 | Login com "EasyStok / Console de atendimento" | `TelaLogin.jsx:46-47` | D-02 DECIDIDO: logo da Casa da Baba e "EasyStok" pequeno no login e no rodapé ("Casa da Baba · EasyStok") |
+| 4 | Login com conta Google entrou no master depois desta spec (#1325, `features/login/BotaoGoogle.jsx`) | `BotaoGoogle.jsx:5-12` | O shell mantém os dois caminhos (e-mail e senha, Google); medir o fluxo antes de mexer na tela de login |
 | 4 | `useSessaoApi` repetido em 4 componentes de rota | `App.jsx:258,273,280,287` | Um guarda de sessão só no shell |
 
 **Aceite.**
@@ -303,18 +311,18 @@ faturas na P02 (#1135), mas o enum ficou.
 | Transversal (sem módulo) | `AuthController`, `NotificacaoController`, `OperacaoEventosController`, `UploadsController`, `PreferenciaMenuController`, `PwaPushController`, `FeatureFlagsController`, `Diagnostico*`, `Webhook*`, `Storefront/*` públicos, `Internal/*`, `ImpressaoController` (bridge) |
 | Bastidor do Web (nível + permissão fina, sem módulo) | `Financeiro*`, `ContasAPagar*`, `ContasAReceber*`, `CategoriasFinanceiras*`, `CentrosCusto*`, `FornecedorController`, `Analytics*`, `Reports*`, `Inteligencia*`, `EntityAuditController` |
 
-**Perfis iniciais e matriz (PROPOSTA, ver D-01).** ✔ = módulo liberado; Porta = rota depois do login.
+**Perfis iniciais e matriz (D-01, DECIDIDO 01/10: três perfis).** ✔ = módulo liberado; Porta = rota depois do login.
+Não há perfil Caixa na v1 (o Atendimento opera o caixa) nem perfil Entregador: o entregador entra por
+link de viagem, sem login (D8-01).
 
 | Perfil | Nível | M1 | M2 | M3 | M4 | M5 | M6 | M7 | M8 | Porta | Finas extras |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | Dona | Admin | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | sala | todas as 11 |
 | Atendimento | Operador | ✔ | | ✔ | ✔ | ✔ | | | ✔ | M3 balcão | `AtenderConversas`, `GerenciarProdutos` |
 | Cozinha | Operador | | ✔ | | ✔ | | | | | M4 fila | `GerenciarEstoque` |
-| Caixa | Operador | | | | | ✔ | | | | M5 | (nenhuma) |
-| Entregador | Operador | | | | | | | | ✔ | M8 minhas viagens | (nenhuma) |
 
 Fechar e estornar caixa continuam exigindo **Gerente** (`CaixaController.cs:61,111`, decisão do F14):
-o perfil Caixa abre, lança e vê; fecha quem é Dona.
+o Atendimento abre, lança e vê; fecha quem é Dona.
 
 **Aceite.**
 - [ ] Enum com 19 membros; `git grep -nE "Tickets|Sla|Fatura|Faq|Helpdesk" -- EasyStock.Domain/Enums/Permissao.cs` = 0.
@@ -409,8 +417,10 @@ em `Infra.Postgre/Data/Configurations/*:7-16`), mais as de `PaymentAttempt*`; co
 de tabelas **só entra depois de uma release em produção sem o código** (`07-poda.md:86`).
 
 **Escopo.** Uma migration `RemoverResiduoSaasEFma`, lista explícita no PR, `Down` recriando vazias.
-Dados de outras empresas conforme D-04 (script separado e revisado, nunca dentro da migration de
-esquema).
+Dados de outras empresas (D-04, DECIDIDO 01/10: **apagar na M0.5**): tudo que não for da Casa da Baba sai
+nesta fatia, por script separado e revisado (nunca dentro da migration de esquema), rodado depois do
+`pg_dump` do `vps-deploy.sh`. Antes de apagar, confirmar qual `Empresa` é a Casa da Baba real (o console foi
+homologado em "Demonstração EasyStok") e anexar a contagem por empresa, antes e depois.
 
 **Aceite.**
 - [ ] Migration aplicada em banco restaurado de produção (cópia), com contagem de linhas antes/depois anexada.
@@ -422,29 +432,12 @@ esquema).
 
 ---
 
-## Decisões pendentes do Felipe
+## Decisões do Felipe (respondidas em 01/10)
 
-**D-01 · Perfis e matriz perfil × módulo** (bloqueia M0.3 e todos os módulos)
-- a) **(Recomendado)** Os 5 perfis da matriz da M0.3 (Dona, Atendimento, Cozinha, Caixa, Entregador), um perfil por usuário.
-- b) Só 3 perfis agora (Dona, Atendimento, Cozinha); Caixa e Entregador quando M5 e M8 chegarem.
-- c) Perfis livres desde já: a Dona monta a matriz na tela (puxa o editor do M7 para dentro do M0).
-
-**D-02 · Nome na tela** (bloqueia M0.1 e M0.2; hoje o login diz "EasyStok" e o topo "Casa da Baba")
-- a) **(Recomendado)** "Casa da Baba" (só a logo; "EasyStok" some do que a equipe vê).
-- b) "Casa da Baba · EasyStok" (logo e o nome do sistema pequeno no login e no rodapé).
-- c) "EasyStok" (nome do sistema, logo da casa só no topo).
-
-**D-03 · Modo escuro**
-- a) **(Recomendado)** Fica fora na v1: `color-scheme: only light`, sai o interruptor de tema. Motivos: a logo não tem ativo para fundo escuro (`GUIA-DA-MARCA.md` §1), o DS aguarda aceite visual (`tokens.json`), e cai pela metade a superfície a testar. Os valores escuros desta spec (texto `#F6EBDD` 15,71:1 sobre `#1A120C`; Caramelo claro `#F0A960` 9,29:1) ficam anotados para uma fatia futura.
-- b) Entra na v1 com a logo dentro de uma placa clara no topo.
-- c) Entra só na cozinha (tablet de parede), o resto claro.
-
-**D-04 · Dados das outras empresas no banco de produção** (bloqueia M0.4 lacuna 2 e M0.5)
-- a) **(Recomendado)** Medir primeiro; depois desativar (`Empresa` inativa, usuários sem vínculo ativo) e manter os dados inertes; apagar só em M0.5 com script revisado e backup.
-- b) Apagar já em M0.5 tudo que não for da Casa da Baba.
-- c) Manter tudo ativo como está (a escolha de empresa continua aparecendo para quem tem duas).
-
-**D-05 · Sessão do tablet da cozinha e do celular do entregador**
-- a) **(Recomendado)** Sessão longa só para os perfis de dispositivo (Cozinha, Entregador), com refresh token e "sair" explícito; os demais seguem no `sessionStorage`.
-- b) Todos no `sessionStorage` (login a cada aba nova, como hoje).
-- c) Todos com sessão longa.
+| # | Decisão |
+|---|---|
+| D-01 | Três perfis na v1: Dona, Atendimento, Cozinha (sem Caixa e sem Entregador) |
+| D-02 | "Casa da Baba · EasyStok": logo da casa, nome do sistema pequeno no login e no rodapé |
+| D-03 | Modo escuro entra em tudo; logo dentro de placa clara |
+| D-04 | Dados de outras empresas são apagados na M0.5, com backup e contagem antes/depois |
+| D-05 | Sessão longa só no perfil Cozinha |

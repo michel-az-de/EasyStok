@@ -8,14 +8,14 @@ Base medida: master `0a70eb56` (estudo da #1316). Plano irmão: [atendimento-wha
 
 ```
               ┌──────────┐
-              │  Login   │  e-mail + senha (JWT da Api, tenant fixo)
+              │  Login   │  e-mail e senha ou Google (#1325), tenant fixo
               └────┬─────┘
-                   │ perfil decide a porta de entrada
-      ┌────────────┼──────────────┬──────────────┐
-      ▼            ▼              ▼              ▼
- Sala de       M3 Balcão      M4 Cozinha     M8 Minhas
- módulos       (Atendimento)  (tablet)       viagens (celular)
- (Dona)        perfil Atend.  perfil Coz.    perfil Entregador
+                   │ perfil decide a porta de entrada        entregador: sem login,
+      ┌────────────┼──────────────┐             link da viagem no WhatsApp
+      ▼            ▼              ▼
+ Sala de       M3 Balcão      M4 Cozinha
+ módulos       (Atendimento)  (tablet, sessão longa)
+ (Dona)        perfil Atend.  perfil Cozinha
       │
       ▼  card liberado/bloqueado por perfil × módulo
  ┌────┬────┬────┬────┬────┬────┬────┬────┐
@@ -83,15 +83,15 @@ Valem as do plano irmão ([README §Convenções](../atendimento-whatsapp/README
 ## 5. Decisões pendentes do Felipe (consolidado)
 
 Detalhe e alternativas no fim de cada doc. A recomendação está entre parênteses. **Bloqueiam a Fase A**
-as marcadas com ⚑; as demais só travam a fatia do próprio módulo.
+as marcadas com ⚑ (todas respondidas em 01/10, ✅); as demais só travam a fatia do próprio módulo.
 
 | # | Pergunta | Recomendação | Doc |
 |---|---|---|---|
-| ⚑ D-01 | Perfis e matriz perfil × módulo | 5 perfis (Dona, Atendimento, Cozinha, Caixa, Entregador), 1 perfil por usuário | [01](01-fundacao.md) |
-| ⚑ D-02 | Nome na tela | "Casa da Baba", só a logo | [01](01-fundacao.md) |
-| ⚑ D-03 | Modo escuro | fora na v1 | [01](01-fundacao.md) |
-| ⚑ D-04 | Dados das outras empresas no banco | medir, desativar, apagar só na M0.5 com backup | [01](01-fundacao.md) |
-| ⚑ D-05 | Sessão do tablet da cozinha e do entregador | sessão longa só nesses perfis | [01](01-fundacao.md) |
+| ✅ D-01 | Perfis e matriz perfil × módulo | **DECIDIDO:** 3 perfis (Dona, Atendimento, Cozinha) | [01](01-fundacao.md) |
+| ✅ D-02 | Nome na tela | **DECIDIDO:** "Casa da Baba · EasyStok" | [01](01-fundacao.md) |
+| ✅ D-03 | Modo escuro | **DECIDIDO:** entra em tudo, logo em placa clara | [01](01-fundacao.md) |
+| ✅ D-04 | Dados das outras empresas no banco | **DECIDIDO:** apagar na M0.5, com backup | [01](01-fundacao.md) |
+| ✅ D-05 | Sessão do tablet da cozinha | **DECIDIDO:** sessão longa só na Cozinha | [01](01-fundacao.md) |
 | D-M1-01 | Dono do preço e da categoria | o cardápio | [02](02-m1-cardapio.md) |
 | D-M1-02 | O que é combo | preço fixo, componentes fixos que baixam estoque | [02](02-m1-cardapio.md) |
 | D-M1-03 | Porção com saldo próprio | por `ProdutoVariacao` | [02](02-m1-cardapio.md) |
@@ -134,7 +134,7 @@ as marcadas com ⚑; as demais só travam a fatia do próprio módulo.
 | DM7-4 | Templates de aviso ao cliente | sem tela por ora | [08](08-m7-configuracoes.md) |
 | DM7-5 | Campos fiscais da vitrine | remover na poda M0.4 | [08](08-m7-configuracoes.md) |
 | DM7-6 | Mensagem "fora da área" | a do atendimento (S08) é a única | [08](08-m7-configuracoes.md) |
-| D8-01 | Acesso do entregador | link por viagem pelo WhatsApp, sem login (se aceito, o perfil Entregador da D-01 sai) | [09](09-m8-entregas.md) |
+| ✅ D8-01 | Acesso do entregador | **DECIDIDO:** link por viagem pelo WhatsApp, sem login | [09](09-m8-entregas.md) |
 | D8-02 | Encomenda até quantos dias | 60 (limite que o código já tem) | [09](09-m8-entregas.md) |
 | D8-03 | Pagamento da encomenda | na hora, como o pedido do dia | [09](09-m8-entregas.md) |
 | D8-04 | Quem marca "entregue" (motoboy da casa) | o entregador; a dona desfaz | [09](09-m8-entregas.md) |
