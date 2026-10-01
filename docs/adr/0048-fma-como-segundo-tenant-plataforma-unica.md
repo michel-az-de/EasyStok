@@ -1,6 +1,6 @@
 # ADR-0048 — FMA Informática como segundo tenant: plataforma única
 
-- Status: Accepted
+- Status: Superseded por ADR-0056 (2026-10-01: tenant único, a FMA sai)
 - Data: 2026-08-08
 - Contexto: épico #1013, issue #1014
 - Relacionado: ADR-0010 (RLS Postgres), ADR-0038 (tenant owner flag), ADR-0047 (login multi-empresa)
