@@ -1,0 +1,21 @@
+<div class="t p1015"><div class="box">
+<div class="r"><div class="g marca"><div class="wm">{{ m.casa.nome }}</div><div class="contato">{{ for c in m.casa.contatos }}<span>{{ c }}</span>{{ end }}</div></div></div>
+<div class="r">
+<div class="inv" style="width:30mm;flex:none"><span class="l">Pedido</span><span class="codigo">#{{ m.numero }}</span><span class="selo">{{ m.prazo.selo }}</span></div>
+<div class="pilha g">
+<div class="div"><div><span class="l">{{ m.prazo.rotulo_data }}</span><span class="grande">{{ m.prazo.data }}</span></div><div><span class="l">{{ m.prazo.rotulo_hora }}</span><span class="grande">{{ m.prazo.hora_curta }}</span></div><div class="contorno"><span class="l">Pronto até</span><span class="grande">{{ m.prazo.pronto_ate }}</span></div></div>
+<div class="div"><div><span class="l">Solicitado</span><b>{{ m.solicitado }}</b></div><div><span class="l">Entregador</span><b>{{ m.entrega }}</b></div></div>
+</div>
+</div>
+<div class="r"><div class="g"><span class="l">Cliente{{ if m.cliente.id }} · ID #{{ m.cliente.id }}{{ end }}</span><div class="nome">{{ m.cliente.nome }}</div>{{ if m.cliente.endereco }}<div class="end">{{ m.cliente.endereco }}</div>{{ end }}</div>{{ if m.cliente.telefone }}<div class="col" style="flex:none;width:36mm"><span class="l">Telefone</span><span class="tel">{{ m.cliente.telefone }}</span></div>{{ end }}</div>
+<div class="r itens">
+<table><thead><tr><th class="q">Qtd</th><th>Item</th><th class="v">Valor</th></tr></thead><tbody>
+{{ for i in m.itens }}<tr><td class="q"><span class="qn">{{ i.quantidade }}</span><span class="qx">{{ i.unidade }}</span></td><td class="n">{{ i.nome }}{{ if i.observacao }}<div class="obs">{{ i.observacao }}</div>{{ end }}</td><td class="v">{{ i.subtotal }}</td></tr>
+{{ end }}</tbody></table>
+{{ if m.observacao || m.nota }}<div class="notas">{{ if m.observacao }}<div><span class="l">Observação</span>{{ m.observacao }}</div>{{ end }}{{ if m.nota }}<div class="nota"><span class="l">Nota</span>{{ m.nota }}</div>{{ end }}</div>{{ end }}
+<div class="resto"></div>
+</div>
+<div class="r total"><span class="l">{{ m.cobranca.rotulo }} · {{ m.quantidade_total }}</span><span class="valor">{{ m.cobranca.total }}</span></div>
+<div class="r"><div class="g barras-cel">{{ m.barras }}<div class="barras-txt">{{ m.numero }}</div></div></div>
+<div class="r"><div class="g meta"><span>Alterado {{ m.alterado }}</span><span>Impresso {{ m.impresso }}</span></div></div>
+</div></div>

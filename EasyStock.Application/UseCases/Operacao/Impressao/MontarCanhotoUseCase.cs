@@ -92,21 +92,8 @@ public sealed class MontarCanhotoUseCase(
         _ => "Outros",
     };
 
-    private static string? MontarEndereco(EasyStock.Domain.Entities.Cliente? cliente, string? apt)
-    {
-        var partes = new List<string>();
-        var rua = string.Join(", ", new[] { Limpo(cliente?.Endereco), Limpo(cliente?.Complemento) ?? Limpo(apt) }
-            .Where(p => p is not null));
-        if (rua.Length > 0) partes.Add(rua);
-        var local = string.Join(", ", new[] { Limpo(cliente?.Bairro), Limpo(cliente?.Cidade) }.Where(p => p is not null));
-        if (local.Length > 0) partes.Add(local);
-        if (Limpo(cliente?.Cep) is { } cep)
-        {
-            var digitos = new string(cep.Where(char.IsDigit).ToArray());
-            partes.Add("CEP " + (digitos.Length == 8 ? $"{digitos[..5]}-{digitos[5..]}" : cep));
-        }
-        return partes.Count == 0 ? null : string.Join(" - ", partes);
-    }
+    private static string? MontarEndereco(EasyStock.Domain.Entities.Cliente? cliente, string? apt) =>
+        EnderecoImpresso.Montar(cliente?.Endereco, cliente?.Complemento, apt, cliente?.Bairro, cliente?.Cidade, cliente?.Cep);
 
     private static string? Limpo(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 }

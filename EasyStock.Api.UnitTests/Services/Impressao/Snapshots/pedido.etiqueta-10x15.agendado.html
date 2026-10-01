@@ -1,0 +1,158 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8" /><title>Pedido #A7F3C21B</title><style>@page{size:100mm 150mm;margin:0}@font-face{font-family:"Lora";src:url("https://api.test/impressao/fontes/Lora.ttf") format("truetype");font-weight:400 700;font-style:normal}@font-face{font-family:"Nunito Sans";src:url("https://api.test/impressao/fontes/NunitoSans.ttf") format("truetype");font-weight:200 1000;font-style:normal}/* Impressos da Casa da Baba (S49). Layout aprovado: docs/plan/atendimento-whatsapp/impressos/pedido-aprovado.html
+   Térmica (.t): só preto, destaque por preto chapado. Jato de tinta (.e4): cor só em linha, contorno e texto. */
+:root { --cacau: #422814; --caramelo: #A25803; --linha: #E5D5BE; --mute: #7a5f48;
+  --lora: "Lora", Georgia, serif; --nunito: "Nunito Sans", system-ui, sans-serif; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #fff; }
+body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+/* ===== Térmica ===== */
+.t { color: #000; font-family: var(--nunito); display: flex; flex-direction: column; }
+.t .box { border: var(--bw) solid #000; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.t .r { display: flex; border-bottom: var(--bh) solid #000; }
+.t .r:last-child { border-bottom: 0; }
+.t .r > * { padding: var(--pad); min-width: 0; }
+.t .r > * + * { border-left: var(--bh) solid #000; }
+.t .g { flex: 1; }
+.t .col { display: flex; flex-direction: column; justify-content: center; }
+.t .l { display: block; font: 900 var(--fl) var(--nunito); letter-spacing: .13em; text-transform: uppercase; margin-bottom: .4mm; }
+.t .marca { display: flex; justify-content: space-between; align-items: center; gap: 3mm; }
+.t .wm { font: 600 var(--fw)/.95 var(--lora); letter-spacing: -.01em; }
+.t .contato { display: grid; gap: .2mm; font: 800 var(--fc)/1.25 var(--nunito); text-align: right; }
+.t .inv { background: #000; color: #fff; display: flex; flex-direction: column; justify-content: center; }
+.t .inv .l { color: #fff; }
+.t .codigo { font: 700 var(--fcod)/1 var(--lora); }
+.t .selo { display: inline-block; align-self: flex-start; margin-top: 1.4mm; border: .6mm solid currentColor;
+  padding: .3mm 1.6mm; font: 900 var(--fselo) var(--nunito); letter-spacing: .16em; }
+.t .grande { font: 700 var(--fg)/1 var(--lora); white-space: nowrap; }
+.t .contorno { border: .9mm solid #000 !important; }
+.t .pilha { display: flex; flex-direction: column; padding: 0 !important; }
+.t .pilha > * { flex: 1; }
+.t .pilha > * + * { border-top: var(--bh) solid #000; }
+.t .div { display: flex; }
+.t .div > * { flex: 1; padding: var(--pad); min-width: 0; }
+.t .div > * + * { border-left: var(--bh) solid #000; }
+.t .nome { font: 600 var(--fnome)/1.15 var(--lora); }
+.t .tel { font: 800 var(--ftel) var(--nunito); white-space: nowrap; }
+.t .end { font-size: var(--fend); line-height: 1.3; }
+.t .itens { flex: 1; flex-direction: column; min-height: 0; overflow: hidden; }
+.t .itens > * { padding: 0; }
+.t .itens > * + * { border-left: 0; }
+.t table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; color: inherit; font-size: inherit; }
+.t th { font: 900 var(--fl) var(--nunito); letter-spacing: .13em; text-transform: uppercase; text-align: left;
+  padding: var(--pad); border-bottom: var(--bh) solid #000; }
+.t td { padding: var(--padi); border-bottom: var(--bt) solid #000; vertical-align: middle; }
+.t th + th, .t td + td { border-left: var(--bh) solid #000; }
+.t tbody tr:last-child td { border-bottom: 0; }
+.t .q { width: 1%; text-align: center; white-space: nowrap; }
+.t .qn { display: block; font: 700 var(--fq)/1 var(--lora); }
+.t .qx { display: block; font: 900 6px var(--nunito); letter-spacing: .12em; text-transform: uppercase; }
+.t .n { font-weight: 800; font-size: var(--fi); }
+.t .obs { font: italic 500 .92em var(--lora); }
+.t .v { width: 1%; text-align: right; white-space: nowrap; font-weight: 800; }
+.t th.q, .t th.v { text-align: center; }
+.t .notas { display: flex; border-top: var(--bh) solid #000; }
+.t .notas > div { flex: 1; padding: var(--pad); }
+.t .notas > div + div { border-left: var(--bh) solid #000; }
+.t .nota { font-weight: 900; }
+.t .resto { flex: 1; }
+.t .total { background: #000; color: #fff; justify-content: space-between; align-items: center; padding: var(--pad); }
+.t .total > * { padding: 0 !important; border: 0 !important; }
+.t .total .l { color: #fff; margin: 0; }
+.t .total .valor { font: 700 var(--ftot)/1 var(--lora); white-space: nowrap; }
+.t .barras-cel { padding: 1.4mm 7mm .6mm !important; text-align: center; }
+.t svg.barras { display: block; width: 100%; height: var(--hb); }
+.t .barras-txt { font: 800 var(--fbt) var(--nunito); letter-spacing: .06em; }
+.t .meta { display: flex; justify-content: space-between; gap: 2mm; font: 700 var(--fmeta) var(--nunito); padding: .6mm 2mm !important; }
+
+.p1015 { width: 100mm; height: 150mm; padding: 2.5mm; font-size: 11px; line-height: 1.3;
+  --bw: .7mm; --bh: .35mm; --bt: .2mm; --pad: 1.3mm 2mm; --padi: .7mm 1.8mm; --fl: 6.8px; --fw: 22px; --fc: 8.6px;
+  --fcod: 17px; --fselo: 9px; --fg: 20px; --fnome: 16px; --ftel: 14px; --fend: 10.5px; --fq: 19px; --fi: 12px;
+  --ftot: 24px; --hb: 10mm; --fbt: 13px; --fmeta: 7.5px; }
+
+.p58 { width: 58mm; padding: 1.5mm; font-size: 9.6px; line-height: 1.3;
+  --bw: .6mm; --bh: .3mm; --bt: .2mm; --pad: 1.1mm 1.4mm; --padi: .6mm 1.2mm; --fl: 6.2px; --fw: 17px; --fc: 7.4px;
+  --fcod: 16px; --fselo: 7.5px; --fg: 17px; --fnome: 13px; --ftel: 12px; --fend: 9.4px; --fq: 16px; --fi: 10.5px;
+  --ftot: 18px; --hb: 9mm; --fbt: 11px; --fmeta: 6.4px; }
+.p58 .box { flex: none; }
+.p58 .marca { flex-direction: column; gap: 1.2mm; text-align: center; }
+.p58 .contato { text-align: center; }
+.p58 .inv { align-items: center; text-align: center; }
+.p58 .selo { align-self: center; }
+.p58 .total { flex-wrap: wrap; }
+.p58 .total .valor { margin-left: auto; }
+.p58 .barras-cel { padding: 1.2mm 3mm .4mm !important; }
+.p58 .meta { flex-direction: column; align-items: center; gap: 0; }
+
+/* ===== Jato de tinta (A4) ===== */
+.e4 { width: 210mm; height: 297mm; padding: 14mm 16mm 12mm; background: #fff; color: var(--cacau);
+  font: 14px/1.45 var(--nunito); display: flex; flex-direction: column; }
+.e4 .el { display: block; font: 800 9.5px var(--nunito); letter-spacing: .14em; text-transform: uppercase; color: var(--caramelo); margin-bottom: .8mm; }
+.e4 .ehead { display: flex; justify-content: space-between; align-items: center; gap: 6mm; padding-bottom: 4mm; border-bottom: .55mm solid var(--caramelo); }
+.e4 .ewm { font: 600 38px/1 var(--lora); color: var(--caramelo); }
+.e4 .elogo { height: 30mm; display: block; }
+.e4 .econt { display: grid; text-align: right; font: 700 12px/1.5 var(--nunito); }
+.e4 .erow { display: flex; border-bottom: .25mm solid var(--linha); }
+.e4 .erow > * { padding: 3mm 4mm; min-width: 0; }
+.e4 .erow > *:first-child { padding-left: 0; }
+.e4 .erow > *:last-child { padding-right: 0; }
+.e4 .erow > * + * { border-left: .25mm solid var(--linha); }
+.e4 .g { flex: 1; }
+.e4 .ecode { display: inline-block; border: .5mm solid var(--caramelo); padding: 2mm 3mm; }
+.e4 .ecode b { display: block; font: 700 26px/1 var(--lora); color: var(--cacau); }
+.e4 .estamp { display: inline-block; margin-top: 1.6mm; border: .35mm solid var(--caramelo); color: var(--caramelo);
+  font: 900 10px var(--nunito); letter-spacing: .16em; padding: .4mm 2mm; }
+.e4 .ebig { font: 600 28px/1.05 var(--lora); white-space: nowrap; }
+.e4 .eprazo { border: .55mm solid var(--caramelo) !important; padding: 2.4mm 4mm !important; margin: 1.6mm 0 1.6mm 3mm; }
+.e4 .eprazo .ebig { color: var(--caramelo); }
+.e4 .ecname { font: 600 24px/1.2 var(--lora); }
+.e4 .ephone { font: 800 20px var(--nunito); white-space: nowrap; }
+.e4 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; color: inherit; }
+.e4 th { text-align: left; font: 800 9.5px var(--nunito); letter-spacing: .14em; text-transform: uppercase; color: var(--caramelo);
+  padding: 3mm 3mm 1.6mm; border-bottom: .35mm solid var(--caramelo); }
+.e4 td { padding: 2.4mm 3mm; border-bottom: .25mm solid var(--linha); vertical-align: middle; }
+.e4 th:first-child, .e4 td:first-child { padding-left: 0; }
+.e4 th:last-child, .e4 td:last-child { padding-right: 0; }
+.e4 th.c { text-align: center; }
+.e4 th.d { text-align: right; }
+.e4 .eq { width: 1%; text-align: center; font: 600 26px/1 var(--lora); color: var(--caramelo); }
+.e4 .eun { font: 800 10px var(--nunito); margin-left: .6mm; text-transform: uppercase; }
+.e4 .en { font-weight: 800; font-size: 15px; }
+.e4 .eobs { font: italic 500 13px var(--lora); color: var(--mute); }
+.e4 .ev { width: 1%; text-align: right; white-space: nowrap; font-weight: 700; }
+.e4 .enotas { border-bottom: 0; margin-top: 3mm; }
+.e4 .enota { border-left: .55mm solid var(--caramelo) !important; font-weight: 800; }
+.e4 .espacer { flex: 1; }
+.e4 .etot { display: flex; justify-content: space-between; align-items: baseline; border-top: .55mm solid var(--caramelo);
+  border-bottom: .55mm solid var(--caramelo); padding: 3mm 0; margin-top: 4mm; }
+.e4 .etot .el { margin: 0; }
+.e4 .etot .ebig { font-size: 36px; color: var(--caramelo); }
+.e4 .ebar { display: flex; flex-direction: column; align-items: center; padding: 4mm 0 2mm; }
+.e4 svg.barras { display: block; width: 72mm; height: 12mm; }
+.e4 .ebar-txt { font: 800 13px var(--nunito); letter-spacing: .06em; color: #000; }
+.e4 .emeta { display: flex; justify-content: space-between; font: 700 10.5px var(--nunito); color: var(--mute); }
+</style></head><body><div class="t p1015"><div class="box">
+<div class="r"><div class="g marca"><div class="wm">Casa da Baba</div><div class="contato"><span>CNPJ 12.345.678/0001-90</span><span>casadababa.com.br</span><span>WhatsApp (11) 90000-0000</span></div></div></div>
+<div class="r">
+<div class="inv" style="width:30mm;flex:none"><span class="l">Pedido</span><span class="codigo">#A7F3C21B</span><span class="selo">AGENDADO</span></div>
+<div class="pilha g">
+<div class="div"><div><span class="l">Entrega</span><span class="grande">02/10</span></div><div><span class="l">Janela</span><span class="grande">10–11h</span></div><div class="contorno"><span class="l">Pronto até</span><span class="grande">09:30</span></div></div>
+<div class="div"><div><span class="l">Solicitado</span><b>30/09 14:32</b></div><div><span class="l">Entregador</span><b>Motoboy · João</b></div></div>
+</div>
+</div>
+<div class="r"><div class="g"><span class="l">Cliente · ID #0412AB</span><div class="nome">Mariana Souza</div><div class="end">Rua das Laranjeiras, 214, ap 32 - Vila Mariana, São Paulo</div></div><div class="col" style="flex:none;width:36mm"><span class="l">Telefone</span><span class="tel">(11) 98765-4412</span></div></div>
+<div class="r itens">
+<table><thead><tr><th class="q">Qtd</th><th>Item</th><th class="v">Valor</th></tr></thead><tbody>
+<tr><td class="q"><span class="qn">2</span><span class="qx">un</span></td><td class="n">Pão de queijo recheado 500 g</td><td class="v">R$ 49,80</td></tr>
+<tr><td class="q"><span class="qn">1</span><span class="qx">un</span></td><td class="n">Bolo de cenoura com cobertura de chocolate<div class="obs">sem granulado</div></td><td class="v">R$ 42,00</td></tr>
+<tr><td class="q"><span class="qn">3</span><span class="qx">un</span></td><td class="n">Coxinha de frango congelada</td><td class="v">R$ 25,50</td></tr>
+<tr><td class="q"><span class="qn">1</span><span class="qx">un</span></td><td class="n">Torta de palmito média</td><td class="v">R$ 56,00</td></tr>
+</tbody></table>
+<div class="notas"><div><span class="l">Observação</span>Deixar na portaria, bloco B</div><div class="nota"><span class="l">Nota</span>Embalar os pães separados</div></div>
+<div class="resto"></div>
+</div>
+<div class="r total"><span class="l">Cobrar na entrega · PIX · 7 itens</span><span class="valor">R$ 173,30</span></div>
+<div class="r"><div class="g barras-cel"><svg class="barras" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 143 40" preserveAspectRatio="none" shape-rendering="crispEdges" role="img" aria-label="Código de barras A7F3C21B"><rect x="10" y="0" width="2" height="40" fill="#000"/><rect x="13" y="0" width="1" height="40" fill="#000"/><rect x="16" y="0" width="1" height="40" fill="#000"/><rect x="21" y="0" width="1" height="40" fill="#000"/><rect x="23" y="0" width="1" height="40" fill="#000"/><rect x="27" y="0" width="2" height="40" fill="#000"/><rect x="32" y="0" width="3" height="40" fill="#000"/><rect x="36" y="0" width="2" height="40" fill="#000"/><rect x="39" y="0" width="3" height="40" fill="#000"/><rect x="43" y="0" width="1" height="40" fill="#000"/><rect x="47" y="0" width="2" height="40" fill="#000"/><rect x="52" y="0" width="1" height="40" fill="#000"/><rect x="54" y="0" width="2" height="40" fill="#000"/><rect x="58" y="0" width="1" height="40" fill="#000"/><rect x="60" y="0" width="3" height="40" fill="#000"/><rect x="65" y="0" width="1" height="40" fill="#000"/><rect x="69" y="0" width="1" height="40" fill="#000"/><rect x="73" y="0" width="2" height="40" fill="#000"/><rect x="76" y="0" width="2" height="40" fill="#000"/><rect x="80" y="0" width="3" height="40" fill="#000"/><rect x="85" y="0" width="1" height="40" fill="#000"/><rect x="87" y="0" width="1" height="40" fill="#000"/><rect x="90" y="0" width="3" height="40" fill="#000"/><rect x="95" y="0" width="2" height="40" fill="#000"/><rect x="98" y="0" width="1" height="40" fill="#000"/><rect x="102" y="0" width="1" height="40" fill="#000"/><rect x="104" y="0" width="2" height="40" fill="#000"/><rect x="109" y="0" width="1" height="40" fill="#000"/><rect x="112" y="0" width="3" height="40" fill="#000"/><rect x="117" y="0" width="2" height="40" fill="#000"/><rect x="120" y="0" width="2" height="40" fill="#000"/><rect x="125" y="0" width="3" height="40" fill="#000"/><rect x="129" y="0" width="1" height="40" fill="#000"/><rect x="131" y="0" width="2" height="40" fill="#000"/></svg><div class="barras-txt">A7F3C21B</div></div></div>
+<div class="r"><div class="g meta"><span>Alterado 01/10 09:12</span><span>Impresso 02/10 07:40</span></div></div>
+</div></div>
+</body></html>
