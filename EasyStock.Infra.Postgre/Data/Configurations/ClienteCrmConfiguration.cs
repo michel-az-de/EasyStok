@@ -7,6 +7,8 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
         {
             b.ToTable("cliente_tags");
             b.HasKey(x => x.Id);
+            // PK gerada no app: tag nova em Cliente.Tags rastreado vira INSERT, não UPDATE de 0 linhas (#1311, ADR-0028).
+            b.Property(x => x.Id).ValueGeneratedNever();
             b.Property(x => x.EmpresaId).IsRequired();
             b.Property(x => x.Tag).IsRequired().HasMaxLength(ClienteTag.TagTamanhoMaximo);
             b.Property(x => x.Origem).IsRequired().HasMaxLength(20);
