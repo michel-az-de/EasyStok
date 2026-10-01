@@ -62,7 +62,8 @@ export function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica }) {
       </p>
     )
   }
-  const entregue = mensagem.status === 'lida'
+  // ✓✓ para entregue e lida (F07, item 4): a API distingue as duas; a massa só tem `lida`.
+  const entregue = mensagem.status === 'lida' || mensagem.status === 'entregue'
   return (
     <div className={`${css.balao} ${CLASSE[mensagem.dir]} ${mensagem.automatica ? css.doAutomatico : ''} ${trocaDeVoz ? css.trocaDeVoz : ''}`}>
       <Corpo mensagem={mensagem} />

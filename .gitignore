@@ -285,6 +285,8 @@ Generated_Code/
 # because we have git ;-)
 _UpgradeReport_Files/
 Backup*/
+# "Backup*/" acima casa com backup-externo no Windows (core.ignorecase). Os scripts sao versionados (#1253).
+!scripts/infra/backup-externo/
 UpgradeLog*.XML
 UpgradeLog*.htm
 ServiceFabricBackup/

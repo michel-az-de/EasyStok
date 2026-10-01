@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Sales;
@@ -44,7 +45,8 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
     IMercadoPagoClient mercadoPagoClient,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
-    ILogger<TrocarFormaPagamentoPedidoUseCase> logger)
+    ILogger<TrocarFormaPagamentoPedidoUseCase> logger,
+    CalculadoraInicioPrevistoPedido inicioPrevisto)
 {
     public const string FormaOnline = "online";
     public const string FormaNaEntrega = "na_entrega";
@@ -146,6 +148,8 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
 
         var statusAntigo = pedido.Status;
         pedido.MudarStatus(StatusPedido.Aguardando);
+        // #1230: paga na entrega, mas a janela já é compromisso: início previsto como no Mercado Pago.
+        await inicioPrevisto.AplicarNaFilaAsync(pedido, ct);
         await pedidoRepository.UpdateAsync(pedido, ct);
         await publicador.PublicarAsync(
             input.EmpresaId, "pedido.mudou_status", "pedido", pedido.Id,

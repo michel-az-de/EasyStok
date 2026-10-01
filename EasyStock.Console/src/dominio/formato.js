@@ -1,22 +1,47 @@
 // Formatação. Funções puras, sem React e sem dependência de outra camada.
 
+// Fuso da loja, explícito (F07, item 8): a hora da tela e o "hoje" não dependem do
+// fuso da máquina de quem abre o console.
+export const FUSO = 'America/Sao_Paulo'
+
 export const moeda = (v) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 export const horaCurta = (iso) =>
-  new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: FUSO })
+
+const DIA_DA_SEMANA = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+const PARTES = new Intl.DateTimeFormat('en-US', {
+  timeZone: FUSO, hourCycle: 'h23', weekday: 'short',
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+})
+
+// Relógio de parede da loja: ano, mês, dia, hora, minuto e dia da semana (0 = domingo).
+export function partesNoFuso(ms) {
+  const p = Object.fromEntries(PARTES.formatToParts(new Date(ms)).map(({ type, value }) => [type, value]))
+  return {
+    ano: Number(p.year), mes: Number(p.month), dia: Number(p.day),
+    horas: Number(p.hour), minutos: Number(p.minute), diaDaSemana: DIA_DA_SEMANA[p.weekday],
+  }
+}
+
+// "2026-09-30" do dia da loja, não do UTC (depois das 21 h o UTC já é amanhã).
+export const dataIsoNoFuso = (ms) => {
+  const { ano, mes, dia } = partesNoFuso(ms)
+  return `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+}
 
 // Hora em mono sem dois-pontos ("12h30"), para o contexto do cartão do Balcão
 // (seção 1, rodada 5) e o sininho. Mesma conta de `horaComH` em dominio/lembrete.js,
 // exportada aqui porque os dois passam a precisar dela.
 export const horaMono = (ms) => {
-  const data = new Date(ms)
-  return `${data.getHours()}h${String(data.getMinutes()).padStart(2, '0')}`
+  const { horas, minutos } = partesNoFuso(ms)
+  return `${horas}h${String(minutos).padStart(2, '0')}`
 }
 
 export const dataHora = (ms) =>
   new Date(ms).toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: FUSO,
   })
 
 // "maio de 2026": mesmo formato de `cliente.desde` na ficha (rodada 10, item
@@ -24,7 +49,7 @@ export const dataHora = (ms) =>
 // cliente, em vez de cada chamador escrever a própria conta de mês por
 // extenso.
 export const mesPorExtenso = (ms) =>
-  new Date(ms).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+  new Date(ms).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: FUSO })
 
 export function haQuantoTempo(iso, agora) {
   const minutos = Math.floor((agora - new Date(iso).getTime()) / 60000)

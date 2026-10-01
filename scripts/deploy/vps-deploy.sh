@@ -20,7 +20,7 @@
 #   scripts/deploy/vps-deploy.sh --dry-run [sha] # plano + checagem de sintaxe, sem SSH
 #
 # Variaveis: VPS_HOST (hostinger), STACK_DIR (/opt/stacks/easystok),
-# BUILD_ROOT (/home/felipe/build), BACKUP_DIR (/opt/backups), DB_CONTAINER
+# BUILD_ROOT (/home/felipe/build), BACKUP_DIR (/home/felipe/backups; /opt/backups e do root), DB_CONTAINER
 # (shared-postgres), DB_NAME (easystock), HEALTH_TIMEOUT (180 s).
 # =============================================================================
 set -euo pipefail
@@ -28,7 +28,7 @@ set -euo pipefail
 VPS_HOST="${VPS_HOST:-hostinger}"
 STACK_DIR="${STACK_DIR:-/opt/stacks/easystok}"
 BUILD_ROOT="${BUILD_ROOT:-/home/felipe/build}"
-BACKUP_DIR="${BACKUP_DIR:-/opt/backups}"
+BACKUP_DIR="${BACKUP_DIR:-/home/felipe/backups}"
 DB_CONTAINER="${DB_CONTAINER:-shared-postgres}"
 DB_NAME="${DB_NAME:-easystock}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-180}"
@@ -67,6 +67,7 @@ for s in $SERVICES; do
 done
 
 echo "==> [3/6] pg_dump de $DB_NAME"
+mkdir -p "$BACKUP_DIR"
 DUMP="$BACKUP_DIR/$DB_NAME-predeploy-$TS.dump"
 docker exec "$DB_CONTAINER" pg_dump -U postgres -Fc "$DB_NAME" >"$DUMP"
 [ -s "$DUMP" ] || { echo "ERRO: dump vazio; nada foi trocado nos containers" >&2; exit 5; }

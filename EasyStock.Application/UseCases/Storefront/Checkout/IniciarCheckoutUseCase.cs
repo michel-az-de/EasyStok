@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -36,6 +37,9 @@ public sealed class IniciarCheckoutUseCase(
     CheckoutCoreService checkoutCore,
     CheckoutIdempotencyService idempotencyService,
     GerarCobrancaPedidoUseCase gerarCobranca,
+    AtribuicaoPedidoCampanha atribuicaoCampanha,
+    ITenantContextAccessor tenantContext,
+    IUnitOfWork unitOfWork,
     ILogger<IniciarCheckoutUseCase> logger)
 {
     private const int ExpiresInSeconds = 1800;
@@ -78,6 +82,13 @@ public sealed class IniciarCheckoutUseCase(
             ct);
         var pedido = reservado.Pedido;
         var storefront = reservado.Storefront;
+
+        // #1226: mesma conversão da campanha que o pedido da conversa (S30). A requisição é do cliente do
+        // site, sem tenant do ERP: o da loja liga o filtro e a RLS. Commit antes da fase 3, que pode falhar
+        // com o pedido já criado.
+        tenantContext.SetCurrentTenant(storefront.EmpresaId);
+        await atribuicaoCampanha.AtribuirAsync(storefront.EmpresaId, input.ClienteId, pedido.Id, ct);
+        await unitOfWork.CommitAsync();
 
         // ═══════════════════════════════════════════════════════════════════
         // FASE 3 — Criar Preference MP (fora de transação, timeout 5 s)

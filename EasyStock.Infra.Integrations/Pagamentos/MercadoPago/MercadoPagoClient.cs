@@ -64,6 +64,8 @@ public sealed partial class MercadoPagoClient(
             // S11: o link vale 30 min (a expiração vem do use case de cobrança).
             expires = command.ExpiraEm.HasValue,
             expiration_date_to = command.ExpiraEm.HasValue ? FormatarDataMp(command.ExpiraEm.Value) : null,
+            // Prazo do Pix/boleto gerado dentro do link: sem ele, o QR continua pagável depois do cancelamento.
+            date_of_expiration = command.ExpiraEm.HasValue ? FormatarDataMp(command.ExpiraEm.Value) : null,
         };
 
         // S32: endpoint documentado do Checkout Pro (o antigo v1/payments/preferences nunca foi validado).

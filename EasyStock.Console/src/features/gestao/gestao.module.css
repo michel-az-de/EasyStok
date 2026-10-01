@@ -41,3 +41,12 @@
 .placeholder p { margin: 0; font-size: var(--t-apoio); }
 
 .toque { min-height: var(--toque); }
+
+/* Modo API (F06): aba que ainda não tem backend. Abre para a dona ver o que vem,
+   com a faixa e todos os controles desabilitados pelo próprio <fieldset disabled>. */
+.naoLigado {
+  margin: 0 0 var(--e-3); padding: var(--e-3);
+  border-radius: var(--r-2); background: var(--aviso-fundo); color: var(--aviso);
+  font-size: var(--t-apoio); font-weight: 600;
+}
+.desligado { min-width: 0; margin: 0; padding: 0; border: 0; opacity: 0.6; }

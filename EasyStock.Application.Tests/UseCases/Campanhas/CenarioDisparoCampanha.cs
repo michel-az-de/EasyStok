@@ -64,11 +64,11 @@ internal sealed class CenarioDisparoCampanha
     }
 
     public Campanha Campanha(int? tamanhoOnda = null, Guid? itemId = null, DateTime? encerramentoEm = null,
-        bool lembrete = false, string? templateMeta = null)
+        bool lembrete = false, string? templateMeta = null, string? imagemUrl = null)
     {
         var filtro = new FiltroCampanha(true, [], [], itemId, itemId is null ? null : 90);
         var campanha = Domain.Entities.Campanhas.Campanha.Criar(EmpresaId, Guid.NewGuid(),
-            new DadosCampanha("Bolo de fubá", "Oi {{nome}}, saiu bolo de fubá!", null, templateMeta, filtro, [],
+            new DadosCampanha("Bolo de fubá", "Oi {{nome}}, saiu bolo de fubá!", imagemUrl, templateMeta, filtro, [],
                 encerramentoEm, lembrete, tamanhoOnda),
             Inicio.UtcDateTime);
         campanha.Agendar(Disparo, Inicio.UtcDateTime);

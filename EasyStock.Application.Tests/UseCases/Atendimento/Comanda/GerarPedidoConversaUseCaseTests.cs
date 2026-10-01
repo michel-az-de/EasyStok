@@ -81,7 +81,7 @@ public class GerarPedidoConversaUseCaseTests
                 TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
             var trocar = new TrocarFormaPagamentoPedidoUseCase(Checkout.PedidoRepo, cobrancaRepo, gerar, aviso,
                 Substitute.For<IPublicadorEventoIntegracao>(), Mp, Uow, TimeProvider.System,
-                NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance);
+                NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
 
             // O núcleo lê o pedido em andamento do banco com a conversa travada (#1238).
             ConversaRepo.TravarParaPedidoAsync(EmpresaId, Conversa.Id, Arg.Any<CancellationToken>())

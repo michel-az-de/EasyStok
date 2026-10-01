@@ -95,6 +95,24 @@ public class MercadoPagoClientTests
         using var json = JsonDocument.Parse(handler.Corpo!);
         json.RootElement.GetProperty("expires").GetBoolean().Should().BeFalse();
         json.RootElement.TryGetProperty("expiration_date_to", out _).Should().BeFalse();
+        json.RootElement.TryGetProperty("date_of_expiration", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PreferenciaEnviaDateOfExpiration()
+    {
+        // expiration_date_to fecha o link; o prazo do Pix gerado dentro dele é date_of_expiration.
+        // Sem ele, um QR gerado aos 29 min continua pagável depois que o pedido é cancelado.
+        var (client, handler) = Criar();
+        var expira = new DateTime(2026, 9, 29, 15, 30, 0, DateTimeKind.Utc);
+
+        await client.CriarPreferenceAsync(new CriarPreferenceCommand(
+            Guid.NewGuid(), Guid.NewGuid(), "Casa da Babá", 10m, [new PreferenceItemCommand("Item", 1, 10m)],
+            ExpiraEm: expira));
+
+        using var json = JsonDocument.Parse(handler.Corpo!);
+        json.RootElement.GetProperty("date_of_expiration").GetString().Should().Be("2026-09-29T15:30:00.000+00:00");
+        json.RootElement.GetProperty("expiration_date_to").GetString().Should().Be("2026-09-29T15:30:00.000+00:00");
     }
 
     [Fact]

@@ -191,6 +191,10 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Atendimento.AutomacaoPedidoPagoHandler>(
                 EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+            // #1228: pagamento confirmado fecha os interesses do cliente nos itens comprados (S31).
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Campanhas.FecharInteressesPedidoPagoHandler>(
+                EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Atendimento.AutomacaoPedidoEntregueHandler>(
                 EasyStock.Application.Events.Atendimento.AutomacaoPedidoEntregueHandler.Tipo);

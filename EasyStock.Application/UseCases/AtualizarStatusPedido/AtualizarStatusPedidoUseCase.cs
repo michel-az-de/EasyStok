@@ -2,6 +2,7 @@ using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Services;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Financeiro.Integracao;
 using EasyStock.Application.UseCases.Pedidos;
@@ -44,7 +45,8 @@ public class AtualizarStatusPedidoUseCase(
     IPublicadorEventoIntegracao publicadorEventos,
     IOperacaoEventPublisher operacaoEventos,
     IUnitOfWork uow,
-    ILogger<AtualizarStatusPedidoUseCase> logger)
+    ILogger<AtualizarStatusPedidoUseCase> logger,
+    CalculadoraInicioPrevistoPedido inicioPrevisto)
 {
     public async Task<PedidoResult?> ExecuteAsync(AtualizarStatusPedidoCommand cmd)
     {
@@ -98,6 +100,9 @@ public class AtualizarStatusPedidoUseCase(
         // idempotente e re-valida (defesa em profundidade); como já validamos
         // acima, o re-check é apenas paranoia barata.
         pedido.MudarStatus(statusNovo);
+        // #1230: AguardandoPagamento -> Aguardando pela troca genérica (a dona recebeu por fora) entra na
+        // fila com início previsto; nos demais status é no-op sem consulta.
+        await inicioPrevisto.AplicarNaFilaAsync(pedido);
 
         var statusNovoStr = StatusPedidoMapper.Format(statusNovo);
         await pedidoRepo.AddEventoAsync(new PedidoEvento

@@ -1,6 +1,7 @@
 using EasyStock.Application.Common;
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Operacao;
@@ -161,6 +162,53 @@ public class ConfirmarPagamentoPedidoUseCaseTests
     }
 
     [Fact]
+    public async Task PagoDepoisDeCanceladoEstornaEAvisa()
+    {
+        // O cliente pagou depois de o job cancelar o pedido: devolve o dinheiro na hora e avisa na conversa.
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Cancelado);
+        var conversaId = Guid.NewGuid();
+        var cobranca = f.AdicionarOnline(conversaId: conversaId);
+
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id));
+
+        r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.PedidoCancelado);
+        await f.Estorno.Received(1).EstornarAsync("pay-9", 25m, "estorno-tardio-pay-9", Arg.Any<CancellationToken>());
+        cobranca.Motivo.Should().Contain("estorno_automatico").And.Contain("pay-9");
+        f.Pedido.Pagamentos.Should().BeEmpty();
+        await f.ConversaRepo.Received(1).ObterPorIdAsync(f.EmpresaId, conversaId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PagoDepoisDeCancelado_RepetidoNaoEstornaDeNovo()
+    {
+        // O Mercado Pago manda mais de uma notificação por pagamento; a segunda não estorna nem avisa.
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Cancelado);
+        var conversaId = Guid.NewGuid();
+        f.AdicionarOnline(conversaId: conversaId);
+
+        await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id));
+        await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id));
+
+        await f.Estorno.Received(1).EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await f.ConversaRepo.Received(1).ObterPorIdAsync(f.EmpresaId, conversaId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PagoDepoisDeCancelado_EstornoRecusadoLanca()
+    {
+        // Falha no estorno propaga: o controller responde 500 e o Mercado Pago reenvia a notificação.
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Cancelado);
+        f.AdicionarOnline(conversaId: Guid.NewGuid());
+        f.Estorno.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(EstornoPedidoResult.Falha("estorno_recusado"));
+
+        var act = () => f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id));
+
+        await act.Should().ThrowAsync<EstornoAutomaticoFalhouException>();
+        await f.ConversaRepo.DidNotReceive().ObterPorIdAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task PublicaPedidoPagoAposCommit()
     {
         var f = new CobrancaPedidoFixture();
@@ -219,12 +267,12 @@ public class ConfirmarPagamentoPedidoUseCaseTests
         var ordem = new List<string>();
         ImpressaoPendente? enfileirada = null;
         f.Uow.ExecuteInTransactionSemRetryAsync(
-                Arg.Any<Func<CancellationToken, Task<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?)>>>(),
+                Arg.Any<Func<CancellationToken, Task<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?, Guid?)>>>(),
                 Arg.Any<CancellationToken>())
             .Returns(async ci =>
             {
                 ordem.Add("abre transacao");
-                var r = await ci.Arg<Func<CancellationToken, Task<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?)>>>()(ci.Arg<CancellationToken>());
+                var r = await ci.Arg<Func<CancellationToken, Task<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?, Guid?)>>>()(ci.Arg<CancellationToken>());
                 ordem.Add("fecha transacao");
                 return r;
             });

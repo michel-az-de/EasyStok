@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import * as api from '../infra/api/entregasApi'
+import { dataIsoNoFuso } from '../dominio/formato'
 
 // Cadastro de entrega da loja (S45, policy Admin): janelas, zonas de frete e
 // bloqueios dos próximos 60 dias. Operador sem Admin recebe 403 e a tela diz isso.
 const DIAS_BLOQUEIO = 60
-const dataIso = (d) => d.toISOString().slice(0, 10)
+// Dia da loja (F07, item 8): em UTC, depois das 21 h o "hoje" já era amanhã.
+const dataIso = (d) => dataIsoNoFuso(d.getTime())
 
 export function useCadastroEntregaApi() {
   const [janelas, setJanelas] = useState(null)

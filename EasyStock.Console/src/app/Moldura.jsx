@@ -232,6 +232,9 @@ function ControleLoja({ aberta, aoAlternar }) {
   )
 }
 
+// Modo API (F06): sem regra vinda da API, sem número. A massa mostrava "Automáticas 6".
+const rotuloAutomaticas = (regras) => (regras ? `Automáticas, ${contarAtivas(regras)} ligadas` : 'Automáticas')
+
 function Cabecalho({
   conversas, regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas,
 }) {
@@ -259,10 +262,10 @@ function Cabecalho({
             zera o font-size do texto (caber em 390 px) e só sobrava
             ícone+número, sem palavra nenhuma. `.rotuloCurto` mostra uma
             abreviação com font-size próprio (não herda o zero do botão). */}
-        <Botao icone="raio" onClick={aoAbrirAutomacoes} aria-label={`Automáticas, ${contarAtivas(regras)} ligadas`}>
+        <Botao icone="raio" onClick={aoAbrirAutomacoes} aria-label={rotuloAutomaticas(regras)}>
           <span className={css.rotuloLongo}>Automáticas</span>
           <span className={css.rotuloCurto} aria-hidden="true">Auto</span>
-          <span className={css.conta}>{contarAtivas(regras)}</span>
+          {regras && <span className={css.conta}>{contarAtivas(regras)}</span>}
         </Botao>
         {/* Casca da rodada 13 (issue das 5 frentes): mesmo lugar de
             Automáticas, ao lado dela. Rodada 13, achado da validação
@@ -299,8 +302,8 @@ function Cabecalho({
 // controles, os mesmos handlers; Balcão é a tela atual, não um botão.
 function Trilho({
   regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, simulando, aoAlternarSimulacoes,
+  atendente,
 }) {
-  const ativas = contarAtivas(regras)
   return (
     <nav className={css.trilho} aria-label="Navegação">
       <span className={css.selo} title="Casa da Baba" aria-hidden="true">cb</span>
@@ -327,10 +330,10 @@ function Trilho({
         <Icone nome="cooking-pot" tamanho={22} />
         <span>Cozinha</span>
       </Botao>
-      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAutomacoes} aria-label={`Automáticas, ${ativas} ligadas`} title="Automáticas">
+      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAutomacoes} aria-label={rotuloAutomaticas(regras)} title="Automáticas">
         <Icone nome="raio" tamanho={22} />
         <span>Automáticas</span>
-        <span className={css.contaTrilho} aria-hidden="true">{ativas}</span>
+        {regras && <span className={css.contaTrilho} aria-hidden="true">{contarAtivas(regras)}</span>}
       </Botao>
       {/* Casca da rodada 13: item de navegação novo, logo abaixo de
           Automáticas, para as 5 frentes da rodada terem um lugar comum sem
@@ -342,16 +345,18 @@ function Trilho({
       </Botao>
       <div className={css.sinoTrilho}><Sininho /></div>
       <span className={css.espacoTrilho} />
-      {!simularEscondido() && (
+      {aoAlternarSimulacoes && !simularEscondido() && (
         <Botao variante="texto" className={css.itemTrilho} aria-pressed={simulando} onClick={aoAlternarSimulacoes} title="Simular (F2)">
           <Icone nome="flask-conical" tamanho={22} />
           <span>Simular</span>
         </Botao>
       )}
       <InterruptorTema classe={css.temaTrilho} />
-      <span className={css.atendente} title="Thatiane, atendendo">
-        <Avatar nome="Thatiane" tamanho="medio" />
-      </span>
+      {atendente && (
+        <span className={css.atendente} title={`${atendente}, atendendo`}>
+          <Avatar nome={atendente} tamanho="medio" />
+        </span>
+      )}
     </nav>
   )
 }
@@ -393,7 +398,7 @@ function simularEscondido() {
 }
 
 function BotaoSimular({ ativo, aoAlternar }) {
-  if (simularEscondido()) return null
+  if (!aoAlternar || simularEscondido()) return null
   return (
     <Botao
       variante="texto"
@@ -413,8 +418,11 @@ export function Moldura({
   aoAbrirEntregas, simulando, aoAlternarSimulacoes, larguras, aoRedimensionar,
 }) {
   const {
-    visiveis, selecionada, conversas, regras, agora, aberta,
+    visiveis, selecionada, conversas, regras: regrasDaMassa, agora, aberta, fonteApi, sessao,
   } = useAtendimento()
+  // Modo API (F06): contadores e avatar vêm da sessão e da API; da massa, nada.
+  const regras = fonteApi ? null : regrasDaMassa
+  const atendente = fonteApi ? (sessao?.usuario?.nome ?? null) : 'Thatiane'
   const { alternarLoja } = useAcoes()
   const [aba, setAba] = useState('balcao')
   const [gavetaAberta, setGavetaAberta] = useState(false)
@@ -496,6 +504,7 @@ export function Moldura({
           aoAbrirEntregas={aoAbrirEntregas}
           simulando={simulando}
           aoAlternarSimulacoes={aoAlternarSimulacoes}
+          atendente={atendente}
         />
         <div className={`${css.palco} ${css.palcoTres}`}>
           {/* Sem contagem ao lado do título (seção 1, corte #11): a aba

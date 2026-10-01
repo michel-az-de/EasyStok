@@ -29,6 +29,26 @@ const ABAS_DEMONSTRACAO = [
 // primeiro. No modo demonstração ela não aparece (não há expediente nem configuração).
 const ABAS_API = [{ id: 'atendimento', rotulo: 'Atendimento' }, ...ABAS_DEMONSTRACAO]
 
+// Modo API (F06, decisão do Felipe em 30/09): as abas sem backend não somem. Abrem com a
+// faixa e os controles desabilitados até a fatia de cada uma entrar. Nada é gravado: as
+// ações delas também avisam (`aplicacao/api/naoLigadas.js`), e Integrações nunca guarda chave.
+const AINDA_NAO_LIGADO = {
+  producao: 'Produção e cardápio ainda não estão ligados ao EasyStok nesta versão (F11). Nada aqui é gravado.',
+  caixa: 'O caixa ainda não está ligado ao EasyStok nesta versão (F14). Nada aqui é gravado.',
+  janelas: 'Esta aba ainda não está ligada. As janelas de verdade estão em Entregas › Janelas e frete.',
+  fidelidade: 'Fidelidade e cupons ainda não estão ligados ao EasyStok nesta versão (F15). Nada aqui é gravado.',
+  integracoes: 'As integrações ainda não estão ligadas nesta versão (F16). Nenhuma chave é guardada no navegador.',
+}
+
+function AbaNaoLigada({ texto, children }) {
+  return (
+    <>
+      <p className={css.naoLigado} role="note">{texto}</p>
+      <fieldset disabled className={css.desligado}>{children}</fieldset>
+    </>
+  )
+}
+
 // "A aba ativa é lembrada durante a sessão": sessionStorage (não
 // localStorage, que sobrevive à sessão) no mesmo molde de `app/Moldura.jsx`
 // (CHAVE_TEMA, CHAVE_SIMULAR_ESCONDIDO).
@@ -133,7 +153,9 @@ export function ModalGestao({ aoFechar }) {
         tabIndex={0}
         className={css.painel}
       >
-        {painelDaAba[ativa]}
+        {fonteApi && AINDA_NAO_LIGADO[ativa]
+          ? <AbaNaoLigada texto={AINDA_NAO_LIGADO[ativa]}>{painelDaAba[ativa]}</AbaNaoLigada>
+          : painelDaAba[ativa]}
       </div>
     </Modal>
   )

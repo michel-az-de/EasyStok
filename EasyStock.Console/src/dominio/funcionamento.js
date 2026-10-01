@@ -2,7 +2,7 @@
 // dono, 24/09/2026). Puro: nenhum import fora de `dominio`, "agora" sempre
 // chega por parâmetro (mesma regra de fronteira de `dominio/simulacoes.js`).
 
-import { horaCurta } from './formato.js'
+import { horaCurta, partesNoFuso } from './formato.js'
 
 export const DIAS_DA_SEMANA = [
   { chave: 'domingo', indice: 0, rotulo: 'Domingo' },
@@ -46,10 +46,11 @@ function dentroDaJanelaDoDia(dia, minutos, comoOntem) {
 // dias: o de hoje (que pode abrir à noite e fechar de madrugada) e o de
 // ontem (cuja fatia da madrugada ainda vale agora).
 export function dentroDoHorario(agora, funcionamento = FUNCIONAMENTO_PADRAO) {
-  const data = new Date(agora)
-  const minutos = data.getHours() * 60 + data.getMinutes()
-  const hoje = funcionamento[diaPorIndice(data.getDay()).chave]
-  const ontem = funcionamento[diaPorIndice((data.getDay() + 6) % 7).chave]
+  // Hora e dia da loja (F07, item 8), não os da máquina.
+  const { horas, minutos: doRelogio, diaDaSemana } = partesNoFuso(agora)
+  const minutos = horas * 60 + doRelogio
+  const hoje = funcionamento[diaPorIndice(diaDaSemana).chave]
+  const ontem = funcionamento[diaPorIndice((diaDaSemana + 6) % 7).chave]
   return dentroDaJanelaDoDia(hoje, minutos, false) || dentroDaJanelaDoDia(ontem, minutos, true)
 }
 

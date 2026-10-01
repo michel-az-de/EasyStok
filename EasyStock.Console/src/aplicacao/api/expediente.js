@@ -40,6 +40,13 @@ export function criarAcoesExpedienteApi({ despachar, estadoRef }) {
   return {
     recarregarExpediente,
 
+    // F07, item 9: quem monta as ações chama ao desmontar. Sem isso o PUT pendente saía
+    // depois da troca de conta, com o horário da empresa A e o token da B.
+    cancelarHorarioPendente: () => {
+      clearTimeout(esperaHorario)
+      esperaHorario = null
+    },
+
     alternarLoja: (agora) => {
       const { funcionamento, lojaAberta } = estadoRef.current
       const abrir = !estaAberta(agora, { funcionamento, lojaAberta })

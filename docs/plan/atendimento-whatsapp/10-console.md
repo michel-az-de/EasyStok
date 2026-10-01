@@ -21,11 +21,16 @@ backend já está no master. Quando o módulo fica em paridade, a tela legada da
 | `entregas` (ligado na F04) | S12, S14, S44, S45 | Sim | `api/kds/pedidos` (+ endereço e aprovação), `api/atendimento/entregadores`, `api/atendimento/viagens`, `api/atendimento/chamados-entregador`, `api/storefront/pedidos/{id}/aprovar` e `/recusar`, `api/minha-vitrine/entrega`, `api/operacao/eventos` (SSE) | Nenhuma |
 | `cozinha` (ligado na F05) | S18, S19, S20, S21 | Sim | `api/kds/pedidos` (+ `/{id}/status`), `api/operacao/eventos` (SSE), `api/pedidos/{id}/canhoto`, `api/pedidos/{id}/reimprimir` | KDS atual (`Api/Mobile/Controllers/KdsController.cs`), sai na P05 |
 | `cardapio`, `cardapio-link` | S45, S48 | Parcial | `api/minha-vitrine/cardapio`, `api/minha-vitrine/configuracao`, `api/storefront/{slug}/menu` | a medir |
-| `ficha-cliente` (tags, notas, dossiê), `notas` | S24, S25 | Não | a definir na spec | a medir |
-| `respostas`, `automacoes` | S42 | Não | a definir na spec | Nenhuma |
-| `lembretes` | S43 | Não | a definir na spec | Nenhuma |
-| `lote-papel` | S46 | Não | a definir na spec | Nenhuma |
+| `ficha-cliente` (tags, notas, dossiê, bloqueio), `notas` (liga na F09) | S24, S25 | Sim (medido em 2026-09-30) | `api/clientes/{id}/tags`, `/notas`, `/dossie`, `/bloquear`, `/desbloquear`, `/preferencias`; `api/atendimento/conversas/{id}/dossie` | a medir |
+| `respostas`, `automacoes` (liga na F10) | S42 | Sim | `api/atendimento/respostas-prontas` (+ `/{id}/arquivar`, `/{id}/render`), `api/atendimento/automacoes/{gatilho}` | Nenhuma |
+| `lembretes` (liga na F10) | S43 | Sim | `api/atendimento/lembretes` (+ `/{id}/concluir`, `/vistos`) | Nenhuma |
+| `lote-papel` (liga na F11) | S46 | Sim | `api/atendimento/esteira/lote` | Nenhuma |
+| `gestao/caixa` (liga na F14, #1244) | caixa do EasyStok | Sim, com lacunas | `api/caixa/dia`, `/abrir`, `/fechar`, `/movimentos`, `/fechamentos` | PWA de caixa, sai na paridade |
+| `gestao/fidelidade` (F15, #1245) | nova | Não | `api/fidelidade/*`, `api/clientes/{id}/pontos` (na spec) | Nenhuma |
+| `gestao/integracoes` (F16, #1246; Lalamove na F17, #1247) | núcleo `credencial_integracao` | Parcial: tabela e cifra existem, sem uso, sem RLS | `api/integracoes` (na spec) | Nenhuma |
 | `simulacoes` | nenhuma | N/A | fica só no modo demonstração | Nenhuma |
+
+Correções e fatias F06 a F17: [11-console-fechamento.md](11-console-fechamento.md) (#1232).
 
 Estoque, rotulagem e o restante do EasyStock.Web não têm tela no console. Continuam no legado até
 existir decisão própria, depois das ondas acima.

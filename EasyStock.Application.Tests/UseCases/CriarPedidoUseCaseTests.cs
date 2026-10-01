@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.CriarPedido;
 using Microsoft.Extensions.Logging;
 
@@ -10,9 +11,10 @@ public class CriarPedidoUseCaseTests
     private readonly IClienteRepository _clienteRepo = Substitute.For<IClienteRepository>();
     private readonly IProdutoRepository _produtoRepo = Substitute.For<IProdutoRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IPrazoPreparoPedidoQueries _prazoQueries = Substitute.For<IPrazoPreparoPedidoQueries>();
 
     private CriarPedidoUseCase Sut() => new(_pedidoRepo, _clienteRepo, _produtoRepo, _uow,
-        Substitute.For<ILogger<CriarPedidoUseCase>>());
+        Substitute.For<ILogger<CriarPedidoUseCase>>(), new CalculadoraInicioPrevistoPedido(_prazoQueries));
 
     [Fact]
     public async Task DeveNormalizarAgendadoParaEm_ParaUtc_QuandoClienteEnviaDataSemFuso()
@@ -32,6 +34,33 @@ public class CriarPedidoUseCaseTests
         salvo!.AgendadoParaEm.Should().NotBeNull();
         salvo.AgendadoParaEm!.Value.Kind.Should().Be(DateTimeKind.Utc);
         await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task PedidoAgendadoCriadoNoErp_GravaInicioPrevisto()
+    {
+        // #1230: pedido criado no ERP (ou pela sync do mobile) já nasce na fila; com agendamento, ganha
+        // início previsto num segundo commit (a leitura da janela e dos itens vai ao banco).
+        var empresaId = Guid.NewGuid();
+        Pedido? salvo = null;
+        _pedidoRepo.When(r => r.AddAsync(Arg.Any<Pedido>())).Do(ci => salvo = ci.Arg<Pedido>());
+        _prazoQueries.ObterAsync(empresaId, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new PrazoPreparoPedidoLeitura(null, null, [null], TempoPreparoPadraoMinutos: 60, RespiroMinutos: 40));
+        var entrega = DateTime.SpecifyKind(DateTime.UtcNow.Date.AddDays(2).AddHours(15), DateTimeKind.Utc);
+
+        await Sut().ExecuteAsync(new CriarPedidoCommand(empresaId, AgendadoParaEm: entrega));
+
+        salvo!.InicioPrevistoEm.Should().Be(entrega.AddMinutes(-100));
+        await _uow.Received(2).CommitAsync();
+    }
+
+    [Fact]
+    public async Task PedidoParaJa_NaoConsultaInicioPrevisto()
+    {
+        // #1230: sem agendamento e recém-criado (sem vaga), não há janela; o balcão não paga a consulta.
+        await Sut().ExecuteAsync(new CriarPedidoCommand(Guid.NewGuid()));
+
+        await _prazoQueries.DidNotReceiveWithAnyArgs().ObterAsync(default, default, default);
     }
 
     [Fact]
