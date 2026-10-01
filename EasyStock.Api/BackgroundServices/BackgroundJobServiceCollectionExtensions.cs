@@ -91,6 +91,10 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableAvaliadorLembretes)
             services.AddHostedService<AvaliadorLembretesBackgroundService>();
 
+        // F16 (#1246): vigia das integrações — testa as chaves em uso e lembra a dona da que caiu.
+        if (options.EnableVigiaIntegracoes)
+            services.AddHostedService<VigiaIntegracoesBackgroundService>();
+
         // S30: campanhas — primeira onda no horário agendado, conciliação com o outbox, encerramento e lembrete.
         if (options.EnableCampanhaJob)
             services.AddHostedService<CampanhaJob>();

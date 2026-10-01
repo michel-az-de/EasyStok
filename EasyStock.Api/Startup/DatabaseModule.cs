@@ -69,6 +69,8 @@ public static class DatabaseModule
                 builder.Services.AddEasyStockMetaMensageria(builder.Configuration);
                 // Atendimento WhatsApp (S06) — LLM do agente (Anthropic:*; desligado sem chave).
                 builder.Services.AddEasyStockAgenteLlm(builder.Configuration);
+                // Integrações por loja (F16, #1246): teste de conexão de cada provider e chaves globais.
+                builder.Services.AddEasyStockTestesIntegracao();
                 // Key ring compartilhado com o Worker via Postgres (#1035). O certificado A1
                 // cifrado aqui e decifrado la na emissao/reprocessamento fiscal — com o
                 // registro default cada processo tinha o seu key ring e o Unprotect cruzado

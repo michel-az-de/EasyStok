@@ -16,6 +16,9 @@ public sealed class BackgroundJobOptions
     /// <summary>S43: avaliador dos lembretes da dona. Desligar é o rollback.</summary>
     public bool EnableAvaliadorLembretes { get; set; } = true;
 
+    /// <summary>F16 (#1246): vigia das integrações, a cada 15 min. Desligar é o rollback.</summary>
+    public bool EnableVigiaIntegracoes { get; set; } = true;
+
     /// <summary>
     /// S30: job das campanhas (primeira onda no horário, conciliação com o outbox, encerramento e
     /// lembrete). Desligar é o rollback: as campanhas ficam <c>Agendada</c>.

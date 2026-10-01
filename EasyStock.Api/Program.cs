@@ -24,6 +24,7 @@ TaskScheduler.UnobservedTaskException += (_, e) =>
 };
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AdicionarChaveMestraDoAmbiente(); // EZ_CRYPTO_* -> Crypto:* (F16, #1246)
 
 // Garantir que diretório de logs existe antes do Serilog iniciar
 {
@@ -204,6 +205,7 @@ StartupHardening.Validate(builder, postgresConnectionString);
 StartupHardening.ValidateTimezone(builder.Environment);
 // WhatsApp Meta: com o provider "meta" ligado, credenciais sao obrigatorias.
 StartupHardening.ValidateWhatsAppMeta(builder);
+StartupHardening.ValidateChaveMestra(builder); // KEK das integrações: sem ela, Production não sobe
 
 Log.Information("""
 

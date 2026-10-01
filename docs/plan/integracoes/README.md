@@ -26,15 +26,18 @@ Provedores: Mercado Pago, PayPal, Pix direto (PSP), 99 Entrega, Lalamove.
 | Orquestrador + failover | `EasyStock.Infra.Async/Pagamentos/PagamentoOrchestrator.cs` | Existe |
 | Saúde do gateway | `NoopGatewayHealthStore` | Noop |
 | Efí Pix | `EfiPixGatewayAdapter`, `EfiPixWebhookProcessor`, conciliação | Pronto |
-| Mercado Pago | `MercadoPagoGatewayAdapter.cs:59` | `CriarAsync` NotImplemented, endpoint de preferência suspeito, sem processor de webhook |
+| Mercado Pago | `MercadoPagoGatewayAdapter.cs:59`, `MercadoPagoWebhookProcessor` (S32) | Processor do webhook existe desde a S32 (este levantamento é anterior); chave ainda global (`MercadoPagoOptions`) |
+| Credencial por loja | `credencial_integracao`, `IntegrationCredentialResolver` (AES-256-GCM com KEK) | Existe; RLS, chave mestra obrigatória, teste e vigia na F16 (#1246). Consumidores reais ainda leem a chave global |
 | Stripe | `StripeGatewayAdapter.cs:67` | Stub |
 | Webhook genérico | `WebhookGatewayController.cs` | Sem processor devolve 500 |
 | Entrega | `CalcularFreteUseCase`, `FreteZona`, `JanelaEntrega` | Só frete interno; sem provedor externo |
 
 ### Lacunas
 
-1. **Credencial por tenant inexistente.** Tudo vem de options globais. Bloqueia multi-tenant.
-2. Processor de webhook só para Efí.
+1. ~~Credencial por tenant inexistente.~~ Corrigido em 2026-10-01: a tabela e o resolver já existiam
+   ociosos; a F16 (#1246) ligou RLS, KEK obrigatória, API de chaves, teste e vigia. Pagamento e
+   geocoding ainda leem a chave global (decisão registrada na #1246).
+2. ~~Processor de webhook só para Efí.~~ O Mercado Pago tem `MercadoPagoWebhookProcessor` desde a S32.
 3. Sem retry/circuit breaker (nenhum Polly/`AddResilience`).
 4. Sem porta de logística.
 5. Conciliação por job de provedor, não genérica.

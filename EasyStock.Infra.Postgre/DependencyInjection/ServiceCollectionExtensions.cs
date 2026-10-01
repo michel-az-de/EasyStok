@@ -160,6 +160,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<ICredencialIntegracaoRepository, CredencialIntegracaoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Integration.Crypto.IIntegrationCredentialResolver,
                 Integration.IntegrationCredentialResolver>();
+            // F16 (#1246): empresas que o vigia das integrações acompanha.
+            services.AddScoped<IAlvosVigiaIntegracoesQuery, Repositories.Integracoes.AlvosVigiaIntegracoesQuery>();
 
             // Modulo Integration (F4) — outbox transacional de eventos externos
             services.AddScoped<IOutboxEventoIntegracaoRepository, OutboxEventoIntegracaoRepository>();

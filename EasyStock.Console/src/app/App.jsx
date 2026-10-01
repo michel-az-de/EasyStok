@@ -24,7 +24,7 @@ import { CartaoArrasto, PainelCardapio } from '../features/cardapio/PainelCardap
 import { ModalNota } from '../features/notas/ModalNota'
 import { PainelGaleria } from '../features/anexos/PainelGaleria'
 import { ModalAutomacoes } from '../features/automacoes/ModalAutomacoes'
-import { ModalGestao } from '../features/gestao/ModalGestao'
+import { ModalGestao, gravarAba } from '../features/gestao/ModalGestao'
 import { ModalBiblioteca } from '../features/respostas/ModalBiblioteca'
 import { GavetaEntregas } from '../features/entregas/GavetaEntregas'
 import { TelaEntregas } from '../features/entregas/TelaEntregas'
@@ -228,7 +228,7 @@ function Composicao({ aoSair }) {
 
       <BalaoAssistente sugestaoAgente={sugestaoAgente} />
 
-      <FaixaApi aoSair={aoSair} />
+      <FaixaApi aoSair={aoSair} aoAbrirIntegracoes={() => { gravarAba('integracoes'); setModal('gestao') }} />
 
       <DragOverlay>
         {pratoArrastando && <CartaoArrasto item={pratoArrastando} />}

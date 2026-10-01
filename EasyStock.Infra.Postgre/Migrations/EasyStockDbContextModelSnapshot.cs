@@ -9159,6 +9159,11 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("character varying(120)")
                         .HasColumnName("kek_id");
 
+                    b.Property<string>("Mascara")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("mascara");
+
                     b.Property<byte[]>("PayloadCifrado")
                         .IsRequired()
                         .HasColumnType("bytea")
@@ -9174,6 +9179,19 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired()
                         .HasColumnType("bytea")
                         .HasColumnName("tag");
+
+                    b.Property<DateTime?>("UltimoTesteEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ultimo_teste_em");
+
+                    b.Property<string>("UltimoTesteMensagem")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("ultimo_teste_mensagem");
+
+                    b.Property<bool?>("UltimoTesteOk")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ultimo_teste_ok");
 
                     b.Property<DateTime?>("UltimoUsoEm")
                         .HasColumnType("timestamp with time zone")

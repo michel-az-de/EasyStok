@@ -45,7 +45,14 @@ public interface IIntegrationCredentialResolver
         T payload,
         Guid criadoPorUsuarioId,
         DateTime? validoAte = null,
+        string? mascara = null,
         CancellationToken ct = default) where T : class;
+
+    /// <summary>
+    /// Desativa as credenciais ativas do provider na empresa (qualquer ambiente) e invalida o
+    /// cache. Idempotente: sem credencial ativa, não faz nada. Devolve quantas desativou.
+    /// </summary>
+    Task<int> DesativarAsync(Guid empresaId, string providerKey, CancellationToken ct = default);
 
     /// <summary>
     /// Re-cifra todas as credenciais com a KEK identificada por
@@ -54,3 +61,10 @@ public interface IIntegrationCredentialResolver
     /// </summary>
     Task RotacionarKekAsync(string novoKekId, CancellationToken ct = default);
 }
+
+/// <summary>
+/// A chave-mestra (KEK) não está configurada, ou está inválida, no ambiente: nada pode ser
+/// cifrado nem decifrado. A mensagem diz qual variável falta e nunca carrega o valor.
+/// </summary>
+public sealed class ChaveMestraAusenteException(string mensagem, Exception? inner = null)
+    : InvalidOperationException(mensagem, inner);

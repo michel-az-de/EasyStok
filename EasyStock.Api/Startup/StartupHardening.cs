@@ -111,4 +111,57 @@ public static class StartupHardening
         if (string.IsNullOrWhiteSpace(verifyToken))
             throw new InvalidOperationException($"Notifications:WhatsApp:Meta:VerifyToken is required {quando}");
     }
+
+    /// <summary>
+    /// Chave-mestra das credenciais de integração (F16, #1246). Em Production a API não sobe sem
+    /// ela: uma chave de loja salva sem KEK não seria lida de volta. Fora de Production, ausente é
+    /// aceito (o <c>PUT</c> de credencial responde 503 com o motivo); configurada, tem de ser válida.
+    /// </summary>
+    public static void ValidateChaveMestra(WebApplicationBuilder builder)
+    {
+        var configuracao = builder.Configuration;
+        ValidateChaveMestraCore(
+            builder.Environment.IsProduction(),
+            configuracao["Crypto:CurrentKekId"],
+            id => configuracao[$"Crypto:Keks:{id}"]);
+    }
+
+    /// <summary>Núcleo puro/testável de <see cref="ValidateChaveMestra(WebApplicationBuilder)"/>. Nunca põe o valor na mensagem.</summary>
+    public static void ValidateChaveMestraCore(bool isProduction, string? currentKekId, Func<string, string?> lerKek)
+    {
+        if (string.IsNullOrWhiteSpace(currentKekId))
+        {
+            if (isProduction)
+                throw new InvalidOperationException(
+                    $"CRITICAL: chave-mestra das integrações ausente. Defina {ChaveMestraConfiguracao.VarKekId} e " +
+                    $"{ChaveMestraConfiguracao.VarKek} (Base64 de 32 bytes, gerar com: openssl rand -base64 32) no .env.");
+            return;
+        }
+
+        var valor = lerKek(currentKekId.Trim());
+        if (string.IsNullOrWhiteSpace(valor))
+        {
+            if (isProduction)
+                throw new InvalidOperationException(
+                    $"CRITICAL: a KEK '{currentKekId}' não tem valor. Defina {ChaveMestraConfiguracao.VarKek} no .env.");
+            return;
+        }
+
+        byte[] bytes;
+        try
+        {
+            bytes = Convert.FromBase64String(valor.Trim());
+        }
+        catch (FormatException)
+        {
+            throw new InvalidOperationException(
+                $"A KEK '{currentKekId}' não é Base64 de 32 bytes. Gere com: openssl rand -base64 32.");
+        }
+
+        var tamanho = bytes.Length;
+        System.Security.Cryptography.CryptographicOperations.ZeroMemory(bytes);
+        if (tamanho != 32)
+            throw new InvalidOperationException(
+                $"A KEK '{currentKekId}' tem {tamanho} bytes; precisa de 32 bytes (AES-256). Gere com: openssl rand -base64 32.");
+    }
 }

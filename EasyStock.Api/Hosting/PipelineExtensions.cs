@@ -225,8 +225,7 @@ public static class PipelineExtensions
         app.UseCors();
         // CSRF do storefront (#1088, ADR-0053): POST com cookie __Host-cdb_* so da mesma origem.
         app.UseMiddleware<ProtecaoCsrfCookieMiddleware>();
-        app.UseRateLimiter();
-        app.UseAuthentication();
+        app.UseAutenticacaoELimiteDeTaxa();
         app.UseAuthorization();
         // Sliding window: atualiza UltimoUsoEm da ClienteSession após cada request autenticado (ADR-0012).
         app.UseMiddleware<ClienteSessionMiddleware>();
@@ -373,6 +372,18 @@ public static class PipelineExtensions
                     "requests sem HMAC. Configurar Efi__WebhookSecret e desativar essa flag.");
             }
         }
+    }
+
+    /// <summary>
+    /// Autenticação antes do limite de taxa (exposta para teste): política que particiona pelo usuário
+    /// (Testar das integrações, por <c>empresaId</c>, #1246) precisa do <c>User</c> já preenchido; antes
+    /// dela todas as lojas atrás do mesmo IP dividiam a cota. As políticas por IP não mudam.
+    /// </summary>
+    public static IApplicationBuilder UseAutenticacaoELimiteDeTaxa(this IApplicationBuilder app)
+    {
+        app.UseAuthentication();
+        app.UseRateLimiter();
+        return app;
     }
 
     /// <summary>Whitelist de POSTs criticos cobertos pelo IdempotencyMiddleware (exposta para teste).</summary>

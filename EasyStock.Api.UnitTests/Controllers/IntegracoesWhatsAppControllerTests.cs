@@ -17,12 +17,13 @@ public class IntegracoesWhatsAppControllerTests
 {
     private readonly ITenantFeatureFlagRepository _featureFlagRepository = Substitute.For<ITenantFeatureFlagRepository>();
     private readonly IEmpresaRepository _empresaRepository = Substitute.For<IEmpresaRepository>();
+    private readonly IConfiguracaoAtendimentoRepository _configuracaoRepository = Substitute.For<IConfiguracaoAtendimentoRepository>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly IntegracoesWhatsAppController _controller;
 
     public IntegracoesWhatsAppControllerTests()
     {
-        var useCase = new ObterStatusIntegracaoWhatsAppUseCase(_featureFlagRepository, _empresaRepository);
+        var useCase = new ObterStatusIntegracaoWhatsAppUseCase(_featureFlagRepository, _empresaRepository, _configuracaoRepository);
         var metaOptions = Options.Create(new MetaCloudWhatsAppOptions { ApiVersion = "v19.0" });
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Notifications:WhatsApp:Provider"] = "meta" })
@@ -58,6 +59,11 @@ public class IntegracoesWhatsAppControllerTests
         var empresa = Empresa.Criar("Casa da Baba", "11111111000191");
         empresa.VincularWhatsApp("551199998888");
         _empresaRepository.GetByIdAsync(empresaId).Returns(empresa);
+        // F16 (#1246): o webhook já grava a última mensagem recebida na configuração do atendimento.
+        var ultima = new DateTime(2026, 9, 30, 14, 0, 0, DateTimeKind.Utc);
+        var configuracao = EasyStock.Domain.Entities.Atendimento.ConfiguracaoAtendimento.CriarPadrao(empresaId);
+        configuracao.RegistrarMensagemRecebida(ultima);
+        _configuracaoRepository.GetByEmpresaIdAsync(empresaId).Returns(configuracao);
 
         var result = await _controller.GetStatus(CancellationToken.None);
 
@@ -68,5 +74,6 @@ public class IntegracoesWhatsAppControllerTests
         data!.GetType().GetProperty("phoneNumberId")!.GetValue(data).Should().Be("551199998888");
         data.GetType().GetProperty("apiVersion")!.GetValue(data).Should().Be("v19.0");
         data.GetType().GetProperty("provider")!.GetValue(data).Should().Be("meta");
+        data.GetType().GetProperty("ultimaMensagemRecebidaEm")!.GetValue(data).Should().Be(ultima);
     }
 }

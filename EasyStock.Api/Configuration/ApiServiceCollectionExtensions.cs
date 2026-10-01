@@ -313,6 +313,13 @@ public static class ApiServiceCollectionExtensions
                     context.Connection.RemoteIpAddress?.ToString() ?? "anon",
                     _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 
+            // Botão Testar das integrações (F16, #1246): 6 por minuto por loja e provider, para a
+            // tela não virar martelo no provedor.
+            options.AddPolicy(IntegracaoTesteRateLimit.Politica, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    IntegracaoTesteRateLimit.Chave(context),
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = IntegracaoTesteRateLimit.PorMinuto, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;            options.OnRejected = async (context, cancellationToken) =>
             {
                 context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
