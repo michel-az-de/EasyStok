@@ -9,7 +9,8 @@ public interface IKdsPedidoQueries
     /// Pedidos da empresa nos <paramref name="status"/> cujo dia de produção cai em
     /// [<paramref name="dataInicial"/>, <paramref name="dataFinal"/>] (datas civis de Brasília).
     /// Dia de produção: a data da vaga ativa (<c>VagaOcupada.DataEntrega</c>); sem vaga,
-    /// <c>AgendadoParaEm</c>; sem agendamento, <c>CriadoEm</c>.
+    /// <c>AgendadoParaEm</c>; sem agendamento, <c>CriadoEm</c>. <c>aguardando_aprovacao_baba</c> não tem corte
+    /// de data: a aprovação acontece antes do dia de produção.
     /// </summary>
     Task<IReadOnlyList<KdsPedidoLeitura>> ListarAsync(
         Guid empresaId,

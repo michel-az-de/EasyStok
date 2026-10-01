@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261001010827_AddMotivoEscaladaConversa")]
+    partial class AddMotivoEscaladaConversa
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -835,10 +838,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("ViagemId", "PedidoId")
                         .IsUnique()
                         .HasDatabaseName("ux_viagem_paradas_viagem_pedido");
-
-                    b.HasIndex(new[] { "PedidoId" }, "ux_viagem_paradas_pedido_ativo")
-                        .IsUnique()
-                        .HasFilter("\"EntregueEm\" IS NULL");
 
                     b.ToTable("viagem_paradas", (string)null);
                 });

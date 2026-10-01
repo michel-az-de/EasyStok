@@ -1,5 +1,6 @@
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Infra.Postgre.Repositories;
@@ -24,13 +25,15 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
         var (_, fimUtc) = HorarioBrasil.JanelaDiaUtc(dataFinal);
 
         // Dia de produção: vaga ativa manda (pedido do storefront); sem vaga, agendamento; sem ele, criação.
+        // Aguardando aprovação não tem corte (#1238): a dona aprova hoje o pedido de daqui a 3 dias.
         var pedidos = await db.Pedidos
             .AsNoTracking()
             .Include(p => p.Itens)
             .Include(p => p.Pagamentos)
             .Where(p => p.EmpresaId == empresaId && statusLista.Contains(p.Status))
             .Where(p =>
-                db.VagasOcupadas.Any(v => v.PedidoId == p.Id && v.LiberadoEm == null
+                p.Status == StatusPedidoMapper.AguardandoAprovacaoBaba
+                || db.VagasOcupadas.Any(v => v.PedidoId == p.Id && v.LiberadoEm == null
                                           && v.DataEntrega >= dataInicial && v.DataEntrega <= dataFinal)
                 || (!db.VagasOcupadas.Any(v => v.PedidoId == p.Id && v.LiberadoEm == null)
                     && (p.AgendadoParaEm ?? p.CriadoEm) >= iniUtc

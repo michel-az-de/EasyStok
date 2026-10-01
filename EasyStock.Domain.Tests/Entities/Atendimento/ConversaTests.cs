@@ -347,4 +347,72 @@ public class ConversaTests
         conversa.DefinirPedidoEmAndamento(null);
         conversa.PedidoEmAndamentoId.Should().BeNull();
     }
+
+    // F08 item 13 (#1238): o motivo da escalada aparece no resumo da inbox e some quando alguém pega.
+
+    [Fact]
+    public void Escalar_AssumeSemResponsavelEGuardaOMotivo()
+    {
+        var conversa = Nova();
+
+        conversa.Escalar(Agora.AddMinutes(1), "  cliente pediu desconto  ");
+
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+        conversa.AssumidaPorUsuarioId.Should().BeNull();
+        conversa.MotivoEscalada.Should().Be("cliente pediu desconto");
+    }
+
+    [Fact]
+    public void Escalar_MotivoLongoEhCortado()
+    {
+        var conversa = Nova();
+
+        conversa.Escalar(Agora, new string('x', Conversa.MotivoEscaladaTamanhoMaximo + 50));
+
+        conversa.MotivoEscalada.Should().HaveLength(Conversa.MotivoEscaladaTamanhoMaximo);
+    }
+
+    [Fact]
+    public void AssumirPorUsuario_LimpaOMotivo()
+    {
+        var conversa = Nova();
+        conversa.Escalar(Agora, "falha do LLM");
+
+        conversa.Assumir(Agora.AddMinutes(1), usuarioId: Guid.NewGuid());
+
+        conversa.MotivoEscalada.Should().BeNull();
+    }
+
+    [Fact]
+    public void AssumirSemUsuario_MantemOMotivo()
+    {
+        var conversa = Nova();
+        conversa.Escalar(Agora, "falha do LLM");
+
+        conversa.Assumir(Agora.AddMinutes(1));
+
+        conversa.MotivoEscalada.Should().Be("falha do LLM");
+    }
+
+    [Fact]
+    public void LiberarAutomatico_LimpaOMotivo()
+    {
+        var conversa = Nova();
+        conversa.Escalar(Agora, "falha do LLM");
+
+        conversa.LiberarAutomatico();
+
+        conversa.MotivoEscalada.Should().BeNull();
+    }
+
+    [Fact]
+    public void Transferir_LimpaOMotivo()
+    {
+        var conversa = Nova();
+        conversa.Escalar(Agora, "falha do LLM");
+
+        conversa.Transferir(Guid.NewGuid(), Agora.AddMinutes(1));
+
+        conversa.MotivoEscalada.Should().BeNull();
+    }
 }
