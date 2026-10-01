@@ -5,6 +5,7 @@
 // (regra de `ferramentas/verificar-camadas.mjs`).
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { conectarEspelho } from '../infra/canalEntreJanelas'
+import { FONTE_API } from '../infra/fonteDados'
 import * as acao from './acoes'
 import { criarAcoesCardapioLink } from './acoes/cardapioLink'
 
@@ -17,7 +18,9 @@ export function useEspelhoCardapioLink() {
   const conexaoRef = useRef(null)
 
   useEffect(() => {
-    conexaoRef.current = conectarEspelho({ aoReceberEstado: setEstado })
+    // Modo API (F06): sem canal entre janelas. O Balcão não publica estado e a página
+    // mostra a própria faixa de "sem Balcão" em vez de mandar ação por fora da API.
+    conexaoRef.current = FONTE_API ? null : conectarEspelho({ aoReceberEstado: setEstado })
     const alarme = setTimeout(() => setSemResposta(true), ESPERA_SEM_BALCAO_MS)
     return () => {
       clearTimeout(alarme)
