@@ -50,6 +50,21 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
     }
 
     [Fact]
+    public async Task OnlineParaNaEntrega_PedidoQueRequerAprovacao_EsperaABaba()
+    {
+        // #1291: lead liberado fora de área (S14) que paga na entrega passa pela aprovação, como no pago online.
+        var f = new CobrancaPedidoFixture();
+        f.Pedido.MarcarRequerAprovacao("fora_de_area");
+        f.AdicionarOnline();
+
+        await f.Trocar().ExecuteAsync(
+            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega", Usuario, "Operadora"));
+
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoAprovacaoBaba,
+            "pedido de exceção não vai para a cozinha sem a dona aprovar");
+    }
+
+    [Fact]
     public async Task OnlineParaNaEntrega_GravaInicioPrevisto()
     {
         // #1230: o pedido que vai pagar na entrega entra na fila; o início previsto vale como no Mercado Pago.
