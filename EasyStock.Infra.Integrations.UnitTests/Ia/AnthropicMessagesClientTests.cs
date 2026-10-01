@@ -116,6 +116,45 @@ public class AnthropicMessagesClientTests
     }
 
     [Fact]
+    public async Task ChaveDoAgenteSubstituiChaveCompartilhada()
+    {
+        var handler = new CapturaHandler(HttpStatusCode.OK, RespostaToolUse);
+        var client = Criar(handler, new AnthropicAgenteOptions
+        {
+            Enabled = true, ApiKey = "chave-anthropic", ApiKeyAgente = "chave-do-agente", ModeloAgente = "m"
+        });
+
+        await client.EnviarAsync(new RequisicaoLlm("s", [new MensagemLlm(MensagemLlm.Usuario, [new BlocoTextoLlm("oi")])], []));
+
+        handler.Requisicao!.Headers.GetValues("x-api-key").Should().ContainSingle("chave-do-agente");
+    }
+
+    [Fact]
+    public void ChaveDoAgenteBastaParaFicarDisponivel()
+    {
+        var client = Criar(new CapturaHandler(HttpStatusCode.OK, "{}"),
+            new AnthropicAgenteOptions { Enabled = true, ApiKey = "", ApiKeyAgente = "chave-do-agente" });
+
+        client.Disponivel.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AutenticacaoBearerEnviaAuthorizationSemXApiKey()
+    {
+        var handler = new CapturaHandler(HttpStatusCode.OK, RespostaToolUse);
+        var client = Criar(handler, new AnthropicAgenteOptions
+        {
+            Enabled = true, ApiKeyAgente = "chave-do-agente", AutenticacaoBearer = true, ModeloAgente = "m"
+        });
+
+        await client.EnviarAsync(new RequisicaoLlm("s", [new MensagemLlm(MensagemLlm.Usuario, [new BlocoTextoLlm("oi")])], []));
+
+        handler.Requisicao!.Headers.Authorization!.Scheme.Should().Be("Bearer");
+        handler.Requisicao.Headers.Authorization.Parameter.Should().Be("chave-do-agente");
+        handler.Requisicao.Headers.Contains("x-api-key").Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ErroHttpLancaSemVazarChave()
     {
         var client = Criar(new CapturaHandler(HttpStatusCode.TooManyRequests, """{"type":"error","error":{"type":"rate_limit_error"}}"""));
