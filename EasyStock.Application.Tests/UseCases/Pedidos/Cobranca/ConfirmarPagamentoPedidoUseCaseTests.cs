@@ -323,4 +323,103 @@ public class ConfirmarPagamentoPedidoUseCaseTests
 
         await f.ImpressaoRepo.DidNotReceive().AddAsync(Arg.Any<ImpressaoPendente>(), Arg.Any<CancellationToken>());
     }
+
+    // ── #1289: segundo pagamento aprovado do mesmo pedido ──────────────────
+
+    [Fact]
+    public async Task SegundoPagamento_ComCobrancaJaPaga_EstornaSemLancar()
+    {
+        // Cobrança paga por P1; o cliente paga de novo (P2). Antes: MarcarPaga lançava e o webhook dava 500 em loop.
+        var f = new CobrancaPedidoFixture();
+        var conversaId = Guid.NewGuid();
+        var cobranca = f.AdicionarOnline(conversaId: conversaId);
+        var uc = f.Confirmar();
+        await uc.ExecuteAsync(Aprovado(f.Pedido.Id));
+        f.ImpressaoRepo.ClearReceivedCalls();
+        f.Publicador.ClearReceivedCalls();
+
+        var r = await uc.ExecuteAsync(Aprovado(f.Pedido.Id) with { PagamentoExternoId = "pay-10" });
+
+        r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.PagamentoDuplicado);
+        await f.Estorno.Received(1).EstornarAsync("pay-10", 25m, "estorno-duplicado-pay-10", Arg.Any<CancellationToken>());
+        f.Pedido.Pagamentos.Should().ContainSingle("o segundo pagamento não é registrado").Which.Referencia.Should().Be("pay-9");
+        cobranca.Status.Should().Be(StatusCobrancaPedido.Paga);
+        cobranca.PagamentoExternoId.Should().Be("pay-9");
+        f.Eventos.Should().Contain(e => e.Tipo == "pagamento_divergente" && e.Detalhes!.Contains("pay-10"));
+        await f.ImpressaoRepo.DidNotReceive().AddAsync(Arg.Any<ImpressaoPendente>(), Arg.Any<CancellationToken>());
+        f.Publicador.ReceivedCalls().Should().BeEmpty();
+        await f.ConversaRepo.Received(1).ObterPorIdAsync(f.EmpresaId, conversaId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SegundoPagamento_NaCobrancaCanceladaComPedidoPago_EstornaENaoRegistra()
+    {
+        // A cobrança paga por P1 e outra cancelada; P2 paga a cancelada. Antes: aceito com PermitirExcedente.
+        var f = new CobrancaPedidoFixture();
+        var paga = f.AdicionarOnline(referencia: "pref-a");
+        var uc = f.Confirmar();
+        await uc.ExecuteAsync(Aprovado(f.Pedido.Id) with { ReferenciaExterna = "pref-a" });
+        var cancelada = f.AdicionarOnline(referencia: "pref-b");
+        cancelada.Cancelar("troca_forma", CobrancaPedidoFixture.Agora);
+        f.ImpressaoRepo.ClearReceivedCalls();
+
+        var r = await uc.ExecuteAsync(Aprovado(f.Pedido.Id) with { PagamentoExternoId = "pay-10", ReferenciaExterna = "pref-b" });
+
+        r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.PagamentoDuplicado);
+        await f.Estorno.Received(1).EstornarAsync("pay-10", 25m, "estorno-duplicado-pay-10", Arg.Any<CancellationToken>());
+        f.Pedido.Pagamentos.Should().ContainSingle();
+        cancelada.Status.Should().Be(StatusCobrancaPedido.Cancelada);
+        paga.PagamentoExternoId.Should().Be("pay-9");
+        await f.ImpressaoRepo.DidNotReceive().AddAsync(Arg.Any<ImpressaoPendente>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Pagamento_ComPedidoJaQuitadoManualmente_EstornaENaoRegistra()
+    {
+        // Pedido já quitado por pagamento registrado no console (TotalPago >= Total) e cobrança online cancelada.
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Aguardando);
+        var cobranca = f.AdicionarOnline();
+        cobranca.Cancelar("troca_forma", CobrancaPedidoFixture.Agora);
+        f.AdicionarPagamento("manual-1", 25m);
+
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id));
+
+        r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.PagamentoDuplicado);
+        await f.Estorno.Received(1).EstornarAsync("pay-9", 25m, "estorno-duplicado-pay-9", Arg.Any<CancellationToken>());
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.Referencia.Should().Be("manual-1");
+        cobranca.Status.Should().Be(StatusCobrancaPedido.Cancelada);
+    }
+
+    [Fact]
+    public async Task SegundoPagamento_RepetidoNaoEstornaDeNovo()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        var uc = f.Confirmar();
+        await uc.ExecuteAsync(Aprovado(f.Pedido.Id));
+        var segundo = Aprovado(f.Pedido.Id) with { PagamentoExternoId = "pay-10" };
+        await uc.ExecuteAsync(segundo);
+
+        var r = await uc.ExecuteAsync(segundo);
+
+        r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.PagamentoDuplicado);
+        await f.Estorno.Received(1).EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SegundoPagamento_EstornoRecusadoLanca()
+    {
+        // Mesmo contrato do estorno tardio: o webhook responde 500 e o Mercado Pago reenvia com a mesma chave.
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        var uc = f.Confirmar();
+        await uc.ExecuteAsync(Aprovado(f.Pedido.Id));
+        f.Estorno.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(EstornoPedidoResult.Falha("estorno_recusado"));
+
+        var act = () => uc.ExecuteAsync(Aprovado(f.Pedido.Id) with { PagamentoExternoId = "pay-10" });
+
+        await act.Should().ThrowAsync<EstornoAutomaticoFalhouException>();
+        f.Pedido.Pagamentos.Should().ContainSingle();
+    }
 }

@@ -171,7 +171,7 @@ internal sealed class CobrancaPedidoFixture
             new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance,
                 new CalculadoraInicioPrevistoPedido(PrazoQueries)),
             Publicador, OperacaoEventos, ImpressaoRepo, Tenant, Uow, Relogio, NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance,
-            new CalculadoraInicioPrevistoPedido(PrazoQueries), Estorno, Aviso());
+            new CalculadoraInicioPrevistoPedido(PrazoQueries), Estorno, Aviso(), PedidoRepo);
 
     public NotificarAtrasoPedidoUseCase NotificarAtraso() =>
         new(PedidoStorefrontRepo, OperacaoEventos, Tenant, Uow, Relogio, NullLogger<NotificarAtrasoPedidoUseCase>.Instance);

@@ -54,6 +54,26 @@ public class MercadoPagoWebhookProcessorTests
     }
 
     [Fact]
+    public async Task SegundoPagamentoAprovado_EstornaEResponde200()
+    {
+        // #1289: outro pagamento aprovado para o pedido já pago. Antes, MarcarPaga lançava e o webhook dava 500 em loop.
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 25m);
+        f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 25m, id: "20359979");
+        f.Estorno.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(EstornoPedidoResult.Ok("estorno-1"));
+        var processor = f.Processor();
+        await processor.ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+
+        var r = await processor.ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(dataId: "20359979"), SemHeaders);
+
+        r.Sucesso.Should().BeTrue();
+        await f.Estorno.Received(1).EstornarAsync("20359979", 25m, "estorno-duplicado-20359979", Arg.Any<CancellationToken>());
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.Referencia.Should().Be(MercadoPagoWebhookFixture.PagamentoId);
+        f.Cobranca.PagamentoExternoId.Should().Be(MercadoPagoWebhookFixture.PagamentoId);
+    }
+
+    [Fact]
     public async Task ValorMenorNaoConfirma()
     {
         var f = new MercadoPagoWebhookFixture();
