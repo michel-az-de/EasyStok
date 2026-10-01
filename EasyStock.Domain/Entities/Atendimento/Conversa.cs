@@ -58,6 +58,12 @@ public class Conversa
 
     public bool EstaAberta => Situacao != SituacaoConversa.Encerrada;
 
+    /// <summary>
+    /// O agente so responde no WhatsApp (envia pelo cliente da Cloud API). Nos demais canais quem
+    /// atende e sempre a dona (#1288).
+    /// </summary>
+    public bool TemAgente => Canal == CanalConversa.WhatsApp;
+
     // EF Core ctor sem parametros
     private Conversa() { }
 
@@ -171,10 +177,15 @@ public class Conversa
         UltimaMensagemEm = Max(UltimaMensagemEm, Utc(agora));
     }
 
-    /// <summary>Devolve ao agente por decisao da dona (D4). Nunca por tempo.</summary>
+    /// <summary>
+    /// Devolve ao agente por decisao da dona (D4). Nunca por tempo. Canal sem agente recusa: a
+    /// conversa ficaria sem ninguem e fora do lembrete (#1288).
+    /// </summary>
     public void LiberarAutomatico()
     {
         GarantirAberta("liberar o automatico de");
+        if (!TemAgente)
+            throw new RegraDeDominioVioladaException($"O canal {Canal} nao tem agente: a conversa fica com a dona.");
         Situacao = SituacaoConversa.Automatica;
         AssumidaPorUsuarioId = null;
     }
