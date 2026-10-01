@@ -26,6 +26,7 @@ import { ModalHistorico } from './ModalHistorico'
 import { ModalBloqueio, ModalDesbloqueio } from './ModalBloqueio'
 import { ModalFidelidade } from './ModalFidelidade'
 import { AvisosDoCliente } from './AvisosDoCliente'
+import { ModalTransferir } from './ModalTransferir'
 import css from './cliente.module.css'
 
 const dataCurta = (iso) =>
@@ -62,7 +63,9 @@ function SeloCaptado({ quando }) {
 
 export function BlocoCliente({ conversa }) {
   const { cliente } = conversa
-  const { conversas, historico, agora, automaticoPausado, fidelidade } = useAtendimento()
+  const {
+    conversas, historico, agora, automaticoPausado, fidelidade, fonteApi,
+  } = useAtendimento()
   const { canais, motivosBloqueio, prefixosCepAtendidos } = useCatalogo()
   const {
     bloquearCliente, desbloquearCliente, selecionar,
@@ -156,7 +159,7 @@ export function BlocoCliente({ conversa }) {
           {lead ? (
             <span className={css.situacao}>Lead · {chegouQuando(conversa, agora)}</span>
           ) : (
-            <span className={css.situacao}>Cliente desde {cliente.desde}</span>
+            <span className={css.situacao}>{cliente.desde ? `Cliente desde ${cliente.desde}` : 'Cliente cadastrado'}</span>
           )}
         </div>
         <span className={css.menuCliente}>
@@ -180,6 +183,16 @@ export function BlocoCliente({ conversa }) {
                   <Icone nome="bloqueio" />
                   {bloqueada ? 'Desbloquear cliente' : 'Bloquear cliente'}
                 </button>
+                {/* F09 (S41): só no modo API; o protótipo não tem transferência. */}
+                {fonteApi && (
+                  <button
+                    type="button" role="menuitem" className={css.itemMenu}
+                    onClick={() => { setMenuAberto(false); setModal('transferir') }}
+                  >
+                    <Icone nome="hand" />
+                    Transferir conversa
+                  </button>
+                )}
               </div>
             </Popover>
           )}
@@ -356,6 +369,8 @@ export function BlocoCliente({ conversa }) {
           aoConfirmar={() => { desbloquearCliente(conversa.nome); setModal(null) }}
         />
       )}
+
+      {modal === 'transferir' && <ModalTransferir conversa={conversa} aoFechar={() => setModal(null)} />}
 
       {modal === 'historico' && (
         <ModalHistorico

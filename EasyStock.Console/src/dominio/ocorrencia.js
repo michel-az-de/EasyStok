@@ -139,3 +139,14 @@ export function motivoParaAutomatico(ocorrencia) {
   if (!ocorrenciaAberta(ocorrencia)) return null
   return ocorrencia.historico[0]?.texto ?? 'Reclamação aberta neste pedido'
 }
+
+// Modo API (F09): as ocorrências do cliente vêm do EasyStok, uma lista por cadastro. A do
+// pedido em tela é a aberta; sem aberta, a mais recente; sem nenhuma, nada.
+export function ocorrenciaDoPedido(ocorrencias, pedidoId) {
+  if (!pedidoId) return null
+  const doPedido = (ocorrencias ?? []).filter((o) => o.pedidoId === pedidoId)
+  const maisRecente = (a, b) => (b.abertaEm ?? 0) - (a.abertaEm ?? 0)
+  return doPedido.filter(ocorrenciaAberta).sort(maisRecente)[0]
+    ?? doPedido.sort(maisRecente)[0]
+    ?? null
+}

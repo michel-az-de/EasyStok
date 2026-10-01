@@ -96,6 +96,24 @@ function AbaAtendimentos({ conversaId, atendimentos }) {
   if (atendimentos.length === 0) {
     return <Vazio titulo="Nenhum atendimento registrado">Aparece aqui a cada encerramento.</Vazio>
   }
+  // F09: no modo API a lista vem do dossiê (conversas recentes, mais nova primeiro), sem o
+  // resumo congelado do encerramento: canal, situação e horário, sem "Ver resumo".
+  if (atendimentos[0]?.daApi) {
+    return (
+      <ul className={css.listaPedidos}>
+        {atendimentos.map((a) => (
+          <li key={a.id} className={css.linhaPedido}>
+            <header>
+              <time dateTime={new Date(a.encerradoEm).toISOString()}>
+                {new Date(a.encerradoEm).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+              </time>
+              <span>{a.resumoApi}</span>
+            </header>
+          </li>
+        ))}
+      </ul>
+    )
+  }
   return (
     <ul className={css.listaPedidos}>
       {[...atendimentos].reverse().map((a) => (
@@ -164,6 +182,7 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
   const { cliente } = conversa
   const lead = ehLead(conversa)
   const financeiro = resumoFinanceiro(historico)
+  const atendimentos = conversa.atendimentos ?? cliente.atendimentos ?? []
 
   return (
     <Modal
@@ -188,7 +207,7 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
       <BarraDeAbas
         abas={[
           { id: 'pedidos', rotulo: 'Pedidos', contador: cliente.pedidos },
-          { id: 'atendimentos', rotulo: 'Atendimentos', contador: (conversa.atendimentos ?? []).length },
+          { id: 'atendimentos', rotulo: 'Atendimentos', contador: atendimentos.length },
           { id: 'notas', rotulo: 'Notas', contador: cliente.notas.length },
         ]}
         ativa={aba}
@@ -198,7 +217,7 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
       <div role="tabpanel" id="painel-da-aba" className={css.painelAba}>
         {aba === 'pedidos' && <AbaPedidos historico={historico} pedidosAnteriores={cliente.pedidos} />}
         {aba === 'atendimentos' && (
-          <AbaAtendimentos conversaId={conversa.id} atendimentos={conversa.atendimentos ?? []} />
+          <AbaAtendimentos conversaId={conversa.id} atendimentos={atendimentos} />
         )}
         {aba === 'notas' && <AbaNotas conversa={conversa} />}
       </div>

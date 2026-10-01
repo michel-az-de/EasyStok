@@ -267,3 +267,5 @@ export const SINCRONIZAR_EXPEDIENTE = 'sincronizar-expediente'
 // F03: cardápio da vitrine da empresa e o pedido da conversa (S10/S11) como a API devolveu.
 export const SINCRONIZAR_CARDAPIO = 'sincronizar-cardapio'
 export const SINCRONIZAR_PEDIDO = 'sincronizar-pedido'
+// F09: dossiê (S25) e ocorrências (S27) da conversa selecionada, como a API devolveu.
+export const APLICAR_FICHA_API = 'aplicar-ficha-api'

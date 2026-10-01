@@ -565,7 +565,10 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
   // jeito que a reclamação abre sozinha hoje (US-049). Mesmo guarda do
   // reducer (`ABRIR_OCORRENCIA` não duplica quando já existe uma ocorrência
   // no pedido) evita reabrir a cada volta do relógio.
+  // Modo API (F09): a ocorrência é do EasyStok (S27); abrir aqui a cada volta do relógio só
+  // criaria uma no navegador que a sincronização apaga.
   useEffect(() => {
+    if (FONTE_API) return
     const paradasAtrasadas = conversasAgora.filter((c) =>
       entregaPassouDoPrazo(c, estado.catalogo.janelas, agoraRef.current) && !ocorrenciaAberta(c.pedido?.ocorrencia))
     paradasAtrasadas.forEach((c) => {
@@ -589,6 +592,13 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
   useEffect(() => {
     if (FONTE_API) acoesAtivas.recarregarExpediente()
   }, [acoesAtivas])
+
+  // Modo API (F09): dossiê e ocorrências só da conversa selecionada, ao selecionar e quando o
+  // vínculo com o cliente muda; nunca no ciclo de 5 s da inbox.
+  const clienteIdSelecionado = estado.conversas.find((c) => c.id === estado.selecionadaId)?.clienteId ?? null
+  useEffect(() => {
+    if (FONTE_API && estado.selecionadaId) acoesAtivas.recarregarFicha(estado.selecionadaId)
+  }, [acoesAtivas, estado.selecionadaId, clienteIdSelecionado])
 
   const valor = useMemo(() => {
     const selecionada = estado.conversas.find((c) => c.id === estado.selecionadaId) ?? null
@@ -626,7 +636,10 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
       // "Precisa de você".
       encerradasDoBalcao: conversasEncerradasDoBalcao(estado.conversas, estado.filtros),
       bloqueadasDoBalcao: conversasBloqueadasDoBalcao(estado.conversas, estado.filtros),
-      historico: selecionada ? historicoComPedidoVivo(carregarHistorico(selecionada.id), selecionada.pedido) : [],
+      // F09: no modo API o histórico é o do dossiê; no demonstração, o da massa.
+      historico: selecionada
+        ? historicoComPedidoVivo(selecionada.cliente?.historico ?? carregarHistorico(selecionada.id), selecionada.pedido)
+        : [],
       ultimoAvanco: estado.ultimoAvanco,
       // Lote de papel (US-042): banner de queda e a modal de lançamento leem
       // só este campo, tirado de `estado.conexao` sem transformação nenhuma.

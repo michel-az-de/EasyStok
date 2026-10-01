@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { SEM_CADASTRO } from '../../aplicacao/api/ficha'
 import { ehRestricao, ordenarTags, sugestoesDeTag } from '../../dominio/cliente'
 import { SEGUNDOS_PARA_DESFAZER } from '../../dominio/esteira'
 import css from './cliente.module.css'
@@ -11,7 +12,9 @@ import css from './cliente.module.css'
 // ação nova: `Desfazer` só chama `adicionarTag` de volta.
 export function TagsDoCliente({ conversa }) {
   const { tags } = conversa.cliente
-  const { conversas } = useAtendimento()
+  const { conversas, fonteApi } = useAtendimento()
+  // Modo API (F09): tag mora no cadastro do EasyStok; lead sem cadastro não tem onde gravar.
+  const semCadastro = fonteApi && !conversa.clienteId
   const { restricoes } = useCatalogo()
   const { adicionarTag, removerTag, editarTag } = useAcoes()
 
@@ -107,7 +110,9 @@ export function TagsDoCliente({ conversa }) {
           </li>
         ))}
         <li>
-          {adicionando ? (
+          {semCadastro ? (
+            <span className={css.avisoCanal}>{SEM_CADASTRO}</span>
+          ) : adicionando ? (
             <input
               autoFocus
               className={css.chipEdicao}

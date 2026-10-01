@@ -4,10 +4,11 @@ import { lerSessao, limparSessao } from './sessao'
 // Erro de chamada à API com o que a tela precisa para falar com a dona:
 // status HTTP, código da API (`error.code` ou `erro`) e mensagem legível.
 export class ErroApi extends Error {
-  constructor(status, codigo, mensagem) {
+  constructor(status, codigo, mensagem, dados = null) {
     super(mensagem)
     this.status = status
     this.codigo = codigo
+    this.dados = dados
   }
 }
 
@@ -53,7 +54,9 @@ export async function chamarApi(caminho, { metodo = 'GET', corpo, autenticado = 
     limparSessao()
     window.dispatchEvent(new Event(EVENTO_SESSAO_EXPIRADA))
   }
-  const codigo = json?.error?.code ?? json?.erro ?? `HTTP_${resposta.status}`
+  // O 502 do estorno recusado (S27) traz `{ data, error: "<código do gateway>" }`.
+  const codigoSolto = typeof json?.error === 'string' ? json.error : null
+  const codigo = codigoSolto ?? json?.error?.code ?? json?.erro ?? `HTTP_${resposta.status}`
   const mensagem = json?.error?.message ?? MENSAGEM_POR_STATUS[resposta.status] ?? (json?.title ? 'Confira os campos.' : 'Não deu certo. Tente de novo.')
-  throw new ErroApi(resposta.status, codigo, mensagem)
+  throw new ErroApi(resposta.status, codigo, mensagem, json?.data ?? null)
 }

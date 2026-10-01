@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
-import { CampoArea } from '../../componentes/Campo'
+import { CampoArea, CampoSelecao } from '../../componentes/Campo'
 import { CampoMascarado } from '../../componentes/CampoMascarado'
 import { EscolhaDeEntregador } from '../../componentes/EscolhaDeEntregador'
 import { Icone } from '../../componentes/Icone'
@@ -77,6 +77,14 @@ function acaoDoPix(situacaoCob, { temItens, aoAbrirBaixa, aoGerarPix, aoReenviar
   }
 }
 
+// Categorias da ocorrência na API (S27), na ordem em que a dona mais usa.
+const CATEGORIAS_OCORRENCIA = [
+  { valor: 'produto_improprio', rotulo: 'Produto com problema' },
+  { valor: 'atraso', rotulo: 'Atraso' },
+  { valor: 'preferencia', rotulo: 'Preferência do cliente' },
+  { valor: 'outro', rotulo: 'Outro' },
+]
+
 // O bloco Pedido: trilha, onde está e ação (secao 5 da direção visual). Um
 // alvo só, fixo no rodapé da coluna Ficha, no lugar de `BlocoEsteira` (que
 // listava os seis passos soltos) e da barra antiga somados.
@@ -84,6 +92,7 @@ export function BarraProximoPasso({
   pedido, nomeCliente, agora, emDesfazer, bloqueado = false, aoAvancar, aoDesfazer,
   aoGerarPix, aoReenviarPix, aoConfirmarPagamento, aoAceitarDivergencia, aoCobrarDiferenca,
   aoVoltarEtapa, aoCancelarPedido, aoMarcarEstorno, aoEncerrarAtendimento, aoDesfazerPagamento,
+  aoRegistrarOcorrencia = null,
 }) {
   const [restam, setRestam] = useState(() => (emDesfazer ? SEGUNDOS_PARA_DESFAZER : 0))
   const [confirmando, setConfirmando] = useState(null) // 'cancelar' | 'estornar' | 'voltar' | 'desfazer'
@@ -101,6 +110,8 @@ export function BarraProximoPasso({
   const [centavosEstorno, setCentavosEstorno] = useState(0)
   // Rodada 12 (issue #13): motivo do "Desfazer pagamento", obrigatório.
   const [motivoDesfazer, setMotivoDesfazer] = useState('')
+  // F09 (S27): ocorrência aberta à mão pela dona, só no modo API.
+  const [ocorrenciaNova, setOcorrenciaNova] = useState({ categoria: 'produto_improprio', relato: '' })
 
   useEffect(() => {
     if (!emDesfazer) return undefined
@@ -267,6 +278,7 @@ export function BarraProximoPasso({
       setCentavosEstorno(Math.round(valorPago * 100))
     }
     if (chave === 'desfazer') setMotivoDesfazer('')
+    if (chave === 'ocorrencia') setOcorrenciaNova({ categoria: 'produto_improprio', relato: '' })
     setConfirmando(chave)
   }
 
@@ -315,6 +327,7 @@ export function BarraProximoPasso({
             podeEstornar={podeEstornar}
             podeVoltarEtapa={podeVoltarEtapa}
             podeDesfazerPagamento={podeDesfazer}
+            podeRegistrarOcorrencia={Boolean(aoRegistrarOcorrencia)}
             aoEscolher={iniciarConfirmacao}
           />
         </div>
@@ -405,6 +418,37 @@ export function BarraProximoPasso({
               onClick={() => { aoDesfazerPagamento(motivoDesfazer.trim()); setConfirmando(null) }}
             >
               Desfazer pagamento
+            </Botao>
+          </p>
+        </div>
+      )}
+
+      {confirmando === 'ocorrencia' && (
+        <div className={css.confirmarCorrecao}>
+          <CampoSelecao
+            rotulo="Tipo da ocorrência"
+            opcoes={CATEGORIAS_OCORRENCIA}
+            value={ocorrenciaNova.categoria}
+            onChange={(e) => setOcorrenciaNova((o) => ({ ...o, categoria: e.target.value }))}
+          />
+          <CampoArea
+            rotulo="O que aconteceu"
+            dica="Obrigatório. Fica na ocorrência do pedido; o reembolso sai dela."
+            rows={2}
+            value={ocorrenciaNova.relato}
+            onChange={(e) => setOcorrenciaNova((o) => ({ ...o, relato: e.target.value }))}
+          />
+          <p className={css.confirmarAcoes}>
+            <Botao variante="texto" onClick={() => setConfirmando(null)}>Manter</Botao>
+            <Botao
+              variante="primario"
+              disabled={ocorrenciaNova.relato.trim().length < 3}
+              onClick={() => {
+                aoRegistrarOcorrencia({ categoria: ocorrenciaNova.categoria, relato: ocorrenciaNova.relato.trim() })
+                setConfirmando(null)
+              }}
+            >
+              Registrar ocorrência
             </Botao>
           </p>
         </div>

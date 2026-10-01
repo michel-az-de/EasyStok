@@ -14,7 +14,8 @@ import css from './ficha.module.css'
 // direto por `abrirEncerramento`, lendo a conversa selecionada do contexto
 // para não precisar de uma prop nova vinda de `BlocoPedido.jsx` (F3).
 export function MenuDoPedido({
-  podeCancelar, podeEstornar, podeVoltarEtapa, podeDesfazerPagamento = false, aoEscolher,
+  podeCancelar, podeEstornar, podeVoltarEtapa, podeDesfazerPagamento = false, podeRegistrarOcorrencia = false,
+  aoEscolher,
 }) {
   const [aberto, setAberto] = useState(false)
   const { selecionada } = useAtendimento()
@@ -60,6 +61,13 @@ export function MenuDoPedido({
               <button type="button" role="menuitem" className={css.itemMenu} onClick={() => escolher('estornar')}>
                 <Icone nome="undo-2" />
                 Marcar estorno
+              </button>
+            )}
+            {podeRegistrarOcorrencia && (
+              // F09 (S27): só no modo API. Abre o formulário em BarraProximoPasso.
+              <button type="button" role="menuitem" className={css.itemMenu} onClick={() => escolher('ocorrencia')}>
+                <Icone nome="message-square-warning" />
+                Registrar ocorrência
               </button>
             )}
             {podeVoltarEtapa && (

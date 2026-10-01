@@ -56,6 +56,8 @@ const ESTADO_DO_STATUS = {
   entregue: 'entregue',
   cancelado: 'cancelado',
 }
+// F09: o Histórico do dossiê usa o mesmo de-para de status do pedido.
+export const estadoDoStatusApi = (status) => ESTADO_DO_STATUS[status] ?? 'aguardando'
 
 export const FORMA_NA_ENTREGA = 'na_entrega'
 export const FORMA_ONLINE = 'online'

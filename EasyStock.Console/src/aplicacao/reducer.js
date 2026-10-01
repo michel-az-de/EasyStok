@@ -273,6 +273,17 @@ const CASOS_API = {
   [acao.SINCRONIZAR_PEDIDO]: (estado, { id, pedido }) =>
     mapear(estado, id, (c) => ({ ...c, pedido: pedidoMesclado(c.pedido, pedido) })),
 
+  // F09: dossiê e ocorrências da conversa selecionada. O cadastro entra na conversa; o bloqueio
+  // é do cliente e vale em todas as conversas dele (RN-14), em qualquer canal.
+  [acao.APLICAR_FICHA_API]: (estado, { id, ficha }) => ({
+    ...estado,
+    conversas: estado.conversas.map((c) => {
+      if (c.id === id) return { ...c, cliente: { ...c.cliente, ...ficha.cliente }, bloqueio: ficha.bloqueio }
+      if (ficha.clienteId && c.clienteId === ficha.clienteId) return { ...c, bloqueio: ficha.bloqueio }
+      return c
+    }),
+  }),
+
   // A API é a verdade do expediente: horário e controle manual substituem o local.
   [acao.SINCRONIZAR_EXPEDIENTE]: (estado, { funcionamento, lojaAberta, mensagemForaDoHorario, mensagemLojaFechada }) => ({
     ...estado,

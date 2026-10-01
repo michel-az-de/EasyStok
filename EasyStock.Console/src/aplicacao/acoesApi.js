@@ -9,6 +9,7 @@ import { criarAcoesConfiguracaoApi } from './api/configuracao'
 import { criarAcoesAssistenteApi } from './api/assistente'
 import { criarAcoesConsentimentosApi } from './api/consentimentos'
 import { criarAcoesComandaApi } from './api/comanda'
+import { criarAcoesFichaApi } from './api/ficha'
 
 const FORA_DA_JANELA = 'fora_da_janela_24h'
 
@@ -32,6 +33,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     ...criarAcoesAssistenteApi(),
     ...criarAcoesConsentimentosApi(),
     ...criarAcoesComandaApi(acoes, { despachar, estadoRef }),
+    ...criarAcoesFichaApi(acoes, { despachar, estadoRef }),
     enviar: (id, texto) => {
       const mensagemId = proximoId('msg')
       despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, agora: agoraRef.current })

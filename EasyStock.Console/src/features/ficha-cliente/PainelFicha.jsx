@@ -7,6 +7,7 @@ import { conversaEncerrada, estaBloqueada } from '../../dominio/conversa'
 import { faltaPagar } from '../../dominio/cobranca'
 import { faixaDaJanela } from '../../dominio/entrega'
 import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
+import { ocorrenciaAberta, ocorrenciaDoPedido } from '../../dominio/ocorrencia'
 import { BarraProximoPasso } from './BarraProximoPasso'
 import { BlocoCobranca } from './BlocoCobranca'
 import { BlocoCapturaAutomatica } from './BlocoCapturaAutomatica'
@@ -19,7 +20,7 @@ import css from './ficha.module.css'
 
 export function PainelFicha({ aoAbrirCardapio }) {
   const {
-    selecionada, visiveis, alertasEstoque, ultimoAvanco, agora, automaticoPausado,
+    selecionada, visiveis, alertasEstoque, ultimoAvanco, agora, automaticoPausado, fonteApi,
   } = useAtendimento()
   const {
     avancarEsteira, cadastrarEndereco, fecharAlerta,
@@ -27,7 +28,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
     gerarCobranca, reenviarCobranca, confirmarPagamento,
     marcarComprovante, aceitarDivergencia, escolherJanela, forcarEncaixe,
     cancelarPedido, marcarEstorno, abrirEncerramento, decidirAreaEntrega, escolherMeioPagamento,
-    alterarMeioPagamento, desfazerPagamento,
+    alterarMeioPagamento, desfazerPagamento, registrarOcorrencia,
   } = useAcoes()
   const { janelas, prefixosCepAtendidos } = useCatalogo()
 
@@ -52,6 +53,9 @@ export function PainelFicha({ aoAbrirCardapio }) {
   const faixa = faixaDaJanela(janelas, pedido?.janela)
   const avancoEm = ultimoAvanco?.conversaId === selecionada.id ? ultimoAvanco.em : null
   const primeiroNome = selecionada.nome.split(' ')[0]
+  // F09: no modo API a ocorrência do pedido vem do EasyStok (dossiê da conversa selecionada).
+  const ocorrencia = pedido?.ocorrencia ?? ocorrenciaDoPedido(cliente.ocorrencias, pedido?.pedidoId)
+  const podeRegistrarOcorrencia = fonteApi && Boolean(pedido?.pedidoId) && !ocorrenciaAberta(ocorrencia)
 
   // Texto pronto que o cliente lê ao cancelar (mesmo padrão de ENVIAR_MIDIA e
   // GERAR_PEDIDO: o domínio não escreve copy, quem monta é a tela). Reusado
@@ -129,9 +133,9 @@ export function PainelFicha({ aoAbrirCardapio }) {
               aoEncerrarAtendimento={aoEncerrarAtendimento}
               aoAlterarMeio={(meio) => alterarMeioPagamento(selecionada.id, meio)}
             />
-            {pedido.ocorrencia && (
+            {ocorrencia && (
               <BlocoOcorrencia
-                ocorrencia={pedido.ocorrencia}
+                ocorrencia={ocorrencia}
                 conversaId={selecionada.id}
                 nomeCliente={selecionada.nome}
                 pedido={pedido}
@@ -173,6 +177,9 @@ export function PainelFicha({ aoAbrirCardapio }) {
           aoCancelarPedido={aoCancelarPedido}
           aoMarcarEstorno={(motivo, valor) => marcarEstorno(selecionada.id, motivo, valor)}
           aoDesfazerPagamento={(motivo) => desfazerPagamento(selecionada.id, motivo)}
+          aoRegistrarOcorrencia={podeRegistrarOcorrencia
+            ? (dados) => registrarOcorrencia(selecionada.id, dados)
+            : null}
           aoEncerrarAtendimento={aoEncerrarAtendimento}
         />
       )}
