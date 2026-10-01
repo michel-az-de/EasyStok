@@ -11,7 +11,9 @@ namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 /// <param name="PedidoId"><c>external_reference</c> do pagamento.</param>
 /// <param name="PagamentoExternoId"><c>id</c> do pagamento no Mercado Pago.</param>
 /// <param name="StatusPagamento"><c>status</c> do pagamento (<c>refunded</c>, <c>charged_back</c>, <c>rejected</c>, <c>cancelled</c>).</param>
-public sealed record AtualizarCobrancaPorPagamentoInput(Guid PedidoId, string PagamentoExternoId, string StatusPagamento);
+/// <param name="StatusDetalhe"><c>status_detail</c> do pagamento (ex.: <c>expired</c> no Pix vencido).</param>
+public sealed record AtualizarCobrancaPorPagamentoInput(
+    Guid PedidoId, string PagamentoExternoId, string StatusPagamento, string? StatusDetalhe = null);
 
 public enum SituacaoAtualizacaoCobranca
 {
@@ -47,6 +49,9 @@ public sealed class AtualizarCobrancaPorPagamentoUseCase(
     ILogger<AtualizarCobrancaPorPagamentoUseCase> logger)
 {
     private const string Origem = "mercadopago";
+
+    /// <summary><c>status_detail</c> do Mercado Pago para o Pix que venceu sem pagamento.</summary>
+    public const string StatusDetalheExpirado = "expired";
 
     public async Task<SituacaoAtualizacaoCobranca> ExecuteAsync(AtualizarCobrancaPorPagamentoInput input, CancellationToken ct = default)
     {
@@ -111,7 +116,12 @@ public sealed class AtualizarCobrancaPorPagamentoUseCase(
         alvo.RegistrarMotivo(motivo, agora);
         await RegistrarNaTrilhaAsync(pedido.Id, "pagamento_recusado", motivo, agora, ct);
         await unitOfWork.CommitAsync();
-        return alvo.EstaPendente
+
+        // #1289: Pix vencido chega como cancelled no instante do vencimento, antes de o job (60 s) expirar a
+        // cobrança. "Tente de novo no mesmo link" mandaria um link morto; o job cuida do link novo ou do cancelamento.
+        var linkVencido = alvo.Venceu(agora)
+            || string.Equals(input.StatusDetalhe?.Trim(), StatusDetalheExpirado, StringComparison.OrdinalIgnoreCase);
+        return alvo.EstaPendente && !linkVencido
             ? (SituacaoAtualizacaoCobranca.Recusada, alvo.ConversaId, alvo.LinkPagamento)
             : (SituacaoAtualizacaoCobranca.Recusada, null, null);
     }

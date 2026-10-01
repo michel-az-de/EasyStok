@@ -80,7 +80,7 @@ public sealed class MercadoPagoWebhookProcessor(
         }
 
         var situacao = await atualizarCobranca.ExecuteAsync(
-            new AtualizarCobrancaPorPagamentoInput(pedidoId, pagamentoId, pagamento.Status), ct);
+            new AtualizarCobrancaPorPagamentoInput(pedidoId, pagamentoId, pagamento.Status, pagamento.StatusDetail), ct);
         logger.LogInformation("Webhook MercadoPago: pagamento {PagamentoId} pedido {PedidoId} nao aprovado atualizacao={Situacao}",
             pagamentoId, pedidoId, situacao);
         return situacao is SituacaoAtualizacaoCobranca.SemCobranca or SituacaoAtualizacaoCobranca.PedidoNaoEncontrado
