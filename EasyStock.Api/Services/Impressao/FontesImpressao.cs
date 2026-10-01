@@ -11,7 +11,7 @@ public static class FontesImpressao
 {
     public static void LiberarCors(StaticFileResponseContext ctx)
     {
-        if (ctx.Context.Request.Path.StartsWithSegments(PedidoImpressoHtml.CaminhoFontes, StringComparison.OrdinalIgnoreCase))
+        if (ctx.Context.Request.Path.StartsWithSegments(ImpressoHtml.CaminhoFontes, StringComparison.OrdinalIgnoreCase))
             ctx.Context.Response.Headers.AccessControlAllowOrigin = "*";
     }
 }

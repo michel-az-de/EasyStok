@@ -1,0 +1,15 @@
+<div class="t p58 cm"><div class="box">
+<div class="r"><div class="inv g" style="align-items:center;text-align:center">{{ if m.numero_dia }}<span class="l">Comanda nº</span><span class="cm-num">{{ m.numero_dia }}</span><span class="cm-hash">#{{ m.numero }}</span>{{ else }}<span class="l">Comanda</span><span class="codigo">#{{ m.numero }}</span>{{ end }}<span class="selo">{{ m.prazo.selo }}</span></div></div>
+{{ if m.alergias }}<div class="cm-alerta"><b>!</b><span>ALERGIA: {{ m.alergias }}<small>cadastro da cliente · confira todos os itens</small></span></div>{{ end }}
+<div class="r"><div class="g contorno cm-prazo"><span class="l">Pronto até</span><span class="grande">{{ m.prazo.pronto_ate }}</span></div><div class="g"><span class="l">Entrega</span><span class="cm-ent">{{ m.prazo.data_longa }}<br>{{ m.prazo.hora_curta }}<br>{{ m.entrega }}</span></div></div>
+<div class="r"><div class="g"><span class="l">Cliente</span><div class="nome">{{ m.cliente }}</div></div></div>
+<div class="r itens">
+{{ for g in m.grupos }}<div class="cm-grupo"><span>{{ g.titulo }}</span><span>{{ g.contagem }}</span></div>
+{{ for i in g.itens }}<div class="cm-item"><div class="cm-q"><span class="qn">{{ i.quantidade }}</span><span class="qx">{{ i.unidade }}</span></div><div class="cm-n"><span class="cm-nome">{{ i.nome }}{{ if i.porcao }} <span class="cm-porcao">· {{ i.porcao }}</span>{{ end }}</span>{{ if i.molho }}<span class="cm-molho">molho: {{ i.molho }}</span>{{ end }}{{ if i.observacao }}<span class="cm-obs">OBS: {{ i.observacao }}</span>{{ end }}</div><div class="cm-ok"><span></span></div></div>
+{{ end }}{{ end }}
+</div>
+<div class="r"><div class="g"><span class="l">Observação do pedido</span>{{ if m.observacao }}{{ m.observacao }}{{ else }}—{{ end }}</div></div>
+<div class="r cm-assin"><div><span class="l">Feito por</span><i></i></div><div><span class="l">Embalado por</span><i></i></div></div>
+<div class="r"><div class="g barras-cel">{{ m.barras }}<div class="barras-txt">{{ m.numero }}</div></div></div>
+<div class="r"><div class="g meta"><span>Solicitado {{ m.solicitado }}</span><b>{{ m.total_linhas }}</b><span>Impresso {{ m.impresso }}</span></div></div>
+</div></div>
