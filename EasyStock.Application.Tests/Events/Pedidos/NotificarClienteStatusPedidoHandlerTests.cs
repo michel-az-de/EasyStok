@@ -131,12 +131,15 @@ public class NotificarClienteStatusPedidoHandlerTests
     [Fact]
     public async Task EntregueAgendaAvaliacaoEm30Min()
     {
-        var entregueEm = new DateTime(2026, 10, 1, 13, 0, 0, DateTimeKind.Utc);
+        // O outbox nasce com o relógio real e AgendarPara não adia para o passado: a entrega fica no
+        // futuro, senão o teste quebra quando o relógio passa da data fixa (#1307).
+        var agora = DateTime.UtcNow;
+        var entregueEm = new DateTime(agora.Year, agora.Month, agora.Day, agora.Hour, 0, 0, DateTimeKind.Utc).AddHours(2);
 
         await MudarStatusAsync(StatusPedidoMapper.SaiuParaEntrega, StatusPedidoMapper.Entregue, entregueEm);
 
         var avaliacao = _outbox.Should().ContainSingle(m => m.CorpoRenderizado.Contains("como foi")).Subject;
-        avaliacao.ProximaTentativaEm.Should().Be(new DateTime(2026, 10, 1, 13, 30, 0, DateTimeKind.Utc));
+        avaliacao.ProximaTentativaEm.Should().Be(entregueEm.AddMinutes(30));
         var metadados = avaliacao.LerMetadados()!;
         metadados["template"].Should().Be("avaliacao");
         metadados["botao1"].Should().Be($"acao:avaliacao:positiva:{_pedido.Id}|Gostei");
