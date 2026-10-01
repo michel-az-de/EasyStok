@@ -14,6 +14,6 @@ public sealed record IniciarCheckoutGuestInput(
     string Cep,
     string? Numero,
     IReadOnlyList<CheckoutItemInput> Items,
-    Guid JanelaId,
-    DateOnly DataEntrega,
+    Guid? JanelaId,
+    DateOnly? DataEntrega,
     string? Observacoes = null);
