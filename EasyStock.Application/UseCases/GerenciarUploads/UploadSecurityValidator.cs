@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using EasyStock.Application.Ports.Output.Storage;
 
 namespace EasyStock.Application.UseCases.GerenciarUploads;
 
@@ -100,6 +101,27 @@ public static class UploadSecurityValidator
         if (!AllowedMimeTypes.Contains(mainType))
             throw new InvalidOperationException(
                 $"ContentType '{mainType}' nao permitido. Tipos aceitos: {string.Join(", ", AllowedMimeTypes)}.");
+    }
+
+    /// <summary>
+    /// Valida o ContentType de um upload: o público sempre contra <see cref="AllowedMimeTypes"/>; o
+    /// privado contra a allowlist própria dele, quando informada (ex.: mídia do atendimento), senão
+    /// contra a mesma whitelist pública.
+    /// </summary>
+    public static void EnsureValidMime(FileUploadRequest request)
+    {
+        if (request.IsPublic || request.PrivateAllowedMimeTypes is null)
+        {
+            EnsureValidMime(request.ContentType);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(request.ContentType))
+            throw new InvalidOperationException("ContentType nao informado no upload.");
+
+        var mainType = request.ContentType.Split(';', 2)[0].Trim();
+        if (!request.PrivateAllowedMimeTypes.Contains(mainType))
+            throw new InvalidOperationException($"ContentType '{mainType}' nao permitido neste upload privado.");
     }
 
     /// <summary>
