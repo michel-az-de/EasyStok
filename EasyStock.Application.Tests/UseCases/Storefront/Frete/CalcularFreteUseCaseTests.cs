@@ -86,6 +86,7 @@ public class CalcularFreteUseCaseTests
             f.FreteZonaRepository,
             f.CepLookupClient,
             geocoding,
+            Substitute.For<IRotaClient>(),
             f.Logger);
     }
 

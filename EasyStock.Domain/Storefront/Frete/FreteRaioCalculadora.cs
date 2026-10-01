@@ -44,14 +44,21 @@ public static class FreteRaioCalculadora
 {
     private const double RaioTerraMetros = 6_371_000.0;
 
-    /// <summary>Calcula o frete do destino até a origem da config.</summary>
-    public static FreteRaioResultado Calcular(Coordenada destino, FreteRaioConfig config)
+    /// <summary>
+    /// Calcula o frete do destino até a origem da config. Com
+    /// <paramref name="distanciaRotaMedidaMetros"/> (rota real, issue #1274) a faixa sai
+    /// dela; sem, da estimativa <c>haversine × FatorRota</c>.
+    /// </summary>
+    public static FreteRaioResultado Calcular(
+        Coordenada destino,
+        FreteRaioConfig config,
+        int? distanciaRotaMedidaMetros = null)
     {
         ArgumentNullException.ThrowIfNull(config);
 
         var distanciaMetros = (int)Math.Round(
             HaversineMetros(config.Origem, destino), MidpointRounding.AwayFromZero);
-        var distanciaRotaMetros = (int)Math.Round(
+        var distanciaRotaMetros = distanciaRotaMedidaMetros ?? (int)Math.Round(
             distanciaMetros * config.FatorRota, MidpointRounding.AwayFromZero);
 
         // Acima do raio máximo → retirada (negócio, não erro).
