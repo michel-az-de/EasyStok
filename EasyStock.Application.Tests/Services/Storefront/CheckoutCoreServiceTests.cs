@@ -1,8 +1,11 @@
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.TestHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute.ExceptionExtensions;
@@ -112,6 +115,21 @@ public class CheckoutCoreServiceTests
         public CheckoutCoreService Servico() => new(
             StorefrontRepo, CardapioRepo, JanelaRepo, BloqueioRepo, FreteZonaRepo, VagaRepo, PedidoRepo,
             ExpedienteRepo, NullLogger<CheckoutCoreService>.Instance, Relogio);
+
+        /// <summary>
+        /// Núcleo do pedido da conversa (S10) sobre este cenário. O mock da transação executa o bloco
+        /// (#1238: a conversa é travada e o pedido criado dentro dela).
+        /// </summary>
+        public EasyStock.Application.UseCases.Atendimento.CriarPedidoAtendimentoUseCase CriarPedidoAtendimento(
+            IConversaRepository conversas,
+            IClienteRepository clientes,
+            IUnitOfWork uow,
+            IPedidoRepository? pedidos = null)
+        {
+            uow.SetupExecuteInTransactionSemRetry<PedidoReservado>();
+            return new(Servico(), conversas, clientes, pedidos ?? Substitute.For<IPedidoRepository>(),
+                ConfiguracaoAtendimentoRepo, uow, Atribuicao());
+        }
     }
 
     private static CheckoutCoreInput Input(Cenario c) => new(

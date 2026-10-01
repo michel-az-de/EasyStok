@@ -34,7 +34,7 @@ public class CriarPedidoAtendimentoUseCaseTests
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
-        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork, c.Atribuicao());
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, unitOfWork);
 
         var reservado = await useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
             EmpresaId: empresaId,
@@ -80,7 +80,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork, c.Atribuicao());
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, unitOfWork);
 
         var act = () => useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
             EmpresaId: empresaId,
@@ -115,7 +115,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork, c.Atribuicao());
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, unitOfWork);
 
         var act = () => useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
             EmpresaId: empresaId,
@@ -149,7 +149,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork, c.Atribuicao());
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, unitOfWork);
 
         var act = () => useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
             EmpresaId: empresaId,
@@ -231,8 +231,7 @@ public class CriarPedidoAtendimentoUseCaseTests
             .Returns(destinatario);
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        var useCase = new CriarPedidoAtendimentoUseCase(
-            c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork, c.Atribuicao());
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, unitOfWork);
 
         var reservado = await useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
             EmpresaId: empresaId,
@@ -264,8 +263,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         var conversaRepo = Substitute.For<IConversaRepository>();
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
-        var useCase = new CriarPedidoAtendimentoUseCase(
-            c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, Substitute.For<IUnitOfWork>(), c.Atribuicao());
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, Substitute.For<IUnitOfWork>());
 
         var reservado = await useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
             EmpresaId: empresaId,

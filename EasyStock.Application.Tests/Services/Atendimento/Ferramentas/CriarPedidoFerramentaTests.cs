@@ -5,7 +5,6 @@ using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.Tests.Services.Storefront;
-using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Pagamentos;
@@ -55,7 +54,7 @@ public class CriarPedidoFerramentaTests
             var gerar = new GerarCobrancaPedidoUseCase(Substitute.For<IPedidoRepository>(), Checkout.StorefrontRepo,
                 cobrancaRepo, mp, uow, TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
             Ferramenta = new CriarPedidoFerramenta(
-                new CriarPedidoAtendimentoUseCase(Checkout.Servico(), conversaRepo, clienteRepo, Checkout.ConfiguracaoAtendimentoRepo, uow, Checkout.Atribuicao()),
+                Checkout.CriarPedidoAtendimento(conversaRepo, clienteRepo, uow),
                 gerar, clienteRepo, Checkout.StorefrontRepo, Checkout.JanelaRepo);
         }
 

@@ -24,6 +24,13 @@ public interface IConversaRepository
 {
     Task<Conversa?> ObterPorIdAsync(Guid empresaId, Guid id, CancellationToken ct = default);
 
+    /// <summary>
+    /// Trava a linha da conversa (<c>SELECT ... FOR UPDATE</c>) e devolve o <c>PedidoEmAndamentoId</c>
+    /// lido do banco nesse instante, não o da entidade rastreada (#1238). Exige transação explícita
+    /// aberta: o lock dura até o commit e serializa a geração de pedido da mesma conversa.
+    /// </summary>
+    Task<Guid?> TravarParaPedidoAsync(Guid empresaId, Guid id, CancellationToken ct = default);
+
     /// <summary>Conversa nao encerrada do contato no canal. O <paramref name="contatoIdExterno"/> e normalizado conforme o canal.</summary>
     Task<Conversa?> ObterAbertaPorContatoAsync(Guid empresaId, CanalConversa canal, string contatoIdExterno, CancellationToken ct = default);
 

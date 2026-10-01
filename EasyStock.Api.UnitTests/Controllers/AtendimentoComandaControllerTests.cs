@@ -50,7 +50,7 @@ public class AtendimentoComandaControllerTests
             new ListarJanelasAtendimentoUseCase(_storefronts, _cardapio, Substitute.For<IConfiguracaoAtendimentoRepository>(), listarJanelas),
             new ObterPedidoConversaUseCase(_conversas, _pedidos, Substitute.For<ICobrancaPedidoRepository>()),
             // Os casos daqui param antes do núcleo do checkout e da cobrança.
-            new GerarPedidoConversaUseCase(_conversas, Substitute.For<IClienteRepository>(), _pedidos,
+            new GerarPedidoConversaUseCase(_conversas, Substitute.For<IClienteRepository>(),
                 null!, null!, null!, null!, TimeProvider.System, NullLogger<GerarPedidoConversaUseCase>.Instance),
             _currentUser);
     }
