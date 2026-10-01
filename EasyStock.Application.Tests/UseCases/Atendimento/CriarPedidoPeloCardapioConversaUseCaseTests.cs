@@ -14,8 +14,11 @@ using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.Exceptions.Storefront;
+using EasyStock.Domain.Sales;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute.ExceptionExtensions;
 
 namespace EasyStock.Application.Tests.UseCases.Atendimento;
 
@@ -41,6 +44,7 @@ public class CriarPedidoPeloCardapioConversaUseCaseTests
         public List<CobrancaPedido> Cobrancas { get; } = new();
         public IUnitOfWork Uow { get; } = Substitute.For<IUnitOfWork>();
         public IOperacaoEventPublisher Eventos { get; } = Substitute.For<IOperacaoEventPublisher>();
+        public IMercadoPagoClient Mp { get; } = Substitute.For<IMercadoPagoClient>();
 
         /// <summary>Ordem observada: "mensagem" (resumo gravado), "commit" e "evento:&lt;nome&gt;".</summary>
         public List<string> Linha { get; } = new();
@@ -74,15 +78,14 @@ public class CriarPedidoPeloCardapioConversaUseCaseTests
             cobrancaRepo.When(r => r.AddAsync(Arg.Any<CobrancaPedido>(), Arg.Any<CancellationToken>()))
                 .Do(ci => Cobrancas.Add(ci.Arg<CobrancaPedido>()));
 
-            var mp = Substitute.For<IMercadoPagoClient>();
-            mp.CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>())
+            Mp.CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>())
                 .Returns(new PreferenceCriadaResult("pref-1", "https://mp.test/pref-1"));
 
             var gerar = new GerarCobrancaPedidoUseCase(Substitute.For<IPedidoRepository>(), Checkout.StorefrontRepo,
-                cobrancaRepo, mp, Uow, TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
+                cobrancaRepo, Mp, Checkout.Servico(), Uow, TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
             var trocar = new TrocarFormaPagamentoPedidoUseCase(Checkout.PedidoRepo, cobrancaRepo, gerar,
                 new AvisoCobrancaConversa(ConversaRepo, new ResolvedorCanal([]), Uow, NullLogger<AvisoCobrancaConversa>.Instance),
-                Substitute.For<IPublicadorEventoIntegracao>(), mp, Uow, TimeProvider.System,
+                Substitute.For<IPublicadorEventoIntegracao>(), Mp, Uow, TimeProvider.System,
                 NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
 
             LinkService = new LinkCardapioConversaService(Links,
@@ -234,5 +237,24 @@ public class CriarPedidoPeloCardapioConversaUseCaseTests
 
         resultado.LinkPagamento.Should().Be("https://mp.test/pref-1");
         c.Conversa.PedidoEmAndamentoId.Should().Be(resultado.PedidoId);
+    }
+
+    [Fact]
+    public async Task MercadoPagoFora_DesfazPedidoEVagaEDevolveOLink()
+    {
+        // #1301: o site recebe 503; sem desfazer, o pedido ficava sem cobrança e a vaga presa.
+        var c = new Cenario();
+        var token = await c.GerarTokenAsync();
+        c.Mp.CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("500"));
+
+        var act = () => c.UseCase.ExecuteAsync(c.Input(token));
+
+        await act.Should().ThrowAsync<MercadoPagoIndisponivelException>();
+        var pedido = c.Checkout.PedidosAdicionados.Should().ContainSingle().Subject;
+        pedido.Status.Should().Be(StatusPedidoMapper.Cancelado);
+        await c.Checkout.VagaRepo.Received(1).LiberarPorPedidoAsync(
+            pedido.Id, Arg.Is<string>(m => m.Contains("mercado_pago_indisponivel")), Arg.Any<CancellationToken>());
+        c.Links.Links.Single().UsadoEm.Should().BeNull("o cliente reenvia o carrinho pelo mesmo link");
     }
 }

@@ -21,7 +21,7 @@ public sealed record GerarPedidoConversaInput(
     string? Observacoes = null,
     string? UsuarioNome = null);
 
-/// <param name="Cobranca">Nula quando o Mercado Pago não respondeu: o link sai pela reemissão (job ou operadora).</param>
+/// <param name="Cobranca">Cobrança da forma escolhida. Mercado Pago fora: <see cref="MercadoPagoIndisponivelException"/> com o pedido já desfeito (#1301).</param>
 /// <param name="EnviadoAoCliente">O resumo saiu pelo canal da conversa (falso fora da janela ou com o canal fora).</param>
 public sealed record PedidoConversaGeradoResult(
     Guid PedidoId,
@@ -97,22 +97,14 @@ public sealed class GerarPedidoConversaUseCase(
             throw new RegraDeDominioVioladaException("Esta conversa já tem um pedido em andamento.");
     }
 
+    /// <summary>Mercado Pago fora propaga: a cobrança já desfez o pedido e a vaga, e a operadora tenta de novo (#1301).</summary>
     private async Task<CobrancaPedidoResult?> CobrarAsync(
         PedidoReservado reservado, Guid conversaId, string forma, string? usuarioNome, CancellationToken ct)
     {
-        try
-        {
-            if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega)
-                return (await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(
-                    reservado.Pedido.EmpresaId, reservado.Pedido.Id, forma, UsuarioNome: usuarioNome ?? "console"), ct)).Cobranca;
-            return await gerarCobranca.ExecuteAsync(reservado, conversaId, ct);
-        }
-        catch (MercadoPagoIndisponivelException ex)
-        {
-            // Pedido criado e vaga reservada; o link sai pela reemissão (operadora ou job), como na criar_pedido.
-            logger.LogWarning(ex, "Console: pedido {PedidoId} criado sem link de pagamento.", reservado.Pedido.Id);
-            return null;
-        }
+        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega)
+            return (await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(
+                reservado.Pedido.EmpresaId, reservado.Pedido.Id, forma, UsuarioNome: usuarioNome ?? "console"), ct)).Cobranca;
+        return await gerarCobranca.ExecuteAsync(reservado, conversaId, ct);
     }
 
     private static string TextoAoCliente(PedidoReservado reservado, DateOnly dataEntrega, string forma, CobrancaPedidoResult? cobranca)

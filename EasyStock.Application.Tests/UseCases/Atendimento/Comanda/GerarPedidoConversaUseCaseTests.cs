@@ -78,7 +78,7 @@ public class GerarPedidoConversaUseCaseTests
 
             var aviso = new AvisoCobrancaConversa(ConversaRepo, new ResolvedorCanal([Canal]), Uow,
                 NullLogger<AvisoCobrancaConversa>.Instance);
-            var gerar = new GerarCobrancaPedidoUseCase(Pedidos, Checkout.StorefrontRepo, cobrancaRepo, Mp, Uow,
+            var gerar = new GerarCobrancaPedidoUseCase(Pedidos, Checkout.StorefrontRepo, cobrancaRepo, Mp, Checkout.Servico(), Uow,
                 TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
             var trocar = new TrocarFormaPagamentoPedidoUseCase(Checkout.PedidoRepo, cobrancaRepo, gerar, aviso,
                 Substitute.For<IPublicadorEventoIntegracao>(), Mp, Uow, TimeProvider.System,
@@ -185,18 +185,22 @@ public class GerarPedidoConversaUseCaseTests
     }
 
     [Fact]
-    public async Task MercadoPagoFora_PedidoFicaEResumoAvisaQueOLinkVemDepois()
+    public async Task MercadoPagoFora_DesfazPedidoEVagaSemAvisarOCliente()
     {
+        // #1301: antes o pedido ficava sem cobrança e a vaga presa, prometendo um link que nenhum job reemitia.
         var c = new Cenario();
         c.Mp.CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new HttpRequestException("fora"));
 
-        var resultado = await c.UseCase.ExecuteAsync(c.Input());
+        var act = () => c.UseCase.ExecuteAsync(c.Input());
 
-        resultado.Cobranca.Should().BeNull();
-        c.Conversa.PedidoEmAndamentoId.Should().Be(resultado.PedidoId);
-        await c.Canal.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(t => t.Contains("link de pagamento chega")),
-            Arg.Any<CancellationToken>());
+        await act.Should().ThrowAsync<EasyStock.Domain.Exceptions.Storefront.MercadoPagoIndisponivelException>(
+            "a operadora recebe 503 e tenta de novo");
+        var pedido = c.Checkout.PedidosAdicionados.Should().ContainSingle().Subject;
+        pedido.Status.Should().Be(StatusPedidoMapper.Cancelado);
+        await c.Checkout.VagaRepo.Received(1).LiberarPorPedidoAsync(
+            pedido.Id, Arg.Is<string>(m => m.Contains("mercado_pago_indisponivel")), Arg.Any<CancellationToken>());
+        await c.Canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
     }
 
     [Fact]
