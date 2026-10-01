@@ -57,7 +57,7 @@ public sealed class ZenviaSmsProvider(
         catch (Exception ex)
         {
             sw.Stop();
-            logger.LogError(ex, "Falha Zenvia SMS para {Destinatario}", mensagem.Destinatario);
+            logger.LogError(ex, "Falha Zenvia SMS outbox={OutboxId}", mensagem.OutboxId); // sem telefone: LGPD (#1292)
             return new ResultadoEnvio(Sucesso: false, ProviderUsado: "zenvia",
                 ErroDetalhado: ex.Message, DuracaoMs: sw.ElapsedMilliseconds);
         }
