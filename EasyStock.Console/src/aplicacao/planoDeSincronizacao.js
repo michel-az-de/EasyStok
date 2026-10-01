@@ -11,8 +11,15 @@
 // Pedido entregue ou cancelado fica no cache até o id mudar.
 export const STATUS_FINAIS_DO_PEDIDO = new Set(['entregue', 'cancelado'])
 
-export const deveRelerMensagens = (resumo, guardado, selecionadaId) =>
-  !guardado || resumo.id === selecionadaId || guardado.ultima !== resumo.ultimaMensagemEm
+//
+// Conversa encerrada que nunca foi lida não busca mensagens na carga (#1287): a
+// inbox pode ter centenas, e o cartão mostra `ultimaMensagemTexto` do resumo.
+// Ela é lida ao ser aberta ou quando volta a ter atendimento.
+export function deveRelerMensagens(resumo, guardado, selecionadaId) {
+  if (resumo.id === selecionadaId) return true
+  if (!guardado) return resumo.situacao !== 'Encerrada'
+  return guardado.ultima !== resumo.ultimaMensagemEm
+}
 
 export function deveRelerPedido(resumo, guardado, { selecionadaId = null, cicloLento = false } = {}) {
   if (!resumo.pedidoEmAndamentoId) return false

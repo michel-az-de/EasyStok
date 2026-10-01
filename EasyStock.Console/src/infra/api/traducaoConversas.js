@@ -29,7 +29,9 @@ export const instante = (valor) => {
   return /[zZ]|[+-]\d{2}:\d{2}$/.test(valor) ? valor : `${valor}Z`
 }
 
-export function mensagemDaApi(m) {
+// `conversaId` vem da listagem: com ele, a mensagem com arquivo leva o endereço para o balão
+// buscar a mídia no endpoint autenticado (#1287). Sem ele (confirmação de envio), só o rótulo.
+export function mensagemDaApi(m, conversaId = null) {
   const saida = m.direcao === 'Saida'
   return {
     id: m.id,
@@ -39,6 +41,7 @@ export function mensagemDaApi(m) {
     ...(saida ? { status: STATUS_DA_MENSAGEM[m.status] ?? 'enviada' } : {}),
     ...(saida && m.autor === 'Agente' ? { automatica: true } : {}),
     ...(m.erro ? { erro: m.erro } : {}),
+    ...(m.midiaChave && conversaId ? { midia: { conversaId, mensagemId: m.id, mime: m.midiaMime ?? null } } : {}),
   }
 }
 
@@ -63,7 +66,7 @@ function passagemDaApi(resumo) {
 }
 
 export function conversaDaApi(resumo, mensagensDaApi, usuario) {
-  const mensagens = (mensagensDaApi ?? []).map(mensagemDaApi).sort(cronologica)
+  const mensagens = (mensagensDaApi ?? []).map((m) => mensagemDaApi(m, resumo.id)).sort(cronologica)
   const minha = resumo.assumidaPorUsuarioId && resumo.assumidaPorUsuarioId === usuario?.id
   return {
     id: resumo.id,
@@ -81,6 +84,8 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario) {
     passagem: passagemDaApi(resumo),
     janelaExpiraEm: janelaExpiraEm(resumo, mensagens),
     ultimaEm: instante(resumo.ultimaMensagemEm),
+    // Prévia do cartão quando as mensagens não foram carregadas (encerrada, #1287).
+    ultimaMensagemTexto: resumo.ultimaMensagemTexto ?? null,
     naoLidas: resumo.naoLidas,
     atrasada: false,
     cliente: { desde: null, endereco: null, enderecoCapturado: null, pedidos: 0, tags: [], notas: [] },
