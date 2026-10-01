@@ -51,6 +51,33 @@ run() { docker run --rm -e "$1" -v "$(pwd -W):/t" bash:5 sh -c 'apk add -q util-
 falhas=0
 confere() { if grep -q -- "$2" <<<"$3"; then echo "ok   $1"; else echo "FAIL $1: esperava '$2'"; echo "$3" | sed 's/^/     /'; falhas=$((falhas+1)); fi; }
 
+# --- trava de SHA (#1337): o lado local roda com --dry-run num repositorio git temporario, sem SSH.
+script="$(pwd)/vps-deploy.sh"
+tmp=$(mktemp -d)
+git init -q --bare "$tmp/origin.git"
+git clone -q "$tmp/origin.git" "$tmp/clone" 2>/dev/null
+(
+  cd "$tmp/clone" && git config user.email t@t && git config user.name t
+  git commit -q --allow-empty -m c1 && git commit -q --allow-empty -m c2 && git push -q origin HEAD:master
+  git checkout -q -b lateral HEAD~1 && git commit -q --allow-empty -m lado
+)
+git -C "$tmp/clone" fetch -q origin
+mestre=$(git -C "$tmp/clone" rev-parse origin/master)
+velho=$(git -C "$tmp/clone" rev-parse origin/master~1)
+lado=$(git -C "$tmp/clone" rev-parse lateral)
+local_() { (cd "$tmp/clone" && bash "$script" --dry-run "$@" 2>&1; echo "rc=$?"); }
+
+r=$(local_);                 confere "trava: sem SHA publica o master"      "rc=0" "$r"
+r=$(local_ "$mestre");       confere "trava: SHA do master segue"           "rc=0" "$r"
+r=$(local_ "$velho");        confere "trava: SHA antigo e recusado"         "rc=7" "$r"
+                              confere "trava: diz quantos commits atras"     "1 commit(s) atras do origin/master" "$r"
+r=$(local_ --rollback "$velho"); confere "trava: --rollback libera o antigo" "rc=0" "$r"
+                              confere "trava: --rollback avisa"              "ATENCAO: --rollback" "$r"
+r=$(local_ "$lado");         confere "trava: SHA fora do master e recusado" "rc=7" "$r"
+                              confere "trava: explica fora do master"        "nao esta no origin/master" "$r"
+r=$(local_ --rollback "$lado"); confere "trava: --rollback nao libera fora do master" "rc=7" "$r"
+rm -rf "$tmp"
+
 r=$(run X=0);                confere "sucesso: exit 0"                  "rc=0" "$r"
                               confere "sucesso: promove vps-<sha>"       "imagem=easystok-api:vps-novo0001" "$r"
                               confere "sucesso: grava easystok-current"  "current=novo0001" "$r"

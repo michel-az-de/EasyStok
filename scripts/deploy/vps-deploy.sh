@@ -16,8 +16,13 @@
 #
 # Uso:
 #   scripts/deploy/vps-deploy.sh                 # origin/master
-#   scripts/deploy/vps-deploy.sh <sha>           # um commit especifico
+#   scripts/deploy/vps-deploy.sh <sha>           # so aceita o SHA do origin/master atual
+#   scripts/deploy/vps-deploy.sh --rollback <sha># commit mais antigo do master, de proposito
 #   scripts/deploy/vps-deploy.sh --dry-run [sha] # plano + checagem de sintaxe, sem SSH
+#
+# Trava de SHA (#1337): commit fora do origin/master e recusado sempre, e commit mais
+# antigo que o master so passa com --rollback. Em 2026-10-01 um deploy do 98ed2cc1
+# (antigo) tirou do ar o que tinha entrado depois.
 #
 # Variaveis: VPS_HOST (hostinger), STACK_DIR (/opt/stacks/easystok),
 # BUILD_ROOT (/home/felipe/build), BACKUP_DIR (/home/felipe/backups; /opt/backups e do root), DB_CONTAINER
@@ -35,7 +40,14 @@ HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-180}"
 SERVICES="api worker web"
 
 DRY_RUN=0
-if [ "${1:-}" = "--dry-run" ]; then DRY_RUN=1; shift; fi
+ROLLBACK=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1; shift ;;
+    --rollback) ROLLBACK=1; shift ;;
+    *) break ;;
+  esac
+done
 REF="${1:-origin/master}"
 
 # Script executado na VPS. Heredoc literal: nada aqui e expandido localmente.
@@ -127,6 +139,21 @@ REMOTE_EOF
 git fetch -q origin
 SHA_FULL="$(git rev-parse --verify "$REF^{commit}")"
 SHA="${SHA_FULL:0:8}"
+MASTER_FULL="$(git rev-parse --verify "origin/master^{commit}")"
+
+if [ "$SHA_FULL" != "$MASTER_FULL" ]; then
+  if ! git merge-base --is-ancestor "$SHA_FULL" "$MASTER_FULL"; then
+    echo "ERRO: $SHA nao esta no origin/master (${MASTER_FULL:0:8}). So se publica o que ja foi mergeado." >&2
+    exit 7
+  fi
+  ATRAS="$(git rev-list --count "$SHA_FULL..$MASTER_FULL")"
+  if [ "$ROLLBACK" != 1 ]; then
+    echo "ERRO: $SHA esta $ATRAS commit(s) atras do origin/master (${MASTER_FULL:0:8}); publicar tiraria do ar o que entrou depois." >&2
+    echo "      Para o master atual, rode sem SHA. Rollback de proposito: --rollback $SHA" >&2
+    exit 7
+  fi
+  echo "==> ATENCAO: --rollback para $SHA, $ATRAS commit(s) atras do origin/master (${MASTER_FULL:0:8})." >&2
+fi
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 
 echo "==> Deploy de $SHA ($(git log -1 --format=%s "$SHA_FULL" | cut -c1-70)) em $VPS_HOST"
