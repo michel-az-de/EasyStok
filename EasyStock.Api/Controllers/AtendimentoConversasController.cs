@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.ClienteDaConversa;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Application.UseCases.Common;
@@ -147,6 +148,22 @@ public class AtendimentoConversasController(
     public Task<IActionResult> LiberarForaDeArea(Guid id, [FromBody] LiberarForaDeAreaBody? body, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await gerenciarUseCase.LiberarForaDeAreaAsync(Acao(id), body?.Motivo, ct)));
 
+    [SwaggerOperation(Summary = "Register the conversation's customer (name, phone, delivery address)",
+        Description = "#1276. Sem cliente vinculado, o telefone é obrigatório: acha o cadastro pelo telefone ou cria, e vincula. " +
+                      "Com cliente, atualiza nome e telefone. Endereço com CEP vira o padrão de entrega; fora da área é gravado " +
+                      "e volta dentroDaArea=false.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [HttpPost("{id:guid}/cliente")]
+    public Task<IActionResult> CadastrarCliente(
+        Guid id, [FromBody] CadastrarClienteConversaBody body,
+        [FromServices] CadastrarClienteDaConversaUseCase cadastrarUseCase, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await cadastrarUseCase.ExecuteAsync(
+            new CadastrarClienteDaConversaCommand(currentUser.EmpresaId, id, body?.Nome, body?.Telefone, body?.Endereco), ct)));
+
     [SwaggerOperation(Summary = "Close the conversation")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -207,3 +224,5 @@ public sealed record EnviarMensagemConsoleBody(string Texto);
 public sealed record TransferirConversaBody(Guid ParaUsuarioId);
 
 public sealed record LiberarForaDeAreaBody(string? Motivo);
+
+public sealed record CadastrarClienteConversaBody(string? Nome, string? Telefone, EnderecoDaConversaInput? Endereco);
