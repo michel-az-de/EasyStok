@@ -35,6 +35,9 @@ public class AgenteAtendimentoServiceTests
     private readonly Conversa _conversa;
     private readonly List<Mensagem> _historico = [];
 
+    /// <summary>Situação "no banco", relida antes do envio; nulo = a mesma da conversa carregada.</summary>
+    private SituacaoConversa? _situacaoNoBanco;
+
     public AgenteAtendimentoServiceTests()
     {
         _llm.Disponivel.Returns(true);
@@ -48,6 +51,8 @@ public class AgenteAtendimentoServiceTests
             "quanto tempo falta?", "wamid.in1"));
         _conversaRepository.ObterComMensagensAsync(_empresaId, _conversa.Id, Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(_ => new ConversaComMensagens(_conversa, _historico));
+        _conversaRepository.ObterSituacaoAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>())
+            .Returns(_ => _situacaoNoBanco ?? _conversa.Situacao);
 
         _configuracaoRepository.GetByEmpresaIdAsync(_empresaId).Returns((ConfiguracaoAtendimento?)null);
         _cloudClient.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
@@ -139,15 +144,167 @@ public class AgenteAtendimentoServiceTests
     }
 
     [Fact]
-    public async Task NaoChamaLlmQuandoDesligado()
+    public async Task NaoChamaLlmQuandoDesligadoEEscalaParaADona()
     {
         _llm.Disponivel.Returns(false);
 
         var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
         resultado.ChamouLlm.Should().BeFalse();
+        resultado.Escalou.Should().BeTrue();
         await _llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
         await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+        // #1288: "fica para a dona" precisa assumir de fato, senão a conversa fica sem ninguém e fora do lembrete.
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa,
+            Arg.Is<string>(m => m.Contains("desligado")), Agora, Arg.Any<CancellationToken>());
+        await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task TimeoutDoLlmComCtVivoEscala()
+    {
+        // #1288: o timeout do HttpClient chega como TaskCanceledException com o ct do turno vivo.
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns<RespostaLlm>(_ => throw new TaskCanceledException("timeout do HttpClient"));
+        _escalador.When(e => e.EscalarAsync(Arg.Any<Guid>(), Arg.Any<Conversa>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()))
+            .Do(ci => ci.Arg<Conversa>().Assumir(ci.Arg<DateTime>()));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeTrue();
+        resultado.Escalou.Should().BeTrue();
+        _conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa,
+            Arg.Is<string>(m => m.Contains("falha ao chamar o LLM")), Agora, Arg.Any<CancellationToken>());
+        await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task CancelamentoDoTurnoPropaga()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns<RespostaLlm>(ci => throw new OperationCanceledException(ci.Arg<CancellationToken>()));
+
+        var act = () => CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora, cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task TimeoutNaFerramentaViraResultadoDeErro()
+    {
+        _consultarPedido.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>())
+            .Returns<string>(_ => throw new TaskCanceledException("timeout"));
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(UsoFerramenta("consultar_pedido"), Texto("Vou confirmar com a cozinha."));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Respondeu.Should().BeTrue();
+        _requisicoes[1].Mensagens[^1].Conteudo.OfType<BlocoResultadoFerramentaLlm>().Single().EhErro.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task TimeoutNoEnvioGravaMensagemComFalha()
+    {
+        _cloudClient.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns<EnvioWhatsAppResult>(_ => throw new TaskCanceledException("timeout"));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Respondeu.Should().BeFalse();
+        await _conversaRepository.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Autor == AutorMensagem.Agente && m.Status == StatusMensagem.Falhou),
+            Arg.Any<CancellationToken>());
+        await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task MensagemEmRajadaNaoProcessadaChamaLlm()
+    {
+        // #1288: a 2ª mensagem chegou com o timestamp da Meta (truncado em segundos) enquanto o turno 1
+        // rodava; a resposta do turno 1 ficou com EnviadaEm do início do turno, depois dela na ordenação.
+        var t = Agora.AddMinutes(-1);
+        _historico.Clear();
+        var primeira = Mensagem.Entrada(_empresaId, _conversa.Id, t, TipoConteudoMensagem.Texto, "oi", "wamid.in1");
+        primeira.MarcarProcessada(t.AddSeconds(1));
+        var segunda = Mensagem.Entrada(_empresaId, _conversa.Id, t, TipoConteudoMensagem.Texto, "quero um bolo de cenoura", "wamid.in2");
+        _historico.Add(primeira);
+        _historico.Add(segunda);
+        _historico.Add(Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Agente, t.AddSeconds(1),
+            TipoConteudoMensagem.Texto, "Olá! Como posso ajudar?", "wamid.out0"));
+        _conversaRepository.ObterMensagemPorExternoIdAsync(_empresaId, "wamid.in2", Arg.Any<CancellationToken>()).Returns(segunda);
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeTrue();
+        var mensagens = _requisicoes.Should().ContainSingle().Subject.Mensagens;
+        mensagens[^1].Papel.Should().Be(MensagemLlm.Usuario);
+        mensagens[^1].Conteudo.OfType<BlocoTextoLlm>().Single().Texto.Should().Be("quero um bolo de cenoura");
+        segunda.ProcessadaEm.Should().Be(Agora);
+    }
+
+    [Fact]
+    public async Task EntradasJaProcessadasNaoChamamLlm()
+    {
+        // Job repetido depois de o turno marcar a entrada: não responde de novo.
+        _historico[0].MarcarProcessada(Agora.AddSeconds(-50));
+        _historico.Add(Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Agente, Agora.AddSeconds(-50),
+            TipoConteudoMensagem.Texto, "Já respondi", "wamid.out0"));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task EntradaRespondidaPelaDonaNaoEPendente()
+    {
+        _historico[0].MarcarProcessada(Agora.AddSeconds(-50));
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora.AddSeconds(-40), TipoConteudoMensagem.Texto,
+            "tem de chocolate?", "wamid.in2"));
+        _historico.Add(Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Dona, Agora.AddSeconds(-30),
+            TipoConteudoMensagem.Texto, "Tem sim!", "wamid.dona1"));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DonaAssumeDuranteOTurnoNaoEnvia()
+    {
+        // #1288: a dona escreveu pelo console (Assumir em outro escopo) enquanto o LLM respondia.
+        _llm.When(l => l.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()))
+            .Do(_ => _situacaoNoBanco = SituacaoConversa.Assumida);
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeTrue();
+        resultado.Respondeu.Should().BeFalse();
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+        await _conversaRepository.DidNotReceive().AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Autor == AutorMensagem.Agente), Arg.Any<CancellationToken>());
+        await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
+        await _usoIaRepository.Received(1).AddAsync(Arg.Any<UsoIa>());
+        await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task DonaAssumeDuranteOTurnoNaoEnviaFraseDeEsperaNemEscala()
+    {
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(_ => UsoFerramenta("consultar_pedido", "toolu_" + _requisicoes.Count));
+        _situacaoNoBanco = SituacaoConversa.Assumida;
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Respondeu.Should().BeFalse();
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+        await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
     }
 
     [Theory]
@@ -168,6 +325,10 @@ public class AgenteAtendimentoServiceTests
         resultado.ChamouLlm.Should().BeFalse();
         await _llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
         await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+        // #1288: sem agente no canal, a conversa passa de fato para a dona.
+        resultado.Escalou.Should().BeTrue();
+        await _escalador.Received(1).EscalarAsync(_empresaId, conversa, Arg.Is<string>(m => m.Contains(canal.ToString())),
+            Agora, Arg.Any<CancellationToken>());
     }
 
     [Fact]

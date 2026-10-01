@@ -24,6 +24,12 @@ public interface IConversaRepository
 {
     Task<Conversa?> ObterPorIdAsync(Guid empresaId, Guid id, CancellationToken ct = default);
 
+    /// <summary>
+    /// Situacao gravada no banco, sem tracking (nulo se a conversa nao existe). O turno do agente rele
+    /// antes de enviar: a dona pode ter assumido enquanto o LLM respondia (#1288).
+    /// </summary>
+    Task<SituacaoConversa?> ObterSituacaoAsync(Guid empresaId, Guid id, CancellationToken ct = default);
+
     /// <summary>Conversa nao encerrada do contato no canal. O <paramref name="contatoIdExterno"/> e normalizado conforme o canal.</summary>
     Task<Conversa?> ObterAbertaPorContatoAsync(Guid empresaId, CanalConversa canal, string contatoIdExterno, CancellationToken ct = default);
 
