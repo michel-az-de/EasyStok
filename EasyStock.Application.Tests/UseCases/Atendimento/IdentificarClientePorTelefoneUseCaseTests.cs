@@ -58,6 +58,47 @@ public class IdentificarClientePorTelefoneUseCaseTests
     }
 
     [Fact]
+    public async Task ConhecidoPeloTelefoneComDdiSemMaisRetornaExistente()
+    {
+        // #1290: o VO Telefone grava "55 11 99757-3992" digitado no ERP como "5511997573992".
+        var existente = ClienteEntity.Criar(_empresaId, "Bia");
+        _clienteRepository.FindByTelefoneAsync(_empresaId, "5511997573992").Returns(existente);
+
+        var resultado = await _useCase.ExecuteAsync(
+            new IdentificarClientePorTelefoneInput(_empresaId, WaId, null));
+
+        resultado.Cliente.Id.Should().Be(existente.Id);
+        resultado.EhNovo.Should().BeFalse();
+        await _clienteRepository.DidNotReceiveWithAnyArgs().AddAsync(default!);
+    }
+
+    [Fact]
+    public async Task ConhecidoPeloTelefoneDoCadastroGanhaTelefoneHash()
+    {
+        // #1290: sem o hash, o OTP e o checkout guest do site (que buscam por TelefoneHash) criavam
+        // outro cadastro para o mesmo cliente.
+        var existente = ClienteEntity.Criar(_empresaId, "João");
+        _clienteRepository.FindByTelefoneAsync(_empresaId, "11997573992").Returns(existente);
+
+        await _useCase.ExecuteAsync(new IdentificarClientePorTelefoneInput(_empresaId, "551197573992", null));
+
+        existente.TelefoneHash.Should().Be(ClienteOtp.CalcularTelefoneHash(TelefoneE164),
+            "o hash é o do E.164 canônico, com o nono dígito, como o cliente digita no OTP");
+    }
+
+    [Fact]
+    public async Task ConhecidoPeloTelefoneComHashProprioMantemHash()
+    {
+        var existente = ClienteEntity.Criar(_empresaId, "Carla");
+        existente.TelefoneHash = "hash-do-otp";
+        _clienteRepository.FindByTelefoneAsync(_empresaId, TelefoneE164).Returns(existente);
+
+        await _useCase.ExecuteAsync(new IdentificarClientePorTelefoneInput(_empresaId, WaId, null));
+
+        existente.TelefoneHash.Should().Be("hash-do-otp");
+    }
+
+    [Fact]
     public async Task WaIdSemNonoDigitoEncontraCadastroComNonoDigito()
     {
         // A Meta entrega wa_id de celular BR antigo sem o 9: 55 11 97573992.
