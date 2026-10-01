@@ -185,18 +185,20 @@ public sealed class CheckoutController(
     }
 
     /// <summary>
-    /// Inicia checkout GUEST (sem login) — cadastra Pedido em
-    /// <c>aguardando_aprovacao_baba</c>, retorna PedidoId + token de
-    /// acompanhamento. Babá agenda janela manualmente via WhatsApp depois.
+    /// Inicia checkout GUEST (sem login): reserva a vaga da janela, cria o pedido em
+    /// <c>aguardando_pagamento</c> e devolve o link do Mercado Pago, o token de acompanhamento e o
+    /// numero curto (#1254). Mesmos codigos de erro do checkout logado.
     /// </summary>
     [SwaggerOperation(
         Summary = "Iniciar checkout guest (sem login)",
-        Description = "Cadastra Pedido sem cookie de sessao. Cliente identificado " +
-                      "por telefoneHash. Issue #680.")]
+        Description = "Cria Pedido sem cookie de sessao, reserva a janela e retorna URL de pagamento " +
+                      "MercadoPago. Cliente identificado por telefoneHash. Issues #680 e #1254.")]
     [ProducesResponseType(typeof(IniciarCheckoutGuestResult), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     [HttpPost("guest")]
     public async Task<IActionResult> IniciarCheckoutGuest(
         [FromRoute] string slug,
@@ -220,6 +222,8 @@ public sealed class CheckoutController(
             Items: (body.Items ?? Array.Empty<CheckoutItemRequestBody>())
                 .Select(i => new CheckoutItemInput(i.CardapioItemId, i.Qtd))
                 .ToList(),
+            JanelaId: body.JanelaId,
+            DataEntrega: body.DataEntrega,
             Observacoes: body.Observacoes);
 
         try
@@ -245,6 +249,35 @@ public sealed class CheckoutController(
         catch (StorefrontNaoEncontradoException ex)
         {
             return DataNotFound(ex.Message);
+        }
+        catch (LojaFechadaException ex)
+        {
+            return StatusCode(
+                StatusCodes.Status409Conflict,
+                new ProblemDetails { Status = StatusCodes.Status409Conflict, Title = "Loja fechada", Detail = ex.Message });
+        }
+        catch (JanelaSemVagasException ex)
+        {
+            return StatusCode(
+                StatusCodes.Status409Conflict,
+                new ProblemDetails { Status = StatusCodes.Status409Conflict, Title = "Janela esgotada", Detail = ex.Message });
+        }
+        catch (CepSemCoberturaException ex)
+        {
+            return StatusCode(
+                StatusCodes.Status422UnprocessableEntity,
+                new ProblemDetails { Status = StatusCodes.Status422UnprocessableEntity, Title = "CEP sem cobertura", Detail = ex.Message });
+        }
+        catch (MercadoPagoIndisponivelException ex)
+        {
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new ProblemDetails
+                {
+                    Status = StatusCodes.Status503ServiceUnavailable,
+                    Title = "Gateway de pagamento indisponível",
+                    Detail = ex.Message,
+                });
         }
         catch (RegraDeDominioVioladaException ex)
         {
@@ -312,11 +345,13 @@ public sealed record CheckoutRequestBody(
 
 public sealed record CheckoutItemRequestBody(Guid CardapioItemId, int Qtd);
 
-/// <summary>Body do POST /checkout/guest (issue #680).</summary>
+/// <summary>Body do POST /checkout/guest (issues #680 e #1254: janela e data obrigatórias).</summary>
 public sealed record CheckoutGuestRequestBody(
     string Nome,
     string Telefone,
     string Cep,
     string? Numero,
     IReadOnlyList<CheckoutItemRequestBody> Items,
+    Guid JanelaId,
+    DateOnly DataEntrega,
     string? Observacoes = null);
