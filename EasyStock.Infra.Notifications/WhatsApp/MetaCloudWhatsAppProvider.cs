@@ -74,7 +74,7 @@ public sealed class MetaCloudWhatsAppProvider(
                 wamid = await canal.EnviarTextoAsync(contato, mensagem.Corpo, ct);
 
             if (conversa is not null)
-                await RegistrarNoHistoricoAsync(conversa, mensagem.Corpo, wamid, agora, ct);
+                await RegistrarNoHistoricoSemReenvioAsync(conversa, mensagem, wamid, agora, ct);
 
             sw.Stop();
             return new ResultadoEnvio(Sucesso: true, ProviderUsado: Nome, DuracaoMs: sw.ElapsedMilliseconds);
@@ -134,6 +134,27 @@ public sealed class MetaCloudWhatsAppProvider(
         // O dispatcher roda sem claim JWT: sem o tenant, o filtro global e a RLS zeram a busca.
         tenantContext.SetCurrentTenant(empresaId);
         return await conversaRepository.ObterAbertaPorContatoAsync(empresaId, CanalConversa.WhatsApp, contato, ct);
+    }
+
+    /// <summary>
+    /// #1290: a Meta já entregou. Falha ao gravar a cópia no histórico não pode voltar como falha do envio,
+    /// senão o outbox reenvia a mesma mensagem ao cliente. Loga e descarta o pendente: o dispatcher grava
+    /// o resultado do outbox no mesmo escopo, e o insert inválido derrubaria o commit dele também.
+    /// </summary>
+    private async Task RegistrarNoHistoricoSemReenvioAsync(
+        Conversa conversa, MensagemPronta mensagem, string wamid, DateTime agora, CancellationToken ct)
+    {
+        try
+        {
+            await RegistrarNoHistoricoAsync(conversa, mensagem.Corpo, wamid, agora, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "Meta WhatsApp: enviado (wamid {Wamid}), mas a cópia no histórico da conversa {ConversaId} falhou (outbox {OutboxId}).",
+                wamid, conversa.Id, mensagem.OutboxId);
+            unitOfWork.DescartarAlteracoesPendentes();
+        }
     }
 
     private async Task RegistrarNoHistoricoAsync(Conversa conversa, string texto, string wamid, DateTime agora, CancellationToken ct)
