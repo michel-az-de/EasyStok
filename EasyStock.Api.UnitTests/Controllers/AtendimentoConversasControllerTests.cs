@@ -14,6 +14,7 @@ using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.ClienteDaConversa;
 using EasyStock.Application.UseCases.Atendimento.Endereco;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
+using EasyStock.Application.UseCases.Atendimento.Reenvio;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Application.UseCases.Storefront.Frete;
@@ -64,6 +65,7 @@ public class AtendimentoConversasControllerTests
             new ListarConversasAtendimentoUseCase(_repositorio),
             new ListarMensagensConversaUseCase(_repositorio),
             new EnviarMensagemConsoleUseCase(_repositorio, resolvedor, uploads, _unitOfWork),
+            new ReenviarMensagemUseCase(_repositorio, resolvedor, _unitOfWork, TimeProvider.System),
             new GerenciarConversaAtendimentoUseCase(_repositorio, _unitOfWork),
             new TransferirConversaUseCase(_repositorio, _atendentes, _unitOfWork),
             new ObterDossieClienteUseCase(
@@ -117,6 +119,32 @@ public class AtendimentoConversasControllerTests
         turno.ChamouLlm.Should().BeFalse();
         turno.Respondeu.Should().BeFalse();
         await llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task ReenviarMensagemQueFalhou()
+    {
+        var conversa = ConversaComClienteAgora();
+        var falhou = Mensagem.Saida(_empresaId, conversa.Id, AutorMensagem.Agente, DateTime.UtcNow, TipoConteudoMensagem.Texto, "Temos ravioli!");
+        falhou.RegistrarFalhaEnvio("Meta fora", TipoFalhaEnvio.Permanente, DateTime.UtcNow);
+        _repositorio.Mensagens.Add(falhou);
+
+        var result = await _controller.ReenviarMensagem(conversa.Id, falhou.Id, default);
+
+        result.Should().BeOfType<OkObjectResult>();
+        await _canal.Received(1).EnviarTextoAsync(WaId, "Temos ravioli!", Arg.Any<CancellationToken>());
+        falhou.Status.Should().Be(StatusMensagem.Enviada);
+        falhou.ExternoId.Should().Be("wamid.dona1");
+    }
+
+    [Fact]
+    public async Task ReenviarMensagemInexistente404()
+    {
+        var conversa = ConversaComClienteAgora();
+
+        var result = await _controller.ReenviarMensagem(conversa.Id, Guid.NewGuid(), default);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
     }
 
     [Fact]
@@ -588,6 +616,12 @@ public class AtendimentoConversasControllerTests
 
         public Task<Mensagem?> ObterMensagemAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
             Task.FromResult(Mensagens.FirstOrDefault(m => m.EmpresaId == empresaId && m.ConversaId == conversaId && m.Id == mensagemId));
+
+        public Task<Mensagem?> ObterMensagemParaAlterarAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
+            ObterMensagemAsync(empresaId, conversaId, mensagemId, ct);
+
+        public Task<IReadOnlyList<Mensagem>> ListarReenviosVencidosComLockAsync(DateTime agora, int limite, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<Mensagem>>(Mensagens.Where(m => m.ProximoReenvioEm <= agora).Take(limite).ToList());
 
         public Task AddAsync(Conversa conversa, CancellationToken ct = default)
         {

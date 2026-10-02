@@ -91,6 +91,15 @@ public interface IConversaRepository
     /// <summary>Mensagem da conversa na empresa (mídia do console, #1287); de outra empresa ou conversa, nula.</summary>
     Task<Mensagem?> ObterMensagemAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default);
 
+    /// <summary>Mesma busca de <see cref="ObterMensagemAsync"/>, rastreada para alterar (reenvio, S57).</summary>
+    Task<Mensagem?> ObterMensagemParaAlterarAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default);
+
+    /// <summary>
+    /// S57: trava (<c>FOR UPDATE SKIP LOCKED</c>) até <paramref name="limite"/> mensagens com reenvio vencido, de
+    /// todas as empresas. Exige bypass de RLS e transação explícita.
+    /// </summary>
+    Task<IReadOnlyList<Mensagem>> ListarReenviosVencidosComLockAsync(DateTime agora, int limite, CancellationToken ct = default);
+
     Task AddAsync(Conversa conversa, CancellationToken ct = default);
 
     Task AddMensagemAsync(Mensagem mensagem, CancellationToken ct = default);

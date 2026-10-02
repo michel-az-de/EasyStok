@@ -322,7 +322,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
                 logger.LogWarning(ex, "Webhook WhatsApp: falha ao enviar a saudação da conversa {ConversaId}.", conversa.Id);
                 saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, DateTime.UtcNow,
                     TipoConteudoMensagem.Texto, texto);
-                saida.AtualizarStatusEntrega(StatusMensagem.Falhou, ex.Message);
+                saida.RegistrarFalhaEnvio(ex.Message, ClassificadorFalhaEnvio.Classificar(ex), saida.EnviadaEm);
             }
 
             conversa.RegistrarSaida(saida.EnviadaEm);
