@@ -16,7 +16,8 @@ public sealed class NotificadorService(
     IRendererTemplate renderer,
     ResolvedorCanal resolvedorCanal,
     IUnitOfWork unitOfWork,
-    ILogger<NotificadorService> logger) : INotificadorService
+    ILogger<NotificadorService> logger,
+    IResolvedorAudiencia? resolvedorAudiencia = null) : INotificadorService
 {
     /// <summary>
     /// Chave do payload com a identidade de negócio do aviso (S13: <c>pedidoId|status</c>). Presente, vira a
@@ -185,10 +186,6 @@ public sealed class NotificadorService(
             return;
         }
 
-        var consentimentos = usuarioDestinoId.HasValue
-            ? await consentimentoRepository.ListarPorUsuarioAsync(usuarioDestinoId.Value, ct)
-            : (IReadOnlyList<ConsentimentoNotificacao>)[];
-
         var configuracoes = await configuracaoCanalRepository.ListarAsync(evento.EmpresaId, ct);
         var configuracoesFallback = await configuracaoCanalRepository.ListarAsync(null, ct);
         var todasConfiguracoes = configuracoes
@@ -202,27 +199,28 @@ public sealed class NotificadorService(
             && !canaisPreferidos.Contains(CanalNotificacao.InApp)
             && await _construtor.TemTemplateAsync(rotina, evento, CanalNotificacao.InApp, ct);
 
-        var canaisPermitidos = resolvedorCanal.ResolverCanaisPermitidos(
-            rotina.Categoria,
-            canaisPreferidos,
-            consentimentos,
-            todasConfiguracoes,
-            todosBloqueios,
-            agora,
-            evento.EmpresaId,
-            inAppTemTemplate);
+        var vars = ConstrutorMensagemOutbox.LerVariaveis(evento.PayloadJson, varsAdicionais);
 
-        if (canaisPermitidos.Count == 0)
+        // N4: a rotina que declara audiência manda para cada pessoa elegível (uma mensagem por pessoa e canal); sem ela, ou
+        // com ela desligada, o destinatário sai das chaves do payload, como sempre.
+        var audiencia = resolvedorAudiencia is null
+            ? null
+            : await resolvedorAudiencia.ResolverAsync(rotina, evento.EmpresaId, usuarioDestinoId, ct);
+
+        var destinatarios = audiencia is null
+            ? [new Destino(usuarioDestinoId, null, vars, null)]
+            : audiencia.Select(p => new Destino(
+                p.UsuarioId, p.Consentimentos, vars, new ContatoAudiencia(p.Email, p.Telefone))).ToList();
+
+        if (destinatarios.Count == 0)
         {
             logger.LogInformation(
-                "Nenhum canal permitido para evento {EventoId} usuário {UsuarioId}",
-                evento.Id, usuarioDestinoId);
+                "Audiência vazia para evento {EventoId} (Tipo={Tipo}, rotina {Rotina}): ninguém elegível",
+                evento.Id, evento.Tipo, rotina.Codigo);
             await FecharEventoAsync(evento, ct);
             return;
         }
 
-        var vars = ConstrutorMensagemOutbox.LerVariaveis(evento.PayloadJson, varsAdicionais);
-        var destinatario = new DestinatarioMensagem(usuarioDestinoId, vars);
         var todos = CanaisDaRotina.LerModo(rotina.ParametrosJson) == ModoCanais.Todos;
         var chaveNegocio = vars.TryGetValue(ChaveIdempotenciaPayload, out var chave) && chave is string c
             && !string.IsNullOrWhiteSpace(c);
@@ -230,35 +228,70 @@ public sealed class NotificadorService(
         var motivos = new List<string>();
         var criadas = 0;
         var repetidas = 0;
-        for (var i = 0; i < canaisPermitidos.Count; i++)
+        var algumCanalPermitido = false;
+        foreach (var destino in destinatarios)
         {
-            var canal = canaisPermitidos[i];
-            // Fallback: os canais seguintes ficam para o dispatcher tentar se este falhar. Todos: cada mensagem é
-            // independente, sem fallback (mandar de novo por outro canal duplicaria).
-            IReadOnlyList<CanalNotificacao> restantes = todos ? [] : canaisPermitidos.Skip(i + 1).ToList();
+            var consentimentos = destino.Consentimentos
+                ?? (usuarioDestinoId.HasValue
+                    ? await consentimentoRepository.ListarPorUsuarioAsync(usuarioDestinoId.Value, ct)
+                    : (IReadOnlyList<ConsentimentoNotificacao>)[]);
 
-            var resultado = await _construtor.ConstruirAsync(evento, rotina, canal, destinatario, restantes, agora, ct);
-            if (resultado.Mensagem is null)
-            {
-                logger.LogWarning(
-                    "Canal {Canal} pulado no evento {EventoId}: {Motivo}", canal, evento.Id, resultado.Detalhe);
-                motivos.Add(resultado.Detalhe ?? $"Canal {canal} sem mensagem");
-                continue;
-            }
+            var canaisPermitidos = resolvedorCanal.ResolverCanaisPermitidos(
+                rotina.Categoria,
+                canaisPreferidos,
+                consentimentos,
+                todasConfiguracoes,
+                todosBloqueios,
+                agora,
+                evento.EmpresaId,
+                inAppTemTemplate);
 
-            if (chaveNegocio && await outboxRepository.ExisteAsync(resultado.Mensagem.IdempotencyKey, ct))
+            if (canaisPermitidos.Count == 0)
             {
                 logger.LogInformation(
-                    "Evento {EventoId} repete um fato já enfileirado (Tipo={Tipo} canal {Canal}) — sem nova mensagem",
-                    evento.Id, evento.Tipo, canal);
-                repetidas++;
-                if (!todos) break;
+                    "Nenhum canal permitido para evento {EventoId} usuário {UsuarioId}",
+                    evento.Id, destino.UsuarioId);
                 continue;
             }
 
-            await outboxRepository.AddAsync(resultado.Mensagem, ct);
-            criadas++;
-            if (!todos) break;
+            algumCanalPermitido = true;
+            var mensagemPara = new DestinatarioMensagem(destino.UsuarioId, destino.Variaveis, destino.Contato);
+            for (var i = 0; i < canaisPermitidos.Count; i++)
+            {
+                var canal = canaisPermitidos[i];
+                // Fallback: os canais seguintes ficam para o dispatcher tentar se este falhar. Todos: cada mensagem é
+                // independente, sem fallback (mandar de novo por outro canal duplicaria).
+                IReadOnlyList<CanalNotificacao> restantes = todos ? [] : canaisPermitidos.Skip(i + 1).ToList();
+
+                var resultado = await _construtor.ConstruirAsync(evento, rotina, canal, mensagemPara, restantes, agora, ct);
+                if (resultado.Mensagem is null)
+                {
+                    logger.LogWarning(
+                        "Canal {Canal} pulado no evento {EventoId}: {Motivo}", canal, evento.Id, resultado.Detalhe);
+                    motivos.Add(resultado.Detalhe ?? $"Canal {canal} sem mensagem");
+                    continue;
+                }
+
+                if (chaveNegocio && await outboxRepository.ExisteAsync(resultado.Mensagem.IdempotencyKey, ct))
+                {
+                    logger.LogInformation(
+                        "Evento {EventoId} repete um fato já enfileirado (Tipo={Tipo} canal {Canal}) — sem nova mensagem",
+                        evento.Id, evento.Tipo, canal);
+                    repetidas++;
+                    if (!todos) break;
+                    continue;
+                }
+
+                await outboxRepository.AddAsync(resultado.Mensagem, ct);
+                criadas++;
+                if (!todos) break;
+            }
+        }
+
+        if (!algumCanalPermitido)
+        {
+            await FecharEventoAsync(evento, ct);
+            return;
         }
 
         if (criadas == 0 && repetidas == 0)
@@ -270,6 +303,13 @@ public sealed class NotificadorService(
 
         await FecharEventoAsync(evento, ct);
     }
+
+    /// <summary>Um destinatário do evento: o do payload (sem contato de audiência) ou uma pessoa da audiência.</summary>
+    private sealed record Destino(
+        Guid? UsuarioId,
+        IReadOnlyList<ConsentimentoNotificacao>? Consentimentos,
+        IDictionary<string, object?> Variaveis,
+        ContatoAudiencia? Contato);
 
     private async Task FecharEventoAsync(EventoNotificacao evento, CancellationToken ct)
     {

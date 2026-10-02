@@ -44,4 +44,44 @@ public class CriarRotinaUseCaseTests
 
         criada!.CanaisOrdemFallbackJson.Should().Be("[]");
     }
+
+    [Theory]
+    [InlineData("""{"audiencia":"superadmins"}""")]
+    [InlineData("""{"modoCanais":"todos","audiencia":"Superadmins"}""")]
+    public async Task AudienciaSuperadminsEmRotinaDaEmpresaEhRecusada(string parametros)
+    {
+        var comando = Comando(null) with { ParametrosJson = parametros };
+
+        var acao = () => _sut.ExecuteAsync(comando);
+
+        (await acao.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("AUDIENCIA_SUPERADMINS_SO_GLOBAL");
+        await _rotinas.DidNotReceiveWithAnyArgs().AddAsync(default!);
+    }
+
+    [Theory]
+    [InlineData("""{"audiencia":"gestores"}""")]
+    [InlineData("""{"modoCanais":"todos"}""")]
+    public async Task OutrasAudienciasEmRotinaDaEmpresaSaoAceitas(string parametros)
+    {
+        await _sut.ExecuteAsync(Comando(null) with { ParametrosJson = parametros });
+
+        await _rotinas.Received(1).AddAsync(Arg.Any<RotinaNotificacao>());
+    }
+
+    [Fact]
+    public async Task AtualizarTambemRecusaSuperadminsEmRotinaDaEmpresa()
+    {
+        var empresaId = Guid.NewGuid();
+        var rotina = RotinaNotificacao.Criar(
+            "r", "R", TipoEventoNotificacao.FaturaVencida, TriggerTipoRotina.Evento, "tpl",
+            CategoriaConteudoNotificacao.Operacional, empresaId: empresaId);
+        _rotinas.GetByIdAsync(rotina.Id, Arg.Any<CancellationToken>()).Returns(rotina);
+        var atualizar = new AtualizarRotinaUseCase(_rotinas, Substitute.For<IUnitOfWork>());
+
+        var acao = () => atualizar.ExecuteAsync(
+            new AtualizarRotinaCommand(rotina.Id, null, """{"audiencia":"superadmins"}""", "admin", empresaId));
+
+        await acao.Should().ThrowAsync<UseCaseValidationException>();
+        rotina.ParametrosJson.Should().NotContain("superadmins");
+    }
 }

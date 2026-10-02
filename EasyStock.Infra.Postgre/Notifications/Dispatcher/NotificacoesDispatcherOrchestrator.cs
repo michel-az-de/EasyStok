@@ -435,6 +435,16 @@ public sealed class NotificacoesDispatcherOrchestrator(
             await rotinaRepo.ListarAtivasAsync(evento.Tipo, evento.EmpresaId, ct), evento.EmpresaId);
         if (rotina is null) return false;
 
+        // N4: a mensagem de uma pessoa da audiência tem contato próprio, que o fallback (que lê o contato do payload)
+        // não conhece. Rotina com audiência entrega em modo "todos"; o fallback de canal não vale para ela.
+        if (AudienciaDaRotina.Ler(rotina.ParametrosJson) is not null)
+        {
+            logger.LogWarning(
+                "Fallback de canal ignorado na rotina {Rotina}: com audiência, use o modo 'todos' (mensagem {MensagemId})",
+                rotina.Codigo, mensagemOriginal.Id);
+            return false;
+        }
+
         var construtor = new ConstrutorMensagemOutbox(templateRepo, renderer);
         var destinatario = new DestinatarioMensagem(
             mensagemOriginal.UsuarioDestinoId, ConstrutorMensagemOutbox.LerVariaveis(evento.PayloadJson));

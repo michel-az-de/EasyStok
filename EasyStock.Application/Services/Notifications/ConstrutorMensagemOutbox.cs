@@ -7,10 +7,18 @@ using EasyStock.Domain.Enums.Notifications;
 namespace EasyStock.Application.Services.Notifications;
 
 /// <summary>
-/// Quem recebe a mensagem (N5): o usuário, quando há, e as variáveis de onde sai o contato de cada canal (e-mail,
-/// telefone). A N5 entrega sempre um destinatário, o do payload; a N4 passa a preencher uma lista.
+/// Contato de uma pessoa da audiência (N4), já filtrado pelas regras de elegibilidade: e-mail e WhatsApp nulos não
+/// geram mensagem. Quando presente, vale no lugar das chaves do payload.
 /// </summary>
-public sealed record DestinatarioMensagem(Guid? UsuarioId, IDictionary<string, object?> Variaveis);
+public sealed record ContatoAudiencia(string? Email, string? Whatsapp);
+
+/// <summary>
+/// Quem recebe a mensagem (N5): o usuário, quando há, e as variáveis de onde sai o contato de cada canal (e-mail,
+/// telefone). Sem <paramref name="Audiencia"/> é o destinatário do payload; com ele (N4) é uma pessoa da audiência da
+/// rotina, e a chave de idempotência de negócio passa a incluí-la.
+/// </summary>
+public sealed record DestinatarioMensagem(
+    Guid? UsuarioId, IDictionary<string, object?> Variaveis, ContatoAudiencia? Audiencia = null);
 
 /// <summary>Por que o canal não gerou mensagem.</summary>
 public enum MotivoPulo
@@ -46,7 +54,7 @@ public sealed class ConstrutorMensagemOutbox(ITemplateRepository templateReposit
                 $"Template '{rotina.TemplateCodigo}' (ou do tipo {evento.Tipo}) não encontrado para canal {canal}");
 
         var vars = destinatario.Variaveis;
-        var contato = ResolverContato(vars, canal, evento.EmpresaId);
+        var contato = ResolverContato(destinatario, canal, evento.EmpresaId);
         if (string.IsNullOrWhiteSpace(contato))
             return new ResultadoConstrucao(null, MotivoPulo.SemContato, $"Destinatário não encontrado para canal {canal}");
 
@@ -88,7 +96,8 @@ public sealed class ConstrutorMensagemOutbox(ITemplateRepository templateReposit
             usuarioDestinoId: destinatario.UsuarioId,
             canaisFallbackRestantesJson: canaisRestantes.Count > 0 ? CanaisDaRotina.Serializar(canaisRestantes) : "[]",
             metadadosJson: metadadosJson,
-            chaveIdempotencia: chave);
+            chaveIdempotencia: chave,
+            destinatarioChave: destinatario.Audiencia is not null ? destinatario.UsuarioId?.ToString("N") : null);
 
         var abertura = JanelaDeEnvio.ProximaAbertura(rotina.JanelaInicio, rotina.JanelaFim, agoraUtc, rotina.Categoria);
         if (abertura is { } instanteAbertura) mensagem.AgendarPara(instanteAbertura);
@@ -163,8 +172,24 @@ public sealed class ConstrutorMensagemOutbox(ITemplateRepository templateReposit
         return JsonSerializer.Serialize(renderizados);
     }
 
-    private static string ResolverContato(IDictionary<string, object?> vars, CanalNotificacao canal, Guid empresaId)
+    private static string ResolverContato(DestinatarioMensagem destinatario, CanalNotificacao canal, Guid empresaId)
     {
+        var vars = destinatario.Variaveis;
+
+        // N4: a pessoa da audiência tem contato próprio, nunca o do payload. Canal sem contato elegível (e-mail não
+        // confirmado, WhatsApp sem verificação ou opt-in) e SMS não geram mensagem.
+        if (destinatario.Audiencia is { } audiencia)
+        {
+            return canal switch
+            {
+                CanalNotificacao.Email => audiencia.Email ?? string.Empty,
+                CanalNotificacao.WhatsApp => audiencia.Whatsapp ?? string.Empty,
+                CanalNotificacao.Push when destinatario.UsuarioId is { } pessoa => $"usuario:{pessoa}",
+                CanalNotificacao.InApp when destinatario.UsuarioId is { } pessoa => pessoa.ToString(),
+                _ => string.Empty
+            };
+        }
+
         // Web Push (S07): o usuario do payload recebe em todos os dispositivos dele; sem usuario,
         // todas as subscriptions ativas da empresa (convencao "usuario:"/"empresa:" do WebPushCanal).
         if (canal == CanalNotificacao.Push)

@@ -66,14 +66,15 @@ public class OutboxMensagemNotificacao
         string tenantTimezone = "America/Sao_Paulo",
         int maxTentativas = 3,
         string? metadadosJson = null,
-        string? chaveIdempotencia = null)
+        string? chaveIdempotencia = null,
+        string? destinatarioChave = null)
     {
         var agora = DateTime.UtcNow;
         // S13: com chave do negócio (ex.: pedido + status), reprocessar o fato gera a mesma chave mesmo vindo de
         // outro EventoNotificacao; o índice único da coluna barra a segunda linha.
         var idempotencyKey = string.IsNullOrWhiteSpace(chaveIdempotencia)
             ? ComputarIdempotencyKey(eventoId, usuarioDestinoId, canal)
-            : ComputarIdempotencyKey(chaveIdempotencia.Trim(), canal);
+            : ComputarIdempotencyKey(chaveIdempotencia.Trim(), canal, destinatarioChave);
         return new OutboxMensagemNotificacao
         {
             Id = Guid.NewGuid(),
@@ -269,10 +270,17 @@ public class OutboxMensagemNotificacao
 
     public bool TentativasEsgotadas() => Tentativas >= MaxTentativas;
 
-    /// <summary>Chave de idempotência do outbox para uma chave de negócio no canal (S13).</summary>
-    public static string ComputarIdempotencyKey(string chaveIdempotencia, CanalNotificacao canal)
+    /// <summary>
+    /// Chave de idempotência do outbox para uma chave de negócio no canal (S13). Com <paramref name="destinatarioChave"/>
+    /// (N4, uma mensagem por pessoa da audiência) a chave muda com o destinatário; sem ele é a chave de sempre, então o
+    /// que já está no outbox, como o aviso ao cliente final, segue deduplicando.
+    /// </summary>
+    public static string ComputarIdempotencyKey(string chaveIdempotencia, CanalNotificacao canal, string? destinatarioChave = null)
     {
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"negocio|{chaveIdempotencia}|{(int)canal}"));
+        var raw = string.IsNullOrWhiteSpace(destinatarioChave)
+            ? $"negocio|{chaveIdempotencia}|{(int)canal}"
+            : $"negocio|{chaveIdempotencia}|{(int)canal}|{destinatarioChave.Trim()}";
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
         return Convert.ToHexString(hash);
     }
 
