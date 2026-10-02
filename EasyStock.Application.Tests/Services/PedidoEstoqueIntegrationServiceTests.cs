@@ -77,6 +77,54 @@ public class PedidoEstoqueIntegrationServiceTests
     }
 
     [Fact]
+    public async Task DescontarAsync_ignora_lote_vazio_e_baixa_o_lote_com_saldo()
+    {
+        var (svc, itemRepo, movRepo) = Build(permiteNegativo: true);
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 5);
+
+        ItemEstoque Lote(decimal qtd, int dias) => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(qtd), Status = StatusItemEstoque.Ok,
+            ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(dias))
+        };
+        var vazio = Lote(0, -10);   // mais antigo: o FEFO antigo o escolhia sempre
+        var cheio = Lote(50, 30);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { vazio, cheio });
+
+        await svc.DescontarAsync(pedido);
+
+        cheio.QuantidadeAtual.Value.Should().Be(45);
+        cheio.QuantidadeDescoberta.Value.Should().Be(0);
+        vazio.QuantidadeDescoberta.Value.Should().Be(0);
+        await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(m => m.ItemEstoqueId == cheio.Id));
+    }
+
+    [Fact]
+    public async Task DescontarAsync_nao_baixa_lote_bloqueado()
+    {
+        var (svc, itemRepo, _) = Build(permiteNegativo: false);
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 2);
+        var bloqueado = new ItemEstoque
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(10), Status = StatusItemEstoque.Bloqueado
+        };
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { bloqueado });
+
+        // Sem lote operavel e sem requerer estoque: ignora o desconto, nao toca no bloqueado.
+        await svc.DescontarAsync(pedido);
+
+        bloqueado.QuantidadeAtual.Value.Should().Be(10);
+    }
+
+    [Fact]
     public void PermiteEstoqueNegativo_default_true()
     {
         new PedidoEstoqueOptions().PermiteEstoqueNegativo.Should().BeTrue();
