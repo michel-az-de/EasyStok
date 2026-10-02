@@ -9,7 +9,7 @@ import css from './atendimento.module.css'
 // texto, o endereço e de onde ele vem ANTES de enviar. O link e o texto
 // continuam os mesmos de `dominio/cardapioLink.js` (quem chama monta).
 export function ModalEnviarCardapio({
-  nomeCliente, canalNome, link, texto, aoEnviar, aoFechar,
+  nomeCliente, canalNome, link, daLoja = false, texto, aoEnviar, aoFechar,
 }) {
   const [copiado, setCopiado] = useState(false)
   const endereco = (() => {
@@ -42,11 +42,19 @@ export function ModalEnviarCardapio({
         <p className={css.cardapioMensagem}>{texto}</p>
 
         <p className={css.cardapioRotulo}>De onde vem o link</p>
-        <p>
-          É a página de pedido da própria Casa da Baba, neste sistema
-          (<strong>{endereco}</strong>). Mostra só o que está disponível hoje. O cliente escolhe,
-          paga e o pedido volta sozinho para esta conversa.
-        </p>
+        {daLoja ? (
+          // #1353: o mesmo link que o agente manda (S48). Vale 24 h e um pedido.
+          <p>
+            É o cardápio da Casa da Baba no site (<strong>{endereco}</strong>), o mesmo link que o
+            atendimento automático manda. Mostra só o que está disponível hoje e vale por 24 horas.
+          </p>
+        ) : (
+          <p>
+            É a página de pedido da própria Casa da Baba, neste sistema
+            (<strong>{endereco}</strong>). Mostra só o que está disponível hoje. O cliente escolhe,
+            paga e o pedido volta sozinho para esta conversa.
+          </p>
+        )}
         <p className={css.cardapioLink}>
           <code>{link}</code>
           <Botao variante="texto" onClick={copiar}>{copiado ? 'Link copiado' : 'Copiar link'}</Botao>
