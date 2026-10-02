@@ -130,7 +130,7 @@ as marcadas com ⚑ (todas respondidas em 01/10, ✅); as demais só travam a fa
 | DM6-6 | Quem opera o M6 | dona e quem ela liberar | [07](07-m6-campanhas.md) |
 | DM7-1 | Parâmetros de estoque | ficam no Web; M7 só aponta | [08](08-m7-configuracoes.md) |
 | DM7-2 | Papel padrão de impressão | por dispositivo | [08](08-m7-configuracoes.md) |
-| DM7-3 | Usuário novo | dona cria com senha inicial e troca obrigatória | [08](08-m7-configuracoes.md) |
+| DM7-3 | Usuário novo | decidido em 01/10: convite com link por e-mail e WhatsApp, a pessoa cria a própria senha | [08](08-m7-configuracoes.md), [N9](../notificacoes-sistema/06-acesso.md) |
 | DM7-4 | Templates de aviso ao cliente | sem tela por ora | [08](08-m7-configuracoes.md) |
 | DM7-5 | Campos fiscais da vitrine | remover na poda M0.4 | [08](08-m7-configuracoes.md) |
 | DM7-6 | Mensagem "fora da área" | a do atendimento (S08) é a única | [08](08-m7-configuracoes.md) |
