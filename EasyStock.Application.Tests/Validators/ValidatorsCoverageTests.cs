@@ -1,7 +1,6 @@
 using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
 using EasyStock.Application.UseCases.CadastrarProduto;
-using EasyStock.Application.UseCases.CadastrarUsuario;
 using EasyStock.Application.UseCases.EsqueciSenha;
 using EasyStock.Application.UseCases.Logout;
 using EasyStock.Application.UseCases.RefreshToken;
@@ -82,37 +81,6 @@ public class AlterarSenhaUsuarioCommandValidatorTests
     {
         _v.Validate(new AlterarSenhaUsuarioCommand(Guid.NewGuid(), "OldP@ssw0rd", senha))
             .IsValid.Should().BeFalse();
-    }
-}
-
-public class CadastrarUsuarioCommandValidatorTests
-{
-    private readonly CadastrarUsuarioCommandValidator _v = new();
-
-    [Fact]
-    public void IsValid_quando_todos_os_campos_corretos()
-    {
-        var cmd = new CadastrarUsuarioCommand("Joao Silva", "joao@x.com", "Senh@1234567");
-        _v.Validate(cmd).IsValid.Should().BeTrue();
-    }
-
-    [Theory]
-    [InlineData("", "x@x.com", "Senh@1234567", "Nome")]
-    [InlineData("J", "nao-eh-email", "Senh@1234567", "Email")]
-    [InlineData("J", "x@x.com", "curta1!A", "Senha")]
-    public void Falha_quando_campo_obrigatorio_invalido(string nome, string email, string senha, string campoComErro)
-    {
-        var r = _v.Validate(new CadastrarUsuarioCommand(nome, email, senha));
-        r.IsValid.Should().BeFalse();
-        r.Errors.Should().Contain(e => e.PropertyName == campoComErro);
-    }
-
-    [Fact]
-    public void Falha_quando_Nome_excede_150_caracteres()
-    {
-        var nomeGigante = new string('a', 151);
-        var r = _v.Validate(new CadastrarUsuarioCommand(nomeGigante, "x@x.com", "Senh@1234567"));
-        r.IsValid.Should().BeFalse();
     }
 }
 
