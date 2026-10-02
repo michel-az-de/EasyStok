@@ -25,6 +25,13 @@ public sealed class OutboxNotificacaoRepository(EasyStockDbContext db) : IOutbox
     public Task<bool> ExisteAsync(string idempotencyKey, CancellationToken ct = default) =>
         db.NotifOutboxMensagens.AnyAsync(m => m.IdempotencyKey == idempotencyKey, ct);
 
+    public Task<bool> ExisteMensagemAbertaDoEventoAsync(
+        Guid empresaId, Guid eventoId, Guid exceto, CancellationToken ct = default) =>
+        db.NotifOutboxMensagens.AnyAsync(m => m.EmpresaId == empresaId
+                                              && m.EventoId == eventoId
+                                              && m.Id != exceto
+                                              && (m.Status == StatusOutbox.Pendente || m.Status == StatusOutbox.EmEnvio), ct);
+
     public async Task<(IReadOnlyList<OutboxMensagemNotificacao> Items, int TotalCount)> ListarAsync(
         Guid? empresaId, StatusOutbox? status = null, CanalNotificacao? canal = null,
         DateTime? de = null, DateTime? ate = null,

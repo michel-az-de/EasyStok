@@ -110,6 +110,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
         EasyStockDbContext db,
         CancellationToken ct)
     {
+        var abriuFallback = false;
         var canal = canais.FirstOrDefault(c => c.Canal == mensagem.Canal);
         if (canal is null)
         {
@@ -117,11 +118,37 @@ public sealed class NotificacoesDispatcherOrchestrator(
                 "Nenhum adapter registrado para canal {Canal} outbox={OutboxId}",
                 mensagem.Canal, mensagem.Id);
             mensagem.Suprimir($"Canal {mensagem.Canal} sem adapter registrado");
-            await outboxRepo.UpdateAsync(mensagem, ct);
-            await db.SaveChangesAsync(ct);
-            return;
+        }
+        else
+        {
+            abriuFallback = await EnviarERegistrarAsync(
+                mensagem, canal, logRepo, eventoRepo, templateRepo, rotinaRepo, renderer, db, ct);
         }
 
+        await PurgarPayloadSeForAUltimaAsync(mensagem, abriuFallback, outboxRepo, eventoRepo, ct);
+
+        await outboxRepo.UpdateAsync(mensagem, ct);
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Chama o canal e traduz o <see cref="ResultadoEnvio.Desfecho"/> em status do outbox e linha de log (N2):
+    /// <c>Enviado</c>; <c>Simulado</c> (log com o provider real, <c>Sucesso = false</c> e erro "simulado");
+    /// <c>Indeterminado</c> (terminal, sem reenvio e sem fallback, para não duplicar entre canais); falha permanente
+    /// (sem reagendar, com fallback de canal); falha transitória (backoff de 1, 5 e 30 min).
+    /// </summary>
+    /// <returns>Se abriu uma mensagem de fallback de canal.</returns>
+    private async Task<bool> EnviarERegistrarAsync(
+        OutboxMensagemNotificacao mensagem,
+        ICanalNotificacao canal,
+        ILogEnvioNotificacaoRepository logRepo,
+        IEventoNotificacaoRepository eventoRepo,
+        ITemplateRepository templateRepo,
+        IRotinaRepository rotinaRepo,
+        IRendererTemplate renderer,
+        EasyStockDbContext db,
+        CancellationToken ct)
+    {
         var mensagemPronta = new MensagemPronta(
             mensagem.Id, mensagem.EmpresaId, mensagem.Destinatario, mensagem.AssuntoRenderizado,
             mensagem.CorpoRenderizado, mensagem.Canal, mensagem.Categoria)
@@ -134,54 +161,110 @@ public sealed class NotificacoesDispatcherOrchestrator(
         var resultado = await canal.EnviarAsync(mensagemPronta, ct);
         sw.Stop();
 
-        if (resultado.Sucesso)
-        {
-            mensagem.MarcarEnviado(resultado.ProviderUsado ?? mensagem.Canal.ToString());
-            var lag = (DateTime.UtcNow - mensagem.CriadoEm).TotalSeconds;
-            OutboxLagHistogram.Record(lag, new TagList { { "canal", mensagem.Canal.ToString() } });
-            SentCounter.Add(1, new TagList { { "canal", mensagem.Canal.ToString() }, { "provider", resultado.ProviderUsado ?? "unknown" } });
+        var provider = resultado.ProviderUsado ?? mensagem.Canal.ToString();
+        var ignoraConsentimento = mensagem.Categoria.IgnoraConsentimento();
+        var tags = new TagList { { "canal", mensagem.Canal.ToString() }, { "provider", resultado.ProviderUsado ?? "unknown" } };
 
-            var logSucesso = LogEnvioNotificacao.RegistrarSucesso(
-                mensagem.Id, mensagem.Tentativas + 1, mensagem.Canal,
-                resultado.ProviderUsado ?? mensagem.Canal.ToString(),
-                sw.ElapsedMilliseconds,
-                resultado.StatusHttp,
-                resultado.RespostaProviderJson,
-                mensagem.Categoria == CategoriaConteudoNotificacao.Transacional);
-
-            await logRepo.AddAsync(logSucesso, ct);
-        }
-        else
+        switch (resultado.Desfecho)
         {
-            var backoff = mensagem.Tentativas switch
+            case DesfechoEnvio.Enviado:
             {
-                0 => TimeSpan.FromMinutes(1),
-                1 => TimeSpan.FromMinutes(5),
-                _ => TimeSpan.FromMinutes(30)
-            };
+                mensagem.MarcarEnviado(provider);
+                var lag = (DateTime.UtcNow - mensagem.CriadoEm).TotalSeconds;
+                OutboxLagHistogram.Record(lag, new TagList { { "canal", mensagem.Canal.ToString() } });
+                SentCounter.Add(1, tags);
 
-            mensagem.MarcarFalhaTentativa(resultado.ErroDetalhado ?? "Erro desconhecido", backoff, resultado.FalhaPermanente);
-            FailedCounter.Add(1, new TagList { { "canal", mensagem.Canal.ToString() }, { "provider", resultado.ProviderUsado ?? "unknown" } });
+                var logSucesso = LogEnvioNotificacao.RegistrarSucesso(
+                    mensagem.Id, mensagem.Tentativas + 1, mensagem.Canal, provider,
+                    sw.ElapsedMilliseconds,
+                    resultado.StatusHttp,
+                    resultado.RespostaProviderJson,
+                    ignoraConsentimento);
 
-            var logFalha = LogEnvioNotificacao.RegistrarFalha(
-                mensagem.Id, mensagem.Tentativas, mensagem.Canal,
-                resultado.ProviderUsado ?? mensagem.Canal.ToString(),
-                sw.ElapsedMilliseconds,
-                resultado.ErroDetalhado ?? "Erro desconhecido",
-                resultado.StatusHttp);
-            logFalha.BypassConsentimento = mensagem.Categoria == CategoriaConteudoNotificacao.Transacional;
+                await logRepo.AddAsync(logSucesso, ct);
+                return false;
+            }
 
-            await logRepo.AddAsync(logFalha, ct);
+            case DesfechoEnvio.Simulado:
+            {
+                // Nada saiu: não conta como enviado, não preenche EnviadoEm e o log não finge sucesso.
+                mensagem.MarcarSimulado(provider);
 
-            if (mensagem.Status == StatusOutbox.Falhado)
-                await TentarFallbackCanalAsync(mensagem, eventoRepo, templateRepo, rotinaRepo, renderer, db, ct);
+                await logRepo.AddAsync(LogEnvioNotificacao.RegistrarSimulado(
+                    mensagem.Id, mensagem.Tentativas + 1, mensagem.Canal, provider,
+                    sw.ElapsedMilliseconds, ignoraConsentimento), ct);
+                return false;
+            }
+
+            case DesfechoEnvio.Indeterminado:
+            {
+                // Pode ter saído: terminal, sem reenvio e sem fallback de canal (mandar por outro canal duplicaria).
+                var erro = resultado.ErroDetalhado ?? "Entrega indeterminada";
+                mensagem.MarcarIndeterminado(erro, provider);
+                FailedCounter.Add(1, tags);
+
+                await logRepo.AddAsync(
+                    LogDeFalha(mensagem, resultado, provider, sw.ElapsedMilliseconds, erro, ignoraConsentimento), ct);
+                return false;
+            }
+
+            default:
+            {
+                // FalhaTransitoria (backoff) e FalhaPermanente (Falhado na hora, sem reagendar, com fallback de canal).
+                var backoff = mensagem.Tentativas switch
+                {
+                    0 => TimeSpan.FromMinutes(1),
+                    1 => TimeSpan.FromMinutes(5),
+                    _ => TimeSpan.FromMinutes(30)
+                };
+
+                var erro = resultado.ErroDetalhado ?? "Erro desconhecido";
+                mensagem.MarcarFalhaTentativa(erro, backoff, permanente: resultado.Desfecho == DesfechoEnvio.FalhaPermanente);
+                FailedCounter.Add(1, tags);
+
+                await logRepo.AddAsync(
+                    LogDeFalha(mensagem, resultado, provider, sw.ElapsedMilliseconds, erro, ignoraConsentimento), ct);
+
+                return mensagem.Status == StatusOutbox.Falhado
+                    && await TentarFallbackCanalAsync(mensagem, eventoRepo, templateRepo, rotinaRepo, renderer, db, ct);
+            }
         }
-
-        await outboxRepo.UpdateAsync(mensagem, ct);
-        await db.SaveChangesAsync(ct);
     }
 
-    private async Task TentarFallbackCanalAsync(
+    private static LogEnvioNotificacao LogDeFalha(
+        OutboxMensagemNotificacao mensagem, ResultadoEnvio resultado, string provider, long duracaoMs, string erro,
+        bool ignoraConsentimento)
+    {
+        var log = LogEnvioNotificacao.RegistrarFalha(
+            mensagem.Id, mensagem.Tentativas, mensagem.Canal, provider, duracaoMs, erro, resultado.StatusHttp);
+        log.BypassConsentimento = ignoraConsentimento;
+        return log;
+    }
+
+    /// <summary>
+    /// Categoria <see cref="CategoriaConteudoNotificacao.Seguranca"/> (N2): a própria mensagem já apagou corpo, assunto e
+    /// metadados ao terminar (<see cref="OutboxMensagemNotificacao.PurgarSegredos"/>, no domínio). O payload do evento,
+    /// que carrega o mesmo segredo, só sai quando não resta nenhuma outra mensagem aberta do evento e nenhum fallback
+    /// foi aberto, porque o fallback de canal relê o payload. É o mesmo commit que fecha a mensagem.
+    /// </summary>
+    private static async Task PurgarPayloadSeForAUltimaAsync(
+        OutboxMensagemNotificacao mensagem,
+        bool abriuFallback,
+        IOutboxNotificacaoRepository outboxRepo,
+        IEventoNotificacaoRepository eventoRepo,
+        CancellationToken ct)
+    {
+        if (mensagem.Categoria != CategoriaConteudoNotificacao.Seguranca) return;
+        if (mensagem.Status is StatusOutbox.Pendente or StatusOutbox.EmEnvio) return;
+        if (abriuFallback) return;
+        if (await outboxRepo.ExisteMensagemAbertaDoEventoAsync(mensagem.EmpresaId, mensagem.EventoId, mensagem.Id, ct)) return;
+
+        var evento = await eventoRepo.GetByIdAsync(mensagem.EventoId, ct);
+        evento?.PurgarPayload();
+    }
+
+    /// <returns>Se criou a mensagem de fallback (e, por isso, o evento ainda tem uma mensagem aberta).</returns>
+    private async Task<bool> TentarFallbackCanalAsync(
         OutboxMensagemNotificacao mensagemOriginal,
         IEventoNotificacaoRepository eventoRepo,
         ITemplateRepository templateRepo,
@@ -198,20 +281,20 @@ public sealed class NotificacoesDispatcherOrchestrator(
         }
         catch
         {
-            return;
+            return false;
         }
 
-        if (fallbacks.Count == 0) return;
+        if (fallbacks.Count == 0) return false;
 
         var proximoCanal = fallbacks[0];
         var fallbackRestantes = fallbacks.Skip(1).ToList();
 
         var evento = await eventoRepo.GetByIdAsync(mensagemOriginal.EventoId, ct);
-        if (evento is null) return;
+        if (evento is null) return false;
 
         var rotina = (await rotinaRepo.ListarAtivasAsync(evento.Tipo, ct))
             .FirstOrDefault(r => r.EmpresaId == evento.EmpresaId || r.EmpresaId == null);
-        if (rotina is null) return;
+        if (rotina is null) return false;
 
         var template = await templateRepo.GetAtivoAsync(rotina.TemplateCodigo, proximoCanal, evento.EmpresaId, ct)
             ?? await templateRepo.GetAtivoAsync(rotina.TemplateCodigo, proximoCanal, null, ct);
@@ -220,7 +303,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
             logger.LogWarning(
                 "Fallback canal {Canal}: template '{Codigo}' não encontrado — cancelando fallback.",
                 proximoCanal, rotina.TemplateCodigo);
-            return;
+            return false;
         }
 
         var vars = ParsePayload(evento.PayloadJson);
@@ -234,7 +317,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
         catch (Exception ex)
         {
             logger.LogError(ex, "Falha ao renderizar template para fallback canal {Canal}", proximoCanal);
-            return;
+            return false;
         }
 
         var novaMsg = OutboxMensagemNotificacao.Criar(
@@ -254,6 +337,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
         logger.LogInformation(
             "Fallback criado para canal {Canal} outbox original={OriginalId}",
             proximoCanal, mensagemOriginal.Id);
+        return true;
     }
 
     private static IDictionary<string, object?> ParsePayload(string payloadJson)
