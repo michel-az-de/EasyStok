@@ -46,6 +46,14 @@ public class PoliticaValidadeNotificacaoTests
     public void Prazos_iniciais_da_spec(TipoEventoNotificacao tipo, int minutos) =>
         NovaPolitica().PrazoDe(tipo).Should().Be(TimeSpan.FromMinutes(minutos));
 
+    [Theory]
+    [InlineData(TipoEventoNotificacao.IncidenteSistema, 2 * 60)]
+    [InlineData(TipoEventoNotificacao.PrazoEstourado, 6 * 60)]
+    [InlineData(TipoEventoNotificacao.ResumoDiario, 4 * 60)]
+    [InlineData(TipoEventoNotificacao.ConviteAcesso, 24 * 60)]
+    public void TiposDoCatalogoTemPrazoProprio(TipoEventoNotificacao tipo, int minutos) =>
+        NovaPolitica().PrazoDe(tipo).Should().Be(TimeSpan.FromMinutes(minutos));
+
     [Fact]
     public void Configuracao_sobrescreve_o_prazo_do_tipo_em_minutos_e_ignora_valor_invalido()
     {

@@ -10,12 +10,21 @@ namespace EasyStock.Api.Data;
 /// </summary>
 public static class NotificacoesGlobaisSeed
 {
-    public static async Task ExecutarAsync(EasyStockDbContext context, ILogger logger)
+    /// <summary>Autor das linhas que o seed escreve; o que tem outro autor foi mexido por pessoa e o seed não sobrescreve (N13).</summary>
+    public const string AutorSistema = "system";
+
+    /// <param name="templates">Catálogo de templates; omitido, é o <see cref="BuildDefaultTemplates"/>. Existe para o teste subir a versão.</param>
+    /// <param name="rotinas">Catálogo de rotinas; omitido, é o <see cref="BuildDefaultRotinas"/>.</param>
+    public static async Task ExecutarAsync(
+        EasyStockDbContext context,
+        ILogger logger,
+        IReadOnlyCollection<TemplateNotificacao>? templates = null,
+        IReadOnlyCollection<RotinaNotificacao>? rotinas = null)
     {
         var seeded = false;
         seeded |= await SeedConfiguracoesCanal(context, logger);
-        seeded |= await SeedTemplates(context, logger);
-        seeded |= await SeedRotinas(context, logger);
+        seeded |= await SeedTemplates(context, logger, templates ?? BuildDefaultTemplates().ToList());
+        seeded |= await SeedRotinas(context, logger, rotinas ?? BuildDefaultRotinas().ToList());
 
         if (seeded)
             await context.SaveChangesAsync();
@@ -48,55 +57,108 @@ public static class NotificacoesGlobaisSeed
         return adicionados;
     }
 
-    private static async Task<bool> SeedTemplates(EasyStockDbContext context, ILogger logger)
+    /// <summary>
+    /// Templates globais versionados (N13). Por <c>Codigo</c>: ausente, insere aprovado e ativo; presente com a última
+    /// linha do sistema e <c>Versao</c> menor que a do catálogo, desativa a vigente e insere a linha nova (o histórico
+    /// fica); presente e editado por pessoa, não mexe e avisa. A segunda execução não escreve nada.
+    /// </summary>
+    private static async Task<bool> SeedTemplates(
+        EasyStockDbContext context, ILogger logger, IReadOnlyCollection<TemplateNotificacao> catalogo)
     {
         // Ver comentario em SeedConfiguracoesCanal — HasQueryFilter global zera a leitura
         // de globais (EmpresaId IS NULL) durante seed; IgnoreQueryFilters restaura.
-        var existentes = await context.NotifTemplates
-            .IgnoreQueryFilters()
-            .Where(t => t.EmpresaId == null)
-            .Select(t => t.Codigo)
-            .ToListAsync();
+        var existentes = (await context.NotifTemplates
+                .IgnoreQueryFilters()
+                .Where(t => t.EmpresaId == null)
+                .ToListAsync())
+            .GroupBy(t => t.Codigo)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(t => t.Versao).ToList());
 
-        var templates = BuildDefaultTemplates();
-        var adicionados = false;
+        var alterou = false;
 
-        foreach (var t in templates)
+        foreach (var t in catalogo)
         {
-            if (existentes.Contains(t.Codigo)) continue;
-            t.Aprovar("system");
+            if (!existentes.TryGetValue(t.Codigo, out var linhas))
+            {
+                Publicar(t);
+                logger.LogInformation("NotificacoesGlobaisSeed: Template global adicionado: {Codigo}", t.Codigo);
+                alterou = true;
+                continue;
+            }
+
+            var ultima = linhas[0];
+            if (ultima.AtualizadoPor != AutorSistema)
+            {
+                logger.LogWarning(
+                    "NotificacoesGlobaisSeed: Template global {Codigo} foi editado por {Autor}; o catálogo não sobrescreve",
+                    t.Codigo, ultima.AtualizadoPor);
+                continue;
+            }
+
+            if (ultima.Versao >= t.Versao) continue;
+
+            foreach (var vigente in linhas.Where(l => l.Ativo)) vigente.Desativar();
+            Publicar(t);
+            logger.LogInformation(
+                "NotificacoesGlobaisSeed: Template global {Codigo} subiu da versão {De} para {Para}",
+                t.Codigo, ultima.Versao, t.Versao);
+            alterou = true;
+        }
+
+        return alterou;
+
+        void Publicar(TemplateNotificacao t)
+        {
+            t.Aprovar(AutorSistema);
             t.Ativar();
             context.NotifTemplates.Add(t);
-            logger.LogInformation("NotificacoesGlobaisSeed: Template global adicionado: {Codigo}", t.Codigo);
-            adicionados = true;
         }
-
-        return adicionados;
     }
 
-    private static async Task<bool> SeedRotinas(EasyStockDbContext context, ILogger logger)
+    /// <summary>
+    /// Rotinas globais (N13). Sem coluna de versão: compara o conteúdo com o catálogo e atualiza no lugar quando a
+    /// rotina é do sistema (<c>AtualizadaPor = "system"</c>). Rotina mexida por pessoa, inclusive desligada, fica como
+    /// está, com aviso. Rotina nova nasce <c>Ativa</c> conforme o catálogo.
+    /// </summary>
+    private static async Task<bool> SeedRotinas(
+        EasyStockDbContext context, ILogger logger, IReadOnlyCollection<RotinaNotificacao> catalogo)
     {
         // Ver comentario em SeedConfiguracoesCanal — HasQueryFilter global zera a leitura
         // de globais (EmpresaId IS NULL) durante seed; IgnoreQueryFilters restaura.
-        var existentes = await context.NotifRotinas
-            .IgnoreQueryFilters()
-            .Where(r => r.EmpresaId == null)
-            .Select(r => r.Codigo)
-            .ToListAsync();
+        var existentes = (await context.NotifRotinas
+                .IgnoreQueryFilters()
+                .Where(r => r.EmpresaId == null)
+                .ToListAsync())
+            .ToDictionary(r => r.Codigo);
 
-        var rotinas = BuildDefaultRotinas();
-        var adicionados = false;
+        var alterou = false;
 
-        foreach (var r in rotinas)
+        foreach (var r in catalogo)
         {
-            if (existentes.Contains(r.Codigo)) continue;
-            r.Ativar("system");
-            context.NotifRotinas.Add(r);
-            logger.LogInformation("NotificacoesGlobaisSeed: Rotina global adicionada: {Codigo}", r.Codigo);
-            adicionados = true;
+            if (!existentes.TryGetValue(r.Codigo, out var atual))
+            {
+                context.NotifRotinas.Add(r);
+                logger.LogInformation("NotificacoesGlobaisSeed: Rotina global adicionada: {Codigo}", r.Codigo);
+                alterou = true;
+                continue;
+            }
+
+            if (atual.EquivaleAoCatalogo(r)) continue;
+
+            if (!atual.EhDoSistema)
+            {
+                logger.LogWarning(
+                    "NotificacoesGlobaisSeed: Rotina global {Codigo} foi alterada por {Autor}; o catálogo não sobrescreve",
+                    r.Codigo, atual.AtualizadaPor);
+                continue;
+            }
+
+            atual.AplicarCatalogo(r);
+            logger.LogInformation("NotificacoesGlobaisSeed: Rotina global {Codigo} atualizada pelo catálogo", r.Codigo);
+            alterou = true;
         }
 
-        return adicionados;
+        return alterou;
     }
 
     public static IEnumerable<TemplateNotificacao> BuildDefaultTemplates()
@@ -611,6 +673,93 @@ public static class NotificacoesGlobaisSeed
             tipoEvento: TipoEventoNotificacao.SlaViolado,
             assuntoTemplate: "",
             corpoTemplate: "SLA {{ tipoSla }} violado: chamado \"{{ titulo }}\" da {{ empresaNome }} - prioridade {{ prioridade }}, nivel {{ nivel }}. Requer atencao.");
+
+        // ===== Catalogo de plataforma (N13). E-mail em Data/Templates/Email/{codigo}.html; texto de WhatsApp aqui,
+        // com os metadados do modelo da Meta (nome aprovado no WhatsApp Manager e param1..N). Os modelos
+        // precisam estar aprovados na Meta antes de a N6 enviar de verdade. =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "reset_senha_whatsapp_v1",
+            nome: "Reset de Senha · WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.ResetSenha,
+            assuntoTemplate: "",
+            corpoTemplate: "{{ codigo }} é o seu código de verificação do EasyStok. Ele vale por {{ expira_em_minutos }} minutos. Não compartilhe com ninguém.")
+            .ComMetadados(
+                """{"template":"codigo_redefinir_senha","idioma":"pt_BR","param1":"{{ codigo }}","botaoUrl0":"{{ codigo }}"}""");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "convite_acesso_email_v1",
+            nome: "Convite de Acesso · Email",
+            canal: CanalNotificacao.Email,
+            tipoEvento: TipoEventoNotificacao.ConviteAcesso,
+            assuntoTemplate: "EasyStok: convite para acessar {{ empresa }}",
+            corpoTemplate: EmailTemplateLoader.LoadBody("convite_acesso_email_v1"));
+
+        // O convite ja nasce como o modelo "convite_acesso_link" (botao URL), para nao aprovar dois modelos na
+        // Meta; a N9 acrescenta o token do botao (botaoUrl0) e sobe este template para a versao 2.
+        yield return TemplateNotificacao.Criar(
+            codigo: "convite_acesso_whatsapp_v1",
+            nome: "Convite de Acesso · WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.ConviteAcesso,
+            assuntoTemplate: "",
+            corpoTemplate: "Olá, {{ nome }}! Você foi convidado para o EasyStok da empresa {{ empresa }}. Use o link para criar sua senha: {{ link_convite }}")
+            .ComMetadados(
+                """{"template":"convite_acesso_link","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ empresa }}"}""");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "incidente_sistema_email_v1",
+            nome: "Incidente do Sistema · Email",
+            canal: CanalNotificacao.Email,
+            tipoEvento: TipoEventoNotificacao.IncidenteSistema,
+            assuntoTemplate: "EasyStok: {{ componente }} {{ estado_texto }}",
+            corpoTemplate: EmailTemplateLoader.LoadBody("incidente_sistema_email_v1"));
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "incidente_sistema_whatsapp_v1",
+            nome: "Incidente do Sistema · WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.IncidenteSistema,
+            assuntoTemplate: "",
+            corpoTemplate: "EasyStok informa: o componente {{ componente }} está {{ estado_texto }} desde {{ desde }}. Veja o resumo no e-mail enviado agora.")
+            .ComMetadados(
+                """{"template":"incidente_sistema","idioma":"pt_BR","param1":"{{ componente }}","param2":"{{ estado_texto }}","param3":"{{ desde }}"}""");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "prazo_estourado_email_v1",
+            nome: "Prazo Estourado · Email",
+            canal: CanalNotificacao.Email,
+            tipoEvento: TipoEventoNotificacao.PrazoEstourado,
+            assuntoTemplate: "EasyStok: {{ tipo_legivel }} há {{ atraso_texto }}",
+            corpoTemplate: EmailTemplateLoader.LoadBody("prazo_estourado_email_v1"));
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "prazo_estourado_whatsapp_v1",
+            nome: "Prazo Estourado · WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.PrazoEstourado,
+            assuntoTemplate: "",
+            corpoTemplate: "Atenção na loja: {{ tipo_legivel }} há {{ atraso_texto }} (referência {{ referencia }}). Abra o EasyStok para resolver.")
+            .ComMetadados(
+                """{"template":"prazo_estourado","idioma":"pt_BR","param1":"{{ tipo_legivel }}","param2":"{{ atraso_texto }}","param3":"{{ referencia }}"}""");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "resumo_diario_email_v1",
+            nome: "Resumo Diário · Email",
+            canal: CanalNotificacao.Email,
+            tipoEvento: TipoEventoNotificacao.ResumoDiario,
+            assuntoTemplate: "EasyStok: resumo de {{ data }}",
+            corpoTemplate: EmailTemplateLoader.LoadBody("resumo_diario_email_v1"));
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "resumo_diario_whatsapp_v1",
+            nome: "Resumo Diário · WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.ResumoDiario,
+            assuntoTemplate: "",
+            corpoTemplate: "Resumo de {{ data }} no EasyStok: {{ entregues }} pedidos entregues, faturamento de {{ faturamento }} e caixa {{ caixa_texto }}. O resumo completo está no seu e-mail.")
+            .ComMetadados(
+                """{"template":"resumo_diario","idioma":"pt_BR","param1":"{{ data }}","param2":"{{ entregues }}","param3":"{{ faturamento }}","param4":"{{ caixa_texto }}"}""");
     }
 
     public static IEnumerable<RotinaNotificacao> BuildDefaultRotinas()
@@ -623,6 +772,7 @@ public static class NotificacoesGlobaisSeed
             templateCodigo: "assinatura_expirando_email_v1",
             categoria: CategoriaConteudoNotificacao.Transacional);
         rotinaCobranca.DefinirFallback("[\"Email\"]", "system");
+        rotinaCobranca.Ativar("system");
         yield return rotinaCobranca;
 
         var rotinaDunning = RotinaNotificacao.Criar(
@@ -633,6 +783,7 @@ public static class NotificacoesGlobaisSeed
             templateCodigo: "assinatura_expirada_dunning_email_v1",
             categoria: CategoriaConteudoNotificacao.Transacional);
         rotinaDunning.DefinirFallback("[\"Email\"]", "system");
+        rotinaDunning.Ativar("system");
         yield return rotinaDunning;
 
         var rotinaEstoque = RotinaNotificacao.Criar(
@@ -642,7 +793,8 @@ public static class NotificacoesGlobaisSeed
             triggerTipo: TriggerTipoRotina.Evento,
             templateCodigo: "alerta_estoque_critico_email_v1",
             categoria: CategoriaConteudoNotificacao.Operacional);
-        rotinaEstoque.DefinirFallback("[\"Email\",\"InApp\"]", "system");
+        rotinaEstoque.DefinirFallback("[\"Email\"]", "system");
+        rotinaEstoque.Ativar("system");
         yield return rotinaEstoque;
 
         var rotinaProdutoVencendo = RotinaNotificacao.Criar(
@@ -652,7 +804,8 @@ public static class NotificacoesGlobaisSeed
             triggerTipo: TriggerTipoRotina.Evento,
             templateCodigo: "produto_vencendo_email_v1",
             categoria: CategoriaConteudoNotificacao.Operacional);
-        rotinaProdutoVencendo.DefinirFallback("[\"Email\",\"InApp\"]", "system");
+        rotinaProdutoVencendo.DefinirFallback("[\"Email\"]", "system");
+        rotinaProdutoVencendo.Ativar("system");
         yield return rotinaProdutoVencendo;
 
         // ===== Rotinas do modulo Helpdesk =====
@@ -691,7 +844,7 @@ public static class NotificacoesGlobaisSeed
         // ===== Auth =====
         yield return MakeRotina("reset_senha_global", "Reset de Senha",
             TipoEventoNotificacao.ResetSenha, "reset_senha_email_v1",
-            CategoriaConteudoNotificacao.Transacional, "[\"Email\"]");
+            CategoriaConteudoNotificacao.Seguranca, "[\"Email\",\"WhatsApp\"]", ModoTodos("usuario"));
 
         yield return MakeRotina("confirmacao_email_global", "Confirmacao de Email",
             TipoEventoNotificacao.ConfirmacaoEmail, "confirmacao_email_email_v1",
@@ -709,7 +862,7 @@ public static class NotificacoesGlobaisSeed
         // ===== Helpdesk faltante =====
         yield return MakeRotina("ticket_respondido_cliente_global", "Resposta do Cliente",
             TipoEventoNotificacao.TicketRespondidoCliente, "ticket_respondido_cliente_inapp_v1",
-            CategoriaConteudoNotificacao.Operacional, "[\"InApp\",\"Email\"]");
+            CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]");
 
         yield return MakeRotina("convite_csat_global", "Convite CSAT pos fechamento",
             TipoEventoNotificacao.ConviteCsat, "convite_csat_email_v1",
@@ -734,7 +887,7 @@ public static class NotificacoesGlobaisSeed
 
         yield return MakeRotina("pagamento_confirmado_global", "Pagamento Confirmado",
             TipoEventoNotificacao.PagamentoConfirmado, "pagamento_confirmado_inapp_v1",
-            CategoriaConteudoNotificacao.Transacional, "[\"InApp\",\"Email\"]");
+            CategoriaConteudoNotificacao.Transacional, "[\"InApp\"]");
 
         yield return MakeRotina("pagamento_falhou_global", "Pagamento Falhou",
             TipoEventoNotificacao.PagamentoFalhou, "pagamento_falhou_email_v1",
@@ -808,24 +961,56 @@ public static class NotificacoesGlobaisSeed
         yield return MakeRotina("reembolso_efetuado_global", "Reembolso Efetuado — Aviso ao Cliente",
             TipoEventoNotificacao.ReembolsoEfetuado, "reembolso_efetuado_whatsapp_v1",
             CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
+
+        // ===== Catalogo de plataforma (N13): e-mail e WhatsApp, modo "todos". A rotina guarda modo e audiencia em
+        // ParametrosJson; a leitura e da N5 (modo) e da N4 (audiencia), ate la as chaves sao inertes. Rollback:
+        // Ativa=false nas quatro rotinas novas antes de reverter o codigo (o enum guarda o nome como texto). =====
+        yield return MakeRotina("convite_acesso_global", "Convite de Acesso",
+            TipoEventoNotificacao.ConviteAcesso, "convite_acesso_email_v1",
+            CategoriaConteudoNotificacao.Seguranca, "[\"Email\",\"WhatsApp\"]", ModoTodos());
+
+        yield return MakeRotina("incidente_sistema_global", "Incidente do Sistema",
+            TipoEventoNotificacao.IncidenteSistema, "incidente_sistema_email_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"Email\",\"WhatsApp\"]", ModoTodos("superadmins"));
+
+        var prazoEstourado = MakeRotina("prazo_estourado_global", "Prazo Estourado",
+            TipoEventoNotificacao.PrazoEstourado, "prazo_estourado_email_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"Email\",\"WhatsApp\"]", ModoTodos("gestores"));
+        prazoEstourado.DefinirJanela(new TimeOnly(7, 0), new TimeOnly(22, 0));
+        yield return prazoEstourado;
+
+        // Molde: nasce inativa e liga por empresa na N12.
+        var resumoDiario = MakeRotina("resumo_diario_global", "Resumo Diário",
+            TipoEventoNotificacao.ResumoDiario, "resumo_diario_email_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"Email\",\"WhatsApp\"]", ModoTodos("admins"));
+        resumoDiario.Desativar("system");
+        yield return resumoDiario;
     }
 
-    private static TemplateNotificacao ComMetadados(TemplateNotificacao template, string metadadosJson)
+    private static TemplateNotificacao ComMetadados(this TemplateNotificacao template, string metadadosJson)
     {
         template.DefinirMetadados(metadadosJson);
         return template;
     }
 
+    /// <summary>Parametros do catalogo de plataforma: modo de canais e, quando ha, a audiencia que a N4 le.</summary>
+    private static string ModoTodos(string? audiencia = null) =>
+        audiencia is null
+            ? """{"modoCanais":"todos"}"""
+            : $$"""{"modoCanais":"todos","audiencia":"{{audiencia}}"}""";
+
     private static RotinaNotificacao MakeRotina(
         string codigo, string nome,
         TipoEventoNotificacao evento, string templateCodigo,
-        CategoriaConteudoNotificacao categoria, string fallbackJson)
+        CategoriaConteudoNotificacao categoria, string fallbackJson, string? parametrosJson = null)
     {
         var r = RotinaNotificacao.Criar(
             codigo: codigo, nome: nome, tipoEvento: evento,
             triggerTipo: TriggerTipoRotina.Evento,
             templateCodigo: templateCodigo, categoria: categoria);
-        r.DefinirFallback(fallbackJson, "system");
+        r.DefinirFallback(fallbackJson, AutorSistema);
+        if (parametrosJson is not null) r.DefinirParametros(parametrosJson, AutorSistema);
+        r.Ativar(AutorSistema);
         return r;
     }
 }

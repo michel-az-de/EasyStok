@@ -73,5 +73,11 @@ public enum TipoEventoNotificacao
 
     // Lembretes da dona (S43): lembrete venceu (manual) ou nasceu do avaliador (pagamento sem baixa,
     // cliente sem resposta). Push para quem e o lembrete, ou para a empresa toda.
-    LembreteVencido = 47
+    LembreteVencido = 47,
+
+    // Catalogo de plataforma (N13): faixa 48 a 63 reservada pela S0. A N4 e a N8 usam a faixa livre a partir de 80.
+    ConviteAcesso = 48,
+    IncidenteSistema = 49,
+    PrazoEstourado = 50,
+    ResumoDiario = 51
 }

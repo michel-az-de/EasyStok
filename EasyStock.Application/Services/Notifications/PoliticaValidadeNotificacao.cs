@@ -23,6 +23,7 @@ public sealed class QuarentenaNotificacaoOptions
 /// <item><term>Segurança (<c>ResetSenha</c>, <c>ConfirmacaoEmail</c>)</term><description>30 min</description></item>
 /// <item><term>Aviso do pedido e pós-venda ao cliente (S13)</term><description>2 h</description></item>
 /// <item><term>Campanha, atendimento interno</term><description>1 h</description></item>
+/// <item><term>Catálogo de plataforma (N13): incidente 2 h, prazo estourado 6 h, resumo diário 4 h</term><description>convite de acesso fica em 24 h</description></item>
 /// <item><term>Demais</term><description>24 h</description></item>
 /// </list>
 /// </summary>
@@ -49,6 +50,11 @@ public sealed class PoliticaValidadeNotificacao
 
             [TipoEventoNotificacao.ConversaEscalada] = TimeSpan.FromHours(1),
             [TipoEventoNotificacao.LembreteVencido] = TimeSpan.FromHours(1),
+
+            // Catalogo de plataforma (N13). ConviteAcesso fica no padrao de 24 h, como a N9 espera.
+            [TipoEventoNotificacao.IncidenteSistema] = TimeSpan.FromHours(2),
+            [TipoEventoNotificacao.PrazoEstourado] = TimeSpan.FromHours(6),
+            [TipoEventoNotificacao.ResumoDiario] = TimeSpan.FromHours(4),
         };
 
     private readonly Dictionary<TipoEventoNotificacao, TimeSpan> _prazos;
