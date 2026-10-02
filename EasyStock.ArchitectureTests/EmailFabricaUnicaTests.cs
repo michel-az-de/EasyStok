@@ -50,7 +50,7 @@ public class EmailFabricaUnicaTests
         var constroemFora = new List<string>();
         var registramFora = new List<string>();
 
-        foreach (var arquivo in ArquivosDeProducao(root))
+        foreach (var arquivo in ArquivosDeProducao(root, "*.cs"))
         {
             var relativo = Path.GetRelativePath(root, arquivo).Replace(Path.DirectorySeparatorChar, '/');
             if (relativo.Equals(Fabrica, StringComparison.OrdinalIgnoreCase))
@@ -68,6 +68,21 @@ public class EmailFabricaUnicaTests
             + "com regras diferentes (a API nunca cai no console, o Worker cai). Use AddEasyStockEmail.", Fabrica);
         registramFora.Should().BeEmpty(
             "IEmailService so e registrado por {0}; registrar em outro lugar faz API e Worker divergirem.", Fabrica);
+    }
+
+    [Fact]
+    public void NenhumRemetenteInventadoSobraNoCodigoDeProducao()
+    {
+        // O padrao noreply@easystock.com era um dominio que nao e do produto (easystok.online), no SMTP e no SendGrid.
+        var root = RepoPaths.FindRepoRoot();
+        var achados = ArquivosDeProducao(root, "*.cs")
+            .Concat(ArquivosDeProducao(root, "appsettings*.json"))
+            .Where(f => File.ReadAllText(f).Contains("noreply@easystock.com", StringComparison.OrdinalIgnoreCase))
+            .Select(f => Path.GetRelativePath(root, f).Replace(Path.DirectorySeparatorChar, '/'))
+            .ToList();
+
+        achados.Should().BeEmpty(
+            "nenhum remetente e inventado: sem FromEmail o provider cai no console com aviso nomeando a chave que falta.");
     }
 
     [Fact]
@@ -96,10 +111,10 @@ public class EmailFabricaUnicaTests
             return !(t.StartsWith("//") || t.StartsWith("*") || t.StartsWith("/*"));
         }));
 
-    private static IEnumerable<string> ArquivosDeProducao(string root) =>
+    private static IEnumerable<string> ArquivosDeProducao(string root, string padrao) =>
         Directory.GetDirectories(root, "EasyStock.*")
             .Where(d => !SufixosDeProjetoDeTeste.Any(s => Path.GetFileName(d).EndsWith(s, StringComparison.Ordinal)))
-            .SelectMany(d => Directory.GetFiles(d, "*.cs", SearchOption.AllDirectories))
+            .SelectMany(d => Directory.GetFiles(d, padrao, SearchOption.AllDirectories))
             .Where(f => !f.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar)
                      && !f.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar)
                      && !f.Contains(Path.DirectorySeparatorChar + "node_modules" + Path.DirectorySeparatorChar));

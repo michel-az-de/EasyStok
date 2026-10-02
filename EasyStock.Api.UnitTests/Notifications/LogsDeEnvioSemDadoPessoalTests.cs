@@ -68,14 +68,20 @@ public class LogsDeEnvioSemDadoPessoalTests
     }
 
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task SmtpNaoLogaEmail(bool falha)
+    [InlineData("enviado")]
+    [InlineData("falha")]
+    [InlineData("excecao")]
+    public async Task SmtpNaoLogaEmail(string cenario)
     {
+        // N3 (#1351): o canal chama EnviarAsync. A excecao inesperada leva o endereco na mensagem de proposito:
+        // o log do canal registra so o tipo dela.
         var email = Substitute.For<IEmailService>();
-        if (falha)
-            email.SendAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>())
-                .Returns(Task.FromException(new InvalidOperationException("recusado")));
+        email.EnviarAsync(Arg.Any<MensagemEmail>(), Arg.Any<CancellationToken>()).Returns(cenario switch
+        {
+            "falha" => Task.FromResult(new ResultadoEnvio(false, "smtp", "SMTP 550: recusado", FalhaPermanente: true)),
+            "excecao" => Task.FromException<ResultadoEnvio>(new InvalidOperationException($"recusado para {Email}")),
+            _ => Task.FromResult(new ResultadoEnvio(true, "smtp")),
+        });
         var logger = new LoggerQueGuarda<SmtpEmailCanal>();
         var canal = new SmtpEmailCanal(email, logger);
         var mensagem = Mensagem(Email, CanalNotificacao.Email);

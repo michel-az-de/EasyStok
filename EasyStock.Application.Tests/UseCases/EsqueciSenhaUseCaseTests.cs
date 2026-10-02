@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.EsqueciSenha;
@@ -23,6 +24,13 @@ public class EsqueciSenhaUseCaseTests
             ["Auth:TrustedLinkOrigins:0"] = HostConfiavel
         })
         .Build();
+
+    public EsqueciSenhaUseCaseTests()
+    {
+        // Sem isto o mock devolveria null para Task<ResultadoEnvio> (o record e selado e nao e substituivel).
+        _emailService.EnviarAsync(Arg.Any<MensagemEmail>(), Arg.Any<CancellationToken>())
+            .Returns(new ResultadoEnvio(true, "smtp"));
+    }
 
     private EsqueciSenhaUseCase CriarUseCase(bool comEmail = true) =>
         new(_usuarioRepository, _resetTokenRepository, _auditLogRepository, _unitOfWork, _config, _logger,
@@ -91,10 +99,24 @@ public class EsqueciSenhaUseCaseTests
         var useCase = CriarUseCase(comEmail: true);
         await useCase.ExecuteAsync(new EsqueciSenhaCommand(usuario.Email));
 
-        await _emailService.Received(1).SendAsync(
-            usuario.Email,
-            Arg.Any<string>(),
-            Arg.Any<string>());
+        await _emailService.Received(1).EnviarAsync(
+            Arg.Is<MensagemEmail>(m => m.Destinatario == usuario.Email),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EnviaPeloRemetenteDeSeguranca()
+    {
+        // N3 (#1351): o link de reset carrega credencial e nao sai da mesma caixa do relatorio de diagnostico.
+        var usuario = CriarUsuario("seguranca@empresa.com");
+        _usuarioRepository.GetByEmailAsync(usuario.Email).Returns(usuario);
+
+        var useCase = CriarUseCase(comEmail: true);
+        await useCase.ExecuteAsync(new EsqueciSenhaCommand(usuario.Email, HostConfiavel));
+
+        await _emailService.Received(1).EnviarAsync(
+            Arg.Is<MensagemEmail>(m => m.Remetente == RemetenteEmail.Seguranca),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -106,10 +128,9 @@ public class EsqueciSenhaUseCaseTests
         var useCase = CriarUseCase(comEmail: false);
         await useCase.ExecuteAsync(new EsqueciSenhaCommand(usuario.Email));
 
-        await _emailService.DidNotReceive().SendAsync(
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<string>());
+        await _emailService.DidNotReceive().EnviarAsync(
+            Arg.Any<MensagemEmail>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -121,10 +142,10 @@ public class EsqueciSenhaUseCaseTests
         var useCase = CriarUseCase(comEmail: true);
         await useCase.ExecuteAsync(new EsqueciSenhaCommand(usuario.Email, HostConfiavel));
 
-        await _emailService.Received(1).SendAsync(
-            usuario.Email,
-            Arg.Any<string>(),
-            Arg.Is<string>(b => b.Contains($"{HostConfiavel}/auth/redefinir-senha?token=")));
+        await _emailService.Received(1).EnviarAsync(
+            Arg.Is<MensagemEmail>(m => m.Destinatario == usuario.Email
+                && m.Corpo.Contains($"{HostConfiavel}/auth/redefinir-senha?token=")),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -138,10 +159,9 @@ public class EsqueciSenhaUseCaseTests
         await useCase.ExecuteAsync(new EsqueciSenhaCommand(usuario.Email, "https://evil.com"));
 
         // E-mail e enviado, mas SEM link para o host do atacante (cai em token puro).
-        await _emailService.Received(1).SendAsync(
-            usuario.Email,
-            Arg.Any<string>(),
-            Arg.Is<string>(b => !b.Contains("evil.com")));
+        await _emailService.Received(1).EnviarAsync(
+            Arg.Is<MensagemEmail>(m => m.Destinatario == usuario.Email && !m.Corpo.Contains("evil.com")),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -162,8 +182,8 @@ public class EsqueciSenhaUseCaseTests
         var usuario = CriarUsuario();
         _usuarioRepository.GetByEmailAsync(usuario.Email).Returns(usuario);
         _emailService
-            .SendAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
-            .Returns(Task.FromException(new InvalidOperationException("SMTP indisponivel")));
+            .EnviarAsync(Arg.Any<MensagemEmail>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<ResultadoEnvio>(new InvalidOperationException("SMTP indisponivel")));
 
         var useCase = CriarUseCase(comEmail: true);
 
@@ -172,5 +192,35 @@ public class EsqueciSenhaUseCaseTests
 
         result.Success.Should().BeTrue();
         await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Theory]
+    [InlineData(DesfechoEnvio.FalhaPermanente)]
+    [InlineData(DesfechoEnvio.FalhaTransitoria)]
+    [InlineData(DesfechoEnvio.Simulado)]
+    public async Task DeveRetornarSucessoELogarSemEndereco_QuandoOEnvioNaoSaiu(DesfechoEnvio desfecho)
+    {
+        // N3 (#1351): falha de envio agora volta como desfecho, nao como excecao. O token fica gravado, o pedido
+        // responde igual (sem revelar nada) e o log do envio nao leva o endereco do usuario.
+        var usuario = CriarUsuario("maria.souza@empresa.com");
+        _usuarioRepository.GetByEmailAsync(usuario.Email).Returns(usuario);
+        _emailService.EnviarAsync(Arg.Any<MensagemEmail>(), Arg.Any<CancellationToken>()).Returns(desfecho switch
+        {
+            DesfechoEnvio.FalhaPermanente => new ResultadoEnvio(false, "smtp", "SMTP 550: recusado", FalhaPermanente: true),
+            DesfechoEnvio.FalhaTransitoria => new ResultadoEnvio(false, "smtp", "SMTP 421: indisponivel"),
+            _ => ResultadoEnvio.Simulado("console"),
+        });
+
+        var result = await CriarUseCase(comEmail: true).ExecuteAsync(new EsqueciSenhaCommand(usuario.Email));
+
+        result.Success.Should().BeTrue();
+        await _unitOfWork.Received(1).CommitAsync();
+        var logsDoEnvio = _logger.ReceivedCalls()
+            .Where(c => c.GetMethodInfo().Name == nameof(ILogger.Log))
+            .Select(c => c.GetArguments()[2]?.ToString() ?? string.Empty)
+            .Where(t => t.Contains("recuperacao de senha", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        logsDoEnvio.Should().NotBeEmpty("o resultado do envio fica registrado");
+        logsDoEnvio.Should().NotContain(t => t.Contains(usuario.Email), "endereco e dado pessoal (LGPD)");
     }
 }

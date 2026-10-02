@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Notifications;
 using Microsoft.Extensions.Configuration;
 
 namespace EasyStock.Application.UseCases.CadastrarUsuario;
@@ -60,17 +61,27 @@ public sealed class CadastrarUsuarioUseCase(
                     System.Net.WebUtility.HtmlEncode(usuario.Nome),
                     confirmLink);
 
-                await emailService.SendAsync(usuario.Email, "Confirme seu email - EasyStock", body, isHtml: true);
-                logger.LogInformation("Email de confirmação enviado para {Email}", usuario.Email);
+                // O link carrega o token de confirmacao: sai da caixa de seguranca (N3, #1351). Falha vira
+                // desfecho, e o log leva so o UsuarioId (LGPD), nunca o endereco.
+                var resultado = await emailService.EnviarAsync(
+                    new MensagemEmail(usuario.Email, "Confirme seu email - EasyStock", body, Html: true, Remetente: RemetenteEmail.Seguranca));
+                if (resultado.Desfecho == DesfechoEnvio.Enviado)
+                    logger.LogInformation("Email de confirmação enviado para o usuário {UsuarioId}", usuario.Id);
+                else
+                    logger.LogWarning(
+                        "Email de confirmação não saiu (desfecho {Desfecho}) para o usuário {UsuarioId}. Token gerado normalmente.",
+                        resultado.Desfecho, usuario.Id);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Falha ao enviar email de confirmação para {Email}. Token gerado normalmente.", usuario.Email);
+                logger.LogError(
+                    "Falha inesperada ao enviar email de confirmação para o usuário {UsuarioId} ({Erro}). Token gerado normalmente.",
+                    usuario.Id, ex.GetType().Name);
             }
         }
         else if (emailService is not null && !string.IsNullOrEmpty(command.BaseUrl))
         {
-            logger.LogWarning("BaseUrl de confirmação de cadastro ignorado por não estar na allowlist de origens confiáveis. Email de confirmação não enviado para {Email}.", usuario.Email);
+            logger.LogWarning("BaseUrl de confirmação de cadastro ignorado por não estar na allowlist de origens confiáveis. Email de confirmação não enviado para o usuário {UsuarioId}.", usuario.Id);
         }
 
         await unitOfWork.CommitAsync();
