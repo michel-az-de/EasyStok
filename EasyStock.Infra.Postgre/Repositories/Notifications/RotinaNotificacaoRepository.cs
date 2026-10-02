@@ -27,6 +27,9 @@ public sealed class RotinaNotificacaoRepository(EasyStockDbContext db) : IRotina
         return await q.OrderBy(r => r.EmpresaId == null).ThenBy(r => r.CriadaEm).ToListAsync(ct);
     }
 
+    public Task<bool> ExisteAtivaAsync(TipoEventoNotificacao tipoEvento, CancellationToken ct = default) =>
+        db.NotifRotinas.IgnoreQueryFilters().AnyAsync(r => r.TipoEvento == tipoEvento && r.Ativa, ct);
+
     public async Task<(IReadOnlyList<RotinaNotificacao> Items, int Total)> ListarAsync(
         Guid? empresaId, bool? ativa = null, int page = 1, int pageSize = 20,
         CancellationToken ct = default)

@@ -40,6 +40,19 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// </summary>
         Task<IReadOnlyList<MovimentoCaixa>> GetAberturasEsquecidasAsync(DateTime limiteInferiorUtc, CancellationToken ct = default);
 
+        /// <summary>
+        /// Carimba <c>NotificadoEsquecidoEm</c> da abertura (1 aviso por sessão esquecida). A abertura de
+        /// <see cref="GetAberturasEsquecidasAsync"/> vem sem rastreio, então é um <c>ExecuteUpdate</c> direto, sem
+        /// filtro do EF (cross-tenant, sob o bypass do job). Não passa pela unidade de trabalho.
+        /// </summary>
+        Task MarcarNotificadoEsquecidoAsync(Guid movimentoId, DateTime em, CancellationToken ct = default);
+
+        /// <summary>
+        /// Destinatário de reserva quando quem abriu o caixa não é conhecido: o usuário ativo mais antigo da empresa
+        /// (≈ proprietário). Cross-tenant, sob o bypass do job.
+        /// </summary>
+        Task<Guid?> ResolverResponsavelPadraoAsync(Guid empresaId, CancellationToken ct = default);
+
         Task AddMovimentoAsync(MovimentoCaixa movimento);
         Task UpdateMovimentoAsync(MovimentoCaixa movimento);
 
