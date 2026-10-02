@@ -114,8 +114,8 @@ public class RotinaNotificacao
         && TipoEvento == catalogo.TipoEvento
         && TemplateCodigo == catalogo.TemplateCodigo
         && Categoria == catalogo.Categoria
-        && CanaisOrdemFallbackJson == catalogo.CanaisOrdemFallbackJson
-        && ParametrosJson == catalogo.ParametrosJson
+        && JsonEquivalente(CanaisOrdemFallbackJson, catalogo.CanaisOrdemFallbackJson)
+        && JsonEquivalente(ParametrosJson, catalogo.ParametrosJson)
         && JanelaInicio == catalogo.JanelaInicio
         && JanelaFim == catalogo.JanelaFim;
 
@@ -132,5 +132,19 @@ public class RotinaNotificacao
         JanelaFim = catalogo.JanelaFim;
         AtualizadaPor = "system";
         AtualizadaEm = DateTime.UtcNow;
+    }
+
+    /// <summary>O Postgres guarda <c>jsonb</c> e devolve o texto normalizado (espaço depois de vírgula e de dois-pontos), então a comparação é pelo valor.</summary>
+    private static bool JsonEquivalente(string a, string b)
+    {
+        try
+        {
+            return System.Text.Json.Nodes.JsonNode.DeepEquals(
+                System.Text.Json.Nodes.JsonNode.Parse(a), System.Text.Json.Nodes.JsonNode.Parse(b));
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return a == b;
+        }
     }
 }
