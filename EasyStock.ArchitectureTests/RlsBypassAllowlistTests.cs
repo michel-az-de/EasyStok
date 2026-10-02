@@ -85,6 +85,16 @@ public class RlsBypassAllowlistTests
         // Pendente de todas as empresas (FOR UPDATE SKIP LOCKED) num escopo com a porta ligada antes de qualquer
         // conexao e processa cada mensagem em escopo proprio, com o tenant da empresa fixado.
         "EasyStock.Infra.Postgre/Notifications/Dispatcher/NotificacoesDispatcherOrchestrator.cs",
+
+        // N1, #1344: o avaliador lista os eventos pendentes de todas as empresas numa leitura curta sob bypass (so ids)
+        // e avalia cada evento em escopo proprio, com o tenant fixado.
+        "EasyStock.Application/Services/Notifications/Orchestrators/NotificacoesAvaliadorOrchestrator.cs",
+
+        // N1, #1344: a rodada do coletor varre lotes de todas as empresas por natureza (produto vencendo).
+        "EasyStock.Application/Services/Notifications/Orchestrators/NotificacoesColetorOrchestrator.cs",
+
+        // N1, #1344: a anonimizacao por retencao (90 dias) atualiza o outbox de todas as empresas.
+        "EasyStock.Infra.Postgre/Notifications/Maintenance/AnonimizarLogsAntigosService.cs",
     };
 
     [Fact]

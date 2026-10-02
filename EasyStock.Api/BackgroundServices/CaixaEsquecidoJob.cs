@@ -61,7 +61,8 @@ public sealed class CaixaEsquecidoJob(
         }
     }
 
-    private async Task ProcessarComLockAsync(CancellationToken ct)
+    /// <summary>Uma rodada do job (com advisory lock). Pública para os testes de integração; o loop diário a chama.</summary>
+    public async Task ProcessarComLockAsync(CancellationToken ct)
     {
         using var scope = serviceProvider.CreateScope();
         var sp = scope.ServiceProvider;

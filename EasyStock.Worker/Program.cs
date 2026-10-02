@@ -7,6 +7,7 @@ using EasyStock.Infra.Notifications.DependencyInjection;
 using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.DependencyInjection;
+using EasyStock.Infra.Postgre.Notifications.Agendamento;
 using EasyStock.Worker;
 using EasyStock.Worker.BackgroundServices;
 using EasyStock.Worker.DependencyInjection;
@@ -61,9 +62,9 @@ builder.Services.Configure<WorkerOptions>(
 var connStr = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection não configurada.");
 
-builder.Services
-    .AddEasyStockPostgreInfrastructure(connStr, builder.Configuration)
-    .AddEasyStockNotificationsRepositories();
+// AddEasyStockPostgreInfrastructure já registra os repositórios de notificação e o coletor (N1: chamar
+// AddEasyStockNotificationsRepositories de novo fazia o coletor rodar duas vezes por rodada).
+builder.Services.AddEasyStockPostgreInfrastructure(connStr, builder.Configuration);
 
 // Email service (reusa Infra.Async, sem chamar AddEasyStockAsyncInfrastructure completo)
 var smtpSection = builder.Configuration.GetSection("Smtp");
@@ -102,6 +103,7 @@ builder.Services
 
 // Lembretes de pedidos agendados (mobile_orders.scheduled_delivery_at):
 // no dia, 1h antes, 10min antes. Idempotencia via colunas agendamento_notificado_*_em.
+builder.Services.AddSingleton<LembretesPedidoAgendadoTick>();
 builder.Services.AddHostedService<AgendamentoNotificacaoService>();
 
 // Monitor de saude de endpoints publicos. Abre ticket via /api/ci/tickets

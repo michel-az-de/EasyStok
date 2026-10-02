@@ -13,13 +13,14 @@ public sealed class EventoNotificacaoRepository(EasyStockDbContext db) : IEvento
     public Task<EventoNotificacao?> ObterAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
         db.NotifEventos.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.EmpresaId == empresaId && e.Id == id, ct);
 
-    public async Task<IReadOnlyList<EventoNotificacao>> ListarPendentesAsync(
+    public async Task<IReadOnlyList<EventoPendente>> ListarPendentesParaAvaliarAsync(
         int limit = 100, CancellationToken ct = default)
     {
-        return await db.NotifEventos.AsNoTracking()
+        return await db.NotifEventos.IgnoreQueryFilters().AsNoTracking()
             .Where(e => e.Status == StatusEventoNotificacao.Pendente)
             .OrderBy(e => e.OcorridoEm)
             .Take(limit)
+            .Select(e => new EventoPendente(e.Id, e.EmpresaId))
             .ToListAsync(ct);
     }
 

@@ -92,22 +92,39 @@ public sealed class NotificadorService(
         }
         catch (Exception ex)
         {
-            // Defesa contra "evento veneno": qualquer exceção não tratada vira Falhado
-            // pra evitar loop infinito com starvation dos demais (orderBy OcorridoEm + Take 200).
-            logger.LogError(ex,
-                "Falha não recuperável ao avaliar evento {EventoId} (Tipo={Tipo}) — marcado como Falhado",
-                evento.Id, evento.Tipo);
+            // O commit que falhou deixa a entidade inválida rastreada: sem descartá-la, o commit seguinte reenvia o
+            // mesmo INSERT e falha também (veneno em cascata, N1). Limpa antes de gravar o desfecho do evento.
+            unitOfWork.DescartarAlteracoesPendentes();
+
             try
             {
-                evento.MarcarComoFalhado($"Erro não tratado: {ex.GetType().Name}: {ex.Message}");
+                if (unitOfWork.EhViolacaoDeUnicidade(ex))
+                {
+                    // 23505 na IdempotencyKey do outbox: outra avaliação já enfileirou esta mensagem. O fato está
+                    // coberto, o evento fecha como processado e não como erro.
+                    logger.LogInformation(
+                        "Evento {EventoId} (Tipo={Tipo}) já tinha a mensagem enfileirada (23505) — processado",
+                        evento.Id, evento.Tipo);
+                    evento.MarcarComoProcessado();
+                }
+                else
+                {
+                    // Defesa contra "evento veneno": qualquer exceção não tratada vira Falhado
+                    // pra evitar loop infinito com starvation dos demais (orderBy OcorridoEm + Take 200).
+                    logger.LogError(ex,
+                        "Falha não recuperável ao avaliar evento {EventoId} (Tipo={Tipo}) — marcado como Falhado",
+                        evento.Id, evento.Tipo);
+                    evento.MarcarComoFalhado($"Erro não tratado: {ex.GetType().Name}: {ex.Message}");
+                }
+
                 await eventoRepository.UpdateAsync(evento, ct);
                 await unitOfWork.CommitAsync();
             }
             catch (Exception saveEx)
             {
-                // Se nem conseguimos persistir o status Falhado, propaga o erro original.
+                // Se nem conseguimos persistir o status do evento, propaga o erro original.
                 logger.LogError(saveEx,
-                    "Erro adicional ao tentar marcar evento {EventoId} como Falhado",
+                    "Erro adicional ao tentar gravar o desfecho do evento {EventoId}",
                     evento.Id);
                 throw;
             }

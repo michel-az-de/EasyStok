@@ -91,4 +91,47 @@ public class MotorNotificacoesComportamentoTests(PostgreSqlDatabaseFixture fixtu
             (await _s.LerMensagemAsync(mensagem.Id)).Status.Should().Be(StatusOutbox.Enviado);
         }
     }
+
+    // ----- avaliador: veneno e idempotência -----
+
+    [SkippableFact]
+    public async Task Avaliador_evento_cujo_commit_falha_nao_impede_o_proximo()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        await _s.SemearCatalogoGlobalAsync(TipoEventoNotificacao.AlertaEstoqueCritico, CanalNotificacao.Email, CategoriaConteudoNotificacao.Transacional);
+        // O assunto sai da variável do payload: com 600 caracteres estoura o varchar(500) do outbox no INSERT, no commit.
+        await _s.SemearCatalogoGlobalAsync(TipoEventoNotificacao.TicketCriado, CanalNotificacao.Email, CategoriaConteudoNotificacao.Transacional,
+            assuntoTemplate: "{{ token }}");
+        var empresa = await _s.SemearEmpresaAsync();
+        var agora = DateTime.UtcNow.AddMinutes(-10);
+        var primeiro = await _s.SemearEventoPendenteAsync(empresa, TipoEventoNotificacao.AlertaEstoqueCritico, ocorridoEm: agora);
+        var venenoso = await _s.SemearEventoPendenteAsync(empresa, TipoEventoNotificacao.TicketCriado,
+            $$"""{"email":"maria@example.com","token":"{{new string('a', 600)}}"}""", ocorridoEm: agora.AddSeconds(1));
+        var terceiro = await _s.SemearEventoPendenteAsync(empresa, TipoEventoNotificacao.AlertaEstoqueCritico, ocorridoEm: agora.AddSeconds(2));
+        // 23505: o evento já tem a mensagem do canal no outbox (mesma IdempotencyKey = evento + usuário + canal).
+        var jaEnfileirado = await _s.SemearEventoPendenteAsync(empresa, TipoEventoNotificacao.AlertaEstoqueCritico, ocorridoEm: agora.AddSeconds(3));
+        var modelo = await _s.SemearAsync(CanalNotificacao.Email, empresaId: empresa);
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.NotifOutboxMensagens.Add(OutboxMensagemNotificacao.Criar(jaEnfileirado.Id, modelo.TemplateId, empresa,
+                CanalNotificacao.Email, "maria@example.com", "Assunto", "corpo", CategoriaConteudoNotificacao.Transacional));
+            await db.SaveChangesAsync();
+        }
+        var quinto = await _s.SemearEventoPendenteAsync(empresa, TipoEventoNotificacao.AlertaEstoqueCritico, ocorridoEm: agora.AddSeconds(4));
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: false);
+
+        await using (var scope = provider.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<INotificacoesAvaliadorOrchestrator>().ExecutarRodadaAsync(TimeSpan.FromMinutes(2));
+
+        (await _s.LerEventoAsync(primeiro.Id)).Status.Should().Be(StatusEventoNotificacao.Processado);
+        var gravadoVenenoso = await _s.LerEventoAsync(venenoso.Id);
+        gravadoVenenoso.Status.Should().Be(StatusEventoNotificacao.Falhado, "o veneno termina Falhado, com o motivo");
+        gravadoVenenoso.ErroProcessamento.Should().NotBeNullOrWhiteSpace();
+        (await _s.LerMensagensDoEventoAsync(venenoso.Id)).Should().BeEmpty();
+        (await _s.LerEventoAsync(terceiro.Id)).Status.Should().Be(StatusEventoNotificacao.Processado, "o DbContext sujo do veneno não derruba os commits seguintes");
+        (await _s.LerMensagensDoEventoAsync(terceiro.Id)).Should().ContainSingle();
+        (await _s.LerEventoAsync(jaEnfileirado.Id)).Status.Should().Be(StatusEventoNotificacao.Processado, "23505 na IdempotencyKey = já enfileirado");
+        (await _s.LerMensagensDoEventoAsync(jaEnfileirado.Id)).Should().ContainSingle();
+        (await _s.LerEventoAsync(quinto.Id)).Status.Should().Be(StatusEventoNotificacao.Processado);
+    }
 }

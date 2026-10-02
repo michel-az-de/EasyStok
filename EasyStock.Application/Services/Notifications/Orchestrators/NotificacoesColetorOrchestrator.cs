@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Ports.Output.Security;
 
 namespace EasyStock.Application.Services.Notifications.Orchestrators;
 
@@ -11,6 +12,7 @@ namespace EasyStock.Application.Services.Notifications.Orchestrators;
 /// </summary>
 public sealed class NotificacoesColetorOrchestrator(
     IEnumerable<IColetorEventoNotificacao> coletores,
+    IRowLevelSecurityBypass bypassRls,
     ILogger<NotificacoesColetorOrchestrator> logger) : INotificacoesColetorOrchestrator
 {
     private static readonly Meter Meter = new("EasyStock.Notifications", "1.0");
@@ -33,6 +35,9 @@ public sealed class NotificacoesColetorOrchestrator(
             var sw = Stopwatch.StartNew();
             try
             {
+                // Varredura cross-tenant por natureza (lotes de todas as empresas): o bypass de RLS entra pela porta
+                // antes da primeira conexão do coletor (N1). Os eventos nascem com a EmpresaId do lote.
+                using var _ = bypassRls.Begin();
                 await coletor.ColetarAsync(ct);
             }
             catch (Exception ex) when (!ct.IsCancellationRequested)

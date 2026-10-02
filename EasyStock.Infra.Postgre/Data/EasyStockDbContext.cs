@@ -341,6 +341,14 @@ namespace EasyStock.Infra.Postgre.Data
 
         public void DescartarAlteracoesPendentes() => ChangeTracker.Clear();
 
+        public bool EhViolacaoDeUnicidade(Exception ex)
+        {
+            for (var atual = ex; atual is not null; atual = atual.InnerException)
+                if (atual is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.UniqueViolation })
+                    return true;
+            return false;
+        }
+
         public async Task<int> CommitAsync()
         {
             try

@@ -8,6 +8,7 @@ using EasyStock.Infra.Postgre.Notifications.Maintenance;
 using EasyStock.Infra.Postgre.Repositories.Notifications;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace EasyStock.Infra.Postgre.DependencyInjection;
 
@@ -36,7 +37,9 @@ public static partial class ServiceCollectionExtensionsNotifications
 
         // Coletores de eventos de estado — vivem em Infra.Postgre porque dependem de
         // EasyStockDbContext. Worker e API ambos consomem via INotificacoesColetorOrchestrator.
-        services.AddScoped<IColetorEventoNotificacao, ColetorProdutosVencendo>();
+        // TryAddEnumerable: AddEasyStockPostgreInfrastructure já chama este registro; o Worker o chamava de novo e o
+        // coletor rodava duas vezes por rodada (N1).
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IColetorEventoNotificacao, ColetorProdutosVencendo>());
 
         return services;
     }

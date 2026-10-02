@@ -26,6 +26,14 @@ public sealed class ColetorProdutosVencendo(
 
     private static readonly int[] DiasPadrao = [7, 3, 1];
 
+    /// <summary>
+    /// Chave de dedup do evento (uma por item, faixa de dias e dia). A coluna <c>CorrelationId</c> é <c>varchar(64)</c>:
+    /// o formato antigo (<c>produto-vencendo-{guid}-d3-yyyyMMdd</c>) tinha 65 caracteres e o INSERT falhava com 22001,
+    /// derrubando o lote inteiro do coletor (N1). Este tem 45.
+    /// </summary>
+    internal static string CorrelationIdDe(Guid loteItemId, int diasRestantes, DateTime agora) =>
+        $"pv-{loteItemId:N}-d{diasRestantes}-{agora:yyMMdd}";
+
     public async Task ColetarAsync(CancellationToken ct = default)
     {
         var agora = DateTime.UtcNow;
@@ -47,7 +55,7 @@ public sealed class ColetorProdutosVencendo(
             .ToList();
 
         var correlationIdsCandidatos = candidatos
-            .Select(x => $"produto-vencendo-{x.item.Id}-d{x.diasRestantes}-{agora:yyyyMMdd}")
+            .Select(x => CorrelationIdDe(x.item.Id, x.diasRestantes, agora))
             .ToHashSet();
 
         var correlationIdsExistentes = await db.NotifEventos
@@ -59,7 +67,7 @@ public sealed class ColetorProdutosVencendo(
         foreach (var (item, diasRestantes) in candidatos)
         {
             var empresaId = item.Lote!.EmpresaId;
-            var correlationId = $"produto-vencendo-{item.Id}-d{diasRestantes}-{agora:yyyyMMdd}";
+            var correlationId = CorrelationIdDe(item.Id, diasRestantes, agora);
 
             if (correlationIdsExistentes.Contains(correlationId)) continue;
 

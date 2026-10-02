@@ -69,6 +69,19 @@ internal sealed class MotorNotificacoesSuporte(PostgreSqlDatabaseFixture fixture
         return Construir(papelRls, config, usuario, ajustar, canais);
     }
 
+    /// <summary>
+    /// Provider como um job da API (<c>CaixaEsquecidoJob</c>, <c>ContaFinanceiraVencimentoJob</c>): sem usuário, então o
+    /// filtro global do EF está ligado com tenant vazio (esconde a rotina global e a da empresa) e só o bypass de RLS
+    /// aberto pelo job enxerga o banco.
+    /// </summary>
+    public ServiceProvider ConstruirProviderDeJobDaApi(
+        bool papelRls, Action<IServiceCollection>? ajustar = null, params ICanalNotificacao[] canais)
+    {
+        var config = new ConfigurationBuilder().Build();
+        var usuario = Substitute.For<ICurrentUserAccessor>(); // não autenticado: CurrentTenantId = Guid.Empty
+        return Construir(papelRls, config, usuario, ajustar, canais);
+    }
+
     /// <summary>Provider como a API: usuário comum da empresa (filtro global do EF ligado e RLS).</summary>
     public ServiceProvider ConstruirProviderDaApi(bool papelRls, Guid empresaId, params ICanalNotificacao[] canais)
     {
@@ -165,7 +178,8 @@ internal sealed class MotorNotificacoesSuporte(PostgreSqlDatabaseFixture fixture
     }
 
     public async Task SemearCatalogoGlobalAsync(
-        TipoEventoNotificacao tipo, CanalNotificacao canal, CategoriaConteudoNotificacao categoria = CategoriaConteudoNotificacao.Operacional)
+        TipoEventoNotificacao tipo, CanalNotificacao canal, CategoriaConteudoNotificacao categoria = CategoriaConteudoNotificacao.Operacional,
+        string assuntoTemplate = "Assunto")
     {
         var codigo = $"global-{tipo}-{canal}".ToLowerInvariant();
         await using var db = fixture.CreateDbContext();
@@ -181,7 +195,7 @@ internal sealed class MotorNotificacoesSuporte(PostgreSqlDatabaseFixture fixture
 
         if (!await db.NotifTemplates.IgnoreQueryFilters().AnyAsync(t => t.Codigo == codigo && t.EmpresaId == null))
         {
-            var template = TemplateNotificacao.Criar(codigo, "Template global de teste", canal, tipo, "Assunto", "Seu codigo: {{ token }}");
+            var template = TemplateNotificacao.Criar(codigo, "Template global de teste", canal, tipo, assuntoTemplate, "Seu codigo: {{ token }}");
             template.Aprovar("teste");
             template.Ativar();
             db.NotifTemplates.Add(template);
@@ -191,6 +205,20 @@ internal sealed class MotorNotificacoesSuporte(PostgreSqlDatabaseFixture fixture
             db.NotifConfiguracoesCanal.Add(ConfiguracaoCanal.Criar(canal, "stub"));
 
         await db.SaveChangesAsync();
+    }
+
+    public async Task<Guid> SemearUsuarioAsync(Guid empresaId)
+    {
+        var usuario = Usuario.Criar("Dona", $"dona-{Guid.NewGuid():N}@casadababa.com", "hash");
+        await using var db = fixture.CreateDbContext();
+        using var _ = db.UseRowLevelSecurityBypass();
+        db.Set<Usuario>().Add(usuario);
+        db.Set<UsuarioEmpresa>().Add(new UsuarioEmpresa
+        {
+            Id = Guid.NewGuid(), UsuarioId = usuario.Id, EmpresaId = empresaId, Ativo = true, CriadoEm = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+        return usuario.Id;
     }
 
     public async Task<OutboxMensagemNotificacao> LerMensagemAsync(Guid id)

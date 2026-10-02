@@ -1,7 +1,12 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
+using EasyStock.Application.Services.Notifications;
+using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Notifications;
+using EasyStock.Infra.Postgre.Notifications.Maintenance;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Data.Interceptors;
@@ -76,6 +81,82 @@ public class MotorNotificacoesRlsTests(PostgreSqlDatabaseFixture fixture) : ICla
         visiveis[a.EmpresaId].Should().BeEquivalentTo(deA.Select(m => m.Id), "o tenant da mensagem só vê o outbox da própria empresa");
         visiveis[b.EmpresaId].Should().BeEquivalentTo(deB.Select(m => m.Id));
         (await _s.LerMensagemAsync(deA[0].Id)).Status.Should().Be(StatusOutbox.Enviado);
+    }
+
+    // ----- avaliador, coletor e anonimizador -----
+
+    [SkippableFact]
+    public async Task Avaliador_sob_papel_NOBYPASSRLS_enfileira_o_evento_pendente_com_a_rotina_global()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = await _s.SemearEmpresaAsync();
+        await _s.SemearCatalogoGlobalAsync(TipoEventoNotificacao.TarefaPendente, CanalNotificacao.Email, CategoriaConteudoNotificacao.Transacional);
+        var evento = await _s.SemearEventoPendenteAsync(empresa, TipoEventoNotificacao.TarefaPendente);
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: true);
+
+        await using (var scope = provider.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<INotificacoesAvaliadorOrchestrator>().ExecutarRodadaAsync(TimeSpan.FromMinutes(2));
+
+        (await _s.LerEventoAsync(evento.Id)).Status.Should().Be(StatusEventoNotificacao.Processado);
+        var mensagens = await _s.LerMensagensDoEventoAsync(evento.Id);
+        mensagens.Should().ContainSingle("a rotina global é visível ao tenant da empresa do evento: nasce o outbox dela")
+            .Which.EmpresaId.Should().Be(empresa);
+    }
+
+    [SkippableFact]
+    public async Task Coletor_sob_papel_NOBYPASSRLS_enxerga_os_lotes_de_todas_as_empresas()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresaA = await _s.SemearEmpresaAsync();
+        var empresaB = await _s.SemearEmpresaAsync();
+        var itemA = await SemearLoteVencendoEm3DiasAsync(empresaA);
+        var itemB = await SemearLoteVencendoEm3DiasAsync(empresaB);
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: true);
+
+        await using (var scope = provider.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<INotificacoesColetorOrchestrator>().ExecutarRodadaAsync();
+
+        (await _s.LerEventosDaEmpresaAsync(empresaA)).Should().Contain(e =>
+            e.Tipo == TipoEventoNotificacao.ProdutoVencendo && e.RefEntidadeId == itemA);
+        (await _s.LerEventosDaEmpresaAsync(empresaB)).Should().Contain(e =>
+            e.Tipo == TipoEventoNotificacao.ProdutoVencendo && e.RefEntidadeId == itemB);
+    }
+
+    private async Task<Guid> SemearLoteVencendoEm3DiasAsync(Guid empresaId)
+    {
+        var lote = Lote.Criar(empresaId, $"LOT-{Guid.NewGuid():N}"[..20]);
+        var item = new LoteItem
+        {
+            Id = Guid.NewGuid(), LoteId = lote.Id, Nome = "Bolo de pote", Quantidade = 10, CriadoEm = DateTime.UtcNow,
+            ExpiraEm = DateTime.UtcNow.Date.AddDays(3).AddHours(12)
+        };
+        await using var db = fixture.CreateDbContext();
+        using var _ = db.UseRowLevelSecurityBypass();
+        db.Set<Lote>().Add(lote);
+        db.Set<LoteItem>().Add(item);
+        await db.SaveChangesAsync();
+        return item.Id;
+    }
+
+    [SkippableFact]
+    public async Task Anonimizador_sob_papel_NOBYPASSRLS_anonimiza_o_outbox_antigo()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var s = await _s.SemearAsync(CanalNotificacao.Email);
+        var antiga = await _s.SemearMensagemAsync(s, CanalNotificacao.Email, ajustar: m =>
+        {
+            m.CriadoEm = DateTime.UtcNow.AddDays(-100);
+            m.Status = StatusOutbox.Enviado;
+        });
+        var recente = await _s.SemearMensagemAsync(s, CanalNotificacao.Email, ajustar: m => m.Status = StatusOutbox.Enviado);
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: true);
+        var anonimizador = new AnonimizarLogsAntigosService(
+            provider, Options.Create(new NotificationsHostingOptions()), NullLogger<AnonimizarLogsAntigosService>.Instance);
+
+        await anonimizador.ExecutarAnonimizacaoAsync(retencaoDias: 90, CancellationToken.None);
+
+        (await _s.LerMensagemAsync(antiga.Id)).Destinatario.Should().Be("[anonimizado]");
+        (await _s.LerMensagemAsync(recente.Id)).Destinatario.Should().NotBe("[anonimizado]", "só passa da retenção o que tem mais de 90 dias");
     }
 
     // ----- catálogo global -----
