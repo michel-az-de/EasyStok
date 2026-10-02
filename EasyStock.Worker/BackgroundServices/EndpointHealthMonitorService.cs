@@ -1,8 +1,8 @@
 using System.Diagnostics.Metrics;
-using System.Net.Http.Json;
-using System.Security.Cryptography;
-using System.Text;
+using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -11,20 +11,18 @@ using Microsoft.Extensions.Options;
 namespace EasyStock.Worker.BackgroundServices;
 
 /// <summary>
-/// Monitor de saude de endpoints criticos. A cada tick faz GET em endpoints
-/// publicos (anonimos) do API e rastreia falhas consecutivas. Quando bate
-/// threshold + nao alertou nas ultimas 24h, abre um ticket BugFixDev via
-/// POST /api/ci/tickets (mesmo endpoint que CI e smoke usam — dogfooding).
+/// Monitor de saude de endpoints criticos. A cada tick faz GET em endpoints publicos (anonimos) do API e rastreia falhas
+/// consecutivas. A maquina de estado e do <see cref="AvaliadorIncidente"/> (N10): abre na N-esima falha seguida, re-emite
+/// enquanto aberto e resolve depois de 2 verificacoes boas. O aviso sai por <see cref="IPublicadorIncidenteSistema"/>
+/// (superadmins por e-mail e WhatsApp), nunca por HTTP. O estado em <c>endpoint_health_state</c> sobrevive a restart.
 ///
-/// Padrao espelha SlaMonitorService: advisory lock pra single-instance, scope
-/// por tick, falhas isoladas nao quebram outras checagens. Estado persistido
-/// em endpoint_health_state pra idempotencia atravessar restarts do worker.
+/// Padrao espelha SlaMonitorService: advisory lock pra single-instance, scope por tick, falhas isoladas nao quebram
+/// outras checagens. <c>LastFailureMessage</c> guarda so um codigo fechado (HTTP_503, TIMEOUT, CONEXAO_RECUSADA, OUTRO).
 ///
 /// Config (appsettings ou env):
 ///   EndpointHealth:BaseUrl              base URL do API (ex: https://api.exemplo.com)
-///   EndpointHealth:FailureThreshold     N falhas consecutivas pra alertar (default 3)
-///   EndpointHealth:CooldownHours        horas entre alertas do mesmo endpoint (default 24)
-///   Ci:AutoTicketKey                    chave compartilhada pra chamar /api/ci/tickets
+///   EndpointHealth:FailureThreshold     N falhas consecutivas pra abrir o incidente (default 3)
+///   Notifications:Incidentes:*          interruptor e janela de dedupe (ver PublicadorIncidenteSistema)
 /// </summary>
 public sealed class EndpointHealthMonitorService(
     IServiceProvider serviceProvider,
@@ -88,9 +86,9 @@ public sealed class EndpointHealthMonitorService(
                 return;
             }
 
-            var threshold = configuration.GetValue<int>("EndpointHealth:FailureThreshold", 3);
-            var cooldownHours = configuration.GetValue<int>("EndpointHealth:CooldownHours", 24);
-            var ciKey = configuration["Ci:AutoTicketKey"];
+            var threshold = Math.Max(1, configuration.GetValue<int>("EndpointHealth:FailureThreshold", 3));
+            var limiares = LimiaresIncidente.Endpoint with { FalhasParaAbrir = threshold };
+            var publicador = sp.GetRequiredService<IPublicadorIncidenteSistema>();
 
             var http = httpClientFactory.CreateClient("endpoint-health");
             http.BaseAddress = new Uri(baseUrl);
@@ -98,15 +96,14 @@ public sealed class EndpointHealthMonitorService(
 
             foreach (var (name, path) in Endpoints)
             {
-                await CheckEndpointAsync(name, path, http, db,
-                    threshold, cooldownHours, ciKey, baseUrl, ct);
+                await CheckEndpointAsync(name, path, http, db, publicador, limiares, ct);
             }
         }, ct);
     }
 
     private async Task CheckEndpointAsync(
         string name, string path, HttpClient http, EasyStockDbContext db,
-        int threshold, int cooldownHours, string? ciKey, string baseUrl,
+        IPublicadorIncidenteSistema publicador, LimiaresIncidente limiares,
         CancellationToken ct)
     {
         var state = await db.EndpointHealthStates
@@ -118,110 +115,51 @@ public sealed class EndpointHealthMonitorService(
         }
 
         var agora = DateTime.UtcNow;
-        state.LastCheckAt = agora;
         CheckCounter.Add(1, new KeyValuePair<string, object?>("endpoint", name));
 
         bool healthy;
-        string? failureMessage = null;
+        string? codigoFalha = null;
         try
         {
             using var resp = await http.GetAsync(path, ct);
             healthy = resp.IsSuccessStatusCode;
             if (!healthy)
-                failureMessage = $"HTTP {(int)resp.StatusCode}";
+                codigoFalha = CodigoFalhaIncidente.DeStatusHttp((int)resp.StatusCode);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             healthy = false;
-            failureMessage = ex.GetType().Name + ": " + Truncate(ex.Message, 256);
+            codigoFalha = CodigoFalhaIncidente.DeExcecao(ex);
         }
 
-        if (healthy)
+        var aberto = state.LastAlertedAt is not null;
+        var avaliacao = AvaliadorIncidente.Avaliar(state, healthy, agora, limiares);
+        if (!healthy) state.LastFailureMessage = codigoFalha;
+
+        switch (avaliacao.Decisao)
         {
-            if (state.ConsecutiveFailures > 0)
-                logger.LogInformation("Endpoint {Name} se recuperou apos {Falhas} falhas",
-                    name, state.ConsecutiveFailures);
-            state.ConsecutiveFailures = 0;
-            state.AtualizadoEm = agora;
-            await db.SaveChangesAsync(ct);
-            return;
+            case DecisaoIncidente.Abrir:
+            case DecisaoIncidente.Reavisar:
+                if (avaliacao.Decisao == DecisaoIncidente.Abrir)
+                    AlertCounter.Add(1, new KeyValuePair<string, object?>("endpoint", name));
+                logger.LogWarning("Endpoint {Name} com problema ({Decisao}, {Falhas} falhas seguidas)",
+                    name, avaliacao.Decisao, state.ConsecutiveFailures);
+                await publicador.PublicarAsync(ComponenteIncidente.Api, EstadoIncidente.ComProblema,
+                    SeveridadeIncidente.Alta, avaliacao.DesdeUtc ?? agora, ct);
+                break;
+            case DecisaoIncidente.Resolver:
+                logger.LogInformation("Endpoint {Name} normalizado", name);
+                await publicador.PublicarAsync(ComponenteIncidente.Api, EstadoIncidente.Normalizado,
+                    SeveridadeIncidente.Media, avaliacao.DesdeUtc ?? agora, ct);
+                break;
+            default:
+                if (healthy && aberto)
+                    logger.LogInformation("Endpoint {Name} respondeu; aguardando nova verificacao boa para normalizar", name);
+                break;
         }
 
-        state.ConsecutiveFailures++;
-        state.LastFailureAt = agora;
-        state.LastFailureMessage = failureMessage;
-        state.AtualizadoEm = agora;
-
-        var cooldownExpired = state.LastAlertedAt is null
-            || (agora - state.LastAlertedAt.Value) >= TimeSpan.FromHours(cooldownHours);
-
-        if (state.ConsecutiveFailures >= threshold && cooldownExpired && !string.IsNullOrWhiteSpace(ciKey))
-        {
-            var ticketId = await TryOpenTicketAsync(http, ciKey, name, state, threshold, ct);
-            if (ticketId.HasValue)
-            {
-                state.LastAlertedAt = agora;
-                state.LastAlertedTicketId = ticketId;
-                AlertCounter.Add(1, new KeyValuePair<string, object?>("endpoint", name));
-                logger.LogWarning("Ticket runtime aberto pro endpoint {Name}: {TicketId}", name, ticketId);
-            }
-        }
-
+        // O publicador commita a mesma unidade de trabalho (estado e evento juntos); sem publicacao (interruptor
+        // desligado, sem empresa padrao) ou sem decisao, o estado ainda precisa ser gravado.
         await db.SaveChangesAsync(ct);
     }
-
-    /// <summary>
-    /// Chama POST /api/ci/tickets via HTTP. Reusa o endpoint que CI e smoke
-    /// tambem usam — dogfood. Signature deterministico por dia evita criar
-    /// 100 tickets do mesmo endpoint quebrado.
-    /// </summary>
-    private async Task<Guid?> TryOpenTicketAsync(
-        HttpClient http, string ciKey, string endpointName,
-        EndpointHealthState state, int threshold, CancellationToken ct)
-    {
-        try
-        {
-            var signature = Sha256Hex($"runtime|{endpointName}|{DateTime.UtcNow:yyyy-MM-dd}");
-            var payload = new
-            {
-                origin = "runtime",
-                signature,
-                titulo = $"Endpoint {endpointName} degradado",
-                descricao = $"Falhou {state.ConsecutiveFailures}x consecutivas (threshold {threshold}). " +
-                            $"Ultima mensagem: {state.LastFailureMessage ?? "(sem detalhe)"}",
-                contexto = $"endpoint={endpointName}\nlastFailureAt={state.LastFailureAt:O}"
-            };
-
-            using var req = new HttpRequestMessage(HttpMethod.Post, "/api/ci/tickets")
-            {
-                Content = JsonContent.Create(payload)
-            };
-            req.Headers.Add("X-Ci-Key", ciKey);
-
-            using var resp = await http.SendAsync(req, ct);
-            if (!resp.IsSuccessStatusCode)
-            {
-                logger.LogWarning("Falha ao POST /api/ci/tickets: {Status}", (int)resp.StatusCode);
-                return null;
-            }
-            var body = await resp.Content.ReadFromJsonAsync<AutoTicketResponse>(cancellationToken: ct);
-            return body?.TicketId;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Erro chamando /api/ci/tickets pro endpoint {Name}", endpointName);
-            return null;
-        }
-    }
-
-    private static string Sha256Hex(string input)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
-
-    private static string Truncate(string s, int max) =>
-        s.Length <= max ? s : s[..max];
-
-    private sealed record AutoTicketResponse(Guid TicketId, bool Created);
 }
