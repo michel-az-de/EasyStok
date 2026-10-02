@@ -163,6 +163,22 @@ public class AutenticarUsuarioUseCaseTests
     }
 
     [Fact]
+    public async Task LoginSenha_SuperAdminComEmpresaPedidaRecebeEssaEmpresa()
+    {
+        // #1342: superadmin por senha que informa a empresa entra nela (rotas da loja exigem empresa).
+        var usuario = SuperAdmin();
+        usuario.SenhaHash = FakePasswordHasher.MakeHash("senha123");
+        var repo = Substitute.For<IUsuarioRepository>();
+        repo.GetByEmailAsync(usuario.Email).Returns(usuario);
+        var empresa = Guid.NewGuid();
+
+        var result = await CriarUseCase(repo).ExecuteAsync(new AutenticarUsuarioCommand(usuario.Email, "senha123", empresa));
+
+        Assert.Equal(NivelAcesso.SuperAdmin, result.Nivel);
+        Assert.Equal(empresa, result.EmpresaId);
+    }
+
+    [Fact]
     public async Task LoginGoogle_SuperAdminEntraNaEmpresaPadrao()
     {
         // #1326: o console recusa token sem empresa; pelo Google o superadmin recebe a empresa padrão.
