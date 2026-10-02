@@ -716,17 +716,19 @@ public static class NotificacoesGlobaisSeed
             assuntoTemplate: "EasyStok: convite para acessar {{ empresa }}",
             corpoTemplate: EmailTemplateLoader.LoadBody("convite_acesso_email_v1"));
 
-        // O convite ja nasce como o modelo "convite_acesso_link" (botao URL), para nao aprovar dois modelos na
-        // Meta; a N9 acrescenta o token do botao (botaoUrl0) e sobe este template para a versao 2.
+        // O convite ja nasceu (N13) como o modelo "convite_acesso_link" (botao URL), para nao aprovar dois modelos na
+        // Meta. N9: versao 2, que liga o botao ao token do WhatsApp (botaoUrl0 = token_convite_whatsapp, um token por
+        // canal) e troca o link solto no corpo pelo texto do modelo aprovado: "Use o botao abaixo para criar sua senha".
         yield return TemplateNotificacao.Criar(
             codigo: "convite_acesso_whatsapp_v1",
             nome: "Convite de Acesso · WhatsApp",
             canal: CanalNotificacao.WhatsApp,
             tipoEvento: TipoEventoNotificacao.ConviteAcesso,
             assuntoTemplate: "",
-            corpoTemplate: "Olá, {{ nome }}! Você foi convidado para o EasyStok da empresa {{ empresa }}. Use o link para criar sua senha: {{ link_convite }}")
+            corpoTemplate: "Olá, {{ nome }}! Você foi convidado para o EasyStok da empresa {{ empresa }}. Use o botão abaixo para criar sua senha.")
             .ComMetadados(
-                """{"template":"convite_acesso_link","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ empresa }}"}""");
+                """{"template":"convite_acesso_link","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ empresa }}","botaoUrl0":"{{ token_convite_whatsapp }}"}""")
+            .ComVersao(2);
 
         yield return TemplateNotificacao.Criar(
             codigo: "contato_alterado_email_v1",
@@ -996,7 +998,7 @@ public static class NotificacoesGlobaisSeed
         // Ativa=false nas quatro rotinas novas antes de reverter o codigo (o enum guarda o nome como texto). =====
         yield return MakeRotina("convite_acesso_global", "Convite de Acesso",
             TipoEventoNotificacao.ConviteAcesso, "convite_acesso_email_v1",
-            CategoriaConteudoNotificacao.Seguranca, "[\"Email\",\"WhatsApp\"]", ModoTodos());
+            CategoriaConteudoNotificacao.Seguranca, "[\"Email\",\"WhatsApp\"]", ModoTodos("convidado"));
 
         // N4: aviso de contato trocado (endereco antigo ou e-mail atual). Seguranca, so e-mail; o destino vem do payload.
         yield return MakeRotina("contato_alterado_global", "Contato Alterado",

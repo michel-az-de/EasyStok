@@ -143,6 +143,75 @@ public class NotificacoesGlobaisSeedIntegrationTests(PostgreSqlDatabaseFixture f
         logger.Avisos.Should().ContainSingle().Which.Should().Contain(CodigoTemplate);
     }
 
+    private const string CodigoConviteWhatsApp = "convite_acesso_whatsapp_v1";
+    private const string MetadadosDoConviteV1 =
+        """{"template":"convite_acesso_link","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ empresa }}"}""";
+
+    /// <summary>Base como estava antes da N9: o WhatsApp do convite em v1, sem o botao URL.</summary>
+    private async Task NovaBaseComConviteEmV1Async(string? editadoPor = null)
+    {
+        await NovaBaseAsync();
+        await using var antigo = fixture.CreateDbContext();
+        using var bypass = antigo.UseRowLevelSecurityBypass();
+        var linha = await antigo.NotifTemplates.IgnoreQueryFilters()
+            .SingleAsync(t => t.Codigo == CodigoConviteWhatsApp && t.EmpresaId == null);
+        linha.DefinirVersao(1);
+        linha.DefinirMetadados(MetadadosDoConviteV1);
+        var rotina = await antigo.NotifRotinas.IgnoreQueryFilters()
+            .SingleAsync(r => r.Codigo == "convite_acesso_global" && r.EmpresaId == null);
+        rotina.ParametrosJson = """{"modoCanais":"todos"}"""; // antes da N9: sem a audiencia convidado
+        if (editadoPor is not null)
+        {
+            linha.AtualizarConteudo("", "Texto da dona para o convite", editadoPor);
+            linha.Aprovar(editadoPor);
+            linha.Ativar();
+        }
+
+        await antigo.SaveChangesAsync();
+    }
+
+    [SkippableFact]
+    public async Task SeedTrocaOV1PeloV2DoConviteQuandoNinguemEditou()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        await NovaBaseComConviteEmV1Async();
+
+        await using (var sobe = fixture.CreateDbContext())
+            await SemearAsync(sobe, new LoggerColetor());
+
+        await using var leitura = fixture.CreateDbContext();
+        using var _ = leitura.UseRowLevelSecurityBypass();
+        var linhas = (await TemplatesGlobaisAsync(leitura)).Where(t => t.Codigo == CodigoConviteWhatsApp).ToList();
+        linhas.Should().HaveCount(2);
+        linhas[0].Should().Match<TemplateNotificacao>(t => t.Versao == 1 && !t.Ativo);
+        linhas[1].Should().Match<TemplateNotificacao>(t => t.Versao == 2 && t.Ativo && t.Aprovado);
+        linhas[1].MetadadosJson.Should().Contain("botaoUrl0").And.Contain("token_convite_whatsapp");
+        linhas[1].CorpoTemplate.Should().Contain("botão abaixo");
+
+        var rotina = (await RotinasGlobaisAsync(leitura)).Single(r => r.Codigo == "convite_acesso_global");
+        System.Text.Json.JsonDocument.Parse(rotina.ParametrosJson).RootElement.GetProperty("audiencia").GetString()
+            .Should().Be("convidado", "o seed atualiza a rotina do sistema no lugar");
+    }
+
+    [SkippableFact]
+    public async Task SeedTrocaOV1PeloV2SemTocarEmTemplateEditadoPorPessoa()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        await NovaBaseComConviteEmV1Async(editadoPor: "dona@casadababa.com.br");
+
+        var logger = new LoggerColetor();
+        await using (var sobe = fixture.CreateDbContext())
+            await SemearAsync(sobe, logger);
+
+        await using var leitura = fixture.CreateDbContext();
+        using var _ = leitura.UseRowLevelSecurityBypass();
+        var linhas = (await TemplatesGlobaisAsync(leitura)).Where(t => t.Codigo == CodigoConviteWhatsApp).ToList();
+        var linha = linhas.Should().ContainSingle("o texto editado pela dona nao e sobrescrito").Subject;
+        linha.CorpoTemplate.Should().Be("Texto da dona para o convite");
+        linha.Versao.Should().Be(1);
+        logger.Avisos.Should().ContainSingle().Which.Should().Contain(CodigoConviteWhatsApp);
+    }
+
     [SkippableFact]
     public async Task SeedAtualizaRotinaDoSistemaENaoReativaRotinaDesligadaPorPessoa()
     {

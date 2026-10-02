@@ -1,7 +1,12 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services.Auth;
+using EasyStock.Application.Tests.Services.Auth;
 using EasyStock.Application.UseCases.AtualizarUsuario;
 using EasyStock.Domain.Enums.Notifications;
+using EasyStock.TestHelpers;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.Tests.UseCases;
@@ -18,8 +23,18 @@ public class AtualizarUsuarioUseCaseTests
     private IUsuarioRepository _repo => _f.Usuarios;
     private ICurrentUserAccessor _currentUser => _f.UsuarioAtual;
 
+    private readonly FakeResetTokenRepository _convitesGravados = new();
+    private readonly IConsentimentoRepository _consentimentos = Substitute.For<IConsentimentoRepository>();
+
+    private ConvitesDeAcesso Convites() => new(
+        _convitesGravados, _f.Notificador, _consentimentos, Substitute.For<IEmpresaRepository>(),
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Auth:LinkConvite"] = CenarioDeAcesso.LinkDoConvite }).Build(),
+        new FakeTimeProvider(new DateTimeOffset(2026, 10, 2, 17, 30, 0, TimeSpan.Zero)),
+        Substitute.For<ILogger<ConvitesDeAcesso>>());
+
     private AtualizarUsuarioUseCase CriarUseCase() =>
-        new(_repo, _currentUser, _f.UnitOfWork, _f.Servico, _auditoria, Substitute.For<ILogger<AtualizarUsuarioUseCase>>());
+        new(_repo, _currentUser, _f.UnitOfWork, _f.Servico, Convites(), _auditoria, Substitute.For<ILogger<AtualizarUsuarioUseCase>>());
 
     private static Usuario UsuarioDaEmpresa(Guid usuarioId, Guid empresaId) => new()
     {
@@ -184,5 +199,89 @@ public class AtualizarUsuarioUseCaseTests
         alvo.EmailPendente.Should().Be("novo@empresa.com");
         _f.Eventos.Should().HaveCount(2);
         await _auditoria.Received(1).AddAsync(Arg.Is<AuditLog>(a => a.Acao == "admin-troca-email-solicitada"));
+    }
+    // ── N9: o convidado nunca teve acesso, então a troca de e-mail é imediata e refaz o convite ─────────────
+
+    private Usuario ConvidadoDaEmpresa(Guid empresaId)
+    {
+        var alvo = AlvoDaEmpresa(empresaId);
+        alvo.SenhaHash = Usuario.MarcadorDeConvite + Guid.NewGuid().ToString("N");
+        return alvo;
+    }
+
+    [Fact]
+    public async Task EditarEmailDeConvidadoEhImediatoERevogaEReemite()
+    {
+        var empresaA = _f.EmpresaId;
+        var alvo = ConvidadoDaEmpresa(empresaA);
+        ComoAdmin(empresaA);
+        await Convites().EmitirAsync(alvo, empresaA, false, null, null);
+        var antigo = _convitesGravados.Linhas.Single();
+        _f.Eventos.Clear();
+
+        await CriarUseCase().ExecuteAsync(new AtualizarUsuarioCommand(alvo.Id, "Alvo", "novo@empresa.com"));
+
+        alvo.Email.Should().Be("novo@empresa.com", "o convidado nunca teve acesso: sem EmailPendente");
+        alvo.EmailPendente.Should().BeNull();
+        alvo.EmailConfirmado.Should().BeFalse();
+        antigo.Usado.Should().BeTrue("o convite do contato antigo morre");
+        _convitesGravados.Linhas.Single(l => !l.Usado).Canal.Should().Be("Email");
+        var evento = _f.Eventos.Should().ContainSingle().Subject;
+        evento.Tipo.Should().Be(TipoEventoNotificacao.ConviteAcesso);
+        evento.Payload["email"].GetString().Should().Be("novo@empresa.com");
+        evento.EmpresaId.Should().Be(empresaA);
+        await _auditoria.Received(1).AddAsync(Arg.Is<AuditLog>(a => a.Acao == "admin-troca-email-convidado"));
+    }
+
+    [Fact]
+    public async Task EditarEmailDeConvidadoParaUmEmailQueJaExisteRecusa()
+    {
+        var empresaA = _f.EmpresaId;
+        var alvo = ConvidadoDaEmpresa(empresaA);
+        ComoAdmin(empresaA);
+        _repo.GetByEmailAsync("ocupado@empresa.com").Returns(
+            new Usuario { Id = Guid.NewGuid(), Nome = "Outro", Email = "ocupado@empresa.com", SenhaHash = "x" });
+
+        var acao = () => CriarUseCase().ExecuteAsync(new AtualizarUsuarioCommand(alvo.Id, "Alvo", "ocupado@empresa.com"));
+
+        await acao.Should().ThrowAsync<UseCaseValidationException>().WithMessage("Email ja cadastrado.");
+        alvo.Email.Should().Be("alvo@empresa.com");
+        _f.Eventos.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task EditarSoONomeDeConvidadoNaoMexeNoConvite()
+    {
+        var empresaA = _f.EmpresaId;
+        var alvo = ConvidadoDaEmpresa(empresaA);
+        ComoAdmin(empresaA);
+        await Convites().EmitirAsync(alvo, empresaA, false, null, null);
+        _f.Eventos.Clear();
+
+        await CriarUseCase().ExecuteAsync(new AtualizarUsuarioCommand(alvo.Id, "Nome Novo", "alvo@empresa.com"));
+
+        alvo.Nome.Should().Be("Nome Novo");
+        _convitesGravados.Linhas.Should().ContainSingle().Which.Usado.Should().BeFalse();
+        _f.Eventos.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task EditarEmailDeQuemJaAceitouNaoMexeNoConvite()
+    {
+        var empresaA = _f.EmpresaId;
+        var alvo = AlvoDaEmpresa(empresaA); // hash de senha comum: já aceitou
+        ComoAdmin(empresaA);
+        var aberto = ResetToken.Criar(alvo.Id, "hash-qualquer", DateTime.UtcNow.AddHours(10), null, null,
+            FinalidadeResetToken.Convite, canal: "Email");
+        await _convitesGravados.AddAsync(aberto);
+
+        await CriarUseCase().ExecuteAsync(new AtualizarUsuarioCommand(alvo.Id, "Alvo", "novo@empresa.com"));
+
+        alvo.Email.Should().Be("alvo@empresa.com", "vale a regra da N4: dois passos");
+        alvo.EmailPendente.Should().Be("novo@empresa.com");
+        aberto.Usado.Should().BeFalse();
+        _f.Eventos.Select(e => e.Tipo).Should().BeEquivalentTo(
+            [TipoEventoNotificacao.ConfirmacaoEmail, TipoEventoNotificacao.ContatoAlterado])
+            .And.NotContain(TipoEventoNotificacao.ConviteAcesso);
     }
 }

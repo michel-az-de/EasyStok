@@ -75,7 +75,7 @@ public class NotificacoesGlobaisSeedTests
 
     [Theory]
     [InlineData(TipoEventoNotificacao.ResetSenha, "reset_senha_global", CategoriaConteudoNotificacao.Seguranca, "usuario", true)]
-    [InlineData(TipoEventoNotificacao.ConviteAcesso, "convite_acesso_global", CategoriaConteudoNotificacao.Seguranca, null, true)]
+    [InlineData(TipoEventoNotificacao.ConviteAcesso, "convite_acesso_global", CategoriaConteudoNotificacao.Seguranca, "convidado", true)]
     [InlineData(TipoEventoNotificacao.IncidenteSistema, "incidente_sistema_global", CategoriaConteudoNotificacao.Operacional, "superadmins", true)]
     [InlineData(TipoEventoNotificacao.PrazoEstourado, "prazo_estourado_global", CategoriaConteudoNotificacao.Operacional, "gestores", true)]
     [InlineData(TipoEventoNotificacao.ResumoDiario, "resumo_diario_global", CategoriaConteudoNotificacao.Operacional, "admins", false)]
@@ -196,6 +196,29 @@ public class NotificacoesGlobaisSeedTests
     }
 
     [Fact]
+    public void ConviteAcessoWhatsAppEmV2LevaBotaoUrl()
+    {
+        var template = NotificacoesGlobaisSeed.BuildDefaultTemplates().Single(t => t.Codigo == "convite_acesso_whatsapp_v1");
+
+        template.Versao.Should().Be(2, "texto e metadados novos sobem a versao do catalogo (o seed troca o v1 sem tocar no editado)");
+        var metadados = JsonDocument.Parse(template.MetadadosJson!).RootElement;
+        metadados.GetProperty("template").GetString().Should().Be("convite_acesso_link");
+        metadados.GetProperty("botaoUrl0").GetString().Should().Be("{{ token_convite_whatsapp }}");
+        metadados.GetProperty("param1").GetString().Should().Be("{{ nome }}");
+        metadados.GetProperty("param2").GetString().Should().Be("{{ empresa }}");
+        template.CorpoTemplate.Should().Contain("botão abaixo").And.NotContain("{{ link_convite }}");
+    }
+
+    [Fact]
+    public void ConviteAcessoEmailContinuaEmV1ComOLink()
+    {
+        var template = NotificacoesGlobaisSeed.BuildDefaultTemplates().Single(t => t.Codigo == "convite_acesso_email_v1");
+
+        template.Versao.Should().Be(1);
+        template.CorpoTemplate.Should().Contain("link_convite");
+    }
+
+    [Fact]
     public void TemplatesNovosNaoUsamTravessao()
     {
         NotificacoesGlobaisSeed.BuildDefaultTemplates()
@@ -222,8 +245,10 @@ public class NotificacoesGlobaisSeedTests
             partes.AddRange(JsonSerializer.Deserialize<Dictionary<string, string>>(template.MetadadosJson)!.Values);
 
         // Variável ausente vira vazio no Scriban, então a checagem é por nome contra as chaves do exemplo.
+        // token_convite_whatsapp e um segredo do envio real (N9): o exemplo nunca o carrega (ExemplosDeEventoTests).
         var usadas = partes
             .SelectMany(p => Regex.Matches(p, @"\{\{\s*([A-Za-z_]\w*)\s*\}\}").Select(m => m.Groups[1].Value))
+            .Where(v => v != "token_convite_whatsapp")
             .Distinct().ToList();
         usadas.Should().NotBeEmpty();
         usadas.Where(v => !variaveis.ContainsKey(v)).Should().BeEmpty($"o exemplo de {template.TipoEvento} precisa cobrir {codigo}");

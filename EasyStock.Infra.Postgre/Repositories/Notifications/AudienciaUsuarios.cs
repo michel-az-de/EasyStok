@@ -10,13 +10,14 @@ public sealed class AudienciaUsuarios(EasyStockDbContext db) : IAudienciaUsuario
     {
         var u = await db.Usuarios.AsNoTracking()
             .Where(x => x.Id == usuarioId)
-            .Select(x => new { x.Id, x.Nome, x.Email, x.EmailConfirmado, x.Ativo, x.Telefone, x.TelefoneVerificadoEm })
+            .Select(x => new { x.Id, x.Nome, x.Email, x.EmailConfirmado, x.Ativo, x.Telefone, x.TelefoneVerificadoEm, x.SenhaHash })
             .FirstOrDefaultAsync(ct);
 
         return u is null
             ? null
             : new UsuarioParaAudiencia(
-                u.Id, u.Nome, u.Email, u.EmailConfirmado, u.Ativo, u.Telefone?.Value, u.TelefoneVerificadoEm);
+                u.Id, u.Nome, u.Email, u.EmailConfirmado, u.Ativo, u.Telefone?.Value, u.TelefoneVerificadoEm,
+                u.SenhaHash.StartsWith(Usuario.MarcadorDeConvite));
     }
 
     public async Task<IReadOnlyList<UsuarioParaAudiencia>> ListarDaEmpresaAsync(

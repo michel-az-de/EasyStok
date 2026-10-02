@@ -30,6 +30,7 @@ public class AuthControllerRotasTests
         "POST forgot-password",
         "POST reset-password",
         "POST reset-password-code",
+        "POST aceitar-convite",
         "POST confirmar-email",
     ];
 

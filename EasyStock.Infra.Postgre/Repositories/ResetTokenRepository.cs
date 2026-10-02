@@ -52,6 +52,17 @@ public class ResetTokenRepository(EasyStockDbContext context) : IResetTokenRepos
                 && (rt.Finalidade == FinalidadeResetToken.Reset || rt.Finalidade == FinalidadeResetToken.ResetCodigo))
             .ExecuteUpdateAsync(s => s.SetProperty(rt => rt.Usado, true));
 
+    // N9: so Finalidade = Convite. O InvalidarAbertosAsync acima nunca encosta em convite, e este nunca em reset.
+    public Task<int> InvalidarConvitesAbertosAsync(Guid usuarioId) =>
+        _context.ResetTokens
+            .Where(rt => rt.UsuarioId == usuarioId && !rt.Usado && rt.Finalidade == FinalidadeResetToken.Convite)
+            .ExecuteUpdateAsync(s => s.SetProperty(rt => rt.Usado, true));
+
+    public Task<int> ContarEmissoesDeConviteAsync(Guid usuarioId, DateTime desde) =>
+        _context.ResetTokens.AsNoTracking()
+            .CountAsync(rt => rt.UsuarioId == usuarioId && rt.Finalidade == FinalidadeResetToken.Convite
+                              && rt.Canal == "Email" && rt.CriadoEm > desde);
+
     // UPDATE ... SET "Usado" = true WHERE "Id" = @id AND "Usado" = false AND "ExpiraEm" > @agora: uso unico de verdade.
     public async Task<bool> ConsumirAsync(Guid id, DateTime agora) =>
         await _context.ResetTokens

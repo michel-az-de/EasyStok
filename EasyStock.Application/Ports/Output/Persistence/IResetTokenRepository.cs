@@ -23,6 +23,19 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<int> InvalidarAbertosAsync(Guid usuarioId, DateTime agora);
 
         /// <summary>
+        /// Revoga, num UPDATE só, os convites abertos do usuário (<c>Finalidade = Convite</c>, N9). Imediato, como o
+        /// <see cref="InvalidarAbertosAsync"/>, que não toca em convite: um pedido de redefinição nunca mata o convite.
+        /// Devolve as linhas alteradas.
+        /// </summary>
+        Task<int> InvalidarConvitesAbertosAsync(Guid usuarioId);
+
+        /// <summary>
+        /// Quantas vezes o convite foi emitido para o usuário desde <paramref name="desde"/> (N9): conta as linhas
+        /// <c>Convite</c> do canal <c>Email</c>, uma por emissão, e é o que limita o reenvio a 3 por hora.
+        /// </summary>
+        Task<int> ContarEmissoesDeConviteAsync(Guid usuarioId, DateTime desde);
+
+        /// <summary>
         /// Uso único de verdade: <c>UPDATE ... SET Usado = true WHERE Id = @id AND Usado = false AND ExpiraEm &gt; @agora</c>.
         /// Só <c>true</c> (1 linha afetada) autoriza trocar a senha; o perdedor de uma corrida recebe <c>false</c>.
         /// </summary>

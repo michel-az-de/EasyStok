@@ -1,12 +1,18 @@
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Auth;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Auth;
+using EasyStock.Application.UseCases.AceitarConvite;
 using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AtribuirPerfilUsuario;
+using EasyStock.Application.UseCases.AtualizarUsuario;
+using EasyStock.Application.UseCases.AutenticarUsuario;
+using EasyStock.Application.UseCases.CriarUsuario;
 using EasyStock.Application.UseCases.DesativarUsuario;
 using EasyStock.Application.UseCases.EsqueciSenha;
+using EasyStock.Application.UseCases.ReenviarConvite;
 using EasyStock.Application.UseCases.ResetarSenha;
 using EasyStock.Application.Validators;
 using FluentValidation;
@@ -46,6 +52,12 @@ public class RevogacaoDeSessaoRegistroTests
             .AddSingleton(Substitute.For<IEmpresaPadraoResolver>())
             .AddSingleton(Substitute.For<ITenantContextAccessor>())
             .AddSingleton(Substitute.For<IConsentimentoRepository>())
+            // N9: o convite le o nome da empresa, o perfil (superadmin nunca nasce por convite) e a assinatura do plano.
+            .AddSingleton(Substitute.For<IEmpresaRepository>())
+            .AddSingleton(Substitute.For<IPerfilRepository>())
+            .AddSingleton(Substitute.For<IAssinaturaEmpresaRepository>())
+            .AddSingleton(Substitute.For<IGoogleIdTokenValidator>())
+            .AddSingleton(Substitute.For<IEmailConfirmationTokenRepository>())
             .AddSingleton<IConfiguration>(new ConfigurationBuilder().Build())
             .AddSingleton<IValidator<AlterarSenhaUsuarioCommand>>(new AlterarSenhaUsuarioCommandValidator());
 
@@ -62,5 +74,11 @@ public class RevogacaoDeSessaoRegistroTests
         resolver.GetRequiredService<AlterarSenhaUsuarioUseCase>().Should().NotBeNull();
         resolver.GetRequiredService<DesativarUsuarioUseCase>().Should().NotBeNull();
         resolver.GetRequiredService<AtribuirPerfilUsuarioUseCase>().Should().NotBeNull();
+        resolver.GetRequiredService<ConvitesDeAcesso>().Should().NotBeNull();
+        resolver.GetRequiredService<AceitarConviteUseCase>().Should().NotBeNull();
+        resolver.GetRequiredService<ReenviarConviteUseCase>().Should().NotBeNull();
+        resolver.GetRequiredService<CriarUsuarioUseCase>().Should().NotBeNull();
+        resolver.GetRequiredService<AtualizarUsuarioUseCase>().Should().NotBeNull();
+        resolver.GetRequiredService<IdentificarUsuarioGoogleUseCase>().Should().NotBeNull();
     }
 }

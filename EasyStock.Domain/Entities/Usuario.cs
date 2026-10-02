@@ -42,6 +42,15 @@ namespace EasyStock.Domain.Entities
         /// </summary>
         public NivelAtendimento? NivelAtendimentoPreferido { get; set; }
 
+        /// <summary>Quando a pessoa aceitou o convite (N9). Nulo: nunca foi convidada ou ainda não aceitou.</summary>
+        public DateTime? ConviteAceitoEm { get; set; }
+
+        /// <summary>
+        /// Por onde o convite foi aceito (N9), já mascarado: <c>+55•••1234</c> (WhatsApp), <c>e-mail</c> ou <c>Google</c>.
+        /// O telefone inteiro nunca vai para esta coluna (<see cref="ViaDoConvite"/>).
+        /// </summary>
+        public string? ConviteAceitoVia { get; set; }
+
         public ICollection<UsuarioEmpresa> Empresas { get; set; } = new List<UsuarioEmpresa>();
         public ICollection<UsuarioPerfil> Perfis { get; set; } = new List<UsuarioPerfil>();
 
@@ -64,6 +73,61 @@ namespace EasyStock.Domain.Entities
                 FailedLoginAttempts = 0,
                 LockoutEnd = null
             };
+        }
+
+        /// <summary>Prefixo do hash inutilizável do convidado (N9). Nenhum bcrypt válido começa assim: o login por senha falha.</summary>
+        public const string MarcadorDeConvite = "$2a$10$CONVIDADO_";
+
+        private const string MarcadorSemSenha = "$2a$10$SEMSENHA_";
+
+        /// <summary>
+        /// Convidado (N9): nasce <c>Ativo</c>, sem e-mail confirmado e com <see cref="MarcadorDeConvite"/> no lugar da senha.
+        /// Quem nunca define senha nunca entra por senha; o aceite do convite troca o marcador pelo hash da senha escolhida.
+        /// </summary>
+        public static Usuario CriarConvidado(string nome, string email)
+        {
+            var id = Guid.NewGuid();
+            return Criar(nome, email, MarcadorDeConvite + id.ToString("N"));
+        }
+
+        /// <summary>Convite ainda não aceito: a senha é o marcador. Não depende de <see cref="Ativo"/>.</summary>
+        public bool ConvitePendente => SenhaHash is not null && SenhaHash.StartsWith(MarcadorDeConvite, StringComparison.Ordinal);
+
+        /// <summary>
+        /// Aceita o convite definindo a senha (N9): troca o marcador pelo hash, grava o instante e a via (já mascarada) e zera
+        /// as falhas de senha. A verificação do canal (e-mail ou telefone) é do use case, que sabe qual canal do token valeu.
+        /// </summary>
+        public void AceitarConvite(string senhaHash, string via, DateTime agora)
+        {
+            if (!ConvitePendente)
+                throw new InvalidOperationException("O usuário não tem convite pendente.");
+            if (string.IsNullOrWhiteSpace(senhaHash))
+                throw new ArgumentException("O hash da senha não pode ser vazio.", nameof(senhaHash));
+
+            SenhaHash = senhaHash;
+            RegistrarAceite(via, agora);
+        }
+
+        /// <summary>
+        /// Aceita o convite sem senha (N9, login Google): o e-mail foi provado pelo Google, mas a senha segue inutilizável
+        /// (outro marcador, que não é o do convite) até a pessoa definir uma por "esqueci a senha".
+        /// </summary>
+        public void AceitarConviteSemSenha(string via, DateTime agora)
+        {
+            if (!ConvitePendente)
+                throw new InvalidOperationException("O usuário não tem convite pendente.");
+
+            SenhaHash = MarcadorSemSenha + Id.ToString("N");
+            EmailConfirmado = true;
+            RegistrarAceite(via, agora);
+        }
+
+        private void RegistrarAceite(string via, DateTime agora)
+        {
+            ConviteAceitoEm = agora;
+            ConviteAceitoVia = via;
+            AlteradoEm = agora;
+            ResetarTentativasFalha();
         }
 
         public void AtualizarUltimoAcesso()
@@ -197,6 +261,7 @@ namespace EasyStock.Domain.Entities
             Telefone = null;
             TelefoneVerificadoEm = null;
             EmailPendente = null;
+            ConviteAceitoVia = null;
             FailedLoginAttempts = 0;
             LockoutEnd = null;
             AlteradoEm = DateTime.UtcNow;

@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Auth;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Tests.Services.Auth;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 
 namespace EasyStock.Application.Tests.UseCases;
@@ -14,7 +15,9 @@ public class IdentificarUsuarioGoogleUseCaseTests
     private readonly IGoogleIdTokenValidator _validador = Substitute.For<IGoogleIdTokenValidator>();
     private readonly IUsuarioRepository _usuarios = Substitute.For<IUsuarioRepository>();
 
-    private IdentificarUsuarioGoogleUseCase UseCase() => new(_validador, _usuarios);
+    private readonly CenarioDeAcesso _c = new();
+
+    private IdentificarUsuarioGoogleUseCase UseCase() => new(_validador, _usuarios, _c.Convites(), _c.UnitOfWork, _c.Relogio);
 
     private static Usuario Usuario(string email, bool ativo = true) => new()
     {
@@ -98,5 +101,57 @@ public class IdentificarUsuarioGoogleUseCaseTests
 
         await UseCase().Invoking(u => u.ExecuteAsync(Token)).Should().ThrowAsync<CredenciaisInvalidasException>();
         await _usuarios.DidNotReceive().AddAsync(Arg.Any<Usuario>());
+    }
+    // ── N9: o Google prova o e-mail, então consome o convite ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GoogleDeConvidadoConsomeOConviteEConfirmaOEmail()
+    {
+        var convidado = Domain.Entities.Usuario.CriarConvidado("Ana", "ana@casadababa.com.br");
+        await _c.Convites().EmitirAsync(convidado, _c.EmpresaPadraoId, false, null, null);
+        Google("ana@casadababa.com.br");
+        _usuarios.GetByEmailAsync("ana@casadababa.com.br").Returns(convidado);
+
+        var usuario = await UseCase().ExecuteAsync(Token);
+
+        usuario.Should().BeSameAs(convidado);
+        convidado.EmailConfirmado.Should().BeTrue();
+        convidado.ConvitePendente.Should().BeFalse();
+        convidado.ConviteAceitoVia.Should().Be("Google");
+        convidado.ConviteAceitoEm.Should().Be(_c.AgoraUtc);
+        convidado.SenhaHash.Should().NotStartWith(Domain.Entities.Usuario.MarcadorDeConvite, "o esqueci a senha passa a valer");
+        _c.Tokens.Linhas.Should().OnlyContain(l => l.Usado, "os convites abertos morrem");
+        await _usuarios.Received(1).UpdateAsync(convidado);
+        _c.UnitOfWork.CommitCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GoogleDeConvidadoComEmailNaoVerificadoNaoConsomeOConvite()
+    {
+        var convidado = Domain.Entities.Usuario.CriarConvidado("Ana", "ana@casadababa.com.br");
+        Google("ana@casadababa.com.br", verificado: false);
+        _usuarios.GetByEmailAsync("ana@casadababa.com.br").Returns(convidado);
+
+        await UseCase().Invoking(u => u.ExecuteAsync(Token)).Should().ThrowAsync<CredenciaisInvalidasException>();
+
+        convidado.ConvitePendente.Should().BeTrue();
+        convidado.EmailConfirmado.Should().BeFalse();
+        _c.UnitOfWork.CommitCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task GoogleDeQuemNaoEConvidadoNaoMudaNada()
+    {
+        var existente = Usuario("dona@casadababa.com.br");
+        Google("dona@casadababa.com.br");
+        _usuarios.GetByEmailAsync("dona@casadababa.com.br").Returns(existente);
+
+        await UseCase().ExecuteAsync(Token);
+
+        existente.EmailConfirmado.Should().BeFalse("a regra do login Google não muda para quem já tem acesso");
+        existente.ConviteAceitoEm.Should().BeNull();
+        existente.ConviteAceitoVia.Should().BeNull();
+        await _usuarios.DidNotReceive().UpdateAsync(Arg.Any<Usuario>());
+        _c.UnitOfWork.CommitCount.Should().Be(0);
     }
 }
