@@ -56,34 +56,23 @@ public sealed class SmtpEmailService : IEmailService
         var remetente = mensagem.Remetente == RemetenteEmail.Seguranca ? _configuracao.Seguranca : _configuracao.Avisos;
         var cronometro = Stopwatch.StartNew();
 
-        MimeMessage mime;
-        try
-        {
-            mime = ConstruirMime(mensagem, remetente);
-        }
-        catch (Exception ex) when (ex is FormatException or ArgumentException)
-        {
-            return Falha(ClassificadorFalhaSmtp.Classificar(ex, false, remetente.ChaveBase), mensagem, cronometro);
-        }
-
         using var teto = CancellationTokenSource.CreateLinkedTokenSource(ct);
         teto.CancelAfter(_configuracao.Timeout);
 
         try
         {
-            using (mime)
-            using (var cliente = NovoCliente())
-            {
-                await cliente.ConnectAsync(_configuracao.Host, _configuracao.Porta, OpcaoDeSeguranca(), teto.Token);
+            using var mime = ConstruirMime(mensagem, remetente);
+            using var cliente = NovoCliente();
 
-                if (!string.IsNullOrEmpty(remetente.Username))
-                    await cliente.AuthenticateAsync(remetente.Username, remetente.Password ?? string.Empty, teto.Token);
+            await cliente.ConnectAsync(_configuracao.Host, _configuracao.Porta, OpcaoDeSeguranca(), teto.Token);
 
-                await cliente.SendAsync(mime, teto.Token);
+            if (!string.IsNullOrEmpty(remetente.Username))
+                await cliente.AuthenticateAsync(remetente.Username, remetente.Password ?? string.Empty, teto.Token);
 
-                // A mensagem ja foi aceita: um QUIT que falha nao pode virar falha de envio (duplicaria na retentativa).
-                await EncerrarSemFalharAsync(cliente);
-            }
+            await cliente.SendAsync(mime, teto.Token);
+
+            // A mensagem ja foi aceita: um QUIT que falha nao pode virar falha de envio (duplicaria na retentativa).
+            await EncerrarSemFalharAsync(cliente);
 
             cronometro.Stop();
             _logger.LogInformation(
@@ -98,6 +87,7 @@ public sealed class SmtpEmailService : IEmailService
             // IOException/SocketException que o socket fechado pelo cancelamento produz.
             ct.ThrowIfCancellationRequested();
 
+            // Endereco ou anexo malformado estoura aqui, antes de abrir conexao, e vira falha permanente.
             var falha = ClassificadorFalhaSmtp.Classificar(ex, teto.IsCancellationRequested, remetente.ChaveBase);
             return Falha(falha, mensagem, cronometro);
         }

@@ -31,7 +31,7 @@ public static class ServiceCollectionExtensions
         // Queue Service
         services.AddSingleton<IQueueService, BackgroundQueueService>();
 
-        // Email Service — N3 (#1351): uma so fabrica para a API e o Worker (Email:Provider em
+        // Email Service (N3, #1351): uma so fabrica para a API e o Worker (Email:Provider em
         // {smtp, sendgrid, console}; sem ele, smtp quando ha Host e remetente, senao console com aviso).
         services.AddEasyStockEmail(configuration);
 

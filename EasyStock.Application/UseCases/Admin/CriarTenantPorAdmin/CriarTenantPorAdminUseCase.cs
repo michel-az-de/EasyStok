@@ -165,7 +165,7 @@ public class CriarTenantPorAdminUseCase(
             // A senha temporaria sai da caixa de seguranca (N3, #1351). "Enviado" so quando o e-mail saiu de
             // verdade: o simulado do console nao conta, para o operador ditar a senha por outro meio.
             var resultado = await emailService.EnviarAsync(new MensagemEmail(
-                usuario.Email, "EasyStock — Sua conta foi criada", body, Html: true, Remetente: RemetenteEmail.Seguranca));
+                usuario.Email, "EasyStock \u2014 Sua conta foi criada", body, Html: true, Remetente: RemetenteEmail.Seguranca));
             return resultado.Desfecho switch
             {
                 DesfechoEnvio.Enviado => (true, null),

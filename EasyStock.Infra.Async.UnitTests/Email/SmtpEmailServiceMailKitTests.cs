@@ -289,6 +289,33 @@ public class SmtpEmailServiceMailKitTests
     }
 
     [Fact]
+    public async Task AnexoComTipoDeConteudoInvalidoEFalhaPermanenteSemAbrirConexao()
+    {
+        await using var servidor = new ServidorSmtpDeTeste().Iniciar();
+        var servico = Servico(Configuracao(servidor));
+
+        var resultado = await servico.EnviarAsync(Mensagem(anexos: [new EmailAttachment("a.bin", [1], "isto nao e um content-type")]));
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaPermanente);
+        servidor.ConexoesAceitas.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ErroInesperadoNaMontagemDaMensagemViraFalhaEmVezDeExcecao()
+    {
+        // O contrato de EnviarAsync e "falha de envio volta como desfecho, so o cancelamento propaga": o Dispatcher
+        // nao tem try/catch por mensagem, e uma excecao aqui derrubaria o lote.
+        await using var servidor = new ServidorSmtpDeTeste().Iniciar();
+        var servico = Servico(Configuracao(servidor));
+
+        var resultado = await servico.EnviarAsync(Mensagem(anexos: [null!]));
+
+        resultado.Sucesso.Should().BeFalse();
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaTransitoria);
+        servidor.ConexoesAceitas.Should().Be(0);
+    }
+
+    [Fact]
     public async Task AutenticacaoRecusadaViraFalhaPermanenteQueNomeiaAsChavesENuncaASenha()
     {
         await using var servidor = new ServidorSmtpDeTeste
