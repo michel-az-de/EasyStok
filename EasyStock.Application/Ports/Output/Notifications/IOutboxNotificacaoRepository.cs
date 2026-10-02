@@ -36,6 +36,9 @@ public interface IOutboxNotificacaoRepository
     /// <summary>A mensagem da empresa pelo id, rastreada. A empresa vai no <c>WHERE</c> porque no Worker o filtro do EF está desligado.</summary>
     Task<OutboxMensagemNotificacao?> ObterAsync(Guid empresaId, Guid id, CancellationToken ct = default);
 
+    /// <summary>As mensagens do evento da empresa, sem rastreio, da mais antiga para a mais nova (N13: consulta do disparo de teste). A empresa vai no <c>WHERE</c>.</summary>
+    Task<IReadOnlyList<OutboxMensagemNotificacao>> ListarDoEventoAsync(Guid empresaId, Guid eventoId, CancellationToken ct = default);
+
     Task<bool> ExisteAsync(string idempotencyKey, CancellationToken ct = default);
 
     /// <summary>
