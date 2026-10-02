@@ -62,8 +62,23 @@ mensagem velha a cliente real.
   empresa e no commit no meio do lote (`RemetenteWhatsAppDoTenant.cs:25-33`;
   `MetaCloudWhatsAppProvider.cs:132`).
 
-## O que falta medir (S0)
+## Medição da S0 (02/10, `scripts/diagnostico/notificacoes-s0.sql` na VPS)
 
-Rodar `scripts/diagnostico/notificacoes-s0.sql`. Ele mede o papel, o RLS das tabelas, o backlog por
-tipo e idade, os eventos Processado sem outbox, o outbox por provider e o catálogo global. Contar
-também os `42501` no log do Worker.
+**A hipótese central se confirma.** Os eventos ficam `Pendente` por mais de um dia, mesmo com o
+Avaliador rodando a cada 60 s. Detalhe completo na issue #1344.
+
+| Medida | Resultado |
+|---|---|
+| Papel `easystock` | `rolsuper=f`, `rolbypassrls=f` |
+| Eventos | 3 no total, todos `Pendente`: `LembreteVencido` ×2 (o mais antigo de 30/09, há 1 dia e 10 h) e `ConversaEscalada` ×1 |
+| Outbox e log de envio | 0 linhas desde sempre: nada chegou ao Dispatcher |
+| Processado sem outbox | 0 |
+| Catálogo | 40 rotinas e 60 templates, todos globais e ativos |
+| Canais globais | Email `smtp`, InApp `inapp`; Push, SMS e WhatsApp `stub`; nenhuma credencial |
+| Outbox de integração | 3 `Enviado`: o bypass desse outbox funciona e serve de modelo |
+| `42501` nos logs, 72 h | 0 no Worker e 0 na API |
+
+**O que muda no plano:**
+- **Backlog mínimo.** O prazo de validade da N1 continua como guarda, mas não há risco de rajada
+  hoje.
+- **A N1 vem antes de qualquer canal real.** Sem ela, ligar SMTP ou a Meta não muda nada.

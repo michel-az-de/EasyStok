@@ -60,7 +60,7 @@ S0 → N0 → N2 → N1 → N3 → N13 → N5 → N4 → (N10 ∥ N11 ∥ N12) �
   - SPF `v=spf1 include:_spf.mail.hostinger.com ~all`;
   - DKIM `hostingermail-a/b/c._domainkey`;
   - DMARC `p=none` com `rua`, passando para `quarantine` depois de 2 a 4 semanas limpas.
-- [ ] Rodar `scripts/diagnostico/notificacoes-s0.sql` na VPS e colar a saída na issue #1344.
+- [x] Rodar `scripts/diagnostico/notificacoes-s0.sql` na VPS (feito em 02/10; saída na issue #1344).
 - [ ] Chip do 2º número de WhatsApp.
 - [ ] Contas grátis no Healthchecks.io e no UptimeRobot.
 - [ ] `.env` da VPS, quando a N0 estiver publicada: `Smtp__*` na API e no Worker,
@@ -95,5 +95,5 @@ RLS ou policy.
 
 | Spec | Planejado | Executado | Testado | PR | Mergeado | Deployado | Validado |
 |---|---|---|---|---|---|---|---|
-| S0 | sim | #1344 | gate | aberta | Pendente | N/A | Pendente (SQL na VPS) |
+| S0 | sim | #1344 | gate | #1348 | Pendente | N/A | medido em 02/10 (#1344) |
 | N0 a N13 | sim | Pendente | Pendente | Pendente | Pendente | Pendente | Pendente |
