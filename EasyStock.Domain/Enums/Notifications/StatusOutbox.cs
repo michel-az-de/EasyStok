@@ -24,5 +24,11 @@ public enum StatusOutbox
     /// Não há como saber se o provider entregou (timeout, queda de conexão ou 5xx no WhatsApp e no SMS, que
     /// saem no máximo uma vez). Terminal: nunca é reenviado nem cai no fallback de canal (N2).
     /// </summary>
-    Indeterminado = 8
+    Indeterminado = 8,
+
+    /// <summary>
+    /// Passou do prazo de validade do tipo antes de sair (N1, quarentena): backlog velho não se envia. Terminal, sem
+    /// <c>EnviadoEm</c>; para a campanha conta como falha, porque nada saiu.
+    /// </summary>
+    Expirado = 9
 }

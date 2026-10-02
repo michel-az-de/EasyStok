@@ -28,6 +28,11 @@ public sealed class FakeUnitOfWork : IUnitOfWork
 
     public void DescartarAlteracoesPendentes() => DescartesCount++;
 
+    /// <summary>Quem testa a violação de unicidade decide: por padrão nenhuma falha é 23505.</summary>
+    public Func<Exception, bool> EhViolacaoDeUnicidadePredicado { get; set; } = _ => false;
+
+    public bool EhViolacaoDeUnicidade(Exception ex) => EhViolacaoDeUnicidadePredicado(ex);
+
     public Task<IDbTransactionScope> BeginTransactionAsync(CancellationToken ct = default)
         => Task.FromResult<IDbTransactionScope>(new FakeTransactionScope());
 

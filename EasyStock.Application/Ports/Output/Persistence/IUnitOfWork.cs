@@ -12,6 +12,13 @@ public interface IUnitOfWork
     void DescartarAlteracoesPendentes();
 
     /// <summary>
+    /// A falha do <see cref="CommitAsync"/> é violação de índice único (SQLSTATE 23505)? A Application não conhece o
+    /// driver: o avaliador de notificações usa para tratar "já enfileirado" (a segunda linha do outbox com a mesma
+    /// <c>IdempotencyKey</c>) como sucesso e não como veneno (N1).
+    /// </summary>
+    bool EhViolacaoDeUnicidade(Exception ex);
+
+    /// <summary>
     /// Inicia transação explícita. Use quando precisar manter locks
     /// pessimistas (FOR UPDATE) entre múltiplas operações até o commit.
     /// Sem isso, EF abre transação implícita só no SaveChanges, e locks

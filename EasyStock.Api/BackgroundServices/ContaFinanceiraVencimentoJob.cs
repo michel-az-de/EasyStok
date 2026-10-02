@@ -94,7 +94,8 @@ public sealed class ContaFinanceiraVencimentoJob(
         finally { await db.Database.CloseConnectionAsync(); }
     }
 
-    private async Task ProcessarAsync(CancellationToken ct)
+    /// <summary>Uma rodada do job (sem o advisory lock). Pública para os testes de integração; o loop diário a chama.</summary>
+    public async Task ProcessarAsync(CancellationToken ct)
     {
         using var scope = serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
@@ -130,7 +131,7 @@ public sealed class ContaFinanceiraVencimentoJob(
             .ToListAsync(ct);
         foreach (var p in parcelasD3Pagar)
         {
-            await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaPagarVencendo, p, "d3", ct);
+            if (!await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaPagarVencendo, p, "d3", ct)) continue; // falhou: sem carimbo, tenta amanhã
             p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaD3, DateTime.UtcNow);
             processadasD3++;
         }
@@ -148,7 +149,7 @@ public sealed class ContaFinanceiraVencimentoJob(
             .ToListAsync(ct);
         foreach (var p in parcelasD3Receber)
         {
-            await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaReceberVencendo, p, "d3", ct);
+            if (!await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaReceberVencendo, p, "d3", ct)) continue; // falhou: sem carimbo, tenta amanhã
             p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaD3, DateTime.UtcNow);
             processadasD3++;
         }
@@ -166,7 +167,7 @@ public sealed class ContaFinanceiraVencimentoJob(
             .ToListAsync(ct);
         foreach (var p in parcelasD1Pagar)
         {
-            await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaPagarVencendo, p, "d1", ct);
+            if (!await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaPagarVencendo, p, "d1", ct)) continue; // falhou: sem carimbo, tenta amanhã
             p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaD1, DateTime.UtcNow);
             processadasD1++;
         }
@@ -182,7 +183,7 @@ public sealed class ContaFinanceiraVencimentoJob(
             .ToListAsync(ct);
         foreach (var p in parcelasD1Receber)
         {
-            await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaReceberVencendo, p, "d1", ct);
+            if (!await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaReceberVencendo, p, "d1", ct)) continue; // falhou: sem carimbo, tenta amanhã
             p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaD1, DateTime.UtcNow);
             processadasD1++;
         }
@@ -200,9 +201,9 @@ public sealed class ContaFinanceiraVencimentoJob(
         foreach (var p in parcelasPagar)
         {
             p.MarcarVencidaSeAplicavel(hoje);
-            if (p.NotificadaVencidaEm is null)
+            if (p.NotificadaVencidaEm is null
+                && await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaPagarVencida, p, "vencida", ct))
             {
-                await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaPagarVencida, p, "vencida", ct);
                 p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaVencida, DateTime.UtcNow);
                 processadasVencidas++;
             }
@@ -220,9 +221,9 @@ public sealed class ContaFinanceiraVencimentoJob(
         foreach (var p in parcelasReceber)
         {
             p.MarcarVencidaSeAplicavel(hoje);
-            if (p.NotificadaVencidaEm is null)
+            if (p.NotificadaVencidaEm is null
+                && await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaReceberVencida, p, "vencida", ct))
             {
-                await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaReceberVencida, p, "vencida", ct);
                 p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaVencida, DateTime.UtcNow);
                 processadasVencidas++;
             }
@@ -253,14 +254,18 @@ public sealed class ContaFinanceiraVencimentoJob(
             processadasD3, processadasD1, processadasVencidas, contasAtualizadas.Count);
     }
 
-    private async Task PublicarNotificacaoAsync(
+    /// <summary>
+    /// Publica o evento. Devolve se deu certo: o chamador só carimba o dedup (<c>Notificada*Em</c>) quando sim (N1);
+    /// falha ou ausência do notificador deixam a parcela sem carimbo e a rodada seguinte tenta de novo.
+    /// </summary>
+    private async Task<bool> PublicarNotificacaoAsync(
         INotificadorService? notificador,
         TipoEventoNotificacao tipo,
         ParcelaPagar parcela,
         string variante,
         CancellationToken ct)
     {
-        if (notificador is null) return;
+        if (notificador is null) return false;
         try
         {
             await notificador.PublicarEventoAsync(
@@ -275,21 +280,27 @@ public sealed class ContaFinanceiraVencimentoJob(
                     descricao = parcela.ContaPagar?.Descricao,
                     variante
                 }), ct: ct);
+            return true;
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Falha ao publicar evento {Tipo} pra parcela {ParcelaId}", tipo, parcela.Id);
+            return false;
         }
     }
 
-    private async Task PublicarNotificacaoAsync(
+    /// <summary>
+    /// Publica o evento. Devolve se deu certo: o chamador só carimba o dedup (<c>Notificada*Em</c>) quando sim (N1);
+    /// falha ou ausência do notificador deixam a parcela sem carimbo e a rodada seguinte tenta de novo.
+    /// </summary>
+    private async Task<bool> PublicarNotificacaoAsync(
         INotificadorService? notificador,
         TipoEventoNotificacao tipo,
         ParcelaReceber parcela,
         string variante,
         CancellationToken ct)
     {
-        if (notificador is null) return;
+        if (notificador is null) return false;
         try
         {
             await notificador.PublicarEventoAsync(
@@ -304,10 +315,12 @@ public sealed class ContaFinanceiraVencimentoJob(
                     descricao = parcela.ContaReceber?.Descricao,
                     variante
                 }), ct: ct);
+            return true;
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Falha ao publicar evento {Tipo} pra parcela {ParcelaId}", tipo, parcela.Id);
+            return false;
         }
     }
 }

@@ -60,6 +60,7 @@ public class RlsBypassAllowlistTests
         "EasyStock.Infra.Postgre",
         "EasyStock.Infra.Async",
         "EasyStock.Infra.Integrations",
+        "EasyStock.Infra.Notifications",
         "EasyStock.Api",
         "EasyStock.Worker",
         "EasyStock.Web",
@@ -79,6 +80,24 @@ public class RlsBypassAllowlistTests
         // issue #1024: registrar empresa e cross-tenant por definicao, porque cria o tenant. A
         // requisicao e anonima e nao existe app.empresa_id no contexto, entao a policy
         // tenant_isolation recusa os INSERTs (42501) e as leituras de perfis voltam vazias.
+
+        // Motor de notificacoes (N1, #1344): o claim do outbox e cross-tenant por natureza. O dispatcher reserva as
+        // Pendente de todas as empresas (FOR UPDATE SKIP LOCKED) num escopo com a porta ligada antes de qualquer
+        // conexao e processa cada mensagem em escopo proprio, com o tenant da empresa fixado.
+        "EasyStock.Infra.Postgre/Notifications/Dispatcher/NotificacoesDispatcherOrchestrator.cs",
+
+        // N1, #1344: o avaliador lista os eventos pendentes de todas as empresas numa leitura curta sob bypass (so ids)
+        // e avalia cada evento em escopo proprio, com o tenant fixado.
+        "EasyStock.Application/Services/Notifications/Orchestrators/NotificacoesAvaliadorOrchestrator.cs",
+
+        // N1, #1344: a rodada do coletor varre lotes de todas as empresas por natureza (produto vencendo).
+        "EasyStock.Application/Services/Notifications/Orchestrators/NotificacoesColetorOrchestrator.cs",
+
+        // N1, #1344: o health de backlog mede o outbox e os eventos de todas as empresas com consultas agregadas.
+        "EasyStock.Infra.Postgre/Notifications/Backlog/BacklogNotificacoesQuery.cs",
+
+        // N1, #1344: a anonimizacao por retencao (90 dias) atualiza o outbox de todas as empresas.
+        "EasyStock.Infra.Postgre/Notifications/Maintenance/AnonimizarLogsAntigosService.cs",
     };
 
     [Fact]
@@ -131,5 +150,48 @@ public class RlsBypassAllowlistTests
         stale.Should().BeEmpty(
             "A Allowlist deve refletir o estado real. Entrada que sobra e permissao concedida a " +
             "quem nao pediu — o proximo arquivo a ocupar aquele caminho herdaria o bypass de graca.");
+    }
+
+    /// <summary>
+    /// Diretórios do módulo de notificações (N1). O motor é cross-tenant só em pontos medidos, e todos passam pela
+    /// porta <c>IRowLevelSecurityBypass</c> (e pela <c>Allowlist</c> acima, com issue e motivo). Chamar
+    /// <c>UseRowLevelSecurityBypass()</c> direto no DbContext esconde a decisão do diff da PR: foi o que o
+    /// <c>TemplateNotificacaoRepository</c> fez e deixou o catálogo global invisível a quem estava no escopo da empresa.
+    /// </summary>
+    private static readonly string[] DiretoriosDoModuloDeNotificacoes =
+    {
+        "EasyStock.Infra.Notifications",
+        "EasyStock.Infra.Postgre/Notifications",
+        "EasyStock.Infra.Postgre/Repositories/Notifications",
+        "EasyStock.Application/Services/Notifications",
+        "EasyStock.Application/UseCases/Notifications",
+    };
+
+    [Fact]
+    public void Notificacoes_nao_chamam_UseRowLevelSecurityBypass_direto()
+    {
+        var root = RepoPaths.FindRepoRoot();
+        var offenders = new List<string>();
+
+        foreach (var dir in DiretoriosDoModuloDeNotificacoes)
+        {
+            var fullDir = Path.Combine(root, dir.Replace('/', Path.DirectorySeparatorChar));
+            if (!Directory.Exists(fullDir)) continue;
+
+            foreach (var file in Directory.GetFiles(fullDir, "*.cs", SearchOption.AllDirectories))
+            {
+                if (file.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar)) continue;
+
+                var chamaDireto = File.ReadAllText(file).Split('\n')
+                    .Select(l => l.TrimStart())
+                    .Any(l => !l.StartsWith("//") && !l.StartsWith("*") && !l.StartsWith("/*")
+                              && l.Contains("UseRowLevelSecurityBypass(", StringComparison.Ordinal));
+                if (chamaDireto)
+                    offenders.Add(Path.GetRelativePath(root, file).Replace(Path.DirectorySeparatorChar, '/'));
+            }
+        }
+
+        offenders.Should().BeEmpty(
+            "o módulo de notificações liga o bypass de RLS só pela porta IRowLevelSecurityBypass, que a Allowlist audita (N1, refs #1367)");
     }
 }

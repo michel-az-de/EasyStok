@@ -5,7 +5,9 @@ using EasyStock.Api.Middleware;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Infra.Async.Storage;
+using EasyStock.Infra.Notifications.Hosting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.FileProviders;
 using Serilog;
 using Serilog.Context;
@@ -274,8 +276,24 @@ public static class PipelineExtensions
             ResponseWriter = HealthCheckResponseWriter.WriteJsonAsync
         });
 
+        // /health/notificacoes (N1): backlog do motor (idade do pendente elegivel, EmEnvio alem do lease, Falhado,
+        // Simulado e Indeterminado por hora, provider de teste em Production). O UptimeRobot so ve o status HTTP, entao
+        // Degraded tambem responde 503. Fica de fora de /health e /health/ready: backlog ruim nao tira a API do LB.
+        app.MapHealthChecks("/health/notificacoes", new HealthCheckOptions
+        {
+            Predicate = check => check.Tags.Contains(NotificacoesBacklogHealthCheck.Tag),
+            ResponseWriter = HealthCheckResponseWriter.WriteJsonAsync,
+            ResultStatusCodes =
+            {
+                [HealthStatus.Healthy] = StatusCodes.Status200OK,
+                [HealthStatus.Degraded] = StatusCodes.Status503ServiceUnavailable,
+                [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable,
+            }
+        });
+
         app.MapHealthChecks("/health", new HealthCheckOptions
         {
+            Predicate = check => !check.Tags.Contains(NotificacoesBacklogHealthCheck.Tag),
             ResponseWriter = HealthCheckResponseWriter.WriteJsonAsync
         });
 

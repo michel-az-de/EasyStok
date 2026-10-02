@@ -23,6 +23,13 @@ public class OutboxMensagemNotificacao
     public DateTime ProximaTentativaEm { get; set; }
     public DateTime? EnviadoEm { get; set; }
     public string? ProviderUsado { get; set; }
+
+    /// <summary>
+    /// Id da mensagem no provider (o <c>wamid</c> da Meta), gravado no mesmo commit do resultado do envio (N1). A N6
+    /// o usa para casar o webhook de status com a mensagem do outbox.
+    /// </summary>
+    public string? ProviderMensagemId { get; set; }
+
     public string? ErroUltimaTentativa { get; set; }
     public string IdempotencyKey { get; set; } = null!;
     public string TenantTimezone { get; set; } = "America/Sao_Paulo";
@@ -103,9 +110,22 @@ public class OutboxMensagemNotificacao
         if (instante > ProximaTentativaEm) ProximaTentativaEm = instante;
     }
 
-    public void MarcarEmEnvio()
+    /// <summary>
+    /// Lease do estado <see cref="StatusOutbox.EmEnvio"/> (N1): ao reservar a mensagem, <see cref="ProximaTentativaEm"/>
+    /// vira agora + este prazo. Se o processo cair antes de gravar o resultado, o claim da rodada seguinte reclama a
+    /// mensagem depois do lease. 5 minutos, como o <c>OutboxEventoIntegracao</c>.
+    /// </summary>
+    public static readonly TimeSpan LeaseEmEnvio = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// O claim do dispatcher reservou a mensagem (N1): <c>EmEnvio</c> com lease em <see cref="ProximaTentativaEm"/>.
+    /// Não conta tentativa: quem conta é o desfecho do envio. No WhatsApp e no SMS o <c>EmEnvio</c> já está gravado
+    /// antes de o canal ser chamado, e é isso que impede o reenvio depois de uma queda.
+    /// </summary>
+    public void MarcarEmEnvio(TimeSpan? lease = null)
     {
         Status = StatusOutbox.EmEnvio;
+        ProximaTentativaEm = DateTime.UtcNow.Add(lease ?? LeaseEmEnvio);
     }
 
     public void MarcarEnviado(string providerUsado)
@@ -158,6 +178,49 @@ public class OutboxMensagemNotificacao
         if (Status == StatusOutbox.Falhado) AoTerminar();
     }
 
+    /// <summary>
+    /// A mensagem passou do prazo de validade do tipo antes de sair (N1, quarentena): terminal, sem
+    /// <see cref="EnviadoEm"/> e sem contar tentativa, porque nada foi tentado. Termina pelo mesmo caminho das demais
+    /// transições terminais (<see cref="AoTerminar"/>), então a categoria de segurança apaga o segredo.
+    /// </summary>
+    public void Expirar(string motivo)
+    {
+        Status = StatusOutbox.Expirado;
+        ErroUltimaTentativa = motivo;
+        AoTerminar();
+    }
+
+    /// <summary>
+    /// O lease do <see cref="StatusOutbox.EmEnvio"/> venceu: o processo caiu, ou o commit do resultado falhou, depois
+    /// da reserva (N1). Em e-mail, in-app e push (ao menos uma vez) a mensagem volta a <c>Pendente</c> contando a
+    /// tentativa, elegível na hora (e <c>Falhado</c> se as tentativas acabaram, para não repetir para sempre). No
+    /// WhatsApp e no SMS (no máximo uma vez) vira <see cref="StatusOutbox.Indeterminado"/> e nunca volta à fila:
+    /// o provider pode ter sido chamado antes da queda.
+    /// </summary>
+    public void ReclamarLeaseVencido()
+    {
+        const string motivo = "Lease de envio vencido: o processo caiu depois de reservar a mensagem";
+        if (Canal is CanalNotificacao.WhatsApp or CanalNotificacao.Sms)
+            MarcarIndeterminado(motivo);
+        else
+            MarcarFalhaTentativa(motivo, TimeSpan.Zero);
+    }
+
+    /// <summary>Limite da coluna <c>ProviderMensagemId</c> (<c>varchar(128)</c>).</summary>
+    public const int ProviderMensagemIdMaxLength = 128;
+
+    /// <summary>
+    /// Guarda o id da mensagem no provider (o <c>wamid</c> da Meta) para a N6 casar o webhook de status. Vazio é
+    /// ignorado e o que passa do limite da coluna é cortado: um id grande demais derrubaria o commit do resultado do
+    /// envio, depois de a mensagem já ter saído.
+    /// </summary>
+    public void RegistrarProviderMensagemId(string? idExterno)
+    {
+        if (string.IsNullOrWhiteSpace(idExterno)) return;
+        var id = idExterno.Trim();
+        ProviderMensagemId = id.Length <= ProviderMensagemIdMaxLength ? id : id[..ProviderMensagemIdMaxLength];
+    }
+
     public void Cancelar()
     {
         Status = StatusOutbox.Cancelado;
@@ -197,6 +260,9 @@ public class OutboxMensagemNotificacao
     /// </summary>
     private void AoTerminar()
     {
+        // Terminal não agenda mais nada: ProximaTentativaEm passa a guardar o momento em que a mensagem terminou, que o
+        // health de backlog (N1) usa para contar "na última hora" sem coluna nova.
+        ProximaTentativaEm = DateTime.UtcNow;
         if (Categoria == CategoriaConteudoNotificacao.Seguranca)
             PurgarSegredos();
     }

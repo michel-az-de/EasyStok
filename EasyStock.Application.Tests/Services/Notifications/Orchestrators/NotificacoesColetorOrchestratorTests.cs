@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -11,6 +12,7 @@ public class NotificacoesColetorOrchestratorTests
     {
         var sut = new NotificacoesColetorOrchestrator(
             Array.Empty<IColetorEventoNotificacao>(),
+            Substitute.For<IRowLevelSecurityBypass>(),
             NullLogger<NotificacoesColetorOrchestrator>.Instance);
 
         var act = async () => await sut.ExecutarRodadaAsync();
@@ -26,6 +28,7 @@ public class NotificacoesColetorOrchestratorTests
 
         var sut = new NotificacoesColetorOrchestrator(
             new[] { coletor1, coletor2 },
+            Substitute.For<IRowLevelSecurityBypass>(),
             NullLogger<NotificacoesColetorOrchestrator>.Instance);
 
         await sut.ExecutarRodadaAsync();
@@ -46,6 +49,7 @@ public class NotificacoesColetorOrchestratorTests
 
         var sut = new NotificacoesColetorOrchestrator(
             new[] { coletorOk1, coletorErro, coletorOk2 },
+            Substitute.For<IRowLevelSecurityBypass>(),
             NullLogger<NotificacoesColetorOrchestrator>.Instance);
 
         var act = async () => await sut.ExecutarRodadaAsync();
@@ -66,6 +70,7 @@ public class NotificacoesColetorOrchestratorTests
 
         var sut = new NotificacoesColetorOrchestrator(
             new[] { coletor },
+            Substitute.For<IRowLevelSecurityBypass>(),
             NullLogger<NotificacoesColetorOrchestrator>.Instance);
 
         using var cts = new CancellationTokenSource();

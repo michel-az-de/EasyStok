@@ -1,13 +1,13 @@
 namespace EasyStock.Application.Services.Notifications.Orchestrators;
 
 /// <summary>
-/// Orquestra 1 rodada completa de despacho — processa todos os shards do outbox.
-/// Granularidade complementar ao <see cref="EasyStock.Application.Ports.Output.Notifications.INotificationDispatcher"/>
-/// (que processa 1 shard por chamada — usado pelo endpoint HTTP cron com ?shard=N).
-/// Idempotente — advisory lock impede dupla entrega entre instâncias.
+/// Orquestra 1 rodada completa de despacho do outbox (N1): reserva as mensagens elegíveis de todas as empresas
+/// (<c>FOR UPDATE SKIP LOCKED</c>, com lease) e processa cada uma em escopo próprio, com o tenant da empresa e
+/// <c>try/catch</c> próprio. Idempotente entre instâncias: o claim e o lease impedem dupla entrega, sem advisory lock.
 /// </summary>
 public interface INotificacoesDispatcherOrchestrator
 {
-    /// <returns>Total de mensagens processadas (somatório de todos os shards).</returns>
+    /// <param name="shardCount">Ignorado: <c>ShardKey</c> não participa mais do claim (N1). Mantido por compatibilidade.</param>
+    /// <returns>Total de mensagens processadas na rodada.</returns>
     Task<int> ExecutarRodadaAsync(int shardCount, int batchSize, CancellationToken ct = default);
 }

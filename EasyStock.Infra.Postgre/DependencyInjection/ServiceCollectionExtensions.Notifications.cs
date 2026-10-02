@@ -2,12 +2,14 @@ using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Infra.Postgre.Notifications;
+using EasyStock.Infra.Postgre.Notifications.Backlog;
 using EasyStock.Infra.Postgre.Notifications.Collectors;
 using EasyStock.Infra.Postgre.Notifications.Dispatcher;
 using EasyStock.Infra.Postgre.Notifications.Maintenance;
 using EasyStock.Infra.Postgre.Repositories.Notifications;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace EasyStock.Infra.Postgre.DependencyInjection;
 
@@ -28,6 +30,14 @@ public static partial class ServiceCollectionExtensionsNotifications
         // Onda 2.2 — subscriptions de Web Push (PWA).
         services.AddScoped<IWebPushSubscriptionRepository, WebPushSubscriptionRepository>();
 
+        // Backlog agregado do motor (N1): health check de backlog e ping do Worker.
+        services.AddScoped<IBacklogNotificacoes, BacklogNotificacoesQuery>();
+
+        // Quarentena (N1): o dispatcher expira o outbox pelo prazo do tipo. TryAdd: AddEasyStockApplication também o
+        // registra e as sobrescritas (Notifications:Quarentena) são bindadas em AddNotificationsCore.
+        services.AddOptions();
+        services.TryAddSingleton<PoliticaValidadeNotificacao>();
+
         // Dispatcher orchestrator — implementa também o port INotificationDispatcher (1 shard).
         // Singleton porque é stateless e cria scopes internamente via IServiceProvider.
         services.AddSingleton<NotificacoesDispatcherOrchestrator>();
@@ -36,7 +46,9 @@ public static partial class ServiceCollectionExtensionsNotifications
 
         // Coletores de eventos de estado — vivem em Infra.Postgre porque dependem de
         // EasyStockDbContext. Worker e API ambos consomem via INotificacoesColetorOrchestrator.
-        services.AddScoped<IColetorEventoNotificacao, ColetorProdutosVencendo>();
+        // TryAddEnumerable: AddEasyStockPostgreInfrastructure já chama este registro; o Worker o chamava de novo e o
+        // coletor rodava duas vezes por rodada (N1).
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IColetorEventoNotificacao, ColetorProdutosVencendo>());
 
         return services;
     }
