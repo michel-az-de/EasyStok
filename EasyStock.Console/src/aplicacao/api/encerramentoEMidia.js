@@ -17,7 +17,7 @@ const ROTULO_DA_MIDIA = {
   audio: 'Áudio', arquivo: 'Arquivo', figurinha: 'Figurinha', peca: 'Peça da galeria',
 }
 
-export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, motivoDaRecusa }) {
+export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio }) {
   const avisar = (mensagem) => despachar({ tipo: acao.AVISO_API, mensagem })
   const conversaDe = (id) => estadoRef.current.conversas.find((c) => c.id === id) ?? null
 
@@ -29,7 +29,7 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
       despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m) })
       return true
     } catch (erro) {
-      despachar({ tipo: acao.FALHAR_ENVIO_API, id, mensagemId, erro: motivoDaRecusa(erro) })
+      despachar(falhaDoEnvio(id, mensagemId, erro))
       return false
     }
   }
@@ -73,7 +73,7 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
       })
       enviarImagem(id, { dataUrl: arte, nomeArquivo: extra.nomeArquivo, legenda: extra.legenda })
         .then((m) => despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m) }))
-        .catch((erro) => despachar({ tipo: acao.FALHAR_ENVIO_API, id, mensagemId, erro: motivoDaRecusa(erro) }))
+        .catch((erro) => despachar(falhaDoEnvio(id, mensagemId, erro)))
     },
   }
 }

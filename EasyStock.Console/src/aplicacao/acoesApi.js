@@ -23,6 +23,16 @@ const motivoDaRecusa = (erro) => {
   return `Não enviada: ${erro.message}`
 }
 
+// #1396: falha do canal devolve a mensagem que o EasyStok gravou como falhou; o balão local troca
+// para ela (id do servidor, que o Reenviar usa). Sem ela, o balão fica sem Reenviar.
+const falhaDoEnvio = (id, mensagemId, erro) => ({
+  tipo: acao.FALHAR_ENVIO_API,
+  id,
+  mensagemId,
+  erro: motivoDaRecusa(erro),
+  ...(erro.dados?.id ? { mensagem: mensagemDaApi(erro.dados, id) } : { semIdServidor: true }),
+})
+
 // Modo API (F01, F02, F03, F06, #1276): as ações que a caixa de entrada, o expediente, a
 // configuração, o assistente, os avisos da Ficha, a comanda (pedido e cobrança), o cadastro do
 // cliente, o encerramento e a foto já ligam passam a valer no EasyStok.
@@ -36,7 +46,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
   return {
     ...acoes,
     ...criarAvisosNaoLigadas(despachar),
-    ...criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, motivoDaRecusa }),
+    ...criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio }),
     fecharAvisoApi: () => despachar({ tipo: acao.FECHAR_AVISO_API }),
     ...criarAcoesExpedienteApi({ despachar, estadoRef }),
     ...criarAcoesConfiguracaoApi(),
@@ -56,13 +66,14 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
       despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, agora: agoraRef.current })
       enviarTexto(id, texto)
         .then((m) => despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m) }))
-        .catch((erro) => despachar({ tipo: acao.FALHAR_ENVIO_API, id, mensagemId, erro: motivoDaRecusa(erro) }))
+        .catch((erro) => despachar(falhaDoEnvio(id, mensagemId, erro)))
     },
     // S57: só no modo API (a massa local não tem envio de verdade). A resposta substitui o balão.
     reenviar: (id, mensagemId) =>
       reenviarMensagem(id, mensagemId)
         .then((m) => despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m, id) }))
-        .catch(avisar),
+        // #1396: o erro do reenvio fica no próprio balão, que segue com o id do servidor.
+        .catch((erro) => despachar({ tipo: acao.FALHAR_ENVIO_API, id, mensagemId, erro: motivoDaRecusa(erro) })),
     // #1353: a tela do link no console não tem dado no modo API; o link é o da loja.
     obterLinkCardapio: (id) => gerarLinkCardapio(id)
       .then((link) => ({ url: link.url, daLoja: true }))
