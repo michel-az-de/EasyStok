@@ -81,6 +81,9 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.Ports.Output.IJwtTokenService>(sp =>
             sp.GetRequiredService<EasyStock.Api.Services.IJwtTokenService>());
 
+        // #1352: sessão revogável. O validador roda no OnTokenValidated do JwtBearer e no laço do SSE.
+        services.AddScoped<EasyStock.Api.Authentication.ValidadorSessaoUsuario>();
+
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
@@ -100,6 +103,13 @@ public static class ApiServiceCollectionExtensions
                     IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
                     NameClaimType            = "sub",
                     RoleClaimType            = "nivel"
+                };
+
+                // #1352: o JWT passa a ser revogável. Token emitido antes do corte de sessão do usuário, ou de
+                // conta inativa, falha aqui com 401; Auth:SessoesRevogaveis=false desliga a checagem.
+                options.Events = new JwtBearerEvents
+                {
+                    OnTokenValidated = EasyStock.Api.Authentication.SessaoRevogavel.AoValidarTokenAsync,
                 };
             })
             .AddInternalCronJobScheme(configuration)
