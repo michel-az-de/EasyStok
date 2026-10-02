@@ -159,6 +159,32 @@ public class MotorNotificacoesRlsTests(PostgreSqlDatabaseFixture fixture) : ICla
         (await _s.LerMensagemAsync(recente.Id)).Destinatario.Should().NotBe("[anonimizado]", "só passa da retenção o que tem mais de 90 dias");
     }
 
+    [SkippableFact]
+    public async Task Backlog_sob_papel_NOBYPASSRLS_mede_o_outbox_de_todas_as_empresas()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var a = await _s.SemearAsync(CanalNotificacao.Email);
+        var b = await _s.SemearAsync(CanalNotificacao.Email);
+        // Uma pendente elegível há 20 min, uma presa em EmEnvio além do lease e uma Falhada agora, em empresas diferentes.
+        await _s.SemearMensagemAsync(a, CanalNotificacao.Email, ajustar: m => m.ProximaTentativaEm = DateTime.UtcNow.AddMinutes(-20));
+        await _s.SemearMensagemAsync(b, CanalNotificacao.Email, ajustar: m =>
+        {
+            m.Status = StatusOutbox.EmEnvio;
+            m.ProximaTentativaEm = DateTime.UtcNow.AddMinutes(-2);
+        });
+        await _s.SemearMensagemAsync(a, CanalNotificacao.Email, ajustar: m => m.MarcarFalhaTentativa("550", TimeSpan.Zero, permanente: true));
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: true);
+
+        BacklogNotificacoes medida;
+        await using (var scope = provider.CreateAsyncScope())
+            medida = await scope.ServiceProvider.GetRequiredService<IBacklogNotificacoes>().MedirAsync();
+
+        medida.IdadeDoPendenteElegivelMaisAntigo.Should().BeGreaterThan(TimeSpan.FromMinutes(19),
+            "sem o bypass pela porta o papel NOBYPASSRLS enxergaria zero linhas e o backlog pareceria vazio");
+        medida.EmEnvioAlemDoLease.Should().BeGreaterThanOrEqualTo(1);
+        medida.FalhadoNaUltimaHora.Should().BeGreaterThanOrEqualTo(1);
+    }
+
     // ----- catálogo global -----
 
     [SkippableFact]

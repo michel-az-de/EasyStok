@@ -93,6 +93,9 @@ public class RlsBypassAllowlistTests
         // N1, #1344: a rodada do coletor varre lotes de todas as empresas por natureza (produto vencendo).
         "EasyStock.Application/Services/Notifications/Orchestrators/NotificacoesColetorOrchestrator.cs",
 
+        // N1, #1344: o health de backlog mede o outbox e os eventos de todas as empresas com consultas agregadas.
+        "EasyStock.Infra.Postgre/Notifications/Backlog/BacklogNotificacoesQuery.cs",
+
         // N1, #1344: a anonimizacao por retencao (90 dias) atualiza o outbox de todas as empresas.
         "EasyStock.Infra.Postgre/Notifications/Maintenance/AnonimizarLogsAntigosService.cs",
     };

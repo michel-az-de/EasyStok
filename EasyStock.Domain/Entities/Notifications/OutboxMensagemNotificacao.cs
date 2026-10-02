@@ -260,6 +260,9 @@ public class OutboxMensagemNotificacao
     /// </summary>
     private void AoTerminar()
     {
+        // Terminal não agenda mais nada: ProximaTentativaEm passa a guardar o momento em que a mensagem terminou, que o
+        // health de backlog (N1) usa para contar "na última hora" sem coluna nova.
+        ProximaTentativaEm = DateTime.UtcNow;
         if (Categoria == CategoriaConteudoNotificacao.Seguranca)
             PurgarSegredos();
     }

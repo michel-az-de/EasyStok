@@ -240,6 +240,20 @@ public class OutboxMensagemNotificacaoTests
 
     [Theory]
     [MemberData(nameof(TransicoesTerminais))]
+    public void Transicao_terminal_carimba_o_momento_em_que_terminou_em_ProximaTentativaEm(
+        string transicao, Action<OutboxMensagemNotificacao> terminar)
+    {
+        // N1: o health de backlog conta "na última hora" por este instante; terminal não agenda mais nada.
+        var m = NovoComSegredo(CategoriaConteudoNotificacao.Operacional);
+        m.ProximaTentativaEm = DateTime.UtcNow.AddDays(-5);
+
+        terminar(m);
+
+        m.ProximaTentativaEm.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2), transicao);
+    }
+
+    [Theory]
+    [MemberData(nameof(TransicoesTerminais))]
     public void Seguranca_ao_terminar_apaga_corpo_assunto_e_metadados(string transicao, Action<OutboxMensagemNotificacao> terminar)
     {
         var m = NovoComSegredo(CategoriaConteudoNotificacao.Seguranca);

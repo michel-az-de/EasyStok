@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Infra.Postgre.Notifications;
+using EasyStock.Infra.Postgre.Notifications.Backlog;
 using EasyStock.Infra.Postgre.Notifications.Collectors;
 using EasyStock.Infra.Postgre.Notifications.Dispatcher;
 using EasyStock.Infra.Postgre.Notifications.Maintenance;
@@ -28,6 +29,9 @@ public static partial class ServiceCollectionExtensionsNotifications
         services.AddScoped<IVariavelTemplateCatalogoRepository, VariavelTemplateCatalogoRepository>();
         // Onda 2.2 — subscriptions de Web Push (PWA).
         services.AddScoped<IWebPushSubscriptionRepository, WebPushSubscriptionRepository>();
+
+        // Backlog agregado do motor (N1): health check de backlog e ping do Worker.
+        services.AddScoped<IBacklogNotificacoes, BacklogNotificacoesQuery>();
 
         // Quarentena (N1): o dispatcher expira o outbox pelo prazo do tipo. TryAdd: AddEasyStockApplication também o
         // registra e as sobrescritas (Notifications:Quarentena) são bindadas em AddNotificationsCore.

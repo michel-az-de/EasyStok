@@ -22,6 +22,10 @@ public static class NotificationsHostingServiceCollectionExtensions
             configuration.GetSection(NotificationsHostingOptions.Section));
         services.Configure<QuarentenaNotificacaoOptions>(
             configuration.GetSection(QuarentenaNotificacaoOptions.Section));
+        services.Configure<NotificacoesHealthOptions>(
+            configuration.GetSection(NotificacoesHealthOptions.Section));
+        services.Configure<NotificacoesMonitoramentoOptions>(
+            configuration.GetSection(NotificacoesMonitoramentoOptions.Section));
 
         // Heartbeat e usado pelos wrappers Hosted E pelo health check (NotificationsHostingHealthCheck).
         // Singleton sempre — custo zero quando Mode=Disabled (so guarda dictionary vazio) e simplifica

@@ -154,8 +154,13 @@ builder.Services.AddEasyStockAgenteLlm(builder.Configuration);
 // decifra o certificado A1 que a Api gravou em credencial_integracao.
 builder.Services.AddEasyStockDataProtection();
 
-// Health checks
-builder.Services.AddHealthChecks();
+// Health checks do motor de notificacoes (N1): heartbeat dos loops e backlog. O Worker nao tem endpoint HTTP: quem
+// consome e o HealthchecksPingService, que pinga o Healthchecks.io enquanto estao saudaveis e chama /fail quando nao.
+builder.Services.AddHealthChecks()
+    .AddNotificationsHosting()
+    .AddNotificacoesBacklog();
+builder.Services.AddHttpClient(HealthchecksPingService.NomeDoCliente);
+builder.Services.AddHostedService<HealthchecksPingService>();
 
 // Validação de DI sob demanda (CI/diagnóstico): `dotnet run -- --validate-di` constrói
 // o grafo com ValidateOnBuild + ValidateScopes, pegando captive dependencies
