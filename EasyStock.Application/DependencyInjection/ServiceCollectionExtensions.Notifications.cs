@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Services;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Application.UseCases.Notifications;
@@ -47,6 +48,12 @@ public static partial class ServiceCollectionExtensions
         // Use cases — kill switch
         services.AddScoped<AtivarKillSwitchUseCase>();
         services.AddScoped<RemoverKillSwitchUseCase>();
+
+        // Disparo de teste por tipo (N13) e empresa padrao da plataforma (extraida do AuthController)
+        services.TryAddSingleton<EmpresaPadraoCache>();
+        services.TryAddScoped<IEmpresaPadraoResolver, EmpresaPadraoResolver>();
+        services.TryAddSingleton(sp => new LimitadorDisparoTeste(sp.GetService<TimeProvider>() ?? TimeProvider.System));
+        services.AddScoped<DispararTesteNotificacaoUseCase>();
 
         // Queries
         services.AddScoped<ListarLogsEnvioUseCase>();

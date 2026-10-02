@@ -25,7 +25,8 @@ public interface INotificadorService
     /// os Pendentes via <see cref="AvaliarEventoAsync"/>. O destinatário in-app/email vai no
     /// payload (chave "usuarioId"/"email"), re-derivado pelo Avaliador.
     /// </summary>
-    Task EnfileirarEventoAsync(
+    /// <returns>O id do evento estagiado (N13: o disparo de teste o devolve para a consulta).</returns>
+    Task<Guid> EnfileirarEventoAsync(
         TipoEventoNotificacao tipo,
         Guid empresaId,
         string payloadJson,

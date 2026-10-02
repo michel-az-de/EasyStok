@@ -30,6 +30,11 @@ public sealed class NotificadorService(
     /// </summary>
     public const string EnviarAposPayload = "enviarApos";
 
+    /// <summary>Chave do payload que marca o evento como teste (N13): o assunto sai prefixado por <see cref="PrefixoTeste"/>.</summary>
+    public const string TestePayload = "teste";
+
+    public const string PrefixoTeste = "[TESTE] ";
+
     private static readonly JsonSerializerOptions EnumOptions = new()
     {
         Converters = { new JsonStringEnumConverter() }
@@ -51,7 +56,7 @@ public sealed class NotificadorService(
         await unitOfWork.CommitAsync();
     }
 
-    public async Task EnfileirarEventoAsync(
+    public async Task<Guid> EnfileirarEventoAsync(
         TipoEventoNotificacao tipo,
         Guid empresaId,
         string payloadJson,
@@ -63,6 +68,7 @@ public sealed class NotificadorService(
         // Avaliador processa fora de banda — nada aguardado/falível após o commit do negócio.
         var evento = EventoNotificacao.Criar(tipo, empresaId, payloadJson, refEntidadeId);
         await eventoRepository.AddAsync(evento, ct);
+        return evento.Id;
     }
 
     public async Task AvaliarEventoAsync(EventoNotificacao evento, CancellationToken ct = default)
@@ -225,6 +231,8 @@ public sealed class NotificadorService(
             assunto = await renderer.RenderizarAsync(template.AssuntoTemplate, vars, ct);
             var corpoEscapaHtml = canalPrimario is CanalNotificacao.Email or CanalNotificacao.InApp;
             corpo = await renderer.RenderizarAsync(template.CorpoTemplate, vars, corpoEscapaHtml, ct);
+            if (vars.TryGetValue(TestePayload, out var teste) && teste is true && !string.IsNullOrWhiteSpace(assunto))
+                assunto = PrefixoTeste + assunto;
         }
         catch (Exception ex)
         {
