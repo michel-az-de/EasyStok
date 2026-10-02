@@ -126,17 +126,19 @@ existente; a gaveta Gestão sai quando todas as abas tiverem casa.
 cai em `Guid.Empty`); medir na primeira hora da fatia com a API local.
 **Abordagem.** Tela sobre `api/usuarios` (fato 1). Perfil escolhido da lista que a M0.3 expõe. Marcação
 "atende conversas" lê a permissão `AtenderConversas` do perfil (S41), sem campo novo.
-**Escopo.** Lista (nome, e-mail, perfil, ativo, último acesso se a API devolver), criar com senha inicial
-(DM7-3), editar nome, trocar perfil, desativar e reativar, trocar a própria senha.
-**Fora.** Convite por e-mail; 2FA; SSO.
+**Escopo.** Lista (nome, e-mail, perfil, ativo, último acesso se a API devolver, convite pendente ou aceito),
+**convidar por link** (DM7-3 decidida em 2026-10-01: convite, sem senha inicial; a dona nunca define a senha de ninguém;
+backend na N9 de [06-acesso](../notificacoes-sistema/06-acesso.md)), reenviar convite, editar nome, trocar perfil,
+desativar e reativar, trocar a própria senha.
+**Fora.** 2FA; SSO.
 **Aceite.**
-- [ ] Usuário criado no console entra no login e cai na porta do perfil (ADR-0056 item 4).
+- [ ] Usuário convidado define a senha pelo link, entra no login e cai na porta do perfil (ADR-0056 item 4).
 - [ ] Desativar impede login na próxima renovação de token.
 - [ ] Operador vê a tela bloqueada e a API devolve 403 em `POST api/usuarios`.
 - [ ] Defeito do fato 6 medido; se confirmado, issue própria ou corrigido junto, com teste.
 **Testes (Red).** prova Playwright `prova-m7-2-usuarios.mjs`; se o defeito confirmar,
 `UsuariosControllerTests.AtribuirPerfilRecebeGuid` no Web.
-**Depende de.** M0.3, M7.1. **Tamanho.** M. **Tier.** alto (mexe em autorização de usuário).
+**Depende de.** M0.3, M7.1, N9 (convite). **Tamanho.** M. **Tier.** alto (mexe em autorização de usuário).
 
 ### M7.3 · Perfis × módulos (tela)
 
@@ -222,7 +224,7 @@ S45 parte 2 ─────────────┴─► M7.6 canais
 |---|---|---|---|
 | DM7-1 | Parâmetros de estoque (`ConfiguracaoLoja`) | **(a) Ficam no Web, o M7 só aponta para lá (Recomendado, ADR-0056 item 7)** · (b) Migram para o console agora · (c) Migram só os alertas que a dona usa no dia (validade e mínimo) | M7.1 |
 | DM7-2 | Onde mora o papel padrão de cada documento | **(a) Por dispositivo, como a S51 já decidiu (Recomendado)** · (b) Por loja, no servidor · (c) Loja define o padrão e o dispositivo sobrescreve | M7.4 |
-| DM7-3 | Como entra um usuário novo | **(a) A dona cria com senha inicial e a pessoa troca no primeiro acesso (Recomendado)** · (b) Como hoje no Web, senha definida pela dona sem troca obrigatória · (c) Convite por WhatsApp com link de definir senha | M7.2 |
+| ✅ DM7-3 | Como entra um usuário novo | **DECIDIDO em 2026-10-01: (c) convite com link** (por e-mail e pelo WhatsApp de plataforma; a própria pessoa define a senha; spec N9 em [06-acesso](../notificacoes-sistema/06-acesso.md)). Descartadas: (a) senha inicial com troca no primeiro acesso e (b) senha definida pela dona sem troca obrigatória | M7.2 |
 | DM7-4 | Templates de aviso ao cliente (`api/notificacoes/templates`) | **(a) Sem tela por ora; os avisos de status (S13) e as automáticas (S42) bastam (Recomendado)** · (b) Tela no M7 para editar os textos dos avisos | M7.1 |
 | DM7-5 | Campos fiscais da vitrine (`ModeloFiscal`, `HabilitarNfeAutomatica`) | **(a) Remover na poda M0.4 (Recomendado)** · (b) Só esconder na tela e manter as colunas | M7.5, M0.4 |
 | DM7-6 | Fonte da mensagem "fora da área de entrega" | **(a) A do atendimento (S08), o site passa a ler dela (Recomendado)** · (b) A da vitrine · (c) Manter as duas, uma para o agente e outra para o site | M7.5 |
