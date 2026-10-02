@@ -224,6 +224,27 @@ namespace EasyStock.Domain.Entities
             return QuantidadeAtual;
         }
 
+        /// <summary>
+        /// Desfaz uma saida (estorno/devolucao). A parte da saida que virou
+        /// <see cref="QuantidadeDescoberta"/> nunca saiu do lote, entao ela e abatida primeiro;
+        /// so o excedente volta a <see cref="QuantidadeAtual"/>. Sem isso o estorno de uma saida
+        /// com descoberto fabricava estoque fantasma.
+        /// </summary>
+        public void RestaurarSaidaEstornada(Quantidade quantidade, DateTime alteradoEm)
+        {
+            var abatida = Math.Min(QuantidadeDescoberta.Value, quantidade.Value);
+            if (abatida > 0m)
+                QuantidadeDescoberta = Quantidade.From(QuantidadeDescoberta.Value - abatida);
+
+            var resto = quantidade.Value - abatida;
+            if (resto > 0m)
+                QuantidadeAtual = QuantidadeAtual.Add(Quantidade.From(resto));
+
+            UltimaMovimentacaoEm = alteradoEm;
+            AlteradoEm = alteradoEm;
+            RecalcularIndicadores(alteradoEm);
+        }
+
         public void RestaurarQuantidade(Quantidade quantidade, DateTime alteradoEm)
         {
             QuantidadeAtual = QuantidadeAtual.Add(quantidade);

@@ -57,7 +57,7 @@ namespace EasyStock.Application.UseCases.EstornarSaida
                 if (itemEstoque.EmpresaId != command.EmpresaId)
                     throw new UseCaseValidationException("O item de estoque nao pertence a empresa informada.");
 
-                itemEstoque.RestaurarQuantidade(original.Quantidade, agora);
+                itemEstoque.RestaurarSaidaEstornada(original.Quantidade, agora);
 
                 var auditoria = currentUser is null ? null : new AuditoriaContexto(
                     UsuarioId: currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
