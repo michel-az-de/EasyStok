@@ -1,3 +1,5 @@
+using EasyStock.Application.Services.Auth;
+
 namespace EasyStock.Application.UseCases.DesativarUsuario
 {
     public sealed record DesativarUsuarioCommand(Guid UsuarioId, Guid EmpresaId);
@@ -5,6 +7,7 @@ namespace EasyStock.Application.UseCases.DesativarUsuario
     public class DesativarUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
         IUsuarioEmpresaRepository usuarioEmpresaRepository,
+        RevogadorSessoes revogadorSessoes,
         IUnitOfWork unitOfWork,
         ILogger<DesativarUsuarioUseCase> logger)
     {
@@ -21,6 +24,10 @@ namespace EasyStock.Application.UseCases.DesativarUsuario
 
             linkEmpresa.Ativo = false;
             await usuarioEmpresaRepository.UpdateAsync(linkEmpresa);
+
+            // #1352: desativar tira o vínculo de uma empresa, mas o corte é do usuário todo. Quem está em duas
+            // empresas entra de novo e fica só com a que continua ativa.
+            await revogadorSessoes.RevogarAsync(usuario);
             await unitOfWork.CommitAsync();
         }
     }

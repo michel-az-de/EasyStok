@@ -1,10 +1,12 @@
+using EasyStock.Application.Services.Auth;
+
 namespace EasyStock.Application.UseCases.ResetarSenha;
 
 public sealed class ResetarSenhaUseCase(
     IResetTokenRepository resetTokenRepository,
-    IRefreshTokenRepository refreshTokenRepository,
     IUsuarioRepository usuarioRepository,
     IAuditLogRepository auditLogRepository,
+    RevogadorSessoes revogadorSessoes,
     IUnitOfWork unitOfWork,
     IPasswordHasher passwordHasher,
     ILogger<ResetarSenhaUseCase> logger) : IUseCase<ResetarSenhaCommand, ResetarSenhaResult>
@@ -35,15 +37,9 @@ public sealed class ResetarSenhaUseCase(
         resetToken.MarcarComoUsado();
         await resetTokenRepository.UpdateAsync(resetToken);
 
-        // Revogar todos os refresh tokens anteriores para invalidar sessões
-        var refreshTokensAntigos = await refreshTokenRepository.GetByUsuarioIdAsync(usuario.Id);
-        var tokensRevogados = 0;
-        foreach (var token in refreshTokensAntigos.Where(t => t.EstaValido()))
-        {
-            token.Revogar();
-            await refreshTokenRepository.UpdateAsync(token);
-            tokensRevogados++;
-        }
+        // #1352: derruba toda sessão anterior (carimbo, refresh tokens num UPDATE e cache). Antes era um laço N+1
+        // só nos refresh tokens, e o JWT em circulação seguia valendo até expirar.
+        var tokensRevogados = await revogadorSessoes.RevogarAsync(usuario);
 
         var auditLog = AuditLog.Criar(
             usuario.Id,

@@ -1,6 +1,7 @@
 using EasyStock.Api.Controllers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services.Auth;
 using EasyStock.Application.UseCases.AlterarSenhaUsuario;
 using EasyStock.Application.UseCases.AtribuirPerfilUsuario;
 using EasyStock.Application.UseCases.AtualizarUsuario;
@@ -42,12 +43,15 @@ public class UsuarioControllerTests
         var atribuirPerfilLogger = Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>();
 
         var passwordHasher = Substitute.For<IPasswordHasher>();
+        var revogadorSessoes = new RevogadorSessoes(
+            _usuarioRepository, Substitute.For<IRefreshTokenRepository>(), Substitute.For<ICacheService>(),
+            TimeProvider.System, Substitute.For<ILogger<RevogadorSessoes>>());
         _criarUseCase = new CriarUsuarioUseCase(_usuarioRepository, _assinaturaRepository, _usuarioEmpresaRepository, _usuarioPerfilRepository, _unitOfWork, passwordHasher, criarLogger);
         _atualizarUseCase = new AtualizarUsuarioUseCase(_usuarioRepository, _currentUser, _unitOfWork, atualizarLogger);
-        _alterarSenhaUseCase = new AlterarSenhaUsuarioUseCase(_usuarioRepository, new AlterarSenhaUsuarioCommandValidator(), _unitOfWork, passwordHasher, alterarSenhaLogger);
-        _desativarUseCase = new DesativarUsuarioUseCase(_usuarioRepository, _usuarioEmpresaRepository, _unitOfWork, desativarLogger);
+        _alterarSenhaUseCase = new AlterarSenhaUsuarioUseCase(_usuarioRepository, new AlterarSenhaUsuarioCommandValidator(), revogadorSessoes, _unitOfWork, passwordHasher, alterarSenhaLogger);
+        _desativarUseCase = new DesativarUsuarioUseCase(_usuarioRepository, _usuarioEmpresaRepository, revogadorSessoes, _unitOfWork, desativarLogger);
         _listarUseCase = new ListarUsuariosUseCase(_usuarioRepository);
-        _atribuirPerfilUseCase = new AtribuirPerfilUsuarioUseCase(_usuarioRepository, _usuarioPerfilRepository, _unitOfWork, atribuirPerfilLogger);
+        _atribuirPerfilUseCase = new AtribuirPerfilUsuarioUseCase(_usuarioRepository, _usuarioPerfilRepository, revogadorSessoes, _unitOfWork, atribuirPerfilLogger);
 
         _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
         _controller = new UsuarioController(_criarUseCase, _atualizarUseCase, _alterarSenhaUseCase, _desativarUseCase, _listarUseCase, _atribuirPerfilUseCase, _currentUser);
