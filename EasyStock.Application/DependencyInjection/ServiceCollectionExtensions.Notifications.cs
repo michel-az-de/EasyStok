@@ -15,7 +15,6 @@ public static partial class ServiceCollectionExtensions
     {
         // Services
         services.AddScoped<ResolvedorCanal>();
-        services.AddSingleton<RotinaScheduler>();
         // Quarentena (N1): prazos por tipo; sobrescritas em Notifications:Quarentena:Prazos (bind em AddNotificationsCore).
         services.TryAddSingleton<PoliticaValidadeNotificacao>();
         services.AddScoped<IResolvedorAudiencia, ResolvedorAudiencia>();
@@ -24,6 +23,9 @@ public static partial class ServiceCollectionExtensions
         // N10: porta única dos avisos de problema no sistema (monitor de endpoint, snapshot de saúde, coletor de 5xx).
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IPublicadorIncidenteSistema, PublicadorIncidenteSistema>();
+
+        // Rotinas agendadas (N12): um construtor de payload por tipo agendado; o coletor (Infra.Postgre) é genérico.
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IConstrutorPayloadAgendado, ConstrutorPayloadResumoDiario>());
 
         // Orchestrators (Avaliador e Coletor são puros — Dispatcher é registrado em Infra.Postgre)
         services.AddScoped<INotificacoesAvaliadorOrchestrator, NotificacoesAvaliadorOrchestrator>();

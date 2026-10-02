@@ -65,7 +65,15 @@ public sealed class PublicadorIncidenteSistema(
         tenantContext.SetCurrentTenant(empresa);
         await notificador.EnfileirarEventoAsync(
             TipoEventoNotificacao.IncidenteSistema, empresa, JsonSerializer.Serialize(payload), ct: ct, correlationId: chave);
-        await unitOfWork.CommitAsync();
+        try
+        {
+            await unitOfWork.CommitAsync();
+        }
+        catch (Exception ex) when (unitOfWork.EhViolacaoDeUnicidade(ex))
+        {
+            // N12: o índice único (EmpresaId, CorrelationId) recusa o mesmo incidente na mesma janela. É a dedupe.
+            logger.LogDebug("Incidente {Componente} {Estado} já publicado nesta janela ({Chave}).", componente, estado, chave);
+        }
     }
 
     /// <summary><c>incidente:{componente}:{estado}:{janela}</c>; cabe no <c>varchar(64)</c> do <c>CorrelationId</c>.</summary>

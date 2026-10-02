@@ -37,6 +37,27 @@ internal static class ParametrosDaRotina
     }
 }
 
+/// <summary>Regras da agenda diária (N12): <c>agenda.horario</c> em HH:mm de Brasília; cron não é suportado.</summary>
+internal static class AgendaDaRotina
+{
+    public static void ValidarCron(TriggerTipoRotina? trigger, string? cronExpression)
+    {
+        if (trigger == TriggerTipoRotina.Cron || !string.IsNullOrWhiteSpace(cronExpression))
+            throw new UseCaseValidationException(
+                "CRON_NAO_SUPORTADO",
+                "Cron não é suportado: use agenda.horario (HH:mm, horário de Brasília) em ParametrosJson.");
+    }
+
+    public static void ValidarHorario(string? parametrosJson)
+    {
+        if (!AgendaDiariaLocal.TemAgenda(parametrosJson)) return;
+        if (AgendaDiariaLocal.HorarioDosParametros(parametrosJson) is null)
+            throw new UseCaseValidationException(
+                "AGENDA_HORARIO_INVALIDO",
+                "agenda.horario deve estar no formato HH:mm (00:00 a 23:59), em horário de Brasília.");
+    }
+}
+
 public sealed class CriarRotinaUseCase(
     IRotinaRepository rotinaRepository,
     IUnitOfWork unitOfWork,
@@ -46,6 +67,8 @@ public sealed class CriarRotinaUseCase(
     public async Task<RotinaResult> ExecuteAsync(CriarRotinaCommand command)
     {
         ParametrosDaRotina.ValidarAudiencia(command.ParametrosJson, command.EmpresaId);
+        AgendaDaRotina.ValidarCron(command.TriggerTipo, command.CronExpression);
+        AgendaDaRotina.ValidarHorario(command.ParametrosJson);
 
         var rotina = RotinaNotificacao.Criar(
             command.Codigo, command.Nome, command.TipoEvento,
@@ -86,9 +109,8 @@ public sealed class AtualizarRotinaUseCase(
         var rotina = await rotinaRepository.ObterDaEmpresaAsync(command.RotinaId, command.EmpresaId);
 
         ParametrosDaRotina.ValidarAudiencia(command.ParametrosJson, rotina.EmpresaId);
-
-        if (command.CronExpression is not null)
-            rotina.DefinirCronExpression(command.CronExpression, command.AtualizadoPor);
+        AgendaDaRotina.ValidarCron(null, command.CronExpression);
+        AgendaDaRotina.ValidarHorario(command.ParametrosJson);
 
         if (command.ParametrosJson is not null)
             rotina.DefinirParametros(command.ParametrosJson, command.AtualizadoPor);

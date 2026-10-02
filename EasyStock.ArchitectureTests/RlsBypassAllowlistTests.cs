@@ -93,6 +93,10 @@ public class RlsBypassAllowlistTests
         // N1, #1344: a rodada do coletor varre lotes de todas as empresas por natureza (produto vencendo).
         "EasyStock.Application/Services/Notifications/Orchestrators/NotificacoesColetorOrchestrator.cs",
 
+        // N12, #1344: o coletor de rotinas agendadas lista as rotinas ativas de todas as empresas numa leitura curta sob
+        // bypass (cross-tenant por natureza); cada empresa gera o evento num escopo proprio com o tenant ligado.
+        "EasyStock.Infra.Postgre/Notifications/Collectors/ColetorRotinasAgendadas.cs",
+
         // N1, #1344: o health de backlog mede o outbox e os eventos de todas as empresas com consultas agregadas.
         "EasyStock.Infra.Postgre/Notifications/Backlog/BacklogNotificacoesQuery.cs",
 

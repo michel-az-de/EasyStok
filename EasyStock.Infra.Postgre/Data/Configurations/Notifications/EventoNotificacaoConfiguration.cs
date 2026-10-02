@@ -21,6 +21,11 @@ public class EventoNotificacaoConfiguration : IEntityTypeConfiguration<EventoNot
 
         b.HasIndex(x => new { x.Status, x.OcorridoEm });
         b.HasIndex(x => new { x.EmpresaId, x.Tipo });
+        // N12: a chave de dedup do produtor (CorrelationId) é única por empresa. É a "última execução persistida" das rotinas
+        // agendadas e a trava entre dois hosts (23505 = outro host já gerou o evento do dia).
+        b.HasIndex(x => new { x.EmpresaId, x.CorrelationId })
+            .IsUnique()
+            .HasDatabaseName("ux_notif_eventos_empresa_correlation");
 
         b.HasOne(x => x.Empresa)
             .WithMany()

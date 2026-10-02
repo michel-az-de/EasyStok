@@ -2,15 +2,14 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Security;
-using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EasyStock.Application.Services.Notifications.Orchestrators;
 
 /// <summary>
-/// Implementação pura — processa eventos pendentes via <see cref="INotificadorService"/> e
-/// detecta rotinas Cron disparáveis. Sem loop, sem sleep — invocada por wrapper hosted ou trigger HTTP.
+/// Implementação pura — processa eventos pendentes via <see cref="INotificadorService"/>.
+/// Sem loop, sem sleep — invocada por wrapper hosted ou trigger HTTP.
 /// <para>
 /// Padrão da S39 (N1): a lista de eventos pendentes é cross-tenant por natureza e sai numa leitura curta com o bypass de
 /// RLS ligado pela porta <see cref="IRowLevelSecurityBypass"/> (só <c>(Id, EmpresaId)</c>); cada evento roda num
@@ -24,10 +23,8 @@ public sealed class NotificacoesAvaliadorOrchestrator(
     IServiceScopeFactory scopeFactory,
     IRowLevelSecurityBypass bypassRls,
     IEventoNotificacaoRepository eventoRepo,
-    IRotinaRepository rotinaRepo,
     IUnitOfWork unitOfWork,
     PoliticaValidadeNotificacao politicaValidade,
-    RotinaScheduler rotinaScheduler,
     ILogger<NotificacoesAvaliadorOrchestrator> logger) : INotificacoesAvaliadorOrchestrator
 {
     private const int LimitePorRodada = 200;
@@ -38,7 +35,7 @@ public sealed class NotificacoesAvaliadorOrchestrator(
     private static readonly Meter Meter = new("EasyStock.Notifications", "1.0");
     private static readonly Histogram<double> RunDuration = Meter.CreateHistogram<double>(
         "notifications.avaliador.run.duration", "ms",
-        "Duração de 1 rodada do avaliador (eventos pendentes + cron rotinas)");
+        "Duração de 1 rodada do avaliador (eventos pendentes)");
     private static readonly Counter<long> EventsProcessed = Meter.CreateCounter<long>(
         "notifications.avaliador.events_processed", "events",
         "Total de eventos avaliados pelo avaliador");
@@ -51,7 +48,6 @@ public sealed class NotificacoesAvaliadorOrchestrator(
         {
             // Leitura curta cross-tenant: o bypass entra ANTES da primeira conexão (o interceptor lê a flag na abertura).
             IReadOnlyList<EventoPendente> pendentes;
-            IReadOnlyList<RotinaNotificacao> rotinasAtivas;
             using (bypassRls.Begin())
             {
                 // Quarentena: o evento Pendente além do prazo do tipo vira Expirado antes da lista, então o backlog
@@ -64,7 +60,6 @@ public sealed class NotificacoesAvaliadorOrchestrator(
                 }
 
                 pendentes = await eventoRepo.ListarPendentesParaAvaliarAsync(LimitePorRodada, ct);
-                rotinasAtivas = await rotinaRepo.ListarAtivasAsync(ct: ct);
             }
 
             // 1. Processa eventos pendentes (criados por coletores de estado / publicação direta)
@@ -78,20 +73,6 @@ public sealed class NotificacoesAvaliadorOrchestrator(
             {
                 logger.LogInformation("AvaliadorOrchestrator: processados {Count} eventos pendentes.", pendentes.Count);
                 EventsProcessed.Add(pendentes.Count);
-            }
-
-            // 2. Detecta rotinas Cron disparáveis (eventos serão criados pelos coletores de estado)
-            var agora = DateTime.UtcNow;
-            var ultimaExecucao = agora - (janelaAvaliacao > TimeSpan.Zero ? janelaAvaliacao : TimeSpan.FromMinutes(2));
-
-            foreach (var rotina in rotinasAtivas.Where(r => r.TriggerTipo == TriggerTipoRotina.Cron))
-            {
-                if (!rotinaScheduler.DeveriasExecutar(rotina, ultimaExecucao, agora))
-                    continue;
-
-                logger.LogInformation(
-                    "Rotina cron {Codigo} matched (eventos serão criados pelos coletores).",
-                    rotina.Codigo);
             }
         }
         finally

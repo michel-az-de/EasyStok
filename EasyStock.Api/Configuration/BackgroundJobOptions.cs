@@ -36,6 +36,14 @@ public sealed class BackgroundJobOptions
     public bool EnableContaFinanceiraVencimentoJob { get; set; } = true;
 
     /// <summary>
+    /// N12 (Q3, decisão do Felipe): quando <c>true</c>, o <c>ContaFinanceiraVencimentoJob</c> publica os avisos de conta a
+    /// pagar e a receber vencendo (D-3, D-1) e vencida. Padrão <c>false</c>: o job só marca a parcela vencida, sem evento e
+    /// sem carimbar o dedup, porque o aviso nasceria sem rotina semeada e sem destinatário no payload e o carimbo faria o
+    /// aviso sumir para sempre. Religar é <c>BackgroundJobs:EnableContaFinanceiraNotificacoes=true</c>.
+    /// </summary>
+    public bool EnableContaFinanceiraNotificacoes { get; set; }
+
+    /// <summary>
     /// Quando <c>true</c>, registra o <c>ContaReceberPixReconciliacaoJob</c>
     /// que roda hora em hora consultando Efi pra fechar gaps de webhook em
     /// parcelas CR com Pix ativo. Default true em producao.

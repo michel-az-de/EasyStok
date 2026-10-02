@@ -21,16 +21,9 @@ public class NotificacoesAvaliadorOrchestratorTests
 {
     private readonly INotificadorService _notificador = Substitute.For<INotificadorService>();
     private readonly IEventoNotificacaoRepository _eventoRepo = Substitute.For<IEventoNotificacaoRepository>();
-    private readonly IRotinaRepository _rotinaRepo = Substitute.For<IRotinaRepository>();
     private readonly ITenantContextAccessor _tenant = Substitute.For<ITenantContextAccessor>();
     private readonly IRowLevelSecurityBypass _bypass = Substitute.For<IRowLevelSecurityBypass>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
-
-    public NotificacoesAvaliadorOrchestratorTests()
-    {
-        _rotinaRepo.ListarAtivasAsync(Arg.Any<TipoEventoNotificacao?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
-            .Returns((IReadOnlyList<RotinaNotificacao>)Array.Empty<RotinaNotificacao>());
-    }
 
     private NotificacoesAvaliadorOrchestrator NovoSut()
     {
@@ -41,8 +34,8 @@ public class NotificacoesAvaliadorOrchestratorTests
         services.AddSingleton(_unitOfWork);
         var provider = services.BuildServiceProvider();
         return new NotificacoesAvaliadorOrchestrator(
-            provider.GetRequiredService<IServiceScopeFactory>(), _bypass, _eventoRepo, _rotinaRepo, _unitOfWork,
-            new PoliticaValidadeNotificacao(), new RotinaScheduler(),
+            provider.GetRequiredService<IServiceScopeFactory>(), _bypass, _eventoRepo, _unitOfWork,
+            new PoliticaValidadeNotificacao(),
             NullLogger<NotificacoesAvaliadorOrchestrator>.Instance);
     }
 
@@ -56,6 +49,19 @@ public class NotificacoesAvaliadorOrchestratorTests
     private void ListaPendentes(params EventoNotificacao[] eventos) =>
         _eventoRepo.ListarPendentesParaAvaliarAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns((IReadOnlyList<EventoPendente>)eventos.Select(e => new EventoPendente(e.Id, e.EmpresaId)).ToList());
+
+    [Fact]
+    public void NaoTemMaisRamoCron()
+    {
+        // O ramo cron era um stub que só logava "matched" (N12): o agendamento é horário diário no coletor, sem cron.
+        var parametros = typeof(NotificacoesAvaliadorOrchestrator).GetConstructors().Single()
+            .GetParameters().Select(p => p.ParameterType).ToList();
+
+        parametros.Should().NotContain(t => t.Name == "RotinaScheduler");
+        parametros.Should().NotContain(typeof(IRotinaRepository), "a lista de rotinas só servia ao ramo cron");
+        typeof(INotificacoesAvaliadorOrchestrator).Assembly.GetReferencedAssemblies()
+            .Should().NotContain(a => a.Name == "Cronos");
+    }
 
     [Fact]
     public async Task ExecutarRodadaAsync_sem_pendentes_nao_chama_notificador()

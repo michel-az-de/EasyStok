@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261002122610_AddIndiceUnicoCorrelacaoEvento")]
+    partial class AddIndiceUnicoCorrelacaoEvento
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -5641,13 +5644,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime>("ProximaTentativaEm")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Remetente")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("Loja");
-
                     b.Property<Guid?>("RotinaId")
                         .HasColumnType("uuid");
 
@@ -5812,29 +5808,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsUnique();
 
                     b.ToTable("notif_rotinas", (string)null);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Notifications.TemplateMetaEstado", b =>
-                {
-                    b.Property<string>("Nome")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<string>("Idioma")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.Property<DateTime>("AtualizadoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CategoriaAtual")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.HasKey("Nome", "Idioma");
-
-                    b.ToTable("notif_templates_meta_estado", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Notifications.TemplateNotificacao", b =>
