@@ -61,6 +61,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.RegistrarRetornoImpressaoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.ReimprimirCanhotoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.AlertarImpressoesAtrasadasUseCase>();
+        // N11: aviso externo (e-mail e WhatsApp) da impressão travada, um escopo por impressão.
+        services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.NotificarImpressaoTravadaUseCase>();
 
         // S40: expediente da loja (abrir e fechar, horário por dia).
         services.AddScoped<EasyStock.Application.UseCases.Storefront.Expediente.ObterExpedienteLojaUseCase>();
