@@ -51,7 +51,7 @@ const diaDe = (iso) => {
 }
 
 export function Thread({
-  mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, digitando = false,
+  mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, digitando = false,
 }) {
   const fim = useRef(null)
 
@@ -90,6 +90,7 @@ export function Thread({
             mensagem={l.mensagem}
             trocaDeVoz={l.trocaDeVoz}
             aoAbrirDefinicaoAutomatica={aoAbrirDefinicaoAutomatica}
+            aoReenviar={aoReenviar}
           />
         )
       })}

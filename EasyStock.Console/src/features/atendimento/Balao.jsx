@@ -57,7 +57,7 @@ function LinkDoCardapio({ url }) {
   )
 }
 
-export function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica }) {
+export function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReenviar }) {
   if (mensagem.dir === 'sistema') {
     return (
       <p className={`${css.balao} ${css.sistema} ${trocaDeVoz ? css.trocaDeVoz : ''}`}>
@@ -88,6 +88,12 @@ export function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica }) {
         <time dateTime={mensagem.em}>{horaCurta(mensagem.em)}</time>
         {mensagem.status === 'falhou' && (
           <span className={css.falhou} role="alert">⚠ {mensagem.erro ?? 'Não enviada.'}</span>
+        )}
+        {/* S57: texto que falhou volta a sair pelo mesmo canal. Só com a ação ligada (modo API). */}
+        {mensagem.status === 'falhou' && mensagem.dir === 'out' && aoReenviar && !mensagem.midia && (
+          <button type="button" className={`${css.selo} ${css.seloBotao}`} onClick={() => aoReenviar(mensagem.id)}>
+            <Icone nome="raio" /> Reenviar
+          </button>
         )}
         {mensagem.dir === 'out' && mensagem.status !== 'falhou' && (
           <span>

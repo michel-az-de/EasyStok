@@ -33,6 +33,10 @@ export const baixarMidia = (conversaId, mensagemId) =>
 export const enviarTexto = (id, texto) =>
   chamarApi(`${BASE}/${id}/mensagens`, { metodo: 'POST', corpo: { texto } })
 
+// Reenvio de texto que falhou (S57): devolve a mensagem atualizada (enviada, ou com o novo erro).
+export const reenviarMensagem = (conversaId, mensagemId) =>
+  chamarApi(`${BASE}/${conversaId}/mensagens/${mensagemId}/reenviar`, { metodo: 'POST' })
+
 export const assumir = (id) => chamarApi(`${BASE}/${id}/assumir`, { metodo: 'POST' })
 export const liberarAutomatico = (id) => chamarApi(`${BASE}/${id}/liberar-automatico`, { metodo: 'POST' })
 export const encerrar = (id) => chamarApi(`${BASE}/${id}/encerrar`, { metodo: 'POST' })

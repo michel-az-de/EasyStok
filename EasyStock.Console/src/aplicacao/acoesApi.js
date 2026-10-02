@@ -1,6 +1,6 @@
 import * as acao from './acoes'
 import {
-  assumir, encerrar, enviarTexto, liberarAutomatico, marcarLida,
+  assumir, encerrar, enviarTexto, liberarAutomatico, marcarLida, reenviarMensagem,
 } from '../infra/api/conversasApi'
 import { mensagemDaApi } from '../infra/api/traducaoConversas'
 import { proximoId } from '../infra/repositorioConversas'
@@ -58,6 +58,11 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
         .then((m) => despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m) }))
         .catch((erro) => despachar({ tipo: acao.FALHAR_ENVIO_API, id, mensagemId, erro: motivoDaRecusa(erro) }))
     },
+    // S57: só no modo API (a massa local não tem envio de verdade). A resposta substitui o balão.
+    reenviar: (id, mensagemId) =>
+      reenviarMensagem(id, mensagemId)
+        .then((m) => despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m, id) }))
+        .catch(avisar),
     selecionar: (id) => {
       despachar({ tipo: acao.SELECIONAR_CONVERSA, id })
       marcarLida(id).catch(() => {})
