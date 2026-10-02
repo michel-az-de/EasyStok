@@ -20,12 +20,14 @@ public static class WhatsAppCloudClientServiceCollectionExtensions
         this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<WhatsAppCloudOptions>(configuration.GetSection("Notifications:WhatsApp:Meta"));
+        // N6: o número de plataforma vem da própria seção; o cliente o usa só nos métodos de plataforma.
+        services.PostConfigure<WhatsAppCloudOptions>(o =>
+            o.PhoneNumberIdPlataforma = configuration["Notifications:WhatsApp:Plataforma:PhoneNumberId"]?.Trim() ?? string.Empty);
 
         services.AddHttpClient<WhatsAppCloudClient>("whatsapp-cloud", (sp, client) =>
         {
             var opts = sp.GetRequiredService<IOptions<WhatsAppCloudOptions>>().Value;
-            if (!string.IsNullOrWhiteSpace(opts.BaseUrl))
-                client.BaseAddress = new Uri(opts.BaseUrl.TrimEnd('/') + "/");
+            client.BaseAddress = new Uri(opts.BaseUrlEfetiva.TrimEnd('/') + "/");
             if (!string.IsNullOrWhiteSpace(opts.AccessToken))
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", opts.AccessToken);
         });
@@ -36,6 +38,11 @@ public static class WhatsAppCloudClientServiceCollectionExtensions
             services.AddScoped<IWhatsAppCloudClient>(sp => sp.GetRequiredService<WhatsAppCloudClient>());
         else
             services.AddScoped<IWhatsAppCloudClient>(sp => sp.GetRequiredService<StubWhatsAppCloudClient>());
+
+        // N6: WhatsApp de plataforma. Mesma classe (mesmo HttpClient, token e pipeline sem retry), métodos que não usam
+        // o remetente do tenant. Registrado sempre: só o provider de plataforma o consome, e só com Provider=meta.
+        services.AddScoped<EasyStock.Application.Ports.Output.Notifications.IClienteWhatsAppPlataforma>(
+            sp => sp.GetRequiredService<WhatsAppCloudClient>());
 
         // Porta de canal (S34, ADR-0051): o WhatsApp e um dos adaptadores que o ResolvedorCanal escolhe.
         services.AddScoped<ICanalMensageria, CanalWhatsApp>();

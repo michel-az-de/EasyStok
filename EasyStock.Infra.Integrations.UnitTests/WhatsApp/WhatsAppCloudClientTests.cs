@@ -208,6 +208,33 @@ public class WhatsAppCloudClientTests
         handler.Chamadas.Should().Be(1, "erro permanente não pode ser reenviado — o pipeline nem vê essa exceção");
     }
 
+    [Fact]
+    public async Task Erro132001EhPermanenteSemRetry()
+    {
+        // N6: a tabela de códigos é uma só para a loja e a plataforma; 132001 (template não existe) nunca passa.
+        const string json = """{"error":{"message":"Template name does not exist in the translation","type":"OAuthException","code":132001,"fbtrace_id":"X"}}""";
+        var client = CreateClient(HttpStatusCode.BadRequest, json, out var handler);
+
+        var act = async () => await client.EnviarTextoAsync("5511999998888", "Oi!");
+
+        var ex = await act.Should().ThrowAsync<WhatsAppCloudException>();
+        ex.Which.Codigo.Should().Be(132001);
+        ex.Which.EhPermanente.Should().BeTrue();
+        handler.Chamadas.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Erro131056NaoEPermanente()
+    {
+        const string json = """{"error":{"message":"Pair rate limit hit","type":"OAuthException","code":131056,"fbtrace_id":"X"}}""";
+        var client = CreateClient(HttpStatusCode.BadRequest, json, out _);
+
+        var act = async () => await client.EnviarTextoAsync("5511999998888", "Oi!");
+
+        var ex = await act.Should().ThrowAsync<WhatsAppCloudException>();
+        ex.Which.EhPermanente.Should().BeFalse();
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.BadRequest, 400)]
     [InlineData(HttpStatusCode.TooManyRequests, 429)]

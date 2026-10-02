@@ -3,6 +3,7 @@ using System.Text;
 using EasyStock.Api.Controllers.Webhooks;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
@@ -10,6 +11,7 @@ using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Webhook;
 using EasyStock.Application.UseCases.FeatureFlags;
+using EasyStock.Application.UseCases.Notifications.Plataforma;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Notifications.Options;
 using FluentAssertions;
@@ -32,6 +34,7 @@ public class WebhookWhatsAppControllerTests
     private readonly IEmpresaRepository _empresaRepository = Substitute.For<IEmpresaRepository>();
     private readonly ITenantFeatureFlagRepository _featureFlagRepository = Substitute.For<ITenantFeatureFlagRepository>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
+    private readonly ITemplateMetaEstadoRepository _estadosDeTemplate = Substitute.For<ITemplateMetaEstadoRepository>();
     private readonly WebhookWhatsAppController _controller;
 
     public WebhookWhatsAppControllerTests()
@@ -60,7 +63,11 @@ public class WebhookWhatsAppControllerTests
 
         var metaOptions = Options.Create(new MetaCloudWhatsAppOptions { VerifyToken = VerifyToken, AppSecret = AppSecret });
 
-        _controller = new WebhookWhatsAppController(processarUseCase, metaOptions, NullLogger<WebhookWhatsAppController>.Instance)
+        var categoriaUseCase = new ProcessarCategoriaTemplateWhatsAppUseCase(
+            _estadosDeTemplate, _unitOfWork, NullLogger<ProcessarCategoriaTemplateWhatsAppUseCase>.Instance);
+
+        _controller = new WebhookWhatsAppController(
+            processarUseCase, categoriaUseCase, metaOptions, NullLogger<WebhookWhatsAppController>.Instance)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -120,6 +127,52 @@ public class WebhookWhatsAppControllerTests
         var result = await _controller.Receber(CancellationToken.None);
 
         result.Should().BeOfType<StatusCodeResult>().Which.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+    }
+
+    [Fact]
+    public async Task TemplateCategoryUpdateVaiParaAPlataformaESemEmpresaDesconhecida()
+    {
+        const string payload = """{"object":"whatsapp_business_account","entry":[{"id":"W","changes":[{"field":"template_category_update","value":{"message_template_name":"prazo_estourado","message_template_language":"pt_BR","new_category":"MARKETING"}}]}]}""";
+        SetRequestBody(payload, assinaturaValida: true);
+
+        var result = await _controller.Receber(CancellationToken.None);
+
+        result.Should().BeOfType<OkResult>();
+        await _estadosDeTemplate.Received(1).GravarCategoriaAsync("prazo_estourado", "pt_BR", "MARKETING", Arg.Any<CancellationToken>());
+        // O atendimento nem foi chamado: sem empresa desconhecida e sem registro de falha de entrada.
+        await _empresaRepository.DidNotReceiveWithAnyArgs().GetByWhatsAppPhoneNumberIdAsync(default!, default);
+        await _webhookRecebidoRepository.DidNotReceiveWithAnyArgs().TryRegistrarAsync(default!, default!, default!, default);
+    }
+
+    [Fact]
+    public async Task MessagesContinuaNoAtendimento()
+    {
+        var empresa = Empresa.Criar("Casa da Baba", "11111111000191");
+        _empresaRepository.GetByWhatsAppPhoneNumberIdAsync("PHONE123", Arg.Any<CancellationToken>()).Returns(empresa);
+        _featureFlagRepository.ListarAtivasAsync(empresa.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { FeatureCatalogo.ModuloAtendimento });
+        const string payload = """{"entry":[{"changes":[{"field":"messages","value":{"metadata":{"phone_number_id":"PHONE123"},"messages":[{"from":"5511999998888","id":"wamid.m","timestamp":"1700000000","type":"text","text":{"body":"oi"}}]}},{"field":"template_category_update","value":{"message_template_name":"x","message_template_language":"pt_BR","new_category":"MARKETING"}}]}]}""";
+        SetRequestBody(payload, assinaturaValida: true);
+
+        await _controller.Receber(CancellationToken.None);
+
+        // O resultado do atendimento (200 ou 503) é dele: aqui só importa quem recebeu o quê.
+        await _empresaRepository.Received(1).GetByWhatsAppPhoneNumberIdAsync("PHONE123", Arg.Any<CancellationToken>());
+        await _estadosDeTemplate.Received(1).GravarCategoriaAsync("x", "pt_BR", "MARKETING", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FieldDesconhecidoDevolve200SemRegistro()
+    {
+        const string payload = """{"entry":[{"changes":[{"field":"phone_number_quality_update","value":{"display_phone_number":"1","event":"FLAGGED"}}]}]}""";
+        SetRequestBody(payload, assinaturaValida: true);
+
+        var result = await _controller.Receber(CancellationToken.None);
+
+        result.Should().BeOfType<OkResult>();
+        await _empresaRepository.DidNotReceiveWithAnyArgs().GetByWhatsAppPhoneNumberIdAsync(default!, default);
+        await _webhookRecebidoRepository.DidNotReceiveWithAnyArgs().TryRegistrarAsync(default!, default!, default!, default);
+        await _estadosDeTemplate.DidNotReceiveWithAnyArgs().GravarCategoriaAsync(default!, default!, default!, default);
     }
 
     [Fact]

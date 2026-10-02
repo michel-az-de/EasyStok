@@ -400,4 +400,63 @@ public class OutboxMensagemNotificacaoTests
         m.ProviderMensagemId.Should().HaveLength(OutboxMensagemNotificacao.ProviderMensagemIdMaxLength,
             "o id maior que o varchar(128) quebraria o commit do resultado do envio");
     }
+
+    [Fact]
+    public void CriarGuardaORemetente()
+    {
+        var m = OutboxMensagemNotificacao.Criar(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), CanalNotificacao.WhatsApp, "+5511999990001", "", "b",
+            CategoriaConteudoNotificacao.Seguranca, remetente: OrigemRemetente.Plataforma);
+
+        m.Remetente.Should().Be(OrigemRemetente.Plataforma);
+    }
+
+    [Theory]
+    [InlineData(StatusOutbox.EmEnvio, true)]
+    [InlineData(StatusOutbox.Indeterminado, true)]
+    [InlineData(StatusOutbox.Enviado, false)]
+    [InlineData(StatusOutbox.Falhado, false)]
+    public void ConfirmarEnvioPeloProviderEhMonotonico(StatusOutbox antes, bool muda)
+    {
+        var m = Novo(canal: CanalNotificacao.WhatsApp);
+        switch (antes)
+        {
+            case StatusOutbox.EmEnvio: m.MarcarEmEnvio(); break;
+            case StatusOutbox.Indeterminado: m.MarcarIndeterminado("timeout", "meta-plataforma"); break;
+            case StatusOutbox.Enviado: m.MarcarEnviado("meta-plataforma"); break;
+            case StatusOutbox.Falhado: m.MarcarFalhaTentativa("x", TimeSpan.Zero, permanente: true); break;
+        }
+
+        var mudou = m.ConfirmarEnvioPeloProvider("wamid.1", "meta-plataforma");
+
+        m.Status.Should().Be(muda ? StatusOutbox.Enviado : antes);
+        mudou.Should().BeTrue("o wamid novo conta como mudança, mesmo sem mudar o status");
+        m.ProviderMensagemId.Should().Be("wamid.1");
+    }
+
+    [Theory]
+    [InlineData(StatusOutbox.Enviado, true)]
+    [InlineData(StatusOutbox.Indeterminado, true)]
+    [InlineData(StatusOutbox.EmEnvio, false)]
+    [InlineData(StatusOutbox.Falhado, false)]
+    public void FalhaDeEntregaPeloProviderEhMonotonica(StatusOutbox antes, bool muda)
+    {
+        var m = Novo(canal: CanalNotificacao.WhatsApp);
+        switch (antes)
+        {
+            case StatusOutbox.EmEnvio: m.MarcarEmEnvio(); break;
+            case StatusOutbox.Indeterminado: m.MarcarIndeterminado("timeout"); break;
+            case StatusOutbox.Enviado: m.MarcarEnviado("meta-plataforma"); break;
+            case StatusOutbox.Falhado: m.MarcarFalhaTentativa("x", TimeSpan.Zero, permanente: true); break;
+        }
+
+        var mudou = m.RegistrarFalhaDeEntregaPeloProvider("meta_131026");
+
+        mudou.Should().Be(muda);
+        m.Status.Should().Be(muda ? StatusOutbox.Falhado : antes);
+    }
+
+    [Fact]
+    public void RemetentePadraoEhLoja() =>
+        Novo().Remetente.Should().Be(OrigemRemetente.Loja, "o que já existe (aviso ao cliente, campanha) sai pela loja");
 }

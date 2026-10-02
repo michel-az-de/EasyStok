@@ -1,4 +1,5 @@
 using EasyStock.Domain.Entities.Notifications;
+using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Infra.Postgre.Data.Configurations.Notifications;
 
@@ -26,6 +27,8 @@ public class OutboxMensagemNotificacaoConfiguration : IEntityTypeConfiguration<O
         b.Property(x => x.ProviderUsado).HasMaxLength(40);
         b.Property(x => x.ProviderMensagemId).HasMaxLength(128);
         b.Property(x => x.ErroUltimaTentativa).HasColumnType("text");
+        // N6: de quem a mensagem sai. O default cobre as linhas que já existem, todas da loja.
+        b.Property(x => x.Remetente).HasConversion<string>().HasMaxLength(20).HasDefaultValue(OrigemRemetente.Loja).IsRequired();
         b.Property(x => x.IdempotencyKey).HasMaxLength(64).IsRequired();
         b.Property(x => x.TenantTimezone).HasMaxLength(64).IsRequired();
         b.Property(x => x.CanaisFallbackRestantesJson).HasColumnType("jsonb").IsRequired();

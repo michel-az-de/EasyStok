@@ -34,6 +34,12 @@ public static partial class ServiceCollectionExtensions
         // Use cases — eventos
         services.AddScoped<PublicarEventoNotificacaoUseCase>();
 
+        // WhatsApp de plataforma (N6): webhook do 2º número (status, resposta automática) e recategorização de template.
+        services.AddScoped<EasyStock.Application.UseCases.Notifications.Plataforma.ProcessarStatusWhatsAppPlataformaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Notifications.Plataforma.ProcessarCategoriaTemplateWhatsAppUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Notifications.Plataforma.ResponderMensagemRecebidaPlataformaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Notifications.Plataforma.ProcessarWebhookWhatsAppPlataformaUseCase>();
+
         // Use cases — consentimento
         services.AddScoped<RegistrarOptInUseCase>();
         services.AddScoped<RegistrarOptOutUseCase>();

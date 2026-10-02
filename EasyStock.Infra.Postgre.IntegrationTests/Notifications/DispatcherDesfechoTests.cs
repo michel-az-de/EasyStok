@@ -230,7 +230,8 @@ public class DispatcherDesfechoTests(PostgreSqlDatabaseFixture fixture) : IClass
         var s = await SemearAsync();
         var mensagem = await SemearMensagemAsync(s, CanalNotificacao.WhatsApp, CategoriaConteudoNotificacao.Transacional);
         var canal = new WhatsAppCanal(
-            new StubWhatsAppProvider(NullLogger<StubWhatsAppProvider>.Instance), NullLogger<WhatsAppCanal>.Instance);
+            new StubWhatsAppProvider(NullLogger<StubWhatsAppProvider>.Instance), new ServiceCollection().BuildServiceProvider(),
+            NullLogger<WhatsAppCanal>.Instance);
         await using var provider = ConstruirProvider(canal);
 
         await RodarAsync(provider);

@@ -81,4 +81,39 @@ public class StartupHardeningTests
 
         act.Should().NotThrow();
     }
+
+    // N6: o WhatsApp de plataforma conta como "usa a Meta" e exige o número e o verify token próprios.
+
+    [Theory]
+    [InlineData("", "verify", "token", "secret", "PhoneNumberId")]
+    [InlineData("abc", "verify", "token", "secret", "PhoneNumberId")]
+    [InlineData("123456789012345678901234567890123", "verify", "token", "secret", "PhoneNumberId")]
+    [InlineData("7770009999", "", "token", "secret", "Plataforma:VerifyToken")]
+    [InlineData("7770009999", "verify", "", "secret", "Meta:AccessToken")]
+    [InlineData("7770009999", "verify", "token", "", "Meta:AppSecret")]
+    public void PlataformaMetaExigePhoneNumberIdEVerifyToken(
+        string numero, string verify, string token, string secret, string chaveEsperada)
+    {
+        var act = () => StartupHardening.ValidateWhatsAppPlataforma("meta", numero, verify, token, secret);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage($"*{chaveEsperada}*");
+    }
+
+    [Fact]
+    public void PlataformaMetaCompletaNaoFalha()
+    {
+        var act = () => StartupHardening.ValidateWhatsAppPlataforma("meta", "7770009999", "verify", "token", "secret");
+
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("stub")]
+    public void PlataformaStubNaoExigeNada(string? provider)
+    {
+        var act = () => StartupHardening.ValidateWhatsAppPlataforma(provider, "", "", "", "");
+
+        act.Should().NotThrow();
+    }
 }

@@ -12,6 +12,9 @@ public sealed record MensagemPronta(
     CategoriaConteudoNotificacao Categoria,
     string? ProviderOverride = null)
 {
+    /// <summary>Chave do <see cref="ProviderOverride"/> do WhatsApp de plataforma (N6): <c>whatsapp:plataforma</c>. Loja não leva override.</summary>
+    public const string ProviderOverridePlataforma = "plataforma";
+
     /// <summary>
     /// Dados do envio que o canal interpreta (S09). No WhatsApp da Meta: <c>template</c>,
     /// <c>idioma</c>, <c>param1..paramN</c> e <c>botao1..botao3</c> para envio fora da janela de 24 h, e

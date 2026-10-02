@@ -1,4 +1,4 @@
-﻿using EasyStock.Api.Configuration;
+using EasyStock.Api.Configuration;
 using EasyStock.Api.DependencyInjection;
 using EasyStock.Api.Hosting;
 using EasyStock.Api.Startup;
@@ -204,6 +204,8 @@ StartupHardening.Validate(builder, postgresConnectionString);
 StartupHardening.ValidateTimezone(builder.Environment);
 // WhatsApp Meta: com o provider "meta" ligado, credenciais sao obrigatorias.
 StartupHardening.ValidateWhatsAppMeta(builder);
+// WhatsApp de plataforma (N6): com o provider "meta", numero e verify token proprios sao obrigatorios.
+EasyStock.Infra.Notifications.Hosting.WhatsAppPlataformaStartup.Validar(builder.Configuration);
 
 Log.Information("""
 

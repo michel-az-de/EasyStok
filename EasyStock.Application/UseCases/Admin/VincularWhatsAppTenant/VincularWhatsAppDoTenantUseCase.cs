@@ -1,9 +1,20 @@
+using Microsoft.Extensions.Configuration;
+
 namespace EasyStock.Application.UseCases.Admin.VincularWhatsAppTenant;
 
 /// <summary><paramref name="PhoneNumberId"/> <c>null</c> desvincula.</summary>
 public sealed record VincularWhatsAppDoTenantCommand(Guid EmpresaId, string? PhoneNumberId);
 
-public enum StatusVinculoWhatsApp { Vinculado, Desvinculado, EmpresaNaoEncontrada, NumeroEmUsoPorOutraEmpresa }
+public enum StatusVinculoWhatsApp
+{
+    Vinculado,
+    Desvinculado,
+    EmpresaNaoEncontrada,
+    NumeroEmUsoPorOutraEmpresa,
+
+    /// <summary>É o número de plataforma (N6): não tem dono, senão o webhook do atendimento criaria <c>Conversa</c> para ele.</summary>
+    NumeroReservadoDaPlataforma
+}
 
 public sealed record VinculoWhatsAppResultado(StatusVinculoWhatsApp Status, string? PhoneNumberId);
 
@@ -12,7 +23,8 @@ public sealed record VinculoWhatsAppResultado(StatusVinculoWhatsApp Status, stri
 /// back-office (#1102). O número decide duas coisas: para qual tenant o webhook roteia a mensagem
 /// recebida e por qual número a resposta sai. Por isso o mesmo número nunca pode ter dois donos.
 /// </summary>
-public sealed class VincularWhatsAppDoTenantUseCase(IEmpresaRepository empresaRepository, IUnitOfWork unitOfWork)
+public sealed class VincularWhatsAppDoTenantUseCase(
+    IEmpresaRepository empresaRepository, IUnitOfWork unitOfWork, IConfiguration configuration)
 {
     /// <summary>Mesmo limite da coluna (<c>EmpresaConfiguration</c>): recusar aqui dá mensagem melhor que erro do banco.</summary>
     public const int TamanhoMaximo = 32;
@@ -32,6 +44,11 @@ public sealed class VincularWhatsAppDoTenantUseCase(IEmpresaRepository empresaRe
             await PersistirAsync(empresa);
             return new VinculoWhatsAppResultado(StatusVinculoWhatsApp.Desvinculado, null);
         }
+
+        // N6: o número do WhatsApp de plataforma é do sistema e nunca de uma empresa.
+        var daPlataforma = configuration["Notifications:WhatsApp:Plataforma:PhoneNumberId"]?.Trim();
+        if (!string.IsNullOrEmpty(daPlataforma) && daPlataforma == numero)
+            return new VinculoWhatsAppResultado(StatusVinculoWhatsApp.NumeroReservadoDaPlataforma, numero);
 
         // Pré-checagem para devolver 409 legível; a corrida entre dois PUTs simultâneos ainda
         // esbarra no índice único filtrado e vira 409 pelo handler global de 23505.
