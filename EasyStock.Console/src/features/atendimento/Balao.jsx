@@ -90,7 +90,8 @@ export function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReen
           <span className={css.falhou} role="alert">⚠ {mensagem.erro ?? 'Não enviada.'}</span>
         )}
         {/* S57: texto que falhou volta a sair pelo mesmo canal. Só com a ação ligada (modo API). */}
-        {mensagem.status === 'falhou' && mensagem.dir === 'out' && aoReenviar && !mensagem.midia && (
+        {mensagem.porSms && <span className={css.selo}><Icone nome="check" /> saiu por SMS</span>}
+        {mensagem.status === 'falhou' && mensagem.dir === 'out' && aoReenviar && !mensagem.midia && !mensagem.aguardaCliente && (
           <button type="button" className={`${css.selo} ${css.seloBotao}`} onClick={() => aoReenviar(mensagem.id)}>
             <Icone nome="raio" /> Reenviar
           </button>

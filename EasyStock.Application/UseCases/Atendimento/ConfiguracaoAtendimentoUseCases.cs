@@ -15,7 +15,9 @@ public sealed record ConfiguracaoAtendimentoResult(
     int TempoPreparoPadraoMinutos,
     DateTime? WebhookVerificadoEm,
     DateTime? UltimaMensagemRecebidaEm,
-    bool Ativo);
+    bool Ativo,
+    string? ModeloRetomadaNome = null,
+    string ModeloRetomadaIdioma = ConfiguracaoAtendimento.IdiomaModeloPadrao);
 
 public sealed record ObterConfiguracaoAtendimentoQuery(Guid EmpresaId);
 
@@ -30,7 +32,7 @@ public sealed class ObterConfiguracaoAtendimentoUseCase(IConfiguracaoAtendimento
     internal static ConfiguracaoAtendimentoResult ToResult(ConfiguracaoAtendimento c) => new(
         c.EmpresaId, c.Tom, c.NivelSugestao, c.SaudacaoPrimeiroContato, c.SaudacaoRetorno,
         c.FraseEspera, c.MensagemForaArea, c.RespiroMinutos, c.TempoPreparoPadraoMinutos,
-        c.WebhookVerificadoEm, c.UltimaMensagemRecebidaEm, c.Ativo);
+        c.WebhookVerificadoEm, c.UltimaMensagemRecebidaEm, c.Ativo, c.ModeloRetomadaNome, c.ModeloRetomadaIdioma);
 }
 
 public sealed record AtualizarConfiguracaoAtendimentoCommand(
@@ -75,6 +77,35 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
         if (nova) await repository.AddAsync(configuracao);
         else await repository.UpdateAsync(configuracao);
 
+        await unitOfWork.CommitAsync();
+
+        return ObterConfiguracaoAtendimentoUseCase.ToResult(configuracao);
+    }
+}
+
+/// <summary>
+/// S58 (#1391): define (ou limpa, com nome vazio) o modelo aprovado que reabre a conversa fora da janela de 24 h.
+/// O nome tem de existir aprovado na Meta, com uma variável no corpo (o primeiro nome do cliente).
+/// </summary>
+public sealed class DefinirModeloRetomadaUseCase(IConfiguracaoAtendimentoRepository repository, IUnitOfWork unitOfWork)
+{
+    public async Task<ConfiguracaoAtendimentoResult> ExecuteAsync(Guid empresaId, string? nome, string? idioma)
+    {
+        var configuracao = await repository.GetByEmpresaIdAsync(empresaId);
+        var nova = configuracao is null;
+        configuracao ??= ConfiguracaoAtendimento.CriarPadrao(empresaId);
+
+        try
+        {
+            configuracao.DefinirModeloRetomada(nome, idioma);
+        }
+        catch (RegraDeDominioVioladaException ex)
+        {
+            throw new UseCaseValidationException(ex.Message);
+        }
+
+        if (nova) await repository.AddAsync(configuracao);
+        else await repository.UpdateAsync(configuracao);
         await unitOfWork.CommitAsync();
 
         return ObterConfiguracaoAtendimentoUseCase.ToResult(configuracao);

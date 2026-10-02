@@ -65,6 +65,26 @@ public class Mensagem
     /// <summary>Quando o reenvio automático tenta de novo; nulo quando não há reenvio agendado (S57).</summary>
     public DateTime? ProximoReenvioEm { get; private set; }
 
+    /// <summary>Tipo da última falha de envio (S57); decide se a reserva por SMS cabe (S60).</summary>
+    public TipoFalhaEnvio? UltimaFalhaEnvio { get; private set; }
+
+    /// <summary>
+    /// S58 (#1391): fora da janela de 24 h, o modelo de retomada saiu e a mensagem espera o cliente responder.
+    /// Nulo quando não espera.
+    /// </summary>
+    public DateTime? AguardaClienteDesde { get; private set; }
+
+    /// <summary>S60: quando o texto saiu pela reserva por SMS; nulo se não saiu.</summary>
+    public DateTime? ReservaSmsEm { get; private set; }
+
+    /// <summary>
+    /// S60: o WhatsApp desistiu (sem reenvio agendado, sem esperar o cliente), a falha não é incerta e o SMS
+    /// ainda não saiu.
+    /// </summary>
+    public bool PrecisaDeReservaSms =>
+        PodeReenviar && ProximoReenvioEm is null && AguardaClienteDesde is null && ReservaSmsEm is null
+        && UltimaFalhaEnvio is TipoFalhaEnvio.Temporaria or TipoFalhaEnvio.Permanente;
+
     /// <summary>Texto que falhou e pode ser reenviado (automático ou pelo console).</summary>
     public bool PodeReenviar =>
         Direcao == DirecaoMensagem.Saida && Status == StatusMensagem.Falhou
@@ -143,6 +163,7 @@ public class Mensagem
         var motivo = tipo == TipoFalhaEnvio.Incerta ? $"Envio incerto (sem resposta do canal): {erro}" : erro;
         AtualizarStatusEntrega(StatusMensagem.Falhou, motivo);
         TentativasEnvio++;
+        UltimaFalhaEnvio = tipo;
 
         var podeAgendar = tipo == TipoFalhaEnvio.Temporaria
             && TentativasEnvio <= EsperasReenvio.Length
@@ -162,6 +183,34 @@ public class Mensagem
         Status = StatusMensagem.Enviada;
         Erro = null;
         ProximoReenvioEm = null;
+        AguardaClienteDesde = null;
+    }
+
+    /// <summary>S58: o modelo de retomada saiu; a mensagem espera o cliente responder para reabrir a janela.</summary>
+    public void AguardarCliente(DateTime agora, string motivo)
+    {
+        if (!PodeReenviar)
+            throw new RegraDeDominioVioladaException("Só texto que falhou pode esperar o cliente.");
+        AguardaClienteDesde = Utc(agora);
+        ProximoReenvioEm = null;
+        Erro = Truncar(motivo, ErroTamanhoMaximo);
+    }
+
+    /// <summary>S58: o cliente respondeu e a janela reabriu: reenvio na hora.</summary>
+    public void LiberarAposResposta(DateTime agora)
+    {
+        if (AguardaClienteDesde is null)
+            throw new RegraDeDominioVioladaException("Mensagem não está esperando o cliente.");
+        AguardaClienteDesde = null;
+        ProximoReenvioEm = Utc(agora);
+    }
+
+    /// <summary>S60: o texto saiu por SMS. Uma vez por mensagem.</summary>
+    public void RegistrarReservaSms(DateTime agora)
+    {
+        if (!PrecisaDeReservaSms)
+            throw new RegraDeDominioVioladaException("Reserva por SMS não cabe nesta mensagem.");
+        ReservaSmsEm = Utc(agora);
     }
 
     public void MarcarComoProgramada()

@@ -6,7 +6,16 @@ const BASE = '/api/atendimento/configuracao'
 
 export const obterConfiguracao = () => chamarApi(BASE)
 
-export const salvarConfiguracao = (c) => chamarApi(BASE, {
+// S58 (#1391): o modelo de retomada vai num PUT próprio; a resposta dele é a configuração inteira gravada.
+export const salvarConfiguracao = async (c) => {
+  await salvarGeral(c)
+  return chamarApi(`${BASE}/modelo-retomada`, {
+    metodo: 'PUT',
+    corpo: { nome: c.modeloRetomadaNome?.trim() || null, idioma: c.modeloRetomadaIdioma || null },
+  })
+}
+
+const salvarGeral = (c) => chamarApi(BASE, {
   metodo: 'PUT',
   corpo: {
     tom: c.tom,

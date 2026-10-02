@@ -37,6 +37,9 @@ export const enviarTexto = (id, texto) =>
 export const reenviarMensagem = (conversaId, mensagemId) =>
   chamarApi(`${BASE}/${conversaId}/mensagens/${mensagemId}/reenviar`, { metodo: 'POST' })
 
+// Mensagens que não chegaram ao cliente, de todas as conversas (S59).
+export const listarNaoEntregues = ({ limite = 50 } = {}) => chamarApi(`${BASE}/nao-entregues?limite=${limite}`)
+
 export const assumir = (id) => chamarApi(`${BASE}/${id}/assumir`, { metodo: 'POST' })
 export const liberarAutomatico = (id) => chamarApi(`${BASE}/${id}/liberar-automatico`, { metodo: 'POST' })
 export const encerrar = (id) => chamarApi(`${BASE}/${id}/encerrar`, { metodo: 'POST' })

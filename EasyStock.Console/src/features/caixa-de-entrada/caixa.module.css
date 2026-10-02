@@ -266,3 +266,20 @@
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   margin-top: 2px; font-size: var(--t-apoio); color: var(--atencao); line-height: 1.35;
 }
+
+/* S59 (#1391): faixa e lista de "Não entregues". */
+.faixaNaoEntregues {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px;
+  padding: 8px 16px; border: 0; border-bottom: 1px solid var(--linha);
+  background: light-dark(#fdecea, #3a1d1a); color: var(--perigo);
+  font: inherit; font-size: 1rem; font-weight: 600; text-align: left; cursor: pointer;
+}
+.faixaNaoEntregues:hover, .faixaNaoEntregues:focus-visible { text-decoration: underline; }
+.verNaoEntregues { margin-left: auto; }
+.listaNaoEntregues { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.itemNaoEntregue { border: 1px solid var(--linha); border-radius: 12px; padding: 12px; display: grid; gap: 6px; }
+.topoNaoEntregue { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.topoNaoEntregue time { margin-left: auto; color: var(--tinta-suave, inherit); }
+.textoNaoEntregue { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.erroNaoEntregue { margin: 0; color: var(--perigo); font-size: .95rem; }
+.acoesNaoEntregue { display: flex; gap: 8px; flex-wrap: wrap; }

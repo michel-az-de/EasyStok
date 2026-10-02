@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using EasyStock.Api.Controllers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
@@ -51,7 +52,10 @@ public class ConsoleTagHumanaTests
             new ListarConversasAtendimentoUseCase(_conversas),
             new ListarMensagensConversaUseCase(_conversas),
             new EnviarMensagemConsoleUseCase(_conversas, resolvedor, uploads, _uow),
-            new ReenviarMensagemUseCase(_conversas, resolvedor, _uow, TimeProvider.System),
+            new ReenviarMensagemUseCase(_conversas, ConfiguracoesPadrao(), resolvedor,
+                new ReservaSmsAtendimento(resolvedor, ReservaSmsOpcoes.Desligada, NullLogger<ReservaSmsAtendimento>.Instance),
+                _uow, TimeProvider.System),
+            new ListarNaoEntreguesUseCase(_conversas),
             new GerenciarConversaAtendimentoUseCase(_conversas, _uow),
             new TransferirConversaUseCase(_conversas, Substitute.For<IAtendenteRepository>(), _uow),
             new ObterDossieClienteUseCase(
@@ -84,6 +88,13 @@ public class ConsoleTagHumanaTests
         _meta.Enviados.Single().Should().Contain("\"messaging_type\":\"MESSAGE_TAG\"").And.Contain("\"tag\":\"HUMAN_AGENT\"")
             .And.Contain(contato);
         await _uow.Received(1).CommitAsync();
+    }
+
+    private static IConfiguracaoAtendimentoRepository ConfiguracoesPadrao()
+    {
+        var configuracoes = Substitute.For<IConfiguracaoAtendimentoRepository>();
+        configuracoes.GetOrDefaultAsync(Arg.Any<Guid>()).Returns(c => ConfiguracaoAtendimento.CriarPadrao(c.Arg<Guid>()));
+        return configuracoes;
     }
 
     [Fact]

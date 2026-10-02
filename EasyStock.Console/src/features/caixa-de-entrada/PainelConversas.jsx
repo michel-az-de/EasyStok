@@ -5,6 +5,7 @@ import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { CartaoConversa } from './CartaoConversa'
 import { BarraBalcao } from './BarraBalcao'
+import { NaoEntregues } from './NaoEntregues'
 import css from './caixa.module.css'
 
 // Grupo recolhido do fim de "Todas" (seção 1): Encerradas e Bloqueados, cada
@@ -105,6 +106,7 @@ export function PainelConversas({ aoAbrir }) {
   return (
     <>
       <BarraBalcao filtros={filtros} aoMudar={mudarFiltro} />
+      <NaoEntregues aoAbrir={aoAbrir} />
       <div
         className={css.rolagem}
         onMouseEnter={travar}

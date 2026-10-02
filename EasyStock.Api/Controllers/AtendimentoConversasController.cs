@@ -23,6 +23,7 @@ public class AtendimentoConversasController(
     ListarMensagensConversaUseCase listarMensagensUseCase,
     EnviarMensagemConsoleUseCase enviarUseCase,
     ReenviarMensagemUseCase reenviarUseCase,
+    ListarNaoEntreguesUseCase naoEntreguesUseCase,
     GerenciarConversaAtendimentoUseCase gerenciarUseCase,
     TransferirConversaUseCase transferirUseCase,
     ObterDossieClienteUseCase dossieUseCase,
@@ -103,6 +104,13 @@ public class AtendimentoConversasController(
     public Task<IActionResult> EnviarMensagem(Guid id, [FromBody] EnviarMensagemConsoleBody body, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await enviarUseCase.EnviarTextoAsync(
             new EnviarTextoConsoleCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.Texto ?? string.Empty), ct)));
+
+    [SwaggerOperation(Summary = "Messages that did not reach the customer (S59)",
+        Description = "Saída que falhou, mais recente primeiro: inclui a que espera o cliente responder ao modelo de retomada e a que saiu por SMS.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [HttpGet("nao-entregues")]
+    public async Task<IActionResult> NaoEntregues([FromQuery] int? limite, CancellationToken ct = default)
+        => DataOk(await naoEntreguesUseCase.ExecuteAsync(currentUser.EmpresaId, limite, ct));
 
     [SwaggerOperation(Summary = "Resend a text message that failed (S57)",
         Description = "Fora da janela de 24 h não envia: devolve a mensagem com o motivo no erro.")]

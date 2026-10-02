@@ -22,6 +22,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<LinkCardapioConversaService>();
         services.AddScoped<ArmazenadorMidiaWhatsApp>();
         services.AddScoped<ResolvedorCanal>();
+        // S60: reserva por SMS, desligada por padrão; a Api liga só com chave e provedor real.
+        services.TryAddSingleton(ReservaSmsOpcoes.Desligada);
+        services.AddScoped<ReservaSmsAtendimento>();
 
         // S38: consentimento do cliente final por canal e opt-out por palavra.
         services.AddScoped<PoliticaEnvioCliente>();

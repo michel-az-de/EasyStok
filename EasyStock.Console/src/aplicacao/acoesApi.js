@@ -1,8 +1,8 @@
 import * as acao from './acoes'
 import {
-  assumir, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, marcarLida, reenviarMensagem,
+  assumir, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarNaoEntregues, marcarLida, reenviarMensagem,
 } from '../infra/api/conversasApi'
-import { mensagemDaApi } from '../infra/api/traducaoConversas'
+import { mensagemDaApi, naoEntregueDaApi } from '../infra/api/traducaoConversas'
 import { proximoId } from '../infra/repositorioConversas'
 import { criarAcoesExpedienteApi } from './api/expediente'
 import { criarAcoesConfiguracaoApi } from './api/configuracao'
@@ -70,6 +70,8 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
         avisar(erro)
         return null
       }),
+    // S59: painel "Não entregues", direto da API (não passa pelo reducer).
+    listarNaoEntregues: () => listarNaoEntregues().then((linhas) => (linhas ?? []).map(naoEntregueDaApi)),
     selecionar: (id) => {
       despachar({ tipo: acao.SELECIONAR_CONVERSA, id })
       marcarLida(id).catch(() => {})

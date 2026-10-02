@@ -70,7 +70,10 @@ public class AtendimentoConversasControllerTests
             new ListarConversasAtendimentoUseCase(_repositorio),
             new ListarMensagensConversaUseCase(_repositorio),
             new EnviarMensagemConsoleUseCase(_repositorio, resolvedor, uploads, _unitOfWork),
-            new ReenviarMensagemUseCase(_repositorio, resolvedor, _unitOfWork, TimeProvider.System),
+            new ReenviarMensagemUseCase(_repositorio, ConfiguracoesPadrao(), resolvedor,
+                new ReservaSmsAtendimento(resolvedor, ReservaSmsOpcoes.Desligada, NullLogger<ReservaSmsAtendimento>.Instance),
+                _unitOfWork, TimeProvider.System),
+            new ListarNaoEntreguesUseCase(_repositorio),
             new GerenciarConversaAtendimentoUseCase(_repositorio, _unitOfWork),
             new TransferirConversaUseCase(_repositorio, _atendentes, _unitOfWork),
             new ObterDossieClienteUseCase(
@@ -88,6 +91,13 @@ public class AtendimentoConversasControllerTests
         _repositorio.Conversas.Add(conversa);
         _repositorio.Mensagens.Add(Mensagem.Entrada(_empresaId, conversa.Id, entrada, TipoConteudoMensagem.Texto, "oi", "wamid.in1"));
         return conversa;
+    }
+
+    private static IConfiguracaoAtendimentoRepository ConfiguracoesPadrao()
+    {
+        var configuracoes = Substitute.For<IConfiguracaoAtendimentoRepository>();
+        configuracoes.GetOrDefaultAsync(Arg.Any<Guid>()).Returns(c => ConfiguracaoAtendimento.CriarPadrao(c.Arg<Guid>()));
+        return configuracoes;
     }
 
     [Fact]
@@ -141,6 +151,21 @@ public class AtendimentoConversasControllerTests
         await _canal.Received(1).EnviarTextoAsync(WaId, "Temos ravioli!", Arg.Any<CancellationToken>());
         falhou.Status.Should().Be(StatusMensagem.Enviada);
         falhou.ExternoId.Should().Be("wamid.dona1");
+    }
+
+    [Fact]
+    public async Task NaoEntreguesListaAMensagemQueFalhou()
+    {
+        var conversa = ConversaComClienteAgora();
+        var falhou = Mensagem.Saida(_empresaId, conversa.Id, AutorMensagem.Agente, DateTime.UtcNow, TipoConteudoMensagem.Texto, "Temos ravioli!");
+        falhou.RegistrarFalhaEnvio("Meta fora", TipoFalhaEnvio.Permanente, DateTime.UtcNow);
+        _repositorio.Mensagens.Add(falhou);
+
+        var result = await _controller.NaoEntregues(null, default);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var dados = (IReadOnlyList<MensagemNaoEntregueResult>)ok.Value!.GetType().GetProperty("Data")!.GetValue(ok.Value)!;
+        dados.Should().ContainSingle().Which.Mensagem.Id.Should().Be(falhou.Id);
     }
 
     [Fact]
@@ -651,6 +676,19 @@ public class AtendimentoConversasControllerTests
 
         public Task<IReadOnlyList<Mensagem>> ListarReenviosVencidosComLockAsync(DateTime agora, int limite, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<Mensagem>>(Mensagens.Where(m => m.ProximoReenvioEm <= agora).Take(limite).ToList());
+
+        public Task<bool> ExisteAguardandoClienteAsync(
+            Guid empresaId, CanalConversa canal, string contatoIdExterno, Guid? clienteId, DateTime desde, CancellationToken ct = default) =>
+            Task.FromResult(Mensagens.Any(m => m.EmpresaId == empresaId && m.AguardaClienteDesde > desde));
+
+        public Task<IReadOnlyList<Mensagem>> ListarAguardandoComRespostaComLockAsync(int limite, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<Mensagem>>([]);
+
+        public Task<IReadOnlyList<MensagemNaoEntregue>> ListarNaoEntreguesAsync(Guid empresaId, int limite, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<MensagemNaoEntregue>>(Mensagens
+                .Where(m => m.EmpresaId == empresaId && m.Direcao == DirecaoMensagem.Saida && m.Status == StatusMensagem.Falhou)
+                .OrderByDescending(m => m.EnviadaEm).Take(limite)
+                .Select(m => new MensagemNaoEntregue(Conversas.First(c => c.Id == m.ConversaId), m)).ToList());
 
         public Task AddAsync(Conversa conversa, CancellationToken ct = default)
         {

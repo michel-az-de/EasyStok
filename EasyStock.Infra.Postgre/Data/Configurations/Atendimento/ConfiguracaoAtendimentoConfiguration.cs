@@ -18,6 +18,10 @@ public class ConfiguracaoAtendimentoConfiguration : IEntityTypeConfiguration<Con
         builder.Property(x => x.RespiroMinutos).HasDefaultValue(40);
         builder.Property(x => x.TempoPreparoPadraoMinutos).HasDefaultValue(60);
         builder.Property(x => x.Ativo).HasDefaultValue(true);
+        // S58: modelo de retomada fora da janela de 24 h (nulo = sem retomada).
+        builder.Property(x => x.ModeloRetomadaNome).HasMaxLength(ConfiguracaoAtendimento.ModeloNomeTamanhoMaximo);
+        builder.Property(x => x.ModeloRetomadaIdioma).IsRequired().HasMaxLength(16)
+            .HasDefaultValue(ConfiguracaoAtendimento.IdiomaModeloPadrao);
         builder.Property(x => x.CriadoEm).IsRequired();
         builder.Property(x => x.AlteradoEm).IsRequired();
 
