@@ -1,12 +1,8 @@
 using System.Net;
-using System.Net.Mail;
-using System.Net.Sockets;
 using System.Security.Cryptography;
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
-using EasyStock.Infra.Notifications.Email;
 using EasyStock.Infra.Notifications.Options;
 using EasyStock.Infra.Notifications.Push;
 using EasyStock.Infra.Notifications.Sms;
@@ -35,84 +31,10 @@ public class ClassificacaoDeFalhaTests
         new(Guid.NewGuid(), Guid.NewGuid(), destinatario, "Assunto", "Corpo", canal, CategoriaConteudoNotificacao.Transacional);
 
     // ----- SMTP (e-mail) -----
-
-    private static async Task<(ResultadoEnvio Resultado, int Chamadas)> EnviarEmailQueFalhaCom(Exception falha)
-    {
-        var chamadas = 0;
-        var email = Substitute.For<IEmailService>();
-        email.SendAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>())
-            .Returns(_ =>
-            {
-                chamadas++;
-                return Task.FromException(falha);
-            });
-        var canal = new SmtpEmailCanal(email, NullLogger<SmtpEmailCanal>.Instance);
-
-        var resultado = await canal.EnviarAsync(Mensagem(CanalNotificacao.Email, Email));
-
-        return (resultado, chamadas);
-    }
-
-    [Fact]
-    public async Task Smtp_550_e_falha_permanente()
-    {
-        var (resultado, chamadas) = await EnviarEmailQueFalhaCom(
-            new SmtpException(SmtpStatusCode.MailboxUnavailable, "550 5.1.1 Mailbox unavailable"));
-
-        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaPermanente);
-        resultado.FalhaPermanente.Should().BeTrue();
-        resultado.Sucesso.Should().BeFalse();
-        resultado.ProviderUsado.Should().Be("smtp");
-        chamadas.Should().Be(1, "550 nunca passa: nenhuma retentativa nem dentro do canal");
-    }
-
-    [Fact]
-    public async Task Smtp_421_e_transitoria_e_chama_o_servico_uma_vez()
-    {
-        var (resultado, chamadas) = await EnviarEmailQueFalhaCom(
-            new SmtpException(SmtpStatusCode.ServiceNotAvailable, "421 4.3.2 Service not available"));
-
-        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaTransitoria);
-        resultado.FalhaPermanente.Should().BeFalse();
-        chamadas.Should().Be(1, "quem repete é o outbox (1, 5 e 30 min), não o canal nem o serviço");
-    }
-
-    [Theory]
-    [InlineData(SmtpStatusCode.ServiceNotAvailable, false)] // 421
-    [InlineData(SmtpStatusCode.MailboxBusy, false)] // 450
-    [InlineData(SmtpStatusCode.LocalErrorInProcessing, false)] // 451
-    [InlineData(SmtpStatusCode.InsufficientStorage, false)] // 452
-    [InlineData(SmtpStatusCode.GeneralFailure, false)] // -1: falha de conexão, sem resposta do servidor
-    [InlineData(SmtpStatusCode.CommandUnrecognized, true)] // 500
-    [InlineData(SmtpStatusCode.MustIssueStartTlsFirst, true)] // 530
-    [InlineData(SmtpStatusCode.MailboxUnavailable, true)] // 550
-    [InlineData(SmtpStatusCode.ExceededStorageAllocation, true)] // 552
-    [InlineData(SmtpStatusCode.TransactionFailed, true)] // 554
-    public async Task Smtp_classifica_pelo_codigo_de_status(SmtpStatusCode codigo, bool permanente)
-    {
-        var (resultado, chamadas) = await EnviarEmailQueFalhaCom(new SmtpException(codigo, $"smtp {(int)codigo}"));
-
-        resultado.FalhaPermanente.Should().Be(permanente);
-        resultado.Desfecho.Should().Be(permanente ? DesfechoEnvio.FalhaPermanente : DesfechoEnvio.FalhaTransitoria);
-        chamadas.Should().Be(1);
-    }
-
-    public static TheoryData<Exception> FalhasDeRede => new()
-    {
-        new IOException("conexão encerrada"),
-        new SocketException(),
-        new InvalidOperationException("sem protocolo SMTP"),
-    };
-
-    [Theory]
-    [MemberData(nameof(FalhasDeRede))]
-    public async Task Email_com_falha_que_nao_e_resposta_smtp_e_transitorio(Exception falha)
-    {
-        var (resultado, chamadas) = await EnviarEmailQueFalhaCom(falha);
-
-        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaTransitoria);
-        chamadas.Should().Be(1);
-    }
+    // N3: a classificacao do SMTP saiu do canal e foi para o servico sobre MailKit. Os casos daqui (550 permanente,
+    // 421 transitorio e uma chamada so, tabela de codigos 4xx e 5xx, falha de rede) agora sao exercitados no protocolo
+    // de verdade: EasyStock.Infra.Async.UnitTests/Email/ClassificadorFalhaSmtpTests (tabela de codigos e rede) e
+    // SmtpEmailServiceTests (servidor SMTP falso em loopback, uma conexao por envio).
 
     // ----- Twilio (SMS e WhatsApp saem no máximo uma vez) -----
 

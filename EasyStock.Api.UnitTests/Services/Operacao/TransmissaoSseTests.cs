@@ -99,27 +99,32 @@ public class TransmissaoSseTests
     {
         // O heartbeat só sai quando a fila fica parada; com pedido entrando o tempo todo, a conferência não
         // pode depender dele, senão uma sessão revogada receberia eventos para sempre.
+        //
+        // O relógio é falso de propósito: com o relógio de parede e intervalo de 200 ms, uma parada de 200 ms do
+        // publicador (runner de CI sob carga) virava heartbeat e o teste falhava sem defeito nenhum no laço. Agora o
+        // tempo só anda quando o teste manda, e um heartbeat exigiria o relógio falso passar do intervalo sem evento.
+        var relogio = new FakeTimeProvider(Inicio);
         using var ouvinte = _broker.SubscribeOperacao("ocupado", _empresaId);
         var (resposta, corpo) = Resposta();
         using var cts = new CancellationTokenSource(Limite);
         var conferencias = 0;
-        var intervalo = TimeSpan.FromMilliseconds(200); // folga: o publicador tem de manter a fila sempre ocupada
+        var intervalo = TimeSpan.FromSeconds(30);
+        var passo = TimeSpan.FromSeconds(11); // menor que o intervalo: a fila nunca fica parada por ele inteiro
 
         var stream = TransmissaoSse.TransmitirAsync(
-            resposta, ouvinte.Slot, intervalo, DateTimeOffset.UtcNow.AddHours(1),
+            resposta, ouvinte.Slot, intervalo, Inicio.AddHours(1),
             _ => Task.FromResult(Interlocked.Increment(ref conferencias) < 3),
-            TimeProvider.System, cts.Token);
+            relogio, cts.Token);
 
-        var publicador = Task.Run(async () =>
+        for (var n = 0; !stream.IsCompleted; n++)
         {
-            for (var n = 0; !stream.IsCompleted && !cts.IsCancellationRequested; n++)
-            {
-                _broker.PublicarOperacao(_empresaId, "pedido.pago", new { n });
-                await Task.Delay(5);
-            }
-        });
+            if (n > 500) throw new TimeoutException("o stream não fechou na 3ª conferência");
+            _broker.PublicarOperacao(_empresaId, "pedido.pago", new { n });
+            relogio.Advance(passo);
+            await Task.Delay(5);
+        }
+
         await stream.WaitAsync(Limite);
-        await publicador;
 
         Volatile.Read(ref conferencias).Should().Be(3, "fechou na 3ª conferência");
         corpo.Texto().Should().Contain("event: pedido.pago").And.NotContain(": heartbeat",

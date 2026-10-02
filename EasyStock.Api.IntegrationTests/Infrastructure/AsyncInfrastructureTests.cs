@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Infra.Async;
 using FluentAssertions;
 using Microsoft.Extensions.Caching.Memory;
@@ -178,6 +179,9 @@ public sealed class TestEmailService : IEmailService
 
     public Task SendTemplateAsync(string to, string subject, string templateName, object model, bool isHtml = true) =>
         Task.CompletedTask;
+
+    public Task<ResultadoEnvio> EnviarAsync(MensagemEmail mensagem, CancellationToken ct = default) =>
+        Task.FromResult(new ResultadoEnvio(Sucesso: true, ProviderUsado: "teste"));
 }
 
 /// <summary>Implementação em memória do storage para testes.</summary>

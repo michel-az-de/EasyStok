@@ -1,4 +1,3 @@
-using System.Net.Mail;
 using System.Net.Sockets;
 using EasyStock.Application.Ports.Output.Notifications;
 using Polly.Timeout;
@@ -21,9 +20,6 @@ internal static class ClassificadorDeFalha
 {
     /// <summary>HTTP 4xx, exceto 408 (timeout do pedido) e 429 (limite de taxa), nunca vai passar.</summary>
     public static bool HttpEhPermanente(int status) => status is >= 400 and < 500 and not (408 or 429);
-
-    /// <summary>SMTP 5xx (<c>SmtpException.StatusCode &gt;= 500</c>) é permanente; 4xx e falha de conexão (-1) não.</summary>
-    public static bool SmtpEhPermanente(SmtpException ex) => (int)ex.StatusCode >= 500;
 
     /// <summary>
     /// Resposta HTTP de falha de um provider que envia no máximo uma vez (Twilio): 4xx é recusa permanente, 408 e

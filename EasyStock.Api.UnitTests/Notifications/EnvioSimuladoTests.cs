@@ -1,7 +1,6 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Enums.Notifications;
-using EasyStock.Infra.Async;
 using EasyStock.Infra.Async.DependencyInjection;
 using EasyStock.Infra.Notifications.Email;
 using EasyStock.Infra.Notifications.Sms;
@@ -85,26 +84,29 @@ public class EnvioSimuladoTests
     [Fact]
     public async Task Canal_de_email_sobre_servico_real_devolve_Enviado_com_provider_smtp()
     {
+        // N3: o canal chama EnviarAsync e repassa o que o servico devolve (o provider vem dele, nao e fixo).
         var email = Substitute.For<IEmailService>();
+        email.EnviarAsync(Arg.Any<MensagemEmail>(), Arg.Any<CancellationToken>()).Returns(new ResultadoEnvio(true, "smtp"));
         var canal = new SmtpEmailCanal(email, NullLogger<SmtpEmailCanal>.Instance);
 
         var resultado = await canal.EnviarAsync(Mensagem(Email, CanalNotificacao.Email));
 
         resultado.Desfecho.Should().Be(DesfechoEnvio.Enviado);
         resultado.ProviderUsado.Should().Be("smtp");
-        await email.Received(1).SendAsync(Email, "Assunto", "Corpo", true);
+        await email.Received(1).EnviarAsync(
+            Arg.Is<MensagemEmail>(m => m.Destinatario == Email && m.Assunto == "Assunto" && m.Corpo == "Corpo" && m.Html),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public void So_o_console_e_simulador_de_email_e_o_nome_dele_continua_o_mesmo()
+    public async Task O_nome_do_console_continua_o_mesmo_e_so_ele_diz_que_nada_saiu()
     {
-        // O diagnóstico decide "SMTP configurado?" por GetType().Name == "ConsoleEmailService" (ver
-        // DiagnosticoController e DiagnosticoEmailReportJob): o nome é contrato, e o canal usa a interface.
+        // O diagnostico decide "SMTP configurado?" por GetType().Name == "ConsoleEmailService" (ver
+        // DiagnosticoController e DiagnosticoEmailReportJob): o nome e contrato. A marcadora IEmailServiceSimulado da
+        // N2 saiu na N3: o console devolve Simulado direto no EnviarAsync e o canal so repassa.
         var console = new ConsoleEmailService(NullLogger<ConsoleEmailService>.Instance);
 
         console.GetType().Name.Should().Be("ConsoleEmailService");
-        console.Should().BeAssignableTo<IEmailServiceSimulado>().Which.Provider.Should().Be("console");
-        typeof(SmtpEmailService).Should().NotBeAssignableTo<IEmailServiceSimulado>();
-        typeof(SendGridEmailService).Should().NotBeAssignableTo<IEmailServiceSimulado>();
+        (await console.EnviarAsync(new MensagemEmail(Email, "Assunto", "Corpo"))).Desfecho.Should().Be(DesfechoEnvio.Simulado);
     }
 }
