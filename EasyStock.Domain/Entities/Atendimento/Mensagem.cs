@@ -41,6 +41,9 @@ public class Mensagem
     public string? MidiaChave { get; private set; }
     public string? MidiaMime { get; private set; }
 
+    /// <summary>#1398: texto do áudio recebido, transcrito depois que a mídia é armazenada.</summary>
+    public string? Transcricao { get; private set; }
+
     public StatusMensagem Status { get; private set; }
     public string? Erro { get; private set; }
     public DateTime EnviadaEm { get; private set; }
@@ -228,6 +231,14 @@ public class Mensagem
             throw new RegraDeDominioVioladaException("Mime da midia e obrigatorio.");
         MidiaChave = Truncar(chave.Trim(), MidiaChaveTamanhoMaximo);
         MidiaMime = Truncar(mime.Trim(), MidiaMimeTamanhoMaximo);
+    }
+
+    public void RegistrarTranscricao(string texto)
+    {
+        if (TipoConteudo != TipoConteudoMensagem.Audio)
+            throw new RegraDeDominioVioladaException("So mensagem de audio guarda transcricao.");
+        if (string.IsNullOrWhiteSpace(texto)) return;
+        Transcricao = Truncar(texto.Trim(), TextoTamanhoMaximo);
     }
 
     public void MarcarProcessada(DateTime em) => ProcessadaEm = Utc(em);

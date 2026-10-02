@@ -24,6 +24,22 @@ public static class AgenteLlmServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(opts.TimeoutSegundos);
         });
 
+        // #1398: transcrição de áudio. Sem chave própria, reaproveita a chave Fireworks do agente.
+        services.Configure<TranscricaoAudioOptions>(configuration.GetSection(TranscricaoAudioOptions.Secao));
+        services.PostConfigure<TranscricaoAudioOptions>(o =>
+        {
+            if (!string.IsNullOrWhiteSpace(o.ApiKey)) return;
+            var agente = configuration.GetSection(AnthropicAgenteOptions.Secao).Get<AnthropicAgenteOptions>();
+            if (agente is { AutenticacaoBearer: true } && !string.IsNullOrWhiteSpace(agente.ApiKeyAgente))
+                o.ApiKey = agente.ApiKeyAgente;
+        });
+        services.AddHttpClient<ITranscritorAudio, FireworksTranscritorAudio>((sp, client) =>
+        {
+            var opts = sp.GetRequiredService<IOptions<TranscricaoAudioOptions>>().Value;
+            client.BaseAddress = new Uri(opts.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(opts.TimeoutSegundos);
+        });
+
         return services;
     }
 }
