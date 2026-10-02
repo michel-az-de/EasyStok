@@ -8,6 +8,7 @@ using EasyStock.Application.UseCases.AtualizarUsuario;
 using EasyStock.Application.UseCases.CriarUsuario;
 using EasyStock.Application.UseCases.DesativarUsuario;
 using EasyStock.Application.UseCases.ListarUsuarios;
+using EasyStock.Application.UseCases.ReenviarConvite;
 using EasyStock.Application.Validators;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
@@ -32,6 +33,7 @@ public class UsuarioControllerTests
     private readonly DesativarUsuarioUseCase _desativarUseCase;
     private readonly ListarUsuariosUseCase _listarUseCase;
     private readonly AtribuirPerfilUsuarioUseCase _atribuirPerfilUseCase;
+    private readonly ReenviarConviteUseCase _reenviarConviteUseCase;
     private readonly UsuarioController _controller;
 
     public UsuarioControllerTests()
@@ -66,14 +68,18 @@ public class UsuarioControllerTests
                 Substitute.For<IEmpresaPadraoResolver>(), Substitute.For<ITenantContextAccessor>(), _currentUser, passwordHasher,
                 _unitOfWork, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), TimeProvider.System,
                 Substitute.For<ILogger<TrocaDeContatoService>>()),
-            Substitute.For<IAuditLogRepository>(), atualizarLogger);
+            convites, Substitute.For<IAuditLogRepository>(), atualizarLogger);
         _alterarSenhaUseCase = new AlterarSenhaUsuarioUseCase(_usuarioRepository, new AlterarSenhaUsuarioCommandValidator(), revogadorSessoes, _unitOfWork, passwordHasher, alterarSenhaLogger);
         _desativarUseCase = new DesativarUsuarioUseCase(_usuarioRepository, _usuarioEmpresaRepository, revogadorSessoes, _unitOfWork, desativarLogger);
         _listarUseCase = new ListarUsuariosUseCase(_usuarioRepository);
         _atribuirPerfilUseCase = new AtribuirPerfilUsuarioUseCase(_usuarioRepository, _usuarioPerfilRepository, revogadorSessoes, _unitOfWork, atribuirPerfilLogger);
 
+        _reenviarConviteUseCase = new ReenviarConviteUseCase(
+            _usuarioRepository, _currentUser, convites, Substitute.For<ITenantContextAccessor>(),
+            Substitute.For<IAuditLogRepository>(), _unitOfWork, Substitute.For<ILogger<ReenviarConviteUseCase>>());
+
         _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
-        _controller = new UsuarioController(_criarUseCase, _atualizarUseCase, _alterarSenhaUseCase, _desativarUseCase, _listarUseCase, _atribuirPerfilUseCase, _currentUser);
+        _controller = new UsuarioController(_criarUseCase, _atualizarUseCase, _alterarSenhaUseCase, _desativarUseCase, _listarUseCase, _atribuirPerfilUseCase, _reenviarConviteUseCase, _currentUser);
     }
 
     [Fact]

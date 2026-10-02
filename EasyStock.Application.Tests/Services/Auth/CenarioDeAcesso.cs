@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Auth;
+using EasyStock.Application.UseCases.AceitarConvite;
 using EasyStock.Application.UseCases.EsqueciSenha;
 using EasyStock.Application.UseCases.ResetarSenha;
 using EasyStock.Domain.Entities.Notifications;
@@ -119,6 +120,10 @@ internal sealed class CenarioDeAcesso
     public ConvitesDeAcesso Convites() => new(
         Tokens, Notificador, Consentimentos, Empresas, Config, Relogio, Substitute.For<ILogger<ConvitesDeAcesso>>());
 
+    public AceitarConviteUseCase AceitarConvite(ILogger<AceitarConviteUseCase>? logger = null) => new(
+        Tokens, Usuarios, Consentimentos, Auditoria, Convites(), Limite(), new FakePasswordHasher(), UnitOfWork, Relogio,
+        logger ?? Substitute.For<ILogger<AceitarConviteUseCase>>());
+
     /// <summary>Convidado pendente com vínculo ativo numa empresa, como a dona o criaria.</summary>
     public Usuario CriarConvidado(string email = "ana@casadababa.com", Guid? empresaId = null, string? telefone = null)
     {
@@ -134,7 +139,7 @@ internal sealed class CenarioDeAcesso
     }
 
     public EsqueciSenhaUseCase EsqueciSenha(ILogger<EsqueciSenhaUseCase>? logger = null) => new(
-        Usuarios, Tokens, Auditoria, Consentimentos, Notificador, EmpresaDoEvento(), Limite(), UnitOfWork, Config,
+        Usuarios, Tokens, Auditoria, Consentimentos, Notificador, EmpresaDoEvento(), Limite(), Convites(), UnitOfWork, Config,
         Relogio, logger ?? Substitute.For<ILogger<EsqueciSenhaUseCase>>());
 
     public ConcluidorDeReset Concluidor(ILogger<ConcluidorDeReset>? logger = null) => new(

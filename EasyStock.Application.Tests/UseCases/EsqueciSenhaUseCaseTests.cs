@@ -4,6 +4,7 @@ using EasyStock.Application.UseCases.EsqueciSenha;
 using EasyStock.Application.UseCases.ResetarSenha;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.ValueObjects;
+using EasyStock.TestHelpers;
 
 namespace EasyStock.Application.Tests.UseCases;
 
@@ -343,5 +344,63 @@ public class EsqueciSenhaUseCaseTests
         resultado.Success.Should().BeTrue();
         _c.Eventos.Should().BeEmpty();
         _c.Tokens.Linhas.Should().BeEmpty();
+    }
+    // ── N9: quem ainda não aceitou o convite nunca recebe token de reset ────────────────────────────────
+
+    [Fact]
+    public async Task PendenteReemiteOConviteENuncaGeraReset()
+    {
+        var pendente = _c.CriarConvidado();
+
+        var resposta = await Pedir(pendente.Email);
+
+        resposta.Success.Should().BeTrue("a resposta é a mesma de qualquer conta");
+        var evento = _c.Eventos.Should().ContainSingle().Subject;
+        evento.Tipo.Should().Be(TipoEventoNotificacao.ConviteAcesso);
+        evento.Payload.GetProperty("usuarioId").GetGuid().Should().Be(pendente.Id);
+        _c.Tokens.Linhas.Should().NotBeEmpty().And.OnlyContain(l => l.Finalidade == FinalidadeResetToken.Convite);
+        _c.UnitOfWork.CommitCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task PendenteRevogaOConviteAnteriorAoReemitir()
+    {
+        var pendente = _c.CriarConvidado();
+        await _c.Convites().EmitirAsync(pendente, _c.EmpresaPadraoId, false, null, null);
+        var anterior = _c.Tokens.Linhas.Single();
+        _c.Relogio.Advance(TimeSpan.FromMinutes(2));
+
+        await Pedir(pendente.Email);
+
+        anterior.Usado.Should().BeTrue();
+        _c.Tokens.Linhas.Count(l => !l.Usado).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task PendenteNaoPassaDeTresConvitesPorHoraEContinuaRespondendoIgual()
+    {
+        var pendente = _c.CriarConvidado();
+        for (var i = 0; i < 3; i++)
+        {
+            await Pedir(pendente.Email, ip: $"203.0.113.{10 + i}");
+            _c.Relogio.Advance(TimeSpan.FromMinutes(2));
+        }
+
+        var quarto = await Pedir(pendente.Email, ip: "203.0.113.99");
+
+        quarto.Success.Should().BeTrue();
+        _c.Eventos.Should().HaveCount(3, "o quarto pedido na hora não emite nada");
+    }
+
+    [Fact]
+    public async Task AposAceitarOEsqueciSenhaPassaAValer()
+    {
+        var usuario = _c.CriarConvidado();
+        usuario.AceitarConvite(FakePasswordHasher.MakeHash("Senha@12345"), ViaDoConvite.Email, _c.AgoraUtc);
+
+        await Pedir(usuario.Email);
+
+        _c.Eventos.Should().ContainSingle().Which.Tipo.Should().Be(TipoEventoNotificacao.ResetSenha);
+        _c.Tokens.Linhas.Should().Contain(l => l.Finalidade == FinalidadeResetToken.Reset);
     }
 }

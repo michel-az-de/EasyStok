@@ -106,6 +106,7 @@ public class AuthRegisterRemovidoTests
                 .AddSingleton(Substitute.For<IRefreshTokenRepository>())
                 .AddSingleton(Substitute.For<IResetTokenRepository>())
                 .AddSingleton(Substitute.For<IEmailConfirmationTokenRepository>())
+                .AddSingleton(Substitute.For<IEmpresaRepository>()) // N9: o ConvitesDeAcesso le o nome da empresa
                 .AddSingleton(Substitute.For<IUsuarioEmpresaRepository>())
                 .AddSingleton(Substitute.For<ICacheService>()) // #1352: o RevogadorSessoes dos use cases reais apaga a chave de sessão
                 // N4: a troca de contato enfileira eventos, e o export e a anonimizacao leem consentimentos e preferencias.

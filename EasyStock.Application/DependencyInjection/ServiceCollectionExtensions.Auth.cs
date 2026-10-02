@@ -8,6 +8,8 @@ using EasyStock.Application.UseCases.RefreshToken;
 using EasyStock.Application.UseCases.Logout;
 using EasyStock.Application.UseCases.EsqueciSenha;
 using EasyStock.Application.UseCases.ResetarSenha;
+using EasyStock.Application.UseCases.AceitarConvite;
+using EasyStock.Application.UseCases.ReenviarConvite;
 using EasyStock.Application.UseCases.ConfirmEmail;
 using EasyStock.Application.UseCases.ObterUsuarioAtual;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
@@ -50,6 +52,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EmpresaDoEventoAnonimo>();       // empresa do evento do pedido anônimo (N8)
         services.AddScoped<LimitePedidosAcesso>();          // teto por IP, no ICacheService (N8)
         services.AddScoped<LimpezaTokensAcesso>();          // limpeza dos reset_tokens expirados (N8)
+        services.AddScoped<AceitarConviteUseCase>();        // aceite do convite de primeiro acesso (N9)
+        services.AddScoped<ReenviarConviteUseCase>();       // reenvio do convite pela dona (N9)
         services.AddScoped<ConvitesDeAcesso>();             // emissao e revogacao do convite de primeiro acesso (N9)
         services.AddScoped<ConfirmEmailUseCase>();
 
