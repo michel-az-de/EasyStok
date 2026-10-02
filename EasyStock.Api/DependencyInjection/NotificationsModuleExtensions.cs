@@ -41,6 +41,9 @@ public static class NotificationsModuleExtensions
             .AddNotificationsHosting(configuracaoDaApi)
             .AddPostgresOutboxSignaler(configuracaoDaApi);
         services.AddScoped<PostgresAdvisoryLock>();
+        // N11: limites e interruptor dos quatro prazos que chegam por e-mail e WhatsApp.
+        services.Configure<EasyStock.Application.Services.Notifications.PrazosOptions>(
+            configuration.GetSection(EasyStock.Application.Services.Notifications.PrazosOptions.Section));
 
         var notifMode = configuration[$"{NotificationsHostingOptions.Section}:Mode"];
         if (string.Equals(notifMode, nameof(NotificationsHostingMode.Hosted), StringComparison.OrdinalIgnoreCase))
