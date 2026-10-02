@@ -23,6 +23,12 @@ public class MensagemConfiguration : IEntityTypeConfiguration<Mensagem>
         builder.Property(m => m.Status).HasConversion<int>().IsRequired();
         builder.Property(m => m.Erro).HasMaxLength(Mensagem.ErroTamanhoMaximo);
         builder.Property(m => m.EnviadaEm).IsRequired();
+        builder.Property(m => m.TentativasEnvio).HasDefaultValue(0);
+
+        // S57: o serviço de reenvio só procura mensagens com reenvio agendado.
+        builder.HasIndex(m => m.ProximoReenvioEm)
+            .HasFilter("\"ProximoReenvioEm\" IS NOT NULL")
+            .HasDatabaseName("ix_atendimento_mensagens_proximo_reenvio");
 
         // Idempotencia do webhook: o mesmo wamid nao entra duas vezes na mesma empresa.
         builder.HasIndex(m => new { m.EmpresaId, m.ExternoId })

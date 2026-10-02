@@ -25,7 +25,7 @@ export function PainelAtendimento({
   } = useAtendimento()
   const {
     enviar, reabrir, definirRascunho, assumirAtendimento, devolverAutomatico,
-    selecionar, abrirEncerramento,
+    selecionar, abrirEncerramento, reenviar,
   } = useAcoes()
   const { cardapio, janelas, canais } = useCatalogo()
   const cabecalhoRef = useRef(null)
@@ -145,6 +145,7 @@ export function PainelAtendimento({
           fronteiras={fronteirasDoFio(selecionada.atendimentos)}
           agora={agora}
           aoAbrirDefinicaoAutomatica={(regra) => aoAbrirBiblioteca(itemDaBibliotecaPelaRegra(regra))}
+          aoReenviar={reenviar ? (mensagemId) => reenviar(selecionada.id, mensagemId) : undefined}
           digitando={digitando}
         />
       </div>

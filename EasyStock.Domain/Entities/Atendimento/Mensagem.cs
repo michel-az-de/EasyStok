@@ -52,6 +52,24 @@ public class Mensagem
     /// <summary>Usuario do console que enviou a mensagem (S41). So em saida humana (<see cref="AutorMensagem.Dona"/>).</summary>
     public Guid? EnviadaPorUsuarioId { get; private set; }
 
+    /// <summary>S57 (#1355): esperas do reenvio automático depois de cada falha temporária.</summary>
+    public static readonly TimeSpan[] EsperasReenvio =
+        [TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(60)];
+
+    /// <summary>Depois disto, contado do primeiro envio, a mensagem não é mais reenviada sozinha.</summary>
+    public static readonly TimeSpan PrazoReenvio = TimeSpan.FromHours(6);
+
+    /// <summary>Tentativas de envio que falharam (S57).</summary>
+    public int TentativasEnvio { get; private set; }
+
+    /// <summary>Quando o reenvio automático tenta de novo; nulo quando não há reenvio agendado (S57).</summary>
+    public DateTime? ProximoReenvioEm { get; private set; }
+
+    /// <summary>Texto que falhou e pode ser reenviado (automático ou pelo console).</summary>
+    public bool PodeReenviar =>
+        Direcao == DirecaoMensagem.Saida && Status == StatusMensagem.Falhou
+        && TipoConteudo == TipoConteudoMensagem.Texto && !string.IsNullOrWhiteSpace(Texto);
+
     // EF Core ctor sem parametros
     private Mensagem() { }
 
@@ -114,6 +132,36 @@ public class Mensagem
 
         if (Status == StatusMensagem.Falhou) return;
         if (novo > Status) Status = novo;
+    }
+
+    /// <summary>
+    /// S57: falha de envio. Temporária agenda o reenvio pela próxima espera de <see cref="EsperasReenvio"/>,
+    /// dentro do <see cref="PrazoReenvio"/>; permanente e incerta não agendam (a incerta avisa no erro).
+    /// </summary>
+    public void RegistrarFalhaEnvio(string? erro, TipoFalhaEnvio tipo, DateTime agora)
+    {
+        var motivo = tipo == TipoFalhaEnvio.Incerta ? $"Envio incerto (sem resposta do canal): {erro}" : erro;
+        AtualizarStatusEntrega(StatusMensagem.Falhou, motivo);
+        TentativasEnvio++;
+
+        var podeAgendar = tipo == TipoFalhaEnvio.Temporaria
+            && TentativasEnvio <= EsperasReenvio.Length
+            && agora - EnviadaEm <= PrazoReenvio;
+        ProximoReenvioEm = podeAgendar ? agora + EsperasReenvio[TentativasEnvio - 1] : null;
+    }
+
+    /// <summary>S57: tira do agendamento antes de enviar, para outro processo não pegar a mesma mensagem.</summary>
+    public void ReservarReenvio() => ProximoReenvioEm = null;
+
+    /// <summary>S57: o reenvio saiu. Única saída de <see cref="StatusMensagem.Falhou"/>.</summary>
+    public void RegistrarReenviada(string externoId)
+    {
+        if (!PodeReenviar)
+            throw new RegraDeDominioVioladaException("Só texto que falhou pode ser reenviado.");
+        ExternoId = Truncar(externoId, ExternoIdTamanhoMaximo);
+        Status = StatusMensagem.Enviada;
+        Erro = null;
+        ProximoReenvioEm = null;
     }
 
     public void MarcarComoProgramada()

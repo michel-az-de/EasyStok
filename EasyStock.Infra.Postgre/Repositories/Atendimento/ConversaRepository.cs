@@ -207,6 +207,24 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
         db.AtendimentoMensagens.AsNoTracking().FirstOrDefaultAsync(
             m => m.EmpresaId == empresaId && m.ConversaId == conversaId && m.Id == mensagemId, ct);
 
+    public Task<Mensagem?> ObterMensagemParaAlterarAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
+        db.AtendimentoMensagens.FirstOrDefaultAsync(
+            m => m.EmpresaId == empresaId && m.ConversaId == conversaId && m.Id == mensagemId, ct);
+
+    // SQL cru de propósito: FOR UPDATE SKIP LOCKED não sai do LINQ. IgnoreQueryFilters mantém o SQL sem
+    // composição; o serviço de reenvio é cross-tenant e roda com bypass de RLS ligado pelo host (S57).
+    public async Task<IReadOnlyList<Mensagem>> ListarReenviosVencidosComLockAsync(DateTime agora, int limite, CancellationToken ct = default) =>
+        await db.AtendimentoMensagens
+            .FromSqlInterpolated($"""
+                SELECT * FROM atendimento_mensagens
+                WHERE "Status" = {(int)StatusMensagem.Falhou} AND "ProximoReenvioEm" <= {agora}
+                ORDER BY "ProximoReenvioEm"
+                LIMIT {limite}
+                FOR UPDATE SKIP LOCKED
+                """)
+            .IgnoreQueryFilters()
+            .ToListAsync(ct);
+
     public Task AddAsync(Conversa conversa, CancellationToken ct = default)
     {
         db.AtendimentoConversas.Add(conversa);

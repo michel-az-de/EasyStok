@@ -7,6 +7,7 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
+using EasyStock.Application.UseCases.Atendimento.Reenvio;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Domain.Entities.Atendimento;
@@ -50,6 +51,7 @@ public class ConsoleTagHumanaTests
             new ListarConversasAtendimentoUseCase(_conversas),
             new ListarMensagensConversaUseCase(_conversas),
             new EnviarMensagemConsoleUseCase(_conversas, resolvedor, uploads, _uow),
+            new ReenviarMensagemUseCase(_conversas, resolvedor, _uow, TimeProvider.System),
             new GerenciarConversaAtendimentoUseCase(_conversas, _uow),
             new TransferirConversaUseCase(_conversas, Substitute.For<IAtendenteRepository>(), _uow),
             new ObterDossieClienteUseCase(
