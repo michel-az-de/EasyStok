@@ -12,8 +12,11 @@ namespace EasyStock.Infra.Async.UnitTests.Email;
 /// <summary>
 /// N3 (#1351): o <c>SmtpEmailService</c> sobre MailKit contra um SMTP falso em loopback. Uma conexão por envio, teto de
 /// tempo, cancelamento, concorrência e classificação por protocolo, sem retentativa dentro do serviço.
+///
+/// O arquivo da spec é <c>SmtpEmailServiceTests.cs</c> ("estende o arquivo da N2"). Enquanto a N2 não mergeou, a N3 usa um
+/// arquivo e uma classe próprios para não dar add/add com ela; depois do merge das duas, os testes se juntam num só.
 /// </summary>
-public class SmtpEmailServiceTests
+public class SmtpEmailServiceMailKitTests
 {
     private const string Senha = "senha-secreta-123";
     private const string Destinatario = "maria.souza@example.com";
