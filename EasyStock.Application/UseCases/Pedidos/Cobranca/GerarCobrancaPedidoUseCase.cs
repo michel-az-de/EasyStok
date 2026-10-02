@@ -40,7 +40,9 @@ public sealed record CobrancaPedidoResult(
 /// </para>
 ///
 /// <para>
-/// Falha ou timeout (5 s) do Mercado Pago: <see cref="MercadoPagoIndisponivelException"/>, nada gravado.
+/// Falha ou timeout (5 s) do Mercado Pago: <see cref="MercadoPagoIndisponivelException"/>, nenhuma cobrança
+/// gravada. No pedido recém-reservado, a reserva é desfeita antes de relançar (#1301): pedido cancelado com
+/// motivo <c>mercado_pago_indisponivel</c> e vaga liberada, porque sem cobrança nenhum job o alcança.
 /// </para>
 /// </summary>
 public sealed class GerarCobrancaPedidoUseCase(
@@ -48,6 +50,7 @@ public sealed class GerarCobrancaPedidoUseCase(
     IStorefrontRepository storefrontRepository,
     ICobrancaPedidoRepository cobrancaRepository,
     IMercadoPagoClient mercadoPagoClient,
+    CheckoutCoreService checkoutCore,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
     ILogger<GerarCobrancaPedidoUseCase> logger)
@@ -58,15 +61,44 @@ public sealed class GerarCobrancaPedidoUseCase(
     public const string MotivoValorAlterado = "valor_do_pedido_alterado";
     private static readonly TimeSpan MpTimeout = TimeSpan.FromSeconds(5);
 
-    /// <summary>Pedido recém-criado pelo núcleo do checkout (site ou conversa).</summary>
-    public Task<CobrancaPedidoResult> ExecuteAsync(PedidoReservado reservado, Guid? conversaId, CancellationToken ct = default)
+    /// <summary>
+    /// Pedido recém-criado pelo núcleo do checkout (site ou conversa). Se o Mercado Pago não responde, desfaz a
+    /// reserva e relança <see cref="MercadoPagoIndisponivelException"/> (#1301).
+    /// </summary>
+    public async Task<CobrancaPedidoResult> ExecuteAsync(PedidoReservado reservado, Guid? conversaId, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(reservado);
         var itens = reservado.Itens.Append(reservado.ItemFrete).ToList();
         var dados = new DadosCobranca(
             reservado.Pedido.EmpresaId, reservado.Pedido.Id, reservado.Storefront.Id,
             reservado.Storefront.TituloPublico, reservado.Total, itens);
-        return CobrarAsync(dados, conversaId, tentativa: 1, ct);
+        try
+        {
+            return await CobrarAsync(dados, conversaId, tentativa: 1, ct);
+        }
+        catch (MercadoPagoIndisponivelException)
+        {
+            await DesfazerReservaAsync(reservado);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Sem <see cref="CancellationToken"/> da requisição: a compensação roda mesmo se o cliente desistiu. Se ela
+    /// falhar, a resposta segue sendo a indisponibilidade do Mercado Pago e a varredura de abandonados cancela
+    /// o pedido depois de 30 minutos.
+    /// </summary>
+    private async Task DesfazerReservaAsync(PedidoReservado reservado)
+    {
+        try
+        {
+            await checkoutCore.DesfazerReservaAsync(
+                reservado, CheckoutCoreService.MotivoMercadoPagoIndisponivel, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Cobranca reserva-nao-desfeita pedidoId={PedidoId}", reservado.Pedido.Id);
+        }
     }
 
     /// <summary>Pedido já gravado: carrega itens e frete do banco.</summary>

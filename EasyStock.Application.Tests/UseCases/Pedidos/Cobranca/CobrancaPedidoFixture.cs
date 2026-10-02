@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Events.Storefront.Handlers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
@@ -11,6 +12,9 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.UseCases.Storefront.Frete;
+using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Application.UseCases.Operacao.Atraso;
@@ -58,6 +62,8 @@ internal sealed class CobrancaPedidoFixture
     public IConversaRepository ConversaRepo { get; } = Substitute.For<IConversaRepository>();
     public IVagaOcupadaRepository VagaRepo { get; } = Substitute.For<IVagaOcupadaRepository>();
     public IUnitOfWork Uow { get; } = Substitute.For<IUnitOfWork>();
+    public INotificadorService Notificador { get; } = Substitute.For<INotificadorService>();
+    public EasyStock.Application.Services.Notifications.PrazosOptions Prazos { get; } = new();
     public IImpressaoPendenteRepository ImpressaoRepo { get; } = Substitute.For<IImpressaoPendenteRepository>();
     public IPrazoPreparoPedidoQueries PrazoQueries { get; } = Substitute.For<IPrazoPreparoPedidoQueries>();
     public List<CriarPreferenceCommand> Preferencias { get; } = new();
@@ -163,8 +169,17 @@ internal sealed class CobrancaPedidoFixture
             NullLogger<AvisoCobrancaConversa>.Instance);
 
     public GerarCobrancaPedidoUseCase Gerar() =>
-        new(PedidoRepo, StorefrontRepo, CobrancaRepo, MpClient, Uow, Relogio,
+        new(PedidoRepo, StorefrontRepo, CobrancaRepo, MpClient, CheckoutCore(), Uow, Relogio,
             NullLogger<GerarCobrancaPedidoUseCase>.Instance);
+
+    /// <summary>Núcleo do checkout sobre a vaga e o pedido da fixture: só a reserva desfeita (#1301) passa por ele aqui.</summary>
+    public CheckoutCoreService CheckoutCore() =>
+        new(StorefrontRepo, Substitute.For<ICardapioItemRepository>(), Substitute.For<IJanelaEntregaRepository>(),
+            Substitute.For<IBloqueioEntregaRepository>(),
+            new CalcularFreteUseCase(StorefrontRepo, Substitute.For<IFreteZonaRepository>(), Substitute.For<ICepLookupClient>(),
+                Substitute.For<IGeocodingClient>(), Substitute.For<IRotaClient>(), NullLogger<CalcularFreteUseCase>.Instance),
+            VagaRepo, PedidoStorefrontRepo, Substitute.For<IExpedienteLojaRepository>(),
+            NullLogger<CheckoutCoreService>.Instance, Relogio);
 
     public ConfirmarPagamentoPedidoUseCase Confirmar() =>
         new(CobrancaRepo, PedidoStorefrontRepo,
@@ -174,7 +189,8 @@ internal sealed class CobrancaPedidoFixture
             new CalculadoraInicioPrevistoPedido(PrazoQueries), Estorno, Aviso(), PedidoRepo);
 
     public NotificarAtrasoPedidoUseCase NotificarAtraso() =>
-        new(PedidoStorefrontRepo, OperacaoEventos, Tenant, Uow, Relogio, NullLogger<NotificarAtrasoPedidoUseCase>.Instance);
+        new(PedidoStorefrontRepo, OperacaoEventos, Tenant, Uow, Notificador, Options.Create(Prazos), Relogio,
+            NullLogger<NotificarAtrasoPedidoUseCase>.Instance);
 
     public TrocarFormaPagamentoPedidoUseCase Trocar() =>
         new(PedidoStorefrontRepo, CobrancaRepo, Gerar(), Aviso(), Publicador, MpClient, Uow, Relogio,

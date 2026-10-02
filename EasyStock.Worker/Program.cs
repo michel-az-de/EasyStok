@@ -90,9 +90,10 @@ builder.Services
 builder.Services.AddSingleton<LembretesPedidoAgendadoTick>();
 builder.Services.AddHostedService<AgendamentoNotificacaoService>();
 
-// Monitor de saude de endpoints publicos. Abre ticket via /api/ci/tickets
-// quando >threshold falhas consecutivas. Idempotencia via tabela
-// endpoint_health_state + cooldown 24h.
+// Monitor de saude de endpoints publicos (N10). Abre incidente apos N falhas seguidas e avisa os superadmins por
+// IPublicadorIncidenteSistema (e-mail e WhatsApp), com aviso de "normalizado" na recuperacao. Estado em
+// endpoint_health_state; a dedupe de 15 min vem da chave de idempotencia do outbox. Precisa de
+// Auth__Google__EmpresaPadrao no .env do Worker: sem ela nada e publicado e o log nomeia a chave.
 builder.Services.AddHttpClient("endpoint-health");
 builder.Services.AddHostedService<EndpointHealthMonitorService>();
 

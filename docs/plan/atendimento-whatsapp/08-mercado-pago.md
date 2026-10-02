@@ -4,6 +4,35 @@ Objetivo: deixar o Mercado Pago cadastrado (conta, aplicação, credenciais, web
 ponta a ponta no EasyStok, porque hoje ele **nunca esteve vivo**: a preferência é criada, o webhook é
 validado e gravado, e nada confirma o pagamento.
 
+## 0. Estado medido em 02/10/2026 (supera a seção 1 onde divergir)
+
+**O código está pronto e nunca rodou contra o Mercado Pago real. Produção não fecha pedido pago por
+falta de dado e de credencial, não de código.**
+
+| Frente | Estado | Evidência |
+|---|---|---|
+| Código de cobrança | S11, S32, S27 mergeados; prazo do Pix (`date_of_expiration`) e estorno automático de pagamento depois do cancelamento (#1251); checkout sem login reserva janela e cobra (#1257); ponte que aceita o site antigo sem janela (#1308); reserva desfeita quando o Mercado Pago falha (#1303) | PRs citadas |
+| Site casadababa.com | Pedido sem login escolhe janela e paga (casa-da-baba #71); volta do Mercado Pago lê `external_reference`; publicação versionada em `scripts/deploy/vps-deploy.sh` do repo do site (casa-da-baba #73) | `version.txt` do container `cdb-storefront` |
+| Domínio | Caddy responde **503 de manutenção** de propósito (bloco `casadababa.com` em `/opt/stacks/shared/Caddyfile`), escrito quando o catálogo estava vazio | `curl -I https://casadababa.com` |
+| Catálogo em produção | 43 itens (#1335) | `GET api/storefront/casa-da-baba/menu` |
+| **Entrega em produção** | **0 zonas, 0 janelas, frete por raio sem coordenada da cozinha** (`CozinhaLat/Lng`, faixas e raio vazios). Todo CEP devolve "CEP sem cobertura" e nenhum checkout fecha, nem site nem conversa | SELECT em `storefront`, `frete_zona`, `janela_entrega` |
+| Geocodificação | `ENABLE_NOMINATIM_GEOCODING=true` na API (frete por raio funciona quando a cozinha tiver coordenada) | `printenv` do `ez-api`, só nomes |
+| **Credencial do Mercado Pago** | **Nenhuma variável `MercadoPago__*` na API** e `appsettings` sem a seção: `UseStub` fica falso e o cliente chama o Mercado Pago com token vazio. Com a #1303 o pedido é desfeito e a vaga liberada; sem ela, a vaga ficava presa | `printenv` do `ez-api`, só nomes |
+| Credencial por loja | #1304 grava e testa a chave do Mercado Pago pelo console, mas a cobrança ainda lê a chave global. Com tenant único (01/10) a chave global basta para o go-live | corpo da #1304 |
+
+Decisões do Felipe em 30/09 (fecham a seção 2 e o desenho): Pix e cartão **só pelo link** do Checkout Pro (sem
+copia-e-cola no chat); checkout sem login **reserva janela e cobra**; pagamento que chega depois do
+cancelamento é **estornado na hora** e o cliente é avisado; maquininha e VR/VA seguem com **baixa manual**.
+
+**Só o Felipe destrava, nesta ordem:**
+
+1. Entrega: endereço da cozinha (vira `CozinhaLat/Lng`), faixas de preço por distância (o site promete frete
+   grátis até ~500 m) e raio máximo; janelas (dias, horários, capacidade). Cadastro pelo console
+   (Entregas › Janelas e frete) ou por script, como o cardápio.
+2. Mercado Pago: autorizar o conector `mercadopago` (`/mcp`) na conta de teste para o sandbox (H16, seção 6);
+   depois, conta da Casa da Baba com credencial de produção, `MercadoPago__*` no `.env` da VPS e webhook.
+3. Tirar a página de manutenção do Caddy quando 1 e 2 estiverem prontos.
+
 ## 1. Estado medido em 22/09/2026
 
 | Peça | Estado | Evidência |

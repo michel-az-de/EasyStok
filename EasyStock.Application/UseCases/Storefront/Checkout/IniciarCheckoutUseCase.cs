@@ -28,8 +28,8 @@ namespace EasyStock.Application.UseCases.Storefront.Checkout;
 /// <para>
 /// <strong>Fase 3 (fora de transação):</strong>
 /// <see cref="GerarCobrancaPedidoUseCase"/> (S11): preferência MP com expiração de 30 min (timeout 5 s)
-/// e <c>CobrancaPedido</c> gravada. Falha → Pedido fica AguardandoPagamento; o <c>CobrancaPedidoJob</c>
-/// expira a cobrança e cancela o pedido.
+/// e <c>CobrancaPedido</c> gravada. Falha do MP → pedido cancelado e vaga liberada pela própria cobrança
+/// (#1301), e o cliente recebe 503. Link pago depois do prazo: o <c>CobrancaPedidoJob</c> expira e cancela.
 /// Sucesso → retorna <c>{pedidoId, initPointUrl, expiresIn}</c>.
 /// </para>
 /// </summary>
@@ -99,7 +99,7 @@ public sealed class IniciarCheckoutUseCase(
         // ═══════════════════════════════════════════════════════════════════
 
         // S11: a cobrança passa pelo mesmo use case da conversa e grava a CobrancaPedido. Falha ou timeout
-        // do MP → MercadoPagoIndisponivelException e o pedido fica AguardandoPagamento (o job expira).
+        // do MP → a cobrança desfaz pedido e vaga e relança MercadoPagoIndisponivelException (503, #1301).
         var cobranca = await gerarCobranca.ExecuteAsync(reservado, conversaId: null, ct);
         var initPointUrl = cobranca.LinkPagamento!;
 

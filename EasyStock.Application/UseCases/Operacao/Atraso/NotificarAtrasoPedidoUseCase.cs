@@ -1,5 +1,8 @@
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Notifications;
+using Microsoft.Extensions.Options;
 
 namespace EasyStock.Application.UseCases.Operacao.Atraso;
 
@@ -10,7 +13,8 @@ namespace EasyStock.Application.UseCases.Operacao.Atraso;
 /// <para>
 /// Liga o tenant do candidato, trava o pedido (<c>SELECT FOR UPDATE</c>) e confere de novo no lock: duas
 /// instâncias ou o operador mudando o status no meio não geram aviso duplicado nem aviso de pedido que já
-/// começou. O evento de UI sai só depois do commit.
+/// começou. O evento de UI sai só depois do commit. O <c>PrazoEstourado</c> (e-mail e WhatsApp, N11) é enfileirado
+/// antes do commit, então evento e marca saem juntos (ADR-0030).
 /// </para>
 /// </summary>
 public sealed class NotificarAtrasoPedidoUseCase(
@@ -18,6 +22,8 @@ public sealed class NotificarAtrasoPedidoUseCase(
     IOperacaoEventPublisher operacaoEventos,
     ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
+    INotificadorService notificador,
+    IOptions<PrazosOptions> prazos,
     TimeProvider relogio,
     ILogger<NotificarAtrasoPedidoUseCase> logger)
 {
@@ -45,6 +51,11 @@ public sealed class NotificarAtrasoPedidoUseCase(
         if (!pedido.MarcarAtrasoNotificado(relogio.GetUtcNow().UtcDateTime)) return null;
 
         await pedidoRepository.UpdateAsync(pedido, ct);
+        var agora = relogio.GetUtcNow().UtcDateTime;
+        var inicio = pedido.InicioPrevistoEm!.Value;
+        await PrazoEstouradoEvento.EnfileirarAsync(notificador, prazos.Value, TipoPrazo.PedidoAtrasado,
+            pedido.EmpresaId, pedido.Id, PrazoEstouradoEvento.Referencia(pedido.Id),
+            PrazoEstouradoEvento.InstanteTexto(inicio), PrazoEstouradoEvento.Duracao(agora - inicio), usuarioId: null, ct);
         await unitOfWork.CommitAsync();
 
         return new PedidoAtrasadoOperacao(pedido.Id, pedido.Id.ToString("N")[..8].ToUpperInvariant(),

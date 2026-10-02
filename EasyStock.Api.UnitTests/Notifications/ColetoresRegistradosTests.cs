@@ -12,14 +12,19 @@ namespace EasyStock.Api.UnitTests.Notifications;
 public class ColetoresRegistradosTests
 {
     [Fact]
-    public void Coletor_fica_registrado_uma_vez_mesmo_chamando_o_registro_duas_vezes()
+    public void Cada_coletor_fica_registrado_uma_vez_mesmo_chamando_o_registro_duas_vezes()
     {
         var services = new ServiceCollection();
 
         services.AddEasyStockNotificationsRepositories();
         services.AddEasyStockNotificationsRepositories();
 
-        services.Count(d => d.ServiceType == typeof(IColetorEventoNotificacao))
-            .Should().Be(1, "dois descritores fazem o mesmo coletor rodar duas vezes por rodada");
+        var coletores = services
+            .Where(d => d.ServiceType == typeof(IColetorEventoNotificacao))
+            .Select(d => d.ImplementationType)
+            .ToList();
+
+        coletores.Should().NotBeEmpty();
+        coletores.Should().OnlyHaveUniqueItems("dois descritores fazem o mesmo coletor rodar duas vezes por rodada");
     }
 }

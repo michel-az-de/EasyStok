@@ -55,6 +55,8 @@ public class ConsoleTagHumanaTests
             new ObterDossieClienteUseCase(
                 Substitute.For<IClienteRepository>(), Substitute.For<IClienteCrmRepository>(),
                 Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(), _conversas),
+            new GerarLinkCardapioConversaUseCase(_conversas,
+                AtendimentoConversasControllerTests.LinkCardapio(Substitute.For<ILinkCardapioConversaRepository>()), _uow, TimeProvider.System),
             currentUser);
     }
 

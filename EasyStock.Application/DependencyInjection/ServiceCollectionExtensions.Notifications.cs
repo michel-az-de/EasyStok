@@ -20,6 +20,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<IResolvedorAudiencia, ResolvedorAudiencia>();
         services.AddScoped<NotificadorService>();
         services.AddScoped<INotificadorService>(sp => sp.GetRequiredService<NotificadorService>());
+        // N10: porta única dos avisos de problema no sistema (monitor de endpoint, snapshot de saúde, coletor de 5xx).
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<IPublicadorIncidenteSistema, PublicadorIncidenteSistema>();
 
         // Rotinas agendadas (N12): um construtor de payload por tipo agendado; o coletor (Infra.Postgre) é genérico.
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IConstrutorPayloadAgendado, ConstrutorPayloadResumoDiario>());

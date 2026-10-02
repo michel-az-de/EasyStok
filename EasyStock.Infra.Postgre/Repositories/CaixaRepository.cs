@@ -97,6 +97,19 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToList();
         }
 
+        public async Task MarcarNotificadoEsquecidoAsync(Guid movimentoId, DateTime em, CancellationToken ct = default) =>
+            await db.MovimentosCaixa.IgnoreQueryFilters()
+                .Where(m => m.Id == movimentoId)
+                .ExecuteUpdateAsync(s => s.SetProperty(m => m.NotificadoEsquecidoEm, em), ct);
+
+        // Multi-tenant via UsuarioEmpresa; cross-tenant, então IgnoreQueryFilters (o job roda sob bypass de RLS).
+        public async Task<Guid?> ResolverResponsavelPadraoAsync(Guid empresaId, CancellationToken ct = default) =>
+            await db.Set<UsuarioEmpresa>().IgnoreQueryFilters()
+                .Where(ue => ue.EmpresaId == empresaId && ue.Ativo)
+                .OrderBy(ue => ue.CriadoEm)
+                .Select(ue => (Guid?)ue.UsuarioId)
+                .FirstOrDefaultAsync(ct);
+
         public Task AddMovimentoAsync(MovimentoCaixa m) { db.MovimentosCaixa.Add(m); return Task.CompletedTask; }
         public Task UpdateMovimentoAsync(MovimentoCaixa m) { db.MovimentosCaixa.Update(m); return Task.CompletedTask; }
 

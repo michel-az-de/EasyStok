@@ -64,6 +64,8 @@ public static partial class ServiceCollectionExtensionsNotifications
         // cada 5 min e poluiria o log. Só liga com Notifications:Coletores:ProdutosVencendo:Habilitado=true.
         if (configuration?.GetValue<bool>(ProdutosVencendoHabilitadoChave) == true)
             services.TryAddEnumerable(ServiceDescriptor.Scoped<IColetorEventoNotificacao, ColetorProdutosVencendo>());
+        // N10: pico de 5xx. Só lê o COUNT de system_error_logs (fora da RLS) e avisa pelo publicador de incidente.
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IColetorEventoNotificacao, ColetorPicoDeErros5xx>());
 
         return services;
     }

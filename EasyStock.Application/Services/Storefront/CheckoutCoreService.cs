@@ -71,7 +71,8 @@ public sealed record PedidoReservado(
 ///
 /// <para>
 /// A cobrança (fase 3) fica com quem chama. A idempotência do site também: o que ela guarda é a
-/// resposta da fase 3 (pedido e link de pagamento).
+/// resposta da fase 3 (pedido e link de pagamento). Cobrança que não sai volta por
+/// <see cref="DesfazerReservaAsync"/>.
 /// </para>
 /// </summary>
 public sealed class CheckoutCoreService(
@@ -90,6 +91,9 @@ public sealed class CheckoutCoreService(
 
     /// <summary>Motivo da recusa quando a janela começa antes de agora + prazo mínimo (S16).</summary>
     public const string JanelaAbaixoDoPrazo = "janela_abaixo_do_prazo";
+
+    /// <summary>Motivo do cancelamento quando a primeira cobrança do pedido não sai (#1301).</summary>
+    public const string MotivoMercadoPagoIndisponivel = "mercado_pago_indisponivel";
 
     /// <summary>
     /// Valida CEP e carrinho antes de qualquer consulta. Devolve o CEP só com dígitos.
@@ -257,6 +261,38 @@ public sealed class CheckoutCoreService(
             pedido.Id, input.JanelaId, input.DataEntrega, swFase2.ElapsedMilliseconds);
 
         return new PedidoReservado(pedido, storefront, itens, itemFrete, total);
+    }
+
+    /// <summary>
+    /// Desfaz a reserva de <see cref="CriarPedidoComReservaAsync"/> quando a cobrança não sai (#1301): libera a
+    /// vaga, cancela o pedido e grava o motivo no histórico. Sem isso o pedido ficava em
+    /// <c>AguardandoPagamento</c> sem <c>CobrancaPedido</c>, fora do alcance do <c>CobrancaPedidoJob</c>, e a vaga
+    /// da janela presa.
+    /// </summary>
+    public async Task DesfazerReservaAsync(PedidoReservado reservado, string motivo, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(reservado);
+        var pedido = reservado.Pedido;
+        var statusAntigo = pedido.Status;
+
+        // A liberação só marca a vaga; o SaveChanges do UpdateAsync grava vaga e pedido juntos.
+        await vagaOcupadaRepository.LiberarPorPedidoAsync(pedido.Id, $"Pedido cancelado: {motivo}", ct);
+        pedido.Cancelar();
+        await pedidoRepository.UpdateAsync(pedido, ct);
+        await pedidoRepository.AddEventoAsync(new PedidoEvento
+        {
+            Id = Guid.NewGuid(),
+            PedidoId = pedido.Id,
+            Tipo = "cancelado",
+            StatusAntigo = statusAntigo,
+            StatusNovo = pedido.Status,
+            Detalhes = motivo,
+            UsuarioNome = "Sistema",
+            Origem = "sistema",
+            OcorridoEm = timeProvider.GetUtcNow().UtcDateTime,
+        }, ct);
+
+        logger.LogWarning("Checkout reserva desfeita pedidoId={PedidoId} motivo={Motivo}", pedido.Id, motivo);
     }
 
     /// <summary>
