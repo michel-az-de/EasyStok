@@ -225,6 +225,43 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
             .IgnoreQueryFilters()
             .ToListAsync(ct);
 
+    public Task<bool> ExisteAguardandoClienteAsync(
+        Guid empresaId, CanalConversa canal, string contatoIdExterno, Guid? clienteId, DateTime desde, CancellationToken ct = default) =>
+        db.AtendimentoMensagens
+            .Where(m => m.EmpresaId == empresaId && m.Status == StatusMensagem.Falhou && m.AguardaClienteDesde > desde)
+            .Join(db.AtendimentoConversas.Where(c => c.EmpresaId == empresaId && c.Canal == canal),
+                m => m.ConversaId, c => c.Id, (m, c) => c)
+            .AnyAsync(c => c.ContatoIdExterno == contatoIdExterno || (clienteId != null && c.ClienteId == clienteId), ct);
+
+    // SQL cru: FOR UPDATE OF m SKIP LOCKED não sai do LINQ. Cross-tenant, com bypass de RLS ligado pelo host (S58).
+    // O contato pode ter escrito numa conversa nova; o cliente vinculado cobre o celular com e sem o nono dígito.
+    public async Task<IReadOnlyList<Mensagem>> ListarAguardandoComRespostaComLockAsync(int limite, CancellationToken ct = default) =>
+        await db.AtendimentoMensagens
+            .FromSqlInterpolated($"""
+                SELECT m.* FROM atendimento_mensagens m
+                JOIN atendimento_conversas c0 ON c0."Id" = m."ConversaId"
+                WHERE m."Status" = {(int)StatusMensagem.Falhou} AND m."AguardaClienteDesde" IS NOT NULL
+                  AND EXISTS (
+                    SELECT 1 FROM atendimento_conversas c
+                    WHERE c."EmpresaId" = c0."EmpresaId" AND c."Canal" = c0."Canal"
+                      AND (c."ContatoIdExterno" = c0."ContatoIdExterno" OR (c0."ClienteId" IS NOT NULL AND c."ClienteId" = c0."ClienteId"))
+                      AND c."UltimaMensagemEntradaEm" > m."AguardaClienteDesde")
+                ORDER BY m."AguardaClienteDesde"
+                LIMIT {limite}
+                FOR UPDATE OF m SKIP LOCKED
+                """)
+            .IgnoreQueryFilters()
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<MensagemNaoEntregue>> ListarNaoEntreguesAsync(Guid empresaId, int limite, CancellationToken ct = default) =>
+        await db.AtendimentoMensagens.AsNoTracking()
+            .Where(m => m.EmpresaId == empresaId && m.Direcao == DirecaoMensagem.Saida && m.Status == StatusMensagem.Falhou)
+            .OrderByDescending(m => m.EnviadaEm)
+            .Take(Math.Clamp(limite, 1, MaxPagina))
+            .Join(db.AtendimentoConversas.AsNoTracking().Where(c => c.EmpresaId == empresaId),
+                m => m.ConversaId, c => c.Id, (m, c) => new MensagemNaoEntregue(c, m))
+            .ToListAsync(ct);
+
     public Task AddAsync(Conversa conversa, CancellationToken ct = default)
     {
         db.AtendimentoConversas.Add(conversa);

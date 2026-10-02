@@ -11,8 +11,26 @@ namespace EasyStock.Api.Controllers;
 public class AtendimentoConfiguracaoController(
     ObterConfiguracaoAtendimentoUseCase obterUseCase,
     AtualizarConfiguracaoAtendimentoUseCase atualizarUseCase,
+    DefinirModeloRetomadaUseCase modeloRetomadaUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
+    [SwaggerOperation(Summary = "Set the approved template that reopens a conversation after 24 h (S58, Admin only)",
+        Description = "Nome vazio desliga a retomada. O modelo precisa estar aprovado na Meta com uma variável (o primeiro nome).")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [HttpPut("modelo-retomada")]
+    public async Task<IActionResult> PutModeloRetomada([FromBody] ModeloRetomadaBody body)
+    {
+        try
+        {
+            return DataOk(await modeloRetomadaUseCase.ExecuteAsync(currentUser.EmpresaId, body?.Nome, body?.Idioma));
+        }
+        catch (UseCaseValidationException ex)
+        {
+            return DataBadRequest(ex.Message);
+        }
+    }
+
     [SwaggerOperation(Summary = "Get WhatsApp attendance configuration (Admin only)",
         Description = "Devolve o padrão em memória quando a empresa ainda não tem registro — nunca 404.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -61,3 +79,5 @@ public sealed record AtualizarConfiguracaoAtendimentoBody(
     int? RespiroMinutos,
     int? TempoPreparoPadraoMinutos,
     bool? Ativo);
+
+public sealed record ModeloRetomadaBody(string? Nome, string? Idioma);

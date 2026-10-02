@@ -9,6 +9,9 @@ public sealed record ConversaComMensagens(Conversa Conversa, IReadOnlyList<Mensa
 /// <summary>Linha da inbox do console (S07): a conversa e o texto da ultima mensagem, quando houver.</summary>
 public sealed record ConversaInboxItem(Conversa Conversa, string? UltimaMensagemTexto);
 
+/// <summary>Mensagem que não chegou ao cliente, com a conversa dela (S59).</summary>
+public sealed record MensagemNaoEntregue(Conversa Conversa, Mensagem Mensagem);
+
 /// <summary>Filtro por responsavel da inbox (S41): <c>UsuarioId</c> nulo = conversas sem ninguem.</summary>
 public sealed record FiltroResponsavel(Guid? UsuarioId)
 {
@@ -99,6 +102,22 @@ public interface IConversaRepository
     /// todas as empresas. Exige bypass de RLS e transação explícita.
     /// </summary>
     Task<IReadOnlyList<Mensagem>> ListarReenviosVencidosComLockAsync(DateTime agora, int limite, CancellationToken ct = default);
+
+    /// <summary>
+    /// S58: há mensagem esperando o cliente responder ao modelo de retomada desde <paramref name="desde"/>, do mesmo
+    /// contato no canal ou do mesmo cliente (o WhatsApp grava o celular com e sem o nono dígito).
+    /// </summary>
+    Task<bool> ExisteAguardandoClienteAsync(
+        Guid empresaId, CanalConversa canal, string contatoIdExterno, Guid? clienteId, DateTime desde, CancellationToken ct = default);
+
+    /// <summary>
+    /// S58: trava (<c>FOR UPDATE SKIP LOCKED</c>) mensagens que esperam o cliente e cujo contato (ou cliente) já
+    /// escreveu depois da espera, de todas as empresas. Exige bypass de RLS e transação explícita.
+    /// </summary>
+    Task<IReadOnlyList<Mensagem>> ListarAguardandoComRespostaComLockAsync(int limite, CancellationToken ct = default);
+
+    /// <summary>S59: mensagens de saída que falharam, mais recentes primeiro, com a conversa.</summary>
+    Task<IReadOnlyList<MensagemNaoEntregue>> ListarNaoEntreguesAsync(Guid empresaId, int limite, CancellationToken ct = default);
 
     Task AddAsync(Conversa conversa, CancellationToken ct = default);
 
