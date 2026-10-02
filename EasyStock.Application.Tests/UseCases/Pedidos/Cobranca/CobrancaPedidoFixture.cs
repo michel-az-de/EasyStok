@@ -11,6 +11,9 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.UseCases.Storefront.Frete;
+using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Application.UseCases.Operacao.Atraso;
@@ -163,8 +166,17 @@ internal sealed class CobrancaPedidoFixture
             NullLogger<AvisoCobrancaConversa>.Instance);
 
     public GerarCobrancaPedidoUseCase Gerar() =>
-        new(PedidoRepo, StorefrontRepo, CobrancaRepo, MpClient, Uow, Relogio,
+        new(PedidoRepo, StorefrontRepo, CobrancaRepo, MpClient, CheckoutCore(), Uow, Relogio,
             NullLogger<GerarCobrancaPedidoUseCase>.Instance);
+
+    /// <summary>Núcleo do checkout sobre a vaga e o pedido da fixture: só a reserva desfeita (#1301) passa por ele aqui.</summary>
+    public CheckoutCoreService CheckoutCore() =>
+        new(StorefrontRepo, Substitute.For<ICardapioItemRepository>(), Substitute.For<IJanelaEntregaRepository>(),
+            Substitute.For<IBloqueioEntregaRepository>(),
+            new CalcularFreteUseCase(StorefrontRepo, Substitute.For<IFreteZonaRepository>(), Substitute.For<ICepLookupClient>(),
+                Substitute.For<IGeocodingClient>(), Substitute.For<IRotaClient>(), NullLogger<CalcularFreteUseCase>.Instance),
+            VagaRepo, PedidoStorefrontRepo, Substitute.For<IExpedienteLojaRepository>(),
+            NullLogger<CheckoutCoreService>.Instance, Relogio);
 
     public ConfirmarPagamentoPedidoUseCase Confirmar() =>
         new(CobrancaRepo, PedidoStorefrontRepo,
