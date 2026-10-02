@@ -8,6 +8,9 @@ namespace EasyStock.Domain.Entities
 
         /// <summary>Código de 6 dígitos enviado por WhatsApp: 10 min, 5 tentativas, 1 uso. Hash de <c>{Id}:{código}</c>.</summary>
         public const string ResetCodigo = "ResetCodigo";
+
+        /// <summary>Link de convite de primeiro acesso (N9): 32 bytes em base64url, 72 h, 1 uso, 1 por canal (e-mail e WhatsApp).</summary>
+        public const string Convite = "Convite";
     }
 
     public class ResetToken
@@ -55,6 +58,9 @@ namespace EasyStock.Domain.Entities
                 Canal = canal
             };
         }
+
+        /// <summary>O segredo só vale para a finalidade que o criou: um convite nunca redefine senha, e vice-versa.</summary>
+        public bool ServePara(string finalidade) => string.Equals(Finalidade, finalidade, StringComparison.Ordinal);
 
         public void MarcarComoUsado()
         {

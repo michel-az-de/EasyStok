@@ -2,7 +2,8 @@ namespace EasyStock.Application.Ports.Output.Notifications;
 
 /// <summary>
 /// Projeção de um usuário interno para a audiência (N4): só o que decide quem recebe e por onde. Nunca leva a
-/// senha nem o endereço pendente.
+/// senha nem o endereço pendente. <see cref="ConvitePendente"/> (N9): ainda não aceitou o convite, o único caso em que o
+/// WhatsApp dispensa o telefone verificado.
 /// </summary>
 public sealed record UsuarioParaAudiencia(
     Guid Id,
@@ -11,7 +12,8 @@ public sealed record UsuarioParaAudiencia(
     bool EmailConfirmado,
     bool Ativo,
     string? Telefone,
-    DateTime? TelefoneVerificadoEm);
+    DateTime? TelefoneVerificadoEm,
+    bool ConvitePendente = false);
 
 /// <summary>Usuários de uma empresa por nível de acesso (N4). Roda no tenant do evento: a empresa do escopo é a do evento.</summary>
 public interface IAudienciaUsuarios

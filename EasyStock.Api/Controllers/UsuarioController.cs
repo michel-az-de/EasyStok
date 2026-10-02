@@ -4,6 +4,8 @@ using EasyStock.Application.UseCases.AtualizarUsuario;
 using EasyStock.Application.UseCases.CriarUsuario;
 using EasyStock.Application.UseCases.DesativarUsuario;
 using EasyStock.Application.UseCases.ListarUsuarios;
+using EasyStock.Application.UseCases.ReenviarConvite;
+using EasyStock.Application.Services.Auth;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
@@ -21,6 +23,7 @@ public class UsuarioController(
     DesativarUsuarioUseCase desativarUseCase,
     ListarUsuariosUseCase listarUseCase,
     AtribuirPerfilUsuarioUseCase atribuirPerfilUseCase,
+    ReenviarConviteUseCase reenviarConviteUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List users (Admin only, paginated)")]
@@ -40,7 +43,11 @@ public class UsuarioController(
         return DataPaged(usuarios, total, page, pageSize);
     }
 
-    [SwaggerOperation(Summary = "Create user (Admin only)")]
+    [SwaggerOperation(
+        Summary = "Create user (Admin only)",
+        Description = "Sem Senha (o caminho novo, N9) nasce o convidado e sai um convite com link por e-mail (e por WhatsApp quando " +
+                      "Telefone e AtestaOptInWhatsApp). Superadmin nunca nasce por convite. OBSOLETO: Senha. Com Senha o usuario nasce " +
+                      "como antes; o campo sai na M7.2, quando o console substituir o formulario do Web.")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -53,6 +60,30 @@ public class UsuarioController(
 
         var resultado = await criarUseCase.ExecuteAsync(command);
         return DataCreated($"/api/usuarios/{resultado.UsuarioId}", resultado);
+    }
+
+    [SwaggerOperation(
+        Summary = "Resend the access invite (Admin only)",
+        Description = "Revoga os convites abertos e emite novos (N9). 3 por hora por usuario (429 com Retry-After). So para convite pendente.")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [HttpPost("{id}/convite")]
+    [Authorize(Policy = "Admin")]
+    public async Task<IActionResult> ReenviarConvite(Guid id)
+    {
+        try
+        {
+            await reenviarConviteUseCase.ExecuteAsync(new ReenviarConviteCommand(id));
+            return NoContent();
+        }
+        catch (LimitePedidosAcessoExcedidoException ex)
+        {
+            Response.Headers.Append("Retry-After", ex.RetryAfterSeconds.ToString());
+            return StatusCode(StatusCodes.Status429TooManyRequests, new ApiErrorResponse(new ApiError(
+                "TOO_MANY_REQUESTS", "Muitos reenvios para este usuario. Tente de novo em alguns minutos.", null, null)));
+        }
     }
 
     [SwaggerOperation(Summary = "Update user (Admin only)")]

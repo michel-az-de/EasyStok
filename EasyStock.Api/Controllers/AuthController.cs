@@ -37,6 +37,9 @@ public sealed record EsqueciSenhaRequest([Required] string Email);
 /// <summary>Reset pelo link do e-mail (N8). IP e agente saem da conexão, não do corpo.</summary>
 public sealed record ResetarSenhaRequest([Required] string Token, [Required] string NovaSenha);
 
+/// <summary>Aceite do convite de primeiro acesso (N9). IP e agente saem da conexão, não do corpo.</summary>
+public sealed record AceitarConviteRequest([Required] string Token, [Required] string NovaSenha);
+
 /// <summary>Reset pelo código de 6 dígitos do WhatsApp (N8).</summary>
 public sealed record ResetarSenhaPorCodigoRequest([Required] string Email, [Required] string Codigo, [Required] string NovaSenha);
 
@@ -262,6 +265,30 @@ public class AuthController(
         {
             return DataOk(await resetarSenhaPorCodigoUseCase.ExecuteAsync(
                 new ResetarSenhaPorCodigoCommand(request.Email, request.Codigo, request.NovaSenha, ClientIp(), ClientUserAgent())));
+        }
+        catch (LimitePedidosAcessoExcedidoException ex)
+        {
+            return TooManyRequests(ex);
+        }
+    }
+
+    [SwaggerOperation(
+        Summary = "Accept an access invite (set the password and verify the channel)",
+        Description = "Anonimo (N9). Quem consome e este POST: abrir o link nunca consome. Define a senha pela politica existente, " +
+                      "verifica o canal do token (e-mail ou WhatsApp) e revoga os outros convites. Revogado, usado, vencido ou de " +
+                      "superadmin: sempre a mesma mensagem. Nao emite sessao: a pessoa volta ao login. Limite por IP da N8 (429).")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [EnableRateLimiting("auth")]
+    [HttpPost("aceitar-convite")]
+    public async Task<IActionResult> AceitarConvite(
+        [FromBody] AceitarConviteRequest request, [FromServices] EasyStock.Application.UseCases.AceitarConvite.AceitarConviteUseCase aceitarConvite)
+    {
+        try
+        {
+            return DataOk(await aceitarConvite.ExecuteAsync(
+                new EasyStock.Application.UseCases.AceitarConvite.AceitarConviteCommand(
+                    request.Token, request.NovaSenha, ClientIp(), ClientUserAgent())));
         }
         catch (LimitePedidosAcessoExcedidoException ex)
         {

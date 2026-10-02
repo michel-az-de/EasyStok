@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Auth;
+using EasyStock.Application.UseCases.AceitarConvite;
 using EasyStock.Application.UseCases.EsqueciSenha;
 using EasyStock.Application.UseCases.ResetarSenha;
 using EasyStock.Domain.Entities.Notifications;
@@ -24,6 +25,7 @@ internal sealed record EventoEnfileirado(TipoEventoNotificacao Tipo, Guid Empres
 internal sealed class CenarioDeAcesso
 {
     public const string LinkConfigurado = "https://app.easystok.com.br/auth/redefinir-senha?token={0}";
+    public const string LinkDoConvite = "https://app.easystok.com.br/auth/convite?token={0}";
     public static readonly DateTimeOffset Agora = new(2026, 10, 2, 13, 0, 0, TimeSpan.Zero);
 
     public FakeTimeProvider Relogio { get; } = new(Agora);
@@ -32,6 +34,8 @@ internal sealed class CenarioDeAcesso
     public IAuditLogRepository Auditoria { get; } = Substitute.For<IAuditLogRepository>();
     public List<AuditLog> Auditorias { get; } = [];
     public IConsentimentoRepository Consentimentos { get; } = Substitute.For<IConsentimentoRepository>();
+    public IEmpresaRepository Empresas { get; } = Substitute.For<IEmpresaRepository>();
+    public List<ConsentimentoNotificacao> ConsentimentosGravados { get; } = [];
     public INotificadorService Notificador { get; } = Substitute.For<INotificadorService>();
     public List<EventoEnfileirado> Eventos { get; } = [];
     public IEmpresaPadraoResolver EmpresaPadrao { get; } = Substitute.For<IEmpresaPadraoResolver>();
@@ -44,6 +48,7 @@ internal sealed class CenarioDeAcesso
     public Dictionary<string, string?> Configuracao { get; } = new()
     {
         ["Auth:LinkRedefinirSenha"] = LinkConfigurado,
+        ["Auth:LinkConvite"] = LinkDoConvite,
         ["Notifications:WhatsApp:Plataforma:PhoneNumberId"] = "123456789012345",
     };
 
@@ -51,6 +56,9 @@ internal sealed class CenarioDeAcesso
     {
         Cache = new FakeCacheComRelogio(Relogio);
         Auditoria.AddAsync(Arg.Do<AuditLog>(Auditorias.Add)).Returns(Task.CompletedTask);
+        Empresas.GetByIdAsync(Arg.Any<Guid>()).Returns(c => new Empresa { Id = c.Arg<Guid>(), Nome = "Casa da Baba" });
+        Consentimentos.AddAsync(Arg.Do<ConsentimentoNotificacao>(ConsentimentosGravados.Add), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
         EmpresaPadrao.ResolverAsync(Arg.Any<CancellationToken>()).Returns(EmpresaPadraoId);
         Consentimentos.ListarPorUsuariosAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<ConsentimentoNotificacao>());
@@ -109,8 +117,29 @@ internal sealed class CenarioDeAcesso
 
     public LimitePedidosAcesso Limite() => new(Cache);
 
+    public ConvitesDeAcesso Convites() => new(
+        Tokens, Notificador, Consentimentos, Empresas, Config, Relogio, Substitute.For<ILogger<ConvitesDeAcesso>>());
+
+    public AceitarConviteUseCase AceitarConvite(ILogger<AceitarConviteUseCase>? logger = null) => new(
+        Tokens, Usuarios, Consentimentos, Auditoria, Convites(), Limite(), new FakePasswordHasher(), UnitOfWork, Relogio,
+        logger ?? Substitute.For<ILogger<AceitarConviteUseCase>>());
+
+    /// <summary>Convidado pendente com vínculo ativo numa empresa, como a dona o criaria.</summary>
+    public Usuario CriarConvidado(string email = "ana@casadababa.com", Guid? empresaId = null, string? telefone = null)
+    {
+        var usuario = Usuario.CriarConvidado("Ana", email);
+        usuario.Empresas.Add(new UsuarioEmpresa
+        {
+            Id = Guid.NewGuid(), UsuarioId = usuario.Id, EmpresaId = empresaId ?? Guid.NewGuid(), Ativo = true,
+        });
+        if (telefone is not null) usuario.DefinirTelefone(TelefoneE164.From(telefone));
+        Usuarios.GetByEmailAsync(usuario.Email).Returns(usuario);
+        Usuarios.GetByIdAsync(usuario.Id).Returns(usuario);
+        return usuario;
+    }
+
     public EsqueciSenhaUseCase EsqueciSenha(ILogger<EsqueciSenhaUseCase>? logger = null) => new(
-        Usuarios, Tokens, Auditoria, Consentimentos, Notificador, EmpresaDoEvento(), Limite(), UnitOfWork, Config,
+        Usuarios, Tokens, Auditoria, Consentimentos, Notificador, EmpresaDoEvento(), Limite(), Convites(), UnitOfWork, Config,
         Relogio, logger ?? Substitute.For<ILogger<EsqueciSenhaUseCase>>());
 
     public ConcluidorDeReset Concluidor(ILogger<ConcluidorDeReset>? logger = null) => new(

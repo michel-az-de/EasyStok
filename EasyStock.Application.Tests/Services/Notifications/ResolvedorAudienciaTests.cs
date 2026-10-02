@@ -46,8 +46,9 @@ public class ResolvedorAudienciaTests
     }
 
     private static UsuarioParaAudiencia Pessoa(
-        string nome, bool confirmado = true, bool ativo = true, string? telefone = null, DateTime? verificadoEm = null) =>
-        new(Guid.NewGuid(), nome, $"{nome.ToLowerInvariant()}@casadababa.com", confirmado, ativo, telefone, verificadoEm);
+        string nome, bool confirmado = true, bool ativo = true, string? telefone = null, DateTime? verificadoEm = null,
+        bool convitePendente = false) =>
+        new(Guid.NewGuid(), nome, $"{nome.ToLowerInvariant()}@casadababa.com", confirmado, ativo, telefone, verificadoEm, convitePendente);
 
     private void Gestores(params UsuarioParaAudiencia[] pessoas) =>
         _usuarios.ListarDaEmpresaAsync(_empresaId, Arg.Any<IReadOnlyCollection<EasyStock.Domain.Enums.NivelAcesso>>(), Arg.Any<CancellationToken>())
@@ -77,6 +78,70 @@ public class ResolvedorAudienciaTests
         var r = await Criar().ResolverAsync(Rotina("gestores"), _empresaId, null);
 
         r.Should().ContainSingle().Which.Email.Should().BeNull();
+    }
+
+    // ── N9: o convidado ainda não verificou o telefone; o atestado da dona faz o papel do opt-in até o aceite ───
+
+    [Fact]
+    public async Task ConvidadoComAtestadoRecebePorWhatsAppSemTelefoneVerificado()
+    {
+        var ana = Pessoa("Ana", confirmado: false, telefone: "+5511999991234", verificadoEm: null, convitePendente: true);
+        _usuarios.ObterAsync(ana.Id, Arg.Any<CancellationToken>()).Returns(ana);
+        OptIn(ana.Id, CanalNotificacao.WhatsApp, CategoriaConteudoNotificacao.Seguranca);
+
+        var r = await Criar().ResolverAsync(
+            Rotina("convidado", CategoriaConteudoNotificacao.Seguranca), _empresaId, ana.Id);
+
+        var destinatario = r.Should().ContainSingle().Subject;
+        destinatario.Telefone.Should().Be("+5511999991234");
+        destinatario.Email.Should().Be("ana@casadababa.com", "o e-mail do convidado sempre recebe, mesmo sem confirmar");
+    }
+
+    [Fact]
+    public async Task ConvidadoSemAtestadoSoRecebePorEmail()
+    {
+        var ana = Pessoa("Ana", confirmado: false, telefone: "+5511999991234", verificadoEm: null, convitePendente: true);
+        _usuarios.ObterAsync(ana.Id, Arg.Any<CancellationToken>()).Returns(ana);
+
+        var r = await Criar().ResolverAsync(
+            Rotina("convidado", CategoriaConteudoNotificacao.Seguranca), _empresaId, ana.Id);
+
+        var destinatario = r.Should().ContainSingle().Subject;
+        destinatario.Telefone.Should().BeNull();
+        destinatario.Email.Should().Be("ana@casadababa.com");
+    }
+
+    [Fact]
+    public async Task ConvidadoQueJaAceitouNaoTemARelaxacaoDoTelefone()
+    {
+        var ana = Pessoa("Ana", telefone: "+5511999991234", verificadoEm: null, convitePendente: false);
+        _usuarios.ObterAsync(ana.Id, Arg.Any<CancellationToken>()).Returns(ana);
+        OptIn(ana.Id, CanalNotificacao.WhatsApp, CategoriaConteudoNotificacao.Seguranca);
+
+        var r = await Criar().ResolverAsync(
+            Rotina("convidado", CategoriaConteudoNotificacao.Seguranca), _empresaId, ana.Id);
+
+        r.Should().ContainSingle().Which.Telefone.Should().BeNull("a relaxação vale só até o aceite");
+    }
+
+    [Fact]
+    public async Task ConvidadoSemUsuarioIdNoPayloadCaiNasChavesDoPayload()
+    {
+        (await Criar().ResolverAsync(Rotina("convidado", CategoriaConteudoNotificacao.Seguranca), _empresaId, null))
+            .Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AudienciaUsuarioContinuaExigindoTelefoneVerificado()
+    {
+        var ana = Pessoa("Ana", telefone: "+5511999991234", verificadoEm: null, convitePendente: true);
+        _usuarios.ObterAsync(ana.Id, Arg.Any<CancellationToken>()).Returns(ana);
+        OptIn(ana.Id, CanalNotificacao.WhatsApp, CategoriaConteudoNotificacao.Seguranca);
+
+        var r = await Criar().ResolverAsync(
+            Rotina("usuario", CategoriaConteudoNotificacao.Seguranca), _empresaId, ana.Id);
+
+        r.Should().ContainSingle().Which.Telefone.Should().BeNull("só a audiência convidado relaxa a verificação");
     }
 
     [Fact]

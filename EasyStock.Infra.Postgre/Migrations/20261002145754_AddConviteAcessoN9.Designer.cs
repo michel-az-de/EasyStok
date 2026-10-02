@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261002145754_AddConviteAcessoN9")]
+    partial class AddConviteAcessoN9
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -261,17 +264,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
-
-                    b.Property<string>("ModeloRetomadaIdioma")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasDefaultValue("pt_BR");
-
-                    b.Property<string>("ModeloRetomadaNome")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
 
                     b.Property<int>("NivelSugestao")
                         .HasColumnType("integer");
@@ -590,9 +582,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime?>("AguardaClienteDesde")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<int>("Autor")
                         .HasColumnType("integer");
 
@@ -642,9 +631,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime?>("ProximoReenvioEm")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime?>("ReservaSmsEm")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -660,14 +646,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<int>("TipoConteudo")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("UltimaFalhaEnvio")
-                        .HasColumnType("integer");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("AguardaClienteDesde")
-                        .HasDatabaseName("ix_atendimento_mensagens_aguarda_cliente")
-                        .HasFilter("\"AguardaClienteDesde\" IS NOT NULL");
 
                     b.HasIndex("ProximoReenvioEm")
                         .HasDatabaseName("ix_atendimento_mensagens_proximo_reenvio")
@@ -675,10 +654,6 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasIndex("ConversaId", "EnviadaEm")
                         .HasDatabaseName("ix_atendimento_mensagens_conversa_enviada");
-
-                    b.HasIndex("EmpresaId", "EnviadaEm")
-                        .HasDatabaseName("ix_atendimento_mensagens_nao_entregues")
-                        .HasFilter("\"Status\" = 5 AND \"Direcao\" = 2");
 
                     b.HasIndex("EmpresaId", "ExternoId")
                         .IsUnique()

@@ -93,7 +93,12 @@ public class AuthControllerTests
         var esqueciSenhaUseCase = new EsqueciSenhaUseCase(
             _acessoUsuarios, _acessoTokens, auditLogRepo2,
             Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(),
-            _notificador, empresaDoEvento, limite, unitOfWork2, config, TimeProvider.System, esqueciSenhaLogger);
+            _notificador, empresaDoEvento, limite,
+            new ConvitesDeAcesso(
+                _acessoTokens, _notificador,
+                Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(),
+                Substitute.For<IEmpresaRepository>(), config, TimeProvider.System, Substitute.For<ILogger<ConvitesDeAcesso>>()),
+            unitOfWork2, config, TimeProvider.System, esqueciSenhaLogger);
         var concluidor = new ConcluidorDeReset(
             usuarioRepo2, _acessoTokens, auditLogRepo2, revogadorSessoes, _notificador, empresaDoEvento, passwordHasher,
             TimeProvider.System, Substitute.For<ILogger<ConcluidorDeReset>>());

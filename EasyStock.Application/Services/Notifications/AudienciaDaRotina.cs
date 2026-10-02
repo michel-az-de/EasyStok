@@ -15,7 +15,13 @@ public enum AudienciaNotificacao
     Gestores,
 
     /// <summary>Superadmins da plataforma. Só vale em rotina global.</summary>
-    Superadmins
+    Superadmins,
+
+    /// <summary>
+    /// O convidado do <c>usuarioId</c> do payload (N9): o e-mail sempre, e o WhatsApp com o atestado da dona, sem exigir o
+    /// telefone verificado, só até o aceite do convite.
+    /// </summary>
+    Convidado
 }
 
 /// <summary>Leitura da audiência da rotina.</summary>
@@ -42,6 +48,7 @@ public static class AudienciaDaRotina
                     "admins" => AudienciaNotificacao.Admins,
                     "gestores" => AudienciaNotificacao.Gestores,
                     "superadmins" => AudienciaNotificacao.Superadmins,
+                    "convidado" => AudienciaNotificacao.Convidado,
                     _ => null
                 };
             }

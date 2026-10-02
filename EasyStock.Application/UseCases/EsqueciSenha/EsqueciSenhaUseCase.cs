@@ -22,6 +22,7 @@ public sealed class EsqueciSenhaUseCase(
     INotificadorService notificador,
     EmpresaDoEventoAnonimo empresaDoEvento,
     LimitePedidosAcesso limitePorIp,
+    ConvitesDeAcesso convites,
     IUnitOfWork unitOfWork,
     IConfiguration configuration,
     TimeProvider relogio,
@@ -47,6 +48,14 @@ public sealed class EsqueciSenhaUseCase(
         if (usuario is null || !usuario.Ativo) return resposta;
 
         var agora = relogio.GetUtcNow().UtcDateTime;
+
+        // N9: quem ainda nao aceitou o convite nao tem senha para redefinir. O pedido reemite o convite e nunca gera
+        // token de reset: o reset so vale para quem ja aceitou (um caminho paralelo ao aceite, sem verificar o canal).
+        if (usuario.ConvitePendente)
+        {
+            await ReemitirConviteAsync(usuario, command);
+            return resposta;
+        }
 
         var motivoDoLimite = await MotivoDoLimiteDeContaAsync(usuario, agora);
         if (motivoDoLimite is not null)
@@ -122,6 +131,39 @@ public sealed class EsqueciSenhaUseCase(
         logger.LogInformation(
             "Redefinicao de senha pedida pelo usuario {UsuarioId} (codigo por WhatsApp: {ComCodigo})", usuario.Id, comCodigo);
         return resposta;
+    }
+
+    /// <summary>
+    /// Convite novo para o pendente que pediu "esqueci a senha". Respeita as 3 emissoes por hora do convite (sem aviso: a
+    /// resposta e a mesma de qualquer conta) e nunca vale para superadmin, que nao nasce por convite.
+    /// </summary>
+    private async Task ReemitirConviteAsync(Usuario usuario, EsqueciSenhaCommand command)
+    {
+        if (usuario.EhSuperAdmin()) return;
+
+        if (await convites.EmissoesNaUltimaHoraAsync(usuario.Id) >= ConvitesDeAcesso.EmissoesPorHora)
+        {
+            logger.LogWarning("Reenvio de convite limitado para o usuario {UsuarioId} (3 por hora)", usuario.Id);
+            return;
+        }
+
+        var empresaId = await empresaDoEvento.ResolverAsync(usuario);
+        if (empresaId is null) return;
+
+        try
+        {
+            convites.ExigirBaseDeLink();
+        }
+        catch (UseCaseValidationException)
+        {
+            return; // sem base de link nao ha o que enviar, e a resposta nao pode revelar isso
+        }
+
+        var comWhatsApp = await convites.ElegivelAoWhatsAppAsync(usuario);
+        await convites.EmitirAsync(usuario, empresaId.Value, comWhatsApp, command.Ip, command.UserAgent);
+        await auditLogRepository.AddAsync(AuditLog.Criar(
+            usuario.Id, "forgot-password-convite", true, "Convite reemitido no lugar da redefinicao", command.Ip, command.UserAgent));
+        await unitOfWork.CommitAsync();
     }
 
     /// <summary>Por conta: 3 por hora, 6 por dia e 60 s entre pedidos, contados nas linhas <c>Reset</c> de <c>reset_tokens</c>.</summary>
