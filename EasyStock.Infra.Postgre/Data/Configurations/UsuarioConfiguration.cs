@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore.Metadata;
+
 namespace EasyStock.Infra.Postgre.Data.Configurations
 {
     public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
@@ -58,6 +60,14 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
 
             builder.Property(u => u.LockoutEnd)
                 .HasColumnType("timestamp with time zone");
+
+            // #1352: corte das sessões. Nulo = nunca revogou, então a coluna nasce nula e sem default.
+            // O SaveChanges nunca grava a coluna num UPDATE (Ignore): a linha inteira costuma ser regravada por
+            // quem leu o usuário antes de uma revogação (login, troca de senha), e isso desfaria o corte ou o
+            // faria recuar. Só o UPDATE atômico do UsuarioRepository (ExecuteUpdate, que ignora esta regra) grava.
+            builder.Property(u => u.SessoesValidasDesde)
+                .HasColumnType("timestamp with time zone")
+                .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
 
             builder.HasIndex(u => u.Email).IsUnique();
             builder.HasIndex(u => u.Ativo);

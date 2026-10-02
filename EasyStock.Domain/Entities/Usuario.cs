@@ -17,6 +17,12 @@ namespace EasyStock.Domain.Entities
         public DateTime? LockoutEnd { get; set; }
 
         /// <summary>
+        /// Corte das sessões (#1352): todo JWT emitido antes deste instante deixa de valer. Nulo quer dizer que
+        /// nunca revogou. Só <see cref="RevogarSessoes"/> muda; o login nunca mexe (logar o tablet derrubaria o balcão).
+        /// </summary>
+        public DateTime? SessoesValidasDesde { get; set; }
+
+        /// <summary>
         /// Nivel preferencial do atendente no helpdesk (N1..N4). NULL para usuarios
         /// que nao atuam no atendimento. Define a fila de tickets que ele ve por default.
         /// </summary>
@@ -92,6 +98,24 @@ namespace EasyStock.Domain.Entities
             IncrementarTentativasFalha();
             if (FailedLoginAttempts >= FalhasParaBloquear)
                 BloquearPorTentativas(MinutosDeBloqueio);
+        }
+
+        /// <summary>
+        /// Derruba as sessões emitidas até <paramref name="agora"/> (#1352): grava o corte
+        /// <see cref="SessoesValidasDesde"/> truncado ao segundo (o <c>iat</c> do JWT é em segundos inteiros) e
+        /// sem nunca recuar. Quem persiste é o <c>RevogadorSessoes</c>, num UPDATE atômico: o
+        /// <c>UpdateAsync</c> do repositório não grava este campo.
+        /// </summary>
+        public void RevogarSessoes(DateTime agora)
+        {
+            var utc = agora.Kind == DateTimeKind.Local ? agora.ToUniversalTime() : agora;
+            var corte = new DateTime(utc.Ticks - utc.Ticks % TimeSpan.TicksPerSecond, DateTimeKind.Utc);
+
+            if (SessoesValidasDesde is { } atual && corte <= atual)
+                return;
+
+            SessoesValidasDesde = corte;
+            AlteradoEm = utc;
         }
 
         /// <summary>
