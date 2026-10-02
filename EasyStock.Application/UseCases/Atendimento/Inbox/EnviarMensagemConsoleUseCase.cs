@@ -20,8 +20,8 @@ public sealed record EnviarImagemConsoleCommand(
 ///
 /// <para>
 /// Fora da janela de atendimento (domínio recusa, ou a Meta devolve 131047) nada é gravado como enviado e a
-/// conversa não muda: <see cref="ForaDaJanelaAtendimentoException"/>. Qualquer outra falha do canal também
-/// não grava nada (<see cref="FalhaEnvioCanalException"/>): a dona tenta de novo.
+/// conversa não muda: <see cref="ForaDaJanelaAtendimentoException"/>. Qualquer outra falha do canal grava a
+/// mensagem como falhou (#1396) e devolve o id em <see cref="FalhaEnvioCanalException.Mensagem"/>: a dona reenvia.
 /// </para>
 /// </summary>
 public sealed class EnviarMensagemConsoleUseCase(
@@ -50,13 +50,13 @@ public sealed class EnviarMensagemConsoleUseCase(
         var tag = TagHumanaForaDaJanela(conversa, canal, agora);
         GarantirJanela(conversa, agora, tag);
 
-        var externoId = await EnviarAsync(() => tag is not null && canal is ICanalComTagHumana comTag
-            ? comTag.EnviarTextoComTagAsync(conversa.ContatoIdExterno, texto, tag, ct)
-            : canal.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct));
-
-        var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
-            TipoConteudoMensagem.Texto, texto, externoId);
-        return await RegistrarAsync(conversa, mensagem, command.UsuarioId, agora, ct);
+        return await EnviarERegistrarAsync(conversa, command.UsuarioId, agora,
+            () => tag is not null && canal is ICanalComTagHumana comTag
+                ? comTag.EnviarTextoComTagAsync(conversa.ContatoIdExterno, texto, tag, ct)
+                : canal.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct),
+            externoId => Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
+                TipoConteudoMensagem.Texto, texto, externoId),
+            ct);
     }
 
     public async Task<MensagemAtendimentoResult> EnviarImagemAsync(EnviarImagemConsoleCommand command, CancellationToken ct = default)
@@ -74,12 +74,16 @@ public sealed class EnviarMensagemConsoleUseCase(
         var imagem = await uploads.UploadImagemAtendimentoAsync(
             command.EmpresaId, conversa.Id, command.FileName, command.ContentType, command.Conteudo, ct);
 
-        var externoId = await EnviarAsync(() => canal.EnviarImagemAsync(conversa.ContatoIdExterno, imagem.Url, legenda, ct));
-
-        var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
-            TipoConteudoMensagem.Imagem, legenda, externoId);
-        mensagem.AnexarMidia(imagem.StorageKey, imagem.ContentType);
-        return await RegistrarAsync(conversa, mensagem, command.UsuarioId, agora, ct);
+        return await EnviarERegistrarAsync(conversa, command.UsuarioId, agora,
+            () => canal.EnviarImagemAsync(conversa.ContatoIdExterno, imagem.Url, legenda, ct),
+            externoId =>
+            {
+                var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
+                    TipoConteudoMensagem.Imagem, legenda, externoId);
+                mensagem.AnexarMidia(imagem.StorageKey, imagem.ContentType);
+                return mensagem;
+            },
+            ct);
     }
 
     private async Task<Conversa> ObterParaEnvioAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct)
@@ -117,11 +121,18 @@ public sealed class EnviarMensagemConsoleUseCase(
             ? CapacidadesCanal.TagAgenteHumano
             : null;
 
-    private static async Task<string> EnviarAsync(Func<Task<string>> envio)
+    /// <summary>
+    /// Envia e grava. Na falha do canal (#1396) grava a mensagem <see cref="StatusMensagem.Falhou"/> com o erro
+    /// (temporária agenda o reenvio, S57) e devolve o id real na exceção, para o botão Reenviar do console.
+    /// </summary>
+    private async Task<MensagemAtendimentoResult> EnviarERegistrarAsync(
+        Conversa conversa, Guid usuarioId, DateTime agora, Func<Task<string>> envio,
+        Func<string?, Mensagem> criarMensagem, CancellationToken ct)
     {
+        string externoId;
         try
         {
-            return await envio();
+            externoId = await envio();
         }
         catch (WhatsAppCloudException ex) when (ex.Codigo == CodigoMetaForaDaJanela)
         {
@@ -129,8 +140,13 @@ public sealed class EnviarMensagemConsoleUseCase(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            throw new FalhaEnvioCanalException($"Falha ao enviar pelo canal: {ex.Message}", ex);
+            var falhou = criarMensagem(null);
+            falhou.RegistrarFalhaEnvio(ex.Message, ClassificadorFalhaEnvio.Classificar(ex), agora);
+            var gravada = await RegistrarAsync(conversa, falhou, usuarioId, agora, ct);
+            throw new FalhaEnvioCanalException($"Falha ao enviar pelo canal: {ex.Message}", ex, gravada);
         }
+
+        return await RegistrarAsync(conversa, criarMensagem(externoId), usuarioId, agora, ct);
     }
 
     private async Task<MensagemAtendimentoResult> RegistrarAsync(

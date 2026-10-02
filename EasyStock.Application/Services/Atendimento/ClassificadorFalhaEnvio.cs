@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Enums.Atendimento;
 
 namespace EasyStock.Application.Services.Atendimento;
@@ -16,4 +17,11 @@ public static class ClassificadorFalhaEnvio
         HttpRequestException => TipoFalhaEnvio.Temporaria,
         _ => TipoFalhaEnvio.Permanente,
     };
+
+    /// <summary>
+    /// #1396: código do callback <c>failed</c> da Meta, pela tabela de <see cref="CodigosErroMeta"/>.
+    /// Sem código não há como saber se é temporária: não insiste.
+    /// </summary>
+    public static TipoFalhaEnvio ClassificarCodigoMeta(int? codigo) =>
+        codigo is { } c && !CodigosErroMeta.EhPermanente(c) ? TipoFalhaEnvio.Temporaria : TipoFalhaEnvio.Permanente;
 }
