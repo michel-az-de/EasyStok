@@ -74,7 +74,8 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
 
             usuario.ResetarTentativasFalha();
 
-            var resultado = await ConcluirAsync(usuario, command.EmpresaId ?? ResolveEmpresaIdPadrao(usuario));
+            // #1342: superadmin que informa a empresa entra nela; sem empresaId, segue sem (painel admin).
+            var resultado = await ConcluirAsync(usuario, command.EmpresaId ?? ResolveEmpresaIdPadrao(usuario), empresaDoSuperAdmin: command.EmpresaId);
 
             swTotal.Stop();
             logger.LogInformation(
