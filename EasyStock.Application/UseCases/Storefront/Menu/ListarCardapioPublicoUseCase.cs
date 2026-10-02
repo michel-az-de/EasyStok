@@ -129,6 +129,12 @@ public sealed class ListarCardapioPublicoUseCase(
         "à", "às", "em", "no", "na", "nos", "nas", "para", "sem", "por", "ou",
     };
 
+    /// <summary>Unidades que seguem um número e ficam minúsculas ("500 g", "250 ml"), #1334.</summary>
+    private static readonly HashSet<string> UnidadesDeMedida = new(StringComparer.Ordinal)
+    {
+        "g", "kg", "ml", "l",
+    };
+
     /// <summary>
     /// Title-case pt-BR para exibição na vitrine. <c>NomePublico</c>/<c>CategoriaTexto</c> de
     /// itens avulsos são armazenados em minúsculo (factory). Capitaliza a 1ª letra de cada
@@ -147,6 +153,7 @@ public sealed class ListarCardapioPublicoUseCase(
             var p = palavras[i];
             if (p.Length == 0) continue;
             if (i > 0 && PalavrasMinusculas.Contains(p)) continue;
+            if (i > 0 && UnidadesDeMedida.Contains(p) && palavras[i - 1].Length > 0 && char.IsDigit(palavras[i - 1][^1])) continue;
 
             var arr = p.ToCharArray();
             var capitalizar = true;
