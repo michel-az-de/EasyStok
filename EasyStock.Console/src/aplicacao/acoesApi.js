@@ -15,9 +15,13 @@ import { criarAvisosNaoLigadas, envioNaoLigado, textoNaoLigado } from './api/nao
 
 const FORA_DA_JANELA = 'fora_da_janela_24h'
 
-const motivoDaRecusa = (erro) => (erro.codigo === FORA_DA_JANELA
-  ? 'Não enviada: passou a janela de 24 h. Só modelo aprovado sai até o cliente responder.'
-  : `Não enviada: ${erro.message}`)
+const CANAL_FALHOU = 'CANAL_FALHOU'
+
+const motivoDaRecusa = (erro) => {
+  if (erro.codigo === FORA_DA_JANELA) return 'Não enviada: passou a janela de 24 h. Só modelo aprovado sai até o cliente responder.'
+  if (erro.codigo === CANAL_FALHOU && erro.detalhe) return `Não enviada: ${erro.detalhe}`
+  return `Não enviada: ${erro.message}`
+}
 
 // Modo API (F01, F02, F03, F06, #1276): as ações que a caixa de entrada, o expediente, a
 // configuração, o assistente, os avisos da Ficha, a comanda (pedido e cobrança), o cadastro do
