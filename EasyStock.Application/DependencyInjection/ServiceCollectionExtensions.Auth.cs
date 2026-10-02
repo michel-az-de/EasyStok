@@ -3,7 +3,6 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using EasyStock.Application.UseCases.AutenticarUsuario;
-using EasyStock.Application.UseCases.CadastrarUsuario;
 using EasyStock.Application.UseCases.RefreshToken;
 using EasyStock.Application.UseCases.Logout;
 using EasyStock.Application.UseCases.EsqueciSenha;
@@ -30,7 +29,6 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AutenticarUsuarioUseCase>();
         services.AddScoped<ListarEmpresasParaLoginUseCase>(); // step-1 do login 2-etapas (ADR-0031)
         services.AddScoped<IdentificarUsuarioGoogleUseCase>(); // login com Google (#1324)
-        services.AddScoped<CadastrarUsuarioUseCase>();
         services.AddScoped<RefreshTokenUseCase>();
         services.AddScoped<LogoutUseCase>();
 
