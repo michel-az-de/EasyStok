@@ -40,6 +40,24 @@ public sealed class TemplateNotificacaoRepository(EasyStockDbContext db) : ITemp
             .FirstOrDefaultAsync(ct);
     }
 
+    /// <summary>
+    /// Por tipo e canal (N5), com a mesma leitura do catálogo global da N1: o filtro do EF é ignorado e o predicado
+    /// <c>EmpresaId == empresa ou nulo</c> delimita o que entra; a policy <c>catalogo_global_leitura</c> expõe os
+    /// globais ao tenant (só SELECT), sem bypass de RLS. A empresa vem antes do global, depois a maior versão.
+    /// </summary>
+    public async Task<TemplateNotificacao?> GetAtivoPorTipoAsync(
+        TipoEventoNotificacao tipo, CanalNotificacao canal, Guid? empresaId, CancellationToken ct = default)
+    {
+        return await db.NotifTemplates
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(t => t.TipoEvento == tipo && t.Canal == canal && t.Ativo && t.Aprovado
+                        && (t.EmpresaId == null || t.EmpresaId == empresaId))
+            .OrderBy(t => t.EmpresaId == null)
+            .ThenByDescending(t => t.Versao)
+            .FirstOrDefaultAsync(ct);
+    }
+
     public async Task<(IReadOnlyList<TemplateNotificacao> Items, int TotalCount)> ListarAsync(
         Guid? empresaId, TipoEventoNotificacao? tipoEvento = null,
         CanalNotificacao? canal = null, bool? ativo = null,

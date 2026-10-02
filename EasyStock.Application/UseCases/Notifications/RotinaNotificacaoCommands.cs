@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 
@@ -15,7 +16,8 @@ public sealed record CriarRotinaCommand(
     CategoriaConteudoNotificacao CategoriaConteudo,
     string? CronExpression = null,
     string? ParametrosJson = null,
-    Guid? EmpresaId = null) : ICommand;
+    Guid? EmpresaId = null,
+    IReadOnlyList<CanalNotificacao>? Canais = null) : ICommand;
 
 public sealed record RotinaResult(Guid Id, string Codigo);
 
@@ -34,6 +36,10 @@ public sealed class CriarRotinaUseCase(
 
         if (command.ParametrosJson is not null)
             rotina.DefinirParametros(command.ParametrosJson, "sistema");
+
+        // N5: canais em ordem de preferência, sem repetição. Sem eles a rotina nasce sem canais, como antes.
+        if (command.Canais is { Count: > 0 })
+            rotina.DefinirFallback(CanaisDaRotina.Serializar(command.Canais.Distinct()), "sistema");
 
         await rotinaRepository.AddAsync(rotina);
         await unitOfWork.CommitAsync();

@@ -164,4 +164,57 @@ public class ResolvedorCanalTests
         comKillSwitch.Should().BeEmpty();
         comCanalInativo.Should().BeEmpty();
     }
+
+    [Fact]
+    public void PausaDaEmpresaSuprimeOCanalDaEmpresaENaoDasOutras()
+    {
+        var empresaA = Guid.NewGuid();
+        var empresaB = Guid.NewGuid();
+        var pausaDeEmail = BloqueioNotificacao.Criar("pausa", "admin@x.com", empresaA, CanalNotificacao.Email);
+        var configs = new List<ConfiguracaoCanal> { CanalAtivo(CanalNotificacao.Email), CanalAtivo(CanalNotificacao.Sms) };
+
+        var daA = Sut.ResolverCanaisPermitidos(
+            CategoriaConteudoNotificacao.Operacional, [CanalNotificacao.Email, CanalNotificacao.Sms],
+            consentimentos: [], configs, [pausaDeEmail], Agora, empresaA, inAppTemTemplate: false);
+        var daB = Sut.ResolverCanaisPermitidos(
+            CategoriaConteudoNotificacao.Operacional, [CanalNotificacao.Email, CanalNotificacao.Sms],
+            consentimentos: [], configs, [pausaDeEmail], Agora, empresaB, inAppTemTemplate: false);
+
+        daA.Should().Equal(CanalNotificacao.Sms);
+        daB.Should().Equal(CanalNotificacao.Email, CanalNotificacao.Sms);
+    }
+
+    [Fact]
+    public void PausaDaEmpresaNaoBloqueiaSeguranca()
+    {
+        var empresa = Guid.NewGuid();
+        var pausa = BloqueioNotificacao.Criar("pausa", "admin@x.com", empresa);
+        var configs = new List<ConfiguracaoCanal> { CanalAtivo(CanalNotificacao.Email) };
+
+        var seguranca = Sut.ResolverCanaisPermitidos(
+            CategoriaConteudoNotificacao.Seguranca, [CanalNotificacao.Email],
+            consentimentos: [], configs, [pausa], Agora, empresa);
+        var transacional = Sut.ResolverCanaisPermitidos(
+            CategoriaConteudoNotificacao.Transacional, [CanalNotificacao.Email],
+            consentimentos: [], configs, [pausa], Agora, empresa);
+
+        seguranca.Should().Equal(CanalNotificacao.Email);
+        transacional.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void InAppAcrescentadoSoComTemplate()
+    {
+        var configs = new List<ConfiguracaoCanal> { CanalAtivo(CanalNotificacao.InApp) };
+
+        var comTemplate = Sut.ResolverCanaisPermitidos(
+            CategoriaConteudoNotificacao.Operacional, [CanalNotificacao.Email],
+            consentimentos: [], configs, [], Agora, inAppTemTemplate: true);
+        var semTemplate = Sut.ResolverCanaisPermitidos(
+            CategoriaConteudoNotificacao.Operacional, [CanalNotificacao.Email],
+            consentimentos: [], configs, [], Agora, inAppTemTemplate: false);
+
+        comTemplate.Should().Contain(CanalNotificacao.InApp);
+        semTemplate.Should().NotContain(CanalNotificacao.InApp);
+    }
 }
