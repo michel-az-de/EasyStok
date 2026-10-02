@@ -68,10 +68,14 @@ public class AuthControllerTests
             usuarioRepo2, refreshTokenRepo2, Substitute.For<ICacheService>(), TimeProvider.System, Substitute.For<ILogger<RevogadorSessoes>>());
         var resetarSenhaUseCase = new ResetarSenhaUseCase(resetTokenRepo, usuarioRepo2, auditLogRepo2, revogadorSessoes, unitOfWork2, passwordHasher, resetarSenhaLogger);
         var obterUsuarioAtualUseCase = new ObterUsuarioAtualUseCase(usuarioRepo2, currentUser, obterUsuarioAtualLogger);
-        var atualizarUsuarioAtualUseCase = new AtualizarUsuarioAtualUseCase(usuarioRepo2, currentUser, unitOfWork2, atualizarUsuarioAtualLogger);
+        var trocaDeContato = new TrocaDeContatoService(
+            usuarioRepo2, emailTokenRepo, Substitute.For<EasyStock.Application.Ports.Output.Notifications.INotificadorService>(),
+            Substitute.For<IEmpresaPadraoResolver>(), Substitute.For<ITenantContextAccessor>(), currentUser, passwordHasher,
+            unitOfWork2, config, TimeProvider.System, Substitute.For<ILogger<TrocaDeContatoService>>());
+        var atualizarUsuarioAtualUseCase = new AtualizarUsuarioAtualUseCase(usuarioRepo2, currentUser, unitOfWork2, trocaDeContato, atualizarUsuarioAtualLogger);
         var alterarSenhaUseCase = new AlterarSenhaUseCase(usuarioRepo2, currentUser, revogadorSessoes, unitOfWork2, passwordHasher, alterarSenhaLogger);
         var confirmEmailLogger = Substitute.For<ILogger<ConfirmEmailUseCase>>();
-        var confirmEmailUseCase = new ConfirmEmailUseCase(emailTokenRepo, usuarioRepo2, auditLogRepo2, unitOfWork2, confirmEmailLogger);
+        var confirmEmailUseCase = new ConfirmEmailUseCase(emailTokenRepo, usuarioRepo2, auditLogRepo2, revogadorSessoes, unitOfWork2, confirmEmailLogger);
 
         var exportarLogger = Substitute.For<ILogger<EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase>>();
         var anonimizarLogger = Substitute.For<ILogger<EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase>>();

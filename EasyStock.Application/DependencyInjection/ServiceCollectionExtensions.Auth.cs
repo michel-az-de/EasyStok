@@ -38,6 +38,9 @@ public static partial class ServiceCollectionExtensions
         // Depende de ICacheService (Infra.Async) e do relógio; o grupo registra o relógio como os de Core e Storefront.
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<RevogadorSessoes>();
+        services.AddScoped<TrocaDeContatoService>(); // troca de contato com senha atual em duas etapas (N4)
+        services.AddScoped<EasyStock.Application.UseCases.ContatoUsuario.DefinirMeuTelefoneUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.ContatoUsuario.VerificarTelefoneUsuarioUseCase>();
 
         // Recuperação e reset de senha
         services.AddScoped<EsqueciSenhaUseCase>();

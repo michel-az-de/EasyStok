@@ -51,6 +51,7 @@ public class PoliticaValidadeNotificacaoTests
     [InlineData(TipoEventoNotificacao.PrazoEstourado, 6 * 60)]
     [InlineData(TipoEventoNotificacao.ResumoDiario, 4 * 60)]
     [InlineData(TipoEventoNotificacao.ConviteAcesso, 24 * 60)]
+    [InlineData(TipoEventoNotificacao.ContatoAlterado, 30)]
     public void TiposDoCatalogoTemPrazoProprio(TipoEventoNotificacao tipo, int minutos) =>
         NovaPolitica().PrazoDe(tipo).Should().Be(TimeSpan.FromMinutes(minutos));
 

@@ -3,10 +3,14 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Auth;
 using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AtribuirPerfilUsuario;
+using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
 using EasyStock.Application.UseCases.AutenticarUsuario;
+using EasyStock.Application.UseCases.ConfirmEmail;
+using EasyStock.Application.UseCases.ContatoUsuario;
 using EasyStock.Application.UseCases.DesativarUsuario;
 using EasyStock.Application.UseCases.ResetarSenha;
 using EasyStock.Application.Validators;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.TestHelpers;
 using Microsoft.Extensions.Logging;
 using AlterarSenhaUsuarioCommand = EasyStock.Application.UseCases.AlterarSenhaUsuario.AlterarSenhaCommand;
@@ -230,6 +234,58 @@ public class RevogacaoDeSessaoTests
 
         await perfis.Received(1).AddAsync(Arg.Is<UsuarioPerfil>(p => p.PerfilId == perfilId));
         await NaoDeveTerRevogadoNada();
+    }
+
+    // ── troca de contato (N4): só o que muda a identidade da conta derruba a sessão ──────────
+
+    private TrocaDeContatoFixture Contato()
+    {
+        var f = new TrocaDeContatoFixture(usuarios: _usuarios, unitOfWork: _unitOfWork);
+        f.UsuarioAtual.UsuarioId.Returns(_usuario.Id);
+        return f;
+    }
+
+    [Fact]
+    public async Task ConfirmarNovoEmailRevoga()
+    {
+        _usuario.SolicitarTrocaDeEmail("nova@casadababa.com");
+        var tokens = Substitute.For<IEmailConfirmationTokenRepository>();
+        tokens.GetByTokenAsync("token-do-email").Returns(EmailConfirmationToken.Criar(_usuario.Id, "hash", null, null));
+
+        await new ConfirmEmailUseCase(
+                tokens, _usuarios, Substitute.For<IAuditLogRepository>(), _revogador, _unitOfWork,
+                Substitute.For<ILogger<ConfirmEmailUseCase>>())
+            .ExecuteAsync(new ConfirmEmailCommand("token-do-email"));
+
+        _usuario.Email.Should().Be("nova@casadababa.com");
+        await DeveTerRevogadoOUsuarioTodo();
+    }
+
+    [Fact]
+    public async Task PedidoDeTrocaDeEmailNaoRevoga()
+    {
+        var f = Contato();
+
+        await new AtualizarUsuarioAtualUseCase(
+                _usuarios, f.UsuarioAtual, _unitOfWork, f.Servico, Substitute.For<ILogger<AtualizarUsuarioAtualUseCase>>())
+            .ExecuteAsync(new AtualizarUsuarioAtualCommand(null, "nova@casadababa.com", SenhaAtual: "SenhaAntiga@123"));
+
+        _usuario.EmailPendente.Should().Be("nova@casadababa.com");
+        await NaoDeveTerRevogadoNada();
+    }
+
+    [Fact]
+    public async Task TrocaDeTelefoneRevoga()
+    {
+        var f = Contato();
+        _usuario.DefinirTelefone(TelefoneE164.From("11997573992"));
+
+        await new DefinirMeuTelefoneUseCase(
+                _usuarios, f.UsuarioAtual, f.Servico, _revogador, _unitOfWork, Substitute.For<ILogger<DefinirMeuTelefoneUseCase>>())
+            .ExecuteAsync(new DefinirMeuTelefoneCommand("11988887777", "SenhaAntiga@123"));
+
+        _usuario.Telefone!.Value.Should().Be("+5511988887777");
+        await DeveTerRevogadoOUsuarioTodo();
     }
 
     // ── login: nunca revoga ───────────────────────────────────────────────────────────────────
