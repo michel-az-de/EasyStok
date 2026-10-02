@@ -1,3 +1,4 @@
+using EasyStock.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace EasyStock.Infra.Postgre.Data.Configurations
@@ -68,6 +69,19 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(u => u.SessoesValidasDesde)
                 .HasColumnType("timestamp with time zone")
                 .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
+
+            // N4: contato verificado. Três colunas nulas; a tabela não tem EmpresaId, então não entra RLS nova.
+            builder.Property(u => u.Telefone)
+                .HasConversion(t => t == null ? null : t.Value, v => v == null ? null : TelefoneE164.From(v))
+                .HasMaxLength(TelefoneE164.TamanhoMaximo)
+                .HasColumnType("character varying(16)");
+
+            builder.Property(u => u.TelefoneVerificadoEm)
+                .HasColumnType("timestamp with time zone");
+
+            builder.Property(u => u.EmailPendente)
+                .HasMaxLength(255)
+                .HasColumnType("character varying(255)");
 
             builder.HasIndex(u => u.Email).IsUnique();
             builder.HasIndex(u => u.Ativo);

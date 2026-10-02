@@ -23,6 +23,7 @@ public static partial class ServiceCollectionExtensionsNotifications
         services.AddScoped<IEventoNotificacaoRepository, EventoNotificacaoRepository>();
         services.AddScoped<IOutboxNotificacaoRepository, OutboxNotificacaoRepository>();
         services.AddScoped<IConsentimentoRepository, ConsentimentoRepository>();
+        services.AddScoped<IPreferenciaNotificacaoRepository, PreferenciaNotificacaoRepository>();
         services.AddScoped<IConfiguracaoCanalRepository, ConfiguracaoCanalRepository>();
         services.AddScoped<IBloqueioNotificacaoRepository, BloqueioNotificacaoRepository>();
         services.AddScoped<ILogEnvioNotificacaoRepository, LogEnvioNotificacaoRepository>();

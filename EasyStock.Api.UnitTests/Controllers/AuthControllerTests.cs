@@ -76,8 +76,8 @@ public class AuthControllerTests
         var exportarLogger = Substitute.For<ILogger<EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase>>();
         var anonimizarLogger = Substitute.For<ILogger<EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase>>();
         var usuarioEmpresaRepo = Substitute.For<IUsuarioEmpresaRepository>();
-        var exportarUseCase = new EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase(usuarioRepo2, usuarioEmpresaRepo, refreshTokenRepo2, currentUser, exportarLogger);
-        var anonimizarUseCase = new EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase(usuarioRepo2, refreshTokenRepo2, resetTokenRepo, emailTokenRepo, currentUser, unitOfWork2, anonimizarLogger);
+        var exportarUseCase = new EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase(usuarioRepo2, usuarioEmpresaRepo, refreshTokenRepo2, Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Notifications.IPreferenciaNotificacaoRepository>(), currentUser, exportarLogger);
+        var anonimizarUseCase = new EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase(usuarioRepo2, refreshTokenRepo2, resetTokenRepo, emailTokenRepo, Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Notifications.IPreferenciaNotificacaoRepository>(), currentUser, unitOfWork2, anonimizarLogger);
 
         var listarEmpresasLogger = Substitute.For<ILogger<ListarEmpresasParaLoginUseCase>>();
         var listarEmpresasUseCase = new ListarEmpresasParaLoginUseCase(
