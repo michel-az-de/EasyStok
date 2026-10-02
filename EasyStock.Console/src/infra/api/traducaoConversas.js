@@ -45,6 +45,8 @@ export function mensagemDaApi(m, conversaId = null) {
     ...(m.aguardaClienteDesde ? { aguardaCliente: true } : {}),
     ...(m.reservaSmsEm ? { porSms: true } : {}),
     ...(m.midiaChave && conversaId ? { midia: { conversaId, mensagemId: m.id, mime: m.midiaMime ?? null } } : {}),
+    // #1397: o EasyStok desistiu de baixar o anexo depois das tentativas; o balão avisa em vez de ficar parado.
+    ...(!m.midiaChave && m.midiaFalhou ? { midia: { falhou: true, erro: m.erroMidia ?? null } } : {}),
   }
 }
 

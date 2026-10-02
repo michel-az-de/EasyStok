@@ -158,6 +158,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             var texto = msg.Tipo is "interactive" or "button" ? null : msg.TextoCorpo;
 
             mensagemEntidade = Mensagem.Entrada(empresaId, conversa.Id, enviadaEm, MapearTipoConteudo(msg.Tipo), texto, msg.Wamid, botaoId);
+            if (msg.MidiaId is not null)
+                mensagemEntidade.AguardarMidia(msg.MidiaId, DateTime.UtcNow); // #1397: pendência durável
             await conversaRepository.AddMensagemAsync(mensagemEntidade, ct);
 
             // S24: cliente bloqueado não é saudado nem atendido pelo agente; a conversa nasce com a
