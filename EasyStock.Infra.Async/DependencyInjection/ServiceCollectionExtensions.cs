@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Pdf;
 using EasyStock.Infra.Async.Pagamentos;
@@ -30,42 +31,9 @@ public static class ServiceCollectionExtensions
         // Queue Service
         services.AddSingleton<IQueueService, BackgroundQueueService>();
 
-        // Email Service — Onda 1.3: switch por Email:Provider em {smtp, sendgrid, console}.
-        // Compat: se Email:Provider nao setado, mantem comportamento legado (Smtp se existir, senao console).
-        var emailProvider = (configuration["Email:Provider"] ?? "").Trim().ToLowerInvariant();
-        var smtpConfig = configuration.GetSection("Smtp");
-        var sendGridConfig = configuration.GetSection("SendGrid");
-
-        if (string.IsNullOrEmpty(emailProvider))
-            emailProvider = smtpConfig.Exists() ? "smtp" : "console";
-
-        switch (emailProvider)
-        {
-            case "sendgrid":
-                services.AddSingleton<IEmailService>(_ => new SendGridEmailService(
-                    apiKey: sendGridConfig["ApiKey"]
-                        ?? throw new InvalidOperationException("SendGrid:ApiKey eh obrigatorio quando Email:Provider=sendgrid."),
-                    fromEmail: sendGridConfig["FromEmail"] ?? "noreply@easystock.com",
-                    fromName: sendGridConfig["FromName"] ?? "EasyStock",
-                    sandbox: bool.Parse(sendGridConfig["SandboxMode"] ?? "false")));
-                break;
-
-            case "smtp":
-                services.AddSingleton<IEmailService>(_ => new SmtpEmailService(
-                    smtpConfig["Host"] ?? "localhost",
-                    int.Parse(smtpConfig["Port"] ?? "587"),
-                    smtpConfig["Username"] ?? "",
-                    smtpConfig["Password"] ?? "",
-                    smtpConfig["FromEmail"] ?? "noreply@easystock.com",
-                    smtpConfig["FromName"] ?? "EasyStock",
-                    bool.Parse(smtpConfig["EnableSsl"] ?? "true")));
-                break;
-
-            default:
-                // Console — fallback dev. Loga email sem enviar.
-                services.AddSingleton<IEmailService, ConsoleEmailService>();
-                break;
-        }
+        // Email Service — N3 (#1351): uma so fabrica para a API e o Worker (Email:Provider em
+        // {smtp, sendgrid, console}; sem ele, smtp quando ha Host e remetente, senao console com aviso).
+        services.AddEasyStockEmail(configuration);
 
         // Storage Service
         services.AddSingleton<IStorageService, S3StorageService>();
@@ -225,5 +193,17 @@ public sealed class ConsoleEmailService(ILogger<ConsoleEmailService> logger) : I
     {
         logger.LogDebug("[EMAIL TEMPLATE] Para: {To} | Assunto: {Subject} | Template: {Template}", to, subject, templateName);
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Nada sai daqui: o desfecho e <see cref="DesfechoEnvio.Simulado"/> com provider <c>console</c>, nunca <c>smtp</c>.
+    /// Sem endereco nem corpo no log (LGPD, #1292): so o rastro e a categoria.
+    /// </summary>
+    public Task<ResultadoEnvio> EnviarAsync(MensagemEmail mensagem, CancellationToken ct = default)
+    {
+        logger.LogDebug(
+            "[EMAIL] simulado outbox={OutboxId} categoria={Categoria} anexos={Anexos}",
+            mensagem.OutboxId, mensagem.Remetente, mensagem.Anexos?.Count ?? 0);
+        return Task.FromResult(ResultadoEnvio.Simulado("console"));
     }
 }

@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Notifications;
 using SendGrid;
 using SendGrid.Helpers.Mail;
 
@@ -20,10 +22,10 @@ public sealed class SendGridEmailService : IEmailService
 {
     private readonly ISendGridClient _client;
     private readonly string _fromEmail;
-    private readonly string _fromName;
+    private readonly string? _fromName;
     private readonly bool _sandbox;
 
-    public SendGridEmailService(string apiKey, string fromEmail, string fromName, bool sandbox = false)
+    public SendGridEmailService(string apiKey, string fromEmail, string? fromName, bool sandbox = false)
     {
         if (string.IsNullOrWhiteSpace(apiKey))
             throw new ArgumentException("SendGrid:ApiKey eh obrigatorio.", nameof(apiKey));
@@ -43,7 +45,48 @@ public sealed class SendGridEmailService : IEmailService
     public Task SendAsync(IEnumerable<string> to, string subject, string body, bool isHtml = false) =>
         SendAsync(to, subject, body, Enumerable.Empty<EmailAttachment>(), isHtml);
 
-    public async Task SendAsync(IEnumerable<string> to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml = false)
+    public Task SendAsync(IEnumerable<string> to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml = false) =>
+        EnviarHttpAsync(to, subject, body, attachments, isHtml, CancellationToken.None);
+
+    /// <summary>
+    /// N3 (#1351): o SendGrid usa um remetente so (<c>SendGrid:FromEmail</c>), entao a categoria
+    /// <see cref="RemetenteEmail.Seguranca"/> nao muda a caixa aqui. A separacao por categoria vale para o SMTP.
+    /// 4xx do SendGrid (menos 408 e 429) e falha permanente; o resto e transitorio. O detalhe leva so o status, nunca o
+    /// corpo da resposta, que pode repetir o endereco.
+    /// </summary>
+    public async Task<ResultadoEnvio> EnviarAsync(MensagemEmail mensagem, CancellationToken ct = default)
+    {
+        var cronometro = Stopwatch.StartNew();
+        try
+        {
+            await EnviarHttpAsync([mensagem.Destinatario], mensagem.Assunto, mensagem.Corpo, mensagem.Anexos ?? [], mensagem.Html, ct);
+            return new ResultadoEnvio(Sucesso: true, ProviderUsado: "sendgrid", DuracaoMs: cronometro.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (ex is SendGridHttpException http)
+            {
+                var permanente = http.StatusCode is >= 400 and < 500 and not 408 and not 429;
+                return new ResultadoEnvio(
+                    Sucesso: false,
+                    ProviderUsado: "sendgrid",
+                    ErroDetalhado: $"SendGrid HTTP {http.StatusCode}",
+                    StatusHttp: http.StatusCode,
+                    DuracaoMs: cronometro.ElapsedMilliseconds,
+                    FalhaPermanente: permanente);
+            }
+
+            return new ResultadoEnvio(
+                Sucesso: false,
+                ProviderUsado: "sendgrid",
+                ErroDetalhado: ex.GetType().Name,
+                DuracaoMs: cronometro.ElapsedMilliseconds);
+        }
+    }
+
+    private async Task EnviarHttpAsync(IEnumerable<string> to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml, CancellationToken ct)
     {
         var from = new EmailAddress(_fromEmail, _fromName);
         var tos = to.Select(t => new EmailAddress(t)).ToList();
@@ -65,13 +108,20 @@ public sealed class SendGridEmailService : IEmailService
             msg.MailSettings = new MailSettings { SandboxMode = new SandboxMode { Enable = true } };
         }
 
-        var response = await _client.SendEmailAsync(msg);
+        var response = await _client.SendEmailAsync(msg, ct);
         if ((int)response.StatusCode >= 400)
         {
-            var detalhe = await response.Body.ReadAsStringAsync();
-            throw new InvalidOperationException(
+            var detalhe = await response.Body.ReadAsStringAsync(ct);
+            throw new SendGridHttpException(
+                (int)response.StatusCode,
                 $"SendGrid retornou HTTP {(int)response.StatusCode}: {detalhe}");
         }
+    }
+
+    /// <summary>Mantem a mensagem de antes (<see cref="InvalidOperationException"/>) e leva o status para a classificacao.</summary>
+    private sealed class SendGridHttpException(int statusCode, string mensagem) : InvalidOperationException(mensagem)
+    {
+        public int StatusCode { get; } = statusCode;
     }
 
     public Task SendTemplateAsync(string to, string subject, string templateName, object model, bool isHtml = true)

@@ -1,6 +1,4 @@
 using EasyStock.Application.DependencyInjection;
-using EasyStock.Application.Ports.Output;
-using EasyStock.Infra.Async;
 using EasyStock.Infra.Async.DependencyInjection;
 using EasyStock.Infra.Async.Storage;
 using EasyStock.Infra.Notifications.DependencyInjection;
@@ -65,23 +63,9 @@ builder.Services
     .AddEasyStockPostgreInfrastructure(connStr, builder.Configuration)
     .AddEasyStockNotificationsRepositories();
 
-// Email service (reusa Infra.Async, sem chamar AddEasyStockAsyncInfrastructure completo)
-var smtpSection = builder.Configuration.GetSection("Smtp");
-if (smtpSection.Exists())
-{
-    builder.Services.AddSingleton<IEmailService>(sp => new SmtpEmailService(
-        smtpSection["Host"] ?? "localhost",
-        int.Parse(smtpSection["Port"] ?? "587"),
-        smtpSection["Username"] ?? "",
-        smtpSection["Password"] ?? "",
-        smtpSection["FromEmail"] ?? "noreply@easystock.com",
-        smtpSection["FromName"] ?? "EasyStock",
-        bool.Parse(smtpSection["EnableSsl"] ?? "true")));
-}
-else
-{
-    builder.Services.AddSingleton<IEmailService, ConsoleEmailService>();
-}
+// Email service: a mesma fabrica da API (Email:Provider e secao Smtp), para os dois hosts resolverem
+// o mesmo provider e as mesmas opcoes (N3, #1351), sem chamar AddEasyStockAsyncInfrastructure completo.
+builder.Services.AddEasyStockEmail(builder.Configuration);
 
 // Notifications infra (canal adapters + Scriban renderer)
 builder.Services.AddNotificationsInfra(builder.Configuration);
