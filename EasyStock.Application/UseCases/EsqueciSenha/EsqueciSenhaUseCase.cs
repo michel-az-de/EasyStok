@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Notifications;
 using Microsoft.Extensions.Configuration;
 
 namespace EasyStock.Application.UseCases.EsqueciSenha;
@@ -81,12 +82,22 @@ public sealed class EsqueciSenhaUseCase(
                            $"Se você não solicitou a redefinição de senha, ignore este e-mail.\n\n" +
                            $"Equipe EasyStock";
 
-                await emailService.SendAsync(usuario.Email, subject, body);
-                logger.LogInformation("E-mail de recuperacao de senha enviado para {Email}", usuario.Email);
+                // O link carrega credencial: sai da caixa de seguranca (N3, #1351). Falha vira desfecho, e o log
+                // leva so o UsuarioId (LGPD), nunca o endereco.
+                var resultado = await emailService.EnviarAsync(
+                    new MensagemEmail(usuario.Email, subject, body, Remetente: RemetenteEmail.Seguranca));
+                if (resultado.Desfecho == DesfechoEnvio.Enviado)
+                    logger.LogInformation("E-mail de recuperacao de senha enviado para o usuario {UsuarioId}", usuario.Id);
+                else
+                    logger.LogWarning(
+                        "E-mail de recuperacao de senha nao saiu (desfecho {Desfecho}) para o usuario {UsuarioId}. Token gerado normalmente.",
+                        resultado.Desfecho, usuario.Id);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Falha ao enviar e-mail de recuperacao de senha para {Email}. Token gerado normalmente.", usuario.Email);
+                logger.LogError(
+                    "Falha inesperada ao enviar e-mail de recuperacao de senha para o usuario {UsuarioId} ({Erro}). Token gerado normalmente.",
+                    usuario.Id, ex.GetType().Name);
             }
         }
         else

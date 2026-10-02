@@ -1,4 +1,4 @@
-using System.Net.Mail;
+using System.Diagnostics;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Enums.Notifications;
@@ -7,14 +7,10 @@ using Microsoft.Extensions.Logging;
 namespace EasyStock.Infra.Notifications.Email;
 
 /// <summary>
-/// Canal de e-mail do outbox. Uma tentativa por chamada: quem repete é o outbox (backoff de 1, 5 e 30 min), nunca o
-/// canal nem o <see cref="IEmailService"/>. Antes eram três camadas aninhadas (Polly do canal, laço do serviço e
-/// outbox), até 36 tentativas SMTP por mensagem (N2).
-/// <list type="bullet">
-/// <item>Sobre um <see cref="IEmailServiceSimulado"/> (o console do desenvolvimento), nada sai: devolve
-/// <see cref="DesfechoEnvio.Simulado"/> com o provider real, nunca <c>smtp</c>.</item>
-/// <item>SMTP 5xx é falha permanente (<see cref="ClassificadorDeFalha"/>); SMTP 4xx e rede são transitórios.</item>
-/// </list>
+/// Canal de e-mail do outbox (N3, #1351). So traduz: manda a mensagem ao <see cref="IEmailService"/> com o token do
+/// chamador e o remetente da categoria (<see cref="CategoriaConteudoNotificacao.Seguranca"/> sai da caixa de seguranca,
+/// o resto da de avisos) e devolve o desfecho e o provider que o servico informou. Nao classifica excecao nem fixa
+/// <c>smtp</c>: o console devolve <c>console</c>, e a unica camada de retentativa e o outbox.
 /// </summary>
 public sealed class SmtpEmailCanal(
     IEmailService emailService,
@@ -24,49 +20,49 @@ public sealed class SmtpEmailCanal(
 
     public async Task<ResultadoEnvio> EnviarAsync(MensagemPronta mensagem, CancellationToken ct = default)
     {
-        // O canal não chama o simulador: o console logaria o endereço, e o OutboxId já é o rastro (LGPD, #1292).
-        if (emailService is IEmailServiceSimulado simulado)
-        {
-            logger.LogInformation(
-                "Email simulado outbox={OutboxId} provider={Provider}: nada foi enviado",
-                mensagem.OutboxId, simulado.Provider);
+        var remetente = mensagem.Categoria == CategoriaConteudoNotificacao.Seguranca
+            ? RemetenteEmail.Seguranca
+            : RemetenteEmail.Avisos;
+        var sw = Stopwatch.StartNew();
 
-            return ResultadoEnvio.Simulado(simulado.Provider);
-        }
-
-        var sw = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            await emailService.SendAsync(
-                mensagem.Destinatario,
-                mensagem.Assunto,
-                mensagem.Corpo,
-                isHtml: true);
+            var resultado = await emailService.EnviarAsync(
+                new MensagemEmail(
+                    mensagem.Destinatario,
+                    mensagem.Assunto,
+                    mensagem.Corpo,
+                    Html: true,
+                    Remetente: remetente,
+                    OutboxId: mensagem.OutboxId),
+                ct);
 
-            sw.Stop();
-            // Sem o endereço: dado pessoal fora do log (LGPD, #1292); o OutboxId leva à mensagem.
+            // Sem o endereco: dado pessoal fora do log (LGPD, #1292); o OutboxId leva a mensagem.
             logger.LogInformation(
-                "Email enviado outbox={OutboxId} em {Ms}ms",
-                mensagem.OutboxId, sw.ElapsedMilliseconds);
+                "Email outbox={OutboxId} categoria={Categoria} desfecho={Desfecho} provider={Provider} em {Ms}ms",
+                mensagem.OutboxId, mensagem.Categoria, resultado.Desfecho, resultado.ProviderUsado, sw.ElapsedMilliseconds);
 
-            return new ResultadoEnvio(
-                Sucesso: true,
-                ProviderUsado: "smtp",
-                DuracaoMs: sw.ElapsedMilliseconds);
+            return resultado;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
+            // Rede de seguranca: o servico de e-mail devolve falha de envio como desfecho e nao lanca. Se algo lancar
+            // mesmo assim (um IEmailService alheio ao MailKit), o canal nao derruba o lote nem inventa provider, e o log
+            // leva so o tipo da excecao: a mensagem dela pode repetir o endereco.
             sw.Stop();
-            logger.LogError(ex,
-                "Falha ao enviar email outbox={OutboxId}",
-                mensagem.OutboxId);
+            logger.LogError(
+                "Falha inesperada ao enviar email outbox={OutboxId} categoria={Categoria} erro={Erro}",
+                mensagem.OutboxId, mensagem.Categoria, ex.GetType().Name);
 
             return new ResultadoEnvio(
                 Sucesso: false,
-                ProviderUsado: "smtp",
-                ErroDetalhado: ex.Message,
-                DuracaoMs: sw.ElapsedMilliseconds,
-                FalhaPermanente: ex is SmtpException smtp && ClassificadorDeFalha.SmtpEhPermanente(smtp));
+                ProviderUsado: null,
+                ErroDetalhado: ex.GetType().Name,
+                DuracaoMs: sw.ElapsedMilliseconds);
         }
     }
 }

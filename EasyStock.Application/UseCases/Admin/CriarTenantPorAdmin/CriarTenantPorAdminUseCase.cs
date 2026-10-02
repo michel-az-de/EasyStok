@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using EasyStock.Application.Ports.Output.Notifications;
 
 namespace EasyStock.Application.UseCases.Admin.CriarTenantPorAdmin;
 
@@ -161,12 +162,21 @@ public class CriarTenantPorAdminUseCase(
 <p>Sua conta no EasyStock foi criada pelo time de suporte.</p>
 <p><strong>Senha temporária:</strong> <code>{senhaSafe}</code></p>
 <p>Recomendamos trocá-la após o primeiro login.</p>";
-            await emailService.SendAsync(usuario.Email, "EasyStock — Sua conta foi criada", body, isHtml: true);
-            return (true, null);
+            // A senha temporaria sai da caixa de seguranca (N3, #1351). "Enviado" so quando o e-mail saiu de
+            // verdade: o simulado do console nao conta, para o operador ditar a senha por outro meio.
+            var resultado = await emailService.EnviarAsync(new MensagemEmail(
+                usuario.Email, "EasyStock \u2014 Sua conta foi criada", body, Html: true, Remetente: RemetenteEmail.Seguranca));
+            return resultado.Desfecho switch
+            {
+                DesfechoEnvio.Enviado => (true, null),
+                DesfechoEnvio.Simulado => (false, "E-mail simulado: o SMTP não está configurado neste ambiente e nada foi enviado."),
+                _ => (false, resultado.ErroDetalhado ?? "Falha no envio do e-mail."),
+            };
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Falha ao enviar email de boas-vindas para {UsuarioId}", usuario.Id);
+            logger.LogWarning(
+                "Falha inesperada ao enviar email de boas-vindas para {UsuarioId} ({Erro})", usuario.Id, ex.GetType().Name);
             return (false, ex.Message);
         }
     }

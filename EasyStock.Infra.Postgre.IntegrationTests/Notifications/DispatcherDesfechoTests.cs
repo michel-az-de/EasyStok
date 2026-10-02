@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Net.Mail;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
@@ -331,18 +330,20 @@ public class DispatcherDesfechoTests(PostgreSqlDatabaseFixture fixture) : IClass
     [SkippableFact]
     public async Task Smtp_550_pelo_canal_real_termina_Falhado_sem_reagendar_e_com_uma_chamada()
     {
-        // Ponta a ponta: o canal de e-mail classifica o 550 como permanente e o dispatcher fecha a mensagem. Antes,
-        // o 550 era transitório e voltava a Pendente (3 tentativas, backoff de 1, 5 e 30 min).
+        // Ponta a ponta: o servico de e-mail (MailKit) classifica o 550 como permanente, o canal repassa o desfecho e o
+        // dispatcher fecha a mensagem. Antes, o 550 era transitorio e voltava a Pendente (3 tentativas, backoff de 1, 5
+        // e 30 min). A classificacao no protocolo de verdade esta em SmtpEmailServiceTests (servidor SMTP falso) e em
+        // ClassificadorFalhaSmtpTests; aqui o servico devolve o resultado que ele daria para o 550.
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
         var s = await SemearAsync();
         var mensagem = await SemearMensagemAsync(s, CanalNotificacao.Email, CategoriaConteudoNotificacao.Operacional);
         var chamadas = 0;
         var servico = Substitute.For<IEmailService>();
-        servico.SendAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>())
+        servico.EnviarAsync(Arg.Any<MensagemEmail>(), Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
                 chamadas++;
-                return Task.FromException(new SmtpException(SmtpStatusCode.MailboxUnavailable, "550 5.1.1 Mailbox unavailable"));
+                return new ResultadoEnvio(false, "smtp", "SMTP 550: Mailbox unavailable", FalhaPermanente: true);
             });
         await using var provider = ConstruirProvider(new SmtpEmailCanal(servico, NullLogger<SmtpEmailCanal>.Instance));
 

@@ -7,6 +7,7 @@
 #  Acesso após subir:
 #    Web  → http://localhost:8081
 #    API  → http://localhost:8080   (Swagger: http://localhost:8080/swagger)
+#    Mailpit → http://localhost:8025   (todo e-mail que a API manda cai aqui, nada sai de verdade)
 #
 #  Credenciais padrão do admin:
 #    E-mail : admin@easystock.local
@@ -52,6 +53,24 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Mailpit (captador de e-mail de desenvolvimento, N3 #1351) ───────────────
+  # Tag fixa, nunca latest: a mesma da fixture dos testes de integracao
+  # (EasyStock.Infra.Postgre.IntegrationTests/Email/MailpitFixture.cs).
+  mailpit:
+    image: axllent/mailpit:v1.31.3
+    container_name: easystock-local-mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"   # interface web: http://localhost:8025
+      - "1025:1025"   # SMTP
+    networks:
+      - easystock-local
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ── API ─────────────────────────────────────────────────────────────────────
   api:
     build:
@@ -63,6 +82,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     ports:
       - "8080:8080"
     environment:
@@ -78,6 +99,16 @@ services:
       Anthropic__Enabled: "false"
       OpenAI__Enabled: "false"
       FileStorage__Provider: Local
+      # E-mail: o Mailpit capta tudo (http://localhost:8025). Texto puro (Modo=Nenhum) so vale fora de
+      # Production. Os remetentes sao do dominio .local de proposito: nenhum remetente e inventado em codigo,
+      # entao sem FromEmail o provider cairia no console.
+      Smtp__Host: mailpit
+      Smtp__Port: "1025"
+      Smtp__Modo: Nenhum
+      Smtp__FromEmail: avisos@easystok.local
+      Smtp__FromName: "EasyStok (dev)"
+      Smtp__Seguranca__FromEmail: seguranca@easystok.local
+      Smtp__Seguranca__FromName: "EasyStok Segurança (dev)"
       # Seed limpo — zero dados, apenas 1 admin
       SEED_DEMO_DATA: "false"
       SEED_ADMIN_EMAIL: "${SEED_ADMIN_EMAIL:-admin@easystock.local}"

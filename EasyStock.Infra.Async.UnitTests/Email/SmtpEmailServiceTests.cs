@@ -1,161 +1,454 @@
-using System.Net;
-using System.Net.Mail;
-using System.Net.Sockets;
-using System.Text;
+using System.Diagnostics;
+using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Infra.Async.Email;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using MimeKit;
 
 namespace EasyStock.Infra.Async.UnitTests.Email;
 
 /// <summary>
-/// N2: o <see cref="SmtpEmailService"/> faz uma tentativa só. Quem repete é o outbox (backoff de 1, 5 e 30 min,
-/// uma linha de log por tentativa). A retentativa aninhada (laço do serviço, Polly do canal e outbox) fazia até 36
-/// tentativas SMTP por mensagem e tratava o 550 como transitório. O servidor SMTP é falso, em loopback, e conta os
-/// <c>RCPT TO</c> que chegam.
+/// N3 (#1351): o <c>SmtpEmailService</c> sobre MailKit contra um SMTP falso em loopback. Uma conexão por envio, teto de
+/// tempo, cancelamento, concorrência e classificação por protocolo, sem retentativa dentro do serviço.
+///
+/// Absorve os testes que a N2 deixou neste arquivo (o SMTP falso em loopback e o 550 tentado uma vez): agora eles
+/// exercitam o <c>EnviarAsync</c> e o MailKit, com o servidor falso da N3 (<c>ServidorSmtpDeTeste</c>).
 /// </summary>
 public class SmtpEmailServiceTests
 {
-    private static SmtpEmailService Servico(ServidorSmtpFalso servidor) =>
-        new("127.0.0.1", servidor.Porta, "usuario", "senha", "avisos@exemplo.test", "EasyStok", enableSsl: false);
+    private const string Senha = "senha-secreta-123";
+    private const string Destinatario = "maria.souza@example.com";
 
-    [Fact]
-    public async Task Envio_aceito_nao_lanca_e_chega_uma_vez_ao_servidor()
+    // O CRLF final e do protocolo (termina a ultima linha antes do ponto), nao do conteudo da mensagem.
+    private static readonly char[] SemQuebraFinal = ['\r', '\n'];
+
+    private static SmtpConfiguracao Configuracao(
+        ServidorSmtpDeTeste servidor,
+        SmtpModo modo = SmtpModo.Nenhum,
+        int timeoutSegundos = 5,
+        Action<SmtpOpcoes>? ajustar = null)
     {
-        // Controle do harness: sem isto o teste do 550 poderia passar por uma falha de conexão qualquer.
-        await using var servidor = new ServidorSmtpFalso(respostaRcpt: "250 2.1.5 Ok");
-        using var servico = Servico(servidor);
+        var opcoes = new SmtpOpcoes
+        {
+            Host = "127.0.0.1",
+            Port = servidor.Porta.ToString(),
+            Modo = modo.ToString(),
+            TimeoutSegundos = timeoutSegundos.ToString(),
+            FromEmail = "avisos@easystok.online",
+            FromName = "EasyStok Avisos",
+        };
+        ajustar?.Invoke(opcoes);
+        return opcoes.Resolver("Development");
+    }
 
-        await servico.SendAsync("para@exemplo.test", "Assunto", "Corpo");
+    private static SmtpEmailService Servico(
+        SmtpConfiguracao configuracao,
+        ILogger<SmtpEmailService>? logger = null,
+        bool aceitarQualquerCertificado = false) =>
+        new(configuracao, logger ?? NullLogger<SmtpEmailService>.Instance,
+            aceitarQualquerCertificado ? (_, _, _, _) => true : null);
 
-        servidor.ChamadasRcptTo.Should().Be(1);
+    private static MensagemEmail Mensagem(
+        string destinatario = Destinatario,
+        RemetenteEmail remetente = RemetenteEmail.Avisos,
+        bool html = true,
+        Guid? outboxId = null,
+        IReadOnlyList<EmailAttachment>? anexos = null) =>
+        new(destinatario, "Confirmação de cadastro", html ? "<p>Olá, <b>Maria</b>! Ação concluída.</p>" : "Olá, Maria! Ação concluída.",
+            html, anexos, remetente, outboxId);
+
+    private static MimeMessage Ler(ServidorSmtpDeTeste.MensagemRecebida recebida)
+    {
+        using var fluxo = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(recebida.Bruto));
+        return MimeMessage.Load(fluxo);
+    }
+
+    private static async Task AguardarAsync(Func<bool> condicao, TimeSpan limite)
+    {
+        var relogio = Stopwatch.StartNew();
+        while (!condicao() && relogio.Elapsed < limite)
+            await Task.Delay(25);
     }
 
     [Fact]
-    public async Task Smtp_550_e_tentado_uma_vez()
+    public async Task EnvioFelizEntregaComRemetenteDeAvisosAutoSubmittedEMessageIdNoDominio()
     {
-        await using var servidor = new ServidorSmtpFalso(respostaRcpt: "550 5.1.1 Mailbox unavailable");
-        using var servico = Servico(servidor);
+        await using var servidor = new ServidorSmtpDeTeste().Iniciar();
+        var servico = Servico(Configuracao(servidor));
 
-        var act = () => servico.SendAsync("para@exemplo.test", "Assunto", "Corpo");
+        var resultado = await servico.EnviarAsync(Mensagem(outboxId: Guid.NewGuid()));
 
-        var ex = await act.Should().ThrowAsync<SmtpException>();
-        ex.Which.StatusCode.Should().Be(SmtpStatusCode.MailboxUnavailable);
-        servidor.ChamadasRcptTo.Should().Be(1, "550 nunca passa e o serviço não repete: o laço antigo fazia 3 RCPT TO");
+        resultado.Desfecho.Should().Be(DesfechoEnvio.Enviado);
+        resultado.Sucesso.Should().BeTrue();
+        resultado.ProviderUsado.Should().Be("smtp");
+        servidor.Mensagens.Should().ContainSingle();
+
+        var recebida = servidor.Mensagens.Single();
+        recebida.Remetente.Should().Be("avisos@easystok.online");
+        recebida.Destinatarios.Should().Equal(Destinatario);
+
+        var mime = Ler(recebida);
+        mime.From.Mailboxes.Single().Address.Should().Be("avisos@easystok.online");
+        mime.From.Mailboxes.Single().Name.Should().Be("EasyStok Avisos");
+        mime.Headers["Auto-Submitted"].Should().Be("auto-generated");
+        mime.MessageId.Should().EndWith("@easystok.online");
+        mime.Subject.Should().Be("Confirmação de cadastro");
+        mime.HtmlBody.Should().NotBeNull();
+        mime.HtmlBody!.TrimEnd(SemQuebraFinal).Should().Be("<p>Olá, <b>Maria</b>! Ação concluída.</p>");
     }
 
     [Fact]
-    public async Task Smtp_421_tambem_e_tentado_uma_vez_pelo_servico()
+    public async Task MensagemEmTextoPuroChegaSemHtml()
     {
-        // O 421 é transitório, mas quem decide repetir é o outbox, com backoff de minutos, não um laço de 2 s.
-        await using var servidor = new ServidorSmtpFalso(respostaRcpt: "421 4.3.2 Service not available");
-        using var servico = Servico(servidor);
+        await using var servidor = new ServidorSmtpDeTeste().Iniciar();
+        var servico = Servico(Configuracao(servidor));
 
-        var act = () => servico.SendAsync("para@exemplo.test", "Assunto", "Corpo");
+        var resultado = await servico.EnviarAsync(Mensagem(html: false));
 
-        var ex = await act.Should().ThrowAsync<SmtpException>();
-        ((int)ex.Which.StatusCode).Should().BeGreaterThanOrEqualTo(400).And.BeLessThan(500);
-        servidor.ChamadasRcptTo.Should().Be(1);
+        resultado.Desfecho.Should().Be(DesfechoEnvio.Enviado);
+        var mime = Ler(servidor.Mensagens.Single());
+        mime.HtmlBody.Should().BeNull();
+        mime.TextBody.Should().NotBeNull();
+        mime.TextBody!.TrimEnd(SemQuebraFinal).Should().Be("Olá, Maria! Ação concluída.");
     }
 
-    /// <summary>SMTP mínimo em loopback: aceita o remetente, responde <paramref name="respostaRcpt"/> ao destinatário.</summary>
-    private sealed class ServidorSmtpFalso : IAsyncDisposable
+    [Fact]
+    public async Task AnexoViajaComNomeTipoEConteudo()
     {
-        private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
-        private readonly CancellationTokenSource _cts = new();
-        private readonly string _respostaRcpt;
-        private readonly Task _aceitando;
-        private int _chamadasRcptTo;
+        await using var servidor = new ServidorSmtpDeTeste().Iniciar();
+        var servico = Servico(Configuracao(servidor));
+        var conteudo = Enumerable.Range(0, 5000).Select(i => (byte)(i % 251)).ToArray();
 
-        public ServidorSmtpFalso(string respostaRcpt)
+        var resultado = await servico.EnviarAsync(Mensagem(anexos: [new EmailAttachment("relatorio.pdf", conteudo, "application/pdf")]));
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.Enviado);
+        var anexo = Ler(servidor.Mensagens.Single()).Attachments.OfType<MimePart>().Single();
+        anexo.FileName.Should().Be("relatorio.pdf");
+        anexo.ContentType.MimeType.Should().Be("application/pdf");
+        anexo.Content.Should().NotBeNull();
+        using var memoria = new MemoryStream();
+        await anexo.Content!.DecodeToAsync(memoria);
+        memoria.ToArray().Should().Equal(conteudo);
+    }
+
+    [Fact]
+    public async Task NomeDeAnexoComAcentoChegaDecodificado()
+    {
+        // RFC 2231: o MimeKit codifica o filename com acento e o parser do destinatario o devolve igual.
+        await using var servidor = new ServidorSmtpDeTeste().Iniciar();
+        var servico = Servico(Configuracao(servidor));
+
+        var resultado = await servico.EnviarAsync(Mensagem(anexos: [new EmailAttachment("relatório-diário.pdf", [1, 2, 3], "application/pdf")]));
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.Enviado);
+        Ler(servidor.Mensagens.Single()).Attachments.OfType<MimePart>().Single().FileName.Should().Be("relatório-diário.pdf");
+    }
+
+    [Fact]
+    public async Task CadaCaixaAutenticaComASuaCredencialESaiComOSeuRemetente()
+    {
+        await using var servidor = new ServidorSmtpDeTeste
         {
-            _respostaRcpt = respostaRcpt;
-            _listener.Start();
-            _aceitando = Task.Run(AceitarAsync);
-        }
-
-        public int Porta => ((IPEndPoint)_listener.LocalEndpoint).Port;
-
-        public int ChamadasRcptTo => Volatile.Read(ref _chamadasRcptTo);
-
-        private async Task AceitarAsync()
+            Tls = ServidorSmtpDeTeste.ModoTls.StartTls,
+            AnunciaAuth = true,
+            ExigeAuth = true,
+        }.Iniciar();
+        var configuracao = Configuracao(servidor, SmtpModo.StartTls, ajustar: o =>
         {
-            try
+            o.Username = "avisos@easystok.online";
+            o.Password = "senha-avisos";
+            o.Seguranca = new SmtpRemetenteOpcoes
             {
-                while (!_cts.IsCancellationRequested)
-                {
-                    var cliente = await _listener.AcceptTcpClientAsync(_cts.Token);
-                    _ = Task.Run(() => AtenderAsync(cliente));
-                }
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or SocketException)
-            {
-                // Servidor encerrado pelo teste.
-            }
-        }
+                Username = "seguranca@easystok.online",
+                Password = "senha-seguranca",
+                FromEmail = "seguranca@easystok.online",
+                FromName = "EasyStok Segurança",
+            };
+        });
+        var servico = Servico(configuracao, aceitarQualquerCertificado: true);
 
-        private async Task AtenderAsync(TcpClient cliente)
+        var seguranca = await servico.EnviarAsync(Mensagem(remetente: RemetenteEmail.Seguranca));
+        var avisos = await servico.EnviarAsync(Mensagem(remetente: RemetenteEmail.Avisos));
+
+        seguranca.Desfecho.Should().Be(DesfechoEnvio.Enviado);
+        avisos.Desfecho.Should().Be(DesfechoEnvio.Enviado);
+        var deSeguranca = servidor.Mensagens.Single(m => m.Remetente == "seguranca@easystok.online");
+        deSeguranca.UsuarioAutenticado.Should().Be("seguranca@easystok.online");
+        Ler(deSeguranca).From.Mailboxes.Single().Name.Should().Be("EasyStok Segurança");
+        var deAvisos = servidor.Mensagens.Single(m => m.Remetente == "avisos@easystok.online");
+        deAvisos.UsuarioAutenticado.Should().Be("avisos@easystok.online");
+    }
+
+    [Fact]
+    public async Task ServidorMudoEstouraNoTetoConfigurado()
+    {
+        await using var servidor = new ServidorSmtpDeTeste { Mudo = true }.Iniciar();
+        var servico = Servico(Configuracao(servidor, timeoutSegundos: 2));
+        var relogio = Stopwatch.StartNew();
+
+        var resultado = await servico.EnviarAsync(Mensagem());
+
+        relogio.Stop();
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaTransitoria);
+        resultado.ErroDetalhado.Should().Contain("tempo limite");
+        relogio.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(4), "o teto de 2 s vale, não o de 100 s do SmtpClient antigo");
+        await AguardarAsync(() => servidor.ConexoesAbertas == 0, TimeSpan.FromSeconds(3));
+        servidor.ConexoesAbertas.Should().Be(0, "estourar o teto não deixa conexão aberta");
+    }
+
+    [Fact]
+    public async Task CancelarOTokenInterrompeOEnvio()
+    {
+        await using var servidor = new ServidorSmtpDeTeste { TravarAposData = true }.Iniciar();
+        var servico = Servico(Configuracao(servidor, timeoutSegundos: 30));
+        using var cancelamento = new CancellationTokenSource();
+
+        var envio = servico.EnviarAsync(Mensagem(), cancelamento.Token);
+        await servidor.DataIniciado.WaitAsync(TimeSpan.FromSeconds(10));
+        await cancelamento.CancelAsync();
+
+        var act = async () => await envio;
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        await AguardarAsync(() => servidor.ConexoesAbertas == 0, TimeSpan.FromSeconds(3));
+        servidor.ConexoesAbertas.Should().Be(0, "cancelar no meio do envio não pode deixar conexão aberta");
+        servidor.Mensagens.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task TokenJaCanceladoNaoAbreConexao()
+    {
+        await using var servidor = new ServidorSmtpDeTeste().Iniciar();
+        var servico = Servico(Configuracao(servidor));
+        using var cancelamento = new CancellationTokenSource();
+        await cancelamento.CancelAsync();
+
+        var act = async () => await servico.EnviarAsync(Mensagem(), cancelamento.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        servidor.ConexoesAceitas.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DezEnviosConcorrentesChegamTodos()
+    {
+        await using var servidor = new ServidorSmtpDeTeste().Iniciar();
+        var servico = Servico(Configuracao(servidor));
+
+        var resultados = await Task.WhenAll(Enumerable.Range(1, 10)
+            .Select(i => servico.EnviarAsync(Mensagem($"destinatario{i}@example.com"))));
+
+        resultados.Should().OnlyContain(r => r.Desfecho == DesfechoEnvio.Enviado);
+        servidor.Mensagens.Should().HaveCount(10);
+        servidor.Mensagens.SelectMany(m => m.Destinatarios).Distinct().Should().HaveCount(10);
+        servidor.ConexoesAceitas.Should().Be(10, "uma conexão por envio, sem estado compartilhado");
+    }
+
+    [Fact]
+    public async Task Rcpt550GeraFalhaPermanenteComUmaUnicaConexao()
+    {
+        await using var servidor = new ServidorSmtpDeTeste { RespostaRcpt = "550 5.1.1 Usuario desconhecido" }.Iniciar();
+        var servico = Servico(Configuracao(servidor));
+
+        var resultado = await servico.EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaPermanente);
+        resultado.FalhaPermanente.Should().BeTrue();
+        resultado.Sucesso.Should().BeFalse();
+        resultado.ErroDetalhado.Should().Contain("550");
+        servidor.ConexoesAceitas.Should().Be(1, "uma tentativa por chamada, sem retentativa no serviço");
+        servidor.RcptRecebidos.Should().Be(1);
+        servidor.Mensagens.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Resposta421GeraFalhaTransitoria()
+    {
+        await using var servidor = new ServidorSmtpDeTeste { Saudacao = "421 4.3.2 Servico indisponivel" }.Iniciar();
+        var servico = Servico(Configuracao(servidor));
+
+        var resultado = await servico.EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaTransitoria);
+        resultado.FalhaPermanente.Should().BeFalse();
+        resultado.ErroDetalhado.Should().Contain("421");
+        servidor.ConexoesAceitas.Should().Be(1, "o 421 não é retentado dentro do serviço");
+    }
+
+    [Fact]
+    public async Task Rcpt421GeraFalhaTransitoriaComUmaUnicaConexao()
+    {
+        // O 421 e transitorio, mas quem decide repetir e o outbox, com backoff de minutos, nao um laco de 2 s no servico.
+        await using var servidor = new ServidorSmtpDeTeste { RespostaRcpt = "421 4.3.2 Service not available" }.Iniciar();
+        var servico = Servico(Configuracao(servidor));
+
+        var resultado = await servico.EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaTransitoria);
+        resultado.ErroDetalhado.Should().Contain("421");
+        servidor.ConexoesAceitas.Should().Be(1);
+        servidor.RcptRecebidos.Should().Be(1, "uma tentativa por chamada, sem retentativa no servico");
+    }
+
+    [Fact]
+    public async Task EnderecoInvalidoEFalhaPermanenteSemAbrirConexao()
+    {
+        await using var servidor = new ServidorSmtpDeTeste().Iniciar();
+        var servico = Servico(Configuracao(servidor));
+
+        var resultado = await servico.EnviarAsync(Mensagem("isto-nao-e-um-email"));
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaPermanente);
+        servidor.ConexoesAceitas.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task AnexoComTipoDeConteudoInvalidoEFalhaPermanenteSemAbrirConexao()
+    {
+        await using var servidor = new ServidorSmtpDeTeste().Iniciar();
+        var servico = Servico(Configuracao(servidor));
+
+        var resultado = await servico.EnviarAsync(Mensagem(anexos: [new EmailAttachment("a.bin", [1], "isto nao e um content-type")]));
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaPermanente);
+        servidor.ConexoesAceitas.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ErroInesperadoNaMontagemDaMensagemViraFalhaEmVezDeExcecao()
+    {
+        // O contrato de EnviarAsync e "falha de envio volta como desfecho, so o cancelamento propaga": o Dispatcher
+        // nao tem try/catch por mensagem, e uma excecao aqui derrubaria o lote.
+        await using var servidor = new ServidorSmtpDeTeste().Iniciar();
+        var servico = Servico(Configuracao(servidor));
+
+        var resultado = await servico.EnviarAsync(Mensagem(anexos: [null!]));
+
+        resultado.Sucesso.Should().BeFalse();
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaTransitoria);
+        servidor.ConexoesAceitas.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task AutenticacaoRecusadaViraFalhaPermanenteQueNomeiaAsChavesENuncaASenha()
+    {
+        await using var servidor = new ServidorSmtpDeTeste
         {
-            using (cliente)
-            {
-                try
-                {
-                    var rede = cliente.GetStream();
-                    using var leitor = new StreamReader(rede, Encoding.ASCII);
-                    await using var escritor = new StreamWriter(rede, Encoding.ASCII) { NewLine = "\r\n", AutoFlush = true };
-
-                    await escritor.WriteLineAsync("220 localhost ESMTP falso");
-                    var emDados = false;
-                    while (await leitor.ReadLineAsync(_cts.Token) is { } linha)
-                    {
-                        if (emDados)
-                        {
-                            if (linha == ".")
-                            {
-                                emDados = false;
-                                await escritor.WriteLineAsync("250 2.0.0 Ok");
-                            }
-
-                            continue;
-                        }
-
-                        var comando = linha.ToUpperInvariant();
-                        if (comando.StartsWith("EHLO", StringComparison.Ordinal) || comando.StartsWith("HELO", StringComparison.Ordinal))
-                            await escritor.WriteLineAsync("250 localhost");
-                        else if (comando.StartsWith("MAIL FROM", StringComparison.Ordinal))
-                            await escritor.WriteLineAsync("250 2.1.0 Ok");
-                        else if (comando.StartsWith("RCPT TO", StringComparison.Ordinal))
-                        {
-                            Interlocked.Increment(ref _chamadasRcptTo);
-                            await escritor.WriteLineAsync(_respostaRcpt);
-                        }
-                        else if (comando.StartsWith("DATA", StringComparison.Ordinal))
-                        {
-                            emDados = true;
-                            await escritor.WriteLineAsync("354 Pode enviar");
-                        }
-                        else if (comando.StartsWith("RSET", StringComparison.Ordinal))
-                            await escritor.WriteLineAsync("250 2.0.0 Ok");
-                        else if (comando.StartsWith("QUIT", StringComparison.Ordinal))
-                        {
-                            await escritor.WriteLineAsync("221 2.0.0 Tchau");
-                            break;
-                        }
-                        else
-                            await escritor.WriteLineAsync("500 5.5.2 Comando desconhecido");
-                    }
-                }
-                catch (Exception ex) when (ex is IOException or OperationCanceledException or ObjectDisposedException)
-                {
-                    // O cliente fechou a conexão ou o teste terminou.
-                }
-            }
-        }
-
-        public async ValueTask DisposeAsync()
+            Tls = ServidorSmtpDeTeste.ModoTls.StartTls,
+            AnunciaAuth = true,
+            RespostaAuth = "535 5.7.8 Credenciais invalidas",
+        }.Iniciar();
+        var logs = new ColetorDeLogs<SmtpEmailService>();
+        var configuracao = Configuracao(servidor, SmtpModo.StartTls, ajustar: o =>
         {
-            await _cts.CancelAsync();
-            _listener.Stop();
-            await _aceitando;
-            _cts.Dispose();
-        }
+            o.Username = "avisos@easystok.online";
+            o.Password = Senha;
+        });
+        var servico = Servico(configuracao, logs, aceitarQualquerCertificado: true);
+
+        var resultado = await servico.EnviarAsync(Mensagem(outboxId: Guid.NewGuid()));
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaPermanente);
+        resultado.ErroDetalhado.Should().Contain("Smtp:Username").And.Contain("Smtp:Password");
+        resultado.ErroDetalhado.Should().NotContain(Senha);
+        logs.Linhas.Should().Contain(l => l.Nivel == LogLevel.Error && l.Texto.Contains("Smtp:Username"));
+        logs.Linhas.Should().NotContain(l => l.Texto.Contains(Senha));
+    }
+
+    [Fact]
+    public async Task TlsImplicitoEntregaNoModoSslImplicito()
+    {
+        await using var servidor = new ServidorSmtpDeTeste { Tls = ServidorSmtpDeTeste.ModoTls.Implicito }.Iniciar();
+        var servico = Servico(Configuracao(servidor, SmtpModo.SslImplicito), aceitarQualquerCertificado: true);
+
+        var resultado = await servico.EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.Enviado);
+        servidor.Mensagens.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task StartTlsEntregaQuandoOServidorOferece()
+    {
+        await using var servidor = new ServidorSmtpDeTeste { Tls = ServidorSmtpDeTeste.ModoTls.StartTls }.Iniciar();
+        var servico = Servico(Configuracao(servidor, SmtpModo.StartTls), aceitarQualquerCertificado: true);
+
+        var resultado = await servico.EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.Enviado);
+        servidor.Mensagens.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task StartTlsObrigatorioNaoRebaixaParaTextoPuro()
+    {
+        // Servidor que não oferece STARTTLS (ou um atacante que o removeu do EHLO): nada pode sair em claro.
+        await using var servidor = new ServidorSmtpDeTeste { Tls = ServidorSmtpDeTeste.ModoTls.Nenhum }.Iniciar();
+        var servico = Servico(Configuracao(servidor, SmtpModo.StartTls));
+
+        var resultado = await servico.EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaTransitoria);
+        servidor.Mensagens.Should().BeEmpty("a mensagem não pode ter saído sem TLS");
+        servidor.RcptRecebidos.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task CertificadoNaoConfiavelERecusadoPorPadrao()
+    {
+        await using var servidor = new ServidorSmtpDeTeste { Tls = ServidorSmtpDeTeste.ModoTls.StartTls }.Iniciar();
+        var servico = Servico(Configuracao(servidor, SmtpModo.StartTls));
+
+        var resultado = await servico.EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaTransitoria);
+        servidor.Mensagens.Should().BeEmpty("o certificado autoassinado não é confiável e o serviço não afrouxa a validação sozinho");
+    }
+
+    [Fact]
+    public async Task LogNaoTemEnderecoNemSenhaEQuemLevaAoEnvioEOOutboxId()
+    {
+        var outboxOk = Guid.NewGuid();
+        var outboxFalha = Guid.NewGuid();
+        await using var servidorOk = new ServidorSmtpDeTeste().Iniciar();
+        await using var servidorFalha = new ServidorSmtpDeTeste { RespostaRcpt = $"550 5.1.1 <{Destinatario}> Usuario desconhecido" }.Iniciar();
+        var logs = new ColetorDeLogs<SmtpEmailService>();
+
+        await Servico(Configuracao(servidorOk, ajustar: o => o.Password = Senha), logs)
+            .EnviarAsync(Mensagem(remetente: RemetenteEmail.Seguranca, outboxId: outboxOk));
+        var falha = await Servico(Configuracao(servidorFalha, ajustar: o => o.Password = Senha), logs)
+            .EnviarAsync(Mensagem(outboxId: outboxFalha));
+
+        logs.Linhas.Should().NotBeEmpty();
+        logs.Linhas.Should().NotContain(l => l.Texto.Contains("maria.souza") || l.Texto.Contains("example.com"),
+            "endereço de e-mail é dado pessoal (LGPD)");
+        logs.Linhas.Should().NotContain(l => l.Texto.Contains(Senha));
+        logs.Linhas.Should().OnlyContain(l => l.Texto.Contains(outboxOk.ToString()) || l.Texto.Contains(outboxFalha.ToString()),
+            "o OutboxId é o rastro do envio");
+        logs.Linhas.Should().Contain(l => l.Texto.Contains("Seguranca"), "a categoria entra no log");
+        falha.ErroDetalhado.Should().NotContain("maria.souza", "o detalhe vai para o banco e não leva o endereço");
+    }
+
+    [Fact]
+    public async Task MetodosAntigosEntregamComRemetenteDeAvisosELancamQuandoFalha()
+    {
+        await using var servidorOk = new ServidorSmtpDeTeste().Iniciar();
+        await using var servidorRecusa = new ServidorSmtpDeTeste { RespostaRcpt = "550 5.1.1 Usuario desconhecido" }.Iniciar();
+        IEmailService ok = Servico(Configuracao(servidorOk));
+        IEmailService recusa = Servico(Configuracao(servidorRecusa));
+
+        await ok.SendAsync(Destinatario, "Relatório", "<p>ok</p>", isHtml: true);
+        await ok.SendAsync(Destinatario, "Com anexo", "texto", [new EmailAttachment("a.txt", [1, 2, 3], "text/plain")]);
+        await ok.SendAsync(new[] { "a@example.com", "b@example.com" }, "Dois destinatários", "texto");
+
+        // A sobrecarga de vários destinatários manda uma mensagem por pessoa: ninguém vê o endereço do outro.
+        servidorOk.Mensagens.Should().HaveCount(4);
+        servidorOk.Mensagens.Should().OnlyContain(m => m.Remetente == "avisos@easystok.online");
+        servidorOk.Mensagens.TakeLast(2).SelectMany(m => m.Destinatarios)
+            .Should().BeEquivalentTo("a@example.com", "b@example.com");
+
+        var act = async () => await recusa.SendAsync(Destinatario, "Relatório", "texto");
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*550*");
     }
 }
