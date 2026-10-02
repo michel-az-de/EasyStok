@@ -53,6 +53,8 @@ public static partial class ServiceCollectionExtensionsNotifications
         // TryAddEnumerable: AddEasyStockPostgreInfrastructure já chama este registro; o Worker o chamava de novo e o
         // coletor rodava duas vezes por rodada (N1).
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IColetorEventoNotificacao, ColetorProdutosVencendo>());
+        // N10: pico de 5xx. Só lê o COUNT de system_error_logs (fora da RLS) e avisa pelo publicador de incidente.
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IColetorEventoNotificacao, ColetorPicoDeErros5xx>());
 
         return services;
     }

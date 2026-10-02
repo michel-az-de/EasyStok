@@ -21,6 +21,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<IResolvedorAudiencia, ResolvedorAudiencia>();
         services.AddScoped<NotificadorService>();
         services.AddScoped<INotificadorService>(sp => sp.GetRequiredService<NotificadorService>());
+        // N10: porta única dos avisos de problema no sistema (monitor de endpoint, snapshot de saúde, coletor de 5xx).
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<IPublicadorIncidenteSistema, PublicadorIncidenteSistema>();
 
         // Orchestrators (Avaliador e Coletor são puros — Dispatcher é registrado em Infra.Postgre)
         services.AddScoped<INotificacoesAvaliadorOrchestrator, NotificacoesAvaliadorOrchestrator>();
