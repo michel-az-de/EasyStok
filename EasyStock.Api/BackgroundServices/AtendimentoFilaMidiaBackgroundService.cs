@@ -1,4 +1,5 @@
 using EasyStock.Application.UseCases.Atendimento.Webhook;
+using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.BackgroundServices;
 
@@ -7,8 +8,9 @@ namespace EasyStock.Api.BackgroundServices;
 /// enfileira, este loop chama <see cref="ProcessarMidiaWhatsAppJobUseCase"/> fora da requisição.
 /// <see cref="FilaAtendimentoNomes.TurnoAgente"/> tem consumidor próprio (<c>AtendimentoFilaTurnoAgenteBackgroundService</c>, S06).
 /// Roda no processo da API, e não no Worker, porque <c>BackgroundQueueService</c> é em memória: só o
-/// processo que enfileira enxerga a fila. Não sobrevive a restart; perda de job nesta janela
-/// é aceitável para mídia (o texto da mensagem já foi salvo, só o anexo atrasa).
+/// processo que enfileira enxerga a fila. A fila não sobrevive a restart: por isso a pendência também fica na
+/// mensagem e a varredura (na partida e a cada <c>Atendimento:FilaMidia:VarreduraIntervalSeconds</c>) retoma os
+/// anexos vencidos e as novas tentativas depois de falha (#1397), no padrão bypass+tenant do reenvio.
 /// </summary>
 public sealed class AtendimentoFilaMidiaBackgroundService(
     IServiceProvider serviceProvider,
@@ -20,6 +22,10 @@ public sealed class AtendimentoFilaMidiaBackgroundService(
     {
         var pollingInterval = TimeSpan.FromSeconds(
             configuration.GetValue("Atendimento:FilaMidia:PollingIntervalSeconds", defaultValue: 5));
+
+        var intervaloVarredura = TimeSpan.FromSeconds(
+            configuration.GetValue("Atendimento:FilaMidia:VarreduraIntervalSeconds", defaultValue: 30));
+        var proximaVarredura = DateTime.MinValue; // a primeira rodada varre: pendência de antes do restart
 
         logger.LogInformation("AtendimentoFilaMidiaBackgroundService iniciado — polling={Interval}.", pollingInterval);
 
@@ -36,6 +42,12 @@ public sealed class AtendimentoFilaMidiaBackgroundService(
                         await processador.ExecuteAsync(job, stoppingToken);
                     },
                     stoppingToken);
+
+                if (DateTime.UtcNow >= proximaVarredura)
+                {
+                    proximaVarredura = DateTime.UtcNow + intervaloVarredura;
+                    await VarrerPendentesAsync(stoppingToken);
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -51,5 +63,32 @@ public sealed class AtendimentoFilaMidiaBackgroundService(
         }
 
         logger.LogInformation("AtendimentoFilaMidiaBackgroundService finalizado.");
+    }
+
+    private const int LotePorVarredura = 20;
+
+    private async Task VarrerPendentesAsync(CancellationToken ct)
+    {
+        IReadOnlyList<ArmazenarMidiaWhatsAppJob> jobs;
+        using (var scope = serviceProvider.CreateScope())
+        {
+            using var _ = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().UseRowLevelSecurityBypass();
+            jobs = await scope.ServiceProvider.GetRequiredService<ReservarMidiasPendentesUseCase>()
+                .ExecuteAsync(LotePorVarredura, ct);
+        }
+
+        foreach (var job in jobs)
+        {
+            try
+            {
+                using var scope = serviceProvider.CreateScope();
+                // O use case define o tenant do job antes de consultar (RLS, ADR-0010).
+                await scope.ServiceProvider.GetRequiredService<ProcessarMidiaWhatsAppJobUseCase>().ExecuteAsync(job, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                logger.LogWarning(ex, "Varredura de mídia: anexo do wamid {Wamid} não rodou.", job.Wamid);
+            }
+        }
     }
 }

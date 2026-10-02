@@ -74,6 +74,35 @@ public class Mensagem
     /// </summary>
     public DateTime? AguardaClienteDesde { get; private set; }
 
+    /// <summary>#1397: tentativas de baixar o anexo antes de desistir.</summary>
+    public const int MaxTentativasMidia = 3;
+    public const int MidiaIdExternoTamanhoMaximo = 200;
+    public const int ErroMidiaTamanhoMaximo = 500;
+
+    /// <summary>#1397: esperas entre as tentativas de baixar o anexo (depois da 1ª e da 2ª falha).</summary>
+    public static readonly TimeSpan[] EsperasMidia = [TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5)];
+
+    /// <summary>
+    /// #1397: folga dada à fila em memória (ou ao processo que reservou) antes de a varredura assumir o anexo.
+    /// Se a API reiniciar no meio, a varredura retoma depois deste prazo.
+    /// </summary>
+    public static readonly TimeSpan PrazoFilaMidia = TimeSpan.FromMinutes(2);
+
+    /// <summary>#1397: id da mídia na Cloud API, guardado para a varredura baixar de novo depois de um restart.</summary>
+    public string? MidiaIdExterno { get; private set; }
+
+    /// <summary>#1397: tentativas de baixar o anexo que falharam.</summary>
+    public int TentativasMidia { get; private set; }
+
+    /// <summary>#1397: quando a varredura tenta baixar o anexo; nulo quando não há anexo pendente.</summary>
+    public DateTime? ProximaTentativaMidiaEm { get; private set; }
+
+    /// <summary>#1397: erro da última tentativa de baixar o anexo.</summary>
+    public string? ErroMidia { get; private set; }
+
+    /// <summary>#1397: o anexo não veio e não haverá nova tentativa.</summary>
+    public bool MidiaFalhou => MidiaChave is null && TentativasMidia >= MaxTentativasMidia;
+
     /// <summary>S60: quando o texto saiu pela reserva por SMS; nulo se não saiu.</summary>
     public DateTime? ReservaSmsEm { get; private set; }
 
@@ -228,6 +257,30 @@ public class Mensagem
             throw new RegraDeDominioVioladaException("Mime da midia e obrigatorio.");
         MidiaChave = Truncar(chave.Trim(), MidiaChaveTamanhoMaximo);
         MidiaMime = Truncar(mime.Trim(), MidiaMimeTamanhoMaximo);
+        ProximaTentativaMidiaEm = null;
+        ErroMidia = null;
+    }
+
+    /// <summary>#1397: anexo a baixar; fica no banco para sobreviver a restart da fila em memória.</summary>
+    public void AguardarMidia(string mediaId, DateTime agora)
+    {
+        if (string.IsNullOrWhiteSpace(mediaId))
+            throw new RegraDeDominioVioladaException("Id da midia e obrigatorio.");
+        MidiaIdExterno = Truncar(mediaId.Trim(), MidiaIdExternoTamanhoMaximo);
+        ProximaTentativaMidiaEm = Utc(agora) + PrazoFilaMidia;
+    }
+
+    /// <summary>#1397: a varredura assumiu o anexo; outro processo não o pega dentro do prazo.</summary>
+    public void ReservarTentativaMidia(DateTime agora) => ProximaTentativaMidiaEm = Utc(agora) + PrazoFilaMidia;
+
+    /// <summary>#1397: falha ao baixar o anexo. Reagenda com espera crescente até <see cref="MaxTentativasMidia"/>.</summary>
+    public void RegistrarFalhaMidia(string? erro, DateTime agora)
+    {
+        TentativasMidia++;
+        ErroMidia = Truncar(string.IsNullOrWhiteSpace(erro) ? "Falha ao baixar o anexo." : erro.Trim(), ErroMidiaTamanhoMaximo);
+        ProximaTentativaMidiaEm = TentativasMidia < MaxTentativasMidia
+            ? Utc(agora) + EsperasMidia[Math.Min(TentativasMidia, EsperasMidia.Length) - 1]
+            : null;
     }
 
     public void MarcarProcessada(DateTime em) => ProcessadaEm = Utc(em);

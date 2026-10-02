@@ -12,6 +12,7 @@ public sealed class ProcessarMidiaWhatsAppJobUseCase(
     ArmazenadorMidiaWhatsApp armazenador,
     ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
+    TimeProvider relogio,
     ILogger<ProcessarMidiaWhatsAppJobUseCase> logger)
 {
     public async Task ExecuteAsync(ArmazenarMidiaWhatsAppJob job, CancellationToken ct = default)
@@ -25,6 +26,8 @@ public sealed class ProcessarMidiaWhatsAppJobUseCase(
             logger.LogWarning("Fila de mídia WhatsApp: mensagem não encontrada para wamid {Wamid}.", job.Wamid);
             return;
         }
+        if (mensagem.MidiaChave is not null)
+            return; // fila em memória e varredura podem entregar o mesmo anexo (#1397)
 
         try
         {
@@ -35,6 +38,9 @@ public sealed class ProcessarMidiaWhatsAppJobUseCase(
         catch (Exception ex)
         {
             logger.LogError(ex, "Fila de mídia WhatsApp: falha ao armazenar mídia do wamid {Wamid}.", job.Wamid);
+            // #1397: o erro fica na mensagem (o console mostra) e a varredura tenta de novo até o limite.
+            mensagem.RegistrarFalhaMidia(ex.Message, relogio.GetUtcNow().UtcDateTime);
+            await unitOfWork.CommitAsync();
         }
     }
 }

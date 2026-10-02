@@ -225,6 +225,19 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
             .IgnoreQueryFilters()
             .ToListAsync(ct);
 
+    // SQL cru: FOR UPDATE SKIP LOCKED não sai do LINQ. Cross-tenant, com bypass de RLS ligado pelo host (#1397).
+    public async Task<IReadOnlyList<Mensagem>> ListarMidiasPendentesComLockAsync(DateTime agora, int limite, CancellationToken ct = default) =>
+        await db.AtendimentoMensagens
+            .FromSqlInterpolated($"""
+                SELECT * FROM atendimento_mensagens
+                WHERE "ProximaTentativaMidiaEm" <= {agora} AND "MidiaChave" IS NULL
+                ORDER BY "ProximaTentativaMidiaEm"
+                LIMIT {limite}
+                FOR UPDATE SKIP LOCKED
+                """)
+            .IgnoreQueryFilters()
+            .ToListAsync(ct);
+
     public Task<bool> ExisteAguardandoClienteAsync(
         Guid empresaId, CanalConversa canal, string contatoIdExterno, Guid? clienteId, DateTime desde, CancellationToken ct = default) =>
         db.AtendimentoMensagens
