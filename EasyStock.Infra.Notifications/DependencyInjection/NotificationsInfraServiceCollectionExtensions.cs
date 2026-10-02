@@ -61,6 +61,13 @@ public static class NotificationsInfraServiceCollectionExtensions
         services.AddScoped<MetaCloudWhatsAppProvider>();
         services.AddKeyedScoped<IProvedorWhatsApp>("whatsapp:meta", (sp, _) => sp.GetRequiredService<MetaCloudWhatsAppProvider>());
 
+        // N6: remetente de plataforma (2º número da WABA). Chave própria, nunca o provider da loja: com Provider diferente
+        // de "meta" vira stub (as mensagens passam a Simulado), e o WhatsAppCanal nunca cai no número da loja.
+        if (string.Equals(configuration["Notifications:WhatsApp:Plataforma:Provider"]?.Trim(), "meta", StringComparison.OrdinalIgnoreCase))
+            services.AddKeyedScoped<IProvedorWhatsApp, EasyStock.Infra.Notifications.WhatsApp.Plataforma.MetaCloudWhatsAppPlataformaProvider>("whatsapp:plataforma");
+        else
+            services.AddKeyedScoped<IProvedorWhatsApp, StubWhatsAppProvider>("whatsapp:plataforma");
+
         var waProvider = configuration["Notifications:WhatsApp:Provider"] ?? "stub";
         services.AddKeyedScoped<IProvedorWhatsApp>(
             "whatsapp:active",

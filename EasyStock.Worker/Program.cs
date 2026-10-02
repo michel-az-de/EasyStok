@@ -68,6 +68,9 @@ builder.Services.AddEasyStockPostgreInfrastructure(connStr, builder.Configuratio
 // o mesmo provider e as mesmas opcoes (N3, #1351), sem chamar AddEasyStockAsyncInfrastructure completo.
 builder.Services.AddEasyStockEmail(builder.Configuration);
 
+// WhatsApp de plataforma (N6): mesma validacao da API; com o provider "meta", numero e verify token sao obrigatorios.
+EasyStock.Infra.Notifications.Hosting.WhatsAppPlataformaStartup.Validar(builder.Configuration);
+
 // Notifications infra (canal adapters + Scriban renderer)
 builder.Services.AddNotificationsInfra(builder.Configuration);
 

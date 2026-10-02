@@ -1,10 +1,13 @@
 using System.Net.Http.Json;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Infra.Integrations.Resilience;
 using EasyStock.Infra.Integrations.WhatsApp.Dtos;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Polly.CircuitBreaker;
 using Polly.Registry;
+using Polly.Timeout;
 
 namespace EasyStock.Infra.Integrations.WhatsApp;
 
@@ -20,11 +23,9 @@ public sealed class WhatsAppCloudClient(
     IOptions<WhatsAppCloudOptions> options,
     IRemetenteWhatsApp remetente,
     ResiliencePipelineProvider<string> pipelineProvider,
-    ILogger<WhatsAppCloudClient> logger) : IWhatsAppCloudClient
+    ILogger<WhatsAppCloudClient> logger) : IWhatsAppCloudClient, IClienteWhatsAppPlataforma
 {
     private readonly WhatsAppCloudOptions _options = options.Value;
-
-    private static readonly HashSet<int> CodigosPermanentes = [131047, 131026, 100];
 
     public Task<EnvioWhatsAppResult> EnviarTextoAsync(
         string waId, string texto, string? responderAWamid = null, CancellationToken ct = default)
@@ -99,48 +100,129 @@ public sealed class WhatsAppCloudClient(
         string? imagemCabecalho = null,
         CancellationToken ct = default)
     {
-        var components = new List<object>();
-        if (!string.IsNullOrWhiteSpace(imagemCabecalho))
-        {
-            components.Add(new
-            {
-                type = "header",
-                parameters = new object[] { new { type = "image", image = new { link = imagemCabecalho } } }
-            });
-        }
-
-        if (parametrosCorpo.Count > 0)
-        {
-            components.Add(new
-            {
-                type = "body",
-                parameters = parametrosCorpo.Select(p => new { type = "text", text = p }).ToArray()
-            });
-        }
-
-        if (botoesQuickReply is { Count: > 0 })
-        {
-            for (var i = 0; i < botoesQuickReply.Count; i++)
-            {
-                components.Add(new
-                {
-                    type = "button",
-                    sub_type = "quick_reply",
-                    index = i.ToString(),
-                    parameters = new object[] { new { type = "payload", payload = botoesQuickReply[i].Id } }
-                });
-            }
-        }
-
-        var payload = new
-        {
-            messaging_product = "whatsapp",
-            to = waId,
-            type = "template",
-            template = new { name = nomeTemplate, language = new { code = idioma }, components }
-        };
+        var payload = MetaTemplatePayload.Montar(
+            waId, nomeTemplate, idioma, parametrosCorpo, botoesQuickReply, imagemCabecalho);
 
         return EnviarEExtrairWamidAsync(payload, ct);
+    }
+
+    // ===== N6: número de plataforma =====
+
+    public async Task<ResultadoEnvioPlataforma> EnviarTemplatePlataformaAsync(
+        EnvioTemplatePlataforma envio, CancellationToken ct = default)
+    {
+        if (envio.CopyCode && ExcedeCopyCode(envio))
+            return new ResultadoEnvioPlataforma(DesfechoEnvio.FalhaPermanente, Erro: "codigo_acima_de_15_caracteres");
+
+        var payload = MetaTemplatePayload.Montar(
+            envio.Para, envio.Nome, envio.Idioma, envio.ParametrosCorpo,
+            botaoUrl0: envio.BotaoUrl0, botaoUrl1: envio.BotaoUrl1, opacoCallback: envio.OpacoCallback);
+        return await EnviarPlataformaAsync(payload, ct);
+    }
+
+    public Task<ResultadoEnvioPlataforma> EnviarTextoPlataformaAsync(string waId, string texto, CancellationToken ct = default) =>
+        EnviarPlataformaAsync(
+            new { messaging_product = "whatsapp", to = waId, type = "text", text = new { body = texto } }, ct);
+
+    private static bool ExcedeCopyCode(EnvioTemplatePlataforma envio) =>
+        envio.ParametrosCorpo.Any(p => p.Length > MetaTemplatePayload.CopyCodeTamanhoMaximo)
+        || (envio.BotaoUrl0?.Length ?? 0) > MetaTemplatePayload.CopyCodeTamanhoMaximo;
+
+    /// <summary>
+    /// POST pelo número de plataforma, sem lançar: no máximo uma vez (pipeline sem retry) e com o desfecho tipado.
+    /// Sem resposta (timeout, queda depois do envio) e 5xx são <c>Indeterminado</c>; só o que prova que nada saiu
+    /// (resolução de nome, conexão, TLS, disjuntor aberto) é transitório. O cancelamento do chamador sobe.
+    /// </summary>
+    private async Task<ResultadoEnvioPlataforma> EnviarPlataformaAsync(object payload, CancellationToken ct)
+    {
+        var phoneNumberId = _options.PhoneNumberIdPlataforma?.Trim();
+        if (string.IsNullOrEmpty(phoneNumberId))
+            return new ResultadoEnvioPlataforma(DesfechoEnvio.FalhaPermanente,
+                Erro: "Notifications:WhatsApp:Plataforma:PhoneNumberId nao configurado");
+
+        var pipeline = pipelineProvider.GetPipeline(IntegrationCategories.WhatsAppEnvio);
+        var url = $"{phoneNumberId}/messages";
+        HttpResponseMessage response;
+        try
+        {
+            response = await pipeline.ExecuteAsync(async pollyCt => await httpClient.PostAsJsonAsync(url, payload, pollyCt), ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (BrokenCircuitException ex)
+        {
+            return new ResultadoEnvioPlataforma(DesfechoEnvio.FalhaTransitoria, Erro: ex.GetType().Name);
+        }
+        catch (HttpRequestException ex) when (ex.HttpRequestError is
+            HttpRequestError.NameResolutionError or HttpRequestError.ConnectionError or HttpRequestError.SecureConnectionError)
+        {
+            return new ResultadoEnvioPlataforma(DesfechoEnvio.FalhaTransitoria, Erro: ex.HttpRequestError.ToString());
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TimeoutRejectedException or TimeoutException
+            or IOException or OperationCanceledException)
+        {
+            // A Meta pode ter recebido: nunca reenviar sozinho.
+            logger.LogError(ex, "WhatsApp de plataforma sem confirmação: entrega indeterminada.");
+            return new ResultadoEnvioPlataforma(DesfechoEnvio.Indeterminado, Erro: ex.GetType().Name);
+        }
+
+        using (response)
+        {
+            var status = (int)response.StatusCode;
+            if (response.IsSuccessStatusCode)
+            {
+                var wamid = await LerWamidAsync(response, ct);
+                return string.IsNullOrEmpty(wamid)
+                    ? new ResultadoEnvioPlataforma(DesfechoEnvio.Indeterminado, StatusHttp: status, Erro: "2xx_sem_message_id")
+                    : new ResultadoEnvioPlataforma(DesfechoEnvio.Enviado, wamid, StatusHttp: status);
+            }
+
+            if (status >= 500)
+                return new ResultadoEnvioPlataforma(DesfechoEnvio.Indeterminado, StatusHttp: status, Erro: $"http_{status}");
+
+            var erro = await LerErroAsync(response, ct);
+            if (erro?.Code is { } codigo)
+            {
+                var classe = CodigosErroMeta.Classificar(codigo);
+                return new ResultadoEnvioPlataforma(
+                    classe == ClasseErroMeta.Transitorio ? DesfechoEnvio.FalhaTransitoria : DesfechoEnvio.FalhaPermanente,
+                    CodigoMeta: codigo, Classe: classe, StatusHttp: status, Erro: erro.Message);
+            }
+
+            // Sem código da Meta: vale a regra HTTP (4xx exceto 408 e 429 é recusa permanente).
+            var permanente = status is >= 400 and < 500 and not (408 or 429);
+            return new ResultadoEnvioPlataforma(
+                permanente ? DesfechoEnvio.FalhaPermanente : DesfechoEnvio.FalhaTransitoria,
+                Classe: permanente ? ClasseErroMeta.Permanente : ClasseErroMeta.Transitorio,
+                StatusHttp: status, Erro: $"http_{status}");
+        }
+    }
+
+    private static async Task<string?> LerWamidAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            var body = await response.Content.ReadFromJsonAsync<MetaSendMessageResponse>(cancellationToken: ct);
+            return body?.Messages?.FirstOrDefault()?.Id;
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static async Task<MetaError?> LerErroAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            return (await response.Content.ReadFromJsonAsync<MetaErrorEnvelope>(cancellationToken: ct))?.Error;
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or NotSupportedException)
+        {
+            return null;
+        }
     }
 
     public async Task MarcarComoLidaAsync(string wamid, CancellationToken ct = default)
@@ -237,7 +319,9 @@ public sealed class WhatsAppCloudClient(
         var codigo = erro?.Code ?? 0;
         var mensagem = erro?.Message ?? $"Meta WhatsApp retornou HTTP {(int)response.StatusCode}.";
         logger.LogWarning("Falha WhatsApp Cloud API: codigo={Codigo} mensagem={Mensagem}", codigo, mensagem);
-        // O status HTTP segue na exceção (N2): o provider do outbox trata o 5xx como Indeterminado.
-        throw new WhatsAppCloudException(codigo, mensagem, CodigosPermanentes.Contains(codigo), (int)response.StatusCode);
+        // O status HTTP segue na exceção (N2): o provider do outbox trata o 5xx como Indeterminado. A permanência vem da
+        // tabela única de códigos (N6); sem código da Meta no corpo não há o que classificar e a exceção segue transitória.
+        var permanente = erro?.Code is { } c && CodigosErroMeta.EhPermanente(c);
+        throw new WhatsAppCloudException(codigo, mensagem, permanente, (int)response.StatusCode);
     }
 }
