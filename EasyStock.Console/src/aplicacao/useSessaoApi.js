@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { configGoogle, entrar, entrarComGoogle, listarEmpresas, sair } from '../infra/api/autenticacao'
 import { EVENTO_SESSAO_EXPIRADA } from '../infra/api/cliente'
 import { lerSessao } from '../infra/api/sessao'
@@ -27,6 +27,7 @@ export function useSessaoApi() {
     setSessao(null)
   }, [])
 
-  const google = { buscarClientId: configGoogle, entrar: entrarGoogle }
+  // #1354: identidade estável; um objeto novo a cada render redesenhava o botão do Google.
+  const google = useMemo(() => ({ buscarClientId: configGoogle, entrar: entrarGoogle }), [entrarGoogle])
   return { sessao, listarEmpresas, entrarNaEmpresa, google, encerrarSessao }
 }
