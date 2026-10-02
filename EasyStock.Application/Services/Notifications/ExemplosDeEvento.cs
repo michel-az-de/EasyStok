@@ -21,6 +21,14 @@ public static class ExemplosDeEvento
                 ["link_redefinicao"] = "https://app.easystok.com.br/redefinir-senha#teste",
                 ["codigo"] = "000000",
                 ["expira_em_minutos"] = 30,
+                ["codigo_expira_em_minutos"] = 10,
+            },
+            [TipoEventoNotificacao.SenhaAlterada] = new Dictionary<string, object?>
+            {
+                ["nome"] = "Maria Exemplo",
+                ["email"] = "maria@exemplo.invalid",
+                ["usuarioId"] = "00000000-0000-0000-0000-000000000000",
+                ["data"] = "02/10/2026 14:30",
             },
             [TipoEventoNotificacao.ConviteAcesso] = new Dictionary<string, object?>
             {

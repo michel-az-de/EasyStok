@@ -24,7 +24,7 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
         public async Task<AutenticarUsuarioResult> ExecuteAsync(AutenticarUsuarioCommand command)
         {
             var swTotal = Stopwatch.StartNew();
-            logger.LogDebug("Tentativa de autenticacao para o email: {Email}", command.Email);
+            logger.LogDebug("Tentativa de autenticacao iniciada");
 
             // --- etapa 1: query do usuário
             var swDb = Stopwatch.StartNew();
@@ -37,13 +37,13 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
 
             if (usuario.EstaBloqueado())
             {
-                logger.LogWarning("Tentativa de login para usuario bloqueado: {Email}", command.Email);
+                logger.LogWarning("Tentativa de login para usuario bloqueado: {UsuarioId}", usuario.Id);
                 throw new CredenciaisInvalidasException("Conta bloqueada temporariamente.");
             }
 
             if (!usuario.EmailConfirmado)
             {
-                logger.LogWarning("Tentativa de login com email não confirmado: {Email}", command.Email);
+                logger.LogWarning("Tentativa de login com email não confirmado: {UsuarioId}", usuario.Id);
             }
 
             // --- etapa 2: verificação do hash (CPU-bound ~200-800ms dependendo do work factor)

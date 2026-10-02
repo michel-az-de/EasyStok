@@ -9,7 +9,8 @@ public class ExemplosDeEventoTests
     private static readonly TipoEventoNotificacao[] TiposDoCatalogo =
     [
         TipoEventoNotificacao.ResetSenha, TipoEventoNotificacao.ConviteAcesso, TipoEventoNotificacao.IncidenteSistema,
-        TipoEventoNotificacao.PrazoEstourado, TipoEventoNotificacao.ResumoDiario, TipoEventoNotificacao.ContatoAlterado
+        TipoEventoNotificacao.PrazoEstourado, TipoEventoNotificacao.ResumoDiario, TipoEventoNotificacao.ContatoAlterado,
+        TipoEventoNotificacao.SenhaAlterada
     ];
 
     [Fact]
@@ -22,7 +23,8 @@ public class ExemplosDeEventoTests
     }
 
     [Theory]
-    [InlineData(TipoEventoNotificacao.ResetSenha, "nome,email,usuarioId,link_redefinicao,codigo,expira_em_minutos")]
+    [InlineData(TipoEventoNotificacao.ResetSenha, "nome,email,usuarioId,link_redefinicao,codigo,expira_em_minutos,codigo_expira_em_minutos")]
+    [InlineData(TipoEventoNotificacao.SenhaAlterada, "nome,email,usuarioId,data")]
     [InlineData(TipoEventoNotificacao.ConviteAcesso, "nome,email,usuarioId,empresa,link_convite,expira_em_dias")]
     [InlineData(TipoEventoNotificacao.IncidenteSistema, "componente,estado_texto,gravidade,desde,duracao")]
     [InlineData(TipoEventoNotificacao.PrazoEstourado, "tipo_legivel,referencia,prazo_texto,atraso_texto")]

@@ -683,9 +683,30 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.WhatsApp,
             tipoEvento: TipoEventoNotificacao.ResetSenha,
             assuntoTemplate: "",
-            corpoTemplate: "{{ codigo }} é o seu código de verificação do EasyStok. Ele vale por {{ expira_em_minutos }} minutos. Não compartilhe com ninguém.")
+            corpoTemplate: "{{ codigo }} é o seu código de verificação do EasyStok. Ele vale por {{ codigo_expira_em_minutos }} minutos. Não compartilhe com ninguém.")
             .ComMetadados(
-                """{"template":"codigo_redefinir_senha","idioma":"pt_BR","param1":"{{ codigo }}","botaoUrl0":"{{ codigo }}"}""");
+                """{"template":"codigo_redefinir_senha","idioma":"pt_BR","param1":"{{ codigo }}","botaoUrl0":"{{ codigo }}"}""")
+            .ComVersao(2); // N8: o código vale 10 min (a validade do link, 30 min, é do e-mail: expira_em_minutos).
+
+        // N8: aviso de senha trocada, por todos os canais verificados. O modelo da Meta "senha_alterada" (utilidade) leva
+        // a data como unico parametro.
+        yield return TemplateNotificacao.Criar(
+            codigo: "senha_alterada_email_v1",
+            nome: "Senha Alterada · Email",
+            canal: CanalNotificacao.Email,
+            tipoEvento: TipoEventoNotificacao.SenhaAlterada,
+            assuntoTemplate: "EasyStok: a senha da sua conta foi alterada",
+            corpoTemplate: EmailTemplateLoader.LoadBody("senha_alterada_email_v1"));
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "senha_alterada_whatsapp_v1",
+            nome: "Senha Alterada · WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.SenhaAlterada,
+            assuntoTemplate: "",
+            corpoTemplate: "EasyStok informa: a senha da sua conta foi alterada em {{ data }}. Se não foi você, fale agora com a responsável da sua empresa.")
+            .ComMetadados(
+                """{"template":"senha_alterada","idioma":"pt_BR","param1":"{{ data }}"}""");
 
         yield return TemplateNotificacao.Criar(
             codigo: "convite_acesso_email_v1",
@@ -982,6 +1003,11 @@ public static class NotificacoesGlobaisSeed
             TipoEventoNotificacao.ContatoAlterado, "contato_alterado_email_v1",
             CategoriaConteudoNotificacao.Seguranca, "[\"Email\"]", ModoTodos());
 
+        // N8: avisa a troca de senha por todos os canais verificados da pessoa (audiencia "usuario": o usuarioId do payload).
+        yield return MakeRotina("senha_alterada_global", "Senha Alterada",
+            TipoEventoNotificacao.SenhaAlterada, "senha_alterada_email_v1",
+            CategoriaConteudoNotificacao.Seguranca, "[\"Email\",\"WhatsApp\"]", ModoTodos("usuario"));
+
         yield return MakeRotina("incidente_sistema_global", "Incidente do Sistema",
             TipoEventoNotificacao.IncidenteSistema, "incidente_sistema_email_v1",
             CategoriaConteudoNotificacao.Operacional, "[\"Email\",\"WhatsApp\"]", ModoTodos("superadmins"));
@@ -1001,6 +1027,12 @@ public static class NotificacoesGlobaisSeed
             """{"modoCanais":"todos","audiencia":"admins","agenda":{"horario":"20:00"}}""");
         resumoDiario.Desativar("system");
         yield return resumoDiario;
+    }
+
+    private static TemplateNotificacao ComVersao(this TemplateNotificacao template, int versao)
+    {
+        template.DefinirVersao(versao);
+        return template;
     }
 
     private static TemplateNotificacao ComMetadados(this TemplateNotificacao template, string metadadosJson)

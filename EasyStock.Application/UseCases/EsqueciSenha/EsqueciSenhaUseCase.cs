@@ -1,110 +1,153 @@
+using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Services.Auth;
+using EasyStock.Application.Services.Notifications;
+using EasyStock.Domain.Enums.Notifications;
 using Microsoft.Extensions.Configuration;
 
 namespace EasyStock.Application.UseCases.EsqueciSenha;
 
+/// <summary>
+/// Pedido de redefinição de senha (N8). Responde sempre o mesmo, exista a conta ou não, e nunca faz rede: só banco.
+/// Aplica os limites (IP 5 em 15 min; conta 3 por hora, 6 por dia e 60 s entre pedidos), invalida os segredos
+/// anteriores, grava o link (sempre) e o código (só para conta elegível) e enfileira UM evento <c>ResetSenha</c> no motor,
+/// na mesma transação (ADR-0030). O modo <c>todos</c> da rotina entrega o link por e-mail e o código por WhatsApp.
+/// Nenhum log leva e-mail, telefone, link ou código: só o <c>UsuarioId</c>.
+/// </summary>
 public sealed class EsqueciSenhaUseCase(
     IUsuarioRepository usuarioRepository,
     IResetTokenRepository resetTokenRepository,
     IAuditLogRepository auditLogRepository,
+    IConsentimentoRepository consentimentoRepository,
+    INotificadorService notificador,
+    EmpresaDoEventoAnonimo empresaDoEvento,
+    LimitePedidosAcesso limitePorIp,
     IUnitOfWork unitOfWork,
     IConfiguration configuration,
-    ILogger<EsqueciSenhaUseCase> logger,
-    IEmailService? emailService = null) : IUseCase<EsqueciSenhaCommand, EsqueciSenhaResult>
+    TimeProvider relogio,
+    ILogger<EsqueciSenhaUseCase> logger) : IUseCase<EsqueciSenhaCommand, EsqueciSenhaResult>
 {
+    public static readonly TimeSpan ValidadeDoLink = TimeSpan.FromMinutes(30);
+    public static readonly TimeSpan ValidadeDoCodigo = TimeSpan.FromMinutes(10);
+    public static readonly TimeSpan IntervaloEntrePedidos = TimeSpan.FromSeconds(60);
+    public const int PedidosPorHora = 3;
+    public const int PedidosPorDia = 6;
+
     public async Task<EsqueciSenhaResult> ExecuteAsync(EsqueciSenhaCommand command)
     {
-        logger.LogInformation("Iniciando esqueci senha para email {Email}", command.Email);
+        // Teto por IP: a única resposta que difere (429) não depende da conta.
+        await limitePorIp.ExigirAsync(command.Ip);
 
-        // Formato inválido é tratado da mesma forma que email inexistente:
-        // retorna sucesso sem efeito colateral, para não vazar informação
-        // sobre formato aceito vs contas cadastradas (mesma classe de leak
-        // que user enumeration).
-        if (!EmailValidator.IsValid(command.Email))
-        {
-            logger.LogWarning("Tentativa de esqueci senha com email em formato invalido.");
-            return new EsqueciSenhaResult(true);
-        }
+        var resposta = new EsqueciSenhaResult(true);
+
+        // Formato inválido, conta inexistente e conta inativa recebem a mesma resposta, sem efeito colateral.
+        if (!EmailValidator.IsValid(command.Email)) return resposta;
 
         var usuario = await usuarioRepository.GetByEmailAsync(command.Email);
-        if (usuario == null || !usuario.Ativo)
+        if (usuario is null || !usuario.Ativo) return resposta;
+
+        var agora = relogio.GetUtcNow().UtcDateTime;
+
+        var motivoDoLimite = await MotivoDoLimiteDeContaAsync(usuario, agora);
+        if (motivoDoLimite is not null)
         {
-            logger.LogWarning("Tentativa de esqueci senha para email inexistente: {Email}", command.Email);
-            // Retornar sucesso para nao revelar se email existe
-            return new EsqueciSenhaResult(true);
+            await auditLogRepository.AddAsync(AuditLog.Criar(
+                usuario.Id, "forgot-password-limitado", false, $"Limite por conta: {motivoDoLimite}", command.Ip, command.UserAgent));
+            await unitOfWork.CommitAsync();
+            logger.LogWarning("Pedido de redefinicao limitado para o usuario {UsuarioId} ({Motivo})", usuario.Id, motivoDoLimite);
+            return resposta;
         }
 
-        // Token plaintext só circula em memória/email; persistimos só o hash.
-        var token = Guid.NewGuid().ToString();
-        var tokenHash = TokenHashHelper.ComputeSha256Hash(token);
-        var expiraEm = DateTime.UtcNow.AddHours(1);
-        var resetToken = ResetToken.Criar(
-            usuario.Id,
-            tokenHash,
-            expiraEm,
-            null,
-            null);
-        await resetTokenRepository.AddAsync(resetToken);
-
-        var auditLog = AuditLog.Criar(
-            usuario.Id,
-            "forgot-password",
-            true,
-            "Token de reset enviado",
-            null,
-            null);
-        await auditLogRepository.AddAsync(auditLog);
-
-        await unitOfWork.CommitAsync();
-
-        if (emailService is not null)
+        var linkTexto = SegredosDeAcesso.GerarLink();
+        var link = LinkRedefinicaoSenha.Montar(configuration, linkTexto);
+        if (link is null)
         {
-            try
-            {
-                // Nunca confiar no BaseUrl do corpo da requisicao: so compomos o link
-                // quando o host bate com uma origem confiavel (#765). Host nao-confiavel
-                // (ou ausente) => e-mail com token puro, nunca link para host do atacante.
-                var baseUrlConfiavel = LinkBaseUrlResolver.ResolveTrusted(command.BaseUrl, configuration);
-                if (!string.IsNullOrEmpty(command.BaseUrl) && baseUrlConfiavel is null)
-                    logger.LogWarning("BaseUrl do reset de senha ignorado por nao estar na allowlist de origens confiaveis.");
+            logger.LogError(
+                "Pedido de redefinicao do usuario {UsuarioId} sem base de link: configure {Chave} ou uma origem em Auth:TrustedLinkOrigins.",
+                usuario.Id, LinkRedefinicaoSenha.Chave);
+            return resposta;
+        }
 
-                var resetLink = baseUrlConfiavel is not null
-                    ? $"{baseUrlConfiavel}/auth/redefinir-senha?token={Uri.EscapeDataString(token)}"
-                    : token;
+        var empresaId = await empresaDoEvento.ResolverAsync(usuario);
+        if (empresaId is null) return resposta;
 
-                var hasLink = baseUrlConfiavel is not null;
-                var subject = "Recuperação de senha - EasyStock";
-                var body = $"Olá {usuario.Nome},\n\n" +
-                           $"Recebemos uma solicitação para redefinir a senha da sua conta.\n\n" +
-                           (hasLink
-                               ? $"Clique no link abaixo para criar uma nova senha (válido por 1 hora):\n\n{resetLink}\n\n"
-                               : $"Use o token abaixo para criar uma nova senha (válido por 1 hora):\n\n{token}\n\n") +
-                           $"Se você não solicitou a redefinição de senha, ignore este e-mail.\n\n" +
-                           $"Equipe EasyStock";
+        var comCodigo = await ElegivelAoCodigoAsync(usuario);
 
-                // O link carrega credencial: sai da caixa de seguranca (N3, #1351). Falha vira desfecho, e o log
-                // leva so o UsuarioId (LGPD), nunca o endereco.
-                var resultado = await emailService.EnviarAsync(
-                    new MensagemEmail(usuario.Email, subject, body, Remetente: RemetenteEmail.Seguranca));
-                if (resultado.Desfecho == DesfechoEnvio.Enviado)
-                    logger.LogInformation("E-mail de recuperacao de senha enviado para o usuario {UsuarioId}", usuario.Id);
-                else
-                    logger.LogWarning(
-                        "E-mail de recuperacao de senha nao saiu (desfecho {Desfecho}) para o usuario {UsuarioId}. Token gerado normalmente.",
-                        resultado.Desfecho, usuario.Id);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(
-                    "Falha inesperada ao enviar e-mail de recuperacao de senha para o usuario {UsuarioId} ({Erro}). Token gerado normalmente.",
-                    usuario.Id, ex.GetType().Name);
-            }
+        // Só depois de saber que o evento sai: invalidar antes de ter o que enviar deixaria a conta sem segredo vivo.
+        await resetTokenRepository.InvalidarAbertosAsync(usuario.Id, agora);
+
+        var tokenDoLink = ResetToken.Criar(
+            usuario.Id, SegredosDeAcesso.HashDoLink(linkTexto), agora + ValidadeDoLink, command.Ip, command.UserAgent,
+            FinalidadeResetToken.Reset, canal: "Email", criadoEm: agora);
+        await resetTokenRepository.AddAsync(tokenDoLink);
+
+        string? codigo = null;
+        if (comCodigo)
+        {
+            codigo = SegredosDeAcesso.GerarCodigo();
+            var id = Guid.NewGuid();
+            await resetTokenRepository.AddAsync(ResetToken.Criar(
+                usuario.Id, SegredosDeAcesso.HashDoCodigo(id, codigo), agora + ValidadeDoCodigo, command.Ip, command.UserAgent,
+                FinalidadeResetToken.ResetCodigo, canal: "WhatsApp", id: id, criadoEm: agora));
+        }
+
+        await auditLogRepository.AddAsync(AuditLog.Criar(
+            usuario.Id, "forgot-password", true,
+            comCodigo ? "Link e codigo de redefinicao gerados" : "Link de redefinicao gerado", command.Ip, command.UserAgent));
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["usuarioId"] = usuario.Id,
+            ["nome"] = usuario.Nome,
+            ["email"] = usuario.Email,
+            ["link_redefinicao"] = link,
+            ["expira_em_minutos"] = (int)ValidadeDoLink.TotalMinutes,
+            [NotificadorService.ChaveIdempotenciaPayload] = $"reset-senha:{tokenDoLink.Id:N}",
+        };
+        if (comCodigo)
+        {
+            payload["codigo"] = codigo;
+            payload["codigo_expira_em_minutos"] = (int)ValidadeDoCodigo.TotalMinutes;
         }
         else
         {
-            logger.LogInformation("Token de reset gerado para usuario {UsuarioId}", usuario.Id);
+            payload[CanaisDaRotina.CanaisPayload] = new[] { nameof(CanalNotificacao.Email) };
         }
 
-        return new EsqueciSenhaResult(true);
+        await notificador.EnfileirarEventoAsync(
+            TipoEventoNotificacao.ResetSenha, empresaId.Value, JsonSerializer.Serialize(payload));
+
+        await unitOfWork.CommitAsync();
+
+        logger.LogInformation(
+            "Redefinicao de senha pedida pelo usuario {UsuarioId} (codigo por WhatsApp: {ComCodigo})", usuario.Id, comCodigo);
+        return resposta;
+    }
+
+    /// <summary>Por conta: 3 por hora, 6 por dia e 60 s entre pedidos, contados nas linhas <c>Reset</c> de <c>reset_tokens</c>.</summary>
+    private async Task<string?> MotivoDoLimiteDeContaAsync(Usuario usuario, DateTime agora)
+    {
+        var contagem = await resetTokenRepository.ContarPedidosAsync(usuario.Id, agora);
+        if (contagem.UltimoPedidoEm is { } ultimo && agora - ultimo < IntervaloEntrePedidos) return "intervalo de 60 s";
+        if (contagem.NaUltimaHora >= PedidosPorHora) return "3 por hora";
+        if (contagem.NasUltimas24Horas >= PedidosPorDia) return "6 por dia";
+        return null;
+    }
+
+    /// <summary>
+    /// Conta que pode receber o código por WhatsApp: ativa, nunca superadmin (o canal não é forte o bastante para a
+    /// conta mais poderosa), telefone verificado, opt-in explícito em Segurança e WhatsApp de plataforma ligado.
+    /// </summary>
+    private async Task<bool> ElegivelAoCodigoAsync(Usuario usuario)
+    {
+        if (usuario.EhSuperAdmin()
+            || usuario.Telefone is null
+            || usuario.TelefoneVerificadoEm is null
+            || string.IsNullOrWhiteSpace(configuration[ResolvedorAudiencia.ChaveWhatsAppPlataforma]))
+            return false;
+
+        var consentimentos = await consentimentoRepository.ListarPorUsuariosAsync([usuario.Id]);
+        return consentimentos.Any(c => c.UsuarioId == usuario.Id && c.Canal == CanalNotificacao.WhatsApp
+                                       && c.Categoria == CategoriaConteudoNotificacao.Seguranca && c.OptIn);
     }
 }

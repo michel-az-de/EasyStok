@@ -53,7 +53,7 @@ public class NotificacoesGlobaisSeedTests
     private static readonly TipoEventoNotificacao[] CincoTipos =
     [
         TipoEventoNotificacao.ResetSenha, TipoEventoNotificacao.ConviteAcesso, TipoEventoNotificacao.IncidenteSistema,
-        TipoEventoNotificacao.PrazoEstourado, TipoEventoNotificacao.ResumoDiario
+        TipoEventoNotificacao.PrazoEstourado, TipoEventoNotificacao.ResumoDiario, TipoEventoNotificacao.SenhaAlterada
     ];
 
     [Fact]
@@ -96,6 +96,44 @@ public class NotificacoesGlobaisSeedTests
             parametros.TryGetProperty("audiencia", out _).Should().BeFalse();
         else
             parametros.GetProperty("audiencia").GetString().Should().Be(audiencia);
+    }
+
+    [Fact]
+    public void SenhaAlteradaTemRotinaETemplatePorCanal()
+    {
+        var rotina = NotificacoesGlobaisSeed.BuildDefaultRotinas().Should()
+            .ContainSingle(r => r.TipoEvento == TipoEventoNotificacao.SenhaAlterada).Subject;
+        rotina.Codigo.Should().Be("senha_alterada_global");
+        rotina.Categoria.Should().Be(CategoriaConteudoNotificacao.Seguranca);
+        rotina.CanaisOrdemFallbackJson.Should().Be("[\"Email\",\"WhatsApp\"]");
+        rotina.Ativa.Should().BeTrue();
+        var parametros = JsonDocument.Parse(rotina.ParametrosJson).RootElement;
+        parametros.GetProperty("modoCanais").GetString().Should().Be("todos");
+        parametros.GetProperty("audiencia").GetString().Should().Be("usuario");
+
+        var templates = NotificacoesGlobaisSeed.BuildDefaultTemplates()
+            .Where(t => t.TipoEvento == TipoEventoNotificacao.SenhaAlterada).ToList();
+        templates.Select(t => t.Canal).Should().BeEquivalentTo([CanalNotificacao.Email, CanalNotificacao.WhatsApp]);
+        templates.Single(t => t.Canal == CanalNotificacao.WhatsApp).MetadadosJson.Should()
+            .Be("""{"template":"senha_alterada","idioma":"pt_BR","param1":"{{ data }}"}""");
+    }
+
+    [Fact]
+    public void ResetSenhaEmModoTodos()
+    {
+        var rotina = NotificacoesGlobaisSeed.BuildDefaultRotinas().Single(r => r.Codigo == "reset_senha_global");
+
+        JsonDocument.Parse(rotina.ParametrosJson).RootElement.GetProperty("modoCanais").GetString().Should().Be("todos");
+        rotina.Categoria.Should().Be(CategoriaConteudoNotificacao.Seguranca);
+    }
+
+    [Fact]
+    public void CodigoDoWhatsAppDeResetUsaAValidadeDoCodigoENaoADoLink()
+    {
+        var template = NotificacoesGlobaisSeed.BuildDefaultTemplates().Single(t => t.Codigo == "reset_senha_whatsapp_v1");
+
+        template.CorpoTemplate.Should().Contain("{{ codigo_expira_em_minutos }}").And.NotContain("{{ expira_em_minutos }}");
+        template.Versao.Should().Be(2, "texto novo sobe a versao do catalogo");
     }
 
     [Fact]

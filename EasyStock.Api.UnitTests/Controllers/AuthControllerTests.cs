@@ -32,6 +32,14 @@ public class AuthControllerTests
     private readonly AutenticarUsuarioUseCase _autenticarUseCase;
     private readonly AuthController _controller;
 
+    // N8: o esqueci a senha e o reset usam estes para o teste ver o que o controller monta e o que vai ao motor.
+    private readonly IUsuarioRepository _acessoUsuarios = Substitute.For<IUsuarioRepository>();
+    private readonly IResetTokenRepository _acessoTokens = Substitute.For<IResetTokenRepository>();
+    private readonly EasyStock.Application.Ports.Output.Notifications.INotificadorService _notificador =
+        Substitute.For<EasyStock.Application.Ports.Output.Notifications.INotificadorService>();
+    private readonly ICacheService _cacheDoLimite = Substitute.For<ICacheService>();
+    private readonly List<string> _payloadsEnfileirados = [];
+
     public AuthControllerTests()
     {
         var passwordHasher = _passwordHasher;
@@ -60,13 +68,40 @@ public class AuthControllerTests
         var jwtServiceApp = Substitute.For<EasyStock.Application.Ports.Output.IJwtTokenService>();
 
         var emailTokenRepo = Substitute.For<IEmailConfirmationTokenRepository>();
-        var config = new ConfigurationBuilder().Build();
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Auth:LinkRedefinirSenha"] = "https://app.easystok.com.br/auth/redefinir-senha?token={0}",
+            })
+            .Build();
         var refreshTokenUseCase = new RefreshTokenUseCase(refreshTokenRepo2, usuarioRepo2, auditLogRepo2, jwtServiceApp, unitOfWork2, refreshTokenLogger);
         var logoutUseCase = new LogoutUseCase(refreshTokenRepo2, auditLogRepo2, unitOfWork2, logoutLogger);
-        var esqueciSenhaUseCase = new EsqueciSenhaUseCase(usuarioRepo2, resetTokenRepo, auditLogRepo2, unitOfWork2, config, esqueciSenhaLogger);
         var revogadorSessoes = new RevogadorSessoes(
             usuarioRepo2, refreshTokenRepo2, Substitute.For<ICacheService>(), TimeProvider.System, Substitute.For<ILogger<RevogadorSessoes>>());
-        var resetarSenhaUseCase = new ResetarSenhaUseCase(resetTokenRepo, usuarioRepo2, auditLogRepo2, revogadorSessoes, unitOfWork2, passwordHasher, resetarSenhaLogger);
+
+        // N8: pedido e reset de acesso sobre os substitutos de campo (o teste le o que foi gravado e enfileirado).
+        var empresaDoEvento = new EmpresaDoEventoAnonimo(
+            Substitute.For<IEmpresaPadraoResolver>(), Substitute.For<ITenantContextAccessor>(),
+            Substitute.For<ILogger<EmpresaDoEventoAnonimo>>());
+        _cacheDoLimite.IncrementAsync(Arg.Any<string>(), Arg.Any<long>()).Returns(1L);
+        _acessoTokens.ContarPedidosAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(new ContagemPedidosReset(0, 0, null));
+        _notificador.EnfileirarEventoAsync(
+                Arg.Any<EasyStock.Domain.Enums.Notifications.TipoEventoNotificacao>(), Arg.Any<Guid>(), Arg.Any<string>(),
+                Arg.Any<Guid?>(), Arg.Any<CancellationToken>(), Arg.Any<string?>())
+            .Returns(call => { _payloadsEnfileirados.Add(call.ArgAt<string>(2)); return Task.FromResult(Guid.NewGuid()); });
+        var limite = new LimitePedidosAcesso(_cacheDoLimite);
+        var esqueciSenhaUseCase = new EsqueciSenhaUseCase(
+            _acessoUsuarios, _acessoTokens, auditLogRepo2,
+            Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(),
+            _notificador, empresaDoEvento, limite, unitOfWork2, config, TimeProvider.System, esqueciSenhaLogger);
+        var concluidor = new ConcluidorDeReset(
+            usuarioRepo2, _acessoTokens, auditLogRepo2, revogadorSessoes, _notificador, empresaDoEvento, passwordHasher,
+            TimeProvider.System, Substitute.For<ILogger<ConcluidorDeReset>>());
+        var resetarSenhaUseCase = new ResetarSenhaUseCase(
+            _acessoTokens, usuarioRepo2, concluidor, limite, unitOfWork2, TimeProvider.System, resetarSenhaLogger);
+        var resetarSenhaPorCodigoUseCase = new ResetarSenhaPorCodigoUseCase(
+            _acessoTokens, usuarioRepo2, concluidor, limite, unitOfWork2, TimeProvider.System,
+            Substitute.For<ILogger<ResetarSenhaPorCodigoUseCase>>());
         var obterUsuarioAtualUseCase = new ObterUsuarioAtualUseCase(usuarioRepo2, currentUser, obterUsuarioAtualLogger);
         var trocaDeContato = new TrocaDeContatoService(
             usuarioRepo2, emailTokenRepo, Substitute.For<EasyStock.Application.Ports.Output.Notifications.INotificadorService>(),
@@ -101,6 +136,7 @@ public class AuthControllerTests
             logoutUseCase,
             esqueciSenhaUseCase,
             resetarSenhaUseCase,
+            resetarSenhaPorCodigoUseCase,
             confirmEmailUseCase,
             obterUsuarioAtualUseCase,
             atualizarUsuarioAtualUseCase,
@@ -139,5 +175,88 @@ public class AuthControllerTests
         await _refreshTokenRepository.Received(1).RevogarSessoesAtivasAsync(usuario.Id, Arg.Any<DateTime>());
         await _usuarioRepository.DidNotReceiveWithAnyArgs().AtualizarSessoesValidasDesdeAsync(default, default);
         usuario.SessoesValidasDesde.Should().BeNull();
+    }
+
+    // ── N8: esqueci a senha ───────────────────────────────────────────────────────────────────
+
+    private void UsarContextoHttp(string ip = "203.0.113.7")
+    {
+        var http = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        http.Connection.RemoteIpAddress = System.Net.IPAddress.Parse(ip);
+        http.Request.Headers.UserAgent = "TesteNavegador/1.0";
+        _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = http };
+    }
+
+    private Usuario UsuarioDoAcesso(string email = "ana@casadababa.com")
+    {
+        var usuario = Usuario.Criar("Ana", email, "hash");
+        usuario.Empresas.Add(new UsuarioEmpresa { UsuarioId = usuario.Id, EmpresaId = Guid.NewGuid(), Ativo = true });
+        _acessoUsuarios.GetByEmailAsync(usuario.Email).Returns(usuario);
+        return usuario;
+    }
+
+    [Fact]
+    public async Task ForgotPasswordDevolve202ComMesmoCorpo()
+    {
+        UsarContextoHttp();
+        var existente = UsuarioDoAcesso();
+        _acessoUsuarios.GetByEmailAsync("ninguem@casadababa.com").Returns((Usuario?)null);
+
+        var comConta = await _controller.ForgotPassword(new EsqueciSenhaRequest(existente.Email)) as Microsoft.AspNetCore.Mvc.ObjectResult;
+        var semConta = await _controller.ForgotPassword(new EsqueciSenhaRequest("ninguem@casadababa.com")) as Microsoft.AspNetCore.Mvc.ObjectResult;
+
+        comConta!.StatusCode.Should().Be(202);
+        semConta!.StatusCode.Should().Be(202);
+        System.Text.Json.JsonSerializer.Serialize(comConta.Value).Should().Be(System.Text.Json.JsonSerializer.Serialize(semConta.Value));
+    }
+
+    [Fact]
+    public async Task ForgotPasswordIgnoraBaseUrlDoCorpo()
+    {
+        UsarContextoHttp();
+        var usuario = UsuarioDoAcesso();
+        var corpo = System.Text.Json.JsonSerializer.Deserialize<EsqueciSenhaRequest>(
+            "{\"email\":\"" + usuario.Email + "\",\"baseUrl\":\"https://evil.example\"}",
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+
+        await _controller.ForgotPassword(corpo);
+
+        _payloadsEnfileirados.Should().ContainSingle().Which.Should()
+            .Contain("https://app.easystok.com.br/auth/redefinir-senha?token=").And.NotContain("evil.example");
+    }
+
+    [Fact]
+    public async Task ForgotPasswordGravaOIpEOAgenteDaConexao()
+    {
+        UsarContextoHttp(ip: "198.51.100.77");
+        var usuario = UsuarioDoAcesso();
+
+        await _controller.ForgotPassword(new EsqueciSenhaRequest(usuario.Email));
+
+        await _acessoTokens.Received().AddAsync(Arg.Is<ResetToken>(t => t.IpCriacao == "198.51.100.77" && t.UserAgent == "TesteNavegador/1.0"));
+    }
+
+    [Fact]
+    public async Task ResetPasswordCodeMapeiaLimiteParaQuatrocentosEVinteENove()
+    {
+        UsarContextoHttp();
+        _cacheDoLimite.IncrementAsync(Arg.Any<string>(), Arg.Any<long>()).Returns(6L);
+
+        var resposta = await _controller.ResetPasswordCode(new ResetarSenhaPorCodigoRequest("ana@casadababa.com", "123456", "Nova@Senha123"))
+            as Microsoft.AspNetCore.Mvc.ObjectResult;
+
+        resposta!.StatusCode.Should().Be(429);
+        _controller.Response.Headers["Retry-After"].ToString().Should().Be("900");
+    }
+
+    [Fact]
+    public async Task ForgotPasswordMapeiaLimiteDeIpParaQuatrocentosEVinteENove()
+    {
+        UsarContextoHttp();
+        _cacheDoLimite.IncrementAsync(Arg.Any<string>(), Arg.Any<long>()).Returns(6L);
+
+        var resposta = await _controller.ForgotPassword(new EsqueciSenhaRequest("ana@casadababa.com")) as Microsoft.AspNetCore.Mvc.ObjectResult;
+
+        resposta!.StatusCode.Should().Be(429);
     }
 }

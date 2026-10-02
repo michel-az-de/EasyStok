@@ -45,6 +45,11 @@ public static partial class ServiceCollectionExtensions
         // Recuperação e reset de senha
         services.AddScoped<EsqueciSenhaUseCase>();
         services.AddScoped<ResetarSenhaUseCase>();
+        services.AddScoped<ResetarSenhaPorCodigoUseCase>(); // código de 6 dígitos do WhatsApp (N8)
+        services.AddScoped<ConcluidorDeReset>();            // efeitos do reset: senha, sessões, demais segredos, aviso (N8)
+        services.AddScoped<EmpresaDoEventoAnonimo>();       // empresa do evento do pedido anônimo (N8)
+        services.AddScoped<LimitePedidosAcesso>();          // teto por IP, no ICacheService (N8)
+        services.AddScoped<LimpezaTokensAcesso>();          // limpeza dos reset_tokens expirados (N8)
         services.AddScoped<ConfirmEmailUseCase>();
 
         // Perfil do usuário autenticado
