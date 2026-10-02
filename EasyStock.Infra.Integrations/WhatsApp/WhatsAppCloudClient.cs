@@ -237,6 +237,7 @@ public sealed class WhatsAppCloudClient(
         var codigo = erro?.Code ?? 0;
         var mensagem = erro?.Message ?? $"Meta WhatsApp retornou HTTP {(int)response.StatusCode}.";
         logger.LogWarning("Falha WhatsApp Cloud API: codigo={Codigo} mensagem={Mensagem}", codigo, mensagem);
-        throw new WhatsAppCloudException(codigo, mensagem, CodigosPermanentes.Contains(codigo));
+        // O status HTTP segue na exceção (N2): o provider do outbox trata o 5xx como Indeterminado.
+        throw new WhatsAppCloudException(codigo, mensagem, CodigosPermanentes.Contains(codigo), (int)response.StatusCode);
     }
 }

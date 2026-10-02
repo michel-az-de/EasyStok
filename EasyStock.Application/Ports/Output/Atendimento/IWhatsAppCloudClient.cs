@@ -43,7 +43,7 @@ public sealed record EnvioWhatsAppResult(string Wamid);
 /// Erro tipado da Cloud API, com o código numérico da Meta (ex.: 131047 = fora da janela de 24h).
 /// <see cref="EhPermanente"/> = true nunca deve ser reenviado automaticamente.
 /// </summary>
-public sealed class WhatsAppCloudException(int codigo, string mensagem, bool ehPermanente)
+public sealed class WhatsAppCloudException(int codigo, string mensagem, bool ehPermanente, int? statusHttp = null)
     : Exception(mensagem)
 {
     /// <summary>Mensagem livre fora da janela de 24 h (só template passa).</summary>
@@ -51,4 +51,11 @@ public sealed class WhatsAppCloudException(int codigo, string mensagem, bool ehP
 
     public int Codigo { get; } = codigo;
     public bool EhPermanente { get; } = ehPermanente;
+
+    /// <summary>
+    /// Status HTTP da resposta da Meta, quando houve resposta (N2). O 5xx deixa a mensagem
+    /// <c>Indeterminado</c>, porque a Meta pode ter aceitado; o 4xx é recusa e nada saiu. Nulo nos erros que o cliente
+    /// levanta antes de chamar a rede.
+    /// </summary>
+    public int? StatusHttp { get; } = statusHttp;
 }

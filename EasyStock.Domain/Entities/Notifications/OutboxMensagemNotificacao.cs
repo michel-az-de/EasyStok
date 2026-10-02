@@ -114,11 +114,39 @@ public class OutboxMensagemNotificacao
         ProviderUsado = providerUsado;
         EnviadoEm = DateTime.UtcNow;
         ErroUltimaTentativa = null;
+        AoTerminar();
+    }
+
+    /// <summary>
+    /// Stub ou console (N2): o provider disse que não enviou nada. Terminal e sem <see cref="EnviadoEm"/>: nada
+    /// saiu. Só o dispatcher chama; <see cref="ProviderUsado"/> guarda o provider real (<c>stub</c>, <c>console</c>).
+    /// </summary>
+    public void MarcarSimulado(string providerUsado)
+    {
+        Status = StatusOutbox.Simulado;
+        ProviderUsado = providerUsado;
+        ErroUltimaTentativa = null;
+        AoTerminar();
+    }
+
+    /// <summary>
+    /// Não há como saber se o provider entregou (N2): timeout, queda de conexão ou 5xx no WhatsApp e no SMS, que
+    /// saem no máximo uma vez, e, na N1, o lease vencido. Terminal: conta a tentativa, nunca reagenda, e o
+    /// dispatcher não abre fallback de canal, para não duplicar. <paramref name="providerUsado"/> fica como estava
+    /// quando não é informado.
+    /// </summary>
+    public void MarcarIndeterminado(string erro, string? providerUsado = null)
+    {
+        Tentativas++;
+        ErroUltimaTentativa = erro;
+        if (providerUsado is not null) ProviderUsado = providerUsado;
+        Status = StatusOutbox.Indeterminado;
+        AoTerminar();
     }
 
     /// <summary>
     /// <paramref name="permanente"/> = erro que nunca vai passar (ex.: fora da janela de 24 h sem
-    /// template, S09): vira <see cref="StatusOutbox.Falhado"/> sem reagendar.
+    /// template, S09; SMTP 550; HTTP 4xx): vira <see cref="StatusOutbox.Falhado"/> sem reagendar.
     /// </summary>
     public void MarcarFalhaTentativa(string erro, TimeSpan backoff, bool permanente = false)
     {
@@ -126,17 +154,51 @@ public class OutboxMensagemNotificacao
         ErroUltimaTentativa = erro;
         ProximaTentativaEm = DateTime.UtcNow.Add(backoff);
         Status = permanente || Tentativas >= MaxTentativas ? StatusOutbox.Falhado : StatusOutbox.Pendente;
+        // Com tentativa sobrando a mensagem segue aberta e o corpo ainda é necessário para reenviar.
+        if (Status == StatusOutbox.Falhado) AoTerminar();
     }
 
     public void Cancelar()
     {
         Status = StatusOutbox.Cancelado;
+        AoTerminar();
     }
 
     public void Suprimir(string motivo)
     {
         Status = StatusOutbox.Suprimido;
         ErroUltimaTentativa = motivo;
+        AoTerminar();
+    }
+
+    /// <summary>
+    /// Texto que substitui o corpo de uma mensagem <see cref="CategoriaConteudoNotificacao.Seguranca"/> quando ela
+    /// termina (N2). A coluna do corpo é obrigatória, então o corpo não fica nulo.
+    /// </summary>
+    public const string CorpoApagado = "[apagado]";
+
+    /// <summary>
+    /// Apaga o que a categoria <see cref="CategoriaConteudoNotificacao.Seguranca"/> não pode guardar depois do
+    /// envio (o token ou o código vai no corpo e nos metadados): o corpo vira <see cref="CorpoApagado"/> e assunto e
+    /// metadados zeram. O destinatário fica até o anonimizador (90 dias). Idempotente. O payload do evento é
+    /// apagado à parte (<see cref="EventoNotificacao.PurgarPayload"/>), porque o fallback de canal ainda o lê.
+    /// </summary>
+    public void PurgarSegredos()
+    {
+        CorpoRenderizado = CorpoApagado;
+        AssuntoRenderizado = string.Empty;
+        MetadadosJson = null;
+    }
+
+    /// <summary>
+    /// Toda transição para um status terminal (qualquer um fora de <see cref="StatusOutbox.Pendente"/> e
+    /// <see cref="StatusOutbox.EmEnvio"/>) passa por aqui. Quem criar uma transição terminal nova (a N1 traz
+    /// <c>Expirado</c>) chama este método, para a categoria de segurança não guardar segredo em nenhum desfecho.
+    /// </summary>
+    private void AoTerminar()
+    {
+        if (Categoria == CategoriaConteudoNotificacao.Seguranca)
+            PurgarSegredos();
     }
 
     public bool TentativasEsgotadas() => Tentativas >= MaxTentativas;

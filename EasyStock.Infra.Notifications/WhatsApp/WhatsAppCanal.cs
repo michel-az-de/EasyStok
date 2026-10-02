@@ -13,9 +13,10 @@ public sealed class WhatsAppCanal(
 
     public async Task<ResultadoEnvio> EnviarAsync(MensagemPronta mensagem, CancellationToken ct = default)
     {
+        // Sem o telefone: dado pessoal fora do log (LGPD, #1292); o OutboxId leva à mensagem.
         logger.LogDebug(
-            "Despachando WhatsApp via provedor={Provedor} para={Destinatario}",
-            provedor.Nome, mensagem.Destinatario);
+            "Despachando WhatsApp via provedor={Provedor} outbox={OutboxId}",
+            provedor.Nome, mensagem.OutboxId);
 
         return await provedor.EnviarAsync(mensagem, ct);
     }

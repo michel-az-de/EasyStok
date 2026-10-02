@@ -208,6 +208,35 @@ public class WhatsAppCloudClientTests
         handler.Chamadas.Should().Be(1, "erro permanente não pode ser reenviado — o pipeline nem vê essa exceção");
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest, 400)]
+    [InlineData(HttpStatusCode.TooManyRequests, 429)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, 503)]
+    public async Task ErroDaMetaCarregaOStatusHttp(HttpStatusCode status, int esperado)
+    {
+        // N2: o provider do outbox separa o 5xx (Indeterminado: a Meta pode ter aceitado) da recusa 4xx (nada saiu).
+        const string json = """{"error":{"message":"An unknown error occurred","type":"OAuthException","code":2,"fbtrace_id":"X"}}""";
+        var client = CreateClient(status, json, out _);
+
+        var act = async () => await client.EnviarTextoAsync("5511999998888", "Oi!");
+
+        var ex = await act.Should().ThrowAsync<WhatsAppCloudException>();
+        ex.Which.StatusHttp.Should().Be(esperado);
+        ex.Which.Codigo.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task ErroSemCorpoDaMetaTambemCarregaOStatusHttp()
+    {
+        var client = CreateClient(HttpStatusCode.BadGateway, "<html>bad gateway</html>", out _);
+
+        var act = async () => await client.EnviarTextoAsync("5511999998888", "Oi!");
+
+        var ex = await act.Should().ThrowAsync<WhatsAppCloudException>();
+        ex.Which.StatusHttp.Should().Be(502);
+        ex.Which.Codigo.Should().Be(0);
+    }
+
     [Fact]
     public async Task BaixaMidiaComBearer()
     {

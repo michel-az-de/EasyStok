@@ -14,6 +14,17 @@ public interface IOutboxNotificacaoRepository
 
     Task<bool> ExisteAsync(string idempotencyKey, CancellationToken ct = default);
 
+    /// <summary>
+    /// O evento ainda tem outra mensagem aberta (<c>Pendente</c> ou <c>EmEnvio</c>) além de <paramref name="exceto"/>?
+    /// O dispatcher usa para só apagar o payload de um evento de segurança quando termina a última mensagem
+    /// dele (N2).
+    /// </summary>
+    Task<bool> ExisteMensagemAbertaDoEventoAsync(
+        Guid empresaId,
+        Guid eventoId,
+        Guid exceto,
+        CancellationToken ct = default);
+
     Task<(IReadOnlyList<OutboxMensagemNotificacao> Items, int TotalCount)> ListarAsync(
         Guid? empresaId,
         StatusOutbox? status = null,

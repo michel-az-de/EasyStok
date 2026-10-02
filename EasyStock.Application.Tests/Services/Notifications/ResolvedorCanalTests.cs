@@ -122,4 +122,46 @@ public class ResolvedorCanalTests
         resultado.Should().ContainInOrder(
             CanalNotificacao.Sms, CanalNotificacao.Email, CanalNotificacao.InApp);
     }
+
+    [Fact]
+    public void Seguranca_ignora_consentimento_como_transacional()
+    {
+        // N2: redefinir senha não pode depender de opt-in. Mesmo com opt-out registrado, o canal sai.
+        var consentimentos = new List<ConsentimentoNotificacao>
+        {
+            ConsentimentoNotificacao.Registrar(Guid.NewGuid(), CanalNotificacao.Email,
+                CategoriaConteudoNotificacao.Seguranca, optIn: false, "user@x.com")
+        };
+        var configs = new List<ConfiguracaoCanal> { CanalAtivo(CanalNotificacao.Email) };
+
+        var resultado = Sut.ResolverCanaisPermitidos(
+            CategoriaConteudoNotificacao.Seguranca,
+            [CanalNotificacao.Email],
+            consentimentos, configs, [], Agora);
+
+        resultado.Should().Contain(CanalNotificacao.Email);
+    }
+
+    [Fact]
+    public void Seguranca_continua_sujeita_ao_kill_switch_e_ao_canal_ativo()
+    {
+        // Ignorar o consentimento não ignora o kill switch global nem o canal desligado.
+        var bloqueio = BloqueioNotificacao.Criar("manutencao", "admin@x.com");
+        var configs = new List<ConfiguracaoCanal>
+        {
+            CanalAtivo(CanalNotificacao.Email),
+            ConfiguracaoCanal.Criar(CanalNotificacao.Sms, "stub", empresaId: null),
+        };
+        configs[1].Desativar("admin@x.com");
+
+        var comKillSwitch = Sut.ResolverCanaisPermitidos(
+            CategoriaConteudoNotificacao.Seguranca, [CanalNotificacao.Email],
+            consentimentos: [], configs, [bloqueio], Agora);
+        var comCanalInativo = Sut.ResolverCanaisPermitidos(
+            CategoriaConteudoNotificacao.Seguranca, [CanalNotificacao.Sms],
+            consentimentos: [], configs, [], Agora);
+
+        comKillSwitch.Should().BeEmpty();
+        comCanalInativo.Should().BeEmpty();
+    }
 }

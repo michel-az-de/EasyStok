@@ -1,21 +1,21 @@
 using EasyStock.Application.Ports.Output;
 using System.Net;
 using System.Net.Mail;
-using System.Net.Sockets;
 
 namespace EasyStock.Infra.Async;
 
 /// <summary>
 /// Implementacao SMTP do servico de email.
-/// Suporte a templates basicos, anexos e retry automatico em falhas transientes.
+/// Suporte a templates basicos e anexos. Uma tentativa por chamada: a falha sobe como
+/// <see cref="SmtpException"/> e quem repete e o outbox de notificacoes (backoff de 1, 5 e 30 min), que classifica
+/// SMTP 5xx como permanente e SMTP 4xx como transitorio. O laco de 3 tentativas que existia aqui, somado ao Polly do
+/// canal e ao outbox, fazia ate 36 tentativas SMTP por mensagem e repetia o 550 (N2).
 /// </summary>
 public sealed class SmtpEmailService : IEmailService, IDisposable
 {
     private readonly SmtpClient _smtpClient;
     private readonly string _fromEmail;
     private readonly string _fromName;
-    private const int MaxRetries = 3;
-    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(2);
 
     public SmtpEmailService(string host, int port, string username, string password, string fromEmail, string fromName, bool enableSsl = true)
     {
@@ -39,26 +39,8 @@ public sealed class SmtpEmailService : IEmailService, IDisposable
     public Task SendAsync(IEnumerable<string> to, string subject, string body, bool isHtml = false) =>
         SendAsync(to, subject, body, Enumerable.Empty<EmailAttachment>(), isHtml);
 
-    public async Task SendAsync(IEnumerable<string> to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml = false)
-    {
-        Exception? lastException = null;
-        for (var tentativa = 1; tentativa <= MaxRetries; tentativa++)
-        {
-            try
-            {
-                await EnviarInternamenteAsync(to, subject, body, attachments, isHtml);
-                return;
-            }
-            catch (SmtpException ex) when (EhFalhaTransiente(ex))
-            {
-                lastException = ex;
-                if (tentativa < MaxRetries)
-                    await Task.Delay(RetryDelay * tentativa);
-            }
-        }
-
-        throw lastException!;
-    }
+    public Task SendAsync(IEnumerable<string> to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml = false) =>
+        EnviarInternamenteAsync(to, subject, body, attachments, isHtml);
 
     private async Task EnviarInternamenteAsync(IEnumerable<string> to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml)
     {
@@ -99,13 +81,6 @@ public sealed class SmtpEmailService : IEmailService, IDisposable
 
         await _smtpClient.SendMailAsync(mailMessage);
     }
-
-    private static bool EhFalhaTransiente(SmtpException ex) =>
-        ex.StatusCode is SmtpStatusCode.ServiceNotAvailable
-            or SmtpStatusCode.MailboxBusy
-            or SmtpStatusCode.MailboxUnavailable
-            or SmtpStatusCode.InsufficientStorage
-        || ex.InnerException is SocketException or IOException;
 
     public Task SendTemplateAsync(string to, string subject, string templateName, object model, bool isHtml = true)
     {
