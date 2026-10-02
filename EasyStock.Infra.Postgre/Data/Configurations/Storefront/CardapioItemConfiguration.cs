@@ -40,6 +40,7 @@ public class CardapioItemConfiguration : IEntityTypeConfiguration<CardapioItem>
         builder.Property(c => c.TempoPreparo).HasMaxLength(50);
         // S15: linha (enum int, default ParaServir=1), preparo numérico e instrução de finalização.
         builder.Property(c => c.Linha).HasConversion<int>().IsRequired().HasDefaultValue(LinhaProduto.ParaServir).HasSentinel((LinhaProduto)0);
+        builder.Property(c => c.Conservacao).HasConversion<int>().IsRequired(); // S53: 0 = ambiente
         builder.Property(c => c.TempoPreparoMinutos);
         builder.Property(c => c.InstrucaoFinalizacao).HasMaxLength(500);
         builder.Property(c => c.FotoUrl).HasMaxLength(500);

@@ -339,6 +339,7 @@ public sealed class CheckoutCoreService(
                 ProdutoId = ci.ProdutoId,
                 CardapioItemId = ci.Id,
                 LinhaSnapshot = ci.Linha.ParaContrato(),
+                ConservacaoSnapshot = ci.Conservacao.ParaContrato(),
                 Nome = ci.Produto?.Nome ?? $"Item {ci.ProdutoId}",
                 Quantidade = inputItem.Qtd,
                 PrecoUnitario = precoUnit,

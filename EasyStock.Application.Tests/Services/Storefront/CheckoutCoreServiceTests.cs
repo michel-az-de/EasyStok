@@ -203,6 +203,9 @@ public class CheckoutCoreServiceTests
 
         reservado.Itens[0].LinhaSnapshot.Should().Be("paraServir");
         reservado.ItemFrete.LinhaSnapshot.Should().BeNull("frete não é produto");
+        // S53: a conservação vai junto (o item de teste é o padrão, ambiente); frete não tem.
+        reservado.Itens[0].ConservacaoSnapshot.Should().Be("ambiente");
+        reservado.ItemFrete.ConservacaoSnapshot.Should().BeNull("frete não é produto");
     }
     // ── S16: antecedência mínima ─────────────────────────────────────────
 

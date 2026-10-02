@@ -212,8 +212,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         foreach (var outra in cobrancas.Where(c => c.EstaPendente && c.Id != alvo.Id))
             outra.Cancelar($"pago_por_outra_cobranca: {alvo.Id}", agora);
 
-        // S21: com o pagamento, a janela vira compromisso; o card do KDS atrasa a partir daqui.
-        pedido.DefinirInicioPrevisto(await inicioPrevisto.CalcularAsync(pedido, ct));
+        // S21/S53: com o pagamento, a janela vira compromisso (o card do KDS atrasa a partir daqui) e o pedido ganha o número do dia.
+        await inicioPrevisto.AplicarCompromissoAsync(pedido, ct);
 
         var statusAntigo = pedido.Status;
         var transitou = pedido.StatusEnum == StatusPedido.AguardandoPagamento;

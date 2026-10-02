@@ -21,10 +21,10 @@ public class MontarComandaUseCaseTests
 
     private static PedidoImpressoItemLeitura Item(
         string nome, decimal qtd, string? linha, bool produto = true, string? unidade = null,
-        string? variacao = null, string? molho = null, string? obs = null) =>
-        new(nome, variacao, qtd, unidade, 10m, 10m * qtd, obs, produto, linha, molho);
+        string? variacao = null, string? molho = null, string? obs = null, string? conservacao = null) =>
+        new(nome, variacao, qtd, unidade, 10m, 10m * qtd, obs, produto, linha, molho, conservacao);
 
-    private static PedidoImpressoLeitura Leitura(IReadOnlyList<PedidoImpressoItemLeitura> itens, IReadOnlyList<string>? tags = null) =>
+    private static PedidoImpressoLeitura Leitura(IReadOnlyList<PedidoImpressoItemLeitura> itens, IReadOnlyList<string>? tags = null, int? numeroDoDia = null) =>
         new(
             Id: PedidoId,
             CriadoEm: new DateTime(2026, 9, 30, 17, 32, 0, DateTimeKind.Utc),
@@ -39,7 +39,8 @@ public class MontarComandaUseCaseTests
             FormaCobranca: null,
             Entrega: new PedidoImpressoEntregaLeitura(TipoEntregador.Motoboy, "João"),
             TempoPreparoPadraoMinutos: 60,
-            Itens: itens);
+            Itens: itens,
+            NumeroDoDia: numeroDoDia);
 
     private static async Task<ComandaDto?> Montar(PedidoImpressoLeitura? leitura)
     {
@@ -91,7 +92,7 @@ public class MontarComandaUseCaseTests
         var dto = await Montar(Leitura([Item("Nhoque", 1, "prepararEmCasa")]));
 
         dto!.Numero.Should().Be("A7F3C21B");
-        dto.NumeroDoDia.Should().BeNull("o número do dia chega na S53");
+        dto.NumeroDoDia.Should().BeNull("pedido fora da fila ainda não tem número");
         dto.Prazo.ProntoAte.Should().Be(new DateTime(2026, 10, 2, 9, 30, 0));
         dto.Cliente.Should().Be("Mariana Souza");
         dto.Entrega.Should().Be(new PedidoImpressoEntregaDto(TipoEntregador.Motoboy, "João"));
@@ -103,5 +104,26 @@ public class MontarComandaUseCaseTests
     public async Task OutraEmpresaNull()
     {
         (await Montar(null)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SeparaCongeladoERefrigeradoEmPrepararEmCasa()
+    {
+        // S53: congelado, refrigerado, o resto de "preparar em casa", depois para servir.
+        var dto = await Montar(Leitura(
+        [
+            Item("Massa fresca", 1, "prepararEmCasa", conservacao: "refrigerado"),
+            Item("Talharim", 1, "paraServir", conservacao: "congelado"),
+            Item("Nhoque", 2, "prepararEmCasa", conservacao: "congelado"),
+            Item("Molho pronto", 1, "prepararEmCasa", conservacao: "ambiente"),
+            Item("Lasanha", 1, "prepararEmCasa", conservacao: "CONGELADO"),
+        ], numeroDoDia: 42));
+
+        dto!.Grupos.Select(g => g.Titulo).Should().Equal(
+            "Preparar em casa · congelado", "Preparar em casa · refrigerado", "Preparar em casa", "Para servir");
+        dto.Grupos[0].Itens.Select(i => i.Nome).Should().Equal("Nhoque", "Lasanha");
+        dto.Grupos[0].Conservacao.Should().Be("congelado");
+        dto.Grupos[3].Conservacao.Should().BeNull("para servir não se divide");
+        dto.NumeroDoDia.Should().Be(42);
     }
 }

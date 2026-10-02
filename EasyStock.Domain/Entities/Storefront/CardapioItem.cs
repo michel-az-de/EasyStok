@@ -87,6 +87,9 @@ public class CardapioItem
     /// <summary>Linha do item (S15, US-024). Default <see cref="LinhaProduto.ParaServir"/>.</summary>
     public LinhaProduto Linha { get; private set; } = LinhaProduto.ParaServir;
 
+    /// <summary>Conservação até o cliente (S53): separa congelado de refrigerado na comanda. Default ambiente.</summary>
+    public ConservacaoProduto Conservacao { get; private set; } = ConservacaoProduto.Ambiente;
+
     /// <summary>
     /// Preparo em minutos (S15, RN-06). Null = usa <c>ConfiguracaoAtendimento.TempoPreparoPadraoMinutos</c>.
     /// <see cref="TempoPreparo"/> continua sendo só o texto de exibição.
@@ -391,6 +394,15 @@ public class CardapioItem
     /// Define linha, preparo numérico e instrução de finalização (S15). Cada parâmetro null deixa o
     /// campo como está; instrução vazia limpa.
     /// </summary>
+    public void DefinirConservacao(ConservacaoProduto conservacao)
+    {
+        if (!Enum.IsDefined(conservacao))
+            throw new RegraDeDominioVioladaException($"Conservação inválida: {(int)conservacao}.");
+        if (Conservacao == conservacao) return;
+        Conservacao = conservacao;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
     public void DefinirPreparo(LinhaProduto? linha, int? tempoPreparoMinutos, string? instrucaoFinalizacao)
     {
         if (linha.HasValue)

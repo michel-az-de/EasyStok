@@ -81,6 +81,21 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasDatabaseName("ix_pedidos_atraso_pendente")
                 .HasFilter("\"Status\" = 'aguardando' AND atraso_notificado_em IS NULL AND inicio_previsto_em IS NOT NULL");
 
+            // S53: número do dia de produção, único por empresa e dia.
+            b.Property(p => p.NumeroDoDia)
+                .HasColumnName("numero_do_dia")
+                .IsRequired(false);
+            b.Property(p => p.DataNumero)
+                .HasColumnName("data_numero")
+                .IsRequired(false);
+            // O índice abaixo é filtrado e não serve às consultas por empresa: o da FK fica explícito, senão o EF o
+            // derruba achando que o composto o cobre.
+            b.HasIndex(p => p.EmpresaId).HasDatabaseName("IX_pedidos_EmpresaId");
+            b.HasIndex(p => new { p.EmpresaId, p.DataNumero, p.NumeroDoDia })
+                .HasDatabaseName("ux_pedidos_empresa_numero_do_dia")
+                .IsUnique()
+                .HasFilter("numero_do_dia IS NOT NULL");
+
             b.HasOne(p => p.Empresa)
                 .WithMany()
                 .HasForeignKey(p => p.EmpresaId)
@@ -138,6 +153,7 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(x => x.VariacaoRotuloSnapshot).HasMaxLength(60);
             b.Property(x => x.SkuSnapshot).HasMaxLength(100);
             b.Property(x => x.LinhaSnapshot).HasMaxLength(30);
+            b.Property(x => x.ConservacaoSnapshot).HasMaxLength(20); // S53
 
             b.HasOne(x => x.Produto)
                 .WithMany()
