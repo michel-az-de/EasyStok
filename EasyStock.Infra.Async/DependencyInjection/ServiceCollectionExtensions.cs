@@ -165,33 +165,37 @@ public static class ServiceCollectionExtensions
 /// configurado). O NOME desta classe e contrato: codigo de diagnostico checa
 /// <c>GetType().Name == "ConsoleEmailService"</c> / <c>nameof(...)</c> para detectar
 /// "SMTP nao configurado" — nao renomear sem atualizar esses call-sites.
+/// <para>
+/// Nada sai daqui: <see cref="EnviarAsync"/> devolve <c>Simulado</c> com provider <c>console</c> (N3), e o canal de
+/// e-mail do outbox so repassa o desfecho. A marcadora <c>IEmailServiceSimulado</c> da N2 saiu por isso.
+/// </para>
 /// </summary>
 public sealed class ConsoleEmailService(ILogger<ConsoleEmailService> logger) : IEmailService
 {
     // #288 item 4: era Console.WriteLine (sem nivel, sem estrutura). Agora ILogger em
-    // Debug. NAO loga o corpo do email — e PII potencial (ver #301); so destinatario +
-    // assunto, suficiente para o fallback de dev.
+    // Debug. NAO loga o corpo nem o destinatario — sao PII (ver #301, #1292, N2); so o
+    // assunto (texto fixo dos fluxos que chamam direto), suficiente para o fallback de dev.
     public Task SendAsync(string to, string subject, string body, bool isHtml = false)
     {
-        logger.LogDebug("[EMAIL] Para: {To} | Assunto: {Subject}", to, subject);
+        logger.LogDebug("[EMAIL] simulado, nada foi enviado | Assunto: {Subject}", subject);
         return Task.CompletedTask;
     }
 
     public Task SendAsync(string to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml = false)
     {
-        logger.LogDebug("[EMAIL] Para: {To} | Assunto: {Subject} | Anexos: {Count}", to, subject, attachments.Count());
+        logger.LogDebug("[EMAIL] simulado, nada foi enviado | Assunto: {Subject} | Anexos: {Count}", subject, attachments.Count());
         return Task.CompletedTask;
     }
 
     public Task SendAsync(IEnumerable<string> to, string subject, string body, bool isHtml = false)
     {
-        logger.LogDebug("[EMAIL] Para: {Count} destinatario(s) | Assunto: {Subject}", to.Count(), subject);
+        logger.LogDebug("[EMAIL] simulado, nada foi enviado | {Count} destinatario(s) | Assunto: {Subject}", to.Count(), subject);
         return Task.CompletedTask;
     }
 
     public Task SendTemplateAsync(string to, string subject, string templateName, object model, bool isHtml = true)
     {
-        logger.LogDebug("[EMAIL TEMPLATE] Para: {To} | Assunto: {Subject} | Template: {Template}", to, subject, templateName);
+        logger.LogDebug("[EMAIL TEMPLATE] simulado, nada foi enviado | Assunto: {Subject} | Template: {Template}", subject, templateName);
         return Task.CompletedTask;
     }
 

@@ -111,9 +111,26 @@ namespace EasyStock.Infra.Postgre.Repositories
             // (UsuarioEmpresa, UsuarioPerfil) as Modified too — those tables have RLS,
             // so their UPDATEs return 0 rows when called without the bypass scope,
             // causing DbUpdateConcurrencyException on login and other pre-auth flows.
+            // #1352: a linha inteira vai, menos SessoesValidasDesde: o modelo (UsuarioConfiguration) manda o EF
+            // ignorar a coluna em UPDATE, e o corte só muda por AtualizarSessoesValidasDesdeAsync.
             dbContext.Entry(usuario).State = EntityState.Modified;
             return Task.CompletedTask;
         }
+
+        public Task<SessaoDoUsuario?> ObterSessaoAsync(Guid usuarioId) =>
+            // Sem IgnoreQueryFilters e sem bypass de RLS: usuarios não tem EmpresaId (#1352).
+            dbContext.Usuarios
+                .AsNoTracking()
+                .Where(u => u.Id == usuarioId)
+                .Select(u => new SessaoDoUsuario(u.Ativo, u.SessoesValidasDesde))
+                .FirstOrDefaultAsync();
+
+        public Task<int> AtualizarSessoesValidasDesdeAsync(Guid usuarioId, DateTime desde) =>
+            // UPDATE atômico e monotônico: só avança. Revogações concorrentes e relógios diferentes entre
+            // réplicas nunca fazem o corte recuar.
+            dbContext.Usuarios
+                .Where(u => u.Id == usuarioId && (u.SessoesValidasDesde == null || u.SessoesValidasDesde < desde))
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.SessoesValidasDesde, desde));
 
         public async Task<IEnumerable<Usuario>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
         {

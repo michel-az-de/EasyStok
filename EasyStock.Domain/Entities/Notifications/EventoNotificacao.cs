@@ -46,4 +46,14 @@ public class EventoNotificacao
         ErroProcessamento = erro;
         ProcessadoEm = DateTime.UtcNow;
     }
+
+    /// <summary>
+    /// Troca o payload por um objeto vazio (N2). O payload de um evento de segurança carrega o segredo (token ou
+    /// código) e o fallback de canal ainda o relê, então o dispatcher só chama isto quando termina a última
+    /// mensagem aberta do evento.
+    /// </summary>
+    public void PurgarPayload()
+    {
+        PayloadJson = "{}";
+    }
 }

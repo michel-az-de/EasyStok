@@ -12,6 +12,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
+using Polly.Timeout;
 
 namespace EasyStock.Infra.Integrations.UnitTests.Notifications;
 
@@ -178,6 +179,138 @@ public class MetaCloudWhatsAppProviderTests
 
         resultado.Sucesso.Should().BeFalse();
         resultado.FalhaPermanente.Should().BeFalse();
+    }
+
+    // ===== N2: desfecho tipado, wamid em IdExterno e timeout =====
+
+    [Fact]
+    public async Task Sucesso_devolve_o_wamid_em_IdExterno()
+    {
+        // A N1 grava o id em ProviderMensagemId e a N6 o usa no webhook de status da Meta.
+        _canal.EnviarTextoAsync(Telefone, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns("wamid.HBgL123");
+
+        var resultado = await Provider().EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.Enviado);
+        resultado.IdExterno.Should().Be("wamid.HBgL123");
+    }
+
+    [Fact]
+    public async Task Sucesso_de_template_tambem_devolve_o_wamid_em_IdExterno()
+    {
+        _canal.EnviarModeloAsync(Telefone, "pedido_pago", "pt_BR", Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns("wamid.template");
+
+        var resultado = await Provider().EnviarAsync(Mensagem(ComTemplate));
+
+        resultado.IdExterno.Should().Be("wamid.template");
+    }
+
+    [Fact]
+    public async Task Timeout_de_http_vira_Indeterminado()
+    {
+        // O POST /messages não é repetido (#1292) e o timeout sobe como TaskCanceledException, que o filtro antigo
+        // deixava escapar: a mensagem voltava a Pendente e o dispatcher reenviava. Agora é Indeterminado, terminal.
+        _canal.EnviarTextoAsync(Telefone, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new TaskCanceledException("HttpClient.Timeout", new TimeoutException()));
+
+        var resultado = await Provider().EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.Indeterminado);
+        resultado.Sucesso.Should().BeFalse();
+        resultado.FalhaPermanente.Should().BeFalse();
+        resultado.ProviderUsado.Should().Be("meta");
+        await _canal.ReceivedWithAnyArgs(1).EnviarTextoAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task Timeout_do_pipeline_de_resiliencia_vira_Indeterminado()
+    {
+        _canal.EnviarTextoAsync(Telefone, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new TimeoutRejectedException(TimeSpan.FromSeconds(30)));
+
+        var resultado = await Provider().EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.Indeterminado);
+    }
+
+    [Fact]
+    public async Task Queda_de_conexao_vira_Indeterminado()
+    {
+        _canal.EnviarTextoAsync(Telefone, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("conexão encerrada depois do envio"));
+
+        var resultado = await Provider().EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.Indeterminado);
+        resultado.FalhaPermanente.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Http_5xx_da_Meta_vira_Indeterminado()
+    {
+        // 5xx: a Meta pode ter aceitado a mensagem antes de falhar. Reenviar duplicaria.
+        _canal.EnviarTextoAsync(Telefone, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new WhatsAppCloudException(2, "An unknown error occurred", ehPermanente: false, statusHttp: 503));
+
+        var resultado = await Provider().EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.Indeterminado);
+        resultado.ErroDetalhado.Should().Be("An unknown error occurred");
+        await _canal.ReceivedWithAnyArgs(1).EnviarTextoAsync(default!, default!, default);
+    }
+
+    [Theory]
+    [InlineData(429)]
+    [InlineData(400)]
+    [InlineData(null)]
+    public async Task Recusa_da_Meta_que_nao_e_permanente_segue_transitoria(int? statusHttp)
+    {
+        // 4xx (ex.: limite de taxa): a Meta recusou e nada saiu, então o outbox pode tentar de novo.
+        _canal.EnviarTextoAsync(Telefone, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new WhatsAppCloudException(130429, "Rate limit hit", ehPermanente: false, statusHttp: statusHttp));
+
+        var resultado = await Provider().EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaTransitoria);
+    }
+
+    [Fact]
+    public async Task Recusa_permanente_da_Meta_segue_permanente_mesmo_com_status_4xx()
+    {
+        _canal.EnviarTextoAsync(Telefone, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new WhatsAppCloudException(131026, "Message undeliverable", ehPermanente: true, statusHttp: 400));
+
+        var resultado = await Provider().EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaPermanente);
+    }
+
+    [Fact]
+    public async Task Cancelamento_do_chamador_nao_vira_Indeterminado()
+    {
+        // Cancelar é desligar o host, não timeout da Meta: a exceção sobe, e a mensagem não é marcada.
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        _canal.EnviarTextoAsync(Telefone, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new OperationCanceledException(cts.Token));
+
+        var act = () => Provider().EnviarAsync(Mensagem(), cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task Falha_antes_de_chamar_a_Meta_segue_transitoria_porque_nada_saiu()
+    {
+        // O banco estourou o tempo ao buscar a conversa: a Meta nem foi chamada, então reenviar não duplica.
+        _conversas.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new TimeoutException("banco"));
+
+        var resultado = await Provider().EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaTransitoria);
+        await _canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
     }
 
     private static readonly Dictionary<string, string> ComBotoes = new()

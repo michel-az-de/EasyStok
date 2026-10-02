@@ -41,4 +41,19 @@ public class EventoNotificacaoTests
         e.Status.Should().Be(StatusEventoNotificacao.Falhado);
         e.ErroProcessamento.Should().Be("template não encontrado");
     }
+
+    [Fact]
+    public void PurgarPayload_troca_o_json_por_objeto_vazio()
+    {
+        // N2: o payload do evento de segurança carrega o segredo (token, código). Apagado, ainda é JSON válido.
+        var e = EventoNotificacao.Criar(
+            TipoEventoNotificacao.ResetSenha,
+            Guid.NewGuid(),
+            """{"usuarioId":"abc","token":"482913"}""");
+
+        e.PurgarPayload();
+
+        e.PayloadJson.Should().Be("{}");
+        e.Status.Should().Be(StatusEventoNotificacao.Pendente, "purgar não muda o estado do evento");
+    }
 }

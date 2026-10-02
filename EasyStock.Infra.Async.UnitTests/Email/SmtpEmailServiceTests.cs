@@ -13,10 +13,10 @@ namespace EasyStock.Infra.Async.UnitTests.Email;
 /// N3 (#1351): o <c>SmtpEmailService</c> sobre MailKit contra um SMTP falso em loopback. Uma conexão por envio, teto de
 /// tempo, cancelamento, concorrência e classificação por protocolo, sem retentativa dentro do serviço.
 ///
-/// O arquivo da spec é <c>SmtpEmailServiceTests.cs</c> ("estende o arquivo da N2"). Enquanto a N2 não mergeou, a N3 usa um
-/// arquivo e uma classe próprios para não dar add/add com ela; depois do merge das duas, os testes se juntam num só.
+/// Absorve os testes que a N2 deixou neste arquivo (o SMTP falso em loopback e o 550 tentado uma vez): agora eles
+/// exercitam o <c>EnviarAsync</c> e o MailKit, com o servidor falso da N3 (<c>ServidorSmtpDeTeste</c>).
 /// </summary>
-public class SmtpEmailServiceMailKitTests
+public class SmtpEmailServiceTests
 {
     private const string Senha = "senha-secreta-123";
     private const string Destinatario = "maria.souza@example.com";
@@ -274,6 +274,21 @@ public class SmtpEmailServiceMailKitTests
         resultado.FalhaPermanente.Should().BeFalse();
         resultado.ErroDetalhado.Should().Contain("421");
         servidor.ConexoesAceitas.Should().Be(1, "o 421 não é retentado dentro do serviço");
+    }
+
+    [Fact]
+    public async Task Rcpt421GeraFalhaTransitoriaComUmaUnicaConexao()
+    {
+        // O 421 e transitorio, mas quem decide repetir e o outbox, com backoff de minutos, nao um laco de 2 s no servico.
+        await using var servidor = new ServidorSmtpDeTeste { RespostaRcpt = "421 4.3.2 Service not available" }.Iniciar();
+        var servico = Servico(Configuracao(servidor));
+
+        var resultado = await servico.EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaTransitoria);
+        resultado.ErroDetalhado.Should().Contain("421");
+        servidor.ConexoesAceitas.Should().Be(1);
+        servidor.RcptRecebidos.Should().Be(1, "uma tentativa por chamada, sem retentativa no servico");
     }
 
     [Fact]

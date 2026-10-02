@@ -64,20 +64,25 @@ select "PedidoId", count(*) from viagem_paradas where "EntregueEm" is null group
 
 ### 4. Console
 
-Do mesmo SHA publicado na API:
+Do mesmo SHA publicado na API, pelo script versionado (#1358):
 
 ```bash
-cd EasyStock.Console && npm ci && VITE_FONTE_DADOS=api npm run build
+scripts/deploy/console-deploy.sh
 ```
 
-Copiar `dist/index.html` para a pasta que o Caddy serve em `app.easystok.online`, guardando antes a
-versão atual como `index.html.prev` (rollback = copiar de volta). Alternativa em contêiner:
+Ele monta o `origin/master` em modo API a partir de `git archive`, carimba
+`<meta name="easystok-console-sha">`, guarda o `index.html` anterior como `index.html.antes-<ts>`,
+copia para a pasta que o Caddy serve e confere o SHA servido. Avisa quando a API está noutro SHA.
+`--so-montar` só monta e confere, sem SSH. Rollback = copiar o `index.html.antes-<ts>` de volta.
+Nunca publicar cópia manual de pasta de sessão: em 01/10 isso deixou o console atrás da API sem
+ninguém ver. Alternativa em contêiner:
 `Dockerfile.web` com `--build-arg VITE_FONTE_DADOS=api` e `API_UPSTREAM=http://ez-api:8080`
 (o nginx já repassa o SSE sem buffer; validado em 01/10).
 
 ### 5. Conferência
 
 - `GET https://api.easystok.online/health/version` → `buildSha` igual ao SHA publicado.
+- `app.easystok.online` → `<meta name="easystok-console-sha">` com o mesmo SHA.
 - `https://app.easystok.online` abre o login; depois do login a faixa do rodapé diz "Conversas ao vivo do EasyStok".
 - Gestão › Entregas e integrações mostra os cartões (só Admin) e o botão Testar responde.
 

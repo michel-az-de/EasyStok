@@ -8570,6 +8570,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<DateTime?>("SessoesValidasDesde")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("TemaPreferido")
                         .IsRequired()
                         .ValueGeneratedOnAdd()

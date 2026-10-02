@@ -107,6 +107,7 @@ public class AuthRegisterRemovidoTests
                 .AddSingleton(Substitute.For<IResetTokenRepository>())
                 .AddSingleton(Substitute.For<IEmailConfirmationTokenRepository>())
                 .AddSingleton(Substitute.For<IUsuarioEmpresaRepository>())
+                .AddSingleton(Substitute.For<ICacheService>()) // #1352: o RevogadorSessoes dos use cases reais apaga a chave de sessão
                 .AddSingleton(Substitute.For<ICurrentUserAccessor>());
             builder.Services.AddControllers().AddApplicationPart(typeof(AuthController).Assembly);
 

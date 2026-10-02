@@ -1,8 +1,11 @@
+using EasyStock.Application.Services.Auth;
+
 namespace EasyStock.Application.UseCases.AlterarSenha;
 
 public sealed class AlterarSenhaUseCase(
     IUsuarioRepository usuarioRepository,
     ICurrentUserAccessor currentUserAccessor,
+    RevogadorSessoes revogadorSessoes,
     IUnitOfWork unitOfWork,
     IPasswordHasher passwordHasher,
     ILogger<AlterarSenhaUseCase> logger) : IUseCase<AlterarSenhaCommand, AlterarSenhaResult>
@@ -32,6 +35,9 @@ public sealed class AlterarSenhaUseCase(
         usuario.AlteradoEm = DateTime.UtcNow;
 
         await usuarioRepository.UpdateAsync(usuario);
+
+        // #1352: a senha mudou, então toda sessão anterior cai (inclusive a que pediu a troca: volta ao login).
+        await revogadorSessoes.RevogarAsync(usuario);
         await unitOfWork.CommitAsync();
 
         logger.LogInformation("Senha alterada com sucesso para usuario {UsuarioId}", usuario.Id);

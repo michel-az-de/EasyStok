@@ -46,13 +46,6 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 logger.LogWarning("Tentativa de login com email não confirmado: {Email}", command.Email);
             }
 
-            // Se a janela de lockout expirou, zera o contador de falhas para não
-            // bloquear o usuário na próxima falha "herdada" da sessão anterior.
-            if (usuario.LockoutEnd.HasValue && usuario.LockoutEnd.Value <= DateTime.UtcNow)
-            {
-                usuario.ResetarTentativasFalha();
-            }
-
             // --- etapa 2: verificação do hash (CPU-bound ~200-800ms dependendo do work factor)
             var swHash = Stopwatch.StartNew();
             var senhaOk = passwordHasher.Verify(command.Senha, usuario.SenhaHash);
@@ -61,12 +54,10 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
 
             if (!senhaOk)
             {
-                usuario.IncrementarTentativasFalha();
-                if (usuario.FailedLoginAttempts >= 5)
-                {
-                    usuario.BloquearPorTentativas(15);
-                    logger.LogWarning("Usuario bloqueado apos 5 tentativas falhidas: {Email}", command.Email);
-                }
+                // #1352: regra única (contagem, bloqueio na 5ª e janela vencida) em Usuario, a mesma do passo 1.
+                usuario.RegistrarFalhaDeSenha();
+                if (usuario.EstaBloqueado())
+                    logger.LogWarning("Usuario {UsuarioId} bloqueado apos {Limite} tentativas falhas", usuario.Id, Domain.Entities.Usuario.FalhasParaBloquear);
                 await usuarioRepository.UpdateAsync(usuario);
                 await unitOfWork.CommitAsync();
                 throw new CredenciaisInvalidasException();

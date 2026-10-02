@@ -2,6 +2,7 @@
 // Registra UseCases relacionados a: login, logout, tokens, recuperação de senha
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 using EasyStock.Application.UseCases.RefreshToken;
 using EasyStock.Application.UseCases.Logout;
@@ -11,6 +12,7 @@ using EasyStock.Application.UseCases.ConfirmEmail;
 using EasyStock.Application.UseCases.ObterUsuarioAtual;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
 using EasyStock.Application.UseCases.AlterarSenha;
+using EasyStock.Application.Services.Auth;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -31,6 +33,11 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<IdentificarUsuarioGoogleUseCase>(); // login com Google (#1324)
         services.AddScoped<RefreshTokenUseCase>();
         services.AddScoped<LogoutUseCase>();
+
+        // Revogação de sessão na hora (#1352): reset, troca de senha, desativação e troca de perfil (e N8/N9).
+        // Depende de ICacheService (Infra.Async) e do relógio; o grupo registra o relógio como os de Core e Storefront.
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<RevogadorSessoes>();
 
         // Recuperação e reset de senha
         services.AddScoped<EsqueciSenhaUseCase>();
