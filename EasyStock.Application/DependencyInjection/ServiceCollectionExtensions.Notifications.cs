@@ -3,6 +3,7 @@ using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Application.UseCases.Notifications;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -14,6 +15,8 @@ public static partial class ServiceCollectionExtensions
         // Services
         services.AddScoped<ResolvedorCanal>();
         services.AddSingleton<RotinaScheduler>();
+        // Quarentena (N1): prazos por tipo; sobrescritas em Notifications:Quarentena:Prazos (bind em AddNotificationsCore).
+        services.TryAddSingleton<PoliticaValidadeNotificacao>();
         services.AddScoped<NotificadorService>();
         services.AddScoped<INotificadorService>(sp => sp.GetRequiredService<NotificadorService>());
 

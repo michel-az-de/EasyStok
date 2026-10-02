@@ -227,6 +227,15 @@ public class OutboxMensagemNotificacaoTests
         },
         { "Cancelado", m => m.Cancelar() },
         { "Suprimido", m => m.Suprimir("kill switch") },
+        { "Expirado", m => m.Expirar("passou do prazo") },
+        {
+            "Indeterminado por lease vencido (canal de entrega única)",
+            m =>
+            {
+                m.Canal = CanalNotificacao.WhatsApp;
+                m.ReclamarLeaseVencido();
+            }
+        },
     };
 
     [Theory]
@@ -305,5 +314,76 @@ public class OutboxMensagemNotificacaoTests
         m.Status.Should().Be(StatusOutbox.EmEnvio);
         m.Tentativas.Should().Be(0);
         m.ProximaTentativaEm.Should().BeCloseTo(DateTime.UtcNow.Add(OutboxMensagemNotificacao.LeaseEmEnvio), TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public void Expirar_e_terminal_sem_EnviadoEm_e_guarda_o_motivo()
+    {
+        var m = Novo(canal: CanalNotificacao.WhatsApp);
+
+        m.Expirar("passou do prazo de 120 min");
+
+        m.Status.Should().Be(StatusOutbox.Expirado);
+        m.EnviadoEm.Should().BeNull("nada saiu");
+        m.ErroUltimaTentativa.Should().Be("passou do prazo de 120 min");
+        m.Tentativas.Should().Be(0, "expirar não é tentativa de envio");
+    }
+
+    [Fact]
+    public void ReclamarLeaseVencido_em_email_volta_a_Pendente_contando_a_tentativa_e_elegivel_na_hora()
+    {
+        var m = Novo(canal: CanalNotificacao.Email);
+        m.MarcarEmEnvio();
+
+        m.ReclamarLeaseVencido();
+
+        m.Status.Should().Be(StatusOutbox.Pendente);
+        m.Tentativas.Should().Be(1);
+        m.ProximaTentativaEm.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
+        m.ErroUltimaTentativa.Should().Contain("Lease de envio vencido");
+    }
+
+    [Fact]
+    public void ReclamarLeaseVencido_em_email_esgotado_vira_Falhado_para_nao_repetir_para_sempre()
+    {
+        var m = Novo(canal: CanalNotificacao.Email);
+        m.Tentativas = m.MaxTentativas - 1;
+        m.MarcarEmEnvio();
+
+        m.ReclamarLeaseVencido();
+
+        m.Status.Should().Be(StatusOutbox.Falhado);
+    }
+
+    [Theory]
+    [InlineData(CanalNotificacao.WhatsApp)]
+    [InlineData(CanalNotificacao.Sms)]
+    public void ReclamarLeaseVencido_em_whatsapp_e_sms_vira_Indeterminado_e_nunca_Pendente(CanalNotificacao canal)
+    {
+        // No máximo uma vez: o processo pode ter caído depois de chamar o provider.
+        var m = Novo(canal: canal);
+        m.MarcarEmEnvio();
+
+        m.ReclamarLeaseVencido();
+
+        m.Status.Should().Be(StatusOutbox.Indeterminado);
+        m.Tentativas.Should().Be(1);
+        m.ProviderUsado.Should().BeNull();
+    }
+
+    [Fact]
+    public void RegistrarProviderMensagemId_grava_o_id_ignora_vazio_e_corta_no_limite_da_coluna()
+    {
+        var m = Novo(canal: CanalNotificacao.WhatsApp);
+
+        m.RegistrarProviderMensagemId("  ");
+        m.ProviderMensagemId.Should().BeNull();
+
+        m.RegistrarProviderMensagemId("wamid.HBgM123");
+        m.ProviderMensagemId.Should().Be("wamid.HBgM123");
+
+        m.RegistrarProviderMensagemId(new string('x', 300));
+        m.ProviderMensagemId.Should().HaveLength(OutboxMensagemNotificacao.ProviderMensagemIdMaxLength,
+            "o id maior que o varchar(128) quebraria o commit do resultado do envio");
     }
 }

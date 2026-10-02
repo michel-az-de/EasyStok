@@ -41,7 +41,8 @@ public class NotificacoesAvaliadorOrchestratorTests
         services.AddSingleton(_unitOfWork);
         var provider = services.BuildServiceProvider();
         return new NotificacoesAvaliadorOrchestrator(
-            provider.GetRequiredService<IServiceScopeFactory>(), _bypass, _eventoRepo, _rotinaRepo, new RotinaScheduler(),
+            provider.GetRequiredService<IServiceScopeFactory>(), _bypass, _eventoRepo, _rotinaRepo, _unitOfWork,
+            new PoliticaValidadeNotificacao(), new RotinaScheduler(),
             NullLogger<NotificacoesAvaliadorOrchestrator>.Instance);
     }
 

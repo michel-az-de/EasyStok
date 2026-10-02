@@ -25,10 +25,15 @@ public sealed class NotificacoesAvaliadorOrchestrator(
     IRowLevelSecurityBypass bypassRls,
     IEventoNotificacaoRepository eventoRepo,
     IRotinaRepository rotinaRepo,
+    IUnitOfWork unitOfWork,
+    PoliticaValidadeNotificacao politicaValidade,
     RotinaScheduler rotinaScheduler,
     ILogger<NotificacoesAvaliadorOrchestrator> logger) : INotificacoesAvaliadorOrchestrator
 {
     private const int LimitePorRodada = 200;
+
+    /// <summary>Teto de eventos expirados por grupo de prazo em cada rodada; a seguinte continua o resto.</summary>
+    private const int LimiteExpiracaoPorPrazo = 500;
 
     private static readonly Meter Meter = new("EasyStock.Notifications", "1.0");
     private static readonly Histogram<double> RunDuration = Meter.CreateHistogram<double>(
@@ -49,6 +54,15 @@ public sealed class NotificacoesAvaliadorOrchestrator(
             IReadOnlyList<RotinaNotificacao> rotinasAtivas;
             using (bypassRls.Begin())
             {
+                // Quarentena: o evento Pendente além do prazo do tipo vira Expirado antes da lista, então o backlog
+                // velho nunca é avaliado (e nunca vira mensagem).
+                var expirados = await eventoRepo.ExpirarPendentesAsync(politicaValidade, LimiteExpiracaoPorPrazo, ct);
+                if (expirados > 0)
+                {
+                    await unitOfWork.CommitAsync();
+                    logger.LogWarning("AvaliadorOrchestrator: {Count} eventos expirados por prazo.", expirados);
+                }
+
                 pendentes = await eventoRepo.ListarPendentesParaAvaliarAsync(LimitePorRodada, ct);
                 rotinasAtivas = await rotinaRepo.ListarAtivasAsync(ct: ct);
             }

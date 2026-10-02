@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
@@ -22,6 +23,34 @@ public sealed class EventoNotificacaoRepository(EasyStockDbContext db) : IEvento
             .Take(limit)
             .Select(e => new EventoPendente(e.Id, e.EmpresaId))
             .ToListAsync(ct);
+    }
+
+    public async Task<int> ExpirarPendentesAsync(
+        PoliticaValidadeNotificacao politica, int limitePorPrazo, CancellationToken ct = default)
+    {
+        var agora = DateTime.UtcNow;
+        var total = 0;
+        // Um grupo por prazo (poucos): o prazo vai no WHERE, em vez de trazer o backlog inteiro para decidir tipo a tipo.
+        foreach (var (prazo, tipos) in politica.PorPrazo())
+        {
+            var limite = agora - prazo;
+            var tiposDoGrupo = tipos.ToArray();
+            var vencidos = await db.NotifEventos.IgnoreQueryFilters()
+                .Where(e => e.Status == StatusEventoNotificacao.Pendente
+                            && e.OcorridoEm < limite
+                            && tiposDoGrupo.Contains(e.Tipo))
+                .OrderBy(e => e.OcorridoEm)
+                .Take(limitePorPrazo)
+                .ToListAsync(ct);
+
+            foreach (var evento in vencidos)
+                evento.MarcarComoExpirado(
+                    $"Expirado: passou do prazo de {prazo.TotalMinutes:0} min sem ser avaliado",
+                    purgarPayload: PoliticaValidadeNotificacao.CarregaSegredo(evento.Tipo));
+            total += vencidos.Count;
+        }
+
+        return total;
     }
 
     public async Task AddAsync(EventoNotificacao evento, CancellationToken ct = default) =>

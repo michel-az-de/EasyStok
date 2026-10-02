@@ -6,6 +6,7 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Security;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
@@ -44,6 +45,12 @@ public sealed class NotificacoesDispatcherOrchestrator(
 
     /// <summary>Teto de lotes por rodada: o loop do host precisa voltar a respirar (cancelamento, heartbeat).</summary>
     private const int MaxLotesPorRodada = 20;
+
+    /// <summary>Teto de mensagens expiradas por grupo de prazo em cada reserva; a rodada seguinte continua o resto.</summary>
+    private const int LimiteExpiracaoPorPrazo = 500;
+
+    /// <summary>Teto de leases vencidos reclamados em cada reserva.</summary>
+    private const int LimiteLeasesPorReserva = 500;
 
     private static readonly JsonSerializerOptions EnumOptions = new()
     {
@@ -100,8 +107,11 @@ public sealed class NotificacoesDispatcherOrchestrator(
     }
 
     /// <summary>
-    /// Passo 1 (cross-tenant): o bypass entra pela porta antes de qualquer conexão e a reserva roda numa transação curta,
-    /// sem retentativa (o bloco não é idempotente). Devolve só ids: as linhas são relidas no escopo da empresa.
+    /// Passo 1 (cross-tenant): o bypass entra pela porta antes de qualquer conexão e tudo roda numa transação curta,
+    /// sem retentativa (o bloco não é idempotente): (a) expira o outbox <c>Pendente</c> além do prazo do tipo, para o
+    /// backlog velho nunca ficar elegível; (b) reclama o <c>EmEnvio</c> com lease vencido (e-mail volta a <c>Pendente</c>,
+    /// WhatsApp e SMS viram <c>Indeterminado</c>); (c) reserva as elegíveis. Devolve só ids: as linhas são relidas no
+    /// escopo da empresa.
     /// </summary>
     private async Task<IReadOnlyList<MensagemReservada>> ReservarAsync(int batchSize, CancellationToken ct)
     {
@@ -110,9 +120,20 @@ public sealed class NotificacoesDispatcherOrchestrator(
         using var _ = sp.GetRequiredService<IRowLevelSecurityBypass>().Begin();
         var outboxRepo = sp.GetRequiredService<IOutboxNotificacaoRepository>();
         var unitOfWork = sp.GetRequiredService<IUnitOfWork>();
+        var politica = sp.GetRequiredService<PoliticaValidadeNotificacao>();
 
         return await unitOfWork.ExecuteInTransactionSemRetryAsync<IReadOnlyList<MensagemReservada>>(async token =>
         {
+            var expiradas = await outboxRepo.ExpirarPendentesAsync(politica, LimiteExpiracaoPorPrazo, token);
+            var reclamadas = await outboxRepo.ReclamarLeasesVencidosAsync(LimiteLeasesPorReserva, token);
+            if (expiradas + reclamadas > 0)
+            {
+                // Grava antes de reservar: a reserva lê o banco e as mensagens devolvidas à fila precisam estar lá.
+                await unitOfWork.CommitAsync();
+                logger.LogWarning("Dispatcher: {Expiradas} mensagens expiradas por prazo e {Reclamadas} reclamadas por lease vencido.",
+                    expiradas, reclamadas);
+            }
+
             var mensagens = await outboxRepo.ReservarParaEnvioAsync(batchSize, token);
             await unitOfWork.CommitAsync();
             return mensagens.Select(m => new MensagemReservada(m.EmpresaId, m.Id, m.Canal)).ToList();
@@ -158,10 +179,11 @@ public sealed class NotificacoesDispatcherOrchestrator(
         var templateRepo = sp.GetRequiredService<ITemplateRepository>();
         var rotinaRepo = sp.GetRequiredService<IRotinaRepository>();
         var renderer = sp.GetRequiredService<IRendererTemplate>();
+        var bloqueioRepo = sp.GetRequiredService<IBloqueioNotificacaoRepository>();
         var canais = sp.GetRequiredService<IEnumerable<ICanalNotificacao>>().ToList();
 
         await ProcessarMensagemAsync(
-            mensagem, estado, canais, outboxRepo, logRepo, eventoRepo, templateRepo, rotinaRepo, renderer, db, ct);
+            mensagem, estado, canais, outboxRepo, logRepo, eventoRepo, templateRepo, rotinaRepo, bloqueioRepo, renderer, db, ct);
     }
 
     /// <summary>
@@ -205,13 +227,24 @@ public sealed class NotificacoesDispatcherOrchestrator(
         IEventoNotificacaoRepository eventoRepo,
         ITemplateRepository templateRepo,
         IRotinaRepository rotinaRepo,
+        IBloqueioNotificacaoRepository bloqueioRepo,
         IRendererTemplate renderer,
         EasyStockDbContext db,
         CancellationToken ct)
     {
         var abriuFallback = false;
         var canal = canais.FirstOrDefault(c => c.Canal == mensagem.Canal);
-        if (canal is null)
+        var bloqueio = await ObterBloqueioAtivoAsync(mensagem, bloqueioRepo, ct);
+        if (bloqueio is not null)
+        {
+            // Kill switch ativado depois do enfileiramento (campanha enfileirada inteira): segura o que já está no outbox.
+            logger.LogWarning(
+                "Kill switch {Escopo} ativo — mensagem {OutboxId} suprimida (canal {Canal}).",
+                bloqueio.EmpresaId is null ? "global" : "da empresa", mensagem.Id, mensagem.Canal);
+            mensagem.Suprimir(
+                $"Kill switch {(bloqueio.EmpresaId is null ? "global" : "da empresa")}: {bloqueio.Motivo}");
+        }
+        else if (canal is null)
         {
             logger.LogWarning(
                 "Nenhum adapter registrado para canal {Canal} outbox={OutboxId}",
@@ -228,6 +261,21 @@ public sealed class NotificacoesDispatcherOrchestrator(
 
         await outboxRepo.UpdateAsync(mensagem, ct);
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// O bloqueio ativo (global ou da empresa, de todos os canais ou do canal da mensagem) que segura o envio, se houver.
+    /// A empresa vai no <c>WHERE</c> do repositório: no Worker o filtro do EF está desligado.
+    /// </summary>
+    private static async Task<BloqueioNotificacao?> ObterBloqueioAtivoAsync(
+        OutboxMensagemNotificacao mensagem, IBloqueioNotificacaoRepository bloqueioRepo, CancellationToken ct)
+    {
+        var agora = DateTime.UtcNow;
+        var bloqueios = await bloqueioRepo.ListarAtivosAsync(mensagem.EmpresaId, mensagem.Canal, ct);
+        return bloqueios.FirstOrDefault(b =>
+            b.EstaAtivo(agora)
+            && (b.Canal is null || b.Canal == mensagem.Canal)
+            && (b.EmpresaId is null || b.EmpresaId == mensagem.EmpresaId));
     }
 
     /// <summary>
@@ -261,6 +309,9 @@ public sealed class NotificacoesDispatcherOrchestrator(
         estado.CanalChamado = true;
         var resultado = await canal.EnviarAsync(mensagemPronta, ct);
         sw.Stop();
+        // O id do provider (wamid da Meta) vai no mesmo commit do resultado, qualquer que seja o desfecho: a N6 casa o
+        // webhook de status por ele, inclusive o de uma entrega Indeterminada.
+        mensagem.RegistrarProviderMensagemId(resultado.IdExterno);
 
         var provider = resultado.ProviderUsado ?? mensagem.Canal.ToString();
         var ignoraConsentimento = mensagem.Categoria.IgnoraConsentimento();

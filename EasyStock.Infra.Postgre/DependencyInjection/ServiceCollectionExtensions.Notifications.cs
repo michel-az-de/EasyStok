@@ -29,6 +29,11 @@ public static partial class ServiceCollectionExtensionsNotifications
         // Onda 2.2 — subscriptions de Web Push (PWA).
         services.AddScoped<IWebPushSubscriptionRepository, WebPushSubscriptionRepository>();
 
+        // Quarentena (N1): o dispatcher expira o outbox pelo prazo do tipo. TryAdd: AddEasyStockApplication também o
+        // registra e as sobrescritas (Notifications:Quarentena) são bindadas em AddNotificationsCore.
+        services.AddOptions();
+        services.TryAddSingleton<PoliticaValidadeNotificacao>();
+
         // Dispatcher orchestrator — implementa também o port INotificationDispatcher (1 shard).
         // Singleton porque é stateless e cria scopes internamente via IServiceProvider.
         services.AddSingleton<NotificacoesDispatcherOrchestrator>();

@@ -1,3 +1,4 @@
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Entities.Notifications;
 
 namespace EasyStock.Application.Ports.Output.Notifications;
@@ -17,6 +18,15 @@ public interface IEventoNotificacaoRepository
     Task<IReadOnlyList<EventoPendente>> ListarPendentesParaAvaliarAsync(
         int limit = 100,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Quarentena (N1): os eventos <c>Pendente</c> cujo prazo de validade (pelo tipo, contado de <c>OcorridoEm</c>)
+    /// passou viram <c>Expirado</c>, até <paramref name="limitePorPrazo"/> por grupo de prazo. Os tipos que carregam
+    /// segredo no payload (<c>ResetSenha</c>, <c>ConfirmacaoEmail</c>) apagam o payload ao expirar. Cross-tenant: o
+    /// chamador liga o bypass pela porta; o commit é dele.
+    /// </summary>
+    /// <returns>Quantos eventos expiraram.</returns>
+    Task<int> ExpirarPendentesAsync(PoliticaValidadeNotificacao politica, int limitePorPrazo, CancellationToken ct = default);
 
     Task AddAsync(EventoNotificacao evento, CancellationToken ct = default);
     Task UpdateAsync(EventoNotificacao evento, CancellationToken ct = default);

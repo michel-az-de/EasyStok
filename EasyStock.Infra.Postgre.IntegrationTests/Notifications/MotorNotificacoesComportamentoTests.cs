@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Notifications;
@@ -133,5 +134,195 @@ public class MotorNotificacoesComportamentoTests(PostgreSqlDatabaseFixture fixtu
         (await _s.LerEventoAsync(jaEnfileirado.Id)).Status.Should().Be(StatusEventoNotificacao.Processado, "23505 na IdempotencyKey = já enfileirado");
         (await _s.LerMensagensDoEventoAsync(jaEnfileirado.Id)).Should().ContainSingle();
         (await _s.LerEventoAsync(quinto.Id)).Status.Should().Be(StatusEventoNotificacao.Processado);
+    }
+
+    // ----- entrega por canal: EmEnvio, id do provider, Indeterminado e lease -----
+
+    private StatusOutbox StatusNoBanco(Guid outboxId)
+    {
+        using var db = fixture.CreateDbContext();
+        return db.NotifOutboxMensagens.AsNoTracking().IgnoreQueryFilters().Single(m => m.Id == outboxId).Status;
+    }
+
+    [SkippableFact]
+    public async Task Dispatcher_whatsapp_grava_EmEnvio_e_o_id_do_provider()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var s = await _s.SemearAsync(CanalNotificacao.WhatsApp);
+        var mensagem = await _s.SemearMensagemAsync(s, CanalNotificacao.WhatsApp);
+        StatusOutbox? statusDuranteOEnvio = null;
+        var whatsapp = new CanalFalso(CanalNotificacao.WhatsApp, m =>
+        {
+            statusDuranteOEnvio = StatusNoBanco(m.OutboxId);
+            return new ResultadoEnvio(true, "meta", DuracaoMs: 5) { IdExterno = "wamid.HBgM-N1" };
+        });
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: false, canais: whatsapp);
+
+        await RodarDispatcherAsync(provider);
+
+        statusDuranteOEnvio.Should().Be(StatusOutbox.EmEnvio, "no máximo uma vez: o EmEnvio é commitado antes de o provider ser chamado");
+        var gravada = await _s.LerMensagemAsync(mensagem.Id);
+        gravada.Status.Should().Be(StatusOutbox.Enviado);
+        gravada.ProviderMensagemId.Should().Be("wamid.HBgM-N1", "o id do provider vai no mesmo commit do resultado, para a N6 casar o webhook");
+    }
+
+    [SkippableFact]
+    public async Task Dispatcher_whatsapp_com_timeout_vira_Indeterminado_e_nao_reenvia()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var s = await _s.SemearAsync(CanalNotificacao.WhatsApp);
+        var mensagem = await _s.SemearMensagemAsync(s, CanalNotificacao.WhatsApp);
+        var whatsapp = new CanalFalso(CanalNotificacao.WhatsApp, _ => ResultadoEnvio.Indeterminado("meta", "timeout na chamada"));
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: false, canais: whatsapp);
+
+        await RodarDispatcherAsync(provider);
+        await RodarDispatcherAsync(provider);
+
+        var gravada = await _s.LerMensagemAsync(mensagem.Id);
+        gravada.Status.Should().Be(StatusOutbox.Indeterminado);
+        gravada.Tentativas.Should().Be(1);
+        whatsapp.ChamadasDe(mensagem.Id).Should().Be(1, "Indeterminado é terminal: nunca volta a Pendente nem reenvia");
+    }
+
+    [SkippableFact]
+    public async Task Dispatcher_lease_vencido_volta_a_Pendente_no_email_e_vira_Indeterminado_no_whatsapp()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var s = await _s.SemearAsync(CanalNotificacao.Email);
+        Action<OutboxMensagemNotificacao> leaseVencido = m =>
+        {
+            m.Status = StatusOutbox.EmEnvio;
+            m.ProximaTentativaEm = DateTime.UtcNow.AddMinutes(-1);
+        };
+        var email = await _s.SemearMensagemAsync(s, CanalNotificacao.Email, ajustar: leaseVencido);
+        var whatsapp = await _s.SemearMensagemAsync(s, CanalNotificacao.WhatsApp, ajustar: leaseVencido);
+        var whatsappDentroDoLease = await _s.SemearMensagemAsync(s, CanalNotificacao.WhatsApp, ajustar: m =>
+        {
+            m.Status = StatusOutbox.EmEnvio;
+            m.ProximaTentativaEm = DateTime.UtcNow.AddMinutes(4);
+        });
+        var canalEmail = new CanalFalso(CanalNotificacao.Email, _ => new ResultadoEnvio(true, "smtp"));
+        var canalWhatsApp = new CanalFalso(CanalNotificacao.WhatsApp, _ => new ResultadoEnvio(true, "meta"));
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: false, canais: [canalEmail, canalWhatsApp]);
+
+        await RodarDispatcherAsync(provider);
+
+        var gravadaEmail = await _s.LerMensagemAsync(email.Id);
+        gravadaEmail.Tentativas.Should().Be(1, "o lease vencido voltou a mensagem a Pendente contando a tentativa");
+        gravadaEmail.Status.Should().Be(StatusOutbox.Enviado, "e, elegível na hora, ela saiu na mesma rodada");
+        canalEmail.ChamadasDe(email.Id).Should().Be(1);
+
+        var gravadaWhatsApp = await _s.LerMensagemAsync(whatsapp.Id);
+        gravadaWhatsApp.Status.Should().Be(StatusOutbox.Indeterminado, "pode ter saído antes da queda: nunca volta a Pendente");
+        gravadaWhatsApp.Tentativas.Should().Be(1);
+        canalWhatsApp.ChamadasDe(whatsapp.Id).Should().Be(0);
+
+        (await _s.LerMensagemAsync(whatsappDentroDoLease.Id)).Status.Should().Be(StatusOutbox.EmEnvio, "o lease ainda vale");
+    }
+
+    // ----- quarentena e kill switch -----
+
+    [SkippableFact]
+    public async Task Quarentena_expira_evento_e_outbox_alem_do_prazo_do_tipo_antes_da_reserva()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var agora = DateTime.UtcNow;
+        const string payloadComToken = """{"email":"maria@example.com","token":"482913"}""";
+
+        // Eventos pendentes: aviso do pedido há 3 h (prazo 2 h), demais há 2 dias (24 h), reset há 31 min (30 min,
+        // com segredo no payload) e um aviso recente, que segue o fluxo normal.
+        var empresa = await _s.SemearEmpresaAsync();
+        var avisoVelho = await _s.SemearEventoPendenteAsync(empresa, TipoEventoNotificacao.PedidoPagoConfirmado, ocorridoEm: agora.AddHours(-3));
+        var demaisVelho = await _s.SemearEventoPendenteAsync(empresa, TipoEventoNotificacao.ProdutoVencendo, ocorridoEm: agora.AddDays(-2));
+        var resetVelho = await _s.SemearEventoPendenteAsync(empresa, TipoEventoNotificacao.ResetSenha, payloadComToken, agora.AddMinutes(-31));
+        var avisoRecente = await _s.SemearEventoPendenteAsync(empresa, TipoEventoNotificacao.PedidoPagoConfirmado, ocorridoEm: agora.AddMinutes(-10));
+
+        // Mensagens do outbox: o prazo vem do tipo do evento e conta de ProximaTentativaEm.
+        Func<TimeSpan, Action<OutboxMensagemNotificacao>> envelhecida = idade => m => m.ProximaTentativaEm = agora - idade;
+        var sAviso = await _s.SemearAsync(CanalNotificacao.WhatsApp, tipo: TipoEventoNotificacao.PedidoPagoConfirmado);
+        var msgAviso = await _s.SemearMensagemAsync(sAviso, CanalNotificacao.WhatsApp, ajustar: envelhecida(TimeSpan.FromHours(3)));
+        var sCampanha = await _s.SemearAsync(CanalNotificacao.WhatsApp, tipo: TipoEventoNotificacao.CampanhaMarketing);
+        var msgCampanha = await _s.SemearMensagemAsync(sCampanha, CanalNotificacao.WhatsApp, CategoriaConteudoNotificacao.Marketing,
+            ajustar: envelhecida(TimeSpan.FromHours(2)));
+        var sDemais = await _s.SemearAsync(CanalNotificacao.WhatsApp, tipo: TipoEventoNotificacao.ProdutoVencendo);
+        var msgDemais = await _s.SemearMensagemAsync(sDemais, CanalNotificacao.WhatsApp, ajustar: envelhecida(TimeSpan.FromDays(2)));
+        var sReset = await _s.SemearAsync(CanalNotificacao.Email, payloadComToken, TipoEventoNotificacao.ResetSenha);
+        var msgReset = await _s.SemearMensagemAsync(sReset, CanalNotificacao.Email, CategoriaConteudoNotificacao.Seguranca,
+            ajustar: envelhecida(TimeSpan.FromMinutes(31)));
+        var sRecente = await _s.SemearAsync(CanalNotificacao.WhatsApp, tipo: TipoEventoNotificacao.PedidoPagoConfirmado);
+        var msgRecente = await _s.SemearMensagemAsync(sRecente, CanalNotificacao.WhatsApp);
+
+        var whatsapp = new CanalFalso(CanalNotificacao.WhatsApp, _ => new ResultadoEnvio(true, "meta"));
+        var emailCanal = new CanalFalso(CanalNotificacao.Email, _ => new ResultadoEnvio(true, "smtp"));
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: false, canais: [whatsapp, emailCanal]);
+
+        // Uma rodada do Worker: o avaliador expira os eventos e o dispatcher expira o outbox antes de reservar.
+        await using (var scope = provider.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<INotificacoesAvaliadorOrchestrator>().ExecutarRodadaAsync(TimeSpan.FromMinutes(2));
+        await RodarDispatcherAsync(provider);
+
+        foreach (var expirado in new[] { avisoVelho, demaisVelho, resetVelho })
+            (await _s.LerEventoAsync(expirado.Id)).Status.Should().Be(StatusEventoNotificacao.Expirado, expirado.Tipo.ToString());
+        (await _s.LerEventoAsync(resetVelho.Id)).PayloadJson.Should().Be("{}", "o token do reset sai do banco ao expirar");
+        (await _s.LerEventoAsync(avisoRecente.Id)).Status.Should().NotBe(StatusEventoNotificacao.Expirado);
+
+        foreach (var expirada in new[] { msgAviso, msgCampanha, msgDemais, msgReset })
+        {
+            var gravada = await _s.LerMensagemAsync(expirada.Id);
+            gravada.Status.Should().Be(StatusOutbox.Expirado, $"{gravada.Canal} {expirada.Id}");
+            gravada.EnviadoEm.Should().BeNull();
+            whatsapp.ChamadasDe(expirada.Id).Should().Be(0, "o canal não é chamado para o que expirou");
+            emailCanal.ChamadasDe(expirada.Id).Should().Be(0);
+        }
+        (await _s.LerMensagemAsync(msgReset.Id)).CorpoRenderizado.Should()
+            .Be(OutboxMensagemNotificacao.CorpoApagado, "segurança apaga o corpo em todo desfecho terminal");
+
+        (await _s.LerMensagemAsync(msgRecente.Id)).Status.Should().Be(StatusOutbox.Enviado, "dentro do prazo, segue o fluxo normal");
+        whatsapp.ChamadasDe(msgRecente.Id).Should().Be(1);
+    }
+
+    [SkippableFact]
+    public async Task Dispatcher_respeita_kill_switch_global_e_da_empresa_no_envio()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var global = await _s.SemearAsync(CanalNotificacao.Sms);
+        var daEmpresa = await _s.SemearAsync(CanalNotificacao.Email);
+        var livre = await _s.SemearAsync(CanalNotificacao.Email);
+        var msgGlobal = await _s.SemearMensagemAsync(global, CanalNotificacao.Sms);
+        var msgEmpresa = await _s.SemearMensagemAsync(daEmpresa, CanalNotificacao.Email);
+        var msgLivre = await _s.SemearMensagemAsync(livre, CanalNotificacao.Email);
+        var motivoGlobal = $"manutenção do provedor {Guid.NewGuid():N}";
+        await using (var db = fixture.CreateDbContext())
+        {
+            // Global só para o SMS e da empresa para todos os canais dela: o kill switch vale também para o que já está no outbox.
+            db.NotifBloqueios.Add(BloqueioNotificacao.Criar(motivoGlobal, "teste", canal: CanalNotificacao.Sms));
+            db.NotifBloqueios.Add(BloqueioNotificacao.Criar("empresa em pausa", "teste", empresaId: daEmpresa.EmpresaId));
+            await db.SaveChangesAsync();
+        }
+        var sms = new CanalFalso(CanalNotificacao.Sms, _ => new ResultadoEnvio(true, "twilio"));
+        var email = new CanalFalso(CanalNotificacao.Email, _ => new ResultadoEnvio(true, "smtp"));
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: false, canais: [sms, email]);
+
+        try
+        {
+            await RodarDispatcherAsync(provider);
+        }
+        finally
+        {
+            await using var limpeza = fixture.CreateDbContext();
+            await limpeza.NotifBloqueios.IgnoreQueryFilters().Where(b => b.Motivo == motivoGlobal).ExecuteDeleteAsync();
+        }
+
+        var gravadaGlobal = await _s.LerMensagemAsync(msgGlobal.Id);
+        gravadaGlobal.Status.Should().Be(StatusOutbox.Suprimido);
+        gravadaGlobal.ErroUltimaTentativa.Should().Contain(motivoGlobal);
+        sms.ChamadasDe(msgGlobal.Id).Should().Be(0);
+
+        var gravadaEmpresa = await _s.LerMensagemAsync(msgEmpresa.Id);
+        gravadaEmpresa.Status.Should().Be(StatusOutbox.Suprimido);
+        gravadaEmpresa.ErroUltimaTentativa.Should().Contain("empresa em pausa");
+        email.ChamadasDe(msgEmpresa.Id).Should().Be(0);
+
+        (await _s.LerMensagemAsync(msgLivre.Id)).Status.Should().Be(StatusOutbox.Enviado, "o bloqueio de outra empresa não atinge esta");
     }
 }

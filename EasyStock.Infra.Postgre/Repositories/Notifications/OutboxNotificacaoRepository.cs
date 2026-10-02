@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
@@ -32,6 +33,57 @@ public sealed class OutboxNotificacaoRepository(EasyStockDbContext db) : IOutbox
         foreach (var mensagem in reservadas)
             mensagem.MarcarEmEnvio();
         return reservadas;
+    }
+
+    public async Task<int> ExpirarPendentesAsync(
+        PoliticaValidadeNotificacao politica, int limitePorPrazo, CancellationToken ct = default)
+    {
+        var agora = DateTime.UtcNow;
+        var total = 0;
+        // Um grupo por prazo (poucos): o prazo vai no WHERE, em vez de trazer o backlog inteiro para decidir tipo a tipo.
+        foreach (var (prazo, tipos) in politica.PorPrazo())
+        {
+            var limite = agora - prazo;
+            var tiposDoGrupo = tipos.ToArray();
+            var vencidas = await (
+                    from m in db.NotifOutboxMensagens.IgnoreQueryFilters()
+                    join e in db.NotifEventos.IgnoreQueryFilters() on m.EventoId equals e.Id
+                    where m.Status == StatusOutbox.Pendente
+                          && m.Tentativas == 0
+                          && m.ProximaTentativaEm < limite
+                          && tiposDoGrupo.Contains(e.Tipo)
+                    orderby m.ProximaTentativaEm
+                    select m)
+                .Take(limitePorPrazo)
+                .ToListAsync(ct);
+
+            foreach (var mensagem in vencidas)
+                mensagem.Expirar($"Expirada: passou do prazo de {prazo.TotalMinutes:0} min sem sair");
+            total += vencidas.Count;
+        }
+
+        return total;
+    }
+
+    // SQL cru de propósito (FOR UPDATE SKIP LOCKED não sai do LINQ): duas réplicas não reclamam a mesma mensagem.
+    public async Task<int> ReclamarLeasesVencidosAsync(int limite, CancellationToken ct = default)
+    {
+        var agora = DateTime.UtcNow;
+        var emEnvio = nameof(StatusOutbox.EmEnvio);
+        var vencidas = await db.NotifOutboxMensagens
+            .FromSqlInterpolated($"""
+                SELECT * FROM notif_outbox_mensagens
+                WHERE "Status" = {emEnvio} AND "ProximaTentativaEm" < {agora}
+                ORDER BY "ProximaTentativaEm"
+                LIMIT {limite}
+                FOR UPDATE SKIP LOCKED
+                """)
+            .IgnoreQueryFilters()
+            .ToListAsync(ct);
+
+        foreach (var mensagem in vencidas)
+            mensagem.ReclamarLeaseVencido();
+        return vencidas.Count;
     }
 
     public Task<OutboxMensagemNotificacao?> ObterAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>

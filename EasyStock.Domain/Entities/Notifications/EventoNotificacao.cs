@@ -40,6 +40,19 @@ public class EventoNotificacao
         ProcessadoEm = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// O evento passou do prazo de validade do tipo sem ser avaliado (N1, quarentena): terminal, sem gerar mensagem.
+    /// <paramref name="purgarPayload"/> apaga o payload dos tipos que carregam segredo (ver
+    /// <see cref="PurgarPayload"/>).
+    /// </summary>
+    public void MarcarComoExpirado(string motivo, bool purgarPayload = false)
+    {
+        Status = StatusEventoNotificacao.Expirado;
+        ErroProcessamento = motivo;
+        ProcessadoEm = DateTime.UtcNow;
+        if (purgarPayload) PurgarPayload();
+    }
+
     public void MarcarComoFalhado(string erro)
     {
         Status = StatusEventoNotificacao.Falhado;
