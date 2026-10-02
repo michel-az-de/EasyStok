@@ -5,7 +5,6 @@ using EasyStock.Application.Services.Auth;
 using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
-using EasyStock.Application.UseCases.CadastrarUsuario;
 using EasyStock.Application.UseCases.ConfirmEmail;
 using EasyStock.Application.UseCases.EsqueciSenha;
 using EasyStock.Application.UseCases.Logout;
@@ -51,7 +50,6 @@ public class AuthControllerTests
         var resetTokenRepo = Substitute.For<IResetTokenRepository>();
         var currentUser = Substitute.For<ICurrentUserAccessor>();
 
-        var cadastrarLogger = Substitute.For<ILogger<CadastrarUsuarioUseCase>>();
         var refreshTokenLogger = Substitute.For<ILogger<RefreshTokenUseCase>>();
         var logoutLogger = Substitute.For<ILogger<LogoutUseCase>>();
         var esqueciSenhaLogger = Substitute.For<ILogger<EsqueciSenhaUseCase>>();
@@ -63,7 +61,6 @@ public class AuthControllerTests
 
         var emailTokenRepo = Substitute.For<IEmailConfirmationTokenRepository>();
         var config = new ConfigurationBuilder().Build();
-        var cadastrarUseCase = new CadastrarUsuarioUseCase(usuarioRepo2, auditLogRepo2, emailTokenRepo, null, unitOfWork2, passwordHasher, config, cadastrarLogger);
         var refreshTokenUseCase = new RefreshTokenUseCase(refreshTokenRepo2, usuarioRepo2, auditLogRepo2, jwtServiceApp, unitOfWork2, refreshTokenLogger);
         var logoutUseCase = new LogoutUseCase(refreshTokenRepo2, auditLogRepo2, unitOfWork2, logoutLogger);
         var esqueciSenhaUseCase = new EsqueciSenhaUseCase(usuarioRepo2, resetTokenRepo, auditLogRepo2, unitOfWork2, config, esqueciSenhaLogger);
@@ -96,7 +93,6 @@ public class AuthControllerTests
             _refreshTokenRepository,
             _auditLogRepository,
             _unitOfWork,
-            cadastrarUseCase,
             refreshTokenUseCase,
             logoutUseCase,
             esqueciSenhaUseCase,

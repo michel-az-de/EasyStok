@@ -203,7 +203,7 @@ public static class ApiServiceCollectionExtensions
                     });
             });
 
-            // Rate limit para endpoints sensíveis de autenticação (login, register,
+            // Rate limit para endpoints sensíveis de autenticação (login,
             // forgot/reset password). Particionado por IP do cliente para dificultar
             // brute-force e spam de contas. O IP real volta a ser confiavel apos o fix do
             // ForwardedHeaders (Program.cs) + repasse de X-Forwarded-For pelos BFFs Web/Admin;
