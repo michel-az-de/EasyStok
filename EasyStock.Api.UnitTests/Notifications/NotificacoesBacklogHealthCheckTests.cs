@@ -22,9 +22,26 @@ public class NotificacoesBacklogHealthCheckTests
         int falhado = 0, int simulado = 0, int indeterminado = 0, int expirado = 0, int processadoSemOutbox = 0) =>
         new(pendenteElegivel, eventoPendente, emEnvioAlemDoLease, falhado, simulado, indeterminado, expirado, processadoSemOutbox);
 
+    /// <summary>O nome da classe e contrato do diagnóstico: o health reconhece o e-mail de console por ele.</summary>
+    private sealed class ConsoleEmailService : IEmailService
+    {
+        public Task SendAsync(string to, string subject, string body, bool isHtml = false) => Task.CompletedTask;
+
+        public Task SendAsync(string to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml = false) =>
+            Task.CompletedTask;
+
+        public Task SendAsync(IEnumerable<string> to, string subject, string body, bool isHtml = false) => Task.CompletedTask;
+
+        public Task SendTemplateAsync(string to, string subject, string templateName, object model, bool isHtml = true) =>
+            Task.CompletedTask;
+
+        public Task<ResultadoEnvio> EnviarAsync(MensagemEmail mensagem, CancellationToken ct = default) =>
+            Task.FromResult(ResultadoEnvio.Simulado("console"));
+    }
+
     private static NotificacoesBacklogHealthCheck NovoCheck(
         BacklogNotificacoes backlog, string ambiente = "Production", Dictionary<string, string?>? configuracao = null,
-        NotificacoesHealthOptions? opcoes = null)
+        NotificacoesHealthOptions? opcoes = null, IEmailService? email = null)
     {
         var medidor = Substitute.For<IBacklogNotificacoes>();
         medidor.MedirAsync(Arg.Any<CancellationToken>()).Returns(backlog);
@@ -36,7 +53,7 @@ public class NotificacoesBacklogHealthCheckTests
             ["Notifications:WhatsApp:Provider"] = "meta",
             ["Notifications:Sms:Provider"] = "twilio",
         }).Build();
-        var services = new ServiceCollection().AddSingleton(Substitute.For<IEmailService>()).BuildServiceProvider();
+        var services = new ServiceCollection().AddSingleton(email ?? Substitute.For<IEmailService>()).BuildServiceProvider();
         return new NotificacoesBacklogHealthCheck(
             medidor, Options.Create(opcoes ?? new NotificacoesHealthOptions()), env, config, services);
     }
@@ -121,6 +138,15 @@ public class NotificacoesBacklogHealthCheckTests
 
         resultado.Status.Should().Be(HealthStatus.Degraded);
         resultado.Description.Should().Contain("WhatsApp").And.Contain("stub");
+    }
+
+    [Fact]
+    public async Task Email_de_console_em_Production_deixa_Degraded()
+    {
+        var resultado = await Rodar(NovoCheck(Backlog(), email: new ConsoleEmailService()));
+
+        resultado.Status.Should().Be(HealthStatus.Degraded);
+        resultado.Description.Should().Contain("E-mail").And.Contain("console");
     }
 
     [Fact]

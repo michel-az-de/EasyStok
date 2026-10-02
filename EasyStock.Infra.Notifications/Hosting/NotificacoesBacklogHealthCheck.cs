@@ -110,7 +110,9 @@ public sealed class NotificacoesBacklogHealthCheck(
         if (string.Equals(sms, "stub", StringComparison.OrdinalIgnoreCase))
             yield return $"SMS: provider {sms} em Production";
 
-        if (services.GetService<IEmailService>() is IEmailServiceSimulado email)
-            yield return $"E-mail: provider {email.Provider} em Production";
+        // O NOME de ConsoleEmailService e contrato do diagnostico (documentado na propria classe): a marcadora
+        // IEmailServiceSimulado da N2 saiu com a N3, que devolve Simulado direto do console.
+        if (string.Equals(services.GetService<IEmailService>()?.GetType().Name, "ConsoleEmailService", StringComparison.Ordinal))
+            yield return "E-mail: provider console em Production";
     }
 }
