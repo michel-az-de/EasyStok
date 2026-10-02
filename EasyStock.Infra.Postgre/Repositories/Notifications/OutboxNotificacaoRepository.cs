@@ -10,17 +10,32 @@ public sealed class OutboxNotificacaoRepository(EasyStockDbContext db) : IOutbox
     public Task<OutboxMensagemNotificacao?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
         db.NotifOutboxMensagens.FirstOrDefaultAsync(m => m.Id == id, ct);
 
-    public async Task<IReadOnlyList<OutboxMensagemNotificacao>> ListarPendentesParaProcessarAsync(
-        int shardKey, int batchSize, CancellationToken ct = default)
+    // SQL cru de propósito: FOR UPDATE SKIP LOCKED não sai do LINQ (padrão da S39, MensagemProgramadaRepository).
+    // IgnoreQueryFilters mantém o SQL sem composição (o filtro global de tenant o embrulharia): o claim é
+    // cross-tenant e roda com o bypass de RLS ligado pelo dispatcher, pela porta IRowLevelSecurityBypass.
+    public async Task<IReadOnlyList<OutboxMensagemNotificacao>> ReservarParaEnvioAsync(
+        int limite, CancellationToken ct = default)
     {
-        return await db.NotifOutboxMensagens
-            .Where(m => m.ShardKey == shardKey
-                        && m.Status == StatusOutbox.Pendente
-                        && m.ProximaTentativaEm <= DateTime.UtcNow)
-            .OrderBy(m => m.ProximaTentativaEm)
-            .Take(batchSize)
+        var agora = DateTime.UtcNow;
+        var pendente = nameof(StatusOutbox.Pendente);
+        var reservadas = await db.NotifOutboxMensagens
+            .FromSqlInterpolated($"""
+                SELECT * FROM notif_outbox_mensagens
+                WHERE "Status" = {pendente} AND "ProximaTentativaEm" <= {agora}
+                ORDER BY "ProximaTentativaEm"
+                LIMIT {limite}
+                FOR UPDATE SKIP LOCKED
+                """)
+            .IgnoreQueryFilters()
             .ToListAsync(ct);
+
+        foreach (var mensagem in reservadas)
+            mensagem.MarcarEmEnvio();
+        return reservadas;
     }
+
+    public Task<OutboxMensagemNotificacao?> ObterAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
+        db.NotifOutboxMensagens.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.EmpresaId == empresaId && m.Id == id, ct);
 
     public Task<bool> ExisteAsync(string idempotencyKey, CancellationToken ct = default) =>
         db.NotifOutboxMensagens.AnyAsync(m => m.IdempotencyKey == idempotencyKey, ct);

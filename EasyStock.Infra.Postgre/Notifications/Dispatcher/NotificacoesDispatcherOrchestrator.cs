@@ -2,11 +2,13 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
-using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -14,10 +16,18 @@ using Microsoft.Extensions.Logging;
 namespace EasyStock.Infra.Postgre.Notifications.Dispatcher;
 
 /// <summary>
-/// Implementa <see cref="INotificacoesDispatcherOrchestrator"/> (todos os shards) e
-/// <see cref="INotificationDispatcher"/> (1 shard) com a mesma lógica subjacente.
-/// Usa <see cref="PostgresAdvisoryLock"/> por shard — safe para múltiplas réplicas/processos.
-/// Métricas via <see cref="System.Diagnostics.Metrics.Meter"/> (OTel-compatível).
+/// Implementa <see cref="INotificacoesDispatcherOrchestrator"/> e <see cref="INotificationDispatcher"/> com a mesma
+/// rodada. Padrão da S39 (<c>MensagensProgramadasBackgroundService</c>):
+/// <list type="number">
+/// <item>escopo A, com o bypass de RLS ligado pela porta <see cref="IRowLevelSecurityBypass"/> ANTES de qualquer
+/// conexão (o interceptor lê a flag na abertura), numa transação curta: reserva as <c>Pendente</c> elegíveis com
+/// <c>FOR UPDATE SKIP LOCKED</c>, passa-as para <c>EmEnvio</c> com lease e devolve só <c>(Id, EmpresaId, Canal)</c>;</item>
+/// <item>por mensagem, um escopo de DI novo com o tenant da empresa fixado antes da primeira conexão e um
+/// <c>try/catch</c> próprio: a falha de uma mensagem vira <c>Falhado</c> com motivo (ou <c>Indeterminado</c>) e nunca
+/// para o lote.</item>
+/// </list>
+/// Sem advisory lock: <c>SKIP LOCKED</c> mais o lease dão a exclusão entre réplicas. <c>ShardKey</c> e o parâmetro de
+/// shards ficam só por compatibilidade e são ignorados. Métricas via <see cref="Meter"/> (OTel-compatível).
 /// </summary>
 public sealed class NotificacoesDispatcherOrchestrator(
     IServiceProvider serviceProvider,
@@ -30,76 +40,165 @@ public sealed class NotificacoesDispatcherOrchestrator(
     private static readonly Histogram<long> BatchSizeHistogram = NotifMeter.CreateHistogram<long>("dispatcher.batch.size", "notifications", "Tamanho do batch processado por rodada");
     private static readonly Histogram<double> OutboxLagHistogram = NotifMeter.CreateHistogram<double>("outbox.lag.seconds", "s", "Atraso entre criação e envio da mensagem outbox");
     private static readonly Histogram<double> RunDuration = NotifMeter.CreateHistogram<double>(
-        "notifications.dispatcher.run.duration", "ms", "Duração de 1 rodada completa do dispatcher (todos os shards)");
+        "notifications.dispatcher.run.duration", "ms", "Duração de 1 rodada completa do dispatcher");
+
+    /// <summary>Teto de lotes por rodada: o loop do host precisa voltar a respirar (cancelamento, heartbeat).</summary>
+    private const int MaxLotesPorRodada = 20;
 
     private static readonly JsonSerializerOptions EnumOptions = new()
     {
         Converters = { new JsonStringEnumConverter() }
     };
 
-    public async Task<int> ExecutarRodadaAsync(int shardCount, int batchSize, CancellationToken ct = default)
+    /// <summary>Mensagem reservada pelo claim: o mínimo para abrir o escopo da empresa e reler a linha.</summary>
+    private sealed record MensagemReservada(Guid EmpresaId, Guid Id, CanalNotificacao Canal);
+
+    /// <summary>O que o escopo da mensagem já fez, para a falha saber se o canal chegou a ser chamado.</summary>
+    private sealed class EstadoDoItem
+    {
+        public bool CanalChamado { get; set; }
+    }
+
+    /// <summary>O parâmetro de shards é ignorado (N1): o claim não depende de <c>ShardKey</c>.</summary>
+    public Task<int> ExecutarRodadaAsync(int shardCount, int batchSize, CancellationToken ct = default) =>
+        RodadaAsync(batchSize, ct);
+
+    /// <summary>Compatibilidade com o gatilho HTTP (<c>?shard=</c>): o shard é ignorado e roda a rodada completa.</summary>
+    public Task<int> ProcessarBatchAsync(int shardKey, int batchSize = 50, CancellationToken ct = default) =>
+        RodadaAsync(batchSize, ct);
+
+    private async Task<int> RodadaAsync(int batchSize, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
-        var totalProcessadas = 0;
+        var total = 0;
         try
         {
-            for (var shard = 0; shard < shardCount; shard++)
+            for (var lote = 0; lote < MaxLotesPorRodada && !ct.IsCancellationRequested; lote++)
             {
-                if (ct.IsCancellationRequested) break;
-                totalProcessadas += await ProcessarBatchAsync(shard, batchSize, ct);
+                var reservadas = await ReservarAsync(batchSize, ct);
+                if (reservadas.Count == 0) break;
+
+                foreach (var reservada in reservadas)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    await ProcessarItemAsync(reservada, ct);
+                }
+
+                total += reservadas.Count;
+                BatchSizeHistogram.Record(reservadas.Count);
+                logger.LogInformation("Dispatcher: processadas {Count} mensagens.", reservadas.Count);
+                if (reservadas.Count < batchSize) break;
             }
-            return totalProcessadas;
+
+            return total;
         }
         finally
         {
             sw.Stop();
-            RunDuration.Record(sw.Elapsed.TotalMilliseconds,
-                new TagList { { "shards", shardCount.ToString() } });
+            RunDuration.Record(sw.Elapsed.TotalMilliseconds);
         }
     }
 
-    public async Task<int> ProcessarBatchAsync(int shardKey, int batchSize = 50, CancellationToken ct = default)
+    /// <summary>
+    /// Passo 1 (cross-tenant): o bypass entra pela porta antes de qualquer conexão e a reserva roda numa transação curta,
+    /// sem retentativa (o bloco não é idempotente). Devolve só ids: as linhas são relidas no escopo da empresa.
+    /// </summary>
+    private async Task<IReadOnlyList<MensagemReservada>> ReservarAsync(int batchSize, CancellationToken ct)
     {
         using var scope = serviceProvider.CreateScope();
         var sp = scope.ServiceProvider;
+        using var _ = sp.GetRequiredService<IRowLevelSecurityBypass>().Begin();
+        var outboxRepo = sp.GetRequiredService<IOutboxNotificacaoRepository>();
+        var unitOfWork = sp.GetRequiredService<IUnitOfWork>();
+
+        return await unitOfWork.ExecuteInTransactionSemRetryAsync<IReadOnlyList<MensagemReservada>>(async token =>
+        {
+            var mensagens = await outboxRepo.ReservarParaEnvioAsync(batchSize, token);
+            await unitOfWork.CommitAsync();
+            return mensagens.Select(m => new MensagemReservada(m.EmpresaId, m.Id, m.Canal)).ToList();
+        }, ct);
+    }
+
+    /// <summary>Passo 2: escopo da empresa com <c>try/catch</c> próprio. Nunca lança, salvo cancelamento do host.</summary>
+    private async Task ProcessarItemAsync(MensagemReservada reservada, CancellationToken ct)
+    {
+        var estado = new EstadoDoItem();
+        try
+        {
+            await ProcessarNoEscopoDaEmpresaAsync(reservada, estado, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Shutdown: a mensagem segue EmEnvio e o lease devolve (ou fecha) na rodada seguinte.
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Dispatcher: falha ao processar a mensagem {OutboxId} (canal {Canal}).",
+                reservada.Id, reservada.Canal);
+            await RegistrarFalhaDoItemAsync(reservada, estado, ex, ct);
+        }
+    }
+
+    private async Task ProcessarNoEscopoDaEmpresaAsync(MensagemReservada reservada, EstadoDoItem estado, CancellationToken ct)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var sp = scope.ServiceProvider;
+        // Antes da primeira conexão: o interceptor emite SET app.empresa_id na abertura.
+        sp.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(reservada.EmpresaId);
+
+        var outboxRepo = sp.GetRequiredService<IOutboxNotificacaoRepository>();
+        var mensagem = await outboxRepo.ObterAsync(reservada.EmpresaId, reservada.Id, ct);
+        // Outro processo já a tirou do EmEnvio (cancelada, reclamada pelo lease): não há o que enviar.
+        if (mensagem is null || mensagem.Status != StatusOutbox.EmEnvio) return;
 
         var db = sp.GetRequiredService<EasyStockDbContext>();
-        var advisoryLock = sp.GetRequiredService<PostgresAdvisoryLock>();
+        var logRepo = sp.GetRequiredService<ILogEnvioNotificacaoRepository>();
+        var eventoRepo = sp.GetRequiredService<IEventoNotificacaoRepository>();
+        var templateRepo = sp.GetRequiredService<ITemplateRepository>();
+        var rotinaRepo = sp.GetRequiredService<IRotinaRepository>();
+        var renderer = sp.GetRequiredService<IRendererTemplate>();
+        var canais = sp.GetRequiredService<IEnumerable<ICanalNotificacao>>().ToList();
 
-        var processadas = 0;
-        await advisoryLock.TentarExecutarAsync(LockKeys.NotificacoesDispatcherBase + shardKey, async token =>
+        await ProcessarMensagemAsync(
+            mensagem, estado, canais, outboxRepo, logRepo, eventoRepo, templateRepo, rotinaRepo, renderer, db, ct);
+    }
+
+    /// <summary>
+    /// A falha vira estado terminal com o motivo, gravada num escopo limpo (o DbContext do item pode estar sujo): se o
+    /// canal de entrega única (WhatsApp, SMS) já foi chamado, <c>Indeterminado</c>, porque pode ter saído; senão
+    /// <c>Falhado</c>. Se nem isso grava, a mensagem segue <c>EmEnvio</c> e o lease a reclama.
+    /// </summary>
+    private async Task RegistrarFalhaDoItemAsync(
+        MensagemReservada reservada, EstadoDoItem estado, Exception ex, CancellationToken ct)
+    {
+        try
         {
+            using var scope = serviceProvider.CreateScope();
+            var sp = scope.ServiceProvider;
+            sp.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(reservada.EmpresaId);
             var outboxRepo = sp.GetRequiredService<IOutboxNotificacaoRepository>();
-            var logRepo = sp.GetRequiredService<ILogEnvioNotificacaoRepository>();
-            var eventoRepo = sp.GetRequiredService<IEventoNotificacaoRepository>();
-            var templateRepo = sp.GetRequiredService<ITemplateRepository>();
-            var rotinaRepo = sp.GetRequiredService<IRotinaRepository>();
-            var renderer = sp.GetRequiredService<IRendererTemplate>();
-            var canais = sp.GetRequiredService<IEnumerable<ICanalNotificacao>>().ToList();
+            var mensagem = await outboxRepo.ObterAsync(reservada.EmpresaId, reservada.Id, ct);
+            if (mensagem is null || mensagem.Status != StatusOutbox.EmEnvio) return;
 
-            var mensagens = await outboxRepo.ListarPendentesParaProcessarAsync(shardKey, batchSize, token);
+            var erro = $"Falha no processamento: {ex.GetType().Name}: {ex.Message}";
+            if (estado.CanalChamado && reservada.Canal is CanalNotificacao.WhatsApp or CanalNotificacao.Sms)
+                mensagem.MarcarIndeterminado(erro);
+            else
+                mensagem.MarcarFalhaTentativa(erro, TimeSpan.Zero, permanente: true);
 
-            foreach (var mensagem in mensagens)
-            {
-                await ProcessarMensagemAsync(
-                    mensagem, canais, outboxRepo, logRepo, eventoRepo, templateRepo, rotinaRepo, renderer, db, token);
-            }
-
-            if (mensagens.Count > 0)
-            {
-                logger.LogInformation(
-                    "Shard {Shard}: processadas {Count} mensagens.", shardKey, mensagens.Count);
-                BatchSizeHistogram.Record(mensagens.Count, new TagList { { "shard", shardKey.ToString() } });
-            }
-
-            processadas = mensagens.Count;
-        }, ct);
-
-        return processadas;
+            await sp.GetRequiredService<IUnitOfWork>().CommitAsync();
+        }
+        catch (Exception salvarEx) when (!ct.IsCancellationRequested)
+        {
+            logger.LogError(salvarEx,
+                "Dispatcher: nem o estado de falha da mensagem {OutboxId} foi gravado; o lease a reclama.", reservada.Id);
+        }
     }
 
     private async Task ProcessarMensagemAsync(
         OutboxMensagemNotificacao mensagem,
+        EstadoDoItem estado,
         IList<ICanalNotificacao> canais,
         IOutboxNotificacaoRepository outboxRepo,
         ILogEnvioNotificacaoRepository logRepo,
@@ -122,7 +221,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
         else
         {
             abriuFallback = await EnviarERegistrarAsync(
-                mensagem, canal, logRepo, eventoRepo, templateRepo, rotinaRepo, renderer, db, ct);
+                mensagem, estado, canal, logRepo, eventoRepo, templateRepo, rotinaRepo, renderer, db, ct);
         }
 
         await PurgarPayloadSeForAUltimaAsync(mensagem, abriuFallback, outboxRepo, eventoRepo, ct);
@@ -140,6 +239,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
     /// <returns>Se abriu uma mensagem de fallback de canal.</returns>
     private async Task<bool> EnviarERegistrarAsync(
         OutboxMensagemNotificacao mensagem,
+        EstadoDoItem estado,
         ICanalNotificacao canal,
         ILogEnvioNotificacaoRepository logRepo,
         IEventoNotificacaoRepository eventoRepo,
@@ -158,6 +258,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
         };
 
         var sw = Stopwatch.StartNew();
+        estado.CanalChamado = true;
         var resultado = await canal.EnviarAsync(mensagemPronta, ct);
         sw.Stop();
 
@@ -259,7 +360,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
         if (abriuFallback) return;
         if (await outboxRepo.ExisteMensagemAbertaDoEventoAsync(mensagem.EmpresaId, mensagem.EventoId, mensagem.Id, ct)) return;
 
-        var evento = await eventoRepo.GetByIdAsync(mensagem.EventoId, ct);
+        var evento = await eventoRepo.ObterAsync(mensagem.EmpresaId, mensagem.EventoId, ct);
         evento?.PurgarPayload();
     }
 
@@ -289,7 +390,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
         var proximoCanal = fallbacks[0];
         var fallbackRestantes = fallbacks.Skip(1).ToList();
 
-        var evento = await eventoRepo.GetByIdAsync(mensagemOriginal.EventoId, ct);
+        var evento = await eventoRepo.ObterAsync(mensagemOriginal.EmpresaId, mensagemOriginal.EventoId, ct);
         if (evento is null) return false;
 
         var rotina = (await rotinaRepo.ListarAtivasAsync(evento.Tipo, evento.EmpresaId, ct))

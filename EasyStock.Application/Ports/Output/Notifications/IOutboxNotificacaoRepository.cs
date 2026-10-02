@@ -7,10 +7,16 @@ public interface IOutboxNotificacaoRepository
 {
     Task<OutboxMensagemNotificacao?> GetByIdAsync(Guid id, CancellationToken ct = default);
 
-    Task<IReadOnlyList<OutboxMensagemNotificacao>> ListarPendentesParaProcessarAsync(
-        int shardKey,
-        int batchSize,
-        CancellationToken ct = default);
+    /// <summary>
+    /// Claim do dispatcher (N1): pega as <c>Pendente</c> elegíveis (<c>ProximaTentativaEm</c> vencida) com
+    /// <c>FOR UPDATE SKIP LOCKED</c> e as passa para <c>EmEnvio</c> com lease, devolvendo as entidades rastreadas. Dois
+    /// dispatchers nunca pegam a mesma mensagem. Cross-tenant por natureza: o chamador liga o bypass de RLS pela porta
+    /// <c>IRowLevelSecurityBypass</c> antes de qualquer conexão e roda dentro de uma transação curta (o commit é dele).
+    /// </summary>
+    Task<IReadOnlyList<OutboxMensagemNotificacao>> ReservarParaEnvioAsync(int limite, CancellationToken ct = default);
+
+    /// <summary>A mensagem da empresa pelo id, rastreada. A empresa vai no <c>WHERE</c> porque no Worker o filtro do EF está desligado.</summary>
+    Task<OutboxMensagemNotificacao?> ObterAsync(Guid empresaId, Guid id, CancellationToken ct = default);
 
     Task<bool> ExisteAsync(string idempotencyKey, CancellationToken ct = default);
 

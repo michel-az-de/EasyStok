@@ -80,6 +80,11 @@ public class RlsBypassAllowlistTests
         // issue #1024: registrar empresa e cross-tenant por definicao, porque cria o tenant. A
         // requisicao e anonima e nao existe app.empresa_id no contexto, entao a policy
         // tenant_isolation recusa os INSERTs (42501) e as leituras de perfis voltam vazias.
+
+        // Motor de notificacoes (N1, #1344): o claim do outbox e cross-tenant por natureza. O dispatcher reserva as
+        // Pendente de todas as empresas (FOR UPDATE SKIP LOCKED) num escopo com a porta ligada antes de qualquer
+        // conexao e processa cada mensagem em escopo proprio, com o tenant da empresa fixado.
+        "EasyStock.Infra.Postgre/Notifications/Dispatcher/NotificacoesDispatcherOrchestrator.cs",
     };
 
     [Fact]

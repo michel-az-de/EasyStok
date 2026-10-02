@@ -292,4 +292,18 @@ public class OutboxMensagemNotificacaoTests
         m.Id.Should().Be(id);
         m.Categoria.Should().Be(CategoriaConteudoNotificacao.Seguranca);
     }
+
+    [Fact]
+    public void MarcarEmEnvio_grava_o_lease_em_ProximaTentativaEm_sem_mexer_nas_tentativas()
+    {
+        // N1: o claim reserva a mensagem em EmEnvio e o lease (5 min, como o OutboxEventoIntegracao) vai em
+        // ProximaTentativaEm; vencido, o claim reclama a mensagem (volta a Pendente ou vira Indeterminado).
+        var m = Novo();
+
+        m.MarcarEmEnvio();
+
+        m.Status.Should().Be(StatusOutbox.EmEnvio);
+        m.Tentativas.Should().Be(0);
+        m.ProximaTentativaEm.Should().BeCloseTo(DateTime.UtcNow.Add(OutboxMensagemNotificacao.LeaseEmEnvio), TimeSpan.FromSeconds(2));
+    }
 }

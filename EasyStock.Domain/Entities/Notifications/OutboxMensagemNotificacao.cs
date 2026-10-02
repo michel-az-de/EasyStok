@@ -110,9 +110,22 @@ public class OutboxMensagemNotificacao
         if (instante > ProximaTentativaEm) ProximaTentativaEm = instante;
     }
 
-    public void MarcarEmEnvio()
+    /// <summary>
+    /// Lease do estado <see cref="StatusOutbox.EmEnvio"/> (N1): ao reservar a mensagem, <see cref="ProximaTentativaEm"/>
+    /// vira agora + este prazo. Se o processo cair antes de gravar o resultado, o claim da rodada seguinte reclama a
+    /// mensagem depois do lease. 5 minutos, como o <c>OutboxEventoIntegracao</c>.
+    /// </summary>
+    public static readonly TimeSpan LeaseEmEnvio = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// O claim do dispatcher reservou a mensagem (N1): <c>EmEnvio</c> com lease em <see cref="ProximaTentativaEm"/>.
+    /// Não conta tentativa: quem conta é o desfecho do envio. No WhatsApp e no SMS o <c>EmEnvio</c> já está gravado
+    /// antes de o canal ser chamado, e é isso que impede o reenvio depois de uma queda.
+    /// </summary>
+    public void MarcarEmEnvio(TimeSpan? lease = null)
     {
         Status = StatusOutbox.EmEnvio;
+        ProximaTentativaEm = DateTime.UtcNow.Add(lease ?? LeaseEmEnvio);
     }
 
     public void MarcarEnviado(string providerUsado)

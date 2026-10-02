@@ -58,14 +58,15 @@ internal sealed class MotorNotificacoesSuporte(PostgreSqlDatabaseFixture fixture
     /// falsos e renderer simples. <paramref name="papelRls"/> usa o login <c>rls_test_client</c> (NOBYPASSRLS).
     /// </summary>
     public ServiceProvider ConstruirProviderDoWorker(
-        bool papelRls, IDictionary<string, string?>? configuracao = null, params ICanalNotificacao[] canais)
+        bool papelRls, IDictionary<string, string?>? configuracao = null, Action<IServiceCollection>? ajustar = null,
+        params ICanalNotificacao[] canais)
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(configuracao ?? new Dictionary<string, string?>()).Build();
         var usuario = Substitute.For<ICurrentUserAccessor>();
         usuario.IsAuthenticated.Returns(true);
         usuario.Nivel.Returns(NivelAcesso.SuperAdmin);
         usuario.EmpresaId.Returns(Guid.Empty);
-        return Construir(papelRls, config, usuario, canais);
+        return Construir(papelRls, config, usuario, ajustar, canais);
     }
 
     /// <summary>Provider como a API: usuário comum da empresa (filtro global do EF ligado e RLS).</summary>
@@ -76,10 +77,12 @@ internal sealed class MotorNotificacoesSuporte(PostgreSqlDatabaseFixture fixture
         usuario.IsAuthenticated.Returns(true);
         usuario.Nivel.Returns(NivelAcesso.Admin);
         usuario.EmpresaId.Returns(empresaId);
-        return Construir(papelRls, config, usuario, canais);
+        return Construir(papelRls, config, usuario, ajustar: null, canais);
     }
 
-    private ServiceProvider Construir(bool papelRls, IConfiguration config, ICurrentUserAccessor usuario, ICanalNotificacao[] canais)
+    private ServiceProvider Construir(
+        bool papelRls, IConfiguration config, ICurrentUserAccessor usuario, Action<IServiceCollection>? ajustar,
+        ICanalNotificacao[] canais)
     {
         var services = new ServiceCollection();
         services.AddSingleton(config);
@@ -96,6 +99,7 @@ internal sealed class MotorNotificacoesSuporte(PostgreSqlDatabaseFixture fixture
         services.AddSingleton<IRendererTemplate, RendererSimplesDoMotor>();
         foreach (var canal in canais)
             services.AddSingleton(canal);
+        ajustar?.Invoke(services);
         return services.BuildServiceProvider();
     }
 
@@ -149,7 +153,7 @@ internal sealed class MotorNotificacoesSuporte(PostgreSqlDatabaseFixture fixture
     {
         var mensagem = OutboxMensagemNotificacao.Criar(s.EventoId, s.TemplateId, s.EmpresaId, canal,
             canal == CanalNotificacao.Email ? "maria@example.com" : "+5511999990001", "Assunto", "Seu codigo: 482913", categoria,
-            canaisFallbackRestantesJson: fallbackJson);
+            canaisFallbackRestantesJson: fallbackJson, chaveIdempotencia: Guid.NewGuid().ToString("N"));
         if (agendarPara is { } quando) mensagem.AgendarPara(quando);
         ajustar?.Invoke(mensagem);
 

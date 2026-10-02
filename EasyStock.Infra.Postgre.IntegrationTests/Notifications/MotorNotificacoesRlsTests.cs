@@ -1,9 +1,11 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Data.Interceptors;
+using System.Collections.Concurrent;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +21,62 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Notifications;
 public class MotorNotificacoesRlsTests(PostgreSqlDatabaseFixture fixture) : IClassFixture<PostgreSqlDatabaseFixture>
 {
     private readonly MotorNotificacoesSuporte _s = new(fixture);
+
+    // ----- dispatcher -----
+
+    [SkippableFact]
+    public async Task Dispatcher_sob_papel_NOBYPASSRLS_envia_a_pendente_de_cada_empresa()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var a = await _s.SemearAsync(CanalNotificacao.Email);
+        var b = await _s.SemearAsync(CanalNotificacao.Email);
+        var mensagemA = await _s.SemearMensagemAsync(a, CanalNotificacao.Email);
+        var mensagemB = await _s.SemearMensagemAsync(b, CanalNotificacao.Email);
+        var email = new CanalFalso(CanalNotificacao.Email, _ => new ResultadoEnvio(true, "smtp"));
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: true, canais: email);
+
+        await provider.GetRequiredService<INotificacoesDispatcherOrchestrator>().ExecutarRodadaAsync(shardCount: 4, batchSize: 50);
+
+        (await _s.LerMensagemAsync(mensagemA.Id)).Status.Should().Be(StatusOutbox.Enviado);
+        (await _s.LerMensagemAsync(mensagemB.Id)).Status.Should().Be(StatusOutbox.Enviado);
+        email.ChamadasDe(mensagemA.Id).Should().Be(1);
+        email.ChamadasDe(mensagemB.Id).Should().Be(1);
+    }
+
+    /// <summary>Canal que, no escopo da mensagem, conta quantas linhas do outbox o tenant enxerga (a RLS é a única camada no Worker).</summary>
+    private sealed class CanalQueEspia(EasyStockDbContext db, ConcurrentDictionary<Guid, List<Guid>> visiveisPorEmpresa)
+        : ICanalNotificacao
+    {
+        public CanalNotificacao Canal => CanalNotificacao.Email;
+
+        public async Task<ResultadoEnvio> EnviarAsync(MensagemPronta mensagem, CancellationToken ct = default)
+        {
+            var ids = await db.NotifOutboxMensagens.IgnoreQueryFilters().Select(m => m.Id).ToListAsync(ct);
+            visiveisPorEmpresa.AddOrUpdate(mensagem.EmpresaId, _ => ids, (_, __) => ids);
+            return new ResultadoEnvio(true, "smtp");
+        }
+    }
+
+    [SkippableFact]
+    public async Task Dispatcher_escopo_por_item_so_enxerga_as_linhas_da_empresa_da_mensagem()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var a = await _s.SemearAsync(CanalNotificacao.Email);
+        var b = await _s.SemearAsync(CanalNotificacao.Email);
+        var deA = new[] { await _s.SemearMensagemAsync(a, CanalNotificacao.Email), await _s.SemearMensagemAsync(a, CanalNotificacao.Email) };
+        var deB = new[] { await _s.SemearMensagemAsync(b, CanalNotificacao.Email), await _s.SemearMensagemAsync(b, CanalNotificacao.Email) };
+        var visiveis = new ConcurrentDictionary<Guid, List<Guid>>();
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: true,
+            ajustar: services => services.AddScoped<ICanalNotificacao>(sp =>
+                new CanalQueEspia(sp.GetRequiredService<EasyStockDbContext>(), visiveis)));
+
+        await provider.GetRequiredService<INotificacoesDispatcherOrchestrator>().ExecutarRodadaAsync(shardCount: 4, batchSize: 50);
+
+        visiveis.Keys.Should().Contain([a.EmpresaId, b.EmpresaId], "as duas empresas foram processadas");
+        visiveis[a.EmpresaId].Should().BeEquivalentTo(deA.Select(m => m.Id), "o tenant da mensagem só vê o outbox da própria empresa");
+        visiveis[b.EmpresaId].Should().BeEquivalentTo(deB.Select(m => m.Id));
+        (await _s.LerMensagemAsync(deA[0].Id)).Status.Should().Be(StatusOutbox.Enviado);
+    }
 
     // ----- catálogo global -----
 
