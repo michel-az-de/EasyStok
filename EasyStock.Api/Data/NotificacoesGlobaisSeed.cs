@@ -992,10 +992,13 @@ public static class NotificacoesGlobaisSeed
         prazoEstourado.DefinirJanela(new TimeOnly(7, 0), new TimeOnly(22, 0));
         yield return prazoEstourado;
 
-        // Molde: nasce inativa e liga por empresa na N12.
+        // Molde: nasce inativa. A N12 liga por empresa (POST api/notificacoes/rotinas com a propria agenda e canais): o
+        // coletor de rotinas agendadas ignora rotina global, entao ativar este molde nao dispara resumo para ninguem.
+        // O horario padrao (agenda.horario, hora de Brasilia) e o do molde, para quem copiar.
         var resumoDiario = MakeRotina("resumo_diario_global", "Resumo Diário",
             TipoEventoNotificacao.ResumoDiario, "resumo_diario_email_v1",
-            CategoriaConteudoNotificacao.Operacional, "[\"Email\",\"WhatsApp\"]", ModoTodos("admins"));
+            CategoriaConteudoNotificacao.Operacional, "[\"Email\",\"WhatsApp\"]",
+            """{"modoCanais":"todos","audiencia":"admins","agenda":{"horario":"20:00"}}""");
         resumoDiario.Desativar("system");
         yield return resumoDiario;
     }

@@ -14,6 +14,10 @@ public sealed class EventoNotificacaoRepository(EasyStockDbContext db) : IEvento
     public Task<EventoNotificacao?> ObterAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
         db.NotifEventos.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.EmpresaId == empresaId && e.Id == id, ct);
 
+    public Task<bool> ExisteCorrelacaoAsync(Guid empresaId, string correlationId, CancellationToken ct = default) =>
+        db.NotifEventos.IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(e => e.EmpresaId == empresaId && e.CorrelationId == correlationId, ct);
+
     public async Task<IReadOnlyList<EventoPendente>> ListarPendentesParaAvaliarAsync(
         int limit = 100, CancellationToken ct = default)
     {

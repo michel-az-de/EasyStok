@@ -21,6 +21,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<NotificadorService>();
         services.AddScoped<INotificadorService>(sp => sp.GetRequiredService<NotificadorService>());
 
+        // Rotinas agendadas (N12): um construtor de payload por tipo agendado; o coletor (Infra.Postgre) é genérico.
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IConstrutorPayloadAgendado, ConstrutorPayloadResumoDiario>());
+
         // Orchestrators (Avaliador e Coletor são puros — Dispatcher é registrado em Infra.Postgre)
         services.AddScoped<INotificacoesAvaliadorOrchestrator, NotificacoesAvaliadorOrchestrator>();
         services.AddScoped<INotificacoesColetorOrchestrator, NotificacoesColetorOrchestrator>();

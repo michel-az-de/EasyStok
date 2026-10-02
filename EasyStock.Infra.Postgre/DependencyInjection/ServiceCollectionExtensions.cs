@@ -255,7 +255,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Repositories.Storefront.PedidoStorefrontRepository>();
 
             // Notification repositories (Templates, Rotinas, Outbox, Consentimentos, etc.)
-            services.AddEasyStockNotificationsRepositories();
+            services.AddEasyStockNotificationsRepositories(configuration);
 
             // AI: OpenAI tem prioridade; Anthropic como fallback; stub se nenhum habilitado
             var openAiEnabled = configuration.GetValue<bool>("OpenAI:Enabled");
