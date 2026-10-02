@@ -44,6 +44,8 @@ export function mensagemDaApi(m, conversaId = null) {
     // S58/S60 (#1391): espera o cliente responder ao modelo de retomada; ou saiu pela reserva por SMS.
     ...(m.aguardaClienteDesde ? { aguardaCliente: true } : {}),
     ...(m.reservaSmsEm ? { porSms: true } : {}),
+    // #1398: texto do áudio transcrito, mostrado abaixo do player.
+    ...(m.transcricao ? { transcricao: m.transcricao } : {}),
     ...(m.midiaChave && conversaId ? { midia: { conversaId, mensagemId: m.id, mime: m.midiaMime ?? null } } : {}),
   }
 }

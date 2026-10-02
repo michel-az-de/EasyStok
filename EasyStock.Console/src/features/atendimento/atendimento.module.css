@@ -164,6 +164,7 @@
 .figura { margin: 0; display: grid; gap: var(--e-1); }
 .figura img { width: 100%; max-width: 280px; border-radius: var(--r-1); display: block; }
 .figura figcaption { font-size: var(--t-apoio); color: var(--tinta-3); }
+.transcricao { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2); font-style: italic; }
 
 /* Quem responde esta conversa. Fica entre o cabeçalho e a thread, que é onde
    a dona olha antes de escrever. Estado por trilho esquerdo mais texto, não
