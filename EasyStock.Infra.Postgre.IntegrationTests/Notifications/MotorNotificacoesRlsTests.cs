@@ -111,7 +111,9 @@ public class MotorNotificacoesRlsTests(PostgreSqlDatabaseFixture fixture) : ICla
         var empresaB = await _s.SemearEmpresaAsync();
         var itemA = await SemearLoteVencendoEm3DiasAsync(empresaA);
         var itemB = await SemearLoteVencendoEm3DiasAsync(empresaB);
-        await using var provider = _s.ConstruirProviderDoWorker(papelRls: true);
+        // N12: o coletor de produtos vencendo vem desligado; este teste prova a varredura sob RLS de quem o ligar.
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: true,
+            new Dictionary<string, string?> { ["Notifications:Coletores:ProdutosVencendo:Habilitado"] = "true" });
 
         await using (var scope = provider.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<INotificacoesColetorOrchestrator>().ExecutarRodadaAsync();

@@ -10,6 +10,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
@@ -97,7 +98,9 @@ public class ProdutoresNotificacaoRlsTests(PostgreSqlDatabaseFixture fixture) : 
             .ThrowsForAnyArgs(new InvalidOperationException("falha simulada na publicação"));
         await using var provider = _s.ConstruirProviderDeJobDaApi(papelRls: true,
             ajustar: services => services.AddScoped(_ => notificador));
-        var job = new ContaFinanceiraVencimentoJob(provider, NullLogger<ContaFinanceiraVencimentoJob>.Instance);
+        // N12: o aviso de contas vem desligado; este teste prova o carimbo com ele ligado.
+        var opcoes = Options.Create(new EasyStock.Api.Configuration.BackgroundJobOptions { EnableContaFinanceiraNotificacoes = true });
+        var job = new ContaFinanceiraVencimentoJob(provider, NullLogger<ContaFinanceiraVencimentoJob>.Instance, opcoes);
 
         await job.ProcessarAsync(CancellationToken.None);
 

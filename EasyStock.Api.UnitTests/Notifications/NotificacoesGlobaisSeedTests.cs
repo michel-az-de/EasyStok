@@ -99,6 +99,15 @@ public class NotificacoesGlobaisSeedTests
     }
 
     [Fact]
+    public void ResumoDiarioTrazOHorarioPadraoDaAgenda()
+    {
+        var molde = NotificacoesGlobaisSeed.BuildDefaultRotinas().Single(r => r.Codigo == "resumo_diario_global");
+
+        EasyStock.Application.Services.Notifications.AgendaDiariaLocal.HorarioDosParametros(molde.ParametrosJson)
+            .Should().Be(new TimeOnly(20, 0));
+    }
+
+    [Fact]
     public void ResumoDiarioEntraInativoNoCatalogo()
     {
         var rotinas = NotificacoesGlobaisSeed.BuildDefaultRotinas().ToList();

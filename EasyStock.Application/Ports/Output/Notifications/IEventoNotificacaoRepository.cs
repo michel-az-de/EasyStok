@@ -29,8 +29,9 @@ public interface IEventoNotificacaoRepository
     Task<int> ExpirarPendentesAsync(PoliticaValidadeNotificacao politica, int limitePorPrazo, CancellationToken ct = default);
 
     /// <summary>
-    /// Já existe evento da empresa com esta chave determinística (N11)? Pré-checagem do produtor que repete a
-    /// rodada (impressão travada); a N12 acrescenta o índice único como segunda trava. A empresa vai no <c>WHERE</c>.
+    /// Já existe evento da empresa com esta <c>CorrelationId</c> (N12)? É a "última execução" das rotinas agendadas e a
+    /// pré-checagem barata antes de montar o payload; a garantia final é o índice único <c>(EmpresaId, CorrelationId)</c>.
+    /// A empresa vai no <c>WHERE</c> porque no Worker o filtro do EF está desligado.
     /// </summary>
     Task<bool> ExisteCorrelacaoAsync(Guid empresaId, string correlationId, CancellationToken ct = default);
 

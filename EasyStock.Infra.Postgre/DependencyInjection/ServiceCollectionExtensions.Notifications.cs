@@ -16,8 +16,11 @@ namespace EasyStock.Infra.Postgre.DependencyInjection;
 
 public static partial class ServiceCollectionExtensionsNotifications
 {
+    /// <summary>Chave que religa o <see cref="ColetorProdutosVencendo"/> (N12): ausente ou <c>false</c>, ele não é registrado.</summary>
+    public const string ProdutosVencendoHabilitadoChave = "Notifications:Coletores:ProdutosVencendo:Habilitado";
+
     public static IServiceCollection AddEasyStockNotificationsRepositories(
-        this IServiceCollection services)
+        this IServiceCollection services, IConfiguration? configuration = null)
     {
         services.AddScoped<ITemplateRepository, TemplateNotificacaoRepository>();
         services.AddScoped<IRotinaRepository, RotinaNotificacaoRepository>();
@@ -52,7 +55,15 @@ public static partial class ServiceCollectionExtensionsNotifications
         // EasyStockDbContext. Worker e API ambos consomem via INotificacoesColetorOrchestrator.
         // TryAddEnumerable: AddEasyStockPostgreInfrastructure já chama este registro; o Worker o chamava de novo e o
         // coletor rodava duas vezes por rodada (N1).
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IColetorEventoNotificacao, ColetorProdutosVencendo>());
+        // N12: rotinas agendadas por horário diário local (resumo diário e o que vier). Relógio injetável para o teste.
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IColetorEventoNotificacao, ColetorRotinasAgendadas>());
+
+        // N12 (Q3, decisão do Felipe): produtos vencendo fica fora. O coletor tem três defeitos conhecidos (data UTC,
+        // CorrelationId de 65 caracteres numa coluna de 64 e payload que não casa com o template); registrado, ele falharia a
+        // cada 5 min e poluiria o log. Só liga com Notifications:Coletores:ProdutosVencendo:Habilitado=true.
+        if (configuration?.GetValue<bool>(ProdutosVencendoHabilitadoChave) == true)
+            services.TryAddEnumerable(ServiceDescriptor.Scoped<IColetorEventoNotificacao, ColetorProdutosVencendo>());
         // N10: pico de 5xx. Só lê o COUNT de system_error_logs (fora da RLS) e avisa pelo publicador de incidente.
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IColetorEventoNotificacao, ColetorPicoDeErros5xx>());
 
