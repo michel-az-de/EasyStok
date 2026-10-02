@@ -144,6 +144,29 @@ public class SmtpOpcoesTests
         configuracao.Avisos.Email.Should().Be("avisos@easystok.online");
     }
 
+    [Theory]
+    [InlineData("avisos@@easystok.online")]
+    [InlineData("@easystok.online")]
+    public void UsernameMalformadoUsadoComoRemetenteNomeiaAChaveNaSubida(string username)
+    {
+        // Sem FromEmail o Username com arroba vira o From. Se ele nao e um endereco, o erro tem que estourar na subida
+        // nomeando a chave, e nao em cada envio como "destinatario invalido".
+        var opcoes = new SmtpOpcoes { Host = "smtp.exemplo.com", Port = "587", Username = username, Password = "x" };
+
+        var act = () => opcoes.Resolver(Producao);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Smtp:Username*");
+    }
+
+    [Fact]
+    public void UsernameDeSegurancaMalformadoUsadoComoRemetenteNomeiaAChaveNaSubida()
+    {
+        var act = () => Base(o => o.Seguranca = new SmtpRemetenteOpcoes { Username = "seguranca@@easystok.online", Password = "x" })
+            .Resolver(Producao);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Smtp:Seguranca:Username*");
+    }
+
     [Fact]
     public void UsernameSemArrobaNaoServeDeRemetente()
     {

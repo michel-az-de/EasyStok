@@ -44,7 +44,7 @@ internal static partial class ClassificadorFalhaSmtp
                     true,
                     "O servidor SMTP não ofereceu STARTTLS ou AUTH: confira Smtp:Modo, Smtp:Port e Smtp:Host.");
 
-            case FormatException or ArgumentException:
+            case MensagemEmailInvalidaException:
                 // Endereco ou anexo malformado: nenhuma tentativa futura conserta.
                 return new FalhaSmtp(
                     DesfechoEnvio.FalhaPermanente,
@@ -74,7 +74,9 @@ internal static partial class ClassificadorFalhaSmtp
             DesfechoEnvio.FalhaPermanente,
             codigo,
             true,
-            $"Autenticação SMTP recusada ({codigo}): confira {chaveBase}:Username e {chaveBase}:Password.");
+            $"Autenticação SMTP recusada ({codigo}): confira {chaveBase}:Username e {chaveBase}:Password."
+            // 530 tambem e "Must issue a STARTTLS command first": ai a chave certa seria a do modo.
+            + (codigo == 530 ? " Se o servidor exige TLS, confira também Smtp:Modo." : string.Empty));
 
     private static int? CodigoNoInicio(string? mensagem)
     {

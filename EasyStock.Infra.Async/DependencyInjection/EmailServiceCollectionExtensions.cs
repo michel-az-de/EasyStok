@@ -77,7 +77,7 @@ internal sealed class EmailAvisosDeSubida(EscolhaEmail escolha, ILogger<EmailAvi
                 var smtp = escolha.Smtp!;
                 logger.LogInformation(
                     "E-mail: provider smtp ativo (servidor {Host}:{Porta}, transporte {Modo}, caixa de seguranca {Caixa}).",
-                    smtp.Host, smtp.Porta, smtp.Modo, smtp.SegurancaUsaAvisos ? "dividida com avisos" : "propria");
+                    smtp.Host, smtp.Porta, smtp.Modo, DescreverCaixaDeSeguranca(smtp));
                 break;
 
             case EscolhaEmail.ProviderSendGrid:
@@ -93,4 +93,9 @@ internal sealed class EmailAvisosDeSubida(EscolhaEmail escolha, ILogger<EmailAvi
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    private static string DescreverCaixaDeSeguranca(SmtpConfiguracao smtp) =>
+        smtp.SegurancaUsaAvisos ? "dividida com avisos"
+        : smtp.Seguranca.ChaveBase == SmtpOpcoes.Secao ? "From proprio com a credencial de avisos"
+        : "propria";
 }

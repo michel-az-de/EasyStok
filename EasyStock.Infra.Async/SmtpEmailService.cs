@@ -87,7 +87,7 @@ public sealed class SmtpEmailService : IEmailService
             // IOException/SocketException que o socket fechado pelo cancelamento produz.
             ct.ThrowIfCancellationRequested();
 
-            // Endereco ou anexo malformado estoura aqui, antes de abrir conexao, e vira falha permanente.
+            // Mensagem malformada estoura aqui, antes de abrir conexao, como MensagemEmailInvalidaException (permanente).
             var falha = ClassificadorFalhaSmtp.Classificar(ex, teto.IsCancellationRequested, remetente.ChaveBase);
             return Falha(falha, mensagem, cronometro);
         }
@@ -171,29 +171,37 @@ public sealed class SmtpEmailService : IEmailService
 
     private static MimeMessage ConstruirMime(MensagemEmail mensagem, SmtpRemetente remetente)
     {
-        if (!MailboxAddress.TryParse(mensagem.Destinatario, out var para) || !para.Address.Contains('@'))
-            throw new FormatException("Destinatario invalido.");
+        try
+        {
+            if (!MailboxAddress.TryParse(mensagem.Destinatario, out var para) || !para.Address.Contains('@'))
+                throw new FormatException("Destinatario invalido.");
 
-        var mime = new MimeMessage();
-        mime.From.Add(new MailboxAddress(remetente.Nome, remetente.Email));
-        mime.To.Add(para);
-        mime.Subject = mensagem.Assunto ?? string.Empty;
+            var mime = new MimeMessage();
+            mime.From.Add(new MailboxAddress(remetente.Nome, remetente.Email));
+            mime.To.Add(para);
+            mime.Subject = mensagem.Assunto ?? string.Empty;
 
-        // Mensagem de sistema: MTAs e auto-respondedores nao respondem a ela (evita laco de resposta automatica).
-        mime.Headers.Add("Auto-Submitted", "auto-generated");
-        mime.MessageId = MimeUtils.GenerateMessageId(remetente.Email[(remetente.Email.LastIndexOf('@') + 1)..]);
+            // Mensagem de sistema: MTAs e auto-respondedores nao respondem a ela (evita laco de resposta automatica).
+            mime.Headers.Add("Auto-Submitted", "auto-generated");
+            mime.MessageId = MimeUtils.GenerateMessageId(remetente.Email[(remetente.Email.LastIndexOf('@') + 1)..]);
 
-        var corpo = new BodyBuilder();
-        if (mensagem.Html)
-            corpo.HtmlBody = mensagem.Corpo;
-        else
-            corpo.TextBody = mensagem.Corpo;
+            var corpo = new BodyBuilder();
+            if (mensagem.Html)
+                corpo.HtmlBody = mensagem.Corpo;
+            else
+                corpo.TextBody = mensagem.Corpo;
 
-        foreach (var anexo in mensagem.Anexos ?? [])
-            corpo.Attachments.Add(anexo.FileName, anexo.Content, ContentType.Parse(anexo.ContentType));
+            foreach (var anexo in mensagem.Anexos ?? [])
+                corpo.Attachments.Add(anexo.FileName, anexo.Content, ContentType.Parse(anexo.ContentType));
 
-        mime.Body = corpo.ToMessageBody();
-        return mime;
+            mime.Body = corpo.ToMessageBody();
+            return mime;
+        }
+        catch (Exception ex) when (ex is FormatException or ArgumentException)
+        {
+            // So o que sai da montagem da mensagem (destinatario, anexo, tipo de conteudo) e "mensagem invalida".
+            throw new MensagemEmailInvalidaException("Mensagem de e-mail malformada.", ex);
+        }
     }
 
     private ResultadoEnvio Falha(FalhaSmtp falha, MensagemEmail mensagem, Stopwatch cronometro)

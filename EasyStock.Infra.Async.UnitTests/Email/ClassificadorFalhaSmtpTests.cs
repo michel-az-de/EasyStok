@@ -132,12 +132,46 @@ public class ClassificadorFalhaSmtpTests
     }
 
     [Fact]
-    public void EnderecoInvalidoAntesDeConectarEPermanente()
+    public void MensagemMalformadaAntesDeConectarEPermanente()
     {
-        var falha = ClassificadorFalhaSmtp.Classificar(new FormatException("endereco invalido"), tetoEstourado: false);
+        var falha = ClassificadorFalhaSmtp.Classificar(
+            new MensagemEmailInvalidaException("destinatario invalido", new FormatException()), tetoEstourado: false);
 
         falha.Desfecho.Should().Be(DesfechoEnvio.FalhaPermanente);
         falha.ErroDeConfiguracao.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(typeof(FormatException))]
+    [InlineData(typeof(ArgumentException))]
+    public void FormatEArgumentSoltosNaoViramPermanentes(Type tipo)
+    {
+        // Um ArgumentException do host ou do cliente nao e "destinatario invalido": o rotulo permanente e so da
+        // mensagem malformada (MensagemEmailInvalidaException). O resto cai no padrao transitorio, com o tipo no detalhe.
+        var excecao = (Exception)Activator.CreateInstance(tipo, "host rejeitado")!;
+
+        var falha = ClassificadorFalhaSmtp.Classificar(excecao, tetoEstourado: false);
+
+        falha.Desfecho.Should().Be(DesfechoEnvio.FalhaTransitoria);
+        falha.Detalhe.Should().Contain(tipo.Name);
+    }
+
+    [Fact]
+    public void Autenticacao530LembraDoModoQuandoOServidorExigeTls()
+    {
+        // 530 tambem e "Must issue a STARTTLS command first": a chave errada para apontar seria a do modo.
+        var falha = ClassificadorFalhaSmtp.Classificar(
+            Comando(530, SmtpErrorCode.SenderNotAccepted, "5.7.0 Must issue a STARTTLS command first"), tetoEstourado: false);
+
+        falha.Desfecho.Should().Be(DesfechoEnvio.FalhaPermanente);
+        falha.Detalhe.Should().Contain("Smtp:Username").And.Contain("Smtp:Modo");
+    }
+
+    [Fact]
+    public void Autenticacao535NaoMencionaOModo()
+    {
+        ClassificadorFalhaSmtp.Classificar(Comando(535), tetoEstourado: false)
+            .Detalhe.Should().NotContain("Smtp:Modo");
     }
 
     [Fact]

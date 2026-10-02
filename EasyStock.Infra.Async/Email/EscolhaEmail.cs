@@ -73,7 +73,15 @@ internal sealed record EscolhaEmail(
         {
             avisos.Add(
                 "Smtp:Seguranca:* ausente (sem FromEmail e sem Username com arroba): os e-mails de segurança " +
-                "(reset de senha, confirmação de cadastro, conta criada pelo admin) sairão do remetente de avisos.");
+                "(reset de senha, conta criada pelo admin) sairão do remetente de avisos.");
+        }
+        else if (configuracao.Seguranca.ChaveBase == SmtpOpcoes.Secao)
+        {
+            // From proprio, credencial de avisos: Gmail, SES e outros recusam um From diferente da conta autenticada.
+            avisos.Add(
+                "Smtp:Seguranca:FromEmail definido sem Smtp:Seguranca:Username: o e-mail de segurança sai com From próprio, " +
+                "mas autentica com a credencial de avisos. Muitos provedores recusam um From diferente da conta autenticada; " +
+                "defina Smtp:Seguranca:Username e Smtp:Seguranca:Password.");
         }
 
         return new EscolhaEmail(ProviderSmtp, configuracao, null, avisos);

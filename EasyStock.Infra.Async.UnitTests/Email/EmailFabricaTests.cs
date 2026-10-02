@@ -213,6 +213,20 @@ public class EmailFabricaTests
     }
 
     [Fact]
+    public async Task SegurancaSoComFromEmailAvisaQueAutenticaComACredencialDeAvisos()
+    {
+        // Provedores como Gmail e SES recusam um From diferente da conta autenticada: quem configurou so o FromEmail
+        // precisa saber, na subida, que a credencial e a de avisos.
+        var (provedor, logs) = Construir(Sem(SmtpCompleto, "Smtp:Seguranca:Username", "Smtp:Seguranca:Password"));
+
+        await IniciarHostedServicesAsync(provedor);
+
+        logs.Linhas.Should().Contain(l => l.Nivel == LogLevel.Warning
+            && l.Texto.Contains("Smtp:Seguranca:Username") && l.Texto.Contains("credencial de avisos"));
+        logs.Linhas.Should().NotContain(l => l.Texto.Contains("propria"), "a caixa nao e propria: a credencial e a de avisos");
+    }
+
+    [Fact]
     public async Task SegurancaComCaixaPropriaNaoAvisa()
     {
         var (provedor, logs) = Construir(SmtpCompleto);

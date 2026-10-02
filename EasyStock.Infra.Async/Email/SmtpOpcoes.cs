@@ -107,7 +107,7 @@ public sealed class SmtpOpcoes
         }
 
         var usuario = Normalizar(Username);
-        var enderecoAvisos = fromEmail ?? EnderecoDe(usuario);
+        var enderecoAvisos = fromEmail ?? EnderecoDe(usuario, $"{Secao}:Username", $"{Secao}:FromEmail");
         if (enderecoAvisos is null)
         {
             chaveFaltando = $"{Secao}:FromEmail";
@@ -118,7 +118,7 @@ public sealed class SmtpOpcoes
         var avisos = new SmtpRemetente(enderecoAvisos, Normalizar(FromName), usuario, SenhaOuNula(Password), Secao);
 
         var usuarioSeguranca = Normalizar(Seguranca?.Username);
-        var enderecoSeguranca = fromEmailSeguranca ?? EnderecoDe(usuarioSeguranca);
+        var enderecoSeguranca = fromEmailSeguranca ?? EnderecoDe(usuarioSeguranca, $"{Secao}:Seguranca:Username", $"{Secao}:Seguranca:FromEmail");
         SmtpRemetente seguranca;
         bool segurancaUsaAvisos;
         if (enderecoSeguranca is null)
@@ -200,8 +200,22 @@ public sealed class SmtpOpcoes
         return caixa.Address;
     }
 
-    private static string? EnderecoDe(string? username) =>
-        username is not null && username.Contains('@') ? username : null;
+    // Sem FromEmail, o Username com arroba serve de remetente. Se ele nao for um endereco valido, estoura na subida
+    // nomeando a chave, em vez de virar "destinatario invalido" em cada envio.
+    private static string? EnderecoDe(string? username, string chaveDoUsername, string chaveDoRemetente)
+    {
+        if (username is null || !username.Contains('@'))
+            return null;
+
+        if (!MailboxAddress.TryParse(username, out var caixa) || !caixa.Address.Contains('@'))
+        {
+            throw new InvalidOperationException(
+                $"{chaveDoUsername} ('{username}') não é um endereço de e-mail válido e, sem {chaveDoRemetente}, ele serve de remetente: " +
+                $"corrija a chave ou defina {chaveDoRemetente}.");
+        }
+
+        return caixa.Address;
+    }
 
     private static string? Normalizar(string? valor) =>
         string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();

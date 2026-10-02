@@ -26,14 +26,25 @@ public sealed class SendGridEmailService : IEmailService
     private readonly bool _sandbox;
 
     public SendGridEmailService(string apiKey, string fromEmail, string? fromName, bool sandbox = false)
+        : this(CriarCliente(apiKey), fromEmail, fromName, sandbox)
+    {
+    }
+
+    /// <summary>Seam de teste: um cliente falso no lugar do HTTP real.</summary>
+    internal SendGridEmailService(ISendGridClient client, string fromEmail, string? fromName, bool sandbox = false)
+    {
+        _client = client;
+        _fromEmail = fromEmail;
+        _fromName = fromName;
+        _sandbox = sandbox;
+    }
+
+    private static SendGridClient CriarCliente(string apiKey)
     {
         if (string.IsNullOrWhiteSpace(apiKey))
             throw new ArgumentException("SendGrid:ApiKey eh obrigatorio.", nameof(apiKey));
 
-        _client = new SendGridClient(apiKey);
-        _fromEmail = fromEmail;
-        _fromName = fromName;
-        _sandbox = sandbox;
+        return new SendGridClient(apiKey);
     }
 
     public Task SendAsync(string to, string subject, string body, bool isHtml = false) =>
@@ -60,7 +71,11 @@ public sealed class SendGridEmailService : IEmailService
         try
         {
             await EnviarHttpAsync([mensagem.Destinatario], mensagem.Assunto, mensagem.Corpo, mensagem.Anexos ?? [], mensagem.Html, ct);
-            return new ResultadoEnvio(Sucesso: true, ProviderUsado: "sendgrid", DuracaoMs: cronometro.ElapsedMilliseconds);
+
+            // O sandbox valida a requisicao e devolve 2xx sem entregar: nada saiu, e quem le o resultado precisa saber.
+            return _sandbox
+                ? ResultadoEnvio.Simulado("sendgrid", cronometro.ElapsedMilliseconds)
+                : new ResultadoEnvio(Sucesso: true, ProviderUsado: "sendgrid", DuracaoMs: cronometro.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {
