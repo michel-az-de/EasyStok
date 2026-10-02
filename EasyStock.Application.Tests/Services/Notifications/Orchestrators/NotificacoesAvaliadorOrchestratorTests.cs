@@ -18,7 +18,7 @@ public class NotificacoesAvaliadorOrchestratorTests
         eventoRepo.ListarPendentesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns((IReadOnlyList<EventoNotificacao>)Array.Empty<EventoNotificacao>());
         var rotinaRepo = Substitute.For<IRotinaRepository>();
-        rotinaRepo.ListarAtivasAsync(Arg.Any<TipoEventoNotificacao?>(), Arg.Any<CancellationToken>())
+        rotinaRepo.ListarAtivasAsync(Arg.Any<TipoEventoNotificacao?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns((IReadOnlyList<RotinaNotificacao>)Array.Empty<RotinaNotificacao>());
 
         var sut = new NotificacoesAvaliadorOrchestrator(
@@ -41,7 +41,7 @@ public class NotificacoesAvaliadorOrchestratorTests
         eventoRepo.ListarPendentesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns((IReadOnlyList<EventoNotificacao>)new[] { ev1, ev2 });
         var rotinaRepo = Substitute.For<IRotinaRepository>();
-        rotinaRepo.ListarAtivasAsync(Arg.Any<TipoEventoNotificacao?>(), Arg.Any<CancellationToken>())
+        rotinaRepo.ListarAtivasAsync(Arg.Any<TipoEventoNotificacao?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns((IReadOnlyList<RotinaNotificacao>)Array.Empty<RotinaNotificacao>());
 
         var sut = new NotificacoesAvaliadorOrchestrator(
@@ -70,7 +70,7 @@ public class NotificacoesAvaliadorOrchestratorTests
         eventoRepo.ListarPendentesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns((IReadOnlyList<EventoNotificacao>)new[] { ev1, ev2, ev3 });
         var rotinaRepo = Substitute.For<IRotinaRepository>();
-        rotinaRepo.ListarAtivasAsync(Arg.Any<TipoEventoNotificacao?>(), Arg.Any<CancellationToken>())
+        rotinaRepo.ListarAtivasAsync(Arg.Any<TipoEventoNotificacao?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns((IReadOnlyList<RotinaNotificacao>)Array.Empty<RotinaNotificacao>());
 
         var sut = new NotificacoesAvaliadorOrchestrator(

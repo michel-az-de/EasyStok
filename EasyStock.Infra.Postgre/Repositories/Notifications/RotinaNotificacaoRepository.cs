@@ -15,9 +15,13 @@ public sealed class RotinaNotificacaoRepository(EasyStockDbContext db) : IRotina
             r => r.Codigo == codigo && r.EmpresaId == empresaId, ct);
 
     public async Task<IReadOnlyList<RotinaNotificacao>> ListarAtivasAsync(
-        TipoEventoNotificacao? tipoEvento = null, CancellationToken ct = default)
+        TipoEventoNotificacao? tipoEvento = null, Guid? empresaId = null, CancellationToken ct = default)
     {
         var q = db.NotifRotinas.AsNoTracking().Where(r => r.Ativa);
+        // N1: o motor lê a rotina da empresa e a global. O filtro do EF só deixa a da empresa (e, no Worker, está
+        // desligado), então o predicado explícito carrega a empresa e a policy catalogo_global_leitura, o global.
+        if (empresaId is { } dona)
+            q = q.IgnoreQueryFilters().Where(r => r.EmpresaId == dona || r.EmpresaId == null);
         if (tipoEvento.HasValue) q = q.Where(r => r.TipoEvento == tipoEvento);
         return await q.ToListAsync(ct);
     }

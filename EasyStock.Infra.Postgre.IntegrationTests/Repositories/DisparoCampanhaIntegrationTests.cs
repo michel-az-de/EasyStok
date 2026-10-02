@@ -187,15 +187,14 @@ public class DisparoCampanhaIntegrationTests(PostgreSqlDatabaseFixture fixture)
         db.SetMobileTenantContext(Guid.NewGuid());
 
         (await db.NotifTemplates.IgnoreQueryFilters().AnyAsync(t => t.EmpresaId == null))
-            .Should().BeFalse("a policy tenant_isolation esconde a linha global de quem está no escopo de uma empresa");
+            .Should().BeTrue("N1: a policy de SELECT do catálogo global expõe a linha global ao tenant, sem bypass");
 
         var template = await new TemplateNotificacaoRepository(db)
             .GetAtivoAsync(EnfileiradorMensagensCampanha.CodigoTemplateOnda, CanalNotificacao.WhatsApp, null);
 
         template.Should().NotBeNull("o fallback para o template global precisa funcionar no escopo da empresa");
         template!.EmpresaId.Should().BeNull();
-        (await db.NotifTemplates.IgnoreQueryFilters().AnyAsync(t => t.EmpresaId == null))
-            .Should().BeFalse("o bypass vale só para a leitura do global");
+        db.BypassRowLevelSecurity.Should().BeFalse("o repositório não liga bypass para ler o global (N1)");
     }
 
     private async Task SemearTemplateGlobalAsync()

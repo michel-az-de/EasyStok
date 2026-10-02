@@ -292,7 +292,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
         var evento = await eventoRepo.GetByIdAsync(mensagemOriginal.EventoId, ct);
         if (evento is null) return false;
 
-        var rotina = (await rotinaRepo.ListarAtivasAsync(evento.Tipo, ct))
+        var rotina = (await rotinaRepo.ListarAtivasAsync(evento.Tipo, evento.EmpresaId, ct))
             .FirstOrDefault(r => r.EmpresaId == evento.EmpresaId || r.EmpresaId == null);
         if (rotina is null) return false;
 

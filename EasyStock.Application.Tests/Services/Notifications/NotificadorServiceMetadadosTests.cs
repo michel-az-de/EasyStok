@@ -45,7 +45,7 @@ public class NotificadorServiceMetadadosTests
             triggerTipo: TriggerTipoRotina.Evento, templateCodigo: "fatura_vencida_whatsapp_v1",
             categoria: CategoriaConteudoNotificacao.Transacional);
         rotina.DefinirFallback("[\"WhatsApp\"]", "system");
-        _rotinaRepository.ListarAtivasAsync(TipoEventoNotificacao.FaturaVencida, Arg.Any<CancellationToken>())
+        _rotinaRepository.ListarAtivasAsync(TipoEventoNotificacao.FaturaVencida, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns([rotina]);
 
         _template = TemplateNotificacao.Criar(

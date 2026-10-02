@@ -134,7 +134,7 @@ public sealed class NotificadorService(
             return;
         }
 
-        var rotina = (await rotinaRepository.ListarAtivasAsync(evento.Tipo, ct))
+        var rotina = (await rotinaRepository.ListarAtivasAsync(evento.Tipo, evento.EmpresaId, ct))
             .FirstOrDefault(r => r.EmpresaId == evento.EmpresaId || r.EmpresaId == null);
 
         if (rotina is null)

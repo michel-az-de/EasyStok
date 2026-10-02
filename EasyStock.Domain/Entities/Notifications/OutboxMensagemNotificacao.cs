@@ -23,6 +23,13 @@ public class OutboxMensagemNotificacao
     public DateTime ProximaTentativaEm { get; set; }
     public DateTime? EnviadoEm { get; set; }
     public string? ProviderUsado { get; set; }
+
+    /// <summary>
+    /// Id da mensagem no provider (o <c>wamid</c> da Meta), gravado no mesmo commit do resultado do envio (N1). A N6
+    /// o usa para casar o webhook de status com a mensagem do outbox.
+    /// </summary>
+    public string? ProviderMensagemId { get; set; }
+
     public string? ErroUltimaTentativa { get; set; }
     public string IdempotencyKey { get; set; } = null!;
     public string TenantTimezone { get; set; } = "America/Sao_Paulo";

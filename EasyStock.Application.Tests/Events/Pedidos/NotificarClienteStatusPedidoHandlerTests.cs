@@ -261,7 +261,7 @@ public class NotificarClienteStatusPedidoHandlerTests
         var rotina = RotinaNotificacao.Criar(templateCodigo + "_rotina", templateCodigo, tipo, TriggerTipoRotina.Evento,
             templateCodigo, CategoriaConteudoNotificacao.Transacional);
         rotina.DefinirFallback("[\"WhatsApp\"]", "system");
-        _rotinaRepository.ListarAtivasAsync(tipo, Arg.Any<CancellationToken>()).Returns([rotina]);
+        _rotinaRepository.ListarAtivasAsync(tipo, Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns([rotina]);
         _templateRepository.GetAtivoAsync(templateCodigo, CanalNotificacao.WhatsApp, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
