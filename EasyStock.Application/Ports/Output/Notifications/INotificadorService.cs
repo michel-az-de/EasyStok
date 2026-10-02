@@ -25,13 +25,18 @@ public interface INotificadorService
     /// os Pendentes via <see cref="AvaliarEventoAsync"/>. O destinatário in-app/email vai no
     /// payload (chave "usuarioId"/"email"), re-derivado pelo Avaliador.
     /// </summary>
+    /// <param name="correlationId">
+    /// Chave determinística do evento dada pelo produtor (N5). Fica depois do <c>ct</c> para os call-sites
+    /// posicionais seguirem compilando; sem ela o evento ganha uma nova.
+    /// </param>
     /// <returns>O id do evento estagiado (N13: o disparo de teste o devolve para a consulta).</returns>
     Task<Guid> EnfileirarEventoAsync(
         TipoEventoNotificacao tipo,
         Guid empresaId,
         string payloadJson,
         Guid? refEntidadeId = null,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        string? correlationId = null);
 
     /// <summary>
     /// Processa um EventoNotificacao já persistido, criando entradas no outbox.

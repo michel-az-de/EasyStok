@@ -1,7 +1,5 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -51,11 +49,6 @@ public sealed class NotificacoesDispatcherOrchestrator(
 
     /// <summary>Teto de leases vencidos reclamados em cada reserva.</summary>
     private const int LimiteLeasesPorReserva = 500;
-
-    private static readonly JsonSerializerOptions EnumOptions = new()
-    {
-        Converters = { new JsonStringEnumConverter() }
-    };
 
     /// <summary>Mensagem reservada pelo claim: o mínimo para abrir o escopo da empresa e reler a linha.</summary>
     private sealed record MensagemReservada(Guid EmpresaId, Guid Id, CanalNotificacao Canal);
@@ -272,10 +265,12 @@ public sealed class NotificacoesDispatcherOrchestrator(
     {
         var agora = DateTime.UtcNow;
         var bloqueios = await bloqueioRepo.ListarAtivosAsync(mensagem.EmpresaId, mensagem.Canal, ct);
+        // N5: a pausa da empresa nunca segura Seguranca; a global do superadmin segura tudo.
+        var seguranca = mensagem.Categoria == CategoriaConteudoNotificacao.Seguranca;
         return bloqueios.FirstOrDefault(b =>
             b.EstaAtivo(agora)
             && (b.Canal is null || b.Canal == mensagem.Canal)
-            && (b.EmpresaId is null || b.EmpresaId == mensagem.EmpresaId));
+            && (b.EmpresaId is null || (b.EmpresaId == mensagem.EmpresaId && !seguranca)));
     }
 
     /// <summary>
@@ -415,6 +410,11 @@ public sealed class NotificacoesDispatcherOrchestrator(
         evento?.PurgarPayload();
     }
 
+    /// <summary>
+    /// Fallback de canal (N5): a mesma construção do <see cref="ConstrutorMensagemOutbox"/> que o avaliador usa, com o
+    /// contato, o template e os metadados do canal de destino e todas as variáveis do payload. Canal sem template ou sem
+    /// contato é pulado e o seguinte é tentado; só desiste quando nenhum sobra.
+    /// </summary>
     /// <returns>Se criou a mensagem de fallback (e, por isso, o evento ainda tem uma mensagem aberta).</returns>
     private async Task<bool> TentarFallbackCanalAsync(
         OutboxMensagemNotificacao mensagemOriginal,
@@ -425,83 +425,43 @@ public sealed class NotificacoesDispatcherOrchestrator(
         EasyStockDbContext db,
         CancellationToken ct)
     {
-        List<CanalNotificacao> fallbacks;
-        try
-        {
-            fallbacks = JsonSerializer.Deserialize<List<CanalNotificacao>>(
-                mensagemOriginal.CanaisFallbackRestantesJson, EnumOptions) ?? [];
-        }
-        catch
-        {
-            return false;
-        }
-
+        var fallbacks = CanaisDaRotina.Ler(mensagemOriginal.CanaisFallbackRestantesJson);
         if (fallbacks.Count == 0) return false;
-
-        var proximoCanal = fallbacks[0];
-        var fallbackRestantes = fallbacks.Skip(1).ToList();
 
         var evento = await eventoRepo.ObterAsync(mensagemOriginal.EmpresaId, mensagemOriginal.EventoId, ct);
         if (evento is null) return false;
 
-        var rotina = (await rotinaRepo.ListarAtivasAsync(evento.Tipo, evento.EmpresaId, ct))
-            .FirstOrDefault(r => r.EmpresaId == evento.EmpresaId || r.EmpresaId == null);
+        var rotina = SeletorRotina.Escolher(
+            await rotinaRepo.ListarAtivasAsync(evento.Tipo, evento.EmpresaId, ct), evento.EmpresaId);
         if (rotina is null) return false;
 
-        var template = await templateRepo.GetAtivoAsync(rotina.TemplateCodigo, proximoCanal, evento.EmpresaId, ct)
-            ?? await templateRepo.GetAtivoAsync(rotina.TemplateCodigo, proximoCanal, null, ct);
-        if (template is null)
+        var construtor = new ConstrutorMensagemOutbox(templateRepo, renderer);
+        var destinatario = new DestinatarioMensagem(
+            mensagemOriginal.UsuarioDestinoId, ConstrutorMensagemOutbox.LerVariaveis(evento.PayloadJson));
+
+        for (var i = 0; i < fallbacks.Count; i++)
         {
-            logger.LogWarning(
-                "Fallback canal {Canal}: template '{Codigo}' não encontrado — cancelando fallback.",
-                proximoCanal, rotina.TemplateCodigo);
-            return false;
+            var proximoCanal = fallbacks[i];
+            var restantes = fallbacks.Skip(i + 1).ToList();
+            var resultado = await construtor.ConstruirAsync(
+                evento, rotina, proximoCanal, destinatario, restantes, DateTime.UtcNow, ct);
+
+            if (resultado.Mensagem is null)
+            {
+                logger.LogWarning(
+                    "Fallback canal {Canal} pulado no evento {EventoId}: {Motivo}",
+                    proximoCanal, evento.Id, resultado.Detalhe);
+                continue;
+            }
+
+            await db.NotifOutboxMensagens.AddAsync(resultado.Mensagem, ct);
+
+            logger.LogInformation(
+                "Fallback criado para canal {Canal} outbox original={OriginalId}",
+                proximoCanal, mensagemOriginal.Id);
+            return true;
         }
 
-        var vars = ParsePayload(evento.PayloadJson);
-        string assunto, corpo;
-        try
-        {
-            assunto = await renderer.RenderizarAsync(template.AssuntoTemplate, vars, ct);
-            var corpoEscapaHtml = proximoCanal is CanalNotificacao.Email or CanalNotificacao.InApp;
-            corpo = await renderer.RenderizarAsync(template.CorpoTemplate, vars, corpoEscapaHtml, ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Falha ao renderizar template para fallback canal {Canal}", proximoCanal);
-            return false;
-        }
-
-        var novaMsg = OutboxMensagemNotificacao.Criar(
-            eventoId: mensagemOriginal.EventoId,
-            templateId: template.Id,
-            empresaId: mensagemOriginal.EmpresaId,
-            canal: proximoCanal,
-            destinatario: mensagemOriginal.Destinatario,
-            assuntoRenderizado: assunto,
-            corpoRenderizado: corpo,
-            categoria: mensagemOriginal.Categoria,
-            usuarioDestinoId: mensagemOriginal.UsuarioDestinoId,
-            canaisFallbackRestantesJson: JsonSerializer.Serialize(fallbackRestantes, EnumOptions));
-
-        await db.NotifOutboxMensagens.AddAsync(novaMsg, ct);
-
-        logger.LogInformation(
-            "Fallback criado para canal {Canal} outbox original={OriginalId}",
-            proximoCanal, mensagemOriginal.Id);
-        return true;
-    }
-
-    private static IDictionary<string, object?> ParsePayload(string payloadJson)
-    {
-        var vars = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        try
-        {
-            var doc = JsonDocument.Parse(payloadJson);
-            foreach (var prop in doc.RootElement.EnumerateObject())
-                vars[prop.Name] = prop.Value.GetString();
-        }
-        catch { /* silencioso */ }
-        return vars;
+        return false;
     }
 }

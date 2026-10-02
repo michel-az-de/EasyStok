@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities.Notifications;
+﻿using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Application.Services.Notifications;
@@ -8,6 +8,15 @@ public sealed class ResolvedorCanal
     /// <summary>
     /// Retorna os canais permitidos em ordem de preferência da rotina,
     /// filtrando por kill switches, ativação do canal e consentimento do usuário.
+    /// <para>
+    /// Pausa da empresa (N5): com <paramref name="empresaId"/>, o bloqueio dessa empresa, de um canal ou geral, suprime o
+    /// canal, menos para <see cref="CategoriaConteudoNotificacao.Seguranca"/>. A pausa global (sem empresa) vale para
+    /// tudo. Sem <paramref name="empresaId"/> só a pausa global é lida, como antes.
+    /// </para>
+    /// <para>
+    /// O InApp que a categoria <c>Operacional</c> acrescenta sozinho só entra quando
+    /// <paramref name="inAppTemTemplate"/> (não adianta enfileirar canal sem template).
+    /// </para>
     /// </summary>
     public IReadOnlyList<CanalNotificacao> ResolverCanaisPermitidos(
         CategoriaConteudoNotificacao categoria,
@@ -15,13 +24,15 @@ public sealed class ResolvedorCanal
         IReadOnlyList<ConsentimentoNotificacao> consentimentos,
         IReadOnlyList<ConfiguracaoCanal> configuracoes,
         IReadOnlyList<BloqueioNotificacao> bloqueios,
-        DateTime agora)
+        DateTime agora,
+        Guid? empresaId = null,
+        bool inAppTemTemplate = true)
     {
         var permitidos = new List<CanalNotificacao>();
 
         foreach (var canal in canaisPreferidos)
         {
-            if (TemKillSwitch(bloqueios, canal, agora))
+            if (TemKillSwitch(bloqueios, canal, agora, empresaId, categoria))
                 continue;
 
             if (!CanalAtivo(configuracoes, canal))
@@ -35,8 +46,9 @@ public sealed class ResolvedorCanal
 
         // InApp nunca é bloqueado para Operacional (garante fallback mínimo)
         if (categoria == CategoriaConteudoNotificacao.Operacional
+            && inAppTemTemplate
             && !permitidos.Contains(CanalNotificacao.InApp)
-            && !TemKillSwitch(bloqueios, CanalNotificacao.InApp, agora))
+            && !TemKillSwitch(bloqueios, CanalNotificacao.InApp, agora, empresaId, categoria))
         {
             permitidos.Add(CanalNotificacao.InApp);
         }
@@ -47,12 +59,15 @@ public sealed class ResolvedorCanal
     private static bool TemKillSwitch(
         IReadOnlyList<BloqueioNotificacao> bloqueios,
         CanalNotificacao canal,
-        DateTime agora)
+        DateTime agora,
+        Guid? empresaId,
+        CategoriaConteudoNotificacao categoria)
     {
         return bloqueios.Any(b =>
             b.EstaAtivo(agora) &&
             (b.Canal == null || b.Canal == canal) &&
-            b.EmpresaId == null); // kill switch global; empresa-scoped é validado pelo caller
+            (b.EmpresaId == null
+             || (empresaId.HasValue && b.EmpresaId == empresaId && categoria != CategoriaConteudoNotificacao.Seguranca)));
     }
 
     private static bool CanalAtivo(

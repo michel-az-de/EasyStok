@@ -1,5 +1,4 @@
 ﻿using System.Text.Json;
-using System.Text.Json.Serialization;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
@@ -35,10 +34,7 @@ public sealed class NotificadorService(
 
     public const string PrefixoTeste = "[TESTE] ";
 
-    private static readonly JsonSerializerOptions EnumOptions = new()
-    {
-        Converters = { new JsonStringEnumConverter() }
-    };
+    private readonly ConstrutorMensagemOutbox _construtor = new(templateRepository, renderer);
 
     public async Task PublicarEventoAsync(
         TipoEventoNotificacao tipo,
@@ -61,12 +57,13 @@ public sealed class NotificadorService(
         Guid empresaId,
         string payloadJson,
         Guid? refEntidadeId = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? correlationId = null)
     {
         // ADR-0030: só estagia o evento Pendente na UoW atual (sem ProcessarEventoInternoAsync,
         // sem CommitAsync). O caller commita junto com a mutação de negócio (atômico). O
         // Avaliador processa fora de banda — nada aguardado/falível após o commit do negócio.
-        var evento = EventoNotificacao.Criar(tipo, empresaId, payloadJson, refEntidadeId);
+        var evento = EventoNotificacao.Criar(tipo, empresaId, payloadJson, refEntidadeId, correlationId);
         await eventoRepository.AddAsync(evento, ct);
         return evento.Id;
     }
@@ -152,29 +149,39 @@ public sealed class NotificadorService(
         if (todosBloqueios.Any(b => b.EstaAtivo(agora) && b.Canal == null && b.EmpresaId == null))
         {
             logger.LogInformation("Kill switch global ativo — evento {EventoId} suprimido", evento.Id);
-            evento.MarcarComoProcessado();
-            await eventoRepository.UpdateAsync(evento, ct);
+            await FecharEventoAsync(evento, ct);
             return;
         }
 
-        var rotina = (await rotinaRepository.ListarAtivasAsync(evento.Tipo, evento.EmpresaId, ct))
-            .FirstOrDefault(r => r.EmpresaId == evento.EmpresaId || r.EmpresaId == null);
+        var rotina = SeletorRotina.Escolher(
+            await rotinaRepository.ListarAtivasAsync(evento.Tipo, evento.EmpresaId, ct), evento.EmpresaId);
 
         if (rotina is null)
         {
             logger.LogDebug(
                 "Nenhuma rotina ativa para TipoEvento={TipoEvento} EmpresaId={EmpresaId}",
                 evento.Tipo, evento.EmpresaId);
-            evento.MarcarComoProcessado();
-            await eventoRepository.UpdateAsync(evento, ct);
+            await FecharEventoAsync(evento, ct);
             return;
         }
 
-        var canaisPreferidos = ParseCanais(rotina.CanaisOrdemFallbackJson);
+        // N5: a pausa geral da empresa cala o evento, menos o de segurança (a global já saiu acima).
+        if (rotina.Categoria != CategoriaConteudoNotificacao.Seguranca
+            && todosBloqueios.Any(b => b.EstaAtivo(agora) && b.Canal == null && b.EmpresaId == evento.EmpresaId))
+        {
+            logger.LogInformation("Pausa da empresa ativa — evento {EventoId} suprimido", evento.Id);
+            await FecharEventoAsync(evento, ct);
+            return;
+        }
+
+        var canaisPreferidos = CanaisDaRotina.Ler(rotina);
+        var restricao = CanaisDaRotina.LerRestricao(evento.PayloadJson);
+        if (restricao is not null)
+            canaisPreferidos = canaisPreferidos.Where(restricao.Contains).ToList();
+
         if (canaisPreferidos.Count == 0)
         {
-            evento.MarcarComoProcessado();
-            await eventoRepository.UpdateAsync(evento, ct);
+            await FecharEventoAsync(evento, ct);
             return;
         }
 
@@ -188,231 +195,85 @@ public sealed class NotificadorService(
             .Concat(configuracoesFallback.Where(gf => configuracoes.All(ef => ef.Canal != gf.Canal)))
             .ToList();
 
+        // O InApp que a categoria Operacional acrescenta sozinho só vale com template do tipo; com restrição de canais
+        // no payload não se acrescenta nada.
+        var inAppTemTemplate = restricao is null
+            && rotina.Categoria == CategoriaConteudoNotificacao.Operacional
+            && !canaisPreferidos.Contains(CanalNotificacao.InApp)
+            && await _construtor.TemTemplateAsync(rotina, evento, CanalNotificacao.InApp, ct);
+
         var canaisPermitidos = resolvedorCanal.ResolverCanaisPermitidos(
             rotina.Categoria,
             canaisPreferidos,
             consentimentos,
             todasConfiguracoes,
             todosBloqueios,
-            agora);
+            agora,
+            evento.EmpresaId,
+            inAppTemTemplate);
 
         if (canaisPermitidos.Count == 0)
         {
             logger.LogInformation(
                 "Nenhum canal permitido para evento {EventoId} usuário {UsuarioId}",
                 evento.Id, usuarioDestinoId);
-            evento.MarcarComoProcessado();
+            await FecharEventoAsync(evento, ct);
+            return;
+        }
+
+        var vars = ConstrutorMensagemOutbox.LerVariaveis(evento.PayloadJson, varsAdicionais);
+        var destinatario = new DestinatarioMensagem(usuarioDestinoId, vars);
+        var todos = CanaisDaRotina.LerModo(rotina.ParametrosJson) == ModoCanais.Todos;
+        var chaveNegocio = vars.TryGetValue(ChaveIdempotenciaPayload, out var chave) && chave is string c
+            && !string.IsNullOrWhiteSpace(c);
+
+        var motivos = new List<string>();
+        var criadas = 0;
+        var repetidas = 0;
+        for (var i = 0; i < canaisPermitidos.Count; i++)
+        {
+            var canal = canaisPermitidos[i];
+            // Fallback: os canais seguintes ficam para o dispatcher tentar se este falhar. Todos: cada mensagem é
+            // independente, sem fallback (mandar de novo por outro canal duplicaria).
+            IReadOnlyList<CanalNotificacao> restantes = todos ? [] : canaisPermitidos.Skip(i + 1).ToList();
+
+            var resultado = await _construtor.ConstruirAsync(evento, rotina, canal, destinatario, restantes, agora, ct);
+            if (resultado.Mensagem is null)
+            {
+                logger.LogWarning(
+                    "Canal {Canal} pulado no evento {EventoId}: {Motivo}", canal, evento.Id, resultado.Detalhe);
+                motivos.Add(resultado.Detalhe ?? $"Canal {canal} sem mensagem");
+                continue;
+            }
+
+            if (chaveNegocio && await outboxRepository.ExisteAsync(resultado.Mensagem.IdempotencyKey, ct))
+            {
+                logger.LogInformation(
+                    "Evento {EventoId} repete um fato já enfileirado (Tipo={Tipo} canal {Canal}) — sem nova mensagem",
+                    evento.Id, evento.Tipo, canal);
+                repetidas++;
+                if (!todos) break;
+                continue;
+            }
+
+            await outboxRepository.AddAsync(resultado.Mensagem, ct);
+            criadas++;
+            if (!todos) break;
+        }
+
+        if (criadas == 0 && repetidas == 0)
+        {
+            evento.MarcarComoFalhado(string.Join("; ", motivos));
             await eventoRepository.UpdateAsync(evento, ct);
             return;
         }
 
-        var canalPrimario = canaisPermitidos[0];
-        var canaisFallback = canaisPermitidos.Skip(1).ToList();
+        await FecharEventoAsync(evento, ct);
+    }
 
-        var template = await ResolverTemplateAsync(rotina.TemplateCodigo, canalPrimario, evento.EmpresaId, ct);
-        if (template is null)
-        {
-            logger.LogWarning(
-                "Template não encontrado: codigo={Codigo} canal={Canal} empresa={EmpresaId}",
-                rotina.TemplateCodigo, canalPrimario, evento.EmpresaId);
-            evento.MarcarComoFalhado($"Template '{rotina.TemplateCodigo}' não encontrado para canal {canalPrimario}");
-            await eventoRepository.UpdateAsync(evento, ct);
-            return;
-        }
-
-        var vars = ConstruirVariaveis(evento.PayloadJson, varsAdicionais);
-
-        string assunto;
-        string corpo;
-
-        try
-        {
-            // Assunto sempre texto puro; corpo HTML em canais que renderizam markup (Email, InApp).
-            assunto = await renderer.RenderizarAsync(template.AssuntoTemplate, vars, ct);
-            var corpoEscapaHtml = canalPrimario is CanalNotificacao.Email or CanalNotificacao.InApp;
-            corpo = await renderer.RenderizarAsync(template.CorpoTemplate, vars, corpoEscapaHtml, ct);
-            if (vars.TryGetValue(TestePayload, out var teste) && teste is true && !string.IsNullOrWhiteSpace(assunto))
-                assunto = PrefixoTeste + assunto;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex,
-                "Erro ao renderizar template {TemplateId} para evento {EventoId}",
-                template.Id, evento.Id);
-            evento.MarcarComoFalhado($"Erro de renderização: {ex.Message}");
-            await eventoRepository.UpdateAsync(evento, ct);
-            return;
-        }
-
-        var destinatario = ResolverDestinatario(vars, canalPrimario, evento.EmpresaId);
-        if (string.IsNullOrWhiteSpace(destinatario))
-        {
-            logger.LogWarning(
-                "Destinatário não resolvido para evento {EventoId} canal {Canal}",
-                evento.Id, canalPrimario);
-            evento.MarcarComoFalhado($"Destinatário não encontrado para canal {canalPrimario}");
-            await eventoRepository.UpdateAsync(evento, ct);
-            return;
-        }
-
-        // S13: chave de negócio no payload (ex.: pedido + status) torna o enfileiramento idempotente entre
-        // eventos distintos do mesmo fato; o índice único do outbox é a defesa final.
-        var chaveIdempotencia = vars.TryGetValue(ChaveIdempotenciaPayload, out var chave) && chave is string c && !string.IsNullOrWhiteSpace(c)
-            ? c
-            : null;
-        if (chaveIdempotencia is not null
-            && await outboxRepository.ExisteAsync(OutboxMensagemNotificacao.ComputarIdempotencyKey(chaveIdempotencia, canalPrimario), ct))
-        {
-            logger.LogInformation(
-                "Evento {EventoId} repete um fato já enfileirado (Tipo={Tipo} canal {Canal}) — sem nova mensagem",
-                evento.Id, evento.Tipo, canalPrimario);
-            evento.MarcarComoProcessado();
-            await eventoRepository.UpdateAsync(evento, ct);
-            return;
-        }
-
-        string? metadadosJson;
-        try
-        {
-            metadadosJson = await RenderizarMetadadosAsync(template.MetadadosJson, vars, ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex,
-                "Erro ao renderizar metadados do template {TemplateId} para evento {EventoId}",
-                template.Id, evento.Id);
-            evento.MarcarComoFalhado($"Erro de renderização dos metadados: {ex.Message}");
-            await eventoRepository.UpdateAsync(evento, ct);
-            return;
-        }
-
-        var canaisFallbackJson = canaisFallback.Count > 0
-            ? JsonSerializer.Serialize(canaisFallback, EnumOptions)
-            : "[]";
-
-        var outbox = OutboxMensagemNotificacao.Criar(
-            eventoId: evento.Id,
-            templateId: template.Id,
-            empresaId: evento.EmpresaId,
-            canal: canalPrimario,
-            destinatario: destinatario,
-            assuntoRenderizado: assunto,
-            corpoRenderizado: corpo,
-            categoria: rotina.Categoria,
-            usuarioDestinoId: usuarioDestinoId,
-            canaisFallbackRestantesJson: canaisFallbackJson,
-            metadadosJson: metadadosJson,
-            chaveIdempotencia: chaveIdempotencia);
-
-        if (vars.TryGetValue(EnviarAposPayload, out var enviarApos) && enviarApos is string instante
-            && DateTime.TryParse(instante, System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var enviarAposUtc))
-            outbox.AgendarPara(DateTime.SpecifyKind(enviarAposUtc, DateTimeKind.Utc));
-
-        await outboxRepository.AddAsync(outbox, ct);
-
+    private async Task FecharEventoAsync(EventoNotificacao evento, CancellationToken ct)
+    {
         evento.MarcarComoProcessado();
         await eventoRepository.UpdateAsync(evento, ct);
-    }
-
-    /// <summary>
-    /// Renderiza cada valor dos metadados do template com as variáveis do evento (texto puro: vão para a API
-    /// do provider, não para HTML). Nulo quando o template não declara metadados.
-    /// </summary>
-    private async Task<string?> RenderizarMetadadosAsync(
-        string? metadadosTemplateJson,
-        IDictionary<string, object?> vars,
-        CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(metadadosTemplateJson)) return null;
-
-        var modelos = JsonSerializer.Deserialize<Dictionary<string, string>>(metadadosTemplateJson)
-            ?? new Dictionary<string, string>();
-        var renderizados = new Dictionary<string, string>(modelos.Count);
-        foreach (var (chave, modelo) in modelos)
-            renderizados[chave] = await renderer.RenderizarAsync(modelo, vars, ct);
-
-        return JsonSerializer.Serialize(renderizados);
-    }
-
-    private async Task<TemplateNotificacao?> ResolverTemplateAsync(
-        string codigo,
-        CanalNotificacao canal,
-        Guid empresaId,
-        CancellationToken ct)
-    {
-        return await templateRepository.GetAtivoAsync(codigo, canal, empresaId, ct)
-            ?? await templateRepository.GetAtivoAsync(codigo, canal, null, ct);
-    }
-
-    private static IReadOnlyList<CanalNotificacao> ParseCanais(string json)
-    {
-        try
-        {
-            return JsonSerializer.Deserialize<List<CanalNotificacao>>(json, EnumOptions)
-                ?? [];
-        }
-        catch
-        {
-            return [];
-        }
-    }
-
-    private static IDictionary<string, object?> ConstruirVariaveis(
-        string payloadJson,
-        IDictionary<string, object?>? varsAdicionais)
-    {
-        var vars = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-
-        try
-        {
-            var doc = JsonDocument.Parse(payloadJson);
-            foreach (var prop in doc.RootElement.EnumerateObject())
-                vars[prop.Name] = prop.Value.ValueKind switch
-                {
-                    JsonValueKind.String => prop.Value.GetString(),
-                    JsonValueKind.Number => prop.Value.TryGetInt64(out var l) ? l : prop.Value.GetDouble(),
-                    JsonValueKind.True => true,
-                    JsonValueKind.False => false,
-                    _ => prop.Value.ToString()
-                };
-        }
-        catch (JsonException) { /* payload malformado */ }
-
-        if (varsAdicionais != null)
-            foreach (var kv in varsAdicionais)
-                vars[kv.Key] = kv.Value;
-
-        return vars;
-    }
-
-    private static string ResolverDestinatario(
-        IDictionary<string, object?> vars,
-        CanalNotificacao canal,
-        Guid empresaId)
-    {
-        // Web Push (S07): o usuario do payload recebe em todos os dispositivos dele; sem usuario,
-        // todas as subscriptions ativas da empresa (convencao "usuario:"/"empresa:" do WebPushCanal).
-        if (canal == CanalNotificacao.Push)
-        {
-            return vars.TryGetValue("usuarioId", out var uid) && uid is string u && Guid.TryParse(u, out var usuarioId)
-                ? $"usuario:{usuarioId}"
-                : $"empresa:{empresaId}";
-        }
-
-        var chaves = canal switch
-        {
-            CanalNotificacao.Email => new[] { "email", "emailDestino", "usuarioEmail" },
-            CanalNotificacao.Sms => new[] { "telefone", "sms", "celular" },
-            CanalNotificacao.WhatsApp => new[] { "telefone", "whatsapp", "celular" },
-            CanalNotificacao.InApp => new[] { "usuarioId" },
-            _ => Array.Empty<string>()
-        };
-
-        foreach (var chave in chaves)
-            if (vars.TryGetValue(chave, out var val) && val is string s && !string.IsNullOrWhiteSpace(s))
-                return s;
-
-        return string.Empty;
     }
 }

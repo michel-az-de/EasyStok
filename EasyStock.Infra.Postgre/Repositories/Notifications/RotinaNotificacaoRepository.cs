@@ -23,7 +23,8 @@ public sealed class RotinaNotificacaoRepository(EasyStockDbContext db) : IRotina
         if (empresaId is { } dona)
             q = q.IgnoreQueryFilters().Where(r => r.EmpresaId == dona || r.EmpresaId == null);
         if (tipoEvento.HasValue) q = q.Where(r => r.TipoEvento == tipoEvento);
-        return await q.ToListAsync(ct);
+        // N5: determinístico. A da empresa antes da global, depois a mais antiga; o SeletorRotina escolhe sobre esta ordem.
+        return await q.OrderBy(r => r.EmpresaId == null).ThenBy(r => r.CriadaEm).ToListAsync(ct);
     }
 
     public async Task<(IReadOnlyList<RotinaNotificacao> Items, int Total)> ListarAsync(
