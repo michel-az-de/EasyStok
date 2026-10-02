@@ -46,7 +46,23 @@
                 {
                     <tr x-data="{ editando: false, nomeEdit: '@u.Nome', editPerfil: false }">
                         <td class="font-medium text-slate-900">@u.Nome</td>
-                        <td class="text-slate-500 text-sm">@u.Email</td>
+                        <td class="text-slate-500 text-sm">
+                            @u.Email
+                            @if (u.ConviteEstado == "pendente")
+                            {
+                                <div class="mt-1 flex items-center gap-2">
+                                    <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Convite pendente</span>
+                                    <form action="/usuarios/@u.Id/convite" method="post" class="inline">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="text-xs text-indigo-600 hover:text-indigo-700">Reenviar convite</button>
+                                    </form>
+                                </div>
+                            }
+                            else if (u.ConviteEstado == "aceito")
+                            {
+                                <div class="mt-1 text-xs text-slate-400">Convite aceito via @u.ConviteVia</div>
+                            }
+                        </td>
                         <td>
                             <div x-show="!editando">
                                 @{
@@ -175,10 +191,18 @@
                     <input type="email" name="Email" required
                            class="ui-field w-full text-sm" />
                 </div>
+                <p class="text-xs text-slate-500">
+                    A pessoa recebe um convite com link e define a própria senha. Você não precisa criar nem repassar senha.
+                </p>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Senha *</label>
-                    <input type="password" name="Senha" required
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Telefone (opcional)</label>
+                    <input type="tel" name="Telefone" autocomplete="off" placeholder="(11) 99999-0000"
                            class="ui-field w-full text-sm" />
+                    <label class="mt-2 flex items-start gap-2 text-xs text-slate-600">
+                        <input type="checkbox" name="AtestaOptInWhatsApp" value="true" class="mt-0.5" />
+                        <span>Atesto que esta pessoa aceitou receber o convite por WhatsApp.</span>
+                    </label>
+                    <input type="hidden" name="AtestaOptInWhatsApp" value="false" />
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Perfil</label>

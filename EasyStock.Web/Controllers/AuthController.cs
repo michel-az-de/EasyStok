@@ -330,6 +330,37 @@ public class AuthController(
         return RedirectToAction(nameof(Login));
     }
 
+    /// <summary>
+    /// Tela do convite de primeiro acesso (N9). Abrir o link NUNCA chama a API e nunca consome: so mostra o formulario, que
+    /// lê o token da query ou do fragmento (<c>#t=</c>, que o servidor nem chega a receber). Quem consome e o POST.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpGet("/auth/convite")]
+    public IActionResult Convite(string? token)
+    {
+        SemReferrer();
+        return View(new AceitarConviteViewModel { Token = token ?? string.Empty });
+    }
+
+    [AllowAnonymous]
+    [HttpPost("/auth/convite")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Convite(AceitarConviteViewModel vm)
+    {
+        SemReferrer();
+        if (!ModelState.IsValid) return View(vm);
+
+        var result = await api.PostAsync<object>("auth/aceitar-convite", new { token = vm.Token, novaSenha = vm.NovaSenha });
+        if (!result.Success)
+        {
+            ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Convite inválido ou expirado.");
+            return View(vm);
+        }
+
+        TempData["Toast"] = "success|Senha criada! Entre com seu e-mail e a senha que você acabou de definir.";
+        return RedirectToAction(nameof(Login));
+    }
+
     /// <summary>Tela do codigo de 6 digitos recebido no WhatsApp (N8). Quem recebeu o link usa a tela do link.</summary>
     [AllowAnonymous]
     [HttpGet("/auth/redefinir-senha-codigo")]
