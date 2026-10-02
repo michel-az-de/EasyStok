@@ -82,6 +82,7 @@ public sealed class ResolvedorAudiencia(
             switch (audiencia)
             {
                 case AudienciaNotificacao.Usuario:
+                case AudienciaNotificacao.Convidado:
                     // Sem usuarioId a audiência cai nas chaves do payload (cliente final, quem entrega o contato).
                     return null;
                 case AudienciaNotificacao.Admins:
@@ -118,9 +119,13 @@ public sealed class ResolvedorAudiencia(
 
             var consentimentosDele = consentimentosPorUsuario.GetValueOrDefault(u.Id) ?? [];
             var email = !string.IsNullOrWhiteSpace(u.Email) && (!coletiva || u.EmailConfirmado) ? u.Email : null;
+            // N9: o convidado ainda nao verificou o telefone (o aceite do convite e que verifica) e o opt-in vem do atestado
+            // da dona. A relaxacao vale so para a audiencia convidado e so enquanto o convite esta pendente.
+            var telefoneVerificadoOuConvidado = u.TelefoneVerificadoEm is not null
+                                                || (audiencia == AudienciaNotificacao.Convidado && u.ConvitePendente);
             var whatsApp = whatsAppDePlataforma
                            && !string.IsNullOrWhiteSpace(u.Telefone)
-                           && u.TelefoneVerificadoEm is not null
+                           && telefoneVerificadoOuConvidado
                            && consentimentosDele.Any(c => c.Canal == CanalNotificacao.WhatsApp
                                                           && c.Categoria == rotina.Categoria && c.OptIn)
                 ? u.Telefone

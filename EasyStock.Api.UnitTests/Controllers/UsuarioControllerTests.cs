@@ -46,7 +46,18 @@ public class UsuarioControllerTests
         var revogadorSessoes = new RevogadorSessoes(
             _usuarioRepository, Substitute.For<IRefreshTokenRepository>(), Substitute.For<ICacheService>(),
             TimeProvider.System, Substitute.For<ILogger<RevogadorSessoes>>());
-        _criarUseCase = new CriarUsuarioUseCase(_usuarioRepository, _assinaturaRepository, _usuarioEmpresaRepository, _usuarioPerfilRepository, _unitOfWork, passwordHasher, criarLogger);
+        var convites = new ConvitesDeAcesso(
+            Substitute.For<IResetTokenRepository>(),
+            Substitute.For<EasyStock.Application.Ports.Output.Notifications.INotificadorService>(),
+            Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(),
+            Substitute.For<IEmpresaRepository>(),
+            new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), TimeProvider.System,
+            Substitute.For<ILogger<ConvitesDeAcesso>>());
+        _criarUseCase = new CriarUsuarioUseCase(
+            _usuarioRepository, _assinaturaRepository, _usuarioEmpresaRepository, _usuarioPerfilRepository,
+            Substitute.For<IPerfilRepository>(),
+            Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(), convites,
+            _currentUser, _unitOfWork, passwordHasher, criarLogger);
         _atualizarUseCase = new AtualizarUsuarioUseCase(
             _usuarioRepository, _currentUser, _unitOfWork,
             new TrocaDeContatoService(

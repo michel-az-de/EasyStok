@@ -1,4 +1,5 @@
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.ValueObjects;
 using FluentAssertions;
 
 namespace EasyStock.Domain.Tests.Entities;
@@ -93,5 +94,76 @@ public class UsuarioTests
         usuario.AtualizarUltimoAcesso();
 
         usuario.SessoesValidasDesde.Should().Be(Utc(13, 45, 10), "login e contagem de falha nunca mudam o corte");
+    }
+}
+
+/// <summary>N9: o convidado nasce com hash inutilizável e só deixa de estar pendente ao aceitar o convite.</summary>
+public class UsuarioConviteTests
+{
+    private static readonly DateTime Agora = new(2026, 10, 2, 15, 0, 0, DateTimeKind.Utc);
+
+    [Fact]
+    public void CriarConvidadoNasceComHashInutilizavelESemEmailConfirmado()
+    {
+        var usuario = Usuario.CriarConvidado("Ana", "ana@casadababa.com");
+
+        usuario.Ativo.Should().BeTrue();
+        usuario.EmailConfirmado.Should().BeFalse();
+        usuario.SenhaHash.Should().StartWith(Usuario.MarcadorDeConvite);
+        usuario.ConviteAceitoEm.Should().BeNull();
+        usuario.ConviteAceitoVia.Should().BeNull();
+    }
+
+    [Fact]
+    public void ConvitePendenteDependeDoMarcador()
+    {
+        Usuario.CriarConvidado("Ana", "ana@casadababa.com").ConvitePendente.Should().BeTrue();
+        Usuario.Criar("Ana", "ana@casadababa.com", "$2a$11$hashDeSenhaDeVerdade").ConvitePendente.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AceitarConviteTrocaOHashEGravaViaMascarada()
+    {
+        var usuario = Usuario.CriarConvidado("Ana", "ana@casadababa.com");
+        usuario.DefinirTelefone(TelefoneE164.From("+5511999991234"));
+
+        usuario.AceitarConvite("$2a$11$hashNovo", ViaDoConvite.WhatsApp(usuario.Telefone!), Agora);
+
+        usuario.SenhaHash.Should().Be("$2a$11$hashNovo");
+        usuario.ConvitePendente.Should().BeFalse();
+        usuario.ConviteAceitoEm.Should().Be(Agora);
+        usuario.ConviteAceitoVia.Should().Be("+55•••1234");
+        usuario.ConviteAceitoVia.Should().NotContain("11999991234", "o telefone inteiro nunca vai para a coluna");
+    }
+
+    [Fact]
+    public void AceitarPeloGoogleDeixaASenhaInutilizavelMasNaoPendente()
+    {
+        var usuario = Usuario.CriarConvidado("Ana", "ana@casadababa.com");
+
+        usuario.AceitarConviteSemSenha(ViaDoConvite.Google, Agora);
+
+        usuario.ConvitePendente.Should().BeFalse("o esqueci a senha passa a valer depois do aceite");
+        usuario.SenhaHash.Should().StartWith("$2a$10$").And.NotStartWith(Usuario.MarcadorDeConvite);
+        usuario.ConviteAceitoVia.Should().Be("Google");
+        usuario.ConviteAceitoEm.Should().Be(Agora);
+    }
+
+    [Fact]
+    public void AceitarConviteQueNaoEstaPendenteLanca()
+    {
+        var usuario = Usuario.Criar("Ana", "ana@casadababa.com", "$2a$11$hash");
+
+        var act = () => usuario.AceitarConvite("$2a$11$novo", ViaDoConvite.Email, Agora);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void ViaMascaraSoGuardaPaisEUltimosQuatroDigitos()
+    {
+        ViaDoConvite.WhatsApp(TelefoneE164.From("+5521988887777")).Should().Be("+55•••7777");
+        ViaDoConvite.Email.Should().Be("e-mail");
+        ViaDoConvite.Google.Should().Be("Google");
     }
 }

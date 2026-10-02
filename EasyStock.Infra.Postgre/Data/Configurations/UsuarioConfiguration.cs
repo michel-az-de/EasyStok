@@ -83,6 +83,14 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasMaxLength(255)
                 .HasColumnType("character varying(255)");
 
+            // N9: convite de primeiro acesso. Duas colunas nulas e aditivas; a via guarda so texto ja mascarado (+55•••1234).
+            builder.Property(u => u.ConviteAceitoEm)
+                .HasColumnType("timestamp with time zone");
+
+            builder.Property(u => u.ConviteAceitoVia)
+                .HasMaxLength(40)
+                .HasColumnType("character varying(40)");
+
             builder.HasIndex(u => u.Email).IsUnique();
             builder.HasIndex(u => u.Ativo);
         }

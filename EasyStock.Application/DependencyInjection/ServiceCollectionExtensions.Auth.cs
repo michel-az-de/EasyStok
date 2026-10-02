@@ -50,6 +50,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EmpresaDoEventoAnonimo>();       // empresa do evento do pedido anônimo (N8)
         services.AddScoped<LimitePedidosAcesso>();          // teto por IP, no ICacheService (N8)
         services.AddScoped<LimpezaTokensAcesso>();          // limpeza dos reset_tokens expirados (N8)
+        services.AddScoped<ConvitesDeAcesso>();             // emissao e revogacao do convite de primeiro acesso (N9)
         services.AddScoped<ConfirmEmailUseCase>();
 
         // Perfil do usuário autenticado
