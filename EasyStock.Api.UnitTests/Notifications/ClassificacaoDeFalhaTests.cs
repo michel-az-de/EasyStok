@@ -12,6 +12,7 @@ using EasyStock.Infra.Notifications.Push;
 using EasyStock.Infra.Notifications.Sms;
 using EasyStock.Infra.Notifications.WhatsApp;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -272,6 +273,23 @@ public class ClassificacaoDeFalhaTests
         var canal = new WebPushCanal(repo, Options.Create(OpcoesVapid()), NullLogger<WebPushCanal>.Instance,
             new WebPushClient(new HttpClient(handler)));
         return (canal, repo, handler);
+    }
+
+    [Fact]
+    public void WebPush_resolve_no_container_sem_WebPushClient_registrado()
+    {
+        // O WebPushClient opcional do construtor é só um ponto de teste. O container do Worker não o registra, e o
+        // valor padrão (nulo) precisa bastar, inclusive com ValidateOnBuild (o Worker sobe com ele ligado).
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(Substitute.For<IWebPushSubscriptionRepository>());
+        services.AddSingleton(Options.Create(OpcoesVapid()));
+        services.AddScoped<ICanalNotificacao, WebPushCanal>();
+
+        using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+        using var scope = provider.CreateScope();
+
+        scope.ServiceProvider.GetRequiredService<ICanalNotificacao>().Should().BeOfType<WebPushCanal>();
     }
 
     [Fact]
