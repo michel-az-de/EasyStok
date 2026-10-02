@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.RateLimiting;
 using EasyStock.Application.UseCases.AnonimizarMeusDados;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
-using EasyStock.Application.UseCases.CadastrarUsuario;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.ConfirmEmail;
 using EasyStock.Application.UseCases.EsqueciSenha;
@@ -44,7 +43,6 @@ public class AuthController(
     IRefreshTokenRepository refreshTokenRepository,
     IAuditLogRepository auditLogRepository,
     IUnitOfWork unitOfWork,
-    CadastrarUsuarioUseCase cadastrarUsuarioUseCase,
     RefreshTokenUseCase refreshTokenUseCase,
     LogoutUseCase logoutUseCase,
     EsqueciSenhaUseCase esqueciSenhaUseCase,
@@ -203,14 +201,6 @@ public class AuthController(
             return Unauthorized(new { error = new { code = "INVALID_CREDENTIALS", message = "E-mail ou senha incorretos." } });
         }
     }
-
-    [SwaggerOperation(Summary = "Register new user account")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [EnableRateLimiting("auth")]
-    [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] CadastrarUsuarioCommand command)
-        => DataOk(await cadastrarUsuarioUseCase.ExecuteAsync(command));
 
     [SwaggerOperation(Summary = "Refresh JWT token", Description = "Exchange a valid refresh token for a new JWT access token.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
