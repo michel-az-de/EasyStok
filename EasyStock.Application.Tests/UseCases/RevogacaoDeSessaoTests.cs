@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Auth;
 using EasyStock.Application.UseCases.AlterarSenha;
@@ -62,29 +63,37 @@ public class RevogacaoDeSessaoTests
 
     // ── reset de senha ────────────────────────────────────────────────────────────────────────
 
-    private (ResetarSenhaUseCase UseCase, ResetToken Token, IAuditLogRepository Auditoria) ResetarSenha(bool tokenValido = true)
+    private (ResetarSenhaUseCase UseCase, IResetTokenRepository Tokens, ResetToken Token, IAuditLogRepository Auditoria) ResetarSenha(bool tokenValido = true)
     {
         var resetTokens = Substitute.For<IResetTokenRepository>();
-        var token = ResetToken.Criar(_usuario.Id, "hash-do-token", DateTime.UtcNow.AddMinutes(30), null, null);
+        var token = ResetToken.Criar(_usuario.Id, "hash-do-token", Agora.UtcDateTime.AddMinutes(30), null, null);
         resetTokens.GetByTokenAsync("token-do-email").Returns(tokenValido ? token : null);
+        resetTokens.ConsumirAsync(token.Id, Arg.Any<DateTime>()).Returns(true);
         var auditoria = Substitute.For<IAuditLogRepository>();
+        var relogio = new FakeTimeProvider(Agora);
+        var concluidor = new ConcluidorDeReset(
+            _usuarios, resetTokens, auditoria, _revogador, Substitute.For<INotificadorService>(),
+            new EmpresaDoEventoAnonimo(
+                Substitute.For<IEmpresaPadraoResolver>(), Substitute.For<ITenantContextAccessor>(),
+                Substitute.For<ILogger<EmpresaDoEventoAnonimo>>()),
+            new FakePasswordHasher(), relogio, Substitute.For<ILogger<ConcluidorDeReset>>());
         var useCase = new ResetarSenhaUseCase(
-            resetTokens, _usuarios, auditoria, _revogador, _unitOfWork,
-            new FakePasswordHasher(), Substitute.For<ILogger<ResetarSenhaUseCase>>());
-        return (useCase, token, auditoria);
+            resetTokens, _usuarios, concluidor, new LimitePedidosAcesso(_cache), _unitOfWork, relogio,
+            Substitute.For<ILogger<ResetarSenhaUseCase>>());
+        return (useCase, resetTokens, token, auditoria);
     }
 
     [Fact]
     public async Task ResetDeSenhaRevogaAsSessoes()
     {
         _refreshTokens.RevogarSessoesAtivasAsync(_usuario.Id, Agora.UtcDateTime).Returns(2);
-        var (useCase, token, auditoria) = ResetarSenha();
+        var (useCase, tokens, token, auditoria) = ResetarSenha();
 
         await useCase.ExecuteAsync(new ResetarSenhaCommand("token-do-email", "NovaSenha@123"));
 
         await DeveTerRevogadoOUsuarioTodo();
         _usuario.SenhaHash.Should().Be(FakePasswordHasher.MakeHash("NovaSenha@123"));
-        token.Usado.Should().BeTrue();
+        await tokens.Received(1).ConsumirAsync(token.Id, Agora.UtcDateTime);
         await auditoria.Received(1).AddAsync(Arg.Is<AuditLog>(a => a.Detalhes!.Contains("2 refresh tokens revogados")));
         // O laço N+1 saiu de cena: nenhum refresh token é lido nem atualizado um a um.
         await _refreshTokens.DidNotReceiveWithAnyArgs().GetByUsuarioIdAsync(default);
@@ -94,7 +103,7 @@ public class RevogacaoDeSessaoTests
     [Fact]
     public async Task ResetComTokenInvalidoNaoRevoga()
     {
-        var (useCase, _, _) = ResetarSenha(tokenValido: false);
+        var (useCase, _, _, _) = ResetarSenha(tokenValido: false);
 
         await Assert.ThrowsAsync<RegraDeDominioVioladaException>(
             () => useCase.ExecuteAsync(new ResetarSenhaCommand("token-do-email", "NovaSenha@123")));

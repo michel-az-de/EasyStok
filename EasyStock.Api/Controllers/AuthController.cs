@@ -11,6 +11,7 @@ using EasyStock.Application.UseCases.ExportarMeusDados;
 using EasyStock.Application.UseCases.Logout;
 using EasyStock.Application.UseCases.ObterUsuarioAtual;
 using EasyStock.Application.UseCases.RefreshToken;
+using EasyStock.Application.Services.Auth;
 using EasyStock.Application.UseCases.ResetarSenha;
 using AuditLogEntity = EasyStock.Domain.Entities.AuditLog;
 using RefreshTokenEntity = EasyStock.Domain.Entities.RefreshToken;
@@ -30,6 +31,15 @@ public sealed record LoginRequest(
 public sealed record ListarEmpresasParaLoginRequest(
     [Required, EmailAddress] string Email,
     [Required] string Senha);
+/// <summary>Pedido de redefinição (N8). Só o e-mail: a base do link vem da configuração, nunca do corpo (#765); um <c>baseUrl</c> enviado é ignorado.</summary>
+public sealed record EsqueciSenhaRequest([Required] string Email);
+
+/// <summary>Reset pelo link do e-mail (N8). IP e agente saem da conexão, não do corpo.</summary>
+public sealed record ResetarSenhaRequest([Required] string Token, [Required] string NovaSenha);
+
+/// <summary>Reset pelo código de 6 dígitos do WhatsApp (N8).</summary>
+public sealed record ResetarSenhaPorCodigoRequest([Required] string Email, [Required] string Codigo, [Required] string NovaSenha);
+
 public sealed record LoginUsuarioInfo(Guid id, string nome, string email, string nivel);
 public sealed record LoginResponse(string token, string refreshToken, int expiresIn, LoginUsuarioInfo usuario);
 
@@ -47,6 +57,7 @@ public class AuthController(
     LogoutUseCase logoutUseCase,
     EsqueciSenhaUseCase esqueciSenhaUseCase,
     ResetarSenhaUseCase resetarSenhaUseCase,
+    ResetarSenhaPorCodigoUseCase resetarSenhaPorCodigoUseCase,
     ConfirmEmailUseCase confirmEmailUseCase,
     ObterUsuarioAtualUseCase obterUsuarioAtualUseCase,
     AtualizarUsuarioAtualUseCase atualizarUsuarioAtualUseCase,
@@ -198,19 +209,81 @@ public class AuthController(
     public async Task<IActionResult> Logout([FromBody] LogoutCommand command)
         => DataOk(await logoutUseCase.ExecuteAsync(command));
 
-    [SwaggerOperation(Summary = "Request password reset email")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [SwaggerOperation(
+        Summary = "Request password reset (link by e-mail, code by WhatsApp when eligible)",
+        Description = "Sempre 202 com o mesmo corpo, exista a conta ou nao (N8). Nao faz rede: enfileira um evento ResetSenha no motor. " +
+                      "Limites: 5 pedidos por IP em 15 min (429) e, por conta, 3 por hora, 6 por dia e 60 s entre pedidos (202 sem envio).")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     [EnableRateLimiting("auth")]
     [HttpPost("forgot-password")]
-    public async Task<IActionResult> ForgotPassword([FromBody] EsqueciSenhaCommand command)
-        => DataOk(await esqueciSenhaUseCase.ExecuteAsync(command));
+    public async Task<IActionResult> ForgotPassword([FromBody] EsqueciSenhaRequest request)
+    {
+        try
+        {
+            var resultado = await esqueciSenhaUseCase.ExecuteAsync(
+                new EsqueciSenhaCommand(request.Email, ClientIp(), ClientUserAgent()));
+            return StatusCode(StatusCodes.Status202Accepted, new ApiResponse<EsqueciSenhaResult>(resultado, new { }));
+        }
+        catch (LimitePedidosAcessoExcedidoException ex)
+        {
+            return TooManyRequests(ex);
+        }
+    }
 
     [SwaggerOperation(Summary = "Reset password using token from email")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     [EnableRateLimiting("auth")]
     [HttpPost("reset-password")]
-    public async Task<IActionResult> ResetPassword([FromBody] ResetarSenhaCommand command)
-        => DataOk(await resetarSenhaUseCase.ExecuteAsync(command));
+    public async Task<IActionResult> ResetPassword([FromBody] ResetarSenhaRequest request)
+    {
+        try
+        {
+            return DataOk(await resetarSenhaUseCase.ExecuteAsync(
+                new ResetarSenhaCommand(request.Token, request.NovaSenha, ClientIp(), ClientUserAgent())));
+        }
+        catch (LimitePedidosAcessoExcedidoException ex)
+        {
+            return TooManyRequests(ex);
+        }
+    }
+
+    [SwaggerOperation(
+        Summary = "Reset password using the 6-digit code sent by WhatsApp",
+        Description = "Codigo de 10 min, 5 tentativas, uso unico. Superadmin nunca redefine por codigo (mesma recusa generica).")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [EnableRateLimiting("auth")]
+    [HttpPost("reset-password-code")]
+    public async Task<IActionResult> ResetPasswordCode([FromBody] ResetarSenhaPorCodigoRequest request)
+    {
+        try
+        {
+            return DataOk(await resetarSenhaPorCodigoUseCase.ExecuteAsync(
+                new ResetarSenhaPorCodigoCommand(request.Email, request.Codigo, request.NovaSenha, ClientIp(), ClientUserAgent())));
+        }
+        catch (LimitePedidosAcessoExcedidoException ex)
+        {
+            return TooManyRequests(ex);
+        }
+    }
+
+    // IP e agente vem da conexao, nunca do corpo. Fora de uma requisicao HTTP (testes) sao nulos.
+    private string? ClientIp() => HttpContext?.Connection.RemoteIpAddress?.ToString();
+
+    private string? ClientUserAgent()
+    {
+        var agente = HttpContext?.Request.Headers.UserAgent.ToString();
+        return string.IsNullOrWhiteSpace(agente) ? null : agente;
+    }
+
+    private IActionResult TooManyRequests(LimitePedidosAcessoExcedidoException ex)
+    {
+        Response.Headers.Append("Retry-After", ex.RetryAfterSeconds.ToString());
+        return StatusCode(StatusCodes.Status429TooManyRequests, new ApiErrorResponse(new ApiError(
+            "TOO_MANY_REQUESTS", ex.Message, null, null)));
+    }
 
     [Authorize]
     [SwaggerOperation(Summary = "Get current authenticated user profile")]

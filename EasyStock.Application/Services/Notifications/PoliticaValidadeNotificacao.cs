@@ -20,7 +20,7 @@ public sealed class QuarentenaNotificacaoOptions
 /// <c>Expirado</c>. No evento o prazo conta de <c>OcorridoEm</c>; no outbox (só <c>Pendente</c> sem tentativa), de
 /// <c>ProximaTentativaEm</c>. Os valores iniciais vêm da spec N1 e podem ser sobrescritos por configuração:
 /// <list type="table">
-/// <item><term>Segurança (<c>ResetSenha</c>, <c>ConfirmacaoEmail</c>, <c>ContatoAlterado</c>)</term><description>30 min</description></item>
+/// <item><term>Segurança (<c>ResetSenha</c>, <c>ConfirmacaoEmail</c>, <c>ContatoAlterado</c>, <c>SenhaAlterada</c>)</term><description>30 min</description></item>
 /// <item><term>Aviso do pedido e pós-venda ao cliente (S13)</term><description>2 h</description></item>
 /// <item><term>Campanha, atendimento interno</term><description>1 h</description></item>
 /// <item><term>Catálogo de plataforma (N13): incidente 2 h, prazo estourado 6 h, resumo diário 4 h</term><description>convite de acesso fica em 24 h</description></item>
@@ -38,6 +38,7 @@ public sealed class PoliticaValidadeNotificacao
             [TipoEventoNotificacao.ResetSenha] = TimeSpan.FromMinutes(30),
             [TipoEventoNotificacao.ConfirmacaoEmail] = TimeSpan.FromMinutes(30),
             [TipoEventoNotificacao.ContatoAlterado] = TimeSpan.FromMinutes(30),
+            [TipoEventoNotificacao.SenhaAlterada] = TimeSpan.FromMinutes(30),
 
             [TipoEventoNotificacao.PedidoPagoConfirmado] = TimeSpan.FromHours(2),
             [TipoEventoNotificacao.PedidoEmPreparo] = TimeSpan.FromHours(2),

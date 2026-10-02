@@ -292,14 +292,8 @@ public class AuthController(
     {
         if (!ModelState.IsValid) return View(vm);
 
-        var baseUrl = GetConfiguredPublicBaseUrl();
-        if (baseUrl is null)
-        {
-            ModelState.AddModelError(string.Empty, "A URL pública da aplicação não está configurada corretamente.");
-            return View(vm);
-        }
-
-        await api.PostAsync<object>("auth/forgot-password", new { email = vm.Email, baseUrl });
+        // N8: a base do link vem da configuracao da API (Auth:LinkRedefinirSenha), nunca do corpo; so o e-mail segue.
+        await api.PostAsync<object>("auth/forgot-password", new { email = vm.Email });
 
         // Always show success to avoid revealing if email exists
         ViewBag.Sent = true;
@@ -310,6 +304,7 @@ public class AuthController(
     [HttpGet("/auth/redefinir-senha")]
     public IActionResult RedefinirSenha(string token)
     {
+        SemReferrer();
         if (string.IsNullOrWhiteSpace(token))
             return RedirectToAction(nameof(EsqueciSenha));
 
@@ -321,6 +316,7 @@ public class AuthController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RedefinirSenha(ResetPasswordViewModel vm)
     {
+        SemReferrer();
         if (!ModelState.IsValid) return View(vm);
 
         var result = await api.PostAsync<object>("auth/reset-password", new { token = vm.Token, novaSenha = vm.NovaSenha });
@@ -333,6 +329,39 @@ public class AuthController(
         TempData["Toast"] = "success|Senha redefinida com sucesso! Faça login com a nova senha.";
         return RedirectToAction(nameof(Login));
     }
+
+    /// <summary>Tela do codigo de 6 digitos recebido no WhatsApp (N8). Quem recebeu o link usa a tela do link.</summary>
+    [AllowAnonymous]
+    [HttpGet("/auth/redefinir-senha-codigo")]
+    public IActionResult RedefinirSenhaCodigo()
+    {
+        SemReferrer();
+        return View(new ResetPasswordCodeViewModel());
+    }
+
+    [AllowAnonymous]
+    [HttpPost("/auth/redefinir-senha-codigo")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RedefinirSenhaCodigo(ResetPasswordCodeViewModel vm)
+    {
+        SemReferrer();
+        if (!ModelState.IsValid) return View(vm);
+
+        var result = await api.PostAsync<object>(
+            "auth/reset-password-code", new { email = vm.Email, codigo = vm.Codigo, novaSenha = vm.NovaSenha });
+        if (!result.Success)
+        {
+            ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Código inválido ou expirado.");
+            vm.Codigo = string.Empty;
+            return View(vm);
+        }
+
+        TempData["Toast"] = "success|Senha redefinida com sucesso! Faça login com a nova senha.";
+        return RedirectToAction(nameof(Login));
+    }
+
+    // O token do link e o codigo nao podem vazar pelo Referer para nenhum recurso externo carregado pela pagina (N8).
+    private void SemReferrer() => Response.Headers["Referrer-Policy"] = "no-referrer";
 
     [Authorize]
     [HttpPost("/auth/logout")]
@@ -402,21 +431,6 @@ public class AuthController(
 
     private static string? GetString(JsonElement el, string prop) =>
         el.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
-
-    private static string? GetConfiguredPublicBaseUrl()
-    {
-        var configuredBaseUrl = Environment.GetEnvironmentVariable("PUBLIC_BASE_URL");
-        if (string.IsNullOrWhiteSpace(configuredBaseUrl))
-            return null;
-
-        if (!Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var uri))
-            return null;
-
-        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
-            return null;
-
-        return uri.GetLeftPart(UriPartial.Authority);
-    }
 
     // ExtractClaim removido — consolidado em IJwtClaimsReader (TASK-EZ-WEB-005).
 }

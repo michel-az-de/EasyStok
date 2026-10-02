@@ -98,7 +98,7 @@ public class AdminNotificacoesControllerTests : IDisposable
 
         var erro = resultado.Should().BeOfType<BadRequestObjectResult>().Subject.Value.Should().BeOfType<ApiErrorResponse>().Subject.Error;
         var validos = (IEnumerable<string>)erro.Details!;
-        validos.Should().BeEquivalentTo("ResetSenha", "ConviteAcesso", "IncidenteSistema", "PrazoEstourado", "ResumoDiario", "ContatoAlterado");
+        validos.Should().BeEquivalentTo("ResetSenha", "ConviteAcesso", "IncidenteSistema", "PrazoEstourado", "ResumoDiario", "ContatoAlterado", "SenhaAlterada");
         await _notificador.DidNotReceiveWithAnyArgs().EnfileirarEventoAsync(default, default, default!, default, default);
     }
 

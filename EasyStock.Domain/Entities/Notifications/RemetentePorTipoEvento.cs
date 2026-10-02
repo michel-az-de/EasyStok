@@ -65,7 +65,8 @@ public static class RemetentePorTipoEvento
             or TipoEventoNotificacao.IncidenteSistema
             or TipoEventoNotificacao.PrazoEstourado
             or TipoEventoNotificacao.ResumoDiario
-            or TipoEventoNotificacao.ContatoAlterado => OrigemRemetente.Plataforma,
+            or TipoEventoNotificacao.ContatoAlterado
+            or TipoEventoNotificacao.SenhaAlterada => OrigemRemetente.Plataforma,
 
         _ => throw new ArgumentOutOfRangeException(nameof(tipo), tipo,
             "Tipo de evento sem remetente declarado: classifique-o em RemetentePorTipoEvento (Loja ou Plataforma).")

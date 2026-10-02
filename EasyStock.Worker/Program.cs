@@ -100,6 +100,9 @@ builder.Services.AddHostedService<AgendamentoNotificacaoService>();
 builder.Services.AddHttpClient("endpoint-health");
 builder.Services.AddHostedService<EndpointHealthMonitorService>();
 
+// Limpeza agendada dos reset_tokens expirados ha mais de 24 h (N8, #301), a cada 6 h.
+builder.Services.AddHostedService<LimpezaTokensAcessoService>();
+
 // Outbox de eventos de integração externa (F4.c) — consome
 // OutboxEventoIntegracao e despacha via handlers registrados.
 // Pode ser desligado via Integration:Outbox:Enabled=false (default true).

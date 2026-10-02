@@ -82,5 +82,8 @@ public enum TipoEventoNotificacao
     ResumoDiario = 51,
 
     // Contato do usuario trocado (N4): aviso ao endereco antigo ou ao e-mail atual. Faixa livre da S0, a partir de 80.
-    ContatoAlterado = 80
+    ContatoAlterado = 80,
+
+    // Senha trocada (N8): aviso por todos os canais verificados depois de um reset concluido. Faixa livre da S0.
+    SenhaAlterada = 81
 }

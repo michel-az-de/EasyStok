@@ -45,6 +45,9 @@ namespace EasyStock.Domain.Entities
         public ICollection<UsuarioEmpresa> Empresas { get; set; } = new List<UsuarioEmpresa>();
         public ICollection<UsuarioPerfil> Perfis { get; set; } = new List<UsuarioPerfil>();
 
+        /// <summary>Tem perfil global de SuperAdmin (<c>Perfil.EmpresaId</c> nulo). Exige <see cref="Perfis"/> carregado com o perfil.</summary>
+        public bool EhSuperAdmin() => Perfis.Any(up => up.Perfil is { Nivel: NivelAcesso.SuperAdmin });
+
         public static Usuario Criar(string nome, string email, string senhaHash)
         {
             var agora = DateTime.UtcNow;

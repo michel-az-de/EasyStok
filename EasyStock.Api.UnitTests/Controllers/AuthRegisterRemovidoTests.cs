@@ -58,7 +58,7 @@ public class AuthRegisterRemovidoTests
         // Controle positivo: o host serve as demais rotas do AuthController. Sem ele, o 404 acima poderia ser
         // do host montado errado, e nao da rota removida.
         var controle = await api.Http.PostAsJsonAsync("api/auth/forgot-password", new { email = "ninguem@easystok.test" });
-        controle.StatusCode.Should().Be(HttpStatusCode.OK, "forgot-password segue no ar (anti-enumeracao: sempre 200)");
+        controle.StatusCode.Should().Be(HttpStatusCode.Accepted, "forgot-password segue no ar (anti-enumeracao: sempre 202, N8)");
     }
 
     /// <summary>Nomes dos métodos que o substituto recebeu, para a falha mostrar tudo o que foi chamado.</summary>

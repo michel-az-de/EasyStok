@@ -37,6 +37,22 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasMaxLength(500)
                 .HasColumnType("character varying(500)");
 
+            // N8: finalidade do segredo (link, codigo; convite na N9), tentativas gastas do codigo e canal de envio.
+            // Linhas anteriores viram 'Reset' pelo DEFAULT da migracao e continuam valendo.
+            builder.Property(rt => rt.Finalidade)
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasColumnType("character varying(20)")
+                .HasDefaultValue(FinalidadeResetToken.Reset);
+
+            builder.Property(rt => rt.Tentativas)
+                .HasColumnType("integer")
+                .HasDefaultValue(0);
+
+            builder.Property(rt => rt.Canal)
+                .HasMaxLength(20)
+                .HasColumnType("character varying(20)");
+
             builder.HasOne(rt => rt.Usuario)
                 .WithMany()
                 .HasForeignKey(rt => rt.UsuarioId)
@@ -48,6 +64,10 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasDatabaseName("ux_reset_tokens_token_hash");
             builder.HasIndex(rt => rt.UsuarioId);
             // Cleanup job consulta apenas tokens ainda válidos.
+            // N8: invalidar os abertos do usuario e achar o codigo ativo leem so o que ainda nao foi usado.
+            builder.HasIndex(rt => new { rt.UsuarioId, rt.Finalidade })
+                .HasFilter("\"Usado\" = false")
+                .HasDatabaseName("ix_reset_tokens_usuario_finalidade_aberto");
             builder.HasIndex(rt => rt.ExpiraEm)
                 .HasFilter("\"Usado\" = false")
                 .HasDatabaseName("ix_reset_tokens_expira_pendente");
