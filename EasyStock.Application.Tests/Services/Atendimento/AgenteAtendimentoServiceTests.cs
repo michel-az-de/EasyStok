@@ -115,6 +115,22 @@ public class AgenteAtendimentoServiceTests
     }
 
     [Fact]
+    public async Task AudioTranscritoChegaComoTextoAoAgente()
+    {
+        // #1398: com transcrição, o agente lê o que o cliente falou no lugar do marcador genérico.
+        _historico.Clear();
+        var audio = Mensagem.Entrada(_empresaId, _conversa.Id, Agora.AddMinutes(-1), TipoConteudoMensagem.Audio,
+            externoId: "wamid.audio1");
+        audio.RegistrarTranscricao("quero dois bolos de cenoura");
+        _historico.Add(audio);
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        _requisicoes[0].Mensagens.Single().Conteudo.OfType<BlocoTextoLlm>().Single().Texto
+            .Should().Contain("[áudio] quero dois bolos de cenoura");
+    }
+
+    [Fact]
     public async Task RespostaDoAgenteSaiSemTravessao()
     {
         // #1330: travessão vira pontuação simples antes de ir ao WhatsApp e ao histórico.

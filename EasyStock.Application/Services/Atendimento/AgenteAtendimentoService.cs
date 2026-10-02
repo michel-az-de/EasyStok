@@ -339,6 +339,8 @@ public sealed class AgenteAtendimentoService(
             _ => null
         };
 
+        if (msg.TipoConteudo == TipoConteudoMensagem.Audio && !string.IsNullOrWhiteSpace(msg.Transcricao))
+            return $"[áudio] {msg.Transcricao}";
         if (marcador is null) return msg.Texto ?? string.Empty;
         return string.IsNullOrWhiteSpace(msg.Texto) ? marcador : $"{marcador} {msg.Texto}";
     }

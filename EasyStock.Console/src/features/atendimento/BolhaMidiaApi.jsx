@@ -23,10 +23,14 @@ export function BolhaMidiaApi({ mensagem }) {
   }
   if (mime.startsWith('audio/')) {
     // Áudio de voz do WhatsApp não tem legenda; a trilha vazia só cumpre o contrato do elemento.
+    // #1398: a transcrição, quando já chegou, aparece logo abaixo do player.
     return (
-      <audio controls src={url} aria-label="Áudio do cliente">
-        <track kind="captions" />
-      </audio>
+      <>
+        <audio controls src={url} aria-label="Áudio do cliente">
+          <track kind="captions" />
+        </audio>
+        {mensagem.transcricao && <p className={css.transcricao}>{mensagem.transcricao}</p>}
+      </>
     )
   }
   return (
