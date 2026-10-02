@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.ClienteDaConversa;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
+using EasyStock.Application.UseCases.Atendimento.Reenvio;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Enums.Atendimento;
@@ -21,6 +22,7 @@ public class AtendimentoConversasController(
     ListarConversasAtendimentoUseCase listarUseCase,
     ListarMensagensConversaUseCase listarMensagensUseCase,
     EnviarMensagemConsoleUseCase enviarUseCase,
+    ReenviarMensagemUseCase reenviarUseCase,
     GerenciarConversaAtendimentoUseCase gerenciarUseCase,
     TransferirConversaUseCase transferirUseCase,
     ObterDossieClienteUseCase dossieUseCase,
@@ -100,6 +102,15 @@ public class AtendimentoConversasController(
     public Task<IActionResult> EnviarMensagem(Guid id, [FromBody] EnviarMensagemConsoleBody body, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await enviarUseCase.EnviarTextoAsync(
             new EnviarTextoConsoleCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.Texto ?? string.Empty), ct)));
+
+    [SwaggerOperation(Summary = "Resend a text message that failed (S57)",
+        Description = "Fora da janela de 24 h não envia: devolve a mensagem com o motivo no erro.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpPost("{id:guid}/mensagens/{mensagemId:guid}/reenviar")]
+    public Task<IActionResult> ReenviarMensagem(Guid id, Guid mensagemId, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await reenviarUseCase.ExecuteAsync(currentUser.EmpresaId, id, mensagemId, ct)));
 
     [SwaggerOperation(Summary = "Send an image as the owner (multipart; takes over the conversation)")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -207,6 +218,10 @@ public class AtendimentoConversasController(
         catch (ConversaNaoEncontradaException)
         {
             return DataNotFound("Conversa não encontrada.");
+        }
+        catch (MensagemNaoEncontradaException)
+        {
+            return DataNotFound("Mensagem não encontrada.");
         }
         catch (DestinoNaoAtendenteException ex)
         {
