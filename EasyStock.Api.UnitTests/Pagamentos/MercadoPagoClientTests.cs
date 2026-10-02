@@ -116,6 +116,47 @@ public class MercadoPagoClientTests
     }
 
     [Fact]
+    public async Task DataDaPreferenciaVaiComMaisLiteral()
+    {
+        // #1400: o Mercado Pago responde 400 error_parsing_date quando o + do fuso vem escapado (+), que é o
+        // padrão do System.Text.Json. Medido no sandbox: o mesmo JSON com + literal passa. Olha o texto bruto,
+        // porque o JsonDocument decodifica o escape e esconderia o defeito.
+        var (client, handler) = Criar();
+
+        await client.CriarPreferenceAsync(new CriarPreferenceCommand(
+            Guid.NewGuid(), Guid.NewGuid(), "Casa da Babá", 10m, [new PreferenceItemCommand("Entrega — Butantã", 1, 10m)],
+            ExpiraEm: new DateTime(2026, 9, 29, 15, 30, 0, DateTimeKind.Utc)));
+
+        handler.Corpo.Should().Contain("\"expiration_date_to\":\"2026-09-29T15:30:00.000+00:00\"")
+            .And.Contain("\"date_of_expiration\":\"2026-09-29T15:30:00.000+00:00\"")
+            .And.NotContain("\\u002B");
+    }
+
+    [Fact]
+    public async Task ExpirarPreferenciaMandaDataComMaisLiteral()
+    {
+        var (client, handler) = Criar(HttpStatusCode.OK);
+
+        await client.ExpirarPreferenciaAsync("pref-1", new DateTime(2026, 9, 29, 15, 0, 0, DateTimeKind.Utc));
+
+        handler.Corpo.Should().Contain("2026-09-29T15:00:00.000+00:00").And.NotContain("\\u002B");
+    }
+
+    [Fact]
+    public async Task RecusaDoMercadoPagoLevaOCorpoParaOErro()
+    {
+        // #1400: o 400 aparecia no log sem o motivo; o corpo do Mercado Pago não traz segredo.
+        var (client, _) = Criar(HttpStatusCode.BadRequest,
+            """{"message":"error_parsing_date","error":"bad_request","status":400,"cause":null}""");
+
+        var act = () => client.CriarPreferenceAsync(new CriarPreferenceCommand(
+            Guid.NewGuid(), Guid.NewGuid(), "Loja", 10m, [new PreferenceItemCommand("Item", 1, 10m)]));
+
+        (await act.Should().ThrowAsync<HttpRequestException>())
+            .Which.Message.Should().Contain("400").And.Contain("error_parsing_date");
+    }
+
+    [Fact]
     public async Task PreferenceUsaCheckoutPreferences()
     {
         var (client, handler) = Criar();
