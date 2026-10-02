@@ -14,6 +14,9 @@ namespace EasyStock.Infra.Async.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
+    // Handler unico e reutilizado: evita esgotar sockets e renova DNS periodicamente.
+    private static readonly SocketsHttpHandler EfiHandler = new() { PooledConnectionLifetime = TimeSpan.FromMinutes(5) };
+
     public static IServiceCollection AddEasyStockAsyncInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -94,7 +97,7 @@ public static class ServiceCollectionExtensions
             var baseUrl = isSandbox ? "https://pix-h.api.efipay.com.br" : "https://pix.api.efipay.com.br";
             services.AddTransient<IEfiPixService>(sp =>
             {
-                var http = new HttpClient { BaseAddress = new Uri(baseUrl) };
+                var http = new HttpClient(EfiHandler, disposeHandler: false) { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(30) };
                 return new EfiPixService(
                     http,
                     sp.GetRequiredService<IMemoryCache>(),
@@ -115,7 +118,7 @@ public static class ServiceCollectionExtensions
             var baseUrl = isSandbox ? "https://cobrancas-h.api.efipay.com.br" : "https://cobrancas.api.efipay.com.br";
             services.AddTransient<IEfiBoletoService>(sp =>
             {
-                var http = new HttpClient { BaseAddress = new Uri(baseUrl) };
+                var http = new HttpClient(EfiHandler, disposeHandler: false) { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(30) };
                 return new EfiBoletoService(
                     http,
                     sp.GetRequiredService<IMemoryCache>(),

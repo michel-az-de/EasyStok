@@ -63,7 +63,7 @@ public class DevicePairingController(
     /// Operador mostra esse código na tela do painel pra digitar no celular.
     /// </summary>
     [HttpPost("pair-codes")]
-    [Authorize]
+    [Authorize(Policy = "Gerente")]
     public async Task<ActionResult<PairCodeResponse>> CreatePairCode(
         [FromBody] CreatePairCodeRequest req,
         CancellationToken ct)
@@ -353,7 +353,7 @@ public class DevicePairingController(
 
     /// <summary>Web autenticado — lista devices pareados de uma empresa.</summary>
     [HttpGet]
-    [Authorize]
+    [Authorize(Policy = "Gerente")]
     public async Task<ActionResult<DeviceSummary[]>> List(
         [FromQuery] Guid empresaId,
         CancellationToken ct)
@@ -413,7 +413,7 @@ public class DevicePairingController(
     /// Device executa na próxima chamada de /sync, /sync/pull ou via SSE realtime.
     /// </summary>
     [HttpPost("{id}/commands")]
-    [Authorize]
+    [Authorize(Policy = "Gerente")]
     public async Task<ActionResult<object>> EnqueueCommand(
         string id,
         [FromBody] EnqueueCommandRequest req,
@@ -459,7 +459,7 @@ public class DevicePairingController(
     /// Filtra por <c>lojaId</c> opcional. Retorna quantos comandos foram enfileirados.
     /// </summary>
     [HttpPost("broadcast")]
-    [Authorize]
+    [Authorize(Policy = "Gerente")]
     public async Task<ActionResult<object>> BroadcastCommand(
         [FromBody] BroadcastCommandRequest req,
         CancellationToken ct)
@@ -570,7 +570,7 @@ public class DevicePairingController(
 
     /// <summary>Web autenticado — revoga device. App correspondente para de funcionar.</summary>
     [HttpDelete("{id}")]
-    [Authorize]
+    [Authorize(Policy = "Gerente")]
     public async Task<IActionResult> Revoke(string id, CancellationToken ct)
     {
         // Auditoria 2026-04-30 (CRITICAL fix): só revoga devices da própria empresa.
