@@ -9,7 +9,9 @@ using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Async;
+using EasyStock.Infra.Async.DependencyInjection;
 using EasyStock.Infra.Notifications.Email;
+using EasyStock.Infra.Notifications.WhatsApp;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.DependencyInjection;
 using FluentAssertions;
@@ -219,6 +221,51 @@ public class DispatcherDesfechoTests(PostgreSqlDatabaseFixture fixture) : IClass
         log.ErroDetalhado.Should().Be("simulado");
         log.Tentativa.Should().Be(1);
         log.BypassConsentimento.Should().BeTrue("transacional ignora consentimento");
+    }
+
+    [SkippableFact]
+    public async Task Stub_de_whatsapp_pelo_canal_real_deixa_o_outbox_Simulado()
+    {
+        // Ponta a ponta com o padrão de Notifications:WhatsApp:Provider (stub): canal e provider reais, só o banco é de teste.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var s = await SemearAsync();
+        var mensagem = await SemearMensagemAsync(s, CanalNotificacao.WhatsApp, CategoriaConteudoNotificacao.Transacional);
+        var canal = new WhatsAppCanal(
+            new StubWhatsAppProvider(NullLogger<StubWhatsAppProvider>.Instance), NullLogger<WhatsAppCanal>.Instance);
+        await using var provider = ConstruirProvider(canal);
+
+        await RodarAsync(provider);
+
+        var gravada = await LerMensagemAsync(mensagem.Id);
+        gravada.Status.Should().Be(StatusOutbox.Simulado);
+        gravada.EnviadoEm.Should().BeNull();
+        gravada.ProviderUsado.Should().Be("stub");
+        var log = (await LerLogsAsync(mensagem.Id)).Should().ContainSingle().Subject;
+        log.Provider.Should().Be("stub");
+        log.Sucesso.Should().BeFalse();
+    }
+
+    [SkippableFact]
+    public async Task Email_sobre_o_console_pelo_canal_real_deixa_o_outbox_Simulado_com_provider_console()
+    {
+        // Worker sem Smtp__*: o e-mail cai no ConsoleEmailService. Antes ficava Enviado, com provider "smtp".
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var s = await SemearAsync();
+        var mensagem = await SemearMensagemAsync(s, CanalNotificacao.Email, CategoriaConteudoNotificacao.Operacional);
+        var canal = new SmtpEmailCanal(
+            new ConsoleEmailService(NullLogger<ConsoleEmailService>.Instance), NullLogger<SmtpEmailCanal>.Instance);
+        await using var provider = ConstruirProvider(canal);
+
+        await RodarAsync(provider);
+
+        var gravada = await LerMensagemAsync(mensagem.Id);
+        gravada.Status.Should().Be(StatusOutbox.Simulado);
+        gravada.EnviadoEm.Should().BeNull();
+        gravada.ProviderUsado.Should().Be("console").And.NotBe("smtp");
+        var log = (await LerLogsAsync(mensagem.Id)).Should().ContainSingle().Subject;
+        log.Provider.Should().Be("console");
+        log.Sucesso.Should().BeFalse();
+        log.ErroDetalhado.Should().Be("simulado");
     }
 
     [SkippableFact]
