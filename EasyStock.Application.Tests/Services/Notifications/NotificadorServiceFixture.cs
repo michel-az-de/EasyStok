@@ -52,7 +52,7 @@ internal sealed class NotificadorServiceFixture
         string[] canais,
         CategoriaConteudoNotificacao categoria = CategoriaConteudoNotificacao.Transacional,
         string? parametrosJson = null,
-        TipoEventoNotificacao tipo = TipoEventoNotificacao.FaturaVencida)
+        TipoEventoNotificacao tipo = TipoEventoNotificacao.PedidoEntregue)
     {
         var rotina = RotinaNotificacao.Criar(
             "fatura_vencida_global", "Fatura vencida", tipo, TriggerTipoRotina.Evento,
@@ -69,7 +69,7 @@ internal sealed class NotificadorServiceFixture
         string assunto = "Fatura de {{ nome }}",
         string corpo = "Corpo {{ nome }}",
         string? metadadosJson = null,
-        TipoEventoNotificacao tipo = TipoEventoNotificacao.FaturaVencida)
+        TipoEventoNotificacao tipo = TipoEventoNotificacao.PedidoEntregue)
     {
         var template = TemplateNotificacao.Criar($"fatura_vencida_{canal}_v1", "Fatura", canal, tipo, assunto, corpo);
         if (metadadosJson is not null) template.DefinirMetadados(metadadosJson);
@@ -77,6 +77,6 @@ internal sealed class NotificadorServiceFixture
         return template;
     }
 
-    public EventoNotificacao NovoEvento(string payload = Payload, TipoEventoNotificacao tipo = TipoEventoNotificacao.FaturaVencida) =>
+    public EventoNotificacao NovoEvento(string payload = Payload, TipoEventoNotificacao tipo = TipoEventoNotificacao.PedidoEntregue) =>
         EventoNotificacao.Criar(tipo, EmpresaId, payload);
 }

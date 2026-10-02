@@ -17,6 +17,13 @@ public sealed class ResolvedorCanal
     /// O InApp que a categoria <c>Operacional</c> acrescenta sozinho só entra quando
     /// <paramref name="inAppTemTemplate"/> (não adianta enfileirar canal sem template).
     /// </para>
+    /// <para>
+    /// Remetente (N6): <see cref="OrigemRemetente.Loja"/> é o comportamento de sempre. No WhatsApp de
+    /// <see cref="OrigemRemetente.Plataforma"/> a política da Meta exige opt-in antes da mensagem, então o canal só sai
+    /// para usuário identificado (<paramref name="usuarioDestinoId"/>) com <c>ConsentimentoNotificacao</c> de WhatsApp
+    /// na categoria e <c>OptIn</c>, inclusive em <see cref="CategoriaConteudoNotificacao.Seguranca"/> (que no e-mail
+    /// segue ignorando opt-out). Telefone solto no payload, sem usuário, ou sem registro: o canal é pulado.
+    /// </para>
     /// </summary>
     public IReadOnlyList<CanalNotificacao> ResolverCanaisPermitidos(
         CategoriaConteudoNotificacao categoria,
@@ -26,7 +33,9 @@ public sealed class ResolvedorCanal
         IReadOnlyList<BloqueioNotificacao> bloqueios,
         DateTime agora,
         Guid? empresaId = null,
-        bool inAppTemTemplate = true)
+        bool inAppTemTemplate = true,
+        OrigemRemetente remetente = OrigemRemetente.Loja,
+        Guid? usuarioDestinoId = null)
     {
         var permitidos = new List<CanalNotificacao>();
 
@@ -38,8 +47,15 @@ public sealed class ResolvedorCanal
             if (!CanalAtivo(configuracoes, canal))
                 continue;
 
-            if (!ConsentimentoPermite(consentimentos, canal, categoria))
+            if (remetente == OrigemRemetente.Plataforma && canal == CanalNotificacao.WhatsApp)
+            {
+                if (!OptInExplicito(consentimentos, canal, categoria, usuarioDestinoId))
+                    continue;
+            }
+            else if (!ConsentimentoPermite(consentimentos, canal, categoria))
+            {
                 continue;
+            }
 
             permitidos.Add(canal);
         }
@@ -76,6 +92,23 @@ public sealed class ResolvedorCanal
     {
         var config = configuracoes.FirstOrDefault(c => c.Canal == canal);
         return config?.AtivoNoTenant ?? false;
+    }
+
+    private static bool OptInExplicito(
+        IReadOnlyList<ConsentimentoNotificacao> consentimentos,
+        CanalNotificacao canal,
+        CategoriaConteudoNotificacao categoria,
+        Guid? usuarioDestinoId)
+    {
+        // Marketing nunca sai pela plataforma, e sem usuário identificado não há quem tenha dado opt-in.
+        if (categoria == CategoriaConteudoNotificacao.Marketing || usuarioDestinoId is null)
+            return false;
+
+        // O histórico é imutável: vale o registro mais recente do usuário para o canal e a categoria.
+        return consentimentos
+            .Where(c => c.UsuarioId == usuarioDestinoId && c.Canal == canal && c.Categoria == categoria)
+            .OrderByDescending(c => c.AtualizadoEm)
+            .FirstOrDefault()?.OptIn == true;
     }
 
     private static bool ConsentimentoPermite(

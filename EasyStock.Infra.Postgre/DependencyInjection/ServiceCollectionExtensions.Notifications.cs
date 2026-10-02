@@ -24,6 +24,7 @@ public static partial class ServiceCollectionExtensionsNotifications
         services.AddScoped<IEventoNotificacaoRepository, EventoNotificacaoRepository>();
         services.AddScoped<IOutboxNotificacaoRepository, OutboxNotificacaoRepository>();
         services.AddScoped<IConsentimentoRepository, ConsentimentoRepository>();
+        services.AddScoped<ITemplateMetaEstadoRepository, TemplateMetaEstadoRepository>();
         services.AddScoped<IPreferenciaNotificacaoRepository, PreferenciaNotificacaoRepository>();
         services.AddScoped<IAudienciaUsuarios, AudienciaUsuarios>();
         services.AddScoped<ISuperAdminsDaPlataforma, SuperAdminsDaPlataformaQuery>();

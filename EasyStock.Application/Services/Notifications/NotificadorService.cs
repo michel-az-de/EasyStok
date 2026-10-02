@@ -244,7 +244,9 @@ public sealed class NotificadorService(
                 todosBloqueios,
                 agora,
                 evento.EmpresaId,
-                inAppTemTemplate);
+                inAppTemTemplate,
+                RemetentePorTipoEvento.De(evento.Tipo),
+                destino.UsuarioId);
 
             if (canaisPermitidos.Count == 0)
             {

@@ -41,16 +41,16 @@ public class NotificadorServiceMetadadosTests
         _configuracaoRepository.ListarAsync(_empresaId, Arg.Any<CancellationToken>()).Returns([]);
 
         var rotina = RotinaNotificacao.Criar(
-            codigo: "fatura_vencida_global", nome: "Fatura vencida", tipoEvento: TipoEventoNotificacao.FaturaVencida,
+            codigo: "fatura_vencida_global", nome: "Fatura vencida", tipoEvento: TipoEventoNotificacao.PedidoEntregue,
             triggerTipo: TriggerTipoRotina.Evento, templateCodigo: "fatura_vencida_whatsapp_v1",
             categoria: CategoriaConteudoNotificacao.Transacional);
         rotina.DefinirFallback("[\"WhatsApp\"]", "system");
-        _rotinaRepository.ListarAtivasAsync(TipoEventoNotificacao.FaturaVencida, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
+        _rotinaRepository.ListarAtivasAsync(TipoEventoNotificacao.PedidoEntregue, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns([rotina]);
 
         _template = TemplateNotificacao.Criar(
             codigo: "fatura_vencida_whatsapp_v1", nome: "Fatura vencida — WhatsApp", canal: CanalNotificacao.WhatsApp,
-            tipoEvento: TipoEventoNotificacao.FaturaVencida, assuntoTemplate: "", corpoTemplate: "Oi {{ nome }}");
+            tipoEvento: TipoEventoNotificacao.PedidoEntregue, assuntoTemplate: "", corpoTemplate: "Oi {{ nome }}");
         _templateRepository.GetAtivoAsync("fatura_vencida_whatsapp_v1", CanalNotificacao.WhatsApp, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(_template);
     }
@@ -59,7 +59,7 @@ public class NotificadorServiceMetadadosTests
     public async Task WhatsAppComMetadadosRenderizaEPersisteNoOutbox()
     {
         _template.DefinirMetadados("""{"template":"fatura_vencida","param1":"{{ nome }}"}""");
-        var evento = EventoNotificacao.Criar(TipoEventoNotificacao.FaturaVencida, _empresaId,
+        var evento = EventoNotificacao.Criar(TipoEventoNotificacao.PedidoEntregue, _empresaId,
             """{"telefone":"+5511999990001","nome":"Maria"}""");
 
         await _service.AvaliarEventoAsync(evento);
@@ -82,8 +82,8 @@ public class NotificadorServiceMetadadosTests
             .Do(c => chaves.Add(c.Arg<OutboxMensagemNotificacao>().IdempotencyKey));
         const string payload = """{"telefone":"+5511999990001","nome":"Maria","chaveIdempotencia":"fatura:1|vencida"}""";
 
-        var primeiro = EventoNotificacao.Criar(TipoEventoNotificacao.FaturaVencida, _empresaId, payload);
-        var segundo = EventoNotificacao.Criar(TipoEventoNotificacao.FaturaVencida, _empresaId, payload);
+        var primeiro = EventoNotificacao.Criar(TipoEventoNotificacao.PedidoEntregue, _empresaId, payload);
+        var segundo = EventoNotificacao.Criar(TipoEventoNotificacao.PedidoEntregue, _empresaId, payload);
         await _service.AvaliarEventoAsync(primeiro);
         await _service.AvaliarEventoAsync(segundo);
 

@@ -31,6 +31,13 @@ public class OutboxMensagemNotificacao
     public string? ProviderMensagemId { get; set; }
 
     public string? ErroUltimaTentativa { get; set; }
+
+    /// <summary>
+    /// De quem a mensagem sai (N6). Vem do tipo do evento e o dispatcher o entrega ao canal como
+    /// <c>ProviderOverride</c>. Padrão <see cref="OrigemRemetente.Loja"/>: o que já existia sai como sempre saiu.
+    /// </summary>
+    public OrigemRemetente Remetente { get; set; } = OrigemRemetente.Loja;
+
     public string IdempotencyKey { get; set; } = null!;
     public string TenantTimezone { get; set; } = "America/Sao_Paulo";
     public string CanaisFallbackRestantesJson { get; set; } = "[]";
@@ -67,7 +74,8 @@ public class OutboxMensagemNotificacao
         int maxTentativas = 3,
         string? metadadosJson = null,
         string? chaveIdempotencia = null,
-        string? destinatarioChave = null)
+        string? destinatarioChave = null,
+        OrigemRemetente remetente = OrigemRemetente.Loja)
     {
         var agora = DateTime.UtcNow;
         // S13: com chave do negócio (ex.: pedido + status), reprocessar o fato gera a mesma chave mesmo vindo de
@@ -88,6 +96,7 @@ public class OutboxMensagemNotificacao
             AssuntoRenderizado = assuntoRenderizado,
             CorpoRenderizado = corpoRenderizado,
             Categoria = categoria,
+            Remetente = remetente,
             Status = StatusOutbox.Pendente,
             Tentativas = 0,
             MaxTentativas = maxTentativas,

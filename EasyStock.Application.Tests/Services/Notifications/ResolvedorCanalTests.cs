@@ -217,4 +217,74 @@ public class ResolvedorCanalTests
         comTemplate.Should().Contain(CanalNotificacao.InApp);
         semTemplate.Should().NotContain(CanalNotificacao.InApp);
     }
+
+    // N6: WhatsApp de plataforma exige opt-in explícito de usuário identificado, até em Segurança.
+
+    [Fact]
+    public void WhatsAppDePlataformaSemOptInPulaOCanalMesmoEmSeguranca()
+    {
+        var usuarioId = Guid.NewGuid();
+        var configs = new List<ConfiguracaoCanal> { CanalAtivo(CanalNotificacao.WhatsApp), CanalAtivo(CanalNotificacao.Email) };
+        var semRegistro = Sut.ResolverCanaisPermitidos(
+            CategoriaConteudoNotificacao.Seguranca, [CanalNotificacao.WhatsApp, CanalNotificacao.Email],
+            consentimentos: [], configs, [], Agora, remetente: OrigemRemetente.Plataforma, usuarioDestinoId: usuarioId);
+        var optOut = Sut.ResolverCanaisPermitidos(
+            CategoriaConteudoNotificacao.Seguranca, [CanalNotificacao.WhatsApp, CanalNotificacao.Email],
+            [ConsentimentoNotificacao.Registrar(usuarioId, CanalNotificacao.WhatsApp,
+                CategoriaConteudoNotificacao.Seguranca, optIn: false, "u")],
+            configs, [], Agora, remetente: OrigemRemetente.Plataforma, usuarioDestinoId: usuarioId);
+        var comOptIn = Sut.ResolverCanaisPermitidos(
+            CategoriaConteudoNotificacao.Seguranca, [CanalNotificacao.WhatsApp, CanalNotificacao.Email],
+            [ConsentimentoNotificacao.Registrar(usuarioId, CanalNotificacao.WhatsApp,
+                CategoriaConteudoNotificacao.Seguranca, optIn: true, "u")],
+            configs, [], Agora, remetente: OrigemRemetente.Plataforma, usuarioDestinoId: usuarioId);
+
+        semRegistro.Should().Equal(CanalNotificacao.Email);
+        optOut.Should().Equal(CanalNotificacao.Email);
+        comOptIn.Should().Equal(CanalNotificacao.WhatsApp, CanalNotificacao.Email);
+    }
+
+    [Fact]
+    public void WhatsAppDePlataformaSemUsuarioEhPulado()
+    {
+        // Telefone solto no payload: sem usuário não há quem tenha dado opt-in.
+        var configs = new List<ConfiguracaoCanal> { CanalAtivo(CanalNotificacao.WhatsApp), CanalAtivo(CanalNotificacao.Email) };
+
+        var r = Sut.ResolverCanaisPermitidos(
+            CategoriaConteudoNotificacao.Operacional, [CanalNotificacao.WhatsApp, CanalNotificacao.Email],
+            consentimentos: [], configs, [], Agora, remetente: OrigemRemetente.Plataforma, usuarioDestinoId: null,
+            inAppTemTemplate: false);
+
+        r.Should().Equal(CanalNotificacao.Email);
+    }
+
+    [Fact]
+    public void EmailDePlataformaSegueIgnorandoOptOutEmSeguranca()
+    {
+        var usuarioId = Guid.NewGuid();
+        var configs = new List<ConfiguracaoCanal> { CanalAtivo(CanalNotificacao.Email) };
+
+        var r = Sut.ResolverCanaisPermitidos(
+            CategoriaConteudoNotificacao.Seguranca, [CanalNotificacao.Email],
+            [ConsentimentoNotificacao.Registrar(usuarioId, CanalNotificacao.Email,
+                CategoriaConteudoNotificacao.Seguranca, optIn: false, "u")],
+            configs, [], Agora, remetente: OrigemRemetente.Plataforma, usuarioDestinoId: usuarioId);
+
+        r.Should().Equal(CanalNotificacao.Email);
+    }
+
+    [Fact]
+    public void WhatsAppDaLojaSegueComoHoje()
+    {
+        var configs = new List<ConfiguracaoCanal> { CanalAtivo(CanalNotificacao.WhatsApp) };
+
+        var semParametro = Sut.ResolverCanaisPermitidos(
+            CategoriaConteudoNotificacao.Transacional, [CanalNotificacao.WhatsApp], [], configs, [], Agora);
+        var lojaExplicita = Sut.ResolverCanaisPermitidos(
+            CategoriaConteudoNotificacao.Operacional, [CanalNotificacao.WhatsApp], [], configs, [], Agora,
+            remetente: OrigemRemetente.Loja, inAppTemTemplate: false);
+
+        semParametro.Should().Equal(CanalNotificacao.WhatsApp);
+        lojaExplicita.Should().Equal(CanalNotificacao.WhatsApp);
+    }
 }

@@ -328,6 +328,9 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<PreferenciaNotificacaoUsuario> NotifPreferenciasUsuario { get; set; } = null!;
         public DbSet<WebPushSubscription> NotifWebPushSubscriptions { get; set; } = null!;
 
+        // N6: categoria atual de cada template da Meta (recategorização para marketing). Global, sem tenant.
+        public DbSet<TemplateMetaEstado> NotifTemplatesMetaEstado { get; set; } = null!;
+
         // Storefront — autenticação (TASK-EZ-005)
         public DbSet<EasyStock.Domain.Entities.Storefront.ClienteOtp> ClienteOtps { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.ClienteSession> ClienteSessions { get; set; } = null!;

@@ -294,7 +294,9 @@ public sealed class NotificacoesDispatcherOrchestrator(
     {
         var mensagemPronta = new MensagemPronta(
             mensagem.Id, mensagem.EmpresaId, mensagem.Destinatario, mensagem.AssuntoRenderizado,
-            mensagem.CorpoRenderizado, mensagem.Canal, mensagem.Categoria)
+            mensagem.CorpoRenderizado, mensagem.Canal, mensagem.Categoria,
+            // N6: o remetente da mensagem escolhe o provider do WhatsApp; a loja não leva override.
+            ProviderOverride: mensagem.Remetente == OrigemRemetente.Plataforma ? MensagemPronta.ProviderOverridePlataforma : null)
         {
             // S13: template da Meta e parâmetros para o envio fora da janela de 24 h (pendência da S09).
             Metadados = mensagem.LerMetadados()

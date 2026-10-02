@@ -400,4 +400,18 @@ public class OutboxMensagemNotificacaoTests
         m.ProviderMensagemId.Should().HaveLength(OutboxMensagemNotificacao.ProviderMensagemIdMaxLength,
             "o id maior que o varchar(128) quebraria o commit do resultado do envio");
     }
+
+    [Fact]
+    public void CriarGuardaORemetente()
+    {
+        var m = OutboxMensagemNotificacao.Criar(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), CanalNotificacao.WhatsApp, "+5511999990001", "", "b",
+            CategoriaConteudoNotificacao.Seguranca, remetente: OrigemRemetente.Plataforma);
+
+        m.Remetente.Should().Be(OrigemRemetente.Plataforma);
+    }
+
+    [Fact]
+    public void RemetentePadraoEhLoja() =>
+        Novo().Remetente.Should().Be(OrigemRemetente.Loja, "o que já existe (aviso ao cliente, campanha) sai pela loja");
 }

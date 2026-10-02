@@ -7,6 +7,7 @@ using EasyStock.Infra.Notifications.Options;
 using EasyStock.Infra.Notifications.Sms;
 using EasyStock.Infra.Notifications.WhatsApp;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -148,7 +149,7 @@ public class LogsDeEnvioSemDadoPessoalTests
         var logger = new LoggerQueGuarda<WhatsAppCanal>();
         var mensagem = Mensagem(Telefone, CanalNotificacao.WhatsApp);
 
-        await new WhatsAppCanal(provedor, logger).EnviarAsync(mensagem);
+        await new WhatsAppCanal(provedor, new ServiceCollection().BuildServiceProvider(), logger).EnviarAsync(mensagem);
 
         logger.Assert(Telefone, mensagem.OutboxId);
     }

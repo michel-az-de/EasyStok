@@ -97,7 +97,8 @@ public sealed class ConstrutorMensagemOutbox(ITemplateRepository templateReposit
             canaisFallbackRestantesJson: canaisRestantes.Count > 0 ? CanaisDaRotina.Serializar(canaisRestantes) : "[]",
             metadadosJson: metadadosJson,
             chaveIdempotencia: chave,
-            destinatarioChave: destinatario.Audiencia is not null ? destinatario.UsuarioId?.ToString("N") : null);
+            destinatarioChave: destinatario.Audiencia is not null ? destinatario.UsuarioId?.ToString("N") : null,
+            remetente: RemetentePorTipoEvento.De(evento.Tipo));
 
         var abertura = JanelaDeEnvio.ProximaAbertura(rotina.JanelaInicio, rotina.JanelaFim, agoraUtc, rotina.Categoria);
         if (abertura is { } instanteAbertura) mensagem.AgendarPara(instanteAbertura);
