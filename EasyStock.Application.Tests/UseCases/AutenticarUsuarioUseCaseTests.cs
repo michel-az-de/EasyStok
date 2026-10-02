@@ -303,4 +303,59 @@ public class AutenticarUsuarioUseCaseTests
 
         await Assert.ThrowsAsync<CredenciaisInvalidasException>(() => useCase.ExecuteAsync(command));
     }
+
+    // ── #1352 (N7): o contador é um só para o passo 1 (lista-empresas) e o login completo ──────
+
+    [Fact]
+    public async Task FalhasDosDoisPassosSomam()
+    {
+        var usuario = new Usuario
+        {
+            Id = Guid.NewGuid(), Nome = "Carlos", Email = "carlos@empresa.com", Ativo = true,
+            SenhaHash = FakePasswordHasher.MakeHash("senhaCorreta"),
+            CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow,
+        };
+        var repo = Substitute.For<IUsuarioRepository>();
+        repo.GetByEmailAsync(usuario.Email).Returns(usuario);
+        var passo1 = new ListarEmpresasParaLoginUseCase(
+            repo, new FakeUnitOfWork(), new FakePasswordHasher(), Substitute.For<ILogger<ListarEmpresasParaLoginUseCase>>());
+        var login = CriarUseCase(repo);
+
+        for (var falha = 1; falha <= 3; falha++)
+        {
+            await Assert.ThrowsAsync<CredenciaisInvalidasException>(
+                () => passo1.ExecuteAsync(new ListarEmpresasParaLoginCommand(usuario.Email, "senhaErrada")));
+        }
+        for (var falha = 1; falha <= 2; falha++)
+        {
+            await Assert.ThrowsAsync<CredenciaisInvalidasException>(
+                () => login.ExecuteAsync(new AutenticarUsuarioCommand(usuario.Email, "senhaErrada", null)));
+        }
+
+        usuario.FailedLoginAttempts.Should().Be(5, "3 no passo 1 e 2 no login somam");
+        usuario.EstaBloqueado().Should().BeTrue();
+        var recusa = await Assert.ThrowsAsync<CredenciaisInvalidasException>(
+            () => login.ExecuteAsync(new AutenticarUsuarioCommand(usuario.Email, "senhaCorreta", null)));
+        recusa.Message.Should().Be("Conta bloqueada temporariamente.");
+    }
+
+    [Fact]
+    public async Task LoginComBloqueioVencidoRecomecaAContagem()
+    {
+        var usuario = new Usuario
+        {
+            Id = Guid.NewGuid(), Nome = "Carlos", Email = "carlos@empresa.com", Ativo = true,
+            SenhaHash = FakePasswordHasher.MakeHash("senhaCorreta"),
+            FailedLoginAttempts = 5, LockoutEnd = DateTime.UtcNow.AddMinutes(-1),
+            CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow,
+        };
+        var repo = Substitute.For<IUsuarioRepository>();
+        repo.GetByEmailAsync(usuario.Email).Returns(usuario);
+
+        await Assert.ThrowsAsync<CredenciaisInvalidasException>(
+            () => CriarUseCase(repo).ExecuteAsync(new AutenticarUsuarioCommand(usuario.Email, "senhaErrada", null)));
+
+        usuario.FailedLoginAttempts.Should().Be(1, "a falha herdada de uma janela vencida não conta");
+        usuario.EstaBloqueado().Should().BeFalse();
+    }
 }

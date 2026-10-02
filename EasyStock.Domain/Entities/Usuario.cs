@@ -73,6 +73,27 @@ namespace EasyStock.Domain.Entities
             return LockoutEnd.HasValue && LockoutEnd > DateTime.UtcNow;
         }
 
+        /// <summary>Falhas de senha seguidas que bloqueiam a conta. O passo 1 do login e o login completo somam.</summary>
+        public const int FalhasParaBloquear = 5;
+
+        /// <summary>Minutos de bloqueio da conta que chegou ao limite de falhas.</summary>
+        public const int MinutosDeBloqueio = 15;
+
+        /// <summary>
+        /// Conta uma senha errada (#1352) e bloqueia a conta por <see cref="MinutosDeBloqueio"/> min na
+        /// <see cref="FalhasParaBloquear"/>ª falha seguida. Regra única do passo 1 do login (lista-empresas) e
+        /// do login completo. Bloqueio já vencido não deixa falha herdada: a contagem recomeça em 1.
+        /// </summary>
+        public void RegistrarFalhaDeSenha()
+        {
+            if (LockoutEnd.HasValue && LockoutEnd.Value <= DateTime.UtcNow)
+                ResetarTentativasFalha();
+
+            IncrementarTentativasFalha();
+            if (FailedLoginAttempts >= FalhasParaBloquear)
+                BloquearPorTentativas(MinutosDeBloqueio);
+        }
+
         /// <summary>
         /// LGPD Art. 18 — direito ao esquecimento. Substitui campos PII por valores
         /// pseudonimizados deterministicos baseados no Id (preserva FKs em audit logs,

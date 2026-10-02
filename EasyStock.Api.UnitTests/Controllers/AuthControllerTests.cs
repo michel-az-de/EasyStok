@@ -81,6 +81,7 @@ public class AuthControllerTests
         var listarEmpresasLogger = Substitute.For<ILogger<ListarEmpresasParaLoginUseCase>>();
         var listarEmpresasUseCase = new ListarEmpresasParaLoginUseCase(
             Substitute.For<IUsuarioRepository>(),
+            unitOfWork2,
             Substitute.For<IPasswordHasher>(),
             listarEmpresasLogger);
 
