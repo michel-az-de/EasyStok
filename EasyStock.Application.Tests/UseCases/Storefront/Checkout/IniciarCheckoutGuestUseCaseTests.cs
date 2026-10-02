@@ -128,7 +128,7 @@ public class IniciarCheckoutGuestUseCaseTests
             var core = new CheckoutCoreService(StorefrontRepo, CardapioRepo, JanelaRepo, BloqueioRepo, frete,
                 VagaRepo, PedidoRepo, ExpedienteRepo, NullLogger<CheckoutCoreService>.Instance, TimeProvider.System);
             var cobranca = new GerarCobrancaPedidoUseCase(Substitute.For<IPedidoRepository>(), StorefrontRepo, CobrancaRepo,
-                MpClient, Uow, TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
+                MpClient, core, Uow, TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
             return new IniciarCheckoutGuestUseCase(StorefrontRepo, core, cobranca, ClienteRepo, PedidoRepo, Uow,
                 new AcompanhamentoTokenService(config, TimeProvider.System),
                 new AtribuicaoPedidoCampanha(CampanhaRepo, TimeProvider.System), Tenant, TimeProvider.System,
@@ -181,6 +181,24 @@ public class IniciarCheckoutGuestUseCaseTests
         pedido.ClienteTelefone.Should().Be("+5511987654321");
         pedido.ClienteId.Should().Be(f.Clientes.Should().ContainSingle().Subject.Id);
         pedido.Observacoes.Should().Contain("sem açúcar").And.Contain("[Guest] CEP 01310-100, numero 120");
+    }
+
+    [Fact]
+    public async Task MercadoPagoFora_CancelaPedidoELiberaVaga()
+    {
+        // #1301: o guest recebe 503 e não vê o pedido; sem desfazer, a vaga ficava presa.
+        var f = new Fixture();
+        f.MpClient.CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("500"));
+
+        var act = () => f.UseCase().ExecuteAsync(Input());
+
+        await act.Should().ThrowAsync<MercadoPagoIndisponivelException>();
+        var pedido = f.Pedidos.Should().ContainSingle().Subject;
+        pedido.Status.Should().Be(StatusPedidoMapper.Cancelado);
+        await f.VagaRepo.Received(1).LiberarPorPedidoAsync(
+            pedido.Id, Arg.Is<string>(m => m.Contains("mercado_pago_indisponivel")), Arg.Any<CancellationToken>());
+        f.Cobrancas.Should().BeEmpty();
     }
 
     [Fact]

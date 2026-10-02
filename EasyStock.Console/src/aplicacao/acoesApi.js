@@ -1,6 +1,6 @@
 import * as acao from './acoes'
 import {
-  assumir, encerrar, enviarTexto, liberarAutomatico, marcarLida, reenviarMensagem,
+  assumir, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, marcarLida, reenviarMensagem,
 } from '../infra/api/conversasApi'
 import { mensagemDaApi } from '../infra/api/traducaoConversas'
 import { proximoId } from '../infra/repositorioConversas'
@@ -63,6 +63,13 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
       reenviarMensagem(id, mensagemId)
         .then((m) => despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m, id) }))
         .catch(avisar),
+    // #1353: a tela do link no console não tem dado no modo API; o link é o da loja.
+    obterLinkCardapio: (id) => gerarLinkCardapio(id)
+      .then((link) => ({ url: link.url, daLoja: true }))
+      .catch((erro) => {
+        avisar(erro)
+        return null
+      }),
     selecionar: (id) => {
       despachar({ tipo: acao.SELECIONAR_CONVERSA, id })
       marcarLida(id).catch(() => {})

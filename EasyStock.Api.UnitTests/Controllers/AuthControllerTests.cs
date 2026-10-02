@@ -1,6 +1,7 @@
 using EasyStock.Api.Controllers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services.Auth;
 using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
@@ -27,12 +28,13 @@ public class AuthControllerTests
     private readonly IAuditLogRepository _auditLogRepository = Substitute.For<IAuditLogRepository>();
     private readonly ILogger<AutenticarUsuarioUseCase> _autenticarLogger = Substitute.For<ILogger<AutenticarUsuarioUseCase>>();
     private readonly EasyStock.Api.Services.IJwtTokenService _mockJwtService = Substitute.For<EasyStock.Api.Services.IJwtTokenService>();
+    private readonly IPasswordHasher _passwordHasher = Substitute.For<IPasswordHasher>();
     private readonly AutenticarUsuarioUseCase _autenticarUseCase;
     private readonly AuthController _controller;
 
     public AuthControllerTests()
     {
-        var passwordHasher = Substitute.For<IPasswordHasher>();
+        var passwordHasher = _passwordHasher;
         _autenticarUseCase = new AutenticarUsuarioUseCase(_usuarioRepository, _unitOfWork, passwordHasher, _autenticarLogger);
 
         _mockJwtService.GerarToken(Arg.Any<AutenticarUsuarioResult>()).Returns("mocked-jwt-token");
@@ -62,22 +64,29 @@ public class AuthControllerTests
         var refreshTokenUseCase = new RefreshTokenUseCase(refreshTokenRepo2, usuarioRepo2, auditLogRepo2, jwtServiceApp, unitOfWork2, refreshTokenLogger);
         var logoutUseCase = new LogoutUseCase(refreshTokenRepo2, auditLogRepo2, unitOfWork2, logoutLogger);
         var esqueciSenhaUseCase = new EsqueciSenhaUseCase(usuarioRepo2, resetTokenRepo, auditLogRepo2, unitOfWork2, config, esqueciSenhaLogger);
-        var resetarSenhaUseCase = new ResetarSenhaUseCase(resetTokenRepo, refreshTokenRepo2, usuarioRepo2, auditLogRepo2, unitOfWork2, passwordHasher, resetarSenhaLogger);
+        var revogadorSessoes = new RevogadorSessoes(
+            usuarioRepo2, refreshTokenRepo2, Substitute.For<ICacheService>(), TimeProvider.System, Substitute.For<ILogger<RevogadorSessoes>>());
+        var resetarSenhaUseCase = new ResetarSenhaUseCase(resetTokenRepo, usuarioRepo2, auditLogRepo2, revogadorSessoes, unitOfWork2, passwordHasher, resetarSenhaLogger);
         var obterUsuarioAtualUseCase = new ObterUsuarioAtualUseCase(usuarioRepo2, currentUser, obterUsuarioAtualLogger);
-        var atualizarUsuarioAtualUseCase = new AtualizarUsuarioAtualUseCase(usuarioRepo2, currentUser, unitOfWork2, atualizarUsuarioAtualLogger);
-        var alterarSenhaUseCase = new AlterarSenhaUseCase(usuarioRepo2, currentUser, unitOfWork2, passwordHasher, alterarSenhaLogger);
+        var trocaDeContato = new TrocaDeContatoService(
+            usuarioRepo2, emailTokenRepo, Substitute.For<EasyStock.Application.Ports.Output.Notifications.INotificadorService>(),
+            Substitute.For<IEmpresaPadraoResolver>(), Substitute.For<ITenantContextAccessor>(), currentUser, passwordHasher,
+            unitOfWork2, config, TimeProvider.System, Substitute.For<ILogger<TrocaDeContatoService>>());
+        var atualizarUsuarioAtualUseCase = new AtualizarUsuarioAtualUseCase(usuarioRepo2, currentUser, unitOfWork2, trocaDeContato, atualizarUsuarioAtualLogger);
+        var alterarSenhaUseCase = new AlterarSenhaUseCase(usuarioRepo2, currentUser, revogadorSessoes, unitOfWork2, passwordHasher, alterarSenhaLogger);
         var confirmEmailLogger = Substitute.For<ILogger<ConfirmEmailUseCase>>();
-        var confirmEmailUseCase = new ConfirmEmailUseCase(emailTokenRepo, usuarioRepo2, auditLogRepo2, unitOfWork2, confirmEmailLogger);
+        var confirmEmailUseCase = new ConfirmEmailUseCase(emailTokenRepo, usuarioRepo2, auditLogRepo2, revogadorSessoes, unitOfWork2, confirmEmailLogger);
 
         var exportarLogger = Substitute.For<ILogger<EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase>>();
         var anonimizarLogger = Substitute.For<ILogger<EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase>>();
         var usuarioEmpresaRepo = Substitute.For<IUsuarioEmpresaRepository>();
-        var exportarUseCase = new EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase(usuarioRepo2, usuarioEmpresaRepo, refreshTokenRepo2, currentUser, exportarLogger);
-        var anonimizarUseCase = new EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase(usuarioRepo2, refreshTokenRepo2, resetTokenRepo, emailTokenRepo, currentUser, unitOfWork2, anonimizarLogger);
+        var exportarUseCase = new EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase(usuarioRepo2, usuarioEmpresaRepo, refreshTokenRepo2, Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Notifications.IPreferenciaNotificacaoRepository>(), currentUser, exportarLogger);
+        var anonimizarUseCase = new EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase(usuarioRepo2, refreshTokenRepo2, resetTokenRepo, emailTokenRepo, Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Notifications.IPreferenciaNotificacaoRepository>(), currentUser, unitOfWork2, anonimizarLogger);
 
         var listarEmpresasLogger = Substitute.For<ILogger<ListarEmpresasParaLoginUseCase>>();
         var listarEmpresasUseCase = new ListarEmpresasParaLoginUseCase(
             Substitute.For<IUsuarioRepository>(),
+            unitOfWork2,
             Substitute.For<IPasswordHasher>(),
             listarEmpresasLogger);
 
@@ -113,5 +122,22 @@ public class AuthControllerTests
 
         // Assert
         await act.Should().ThrowAsync<CredenciaisInvalidasException>();
+    }
+
+    [Fact]
+    public async Task Login_RevogaORefreshDosOutrosAparelhosMasNaoGravaOCarimboDeSessao()
+    {
+        // #1352: logar em outro aparelho revoga só o refresh dos outros; o JWT deles segue valendo, então o
+        // carimbo de sessão não pode mudar no login (logar o tablet derrubaria o balcão).
+        var usuario = Usuario.Criar("Ana", "ana@casadababa.com", "hash");
+        _usuarioRepository.GetByEmailAsync(usuario.Email).Returns(usuario);
+        _passwordHasher.Verify("Senha@12345", "hash").Returns(true);
+        _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() };
+
+        await _controller.Login(new LoginRequest(usuario.Email, "Senha@12345", null));
+
+        await _refreshTokenRepository.Received(1).RevogarSessoesAtivasAsync(usuario.Id, Arg.Any<DateTime>());
+        await _usuarioRepository.DidNotReceiveWithAnyArgs().AtualizarSessoesValidasDesdeAsync(default, default);
+        usuario.SessoesValidasDesde.Should().BeNull();
     }
 }

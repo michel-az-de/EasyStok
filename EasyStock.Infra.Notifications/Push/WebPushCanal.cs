@@ -25,27 +25,35 @@ namespace EasyStock.Infra.Notifications.Push;
 public sealed class WebPushCanal(
     IWebPushSubscriptionRepository repo,
     IOptions<WebPushOptions> options,
-    ILogger<WebPushCanal> logger) : ICanalNotificacao
+    ILogger<WebPushCanal> logger,
+    WebPushClient? client = null) : ICanalNotificacao
 {
     public CanalNotificacao Canal => CanalNotificacao.Push;
 
     private readonly WebPushOptions _opts = options.Value;
-    private readonly WebPushClient _client = new();
+
+    // O cliente HTTP do Web Push e injetavel so para teste (HttpClient com handler falso). Em runtime o container
+    // nao registra WebPushClient e o valor padrao (nulo) cai no cliente proprio.
+    private readonly WebPushClient _client = client ?? new();
 
     public async Task<ResultadoEnvio> EnviarAsync(MensagemPronta mensagem, CancellationToken ct = default)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
+        // Sem chave VAPID nenhuma tentativa vai passar: falha permanente (N2).
         if (string.IsNullOrWhiteSpace(_opts.PublicKey) || string.IsNullOrWhiteSpace(_opts.PrivateKey))
         {
-            return new ResultadoEnvio(false, "webpush", "WebPush:PublicKey/PrivateKey nao configurados.", DuracaoMs: sw.ElapsedMilliseconds);
+            return new ResultadoEnvio(false, "webpush", "WebPush:PublicKey/PrivateKey nao configurados.",
+                DuracaoMs: sw.ElapsedMilliseconds, FalhaPermanente: true);
         }
 
         var subs = await ResolverSubscriptionsAsync(mensagem, ct);
         if (subs.Count == 0)
         {
             sw.Stop();
-            return new ResultadoEnvio(false, "webpush", "NENHUMA_SUBSCRIPTION_ATIVA", DuracaoMs: sw.ElapsedMilliseconds);
+            // Ninguem registrou o PWA: repetir nao cria inscricao, falha permanente (N2).
+            return new ResultadoEnvio(false, "webpush", "NENHUMA_SUBSCRIPTION_ATIVA",
+                DuracaoMs: sw.ElapsedMilliseconds, FalhaPermanente: true);
         }
 
         var vapid = new VapidDetails(_opts.Subject, _opts.PublicKey, _opts.PrivateKey);
@@ -59,6 +67,7 @@ public sealed class WebPushCanal(
 
         var sucessos = 0;
         var falhas = 0;
+        var permanentes = 0;
         foreach (var sub in subs)
         {
             try
@@ -75,9 +84,20 @@ public sealed class WebPushCanal(
                 logger.LogInformation("Subscription Web Push {Endpoint} desativada (HTTP {Status}).", sub.Endpoint, (int)ex.StatusCode);
                 await repo.DesativarAsync(sub.Endpoint, ct);
                 falhas++;
+                permanentes++;
+            }
+            catch (WebPushException ex)
+            {
+                // Resposta do push service (N2): 4xx, menos 408 e 429 (400, 401, 403 e 413 entre eles), nunca passa;
+                // 5xx, 408 e 429 passam.
+                logger.LogWarning(ex, "Falha ao enviar Web Push para subscription {Endpoint} (HTTP {Status})",
+                    sub.Endpoint, (int)ex.StatusCode);
+                falhas++;
+                if (ClassificadorDeFalha.HttpEhPermanente((int)ex.StatusCode)) permanentes++;
             }
             catch (Exception ex)
             {
+                // Rede e o resto: transitorio.
                 logger.LogWarning(ex, "Falha ao enviar Web Push para subscription {Endpoint}", sub.Endpoint);
                 falhas++;
             }
@@ -88,7 +108,10 @@ public sealed class WebPushCanal(
             Sucesso: sucessos > 0,
             ProviderUsado: "webpush",
             ErroDetalhado: sucessos > 0 ? null : $"todas {falhas} subs falharam",
-            DuracaoMs: sw.ElapsedMilliseconds);
+            DuracaoMs: sw.ElapsedMilliseconds,
+            // Sem nenhuma entrega e com toda falha permanente, repetir nao adianta. Com ao menos uma falha
+            // transitoria o outbox tenta de novo, e nenhuma inscricao recebeu, entao nao duplica.
+            FalhaPermanente: sucessos == 0 && permanentes == falhas);
     }
 
     private async Task<IReadOnlyList<Domain.Entities.Notifications.WebPushSubscription>> ResolverSubscriptionsAsync(MensagemPronta msg, CancellationToken ct)

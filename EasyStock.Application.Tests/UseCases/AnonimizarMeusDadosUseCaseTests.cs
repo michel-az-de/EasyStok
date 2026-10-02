@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.AnonimizarMeusDados;
@@ -12,13 +13,15 @@ public class AnonimizarMeusDadosUseCaseTests
     private readonly IRefreshTokenRepository _refreshTokenRepository = Substitute.For<IRefreshTokenRepository>();
     private readonly IResetTokenRepository _resetTokenRepository = Substitute.For<IResetTokenRepository>();
     private readonly IEmailConfirmationTokenRepository _emailConfirmationTokenRepository = Substitute.For<IEmailConfirmationTokenRepository>();
+    private readonly IConsentimentoRepository _consentimentos = Substitute.For<IConsentimentoRepository>();
+    private readonly IPreferenciaNotificacaoRepository _preferencias = Substitute.For<IPreferenciaNotificacaoRepository>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly ILogger<AnonimizarMeusDadosUseCase> _logger = Substitute.For<ILogger<AnonimizarMeusDadosUseCase>>();
 
     private AnonimizarMeusDadosUseCase CriarUseCase() =>
         new(_usuarioRepository, _refreshTokenRepository, _resetTokenRepository,
-            _emailConfirmationTokenRepository, _currentUser, _unitOfWork, _logger);
+            _emailConfirmationTokenRepository, _consentimentos, _preferencias, _currentUser, _unitOfWork, _logger);
 
     private static Usuario CriarUsuario() =>
         new()
@@ -128,5 +131,22 @@ public class AnonimizarMeusDadosUseCaseTests
         u1.Email.Should().NotBe(u2.Email);
         u1.Email.Should().StartWith("anonimizado-").And.EndWith("@anonimizado.local");
         u2.Email.Should().StartWith("anonimizado-").And.EndWith("@anonimizado.local");
+    }
+
+    [Fact]
+    public async Task RevogaOptInZeraIpEApagaPreferencias()
+    {
+        var usuario = CriarUsuario();
+        usuario.DefinirTelefone(EasyStock.Domain.ValueObjects.TelefoneE164.From("11997573992"));
+        _currentUser.UsuarioId.Returns(usuario.Id);
+        _usuarioRepository.GetByIdAsync(usuario.Id).Returns(usuario);
+
+        await CriarUseCase().ExecuteAsync(new AnonimizarMeusDadosCommand("ANONIMIZAR"));
+
+        await _consentimentos.Received(1).RevogarPorAnonimizacaoAsync(usuario.Id, Arg.Any<CancellationToken>());
+        await _preferencias.Received(1).RemoverPorUsuarioAsync(usuario.Id, Arg.Any<CancellationToken>());
+        usuario.Telefone.Should().BeNull();
+        usuario.TelefoneVerificadoEm.Should().BeNull();
+        usuario.EmailPendente.Should().BeNull();
     }
 }

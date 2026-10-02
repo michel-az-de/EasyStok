@@ -200,8 +200,9 @@ public class IniciarCheckoutUseCaseTests
             storefront, cardapioItem, janela, freteZona);
     }
 
-    private static IniciarCheckoutUseCase BuildUseCase(Fakes f) => new(
-        new CheckoutCoreService(
+    private static IniciarCheckoutUseCase BuildUseCase(Fakes f)
+    {
+        var core = new CheckoutCoreService(
             f.StorefrontRepo,
             f.CardapioRepo,
             f.JanelaRepo,
@@ -213,22 +214,26 @@ public class IniciarCheckoutUseCaseTests
             f.PedidoRepo,
             f.ExpedienteRepo,
             NullLogger<CheckoutCoreService>.Instance,
-            TimeProvider.System),
-        f.StorefrontRepo,
-        f.ClienteRepo,
-        f.IdempotencyService,
-        new GerarCobrancaPedidoUseCase(
-            Substitute.For<IPedidoRepository>(),
+            TimeProvider.System);
+        return new(
+            core,
             f.StorefrontRepo,
-            f.CobrancaRepo,
-            f.MpClient,
+            f.ClienteRepo,
+            f.IdempotencyService,
+            new GerarCobrancaPedidoUseCase(
+                Substitute.For<IPedidoRepository>(),
+                f.StorefrontRepo,
+                f.CobrancaRepo,
+                f.MpClient,
+                core,
+                f.Uow,
+                TimeProvider.System,
+                NullLogger<GerarCobrancaPedidoUseCase>.Instance),
+            new AtribuicaoPedidoCampanha(f.CampanhaRepo, TimeProvider.System),
+            f.Tenant,
             f.Uow,
-            TimeProvider.System,
-            NullLogger<GerarCobrancaPedidoUseCase>.Instance),
-        new AtribuicaoPedidoCampanha(f.CampanhaRepo, TimeProvider.System),
-        f.Tenant,
-        f.Uow,
-        NullLogger<IniciarCheckoutUseCase>.Instance);
+            NullLogger<IniciarCheckoutUseCase>.Instance);
+    }
 
     private static IniciarCheckoutInput InputValido() => new(
         Slug: SlugValido,
@@ -472,6 +477,37 @@ public class IniciarCheckoutUseCaseTests
 
         await uc.Invoking(u => u.ExecuteAsync(InputValido()))
             .Should().ThrowAsync<MercadoPagoIndisponivelException>();
+    }
+
+    public static TheoryData<Exception> FalhasDoMercadoPago => new()
+    {
+        new HttpRequestException("500"),
+        new OperationCanceledException("timeout de 5 s"),
+    };
+
+    [Theory]
+    [MemberData(nameof(FalhasDoMercadoPago))]
+    public async Task ExecuteAsync_MercadoPagoFora_CancelaPedidoELiberaVaga(Exception falha)
+    {
+        // #1301: sem CobrancaPedido gravada o CobrancaPedidoJob não enxerga o pedido, e a vaga ficava presa.
+        var f = BuildFakes();
+        var pedidos = new List<EasyStock.Domain.Entities.Pedido>();
+        f.PedidoRepo.When(r => r.AddAsync(Arg.Any<EasyStock.Domain.Entities.Pedido>(), Arg.Any<CancellationToken>()))
+            .Do(ci => pedidos.Add(ci.Arg<EasyStock.Domain.Entities.Pedido>()));
+        f.MpClient.CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(falha);
+
+        await BuildUseCase(f).Invoking(u => u.ExecuteAsync(InputValido()))
+            .Should().ThrowAsync<MercadoPagoIndisponivelException>("o site segue respondendo 503");
+
+        var pedido = pedidos.Should().ContainSingle().Subject;
+        pedido.Status.Should().Be(StatusPedidoMapper.Cancelado);
+        await f.VagaRepo.Received(1).LiberarPorPedidoAsync(
+            pedido.Id, Arg.Is<string>(m => m.Contains("mercado_pago_indisponivel")), Arg.Any<CancellationToken>());
+        await f.PedidoRepo.Received(1).AddEventoAsync(
+            Arg.Is<EasyStock.Domain.Entities.PedidoEvento>(e =>
+                e.PedidoId == pedido.Id && e.Tipo == "cancelado" && e.Detalhes == "mercado_pago_indisponivel"),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

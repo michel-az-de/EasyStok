@@ -86,15 +86,14 @@ public class AuthController(
         [FromBody] LoginGoogleRequest request,
         [FromServices] IGoogleIdTokenValidator google,
         [FromServices] IdentificarUsuarioGoogleUseCase identificar,
-        [FromServices] IEmpresaRepository empresas,
-        [FromServices] ILogger<AuthController> logger,
+        [FromServices] IEmpresaPadraoResolver empresaPadraoResolver,
         CancellationToken ct)
     {
         if (google.ClientId is null) return DataNotFound("Login com Google desligado.");
         try
         {
             var usuario = await identificar.ExecuteAsync(request.IdToken ?? string.Empty, ct);
-            var empresaPadrao = await EmpresaPadraoAsync(google.EmpresaPadrao, empresas, logger);
+            var empresaPadrao = await empresaPadraoResolver.ResolverAsync(ct);
             var resultado = await autenticarUseCase.ConcluirLoginGoogleAsync(usuario, request.EmpresaId, empresaPadrao);
             return await EmitirSessaoAsync(resultado, "login_google");
         }
@@ -102,23 +101,6 @@ public class AuthController(
         {
             return Unauthorized(new { error = new { code = "INVALID_CREDENTIALS", message = ex.Message } });
         }
-    }
-
-    /// <summary>#1326: empresa padrão do superadmin pelo CNPJ ou, sem match, pelo nome exato (uma só).</summary>
-    private static async Task<Guid?> EmpresaPadraoAsync(string? chave, IEmpresaRepository empresas, ILogger logger)
-    {
-        if (chave is null) return null;
-        var empresa = await empresas.GetByDocumentoAsync(chave);
-        if (empresa is null)
-        {
-            var porNome = (await empresas.GetAllAsync())
-                .Where(e => string.Equals(e.Nome?.Trim(), chave, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-            empresa = porNome.Count == 1 ? porNome[0] : null;
-        }
-        if (empresa is null)
-            logger.LogWarning("Auth:Google:EmpresaPadrao '{Chave}' não corresponde a uma única empresa.", chave);
-        return empresa?.Id;
     }
 
     /// <summary>Revoga as sessões anteriores, emite JWT + refresh token e audita. Credencial já conferida.</summary>
@@ -239,9 +221,13 @@ public class AuthController(
         => DataOk(await obterUsuarioAtualUseCase.ExecuteAsync(new ObterUsuarioAtualCommand()));
 
     [Authorize]
-    [SwaggerOperation(Summary = "Update current user profile")]
+    [EnableRateLimiting("auth")]
+    [SwaggerOperation(
+        Summary = "Update current user profile",
+        Description = "Trocar o e-mail exige senhaAtual (ausente ou errada: 403, e a errada conta como falha de login) e so grava o endereco como pendente: o e-mail da conta troca no clique do link enviado ao endereco novo.")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [HttpPatch("me")]
     public async Task<IActionResult> UpdateMe([FromBody] AtualizarUsuarioAtualCommand command)
         => DataOk(await atualizarUsuarioAtualUseCase.ExecuteAsync(command));

@@ -1,9 +1,13 @@
 using System.Net;
 using System.Reflection;
+using System.Security.Claims;
 using System.Text;
+using EasyStock.Api.Authentication;
 using EasyStock.Api.Controllers;
 using EasyStock.Api.Services.Operacao;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.TestHelpers;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
@@ -13,6 +17,7 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -133,7 +138,8 @@ public class OperacaoEventosControllerTests
         context.Response.Body = corpo;
         using var cts = new CancellationTokenSource(Limite);
 
-        var stream = TransmissaoSse.TransmitirAsync(context.Response, ouvinte.Slot, TimeSpan.FromMilliseconds(50), cts.Token);
+        var stream = TransmissaoSse.TransmitirAsync(
+            context.Response, ouvinte.Slot, TimeSpan.FromMilliseconds(50), null, null, TimeProvider.System, cts.Token);
         await Aguardar(() => Ocorrencias(corpo.Texto(), ": heartbeat\n\n") >= 2);
         await cts.CancelAsync();
         await stream;
@@ -141,14 +147,74 @@ public class OperacaoEventosControllerTests
         corpo.Texto().Should().StartWith("event: ready\n");
     }
 
-    private static (OperacaoEventosController, CorpoObservavel) Controller(OperacaoEventBroker broker, Guid empresaId)
+    // ── #1352 (N7): o stream não vive mais que o JWT que o abriu ──────────────────────────────
+
+    [Fact]
+    public async Task FechaQuandoOJwtVence()
+    {
+        var broker = new OperacaoEventBroker(NullLogger<OperacaoEventBroker>.Instance);
+        var agora = DateTimeOffset.UtcNow;
+        var (controller, corpo) = Controller(broker, Guid.NewGuid(), Jwt(Guid.NewGuid(), agora.AddMinutes(-5), agora.AddSeconds(1)));
+        using var cts = new CancellationTokenSource(Limite);
+
+        await controller.Get(cts.Token).WaitAsync(Limite); // fecha sozinho no exp, bem antes dos 25 s do heartbeat
+
+        cts.IsCancellationRequested.Should().BeFalse();
+        corpo.Texto().Should().StartWith("event: ready\n");
+        broker.Ouvintes.Should().Be(0, "o ouvinte sai do broker quando o stream fecha");
+    }
+
+    [Fact]
+    public async Task FechaQuandoOCarimboDeSessaoRevoga()
+    {
+        // A conferência vem a cada heartbeat (25 s): o relógio falso anda 26 s e um evento acorda o laço.
+        var inicio = new DateTimeOffset(2026, 10, 2, 13, 0, 0, TimeSpan.Zero);
+        var relogio = new FakeTimeProvider(inicio);
+        var empresaId = Guid.NewGuid();
+        var usuarioId = Guid.NewGuid();
+        var usuarios = Substitute.For<IUsuarioRepository>();
+        usuarios.ObterSessaoAsync(usuarioId).Returns(new SessaoDoUsuario(true, inicio.UtcDateTime.AddMinutes(-1)));
+        var broker = new OperacaoEventBroker(NullLogger<OperacaoEventBroker>.Instance);
+        var (controller, corpo) = Controller(
+            broker, empresaId, Jwt(usuarioId, inicio.AddMinutes(-10), inicio.AddHours(8)), relogio, usuarios);
+        using var cts = new CancellationTokenSource(Limite);
+
+        var stream = controller.Get(cts.Token);
+        await Aguardar(() => corpo.Texto().StartsWith("event: ready", StringComparison.Ordinal));
+        stream.IsCompleted.Should().BeFalse("o token emitido antes do corte ainda não foi conferido");
+
+        relogio.Advance(OperacaoEventosController.IntervaloHeartbeat + TimeSpan.FromSeconds(1));
+        broker.PublicarOperacao(empresaId, "pedido.pago", new { });
+        await stream.WaitAsync(Limite);
+
+        cts.IsCancellationRequested.Should().BeFalse();
+        await usuarios.Received().ObterSessaoAsync(usuarioId);
+    }
+
+    private static ClaimsPrincipal Jwt(Guid usuarioId, DateTimeOffset emitidoEm, DateTimeOffset expiraEm) =>
+        new(new ClaimsIdentity(
+        [
+            new Claim("sub", usuarioId.ToString()),
+            new Claim("iat", emitidoEm.ToUnixTimeSeconds().ToString()),
+            new Claim("exp", expiraEm.ToUnixTimeSeconds().ToString()),
+        ], "Bearer"));
+
+    private static (OperacaoEventosController, CorpoObservavel) Controller(
+        OperacaoEventBroker broker, Guid empresaId, ClaimsPrincipal? jwt = null,
+        TimeProvider? relogio = null, IUsuarioRepository? usuarios = null)
     {
         var usuario = Substitute.For<ICurrentUserAccessor>();
         usuario.EmpresaId.Returns(empresaId);
         var corpo = new CorpoObservavel();
         var context = new DefaultHttpContext();
         context.Response.Body = corpo;
-        var controller = new OperacaoEventosController(broker, usuario)
+        if (jwt is not null) context.User = jwt;
+        var validador = new ValidadorSessaoUsuario(
+            Substitute.For<ICacheService>(),
+            usuarios ?? Substitute.For<IUsuarioRepository>(),
+            new ConfigurationBuilder().Build(),
+            NullLogger<ValidadorSessaoUsuario>.Instance);
+        var controller = new OperacaoEventosController(broker, usuario, validador, relogio ?? TimeProvider.System)
         {
             ControllerContext = new ControllerContext { HttpContext = context },
         };

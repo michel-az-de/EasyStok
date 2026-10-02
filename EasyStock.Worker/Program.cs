@@ -1,12 +1,11 @@
 using EasyStock.Application.DependencyInjection;
-using EasyStock.Application.Ports.Output;
-using EasyStock.Infra.Async;
 using EasyStock.Infra.Async.DependencyInjection;
 using EasyStock.Infra.Async.Storage;
 using EasyStock.Infra.Notifications.DependencyInjection;
 using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.DependencyInjection;
+using EasyStock.Infra.Postgre.Notifications.Agendamento;
 using EasyStock.Worker;
 using EasyStock.Worker.BackgroundServices;
 using EasyStock.Worker.DependencyInjection;
@@ -61,27 +60,13 @@ builder.Services.Configure<WorkerOptions>(
 var connStr = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection não configurada.");
 
-builder.Services
-    .AddEasyStockPostgreInfrastructure(connStr, builder.Configuration)
-    .AddEasyStockNotificationsRepositories();
+// AddEasyStockPostgreInfrastructure já registra os repositórios de notificação e o coletor (N1: chamar
+// AddEasyStockNotificationsRepositories de novo fazia o coletor rodar duas vezes por rodada).
+builder.Services.AddEasyStockPostgreInfrastructure(connStr, builder.Configuration);
 
-// Email service (reusa Infra.Async, sem chamar AddEasyStockAsyncInfrastructure completo)
-var smtpSection = builder.Configuration.GetSection("Smtp");
-if (smtpSection.Exists())
-{
-    builder.Services.AddSingleton<IEmailService>(sp => new SmtpEmailService(
-        smtpSection["Host"] ?? "localhost",
-        int.Parse(smtpSection["Port"] ?? "587"),
-        smtpSection["Username"] ?? "",
-        smtpSection["Password"] ?? "",
-        smtpSection["FromEmail"] ?? "noreply@easystock.com",
-        smtpSection["FromName"] ?? "EasyStock",
-        bool.Parse(smtpSection["EnableSsl"] ?? "true")));
-}
-else
-{
-    builder.Services.AddSingleton<IEmailService, ConsoleEmailService>();
-}
+// Email service: a mesma fabrica da API (Email:Provider e secao Smtp), para os dois hosts resolverem
+// o mesmo provider e as mesmas opcoes (N3, #1351), sem chamar AddEasyStockAsyncInfrastructure completo.
+builder.Services.AddEasyStockEmail(builder.Configuration);
 
 // Notifications infra (canal adapters + Scriban renderer)
 builder.Services.AddNotificationsInfra(builder.Configuration);
@@ -102,6 +87,7 @@ builder.Services
 
 // Lembretes de pedidos agendados (mobile_orders.scheduled_delivery_at):
 // no dia, 1h antes, 10min antes. Idempotencia via colunas agendamento_notificado_*_em.
+builder.Services.AddSingleton<LembretesPedidoAgendadoTick>();
 builder.Services.AddHostedService<AgendamentoNotificacaoService>();
 
 // Monitor de saude de endpoints publicos. Abre ticket via /api/ci/tickets
@@ -152,8 +138,13 @@ builder.Services.AddEasyStockAgenteLlm(builder.Configuration);
 // decifra o certificado A1 que a Api gravou em credencial_integracao.
 builder.Services.AddEasyStockDataProtection();
 
-// Health checks
-builder.Services.AddHealthChecks();
+// Health checks do motor de notificacoes (N1): heartbeat dos loops e backlog. O Worker nao tem endpoint HTTP: quem
+// consome e o HealthchecksPingService, que pinga o Healthchecks.io enquanto estao saudaveis e chama /fail quando nao.
+builder.Services.AddHealthChecks()
+    .AddNotificationsHosting()
+    .AddNotificacoesBacklog();
+builder.Services.AddHttpClient(HealthchecksPingService.NomeDoCliente);
+builder.Services.AddHostedService<HealthchecksPingService>();
 
 // Validação de DI sob demanda (CI/diagnóstico): `dotnet run -- --validate-di` constrói
 // o grafo com ValidateOnBuild + ValidateScopes, pegando captive dependencies

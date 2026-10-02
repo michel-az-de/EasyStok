@@ -23,6 +23,13 @@ public class OutboxMensagemNotificacao
     public DateTime ProximaTentativaEm { get; set; }
     public DateTime? EnviadoEm { get; set; }
     public string? ProviderUsado { get; set; }
+
+    /// <summary>
+    /// Id da mensagem no provider (o <c>wamid</c> da Meta), gravado no mesmo commit do resultado do envio (N1). A N6
+    /// o usa para casar o webhook de status com a mensagem do outbox.
+    /// </summary>
+    public string? ProviderMensagemId { get; set; }
+
     public string? ErroUltimaTentativa { get; set; }
     public string IdempotencyKey { get; set; } = null!;
     public string TenantTimezone { get; set; } = "America/Sao_Paulo";
@@ -59,14 +66,15 @@ public class OutboxMensagemNotificacao
         string tenantTimezone = "America/Sao_Paulo",
         int maxTentativas = 3,
         string? metadadosJson = null,
-        string? chaveIdempotencia = null)
+        string? chaveIdempotencia = null,
+        string? destinatarioChave = null)
     {
         var agora = DateTime.UtcNow;
         // S13: com chave do negócio (ex.: pedido + status), reprocessar o fato gera a mesma chave mesmo vindo de
         // outro EventoNotificacao; o índice único da coluna barra a segunda linha.
         var idempotencyKey = string.IsNullOrWhiteSpace(chaveIdempotencia)
             ? ComputarIdempotencyKey(eventoId, usuarioDestinoId, canal)
-            : ComputarIdempotencyKey(chaveIdempotencia.Trim(), canal);
+            : ComputarIdempotencyKey(chaveIdempotencia.Trim(), canal, destinatarioChave);
         return new OutboxMensagemNotificacao
         {
             Id = Guid.NewGuid(),
@@ -103,9 +111,22 @@ public class OutboxMensagemNotificacao
         if (instante > ProximaTentativaEm) ProximaTentativaEm = instante;
     }
 
-    public void MarcarEmEnvio()
+    /// <summary>
+    /// Lease do estado <see cref="StatusOutbox.EmEnvio"/> (N1): ao reservar a mensagem, <see cref="ProximaTentativaEm"/>
+    /// vira agora + este prazo. Se o processo cair antes de gravar o resultado, o claim da rodada seguinte reclama a
+    /// mensagem depois do lease. 5 minutos, como o <c>OutboxEventoIntegracao</c>.
+    /// </summary>
+    public static readonly TimeSpan LeaseEmEnvio = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// O claim do dispatcher reservou a mensagem (N1): <c>EmEnvio</c> com lease em <see cref="ProximaTentativaEm"/>.
+    /// Não conta tentativa: quem conta é o desfecho do envio. No WhatsApp e no SMS o <c>EmEnvio</c> já está gravado
+    /// antes de o canal ser chamado, e é isso que impede o reenvio depois de uma queda.
+    /// </summary>
+    public void MarcarEmEnvio(TimeSpan? lease = null)
     {
         Status = StatusOutbox.EmEnvio;
+        ProximaTentativaEm = DateTime.UtcNow.Add(lease ?? LeaseEmEnvio);
     }
 
     public void MarcarEnviado(string providerUsado)
@@ -114,11 +135,39 @@ public class OutboxMensagemNotificacao
         ProviderUsado = providerUsado;
         EnviadoEm = DateTime.UtcNow;
         ErroUltimaTentativa = null;
+        AoTerminar();
+    }
+
+    /// <summary>
+    /// Stub ou console (N2): o provider disse que não enviou nada. Terminal e sem <see cref="EnviadoEm"/>: nada
+    /// saiu. Só o dispatcher chama; <see cref="ProviderUsado"/> guarda o provider real (<c>stub</c>, <c>console</c>).
+    /// </summary>
+    public void MarcarSimulado(string providerUsado)
+    {
+        Status = StatusOutbox.Simulado;
+        ProviderUsado = providerUsado;
+        ErroUltimaTentativa = null;
+        AoTerminar();
+    }
+
+    /// <summary>
+    /// Não há como saber se o provider entregou (N2): timeout, queda de conexão ou 5xx no WhatsApp e no SMS, que
+    /// saem no máximo uma vez, e, na N1, o lease vencido. Terminal: conta a tentativa, nunca reagenda, e o
+    /// dispatcher não abre fallback de canal, para não duplicar. <paramref name="providerUsado"/> fica como estava
+    /// quando não é informado.
+    /// </summary>
+    public void MarcarIndeterminado(string erro, string? providerUsado = null)
+    {
+        Tentativas++;
+        ErroUltimaTentativa = erro;
+        if (providerUsado is not null) ProviderUsado = providerUsado;
+        Status = StatusOutbox.Indeterminado;
+        AoTerminar();
     }
 
     /// <summary>
     /// <paramref name="permanente"/> = erro que nunca vai passar (ex.: fora da janela de 24 h sem
-    /// template, S09): vira <see cref="StatusOutbox.Falhado"/> sem reagendar.
+    /// template, S09; SMTP 550; HTTP 4xx): vira <see cref="StatusOutbox.Falhado"/> sem reagendar.
     /// </summary>
     public void MarcarFalhaTentativa(string erro, TimeSpan backoff, bool permanente = false)
     {
@@ -126,25 +175,112 @@ public class OutboxMensagemNotificacao
         ErroUltimaTentativa = erro;
         ProximaTentativaEm = DateTime.UtcNow.Add(backoff);
         Status = permanente || Tentativas >= MaxTentativas ? StatusOutbox.Falhado : StatusOutbox.Pendente;
+        // Com tentativa sobrando a mensagem segue aberta e o corpo ainda é necessário para reenviar.
+        if (Status == StatusOutbox.Falhado) AoTerminar();
+    }
+
+    /// <summary>
+    /// A mensagem passou do prazo de validade do tipo antes de sair (N1, quarentena): terminal, sem
+    /// <see cref="EnviadoEm"/> e sem contar tentativa, porque nada foi tentado. Termina pelo mesmo caminho das demais
+    /// transições terminais (<see cref="AoTerminar"/>), então a categoria de segurança apaga o segredo.
+    /// </summary>
+    public void Expirar(string motivo)
+    {
+        Status = StatusOutbox.Expirado;
+        ErroUltimaTentativa = motivo;
+        AoTerminar();
+    }
+
+    /// <summary>
+    /// O lease do <see cref="StatusOutbox.EmEnvio"/> venceu: o processo caiu, ou o commit do resultado falhou, depois
+    /// da reserva (N1). Em e-mail, in-app e push (ao menos uma vez) a mensagem volta a <c>Pendente</c> contando a
+    /// tentativa, elegível na hora (e <c>Falhado</c> se as tentativas acabaram, para não repetir para sempre). No
+    /// WhatsApp e no SMS (no máximo uma vez) vira <see cref="StatusOutbox.Indeterminado"/> e nunca volta à fila:
+    /// o provider pode ter sido chamado antes da queda.
+    /// </summary>
+    public void ReclamarLeaseVencido()
+    {
+        const string motivo = "Lease de envio vencido: o processo caiu depois de reservar a mensagem";
+        if (Canal is CanalNotificacao.WhatsApp or CanalNotificacao.Sms)
+            MarcarIndeterminado(motivo);
+        else
+            MarcarFalhaTentativa(motivo, TimeSpan.Zero);
+    }
+
+    /// <summary>Limite da coluna <c>ProviderMensagemId</c> (<c>varchar(128)</c>).</summary>
+    public const int ProviderMensagemIdMaxLength = 128;
+
+    /// <summary>
+    /// Guarda o id da mensagem no provider (o <c>wamid</c> da Meta) para a N6 casar o webhook de status. Vazio é
+    /// ignorado e o que passa do limite da coluna é cortado: um id grande demais derrubaria o commit do resultado do
+    /// envio, depois de a mensagem já ter saído.
+    /// </summary>
+    public void RegistrarProviderMensagemId(string? idExterno)
+    {
+        if (string.IsNullOrWhiteSpace(idExterno)) return;
+        var id = idExterno.Trim();
+        ProviderMensagemId = id.Length <= ProviderMensagemIdMaxLength ? id : id[..ProviderMensagemIdMaxLength];
     }
 
     public void Cancelar()
     {
         Status = StatusOutbox.Cancelado;
+        AoTerminar();
     }
 
     public void Suprimir(string motivo)
     {
         Status = StatusOutbox.Suprimido;
         ErroUltimaTentativa = motivo;
+        AoTerminar();
+    }
+
+    /// <summary>
+    /// Texto que substitui o corpo de uma mensagem <see cref="CategoriaConteudoNotificacao.Seguranca"/> quando ela
+    /// termina (N2). A coluna do corpo é obrigatória, então o corpo não fica nulo.
+    /// </summary>
+    public const string CorpoApagado = "[apagado]";
+
+    /// <summary>
+    /// Apaga o que a categoria <see cref="CategoriaConteudoNotificacao.Seguranca"/> não pode guardar depois do
+    /// envio (o token ou o código vai no corpo e nos metadados): o corpo vira <see cref="CorpoApagado"/> e assunto e
+    /// metadados zeram. O destinatário fica até o anonimizador (90 dias). Idempotente. O payload do evento é
+    /// apagado à parte (<see cref="EventoNotificacao.PurgarPayload"/>), porque o fallback de canal ainda o lê.
+    /// </summary>
+    public void PurgarSegredos()
+    {
+        CorpoRenderizado = CorpoApagado;
+        AssuntoRenderizado = string.Empty;
+        MetadadosJson = null;
+    }
+
+    /// <summary>
+    /// Toda transição para um status terminal (qualquer um fora de <see cref="StatusOutbox.Pendente"/> e
+    /// <see cref="StatusOutbox.EmEnvio"/>) passa por aqui. Quem criar uma transição terminal nova (a N1 traz
+    /// <c>Expirado</c>) chama este método, para a categoria de segurança não guardar segredo em nenhum desfecho.
+    /// </summary>
+    private void AoTerminar()
+    {
+        // Terminal não agenda mais nada: ProximaTentativaEm passa a guardar o momento em que a mensagem terminou, que o
+        // health de backlog (N1) usa para contar "na última hora" sem coluna nova.
+        ProximaTentativaEm = DateTime.UtcNow;
+        if (Categoria == CategoriaConteudoNotificacao.Seguranca)
+            PurgarSegredos();
     }
 
     public bool TentativasEsgotadas() => Tentativas >= MaxTentativas;
 
-    /// <summary>Chave de idempotência do outbox para uma chave de negócio no canal (S13).</summary>
-    public static string ComputarIdempotencyKey(string chaveIdempotencia, CanalNotificacao canal)
+    /// <summary>
+    /// Chave de idempotência do outbox para uma chave de negócio no canal (S13). Com <paramref name="destinatarioChave"/>
+    /// (N4, uma mensagem por pessoa da audiência) a chave muda com o destinatário; sem ele é a chave de sempre, então o
+    /// que já está no outbox, como o aviso ao cliente final, segue deduplicando.
+    /// </summary>
+    public static string ComputarIdempotencyKey(string chaveIdempotencia, CanalNotificacao canal, string? destinatarioChave = null)
     {
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"negocio|{chaveIdempotencia}|{(int)canal}"));
+        var raw = string.IsNullOrWhiteSpace(destinatarioChave)
+            ? $"negocio|{chaveIdempotencia}|{(int)canal}"
+            : $"negocio|{chaveIdempotencia}|{(int)canal}|{destinatarioChave.Trim()}";
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
         return Convert.ToHexString(hash);
     }
 

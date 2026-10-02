@@ -12,7 +12,7 @@ import {
 import { useArquivoComoDataUrl } from '../../hooks/useArquivoComoDataUrl'
 import { useGravadorAudio } from '../../hooks/useGravadorAudio'
 import { BotaoAnexarArquivo, GravadorAudio, PreviaAnexo } from './ComposerAnexos'
-import { linkDoCardapio, textoConviteCardapio } from '../../dominio/cardapioLink'
+import { textoConviteCardapio } from '../../dominio/cardapioLink'
 import { ModalEnviarCardapio } from './ModalEnviarCardapio'
 import css from './atendimento.module.css'
 
@@ -21,7 +21,7 @@ export function Composer({
   aoMudarRascunho, aoEnviar, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
   aoReabrir,
 }) {
-  const { enviarMidia, enviar } = useAcoes()
+  const { enviarMidia, enviar, obterLinkCardapio } = useAcoes()
   // Atalho "/" no campo (rodada 7, pedido do dono 24/09/2026): filtra a
   // biblioteca inteira (pronta e automática) e insere no lugar do atalho.
   const barra = useAtalhoBarra({ rascunho, conversa, aoInserir: aoMudarRascunho })
@@ -36,7 +36,9 @@ export function Composer({
   // arquivo em espera (prévia antes de enviar) e o gravador de áudio.
   const [anexo, setAnexo] = useState(null)
   const [erroAnexo, setErroAnexo] = useState(null)
-  const [enviandoCardapio, setEnviandoCardapio] = useState(false)
+  // Link do cardápio para a prévia (#1353): `{ url, daLoja }` depois de obtido; null fecha.
+  const [linkCardapio, setLinkCardapio] = useState(null)
+  const [buscandoLink, setBuscandoLink] = useState(false)
   const { ler } = useArquivoComoDataUrl()
   const gravador = useGravadorAudio()
   const gravando = gravador.estado !== 'ocioso'
@@ -94,11 +96,23 @@ export function Composer({
   // pela conversa (infra/canalEntreJanelas.js), nunca cola nada aqui.
   // Rodada 12 (issue #16): o botão abre a prévia com o link e a origem
   // dele; o envio é o mesmo de antes, só que depois de ela ver.
-  const linkCardapio = linkDoCardapio(window.location.origin + window.location.pathname, conversa.id)
-  const textoCardapio = textoConviteCardapio(conversa.nome, linkCardapio)
+  // #1353: no modo API o link vem da loja (o mesmo do agente), então a prévia só abre
+  // depois de ele chegar; falha vira aviso na faixa e a prévia não abre.
+  const abrirCardapio = async () => {
+    const conversaId = conversa.id
+    setBuscandoLink(true)
+    try {
+      const link = await obterLinkCardapio(conversaId)
+      if (link) setLinkCardapio({ ...link, conversaId })
+    } finally {
+      setBuscandoLink(false)
+    }
+  }
+  const linkDaConversa = linkCardapio?.conversaId === conversa.id ? linkCardapio : null
+  const textoCardapio = linkDaConversa ? textoConviteCardapio(conversa.nome, linkDaConversa.url) : ''
   const aoEnviarCardapio = () => {
     enviar(conversa.id, textoCardapio)
-    setEnviandoCardapio(false)
+    setLinkCardapio(null)
   }
 
   return (
@@ -207,8 +221,8 @@ export function Composer({
                 title="Enviar ao cliente o link do cardápio de hoje (mostra o link antes de enviar)"
                 className={css.acaoComRotulo}
                 aria-haspopup="dialog"
-                disabled={!podeEscrever}
-                onClick={() => setEnviandoCardapio(true)}
+                disabled={!podeEscrever || buscandoLink}
+                onClick={abrirCardapio}
               >
                 <Icone nome="cardapio" /><span className={css.rotuloAcao}>Cardápio</span>
               </Botao>
@@ -241,14 +255,15 @@ export function Composer({
         </>
       )}
 
-      {enviandoCardapio && (
+      {linkDaConversa && (
         <ModalEnviarCardapio
           nomeCliente={conversa.nome}
           canalNome={canal.nome}
-          link={linkCardapio}
+          link={linkDaConversa.url}
+          daLoja={linkDaConversa.daLoja}
           texto={textoCardapio}
           aoEnviar={aoEnviarCardapio}
-          aoFechar={() => setEnviandoCardapio(false)}
+          aoFechar={() => setLinkCardapio(null)}
         />
       )}
     </div>

@@ -4,7 +4,9 @@ using Microsoft.Extensions.Logging;
 namespace EasyStock.Infra.Notifications.Sms;
 
 /// <summary>
-/// Provedor SMS stub para desenvolvimento/testes — loga a mensagem sem enviar.
+/// Provedor SMS stub para desenvolvimento/testes — não envia nada. Devolve <see cref="DesfechoEnvio.Simulado"/>
+/// com provider <c>stub</c>: o outbox fica <c>Simulado</c>, nunca <c>Enviado</c>. O log leva só o
+/// <c>OutboxId</c>, sem telefone nem corpo (LGPD, #1292).
 /// </summary>
 public sealed class StubSmsProvider(ILogger<StubSmsProvider> logger) : IProvedorSms
 {
@@ -18,15 +20,14 @@ public sealed class StubSmsProvider(ILogger<StubSmsProvider> logger) : IProvedor
     {
         if (SimularFalha)
         {
-            logger.LogWarning("[STUB-SMS] Falha simulada para {Destinatario}", mensagem.Destinatario);
+            logger.LogWarning("[STUB-SMS] Falha simulada outbox={OutboxId}", mensagem.OutboxId);
             return Task.FromResult(new ResultadoEnvio(Sucesso: false, ProviderUsado: "stub",
                 ErroDetalhado: "Falha simulada"));
         }
 
         MensagensEnviadas.Add(mensagem);
-        logger.LogInformation(
-            "[STUB-SMS] → {Destinatario} | Assunto: {Assunto}", mensagem.Destinatario, mensagem.Assunto);
+        logger.LogInformation("[STUB-SMS] simulado, nada foi enviado outbox={OutboxId}", mensagem.OutboxId);
 
-        return Task.FromResult(new ResultadoEnvio(Sucesso: true, ProviderUsado: "stub", DuracaoMs: 1));
+        return Task.FromResult(ResultadoEnvio.Simulado("stub", duracaoMs: 1));
     }
 }

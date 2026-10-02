@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Pdf;
 using EasyStock.Infra.Async.Pagamentos;
@@ -30,42 +31,9 @@ public static class ServiceCollectionExtensions
         // Queue Service
         services.AddSingleton<IQueueService, BackgroundQueueService>();
 
-        // Email Service — Onda 1.3: switch por Email:Provider em {smtp, sendgrid, console}.
-        // Compat: se Email:Provider nao setado, mantem comportamento legado (Smtp se existir, senao console).
-        var emailProvider = (configuration["Email:Provider"] ?? "").Trim().ToLowerInvariant();
-        var smtpConfig = configuration.GetSection("Smtp");
-        var sendGridConfig = configuration.GetSection("SendGrid");
-
-        if (string.IsNullOrEmpty(emailProvider))
-            emailProvider = smtpConfig.Exists() ? "smtp" : "console";
-
-        switch (emailProvider)
-        {
-            case "sendgrid":
-                services.AddSingleton<IEmailService>(_ => new SendGridEmailService(
-                    apiKey: sendGridConfig["ApiKey"]
-                        ?? throw new InvalidOperationException("SendGrid:ApiKey eh obrigatorio quando Email:Provider=sendgrid."),
-                    fromEmail: sendGridConfig["FromEmail"] ?? "noreply@easystock.com",
-                    fromName: sendGridConfig["FromName"] ?? "EasyStock",
-                    sandbox: bool.Parse(sendGridConfig["SandboxMode"] ?? "false")));
-                break;
-
-            case "smtp":
-                services.AddSingleton<IEmailService>(_ => new SmtpEmailService(
-                    smtpConfig["Host"] ?? "localhost",
-                    int.Parse(smtpConfig["Port"] ?? "587"),
-                    smtpConfig["Username"] ?? "",
-                    smtpConfig["Password"] ?? "",
-                    smtpConfig["FromEmail"] ?? "noreply@easystock.com",
-                    smtpConfig["FromName"] ?? "EasyStock",
-                    bool.Parse(smtpConfig["EnableSsl"] ?? "true")));
-                break;
-
-            default:
-                // Console — fallback dev. Loga email sem enviar.
-                services.AddSingleton<IEmailService, ConsoleEmailService>();
-                break;
-        }
+        // Email Service (N3, #1351): uma so fabrica para a API e o Worker (Email:Provider em
+        // {smtp, sendgrid, console}; sem ele, smtp quando ha Host e remetente, senao console com aviso).
+        services.AddEasyStockEmail(configuration);
 
         // Storage Service
         services.AddSingleton<IStorageService, S3StorageService>();
@@ -197,33 +165,49 @@ public static class ServiceCollectionExtensions
 /// configurado). O NOME desta classe e contrato: codigo de diagnostico checa
 /// <c>GetType().Name == "ConsoleEmailService"</c> / <c>nameof(...)</c> para detectar
 /// "SMTP nao configurado" — nao renomear sem atualizar esses call-sites.
+/// <para>
+/// Nada sai daqui: <see cref="EnviarAsync"/> devolve <c>Simulado</c> com provider <c>console</c> (N3), e o canal de
+/// e-mail do outbox so repassa o desfecho. A marcadora <c>IEmailServiceSimulado</c> da N2 saiu por isso.
+/// </para>
 /// </summary>
 public sealed class ConsoleEmailService(ILogger<ConsoleEmailService> logger) : IEmailService
 {
     // #288 item 4: era Console.WriteLine (sem nivel, sem estrutura). Agora ILogger em
-    // Debug. NAO loga o corpo do email — e PII potencial (ver #301); so destinatario +
-    // assunto, suficiente para o fallback de dev.
+    // Debug. NAO loga o corpo nem o destinatario — sao PII (ver #301, #1292, N2); so o
+    // assunto (texto fixo dos fluxos que chamam direto), suficiente para o fallback de dev.
     public Task SendAsync(string to, string subject, string body, bool isHtml = false)
     {
-        logger.LogDebug("[EMAIL] Para: {To} | Assunto: {Subject}", to, subject);
+        logger.LogDebug("[EMAIL] simulado, nada foi enviado | Assunto: {Subject}", subject);
         return Task.CompletedTask;
     }
 
     public Task SendAsync(string to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml = false)
     {
-        logger.LogDebug("[EMAIL] Para: {To} | Assunto: {Subject} | Anexos: {Count}", to, subject, attachments.Count());
+        logger.LogDebug("[EMAIL] simulado, nada foi enviado | Assunto: {Subject} | Anexos: {Count}", subject, attachments.Count());
         return Task.CompletedTask;
     }
 
     public Task SendAsync(IEnumerable<string> to, string subject, string body, bool isHtml = false)
     {
-        logger.LogDebug("[EMAIL] Para: {Count} destinatario(s) | Assunto: {Subject}", to.Count(), subject);
+        logger.LogDebug("[EMAIL] simulado, nada foi enviado | {Count} destinatario(s) | Assunto: {Subject}", to.Count(), subject);
         return Task.CompletedTask;
     }
 
     public Task SendTemplateAsync(string to, string subject, string templateName, object model, bool isHtml = true)
     {
-        logger.LogDebug("[EMAIL TEMPLATE] Para: {To} | Assunto: {Subject} | Template: {Template}", to, subject, templateName);
+        logger.LogDebug("[EMAIL TEMPLATE] simulado, nada foi enviado | Assunto: {Subject} | Template: {Template}", subject, templateName);
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Nada sai daqui: o desfecho e <see cref="DesfechoEnvio.Simulado"/> com provider <c>console</c>, nunca <c>smtp</c>.
+    /// Sem endereco nem corpo no log (LGPD, #1292): so o rastro e a categoria.
+    /// </summary>
+    public Task<ResultadoEnvio> EnviarAsync(MensagemEmail mensagem, CancellationToken ct = default)
+    {
+        logger.LogDebug(
+            "[EMAIL] simulado outbox={OutboxId} categoria={Categoria} anexos={Anexos}",
+            mensagem.OutboxId, mensagem.Remetente, mensagem.Anexos?.Count ?? 0);
+        return Task.FromResult(ResultadoEnvio.Simulado("console"));
     }
 }

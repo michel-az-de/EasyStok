@@ -21,7 +21,7 @@ public sealed record CriarPedidoPeloCardapioConversaInput(
     string? Forma = null,
     string? Observacoes = null);
 
-/// <param name="LinkPagamento">Nulo na entrega ou quando o Mercado Pago não respondeu (o link sai pela reemissão).</param>
+/// <param name="LinkPagamento">Nulo na entrega. Mercado Pago fora: <see cref="MercadoPagoIndisponivelException"/> com o pedido desfeito e o link do cardápio devolvido (#1301).</param>
 public sealed record PedidoPeloCardapioConversaResult(
     Guid PedidoId,
     decimal Total,
@@ -107,7 +107,18 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
         await unitOfWork.CommitAsync();
         await AvisarConsoleAsync(reservado, resumo, ct);
 
-        var cobranca = await CobrarAsync(reservado, conversa.Id, forma, ct);
+        CobrancaPedidoResult? cobranca;
+        try
+        {
+            cobranca = await CobrarAsync(reservado, conversa.Id, forma, ct);
+        }
+        catch (MercadoPagoIndisponivelException ex)
+        {
+            // #1301: a cobrança desfez o pedido e a vaga; o cliente reenvia o carrinho pelo mesmo link.
+            logger.LogWarning(ex, "Cardapio da conversa: pedido {PedidoId} desfeito sem link de pagamento.", reservado.Pedido.Id);
+            await linkService.LiberarAsync(link, CancellationToken.None);
+            throw;
+        }
         return new PedidoPeloCardapioConversaResult(
             reservado.Pedido.Id, reservado.Total, forma, cobranca?.LinkPagamento, cobranca?.ExpiraEm);
     }
@@ -133,18 +144,9 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
     private async Task<CobrancaPedidoResult?> CobrarAsync(
         PedidoReservado reservado, Guid conversaId, string forma, CancellationToken ct)
     {
-        try
-        {
-            if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega)
-                return (await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(
-                    reservado.Pedido.EmpresaId, reservado.Pedido.Id, forma, UsuarioNome: "cardápio da conversa"), ct)).Cobranca;
-            return await gerarCobranca.ExecuteAsync(reservado, conversaId, ct);
-        }
-        catch (MercadoPagoIndisponivelException ex)
-        {
-            // Pedido criado e vaga reservada; o link sai pela reemissão (operadora ou job), como na criar_pedido.
-            logger.LogWarning(ex, "Cardapio da conversa: pedido {PedidoId} criado sem link de pagamento.", reservado.Pedido.Id);
-            return null;
-        }
+        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega)
+            return (await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(
+                reservado.Pedido.EmpresaId, reservado.Pedido.Id, forma, UsuarioNome: "cardápio da conversa"), ct)).Cobranca;
+        return await gerarCobranca.ExecuteAsync(reservado, conversaId, ct);
     }
 }

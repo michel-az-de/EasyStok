@@ -26,6 +26,7 @@ public class AtendimentoConversasController(
     GerenciarConversaAtendimentoUseCase gerenciarUseCase,
     TransferirConversaUseCase transferirUseCase,
     ObterDossieClienteUseCase dossieUseCase,
+    GerarLinkCardapioConversaUseCase linkCardapioUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     private const int TamanhoMaximoImagem = 6 * 1024 * 1024;
@@ -201,6 +202,15 @@ public class AtendimentoConversasController(
     [HttpPost("{id:guid}/marcar-lida")]
     public Task<IActionResult> MarcarLida(Guid id, CancellationToken ct = default)
         => Tratar(async () => DataOk(await gerenciarUseCase.MarcarLidaAsync(Acao(id), ct)));
+
+    [SwaggerOperation(Summary = "Store menu link tied to the conversation (same link the agent sends)",
+        Description = "#1353: \"Enviar cardápio\" do console. Vale 24 h e um pedido.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpPost("{id:guid}/link-cardapio")]
+    public Task<IActionResult> LinkCardapio(Guid id, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await linkCardapioUseCase.ExecuteAsync(currentUser.EmpresaId, id, ct)));
 
     private AcaoConversaCommand Acao(Guid id) => new(currentUser.EmpresaId, currentUser.UsuarioId, id);
 

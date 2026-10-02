@@ -61,7 +61,8 @@ public static class DatabaseModule
                     .AddNpgSql(postgresConnectionString!, name: "PostgreSQL", tags: ["ready", "api"])
                     .AddCheck<RedisHealthCheck>("Redis", tags: ["api"])           // sem tag "ready" — Redis degradado não remove pod do LB
                     .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready", "api"])
-                    .AddNotificationsHosting();
+                    .AddNotificationsHosting()
+                    .AddNotificacoesBacklog();
                 // Polly pipelines compartilhados pelas integracoes HTTP
                 builder.Services.AddEasyStockIntegrationResilience();
                 // Atendimento WhatsApp (S02) — cliente da Cloud API que MetaCloudWhatsAppProvider delega.

@@ -45,7 +45,12 @@ public class AtendimentoConversasControllerTests
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly IAtendenteRepository _atendentes = Substitute.For<IAtendenteRepository>();
+    private readonly ILinkCardapioConversaRepository _links = Substitute.For<ILinkCardapioConversaRepository>();
     private readonly AtendimentoConversasController _controller;
+
+    internal static LinkCardapioConversaService LinkCardapio(ILinkCardapioConversaRepository links) =>
+        new(links, new SaudacaoAtendimento(Substitute.For<IStorefrontRepository>(),
+            new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
 
     public AtendimentoConversasControllerTests()
     {
@@ -71,6 +76,7 @@ public class AtendimentoConversasControllerTests
             new ObterDossieClienteUseCase(
                 Substitute.For<IClienteRepository>(), Substitute.For<IClienteCrmRepository>(),
                 Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(), _repositorio),
+            new GerarLinkCardapioConversaUseCase(_repositorio, LinkCardapio(_links), _unitOfWork, TimeProvider.System),
             _currentUser);
     }
 
@@ -305,6 +311,28 @@ public class AtendimentoConversasControllerTests
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
+    [Fact]
+    public async Task LinkCardapioDevolveOLinkDaLojaComTokenDaConversa()
+    {
+        var conversa = ConversaComClienteAgora();
+
+        var link = Dados<LinkCardapioConversaGerado>(await _controller.LinkCardapio(conversa.Id, default));
+
+        // #1353: o mesmo link que o agente manda (S48), não a tela do console.
+        link.Url.Should().StartWith($"{SaudacaoAtendimento.BaseUrlPadrao}{SaudacaoAtendimento.CaminhoCardapio}?c=");
+        await _links.Received(1).AddAsync(Arg.Is<LinkCardapioConversa>(l => l.ConversaId == conversa.Id), Arg.Any<CancellationToken>());
+        await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task LinkCardapioDeConversaDeOutraEmpresaDevolve404()
+    {
+        var result = await _controller.LinkCardapio(Guid.NewGuid(), default);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+        await _links.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+    }
+
     private static T Dados<T>(IActionResult result)
     {
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
@@ -326,6 +354,7 @@ public class AtendimentoConversasControllerTests
         (await _controller.Transferir(conversa.Id, new TransferirConversaBody(Guid.NewGuid()), default)).Should().BeOfType<ForbidResult>();
         (await _controller.LiberarAutomatico(conversa.Id, default)).Should().BeOfType<ForbidResult>();
         (await _controller.Encerrar(conversa.Id, default)).Should().BeOfType<ForbidResult>();
+        (await _controller.LinkCardapio(conversa.Id, default)).Should().BeOfType<ForbidResult>();
 
         conversa.Situacao.Should().Be(SituacaoConversa.Automatica);
         await _canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);

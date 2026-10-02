@@ -1,3 +1,5 @@
+using EasyStock.Application.Services.Auth;
+
 namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
 {
     public sealed record AtribuirPerfilUsuarioCommand(Guid UsuarioId, Guid EmpresaId, Guid PerfilId, Guid? LojaId);
@@ -5,6 +7,7 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
     public class AtribuirPerfilUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
         IUsuarioPerfilRepository usuarioPerfilRepository,
+        RevogadorSessoes revogadorSessoes,
         IUnitOfWork unitOfWork,
         ILogger<AtribuirPerfilUsuarioUseCase> logger)
     {
@@ -39,6 +42,12 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
 
                 await usuarioPerfilRepository.AddAsync(usuarioPerfil);
             }
+
+            // #1352: nível e permissões viajam no JWT, então quem tinha token com o perfil antigo cai. O corte é do
+            // usuário todo e esta rota só confere a empresa de quem chama: sem vínculo ativo com a empresa da
+            // atribuição, o Admin de outra empresa deslogaria quem não é dele.
+            if (usuario.Empresas.Any(e => e.EmpresaId == command.EmpresaId && e.Ativo))
+                await revogadorSessoes.RevogarAsync(usuario);
 
             await unitOfWork.CommitAsync();
         }

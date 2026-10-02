@@ -33,9 +33,10 @@ public class FilaImpressaoUseCasesTests
         _repo.ListarAtrasadasAsync(Agora.AddHours(-12), Agora.AddMinutes(-3), AlertarImpressoesAtrasadasUseCase.MaximoPorRodada, Arg.Any<CancellationToken>())
             .Returns(new[] { b, a });
 
-        var total = await new AlertarImpressoesAtrasadasUseCase(_repo, _eventos, new RelogioFixo(Agora)).ExecuteAsync();
+        var total = await new AlertarImpressoesAtrasadasUseCase(_repo, _eventos, new RelogioFixo(Agora),
+            Microsoft.Extensions.Options.Options.Create(new EasyStock.Application.Services.Notifications.PrazosOptions())).ExecuteAsync();
 
-        total.Should().Be(2);
+        total.Should().HaveCount(2);
         await _eventos.Received(1).PublicarAsync(EventosOperacao.ImpressaoAtrasada, _empresaId,
             Arg.Is<ImpressaoAtrasadaOperacao>(e => e.ImpressaoId == a.ImpressaoId && e.PedidoId == a.PedidoId), Arg.Any<CancellationToken>());
         await _eventos.Received(1).PublicarAsync(EventosOperacao.ImpressaoAtrasada, outra,
@@ -48,9 +49,10 @@ public class FilaImpressaoUseCasesTests
         _repo.ListarAtrasadasAsync(Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<ImpressaoAtrasada>());
 
-        var total = await new AlertarImpressoesAtrasadasUseCase(_repo, _eventos, new RelogioFixo(Agora)).ExecuteAsync();
+        var total = await new AlertarImpressoesAtrasadasUseCase(_repo, _eventos, new RelogioFixo(Agora),
+            Microsoft.Extensions.Options.Options.Create(new EasyStock.Application.Services.Notifications.PrazosOptions())).ExecuteAsync();
 
-        total.Should().Be(0);
+        total.Should().BeEmpty();
         _eventos.ReceivedCalls().Should().BeEmpty();
     }
 

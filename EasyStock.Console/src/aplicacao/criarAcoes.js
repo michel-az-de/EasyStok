@@ -24,6 +24,7 @@ import { criarAcoesProducao } from './acoes/producao'
 import { criarAcoesCaixa } from './acoes/caixa'
 import { criarAcoesIntegracoes } from './acoes/integracoes'
 import { criarAcoesFidelidade } from './acoes/fidelidade'
+import { linkDoCardapio } from '../dominio/cardapioLink'
 
 const mesPorExtenso = (ms) =>
   new Date(ms).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
@@ -49,6 +50,11 @@ export function criarAcoes({
 
   return {
     enviar,
+    // "Enviar cardápio" (#1353): na demonstração o link é a tela do próprio console
+    // (useEspelhoCardapioLink.js); no modo API vem da loja (acoesApi.js).
+    obterLinkCardapio: async (id) => ({
+      url: linkDoCardapio(window.location.origin + window.location.pathname, id), daLoja: false,
+    }),
     consultarAgente,
     perguntarAssistente,
     selecionar: (id) => despachar({ tipo: acao.SELECIONAR_CONVERSA, id }),

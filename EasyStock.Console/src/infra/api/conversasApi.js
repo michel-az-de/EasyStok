@@ -42,6 +42,9 @@ export const liberarAutomatico = (id) => chamarApi(`${BASE}/${id}/liberar-automa
 export const encerrar = (id) => chamarApi(`${BASE}/${id}/encerrar`, { metodo: 'POST' })
 export const marcarLida = (id) => chamarApi(`${BASE}/${id}/marcar-lida`, { metodo: 'POST' })
 
+// Link do cardápio da loja ligado à conversa, o mesmo que o agente manda (#1353, S48).
+export const gerarLinkCardapio = (id) => chamarApi(`${BASE}/${id}/link-cardapio`, { metodo: 'POST' })
+
 // Cliente da conversa (#1276): cadastra ou atualiza (`{ nome, telefone, endereco }`) e o dossiê (S25)
 // que a Ficha relê depois. Conversa sem cliente devolve o dossiê mínimo.
 export const cadastrarClienteDaConversa = (id, corpo) => chamarApi(`${BASE}/${id}/cliente`, { metodo: 'POST', corpo })

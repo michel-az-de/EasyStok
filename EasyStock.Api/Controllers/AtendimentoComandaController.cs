@@ -58,6 +58,7 @@ public class AtendimentoComandaController(
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     [HttpPost("conversas/{id:guid}/pedido")]
     public Task<IActionResult> GerarPedido(Guid id, [FromBody] GerarPedidoConversaBody body, CancellationToken ct = default)
     {
@@ -93,6 +94,12 @@ public class AtendimentoComandaController(
         catch (CobrancaPedidoConflitoException ex)
         {
             return DataConflict(ex.Message, ex.Codigo);
+        }
+        catch (MercadoPagoIndisponivelException ex)
+        {
+            // #1301: o pedido e a vaga já foram desfeitos; a operadora gera de novo.
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new ApiErrorResponse(new ApiError("pagamento_indisponivel", ex.Message, null, null)));
         }
         catch (RegraDeDominioVioladaException ex)
         {

@@ -24,6 +24,12 @@ namespace EasyStock.Infra.Notifications.WhatsApp;
 /// <item>sem conversa e sem template: tenta o texto; se a Meta recusar com 131047, falha permanente.</item>
 /// </list>
 /// Com conversa aberta, a saída é copiada para o histórico como <c>Mensagem(Saida, Sistema)</c> com o <c>wamid</c>.
+/// <para>
+/// Desfecho (N2): o <c>wamid</c> volta em <see cref="ResultadoEnvio.IdExterno"/>. A mensagem sai no máximo uma vez,
+/// então 5xx, timeout e queda de conexão depois de chamar a Meta são <see cref="DesfechoEnvio.Indeterminado"/>:
+/// a Meta pode ter aceitado e reenviar duplicaria. Falha antes de a Meta ser chamada e recusa 4xx que não é
+/// permanente (limite de taxa) seguem transitórias.
+/// </para>
 /// </summary>
 public sealed class MetaCloudWhatsAppProvider(
     ResolvedorCanal resolvedorCanal,
@@ -47,6 +53,8 @@ public sealed class MetaCloudWhatsAppProvider(
         var template = LerTemplate(mensagem.Metadados);
         var botoes = LerBotoes(mensagem.Metadados);
         var imagem = LerImagem(mensagem.Metadados);
+        // Só depois de começar a chamar a Meta um timeout ou queda deixa a entrega indeterminada; antes, nada saiu.
+        var chamouAMeta = false;
 
         try
         {
@@ -59,6 +67,7 @@ public sealed class MetaCloudWhatsAppProvider(
                 return Falha(ErroForaDaJanelaSemTemplate, permanente: true, sw);
 
             var canal = resolvedorCanal.Obter(CanalConversa.WhatsApp);
+            chamouAMeta = true;
             string wamid;
             if (template is { } t && !dentroDaJanela)
                 wamid = botoes.Count > 0
@@ -77,17 +86,33 @@ public sealed class MetaCloudWhatsAppProvider(
                 await RegistrarNoHistoricoSemReenvioAsync(conversa, mensagem, wamid, agora, ct);
 
             sw.Stop();
-            return new ResultadoEnvio(Sucesso: true, ProviderUsado: Nome, DuracaoMs: sw.ElapsedMilliseconds);
+            return new ResultadoEnvio(Sucesso: true, ProviderUsado: Nome, DuracaoMs: sw.ElapsedMilliseconds)
+            {
+                IdExterno = wamid
+            };
         }
         catch (WhatsAppCloudException ex) when (ex.Codigo == WhatsAppCloudException.CodigoForaDaJanela && template is null)
         {
             logger.LogWarning("Meta recusou texto fora da janela de 24 h (outbox {OutboxId}).", mensagem.OutboxId);
             return Falha(ErroForaDaJanelaSemTemplate, permanente: true, sw);
         }
+        catch (WhatsAppCloudException ex) when (!ex.EhPermanente && ex.StatusHttp is >= 500)
+        {
+            logger.LogError(ex, "Meta WhatsApp respondeu HTTP {Status}: entrega indeterminada (outbox {OutboxId}).",
+                ex.StatusHttp, mensagem.OutboxId);
+            return Indeterminado(ex.Message, ex.StatusHttp, sw);
+        }
         catch (WhatsAppCloudException ex)
         {
             logger.LogError(ex, "Falha Meta WhatsApp {Codigo} (outbox {OutboxId}).", ex.Codigo, mensagem.OutboxId);
             return Falha(ex.Message, permanente: ex.EhPermanente, sw);
+        }
+        catch (Exception ex) when (chamouAMeta && !ct.IsCancellationRequested && ClassificadorDeFalha.EhFalhaDeTransporte(ex))
+        {
+            // Timeout (TaskCanceledException do HttpClient ou TimeoutRejectedException da Polly) e queda de conexão: o
+            // cancelamento do chamador, que desliga o host, não entra aqui e sobe como antes.
+            logger.LogError(ex, "Meta WhatsApp sem confirmação: entrega indeterminada (outbox {OutboxId}).", mensagem.OutboxId);
+            return Indeterminado(ex.Message, statusHttp: null, sw);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -225,5 +250,11 @@ public sealed class MetaCloudWhatsAppProvider(
         sw.Stop();
         return new ResultadoEnvio(Sucesso: false, ProviderUsado: Nome, ErroDetalhado: erro,
             DuracaoMs: sw.ElapsedMilliseconds, FalhaPermanente: permanente);
+    }
+
+    private ResultadoEnvio Indeterminado(string erro, int? statusHttp, System.Diagnostics.Stopwatch sw)
+    {
+        sw.Stop();
+        return ResultadoEnvio.Indeterminado(Nome, erro, statusHttp, sw.ElapsedMilliseconds);
     }
 }
