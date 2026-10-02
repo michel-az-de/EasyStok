@@ -38,6 +38,7 @@ public sealed class AgenteAtendimentoService(
     IUsoIaRepository usoIaRepository,
     IUnitOfWork unitOfWork,
     ObterDossieClienteUseCase dossieUseCase,
+    ICadernoRepository caderno,
     ILogger<AgenteAtendimentoService> logger)
 {
     public const int MaximoIteracoes = 6;
@@ -93,7 +94,12 @@ public sealed class AgenteAtendimentoService(
             return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
         }
 
-        var system = PromptAtendimento.Montar(configuracao) + "\n\n" + MontarDossie(conversa, cliente, dados.Mensagens, agora);
+        // S54: caderno da loja (núcleo + índice) logo depois do prompt base e antes do dossiê, para o começo do
+        // prompt ser igual entre conversas da mesma empresa e aproveitar o cache do provedor.
+        var blocoCaderno = CadernoParaAgente.Montar(await caderno.ListarAsync(empresaId, incluirArquivados: false, ct));
+        var system = PromptAtendimento.Montar(configuracao)
+            + (blocoCaderno.Length > 0 ? "\n\n" + blocoCaderno : string.Empty)
+            + "\n\n" + MontarDossie(conversa, cliente, dados.Mensagens, agora);
 
         // S25: histórico do cadastro (tags, pedidos, favorito, notas [interno]) quando há cliente vinculado.
         if (cliente is not null
@@ -200,6 +206,7 @@ public sealed class AgenteAtendimentoService(
     private async Task<bool> EnviarRespostaAsync(Guid empresaId, Conversa conversa, string texto, DateTime agora, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(texto)) return false;
+        texto = TextoWhatsApp.SemTravessao(texto);
         if (texto.Length > Mensagem.TextoTamanhoMaximo) texto = texto[..Mensagem.TextoTamanhoMaximo];
 
         Mensagem saida;

@@ -74,6 +74,28 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
 
             usuario.ResetarTentativasFalha();
 
+            // #1342: superadmin que informa a empresa entra nela; sem empresaId, segue sem (painel admin).
+            var resultado = await ConcluirAsync(usuario, command.EmpresaId ?? ResolveEmpresaIdPadrao(usuario), empresaDoSuperAdmin: command.EmpresaId);
+
+            swTotal.Stop();
+            logger.LogInformation(
+                "Autenticacao bem-sucedida. UsuarioId={UsuarioId} | total={TotalMs}ms (db={DbMs}ms bcrypt={BcryptMs}ms)",
+                usuario.Id, swTotal.ElapsedMilliseconds, swDb.ElapsedMilliseconds, swHash.ElapsedMilliseconds);
+            return resultado;
+        }
+
+        /// <summary>
+        /// #1324: final do login sem senha (Google), com a identidade já validada. Sem empresa pedida, entra
+        /// na empresa ativa do usuário; com mais de uma, na primeira por nome (escolha de empresa fica para depois).
+        /// </summary>
+        /// <param name="empresaPadrao">#1326: empresa do superadmin no console (que recusa token sem empresa).</param>
+        public Task<AutenticarUsuarioResult> ConcluirLoginGoogleAsync(Domain.Entities.Usuario usuario, Guid? empresaId, Guid? empresaPadrao = null) =>
+            ConcluirAsync(usuario, empresaId ?? ResolveEmpresaIdPadrao(usuario) ?? PrimeiraEmpresaAtiva(usuario),
+                empresaDoSuperAdmin: empresaId ?? empresaPadrao);
+
+        /// <summary>SuperAdmin, empresa, nível e permissões, e o último acesso. Credencial já conferida.</summary>
+        private async Task<AutenticarUsuarioResult> ConcluirAsync(Domain.Entities.Usuario usuario, Guid? empresaId, Guid? empresaDoSuperAdmin = null)
+        {
             // SuperAdmin: perfil global com Perfil.EmpresaId=null. Nao tem vinculo
             // em UsuarioEmpresa, entao o fluxo padrao (que exige empresaId resolvido)
             // deixava nivel=Visualizador como default e a tela /Auth/Login do
@@ -93,21 +115,14 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 await usuarioRepository.UpdateAsync(usuario);
                 await unitOfWork.CommitAsync();
 
-                swTotal.Stop();
-                logger.LogInformation(
-                    "Autenticacao SuperAdmin bem-sucedida. UsuarioId={UsuarioId} | total={TotalMs}ms (db={DbMs}ms bcrypt={BcryptMs}ms)",
-                    usuario.Id, swTotal.ElapsedMilliseconds, swDb.ElapsedMilliseconds, swHash.ElapsedMilliseconds);
-
                 return new AutenticarUsuarioResult(
                     UsuarioId: usuario.Id,
-                    EmpresaId: null,
+                    EmpresaId: empresaDoSuperAdmin,
                     Nome: usuario.Nome,
                     Email: usuario.Email,
                     Nivel: NivelAcesso.SuperAdmin,
                     Permissoes: permissoesSuper);
             }
-
-            var empresaId = command.EmpresaId ?? ResolveEmpresaIdPadrao(usuario);
 
             if (empresaId.HasValue)
             {
@@ -138,18 +153,9 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 }
             }
 
-            // --- etapa 3: atualizar último acesso
-            var swUpdate = Stopwatch.StartNew();
             usuario.AtualizarUltimoAcesso();
             await usuarioRepository.UpdateAsync(usuario);
             await unitOfWork.CommitAsync();
-            swUpdate.Stop();
-
-            swTotal.Stop();
-            logger.LogInformation(
-                "Autenticacao bem-sucedida. UsuarioId={UsuarioId} | total={TotalMs}ms (db={DbMs}ms bcrypt={BcryptMs}ms update={UpdateMs}ms)",
-                usuario.Id, swTotal.ElapsedMilliseconds, swDb.ElapsedMilliseconds,
-                swHash.ElapsedMilliseconds, swUpdate.ElapsedMilliseconds);
 
             return new AutenticarUsuarioResult(
                 UsuarioId: usuario.Id,
@@ -159,6 +165,13 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 Nivel: nivel,
                 Permissoes: permissoes);
         }
+
+        private static Guid? PrimeiraEmpresaAtiva(Domain.Entities.Usuario usuario) =>
+            usuario.Empresas?
+                .Where(e => e.Ativo)
+                .OrderBy(e => e.Empresa?.Nome)
+                .Select(e => (Guid?)e.EmpresaId)
+                .FirstOrDefault();
 
         private static Guid? ResolveEmpresaIdPadrao(Domain.Entities.Usuario usuario)
         {

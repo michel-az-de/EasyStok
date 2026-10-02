@@ -10,7 +10,8 @@ using EasyStock.Domain.Enums.Notifications;
 namespace EasyStock.Application.UseCases.Atendimento;
 
 /// <summary>
-/// Escalada para a dona (S07, US-013): <see cref="Conversa.Assumir"/> (o agente cala, RN-04),
+/// Escalada para a dona (S07, US-013): <see cref="Conversa.Escalar"/> (o agente cala, RN-04, e o motivo
+/// fica na conversa para o resumo da inbox, #1238),
 /// <c>Mensagem(Sistema, motivo)</c> interna (sem <c>wamid</c>, nunca enviada ao cliente), evento
 /// <see cref="TipoEventoNotificacao.ConversaEscalada"/> e SSE <c>conversa.escalada</c>.
 ///
@@ -49,7 +50,7 @@ public sealed class EscalarConversaUseCase(
         var texto = PrefixoMotivo + motivoLimpo;
         if (texto.Length > Mensagem.TextoTamanhoMaximo) texto = texto[..Mensagem.TextoTamanhoMaximo];
 
-        conversa.Assumir(agora);
+        conversa.Escalar(agora, motivoLimpo);
         await conversaRepository.AddMensagemAsync(
             Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto, texto),
             ct);

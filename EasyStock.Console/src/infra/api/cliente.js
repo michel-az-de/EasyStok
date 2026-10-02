@@ -2,12 +2,14 @@ import { API_BASE } from '../fonteDados'
 import { lerSessao, limparSessao } from './sessao'
 
 // Erro de chamada à API com o que a tela precisa para falar com a dona:
-// status HTTP, código da API (`error.code` ou `erro`) e mensagem legível.
+// status HTTP, código da API (`error.code` ou `erro`), mensagem legível e o detalhe
+// (`error.detail`), que no CANAL_FALHOU traz o motivo devolvido pelo canal (#1339).
 export class ErroApi extends Error {
-  constructor(status, codigo, mensagem) {
+  constructor(status, codigo, mensagem, detalhe = null) {
     super(mensagem)
     this.status = status
     this.codigo = codigo
+    this.detalhe = detalhe
   }
 }
 
@@ -62,5 +64,5 @@ export async function chamarApi(caminho, {
   }
   const codigo = json?.error?.code ?? json?.erro ?? `HTTP_${resposta.status}`
   const mensagem = json?.error?.message ?? MENSAGEM_POR_STATUS[resposta.status] ?? (json?.title ? 'Confira os campos.' : 'Não deu certo. Tente de novo.')
-  throw new ErroApi(resposta.status, codigo, mensagem)
+  throw new ErroApi(resposta.status, codigo, mensagem, json?.error?.detail ?? null)
 }

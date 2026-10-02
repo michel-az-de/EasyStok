@@ -25,10 +25,19 @@ export function limparSessao() {
 // Vencimento do JWT lido do próprio token (`exp`, segundos), em ms. Token sem `exp` ou
 // ilegível devolve null e quem chama usa o `expiresIn` da resposta do login.
 export function vencimentoDoToken(token) {
+  const exp = cargaDoToken(token)?.exp
+  return Number.isFinite(exp) ? exp * 1000 : null
+}
+
+// Empresa do token (claim `empresaId`); null para superadmin ou token ilegível (#1324).
+export function empresaDoToken(token) {
+  return cargaDoToken(token)?.empresaId ?? null
+}
+
+function cargaDoToken(token) {
   try {
     const carga = String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-    const { exp } = JSON.parse(atob(carga.padEnd(Math.ceil(carga.length / 4) * 4, '=')))
-    return Number.isFinite(exp) ? exp * 1000 : null
+    return JSON.parse(atob(carga.padEnd(Math.ceil(carga.length / 4) * 4, '=')))
   } catch {
     return null
   }

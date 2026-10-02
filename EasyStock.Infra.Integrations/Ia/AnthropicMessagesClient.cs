@@ -25,7 +25,7 @@ public sealed class AnthropicMessagesClient(
     private readonly AnthropicAgenteOptions _opcoes = options.Value;
 
     public bool Disponivel =>
-        _opcoes.Enabled && _opcoes.AgenteAtendimentoEnabled && !string.IsNullOrWhiteSpace(_opcoes.ApiKey);
+        _opcoes.Enabled && _opcoes.AgenteAtendimentoEnabled && !string.IsNullOrWhiteSpace(_opcoes.ChaveDoAgente);
 
     public async Task<RespostaLlm> EnviarAsync(RequisicaoLlm requisicao, CancellationToken ct = default)
     {
@@ -34,7 +34,10 @@ public sealed class AnthropicMessagesClient(
             throw new InvalidOperationException("Agente de atendimento desligado (Anthropic:Enabled/ApiKey).");
 
         using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint);
-        request.Headers.Add("x-api-key", _opcoes.ApiKey);
+        if (_opcoes.AutenticacaoBearer)
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _opcoes.ChaveDoAgente);
+        else
+            request.Headers.Add("x-api-key", _opcoes.ChaveDoAgente);
         request.Headers.Add("anthropic-version", AnthropicVersion);
         request.Content = new ByteArrayContent(MontarCorpo(requisicao));
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");

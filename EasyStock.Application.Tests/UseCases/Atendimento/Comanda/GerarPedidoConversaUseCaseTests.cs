@@ -8,7 +8,6 @@ using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.Tests.Services.Storefront;
-using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -84,10 +83,13 @@ public class GerarPedidoConversaUseCaseTests
                 Substitute.For<IPublicadorEventoIntegracao>(), Mp, Uow, TimeProvider.System,
                 NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
 
+            // O núcleo lê o pedido em andamento do banco com a conversa travada (#1238).
+            ConversaRepo.TravarParaPedidoAsync(EmpresaId, Conversa.Id, Arg.Any<CancellationToken>())
+                .Returns(_ => Conversa.PedidoEmAndamentoId);
+
             UseCase = new GerarPedidoConversaUseCase(
-                ConversaRepo, clienteRepo, Pedidos,
-                new CriarPedidoAtendimentoUseCase(Checkout.Servico(), ConversaRepo, clienteRepo,
-                    Checkout.ConfiguracaoAtendimentoRepo, Uow, Checkout.Atribuicao()),
+                ConversaRepo, clienteRepo,
+                Checkout.CriarPedidoAtendimento(ConversaRepo, clienteRepo, Uow, Pedidos),
                 gerar, trocar, aviso, TimeProvider.System,
                 NullLogger<GerarPedidoConversaUseCase>.Instance);
         }

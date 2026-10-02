@@ -12,6 +12,7 @@
          por categoria (payments, fiscal, marketplace, logistics). Logging e
          DependencyInjection.Abstractions vêm transitive via EasyStock.Application
          (10.0.5) — não fixar aqui pra evitar downgrade. -->
+    <PackageReference Include="Google.Apis.Auth" Version="1.77.0" />
     <PackageReference Include="Polly.Core" Version="8.5.2" />
     <PackageReference Include="Microsoft.Extensions.Resilience" Version="10.1.0" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.1.0" />

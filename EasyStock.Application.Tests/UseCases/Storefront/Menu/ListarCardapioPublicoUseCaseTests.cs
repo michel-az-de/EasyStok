@@ -369,6 +369,24 @@ public class ListarCardapioPublicoUseCaseTests
         dto.Categoria.Should().Be("Acompanhamentos", "CategoriaTexto avulso lowercase recebe title-case na vitrine");
     }
 
+    [Theory]
+    [InlineData("molho pomodoro 500 ml", "Molho Pomodoro 500 ml")]
+    [InlineData("capeletti de carne 1 kg", "Capeletti de Carne 1 kg")]
+    [InlineData("nhoque artesanal 500 g", "Nhoque Artesanal 500 g")]
+    [InlineData("suco de uva 1 l", "Suco de Uva 1 l")]
+    public async Task ExecuteAsync_AvulsoComUnidade_MantemUnidadeMinuscula(string armazenado, string esperado)
+    {
+        // #1334: o cardápio real tem um item por tamanho; "500 G" e "250 Ml" chegavam ao cliente e ao agente.
+        var f = BuildFakes();
+        var avulso = CriarItemAvulso(f.Storefront.Id, armazenado, 18.00m);
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { avulso });
+
+        var dto = (await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido))).Itens.Single();
+
+        dto.Nome.Should().Be(esperado);
+    }
+
     [Fact]
     public async Task ExecuteAsync_MixAvulsoVinculado_OrdenaSemExcecao()
     {

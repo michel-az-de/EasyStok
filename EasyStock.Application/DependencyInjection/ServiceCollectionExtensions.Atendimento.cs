@@ -34,6 +34,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Automacoes.RespostasProntasUseCases>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Automacoes.AutomacoesUseCases>();
 
+        // S54: caderno da loja para o agente.
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Caderno.CadernoUseCases>();
+
         // S06: agente de atendimento (LLM com ferramentas) e roteador de botões sem LLM.
         services.AddScoped<AgenteAtendimentoService>();
         services.AddScoped<IEscaladorConversa, EscalarConversaUseCase>(); // S07: Assumir + nota + Push + SSE

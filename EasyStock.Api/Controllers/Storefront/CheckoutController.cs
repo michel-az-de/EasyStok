@@ -353,6 +353,6 @@ public sealed record CheckoutGuestRequestBody(
     string Cep,
     string? Numero,
     IReadOnlyList<CheckoutItemRequestBody> Items,
-    Guid JanelaId,
-    DateOnly DataEntrega,
+    Guid? JanelaId = null,
+    DateOnly? DataEntrega = null,
     string? Observacoes = null);
