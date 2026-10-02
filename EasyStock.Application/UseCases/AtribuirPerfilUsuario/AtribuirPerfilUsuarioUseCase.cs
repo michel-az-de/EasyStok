@@ -7,6 +7,7 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
     public class AtribuirPerfilUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
         IUsuarioPerfilRepository usuarioPerfilRepository,
+        IPerfilRepository perfilRepository,
         RevogadorSessoes revogadorSessoes,
         IUnitOfWork unitOfWork,
         ILogger<AtribuirPerfilUsuarioUseCase> logger)
@@ -19,6 +20,13 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
 
             var usuario = await usuarioRepository.GetByIdAsync(command.UsuarioId)
                 ?? throw new UseCaseValidationException("Usuario nao encontrado.");
+
+            // Perfil global SuperAdmin ou de outra empresa nao pode ser atribuido por um Admin de tenant
+            // (o login promove a SuperAdmin quem tiver QUALQUER perfil com esse nivel).
+            var perfil = await perfilRepository.GetByIdAsync(command.PerfilId)
+                ?? throw new UseCaseValidationException("Perfil invalido.");
+            if (perfil.Nivel == NivelAcesso.SuperAdmin || (perfil.EmpresaId is not null && perfil.EmpresaId != command.EmpresaId))
+                throw new UseCaseValidationException("Perfil invalido.");
 
             var perfilExistente = await usuarioPerfilRepository.GetByUsuarioEmpresaEPerfilAsync(command.UsuarioId, command.EmpresaId, command.PerfilId);
 

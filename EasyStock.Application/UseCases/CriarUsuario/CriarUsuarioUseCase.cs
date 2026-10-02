@@ -56,8 +56,9 @@ namespace EasyStock.Application.UseCases.CriarUsuario
                 // Tudo o que pode recusar vem antes de gravar: o convite nunca nasce pela metade.
                 convites.ExigirBaseDeLink();
                 telefone = LerTelefone(command.Telefone);
-                await ExigirQueNaoSejaSuperAdminAsync(command.PerfilId);
             }
+            // Vale tambem para o cadastro legado com senha: antes so o convite barrava SuperAdmin.
+            await ExigirQueNaoSejaSuperAdminAsync(command.PerfilId);
 
             var emailExistente = await usuarioRepository.GetByEmailAsync(command.Email);
             if (emailExistente is not null)

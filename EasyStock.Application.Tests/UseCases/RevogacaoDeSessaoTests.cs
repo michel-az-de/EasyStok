@@ -189,8 +189,37 @@ public class RevogacaoDeSessaoTests
     private void VincularA(Guid empresaId, bool ativo = true) =>
         _usuario.Empresas.Add(new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = _usuario.Id, EmpresaId = empresaId, Ativo = ativo, CriadoEm = DateTime.UtcNow });
 
+    private static IPerfilRepository PerfilComum(NivelAcesso nivel = NivelAcesso.Admin, Guid? empresaId = null)
+    {
+        var repo = Substitute.For<IPerfilRepository>();
+        repo.GetByIdAsync(Arg.Any<Guid>()).Returns(new Perfil { Nivel = nivel, EmpresaId = empresaId });
+        return repo;
+    }
+
+    [Fact]
+    public async Task AtribuirPerfil_DeveRecusarPerfilSuperAdmin()
+    {
+        var uc = new AtribuirPerfilUsuarioUseCase(_usuarios, Substitute.For<IUsuarioPerfilRepository>(),
+            PerfilComum(NivelAcesso.SuperAdmin), _revogador, _unitOfWork, Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
+
+        var act = () => uc.ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, Guid.NewGuid(), Guid.NewGuid(), null));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+    }
+
+    [Fact]
+    public async Task AtribuirPerfil_DeveRecusarPerfilDeOutraEmpresa()
+    {
+        var uc = new AtribuirPerfilUsuarioUseCase(_usuarios, Substitute.For<IUsuarioPerfilRepository>(),
+            PerfilComum(NivelAcesso.Admin, Guid.NewGuid()), _revogador, _unitOfWork, Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
+
+        var act = () => uc.ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, Guid.NewGuid(), Guid.NewGuid(), null));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+    }
+
     private AtribuirPerfilUsuarioUseCase AtribuirPerfil(IUsuarioPerfilRepository perfis) =>
-        new(_usuarios, perfis, _revogador, _unitOfWork, Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
+        new(_usuarios, perfis, PerfilComum(), _revogador, _unitOfWork, Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
 
     [Fact]
     public async Task TrocaDePerfilRevoga()

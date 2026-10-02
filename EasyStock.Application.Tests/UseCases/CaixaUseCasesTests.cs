@@ -443,6 +443,23 @@ public class CaixaUseCasesTests
         await _uow.DidNotReceive().CommitAsync();
     }
 
+    [Theory]
+    [InlineData("abertura")]
+    [InlineData("fechamento")]
+    public async Task EstornarMovimento_DeveRecusar_AberturaEFechamento(string tipo)
+    {
+        var empresaId = Guid.NewGuid();
+        var mov = MovimentoCaixa.Criar(empresaId, tipo, 50m);
+        _repo.GetMovimentoAsync(empresaId, mov.Id).Returns(mov);
+        var useCase = new EstornarMovimentoCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<EstornarMovimentoCaixaUseCase>>());
+
+        var act = () => useCase.ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, mov.Id));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
     [Fact]
     public async Task EstornarMovimento_DeveSerIdempotente_QuandoJaEstornado()
     {

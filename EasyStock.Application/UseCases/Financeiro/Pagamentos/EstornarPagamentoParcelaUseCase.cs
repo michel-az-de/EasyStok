@@ -40,7 +40,7 @@ public class EstornarPagamentoParcelaPagarUseCase(
                 var mov = await caixaRepo.GetMovimentoAsync(cmd.EmpresaId, pag.MovimentoCaixaId.Value);
                 if (mov is not null && mov.EstornadoEm is null)
                 {
-                    var movDay = DateOnly.FromDateTime(mov.DataMovimento);
+                    var movDay = EasyStock.Application.Common.HorarioBrasil.DataOperacional(mov.DataMovimento);
                     var diaFechado = await caixaRepo.GetFechamentoDoDiaAsync(cmd.EmpresaId, movDay, mov.LojaId) is not null;
                     if (!diaFechado)
                     {
@@ -111,7 +111,7 @@ public class EstornarPagamentoParcelaReceberUseCase(
                 var mov = await caixaRepo.GetMovimentoAsync(cmd.EmpresaId, pag.MovimentoCaixaId.Value);
                 if (mov is not null && mov.EstornadoEm is null)
                 {
-                    var movDay = DateOnly.FromDateTime(mov.DataMovimento);
+                    var movDay = EasyStock.Application.Common.HorarioBrasil.DataOperacional(mov.DataMovimento);
                     var diaFechado = await caixaRepo.GetFechamentoDoDiaAsync(cmd.EmpresaId, movDay, mov.LojaId) is not null;
                     if (!diaFechado)
                     {

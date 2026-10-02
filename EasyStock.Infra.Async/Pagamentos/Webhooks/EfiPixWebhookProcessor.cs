@@ -51,6 +51,7 @@ public sealed class EfiPixWebhookProcessor(
             return ResultadoWebhookGateway.Ok;
 
         var algumDesconhecido = false;
+        Exception? falha = null;
         foreach (var item in pixArray.EnumerateArray())
         {
             ct.ThrowIfCancellationRequested();
@@ -84,8 +85,15 @@ public sealed class EfiPixWebhookProcessor(
             catch (Exception ex)
             {
                 logger.LogError(ex, "EfiPixWebhookProcessor: falha ao processar txid {Txid}", txid);
+                if (ex is OperationCanceledException) throw;
+                falha ??= ex;
             }
         }
+
+        // Propaga para o controller responder 500: a Efi so reenvia se nao receber 200 (#787);
+        // engolir aqui marcava o webhook como Sucesso e o Pix nunca baixava.
+        if (falha is not null)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(falha).Throw();
 
         return algumDesconhecido
             ? ResultadoWebhookGateway.Falha(ErroTxidDesconhecido)

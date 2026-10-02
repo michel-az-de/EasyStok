@@ -119,6 +119,8 @@ public sealed class ReportRunnerBackgroundService(
             _ = Task.Run(async () =>
             {
                 try    { await TryStartAndExecuteAsync(runId, leaseDuration, ct); }
+                catch (OperationCanceledException) { /* shutdown */ }
+                catch (Exception ex) { logger.LogError(ex, "ReportRunner: falha nao tratada ao iniciar/executar run {RunId}.", runId); }
                 finally { _instanceSemaphore.Release(); }
             }, ct);
 
@@ -237,6 +239,11 @@ public sealed class ReportRunnerBackgroundService(
                 }
             }
             catch (OperationCanceledException) { /* esperado */ }
+            catch (Exception ex)
+            {
+                // Falha transitoria de banco nao pode matar o heartbeat em silencio (lease expira, run duplica).
+                logger.LogError(ex, "ReportRunner: heartbeat da run {RunId} falhou.", run.Id);
+            }
         }, CancellationToken.None);
 
         long rowCount = 0;

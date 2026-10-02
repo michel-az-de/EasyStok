@@ -186,7 +186,8 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
         // 3. ATUALIZAR PEDIDO — total absoluto vs pedido determina parcial/total.
         var totalPedido = itens.Sum(i => i.Quantidade);
         var totalRecebidoApos = itens.Sum(i => i.QuantidadeRecebida);
-        pedido.Status = totalRecebidoApos >= totalPedido
+        // Por item: soma global deixaria um item sobre-recebido mascarar outro nao recebido.
+        pedido.Status = itens.All(i => i.QuantidadeRecebida >= i.Quantidade)
             ? Domain.Enums.StatusPedidoFornecedor.Recebido
             : Domain.Enums.StatusPedidoFornecedor.RecebidoParcial;
         pedido.DataRecebimento = dataRecebimento;
