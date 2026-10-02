@@ -55,6 +55,8 @@
   <ItemGroup>
     <!-- Seam de teste: expõe o ctor interno (injeção de IAmazonS3) para os unit tests. -->
     <InternalsVisibleTo Include="EasyStock.Infra.Async.UnitTests" />
+    <!-- N3 (#1351): o teste de integracao com o Mailpit injeta o validador de certificado (certificado proprio). -->
+    <InternalsVisibleTo Include="EasyStock.Infra.Postgre.IntegrationTests" />
   </ItemGroup>
 
 </Project>

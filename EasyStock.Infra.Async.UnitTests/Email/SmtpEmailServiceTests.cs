@@ -131,6 +131,19 @@ public class SmtpEmailServiceTests
     }
 
     [Fact]
+    public async Task NomeDeAnexoComAcentoChegaDecodificado()
+    {
+        // RFC 2231: o MimeKit codifica o filename com acento e o parser do destinatario o devolve igual.
+        await using var servidor = new ServidorSmtpDeTeste().Iniciar();
+        var servico = Servico(Configuracao(servidor));
+
+        var resultado = await servico.EnviarAsync(Mensagem(anexos: [new EmailAttachment("relatório-diário.pdf", [1, 2, 3], "application/pdf")]));
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.Enviado);
+        Ler(servidor.Mensagens.Single()).Attachments.OfType<MimePart>().Single().FileName.Should().Be("relatório-diário.pdf");
+    }
+
+    [Fact]
     public async Task CadaCaixaAutenticaComASuaCredencialESaiComOSeuRemetente()
     {
         await using var servidor = new ServidorSmtpDeTeste
