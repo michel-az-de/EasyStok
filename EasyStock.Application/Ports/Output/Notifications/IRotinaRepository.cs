@@ -19,6 +19,12 @@ public interface IRotinaRepository
         Guid? empresaId = null,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Existe rotina ativa (de qualquer empresa ou global) para o tipo? Gate dos produtores cross-tenant que carimbam
+    /// o fato depois de avisar (<c>CaixaEsquecidoJob</c>). Ignora o filtro do EF.
+    /// </summary>
+    Task<bool> ExisteAtivaAsync(TipoEventoNotificacao tipoEvento, CancellationToken ct = default);
+
     Task<(IReadOnlyList<RotinaNotificacao> Items, int Total)> ListarAsync(
         Guid? empresaId,
         bool? ativa = null,

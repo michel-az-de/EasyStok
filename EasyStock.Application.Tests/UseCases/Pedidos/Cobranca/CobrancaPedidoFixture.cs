@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Events.Storefront.Handlers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
@@ -61,6 +62,8 @@ internal sealed class CobrancaPedidoFixture
     public IConversaRepository ConversaRepo { get; } = Substitute.For<IConversaRepository>();
     public IVagaOcupadaRepository VagaRepo { get; } = Substitute.For<IVagaOcupadaRepository>();
     public IUnitOfWork Uow { get; } = Substitute.For<IUnitOfWork>();
+    public INotificadorService Notificador { get; } = Substitute.For<INotificadorService>();
+    public EasyStock.Application.Services.Notifications.PrazosOptions Prazos { get; } = new();
     public IImpressaoPendenteRepository ImpressaoRepo { get; } = Substitute.For<IImpressaoPendenteRepository>();
     public IPrazoPreparoPedidoQueries PrazoQueries { get; } = Substitute.For<IPrazoPreparoPedidoQueries>();
     public List<CriarPreferenceCommand> Preferencias { get; } = new();
@@ -186,7 +189,8 @@ internal sealed class CobrancaPedidoFixture
             new CalculadoraInicioPrevistoPedido(PrazoQueries), Estorno, Aviso(), PedidoRepo);
 
     public NotificarAtrasoPedidoUseCase NotificarAtraso() =>
-        new(PedidoStorefrontRepo, OperacaoEventos, Tenant, Uow, Relogio, NullLogger<NotificarAtrasoPedidoUseCase>.Instance);
+        new(PedidoStorefrontRepo, OperacaoEventos, Tenant, Uow, Notificador, Options.Create(Prazos), Relogio,
+            NullLogger<NotificarAtrasoPedidoUseCase>.Instance);
 
     public TrocarFormaPagamentoPedidoUseCase Trocar() =>
         new(PedidoStorefrontRepo, CobrancaRepo, Gerar(), Aviso(), Publicador, MpClient, Uow, Relogio,

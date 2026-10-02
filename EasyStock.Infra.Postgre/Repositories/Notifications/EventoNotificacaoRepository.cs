@@ -53,6 +53,10 @@ public sealed class EventoNotificacaoRepository(EasyStockDbContext db) : IEvento
         return total;
     }
 
+    public Task<bool> ExisteCorrelacaoAsync(Guid empresaId, string correlationId, CancellationToken ct = default) =>
+        db.NotifEventos.IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(e => e.EmpresaId == empresaId && e.CorrelationId == correlationId, ct);
+
     public async Task AddAsync(EventoNotificacao evento, CancellationToken ct = default) =>
         await db.NotifEventos.AddAsync(evento, ct);
 

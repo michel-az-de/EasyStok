@@ -2,9 +2,11 @@ using System.Text.Json;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Notifications;
+using Microsoft.Extensions.Options;
 
 namespace EasyStock.Application.UseCases.Atendimento.Lembretes;
 
@@ -31,9 +33,11 @@ public sealed class AvaliarLembretesUseCase(
     INotificadorService notificador,
     IOperacaoEventPublisher publisher,
     IUnitOfWork unitOfWork,
-    TimeProvider relogio)
+    TimeProvider relogio,
+    IOptions<PrazosOptions> prazos)
 {
     public static readonly TimeSpan PagamentoSemBaixaApos = TimeSpan.FromMinutes(15);
+    /// <summary>Padrão do limite de cliente sem resposta; a fonte é <see cref="PrazosOptions.ClienteSemRespostaMin"/> (N11).</summary>
     public static readonly TimeSpan SemRespostaApos = TimeSpan.FromMinutes(10);
     public const string EventoSse = "lembrete.vencido";
     public const int AvisosPorRodada = 100;
@@ -57,7 +61,8 @@ public sealed class AvaliarLembretesUseCase(
             criados++;
         }
 
-        foreach (var conversa in await candidatos.ListarConversasSemRespostaAsync(agora - SemRespostaApos, ct))
+        var semRespostaApos = prazos.Value.ClienteSemResposta;
+        foreach (var conversa in await candidatos.ListarConversasSemRespostaAsync(agora - semRespostaApos, ct))
         {
             var referencia = conversa.MensagemEntradaId.ToString();
             vigentes.Add((conversa.EmpresaId, TipoLembrete.ClienteSemResposta, referencia));
@@ -65,7 +70,7 @@ public sealed class AvaliarLembretesUseCase(
 
             var quem = string.IsNullOrWhiteSpace(conversa.ContatoNome) ? "Um cliente" : conversa.ContatoNome.Trim();
             await repository.AddAsync(Lembrete.Automatico(conversa.EmpresaId, TipoLembrete.ClienteSemResposta, referencia,
-                $"{quem} está há {SemRespostaApos.TotalMinutes:0} min sem resposta.", agora,
+                $"{quem} está há {semRespostaApos.TotalMinutes:0} min sem resposta.", agora,
                 paraUsuarioId: conversa.AssumidaPorUsuarioId, conversaId: conversa.ConversaId), ct);
             criados++;
         }
@@ -97,6 +102,13 @@ public sealed class AvaliarLembretesUseCase(
                 ? JsonSerializer.Serialize(new { usuarioId, lembreteId = lembrete.Id, tipo = lembrete.Tipo.ToString(), texto = lembrete.Texto })
                 : JsonSerializer.Serialize(new { lembreteId = lembrete.Id, tipo = lembrete.Tipo.ToString(), texto = lembrete.Texto });
             await notificador.EnfileirarEventoAsync(TipoEventoNotificacao.LembreteVencido, lembrete.EmpresaId, payload, lembrete.Id, ct);
+            // N11: o cliente sem resposta também chega por e-mail e WhatsApp. Pagamento sem baixa e lembrete manual
+            // ficam só no Push. Sem atendente, o destino é a audiência da rotina (gestores).
+            if (lembrete is { Tipo: TipoLembrete.ClienteSemResposta, CriadoPorUsuarioId: null })
+                await PrazoEstouradoEvento.EnfileirarAsync(notificador, prazos.Value, TipoPrazo.ClienteSemResposta,
+                    lembrete.EmpresaId, lembrete.Id, PrazoEstouradoEvento.Referencia(lembrete.ConversaId ?? lembrete.Id),
+                    PrazoEstouradoEvento.Duracao(prazos.Value.ClienteSemResposta),
+                    PrazoEstouradoEvento.Duracao(prazos.Value.ClienteSemResposta), lembrete.ParaUsuarioId, ct);
             lembrete.MarcarAvisado(agora);
         }
 

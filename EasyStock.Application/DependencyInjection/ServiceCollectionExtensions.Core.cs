@@ -75,6 +75,8 @@ public static partial class ServiceCollectionExtensions
         // S21: início previsto do preparo e aviso de atraso (PedidoAtrasoJob)
         services.AddScoped<EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido>();
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Atraso.NotificarAtrasoPedidoUseCase>();
+        // N11: miolo do CaixaEsquecidoJob (sino + PrazoEstourado).
+        services.AddScoped<EasyStock.Application.UseCases.Caixa.AvisarCaixasEsquecidasUseCase>();
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<CancelarPedidoUseCase>();
         services.AddScoped<ObterPedidoDetalhesUseCase>();

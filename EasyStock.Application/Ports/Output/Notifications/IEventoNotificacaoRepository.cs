@@ -28,6 +28,12 @@ public interface IEventoNotificacaoRepository
     /// <returns>Quantos eventos expiraram.</returns>
     Task<int> ExpirarPendentesAsync(PoliticaValidadeNotificacao politica, int limitePorPrazo, CancellationToken ct = default);
 
+    /// <summary>
+    /// Já existe evento da empresa com esta chave determinística (N11)? Pré-checagem do produtor que repete a
+    /// rodada (impressão travada); a N12 acrescenta o índice único como segunda trava. A empresa vai no <c>WHERE</c>.
+    /// </summary>
+    Task<bool> ExisteCorrelacaoAsync(Guid empresaId, string correlationId, CancellationToken ct = default);
+
     Task AddAsync(EventoNotificacao evento, CancellationToken ct = default);
     Task UpdateAsync(EventoNotificacao evento, CancellationToken ct = default);
 }
