@@ -15,7 +15,6 @@ public static partial class ServiceCollectionExtensions
     {
         // Services
         services.AddScoped<ResolvedorCanal>();
-        services.AddSingleton<RotinaScheduler>();
         // Quarentena (N1): prazos por tipo; sobrescritas em Notifications:Quarentena:Prazos (bind em AddNotificationsCore).
         services.TryAddSingleton<PoliticaValidadeNotificacao>();
         services.AddScoped<IResolvedorAudiencia, ResolvedorAudiencia>();
