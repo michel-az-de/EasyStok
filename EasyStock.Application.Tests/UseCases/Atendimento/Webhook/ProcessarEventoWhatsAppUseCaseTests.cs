@@ -217,6 +217,38 @@ public class ProcessarEventoWhatsAppUseCaseTests
 
         mensagem.Status.Should().Be(StatusMensagem.Falhou);
         mensagem.Erro.Should().Be("Erro generico");
+        mensagem.ProximoReenvioEm.Should().BeNull("sem código da Meta não há como saber se é temporária");
+    }
+
+    [Theory]
+    [InlineData(131000, true)]
+    [InlineData(130429, true)]
+    [InlineData(131016, true)]
+    [InlineData(133004, true)]
+    [InlineData(131030, false)]
+    [InlineData(131026, false)]
+    [InlineData(131047, false)]
+    [InlineData(131051, false)]
+    public async Task StatusFalhouAgendaReenvioSoQuandoTemporario(int codigo, bool agenda)
+    {
+        var wamid = "wamid.falha" + codigo;
+        var mensagem = Mensagem.Saida(_empresaId, Guid.NewGuid(), AutorMensagem.Dona, DateTime.UtcNow, TipoConteudoMensagem.Texto, "Oi", wamid);
+        _conversaRepository.ObterMensagemPorExternoIdAsync(_empresaId, wamid, Arg.Any<CancellationToken>()).Returns(mensagem);
+
+        var payload = """
+            {"entry":[{"changes":[{"value":{
+                "metadata":{"phone_number_id":"__PHONE__"},
+                "statuses":[{"id":"__WAMID__","status":"failed","recipient_id":"__WAID__","errors":[{"code":__COD__,"title":"Falha da Meta"}]}]
+            }}]}]}
+            """
+            .Replace("__PHONE__", PhoneNumberId).Replace("__WAID__", ContatoWaId).Replace("__WAMID__", wamid)
+            .Replace("__COD__", codigo.ToString());
+
+        await _useCase.ExecuteAsync(payload);
+
+        mensagem.Status.Should().Be(StatusMensagem.Falhou);
+        mensagem.Erro.Should().Be("Falha da Meta");
+        (mensagem.ProximoReenvioEm is not null).Should().Be(agenda);
     }
 
     [Fact]
