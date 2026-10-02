@@ -90,4 +90,29 @@ public class GeocodingProviderSelecaoTests
 
         Assert.IsType<EasyStock.Infra.Integrations.Rotas.NoOpRotaClient>(rota);
     }
+
+    [Fact]
+    public void TomTom_com_chave_usa_adapters_tomtom()
+    {
+        var config = new Dictionary<string, string?>
+        {
+            [GeocodingServiceCollectionExtensions.ProviderKey] = "tomtom",
+            [GeocodingServiceCollectionExtensions.TomTomApiKeyKey] = "k",
+        };
+
+        Assert.IsType<EasyStock.Infra.Integrations.TomTom.TomTomGeocodingClient>(Resolver(config));
+        Assert.IsType<EasyStock.Infra.Integrations.TomTom.TomTomRotasClient>(ResolverRota(config));
+    }
+
+    [Fact]
+    public void TomTom_sem_chave_cai_em_noop()
+    {
+        var config = new Dictionary<string, string?>
+        {
+            [GeocodingServiceCollectionExtensions.ProviderKey] = "tomtom",
+        };
+
+        Assert.IsType<NoOpGeocodingClient>(Resolver(config));
+        Assert.IsType<EasyStock.Infra.Integrations.Rotas.NoOpRotaClient>(ResolverRota(config));
+    }
 }
