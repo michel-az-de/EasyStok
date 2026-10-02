@@ -27,6 +27,7 @@ operador é o console React em `EasyStock.Console/` (ADR-0054), ligado à API m�
 | Homologação | [13-homologacao-organica.md](13-homologacao-organica.md) | H00–H16 | Aderência medida do atendimento (61 %), 14 achados Altos e spec de correção revisada por banca de 5 lentes |
 | 10 | [14-caderno-da-loja.md](14-caderno-da-loja.md) | S54–S56 | Caderno da loja em trechos para o agente: núcleo e índice no prompt, texto sob demanda por `consultar_caderno`; depois pré-busca e busca semântica |
 | 11 | [15-reenvio-mensagens.md](15-reenvio-mensagens.md) | S57 | Reenvio de mensagens que falharam: automático em 1/5/15/60 min para falha temporária, nunca para permanente ou incerta; botão "Reenviar" no console |
+| 12 | [16-retomada-nao-entregues-sms.md](16-retomada-nao-entregues-sms.md) | S58–S60 | Janela vencida: modelo de retomada e reenvio quando o cliente responde; painel "Não entregues"; reserva por SMS pronta e desligada |
 
 Ordem: 1 → 2 → 3 → 4 → 5 → 6. S32 (Mercado Pago, doc 08) entra logo após S11. A onda 7 pode correr em paralelo a partir da onda 4 (P05 depende de S18/S19).
 **Onda 8 (ADR-0051, go-live com tudo):** S34 entra **entre S03 e S05**, porque muda a chave da identidade do cliente. As demais fatias da onda 8 correm em paralelo às ondas 2 e 3, conforme o diagrama de ordem em [09-sistema-completo.md](09-sistema-completo.md).

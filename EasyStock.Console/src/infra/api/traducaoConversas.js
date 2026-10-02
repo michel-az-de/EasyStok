@@ -41,6 +41,9 @@ export function mensagemDaApi(m, conversaId = null) {
     ...(saida ? { status: STATUS_DA_MENSAGEM[m.status] ?? 'enviada' } : {}),
     ...(saida && m.autor === 'Agente' ? { automatica: true } : {}),
     ...(m.erro ? { erro: m.erro } : {}),
+    // S58/S60 (#1391): espera o cliente responder ao modelo de retomada; ou saiu pela reserva por SMS.
+    ...(m.aguardaClienteDesde ? { aguardaCliente: true } : {}),
+    ...(m.reservaSmsEm ? { porSms: true } : {}),
     ...(m.midiaChave && conversaId ? { midia: { conversaId, mensagemId: m.id, mime: m.midiaMime ?? null } } : {}),
   }
 }
@@ -93,3 +96,12 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario) {
     mensagens,
   }
 }
+
+// Linha do painel "Não entregues" (S59): quem devia receber e a mensagem no formato do balão.
+export const naoEntregueDaApi = (l) => ({
+  conversaId: l.conversaId,
+  contato: l.contatoNome || l.contatoIdExterno,
+  canal: l.canal,
+  aberta: l.conversaAberta,
+  mensagem: mensagemDaApi(l.mensagem, l.conversaId),
+})

@@ -202,6 +202,12 @@ function ConfiguracaoDoAtendimento() {
         onChange={mudar('fraseEspera')}
       />
       <CampoArea rotulo="Endereço fora da área" value={form.mensagemForaArea} onChange={mudar('mensagemForaArea')} />
+      <CampoTexto
+        rotulo="Modelo de retomada (WhatsApp)"
+        dica="Nome do modelo aprovado na Meta, com uma variável: o primeiro nome do cliente. Sai quando a janela de 24 h venceu; a mensagem que falhou vai quando o cliente responder. Vazio: sem retomada."
+        value={form.modeloRetomadaNome ?? ''}
+        onChange={mudar('modeloRetomadaNome')}
+      />
       <div className={css.numeros}>
         <CampoTexto
           rotulo="Respiro entre janelas (min)"
