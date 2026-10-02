@@ -68,8 +68,8 @@ public sealed class ResolvedorCanal
         CanalNotificacao canal,
         CategoriaConteudoNotificacao categoria)
     {
-        // Transacional bypassa consentimento (interesse legítimo)
-        if (categoria == CategoriaConteudoNotificacao.Transacional)
+        // Transacional (interesse legítimo) e Segurança (segurança da conta, N2) bypassam consentimento
+        if (categoria.IgnoraConsentimento())
             return true;
 
         var consentimento = consentimentos.FirstOrDefault(
