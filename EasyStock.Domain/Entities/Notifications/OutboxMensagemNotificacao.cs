@@ -231,6 +231,45 @@ public class OutboxMensagemNotificacao
         ProviderMensagemId = id.Length <= ProviderMensagemIdMaxLength ? id : id[..ProviderMensagemIdMaxLength];
     }
 
+    /// <summary>
+    /// O webhook de status do provider confirmou a entrega (N6: <c>sent</c>, <c>delivered</c> ou <c>read</c>). Transição
+    /// monotônica: só <see cref="StatusOutbox.EmEnvio"/> e <see cref="StatusOutbox.Indeterminado"/> viram
+    /// <see cref="StatusOutbox.Enviado"/>; o resto não regride. Guarda o id do provider se a linha ainda não o tem.
+    /// </summary>
+    /// <returns>Se algo mudou.</returns>
+    public bool ConfirmarEnvioPeloProvider(string? idExterno, string providerUsado)
+    {
+        var tinhaId = !string.IsNullOrEmpty(ProviderMensagemId);
+        if (!tinhaId) RegistrarProviderMensagemId(idExterno);
+        var gravouId = !tinhaId && !string.IsNullOrEmpty(ProviderMensagemId);
+
+        if (Status is not (StatusOutbox.EmEnvio or StatusOutbox.Indeterminado))
+            return gravouId;
+
+        Status = StatusOutbox.Enviado;
+        ProviderUsado ??= providerUsado;
+        EnviadoEm = DateTime.UtcNow;
+        ErroUltimaTentativa = null;
+        AoTerminar();
+        return true;
+    }
+
+    /// <summary>
+    /// O webhook de status do provider informou falha de entrega (N6: <c>failed</c>). Só
+    /// <see cref="StatusOutbox.Enviado"/> e <see cref="StatusOutbox.Indeterminado"/> viram <see cref="StatusOutbox.Falhado"/>:
+    /// o <c>EmEnvio</c> ainda é do dispatcher (o lease o fecha) e o que já é terminal não muda.
+    /// </summary>
+    /// <returns>Se algo mudou.</returns>
+    public bool RegistrarFalhaDeEntregaPeloProvider(string erro)
+    {
+        if (Status is not (StatusOutbox.Enviado or StatusOutbox.Indeterminado)) return false;
+
+        Status = StatusOutbox.Falhado;
+        ErroUltimaTentativa = erro;
+        AoTerminar();
+        return true;
+    }
+
     public void Cancelar()
     {
         Status = StatusOutbox.Cancelado;

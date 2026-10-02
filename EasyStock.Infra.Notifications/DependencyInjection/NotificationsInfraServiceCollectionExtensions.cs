@@ -53,6 +53,7 @@ public static class NotificationsInfraServiceCollectionExtensions
         // WhatsApp providers
         services.Configure<TwilioWhatsAppOptions>(configuration.GetSection("Notifications:WhatsApp:Twilio"));
         services.Configure<MetaCloudWhatsAppOptions>(configuration.GetSection("Notifications:WhatsApp:Meta"));
+        services.Configure<WhatsAppPlataformaOptions>(configuration.GetSection("Notifications:WhatsApp:Plataforma"));
 
         services.AddKeyedScoped<IProvedorWhatsApp, StubWhatsAppProvider>("whatsapp:stub");
         services.AddKeyedScoped<IProvedorWhatsApp, TwilioWhatsAppProvider>("whatsapp:twilio");

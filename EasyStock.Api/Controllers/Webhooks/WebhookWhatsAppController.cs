@@ -1,5 +1,6 @@
 using System.Text;
 using EasyStock.Application.UseCases.Atendimento.Webhook;
+using EasyStock.Application.UseCases.Notifications.Plataforma;
 using EasyStock.Infra.Notifications.Options;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
@@ -17,6 +18,7 @@ namespace EasyStock.Api.Controllers.Webhooks;
 [IgnoreAntiforgeryToken] // Webhook servidor-a-servidor autenticado por HMAC (X-Hub-Signature-256), sem cookie/sessão — CSRF não se aplica.
 public class WebhookWhatsAppController(
     ProcessarEventoWhatsAppUseCase processarUseCase,
+    ProcessarCategoriaTemplateWhatsAppUseCase categoriaTemplateUseCase,
     IOptions<MetaCloudWhatsAppOptions> metaOptions,
     ILogger<WebhookWhatsAppController> logger) : ControllerBase
 {
@@ -55,7 +57,16 @@ public class WebhookWhatsAppController(
             return Forbid();
         }
 
-        var completo = await processarUseCase.ExecuteAsync(rawBody, ct);
+        // N6: o callback do app recebe também template_category_update (a Meta não deixa sobrescrever esse webhook).
+        // Cada field vai ao seu dono; field desconhecido devolve 200 sem passar pelo atendimento.
+        var campos = CamposWebhookMeta.Separar(rawBody);
+        var completo = true;
+        if (campos.CategoriaTemplate is not null)
+            completo &= await categoriaTemplateUseCase.ExecuteAsync(campos.CategoriaTemplate, ct);
+        if (campos.Mensagens is not null)
+            completo &= await processarUseCase.ExecuteAsync(campos.Mensagens, ct);
+        if (campos.Ignoradas > 0)
+            logger.LogInformation("Webhook WhatsApp: {Ignoradas} mudança(s) de outro field descartada(s) de propósito.", campos.Ignoradas);
 
         // Não-200 faz a Meta reenviar o payload inteiro; o reprocessamento é seguro porque o use
         // case pula pelo wamid o que já gravou. Só pede reenvio quando algo pode passar na próxima.
