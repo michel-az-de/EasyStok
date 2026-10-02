@@ -49,8 +49,8 @@ F01 caixa de entrada real ──► F02 gestão + assistente + consentimento ─
 A API (`api/atendimento/conversas`) está em produção desde 29/09; a tela só existe com dados falsos.
 
 **Abordagem.** Um cliente HTTP em `src/infra/api/` com login (`api/auth`) e o token com a empresa;
-`repositorioConversas.js` passa a ler da API quando `VITE_API_URL` está definido e cai na massa
-quando não está (o modo demonstração continua). Assumir, responder, liberar o automático, encerrar e
+`repositorioConversas.js` passa a ler da API quando `VITE_FONTE_DADOS=api` (e `VITE_API_BASE` para
+outra origem; vazio = mesma origem) e cai na massa quando não está (o modo demonstração continua). Assumir, responder, liberar o automático, encerrar e
 marcar como lida chamam os endpoints do S07. Atualização por polling curto até o SSE do S18 existir.
 
 **Aceite.**

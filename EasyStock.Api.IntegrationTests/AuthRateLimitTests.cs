@@ -9,9 +9,10 @@ using Testcontainers.PostgreSql;
 namespace EasyStock.Api.IntegrationTests;
 
 /// <summary>
-/// B-015: confirma que /api/auth/login e /api/auth/register estao cobertos pela
-/// policy "auth" (fixed-window 10 req/min particionado por IP). Brute-force e spam
-/// de tenant disparam 429 antes da 11a tentativa por IP.
+/// B-015: confirma que a policy "auth" (fixed-window de 20 req/min, particionado por IP) devolve
+/// 429 no 21o pedido a uma rota anonima de autenticacao. A prova usa forgot-password: o register
+/// anonimo foi removido na N0 (#1349) e o par antigo login/register esperava o bloqueio na 11a
+/// chamada, com o balde ja em 20. Roda local, com Docker: este projeto esta fora do EasyStok.CI.slnf.
 /// </summary>
 public sealed class AuthRateLimitTests : IAsyncLifetime
 {
@@ -73,54 +74,27 @@ public sealed class AuthRateLimitTests : IAsyncLifetime
     }
 
     [SkippableFact]
-    public async Task Login_apos_10_tentativas_invalidas_no_mesmo_IP_retorna_429()
+    public async Task Forgot_password_apos_20_tentativas_no_mesmo_IP_retorna_429()
     {
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
 
-        var payload = new { Email = "naoexiste@easystock.com", Senha = "Errada@123!" };
+        // E-mail inexistente: a rota responde 200 sem efeito colateral (anti-enumeracao), entao so o
+        // permit da janela muda de uma chamada para a outra.
+        var payload = new { Email = "naoexiste@easystock.com" };
 
-        // 10 primeiros requests devolvem 401 (credenciais invalidas) — todos consomem o permit.
-        for (var i = 0; i < 10; i++)
+        // 20 primeiros requests passam: a policy "auth" libera 20 permits por minuto por IP.
+        for (var i = 0; i < 20; i++)
         {
-            var resp = await client.PostAsJsonAsync("/api/auth/login", payload);
-            resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
-                $"tentativa {i + 1} ainda dentro da janela de 10 permits/min");
+            var resp = await client.PostAsJsonAsync("/api/auth/forgot-password", payload);
+            resp.StatusCode.Should().Be(HttpStatusCode.OK,
+                $"tentativa {i + 1} ainda dentro da janela de 20 permits/min");
         }
 
-        // 11o request: rate limiter rejeita antes do controller (sem QueueLimit).
-        var blocked = await client.PostAsJsonAsync("/api/auth/login", payload);
-        blocked.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
-        blocked.Headers.Should().ContainKey("Retry-After");
-    }
-
-    [SkippableFact]
-    public async Task Register_apos_10_tentativas_no_mesmo_IP_retorna_429()
-    {
-        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
-
-        await using var factory = CriarFactory();
-        using var client = factory.CreateClient();
-
-        // Payload propositalmente invalido — interessa o COUNTING, nao o resultado de negocio.
-        var payload = new
-        {
-            Nome = "x",
-            Email = "spam@spam.com",
-            Senha = "x",
-            EmpresaId = (Guid?)null
-        };
-
-        for (var i = 0; i < 10; i++)
-        {
-            var resp = await client.PostAsJsonAsync("/api/auth/register", payload);
-            resp.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests,
-                $"tentativa {i + 1} ainda dentro da janela");
-        }
-
-        var blocked = await client.PostAsJsonAsync("/api/auth/register", payload);
+        // 21o request: rate limiter rejeita antes do controller (sem QueueLimit).
+        var blocked = await client.PostAsJsonAsync("/api/auth/forgot-password", payload);
         blocked.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
         blocked.Headers.Should().ContainKey("Retry-After");
     }
