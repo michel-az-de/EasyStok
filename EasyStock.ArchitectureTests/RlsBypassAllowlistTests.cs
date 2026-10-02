@@ -98,6 +98,11 @@ public class RlsBypassAllowlistTests
 
         // N1, #1344: a anonimizacao por retencao (90 dias) atualiza o outbox de todas as empresas.
         "EasyStock.Infra.Postgre/Notifications/Maintenance/AnonimizarLogsAntigosService.cs",
+
+        // N4, #1344: a audiencia "superadmins" le quem tem perfil SuperAdmin, que e global por natureza (Perfil.EmpresaId
+        // nulo, UsuarioPerfil.EmpresaId = Guid.Empty, sem UsuarioEmpresa): nenhuma consulta por empresa o acha. A leitura
+        // e so de Id, nome e contato, num escopo de DI proprio e curto, e so vale em rotina global.
+        "EasyStock.Infra.Postgre/Notifications/Audiencia/SuperAdminsDaPlataformaQuery.cs",
     };
 
     [Fact]

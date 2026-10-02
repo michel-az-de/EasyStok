@@ -46,6 +46,15 @@ public static class ExemplosDeEvento
                 ["prazo_texto"] = "02/10/2026 14:00",
                 ["atraso_texto"] = "35 minutos",
             },
+            [TipoEventoNotificacao.ContatoAlterado] = new Dictionary<string, object?>
+            {
+                ["nome"] = "Maria Exemplo",
+                ["email"] = "maria@exemplo.invalid",
+                ["usuarioId"] = "00000000-0000-0000-0000-000000000000",
+                ["contato"] = "e-mail",
+                ["novo_mascarado"] = "m***@exemplo.invalid",
+                ["quando"] = "02/10/2026 14:30",
+            },
             [TipoEventoNotificacao.ResumoDiario] = new Dictionary<string, object?>
             {
                 ["data"] = "01/10/2026",

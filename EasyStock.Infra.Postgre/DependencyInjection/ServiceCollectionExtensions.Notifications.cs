@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Infra.Postgre.Notifications;
+using EasyStock.Infra.Postgre.Notifications.Audiencia;
 using EasyStock.Infra.Postgre.Notifications.Backlog;
 using EasyStock.Infra.Postgre.Notifications.Collectors;
 using EasyStock.Infra.Postgre.Notifications.Dispatcher;
@@ -23,6 +24,9 @@ public static partial class ServiceCollectionExtensionsNotifications
         services.AddScoped<IEventoNotificacaoRepository, EventoNotificacaoRepository>();
         services.AddScoped<IOutboxNotificacaoRepository, OutboxNotificacaoRepository>();
         services.AddScoped<IConsentimentoRepository, ConsentimentoRepository>();
+        services.AddScoped<IPreferenciaNotificacaoRepository, PreferenciaNotificacaoRepository>();
+        services.AddScoped<IAudienciaUsuarios, AudienciaUsuarios>();
+        services.AddScoped<ISuperAdminsDaPlataforma, SuperAdminsDaPlataformaQuery>();
         services.AddScoped<IConfiguracaoCanalRepository, ConfiguracaoCanalRepository>();
         services.AddScoped<IBloqueioNotificacaoRepository, BloqueioNotificacaoRepository>();
         services.AddScoped<ILogEnvioNotificacaoRepository, LogEnvioNotificacaoRepository>();

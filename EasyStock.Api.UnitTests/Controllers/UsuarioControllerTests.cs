@@ -47,7 +47,15 @@ public class UsuarioControllerTests
             _usuarioRepository, Substitute.For<IRefreshTokenRepository>(), Substitute.For<ICacheService>(),
             TimeProvider.System, Substitute.For<ILogger<RevogadorSessoes>>());
         _criarUseCase = new CriarUsuarioUseCase(_usuarioRepository, _assinaturaRepository, _usuarioEmpresaRepository, _usuarioPerfilRepository, _unitOfWork, passwordHasher, criarLogger);
-        _atualizarUseCase = new AtualizarUsuarioUseCase(_usuarioRepository, _currentUser, _unitOfWork, atualizarLogger);
+        _atualizarUseCase = new AtualizarUsuarioUseCase(
+            _usuarioRepository, _currentUser, _unitOfWork,
+            new TrocaDeContatoService(
+                _usuarioRepository, Substitute.For<IEmailConfirmationTokenRepository>(),
+                Substitute.For<EasyStock.Application.Ports.Output.Notifications.INotificadorService>(),
+                Substitute.For<IEmpresaPadraoResolver>(), Substitute.For<ITenantContextAccessor>(), _currentUser, passwordHasher,
+                _unitOfWork, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), TimeProvider.System,
+                Substitute.For<ILogger<TrocaDeContatoService>>()),
+            Substitute.For<IAuditLogRepository>(), atualizarLogger);
         _alterarSenhaUseCase = new AlterarSenhaUsuarioUseCase(_usuarioRepository, new AlterarSenhaUsuarioCommandValidator(), revogadorSessoes, _unitOfWork, passwordHasher, alterarSenhaLogger);
         _desativarUseCase = new DesativarUsuarioUseCase(_usuarioRepository, _usuarioEmpresaRepository, revogadorSessoes, _unitOfWork, desativarLogger);
         _listarUseCase = new ListarUsuariosUseCase(_usuarioRepository);

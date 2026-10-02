@@ -9,7 +9,7 @@ public class ExemplosDeEventoTests
     private static readonly TipoEventoNotificacao[] TiposDoCatalogo =
     [
         TipoEventoNotificacao.ResetSenha, TipoEventoNotificacao.ConviteAcesso, TipoEventoNotificacao.IncidenteSistema,
-        TipoEventoNotificacao.PrazoEstourado, TipoEventoNotificacao.ResumoDiario
+        TipoEventoNotificacao.PrazoEstourado, TipoEventoNotificacao.ResumoDiario, TipoEventoNotificacao.ContatoAlterado
     ];
 
     [Fact]
@@ -26,6 +26,7 @@ public class ExemplosDeEventoTests
     [InlineData(TipoEventoNotificacao.ConviteAcesso, "nome,email,usuarioId,empresa,link_convite,expira_em_dias")]
     [InlineData(TipoEventoNotificacao.IncidenteSistema, "componente,estado_texto,gravidade,desde,duracao")]
     [InlineData(TipoEventoNotificacao.PrazoEstourado, "tipo_legivel,referencia,prazo_texto,atraso_texto")]
+    [InlineData(TipoEventoNotificacao.ContatoAlterado, "nome,email,usuarioId,contato,novo_mascarado,quando")]
     [InlineData(TipoEventoNotificacao.ResumoDiario, "data,entregues,faturamento,ticket_medio,pendentes,valor_pendentes,caixa_texto,pix_texto")]
     public void ExemploTemExatamenteAsChavesDoContrato(TipoEventoNotificacao tipo, string chaves) =>
         ExemplosDeEvento.Obter(tipo).Keys.Should().BeEquivalentTo(chaves.Split(','));

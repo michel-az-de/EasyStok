@@ -18,6 +18,9 @@ internal sealed class NotificadorServiceFixture
     public IConfiguracaoCanalRepository Configuracoes { get; } = Substitute.For<IConfiguracaoCanalRepository>();
     public IBloqueioNotificacaoRepository Bloqueios { get; } = Substitute.For<IBloqueioNotificacaoRepository>();
     public IOutboxNotificacaoRepository Outbox { get; } = Substitute.For<IOutboxNotificacaoRepository>();
+
+    /// <summary>A audiência (N4): por padrão <c>null</c>, isto é, o destinatário sai das chaves do payload.</summary>
+    public IResolvedorAudiencia Audiencia { get; } = Substitute.For<IResolvedorAudiencia>();
     public Guid EmpresaId { get; } = Guid.NewGuid();
     public List<OutboxMensagemNotificacao> Gravadas { get; } = [];
     public NotificadorService Service { get; }
@@ -27,7 +30,14 @@ internal sealed class NotificadorServiceFixture
         Service = new NotificadorService(
             Evento, Rotinas, Templates, Substitute.For<IConsentimentoRepository>(), Configuracoes, Bloqueios, Outbox,
             new NotificadorServiceMetadadosTests.RendererTemplateSimples(), new ResolvedorCanal(),
-            Substitute.For<IUnitOfWork>(), NullLogger<NotificadorService>.Instance);
+            Substitute.For<IUnitOfWork>(), NullLogger<NotificadorService>.Instance, Audiencia);
+
+        Audiencia.ResolverAsync(
+                Arg.Any<RotinaNotificacao>(), Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<DestinatarioAudiencia>?)null);
+        // Como o banco: o índice único da chave de idempotência barra a segunda linha igual.
+        Outbox.ExisteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(c => Gravadas.Any(g => g.IdempotencyKey == c.Arg<string>()));
 
         Bloqueios.ListarAtivosAsync(Arg.Any<Guid?>(), Arg.Any<CanalNotificacao?>(), Arg.Any<CancellationToken>()).Returns([]);
         var canais = canaisAtivos.Length > 0 ? canaisAtivos : Enum.GetValues<CanalNotificacao>();

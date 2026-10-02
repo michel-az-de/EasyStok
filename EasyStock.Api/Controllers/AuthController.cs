@@ -221,9 +221,13 @@ public class AuthController(
         => DataOk(await obterUsuarioAtualUseCase.ExecuteAsync(new ObterUsuarioAtualCommand()));
 
     [Authorize]
-    [SwaggerOperation(Summary = "Update current user profile")]
+    [EnableRateLimiting("auth")]
+    [SwaggerOperation(
+        Summary = "Update current user profile",
+        Description = "Trocar o e-mail exige senhaAtual (ausente ou errada: 403, e a errada conta como falha de login) e so grava o endereco como pendente: o e-mail da conta troca no clique do link enviado ao endereco novo.")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [HttpPatch("me")]
     public async Task<IActionResult> UpdateMe([FromBody] AtualizarUsuarioAtualCommand command)
         => DataOk(await atualizarUsuarioAtualUseCase.ExecuteAsync(command));

@@ -708,6 +708,14 @@ public static class NotificacoesGlobaisSeed
                 """{"template":"convite_acesso_link","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ empresa }}"}""");
 
         yield return TemplateNotificacao.Criar(
+            codigo: "contato_alterado_email_v1",
+            nome: "Contato Alterado · Email",
+            canal: CanalNotificacao.Email,
+            tipoEvento: TipoEventoNotificacao.ContatoAlterado,
+            assuntoTemplate: "EasyStok: o {{ contato }} da sua conta foi alterado",
+            corpoTemplate: EmailTemplateLoader.LoadBody("contato_alterado_email_v1"));
+
+        yield return TemplateNotificacao.Criar(
             codigo: "incidente_sistema_email_v1",
             nome: "Incidente do Sistema · Email",
             canal: CanalNotificacao.Email,
@@ -848,7 +856,7 @@ public static class NotificacoesGlobaisSeed
 
         yield return MakeRotina("confirmacao_email_global", "Confirmacao de Email",
             TipoEventoNotificacao.ConfirmacaoEmail, "confirmacao_email_email_v1",
-            CategoriaConteudoNotificacao.Transacional, "[\"Email\"]");
+            CategoriaConteudoNotificacao.Seguranca, "[\"Email\"]");
 
         // ===== Operacional faltante =====
         yield return MakeRotina("produto_vencido_global", "Produto Vencido",
@@ -968,6 +976,11 @@ public static class NotificacoesGlobaisSeed
         yield return MakeRotina("convite_acesso_global", "Convite de Acesso",
             TipoEventoNotificacao.ConviteAcesso, "convite_acesso_email_v1",
             CategoriaConteudoNotificacao.Seguranca, "[\"Email\",\"WhatsApp\"]", ModoTodos());
+
+        // N4: aviso de contato trocado (endereco antigo ou e-mail atual). Seguranca, so e-mail; o destino vem do payload.
+        yield return MakeRotina("contato_alterado_global", "Contato Alterado",
+            TipoEventoNotificacao.ContatoAlterado, "contato_alterado_email_v1",
+            CategoriaConteudoNotificacao.Seguranca, "[\"Email\"]", ModoTodos());
 
         yield return MakeRotina("incidente_sistema_global", "Incidente do Sistema",
             TipoEventoNotificacao.IncidenteSistema, "incidente_sistema_email_v1",

@@ -32,7 +32,7 @@ public class EmailTemplateRenderSmokeTests
         "relatorio_pronto_email_v1", "relatorio_falhou_email_v1",
         "reset_senha_email_v1", "confirmacao_email_email_v1",
         // Catalogo de plataforma (N13)
-        "convite_acesso_email_v1", "incidente_sistema_email_v1", "prazo_estourado_email_v1", "resumo_diario_email_v1",
+        "convite_acesso_email_v1", "contato_alterado_email_v1", "incidente_sistema_email_v1", "prazo_estourado_email_v1", "resumo_diario_email_v1",
     };
 
     public static IEnumerable<object[]> TodosOsTemplates() => Templates.Select(t => new object[] { t });

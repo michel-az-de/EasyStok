@@ -79,5 +79,8 @@ public enum TipoEventoNotificacao
     ConviteAcesso = 48,
     IncidenteSistema = 49,
     PrazoEstourado = 50,
-    ResumoDiario = 51
+    ResumoDiario = 51,
+
+    // Contato do usuario trocado (N4): aviso ao endereco antigo ou ao e-mail atual. Faixa livre da S0, a partir de 80.
+    ContatoAlterado = 80
 }

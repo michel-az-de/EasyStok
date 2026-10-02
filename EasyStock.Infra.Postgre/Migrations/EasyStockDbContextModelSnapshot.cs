@@ -8559,6 +8559,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<string>("EmailPendente")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
                     b.Property<int>("FailedLoginAttempts")
                         .HasColumnType("integer");
 
@@ -8579,6 +8583,13 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.Property<DateTime?>("SessoesValidasDesde")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Telefone")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime?>("TelefoneVerificadoEm")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("TemaPreferido")

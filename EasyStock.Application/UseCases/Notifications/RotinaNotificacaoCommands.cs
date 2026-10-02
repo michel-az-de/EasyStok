@@ -21,6 +21,22 @@ public sealed record CriarRotinaCommand(
 
 public sealed record RotinaResult(Guid Id, string Codigo);
 
+/// <summary>Regras de <c>ParametrosJson</c> que a API impõe à rotina da empresa (N4).</summary>
+internal static class ParametrosDaRotina
+{
+    /// <summary>
+    /// O Admin de uma empresa também grava <c>ParametrosJson</c>: apontar a rotina dele para os superadmins mandaria o
+    /// aviso (e o contato deles) para fora do tenant. A audiência <c>superadmins</c> só vale em rotina global.
+    /// </summary>
+    public static void ValidarAudiencia(string? parametrosJson, Guid? empresaId)
+    {
+        if (empresaId is not null && AudienciaDaRotina.Ler(parametrosJson) == AudienciaNotificacao.Superadmins)
+            throw new UseCaseValidationException(
+                "AUDIENCIA_SUPERADMINS_SO_GLOBAL",
+                "A audiência 'superadmins' só vale em rotina global, não em rotina da empresa.");
+    }
+}
+
 public sealed class CriarRotinaUseCase(
     IRotinaRepository rotinaRepository,
     IUnitOfWork unitOfWork,
@@ -29,6 +45,8 @@ public sealed class CriarRotinaUseCase(
 {
     public async Task<RotinaResult> ExecuteAsync(CriarRotinaCommand command)
     {
+        ParametrosDaRotina.ValidarAudiencia(command.ParametrosJson, command.EmpresaId);
+
         var rotina = RotinaNotificacao.Criar(
             command.Codigo, command.Nome, command.TipoEvento,
             command.TriggerTipo, command.TemplateCodigo, command.CategoriaConteudo,
@@ -66,6 +84,8 @@ public sealed class AtualizarRotinaUseCase(
     public async Task<RotinaResult> ExecuteAsync(AtualizarRotinaCommand command)
     {
         var rotina = await rotinaRepository.ObterDaEmpresaAsync(command.RotinaId, command.EmpresaId);
+
+        ParametrosDaRotina.ValidarAudiencia(command.ParametrosJson, rotina.EmpresaId);
 
         if (command.CronExpression is not null)
             rotina.DefinirCronExpression(command.CronExpression, command.AtualizadoPor);
