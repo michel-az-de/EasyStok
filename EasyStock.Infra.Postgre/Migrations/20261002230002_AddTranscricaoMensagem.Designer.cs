@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261002230002_AddTranscricaoMensagem")]
+    partial class AddTranscricaoMensagem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -619,10 +622,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<string>("ErroMidia")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<string>("ExternoId")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
@@ -630,10 +629,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("MidiaChave")
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
-
-                    b.Property<string>("MidiaIdExterno")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("MidiaMime")
                         .HasMaxLength(100)
@@ -647,9 +642,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
-                    b.Property<DateTime?>("ProximaTentativaMidiaEm")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<DateTime?>("ProximoReenvioEm")
                         .HasColumnType("timestamp with time zone");
 
@@ -660,11 +652,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("TentativasEnvio")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<int>("TentativasMidia")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
@@ -688,10 +675,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("AguardaClienteDesde")
                         .HasDatabaseName("ix_atendimento_mensagens_aguarda_cliente")
                         .HasFilter("\"AguardaClienteDesde\" IS NOT NULL");
-
-                    b.HasIndex("ProximaTentativaMidiaEm")
-                        .HasDatabaseName("ix_atendimento_mensagens_proxima_tentativa_midia")
-                        .HasFilter("\"ProximaTentativaMidiaEm\" IS NOT NULL");
 
                     b.HasIndex("ProximoReenvioEm")
                         .HasDatabaseName("ix_atendimento_mensagens_proximo_reenvio")

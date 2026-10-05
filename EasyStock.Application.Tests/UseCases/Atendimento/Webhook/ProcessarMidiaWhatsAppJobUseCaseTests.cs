@@ -75,6 +75,46 @@ public class ProcessarMidiaWhatsAppJobUseCaseTests
             conversaRepository.ObterMensagemPorExternoIdAsync(empresaId, "wamid.x", Arg.Any<CancellationToken>());
         });
     }
+
+    [Fact]
+    public async Task AudioArmazenadoETranscrito()
+    {
+        // #1398: depois do commit da mídia, o áudio é transcrito e o texto vai para a mensagem.
+        var empresaId = Guid.NewGuid();
+        var conversaId = Guid.NewGuid();
+        var mensagem = Domain.Entities.Atendimento.Mensagem.Entrada(
+            empresaId, conversaId, DateTime.UtcNow, TipoConteudoMensagem.Audio, externoId: "wamid.a1");
+        var conversaRepository = Substitute.For<IConversaRepository>();
+        conversaRepository.ObterMensagemPorExternoIdAsync(empresaId, "wamid.a1", Arg.Any<CancellationToken>())
+            .Returns(mensagem);
+        var cloudClient = Substitute.For<IWhatsAppCloudClient>();
+        cloudClient.BaixarMidiaAsync("media-a", Arg.Any<CancellationToken>())
+            .Returns(((Stream)new MemoryStream([1, 2]), "audio/ogg"));
+        var fileStorage = Substitute.For<IFileStorage>();
+        fileStorage.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                var req = ci.Arg<FileUploadRequest>();
+                return Task.FromResult(new StoredFileResult(
+                    $"{req.BucketPath}/{req.FileName}", "https://storage.test/x", req.ContentType, req.Content.Length));
+            });
+        fileStorage.DownloadAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new byte[] { 1, 2 });
+        var transcritor = Substitute.For<EasyStock.Application.Ports.Output.Ai.ITranscritorAudio>();
+        transcritor.Disponivel.Returns(true);
+        transcritor.TranscreverAsync(Arg.Any<byte[]>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns("oi, tudo bem?");
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var processador = new ProcessarMidiaWhatsAppJobUseCase(
+            conversaRepository, new ArmazenadorMidiaWhatsApp(cloudClient, fileStorage),
+            Substitute.For<ITenantContextAccessor>(), unitOfWork, TimeProvider.System, NullLogger<ProcessarMidiaWhatsAppJobUseCase>.Instance,
+            new TranscricaoAudioWhatsApp(transcritor, fileStorage, unitOfWork, NullLogger<TranscricaoAudioWhatsApp>.Instance));
+
+        await processador.ExecuteAsync(new ArmazenarMidiaWhatsAppJob(empresaId, conversaId, "wamid.a1", "media-a"));
+
+        mensagem.MidiaChave.Should().NotBeNull();
+        mensagem.Transcricao.Should().Be("oi, tudo bem?");
+    }
+
     [Fact]
     public async Task FalhaNoDownload_GravaErroNaMensagemEReagenda()
     {

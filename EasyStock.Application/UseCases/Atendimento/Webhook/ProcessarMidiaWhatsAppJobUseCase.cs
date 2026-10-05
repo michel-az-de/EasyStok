@@ -13,7 +13,8 @@ public sealed class ProcessarMidiaWhatsAppJobUseCase(
     ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
-    ILogger<ProcessarMidiaWhatsAppJobUseCase> logger)
+    ILogger<ProcessarMidiaWhatsAppJobUseCase> logger,
+    TranscricaoAudioWhatsApp? transcricao = null)
 {
     public async Task ExecuteAsync(ArmazenarMidiaWhatsAppJob job, CancellationToken ct = default)
     {
@@ -34,6 +35,7 @@ public sealed class ProcessarMidiaWhatsAppJobUseCase(
             var (chave, mime) = await armazenador.ArmazenarAsync(job.EmpresaId, job.ConversaId, job.Wamid, job.MediaId, ct);
             mensagem.AnexarMidia(chave, mime);
             await unitOfWork.CommitAsync();
+            if (transcricao is not null) await transcricao.TranscreverAsync(mensagem, ct); // #1398, nunca lança
         }
         catch (Exception ex)
         {
