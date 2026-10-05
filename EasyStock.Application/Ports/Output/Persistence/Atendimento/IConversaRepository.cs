@@ -104,6 +104,12 @@ public interface IConversaRepository
     Task<IReadOnlyList<Mensagem>> ListarReenviosVencidosComLockAsync(DateTime agora, int limite, CancellationToken ct = default);
 
     /// <summary>
+    /// #1397: trava (<c>FOR UPDATE SKIP LOCKED</c>) até <paramref name="limite"/> mensagens com anexo ainda não
+    /// baixado e tentativa vencida, de todas as empresas. Exige bypass de RLS e transação explícita.
+    /// </summary>
+    Task<IReadOnlyList<Mensagem>> ListarMidiasPendentesComLockAsync(DateTime agora, int limite, CancellationToken ct = default);
+
+    /// <summary>
     /// S58: há mensagem esperando o cliente responder ao modelo de retomada desde <paramref name="desde"/>, do mesmo
     /// contato no canal ou do mesmo cliente (o WhatsApp grava o celular com e sem o nono dígito).
     /// </summary>

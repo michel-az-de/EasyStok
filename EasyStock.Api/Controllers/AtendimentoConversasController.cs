@@ -260,7 +260,7 @@ public class AtendimentoConversasController(
         catch (FalhaEnvioCanalException ex)
         {
             return StatusCode(StatusCodes.Status502BadGateway,
-                new ApiErrorResponse(new ApiError("CANAL_FALHOU", "Falha ao enviar pelo canal.", ex.Message, null)));
+                new ApiErrorResponse(new ApiError("CANAL_FALHOU", "Falha ao enviar pelo canal.", ex.Message, null) { Details = ex.Mensagem }));
         }
     }
 }

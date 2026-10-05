@@ -1,4 +1,5 @@
 using EasyStock.Api.Controllers;
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Atendimento;
@@ -23,6 +24,7 @@ using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Enums.Atendimento;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -166,6 +168,33 @@ public class AtendimentoConversasControllerTests
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         var dados = (IReadOnlyList<MensagemNaoEntregueResult>)ok.Value!.GetType().GetProperty("Data")!.GetValue(ok.Value)!;
         dados.Should().ContainSingle().Which.Mensagem.Id.Should().Be(falhou.Id);
+    }
+
+    [Fact]
+    public async Task FalhaDoCanalGravaMensagemFalhouEDevolveIdParaReenviar()
+    {
+        var conversa = ConversaComClienteAgora();
+        _canal.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<Task<string>>(_ => throw new WhatsAppCloudException(131000, "Meta instável", ehPermanente: false), _ => Task.FromResult("wamid.dona1"));
+
+        var result = await _controller.EnviarMensagem(conversa.Id, new EnviarMensagemConsoleBody("Temos nhoque!"), default);
+
+        var erro = result.Should().BeOfType<ObjectResult>().Subject;
+        erro.StatusCode.Should().Be(StatusCodes.Status502BadGateway);
+        var gravada = _repositorio.Mensagens.Should().ContainSingle(m => m.Direcao == DirecaoMensagem.Saida).Subject;
+        gravada.Status.Should().Be(StatusMensagem.Falhou);
+        gravada.Erro.Should().Contain("Meta instável");
+        gravada.Autor.Should().Be(AutorMensagem.Dona);
+        gravada.ProximoReenvioEm.Should().NotBeNull("131000 é temporária");
+        var corpo = erro.Value.Should().BeOfType<ApiErrorResponse>().Subject;
+        corpo.Error.Code.Should().Be("CANAL_FALHOU");
+        corpo.Error.Details.Should().BeOfType<MensagemAtendimentoResult>().Which.Id.Should().Be(gravada.Id);
+        await _unitOfWork.Received(1).CommitAsync();
+
+        var reenvio = await _controller.ReenviarMensagem(conversa.Id, gravada.Id, default);
+
+        reenvio.Should().BeOfType<OkObjectResult>();
+        gravada.Status.Should().Be(StatusMensagem.Enviada);
     }
 
     [Fact]
@@ -676,6 +705,9 @@ public class AtendimentoConversasControllerTests
 
         public Task<IReadOnlyList<Mensagem>> ListarReenviosVencidosComLockAsync(DateTime agora, int limite, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<Mensagem>>(Mensagens.Where(m => m.ProximoReenvioEm <= agora).Take(limite).ToList());
+
+        public Task<IReadOnlyList<Mensagem>> ListarMidiasPendentesComLockAsync(DateTime agora, int limite, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<Mensagem>>(Mensagens.Where(m => m.ProximaTentativaMidiaEm <= agora && m.MidiaChave == null).Take(limite).ToList());
 
         public Task<bool> ExisteAguardandoClienteAsync(
             Guid empresaId, CanalConversa canal, string contatoIdExterno, Guid? clienteId, DateTime desde, CancellationToken ct = default) =>

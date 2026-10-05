@@ -33,7 +33,7 @@ public enum ClasseErroMeta
 public static class CodigosErroMeta
 {
     private static readonly HashSet<int> Permanentes =
-        [100, 131008, 131009, 131021, 131026, 131047, 131049, 131050, 131051, 132000, 132001, 132005, 132007, 132012, 132015, 132016, 132018];
+        [100, 131008, 131009, 131021, 131026, 131030, 131047, 131049, 131050, 131051, 132000, 132001, 132005, 132007, 132012, 132015, 132016, 132018];
 
     private static readonly HashSet<int> PermanentesComAlerta =
         [0, 3, 10, 190, 131005, 131042, 131031, 368, 130497, 131037, 131045, 133010, 131048];

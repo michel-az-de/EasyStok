@@ -43,11 +43,14 @@ public sealed record MensagemAtendimentoResult(
     Guid? EnviadaPorUsuarioId,
     DateTime? AguardaClienteDesde = null,
     DateTime? ReservaSmsEm = null,
+    string? ErroMidia = null,
+    bool MidiaFalhou = false,
     string? Transcricao = null)
 {
     internal static MensagemAtendimentoResult De(Mensagem m) => new(
         m.Id, m.Direcao, m.Autor, m.TipoConteudo, m.Texto, m.BotaoId, m.MidiaChave, m.MidiaMime,
-        m.Status, m.Erro, m.ExternoId, m.EnviadaEm, m.EnviadaPorUsuarioId, m.AguardaClienteDesde, m.ReservaSmsEm, m.Transcricao);
+        m.Status, m.Erro, m.ExternoId, m.EnviadaEm, m.EnviadaPorUsuarioId, m.AguardaClienteDesde, m.ReservaSmsEm,
+        m.ErroMidia, m.MidiaFalhou, m.Transcricao);
 }
 
 /// <summary>Estado da conversa depois de uma ação do console.</summary>
@@ -74,5 +77,12 @@ public sealed class ForaDaJanelaAtendimentoException(string mensagem, Exception?
     public const string Sugestao = "template";
 }
 
-/// <summary>O canal recusou ou falhou no envio por outro motivo (rede, token, erro da Meta): nada gravado.</summary>
-public sealed class FalhaEnvioCanalException(string mensagem, Exception inner) : Exception(mensagem, inner);
+/// <summary>
+/// O canal recusou ou falhou no envio por outro motivo (rede, token, erro da Meta). <see cref="Mensagem"/> é a
+/// mensagem gravada como falhou (#1396), com o id que o console usa para reenviar.
+/// </summary>
+public sealed class FalhaEnvioCanalException(string mensagem, Exception inner, MensagemAtendimentoResult? gravada = null)
+    : Exception(mensagem, inner)
+{
+    public MensagemAtendimentoResult? Mensagem { get; } = gravada;
+}

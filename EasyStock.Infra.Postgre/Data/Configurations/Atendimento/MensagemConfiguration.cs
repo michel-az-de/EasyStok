@@ -26,6 +26,15 @@ public class MensagemConfiguration : IEntityTypeConfiguration<Mensagem>
         builder.Property(m => m.EnviadaEm).IsRequired();
         builder.Property(m => m.TentativasEnvio).HasDefaultValue(0);
         builder.Property(m => m.UltimaFalhaEnvio).HasConversion<int?>();
+        builder.Property(m => m.MidiaIdExterno).HasMaxLength(Mensagem.MidiaIdExternoTamanhoMaximo);
+        builder.Property(m => m.ErroMidia).HasMaxLength(Mensagem.ErroMidiaTamanhoMaximo);
+        builder.Property(m => m.TentativasMidia).HasDefaultValue(0);
+        builder.Ignore(m => m.MidiaFalhou);
+
+        // #1397: a varredura de anexos só procura mensagens com tentativa agendada.
+        builder.HasIndex(m => m.ProximaTentativaMidiaEm)
+            .HasFilter("\"ProximaTentativaMidiaEm\" IS NOT NULL")
+            .HasDatabaseName("ix_atendimento_mensagens_proxima_tentativa_midia");
 
         // S58: o serviço de reenvio procura quem espera o cliente responder ao modelo de retomada.
         builder.HasIndex(m => m.AguardaClienteDesde)

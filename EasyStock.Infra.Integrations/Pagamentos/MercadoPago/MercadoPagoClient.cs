@@ -31,6 +31,9 @@ public sealed partial class MercadoPagoClient(
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         // Campo opcional ausente não vai no corpo (ex.: expiration_date_to sem expiração).
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        // #1400: o encoder padrão escreve o + do fuso como + e o Mercado Pago responde 400
+        // error_parsing_date. O relaxado mantém + e acentos literais (o corpo não vai para HTML).
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     [GeneratedRegex("^[0-9]{1,30}$")]
@@ -75,7 +78,7 @@ public sealed partial class MercadoPagoClient(
             request.Headers.Add("X-Idempotency-Key", command.IdempotencyKey);
 
         using var response = await httpClient.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
+        await GarantirSucessoAsync(response, ct);
 
         using var doc = await JsonDocument.ParseAsync(
             await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
@@ -100,7 +103,7 @@ public sealed partial class MercadoPagoClient(
         using var request = Requisicao(HttpMethod.Get, $"v1/payments/{id}");
         using var response = await httpClient.SendAsync(request, ct);
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
-        response.EnsureSuccessStatusCode();
+        await GarantirSucessoAsync(response, ct);
 
         using var doc = await JsonDocument.ParseAsync(
             await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
@@ -117,7 +120,7 @@ public sealed partial class MercadoPagoClient(
                   "&sort=date_created&criteria=desc";
         using var request = Requisicao(HttpMethod.Get, url);
         using var response = await httpClient.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
+        await GarantirSucessoAsync(response, ct);
 
         using var doc = await JsonDocument.ParseAsync(
             await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
@@ -145,7 +148,7 @@ public sealed partial class MercadoPagoClient(
             request.Content = JsonContent.Create(new { amount = valor.Value }, options: JsonOpts);
 
         using var response = await httpClient.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
+        await GarantirSucessoAsync(response, ct);
 
         using var doc = await JsonDocument.ParseAsync(
             await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
@@ -167,8 +170,25 @@ public sealed partial class MercadoPagoClient(
             new { expires = true, expiration_date_to = FormatarDataMp(expiraEm) }, options: JsonOpts);
 
         using var response = await httpClient.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
+        await GarantirSucessoAsync(response, ct);
         logger.LogInformation("MP preference expirada preferenceId={PreferenceId}", preferenceId);
+    }
+
+    /// <summary>
+    /// Falha HTTP com o motivo do Mercado Pago (#1400): o corpo de erro (sem token nem dado do comprador) vai para a
+    /// mensagem da exceção e para o log. Continua <see cref="HttpRequestException"/>, que é o que os chamadores tratam.
+    /// </summary>
+    private async Task GarantirSucessoAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        if (response.IsSuccessStatusCode) return;
+        var corpo = await response.Content.ReadAsStringAsync(ct);
+        if (corpo.Length > 500) corpo = corpo[..500];
+        var caminho = response.RequestMessage?.RequestUri?.AbsolutePath;
+        logger.LogWarning("MP recusou {Metodo} {Caminho}: {Status} {Corpo}",
+            response.RequestMessage?.Method, caminho, (int)response.StatusCode, corpo);
+        throw new HttpRequestException(
+            $"Mercado Pago respondeu {(int)response.StatusCode} ({response.StatusCode}) em {caminho}: {corpo}",
+            null, response.StatusCode);
     }
 
     private HttpRequestMessage Requisicao(HttpMethod metodo, string caminho)

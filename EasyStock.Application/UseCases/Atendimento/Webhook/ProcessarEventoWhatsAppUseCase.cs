@@ -158,6 +158,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             var texto = msg.Tipo is "interactive" or "button" ? null : msg.TextoCorpo;
 
             mensagemEntidade = Mensagem.Entrada(empresaId, conversa.Id, enviadaEm, MapearTipoConteudo(msg.Tipo), texto, msg.Wamid, botaoId);
+            if (msg.MidiaId is not null)
+                mensagemEntidade.AguardarMidia(msg.MidiaId, DateTime.UtcNow); // #1397: pendência durável
             await conversaRepository.AddMensagemAsync(mensagemEntidade, ct);
 
             // S24: cliente bloqueado não é saudado nem atendido pelo agente; a conversa nasce com a
@@ -287,7 +289,11 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         var novoStatus = MapearStatus(status.Status);
         if (novoStatus is null) return;
 
-        mensagem.AtualizarStatusEntrega(novoStatus.Value, novoStatus == StatusMensagem.Falhou ? status.ErroMensagem : null);
+        // #1396: falha temporária da Meta agenda o reenvio automático (S57); permanente ou sem código, não.
+        if (novoStatus == StatusMensagem.Falhou)
+            mensagem.RegistrarFalhaEnvio(status.ErroMensagem, ClassificadorFalhaEnvio.ClassificarCodigoMeta(status.ErroCodigo), DateTime.UtcNow);
+        else
+            mensagem.AtualizarStatusEntrega(novoStatus.Value);
         await unitOfWork.CommitAsync();
     }
 
