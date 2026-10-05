@@ -118,13 +118,16 @@ public static class WebhookWhatsAppParser
         var recipientId = GetString(s, "recipient_id");
 
         string? erro = null;
+        int? codigo = null;
         if (s.TryGetProperty("errors", out var errorsArr) && errorsArr.ValueKind == JsonValueKind.Array && errorsArr.GetArrayLength() > 0)
         {
             var primeiro = errorsArr[0];
             erro = GetString(primeiro, "title") ?? GetString(primeiro, "message");
+            if (primeiro.TryGetProperty("code", out var c) && c.ValueKind == JsonValueKind.Number && c.TryGetInt32(out var n))
+                codigo = n;
         }
 
-        return new StatusRecebidoWhatsApp(wamid, status, recipientId, erro);
+        return new StatusRecebidoWhatsApp(wamid, status, recipientId, erro, codigo);
     }
 
     /// <summary>"Nome; endereço; lat,long", só com as partes presentes. Coordenadas no texto bruto da Meta.</summary>

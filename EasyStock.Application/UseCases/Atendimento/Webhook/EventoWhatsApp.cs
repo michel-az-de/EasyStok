@@ -32,4 +32,5 @@ public sealed record StatusRecebidoWhatsApp(
     string Wamid,
     string Status,
     string? RecipientId,
-    string? ErroMensagem);
+    string? ErroMensagem,
+    int? ErroCodigo = null);

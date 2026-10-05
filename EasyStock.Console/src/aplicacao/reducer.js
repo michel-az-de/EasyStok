@@ -281,9 +281,16 @@ const CASOS_API = {
       }
     }),
 
-  [acao.FALHAR_ENVIO_API]: (estado, { id, mensagemId, erro }) =>
+  // #1396: com a mensagem gravada pelo EasyStok, o balão local vira ela (id do servidor, que o Reenviar
+  // usa); sem ela, fica marcado `semIdServidor` e não oferece Reenviar.
+  [acao.FALHAR_ENVIO_API]: (estado, { id, mensagemId, erro, mensagem, semIdServidor }) =>
     mapear(estado, id, (c) => ({
-      ...c, mensagens: c.mensagens.map((m) => (m.id === mensagemId ? { ...m, status: 'falhou', erro } : m)),
+      ...c,
+      mensagens: c.mensagens.map((m) => {
+        if (m.id !== mensagemId) return m
+        if (mensagem) return { ...m, ...mensagem, status: 'falhou', erro }
+        return { ...m, status: 'falhou', erro, ...(semIdServidor ? { semIdServidor: true } : {}) }
+      }),
     })),
 
   [acao.AVISO_API]: (estado, { mensagem }) => ({

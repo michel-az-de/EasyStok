@@ -73,5 +73,12 @@ public sealed class ForaDaJanelaAtendimentoException(string mensagem, Exception?
     public const string Sugestao = "template";
 }
 
-/// <summary>O canal recusou ou falhou no envio por outro motivo (rede, token, erro da Meta): nada gravado.</summary>
-public sealed class FalhaEnvioCanalException(string mensagem, Exception inner) : Exception(mensagem, inner);
+/// <summary>
+/// O canal recusou ou falhou no envio por outro motivo (rede, token, erro da Meta). <see cref="Mensagem"/> é a
+/// mensagem gravada como falhou (#1396), com o id que o console usa para reenviar.
+/// </summary>
+public sealed class FalhaEnvioCanalException(string mensagem, Exception inner, MensagemAtendimentoResult? gravada = null)
+    : Exception(mensagem, inner)
+{
+    public MensagemAtendimentoResult? Mensagem { get; } = gravada;
+}

@@ -287,7 +287,11 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         var novoStatus = MapearStatus(status.Status);
         if (novoStatus is null) return;
 
-        mensagem.AtualizarStatusEntrega(novoStatus.Value, novoStatus == StatusMensagem.Falhou ? status.ErroMensagem : null);
+        // #1396: falha temporária da Meta agenda o reenvio automático (S57); permanente ou sem código, não.
+        if (novoStatus == StatusMensagem.Falhou)
+            mensagem.RegistrarFalhaEnvio(status.ErroMensagem, ClassificadorFalhaEnvio.ClassificarCodigoMeta(status.ErroCodigo), DateTime.UtcNow);
+        else
+            mensagem.AtualizarStatusEntrega(novoStatus.Value);
         await unitOfWork.CommitAsync();
     }
 
