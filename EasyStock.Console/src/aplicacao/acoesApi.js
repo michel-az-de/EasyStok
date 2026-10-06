@@ -7,6 +7,7 @@ import { proximoId } from '../infra/repositorioConversas'
 import { criarAcoesExpedienteApi } from './api/expediente'
 import { criarAcoesConfiguracaoApi } from './api/configuracao'
 import { criarAcoesAssistenteApi } from './api/assistente'
+import { criarAcoesAgenteApi } from './api/agente'
 import { criarAcoesConsentimentosApi } from './api/consentimentos'
 import { criarAcoesComandaApi } from './api/comanda'
 import { criarAcoesClienteApi } from './api/cliente'
@@ -33,8 +34,8 @@ const falhaDoEnvio = (id, mensagemId, erro) => ({
   ...(erro.dados?.id ? { mensagem: mensagemDaApi(erro.dados, id) } : { semIdServidor: true }),
 })
 
-// Modo API (F01, F02, F03, F06, #1276): as ações que a caixa de entrada, o expediente, a
-// configuração, o assistente, os avisos da Ficha, a comanda (pedido e cobrança), o cadastro do
+// Modo API (F01, F02, F03, F06, #1276, #1420): as ações que a caixa de entrada, o expediente, a
+// configuração, o assistente, a sugestão do agente, os avisos da Ficha, a comanda (pedido e cobrança), o cadastro do
 // cliente, o encerramento e a foto já ligam passam a valer no EasyStok.
 // O despacho local vem antes, para a tela responder na hora; a próxima sincronização
 // traz o estado do servidor. As ações ainda não ligadas (lista única em
@@ -51,6 +52,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     ...criarAcoesExpedienteApi({ despachar, estadoRef }),
     ...criarAcoesConfiguracaoApi(),
     ...criarAcoesAssistenteApi(),
+    ...criarAcoesAgenteApi({ despachar }),
     ...criarAcoesConsentimentosApi(),
     ...criarAcoesComandaApi(acoes, { despachar, estadoRef }),
     ...clienteApi,
