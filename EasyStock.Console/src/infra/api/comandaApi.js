@@ -1,5 +1,6 @@
 import { chamarApi } from './cliente'
 import { instante } from './traducaoConversas'
+import { lerSessao } from './sessao'
 
 // Comanda da conversa na API real (F03): cardápio e janelas da vitrine da empresa logada,
 // o pedido da conversa (S10) com a cobrança do Mercado Pago (S11) e o estado dos dois.
@@ -78,6 +79,8 @@ function cobrancaDaApi(c, meioAnterior) {
   return {
     id: c.cobrancaId,
     meio,
+    metodoRecebido: c.metodoPagamento ?? null,
+    manual: naEntrega,
     valor: c.valor,
     copiaECola: null,
     link: c.linkPagamento ?? null,
@@ -113,6 +116,10 @@ export function pedidoDaApi(p, anterior = null) {
     })),
     agradecimentoEnviado: anterior?.agradecimentoEnviado ?? false,
     pagamentos: [],
+    totalPagoApi: p.totalPago ?? 0,
+    pagamentosApi: p.pagamentos?.map((pag) => ({
+      valor: pag.valor, coberto: pag.valor, em: ms(pag.pagoEm), meio: pag.metodo, pagamentoId: pag.id,
+    })),
     meio: cobranca?.meio ?? anterior?.meio ?? null,
     cobranca,
     frete: p.frete,
@@ -159,3 +166,11 @@ export const reemitirCobranca = (pedidoId) =>
 // Troca de forma da S11: com conversa aberta, o link novo sai ao cliente pelo EasyStok.
 export const trocarFormaPagamento = (pedidoId, forma) =>
   chamarApi(`/api/pedidos/${pedidoId}/cobranca/forma`, { metodo: 'POST', corpo: { forma } })
+
+export const registrarPagamentoManual = (pedidoId, valor, metodo) =>
+  chamarApi(`/api/pedidos/${pedidoId}/pagamentos`, {
+    metodo: 'POST', corpo: { empresaId: lerSessao()?.empresa?.id, pedidoId, valor, metodo },
+  })
+
+export const desfazerPagamentoManual = (pedidoId, motivo) =>
+  chamarApi(`/api/pedidos/${pedidoId}/pagamento-manual/desfazer`, { metodo: 'POST', corpo: { motivo } })

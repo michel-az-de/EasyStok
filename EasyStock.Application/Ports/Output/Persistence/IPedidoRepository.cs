@@ -34,7 +34,9 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task AddItemAsync(PedidoItem item);
         Task AddEventoAsync(PedidoEvento evento);
         Task<IEnumerable<PedidoEvento>> GetEventosAsync(Guid pedidoId, int max = 200);
+        Task TravarAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default);
         Task AddPagamentoAsync(PedidoPagamento pagamento);
+        Task<bool> ExisteEventoAsync(Guid empresaId, Guid pedidoId, string tipo, CancellationToken ct = default);
 
         /// <summary>
         /// Verifica se existe pedido aberto (status aguardando/preparando/pronto)

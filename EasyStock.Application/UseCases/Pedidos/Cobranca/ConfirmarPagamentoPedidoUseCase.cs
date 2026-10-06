@@ -2,7 +2,6 @@ using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Pagamentos;
-using EasyStock.Application.Ports.Output.Persistence.Operacao;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
@@ -114,7 +113,7 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
     RegistrarPagamentoPedidoUseCase registrarPagamento,
     IPublicadorEventoIntegracao publicador,
     IOperacaoEventPublisher operacaoEventos,
-    IImpressaoPendenteRepository impressoes,
+    QuitacaoPedido quitacao,
     ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
@@ -230,14 +229,7 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
                 correlationId: pedido.Id.ToString(), ct: ct);
         }
 
-        await publicador.PublicarAsync(
-            empresaId, PedidoPagoEvent.TipoEvento, "pedido", pedido.Id,
-            new PedidoPagoEvent(pedido.Id, empresaId, pedido.LojaId, pedido.ClienteId, alvo.ConversaId, alvo.Id,
-                alvo.Provedor, input.PagamentoExternoId, metodo, input.ValorPago, pedido.Status, pagoEm),
-            correlationId: pedido.Id.ToString(), ct: ct);
-
-        var canhoto = ImpressaoPendente.CriarCanhoto(empresaId, pedido.LojaId, pedido.Id, agora);
-        await impressoes.AddAsync(canhoto, ct);
+        var efeito = await quitacao.PrepararAsync(pedido, alvo, pagoEm, ct);
 
         // Registra o PedidoPagamento na mesma transação (o use case reusa a transação aberta e faz o flush).
         // Excedente permitido: o valor veio do provedor, não de digitação.
@@ -258,10 +250,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         logger.LogInformation(
             "Pagamento confirmado pedidoId={PedidoId} cobrancaId={CobrancaId} pagamento={Pagamento} status={Status}",
             pedido.Id, alvo.Id, input.PagamentoExternoId, pedido.Status);
-        var pago = new PedidoPagoOperacao(pedido.Id, pedido.Id.ToString("N")[..8].ToUpperInvariant(),
-            pedido.ClienteNome, pedido.Total.Valor, pedido.AgendadoParaEm);
-        return (new(SituacaoConfirmacaoPagamento.Confirmado, alvo.Id, pedido.Status), pago,
-            new ImpressaoPendenteOperacao(canhoto.Id, pedido.Id), null);
+        return (new(SituacaoConfirmacaoPagamento.Confirmado, alvo.Id, pedido.Status), efeito?.Pago,
+            efeito?.Impressao, null);
     }
 
     /// <summary>

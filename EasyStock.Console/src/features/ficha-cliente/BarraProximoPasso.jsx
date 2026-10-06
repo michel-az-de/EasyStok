@@ -249,6 +249,8 @@ export function BarraProximoPasso({
     }
   }
 
+  const naFilaSemQuitar = Boolean(pedido.pedidoId) && pedido.totalPagoApi < pedido.totalApi
+  if (naFilaSemQuitar && pedido.estado === 'pago') rotuloEstado = 'Na fila de preparo'
   const podeVoltarEtapa = Boolean(anterior)
   const podeCancelar = pedido.estado === 'aguardando'
   // Estornar é devolver dinheiro que entrou. Pedido sem cobrança paga (venda
@@ -257,6 +259,7 @@ export function BarraProximoPasso({
   const podeEstornar = pedido.estado !== 'aguardando' && Boolean(pedido.cobranca?.pagaEm)
   const valorPago = pedido.cobranca?.valorPago ?? pedido.cobranca?.valor ?? 0
   const podeDesfazer = podeDesfazerPagamento(pedido)
+  const valorParaDesfazer = pedido.pagamentosApi?.toSorted((a, b) => b.em - a.em)[0]?.valor ?? valorPago
 
   // UC-06 passo 5: o valor nasce pré-preenchido com o que foi pago, editável
   // para um estorno parcial. Motivo some ao fechar, para não vazar de um
@@ -283,12 +286,12 @@ export function BarraProximoPasso({
             <li
               key={passo.id}
               className={`${css.trilhaItem} ${css[situacao.chave === 'proximo' ? 'futuro' : situacao.chave]} ${concluido ? css.concluido : ''}`}
-              aria-label={`${passo.rotulo}, ${situacao.rotulo}`}
+              aria-label={`${naFilaSemQuitar && passo.id === 'pago' ? 'Fila' : passo.rotulo}, ${situacao.rotulo}`}
             >
               <span className={css.circuloPasso} aria-hidden="true">
                 <Icone nome={ICONE_DA_TRILHA[passo.id]} tamanho={18} />
               </span>
-              <span className={css.rotuloPasso} aria-hidden="true">{ROTULO_CURTO[passo.id] ?? passo.rotulo}</span>
+              <span className={css.rotuloPasso} aria-hidden="true">{naFilaSemQuitar && passo.id === 'pago' ? 'Fila' : ROTULO_CURTO[passo.id] ?? passo.rotulo}</span>
             </li>
           )
         })}
@@ -320,11 +323,14 @@ export function BarraProximoPasso({
         </div>
       )}
 
+      {pedido.totalPagoApi > 0 && pedido.totalPagoApi < pedido.totalApi && (
+        <p className={css.corpoBloco}>Recebido: {moeda(pedido.totalPagoApi)}. Falta: {moeda(pedido.totalApi - pedido.totalPagoApi)}.</p>
+      )}
       {abrindoBaixa && (
         <BaixaAMao
-          valorCobrado={pedido.cobranca.valor}
+          valorCobrado={Math.max(0, (pedido.totalApi ?? pedido.cobranca.valor) - (pedido.totalPagoApi ?? 0))}
           aoCancelar={() => setAbrindoBaixa(false)}
-          aoConfirmar={(valor) => { setAbrindoBaixa(false); aoConfirmarPagamento(valor) }}
+          aoConfirmar={(valor, metodo) => { setAbrindoBaixa(false); aoConfirmarPagamento(valor, metodo) }}
         />
       )}
 
@@ -386,7 +392,7 @@ export function BarraProximoPasso({
       {confirmando === 'desfazer' && (
         <div className={css.confirmarCorrecao}>
           <p className={css.corpoBloco}>
-            Desfazer o pagamento de {moeda(valorPago)}? A cobrança volta a esperar
+            Desfazer o último pagamento de {moeda(valorParaDesfazer)}? A cobrança volta a esperar
             {pedido.cobranca?.link ? ' e o pedido sai da cozinha' : ''}.
             {' '}{nomeCliente} não recebe mensagem nenhuma.
           </p>

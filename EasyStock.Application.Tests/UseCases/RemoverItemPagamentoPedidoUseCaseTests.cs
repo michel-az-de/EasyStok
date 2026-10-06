@@ -1,3 +1,4 @@
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.RemoverItemPedido;
@@ -16,6 +17,9 @@ public class RemoverItemPagamentoPedidoUseCaseTests
     private readonly IPedidoRepository _repo = Substitute.For<IPedidoRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
+    public RemoverItemPagamentoPedidoUseCaseTests() =>
+        _uow.SetupExecuteInTransactionSemRetry<EasyStock.Application.UseCases.Pedidos.PedidoResult?>();
+
     private RemoverItemPedidoUseCase ItemUC() =>
         new(_repo,
             new PedidoEstoqueIntegrationService(
@@ -26,7 +30,7 @@ public class RemoverItemPagamentoPedidoUseCaseTests
                 Substitute.For<ILogger<PedidoEstoqueIntegrationService>>()),
             _uow, Substitute.For<ILogger<RemoverItemPedidoUseCase>>());
     private RemoverPagamentoPedidoUseCase PagUC() =>
-        new(_repo, _uow, Substitute.For<ILogger<RemoverPagamentoPedidoUseCase>>());
+        new(_repo, _uow, Substitute.For<ILogger<RemoverPagamentoPedidoUseCase>>(), QuitacaoPedidoTeste.Criar(_repo));
 
     private static PedidoItem NovoItem(Guid pedidoId, string nome, decimal qtd, decimal preco) => new()
     {

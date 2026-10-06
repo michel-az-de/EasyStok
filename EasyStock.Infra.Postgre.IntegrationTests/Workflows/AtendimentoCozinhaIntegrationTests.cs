@@ -1,3 +1,8 @@
+using EasyStock.Application.Events.Pedidos;
+using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.Ports.Output.Integration;
+using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
@@ -113,7 +118,7 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         db.SetMobileTenantContext(cenario.EmpresaId);
         (await db.Pedidos.CountAsync()).Should().Be(1);
         (await db.VagasOcupadas.CountAsync(v => v.PedidoId == pedidoId && v.LiberadoEm == null)).Should().Be(1);
-        (await db.ImpressoesPendentes.CountAsync(i => i.PedidoId == pedidoId)).Should().Be(forma == "online" ? 1 : 0);
+        (await db.ImpressoesPendentes.CountAsync(i => i.PedidoId == pedidoId)).Should().Be(1);
         var pedido = await db.Pedidos.Include(p => p.Pagamentos).SingleAsync(p => p.Id == pedidoId);
         pedido.TotalPago.Should().Be(forma == "online" ? 25m : 0m);
         await using var consulta = provider.CreateAsyncScope();
@@ -122,6 +127,117 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
             .ExecuteAsync(cenario.EmpresaId, cenario.ConversaId);
         comanda!.Status.Should().Be("pronto");
         comanda.Cobranca!.Status.Should().Be(forma == "online" ? "Paga" : "Pendente");
+    }
+
+    [SkippableFact]
+    public async Task PagamentoManual_ParcialQuitacaoEDesfazer_NaoDuplicamAvisoOuCanhoto()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var cenario = await SemearAsync();
+        var eventos = Substitute.For<IOperacaoEventPublisher>();
+        await using var provider = CriarProvider(eventos);
+        Guid pedidoId;
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            DefinirEmpresa(scope, cenario.EmpresaId);
+            pedidoId = (await scope.ServiceProvider.GetRequiredService<GerarPedidoConversaUseCase>().ExecuteAsync(
+                new GerarPedidoConversaInput(cenario.EmpresaId, cenario.ConversaId,
+                    [new ItemPedidoCheckout(cenario.ItemId, 2, null)], cenario.JanelaId, cenario.Data, Forma: "na_entrega"))).PedidoId;
+        }
+        async Task Receber(decimal valor)
+        {
+            await using var scope = provider.CreateAsyncScope();
+            DefinirEmpresa(scope, cenario.EmpresaId);
+            await scope.ServiceProvider.GetRequiredService<EasyStock.Application.UseCases.RegistrarPagamentoPedido.RegistrarPagamentoPedidoUseCase>()
+                .ExecuteAsync(new(cenario.EmpresaId, pedidoId, "dinheiro", valor));
+        }
+        await Receber(10m);
+        await eventos.DidNotReceive().PublicarAsync(EventosOperacao.PedidoPago, Arg.Any<Guid>(), Arg.Any<object>(), Arg.Any<CancellationToken>());
+        await Receber(15m);
+        await eventos.Received(1).PublicarAsync(EventosOperacao.PedidoPago, cenario.EmpresaId, Arg.Any<object>(), Arg.Any<CancellationToken>());
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            DefinirEmpresa(scope, cenario.EmpresaId);
+            var comanda = await scope.ServiceProvider.GetRequiredService<ObterPedidoConversaUseCase>().ExecuteAsync(cenario.EmpresaId, cenario.ConversaId);
+            comanda!.Cobranca!.Status.Should().Be("Paga");
+            await scope.ServiceProvider.GetRequiredService<DesfazerPagamentoManualUseCase>()
+                .ExecuteAsync(new(cenario.EmpresaId, pedidoId, "Registro corrigido"));
+        }
+        await Receber(15m);
+        await eventos.Received(1).PublicarAsync(EventosOperacao.PedidoPago, cenario.EmpresaId, Arg.Any<object>(), Arg.Any<CancellationToken>());
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(cenario.EmpresaId);
+        (await db.Pedidos.Include(p => p.Pagamentos).SingleAsync(p => p.Id == pedidoId)).TotalPago.Should().Be(25m);
+        (await db.ImpressoesPendentes.CountAsync(i => i.PedidoId == pedidoId)).Should().Be(1);
+    }
+
+    [SkippableFact]
+    public async Task QuitacaoManualConcorrente_GravaUmPagamentoEUmAviso()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var cenario = await SemearAsync();
+        var eventos = Substitute.For<IOperacaoEventPublisher>();
+        await using var provider = CriarProvider(eventos);
+        var pedidoId = await CriarNaEntregaAsync(provider, cenario);
+        async Task<bool> Receber()
+        {
+            await using var scope = provider.CreateAsyncScope();
+            DefinirEmpresa(scope, cenario.EmpresaId);
+            try
+            {
+                await scope.ServiceProvider.GetRequiredService<RegistrarPagamentoPedidoUseCase>()
+                    .ExecuteAsync(new(cenario.EmpresaId, pedidoId, "dinheiro", 25m));
+                return true;
+            }
+            catch (UseCaseValidationException) { return false; }
+        }
+        var resultados = await Task.WhenAll(Receber(), Receber());
+        resultados.Count(v => v).Should().Be(1);
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(cenario.EmpresaId);
+        var pedido = await db.Pedidos.Include(p => p.Pagamentos).Include(p => p.Eventos).SingleAsync(p => p.Id == pedidoId);
+        pedido.Pagamentos.Should().ContainSingle().Which.Valor.Should().Be(25m);
+        pedido.Eventos.Should().ContainSingle(e => e.Tipo == QuitacaoPedido.Marco);
+        (await db.OutboxEventosIntegracao.CountAsync(e => e.AggregateId == pedidoId && e.TipoEvento == PedidoPagoEvent.TipoEvento)).Should().Be(1);
+        (await db.ImpressoesPendentes.CountAsync(i => i.PedidoId == pedidoId)).Should().Be(1);
+        await eventos.Received(1).PublicarAsync(EventosOperacao.PedidoPago, cenario.EmpresaId, Arg.Any<object>(), Arg.Any<CancellationToken>());
+    }
+
+    [SkippableFact]
+    public async Task FalhaAoGravarQuitacao_RevertePagamentoENaoPublicaSse()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var cenario = await SemearAsync();
+        var eventos = Substitute.For<IOperacaoEventPublisher>();
+        var publicador = Substitute.For<IPublicadorEventoIntegracao>();
+        publicador.PublicarAsync(cenario.EmpresaId, PedidoPagoEvent.TipoEvento, "pedido", Arg.Any<Guid>(),
+            Arg.Any<PedidoPagoEvent>(), 1, Arg.Any<string>(), null, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new InvalidOperationException("Falha de persistência simulada")));
+        await using var provider = CriarProvider(eventos, publicador);
+        var pedidoId = await CriarNaEntregaAsync(provider, cenario);
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            DefinirEmpresa(scope, cenario.EmpresaId);
+            var receber = () => scope.ServiceProvider.GetRequiredService<RegistrarPagamentoPedidoUseCase>()
+                .ExecuteAsync(new(cenario.EmpresaId, pedidoId, "dinheiro", 25m));
+            await receber.Should().ThrowAsync<InvalidOperationException>();
+        }
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(cenario.EmpresaId);
+        var pedido = await db.Pedidos.Include(p => p.Pagamentos).Include(p => p.Eventos).SingleAsync(p => p.Id == pedidoId);
+        pedido.Pagamentos.Should().BeEmpty();
+        pedido.Eventos.Should().NotContain(e => e.Tipo == QuitacaoPedido.Marco);
+        (await db.CobrancasPedido.SingleAsync(c => c.PedidoId == pedidoId)).PagaEm.Should().BeNull();
+        await eventos.DidNotReceive().PublicarAsync(EventosOperacao.PedidoPago, Arg.Any<Guid>(), Arg.Any<object>(), Arg.Any<CancellationToken>());
+    }
+
+    private static async Task<Guid> CriarNaEntregaAsync(ServiceProvider provider, Cenario cenario)
+    {
+        await using var scope = provider.CreateAsyncScope();
+        DefinirEmpresa(scope, cenario.EmpresaId);
+        return (await scope.ServiceProvider.GetRequiredService<GerarPedidoConversaUseCase>().ExecuteAsync(
+            new GerarPedidoConversaInput(cenario.EmpresaId, cenario.ConversaId,
+                [new ItemPedidoCheckout(cenario.ItemId, 2, null)], cenario.JanelaId, cenario.Data, Forma: "na_entrega"))).PedidoId;
     }
 
     private static void DefinirEmpresa(AsyncServiceScope scope, Guid empresaId) =>
@@ -163,7 +279,7 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         return new Cenario(empresaId, conversa.Id, item.Id, janela.Id, data);
     }
 
-    private ServiceProvider CriarProvider(IOperacaoEventPublisher eventos)
+    private ServiceProvider CriarProvider(IOperacaoEventPublisher eventos, IPublicadorEventoIntegracao? publicador = null)
     {
         var config = new ConfigurationBuilder().Build();
         var services = new ServiceCollection();
@@ -177,6 +293,7 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         services.AddEasyStockApplication();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton(eventos);
+        if (publicador is not null) services.AddSingleton(publicador);
         services.AddSingleton(Substitute.For<ICepLookupClient>());
         services.AddSingleton(Substitute.For<IGeocodingClient>());
         services.AddSingleton(Substitute.For<IRotaClient>());

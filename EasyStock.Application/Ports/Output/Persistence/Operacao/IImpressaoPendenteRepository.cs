@@ -11,6 +11,8 @@ public sealed record ImpressaoAtrasada(Guid ImpressaoId, Guid EmpresaId, Guid Pe
 /// </summary>
 public interface IImpressaoPendenteRepository
 {
+    Task<bool> ExisteCanhotoAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default);
+
     Task AddAsync(ImpressaoPendente impressao, CancellationToken ct = default);
 
     /// <summary>Carrega com tracking para o use case mudar o status e comitar.</summary>

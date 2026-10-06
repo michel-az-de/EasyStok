@@ -1,3 +1,4 @@
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
@@ -31,7 +32,8 @@ public sealed class DesfazerPagamentoManualUseCase(
     ICobrancaPedidoRepository cobrancaRepository,
     IPublicadorEventoIntegracao publicador,
     IUnitOfWork unitOfWork,
-    TimeProvider relogio)
+    TimeProvider relogio,
+    QuitacaoPedido quitacao)
 {
     public Task<DesfazerPagamentoManualResult> ExecuteAsync(DesfazerPagamentoManualInput input, CancellationToken ct = default)
     {
@@ -63,7 +65,7 @@ public sealed class DesfazerPagamentoManualUseCase(
 
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(input.EmpresaId, pedido.Id, ct);
         if (!string.IsNullOrEmpty(pagamento.Referencia)
-            && cobrancas.Any(c => c.PagamentoExternoId == pagamento.Referencia))
+            && cobrancas.Any(c => c.EhOnline && c.PagamentoExternoId == pagamento.Referencia))
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.UseEstorno,
                 "Pagamento do Mercado Pago não se desfaz: use o estorno.");
 
@@ -102,6 +104,7 @@ public sealed class DesfazerPagamentoManualUseCase(
                 correlationId: pedido.Id.ToString(), ct: ct);
         }
 
+        await quitacao.ReabrirManualAsync(pedido, agora, ct);
         await unitOfWork.CommitAsync();
         return new DesfazerPagamentoManualResult(pedido.Id, pedido.Status, pagamento.Id);
     }

@@ -12,6 +12,9 @@ namespace EasyStock.Infra.Postgre.Repositories.Operacao;
 /// </summary>
 public sealed class ImpressaoPendenteRepository(EasyStockDbContext db) : IImpressaoPendenteRepository
 {
+    public Task<bool> ExisteCanhotoAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default) =>
+        db.ImpressoesPendentes.AnyAsync(i => i.EmpresaId == empresaId && i.PedidoId == pedidoId, ct);
+
     public async Task AddAsync(ImpressaoPendente impressao, CancellationToken ct = default) =>
         await db.ImpressoesPendentes.AddAsync(impressao, ct);
 

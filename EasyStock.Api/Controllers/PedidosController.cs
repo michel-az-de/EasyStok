@@ -185,7 +185,8 @@ public class PedidosController(
             EmpresaId = emp,
             PedidoId = id,
             RegistradoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
-            Origem = command.Origem ?? "web"
+            Origem = "web",
+            ConfirmadoPeloProvedor = false
         });
         return result == null ? DataNotFound("Pedido não encontrado.") : DataOk(result);
     }
