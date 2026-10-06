@@ -637,6 +637,79 @@ public class AtendimentoConversasControllerTests
         await storage.DidNotReceiveWithAnyArgs().DownloadAsync(default!, default);
     }
 
+    // ── #1420: sugestão do agente para a dona ───────────────────────────────────────────────
+
+    private SugerirRespostaAgenteUseCase Sugestao(IAgenteLlmClient llm) => new(
+        llm, _repositorio, Substitute.For<IConfiguracaoAtendimentoRepository>(), Substitute.For<IClienteRepository>(),
+        Array.Empty<IFerramentaAgente>(),
+        new ObterDossieClienteUseCase(
+            Substitute.For<IClienteRepository>(), Substitute.For<IClienteCrmRepository>(),
+            Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(), _repositorio),
+        Substitute.For<ICadernoRepository>(), TimeProvider.System, NullLogger<SugerirRespostaAgenteUseCase>.Instance);
+
+    private static IAgenteLlmClient LlmQueResponde(string texto)
+    {
+        var llm = Substitute.For<IAgenteLlmClient>();
+        llm.Disponivel.Returns(true);
+        llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(new RespostaLlm("end_turn", [new BlocoTextoLlm(texto)], 100, 20));
+        return llm;
+    }
+
+    [Fact]
+    public async Task SugestaoDevolveOTextoSemEnviarNemMudarAConversa()
+    {
+        var conversa = ConversaComClienteAgora();
+        conversa.Assumir(DateTime.UtcNow, _usuarioId);
+        var mensagensAntes = _repositorio.Mensagens.Count;
+
+        var dados = Dados<SugestaoAgenteResult>(await _controller.Sugestao(
+            conversa.Id, Sugestao(LlmQueResponde("Oi Maria! Hoje temos bolo de cenoura.")), default));
+
+        dados.Texto.Should().Be("Oi Maria! Hoje temos bolo de cenoura.");
+        _repositorio.Mensagens.Should().HaveCount(mensagensAntes);
+        await _canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task SugestaoComAgenteDesligado503()
+    {
+        var conversa = ConversaComClienteAgora();
+        var llm = Substitute.For<IAgenteLlmClient>();
+        llm.Disponivel.Returns(false);
+
+        var result = await _controller.Sugestao(conversa.Id, Sugestao(llm), default);
+
+        var objeto = result.Should().BeOfType<ObjectResult>().Subject;
+        objeto.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+        var erro = objeto.Value.Should().BeOfType<ApiErrorResponse>().Subject.Error;
+        erro.Code.Should().Be("AGENTE_INDISPONIVEL");
+        erro.Message.Should().Contain("Anthropic:Enabled");
+    }
+
+    [Fact]
+    public async Task SugestaoConversaInexistente404()
+    {
+        var result = await _controller.Sugestao(Guid.NewGuid(), Sugestao(LlmQueResponde("oi")), default);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task SugestaoSemPermissaoDeAtender403()
+    {
+        _currentUser.TemPermissao(Permissao.AtenderConversas).Returns(false);
+        var conversa = ConversaComClienteAgora();
+        var llm = LlmQueResponde("oi");
+
+        var result = await _controller.Sugestao(conversa.Id, Sugestao(llm), default);
+
+        result.Should().BeOfType<ForbidResult>();
+        await llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
+    }
+
     /// <summary>Repositório em memória: basta para os use cases e para o turno do agente.</summary>
     private sealed class ConversaRepositoryEmMemoria : IConversaRepository
     {

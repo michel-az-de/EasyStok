@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.ClienteDaConversa;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Atendimento.Reenvio;
@@ -220,6 +221,19 @@ public class AtendimentoConversasController(
     public Task<IActionResult> LinkCardapio(Guid id, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await linkCardapioUseCase.ExecuteAsync(currentUser.EmpresaId, id, ct)));
 
+    [SwaggerOperation(Summary = "Agent's suggested reply for the owner (never sent to the customer)",
+        Description = "#1420: \"Sugerir\" do painel do agente. Mesmo contexto do agente, só ferramentas de consulta; " +
+                      "não grava mensagem nem muda a conversa. Sem Anthropic:Enabled/Anthropic:ApiKey devolve 503.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    [HttpPost("{id:guid}/sugestao")]
+    public Task<IActionResult> Sugestao(
+        Guid id, [FromServices] SugerirRespostaAgenteUseCase sugestaoUseCase, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await sugestaoUseCase.ExecuteAsync(
+            new SugerirRespostaAgenteCommand(currentUser.EmpresaId, id), ct)));
+
     private AcaoConversaCommand Acao(Guid id) => new(currentUser.EmpresaId, currentUser.UsuarioId, id);
 
     /// <summary>Ação que mexe na conversa: só quem atende (S41). Sem a permissão, 403 antes de tocar em nada.</summary>
@@ -256,6 +270,11 @@ public class AtendimentoConversasController(
         catch (RegraDeDominioVioladaException ex)
         {
             return DataConflict(ex.Message);
+        }
+        catch (AgenteIndisponivelException ex)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new ApiErrorResponse(new ApiError("AGENTE_INDISPONIVEL", ex.Message, null, null)));
         }
         catch (FalhaEnvioCanalException ex)
         {
