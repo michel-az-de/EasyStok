@@ -18,13 +18,13 @@ public sealed class FireworksTranscritorAudio(
     private const string Endpoint = "v1/audio/transcriptions";
     private readonly TranscricaoAudioOptions _opcoes = options.Value;
 
-    public bool Disponivel => _opcoes.Enabled && !string.IsNullOrWhiteSpace(_opcoes.ApiKey);
+    public bool Disponivel => _opcoes.Enabled && !string.IsNullOrWhiteSpace(_opcoes.BaseUrl);
 
     public async Task<string?> TranscreverAsync(byte[] audio, string mime, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(audio);
         if (!Disponivel)
-            throw new InvalidOperationException("Transcrição de áudio desligada (Transcricao:Enabled/ApiKey).");
+            throw new InvalidOperationException("Transcrição de áudio desligada (Transcricao:Enabled/BaseUrl).");
 
         using var arquivo = new ByteArrayContent(audio);
         arquivo.Headers.ContentType = MediaTypeHeaderValue.TryParse(mime, out var tipo)
@@ -39,7 +39,8 @@ public sealed class FireworksTranscritorAudio(
         };
 
         using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint) { Content = form };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _opcoes.ApiKey);
+        if (!string.IsNullOrWhiteSpace(_opcoes.ApiKey))
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _opcoes.ApiKey);
 
         using var response = await http.SendAsync(request, ct);
         var corpo = await response.Content.ReadAsStringAsync(ct);

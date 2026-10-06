@@ -12,7 +12,7 @@ public class FireworksTranscritorAudioTests
 {
     private static FireworksTranscritorAudio Criar(CapturaHandler handler, TranscricaoAudioOptions? opcoes = null)
     {
-        opcoes ??= new TranscricaoAudioOptions { ApiKey = "chave-de-teste" };
+        opcoes ??= new TranscricaoAudioOptions { ApiKey = "chave-de-teste", Modelo = "whisper-v3-turbo" };
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://audio.test/") };
         return new FireworksTranscritorAudio(http, Options.Create(opcoes), NullLogger<FireworksTranscritorAudio>.Instance);
     }
@@ -29,7 +29,7 @@ public class FireworksTranscritorAudioTests
         handler.Requisicao.Headers.Authorization!.Scheme.Should().Be("Bearer");
         handler.Requisicao.Headers.Authorization.Parameter.Should().Be("chave-de-teste");
         handler.Corpo.Should().Contain("name=file").And.Contain("filename=audio.ogg")
-            .And.Contain("whisper-v3-turbo").And.Contain("name=language");
+            .And.Contain("name=language");
     }
 
     [Fact]
@@ -43,10 +43,24 @@ public class FireworksTranscritorAudioTests
     }
 
     [Fact]
-    public void SemChaveFicaIndisponivel()
+    public async Task SemChaveFicaDisponivelEEnviaSemAuthorization()
     {
-        Criar(new CapturaHandler(HttpStatusCode.OK, "{}"), new TranscricaoAudioOptions()).Disponivel.Should().BeFalse();
-        Criar(new CapturaHandler(HttpStatusCode.OK, "{}"), new TranscricaoAudioOptions { ApiKey = "k", Enabled = false })
+        // Fireworks desativou o áudio em 10/06/2026 (401); o servidor faster-whisper da VPS não pede chave.
+        var handler = new CapturaHandler(HttpStatusCode.OK, """{"text":"oi"}""");
+        var transcritor = Criar(handler, new TranscricaoAudioOptions());
+
+        transcritor.Disponivel.Should().BeTrue();
+        (await transcritor.TranscreverAsync([1], "audio/ogg")).Should().Be("oi");
+        handler.Requisicao!.Headers.Authorization.Should().BeNull();
+        handler.Corpo.Should().Contain("Systran/faster-whisper-small");
+    }
+
+    [Fact]
+    public void DesligadoOuSemEnderecoFicaIndisponivel()
+    {
+        Criar(new CapturaHandler(HttpStatusCode.OK, "{}"), new TranscricaoAudioOptions { Enabled = false })
+            .Disponivel.Should().BeFalse();
+        Criar(new CapturaHandler(HttpStatusCode.OK, "{}"), new TranscricaoAudioOptions { BaseUrl = " " })
             .Disponivel.Should().BeFalse();
     }
 
