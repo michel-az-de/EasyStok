@@ -42,7 +42,8 @@ public class IntegracoesWhatsAppController(
 
     /// <summary>
     /// O que o console precisa para abrir o Embedded Signup v4 (#1417). Só valores públicos; <c>habilitado</c> exige
-    /// também o segredo do app, sem o qual a troca do <c>code</c> falharia no fim do fluxo.
+    /// também o segredo do app, sem o qual a troca do <c>code</c> falharia no fim do fluxo, e a KEK corrente, sem a
+    /// qual o token da loja não é gravado depois que a Meta já conectou o número.
     /// </summary>
     [SwaggerOperation(Summary = "Public Embedded Signup config for the WhatsApp coexistence flow (Admin only)")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -50,9 +51,12 @@ public class IntegracoesWhatsAppController(
     public IActionResult GetConfigCoexistencia()
     {
         var meta = metaOptions.Value;
+        var kekCorrente = configuration["Crypto:CurrentKekId"];
         var habilitado = !string.IsNullOrWhiteSpace(meta.AppId)
                          && !string.IsNullOrWhiteSpace(meta.EmbeddedSignupConfigId)
-                         && !string.IsNullOrWhiteSpace(meta.AppSecret);
+                         && !string.IsNullOrWhiteSpace(meta.AppSecret)
+                         && !string.IsNullOrWhiteSpace(kekCorrente)
+                         && !string.IsNullOrWhiteSpace(configuration[$"Crypto:Keks:{kekCorrente}"]);
         return DataOk(new
         {
             appId = meta.AppId.Trim(),

@@ -36,10 +36,23 @@ public class IntegracoesWhatsAppCoexistenciaControllerTests
             .Returns(new NumeroWhatsAppMeta("+55 11 92703-2814", "Casa da Baba", true, "CLOUD_API"));
     }
 
-    private static IntegracoesWhatsAppController Controller(MetaCloudWhatsAppOptions? meta = null, ICurrentUserAccessor? usuario = null) =>
+    private static readonly Dictionary<string, string?> ComKek = new()
+    {
+        ["Crypto:CurrentKekId"] = "kek-teste",
+        ["Crypto:Keks:kek-teste"] = Convert.ToBase64String(new byte[32])
+    };
+
+    private static IntegracoesWhatsAppController Controller(
+        MetaCloudWhatsAppOptions? meta = null, ICurrentUserAccessor? usuario = null, Dictionary<string, string?>? config = null) =>
         new(new ObterStatusIntegracaoWhatsAppUseCase(Substitute.For<ITenantFeatureFlagRepository>(), Substitute.For<IEmpresaRepository>()),
-            Options.Create(meta ?? new MetaCloudWhatsAppOptions()), new ConfigurationBuilder().Build(),
+            Options.Create(meta ?? new MetaCloudWhatsAppOptions()),
+            new ConfigurationBuilder().AddInMemoryCollection(config ?? []).Build(),
             usuario ?? Substitute.For<ICurrentUserAccessor>());
+
+    private static MetaCloudWhatsAppOptions MetaCompleta() => new()
+    {
+        AppId = "897859909924304", EmbeddedSignupConfigId = "cfg-1", AppSecret = "segredo", ApiVersion = "v26.0"
+    };
 
     private ConectarWhatsAppCoexistenciaUseCase UseCase() => new(
         _meta, Substitute.For<IIntegrationCredentialResolver>(),
@@ -56,16 +69,21 @@ public class IntegracoesWhatsAppCoexistenciaControllerTests
     [Fact]
     public void ConfigCompletaFicaHabilitadaSemExporOSegredo()
     {
-        var resultado = Controller(new MetaCloudWhatsAppOptions
-        {
-            AppId = "897859909924304", EmbeddedSignupConfigId = "cfg-1", AppSecret = "segredo", ApiVersion = "v26.0"
-        }).GetConfigCoexistencia();
+        var resultado = Controller(MetaCompleta(), config: ComKek).GetConfigCoexistencia();
 
         Campo(resultado, "appId").Should().Be("897859909924304");
         Campo(resultado, "configId").Should().Be("cfg-1");
         Campo(resultado, "graphVersion").Should().Be("v26.0");
         Campo(resultado, "habilitado").Should().Be(true);
         ((ObjectResult)resultado).Value!.ToString().Should().NotContain("segredo");
+    }
+
+    [Fact]
+    public void SemKekFicaDesabilitadaParaNaoPerderOTokenDepoisDaMeta()
+    {
+        var resultado = Controller(MetaCompleta()).GetConfigCoexistencia();
+
+        Campo(resultado, "habilitado").Should().Be(false);
     }
 
     [Fact]
