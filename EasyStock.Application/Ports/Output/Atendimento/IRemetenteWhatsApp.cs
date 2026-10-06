@@ -19,4 +19,10 @@ public interface IRemetenteWhatsApp
     /// empresa ainda não tem número vinculado (o cliente decide o fallback).
     /// </summary>
     Task<string?> ObterPhoneNumberIdAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Business token da empresa corrente, gravado pela conexão por coexistência (#1417, <see cref="CredencialWhatsAppMeta"/>),
+    /// ou <c>null</c> sem tenant ou sem credencial: aí o cliente usa o token global do app, como sempre fez.
+    /// </summary>
+    Task<string?> ObterAccessTokenAsync(CancellationToken ct = default);
 }
