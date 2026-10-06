@@ -42,7 +42,7 @@ public class AlterarAgendamentoPedidoUseCase(
         pedido.AgendadoParaEm = agendado;
         pedido.AlteradoEm = DateTime.UtcNow;
         // S21: janela nova, início previsto novo (e o aviso de atraso volta a valer).
-        pedido.DefinirInicioPrevisto(await inicioPrevisto.CalcularAsync(pedido));
+        await inicioPrevisto.RecalcularAsync(pedido);
 
         var descricao = cmd.AgendadoParaEm.HasValue
             ? $"Agendado para {cmd.AgendadoParaEm.Value:dd/MM/yyyy HH:mm}"

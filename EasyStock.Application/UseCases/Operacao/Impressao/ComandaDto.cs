@@ -5,7 +5,8 @@ namespace EasyStock.Application.UseCases.Operacao.Impressao;
 /// aprovado em <c>docs/plan/atendimento-whatsapp/impressos/comanda-aprovada.html</c>.
 /// </summary>
 /// <param name="Numero">Número curto do pedido (8 hex maiúsculos), o mesmo do Pedido e do código de barras.</param>
-/// <param name="NumeroDoDia">Sequência do dia para falar na cozinha ("042"); nulo até a S53.</param>
+/// <param name="NumeroDoDia">Sequência do dia de produção para falar na cozinha ("042"); nulo antes de o pedido
+/// entrar na fila (aí o código ocupa o lugar).</param>
 /// <param name="Alergias">Alergias do cadastro do cliente, já em texto ("CASTANHA"); valem para o pedido inteiro.</param>
 public sealed record ComandaDto(
     string Numero,
@@ -24,7 +25,8 @@ public sealed record ComandaDto(
 }
 
 /// <param name="Linha"><c>prepararEmCasa</c>, <c>paraServir</c> ou <c>outros</c>.</param>
-public sealed record ComandaGrupoDto(string Linha, string Titulo, IReadOnlyList<ComandaItemDto> Itens);
+/// <param name="Conservacao">Só em "preparar em casa": <c>congelado</c> ou <c>refrigerado</c> (S53); nulo nos demais.</param>
+public sealed record ComandaGrupoDto(string Linha, string Titulo, IReadOnlyList<ComandaItemDto> Itens, string? Conservacao = null);
 
 /// <param name="Porcao">Variação escolhida (<c>800 g</c>, <c>Família</c>).</param>
 /// <param name="Molho">Sugestão de molho do item do cardápio.</param>

@@ -16,6 +16,7 @@ public interface IPedidoImpressoQueries
 /// <param name="FormaCobranca">Método da cobrança mais recente (<c>CobrancaPedido.MetodoPagamento</c>).</param>
 /// <param name="Entrega">Parada da viagem mais recente do pedido (S44); nulo sem viagem.</param>
 /// <param name="TempoPreparoPadraoMinutos"><c>ConfiguracaoAtendimento.TempoPreparoPadraoMinutos</c> (padrão 60).</param>
+/// <param name="NumeroDoDia"><c>Pedido.NumeroDoDia</c> (S53); nulo antes de o pedido entrar na fila.</param>
 public sealed record PedidoImpressoLeitura(
     Guid Id,
     DateTime CriadoEm,
@@ -30,7 +31,8 @@ public sealed record PedidoImpressoLeitura(
     string? FormaCobranca,
     PedidoImpressoEntregaLeitura? Entrega,
     int TempoPreparoPadraoMinutos,
-    IReadOnlyList<PedidoImpressoItemLeitura> Itens);
+    IReadOnlyList<PedidoImpressoItemLeitura> Itens,
+    int? NumeroDoDia = null);
 
 public sealed record PedidoImpressoJanelaLeitura(DateOnly Data, TimeOnly Inicio, TimeOnly Fim);
 
@@ -71,6 +73,7 @@ public sealed record PedidoImpressoEntregaLeitura(TipoEntregador? Tipo, string? 
 /// <param name="EhProduto">Tem linha, item de cardápio ou produto (mesma regra do canhoto); frete e taxa não.</param>
 /// <param name="Linha"><c>PedidoItem.LinhaSnapshot</c> (<c>paraServir</c>, <c>prepararEmCasa</c>), para a comanda (S52).</param>
 /// <param name="Molho"><c>CardapioItem.SugestaoMolho</c> do item, como no canhoto.</param>
+/// <param name="Conservacao"><c>PedidoItem.ConservacaoSnapshot</c> (S53): <c>ambiente</c>, <c>refrigerado</c>, <c>congelado</c>.</param>
 public sealed record PedidoImpressoItemLeitura(
     string Nome,
     string? Variacao,
@@ -81,4 +84,5 @@ public sealed record PedidoImpressoItemLeitura(
     string? Observacao,
     bool EhProduto,
     string? Linha = null,
-    string? Molho = null);
+    string? Molho = null,
+    string? Conservacao = null);
