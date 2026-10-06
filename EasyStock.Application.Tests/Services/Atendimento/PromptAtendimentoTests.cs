@@ -64,5 +64,17 @@ public class PromptAtendimentoTests
         prompt.Should().Contain("no máximo 3 frases curtas").And.Contain("nunca use travessão");
     }
 
+    [Fact]
+    public void Audio_TranscricaoEhFalaDoCliente_SemTranscricaoPedeParaEscrever()
+    {
+        var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));
+
+        // #1406: o agente le a transcricao automatica do audio (#1398) como fala do cliente.
+        prompt.Should().Contain("[áudio] seguido de texto é a transcrição automática do áudio do cliente")
+            .And.Contain("pode ter erros de transcrição")
+            .And.Contain("[áudio recebido] é um áudio sem transcrição");
+        prompt.Should().NotContain("você só lê texto");
+    }
+
     private static string Normalizar(string texto) => texto.Replace("\r\n", "\n").Trim();
 }
