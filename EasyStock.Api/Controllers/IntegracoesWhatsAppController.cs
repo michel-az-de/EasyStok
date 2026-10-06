@@ -88,14 +88,15 @@ public class IntegracoesWhatsAppController(
                 currentUser.EmpresaId, currentUser.UsuarioId, req?.Code ?? "", req?.WabaId ?? "", req?.PhoneNumberId ?? ""), ct);
         }
         catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
-        catch (ConexaoWhatsAppRecusadaException ex) when (ex.Etapa == EtapaConexaoWhatsApp.TrocaDoCode)
+        catch (ConexaoWhatsAppRecusadaException ex) when (ex.Etapa == EtapaConexaoWhatsApp.TrocaDoCode && !ex.MetaIndisponivel)
         {
             return DataBadRequest(ex.Message);
         }
         catch (ConexaoWhatsAppRecusadaException ex)
         {
             return StatusCode(StatusCodes.Status502BadGateway,
-                new ApiErrorResponse(new ApiError("META_RECUSOU", ex.Message, ex.Etapa.ToString(), null)));
+                new ApiErrorResponse(new ApiError(ex.MetaIndisponivel ? "META_INDISPONIVEL" : "META_RECUSOU",
+                    ex.Message, ex.Etapa.ToString(), null)));
         }
 
         switch (r.Status)

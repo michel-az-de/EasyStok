@@ -40,10 +40,14 @@ public enum EtapaConexaoWhatsApp
     ConsultaDoNumero,
 }
 
-public sealed class ConexaoWhatsAppRecusadaException(EtapaConexaoWhatsApp etapa, string mensagem, Exception inner)
+public sealed class ConexaoWhatsAppRecusadaException(
+    EtapaConexaoWhatsApp etapa, string mensagem, Exception inner, bool metaIndisponivel = false)
     : Exception(mensagem, inner)
 {
     public EtapaConexaoWhatsApp Etapa { get; } = etapa;
+
+    /// <summary>A Meta não respondeu (rede, tempo esgotado): não houve recusa, nem do <c>code</c>.</summary>
+    public bool MetaIndisponivel { get; } = metaIndisponivel;
 }
 
 /// <summary>
@@ -72,11 +76,11 @@ public sealed class ConectarWhatsAppCoexistenciaUseCase(
         var (code, wabaId, phoneNumberId) = Validar(cmd);
 
         var token = await Etapa(EtapaConexaoWhatsApp.TrocaDoCode,
-            () => meta.TrocarCodigoPorTokenAsync(code, ct));
+            () => meta.TrocarCodigoPorTokenAsync(code, ct), ct);
         await Etapa(EtapaConexaoWhatsApp.InscricaoNaWaba,
-            async () => { await meta.InscreverAppNaWabaAsync(wabaId, token, ct); return true; });
+            async () => { await meta.InscreverAppNaWabaAsync(wabaId, token, ct); return true; }, ct);
         var numero = await Etapa(EtapaConexaoWhatsApp.ConsultaDoNumero,
-            () => meta.ConsultarNumeroAsync(phoneNumberId, token, ct));
+            () => meta.ConsultarNumeroAsync(phoneNumberId, token, ct), ct);
 
         // Confere, grava o token e só então vincula: falha ao gravar não deixa o número novo sem token.
         var vinculo = new VincularWhatsAppDoTenantCommand(cmd.EmpresaId, phoneNumberId);
@@ -128,7 +132,7 @@ public sealed class ConectarWhatsAppCoexistenciaUseCase(
         }
     }
 
-    private static async Task<T> Etapa<T>(EtapaConexaoWhatsApp etapa, Func<Task<T>> chamada)
+    private static async Task<T> Etapa<T>(EtapaConexaoWhatsApp etapa, Func<Task<T>> chamada, CancellationToken ct)
     {
         try
         {
@@ -137,6 +141,14 @@ public sealed class ConectarWhatsAppCoexistenciaUseCase(
         catch (WhatsAppCloudException ex)
         {
             throw new ConexaoWhatsAppRecusadaException(etapa, MensagemDa(etapa, ex), ex);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TimeoutException or IOException
+                                   || (ex is OperationCanceledException && !ct.IsCancellationRequested))
+        {
+            // Revisão da PR #1418: rede e tempo esgotado viravam 500. Mensagem fixa: a da exceção pode trazer URL.
+            throw new ConexaoWhatsAppRecusadaException(etapa,
+                "A Meta não respondeu a tempo (rede ou tempo esgotado). Abra o fluxo de novo em alguns minutos.",
+                ex, metaIndisponivel: true);
         }
     }
 

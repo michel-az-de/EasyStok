@@ -144,4 +144,36 @@ public class IntegracoesWhatsAppCoexistenciaControllerTests
 
         ((ObjectResult)resultado).StatusCode.Should().Be(502);
     }
+
+    [Fact]
+    public async Task TimeoutNaTrocaDoCodeE502SemSegredo()
+    {
+        // Revisão da PR #1418: rede e tempo esgotado viravam 500. A Meta não respondeu: não é culpa do code.
+        _meta.TrocarCodigoPorTokenAsync("code", Arg.Any<CancellationToken>())
+            .Returns<string>(_ => throw new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout",
+                new TimeoutException()));
+
+        var resultado = await Controller(usuario: _currentUser).PostCoexistencia(
+            new ConectarWhatsAppCoexistenciaRequest("code", "1001", "555"), UseCase(), CancellationToken.None);
+
+        ((ObjectResult)resultado).StatusCode.Should().Be(502);
+        var erro = ((ApiErrorResponse)((ObjectResult)resultado).Value!).Error;
+        erro.Message.Should().Contain("não respondeu");
+        erro.Message.Should().NotContain("code=").And.NotContain("client_secret");
+    }
+
+    [Fact]
+    public async Task FalhaDeRedeDepoisDoCodeE502SemSegredo()
+    {
+        _meta.InscreverAppNaWabaAsync("1001", Token, Arg.Any<CancellationToken>())
+            .Returns(_ => throw new HttpRequestException(
+                "No such host is known. (graph.facebook.com:443) access_token=" + Token));
+
+        var resultado = await Controller(usuario: _currentUser).PostCoexistencia(
+            new ConectarWhatsAppCoexistenciaRequest("code", "1001", "555"), UseCase(), CancellationToken.None);
+
+        ((ObjectResult)resultado).StatusCode.Should().Be(502);
+        var erro = ((ApiErrorResponse)((ObjectResult)resultado).Value!).Error;
+        (erro.Message + erro.Detail).Should().NotContain(Token);
+    }
 }
