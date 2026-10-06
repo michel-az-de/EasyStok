@@ -35,7 +35,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     OptOutPorPalavra optOut,
     IEscaladorConversa escalador,
     ILogger<ProcessarEventoWhatsAppUseCase> logger,
-    IPublicadorEventoIntegracao? publicadorEventos = null)
+    IPublicadorEventoIntegracao? publicadorEventos = null,
+    Ports.Output.Ai.ITranscritorAudio? transcritor = null)
 {
     private const string Provedor = "meta_whatsapp";
 
@@ -238,6 +239,11 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             else if (TiposSemTurnoDoAgente.Contains(msg.Tipo))
             {
                 // Reação, mensagem sem suporte ou de sistema: fica gravada para a dona; o agente não responde.
+            }
+            else if (!string.IsNullOrWhiteSpace(msg.MidiaId)
+                && ProcessarMidiaWhatsAppJobUseCase.AguardaTranscricao(mensagem.TipoConteudo, transcritor?.Disponivel == true))
+            {
+                // #1406: o turno sai do job de mídia depois da transcrição; daqui o agente leria "[áudio recebido]".
             }
             else if (await optOut.TentarAsync(empresaId, conversa, mensagem.Texto, DateTime.UtcNow, ct))
             {

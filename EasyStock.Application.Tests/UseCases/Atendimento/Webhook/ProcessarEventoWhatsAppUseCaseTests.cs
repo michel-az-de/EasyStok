@@ -51,7 +51,12 @@ public class ProcessarEventoWhatsAppUseCaseTests
         // Antes de construir: o ResolvedorCanal indexa os adaptadores pelo Canal no construtor.
         _canalWhatsApp.Canal.Returns(CanalConversa.WhatsApp);
 
-        _useCase = new ProcessarEventoWhatsAppUseCase(
+        _useCase = CriarUseCase();
+        ConfigurarCenario();
+    }
+
+    private ProcessarEventoWhatsAppUseCase CriarUseCase(EasyStock.Application.Ports.Output.Ai.ITranscritorAudio? transcritor = null) =>
+        new ProcessarEventoWhatsAppUseCase(
             _empresaRepository, _featureFlagRepository, _configuracaoRepository, _conversaRepository,
             _webhookRecebidoRepository, _cloudClient, _queueService, _eventPublisher, _tenantContext,
             _unitOfWork,
@@ -66,7 +71,11 @@ public class ProcessarEventoWhatsAppUseCaseTests
                 _unitOfWork, NullLogger<OptOutPorPalavra>.Instance),
             new EscalarConversaUseCase(_conversaRepository, _notificador, _eventPublisher),
             NullLogger<ProcessarEventoWhatsAppUseCase>.Instance,
-            _publicadorEventos);
+            _publicadorEventos,
+            transcritor);
+
+    private void ConfigurarCenario()
+    {
 
         _cloudClient.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(new EnvioWhatsAppResult("wamid.saida"));
@@ -152,6 +161,34 @@ public class ProcessarEventoWhatsAppUseCaseTests
         await _conversaRepository.Received(1).AddMensagemAsync(
             Arg.Is<Mensagem>(m => m.Autor == AutorMensagem.Sistema && m.Texto!.Contains("confirmou o endereço 123")),
             Arg.Any<CancellationToken>());
+    }
+
+    private static string PayloadAudio(string wamid, string mediaId) =>
+        PayloadImagem(wamid, mediaId).Replace("\"type\":\"image\",\"image\"", "\"type\":\"audio\",\"audio\"")
+            .Replace("image/jpeg", "audio/ogg");
+
+    [Fact]
+    public async Task AudioComTranscritor_NaoEnfileiraTurnoNoWebhook()
+    {
+        // #1406: o turno sai do job de midia depois da transcricao, senao o agente responde ao "[audio recebido]".
+        var transcritor = Substitute.For<EasyStock.Application.Ports.Output.Ai.ITranscritorAudio>();
+        transcritor.Disponivel.Returns(true);
+
+        await CriarUseCase(transcritor).ExecuteAsync(PayloadAudio("wamid.audio1", "media-a"));
+
+        await _queueService.Received(1).EnqueueAsync(FilaAtendimentoNomes.MidiaWhatsApp, Arg.Any<ArmazenarMidiaWhatsAppJob>());
+        await _queueService.DidNotReceive().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+    }
+
+    [Fact]
+    public async Task AudioSemTranscritor_EnfileiraTurnoNoWebhook()
+    {
+        var transcritor = Substitute.For<EasyStock.Application.Ports.Output.Ai.ITranscritorAudio>();
+        transcritor.Disponivel.Returns(false);
+
+        await CriarUseCase(transcritor).ExecuteAsync(PayloadAudio("wamid.audio2", "media-b"));
+
+        await _queueService.Received(1).EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
     }
 
     [Fact]

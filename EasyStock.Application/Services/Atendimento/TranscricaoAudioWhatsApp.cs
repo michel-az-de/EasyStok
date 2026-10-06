@@ -15,6 +15,9 @@ public sealed class TranscricaoAudioWhatsApp(
     IUnitOfWork unitOfWork,
     ILogger<TranscricaoAudioWhatsApp> logger)
 {
+    /// <summary>#1406: com transcritor, o turno do agente para áudio sai depois da transcrição.</summary>
+    public bool Disponivel => transcritor.Disponivel;
+
     public async Task TranscreverAsync(Mensagem mensagem, CancellationToken ct = default)
     {
         if (mensagem.TipoConteudo != TipoConteudoMensagem.Audio

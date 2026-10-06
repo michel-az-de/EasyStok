@@ -116,6 +116,85 @@ public class ProcessarMidiaWhatsAppJobUseCaseTests
     }
 
     [Fact]
+    public async Task AudioTranscrito_DisparaTurnoDoAgenteDepoisDaTranscricao()
+    {
+        // #1406: com transcritor, o webhook nao enfileira o turno do audio; o job de midia o faz depois de transcrever.
+        var (processador, mensagem, fila, transcritor) = CriarAudio(falhaDownload: false);
+        var ordem = new List<string>();
+        transcritor.When(t => t.TranscreverAsync(Arg.Any<byte[]>(), Arg.Any<string>(), Arg.Any<CancellationToken>()))
+            .Do(_ => ordem.Add("transcricao"));
+        fila.When(f => f.EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>()))
+            .Do(_ => ordem.Add("turno"));
+
+        await processador.ExecuteAsync(new ArmazenarMidiaWhatsAppJob(mensagem.EmpresaId, mensagem.ConversaId, "wamid.t", "media-t"));
+
+        await fila.Received(1).EnqueueAsync(FilaAtendimentoNomes.TurnoAgente,
+            Arg.Is<ProcessarTurnoAgenteJob>(j => j.EmpresaId == mensagem.EmpresaId && j.ConversaId == mensagem.ConversaId));
+        ordem.Should().Equal("transcricao", "turno");
+    }
+
+    [Fact]
+    public async Task AudioComFalhaNoDownload_DisparaTurnoSoNaPrimeiraFalha()
+    {
+        // #1406: sem transcricao possivel o agente ainda responde (pede para escrever), mas uma vez so.
+        var (processador, mensagem, fila, _) = CriarAudio(falhaDownload: true);
+        var job = new ArmazenarMidiaWhatsAppJob(mensagem.EmpresaId, mensagem.ConversaId, "wamid.t", "media-t");
+
+        await processador.ExecuteAsync(job);
+        await processador.ExecuteAsync(job);
+
+        await fila.Received(1).EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+    }
+
+    [Fact]
+    public async Task Imagem_NaoDisparaTurnoPeloJobDeMidia()
+    {
+        var mensagem = Domain.Entities.Atendimento.Mensagem.Entrada(
+            Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow, TipoConteudoMensagem.Imagem, externoId: "wamid.t");
+        var (processador, _, fila, _) = CriarAudio(falhaDownload: false, mensagem);
+
+        await processador.ExecuteAsync(new ArmazenarMidiaWhatsAppJob(mensagem.EmpresaId, mensagem.ConversaId, "wamid.t", "media-t"));
+
+        await fila.DidNotReceive().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+    }
+
+    private static (ProcessarMidiaWhatsAppJobUseCase, Domain.Entities.Atendimento.Mensagem, IQueueService, EasyStock.Application.Ports.Output.Ai.ITranscritorAudio)
+        CriarAudio(bool falhaDownload, Domain.Entities.Atendimento.Mensagem? mensagem = null)
+    {
+        mensagem ??= Domain.Entities.Atendimento.Mensagem.Entrada(
+            Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow, TipoConteudoMensagem.Audio, externoId: "wamid.t");
+        var conversaRepository = Substitute.For<IConversaRepository>();
+        conversaRepository.ObterMensagemPorExternoIdAsync(mensagem.EmpresaId, "wamid.t", Arg.Any<CancellationToken>()).Returns(mensagem);
+        var cloudClient = Substitute.For<IWhatsAppCloudClient>();
+        if (falhaDownload)
+            cloudClient.BaixarMidiaAsync("media-t", Arg.Any<CancellationToken>())
+                .Returns<(Stream, string)>(_ => throw new HttpRequestException("Meta fora"));
+        else
+            cloudClient.BaixarMidiaAsync("media-t", Arg.Any<CancellationToken>())
+                .Returns(_ => ((Stream)new MemoryStream([1, 2]), "audio/ogg"));
+        var fileStorage = Substitute.For<IFileStorage>();
+        fileStorage.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                var req = ci.Arg<FileUploadRequest>();
+                return Task.FromResult(new StoredFileResult(
+                    $"{req.BucketPath}/{req.FileName}", "https://storage.test/x", req.ContentType, req.Content.Length));
+            });
+        fileStorage.DownloadAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new byte[] { 1, 2 });
+        var transcritor = Substitute.For<EasyStock.Application.Ports.Output.Ai.ITranscritorAudio>();
+        transcritor.Disponivel.Returns(true);
+        transcritor.TranscreverAsync(Arg.Any<byte[]>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns("quero um bolo");
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var fila = Substitute.For<IQueueService>();
+        var processador = new ProcessarMidiaWhatsAppJobUseCase(
+            conversaRepository, new ArmazenadorMidiaWhatsApp(cloudClient, fileStorage),
+            Substitute.For<ITenantContextAccessor>(), unitOfWork, TimeProvider.System, NullLogger<ProcessarMidiaWhatsAppJobUseCase>.Instance,
+            new TranscricaoAudioWhatsApp(transcritor, fileStorage, unitOfWork, NullLogger<TranscricaoAudioWhatsApp>.Instance),
+            fila);
+        return (processador, mensagem, fila, transcritor);
+    }
+
+    [Fact]
     public async Task FalhaNoDownload_GravaErroNaMensagemEReagenda()
     {
         // #1397: antes o catch só logava e o balão ficava em "Foto" para sempre.

@@ -6,6 +6,8 @@ namespace EasyStock.Application.UseCases.Atendimento.Webhook;
 /// <summary>
 /// Drena um <see cref="ArmazenarMidiaWhatsAppJob"/> da fila (S03): baixa a mídia pelo
 /// <see cref="ArmazenadorMidiaWhatsApp"/> (S02) e anexa a chave na <c>Mensagem</c> correspondente.
+/// #1406: com transcritor disponível, o webhook não enfileira o turno do agente para áudio; ele sai
+/// daqui, depois da transcrição (ou na primeira falha da mídia, para o agente pedir que o cliente escreva).
 /// </summary>
 public sealed class ProcessarMidiaWhatsAppJobUseCase(
     IConversaRepository conversaRepository,
@@ -14,7 +16,8 @@ public sealed class ProcessarMidiaWhatsAppJobUseCase(
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
     ILogger<ProcessarMidiaWhatsAppJobUseCase> logger,
-    TranscricaoAudioWhatsApp? transcricao = null)
+    TranscricaoAudioWhatsApp? transcricao = null,
+    IQueueService? fila = null)
 {
     public async Task ExecuteAsync(ArmazenarMidiaWhatsAppJob job, CancellationToken ct = default)
     {
@@ -42,10 +45,21 @@ public sealed class ProcessarMidiaWhatsAppJobUseCase(
             // #1397: o erro fica na mensagem (o console mostra) e a varredura tenta de novo até o limite.
             mensagem.RegistrarFalhaMidia(ex.Message, relogio.GetUtcNow().UtcDateTime);
             await unitOfWork.CommitAsync();
+            if (mensagem.TentativasMidia == 1) await DispararTurnoDoAudioAsync(job, mensagem);
             return;
         }
 
         // #1411: fora do try do armazenamento; falha aqui não é erro de mídia de um anexo já salvo.
         if (transcricao is not null) await transcricao.TranscreverAsync(mensagem, ct); // #1398
+        await DispararTurnoDoAudioAsync(job, mensagem); // #1406: depois da transcrição
     }
+
+    private Task DispararTurnoDoAudioAsync(ArmazenarMidiaWhatsAppJob job, Domain.Entities.Atendimento.Mensagem mensagem) =>
+        AguardaTranscricao(mensagem.TipoConteudo, transcricao?.Disponivel == true) && fila is not null
+            ? fila.EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, new ProcessarTurnoAgenteJob(job.EmpresaId, job.ConversaId))
+            : Task.CompletedTask;
+
+    /// <summary>Regra única (#1406): áudio com transcritor disponível tem o turno disparado pelo job de mídia.</summary>
+    public static bool AguardaTranscricao(Domain.Enums.Atendimento.TipoConteudoMensagem tipo, bool transcritorDisponivel) =>
+        tipo == Domain.Enums.Atendimento.TipoConteudoMensagem.Audio && transcritorDisponivel;
 }
