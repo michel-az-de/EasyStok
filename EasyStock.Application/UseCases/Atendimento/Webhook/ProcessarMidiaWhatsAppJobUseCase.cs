@@ -35,14 +35,17 @@ public sealed class ProcessarMidiaWhatsAppJobUseCase(
             var (chave, mime) = await armazenador.ArmazenarAsync(job.EmpresaId, job.ConversaId, job.Wamid, job.MediaId, ct);
             mensagem.AnexarMidia(chave, mime);
             await unitOfWork.CommitAsync();
-            if (transcricao is not null) await transcricao.TranscreverAsync(mensagem, ct); // #1398, nunca lança
         }
-        catch (Exception ex)
+        catch (Exception ex) when (mensagem.MidiaChave is null)
         {
             logger.LogError(ex, "Fila de mídia WhatsApp: falha ao armazenar mídia do wamid {Wamid}.", job.Wamid);
             // #1397: o erro fica na mensagem (o console mostra) e a varredura tenta de novo até o limite.
             mensagem.RegistrarFalhaMidia(ex.Message, relogio.GetUtcNow().UtcDateTime);
             await unitOfWork.CommitAsync();
+            return;
         }
+
+        // #1411: fora do try do armazenamento; falha aqui não é erro de mídia de um anexo já salvo.
+        if (transcricao is not null) await transcricao.TranscreverAsync(mensagem, ct); // #1398
     }
 }
