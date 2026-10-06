@@ -19,9 +19,16 @@ public static class ClassificadorFalhaEnvio
     };
 
     /// <summary>
-    /// #1396: código do callback <c>failed</c> da Meta, pela tabela de <see cref="CodigosErroMeta"/>.
-    /// Sem código não há como saber se é temporária: não insiste.
+    /// #1411: códigos do callback <c>failed</c> sabidamente temporários (erro genérico, limite de taxa, spam rate,
+    /// par de envios, serviço indisponível). A tabela de notificações (<see cref="CodigosErroMeta"/>) trata código
+    /// fora dela como transitório; aqui é o contrário, porque reenviar sozinho ao cliente exige certeza.
+    /// </summary>
+    private static readonly HashSet<int> CodigosTemporarios = [131000, 130429, 131016, 131056, 133004];
+
+    /// <summary>
+    /// #1396: código do callback <c>failed</c> da Meta. Só insiste em código da lista de temporários;
+    /// desconhecido ou sem código não insiste.
     /// </summary>
     public static TipoFalhaEnvio ClassificarCodigoMeta(int? codigo) =>
-        codigo is { } c && !CodigosErroMeta.EhPermanente(c) ? TipoFalhaEnvio.Temporaria : TipoFalhaEnvio.Permanente;
+        codigo is { } c && CodigosTemporarios.Contains(c) ? TipoFalhaEnvio.Temporaria : TipoFalhaEnvio.Permanente;
 }

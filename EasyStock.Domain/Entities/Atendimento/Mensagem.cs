@@ -198,6 +198,7 @@ public class Mensagem
         UltimaFalhaEnvio = tipo;
 
         var podeAgendar = tipo == TipoFalhaEnvio.Temporaria
+            && PodeReenviar
             && TentativasEnvio <= EsperasReenvio.Length
             && agora - EnviadaEm <= PrazoReenvio;
         ProximoReenvioEm = podeAgendar ? agora + EsperasReenvio[TentativasEnvio - 1] : null;

@@ -138,7 +138,7 @@ public sealed class EnviarMensagemConsoleUseCase(
         {
             throw new ForaDaJanelaAtendimentoException("A Meta recusou: fora da janela de 24 h.", ex);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             var falhou = criarMensagem(null);
             falhou.RegistrarFalhaEnvio(ex.Message, ClassificadorFalhaEnvio.Classificar(ex), agora);
