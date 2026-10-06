@@ -339,7 +339,7 @@ public sealed class CheckoutCoreService(
                 ProdutoId = ci.ProdutoId,
                 CardapioItemId = ci.Id,
                 LinhaSnapshot = ci.Linha.ParaContrato(),
-                Nome = ci.Produto?.Nome ?? $"Item {ci.ProdutoId}",
+                Nome = ci.NomeEfetivo() ?? $"Item {ci.ProdutoId}",
                 Quantidade = inputItem.Qtd,
                 PrecoUnitario = precoUnit,
                 Subtotal = inputItem.Qtd * precoUnit,
