@@ -45,4 +45,10 @@ public sealed class MetaCloudWhatsAppOptions
     public string ApiVersion { get; set; } = VersaoGraphApi.Padrao;
 
     public string? WabaId { get; set; }
+
+    /// <summary>Id do app da Meta, público (#1417): o console o passa ao <c>FB.init</c> do Embedded Signup.</summary>
+    public string AppId { get; set; } = string.Empty;
+
+    /// <summary><c>config_id</c> da configuração v4 do Facebook Login for Business, público (#1417).</summary>
+    public string EmbeddedSignupConfigId { get; set; } = string.Empty;
 }

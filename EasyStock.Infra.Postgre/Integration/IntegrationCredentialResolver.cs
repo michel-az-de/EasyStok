@@ -111,12 +111,11 @@ public sealed class IntegrationCredentialResolver(
 
         if (payload is null) return null;
 
-        // Telemetria de uso (não bloqueia retorno se falhar persistir).
+        // Telemetria de uso (não bloqueia retorno se falhar persistir). Isolada do change tracker (#1417): a leitura
+        // roda no meio do envio do atendimento, e um commit aqui gravaria pela metade o que o chamador tem pendente.
         try
         {
-            credencial.RegistrarUso();
-            await repo.UpdateAsync(credencial, ct);
-            await uow.CommitAsync();
+            await repo.RegistrarUsoAsync(credencial.Id, DateTime.UtcNow, ct);
         }
         catch (Exception ex)
         {

@@ -52,6 +52,11 @@ public sealed class CredencialIntegracaoRepository(EasyStockDbContext db) : ICre
         return Task.CompletedTask;
     }
 
+    public Task RegistrarUsoAsync(Guid credencialId, DateTime em, CancellationToken ct = default) =>
+        db.Set<CredencialIntegracao>()
+            .Where(c => c.Id == credencialId)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.UltimoUsoEm, em), ct);
+
     public Task UpdateAsync(CredencialIntegracao credencial, CancellationToken ct = default)
     {
         db.Set<CredencialIntegracao>().Update(credencial);

@@ -8,7 +8,8 @@ public sealed record EntradaWhatsApp(
     string RawJson,
     IReadOnlyList<ContatoWhatsApp> Contatos,
     IReadOnlyList<MensagemRecebidaWhatsApp> Mensagens,
-    IReadOnlyList<StatusRecebidoWhatsApp> Statuses);
+    IReadOnlyList<StatusRecebidoWhatsApp> Statuses,
+    IReadOnlyList<EcoWhatsApp> Ecos);
 
 public sealed record ContatoWhatsApp(string WaId, string? Nome);
 
@@ -34,3 +35,16 @@ public sealed record StatusRecebidoWhatsApp(
     string? RecipientId,
     string? ErroMensagem,
     int? ErroCodigo = null);
+
+/// <summary>
+/// Mensagem que a loja mandou pelo app WhatsApp Business do celular (coexistência, #1417, field
+/// <c>smb_message_echoes</c>). <see cref="Para"/> é o <c>wa_id</c> do cliente; o resto segue <see cref="MensagemRecebidaWhatsApp"/>.
+/// </summary>
+public sealed record EcoWhatsApp(
+    string Para,
+    string Wamid,
+    DateTimeOffset Timestamp,
+    string Tipo,
+    string? TextoCorpo,
+    string? MidiaId,
+    string? MidiaMime);

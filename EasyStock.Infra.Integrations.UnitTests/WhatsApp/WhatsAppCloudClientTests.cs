@@ -30,7 +30,7 @@ public class WhatsAppCloudClientTests
 
     private static WhatsAppCloudClient BuildClient(
         SequenceHandler handler, string? phoneNumberIdDoTenant = null, string phoneNumberIdGlobal = "1234567890",
-        bool? haTenant = null, ResiliencePipelineProvider<string>? pipelines = null)
+        bool? haTenant = null, ResiliencePipelineProvider<string>? pipelines = null, string? tokenDoTenant = null)
     {
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://graph.test/v19.0/") };
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "token-teste");
@@ -45,6 +45,7 @@ public class WhatsAppCloudClientTests
         var remetente = Substitute.For<IRemetenteWhatsApp>();
         remetente.ObterPhoneNumberIdAsync(Arg.Any<CancellationToken>()).Returns(phoneNumberIdDoTenant);
         remetente.HaTenantCorrente.Returns(haTenant ?? phoneNumberIdDoTenant is not null);
+        remetente.ObterAccessTokenAsync(Arg.Any<CancellationToken>()).Returns(tokenDoTenant);
 
         var pipelineProvider = pipelines ?? Substitute.For<ResiliencePipelineProvider<string>>();
         if (pipelines is null)
@@ -311,9 +312,74 @@ public class WhatsAppCloudClientTests
         handler.UltimoCorpo.Should().NotContain("\"header\"");
     }
 
+    [Fact]
+    public async Task EmpresaComCredencialEnviaComOTokenDela()
+    {
+        // #1417: coexistência. O número da loja só aceita o business token da empresa.
+        var handler = new SequenceHandler();
+        handler.Enfileirar(HttpStatusCode.OK, RespostaEnvioOk);
+        handler.Enfileirar(HttpStatusCode.OK, "{}");
+        var client = BuildClient(handler, phoneNumberIdDoTenant: "5550001111", tokenDoTenant: "token-da-empresa");
+
+        await client.EnviarTextoAsync("5511999998888", "Oi!");
+        await client.MarcarComoLidaAsync("wamid.X");
+
+        handler.Tokens.Should().Equal("token-da-empresa", "token-da-empresa");
+    }
+
+    [Fact]
+    public async Task EmpresaSemCredencialMantemOTokenGlobal()
+    {
+        var handler = new SequenceHandler();
+        handler.Enfileirar(HttpStatusCode.OK, RespostaEnvioOk);
+        var client = BuildClient(handler, phoneNumberIdDoTenant: "5550001111", tokenDoTenant: null);
+
+        await client.EnviarTextoAsync("5511999998888", "Oi!");
+
+        handler.Tokens.Should().Equal("token-teste");
+    }
+
+    [Fact]
+    public async Task BaixaMidiaComOTokenDaEmpresaNasDuasChamadas()
+    {
+        var handler = new SequenceHandler();
+        handler.Enfileirar(HttpStatusCode.OK,
+            """{"url":"https://graph.test/media-cdn/abc","mime_type":"audio/ogg","id":"media-1"}""");
+        handler.Enfileirar(HttpStatusCode.OK, "binario-fake");
+        var client = BuildClient(handler, phoneNumberIdDoTenant: "5550001111", tokenDoTenant: "token-da-empresa");
+
+        await client.BaixarMidiaAsync("media-1");
+
+        handler.Tokens.Should().Equal("token-da-empresa", "token-da-empresa");
+    }
+
+    [Fact]
+    public async Task EnvioDePlataformaIgnoraOTokenDaEmpresa()
+    {
+        // O número de plataforma (N6) é do app: continua no token global mesmo com tenant conectado.
+        var handler = new SequenceHandler();
+        handler.Enfileirar(HttpStatusCode.OK, RespostaEnvioOk);
+        var http = new HttpClient(handler) { BaseAddress = new Uri("https://graph.test/v19.0/") };
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "token-teste");
+        var remetente = Substitute.For<IRemetenteWhatsApp>();
+        remetente.ObterAccessTokenAsync(Arg.Any<CancellationToken>()).Returns("token-da-empresa");
+        var pipelines = Substitute.For<ResiliencePipelineProvider<string>>();
+        pipelines.GetPipeline(Arg.Any<string>()).Returns(ResiliencePipeline.Empty);
+        var client = new WhatsAppCloudClient(http,
+            Options.Create(new WhatsAppCloudOptions { AccessToken = "token-teste", PhoneNumberIdPlataforma = "7770001" }),
+            remetente, pipelines, NullLogger<WhatsAppCloudClient>.Instance);
+
+        await client.EnviarTextoPlataformaAsync("5511999998888", "Oi!");
+
+        handler.Tokens.Should().Equal("token-teste");
+    }
+
     private sealed class SequenceHandler : HttpMessageHandler
     {
         private readonly Queue<(HttpStatusCode Status, string Body, Exception? Falha)> _respostas = new();
+
+        /// <summary>Bearer de cada chamada, na ordem (#1417).</summary>
+        public List<string?> Tokens { get; } = [];
 
         public int Chamadas { get; private set; }
         public string? UltimoCorpo { get; private set; }
@@ -328,6 +394,7 @@ public class WhatsAppCloudClientTests
         {
             Chamadas++;
             UltimaUrl = request.RequestUri?.ToString();
+            Tokens.Add(request.Headers.Authorization?.Parameter);
             if (request.Headers.Authorization is not { Scheme: "Bearer" })
                 TodosComBearer = false;
 

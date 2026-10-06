@@ -13,6 +13,7 @@ import { AbaCaixa } from './caixa/AbaCaixa'
 import { AbaJanelas } from './janelas/AbaJanelas'
 import { AbaFidelidade } from './fidelidade/AbaFidelidade'
 import { AbaIntegracoes } from './integracoes/AbaIntegracoes'
+import { SecaoWhatsApp } from './integracoes/SecaoWhatsApp'
 import { AbaAtendimento } from './atendimento/AbaAtendimento'
 import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
@@ -153,6 +154,8 @@ export function ModalGestao({ aoFechar }) {
         tabIndex={0}
         className={css.painel}
       >
+        {/* #1417: a seção do WhatsApp já grava no EasyStok; fica fora do bloco desligado. */}
+        {fonteApi && ativa === 'integracoes' && <SecaoWhatsApp />}
         {fonteApi && AINDA_NAO_LIGADO[ativa]
           ? <AbaNaoLigada texto={AINDA_NAO_LIGADO[ativa]}>{painelDaAba[ativa]}</AbaNaoLigada>
           : painelDaAba[ativa]}

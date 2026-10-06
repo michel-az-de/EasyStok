@@ -32,6 +32,14 @@ public static class WhatsAppCloudClientServiceCollectionExtensions
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", opts.AccessToken);
         });
 
+        // #1417: Embedded Signup (coexistência). Sem Bearer padrão: cada chamada leva o business token da empresa.
+        services.AddHttpClient<IMetaEmbeddedSignupClient, MetaEmbeddedSignupClient>(MetaEmbeddedSignupClient.NomeHttpClient, (sp, client) =>
+        {
+            var opts = sp.GetRequiredService<IOptions<WhatsAppCloudOptions>>().Value;
+            client.BaseAddress = new Uri(opts.BaseUrlEfetiva.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(20);
+        });
+
         services.AddScoped<StubWhatsAppCloudClient>();
 
         if (UsaClienteMeta(configuration[ChaveClienteAtendimento], configuration[ChaveProviderNotificacoes]))

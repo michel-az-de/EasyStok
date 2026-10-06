@@ -18,6 +18,12 @@ public sealed class WhatsAppCloudOptions
     /// </summary>
     public string PhoneNumberIdPlataforma { get; set; } = string.Empty;
 
+    /// <summary>Id do app da Meta (#1417): <c>client_id</c> da troca do <c>code</c> do Embedded Signup.</summary>
+    public string AppId { get; set; } = string.Empty;
+
+    /// <summary>Segredo do app (o mesmo que assina o webhook): <c>client_secret</c> da troca do <c>code</c> (#1417).</summary>
+    public string AppSecret { get; set; } = string.Empty;
+
     /// <summary>Versão da Graph API (N6): um ponto só, <see cref="VersaoGraphApi.Padrao"/>.</summary>
     public string ApiVersion { get; set; } = VersaoGraphApi.Padrao;
 

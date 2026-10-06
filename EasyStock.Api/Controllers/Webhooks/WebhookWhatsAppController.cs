@@ -65,6 +65,10 @@ public class WebhookWhatsAppController(
             completo &= await categoriaTemplateUseCase.ExecuteAsync(campos.CategoriaTemplate, ct);
         if (campos.Mensagens is not null)
             completo &= await processarUseCase.ExecuteAsync(campos.Mensagens, ct);
+        // #1417: coexistência. Histórico e estado do app são aceitos e só registrados; a importação fica para depois.
+        if (campos.Historico > 0 || campos.EstadoApp > 0)
+            logger.LogInformation("Webhook WhatsApp: coexistência recebeu {Historico} lote(s) de history e {EstadoApp} de smb_app_state_sync (não importados).",
+                campos.Historico, campos.EstadoApp);
         if (campos.Ignoradas > 0)
             logger.LogInformation("Webhook WhatsApp: {Ignoradas} mudança(s) de outro field descartada(s) de propósito.", campos.Ignoradas);
 

@@ -1,0 +1,17 @@
+/* WhatsApp por coexistência (#1417). Fonte grande e contraste alto: texto em
+   --tinta, corpo em --t-corpo, só tokens existentes. */
+.secao {
+  display: flex; flex-direction: column; gap: var(--e-3); align-items: flex-start;
+  padding: var(--e-4); margin-bottom: var(--e-4);
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+}
+
+.titulo { margin: 0; font-size: var(--t-titulo); color: var(--tinta); }
+.texto { margin: 0; font-size: var(--t-corpo); color: var(--tinta); }
+.botao { font-size: var(--t-forte); }
+.explicacao { margin: 0; font-size: var(--t-corpo); color: var(--tinta); }
+.erro { margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--perigo); }
+
+.resultado { display: flex; flex-direction: column; gap: var(--e-2); }
+.numero { margin: 0; font-size: var(--t-forte); color: var(--tinta); overflow-wrap: anywhere; }
+.syncs { margin: 0; padding-left: var(--e-4); font-size: var(--t-corpo); color: var(--tinta); }

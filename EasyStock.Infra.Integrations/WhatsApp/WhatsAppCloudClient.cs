@@ -236,9 +236,10 @@ public sealed class WhatsAppCloudClient(
     public async Task<(Stream Conteudo, string MimeType)> BaixarMidiaAsync(string mediaId, CancellationToken ct = default)
     {
         var pipeline = pipelineProvider.GetPipeline(IntegrationCategories.WhatsApp);
+        var token = await remetente.ObterAccessTokenAsync(ct); // #1417: a mídia do número da loja só abre com o token dela
 
         using var metadataResponse = await pipeline.ExecuteAsync(
-            async pollyCt => await httpClient.GetAsync(mediaId, pollyCt), ct);
+            async pollyCt => await GetComTokenAsync(mediaId, token, pollyCt), ct);
         if (!metadataResponse.IsSuccessStatusCode)
             await LancarErroAsync(metadataResponse, ct);
 
@@ -246,12 +247,18 @@ public sealed class WhatsAppCloudClient(
             ?? throw new WhatsAppCloudException(0, "Meta não devolveu metadados da mídia.", ehPermanente: true);
 
         var binarioResponse = await pipeline.ExecuteAsync(
-            async pollyCt => await httpClient.GetAsync(metadata.Url, pollyCt), ct);
+            async pollyCt => await GetComTokenAsync(metadata.Url, token, pollyCt), ct);
         if (!binarioResponse.IsSuccessStatusCode)
             await LancarErroAsync(binarioResponse, ct);
 
         var conteudo = await binarioResponse.Content.ReadAsStreamAsync(ct);
         return (conteudo, metadata.MimeType);
+    }
+
+    private async Task<HttpResponseMessage> GetComTokenAsync(string url, string? token, CancellationToken ct)
+    {
+        using var request = ComTokenDaEmpresa(HttpMethod.Get, url, token);
+        return await httpClient.SendAsync(request, ct);
     }
 
     private async Task<EnvioWhatsAppResult> EnviarEExtrairWamidAsync(object payload, CancellationToken ct)
@@ -271,9 +278,27 @@ public sealed class WhatsAppCloudClient(
     private async Task<HttpResponseMessage> PostMessagesAsync(object payload, CancellationToken ct)
     {
         var phoneNumberId = await ResolverPhoneNumberIdAsync(ct);
+        var token = await remetente.ObterAccessTokenAsync(ct);
         var pipeline = pipelineProvider.GetPipeline(IntegrationCategories.WhatsAppEnvio);
         var url = $"{phoneNumberId}/messages";
-        return await pipeline.ExecuteAsync(async pollyCt => await httpClient.PostAsJsonAsync(url, payload, pollyCt), ct);
+        return await pipeline.ExecuteAsync(async pollyCt =>
+        {
+            using var request = ComTokenDaEmpresa(HttpMethod.Post, url, token);
+            request.Content = JsonContent.Create(payload);
+            return await httpClient.SendAsync(request, pollyCt);
+        }, ct);
+    }
+
+    /// <summary>
+    /// #1417: com business token da empresa (coexistência) ele vai no cabeçalho da requisição e vence o Bearer global
+    /// do HttpClient; sem ele a requisição sai como antes, com o global. Mensagem nova a cada tentativa do pipeline.
+    /// </summary>
+    private static HttpRequestMessage ComTokenDaEmpresa(HttpMethod metodo, string url, string? token)
+    {
+        var request = new HttpRequestMessage(metodo, url);
+        if (!string.IsNullOrWhiteSpace(token))
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        return request;
     }
 
     /// <summary>
