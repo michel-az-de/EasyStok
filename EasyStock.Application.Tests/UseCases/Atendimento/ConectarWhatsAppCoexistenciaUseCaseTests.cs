@@ -136,6 +136,22 @@ public class ConectarWhatsAppCoexistenciaUseCaseTests
         await _meta.DidNotReceiveWithAnyArgs().SolicitarSincronizacaoAsync(default!, default!, default);
     }
 
+    [Fact]
+    public async Task FalhaAoGravarOTokenNaoDeixaONumeroVinculado()
+    {
+        // Revisão da PR #1418: vincular antes de gravar deixava a empresa com o número novo e sem token.
+        _credenciais.SalvarAsync(Arg.Any<Guid>(), Arg.Any<CategoriaIntegracao>(), Arg.Any<string>(), Arg.Any<AmbienteIntegracao>(),
+                Arg.Any<CredencialWhatsAppMeta>(), Arg.Any<Guid>(), Arg.Any<DateTime?>(), Arg.Any<CancellationToken>())
+            .Returns(_ => throw new InvalidOperationException("KEK 'kek-x' não configurada"));
+
+        var acao = () => Sut().ExecuteAsync(Comando());
+
+        await acao.Should().ThrowAsync<InvalidOperationException>();
+        _empresa.WhatsAppPhoneNumberId.Should().BeNull();
+        await _empresas.DidNotReceive().UpdateAsync(Arg.Any<Empresa>());
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+
     [Theory]
     [InlineData("", Waba, Numero)]
     [InlineData(Code, "", Numero)]

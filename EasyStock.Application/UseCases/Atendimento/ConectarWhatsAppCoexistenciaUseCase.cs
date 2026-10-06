@@ -51,7 +51,8 @@ public sealed class ConexaoWhatsAppRecusadaException(EtapaConexaoWhatsApp etapa,
 /// Conecta o número da loja por coexistência (#1417, Embedded Signup v4): troca o <c>code</c> pelo business token,
 /// inscreve o app na WABA, confere o número, vincula o <c>phone_number_id</c> à empresa (mesmas regras do back-office:
 /// número de outra empresa ou da plataforma é recusado), grava o token cifrado e pede as duas sincronizações.
-/// O vínculo vem antes do token: número recusado não deixa token trocado na empresa. Sincronização que falha não
+/// O número é conferido antes, o token é gravado e só então o número é vinculado: nem número recusado deixa token
+/// trocado, nem falha ao gravar o token deixa a empresa com o número novo e sem token. Sincronização que falha não
 /// derruba a conexão, só aparece no resultado (a Meta aceita refazer em até 24 h).
 /// </summary>
 public sealed class ConectarWhatsAppCoexistenciaUseCase(
@@ -77,20 +78,19 @@ public sealed class ConectarWhatsAppCoexistenciaUseCase(
         var numero = await Etapa(EtapaConexaoWhatsApp.ConsultaDoNumero,
             () => meta.ConsultarNumeroAsync(phoneNumberId, token, ct));
 
-        var vinculo = await vincularWhatsApp.ExecuteAsync(new VincularWhatsAppDoTenantCommand(cmd.EmpresaId, phoneNumberId), ct);
-        var recusa = vinculo.Status switch
-        {
-            StatusVinculoWhatsApp.EmpresaNaoEncontrada => StatusConexaoWhatsApp.EmpresaNaoEncontrada,
-            StatusVinculoWhatsApp.NumeroEmUsoPorOutraEmpresa => StatusConexaoWhatsApp.NumeroEmUsoPorOutraEmpresa,
-            StatusVinculoWhatsApp.NumeroReservadoDaPlataforma => StatusConexaoWhatsApp.NumeroReservadoDaPlataforma,
-            _ => (StatusConexaoWhatsApp?)null,
-        };
-        if (recusa is { } status)
-            return new ConexaoWhatsAppResultado(status);
+        // Confere, grava o token e só então vincula: falha ao gravar não deixa o número novo sem token.
+        var vinculo = new VincularWhatsAppDoTenantCommand(cmd.EmpresaId, phoneNumberId);
+        if (Recusa(await vincularWhatsApp.ConferirAsync(vinculo, ct)) is { } recusado)
+            return new ConexaoWhatsAppResultado(recusado);
 
         await credenciais.SalvarAsync(cmd.EmpresaId, CategoriaIntegracao.Mensageria, CredencialWhatsAppMeta.ProviderKey,
             AmbienteIntegracao.Production, new CredencialWhatsAppMeta(token, wabaId, phoneNumberId, DateTime.UtcNow),
             cmd.UsuarioId, ct: ct);
+
+        // Corrida rara entre conferir e vincular: o token fica gravado, mas o envio o ignora enquanto o número dele
+        // não for o vinculado à empresa.
+        if (Recusa(await vincularWhatsApp.ExecuteAsync(vinculo, ct)) is { } corrida)
+            return new ConexaoWhatsAppResultado(corrida);
 
         if (numero.IsOnBizApp != true)
             logger.LogWarning("Coexistência: número {PhoneNumberId} conectado, mas a Meta não o marca no app Business (is_on_biz_app={NoApp}).",
@@ -103,6 +103,14 @@ public sealed class ConectarWhatsAppCoexistenciaUseCase(
         return new ConexaoWhatsAppResultado(StatusConexaoWhatsApp.Conectado,
             numero.DisplayPhoneNumber, numero.VerifiedName, numero.IsOnBizApp, numero.PlatformType, estado, historico);
     }
+
+    private static StatusConexaoWhatsApp? Recusa(VinculoWhatsAppResultado vinculo) => vinculo.Status switch
+    {
+        StatusVinculoWhatsApp.EmpresaNaoEncontrada => StatusConexaoWhatsApp.EmpresaNaoEncontrada,
+        StatusVinculoWhatsApp.NumeroEmUsoPorOutraEmpresa => StatusConexaoWhatsApp.NumeroEmUsoPorOutraEmpresa,
+        StatusVinculoWhatsApp.NumeroReservadoDaPlataforma => StatusConexaoWhatsApp.NumeroReservadoDaPlataforma,
+        _ => null,
+    };
 
     private async Task<SincronizacaoWhatsAppResultado> SincronizarAsync(
         string phoneNumberId, string token, TipoSincronizacaoWhatsApp tipo, CancellationToken ct)

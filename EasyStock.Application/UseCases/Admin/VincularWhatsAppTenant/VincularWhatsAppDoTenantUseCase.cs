@@ -32,33 +32,50 @@ public sealed class VincularWhatsAppDoTenantUseCase(
     public async Task<VinculoWhatsAppResultado> ExecuteAsync(
         VincularWhatsAppDoTenantCommand cmd, CancellationToken ct = default)
     {
+        var (resultado, empresa) = await ConferirComEmpresaAsync(cmd, ct);
+        if (empresa is null)
+            return resultado;
+
+        if (resultado.Status == StatusVinculoWhatsApp.Desvinculado)
+            empresa.DesvincularWhatsApp();
+        else
+            empresa.VincularWhatsApp(resultado.PhoneNumberId!);
+        await PersistirAsync(empresa);
+        return resultado;
+    }
+
+    /// <summary>
+    /// As mesmas checagens do <see cref="ExecuteAsync"/>, sem gravar nada (#1417): a conexão por coexistência confere o
+    /// número antes de gravar o token e só vincula depois, para não deixar estado pela metade.
+    /// </summary>
+    public async Task<VinculoWhatsAppResultado> ConferirAsync(VincularWhatsAppDoTenantCommand cmd, CancellationToken ct = default) =>
+        (await ConferirComEmpresaAsync(cmd, ct)).Resultado;
+
+    /// <summary><c>Empresa</c> só volta preenchida quando o comando pode ser aplicado.</summary>
+    private async Task<(VinculoWhatsAppResultado Resultado, Empresa? Empresa)> ConferirComEmpresaAsync(
+        VincularWhatsAppDoTenantCommand cmd, CancellationToken ct)
+    {
         var numero = cmd.PhoneNumberId is null ? null : Validar(cmd.PhoneNumberId);
 
         var empresa = await empresaRepository.GetByIdAsync(cmd.EmpresaId);
         if (empresa is null)
-            return new VinculoWhatsAppResultado(StatusVinculoWhatsApp.EmpresaNaoEncontrada, null);
+            return (new VinculoWhatsAppResultado(StatusVinculoWhatsApp.EmpresaNaoEncontrada, null), null);
 
         if (numero is null)
-        {
-            empresa.DesvincularWhatsApp();
-            await PersistirAsync(empresa);
-            return new VinculoWhatsAppResultado(StatusVinculoWhatsApp.Desvinculado, null);
-        }
+            return (new VinculoWhatsAppResultado(StatusVinculoWhatsApp.Desvinculado, null), empresa);
 
         // N6: o número do WhatsApp de plataforma é do sistema e nunca de uma empresa.
         var daPlataforma = configuration["Notifications:WhatsApp:Plataforma:PhoneNumberId"]?.Trim();
         if (!string.IsNullOrEmpty(daPlataforma) && daPlataforma == numero)
-            return new VinculoWhatsAppResultado(StatusVinculoWhatsApp.NumeroReservadoDaPlataforma, numero);
+            return (new VinculoWhatsAppResultado(StatusVinculoWhatsApp.NumeroReservadoDaPlataforma, numero), null);
 
         // Pré-checagem para devolver 409 legível; a corrida entre dois PUTs simultâneos ainda
         // esbarra no índice único filtrado e vira 409 pelo handler global de 23505.
         var dono = await empresaRepository.GetByWhatsAppPhoneNumberIdAsync(numero, ct);
         if (dono is not null && dono.Id != empresa.Id)
-            return new VinculoWhatsAppResultado(StatusVinculoWhatsApp.NumeroEmUsoPorOutraEmpresa, numero);
+            return (new VinculoWhatsAppResultado(StatusVinculoWhatsApp.NumeroEmUsoPorOutraEmpresa, numero), null);
 
-        empresa.VincularWhatsApp(numero);
-        await PersistirAsync(empresa);
-        return new VinculoWhatsAppResultado(StatusVinculoWhatsApp.Vinculado, numero);
+        return (new VinculoWhatsAppResultado(StatusVinculoWhatsApp.Vinculado, numero), empresa);
     }
 
     private static string Validar(string bruto)
