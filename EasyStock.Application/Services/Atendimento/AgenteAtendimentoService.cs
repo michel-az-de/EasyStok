@@ -1,4 +1,3 @@
-using System.Text;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
@@ -76,7 +75,7 @@ public sealed class AgenteAtendimentoService(
             return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
         }
 
-        var mensagens = MontarConversacao(dados.Mensagens, pendentes);
+        var mensagens = GeracaoAgenteAtendimento.MontarConversacao(dados.Mensagens, pendentes);
         if (mensagens.Count == 0 || mensagens[^1].Papel != MensagemLlm.Usuario)
             return ResultadoTurnoAgente.Ignorado;
 
@@ -94,58 +93,16 @@ public sealed class AgenteAtendimentoService(
             return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
         }
 
-        // S54: caderno da loja (núcleo + índice) logo depois do prompt base e antes do dossiê, para o começo do
-        // prompt ser igual entre conversas da mesma empresa e aproveitar o cache do provedor.
-        var blocoCaderno = CadernoParaAgente.Montar(await caderno.ListarAsync(empresaId, incluirArquivados: false, ct));
-        var system = PromptAtendimento.Montar(configuracao)
-            + (blocoCaderno.Length > 0 ? "\n\n" + blocoCaderno : string.Empty)
-            + "\n\n" + MontarDossie(conversa, cliente, dados.Mensagens, agora);
-
-        // S25: histórico do cadastro (tags, pedidos, favorito, notas [interno]) quando há cliente vinculado.
-        if (cliente is not null
-            && await dossieUseCase.ExecuteAsync(new ObterDossieClienteQuery(empresaId, cliente.Id), ct) is { } dossie)
-            system += "\n\n" + ResumoDossieParaAgente.Montar(dossie);
-        var definicoes = _ferramentas.Values
-            .Select(f => new FerramentaLlm(f.Nome, f.Descricao, f.SchemaJson))
-            .ToList();
+        var system = await GeracaoAgenteAtendimento.MontarSystemAsync(
+            empresaId, configuracao, conversa, cliente, dados.Mensagens, agora, caderno, dossieUseCase, ct);
         var contexto = new ContextoTurnoAgente(empresaId, conversa, agora);
 
-        var tokens = 0;
-        string? textoFinal = null;
-        string? motivoEscalada = null;
-        var concluiu = false;
-
-        for (var iteracao = 0; iteracao < MaximoIteracoes; iteracao++)
-        {
-            RespostaLlm resposta;
-            try
-            {
-                resposta = await llm.EnviarAsync(new RequisicaoLlm(system, [.. mensagens], definicoes), ct);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-            {
-                logger.LogError(ex, "Agente de atendimento: falha chamando o LLM na conversa {ConversaId}.", conversaId);
-                motivoEscalada = "o agente não conseguiu responder (falha ao chamar o LLM)";
-                break;
-            }
-
-            tokens += resposta.TokensEntrada + resposta.TokensSaida;
-
-            if (resposta.StopReason != RespostaLlm.StopToolUse)
-            {
-                concluiu = true;
-                textoFinal = string.Join("\n", resposta.Conteudo.OfType<BlocoTextoLlm>().Select(b => b.Texto)).Trim();
-                if (textoFinal.Length == 0)
-                    motivoEscalada = $"o agente não produziu resposta (stop_reason={resposta.StopReason})";
-                break;
-            }
-
-            mensagens.Add(new MensagemLlm(MensagemLlm.Assistente, resposta.Conteudo));
-            var resultados = new List<BlocoLlm>();
-            foreach (var uso in resposta.Conteudo.OfType<BlocoUsoFerramentaLlm>())
-                resultados.Add(await ExecutarFerramentaAsync(contexto, uso, ct));
-            mensagens.Add(new MensagemLlm(MensagemLlm.Usuario, resultados));
-        }
+        var geracao = await GeracaoAgenteAtendimento.GerarAsync(
+            llm, system, mensagens, _ferramentas, contexto, MaximoIteracoes, logger, ct);
+        var tokens = geracao.Tokens;
+        var textoFinal = geracao.Texto;
+        var motivoEscalada = geracao.MotivoFalha;
+        var concluiu = geracao.Concluiu;
 
         // As entradas que foram ao LLM ficam processadas: um job repetido não responde de novo e a
         // mensagem que chegar durante o turno continua pendente para o próximo (#1288).
@@ -183,24 +140,6 @@ public sealed class AgenteAtendimentoService(
         await unitOfWork.CommitAsync();
         return new ResultadoTurnoAgente(true, respondeu,
             motivoEscalada is not null || conversa.Situacao == SituacaoConversa.Assumida);
-    }
-
-    private async Task<BlocoResultadoFerramentaLlm> ExecutarFerramentaAsync(
-        ContextoTurnoAgente contexto, BlocoUsoFerramentaLlm uso, CancellationToken ct)
-    {
-        if (!_ferramentas.TryGetValue(uso.Nome, out var ferramenta))
-            return new BlocoResultadoFerramentaLlm(uso.Id, $"Ferramenta desconhecida: {uso.Nome}.", EhErro: true);
-
-        try
-        {
-            return new BlocoResultadoFerramentaLlm(uso.Id, await ferramenta.ExecutarAsync(contexto, uso.Entrada, ct));
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-        {
-            logger.LogError(ex, "Agente de atendimento: ferramenta {Ferramenta} falhou na conversa {ConversaId}.",
-                ferramenta.Nome, contexto.Conversa.Id);
-            return new BlocoResultadoFerramentaLlm(uso.Id, "A ferramenta falhou; não invente o resultado.", EhErro: true);
-        }
     }
 
     private async Task<bool> EnviarRespostaAsync(Guid empresaId, Conversa conversa, string texto, DateTime agora, CancellationToken ct)
@@ -291,99 +230,5 @@ public sealed class AgenteAtendimentoService(
             var rastreada = await conversaRepository.ObterMensagemPorExternoIdAsync(empresaId, externoId, ct);
             rastreada?.MarcarProcessada(agora);
         }
-    }
-
-    /// <summary>
-    /// Cliente → <c>user</c>; agente e dona → <c>assistant</c>. Mensagens do sistema não entram na
-    /// conversa (vão para o dossiê). Mensagens seguidas do mesmo papel viram uma só. As
-    /// <paramref name="pendentes"/> vão para o fim: o agente ainda não as viu (#1288).
-    /// </summary>
-    private static List<MensagemLlm> MontarConversacao(IReadOnlyList<Mensagem> historico, IReadOnlyList<Mensagem> pendentes)
-    {
-        var resultado = new List<MensagemLlm>();
-        var ordenado = historico.Where(m => !pendentes.Contains(m)).Concat(pendentes);
-        foreach (var msg in ordenado.Where(m => m.Autor != AutorMensagem.Sistema))
-        {
-            var papel = msg.Autor == AutorMensagem.Cliente ? MensagemLlm.Usuario : MensagemLlm.Assistente;
-            var texto = msg.Autor switch
-            {
-                AutorMensagem.Cliente => TextoDoCliente(msg),
-                AutorMensagem.Dona => $"(dona) {msg.Texto}",
-                _ => msg.Texto ?? string.Empty
-            };
-            if (string.IsNullOrWhiteSpace(texto)) continue;
-
-            if (resultado.Count > 0 && resultado[^1].Papel == papel)
-                resultado[^1] = resultado[^1] with { Conteudo = [.. resultado[^1].Conteudo, new BlocoTextoLlm(texto)] };
-            else
-                resultado.Add(new MensagemLlm(papel, [new BlocoTextoLlm(texto)]));
-        }
-
-        // A API exige que a conversa comece pelo usuário.
-        while (resultado.Count > 0 && resultado[0].Papel != MensagemLlm.Usuario)
-            resultado.RemoveAt(0);
-
-        return resultado;
-    }
-
-    private static string TextoDoCliente(Mensagem msg)
-    {
-        var marcador = msg.TipoConteudo switch
-        {
-            TipoConteudoMensagem.Imagem => "[imagem recebida]",
-            TipoConteudoMensagem.Audio => "[áudio recebido]",
-            TipoConteudoMensagem.Documento => "[documento recebido]",
-            TipoConteudoMensagem.Localizacao => "[localização recebida]",
-            TipoConteudoMensagem.Botao => $"[botão tocado: {msg.BotaoId}]",
-            TipoConteudoMensagem.Outro => "[mensagem não suportada]",
-            _ => null
-        };
-
-        if (msg.TipoConteudo == TipoConteudoMensagem.Audio && !string.IsNullOrWhiteSpace(msg.Transcricao))
-            return $"[áudio] {msg.Transcricao}";
-        if (marcador is null) return msg.Texto ?? string.Empty;
-        return string.IsNullOrWhiteSpace(msg.Texto) ? marcador : $"{marcador} {msg.Texto}";
-    }
-
-    /// <summary>
-    /// Dossiê do turno, depois do prompt fixo. Mensagem do sistema sem <c>wamid</c> nunca saiu para o
-    /// cliente: é nota interna e entra marcada <see cref="PromptAtendimento.MarcadorInterno"/> (RN-08).
-    /// </summary>
-    private static string MontarDossie(Conversa conversa, Cliente? cliente, IReadOnlyList<Mensagem> historico, DateTime agora)
-    {
-        var interno = PromptAtendimento.MarcadorInterno;
-        var sb = new StringBuilder();
-        sb.AppendLine("Dossiê desta conversa (contexto para você, não para citar):");
-        sb.AppendLine($"- Agora: {HorarioBrasil.ConverterParaBrasilia(agora):dd/MM/yyyy HH:mm} (horário de Brasília).");
-
-        var nome = cliente?.Nome is { } n && n != IdentificarClientePorTelefoneUseCase.NomePadraoLead ? n : conversa.ContatoNome;
-        sb.AppendLine($"- Nome: {(string.IsNullOrWhiteSpace(nome) ? "não informado" : nome)}.");
-        sb.AppendLine(cliente is null || cliente.OrderCount == 0
-            ? "- Situação: lead (ainda não comprou)."
-            : $"- Situação: cliente com {cliente.OrderCount} pedido(s).");
-        sb.AppendLine(conversa.PedidoEmAndamentoId is { } pedidoId
-            ? $"- Pedido em andamento: {pedidoId}."
-            : "- Pedido em andamento: nenhum registrado nesta conversa.");
-        if (conversa.ContextoJson != "{}")
-            sb.AppendLine($"- Contexto salvo: {conversa.ContextoJson}");
-        if (!string.IsNullOrWhiteSpace(cliente?.Observacoes))
-            sb.AppendLine($"- {interno} Observações do cadastro: {cliente.Observacoes}");
-
-        var sistema = historico.Where(m => m.Autor == AutorMensagem.Sistema && !string.IsNullOrWhiteSpace(m.Texto)).ToList();
-        var notas = sistema.Where(m => m.ExternoId is null).ToList();
-        if (notas.Count > 0)
-        {
-            sb.AppendLine("Notas internas:");
-            foreach (var nota in notas) sb.AppendLine($"- {interno} {nota.Texto}");
-        }
-
-        var automaticas = sistema.Where(m => m.ExternoId is not null).ToList();
-        if (automaticas.Count > 0)
-        {
-            sb.AppendLine("Mensagens automáticas já enviadas ao cliente:");
-            foreach (var auto in automaticas) sb.AppendLine($"- {auto.Texto}");
-        }
-
-        return sb.ToString().TrimEnd();
     }
 }
