@@ -25,6 +25,10 @@ services:
       Notifications__WhatsApp__Meta__VerifyToken: "verify-homol"
       Notifications__WhatsApp__Meta__BaseUrl: "http://host.docker.internal:18620/v26.0"
       Notifications__WhatsApp__Meta__ApiVersion: "v26.0"
+      # #1417: coexistência (Embedded Signup v4). Vazios de propósito: o fluxo usa o SDK real do Facebook, que
+      # o fake da Meta não simula; com eles vazios o /coexistencia/config responde habilitado=false.
+      Notifications__WhatsApp__Meta__AppId: ""
+      Notifications__WhatsApp__Meta__EmbeddedSignupConfigId: ""
       Notifications__WhatsApp__Plataforma__Provider: "meta"
       Notifications__WhatsApp__Plataforma__PhoneNumberId: "7770000001"
       Notifications__WhatsApp__Plataforma__VerifyToken: "verify-plataforma-homol"
