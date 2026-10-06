@@ -111,7 +111,8 @@ public sealed class CriarPedidoAtendimentoUseCase(
                 Origem: OrigemPedido.WhatsApp,
                 EmpresaId: input.EmpresaId,
                 Observacoes: input.Observacoes,
-                Prazo: new PrazoPreparoCheckout(configuracao.TempoPreparoPadraoMinutos, configuracao.RespiroMinutos)),
+                Prazo: new PrazoPreparoCheckout(configuracao.TempoPreparoPadraoMinutos, configuracao.RespiroMinutos),
+                Numero: endereco.Numero),
             ct);
 
         // S14: a dona liberou o lead fora de área; pago, o pedido espera por ela (S12/S13), não vai para a cozinha.

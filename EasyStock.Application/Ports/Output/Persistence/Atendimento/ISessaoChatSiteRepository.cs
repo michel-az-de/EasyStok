@@ -9,6 +9,9 @@ public interface ISessaoChatSiteRepository
 
     Task<SessaoChatSite?> ObterPorTokenHashAsync(Guid empresaId, string tokenHash, CancellationToken ct = default);
 
+    /// <summary>Leitura atual do banco, sem reutilizar uma entidade rastreada pelo stream.</summary>
+    Task<SessaoChatSite?> ObterSnapshotPorTokenHashAsync(Guid empresaId, string tokenHash, CancellationToken ct = default);
+
     /// <summary>Apaga, de todas as empresas, as sessões vencidas antes de <paramref name="limiteUtc"/>. Roda com bypass de RLS.</summary>
     Task<int> RemoverVencidasAsync(DateTime limiteUtc, CancellationToken ct = default);
 }

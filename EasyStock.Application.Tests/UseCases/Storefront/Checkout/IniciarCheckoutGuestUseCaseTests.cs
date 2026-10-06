@@ -239,7 +239,7 @@ public class IniciarCheckoutGuestUseCaseTests
     }
 
     [Fact]
-    public async Task PedidoGuestDeQuemRecebeuCampanhaMarcaPediu()
+    public async Task TelefoneAlegadoNaoAssociaPedidoACadastroOuCampanhaSemOtp()
     {
         var f = new Fixture();
         var empresaId = f.Storefront.EmpresaId;
@@ -260,8 +260,10 @@ public class IniciarCheckoutGuestUseCaseTests
 
         var resultado = await f.UseCase().ExecuteAsync(Input());
 
-        destinatario.Status.Should().Be(StatusCampanhaDestinatario.Pediu);
-        destinatario.PedidoId.Should().Be(resultado.PedidoId);
+        destinatario.Status.Should().Be(StatusCampanhaDestinatario.Enviado);
+        destinatario.PedidoId.Should().BeNull();
+        f.Pedidos.Single().ClienteId.Should().NotBe(cliente.Id);
+        await f.ClienteRepo.DidNotReceive().UpdateAsync(cliente, Arg.Any<CancellationToken>());
         f.Tenant.Received().SetCurrentTenant(empresaId);
     }
 

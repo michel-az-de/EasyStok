@@ -51,7 +51,7 @@ public class ChatSiteControllerTests
             acesso,
             new AbrirSessaoChatSiteUseCase(acesso, _sessoes, uow),
             new EnviarMensagemVisitanteUseCase(acesso, _conversas, Substitute.For<IOperacaoEventPublisher>(), uow,
-                NullLogger<EnviarMensagemVisitanteUseCase>.Instance),
+                NullLogger<EnviarMensagemVisitanteUseCase>.Instance, new EasyStock.Application.Services.Atendimento.ConversaChatSiteService(_conversas, uow)),
             new ListarMensagensChatSiteUseCase(acesso, _sessoes, _conversas));
         var http = new DefaultHttpContext();
         http.Response.Body = _corpo;
@@ -63,6 +63,7 @@ public class ChatSiteControllerTests
         var token = AcessoChatSite.NovoToken();
         var sessao = SessaoChatSite.Abrir(_loja.EmpresaId, _loja.Id, AcessoChatSite.HashDoToken(token), DateTime.UtcNow);
         _sessoes.ObterPorTokenHashAsync(_loja.EmpresaId, sessao.TokenHash, Arg.Any<CancellationToken>()).Returns(sessao);
+        _sessoes.ObterSnapshotPorTokenHashAsync(_loja.EmpresaId, sessao.TokenHash, Arg.Any<CancellationToken>()).Returns(sessao);
         return (sessao, token);
     }
 

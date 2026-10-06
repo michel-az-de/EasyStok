@@ -1,4 +1,4 @@
-﻿using EasyStock.Domain.Entities.Storefront;
+using EasyStock.Domain.Entities.Storefront;
 
 namespace EasyStock.Application.Ports.Output.Persistence.Storefront;
 
@@ -8,6 +8,8 @@ namespace EasyStock.Application.Ports.Output.Persistence.Storefront;
 /// </summary>
 public interface ICheckoutIdempotencyRepository
 {
+    Task RemoverSemRespostaAsync(Guid key, string hash, CancellationToken ct = default);
+
     Task<CheckoutIdempotency?> GetByIdAsync(Guid id, CancellationToken ct = default);
 
     /// <summary>Lookup por (Key, ContentHash) — chave composta exata.</summary>

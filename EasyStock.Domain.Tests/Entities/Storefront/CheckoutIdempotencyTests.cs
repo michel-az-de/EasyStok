@@ -173,6 +173,31 @@ public class CheckoutIdempotencyTests
             .WithMessage("*Fatura*");
     }
 
+    [Fact]
+    public void Pedido_em_processamento_pode_receber_resposta_sem_mudar_identidade()
+    {
+        var idem = NovoValido();
+        var pedidoId = Guid.NewGuid();
+        idem.VincularPedidoEmProcessamento(pedidoId);
+        idem.FaturaId.Should().Be(pedidoId);
+        idem.InitPoint.Should().BeNull();
+        idem.VincularPedidoEmProcessamento(pedidoId);
+        idem.VincularFatura(pedidoId, "https://mp.test/original");
+        idem.VincularFatura(pedidoId, "https://mp.test/alterado");
+        idem.InitPoint.Should().Be("https://mp.test/original");
+    }
+
+    [Fact]
+    public void Pedido_em_processamento_nao_pode_ser_trocado()
+    {
+        var idem = NovoValido();
+        idem.VincularPedidoEmProcessamento(Guid.NewGuid());
+        var trocar = () => idem.VincularPedidoEmProcessamento(Guid.NewGuid());
+        var limpar = () => idem.VincularPedidoEmProcessamento(Guid.Empty);
+        trocar.Should().Throw<RegraDeDominioVioladaException>();
+        limpar.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
     // ── Expirou ────────────────────────────────────────────────────────
 
     [Fact]

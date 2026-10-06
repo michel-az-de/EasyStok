@@ -1,4 +1,4 @@
-﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 
 namespace EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
@@ -53,10 +53,7 @@ public sealed class CheckoutIdempotencyService(
                     return new CheckoutCriadoDto(comMesmoHash.FaturaId.Value, comMesmoHash.InitPoint, ExpiresInSeconds);
                 }
 
-                // Registro existe mas sem resposta (Fase 3 falhou anteriormente) → recria.
-                logger.LogInformation(
-                    "Idempotency in-flight sem resposta: key={Key}, prosseguindo com nova tentativa.", key);
-                return null;
+                throw new CheckoutEmAndamentoException();
             }
 
             // Key existe com hash diferente → carrinho foi alterado.
@@ -71,6 +68,7 @@ public sealed class CheckoutIdempotencyService(
 
         if (!reservado)
         {
+            if (!existente.Confere(key, contentHash)) throw new IdempotencyMismatchException();
             // Race condition: outra request inseriu simultaneamente.
             if (existente.FaturaId.HasValue && existente.InitPoint is not null)
             {
@@ -80,9 +78,7 @@ public sealed class CheckoutIdempotencyService(
                 return new CheckoutCriadoDto(existente.FaturaId.Value, existente.InitPoint, ExpiresInSeconds);
             }
 
-            // A concorrente reservou mas ainda não terminou → prossegue (melhor esforço).
-            logger.LogInformation(
-                "Idempotency race sem resposta ainda: key={Key}, prosseguindo.", key);
+            throw new CheckoutEmAndamentoException();
         }
 
         return null;

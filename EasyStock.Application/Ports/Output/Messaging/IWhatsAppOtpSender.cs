@@ -1,4 +1,4 @@
-﻿namespace EasyStock.Application.Ports.Output.Messaging;
+namespace EasyStock.Application.Ports.Output.Messaging;
 
 /// <summary>
 /// Porta para envio de código OTP via WhatsApp/SMS. Implementação concreta vive em
@@ -24,6 +24,9 @@
 /// </summary>
 public interface IWhatsAppOtpSender
 {
+    /// <summary>Recusa configuração indisponível antes de persistir ou reaproveitar um OTP.</summary>
+    Task ValidarDisponibilidadeAsync(CancellationToken ct = default) => Task.CompletedTask;
+
     /// <summary>
     /// Dispara o envio do código <paramref name="codigo"/> para
     /// <paramref name="telefoneE164"/> (formato +55XXXXXXXXXXX já validado).

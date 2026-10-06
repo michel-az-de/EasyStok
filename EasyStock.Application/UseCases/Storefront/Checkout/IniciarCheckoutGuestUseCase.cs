@@ -25,7 +25,7 @@ namespace EasyStock.Application.UseCases.Storefront.Checkout;
 /// </para>
 ///
 /// <para>
-/// O que e so do guest: Cliente resolvido por <c>telefoneHash</c> em vez de cookie de sessao,
+/// O que e so do guest: cadastro guest isolado, sem tratar telefone informado como identidade verificada,
 /// snapshot de nome e telefone no pedido, endereco (CEP e numero) nas observacoes e token de
 /// acompanhamento sem login (#681). CEP fora da area (zona ou raio) e recusado como no logado: sem
 /// frete cotado nao ha o que cobrar. Cliente bloqueado e recusado antes da vaga (#1291).
@@ -60,7 +60,8 @@ public sealed class IniciarCheckoutGuestUseCase(
 
     public async Task<IniciarCheckoutGuestResult> ExecuteAsync(
         IniciarCheckoutGuestInput input,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Func<Guid, CancellationToken, Task>? pedidoCriado = null)
     {
         ArgumentNullException.ThrowIfNull(input);
 
@@ -85,7 +86,7 @@ public sealed class IniciarCheckoutGuestUseCase(
         if (storefront is null || !storefront.Ativo)
             throw new StorefrontNaoEncontradoException(input.Slug);
 
-        // ── Resolver/criar Cliente por telefoneHash ──────────────────────
+        // ── Cadastro guest isolado; telefone informado não equivale a OTP ──
         var (cliente, clienteNovo) = await ResolverClienteAsync(storefront.EmpresaId, nome, telefoneE164, cep, ct);
 
         // #1291: o bloqueio vale em todos os canais (S24); nada de vaga ocupada nem pedido.
@@ -94,7 +95,7 @@ public sealed class IniciarCheckoutGuestUseCase(
 
         if (input.JanelaId is not { } janelaId || input.DataEntrega is not { } dataEntrega)
             return await CriarSemJanelaAsync(storefront.Id, storefront.EmpresaId, cliente, clienteNovo, nome, telefoneE164,
-                cep, input, sw, ct);
+                cep, input, sw, ct, pedidoCriado);
 
         // ── Fases 1 e 2: pedido, frete cotado e vaga (S10) ───────────────
         var reservado = await checkoutCore.CriarPedidoComReservaAsync(
@@ -123,7 +124,8 @@ public sealed class IniciarCheckoutGuestUseCase(
         await unitOfWork.CommitAsync();
 
         // ── Fase 3: cobranca do Mercado Pago (S11) ─────────────────────────
-        var cobranca = await gerarCobranca.ExecuteAsync(reservado, conversaId: null, ct);
+        if (pedidoCriado is not null) await pedidoCriado(pedido.Id, ct);
+        var cobranca = await gerarCobranca.ExecuteAsync(reservado, conversaId: input.ConversaId, ct);
 
         var token = tokenService.Gerar(pedido.Id);
         var numeroCurto = pedido.Id.ToString("N")[..8].ToUpperInvariant();
@@ -143,7 +145,8 @@ public sealed class IniciarCheckoutGuestUseCase(
     /// </summary>
     private async Task<IniciarCheckoutGuestResult> CriarSemJanelaAsync(
         Guid storefrontId, Guid empresaId, DomainCliente cliente, bool clienteNovo, string nome, string telefoneE164,
-        string cep, IniciarCheckoutGuestInput input, Stopwatch sw, CancellationToken ct)
+        string cep, IniciarCheckoutGuestInput input, Stopwatch sw, CancellationToken ct,
+        Func<Guid, CancellationToken, Task>? pedidoCriado)
     {
         var itensPedidos = input.Items!.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd)).ToList();
         var cardapioItens = await checkoutCore.CarregarItensCardapioAsync(
@@ -171,33 +174,24 @@ public sealed class IniciarCheckoutGuestUseCase(
             "Checkout guest sem janela (ponte #1306) pedidoId={PedidoId} numeroCurto={Numero} storefrontId={StorefrontId} clienteNovo={Novo} elapsedMs={Ms}",
             pedido.Id, numeroCurto, storefrontId, clienteNovo, sw.ElapsedMilliseconds);
 
+        if (pedidoCriado is not null) await pedidoCriado(pedido.Id, ct);
         return new IniciarCheckoutGuestResult(pedido.Id, numeroCurto, tokenService.Gerar(pedido.Id), FreteEstimado: null);
     }
 
     private async Task<(DomainCliente Cliente, bool Novo)> ResolverClienteAsync(
         Guid empresaId, string nome, string telefoneE164, string cep, CancellationToken ct)
     {
-        var telefoneHash = ClienteOtp.CalcularTelefoneHash(telefoneE164);
-        var cliente = await clienteRepository.GetByTelefoneHashAsync(empresaId, telefoneHash, ct);
-        if (cliente is null)
-        {
-            cliente = DomainCliente.CriarParaStorefront(empresaId, telefoneHash, timeProvider);
-            cliente.Nome = nome;
-            cliente.Telefone = telefoneE164;
-            cliente.Cep = cep;
-            await clienteRepository.AddAsync(cliente, ct);
-            return (cliente, true);
-        }
-
-        // Idempotente: se cliente recorrente ainda nao tinha nome (telefone-only),
-        // preencher agora. Se ja tem nome diferente, preservar o existente.
-        if (string.IsNullOrWhiteSpace(cliente.Nome))
-            cliente.Nome = nome;
-        if (string.IsNullOrWhiteSpace(cliente.Telefone))
-            cliente.Telefone = telefoneE164;
-        cliente.RegistrarAcessoStorefront(timeProvider);
-        await clienteRepository.UpdateAsync(cliente, ct);
-        return (cliente, false);
+        // O bloqueio comercial continua valendo; consultar não concede identidade nem altera cadastro.
+        var declarado = await clienteRepository.GetByTelefoneHashAsync(empresaId, ClienteOtp.CalcularTelefoneHash(telefoneE164), ct);
+        if (declarado is { Bloqueado: true }) throw new ClienteBloqueadoException(declarado.Id);
+        // O telefone informado não prova posse: o pedido usa um cadastro guest separado.
+        var cliente = DomainCliente.CriarParaStorefront(empresaId,
+            ClienteOtp.CalcularTelefoneHash($"guest:{Guid.NewGuid():N}"), timeProvider);
+        cliente.Nome = nome;
+        cliente.Telefone = telefoneE164;
+        cliente.Cep = cep;
+        await clienteRepository.AddAsync(cliente, ct);
+        return (cliente, true);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────

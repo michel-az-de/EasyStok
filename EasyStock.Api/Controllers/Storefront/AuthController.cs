@@ -1,4 +1,5 @@
-﻿using EasyStock.Application.UseCases.Storefront.Auth;
+using EasyStock.Application.UseCases.Storefront.Auth;
+using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Domain.Exceptions.Storefront;
 using Microsoft.AspNetCore.RateLimiting;
 using Swashbuckle.AspNetCore.Annotations;
@@ -27,8 +28,27 @@ namespace EasyStock.Api.Controllers.Storefront;
 public sealed class AuthController(
     SolicitarOtpUseCase solicitarOtpUseCase,
     ValidarOtpUseCase validarOtpUseCase,
+    EncerrarSessaoUseCase encerrarSessaoUseCase,
+    VincularChatAposLoginUseCase vincularChat,
     ILogger<AuthController> logger) : EasyStockControllerBase
 {
+    [HttpPost("logout")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Logout([FromRoute] string slug, CancellationToken ct)
+    {
+        Guid? sessionId = Guid.TryParse(Request.Cookies["__Host-cdb_session"], out var parsed) ? parsed : null;
+        await encerrarSessaoUseCase.ExecuteAsync(slug, sessionId, Request.Headers["X-Chat-Token"].ToString(), ct);
+        Response.Cookies.Delete("__Host-cdb_session", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Lax,
+            Path = "/",
+        });
+        Response.Headers.CacheControl = "no-store";
+        return NoContent();
+    }
+
     public sealed record SolicitarOtpRequest(
         [Required] string Telefone);
 
@@ -171,6 +191,16 @@ public sealed class AuthController(
                 IpOrigem: ip,
                 UserAgent: string.IsNullOrWhiteSpace(ua) ? null : ua,
                 AcceptLanguage: string.IsNullOrWhiteSpace(al) ? null : al), ct);
+
+            try
+            {
+                await vincularChat.ExecuteAsync(slug, result.SessionId, Request.Headers["X-Chat-Token"].ToString(), ct);
+            }
+            catch (Exception ex) when (ex is SessaoChatSiteInvalidaException or ChatSiteIndisponivelException)
+            {
+                // Um chat vencido não invalida o OTP já comprovado. O widget abre nova sessão.
+                logger.LogInformation("Login concluído com chat indisponível para slug={Slug}", slug);
+            }
 
             Response.Cookies.Append("__Host-cdb_session", result.SessionId.ToString(), new CookieOptions
             {

@@ -10,6 +10,8 @@ using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.Tests.Services.Atendimento;
 using EasyStock.Application.Tests.Services.Storefront;
 using EasyStock.Application.UseCases.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.Endereco;
+using EasyStock.Application.UseCases.AdicionarClienteEndereco;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Pagamentos;
@@ -59,6 +61,8 @@ public class CriarPedidoPeloCardapioConversaUseCaseTests
             Cliente.Enderecos.Add(Endereco);
             var clienteRepo = Substitute.For<IClienteRepository>();
             clienteRepo.GetByIdWithDetailsAsync(EmpresaId, Cliente.Id).Returns(Cliente);
+            clienteRepo.GetByIdAsync(EmpresaId, Cliente.Id).Returns(Cliente);
+            clienteRepo.When(r => r.AddEnderecoAsync(Arg.Any<ClienteEndereco>())).Do(ci => Cliente.Enderecos.Add(ci.Arg<ClienteEndereco>()));
 
             Conversa = Conversa.Abrir(EmpresaId, "5511999998888", Agora, "Maria", Cliente.Id);
             ConversaRepo.ObterPorIdAsync(EmpresaId, Conversa.Id, Arg.Any<CancellationToken>()).Returns(Conversa);
@@ -95,7 +99,9 @@ public class CriarPedidoPeloCardapioConversaUseCaseTests
                 LinkService, Tenant, ConversaRepo, clienteRepo,
                 Checkout.CriarPedidoAtendimento(ConversaRepo, clienteRepo, Uow),
                 gerar, trocar, Eventos, Uow, TimeProvider.System,
-                NullLogger<CriarPedidoPeloCardapioConversaUseCase>.Instance);
+                NullLogger<CriarPedidoPeloCardapioConversaUseCase>.Instance,
+                new ConfirmarEnderecoClienteUseCase(clienteRepo, Uow,
+                    new AdicionarClienteEnderecoUseCase(clienteRepo, Uow, NullLogger<AdicionarClienteEnderecoUseCase>.Instance)));
         }
 
         public async Task<string> GerarTokenAsync() =>
@@ -131,6 +137,17 @@ public class CriarPedidoPeloCardapioConversaUseCaseTests
         resultado.LinkPagamento.Should().Be("https://mp.test/pref-1");
         c.Cobrancas.Should().ContainSingle().Which.ConversaId.Should().Be(c.Conversa.Id);
         c.Links.Links.Single().UsadoEm.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Endereco_completo_do_site_e_confirmado_no_cliente_da_conversa()
+    {
+        var c = new Cenario();
+        var token = await c.GerarTokenAsync();
+        var endereco = new EnderecoCheckout("01310100", "Avenida Paulista", "120", "Bela Vista", "São Paulo", "SP", "apto 3");
+        var r = await c.UseCase.ExecuteAsync(c.Input(token) with { Endereco = endereco });
+        c.Cliente.Enderecos.Should().Contain(e => e.Logradouro == "Avenida Paulista" && e.Numero == "120" && e.Complemento == "apto 3");
+        c.Checkout.PedidosAdicionados.Single(p => p.Id == r.PedidoId).Observacoes.Should().Contain("Avenida Paulista, 120, apto 3");
     }
 
     [Fact]

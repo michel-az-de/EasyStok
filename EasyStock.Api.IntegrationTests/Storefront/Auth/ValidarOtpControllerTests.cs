@@ -4,6 +4,8 @@ using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Infra.Postgre.Data;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
@@ -53,10 +55,14 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_validarotp_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                .WithPassword("Si6IT-" + Guid.NewGuid().ToString("N"))
                 .Build();
             await _pg.StartAsync();
             _connString = _pg.GetConnectionString();
+            await using var db = new EasyStockDbContext(new DbContextOptionsBuilder<EasyStockDbContext>()
+                .UseNpgsql(_connString).Options);
+            using var bypass = db.UseRowLevelSecurityBypass();
+            await db.Database.MigrateAsync();
             _isAvailable = true;
         }
         catch (DockerUnavailableException)
@@ -75,6 +81,9 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
         new WebApplicationFactory<Program>()
             .WithWebHostBuilder(b =>
             {
+                b.UseEnvironment("Development");
+                b.UseSetting("Database:Provider", "PostgreSql");
+                b.UseSetting("ConnectionStrings:DefaultConnection", _connString);
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
@@ -88,6 +97,7 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
                         ["Jwt:ExpirationMinutes"] = "60",
                         ["Anthropic:Enabled"] = "false",
                         ["FileStorage:Provider"] = "Local",
+                        ["RunMigrationsOnStartup"] = _pg is null ? "true" : "false",
                         ["Mobile:ApiKey"] = "easystock-integration-test-mobile-key-0001",
                     });
                 });

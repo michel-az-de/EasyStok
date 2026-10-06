@@ -37,6 +37,8 @@ public class ChatSiteUseCasesTests
         _flags.ListarAtivasAsync(_loja.EmpresaId, Arg.Any<CancellationToken>())
             .Returns([FeatureCatalogo.ModuloAtendimento, FeatureCatalogo.CanalChatSite]);
         _acesso = new AcessoChatSite(_lojas, _flags, _tenant, _sessoes);
+        _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<Conversa>>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task<Conversa>>>()(ci.Arg<CancellationToken>()));
     }
 
     private (SessaoChatSite Sessao, string Token) SessaoValida(Guid? storefrontId = null, DateTime? abertaEm = null)
@@ -48,7 +50,7 @@ public class ChatSiteUseCasesTests
     }
 
     private EnviarMensagemVisitanteUseCase Enviar() => new(
-        _acesso, _conversas, Substitute.For<IOperacaoEventPublisher>(), _uow, NullLogger<EnviarMensagemVisitanteUseCase>.Instance);
+        _acesso, _conversas, Substitute.For<IOperacaoEventPublisher>(), _uow, NullLogger<EnviarMensagemVisitanteUseCase>.Instance, new ConversaChatSiteService(_conversas, _uow));
 
     [Fact]
     public async Task AbrirSessao_DevolveTokenEGuardaSoOHash()
@@ -107,7 +109,7 @@ public class ChatSiteUseCasesTests
         resultado.Texto.Should().Be("Oi, vocês entregam hoje?");
         await _conversas.Received(1).AddMensagemAsync(
             Arg.Is<Mensagem>(m => m.ConversaId == criada.Id && m.Direcao == DirecaoMensagem.Entrada), Arg.Any<CancellationToken>());
-        await _uow.Received(1).CommitAsync();
+        await _uow.Received(2).CommitAsync();
     }
 
     [Fact]
@@ -169,4 +171,16 @@ public class ChatSiteUseCasesTests
         var imagem = () => canal.EnviarImagemAsync("sessao", "https://x/y.png");
         await imagem.Should().ThrowAsync<NotSupportedException>();
     }
+    [Fact]
+    public async Task Stream_UsaSnapshotAtualENaoSessaoRastreadaAntesDoLogout()
+    {
+        var (sessao, token) = SessaoValida();
+        _sessoes.ObterSnapshotPorTokenHashAsync(_loja.EmpresaId, sessao.TokenHash, Arg.Any<CancellationToken>())
+            .Returns((SessaoChatSite?)null);
+        var sut = new ListarMensagensChatSiteUseCase(_acesso, _sessoes, _conversas);
+        await sut.Invoking(x => x.ListarParaStreamAsync(_loja.EmpresaId, AcessoChatSite.HashDoToken(token), null))
+            .Should().ThrowAsync<SessaoChatSiteInvalidaException>();
+        await _conversas.DidNotReceiveWithAnyArgs().ListarMensagensDepoisAsync(default, default, default, default, default);
+    }
+
 }
