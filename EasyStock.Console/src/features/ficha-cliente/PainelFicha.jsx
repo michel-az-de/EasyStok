@@ -166,7 +166,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
           aoDesfazer={() => desfazerEsteira(selecionada.id, ultimoAvanco.mensagemId, ultimoAvanco.posEntregaId)}
           aoGerarPix={(meio) => { escolherMeioPagamento(selecionada.id, meio); gerarCobranca(selecionada.id, pedido, meio) }}
           aoReenviarPix={(valorForcado) => reenviarCobranca(selecionada.id, pedido, valorForcado ?? null)}
-          aoConfirmarPagamento={(valorPago) => confirmarPagamento(selecionada.id, valorPago ?? null)}
+          aoConfirmarPagamento={(valorPago, metodo) => confirmarPagamento(selecionada.id, valorPago ?? null, metodo)}
           aoAceitarDivergencia={() => aceitarDivergencia(selecionada.id)}
           aoCobrarDiferenca={() => reenviarCobranca(selecionada.id, pedido, faltaPagar(pedido.cobranca))}
           aoVoltarEtapa={() => corrigirPasso(selecionada.id)}

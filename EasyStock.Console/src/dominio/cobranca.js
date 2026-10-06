@@ -50,6 +50,11 @@ export const MINUTOS_PARA_EXPIRAR = 30
 // compromisso da casa (mesmo motivo de `textoDaCobranca` existir aqui).
 export const NOME_DO_MEIO = {
   pix: 'Pix',
+  dinheiro: 'dinheiro',
+  credito: 'cartão de crédito',
+  debito: 'cartão de débito',
+  transferencia: 'transferência',
+  outro: 'outro meio',
   'cartao-link': 'link de cartão',
   maquininha: 'maquininha',
   'vale-refeicao': 'vale',
@@ -169,7 +174,7 @@ export function situacaoDaCobranca(cobranca, agora) {
     return { chave: 'cancelada', tom: 'neutro', rotulo: 'Pedido cancelado', restamMs: 0 }
   }
   if (cobranca.pagaEm) {
-    if (cobranca.valorPago == null) {
+    if (cobranca.manual || cobranca.valorPago == null) {
       return { chave: 'paga', tom: 'ok', rotulo: 'Pago, marcado à mão', restamMs: 0 }
     }
     if (cobranca.valorPago === cobranca.valor) {
@@ -343,6 +348,10 @@ export function estadoDepoisDaTroca(pedido, anterior, novaTemLink) {
 // ("Recebi") se desfazem em qualquer passo, porque a esteira deles nunca
 // dependeu do pagamento.
 export function podeDesfazerPagamento(pedido) {
+  if (pedido?.pagamentosApi) {
+    return pedido.pagamentosApi.length > 0 && !pedido.cobranca?.link
+      && ['aguardando', 'aprovado_baba'].includes(pedido.statusApi)
+  }
   const cobranca = pedido?.cobranca
   if (!cobranca?.pagaEm || cobranca.estornadaEm || cobranca.canceladaEm) return false
   if (pedido.estado === 'cancelado') return false

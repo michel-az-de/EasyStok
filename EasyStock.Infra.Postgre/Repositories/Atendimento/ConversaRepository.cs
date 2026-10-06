@@ -12,6 +12,10 @@ namespace EasyStock.Infra.Postgre.Repositories.Atendimento;
 /// </summary>
 public sealed class ConversaRepository(EasyStockDbContext db) : IConversaRepository
 {
+    public Task<Guid?> ObterIdPorPedidoAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default) =>
+        db.AtendimentoConversas.Where(c => c.EmpresaId == empresaId && c.PedidoEmAndamentoId == pedidoId)
+            .Select(c => (Guid?)c.Id).FirstOrDefaultAsync(ct);
+
     public Task<Conversa?> ObterAbertaPorClienteNoCanalAsync(Guid empresaId, Guid clienteId, CanalConversa canal, CancellationToken ct = default) =>
         db.AtendimentoConversas.Where(c => c.EmpresaId == empresaId && c.ClienteId == clienteId
             && c.Canal == canal && c.Situacao != SituacaoConversa.Encerrada)

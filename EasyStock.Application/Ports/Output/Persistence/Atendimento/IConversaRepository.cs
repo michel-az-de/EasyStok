@@ -25,6 +25,8 @@ public sealed record FiltroResponsavel(Guid? UsuarioId)
 /// </summary>
 public interface IConversaRepository
 {
+    Task<Guid?> ObterIdPorPedidoAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default);
+
     Task<Conversa?> ObterAbertaPorClienteNoCanalAsync(Guid empresaId, Guid clienteId, CanalConversa canal, CancellationToken ct = default);
 
     Task TravarContatoAsync(Guid empresaId, string contato, CancellationToken ct = default);

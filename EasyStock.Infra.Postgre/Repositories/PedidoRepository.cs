@@ -6,6 +6,18 @@ namespace EasyStock.Infra.Postgre.Repositories
 {
     public sealed class PedidoRepository(EasyStockDbContext db) : IPedidoRepository
     {
+        public async Task TravarAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default)
+        {
+            if (db.Database.CurrentTransaction is null)
+                throw new InvalidOperationException("Lock do pedido exige transação ativa.");
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT 1 FROM pedidos WHERE \"Id\" = {pedidoId} AND \"EmpresaId\" = {empresaId} FOR UPDATE", ct);
+        }
+
+        public Task<bool> ExisteEventoAsync(Guid empresaId, Guid pedidoId, string tipo, CancellationToken ct = default) =>
+            db.Pedidos.Where(p => p.EmpresaId == empresaId && p.Id == pedidoId)
+                .AnyAsync(p => p.Eventos.Any(e => e.Tipo == tipo), ct);
+
         public Task<Pedido?> GetByIdAsync(Guid empresaId, Guid id) =>
             db.Pedidos.FirstOrDefaultAsync(p => p.EmpresaId == empresaId && p.Id == id);
 

@@ -1,3 +1,4 @@
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
@@ -29,7 +30,7 @@ public class RegistrarPagamentoPedidoUseCaseTests
 
     private RegistrarPagamentoPedidoUseCase UC(bool comCaixa = true) =>
         new(_repo, _uow, Substitute.For<ILogger<RegistrarPagamentoPedidoUseCase>>(),
-            new CalculadoraInicioPrevistoPedido(_prazoQueries),
+            new CalculadoraInicioPrevistoPedido(_prazoQueries), QuitacaoPedidoTeste.Criar(_repo),
             comCaixa ? _caixaRepo : null);
 
     private Pedido NovoPedidoOperacional(Guid empresaId, Guid? lojaId = null)
@@ -56,6 +57,35 @@ public class RegistrarPagamentoPedidoUseCaseTests
              .Do(ci => pedido.Pagamentos.Add(ci.Arg<PedidoPagamento>()));
 
         return pedido;
+    }
+
+    [Theory]
+    [InlineData("balcao", "web")]
+    [InlineData("whatsapp", "balcao")]
+    public async Task PagamentoDoBalcao_NaoEmiteQuitacaoAutomatica(string origemPedido, string origemComando)
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId);
+        pedido.Origem = origemPedido;
+        var eventos = Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>();
+        var publicador = Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>();
+        var uc = new RegistrarPagamentoPedidoUseCase(_repo, _uow,
+            Substitute.For<ILogger<RegistrarPagamentoPedidoUseCase>>(), new CalculadoraInicioPrevistoPedido(_prazoQueries),
+            QuitacaoPedidoTeste.Criar(_repo, publicador: publicador, eventos: eventos));
+        await uc.ExecuteAsync(new(empresaId, pedido.Id, "dinheiro", 100m, Origem: origemComando));
+        pedido.TotalPago.Should().Be(100m);
+        publicador.ReceivedCalls().Should().BeEmpty();
+        eventos.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PedidoDeOutraEmpresa_NaoRecebePagamentoMesmoSeRepositorioDevolver()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId);
+        pedido.EmpresaId = Guid.NewGuid();
+        (await UC().ExecuteAsync(new(empresaId, pedido.Id, "dinheiro", 100m))).Should().BeNull();
+        await _repo.DidNotReceive().AddPagamentoAsync(Arg.Any<PedidoPagamento>());
     }
 
     [Fact]

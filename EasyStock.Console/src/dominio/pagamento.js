@@ -29,7 +29,7 @@ export const registroDaCobranca = (cobranca) => ({
 // (`receitaDoTrecho`) lê o bruto por este caminho e subtrai o estorno como
 // linha própria (`bruto - estorno = líquido`, decisão 36). Tirar a estornada
 // daqui faria o líquido subtrair duas vezes o mesmo valor.
-export const pagamentosDoPedido = (pedido) => [
+export const pagamentosDoPedido = (pedido) => pedido?.pagamentosApi ?? [
   ...(pedido?.pagamentos ?? []),
   ...(pedido?.cobranca?.pagaEm ? [registroDaCobranca(pedido.cobranca)] : []),
 ]

@@ -1,7 +1,7 @@
 import * as acao from '../acoes'
 import {
   FORMA_ONLINE, corpoDoPedido, formaDoMeio, gerarPedido, janelaDoId, listarJanelas, obterPedido, pedidoDaApi,
-  reemitirCobranca, trocarFormaPagamento,
+  reemitirCobranca, trocarFormaPagamento, registrarPagamentoManual, desfazerPagamentoManual,
 } from '../../infra/api/comandaApi'
 
 // Comanda e cobrança no modo API (F03, S10/S11). Montar a comanda (itens, observação,
@@ -9,7 +9,7 @@ import {
 // que cobra pelo Mercado Pago e manda o resumo com o link pela conversa. Depois disso o
 // pedido é do EasyStok: a polling traz pago, expirado e o resto da esteira.
 //
-// O que a F03 não liga (confirmar à mão, estorno, cancelar, esteira, reenvio avulso) não
+// O que ainda não está ligado (estorno, cancelar, esteira, reenvio avulso) não
 // mexe na memória do navegador com pedido já criado: avisa e deixa como está, para a tela
 // nunca mostrar um estado que o EasyStok não tem.
 //
@@ -21,10 +21,8 @@ const SEM_PEDIDO = 'o pedido ainda não está no EasyStok. Gere a cobrança ou e
 
 const EDITA_COMANDA = ['adicionarItem', 'removerItem', 'ajustarQuantidade', 'ajustarObservacao', 'escolherJanela', 'forcarEncaixe']
 const SO_NO_EASYSTOK = {
-  confirmarPagamento: 'Marcar pago à mão',
   marcarComprovante: 'Comprovante',
   aceitarDivergencia: 'Aceitar diferença',
-  desfazerPagamento: 'Desfazer pagamento',
   marcarEstorno: 'Estorno',
   cancelarPedido: 'Cancelar pedido',
   avancarEsteira: 'Avançar a esteira',
@@ -124,7 +122,25 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
     return undefined
   }
 
+  const receber = (id, valor, metodo) => {
+    if (!pedidoCriado(id)) return soNoEasyStok('Receber pagamento')(id)
+    if (!metodo) { avisar('Selecione como recebeu o pagamento.'); return undefined }
+    return umaPorConversa(id, () => registrarPagamentoManual(pedidoCriado(id), valor, metodo).then(
+      () => recarregar(id).catch(() => avisar('Pagamento registrado. Atualizando a tela…')),
+      (erro) => avisar(`Pagamento não registrado: ${erro.message}`),
+    ))
+  }
+  const desfazer = (id, motivo) => {
+    if (!pedidoCriado(id)) return soNoEasyStok('Desfazer pagamento')(id)
+    return umaPorConversa(id, () => desfazerPagamentoManual(pedidoCriado(id), motivo).then(
+      () => recarregar(id).catch(() => avisar('Pagamento desfeito. Atualizando a tela…')),
+      (erro) => avisar(`Pagamento não desfeito: ${erro.message}`),
+    ))
+  }
+
   return {
+    confirmarPagamento: receber,
+    desfazerPagamento: desfazer,
     ...Object.fromEntries(EDITA_COMANDA.map((nome) => [nome, soSemPedidoCriado(nome)])),
     ...Object.fromEntries(Object.entries(SO_NO_EASYSTOK).map(([nome, rotulo]) => [nome, soNoEasyStok(rotulo)])),
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Bloco } from '../../componentes/Bloco'
 import { Botao } from '../../componentes/Botao'
 import { CampoMascarado } from '../../componentes/CampoMascarado'
-import { CampoTexto } from '../../componentes/Campo'
+import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
 import { ListaDados } from '../../componentes/ListaDados'
 import { Pilula } from '../../componentes/Pilula'
@@ -138,18 +138,25 @@ function CopiaECola({ codigo }) {
 // para o bloco Pedido (secao 2 da direção visual); este formulário é o que
 // abre quando ele é clicado, então mora aqui para o bloco Pedido reusar.
 //
-// No sistema real este caminho não existe: a baixa chega por webhook e concilia
-// sozinha (RN-24). Ele está aqui porque no protótipo não há provedor do outro
-// lado, e por isso é ação discreta, nunca o botão principal.
+// Recebimento manual exige escolher o método usado; a API decide se o pedido foi quitado.
 export function BaixaAMao({ valorCobrado, aoConfirmar, aoCancelar }) {
   // Nasce preenchida com o total cobrado, em centavos por dentro (seção 4 da
   // direção visual, passo zero): a tela só vê o texto já mascarado, "R$ X,XX".
   const [centavos, setCentavos] = useState(() => Math.round(valorCobrado * 100))
   const excedeu = moedaAltaDemais(centavos)
-  const valido = centavos > 0 && !excedeu
+  const [metodo, setMetodo] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const valido = centavos > 0 && !excedeu && Boolean(metodo)
 
   return (
     <div className={css.baixaDivergente}>
+      <CampoSelecao rotulo="Como recebeu" value={metodo} onChange={(e) => setMetodo(e.target.value)}
+        opcoes={[
+          { valor: '', rotulo: 'Selecione' }, { valor: 'pix', rotulo: 'Pix' },
+          { valor: 'dinheiro', rotulo: 'Dinheiro' }, { valor: 'credito', rotulo: 'Cartão de crédito' },
+          { valor: 'debito', rotulo: 'Cartão de débito' }, { valor: 'transferencia', rotulo: 'Transferência' },
+          { valor: 'outro', rotulo: 'Outro' },
+        ]} />
       <CampoMascarado
         tipo="moeda"
         rotulo="Valor recebido"
@@ -160,7 +167,10 @@ export function BaixaAMao({ valorCobrado, aoConfirmar, aoCancelar }) {
       />
       <div className={css.acoesCobranca}>
         <Botao largo onClick={aoCancelar}>Voltar</Botao>
-        <Botao largo variante="primario" disabled={!valido} onClick={() => aoConfirmar(centavos / 100)}>
+        <Botao largo variante="primario" disabled={!valido || enviando} onClick={async () => {
+          setEnviando(true)
+          try { await aoConfirmar(centavos / 100, metodo) } finally { setEnviando(false) }
+        }}>
           Confirmar
         </Botao>
       </div>
@@ -222,13 +232,14 @@ export function BlocoCobranca({
   const { cardapio } = useCatalogo()
   const { fidelidade } = useAtendimento()
   const {
-    marcarRecebidoEntrega, refazerCobranca, escolherMeioPagamento, aplicarCupom, removerCupomDoPedido,
+    confirmarPagamento, marcarRecebidoEntrega, refazerCobranca, escolherMeioPagamento, aplicarCupom, removerCupomDoPedido,
   } = useAcoes()
   // Ponta (a): o chip marcado mora no pedido, para "Enviar comanda" e a
   // barra mandarem o mesmo meio. Nenhum vem marcado: ela escolhe.
   const meioEscolhido = pedido.meio ?? null
   // Diferença de item novo em pedido pago: pergunta o meio de novo, com os
   // mesmos quatro chips (pago na maquininha pode completar no Pix e vice-versa).
+  const [recebendo, setRecebendo] = useState(false)
   const [meioDaDiferenca, setMeioDaDiferenca] = useState(false)
   const cobranca = pedido.cobranca ?? null
   const situacao = situacaoDaCobranca(cobranca, agora)
@@ -332,7 +343,7 @@ export function BlocoCobranca({
   // Fonte única de "quanto já foi pago" (dominio/pagamento.js, registro 38):
   // depois de um complemento pago, não mostra de novo a parte original.
   const diferencaPosPagamento = diferencaAposPagamento(pedido, cardapio)
-  const nome = nomeDoMeio(cobranca.meio)
+  const nome = nomeDoMeio(cobranca.metodoRecebido ?? cobranca.meio)
 
   // Maquininha ou vale (sem link): sem anel, sem prazo, uma linha só (decisão
   // 19, seção 4: "Linha 'Receber na entrega · maquininha · R$ 68,00'").
@@ -346,13 +357,18 @@ export function BlocoCobranca({
         <p className={css.linhaNaEntrega}>
           <Icone nome="credit-card" /> Receber na entrega · {nome} <b>{moeda(cobranca.valor)}</b>
         </p>
-        {editavel && (
+        {recebendo && (
+          <BaixaAMao valorCobrado={Math.max(0, (pedido.totalApi ?? cobranca.valor) - (pedido.totalPagoApi ?? 0))}
+            aoCancelar={() => setRecebendo(false)}
+            aoConfirmar={async (valor, metodo) => { await confirmarPagamento(conversaId, valor, metodo); setRecebendo(false) }} />
+        )}
+        {editavel && !recebendo && (
           <div className={css.acoesCobranca}>
             <Botao
               largo
               variante="primario"
               icone="circle-check"
-              onClick={() => marcarRecebidoEntrega(conversaId, true, agora)}
+              onClick={() => pedido.pedidoId ? setRecebendo(true) : marcarRecebidoEntrega(conversaId, true, agora)}
             >
               Recebi
             </Botao>

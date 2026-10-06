@@ -16,7 +16,11 @@ public sealed record PedidoConversaResult(
     DateTime CriadoEm,
     DateTime? AgendadoParaEm,
     IReadOnlyList<ItemPedidoConversaResult> Itens,
-    CobrancaPedidoConversaResult? Cobranca);
+    CobrancaPedidoConversaResult? Cobranca,
+    decimal TotalPago = 0,
+    IReadOnlyList<PagamentoPedidoConversaResult>? Pagamentos = null);
+
+public sealed record PagamentoPedidoConversaResult(Guid Id, decimal Valor, string Metodo, DateTime PagoEm);
 
 public sealed record ItemPedidoConversaResult(
     Guid? CardapioItemId,
@@ -75,6 +79,7 @@ public sealed class ObterPedidoConversaUseCase(
         return new PedidoConversaResult(
             pedido.Id, pedido.Status, pedido.Total.Valor, frete, pedido.CriadoEm, pedido.AgendadoParaEm,
             itens.Select(i => new ItemPedidoConversaResult(i.CardapioItemId, i.Nome, i.Quantidade, i.PrecoUnitario, i.Observacao)).ToList(),
-            vigente is null ? null : CobrancaPedidoConversaResult.De(vigente));
+            vigente is null ? null : CobrancaPedidoConversaResult.De(vigente), pedido.TotalPago,
+            pedido.Pagamentos.Select(p => new PagamentoPedidoConversaResult(p.Id, p.Valor, p.Metodo, p.PagoEm)).ToList());
     }
 }

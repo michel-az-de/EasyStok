@@ -5,7 +5,6 @@ using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
-using EasyStock.Application.Ports.Output.Persistence.Operacao;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
@@ -100,8 +99,8 @@ internal sealed class MercadoPagoWebhookFixture
             new ResolvedorCanal(Array.Empty<ICanalMensageria>()), Uow, NullLogger<AvisoCobrancaConversa>.Instance);
         var confirmar = new ConfirmarPagamentoPedidoUseCase(CobrancaRepo, PedidoStorefrontRepo,
             new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance,
-                new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>())),
-            Publicador, Substitute.For<IOperacaoEventPublisher>(), Substitute.For<IImpressaoPendenteRepository>(), tenant, Uow, relogio,
+                new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()), QuitacaoPedidoTeste.Criar(PedidoRepo)),
+            Publicador, Substitute.For<IOperacaoEventPublisher>(), QuitacaoPedidoTeste.Criar(PedidoRepo, CobrancaRepo, publicador: Publicador), tenant, Uow, relogio,
             NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance,
             new CalculadoraInicioPrevistoPedido(Substitute.For<IPrazoPreparoPedidoQueries>()), Estorno, aviso, PedidoRepo);
         var atualizar = new AtualizarCobrancaPorPagamentoUseCase(CobrancaRepo, PedidoStorefrontRepo, aviso, tenant, Uow,

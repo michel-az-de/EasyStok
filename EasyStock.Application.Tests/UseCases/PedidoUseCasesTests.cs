@@ -1,4 +1,5 @@
-﻿using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Tests.Helpers;
+using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.AdicionarItemPedido;
 using EasyStock.Application.UseCases.CancelarPedido;
@@ -50,7 +51,7 @@ public class PedidoUseCasesTests
         Substitute.For<IContaReceberRepository>(),
         _uow, Substitute.For<ILogger<CancelarPedidoUseCase>>());
     private RegistrarPagamentoPedidoUseCase PagamentoUC() => new(_pedidoRepo, _uow,
-        Substitute.For<ILogger<RegistrarPagamentoPedidoUseCase>>(), new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
+        Substitute.For<ILogger<RegistrarPagamentoPedidoUseCase>>(), new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()), QuitacaoPedidoTeste.Criar(_pedidoRepo));
     private AdicionarItemPedidoUseCase AdicionarItemUC() => new(_pedidoRepo, _produtoRepo, EstoqueSvc(), _uow,
         Substitute.For<ILogger<AdicionarItemPedidoUseCase>>());
     private RemoverItemPedidoUseCase RemoverItemUC() => new(_pedidoRepo, EstoqueSvc(), _uow,

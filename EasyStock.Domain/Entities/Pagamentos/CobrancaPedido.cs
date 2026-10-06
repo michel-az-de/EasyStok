@@ -160,6 +160,18 @@ public class CobrancaPedido
         AtualizadaEm = PagaEm;
     }
 
+    public void ReabrirPagamentoManual(DateTime agora)
+    {
+        if (EhOnline || Status != StatusCobrancaPedido.Paga)
+            throw new RegraDeDominioVioladaException("Só cobrança manual paga pode ser reaberta.");
+        Status = StatusCobrancaPedido.Pendente;
+        PagamentoExternoId = null;
+        ValorPago = null;
+        PagaEm = null;
+        MetodoPagamento = null;
+        AtualizadaEm = Utc(agora);
+    }
+
     public void Expirar(DateTime agora)
     {
         if (!EstaPendente)
