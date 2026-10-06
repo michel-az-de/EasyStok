@@ -125,7 +125,7 @@ public sealed class OtpStubFlagTests : IAsyncLifetime
     {
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
         await using var factory = CriarFactory(environment: "Production", useStub: false);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
         var loja = await SeedStorefrontAsync(factory, "loja-sem-provider-otp");
         using (var scope = factory.Services.CreateScope())
             scope.ServiceProvider.GetRequiredService<IWhatsAppOtpSender>().Should().BeOfType<IndisponivelWhatsAppOtpSender>();
@@ -142,6 +142,13 @@ public sealed class OtpStubFlagTests : IAsyncLifetime
             using var bypass = db.UseRowLevelSecurityBypass();
             (await db.ClienteOtps.CountAsync(o => o.EmpresaId == loja.EmpresaId)).Should().Be(0);
         }
+        var csrf = await client.GetAsync($"/api/storefront/{loja.Slug}/auth/csrf");
+        csrf.StatusCode.Should().Be(HttpStatusCode.OK);
+        csrf.Headers.CacheControl!.NoStore.Should().BeTrue();
+        csrf.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith("__Host-cdb_csrf=", StringComparison.Ordinal))
+            .ToLowerInvariant().Should().Contain("secure").And.Contain("httponly").And.Contain("samesite=strict").And.Contain("path=/");
+        var token = (await csrf.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()).GetProperty("requestToken").GetString();
+        client.DefaultRequestHeaders.Add("X-CSRF-Token", token);
         var logout = await client.PostAsync($"/api/storefront/{loja.Slug}/auth/logout", null);
         logout.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }

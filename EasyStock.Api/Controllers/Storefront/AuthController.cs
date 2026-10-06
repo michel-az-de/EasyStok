@@ -2,6 +2,7 @@ using EasyStock.Application.UseCases.Storefront.Auth;
 using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Domain.Exceptions.Storefront;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Antiforgery;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers.Storefront;
@@ -32,8 +33,18 @@ public sealed class AuthController(
     VincularChatAposLoginUseCase vincularChat,
     ILogger<AuthController> logger) : EasyStockControllerBase
 {
+    [HttpGet("csrf")]
+    public IActionResult Csrf([FromServices] IAntiforgery antiforgery)
+    {
+        var tokens = antiforgery.GetAndStoreTokens(HttpContext);
+        Response.Headers.CacheControl = "no-store";
+        return Ok(new { requestToken = tokens.RequestToken });
+    }
+
     [HttpPost("logout")]
+    [ValidateAntiForgeryToken]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Logout([FromRoute] string slug, CancellationToken ct)
     {
         Guid? sessionId = Guid.TryParse(Request.Cookies["__Host-cdb_session"], out var parsed) ? parsed : null;
@@ -199,7 +210,7 @@ public sealed class AuthController(
             catch (Exception ex) when (ex is SessaoChatSiteInvalidaException or ChatSiteIndisponivelException)
             {
                 // Um chat vencido não invalida o OTP já comprovado. O widget abre nova sessão.
-                logger.LogInformation("Login concluído com chat indisponível para slug={Slug}", slug);
+                logger.LogInformation("Login concluido com chat indisponivel.");
             }
 
             Response.Cookies.Append("__Host-cdb_session", result.SessionId.ToString(), new CookieOptions

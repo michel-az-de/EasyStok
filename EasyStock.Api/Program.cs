@@ -67,6 +67,16 @@ builder.Host.UseSerilog();
 
 // ── Core MVC ─────────────────────────────────────────────────────────────────
 builder.Services.AddEasyStockCoreMvc();
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-Token";
+    options.Cookie.Name = builder.Environment.IsProduction() ? "__Host-cdb_csrf" : "cdb_csrf";
+    options.Cookie.Path = "/";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Strict;
+    options.Cookie.SecurePolicy = builder.Environment.IsProduction()
+        ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
+});
 
 // ── Feature DI groups ─────────────────────────────────────────────────────────
 builder.Services.AddEasyStockSwagger();
