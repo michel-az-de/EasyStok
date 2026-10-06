@@ -1,4 +1,4 @@
-﻿namespace EasyStock.Application.UseCases.Storefront.Checkout;
+namespace EasyStock.Application.UseCases.Storefront.Checkout;
 
 /// <summary>Input do checkout storefront (ADR-0014).</summary>
 public sealed record IniciarCheckoutInput(
@@ -10,6 +10,8 @@ public sealed record IniciarCheckoutInput(
     string Cep,
     string? Observacoes = null,
     Guid? IdempotencyKey = null,
-    string? ContentHash = null);
+    string? ContentHash = null,
+    string? Numero = null,
+    Guid? ConversaId = null);
 
 public sealed record CheckoutItemInput(Guid CardapioItemId, int Qtd);

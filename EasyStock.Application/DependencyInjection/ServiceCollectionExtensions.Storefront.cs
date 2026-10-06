@@ -28,6 +28,8 @@ public static partial class ServiceCollectionExtensions
         // Autenticacao via OTP (EZ-AUTH-001, EZ-AUTH-002)
         services.AddScoped<SolicitarOtpUseCase>();
         services.AddScoped<ValidarOtpUseCase>();
+        services.AddScoped<EncerrarSessaoUseCase>();
+        services.AddScoped<VincularChatAposLoginUseCase>();
 
         // Frete (EZ-FRETE-001)
         services.AddScoped<CalcularFreteUseCase>();
@@ -40,6 +42,8 @@ public static partial class ServiceCollectionExtensions
 
         // Checkout (CHECKOUT-001 base + WEBHOOK-001)
         services.AddScoped<CheckoutIdempotencyService>();
+        services.AddScoped<EasyStock.Application.Services.Atendimento.ConversaChatSiteService>();
+        services.AddScoped<CheckoutSiteUseCase>();
         services.AddScoped<EasyStock.Application.Services.Storefront.CheckoutCoreService>(); // S10: fases 1-2
         services.AddScoped<IniciarCheckoutUseCase>();
 

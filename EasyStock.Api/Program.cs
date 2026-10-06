@@ -67,6 +67,16 @@ builder.Host.UseSerilog();
 
 // ── Core MVC ─────────────────────────────────────────────────────────────────
 builder.Services.AddEasyStockCoreMvc();
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-Token";
+    options.Cookie.Name = builder.Environment.IsProduction() ? "__Host-cdb_csrf" : "cdb_csrf";
+    options.Cookie.Path = "/";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Strict;
+    options.Cookie.SecurePolicy = builder.Environment.IsProduction()
+        ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
+});
 
 // ── Feature DI groups ─────────────────────────────────────────────────────────
 builder.Services.AddEasyStockSwagger();
@@ -95,17 +105,19 @@ builder.Services.Configure<EasyStock.Application.Services.PedidoEstoqueOptions>(
     builder.Configuration.GetSection("Pedidos"));
 builder.Services.AddEasyStockAsyncInfrastructure(builder.Configuration);
 
-// ── Storefront — WhatsApp OTP provider (stub em Development, real em Prod) ────
-// TASK-EZ-AUTH-001: stub em ambientes nao-Production por default. Provider real
-// (Meta WhatsApp Cloud API) entra em TASK-EZ-WA-001 apos Meta Business
-// Verification (TASK-HUM-001). Flag explicita Otp:UseStub destrava o stub em
-// Production enquanto a verificacao do Meta nao sai (issue #677 — Casa da Baba):
-// codigo so vai pro docker logs, nao volta no response. Em Production sem flag
-// e sem provider real, AuthController nao resolve — fail fast intencional.
+// ── Storefront — WhatsApp OTP provider ────────────────────────────────────────
+// O stub exige opt-in em Production e não envia mensagens reais. Sem provider configurado,
+// registrar indisponibilidade explícita mantém logout/auth resolvíveis e solicitar-otp retorna
+// OTP_PROVIDER_UNAVAILABLE antes de persistir ou reaproveitar um código. Provider real ainda pendente.
 var otpUseStub = builder.Configuration.GetValue<bool>("Otp:UseStub");
 if (otpUseStub || !builder.Environment.IsProduction())
 {
     builder.Services.AddEasyStockWhatsAppStub();
+}
+else
+{
+    builder.Services.AddScoped<EasyStock.Application.Ports.Output.Messaging.IWhatsAppOtpSender,
+        EasyStock.Infra.Integrations.WhatsApp.IndisponivelWhatsAppOtpSender>();
 }
 
 // ── Storefront — CEP lookup (ViaCEP em prod, NoOp por default) ────────────────

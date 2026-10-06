@@ -4,11 +4,15 @@ using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Infra.Postgre.Data;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
 using Testcontainers.PostgreSql;
+using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.ChatSite;
 
 namespace EasyStock.Api.IntegrationTests.Storefront.Auth;
 
@@ -53,10 +57,14 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_validarotp_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                .WithPassword("Si6IT-" + Guid.NewGuid().ToString("N"))
                 .Build();
             await _pg.StartAsync();
             _connString = _pg.GetConnectionString();
+            await using var db = new EasyStockDbContext(new DbContextOptionsBuilder<EasyStockDbContext>()
+                .UseNpgsql(_connString).Options);
+            using var bypass = db.UseRowLevelSecurityBypass();
+            await db.Database.MigrateAsync();
             _isAvailable = true;
         }
         catch (DockerUnavailableException)
@@ -75,6 +83,9 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
         new WebApplicationFactory<Program>()
             .WithWebHostBuilder(b =>
             {
+                b.UseEnvironment("Development");
+                b.UseSetting("Database:Provider", "PostgreSql");
+                b.UseSetting("ConnectionStrings:DefaultConnection", _connString);
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
@@ -88,6 +99,7 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
                         ["Jwt:ExpirationMinutes"] = "60",
                         ["Anthropic:Enabled"] = "false",
                         ["FileStorage:Provider"] = "Local",
+                        ["RunMigrationsOnStartup"] = _pg is null ? "true" : "false",
                         ["Mobile:ApiKey"] = "easystock-integration-test-mobile-key-0001",
                     });
                 });
@@ -241,6 +253,76 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
         var response = await client.SendAsync(pedidos);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, "a sessão criada no login precisa valer na requisição seguinte");
+    }
+
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Logout_exige_par_csrf_e_so_revoga_com_token_valido(bool autenticado)
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var factory = CriarFactory();
+        await SeedDadosAsync(factory.Services, BCrypt.Net.BCrypt.HashPassword(CodigoValido));
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            { BaseAddress = new Uri(autenticado ? "https://localhost" : "http://localhost") });
+        Guid? sessionId = null;
+        if (autenticado)
+        {
+            var login = await client.PostAsJsonAsync($"/api/storefront/{SlugTeste}/auth/validar-otp",
+                new { Telefone = TelefoneE164, Codigo = CodigoValido });
+            login.StatusCode.Should().Be(HttpStatusCode.OK);
+            var cookie = login.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith("__Host-cdb_session=", StringComparison.Ordinal));
+            sessionId = Guid.Parse(cookie.Split(';')[0].Split('=')[1]);
+        }
+        var chatToken = AcessoChatSite.NovoToken();
+        var chatHash = AcessoChatSite.HashDoToken(chatToken);
+        Guid chatId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            using var bypass = db.UseRowLevelSecurityBypass();
+            var loja = await db.Storefronts.IgnoreQueryFilters().SingleAsync(s => s.Slug == SlugTeste);
+            var chat = SessaoChatSite.Abrir(loja.EmpresaId, loja.Id, chatHash, DateTime.UtcNow);
+            chatId = chat.Id;
+            db.SessoesChatSite.Add(chat);
+            await db.SaveChangesAsync();
+        }
+        client.DefaultRequestHeaders.Add("X-Chat-Token", chatToken);
+        client.DefaultRequestHeaders.Add("Origin", "https://outro-site.example");
+        (await client.PostAsync($"/api/storefront/{SlugTeste}/auth/logout", null)).StatusCode.Should()
+            .Be(autenticado ? HttpStatusCode.Forbidden : HttpStatusCode.BadRequest);
+        client.DefaultRequestHeaders.Remove("Origin");
+        (await client.PostAsync($"/api/storefront/{SlugTeste}/auth/logout", null)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var csrf = await client.GetAsync($"/api/storefront/{SlugTeste}/auth/csrf");
+        csrf.StatusCode.Should().Be(HttpStatusCode.OK);
+        csrf.Headers.CacheControl!.NoStore.Should().BeTrue();
+        var token = (await csrf.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()).GetProperty("requestToken").GetString();
+        token.Should().NotBeNullOrWhiteSpace();
+        client.DefaultRequestHeaders.Add("X-CSRF-Token", "token-invalido");
+        (await client.PostAsync($"/api/storefront/{SlugTeste}/auth/logout", null)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        using (var semCookie = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false }))
+        {
+            semCookie.DefaultRequestHeaders.Add("X-Chat-Token", chatToken);
+            semCookie.DefaultRequestHeaders.Add("X-CSRF-Token", token);
+            (await semCookie.PostAsync($"/api/storefront/{SlugTeste}/auth/logout", null)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        }
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            using var bypass = db.UseRowLevelSecurityBypass();
+            (await db.SessoesChatSite.IgnoreQueryFilters().SingleAsync(s => s.Id == chatId)).TokenHash.Should().Be(chatHash);
+            if (sessionId is { } id) (await db.ClienteSessions.IgnoreQueryFilters().SingleAsync(s => s.Id == id)).Revogada.Should().BeFalse();
+        }
+        client.DefaultRequestHeaders.Remove("X-CSRF-Token");
+        client.DefaultRequestHeaders.Add("X-CSRF-Token", token);
+        (await client.PostAsync($"/api/storefront/{SlugTeste}/auth/logout", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            using var bypass = db.UseRowLevelSecurityBypass();
+            (await db.SessoesChatSite.IgnoreQueryFilters().SingleAsync(s => s.Id == chatId)).TokenHash.Should().NotBe(chatHash);
+            if (sessionId is { } id) (await db.ClienteSessions.IgnoreQueryFilters().SingleAsync(s => s.Id == id)).Revogada.Should().BeTrue();
+        }
     }
 
     private sealed record ValidarOtpResponseDto(string TelefoneOfuscado, string PrimeiroNome);

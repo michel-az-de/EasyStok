@@ -10,7 +10,7 @@ namespace EasyStock.Api.DependencyInjection;
 /// Extensions para registrar MVC core + JSON + Response Compression do EasyStock.Api.
 ///
 /// Mantém a mesma ordem relativa de registro do Program.cs original:
-/// AddControllers → JsonOptions → FluentValidationAutoValidation →
+/// AddControllersWithViews → JsonOptions → FluentValidationAutoValidation →
 /// HttpContextAccessor → EndpointsApiExplorer → ResponseCompression →
 /// Configure&lt;BrotliCompressionProviderOptions&gt; → Configure&lt;GzipCompressionProviderOptions&gt;.
 /// </summary>
@@ -18,7 +18,7 @@ public static class CoreMvcExtensions
 {
     public static IServiceCollection AddEasyStockCoreMvc(this IServiceCollection services)
     {
-        services.AddControllers()
+        services.AddControllersWithViews()
             .AddJsonOptions(opts =>
             {
                 opts.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;

@@ -643,6 +643,11 @@ public class AtendimentoConversasControllerTests
         public List<Conversa> Conversas { get; } = [];
         public List<Mensagem> Mensagens { get; } = [];
 
+        public Task TravarContatoAsync(Guid empresaId, string contato, CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task<Conversa?> ObterAbertaPorClienteNoCanalAsync(Guid empresaId, Guid clienteId, CanalConversa canal, CancellationToken ct = default) =>
+            Task.FromResult(Conversas.FirstOrDefault(c => c.EmpresaId == empresaId && c.ClienteId == clienteId && c.Canal == canal && c.EstaAberta));
+
         public Task<Conversa?> ObterPorIdAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
             Task.FromResult(Conversas.FirstOrDefault(c => c.EmpresaId == empresaId && c.Id == id));
 

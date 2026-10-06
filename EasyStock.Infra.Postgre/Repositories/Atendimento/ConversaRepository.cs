@@ -12,6 +12,17 @@ namespace EasyStock.Infra.Postgre.Repositories.Atendimento;
 /// </summary>
 public sealed class ConversaRepository(EasyStockDbContext db) : IConversaRepository
 {
+    public Task<Conversa?> ObterAbertaPorClienteNoCanalAsync(Guid empresaId, Guid clienteId, CanalConversa canal, CancellationToken ct = default) =>
+        db.AtendimentoConversas.Where(c => c.EmpresaId == empresaId && c.ClienteId == clienteId
+            && c.Canal == canal && c.Situacao != SituacaoConversa.Encerrada)
+            .OrderByDescending(c => c.IniciadaEm).FirstOrDefaultAsync(ct);
+
+    public Task TravarContatoAsync(Guid empresaId, string contato, CancellationToken ct = default)
+    {
+        var chave = $"chat-site:{empresaId:N}:{contato}";
+        return db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({chave}))", ct);
+    }
+
     private const int MaxMensagens = 500;
     private const int MaxPagina = 200;
 

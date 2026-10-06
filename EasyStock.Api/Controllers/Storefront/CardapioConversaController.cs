@@ -54,7 +54,7 @@ public sealed class CardapioConversaController(CriarPedidoPeloCardapioConversaUs
                 DataEntrega: body.DataEntrega,
                 EnderecoId: body.EnderecoId,
                 Forma: body.Forma,
-                Observacoes: body.Observacoes), ct);
+                Observacoes: body.Observacoes, Endereco: body.Endereco), ct);
             return StatusCode(StatusCodes.Status201Created, result);
         }
         catch (LinkCardapioConversaIndisponivelException ex)
@@ -96,6 +96,7 @@ public sealed record PedidoCardapioConversaRequestBody(
     DateOnly DataEntrega,
     Guid? EnderecoId = null,
     string? Forma = null,
-    string? Observacoes = null);
+    string? Observacoes = null,
+    EnderecoCheckout? Endereco = null);
 
 public sealed record ItemCardapioConversaRequest(Guid CardapioItemId, int Qtd, string? Observacao = null);

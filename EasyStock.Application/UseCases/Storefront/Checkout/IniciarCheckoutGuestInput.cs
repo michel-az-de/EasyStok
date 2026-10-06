@@ -4,8 +4,8 @@ namespace EasyStock.Application.UseCases.Storefront.Checkout;
 /// Input do checkout GUEST storefront (issue #680).
 ///
 /// Com janela e data (#1254): o guest reserva a vaga e é cobrado pelo Mercado Pago, como o
-/// checkout logado. Sem ClienteId: use case resolve por <c>telefoneHash</c> (cria Cliente novo
-/// na empresa se for guest novo; reusa se telefone já existir).
+/// checkout logado. Sem prova OTP, usa um cadastro guest isolado e preserva o telefone
+/// informado apenas como contato do pedido.
 /// </summary>
 public sealed record IniciarCheckoutGuestInput(
     string Slug,
@@ -16,4 +16,5 @@ public sealed record IniciarCheckoutGuestInput(
     IReadOnlyList<CheckoutItemInput> Items,
     Guid? JanelaId,
     DateOnly? DataEntrega,
-    string? Observacoes = null);
+    string? Observacoes = null,
+    Guid? ConversaId = null);

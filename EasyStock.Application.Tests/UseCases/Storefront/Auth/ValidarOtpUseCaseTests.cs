@@ -1,6 +1,8 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Auth;
+using EasyStock.Application.UseCases.Atendimento;
+using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.TestHelpers;
@@ -43,6 +45,7 @@ public class ValidarOtpUseCaseTests
         IStorefrontRepository StorefrontRepository,
         IClienteOtpRepository ClienteOtpRepository,
         IClienteStorefrontRepository ClienteRepository,
+        IClienteRepository CadastroRepository,
         IClienteSessionRepository ClienteSessionRepository,
         IPasswordHasher PasswordHasher,
         FakeUnitOfWork UnitOfWork,
@@ -55,7 +58,7 @@ public class ValidarOtpUseCaseTests
         bool storefrontAtivo = true,
         Cliente? clienteExistente = null)
     {
-        var empresaId = Guid.NewGuid();
+        var empresaId = clienteExistente?.EmpresaId ?? Guid.NewGuid();
         var storefront = StorefrontEntity.Criar(
             empresaId: empresaId,
             slug: SlugValido,
@@ -96,7 +99,7 @@ public class ValidarOtpUseCaseTests
         var logger = Substitute.For<ILogger<ValidarOtpUseCase>>();
 
         return new Fakes(
-            storefrontRepo, clienteOtpRepo, clienteRepo, sessionRepo,
+            storefrontRepo, clienteOtpRepo, clienteRepo, Substitute.For<IClienteRepository>(), sessionRepo,
             hasher, uow, time, logger, empresaId, storefront);
     }
 
@@ -105,6 +108,8 @@ public class ValidarOtpUseCaseTests
         f.ClienteOtpRepository,
         f.ClienteRepository,
         f.ClienteSessionRepository,
+        new IdentificarClientePorTelefoneUseCase(f.CadastroRepository, f.ClienteRepository,
+            Substitute.For<ILogger<IdentificarClientePorTelefoneUseCase>>()),
         f.PasswordHasher,
         f.UnitOfWork,
         f.Time,
@@ -134,9 +139,8 @@ public class ValidarOtpUseCaseTests
         result.TelefoneOfuscado.Should().StartWith("+5511").And.Contain("*");
         result.MaxAgeSecs.Should().Be(2592000, "30 dias em segundos");
 
-        await f.ClienteRepository.Received(1).AddAsync(
-            Arg.Is<Cliente>(c => c.EmpresaId == f.EmpresaId),
-            Arg.Any<CancellationToken>());
+        await f.CadastroRepository.Received(1).AddAsync(
+            Arg.Is<Cliente>(c => c.EmpresaId == f.EmpresaId));
         await f.ClienteSessionRepository.Received(1).AddAsync(
             Arg.Is<ClienteSession>(s => s.EmpresaId == f.EmpresaId),
             Arg.Any<CancellationToken>());
@@ -298,4 +302,42 @@ public class ValidarOtpUseCaseTests
             "fingerprint deve ser calculado com UA + Accept-Language");
         sessionCriada.Fingerprint.Should().HaveLength(64);
     }
+
+    [Fact]
+    public async Task Otp_valido_reutiliza_cliente_do_ERP_sem_hash()
+    {
+        var f = BuildFakes();
+        var cadastro = Cliente.Criar(f.EmpresaId, "Cliente canônico");
+        cadastro.Telefone = TelefoneE164;
+        f.CadastroRepository.FindByTelefoneAsync(f.EmpresaId, TelefoneE164).Returns(cadastro);
+
+        await BuildUseCase(f).ExecuteAsync(Input());
+
+        cadastro.TelefoneHash.Should().Be(ClienteOtp.CalcularTelefoneHash(TelefoneE164));
+        await f.CadastroRepository.DidNotReceive().AddAsync(Arg.Any<Cliente>());
+        await f.ClienteSessionRepository.Received(1).AddAsync(
+            Arg.Is<ClienteSession>(s => s.ClienteId == cadastro.Id && s.EmpresaId == f.EmpresaId),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Otp_invalido_nao_procura_cadastro_pelo_telefone_alegado()
+    {
+        var f = BuildFakes();
+        await BuildUseCase(f).Invoking(sut => sut.ExecuteAsync(Input(codigo: "000000")))
+            .Should().ThrowAsync<OtpInvalidoException>();
+        await f.CadastroRepository.DidNotReceive().FindByTelefoneAsync(Arg.Any<Guid>(), Arg.Any<string>());
+        await f.CadastroRepository.DidNotReceive().AddAsync(Arg.Any<Cliente>());
+    }
+
+    [Fact]
+    public async Task Cadastro_de_outro_tenant_nao_recebe_sessao()
+    {
+        var f = BuildFakes();
+        f.ClienteRepository.GetByTelefoneHashAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Cliente.Criar(Guid.NewGuid(), "Outro tenant"));
+        await BuildUseCase(f).Invoking(sut => sut.ExecuteAsync(Input())).Should().ThrowAsync<OtpInvalidoException>();
+        await f.ClienteSessionRepository.DidNotReceive().AddAsync(Arg.Any<ClienteSession>(), Arg.Any<CancellationToken>());
+    }
+
 }

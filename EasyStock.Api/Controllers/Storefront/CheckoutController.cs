@@ -1,3 +1,5 @@
+using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
@@ -21,8 +23,7 @@ namespace EasyStock.Api.Controllers.Storefront;
 [AllowAnonymous]
 [TenantDoStorefront]
 public sealed class CheckoutController(
-    IniciarCheckoutUseCase iniciarCheckoutUseCase,
-    IniciarCheckoutGuestUseCase iniciarCheckoutGuestUseCase,
+    CheckoutSiteUseCase checkoutSite,
     IClienteSessionRepository clienteSessionRepository,
     TimeProvider timeProvider) : EasyStockControllerBase
 {
@@ -75,18 +76,7 @@ public sealed class CheckoutController(
         {
             idempotencyKey = parsedKey;
 
-            if (!Request.Headers.TryGetValue("X-Content-Hash", out var hashHeader)
-                || string.IsNullOrWhiteSpace(hashHeader.ToString()))
-            {
-                return BadRequest(new ProblemDetails
-                {
-                    Status = StatusCodes.Status400BadRequest,
-                    Title = "Header ausente",
-                    Detail = "X-Content-Hash é obrigatório quando X-Idempotency-Key está presente.",
-                });
-            }
-
-            contentHash = hashHeader.ToString().Trim();
+            contentHash = Request.Headers["X-Content-Hash"].ToString();
         }
 
         // ── Executar use case ─────────────────────────────────────────────
@@ -99,11 +89,11 @@ public sealed class CheckoutController(
             Cep: body.Cep,
             Observacoes: body.Observacoes,
             IdempotencyKey: idempotencyKey,
-            ContentHash: contentHash);
+            ContentHash: contentHash, Numero: body.Endereco?.Numero ?? body.Numero);
 
         try
         {
-            var result = await iniciarCheckoutUseCase.ExecuteAsync(input, ct);
+            var result = await checkoutSite.LogadoAsync(input, body.Endereco, Request.Headers["X-Chat-Token"].ToString(), idempotencyKey, ct);
             Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue { NoStore = true, NoCache = true };
             return StatusCode(StatusCodes.Status201Created, result);
         }
@@ -118,6 +108,19 @@ public sealed class CheckoutController(
                     Detail = ex.Message,
                     Type = "https://httpstatuses.com/409",
                 });
+        }
+        catch (CheckoutEmAndamentoException ex)
+        {
+            Response.Headers["Retry-After"] = "2";
+            return StatusCode(409, new { error = new { code = "CHECKOUT_EM_ANDAMENTO", message = ex.Message } });
+        }
+        catch (SessaoChatSiteInvalidaException ex)
+        {
+            return StatusCode(403, new { error = new { code = "SESSAO_CHAT_INVALIDA", message = ex.Message } });
+        }
+        catch (ChatSiteIndisponivelException ex)
+        {
+            return DataNotFound(ex.Message);
         }
         catch (CepInvalidoException ex)
         {
@@ -193,7 +196,7 @@ public sealed class CheckoutController(
     [SwaggerOperation(
         Summary = "Iniciar checkout guest (sem login)",
         Description = "Cria Pedido sem cookie de sessao, reserva a janela e retorna URL de pagamento " +
-                      "MercadoPago. Cliente identificado por telefoneHash. Issues #680 e #1254.")]
+                      "MercadoPago. Telefone informado não concede identidade nem histórico verificado.")]
     [ProducesResponseType(typeof(IniciarCheckoutGuestResult), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -229,10 +232,15 @@ public sealed class CheckoutController(
 
         try
         {
-            var result = await iniciarCheckoutGuestUseCase.ExecuteAsync(input, ct);
+            var result = await checkoutSite.GuestAsync(input, body.Endereco, Request.Headers["X-Chat-Token"].ToString(),
+                Guid.TryParse(Request.Headers["X-Idempotency-Key"], out var key) ? key : null, ct);
             Response.GetTypedHeaders().CacheControl =
                 new CacheControlHeaderValue { NoStore = true, NoCache = true };
             return StatusCode(StatusCodes.Status201Created, result);
+        }
+        catch (IdempotencyMismatchException ex)
+        {
+            return StatusCode(409, new { error = new { code = "CARRINHO_ALTERADO", message = ex.Message } });
         }
         catch (TelefoneInvalidoException ex)
         {
@@ -242,6 +250,19 @@ public sealed class CheckoutController(
                 Title = "Telefone invalido",
                 Detail = ex.Message,
             });
+        }
+        catch (CheckoutEmAndamentoException ex)
+        {
+            Response.Headers["Retry-After"] = "2";
+            return StatusCode(409, new { error = new { code = "CHECKOUT_EM_ANDAMENTO", message = ex.Message } });
+        }
+        catch (SessaoChatSiteInvalidaException ex)
+        {
+            return StatusCode(403, new { error = new { code = "SESSAO_CHAT_INVALIDA", message = ex.Message } });
+        }
+        catch (ChatSiteIndisponivelException ex)
+        {
+            return DataNotFound(ex.Message);
         }
         catch (CepInvalidoException ex)
         {
@@ -301,39 +322,9 @@ public sealed class CheckoutController(
             || string.IsNullOrWhiteSpace(cookieValue))
             return null;
 
-        // Aceita o cookie como Guid direto (testes) ou extrai o "sid" de um JWT simples.
-        if (Guid.TryParse(cookieValue, out var guid))
-            return guid;
-
-        // Parsing minimal de JWT (sem validação de assinatura — middleware dedicado
-        // faz isso em produção quando TASK-EZ-AUTH-002 for integrado).
-        try
-        {
-            var parts = cookieValue.Split('.');
-            if (parts.Length >= 2)
-            {
-                var payloadJson = System.Text.Encoding.UTF8.GetString(
-                    Convert.FromBase64String(PadBase64(parts[1])));
-                using var doc = System.Text.Json.JsonDocument.Parse(payloadJson);
-                if (doc.RootElement.TryGetProperty("sid", out var sidEl)
-                    && Guid.TryParse(sidEl.GetString(), out var sidGuid))
-                    return sidGuid;
-            }
-        }
-        catch { /* JWT malformado — retorna null */ }
-
-        return null;
+        return Guid.TryParse(cookieValue, out var guid) ? guid : null;
     }
 
-    private static string PadBase64(string base64)
-    {
-        return (base64.Length % 4) switch
-        {
-            2 => base64 + "==",
-            3 => base64 + "=",
-            _ => base64,
-        };
-    }
 }
 
 /// <summary>Body do POST /checkout.</summary>
@@ -342,7 +333,9 @@ public sealed record CheckoutRequestBody(
     Guid JanelaId,
     DateOnly DataEntrega,
     string Cep,
-    string? Observacoes = null);
+    string? Observacoes = null,
+    EnderecoCheckout? Endereco = null,
+    string? Numero = null);
 
 public sealed record CheckoutItemRequestBody(Guid CardapioItemId, int Qtd);
 
@@ -355,4 +348,5 @@ public sealed record CheckoutGuestRequestBody(
     IReadOnlyList<CheckoutItemRequestBody> Items,
     Guid? JanelaId = null,
     DateOnly? DataEntrega = null,
-    string? Observacoes = null);
+    string? Observacoes = null,
+    EnderecoCheckout? Endereco = null);

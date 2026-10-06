@@ -48,7 +48,8 @@ public sealed class IniciarCheckoutUseCase(
 
     public async Task<CheckoutCriadoDto> ExecuteAsync(
         IniciarCheckoutInput input,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Func<Guid, CancellationToken, Task>? pedidoCriado = null)
     {
         ArgumentNullException.ThrowIfNull(input);
 
@@ -82,7 +83,7 @@ public sealed class IniciarCheckoutUseCase(
                 Cep: input.Cep,
                 Origem: OrigemPedido.Storefront,
                 Slug: input.Slug,
-                Observacoes: input.Observacoes),
+                Observacoes: input.Observacoes, Numero: input.Numero),
             ct);
         var pedido = reservado.Pedido;
         var storefront = reservado.Storefront;
@@ -100,7 +101,8 @@ public sealed class IniciarCheckoutUseCase(
 
         // S11: a cobrança passa pelo mesmo use case da conversa e grava a CobrancaPedido. Falha ou timeout
         // do MP → a cobrança desfaz pedido e vaga e relança MercadoPagoIndisponivelException (503, #1301).
-        var cobranca = await gerarCobranca.ExecuteAsync(reservado, conversaId: null, ct);
+        if (pedidoCriado is not null) await pedidoCriado(pedido.Id, ct);
+        var cobranca = await gerarCobranca.ExecuteAsync(reservado, conversaId: input.ConversaId, ct);
         var initPointUrl = cobranca.LinkPagamento!;
 
         // Registrar resposta de idempotência
@@ -134,6 +136,8 @@ public sealed class IniciarCheckoutUseCase(
 
         tenantContext.SetCurrentTenant(storefront.EmpresaId);
         var cliente = await clienteRepository.GetByIdAsync(input.ClienteId, ct);
+        if (cliente is not null && cliente.EmpresaId != storefront.EmpresaId)
+            throw new RegraDeDominioVioladaException("Cliente não pertence a esta loja.");
         if (cliente is { Bloqueado: true })
             throw new ClienteBloqueadoException(cliente.Id);
     }

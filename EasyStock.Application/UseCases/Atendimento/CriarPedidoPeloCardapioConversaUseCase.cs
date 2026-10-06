@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.Endereco;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Storefront;
@@ -19,7 +20,8 @@ public sealed record CriarPedidoPeloCardapioConversaInput(
     DateOnly DataEntrega,
     Guid? EnderecoId = null,
     string? Forma = null,
-    string? Observacoes = null);
+    string? Observacoes = null,
+    EnderecoCheckout? Endereco = null);
 
 /// <param name="LinkPagamento">Nulo na entrega. Mercado Pago fora: <see cref="MercadoPagoIndisponivelException"/> com o pedido desfeito e o link do cardápio devolvido (#1301).</param>
 public sealed record PedidoPeloCardapioConversaResult(
@@ -55,7 +57,8 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
     IOperacaoEventPublisher eventPublisher,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
-    ILogger<CriarPedidoPeloCardapioConversaUseCase> logger)
+    ILogger<CriarPedidoPeloCardapioConversaUseCase> logger,
+    ConfirmarEnderecoClienteUseCase confirmarEndereco)
 {
     private const string ClienteNaoIdentificado =
         "Não identificamos o cliente desta conversa. Conclua o pedido pela conversa.";
@@ -82,16 +85,23 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
 
         var cliente = await clienteRepository.GetByIdWithDetailsAsync(link.EmpresaId, clienteId)
             ?? throw new RegraDeDominioVioladaException(ClienteNaoIdentificado);
-        var enderecoId = input.EnderecoId ?? CriarPedidoAtendimentoUseCase.EnderecoPadrao(cliente)
-            ?? throw new RegraDeDominioVioladaException("Informe o endereço de entrega na conversa antes de enviar o pedido.");
+        if (cliente.EmpresaId != link.EmpresaId) throw new RegraDeDominioVioladaException(ClienteNaoIdentificado);
+        var endereco = input.Endereco?.Validar();
+        var enderecoId = input.EnderecoId ?? CriarPedidoAtendimentoUseCase.EnderecoPadrao(cliente);
+        if (endereco is null && enderecoId is null)
+            throw new RegraDeDominioVioladaException("Informe o endereço de entrega na conversa antes de enviar o pedido.");
 
         await linkService.ConsumirAsync(link, agora, ct);
         PedidoReservado reservado;
         try
         {
+            if (endereco is not null)
+                enderecoId = await confirmarEndereco.ExecuteAsync(new ConfirmarEnderecoClienteCommand(
+                    link.EmpresaId, clienteId, endereco.Normalizado()), ct)
+                    ?? throw new RegraDeDominioVioladaException("Não foi possível confirmar o endereço de entrega.");
             reservado = await criarPedido.ExecuteAsync(new CriarPedidoAtendimentoInput(
-                link.EmpresaId, conversa.Id, clienteId, input.Itens, input.JanelaId, input.DataEntrega, enderecoId,
-                input.Observacoes), ct);
+                link.EmpresaId, conversa.Id, clienteId, input.Itens, input.JanelaId, input.DataEntrega, enderecoId!.Value,
+                endereco?.Snapshot(input.Observacoes) ?? input.Observacoes), ct);
         }
         catch
         {

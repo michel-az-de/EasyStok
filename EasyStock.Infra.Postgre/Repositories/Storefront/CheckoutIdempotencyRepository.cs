@@ -1,20 +1,12 @@
-﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Infra.Postgre.Data;
-using Npgsql;
 
 namespace EasyStock.Infra.Postgre.Repositories.Storefront;
 
 /// <summary>
-/// EF Repository de <see cref="CheckoutIdempotency"/>. Entity não tem EmpresaId,
-/// então é cross-tenant by-design (idempotency key é UUID — colisão ~impossível).
-///
-/// <para>
-/// <see cref="TentarReservarAsync"/> usa dedup atômico via unique constraint
-/// <c>uq_checkout_idempotency_key_hash</c> + catch de <see cref="DbUpdateException"/>
-/// SQLSTATE 23505. Substitui o padrão SELECT-then-INSERT que abre TOCTOU
-/// em duplo-clique de "Pagar" concorrente.
-/// </para>
+/// Reserva serializada por chave, inclusive quando o hash diverge. O coordenador calcula a chave
+/// com loja e identidade verificada ou chave anônima; nunca reutiliza diretamente a chave pública em outro tenant.
 /// </summary>
 public sealed class CheckoutIdempotencyRepository(EasyStockDbContext db) : ICheckoutIdempotencyRepository
 {
@@ -51,29 +43,28 @@ public sealed class CheckoutIdempotencyRepository(EasyStockDbContext db) : IChec
         return Task.CompletedTask;
     }
 
-    public async Task<(bool reservado, CheckoutIdempotency registro)> TentarReservarAsync(
-        CheckoutIdempotency proposta,
-        CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(proposta);
+    public Task RemoverSemRespostaAsync(Guid key, string hash, CancellationToken ct = default) =>
+        db.CheckoutsIdempotency.Where(c => c.Key == key && c.ContentHash == hash && c.InitPoint == null).ExecuteDeleteAsync(ct);
 
-        try
+    public async Task<(bool reservado, CheckoutIdempotency registro)> TentarReservarAsync(
+        CheckoutIdempotency proposta, CancellationToken ct = default)
+    {
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            var chave = $"checkout-idempotency:{proposta.Key:N}";
+            await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({chave}))", ct);
+            var existente = await db.CheckoutsIdempotency.FirstOrDefaultAsync(c => c.Key == proposta.Key, ct);
+            if (existente is not null)
+            {
+                await tx.CommitAsync(ct);
+                return (false, existente);
+            }
             await db.CheckoutsIdempotency.AddAsync(proposta, ct);
             await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
             return (true, proposta);
-        }
-        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
-        {
-            // Duplo-clique: outra request com (Key, ContentHash) idênticos chegou primeiro.
-            // Detacha pra não tentar novamente, busca o vencedor.
-            db.Entry(proposta).State = EntityState.Detached;
-            var existente = await GetByKeyHashAsync(proposta.Key, proposta.ContentHash, ct);
-            return (false, existente ?? throw new InvalidOperationException(
-                $"Unique violation em (key={proposta.Key}, hash={proposta.ContentHash}) mas registro existente não encontrado."));
-        }
+        });
     }
-
-    private static bool IsUniqueConstraintViolation(DbUpdateException ex) =>
-        ex.InnerException is PostgresException pg && pg.SqlState == "23505";
 }
