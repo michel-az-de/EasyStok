@@ -49,8 +49,12 @@ public class RemetenteWhatsAppDoTenantIntegrationTests(PostgreSqlDatabaseFixture
         await fixture.ResetDatabaseAsync();
 
         var conectada = Empresa.Criar("Conectada", "11111111000191");
+        conectada.VincularWhatsApp("5550001111");
         var semCredencial = Empresa.Criar("Sem credencial", "22222222000191");
-        await SeedAsync(conectada, semCredencial);
+        // Revisão da PR #1418: credencial de outro número (troca de número, corrida no vínculo) não vale para o envio.
+        var divergente = Empresa.Criar("Divergente", "33333333000191");
+        divergente.VincularWhatsApp("5550002222");
+        await SeedAsync(conectada, semCredencial, divergente);
 
         await using var provider = BuildProvider(new Dictionary<string, string?>
         {
@@ -66,8 +70,17 @@ public class RemetenteWhatsAppDoTenantIntegrationTests(PostgreSqlDatabaseFixture
                 new CredencialWhatsAppMeta("token-da-conectada", "1001", "5550001111", DateTime.UtcNow), Guid.NewGuid());
         }
 
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(divergente.Id);
+            await scope.ServiceProvider.GetRequiredService<IIntegrationCredentialResolver>().SalvarAsync(
+                divergente.Id, CategoriaIntegracao.Mensageria, CredencialWhatsAppMeta.ProviderKey, AmbienteIntegracao.Production,
+                new CredencialWhatsAppMeta("token-de-outro-numero", "1002", "5550003333", DateTime.UtcNow), Guid.NewGuid());
+        }
+
         (await TokenAsync(provider, conectada.Id)).Should().Be("token-da-conectada");
         (await TokenAsync(provider, semCredencial.Id)).Should().BeNull("sem credencial vale o token global");
+        (await TokenAsync(provider, divergente.Id)).Should().BeNull("o token é de outro número: vale o global");
         (await TokenAsync(provider, tenant: null)).Should().BeNull();
     }
 

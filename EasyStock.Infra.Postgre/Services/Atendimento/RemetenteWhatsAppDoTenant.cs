@@ -50,7 +50,13 @@ public sealed class RemetenteWhatsAppDoTenant(EasyStockDbContext dbContext, IInt
 
         var credencial = await credenciais.ObterAsync<CredencialWhatsAppMeta>(
             tenant, CredencialWhatsAppMeta.ProviderKey, AmbienteIntegracao.Production, ct);
-        _accessToken = string.IsNullOrWhiteSpace(credencial?.AccessToken) ? null : credencial.AccessToken.Trim();
+        // Token de outro número (troca de número, corrida no vínculo) não vale: a Meta recusaria o envio pelo número
+        // vinculado. Cai no global, como sem credencial (revisão da PR #1418).
+        var vinculado = await ObterPhoneNumberIdAsync(ct);
+        _accessToken = string.IsNullOrWhiteSpace(credencial?.AccessToken)
+                       || !string.Equals(credencial.PhoneNumberId?.Trim(), vinculado?.Trim(), StringComparison.Ordinal)
+            ? null
+            : credencial.AccessToken.Trim();
         _tenantDoToken = tenant;
         return _accessToken;
     }
