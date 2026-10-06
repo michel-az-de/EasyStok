@@ -62,7 +62,19 @@ public static class WebhookWhatsAppParser
                 statuses.Add(ParseStatus(s));
         }
 
-        return new EntradaWhatsApp(phoneNumberId, value.GetRawText(), contatos, mensagens, statuses);
+        // #1417: coexistência. O que a loja mandou pelo app do celular chega em message_echoes ("to" é o cliente).
+        var ecos = new List<EcoWhatsApp>();
+        if (value.TryGetProperty("message_echoes", out var ecosArr) && ecosArr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var e in ecosArr.EnumerateArray())
+            {
+                var conteudo = ParseMensagem(e);
+                ecos.Add(new EcoWhatsApp(GetString(e, "to") ?? "", conteudo.Wamid, conteudo.Timestamp, conteudo.Tipo,
+                    conteudo.TextoCorpo, conteudo.MidiaId, conteudo.MidiaMime));
+            }
+        }
+
+        return new EntradaWhatsApp(phoneNumberId, value.GetRawText(), contatos, mensagens, statuses, ecos);
     }
 
     private static MensagemRecebidaWhatsApp ParseMensagem(JsonElement m)

@@ -96,8 +96,81 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         foreach (var status in entrada.Statuses)
             await ProcessarStatusAsync(empresa.Id, status, ct);
 
+        foreach (var eco in entrada.Ecos)
+            completo &= await ProcessarEcoAsync(empresa.Id, entrada, eco, ct);
+
         return completo;
     }
+
+    /// <summary>
+    /// #1417 (coexistência): a loja respondeu pelo app WhatsApp Business do celular. Vira <c>Mensagem(Saida, Dona)</c> na
+    /// conversa do cliente e a conversa fica assumida, como quando a dona escreve pelo console (RN-04): o agente não
+    /// responde por cima. Nada automático sai daqui: sem saudação, sem marcar como lida, sem turno do agente e sem job de
+    /// mídia (que enfileira o agente depois da transcrição). Idempotente pelo wamid, inclusive para o eco de mensagem
+    /// que o próprio EasyStok enviou.
+    /// </summary>
+    private async Task<bool> ProcessarEcoAsync(Guid empresaId, EntradaWhatsApp entrada, EcoWhatsApp eco, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(eco.Wamid) || string.IsNullOrWhiteSpace(eco.Para))
+        {
+            logger.LogWarning("Webhook WhatsApp: eco do app sem wamid ou sem destino, ignorado.");
+            return true;
+        }
+
+        if (await conversaRepository.ObterMensagemPorExternoIdAsync(empresaId, eco.Wamid, ct) is not null)
+            return true;
+
+        var enviadaEm = eco.Timestamp.UtcDateTime;
+        Conversa conversa;
+        Mensagem mensagem;
+        try
+        {
+            var existente = await conversaRepository.ObterAbertaPorContatoAsync(empresaId, CanalConversa.WhatsApp, eco.Para, ct);
+            conversa = existente ?? Conversa.Abrir(empresaId, eco.Para, enviadaEm,
+                entrada.Contatos.FirstOrDefault(c => c.WaId == eco.Para)?.Nome);
+            if (existente is null)
+            {
+                // A loja puxou a conversa pelo celular: identifica (ou cria o lead) como na 1ª mensagem do cliente.
+                var identificacao = await identificarCliente.ExecuteAsync(
+                    new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoIdExterno, conversa.ContatoNome), ct);
+                conversa.VincularCliente(identificacao.Cliente.Id);
+                await conversaRepository.AddAsync(conversa, ct);
+            }
+
+            conversa.Assumir(enviadaEm);
+            conversa.RegistrarSaida(enviadaEm);
+            mensagem = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Dona, enviadaEm,
+                MapearTipoConteudo(eco.Tipo), TextoDoEco(eco), eco.Wamid);
+            await conversaRepository.AddMensagemAsync(mensagem, ct);
+            await unitOfWork.CommitAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Webhook WhatsApp: falha gravando o eco do app wamid={Wamid}.", eco.Wamid);
+            unitOfWork.DescartarAlteracoesPendentes();
+            // Mesmo critério das mensagens: regra de domínio não passa num reenvio; concorrência e banco passam.
+            return ex is RegraDeDominioVioladaException;
+        }
+
+        try
+        {
+            // O console atualiza a conversa por este evento, venha a mensagem de qual lado vier.
+            await eventPublisher.PublicarAsync("conversa.mensagem_recebida", empresaId,
+                new { conversaId = conversa.Id, mensagemId = mensagem.Id }, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Webhook WhatsApp: eco {Wamid} gravado, aviso ao console falhou.", eco.Wamid);
+        }
+
+        return true;
+    }
+
+    /// <summary>Mídia do eco não é baixada (#1417): fica o tipo e um aviso, como no Instagram e no Messenger.</summary>
+    private static string? TextoDoEco(EcoWhatsApp eco) =>
+        !string.IsNullOrWhiteSpace(eco.TextoCorpo) ? eco.TextoCorpo
+        : eco.Tipo == "text" ? null
+        : $"[{eco.Tipo} enviado pelo app do celular; abra no app para ver]";
 
     private async Task<bool> ProcessarMensagemAsync(Guid empresaId, EntradaWhatsApp entrada, MensagemRecebidaWhatsApp msg, CancellationToken ct)
     {

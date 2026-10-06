@@ -134,6 +134,66 @@ public class ProcessarEventoWhatsAppUseCaseTests
         .Replace("__PHONE__", PhoneNumberId).Replace("__WAID__", ContatoWaId)
         .Replace("__WAMID__", wamid).Replace("__STATUS__", status);
 
+    /// <summary>#1417: o que a loja respondeu pelo app WhatsApp Business do celular (coexistência).</summary>
+    private static string PayloadEco(string wamid, string texto) => """
+        {"entry":[{"changes":[{"field":"smb_message_echoes","value":{
+            "messaging_product":"whatsapp",
+            "metadata":{"display_phone_number":"551192703281","phone_number_id":"__PHONE__"},
+            "message_echoes":[{"from":"551192703281","to":"__WAID__","id":"__WAMID__","timestamp":"1700000100","type":"text","text":{"body":"__TEXTO__"}}]
+        }}]}]}
+        """
+        .Replace("__PHONE__", PhoneNumberId).Replace("__WAID__", ContatoWaId)
+        .Replace("__WAMID__", wamid).Replace("__TEXTO__", texto);
+
+    [Fact]
+    public async Task EcoDoAppViraSaidaDaDonaEAssumeSemDispararOAgente()
+    {
+        var conversa = Conversa.Abrir(_empresaId, ContatoWaId, DateTime.UtcNow.AddMinutes(-5));
+        _conversaRepository.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, ContatoWaId, Arg.Any<CancellationToken>())
+            .Returns(conversa);
+
+        var completo = await _useCase.ExecuteAsync(PayloadEco("wamid.eco1", "Já separo o seu bolo"));
+
+        completo.Should().BeTrue();
+        await _conversaRepository.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Direcao == DirecaoMensagem.Saida && m.Autor == AutorMensagem.Dona
+                && m.ExternoId == "wamid.eco1" && m.Texto == "Já separo o seu bolo" && m.Status == StatusMensagem.Enviada),
+            Arg.Any<CancellationToken>());
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida, "a loja respondeu pelo celular: o agente não fala por cima");
+        conversa.NaoLidas.Should().Be(0);
+        await _unitOfWork.Received(1).CommitAsync();
+        await _queueService.DidNotReceive().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+        await _cloudClient.DidNotReceiveWithAnyArgs().MarcarComoLidaAsync(default!, default);
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task EcoDuplicadoEIgnorado()
+    {
+        var existente = Mensagem.Saida(_empresaId, Guid.NewGuid(), AutorMensagem.Dona, DateTime.UtcNow, TipoConteudoMensagem.Texto, "Oi", "wamid.eco2");
+        _conversaRepository.ObterMensagemPorExternoIdAsync(_empresaId, "wamid.eco2", Arg.Any<CancellationToken>()).Returns(existente);
+
+        var completo = await _useCase.ExecuteAsync(PayloadEco("wamid.eco2", "Oi"));
+
+        completo.Should().BeTrue();
+        await _conversaRepository.DidNotReceiveWithAnyArgs().AddMensagemAsync(default!, default);
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task EcoSemConversaAbertaAbreAConversaJaComADona()
+    {
+        await _useCase.ExecuteAsync(PayloadEco("wamid.eco3", "Bom dia! Seu pedido saiu."));
+
+        await _conversaRepository.Received(1).AddAsync(
+            Arg.Is<Conversa>(c => c.ContatoIdExterno == ContatoWaId && c.Situacao == SituacaoConversa.Assumida
+                && c.UltimaMensagemEntradaEm == null),
+            Arg.Any<CancellationToken>());
+        await _queueService.DidNotReceive().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+        await _publicadorEventos.DidNotReceiveWithAnyArgs().PublicarAsync<ConversaAbertaEvent>(
+            default, default!, default!, default, default!, default, default, default, default);
+    }
+
     [Fact]
     public async Task TextoEnfileiraAgente()
     {
