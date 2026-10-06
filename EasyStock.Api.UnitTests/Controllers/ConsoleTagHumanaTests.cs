@@ -129,4 +129,18 @@ public class ConsoleTagHumanaTests
         result.Should().BeOfType<ConflictObjectResult>();
         await _whatsApp.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
     }
+    [Fact]
+    public async Task WhatsAppTimeoutDoHttpClient_GravaMensagemComoFalhou()
+    {
+        // #1411: o timeout do HttpClient chega como TaskCanceledException sem o ct cancelado; a mensagem não pode sumir.
+        var conversa = Conversa(CanalConversa.WhatsApp, "5511999997777", TimeSpan.FromHours(1));
+        _whatsApp.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<Task<string>>(_ => throw new TaskCanceledException("timeout"));
+
+        await _controller.EnviarMensagem(conversa.Id, new EnviarMensagemConsoleBody("oi"), default);
+
+        await _conversas.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Status == StatusMensagem.Falhou), Arg.Any<CancellationToken>());
+        await _uow.Received(1).CommitAsync();
+    }
 }

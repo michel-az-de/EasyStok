@@ -103,4 +103,15 @@ public class MensagemReenvioTests
         enviada.PodeReenviar.Should().BeFalse();
         falhou.PodeReenviar.Should().BeTrue();
     }
+    [Fact]
+    public void FalhaTemporariaDeImagemNaoAgendaReenvio()
+    {
+        // #1411: só texto pode ser reenviado; agendar imagem deixaria a varredura presa nela.
+        var m = Mensagem.Saida(Guid.NewGuid(), Guid.NewGuid(), AutorMensagem.Agente, Agora, TipoConteudoMensagem.Imagem, null);
+
+        m.RegistrarFalhaEnvio("Meta fora", TipoFalhaEnvio.Temporaria, Agora);
+
+        m.Status.Should().Be(StatusMensagem.Falhou);
+        m.ProximoReenvioEm.Should().BeNull();
+    }
 }
