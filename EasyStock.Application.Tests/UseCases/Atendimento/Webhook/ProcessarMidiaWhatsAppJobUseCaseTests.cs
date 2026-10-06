@@ -185,4 +185,43 @@ public class ProcessarMidiaWhatsAppJobUseCaseTests
         mensagem.ProximaTentativaMidiaEm.Should().BeAfter(DateTime.UtcNow, "reservada: outro processo não pega a mesma");
         await unitOfWork.Received(1).CommitAsync();
     }
+    [Fact]
+    public async Task CancelamentoNaTranscricao_NaoMarcaErroNoAnexoSalvo()
+    {
+        // #1411: a mídia já foi gravada; cancelar a transcrição não pode virar erro de mídia nem reagendar o download.
+        var empresaId = Guid.NewGuid();
+        var mensagem = Domain.Entities.Atendimento.Mensagem.Entrada(
+            empresaId, Guid.NewGuid(), DateTime.UtcNow, TipoConteudoMensagem.Audio, externoId: "wamid.c");
+        var conversaRepository = Substitute.For<IConversaRepository>();
+        conversaRepository.ObterMensagemPorExternoIdAsync(empresaId, "wamid.c", Arg.Any<CancellationToken>()).Returns(mensagem);
+        var cloudClient = Substitute.For<IWhatsAppCloudClient>();
+        cloudClient.BaixarMidiaAsync("media-c", Arg.Any<CancellationToken>())
+            .Returns(((Stream)new MemoryStream([1, 2]), "audio/ogg"));
+        var fileStorage = Substitute.For<IFileStorage>();
+        fileStorage.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                var req = ci.Arg<FileUploadRequest>();
+                return Task.FromResult(new StoredFileResult(
+                    $"{req.BucketPath}/{req.FileName}", "https://storage.test/x", req.ContentType, req.Content.Length));
+            });
+        fileStorage.DownloadAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new byte[] { 1, 2 });
+        using var cts = new CancellationTokenSource();
+        var transcritor = Substitute.For<EasyStock.Application.Ports.Output.Ai.ITranscritorAudio>();
+        transcritor.Disponivel.Returns(true);
+        transcritor.TranscreverAsync(Arg.Any<byte[]>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<Task<string?>>(_ => { cts.Cancel(); throw new OperationCanceledException(cts.Token); });
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var processador = new ProcessarMidiaWhatsAppJobUseCase(
+            conversaRepository, new ArmazenadorMidiaWhatsApp(cloudClient, fileStorage),
+            Substitute.For<ITenantContextAccessor>(), unitOfWork, TimeProvider.System, NullLogger<ProcessarMidiaWhatsAppJobUseCase>.Instance,
+            new TranscricaoAudioWhatsApp(transcritor, fileStorage, unitOfWork, NullLogger<TranscricaoAudioWhatsApp>.Instance));
+
+        await Record.ExceptionAsync(() =>
+            processador.ExecuteAsync(new ArmazenarMidiaWhatsAppJob(empresaId, mensagem.ConversaId, "wamid.c", "media-c"), cts.Token));
+
+        mensagem.MidiaChave.Should().NotBeNull();
+        mensagem.ErroMidia.Should().BeNull();
+        mensagem.TentativasMidia.Should().Be(0);
+    }
 }
