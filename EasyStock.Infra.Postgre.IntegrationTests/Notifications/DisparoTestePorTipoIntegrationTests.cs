@@ -79,6 +79,15 @@ public class DisparoTestePorTipoIntegrationTests(MailpitFixture mailpit, Postgre
                 rotina.Ativar("teste");
                 await db.SaveChangesAsync();
             }
+
+            // prazo_estourado_global só envia das 7h às 22h de Brasília; fora disso o outbox adia e o teste ficava
+            // Pendente quando o CI rodava de madrugada. A janela tem teste próprio (JanelaDeEnvio).
+            foreach (var comJanela in await db.NotifRotinas.IgnoreQueryFilters().Where(r => r.JanelaInicio != null).ToListAsync())
+            {
+                comJanela.JanelaInicio = null;
+                comJanela.JanelaFim = null;
+            }
+            await db.SaveChangesAsync();
         }
 
         var suporte = new MotorNotificacoesSuporte(postgres);
