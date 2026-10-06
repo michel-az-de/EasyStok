@@ -4,6 +4,7 @@
 // ganha o dado de verdade quando for ligado (matriz 10-console.md).
 
 import { pausaDaSituacao } from '../../dominio/automatico'
+import { ACOES } from '../../dominio/agente'
 
 const NOME_DO_CANAL = {
   WhatsApp: 'WhatsApp', Instagram: 'Instagram', Messenger: 'Messenger',
@@ -108,4 +109,23 @@ export const naoEntregueDaApi = (l) => ({
   canal: l.canal,
   aberta: l.conversaAberta,
   mensagem: mensagemDaApi(l.mensagem, l.conversaId),
+})
+
+// Sugestão do agente (#1420) no formato que o painel do agente lê. O agente do EasyStok escreve a
+// mensagem; quem decide se passa para a dona é ele no automático, então aqui a ação é sempre propor.
+export const sugestaoDaApi = (r, recebidoEm = Date.now()) => ({
+  modo: 'api',
+  modelo: 'agente do EasyStok',
+  intencao: { chave: 'sugestao', rotulo: 'Sugestão do agente' },
+  confianca: null,
+  acao: ACOES.PROPOR,
+  texto: r?.texto ?? '',
+  estruturada: true,
+  prompt: '',
+  recebidoEm,
+  latenciaMs: r?.latenciaMs ?? null,
+  tokensEstimados: null,
+  tokensMedidos: r?.tokens ?? null,
+  custoUsd: null,
+  transporte: 'easystok',
 })
