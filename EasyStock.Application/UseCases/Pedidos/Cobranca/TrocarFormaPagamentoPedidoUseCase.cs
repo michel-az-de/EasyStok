@@ -1,4 +1,5 @@
 using EasyStock.Application.Events.Pedidos;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
@@ -46,7 +47,8 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
     ILogger<TrocarFormaPagamentoPedidoUseCase> logger,
-    CalculadoraInicioPrevistoPedido inicioPrevisto)
+    CalculadoraInicioPrevistoPedido inicioPrevisto,
+    IOperacaoEventPublisher operacaoEventos)
 {
     public const string FormaOnline = "online";
     public const string FormaNaEntrega = "na_entrega";
@@ -60,8 +62,12 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         if (forma is not (FormaOnline or FormaNaEntrega))
             throw new UseCaseValidationException("Forma de pagamento deve ser 'online' ou 'na_entrega'.");
 
-        var (cobranca, conversaId, preferenciaSubstituida) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
+        var (cobranca, conversaId, preferenciaSubstituida, mudanca) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
             async token => await TrocarNoLockAsync(input, forma, token), ct);
+
+        // A cozinha só relê depois que a transação terminou; na entrega ainda não é pagamento.
+        if (mudanca is not null)
+            await operacaoEventos.PublicarAsync(EventosOperacao.PedidoMudouStatus, input.EmpresaId, mudanca, ct);
 
         if (preferenciaSubstituida is not null)
             await ExpirarPreferenciaAsync(preferenciaSubstituida, ct);
@@ -86,7 +92,7 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         }
     }
 
-    private async Task<(CobrancaPedidoResult, Guid?, string?)> TrocarNoLockAsync(
+    private async Task<(CobrancaPedidoResult, Guid?, string?, PedidoMudouStatusOperacao?)> TrocarNoLockAsync(
         TrocarFormaPagamentoPedidoInput input, string forma, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
@@ -104,13 +110,14 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         var pendente = cobrancas.FirstOrDefault(c => c.EstaPendente);
         var provedorPedido = forma == FormaOnline ? CobrancaPedido.ProvedorMercadoPago : CobrancaPedido.ProvedorNaEntrega;
         if (pendente is not null && pendente.Provedor == provedorPedido && !pendente.Venceu(agora))
-            return (CobrancaPedidoResult.De(pendente, reutilizada: true), pendente.ConversaId, null);
+            return (CobrancaPedidoResult.De(pendente, reutilizada: true), pendente.ConversaId, null, null);
 
         var conversaId = cobrancas.Where(c => c.ConversaId is not null).Select(c => c.ConversaId).LastOrDefault();
         var formaAnterior = pendente?.Provedor ?? "nenhuma";
         pendente?.Cancelar($"troca_forma: {forma}", agora);
         var preferenciaSubstituida = pendente is { EhOnline: true } ? pendente.ReferenciaExterna : null;
 
+        PedidoMudouStatusOperacao? mudanca = null;
         CobrancaPedidoResult nova;
         if (forma == FormaOnline)
         {
@@ -122,7 +129,7 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         {
             var naEntrega = CobrancaPedido.CriarNaEntrega(input.EmpresaId, pedido.Id, pedido.Total.Valor, agora, conversaId);
             await cobrancaRepository.AddAsync(naEntrega, ct);
-            await ColocarNaFilaAsync(pedido, input, agora, ct);
+            mudanca = await ColocarNaFilaAsync(pedido, input, agora, ct);
             nova = CobrancaPedidoResult.De(naEntrega);
         }
 
@@ -139,12 +146,12 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         }, ct);
         await unitOfWork.CommitAsync();
 
-        return (nova, conversaId, preferenciaSubstituida);
+        return (nova, conversaId, preferenciaSubstituida, mudanca);
     }
 
-    private async Task ColocarNaFilaAsync(PedidoEntity pedido, TrocarFormaPagamentoPedidoInput input, DateTime agora, CancellationToken ct)
+    private async Task<PedidoMudouStatusOperacao?> ColocarNaFilaAsync(PedidoEntity pedido, TrocarFormaPagamentoPedidoInput input, DateTime agora, CancellationToken ct)
     {
-        if (pedido.StatusEnum != StatusPedido.AguardandoPagamento) return;
+        if (pedido.StatusEnum != StatusPedido.AguardandoPagamento) return null;
 
         var statusAntigo = pedido.Status;
         // #1291: pedido de exceção (ex.: lead liberado fora de área) espera a dona, como no pago online.
@@ -157,5 +164,6 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
             new PedidoMudouStatusEvent(pedido.Id, input.EmpresaId, pedido.LojaId, statusAntigo, pedido.Status,
                 "web", input.UsuarioId, input.UsuarioNome, agora),
             correlationId: pedido.Id.ToString(), ct: ct);
+        return new PedidoMudouStatusOperacao(pedido.Id, statusAntigo, pedido.Status);
     }
 }

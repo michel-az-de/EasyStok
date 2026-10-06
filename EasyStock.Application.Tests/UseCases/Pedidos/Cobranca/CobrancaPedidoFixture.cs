@@ -128,7 +128,7 @@ internal sealed class CobrancaPedidoFixture
         Uow.SetupExecuteInTransactionSemRetry<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?, Guid?)>();
         Uow.SetupExecuteInTransactionSemRetry<(SituacaoAtualizacaoCobranca, Guid?, string?)>();
         Uow.SetupExecuteInTransactionSemRetry<CobrancaPedidoResult>();
-        Uow.SetupExecuteInTransactionSemRetry<(CobrancaPedidoResult, Guid?, string?)>();
+        Uow.SetupExecuteInTransactionSemRetry<(CobrancaPedidoResult, Guid?, string?, PedidoMudouStatusOperacao?)>();
         Uow.SetupExecuteInTransactionSemRetry<DesfazerPagamentoManualResult>();
         Uow.SetupExecuteInTransactionSemRetry<(ResultadoExpiracaoCobranca, Guid?, string?)>();
         Uow.SetupExecuteInTransactionSemRetry<PedidoResult?>();
@@ -194,7 +194,7 @@ internal sealed class CobrancaPedidoFixture
 
     public TrocarFormaPagamentoPedidoUseCase Trocar() =>
         new(PedidoStorefrontRepo, CobrancaRepo, Gerar(), Aviso(), Publicador, MpClient, Uow, Relogio,
-            NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new CalculadoraInicioPrevistoPedido(PrazoQueries));
+            NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new CalculadoraInicioPrevistoPedido(PrazoQueries), OperacaoEventos);
 
     public AtualizarCobrancaPorPagamentoUseCase AtualizarPorPagamento() =>
         new(CobrancaRepo, PedidoStorefrontRepo, Aviso(), Tenant, Uow, Relogio,

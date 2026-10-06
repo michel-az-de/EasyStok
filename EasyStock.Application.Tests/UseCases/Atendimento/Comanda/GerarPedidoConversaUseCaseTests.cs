@@ -71,7 +71,7 @@ public class GerarPedidoConversaUseCaseTests
                 .Returns(new PreferenceCriadaResult("pref-1", "https://mp.test/pref-1"));
 
             // Troca de forma (na entrega) trava o pedido recém-criado numa transação.
-            Uow.SetupExecuteInTransactionSemRetry<(CobrancaPedidoResult, Guid?, string?)>();
+            Uow.SetupExecuteInTransactionSemRetry<(CobrancaPedidoResult, Guid?, string?, PedidoMudouStatusOperacao?)>();
             Checkout.PedidoRepo.GetForUpdateAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
                 .Returns(ci => Checkout.PedidosAdicionados.FirstOrDefault(p => p.Id == ci.Arg<Guid>()));
 
@@ -81,7 +81,7 @@ public class GerarPedidoConversaUseCaseTests
                 TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
             var trocar = new TrocarFormaPagamentoPedidoUseCase(Checkout.PedidoRepo, cobrancaRepo, gerar, aviso,
                 Substitute.For<IPublicadorEventoIntegracao>(), Mp, Uow, TimeProvider.System,
-                NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
+                NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()), Substitute.For<IOperacaoEventPublisher>());
 
             // O núcleo lê o pedido em andamento do banco com a conversa travada (#1238).
             ConversaRepo.TravarParaPedidoAsync(EmpresaId, Conversa.Id, Arg.Any<CancellationToken>())

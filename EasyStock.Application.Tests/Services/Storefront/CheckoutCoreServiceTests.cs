@@ -173,6 +173,7 @@ public class CheckoutCoreServiceTests
         item.Observacao.Should().Be("sem granulado");
         item.Quantidade.Should().Be(2);
         item.PrecoUnitario.Should().Be(10m);
+        item.Nome.Should().Be("Brigadeiro");
         reservado.ItemFrete.Subtotal.Should().Be(5m);
         c.ItensAdicionados.Should().HaveCount(2);
 
@@ -204,6 +205,23 @@ public class CheckoutCoreServiceTests
         reservado.Itens[0].LinhaSnapshot.Should().Be("paraServir");
         reservado.ItemFrete.LinhaSnapshot.Should().BeNull("frete não é produto");
     }
+    [Theory]
+    [InlineData(true, "brigadeiro avulso")]
+    [InlineData(false, "brigadeiro da casa")]
+    public async Task PreservaNomePublicoDoCardapioNoPedido(bool avulso, string nome)
+    {
+        var c = new Cenario();
+        var item = avulso ? CardapioItem.CriarAvulso(c.Storefront.Id, nome, 10m) : c.CardapioItem;
+        if (!avulso) item.AtualizarMetadata(nomePublico: nome);
+        item.TornarVisivel();
+        c.CardapioRepo.GetByIdAsync(c.Storefront.Id, CardapioItemId, Arg.Any<CancellationToken>())
+            .Returns(item);
+
+        var reservado = await c.Servico().CriarPedidoComReservaAsync(Input(c));
+
+        reservado.Itens[0].Nome.Should().Be(nome);
+    }
+
     // ── S16: antecedência mínima ─────────────────────────────────────────
 
     [Fact]

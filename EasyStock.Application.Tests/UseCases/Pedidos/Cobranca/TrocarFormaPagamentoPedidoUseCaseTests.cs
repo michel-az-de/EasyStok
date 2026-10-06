@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Pagamentos;
@@ -79,6 +80,43 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
             new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega", Usuario, "Operadora"));
 
         f.Pedido.InicioPrevistoEm.Should().Be(entrega.AddMinutes(-100));
+    }
+
+    [Fact]
+    public async Task NaEntrega_AvisaACozinhaUmaVezDepoisDeGravar()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        var gravou = false;
+        f.Uow.When(u => u.CommitAsync()).Do(_ => gravou = true);
+        f.OperacaoEventos.When(e => e.PublicarAsync(Arg.Any<string>(), Arg.Any<Guid>(),
+                Arg.Any<object>(), Arg.Any<CancellationToken>()))
+            .Do(_ => gravou.Should().BeTrue("a cozinha só pode reler um pedido já gravado"));
+        var input = new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega");
+
+        await f.Trocar().ExecuteAsync(input);
+        await f.Trocar().ExecuteAsync(input);
+
+        await f.OperacaoEventos.Received(1).PublicarAsync(EventosOperacao.PedidoMudouStatus, f.EmpresaId,
+            Arg.Is<PedidoMudouStatusOperacao>(e => e.PedidoId == f.Pedido.Id
+                && e.StatusAntigo == StatusPedidoMapper.AguardandoPagamento
+                && e.StatusNovo == StatusPedidoMapper.Aguardando), Arg.Any<CancellationToken>());
+        await f.OperacaoEventos.DidNotReceive().PublicarAsync(EventosOperacao.PedidoPago,
+            Arg.Any<Guid>(), Arg.Any<object>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task NaEntrega_GravacaoFalha_NaoAvisaACozinha()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        f.Uow.CommitAsync().Returns<Task>(_ => throw new InvalidOperationException("falha no banco"));
+
+        var act = () => f.Trocar().ExecuteAsync(
+            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega"));
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        await f.OperacaoEventos.DidNotReceiveWithAnyArgs().PublicarAsync(default!, default, default!);
     }
 
     [Fact]
