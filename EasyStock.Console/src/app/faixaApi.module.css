@@ -1,6 +1,12 @@
+/* A sessão ocupa espaço no layout: avisos longos não cobrem as abas do celular. */
+@media screen {
+  :global(#root):has(.faixa) { display: flex; flex-direction: column; }
+  :global(#root):has(.faixa) > :first-child { flex: 1; min-height: 0; height: auto; }
+}
+
 .faixa {
-  position: fixed;
-  inset: auto 0 0 0;
+  position: relative;
+  flex-shrink: 0;
   z-index: 50;
   display: flex;
   justify-content: space-between;
@@ -42,4 +48,17 @@
 
 .vence {
   color: var(--perigo);
+}
+
+@media (max-width: 767px) {
+  .faixa, .quem { flex-wrap: wrap; gap: 4px 12px; }
+  .quem { white-space: normal; overflow-wrap: anywhere; }
+}
+
+@media screen and (max-width: 767px) {
+  /* A fila de impressão é irmã da moldura e também precisa ceder espaço às abas. */
+  :global(#root):has(.faixa) > :global(output[aria-live="polite"]) {
+    position: relative; inset: auto; flex-shrink: 0;
+    justify-content: space-between; border-radius: 0;
+  }
 }
