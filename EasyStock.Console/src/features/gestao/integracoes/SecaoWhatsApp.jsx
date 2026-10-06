@@ -24,7 +24,7 @@ function Resultado({ resultado }) {
         : <Pilula tom="ok">Conectado e no app WhatsApp Business</Pilula>}
       <ul className={css.syncs}>
         <li>{textoDaSincronizacao('Contatos do app', resultado.sincronizacaoEstadoApp)}</li>
-        <li>{textoDaSincronizacao('Histórico de conversas', resultado.sincronizacaoHistorico)}</li>
+        <li>Histórico anterior: não importado nesta versão</li>
       </ul>
     </div>
   )

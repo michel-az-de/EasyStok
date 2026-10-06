@@ -26,8 +26,7 @@ public sealed record ConexaoWhatsAppResultado(
     string? VerifiedName = null,
     bool? IsOnBizApp = null,
     string? PlatformType = null,
-    SincronizacaoWhatsAppResultado? SincronizacaoEstadoApp = null,
-    SincronizacaoWhatsAppResultado? SincronizacaoHistorico = null)
+    SincronizacaoWhatsAppResultado? SincronizacaoEstadoApp = null)
 {
     /// <summary>Conectou, mas a Meta não diz que o número está no app Business: a coexistência pode não estar ativa.</summary>
     public bool ForaDoAppBusiness => Status == StatusConexaoWhatsApp.Conectado && IsOnBizApp != true;
@@ -50,10 +49,11 @@ public sealed class ConexaoWhatsAppRecusadaException(EtapaConexaoWhatsApp etapa,
 /// <summary>
 /// Conecta o número da loja por coexistência (#1417, Embedded Signup v4): troca o <c>code</c> pelo business token,
 /// inscreve o app na WABA, confere o número, vincula o <c>phone_number_id</c> à empresa (mesmas regras do back-office:
-/// número de outra empresa ou da plataforma é recusado), grava o token cifrado e pede as duas sincronizações.
+/// número de outra empresa ou da plataforma é recusado), grava o token cifrado e pede a sincronização dos contatos
+/// (<c>smb_app_state_sync</c>; o <c>history</c> não é pedido enquanto não houver importação).
 /// O número é conferido antes, o token é gravado e só então o número é vinculado: nem número recusado deixa token
 /// trocado, nem falha ao gravar o token deixa a empresa com o número novo e sem token. Sincronização que falha não
-/// derruba a conexão, só aparece no resultado (a Meta aceita refazer em até 24 h).
+/// derruba a conexão, só aparece no resultado.
 /// </summary>
 public sealed class ConectarWhatsAppCoexistenciaUseCase(
     IMetaEmbeddedSignupClient meta,
@@ -97,11 +97,12 @@ public sealed class ConectarWhatsAppCoexistenciaUseCase(
                 phoneNumberId, numero.IsOnBizApp);
 
         var estado = await SincronizarAsync(phoneNumberId, token, TipoSincronizacaoWhatsApp.EstadoDoApp, ct);
-        var historico = await SincronizarAsync(phoneNumberId, token, TipoSincronizacaoWhatsApp.Historico, ct);
+        // O history (180 dias) não é pedido enquanto não houver importação (revisão da PR #1418): o webhook só o
+        // descartaria e a janela de 24 h para pedi-lo se perderia. Para importar depois, reconectar.
 
         logger.LogInformation("Coexistência: WhatsApp {PhoneNumberId} conectado à empresa {EmpresaId}.", phoneNumberId, cmd.EmpresaId);
         return new ConexaoWhatsAppResultado(StatusConexaoWhatsApp.Conectado,
-            numero.DisplayPhoneNumber, numero.VerifiedName, numero.IsOnBizApp, numero.PlatformType, estado, historico);
+            numero.DisplayPhoneNumber, numero.VerifiedName, numero.IsOnBizApp, numero.PlatformType, estado);
     }
 
     private static StatusConexaoWhatsApp? Recusa(VinculoWhatsAppResultado vinculo) => vinculo.Status switch

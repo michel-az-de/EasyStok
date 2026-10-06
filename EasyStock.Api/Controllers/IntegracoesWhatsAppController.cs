@@ -116,8 +116,7 @@ public class IntegracoesWhatsAppController(
             isOnBizApp = r.IsOnBizApp,
             platformType = r.PlatformType,
             foraDoAppBusiness = r.ForaDoAppBusiness,
-            sincronizacaoEstadoApp = r.SincronizacaoEstadoApp,
-            sincronizacaoHistorico = r.SincronizacaoHistorico
+            sincronizacaoEstadoApp = r.SincronizacaoEstadoApp
         });
     }
 }

@@ -19,7 +19,7 @@ API
   3. GET  {phone}?fields=display_phone_number,verified_name,is_on_biz_app,platform_type
   4. vincula o phone_number_id à empresa (outra empresa ou número de plataforma: 409)
   5. grava o token cifrado em credencial_integracao (provider meta-whatsapp)
-  6. POST {phone}/smb_app_data  sync_type=smb_app_state_sync e history
+  6. POST {phone}/smb_app_data  sync_type=smb_app_state_sync (contatos; history não é pedido)
 ```
 
 Respostas: 400 quando a Meta recusa o `code` (refazer o fluxo), 502 quando recusa os passos 2 e 3,
@@ -67,8 +67,10 @@ valores no `.env` (nunca pelo chat):
 - **20 mensagens por segundo** por número em coexistência.
 - **Sem grupos**: só conversas individuais passam pela API.
 - **Sincronização em até 24 h** depois da conexão; perdeu o prazo, refaça o Embedded Signup.
-- O histórico (`history`) e o estado do app (`smb_app_state_sync`) são aceitos e só contados no
-  log; a importação dos 180 dias fica para outra issue.
+- **O histórico anterior não é importado.** A conexão só pede `smb_app_state_sync` (contatos); o
+  `history` (até 180 dias) não é pedido porque ainda não há importação, e a janela de 24 h para
+  pedi-lo se perde. Para importar o histórico depois, será preciso reconectar o número.
+- Os webhooks `history` e `smb_app_state_sync` são aceitos com 200 e só contados no log.
 - Mídia que a loja manda pelo celular entra com o tipo e um aviso, sem baixar o arquivo.
 
 ## Desfazer

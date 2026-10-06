@@ -46,7 +46,7 @@ public class ConectarWhatsAppCoexistenciaUseCaseTests
         new(_empresa.Id, _usuarioId, code, waba, numero);
 
     [Fact]
-    public async Task ConectaGravaOTokenVinculaONumeroEPedeAsDuasSincronizacoes()
+    public async Task ConectaGravaOTokenVinculaONumeroESoPedeOsContatos()
     {
         var r = await Sut().ExecuteAsync(Comando());
 
@@ -56,7 +56,9 @@ public class ConectarWhatsAppCoexistenciaUseCaseTests
         r.IsOnBizApp.Should().BeTrue();
         r.ForaDoAppBusiness.Should().BeFalse();
         r.SincronizacaoEstadoApp.Should().Be(new SincronizacaoWhatsAppResultado(true, "req-EstadoDoApp", null));
-        r.SincronizacaoHistorico.Should().Be(new SincronizacaoWhatsAppResultado(true, "req-Historico", null));
+        // Revisão da PR #1418: sem importação, pedir o history só queimaria a janela de 24 h.
+        await _meta.DidNotReceive().SolicitarSincronizacaoAsync(
+            Arg.Any<string>(), Arg.Any<string>(), TipoSincronizacaoWhatsApp.Historico, Arg.Any<CancellationToken>());
 
         _empresa.WhatsAppPhoneNumberId.Should().Be(Numero);
         await _meta.Received(1).InscreverAppNaWabaAsync(Waba, Token, Arg.Any<CancellationToken>());
@@ -110,15 +112,14 @@ public class ConectarWhatsAppCoexistenciaUseCaseTests
     [Fact]
     public async Task SincronizacaoQueFalhaNaoDerrubaAConexao()
     {
-        _meta.SolicitarSincronizacaoAsync(Numero, Token, TipoSincronizacaoWhatsApp.Historico, Arg.Any<CancellationToken>())
+        _meta.SolicitarSincronizacaoAsync(Numero, Token, TipoSincronizacaoWhatsApp.EstadoDoApp, Arg.Any<CancellationToken>())
             .Returns<string?>(_ => throw new WhatsAppCloudException(131000, "Something went wrong", false, 500));
 
         var r = await Sut().ExecuteAsync(Comando());
 
         r.Status.Should().Be(StatusConexaoWhatsApp.Conectado);
-        r.SincronizacaoEstadoApp!.Solicitada.Should().BeTrue();
-        r.SincronizacaoHistorico!.Solicitada.Should().BeFalse();
-        r.SincronizacaoHistorico.Erro.Should().Contain("Something went wrong");
+        r.SincronizacaoEstadoApp!.Solicitada.Should().BeFalse();
+        r.SincronizacaoEstadoApp.Erro.Should().Contain("Something went wrong");
         await _credenciais.ReceivedWithAnyArgs(1).SalvarAsync<CredencialWhatsAppMeta>(default, default, default!, default, default!, default);
     }
 
