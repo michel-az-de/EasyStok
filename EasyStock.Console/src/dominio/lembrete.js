@@ -10,7 +10,13 @@ import { origemDaPassagem } from './passagem'
 
 export const TIPOS = { DONA: 'dona' }
 
-export const ORIGENS = { MANUAL: 'manual', PASSAGEM: 'passagem', PAGAMENTO: 'pagamento' }
+// AVISO (#1426): notificação do EasyStok no modo API, não é tarefa escrita por ela.
+export const ORIGENS = { MANUAL: 'manual', PASSAGEM: 'passagem', PAGAMENTO: 'pagamento', AVISO: 'aviso' }
+
+// De onde veio o item no modo API (#1426): lembrete gravado no EasyStok ou
+// notificação InApp. Item sem `fonte` é da tela (manual da demonstração ou
+// automático calculado das conversas).
+export const FONTES = { LEMBRETE: 'lembrete', AVISO: 'aviso' }
 
 export const MINUTOS_SEM_RESPOSTA = 10
 export const MINUTOS_SEM_PAGAMENTO = 15
