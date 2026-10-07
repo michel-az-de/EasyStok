@@ -91,6 +91,10 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableReenvioMensagens)
             services.AddHostedService<ReenvioMensagensBackgroundService>();
 
+        // #1432: e-mails da caixa de suporte de cada loja viram mensagens do canal E-mail.
+        if (options.EnableAtendimentoCaixaEmail)
+            services.AddHostedService<AtendimentoCaixaEmailBackgroundService>();
+
         // S43: lembretes internos da dona (pagamento sem baixa, cliente sem resposta, manuais vencidos).
         if (options.EnableAvaliadorLembretes)
             services.AddHostedService<AvaliadorLembretesBackgroundService>();

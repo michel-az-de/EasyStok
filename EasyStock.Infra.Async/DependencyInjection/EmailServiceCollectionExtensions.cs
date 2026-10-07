@@ -46,6 +46,13 @@ public static class EmailServiceCollectionExtensions
         }
 
         services.AddSingleton(escolha);
+
+        // #1432: caixa de suporte da loja (IMAP/SMTP por empresa), independente do provider acima, que é o da plataforma.
+        services.TryAddSingleton<EasyStock.Application.Ports.Output.Atendimento.Email.ICaixaEmailCliente>(sp =>
+            new EasyStock.Infra.Async.Email.Atendimento.CaixaEmailMailKit(
+                sp.GetRequiredService<ILogger<EasyStock.Infra.Async.Email.Atendimento.CaixaEmailMailKit>>(),
+                sp.GetService<TimeProvider>() ?? TimeProvider.System));
+
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, EmailAvisosDeSubida>());
         return services;
     }

@@ -47,7 +47,7 @@ public sealed class ArmazenadorMidiaWhatsApp(IWhatsAppCloudClient cloudClient, I
     }
 
     // A nota de voz chega como "audio/ogg; codecs=opus": a extensão sai do tipo sem parâmetros.
-    private static string ExtensaoPara(string mimeType) => mimeType.Split(';', 2)[0].Trim().ToLowerInvariant() switch
+    internal static string ExtensaoPara(string mimeType) => mimeType.Split(';', 2)[0].Trim().ToLowerInvariant() switch
     {
         "image/jpeg" => ".jpg",
         "image/png" => ".png",
