@@ -376,6 +376,21 @@
 .cardapioLink { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .cardapioLink code { overflow-wrap: anywhere; font-size: var(--t-apoio); color: var(--tinta-2); }
 
+/* #1424: programar mensagem ao cliente (formulário e lista das programadas da conversa). */
+.programar { display: grid; gap: var(--e-3); }
+.programar p { margin: 0; }
+.programarOpcao { display: flex; align-items: flex-start; gap: var(--e-2); font-size: var(--t-apoio); color: var(--tinta-2); }
+.programarOpcao input { margin-top: 3px; }
+.programarErro {
+  padding: var(--e-2) var(--e-3); font-size: var(--t-apoio); color: var(--parado);
+  border-left: var(--trilho) solid var(--parado); background: var(--elevado);
+}
+.programadas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+.programadas li { display: grid; gap: var(--e-1); padding: var(--e-2) var(--e-3); border-radius: 12px; background: var(--elevado); }
+.programadaTopo { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
+.programadaTopo button { margin-left: auto; }
+.programadaTexto { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--tinta-2); }
+
 /* Rodada 12 (issue #16, dúvidas da Thatiane): Anexar, Fotos, Cardápio e Nota
    ganham nome visível embaixo do ícone, no desenho do trilho lateral (ícone
    em cima, nome pequeno embaixo). Ao lado do ícone, como no Respostas, os

@@ -11,6 +11,10 @@ const NOME_DO_CANAL = {
   ChatSite: 'Chat do site', Email: 'E-mail', Sms: 'SMS',
 }
 
+// Caminho de volta (#1424): o nome do canal na tela vira o enum da API (`CanalConversa`, string).
+const CANAL_DO_NOME = Object.fromEntries(Object.entries(NOME_DO_CANAL).map(([api, nome]) => [nome, api]))
+export const canalParaApi = (nome) => CANAL_DO_NOME[nome] ?? nome
+
 const ESTADO_DA_SITUACAO = { Automatica: 'Aberto', Assumida: 'Em atendimento', Encerrada: 'Encerrado' }
 
 const STATUS_DA_MENSAGEM = {
@@ -41,6 +45,8 @@ export function mensagemDaApi(m, conversaId = null) {
     em: instante(m.enviadaEm),
     ...(saida ? { status: STATUS_DA_MENSAGEM[m.status] ?? 'enviada' } : {}),
     ...(saida && m.autor === 'Agente' ? { automatica: true } : {}),
+    // #1424: saiu pelo disparo da mensagem programada; o balão mostra o selo.
+    ...(saida && m.programada ? { programada: true } : {}),
     ...(m.erro ? { erro: m.erro } : {}),
     // S58/S60 (#1391): espera o cliente responder ao modelo de retomada; ou saiu pela reserva por SMS.
     ...(m.aguardaClienteDesde ? { aguardaCliente: true } : {}),
@@ -109,6 +115,23 @@ export const naoEntregueDaApi = (l) => ({
   canal: l.canal,
   aberta: l.conversaAberta,
   mensagem: mensagemDaApi(l.mensagem, l.conversaId),
+})
+
+// Mensagem programada (#1424, `MensagemProgramadaResult`) no formato da lista do console.
+// `situacao` segue o enum da API (Agendada, Enviando, Enviada, Cancelada, Falhou).
+export const programadaDaApi = (r) => ({
+  id: r.id,
+  clienteId: r.clienteId,
+  conversaId: r.conversaId ?? null,
+  canal: NOME_DO_CANAL[r.canal] ?? r.canal,
+  finalidade: r.finalidade,
+  texto: r.texto ?? null,
+  modelo: r.modelo ?? null,
+  agendadaPara: instante(r.agendadaPara),
+  situacao: r.situacao,
+  tentativas: r.tentativas ?? 0,
+  erro: r.erro ?? null,
+  enviadaEm: instante(r.enviadaEm),
 })
 
 // Sugestão do agente (#1420) no formato que o painel do agente lê. O agente do EasyStok escreve a
