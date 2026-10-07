@@ -27,7 +27,6 @@ const grupo = (rotulo, nomes) => Object.fromEntries(nomes.map((nome) => [nome, r
 export const NAO_LIGADAS = {
   reabrir: 'Reabrir conversa',
   trocarJanela: 'Trocar a janela do pedido',
-  salvarNota: 'Nota do cliente',
   ...grupo('Mensagens automáticas', ['alternarRegra', 'editarRegra']),
   ...grupo('Lembretes', ['criarLembrete', 'concluirLembrete']),
   ...grupo('Bloqueio do cliente', ['bloquearCliente', 'desbloquearCliente']),

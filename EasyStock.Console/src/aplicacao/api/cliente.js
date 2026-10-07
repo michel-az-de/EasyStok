@@ -1,5 +1,5 @@
 import * as acao from '../acoes'
-import { cadastrarClienteDaConversa, obterDossie } from '../../infra/api/conversasApi'
+import { adicionarNotaCliente, cadastrarClienteDaConversa, obterDossie } from '../../infra/api/conversasApi'
 import { clienteDoDossie, enderecoParaApi } from '../../infra/api/traducaoCliente'
 import { textoNaoLigado } from './naoLigadas'
 
@@ -65,6 +65,18 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
         return undefined
       }
       return cadastrar(id, { [campo]: valor })
+    },
+
+    // #1436: nota interna vai ao cadastro do cliente; a Ficha relê o dossiê. Lead não tem cadastro.
+    salvarNota: (id, texto) => {
+      const clienteId = conversaDe(id)?.clienteId
+      if (!clienteId) {
+        avisar('Cadastre o cliente (Salvar cadastro na Ficha) antes de anotar.')
+        return undefined
+      }
+      return adicionarNotaCliente(clienteId, texto.trim())
+        .then(() => carregar(id))
+        .catch((erro) => avisar(`Nota do cliente: ${erro.message}`))
     },
 
     carregarClienteDaConversa: (id) => carregar(id).catch(() => {}),

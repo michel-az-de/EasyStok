@@ -334,7 +334,7 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
       // "Precisa de você".
       encerradasDoBalcao: conversasEncerradasDoBalcao(estado.conversas, estado.filtros),
       bloqueadasDoBalcao: conversasBloqueadasDoBalcao(estado.conversas, estado.filtros),
-      historico: selecionada ? historicoComPedidoVivo(carregarHistorico(selecionada.id), selecionada.pedido) : [],
+      historico: selecionada ? historicoComPedidoVivo(selecionada.cliente?.historico ?? carregarHistorico(selecionada.id), selecionada.pedido) : [],
       ultimoAvanco: estado.ultimoAvanco,
       // Lote de papel (US-042): banner de queda e a modal de lançamento leem
       // só este campo, tirado de `estado.conexao` sem transformação nenhuma.
