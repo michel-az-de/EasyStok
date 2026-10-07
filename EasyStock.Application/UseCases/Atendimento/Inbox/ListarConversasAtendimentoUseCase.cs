@@ -7,7 +7,8 @@ public sealed record ListarConversasAtendimentoQuery(
     Guid EmpresaId, SituacaoConversa? Situacao, string? Busca, int Pagina, int Limite, FiltroResponsavel? Responsavel = null);
 
 /// <summary>Inbox do console (S07): mais recentes primeiro, com a última mensagem e as não lidas.</summary>
-public sealed class ListarConversasAtendimentoUseCase(IConversaRepository conversaRepository)
+public sealed class ListarConversasAtendimentoUseCase(
+    IConversaRepository conversaRepository, IConfiguracaoAtendimentoRepository configuracoes)
 {
     public const int LimitePadrao = 30;
     public const int LimiteMaximo = 100;
@@ -22,6 +23,7 @@ public sealed class ListarConversasAtendimentoUseCase(IConversaRepository conver
             query.EmpresaId, query.Situacao, busca, query.Responsavel, Math.Max(query.Pagina, 1), limite, ct);
 
         var agora = DateTime.UtcNow;
-        return itens.Select(i => ConversaResumoResult.De(i.Conversa, i.UltimaMensagemTexto, agora)).ToList();
+        var sla = (await configuracoes.GetOrDefaultAsync(query.EmpresaId)).SlaRespostaMinutos;
+        return itens.Select(i => ConversaResumoResult.De(i.Conversa, i.UltimaMensagemTexto, agora, sla)).ToList();
     }
 }

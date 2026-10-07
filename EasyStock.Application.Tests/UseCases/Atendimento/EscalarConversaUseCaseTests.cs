@@ -1,6 +1,7 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
@@ -72,7 +73,9 @@ public class EscalarConversaUseCaseTests
         var repo = Substitute.For<IConversaRepository>();
         repo.ListarInboxAsync(default, default, default, default, default, default, default)
             .ReturnsForAnyArgs([new ConversaInboxItem(conversa, null)]);
-        var itens = await new ListarConversasAtendimentoUseCase(repo)
+        var configuracoes = Substitute.For<IConfiguracaoAtendimentoRepository>();
+        configuracoes.GetOrDefaultAsync(conversa.EmpresaId).Returns(ConfiguracaoAtendimento.CriarPadrao(conversa.EmpresaId));
+        var itens = await new ListarConversasAtendimentoUseCase(repo, configuracoes)
             .ExecuteAsync(new ListarConversasAtendimentoQuery(conversa.EmpresaId, null, null, 1, 10));
         return itens.Single();
     }

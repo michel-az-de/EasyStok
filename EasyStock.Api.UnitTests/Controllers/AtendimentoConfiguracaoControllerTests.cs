@@ -62,6 +62,7 @@ public class AtendimentoConfiguracaoControllerTests
         var data = (ConfiguracaoAtendimentoResult)ok.Value!.GetType().GetProperty("Data")!.GetValue(ok.Value)!;
         data.RespiroMinutos.Should().Be(40);
         data.TempoPreparoPadraoMinutos.Should().Be(60);
+        data.SlaRespostaMinutos.Should().Be(5);
     }
 
     [Fact]
@@ -104,6 +105,40 @@ public class AtendimentoConfiguracaoControllerTests
 
         var body = new AtualizarConfiguracaoAtendimentoBody(
             null, null, null, null, null, null, RespiroMinutos: null, TempoPreparoPadraoMinutos: 0, Ativo: null);
+
+        var result = await _controller.Put(body);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task PutGravaOSlaDeResposta()
+    {
+        var config = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns(config);
+
+        var body = new AtualizarConfiguracaoAtendimentoBody(
+            null, null, null, null, null, null, null, null, null, SlaRespostaMinutos: 15);
+
+        var result = await _controller.Put(body);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var data = (ConfiguracaoAtendimentoResult)ok.Value!.GetType().GetProperty("Data")!.GetValue(ok.Value)!;
+        data.SlaRespostaMinutos.Should().Be(15);
+        config.SlaRespostaMinutos.Should().Be(15);
+        await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(241)]
+    public async Task PutComSlaForaDaFaixaDevolveBadRequest(int minutos)
+    {
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns(ConfiguracaoAtendimento.CriarPadrao(_empresaId));
+
+        var body = new AtualizarConfiguracaoAtendimentoBody(
+            null, null, null, null, null, null, null, null, null, SlaRespostaMinutos: minutos);
 
         var result = await _controller.Put(body);
 

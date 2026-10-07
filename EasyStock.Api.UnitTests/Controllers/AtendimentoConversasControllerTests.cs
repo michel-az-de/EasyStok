@@ -69,7 +69,7 @@ public class AtendimentoConversasControllerTests
             Substitute.For<ICardapioItemRepository>(), _unitOfWork);
 
         _controller = new AtendimentoConversasController(
-            new ListarConversasAtendimentoUseCase(_repositorio),
+            new ListarConversasAtendimentoUseCase(_repositorio, ConfiguracoesPadrao()),
             new ListarMensagensConversaUseCase(_repositorio),
             new EnviarMensagemConsoleUseCase(_repositorio, resolvedor, uploads, _unitOfWork),
             new ReenviarMensagemUseCase(_repositorio, ConfiguracoesPadrao(), resolvedor,
@@ -340,6 +340,19 @@ public class AtendimentoConversasControllerTests
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         var data = (IReadOnlyList<ConversaResumoResult>)ok.Value!.GetType().GetProperty("Data")!.GetValue(ok.Value)!;
         data.Should().ContainSingle(c => c.Id == conversa.Id && c.UltimaMensagemTexto == "oi" && c.NaoLidas == 1);
+    }
+
+    [Fact]
+    public async Task ListarDizSeOClienteAguardaRespostaEOSlaDaLoja()
+    {
+        var conversa = ConversaComClienteAgora();
+
+        var data = Dados<IReadOnlyList<ConversaResumoResult>>(await _controller.Listar(null, "mar", null, 1, 20, default));
+
+        var resumo = data.Should().ContainSingle(c => c.Id == conversa.Id).Subject;
+        resumo.AguardaResposta.Should().BeTrue("o cliente falou por último");
+        resumo.UltimaMensagemEntradaEm.Should().Be(conversa.UltimaMensagemEntradaEm);
+        resumo.SlaRespostaMinutos.Should().Be(ConfiguracaoAtendimento.SlaRespostaPadraoMinutos);
     }
 
     // ── S41: atendentes e atribuição ──────────────────────────────────

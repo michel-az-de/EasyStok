@@ -37,7 +37,10 @@ public sealed class AvaliarLembretesUseCase(
     IOptions<PrazosOptions> prazos)
 {
     public static readonly TimeSpan PagamentoSemBaixaApos = TimeSpan.FromMinutes(15);
-    /// <summary>Padrão do limite de cliente sem resposta; a fonte é <see cref="PrazosOptions.ClienteSemRespostaMin"/> (N11).</summary>
+    /// <summary>
+    /// Padrão do limite de cliente sem resposta quando a loja não gravou configuração; a fonte é
+    /// <see cref="PrazosOptions.ClienteSemRespostaMin"/> (N11). Com configuração, vale o SLA da loja (#1427).
+    /// </summary>
     public static readonly TimeSpan SemRespostaApos = TimeSpan.FromMinutes(10);
     public const string EventoSse = "lembrete.vencido";
     public const int AvisosPorRodada = 100;
@@ -61,9 +64,16 @@ public sealed class AvaliarLembretesUseCase(
             criados++;
         }
 
-        var semRespostaApos = prazos.Value.ClienteSemResposta;
-        foreach (var conversa in await candidatos.ListarConversasSemRespostaAsync(agora - semRespostaApos, ct))
+        // #1427: o prazo é da loja. A consulta traz desde o menor SLA possível e o corte fino é aqui, por loja.
+        var padrao = prazos.Value.ClienteSemResposta;
+        var slaPorEmpresa = new Dictionary<Guid, TimeSpan>();
+        var menorPrazo = TimeSpan.FromMinutes(Math.Min(ConfiguracaoAtendimento.SlaRespostaMinimoMinutos, padrao.TotalMinutes));
+        foreach (var conversa in await candidatos.ListarConversasSemRespostaAsync(agora - menorPrazo, ct))
         {
+            var semRespostaApos = SlaDa(conversa, padrao);
+            if (conversa.EntradaEm is { } entrada && entrada >= agora - semRespostaApos) continue;
+            slaPorEmpresa[conversa.EmpresaId] = semRespostaApos;
+
             var referencia = conversa.MensagemEntradaId.ToString();
             vigentes.Add((conversa.EmpresaId, TipoLembrete.ClienteSemResposta, referencia));
             if (await repository.ExisteAutomaticoAsync(conversa.EmpresaId, TipoLembrete.ClienteSemResposta, referencia, ct)) continue;
@@ -86,11 +96,15 @@ public sealed class AvaliarLembretesUseCase(
         if (criados + resolvidos > 0)
             await unitOfWork.CommitAsync();
 
-        var avisados = await AvisarVencidosAsync(agora, ct);
+        var avisados = await AvisarVencidosAsync(agora, slaPorEmpresa, ct);
         return new ResultadoAvaliacaoLembretes(criados, resolvidos, avisados);
     }
 
-    private async Task<int> AvisarVencidosAsync(DateTime agora, CancellationToken ct)
+    private static TimeSpan SlaDa(ConversaSemResposta conversa, TimeSpan padrao) =>
+        conversa.SlaRespostaMinutos is { } minutos and > 0 ? TimeSpan.FromMinutes(minutos) : padrao;
+
+    // `slaPorEmpresa`: o SLA aplicado nesta rodada, para o PrazoEstourado dizer o mesmo prazo que criou o lembrete.
+    private async Task<int> AvisarVencidosAsync(DateTime agora, IReadOnlyDictionary<Guid, TimeSpan> slaPorEmpresa, CancellationToken ct)
     {
         var vencidos = await repository.ListarVencidosSemAvisoAsync(agora, AvisosPorRodada, ct);
         if (vencidos.Count == 0) return 0;
@@ -105,10 +119,12 @@ public sealed class AvaliarLembretesUseCase(
             // N11: o cliente sem resposta também chega por e-mail e WhatsApp. Pagamento sem baixa e lembrete manual
             // ficam só no Push. Sem atendente, o destino é a audiência da rotina (gestores).
             if (lembrete is { Tipo: TipoLembrete.ClienteSemResposta, CriadoPorUsuarioId: null })
+            {
+                var sla = slaPorEmpresa.GetValueOrDefault(lembrete.EmpresaId, prazos.Value.ClienteSemResposta);
                 await PrazoEstouradoEvento.EnfileirarAsync(notificador, prazos.Value, TipoPrazo.ClienteSemResposta,
                     lembrete.EmpresaId, lembrete.Id, PrazoEstouradoEvento.Referencia(lembrete.ConversaId ?? lembrete.Id),
-                    PrazoEstouradoEvento.Duracao(prazos.Value.ClienteSemResposta),
-                    PrazoEstouradoEvento.Duracao(prazos.Value.ClienteSemResposta), lembrete.ParaUsuarioId, ct);
+                    PrazoEstouradoEvento.Duracao(sla), PrazoEstouradoEvento.Duracao(sla), lembrete.ParaUsuarioId, ct);
+            }
             lembrete.MarcarAvisado(agora);
         }
 

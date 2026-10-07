@@ -65,8 +65,8 @@ public class AvaliadorLembretesTests
         var conversaId = Guid.NewGuid();
         var entradaId = Guid.NewGuid();
         var atendente = Guid.NewGuid();
-        _candidatos.ListarConversasSemRespostaAsync(Agora - TimeSpan.FromMinutes(10), Arg.Any<CancellationToken>())
-            .Returns([new ConversaSemResposta(_empresaId, conversaId, entradaId, "Fulana", atendente)]);
+        _candidatos.ListarConversasSemRespostaAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns([new ConversaSemResposta(_empresaId, conversaId, entradaId, "Fulana", atendente, Agora.AddMinutes(-11))]);
 
         await Avaliador().ExecuteAsync();
 

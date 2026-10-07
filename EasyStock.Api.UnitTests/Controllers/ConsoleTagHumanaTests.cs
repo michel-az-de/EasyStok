@@ -49,7 +49,7 @@ public class ConsoleTagHumanaTests
         var resolvedor = new ResolvedorCanal([_whatsApp, new CanalMessenger(_meta), new CanalInstagram(_meta)]);
 
         _controller = new AtendimentoConversasController(
-            new ListarConversasAtendimentoUseCase(_conversas),
+            new ListarConversasAtendimentoUseCase(_conversas, ConfiguracoesPadrao()),
             new ListarMensagensConversaUseCase(_conversas),
             new EnviarMensagemConsoleUseCase(_conversas, resolvedor, uploads, _uow),
             new ReenviarMensagemUseCase(_conversas, ConfiguracoesPadrao(), resolvedor,

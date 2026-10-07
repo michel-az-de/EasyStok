@@ -17,7 +17,8 @@ public sealed record ConfiguracaoAtendimentoResult(
     DateTime? UltimaMensagemRecebidaEm,
     bool Ativo,
     string? ModeloRetomadaNome = null,
-    string ModeloRetomadaIdioma = ConfiguracaoAtendimento.IdiomaModeloPadrao);
+    string ModeloRetomadaIdioma = ConfiguracaoAtendimento.IdiomaModeloPadrao,
+    int SlaRespostaMinutos = ConfiguracaoAtendimento.SlaRespostaPadraoMinutos);
 
 public sealed record ObterConfiguracaoAtendimentoQuery(Guid EmpresaId);
 
@@ -32,7 +33,8 @@ public sealed class ObterConfiguracaoAtendimentoUseCase(IConfiguracaoAtendimento
     internal static ConfiguracaoAtendimentoResult ToResult(ConfiguracaoAtendimento c) => new(
         c.EmpresaId, c.Tom, c.NivelSugestao, c.SaudacaoPrimeiroContato, c.SaudacaoRetorno,
         c.FraseEspera, c.MensagemForaArea, c.RespiroMinutos, c.TempoPreparoPadraoMinutos,
-        c.WebhookVerificadoEm, c.UltimaMensagemRecebidaEm, c.Ativo, c.ModeloRetomadaNome, c.ModeloRetomadaIdioma);
+        c.WebhookVerificadoEm, c.UltimaMensagemRecebidaEm, c.Ativo, c.ModeloRetomadaNome, c.ModeloRetomadaIdioma,
+        c.SlaRespostaMinutos);
 }
 
 public sealed record AtualizarConfiguracaoAtendimentoCommand(
@@ -45,7 +47,8 @@ public sealed record AtualizarConfiguracaoAtendimentoCommand(
     string? MensagemForaArea,
     int? RespiroMinutos,
     int? TempoPreparoPadraoMinutos,
-    bool? Ativo);
+    bool? Ativo,
+    int? SlaRespostaMinutos = null);
 
 public sealed class AtualizarConfiguracaoAtendimentoUseCase(
     IConfiguracaoAtendimentoRepository repository, IUnitOfWork unitOfWork)
@@ -67,7 +70,8 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
                 command.MensagemForaArea,
                 command.RespiroMinutos,
                 command.TempoPreparoPadraoMinutos,
-                command.Ativo);
+                command.Ativo,
+                command.SlaRespostaMinutos);
         }
         catch (ArgumentOutOfRangeException ex)
         {

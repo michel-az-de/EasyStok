@@ -109,6 +109,56 @@ public class LembretesIntegrationTests(PostgreSqlDatabaseFixture fixture)
         }
     }
 
+    [SkippableFact]
+    public async Task SlaDaLojaDecideQuandoOClienteSemRespostaVence()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+
+        // #1427: com SLA de 2 min gravado na loja, 3 min de espera já vencem (o padrão das opções é 10).
+        var agora = DateTime.UtcNow;
+        var comSla = Empresa.Criar("Casa da Baba SLA", "11222333000262");
+        var semConfiguracao = Empresa.Criar("Casa da Baba Sem SLA", "11222333000343");
+        var configuracao = ConfiguracaoAtendimento.CriarPadrao(comSla.Id);
+        configuracao.Atualizar(null, null, null, null, null, null, null, null, null, slaRespostaMinutos: 2);
+
+        Conversa Esperando(Empresa empresa, string waId, out Mensagem entrada)
+        {
+            var conversa = Conversa.Abrir(empresa.Id, waId, agora.AddMinutes(-10));
+            conversa.Assumir(agora.AddMinutes(-9), Guid.NewGuid());
+            entrada = Mensagem.Entrada(empresa.Id, conversa.Id, agora.AddMinutes(-3), TipoConteudoMensagem.Texto, "oi?");
+            return conversa;
+        }
+
+        var daLoja = Esperando(comSla, "5511999990011", out var entradaDaLoja);
+        var padrao = Esperando(semConfiguracao, "5511999990012", out var entradaPadrao);
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            using var _ = db.UseRowLevelSecurityBypass();
+            db.Empresas.AddRange(comSla, semConfiguracao);
+            db.ConfiguracoesAtendimento.Add(configuracao);
+            db.AtendimentoConversas.AddRange(daLoja, padrao);
+            db.AtendimentoMensagens.AddRange(entradaDaLoja, entradaPadrao);
+            await db.SaveChangesAsync();
+
+            var candidatos = await new CandidatosLembreteQuery(db).ListarConversasSemRespostaAsync(agora.AddMinutes(-1));
+            candidatos.Should().Contain(c => c.ConversaId == daLoja.Id && c.SlaRespostaMinutos == 2 && c.EntradaEm != null);
+            candidatos.Should().Contain(c => c.ConversaId == padrao.Id && c.SlaRespostaMinutos == null);
+        }
+
+        await RodarAvaliadorAsync(agora);
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            using var _ = db.UseRowLevelSecurityBypass();
+            var lembretes = await db.Lembretes.IgnoreQueryFilters()
+                .Where(l => l.EmpresaId == comSla.Id || l.EmpresaId == semConfiguracao.Id).ToListAsync();
+            var vencido = lembretes.Should().ContainSingle().Subject;
+            vencido.ConversaId.Should().Be(daLoja.Id);
+            vencido.Texto.Should().Contain("há 2 min");
+        }
+    }
+
     private async Task RodarAvaliadorAsync(DateTime instante)
     {
         await using var db = fixture.CreateDbContext();
