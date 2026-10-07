@@ -47,6 +47,7 @@ export function mensagemDaApi(m, conversaId = null) {
     ...(m.reservaSmsEm ? { porSms: true } : {}),
     // #1398: texto do áudio transcrito, mostrado abaixo do player.
     ...(m.transcricao ? { transcricao: m.transcricao } : {}),
+    ...(m.assunto ? { assunto: m.assunto } : {}), // #1432: assunto do e-mail recebido
     ...(m.midiaChave && conversaId ? { midia: { conversaId, mensagemId: m.id, mime: m.midiaMime ?? null } } : {}),
     // #1397: o EasyStok desistiu de baixar o anexo depois das tentativas; o balão avisa em vez de ficar parado.
     ...(!m.midiaChave && m.midiaFalhou ? { midia: { falhou: true, erro: m.erroMidia ?? null } } : {}),
@@ -83,6 +84,7 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario) {
     clienteId: resumo.clienteId ?? null,
     nome: resumo.contatoNome || resumo.contatoIdExterno,
     contato: resumo.contatoIdExterno,
+    assunto: resumo.assunto ?? null, // #1432: assunto do último e-mail (canal E-mail)
     canal: NOME_DO_CANAL[resumo.canal] ?? resumo.canal,
     estado: ESTADO_DA_SITUACAO[resumo.situacao] ?? 'Aberto',
     situacaoApi: resumo.situacao,

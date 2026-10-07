@@ -157,11 +157,12 @@
   font-family: var(--f-dado); font-weight: 400; font-variant-numeric: tabular-nums;
 }
 
-/* Linha C: um contador por canal (issue #2), três colunas iguais do celular
-   de 390 px ao computador. `fieldset` por semântica de grupo (a11y); zera o
-   estilo nativo do navegador. */
+/* Linha C: um contador por canal (issue #2), colunas iguais. Com quatro canais
+   (#1432: E-mail) a coluna de 334 px do Balcão vira 2 x 2, para "WhatsApp" e
+   "Instagram" caberem inteiros; coluna larga põe os quatro numa linha.
+   `fieldset` por semântica de grupo (a11y); zera o estilo nativo do navegador. */
 .contadoresCanal {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: 6px;
   border: 0; margin: 0; padding: 0; min-width: 0;
 }
 /* Mesmo desenho do chip de filtro (Chip.module.css): parado é preenchimento

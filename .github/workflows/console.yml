@@ -34,3 +34,4 @@ jobs:
       - run: npm run qualidade
       - run: node ferramentas/prova-1255-pagamento-manual-api.mjs
       - run: node ferramentas/prova-1420-sugestao-agente-api.mjs
+      - run: node ferramentas/prova-1432-atendimento-email.mjs

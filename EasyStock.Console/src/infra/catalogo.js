@@ -58,6 +58,23 @@ export const CANAIS = [
       'Sem foto de perfil nem anexo. Peça o WhatsApp depois.',
     ],
   },
+  // #1432: caixa de suporte da loja (Integrações > E-mail). A resposta sai pela
+  // própria caixa, no mesmo fio do cliente; foto vai como imagem no corpo.
+  {
+    nome: 'E-mail',
+    icone: 'email',
+    temJanela: false,
+    horasJanela: 0,
+    aceitaModelo: false,
+    aceitaMidia: {
+      foto: true, figurinha: false, audio: false, arquivo: false,
+    },
+    temFoto: false,
+    explicacao: [
+      'Sem janela: a resposta sai pela caixa da loja, no mesmo fio do cliente.',
+      'Aceita foto. Os anexos que o cliente manda aparecem na conversa.',
+    ],
+  },
 ]
 
 export const NOMES_DE_CANAL = CANAIS.map((c) => c.nome)
