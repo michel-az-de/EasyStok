@@ -125,6 +125,10 @@ export function mascaraTelefone(valor) {
   return `(${ddd}) ${resto.slice(0, tamanhoLinha)}-${resto.slice(tamanhoLinha)}`
 }
 
+// Telefone E.164 do Brasil como a API devolve ("+5511987654321") na máscara da tela (#1430).
+export const telefoneDoE164 = (e164) =>
+  mascaraTelefone(String(e164 ?? '').replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, ''))
+
 // CEP (seção 2): "05433-001".
 export function mascaraCep(valor) {
   const digitos = String(valor ?? '').replace(/\D/g, '').slice(0, 8)

@@ -261,6 +261,9 @@ const CASOS_API = {
       cliente: { ...c.cliente, ...cliente, enderecoCapturado: null, daApi: true },
     })),
 
+  [acao.CONTATO_INFORMADO_API]: (estado, { id, contato }) =>
+    mapear(estado, id, (c) => ({ ...c, contatoInformado: contato })),
+
   [acao.RENOMEAR_LEAD_API]: (estado, { id, nome }) =>
     mapear(estado, id, (c) => ({ ...c, nome: nome?.trim() || c.nome, nomeDaDona: Boolean(nome?.trim()) })),
 
