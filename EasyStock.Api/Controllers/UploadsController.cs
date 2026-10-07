@@ -63,7 +63,8 @@ public class UploadsController(
         return DataOk(result);
     }
 
-    [SwaggerOperation(Summary = "Upload cardapio item photo (Admin only)")]
+    [SwaggerOperation(Summary = "Upload cardapio item photo (Admin only)",
+        Description = "galeria=true adiciona um ângulo (até 5); a primeira foto vira capa. O padrão substitui apenas a capa.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -71,7 +72,8 @@ public class UploadsController(
     [RequestSizeLimit(6 * 1024 * 1024)]
     [RequestFormLimits(MultipartBodyLengthLimit = 6 * 1024 * 1024)]
     [HttpPost("cardapio-item/{itemId:guid}/foto")]
-    public async Task<IActionResult> UploadFotoCardapioItem(Guid itemId, IFormFile file, CancellationToken cancellationToken)
+    public async Task<IActionResult> UploadFotoCardapioItem(Guid itemId, IFormFile file, CancellationToken cancellationToken,
+        [FromQuery] bool galeria = false)
     {
         // Teto checado ANTES de bufferizar (o [RequestSizeLimit] barra no Kestrel; aqui é o 2o gate).
         if (file is null || file.Length == 0)
@@ -88,7 +90,8 @@ public class UploadsController(
                 payload.FileName,
                 payload.ContentType,
                 payload.Content,
-                cancellationToken);
+                cancellationToken,
+                galeria);
 
             return DataOk(result);
         }

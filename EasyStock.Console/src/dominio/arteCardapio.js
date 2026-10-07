@@ -97,6 +97,7 @@ const massaGenerica = (m) => '<path d="M120 110c0-26 40-34 52-12s-8 40-30 30-18-
   + `fill="none" stroke="${m}" stroke-width="12" stroke-linecap="round"/>`
 
 export function fotoDoPrato(item) {
+  if (item.foto) return item.foto
   const { fundo, massa } = PALETA[item.sku] ?? { fundo: '#5E564C', massa: '#E6DCC8' }
   const desenhar = TIPOS_DE_MASSA[String(item.sku).split('-')[0]] ?? massaGenerica
   return 'data:image/svg+xml;utf8,' + encodeURIComponent(

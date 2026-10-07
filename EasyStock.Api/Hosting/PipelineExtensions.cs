@@ -188,6 +188,8 @@ public static class PipelineExtensions
         }
 
         app.UseHttpsRedirection();
+        // O console baixa fotos públicas para anexá-las; os arquivos também usam a política de origens da API.
+        app.UseCors();
         // S49: as fontes do impresso precisam de CORS (o console as carrega de outra origem).
         app.UseStaticFiles(new StaticFileOptions { OnPrepareResponse = EasyStock.Api.Services.Impressao.FontesImpressao.LiberarCors });
 
@@ -224,7 +226,6 @@ public static class PipelineExtensions
         // Casa da Baba Mobile PWA — static files em /pwa/ com headers de service worker.
         Mobile.MobileModule.UseMobilePwa(app);
 
-        app.UseCors();
         // CSRF do storefront (#1088, ADR-0053): POST com cookie __Host-cdb_* so da mesma origem.
         app.UseMiddleware<ProtecaoCsrfCookieMiddleware>();
         app.UseRateLimiter();

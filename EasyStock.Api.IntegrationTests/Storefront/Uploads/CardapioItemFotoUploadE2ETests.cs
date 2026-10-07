@@ -35,6 +35,7 @@ public sealed class CardapioItemFotoUploadE2ETests : IAsyncLifetime
 {
     private PostgreSqlContainer? _pg;
     private bool _isAvailable;
+    private static readonly Guid UsuarioTesteId = Guid.NewGuid();
 
     private const string JwtIssuer = "EasyStock";
     private const string JwtAudience = "EasyStock";
@@ -52,7 +53,7 @@ public sealed class CardapioItemFotoUploadE2ETests : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_upload_e2e_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                .WithPassword("Upload-E2E-" + Guid.NewGuid().ToString("N"))
                 .Build();
 
             await _pg.StartAsync();
@@ -70,6 +71,81 @@ public sealed class CardapioItemFotoUploadE2ETests : IAsyncLifetime
             await _pg.DisposeAsync();
     }
 
+    [SkippableFact]
+    public async Task Galeria_persiste_quatro_angulos_sem_apagar_bytes_e_respeita_limite()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var factory = CriarFactory();
+        var empresaId = Guid.NewGuid();
+        var (_, itemId) = await SeedAsync(factory, empresaId, "loja-galeria");
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", GerarJwt("Admin", empresaId));
+        var urls = new List<string>();
+        for (var n = 0; n < 5; n++)
+        {
+            using var form = new MultipartFormDataContent();
+            var file = new ByteArrayContent(PngValido);
+            file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+            form.Add(file, "file", $"angulo-{n}.png");
+            var resp = await client.PostAsync($"/api/uploads/cardapio-item/{itemId}/foto?galeria=true", form);
+            resp.StatusCode.Should().Be(HttpStatusCode.OK);
+            urls.Add((await resp.Content.ReadFromJsonAsync<Envelope>())!.Data.Url);
+            if (n == 3)
+            {
+                var detalhe = await client.GetFromJsonAsync<System.Text.Json.JsonElement>($"/api/minha-vitrine/cardapio/{itemId}");
+                detalhe.GetProperty("data").GetProperty("fotos").GetArrayLength().Should().Be(4);
+                detalhe.GetProperty("data").GetProperty("fotoUrl").GetString().Should().Be(urls[0]);
+                using var download = new HttpRequestMessage(HttpMethod.Get, new Uri(urls[0]).AbsolutePath);
+                download.Headers.Add("Origin", "https://app.easystok.online");
+                var imagem = await client.SendAsync(download);
+                imagem.StatusCode.Should().Be(HttpStatusCode.OK);
+                imagem.Headers.GetValues("Access-Control-Allow-Origin").Should().Contain("https://app.easystok.online");
+                (await imagem.Content.ReadAsByteArrayAsync()).Should().NotBeEmpty();
+            }
+        }
+        using var excedente = new MultipartFormDataContent();
+        var extra = new ByteArrayContent(PngValido);
+        extra.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        excedente.Add(extra, "file", "excedente.png");
+        (await client.PostAsync($"/api/uploads/cardapio-item/{itemId}/foto?galeria=true", excedente))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        using var scope = factory.Services.CreateScope();
+        var storage = scope.ServiceProvider.GetRequiredService<IFileStorage>();
+        foreach (var url in urls)
+            (await storage.DownloadAsync(StorageKeyExtractor.Extract(url)!, CancellationToken.None)).Should().NotBeEmpty();
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var bypass = db.UseRowLevelSecurityBypass();
+        var item = await db.CardapioItens.AsNoTracking().SingleAsync(c => c.Id == itemId);
+        item.ObterFotosGaleria().Should().Equal(urls);
+        item.ProdutoId.Should().BeNull();
+        item.PrecoStorefront.Should().Be(18m);
+    }
+
+    [SkippableFact]
+    public async Task Galeria_recusa_item_de_outra_empresa_sem_gravar()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var factory = CriarFactory();
+        var dona = Guid.NewGuid();
+        var outra = Guid.NewGuid();
+        var (_, itemId) = await SeedAsync(factory, dona, "galeria-dona");
+        await SeedAsync(factory, outra, "galeria-outra");
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", GerarJwt("Admin", outra));
+        using var form = new MultipartFormDataContent();
+        var file = new ByteArrayContent(PngValido);
+        file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        form.Add(file, "file", "foto.png");
+        (await client.PostAsync($"/api/uploads/cardapio-item/{itemId}/foto?galeria=true", form))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var bypass = db.UseRowLevelSecurityBypass();
+        (await db.CardapioItens.AsNoTracking().SingleAsync(c => c.Id == itemId))
+            .ObterFotosGaleria().Should().BeEmpty();
+    }
+
     private WebApplicationFactory<Program> CriarFactory()
     {
         if (_pg is null) throw new InvalidOperationException("Conteiner PostgreSQL nao disponivel.");
@@ -78,6 +154,15 @@ public sealed class CardapioItemFotoUploadE2ETests : IAsyncLifetime
             .WithWebHostBuilder(b =>
             {
                 b.UseEnvironment("Development");
+                // Program resolve o banco antes dos callbacks tardios de configuração.
+                b.UseSetting("ConnectionStrings:DefaultConnection", _pg!.GetConnectionString());
+                b.UseSetting("Database:Provider", "PostgreSql");
+                b.UseSetting("Jwt:SecretKey", JwtSecret);
+                b.UseSetting("Jwt:Issuer", JwtIssuer);
+                b.UseSetting("Jwt:Audience", JwtAudience);
+                b.UseSetting("FileStorage:Provider", "Local");
+                b.UseSetting("FileStorage:PublicBaseUrl", "https://uploads.test/files");
+                b.UseSetting("Cors:AllowedOrigins:0", "https://app.easystok.online");
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
@@ -103,8 +188,9 @@ public sealed class CardapioItemFotoUploadE2ETests : IAsyncLifetime
 
         var claims = new List<Claim>
         {
-            new("sub", Guid.NewGuid().ToString()),
+            new("sub", UsuarioTesteId.ToString()),
             new("nivel", nivel),
+            new("iat", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
         };
         if (empresaId.HasValue)
             claims.Add(new Claim("empresaId", empresaId.Value.ToString()));
@@ -125,6 +211,13 @@ public sealed class CardapioItemFotoUploadE2ETests : IAsyncLifetime
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         using var _ = db.UseRowLevelSecurityBypass();
+
+        if (!await db.Usuarios.AnyAsync(u => u.Id == UsuarioTesteId))
+        {
+            var usuario = Usuario.Criar("Upload E2E", "upload-e2e@example.test", "sem-login-por-senha");
+            usuario.Id = UsuarioTesteId;
+            db.Usuarios.Add(usuario);
+        }
 
         db.Empresas.Add(new Empresa
         {

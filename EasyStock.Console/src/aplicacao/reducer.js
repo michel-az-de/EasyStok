@@ -304,7 +304,13 @@ const CASOS_API = {
   // F03: o cardápio da vitrine substitui o da massa. Adicional da massa não existe na API.
   [acao.SINCRONIZAR_CARDAPIO]: (estado, { cardapio }) => ({
     ...estado,
-    catalogo: { ...estado.catalogo, cardapio, adicionais: {} },
+    catalogo: {
+      ...estado.catalogo, cardapio, adicionais: {},
+      galeria: cardapio.flatMap((item) => (item.fotos ?? []).map((foto, indice) => ({
+        id: `${item.sku}-foto-${indice}`, nome: item.nome,
+        descricao: `${item.porcao} · Foto ${indice + 1}`, foto, doCardapio: true,
+      }))),
+    },
   }),
 
   // F03: pedido que a API acabou de criar ou trocar de forma, sem esperar o próximo ciclo.

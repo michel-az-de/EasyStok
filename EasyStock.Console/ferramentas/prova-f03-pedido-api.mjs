@@ -37,6 +37,14 @@ let passou = 0
 const confere = (descricao, fn) => { fn(); passou += 1; console.log('ok  ' + descricao) }
 
 const AGORA = Date.parse('2026-09-30T15:00:00Z')
+confere('fotos persistidas chegam à galeria após sincronizar o cardápio', () => {
+  const fotos = [1, 2, 3, 4].map((n) => `https://fotos.test/${n}.webp`)
+  const produto = produtoDaApi({ id: 'foto-item', nome: 'Lasanha', precoCentavos: 5000, imagemUrl: fotos[0], fotos })
+  const estado = reducer(estadoInicial({ conversas: [], catalogo: { cardapio: [], janelas: [], canais: [] }, regras: [] }), { tipo: acao.SINCRONIZAR_CARDAPIO, cardapio: [produto] })
+  assert.equal(produto.foto, fotos[0])
+  assert.deepEqual(estado.catalogo.galeria.map((p) => p.foto), fotos)
+  assert.ok(estado.catalogo.galeria.every((p) => p.doCardapio))
+})
 const LASANHA = '11111111-1111-1111-1111-111111111111'
 const JANELA = '22222222-2222-2222-2222-222222222222'
 const PEDIDO = 'abcdef12-3333-3333-3333-333333333333'

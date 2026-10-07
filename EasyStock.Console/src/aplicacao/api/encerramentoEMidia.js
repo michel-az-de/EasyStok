@@ -56,24 +56,33 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
       avisar(partes.join(' '))
     },
 
-    enviarMidia: (id, { formato, arte, texto, ...extra }) => {
-      if (formato !== 'imagem') {
+    enviarMidia: async (id, { formato, arte, texto, ...extra }) => {
+      if (formato !== 'imagem' && formato !== 'peca') {
         avisar(`${ROTULO_DA_MIDIA[formato] ?? 'Mídia'}: ainda não ligado nesta versão. Pelo EasyStok sai só foto no WhatsApp.`)
-        return
+        return false
       }
       const canal = conversaDe(id)?.canal
       if (canal !== CANAL_COM_FOTO) {
         avisar(`Foto: ainda não ligada para ${canal ?? 'este canal'} nesta versão. Pelo EasyStok sai só no WhatsApp.`)
-        return
+        return false
       }
       const mensagemId = proximoId('mid')
       // Nasce "enviando" (não "lida"): só a resposta do EasyStok confirma que saiu.
       despachar({
-        tipo: acao.ENVIAR_MIDIA, id, formato, arte, texto, ...extra, status: 'enviando', agora: agoraRef.current, mensagemId,
+        tipo: acao.ENVIAR_MIDIA, id, formato: 'imagem', arte, texto, ...extra, status: 'enviando', agora: agoraRef.current, mensagemId,
       })
-      enviarImagem(id, { dataUrl: arte, nomeArquivo: extra.nomeArquivo, legenda: extra.legenda })
-        .then((m) => despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m) }))
-        .catch((erro) => despachar(falhaDoEnvio(id, mensagemId, erro)))
+      try {
+        const m = await enviarImagem(id, {
+          dataUrl: arte, nomeArquivo: extra.nomeArquivo,
+          legenda: extra.legenda ?? (formato === 'peca' ? [texto, extra.descricao].filter(Boolean).join('\n') : undefined),
+        })
+        const mensagem = mensagemDaApi(m)
+        despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem })
+        return mensagem.status !== 'falhou'
+      } catch (erro) {
+        despachar(falhaDoEnvio(id, mensagemId, erro))
+        return false
+      }
     },
   }
 }

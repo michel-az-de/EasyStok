@@ -126,7 +126,7 @@ function FormularioPeca({ peca, aoFechar, aoIncluir, aoEditar }) {
 }
 
 export function PainelGaleria({ aoFechar }) {
-  const { selecionada, agora } = useAtendimento()
+  const { selecionada, agora, fonteApi } = useAtendimento()
   const { canais, galeria } = useCatalogo()
   const {
     enviarMidia, incluirPeca, editarPeca, tirarPeca,
@@ -134,14 +134,18 @@ export function PainelGaleria({ aoFechar }) {
   const [modal, setModal] = useState(null) // { modo: 'novo' } | { modo: 'editar', peca }
   const [confirmandoTirar, setConfirmandoTirar] = useState(null)
   const [enviadoId, setEnviadoId] = useState(null)
+  const [enviandoId, setEnviandoId] = useState(null)
 
   const canal = canalDaConversa(canais, selecionada)
   const { pode, motivo } = permissaoDeEscrita(selecionada, agora, canal)
   const podeEnviarFoto = pode && aceitaFormato(canal, 'foto')
   const motivoBloqueio = !pode ? motivo?.detalhe : motivoDeFormato(canal, 'foto')
 
-  function aoCliqueEnviar(peca) {
-    enviarMidia(selecionada.id, mensagemDePeca(peca))
+  async function aoCliqueEnviar(peca) {
+    setEnviandoId(peca.id)
+    const enviado = await enviarMidia(selecionada.id, mensagemDePeca(peca))
+    setEnviandoId(null)
+    if (enviado === false) return
     setEnviadoId(peca.id)
     setTimeout(() => setEnviadoId((atual) => (atual === peca.id ? null : atual)), 1400)
   }
@@ -168,7 +172,7 @@ export function PainelGaleria({ aoFechar }) {
       {galeria.length === 0 ? (
         <Vazio
           titulo="Nenhuma peça cadastrada"
-          acao={<Botao variante="primario" onClick={() => setModal({ modo: 'novo' })}>Nova peça</Botao>}
+          acao={!fonteApi && <Botao variante="primario" onClick={() => setModal({ modo: 'novo' })}>Nova peça</Botao>}
         >
           Cadastre uma foto com nome e descrição para mandar na conversa em um toque.
         </Vazio>
@@ -176,12 +180,14 @@ export function PainelGaleria({ aoFechar }) {
         <ul className={css.grade}>
           {galeria.map((peca) => (
             <li key={peca.id} className={css.cartao}>
-              <img src={peca.foto} alt="" />
+              <img src={peca.foto} alt={peca.nome} loading="lazy" />
               <div className={css.cartaoTexto}>
                 <strong>{peca.nome}</strong>
                 <p>{peca.descricao}</p>
               </div>
               <div className={css.cartaoAcoes}>
+                {peca.doCardapio && <a href={peca.foto} target="_blank" rel="noreferrer">Abrir foto</a>}
+                {!fonteApi && <>
                 <button
                   type="button"
                   className={css.cartaoIcone}
@@ -199,23 +205,24 @@ export function PainelGaleria({ aoFechar }) {
                   <Icone nome="lixeira" />
                   {confirmandoTirar === peca.id && <span>Confirmar</span>}
                 </button>
+                </>}
                 <Botao
                   variante="primario"
                   className={css.cartaoEnviar}
-                  disabled={!podeEnviarFoto}
+                  disabled={!podeEnviarFoto || enviandoId !== null || (fonteApi && selecionada?.canal !== 'WhatsApp')}
                   title={motivoBloqueio ?? undefined}
                   onClick={() => aoCliqueEnviar(peca)}
                 >
-                  {enviadoId === peca.id ? <><Icone nome="check" /> Enviado</> : 'Enviar'}
+                  {enviandoId === peca.id ? 'Enviando…' : enviadoId === peca.id ? <><Icone nome="check" /> Enviado</> : 'Enviar'}
                 </Botao>
               </div>
             </li>
           ))}
-          <li className={css.cartaoNovo}>
+          {!fonteApi && <li className={css.cartaoNovo}>
             <button type="button" onClick={() => setModal({ modo: 'novo' })}>
               <Icone nome="plus" /> Nova peça
             </button>
-          </li>
+          </li>}
         </ul>
       )}
 

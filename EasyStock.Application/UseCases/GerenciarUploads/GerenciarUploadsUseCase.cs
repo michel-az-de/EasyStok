@@ -177,7 +177,7 @@ public sealed class GerenciarUploadsUseCase(
     /// </summary>
     public async Task<UploadedFileResult> UploadFotoCardapioItemAsync(
         Guid empresaId, Guid itemId, string fileName, string contentType, byte[] content,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, bool galeria = false)
     {
         ValidarImagem(fileName, contentType, content, 6 * 1024 * 1024); // ate 6MB antes de otimizar
 
@@ -186,6 +186,9 @@ public sealed class GerenciarUploadsUseCase(
 
         var item = await cardapioItemRepository.GetByIdAndScopeAsync(storefront.Id, itemId, empresaId, cancellationToken)
             ?? throw new CardapioItemNaoEncontradoException(storefront.Id, itemId);
+
+        if (galeria && item.ObterFotosGaleria().Count >= 5)
+            throw new UseCaseValidationException("O item já possui o limite de 5 fotos.");
 
         var (optimized, optContentType, optExt) = await Task.Run(
             () => imageProcessor.Optimize(content, contentType, maxSide: 1920, quality: 85),
@@ -200,13 +203,17 @@ public sealed class GerenciarUploadsUseCase(
             cancellationToken);
 
         var fotoAntiga = item.FotoUrl;
-        item.AtualizarMetadata(fotoUrl: stored.Url);
+        if (galeria) item.AdicionarFotoGaleria(stored.Url);
+        else item.AtualizarMetadata(fotoUrl: stored.Url);
 
         await cardapioItemRepository.UpdateAsync(item, cancellationToken);
         await unitOfWork.CommitAsync();
 
         // Best-effort: remove a foto anterior só depois de persistir a nova.
-        await TryDeletePreviousAsync(fotoAntiga, cancellationToken);
+        // Adicionar ângulos preserva a capa anterior; substituir a capa também preserva
+        // qualquer arquivo que continue referenciado pela galeria.
+        if (!galeria && !item.ObterFotosGaleria().Contains(fotoAntiga))
+            await TryDeletePreviousAsync(fotoAntiga, cancellationToken);
 
         return new UploadedFileResult(stored.Url, fileName, optContentType, stored.Size);
     }
@@ -322,7 +329,8 @@ public sealed class GerenciarUploadsUseCase(
 
         // Confere a assinatura de bytes contra o tipo declarado (anti arquivo renomeado).
         // SkiaSharp decodifica depois como segundo gate para imagens.
-        UploadSecurityValidator.EnsureContentMatchesDeclaredType(content, contentType);
+        try { UploadSecurityValidator.EnsureContentMatchesDeclaredType(content, contentType); }
+        catch (InvalidOperationException ex) { throw new UseCaseValidationException(ex.Message); }
 
         var extension = Path.GetExtension(fileName);
         if (string.IsNullOrWhiteSpace(extension))

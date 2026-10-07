@@ -22,6 +22,41 @@ namespace EasyStock.Domain.Tests.Entities.Storefront;
 /// </summary>
 public class CardapioItemTests
 {
+    [Fact]
+    public void Galeria_preserva_angulos_e_define_apenas_a_primeira_como_capa()
+    {
+        var item = CardapioItem.CriarAvulso(Guid.NewGuid(), "Lasanha", 50m);
+        item.AtualizarMetadata(fotoUrl: "https://exemplo.test/anterior.webp");
+        for (var n = 1; n <= 4; n++) item.AdicionarFotoGaleria($"https://exemplo.test/{n}.webp");
+        item.ObterFotosGaleria().Should().HaveCount(4);
+        item.FotoUrl.Should().Be("https://exemplo.test/1.webp");
+        item.PrecoEfetivo().Should().Be(50m);
+        item.ProdutoId.Should().BeNull();
+    }
+
+    [Fact]
+    public void Galeria_limita_cinco_fotos_sem_duplicar_url()
+    {
+        var item = CardapioItem.CriarAvulso(Guid.NewGuid(), "Lasanha", 50m);
+        for (var n = 1; n <= 5; n++) item.AdicionarFotoGaleria($"https://exemplo.test/{n}.webp");
+        item.AdicionarFotoGaleria("https://exemplo.test/1.webp");
+        item.ObterFotosGaleria().Should().HaveCount(5);
+        var adicionar = () => item.AdicionarFotoGaleria("https://exemplo.test/6.webp");
+        adicionar.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Theory]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("file:///etc/passwd")]
+    [InlineData("")]
+    public void Galeria_recusa_endereco_que_nao_seja_http(string url)
+    {
+        var item = CardapioItem.CriarAvulso(Guid.NewGuid(), "Lasanha", 50m);
+        var adicionar = () => item.AdicionarFotoGaleria(url);
+        adicionar.Should().Throw<RegraDeDominioVioladaException>();
+        item.ObterFotosGaleria().Should().BeEmpty();
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────
 
     private static Produto NovoProdutoValido(decimal? precoReferencia = 25m)

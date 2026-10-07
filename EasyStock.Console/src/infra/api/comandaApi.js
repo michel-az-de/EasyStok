@@ -21,6 +21,8 @@ export const produtoDaApi = (item) => ({
   estoque: item.estoqueAtual ?? null,
   disponivelHoje: item.disponivel !== false,
   categoria: item.categoria ?? null,
+  foto: item.imagemUrl ?? null,
+  fotos: item.fotos?.length ? item.fotos : item.imagemUrl ? [item.imagemUrl] : [],
 })
 
 const DIA_DA_SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']

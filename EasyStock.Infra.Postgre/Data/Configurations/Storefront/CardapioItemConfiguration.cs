@@ -43,6 +43,7 @@ public class CardapioItemConfiguration : IEntityTypeConfiguration<CardapioItem>
         builder.Property(c => c.TempoPreparoMinutos);
         builder.Property(c => c.InstrucaoFinalizacao).HasMaxLength(500);
         builder.Property(c => c.FotoUrl).HasMaxLength(500);
+        builder.Property(c => c.FotosJson).IsRequired().HasColumnType("jsonb").HasDefaultValue("[]");
         builder.Property(c => c.PesoExibicao).HasMaxLength(50);
 
         builder.Property(c => c.PrecoStorefront)

@@ -6,7 +6,7 @@
 //      ou "avisa" (`aplicacao/api/naoLigadas.js`), e as listas não citam ação que não existe;
 //   2. cada "avisa" só despacha AVISO_API e não chama a API;
 //   3. Encerrar pelo modal faz POST .../encerrar (e manda a despedida marcada pelo envio real);
-//   4. foto no WhatsApp vai por multipart ao S02; áudio, arquivo, peça e outros canais avisam;
+//   4. foto e peça da galeria no WhatsApp vão por multipart; áudio, arquivo e outros canais avisam;
 //   5. o aviso sobrevive à sincronização de 5 s e só some quando a dona fecha.
 //
 //   node ferramentas/prova-f06-honestidade.mjs
@@ -151,7 +151,6 @@ const FOTO = 'data:image/png;base64,iVBORw0KGgo='
 for (const [descricao, id, molde] of [
   ['áudio', 'c1', { formato: 'audio', arte: 'data:audio/webm;base64,AAAA', duracaoMs: 1000, texto: 'Mensagem de áudio' }],
   ['arquivo PDF', 'c1', { formato: 'arquivo', arte: 'data:application/pdf;base64,AAAA', texto: 'a.pdf' }],
-  ['peça da galeria', 'c1', { formato: 'peca', arte: FOTO, nome: 'Lasanha', texto: 'Lasanha' }],
   ['figurinha', 'c1', { formato: 'figurinha', arte: FOTO, texto: 'oi' }],
   ['foto em canal sem envio de mídia (Instagram)', 'c2', { formato: 'imagem', arte: FOTO, texto: 'x', nomeArquivo: 'x.png' }],
 ]) {
@@ -161,6 +160,23 @@ for (const [descricao, id, molde] of [
   await esvaziar()
   confere(`${descricao} avisa e não sai`, chamadas.length === 0 && despachos.length === 1 && despachos[0].tipo === acao.AVISO_API,
     `${despachos.map((d) => d.tipo).join(', ')} / ${chamadas.length} chamada(s)`)
+}
+
+// Foto persistida no cardápio é baixada e enviada como arquivo; falha nunca vira "Enviado".
+{
+  const fetchAnterior = globalThis.fetch
+  globalThis.fetch = async (url, opcoes) => String(url) === 'https://fotos.test/lasanha.webp'
+    ? new Response(new Uint8Array([1, 2, 3]), { headers: { 'Content-Type': 'image/webp' } })
+    : fetchAnterior(url, opcoes)
+  const { api, despachos } = montar()
+  chamadas.length = 0
+  const enviado = await api.enviarMidia('c1', { formato: 'peca', arte: 'https://fotos.test/lasanha.webp', texto: 'Lasanha', descricao: '600 g' })
+  confere('peça usa bytes da foto persistida e multipart', enviado && chamadas.length === 1 && chamadas[0].corpo instanceof FormData)
+  confere('peça preserva legenda e espera confirmação', chamadas[0].corpo.get('legenda') === 'Lasanha\n600 g' && despachos.at(-1).tipo === acao.CONFIRMAR_ENVIO_API)
+  globalThis.fetch = async () => new Response('indisponível', { status: 503 })
+  const falhou = montar()
+  confere('falha ao baixar foto não confirma envio', await falhou.api.enviarMidia('c1', { formato: 'peca', arte: 'https://fotos.test/lasanha.webp', texto: 'Lasanha' }) === false && !falhou.despachos.some((d) => d.tipo === acao.CONFIRMAR_ENVIO_API))
+  globalThis.fetch = fetchAnterior
 }
 
 // 5. O aviso sobrevive à sincronização e some quando a dona fecha.

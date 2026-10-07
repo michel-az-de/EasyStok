@@ -68,8 +68,20 @@ function arquivoDoDataUrl(dataUrl, nomeArquivo) {
   return { blob: new Blob([bytes], { type: tipo }), nome: nomeArquivo || 'foto' }
 }
 
-export function enviarImagem(id, { dataUrl, nomeArquivo, legenda }) {
-  const { blob, nome } = arquivoDoDataUrl(dataUrl, nomeArquivo)
+export async function enviarImagem(id, { dataUrl, nomeArquivo, legenda }) {
+  let arquivo
+  if (dataUrl.startsWith('data:')) arquivo = arquivoDoDataUrl(dataUrl, nomeArquivo)
+  else {
+    const url = new URL(dataUrl)
+    if (url.protocol !== 'https:') throw new Error('Endereço da foto inválido.')
+    const resposta = await fetch(url, { credentials: 'omit' })
+    if (!resposta.ok) throw new Error('Não foi possível carregar a foto do cardápio.')
+    const blob = await resposta.blob()
+    if (!blob.type.startsWith('image/') || blob.size > 6 * 1024 * 1024)
+      throw new Error('Foto inválida ou maior que 6 MB.')
+    arquivo = { blob, nome: nomeArquivo || `cardapio.${blob.type.split('/')[1]}` }
+  }
+  const { blob, nome } = arquivo
   const formulario = new FormData()
   formulario.append('file', blob, nome)
   if (legenda?.trim()) formulario.append('legenda', legenda.trim())

@@ -96,6 +96,28 @@ public class CardapioItem
     /// <summary>Como o cliente finaliza em casa (RN-18). Faz sentido na linha <see cref="LinhaProduto.PrepararEmCasa"/>.</summary>
     public string? InstrucaoFinalizacao { get; private set; }
     public string? FotoUrl { get; private set; }
+    public string FotosJson { get; private set; } = "[]";
+
+    public IReadOnlyList<string> ObterFotosGaleria() =>
+        JsonSerializer.Deserialize<string[]>(FotosJson) ?? [];
+
+    public void AdicionarFotoGaleria(string url)
+    {
+        ValidarTamanho(url, max: 500, nome: "URL da foto");
+        if (!url.StartsWith("/files/", StringComparison.Ordinal) &&
+            (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+             (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp)))
+            throw new RegraDeDominioVioladaException("URL da foto inválida.");
+
+        var fotos = ObterFotosGaleria().ToList();
+        if (fotos.Contains(url)) return;
+        if (fotos.Count >= 5)
+            throw new RegraDeDominioVioladaException("O item já possui o limite de 5 fotos.");
+        fotos.Add(url);
+        FotosJson = JsonSerializer.Serialize(fotos);
+        if (fotos.Count == 1) FotoUrl = url;
+        AlteradoEm = DateTime.UtcNow;
+    }
 
     /// <summary>Override do preço do <see cref="Produto"/>. Null = usa <c>Produto.PrecoReferencia</c>.</summary>
     public decimal? PrecoStorefront { get; private set; }

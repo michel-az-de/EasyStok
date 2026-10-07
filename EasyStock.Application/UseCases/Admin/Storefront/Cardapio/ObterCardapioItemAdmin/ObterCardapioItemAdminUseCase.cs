@@ -46,7 +46,8 @@ public sealed record CardapioItemDetalheAdmin(
     string? TempoPreparo,
     string FiltrosJson,
     Guid? SecaoId,                                     // ADR-0035: seção do item
-    IReadOnlyList<CardapioItemVariacaoAdmin> Opcoes);  // ADR-0035: opções (vazio = preço único)
+    IReadOnlyList<CardapioItemVariacaoAdmin> Opcoes,  // ADR-0035: opções (vazio = preço único)
+    IReadOnlyList<string>? Fotos = null);
 
 public class ObterCardapioItemAdminUseCase(ICardapioItemRepository cardapioRepository)
     : IUseCase<ObterCardapioItemAdminCommand, CardapioItemDetalheAdmin>
@@ -82,6 +83,7 @@ public class ObterCardapioItemAdminUseCase(ICardapioItemRepository cardapioRepos
                 .Select(v => new CardapioItemVariacaoAdmin(
                     v.Id, v.Rotulo, v.PrecoStorefront, v.Disponivel, v.EhPadrao,
                     v.PesoExibicao, v.Sku?.Value, v.OrdemExibicao))
-                .ToList());
+                .ToList(),
+            item.ObterFotosGaleria());
     }
 }
