@@ -27,6 +27,12 @@ public interface IViagemRepository
 
     /// <summary>O pedido já está numa viagem montando ou em rota?</summary>
     Task<bool> PedidoEmViagemAtivaAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default);
+
+    /// <summary>
+    /// #1440: marca como nova a parada que o domínio acabou de pôr numa viagem já gravada. O Id nasce no
+    /// domínio; sem isto o EF a toma por existente e manda UPDATE de 0 linha (conflito de concorrência).
+    /// </summary>
+    Task RegistrarParadaNovaAsync(ParadaViagem parada, CancellationToken ct = default);
 }
 
 /// <summary>Chamados de entregador (S44).</summary>

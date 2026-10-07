@@ -41,6 +41,12 @@ public sealed class ViagemRepository(EasyStockDbContext db) : IViagemRepository
         db.Viagens.AnyAsync(v => v.EmpresaId == empresaId
             && (v.Situacao == SituacaoViagem.Montando || v.Situacao == SituacaoViagem.EmRota)
             && v.Paradas.Any(p => p.PedidoId == pedidoId), ct);
+
+    public Task RegistrarParadaNovaAsync(ParadaViagem parada, CancellationToken ct = default)
+    {
+        db.ParadasViagem.Add(parada);
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class ChamadoEntregadorRepository(EasyStockDbContext db) : IChamadoEntregadorRepository
