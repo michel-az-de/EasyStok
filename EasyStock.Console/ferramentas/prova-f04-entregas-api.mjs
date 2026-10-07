@@ -19,7 +19,7 @@ registerHooks({
 
 const {
   STATUS_KDS_ENTREGAS, paineisDeEntregas, motivoDeSaida, motivoDaAprovacao, recarregaEntregasCom,
-  corpoJanela, corpoZona, corpoBloqueio, rotuloSituacaoViagem,
+  corpoJanela, corpoZona, corpoBloqueio, rotuloSituacaoViagem, situacaoDaLista,
 } = await import('../src/dominio/entregasApi.js')
 
 // A gaveta pede ao KDS os três status que importam para a entrega.
@@ -79,5 +79,10 @@ assert.deepEqual(
   corpoBloqueio({ data: '2026-12-25', motivo: ' Natal ', janelaEspecificaId: '' }),
   { data: '2026-12-25', motivo: 'Natal', janelaEspecificaId: null },
 )
+
+// #1434: a primeira carga que falha não deixa "Carregando" eterno; o erro já está na faixa.
+assert.equal(situacaoDaLista(null, null), 'carregando')
+assert.equal(situacaoDaLista(null, 'As entregas não carregaram: EmpresaId é obrigatório.'), 'falhou')
+assert.equal(situacaoDaLista([], 'O pedido não foi aprovado'), 'pronta')
 
 console.log('prova F04 (entregas na API): ok')

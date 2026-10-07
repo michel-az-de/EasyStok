@@ -5,6 +5,7 @@ import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { useEntregasApi } from '../../aplicacao/useEntregasApi'
 import {
   EMPRESAS_ENTREGADOR, TIPOS_ENTREGADOR, motivoDaAprovacao, motivoDeSaida, paineisDeEntregas, rotuloSituacaoViagem,
+  situacaoDaLista,
 } from '../../dominio/entregasApi'
 import { CadastroEntregaApi } from './CadastroEntregaApi'
 import css from './entregasApi.module.css'
@@ -16,6 +17,7 @@ import css from './entregasApi.module.css'
 export function ConteudoEntregasApi() {
   const [aba, setAba] = useState('hoje')
   const { pedidos, viagens, entregadores, chamados, erro, aoVivo, ocupado, acoes, limparErro } = useEntregasApi()
+  const situacao = situacaoDaLista(pedidos, erro)
 
   return (
     <div className={css.conteudo}>
@@ -33,9 +35,9 @@ export function ConteudoEntregasApi() {
           <Botao variante="texto" onClick={limparErro}>Fechar</Botao>
         </p>
       )}
-      {aba === 'hoje' && (pedidos === null
-        ? <p className={css.vazio}>Carregando as entregas…</p>
-        : <Hoje {...{ pedidos, viagens, entregadores, chamados, ocupado, acoes }} />)}
+      {aba === 'hoje' && situacao === 'carregando' && <p className={css.vazio}>Carregando as entregas…</p>}
+      {aba === 'hoje' && situacao === 'falhou' && <p className={css.vazio}>Sem entregas para mostrar enquanto a carga falhar.</p>}
+      {aba === 'hoje' && situacao === 'pronta' && <Hoje {...{ pedidos, viagens, entregadores, chamados, ocupado, acoes }} />}
       {aba === 'entregadores' && <Entregadores entregadores={entregadores} ocupado={ocupado} acoes={acoes} />}
       {aba === 'cadastro' && <CadastroEntregaApi />}
     </div>

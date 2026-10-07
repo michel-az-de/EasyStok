@@ -68,6 +68,11 @@ public abstract class EasyStockControllerBase : ControllerBase
 
         if (currentUser.Nivel == NivelAcesso.SuperAdmin)
         {
+            // #1434: o console entra como SuperAdmin com o claim da empresa padrão e não manda
+            // ?empresaId=. A query explícita continua tendo precedência.
+            if (empresaId == Guid.Empty)
+                empresaId = currentUser.EmpresaId;
+
             if (empresaId == Guid.Empty)
             {
                 error = DataBadRequest("EmpresaId é obrigatório.");
