@@ -2,7 +2,6 @@ import { useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
-import { Popover } from '../../componentes/Popover'
 import { useAcoes } from '../../aplicacao/contextos'
 import { useAtalhoBarra } from '../../aplicacao/useAtalhoBarra'
 import { aceitaFormato, motivoDeFormato, restricoesDoCanal } from '../../dominio/canal'
@@ -14,6 +13,7 @@ import { useGravadorAudio } from '../../hooks/useGravadorAudio'
 import { BotaoAnexarArquivo, GravadorAudio, PreviaAnexo } from './ComposerAnexos'
 import { textoConviteCardapio } from '../../dominio/cardapioLink'
 import { ModalEnviarCardapio } from './ModalEnviarCardapio'
+import { SeletorRespostas } from './SeletorRespostas'
 import css from './atendimento.module.css'
 
 export function Composer({
@@ -22,8 +22,8 @@ export function Composer({
   aoReabrir,
 }) {
   const { enviarMidia, enviar, obterLinkCardapio } = useAcoes()
-  // Atalho "/" no campo (rodada 7, pedido do dono 24/09/2026): filtra a
-  // biblioteca inteira (pronta e automática) e insere no lugar do atalho.
+  // Seletor rápido (#1441): "/" no campo ou o botão Respostas abrem a lista
+  // compacta de respostas prontas; Enter insere no campo.
   const barra = useAtalhoBarra({ rascunho, conversa, aoInserir: aoMudarRascunho })
   // `.composer` tem overflow-y:auto (válvula de segurança de tela baixa,
   // atendimento.module.css) e isso RECORTA um Popover ancorado nele, porque
@@ -170,20 +170,7 @@ export function Composer({
                   do próprio Popover) e planta o conteúdo em document.body,
                   fora do recorte de `.composer`. Visual idêntico ao de antes,
                   só que agora fora do overflow. */}
-              {barra.aberto && (barra.semResultado ? (
-                <Popover rotulo="Atalho de resposta" aoFechar={() => aoMudarRascunho('')} semAutoFoco portal>
-                  <p className={css.restricao}>Nada com esse atalho.</p>
-                </Popover>
-              ) : (
-                <Popover
-                  rotulo="Atalho de resposta"
-                  grupos={barra.grupos}
-                  aoEscolher={barra.aoEscolher}
-                  aoFechar={() => aoMudarRascunho('')}
-                  semAutoFoco
-                  portal
-                />
-              ))}
+              {barra.aberto && <SeletorRespostas seletor={barra} aoGerenciar={aoAbrirBiblioteca} />}
             </div>
 
             <div className={css.acoes}>
@@ -195,10 +182,11 @@ export function Composer({
                   Fotos, Cardápio, Nota, Enviar) continuam ícone só. */}
               <Botao
                 disabled={!podeEscrever}
-                aria-haspopup="dialog"
-                title="Respostas prontas e mensagens automáticas"
+                aria-haspopup="listbox"
+                aria-expanded={barra.aberto}
+                title="Respostas prontas (atalho: / no campo)"
                 className={css.botaoRespostas}
-                onClick={() => aoAbrirBiblioteca()}
+                onClick={barra.abrir}
               >
                 <Icone nome="respostas" />
                 <span>Respostas</span>

@@ -396,3 +396,17 @@
     clip: rect(0 0 0 0); white-space: nowrap;
   }
 }
+
+/* Nota interna como post-it no fio (#1441): papel amarelo de recado, do lado de quem
+   atende, levemente torto. Nunca parece balão de mensagem: o cliente não vê. */
+.postIt {
+  align-self: flex-end; max-width: min(320px, 80%);
+  margin: var(--e-2) var(--e-2) var(--e-2) 0; padding: var(--e-2) var(--e-3);
+  background: var(--atencao-pastel); color: var(--tinta);
+  border-left: 3px solid var(--atencao); border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
+  box-shadow: var(--sombra); transform: rotate(-.6deg);
+  font-size: var(--t-apoio); line-height: var(--lh-corpo);
+}
+.postIt p { margin: var(--e-1) 0 0; white-space: pre-line; }
+.postItQuem { display: inline-flex; align-items: center; gap: var(--e-1); font-size: var(--t-micro); font-weight: 600; color: var(--atencao); }
+@media (prefers-reduced-motion: reduce) { .postIt { transform: none; } }

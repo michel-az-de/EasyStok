@@ -40,7 +40,9 @@ export function mensagemDaApi(m, conversaId = null) {
     texto: m.texto || ROTULO_DO_CONTEUDO[m.tipoConteudo] || '',
     em: instante(m.enviadaEm),
     ...(saida ? { status: STATUS_DA_MENSAGEM[m.status] ?? 'enviada' } : {}),
-    ...(saida && m.autor === 'Agente' ? { automatica: true } : {}),
+    ...(saida && m.autor === 'Agente' ? { automatica: true, origemAutomatica: 'agente' } : {}),
+    // #1441: automáticas por gatilho (S42) e avisos do sistema também saem sem a dona.
+    ...(saida && m.autor === 'Sistema' ? { automatica: true, origemAutomatica: 'sistema' } : {}),
     ...(m.erro ? { erro: m.erro } : {}),
     // S58/S60 (#1391): espera o cliente responder ao modelo de retomada; ou saiu pela reserva por SMS.
     ...(m.aguardaClienteDesde ? { aguardaCliente: true } : {}),

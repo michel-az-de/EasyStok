@@ -15,10 +15,15 @@ import { AbaFidelidade } from './fidelidade/AbaFidelidade'
 import { AbaIntegracoes } from './integracoes/AbaIntegracoes'
 import { SecaoWhatsApp } from './integracoes/SecaoWhatsApp'
 import { AbaAtendimento } from './atendimento/AbaAtendimento'
+import { AbaRespostas } from './respostas/AbaRespostas'
 import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
 
+// #1441: respostas prontas e automáticas saíram do caminho do atendimento e vivem aqui.
+const ABA_RESPOSTAS = { id: 'respostas', rotulo: 'Respostas e automáticas' }
+
 const ABAS_DEMONSTRACAO = [
+  ABA_RESPOSTAS,
   { id: 'producao', rotulo: 'Produção e cardápio' },
   { id: 'caixa', rotulo: 'Caixa' },
   { id: 'janelas', rotulo: 'Janelas de entrega' },
@@ -73,10 +78,10 @@ function gravarAba(id) {
   }
 }
 
-export function ModalGestao({ aoFechar }) {
+export function ModalGestao({ aoFechar, abaInicial = null }) {
   const { fonteApi } = useAtendimento()
   const ABAS = fonteApi ? ABAS_API : ABAS_DEMONSTRACAO
-  const [ativa, setAtiva] = useState(() => lerAbaSalva(ABAS))
+  const [ativa, setAtiva] = useState(() => (ABAS.some((aba) => aba.id === abaInicial) ? abaInicial : lerAbaSalva(ABAS)))
   const referenciasDasAbas = useRef([])
 
   const escolher = useCallback((id) => {
@@ -104,6 +109,7 @@ export function ModalGestao({ aoFechar }) {
   // elemento entra na árvore, os outros quatro nunca chegam a renderizar.
   const painelDaAba = useMemo(() => ({
     atendimento: <AbaAtendimento />,
+    respostas: <AbaRespostas />,
     producao: <AbaProducao />,
     caixa: <AbaCaixa />,
     janelas: <AbaJanelas />,
@@ -114,7 +120,7 @@ export function ModalGestao({ aoFechar }) {
   return (
     <Modal
       titulo="Gestão"
-      descricao="Produção, caixa, janelas de entrega, fidelidade e integrações num só lugar."
+      descricao="Respostas, produção, caixa, janelas de entrega, fidelidade e integrações num só lugar."
       aoFechar={aoFechar}
       largura="min(880px, calc(100vw - 32px))"
       rodape={<Botao className={css.toque} onClick={aoFechar}>Fechar</Botao>}

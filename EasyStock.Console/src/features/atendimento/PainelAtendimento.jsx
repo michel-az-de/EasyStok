@@ -147,6 +147,7 @@ export function PainelAtendimento({
           aoAbrirDefinicaoAutomatica={(regra) => aoAbrirBiblioteca(itemDaBibliotecaPelaRegra(regra))}
           aoReenviar={reenviar ? (mensagemId) => reenviar(selecionada.id, mensagemId) : undefined}
           digitando={digitando}
+          notas={selecionada.cliente?.notas ?? []}
         />
       </div>
 

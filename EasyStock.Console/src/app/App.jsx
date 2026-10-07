@@ -25,7 +25,6 @@ import { ModalNota } from '../features/notas/ModalNota'
 import { PainelGaleria } from '../features/anexos/PainelGaleria'
 import { ModalAutomacoes } from '../features/automacoes/ModalAutomacoes'
 import { ModalGestao } from '../features/gestao/ModalGestao'
-import { ModalBiblioteca } from '../features/respostas/ModalBiblioteca'
 import { GavetaEntregas } from '../features/entregas/GavetaEntregas'
 import { TelaEntregas } from '../features/entregas/TelaEntregas'
 import { GavetaEntregasApi } from '../features/entregas/GavetaEntregasApi'
@@ -58,10 +57,9 @@ function Composicao({ aoSair }) {
   // para quem trocou de janela no mesmo computador (US-010, saber sem olhar).
   useTituloDaAba(contarPrecisaDeVoce(conversas, agora, automaticoPausado, aberta, janelas))
   const [modal, setModal] = useState(null)
-  // Item D (banca 10): quando o modal "respostas" abre pela etiqueta
-  // "automática" de um balão, `focoBiblioteca` guarda o id do item para
-  // ModalBiblioteca rolar até ele. `null` (composer, atalho "/") abre sem foco.
-  const [focoBiblioteca, setFocoBiblioteca] = useState(null)
+  // #1441: a gestão de respostas e automáticas mora numa aba da Gestão. "Gerenciar
+  // respostas" do seletor e a etiqueta "automática" do balão abrem direto nela.
+  const [abaGestao, setAbaGestao] = useState(null)
   const [pratoArrastando, setPratoArrastando] = useState(null)
   // Rodada 10 (registro 79): o cliente simulado que reage às ações da
   // Thatiane, sempre ativo (não só quando a gaveta Simulações está aberta).
@@ -147,10 +145,10 @@ function Composicao({ aoSair }) {
         tamanho={tamanho}
         aoAbrirNota={() => setModal('nota')}
         aoAbrirGaleria={() => setModal('galeria')}
-        aoAbrirBiblioteca={(foco) => { setFocoBiblioteca(foco ?? null); setModal('respostas') }}
+        aoAbrirBiblioteca={() => { setAbaGestao('respostas'); setModal('gestao') }}
         aoAbrirCardapio={() => setModal('cardapio')}
         aoAbrirAutomacoes={() => setModal('automacoes')}
-        aoAbrirGestao={() => setModal('gestao')}
+        aoAbrirGestao={() => { setAbaGestao(null); setModal('gestao') }}
         aoAbrirEntregas={() => setModal('entregas')}
         simulando={simulando}
         // Modo API (F06): sem Simular. Cenário simulado em conversa de verdade some em 5 s
@@ -171,13 +169,6 @@ function Composicao({ aoSair }) {
       {/* Rodada 7 · frente Anexos: substitui o antigo "Prato" do composer
           (registro em auditoria/decisoes/61-anexos.md). */}
       {modal === 'galeria' && selecionada && <PainelGaleria aoFechar={fechar} />}
-      {/* Rodada 7 (pedido do dono 24/09/2026): biblioteca de respostas, aberta
-          pelo botão Respostas do composer. Auto-suficiente (só aoFechar),
-          mesmo molde de ModalAutomacoes logo abaixo. */}
-      {modal === 'respostas' && selecionada && (
-        <ModalBiblioteca aoFechar={fechar} focoInicial={focoBiblioteca} />
-      )}
-
       {modal === 'cardapio' && selecionada && (
         <PainelCardapio
           pedido={selecionada.pedido}
@@ -202,7 +193,7 @@ function Composicao({ aoSair }) {
 
       {/* Casca da rodada 13 (5 frentes paralelas): auto-suficiente (só
           aoFechar), mesmo molde de ModalAutomacoes logo acima. */}
-      {modal === 'gestao' && <ModalGestao aoFechar={fechar} />}
+      {modal === 'gestao' && <ModalGestao aoFechar={fechar} abaInicial={abaGestao} />}
 
       {/* Rodada 5, seção 6 (passo zero): gaveta vazia, a F6 desenha a tela de
           verdade. `PainelEntregas.jsx` fica no lugar até a F6 apagar. */}

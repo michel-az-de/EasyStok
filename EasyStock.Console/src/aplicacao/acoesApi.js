@@ -12,6 +12,8 @@ import { criarAcoesConsentimentosApi } from './api/consentimentos'
 import { criarAcoesComandaApi } from './api/comanda'
 import { criarAcoesClienteApi } from './api/cliente'
 import { criarAcoesEncerramentoEMidiaApi } from './api/encerramentoEMidia'
+import { criarAcoesRespostasApi } from './api/respostas'
+import { criarAcoesTagsApi } from './api/tags'
 import { criarAvisosNaoLigadas, envioNaoLigado, textoNaoLigado } from './api/naoLigadas'
 
 const FORA_DA_JANELA = 'fora_da_janela_24h'
@@ -56,6 +58,9 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     ...criarAcoesConsentimentosApi(),
     ...criarAcoesComandaApi(acoes, { despachar, estadoRef }),
     ...clienteApi,
+    // #1441: respostas prontas, automáticas e tags do cliente.
+    ...criarAcoesRespostasApi({ despachar, estadoRef }),
+    ...criarAcoesTagsApi({ despachar, estadoRef }),
     enviar: (id, texto, opcoes = {}) => {
       // #1287: texto vazio a API recusa (400); modelo e automática ainda não têm endpoint.
       if (!texto?.trim()) return

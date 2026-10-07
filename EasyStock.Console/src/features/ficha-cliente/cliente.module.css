@@ -67,11 +67,17 @@
   font-size: inherit; text-decoration: underline; min-height: var(--toque);
 }
 
+/* #1441: post-it. Papel de recado com a borda do aviso e leve inclinação alternada. */
+.postIts { list-style: none; margin: 0 0 var(--e-3); padding: 0; display: grid; gap: var(--e-2); }
 .ultimaNota {
-  margin: 0 0 var(--e-3); padding: var(--e-3) var(--e-4);
-  background: var(--atencao-pastel); border-radius: var(--r-2);
+  margin: 0; padding: var(--e-3) var(--e-4);
+  background: var(--atencao-pastel); border-left: 3px solid var(--atencao);
+  border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
+  box-shadow: var(--sombra); transform: rotate(-.5deg);
   font-size: var(--t-apoio); color: var(--tinta);
 }
+.ultimaNota:nth-child(even) { transform: rotate(.4deg); }
+@media (prefers-reduced-motion: reduce) { .ultimaNota, .ultimaNota:nth-child(even) { transform: none; } }
 /* O corte em duas linhas mora no texto, não no bloco: com o corte no bloco, o
    rótulo contava como linha e a terceira linha vazava pela margem de baixo. */
 .textoNota { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

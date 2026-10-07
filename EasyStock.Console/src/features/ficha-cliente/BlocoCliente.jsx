@@ -20,6 +20,7 @@ import { SITUACOES, situacaoDoCep } from '../../dominio/areaEntrega'
 import { chegouQuando, mesmoDomicilio, resumoFinanceiro } from '../../dominio/cliente'
 import { SELO_CAPTADO, automaticoConduzindo } from '../../dominio/captura'
 import { historicoElegivelParaFidelidade, saldoDePontos } from '../../dominio/fidelidade'
+import { notasRecentes } from '../../dominio/notas'
 import { CampoEmLinha } from './CampoEmLinha'
 import { TagsDoCliente } from './TagsDoCliente'
 import { ModalHistorico } from './ModalHistorico'
@@ -327,11 +328,16 @@ export function BlocoCliente({ conversa }) {
 
       <TagsDoCliente conversa={conversa} />
 
+      {/* #1441: as notas internas mais recentes como post-its, ao lado da conversa. */}
       {cliente.notas.length > 0 && (
-        <p className={css.ultimaNota}>
-          <span className={css.rotuloNota}>Nota · {cliente.notas[0].em.slice(0, 5)}</span>
-          <span className={css.textoNota}>{cliente.notas[0].texto}</span>
-        </p>
+        <ul className={css.postIts} aria-label="Notas internas">
+          {notasRecentes(cliente.notas).map((nota) => (
+            <li key={nota.id ?? nota.em + nota.texto.slice(0, 12)} className={css.ultimaNota}>
+              <span className={css.rotuloNota}>Nota · {nota.em.slice(0, 5)}{nota.autor ? ` · ${nota.autor}` : ''}</span>
+              <span className={css.textoNota}>{nota.texto}</span>
+            </li>
+          ))}
+        </ul>
       )}
 
       <Botao largo icone="historico" onClick={() => setModal('historico')}>

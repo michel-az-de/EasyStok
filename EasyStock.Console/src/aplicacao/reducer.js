@@ -648,7 +648,8 @@ const CASOS = {
       ...c,
       cliente: {
         ...c.cliente,
-        notas: [{ id: notaId, autor: ATENDENTE, em: dataHora(agora), texto }, ...c.cliente.notas],
+        // `criadoEm` (#1441): a nota entra no fio da conversa como post-it pela hora.
+        notas: [{ id: notaId, autor: ATENDENTE, em: dataHora(agora), criadoEm: new Date(agora).toISOString(), texto }, ...c.cliente.notas],
       },
     })),
 
