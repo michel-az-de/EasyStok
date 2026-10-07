@@ -543,6 +543,24 @@ public static class NotificacoesGlobaisSeed
             assuntoTemplate: "Lembrete",
             corpoTemplate: "{{ texto }}");
 
+        // ===== Loja fechada no horario (#1443): aviso aos donos (audiencia "admins") de quem fechou e por que.
+        // Interno: nada sai para o cliente. =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "loja_fechada_no_horario_push_v1",
+            nome: "Loja Fechada no Horário — Push",
+            canal: CanalNotificacao.Push,
+            tipoEvento: TipoEventoNotificacao.LojaFechadaNoHorario,
+            assuntoTemplate: "Loja fechada no horário",
+            corpoTemplate: "Loja fechada às {{ hora }}, dentro do horário. Motivo: {{ justificativa }}");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "loja_fechada_no_horario_inapp_v1",
+            nome: "Loja Fechada no Horário — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.LojaFechadaNoHorario,
+            assuntoTemplate: "Loja fechada no horário",
+            corpoTemplate: "A loja foi fechada na mão às {{ hora }}, dentro do horário de funcionamento. Justificativa: {{ justificativa }}");
+
         // ===== Campanhas (S30): carregam a mensagem da onda e o lembrete do encerramento pelo WhatsApp. Sem
         // rotina: o EnfileiradorMensagensCampanha escreve direto no outbox (categoria Marketing) e monta os
         // metadados da Meta (campanha_generica / campanha_lembrete ou o template da propria campanha). =====
@@ -969,6 +987,11 @@ public static class NotificacoesGlobaisSeed
         yield return MakeRotina("lembrete_vencido_global", "Lembrete da Dona",
             TipoEventoNotificacao.LembreteVencido, "lembrete_vencido_push_v1",
             CategoriaConteudoNotificacao.Operacional, "[\"Push\"]");
+
+        // ===== Loja fechada no horario (#1443): so os donos (audiencia admins), Push e In-App. Rollback: Ativa=false. =====
+        yield return MakeRotina("loja_fechada_no_horario_global", "Loja Fechada no Horário",
+            TipoEventoNotificacao.LojaFechadaNoHorario, "loja_fechada_no_horario_push_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"Push\",\"InApp\"]", ModoTodos("admins"));
 
         // ===== Avisos de status do pedido ao cliente (S13): transacionais, so WhatsApp, sem janela de horario
         // (aviso de status nao espera). Rollback: desativar a rotina (Ativa=false). =====

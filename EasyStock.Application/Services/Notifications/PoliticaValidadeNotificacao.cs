@@ -52,6 +52,7 @@ public sealed class PoliticaValidadeNotificacao
 
             [TipoEventoNotificacao.ConversaEscalada] = TimeSpan.FromHours(1),
             [TipoEventoNotificacao.LembreteVencido] = TimeSpan.FromHours(1),
+            [TipoEventoNotificacao.LojaFechadaNoHorario] = TimeSpan.FromHours(2),
 
             // Catalogo de plataforma (N13). ConviteAcesso fica no padrao de 24 h, como a N9 espera.
             [TipoEventoNotificacao.IncidenteSistema] = TimeSpan.FromHours(2),

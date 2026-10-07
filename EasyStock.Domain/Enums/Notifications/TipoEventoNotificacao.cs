@@ -85,5 +85,8 @@ public enum TipoEventoNotificacao
     ContatoAlterado = 80,
 
     // Senha trocada (N8): aviso por todos os canais verificados depois de um reset concluido. Faixa livre da S0.
-    SenhaAlterada = 81
+    SenhaAlterada = 81,
+
+    // Loja fechada na mao dentro do horario de funcionamento (#1443): aviso aos donos com quem fechou e a justificativa.
+    LojaFechadaNoHorario = 82
 }

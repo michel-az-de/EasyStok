@@ -10,11 +10,13 @@ namespace EasyStock.Api.Controllers;
 /// <summary>
 /// Expediente da loja pelo console (S40, ADR-0051): horário por dia, mensagens de "fora do
 /// horário" e "loja fechada", e o controle manual de abrir e fechar que vence o relógio.
+/// Horário e mensagens são da dona (Admin); abrir e fechar na mão é de gerente para cima, e fechar
+/// dentro do horário pede justificativa (#1443, regra no <see cref="DefinirControleExpedienteUseCase"/>).
 /// </summary>
 [SwaggerTag("Store opening hours and manual open/close")]
 [ApiController]
 [Route("api/atendimento/expediente")]
-[Authorize(Policy = "Admin")]
+[Authorize]
 public class AtendimentoExpedienteController(
     ObterExpedienteLojaUseCase obterUseCase,
     AtualizarExpedienteLojaUseCase atualizarUseCase,
@@ -25,6 +27,7 @@ public class AtendimentoExpedienteController(
         Description = "Sem registro, devolve o padrão (08–22 h todos os dias, automático) — nunca 404.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [HttpGet]
+    [Authorize(Policy = "Admin")]
     public async Task<IActionResult> Get(CancellationToken ct)
         => DataOk(await obterUseCase.ExecuteAsync(currentUser.EmpresaId, ct));
 
@@ -33,6 +36,7 @@ public class AtendimentoExpedienteController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [HttpPut]
+    [Authorize(Policy = "Admin")]
     public async Task<IActionResult> Put([FromBody] AtualizarExpedienteBody body, CancellationToken ct)
     {
         try
@@ -48,22 +52,29 @@ public class AtendimentoExpedienteController(
         }
     }
 
-    [SwaggerOperation(Summary = "Open or close the store manually, or back to automatic (Admin only)",
-        Description = "O manual não volta sozinho: só a própria dona devolve para Automatico.")]
+    [SwaggerOperation(Summary = "Open or close the store manually, or back to automatic (Gerente+)",
+        Description = "O manual não volta sozinho: só a dona (Admin) devolve para Automatico. Fechar dentro do horário de funcionamento exige justificativa, que vai para a auditoria e avisa os donos.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [HttpPost("controle")]
+    [Authorize(Policy = "Gerente")]
     public async Task<IActionResult> DefinirControle([FromBody] DefinirControleExpedienteBody body, CancellationToken ct)
     {
         try
         {
             var resultado = await controleUseCase.ExecuteAsync(new DefinirControleExpedienteCommand(
-                currentUser.EmpresaId, body.Controle, currentUser.UsuarioId), ct);
+                currentUser.EmpresaId, body.Controle, currentUser.UsuarioId, currentUser.Nivel, body.Justificativa), ct);
             return DataOk(resultado);
         }
         catch (UseCaseValidationException ex)
         {
             return DataBadRequest(ex.Message);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden,
+                new ApiErrorResponse(new ApiError("FORBIDDEN", ex.Message, null, null)));
         }
     }
 
@@ -83,4 +94,4 @@ public sealed record AtualizarExpedienteBody(
     string? MensagemForaDoHorario,
     string? MensagemLojaFechada);
 
-public sealed record DefinirControleExpedienteBody(ControleManualLoja Controle);
+public sealed record DefinirControleExpedienteBody(ControleManualLoja Controle, string? Justificativa = null);
