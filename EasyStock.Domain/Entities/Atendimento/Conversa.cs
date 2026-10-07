@@ -40,6 +40,9 @@ public class Conversa
     /// <summary>Nome do perfil no canal, quando informado.</summary>
     public string? ContatoNome { get; private set; }
 
+    /// <summary>#1432: assunto do último e-mail recebido, sem "Re:"/"Fwd:". Só no canal E-mail.</summary>
+    public string? Assunto { get; private set; }
+
     public CanalConversa Canal { get; private set; }
     public SituacaoConversa Situacao { get; private set; }
     public Guid? PedidoEmAndamentoId { get; private set; }
@@ -156,6 +159,16 @@ public class Conversa
     }
 
     public void AtualizarContatoNome(string? nome) => ContatoNome = NormalizarNome(nome);
+
+    /// <summary>
+    /// #1432: guarda o assunto do e-mail (aparado e cortado em <see cref="Mensagem.AssuntoTamanhoMaximo"/>).
+    /// Vazio não apaga o anterior: resposta sem assunto continua o mesmo fio.
+    /// </summary>
+    public void DefinirAssunto(string? assunto)
+    {
+        if (Mensagem.NormalizarAssunto(assunto) is { } limpo)
+            Assunto = limpo;
+    }
 
     /// <summary>
     /// #1332: a conversa pode ter sido achada pela outra grafia do celular (com/sem o nono dígito, #1290).

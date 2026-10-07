@@ -21,6 +21,7 @@ public class Mensagem
     public const int MidiaChaveTamanhoMaximo = 300;
     public const int MidiaMimeTamanhoMaximo = 100;
     public const int ErroTamanhoMaximo = 500;
+    public const int AssuntoTamanhoMaximo = 300;
 
     public Guid Id { get; private set; }
     public Guid EmpresaId { get; private set; }
@@ -33,6 +34,9 @@ public class Mensagem
     public AutorMensagem Autor { get; private set; }
     public TipoConteudoMensagem TipoConteudo { get; private set; }
     public string? Texto { get; private set; }
+
+    /// <summary>#1432: assunto do e-mail recebido, como veio. Nulo nos outros canais.</summary>
+    public string? Assunto { get; private set; }
 
     /// <summary>Id do botao interativo respondido (ex.: <c>acao:avaliacao:positiva:{pedidoId}</c>).</summary>
     public string? BotaoId { get; private set; }
@@ -296,6 +300,18 @@ public class Mensagem
     }
 
     public void MarcarProcessada(DateTime em) => ProcessadaEm = Utc(em);
+
+    /// <summary>#1432: assunto do e-mail recebido (aparado, cortado em <see cref="AssuntoTamanhoMaximo"/>).</summary>
+    public void DefinirAssunto(string? assunto) => Assunto = NormalizarAssunto(assunto);
+
+    /// <summary>Assunto aparado, sem quebra de linha e cortado no teto; vazio vira nulo.</summary>
+    public static string? NormalizarAssunto(string? assunto)
+    {
+        if (string.IsNullOrWhiteSpace(assunto)) return null;
+        // Cabeçalho dobrado ("Assunto\r\n continua") vira uma linha com um espaço só.
+        var umaLinha = string.Join(' ', assunto.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return umaLinha.Length == 0 ? null : Truncar(umaLinha, AssuntoTamanhoMaximo);
+    }
 
     public void RegistrarEnviadaPor(Guid usuarioId)
     {
