@@ -155,6 +155,23 @@ public class AtendimentoConversasControllerTests
         falhou.ExternoId.Should().Be("wamid.dona1");
     }
 
+    // #1424: o balão do console mostra o selo "programada" da mensagem que o disparo mandou.
+    [Fact]
+    public async Task ListarMensagensExpoeProgramada()
+    {
+        var conversa = ConversaComClienteAgora();
+        var programada = Mensagem.Saida(_empresaId, conversa.Id, AutorMensagem.Dona, DateTime.UtcNow, TipoConteudoMensagem.Texto, "Bom dia!");
+        programada.MarcarComoProgramada();
+        _repositorio.Mensagens.Add(programada);
+
+        var result = await _controller.ListarMensagens(conversa.Id, null, 20, default);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var dados = (IReadOnlyList<MensagemAtendimentoResult>)ok.Value!.GetType().GetProperty("Data")!.GetValue(ok.Value)!;
+        dados.Should().ContainSingle(m => m.Id == programada.Id).Which.Programada.Should().BeTrue();
+        dados.Should().ContainSingle(m => m.Texto == "oi").Which.Programada.Should().BeFalse();
+    }
+
     [Fact]
     public async Task NaoEntreguesListaAMensagemQueFalhou()
     {
