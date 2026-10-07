@@ -164,6 +164,9 @@ export const CONFIRMAR_VALIDACAO_ITEM = 'confirmar-validacao-item'
 // Frente Horário e loja (rodada 5, pedido do dono 24/09/2026): controle do
 // topo (Aberta/Fechada) e horário de funcionamento configurável por dia.
 export const ALTERNAR_LOJA = 'alternar-loja'
+// #1443: gesto com conferência ao abrir (abre o caixa) ou fechar no horário (justificativa).
+export const PEDIR_GESTO_LOJA = 'pedir-gesto-loja'
+export const FECHAR_GESTO_LOJA = 'fechar-gesto-loja'
 export const EDITAR_FUNCIONAMENTO = 'editar-funcionamento'
 
 // Frente Cardápio por link (rodada 7, US-021): o pedido fechado na janela do

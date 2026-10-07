@@ -24,7 +24,7 @@ const OPCOES_METODO = METODOS_CAIXA.map((id) => ({ valor: id, rotulo: nomeDoMeto
 // reaproveitando a MESMA ação `marcarEstorno`). Mesmo padrão de campo e
 // validação de `features/ficha-cliente/BlocoOcorrencia.jsx` ("Confirmar
 // reembolso"), só que sem valor parcial: aqui é o toque único do caixa.
-function PromptEstorno({ rotulo, aoCancelar, aoConfirmar }) {
+export function PromptEstorno({ rotulo, aoCancelar, aoConfirmar }) {
   const [motivo, setMotivo] = useState('')
   return (
     <div className={css.promptEstorno}>

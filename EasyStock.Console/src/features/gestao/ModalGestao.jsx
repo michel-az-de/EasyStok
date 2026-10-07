@@ -10,6 +10,7 @@ import { Botao } from '../../componentes/Botao'
 import { Modal } from '../../componentes/Modal'
 import { AbaProducao } from './producao/AbaProducao'
 import { AbaCaixa } from './caixa/AbaCaixa'
+import { AbaCaixaApi } from './caixa/AbaCaixaApi'
 import { AbaJanelas } from './janelas/AbaJanelas'
 import { AbaFidelidade } from './fidelidade/AbaFidelidade'
 import { AbaIntegracoes } from './integracoes/AbaIntegracoes'
@@ -35,7 +36,6 @@ const ABAS_API = [{ id: 'atendimento', rotulo: 'Atendimento' }, ...ABAS_DEMONSTR
 // ações delas também avisam (`aplicacao/api/naoLigadas.js`), e Integrações nunca guarda chave.
 const AINDA_NAO_LIGADO = {
   producao: 'Produção e cardápio ainda não estão ligados ao EasyStok nesta versão (F11). Nada aqui é gravado.',
-  caixa: 'O caixa ainda não está ligado ao EasyStok nesta versão (F14). Nada aqui é gravado.',
   janelas: 'Esta aba ainda não está ligada. As janelas de verdade estão em Entregas › Janelas e frete.',
   fidelidade: 'Fidelidade e cupons ainda não estão ligados ao EasyStok nesta versão (F15). Nada aqui é gravado.',
   integracoes: 'As integrações ainda não estão ligadas nesta versão (F16). Nenhuma chave é guardada no navegador.',
@@ -105,11 +105,12 @@ export function ModalGestao({ aoFechar }) {
   const painelDaAba = useMemo(() => ({
     atendimento: <AbaAtendimento />,
     producao: <AbaProducao />,
-    caixa: <AbaCaixa />,
+    // #1443: no modo API o caixa é o do EasyStok; a demonstração segue com a massa local.
+    caixa: fonteApi ? <AbaCaixaApi /> : <AbaCaixa />,
     janelas: <AbaJanelas />,
     fidelidade: <AbaFidelidade />,
     integracoes: <AbaIntegracoes />,
-  }), [])
+  }), [fonteApi])
 
   return (
     <Modal

@@ -35,6 +35,7 @@ import { TelaCozinhaApi } from '../features/cozinha/TelaCozinhaApi'
 import { TelaCardapioLink } from '../features/cardapio-link/TelaCardapioLink'
 import { ModalEncerrar } from '../features/encerramento/ModalEncerrar'
 import { FilaCanhotos } from '../features/ficha-cliente/FilaCanhotos'
+import { GestoLoja } from '../features/loja/GestoLoja'
 import { ModalLoteDePapel } from '../features/lote-papel/ModalLoteDePapel'
 import { PainelSimulacoes } from '../features/simulacoes/PainelSimulacoes'
 import { useRoteiro } from '../features/simulacoes/useRoteiro'
@@ -217,6 +218,9 @@ function Composicao({ aoSair }) {
       {/* Rodada 5, seção 7 (passo zero): painel vazio, a F7 constrói os
           cenários. Só existe para o botão "Simular" ter o que abrir. */}
       {simulando && !FONTE_API && <PainelSimulacoes roteiro={roteiro} aoFechar={() => setSimulando(false)} />}
+
+      {/* #1443: abrir a loja abre o caixa; fechar no horário pede justificativa. Só o modo API pede. */}
+      {FONTE_API && <GestoLoja />}
 
       {/* RN-27: fila do canhoto automático no pagamento, global porque o
           pedido pago pode não ser o da ficha aberta agora. */}
