@@ -146,6 +146,32 @@ public sealed class CardapioItemFotoUploadE2ETests : IAsyncLifetime
             .ObterFotosGaleria().Should().BeEmpty();
     }
 
+    [SkippableFact]
+    public async Task Foto_WebP_do_cardapio_vira_JPEG_publico_para_envio_no_atendimento()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var factory = CriarFactory();
+        using var client = factory.CreateClient();
+        using var scope = factory.Services.CreateScope();
+        using var bitmap = new SkiaSharp.SKBitmap(16, 16);
+        bitmap.Erase(SkiaSharp.SKColors.Orange);
+        using var image = SkiaSharp.SKImage.FromBitmap(bitmap);
+        using var webp = image.Encode(SkiaSharp.SKEncodedImageFormat.Webp, 85);
+        var uploads = scope.ServiceProvider.GetRequiredService<GerenciarUploadsUseCase>();
+        var saved = await uploads.UploadImagemAtendimentoAsync(
+            Guid.NewGuid(), Guid.NewGuid(), "foto.webp", "image/webp", webp.ToArray());
+        saved.ContentType.Should().Be("image/jpeg");
+        saved.Url.Should().EndWith(".jpg");
+        var response = await client.GetAsync(new Uri(saved.Url).AbsolutePath);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("image/jpeg");
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        bytes.Take(3).Should().Equal(new byte[] { 0xff, 0xd8, 0xff });
+        using var decoded = SkiaSharp.SKBitmap.Decode(bytes);
+        decoded.Width.Should().Be(16);
+        decoded.Height.Should().Be(16);
+    }
+
     private WebApplicationFactory<Program> CriarFactory()
     {
         if (_pg is null) throw new InvalidOperationException("Conteiner PostgreSQL nao disponivel.");
@@ -162,7 +188,12 @@ public sealed class CardapioItemFotoUploadE2ETests : IAsyncLifetime
                 b.UseSetting("Jwt:Audience", JwtAudience);
                 b.UseSetting("FileStorage:Provider", "Local");
                 b.UseSetting("FileStorage:PublicBaseUrl", "https://uploads.test/files");
-                b.UseSetting("Cors:AllowedOrigins:0", "https://app.easystok.online");
+                // Reproduz a lista publicada, para não esconder uma origem ausente em produção.
+                var production = new ConfigurationBuilder()
+                    .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.Production.json")).Build();
+                var origins = production.GetSection("Cors:AllowedOrigins").Get<string[]>()!;
+                for (var i = 0; i < origins.Length; i++)
+                    b.UseSetting($"Cors:AllowedOrigins:{i}", origins[i]);
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>

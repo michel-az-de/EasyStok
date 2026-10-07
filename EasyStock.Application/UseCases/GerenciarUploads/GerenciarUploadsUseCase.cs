@@ -170,8 +170,8 @@ public sealed class GerenciarUploadsUseCase(
     }
 
     /// <summary>
-    /// Foto de um item de cardápio da vitrine (ADR-0031). 1 foto por item: grava a nova
-    /// com nome novo e remove a anterior best-effort (igual avatar/logo) — sem órfão no replace.
+    /// Foto de um item de cardápio da vitrine (ADR-0031). Substitui a capa ou acrescenta à
+    /// galeria. A troca da capa preserva arquivos ainda referenciados pela galeria.
     /// Escopo de tenant fechado por construção: resolve o storefront pela empresa do token e
     /// busca o item via <c>GetByIdAndScopeAsync</c> (item de outra empresa → 404, não vaza).
     /// </summary>
@@ -256,8 +256,12 @@ public sealed class GerenciarUploadsUseCase(
         ValidarImagem(fileName, contentType, content, 6 * 1024 * 1024); // ate 6MB antes de otimizar
 
         var (optimized, optContentType, optExt) = await Task.Run(
-            () => imageProcessor.Optimize(content, contentType, maxSide: 1920, quality: 85),
+            () => imageProcessor.Optimize(content, contentType, maxSide: 1920, quality: 85, jpeg: true),
             cancellationToken);
+
+        // A Meta aceita JPEG/PNG como imagem, com até 5 MB. Não envia WebP se a conversão falhar.
+        if (optContentType is not ("image/jpeg" or "image/png") || optimized.Length > 5 * 1024 * 1024)
+            throw new UseCaseValidationException("Não foi possível preparar a imagem para o WhatsApp (JPEG/PNG de até 5 MB).");
 
         var stored = await fileStorage.UploadAsync(
             new FileUploadRequest(

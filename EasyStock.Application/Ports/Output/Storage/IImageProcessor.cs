@@ -6,7 +6,7 @@ namespace EasyStock.Application.Ports.Output.Storage;
 public interface IImageProcessor
 {
     /// <summary>
-    /// Otimiza uma imagem: redimensiona para maxSide e comprime como WebP.
+    /// Otimiza uma imagem: redimensiona para maxSide e comprime como WebP, ou JPEG quando solicitado.
     /// Retorna (bytes otimizados, content-type, extensao com ponto).
     /// Se o processamento falhar, retorna o original sem alterar.
     /// </summary>
@@ -14,5 +14,6 @@ public interface IImageProcessor
         byte[] source,
         string originalContentType,
         int maxSide = 1920,
-        int quality = 85);
+        int quality = 85,
+        bool jpeg = false);
 }
