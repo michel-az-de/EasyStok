@@ -1,5 +1,5 @@
 import { useAcoes, useAtendimento } from '../aplicacao/contextos'
-import { avisoDeVencimento } from '../dominio/sessao'
+import { avisoDeVencimento, rotuloDaSessao } from '../dominio/sessao'
 import css from './faixaApi.module.css'
 
 // Faixa fina do modo API (F01): quem está logado, em qual empresa, se a lista
@@ -29,7 +29,7 @@ export function FaixaApi({ aoSair }) {
       </span>
       <span className={css.quem}>
         {vencimento && <strong className={css.vence}>{vencimento}</strong>}
-        {sessao?.usuario?.nome}{sessao?.empresa ? ` · ${sessao.empresa.nome}` : ''}
+        {rotuloDaSessao(sessao)}
         <button type="button" className={css.sair} onClick={aoSair}>Sair</button>
       </span>
     </div>
