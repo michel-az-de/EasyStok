@@ -302,6 +302,7 @@ const CASOS_API = {
   }),
 
   // F03: o cardápio da vitrine substitui o da massa. Adicional da massa não existe na API.
+  // A peça guarda o id do item e o índice da foto: o envio vai pelo id (#1437), não pela URL.
   [acao.SINCRONIZAR_CARDAPIO]: (estado, { cardapio }) => ({
     ...estado,
     catalogo: {
@@ -309,6 +310,7 @@ const CASOS_API = {
       galeria: cardapio.flatMap((item) => (item.fotos ?? []).map((foto, indice) => ({
         id: `${item.sku}-foto-${indice}`, nome: item.nome,
         descricao: `${item.porcao} · Foto ${indice + 1}`, foto, doCardapio: true,
+        cardapioItemId: item.sku, indice,
       }))),
     },
   }),

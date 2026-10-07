@@ -209,8 +209,10 @@ export function mensagemDeAudio({ dataUrl, duracaoMs }) {
   return { formato: 'audio', arte: dataUrl, duracaoMs, texto: 'Mensagem de áudio' }
 }
 
-export function mensagemDePeca({ nome, descricao, foto }) {
+// Peça do cardápio (#1437) leva o id do item e o índice da foto: o EasyStok envia pelo id.
+export function mensagemDePeca({ nome, descricao, foto, cardapioItemId, indice }) {
   return {
     formato: 'peca', arte: foto, nome, descricao, texto: nome,
+    ...(cardapioItemId ? { cardapioItemId, indice } : {}),
   }
 }

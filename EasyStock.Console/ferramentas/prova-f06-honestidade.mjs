@@ -6,7 +6,8 @@
 //      ou "avisa" (`aplicacao/api/naoLigadas.js`), e as listas não citam ação que não existe;
 //   2. cada "avisa" só despacha AVISO_API e não chama a API;
 //   3. Encerrar pelo modal faz POST .../encerrar (e manda a despedida marcada pelo envio real);
-//   4. foto e peça da galeria no WhatsApp vão por multipart; áudio, arquivo e outros canais avisam;
+//   4. foto do computador no WhatsApp vai por multipart e a peça da galeria do cardápio pelo id do
+//      item (#1437), sem o navegador baixar a foto; áudio, arquivo e outros canais avisam;
 //   5. o aviso sobrevive à sincronização de 5 s e só some quando a dona fecha.
 //
 //   node ferramentas/prova-f06-honestidade.mjs
@@ -162,21 +163,33 @@ for (const [descricao, id, molde] of [
     `${despachos.map((d) => d.tipo).join(', ')} / ${chamadas.length} chamada(s)`)
 }
 
-// Foto persistida no cardápio é baixada e enviada como arquivo; falha nunca vira "Enviado".
+// Foto da galeria do cardápio (#1437): vai pelo id do item; o navegador nunca baixa a URL da foto
+// (cross-origin, host antigo gravado). Falha nunca vira "Enviado".
 {
-  const fetchAnterior = globalThis.fetch
-  globalThis.fetch = async (url, opcoes) => String(url) === 'https://fotos.test/lasanha.webp'
-    ? new Response(new Uint8Array([1, 2, 3]), { headers: { 'Content-Type': 'image/webp' } })
-    : fetchAnterior(url, opcoes)
+  const { mensagemDePeca } = await import('../src/dominio/anexos.js')
+  const URL_ANTIGA = 'https://ez-api.92.113.33.60.sslip.io/files/cardapios/e/s/i/angulo.webp'
+  let estado = estadoInicial({ conversas: [], catalogo: { cardapio: [], janelas: [], canais: [] }, regras: [] })
+  estado = reducer(estado, { tipo: acao.SINCRONIZAR_CARDAPIO, cardapio: [{ sku: 'item-1', nome: 'Lasanha', porcao: '600 g', fotos: ['https://x.test/capa.webp', URL_ANTIGA] }] })
+  const peca = estado.catalogo.galeria[1]
+  confere('galeria do cardápio guarda o id do item e o índice da foto', peca?.cardapioItemId === 'item-1' && peca?.indice === 1,
+    JSON.stringify(peca))
+
   const { api, despachos } = montar()
   chamadas.length = 0
-  const enviado = await api.enviarMidia('c1', { formato: 'peca', arte: 'https://fotos.test/lasanha.webp', texto: 'Lasanha', descricao: '600 g' })
-  confere('peça usa bytes da foto persistida e multipart', enviado && chamadas.length === 1 && chamadas[0].corpo instanceof FormData)
-  confere('peça preserva legenda e espera confirmação', chamadas[0].corpo.get('legenda') === 'Lasanha\n600 g' && despachos.at(-1).tipo === acao.CONFIRMAR_ENVIO_API)
-  globalThis.fetch = async () => new Response('indisponível', { status: 503 })
-  const falhou = montar()
-  confere('falha ao baixar foto não confirma envio', await falhou.api.enviarMidia('c1', { formato: 'peca', arte: 'https://fotos.test/lasanha.webp', texto: 'Lasanha' }) === false && !falhou.despachos.some((d) => d.tipo === acao.CONFIRMAR_ENVIO_API))
-  globalThis.fetch = fetchAnterior
+  const enviado = await api.enviarMidia('c1', mensagemDePeca(peca))
+  const rota = chamadas.map((c) => `${c.metodo} ${c.url}`)
+  confere('peça do cardápio vai por POST .../mensagens/imagem-cardapio', enviado === true && chamadas.length === 1
+    && rota[0] === 'POST /api/atendimento/conversas/c1/mensagens/imagem-cardapio', rota.join(', ') || 'nenhuma chamada')
+  const corpo = chamadas[0] && typeof chamadas[0].corpo === 'string' ? JSON.parse(chamadas[0].corpo) : {}
+  confere('peça manda id, índice e legenda, sem baixar a foto', corpo.cardapioItemId === 'item-1' && corpo.indice === 1
+    && corpo.legenda === 'Lasanha\n600 g · Foto 2' && !chamadas.some((c) => String(c.url).startsWith('https://')), JSON.stringify(corpo))
+  confere('peça espera a confirmação do EasyStok', despachos.at(-1)?.tipo === acao.CONFIRMAR_ENVIO_API)
+
+  chamadas.length = 0
+  const semId = montar()
+  const saiu = await semId.api.enviarMidia('c1', { formato: 'peca', arte: URL_ANTIGA, texto: 'Lasanha' })
+  confere('foto por URL sem id do item não é baixada nem confirmada', saiu === false && chamadas.length === 0
+    && !semId.despachos.some((d) => d.tipo === acao.CONFIRMAR_ENVIO_API), chamadas.map((c) => c.url).join(', '))
 }
 
 // 5. O aviso sobrevive à sincronização e some quando a dona fecha.

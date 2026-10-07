@@ -1,5 +1,5 @@
 import * as acao from '../acoes'
-import { encerrar, enviarImagem, enviarTexto } from '../../infra/api/conversasApi'
+import { encerrar, enviarImagem, enviarImagemCardapio, enviarTexto } from '../../infra/api/conversasApi'
 import { mensagemDaApi } from '../../infra/api/traducaoConversas'
 import { proximoId } from '../../infra/repositorioConversas'
 
@@ -9,8 +9,9 @@ import { proximoId } from '../../infra/repositorioConversas'
 // EasyStok (`POST .../encerrar`). O resumo, a avaliação, a anotação e os avisos por e-mail
 // e SMS do modo demonstração não têm endpoint: não viram registro local, só avisam.
 //
-// Mídia: só foto no WhatsApp tem endpoint (S02, multipart). Áudio, arquivo, figurinha,
-// peça da galeria e foto em outro canal avisam e não aparecem como enviados.
+// Mídia: só foto no WhatsApp tem endpoint. A do computador vai em multipart (S02); a peça da
+// galeria do cardápio, pelo id do item (#1437). Áudio, arquivo, figurinha e foto em outro canal
+// avisam e não aparecem como enviados.
 const CANAL_COM_FOTO = 'WhatsApp'
 
 const ROTULO_DA_MIDIA = {
@@ -71,11 +72,12 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
       despachar({
         tipo: acao.ENVIAR_MIDIA, id, formato: 'imagem', arte, texto, ...extra, status: 'enviando', agora: agoraRef.current, mensagemId,
       })
+      const legenda = extra.legenda ?? (formato === 'peca' ? [texto, extra.descricao].filter(Boolean).join('\n') : undefined)
       try {
-        const m = await enviarImagem(id, {
-          dataUrl: arte, nomeArquivo: extra.nomeArquivo,
-          legenda: extra.legenda ?? (formato === 'peca' ? [texto, extra.descricao].filter(Boolean).join('\n') : undefined),
-        })
+        // Peça do cardápio vai pelo id do item (#1437); foto do computador, em multipart.
+        const m = extra.cardapioItemId && Number.isInteger(extra.indice)
+          ? await enviarImagemCardapio(id, { cardapioItemId: extra.cardapioItemId, indice: extra.indice, legenda })
+          : await enviarImagem(id, { dataUrl: arte, nomeArquivo: extra.nomeArquivo, legenda })
         const mensagem = mensagemDaApi(m)
         despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem })
         return mensagem.status !== 'falhou'

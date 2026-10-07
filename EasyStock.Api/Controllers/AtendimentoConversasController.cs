@@ -145,6 +145,24 @@ public class AtendimentoConversasController(
                 currentUser.EmpresaId, currentUser.UsuarioId, id, file.FileName, file.ContentType, memoria.ToArray(), legenda), ct));
         });
 
+    /// <remarks>Use case por <c>[FromServices]</c>: o construtor fica como está para os testes que o montam.</remarks>
+    [SwaggerOperation(Summary = "Send a menu gallery photo by item id (takes over the conversation)",
+        Description = "#1437: o backend lê a foto do storage pela chave (independe do host gravado na URL), converte para " +
+                      "JPEG e envia como a rota /imagem. indice segue a galeria do item; sem galeria, 0 é a capa. " +
+                      "Item de outra empresa ou arquivo fora do storage: 404. Índice inválido: 400.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status502BadGateway)]
+    [HttpPost("{id:guid}/mensagens/imagem-cardapio")]
+    public Task<IActionResult> EnviarImagemCardapio(
+        Guid id, [FromBody] EnviarImagemCardapioBody body,
+        [FromServices] EnviarImagemCardapioConsoleUseCase imagemCardapioUseCase, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await imagemCardapioUseCase.ExecuteAsync(new EnviarImagemCardapioConsoleCommand(
+            currentUser.EmpresaId, currentUser.UsuarioId, id, body?.CardapioItemId ?? Guid.Empty, body?.Indice ?? 0, body?.Legenda), ct)));
+
     [SwaggerOperation(Summary = "Take over the conversation without sending")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -255,6 +273,10 @@ public class AtendimentoConversasController(
         {
             return DataNotFound("Mensagem não encontrada.");
         }
+        catch (FotoCardapioNaoEncontradaException ex)
+        {
+            return DataNotFound(ex.Message);
+        }
         catch (DestinoNaoAtendenteException ex)
         {
             return UnprocessableEntity(new ApiErrorResponse(new ApiError("DESTINO_NAO_ATENDE", ex.Message, null, null)));
@@ -285,6 +307,8 @@ public class AtendimentoConversasController(
 }
 
 public sealed record EnviarMensagemConsoleBody(string Texto);
+
+public sealed record EnviarImagemCardapioBody(Guid CardapioItemId, int Indice, string? Legenda);
 
 public sealed record TransferirConversaBody(Guid ParaUsuarioId);
 

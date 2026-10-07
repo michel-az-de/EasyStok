@@ -48,6 +48,11 @@ public class AtendimentoConversasControllerTests
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly IAtendenteRepository _atendentes = Substitute.For<IAtendenteRepository>();
     private readonly ILinkCardapioConversaRepository _links = Substitute.For<ILinkCardapioConversaRepository>();
+    private readonly IFileStorage _fileStorage = Substitute.For<IFileStorage>();
+    private readonly IImageProcessor _imageProcessor = Substitute.For<IImageProcessor>();
+    private readonly IStorefrontRepository _storefronts = Substitute.For<IStorefrontRepository>();
+    private readonly ICardapioItemRepository _cardapioItens = Substitute.For<ICardapioItemRepository>();
+    private readonly EnviarMensagemConsoleUseCase _enviarUseCase;
     private readonly AtendimentoConversasController _controller;
 
     internal static LinkCardapioConversaService LinkCardapio(ILinkCardapioConversaRepository links) =>
@@ -64,14 +69,15 @@ public class AtendimentoConversasControllerTests
 
         var resolvedor = new ResolvedorCanal([_canal]);
         var uploads = new GerenciarUploadsUseCase(
-            Substitute.For<IFileStorage>(), Substitute.For<IImageProcessor>(), Substitute.For<IProdutoRepository>(),
-            Substitute.For<IUsuarioRepository>(), Substitute.For<ILojaRepository>(), Substitute.For<IStorefrontRepository>(),
-            Substitute.For<ICardapioItemRepository>(), _unitOfWork);
+            _fileStorage, _imageProcessor, Substitute.For<IProdutoRepository>(),
+            Substitute.For<IUsuarioRepository>(), Substitute.For<ILojaRepository>(), _storefronts,
+            _cardapioItens, _unitOfWork);
+        _enviarUseCase = new EnviarMensagemConsoleUseCase(_repositorio, resolvedor, uploads, _unitOfWork);
 
         _controller = new AtendimentoConversasController(
             new ListarConversasAtendimentoUseCase(_repositorio),
             new ListarMensagensConversaUseCase(_repositorio),
-            new EnviarMensagemConsoleUseCase(_repositorio, resolvedor, uploads, _unitOfWork),
+            _enviarUseCase,
             new ReenviarMensagemUseCase(_repositorio, ConfiguracoesPadrao(), resolvedor,
                 new ReservaSmsAtendimento(resolvedor, ReservaSmsOpcoes.Desligada, NullLogger<ReservaSmsAtendimento>.Instance),
                 _unitOfWork, TimeProvider.System),
@@ -708,6 +714,136 @@ public class AtendimentoConversasControllerTests
 
         result.Should().BeOfType<ForbidResult>();
         await llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
+    }
+
+    // ── Foto da galeria do cardápio pelo id do item (#1437) ─────────────────────────────────
+
+    /// <summary>Host antigo gravado na produção: o navegador não alcança, o backend lê pela chave.</summary>
+    private const string HostAntigo = "https://ez-api.92.113.33.60.sslip.io/files/";
+
+    private static readonly byte[] WebpDaGaleria =
+        [0x52, 0x49, 0x46, 0x46, 0x10, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x20];
+
+    private static readonly byte[] JpegConvertido = [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3];
+
+    private EnviarImagemCardapioConsoleUseCase ImagemCardapio() =>
+        new(_storefronts, _cardapioItens, _fileStorage, _enviarUseCase);
+
+    private EasyStock.Domain.Entities.Storefront.CardapioItem ItemComGaleria(params string[] chaves)
+    {
+        var storefront = EasyStock.Domain.Entities.Storefront.Storefront.Criar(_empresaId, "casa-da-baba", "Casa da Baba", 0m);
+        _storefronts.GetByEmpresaAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(storefront);
+        var item = EasyStock.Domain.Entities.Storefront.CardapioItem.CriarAvulso(storefront.Id, "Lasanha", 50m);
+        foreach (var chave in chaves) item.AdicionarFotoGaleria(HostAntigo + chave);
+        _cardapioItens.GetByIdAndScopeAsync(storefront.Id, item.Id, _empresaId, Arg.Any<CancellationToken>()).Returns(item);
+        return item;
+    }
+
+    [Fact]
+    public async Task ImagemCardapioEnviaAFotoDaGaleriaConvertidaSemONavegadorBaixar()
+    {
+        var conversa = ConversaComClienteAgora();
+        var item = ItemComGaleria("cardapios/e/s/i/capa.webp", "cardapios/e/s/i/angulo.webp");
+        _fileStorage.ExistsAsync("cardapios/e/s/i/angulo.webp", Arg.Any<CancellationToken>()).Returns(true);
+        _fileStorage.DownloadAsync("cardapios/e/s/i/angulo.webp", Arg.Any<CancellationToken>()).Returns(WebpDaGaleria);
+        _imageProcessor.Optimize(WebpDaGaleria, "image/webp", 1920, 85, true).Returns((JpegConvertido, "image/jpeg", ".jpg"));
+        _fileStorage.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new StoredFileResult("atendimento/x/foto.jpg", "https://app.easystok.online/files/atendimento/x/foto.jpg", "image/jpeg", 7));
+        _canal.EnviarImagemAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns("wamid.foto1");
+
+        var result = await _controller.EnviarImagemCardapio(
+            conversa.Id, new EnviarImagemCardapioBody(item.Id, 1, "Lasanha\n600 g"), ImagemCardapio(), default);
+
+        Dados<MensagemAtendimentoResult>(result).Should().NotBeNull();
+        await _fileStorage.Received(1).UploadAsync(
+            Arg.Is<FileUploadRequest>(r => r.Content == JpegConvertido && r.ContentType == "image/jpeg"
+                && r.BucketPath == $"atendimento/{_empresaId}/{conversa.Id}"),
+            Arg.Any<CancellationToken>());
+        await _canal.Received(1).EnviarImagemAsync(
+            WaId, "https://app.easystok.online/files/atendimento/x/foto.jpg", "Lasanha\n600 g", Arg.Any<CancellationToken>());
+        _repositorio.Mensagens.Should().ContainSingle(m => m.Direcao == DirecaoMensagem.Saida
+            && m.Autor == AutorMensagem.Dona && m.TipoConteudo == TipoConteudoMensagem.Imagem
+            && m.MidiaChave == "atendimento/x/foto.jpg" && m.ExternoId == "wamid.foto1" && m.Texto == "Lasanha\n600 g");
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+    }
+
+    [Fact]
+    public async Task ImagemCardapioSemGaleriaUsaACapaNoIndiceZero()
+    {
+        var conversa = ConversaComClienteAgora();
+        var item = ItemComGaleria();
+        item.AtualizarMetadata(fotoUrl: HostAntigo + "cardapios/e/s/i/capa.webp");
+        _fileStorage.ExistsAsync("cardapios/e/s/i/capa.webp", Arg.Any<CancellationToken>()).Returns(true);
+        _fileStorage.DownloadAsync("cardapios/e/s/i/capa.webp", Arg.Any<CancellationToken>()).Returns(WebpDaGaleria);
+        _imageProcessor.Optimize(WebpDaGaleria, "image/webp", 1920, 85, true).Returns((JpegConvertido, "image/jpeg", ".jpg"));
+        _fileStorage.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new StoredFileResult("atendimento/x/capa.jpg", "https://app.easystok.online/files/atendimento/x/capa.jpg", "image/jpeg", 7));
+        _canal.EnviarImagemAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns("wamid.capa");
+
+        var result = await _controller.EnviarImagemCardapio(
+            conversa.Id, new EnviarImagemCardapioBody(item.Id, 0, null), ImagemCardapio(), default);
+
+        result.Should().BeOfType<OkObjectResult>();
+        await _canal.Received(1).EnviarImagemAsync(
+            WaId, "https://app.easystok.online/files/atendimento/x/capa.jpg", null, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ImagemCardapioDeItemInexistenteOuDeOutraEmpresa404()
+    {
+        var conversa = ConversaComClienteAgora();
+        ItemComGaleria("cardapios/e/s/i/capa.webp");
+
+        var result = await _controller.EnviarImagemCardapio(
+            conversa.Id, new EnviarImagemCardapioBody(Guid.NewGuid(), 0, null), ImagemCardapio(), default);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+        await _canal.DidNotReceiveWithAnyArgs().EnviarImagemAsync(default!, default!, default, default);
+        _repositorio.Mensagens.Should().NotContain(m => m.Direcao == DirecaoMensagem.Saida);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(-1)]
+    public async Task ImagemCardapioComIndiceForaDaGaleria400(int indice)
+    {
+        var conversa = ConversaComClienteAgora();
+        var item = ItemComGaleria("cardapios/e/s/i/capa.webp");
+
+        var result = await _controller.EnviarImagemCardapio(
+            conversa.Id, new EnviarImagemCardapioBody(item.Id, indice, null), ImagemCardapio(), default);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        await _fileStorage.DidNotReceiveWithAnyArgs().DownloadAsync(default!, default);
+        await _canal.DidNotReceiveWithAnyArgs().EnviarImagemAsync(default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task ImagemCardapioComArquivoFaltandoNoStorage404()
+    {
+        var conversa = ConversaComClienteAgora();
+        var item = ItemComGaleria("cardapios/e/s/i/sumiu.webp");
+        _fileStorage.ExistsAsync("cardapios/e/s/i/sumiu.webp", Arg.Any<CancellationToken>()).Returns(false);
+
+        var result = await _controller.EnviarImagemCardapio(
+            conversa.Id, new EnviarImagemCardapioBody(item.Id, 0, null), ImagemCardapio(), default);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+        await _canal.DidNotReceiveWithAnyArgs().EnviarImagemAsync(default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task ImagemCardapioSemPermissaoDeAtender403()
+    {
+        _currentUser.TemPermissao(Permissao.AtenderConversas).Returns(false);
+        var conversa = ConversaComClienteAgora();
+        var item = ItemComGaleria("cardapios/e/s/i/capa.webp");
+
+        var result = await _controller.EnviarImagemCardapio(
+            conversa.Id, new EnviarImagemCardapioBody(item.Id, 0, null), ImagemCardapio(), default);
+
+        result.Should().BeOfType<ForbidResult>();
+        await _fileStorage.DidNotReceiveWithAnyArgs().DownloadAsync(default!, default);
     }
 
     /// <summary>Repositório em memória: basta para os use cases e para o turno do agente.</summary>
