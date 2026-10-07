@@ -135,6 +135,18 @@ function Composicao({ aoSair }) {
     />
   ) : null
 
+  // #1445: "abrir o cardápio/comanda" pedido ao assistente, só depois do clique no cartão.
+  // A comanda mora na Ficha (`#comanda-pedido`); sem ela na tela (sem pedido ainda, ou Ficha
+  // em gaveta fechada), abre o cardápio, que é por onde a comanda começa.
+  const abrirTelaDoAssistente = (tela) => {
+    const comanda = tela === 'comanda' ? document.getElementById('comanda-pedido') : null
+    if (comanda) {
+      comanda.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return
+    }
+    setModal('cardapio')
+  }
+
   return (
     <DndContext
       sensors={sensores}
@@ -226,7 +238,7 @@ function Composicao({ aoSair }) {
           voltar. Global pelo mesmo motivo de FilaCanhotos, um degrau acima. */}
       <ModalLoteDePapel />
 
-      <BalaoAssistente sugestaoAgente={sugestaoAgente} />
+      <BalaoAssistente sugestaoAgente={sugestaoAgente} aoAbrirTela={abrirTelaDoAssistente} />
 
       <FaixaApi aoSair={aoSair} />
 
