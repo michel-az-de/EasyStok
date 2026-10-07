@@ -23,6 +23,27 @@ export function clienteDoDossie(dossie) {
   return {
     clienteId: dados.id,
     nome: dados.nome || null,
-    cliente: { telefone: dados.telefone || null, endereco: endereco || null },
+    cliente: {
+      telefone: dados.telefone || null,
+      endereco: endereco || null,
+      pedidos: dossie.totalPedidos ?? 0,
+      notas: (dossie.notas ?? []).map(notaDaApi),
+      // #1436: últimos pedidos no formato do modal Histórico (o mesmo da massa de demonstração).
+      // Fica em `cliente` porque a sincronização de 5 s preserva o cliente lido da API.
+      historico: (dossie.ultimosPedidos ?? []).map(pedidoDaApi),
+    },
   }
 }
+
+const quando = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+
+const notaDaApi = (n) => ({ id: n.id, texto: n.texto, autor: n.autor, em: quando(n.criadoEm) })
+
+const pedidoDaApi = (p) => ({
+  numero: `#${p.id.slice(0, 8)}`,
+  em: p.criadoEm.slice(0, 10),
+  total: p.total,
+  estado: String(p.status ?? '').toLowerCase().replaceAll('_', ' '),
+  itens: (p.itens ?? []).map((i) => `${i.quantidade}× ${i.nome}`),
+  nota: null,
+})

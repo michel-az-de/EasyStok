@@ -56,6 +56,9 @@ export const gerarLinkCardapio = (id) => chamarApi(`${BASE}/${id}/link-cardapio`
 // que a Ficha relê depois. Conversa sem cliente devolve o dossiê mínimo.
 export const cadastrarClienteDaConversa = (id, corpo) => chamarApi(`${BASE}/${id}/cliente`, { metodo: 'POST', corpo })
 export const obterDossie = (id) => chamarApi(`${BASE}/${id}/dossie`)
+// #1436: nota interna no cadastro do cliente (o cliente nunca vê).
+export const adicionarNotaCliente = (clienteId, texto) =>
+  chamarApi(`/api/clientes/${clienteId}/notas`, { metodo: 'POST', corpo: { texto } })
 
 // Foto da dona (S02): multipart com `file` e `legenda`. A imagem chega como data URL
 // (o Composer já leu o arquivo para a prévia) e volta a ser binário aqui.
