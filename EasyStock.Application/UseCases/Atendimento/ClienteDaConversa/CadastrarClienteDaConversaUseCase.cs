@@ -2,7 +2,9 @@ using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Endereco;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
+using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Storefront;
+using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Exceptions.Storefront;
 using ClienteEntity = EasyStock.Domain.Entities.Cliente;
 
@@ -13,14 +15,16 @@ public sealed record EnderecoDaConversaInput(string? Cep, string? Logradouro, st
 
 /// <param name="Telefone">Obrigatório quando a conversa ainda não tem cliente: é por ele que o cadastro é achado.</param>
 /// <param name="Endereco">Opcional; com CEP, vira o endereço de entrega padrão do cliente.</param>
+/// <param name="Email">Opcional (#1430). Cadastro já existente achado pelo telefone só recebe se ainda não tinha e-mail.</param>
 public sealed record CadastrarClienteDaConversaCommand(
-    Guid EmpresaId, Guid ConversaId, string? Nome, string? Telefone, EnderecoDaConversaInput? Endereco);
+    Guid EmpresaId, Guid ConversaId, string? Nome, string? Telefone, EnderecoDaConversaInput? Endereco,
+    string? Email = null);
 
 /// <param name="Novo">O cadastro nasceu agora (o telefone não existia na empresa).</param>
 /// <param name="DentroDaArea">Nulo sem endereço; falso quando o CEP está fora da área de entrega.</param>
 public sealed record ClienteDaConversaResult(
     Guid ClienteId, string Nome, string? Telefone, string? Endereco, string? Cep, bool Novo,
-    bool? DentroDaArea, string? MensagemForaArea);
+    bool? DentroDaArea, string? MensagemForaArea, string? Email = null);
 
 /// <summary>
 /// #1276: a dona cadastra pelo console o cliente de uma conversa que chegou sem ele (chat do site,
@@ -30,6 +34,11 @@ public sealed record ClienteDaConversaResult(
 /// <see cref="ValidarEnderecoUseCase"/> e vira o padrão por <see cref="ConfirmarEnderecoClienteUseCase"/>.
 /// Com cliente já vinculado, atualiza nome e telefone informados. Endereço fora da área é gravado mesmo assim
 /// e volta com <c>DentroDaArea=false</c>: a dona decide (liberar fora da área ou corrigir).
+/// <para>
+/// #1430: é aqui que a loja confirma o contato informado pelo visitante do chat do site. O aceite da política
+/// que ele deu no formulário vira o consentimento transacional do canal (origem <see cref="OrigemAceiteChatSite"/>),
+/// sem passar por cima de uma revogação que o cadastro já tinha.
+/// </para>
 /// </summary>
 public sealed class CadastrarClienteDaConversaUseCase(
     IConversaRepository conversaRepository,
@@ -37,9 +46,11 @@ public sealed class CadastrarClienteDaConversaUseCase(
     IUnitOfWork unitOfWork,
     IdentificarClientePorTelefoneUseCase identificarCliente,
     ValidarEnderecoUseCase validarEndereco,
-    ConfirmarEnderecoClienteUseCase confirmarEndereco)
+    ConfirmarEnderecoClienteUseCase confirmarEndereco,
+    IConsentimentoContatoRepository consentimentos)
 {
     private const int NomeTamanhoMaximo = 150;
+    public const string OrigemAceiteChatSite = "chat_site_formulario";
 
     public async Task<ClienteDaConversaResult> ExecuteAsync(CadastrarClienteDaConversaCommand command, CancellationToken ct = default)
     {
@@ -51,6 +62,7 @@ public sealed class CadastrarClienteDaConversaUseCase(
 
         var telefone = TelefoneE164(command.Telefone);
         var nome = NomeLimpo(command.Nome);
+        var email = EmailValido(command.Email);
 
         ClienteEntity cliente;
         var novo = false;
@@ -59,6 +71,7 @@ public sealed class CadastrarClienteDaConversaUseCase(
             cliente = await clienteRepository.GetByIdWithDetailsAsync(command.EmpresaId, clienteId)
                 ?? throw new RegraDeDominioVioladaException("O cliente desta conversa não existe mais.");
             AtualizarDados(cliente, nome, telefone);
+            if (email is not null) cliente.Email = email;
             await clienteRepository.UpdateAsync(cliente);
         }
         else
@@ -70,7 +83,15 @@ public sealed class CadastrarClienteDaConversaUseCase(
             cliente = identificacao.Cliente;
             novo = identificacao.EhNovo;
             conversa.VincularCliente(cliente.Id);
+            // Cadastro antigo achado pelo telefone: o e-mail digitado não substitui o que ele já tinha.
+            if (email is not null && string.IsNullOrWhiteSpace(cliente.Email))
+            {
+                cliente.Email = email;
+                if (!novo) await clienteRepository.UpdateAsync(cliente);
+            }
         }
+
+        await RegistrarAceiteDoChatSiteAsync(command.EmpresaId, conversa, cliente.Id, ct);
 
         // A inbox mostra o nome do contato: passa a ser o do cadastro (o do chat do site é genérico).
         conversa.AtualizarContatoNome(cliente.Nome);
@@ -95,7 +116,31 @@ public sealed class CadastrarClienteDaConversaUseCase(
         }
 
         return new ClienteDaConversaResult(
-            cliente.Id, cliente.Nome, cliente.Telefone, cliente.Endereco, cliente.Cep, novo, dentroDaArea, mensagemForaArea);
+            cliente.Id, cliente.Nome, cliente.Telefone, cliente.Endereco, cliente.Cep, novo, dentroDaArea, mensagemForaArea,
+            cliente.Email);
+    }
+
+    private async Task RegistrarAceiteDoChatSiteAsync(Guid empresaId, Conversa conversa, Guid clienteId, CancellationToken ct)
+    {
+        if (conversa.Canal != CanalConversa.ChatSite || conversa.ContatoInformadoEm is not { } aceiteEm)
+            return;
+        var atuais = await consentimentos.ListarDoClienteAsync(empresaId, clienteId, ct);
+        if (atuais.Any(c => c.Canal == CanalConversa.ChatSite && c.Finalidade == FinalidadeContato.Transacional))
+            return;
+        await consentimentos.AddAsync(ConsentimentoContato.Registrar(empresaId, clienteId, CanalConversa.ChatSite,
+            FinalidadeContato.Transacional, SituacaoConsentimento.Concedido, OrigemAceiteChatSite, aceiteEm), ct);
+    }
+
+    private static string? EmailValido(string? email)
+    {
+        try
+        {
+            return ContatoInformadoVisitante.EmailNormalizado(email);
+        }
+        catch (RegraDeDominioVioladaException)
+        {
+            throw new UseCaseValidationException("E-mail inválido.");
+        }
     }
 
     private static void AtualizarDados(ClienteEntity cliente, string? nome, string? telefone)

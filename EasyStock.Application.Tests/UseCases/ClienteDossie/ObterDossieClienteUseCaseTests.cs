@@ -132,6 +132,33 @@ public class ObterDossieClienteUseCaseTests
     }
 
     [Fact]
+    public async Task LeadDoChatDoSite_TrazOContatoInformadoForaDoCadastro()
+    {
+        // #1430: o que o visitante escreveu no formulário vem à parte, não como dado do cliente.
+        var conversa = Conversa.Abrir(_empresaId, "sessao-1", Base, "Visitante do site", canal: CanalConversa.ChatSite);
+        conversa.RegistrarContatoInformado(ContatoInformadoVisitante.Criar("Ana Lima", "(11) 97777-6666", "ana@exemplo.com", true, Base));
+        _conversas.ObterPorIdAsync(_empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        var dossie = await CriarUseCase().ObterPorConversaAsync(_empresaId, conversa.Id);
+
+        dossie!.Cliente.Should().Be(new DossieClienteDados(null, "Ana Lima", null, null, null, null));
+        dossie.ContatoInformado.Should().Be(new ContatoInformadoDossie("Ana Lima", "+5511977776666", "ana@exemplo.com", Base));
+    }
+
+    [Fact]
+    public async Task ConversaComCliente_NaoTrazContatoInformado()
+    {
+        var conversa = Conversa.Abrir(_empresaId, "sessao-1", Base, "Maria", _cliente.Id, CanalConversa.ChatSite);
+        conversa.RegistrarContatoInformado(ContatoInformadoVisitante.Criar("Maria", "(11) 97777-6666", null, true, Base));
+        _conversas.ObterPorIdAsync(_empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        var dossie = await CriarUseCase().ObterPorConversaAsync(_empresaId, conversa.Id);
+
+        dossie!.Cliente.Id.Should().Be(_cliente.Id);
+        dossie.ContatoInformado.Should().BeNull();
+    }
+
+    [Fact]
     public async Task ConversaInexistenteDevolveNulo() =>
         (await CriarUseCase().ObterPorConversaAsync(_empresaId, Guid.NewGuid())).Should().BeNull();
 }

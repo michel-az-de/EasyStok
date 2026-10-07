@@ -27,6 +27,7 @@ public class CadastrarClienteDaConversaUseCaseTests
     private readonly IFreteZonaRepository _zonas = Substitute.For<IFreteZonaRepository>();
     private readonly ICepLookupClient _cep = Substitute.For<ICepLookupClient>();
     private readonly IConfiguracaoAtendimentoRepository _configuracao = Substitute.For<IConfiguracaoAtendimentoRepository>();
+    private readonly IConsentimentoContatoRepository _consentimentos = Substitute.For<IConsentimentoContatoRepository>();
     private readonly StorefrontEntity _storefront;
 
     public CadastrarClienteDaConversaUseCaseTests()
@@ -57,7 +58,8 @@ public class CadastrarClienteDaConversaUseCaseTests
             new IdentificarClientePorTelefoneUseCase(_clientes, _clientesStorefront, NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
             new ValidarEnderecoUseCase(_storefronts, frete, _cep, _configuracao, NullLogger<ValidarEnderecoUseCase>.Instance),
             new ConfirmarEnderecoClienteUseCase(_clientes, _uow,
-                new AdicionarClienteEnderecoUseCase(_clientes, _uow, NullLogger<AdicionarClienteEnderecoUseCase>.Instance)));
+                new AdicionarClienteEnderecoUseCase(_clientes, _uow, NullLogger<AdicionarClienteEnderecoUseCase>.Instance)),
+            _consentimentos);
     }
 
     private Conversa ConversaDoSite(Guid? clienteId = null)
@@ -205,5 +207,103 @@ public class CadastrarClienteDaConversaUseCaseTests
         var acao = () => UseCase().ExecuteAsync(new CadastrarClienteDaConversaCommand(_empresaId, Guid.NewGuid(), "Maria", "11987654321", null));
 
         await acao.Should().ThrowAsync<ConversaNaoEncontradaException>();
+    }
+
+    // ── #1430: e-mail e aceite do formulário do chat do site ──
+
+    private Conversa ConversaComContatoInformado()
+    {
+        var conversa = ConversaDoSite();
+        conversa.RegistrarContatoInformado(ContatoInformadoVisitante.Criar(
+            "Maria do site", "(11) 98765-4321", "Maria@Exemplo.com", aceitePrivacidade: true, DateTime.UtcNow.AddMinutes(-6)));
+        return conversa;
+    }
+
+    [Fact]
+    public async Task ClienteNovo_GravaOEmailNormalizado()
+    {
+        var conversa = ConversaDoSite();
+
+        var r = await UseCase().ExecuteAsync(Comando(conversa) with { Email = " Maria@Exemplo.com " });
+
+        await _clientes.Received(1).AddAsync(Arg.Is<Cliente>(c => c.Email == "maria@exemplo.com"));
+        r.Email.Should().Be("maria@exemplo.com");
+    }
+
+    [Fact]
+    public async Task EmailInvalido_RecusaComoValidacaoSemCadastrar()
+    {
+        var conversa = ConversaDoSite();
+
+        var acao = () => UseCase().ExecuteAsync(Comando(conversa) with { Email = "maria-sem-arroba" });
+
+        await acao.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*E-mail*");
+        await _clientes.DidNotReceive().AddAsync(Arg.Any<Cliente>());
+        conversa.ClienteId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CadastroAntigoComEmail_NaoTemOEmailSubstituidoPeloDigitado()
+    {
+        var existente = new Cliente { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Maria Cadastrada", Telefone = "+5511987654321", Email = "maria@antigo.com" };
+        _clientes.FindByTelefoneAsync(_empresaId, "+5511987654321").Returns(existente);
+        _clientes.GetByIdWithDetailsAsync(_empresaId, existente.Id).Returns(existente);
+        var conversa = ConversaDoSite();
+
+        await UseCase().ExecuteAsync(Comando(conversa) with { Email = "outra@pessoa.com" });
+
+        existente.Email.Should().Be("maria@antigo.com");
+    }
+
+    [Fact]
+    public async Task CadastroAntigoSemEmail_RecebeOEmail()
+    {
+        var existente = new Cliente { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Maria Cadastrada", Telefone = "+5511987654321" };
+        _clientes.FindByTelefoneAsync(_empresaId, "+5511987654321").Returns(existente);
+        _clientes.GetByIdWithDetailsAsync(_empresaId, existente.Id).Returns(existente);
+        var conversa = ConversaDoSite();
+
+        await UseCase().ExecuteAsync(Comando(conversa) with { Email = "maria@exemplo.com" });
+
+        existente.Email.Should().Be("maria@exemplo.com");
+        await _clientes.Received().UpdateAsync(existente);
+    }
+
+    [Fact]
+    public async Task ConfirmarContatoInformado_RegistraOAceiteComoConsentimentoTransacionalDoChat()
+    {
+        var conversa = ConversaComContatoInformado();
+        _consentimentos.ListarDoClienteAsync(_empresaId, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<ConsentimentoContato>());
+
+        var r = await UseCase().ExecuteAsync(Comando(conversa, nome: "Maria do site") with { Email = "maria@exemplo.com" });
+
+        await _consentimentos.Received(1).AddAsync(Arg.Is<ConsentimentoContato>(c =>
+            c.ClienteId == r.ClienteId && c.Canal == CanalConversa.ChatSite && c.Finalidade == FinalidadeContato.Transacional
+            && c.Situacao == SituacaoConsentimento.Concedido && c.Origem == CadastrarClienteDaConversaUseCase.OrigemAceiteChatSite
+            && c.AtualizadoEm == conversa.ContatoInformadoEm), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ConsentimentoJaGravado_NaoEhSobrescritoPeloAceite()
+    {
+        var conversa = ConversaComContatoInformado();
+        _consentimentos.ListarDoClienteAsync(_empresaId, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(ci => new[] { ConsentimentoContato.Registrar(_empresaId, ci.ArgAt<Guid>(1), CanalConversa.ChatSite,
+                FinalidadeContato.Transacional, SituacaoConsentimento.Revogado, "console", DateTime.UtcNow.AddDays(-1)) });
+
+        await UseCase().ExecuteAsync(Comando(conversa));
+
+        await _consentimentos.DidNotReceive().AddAsync(Arg.Any<ConsentimentoContato>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ConversaSemFormulario_NaoRegistraConsentimento()
+    {
+        var conversa = ConversaDoSite();
+
+        await UseCase().ExecuteAsync(Comando(conversa));
+
+        await _consentimentos.DidNotReceive().AddAsync(Arg.Any<ConsentimentoContato>(), Arg.Any<CancellationToken>());
     }
 }

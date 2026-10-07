@@ -26,3 +26,12 @@ export function clienteDoDossie(dossie) {
     cliente: { telefone: dados.telefone || null, endereco: endereco || null },
   }
 }
+
+// #1430: o que o visitante do chat do site escreveu no formulário antes de conversar. Vem só no
+// dossiê de lead e não é cadastro: a Ficha mostra com selo até a dona confirmar.
+export function contatoInformadoDoDossie(dossie) {
+  if (dossie?.cliente?.id) return null
+  const c = dossie?.contatoInformado
+  if (!c?.telefone) return null
+  return { nome: c.nome || null, telefone: c.telefone, email: c.email || null, informadoEm: c.informadoEm ?? null }
+}

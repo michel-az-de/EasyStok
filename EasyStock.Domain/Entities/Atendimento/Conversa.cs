@@ -40,6 +40,19 @@ public class Conversa
     /// <summary>Nome do perfil no canal, quando informado.</summary>
     public string? ContatoNome { get; private set; }
 
+    /// <summary>
+    /// Chat do site (#1430): telefone (E.164) e e-mail que o visitante escreveu no formulário, e o instante
+    /// do aceite da política. É "informado pelo visitante": não liga a conversa a cliente nenhum; a loja
+    /// confirma pela Ficha (<c>POST .../cliente</c>).
+    /// </summary>
+    public string? ContatoTelefoneInformado { get; private set; }
+    public string? ContatoEmailInformado { get; private set; }
+    public DateTime? ContatoInformadoEm { get; private set; }
+
+    /// <summary>Nulo quando o contato não preencheu o formulário do chat do site.</summary>
+    public ContatoInformadoVisitante? ContatoInformado =>
+        ContatoInformadoVisitante.Gravado(ContatoNome, ContatoTelefoneInformado, ContatoEmailInformado, ContatoInformadoEm);
+
     public CanalConversa Canal { get; private set; }
     public SituacaoConversa Situacao { get; private set; }
     public Guid? PedidoEmAndamentoId { get; private set; }
@@ -156,6 +169,19 @@ public class Conversa
     }
 
     public void AtualizarContatoNome(string? nome) => ContatoNome = NormalizarNome(nome);
+
+    /// <summary>
+    /// Grava o que o visitante informou (#1430). Sem cliente vinculado, o nome dele passa a ser o do contato;
+    /// com cliente, o nome do cadastro continua valendo.
+    /// </summary>
+    public void RegistrarContatoInformado(ContatoInformadoVisitante contato)
+    {
+        ArgumentNullException.ThrowIfNull(contato);
+        ContatoTelefoneInformado = contato.Telefone;
+        ContatoEmailInformado = contato.Email;
+        ContatoInformadoEm = contato.InformadoEm;
+        if (ClienteId is null) ContatoNome = NormalizarNome(contato.Nome);
+    }
 
     /// <summary>
     /// #1332: a conversa pode ter sido achada pela outra grafia do celular (com/sem o nono dígito, #1290).

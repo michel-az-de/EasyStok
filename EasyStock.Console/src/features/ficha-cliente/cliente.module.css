@@ -256,3 +256,22 @@
 }
 .textoRecompensa { flex: 1 1 140px; min-width: 0; display: grid; }
 .subRecompensa { font-size: var(--t-micro); color: var(--tinta-3); }
+
+/* #1430: contato que o visitante do chat do site informou antes de conversar.
+   Selo em azul de informação (não é o verde de "feito": ninguém confirmou ainda). */
+.contatoInformado {
+  display: grid; gap: var(--e-2); margin-bottom: var(--e-3); padding: var(--e-3);
+  background: var(--info-fundo); border-radius: var(--r-2);
+}
+.seloInformado {
+  justify-self: start; padding: 1px 8px; border-radius: 999px;
+  font-size: var(--t-micro); font-weight: 600; line-height: 1.5;
+  color: var(--info); background: var(--elevado);
+}
+.listaInformado {
+  display: grid; grid-template-columns: auto 1fr; gap: var(--e-1) var(--e-3); margin: 0;
+  font-size: var(--t-corpo); color: var(--tinta);
+}
+.listaInformado dt { font-size: var(--t-apoio); color: var(--tinta-3); }
+.listaInformado dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.contatoInformado .rodapeBloco { margin: 0; }

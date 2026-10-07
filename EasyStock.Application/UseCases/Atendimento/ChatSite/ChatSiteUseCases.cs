@@ -137,6 +137,54 @@ public sealed class EnviarMensagemVisitanteUseCase(
 
 }
 
+/// <summary>O que o visitante preencheu no formulário antes do chat (#1430).</summary>
+public sealed record IdentificacaoVisitanteInput(string? Nome, string? Telefone, string? Email, bool AceitePrivacidade);
+
+/// <summary>Os dados como ficaram gravados (telefone em E.164, e-mail minúsculo).</summary>
+public sealed record IdentificacaoVisitanteResult(string Nome, string Telefone, string? Email, DateTime InformadoEm);
+
+/// <summary>
+/// #1430: formulário curto antes do chat. Grava nome, telefone, e-mail e o aceite da política na sessão; a
+/// conversa já aberta recebe o contato na hora, e a que nascer depois nasce com ele
+/// (<see cref="EasyStock.Application.Services.Atendimento.ConversaChatSiteService"/>). Não procura nem liga
+/// cliente pelo telefone: o dado fica "informado pelo visitante" até a loja confirmar pela Ficha.
+/// </summary>
+public sealed class IdentificarVisitanteChatSiteUseCase(
+    AcessoChatSite acesso, IConversaRepository conversaRepository, IUnitOfWork unitOfWork)
+{
+    public async Task<IdentificacaoVisitanteResult> ExecuteAsync(
+        string slug, string? token, IdentificacaoVisitanteInput? input, CancellationToken ct = default)
+    {
+        if (input is null)
+            throw new UseCaseValidationException("Preencha nome e telefone.");
+
+        var agora = DateTime.UtcNow;
+        ContatoInformadoVisitante contato;
+        try
+        {
+            contato = ContatoInformadoVisitante.Criar(input.Nome, input.Telefone, input.Email, input.AceitePrivacidade, agora);
+        }
+        catch (RegraDeDominioVioladaException ex)
+        {
+            throw new UseCaseValidationException(ex.Message);
+        }
+
+        var sessao = await acesso.ResolverSessaoAsync(slug, token, agora, ct);
+        sessao.RegistrarUso(agora);
+        sessao.Identificar(contato);
+
+        if (sessao.ConversaId is { } conversaId)
+        {
+            var conversa = await conversaRepository.ObterPorIdAsync(sessao.EmpresaId, conversaId, ct);
+            if (conversa is { EstaAberta: true, Canal: CanalConversa.ChatSite } && conversa.EmpresaId == sessao.EmpresaId)
+                conversa.RegistrarContatoInformado(contato);
+        }
+
+        await unitOfWork.CommitAsync();
+        return new IdentificacaoVisitanteResult(contato.Nome, contato.Telefone, contato.Email, contato.InformadoEm);
+    }
+}
+
 /// <summary>
 /// S36: o que o visitante vê depois de um instante (cursor). Só a mensagem dele e as enviadas pela loja
 /// pelo canal (com id externo); nota interna do sistema fica de fora. Ler não renova a sessão.

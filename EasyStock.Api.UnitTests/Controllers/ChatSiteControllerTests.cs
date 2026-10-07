@@ -111,6 +111,25 @@ public class ChatSiteControllerTests
         result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
     }
 
+    private IdentificarVisitanteChatSiteUseCase Identificacao() => new(
+        new AcessoChatSite(_lojas, _flags, Substitute.For<ITenantContextAccessor>(), _sessoes), _conversas, Substitute.For<IUnitOfWork>());
+
+    [Fact]
+    public async Task IdentificacaoValida200SemAceite400TokenInvalido403()
+    {
+        // #1430: o formulário antes do chat.
+        var (sessao, token) = Sessao();
+        var valido = new IdentificacaoVisitanteBody("Maria Souza", "(11) 98765-4321", null, true);
+
+        (await _controller.Identificar(Slug, token, valido, Identificacao(), default)).Should().BeOfType<OkObjectResult>();
+        sessao.ContatoInformado!.Nome.Should().Be("Maria Souza");
+
+        (await _controller.Identificar(Slug, token, valido with { AceitePrivacidade = false }, Identificacao(), default))
+            .Should().BeOfType<BadRequestObjectResult>();
+        (await _controller.Identificar(Slug, "inventado", valido, Identificacao(), default))
+            .Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+    }
+
     [Fact]
     public async Task ChatDesligado404()
     {
@@ -124,6 +143,7 @@ public class ChatSiteControllerTests
     [InlineData(nameof(ChatSiteController.EnviarMensagem), ChatSiteRateLimit.Mensagem)]
     [InlineData(nameof(ChatSiteController.ListarMensagens), ChatSiteRateLimit.Leitura)]
     [InlineData(nameof(ChatSiteController.Stream), ChatSiteRateLimit.Leitura)]
+    [InlineData(nameof(ChatSiteController.Identificar), ChatSiteRateLimit.Identificacao)]
     public void CadaEndpointTemRateLimit(string acao, string politica) =>
         typeof(ChatSiteController).GetMethod(acao)!.GetCustomAttribute<EnableRateLimitingAttribute>()!
             .PolicyName.Should().Be(politica);

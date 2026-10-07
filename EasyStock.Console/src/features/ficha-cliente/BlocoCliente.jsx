@@ -26,6 +26,7 @@ import { ModalHistorico } from './ModalHistorico'
 import { ModalBloqueio, ModalDesbloqueio } from './ModalBloqueio'
 import { ModalFidelidade } from './ModalFidelidade'
 import { AvisosDoCliente } from './AvisosDoCliente'
+import { ContatoInformado } from './ContatoInformado'
 import css from './cliente.module.css'
 
 const dataCurta = (iso) =>
@@ -104,8 +105,10 @@ export function BlocoCliente({ conversa }) {
   // do formulário vazio esperando a dona digitar o que o cliente já disse.
   const captado = cliente.captado ?? {}
   const automaticoCaptando = automaticoConduzindo(conversa, automaticoPausado[conversa.id])
+  // #1430: o visitante do chat do site já informou nome e contato; a confirmação toma o lugar do formulário.
+  const informado = lead ? conversa.contatoInformado : null
   const precisaCadastro = lead && (!cliente.telefone || !cliente.endereco) && !cliente.enderecoCapturado
-    && !conversa.captura
+    && !conversa.captura && !informado
   const domicilio = mesmoDomicilio(conversa, conversas)
   const financeiro = resumoFinanceiro(historico)
 
@@ -231,6 +234,15 @@ export function BlocoCliente({ conversa }) {
           </span>
           <Botao variante="texto" onClick={() => setModal('fidelidade')}>Resgatar</Botao>
         </div>
+      )}
+
+      {informado && (
+        <ContatoInformado
+          contato={informado}
+          aoConfirmar={() => salvarCadastroRapido(conversa.id, {
+            nome: informado.nome ?? conversa.nome, telefone: informado.telefone, email: informado.email, endereco: null,
+          }, agora)}
+        />
       )}
 
       {precisaCadastro ? (

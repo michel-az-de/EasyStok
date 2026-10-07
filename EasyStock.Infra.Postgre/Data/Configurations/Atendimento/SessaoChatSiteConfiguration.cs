@@ -1,4 +1,5 @@
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Infra.Postgre.Data.Configurations.Atendimento;
 
@@ -16,6 +17,12 @@ public class SessaoChatSiteConfiguration : IEntityTypeConfiguration<SessaoChatSi
         builder.Property(s => s.CriadaEm).IsRequired();
         builder.Property(s => s.UltimoUsoEm).IsRequired();
         builder.Property(s => s.ExpiraEm).IsRequired();
+
+        // Formulário antes do chat (#1430). Some com a sessão; a conversa guarda a cópia.
+        builder.Ignore(s => s.ContatoInformado);
+        builder.Property(s => s.VisitanteNome).HasMaxLength(ContatoInformadoVisitante.NomeTamanhoMaximo);
+        builder.Property(s => s.VisitanteTelefone).HasMaxLength(TelefoneE164.TamanhoMaximo);
+        builder.Property(s => s.VisitanteEmail).HasMaxLength(ContatoInformadoVisitante.EmailTamanhoMaximo);
 
         // Toda requisição do visitante busca a sessão pelo hash do token.
         builder.HasIndex(s => s.TokenHash).IsUnique().HasDatabaseName("uq_sessoes_chat_site_token_hash");
