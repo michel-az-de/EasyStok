@@ -1,0 +1,11 @@
+/* #1432: linha do assunto do e-mail. Mesmo corpo de apoio do resto do cartão,
+   em --tinta-2 para não competir com o nome; só tokens existentes. */
+.assunto {
+  display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%;
+  font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2);
+}
+.assunto svg { flex-shrink: 0; }
+.texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* No fio da conversa: acima do balão do cliente, alinhado à esquerda como ele. */
+.fio { align-self: flex-start; margin-top: var(--e-2); padding-inline: var(--e-2); }

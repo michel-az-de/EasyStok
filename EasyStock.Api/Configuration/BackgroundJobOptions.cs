@@ -16,6 +16,12 @@ public sealed class BackgroundJobOptions
     /// <summary>S57: reenvio automático das mensagens com falha temporária. Desligar é o rollback.</summary>
     public bool EnableReenvioMensagens { get; set; } = true;
 
+    /// <summary>
+    /// #1432: leitura das caixas de suporte (IMAP) das empresas que configuraram uma. Sem caixa configurada não
+    /// conecta em nada. Desligar é o rollback da entrada de e-mail.
+    /// </summary>
+    public bool EnableAtendimentoCaixaEmail { get; set; } = true;
+
     /// <summary>S43: avaliador dos lembretes da dona. Desligar é o rollback.</summary>
     public bool EnableAvaliadorLembretes { get; set; } = true;
 

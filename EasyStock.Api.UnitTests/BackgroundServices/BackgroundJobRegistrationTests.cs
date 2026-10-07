@@ -84,6 +84,22 @@ public class BackgroundJobRegistrationTests
     }
 
     [Fact]
+    public void AddEasyStockBackgroundJobs_RegistraCaixaDeEmail_EDesligaPorFlag()
+    {
+        var ligado = new ServiceCollection().AddLogging();
+        ligado.AddEasyStockBackgroundJobs(new ConfigurationBuilder().Build());
+        var desligado = new ServiceCollection().AddLogging();
+        desligado.AddEasyStockBackgroundJobs(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [$"{BackgroundJobOptions.SectionName}:EnableAtendimentoCaixaEmail"] = "false" })
+            .Build());
+
+        ligado.Where(d => d.ServiceType == typeof(IHostedService)).Select(d => d.ImplementationType)
+            .Should().Contain(typeof(AtendimentoCaixaEmailBackgroundService));
+        desligado.Where(d => d.ServiceType == typeof(IHostedService)).Select(d => d.ImplementationType)
+            .Should().NotContain(typeof(AtendimentoCaixaEmailBackgroundService));
+    }
+
+    [Fact]
     public void AddEasyStockBackgroundJobs_RegistraAvaliadorDeLembretes_EDesligaPorFlag()
     {
         var ligado = new ServiceCollection().AddLogging();

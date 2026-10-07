@@ -1,3 +1,4 @@
+import { AssuntoEmail } from '../../componentes/AssuntoEmail'
 import { Avatar } from '../../componentes/Avatar'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
@@ -132,6 +133,7 @@ export function CartaoConversa({
             {duracao(agora - new Date(conversa.ultimaEm).getTime())}
           </time>
         </span>
+        <AssuntoEmail assunto={conversa.assunto} />
         <span className={css.previa}>
           {previa.prefixo && (
             <span className={css.prefixo}>

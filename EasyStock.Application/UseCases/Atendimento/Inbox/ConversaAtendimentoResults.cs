@@ -20,10 +20,14 @@ public sealed record ConversaResumoResult(
     bool DentroDaJanela,
     string? MotivoEscalada = null)
 {
+    /// <summary>#1432: assunto do último e-mail recebido (canal E-mail); nulo nos outros canais.</summary>
+    public string? Assunto { get; init; }
+
     internal static ConversaResumoResult De(Conversa c, string? ultimaMensagemTexto, DateTime agora) => new(
         c.Id, c.Canal, c.ContatoIdExterno, c.ContatoNome, c.ClienteId, c.Situacao, c.NaoLidas,
         c.UltimaMensagemEm, ultimaMensagemTexto, c.PedidoEmAndamentoId, c.AssumidaPorUsuarioId, c.DentroDaJanela(agora),
-        c.MotivoEscalada);
+        c.MotivoEscalada)
+    { Assunto = c.Assunto };
 }
 
 /// <summary>Mensagem como o console mostra. <c>MidiaChave</c> é interna: o arquivo é servido por endpoint autenticado.</summary>
@@ -47,10 +51,14 @@ public sealed record MensagemAtendimentoResult(
     bool MidiaFalhou = false,
     string? Transcricao = null)
 {
+    /// <summary>#1432: assunto do e-mail recebido; nulo nos outros canais e na saída.</summary>
+    public string? Assunto { get; init; }
+
     internal static MensagemAtendimentoResult De(Mensagem m) => new(
         m.Id, m.Direcao, m.Autor, m.TipoConteudo, m.Texto, m.BotaoId, m.MidiaChave, m.MidiaMime,
         m.Status, m.Erro, m.ExternoId, m.EnviadaEm, m.EnviadaPorUsuarioId, m.AguardaClienteDesde, m.ReservaSmsEm,
-        m.ErroMidia, m.MidiaFalhou, m.Transcricao);
+        m.ErroMidia, m.MidiaFalhou, m.Transcricao)
+    { Assunto = m.Assunto };
 }
 
 /// <summary>Estado da conversa depois de uma ação do console.</summary>

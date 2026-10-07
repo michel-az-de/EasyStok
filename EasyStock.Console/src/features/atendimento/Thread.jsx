@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
+import { AssuntoEmail } from '../../componentes/AssuntoEmail'
 import { Icone } from '../../componentes/Icone'
+import { marcarMudancasDeAssunto } from '../../dominio/email'
 import { Pilula } from '../../componentes/Pilula'
 import { rotuloDoDia } from '../../dominio/formato'
 import { Balao } from './Balao'
@@ -66,6 +68,8 @@ export function Thread({
   // não é remetente e não deve contar como troca de voz.
   let proxima = 0
   const linhas = []
+  // #1432: assunto acima do e-mail recebido, só quando muda.
+  const assuntos = marcarMudancasDeAssunto(mensagens)
   mensagens.forEach((m, i) => {
     while (proxima < fronteiras.length && i > fronteiras[proxima].aposIndice) {
       linhas.push({ tipo: 'divisoria', chave: `divisoria-${fronteiras[proxima].numero}`, numero: fronteiras[proxima].numero })
@@ -74,6 +78,7 @@ export function Thread({
     if (i === 0 || diaDe(m.em) !== diaDe(mensagens[i - 1].em)) {
       linhas.push({ tipo: 'dia', chave: `dia-${m.id}`, rotulo: rotuloDoDia(m.em, agora) })
     }
+    if (assuntos[i]) linhas.push({ tipo: 'assunto', chave: `assunto-${m.id}`, assunto: assuntos[i] })
     linhas.push({
       tipo: 'mensagem', chave: m.id, mensagem: m, trocaDeVoz: i > 0 && mensagens[i - 1].dir !== m.dir,
     })
@@ -84,6 +89,7 @@ export function Thread({
       {linhas.map((l) => {
         if (l.tipo === 'divisoria') return <Divisoria key={l.chave} numero={l.numero} />
         if (l.tipo === 'dia') return <SeparadorDeDia key={l.chave} rotulo={l.rotulo} />
+        if (l.tipo === 'assunto') return <AssuntoEmail key={l.chave} assunto={l.assunto} noFio />
         return (
           <Balao
             key={l.chave}

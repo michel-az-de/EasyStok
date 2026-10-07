@@ -245,6 +245,11 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             // #1102: número da Meta pelo qual a resposta sai = o da empresa do tenant corrente.
             services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.IRemetenteWhatsApp,
                 Services.Atendimento.RemetenteWhatsAppDoTenant>();
+            // #1432: caixa de suporte da loja (IMAP/SMTP) e o fio do e-mail da conversa.
+            services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.Email.ICaixaEmailDoTenant,
+                Services.Atendimento.CaixaEmailDoTenant>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IEmailAtendimentoQuery,
+                Repositories.Atendimento.EmailAtendimentoQuery>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IStorefrontFaleConoscoRepository,
                 Repositories.Storefront.StorefrontFaleConoscoRepository>();
             // Storefront — autenticação OTP cliente (AUTH-002)
