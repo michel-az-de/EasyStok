@@ -90,6 +90,21 @@
 .respostaErro { align-self: flex-start; background: var(--perigo-fundo); color: var(--perigo); }
 .respostaPensando { align-self: flex-start; color: var(--tinta-3); font-style: italic; }
 
+/* #1445: ações propostas pelo assistente. Linha simples sob a resposta, sem cartão
+   dentro de cartão; separador fino entre elas. Só tokens existentes. */
+.acoesPropostas { list-style: none; margin: 0; padding: 0; align-self: stretch; display: flex; flex-direction: column; }
+.acaoProposta {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
+  padding: var(--e-2) 0; border-top: var(--b-1) solid var(--linha);
+}
+.acaoProposta:last-child { border-bottom: var(--b-1) solid var(--linha); }
+.acaoTexto { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: var(--t-apoio); }
+.acaoTitulo { display: flex; align-items: center; gap: var(--e-1); font-weight: 700; color: var(--tinta); }
+.acaoDetalhe { color: var(--tinta-2); line-height: var(--lh-corpo); overflow-wrap: anywhere; }
+.acaoErro { display: flex; align-items: center; gap: var(--e-1); color: var(--perigo); }
+.acaoBotao { flex-shrink: 0; }
+.acaoFeita { display: flex; align-items: center; gap: var(--e-1); flex-shrink: 0; font-size: var(--t-apoio); color: var(--ok); }
+
 .formPergunta { display: flex; align-items: flex-end; gap: var(--e-1); }
 .campoPergunta { flex: 1; }
 .botaoEnviar { flex-shrink: 0; }
