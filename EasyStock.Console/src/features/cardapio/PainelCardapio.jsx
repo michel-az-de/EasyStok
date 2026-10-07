@@ -9,6 +9,7 @@ import { Vazio } from '../../componentes/Vazio'
 import { Botao } from '../../componentes/Botao'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useEscape } from '../../hooks/useEscape'
+import { abrirSecao } from '../../hooks/useRecolhido'
 import {
   adicionaisDoItem, alternativasPara, catalogoDeAdicionais, contarDisponiveis, ehNovidade,
   estaEmValidacao, itensAtivos, itensRemovidos, situacaoDoItem,
@@ -537,10 +538,14 @@ export function PainelCardapio({
     // por atributo (não por import) porque cardápio e ficha-cliente são
     // features separadas — a fronteira de camadas não deixa uma importar a
     // outra, então o encontro é só no DOM, como o resto do arrasto já faz.
+    // #1442: a comanda pode estar recolhida na Ficha; abre e rola depois que
+    // ela volta ao layout.
+    abrirSecao('comanda')
     const reduzMovimento = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    document.getElementById('comanda-pedido')
-      ?.scrollIntoView({ behavior: reduzMovimento ? 'auto' : 'smooth', block: 'nearest' })
+    const rolar = setTimeout(() => document.getElementById('comanda-pedido')
+      ?.scrollIntoView({ behavior: reduzMovimento ? 'auto' : 'smooth', block: 'nearest' }))
     return () => {
+      clearTimeout(rolar)
       if (focoAnterior.current?.isConnected) focoAnterior.current.focus()
     }
   }, [])

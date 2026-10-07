@@ -14,3 +14,20 @@
   padding-left: calc(var(--e-4) - var(--trilho));
 }
 .destaque > h3 { color: var(--atencao); }
+
+/* #1442: seção recolhível. O título vira o gatilho, linha inteira, com a seta
+   no fim; recolhida, o resumo aparece entre os dois. */
+.gatilho {
+  display: flex; align-items: center; gap: var(--e-2); width: 100%; min-height: 28px;
+  padding: 0; border: 0; background: none; color: inherit; cursor: pointer;
+  font: inherit; text-align: left;
+}
+.gatilho:hover { color: var(--tinta); }
+.gatilho:focus-visible { outline: 2px solid var(--halo); outline-offset: 2px; border-radius: var(--r-ponta); }
+.resumo {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 400; color: var(--tinta-3);
+}
+.seta { margin-left: auto; flex-shrink: 0; color: var(--tinta-3); transition: transform var(--dur-curta) var(--ease-padrao); }
+.setaAberta { transform: rotate(90deg); }
+.recolhido > h3 { margin-bottom: 0; }

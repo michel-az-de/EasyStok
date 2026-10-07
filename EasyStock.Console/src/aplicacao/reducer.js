@@ -72,8 +72,9 @@ export function estadoInicial({
     selecionadaId: conversas[0]?.id ?? null,
     // Balcão (seção 1, rodada 5): duas abas, canais que ligam mais de um ao
     // mesmo tempo e uma ordem só. `MUDAR_FILTRO` é genérico (chave/valor), a
-    // forma nova só muda o que mora em cada chave.
-    filtros: { busca: '', aba: 'precisa', canais: [], ordenacao: 'urgencia' },
+    // forma nova só muda o que mora em cada chave. #1442: abre em "Todas";
+    // "Precisa de você" virou filtro com contador.
+    filtros: { busca: '', aba: 'todas', canais: [], ordenacao: 'urgencia' },
     rascunhos: {},
     automaticoPausado: {},
     // Lista, não campo único: dois desacertos de saldo antes dela clicar
