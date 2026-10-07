@@ -14,6 +14,11 @@ import {
   estaEmValidacao, itensAtivos, itensRemovidos, situacaoDoItem,
 } from '../../dominio/cardapio'
 import { cartaDoItem } from '../../dominio/arteCardapio'
+import { aceitaFormato, canalDaConversa, motivoDeFormato } from '../../dominio/canal'
+import { permissaoDeEscrita } from '../../dominio/janela'
+import {
+  SEM_CATEGORIA, agruparPorCategoria, filtrarCardapio, fotoDoItem, mensagemDaFotoDoItem,
+} from '../../dominio/vitrineCardapio'
 import { lerMoeda, mascaraMoeda, moeda, moedaAltaDemais } from '../../dominio/formato'
 import {
   agruparPorLinha, itensDetalhados, numeroCurto, totalDoPedido,
@@ -34,10 +39,26 @@ const PAPEIS = [
   { id: 'gerir', rotulo: 'Gerir o dia' },
 ]
 
+// Foto real do item (#1448), a mesma da vitrine. Sem foto, ou se ela não carregar, a carta
+// desenhada: honesta, parece arte de cardápio e não finge ser fotografia.
+function FotoDoItem({ item, className, alt = '' }) {
+  const foto = fotoDoItem(item)
+  const [falhou, setFalhou] = useState(null)
+  const usarFoto = foto && falhou !== foto
+  return (
+    <img
+      className={className}
+      src={usarFoto ? foto : cartaDoItem(item)}
+      alt={alt}
+      onError={usarFoto ? () => setFalhou(foto) : undefined}
+    />
+  )
+}
+
 function FichaDoItem({ item, adicionais, linhas }) {
   return (
     <div className={css.ficha}>
-      <img className={css.carta} src={cartaDoItem(item)} alt={'Carta do cardápio de ' + item.nome} />
+      <FotoDoItem item={item} className={css.carta} alt={'Foto de ' + item.nome} />
       <dl className={css.dados}>
         <div><dt>Porção</dt><dd>{item.porcao}</dd></div>
         <div><dt>Linha</dt><dd>{linhas[item.linha]?.rotulo}</dd></div>
@@ -60,7 +81,7 @@ function FichaDoItem({ item, adicionais, linhas }) {
 export function CartaoArrasto({ item }) {
   return (
     <div className={css.cartaoArrasto}>
-      <img src={cartaDoItem(item)} alt="" />
+      <FotoDoItem item={item} />
       <span>{item.nome}</span>
     </div>
   )
@@ -69,7 +90,7 @@ export function CartaoArrasto({ item }) {
 // Um item por instância do hook: useDraggable precisa de um componente por
 // linha, senão a lista muda de tamanho e a ordem dos hooks quebra.
 function ItemEscolher({
-  item, situacao, quantos, alternativas, linhas, adicionais, cardapio, novidade, aoEscolher, aoAjustar,
+  item, situacao, quantos, alternativas, linhas, adicionais, cardapio, novidade, aoEscolher, aoAjustar, envioDeFoto,
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: 'prato-' + item.sku,
@@ -94,13 +115,14 @@ function ItemEscolher({
           {...listeners}
           {...attributes}
         >
+          <FotoDoItem item={item} className={css.foto} />
           {/* Sete itens viravam sete manchas de cor. O estado do item é
               texto na segunda linha, e só aparece quando muda a venda. */}
           <span className={css.nome}>
             {item.nome}
             {novidade && <Pilula tom="ragu" fina>Novidade da casa</Pilula>}
             <small>
-              {linhas[item.linha]?.rotulo} · {item.porcao}
+              {[linhas[item.linha]?.rotulo, item.porcao].filter(Boolean).join(' · ')}
               {PEDE_ACAO.has(situacao.chave) && (
                 <b className={css[situacao.tom]}> · {situacao.rotulo}</b>
               )}
@@ -127,6 +149,23 @@ function ItemEscolher({
               <Icone nome="menos" rotulo={'Tirar uma unidade de ' + item.nome} />
             </button>
           </div>
+        )}
+
+        {/* Enviar a foto ao cliente (#1448): a mesma peça da galeria, que o
+            EasyStok manda pelo id do item (#1439). Irmão do botão da linha. */}
+        {envioDeFoto && fotoDoItem(item) && (
+          <button
+            type="button"
+            className={css.enviarFoto}
+            disabled={!envioDeFoto.pode || envioDeFoto.enviando !== null}
+            title={envioDeFoto.motivo ?? 'Enviar a foto ao cliente'}
+            onClick={() => envioDeFoto.enviar(item)}
+          >
+            <Icone
+              nome={envioDeFoto.enviado === item.sku ? 'check' : 'imagem'}
+              rotulo={rotuloDoEnvio(envioDeFoto, item)}
+            />
+          </button>
         )}
       </div>
 
@@ -157,33 +196,63 @@ function ItemEscolher({
 // esgotado continua vendendo (D7 e RN-48), item fora do dia não: quem desligou
 // foi ela, de propósito. O prato também se arrasta até a comanda (seção 9);
 // o toque continua somando, e é o caminho mais rápido.
-function Escolher({ cardapio, linhas, adicionais, pedido, agora, aoEscolher, aoAjustar }) {
+function rotuloDoEnvio(envioDeFoto, item) {
+  if (envioDeFoto.enviando === item.sku) return 'Enviando a foto de ' + item.nome
+  if (envioDeFoto.enviado === item.sku) return 'Foto de ' + item.nome + ' enviada'
+  return 'Enviar a foto de ' + item.nome + ' ao cliente'
+}
+
+// Grupos pela categoria da vitrine (#1448): 43 itens em lista corrida não se
+// leem. O título do grupo é texto, sem caixa: a hierarquia vem da tipografia.
+// Cardápio sem categoria nenhuma (a massa de demonstração) é uma lista só, sem título "Outros".
+function PorCategoria({ itens, children }) {
+  const grupos = agruparPorCategoria(itens)
+  if (grupos.length === 1 && grupos[0].categoria === SEM_CATEGORIA) return children(grupos[0].itens)
+  return grupos.map((grupo) => (
+    <section key={grupo.categoria} className={css.grupo} aria-label={grupo.categoria}>
+      <h3 className={css.categoria}>
+        {grupo.categoria} <span>{grupo.itens.length}</span>
+      </h3>
+      {children(grupo.itens)}
+    </section>
+  ))
+}
+
+function Escolher({
+  cardapio, visiveis, linhas, adicionais, pedido, agora, aoEscolher, aoAjustar, envioDeFoto,
+}) {
   const naComanda = (sku) => pedido?.itens.find((l) => l.sku === sku)?.qtd ?? 0
 
   return (
-    <ul className={css.lista}>
-      {cardapio.map((item) => {
-        const situacao = situacaoDoItem(item)
-        const alternativas = situacao.chave === 'esgotado' || situacao.chave === 'fora-do-dia'
-          ? alternativasPara(cardapio, item.sku)
-          : []
-        return (
-          <ItemEscolher
-            key={item.sku}
-            item={item}
-            situacao={situacao}
-            quantos={naComanda(item.sku)}
-            alternativas={alternativas}
-            linhas={linhas}
-            adicionais={adicionais}
-            cardapio={cardapio}
-            novidade={ehNovidade(item, agora)}
-            aoEscolher={aoEscolher}
-            aoAjustar={aoAjustar}
-          />
-        )
-      })}
-    </ul>
+    <PorCategoria itens={visiveis}>
+      {(itens) => (
+        <ul className={css.lista}>
+          {itens.map((item) => {
+            const situacao = situacaoDoItem(item)
+            // A alternativa olha o cardápio inteiro, não só o que a busca deixou à vista.
+            const alternativas = situacao.chave === 'esgotado' || situacao.chave === 'fora-do-dia'
+              ? alternativasPara(cardapio, item.sku)
+              : []
+            return (
+              <ItemEscolher
+                key={item.sku}
+                item={item}
+                situacao={situacao}
+                quantos={naComanda(item.sku)}
+                alternativas={alternativas}
+                linhas={linhas}
+                adicionais={adicionais}
+                cardapio={cardapio}
+                novidade={ehNovidade(item, agora)}
+                aoEscolher={aoEscolher}
+                aoAjustar={aoAjustar}
+                envioDeFoto={envioDeFoto}
+              />
+            )
+          })}
+        </ul>
+      )}
+    </PorCategoria>
   )
 }
 
@@ -203,75 +272,79 @@ function Gerir({
         Incluir item novo
       </Botao>
 
-      <ul className={css.gestao}>
-        {cardapio.map((item) => {
-          const situacao = situacaoDoItem(item)
-          const novidade = ehNovidade(item, agora)
-          return (
-            <li key={item.sku} className={`${css.cartaoItem} ${situacao.vendavel ? '' : css.apagado}`}>
-              <img className={css.miniatura} src={cartaDoItem(item)} alt="" />
+      <PorCategoria itens={cardapio}>
+        {(itens) => (
+          <ul className={css.gestao}>
+            {itens.map((item) => {
+              const situacao = situacaoDoItem(item)
+              const novidade = ehNovidade(item, agora)
+              return (
+                <li key={item.sku} className={`${css.cartaoItem} ${situacao.vendavel ? '' : css.apagado}`}>
+                  <FotoDoItem item={item} className={css.miniatura} />
 
-              <div className={css.corpoItem}>
-                <strong>
-                  {item.nome}
-                  {novidade && <Pilula tom="ragu" fina>Novidade</Pilula>}
-                  {estaEmValidacao(item) && <Pilula tom="aviso" fina>Em validação</Pilula>}
-                </strong>
-                <small>
-                  {linhas[item.linha]?.rotulo} · {item.porcao} · {moeda(item.preco)}
-                  {PEDE_ACAO.has(situacao.chave) && (
-                    <b className={css[situacao.tom]}> · {situacao.rotulo}</b>
-                  )}
-                </small>
-                <small className={css.extras}>
-                  {adicionaisDoItem(cardapio, adicionais, item.sku).map((a) => a.nome).join(' · ')
-                    || 'Sem adicional'}
-                </small>
-                {estaEmValidacao(item) && (
-                  <p className={css.avisoValidacao}>
-                    Vendeu menos de duas vezes. Confirme se ele fica no cardápio ou tire.
-                    <button type="button" className={css.linkValidacao} onClick={() => aoConfirmarValidacao(item.sku)}>
-                      Confirmar no cardápio
-                    </button>
-                  </p>
-                )}
-              </div>
+                  <div className={css.corpoItem}>
+                    <strong>
+                      {item.nome}
+                      {novidade && <Pilula tom="ragu" fina>Novidade</Pilula>}
+                      {estaEmValidacao(item) && <Pilula tom="aviso" fina>Em validação</Pilula>}
+                    </strong>
+                    <small>
+                      {linhas[item.linha]?.rotulo} · {item.porcao} · {moeda(item.preco)}
+                      {PEDE_ACAO.has(situacao.chave) && (
+                        <b className={css[situacao.tom]}> · {situacao.rotulo}</b>
+                      )}
+                    </small>
+                    <small className={css.extras}>
+                      {adicionaisDoItem(cardapio, adicionais, item.sku).map((a) => a.nome).join(' · ')
+                        || 'Sem adicional'}
+                    </small>
+                    {estaEmValidacao(item) && (
+                      <p className={css.avisoValidacao}>
+                        Vendeu menos de duas vezes. Confirme se ele fica no cardápio ou tire.
+                        <button type="button" className={css.linkValidacao} onClick={() => aoConfirmarValidacao(item.sku)}>
+                          Confirmar no cardápio
+                        </button>
+                      </p>
+                    )}
+                  </div>
 
-              <div className={css.controles}>
-                <label className={css.chave}>
-                  <input
-                    type="checkbox"
-                    checked={situacao.chave !== 'fora-do-dia'}
-                    onChange={() => aoAlternar(item.sku)}
-                  />
-                  Hoje
-                </label>
-                <span className={css.saldo}>
-                  <button
-                    type="button"
-                    onClick={() => aoAjustar(item.sku, -1)}
-                    disabled={item.estoque === 0}
-                  >
-                    <Icone nome="menos" rotulo={'Tirar uma porção de ' + item.nome} />
-                  </button>
-                  <b>{item.estoque}</b>
-                  <button type="button" onClick={() => aoAjustar(item.sku, 1)}>
-                    <Icone nome="mais" rotulo={'Somar uma porção de ' + item.nome} />
-                  </button>
-                </span>
-                <span className={css.acoesItem}>
-                  <button type="button" onClick={() => aoAbrirEditar(item)}>
-                    <Icone nome="lapis" rotulo={'Editar ' + item.nome} />
-                  </button>
-                  <button type="button" onClick={() => aoTirar(item.sku)}>
-                    <Icone nome="x" rotulo={'Tirar ' + item.nome + ' do cardápio'} />
-                  </button>
-                </span>
-              </div>
-            </li>
-          )
-        })}
-      </ul>
+                  <div className={css.controles}>
+                    <label className={css.chave}>
+                      <input
+                        type="checkbox"
+                        checked={situacao.chave !== 'fora-do-dia'}
+                        onChange={() => aoAlternar(item.sku)}
+                      />
+                      Hoje
+                    </label>
+                    <span className={css.saldo}>
+                      <button
+                        type="button"
+                        onClick={() => aoAjustar(item.sku, -1)}
+                        disabled={item.estoque === 0}
+                      >
+                        <Icone nome="menos" rotulo={'Tirar uma porção de ' + item.nome} />
+                      </button>
+                      <b>{item.estoque}</b>
+                      <button type="button" onClick={() => aoAjustar(item.sku, 1)}>
+                        <Icone nome="mais" rotulo={'Somar uma porção de ' + item.nome} />
+                      </button>
+                    </span>
+                    <span className={css.acoesItem}>
+                      <button type="button" onClick={() => aoAbrirEditar(item)}>
+                        <Icone nome="lapis" rotulo={'Editar ' + item.nome} />
+                      </button>
+                      <button type="button" onClick={() => aoTirar(item.sku)}>
+                        <Icone nome="x" rotulo={'Tirar ' + item.nome + ' do cardápio'} />
+                      </button>
+                    </span>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </PorCategoria>
 
       {removidos.length > 0 && (
         <details className={css.foraDoCardapio}>
@@ -279,7 +352,7 @@ function Gerir({
           <ul className={css.gestao}>
             {removidos.map((item) => (
               <li key={item.sku} className={`${css.cartaoItem} ${css.apagado}`}>
-                <img className={css.miniatura} src={cartaDoItem(item)} alt="" />
+                <FotoDoItem item={item} className={css.miniatura} />
                 <div className={css.corpoItem}>
                   <strong>{item.nome}</strong>
                   <small>{linhas[item.linha]?.rotulo} · {item.porcao} · {moeda(item.preco)}</small>
@@ -516,14 +589,17 @@ function FormularioItemCardapio({
 export function PainelCardapio({
   pedido, aoEscolher, aoAjustar, aoFechar, largura, deslocamentoDireita = 0, aoRedimensionar,
 }) {
-  const { cardapio, linhas, adicionais } = useCatalogo()
-  const { agora } = useAtendimento()
+  const { cardapio, linhas, adicionais, canais } = useCatalogo()
+  const { agora, selecionada, fonteApi } = useAtendimento()
   const {
     alternarDisponibilidade, ajustarSaldo, incluirItemCardapio, editarItemCardapio,
-    alternarRemocaoItemCardapio, confirmarValidacaoItem,
+    alternarRemocaoItemCardapio, confirmarValidacaoItem, enviarMidia,
   } = useAcoes()
   const [papel, setPapel] = useState('escolher')
   const [modal, setModal] = useState(null)
+  const [busca, setBusca] = useState('')
+  const [enviandoSku, setEnviandoSku] = useState(null)
+  const [enviadoSku, setEnviadoSku] = useState(null)
   const fecharRef = useRef(null)
   const focoAnterior = useRef(null)
 
@@ -548,6 +624,31 @@ export function PainelCardapio({
   const ativos = itensAtivos(cardapio)
   const removidos = itensRemovidos(cardapio)
   const noDia = contarDisponiveis(ativos)
+  const visiveis = filtrarCardapio(ativos, busca)
+
+  // Mesma regra da galeria (PainelGaleria.jsx): canal que aceita foto, janela aberta e, no modo
+  // API, só o WhatsApp tem envio de foto. O motivo vai no title do botão desabilitado.
+  const canal = canalDaConversa(canais, selecionada)
+  const escrita = permissaoDeEscrita(selecionada, agora, canal)
+  let motivoFoto = null
+  if (!escrita.pode) motivoFoto = escrita.motivo?.detalhe ?? 'Conversa sem envio agora.'
+  else if (!aceitaFormato(canal, 'foto')) motivoFoto = motivoDeFormato(canal, 'foto')
+  else if (fonteApi && selecionada?.canal !== 'WhatsApp') motivoFoto = `${selecionada?.canal} ainda não recebe foto pelo EasyStok.`
+
+  async function enviarFoto(item) {
+    const mensagem = mensagemDaFotoDoItem(item)
+    if (!mensagem || !selecionada) return
+    setEnviandoSku(item.sku)
+    const enviado = await enviarMidia(selecionada.id, mensagem)
+    setEnviandoSku(null)
+    if (enviado === false) return
+    setEnviadoSku(item.sku)
+    setTimeout(() => setEnviadoSku((atual) => (atual === item.sku ? null : atual)), 1400)
+  }
+
+  const envioDeFoto = selecionada
+    ? { pode: !motivoFoto, motivo: motivoFoto, enviando: enviandoSku, enviado: enviadoSku, enviar: enviarFoto }
+    : null
 
   function incluir(dados) {
     incluirItemCardapio(dados)
@@ -604,7 +705,24 @@ export function PainelCardapio({
           ))}
         </fieldset>
 
+        {ativos.length > 0 && (
+          <label className={css.busca}>
+            <Icone nome="lupa" />
+            <span className="sr">Buscar no cardápio</span>
+            <input
+              type="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar prato, categoria ou porção"
+            />
+          </label>
+        )}
+
         <div className={css.rolavelPainel}>
+          {ativos.length > 0 && visiveis.length === 0 && (
+            <p className={css.semResultado}>Nada com &ldquo;{busca.trim()}&rdquo; no cardápio de hoje.</p>
+          )}
+
           {ativos.length === 0 && (
             <Vazio
               titulo="Cardápio sem itens"
@@ -618,18 +736,20 @@ export function PainelCardapio({
           {ativos.length > 0 && papel === 'escolher' && (
             <Escolher
               cardapio={ativos}
+              visiveis={visiveis}
               linhas={linhas}
               adicionais={adicionais}
               pedido={pedido}
               agora={agora}
               aoEscolher={aoEscolher}
               aoAjustar={aoAjustar}
+              envioDeFoto={envioDeFoto}
             />
           )}
 
           {papel === 'gerir' && (
             <Gerir
-              cardapio={ativos}
+              cardapio={visiveis}
               removidos={removidos}
               linhas={linhas}
               adicionais={adicionais}
