@@ -7,6 +7,7 @@ import { conversaEncerrada, estaBloqueada } from '../../dominio/conversa'
 import { faltaPagar } from '../../dominio/cobranca'
 import { faixaDaJanela } from '../../dominio/entrega'
 import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
+import { numeroCurto } from '../../dominio/pedido'
 import { BarraProximoPasso } from './BarraProximoPasso'
 import { BlocoCobranca } from './BlocoCobranca'
 import { BlocoCapturaAutomatica } from './BlocoCapturaAutomatica'
@@ -100,20 +101,23 @@ export function PainelFicha({ aoAbrirCardapio }) {
 
         {pedido ? (
           <>
-            <BlocoPedido
-              pedido={pedido}
-              editavel={editavel}
-              aoTrocarJanela={(janela) => escolherJanela(selecionada.id, janela)}
-              aoForcarEncaixe={(janela, faixa, motivo) => forcarEncaixe(selecionada.id, janela, faixa, motivo)}
-              aoAbrirCardapio={aoAbrirCardapio}
-              aoAjustar={(sku, delta) => ajustarQuantidade(selecionada.id, sku, delta)}
-              aoAjustarObservacao={(sku, texto) => ajustarObservacao(selecionada.id, sku, texto)}
-              aoGerarPedido={(meio) => { escolherMeioPagamento(selecionada.id, meio); return gerarPedido(selecionada.id, meio) }}
-              nomeCliente={selecionada.nome}
-              endereco={cliente.endereco}
-              faixa={faixa}
-              bloqueado={estaBloqueada(selecionada)}
-            />
+            {/* #1442: a comanda recolhe e lembra, como as seções do cliente. */}
+            <Bloco titulo="Comanda" chave="comanda" resumo={`Nº ${numeroCurto(pedido.numero)}`}>
+              <BlocoPedido
+                pedido={pedido}
+                editavel={editavel}
+                aoTrocarJanela={(janela) => escolherJanela(selecionada.id, janela)}
+                aoForcarEncaixe={(janela, faixa, motivo) => forcarEncaixe(selecionada.id, janela, faixa, motivo)}
+                aoAbrirCardapio={aoAbrirCardapio}
+                aoAjustar={(sku, delta) => ajustarQuantidade(selecionada.id, sku, delta)}
+                aoAjustarObservacao={(sku, texto) => ajustarObservacao(selecionada.id, sku, texto)}
+                aoGerarPedido={(meio) => { escolherMeioPagamento(selecionada.id, meio); return gerarPedido(selecionada.id, meio) }}
+                nomeCliente={selecionada.nome}
+                endereco={cliente.endereco}
+                faixa={faixa}
+                bloqueado={estaBloqueada(selecionada)}
+              />
+            </Bloco>
             <BlocoCobranca
               pedido={pedido}
               agora={agora}
@@ -140,7 +144,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
             <BlocoEntrega conversa={selecionada} />
           </>
         ) : (
-          <Bloco titulo="Comanda">
+          <Bloco titulo="Comanda" chave="comanda">
             <p className={css.corpoBloco}>
               Nenhuma comanda aberta. O resumo e a cobrança nascem do pedido.
             </p>

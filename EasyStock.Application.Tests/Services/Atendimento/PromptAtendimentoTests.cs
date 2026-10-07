@@ -62,6 +62,8 @@ public class PromptAtendimentoTests
         // #1330: o modelo imitava o travessão do próprio prompt e escrevia textos longos.
         prompt.Should().NotContain("—").And.NotContain("–");
         prompt.Should().Contain("no máximo 3 frases curtas").And.Contain("nunca use travessão");
+        // #1445 (homologação 07/10): "está sendo muito prolixo".
+        prompt.Should().Contain("Vá direto ao ponto, sem floreio");
     }
 
     [Fact]

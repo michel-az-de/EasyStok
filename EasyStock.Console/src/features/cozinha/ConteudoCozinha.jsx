@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  DndContext, DragOverlay, KeyboardSensor, MouseSensor, pointerWithin, rectIntersection, TouchSensor,
+  DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor,
   useDroppable, useSensor, useSensors,
 } from '@dnd-kit/core'
 import { Chip } from '../../componentes/Chip'
@@ -12,6 +12,7 @@ import { passoPorId } from '../../dominio/esteira'
 import { PASSOS_DA_COZINHA, ROTULO_DO_TOQUE, pedidosNaCozinha, respostaAoSoltar } from '../../dominio/cozinha'
 import { opcoesDoDespacho } from '../../dominio/despacho'
 import { CartaoCozinha, CartaoErguido } from './CartaoCozinha'
+import { colisaoPorColuna, coordenadasEntreColunas } from './arrastoEntreColunas'
 import css from './cozinha.module.css'
 
 // Quanto tempo a recusa fica escrita no cartão e quanto dura o "assentar".
@@ -31,31 +32,6 @@ const MS_SEM_ESPELHO = 5000
 // tablet. Mouse e toque em sensores separados: com PointerSensor o dedo que
 // só quer rolar a coluna viraria arrasto no sexto pixel.
 const rotuloDaColuna = (id) => passoPorId(id)?.rotulo ?? id
-
-// Teclado: setas para a esquerda e para a direita pulam de coluna em coluna
-// (o KeyboardSensor padrão anda 25 px por tecla, e cinco colunas de 220 px
-// virariam dezenas de toques).
-function coordenadasEntreColunas(evento, { context: { collisionRect, droppableRects, droppableContainers } }) {
-  const direita = evento.code === 'ArrowRight'
-  if ((!direita && evento.code !== 'ArrowLeft') || !collisionRect) return undefined
-  evento.preventDefault()
-  const centro = collisionRect.left + collisionRect.width / 2
-  const alvos = droppableContainers.getEnabled()
-    .map((coluna) => droppableRects.get(coluna.id))
-    .filter(Boolean)
-    .filter((r) => (direita ? r.left + r.width / 2 > centro + 1 : r.left + r.width / 2 < centro - 1))
-  if (alvos.length === 0) return undefined
-  const distancia = (r) => Math.abs(r.left + r.width / 2 - centro)
-  const alvo = alvos.reduce((a, b) => (distancia(a) <= distancia(b) ? a : b))
-  return { x: alvo.left + (alvo.width - collisionRect.width) / 2, y: collisionRect.top }
-}
-
-// Ponteiro primeiro (solta onde a mão está); sem ponteiro, que é o teclado,
-// a coluna que mais cobre o cartão.
-const colisaoPorColuna = (args) => {
-  const soba = pointerWithin(args)
-  return soba.length > 0 ? soba : rectIntersection(args)
-}
 
 // Anúncios para leitor de tela em PT-BR (o padrão do dnd-kit fala inglês).
 const respostaDoArrasto = (dados, destino) => respostaAoSoltar(dados.estado, destino, { bloqueado: dados.bloqueado })

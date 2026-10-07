@@ -40,7 +40,7 @@ function caneta(larguraDaPagina, margem) {
 // observação (molho mora na observação). Sem preço: não é cupom fiscal. A
 // largura é a da bobina, 80 mm; a altura sai do próprio conteúdo, como o
 // papel que a térmica corta no fim.
-export function documentoDoCanhoto({ pedido, itens, linhas, nomeCliente, endereco, faixa }) {
+export function documentoDoCanhoto({ pedido, itens, linhas, nomeCliente, endereco, faixa, observacoes = null }) {
   const margem = mm(4)
   const c = caneta(LARGURA_BOBINA, margem)
   const recuo = mm(7)
@@ -69,6 +69,12 @@ export function documentoDoCanhoto({ pedido, itens, linhas, nomeCliente, enderec
     if (indice < grupos.length - 1) c.traco({ tracejada: true })
   })
   if (grupos.length === 0) c.escrever('Sem itens na comanda.', { tamanho: 10 })
+  // Observação do pedido inteiro (issue #1446, cozinha no modo API): vem do KDS; a comanda do
+  // protótipo não tem esse campo e segue igual.
+  if (observacoes) {
+    c.traco({ tracejada: true })
+    c.escrever(`Obs.: ${observacoes}`, { tamanho: 10, fonte: 'negrito' })
+  }
 
   const altura = c.estado.y + mm(6)
   return {
