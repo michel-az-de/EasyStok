@@ -173,7 +173,7 @@
   flex-shrink: 0; background: var(--papel);
   border-bottom: var(--b-1) solid var(--linha);
   border-left: var(--trilho) solid var(--linha-forte);
-  padding: var(--e-3) var(--e-4);
+  padding: var(--e-2) var(--e-4);
 }
 .modo_ligado { border-left-color: var(--ok); }
 .modo_pausado { border-left-color: var(--linha-forte); }
@@ -181,16 +181,16 @@
 .modo_encerrado { border-left-color: var(--linha-forte); }
 .modo_bloqueado { border-left-color: var(--parado); }
 
-.modoLinha { display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap; }
+/* #1442: uma linha só, rótulo + frase + ações. A frase encolhe com
+   reticência (inteira no `title`); em coluna estreita as ações descem. */
+.modoLinha { display: flex; align-items: center; gap: var(--e-2) var(--e-3); flex-wrap: wrap; }
+.modoTexto {
+  flex: 1 1 12rem; min-width: 0; margin: 0;
+  font-size: var(--t-apoio); color: var(--tinta-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .modoAcoes { margin-left: auto; display: flex; gap: var(--e-2); flex-wrap: wrap; }
-.modoDetalhe {
-  margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2);
-}
-/* Rodada 12 (issue #16): próximo passo sugerido depois de ela responder.
-   Mesma letra do detalhe, com peso, porque é o que ela faz a seguir. */
-.modoProximo {
-  margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta); font-weight: 600;
-}
+.acaoModo { min-height: 36px; padding-block: 0; }
 .listaEfeito { margin: 0; padding-left: 1.2em; display: grid; gap: var(--e-2); color: var(--tinta-2); }
 
 /* Alvo de toque de 44 px em qualquer ponteiro, não só no grosso. */
