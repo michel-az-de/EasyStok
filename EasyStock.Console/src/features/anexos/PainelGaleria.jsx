@@ -180,7 +180,8 @@ export function PainelGaleria({ aoFechar }) {
         <ul className={css.grade}>
           {galeria.map((peca) => (
             <li key={peca.id} className={css.cartao}>
-              <img src={peca.foto} alt={peca.nome} loading="lazy" />
+              {/* Sem loading="lazy": dentro do <dialog> a miniatura ficava branca (#1437). */}
+              <img src={peca.foto} alt={peca.nome} />
               <div className={css.cartaoTexto}>
                 <strong>{peca.nome}</strong>
                 <p>{peca.descricao}</p>

@@ -72,21 +72,18 @@ function arquivoDoDataUrl(dataUrl, nomeArquivo) {
 }
 
 export async function enviarImagem(id, { dataUrl, nomeArquivo, legenda }) {
-  let arquivo
-  if (dataUrl.startsWith('data:')) arquivo = arquivoDoDataUrl(dataUrl, nomeArquivo)
-  else {
-    const url = new URL(dataUrl)
-    if (url.protocol !== 'https:') throw new Error('Endereço da foto inválido.')
-    const resposta = await fetch(url, { credentials: 'omit' })
-    if (!resposta.ok) throw new Error('Não foi possível carregar a foto do cardápio.')
-    const blob = await resposta.blob()
-    if (!blob.type.startsWith('image/') || blob.size > 6 * 1024 * 1024)
-      throw new Error('Foto inválida ou maior que 6 MB.')
-    arquivo = { blob, nome: nomeArquivo || `cardapio.${blob.type.split('/')[1]}` }
-  }
-  const { blob, nome } = arquivo
+  // Só arquivo lido no navegador. Foto por endereço (cardápio) vai pelo id: enviarImagemCardapio.
+  if (!dataUrl?.startsWith('data:')) throw new Error('Foto sem arquivo: anexe do computador.')
+  const { blob, nome } = arquivoDoDataUrl(dataUrl, nomeArquivo)
   const formulario = new FormData()
   formulario.append('file', blob, nome)
   if (legenda?.trim()) formulario.append('legenda', legenda.trim())
   return chamarApi(`${BASE}/${id}/mensagens/imagem`, { metodo: 'POST', formulario })
 }
+
+// Foto da galeria do cardápio (#1437): o EasyStok lê a foto do storage pelo id do item e o índice;
+// o navegador não baixa a URL (cross-origin, host gravado pode estar fora do ar).
+export const enviarImagemCardapio = (id, { cardapioItemId, indice, legenda }) =>
+  chamarApi(`${BASE}/${id}/mensagens/imagem-cardapio`, {
+    metodo: 'POST', corpo: { cardapioItemId, indice, legenda: legenda?.trim() || null },
+  })
