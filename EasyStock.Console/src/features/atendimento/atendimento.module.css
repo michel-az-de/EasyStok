@@ -59,6 +59,14 @@
 }
 .meta time { font-family: var(--f-dado); font-weight: 400; font-variant-numeric: tabular-nums; }
 .falhou { color: var(--perigo); font-weight: 600; white-space: normal; text-align: right; }
+/* #1444: "enviando" escrito, não só o ✓ cinza: a mídia demora e a dona precisa ver que está indo. */
+.enviando { display: inline-flex; align-items: center; gap: 4px; }
+.enviando::before {
+  content: ""; width: 9px; height: 9px; border-radius: 50%;
+  border: 1.5px solid var(--linha-media); border-top-color: currentColor;
+  animation: girarMeta .8s linear infinite;
+}
+@keyframes girarMeta { to { transform: rotate(360deg); } }
 .entrada {
   align-self: flex-start; background: var(--papel); border: 0;
   border-radius: 20px 20px 20px 6px;

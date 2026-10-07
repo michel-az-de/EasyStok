@@ -7,7 +7,8 @@
 //   2. cada "avisa" só despacha AVISO_API e não chama a API;
 //   3. Encerrar pelo modal faz POST .../encerrar (e manda a despedida marcada pelo envio real);
 //   4. foto do computador no WhatsApp vai por multipart e a peça da galeria do cardápio pelo id do
-//      item (#1437), sem o navegador baixar a foto; áudio, arquivo e outros canais avisam;
+//      item (#1437), sem o navegador baixar a foto; áudio no WhatsApp vai por multipart (#1444);
+//      arquivo, figurinha e outros canais avisam;
 //   5. o aviso sobrevive à sincronização de 5 s e só some quando a dona fecha.
 //
 //   node ferramentas/prova-f06-honestidade.mjs
@@ -149,8 +150,20 @@ const FOTO = 'data:image/png;base64,iVBORw0KGgo='
   confere('foto nasce "enviando" e não "lida"', despachos.some((d) => d.tipo === acao.ENVIAR_MIDIA && d.status === 'enviando'),
     despachos.map((d) => `${d.tipo}:${d.status ?? ''}`).join(', '))
 }
+{
+  const { api, despachos } = montar()
+  chamadas.length = 0
+  api.enviarMidia('c1', { formato: 'audio', arte: 'data:audio/webm;base64,AAAA', duracaoMs: 1000, texto: 'Mensagem de áudio' })
+  await esvaziar()
+  const envio = chamadas.find((c) => c.url === '/api/atendimento/conversas/c1/mensagens/audio')
+  confere('áudio no WhatsApp vai por POST .../mensagens/audio com o arquivo (#1444)',
+    Boolean(envio?.metodo === 'POST' && envio.corpo instanceof FormData && envio.corpo.get('file') instanceof Blob),
+    chamadas.map((c) => c.url).join(', ') || 'nenhuma chamada')
+  confere('áudio nasce "enviando"', despachos.some((d) => d.tipo === acao.ENVIAR_MIDIA && d.formato === 'audio' && d.status === 'enviando'),
+    despachos.map((d) => `${d.tipo}:${d.status ?? ''}`).join(', '))
+}
 for (const [descricao, id, molde] of [
-  ['áudio', 'c1', { formato: 'audio', arte: 'data:audio/webm;base64,AAAA', duracaoMs: 1000, texto: 'Mensagem de áudio' }],
+  ['áudio em canal sem envio de áudio (Instagram)', 'c2', { formato: 'audio', arte: 'data:audio/webm;base64,AAAA', duracaoMs: 1000, texto: 'Mensagem de áudio' }],
   ['arquivo PDF', 'c1', { formato: 'arquivo', arte: 'data:application/pdf;base64,AAAA', texto: 'a.pdf' }],
   ['figurinha', 'c1', { formato: 'figurinha', arte: FOTO, texto: 'oi' }],
   ['foto em canal sem envio de mídia (Instagram)', 'c2', { formato: 'imagem', arte: FOTO, texto: 'x', nomeArquivo: 'x.png' }],

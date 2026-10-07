@@ -68,7 +68,17 @@ export function PreviaAnexo({ anexo, aoRemover }) {
 // `onda` é decorativa (amplitude simulada, seção B da pesquisa: "pode ser
 // simulada, não precisa FFT real"); o cronômetro é de verdade
 // (`gravador.duracaoMs`, hooks/useGravadorAudio.js).
-export function GravadorAudio({ gravador, aoCancelar, aoEnviar }) {
+//
+// `enviando` (#1444): depois de "Enviar áudio" o gravador fica no lugar com o envio em curso, até
+// o EasyStok responder, em vez de sumir sem dizer se o áudio saiu.
+export function GravadorAudio({ gravador, enviando = false, aoCancelar, aoEnviar }) {
+  if (enviando) {
+    return (
+      <output className={css.enviandoAudio}>
+        <span className={css.girando} aria-hidden="true" /> Enviando áudio…
+      </output>
+    )
+  }
   if (gravador.estado === 'pedindo') {
     return <p className={css.aviso}>Pedindo acesso ao microfone…</p>
   }
