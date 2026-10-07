@@ -30,6 +30,12 @@ export const motivoDaAprovacao = (motivo) => (motivo ? MOTIVOS_APROVACAO[motivo]
 // Recarrega no `ready` (a API não tem replay) e a cada evento de pedido do SSE (S18).
 export const recarregaEntregasCom = (evento) => evento === 'ready' || evento.startsWith('pedido.')
 
+// #1434: sem pedidos e com erro, a primeira carga falhou; não fica "Carregando" para sempre.
+export const situacaoDaLista = (pedidos, erro) => {
+  if (pedidos !== null) return 'pronta'
+  return erro ? 'falhou' : 'carregando'
+}
+
 // Divide em painéis. Pedido pronto que já está numa viagem montando não aparece
 // de novo solto; viagens concluídas e desfeitas saem da tela do dia.
 export function paineisDeEntregas(pedidos, viagens) {
