@@ -10,7 +10,7 @@ import { useHash } from '../hooks/useHash'
 import { useLarguras } from '../hooks/useLarguras'
 import { useRelogio } from '../hooks/useRelogio'
 import { DESKTOP, useTamanhoTela } from '../hooks/useTamanhoTela'
-import { INSTANTE_INICIAL } from '../infra/catalogo'
+import { INSTANTE_INICIAL, LINHAS_PRODUTO } from '../infra/catalogo'
 import { FONTE_API } from '../infra/fonteDados'
 import { useSessaoApi } from '../aplicacao/useSessaoApi'
 import { TelaLogin } from '../features/login/TelaLogin'
@@ -301,7 +301,7 @@ function NoModulo({ rota, children }) {
 function CozinhaApi({ rota }) {
   const { sessao, listarEmpresas, entrarNaEmpresa, google } = useSessaoApi()
   if (!sessao) return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} google={google} />
-  return <NoModulo rota={rota}><TelaCozinhaApi key={sessao.token} /></NoModulo>
+  return <NoModulo rota={rota}><TelaCozinhaApi key={sessao.token} linhas={LINHAS_PRODUTO} /></NoModulo>
 }
 
 // Cardápio por link no modo API (F06): sem canal entre janelas, e nada abre sem sessão.
