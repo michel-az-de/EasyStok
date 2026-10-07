@@ -3,7 +3,7 @@
 // O que a API ainda não entrega (pedido, notas, tags, endereço) nasce vazio: cada módulo
 // ganha o dado de verdade quando for ligado (matriz 10-console.md).
 
-import { pausaDaSituacao } from '../../dominio/automatico'
+import { pausaDaSituacao, respostaAtrasada } from '../../dominio/automatico'
 import { ACOES } from '../../dominio/agente'
 
 const NOME_DO_CANAL = {
@@ -73,10 +73,13 @@ function passagemDaApi(resumo) {
   return { motivo: resumo.motivoEscalada || null, em: null, assumida: false }
 }
 
-export function conversaDaApi(resumo, mensagensDaApi, usuario) {
+// `agora` só pesa em `atrasada` (#1427): retrato do SLA na sincronização (a
+// cada 5 s), no relógio inteiro. O cartão recalcula a cada tique com o
+// expediente da loja (`respostaAtrasada`, dominio/automatico.js).
+export function conversaDaApi(resumo, mensagensDaApi, usuario, agora = Date.now()) {
   const mensagens = (mensagensDaApi ?? []).map((m) => mensagemDaApi(m, resumo.id)).sort(cronologica)
   const minha = resumo.assumidaPorUsuarioId && resumo.assumidaPorUsuarioId === usuario?.id
-  return {
+  const conversa = {
     id: resumo.id,
     conta: resumo.clienteId ? 'cliente' : 'lead',
     // Chave do cadastro na API: consentimento (S38) e o que mais for por cliente.
@@ -95,11 +98,15 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario) {
     // Prévia do cartão quando as mensagens não foram carregadas (encerrada, #1287).
     ultimaMensagemTexto: resumo.ultimaMensagemTexto ?? null,
     naoLidas: resumo.naoLidas,
-    atrasada: false,
+    // #1427: SLA de primeira resposta da loja e de onde ele conta.
+    slaMinutos: resumo.slaRespostaMinutos ?? null,
+    aguardaResposta: resumo.aguardaResposta ?? false,
+    ultimaEntradaEm: resumo.ultimaMensagemEntradaEm ? instante(resumo.ultimaMensagemEntradaEm) : null,
     cliente: { desde: null, endereco: null, enderecoCapturado: null, pedidos: 0, tags: [], notas: [] },
     pedido: null,
     mensagens,
   }
+  return { ...conversa, atrasada: respostaAtrasada(conversa, agora, Boolean(conversa.pausaApi)) }
 }
 
 // Linha do painel "Não entregues" (S59): quem devia receber e a mensagem no formato do balão.

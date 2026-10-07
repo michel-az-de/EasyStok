@@ -36,6 +36,22 @@
 .cartao.precisa[aria-current='true'] { background: var(--atencao-pastel); }
 .cartao.atrasada[aria-current='true'] { background: var(--parado-pastel); }
 
+/* #1427: SLA de primeira resposta da loja estourado. O cartão pisca devagar
+   entre o papel e o pastel de alarme, com a borda interna em vermelho, até
+   alguém responder. Com movimento reduzido não pisca: fica o destaque fixo. */
+.cartao.slaEstourado {
+  box-shadow: inset 3px 0 0 var(--parado);
+  animation: entradaCartao var(--dur-media) var(--ease-saida), piscaSla 1.6s ease-in-out infinite;
+}
+.cartao.slaEstourado[aria-current='true'] { box-shadow: inset 3px 0 0 var(--parado); }
+@keyframes piscaSla {
+  0%, 100% { background: transparent; }
+  50% { background: var(--parado-pastel); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cartao.slaEstourado { animation: none; background: var(--parado-pastel); }
+}
+
 .iconeCanal {
   margin-top: 0; color: var(--tinta-3); flex-shrink: 0; width: 24px; height: 24px;
 }

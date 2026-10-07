@@ -225,6 +225,19 @@ function ConfiguracaoDoAtendimento() {
           value={form.tempoPreparoPadraoMinutos}
           onChange={mudar('tempoPreparoPadraoMinutos')}
         />
+        {/* #1427: um prazo só para a loja, todos os canais. Estourado, o
+            cartão pisca no Balcão; fora do expediente a contagem para. */}
+        <CampoTexto
+          rotulo="Prazo de primeira resposta (min)"
+          dica="De 1 a 240. Passou disso, a conversa pisca. Fora do horário da loja o prazo para de contar."
+          tipo="number"
+          min={1}
+          max={240}
+          required
+          inputMode="numeric"
+          value={form.slaRespostaMinutos ?? 5}
+          onChange={mudar('slaRespostaMinutos')}
+        />
       </div>
       <div className={css.acoes}>
         <Botao variante="primario" tipo="submit" className={css.toque} disabled={situacao.estado === 'salvando'}>

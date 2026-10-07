@@ -18,6 +18,7 @@ import { pedidoAtrasado } from './cozinha.js'
 import { MOTIVO_PADRAO, origemDaPassagem } from './passagem.js'
 import { pedidoEncerrado } from './pedido.js'
 import { ehPerguntaSemResposta, mensagensSemRespostaReal } from './mensagem.js'
+import { minutosAbertos } from './funcionamento.js'
 
 export const MODOS = {
   LIGADO: 'ligado',
@@ -198,9 +199,37 @@ export function proximoPassoDepoisDeResponder(conversa, pausado) {
 // obriga a abrir a conversa para descobrir o que era.
 
 // Silêncio que já pede a voz dela. Abaixo disso o automático ainda tem chance.
-export const MINUTOS_DE_ESPERA = 5
+// #1427: é o SLA de primeira resposta da loja, um só (não por canal), que a
+// dona edita na aba Atendimento. Chega em `conversa.slaMinutos` (a API manda
+// em cada linha da inbox); sem ele, o padrão. O nome antigo fica para quem
+// ainda importa.
+export const SLA_RESPOSTA_PADRAO = 5
+export const MINUTOS_DE_ESPERA = SLA_RESPOSTA_PADRAO
 
-const minutosDesde = (iso, agora) => Math.floor((agora - new Date(iso).getTime()) / 60000)
+export const slaDaConversa = (conversa) =>
+  Number.isFinite(conversa?.slaMinutos) && conversa.slaMinutos > 0 ? conversa.slaMinutos : SLA_RESPOSTA_PADRAO
+
+// Minutos que contam para o SLA. Com `expediente` ({ funcionamento,
+// lojaAberta }), só o tempo com a loja aberta: quem escreveu às 21h58 com a
+// loja fechando às 22h estoura às 8h03, não às 22h03. Sem ele, o relógio
+// inteiro (quem ainda não passa o expediente segue como antes).
+function minutosDeEspera(em, agora, sla, expediente) {
+  const inicio = new Date(em).getTime()
+  const minutos = expediente ? minutosAbertos(inicio, agora, expediente, sla + 1) : (agora - inicio) / 60000
+  return Math.floor(minutos)
+}
+
+// Última fala do cliente sem resposta. As mensagens carregadas decidem; sem
+// nenhuma carregada, vale o que a API diz no resumo (`aguardaResposta` e
+// `ultimaEntradaEm`, #1427), sem texto.
+function ultimaSemResposta(conversa) {
+  const ultima = mensagensSemRespostaReal(conversa).at(-1)
+  if (ultima) return ultima
+  if ((conversa.mensagens ?? []).length === 0 && conversa.aguardaResposta && conversa.ultimaEntradaEm) {
+    return { em: conversa.ultimaEntradaEm, texto: null }
+  }
+  return null
+}
 
 // `bloqueio` chega normalizado do repositório: com o campo, a conversa está
 // bloqueada. Conversa bloqueada sai da lista padrão do balcão, então contar ela
@@ -228,15 +257,15 @@ const foraDeAlcance = (conversa) =>
 // "obrigada" ou uma frase qualquer não pode virar pendência só por ele não
 // ter respondido nada depois. Pausado (RN-04, ela escreveu ou assumiu) o
 // silêncio já é dela: qualquer mensagem pendente conta, pergunta ou não.
-function esperaDoCliente(conversa, agora, pausado = true) {
-  const pendentes = mensagensSemRespostaReal(conversa)
-  const ultima = pendentes.at(-1)
+function esperaDoCliente(conversa, agora, pausado = true, expediente = null) {
+  const ultima = ultimaSemResposta(conversa)
   if (!ultima) return null
-  if (!pausado && !ehPerguntaSemResposta(ultima.texto)) return null
-  const minutos = minutosDesde(ultima.em, agora)
-  if (minutos <= MINUTOS_DE_ESPERA) return null
+  if (!pausado && !ehPerguntaSemResposta(ultima.texto ?? '')) return null
+  const sla = slaDaConversa(conversa)
+  if (minutosDeEspera(ultima.em, agora, sla, expediente) <= sla) return null
   return {
     chave: 'esperando',
+    estourado: true,
     rotulo: 'Esperando você',
     tom: 'perigo',
     // Minuto cru acima de uma hora nunca mais (seção 1): "duracao" já sabe
@@ -319,7 +348,9 @@ function aguardandoAbertura(conversa, aberta) {
 // `janelas` é novo na rodada 10 (achado 3): default `[]` para quem ainda não
 // passa o catálogo continuar funcionando exatamente como antes (pedido
 // atrasado simplesmente não entra na conta, nunca quebra).
-export function motivoDePrecisar(conversa, agora, pausado = true, aberta = true, janelas = []) {
+// `expediente` (#1427) é `{ funcionamento, lojaAberta }`: com ele, o SLA de
+// resposta pausa fora do horário. Default `null` conta o relógio inteiro.
+export function motivoDePrecisar(conversa, agora, pausado = true, aberta = true, janelas = [], expediente = null) {
   if (!conversa) return null
   if (conversa.passagem && !conversa.passagem.assumida) {
     return {
@@ -333,18 +364,25 @@ export function motivoDePrecisar(conversa, agora, pausado = true, aberta = true,
   return aguardandoAbertura(conversa, aberta)
     ?? ocorrenciaPendente(conversa)
     ?? pedidoAtrasadoVisivel(conversa, janelas, agora)
-    ?? esperaDoCliente(conversa, agora, pausado)
+    ?? esperaDoCliente(conversa, agora, pausado, expediente)
     ?? cobrancaVencida(conversa, agora)
 }
 
-export const precisaDeVoce = (conversa, agora, pausado = true, aberta = true, janelas = []) =>
-  motivoDePrecisar(conversa, agora, pausado, aberta, janelas) != null
+export const precisaDeVoce = (conversa, agora, pausado = true, aberta = true, janelas = [], expediente = null) =>
+  motivoDePrecisar(conversa, agora, pausado, aberta, janelas, expediente) != null
 
-export const motivoVisivel = (conversa, agora, pausado = true, aberta = true, janelas = []) =>
-  motivoDePrecisar(conversa, agora, pausado, aberta, janelas)?.texto ?? null
+export const motivoVisivel = (conversa, agora, pausado = true, aberta = true, janelas = [], expediente = null) =>
+  motivoDePrecisar(conversa, agora, pausado, aberta, janelas, expediente)?.texto ?? null
+
+// SLA de primeira resposta estourado (#1427): o cartão pisca e sobe para o
+// topo de "Precisa de você". Independe da precedência do motivo do cartão:
+// passagem ou reclamação com o cliente esperando além do prazo também piscam,
+// porque quem espera é o mesmo cliente.
+export const respostaAtrasada = (conversa, agora, pausado = true, expediente = null) =>
+  Boolean(conversa) && !foraDeAlcance(conversa) && esperaDoCliente(conversa, agora, pausado, expediente) != null
 
 // A Frente A do Balcão (rodada 5) passa o valor real de `automaticoPausado`
 // aqui: contar com o default (automático pausado) inflava "Precisa de você"
 // com conversa que o automático ainda vai responder sozinho.
-export const contarPrecisaDeVoce = (conversas, agora, automaticoPausado = {}, aberta = true, janelas = []) =>
-  (conversas ?? []).filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas)).length
+export const contarPrecisaDeVoce = (conversas, agora, automaticoPausado = {}, aberta = true, janelas = [], expediente = null) =>
+  (conversas ?? []).filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas, expediente)).length

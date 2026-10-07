@@ -70,6 +70,41 @@ export function estaAberta(agora, { funcionamento = FUNCIONAMENTO_PADRAO, lojaAb
   return dentroDoHorario(agora, funcionamento)
 }
 
+// Minutos com a loja aberta entre `inicioMs` e `fimMs` (#1427: o SLA de
+// primeira resposta pausa fora do expediente). Anda de fronteira em fronteira
+// (abre, fecha e meia-noite, no relógio da loja), porque só nelas o estado
+// muda: uma noite fechada é um passo, não 600. `limite` para a conta assim
+// que passa dele (quem pergunta só quer saber se estourou).
+//
+// Controle manual: aberta na mão conta o relógio inteiro; fechada na mão
+// conta zero, porque o histórico do controle não existe e a loja fechada é,
+// por definição, fora do expediente.
+export function minutosAbertos(inicioMs, fimMs, { funcionamento = FUNCIONAMENTO_PADRAO, lojaAberta = null } = {}, limite = Infinity) {
+  if (!(fimMs > inicioMs)) return 0
+  if (lojaAberta === true) return (fimMs - inicioMs) / 60000
+  if (lojaAberta === false) return 0
+  const fronteiras = [...new Set(
+    Object.values(funcionamento)
+      .filter((dia) => dia && !dia.fechado && dia.abre && dia.fecha)
+      .flatMap((dia) => [paraMinutos(dia.abre), paraMinutos(dia.fecha)]),
+  )].sort((a, b) => a - b)
+  if (fronteiras.length === 0) return 0
+  fronteiras.push(24 * 60)
+
+  let instante = inicioMs
+  let total = 0
+  // Teto de passos: oito dias de fronteiras sobram para qualquer SLA (até 240 min).
+  for (let passos = 0; instante < fimMs && total <= limite && passos < 8 * fronteiras.length; passos += 1) {
+    const { horas, minutos } = partesNoFuso(instante)
+    const minutoDoDia = horas * 60 + minutos
+    const proxima = fronteiras.find((f) => f > minutoDoDia)
+    const ate = Math.min(fimMs, instante - (instante % 60000) + (proxima - minutoDoDia) * 60000)
+    if (dentroDoHorario(instante, funcionamento)) total += (ate - instante) / 60000
+    instante = ate
+  }
+  return total
+}
+
 const inicioDoDia = (ms) => {
   const data = new Date(ms)
   data.setHours(0, 0, 0, 0)

@@ -4,7 +4,7 @@ import { Pilula } from '../../componentes/Pilula'
 import { useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { sinalVerde } from '../../dominio/cobranca'
 import { ehLead, previaDaConversa, tagCorrespondida } from '../../dominio/conversa'
-import { motivoDePrecisar } from '../../dominio/automatico'
+import { motivoDePrecisar, respostaAtrasada } from '../../dominio/automatico'
 import { mensagensSemRespostaReal } from '../../dominio/mensagem'
 import { origemDaPassagem } from '../../dominio/passagem'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
@@ -13,6 +13,7 @@ import { passoPorId } from '../../dominio/esteira'
 import { inicioDoPedidoAtivo } from '../../dominio/entrega'
 import { duracao, horaMono } from '../../dominio/formato'
 import css from './caixa.module.css'
+import { classesDoCartao } from './classesDoCartao'
 
 // Rótulo e ícone da marca única, por `chave` do motivo (dominio/automatico.js).
 // A direção 19 (seção 1) pede um texto de pílula diferente do `rotulo` que o
@@ -69,13 +70,15 @@ function motivoDoCartao(motivo) {
 }
 
 export function CartaoConversa({
-  conversa, selecionada, agora, automaticoPausado, aberta = true, grupo, busca, aoAbrir,
+  conversa, selecionada, agora, automaticoPausado, aberta = true, expediente = null, grupo, busca, aoAbrir,
 }) {
   const { canais, janelas } = useCatalogo()
   const { pagamentosNaoVistos } = useAtendimento()
   const canal = canalDaConversa(canais, conversa)
   const pausado = automaticoPausado?.[conversa.id] ?? false
-  const motivo = grupo ? null : motivoDoCartao(motivoDePrecisar(conversa, agora, pausado, aberta, janelas))
+  const motivo = grupo ? null : motivoDoCartao(motivoDePrecisar(conversa, agora, pausado, aberta, janelas, expediente))
+  // #1427: SLA de primeira resposta da loja estourado, o cartão pisca.
+  const slaEstourado = !grupo && respostaAtrasada(conversa, agora, pausado, expediente)
   const marca = marcaDe(conversa, motivo, grupo)
   // Rodada 12 (issue #16): "Passou para você" sem origem obrigava a abrir a
   // conversa para saber por quê. A linha diz quem passou, a hora e o motivo.
@@ -102,11 +105,7 @@ export function CartaoConversa({
   return (
     <button
       type="button"
-      className={[
-        css.cartao,
-        motivo?.tom === 'aviso' ? css.precisa : '',
-        motivo?.tom === 'perigo' ? css.atrasada : '',
-      ].filter(Boolean).join(' ')}
+      className={classesDoCartao(css, { motivo, slaEstourado })}
       aria-current={selecionada}
       onClick={() => aoAbrir(conversa.id)}
     >
@@ -128,6 +127,7 @@ export function CartaoConversa({
             {conversa.nome}
           </strong>
           {selecionada && <span className="sr">, conversa aberta</span>}
+          {slaEstourado && <span className="sr">, prazo de resposta estourado</span>}
           <time dateTime={conversa.ultimaEm}>
             {duracao(agora - new Date(conversa.ultimaEm).getTime())}
           </time>

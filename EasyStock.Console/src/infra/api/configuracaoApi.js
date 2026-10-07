@@ -26,6 +26,8 @@ const salvarGeral = (c) => chamarApi(BASE, {
     mensagemForaArea: c.mensagemForaArea,
     respiroMinutos: Number(c.respiroMinutos),
     tempoPreparoPadraoMinutos: Number(c.tempoPreparoPadraoMinutos),
+    // #1427: SLA de primeira resposta da loja (1..240); vazio mantém o atual.
+    slaRespostaMinutos: c.slaRespostaMinutos == null || c.slaRespostaMinutos === '' ? null : Number(c.slaRespostaMinutos),
     ativo: c.ativo,
   },
 })
