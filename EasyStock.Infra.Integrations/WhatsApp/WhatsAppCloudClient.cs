@@ -58,6 +58,20 @@ public sealed class WhatsAppCloudClient(
         return EnviarEExtrairWamidAsync(payload, ct);
     }
 
+    public Task<EnvioWhatsAppResult> EnviarAudioAsync(
+        string waId, string urlPublica, bool notaDeVoz, CancellationToken ct = default)
+    {
+        var payload = new
+        {
+            messaging_product = "whatsapp",
+            to = waId,
+            type = "audio",
+            audio = new { link = urlPublica, voice = notaDeVoz }
+        };
+
+        return EnviarEExtrairWamidAsync(payload, ct);
+    }
+
     public Task<EnvioWhatsAppResult> EnviarBotoesAsync(
         string waId, string corpo, IReadOnlyList<(string Id, string Titulo)> botoes, CancellationToken ct = default)
     {

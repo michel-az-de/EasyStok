@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Services.Atendimento.Audio;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.ClienteDaConversa;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
@@ -32,6 +33,9 @@ public class AtendimentoConversasController(
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     private const int TamanhoMaximoImagem = 6 * 1024 * 1024;
+
+    /// <summary>Limite de áudio da Cloud API (#1444) mais folga para o envelope do multipart.</summary>
+    private const int TamanhoMaximoAudio = AudioParaWhatsApp.TamanhoMaximo + 64 * 1024;
 
     [SwaggerOperation(Summary = "List conversations (inbox)",
         Description = "responsavel: eu | ninguem | {usuarioId}. Sem o parâmetro, todas.")]
@@ -143,6 +147,31 @@ public class AtendimentoConversasController(
             await file.CopyToAsync(memoria, ct);
             return DataOk(await enviarUseCase.EnviarImagemAsync(new EnviarImagemConsoleCommand(
                 currentUser.EmpresaId, currentUser.UsuarioId, id, file.FileName, file.ContentType, memoria.ToArray(), legenda), ct));
+        });
+
+    [SwaggerOperation(Summary = "Send a recorded audio as the owner (multipart; takes over the conversation)",
+        Description = "#1444: WebM/Opus do Chrome vira Ogg/Opus sem recodificar (a Meta não aceita WebM) e sai como nota de " +
+                      "voz; Ogg/Opus, MP4, MP3, AAC e AMR passam como vieram. O formato vem dos bytes. Até 16 MB.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status502BadGateway)]
+    [RequestSizeLimit(TamanhoMaximoAudio)]
+    [RequestFormLimits(MultipartBodyLengthLimit = TamanhoMaximoAudio)]
+    [HttpPost("{id:guid}/mensagens/audio")]
+    public Task<IActionResult> EnviarAudio(Guid id, IFormFile file, CancellationToken ct = default)
+        => Atendendo(async () =>
+        {
+            if (file is null || file.Length == 0)
+                return DataBadRequest("Áudio não informado ou vazio.");
+            if (file.Length > AudioParaWhatsApp.TamanhoMaximo)
+                return DataBadRequest("O áudio passa de 16 MB, o limite do WhatsApp.");
+
+            await using var memoria = new MemoryStream();
+            await file.CopyToAsync(memoria, ct);
+            return DataOk(await enviarUseCase.EnviarAudioAsync(new EnviarAudioConsoleCommand(
+                currentUser.EmpresaId, currentUser.UsuarioId, id, memoria.ToArray()), ct));
         });
 
     /// <remarks>Use case por <c>[FromServices]</c>: o construtor fica como está para os testes que o montam.</remarks>
