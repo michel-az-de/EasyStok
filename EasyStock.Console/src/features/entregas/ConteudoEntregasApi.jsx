@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
@@ -7,16 +7,21 @@ import {
   EMPRESAS_ENTREGADOR, TIPOS_ENTREGADOR, motivoDaAprovacao, motivoDeSaida, paineisDeEntregas, rotuloSituacaoViagem,
   situacaoDaLista,
 } from '../../dominio/entregasApi'
+import { roteiroDoDia } from '../../dominio/roteiroDoDia'
 import { CadastroEntregaApi } from './CadastroEntregaApi'
+import { Endereco, EntregasDoDia } from './EntregasDoDia'
 import css from './entregasApi.module.css'
 
 // Entregas no modo API (F04, issue #1221). Mesmo conteúdo na gaveta e na
 // janela própria: aprovação da exceção (S12/S14), prontos para despachar,
-// viagens (S44, RN-32), entregadores, chamados e o cadastro da loja (S45).
+// viagens (S44, RN-32), entregadores, chamados e o cadastro da loja (S45). Desde a #1440
+// "Entregas de hoje" vem organizada por janela do dia, com o roteiro para imprimir.
 // A máquina de estados e as regras são da API; a tela só mostra e chama.
 export function ConteudoEntregasApi() {
   const [aba, setAba] = useState('hoje')
-  const { pedidos, viagens, entregadores, chamados, erro, aoVivo, ocupado, acoes, limparErro } = useEntregasApi()
+  const {
+    pedidos, viagens, entregadores, chamados, erro, aoVivo, ocupado, acoes, limparErro, dia, mudarDia, doDia,
+  } = useEntregasApi()
   const situacao = situacaoDaLista(pedidos, erro)
 
   return (
@@ -37,15 +42,18 @@ export function ConteudoEntregasApi() {
       )}
       {aba === 'hoje' && situacao === 'carregando' && <p className={css.vazio}>Carregando as entregas…</p>}
       {aba === 'hoje' && situacao === 'falhou' && <p className={css.vazio}>Sem entregas para mostrar enquanto a carga falhar.</p>}
-      {aba === 'hoje' && situacao === 'pronta' && <Hoje {...{ pedidos, viagens, entregadores, chamados, ocupado, acoes }} />}
+      {aba === 'hoje' && situacao === 'pronta' && <Hoje {...{ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, mudarDia, doDia }} />}
       {aba === 'entregadores' && <Entregadores entregadores={entregadores} ocupado={ocupado} acoes={acoes} />}
       {aba === 'cadastro' && <CadastroEntregaApi />}
     </div>
   )
 }
 
-function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes }) {
+function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, mudarDia, doDia }) {
   const p = paineisDeEntregas(pedidos, viagens)
+  const roteiro = useMemo(() => (doDia ? roteiroDoDia({ ...doDia, viagens, entregadores }) : null), [doDia, viagens, entregadores])
+  // Prontos que o dia escolhido não mostra (de outro dia), para nenhum ficar sem viagem.
+  const prontosFora = roteiro ? p.prontos.filter((x) => !roteiro.ids.has(x.id)) : []
   const pedidoPorId = new Map(pedidos.map((x) => [x.id, x]))
   const opcoesEntregador = [{ valor: '', rotulo: 'Sem entregador' }, ...entregadores.map((e) => ({ valor: e.id, rotulo: e.nome }))]
 
@@ -73,31 +81,39 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes }) {
         </section>
       )}
 
-      <section className={css.secao} aria-label="Prontos para sair">
+      <EntregasDoDia dia={dia} mudarDia={mudarDia} roteiro={roteiro} montando={p.montando} ocupado={ocupado} acoes={acoes} />
+
+      {prontosFora.length > 0 && (
+        <section className={css.secao} aria-label="Prontos de outro dia">
+          <h3>Prontos de outro dia</h3>
+          <ul className={css.lista}>
+            {prontosFora.map((x) => (
+              <li key={x.id} className={css.cartao}>
+                <div className={css.linha}>
+                  <span className={css.numero}>{x.numeroCurto}</span>
+                  <span className={css.cresce}>{[x.clienteNome, x.clienteApt].filter(Boolean).join(' · ')}</span>
+                  {x.janela && <span className={css.apoio}>{x.janela.label}</span>}
+                </div>
+                <Endereco texto={x.endereco} />
+                <div className={css.linha}>
+                  {p.montando.map((v, i) => (
+                    <Botao key={v.id} variante="texto" disabled={ocupado} onClick={() => acoes.incluirParada(v.id, x.id)}>
+                      Pôr na viagem {i + 1}
+                    </Botao>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className={css.secao} aria-label="Viagens">
         <div className={css.linha}>
-          <h3 className={css.cresce}>Prontos para sair</h3>
+          <h3 className={css.cresce}>Viagens</h3>
           <Botao variante="secundario" icone="plus" disabled={ocupado} onClick={() => acoes.criarViagem(null)}>Nova viagem</Botao>
         </div>
-        {p.prontos.length === 0 && <p className={css.vazio}>Nenhum pedido pronto fora de viagem.</p>}
-        <ul className={css.lista}>
-          {p.prontos.map((x) => (
-            <li key={x.id} className={css.cartao}>
-              <div className={css.linha}>
-                <span className={css.numero}>{x.numeroCurto}</span>
-                <span className={css.cresce}>{[x.clienteNome, x.clienteApt].filter(Boolean).join(' · ')}</span>
-                {x.janela && <span className={css.apoio}>{x.janela.label}</span>}
-              </div>
-              <Endereco texto={x.endereco} />
-              <div className={css.linha}>
-                {p.montando.map((v, i) => (
-                  <Botao key={v.id} variante="texto" disabled={ocupado} onClick={() => acoes.incluirParada(v.id, x.id)}>
-                    Pôr na viagem {i + 1}
-                  </Botao>
-                ))}
-              </div>
-            </li>
-          ))}
-        </ul>
+        {p.montando.length + p.emRota.length === 0 && <p className={css.vazio}>Nenhuma viagem montando ou na rua.</p>}
       </section>
 
       {[...p.montando, ...p.emRota].map((v, i) => (
@@ -109,14 +125,6 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes }) {
 
       <Chamados chamados={chamados} ocupado={ocupado} acoes={acoes} />
     </>
-  )
-}
-
-function Endereco({ texto }) {
-  return (
-    <p className={`${css.linha} ${css.apoio}`}>
-      <Icone nome="map-pin" tamanho={16} /> {texto ?? 'Sem endereço no cadastro do cliente'}
-    </p>
   )
 }
 

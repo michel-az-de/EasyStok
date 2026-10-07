@@ -36,7 +36,6 @@ const ABAS_API = [{ id: 'atendimento', rotulo: 'Atendimento' }, ...ABAS_DEMONSTR
 const AINDA_NAO_LIGADO = {
   producao: 'Produção e cardápio ainda não estão ligados ao EasyStok nesta versão (F11). Nada aqui é gravado.',
   caixa: 'O caixa ainda não está ligado ao EasyStok nesta versão (F14). Nada aqui é gravado.',
-  janelas: 'Esta aba ainda não está ligada. As janelas de verdade estão em Entregas › Janelas e frete.',
   fidelidade: 'Fidelidade e cupons ainda não estão ligados ao EasyStok nesta versão (F15). Nada aqui é gravado.',
   integracoes: 'As integrações ainda não estão ligadas nesta versão (F16). Nenhuma chave é guardada no navegador.',
 }
@@ -73,7 +72,9 @@ function gravarAba(id) {
   }
 }
 
-export function ModalGestao({ aoFechar }) {
+// `janelasApi` (#1440): no modo API o App entrega aqui o cadastro de janelas, zonas e bloqueios
+// da S45 (o mesmo de Entregas › Janelas e frete), no lugar da aba de demonstração.
+export function ModalGestao({ aoFechar, janelasApi = null }) {
   const { fonteApi } = useAtendimento()
   const ABAS = fonteApi ? ABAS_API : ABAS_DEMONSTRACAO
   const [ativa, setAtiva] = useState(() => lerAbaSalva(ABAS))
@@ -106,10 +107,10 @@ export function ModalGestao({ aoFechar }) {
     atendimento: <AbaAtendimento />,
     producao: <AbaProducao />,
     caixa: <AbaCaixa />,
-    janelas: <AbaJanelas />,
+    janelas: fonteApi && janelasApi ? janelasApi : <AbaJanelas />,
     fidelidade: <AbaFidelidade />,
     integracoes: <AbaIntegracoes />,
-  }), [])
+  }), [fonteApi, janelasApi])
 
   return (
     <Modal

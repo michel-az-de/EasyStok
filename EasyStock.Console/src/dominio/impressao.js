@@ -2,10 +2,11 @@
 // térmica de 80 mm e rota da viagem em A4. Puro, sem React: recebe o mesmo
 // dado que a tela já mostra e devolve o documento pronto para `montarPdf`.
 // Sempre preto no branco, independente do tema da tela.
-import { dataHora, horaCurta } from './formato'
+import { dataHora, horaCurta, listaEmPortugues, plural } from './formato'
 import { A4, LARGURA_BOBINA, larguraDoTexto, mm, montarPdf, quebrarLinhas } from './pdf'
 import { agruparPorLinha, itensDetalhados, numeroCurto } from './pedido'
 import { entregadorDaViagem, marcosDaViagem } from './viagem'
+import { resumoDoRoteiro, rotuloDaData, textoDeQuemLeva } from './roteiroDoDia'
 
 // Caneta que desce a folha: guarda o `y` atual e empilha os desenhos. A
 // altura da linha é 1,3 vez o corpo, a mesma folga do texto corrido da tela.
@@ -182,5 +183,88 @@ export const pdfDoCanhoto = (dados) => {
 }
 export const pdfDaRota = (dados) => {
   const documento = documentoDaRota(dados)
+  return { ...documento, bytes: montarPdf(documento) }
+}
+
+// Roteiro de entregas do dia (issue #1440): por janela, quantas entregas, cada pedido com
+// endereço, situação e quem leva. A4 (paginado, pedido nunca parte entre páginas) ou bobina
+// de 80 mm (uma tira só, a altura sai do conteúdo). Só preto: a térmica não tem cinza.
+export function documentoDoRoteiro({ roteiro, papel = 'a4', agora }) {
+  const bobina = papel === 'bobina'
+  const largura = bobina ? LARGURA_BOBINA : A4.largura
+  const margem = bobina ? mm(4) : mm(18)
+  const t = bobina
+    ? { titulo: 14, janela: 11, nome: 10, corpo: 9, apoio: 8.5 }
+    : { titulo: 20, janela: 13, nome: 11.5, corpo: 10.5, apoio: 9.5 }
+  const paginas = []
+  let c = null
+  const novaPagina = () => {
+    c = caneta(largura, margem)
+    paginas.push({ largura, altura: A4.altura, desenhos: c.desenhos })
+  }
+  novaPagina()
+  const fimUtil = A4.altura - margem - mm(8)
+  const alturaDe = (texto, tamanho, negrito = false) => quebrarLinhas(texto, c.largura, tamanho, negrito).length * tamanho * 1.3
+  // A4: o bloco que não cabe vai inteiro para a página seguinte. Na bobina não há página.
+  const caber = (altura) => { if (!bobina && c.estado.y + altura > fimUtil) novaPagina() }
+
+  c.escrever('Roteiro de entregas', { tamanho: t.titulo, fonte: 'negrito', larguraMax: bobina ? c.largura : c.largura - mm(40) })
+  if (!bobina) c.direita('Casa da Baba', { tamanho: 11, fonte: 'negrito', y: c.estado.y - t.titulo * 0.3 })
+  c.escrever(rotuloDaData(roteiro.data), { tamanho: t.corpo + 1, fonte: 'negrito' })
+  c.escrever(`${resumoDoRoteiro(roteiro)}.`, { tamanho: t.corpo })
+  if (roteiro.bloqueioDoDia) c.escrever(`Dia bloqueado: ${roteiro.bloqueioDoDia}`, { tamanho: t.corpo, fonte: 'negrito' })
+  c.traco({ espessura: 1 })
+
+  roteiro.grupos.forEach((grupo) => {
+    const titulo = grupo.chave === 'sem-janela' ? 'Sem janela' : `${grupo.faixa} · ${grupo.label}`
+    const quantas = plural(grupo.pedidos.length, 'entrega', 'entregas')
+      + (grupo.capacidade ? ` de ${grupo.capacidade} vagas` : '')
+    const quem = `Quem leva: ${grupo.quemLeva.length ? listaEmPortugues(grupo.quemLeva) : 'a definir'}`
+    caber(alturaDe(titulo, t.janela, true) + alturaDe(quantas, t.corpo) * 2 + mm(14))
+    c.espaco(mm(2))
+    c.escrever(titulo, { tamanho: t.janela, fonte: 'negrito' })
+    c.escrever(quantas, { tamanho: t.corpo, fonte: 'negrito' })
+    if (grupo.bloqueio) c.escrever(`Bloqueada: ${grupo.bloqueio}`, { tamanho: t.corpo, fonte: 'negrito' })
+    c.escrever(quem, { tamanho: t.corpo })
+    if (grupo.pedidos.length === 0) c.escrever('Nenhum pedido nesta janela.', { tamanho: t.corpo })
+    c.traco({ tracejada: true })
+
+    grupo.pedidos.forEach((p, indice) => {
+      const nome = `${indice + 1}. Nº ${p.numero} · ${p.cliente}${p.apto ? ` · apto ${p.apto}` : ''}`
+      const endereco = p.endereco ?? 'Sem endereço no cadastro'
+      const situacao = [
+        p.pago ? 'Pago' : 'Não pago', p.rotulo,
+        p.entregador ? `Leva ${textoDeQuemLeva(p.entregador)}` : null, p.falta,
+      ].filter(Boolean).join(' · ')
+      caber(alturaDe(nome, t.nome, true) + alturaDe(endereco, t.corpo) + alturaDe(situacao, t.apoio) + mm(4))
+      c.escrever(nome, { tamanho: t.nome, fonte: 'negrito' })
+      c.escrever(endereco, { tamanho: t.corpo })
+      c.escrever(situacao, { tamanho: t.apoio })
+      c.espaco(mm(2))
+    })
+  })
+
+  const geradoEm = `Gerado em ${dataHora(agora)}`
+  if (bobina) {
+    c.traco({ tracejada: true })
+    c.escrever(geradoEm, { tamanho: t.apoio })
+    paginas[0].altura = c.estado.y + mm(6)
+  } else {
+    paginas.forEach((pagina, indice) => {
+      const y = A4.altura - margem + mm(4)
+      pagina.desenhos.push({ tipo: 'texto', x: margem, y, tamanho: 8.5, texto: geradoEm })
+      const rodape = `Página ${indice + 1} de ${paginas.length}`
+      pagina.desenhos.push({ tipo: 'texto', x: A4.largura - margem - larguraDoTexto(rodape, 8.5), y, tamanho: 8.5, texto: rodape })
+    })
+  }
+  return {
+    nomeArquivo: `roteiro-${roteiro.data}${bobina ? '-80mm' : ''}.pdf`,
+    titulo: `Roteiro de entregas ${roteiro.data}`,
+    paginas,
+  }
+}
+
+export const pdfDoRoteiro = (dados) => {
+  const documento = documentoDoRoteiro(dados)
   return { ...documento, bytes: montarPdf(documento) }
 }

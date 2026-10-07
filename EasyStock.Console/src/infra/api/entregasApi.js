@@ -4,8 +4,8 @@ import { chamarApi } from './cliente'
 // entregadores, viagens e chamados (S44, `api/atendimento`), aprovação manual
 // (S12, `api/storefront/pedidos`) e o cadastro da loja (S45, `api/minha-vitrine/entrega`).
 // Toda rota usa a empresa do token; a API confere cada id contra ela.
-export const listarPedidosEntrega = (status) =>
-  chamarApi(`/api/kds/pedidos?status=${encodeURIComponent(status)}`)
+export const listarPedidosEntrega = (status, data) =>
+  chamarApi(`/api/kds/pedidos?status=${encodeURIComponent(status)}${data ? `&data=${data}` : ''}`)
 
 // Entregadores (policy Operador).
 export const listarEntregadores = () => chamarApi('/api/atendimento/entregadores')
@@ -42,6 +42,8 @@ export const recusarPedido = (id, motivo) =>
 const E = '/api/minha-vitrine/entrega'
 export const listarJanelas = () => chamarApi(`${E}/janelas`)
 export const criarJanela = (corpo) => chamarApi(`${E}/janelas`, { metodo: 'POST', corpo })
+export const atualizarJanela = (id, corpo) => chamarApi(`${E}/janelas/${id}`, { metodo: 'PUT', corpo })
+export const excluirJanela = (id) => chamarApi(`${E}/janelas/${id}`, { metodo: 'DELETE' })
 export const definirJanelaAtiva = (id, ativa) => chamarApi(`${E}/janelas/${id}/ativa`, { metodo: 'POST', corpo: { ativa } })
 export const listarZonas = () => chamarApi(`${E}/zonas`)
 export const criarZona = (corpo) => chamarApi(`${E}/zonas`, { metodo: 'POST', corpo })
