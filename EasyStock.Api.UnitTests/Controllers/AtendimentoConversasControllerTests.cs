@@ -519,7 +519,8 @@ public class AtendimentoConversasControllerTests
             new ValidarEnderecoUseCase(storefronts, frete, cep, Substitute.For<IConfiguracaoAtendimentoRepository>(),
                 NullLogger<ValidarEnderecoUseCase>.Instance),
             new ConfirmarEnderecoClienteUseCase(clientes, _unitOfWork,
-                new AdicionarClienteEnderecoUseCase(clientes, _unitOfWork, NullLogger<AdicionarClienteEnderecoUseCase>.Instance)));
+                new AdicionarClienteEnderecoUseCase(clientes, _unitOfWork, NullLogger<AdicionarClienteEnderecoUseCase>.Instance)),
+            Substitute.For<IConsentimentoContatoRepository>());
         return (useCase, clientes);
     }
 

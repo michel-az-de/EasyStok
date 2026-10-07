@@ -184,6 +184,7 @@ public class AtendimentoConversasController(
 
     [SwaggerOperation(Summary = "Register the conversation's customer (name, phone, delivery address)",
         Description = "#1276. Sem cliente vinculado, o telefone é obrigatório: acha o cadastro pelo telefone ou cria, e vincula. " +
+                      "E-mail opcional (#1430): cadastro antigo só recebe se não tinha. " +
                       "Com cliente, atualiza nome e telefone. Endereço com CEP vira o padrão de entrega; fora da área é gravado " +
                       "e volta dentroDaArea=false.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -196,7 +197,7 @@ public class AtendimentoConversasController(
         Guid id, [FromBody] CadastrarClienteConversaBody body,
         [FromServices] CadastrarClienteDaConversaUseCase cadastrarUseCase, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await cadastrarUseCase.ExecuteAsync(
-            new CadastrarClienteDaConversaCommand(currentUser.EmpresaId, id, body?.Nome, body?.Telefone, body?.Endereco), ct)));
+            new CadastrarClienteDaConversaCommand(currentUser.EmpresaId, id, body?.Nome, body?.Telefone, body?.Endereco, body?.Email), ct)));
 
     [SwaggerOperation(Summary = "Close the conversation")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -290,4 +291,4 @@ public sealed record TransferirConversaBody(Guid ParaUsuarioId);
 
 public sealed record LiberarForaDeAreaBody(string? Motivo);
 
-public sealed record CadastrarClienteConversaBody(string? Nome, string? Telefone, EnderecoDaConversaInput? Endereco);
+public sealed record CadastrarClienteConversaBody(string? Nome, string? Telefone, EnderecoDaConversaInput? Endereco, string? Email = null);

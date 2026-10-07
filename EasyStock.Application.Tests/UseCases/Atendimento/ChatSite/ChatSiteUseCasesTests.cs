@@ -183,4 +183,91 @@ public class ChatSiteUseCasesTests
         await _conversas.DidNotReceiveWithAnyArgs().ListarMensagensDepoisAsync(default, default, default, default, default);
     }
 
+    // ── #1430: formulário antes do chat ──
+
+    private IdentificarVisitanteChatSiteUseCase Identificar() => new(_acesso, _conversas, _uow);
+
+    private static IdentificacaoVisitanteInput Formulario(string? email = "Maria@Exemplo.com", bool aceite = true) =>
+        new("Maria Souza", "(11) 98765-4321", email, aceite);
+
+    [Fact]
+    public async Task Identificar_GravaNaSessaoSemProcurarCliente()
+    {
+        var (sessao, token) = SessaoValida();
+
+        var r = await Identificar().ExecuteAsync(Slug, token, Formulario());
+
+        r.Should().BeEquivalentTo(new { Nome = "Maria Souza", Telefone = "+5511987654321", Email = "maria@exemplo.com" });
+        sessao.ContatoInformado!.Telefone.Should().Be("+5511987654321");
+        await _uow.Received(1).CommitAsync();
+        await _conversas.DidNotReceiveWithAnyArgs().ObterPorIdAsync(default, default, default);
+    }
+
+    [Fact]
+    public async Task ConversaNasceDepoisDoFormulario_ComNomeEContatoInformado()
+    {
+        var (sessao, token) = SessaoValida();
+        await Identificar().ExecuteAsync(Slug, token, Formulario());
+        Conversa? criada = null;
+        await _conversas.AddAsync(Arg.Do<Conversa>(c => criada = c), Arg.Any<CancellationToken>());
+
+        await Enviar().ExecuteAsync(Slug, token, "Oi");
+
+        criada!.ContatoNome.Should().Be("Maria Souza");
+        criada.ContatoTelefoneInformado.Should().Be("+5511987654321");
+        criada.ContatoEmailInformado.Should().Be("maria@exemplo.com");
+        criada.ContatoInformadoEm.Should().Be(sessao.VisitanteInformadoEm);
+        criada.ClienteId.Should().BeNull("o telefone digitado não liga a conversa a cliente nenhum");
+    }
+
+    [Fact]
+    public async Task SemFormulario_ConversaNasceComoVisitanteDoSite()
+    {
+        var (_, token) = SessaoValida();
+        Conversa? criada = null;
+        await _conversas.AddAsync(Arg.Do<Conversa>(c => criada = c), Arg.Any<CancellationToken>());
+
+        await Enviar().ExecuteAsync(Slug, token, "Oi");
+
+        criada!.ContatoNome.Should().Be(ConversaChatSiteService.NomeSemFormulario);
+        criada.ContatoInformado.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Identificar_ComConversaAberta_AtualizaNomeEContato()
+    {
+        var (sessao, token) = SessaoValida();
+        var conversa = Conversa.Abrir(_loja.EmpresaId, sessao.ContatoIdExterno, DateTime.UtcNow, "Visitante do site", canal: CanalConversa.ChatSite);
+        sessao.VincularConversa(conversa.Id);
+        _conversas.ObterPorIdAsync(_loja.EmpresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        await Identificar().ExecuteAsync(Slug, token, Formulario(email: null));
+
+        conversa.ContatoNome.Should().Be("Maria Souza");
+        conversa.ContatoTelefoneInformado.Should().Be("+5511987654321");
+        conversa.ContatoEmailInformado.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(false, "(11) 98765-4321", null)]
+    [InlineData(true, "123", null)]
+    [InlineData(true, "(11) 98765-4321", "sem-arroba")]
+    public async Task Identificar_DadoInvalidoOuSemAceite_ValidacaoSemGravar(bool aceite, string telefone, string? email)
+    {
+        var (sessao, token) = SessaoValida();
+
+        var act = () => Identificar().ExecuteAsync(Slug, token, new IdentificacaoVisitanteInput("Maria", telefone, email, aceite));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        sessao.ContatoInformado.Should().BeNull();
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task Identificar_SemTokenValido_Invalida()
+    {
+        var act = () => Identificar().ExecuteAsync(Slug, "token-inventado", Formulario());
+
+        await act.Should().ThrowAsync<SessaoChatSiteInvalidaException>();
+    }
 }

@@ -6,6 +6,9 @@ namespace EasyStock.Application.Services.Atendimento;
 
 public sealed class ConversaChatSiteService(IConversaRepository conversas, IUnitOfWork unitOfWork)
 {
+    /// <summary>Nome do contato quando o visitante não preencheu o formulário (#1430).</summary>
+    public const string NomeSemFormulario = "Visitante do site";
+
     public Task<Conversa> ObterOuCriarAsync(SessaoChatSite sessao, Guid? clienteVerificadoId, DateTime agora,
         CancellationToken ct = default) => unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
     {
@@ -27,11 +30,15 @@ public sealed class ConversaChatSiteService(IConversaRepository conversas, IUnit
             throw new RegraDeDominioVioladaException("Conversa não pertence a esta sessão.");
         if (conversa is null)
         {
-            conversa = Conversa.Abrir(sessao.EmpresaId, contato, agora, "Visitante do site", clienteVerificadoId, CanalConversa.ChatSite);
+            conversa = Conversa.Abrir(sessao.EmpresaId, contato, agora, sessao.ContatoInformado?.Nome ?? NomeSemFormulario,
+                clienteVerificadoId, CanalConversa.ChatSite);
             conversa.Assumir(agora);
             await conversas.AddAsync(conversa, token);
         }
         if (clienteVerificadoId is { } verificado) conversa.VincularCliente(verificado);
+        // #1430: a conversa nasce (ou fica) com o que o visitante informou no formulário antes do chat.
+        if (sessao.ContatoInformado is { } informado && conversa.ContatoInformadoEm is null)
+            conversa.RegistrarContatoInformado(informado);
         sessao.VincularConversa(conversa.Id);
         sessao.RegistrarUso(agora);
         await unitOfWork.CommitAsync();

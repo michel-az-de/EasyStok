@@ -22,6 +22,16 @@ public class SessaoChatSite
     public DateTime UltimoUsoEm { get; private set; }
     public DateTime ExpiraEm { get; private set; }
 
+    // Formulário antes do chat (#1430): o que o visitante informou, com o instante do aceite da política.
+    public string? VisitanteNome { get; private set; }
+    public string? VisitanteTelefone { get; private set; }
+    public string? VisitanteEmail { get; private set; }
+    public DateTime? VisitanteInformadoEm { get; private set; }
+
+    /// <summary>Nulo enquanto o visitante não preencheu o formulário.</summary>
+    public ContatoInformadoVisitante? ContatoInformado =>
+        ContatoInformadoVisitante.Gravado(VisitanteNome, VisitanteTelefone, VisitanteEmail, VisitanteInformadoEm);
+
     /// <summary>Identificador opaco do contato na conversa do canal <c>ChatSite</c>.</summary>
     public string ContatoIdExterno => Id.ToString("N");
 
@@ -68,6 +78,16 @@ public class SessaoChatSite
         // irrecuperavel mesmo nesses casos; a renovacao nunca altera esta propriedade.
         TokenHash = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(TokenHashTamanho / 2));
         if (Utc(agora) < ExpiraEm) ExpiraEm = Utc(agora);
+    }
+
+    /// <summary>O visitante pode corrigir o que escreveu: vale o último envio.</summary>
+    public void Identificar(ContatoInformadoVisitante contato)
+    {
+        ArgumentNullException.ThrowIfNull(contato);
+        VisitanteNome = contato.Nome;
+        VisitanteTelefone = contato.Telefone;
+        VisitanteEmail = contato.Email;
+        VisitanteInformadoEm = contato.InformadoEm;
     }
 
     public void VincularConversa(Guid conversaId)
