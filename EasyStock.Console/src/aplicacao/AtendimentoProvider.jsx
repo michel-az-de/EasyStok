@@ -32,6 +32,8 @@ import { FONTE_API } from '../infra/fonteDados'
 import { comApi } from './acoesApi'
 import { criarAcoes } from './criarAcoes'
 import { useSincronizacaoApi } from './useSincronizacaoApi'
+import { useLembretesApi } from './useLembretesApi'
+import { useAvisosNoAparelho } from './useAvisosNoAparelho'
 import { gravarRascunhos, lerRascunhos } from '../infra/api/rascunhosDaSessao'
 
 const carregar = () => ({
@@ -64,6 +66,9 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
   }))
   useEffect(() => { if (FONTE_API) gravarRascunhos(sessao, estado.rascunhos) }, [sessao, estado.rascunhos])
   useSincronizacaoApi({ ativo: FONTE_API, usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId })
+  // #1426: lembretes manuais e notificações do EasyStok no sininho, e o Web Push do aparelho.
+  useLembretesApi({ ativo: FONTE_API, despachar })
+  const avisosNoAparelho = useAvisosNoAparelho({ ativo: FONTE_API })
 
   // Relógio da tela mais o deslocamento do painel de simulações (seção 7,
   // "+10 min"/"+30 min"/"Agora"): as ações carimbam o mesmo instante que a
@@ -355,6 +360,8 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
       eventosSonoros,
       pagamentosNaoVistos,
       permissaoNotificacao,
+      // #1426: inscrição Web Push deste aparelho ({ estado, mensagem, ativar }).
+      avisosNoAparelho,
       // `ui.encerrando` (seção 5): id da conversa com a modal de
       // encerramento aberta, ou `null`.
       encerrando: estado.ui.encerrando,
@@ -375,7 +382,7 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
       expediente: estado.expediente,
       sessao,
     }
-  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao])
+  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao, avisosNoAparelho])
 
   return (
     <ContextoCatalogo.Provider value={estado.catalogo}>

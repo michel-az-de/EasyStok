@@ -17,6 +17,35 @@ const ICONE_ORIGEM = {
   [ORIGENS.MANUAL]: 'relogio',
   [ORIGENS.PASSAGEM]: 'conversa',
   [ORIGENS.PAGAMENTO]: 'dollar-sign',
+  [ORIGENS.AVISO]: 'bell',
+}
+
+// Avisos no aparelho (#1426): Web Push com o console fechado. Só no modo API,
+// onde existe servidor para mandar; a permissão sai só deste botão.
+const TEXTO_AVISO_NO_APARELHO = {
+  desligado: 'Receba o aviso mesmo com o console fechado.',
+  ativando: 'Ativando os avisos neste aparelho...',
+  ativo: 'Avisos ativados neste aparelho.',
+  bloqueado: 'Avisos bloqueados nas configurações do navegador deste aparelho.',
+  'sem-chave': 'O EasyStok ainda não está configurado para mandar avisos ao aparelho.',
+  indisponivel: 'Este navegador não recebe avisos com o console fechado. No iPhone, só com o console na tela de início.',
+}
+
+function AvisosNoAparelho({ estado, mensagem, ativar }) {
+  const podeAtivar = estado === 'desligado' || estado === 'erro'
+  return (
+    <div className={`${css.secao} ${css.avisosAparelho}`}>
+      <p className={css.tituloSecao}>Avisos no celular ou computador</p>
+      <output className={css.textoAparelho}>
+        {estado === 'erro' ? `Não deu para ativar: ${mensagem ?? 'tente de novo.'}` : TEXTO_AVISO_NO_APARELHO[estado]}
+      </output>
+      {(podeAtivar || estado === 'ativando') && (
+        <Botao icone="bell" largo disabled={estado === 'ativando'} onClick={ativar}>
+          {estado === 'erro' ? 'Tentar de novo' : 'Ativar avisos no celular/computador'}
+        </Botao>
+      )}
+    </div>
+  )
 }
 
 // Item 7 (rodada 10): reaproveita ícone que já tem sentido em outro lugar da
@@ -95,7 +124,9 @@ function ItemProgramado({ lembrete, agora, realcado, aoAbrir }) {
 // programar. Visto é estilo Instagram: some da lista quando o painel fecha,
 // não quando ela olha.
 export function Sininho() {
-  const { lembretes, agora, selecionada, vistos, conversas, eventosSonoros } = useAtendimento()
+  const {
+    lembretes, agora, selecionada, vistos, conversas, eventosSonoros, fonteApi, avisosNoAparelho,
+  } = useAtendimento()
   const {
     concluirLembrete, criarLembrete, marcarLembretesVistos, selecionar,
   } = useAcoes()
@@ -331,6 +362,8 @@ export function Sininho() {
               </ul>
             </div>
           )}
+
+          {fonteApi && avisosNoAparelho && <AvisosNoAparelho {...avisosNoAparelho} />}
         </section>
       )}
 

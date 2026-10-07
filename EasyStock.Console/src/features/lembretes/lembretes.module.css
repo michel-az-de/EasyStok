@@ -102,6 +102,10 @@ button.acaoItem { flex-shrink: 0; padding: 0; width: var(--toque); height: var(-
 
 .vazio { margin: var(--e-2) 0 0; color: var(--tinta-2); font-size: var(--t-corpo); }
 
+/* Avisos no aparelho (#1426): rodapé do painel, separado da lista. */
+.avisosAparelho { padding-top: var(--e-3); border-top: var(--b-1) solid var(--linha); }
+.textoAparelho { display: block; margin: 0 0 var(--e-2); color: var(--tinta-2); font-size: var(--t-apoio); }
+
 /* Modal Programar lembrete (seção 8). A direção pede 480 px de largura; o
    `Modal.jsx` é para usar como está (min(560px, 100vw − 52px)), então o
    formulário aqui não força a caixa, só não estica o conteúdo além disso. */

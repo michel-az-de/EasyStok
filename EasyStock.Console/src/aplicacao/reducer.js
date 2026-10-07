@@ -16,7 +16,7 @@ import { GATILHOS, contextoDePrevia, regraDoGatilho, textoDaRegra } from '../dom
 import { PAUSA_POR_ASSUMIR } from '../dominio/automatico'
 import { canalDaConversa } from '../dominio/canal'
 import { envioBloqueado } from '../dominio/janela'
-import { ORIGENS } from '../dominio/lembrete'
+import { FONTES, ORIGENS } from '../dominio/lembrete'
 import { dataHora, mesPorExtenso, moeda } from '../dominio/formato'
 import { faixaParaCliente, janelaPorId } from '../dominio/entrega'
 import {
@@ -319,6 +319,9 @@ const CASOS_API = {
     expediente: { carregado: true, mensagemForaDoHorario, mensagemLojaFechada },
   }),
 }
+
+// Chave da SINCRONIZAR_LEMBRETES_API -> fonte dos itens que ela troca (#1426).
+const FONTE_DA_CHAVE = { lembretes: FONTES.LEMBRETE, avisos: FONTES.AVISO }
 
 const CASOS = {
   [acao.SELECIONAR_CONVERSA]: (estado, { id }) => ({
@@ -992,8 +995,10 @@ const CASOS = {
   // Os lembretes automáticos são retrato do estado das conversas: o que não
   // vale mais sai sozinho, o que foi adiado mantém a hora nova, e o que ela
   // concluiu não volta.
+  // O que veio do EasyStok (`fonte`, modo API) também fica: quem troca isso é a
+  // SINCRONIZAR_LEMBRETES_API.
   [acao.SINCRONIZAR_LEMBRETES]: (estado, { automaticos }) => {
-    const manuais = estado.lembretes.filter((l) => l.origem === ORIGENS.MANUAL)
+    const manuais = estado.lembretes.filter((l) => l.origem === ORIGENS.MANUAL || l.fonte)
     const antigos = new Map(estado.lembretes.map((l) => [l.id, l]))
     const vivos = automaticos
       .filter((l) => !estado.lembretesConcluidos[l.id])
@@ -1001,6 +1006,26 @@ const CASOS = {
     const proximos = [...manuais, ...vivos]
     const igual = proximos.length === estado.lembretes.length
       && proximos.every((l, i) => l === estado.lembretes[i])
+    return igual ? estado : { ...estado, lembretes: proximos }
+  },
+
+  // Modo API (#1426): a leitura do EasyStok troca por inteiro cada fonte que
+  // chegou (`lembretes`, `avisos`); fonte ausente (a chamada falhou) fica como
+  // estava. Item igual ao anterior mantém a referência, e nada mudou devolve o
+  // mesmo estado: a leitura periódica não repinta o sininho à toa.
+  [acao.SINCRONIZAR_LEMBRETES_API]: (estado, porFonte) => {
+    const fontes = Object.entries(FONTE_DA_CHAVE).filter(([chave]) => Array.isArray(porFonte[chave]))
+    if (fontes.length === 0) return estado
+    const trocadas = new Set(fontes.map(([, fonte]) => fonte))
+    const antigos = new Map(estado.lembretes.map((l) => [l.id, l]))
+    const mesmo = (a, b) => a && a.quando === b.quando && a.titulo === b.titulo
+      && a.detalhe === b.detalhe && a.conversaId === b.conversaId
+    const chegaram = fontes.flatMap(([chave]) => porFonte[chave])
+      .filter((l) => !estado.lembretesConcluidos[l.id])
+      .map((l) => (mesmo(antigos.get(l.id), l) ? antigos.get(l.id) : l))
+    const proximos = [...estado.lembretes.filter((l) => !trocadas.has(l.fonte)), ...chegaram]
+    const atuais = new Set(estado.lembretes)
+    const igual = proximos.length === estado.lembretes.length && proximos.every((l) => atuais.has(l))
     return igual ? estado : { ...estado, lembretes: proximos }
   },
 

@@ -29,7 +29,6 @@ export const NAO_LIGADAS = {
   trocarJanela: 'Trocar a janela do pedido',
   salvarNota: 'Nota do cliente',
   ...grupo('Mensagens automáticas', ['alternarRegra', 'editarRegra']),
-  ...grupo('Lembretes', ['criarLembrete', 'concluirLembrete']),
   ...grupo('Bloqueio do cliente', ['bloquearCliente', 'desbloquearCliente']),
   ...grupo('Cardápio do dia', ['alternarDisponibilidade', 'ajustarSaldo']),
   ...grupo('Cardápio', ['incluirItemCardapio', 'editarItemCardapio', 'alternarRemocaoItemCardapio', 'confirmarValidacaoItem']),
