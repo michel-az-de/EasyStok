@@ -220,6 +220,20 @@
   --ease-mola: linear(0, .013 1%, .052 2.2%, .207 5%, .44 8.6%, .675 12.8%,
     .847 17%, .95 21.2%, 1.012 25.6%, 1.038 29.6%, 1.043 33.2%, 1.035 37.8%,
     1.016 44.6%, 1.002 53%, .996 62%, .998 78%, 1);
+
+  /* --- marca Casa da Baba (#1447) ------------------------------------------
+     Prévia do design-system-v1 (cores e Lora, plano erp-casa-da-baba M0.1),
+     usada só no hall de módulos e na barra do módulo enquanto a M0.1 não troca
+     o tema inteiro. Contraste conferido nos dois temas: cacau 12,8:1 e
+     caramelo 5,0:1 sobre o creme; no escuro 15,7:1 e 9,0:1. Trigo nunca é texto. */
+  --cdb-chao:     light-dark(#FFF8E8, #1A120C);
+  --cdb-papel:    light-dark(#FEFEFE, #241A12);
+  --cdb-cacau:    light-dark(#422814, #F6EBDD);
+  --cdb-cacau-2:  light-dark(#5E4128, #D9C6B0);
+  --cdb-caramelo: light-dark(#A25803, #F0A960);
+  --cdb-trigo:    #E3A542;
+  --cdb-linha:    light-dark(#E5D5BE, #3A2C20);
+  --f-titulo-marca: 'Lora', Georgia, 'Times New Roman', serif;
 }
 
 /* Escolha explícita vence a preferência do sistema, nos dois sentidos. */

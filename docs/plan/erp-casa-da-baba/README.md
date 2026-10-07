@@ -167,3 +167,4 @@ Atualizado por cada PR. Legenda: ⬜ sem issue · 🟡 em PR · ✅ mergeada. 78
 | Fatia | Título | Estado | Issue/PR |
 |---|---|---|---|
 | — | ADR-0056 e este plano | 🟡 | #1316 |
+| M0.2 (parcial) | Hall de módulos, menu do módulo pela rota (`#/m/<modulo>/<tela>`) e abas da Gestão no módulo dono; sem login de um passo nem permissão por perfil (dependem da M0.3) | 🟡 | #1447 |

@@ -81,7 +81,8 @@ function MenuMais({
         // Automáticas, e a 390 px isso empurrava "Mais" para fora da tela.
         // O botão saiu do topo; o caminho para Gestão no celular/tablet
         // estreito passa a ser só por aqui.
-        { chave: '__gestao', titulo: 'Gestão', detalhe: 'Produção, cardápio e as outras frentes da loja' },
+        // #1447: a Gestão virou o hall de módulos; o item leva para lá.
+        { chave: '__gestao', titulo: 'Módulos', detalhe: 'Cozinha, entregas, financeiro e os outros módulos' },
       ],
     },
     grupoDoDia(emAndamento, naEsteira),
@@ -274,9 +275,9 @@ function Cabecalho({
             topo largo (tablet 1024-1179 px, sem MenuMais); no compacto,
             Gestão mudou para dentro do Mais logo abaixo. */}
         {!compacto && (
-          <Botao icone="painel" onClick={aoAbrirGestao} aria-label="Gestão">
-            <span className={css.rotuloLongo}>Gestão</span>
-            <span className={css.rotuloCurto} aria-hidden="true">Gestão</span>
+          <Botao icone="painel" onClick={aoAbrirGestao} aria-label="Módulos">
+            <span className={css.rotuloLongo}>Módulos</span>
+            <span className={css.rotuloCurto} aria-hidden="true">Módulos</span>
           </Botao>
         )}
         {compacto ? (
@@ -337,11 +338,11 @@ function Trilho({
       </Botao>
       {/* Casca da rodada 13: item de navegação novo, logo abaixo de
           Automáticas, para as 5 frentes da rodada terem um lugar comum sem
-          mexer em navegação de novo depois. Abre a mesma gaveta grande de
-          `ModalGestao`, ainda sem contador (sem dado de negócio aqui). */}
-      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirGestao} title="Gestão">
+          mexer em navegação de novo depois. Desde a #1447 leva ao hall de
+          módulos (o modal Gestão saiu). */}
+      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirGestao} title="Módulos">
         <Icone nome="painel" tamanho={22} />
-        <span>Gestão</span>
+        <span>Módulos</span>
       </Botao>
       <div className={css.sinoTrilho}><Sininho /></div>
       <span className={css.espacoTrilho} />
