@@ -3,13 +3,16 @@ import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { useCadastroEntregaApi } from '../../aplicacao/useCadastroEntregaApi'
-import { DIAS_DA_SEMANA, corpoBloqueio, corpoJanela, corpoZona } from '../../dominio/entregasApi'
+import { faixaDeHorarios } from '../../dominio/entrega'
+import { DIAS_DA_SEMANA, corpoBloqueio, corpoZona } from '../../dominio/entregasApi'
+import { JanelasDaLoja } from './JanelasDaLoja'
 import css from './entregasApi.module.css'
 
 // Cadastro de entrega da loja (S45, `api/minha-vitrine/entrega`): janelas com
-// capacidade, zonas de frete por CEP ou bairros e bloqueios de dia ou janela.
-const OPCOES_DIA = DIAS_DA_SEMANA.map((rotulo, i) => ({ valor: String(i), rotulo }))
-const JANELA_VAZIA = { diaDaSemana: '1', horaInicio: '18:00', horaFim: '20:00', capacidadeMaxima: '10', label: '' }
+// capacidade, zonas de frete por CEP ou bairros e bloqueios de dia ou janela. Montado em
+// Entregas › Janelas e frete e, pelo App, em Gestão › Janelas de entrega (#1440).
+const rotuloDaJanela = (x) =>
+  `${DIAS_DA_SEMANA[x.diaDaSemana]} ${faixaDeHorarios(String(x.horaInicio).slice(0, 5), String(x.horaFim).slice(0, 5))}`
 const ZONA_VAZIA = { label: '', valor: '', tempoEstimadoMinutos: '40', ordem: '1', cobertura: 'bairros', cepInicio: '', cepFim: '', bairros: '' }
 const BLOQUEIO_VAZIO = { data: '', motivo: '', janelaEspecificaId: '' }
 
@@ -21,45 +24,29 @@ function useFormulario(inicial) {
 
 export function CadastroEntregaApi() {
   const { janelas, zonas, bloqueios, erro, acoes, limparErro } = useCadastroEntregaApi()
-  const j = useFormulario(JANELA_VAZIA)
   const z = useFormulario(ZONA_VAZIA)
   const b = useFormulario(BLOQUEIO_VAZIO)
   const enviar = (acao, f, corpo) => (e) => {
     e.preventDefault()
-    acao(corpo(f.form)).then(f.limpar)
+    acao(corpo(f.form)).then((ok) => { if (ok) f.limpar() })
   }
 
   if (janelas === null && !erro) return <p className={css.vazio}>Carregando o cadastro…</p>
-  const opcoesJanela = [{ valor: '', rotulo: 'O dia inteiro' }, ...(janelas ?? []).map((x) => ({ valor: x.id, rotulo: x.label }))]
+  const rotuloJanelaPorId = (id) => {
+    const janela = (janelas ?? []).find((w) => w.id === id)
+    return janela ? rotuloDaJanela(janela) : 'Janela excluída'
+  }
+  const opcoesJanela = [{ valor: '', rotulo: 'O dia inteiro' }, ...(janelas ?? []).map((x) => ({ valor: x.id, rotulo: rotuloDaJanela(x) }))]
 
   return (
-    <>
+    <div className={css.cadastro}>
       {erro && (
-        <p className={css.faixa} role="alert">
+        <p className={`${css.faixa} ${css.faixaFixa}`} role="alert">
           <Icone nome="circle-x" tamanho={16} /> <span className={css.cresce}>{erro}</span>
           <Botao variante="texto" onClick={limparErro}>Fechar</Botao>
         </p>
       )}
-      <section className={css.secao} aria-label="Janelas de entrega">
-        <h3>Janelas de entrega</h3>
-        <form className={css.formulario} onSubmit={enviar(acoes.criarJanela, j, corpoJanela)}>
-          <CampoSelecao rotulo="Dia" opcoes={OPCOES_DIA} {...j.campo('diaDaSemana')} />
-          <CampoTexto rotulo="Início" tipo="time" {...j.campo('horaInicio')} required />
-          <CampoTexto rotulo="Fim" tipo="time" {...j.campo('horaFim')} required />
-          <CampoTexto rotulo="Capacidade" tipo="number" min="1" {...j.campo('capacidadeMaxima')} required />
-          <CampoTexto rotulo="Nome" {...j.campo('label')} required />
-          <Botao tipo="submit" variante="primario">Criar janela</Botao>
-        </form>
-        <ul className={css.lista}>
-          {(janelas ?? []).map((x) => (
-            <li key={x.id} className={`${css.cartao} ${css.linha}`}>
-              <span className={css.cresce}>{x.label} · {DIAS_DA_SEMANA[x.diaDaSemana]} {x.horaInicio.slice(0, 5)}–{x.horaFim.slice(0, 5)}</span>
-              <span className={css.apoio}>{x.capacidadeMaxima} vagas{x.ativa ? '' : ' · desativada'}</span>
-              <Botao variante="texto" onClick={() => acoes.alternarJanela(x)}>{x.ativa ? 'Desativar' : 'Ativar'}</Botao>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <JanelasDaLoja janelas={janelas} acoes={acoes} />
 
       <section className={css.secao} aria-label="Zonas de frete">
         <h3>Zonas de frete</h3>
@@ -107,12 +94,12 @@ export function CadastroEntregaApi() {
           {bloqueios.map((x) => (
             <li key={x.id} className={`${css.cartao} ${css.linha}`}>
               <span className={css.cresce}>{x.data} · {x.motivo}</span>
-              <span className={css.apoio}>{x.janelaEspecificaId ? (janelas ?? []).find((w) => w.id === x.janelaEspecificaId)?.label : 'Dia inteiro'}</span>
+              <span className={css.apoio}>{x.janelaEspecificaId ? rotuloJanelaPorId(x.janelaEspecificaId) : 'Dia inteiro'}</span>
               <Botao variante="texto" onClick={() => acoes.removerBloqueio(x.id)}>Remover</Botao>
             </li>
           ))}
         </ul>
       </section>
-    </>
+    </div>
   )
 }

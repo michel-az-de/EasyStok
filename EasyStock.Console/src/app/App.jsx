@@ -34,6 +34,7 @@ import { GavetaEntregas } from '../features/entregas/GavetaEntregas'
 import { TelaEntregas } from '../features/entregas/TelaEntregas'
 import { GavetaEntregasApi } from '../features/entregas/GavetaEntregasApi'
 import { TelaEntregasApi } from '../features/entregas/TelaEntregasApi'
+import { CadastroEntregaApi } from '../features/entregas/CadastroEntregaApi'
 import { TelaCozinha } from '../features/cozinha/TelaCozinha'
 import { TelaCozinhaApi } from '../features/cozinha/TelaCozinhaApi'
 import { TelaCardapioLink } from '../features/cardapio-link/TelaCardapioLink'
@@ -278,7 +279,11 @@ function TelaDaRota({ rota, aoSair }) {
         ? <HallDeModulos />
         : (
           <MolduraDoModulo moduloId={rota.modulo} telaId={rota.tela} fonteApi={FONTE_API}>
-            {rota.aba && <PainelDeAjuste key={rota.aba} aba={rota.aba} />}
+            {/* #1440: no modo API, Entregas › Janelas de entrega é o cadastro da S45 (o mesmo de
+                Entregas › Janelas e frete). Feature não importa feature; quem compõe é o App. */}
+            {rota.aba && (
+              <PainelDeAjuste key={rota.aba} aba={rota.aba} janelasApi={FONTE_API ? <CadastroEntregaApi /> : null} />
+            )}
           </MolduraDoModulo>
         )}
       <FaixaApi aoSair={aoSair} />

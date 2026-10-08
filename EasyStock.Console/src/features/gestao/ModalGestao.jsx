@@ -21,7 +21,6 @@ import css from './gestao.module.css'
 const AINDA_NAO_LIGADO = {
   producao: 'Produção e cardápio ainda não estão ligados ao EasyStok nesta versão (F11). Nada aqui é gravado.',
   caixa: 'O caixa ainda não está ligado ao EasyStok nesta versão (F14). Nada aqui é gravado.',
-  janelas: 'Esta aba ainda não está ligada. As janelas de verdade estão em Entregas › Janelas e frete.',
   fidelidade: 'Fidelidade e cupons ainda não estão ligados ao EasyStok nesta versão (F15). Nada aqui é gravado.',
   integracoes: 'As integrações ainda não estão ligadas nesta versão (F16). Nenhuma chave é guardada no navegador.',
 }
@@ -36,17 +35,19 @@ function AbaNaoLigada({ texto, children }) {
 }
 
 // Uma tela por aba: o objeto só decide qual elemento entra na árvore.
-export function PainelDeAjuste({ aba }) {
+// `janelasApi` (#1440): no modo API o App entrega aqui o cadastro de janelas, zonas e bloqueios
+// da S45 (o mesmo de Entregas › Janelas e frete), no lugar da aba de demonstração.
+export function PainelDeAjuste({ aba, janelasApi = null }) {
   const { fonteApi } = useAtendimento()
   const painelDaAba = useMemo(() => ({
     atendimento: <AbaAtendimento />,
     producao: <AbaProducao />,
     caixa: <AbaCaixa />,
-    janelas: <AbaJanelas />,
+    janelas: fonteApi && janelasApi ? janelasApi : <AbaJanelas />,
     fidelidade: <AbaFidelidade />,
     integracoes: <AbaIntegracoes />,
     canais: <TelaCanais />,
-  }), [])
+  }), [fonteApi, janelasApi])
   const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada texto={AINDA_NAO_LIGADO[aba]}>{painel}</AbaNaoLigada>
   return painel
