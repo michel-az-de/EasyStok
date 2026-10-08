@@ -363,6 +363,8 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
       // encerramento aberta, ou `null`.
       encerrando: estado.ui.encerrando,
       encerrandoNumero: estado.ui.encerrandoNumero ?? null,
+      // #1443: gesto da loja pedido ('abrir' | 'fechar'), ou null.
+      gestoLoja: estado.ui.gestoLoja ?? null,
       // Rodada 13 (issue #43): lotes, descobertos e ajustes lidos pela aba
       // Produção e cardápio de Gestão.
       producao: estado.producao,

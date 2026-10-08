@@ -42,9 +42,9 @@ const confere = async (descricao, fn) => {
 const esperar = () => new Promise((r) => setTimeout(r, 20))
 globalThis.fetch = async () => new Response('', { status: 403 })
 
-const expediente = () => {
+const expediente = (lojaAberta = null) => {
   const despachados = []
-  const estadoRef = { current: { funcionamento: {}, lojaAberta: null } }
+  const estadoRef = { current: { funcionamento: {}, lojaAberta } }
   return { acoes: criarAcoesExpedienteApi({ despachar: (a) => despachados.push(a), estadoRef }), despachados }
 }
 
@@ -55,13 +55,15 @@ await confere('operador: carregar o expediente com 403 não acende aviso', async
   assert.ok(!despachados.some((a) => a.tipo === acao.AVISO_API), `avisou: ${despachados.map((a) => a.mensagem).join(' | ')}`)
 })
 
-await confere('operador: abrir ou fechar a loja com 403 diz que é do administrador', async () => {
-  const { acoes, despachados } = expediente()
+// #1443: abrir agora passa pelo gesto com o caixa (prova-1443); o toque direto que ainda chama a
+// API é fechar fora do horário, e a rota é de gerente para cima.
+await confere('operador: fechar a loja com 403 diz que é de gerente ou dona', async () => {
+  const { acoes, despachados } = expediente(true)
   acoes.alternarLoja(Date.parse('2026-10-01T15:00:00Z'))
   await esperar()
   const aviso = despachados.find((a) => a.tipo === acao.AVISO_API)
   assert.ok(aviso, 'não avisou')
-  assert.match(aviso.mensagem, /administrador/)
+  assert.match(aviso.mensagem, /gerente ou dona/)
   // A tela trocou a loja antes da resposta; sem permissão, volta (a releitura também dá 403).
   assert.equal(despachados.filter((a) => a.tipo === acao.ALTERNAR_LOJA).length, 2, 'a troca local não foi desfeita')
 })

@@ -127,6 +127,12 @@ public class ExpedienteLoja
     };
 
     /// <summary>
+    /// Se o relógio está dentro de algum turno, ignorando o controle manual (#1443): é o que decide se
+    /// fechar na mão é "fechar no horário de funcionamento", que pede gerente e justificativa.
+    /// </summary>
+    public bool DentroDoHorarioDeFuncionamento(DateTime agoraUtc) => DentroDoHorario(ParaLocal(agoraUtc));
+
+    /// <summary>
     /// Próxima abertura em horário local (America/Sao_Paulo), olhando até 7 dias. Nula com a loja
     /// fechada na mão (não volta sozinha) ou sem nenhum turno cadastrado.
     /// </summary>

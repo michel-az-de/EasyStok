@@ -61,6 +61,7 @@ public static class RemetentePorTipoEvento
             or TipoEventoNotificacao.CaixaAbertoEsquecido
             or TipoEventoNotificacao.ConversaEscalada
             or TipoEventoNotificacao.LembreteVencido
+            or TipoEventoNotificacao.LojaFechadaNoHorario
             or TipoEventoNotificacao.ConviteAcesso
             or TipoEventoNotificacao.IncidenteSistema
             or TipoEventoNotificacao.PrazoEstourado

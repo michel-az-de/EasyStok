@@ -5,6 +5,7 @@ import {
 import { mensagemDaApi, naoEntregueDaApi } from '../infra/api/traducaoConversas'
 import { proximoId } from '../infra/repositorioConversas'
 import { criarAcoesExpedienteApi } from './api/expediente'
+import { criarAcoesCaixaApi } from './api/caixa'
 import { criarAcoesConfiguracaoApi } from './api/configuracao'
 import { criarAcoesAssistenteApi } from './api/assistente'
 import { criarAcoesAgenteApi } from './api/agente'
@@ -52,6 +53,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     ...criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio }),
     fecharAvisoApi: () => despachar({ tipo: acao.FECHAR_AVISO_API }),
     ...criarAcoesExpedienteApi({ despachar, estadoRef }),
+    ...criarAcoesCaixaApi(),
     ...criarAcoesConfiguracaoApi(),
     ...criarAcoesAssistenteApi(),
     ...criarAcoesAgenteApi({ despachar }),

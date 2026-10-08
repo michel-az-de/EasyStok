@@ -19,6 +19,8 @@ export const SO_DA_TELA = [
   'escolherMeioPagamento',
   // Marca de canhoto já impresso nesta tela; a impressão em si não depende dela.
   'marcarCanhotoImpresso',
+  // Fechar o modal do gesto da loja (#1443): abrir e fechar de verdade são ligadas.
+  'fecharGestoLoja',
 ]
 
 const grupo = (rotulo, nomes) => Object.fromEntries(nomes.map((nome) => [nome, rotulo]))
@@ -49,7 +51,8 @@ export const NAO_LIGADAS = {
   ...grupo('Lote de papel', ['conexaoCaiu', 'conexaoVoltou', 'lancarLotePapel']),
   ...grupo('Janelas de entrega', ['criarJanela', 'editarJanela', 'pausarJanela', 'reativarJanela', 'excluirJanela', 'ajustarRespiroMinimo']),
   ...grupo('Produção', ['registrarProducao', 'ajustarContagemProducao']),
-  ...grupo('Caixa', ['abrirCaixa', 'lancarMovimentoCaixa', 'estornarMovimentoCaixa', 'fecharCaixa', 'lancarVendaAvulsa']),
+  // Caixa (#1443): abrir, lançar, estornar e fechar ligados; a venda avulsa ainda não tem rota.
+  ...grupo('Venda avulsa', ['lancarVendaAvulsa']),
   ...grupo('Integrações', [
     'alternarProvedorLogistica', 'salvarCredencialProvedor', 'definirProvedorPadrao', 'cotarEntrega',
     'chamarEntregadorComProvedor', 'cancelarCorrida', 'avancarCorrida',

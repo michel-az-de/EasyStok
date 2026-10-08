@@ -1,0 +1,28 @@
+/* Gesto da loja (#1443): abrir com o caixa, fechar no horário com justificativa. Pouca caixa,
+   números em destaque, o alerta só quando há o que decidir. */
+
+.corpo { display: grid; gap: var(--e-4); }
+
+.bloco { display: grid; gap: var(--e-2); }
+
+.apoio { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+
+.nota {
+  margin: 0; padding-left: var(--e-3); font-size: var(--t-apoio); color: var(--tinta-2);
+  border-left: var(--b-1) solid var(--linha); white-space: pre-line;
+}
+
+.alerta {
+  margin: 0; padding: var(--e-2) var(--e-3); font-size: var(--t-apoio); color: var(--tinta);
+  background: var(--aviso-fundo); border-radius: var(--r-1);
+}
+
+.erro { margin: 0; font-size: var(--t-apoio); color: var(--perigo); }
+
+.numeros {
+  margin: 0; display: grid; gap: var(--e-3);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+.numeros div { display: flex; flex-direction: column; gap: 2px; }
+.numeros dt { font-size: var(--t-apoio); color: var(--tinta-2); }
+.numeros dd { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); font-variant-numeric: tabular-nums; }
