@@ -14217,6 +14217,16 @@ function getLoteDoDia(dt = new Date()) {
   return `LOT-${y}${m}${d}`;
 }
 
+// #1471: codigo do lote igual ao do ERP (BatchLinker): lote do dia + '-' + ultimos 6
+// caracteres do id do batch, so letras e digitos. Deterministico, funciona offline e
+// distingue dois lotes do mesmo dia.
+function codigoDoLote(batch) {
+  const base = batch.lote || batch.code || getLoteDoDia(new Date(batch.createdAt));
+  const id = String(batch.id || '');
+  const sufixo = (id.length >= 6 ? id.slice(-6) : id).replace(/[^\p{L}\p{N}]/gu, '');
+  return sufixo ? base + '-' + sufixo : base;
+}
+
 // SKU pra etiqueta (prefixo do código de barras). Lê do produto se cadastrado;
 // senão deriva do id (slug uppercase, max 8 caracteres).
 function getProductSku(product) {
@@ -16509,6 +16519,15 @@ function findUnitByCode(code) {
     const ets = etiquetasFromBatch(batch);
     for (const et of ets) {
       if (String(et.codigoBarras || '').toUpperCase() === c) {
+        return { batch, et, idxStr: et.idxStr };
+      }
+    }
+  }
+  // Etiqueta impressa antes do #1471 (sem sufixo do lote). Pode colidir entre lotes
+  // do mesmo dia; devolve o primeiro, como antes.
+  for (const batch of allBatches) {
+    for (const et of etiquetasFromBatch(batch)) {
+      if (String(et.codigoBarrasLegado || '').toUpperCase() === c) {
         return { batch, et, idxStr: et.idxStr };
       }
     }
@@ -18988,7 +19007,9 @@ function generateCode128Svg(data, width = 260, height = 58) {
  */
 function etiquetasFromBatch(batch) {
   const out = [];
-  const lote = batch.lote || getLoteDoDia(new Date(batch.createdAt));
+  const lote = codigoDoLote(batch);
+  // Formato antigo (so o lote do dia): etiquetas ja impressas continuam achaveis.
+  const loteLegado = batch.lote || getLoteDoDia(new Date(batch.createdAt));
   const empresa = getEmpresaName();
   let serial = 1;
   (batch.items || []).forEach(it => {
@@ -19006,6 +19027,7 @@ function etiquetasFromBatch(batch) {
         idx: serial,
         idxStr,
         codigoBarras: `${sku}-${lote}-${idxStr}`,
+        codigoBarrasLegado: `${sku}-${loteLegado}-${idxStr}`,
         weightG: it.weightG ?? null,
         productionDate: batch.createdAt,
         expiresAt: it.expiresAt ?? null,

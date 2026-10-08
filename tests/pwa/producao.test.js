@@ -94,10 +94,49 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     const ets = JSON.parse(r);
     assert.strictEqual(ets.length, 3, '3 etiquetas pra qty=3');
     assert.strictEqual(ets[0].productName, 'Pao');
-    assert.strictEqual(ets[0].lote, 'L-2026-001');
+    // #1471: a etiqueta mostra o codigo do lote igual ao ERP (lote do dia + sufixo do batch).
+    assert.strictEqual(ets[0].lote, 'L-2026-001-b1');
     assert.strictEqual(ets[0].idxStr, '001');
     assert.strictEqual(ets[2].idxStr, '003');
     assert.match(ets[0].codigoBarras, /-001$/);
+  });
+
+  // #1471 — mesma regra do BatchLinker: base + '-' + ultimos 6 do id, so letras e digitos.
+  test('producao: codigoDoLote bate com o codigo do Lote no ERP', () => {
+    const r = runInSandbox(`
+      JSON.stringify([
+        codigoDoLote({ id: 'b-1728412345678', lote: 'LOT-261008' }),
+        codigoDoLote({ id: 'b-12', code: 'BATCH-X' }),
+        codigoDoLote({ id: 'ab-c-d', lote: 'LOT-261008' })
+      ]);
+    `);
+    assert.deepStrictEqual(JSON.parse(r), ['LOT-261008-345678', 'BATCH-X-b12', 'LOT-261008-abcd']);
+  });
+
+  test('producao: dois lotes do mesmo produto no mesmo dia nao colidem na etiqueta', () => {
+    const r = runInSandbox(`
+      products = [{ id: 'p1', name: 'Lasanha', sku: 'LASA', archived: false }];
+      const item = { productId: 'p1', name: 'Lasanha', qty: 1, unit: 'Un', expiresAt: null };
+      const a = etiquetasFromBatch({ id: 'b-1728400000001', lote: 'LOT-261008', createdAt: Date.now(), items: [item] });
+      const b = etiquetasFromBatch({ id: 'b-1728400000002', lote: 'LOT-261008', createdAt: Date.now(), items: [item] });
+      JSON.stringify([a[0].codigoBarras, b[0].codigoBarras]);
+    `);
+    const [a, b] = JSON.parse(r);
+    assert.notStrictEqual(a, b, 'cada lote tem codigo proprio');
+    assert.strictEqual(a, 'LASA-LOT-261008-000001-001');
+    assert.ok(a.length <= 32, 'cabe no CODE128 ESC/POS (max 32)');
+  });
+
+  test('producao: findUnitByCode acha etiqueta nova e etiqueta antiga ja impressa', () => {
+    const r = runInSandbox(`
+      products = [{ id: 'p1', name: 'Lasanha', sku: 'LASA', archived: false }];
+      batches = [{ id: 'b-1728400000001', lote: 'LOT-261008', createdAt: Date.now(),
+        items: [{ productId: 'p1', name: 'Lasanha', qty: 2, unit: 'Un', expiresAt: null }] }];
+      const nova = findUnitByCode('LASA-LOT-261008-000001-002');
+      const antiga = findUnitByCode('lasa-lot-261008-002');
+      JSON.stringify([nova && nova.idxStr, antiga && antiga.idxStr]);
+    `);
+    assert.deepStrictEqual(JSON.parse(r), ['002', '002']);
   });
 
   // #412 — demanda agrega so pedidos abertos (aguardando+preparando), soma qty
