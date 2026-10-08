@@ -36,3 +36,14 @@ public class AtendimentoCardapioDoDiaControllerTests
         r.Should().BeOfType<ForbidResult>();
     }
 }
+
+/// <summary>#1241 (decisão do Felipe, 08/10/2026): editar o item do cardápio é do Gerente.</summary>
+public class AtendimentoItensCardapioControllerTests
+{
+    [Fact]
+    public void ItensDoCardapio_SaoDoGerente()
+    {
+        typeof(AtendimentoItensCardapioController).GetCustomAttributes<AuthorizeAttribute>(inherit: true)
+            .Select(a => a.Policy).Should().ContainSingle().Which.Should().Be("Gerente");
+    }
+}

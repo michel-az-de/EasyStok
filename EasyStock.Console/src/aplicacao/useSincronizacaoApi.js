@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react'
 import * as acao from './acoes'
 import { listarTodasConversas, listarMensagens } from '../infra/api/conversasApi'
 import { conversaDaApi } from '../infra/api/traducaoConversas'
-import { listarCardapio, obterPedido, pedidoDaApi } from '../infra/api/comandaApi'
+import { obterPedido, pedidoDaApi } from '../infra/api/comandaApi'
+import { lerAlertasDeEstoque, lerCardapio } from './api/cardapio'
 import { deveRelerMensagens, deveRelerPedido, quedaDaSincronizacao } from './planoDeSincronizacao'
 
 // Polling da inbox (F01): não existe SSE de conversas ainda (S18). A lista vem a
@@ -54,13 +55,16 @@ export function useSincronizacaoApi({ ativo, usuario, despachar, selecionadaId =
       }
     }
 
+    // #1241: com os itens tirados (Repor) e os alertas de produto vendido sem saldo.
     async function cardapio() {
       try {
-        const itens = await listarCardapio()
+        const itens = await lerCardapio()
         if (vivo) despachar({ tipo: acao.SINCRONIZAR_CARDAPIO, cardapio: itens })
       } catch (erro) {
         if (vivo) despachar({ tipo: acao.AVISO_API, mensagem: `Cardápio: ${erro.message}` })
       }
+      const alertas = await lerAlertasDeEstoque()
+      if (vivo) despachar({ tipo: acao.ALERTAS_DE_ESTOQUE_DA_API, alertas })
     }
 
     async function ciclo() {
