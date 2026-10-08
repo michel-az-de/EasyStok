@@ -365,11 +365,9 @@ public class SyncMutationDispatcher(
             var p = await _db.Set<Product>()
                 .FirstOrDefaultAsync(x => x.Id == i.ProductId && x.EmpresaId == empresaId);
             if (p == null) continue;
-            var reconciliouNoErp = await _stockReconciler.ApplyDeltaAsync(
-                p, +i.Qty, NaturezaMovimentacaoEstoque.Producao,
-                descricao: $"Lote mobile {dto.Lote ?? dto.Code} unidade {i.Name}",
-                referenciaDocumento: dto.Id);
-            if (!reconciliouNoErp) p.Stock += i.Qty;
+            // #1458: a entrada no ERP e do BatchLinker (um ItemEstoque por lote, com validade).
+            // Reconciliar aqui tambem somava o mesmo lote duas vezes no estoque.
+            p.Stock += i.Qty;
         }
         _db.Add(batch);
     }
