@@ -40,6 +40,12 @@ Fica no `EasyStock.Web` (bastidor, ADR-0056 item 7): gestão e histórico de est
 fornecedores, financeiro (contas a pagar e a receber), etiquetas de lote, relatórios gerenciais. A operação
 do dia (saldo, lote em porções, desacerto, produção, perda) vai para o console no M2.
 
+> **Emendado em 08/10 pelo [ADR-0059](../../adr/0059-web-sai-pwa-continua-e-merge-de-conflitos.md).**
+> O `EasyStock.Web` sai inteiro: todas as áreas acima vão para o console, e as telas antigas servem só
+> de referência de regra. A PWA de produção e cadastro continua junto ao console como backup offline, e
+> conflito entre os dois vai para um módulo de merge decidido pela dona. DM7-1, D-M5-02, D-M5-07 e a
+> Fase B precisam ser revistas à luz disso.
+
 ## 2. Princípios (vinculantes para toda fatia)
 
 1. **O jeito de operar é o do protótipo.** Atendimento é o cockpit (D5); avisa, não trava (D7);
