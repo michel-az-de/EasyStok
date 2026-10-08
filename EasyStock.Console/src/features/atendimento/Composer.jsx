@@ -2,18 +2,19 @@ import { useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
-import { Popover } from '../../componentes/Popover'
 import { useAcoes } from '../../aplicacao/contextos'
 import { useAtalhoBarra } from '../../aplicacao/useAtalhoBarra'
 import { aceitaFormato, motivoDeFormato, restricoesDoCanal } from '../../dominio/canal'
 import {
   mensagemDeArquivoAnexado, mensagemDeAudio, mensagemDeImagemAnexada, tipoDeArquivo, validarArquivo,
 } from '../../dominio/anexos'
+import { escolherFormatoGravacao } from '../../dominio/audio'
 import { useArquivoComoDataUrl } from '../../hooks/useArquivoComoDataUrl'
 import { useGravadorAudio } from '../../hooks/useGravadorAudio'
 import { BotaoAnexarArquivo, GravadorAudio, PreviaAnexo } from './ComposerAnexos'
 import { textoConviteCardapio } from '../../dominio/cardapioLink'
 import { ModalEnviarCardapio } from './ModalEnviarCardapio'
+import { SeletorRespostas } from './SeletorRespostas'
 import css from './atendimento.module.css'
 
 export function Composer({
@@ -22,8 +23,8 @@ export function Composer({
   aoReabrir,
 }) {
   const { enviarMidia, enviar, obterLinkCardapio } = useAcoes()
-  // Atalho "/" no campo (rodada 7, pedido do dono 24/09/2026): filtra a
-  // biblioteca inteira (pronta e automática) e insere no lugar do atalho.
+  // Seletor rápido (#1441): "/" no campo ou o botão Respostas abrem a lista
+  // compacta de respostas prontas; Enter insere no campo.
   const barra = useAtalhoBarra({ rascunho, conversa, aoInserir: aoMudarRascunho })
   // `.composer` tem overflow-y:auto (válvula de segurança de tela baixa,
   // atendimento.module.css) e isso RECORTA um Popover ancorado nele, porque
@@ -40,7 +41,7 @@ export function Composer({
   const [linkCardapio, setLinkCardapio] = useState(null)
   const [buscandoLink, setBuscandoLink] = useState(false)
   const { ler } = useArquivoComoDataUrl()
-  const gravador = useGravadorAudio()
+  const gravador = useGravadorAudio({ escolherTipo: escolherFormatoGravacao })
   const gravando = gravador.estado !== 'ocioso'
 
   async function aoEscolherArquivo(arquivo) {
@@ -74,10 +75,21 @@ export function Composer({
     aoEnviar()
   }
 
+  // #1444 (homologação 07/10: "não sei se ele tá enviando"): o gravador fica no lugar mostrando o
+  // envio até o EasyStok responder; o balão na conversa nasce "enviando". Se não sair, o motivo
+  // fica no balão e aqui só o aviso curto.
+  const [enviandoAudio, setEnviandoAudio] = useState(false)
   async function aoEnviarAudio() {
-    const resultado = await gravador.finalizar()
-    if (!resultado) return
-    enviarMidia(conversa.id, mensagemDeAudio(resultado))
+    setErroAnexo(null)
+    setEnviandoAudio(true)
+    try {
+      const resultado = await gravador.finalizar()
+      if (!resultado) return
+      const saiu = await enviarMidia(conversa.id, mensagemDeAudio(resultado))
+      if (saiu === false) setErroAnexo('O áudio não foi enviado. O motivo está no balão da conversa.')
+    } finally {
+      setEnviandoAudio(false)
+    }
   }
 
   const temTexto = rascunho.trim().length > 0
@@ -131,8 +143,8 @@ export function Composer({
       {/* Gravando substitui o campo de texto e as ações: gravar e escrever ao
           mesmo tempo não é o gesto que o dono pediu ("gravar... cancelar ou
           enviar"), e um estado só por vez é mais fácil de entender. */}
-      {gravando ? (
-        <GravadorAudio gravador={gravador} aoCancelar={gravador.cancelar} aoEnviar={aoEnviarAudio} />
+      {gravando || enviandoAudio ? (
+        <GravadorAudio gravador={gravador} enviando={enviandoAudio} aoCancelar={gravador.cancelar} aoEnviar={aoEnviarAudio} />
       ) : (
         <>
           {anexo && (
@@ -170,20 +182,7 @@ export function Composer({
                   do próprio Popover) e planta o conteúdo em document.body,
                   fora do recorte de `.composer`. Visual idêntico ao de antes,
                   só que agora fora do overflow. */}
-              {barra.aberto && (barra.semResultado ? (
-                <Popover rotulo="Atalho de resposta" aoFechar={() => aoMudarRascunho('')} semAutoFoco portal>
-                  <p className={css.restricao}>Nada com esse atalho.</p>
-                </Popover>
-              ) : (
-                <Popover
-                  rotulo="Atalho de resposta"
-                  grupos={barra.grupos}
-                  aoEscolher={barra.aoEscolher}
-                  aoFechar={() => aoMudarRascunho('')}
-                  semAutoFoco
-                  portal
-                />
-              ))}
+              {barra.aberto && <SeletorRespostas seletor={barra} aoGerenciar={aoAbrirBiblioteca} />}
             </div>
 
             <div className={css.acoes}>
@@ -195,10 +194,11 @@ export function Composer({
                   Fotos, Cardápio, Nota, Enviar) continuam ícone só. */}
               <Botao
                 disabled={!podeEscrever}
-                aria-haspopup="dialog"
-                title="Respostas prontas e mensagens automáticas"
+                aria-haspopup="listbox"
+                aria-expanded={barra.aberto}
+                title="Respostas prontas (atalho: / no campo)"
                 className={css.botaoRespostas}
-                onClick={() => aoAbrirBiblioteca()}
+                onClick={barra.abrir}
               >
                 <Icone nome="respostas" />
                 <span>Respostas</span>

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as api from '../infra/api/entregasApi'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
-import { STATUS_KDS_ENTREGAS, recarregaEntregasCom } from '../dominio/entregasApi'
+import { STATUS_KDS_DIA, STATUS_KDS_ENTREGAS, recarregaEntregasCom } from '../dominio/entregasApi'
+import { dataIsoNoFuso } from '../dominio/formato'
 
 // Entregas no modo API (F04). Pedidos e viagens recarregam a cada evento de
 // pedido do SSE de operação (S18), o mesmo da cozinha (F05). Com o SSE caído,
@@ -19,22 +20,43 @@ export function useEntregasApi() {
   const [aoVivo, setAoVivo] = useState(false)
   const [ocupado, setOcupado] = useState(false)
   const vivoRef = useRef(true)
+  // #1440: o dia do roteiro (hoje por padrão; amanhã para preparar a véspera). Pedidos do dia
+  // em todos os status, janelas e bloqueios da S45 (Admin: sem permissão, a tela agrupa só
+  // pelo que vem no pedido).
+  const [dia, setDia] = useState(() => dataIsoNoFuso(Date.now()))
+  const diaRef = useRef(dia)
+  const [doDia, setDoDia] = useState(null)
 
-  const recarregar = useCallback(() => Promise.all([
-    api.listarPedidosEntrega(STATUS_KDS_ENTREGAS),
-    api.listarViagens(),
-    api.listarEntregadores(),
-    api.listarChamados(),
-  ])
-    .then(([p, v, e, c]) => {
-      if (!vivoRef.current) return
-      setPedidos(p ?? [])
-      setViagens(v ?? [])
-      setEntregadores(e ?? [])
-      setChamados(c ?? [])
-      setErro(null)
-    })
-    .catch((e) => { if (vivoRef.current) setErro(`As entregas não carregaram: ${e.message}`) }), [])
+  const recarregar = useCallback(() => {
+    const data = diaRef.current
+    return Promise.all([
+      api.listarPedidosEntrega(STATUS_KDS_ENTREGAS),
+      api.listarViagens(),
+      api.listarEntregadores(),
+      api.listarChamados(),
+      api.listarPedidosEntrega(STATUS_KDS_DIA, data),
+      api.listarJanelas().catch(() => null),
+      api.listarBloqueios(data, data).catch(() => null),
+    ])
+      .then(([p, v, e, c, pedidosDoDia, janelas, bloqueios]) => {
+        if (!vivoRef.current) return
+        setPedidos(p ?? [])
+        setViagens(v ?? [])
+        setEntregadores(e ?? [])
+        setChamados(c ?? [])
+        if (diaRef.current === data) setDoDia({ data, pedidos: pedidosDoDia ?? [], janelas, bloqueios })
+        setErro(null)
+      })
+      .catch((e) => { if (vivoRef.current) setErro(`As entregas não carregaram: ${e.message}`) })
+  }, [])
+
+  const mudarDia = useCallback((data) => {
+    if (!data || data === diaRef.current) return
+    diaRef.current = data
+    setDia(data)
+    setDoDia(null)
+    recarregar()
+  }, [recarregar])
 
   useEffect(() => {
     vivoRef.current = true
@@ -103,5 +125,8 @@ export function useEntregasApi() {
     recusar: (id) => executar(() => api.recusarPedido(id, 'operacional'), 'O pedido não foi recusado'),
   }
 
-  return { pedidos, viagens, entregadores, chamados, erro, aoVivo, ocupado, acoes, limparErro: () => setErro(null) }
+  return {
+    pedidos, viagens, entregadores, chamados, erro, aoVivo, ocupado, acoes, limparErro: () => setErro(null),
+    dia, mudarDia, doDia,
+  }
 }

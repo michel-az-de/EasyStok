@@ -1,3 +1,5 @@
+import { API_BASE } from '../fonteDados'
+import { urlDeExibicaoDaFoto } from '../../dominio/vitrineCardapio'
 import { chamarApi } from './cliente'
 import { instante } from './traducaoConversas'
 import { lerSessao } from './sessao'
@@ -21,8 +23,10 @@ export const produtoDaApi = (item) => ({
   estoque: item.estoqueAtual ?? null,
   disponivelHoje: item.disponivel !== false,
   categoria: item.categoria ?? null,
-  foto: item.imagemUrl ?? null,
-  fotos: item.fotos?.length ? item.fotos : item.imagemUrl ? [item.imagemUrl] : [],
+  // #1448: a foto passa pela rota de mídia da API, de qualquer host gravado na URL.
+  foto: urlDeExibicaoDaFoto(item.imagemUrl, API_BASE),
+  fotos: (item.fotos?.length ? item.fotos : item.imagemUrl ? [item.imagemUrl] : [])
+    .map((url) => urlDeExibicaoDaFoto(url, API_BASE)).filter(Boolean),
 })
 
 const DIA_DA_SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']

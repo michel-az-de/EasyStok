@@ -122,7 +122,8 @@ public sealed class IncluirParadaViagemUseCase(
             throw new UseCaseValidationException("Pedido já está em outra viagem.");
 
         var bloqueado = pedido.ClienteId is { } cid && (await clientes.GetByIdAsync(empresaId, cid))?.Bloqueado == true;
-        Regra.Validar(() => viagem.IncluirParada(pedidoId, bloqueado));
+        var parada = Regra.Validar(() => viagem.IncluirParada(pedidoId, bloqueado));
+        await viagens.RegistrarParadaNovaAsync(parada, ct);
         await unitOfWork.CommitAsync();
     }
 }

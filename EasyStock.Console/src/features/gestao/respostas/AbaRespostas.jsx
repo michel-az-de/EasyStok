@@ -1,0 +1,236 @@
+import { useMemo, useState } from 'react'
+import { Botao } from '../../../componentes/Botao'
+import { CampoArea, CampoTexto } from '../../../componentes/Campo'
+import { useAcoes, useAtendimento, useCatalogo } from '../../../aplicacao/contextos'
+import { VARIAVEIS_DA_API, variaveisForaDaApi } from '../../../dominio/automacao'
+import { gerarAtalho, normalizarBusca } from '../../../dominio/respostas'
+import css from './abaRespostas.module.css'
+
+// Aba "Respostas e automáticas" da Gestão (#1441). Saiu do caminho do atendimento:
+// lá fica só o seletor rápido. Aqui a dona cria, edita e arquiva as respostas
+// prontas e liga, desliga e escreve as mensagens automáticas. Lista densa, uma
+// linha por item, ações em texto; o formulário só abre na linha que ela escolheu.
+
+// A ação do modo API devolve `false` quando não gravou (o aviso já foi para a faixa);
+// a da demonstração não devolve nada. Nos dois casos sem `false`, o formulário fecha.
+const depois = (resultado, fechar) => Promise.resolve(resultado).then((ok) => { if (ok !== false) fechar() })
+
+const VARIAVEIS_TEXTO = VARIAVEIS_DA_API.map((v) => `{${v.chave}} ${v.descricao}`).join(' · ')
+
+function FormResposta({ inicial, aoSalvar, aoCancelar }) {
+  const [titulo, setTitulo] = useState(inicial?.titulo ?? '')
+  const [atalho, setAtalho] = useState(inicial?.atalho ?? '')
+  const [texto, setTexto] = useState(inicial?.texto ?? '')
+  const [salvando, setSalvando] = useState(false)
+  const pronto = titulo.trim() && texto.trim()
+
+  function salvar(evento) {
+    evento.preventDefault()
+    if (!pronto) return
+    setSalvando(true)
+    const dados = { titulo: titulo.trim(), atalho: atalho.trim() || gerarAtalho(titulo), texto: texto.trim() }
+    Promise.resolve(aoSalvar(dados)).finally(() => setSalvando(false))
+  }
+
+  return (
+    <form className={css.form} onSubmit={salvar}>
+      <div className={css.duas}>
+        <CampoTexto rotulo="Título" value={titulo} maxLength={80} onChange={(e) => setTitulo(e.target.value)} autoFocus />
+        <CampoTexto
+          rotulo="Atalho"
+          value={atalho}
+          placeholder={titulo ? gerarAtalho(titulo) : '/pix'}
+          onChange={(e) => setAtalho(e.target.value.replace(/\s/g, '-'))}
+        />
+      </div>
+      <CampoArea rotulo="Texto" rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} dica={VARIAVEIS_TEXTO} />
+      <div className={css.acoes}>
+        <Botao variante="primario" tipo="submit" disabled={!pronto || salvando}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
+        <Botao variante="texto" onClick={aoCancelar}>Cancelar</Botao>
+      </div>
+    </form>
+  )
+}
+
+function SecaoRespostas() {
+  const { respostasProntas } = useCatalogo()
+  const { incluirRespostaPronta, editarRespostaPronta, alternarArquivamentoRespostaPronta } = useAcoes()
+  const [busca, setBusca] = useState('')
+  const [verArquivadas, setVerArquivadas] = useState(false)
+  // 'nova', o id da resposta em edição, ou null.
+  const [editando, setEditando] = useState(null)
+
+  const lista = useMemo(() => {
+    const alvo = normalizarBusca(busca)
+    return (respostasProntas ?? [])
+      .filter((r) => verArquivadas || !r.arquivada)
+      .filter((r) => !alvo || [r.titulo, r.atalho, r.texto].some((c) => normalizarBusca(c).includes(alvo)))
+      .sort((a, b) => Number(a.arquivada) - Number(b.arquivada) || a.titulo.localeCompare(b.titulo, 'pt-BR'))
+  }, [respostasProntas, busca, verArquivadas])
+  const ativas = (respostasProntas ?? []).filter((r) => !r.arquivada).length
+
+  return (
+    <section className={css.secao} aria-labelledby="gestao-respostas">
+      <header className={css.topo}>
+        <div>
+          <h3 id="gestao-respostas">Respostas prontas</h3>
+          <p className={css.descricao}>{ativas} ativas. No atendimento, digite / no campo ou toque em Respostas.</p>
+        </div>
+        <Botao variante="primario" icone="plus" onClick={() => setEditando('nova')} disabled={editando === 'nova'}>Nova resposta</Botao>
+      </header>
+
+      <div className={css.filtros}>
+        <input
+          type="search"
+          className={css.busca}
+          aria-label="Buscar resposta pronta"
+          placeholder="Buscar"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+        />
+        <label className={css.chave}>
+          <input type="checkbox" checked={verArquivadas} onChange={(e) => setVerArquivadas(e.target.checked)} />
+          Mostrar arquivadas
+        </label>
+      </div>
+
+      {editando === 'nova' && (
+        <FormResposta
+          aoSalvar={(dados) => depois(incluirRespostaPronta(dados), () => setEditando(null))}
+          aoCancelar={() => setEditando(null)}
+        />
+      )}
+
+      {lista.length === 0 ? (
+        <p className={css.vazio}>{busca ? 'Nada com essa busca.' : 'Nenhuma resposta pronta ainda.'}</p>
+      ) : (
+        <ul className={css.lista}>
+          {lista.map((r) => (
+            <li key={r.id} className={`${css.linha} ${r.arquivada ? css.arquivada : ''}`}>
+              {editando === r.id ? (
+                <FormResposta
+                  inicial={r}
+                  aoSalvar={(dados) => depois(editarRespostaPronta(r.id, dados), () => setEditando(null))}
+                  aoCancelar={() => setEditando(null)}
+                />
+              ) : (
+                <>
+                  <div className={css.resumo}>
+                    <span className={css.titulo}>{r.titulo}</span>
+                    <span className={css.atalho}>{r.atalho}</span>
+                    {r.arquivada && <span className={css.marca}>arquivada</span>}
+                    <span className={css.texto}>{r.texto}</span>
+                  </div>
+                  <div className={css.acoesLinha}>
+                    {!r.arquivada && <Botao variante="texto" onClick={() => setEditando(r.id)}>Editar</Botao>}
+                    <Botao variante="texto" onClick={() => alternarArquivamentoRespostaPronta(r.id)}>
+                      {r.arquivada ? 'Restaurar' : 'Arquivar'}
+                    </Botao>
+                  </div>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+function LinhaAutomatica({ regra, fonteApi }) {
+  const { alternarRegra, editarRegra } = useAcoes()
+  const [rascunho, setRascunho] = useState(null)
+  const [salvando, setSalvando] = useState(false)
+  const editando = rascunho !== null
+  const foraDaApi = fonteApi ? variaveisForaDaApi(rascunho ?? regra.texto) : []
+
+  function salvar() {
+    setSalvando(true)
+    depois(editarRegra(regra.id, { texto: rascunho.trim() }), () => setRascunho(null)).finally(() => setSalvando(false))
+  }
+
+  return (
+    <li className={`${css.linha} ${regra.ativa ? '' : css.desligada}`}>
+      <div className={css.resumo}>
+        <span className={css.titulo}>{regra.nome}</span>
+        <label className={`${css.chave} ${css.chaveLinha}`}>
+          <input
+            type="checkbox"
+            aria-label={`${regra.nome}, ${regra.ativa ? 'ligada' : 'desligada'}`}
+            checked={regra.ativa}
+            onChange={() => alternarRegra(regra.id)}
+          />
+          {regra.ativa ? 'Ligada' : 'Desligada'}
+        </label>
+        <span className={css.quando}>{regra.descricao}</span>
+        {!editando && (
+          regra.texto
+            ? <span className={css.textoInteiro}>{regra.texto}</span>
+            : <span className={css.semTexto}>Sem texto: não sai nada para o cliente.</span>
+        )}
+        {foraDaApi.length > 0 && (
+          <span className={css.alerta} role={editando ? 'alert' : undefined}>
+            {foraDaApi.map((v) => `{${v}}`).join(', ')} não é preenchida pelo EasyStok e sai escrita assim para o cliente.
+          </span>
+        )}
+      </div>
+
+      {editando ? (
+        <div className={css.form}>
+          <CampoArea
+            rotulo={`Texto de ${regra.nome}`}
+            rotuloOculto
+            rows={3}
+            value={rascunho}
+            onChange={(e) => setRascunho(e.target.value)}
+            dica={fonteApi ? VARIAVEIS_TEXTO : null}
+            autoFocus
+          />
+          <div className={css.acoes}>
+            <Botao variante="primario" disabled={!rascunho.trim() || salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
+            <Botao variante="texto" onClick={() => setRascunho(null)}>Cancelar</Botao>
+          </div>
+        </div>
+      ) : (
+        <div className={css.acoesLinha}>
+          <Botao variante="texto" onClick={() => setRascunho(regra.texto || regra.sugestao || '')}>
+            {regra.texto ? 'Editar texto' : 'Escrever texto'}
+          </Botao>
+        </div>
+      )}
+    </li>
+  )
+}
+
+function SecaoAutomaticas() {
+  const { regras, fonteApi } = useAtendimento()
+  return (
+    <section className={css.secao} aria-labelledby="gestao-automaticas">
+      <header className={css.topo}>
+        <div>
+          <h3 id="gestao-automaticas">Mensagens automáticas</h3>
+          <p className={css.descricao}>
+            Saem sozinhas, só dentro da janela de 24 h do canal e nunca para cliente bloqueado.
+            Na conversa aparecem com a etiqueta automática.
+          </p>
+        </div>
+      </header>
+      {regras.length === 0 ? (
+        <p className={css.vazio}>{fonteApi ? 'Carregando as automáticas do EasyStok…' : 'Nenhuma automática.'}</p>
+      ) : (
+        <ul className={css.lista}>
+          {regras.map((r) => <LinhaAutomatica key={r.id} regra={r} fonteApi={fonteApi} />)}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+export function AbaRespostas() {
+  return (
+    <div className={css.aba}>
+      <SecaoRespostas />
+      <SecaoAutomaticas />
+    </div>
+  )
+}

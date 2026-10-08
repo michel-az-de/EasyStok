@@ -9,9 +9,11 @@ import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import {
   analisarFotoSuspeita, dicaCDC, padraoDeCompra, resumoCliente, revisarOrtografia, sentimentoDaConversa,
 } from '../../dominio/assistente'
+import { executarAcaoDoAssistente, respostaDoAssistente } from '../../dominio/acoesDoAssistente'
 import {
   CartaoCDC, CartaoCliente, CartaoFotoSuspeita, CartaoOrtografia, CartaoPadraoDeCompra, CartaoSentimento,
 } from './Cartoes'
+import { AcoesPropostas } from './AcoesPropostas'
 import css from './assistente.module.css'
 
 // Balão flutuante do canto inferior direito (fala do dono, 24/09/2026 04h12):
@@ -20,9 +22,10 @@ import css from './assistente.module.css'
 // tela com a conversa. `sugestaoAgente` chega pronto de cima (mesma regra de
 // `PainelAtendimento`: feature não monta feature; quem junta as duas
 // features é `app/App.jsx`).
-export function BalaoAssistente({ sugestaoAgente }) {
+// #1445: `aoAbrirTela('cardapio' | 'comanda')` também vem do App, pelo mesmo motivo.
+export function BalaoAssistente({ sugestaoAgente, aoAbrirTela }) {
   const { selecionada, agora, historico, rascunho } = useAtendimento()
-  const { definirRascunho, perguntarAssistente } = useAcoes()
+  const { definirRascunho, perguntarAssistente, obterLinkCardapio, enviar, salvarNota } = useAcoes()
 
   const [aberto, setAberto] = useState(false)
   const [dispensados, setDispensados] = useState(() => new Set())
@@ -86,14 +89,33 @@ export function BalaoAssistente({ sugestaoAgente }) {
     proximoIdRef.current += 1
     setPergunta('')
     setPerguntando(true)
-    setTrocas((atual) => [...atual, { id, pergunta: texto, resposta: null, erro: null }])
+    setTrocas((atual) => [...atual, { id, pergunta: texto, resposta: null, acoes: [], erro: null }])
     try {
-      const resposta = await perguntarAssistente(texto, selecionada, historico)
-      setTrocas((atual) => atual.map((t) => (t.id === id ? { ...t, resposta } : t)))
+      // #1445: com as ações propostas, o texto pode vir vazio; a troca fica pronta mesmo assim.
+      const { texto: resposta, acoes } = respostaDoAssistente(await perguntarAssistente(texto, selecionada, historico))
+      setTrocas((atual) => atual.map((t) => (t.id === id ? { ...t, resposta: resposta || (acoes.length ? '' : '(sem resposta)'), acoes } : t)))
     } catch (erro) {
       setTrocas((atual) => atual.map((t) => (t.id === id ? { ...t, erro: erro.message } : t)))
     } finally {
       setPerguntando(false)
+    }
+  }
+
+  // #1445: só o clique da atendente executa a ação proposta. A conversa é a da troca
+  // (troca de conversa já zera as trocas, então é sempre a selecionada).
+  const marcarAcao = (trocaId, chave, mudanca) => setTrocas((atual) => atual.map((t) => (t.id !== trocaId ? t : {
+    ...t, acoes: t.acoes.map((a) => (a.chave === chave ? { ...a, ...mudanca } : a)),
+  })))
+  async function aoExecutarAcao(trocaId, acaoProposta) {
+    if (!selecionada) return
+    marcarAcao(trocaId, acaoProposta.chave, { estado: 'executando', erro: null })
+    try {
+      await executarAcaoDoAssistente(acaoProposta, selecionada, {
+        obterLinkCardapio, enviar, salvarNota, definirRascunho, abrirTela: (tela) => aoAbrirTela?.(tela),
+      })
+      marcarAcao(trocaId, acaoProposta.chave, { estado: 'feita' })
+    } catch (erro) {
+      marcarAcao(trocaId, acaoProposta.chave, { estado: 'falhou', erro: erro.message })
     }
   }
 
@@ -192,8 +214,13 @@ export function BalaoAssistente({ sugestaoAgente }) {
                         <div key={t.id} className={css.troca}>
                           <p className={css.perguntaDaThatiane}>{t.pergunta}</p>
                           {t.resposta && <p className={css.respostaDoAssistente}>{t.resposta}</p>}
+                          <AcoesPropostas
+                            acoes={t.acoes}
+                            nomeCliente={selecionada.nome}
+                            aoExecutar={(acaoProposta) => aoExecutarAcao(t.id, acaoProposta)}
+                          />
                           {t.erro && <p className={css.respostaErro}><Icone nome="alerta" tamanho={16} /> {t.erro}</p>}
-                          {!t.resposta && !t.erro && <p className={css.respostaPensando}>Pensando…</p>}
+                          {t.resposta === null && !t.erro && <p className={css.respostaPensando}>Pensando…</p>}
                         </div>
                       ))}
                     </div>
@@ -205,7 +232,7 @@ export function BalaoAssistente({ sugestaoAgente }) {
                       className={css.campoPergunta}
                       value={pergunta}
                       onChange={(e) => setPergunta(e.target.value)}
-                      placeholder="Ex.: esse cliente já reclamou antes?"
+                      placeholder="Ex.: manda o cardápio, anota que prefere sem cebola"
                       disabled={perguntando}
                     />
                     <Botao

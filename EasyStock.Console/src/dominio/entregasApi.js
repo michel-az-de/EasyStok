@@ -1,9 +1,17 @@
 // Entregas no modo API (F04). Regras puras sobre o que a API devolve: pedidos
 // do KDS (S19, com endereço e aprovação da S12/S14) e viagens da S44. Nada de
 // rede aqui; quem busca é `infra/api/entregasApi.js`.
+import { faixaDeHorarios, minutosDoDia } from './entrega'
 
 // Status que a gaveta pede ao KDS: aprovação manual, pronto e em rota.
 export const STATUS_KDS_ENTREGAS = 'aguardando_aprovacao_baba,pronto,saiu_para_entrega'
+
+// #1440: o dia inteiro do roteiro, do pedido que acabou de chegar ao que já foi entregue.
+// Rascunho e cancelado não são entrega.
+export const STATUS_KDS_DIA = [
+  'aguardando_pagamento', 'aguardando_aprovacao_baba', 'aprovado_baba', 'aguardando', 'preparando', 'pronto',
+  'saiu_para_entrega', 'entregue',
+].join(',')
 
 const ROTULO_SITUACAO = { Montando: 'Montando', EmRota: 'Em rota', Concluida: 'Concluída', Desfeita: 'Desfeita' }
 export const rotuloSituacaoViagem = (situacao) => ROTULO_SITUACAO[situacao] ?? situacao
@@ -21,6 +29,9 @@ export const EMPRESAS_ENTREGADOR = [
   { valor: 'Ifood', rotulo: 'iFood Entregas' },
   { valor: 'Outra', rotulo: 'Outra' },
 ]
+
+export const rotuloEmpresaEntregador = (valor) =>
+  (valor ? EMPRESAS_ENTREGADOR.find((e) => e.valor === valor)?.rotulo ?? valor : null)
 
 export const DIAS_DA_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 
@@ -88,4 +99,33 @@ export const corpoBloqueio = (f) => ({
   data: f.data,
   motivo: f.motivo.trim(),
   janelaEspecificaId: f.janelaEspecificaId || null,
+})
+
+// #1440: o formulário de janela marca vários dias de uma vez; a API guarda uma janela por dia
+// da semana, então sai um corpo por dia. Sem nome, a janela leva a própria faixa.
+const diasOrdenados = (dias) => [...new Set((dias ?? []).map(Number))].sort((a, b) => a - b)
+
+export function erroDoFormularioJanela(f) {
+  const inicio = minutosDoDia(f.horaInicio)
+  const fim = minutosDoDia(f.horaFim)
+  if (inicio == null || fim == null) return 'Informe início e fim da janela.'
+  if (fim <= inicio) return 'O fim da janela tem que vir depois do início.'
+  const capacidade = Number(f.capacidadeMaxima)
+  if (!Number.isInteger(capacidade) || capacidade < 1) return 'Capacidade tem que ser um número inteiro de 1 ou mais.'
+  if (diasOrdenados(f.dias).length === 0) return 'Escolha pelo menos um dia da semana.'
+  return null
+}
+
+export const corposJanela = (f) => {
+  const label = f.label?.trim() || faixaDeHorarios(f.horaInicio, f.horaFim)
+  return diasOrdenados(f.dias).map((diaDaSemana) => corpoJanela({ ...f, diaDaSemana, label }))
+}
+
+// Janela da API -> campos do formulário de edição (um dia só: cada janela é de um dia).
+export const camposDaJanela = (j) => ({
+  dias: [j.diaDaSemana],
+  horaInicio: String(j.horaInicio).slice(0, 5),
+  horaFim: String(j.horaFim).slice(0, 5),
+  capacidadeMaxima: String(j.capacidadeMaxima),
+  label: j.label ?? '',
 })

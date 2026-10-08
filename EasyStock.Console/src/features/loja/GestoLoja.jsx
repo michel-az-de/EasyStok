@@ -244,7 +244,7 @@ export function ModalFecharLoja({ aoFechar }) {
           value={justificativa}
           onChange={(e) => setJustificativa(e.target.value)}
         />
-        <p className={css.apoio}>O caixa continua aberto. Para fechar o dia, use Gestão › Caixa.</p>
+        <p className={css.apoio}>O caixa continua aberto. Para fechar o dia, use Financeiro › Caixa do dia.</p>
         <Erro texto={envio.erro} />
       </div>
     </Modal>

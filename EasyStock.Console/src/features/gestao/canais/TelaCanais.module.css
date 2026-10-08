@@ -1,0 +1,36 @@
+/* Configurações › Canais (#1447). Uma coluna, pouca moldura: o canal em cima,
+   as telas ligadas a ele embaixo como lista de atalhos. Só tokens. */
+.tela { display: flex; flex-direction: column; gap: var(--e-5); }
+
+.canal {
+  display: flex; flex-direction: column; gap: var(--e-4);
+  padding: var(--e-4); border-radius: var(--r-3);
+  background: var(--papel); box-shadow: var(--sombra);
+}
+
+.cabeca { display: flex; align-items: flex-start; gap: var(--e-3); }
+.selo {
+  display: grid; place-items: center; flex: none;
+  width: 52px; height: 52px; border-radius: var(--r-2);
+  background: var(--elevado); color: var(--c-whatsapp);
+}
+.titulo { margin: 0; font-family: var(--f-titulo-marca); font-size: var(--t-titulo); font-weight: 600; color: var(--tinta); }
+.subtitulo { margin: 0 0 var(--e-2); font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
+.apoio { margin: var(--e-1) 0 0; font-size: var(--t-corpo); color: var(--tinta-2); }
+
+.estado { display: flex; flex-direction: column; align-items: flex-start; gap: var(--e-2); }
+.linhas { margin: 0; padding-left: var(--e-4); font-size: var(--t-corpo); color: var(--tinta); }
+.erro { margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--perigo); }
+
+.listaLigadas { margin: 0; padding: 0; list-style: none; border-top: var(--b-1) solid var(--linha); }
+.ligada {
+  display: flex; align-items: center; gap: var(--e-3);
+  min-height: calc(var(--toque) + var(--e-3)); padding: var(--e-3) var(--e-2);
+  border-bottom: var(--b-1) solid var(--linha);
+  color: var(--tinta); text-decoration: none;
+  transition: background var(--dur-micro) var(--ease-padrao);
+}
+.ligada:hover { background: var(--preenchimento); }
+.ligada:focus-visible { outline: 2px solid var(--halo); outline-offset: 2px; }
+.textoLigada { display: flex; flex: 1; flex-direction: column; min-width: 0; font-size: var(--t-corpo); }
+.textoLigada span { color: var(--tinta-2); font-size: var(--t-apoio); }

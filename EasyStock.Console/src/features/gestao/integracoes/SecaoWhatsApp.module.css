@@ -6,6 +6,8 @@
   border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
 }
 
+.embutida { display: flex; flex-direction: column; gap: var(--e-3); align-items: flex-start; }
+
 .titulo { margin: 0; font-size: var(--t-titulo); color: var(--tinta); }
 .texto { margin: 0; font-size: var(--t-corpo); color: var(--tinta); }
 .botao { font-size: var(--t-forte); }

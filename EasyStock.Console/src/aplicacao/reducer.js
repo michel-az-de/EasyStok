@@ -72,8 +72,9 @@ export function estadoInicial({
     selecionadaId: conversas[0]?.id ?? null,
     // Balcão (seção 1, rodada 5): duas abas, canais que ligam mais de um ao
     // mesmo tempo e uma ordem só. `MUDAR_FILTRO` é genérico (chave/valor), a
-    // forma nova só muda o que mora em cada chave.
-    filtros: { busca: '', aba: 'precisa', canais: [], ordenacao: 'urgencia' },
+    // forma nova só muda o que mora em cada chave. #1442: abre em "Todas";
+    // "Precisa de você" virou filtro com contador.
+    filtros: { busca: '', aba: 'todas', canais: [], ordenacao: 'urgencia' },
     rascunhos: {},
     automaticoPausado: {},
     // Lista, não campo único: dois desacertos de saldo antes dela clicar
@@ -648,7 +649,8 @@ const CASOS = {
       ...c,
       cliente: {
         ...c.cliente,
-        notas: [{ id: notaId, autor: ATENDENTE, em: dataHora(agora), texto }, ...c.cliente.notas],
+        // `criadoEm` (#1441): a nota entra no fio da conversa como post-it pela hora.
+        notas: [{ id: notaId, autor: ATENDENTE, em: dataHora(agora), criadoEm: new Date(agora).toISOString(), texto }, ...c.cliente.notas],
       },
     })),
 

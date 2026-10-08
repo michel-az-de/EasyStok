@@ -36,8 +36,10 @@ import { gravarRascunhos, lerRascunhos } from '../infra/api/rascunhosDaSessao'
 
 const carregar = () => ({
   conversas: carregarConversas(),
-  catalogo: carregarCatalogo(),
-  regras: REGRAS_PADRAO,
+  // #1441: no modo API as respostas prontas são as do EasyStok, nunca as da demonstração.
+  catalogo: FONTE_API ? { ...carregarCatalogo(), respostasProntas: [] } : carregarCatalogo(),
+  // #1441: no modo API as automáticas chegam do EasyStok; até lá, nenhuma (não as da demonstração).
+  regras: FONTE_API ? [] : REGRAS_PADRAO,
   funcionamento: FUNCIONAMENTO_PADRAO,
   // Integração 48, decisão do gerente: a massa nasce com a loja ABERTA pela
   // Thatiane, no modo manual, coerente com os pedidos em preparo do dia. Sem
@@ -295,6 +297,8 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
   // Modo API (F02): o expediente vem da API uma vez ao entrar; depois, a cada gravação.
   useEffect(() => {
     if (FONTE_API) acoesAtivas.recarregarExpediente()
+    // #1441: respostas prontas e automáticas também vêm do EasyStok ao entrar.
+    if (FONTE_API) acoesAtivas.recarregarRespostas()
   }, [acoesAtivas])
   useEffect(() => () => acoesAtivas.cancelarHorarioPendente?.(), [acoesAtivas])
 

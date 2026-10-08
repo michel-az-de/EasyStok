@@ -13,6 +13,9 @@ public sealed record EnviarTextoConsoleCommand(Guid EmpresaId, Guid UsuarioId, G
 public sealed record EnviarImagemConsoleCommand(
     Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string FileName, string ContentType, byte[] Conteudo, string? Legenda);
 
+/// <summary>Áudio gravado no console (#1444): os bytes como vieram do navegador; o formato sai dos bytes.</summary>
+public sealed record EnviarAudioConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, byte[] Conteudo);
+
 /// <summary>
 /// A dona responde pelo console (S07, RN-04, D4): envia pela porta do canal da conversa (S34), grava
 /// <c>Mensagem(Saida, Dona)</c> com o id externo e marca a conversa <see cref="SituacaoConversa.Assumida"/>,
@@ -81,6 +84,31 @@ public sealed class EnviarMensagemConsoleUseCase(
                 var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
                     TipoConteudoMensagem.Imagem, legenda, externoId);
                 mensagem.AnexarMidia(imagem.StorageKey, imagem.ContentType);
+                return mensagem;
+            },
+            ct);
+    }
+
+    /// <summary>
+    /// Áudio gravado pela dona (#1444). Só em canal que aceita áudio (domínio) e cujo adaptador já envia
+    /// (<see cref="ICanalComAudio"/>); a conversão e a validação do formato vêm antes de qualquer envio.
+    /// </summary>
+    public async Task<MensagemAtendimentoResult> EnviarAudioAsync(EnviarAudioConsoleCommand command, CancellationToken ct = default)
+    {
+        var agora = DateTime.UtcNow;
+        var conversa = await ObterParaEnvioAsync(command.EmpresaId, command.ConversaId, agora, ct);
+        if (!conversa.Capacidades.AceitaAudio || resolvedorCanal.Obter(conversa.Canal) is not ICanalComAudio canal)
+            throw new UseCaseValidationException($"O canal {conversa.Canal} ainda não envia áudio pelo EasyStok.");
+
+        var audio = await uploads.UploadAudioAtendimentoAsync(command.EmpresaId, conversa.Id, command.Conteudo, ct);
+
+        return await EnviarERegistrarAsync(conversa, command.UsuarioId, agora,
+            () => canal.EnviarAudioAsync(conversa.ContatoIdExterno, audio.Url, audio.NotaDeVoz, ct),
+            externoId =>
+            {
+                var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
+                    TipoConteudoMensagem.Audio, null, externoId);
+                mensagem.AnexarMidia(audio.StorageKey, audio.ContentType);
                 return mensagem;
             },
             ct);

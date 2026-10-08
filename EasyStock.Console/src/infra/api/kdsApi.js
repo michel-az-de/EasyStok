@@ -1,6 +1,7 @@
 import { chamarApi } from './cliente'
 
-// KDS do console (S19, `api/kds`) e canhoto (S20, `api/pedidos/{id}/canhoto`).
+// KDS do console (S19, `api/kds`) e reimpressão do canhoto (S20). O canhoto em si é o
+// PDF de 80 mm do protótipo, montado no console (issue #1446).
 // Mudança de status passa pela máquina de estados da API; transição inválida
 // volta 400 com a mensagem pronta para a tela.
 export const listarPedidosKds = () => chamarApi('/api/kds/pedidos')
@@ -10,6 +11,8 @@ export const mudarStatusKds = (id, status) =>
 
 export const reimprimirCanhoto = (id) => chamarApi(`/api/pedidos/${id}/reimprimir`, { metodo: 'POST' })
 
-// O canhoto HTML (80 mm, com @media print) não vem no envelope `{ data }`: é a página
-// pronta. Passa pelo `chamarApi` (F07, item 10): 401 aqui também devolve para o login.
-export const obterCanhotoHtml = (id) => chamarApi(`/api/pedidos/${id}/canhoto?formato=html`, { texto: true })
+// Fila de impressão (S20) consumida pela aba da Cozinha (issue #1446): o pedido pago entra
+// pendente; a aba imprime o canhoto e confirma. Confirmar é idempotente na API.
+export const listarImpressoesPendentes = () => chamarApi('/api/impressao/pendentes?limite=20')
+
+export const confirmarImpressao = (id) => chamarApi(`/api/impressao/${id}/impressa`, { metodo: 'POST' })

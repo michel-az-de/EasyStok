@@ -15,6 +15,13 @@ public interface IWhatsAppCloudClient
     Task<EnvioWhatsAppResult> EnviarImagemAsync(
         string waId, string urlPublica, string? legenda = null, CancellationToken ct = default);
 
+    /// <summary>
+    /// Áudio pelo link HTTPS público (#1444). <paramref name="notaDeVoz"/> manda <c>voice: true</c>, que a Meta só
+    /// aceita para Ogg/Opus mono; os outros formatos (MP4, MPEG, AAC, AMR) saem como áudio comum.
+    /// </summary>
+    Task<EnvioWhatsAppResult> EnviarAudioAsync(
+        string waId, string urlPublica, bool notaDeVoz, CancellationToken ct = default);
+
     /// <summary>No máximo 3 botões; título até 20 caracteres; id até 256. Lança <see cref="ArgumentException"/> antes de chamar a rede quando violado.</summary>
     Task<EnvioWhatsAppResult> EnviarBotoesAsync(
         string waId, string corpo, IReadOnlyList<(string Id, string Titulo)> botoes, CancellationToken ct = default);

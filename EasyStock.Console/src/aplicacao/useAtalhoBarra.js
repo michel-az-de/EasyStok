@@ -1,63 +1,83 @@
-import { useMemo } from 'react'
-import { useAtendimento, useCatalogo } from './contextos'
-import { filtrarBiblioteca, listarBiblioteca, resolverVariaveis } from '../dominio/respostas'
+import { useMemo, useState } from 'react'
+import { useCatalogo } from './contextos'
+import { moverDestaque, resolverVariaveis, respostasDoSeletor, termoDaBarra } from '../dominio/respostas'
 
-const LIMITE = 8
-
-// Atalho "/" no campo de mensagem (rodada 7, pedido do dono 24/09/2026, e
-// padrão de mercado nas ferramentas de atendimento: seção A de
-// auditoria/pesquisa-funcional-itens-4-a-7.md). Campo com só "/" e um token
-// sem espaço filtra a biblioteca inteira (pronta e automática); Enter insere
-// o texto no campo, nunca envia direto. Sem realce por seta de propósito:
-// ela vê a lista e clica, ou estreita a busca até sobrar uma.
+// Seletor rápido de respostas do compositor (#1441, homologação de 07/10, comparando
+// com o Lumina: "uma resposta rápida e já bem direta do que tem que ser feito").
+// Abre de dois jeitos: "/" no começo do campo (o resto do token é a busca, o foco
+// fica no campo) ou o botão Respostas (busca própria no topo da lista). Setas
+// escolhem, Enter insere no campo, Esc fecha. Nunca envia direto: a atendente vê
+// o texto antes. Gestão (criar, editar, arquivar) fica na Gestão, fora daqui.
 //
-// Mora em aplicacao/ (mesmo molde de useAvisoSonoro.js, useEspelhoDeCozinha.js):
-// precisa dos contextos, e feature nenhuma importa outra feature
-// (ferramentas/verificar-camadas.mjs), então não pode morar em features/respostas/.
+// Mora em aplicacao/ porque precisa dos contextos e feature nenhuma importa outra
+// feature (ferramentas/verificar-camadas.mjs).
 export function useAtalhoBarra({ rascunho, conversa, aoInserir }) {
   const { respostasProntas } = useCatalogo()
-  const { regras } = useAtendimento()
+  const termoBarra = termoDaBarra(rascunho)
+  const pelaBarra = termoBarra !== null
+  // A busca aberta pelo botão vale só para a conversa em que abriu; o destaque, só
+  // para o termo em que foi escolhido (termo novo volta ao primeiro da lista).
+  const [aberturaPeloBotao, setAberturaPeloBotao] = useState(null)
+  const busca = aberturaPeloBotao?.conversaId === conversa?.id ? aberturaPeloBotao.texto : null
+  const setBusca = (texto) => setAberturaPeloBotao(texto === null ? null : { conversaId: conversa?.id, texto })
 
-  const termo = /^\/(\S*)$/.exec(rascunho ?? '')?.[1] ?? null
-  const aberto = termo !== null
+  const aberto = pelaBarra || busca !== null
+  const termo = termoBarra ?? busca ?? ''
+  const [escolha, setEscolha] = useState({ termo: '', indice: 0 })
+  const destaque = escolha.termo === termo ? escolha.indice : 0
+  const setDestaque = (proximo) => setEscolha({ termo, indice: typeof proximo === 'function' ? proximo(destaque) : proximo })
 
   const itens = useMemo(
-    () => listarBiblioteca({ respostasProntas, regras }),
-    [respostasProntas, regras],
+    () => (aberto ? respostasDoSeletor({ respostasProntas, termo }) : []),
+    [aberto, termo, respostasProntas],
   )
-  const filtrados = useMemo(
-    () => (aberto ? filtrarBiblioteca(itens, termo).slice(0, LIMITE) : []),
-    [aberto, termo, itens],
-  )
+  const temRespostas = useMemo(() => (respostasProntas ?? []).some((r) => !r.arquivada), [respostasProntas])
 
+  function fechar() {
+    setBusca(null)
+    if (pelaBarra) aoInserir('')
+  }
+
+  // Pela barra, o texto substitui o "/termo"; pelo botão, entra depois do que já estava escrito.
   function inserir(item) {
-    aoInserir(resolverVariaveis(item.texto, conversa).texto)
+    const texto = resolverVariaveis(item.texto, conversa).texto
+    const antes = pelaBarra ? '' : (rascunho ?? '').trimEnd()
+    aoInserir(antes ? `${antes} ${texto}` : texto)
+    setBusca(null)
   }
 
   function aoTeclar(evento) {
     if (!aberto) return false
-    if (evento.key === 'Escape') { evento.preventDefault(); aoInserir(''); return true }
-    if (evento.key === 'Enter') {
+    if (evento.key === 'ArrowDown' || evento.key === 'ArrowUp') {
       evento.preventDefault()
-      if (filtrados[0]) inserir(filtrados[0])
+      setDestaque((i) => moverDestaque(i, evento.key === 'ArrowDown' ? 1 : -1, itens.length))
+      return true
+    }
+    if (evento.key === 'Enter' && !evento.shiftKey) {
+      evento.preventDefault()
+      if (itens[destaque]) inserir(itens[destaque])
+      return true
+    }
+    if (evento.key === 'Escape') {
+      evento.preventDefault()
+      fechar()
       return true
     }
     return false
   }
 
-  const grupos = [{
-    titulo: `Atalho "/${termo}"`,
-    itens: filtrados.map((item) => ({ chave: item.id, titulo: item.titulo, detalhe: item.texto })),
-  }]
-
   return {
     aberto,
-    semResultado: aberto && filtrados.length === 0,
-    grupos,
+    pelaBarra,
+    busca: busca ?? '',
+    mudarBusca: setBusca,
+    itens,
+    temRespostas,
+    destaque,
+    destacar: setDestaque,
+    abrir: () => setBusca(''),
+    fechar,
+    inserir,
     aoTeclar,
-    aoEscolher: (i) => {
-      const item = filtrados.find((it) => it.id === i.chave)
-      if (item) inserir(item)
-    },
   }
 }

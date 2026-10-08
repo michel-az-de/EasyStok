@@ -374,6 +374,24 @@ public class WhatsAppCloudClientTests
         handler.Tokens.Should().Equal("token-teste");
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AudioSaiComoTipoAudioPeloLinkEMarcaNotaDeVoz(bool notaDeVoz)
+    {
+        // #1444: a Meta busca o áudio pela URL; "voice" só vale para Ogg/Opus mono.
+        var client = CreateClient(HttpStatusCode.OK, RespostaEnvioOk, out var handler);
+
+        var envio = await client.EnviarAudioAsync("5511999998888", "https://cdn.test/a.ogg", notaDeVoz);
+
+        envio.Wamid.Should().Be("wamid.X");
+        using var json = System.Text.Json.JsonDocument.Parse(handler.UltimoCorpo!);
+        json.RootElement.GetProperty("type").GetString().Should().Be("audio");
+        var audio = json.RootElement.GetProperty("audio");
+        audio.GetProperty("link").GetString().Should().Be("https://cdn.test/a.ogg");
+        audio.GetProperty("voice").GetBoolean().Should().Be(notaDeVoz);
+    }
+
     private sealed class SequenceHandler : HttpMessageHandler
     {
         private readonly Queue<(HttpStatusCode Status, string Body, Exception? Falha)> _respostas = new();

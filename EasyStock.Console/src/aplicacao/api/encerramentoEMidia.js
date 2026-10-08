@@ -1,5 +1,7 @@
 import * as acao from '../acoes'
-import { encerrar, enviarImagem, enviarImagemCardapio, enviarTexto } from '../../infra/api/conversasApi'
+import {
+  encerrar, enviarAudio, enviarImagem, enviarImagemCardapio, enviarTexto,
+} from '../../infra/api/conversasApi'
 import { mensagemDaApi } from '../../infra/api/traducaoConversas'
 import { proximoId } from '../../infra/repositorioConversas'
 
@@ -9,10 +11,11 @@ import { proximoId } from '../../infra/repositorioConversas'
 // EasyStok (`POST .../encerrar`). O resumo, a avaliação, a anotação e os avisos por e-mail
 // e SMS do modo demonstração não têm endpoint: não viram registro local, só avisam.
 //
-// Mídia: só foto no WhatsApp tem endpoint. A do computador vai em multipart (S02); a peça da
-// galeria do cardápio, pelo id do item (#1437). Áudio, arquivo, figurinha e foto em outro canal
-// avisam e não aparecem como enviados.
+// Mídia: foto e áudio no WhatsApp têm endpoint. A foto do computador vai em multipart (S02); a peça
+// da galeria do cardápio, pelo id do item (#1437); o áudio gravado, em multipart (#1444). Arquivo,
+// figurinha e foto ou áudio em outro canal avisam e não aparecem como enviados.
 const CANAL_COM_FOTO = 'WhatsApp'
+const CANAL_COM_AUDIO = 'WhatsApp'
 
 const ROTULO_DA_MIDIA = {
   audio: 'Áudio', arquivo: 'Arquivo', figurinha: 'Figurinha', peca: 'Peça da galeria',
@@ -29,6 +32,31 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
       const m = await enviarTexto(id, texto)
       despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m) })
       return true
+    } catch (erro) {
+      despachar(falhaDoEnvio(id, mensagemId, erro))
+      return false
+    }
+  }
+
+  // Áudio (#1444): o balão nasce "enviando" e a ação devolve só depois da resposta, para o gravador
+  // mostrar o envio. Confirmado, o balão segue tocando o que foi gravado; o arquivo convertido do
+  // EasyStok chega na sincronização.
+  async function enviarAudioGravado(id, { arte, texto, ...extra }) {
+    const canal = conversaDe(id)?.canal
+    if (canal !== CANAL_COM_AUDIO) {
+      avisar(`Áudio: ainda não ligado para ${canal ?? 'este canal'} nesta versão. Pelo EasyStok sai só no WhatsApp.`)
+      return false
+    }
+    const mensagemId = proximoId('mid')
+    despachar({
+      tipo: acao.ENVIAR_MIDIA, id, formato: 'audio', arte, texto, ...extra, status: 'enviando', agora: agoraRef.current, mensagemId,
+    })
+    try {
+      const mensagem = mensagemDaApi(await enviarAudio(id, { dataUrl: arte }))
+      despachar({
+        tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: { ...mensagem, formato: 'audio', arte, duracaoMs: extra.duracaoMs },
+      })
+      return mensagem.status !== 'falhou'
     } catch (erro) {
       despachar(falhaDoEnvio(id, mensagemId, erro))
       return false
@@ -58,8 +86,9 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
     },
 
     enviarMidia: async (id, { formato, arte, texto, ...extra }) => {
+      if (formato === 'audio') return enviarAudioGravado(id, { arte, texto, ...extra })
       if (formato !== 'imagem' && formato !== 'peca') {
-        avisar(`${ROTULO_DA_MIDIA[formato] ?? 'Mídia'}: ainda não ligado nesta versão. Pelo EasyStok sai só foto no WhatsApp.`)
+        avisar(`${ROTULO_DA_MIDIA[formato] ?? 'Mídia'}: ainda não ligado nesta versão. Pelo EasyStok saem só foto e áudio no WhatsApp.`)
         return false
       }
       const canal = conversaDe(id)?.canal
