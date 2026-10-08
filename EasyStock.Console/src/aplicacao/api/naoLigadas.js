@@ -33,7 +33,6 @@ export const NAO_LIGADAS = {
   trocarJanela: 'Trocar a janela do pedido',
   ...grupo('Lembretes', ['criarLembrete', 'concluirLembrete']),
   ...grupo('Bloqueio do cliente', ['bloquearCliente', 'desbloquearCliente']),
-  ...grupo('Cardápio do dia', ['alternarDisponibilidade', 'ajustarSaldo']),
   ...grupo('Cardápio', ['incluirItemCardapio', 'editarItemCardapio', 'alternarRemocaoItemCardapio', 'confirmarValidacaoItem']),
   mudarEnderecoDoPedido: 'Endereço do pedido',
   marcarRecebidoEntrega: 'Recebido na entrega',

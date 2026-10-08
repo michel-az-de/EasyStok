@@ -16,6 +16,7 @@ import { criarAcoesEncerramentoEMidiaApi } from './api/encerramentoEMidia'
 import { criarAcoesRespostasApi } from './api/respostas'
 import { criarAcoesTagsApi } from './api/tags'
 import { criarAcoesLoteApi } from './api/lote'
+import { criarAcoesCardapioApi } from './api/cardapio'
 import { criarAvisosNaoLigadas, envioNaoLigado, textoNaoLigado } from './api/naoLigadas'
 
 const FORA_DA_JANELA = 'fora_da_janela_24h'
@@ -66,6 +67,8 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     ...criarAcoesTagsApi({ despachar, estadoRef }),
     // #1241: lote de papel no EasyStok.
     ...criarAcoesLoteApi({ despachar, estadoRef }),
+    // #1241: cardápio do dia (disponibilidade e saldo) no EasyStok.
+    ...criarAcoesCardapioApi({ despachar, estadoRef }),
     enviar: (id, texto, opcoes = {}) => {
       // #1287: texto vazio a API recusa (400); modelo e automática ainda não têm endpoint.
       if (!texto?.trim()) return
