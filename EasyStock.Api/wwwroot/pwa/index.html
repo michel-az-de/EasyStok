@@ -12072,6 +12072,9 @@ const CATEGORIES = [
   { key: 'extra', label: 'Extras' }
 ];
 let productionCategoryFilter = 'all';
+function categoriaDoGrid(p) {
+  return CATEGORIES.some(function (c) { return c.key === p.category; }) ? p.category : 'extra';
+}
 
 function setProductionCategory(cat) {
   productionCategoryFilter = cat || 'all';
@@ -12192,7 +12195,8 @@ function renderProductGrid() {
 
   visibleCategories.forEach(cat => {
     // Filtra arquivados — ficam visiveis so no Catalogo (Ajustes)
-    const items = products.filter(p => p.category === cat.key && !p.archived);
+    // #1469: categoria fora da lista (ex.: produto vindo do ERP) aparece em Extras, nao some.
+    const items = products.filter(p => categoriaDoGrid(p) === cat.key && !p.archived);
     if (items.length === 0) return;
     anyActive = true;
 
