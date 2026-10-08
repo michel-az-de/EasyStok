@@ -313,3 +313,26 @@ export function rascunhoSugerido({ intencao }, conversa, catalogo, ocupacoes = [
 
 export const confiancaDe = ({ intencao }) =>
   (intencao.chave === INTENCOES.OUTRO.chave ? 0.42 : 0.88)
+
+// #1445 (homologação 07/10: "está sendo muito prolixo"): régua da resposta ao cliente no
+// WhatsApp, a mesma dos prompts. Até 3 frases curtas, até 320 caracteres e sem fecho de
+// cortesia genérico. `ferramentas/avaliar-agente.mjs` conta quem passa da régua.
+export const LIMITE_FRASES = 3
+export const LIMITE_CARACTERES = 320
+const FLOREIOS = ['fico a disposicao', 'estamos a disposicao', 'qualquer duvida', 'nao hesite', 'sera um prazer', 'conte comigo']
+
+const semAcento = (texto) => texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
+export function objetividade(texto) {
+  const limpo = String(texto ?? '').trim()
+  // Link não é frase: o ponto do domínio não conta.
+  const semLinks = limpo.replace(/https?:\/\/\S+/g, 'link')
+  const frases = semLinks.split(/[.!?…]+(?:\s+|$)/).filter((f) => f.trim()).length
+  const normalizado = semAcento(limpo)
+  const floreios = FLOREIOS.filter((f) => normalizado.includes(f))
+  const caracteres = limpo.length
+  return {
+    frases, caracteres, floreios,
+    prolixo: frases > LIMITE_FRASES || caracteres > LIMITE_CARACTERES || floreios.length > 0,
+  }
+}

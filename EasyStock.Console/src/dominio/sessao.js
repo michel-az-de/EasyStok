@@ -14,3 +14,9 @@ export function avisoDeVencimento(venceEm, agora) {
     ? `Sessão vence em ${minutos} min. Entre de novo; o rascunho fica guardado.`
     : 'Sessão vencida. Entre de novo; o rascunho fica guardado.'
 }
+
+// "Nome · Empresa" da faixa da sessão (#1447). Empresa sem nome some, em vez de
+// aparecer "· null" (visto na homologação de 07/10).
+export function rotuloDaSessao(sessao) {
+  return [sessao?.usuario?.nome, sessao?.empresa?.nome].filter(Boolean).join(' · ')
+}

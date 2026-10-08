@@ -1,4 +1,5 @@
 import { chamarApi } from './cliente'
+import { nomeDoArquivoDeAudio } from '../../dominio/audio'
 
 // Inbox do console (S07): `api/atendimento/conversas`. Devolve o formato da API;
 // a tradução para o formato do console mora em traducaoConversas.js.
@@ -79,6 +80,16 @@ export async function enviarImagem(id, { dataUrl, nomeArquivo, legenda }) {
   formulario.append('file', blob, nome)
   if (legenda?.trim()) formulario.append('legenda', legenda.trim())
   return chamarApi(`${BASE}/${id}/mensagens/imagem`, { metodo: 'POST', formulario })
+}
+
+// Áudio gravado no console (#1444). Vai como veio do navegador; o EasyStok converte o WebM do
+// Chrome em Ogg/Opus, que é o que a Meta aceita como nota de voz.
+export async function enviarAudio(id, { dataUrl }) {
+  if (!dataUrl?.startsWith('data:')) throw new Error('Áudio sem gravação: grave de novo.')
+  const { blob } = arquivoDoDataUrl(dataUrl)
+  const formulario = new FormData()
+  formulario.append('file', blob, nomeDoArquivoDeAudio(blob.type))
+  return chamarApi(`${BASE}/${id}/mensagens/audio`, { metodo: 'POST', formulario })
 }
 
 // Foto da galeria do cardápio (#1437): o EasyStok lê a foto do storage pelo id do item e o índice;

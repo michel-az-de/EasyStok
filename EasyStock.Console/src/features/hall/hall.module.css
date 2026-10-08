@@ -1,0 +1,86 @@
+/* Hall de módulos (#1447). Roupa da Casa da Baba (tokens --cdb-*, prévia da
+   M0.1): chão creme, cartão papel, número e ícone em caramelo, Lora no título.
+   Pouca moldura: o cartão inteiro é o alvo do clique, os atalhos ficam por cima. */
+.hall {
+  display: flex; flex-direction: column; height: 100%; min-height: 0; overflow-y: auto;
+  background: var(--cdb-chao); color: var(--cdb-cacau); font-family: var(--f-corpo);
+}
+
+.topo {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--e-4) var(--e-5);
+}
+.marca { display: flex; align-items: baseline; gap: var(--e-2); margin: 0; }
+.casa { font-family: var(--f-titulo-marca); font-size: var(--t-titulo); font-weight: 600; color: var(--cdb-cacau); }
+.produto { font-size: var(--t-micro); font-weight: 700; letter-spacing: .04em; color: var(--cdb-cacau-2); }
+
+.conteudo { width: min(1120px, 100%); margin: 0 auto; padding: var(--e-3) var(--e-5) var(--e-6); }
+
+.cabeca { margin-bottom: var(--e-5); }
+.titulo {
+  margin: 0; font-family: var(--f-titulo-marca); font-weight: 600;
+  font-size: var(--t-display); line-height: 1.15; color: var(--cdb-cacau);
+}
+.apoio { margin: var(--e-2) 0 0; font-size: var(--t-forte); color: var(--cdb-cacau-2); }
+
+.grade {
+  display: grid; gap: var(--e-4);
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  margin: 0; padding: 0; list-style: none;
+}
+
+.cartao {
+  position: relative;
+  display: flex; flex-direction: column; gap: var(--e-2);
+  min-height: 11rem; padding: var(--e-4);
+  border: var(--b-1) solid var(--cdb-linha); border-radius: var(--r-3);
+  background: var(--cdb-papel);
+  transition: border-color var(--dur-curta) var(--ease-padrao), transform var(--dur-curta) var(--ease-saida),
+    box-shadow var(--dur-curta) var(--ease-padrao);
+}
+.cartao:not(.emBreve):hover { border-color: var(--cdb-caramelo); box-shadow: var(--sombra-media); transform: translateY(-2px); }
+.cartao:has(.abrir:focus-visible) { outline: 3px solid var(--cdb-caramelo); outline-offset: 2px; }
+
+.numero {
+  position: absolute; top: var(--e-4); right: var(--e-4);
+  font-size: var(--t-apoio); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--cdb-cacau-2);
+}
+.icone { color: var(--cdb-caramelo); }
+.nome { font-family: var(--f-titulo-marca); font-size: var(--t-titulo); font-weight: 600; color: var(--cdb-cacau); }
+.resumo { font-size: var(--t-corpo); color: var(--cdb-cacau-2); }
+
+/* O link do nome cobre o cartão inteiro; foco aparece no cartão (regra acima). */
+.abrir { text-decoration: none; color: inherit; outline: none; }
+.abrir::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+
+.atalhos {
+  position: relative; z-index: 1;
+  display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-3);
+  margin: auto 0 0; padding: var(--e-2) 0 0; list-style: none;
+  border-top: var(--b-1) solid var(--cdb-linha);
+}
+.atalho {
+  display: inline-flex; align-items: center; min-height: var(--toque);
+  font-size: var(--t-apoio); font-weight: 700; color: var(--cdb-caramelo); text-decoration: none;
+}
+.atalho:hover { text-decoration: underline; }
+.atalho:focus-visible { outline: 2px solid var(--cdb-caramelo); outline-offset: 2px; border-radius: var(--r-1); }
+
+/* Em breve: borda tracejada e cadeado, texto mantém contraste (sem opacidade). */
+.emBreve { border-style: dashed; background: transparent; }
+.emBreve .icone, .emBreve .nome { color: var(--cdb-cacau-2); }
+.selo {
+  display: inline-flex; align-items: center; gap: var(--e-1); margin-top: auto;
+  font-size: var(--t-apoio); font-weight: 700; color: var(--cdb-cacau-2);
+}
+
+@media (max-width: 640px) {
+  .topo, .conteudo { padding-inline: var(--e-3); }
+  .grade { grid-template-columns: 1fr; gap: var(--e-3); }
+  .cartao { min-height: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cartao { transition: none; }
+  .cartao:not(.emBreve):hover { transform: none; }
+}

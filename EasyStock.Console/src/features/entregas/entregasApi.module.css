@@ -19,3 +19,26 @@
 }
 .formulario { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--e-2); align-items: end; }
 .vazio { color: var(--tinta-2); margin: 0; }
+
+/* #1440: janelas da loja e entregas do dia por janela. */
+.secao h4 { margin: var(--e-2) 0 var(--e-1, 4px); font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2); }
+.diaDaSemana { display: flex; flex-direction: column; }
+.edicaoJanela { display: flex; flex-direction: column; gap: var(--e-2); }
+.erroCampo { margin: 0; color: var(--parado); font-size: var(--t-apoio); }
+.pausada { opacity: .7; }
+.nomeJanela { font-family: inherit; font-weight: 400; color: var(--tinta-2); }
+.campoData { min-width: 150px; }
+.cabecalhoDoDia {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap;
+  padding-bottom: var(--e-2); border-bottom: var(--b-1) solid var(--linha);
+}
+.cabecalhoDoDia p { margin: 0; }
+.dataDoDia { font-weight: 700; color: var(--tinta); }
+.dataDoDia::first-letter { text-transform: uppercase; }
+.janelaDoDia { display: flex; flex-direction: column; gap: var(--e-2); }
+.janelaDoDia h3 { margin: 0; font-size: var(--t-corpo, 1rem); font-weight: 700; color: var(--tinta); }
+.janelaDoDia p { margin: 0; }
+.dias { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; border: 0; margin: 0; padding: 0; min-width: 0; }
+.cadastro { display: flex; flex-direction: column; gap: var(--e-4); }
+/* O aviso de erro do cadastro fica visível mesmo com a lista rolada (Gestão rola o painel). */
+.faixaFixa { position: sticky; top: 0; z-index: 2; }

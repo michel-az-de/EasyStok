@@ -75,6 +75,47 @@ public class CadastroEntregaUseCasesTests
         await _uow.Received(1).CommitAsync();
     }
 
+    // #1440: excluir a janela criada por engano. Com pedido ou bloqueio apontando para ela,
+    // recusa e pede para pausar (as FKs são RESTRICT; o histórico de vagas não some).
+    [Fact]
+    public async Task ExcluirJanelaSemUso_Remove()
+    {
+        var janela = JanelaEntrega.Criar(_loja.Id, 4, new TimeOnly(12, 0), new TimeOnly(14, 0), 6, "Almoço");
+        _janelas.GetByIdAsync(janela.Id, Arg.Any<CancellationToken>()).Returns(janela);
+        _janelas.TemUsoAsync(janela.Id, Arg.Any<CancellationToken>()).Returns(false);
+
+        await Janelas().ExcluirAsync(_empresaId, janela.Id);
+
+        await _janelas.Received(1).RemoveAsync(janela, Arg.Any<CancellationToken>());
+        await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task ExcluirJanelaComPedidoOuBloqueio_RecusaEPedeParaPausar()
+    {
+        var janela = JanelaEntrega.Criar(_loja.Id, 4, new TimeOnly(12, 0), new TimeOnly(14, 0), 6, "Almoço");
+        _janelas.GetByIdAsync(janela.Id, Arg.Any<CancellationToken>()).Returns(janela);
+        _janelas.TemUsoAsync(janela.Id, Arg.Any<CancellationToken>()).Returns(true);
+
+        var act = () => Janelas().ExcluirAsync(_empresaId, janela.Id);
+
+        (await act.Should().ThrowAsync<UseCaseValidationException>()).WithMessage("*Pause*");
+        await _janelas.DidNotReceiveWithAnyArgs().RemoveAsync(default!, default);
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task ExcluirJanelaDeOutraLoja_NaoEncontrado()
+    {
+        var alheia = JanelaEntrega.Criar(Guid.NewGuid(), 1, new TimeOnly(9, 0), new TimeOnly(12, 0), 5, "Outra");
+        _janelas.GetByIdAsync(alheia.Id, Arg.Any<CancellationToken>()).Returns(alheia);
+
+        var act = () => Janelas().ExcluirAsync(_empresaId, alheia.Id);
+
+        await act.Should().ThrowAsync<CadastroEntregaNaoEncontradoException>();
+        await _janelas.DidNotReceiveWithAnyArgs().RemoveAsync(default!, default);
+    }
+
     [Fact]
     public async Task CriarZonaPorBairros_EEditarParaCep()
     {

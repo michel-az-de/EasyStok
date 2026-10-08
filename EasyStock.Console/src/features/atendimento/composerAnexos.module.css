@@ -48,3 +48,14 @@
 .erro button {
   margin-left: auto; border: 0; background: none; color: inherit; text-decoration: underline; cursor: pointer;
 }
+/* #1444: envio do áudio em curso, no lugar do gravador, até o EasyStok responder. */
+.enviandoAudio {
+  display: flex; align-items: center; gap: var(--e-2); min-height: var(--toque);
+  font-size: var(--t-apoio); color: var(--tinta-2); margin: 0;
+}
+.girando {
+  width: 16px; height: 16px; flex: none; border-radius: 50%;
+  border: 2px solid var(--linha-media); border-top-color: currentColor;
+  animation: girar .8s linear infinite;
+}
+@keyframes girar { to { transform: rotate(360deg); } }

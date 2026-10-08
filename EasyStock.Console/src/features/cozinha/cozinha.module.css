@@ -212,3 +212,88 @@
 .quemLeva { display: flex; align-items: flex-start; gap: var(--e-1); color: var(--tinta-2); }
 .quemLeva > :first-child { flex-shrink: 0; margin-top: 2px; }
 .quemLeva b { color: var(--tinta); }
+
+/* --- Cozinha viva no modo API (issue #1446) ---------------------------------
+   "Parece mais um game do que um sistema" (Felipe, 07/10): cada mudança tem
+   um movimento curto que diz o que aconteceu. Entra = chegou pedido; assenta =
+   mudou de coluna (`.cartaoAssenta`, acima); sai = deixou a fila; pulsa =
+   atrasado. Com movimento reduzido, `estilos/base.css` zera as durações e
+   sobram a cor e o texto escrito (RN-30). */
+.cor-agora { border-left-color: var(--atencao); }
+.cor-agora .rotuloSituacao { color: var(--atencao); }
+
+.cartaoEntra { animation: cartaoEntrar 900ms var(--ease-saida); }
+@keyframes cartaoEntrar {
+  0% { opacity: 0; transform: translateY(-16px) scale(.95); background: var(--ok-pastel); }
+  55% { opacity: 1; transform: translateY(2px) scale(1.015); background: var(--ok-pastel); }
+  100% { transform: none; background: var(--papel); }
+}
+
+.cartaoSai { animation: cartaoSair 500ms var(--ease-entrada) forwards; pointer-events: none; }
+@keyframes cartaoSair {
+  to { opacity: 0; transform: translateX(32px) scale(.95); }
+}
+
+.cartaoAtrasado { animation: pulsarAtraso 2.4s var(--ease-padrao) infinite; }
+@keyframes pulsarAtraso {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--parado) 40%, transparent); }
+  70% { box-shadow: 0 0 0 10px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.contagemPula { display: inline-block; animation: contagemPular var(--dur-longa) var(--ease-pulo); }
+@keyframes contagemPular {
+  0% { transform: scale(1.5); color: var(--ragu); }
+  100% { transform: scale(1); }
+}
+
+/* Barra do tempo que falta até o início previsto (S21): esvazia sozinha. */
+.barraTempo { height: 4px; border-radius: var(--r-pilula); background: var(--preenchimento); overflow: hidden; }
+.barraTempo > span {
+  display: block; height: 100%; background: var(--ok); transform-origin: left center;
+  transition: transform 1s linear, background-color var(--dur-media) var(--ease-padrao);
+}
+.barra-logo > span { background: var(--atencao); }
+.barra-agora > span, .barra-atrasado > span { background: var(--parado); }
+
+.acoesCartao { display: flex; flex-wrap: wrap; gap: var(--e-1); }
+.obsPedido {
+  margin: 0; padding: var(--e-1) var(--e-2); border-radius: var(--r-1);
+  background: var(--aviso-fundo); color: var(--tinta); font-size: var(--t-apoio); font-weight: 600;
+}
+
+.aoVivo { display: inline-flex; align-items: center; gap: var(--e-1); color: var(--tinta-2); font-size: var(--t-apoio); }
+.pontoVivo { width: 8px; height: 8px; border-radius: 50%; background: var(--tinta-3); }
+.aoVivoLigado .pontoVivo { background: var(--ok); animation: pulsarVivo 2s var(--ease-padrao) infinite; }
+@keyframes pulsarVivo {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 50%, transparent); }
+  70% { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.chipsFiltro { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; flex: 1; }
+.gavetaCanhotos {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  padding: var(--e-1) var(--e-1) var(--e-1) var(--e-3); border-radius: var(--r-pilula);
+  background: var(--ragu-claro); color: var(--ragu); font-weight: 700; font-size: var(--t-apoio);
+  animation: dicaEntrar var(--dur-media) var(--ease-saida);
+}
+.cozinhaEmDia { margin: 0 var(--e-4); color: var(--tinta-2); font-size: var(--t-apoio); }
+
+/* Comanda aberta da Cozinha (Modal). */
+.comanda { display: grid; gap: var(--e-3); }
+.comandaCliente { margin: 0; font-family: var(--f-display); font-size: var(--t-forte); font-weight: 700; }
+.comandaApoio { margin: 0; display: flex; align-items: center; gap: var(--e-1); flex-wrap: wrap; color: var(--tinta-2); font-size: var(--t-apoio); }
+.comandaAtraso { color: var(--parado); font-weight: 700; }
+.trilha { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-3); font-size: var(--t-apoio); }
+.trilha > li { display: inline-flex; align-items: center; gap: var(--e-1); }
+.marcaEtapa {
+  display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%;
+  font-family: var(--f-dado); font-size: 12px; border: var(--b-1) solid var(--linha-forte); color: var(--tinta-3);
+}
+.etapa-feita { color: var(--tinta-2); }
+.etapa-feita .marcaEtapa { background: var(--ok); border-color: var(--ok); color: var(--papel); }
+.etapa-atual { color: var(--tinta); font-weight: 700; }
+.etapa-atual .marcaEtapa { border-color: var(--ragu); color: var(--ragu); border-width: var(--b-2); }
+.etapa-futura { color: var(--tinta-3); }
+.itemComanda { font-size: var(--t-corpo); }

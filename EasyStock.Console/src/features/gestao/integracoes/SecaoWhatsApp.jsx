@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Pilula } from '../../../componentes/Pilula'
 import { useConexaoWhatsAppApi } from '../../../aplicacao/useConexaoWhatsAppApi'
@@ -30,14 +31,17 @@ function Resultado({ resultado }) {
   )
 }
 
-export function SecaoWhatsApp() {
+// #1447: a tela Canais monta a seção `embutida` (sem título nem moldura, o cabeçalho é dela)
+// e recarrega o estado do canal quando a conexão termina (`aoConectar`).
+export function SecaoWhatsApp({ embutida = false, aoConectar }) {
   const { estado, erro, resultado, conectar } = useConexaoWhatsAppApi()
+  useEffect(() => { if (resultado) aoConectar?.() }, [resultado, aoConectar])
   const ocupado = estado in ROTULO_BOTAO
   const desabilitado = ocupado || estado === 'indisponivel'
 
   return (
-    <section className={css.secao} aria-labelledby="secao-whatsapp-titulo">
-      <h3 id="secao-whatsapp-titulo" className={css.titulo}>WhatsApp</h3>
+    <section className={embutida ? css.embutida : css.secao} aria-labelledby={embutida ? undefined : 'secao-whatsapp-titulo'}>
+      {!embutida && <h3 id="secao-whatsapp-titulo" className={css.titulo}>WhatsApp</h3>}
       <p className={css.texto}>
         Conecte o número da loja sem tirá-lo do celular: o app WhatsApp Business continua funcionando, e o
         que a loja responder por ele aparece aqui na conversa.

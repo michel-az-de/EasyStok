@@ -97,10 +97,13 @@ export function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReen
             <Icone nome="raio" /> Reenviar
           </button>
         )}
-        {mensagem.dir === 'out' && mensagem.status !== 'falhou' && (
+        {mensagem.dir === 'out' && mensagem.status === 'enviando' && (
+          <span className={css.enviando}>enviando</span>
+        )}
+        {mensagem.dir === 'out' && mensagem.status !== 'falhou' && mensagem.status !== 'enviando' && (
           <span>
             <span aria-hidden="true">{entregue ? '✓✓' : '✓'}</span>
-            <span className="sr">{entregue ? 'entregue' : 'enviando'}</span>
+            <span className="sr">{entregue ? 'entregue' : 'enviada'}</span>
           </span>
         )}
       </span>

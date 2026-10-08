@@ -8,6 +8,7 @@ import { aceitaFormato, motivoDeFormato, restricoesDoCanal } from '../../dominio
 import {
   mensagemDeArquivoAnexado, mensagemDeAudio, mensagemDeImagemAnexada, tipoDeArquivo, validarArquivo,
 } from '../../dominio/anexos'
+import { escolherFormatoGravacao } from '../../dominio/audio'
 import { useArquivoComoDataUrl } from '../../hooks/useArquivoComoDataUrl'
 import { useGravadorAudio } from '../../hooks/useGravadorAudio'
 import { BotaoAnexarArquivo, GravadorAudio, PreviaAnexo } from './ComposerAnexos'
@@ -40,7 +41,7 @@ export function Composer({
   const [linkCardapio, setLinkCardapio] = useState(null)
   const [buscandoLink, setBuscandoLink] = useState(false)
   const { ler } = useArquivoComoDataUrl()
-  const gravador = useGravadorAudio()
+  const gravador = useGravadorAudio({ escolherTipo: escolherFormatoGravacao })
   const gravando = gravador.estado !== 'ocioso'
 
   async function aoEscolherArquivo(arquivo) {
@@ -74,10 +75,21 @@ export function Composer({
     aoEnviar()
   }
 
+  // #1444 (homologação 07/10: "não sei se ele tá enviando"): o gravador fica no lugar mostrando o
+  // envio até o EasyStok responder; o balão na conversa nasce "enviando". Se não sair, o motivo
+  // fica no balão e aqui só o aviso curto.
+  const [enviandoAudio, setEnviandoAudio] = useState(false)
   async function aoEnviarAudio() {
-    const resultado = await gravador.finalizar()
-    if (!resultado) return
-    enviarMidia(conversa.id, mensagemDeAudio(resultado))
+    setErroAnexo(null)
+    setEnviandoAudio(true)
+    try {
+      const resultado = await gravador.finalizar()
+      if (!resultado) return
+      const saiu = await enviarMidia(conversa.id, mensagemDeAudio(resultado))
+      if (saiu === false) setErroAnexo('O áudio não foi enviado. O motivo está no balão da conversa.')
+    } finally {
+      setEnviandoAudio(false)
+    }
   }
 
   const temTexto = rascunho.trim().length > 0
@@ -131,8 +143,8 @@ export function Composer({
       {/* Gravando substitui o campo de texto e as ações: gravar e escrever ao
           mesmo tempo não é o gesto que o dono pediu ("gravar... cancelar ou
           enviar"), e um estado só por vez é mais fácil de entender. */}
-      {gravando ? (
-        <GravadorAudio gravador={gravador} aoCancelar={gravador.cancelar} aoEnviar={aoEnviarAudio} />
+      {gravando || enviandoAudio ? (
+        <GravadorAudio gravador={gravador} enviando={enviandoAudio} aoCancelar={gravador.cancelar} aoEnviar={aoEnviarAudio} />
       ) : (
         <>
           {anexo && (

@@ -29,13 +29,22 @@ export function useCadastroEntregaApi() {
 
   useEffect(() => { recarregar() }, [recarregar])
 
+  // Devolve se deu certo: o formulário só limpa (ou fecha) quando a API aceitou.
   const executar = (chamada, falha) => chamada()
     .then(() => recarregar())
-    .catch((e) => setErro(`${falha}: ${e.message}`))
+    .then(() => true)
+    .catch((e) => { setErro(`${falha}: ${e.message}`); return false })
 
   const acoes = {
     criarJanela: (corpo) => executar(() => api.criarJanela(corpo), 'A janela não foi criada'),
     alternarJanela: (j) => executar(() => api.definirJanelaAtiva(j.id, !j.ativa), 'A janela não mudou'),
+    // #1440: uma janela por dia marcado, em sequência (a lista recarrega no fim, com o que entrou).
+    criarJanelas: (corpos) => executar(
+      () => corpos.reduce((anterior, corpo) => anterior.then(() => api.criarJanela(corpo)), Promise.resolve()),
+      'A janela não foi criada',
+    ),
+    atualizarJanela: (id, corpo) => executar(() => api.atualizarJanela(id, corpo), 'A janela não mudou'),
+    excluirJanela: (id) => executar(() => api.excluirJanela(id), 'A janela não foi excluída'),
     criarZona: (corpo) => executar(() => api.criarZona(corpo), 'A zona não foi criada'),
     alternarZona: (z) => executar(() => api.definirZonaAtiva(z.id, !z.ativa), 'A zona não mudou'),
     criarBloqueio: (corpo) => executar(() => api.criarBloqueio(corpo), 'O bloqueio não foi criado'),

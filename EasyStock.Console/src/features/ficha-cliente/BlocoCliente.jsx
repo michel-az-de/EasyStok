@@ -144,246 +144,259 @@ export function BlocoCliente({ conversa }) {
     }
   }
 
+  // #1442: quatro seções que recolhem e lembram (Bloco com `chave`), para a
+  // rolagem da ficha não ficar extensa. Recolhida, cada uma deixa um resumo.
+  const resumoTags = cliente.tags.length === 1 ? '1 tag' : `${cliente.tags.length} tags`
+  const resumoHistorico = cliente.pedidos === 1 ? '1 pedido' : `${cliente.pedidos} pedidos`
+
   return (
-    <Bloco titulo="Cliente">
-      <div className={css.identidade}>
-        <Avatar nome={conversa.nome} foto={fotoDoCliente(canal, cliente)} tamanho="enorme" />
-        <div className={css.identidadeTextos}>
-          <div key={`nome-${captado.nome ?? ''}`} className={captado.nome ? css.captadoAgora : undefined}>
-            <CampoEmLinha rotulo="Nome do cliente" valor={conversa.nome} validar={validarNome}
-              aoSalvar={(v) => editarDadoCliente(conversa.id, 'nome', v.trim(), agora)} />
-            <SeloCaptado quando={captado.nome} />
+    <>
+      <Bloco titulo="Cliente" chave="cliente" resumo={conversa.nome}>
+        <div className={css.identidade}>
+          <Avatar nome={conversa.nome} foto={fotoDoCliente(canal, cliente)} tamanho="enorme" />
+          <div className={css.identidadeTextos}>
+            <div key={`nome-${captado.nome ?? ''}`} className={captado.nome ? css.captadoAgora : undefined}>
+              <CampoEmLinha rotulo="Nome do cliente" valor={conversa.nome} validar={validarNome}
+                aoSalvar={(v) => editarDadoCliente(conversa.id, 'nome', v.trim(), agora)} />
+              <SeloCaptado quando={captado.nome} />
+            </div>
+            {lead ? (
+              <span className={css.situacao}>Lead · {chegouQuando(conversa, agora)}</span>
+            ) : (
+              <span className={css.situacao}>Cliente desde {cliente.desde}</span>
+            )}
           </div>
-          {lead ? (
-            <span className={css.situacao}>Lead · {chegouQuando(conversa, agora)}</span>
-          ) : (
-            <span className={css.situacao}>Cliente desde {cliente.desde}</span>
-          )}
-        </div>
-        <span className={css.menuCliente}>
-          <Botao
-            className={css.gatilhoMenu}
-            aria-haspopup="menu"
-            aria-expanded={menuAberto}
-            aria-label="Mais ações do cliente"
-            title="Mais ações do cliente"
-            onClick={() => setMenuAberto((v) => !v)}
-          >
-            <Icone nome="ellipsis" tamanho={24} />
-          </Botao>
-          {menuAberto && (
-            <Popover rotulo="Mais ações do cliente" posicao="abaixo" aoFechar={() => setMenuAberto(false)}>
-              <div className={css.menuAcoes}>
-                <button
-                  type="button" role="menuitem" className={css.itemMenu}
-                  onClick={() => { setMenuAberto(false); setModal(bloqueada ? 'desbloquear' : 'bloquear') }}
-                >
-                  <Icone nome="bloqueio" />
-                  {bloqueada ? 'Desbloquear cliente' : 'Bloquear cliente'}
-                </button>
-              </div>
-            </Popover>
-          )}
-        </span>
-      </div>
-
-      {/* Sinal forte de bloqueio: ícone, palavra e motivo. A cor sozinha não
-          informa nada, então o texto diz tudo o que o vermelho sugeriria. */}
-      {bloqueada && (
-        <div className={css.avisoBloqueio}>
-          <p className={css.tituloBloqueio}>
-            <Icone nome="bloqueio" />
-            <strong>Cadastro bloqueado</strong>
-            <span className={css.alcanceBloqueio}>vale em todos os canais</span>
-          </p>
-          <p className={css.motivoBloqueio}>{bloqueio.motivo}</p>
-          <p className={css.rodapeBloco}>{resumoDoBloqueio(bloqueio)}</p>
-        </div>
-      )}
-
-      {!lead && cliente.pedidos > 0 && (
-        <div className={css.numerosCliente}>
-          <span>
-            <b>{cliente.pedidos}</b>
-            <i>{cliente.pedidos === 1 ? 'pedido' : 'pedidos'}</i>
+          <span className={css.menuCliente}>
+            <Botao
+              className={css.gatilhoMenu}
+              aria-haspopup="menu"
+              aria-expanded={menuAberto}
+              aria-label="Mais ações do cliente"
+              title="Mais ações do cliente"
+              onClick={() => setMenuAberto((v) => !v)}
+            >
+              <Icone nome="ellipsis" tamanho={24} />
+            </Botao>
+            {menuAberto && (
+              <Popover rotulo="Mais ações do cliente" posicao="abaixo" aoFechar={() => setMenuAberto(false)}>
+                <div className={css.menuAcoes}>
+                  <button
+                    type="button" role="menuitem" className={css.itemMenu}
+                    onClick={() => { setMenuAberto(false); setModal(bloqueada ? 'desbloquear' : 'bloquear') }}
+                  >
+                    <Icone nome="bloqueio" />
+                    {bloqueada ? 'Desbloquear cliente' : 'Bloquear cliente'}
+                  </button>
+                </div>
+              </Popover>
+            )}
           </span>
-          {/* Sem histórico carregado não há soma: "R$ 0,00" dizia um valor falso. */}
-          {financeiro.total > 0 && (
-            <span>
-              <b>{moeda(financeiro.total)}</b>
-              <i>valor total</i>
-            </span>
-          )}
-          {financeiro.ultimoEm && (
-            <span>
-              <b>{dataCurta(financeiro.ultimoEm)}</b>
-              <i>último pedido</i>
-            </span>
-          )}
         </div>
-      )}
 
-      {/* Selo discreto de fidelidade (pedido do Felipe: "sem sujar a UX
-          atual"): só saldo e o botão de resgate, o catálogo mora na Gestão. */}
-      {!lead && (
-        <div className={css.linhaFidelidade}>
-          <span className={css.seloPontos}>
-            <Icone nome="estrela" tamanho={13} /> {saldoPontos} {saldoPontos === 1 ? 'ponto' : 'pontos'}
-          </span>
-          <Botao variante="texto" onClick={() => setModal('fidelidade')}>Resgatar</Botao>
-        </div>
-      )}
-
-      {precisaCadastro ? (
-        <div className={css.cadastroRapido}>
-          {!cliente.telefone && (
-            <CampoMascarado
-              tipo="telefone" rotulo="Telefone"
-              valor={form.telefone}
-              aoMudarDigitos={(d) => setForm((f) => ({ ...f, telefone: mascaraTelefone(d) }))}
-              placeholder="(11) 98765-4321"
-            />
-          )}
-          {!cliente.endereco && (
-            <>
-              <CampoTexto
-                rotulo="Endereço"
-                value={form.enderecoSemCep}
-                onChange={(e) => setForm((f) => ({ ...f, enderecoSemCep: e.target.value }))}
-                placeholder="Rua, número, complemento e bairro"
-                dica={cliente.enderecoCapturado ? 'Lido da conversa' : undefined}
-              />
-              <CampoMascarado
-                tipo="cep" rotulo="CEP"
-                valor={form.cep}
-                aoMudarDigitos={(d) => setForm((f) => ({ ...f, cep: mascaraCep(d) }))}
-                placeholder="00000-000"
-                dica={cepForaDaArea ? 'Fora da área de entrega' : undefined}
-              />
-            </>
-          )}
-          <Botao largo variante="primario" icone="user-plus" disabled={!podeSalvarCadastro} onClick={aoSalvarCadastro}>
-            Salvar cadastro
-          </Botao>
-        </div>
-      ) : (
-        <div className={css.dadosCliente}>
-          <div key={`tel-${captado.telefone ?? ''}`} className={`${css.linhaDado} ${captado.telefone ? css.captadoAgora : ''}`}>
-            <span className={`${css.azulejo} ${css.azVerde}`} aria-hidden="true"><Icone nome="phone" tamanho={15} /></span>
-            <span className={css.rotuloDado}>Telefone <SeloCaptado quando={captado.telefone} /></span>
-            <CampoEmLinha rotulo="Telefone" valor={cliente.telefone}
-              vazio={automaticoCaptando ? 'O automático está pedindo na conversa' : 'Adicionar telefone'} tipo="telefone"
-              validar={validarTelefone} aoSalvar={(v) => editarDadoCliente(conversa.id, 'telefone', v, agora)} />
-          </div>
-          <div
-            key={`end-${captado.endereco ?? ''}`}
-            className={`${css.linhaDado} ${enderecoPendente ? css.linhaDadoPendente : ''} ${captado.endereco ? css.captadoAgora : ''}`}
-          >
-            <span className={`${css.azulejo} ${css.azAzul}`} aria-hidden="true"><Icone nome="map-pin" tamanho={15} /></span>
-            <span className={css.rotuloDado}>Endereço <SeloCaptado quando={captado.endereco} /></span>
-            <CampoEmLinha rotulo="Endereço" valor={cliente.endereco}
-              vazio={enderecoPendente ? 'Aguardando confirmação acima'
-                : automaticoCaptando ? 'O automático está pedindo na conversa' : 'Adicionar endereço'}
-              aoSalvar={aoSalvarEndereco} />
-          </div>
-          <div className={css.linhaDado}>
-            <span className={`${css.azulejo} ${css['az_' + canal.icone] ?? css.azCinza}`} aria-hidden="true"><Icone nome={canal.icone} tamanho={15} /></span>
-            <span className={css.rotuloDado}>Canal</span>
-            <span className={css.valorCanal}>
-              {canal.nome}{cliente.usuario ? ` · @${cliente.usuario}` : ''}
-            </span>
-          </div>
-          {/* Canais de aviso: e-mail e SMS (AvisosDoCliente.jsx, que no modo API
-              grava o consentimento do cadastro, F02). */}
-          <div className={css.linhaDado}>
-            <span className={css.rotuloDado}>Avisos</span>
-            <span className={css.avisosCanais}>
-              <AvisosDoCliente conversa={conversa} />
-            </span>
-          </div>
-
-          {avisoEndereco === 'perguntar' && (
-            <p className={css.avisoEmLinha}>
-              Mudar também a entrega do pedido {numeroCurto(conversa.pedido.numero)}?
-              <Botao variante="secundario" onClick={() => { mudarEnderecoDoPedido(conversa.id, agora); setAvisoEndereco(null) }}>
-                Mudar entrega
-              </Botao>
-              <Botao variante="texto" onClick={() => setAvisoEndereco(null)}>Só o cadastro</Botao>
+        {/* Sinal forte de bloqueio: ícone, palavra e motivo. A cor sozinha não
+            informa nada, então o texto diz tudo o que o vermelho sugeriria. */}
+        {bloqueada && (
+          <div className={css.avisoBloqueio}>
+            <p className={css.tituloBloqueio}>
+              <Icone nome="bloqueio" />
+              <strong>Cadastro bloqueado</strong>
+              <span className={css.alcanceBloqueio}>vale em todos os canais</span>
             </p>
-          )}
-          {avisoEndereco === 'aviso' && (
-            <p className={css.avisoEmLinha}>Pedido {numeroCurto(conversa.pedido.numero)} já saiu com o endereço antigo.</p>
-          )}
-        </div>
-      )}
+            <p className={css.motivoBloqueio}>{bloqueio.motivo}</p>
+            <p className={css.rodapeBloco}>{resumoDoBloqueio(bloqueio)}</p>
+          </div>
+        )}
+      </Bloco>
 
-      {domicilio && (
-        <p className={css.mesmoDomicilio}>
-          Mesmo endereço de{' '}
-          <button type="button" className={css.linkDomicilio} onClick={() => selecionar(domicilio.id)}>
-            {domicilio.nome}
-          </button>
-        </p>
-      )}
+      <Bloco titulo="Contato e endereço" chave="contato" resumo={cliente.telefone ?? ''}>
+        {precisaCadastro ? (
+          <div className={css.cadastroRapido}>
+            {!cliente.telefone && (
+              <CampoMascarado
+                tipo="telefone" rotulo="Telefone"
+                valor={form.telefone}
+                aoMudarDigitos={(d) => setForm((f) => ({ ...f, telefone: mascaraTelefone(d) }))}
+                placeholder="(11) 98765-4321"
+              />
+            )}
+            {!cliente.endereco && (
+              <>
+                <CampoTexto
+                  rotulo="Endereço"
+                  value={form.enderecoSemCep}
+                  onChange={(e) => setForm((f) => ({ ...f, enderecoSemCep: e.target.value }))}
+                  placeholder="Rua, número, complemento e bairro"
+                  dica={cliente.enderecoCapturado ? 'Lido da conversa' : undefined}
+                />
+                <CampoMascarado
+                  tipo="cep" rotulo="CEP"
+                  valor={form.cep}
+                  aoMudarDigitos={(d) => setForm((f) => ({ ...f, cep: mascaraCep(d) }))}
+                  placeholder="00000-000"
+                  dica={cepForaDaArea ? 'Fora da área de entrega' : undefined}
+                />
+              </>
+            )}
+            <Botao largo variante="primario" icone="user-plus" disabled={!podeSalvarCadastro} onClick={aoSalvarCadastro}>
+              Salvar cadastro
+            </Botao>
+          </div>
+        ) : (
+          <div className={css.dadosCliente}>
+            <div key={`tel-${captado.telefone ?? ''}`} className={`${css.linhaDado} ${captado.telefone ? css.captadoAgora : ''}`}>
+              <span className={`${css.azulejo} ${css.azVerde}`} aria-hidden="true"><Icone nome="phone" tamanho={15} /></span>
+              <span className={css.rotuloDado}>Telefone <SeloCaptado quando={captado.telefone} /></span>
+              <CampoEmLinha rotulo="Telefone" valor={cliente.telefone}
+                vazio={automaticoCaptando ? 'O automático está pedindo na conversa' : 'Adicionar telefone'} tipo="telefone"
+                validar={validarTelefone} aoSalvar={(v) => editarDadoCliente(conversa.id, 'telefone', v, agora)} />
+            </div>
+            <div
+              key={`end-${captado.endereco ?? ''}`}
+              className={`${css.linhaDado} ${enderecoPendente ? css.linhaDadoPendente : ''} ${captado.endereco ? css.captadoAgora : ''}`}
+            >
+              <span className={`${css.azulejo} ${css.azAzul}`} aria-hidden="true"><Icone nome="map-pin" tamanho={15} /></span>
+              <span className={css.rotuloDado}>Endereço <SeloCaptado quando={captado.endereco} /></span>
+              <CampoEmLinha rotulo="Endereço" valor={cliente.endereco}
+                vazio={enderecoPendente ? 'Aguardando confirmação acima'
+                  : automaticoCaptando ? 'O automático está pedindo na conversa' : 'Adicionar endereço'}
+                aoSalvar={aoSalvarEndereco} />
+            </div>
+            <div className={css.linhaDado}>
+              <span className={`${css.azulejo} ${css['az_' + canal.icone] ?? css.azCinza}`} aria-hidden="true"><Icone nome={canal.icone} tamanho={15} /></span>
+              <span className={css.rotuloDado}>Canal</span>
+              <span className={css.valorCanal}>
+                {canal.nome}{cliente.usuario ? ` · @${cliente.usuario}` : ''}
+              </span>
+            </div>
+            {/* Canais de aviso: e-mail e SMS (AvisosDoCliente.jsx, que no modo API
+                grava o consentimento do cadastro, F02). */}
+            <div className={css.linhaDado}>
+              <span className={css.rotuloDado}>Avisos</span>
+              <span className={css.avisosCanais}>
+                <AvisosDoCliente conversa={conversa} />
+              </span>
+            </div>
 
-      <TagsDoCliente conversa={conversa} />
+            {avisoEndereco === 'perguntar' && (
+              <p className={css.avisoEmLinha}>
+                Mudar também a entrega do pedido {numeroCurto(conversa.pedido.numero)}?
+                <Botao variante="secundario" onClick={() => { mudarEnderecoDoPedido(conversa.id, agora); setAvisoEndereco(null) }}>
+                  Mudar entrega
+                </Botao>
+                <Botao variante="texto" onClick={() => setAvisoEndereco(null)}>Só o cadastro</Botao>
+              </p>
+            )}
+            {avisoEndereco === 'aviso' && (
+              <p className={css.avisoEmLinha}>Pedido {numeroCurto(conversa.pedido.numero)} já saiu com o endereço antigo.</p>
+            )}
+          </div>
+        )}
 
-      {/* #1441: as notas internas mais recentes como post-its, ao lado da conversa. */}
-      {cliente.notas.length > 0 && (
-        <ul className={css.postIts} aria-label="Notas internas">
-          {notasRecentes(cliente.notas).map((nota) => (
-            <li key={nota.id ?? nota.em + nota.texto.slice(0, 12)} className={css.ultimaNota}>
-              <span className={css.rotuloNota}>Nota · {nota.em.slice(0, 5)}{nota.autor ? ` · ${nota.autor}` : ''}</span>
-              <span className={css.textoNota}>{nota.texto}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+        {domicilio && (
+          <p className={css.mesmoDomicilio}>
+            Mesmo endereço de{' '}
+            <button type="button" className={css.linkDomicilio} onClick={() => selecionar(domicilio.id)}>
+              {domicilio.nome}
+            </button>
+          </p>
+        )}
+      </Bloco>
 
-      <Botao largo icone="historico" onClick={() => setModal('historico')}>
-        Histórico · {cliente.pedidos}
-      </Botao>
+      <Bloco titulo="Tags" chave="tags" resumo={resumoTags}>
+        <TagsDoCliente conversa={conversa} />
 
-      {modal === 'bloquear' && (
-        <ModalBloqueio
-          nome={conversa.nome}
-          canais={nomesDeCanal}
-          quantasConversas={doCadastro}
-          motivos={motivosBloqueio}
-          aoFechar={() => setModal(null)}
-          aoConfirmar={(motivo) => { bloquearCliente(conversa.nome, motivo); setModal(null) }}
-        />
-      )}
+        {/* #1441: as notas internas mais recentes como post-its, ao lado da conversa. */}
+        {cliente.notas.length > 0 && (
+          <ul className={css.postIts} aria-label="Notas internas">
+            {notasRecentes(cliente.notas).map((nota) => (
+              <li key={nota.id ?? nota.em + nota.texto.slice(0, 12)} className={css.ultimaNota}>
+                <span className={css.rotuloNota}>Nota · {nota.em.slice(0, 5)}{nota.autor ? ` · ${nota.autor}` : ''}</span>
+                <span className={css.textoNota}>{nota.texto}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Bloco>
 
-      {modal === 'desbloquear' && (
-        <ModalDesbloqueio
-          nome={conversa.nome}
-          aoFechar={() => setModal(null)}
-          aoConfirmar={() => { desbloquearCliente(conversa.nome); setModal(null) }}
-        />
-      )}
+      <Bloco titulo="Histórico" chave="historico" resumo={resumoHistorico}>
+        {!lead && cliente.pedidos > 0 && (
+          <div className={css.numerosCliente}>
+            <span>
+              <b>{cliente.pedidos}</b>
+              <i>{cliente.pedidos === 1 ? 'pedido' : 'pedidos'}</i>
+            </span>
+            {/* Sem histórico carregado não há soma: "R$ 0,00" dizia um valor falso. */}
+            {financeiro.total > 0 && (
+              <span>
+                <b>{moeda(financeiro.total)}</b>
+                <i>valor total</i>
+              </span>
+            )}
+            {financeiro.ultimoEm && (
+              <span>
+                <b>{dataCurta(financeiro.ultimoEm)}</b>
+                <i>último pedido</i>
+              </span>
+            )}
+          </div>
+        )}
 
-      {modal === 'historico' && (
-        <ModalHistorico
-          conversa={conversa}
-          historico={historico}
-          agora={agora}
-          aoFechar={() => setModal(null)}
-        />
-      )}
+        {/* Selo discreto de fidelidade (pedido do Felipe: "sem sujar a UX
+            atual"): só saldo e o botão de resgate, o catálogo mora na Gestão. */}
+        {!lead && (
+          <div className={css.linhaFidelidade}>
+            <span className={css.seloPontos}>
+              <Icone nome="estrela" tamanho={13} /> {saldoPontos} {saldoPontos === 1 ? 'ponto' : 'pontos'}
+            </span>
+            <Botao variante="texto" onClick={() => setModal('fidelidade')}>Resgatar</Botao>
+          </div>
+        )}
 
-      {modal === 'fidelidade' && (
-        <ModalFidelidade
-          nome={conversa.nome}
-          saldo={saldoPontos}
-          recompensas={fidelidade.recompensas}
-          sorteios={fidelidade.sorteios}
-          aoResgatar={(recompensa) => resgatarRecompensa(
-            conversa.cadastroId, conversa.nome, recompensa.id, saldoPontos, agora,
-          )}
-          aoFechar={() => setModal(null)}
-        />
-      )}
-    </Bloco>
+        <Botao largo icone="historico" onClick={() => setModal('historico')}>
+          Histórico · {cliente.pedidos}
+        </Botao>
+      </Bloco>
+
+        {modal === 'bloquear' && (
+          <ModalBloqueio
+            nome={conversa.nome}
+            canais={nomesDeCanal}
+            quantasConversas={doCadastro}
+            motivos={motivosBloqueio}
+            aoFechar={() => setModal(null)}
+            aoConfirmar={(motivo) => { bloquearCliente(conversa.nome, motivo); setModal(null) }}
+          />
+        )}
+
+        {modal === 'desbloquear' && (
+          <ModalDesbloqueio
+            nome={conversa.nome}
+            aoFechar={() => setModal(null)}
+            aoConfirmar={() => { desbloquearCliente(conversa.nome); setModal(null) }}
+          />
+        )}
+
+        {modal === 'historico' && (
+          <ModalHistorico
+            conversa={conversa}
+            historico={historico}
+            agora={agora}
+            aoFechar={() => setModal(null)}
+          />
+        )}
+
+        {modal === 'fidelidade' && (
+          <ModalFidelidade
+            nome={conversa.nome}
+            saldo={saldoPontos}
+            recompensas={fidelidade.recompensas}
+            sorteios={fidelidade.sorteios}
+            aoResgatar={(recompensa) => resgatarRecompensa(
+              conversa.cadastroId, conversa.nome, recompensa.id, saldoPontos, agora,
+            )}
+            aoFechar={() => setModal(null)}
+          />
+        )}
+    </>
   )
 }

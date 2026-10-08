@@ -36,14 +36,14 @@ namespace EasyStock.Api.UnitTests.Controllers;
 /// Handoff pelo console (S07). Use cases reais sobre um repositório em memória; o canal é substituto
 /// (nenhuma chamada à Meta).
 /// </summary>
-public class AtendimentoConversasControllerTests
+public partial class AtendimentoConversasControllerTests
 {
     private const string WaId = "5511999998888";
 
     private readonly Guid _empresaId = Guid.NewGuid();
     private readonly Guid _usuarioId = Guid.NewGuid();
     private readonly ConversaRepositoryEmMemoria _repositorio = new();
-    private readonly ICanalMensageria _canal = Substitute.For<ICanalMensageria>();
+    private readonly ICanalMensageria _canal = Substitute.For<ICanalMensageria, ICanalComAudio>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly IAtendenteRepository _atendentes = Substitute.For<IAtendenteRepository>();

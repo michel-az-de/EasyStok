@@ -10,7 +10,7 @@ import { useHash } from '../hooks/useHash'
 import { useLarguras } from '../hooks/useLarguras'
 import { useRelogio } from '../hooks/useRelogio'
 import { DESKTOP, useTamanhoTela } from '../hooks/useTamanhoTela'
-import { INSTANTE_INICIAL } from '../infra/catalogo'
+import { INSTANTE_INICIAL, LINHAS_PRODUTO } from '../infra/catalogo'
 import { FONTE_API } from '../infra/fonteDados'
 import { useSessaoApi } from '../aplicacao/useSessaoApi'
 import { TelaLogin } from '../features/login/TelaLogin'
@@ -19,16 +19,22 @@ import { contarPrecisaDeVoce, precisaDeVoce } from '../dominio/automatico'
 import { useTituloDaAba } from '../aplicacao/useTituloDaAba'
 import { canalDaConversa } from '../dominio/canal'
 import { envioBloqueado } from '../dominio/janela'
-import { ROTA_CARDAPIO_LINK, ROTA_COZINHA, ROTA_ENTREGAS, rotaDaHash } from '../dominio/rota'
+import {
+  HASH_HALL, ROTA_CARDAPIO_LINK, ROTA_COZINHA, ROTA_ENTREGAS, ROTA_HALL, ROTA_PRINCIPAL, rotaDaHash,
+} from '../dominio/rota'
+import { hashDoModulo } from '../dominio/modulos'
 import { CartaoArrasto, PainelCardapio } from '../features/cardapio/PainelCardapio'
 import { ModalNota } from '../features/notas/ModalNota'
 import { PainelGaleria } from '../features/anexos/PainelGaleria'
 import { ModalAutomacoes } from '../features/automacoes/ModalAutomacoes'
-import { ModalGestao } from '../features/gestao/ModalGestao'
+import { PainelDeAjuste } from '../features/gestao/ModalGestao'
+import { HallDeModulos } from '../features/hall/HallDeModulos'
+import { MolduraDoModulo } from '../features/hall/MolduraDoModulo'
 import { GavetaEntregas } from '../features/entregas/GavetaEntregas'
 import { TelaEntregas } from '../features/entregas/TelaEntregas'
 import { GavetaEntregasApi } from '../features/entregas/GavetaEntregasApi'
 import { TelaEntregasApi } from '../features/entregas/TelaEntregasApi'
+import { CadastroEntregaApi } from '../features/entregas/CadastroEntregaApi'
 import { TelaCozinha } from '../features/cozinha/TelaCozinha'
 import { TelaCozinhaApi } from '../features/cozinha/TelaCozinhaApi'
 import { TelaCardapioLink } from '../features/cardapio-link/TelaCardapioLink'
@@ -57,9 +63,6 @@ function Composicao({ aoSair }) {
   // para quem trocou de janela no mesmo computador (US-010, saber sem olhar).
   useTituloDaAba(contarPrecisaDeVoce(conversas, agora, automaticoPausado, aberta, janelas))
   const [modal, setModal] = useState(null)
-  // #1441: a gestão de respostas e automáticas mora numa aba da Gestão. "Gerenciar
-  // respostas" do seletor e a etiqueta "automática" do balão abrem direto nela.
-  const [abaGestao, setAbaGestao] = useState(null)
   const [pratoArrastando, setPratoArrastando] = useState(null)
   // Rodada 10 (registro 79): o cliente simulado que reage às ações da
   // Thatiane, sempre ativo (não só quando a gaveta Simulações está aberta).
@@ -133,6 +136,18 @@ function Composicao({ aoSair }) {
     />
   ) : null
 
+  // #1445: "abrir o cardápio/comanda" pedido ao assistente, só depois do clique no cartão.
+  // A comanda mora na Ficha (`#comanda-pedido`); sem ela na tela (sem pedido ainda, ou Ficha
+  // em gaveta fechada), abre o cardápio, que é por onde a comanda começa.
+  const abrirTelaDoAssistente = (tela) => {
+    const comanda = tela === 'comanda' ? document.getElementById('comanda-pedido') : null
+    if (comanda) {
+      comanda.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return
+    }
+    setModal('cardapio')
+  }
+
   return (
     <DndContext
       sensors={sensores}
@@ -145,10 +160,13 @@ function Composicao({ aoSair }) {
         tamanho={tamanho}
         aoAbrirNota={() => setModal('nota')}
         aoAbrirGaleria={() => setModal('galeria')}
-        aoAbrirBiblioteca={() => { setAbaGestao('respostas'); setModal('gestao') }}
+        // #1441: "Gerenciar respostas" do seletor e a etiqueta "automática" do balão abrem
+        // a tela Respostas e automáticas do módulo Atendimento.
+        aoAbrirBiblioteca={() => { window.location.hash = hashDoModulo('atendimento', 'respostas') }}
         aoAbrirCardapio={() => setModal('cardapio')}
         aoAbrirAutomacoes={() => setModal('automacoes')}
-        aoAbrirGestao={() => { setAbaGestao(null); setModal('gestao') }}
+        // #1447: o antigo modal Gestão virou o hall de módulos; o botão leva para lá.
+        aoAbrirGestao={() => { window.location.hash = HASH_HALL }}
         aoAbrirEntregas={() => setModal('entregas')}
         simulando={simulando}
         // Modo API (F06): sem Simular. Cenário simulado em conversa de verdade some em 5 s
@@ -191,10 +209,6 @@ function Composicao({ aoSair }) {
         <ModalAutomacoes regras={regras} aoAlternar={alternarRegra} aoFechar={fechar} />
       )}
 
-      {/* Casca da rodada 13 (5 frentes paralelas): auto-suficiente (só
-          aoFechar), mesmo molde de ModalAutomacoes logo acima. */}
-      {modal === 'gestao' && <ModalGestao aoFechar={fechar} abaInicial={abaGestao} />}
-
       {/* Rodada 5, seção 6 (passo zero): gaveta vazia, a F6 desenha a tela de
           verdade. `PainelEntregas.jsx` fica no lugar até a F6 apagar. */}
       {modal === 'entregas' && (FONTE_API ? <GavetaEntregasApi aoFechar={fechar} /> : <GavetaEntregas aoFechar={fechar} />)}
@@ -217,7 +231,7 @@ function Composicao({ aoSair }) {
           voltar. Global pelo mesmo motivo de FilaCanhotos, um degrau acima. */}
       <ModalLoteDePapel />
 
-      <BalaoAssistente sugestaoAgente={sugestaoAgente} />
+      <BalaoAssistente sugestaoAgente={sugestaoAgente} aoAbrirTela={abrirTelaDoAssistente} />
 
       <FaixaApi aoSair={aoSair} />
 
@@ -244,7 +258,31 @@ const SEM_CONVERSAS = []
 // Modo demonstração parte do instante fixo da massa; modo API usa o relógio real.
 const INICIO_DO_RELOGIO = FONTE_API ? Date.now() : INSTANTE_INICIAL
 
-function AppPrincipal() {
+// #1447 (homologação de 07/10): a janela principal abre no hall de módulos. O
+// Balcão (`#/m/atendimento`) segue sendo a `Composicao` de sempre (cockpit, D5);
+// as telas de ajuste (as abas da antiga Gestão) abrem na moldura do módulo. As
+// três dividem o mesmo `AtendimentoProvider`, então ir e voltar não recarrega nada.
+function TelaDaRota({ rota, aoSair }) {
+  if (rota.tipo === ROTA_PRINCIPAL) return <Composicao aoSair={aoSair} />
+  return (
+    <>
+      {rota.tipo === ROTA_HALL
+        ? <HallDeModulos />
+        : (
+          <MolduraDoModulo moduloId={rota.modulo} telaId={rota.tela} fonteApi={FONTE_API}>
+            {/* #1440: no modo API, Entregas › Janelas de entrega é o cadastro da S45 (o mesmo de
+                Entregas › Janelas e frete). Feature não importa feature; quem compõe é o App. */}
+            {rota.aba && (
+              <PainelDeAjuste key={rota.aba} aba={rota.aba} janelasApi={FONTE_API ? <CadastroEntregaApi /> : null} />
+            )}
+          </MolduraDoModulo>
+        )}
+      <FaixaApi aoSair={aoSair} />
+    </>
+  )
+}
+
+function AppPrincipal({ rota }) {
   const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: FONTE_API })
   const { sessao, listarEmpresas, entrarNaEmpresa, google, encerrarSessao } = useSessaoApi()
   if (FONTE_API && !sessao) {
@@ -253,17 +291,25 @@ function AppPrincipal() {
   return (
     // `key`: trocar de usuário ou empresa recomeça o estado, sem conversa de outra empresa na tela.
     <AtendimentoProvider key={sessao?.token ?? 'demo'} agora={agora} sessao={sessao}>
-      <Composicao aoSair={encerrarSessao} />
+      <TelaDaRota rota={rota} aoSair={encerrarSessao} />
     </AtendimentoProvider>
   )
 }
 
+// Fila da Cozinha e painel de Entregas abertos pelo hall (`#/m/cozinha`, `#/m/entregas`)
+// ganham a barra do módulo para voltar; pelo apelido antigo (`#/cozinha`, a janela
+// avulsa do tablet) abrem como sempre, sem barra.
+function NoModulo({ rota, children }) {
+  if (!rota.modulo) return children
+  return <MolduraDoModulo moduloId={rota.modulo} telaId={rota.tela} fonteApi={FONTE_API} operacao>{children}</MolduraDoModulo>
+}
+
 // Cozinha no modo API (F05): a fila vem do KDS, não do espelho do Balcão. Sem
 // sessão nesta aba, pede o login como a janela principal.
-function CozinhaApi() {
+function CozinhaApi({ rota }) {
   const { sessao, listarEmpresas, entrarNaEmpresa, google } = useSessaoApi()
   if (!sessao) return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} google={google} />
-  return <TelaCozinhaApi key={sessao.token} />
+  return <NoModulo rota={rota}><TelaCozinhaApi key={sessao.token} linhas={LINHAS_PRODUTO} /></NoModulo>
 }
 
 // Cardápio por link no modo API (F06): sem canal entre janelas, e nada abre sem sessão.
@@ -274,17 +320,17 @@ function CardapioLinkApi() {
 }
 
 // Entregas no modo API (F04): janela própria lê a API, sem espelho do Balcão.
-function EntregasApi() {
+function EntregasApi({ rota }) {
   const { sessao, listarEmpresas, entrarNaEmpresa, google } = useSessaoApi()
   if (!sessao) return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} google={google} />
-  return <TelaEntregasApi key={sessao.token} />
+  return <NoModulo rota={rota}><TelaEntregasApi key={sessao.token} /></NoModulo>
 }
 
 export function App() {
   const hash = useHash()
-  const rota = rotaDaHash(hash)
-  if (rota.tipo === ROTA_ENTREGAS) return FONTE_API ? <EntregasApi /> : <TelaEntregas />
-  if (rota.tipo === ROTA_COZINHA) return FONTE_API ? <CozinhaApi /> : <TelaCozinha />
+  const rota = rotaDaHash(hash, { fonteApi: FONTE_API })
+  if (rota.tipo === ROTA_ENTREGAS) return FONTE_API ? <EntregasApi rota={rota} /> : <NoModulo rota={rota}><TelaEntregas /></NoModulo>
+  if (rota.tipo === ROTA_COZINHA) return FONTE_API ? <CozinhaApi rota={rota} /> : <NoModulo rota={rota}><TelaCozinha /></NoModulo>
   if (rota.tipo === ROTA_CARDAPIO_LINK) return FONTE_API ? <CardapioLinkApi /> : <TelaCardapioLink />
-  return <AppPrincipal />
+  return <AppPrincipal rota={rota} />
 }
