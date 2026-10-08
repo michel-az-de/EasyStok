@@ -44,7 +44,9 @@ public class SyncReversePullService(
                 Custom: false,
                 Sku: p.CodigoBarras,
                 DefaultWeightG: null,
-                DefaultValidityDays: null);
+                DefaultValidityDays: null,
+                Cost: p.CustoReferencia?.Valor,
+                MinStock: p.QuantidadeMinima);
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
                 "product.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(p.AlteradoEm).ToUnixTimeMilliseconds()));
         }
