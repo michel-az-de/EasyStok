@@ -3,7 +3,7 @@ import * as acao from './acoes'
 import { listarTodasConversas, listarMensagens } from '../infra/api/conversasApi'
 import { conversaDaApi } from '../infra/api/traducaoConversas'
 import { listarCardapio, obterPedido, pedidoDaApi } from '../infra/api/comandaApi'
-import { deveRelerMensagens, deveRelerPedido } from './planoDeSincronizacao'
+import { deveRelerMensagens, deveRelerPedido, quedaDaSincronizacao } from './planoDeSincronizacao'
 
 // Polling da inbox (F01): não existe SSE de conversas ainda (S18). A lista vem a
 // cada ciclo, paginada (F07); o que mais se relê está em `planoDeSincronizacao.js`:
@@ -73,9 +73,17 @@ export function useSincronizacaoApi({ ativo, usuario, despachar, selecionadaId =
           const [mensagens, pedido] = await Promise.all([mensagensDe(resumo), pedidoDe(resumo, cicloLento)])
           return { ...conversaDaApi(resumo, mensagens, usuario), pedido: pedidoDaApi(pedido) }
         }))
-        if (vivo) despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas })
+        if (vivo) {
+          despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas })
+          // #1241: a volta da rede abre o lançamento do papel (o reducer ignora se já estava online).
+          despachar({ tipo: acao.CONEXAO_VOLTOU, agora: Date.now() })
+        }
       } catch (erro) {
-        if (vivo) despachar({ tipo: acao.SINCRONIZACAO_FALHOU, mensagem: erro.message })
+        if (vivo) {
+          despachar({ tipo: acao.SINCRONIZACAO_FALHOU, mensagem: erro.message })
+          // #1241: sem rede, a faixa do papel liga e guarda quem estava aberto.
+          if (quedaDaSincronizacao(erro)) despachar({ tipo: acao.CONEXAO_CAIU, agora: Date.now() })
+        }
       }
       if (vivo) proximo = setTimeout(ciclo, INTERVALO_MS)
     }

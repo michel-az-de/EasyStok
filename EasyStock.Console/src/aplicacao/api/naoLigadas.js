@@ -21,6 +21,8 @@ export const SO_DA_TELA = [
   'marcarCanhotoImpresso',
   // Fechar o modal do gesto da loja (#1443): abrir e fechar de verdade são ligadas.
   'fecharGestoLoja',
+  // Queda e volta da conexão (#1241): só a faixa e a foto dos pedidos abertos; o lote é ligado.
+  'conexaoCaiu', 'conexaoVoltou',
 ]
 
 const grupo = (rotulo, nomes) => Object.fromEntries(nomes.map((nome) => [nome, rotulo]))
@@ -48,7 +50,6 @@ export const NAO_LIGADAS = {
   ]),
   decidirAreaEntrega: 'Área de entrega',
   ...grupo('Galeria de fotos', ['incluirPeca', 'editarPeca', 'tirarPeca']),
-  ...grupo('Lote de papel', ['conexaoCaiu', 'conexaoVoltou', 'lancarLotePapel']),
   ...grupo('Janelas de entrega', ['criarJanela', 'editarJanela', 'pausarJanela', 'reativarJanela', 'excluirJanela', 'ajustarRespiroMinimo']),
   ...grupo('Produção', ['registrarProducao', 'ajustarContagemProducao']),
   // Caixa (#1443): abrir, lançar, estornar e fechar ligados; a venda avulsa ainda não tem rota.

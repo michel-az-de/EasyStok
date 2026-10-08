@@ -74,3 +74,18 @@ export function construirLancamentos(conversas, pedidosAbertos, selecoes, janela
     .filter(Boolean)
     .sort((a, b) => (a.ordem - b.ordem) || (a.numero < b.numero ? -1 : 1))
 }
+
+// #1241 (F11): o mesmo lançamento no vocabulário da API. A máquina de estados do pedido no
+// EasyStok não pula etapa (pago → preparando → pronto → entregue), então o salto que ela
+// anotou no papel vira um passo por etapa. Sem a entrega marcada, vai de pronto direto para
+// entregue (retirada ou entrega que ela não anotou), transição que o EasyStok aceita.
+const STATUS_DA_API = { preparo: 'preparando', embalado: 'pronto', entrega: 'saiu_para_entrega', entregue: 'entregue' }
+
+export function passosNaApi(de, para) {
+  const inicio = PASSOS_PAPEL.includes(de) ? PASSOS_PAPEL.indexOf(de) + 1 : 0
+  const fim = PASSOS_PAPEL.indexOf(para)
+  if (fim < inicio) return []
+  return PASSOS_PAPEL.slice(inicio, fim + 1)
+    .filter((passo) => passo !== 'entrega' || para === 'entrega')
+    .map((passo) => STATUS_DA_API[passo])
+}
