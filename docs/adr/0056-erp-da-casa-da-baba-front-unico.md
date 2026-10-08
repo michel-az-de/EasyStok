@@ -2,6 +2,9 @@
 
 - Status: Proposto
 - Data: 2026-10-01
+- Emendado por ADR-0059 (2026-10-08): o `EasyStock.Web` sai inteiro (supersede o item 7 na parte do
+  bastidor), a PWA de produção e cadastro continua como backup offline e conflito vai para um
+  módulo de merge.
 - Supersede: ADR-0048 (FMA como 2º tenant) por inteiro; o item 4 do ADR-0054 (estrangulamento
   total do EasyStock.Web).
 - Emenda: ADR-0054 (o console deixa de ser só o atendimento e vira o front único da operação);
