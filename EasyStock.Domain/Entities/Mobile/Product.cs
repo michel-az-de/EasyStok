@@ -32,6 +32,14 @@ public class Product
     /// <summary>Quantidade atual disponível em estoque (unidades).</summary>
     public int Stock { get; set; }
 
+    /// <summary>Custo unitário informado no PWA (#1467). Espelha <c>Produto.CustoReferencia</c>.</summary>
+    [Column("cost", TypeName = "numeric(10,2)")]
+    public decimal? Cost { get; set; }
+
+    /// <summary>Estoque mínimo informado no PWA (#1467). Espelha <c>Produto.QuantidadeMinima</c>.</summary>
+    [Column("min_stock")]
+    public int? MinStock { get; set; }
+
     /// <summary>True se foi criado ad-hoc pelo app e ainda não foi revisado.</summary>
     [Column("is_custom")]
     public bool IsCustom { get; set; }

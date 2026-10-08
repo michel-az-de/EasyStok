@@ -77,6 +77,8 @@ public class SyncMutationDispatcher(
                 Sku = dto.Sku,
                 DefaultWeightG = dto.DefaultWeightG,
                 DefaultValidityDays = dto.DefaultValidityDays,
+                Cost = CustoValido(dto.Cost),
+                MinStock = MinimoValido(dto.MinStock),
                 LastDeviceId = deviceId,
                 LastOperatorName = operatorName,
                 EmpresaId = empresaId,
@@ -99,8 +101,14 @@ public class SyncMutationDispatcher(
             if (dto.Sku is not null)                 existing.Sku = dto.Sku;
             if (dto.DefaultWeightG.HasValue)         existing.DefaultWeightG = dto.DefaultWeightG;
             if (dto.DefaultValidityDays.HasValue)    existing.DefaultValidityDays = dto.DefaultValidityDays;
+            // #1467: so mexe quando o campo veio no payload (null explicito = apagado no PWA).
+            if (m.Payload.TryGetProperty("cost", out _))     existing.Cost = CustoValido(dto.Cost);
+            if (m.Payload.TryGetProperty("minStock", out _)) existing.MinStock = MinimoValido(dto.MinStock);
         }
     }
+
+    private static decimal? CustoValido(decimal? c) => c is >= 0 ? c : null;
+    private static int? MinimoValido(int? q) => q is >= 0 ? q : null;
 
     private async Task ApplyClient(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)

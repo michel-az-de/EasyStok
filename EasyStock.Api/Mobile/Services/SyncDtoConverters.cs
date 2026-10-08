@@ -17,7 +17,7 @@ internal static class SyncDtoConverters
 
     internal static ProductDto ToDto(Product p) =>
         new(p.Id, p.Name, p.Emoji, p.Category, p.Unit, p.Price, p.Stock, p.IsCustom,
-            p.Sku, p.DefaultWeightG, p.DefaultValidityDays);
+            p.Sku, p.DefaultWeightG, p.DefaultValidityDays, Cost: p.Cost, MinStock: p.MinStock);
 
     /// <summary>
     /// Overload C2 (RDC 727/2022): popula TipoEmbalagem sem N+1 no Pull.
@@ -28,7 +28,7 @@ internal static class SyncDtoConverters
         if (p.ErpProductId.HasValue && tipoEmbMap.TryGetValue(p.ErpProductId.Value, out var t))
             tipo = t.ToString();
         return new ProductDto(p.Id, p.Name, p.Emoji, p.Category, p.Unit, p.Price, p.Stock, p.IsCustom,
-            p.Sku, p.DefaultWeightG, p.DefaultValidityDays, tipo);
+            p.Sku, p.DefaultWeightG, p.DefaultValidityDays, tipo, p.Cost, p.MinStock);
     }
 
     internal static ClientDto ToDto(Client c) =>

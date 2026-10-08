@@ -19,7 +19,10 @@ public record ProductDto(
     // C2 (RDC 727/2022): "Avulso" (default) | "Embalado".
     // PWA usa para validar peso obrigatorio em confirmProduction.
     // Inserido 2026-05-16. Lido do Produto(ERP) ligado via ErpProductId.
-    string TipoEmbalagem = "Avulso"
+    string TipoEmbalagem = "Avulso",
+    // #1467 — custo unitario e estoque minimo, nos dois sentidos.
+    decimal? Cost = null,
+    int? MinStock = null
 );
 
 public record ClientDto(
