@@ -82,7 +82,15 @@ public record BatchDto(
     string? BatchPhoto,
     long CreatedAt,
     // Lote do dia (LOT-YYMMDD). Opcional — APKs antigos omitem.
-    string? Lote = null
+    string? Lote = null,
+    // #1464 — marcas de exclusao e descarte, nos dois sentidos (epoch ms).
+    bool? Deleted = null,
+    long? DeletedAt = null,
+    string? DeletedBy = null,
+    bool? Discarded = null,
+    long? DiscardedAt = null,
+    string? DiscardedBy = null,
+    string? DiscardReason = null
 );
 
 public record CashEntryDto(

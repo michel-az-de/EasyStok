@@ -14,6 +14,7 @@ namespace EasyStock.Api.Mobile.Services.Linkers;
 public sealed class BatchLinker(
     EasyStockDbContext db,
     ILoteRepository loteRepo,
+    LoteMobileEstadoReconciler loteEstado,
     ILogger<BatchLinker> log)
 {
     public async Task ExecuteAsync(IEnumerable<string> mobileBatchIds, Guid? empresaId)
@@ -98,6 +99,10 @@ public sealed class BatchLinker(
                     bid, lote.Id, lote.Itens.Count);
 
                 await EnsureEntradaEstoqueDoLoteAsync(lote);
+
+                // #1464: lote que ja chega excluido/descartado no primeiro sync.
+                await loteEstado.AplicarAsync(mobileB);
+                if (db.ChangeTracker.HasChanges()) await db.SaveChangesAsync();
             }
             catch (Exception ex)
             {

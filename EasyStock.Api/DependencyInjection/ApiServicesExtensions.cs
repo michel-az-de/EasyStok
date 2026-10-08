@@ -32,6 +32,7 @@ public static class ApiServicesExtensions
 
         // ── Mobile module services (Onda 2 parte 2: stock reconciliation) ────────
         services.AddScoped<MobileStockReconciler>();
+        services.AddScoped<LoteMobileEstadoReconciler>();
         // Onda 3: vendas mobile -> Venda ERP (Order entregue cria Venda + ItemVenda).
         services.AddScoped<MobileSaleSyncService>();
         // F9-E: resolve Usuario "Sistema Mobile Sync" pra auditoria de produto/movimentacao
