@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
 import { rotuloDoDia } from '../../dominio/formato'
+import { intercalarNotas } from '../../dominio/notas'
 import { Balao } from './Balao'
 import css from './atendimento.module.css'
 
@@ -45,19 +46,31 @@ function Digitando() {
   )
 }
 
+// Nota interna como post-it (#1441): entra no fio pela hora em que foi escrita, do
+// lado de quem atende, e nunca vai ao cliente. A nota é do cadastro, então uma nota
+// de outra conversa do mesmo cliente também aparece aqui, na hora dela.
+function PostIt({ nota }) {
+  return (
+    <aside className={css.postIt} aria-label="Nota interna">
+      <span className={css.postItQuem}><Icone nome="nota" /> Nota interna · {nota.autor} · {nota.em}</span>
+      <p>{nota.texto}</p>
+    </aside>
+  )
+}
+
 const diaDe = (iso) => {
   const d = new Date(iso)
   return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate()
 }
 
 export function Thread({
-  mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, digitando = false,
+  mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, digitando = false, notas = [],
 }) {
   const fim = useRef(null)
 
   useEffect(() => {
     fim.current?.scrollIntoView({ block: 'end' })
-  }, [mensagens.length, chaveRolagem, digitando])
+  }, [mensagens.length, chaveRolagem, digitando, notas.length])
 
   // Intercala as divisórias na posição certa: por ÍNDICE (`aposIndice`), não
   // por horário — o relógio simulado anda em passos e duas mensagens de
@@ -66,7 +79,14 @@ export function Thread({
   // não é remetente e não deve contar como troca de voz.
   let proxima = 0
   const linhas = []
-  mensagens.forEach((m, i) => {
+  let i = -1
+  for (const item of intercalarNotas(mensagens, notas)) {
+    if (item.tipo === 'nota') {
+      linhas.push({ tipo: 'nota', chave: `nota-${item.nota.id}`, nota: item.nota })
+      continue
+    }
+    i += 1
+    const m = item.mensagem
     while (proxima < fronteiras.length && i > fronteiras[proxima].aposIndice) {
       linhas.push({ tipo: 'divisoria', chave: `divisoria-${fronteiras[proxima].numero}`, numero: fronteiras[proxima].numero })
       proxima += 1
@@ -77,13 +97,14 @@ export function Thread({
     linhas.push({
       tipo: 'mensagem', chave: m.id, mensagem: m, trocaDeVoz: i > 0 && mensagens[i - 1].dir !== m.dir,
     })
-  })
+  }
 
   return (
     <div className={css.thread} role="log" aria-live="polite" aria-label="Mensagens da conversa">
       {linhas.map((l) => {
         if (l.tipo === 'divisoria') return <Divisoria key={l.chave} numero={l.numero} />
         if (l.tipo === 'dia') return <SeparadorDeDia key={l.chave} rotulo={l.rotulo} />
+        if (l.tipo === 'nota') return <PostIt key={l.chave} nota={l.nota} />
         return (
           <Balao
             key={l.chave}

@@ -22,6 +22,7 @@ import { envioBloqueado } from '../dominio/janela'
 import {
   HASH_HALL, ROTA_CARDAPIO_LINK, ROTA_COZINHA, ROTA_ENTREGAS, ROTA_HALL, ROTA_PRINCIPAL, rotaDaHash,
 } from '../dominio/rota'
+import { hashDoModulo } from '../dominio/modulos'
 import { CartaoArrasto, PainelCardapio } from '../features/cardapio/PainelCardapio'
 import { ModalNota } from '../features/notas/ModalNota'
 import { PainelGaleria } from '../features/anexos/PainelGaleria'
@@ -29,7 +30,6 @@ import { ModalAutomacoes } from '../features/automacoes/ModalAutomacoes'
 import { PainelDeAjuste } from '../features/gestao/ModalGestao'
 import { HallDeModulos } from '../features/hall/HallDeModulos'
 import { MolduraDoModulo } from '../features/hall/MolduraDoModulo'
-import { ModalBiblioteca } from '../features/respostas/ModalBiblioteca'
 import { GavetaEntregas } from '../features/entregas/GavetaEntregas'
 import { TelaEntregas } from '../features/entregas/TelaEntregas'
 import { GavetaEntregasApi } from '../features/entregas/GavetaEntregasApi'
@@ -63,10 +63,6 @@ function Composicao({ aoSair }) {
   // para quem trocou de janela no mesmo computador (US-010, saber sem olhar).
   useTituloDaAba(contarPrecisaDeVoce(conversas, agora, automaticoPausado, aberta, janelas))
   const [modal, setModal] = useState(null)
-  // Item D (banca 10): quando o modal "respostas" abre pela etiqueta
-  // "automática" de um balão, `focoBiblioteca` guarda o id do item para
-  // ModalBiblioteca rolar até ele. `null` (composer, atalho "/") abre sem foco.
-  const [focoBiblioteca, setFocoBiblioteca] = useState(null)
   const [pratoArrastando, setPratoArrastando] = useState(null)
   // Rodada 10 (registro 79): o cliente simulado que reage às ações da
   // Thatiane, sempre ativo (não só quando a gaveta Simulações está aberta).
@@ -164,7 +160,9 @@ function Composicao({ aoSair }) {
         tamanho={tamanho}
         aoAbrirNota={() => setModal('nota')}
         aoAbrirGaleria={() => setModal('galeria')}
-        aoAbrirBiblioteca={(foco) => { setFocoBiblioteca(foco ?? null); setModal('respostas') }}
+        // #1441: "Gerenciar respostas" do seletor e a etiqueta "automática" do balão abrem
+        // a tela Respostas e automáticas do módulo Atendimento.
+        aoAbrirBiblioteca={() => { window.location.hash = hashDoModulo('atendimento', 'respostas') }}
         aoAbrirCardapio={() => setModal('cardapio')}
         aoAbrirAutomacoes={() => setModal('automacoes')}
         // #1447: o antigo modal Gestão virou o hall de módulos; o botão leva para lá.
@@ -189,13 +187,6 @@ function Composicao({ aoSair }) {
       {/* Rodada 7 · frente Anexos: substitui o antigo "Prato" do composer
           (registro em auditoria/decisoes/61-anexos.md). */}
       {modal === 'galeria' && selecionada && <PainelGaleria aoFechar={fechar} />}
-      {/* Rodada 7 (pedido do dono 24/09/2026): biblioteca de respostas, aberta
-          pelo botão Respostas do composer. Auto-suficiente (só aoFechar),
-          mesmo molde de ModalAutomacoes logo abaixo. */}
-      {modal === 'respostas' && selecionada && (
-        <ModalBiblioteca aoFechar={fechar} focoInicial={focoBiblioteca} />
-      )}
-
       {modal === 'cardapio' && selecionada && (
         <PainelCardapio
           pedido={selecionada.pedido}

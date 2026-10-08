@@ -8,6 +8,7 @@ import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcoes } from '../../aplicacao/contextos'
 import { ehLead } from '../../dominio/conversa'
+import { enviosAutomaticos } from '../../dominio/automacao'
 import { diasEntre, quandoRelativo, resumoFinanceiro } from '../../dominio/cliente'
 import { moeda } from '../../dominio/formato'
 import { numeroParaEntregador, textoDoEntregador } from '../../dominio/despacho'
@@ -159,11 +160,34 @@ function AbaNotas({ conversa }) {
   )
 }
 
+// #1441: o que a casa mandou sozinha nesta conversa (automáticas do EasyStok, avisos do
+// pedido e o agente). A API grava cada envio como mensagem; o gatilho de cada uma e os
+// disparos que não saíram (fora da janela, desligada) ainda não ficam registrados.
+const ROTULO_ORIGEM = { agente: 'Agente', sistema: 'Automática' }
+const horaCompleta = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+
+function AbaAutomaticas({ envios }) {
+  if (envios.length === 0) return <p className={css.corpoBloco}>Nada automático nesta conversa.</p>
+  return (
+    <ul className={css.listaNotas}>
+      {envios.map((m) => (
+        <li key={m.id} className={css.linhaNota}>
+          <span className={css.quemNota}>
+            {ROTULO_ORIGEM[m.origemAutomatica] ?? 'Automática'} · {horaCompleta(m.em)}{m.status === 'falhou' ? ' · não entregue' : ''}
+          </span>
+          {m.texto}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
   const [aba, setAba] = useState('pedidos')
   const { cliente } = conversa
   const lead = ehLead(conversa)
   const financeiro = resumoFinanceiro(historico)
+  const automaticas = enviosAutomaticos(conversa.mensagens)
 
   return (
     <Modal
@@ -190,6 +214,7 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
           { id: 'pedidos', rotulo: 'Pedidos', contador: cliente.pedidos },
           { id: 'atendimentos', rotulo: 'Atendimentos', contador: (conversa.atendimentos ?? []).length },
           { id: 'notas', rotulo: 'Notas', contador: cliente.notas.length },
+          { id: 'automaticas', rotulo: 'Automáticas', contador: automaticas.length },
         ]}
         ativa={aba}
         aoTrocar={setAba}
@@ -201,6 +226,7 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
           <AbaAtendimentos conversaId={conversa.id} atendimentos={conversa.atendimentos ?? []} />
         )}
         {aba === 'notas' && <AbaNotas conversa={conversa} />}
+        {aba === 'automaticas' && <AbaAutomaticas envios={automaticas} />}
       </div>
     </Modal>
   )

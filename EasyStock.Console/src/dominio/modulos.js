@@ -34,6 +34,8 @@ export const MODULOS = [
     telas: [
       { id: 'balcao', rotulo: 'Balcão', tipo: TELA_OPERACAO },
       { id: 'horarios', rotulo: 'Horários e mensagens', tipo: TELA_AJUSTE, aba: 'atendimento', soApi: true },
+      // #1441: criar, editar e arquivar respostas prontas; ligar e escrever as automáticas.
+      { id: 'respostas', rotulo: 'Respostas e automáticas', tipo: TELA_AJUSTE, aba: 'respostas' },
     ],
   },
   {

@@ -11,6 +11,7 @@ import { AbaJanelas } from './janelas/AbaJanelas'
 import { AbaFidelidade } from './fidelidade/AbaFidelidade'
 import { AbaIntegracoes } from './integracoes/AbaIntegracoes'
 import { AbaAtendimento } from './atendimento/AbaAtendimento'
+import { AbaRespostas } from './respostas/AbaRespostas'
 import { TelaCanais } from './canais/TelaCanais'
 import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
@@ -41,6 +42,8 @@ export function PainelDeAjuste({ aba, janelasApi = null }) {
   const { fonteApi } = useAtendimento()
   const painelDaAba = useMemo(() => ({
     atendimento: <AbaAtendimento />,
+    // #1441: respostas prontas e automáticas, fora do caminho do atendimento.
+    respostas: <AbaRespostas />,
     producao: <AbaProducao />,
     caixa: <AbaCaixa />,
     janelas: fonteApi && janelasApi ? janelasApi : <AbaJanelas />,

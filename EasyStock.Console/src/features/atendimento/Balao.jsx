@@ -78,6 +78,7 @@ export function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReen
           <button
             type="button"
             className={`${css.selo} ${css.seloBotao}`}
+            title={mensagem.origemAutomatica === 'agente' ? 'Escrita pelo agente do EasyStok' : 'Mensagem automática do sistema'}
             onClick={() => aoAbrirDefinicaoAutomatica?.(mensagem.regra)}
           >
             <Icone nome="raio" /> automática

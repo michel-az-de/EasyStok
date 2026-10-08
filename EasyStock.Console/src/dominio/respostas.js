@@ -257,3 +257,37 @@ export function agruparPorCategoria(itens) {
   })
   return categorias.map((categoria) => ({ categoria, itens: porCategoria.get(categoria) }))
 }
+
+// ---------------------------------------------------------------------------
+// Seletor rápido do compositor (#1441, homologação de 07/10: "uma resposta
+// rápida e já bem direta"). Só resposta pronta ativa: automática é do sistema
+// e mora na Gestão, não no caminho do atendimento. Ordem: atalho que começa
+// com o termo, depois título que começa, depois quem só contém; empate pelo
+// título. Sem termo, ordem alfabética do título.
+// ---------------------------------------------------------------------------
+const semBarra = (atalho) => String(atalho ?? '').replace(/^\//, '')
+
+function pesoNoSeletor(resposta, alvo) {
+  if (!alvo) return 0
+  if (normalizarBusca(semBarra(resposta.atalho)).startsWith(alvo)) return 0
+  if (normalizarBusca(resposta.titulo).startsWith(alvo)) return 1
+  if ([resposta.atalho, resposta.titulo, resposta.texto].some((c) => normalizarBusca(c).includes(alvo))) return 2
+  return null
+}
+
+export function respostasDoSeletor({ respostasProntas, termo = '', limite = 8 }) {
+  const alvo = normalizarBusca(semBarra(termo))
+  return (respostasProntas ?? [])
+    .filter((r) => !r.arquivada)
+    .map((r) => ({ r, peso: pesoNoSeletor(r, alvo) }))
+    .filter(({ peso }) => peso !== null)
+    .sort((a, b) => a.peso - b.peso || a.r.titulo.localeCompare(b.r.titulo, 'pt-BR'))
+    .slice(0, limite)
+    .map(({ r }) => r)
+}
+
+// "/" no começo do campo e um token sem espaço: o resto é o termo da busca.
+export const termoDaBarra = (rascunho) => /^\/(\S*)$/.exec(rascunho ?? '')?.[1] ?? null
+
+// Setas do seletor: dão a volta nas pontas, lista vazia fica em zero.
+export const moverDestaque = (indice, delta, total) => (total > 0 ? (indice + delta + total) % total : 0)
