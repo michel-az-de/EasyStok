@@ -14,6 +14,7 @@ namespace EasyStock.Api.Mobile.Services;
 public class SyncMutationDispatcher(
     EasyStockDbContext db,
     MobileStockReconciler stockReconciler,
+    LoteMobileEstadoReconciler loteEstado,
     MobileSaleSyncService saleSync,
     OperacaoEventBroker eventBroker,
     IProdutoRepository produtoRepo,
@@ -21,6 +22,7 @@ public class SyncMutationDispatcher(
 {
     private readonly EasyStockDbContext _db = db;
     private readonly MobileStockReconciler _stockReconciler = stockReconciler;
+    private readonly LoteMobileEstadoReconciler _loteEstado = loteEstado;
     private readonly MobileSaleSyncService _saleSync = saleSync;
     private readonly OperacaoEventBroker _eventBroker = eventBroker;
     private readonly IProdutoRepository _produtoRepo = produtoRepo;
@@ -307,7 +309,13 @@ public class SyncMutationDispatcher(
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<Batch>().Include(b => b.Items)
             .FirstOrDefaultAsync(b => b.Id == dto.Id && b.EmpresaId == empresaId);
-        if (existing != null) return; // Batches são imutáveis — ignora re-envio
+        if (existing != null)
+        {
+            // Itens sao imutaveis; o re-envio so traz as marcas de exclusao/descarte (#1464).
+            AplicarMarcas(existing, dto);
+            await _loteEstado.AplicarAsync(existing);
+            return;
+        }
 
         // C2 (RDC 727/2022): valida peso obrigatorio para itens Embalados.
         if (empresaId.HasValue && dto.Items != null && dto.Items.Count > 0)
@@ -345,6 +353,7 @@ public class SyncMutationDispatcher(
             EmpresaId = empresaId,
             LojaId = lojaId
         };
+        AplicarMarcas(batch, dto);
         if (dto.Items is null)
             throw new InvalidOperationException(
                 $"Batch {dto.Id} chegou sem coleção Items — payload mal-formado do PWA. " +
@@ -371,6 +380,21 @@ public class SyncMutationDispatcher(
         }
         _db.Add(batch);
     }
+
+    private static void AplicarMarcas(Batch b, BatchDto dto)
+    {
+        b.DeletedAt = dto.Deleted == true ? MsParaUtc(dto.DeletedAt) ?? b.DeletedAt ?? DateTime.UtcNow : null;
+        b.DeletedBy = dto.Deleted == true ? Cortar(dto.DeletedBy, 64) : null;
+        b.DiscardedAt = dto.Discarded == true ? MsParaUtc(dto.DiscardedAt) ?? b.DiscardedAt ?? DateTime.UtcNow : null;
+        b.DiscardedBy = dto.Discarded == true ? Cortar(dto.DiscardedBy, 64) : null;
+        // Motivo + observacao livre do operador: corta para caber na coluna em vez de rejeitar o sync.
+        b.DiscardReason = dto.Discarded == true ? Cortar(dto.DiscardReason, 200) : null;
+    }
+
+    private static string? Cortar(string? s, int max) => s is { Length: > 0 } && s.Length > max ? s[..max] : s;
+
+    private static DateTime? MsParaUtc(long? ms) =>
+        ms.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(ms.Value).UtcDateTime : null;
 
     private async Task ApplyCashEntry(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)

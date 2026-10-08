@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Api.Mobile.Services;
@@ -54,13 +55,14 @@ public sealed class LoteMobileEntradaEstoqueTests : IDisposable
 
         var reconciler = new MobileStockReconciler(
             _db, new MobileSystemUserResolver(_db), NullLogger<MobileStockReconciler>.Instance);
+        var loteEstado = new LoteMobileEstadoReconciler(_db, NullLogger<LoteMobileEstadoReconciler>.Instance);
         _dispatcher = new SyncMutationDispatcher(
-            _db, reconciler,
+            _db, reconciler, loteEstado,
             new MobileSaleSyncService(_db, NullLogger<MobileSaleSyncService>.Instance),
             new OperacaoEventBroker(NullLogger<OperacaoEventBroker>.Instance),
             produtoRepo,
             NullLogger<SyncMutationDispatcher>.Instance);
-        _linker = new BatchLinker(_db, new LoteRepository(_db), NullLogger<BatchLinker>.Instance);
+        _linker = new BatchLinker(_db, new LoteRepository(_db), loteEstado, NullLogger<BatchLinker>.Instance);
 
         _db.Add(new Produto
         {
@@ -83,14 +85,18 @@ public sealed class LoteMobileEntradaEstoqueTests : IDisposable
         _db.SaveChanges();
     }
 
-    private async Task SincronizarLoteAsync(string batchId, int qtd)
+    private static BatchDto Lote(string batchId, int qtd) => new(
+        batchId, "LOT-261008",
+        [new BatchItemDto(ProdutoMobileId, "Massa de lasanha", null, "un", qtd, null)],
+        null, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+
+    private Task SincronizarLoteAsync(string batchId, int qtd) => SincronizarAsync(Lote(batchId, qtd));
+
+    private async Task SincronizarAsync(BatchDto dto)
     {
-        var dto = new BatchDto(
-            batchId, "LOT-261008",
-            [new BatchItemDto(ProdutoMobileId, "Massa de lasanha", null, "un", qtd, null)],
-            null, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        var batchId = dto.Id;
         var mutation = new MutationDto(
-            $"m-{batchId}", "dev-1", "batch.upsert",
+            $"m-{batchId}-{Guid.NewGuid():N}", "dev-1", "batch.upsert",
             JsonSerializer.SerializeToElement(dto, Json),
             DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
@@ -117,6 +123,103 @@ public sealed class LoteMobileEntradaEstoqueTests : IDisposable
 
         SaldoDoProdutoNaLoja().Should().Be(8, "5 + 3 produzidos, nenhum contado em dobro");
         EntradasDeProducao().Should().Be(2, "uma entrada de producao por lote");
+    }
+
+    private List<MovimentacaoEstoque> Saidas(NaturezaMovimentacaoEstoque natureza) =>
+        _db.Set<MovimentacaoEstoque>().IgnoreQueryFilters()
+            .Where(m => m.EmpresaId == _empresaId && m.ProdutoId == _produtoErpId
+                        && m.Tipo == TipoMovimentacaoEstoque.Saida && m.Natureza == natureza)
+            .ToList();
+
+    private string StatusDoLoteErp(string batchId) => _db.Set<Lote>().IgnoreQueryFilters()
+        .Single(l => l.MobileBatchId == batchId).Status;
+
+    private static long Agora() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+    [Fact]
+    public async Task DescartarLote_BaixaOSaldoRestanteComoPerda()
+    {
+        await SincronizarLoteAsync("b-1", 5);
+
+        await SincronizarAsync(Lote("b-1", 5) with
+        {
+            Discarded = true, DiscardedAt = Agora(), DiscardedBy = "Thati", DiscardReason = "vencido"
+        });
+
+        SaldoDoProdutoNaLoja().Should().Be(0);
+        Saidas(NaturezaMovimentacaoEstoque.Perda).Should().ContainSingle()
+            .Which.Quantidade.Value.Should().Be(5);
+        StatusDoLoteErp("b-1").Should().Be("descartado");
+        _db.Set<Batch>().Single(b => b.Id == "b-1").DiscardReason.Should().Be("vencido");
+    }
+
+    [Fact]
+    public async Task ReenviarOMesmoDescarte_NaoBaixaDeNovo()
+    {
+        await SincronizarLoteAsync("b-1", 5);
+        var descartado = Lote("b-1", 5) with { Discarded = true, DiscardedAt = Agora() };
+
+        await SincronizarAsync(descartado);
+        await SincronizarAsync(descartado);
+
+        Saidas(NaturezaMovimentacaoEstoque.Perda).Should().ContainSingle();
+        SaldoDoProdutoNaLoja().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DesfazerDescarte_EstornaAPerda()
+    {
+        await SincronizarLoteAsync("b-1", 5);
+        await SincronizarAsync(Lote("b-1", 5) with { Discarded = true, DiscardedAt = Agora() });
+
+        await SincronizarAsync(Lote("b-1", 5));
+
+        SaldoDoProdutoNaLoja().Should().Be(5);
+        Saidas(NaturezaMovimentacaoEstoque.Perda).Should().ContainSingle()
+            .Which.EstornadaEm.Should().NotBeNull();
+        StatusDoLoteErp("b-1").Should().Be("finalizado");
+    }
+
+    [Fact]
+    public async Task ExcluirERestaurarLote_TiraEDevolveOSaldo()
+    {
+        await SincronizarLoteAsync("b-1", 5);
+
+        await SincronizarAsync(Lote("b-1", 5) with { Deleted = true, DeletedAt = Agora(), DeletedBy = "Thati" });
+        SaldoDoProdutoNaLoja().Should().Be(0);
+        Saidas(NaturezaMovimentacaoEstoque.Ajuste).Should().ContainSingle();
+        StatusDoLoteErp("b-1").Should().Be("excluido");
+
+        await SincronizarAsync(Lote("b-1", 5));
+        SaldoDoProdutoNaLoja().Should().Be(5);
+        StatusDoLoteErp("b-1").Should().Be("finalizado");
+    }
+
+    [Fact]
+    public async Task LoteQueJaChegaExcluido_NaoFicaNoEstoque()
+    {
+        await SincronizarAsync(Lote("b-1", 5) with { Deleted = true, DeletedAt = Agora() });
+
+        SaldoDoProdutoNaLoja().Should().Be(0);
+        StatusDoLoteErp("b-1").Should().Be("excluido");
+    }
+
+    [Fact]
+    public async Task PullDevolveAsMarcasDoLote()
+    {
+        await SincronizarLoteAsync("b-1", 5);
+        await SincronizarAsync(Lote("b-1", 5) with { Discarded = true, DiscardedAt = Agora(), DiscardReason = "caiu" });
+
+        var batch = _db.Set<Batch>().Include(b => b.Items).Single(b => b.Id == "b-1");
+        // SyncDtoConverters e internal: e o mesmo conversor que o pull usa (SyncController).
+        var conversor = typeof(SyncMutationDispatcher).Assembly
+            .GetType("EasyStock.Api.Mobile.Services.SyncDtoConverters")!;
+        var dto = conversor.GetMethod("ToDto", BindingFlags.Static | BindingFlags.NonPublic, [typeof(Batch)])!
+            .Invoke(null, [batch])!;
+        var json = JsonSerializer.SerializeToElement(dto, Json);
+
+        json.GetProperty("discarded").GetBoolean().Should().BeTrue();
+        json.GetProperty("discardReason").GetString().Should().Be("caiu");
     }
 
     public void Dispose() => _db.Dispose();

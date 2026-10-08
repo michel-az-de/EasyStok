@@ -64,7 +64,17 @@ internal static class SyncDtoConverters
                     : (long?)null)).ToList(),
             b.BatchPhoto,
             new DateTimeOffset(b.CreatedAt).ToUnixTimeMilliseconds(),
-            b.Lote);
+            b.Lote,
+            Deleted: b.Excluido ? true : null,
+            DeletedAt: EpochMs(b.DeletedAt),
+            DeletedBy: b.DeletedBy,
+            Discarded: b.Descartado ? true : null,
+            DiscardedAt: EpochMs(b.DiscardedAt),
+            DiscardedBy: b.DiscardedBy,
+            DiscardReason: b.DiscardReason);
+
+    private static long? EpochMs(DateTime? d) =>
+        d.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(d.Value, DateTimeKind.Utc)).ToUnixTimeMilliseconds() : null;
 
     internal static CashEntryDto ToDto(CashEntry c) =>
         new(c.Id, c.Type, c.Amount, c.Description,
