@@ -211,4 +211,31 @@ public class CalcularProducaoUseCaseTests
         await _itemEstoqueRepo.Received(1).GetByProdutosAsync(
             empresaId, Arg.Any<IEnumerable<Guid>>(), null, Arg.Any<CancellationToken>());
     }
+
+    // #1498: o custo do insumo é por unidade-base dele; a receita pode estar em outra unidade.
+    // Molho a R$ 0,03 por grama, receita pede 0,2 kg para 10 porções: 200 g × 0,03 = R$ 6,00.
+    [Fact]
+    public async Task Custo_ConverteAUnidadeDaReceitaParaADoInsumo()
+    {
+        var empresaId = Guid.NewGuid();
+        var produto = BuildProduto(empresaId, rendimento: 10m);
+        var molho = new Produto
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Molho", CategoriaId = Guid.NewGuid(),
+            UnidadeMedidaBase = UnidadeMedida.G, CustoReferencia = Dinheiro.FromDecimal(0.03m)
+        };
+        var composicao = new ProdutoComposicao
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoFinalId = produto.Id, InsumoId = molho.Id,
+            Quantidade = 0.2m, Unidade = UnidadeMedida.Kg, Insumo = molho
+        };
+        _produtoRepo.GetByIdAsync(empresaId, produto.Id).Returns(produto);
+        _composicaoRepo.GetByProdutoFinalAsync(empresaId, produto.Id, null, Arg.Any<CancellationToken>()).Returns([composicao]);
+        _itemEstoqueRepo.GetByProdutosAsync(empresaId, Arg.Any<IEnumerable<Guid>>(), null, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, IReadOnlyCollection<ItemEstoque>>());
+
+        var result = await Build().ExecuteAsync(new CalcularProducaoCommand(empresaId, produto.Id, 10m, UnidadeMedida.Un, null));
+
+        result.Insumos[0].CustoEstimadoLinha.Should().Be(6m);
+    }
 }

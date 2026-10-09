@@ -14,6 +14,18 @@ internal static class CalculoProducaoCore
     public const decimal PrecisaoMinima = 0.0001m;
 
     /// <summary>
+    /// #1498: o custo do insumo é por unidade-base DELE; a receita pode pedir em outra unidade (0,2 kg de
+    /// um molho que custa por grama). Converte a quantidade antes de multiplicar. Unidades incompatíveis
+    /// (kg × un): null, custo desconhecido em vez de errado.
+    /// </summary>
+    public static decimal? CustoNaUnidadeDoInsumo(
+        decimal quantidade, UnidadeMedida unidadeDaReceita, UnidadeMedida unidadeDoInsumo, decimal custoPorUnidadeDoInsumo)
+    {
+        var (convertida, _) = UnidadeMedidaConverter.Converter(quantidade, unidadeDaReceita, unidadeDoInsumo);
+        return convertida * custoPorUnidadeDoInsumo;
+    }
+
+    /// <summary>
     /// Calcula 1 produto-final: aplica fator, soma saldos por insumo, marca faltas e estima custo.
     /// </summary>
     /// <param name="produto">Produto-final (precisa de RendimentoBase, RendimentoUnidade).</param>
@@ -81,7 +93,9 @@ internal static class CalculoProducaoCore
             else if (insumo.CustoReferencia != null)
                 custoUnit = insumo.CustoReferencia.Valor;
 
-            decimal? custoLinha = custoUnit.HasValue ? custoUnit.Value * qtdNecessaria : null;
+            decimal? custoLinha = custoUnit.HasValue
+                ? CustoNaUnidadeDoInsumo(qtdNecessaria, comp.Unidade, insumo.UnidadeMedidaBase, custoUnit.Value)
+                : null;
             if (custoLinha.HasValue)
             {
                 custoTotal += custoLinha.Value;

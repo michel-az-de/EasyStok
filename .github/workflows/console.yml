@@ -50,3 +50,4 @@ jobs:
       - run: node ferramentas/prova-1490-estoque-do-dia.mjs
       - run: node ferramentas/prova-1491-producao-do-dia.mjs
       - run: node ferramentas/prova-1496-insumos.mjs
+      - run: node ferramentas/prova-1498-receitas.mjs

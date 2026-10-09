@@ -77,3 +77,41 @@ export const insumoDaApi = (i) => ({
   receitas: i.receitas,
   comprar: i.abaixoDoMinimo === true,
 })
+
+// M2.4a (#1498): receitas dos pratos. Ler é do Operador com estoque; gravar é o PUT da composição
+// que já existe (Gerente desde a #1462), que guarda o diff na auditoria.
+export const listarReceitas = () => chamarApi(`${PRODUCAO}/receitas`)
+export const obterReceita = (produtoId) => chamarApi(`${PRODUCAO}/receitas/${produtoId}`)
+export const salvarReceita = (produtoId, { rendimentoBase, rendimentoUnidade, unidadeMedidaBase, linhas }) =>
+  chamarApi(`/api/produtos/${produtoId}/composicao`, {
+    metodo: 'PUT',
+    corpo: {
+      rendimentoBase,
+      rendimentoUnidade,
+      unidadeMedidaBaseProdutoFinal: unidadeMedidaBase,
+      linhas: linhas.map((l, i) => ({ insumoId: l.insumoId, quantidade: l.quantidade, unidade: l.unidade, observacao: null, ordemExibicao: i })),
+      observacao: 'Receita editada pelo console',
+    },
+  })
+
+export const receitaDaApi = (r) => ({
+  sku: r.cardapioItemId,
+  produtoId: r.produtoId,
+  nome: r.nome,
+  rendimento: r.rendimentoBase,
+  unidadeRendimento: r.rendimentoUnidade,
+  linhas: r.linhas,
+  custoTotal: r.custoTotal ?? null,
+  custoPorRendimento: r.custoPorRendimento ?? null,
+})
+
+export const detalheDaReceitaDaApi = (d) => ({
+  produtoId: d.produtoId,
+  nome: d.nome,
+  rendimento: d.rendimentoBase,
+  unidadeRendimento: d.rendimentoUnidade,
+  unidadeMedidaBase: d.unidadeMedidaBase,
+  linhas: (d.linhas ?? []).map((l) => ({ insumoId: l.insumoId, insumo: l.insumo, quantidade: l.quantidade, unidade: l.unidade, custo: l.custo ?? null })),
+  custoTotal: d.custoTotal ?? null,
+  custoPorRendimento: d.custoPorRendimento ?? null,
+})

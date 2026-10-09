@@ -39,6 +39,8 @@ export const MODULOS = [
       { id: 'producao', rotulo: 'Produção do dia', tipo: TELA_AJUSTE, aba: 'producao-do-dia', soApi: true },
       // M2.3 (#1496): insumos (intermediário e embalagem), com o que comprar.
       { id: 'insumos', rotulo: 'Insumos', tipo: TELA_AJUSTE, aba: 'insumos', soApi: true },
+      // M2.4a (#1498): a receita de cada prato, com o custo por porção.
+      { id: 'receitas', rotulo: 'Receitas', tipo: TELA_AJUSTE, aba: 'receitas', soApi: true },
     ],
   },
   {
