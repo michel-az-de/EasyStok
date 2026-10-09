@@ -193,4 +193,16 @@ confere('aviso de início: "Começar em" só enquanto aguarda; atraso de outro d
   assert.equal(avisoDeInicio(pedido({ status: 'preparando', inicioPrevistoEm: null, atrasado: true }), agora).atrasado, true)
 })
 
+confere('#1474: início distante mostra a hora, não centenas de minutos', () => {
+  const agora = Date.parse('2026-10-08T21:50:00-03:00')
+  assert.match(avisoDeInicio({ inicioPrevistoEm: '2026-10-09T09:30:00-03:00', atrasado: false, status: 'aguardando' }, agora).texto,
+    /^Começar amanhã às 09:30$/)
+  assert.match(avisoDeInicio({ inicioPrevistoEm: '2026-10-08T23:30:00-03:00', atrasado: false, status: 'aguardando' }, agora).texto,
+    /^Começar às 23:30$/)
+  assert.match(avisoDeInicio({ inicioPrevistoEm: '2026-10-08T22:30:00-03:00', atrasado: false, status: 'aguardando' }, agora).texto,
+    /^Começar em 40 min$/)
+  assert.match(avisoDeInicio({ inicioPrevistoEm: '2026-10-11T09:30:00-03:00', atrasado: false, status: 'aguardando' }, agora).texto,
+    /^Começar em 11\/10 às 09:30$/)
+})
+
 console.log(`prova #1446 (cozinha viva no modo API): ${passou} conferências ok`)

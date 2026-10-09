@@ -21,9 +21,9 @@ import css from './gestao.module.css'
 // faixa e os controles desabilitados até a fatia de cada uma entrar. Nada é gravado: as
 // ações delas também avisam (`aplicacao/api/naoLigadas.js`), e Integrações nunca guarda chave.
 const AINDA_NAO_LIGADO = {
-  producao: 'Produção e cardápio ainda não estão ligados ao EasyStok nesta versão (F11). Nada aqui é gravado.',
-  fidelidade: 'Fidelidade e cupons ainda não estão ligados ao EasyStok nesta versão (F15). Nada aqui é gravado.',
-  integracoes: 'As integrações ainda não estão ligadas nesta versão (F16). Nenhuma chave é guardada no navegador.',
+  producao: 'Produção e cardápio ainda não funcionam por esta tela. Nada aqui é gravado.',
+  fidelidade: 'Fidelidade e cupons ainda não funcionam por esta tela. Nada aqui é gravado.',
+  integracoes: 'As integrações ainda não funcionam por esta tela. Nenhuma chave é guardada no navegador.',
 }
 
 function AbaNaoLigada({ texto, children }) {

@@ -158,7 +158,8 @@ confere('WhatsApp com número, webhook e mensagem recente: ligado', () => {
   }, AGORA)
   assert.equal(r.tom, 'ok')
   assert.match(r.titulo, /ligado/i)
-  assert.ok(r.linhas.some((l) => /10 min/.test(l)), 'diz há quanto tempo chegou a última mensagem')
+  // #1474: a linha diz a hora e o dia da última mensagem, no fuso da loja.
+  assert.ok(r.linhas.includes('Recebendo mensagens (última às 11:50 de 07/10)'), 'diz quando chegou a última mensagem')
 })
 
 confere('provedor simulado (stub) avisa que nada sai para a Meta', () => {

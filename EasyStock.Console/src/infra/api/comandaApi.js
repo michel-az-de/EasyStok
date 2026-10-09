@@ -64,6 +64,15 @@ const ESTADO_DO_STATUS = {
   cancelado: 'cancelado',
 }
 
+// #1474 (R1): etapa da esteira do console → status da API (`StatusPedidoMapper`), o mesmo que a
+// Cozinha manda. "Pago" não se marca por aqui: entra pela cobrança ou pela baixa à mão.
+export const STATUS_DO_PASSO = {
+  preparo: 'preparando',
+  embalado: 'pronto',
+  entrega: 'saiu_para_entrega',
+  entregue: 'entregue',
+}
+
 export const FORMA_NA_ENTREGA = 'na_entrega'
 export const FORMA_ONLINE = 'online'
 const MEIOS_NA_ENTREGA = new Set(['maquininha', 'vale-refeicao'])
@@ -115,6 +124,8 @@ export function pedidoDaApi(p, anterior = null) {
     numero: p.pedidoId.replace(/-/g, '').slice(0, 8).toUpperCase(),
     estado: ESTADO_DO_STATUS[p.status] ?? 'aguardando',
     statusApi: p.status,
+    // #1474: pedido fora da área liberado espera aprovação; a baixa manual é barrada antes.
+    requerAprovacao: Boolean(p.requerAprovacao),
     janela: anterior?.janela ?? null,
     entregador: anterior?.entregador ?? null,
     itens: p.itens.map((i) => ({

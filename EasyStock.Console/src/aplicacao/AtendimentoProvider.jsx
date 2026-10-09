@@ -32,6 +32,7 @@ import { FONTE_API } from '../infra/fonteDados'
 import { comApi } from './acoesApi'
 import { criarAcoes } from './criarAcoes'
 import { useSincronizacaoApi } from './useSincronizacaoApi'
+import { deveCarregarDossie } from './planoDeSincronizacao'
 import { gravarRascunhos, lerRascunhos } from '../infra/api/rascunhosDaSessao'
 
 const carregar = () => ({
@@ -61,6 +62,8 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
     // Modo API (F02): mensagens do expediente (S40); horário e controle vivem em
     // `funcionamento` e `lojaAberta`, os mesmos do modo demonstração.
     expediente: { carregado: false, mensagemForaDoHorario: '', mensagemLojaFechada: '' },
+    // #1474: carregando, ok ou erro das automáticas da API, para a tela não confundir com vazio.
+    cargaDasRegras: { estado: FONTE_API ? 'carregando' : 'ok', mensagem: null },
     // F07, item 6: o rascunho de antes do 401 volta depois do novo login.
     ...(FONTE_API ? { rascunhos: lerRascunhos(sessao) } : {}),
   }))
@@ -302,6 +305,15 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
   }, [acoesAtivas])
   useEffect(() => () => acoesAtivas.cancelarHorarioPendente?.(), [acoesAtivas])
 
+  // #1474: a conversa restaurada na carga (ou escolhida pela sincronização antes de qualquer
+  // clique) não passa por `selecionar`; sem isto a Ficha ficava sem telefone, tags e notas.
+  // A ação junta pedidos em voo, então o clique e este efeito não duplicam a chamada.
+  const precisaDossie = FONTE_API
+    && deveCarregarDossie(estado.conversas.find((c) => c.id === estado.selecionadaId))
+  useEffect(() => {
+    if (precisaDossie) acoesAtivas.carregarClienteDaConversa(estado.selecionadaId)
+  }, [precisaDossie, estado.selecionadaId, acoesAtivas])
+
   const valor = useMemo(() => {
     const selecionada = estado.conversas.find((c) => c.id === estado.selecionadaId) ?? null
     return {
@@ -379,6 +391,7 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
       fonteApi: FONTE_API,
       sincronizacao: estado.sincronizacao,
       expediente: estado.expediente,
+      cargaDasRegras: estado.cargaDasRegras,
       sessao,
     }
   }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao])

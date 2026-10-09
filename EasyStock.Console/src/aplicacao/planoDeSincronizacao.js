@@ -27,3 +27,16 @@ export function deveRelerPedido(resumo, guardado, { selecionadaId = null, cicloL
   if (STATUS_FINAIS_DO_PEDIDO.has(guardado.dados?.status)) return false
   return resumo.id === selecionadaId || guardado.ultima !== resumo.ultimaMensagemEm || cicloLento
 }
+
+// Dossiê do cliente (#1276, #1474): a Ficha lê telefone, tags e notas do cadastro. Vale para a
+// conversa aberta por clique e para a que a carga restaurou ou escolheu sozinha.
+export const deveCarregarDossie = (conversa) => Boolean(conversa?.clienteId && !conversa.cliente?.daApi)
+
+// Aviso da faixa quando o cardápio da vitrine não vem (#1474): a vitrine desligada é um 404
+// com texto técnico; a dona precisa saber o que ligar.
+export function avisoDoCardapio(erro) {
+  if (erro?.status === 404 && /vitrine ativa/i.test(erro.message ?? '')) {
+    return 'A loja online está desligada: o cardápio não carrega até ligar a vitrine.'
+  }
+  return `Cardápio: ${erro?.message ?? 'não carregou.'}`
+}

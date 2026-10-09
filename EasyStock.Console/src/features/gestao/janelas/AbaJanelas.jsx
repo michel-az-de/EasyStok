@@ -79,7 +79,7 @@ function ToggleDias({ diasSemana, aoMudar }) {
   return (
     <div className={css.dias}>
       {DIAS_DA_SEMANA.map((dia) => (
-        <Chip key={dia.valor} papel="filtro" ativo={diasSemana.includes(dia.valor)} onClick={() => alternar(dia.valor)}>
+        <Chip key={dia.valor} papel="filtro" reservarIcone ativo={diasSemana.includes(dia.valor)} onClick={() => alternar(dia.valor)}>
           {dia.rotulo}
         </Chip>
       ))}

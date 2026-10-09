@@ -10,7 +10,9 @@ const CHAVE = 'cdb.larguras.v1'
 // a alça de arrastar e o contador na mesma linha (achado do corte na coluna).
 // Balcão em 360 (rodada 5, seção 1): os chips de canal cabem numa linha só a
 // partir de 336 px úteis.
-export const PADRAO = { balcao: 360, ficha: 420, cardapio: 400 }
+// Cardápio em 460 (#1474): com foto, preço e o botão de enviar foto, 400 deixava o nome
+// do prato em quatro linhas.
+export const PADRAO = { balcao: 360, ficha: 420, cardapio: 460 }
 
 function ler() {
   try {

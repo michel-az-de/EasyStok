@@ -8,12 +8,14 @@ import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { CampoMascarado } from '../../componentes/CampoMascarado'
 import { Modal } from '../../componentes/Modal'
+import { Pilula } from '../../componentes/Pilula'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useCaixaDoDiaApi } from '../../aplicacao/useCaixaDoDiaApi'
 import {
   JUSTIFICATIVA_MINIMA, diaMes, justificativaValida, observacaoDaAbertura, retificacaoDoSaldo,
   situacaoDoCaixaParaAbrirLoja,
 } from '../../dominio/aberturaDaLoja'
+import { conferenciaDaGaveta } from '../../dominio/caixa'
 import {
   horaCurta, lerMoeda, mascaraMoeda, moeda, moedaAltaDemais,
 } from '../../dominio/formato'
@@ -56,11 +58,14 @@ function Erro({ texto }) {
 }
 
 // O caixa de um dia anterior ficou aberto: confere a gaveta e fecha aquele dia antes de abrir hoje.
+// #1474: confere só o dinheiro da gaveta (Pix e cartão não estão nela) e o campo nasce vazio: o
+// botão só libera depois que ela digitar o que contou.
 function FecharEsquecido({ situacao, aoFechou }) {
   const { agora } = useAtendimento()
   const { fecharCaixa } = useAcoes()
-  const [contado, setContado] = useState(Math.round(situacao.saldoEsperado * 100))
+  const [contado, setContado] = useState(null)
   const [envio, enviar] = useEnvio()
+  const conferencia = conferenciaDaGaveta(contado, situacao.naGaveta)
 
   return (
     <div className={css.bloco}>
@@ -68,21 +73,28 @@ function FecharEsquecido({ situacao, aoFechou }) {
         O caixa de <strong>{diaMes(situacao.desde)}</strong> ficou aberto. Feche aquele dia antes de abrir o de hoje.
       </p>
       <dl className={css.numeros}>
-        <div><dt>Saldo esperado</dt><dd>{moeda(situacao.saldoEsperado)}</dd></div>
+        <div><dt>Na gaveta (dinheiro)</dt><dd>{moeda(situacao.naGaveta)}</dd></div>
       </dl>
-      <CampoDinheiro
-        rotulo="Quanto tem na gaveta"
+      <CampoMascarado
+        tipo="moeda"
+        rotulo="Quanto você contou na gaveta (só dinheiro)"
         dica="Conte o dinheiro. A diferença fica registrada no fechamento."
-        centavos={contado}
-        aoMudar={setContado}
+        placeholder="Digite o que contou"
+        valor={contado == null ? '' : mascaraMoeda(contado)}
+        erro={moedaAltaDemais(contado) ? 'Valor alto demais' : null}
+        aoMudarDigitos={(digitos) => setContado(digitos ? Number(digitos) : null)}
+        aoColarTexto={(texto) => setContado(lerMoeda(texto))}
       />
+      {conferencia.pronta && (
+        <p className={css.apoio}>Diferença: <Pilula tom={conferencia.tom}>{conferencia.texto}</Pilula></p>
+      )}
       <Erro texto={envio.erro} />
       <Botao
         variante="secundario"
         icone="log-out"
-        disabled={envio.enviando || moedaAltaDemais(contado)}
+        disabled={envio.enviando || !conferencia.pronta || moedaAltaDemais(contado)}
         onClick={async () => {
-          const ok = await enviar(() => fecharCaixa(agora, contado / 100, situacao.saldoEsperado, 'Fechado ao abrir a loja.'))
+          const ok = await enviar(() => fecharCaixa(agora, contado / 100, situacao.naGaveta, 'Fechado ao abrir a loja.'))
           if (ok) aoFechou()
         }}
       >
@@ -176,7 +188,7 @@ export function ModalAbrirLoja({ aoFechar }) {
         {situacao?.tipo === 'aberto' && (
           <dl className={css.numeros}>
             <div><dt>Caixa de hoje aberto com</dt><dd>{moeda(situacao.saldoInicial)}</dd></div>
-            <div><dt>Saldo esperado agora</dt><dd>{moeda(situacao.saldoEsperado)}</dd></div>
+            <div><dt>Na gaveta (dinheiro) agora</dt><dd>{moeda(situacao.naGaveta)}</dd></div>
           </dl>
         )}
 

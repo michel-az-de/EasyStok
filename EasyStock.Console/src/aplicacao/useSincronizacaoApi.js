@@ -3,7 +3,7 @@ import * as acao from './acoes'
 import { listarTodasConversas, listarMensagens } from '../infra/api/conversasApi'
 import { conversaDaApi } from '../infra/api/traducaoConversas'
 import { listarCardapio, obterPedido, pedidoDaApi } from '../infra/api/comandaApi'
-import { deveRelerMensagens, deveRelerPedido } from './planoDeSincronizacao'
+import { avisoDoCardapio, deveRelerMensagens, deveRelerPedido } from './planoDeSincronizacao'
 
 // Polling da inbox (F01): não existe SSE de conversas ainda (S18). A lista vem a
 // cada ciclo, paginada (F07); o que mais se relê está em `planoDeSincronizacao.js`:
@@ -54,12 +54,22 @@ export function useSincronizacaoApi({ ativo, usuario, despachar, selecionadaId =
       }
     }
 
+    // #1474: o aviso do cardápio (loja online desligada) é estado de configuração, não de ação:
+    // vai como persistente (trocar de tela não o apaga) e sai sozinho quando o cardápio volta.
+    let avisouCardapio = false
     async function cardapio() {
       try {
         const itens = await listarCardapio()
-        if (vivo) despachar({ tipo: acao.SINCRONIZAR_CARDAPIO, cardapio: itens })
+        if (!vivo) return
+        despachar({ tipo: acao.SINCRONIZAR_CARDAPIO, cardapio: itens })
+        if (avisouCardapio) {
+          avisouCardapio = false
+          despachar({ tipo: acao.AVISO_API, mensagem: null, persistente: true })
+        }
       } catch (erro) {
-        if (vivo) despachar({ tipo: acao.AVISO_API, mensagem: `Cardápio: ${erro.message}` })
+        if (!vivo) return
+        avisouCardapio = true
+        despachar({ tipo: acao.AVISO_API, mensagem: avisoDoCardapio(erro), persistente: true })
       }
     }
 

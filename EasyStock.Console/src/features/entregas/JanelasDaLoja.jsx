@@ -7,6 +7,7 @@ import { DIAS_DA_SEMANA as DIAS_CURTOS, faixaDeHorarios } from '../../dominio/en
 import {
   DIAS_DA_SEMANA, camposDaJanela, corpoJanela, corposJanela, erroDoFormularioJanela,
 } from '../../dominio/entregasApi'
+import { plural } from '../../dominio/formato'
 import css from './entregasApi.module.css'
 
 // Janelas de entrega da loja (S45, issue #1440): criar marcando os dias de uma vez, editar,
@@ -25,7 +26,7 @@ function Dias({ dias, umSo, aoMudar }) {
     <fieldset className={css.dias}>
       <legend className="sr">Dias da semana</legend>
       {ORDEM_DA_SEMANA.map((valor) => (
-        <Chip key={valor} papel="filtro" ativo={dias.includes(valor)} onClick={() => alternar(valor)}>
+        <Chip key={valor} papel="filtro" reservarIcone ativo={dias.includes(valor)} onClick={() => alternar(valor)}>
           {DIAS_CURTOS.find((d) => d.valor === valor).rotulo}
         </Chip>
       ))}
@@ -92,7 +93,7 @@ function LinhaJanela({ janela, acoes }) {
           {faixa}{mostraNome && <span className={css.nomeJanela}> · {janela.label}</span>}
         </span>
         {!janela.ativa && <Pilula tom="neutro">Pausada</Pilula>}
-        <span className={css.apoio}>{janela.capacidadeMaxima} vagas</span>
+        <span className={css.apoio}>{plural(janela.capacidadeMaxima, 'vaga', 'vagas')}</span>
       </div>
       {modo === 'excluir' ? (
         <div className={css.linha}>

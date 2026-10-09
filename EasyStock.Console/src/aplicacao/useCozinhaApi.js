@@ -30,7 +30,21 @@ const comId = (conjunto, id, liga) => {
   return novo
 }
 
-export function useCozinhaApi() {
+// Geração da leitura (#1474): cada troca de dia abre uma geração nova; a resposta que chega de
+// uma geração velha (Hoje respondendo depois de Amanhã) é descartada em vez de sobrescrever.
+export function criarGeracao() {
+  let atual = 0
+  return {
+    nova: () => { atual += 1; return atual },
+    agora: () => atual,
+    vale: (geracao) => geracao === atual,
+  }
+}
+
+// `data` (YYYY-MM-DD ou null para hoje, #1474): o dia da fila. Trocar o dia relê e não anima
+// a troca como se os pedidos tivessem entrado ou saído.
+export function useCozinhaApi({ data = null } = {}) {
+  const [geracao] = useState(criarGeracao)
   const [pedidos, setPedidos] = useState(null)
   const [erro, setErro] = useState(null)
   const [aoVivo, setAoVivo] = useState(false)
@@ -74,20 +88,24 @@ export function useCozinhaApi() {
 
   const recarregar = useCallback(() => {
     recarregarImpressoes()
-    return listarPedidosKds()
+    const minha = geracao.agora()
+    const vale = () => vivoRef.current && geracao.vale(minha)
+    return listarPedidosKds(data)
       .then((lista) => {
-        if (!vivoRef.current) return
+        if (!vale()) return
         const atual = lista ?? []
         animar(transicaoDaFila(anteriorRef.current, atual))
         anteriorRef.current = atual
         setPedidos(atual)
         setErro(null)
       })
-      .catch((e) => { if (vivoRef.current) setErro(`A fila não carregou: ${e.message}`) })
-  }, [animar, recarregarImpressoes])
+      .catch((e) => { if (vale()) setErro(`A fila não carregou: ${e.message}`) })
+  }, [animar, recarregarImpressoes, data, geracao])
 
   useEffect(() => {
     vivoRef.current = true
+    geracao.nova()
+    anteriorRef.current = null
     const timers = timersRef.current
     let fechar = () => {}
     let espera = null
@@ -128,7 +146,7 @@ export function useCozinhaApi() {
       timers.forEach(clearTimeout)
       timers.clear()
     }
-  }, [recarregar])
+  }, [recarregar, geracao])
 
   // Um toque (ou um soltar): a chamada vai, o cartão fica "movendo" até a API responder; a
   // lista nova chega pela resposta e pelo `pedido.mudou_status` do SSE.

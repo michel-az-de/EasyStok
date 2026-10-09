@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Anel } from '../../componentes/Anel'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
+import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { faltaPagar, situacaoDaCobranca } from '../../dominio/cobranca'
 import { horaCurta, moeda } from '../../dominio/formato'
 import css from './RelogioPix.module.css'
@@ -68,6 +69,8 @@ export function RelogioPix({
   const zerado = situacao.chave === 'expirada' || (situacao.chave === 'aguardando' && restam <= 0)
 
   const [confirmando, setConfirmando] = useState(null)
+  // #1474 (R2): no modo API aceitar a diferença e cancelar o pedido não estão ligados.
+  const disponivel = useAcaoDisponivel()
   const [recolhido, setRecolhido] = useState(false)
 
   // Recolhe a linha "Pago" 3s depois de cair. `cobranca` chega com `key` do
@@ -174,7 +177,9 @@ export function RelogioPix({
         </Anel>
         {editavel && (
           <div className={css.botoesZerado}>
-            <Botao largo variante="primario" onClick={aoAceitarDivergencia}>Aceitar diferença</Botao>
+            {disponivel('aceitarDivergencia') && (
+              <Botao largo variante="primario" onClick={aoAceitarDivergencia}>Aceitar diferença</Botao>
+            )}
             {falta > 0 && (
               <Botao largo variante="secundario" onClick={aoCobrarDiferenca}>Cobrar diferença</Botao>
             )}
@@ -198,9 +203,11 @@ export function RelogioPix({
         {editavel && confirmando === null && (
           <div className={css.botoesZerado}>
             <Botao largo variante="primario" icone="refresh-cw" onClick={aoReenviar}>Reenviar cobrança</Botao>
-            <Botao largo variante="secundario" icone="circle-x" onClick={() => setConfirmando('cancelar')}>
-              Cancelar pedido
-            </Botao>
+            {disponivel('cancelarPedido') && (
+              <Botao largo variante="secundario" icone="circle-x" onClick={() => setConfirmando('cancelar')}>
+                Cancelar pedido
+              </Botao>
+            )}
             <Botao largo variante="secundario" icone="log-out" onClick={aoEncerrarAtendimento}>
               Encerrar atendimento
             </Botao>

@@ -1,5 +1,7 @@
 import * as acao from '../acoes'
-import { adicionarNotaCliente, cadastrarClienteDaConversa, obterDossie } from '../../infra/api/conversasApi'
+import {
+  adicionarNotaCliente, bloquearClienteApi, cadastrarClienteDaConversa, desbloquearClienteApi, obterDossie,
+} from '../../infra/api/conversasApi'
 import { clienteDoDossie, enderecoParaApi } from '../../infra/api/traducaoCliente'
 import { textoNaoLigado } from './naoLigadas'
 
@@ -10,10 +12,24 @@ import { textoNaoLigado } from './naoLigadas'
 export function criarAcoesClienteApi({ despachar, estadoRef }) {
   const avisar = (mensagem) => despachar({ tipo: acao.AVISO_API, mensagem })
   const conversaDe = (id) => estadoRef.current.conversas.find((c) => c.id === id) ?? null
+  const lendoDossie = new Map()
 
   async function carregar(id) {
     const cliente = clienteDoDossie(await obterDossie(id))
     if (cliente) despachar({ tipo: acao.CLIENTE_DA_API, id, ...cliente })
+  }
+
+  // #1474 (R2): bloquear e desbloquear vão ao cadastro no EasyStok (todos os canais); a Ficha
+  // relê o dossiê, que traz o bloqueio e o motivo. A tela ainda chama pelo nome (`BlocoCliente`).
+  function mudarBloqueio(nome, fazer, rotulo) {
+    const c = estadoRef.current.conversas.find((x) => x.nome === nome) ?? null
+    if (!c?.clienteId) {
+      avisar(`Salve o cadastro do cliente antes de ${rotulo}.`)
+      return undefined
+    }
+    return fazer(c.clienteId)
+      .then(() => carregar(c.id))
+      .catch((erro) => avisar(`Bloqueio do cliente: ${erro.message}`))
   }
 
   function cadastrar(id, { nome = null, telefone = null, endereco = null }) {
@@ -33,6 +49,9 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
   }
 
   return {
+    bloquearCliente: (nome, motivo) => mudarBloqueio(nome, (clienteId) => bloquearClienteApi(clienteId, motivo?.trim() || null), 'bloquear'),
+    desbloquearCliente: (nome) => mudarBloqueio(nome, desbloquearClienteApi, 'desbloquear'),
+
     // O nome que vale é o que a dona escreveu no lápis (rascunho do lead). No chat do site o
     // nome do contato é genérico ("Visitante do site"): sem o dela, não cadastra.
     salvarCadastroRapido: (id, dados) => {
@@ -79,6 +98,13 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
         .catch((erro) => avisar(`Nota do cliente: ${erro.message}`))
     },
 
-    carregarClienteDaConversa: (id) => carregar(id).catch(() => {}),
+    // #1474: o clique em `selecionar` e o efeito da conversa restaurada podem pedir o mesmo
+    // dossiê juntos; com um em voo, o segundo recebe a mesma promessa.
+    carregarClienteDaConversa: (id) => {
+      if (!lendoDossie.has(id)) {
+        lendoDossie.set(id, carregar(id).catch(() => {}).finally(() => lendoDossie.delete(id)))
+      }
+      return lendoDossie.get(id)
+    },
   }
 }

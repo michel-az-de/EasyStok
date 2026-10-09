@@ -13,7 +13,7 @@ import {
   diaMes, observacaoDaAbertura, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
 } from '../../../dominio/aberturaDaLoja'
 import {
-  CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, TIPOS_MOVIMENTO, nomeDoMetodoCaixa,
+  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, TIPOS_MOVIMENTO, gavetaDoDia, lancamentosEmOrdem, nomeDoMetodoCaixa,
 } from '../../../dominio/caixa'
 import {
   horaCurta, lerMoeda, mascaraMoeda, moeda, moedaAltaDemais,
@@ -127,13 +127,12 @@ function FormLancamento({ executar, enviando }) {
         <Chip papel="escolha" ativo={!saida} onClick={() => setTipo(TIPOS_MOVIMENTO.ENTRADA)}>Entrada</Chip>
         <Chip papel="escolha" ativo={saida} onClick={() => setTipo(TIPOS_MOVIMENTO.SAIDA)}>Saída</Chip>
       </div>
-      {saida && (
-        <div className={css.categoriasSugeridas}>
-          {CATEGORIAS_SAIDA_SUGERIDAS.map((sugestao) => (
-            <Chip key={sugestao} papel="filtro" ativo={categoria === sugestao} onClick={() => setCategoria(sugestao)}>{sugestao}</Chip>
-          ))}
-        </div>
-      )}
+      {/* #1474: suprimento (reforço de troco) entra na gaveta; sangria e despesa saem. */}
+      <div className={css.categoriasSugeridas}>
+        {(saida ? CATEGORIAS_SAIDA_SUGERIDAS : CATEGORIAS_ENTRADA_SUGERIDAS).map((sugestao) => (
+          <Chip key={sugestao} papel="filtro" ativo={categoria === sugestao} onClick={() => setCategoria(sugestao)}>{sugestao}</Chip>
+        ))}
+      </div>
       <div className={css.formGrade}>
         <CampoTexto rotulo="Categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)} />
         <CampoSelecao rotulo="Método" opcoes={OPCOES_METODO} value={metodo} onChange={(e) => setMetodo(e.target.value)} />
@@ -155,15 +154,26 @@ function Lancamentos({ dia, executar }) {
   const { agora } = useAtendimento()
   const { estornarMovimentoCaixa } = useAcoes()
   const [estornando, setEstornando] = useState(null)
-  const movimentos = dia.movimentos.filter((m) => m.tipo !== TIPOS_MOVIMENTO.FECHAMENTO)
+  // #1474: movimentos e pagamentos numa lista só, na ordem da hora.
+  const lancamentos = lancamentosEmOrdem(dia)
   const podeEstornar = (m) => !dia.fechado && !m.estornadoEm && (m.tipo === TIPOS_MOVIMENTO.ENTRADA || m.tipo === TIPOS_MOVIMENTO.SAIDA)
 
-  if (movimentos.length === 0 && dia.linhasExtras.length === 0) return null
+  if (lancamentos.length === 0) return null
   return (
     <>
       <h4 className={css.tituloSecao}>Lançamentos</h4>
       <ul className={css.lista}>
-        {movimentos.map((m) => (estornando === m.id
+        {lancamentos.map((m) => (m.origemLinha === 'extra'
+          ? (
+            <li key={`${m.origem}-${m.em}-${m.valor}`} className={css.linha}>
+              <span className={css.linhaInfo}>
+                <strong>{m.origem === 'Pedido' ? 'Pagamento de pedido' : 'Venda'}</strong>
+                <span className={css.dicaItem}>{horaCurta(m.em)}{m.meio && ` · ${nomeDoMetodoCaixa(m.meio)}`}{m.descricao && ` · ${m.descricao}`}</span>
+              </span>
+              <span className={css.linhaValor}>+ {moeda(m.valor)}</span>
+            </li>
+          )
+          : estornando === m.id
           ? (
             <li key={m.id}>
               <PromptEstorno
@@ -196,15 +206,6 @@ function Lancamentos({ dia, executar }) {
               </span>
             </li>
           )))}
-        {dia.linhasExtras.map((l) => (
-          <li key={`${l.origem}-${l.em}-${l.valor}`} className={css.linha}>
-            <span className={css.linhaInfo}>
-              <strong>{l.origem === 'Pedido' ? 'Pagamento de pedido' : 'Venda'}</strong>
-              <span className={css.dicaItem}>{horaCurta(l.em)}{l.meio && ` · ${nomeDoMetodoCaixa(l.meio)}`}{l.descricao && ` · ${l.descricao}`}</span>
-            </span>
-            <span className={css.linhaValor}>+ {moeda(l.valor)}</span>
-          </li>
-        ))}
       </ul>
     </>
   )
@@ -261,6 +262,8 @@ export function AbaCaixaApi() {
     )
   }
 
+  // #1474: a dona confere a gaveta; Pix e cartão não estão nela.
+  const gaveta = gavetaDoDia(dia)
   const titulo = dia.esquecidoAberto ? `Caixa de ${diaMes(dia.abertoDesde)} (ainda aberto)` : 'Caixa de hoje'
   return (
     <div className={css.painel}>
@@ -283,18 +286,21 @@ export function AbaCaixaApi() {
         </p>
       )}
 
+      {/* #1474: a gaveta primeiro, porque é o número que ela confere na mão. */}
       <dl className={css.resumoLista}>
+        <div className={css.resumoForte}><dt>Na gaveta (dinheiro)</dt><dd>{moeda(gaveta.naGaveta)}</dd></div>
         <div><dt>Saldo inicial</dt><dd>{moeda(dia.saldoInicial)}</dd></div>
-        <div><dt>Entradas extras</dt><dd>{moeda(dia.totalEntradasExtras)}</dd></div>
-        <div><dt>Saídas extras</dt><dd>{moeda(dia.totalSaidasExtras)}</dd></div>
+        <div><dt>Outras entradas</dt><dd>{moeda(dia.totalEntradasExtras)}</dd></div>
+        <div><dt>Outras saídas</dt><dd>{moeda(dia.totalSaidasExtras)}</dd></div>
         <div><dt>Pagamentos de pedidos</dt><dd>{moeda(dia.totalPagamentosPedidos)}</dd></div>
-        <div className={css.resumoForte}><dt>{dia.fechado ? 'Saldo final' : 'Saldo esperado'}</dt><dd>{moeda(dia.saldoEsperado)}</dd></div>
+        <div><dt>Pix e cartão (fora da gaveta)</dt><dd>{moeda(gaveta.pixECartao)}</dd></div>
+        <div><dt>{dia.fechado ? 'Total do dia' : 'Total esperado do dia'}</dt><dd>{moeda(dia.saldoEsperado)}</dd></div>
       </dl>
 
       {dia.aberto && !dia.fechado && (
         <div className={css.acoesTopo}>
           <Botao variante="secundario" icone="log-out" onClick={() => setFecharAberto(true)}>
-            {dia.esquecidoAberto ? `Fechar o caixa de ${diaMes(dia.abertoDesde)}` : 'Fechar o dia'}
+            {dia.esquecidoAberto ? `Fechar o caixa de ${diaMes(dia.abertoDesde)}` : 'Fechar o caixa'}
           </Botao>
         </div>
       )}
@@ -308,10 +314,11 @@ export function AbaCaixaApi() {
       {fecharAberto && (
         <ModalFecharCaixa
           resumo={dia}
+          gaveta={gaveta}
           aoFechar={() => setFecharAberto(false)}
           aoConfirmar={async (contado) => {
             setFecharAberto(false)
-            await executar(() => fecharCaixa(agora, contado, dia.saldoEsperado))
+            await executar(() => fecharCaixa(agora, contado, gaveta.naGaveta))
           }}
         />
       )}

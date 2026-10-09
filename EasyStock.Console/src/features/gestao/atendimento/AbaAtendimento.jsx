@@ -1,6 +1,6 @@
 // Aba Atendimento da Gestão (F02, só no modo API): o expediente da loja (S40) e a
-// configuração do atendimento (S08) gravados no EasyStok. O horário por dia continua em
-// Mensagens automáticas, onde a dona já o achava; aqui ficam o controle manual, as
+// configuração do atendimento (S08) gravados no EasyStok. O horário por dia continua no
+// modal Automáticas da barra lateral, onde a dona já o achava; aqui ficam o controle manual, as
 // mensagens de loja fechada e o jeito do automático falar.
 import { useCallback, useEffect, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
@@ -55,7 +55,7 @@ function LojaAgora() {
       </div>
       <p className={css.descricao}>
         {lojaAberta == null
-          ? 'Segue o horário por dia (em Mensagens automáticas).'
+          ? 'Segue o horário configurado. O horário de cada dia se ajusta no Balcão, botão Automáticas (raio).'
           : `Forçada ${lojaAberta ? 'aberta' : 'fechada'} na mão. Só volta ao horário quando você mandar.`}
       </p>
       <div className={css.acoes}>
@@ -97,14 +97,14 @@ function MensagensDoExpediente() {
       {!expediente.carregado && <p className={css.descricao}>Carregando o expediente…</p>}
       <CampoArea
         rotulo="Fora do horário"
-        dica="O cliente recebe isto quando escreve fora do horário por dia."
+        dica="O cliente recebe isto na primeira mensagem fora do horário, no lugar da saudação."
         maxLength={TAMANHO_MENSAGEM}
         value={valor.mensagemForaDoHorario}
         onChange={mudar('mensagemForaDoHorario')}
       />
       <CampoArea
         rotulo="Loja fechada"
-        dica="O cliente recebe isto quando você fecha a loja na mão."
+        dica="O cliente recebe isto na primeira mensagem com a loja fechada na mão, no lugar da saudação."
         maxLength={TAMANHO_MENSAGEM}
         value={valor.mensagemLojaFechada}
         onChange={mudar('mensagemLojaFechada')}
@@ -177,6 +177,8 @@ function ConfiguracaoDoAtendimento() {
           Atendimento automático {form.ativo ? 'ligado' : 'desligado'}
         </label>
       </div>
+      {/* #1474: a chave é gravada, mas nenhum fluxo do atendimento a lê ainda (follow-up à parte). */}
+      <p className={css.descricao}>Ainda sem efeito no atendimento: em breve.</p>
       <CampoTexto
         rotulo="Tom"
         dica="Curto, por exemplo: acolhedor, direto, sem gíria."

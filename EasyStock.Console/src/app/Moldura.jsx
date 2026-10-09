@@ -16,6 +16,8 @@ import { PainelFicha } from '../features/ficha-cliente/PainelFicha'
 import { ResumoEntregas } from '../features/entregas/ResumoEntregas'
 import { Sininho } from '../features/lembretes/Sininho'
 import { Popover } from '../componentes/Popover'
+import { FONTE_API } from '../infra/fonteDados'
+import { HASH_MODULO_COZINHA, HASH_MODULO_ENTREGAS } from '../dominio/rota'
 import css from './moldura.module.css'
 
 // Título de coluna sem ícone: quando todo título tem ícone, ícone nenhum marca.
@@ -211,7 +213,14 @@ function InterruptorTema({ classe }) {
 // (D6). Botão discreto e fixo, fora do `compacto ? MenuMais : ResumoEntregas`
 // que já existe: assim ela sempre acha o mesmo controle, larga ou estreita a
 // tela, sem duplicar o item em dois menus.
+//
+// #1474: no modo API a Cozinha lê o KDS sozinha (não depende desta janela), e a janela
+// avulsa em `#/cozinha` não tinha como voltar. Abre a tela do módulo, com "← Módulos".
 function abrirCozinha() {
+  if (FONTE_API) {
+    window.location.hash = HASH_MODULO_COZINHA
+    return
+  }
   const janela = window.open('#/cozinha', 'cdb-cozinha', 'width=1280,height=900')
   // Issue #40 (rodada 13, achado da varredura): popup bloqueado devolve
   // `null` e nada acontece. Cai para a mesma aba: `App.jsx` agora reage à
@@ -326,8 +335,12 @@ function Trilho({
         <Icone nome="inbox" tamanho={22} />
         <span>Balcão</span>
       </span>
-      <ResumoEntregas aoAbrir={aoAbrirEntregas} noTrilho classeItem={css.itemTrilho} classeSelo={css.seloTrilho} />
-      <Botao variante="texto" className={css.itemTrilho} onClick={abrirCozinha} title="Cozinha (abre em outra janela)">
+      {/* #1474: no modo API Entregas abre a tela do módulo (com "← Módulos"), não a gaveta. */}
+      <ResumoEntregas
+        aoAbrir={FONTE_API ? () => { window.location.hash = HASH_MODULO_ENTREGAS } : aoAbrirEntregas}
+        noTrilho classeItem={css.itemTrilho} classeSelo={css.seloTrilho}
+      />
+      <Botao variante="texto" className={css.itemTrilho} onClick={abrirCozinha} title={FONTE_API ? 'Cozinha' : 'Cozinha (abre em outra janela)'}>
         <Icone nome="cooking-pot" tamanho={22} />
         <span>Cozinha</span>
       </Botao>
@@ -533,6 +546,9 @@ export function Moldura({
           />
           <Coluna variante="ficha" titulo="Ficha">
             <div className={css.rolavel}><PainelFicha aoAbrirCardapio={aoAbrirCardapio} /></div>
+            {/* #1474: lugar da fila de canhotos (FilaCanhotos), no pé da Ficha e no fluxo da
+                coluna: a pílula não cobre mais o título nem o topo da coluna. Vazio, não ocupa. */}
+            <div className={css.slotFila} data-fila-canhotos="" />
           </Coluna>
         </div>
       </div>

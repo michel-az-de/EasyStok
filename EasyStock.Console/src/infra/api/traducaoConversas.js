@@ -34,6 +34,11 @@ export const instante = (valor) => {
 // buscar a mídia no endpoint autenticado (#1287). Sem ele (confirmação de envio), só o rótulo.
 export function mensagemDaApi(m, conversaId = null) {
   const saida = m.direcao === 'Saida'
+  // #1474: nota interna do sistema (ex.: escalada para a dona) nunca vai ao canal: sem id externo
+  // e Pendente para sempre. Vira evento na conversa, não balão "automática · enviando".
+  if (saida && m.autor === 'Sistema' && !m.externoId && m.status === 'Pendente') {
+    return { id: m.id, dir: 'sistema', texto: m.texto || '', em: instante(m.enviadaEm) }
+  }
   return {
     id: m.id,
     dir: saida ? 'out' : 'in',

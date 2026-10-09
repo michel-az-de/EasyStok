@@ -8,6 +8,7 @@ import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
 import { Botao } from '../../componentes/Botao'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useEscape } from '../../hooks/useEscape'
 import { abrirSecao } from '../../hooks/useRecolhido'
 import {
@@ -34,6 +35,9 @@ import css from './cardapio.module.css'
 // Só o estado que muda a venda vira texto colorido. Saldo folgado não precisa
 // de marca: o número já está no contador de Gerir o dia.
 const PEDE_ACAO = new Set(['esgotado', 'fora-do-dia', 'pouco'])
+
+// #1474: largura em que nome, porção, preço e o botão de foto cabem sem espremer o nome.
+const LARGURA_MINIMA = 440
 
 const PAPEIS = [
   { id: 'escolher', rotulo: 'Anotar na comanda' },
@@ -92,6 +96,7 @@ export function CartaoArrasto({ item }) {
 // linha, senão a lista muda de tamanho e a ordem dos hooks quebra.
 function ItemEscolher({
   item, situacao, quantos, alternativas, linhas, adicionais, cardapio, novidade, aoEscolher, aoAjustar, envioDeFoto,
+  podeGerir = true,
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: 'prato-' + item.sku,
@@ -175,7 +180,7 @@ function ItemEscolher({
       {alternativas.length > 0 && (
         <p className={css.alternativa}>
           {situacao.chave === 'fora-do-dia'
-            ? 'Você tirou do dia. Ligue de volta em Gerir o dia, ou ofereça: '
+            ? (podeGerir ? 'Você tirou do dia. Ligue de volta em Gerir o dia, ou ofereça: ' : 'Fora do dia. Ofereça: ')
             : 'Sem saldo, mas ainda vende. No lugar dele: '}
           {alternativas.map((a) => a.nome).join(' ou ')}.
         </p>
@@ -220,7 +225,7 @@ function PorCategoria({ itens, children }) {
 }
 
 function Escolher({
-  cardapio, visiveis, linhas, adicionais, pedido, agora, aoEscolher, aoAjustar, envioDeFoto,
+  cardapio, visiveis, linhas, adicionais, pedido, agora, aoEscolher, aoAjustar, envioDeFoto, podeGerir,
 }) {
   const naComanda = (sku) => pedido?.itens.find((l) => l.sku === sku)?.qtd ?? 0
 
@@ -248,6 +253,7 @@ function Escolher({
                 aoEscolher={aoEscolher}
                 aoAjustar={aoAjustar}
                 envioDeFoto={envioDeFoto}
+                podeGerir={podeGerir}
               />
             )
           })}
@@ -588,8 +594,10 @@ function FormularioItemCardapio({
 // do dono"). Deixa de tampar a tela porque ela consulta o cardápio enquanto lê
 // a conversa: sem cortina, sem <dialog>, o resto da tela continua clicável.
 export function PainelCardapio({
-  pedido, aoEscolher, aoAjustar, aoFechar, largura, deslocamentoDireita = 0, aoRedimensionar,
+  pedido, aoEscolher, aoAjustar, aoFechar, largura: larguraGuardada, deslocamentoDireita = 0, aoRedimensionar,
 }) {
+  // #1474: largura guardada de antes (320 a 400) espremia o nome do prato; o mínimo agora é 440.
+  const largura = Math.max(larguraGuardada ?? LARGURA_MINIMA, LARGURA_MINIMA)
   const { cardapio, linhas, adicionais, canais } = useCatalogo()
   const { agora, selecionada, fonteApi } = useAtendimento()
   const {
@@ -597,6 +605,10 @@ export function PainelCardapio({
     alternarRemocaoItemCardapio, confirmarValidacaoItem, enviarMidia,
   } = useAcoes()
   const [papel, setPapel] = useState('escolher')
+  // #1474 (R2): saldo, disponibilidade e edição do cardápio não têm endpoint para o operador
+  // no modo API (a vitrine só aceita Admin); a aba "Gerir o dia" some em vez de só avisar.
+  const podeGerir = useAcaoDisponivel()('alternarDisponibilidade')
+  const papeis = podeGerir ? PAPEIS : PAPEIS.filter((p) => p.id !== 'gerir')
   const [modal, setModal] = useState(null)
   const [busca, setBusca] = useState('')
   const [enviandoSku, setEnviandoSku] = useState(null)
@@ -674,9 +686,9 @@ export function PainelCardapio({
       <AlcaLargura
         rotulo="Redimensionar painel do cardápio"
         valor={largura}
-        min={320}
-        max={560}
-        padrao={400}
+        min={LARGURA_MINIMA}
+        max={600}
+        padrao={460}
         invertida
         aoMudar={aoRedimensionar}
       />
@@ -695,20 +707,22 @@ export function PainelCardapio({
         {/* Botão de alternância em vez do padrão ARIA de aba: aba promete
             navegação por seta, e prometer teclado que não existe é pior que
             não prometer. */}
-        <fieldset className={css.papeis}>
-          <legend className="sr">O que fazer no cardápio</legend>
-          {PAPEIS.map((p) => (
-            <button
-              type="button"
-              key={p.id}
-              aria-pressed={papel === p.id}
-              className={`${css.papel} ${papel === p.id ? css.papelAtivo : ''}`}
-              onClick={() => setPapel(p.id)}
-            >
-              {p.rotulo}
-            </button>
-          ))}
-        </fieldset>
+        {papeis.length > 1 && (
+          <fieldset className={css.papeis}>
+            <legend className="sr">O que fazer no cardápio</legend>
+            {papeis.map((p) => (
+              <button
+                type="button"
+                key={p.id}
+                aria-pressed={papel === p.id}
+                className={`${css.papel} ${papel === p.id ? css.papelAtivo : ''}`}
+                onClick={() => setPapel(p.id)}
+              >
+                {p.rotulo}
+              </button>
+            ))}
+          </fieldset>
+        )}
 
         {ativos.length > 0 && (
           <label className={css.busca}>
@@ -731,7 +745,7 @@ export function PainelCardapio({
           {ativos.length === 0 && (
             <Vazio
               titulo="Cardápio sem itens"
-              acao={<Botao variante="primario" onClick={() => setModal({ modo: 'novo' })}>Incluir item novo</Botao>}
+              acao={podeGerir && <Botao variante="primario" onClick={() => setModal({ modo: 'novo' })}>Incluir item novo</Botao>}
             >
               Nenhum item no cardápio de hoje. Sem cardápio não dá para anotar comanda
               nem dizer o que a casa vende hoje.
@@ -749,10 +763,11 @@ export function PainelCardapio({
               aoEscolher={aoEscolher}
               aoAjustar={aoAjustar}
               envioDeFoto={envioDeFoto}
+              podeGerir={podeGerir}
             />
           )}
 
-          {papel === 'gerir' && (
+          {papel === 'gerir' && podeGerir && (
             <Gerir
               cardapio={visiveis}
               removidos={removidos}

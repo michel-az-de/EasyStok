@@ -5,6 +5,7 @@ import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { MOTIVO_BLOQUEIO, permissaoDeEscrita } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
@@ -28,6 +29,8 @@ export function PainelAtendimento({
     selecionar, abrirEncerramento, reenviar,
   } = useAcoes()
   const { cardapio, janelas, canais } = useCatalogo()
+  // #1474 (R2): reabrir conversa não tem endpoint no EasyStok; no modo API o botão some.
+  const podeReabrir = useAcaoDisponivel()('reabrir')
   const cabecalhoRef = useRef(null)
 
   useEffect(() => {
@@ -119,7 +122,7 @@ export function PainelAtendimento({
               Encerrar
             </Botao>
           )}
-          {encerrada && !bloqueada && (
+          {encerrada && !bloqueada && podeReabrir && (
             <Botao variante="primario" className={css.acaoToque} onClick={() => reabrir(selecionada.id)}>
               Reabrir conversa
             </Botao>
@@ -165,7 +168,7 @@ export function PainelAtendimento({
         aoAbrirNota={aoAbrirNota}
         aoAbrirGaleria={aoAbrirGaleria}
         aoAbrirBiblioteca={aoAbrirBiblioteca}
-        aoReabrir={() => reabrir(selecionada.id)}
+        aoReabrir={podeReabrir ? () => reabrir(selecionada.id) : null}
       />
     </>
   )

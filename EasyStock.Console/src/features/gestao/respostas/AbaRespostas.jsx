@@ -2,7 +2,10 @@ import { useMemo, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { CampoArea, CampoTexto } from '../../../componentes/Campo'
 import { useAcoes, useAtendimento, useCatalogo } from '../../../aplicacao/contextos'
-import { VARIAVEIS_DA_API, variaveisForaDaApi } from '../../../dominio/automacao'
+import {
+  VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, variaveisForaDaApi,
+} from '../../../dominio/automacao'
+import { plural } from '../../../dominio/formato'
 import { gerarAtalho, normalizarBusca } from '../../../dominio/respostas'
 import css from './abaRespostas.module.css'
 
@@ -74,7 +77,7 @@ function SecaoRespostas() {
       <header className={css.topo}>
         <div>
           <h3 id="gestao-respostas">Respostas prontas</h3>
-          <p className={css.descricao}>{ativas} ativas. No atendimento, digite / no campo ou toque em Respostas.</p>
+          <p className={css.descricao}>{plural(ativas, 'ativa', 'ativas')}. No atendimento, digite / no campo ou toque em Respostas.</p>
         </div>
         <Botao variante="primario" icone="plus" onClick={() => setEditando('nova')} disabled={editando === 'nova'}>Nova resposta</Botao>
       </header>
@@ -143,6 +146,8 @@ function LinhaAutomatica({ regra, fonteApi }) {
   const [salvando, setSalvando] = useState(false)
   const editando = rascunho !== null
   const foraDaApi = fonteApi ? variaveisForaDaApi(rascunho ?? regra.texto) : []
+  // #1474: no modo API a saudação de Horários e mensagens sai sempre na primeira mensagem.
+  const avisoEntrada = fonteApi ? avisoDaAutomaticaDeEntrada(regra) : null
 
   function salvar() {
     setSalvando(true)
@@ -166,8 +171,9 @@ function LinhaAutomatica({ regra, fonteApi }) {
         {!editando && (
           regra.texto
             ? <span className={css.textoInteiro}>{regra.texto}</span>
-            : <span className={css.semTexto}>Sem texto: não sai nada para o cliente.</span>
+            : !avisoEntrada && <span className={css.semTexto}>Sem texto: não sai nada para o cliente.</span>
         )}
+        {avisoEntrada && <span className={css.semTexto}>{avisoEntrada}</span>}
         {foraDaApi.length > 0 && (
           <span className={css.alerta} role={editando ? 'alert' : undefined}>
             {foraDaApi.map((v) => `{${v}}`).join(', ')} não é preenchida pelo EasyStok e sai escrita assim para o cliente.
@@ -203,20 +209,26 @@ function LinhaAutomatica({ regra, fonteApi }) {
 }
 
 function SecaoAutomaticas() {
-  const { regras, fonteApi } = useAtendimento()
+  const { regras, fonteApi, cargaDasRegras } = useAtendimento()
+  // #1474: lista vazia não é "carregando": separa a espera, o erro e o vazio de verdade.
+  const vazio = cargaDasRegras?.estado === 'carregando'
+    ? 'Carregando as automáticas do EasyStok…'
+    : cargaDasRegras?.estado === 'erro'
+      ? `As automáticas não carregaram: ${cargaDasRegras.mensagem ?? 'tente de novo.'}`
+      : 'Nenhuma automática.'
   return (
     <section className={css.secao} aria-labelledby="gestao-automaticas">
       <header className={css.topo}>
         <div>
           <h3 id="gestao-automaticas">Mensagens automáticas</h3>
           <p className={css.descricao}>
-            Saem sozinhas, só dentro da janela de 24 h do canal e nunca para cliente bloqueado.
+            Saem sozinhas, só até 24 h depois da última mensagem do cliente e nunca para cliente bloqueado.
             Na conversa aparecem com a etiqueta automática.
           </p>
         </div>
       </header>
       {regras.length === 0 ? (
-        <p className={css.vazio}>{fonteApi ? 'Carregando as automáticas do EasyStok…' : 'Nenhuma automática.'}</p>
+        <p className={css.vazio} role={cargaDasRegras?.estado === 'erro' ? 'alert' : undefined}>{vazio}</p>
       ) : (
         <ul className={css.lista}>
           {regras.map((r) => <LinhaAutomatica key={r.id} regra={r} fonteApi={fonteApi} />)}

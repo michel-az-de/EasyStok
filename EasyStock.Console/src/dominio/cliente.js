@@ -95,9 +95,22 @@ function gostosConhecidos(conversas, cadastroIdAtual, restricoes) {
   return [...usados].sort()
 }
 
+// #1474: o EasyStok grava a tag normalizada ("Lactose" vira "lactose", "cliente vip" vira
+// "cliente_vip"). A tela mostra com espaço e compara sem acento, caixa nem "_", senão a
+// sugestão já escolhida continuava na lista.
+// #1474 (R9): a área de entrega da demonstração vem de prefixos de CEP inventados; no modo API
+// quem diz se o CEP é atendido é o EasyStok, ao salvar o cadastro. A dica some lá.
+export const dicaDoCep = (foraDaArea, { fonteApi = false } = {}) =>
+  (foraDaArea && !fonteApi ? 'Fora da área de entrega' : undefined)
+
+export const rotuloDaTag = (tag) => String(tag ?? '').replace(/_/g, ' ')
+export const chaveDaTag = (tag) => rotuloDaTag(tag).normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .toLowerCase().replace(/\s+/g, ' ').trim()
+
 export function sugestoesDeTag(texto, { conversas, cadastroIdAtual, tagsAtuais, restricoes }) {
-  const termo = texto.trim().toLowerCase()
-  const bate = (t) => !tagsAtuais.includes(t) && (termo === '' || t.toLowerCase().includes(termo))
+  const termo = chaveDaTag(texto)
+  const atuais = new Set(tagsAtuais.map(chaveDaTag))
+  const bate = (t) => !atuais.has(chaveDaTag(t)) && (termo === '' || chaveDaTag(t).includes(termo))
   return {
     restricao: restricoes.filter(bate),
     gosto: gostosConhecidos(conversas, cadastroIdAtual, restricoes).filter(bate),

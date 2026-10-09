@@ -14,7 +14,7 @@ import { INSTANTE_INICIAL, LINHAS_PRODUTO } from '../infra/catalogo'
 import { FONTE_API } from '../infra/fonteDados'
 import { useSessaoApi } from '../aplicacao/useSessaoApi'
 import { TelaLogin } from '../features/login/TelaLogin'
-import { FaixaApi } from './FaixaApi'
+import { FaixaApi, LimparAvisoAoNavegar } from './FaixaApi'
 import { contarPrecisaDeVoce, precisaDeVoce } from '../dominio/automatico'
 import { useTituloDaAba } from '../aplicacao/useTituloDaAba'
 import { canalDaConversa } from '../dominio/canal'
@@ -295,6 +295,7 @@ function AppPrincipal({ rota }) {
   return (
     // `key`: trocar de usuário ou empresa recomeça o estado, sem conversa de outra empresa na tela.
     <AtendimentoProvider key={sessao?.token ?? 'demo'} agora={agora} sessao={sessao}>
+      <LimparAvisoAoNavegar />
       <TelaDaRota rota={rota} aoSair={encerrarSessao} />
     </AtendimentoProvider>
   )

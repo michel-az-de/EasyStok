@@ -35,3 +35,5 @@ button.chip:hover:not(.ativo):not(.emBreve) { background: var(--preenchimento-fo
   background: none; border: 0; border-radius: var(--r-pilula); color: inherit; opacity: .7;
 }
 .remover:hover { opacity: 1; background: var(--preenchimento-forte); }
+/* #1474: lugar do ✓ quando desligado, mesmo tamanho do ícone (sem pulo de largura). */
+.lugarDoIcone { display: inline-block; width: 20px; height: 20px; flex-shrink: 0; }

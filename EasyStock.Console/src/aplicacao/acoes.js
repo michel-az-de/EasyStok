@@ -279,3 +279,5 @@ export const RENOMEAR_LEAD_API = 'renomear-lead-api'
 // #1441: respostas prontas e mensagens automáticas como o EasyStok devolveu (S42).
 export const RESPOSTAS_DA_API = 'respostas-da-api'
 export const REGRAS_DA_API = 'regras-da-api'
+// #1474: a leitura das automáticas falhou (a tela separa carregando, erro e vazio).
+export const REGRAS_FALHARAM = 'regras-falharam'

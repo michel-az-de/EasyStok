@@ -7,8 +7,10 @@ import { Icone } from './Icone'
 //   tag      do cliente, com × para tirar e texto editável em toque.
 // `emBreve` desabilita o clique e escreve o motivo no próprio rótulo (a
 // palavra "em breve" já vem em `children`, o componente só estiliza).
+// `reservarIcone` (#1474): guarda o lugar do ✓ desligado, para a fileira de chips não mudar de
+// largura a cada toque (dias da semana).
 export function Chip({
-  papel = 'filtro', ativo = false, emBreve = false, tracejado = false, icone, className,
+  papel = 'filtro', ativo = false, emBreve = false, tracejado = false, reservarIcone = false, icone, className,
   onClick, onRemover, rotuloRemover, children,
 }) {
   const classes = [
@@ -44,6 +46,7 @@ export function Chip({
     >
       {ativo && <Icone nome="check" tamanho={20} />}
       {icone && !ativo && <Icone nome={icone} tamanho={20} />}
+      {reservarIcone && !ativo && !icone && <span className={css.lugarDoIcone} aria-hidden="true" />}
       {children}
     </button>
   )

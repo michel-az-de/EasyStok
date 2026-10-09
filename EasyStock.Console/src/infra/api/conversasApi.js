@@ -60,6 +60,11 @@ export const obterDossie = (id) => chamarApi(`${BASE}/${id}/dossie`)
 // #1436: nota interna no cadastro do cliente (o cliente nunca vê).
 export const adicionarNotaCliente = (clienteId, texto) =>
   chamarApi(`/api/clientes/${clienteId}/notas`, { metodo: 'POST', corpo: { texto } })
+// #1474 (R2): bloqueio do cadastro em todos os canais (policy Gerente na API).
+export const bloquearClienteApi = (clienteId, motivo) =>
+  chamarApi(`/api/clientes/${clienteId}/bloquear`, { metodo: 'POST', corpo: { motivo } })
+export const desbloquearClienteApi = (clienteId) =>
+  chamarApi(`/api/clientes/${clienteId}/desbloquear`, { metodo: 'POST' })
 
 // Foto da dona (S02): multipart com `file` e `legenda`. A imagem chega como data URL
 // (o Composer já leu o arquivo para a prévia) e volta a ser binário aqui.

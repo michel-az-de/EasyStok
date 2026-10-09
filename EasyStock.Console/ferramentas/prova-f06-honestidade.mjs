@@ -194,8 +194,9 @@ for (const [descricao, id, molde] of [
   confere('peça do cardápio vai por POST .../mensagens/imagem-cardapio', enviado === true && chamadas.length === 1
     && rota[0] === 'POST /api/atendimento/conversas/c1/mensagens/imagem-cardapio', rota.join(', ') || 'nenhuma chamada')
   const corpo = chamadas[0] && typeof chamadas[0].corpo === 'string' ? JSON.parse(chamadas[0].corpo) : {}
+  // #1474: "Foto N" é só da tela da galeria; a legenda do cliente é nome e porção (e preço, se houver).
   confere('peça manda id, índice e legenda, sem baixar a foto', corpo.cardapioItemId === 'item-1' && corpo.indice === 1
-    && corpo.legenda === 'Lasanha\n600 g · Foto 2' && !chamadas.some((c) => String(c.url).startsWith('https://')), JSON.stringify(corpo))
+    && corpo.legenda === 'Lasanha\n600 g' && !chamadas.some((c) => String(c.url).startsWith('https://')), JSON.stringify(corpo))
   confere('peça espera a confirmação do EasyStok', despachos.at(-1)?.tipo === acao.CONFIRMAR_ENVIO_API)
 
   chamadas.length = 0

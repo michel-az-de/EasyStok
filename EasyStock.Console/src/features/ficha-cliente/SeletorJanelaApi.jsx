@@ -50,7 +50,7 @@ export function SeletorJanelaApi({ pedido, editavel, aoEscolher }) {
                     {escolhida && <Icone nome="check" rotulo="Janela escolhida" />}
                   </span>
                   <span className={css.vagas}>
-                    {janela.vagas} de {janela.capacidade} vaga{janela.capacidade === 1 ? '' : 's'}
+                    {janela.vagas} {janela.vagas === 1 ? 'vaga livre' : 'vagas livres'} de {janela.capacidade}
                   </span>
                 </button>
               </li>

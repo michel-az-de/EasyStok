@@ -6,9 +6,16 @@
 // `{ semPermissao: true }` = 403 (a rota é só de administrador).
 // tom: ok | aviso | neutro.
 
-import { dataHora, haQuantoTempo } from './formato'
+import { FUSO, dataHora, horaCurta } from './formato'
 
-export function resumoDoWhatsApp(status, agora) {
+// "11:50 de 07/10" no fuso da loja. DateTime sem fuso vem da API em UTC.
+function horaEDia(valor) {
+  const iso = /[zZ]|[+-]\d{2}:\d{2}$/.test(valor) ? valor : `${valor}Z`
+  const dia = new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: FUSO })
+  return `${horaCurta(iso)} de ${dia}`
+}
+
+export function resumoDoWhatsApp(status) {
   if (status?.semPermissao) {
     return {
       tom: 'neutro',
@@ -24,12 +31,15 @@ export function resumoDoWhatsApp(status, agora) {
     }
   }
 
+  // #1474: mensagem que chegou prova que o webhook funciona, mesmo sem a data de verificação
+  // gravada; dizer "ainda não verificado" com o Balcão cheio de conversas era mentira.
+  const recebendo = Boolean(status.ultimaMensagemRecebidaEm)
   const linhas = [
     status.webhookVerificadoEm
       ? `Webhook verificado em ${dataHora(Date.parse(status.webhookVerificadoEm))}`
-      : 'Webhook ainda não verificado pela Meta',
-    status.ultimaMensagemRecebidaEm
-      ? `Última mensagem recebida há ${haQuantoTempo(status.ultimaMensagemRecebidaEm, agora)}`
+      : recebendo ? 'Webhook funcionando: as mensagens chegam ao Balcão' : 'Webhook ainda não verificado pela Meta',
+    recebendo
+      ? `Recebendo mensagens (última às ${horaEDia(status.ultimaMensagemRecebidaEm)})`
       : 'Nenhuma mensagem recebida ainda',
   ]
 

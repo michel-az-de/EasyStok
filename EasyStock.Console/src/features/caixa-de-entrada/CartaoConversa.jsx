@@ -23,7 +23,8 @@ const APRESENTACAO_DO_MOTIVO = {
   passagem: { texto: 'Passou para você', icone: 'hand' },
   esperando: { texto: 'Esperando você', icone: 'relogio' },
   cobranca: { texto: 'Cobrança venceu', icone: 'dollar-sign' },
-  'aguardando-abertura': { texto: 'Loja abriu', icone: 'relogio' },
+  // #1474 (R12): o cliente escreveu fora do horário; "Loja abriu" parecia aviso da loja.
+  'aguardando-abertura': { texto: 'Escreveu com a loja fechada', icone: 'relogio' },
   // Rodada 10, itens 3 e 4: pedido atrasado (ainda na cozinha) e entrega
   // atrasada (já em rota) ganham marca própria, mesmo padrão das outras.
   'pedido-atrasado': { texto: 'Pedido atrasado', icone: 'cooking-pot' },

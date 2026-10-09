@@ -162,7 +162,9 @@ export function PainelGaleria({ aoFechar }) {
   return (
     <Modal
       titulo="Fotos e peças"
-      descricao="Fotos prontas para enviar na conversa: prato, horário de funcionamento, ou o que você cadastrar."
+      descricao={fonteApi
+        ? 'Fotos dos pratos do cardápio, prontas para enviar na conversa.'
+        : 'Fotos prontas para enviar na conversa: prato, horário de funcionamento, ou o que você cadastrar.'}
       largura="720px"
       aoFechar={aoFechar}
       rodape={<Botao onClick={aoFechar}>Fechar</Botao>}
@@ -171,10 +173,13 @@ export function PainelGaleria({ aoFechar }) {
 
       {galeria.length === 0 ? (
         <Vazio
-          titulo="Nenhuma peça cadastrada"
+          titulo={fonteApi ? 'Nenhum prato com foto' : 'Nenhuma peça cadastrada'}
           acao={!fonteApi && <Botao variante="primario" onClick={() => setModal({ modo: 'novo' })}>Nova peça</Botao>}
         >
-          Cadastre uma foto com nome e descrição para mandar na conversa em um toque.
+          {/* #1474: no modo API não há cadastro de peça aqui; prometer isso era um beco sem saída. */}
+          {fonteApi
+            ? 'As fotos vêm dos pratos do cardápio. Nenhum prato tem foto ainda.'
+            : 'Cadastre uma foto com nome e descrição para mandar na conversa em um toque.'}
         </Vazio>
       ) : (
         <ul className={css.grade}>

@@ -376,3 +376,31 @@ export function desfazerPagamento(cobranca, agora, motivo) {
 // Pix e cartão voltam a esperar; maquininha e vale seguem na esteira.
 export const estadoDepoisDeDesfazer = (pedido) =>
   (pedido.cobranca?.link && pedido.estado === 'pago' ? 'aguardando' : pedido.estado)
+
+// --- Baixa à mão com link online pendente (#1474) ---------------------------
+// O EasyStok recusa pagamento manual em pedido que ainda espera o Mercado Pago
+// ("pré-operacional"). O caminho é virar a forma para "na entrega" (cancela o
+// link e põe o pedido na fila) e só então registrar o recebido. A tela avisa
+// antes de confirmar, porque o link que o cliente tem deixa de valer.
+export const AVISO_BAIXA_COM_LINK = 'O link do Mercado Pago será cancelado e o pagamento fica registrado como recebido por fora.'
+
+// #1474 (R8): pedido que exige aprovação (fora da área liberado) só aceita baixa à mão depois
+// de aprovado; antes disso o EasyStok recusa ("ainda não foi confirmado/aprovado").
+export const MOTIVO_BAIXA_SEM_APROVACAO = 'Aprove o pedido antes de registrar o pagamento.'
+export const aguardaAprovacao = (pedido) => Boolean(pedido?.pedidoId) && pedido.statusApi === 'aguardando_aprovacao_baba'
+// Com o link ainda pendente o status não mostra a aprovação que falta; o pedido traz `requerAprovacao`.
+export const baixaEsperaAprovacao = (pedido) => aguardaAprovacao(pedido)
+  || (Boolean(pedido?.pedidoId) && pedido.requerAprovacao === true)
+
+export const baixaCancelaCobrancaOnline = (pedido) => Boolean(pedido?.pedidoId)
+  && pedido.statusApi === 'aguardando_pagamento'
+  && !pedido.cobranca?.manual
+  && !pedido.cobranca?.pagaEm
+
+// "Como recebeu" já preenchido com o meio da cobrança quando ele é um dos métodos
+// da baixa; link de cartão não diz se foi crédito ou débito, então fica em branco.
+const METODOS_DA_BAIXA = new Set(['pix', 'dinheiro', 'credito', 'debito', 'transferencia'])
+export function metodoDaCobranca(cobranca) {
+  if (METODOS_DA_BAIXA.has(cobranca?.metodoRecebido)) return cobranca.metodoRecebido
+  return METODOS_DA_BAIXA.has(cobranca?.meio) ? cobranca.meio : ''
+}

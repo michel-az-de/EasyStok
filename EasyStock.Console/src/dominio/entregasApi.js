@@ -36,6 +36,10 @@ export const rotuloEmpresaEntregador = (valor) =>
 export const DIAS_DA_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 
 const MOTIVOS_APROVACAO = { fora_de_area: 'Entrega fora da área' }
+// #1474 (R7): recusar cancela, estorna e avisa o cliente num toque só; a tela pergunta antes.
+export const confirmacaoDaRecusa = (numero, nome) =>
+  `Recusar o pedido ${numero} de ${nome}? O pedido é cancelado, o pagamento volta ao cliente e ele recebe aviso.`
+
 export const motivoDaAprovacao = (motivo) => (motivo ? MOTIVOS_APROVACAO[motivo] ?? motivo : 'Aprovação manual')
 
 // Recarrega no `ready` (a API não tem replay) e a cada evento de pedido do SSE (S18).
