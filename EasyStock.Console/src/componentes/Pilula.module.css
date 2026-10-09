@@ -12,29 +12,29 @@
 .fina { font-weight: 400; color: var(--tinta-2); }
 
 /* Três estados e a marca. Nada mais ganha ponto. */
-.ok::before, .aviso::before, .perigo::before, .ragu::before {
+.ok::before, .aviso::before, .perigo::before, .marca::before {
   content: ''; flex-shrink: 0;
   width: var(--ponto); height: var(--ponto); border-radius: var(--r-pilula);
 }
-.ok::before { background: var(--ok); }
-.aviso::before { background: var(--atencao); }
-.perigo::before { background: var(--parado); }
-.ragu::before { background: var(--ragu); }
+.ok::before { background: var(--sucesso); }
+.aviso::before { background: var(--alerta); }
+.perigo::before { background: var(--erro); }
+.marca::before { background: var(--marca); }
 
 /* Registro do sistema não é estado: fica em texto neutro, sem ponto. */
 .info, .neutro { color: var(--tinta-2); }
 
 /* Marca com fundo pastel e ícone (seção 1 da direção visual, rodada 5): troca
    o ponto por um selo cheio, para o cartão de triagem do Balcão escanear numa
-   passada. Os pares de cor são os medidos na direção ("--parado sobre
-   --parado-pastel" etc): ícone e texto na cor forte, fundo na pastel. */
+   passada. Os pares de cor são os medidos na direção ("--erro sobre
+   --erro-pastel" etc): ícone e texto na cor forte, fundo na pastel. */
 .comIcone {
   padding: 2px var(--e-3) 2px var(--e-2); border-radius: var(--r-pilula);
   gap: 6px; white-space: nowrap; flex-shrink: 0; font-weight: 600;
 }
 .comIcone::before { content: none; }
-.comIcone.ok { background: var(--ok-fundo); color: var(--ok); }
-.comIcone.aviso { background: var(--aviso-fundo); color: var(--atencao); }
-.comIcone.perigo { background: var(--perigo-fundo); color: var(--parado); }
-.comIcone.ragu { background: var(--ragu-claro); color: var(--ragu); }
+.comIcone.ok { background: var(--sucesso-pastel); color: var(--sucesso); }
+.comIcone.aviso { background: var(--alerta-pastel); color: var(--alerta); }
+.comIcone.perigo { background: var(--erro-pastel); color: var(--erro); }
+.comIcone.marca { background: var(--marca-claro); color: var(--marca); }
 .comIcone.neutro, .comIcone.info { background: var(--elevado); color: var(--tinta-3); }

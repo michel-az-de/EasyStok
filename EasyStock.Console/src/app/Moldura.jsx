@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlcaLargura } from '../componentes/AlcaLargura'
 import { Avatar } from '../componentes/Avatar'
+import { Marca } from '../componentes/Marca'
 import { BarraDeAbas } from '../componentes/BarraDeAbas'
 import { Botao } from '../componentes/Botao'
 import { Icone } from '../componentes/Icone'
@@ -256,8 +257,7 @@ function Cabecalho({
   return (
     <header className={css.topo}>
       <h1 className={css.marca}>
-        <b>Casa da Baba</b>
-        <span>massa artesanal</span>
+        <Marca compacta />
       </h1>
       {!compacto && <InterruptorTema />}
       <ControleLoja aberta={aberta} aoAlternar={aoAlternarLoja} />
@@ -316,7 +316,7 @@ function Trilho({
 }) {
   return (
     <nav className={css.trilho} aria-label="Navegação">
-      <span className={css.selo} title="Casa da Baba" aria-hidden="true">cb</span>
+      <Marca compacta />
       <h1 className="sr">Casa da Baba</h1>
       {/* Estado da loja logo abaixo da marca: é o que vale para tudo embaixo.
           Mesmo texto e mesmo nome do controle do topo da main ("Loja aberta"

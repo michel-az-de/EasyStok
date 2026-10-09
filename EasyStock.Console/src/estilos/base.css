@@ -55,14 +55,14 @@ button:active:not(:disabled) {
 
 /* Foco: anel de 3 px com folga de 2. */
 :focus-visible {
-  outline: var(--b-3) solid var(--ragu);
+  outline: var(--b-3) solid var(--marca);
   outline-offset: 2px;
 }
 
 h1, h2, h3 { text-wrap: balance; letter-spacing: var(--ls-titulo); }
 p { text-wrap: pretty; }
 
-::selection { background: var(--ragu-claro); color: var(--tinta); }
+::selection { background: var(--marca-claro); color: var(--tinta); }
 
 /* Barra de rolagem fina e discreta. */
 * { scrollbar-width: thin; scrollbar-color: var(--linha-media) transparent; }

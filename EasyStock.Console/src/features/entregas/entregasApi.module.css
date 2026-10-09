@@ -24,7 +24,7 @@
 .secao h4 { margin: var(--e-2) 0 var(--e-1, 4px); font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2); }
 .diaDaSemana { display: flex; flex-direction: column; }
 .edicaoJanela { display: flex; flex-direction: column; gap: var(--e-2); }
-.erroCampo { margin: 0; color: var(--parado); font-size: var(--t-apoio); }
+.erroCampo { margin: 0; color: var(--erro); font-size: var(--t-apoio); }
 .pausada { opacity: .7; }
 .nomeJanela { font-family: inherit; font-weight: 400; color: var(--tinta-2); }
 .campoData { min-width: 150px; }

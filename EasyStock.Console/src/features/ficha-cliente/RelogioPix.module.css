@@ -8,13 +8,13 @@
 }
 
 .numero {
-  font-family: var(--f-dado); font-size: var(--t-26); font-weight: 600;
+  font-family: var(--f-dado); font-size: var(--t-valor); font-weight: 600;
   font-variant-numeric: tabular-nums; color: var(--tinta); line-height: var(--lh-compacto);
 }
 .legenda { font-size: var(--t-apoio); color: var(--tinta-2); }
 .numeroDivergente { font-family: var(--f-dado); font-size: var(--t-forte); font-weight: 600; }
 
-/* Ao zerar: trilho inteiro vira --parado (prop `trilhoParado` do Anel
+/* Ao zerar: trilho inteiro vira --erro (prop `trilhoParado` do Anel
    genérico, componentes/Anel.jsx), número e legenda piscam juntos (10
    ciclos de 1s, depois fica parado e aceso). O global de
    prefers-reduced-motion (base.css) já esmaga a duração da animação a
@@ -30,7 +30,7 @@
 
 /* Pago: linha grande nos primeiros 3s, depois recolhe para uma linha só. */
 .pago {
-  display: flex; flex-direction: column; align-items: center; gap: var(--e-1); color: var(--ok);
+  display: flex; flex-direction: column; align-items: center; gap: var(--e-1); color: var(--sucesso);
   animation: pagoEntra var(--dur-longa) var(--ease-pulo) both;
 }
 /* Pagamento confirmado: o selo estala para dentro, o único momento de
@@ -44,7 +44,7 @@
 .pago .horaPago { font-size: var(--t-apoio); color: var(--tinta-2); }
 .recolhido {
   display: flex; align-items: center; gap: var(--e-2);
-  color: var(--ok); font-size: var(--t-apoio); font-weight: 600;
+  color: var(--sucesso); font-size: var(--t-apoio); font-weight: 600;
 }
 
 .confirmacao { display: grid; gap: var(--e-2); width: 100%; margin-top: var(--e-2); }

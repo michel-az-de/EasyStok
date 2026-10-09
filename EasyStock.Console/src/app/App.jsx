@@ -268,6 +268,10 @@ const INICIO_DO_RELOGIO = FONTE_API ? Date.now() : INSTANTE_INICIAL
 // três dividem o mesmo `AtendimentoProvider`, então ir e voltar não recarrega nada.
 function TelaDaRota({ rota, aoSair }) {
   if (rota.tipo === ROTA_PRINCIPAL) return <Composicao aoSair={aoSair} />
+  // Na demonstração, navegar no mesmo tab mantém a origem do espelho viva.
+  // Os apelidos avulsos continuam sem outro provider, como as janelas do tablet.
+  if (!FONTE_API && rota.tipo === ROTA_COZINHA) return <NoModulo rota={rota}><TelaCozinha /></NoModulo>
+  if (!FONTE_API && rota.tipo === ROTA_ENTREGAS) return <NoModulo rota={rota}><TelaEntregas /></NoModulo>
   return (
     <>
       {rota.tipo === ROTA_HALL
@@ -286,17 +290,13 @@ function TelaDaRota({ rota, aoSair }) {
   )
 }
 
-function AppPrincipal({ rota }) {
+function AppPrincipal({ rota, sessao, aoSair }) {
   const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: FONTE_API })
-  const { sessao, listarEmpresas, entrarNaEmpresa, google, encerrarSessao } = useSessaoApi()
-  if (FONTE_API && !sessao) {
-    return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} google={google} />
-  }
   return (
     // `key`: trocar de usuário ou empresa recomeça o estado, sem conversa de outra empresa na tela.
     <AtendimentoProvider key={sessao?.token ?? 'demo'} agora={agora} sessao={sessao}>
       <LimparAvisoAoNavegar />
-      <TelaDaRota rota={rota} aoSair={encerrarSessao} />
+      <TelaDaRota rota={rota} aoSair={aoSair} />
     </AtendimentoProvider>
   )
 }
@@ -311,31 +311,23 @@ function NoModulo({ rota, children }) {
 
 // Cozinha no modo API (F05): a fila vem do KDS, não do espelho do Balcão. Sem
 // sessão nesta aba, pede o login como a janela principal.
-function CozinhaApi({ rota }) {
-  const { sessao, listarEmpresas, entrarNaEmpresa, google } = useSessaoApi()
-  if (!sessao) return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} google={google} />
+function CozinhaApi({ rota, sessao }) {
   return <NoModulo rota={rota}><TelaCozinhaApi key={sessao.token} linhas={LINHAS_PRODUTO} /></NoModulo>
 }
 
-// Cardápio por link no modo API (#1241): o real é a página do site; esta rota só explica.
-function CardapioLinkApi() {
-  const { sessao, listarEmpresas, entrarNaEmpresa, google } = useSessaoApi()
-  if (!sessao) return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} google={google} />
-  return <AvisoCardapioDoSite />
-}
-
 // Entregas no modo API (F04): janela própria lê a API, sem espelho do Balcão.
-function EntregasApi({ rota }) {
-  const { sessao, listarEmpresas, entrarNaEmpresa, google } = useSessaoApi()
-  if (!sessao) return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} google={google} />
+function EntregasApi({ rota, sessao }) {
   return <NoModulo rota={rota}><TelaEntregasApi key={sessao.token} /></NoModulo>
 }
 
 export function App() {
   const hash = useHash()
+  const { sessao, entrarNaEmpresa, google, encerrarSessao } = useSessaoApi()
   const rota = rotaDaHash(hash, { fonteApi: FONTE_API })
-  if (rota.tipo === ROTA_ENTREGAS) return FONTE_API ? <EntregasApi rota={rota} /> : <NoModulo rota={rota}><TelaEntregas /></NoModulo>
-  if (rota.tipo === ROTA_COZINHA) return FONTE_API ? <CozinhaApi rota={rota} /> : <NoModulo rota={rota}><TelaCozinha /></NoModulo>
-  if (rota.tipo === ROTA_CARDAPIO_LINK) return FONTE_API ? <CardapioLinkApi /> : <TelaCardapioLink />
-  return <AppPrincipal rota={rota} />
+  if (FONTE_API && !sessao) return <TelaLogin entrarNaEmpresa={entrarNaEmpresa} google={google} />
+  if (!FONTE_API && rota.modulo) return <AppPrincipal rota={rota} sessao={sessao} aoSair={encerrarSessao} />
+  if (rota.tipo === ROTA_ENTREGAS) return FONTE_API ? <EntregasApi rota={rota} sessao={sessao} /> : <NoModulo rota={rota}><TelaEntregas /></NoModulo>
+  if (rota.tipo === ROTA_COZINHA) return FONTE_API ? <CozinhaApi rota={rota} sessao={sessao} /> : <NoModulo rota={rota}><TelaCozinha /></NoModulo>
+  if (rota.tipo === ROTA_CARDAPIO_LINK) return FONTE_API ? <AvisoCardapioDoSite /> : <TelaCardapioLink />
+  return <AppPrincipal rota={rota} sessao={sessao} aoSair={encerrarSessao} />
 }

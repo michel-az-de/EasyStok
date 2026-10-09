@@ -9,15 +9,15 @@
 
 .anel { display: block; }
 .trilho { fill: none; stroke: var(--linha); }
-/* Trilho inteiro em --parado (RelogioPix.jsx, "ao zerar"): estado raro o
+/* Trilho inteiro em --erro (RelogioPix.jsx, "ao zerar"): estado raro o
    bastante para não virar mais um `tom`, só um reforço opcional por cima. */
-.trilhoParado { stroke: var(--parado); }
+.trilhoParado { stroke: var(--erro); }
 .arco {
   fill: none; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%;
   transition: stroke-dashoffset 1s linear, stroke .3s ease;
 }
-.arco.ok { stroke: var(--ok); }
-.arco.atencao { stroke: var(--atencao); }
-.arco.parado { stroke: var(--parado); }
+.arco.ok { stroke: var(--sucesso); }
+.arco.atencao { stroke: var(--alerta); }
+.arco.parado { stroke: var(--erro); }
 
 .centro { display: grid; justify-items: center; gap: var(--e-1); }

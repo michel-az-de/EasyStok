@@ -23,8 +23,44 @@ public class AtendimentoProducaoController(
     EstoqueDoDiaUseCase estoqueDoDia,
     ProduzirPratosUseCase produzirPratos,
     InsumosDaProducaoUseCase insumos,
+    ReceitasDaProducaoUseCase receitas,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
+    [SwaggerOperation(Summary = "Recipes of the menu dishes with cost per yield unit (M2.4a)",
+        Description = "Gravar a receita é o PUT api/produtos/{id}/composicao (Gerente).")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [HttpGet("receitas")]
+    public async Task<IActionResult> Receitas(CancellationToken ct)
+    {
+        if (!currentUser.TemPermissao(Permissao.GerenciarEstoque)) return Forbid();
+        try
+        {
+            return DataOk(await receitas.ListarAsync(currentUser.EmpresaId, ct));
+        }
+        catch (StorefrontNaoEncontradoException)
+        {
+            return DataNotFound("A empresa não tem vitrine ativa.");
+        }
+    }
+
+    [SwaggerOperation(Summary = "One recipe with line costs (unit converted) and cost per yield unit")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [HttpGet("receitas/{produtoId:guid}")]
+    public async Task<IActionResult> Receita(Guid produtoId, CancellationToken ct)
+    {
+        if (!currentUser.TemPermissao(Permissao.GerenciarEstoque)) return Forbid();
+        try
+        {
+            return DataOk(await receitas.ObterAsync(currentUser.EmpresaId, produtoId, ct));
+        }
+        catch (UseCaseValidationException ex)
+        {
+            return DataBadRequest(ex.Message);
+        }
+    }
+
     [SwaggerOperation(Summary = "Production supplies (EhInsumo) with stock, minimum, cost and recipes using them (M2.3)")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]

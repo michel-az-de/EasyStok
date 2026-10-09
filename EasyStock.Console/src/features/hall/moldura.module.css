@@ -5,20 +5,20 @@
 .barra {
   display: flex; align-items: center; gap: var(--e-3); flex: none;
   min-height: calc(var(--toque) + var(--e-3)); padding: var(--e-1) var(--e-4);
-  border-bottom: var(--b-1) solid var(--cdb-linha); background: var(--cdb-chao); color: var(--cdb-cacau);
+  border-bottom: var(--b-1) solid var(--linha); background: var(--creme); color: var(--tinta);
 }
 
 .voltar {
   display: inline-flex; align-items: center; gap: var(--e-1); flex: none;
   min-height: var(--toque); padding: 0 var(--e-2); border-radius: var(--r-1);
-  font-size: var(--t-apoio); font-weight: 700; color: var(--cdb-caramelo); text-decoration: none;
+  font-size: var(--t-apoio); font-weight: 700; color: var(--marca); text-decoration: none;
 }
 .voltar:hover { background: var(--preenchimento); }
-.voltar:focus-visible, .item:focus-visible, .link:focus-visible { outline: 2px solid var(--cdb-caramelo); outline-offset: 2px; }
+.voltar:focus-visible, .item:focus-visible, .link:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
 
 .modulo {
   display: inline-flex; align-items: center; gap: var(--e-2); flex: none;
-  padding-left: var(--e-3); border-left: var(--b-1) solid var(--cdb-linha);
+  padding-left: var(--e-3); border-left: var(--b-1) solid var(--linha);
   font-family: var(--f-titulo-marca); font-size: var(--t-forte); font-weight: 600;
 }
 
@@ -30,10 +30,10 @@
 .item {
   display: inline-flex; align-items: center; flex: none;
   min-height: var(--toque); padding: 0 var(--e-3); border-radius: var(--r-1);
-  font-size: var(--t-apoio); font-weight: 600; color: var(--cdb-cacau-2); text-decoration: none; white-space: nowrap;
+  font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2); text-decoration: none; white-space: nowrap;
 }
-.item:hover { background: var(--preenchimento); color: var(--cdb-cacau); }
-.itemAtivo { color: var(--cdb-cacau); box-shadow: inset 0 -3px 0 var(--cdb-caramelo); border-radius: 0; }
+.item:hover { background: var(--preenchimento); color: var(--tinta); }
+.itemAtivo { color: var(--tinta); box-shadow: inset 0 -3px 0 var(--marca); border-radius: 0; }
 
 .operacao { flex: 1; min-height: 0; }
 
@@ -43,7 +43,7 @@
   margin: 0 0 var(--e-4); font-family: var(--f-titulo-marca);
   font-size: var(--t-valor); font-weight: 600; color: var(--tinta);
 }
-.link { font-weight: 700; color: var(--cdb-caramelo); }
+.link { font-weight: 700; color: var(--marca); }
 
 @media (max-width: 640px) {
   .barra { flex-wrap: wrap; padding-inline: var(--e-2); }

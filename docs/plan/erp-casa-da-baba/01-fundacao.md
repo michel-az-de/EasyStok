@@ -22,6 +22,8 @@ para não decidir permissão no front (princípio 2 do README).
 
 ## M0.1 · Tema da marca no console
 
+> Execução de 09/10/2026: tema global, tipografia, logo derivada, contraste automatizado e ajuste de largura implementados. Capturas e limites da homologação na [seção 13 do levantamento](11-levantamento-e-ondas-2026-10-09.md#13-continuação-autorizada-identidade-e-navegação-09102026). A M0.2 avançou com busca, login único e guarda compartilhado; M0.3/perfis continua pendente. Este registro não declara deploy.
+
 **Fato medido.** O console define tudo em tokens (`src/estilos/tokens.css:1`, "nenhum componente
 escreve cor... literal"), com `light-dark()` em 44 declarações e tema claro/escuro escolhido pelo
 usuário (`tokens.css:18,226-227`; interruptor em `src/app/Moldura.jsx:135-160`). A identidade é o

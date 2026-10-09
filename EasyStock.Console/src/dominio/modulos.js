@@ -39,6 +39,8 @@ export const MODULOS = [
       { id: 'producao', rotulo: 'Produção do dia', tipo: TELA_AJUSTE, aba: 'producao-do-dia', soApi: true },
       // M2.3 (#1496): insumos (intermediário e embalagem), com o que comprar.
       { id: 'insumos', rotulo: 'Insumos', tipo: TELA_AJUSTE, aba: 'insumos', soApi: true },
+      // M2.4a (#1498): a receita de cada prato, com o custo por porção.
+      { id: 'receitas', rotulo: 'Receitas', tipo: TELA_AJUSTE, aba: 'receitas', soApi: true },
     ],
   },
   {
@@ -110,6 +112,16 @@ export function modulosDoHall({ fonteApi = false } = {}) {
       disponivel,
       href: disponivel ? hashDoModulo(modulo.id) : null,
     }
+  })
+}
+
+// Busca somente no catálogo de navegação, sem consultar dados de clientes.
+const textoDeBusca = (valor) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim()
+export function filtrarModulos(modulos, busca) {
+  const termos = textoDeBusca(busca).split(/\s+/).filter(Boolean)
+  return modulos.filter((modulo) => {
+    const texto = textoDeBusca([modulo.nome, modulo.resumo, ...modulo.telas.map((t) => t.rotulo)].join(' '))
+    return termos.every((termo) => texto.includes(termo))
   })
 }
 

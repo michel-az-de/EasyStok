@@ -15,7 +15,7 @@
 /* Ocupação em texto. Só a janela estourada ganha peso e cor. */
 .chipCheio {
   display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 var(--e-3);
-  border-radius: var(--r-pilula); background: var(--parado-pastel); color: var(--parado);
+  border-radius: var(--r-pilula); background: var(--erro-pastel); color: var(--erro);
   font-size: var(--t-apoio); font-weight: 700; font-family: var(--f-dado); white-space: nowrap;
 }
 .chipCheio::before {

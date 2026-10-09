@@ -10,10 +10,10 @@
 /* Bloco que espera ação dela: trilho de 3 px mais o título em âmbar. Sem fundo
    pastel, que vale um lugar por tela e não é aqui. */
 .destaque {
-  border-left: var(--trilho) solid var(--atencao);
+  border-left: var(--trilho) solid var(--alerta);
   padding-left: calc(var(--e-4) - var(--trilho));
 }
-.destaque > h3 { color: var(--atencao); }
+.destaque > h3 { color: var(--alerta); }
 
 /* #1442: seção recolhível. O título vira o gatilho, linha inteira, com a seta
    no fim; recolhida, o resumo aparece entre os dois. */

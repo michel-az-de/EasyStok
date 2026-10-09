@@ -3,14 +3,17 @@
 // módulo ligado abre pela rota; o que ainda não tem tela aparece "Em breve" e
 // não navega. Os atalhos embaixo do nome são o menu do módulo (as outras telas).
 import { Icone } from '../../componentes/Icone'
+import { useState } from 'react'
+import { Marca } from '../../componentes/Marca'
+import { CampoTexto } from '../../componentes/Campo'
 import { useAtendimento } from '../../aplicacao/contextos'
-import { hashDoModulo, modulosDoHall, saudacaoDoHall } from '../../dominio/modulos'
+import { filtrarModulos, hashDoModulo, modulosDoHall, saudacaoDoHall } from '../../dominio/modulos'
 import css from './hall.module.css'
 
 const doisDigitos = (n) => String(n).padStart(2, '0')
 
-function CartaoModulo({ modulo }) {
-  const atalhos = modulo.telas.slice(1)
+function CartaoModulo({ modulo, buscando }) {
+  const atalhos = buscando ? modulo.telas : modulo.telas.slice(1)
   if (!modulo.disponivel) {
     return (
       <li className={`${css.cartao} ${css.emBreve}`}>
@@ -45,14 +48,15 @@ function CartaoModulo({ modulo }) {
 
 export function HallDeModulos() {
   const { fonteApi, sessao, agora } = useAtendimento()
-  const modulos = modulosDoHall({ fonteApi })
+  const [busca, setBusca] = useState('')
+  const modulos = filtrarModulos(modulosDoHall({ fonteApi }), busca)
   return (
     <div className={css.hall}>
       <header className={css.topo}>
-        <p className={css.marca}>
-          <span className={css.casa}>Casa da Baba</span>
-          <span className={css.produto}>EasyStok</span>
-        </p>
+        <Marca />
+        <div className={css.busca}>
+          <CampoTexto rotulo="Buscar módulo ou tela" tipo="search" value={busca} onChange={(e) => setBusca(e.target.value)} />
+        </div>
       </header>
       <main className={css.conteudo}>
         <div className={css.cabeca}>
@@ -60,8 +64,9 @@ export function HallDeModulos() {
           <p className={css.apoio}>Escolha o módulo para começar.</p>
         </div>
         <ul className={css.grade} aria-label="Módulos">
-          {modulos.map((modulo) => <CartaoModulo key={modulo.id} modulo={modulo} />)}
+          {modulos.map((modulo) => <CartaoModulo key={modulo.id} modulo={modulo} buscando={Boolean(busca.trim())} />)}
         </ul>
+        <output className={css.resultado} aria-live="polite">{busca.trim() && (modulos.length ? `${modulos.length} módulo(s) encontrado(s).` : 'Nenhum módulo ou tela encontrado. Tente outro nome.')}</output>
       </main>
     </div>
   )

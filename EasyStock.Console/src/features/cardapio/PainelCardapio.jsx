@@ -126,7 +126,7 @@ function ItemEscolher({
               texto na segunda linha, e só aparece quando muda a venda. */}
           <span className={css.nome}>
             {item.nome}
-            {novidade && <Pilula tom="ragu" fina>Novidade da casa</Pilula>}
+            {novidade && <Pilula tom="marca" fina>Novidade da casa</Pilula>}
             <small>
               {[linhas[item.linha]?.rotulo, item.porcao].filter(Boolean).join(' · ')}
               {PEDE_ACAO.has(situacao.chave) && (
@@ -292,7 +292,7 @@ function Gerir({
                   <div className={css.corpoItem}>
                     <strong>
                       {item.nome}
-                      {novidade && <Pilula tom="ragu" fina>Novidade</Pilula>}
+                      {novidade && <Pilula tom="marca" fina>Novidade</Pilula>}
                       {estaEmValidacao(item) && <Pilula tom="aviso" fina>Em validação</Pilula>}
                     </strong>
                     <small>

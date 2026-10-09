@@ -7,4 +7,4 @@
 .texto { margin: 0; display: grid; gap: 2px; flex: 1 1 260px; min-width: 0; }
 .texto strong { font-weight: 700; }
 .texto span { font-size: var(--t-apoio); color: var(--tinta-2); }
-.erro { margin: 0; flex-basis: 100%; font-size: var(--t-apoio); color: var(--parado); }
+.erro { margin: 0; flex-basis: 100%; font-size: var(--t-apoio); color: var(--erro); }

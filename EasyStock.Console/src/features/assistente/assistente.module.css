@@ -19,7 +19,7 @@
 .pontoAtencao {
   position: absolute; top: 4px; right: 4px;
   width: calc(var(--ponto) + 2px); height: calc(var(--ponto) + 2px);
-  border-radius: var(--r-pilula); background: var(--parado);
+  border-radius: var(--r-pilula); background: var(--erro);
   border: var(--b-2) solid var(--papel);
 }
 
@@ -56,8 +56,8 @@
   border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
   background: var(--elevado); padding: var(--e-2) var(--e-3);
 }
-.cartao.perigo { border-color: var(--parado); }
-.cartao.ok { border-color: var(--ok); }
+.cartao.perigo { border-color: var(--erro); }
+.cartao.ok { border-color: var(--sucesso); }
 
 .cartaoTopo { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-2); }
 .cartaoTopo h3 {
@@ -85,9 +85,9 @@
   font-size: var(--t-apoio); border-radius: var(--r-2); padding: var(--e-1) var(--e-2);
   max-width: 92%; overflow-wrap: anywhere; line-height: var(--lh-corpo);
 }
-.perguntaDaThatiane { align-self: flex-end; background: var(--ragu-claro); color: var(--ragu-forte); }
+.perguntaDaThatiane { align-self: flex-end; background: var(--marca-claro); color: var(--marca-forte); }
 .respostaDoAssistente { align-self: flex-start; background: var(--elevado); color: var(--tinta); }
-.respostaErro { align-self: flex-start; background: var(--perigo-fundo); color: var(--perigo); }
+.respostaErro { align-self: flex-start; background: var(--erro-pastel); color: var(--erro); }
 .respostaPensando { align-self: flex-start; color: var(--tinta-3); font-style: italic; }
 
 /* #1445: ações propostas pelo assistente. Linha simples sob a resposta, sem cartão
@@ -101,9 +101,9 @@
 .acaoTexto { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: var(--t-apoio); }
 .acaoTitulo { display: flex; align-items: center; gap: var(--e-1); font-weight: 700; color: var(--tinta); }
 .acaoDetalhe { color: var(--tinta-2); line-height: var(--lh-corpo); overflow-wrap: anywhere; }
-.acaoErro { display: flex; align-items: center; gap: var(--e-1); color: var(--perigo); }
+.acaoErro { display: flex; align-items: center; gap: var(--e-1); color: var(--erro); }
 .acaoBotao { flex-shrink: 0; }
-.acaoFeita { display: flex; align-items: center; gap: var(--e-1); flex-shrink: 0; font-size: var(--t-apoio); color: var(--ok); }
+.acaoFeita { display: flex; align-items: center; gap: var(--e-1); flex-shrink: 0; font-size: var(--t-apoio); color: var(--sucesso); }
 
 .formPergunta { display: flex; align-items: flex-end; gap: var(--e-1); }
 .campoPergunta { flex: 1; }

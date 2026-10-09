@@ -2,15 +2,14 @@ import { chamarApi } from './cliente'
 import { empresaDoToken, gravarSessao, limparSessao, vencimentoDoToken } from './sessao'
 import { esquecerRascunhos } from './rascunhosDaSessao'
 
-// Login em dois passos (ADR-0047): credenciais → empresas do usuário → token da empresa.
-export const listarEmpresas = (email, senha) =>
-  chamarApi('/api/auth/lista-empresas', { metodo: 'POST', corpo: { email, senha }, autenticado: false })
-
-export async function entrar(email, senha, empresa) {
+// Casa da Baba (M0.2): a API resolve a empresa ativa; nunca escolhemos uma no navegador.
+export async function entrar(email, senha) {
   const dados = await chamarApi('/api/auth/login', {
-    metodo: 'POST', corpo: { email, senha, empresaId: empresa?.id ?? null }, autenticado: false,
+    metodo: 'POST', corpo: { email, senha, empresaId: null }, autenticado: false,
   })
-  return abrirSessao(dados, empresa ?? null)
+  const empresaId = empresaDoToken(dados.token)
+  if (!empresaId) throw new Error('Este usuário precisa de uma empresa ativa única para entrar na Casa da Baba. Peça à responsável para conferir o acesso.')
+  return abrirSessao(dados, { id: empresaId, nome: null })
 }
 
 // Login com Google (#1324): o ClientId vem da API; sem ele (404), o botão não aparece.
