@@ -46,15 +46,17 @@ confere('o hall lista os oito módulos do plano, numerados de 1 a 8 e na ordem',
   }
 })
 
-// M1.1 (#1481): o Cardápio ganhou a gestão no modo API; na demonstração segue em breve.
-confere('Produção ainda não tem tela; Cardápio abre só no modo API', () => {
+// M1.1 (#1481) e M2.1 (#1490): Cardápio e Produção ganharam tela no modo API; na demonstração
+// seguem em breve (não navegam).
+confere('Cardápio e Produção abrem só no modo API', () => {
   const hall = modulosDoHall({ fonteApi: true })
   const porId = Object.fromEntries(hall.map((m) => [m.id, m]))
-  assert.equal(porId.producao.disponivel, false)
-  assert.equal(porId.producao.href, null, 'card em breve não navega')
   const demonstracao = Object.fromEntries(modulosDoHall({ fonteApi: false }).map((m) => [m.id, m]))
-  assert.equal(demonstracao.cardapio.disponivel, false, 'sem API não há o que gerir')
-  for (const id of ['cardapio', 'atendimento', 'cozinha', 'financeiro', 'campanhas', 'configuracoes', 'entregas']) {
+  for (const id of ['cardapio', 'producao']) {
+    assert.equal(demonstracao[id].disponivel, false, `${id}: sem API não há o que gerir`)
+    assert.equal(demonstracao[id].href, null, `${id}: card em breve não navega`)
+  }
+  for (const id of ['cardapio', 'producao', 'atendimento', 'cozinha', 'financeiro', 'campanhas', 'configuracoes', 'entregas']) {
     assert.equal(porId[id].disponivel, true, `${id} abre`)
     assert.ok(porId[id].href.startsWith('#/m/' + id), `${id} aponta para a própria rota`)
   }

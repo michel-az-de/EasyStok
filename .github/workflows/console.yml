@@ -43,3 +43,4 @@ jobs:
       - run: node ferramentas/prova-1481-gestao-cardapio.mjs
       - run: node ferramentas/prova-1482-item-cardapio.mjs
       - run: node ferramentas/prova-1483-categorias-cardapio.mjs
+      - run: node ferramentas/prova-1490-estoque-do-dia.mjs

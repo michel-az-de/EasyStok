@@ -255,6 +255,13 @@ das decisões abaixo.
 
 ## 6. Decisões pendentes do Felipe
 
+> **Decididas em 09/10/2026 (Felipe, múltipla escolha):**
+> - **D-M2-01 = a:** a baixa de insumo é só para produto com receita marcada "baixa automática"; falta de insumo avisa, não trava. Entra com a M2.4.
+> - **D-M2-04 = a:** o destino da porção vem da linha do prato (servir × preparar em casa). Nada novo no lote.
+> - **D-M2-06 = a:** o Operador lança a produção e ajusta o saldo; ver e mexer no estoque ainda exige a permissão de estoque. Perda acima de um valor pede Gerente (M2.6).
+>
+> Seguem pendentes: D-M2-02, 03 e 05.
+
 **D-M2-01 · A produção baixa insumo pela receita?**
 - a) Sim, só para produto com receita marcada "baixa automática"; falta de insumo avisa, não trava **(Recomendado)**
 - b) Não; receita serve só para planejar e custear, insumo é contado à mão

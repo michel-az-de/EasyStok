@@ -32,7 +32,10 @@ export const MODULOS = [
   {
     numero: 2, id: 'producao', nome: 'Produção', icone: 'flask-conical',
     resumo: 'Insumos, fichas técnicas e perdas',
-    telas: [],
+    // M2.1 (#1490): o estoque do dia lê do EasyStok; na demonstração segue a aba da Cozinha.
+    telas: [
+      { id: 'estoque', rotulo: 'Estoque do dia', tipo: TELA_AJUSTE, aba: 'estoque-do-dia', soApi: true },
+    ],
   },
   {
     numero: 3, id: 'atendimento', nome: 'Atendimento', icone: 'conversa',
