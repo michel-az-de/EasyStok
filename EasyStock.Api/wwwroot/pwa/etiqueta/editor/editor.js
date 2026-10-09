@@ -2,8 +2,8 @@
  * EasyStok Label Editor — F5
  * Vanilla JS, Pointer Events, no deps beyond render.js + codes.js
  */
-import { renderEtiqueta } from '/etiqueta/render.js';
-import { renderCodes }   from '/etiqueta/codes.js';
+import { renderEtiqueta } from '../render.js';
+import { renderCodes }   from '../codes.js';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const MM = 3.7795275591; // px per mm at 96dpi
@@ -878,17 +878,19 @@ function _getValidationErrors() {
 
 // ── Preview window ─────────────────────────────────────────────────────────
 async function _openPreview() {
+    // #1509: base absoluta do modulo de etiquetas (o caminho absoluto /etiqueta/ dava 404 em /pwa/).
+    const base   = new URL('../', import.meta.url).href;
     const el     = renderEtiqueta(_layout, FIXTURE_DADOS, { forPrint: false });
     const wPx    = _layout.size.w_mm * MM;
     const hPx    = _layout.size.h_mm * MM;
     const win    = window.open('', '_blank', `width=${wPx+40},height=${hPx+80}`);
     win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Prévia</title>
-<link rel="stylesheet" href="/etiqueta/etiqueta.css">
+<link rel="stylesheet" href="${base}etiqueta.css">
 <style>body{display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#ECEFF5}</style>
 </head><body>${el.outerHTML}
-<script src="/etiqueta/vendor/qrcode.min.js"><\/script>
-<script src="/etiqueta/vendor/jsbarcode.min.js"><\/script>
-<script type="module">import{renderCodes}from'/etiqueta/codes.js';renderCodes(document.body);<\/script>
+<script src="${base}vendor/qrcode.min.js"><\/script>
+<script src="${base}vendor/jsbarcode.min.js"><\/script>
+<script type="module">import{renderCodes}from'${base}codes.js';renderCodes(document.body);<\/script>
 </body></html>`);
     win.document.close();
 }

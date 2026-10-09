@@ -403,6 +403,49 @@ public class PedidoEstoqueIntegrationServiceTests
             m => m.Natureza == NaturezaMovimentacaoEstoque.Estorno));
     }
 
+    [Fact] // #1506: estorno manual de UMA saida nao pode fazer o cancelamento pular as outras.
+    public async Task DevolverItemAsync_devolve_as_saidas_nao_estornadas_depois_de_estorno_manual_parcial()
+    {
+        var (svc, itemRepo, movRepo) = Build();
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 5);
+        var item = pedido.Itens.Single();
+        var referencia = $"{pedido.Id}:{item.Id}";
+        ItemEstoque Lote() => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(0)
+        };
+        var primeiro = Lote();
+        var segundo = Lote();
+        MovimentacaoEstoque Saida(ItemEstoque lote, decimal quantidade) => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, ItemEstoqueId = lote.Id,
+            DocumentoReferencia = referencia, Tipo = TipoMovimentacaoEstoque.Saida,
+            Natureza = NaturezaMovimentacaoEstoque.Venda, Quantidade = Quantidade.From(quantidade)
+        };
+        var jaEstornada = Saida(primeiro, 2);
+        jaEstornada.MarcarComoEstornada(DateTime.UtcNow.AddHours(-1));
+        var pendente = Saida(segundo, 3);
+        movRepo.ExisteReferenciaAsync(empresaId, produtoId, referencia, Arg.Any<NaturezaMovimentacaoEstoque>(), Arg.Any<CancellationToken>()).Returns(true);
+        movRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { jaEstornada, pendente });
+        itemRepo.GetByIdComLockAsync(empresaId, primeiro.Id).Returns(primeiro);
+        itemRepo.GetByIdComLockAsync(empresaId, segundo.Id).Returns(segundo);
+
+        await svc.DevolverItemAsync(pedido, item);
+
+        primeiro.QuantidadeAtual.Value.Should().Be(0);
+        segundo.QuantidadeAtual.Value.Should().Be(3);
+        pendente.EstornadaEm.Should().NotBeNull();
+        await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(m => m.Natureza == NaturezaMovimentacaoEstoque.Estorno));
+
+        // Segunda chamada (retry) nao devolve de novo.
+        await svc.DevolverItemAsync(pedido, item);
+        segundo.QuantidadeAtual.Value.Should().Be(3);
+    }
+
     [Fact] // #939: sem Venda anterior, não há o que estornar (idempotência).
     public async Task DevolverItemAsync_pula_quando_sem_venda_anterior()
     {

@@ -46,7 +46,8 @@ public class AtualizarStatusPedidoUseCase(
     IOperacaoEventPublisher operacaoEventos,
     IUnitOfWork uow,
     ILogger<AtualizarStatusPedidoUseCase> logger,
-    CalculadoraInicioPrevistoPedido inicioPrevisto)
+    CalculadoraInicioPrevistoPedido inicioPrevisto,
+    EfeitosCancelamentoPedido efeitosCancelamento)
 {
     public async Task<PedidoResult?> ExecuteAsync(AtualizarStatusPedidoCommand cmd)
     {
@@ -137,6 +138,11 @@ public class AtualizarStatusPedidoUseCase(
                 UsuarioNome: cmd.UsuarioNome,
                 OcorridoEm: DateTime.UtcNow),
             correlationId: pedido.Id.ToString());
+
+        // #1506: cancelar pela troca de status tem os mesmos efeitos do CancelarPedidoUseCase
+        // (ContaReceber cancelada e vaga da janela liberada), na mesma transacao.
+        if (statusNovo == StatusPedido.Cancelado)
+            await efeitosCancelamento.AplicarAsync(pedido, "Cancelado pela troca de status", cmd.UsuarioId);
 
         await pedidoRepo.UpdateAsync(pedido);
         await uow.CommitAsync();

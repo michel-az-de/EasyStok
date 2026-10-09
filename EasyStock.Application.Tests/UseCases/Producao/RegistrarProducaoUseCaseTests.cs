@@ -88,6 +88,25 @@ public class RegistrarProducaoUseCaseTests
     }
 
     [Fact]
+    public async Task ProducaoDepoisDas21h_ContaValidadeEDiaDoLotePeloDiaDeBrasilia()
+    {
+        // #1506: 08/10 22:00 em Brasilia = 09/10 01:00Z. Somar dias ao instante UTC gravava a
+        // validade com um dia a mais (risco sanitario) e o lote como LOT-261009.
+        var produto = NovoProduto(TipoEmbalagem.Embalado);
+        _loteRepo.FindByCodigoAsync(_empresaId, Arg.Any<string>()).Returns(_ => _loteGravado);
+        var noite = new DateTime(2026, 10, 9, 1, 0, 0, DateTimeKind.Utc);
+
+        var result = await Sut().ExecuteAsync(new RegistrarProducaoCommand(
+            _empresaId, null, noite,
+            [new RegistrarProducaoItemInput(produto.Id, Porcoes: 1, PesoPorPorcaoG: 500, ValidadeDias: 3, CustoUnitario: 12m)]));
+
+        await _itemRepo.Received(1).InsertAsync(Arg.Is<ItemEstoque>(i =>
+            i.ValidadeEm != null && i.ValidadeEm.DataValidade == new DateTime(2026, 10, 11)));
+        result.Itens.Should().ContainSingle(i => i.ValidadeEm == new DateTime(2026, 10, 11, 0, 0, 0, DateTimeKind.Utc));
+        await _loteRepo.Received().GetNextSequencialDoDiaAsync(_empresaId, new DateOnly(2026, 10, 8));
+    }
+
+    [Fact]
     public async Task FalhaDesfazTudo()
     {
         var produto = NovoProduto(TipoEmbalagem.Avulso);

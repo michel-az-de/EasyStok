@@ -1,5 +1,4 @@
 using EasyStock.Application.Ports.Output.Notifications;
-using EasyStock.Application.Events.Storefront.Handlers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
@@ -213,10 +212,10 @@ internal sealed class CobrancaPedidoFixture
             Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(),
             Options.Create(new PedidoEstoqueOptions()),
             NullLogger<PedidoEstoqueIntegrationService>.Instance);
-        var cancelar = new CancelarPedidoUseCase(PedidoRepo, estoque, Substitute.For<IContaReceberRepository>(), Uow,
+        var cancelar = new CancelarPedidoUseCase(PedidoRepo, estoque,
+            new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(Substitute.For<IContaReceberRepository>(), VagaRepo, NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance), Uow,
             NullLogger<CancelarPedidoUseCase>.Instance);
-        var liberarVaga = new LiberarVagaOnPedidoCanceladoHandler(VagaRepo, NullLogger<LiberarVagaOnPedidoCanceladoHandler>.Instance);
-        return new ProcessarCobrancaVencidaUseCase(PedidoStorefrontRepo, CobrancaRepo, Gerar(), cancelar, liberarVaga,
+        return new ProcessarCobrancaVencidaUseCase(PedidoStorefrontRepo, CobrancaRepo, Gerar(), cancelar,
             Aviso(), MpClient, Confirmar(), Tenant, Uow, Relogio, NullLogger<ProcessarCobrancaVencidaUseCase>.Instance);
     }
 

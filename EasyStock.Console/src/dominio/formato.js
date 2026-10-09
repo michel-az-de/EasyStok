@@ -101,13 +101,20 @@ export const LIMITE_MOEDA_CENTAVOS = 9999999
 export const moedaAltaDemais = (centavos) => (centavos ?? 0) > LIMITE_MOEDA_CENTAVOS
 
 // Cola de "68,5", "68.50" ou "R$ 68,50": o último separador (vírgula ou
-// ponto) é sempre o decimal, o resto é parte inteira. Sem separador nenhum, o
+// ponto) é o decimal, o resto é parte inteira. Sem separador nenhum, o
 // texto inteiro é reais cheios ("68" vira R$ 68,00).
+// #1510: um só tipo de separador seguido de exatamente 3 dígitos é milhar
+// ("R$ 1.500" é mil e quinhentos, não R$ 1,50), salvo parte inteira zero.
 export function lerMoeda(texto) {
   const semSimbolo = String(texto ?? '').replace(/[^\d.,]/g, '')
   if (!semSimbolo) return 0
   const posSeparador = Math.max(semSimbolo.lastIndexOf(','), semSimbolo.lastIndexOf('.'))
   if (posSeparador === -1) return Math.round(Number(semSimbolo) * 100)
+  const outroSeparador = semSimbolo[posSeparador] === ',' ? '.' : ','
+  const ehMilhar = !semSimbolo.includes(outroSeparador)
+    && /^\d{3}$/.test(semSimbolo.slice(posSeparador + 1))
+    && /[1-9]/.test(semSimbolo.slice(0, posSeparador))
+  if (ehMilhar) return Number(semSimbolo.replace(/[.,]/g, '')) * 100
   const inteiro = semSimbolo.slice(0, posSeparador).replace(/[.,]/g, '')
   const decimal = (semSimbolo.slice(posSeparador + 1).replace(/[.,]/g, '') + '00').slice(0, 2)
   return Number(inteiro || '0') * 100 + Number(decimal || '0')

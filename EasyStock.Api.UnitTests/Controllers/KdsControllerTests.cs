@@ -268,6 +268,7 @@ public class KdsControllerTests : IDisposable
             Substitute.For<IOperacaoEventPublisher>(),
             _uow,
             NullLogger<AtualizarStatusPedidoUseCase>.Instance,
-            new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
+            new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()),
+            new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(Substitute.For<IContaReceberRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>(), NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance));
     }
 }
