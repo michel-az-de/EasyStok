@@ -423,12 +423,14 @@ Felipe autorizou concluir os aceites por ele e continuar. Base desta fatia: `a68
 | API local atual | Compilada em net10.0 e conectada ao PostgreSQL descartável da onda 0 |
 | Navegador autenticado | Login real, busca por Insumos, abertura/volta de módulo, aliases e logout; 5 telas × 2 temas × 2 tamanhos (1280 × 800 e 1024 × 768), sem excesso de largura do documento/root |
 | Demonstração preenchida | Conversa, ficha, cozinha no mesmo tab, rascunho e larguras salvas conferidos; massa simulada não comprova envio a clientes |
-| Peso | Base de 1.218.522 bytes; crescimento abaixo dos 150.000 bytes da M0.1 conferido após build |
+| Peso | Base de 1.218.522 bytes; final de 1.335.434 bytes; crescimento de 116.912 bytes, abaixo dos 150.000 da M0.1 |
+| Gate de commit | Build aprovado e 36 testes de arquitetura aprovados |
+| Integração | Commit `e0d401bd` integrado por fast-forward e enviado ao master; check remoto do Console aprovado |
 | Capturas | 12 imagens antes/depois autenticadas e 2 do balcão demonstrativo, em `evidencias-onda1/` |
 
 Capturas: [balcão claro demonstrativo](evidencias-onda1/depois-balcao-demonstracao-light.png), [balcão escuro demonstrativo](evidencias-onda1/depois-balcao-demonstracao-dark.png), [cozinha autenticada](evidencias-onda1/depois-cozinha-light.png) e [caixa autenticado](evidencias-onda1/depois-gestao-dark.png). A base local tinha caixa fechado e pedidos da jornada HTTP anterior, mas nenhuma conversa aberta; o aceite autenticado do balcão cobre seu estado vazio. Ciclo completo de pedido real por interação no balcão continua sendo aceite da onda 2.
 
-Playwright já instalado permitiu executar o navegador após o CUA continuar falhando na inicialização do sandbox. Logs, scripts locais e capturas adicionais ficam em `.build/onda1-*` no worktree. Isso não homologa a versão publicada.
+Playwright já instalado permitiu executar o navegador após o CUA continuar falhando na inicialização do sandbox. Antes de encerrar o worktree, logs, scripts locais, TRX, dump da onda 0 e capturas adicionais foram preservados em `C:\rep\EasyStok\.build\validacao-casa-da-baba-20261009`, fora do Git: 163 arquivos conferidos por SHA-256. A API/servidores locais foram encerrados; o container PostgreSQL de teste foi parado, com os dados mantidos. Isso não homologa a versão publicada.
 
 ### Backup e próximo trabalho
 
