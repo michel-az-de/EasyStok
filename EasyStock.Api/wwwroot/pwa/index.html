@@ -3436,6 +3436,29 @@ button:disabled {
   background: var(--basil);
   color: #fff;
 }
+/* #1493 — forma de pagamento (caixa e entrega do pedido) */
+.forma-pills {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.forma-pill {
+  padding: 12px 6px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.forma-pill.active {
+  background: var(--basil);
+  border-color: var(--basil);
+  color: #fff;
+}
 
 /* Toast */
 .toast {
@@ -7634,6 +7657,16 @@ body.ux-calm [data-screen="producao"] .section-label {
         <div class="retroactive-fields" id="retroFields">
           <label>Quando aconteceu?</label>
           <input type="datetime-local" id="retroDatetime" />
+          <label for="retroMetodo">Como foi pago?</label>
+          <select id="retroMetodo">
+            <option value="">Escolha a forma</option>
+            <option value="pix">Pix</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="credito">Crédito</option>
+            <option value="debito">Débito</option>
+            <option value="transferencia">Transferência</option>
+            <option value="outro">Outro</option>
+          </select>
           <div class="hint">Pedido será criado já como <b>entregue</b>, descontando do estoque sem passar pela esteira.</div>
         </div>
         <div class="schedule-fields" id="scheduleFields">
@@ -8093,9 +8126,26 @@ body.ux-calm [data-screen="producao"] .section-label {
         <div class="input-box"><input id="cashAmount" type="text" inputmode="numeric" placeholder="45,00" autocomplete="off" oninput="maskMoneyInput(this); updateCashSaveState()"></div>
       </div>
 
+      <label class="modal-label">Forma de pagamento</label>
+      <div class="forma-pills" id="cashMetodoPills" role="radiogroup" aria-label="Forma de pagamento"></div>
+
       <div class="modal-ctas">
         <button class="cta-btn" onclick="closeCashModal()">Cancelar</button>
         <button class="cta-btn primary" id="cashSaveBtn" onclick="saveCashEntry()" disabled>Lançar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- #1493 — forma de pagamento ao entregar o pedido. Sem ela o servidor
+       registrava tudo como dinheiro e inflava a gaveta do Caixa do dia. -->
+  <div class="modal-overlay" id="pagamentoEntregaModal">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Como foi <span class="accent">pago</span>?</div>
+      <div class="modal-sub" id="pagamentoEntregaSub">escolha para marcar o pedido como entregue</div>
+      <div class="forma-pills" id="pagamentoEntregaPills" role="radiogroup" aria-label="Forma de pagamento"></div>
+      <div class="modal-ctas">
+        <button class="cta-btn" onclick="closePagamentoEntrega()">Cancelar</button>
       </div>
     </div>
   </div>
@@ -9018,6 +9068,7 @@ let currentPhotoDataUrl = null;
 let selectedCat = 'massa';
 let selectedEmoji = '🍝';
 let cashType = 'expense';
+let cashMetodo = null; // #1493 — forma do lancamento aberto no modal
 
 // ================================================================
 // OPERADOR (nome informado no primeiro boot; usado para auditoria)
@@ -13741,7 +13792,7 @@ function exportSnapshot() {
           qty: i.qty, unitPrice: i.unitPrice
         })),
         notes: o.notes ?? null, total: o.total || 0,
-        status: o.status,
+        status: o.status, metodo: o.metodo ?? null,
         createdAt: o.createdAt, updatedAt: o.updatedAt
       },
       ts
@@ -13770,7 +13821,7 @@ function exportSnapshot() {
       id: 'exp-cash-' + c.id, deviceId, type: 'cashEntry.upsert',
       payload: {
         id: c.id, type: c.type, amount: c.amount,
-        description: c.description, createdAt: c.createdAt
+        description: c.description, metodo: c.metodo ?? null, createdAt: c.createdAt
       },
       ts
     });
@@ -13880,6 +13931,7 @@ function applyImportedMutations(mutations) {
           clientSnapshot: p.clientSnapshot || { name: 'Sem cliente', ref: null },
           items: p.items || [], notes: p.notes,
           total: p.total || 0, status: p.status || 'aguardando',
+          metodo: p.metodo ?? null,
           createdAt: p.createdAt, updatedAt: p.updatedAt || p.createdAt
         }, (cur, inc) => (inc.updatedAt || 0) >= (cur.updatedAt || 0));
         break;
@@ -13892,7 +13944,7 @@ function applyImportedMutations(mutations) {
       case 'cashEntry.upsert':
         upsertById(cashEntries, {
           id: p.id, type: p.type, amount: p.amount,
-          description: p.description, createdAt: p.createdAt
+          description: p.description, metodo: p.metodo ?? null, createdAt: p.createdAt
         }, () => false); // cash imutável
         break;
       default:
@@ -16388,7 +16440,10 @@ function confirmConfer() {
   // Em outros status, so registra a conferencia e mantem o pedido no fluxo.
   if (o && o.status === STATUS.PRONTO) {
     applyAdvanceTransition(id, STATUS.ENTREGUE);
-    showToast('✓ Conferido e entregue por ' + (operatorName || 'operador'));
+    // #1493: sem forma, o modal de pagamento fica aberto e a entrega espera.
+    showToast(o.status === STATUS.ENTREGUE
+      ? '✓ Conferido e entregue por ' + (operatorName || 'operador')
+      : '✓ Conferido por ' + (operatorName || 'operador') + '. Como foi pago?');
   } else {
     showToast('✓ Conferido por ' + (operatorName || 'operador'));
   }
@@ -18393,6 +18448,11 @@ function doConferScreenSearch() {
 function applyAdvanceTransition(id, nextStatus) {
   const o = getOrderById(id);
   if (!o) return;
+  // #1493: entregar = receber. Sem a forma o servidor assumia dinheiro.
+  if (nextStatus === STATUS.ENTREGUE && !normalizarFormaPagamento(o.metodo)) {
+    openPagamentoEntrega(id);
+    return;
+  }
   // Bug 1 (Onda 4): se vai descontar estoque (transicao pra PRONTO) e o
   // resultado seria negativo, abre dialog explicito de 3 opcoes ao inves
   // de um confirm() simples que era ignoravel demais. Estoque negativo
@@ -21288,6 +21348,7 @@ function saveOrder() {
   const retroFields = document.getElementById('retroFields');
   const isRetro = retroFields && retroFields.classList.contains('show');
   let retroAtMs = null;
+  let retroMetodo = null;
   if (isRetro) {
     const dtRaw = (document.getElementById('retroDatetime')?.value || '').trim();
     if (!dtRaw) { showToast('Data retroativa em branco'); return; }
@@ -21307,6 +21368,8 @@ function saveOrder() {
       if (!confirm('Data retroativa é mais de 90 dias atrás.\n\nConfirmar?')) return;
     }
     retroAtMs = t;
+    retroMetodo = normalizarFormaPagamento(document.getElementById('retroMetodo')?.value);
+    if (!retroMetodo) { showToast('Escolha como o pedido retroativo foi pago'); return; }
   }
 
   // F5 — Agendamento: data/hora FUTURA. Pedido entra como 'aguardando' normal,
@@ -21346,7 +21409,8 @@ function saveOrder() {
     factAt: retroAtMs || null,
     scheduledDeliveryAt: scheduledAtMs || null,
     confirmedBy: retroAtMs ? (operatorName || null) : null,
-    confirmedAt: retroAtMs ? nowMs : null
+    confirmedAt: retroAtMs ? nowMs : null,
+    metodo: retroMetodo
   };
   addHistoryEvent(order, STATUS.CRIADO, retroAtMs
     ? 'pedido retroativo (' + new Date(retroAtMs).toLocaleString('pt-BR') + ') já entregue'
@@ -21722,6 +21786,63 @@ document.querySelectorAll('#emojiGrid .emoji-pick').forEach(em => {
 });
 
 // =========================
+// FORMA DE PAGAMENTO (#1493)
+// =========================
+// Mesma lista do servidor (FormaPagamentoMobile). O objeto (pedido ou
+// lancamento) carrega `metodo`, que viaja inteiro na mutacao do sync.
+const FORMAS_PAGAMENTO = [
+  { key: 'pix', label: 'Pix' },
+  { key: 'dinheiro', label: 'Dinheiro' },
+  { key: 'credito', label: 'Crédito' },
+  { key: 'debito', label: 'Débito' },
+  { key: 'transferencia', label: 'Transferência' },
+  { key: 'outro', label: 'Outro' }
+];
+function normalizarFormaPagamento(key) {
+  const k = String(key == null ? '' : key).trim().toLowerCase();
+  return FORMAS_PAGAMENTO.some(f => f.key === k) ? k : null;
+}
+function renderFormaPills(hostId, selected, onPick) {
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  host.innerHTML = FORMAS_PAGAMENTO.map(f =>
+    `<button type="button" class="forma-pill${f.key === selected ? ' active' : ''}" role="radio"` +
+    ` aria-checked="${f.key === selected}" onclick="${onPick}('${f.key}')">${f.label}</button>`
+  ).join('');
+}
+
+// Entregar pedido pergunta a forma antes; escolherFormaEntrega retoma a entrega.
+let pendingPagamentoEntregaId = null;
+function openPagamentoEntrega(orderId) {
+  const o = getOrderById(orderId);
+  if (!o) return;
+  pendingPagamentoEntregaId = orderId;
+  const sub = document.getElementById('pagamentoEntregaSub');
+  if (sub) sub.textContent = (o.clientSnapshot?.name || 'Pedido') + ' · ' + money(o.total || 0);
+  renderFormaPills('pagamentoEntregaPills', null, 'escolherFormaEntrega');
+  toggleModal('pagamentoEntregaModal', true);
+}
+function closePagamentoEntrega() {
+  pendingPagamentoEntregaId = null;
+  toggleModal('pagamentoEntregaModal', false);
+}
+function escolherFormaEntrega(key) {
+  const id = pendingPagamentoEntregaId;
+  const metodo = normalizarFormaPagamento(key);
+  closePagamentoEntrega();
+  const o = id ? getOrderById(id) : null;
+  if (!o || !metodo) return;
+  o.metodo = metodo;
+  applyAdvanceTransition(id, STATUS.ENTREGUE);
+}
+
+function selectCashMetodo(key) {
+  cashMetodo = normalizarFormaPagamento(key);
+  renderFormaPills('cashMetodoPills', cashMetodo, 'selectCashMetodo');
+  updateCashSaveState();
+}
+
+// =========================
 // MODAL CAIXA
 // =========================
 // editingCashEntryId: se setado, openCashModal abre em modo edicao
@@ -21734,15 +21855,18 @@ function openCashModal(editId) {
     return;
   }
   editingCashEntryId = editId || null;
-  let desc = '', amount = '', type = 'expense';
+  let desc = '', amount = '', type = 'expense', metodo = null;
   if (editId) {
     const e = (cashEntries || []).find(x => x.id === editId);
     if (e) {
       desc = e.description || '';
       amount = String(e.amount || '').replace('.', ',');
       type = e.type || 'expense';
+      metodo = normalizarFormaPagamento(e.metodo);
     }
   }
+  cashMetodo = metodo;
+  renderFormaPills('cashMetodoPills', cashMetodo, 'selectCashMetodo');
   document.getElementById('cashDesc').value = desc;
   document.getElementById('cashAmount').value = amount;
   cashType = type;
@@ -21802,7 +21926,7 @@ function updateCashSaveState() {
   if (!btn) return;
   const desc = document.getElementById('cashDesc')?.value?.trim() || '';
   const amount = parseMoneyInput(document.getElementById('cashAmount')?.value || '');
-  btn.disabled = !desc || isNaN(amount) || amount <= 0;
+  btn.disabled = !desc || isNaN(amount) || amount <= 0 || !cashMetodo;
 }
 
 function saveCashEntry() {
@@ -21829,15 +21953,17 @@ function saveCashEntry() {
     showToast('Valor inválido. Use 12 ou 12,50.');
     return;
   }
+  if (!cashMetodo) { showToast('Escolha a forma de pagamento.'); return; }
 
   // Modo edicao
   if (editingCashEntryId) {
     const entry = (cashEntries || []).find(x => x.id === editingCashEntryId);
     if (!entry) { showToast('Lançamento não encontrado'); closeCashModal(); return; }
-    const before = { type: entry.type, amount: entry.amount, description: entry.description };
+    const before = { type: entry.type, amount: entry.amount, description: entry.description, metodo: entry.metodo || null };
     entry.type = cashType;
     entry.amount = Math.abs(Number(amount));
     entry.description = desc;
+    entry.metodo = cashMetodo;
     entry.lastOperatorName = operatorName || null;
     persistAll();
     pendingSync++;
@@ -21845,7 +21971,7 @@ function saveCashEntry() {
     logAction({
       action: 'cash.entry_edit', entityType: 'cash', entityId: entry.id,
       summary: 'Lançamento editado · ' + (entry.type === 'expense' ? 'Saída ' : 'Entrada ') + money(entry.amount) + ' · ' + desc,
-      diff: { before, after: { type: entry.type, amount: entry.amount, description: entry.description } }
+      diff: { before, after: { type: entry.type, amount: entry.amount, description: entry.description, metodo: entry.metodo } }
     });
     closeCashModal();
     renderHome();
@@ -21860,6 +21986,7 @@ function saveCashEntry() {
     type: cashType,
     amount: Math.abs(Number(amount)),
     description: desc,
+    metodo: cashMetodo,
     createdAt: Date.now(),
     lastOperatorName: operatorName || null
   };
