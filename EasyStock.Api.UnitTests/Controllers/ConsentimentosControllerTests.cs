@@ -25,7 +25,8 @@ public class ConsentimentosControllerTests
     private readonly IConsentimentoRepository _repo = Substitute.For<IConsentimentoRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private ConsentimentosController BuildController(string? secret = "segredo-de-teste-min32-chars-1234")
+    private ConsentimentosController BuildController(string? secret = "segredo-de-teste-min32-chars-1234",
+        string? jwtSecret = null)
     {
         var optIn = new RegistrarOptInUseCase(_repo, _uow,
             NullLogger<RegistrarOptInUseCase>.Instance);
@@ -34,6 +35,7 @@ public class ConsentimentosControllerTests
 
         var dict = new Dictionary<string, string?>();
         if (secret is not null) dict["Notifications:UnsubscribeSecret"] = secret;
+        if (jwtSecret is not null) dict["Jwt:SecretKey"] = jwtSecret;
         var config = new ConfigurationBuilder().AddInMemoryCollection(dict).Build();
 
         return new ConsentimentosController(_currentUser, _repo, optIn, optOut, config);
@@ -156,6 +158,85 @@ public class ConsentimentosControllerTests
         t1.Should().Be(t2);
         t1.Should().Contain(".");
         t1.Split('.').Should().HaveCount(2);
+    }
+
+    // ── #1508: segredo do link de descadastro ─────────────────────────────
+
+    private const string JwtDeTeste = "chave-jwt-de-teste-com-mais-de-32-caracteres";
+
+    private static IConfiguration Config(params (string Chave, string Valor)[] itens) =>
+        new ConfigurationBuilder().AddInMemoryCollection(
+            itens.ToDictionary(i => i.Chave, i => (string?)i.Valor)).Build();
+
+    [Fact]
+    public async Task Unsubscribe_sem_segredo_configurado_retorna_503_e_nao_aceita_literal_fixo()
+    {
+        var token = ConsentimentosController.GerarToken("default-unsubscribe-secret-change-me",
+            Guid.NewGuid(), CanalNotificacao.Email, CategoriaConteudoNotificacao.Marketing);
+
+        var result = await BuildController(secret: null).Unsubscribe(token, CancellationToken.None);
+
+        result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(503);
+        await _repo.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Unsubscribe_sem_segredo_proprio_usa_derivacao_da_chave_jwt()
+    {
+        var usuarioId = Guid.NewGuid();
+        var segredo = ConsentimentosController.ResolverSegredoUnsubscribe(Config(("Jwt:SecretKey", JwtDeTeste)));
+        var token = ConsentimentosController.GerarToken(segredo!, usuarioId,
+            CanalNotificacao.Email, CategoriaConteudoNotificacao.Marketing);
+
+        var result = await BuildController(secret: null, jwtSecret: JwtDeTeste).Unsubscribe(token, CancellationToken.None);
+
+        result.Should().BeOfType<OkObjectResult>();
+        await _repo.Received().AddAsync(Arg.Is<ConsentimentoNotificacao>(c =>
+            c.UsuarioId == usuarioId && c.OptIn == false), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Unsubscribe_nao_aceita_token_assinado_com_a_chave_jwt_crua()
+    {
+        var token = ConsentimentosController.GerarToken(JwtDeTeste, Guid.NewGuid(),
+            CanalNotificacao.Email, CategoriaConteudoNotificacao.Marketing);
+
+        var result = await BuildController(secret: null, jwtSecret: JwtDeTeste).Unsubscribe(token, CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public void ResolverSegredo_prefere_o_segredo_proprio_e_nunca_devolve_a_chave_jwt()
+    {
+        ConsentimentosController.ResolverSegredoUnsubscribe(Config(
+            ("Notifications:UnsubscribeSecret", "proprio"), ("Jwt:SecretKey", JwtDeTeste))).Should().Be("proprio");
+        ConsentimentosController.ResolverSegredoUnsubscribe(Config(("Jwt:SecretKey", JwtDeTeste)))
+            .Should().NotBeNullOrWhiteSpace().And.NotBe(JwtDeTeste);
+        ConsentimentosController.ResolverSegredoUnsubscribe(Config()).Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(CategoriaConteudoNotificacao.Seguranca)]
+    [InlineData(CategoriaConteudoNotificacao.Transacional)]
+    public async Task Unsubscribe_recusa_categoria_que_ignora_consentimento(CategoriaConteudoNotificacao categoria)
+    {
+        var secret = "segredo-de-teste-min32-chars-1234";
+        var token = ConsentimentosController.GerarToken(secret, Guid.NewGuid(), CanalNotificacao.Email, categoria);
+
+        var result = await BuildController(secret).Unsubscribe(token, CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        await _repo.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+    }
+
+    [Fact]
+    public void Unsubscribe_anonimo_tem_rate_limit()
+    {
+        var metodo = typeof(ConsentimentosController).GetMethod(nameof(ConsentimentosController.Unsubscribe))!;
+        metodo.GetCustomAttributes(typeof(Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute), false)
+            .Cast<Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute>()
+            .Should().ContainSingle(a => a.PolicyName == "public-post");
     }
 
     private static string ComputeHmac(string secret, string message)

@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.UseCases.Notifications;
 using EasyStock.Domain.Enums.Notifications;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -56,6 +57,7 @@ public sealed class ConsentimentosController(
     /// </summary>
     [HttpGet("unsubscribe")]
     [AllowAnonymous]
+    [EnableRateLimiting("public-post")]
     public async Task<IActionResult> Unsubscribe([FromQuery] string t, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(t))
@@ -65,6 +67,11 @@ public sealed class ConsentimentosController(
         if (parts.Length != 2)
             return BadRequest("Token inválido.");
 
+        // Sem segredo configurado não há como validar o link: recusa em vez de cair num literal conhecido.
+        var secret = ResolverSegredoUnsubscribe(configuration);
+        if (secret is null)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Descadastro indisponível no momento.");
+
         Guid usuarioId;
         CanalNotificacao canal;
         CategoriaConteudoNotificacao categoria;
@@ -72,10 +79,6 @@ public sealed class ConsentimentosController(
         try
         {
             var payload = Encoding.UTF8.GetString(Base64UrlDecode(parts[0]));
-            var secret = configuration["Notifications:UnsubscribeSecret"]
-                ?? configuration["JwtSettings:SecretKey"]
-                ?? "default-unsubscribe-secret-change-me";
-
             var expectedHmac = ComputeHmac(secret, payload)[..32];
             if (!CryptographicOperations.FixedTimeEquals(
                 Encoding.ASCII.GetBytes(parts[1]),
@@ -98,12 +101,34 @@ public sealed class ConsentimentosController(
             return BadRequest("Token inválido.");
         }
 
+        // Segurança e transacional saem sem consentimento: o link não pode registrar opt-out delas.
+        if (categoria.IgnoraConsentimento())
+            return BadRequest("Esta categoria não aceita descadastro.");
+
+        // RegistrarOptOutUseCase segue o IUseCase sem CancellationToken (ADR-0013, adiado); a gravação é única.
         await optOutUseCase.ExecuteAsync(new RegistrarOptOutCommand(
             usuarioId, canal, categoria,
             "unsubscribe-link", "Descadastro via link no email"));
 
         return Ok(new { mensagem = "Você foi descadastrado com sucesso. Suas preferências foram atualizadas." });
     }
+
+    /// <summary>
+    /// Segredo do link de descadastro (#1508): <c>Notifications:UnsubscribeSecret</c>; sem ele, derivado da chave
+    /// JWT real (<c>Jwt:SecretKey</c>) por HMAC com rótulo de domínio, para não reutilizar a chave crua; sem nenhum
+    /// dos dois, <c>null</c>. Quem gera o link deve usar este mesmo segredo.
+    /// </summary>
+    public static string? ResolverSegredoUnsubscribe(IConfiguration configuration)
+    {
+        var proprio = configuration["Notifications:UnsubscribeSecret"];
+        if (!string.IsNullOrWhiteSpace(proprio))
+            return proprio;
+
+        var jwt = configuration["Jwt:SecretKey"];
+        return string.IsNullOrWhiteSpace(jwt) ? null : ComputeHmac(jwt, RotuloDerivacaoUnsubscribe);
+    }
+
+    private const string RotuloDerivacaoUnsubscribe = "easystok/notificacoes/unsubscribe/v1";
 
     /// <summary>
     /// Gera token HMAC para link de unsubscribe 1-clique.
