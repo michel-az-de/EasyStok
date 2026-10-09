@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261009135559_AddMetodoPagamentoMobile")]
+    partial class AddMetodoPagamentoMobile
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -4333,9 +4336,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<int?>("PesoG")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("PesoRealG")
-                        .HasColumnType("integer");
-
                     b.Property<Guid?>("ProdutoId")
                         .HasColumnType("uuid");
 
@@ -6960,10 +6960,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid?>("EmpresaId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ModuloInicial")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
                     b.Property<string>("Nivel")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -6973,12 +6969,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired()
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
-
-                    b.Property<bool>("PermissoesExplicitas")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("PermissoesLegadas")
-                        .HasColumnType("jsonb");
 
                     b.HasKey("Id");
 
@@ -7101,11 +7091,6 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<string>("AtributosJson")
                         .HasColumnType("jsonb");
-
-                    b.Property<bool>("BaixaInsumoAutomatica")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
 
                     b.Property<Guid>("CategoriaId")
                         .HasColumnType("uuid");

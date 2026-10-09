@@ -46,4 +46,12 @@ public class CashEntry
     /// </summary>
     [Column("erp_movimento_caixa_id")]
     public Guid? ErpMovimentoCaixaId { get; set; }
+
+    /// <summary>
+    /// #1493 — forma de pagamento informada no PWA
+    /// ("pix" | "dinheiro" | "credito" | "debito" | "transferencia" | "outro").
+    /// NULL = aparelho antigo que nao pergunta; o movimento no ERP cai em "dinheiro".
+    /// </summary>
+    [Column("metodo"), MaxLength(20)]
+    public string? Metodo { get; set; }
 }
