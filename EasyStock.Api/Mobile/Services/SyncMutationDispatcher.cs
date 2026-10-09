@@ -200,6 +200,7 @@ public class SyncMutationDispatcher(
                 ConfirmedAt = confirmedAt,
                 FactAt = factAt,
                 ScheduledDeliveryAt = scheduledDeliveryAt,
+                Metodo = FormaPagamentoMobile.Normalizar(dto.Metodo),
                 EmpresaId = empresaId,
                 LojaId = lojaId
             };
@@ -236,6 +237,9 @@ public class SyncMutationDispatcher(
             if (confirmedAt.HasValue) existing.ConfirmedAt = confirmedAt;
             if (factAt.HasValue) existing.FactAt = factAt;
             if (dto.ScheduledDeliveryAt.HasValue) existing.ScheduledDeliveryAt = scheduledDeliveryAt;
+            // #1493 — reenvio sem forma (aparelho antigo) nao apaga a forma ja gravada.
+            var metodo = FormaPagamentoMobile.Normalizar(dto.Metodo);
+            if (metodo is not null) existing.Metodo = metodo;
             _db.RemoveRange(existing.Items);
             foreach (var i in dto.Items)
                 existing.Items.Add(new OrderItem
@@ -418,6 +422,7 @@ public class SyncMutationDispatcher(
         {
             Id = dto.Id, Type = dto.Type, Amount = dto.Amount,
             Description = dto.Description, CreatedAt = createdAt,
+            Metodo = FormaPagamentoMobile.Normalizar(dto.Metodo),
             LastDeviceId = deviceId,
             LastOperatorName = operatorName,
             EmpresaId = empresaId,

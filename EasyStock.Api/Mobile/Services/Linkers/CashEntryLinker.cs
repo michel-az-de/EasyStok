@@ -50,7 +50,7 @@ public sealed class CashEntryLinker(
                 var tipo = string.Equals(mobileCE.Type, "income", StringComparison.OrdinalIgnoreCase) ? "entrada" : "saida";
                 var mov = MovimentoCaixa.Criar(empresaId.Value, tipo, mobileCE.Amount, mobileCE.CreatedAt, mobileCE.LojaId);
                 mov.Descricao = mobileCE.Description;
-                mov.Metodo = "dinheiro";
+                mov.Metodo = FormaPagamentoMobile.ParaErp(mobileCE.Metodo);
                 mov.Origem = "mobile";
                 mov.RegistradoPorNome = mobileCE.LastOperatorName;
                 mov.Referencia = referencia;
