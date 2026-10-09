@@ -11,7 +11,7 @@
 /* Resumo do que está pendente com a gaveta fechada: número e palavra, para o
    recolhido não virar um silêncio. */
 .resumoFechado { font-size: var(--t-apoio); color: var(--tinta-2); }
-.resumoFechado.pendente { color: var(--atencao); font-weight: 600; }
+.resumoFechado.pendente { color: var(--alerta); font-weight: 600; }
 .cabeca h3 {
   margin: 0; font-size: var(--t-apoio); font-weight: 700;
   display: flex; align-items: center; gap: var(--e-2); line-height: var(--lh-compacto);
@@ -28,7 +28,7 @@
 
 .tranquilo {
   display: flex; align-items: center; gap: var(--e-2);
-  margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--ok);
+  margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--sucesso);
 }
 
 .sugestao {
@@ -52,8 +52,8 @@
 .erro {
   display: flex; align-items: flex-start; gap: var(--e-2);
   margin: var(--e-2) 0 0; padding: var(--e-2) var(--e-3);
-  font-size: var(--t-apoio); color: var(--parado);
-  border-left: var(--trilho) solid var(--parado); background: var(--elevado);
+  font-size: var(--t-apoio); color: var(--erro);
+  border-left: var(--trilho) solid var(--erro); background: var(--elevado);
   border-radius: var(--r-1);
 }
 
@@ -62,21 +62,21 @@
 .sugestaoDona {
   margin: var(--e-2) 0 0; padding: var(--e-3);
   background: var(--elevado); border-radius: var(--r-1);
-  border-left: var(--trilho) solid var(--atencao);
+  border-left: var(--trilho) solid var(--alerta);
   font-size: var(--t-corpo); color: var(--tinta);
 }
 .sugestaoDona p { margin: 0; }
-.sugestaoDona .rotuloSugestao { color: var(--atencao); }
+.sugestaoDona .rotuloSugestao { color: var(--alerta); }
 
 /* Linha de teste da massa: só aparece em conversa que traz resultado esperado,
    e agora dentro da bancada, porque é dado de quem constrói, não de quem atende. */
 .cenario { margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta-3); }
-.bateu { color: var(--ok); font-weight: 700; }
-.errou { color: var(--perigo); font-weight: 700; }
+.bateu { color: var(--sucesso); font-weight: 700; }
+.errou { color: var(--erro); font-weight: 700; }
 
 .prompt {
   margin: var(--e-2) 0 0; font-family: var(--f-dado); font-size: var(--t-apoio);
-  color: var(--tinta-2); background: var(--semola); border-radius: var(--r-1);
+  color: var(--tinta-2); background: var(--fundo); border-radius: var(--r-1);
   padding: var(--e-2) var(--e-3); white-space: pre-wrap; max-height: 160px; overflow-y: auto;
 }
 

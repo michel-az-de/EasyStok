@@ -398,3 +398,42 @@ Pendências encontradas no backup: a cópia de `enviar.sh` instalada na VPS regi
 - Recuperação técnica do backup externo comprovada acima. Teste funcional da aplicação restaurada, correção do script instalado e continuidade da autenticação do rclone seguem pendentes.
 - Não há workflow `build-casa-da-baba-apk.yml` na árvore atual, nem cópia MAUI ativa para sincronizar. O workflow PWA vigente roda `node tests/pwa/run.js`; não foi gerado APK nem testada a Oasis.
 - Não fechar a onda 0 como homologada visualmente. A próxima fatia é completar esse aceite e então apresentar navegação/DS/perfis da onda 1 para aprovação das telas representativas. API pública `701dbf4b` e console público `888eeab7` foram reconferidos após os testes e continuam anteriores às correções; não houve deploy nesta execução.
+
+## 13. Continuação autorizada: identidade e navegação, 09/10/2026
+
+Felipe autorizou concluir os aceites por ele e continuar. Base desta fatia: `a680c639`, incluindo insumos #1497 entregues em outro trabalho. Esta seção atualiza as pendências da seção 12; não transforma o inventário inicial em funcionalidades publicadas.
+
+### Implementado
+
+- Identidade do Console unificada: cacau/caramelo/creme, Lora e Nunito Sans, escala maior, claro/escuro e estados sem os aliases antigos dos tokens. Ragu nos nomes dos pratos continua sendo conteúdo válido.
+- Logo completa no login, hall e balcão, com placa clara no escuro. Derivada PNG 420 × 280, 88.397 bytes, sem recorte/redesenho. SHA-256 da fonte: `785C453D6A011A0002EFB8173C3E27D42508E9792D75826E7314B2EF63DB56BC`.
+- Login por uma chamada a `/api/auth/login`; a API resolve a empresa e o Console confere sua presença no JWT antes de guardar sessão. Não chama mais `lista-empresas`. Google preservado, mas OAuth real não exercitado aqui.
+- Um guarda de sessão para todas as rotas. Busca de módulos e telas por nome, ignorando acentos/caixa, com estado vazio e atalhos diretos.
+- Corrigido o corte lateral da ficha: colunas cedem espaço respeitando mínimos, inclusive com larguras salvas maiores que a janela.
+- Na demonstração, navegar para Cozinha/Entregas dentro do módulo mantém o provider do balcão vivo; antes o espelho perdia sua origem. Apelidos de janelas avulsas continuam independentes. Rascunho preservado no percurso balcão → módulos → cozinha → balcão.
+- Verificador de contraste no `npm run qualidade`; prova de busca/autenticação no workflow do Console.
+
+### Evidência
+
+| Verificação | Resultado e limite |
+|---|---|
+| Console | Lint/camadas/build aprovados; avisos preexistentes do lint permanecem |
+| Provas JavaScript | 51 scripts aprovados, incluindo busca e login de uma etapa |
+| Contraste | 264 pares aprovados nos dois temas, incluindo texto, ações, estados, avisos, bordas e foco; não equivale a auditoria WCAG completa |
+| API local atual | Compilada em net10.0 e conectada ao PostgreSQL descartável da onda 0 |
+| Navegador autenticado | Login real, busca por Insumos, abertura/volta de módulo, aliases e logout; 5 telas × 2 temas × 2 tamanhos (1280 × 800 e 1024 × 768), sem excesso de largura do documento/root |
+| Demonstração preenchida | Conversa, ficha, cozinha no mesmo tab, rascunho e larguras salvas conferidos; massa simulada não comprova envio a clientes |
+| Peso | Base de 1.218.522 bytes; crescimento abaixo dos 150.000 bytes da M0.1 conferido após build |
+| Capturas | 12 imagens antes/depois autenticadas e 2 do balcão demonstrativo, em `evidencias-onda1/` |
+
+Capturas: [balcão claro demonstrativo](evidencias-onda1/depois-balcao-demonstracao-light.png), [balcão escuro demonstrativo](evidencias-onda1/depois-balcao-demonstracao-dark.png), [cozinha autenticada](evidencias-onda1/depois-cozinha-light.png) e [caixa autenticado](evidencias-onda1/depois-gestao-dark.png). A base local tinha caixa fechado e pedidos da jornada HTTP anterior, mas nenhuma conversa aberta; o aceite autenticado do balcão cobre seu estado vazio. Ciclo completo de pedido real por interação no balcão continua sendo aceite da onda 2.
+
+Playwright já instalado permitiu executar o navegador após o CUA continuar falhando na inicialização do sandbox. Logs, scripts locais e capturas adicionais ficam em `.build/onda1-*` no worktree. Isso não homologa a versão publicada.
+
+### Backup e próximo trabalho
+
+A cópia instalada de `/home/felipe/backup-externo/enviar.sh` diferia da canônica apenas pelo trap. Preservada como `enviar.sh.antes-onda1-20261009` e substituída após conferir seu hash. `bash -n` aprovado; ensaio do trap instalado em processo isolado saiu com 0 e removeu o diretório temporário. SHA-256 instalado: `8a3d114b844c6a06eb6a2a00dbba4f1425dfaac592992c8d5ef88b886bade5f1`. Nenhum banco restaurado sobre produção, nenhuma credencial alterada e nenhum novo expurgo/envio disparado para testar a limpeza.
+
+Confirmada a ausência de `client_id` próprio do Google Drive, sem imprimir valores de credenciais. Essa configuração depende do acesso à conta/projeto OAuth responsável e permanece pendente.
+
+**A onda 1 não está integralmente concluída.** Próxima fatia: M0.3, matriz Dona/Atendimento/Cozinha aplicada pela API e shell, porta por perfil, bloqueio de rota digitada e classificação dos controllers. Sino real transversal e sessão longa da cozinha também permanecem pendentes. Tenant, permissões de backend e migrations não foram alterados nesta fatia. Mercado Pago real, transportadoras/geolocalização e Oasis mantêm os aceites das respectivas ondas. Não houve deploy da aplicação nesta execução.

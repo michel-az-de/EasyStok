@@ -58,7 +58,7 @@
   margin-top: 6px; font-size: var(--t-micro); color: var(--tinta-3);
 }
 .meta time { font-family: var(--f-dado); font-weight: 400; font-variant-numeric: tabular-nums; }
-.falhou { color: var(--perigo); font-weight: 600; white-space: normal; text-align: right; }
+.falhou { color: var(--erro); font-weight: 600; white-space: normal; text-align: right; }
 /* #1444: "enviando" escrito, não só o ✓ cinza: a mídia demora e a dona precisa ver que está indo. */
 .enviando { display: inline-flex; align-items: center; gap: 4px; }
 .enviando::before {
@@ -73,7 +73,7 @@
   box-shadow: 0 1px 2px light-dark(rgba(48, 32, 16, .08), rgba(0, 0, 0, .4)), 0 0 0 1px var(--linha);
 }
 .saida {
-  align-self: flex-end; background: var(--ragu-claro); color: var(--tinta);
+  align-self: flex-end; background: var(--marca-claro); color: var(--tinta);
   border-radius: 20px 20px 6px 20px;
   box-shadow: 0 1px 2px light-dark(rgba(120, 40, 10, .08), rgba(0, 0, 0, .35));
 }
@@ -136,7 +136,7 @@
 }
 .caixa:has(textarea:disabled) { background: var(--preenchimento); box-shadow: none; }
 .caixa:focus-within {
-  border-color: var(--ragu); box-shadow: var(--sombra), 0 0 0 4px var(--halo);
+  border-color: var(--marca); box-shadow: var(--sombra), 0 0 0 4px var(--halo);
 }
 .acoes {
   display: flex; gap: var(--e-2); align-items: center; flex-wrap: wrap;
@@ -149,7 +149,7 @@
 .bloqueio {
   display: flex; gap: var(--e-2); align-items: flex-start; flex-wrap: wrap;
   padding: 10px 16px; margin: 0 0 var(--e-3);
-  background: var(--atencao-pastel); color: var(--atencao);
+  background: var(--alerta-pastel); color: var(--alerta);
   border: 0; border-radius: 12px; font-size: var(--t-apoio);
 }
 .bloqueio strong { color: var(--tinta); font-weight: 600; }
@@ -183,11 +183,11 @@
   border-left: var(--trilho) solid var(--linha-forte);
   padding: var(--e-2) var(--e-4);
 }
-.modo_ligado { border-left-color: var(--ok); }
+.modo_ligado { border-left-color: var(--sucesso); }
 .modo_pausado { border-left-color: var(--linha-forte); }
-.modo_com-voce { border-left-color: var(--atencao); }
+.modo_com-voce { border-left-color: var(--alerta); }
 .modo_encerrado { border-left-color: var(--linha-forte); }
-.modo_bloqueado { border-left-color: var(--parado); }
+.modo_bloqueado { border-left-color: var(--erro); }
 
 /* #1442: uma linha só, rótulo + frase + ações. A frase encolhe com
    reticência (inteira no `title`); em coluna estreita as ações descem. */
@@ -207,7 +207,7 @@
 /* Trava por bloqueio de cadastro. Vermelho aqui é o único caso no composer:
    os outros avisos são âmbar porque voltam sozinhos, este só sai pela mão. */
 .bloqueioGrave {
-  background: var(--parado-pastel); color: var(--parado); border-left-color: var(--parado);
+  background: var(--erro-pastel); color: var(--erro); border-left-color: var(--erro);
 }
 .bloqueioGrave span { color: var(--tinta); }
 
@@ -226,7 +226,7 @@
    laranja cheio é só o que ela escreveu. A conversa ganha ritmo em vez de
    virar um bloco laranja só. */
 .saida.doAutomatico {
-  background: light-dark(#E9E9EB, #2C2927); color: var(--tinta);
+  background: var(--elevado); color: var(--tinta);
   box-shadow: none;
 }
 .saida.doAutomatico .meta, .saida.doAutomatico .meta * { color: var(--tinta-3); }
@@ -278,7 +278,7 @@
 .caixa textarea:disabled { min-height: 36px; padding: 7px 8px; line-height: 1.4; }
 /* Enviar: a única mancha de cor da barra quando há texto; sem texto, tinta
    clara da marca, visível no claro e no escuro. */
-.acoes .enviar:disabled { background: var(--ragu-claro); color: var(--ragu); opacity: .55; }
+.acoes .enviar:disabled { background: var(--marca-claro); color: var(--marca); opacity: .55; }
 @media (max-width: 759px) {
   .acoes .enviar { width: 40px; margin-left: 0; }
 }
@@ -306,7 +306,7 @@
 .saida { border-radius: 18px; }
 .entrada.trocaDeVoz { border-top-left-radius: 6px; }
 .saida.trocaDeVoz { border-top-right-radius: 6px; }
-.saida.doAutomatico { background: var(--ragu-claro); }
+.saida.doAutomatico { background: var(--marca-claro); }
 .sistema {
   background: transparent; box-shadow: none; color: var(--tinta-3);
   font-size: var(--t-micro); padding: 2px var(--e-3); max-width: 80%;
@@ -378,7 +378,7 @@
 .cardapioEnvio p { margin: 0; }
 .cardapioRotulo { font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-3); margin-top: var(--e-2) !important; }
 .cardapioMensagem {
-  padding: var(--e-3); border-radius: 12px; background: var(--ragu-claro); color: var(--tinta);
+  padding: var(--e-3); border-radius: 12px; background: var(--marca-claro); color: var(--tinta);
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .cardapioLink { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
@@ -394,7 +394,7 @@
 .acoes > label {
   width: auto; min-width: 44px; min-height: 44px; height: auto; padding: 2px 6px; gap: 1px;
   display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
-  font-size: var(--t-11); font-weight: 600; line-height: 1.1; border-radius: var(--r-1);
+  font-size: var(--t-minimo); font-weight: 600; line-height: 1.1; border-radius: var(--r-1);
 }
 @container composer (max-width: 439px) {
   .acoes > button.acaoComRotulo,
@@ -410,11 +410,11 @@
 .postIt {
   align-self: flex-end; max-width: min(320px, 80%);
   margin: var(--e-2) var(--e-2) var(--e-2) 0; padding: var(--e-2) var(--e-3);
-  background: var(--atencao-pastel); color: var(--tinta);
-  border-left: 3px solid var(--atencao); border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
+  background: var(--alerta-pastel); color: var(--tinta);
+  border-left: 3px solid var(--alerta); border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
   box-shadow: var(--sombra); transform: rotate(-.6deg);
   font-size: var(--t-apoio); line-height: var(--lh-corpo);
 }
 .postIt p { margin: var(--e-1) 0 0; white-space: pre-line; }
-.postItQuem { display: inline-flex; align-items: center; gap: var(--e-1); font-size: var(--t-micro); font-weight: 600; color: var(--atencao); }
+.postItQuem { display: inline-flex; align-items: center; gap: var(--e-1); font-size: var(--t-micro); font-weight: 600; color: var(--alerta); }
 @media (prefers-reduced-motion: reduce) { .postIt { transform: none; } }

@@ -13,7 +13,7 @@
   transition: border-color var(--dur-curta) var(--ease-padrao), box-shadow var(--dur-curta) var(--ease-padrao);
 }
 .controle:hover:not(:disabled) { border-color: var(--linha-forte); }
-.controle:focus { outline: none; border-color: var(--ragu); box-shadow: 0 0 0 4px var(--halo); }
+.controle:focus { outline: none; border-color: var(--marca); box-shadow: 0 0 0 4px var(--halo); }
 .controle:disabled { background: var(--preenchimento); color: var(--tinta-3); }
 .controle::placeholder { color: var(--tinta-3); }
 .area { min-height: 96px; resize: vertical; }

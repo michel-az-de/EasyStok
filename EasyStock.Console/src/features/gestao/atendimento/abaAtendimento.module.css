@@ -23,7 +23,7 @@
   display: inline-flex; align-items: center; gap: var(--e-2);
   min-height: var(--toque); font-size: var(--t-apoio); color: var(--tinta);
 }
-.chave input { width: 20px; height: 20px; accent-color: var(--ragu); }
+.chave input { width: 20px; height: 20px; accent-color: var(--marca); }
 
 .retorno { font-size: var(--t-apoio); color: var(--tinta-2); }
-.erro { color: var(--perigo); font-size: var(--t-apoio); margin: 0; }
+.erro { color: var(--erro); font-size: var(--t-apoio); margin: 0; }

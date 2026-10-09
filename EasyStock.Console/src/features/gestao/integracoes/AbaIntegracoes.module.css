@@ -25,7 +25,7 @@
 .botoesCredencial { display: flex; gap: var(--e-2); }
 
 .rodapeCartao { display: flex; flex-direction: column; gap: var(--e-1); align-items: flex-start; }
-.motivo { margin: 0; color: var(--tinta-2); font-size: var(--t-15); }
+.motivo { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 
-.rodape { margin: 0; color: var(--tinta-3); font-size: var(--t-15); }
+.rodape { margin: 0; color: var(--tinta-3); font-size: var(--t-apoio); }
 .rodape code { font-size: inherit; }

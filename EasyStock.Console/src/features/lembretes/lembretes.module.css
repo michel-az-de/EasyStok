@@ -16,8 +16,8 @@ button.sino {
 
 .badge {
   position: absolute; top: -4px; right: -4px; min-width: 26px; height: 26px;
-  padding: 0 var(--e-1); border-radius: 999px; background: var(--parado);
-  color: var(--sobre-parado); font-size: var(--t-corpo); font-weight: 700;
+  padding: 0 var(--e-1); border-radius: 999px; background: var(--erro);
+  color: var(--sobre-erro); font-size: var(--t-corpo); font-weight: 700;
   line-height: 26px; text-align: center; font-variant-numeric: tabular-nums;
   animation: estalar var(--dur-curta) var(--ease-pulo);
 }
@@ -53,7 +53,7 @@ button.mais { padding: 0; width: var(--toque); height: var(--toque); display: gr
   color: var(--tinta-2); line-height: var(--lh-compacto);
 }
 button.botaoVistos {
-  width: 100%; justify-content: space-between; background: var(--semola-2);
+  width: 100%; justify-content: space-between; background: var(--elevado);
   border: 0; border-radius: var(--r-1); padding: var(--e-2) var(--e-3);
   font-weight: 700; color: var(--tinta-2); min-height: var(--toque);
 }
@@ -62,13 +62,13 @@ button.botaoVistos {
 
 .item {
   display: flex; align-items: center; gap: var(--e-2);
-  padding: var(--e-2); border-radius: var(--r-1); background: var(--semola-2);
+  padding: var(--e-2); border-radius: var(--r-1); background: var(--elevado);
 }
 .destaque { animation: realce .6s ease; }
-@keyframes realce { 0% { background: var(--ok-pastel); } 100% { background: var(--semola-2); } }
+@keyframes realce { 0% { background: var(--sucesso-pastel); } 100% { background: var(--elevado); } }
 
 .ponto {
-  flex-shrink: 0; width: 10px; height: 10px; border-radius: 999px; background: var(--parado);
+  flex-shrink: 0; width: 10px; height: 10px; border-radius: 999px; background: var(--erro);
 }
 
 .alvo {
@@ -109,8 +109,8 @@ button.acaoItem { flex-shrink: 0; padding: 0; width: var(--toque); height: var(-
 .sugestoes { display: flex; gap: var(--e-2); flex-wrap: wrap; }
 .erro {
   margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-1);
-  border-left: var(--trilho) solid var(--parado); background: var(--elevado);
-  color: var(--parado); font-size: var(--t-apoio);
+  border-left: var(--trilho) solid var(--erro); background: var(--elevado);
+  color: var(--erro); font-size: var(--t-apoio);
 }
 
 .rotuloCampo {
@@ -132,4 +132,4 @@ button.pilula { border-radius: 999px; min-height: var(--toque); }
 
 /* Contador único (banca, item 4): mesmo desenho do trilho, carmim por ser
    lembrete vencido esperando. */
-.badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-pilula); display: inline-grid; place-items: center; font-size: var(--t-11); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; background: var(--preenchimento-forte); color: var(--tinta-2); background: var(--parado); color: var(--sobre-parado); position: absolute; top: 4px; right: 6px; box-shadow: 0 0 0 2px var(--fundo); }
+.badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-pilula); display: inline-grid; place-items: center; font-size: var(--t-minimo); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; background: var(--preenchimento-forte); color: var(--tinta-2); background: var(--erro); color: var(--sobre-erro); position: absolute; top: 4px; right: 6px; box-shadow: 0 0 0 2px var(--fundo); }

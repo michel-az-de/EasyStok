@@ -105,7 +105,7 @@ export function AbaProducaoDoDiaApi() {
       {etiquetas && (
         <FolhaImpressao>
           {etiquetas.map((e) => (
-            <div key={e.id} style={{ breakInside: 'avoid', border: '1px solid #000', padding: '4mm', marginBottom: '3mm', color: '#000' }}>
+            <div key={e.id} style={{ breakInside: 'avoid', border: '1px solid var(--impressao-tinta)', padding: '4mm', marginBottom: '3mm', color: 'var(--impressao-tinta)' }}>
               <strong>{e.nome}</strong>{e.pesoG ? ` · ${e.pesoG} g` : ''}
               <div>Lote {e.lote} · {e.sequencial}/{etiquetas.length}</div>
               <div>Produzido {dataCurta(e.produzidoEm)} · Validade {dataCurta(e.validadeEm)}</div>

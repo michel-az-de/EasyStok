@@ -20,11 +20,11 @@
 .avisoBloqueio {
   margin: var(--e-3) 0; padding: var(--e-3);
   background: var(--elevado); border-radius: var(--r-1);
-  border-left: var(--trilho) solid var(--parado);
+  border-left: var(--trilho) solid var(--erro);
 }
 .tituloBloqueio {
   display: flex; align-items: baseline; gap: var(--e-2); flex-wrap: wrap;
-  margin: 0; color: var(--parado); font-size: var(--t-corpo);
+  margin: 0; color: var(--erro); font-size: var(--t-corpo);
 }
 .motivoBloqueio { margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta); }
 .alcanceBloqueio { font-size: var(--t-apoio); color: var(--tinta-2); }
@@ -54,16 +54,16 @@
    ou não. Mesma linha do resto do cadastro, dois toques lado a lado. */
 .avisosCanais { display: flex; gap: var(--e-4); flex-wrap: wrap; }
 .avisoCanal { display: flex; align-items: center; gap: var(--e-1); font-size: var(--t-apoio); color: var(--tinta-2); }
-.avisoErro { flex-basis: 100%; font-size: var(--t-apoio); color: var(--perigo); }
+.avisoErro { flex-basis: 100%; font-size: var(--t-apoio); color: var(--erro); }
 
 .avisoEmLinha {
   display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap;
-  margin: 0; padding: var(--e-2) 0; font-size: var(--t-apoio); color: var(--atencao);
+  margin: 0; padding: var(--e-2) 0; font-size: var(--t-apoio); color: var(--alerta);
 }
 
 .mesmoDomicilio { margin: 0 0 var(--e-3); font-size: var(--t-apoio); color: var(--tinta-2); }
 .linkDomicilio {
-  background: none; border: 0; padding: 0; color: var(--ragu); font-weight: 600;
+  background: none; border: 0; padding: 0; color: var(--marca); font-weight: 600;
   font-size: inherit; text-decoration: underline; min-height: var(--toque);
 }
 
@@ -71,7 +71,7 @@
 .postIts { list-style: none; margin: 0 0 var(--e-3); padding: 0; display: grid; gap: var(--e-2); }
 .ultimaNota {
   margin: 0; padding: var(--e-3) var(--e-4);
-  background: var(--atencao-pastel); border-left: 3px solid var(--atencao);
+  background: var(--alerta-pastel); border-left: 3px solid var(--alerta);
   border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
   box-shadow: var(--sombra); transform: rotate(-.5deg);
   font-size: var(--t-apoio); color: var(--tinta);
@@ -81,7 +81,7 @@
 /* O corte em duas linhas mora no texto, não no bloco: com o corte no bloco, o
    rótulo contava como linha e a terceira linha vazava pela margem de baixo. */
 .textoNota { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.rotuloNota { display: block; color: var(--atencao); font-weight: 600; margin-bottom: var(--e-2); }
+.rotuloNota { display: block; color: var(--alerta); font-weight: 600; margin-bottom: var(--e-2); }
 
 /* --- Edição em linha (CampoEmLinha.jsx) ------------------------------------ */
 .campoEmLinha { position: relative; }
@@ -92,7 +92,7 @@
 }
 .valorBotao svg { color: var(--tinta-2); flex-shrink: 0; }
 .valorVazio { color: var(--tinta-3); font-style: italic; }
-.salvo { display: flex; align-items: center; gap: var(--e-1); margin: 0; color: var(--ok); font-size: var(--t-apoio); }
+.salvo { display: flex; align-items: center; gap: var(--e-1); margin: 0; color: var(--sucesso); font-size: var(--t-apoio); }
 
 .edicaoEmLinha { display: flex; align-items: center; gap: var(--e-1); }
 .controleEmLinha {
@@ -100,13 +100,13 @@
   border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-1);
   background: var(--papel); color: var(--tinta); font-size: var(--t-corpo); font-family: inherit;
 }
-.controleComErro { border-width: var(--b-2); border-color: var(--parado); }
+.controleComErro { border-width: var(--b-2); border-color: var(--erro); }
 .botaoIconeEdicao {
   display: inline-flex; align-items: center; justify-content: center;
   width: var(--toque); height: var(--toque); flex-shrink: 0;
   background: none; border: 0; color: var(--tinta-2);
 }
-.erroEmLinha { margin: var(--e-1) 0 0; color: var(--parado); font-size: var(--t-apoio); }
+.erroEmLinha { margin: var(--e-1) 0 0; color: var(--erro); font-size: var(--t-apoio); }
 
 /* --- Tags (TagsDoCliente.jsx) ---------------------------------------------- */
 .blocoTags { margin-bottom: var(--e-3); }
@@ -120,7 +120,7 @@
   background: var(--preenchimento); color: var(--tinta);
   font-size: var(--t-apoio); font-weight: 600; line-height: 1; white-space: nowrap;
 }
-.chipRestricao { border-color: var(--atencao); color: var(--tinta); background: var(--atencao-pastel); }
+.chipRestricao { border-color: var(--alerta); color: var(--tinta); background: var(--alerta-pastel); }
 .chipTexto { background: none; border: 0; padding: 0; font: inherit; color: inherit; min-height: auto; }
 .chipRemover {
   display: inline-flex; align-items: center; justify-content: center;
@@ -130,7 +130,7 @@
 .chipRemover:hover { background: var(--preenchimento-forte); color: var(--tinta); }
 .chipEdicao {
   min-height: var(--toque); min-width: 96px; padding: 0 var(--e-3);
-  border-radius: var(--r-pilula); border: var(--b-2) solid var(--ragu);
+  border-radius: var(--r-pilula); border: var(--b-2) solid var(--marca);
   background: var(--papel); color: var(--tinta); font-size: var(--t-apoio); font-weight: 600;
 }
 .chipTracejado {
@@ -150,7 +150,7 @@
   display: flex; align-items: center; gap: var(--e-1); margin: var(--e-2) 0 0;
   font-size: var(--t-apoio); color: var(--tinta-2);
 }
-.avisoDesfazer button { background: none; border: 0; color: var(--ragu); font-weight: 600; padding: 0 var(--e-1); }
+.avisoDesfazer button { background: none; border: 0; color: var(--marca); font-weight: 600; padding: 0 var(--e-1); }
 
 /* --- Modal Histórico -------------------------------------------------------- */
 .faixaLead { margin: 0 0 var(--e-4); color: var(--tinta-2); font-size: var(--t-apoio); }
@@ -178,7 +178,7 @@
    encerrou, com que desfecho, e o que foi avisado. Uma linha discreta entre
    o cabeçalho e a anotação. */
 .logEncerramento { margin: var(--e-1) 0 0; color: var(--tinta-3); font-size: var(--t-micro); }
-.avaliacao { display: inline-flex; align-items: center; gap: var(--e-1); color: var(--ok); font-size: var(--t-apoio); }
+.avaliacao { display: inline-flex; align-items: center; gap: var(--e-1); color: var(--sucesso); font-size: var(--t-apoio); }
 .avaliacaoVazia { color: var(--tinta-3); font-size: var(--t-apoio); }
 
 .abaNotas { display: grid; gap: var(--e-4); }
@@ -197,25 +197,25 @@
 .azulejo {
   grid-row: 1 / span 2; align-self: center;
   width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
-  color: #FFFFFF; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 1px 2px rgba(0, 0, 0, .12);
+  color: var(--branco); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 1px 2px rgba(0, 0, 0, .12);
 }
-.azVerde, .az_conversa { background: linear-gradient(160deg, #3FC77A, #1E9E57); }
-.azAzul, .az_globo { background: linear-gradient(160deg, #5B9BFF, #2D6BE0); }
+.azVerde, .az_conversa { background: var(--canal-whatsapp-fundo); }
+.azAzul, .az_globo { background: var(--canal-site-fundo); }
 /* Achado 5 (banca capricho R10): mesma cor do banner "Endereço capturado"
    (Bloco.module.css .destaque), para o campo vazio abaixo ler como parte da
    mesma pendência, não como um segundo dado desencontrado. */
 .linhaDadoPendente {
-  border-left: var(--trilho) solid var(--atencao); background: var(--atencao-pastel);
+  border-left: var(--trilho) solid var(--alerta); background: var(--alerta-pastel);
   padding-left: calc(var(--e-3) - var(--trilho));
 }
-.linhaDadoPendente .valorVazio { color: var(--atencao); font-style: normal; }
-.az_camera { background: linear-gradient(160deg, #FF6A9A, #C2185B 55%, #F58529); }
-.azCinza { background: linear-gradient(160deg, #A8A29E, #78716C); }
+.linhaDadoPendente .valorVazio { color: var(--alerta); font-style: normal; }
+.az_camera { background: var(--canal-instagram-fundo); }
+.azCinza { background: var(--canal-neutro-fundo); }
 .rotuloDado { flex: none; font-size: var(--t-micro); color: var(--tinta-3); font-weight: 400; line-height: 1.2; }
 .linhaDado > .campoEmLinha, .linhaDado .valorCanal { font-size: var(--t-corpo); }
 
-.az_whatsapp { background: linear-gradient(160deg, #3FC77A, #1E9E57); }
-.az_instagram { background: linear-gradient(160deg, #FF6A9A, #C2185B 55%, #F58529); }
+.az_whatsapp { background: var(--canal-whatsapp-fundo); }
+.az_instagram { background: var(--canal-instagram-fundo); }
 
 /* Rodada 11 (issue #8, registro 92): campo que o automático captou da
    conversa. Selo pequeno ao lado do rótulo, no verde de "feito", e um realce
@@ -226,11 +226,11 @@
   display: inline-flex; align-items: center; gap: 3px; margin-left: var(--e-1);
   padding: 1px 7px; border-radius: 999px; vertical-align: middle;
   font-size: var(--t-micro); font-weight: 600; line-height: 1.5; white-space: nowrap;
-  color: var(--ok); background: var(--ok-pastel);
+  color: var(--sucesso); background: var(--sucesso-pastel);
 }
 .captadoAgora { animation: realceCaptado 1.6s var(--ease-saida, ease-out); }
 @keyframes realceCaptado {
-  0% { background-color: var(--ok-pastel); box-shadow: inset 3px 0 0 var(--ok); }
+  0% { background-color: var(--sucesso-pastel); box-shadow: inset 3px 0 0 var(--sucesso); }
   100% { background-color: transparent; box-shadow: inset 3px 0 0 transparent; }
 }
 
@@ -241,7 +241,7 @@
 .seloPontos {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px;
   border-radius: 999px; font-size: var(--t-micro); font-weight: 600;
-  color: var(--ragu); background: var(--ragu-claro);
+  color: var(--marca); background: var(--marca-claro);
 }
 .linhaFidelidade {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
@@ -258,7 +258,7 @@
 }
 .iconeRecompensa {
   flex: none; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
-  color: var(--ragu); background: var(--ragu-claro);
+  color: var(--marca); background: var(--marca-claro);
 }
 .textoRecompensa { flex: 1 1 140px; min-width: 0; display: grid; }
 .subRecompensa { font-size: var(--t-micro); color: var(--tinta-3); }

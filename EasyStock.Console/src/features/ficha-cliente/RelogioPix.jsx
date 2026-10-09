@@ -109,7 +109,7 @@ export function RelogioPix({
   }
 
   // Pago (por qualquer via): conciliado sozinho, marcado à mão, ou com
-  // diferença aceita. A cor fica sempre em --ok, o rótulo diz a via.
+  // diferença aceita. A cor fica sempre em --sucesso, o rótulo diz a via.
   // Divergente também tem `pagaEm` (a baixa chegou, só não bateu o valor),
   // então sai daqui e cai no ramo próprio logo abaixo.
   if (cobranca.pagaEm && situacao.chave !== 'divergente') {
@@ -189,7 +189,7 @@ export function RelogioPix({
     )
   }
 
-  // Ao zerar: numero "0:00", trilho inteiro --parado, pisca e para. Os tres
+  // Ao zerar: numero "0:00", trilho inteiro --erro, pisca e para. Os tres
   // botoes empilhados cobrem os tres caminhos dali: tentar de novo, desistir
   // com o pedido aberto, ou desistir fechando a conversa tambem.
   if (zerado) {

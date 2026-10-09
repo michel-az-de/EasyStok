@@ -14,8 +14,8 @@ button.chip { cursor: pointer; }
 button.chip:hover:not(.ativo):not(.emBreve) { background: var(--preenchimento-forte); }
 /* Ligado/marcado: fundo e borda mudam, não só a cor do texto. */
 .ativo {
-  background: var(--ragu-claro); color: var(--ragu);
-  border-color: color-mix(in srgb, var(--ragu) 45%, transparent);
+  background: var(--marca-claro); color: var(--marca);
+  border-color: color-mix(in srgb, var(--marca) 45%, transparent);
 }
 /* "Em breve" (seção 4): não é clicável, rótulo inteiro escreve o motivo. */
 .emBreve {

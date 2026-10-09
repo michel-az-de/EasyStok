@@ -10,7 +10,7 @@
 
 .lista { list-style: none; margin: 0; padding: 0; }
 .contagem {
-  font-size: var(--t-apoio); color: var(--ragu); background: var(--ragu-claro);
+  font-size: var(--t-apoio); color: var(--marca); background: var(--marca-claro);
   padding: 2px var(--e-2); border-radius: var(--r-pilula); white-space: nowrap;
 }
 
@@ -21,7 +21,7 @@
 /* Dois papéis, um alvo de 44 px cada, sempre visíveis. */
 .papeis {
   display: flex; gap: var(--e-1); margin: 0 0 var(--e-4); border: 0;
-  padding: var(--e-1); background: var(--semola-2); border-radius: var(--r-1);
+  padding: var(--e-1); background: var(--elevado); border-radius: var(--r-1);
 }
 .papel {
   flex: 1; min-height: var(--toque); padding: var(--e-2) var(--e-3);
@@ -58,7 +58,7 @@
 .cartaoItem {
   display: flex; gap: var(--e-3); align-items: flex-start; flex-wrap: wrap;
   padding: var(--e-3); border: var(--b-1) solid var(--linha);
-  border-radius: var(--r-1); background: var(--semola);
+  border-radius: var(--r-1); background: var(--fundo);
 }
 .miniatura { width: 96px; border-radius: var(--r-1); flex-shrink: 0; }
 .corpoItem { flex: 1; min-width: 140px; display: grid; gap: var(--e-1); justify-items: start; }
@@ -71,7 +71,7 @@
   display: inline-flex; align-items: center; gap: var(--e-2);
   min-height: var(--toque); font-size: var(--t-apoio); font-weight: 600;
 }
-.chave input { width: 20px; height: 20px; accent-color: var(--ragu); }
+.chave input { width: 20px; height: 20px; accent-color: var(--marca); }
 /* Integração 72: a mesma cápsula das Automáticas (banca da rodada 6, item 9).
    Continua sendo o mesmo checkbox, só com o desenho de interruptor. */
 .chave input[type='checkbox'] {
@@ -81,12 +81,12 @@
 }
 .chave input[type='checkbox']::after {
   content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%;
-  background: #FFFFFF; box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+  background: var(--branco); box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
   transition: transform var(--dur-media) var(--ease-mola);
 }
-.chave input[type='checkbox']:checked { background: var(--ok); }
+.chave input[type='checkbox']:checked { background: var(--sucesso); }
 .chave input[type='checkbox']:checked::after { transform: translateX(18px); }
-.chave input[type='checkbox']:focus-visible { outline: var(--b-3) solid var(--ragu); outline-offset: 2px; }
+.chave input[type='checkbox']:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
 
 .saldo {
   display: inline-flex; align-items: center; gap: var(--e-1);
@@ -97,7 +97,7 @@
   background: none; border: 0; color: var(--tinta-2); border-radius: var(--r-pilula);
   min-width: var(--toque); min-height: var(--toque); display: grid; place-items: center;
 }
-.saldo button:hover:not(:disabled) { background: var(--semola-2); color: var(--tinta); }
+.saldo button:hover:not(:disabled) { background: var(--elevado); color: var(--tinta); }
 .saldo button:disabled { opacity: .4; cursor: not-allowed; }
 .saldo b { font-family: var(--f-dado); min-width: 24px; text-align: center; }
 
@@ -106,9 +106,9 @@
 }
 
 /* Estado do item em texto, no lugar de uma pílula pintada por linha. */
-.perigo { color: var(--parado); font-weight: 700; }
-.aviso { color: var(--atencao); font-weight: 700; }
-.ok { color: var(--ok); font-weight: 700; }
+.perigo { color: var(--erro); font-weight: 700; }
+.aviso { color: var(--alerta); font-weight: 700; }
+.ok { color: var(--sucesso); font-weight: 700; }
 .neutro { color: var(--tinta-2); font-weight: 700; }
 
 /* ---------------------------------------------------------------------------
@@ -157,7 +157,7 @@
 .ajusteNaLinha {
   flex-shrink: 0; display: flex; align-items: center; gap: var(--e-2);
   padding: var(--e-2); border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
-  background: var(--semola);
+  background: var(--fundo);
 }
 .botaoMenosCardapio {
   width: var(--toque); height: var(--toque); flex-shrink: 0;
@@ -188,16 +188,16 @@
   padding: 2px var(--e-2); border-radius: var(--r-1);
   transition: background-color var(--dur-longa) var(--ease-padrao);
 }
-/* Ao somar: fundo `--ok-pastel` pisca junto com o "+ R$" por 600 ms (seção
+/* Ao somar: fundo `--sucesso-pastel` pisca junto com o "+ R$" por 600 ms (seção
    3.1). O global de prefers-reduced-motion (base.css) já esmaga a duração da
    transição a quase zero, então quem pediu menos movimento só troca o
    número, sem piscar de verdade. */
-.rodapeTotalSomando { background: var(--ok-pastel); }
-.rodapeSoma { color: var(--ok); font-family: var(--f-dado); font-size: var(--t-corpo); font-weight: 700; }
+.rodapeTotalSomando { background: var(--sucesso-pastel); }
+.rodapeSoma { color: var(--sucesso); font-family: var(--f-dado); font-size: var(--t-corpo); font-weight: 700; }
 
 .rodapeAcrescimo {
   display: flex; gap: var(--e-2); align-items: center; margin: 0;
-  padding: var(--e-2) var(--e-4); background: var(--atencao-pastel); color: var(--atencao);
+  padding: var(--e-2) var(--e-4); background: var(--alerta-pastel); color: var(--alerta);
   border-top: var(--b-1) solid var(--linha-forte); font-size: var(--t-apoio); font-weight: 600;
 }
 
@@ -212,7 +212,7 @@
 }
 .rodapeObs {
   flex-basis: 100%; color: var(--tinta-2);
-  border-left: var(--trilho) solid var(--atencao); padding-left: var(--e-2);
+  border-left: var(--trilho) solid var(--alerta); padding-left: var(--e-2);
 }
 
 /* Cartãozinho de 64 px que segue o dedo no arrasto do prato até a comanda
@@ -243,11 +243,11 @@
 .acoesItem button:hover { background: var(--elevado); color: var(--tinta); }
 
 .avisoValidacao {
-  margin: 0; font-size: var(--t-apoio); color: var(--atencao);
+  margin: 0; font-size: var(--t-apoio); color: var(--alerta);
   display: flex; gap: var(--e-2); flex-wrap: wrap; align-items: baseline;
 }
 .linkValidacao {
-  background: none; border: 0; padding: 0; color: var(--ragu);
+  background: none; border: 0; padding: 0; color: var(--marca);
   font-size: var(--t-apoio); font-weight: 600; text-decoration: underline;
 }
 
@@ -276,8 +276,8 @@
 .opcaoAdicional {
   display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-apoio); min-height: var(--toque);
 }
-.opcaoAdicional input { width: 20px; height: 20px; accent-color: var(--ragu); }
-.erroFormulario { margin: 0; color: var(--parado); font-size: var(--t-apoio); font-weight: 600; }
+.opcaoAdicional input { width: 20px; height: 20px; accent-color: var(--marca); }
+.erroFormulario { margin: 0; color: var(--erro); font-size: var(--t-apoio); font-weight: 600; }
 
 /* ---------------------------------------------------------------------------
    #1448 · homologação de 07/10: "não estou vendo foto [...] de maneira mais
@@ -291,7 +291,7 @@
   border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-1);
   background: var(--papel); color: var(--tinta-3);
 }
-.busca:focus-within { border-color: var(--ragu); color: var(--tinta-2); }
+.busca:focus-within { border-color: var(--marca); color: var(--tinta-2); }
 .busca input {
   flex: 1; min-width: 0; min-height: var(--toque); border: 0; outline: 0;
   background: transparent; color: var(--tinta); font-size: var(--t-corpo);
@@ -315,14 +315,14 @@
 .lista .linhaComAjuste { margin-bottom: 0; border-bottom: var(--b-1) solid var(--linha); padding: var(--e-1) 0; }
 .foto {
   width: 56px; height: 56px; flex-shrink: 0; object-fit: cover;
-  border-radius: var(--r-1); background: var(--semola-2);
+  border-radius: var(--r-1); background: var(--elevado);
 }
-.carta, .miniatura { aspect-ratio: 16 / 10; object-fit: cover; background: var(--semola-2); }
+.carta, .miniatura { aspect-ratio: 16 / 10; object-fit: cover; background: var(--elevado); }
 
 .enviarFoto {
   flex-shrink: 0; align-self: center; width: var(--toque); height: var(--toque);
   display: grid; place-items: center; background: none; border: 0;
   border-radius: var(--r-1); color: var(--tinta-2);
 }
-.enviarFoto:hover:not(:disabled) { background: var(--elevado); color: var(--ragu); }
+.enviarFoto:hover:not(:disabled) { background: var(--elevado); color: var(--marca); }
 .enviarFoto:disabled { opacity: .4; cursor: not-allowed; }

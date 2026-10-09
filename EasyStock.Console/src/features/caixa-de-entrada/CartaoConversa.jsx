@@ -44,7 +44,7 @@ function marcaDoPedido(conversa) {
     if (sinalVerde(conversa.pedido)) return { texto: 'Pago', icone: 'circle-check', tom: 'ok' }
     return { texto: passo.rotulo, icone: ICONE_DO_PASSO[passo.id], tom: 'neutro' }
   }
-  if (ehLead(conversa)) return { texto: 'Lead', icone: 'user-plus', tom: 'ragu' }
+  if (ehLead(conversa)) return { texto: 'Lead', icone: 'user-plus', tom: 'marca' }
   return null
 }
 

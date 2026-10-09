@@ -13,7 +13,7 @@
 
 .avisoFechado {
   margin: 0; padding: var(--e-3); font-size: var(--t-apoio); color: var(--tinta);
-  background: var(--perigo-fundo); border-radius: var(--r-1);
+  background: var(--erro-pastel); border-radius: var(--r-1);
 }
 
 .resumoLista {
@@ -26,8 +26,8 @@
 }
 .resumoLista dt { font-size: var(--t-apoio); color: var(--tinta-2); }
 .resumoLista dd { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
-.resumoForte dd { color: var(--ragu); }
-.resumoForte { background: var(--ragu-claro) !important; }
+.resumoForte dd { color: var(--marca); }
+.resumoForte { background: var(--marca-claro) !important; }
 
 .porMetodo {
   margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: var(--e-2) var(--e-4);
@@ -61,12 +61,12 @@
 
 .linhaValor { display: flex; align-items: center; gap: var(--e-2); font-weight: 700; color: var(--tinta); white-space: nowrap; }
 
-.acaoEstorno { color: var(--perigo); min-height: auto; padding: 0 var(--e-2); }
-.acaoEstorno:hover:not(:disabled) { background: var(--perigo-fundo); }
+.acaoEstorno { color: var(--erro); min-height: auto; padding: 0 var(--e-2); }
+.acaoEstorno:hover:not(:disabled) { background: var(--erro-pastel); }
 
 .promptEstorno {
   display: grid; gap: var(--e-2); padding: var(--e-3);
-  background: var(--perigo-fundo); border-radius: var(--r-1); width: 100%;
+  background: var(--erro-pastel); border-radius: var(--r-1); width: 100%;
 }
 
 .confirmarAcoes { display: flex; gap: var(--e-2); flex-wrap: wrap; margin: 0; justify-content: flex-end; }

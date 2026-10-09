@@ -15,7 +15,7 @@
   transition: border-color var(--dur-curta) var(--ease-padrao), box-shadow var(--dur-curta) var(--ease-padrao);
 }
 .controle:hover:not(:disabled) { border-color: var(--linha-forte); }
-.controle:focus { outline: none; border-color: var(--ragu); box-shadow: 0 0 0 4px var(--halo); }
-.controle.erro { border-width: var(--b-2); border-color: var(--parado); }
-.erroTexto { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--parado); }
+.controle:focus { outline: none; border-color: var(--marca); box-shadow: 0 0 0 4px var(--halo); }
+.controle.erro { border-width: var(--b-2); border-color: var(--erro); }
+.erroTexto { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--erro); }
 .dica { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-3); }

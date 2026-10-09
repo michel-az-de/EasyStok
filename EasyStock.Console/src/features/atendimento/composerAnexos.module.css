@@ -7,7 +7,7 @@
   color: var(--tinta); cursor: pointer;
   transition: background 180ms ease, border-color 180ms ease;
 }
-.botaoAnexo:hover { background: var(--semola-2); }
+.botaoAnexo:hover { background: var(--elevado); }
 .botaoAnexo.desabilitado { opacity: .5; cursor: not-allowed; }
 
 .previa {
@@ -34,17 +34,17 @@
   display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap;
   min-height: var(--toque);
 }
-.gravandoIcone { color: var(--perigo); flex-shrink: 0; }
+.gravandoIcone { color: var(--erro); flex-shrink: 0; }
 .onda { display: flex; align-items: flex-end; gap: 2px; height: 24px; flex: 1 1 80px; min-width: 60px; }
-.onda span { width: 3px; min-height: 3px; border-radius: 2px; background: var(--perigo); }
+.onda span { width: 3px; min-height: 3px; border-radius: 2px; background: var(--erro); }
 .cronometro { font-family: var(--f-dado); font-size: var(--t-corpo); color: var(--tinta); min-width: 3.5ch; }
-.avisoLimite { font-size: var(--t-apoio); color: var(--aviso); }
+.avisoLimite { font-size: var(--t-apoio); color: var(--alerta); }
 
 .aviso, .erro {
   display: flex; align-items: center; gap: var(--e-2); min-height: var(--toque);
   font-size: var(--t-apoio); color: var(--tinta-2); margin: 0;
 }
-.erro { color: var(--perigo); }
+.erro { color: var(--erro); }
 .erro button {
   margin-left: auto; border: 0; background: none; color: inherit; text-decoration: underline; cursor: pointer;
 }

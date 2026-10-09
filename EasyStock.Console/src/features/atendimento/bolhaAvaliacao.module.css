@@ -10,6 +10,6 @@
   width: 32px; height: 32px; border-radius: var(--r-2);
   background: var(--preenchimento-forte); color: var(--tinta-2);
 }
-.resposta.positiva .icone { background: var(--ok-fundo); color: var(--ok); }
-.resposta.negativa .icone { background: var(--perigo-fundo); color: var(--perigo); }
+.resposta.positiva .icone { background: var(--sucesso-pastel); color: var(--sucesso); }
+.resposta.negativa .icone { background: var(--erro-pastel); color: var(--erro); }
 .resposta strong { font-weight: 600; }

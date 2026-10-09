@@ -113,6 +113,16 @@ export function modulosDoHall({ fonteApi = false } = {}) {
   })
 }
 
+// Busca somente no catálogo de navegação, sem consultar dados de clientes.
+const textoDeBusca = (valor) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim()
+export function filtrarModulos(modulos, busca) {
+  const termos = textoDeBusca(busca).split(/\s+/).filter(Boolean)
+  return modulos.filter((modulo) => {
+    const texto = textoDeBusca([modulo.nome, modulo.resumo, ...modulo.telas.map((t) => t.rotulo)].join(' '))
+    return termos.every((termo) => texto.includes(termo))
+  })
+}
+
 // Saudação do topo do hall, pela hora da loja (não a do navegador nem a UTC).
 export function saudacaoDoHall(agora, nome) {
   const { horas } = partesNoFuso(agora)

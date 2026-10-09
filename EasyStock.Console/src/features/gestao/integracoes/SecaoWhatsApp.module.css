@@ -12,7 +12,7 @@
 .texto { margin: 0; font-size: var(--t-corpo); color: var(--tinta); }
 .botao { font-size: var(--t-forte); }
 .explicacao { margin: 0; font-size: var(--t-corpo); color: var(--tinta); }
-.erro { margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--perigo); }
+.erro { margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--erro); }
 
 .resultado { display: flex; flex-direction: column; gap: var(--e-2); }
 .numero { margin: 0; font-size: var(--t-forte); color: var(--tinta); overflow-wrap: anywhere; }

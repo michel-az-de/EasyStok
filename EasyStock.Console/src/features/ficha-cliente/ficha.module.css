@@ -12,7 +12,7 @@
   min-width: var(--toque); min-height: var(--toque);
   font-size: var(--t-apoio); line-height: 1;
 }
-.remover:hover { color: var(--perigo); }
+.remover:hover { color: var(--erro); }
 
 /* Total da comanda: a segunda voz da serifa, ao lado do número em 26 px na
    fonte de dado. Nada mais na tela mistura as duas. */
@@ -54,11 +54,11 @@
 .trilha::before { right: var(--trilho-ponta); background: var(--linha-media); }
 .trilha::after {
   width: calc((100% - 2 * var(--trilho-ponta)) * var(--progresso, 0));
-  background: var(--ok);
+  background: var(--sucesso);
   transition: width var(--dur-longa) var(--ease-mola);
 }
 .trilhaItem { position: relative; z-index: 1; display: grid; justify-items: center; gap: 6px; }
-.rotuloPasso { font-size: var(--t-11); font-weight: 600; color: var(--tinta-3); line-height: 1.1; white-space: nowrap; }
+.rotuloPasso { font-size: var(--t-minimo); font-weight: 600; color: var(--tinta-3); line-height: 1.1; white-space: nowrap; }
 .trilhaItem.feito .rotuloPasso, .trilhaItem.atual .rotuloPasso { color: var(--tinta); }
 .circuloPasso {
   flex-shrink: 0; width: 36px; height: 36px; border-radius: var(--r-pilula);
@@ -67,8 +67,8 @@
   transition: background-color var(--dur-media) var(--ease-padrao), border-color var(--dur-media) var(--ease-padrao), color var(--dur-media) var(--ease-padrao), transform var(--dur-longa) var(--ease-mola);
 }
 .trilhaItem.feito .circuloPasso {
-  border-color: transparent; color: #FFFFFF;
-  background: linear-gradient(145deg, light-dark(#3E9A63, #3E9A63), light-dark(#2B6A45, #2B7A4E));
+  border-color: transparent; color: var(--branco);
+  background: var(--acao-sucesso);
   box-shadow: 0 3px 8px -3px rgba(43, 106, 69, .55);
 }
 .trilhaItem.atual .circuloPasso {
@@ -90,7 +90,7 @@
 .ondeEsta > div { display: flex; flex-direction: column; gap: var(--e-1); }
 .rotuloEstado { display: block; font-size: var(--t-titulo); font-weight: 700; }
 .depoisTexto { display: block; font-size: var(--t-apoio); color: var(--tinta-3); }
-.marcaEstorno { color: var(--parado); font-weight: 600; }
+.marcaEstorno { color: var(--erro); font-weight: 600; }
 .motivoDesabilitado { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
 
 /* Ação: botão primário largo e o gatilho do menu ⋯ ao lado (secao 5, item 3). */
@@ -104,7 +104,7 @@
   background: none; border: 0; border-radius: var(--r-1); min-height: var(--toque);
   padding: var(--e-2); font-size: var(--t-apoio); color: var(--tinta);
 }
-.itemMenu:hover { background: var(--semola-2); }
+.itemMenu:hover { background: var(--elevado); }
 
 /* Confirmação em linha, no lugar do botão, nunca em modal (secao 4). Mesmo
    par pergunta/ação em toda ação destrutiva: voltar etapa, cancelar pedido,
@@ -115,19 +115,19 @@
 .notas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
 .nota {
   background: var(--elevado); border-radius: var(--r-1);
-  border-left: var(--trilho) solid var(--atencao);
+  border-left: var(--trilho) solid var(--alerta);
   padding: var(--e-2) var(--e-3); font-size: var(--t-apoio);
 }
 /* Autoria da nota é rótulo, não carimbo de hora: 15 px. */
 .nota .quem {
   display: block; font-family: var(--f-dado); font-size: var(--t-apoio);
-  color: var(--atencao); margin-bottom: var(--e-1);
+  color: var(--alerta); margin-bottom: var(--e-1);
 }
 
 .historico { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
 .pedidoAntigo {
   border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
-  padding: var(--e-2) var(--e-3); font-size: var(--t-apoio); background: var(--semola);
+  padding: var(--e-2) var(--e-3); font-size: var(--t-apoio); background: var(--fundo);
 }
 .pedidoAntigo header { display: flex; gap: var(--e-2); align-items: baseline; }
 .pedidoAntigo header b { font-family: var(--f-dado); font-weight: 600; }
@@ -151,8 +151,8 @@
 
 .alerta {
   display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
-  padding: var(--e-3) var(--e-4); background: var(--papel); color: var(--atencao);
-  border-left: var(--trilho) solid var(--atencao);
+  padding: var(--e-3) var(--e-4); background: var(--papel); color: var(--alerta);
+  border-left: var(--trilho) solid var(--alerta);
   border-bottom: var(--b-1) solid var(--linha); font-size: var(--t-apoio);
 }
 .alerta p { margin: 0; flex: 1; min-width: 160px; color: var(--tinta); }
@@ -166,7 +166,7 @@
 }
 .barraDesfazer {
   grid-auto-flow: column; align-items: center; justify-content: start;
-  border-left: var(--trilho) solid var(--ok); color: var(--ok);
+  border-left: var(--trilho) solid var(--sucesso); color: var(--sucesso);
 }
 .barraTexto { font-size: var(--t-apoio); font-weight: 600; }
 
@@ -218,7 +218,7 @@
 .copiaECola { display: grid; gap: var(--e-2); margin: var(--e-3) 0; }
 .codigoPix {
   display: block; padding: var(--e-2) var(--e-3);
-  background: var(--semola); border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
+  background: var(--fundo); border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
   font-family: var(--f-dado); font-size: var(--t-apoio); color: var(--tinta-2);
   overflow-wrap: anywhere; max-height: 72px; overflow-y: auto;
 }
@@ -228,7 +228,7 @@
 
 .baixaDivergente {
   display: grid; gap: var(--e-3); margin-top: var(--e-3);
-  padding: var(--e-3); background: var(--semola); border-radius: var(--r-1);
+  padding: var(--e-3); background: var(--fundo); border-radius: var(--r-1);
 }
 
 /* ---------------------------------------------------------------------------
@@ -243,18 +243,18 @@
 /* Rodada 12 (issue #13): Pix e cartão em destaque; pagar na entrega em
    segundo plano, menor e sem preenchimento, mas ainda com 40 px de toque. */
 .escolhaMeio { display: grid; gap: 0; }
-.chipDestaque { font-size: var(--t-17); min-height: 48px; }
+.chipDestaque { font-size: var(--t-forte); min-height: 48px; }
 .chipsNaEntrega { align-items: center; }
-.rotuloNaEntrega { font-size: var(--t-13); color: var(--tinta-2); font-weight: 600; }
+.rotuloNaEntrega { font-size: var(--t-micro); color: var(--tinta-2); font-weight: 600; }
 .chipSecundario:not([aria-checked="true"]) {
   background: transparent; border-color: var(--linha-media); color: var(--tinta-2);
-  font-size: var(--t-15); font-weight: 500;
+  font-size: var(--t-apoio); font-weight: 500;
 }
 
 /* "Alterar forma de pagamento" e "Desfazer pagamento": confirmação em linha. */
 .confirmarTroca {
   display: grid; gap: var(--e-2); margin-top: var(--e-3); padding: var(--e-3);
-  border-radius: var(--r-1); background: var(--aviso-fundo); color: var(--tinta);
+  border-radius: var(--r-1); background: var(--alerta-pastel); color: var(--tinta);
 }
 .confirmarTroca p { margin: 0; font-size: var(--t-corpo); }
 .alterarForma { margin-top: var(--e-3); }
@@ -278,17 +278,17 @@
 .janela {
   border: 0; border-left: var(--trilho) solid var(--linha);
   border-radius: var(--r-1);
-  background: var(--semola); overflow: hidden;
+  background: var(--fundo); overflow: hidden;
 }
-.janela.confirmada { border-left-color: var(--ragu); background: var(--ragu-claro); }
-.janela.estourada { border-left-color: var(--perigo); }
+.janela.confirmada { border-left-color: var(--marca); background: var(--marca-claro); }
+.janela.estourada { border-left-color: var(--erro); }
 
 .escolhaJanela {
   display: grid; gap: var(--e-1); width: 100%; text-align: left;
   min-height: var(--toque); padding: var(--e-2) var(--e-3);
   background: none; border: 0; color: inherit;
 }
-.escolhaJanela:hover:not(:disabled) { background: var(--semola-2); }
+.escolhaJanela:hover:not(:disabled) { background: var(--elevado); }
 .escolhaJanela:disabled { opacity: .65; cursor: not-allowed; }
 
 .faixaJanela {
@@ -298,20 +298,20 @@
 .vagas { font-size: var(--t-apoio); color: var(--tinta-2); }
 
 .trilho {
-  display: block; height: 6px; background: var(--semola-2);
+  display: block; height: 6px; background: var(--elevado);
   border-radius: var(--r-pilula); overflow: hidden;
 }
 .preenchimento {
   display: block; height: 100%; background: var(--linha-forte); border-radius: var(--r-pilula);
 }
-.preenchimentoEstourado { background: var(--perigo); }
+.preenchimentoEstourado { background: var(--erro); }
 
 /* Motivo por escrito. Sem isto sobra botão morto, e botão morto faz a pessoa
    clicar de novo achando que a tela travou. */
 .motivoJanela {
   display: flex; gap: var(--e-2); align-items: center; flex-wrap: wrap;
   margin: 0; padding: var(--e-2) var(--e-3);
-  background: var(--elevado); border-left: var(--trilho) solid var(--atencao);
+  background: var(--elevado); border-left: var(--trilho) solid var(--alerta);
   font-size: var(--t-apoio); color: var(--tinta);
 }
 .motivoJanela b { font-weight: 700; }
@@ -320,11 +320,11 @@
 .avisoBloqueio {
   margin: var(--e-3) 0; padding: var(--e-3);
   background: var(--elevado); border-radius: var(--r-1);
-  border-left: var(--trilho) solid var(--parado);
+  border-left: var(--trilho) solid var(--erro);
 }
 .tituloBloqueio {
   display: flex; align-items: baseline; gap: var(--e-2); flex-wrap: wrap;
-  margin: 0; color: var(--parado); font-size: var(--t-corpo);
+  margin: 0; color: var(--erro); font-size: var(--t-corpo);
 }
 .motivoBloqueio { margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta); }
 .avisoBloqueio .rodapeBloco { margin-top: var(--e-1); }
@@ -335,16 +335,16 @@
    mas em âmbar, porque aqui ainda dá para resolver com um toque. */
 .avisoDiferenca {
   margin: 0 0 var(--e-3); padding: var(--e-3); display: grid; gap: var(--e-2);
-  background: var(--atencao-pastel); border-radius: var(--r-1);
-  border-left: var(--trilho) solid var(--atencao);
+  background: var(--alerta-pastel); border-radius: var(--r-1);
+  border-left: var(--trilho) solid var(--alerta);
 }
-.avisoDiferenca .corpoBloco { margin: 0; color: var(--atencao); display: flex; gap: var(--e-2); align-items: baseline; }
-.avisoDiferenca .corpoBloco b { color: var(--atencao); }
+.avisoDiferenca .corpoBloco { margin: 0; color: var(--alerta); display: flex; gap: var(--e-2); align-items: baseline; }
+.avisoDiferenca .corpoBloco b { color: var(--alerta); }
 
 .formBloqueio { display: grid; gap: var(--e-4); }
 .motivoEscolhido {
   margin: 0 0 var(--e-3); padding: var(--e-2) var(--e-3);
-  background: var(--semola-2); border-radius: var(--r-1); font-size: var(--t-apoio);
+  background: var(--elevado); border-radius: var(--r-1); font-size: var(--t-apoio);
 }
 .consequencias {
   margin: 0; padding-left: var(--e-5); display: grid; gap: var(--e-1);
@@ -353,7 +353,7 @@
 
 /* Texto que era pílula. Etiqueta, alcance do bloqueio e número da tentativa
    são dado de catálogo, não estado que pede ação. */
-.tag { font-size: var(--t-apoio); color: var(--ragu); font-weight: 600; }
+.tag { font-size: var(--t-apoio); color: var(--marca); font-weight: 600; }
 .alcanceBloqueio { font-size: var(--t-apoio); color: var(--tinta-2); }
 .tentativa { margin-left: auto; font-family: var(--f-dado); font-size: var(--t-apoio); color: var(--tinta-3); }
 
@@ -390,27 +390,27 @@
 .botoesPrimarios > button { width: auto; padding: 0 var(--e-4); }
 
 /* Rodada 11 (issue #8, registro 92): faixa "Atendimento automático" no topo
-   da ficha. Trilho do automático (ragu, mesma cor da bolha automática) em vez
+   da ficha. Trilho do automático (marca, mesma cor da bolha automática) em vez
    de fundo pastel, como o resto da ficha; os cinco passos numa linha que
    quebra em 390 px sem rolar de lado. O passo que o automático está pedindo
    pulsa de leve; movimento reduzido (base.css) corta o pulso e o contorno
    continua marcando. */
 .capturaAuto {
   margin: 0 var(--e-4); padding: var(--e-3) var(--e-3) var(--e-3) calc(var(--e-3) - var(--trilho));
-  border-left: var(--trilho) solid var(--ragu); border-radius: var(--r-2);
+  border-left: var(--trilho) solid var(--marca); border-radius: var(--r-2);
   background: var(--elevado); display: grid; gap: var(--e-2);
 }
 .capturaTitulo {
   margin: 0; display: flex; align-items: center; gap: var(--e-2);
   font-size: var(--t-apoio); font-weight: 600; color: var(--tinta);
 }
-.capturaTitulo svg { color: var(--ragu); }
+.capturaTitulo svg { color: var(--marca); }
 .capturaAtivo, .capturaParado {
   margin-left: auto; padding: 1px 8px; border-radius: 999px;
   font-size: var(--t-micro); font-weight: 600;
 }
-.capturaAtivo { color: var(--ok); background: var(--ok-pastel); }
-.capturaParado { color: var(--atencao); background: var(--atencao-pastel); }
+.capturaAtivo { color: var(--sucesso); background: var(--sucesso-pastel); }
+.capturaParado { color: var(--alerta); background: var(--alerta-pastel); }
 .capturaPassos {
   margin: 0; padding: 0; list-style: none;
   display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-2);
@@ -425,13 +425,13 @@
   width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center;
   border: var(--b-1) solid var(--linha-forte);
 }
-.capturaPassos .passoFeito { color: var(--ok); border-color: transparent; background: var(--ok-pastel); }
-.passoFeito .passoMarca { border-color: transparent; background: var(--ok); color: var(--papel); }
+.capturaPassos .passoFeito { color: var(--sucesso); border-color: transparent; background: var(--sucesso-pastel); }
+.passoFeito .passoMarca { border-color: transparent; background: var(--sucesso); color: var(--papel); }
 .capturaPassos .passoAgora {
-  color: var(--ragu); border-color: var(--ragu); font-weight: 600;
+  color: var(--marca); border-color: var(--marca); font-weight: 600;
   animation: passoAgoraPulso 1.4s ease-in-out infinite;
 }
-.passoAgora .passoMarca { border-color: var(--ragu); }
+.passoAgora .passoMarca { border-color: var(--marca); }
 @keyframes passoAgoraPulso {
   0%, 100% { box-shadow: 0 0 0 0 transparent; }
   50% { box-shadow: 0 0 0 3px var(--halo); }
@@ -444,11 +444,11 @@
 .cupomAplicado {
   display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap;
   margin: 0 0 var(--e-3); padding: var(--e-2) var(--e-3);
-  background: var(--ragu-claro); color: var(--ragu); border-radius: var(--r-2);
+  background: var(--marca-claro); color: var(--marca); border-radius: var(--r-2);
   font-size: var(--t-apoio);
 }
 .cupomAplicado b { color: var(--tinta); }
 .capturaStatus { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
 
 /* F03: erro de carga das janelas da API, ao lado da lista. */
-.avisoErro { display: block; font-size: var(--t-apoio); color: var(--perigo); }
+.avisoErro { display: block; font-size: var(--t-apoio); color: var(--erro); }

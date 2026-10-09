@@ -19,35 +19,22 @@
 
 .titulo {
   margin: 0;
-  font-size: var(--t-20);
-  color: var(--ragu);
+  font-size: var(--t-titulo);
+  color: var(--marca);
 }
 
-.subtitulo {
-  margin: -12px 0 0;
-  color: var(--tinta-2);
-  font-size: var(--t-15);
-}
-
-.formulario,
-.empresas {
+.formulario {
   display: grid;
   gap: 16px;
-}
-
-.pergunta {
-  margin: 0;
-  font-weight: 600;
-  color: var(--tinta);
 }
 
 .erro {
   margin: 0;
   padding: 12px;
   border-radius: 8px;
-  background: var(--perigo-fundo);
-  color: var(--perigo);
-  font-size: var(--t-15);
+  background: var(--erro-pastel);
+  color: var(--erro);
+  font-size: var(--t-apoio);
 }
 
 .google {

@@ -317,7 +317,7 @@ export function AbaProducao() {
                   <td>{rotuloDoSaldo(item.estoque)}</td>
                   <td>
                     {temLote
-                      ? <Pilula tom="ragu">lote lançado</Pilula>
+                      ? <Pilula tom="marca">lote lançado</Pilula>
                       : <Pilula tom="neutro" fina>sem produção lançada</Pilula>}
                   </td>
                   <td className={css.acoesLinha}>

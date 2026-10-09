@@ -1,114 +1,59 @@
-/* Tokens. Nenhum componente escreve cor, tamanho, espaço ou raio literal.
-   Tema por light-dark(): a paleta escura deixa de ser uma cópia da clara, então
-   não existe mais o risco de ajustar uma e esquecer a outra.
-
-   Rodada 6 (repaginação visual, 24/09): a hierarquia da rodada 3 fica, o
-   acabamento muda. Base na pesquisa de Apple HIG, Material 3, Radix e Linear:
-     1. Escala tipográfica do SF: 13, 15, 16, 17, 20, 24, 32. Hierarquia por
-        tamanho, peso e tom juntos.
-     2. Superfície separada por sombra macia e linha fina com alfa, não por
-        contorno escuro. Contorno forte ficou só no que precisa de 3:1.
-     3. Raio maior e consistente: controle 10, cartão 16, painel e modal 22.
-     4. Movimento com propósito: entra rápido e assenta, sai mais curto que
-        entrou, e some inteiro com prefers-reduced-motion.
-     5. Número em algarismo tabular da própria fonte do corpo. O mono ficou só
-        na comanda e no canhoto, onde a cara de papel de cozinha é o ponto. */
-
+/* Casa da Baba: paleta por papel, tema claro e escuro.
+   Fonte da marca: docs/plan/erp-casa-da-baba/01-fundacao.md, M0.1.
+   Pares de texto, ação, estado e foco verificados por verificar-contraste.mjs. */
 :root {
   color-scheme: light dark;
-
-  /* --- superfície: três, e só três ---------------------------------------
-     fundo   = o chão da tela, onde os painéis flutuam
-     papel   = o cartão, o painel, a coisa que se lê
-     elevado = o que encosta no papel: hover, faixa de controle, bloco embutido */
-  --fundo:   light-dark(#F2F2F4, #0F0E0D);
-  --papel:   light-dark(#FFFFFF, #1A1816);
-  --elevado: light-dark(#F5F5F7, #242120);
-  /* Chão da conversa: um meio tom entre fundo e papel, para a bolha branca
-     ter onde se destacar sem precisar de contorno. */
-  --chao-conversa: light-dark(#F7F7F9, #141312);
-
-  /* Preenchimento translúcido (o "fill" da Apple): botão secundário, campo,
-     chip parado. Por ser alfa, funciona igual sobre papel e sobre fundo. */
-  --preenchimento:       light-dark(rgba(60, 60, 67, .07), rgba(255, 240, 225, .07));
-  --preenchimento-forte: light-dark(rgba(60, 60, 67, .12), rgba(255, 240, 225, .12));
-
-  /* Material de vidro do topo e das camadas flutuantes. */
-  --vidro: light-dark(rgba(255, 255, 255, .78), rgba(26, 24, 22, .74));
+  --fundo: light-dark(#F6EEDD, #1A120C);
+  --papel: light-dark(#FEFEFE, #241A12);
+  --elevado: light-dark(#FFF8E8, #302318);
+  --creme: light-dark(#FFF8E8, #1A120C);
+  --chao-conversa: light-dark(#FFF8E8, #1A120C);
+  --preenchimento: light-dark(rgba(66, 40, 20, .07), rgba(246, 235, 221, .07));
+  --preenchimento-forte: light-dark(rgba(66, 40, 20, .12), rgba(246, 235, 221, .12));
+  --vidro: light-dark(rgba(254, 254, 254, .94), rgba(36, 26, 18, .94));
   --desfoque: saturate(180%) blur(20px);
-
-  /* Nomes antigos das superfícies. Ficam como apelido para o código existente
-     não quebrar, e não devem aparecer em regra nova. */
-  --semola:   var(--fundo);
-  --semola-2: var(--elevado);
-
-  /* Linha: fina e com alfa. --linha separa, --linha-media contorna controle,
-     --linha-forte é a que precisa de 3:1 (campo com erro, borda de foco). */
-  --linha:       light-dark(rgba(60, 60, 67, .10), rgba(255, 240, 225, .09));
-  --linha-media: light-dark(rgba(60, 60, 67, .17), rgba(255, 240, 225, .16));
-  --linha-forte: light-dark(rgba(60, 60, 67, .42), rgba(255, 240, 225, .38));
-
-  /* texto: tinta-3 passa 4,5:1 sobre fundo e papel nos dois temas */
-  --tinta:   light-dark(#1D1D1F, #F4EFE9);
-  --tinta-2: light-dark(#48484D, #C6BDB3);
-  --tinta-3: light-dark(#616166, #A39A90);
-
-  /* --- ação: uma cor só na tela inteira -----------------------------------
-     A marca é a ação primária e a identidade. NUNCA significa estado.
-     --ragu é a marca como TEXTO e traço; --acao é a marca como FUNDO de botão.
-     No escuro elas se separam: rosa claro lê bem como texto, mas como fundo
-     de botão lavava; o vinho médio com texto branco passa 5:1. */
-  /* Rodada 6b: a marca saiu do vinho (pesado, apagava a tela) para o tomate
-     do molho, com gradiente no que é ação. É a cor que dá vida à tela. */
-  --ragu:            light-dark(#B0381C, #FF9F80);
-  --ragu-forte:      light-dark(#962C12, #FFB89F);
-  --ragu-claro:      light-dark(#FCEDE7, #3A221B);
-  --ragu-contraste:  light-dark(#FFFFFF, #2A1210);
-  --acao:        light-dark(#B83B1D, #B94125);
-  --acao-forte:  light-dark(#AE3516, #D4532F);
-  --acao-gradiente: linear-gradient(180deg, light-dark(#C4401F, #C4452A), light-dark(#A8341A, #A8361D));
-  --sobre-acao:  #FFFFFF;
-  /* Anel de foco e halo de campo ativo: marca a 20% de alfa. */
-  --halo: light-dark(rgba(196, 64, 31, .2), rgba(255, 159, 128, .26));
-
-  /* Cor de cada canal: o ícone diz de onde veio antes do texto. */
-  --c-whatsapp:  light-dark(#1E9E57, #4ED88A);
-  --c-instagram: light-dark(#D6336C, #FF7AA8);
-  --c-site:      light-dark(#2D6BE0, #7AA7FF);
-
-  /* --- estado: três, e cada um significa uma coisa só ---------------------
-     ok      = andando bem
-     atencao = espera uma ação dela
-     parado  = cliente esperando ou pedido travado */
-  --ok:      light-dark(#2B6A45, #86CFA2);
-  --atencao: light-dark(#835600, #E8BD62);
-  --parado:  light-dark(#B4185A, #FF86AE);
-
-  --ok-pastel:      light-dark(#E5F2E9, #17271E);
-  --atencao-pastel: light-dark(#FAF0D8, #2D2415);
-  --parado-pastel:  light-dark(#FCE8EF, #3A1726);
-
-  /* Cozinha (US-037/RN-30, áudio 05): ela citou quatro cores, não três.
-     "Entregue" não pede ação (mesmo motivo que aposentou --info), mas ela
-     quer azul aqui, não neutro. Escopo: só o cartão de
-     `features/cozinha/CartaoCozinha.jsx`, o resto da tela continua nos três
-     estados de sempre. */
-  --entregue:        light-dark(#1F5A7A, #86C2E6);
-  --entregue-pastel: light-dark(#DCEAF2, #16242E);
-
-  /* Nomes antigos dos estados. Apelido para não quebrar quem já usa. */
-  --aviso:        var(--atencao);
-  --aviso-fundo:  var(--atencao-pastel);
-  --perigo:       var(--parado);
-  --perigo-fundo: var(--parado-pastel);
-  --ok-fundo:     var(--ok-pastel);
-  --info:         var(--tinta-2);
-  --info-fundo:   var(--elevado);
-
-  /* Comanda: papel de cozinha, um tom creme acima do papel. */
-  --comanda: light-dark(#FFFDF6, #25211B);
-  --sobre-parado: light-dark(#FFFFFF, #14110E);
-
+  --linha: light-dark(#E5D5BE, #594532);
+  --linha-media: light-dark(#8C7259, #AA8A69);
+  --linha-forte: light-dark(#8C7259, #AA8A69);
+  --tinta: light-dark(#422814, #F6EBDD);
+  --tinta-2: light-dark(#5E4128, #D9C6B0);
+  --tinta-3: light-dark(#735A45, #C4AB91);
+  --marca: light-dark(#A25803, #F0A960);
+  --marca-forte: light-dark(#874902, #FFC48A);
+  --marca-claro: light-dark(#FFF0D8, #3A2918);
+  --marca-contraste: light-dark(#FEFEFE, #422814);
+  --acao: light-dark(#A25803, #F0A960);
+  --acao-forte: light-dark(#874902, #FFC48A);
+  --sobre-acao: light-dark(#FEFEFE, #422814);
+  --halo: light-dark(rgba(162, 88, 3, .2), rgba(240, 169, 96, .26));
+  --trigo: #E3A542; /* somente decoração */
+  --c-whatsapp: light-dark(#1A7A43, #86CFA2);
+  --c-instagram: light-dark(#C1306B, #FF9DC2);
+  --c-messenger: light-dark(#1A5FD0, #9BC0FF);
+  --c-site: light-dark(#7A4A1E, #E4B88E);
+  --c-email: light-dark(#5B4FA0, #C2B8F4);
+  --c-sms: light-dark(#4A5868, #BECCDA);
+  --sucesso: light-dark(#2B6A45, #86CFA2);
+  --alerta: light-dark(#7A5A00, #E8BD62);
+  --erro: light-dark(#A8201A, #FFAAA3);
+  --info: light-dark(#1F5A7A, #9BCDEA);
+  --sucesso-pastel: light-dark(#E3F1E7, #17271E);
+  --alerta-pastel: light-dark(#FBF0CC, #2D2415);
+  --erro-pastel: light-dark(#FBE5E2, #3A1D1A);
+  --info-pastel: light-dark(#DFEDF5, #16242E);
+  --entregue: light-dark(#3D4F8F, #B0BDEB);
+  --entregue-pastel: light-dark(#E9EDF8, #212640);
+  --comanda: light-dark(#FFF8E8, #302318);
+  --sobre-erro: light-dark(#FEFEFE, #1A120C);
+  --branco: #FEFEFE;
+  --impressao-tinta: #000000;
+  --impressao-papel: #FFFFFF;
+  --avatar-fundo: #5E4128;
+  --canal-whatsapp-fundo: #1A7A43;
+  --canal-instagram-fundo: #C1306B;
+  --canal-site-fundo: #7A4A1E;
+  --canal-neutro-fundo: #4A5868;
+  --acao-sucesso: #2B6A45;
   /* Largura das colunas Balcão e Ficha, lida e escrita por localStorage pela
      Frente C (seção 9). */
   --largura-balcao: 360px;
@@ -130,31 +75,15 @@
     0 0 0 1px light-dark(rgba(16, 16, 24, .06), rgba(255, 240, 225, .08));
   --brilho: inset 0 1px 0 light-dark(rgba(255, 255, 255, .7), rgba(255, 255, 255, .05));
 
-  /* --- tipografia: escala Apple ----------------------------------------------
-     13 hora e carimbo, 15 apoio e rótulo, 16 corpo e conversa, 17 nome,
-     20 título de painel, 24 valor, 32 número de relance. A hierarquia sai de
-     tamanho, peso e tom juntos, como no SF. */
-  --t-11: .6875rem;  /* rótulo de navegação e de etapa, como a tab bar do iOS */
-  --t-13: .8125rem;
-  --t-15: .9375rem;
-  --t-16: 1rem;
-  --t-17: 1.0625rem;
-  --t-20: 1.25rem;
-  --t-24: 1.5rem;
-  --t-32: 2rem;
-  /* Apelidos de rodadas antigas: quem ainda chama pelo número velho cai no
-     degrau novo mais próximo. Regra nova usa o papel, não o número. */
-  --t-21: var(--t-20);
-  --t-26: var(--t-24);
-  --t-34: var(--t-32);
-
-  --t-micro:   var(--t-13);  /* hora, carimbo, contagem pequena */
-  --t-apoio:   var(--t-15);  /* rótulo, legenda, apoio */
-  --t-corpo:   var(--t-16);  /* conversa e comanda */
-  --t-forte:   var(--t-17);  /* nome do cliente */
-  --t-titulo:  var(--t-20);  /* título de painel e de modal */
-  --t-valor:   var(--t-24);  /* total da comanda */
-  --t-display: var(--t-32);  /* número lido de relance */
+  /* Escala por papel. */
+  --t-minimo: .8125rem;
+  --t-micro: .875rem;
+  --t-apoio: 1rem;
+  --t-corpo: 1.0625rem;
+  --t-forte: 1.1875rem;
+  --t-titulo: 1.375rem;
+  --t-valor: 1.75rem;
+  --t-display: 2.25rem;
 
   --lh-corpo: 1.45;
   --lh-compacto: 1.22;
@@ -196,13 +125,11 @@
   --coluna: 320px;
   --gaveta: 400px;
 
-  /* --- fontes --------------------------------------------------------------
-     Corpo: SF no Mac, Inter no Windows. Marca: Fraunces, só no nome da casa.
-     Papel: mono, só na comanda e no canhoto. */
-  --f-corpo: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
-  --f-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+  /* Fontes: títulos Lora; leitura e números Nunito Sans; papel monoespaçado. */
+  --f-corpo: 'Nunito Sans', 'Segoe UI', system-ui, sans-serif;
+  --f-display: 'Lora', Georgia, serif;
   --f-dado: var(--f-corpo);
-  --f-marca: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --f-titulo-marca: var(--f-display);
   --f-papel: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', monospace;
 
   /* --- movimento -----------------------------------------------------------
@@ -221,21 +148,7 @@
     .847 17%, .95 21.2%, 1.012 25.6%, 1.038 29.6%, 1.043 33.2%, 1.035 37.8%,
     1.016 44.6%, 1.002 53%, .996 62%, .998 78%, 1);
 
-  /* --- marca Casa da Baba (#1447) ------------------------------------------
-     Prévia do design-system-v1 (cores e Lora, plano erp-casa-da-baba M0.1),
-     usada só no hall de módulos e na barra do módulo enquanto a M0.1 não troca
-     o tema inteiro. Contraste conferido nos dois temas: cacau 12,8:1 e
-     caramelo 5,0:1 sobre o creme; no escuro 15,7:1 e 9,0:1. Trigo nunca é texto. */
-  --cdb-chao:     light-dark(#FFF8E8, #1A120C);
-  --cdb-papel:    light-dark(#FEFEFE, #241A12);
-  --cdb-cacau:    light-dark(#422814, #F6EBDD);
-  --cdb-cacau-2:  light-dark(#5E4128, #D9C6B0);
-  --cdb-caramelo: light-dark(#A25803, #F0A960);
-  --cdb-trigo:    #E3A542;
-  --cdb-linha:    light-dark(#E5D5BE, #3A2C20);
-  --f-titulo-marca: 'Lora', Georgia, 'Times New Roman', serif;
 }
 
-/* Escolha explícita vence a preferência do sistema, nos dois sentidos. */
 :root[data-theme='light'] { color-scheme: only light; }
 :root[data-theme='dark'] { color-scheme: only dark; }

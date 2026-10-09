@@ -96,7 +96,7 @@ export function duracao(ms) {
 export const mascaraMoeda = (centavos) => moeda((centavos ?? 0) / 100)
 
 // Acima disto o campo de moeda avisa em vez de aceitar (seção 4):
-// "Valor alto demais" em --parado, no lugar do valor.
+// "Valor alto demais" em --erro, no lugar do valor.
 export const LIMITE_MOEDA_CENTAVOS = 9999999
 export const moedaAltaDemais = (centavos) => (centavos ?? 0) > LIMITE_MOEDA_CENTAVOS
 

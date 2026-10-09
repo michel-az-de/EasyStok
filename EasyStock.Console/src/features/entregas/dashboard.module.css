@@ -110,7 +110,7 @@
   padding: var(--e-4); text-align: center; color: var(--tinta-3); font-size: var(--t-apoio);
   min-height: var(--toque);
 }
-.zonaNovaViagemSobre { border-color: var(--ragu); color: var(--ragu); background: var(--ragu-claro); }
+.zonaNovaViagemSobre { border-color: var(--marca); color: var(--marca); background: var(--marca-claro); }
 
 /* --- Cartão de entrega --------------------------------------------------- */
 .cartao {
@@ -124,14 +124,14 @@
 }
 .cartao:hover { box-shadow: var(--sombra-media); }
 @keyframes cartaoEntra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.cartao:focus-visible { outline: var(--b-3) solid var(--ragu); outline-offset: 2px; }
+.cartao:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
 
 /* Achado 1 (rodada 10): cartão que muda sozinho (pagamento, "precisa de
    você") pisca por ~1,5 s, mesmo tempo do destaque sonoro
    (aplicacao/useAvisoSonoro.js) e mesma receita do cartão da Cozinha. */
 .cartaoNovo { animation: cartaoRealce 1.5s var(--ease-pulo); }
 @keyframes cartaoRealce {
-  0% { background: var(--ok-pastel); }
+  0% { background: var(--sucesso-pastel); }
   100% { background: var(--papel); }
 }
 .arrastando { opacity: .5; box-shadow: var(--sombra-alta); }
@@ -155,7 +155,7 @@
   background: none; border: 0; padding: 0; margin: 0; text-align: left; color: inherit; cursor: pointer;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em;
 }
-.nomeCartao:focus-visible { outline: var(--b-3) solid var(--ragu); outline-offset: 2px; border-radius: var(--r-1); }
+.nomeCartao:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
 .linha2 {
   display: flex; align-items: baseline; gap: var(--e-2); justify-content: space-between;
   padding-left: var(--e-1); font-size: var(--t-apoio); color: var(--tinta-2);
@@ -165,7 +165,7 @@
   display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
   padding-left: var(--e-1); font-size: var(--t-apoio); color: var(--tinta-2);
 }
-.marcas { font-size: var(--t-apoio); color: var(--atencao); }
+.marcas { font-size: var(--t-apoio); color: var(--alerta); }
 /* Motivo do botão do marco desabilitado (RN-14). */
 .motivoDesabilitado { margin: 0; padding-left: var(--e-1); font-size: var(--t-apoio); color: var(--tinta-2); }
 
@@ -191,7 +191,7 @@
   font-size: var(--t-apoio); color: var(--tinta); cursor: pointer;
 }
 .itemMenu:hover { background: var(--elevado); }
-.itemMenu.perigo { color: var(--parado); }
+.itemMenu.perigo { color: var(--erro); }
 .submenu { padding-left: var(--e-5); display: grid; }
 
 .confirmacaoInline {
@@ -206,7 +206,7 @@
   display: grid; gap: var(--e-2); padding: var(--e-3);
   background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
 }
-.viagemSobre { border-color: var(--ragu); border-style: dashed; background: var(--ragu-claro); }
+.viagemSobre { border-color: var(--marca); border-style: dashed; background: var(--marca-claro); }
 .cabecaViagem { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .cabecaViagem h3 { margin: 0; font-size: var(--t-corpo); font-weight: 700; flex: 1; }
 .saiViagem { font-size: var(--t-apoio); color: var(--tinta-2); font-family: var(--f-dado); }
@@ -216,7 +216,7 @@
   display: flex; align-items: center; gap: var(--e-2); padding: var(--e-2);
   background: var(--elevado); border-radius: var(--r-1); font-size: var(--t-apoio);
 }
-.paradaAtrasada { color: var(--parado); }
+.paradaAtrasada { color: var(--erro); }
 .numeroParada { font-family: var(--f-dado); color: var(--tinta-3); width: 1.5em; }
 .nomeParada { flex: 1; }
 .botoesOrdem { display: flex; }
@@ -237,9 +237,9 @@
   min-height: var(--toque); padding: var(--e-2) var(--e-3); border: var(--b-1) solid var(--linha);
   border-radius: var(--r-1); background: var(--papel); font-size: var(--t-apoio);
 }
-.linhaJanela[aria-pressed='true'] { border-color: var(--ragu); background: var(--ragu-claro); }
+.linhaJanela[aria-pressed='true'] { border-color: var(--marca); background: var(--marca-claro); }
 .linhaJanela:disabled { opacity: .5; cursor: not-allowed; }
-.motivoJanela { margin: 0; font-size: var(--t-apoio); color: var(--parado); }
+.motivoJanela { margin: 0; font-size: var(--t-apoio); color: var(--erro); }
 
 .previaAviso {
   display: flex; align-items: flex-start; gap: var(--e-2); font-size: var(--t-apoio);
@@ -252,16 +252,16 @@
   background: var(--elevado); border-radius: var(--r-1); font-size: var(--t-apoio);
 }
 .paradaRota strong { font-size: var(--t-corpo); }
-.linkMapa { color: var(--ragu); font-weight: 600; }
+.linkMapa { color: var(--marca); font-weight: 600; }
 
 /* Ação do passo dentro do cartão: botão tinto, não cheio. Quatro primários
    cheios empilhados competiam entre si e com a ação principal da tela. */
 .linha3 > button,
 .linha3 > button:hover:not(:disabled) {
-  background: var(--ragu-claro); color: var(--ragu); border-color: transparent;
+  background: var(--marca-claro); color: var(--marca); border-color: transparent;
   box-shadow: none; min-height: 36px;
 }
-.linha3 > button:hover:not(:disabled) { background: color-mix(in srgb, var(--ragu) 18%, var(--ragu-claro)); }
+.linha3 > button:hover:not(:disabled) { background: color-mix(in srgb, var(--marca) 18%, var(--marca-claro)); }
 
 /* Issue #17 (rodada 12): dica do "por janela de entrega", alcance por bairro,
    número do pedido para o entregador e quem leva no cartão. */
@@ -273,7 +273,7 @@
   max-height: 45vh; overflow-y: auto;
 }
 .alcanceTopo { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e-1) var(--e-3); }
-.alcanceTopo h2 { margin: 0; font-size: var(--t-17); }
+.alcanceTopo h2 { margin: 0; font-size: var(--t-forte); }
 .alcanceLista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--e-1); }
 /* Dentro de um contêiner que rola, filho de flex encolhe até sumir: fixa. */
 .alcance > * { flex-shrink: 0; }
@@ -286,14 +286,14 @@
 }
 .alcanceBairro { grid-area: bairro; display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1); font-weight: 600; }
 .alcanceMarca {
-  font-size: var(--t-13); font-weight: 600; color: var(--tinta-2);
+  font-size: var(--t-micro); font-weight: 600; color: var(--tinta-2);
   border: var(--b-1) solid var(--linha-media); border-radius: var(--r-pilula); padding: 0 var(--e-2);
 }
 .alcanceBarra { grid-area: barra; height: 8px; border-radius: var(--r-pilula); background: var(--preenchimento); overflow: hidden; }
-.alcanceBarra span { display: block; height: 100%; background: var(--ragu); border-radius: inherit; }
+.alcanceBarra span { display: block; height: 100%; background: var(--marca); border-radius: inherit; }
 .alcanceNumeros { grid-area: numeros; text-align: right; font-size: var(--t-apoio); font-family: var(--f-dado); color: var(--tinta-2); }
-.alcanceVariacao { color: var(--ok); }
-.alcanceCaiu { color: var(--parado); }
+.alcanceVariacao { color: var(--sucesso); }
+.alcanceCaiu { color: var(--erro); }
 @media (max-width: 600px) {
   .alcanceLinha { grid-template-columns: 1fr; grid-template-areas: "bairro" "numeros" "barra"; }
   .alcanceNumeros { text-align: left; }

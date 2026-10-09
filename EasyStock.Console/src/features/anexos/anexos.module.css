@@ -3,7 +3,7 @@
 .aviso {
   display: flex; align-items: center; gap: var(--e-2);
   margin: 0 0 var(--e-3); padding: var(--e-2) var(--e-3);
-  background: var(--aviso-fundo); color: var(--aviso); border-radius: var(--r-1);
+  background: var(--alerta-pastel); color: var(--alerta); border-radius: var(--r-1);
   font-size: var(--t-apoio);
 }
 
@@ -30,7 +30,7 @@
   transition: background 180ms ease, color 180ms ease;
 }
 .cartaoIcone:hover { background: var(--elevado); }
-.confirmarTirar { width: auto; padding: 0 var(--e-2); color: var(--perigo); background: var(--perigo-fundo); }
+.confirmarTirar { width: auto; padding: 0 var(--e-2); color: var(--erro); background: var(--erro-pastel); }
 .cartaoEnviar { margin-left: auto; }
 
 .formulario { display: grid; gap: var(--e-3); }
@@ -40,13 +40,13 @@
 }
 .campoFoto img { width: 100%; height: 100%; object-fit: cover; }
 .campoFotoVazio { display: flex; align-items: center; gap: var(--e-1); color: var(--tinta-2); font-size: var(--t-apoio); }
-.campoFoto:focus-within { border-color: var(--ragu); box-shadow: 0 0 0 4px var(--halo); }
+.campoFoto:focus-within { border-color: var(--marca); box-shadow: 0 0 0 4px var(--halo); }
 
 /* Campo obrigatório vazio depois do clique em Incluir/Salvar (dominio/anexos.js
    validarPeca): marca e frase curta, nunca clique sem resposta. A marca (borda)
    já carrega a cor de erro (RN-30); a frase fica no mesmo tom neutro do
    componentes/Campo.module.css .dica, para os três campos lerem igual. */
-.campoFotoInvalido { border-color: var(--perigo); }
+.campoFotoInvalido { border-color: var(--erro); }
 .dicaFoto { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-3); }
 .formulario input[aria-invalid="true"],
-.formulario textarea[aria-invalid="true"] { border-color: var(--perigo); }
+.formulario textarea[aria-invalid="true"] { border-color: var(--erro); }

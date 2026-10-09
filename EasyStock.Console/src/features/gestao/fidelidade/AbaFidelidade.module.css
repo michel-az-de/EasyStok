@@ -36,6 +36,6 @@
 
 .notaProposta {
   grid-column: 1 / -1; display: flex; gap: var(--e-2); align-items: flex-start; margin: 0;
-  padding: var(--e-2) var(--e-3); background: var(--ragu-claro); color: var(--ragu);
+  padding: var(--e-2) var(--e-3); background: var(--marca-claro); color: var(--marca);
   border-radius: var(--r-1); font-size: var(--t-micro);
 }

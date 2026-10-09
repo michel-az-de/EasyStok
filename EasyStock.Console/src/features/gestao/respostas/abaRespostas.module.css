@@ -19,7 +19,7 @@
   display: inline-flex; align-items: center; gap: var(--e-2);
   min-height: var(--toque); font-size: var(--t-apoio); color: var(--tinta);
 }
-.chave input { width: 20px; height: 20px; accent-color: var(--ragu); }
+.chave input { width: 20px; height: 20px; accent-color: var(--marca); }
 
 .lista { list-style: none; margin: 0; padding: 0; border-top: var(--b-1) solid var(--linha); }
 .linha {
@@ -41,7 +41,7 @@
 }
 .textoInteiro { grid-column: 1 / -1; font-size: var(--t-apoio); color: var(--tinta-2); white-space: pre-line; }
 .quando { grid-column: 1 / -1; font-size: var(--t-micro); color: var(--tinta-3); }
-.semTexto { grid-column: 1 / -1; font-size: var(--t-apoio); color: var(--atencao); }
+.semTexto { grid-column: 1 / -1; font-size: var(--t-apoio); color: var(--alerta); }
 .chaveLinha { min-height: 0; justify-self: start; grid-column: 2 / -1; }
 
 .arquivada .titulo, .arquivada .texto { color: var(--tinta-3); }
@@ -52,7 +52,7 @@
 .form { display: grid; gap: var(--e-3); padding: var(--e-2) 0; }
 .duas { display: grid; gap: var(--e-3); grid-template-columns: 2fr 1fr; }
 .acoes { display: flex; gap: var(--e-2); flex-wrap: wrap; }
-.alerta { grid-column: 1 / -1; margin: 0; font-size: var(--t-apoio); color: var(--atencao); }
+.alerta { grid-column: 1 / -1; margin: 0; font-size: var(--t-apoio); color: var(--alerta); }
 .vazio { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
 
 @media (max-width: 759px) {

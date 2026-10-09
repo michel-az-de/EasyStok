@@ -8,7 +8,7 @@ import { SEGUNDOS_PARA_DESFAZER } from '../../dominio/esteira'
 import css from './cliente.module.css'
 
 // Tags como chips (seção 2 da direção visual, US-016). Restrição sempre
-// primeiro (RN-39/RN-52): ícone de alerta e borda `--atencao`. Remover usa o
+// primeiro (RN-39/RN-52): ícone de alerta e borda `--alerta`. Remover usa o
 // mesmo padrão de desfazer da esteira (`SEGUNDOS_PARA_DESFAZER`), sem criar
 // ação nova: `Desfazer` só chama `adicionarTag` de volta.
 export function TagsDoCliente({ conversa }) {

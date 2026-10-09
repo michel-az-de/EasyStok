@@ -12,15 +12,15 @@
   justify-content: space-between;
   gap: 12px;
   padding: 6px 16px;
-  font-size: var(--t-13);
+  font-size: var(--t-micro);
   color: var(--tinta-2);
   background: var(--elevado);
   border-top: 1px solid var(--linha);
 }
 
 .alerta {
-  color: var(--perigo);
-  background: var(--perigo-fundo);
+  color: var(--erro);
+  background: var(--erro-pastel);
 }
 
 .quem {
@@ -33,7 +33,7 @@
 .sair {
   border: 0;
   background: none;
-  color: var(--ragu);
+  color: var(--marca-forte);
   font: inherit;
   cursor: pointer;
   text-decoration: underline;
@@ -47,7 +47,7 @@
 }
 
 .vence {
-  color: var(--perigo);
+  color: var(--erro);
 }
 
 @media (max-width: 767px) {
