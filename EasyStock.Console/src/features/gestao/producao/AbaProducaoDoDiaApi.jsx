@@ -3,6 +3,7 @@ import { Botao } from '../../../componentes/Botao'
 import { FolhaImpressao } from '../../../componentes/FolhaImpressao'
 import { useCatalogo } from '../../../aplicacao/contextos'
 import { criarProducaoDoDia } from '../../../aplicacao/producaoDoDia'
+import { retirarProducaoPlanejada } from '../../../aplicacao/planejamento'
 import { estaRemovido } from '../../../dominio/cardapio'
 import { sobraDaLinha } from '../../../dominio/producao'
 import css from '../cardapio/abaCardapio.module.css'
@@ -30,7 +31,11 @@ export function AbaProducaoDoDiaApi() {
   const { cardapio } = useCatalogo()
   const producao = useMemo(() => criarProducaoDoDia(), [])
   const pratos = useMemo(() => (cardapio ?? []).filter((i) => !estaRemovido(i)), [cardapio])
-  const [linhas, setLinhas] = useState(() => [novaLinha()])
+  // M2.5 (#1502): vindo do Planejamento, as porções planejadas já entram como linhas.
+  const [linhas, setLinhas] = useState(() => {
+    const planejadas = retirarProducaoPlanejada()
+    return planejadas?.length ? planejadas.map((p) => ({ ...novaLinha(), ...p })) : [novaLinha()]
+  })
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState(null)
   const [feito, setFeito] = useState(null)

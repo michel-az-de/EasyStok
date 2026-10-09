@@ -41,6 +41,8 @@ export const MODULOS = [
       { id: 'insumos', rotulo: 'Insumos', tipo: TELA_AJUSTE, aba: 'insumos', soApi: true },
       // M2.4a (#1498): a receita de cada prato, com o custo por porção.
       { id: 'receitas', rotulo: 'Receitas', tipo: TELA_AJUSTE, aba: 'receitas', soApi: true },
+      // M2.5 (#1502): quanto produzir, insumos, faltas e lista de compras.
+      { id: 'planejamento', rotulo: 'Planejamento', tipo: TELA_AJUSTE, aba: 'planejamento', soApi: true },
     ],
   },
   {

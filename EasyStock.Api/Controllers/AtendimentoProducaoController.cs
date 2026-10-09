@@ -7,6 +7,8 @@ namespace EasyStock.Api.Controllers;
 
 public sealed record BaixaAutomaticaRequest(bool Ligada);
 
+public sealed record PlanejamentoRequest(IReadOnlyList<PratoPlanejado>? Pratos);
+
 public sealed record ProduzirPratosRequest(IReadOnlyList<PratoProduzidoInput>? Pratos, string? Observacao = null);
 
 /// <param name="Unidade">G, Kg, Ml, L, Un...; null = não mexe (no cadastro, Un).</param>
@@ -26,8 +28,51 @@ public class AtendimentoProducaoController(
     ProduzirPratosUseCase produzirPratos,
     InsumosDaProducaoUseCase insumos,
     ReceitasDaProducaoUseCase receitas,
+    PlanejamentoDaProducaoUseCase planejamento,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
+    [SwaggerOperation(Summary = "Production suggestion per menu dish: minimum + scheduled orders + uncovered - stock (M2.5)",
+        Description = "ate = último dia dos pedidos agendados (padrão: amanhã, no dia operacional do Brasil).")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [HttpGet("sugestao")]
+    public async Task<IActionResult> Sugestao([FromQuery] DateOnly? ate, CancellationToken ct)
+    {
+        if (!currentUser.TemPermissao(Permissao.GerenciarEstoque)) return Forbid();
+        try
+        {
+            return DataOk(await planejamento.SugestaoAsync(currentUser.EmpresaId, ate, ct));
+        }
+        catch (StorefrontNaoEncontradoException)
+        {
+            return DataNotFound("A empresa não tem vitrine ativa.");
+        }
+        catch (UseCaseValidationException ex)
+        {
+            return DataBadRequest(ex.Message);
+        }
+    }
+
+    [SwaggerOperation(Summary = "Supplies needed and shortages for the planned portions (M2.5)",
+        Description = "Mesma cesta da calculadora mobile (POST api/mobile/calculadora/calcular-cesta). Não mexe no estoque.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [HttpPost("planejamento")]
+    public async Task<IActionResult> Planejar([FromBody] PlanejamentoRequest req, CancellationToken ct)
+    {
+        if (!currentUser.TemPermissao(Permissao.GerenciarEstoque)) return Forbid();
+        try
+        {
+            return DataOk(await planejamento.PlanejarAsync(currentUser.EmpresaId, req.Pratos, ct));
+        }
+        catch (UseCaseValidationException ex)
+        {
+            return DataBadRequest(ex.Message);
+        }
+    }
+
     [SwaggerOperation(Summary = "Recipes of the menu dishes with cost per yield unit (M2.4a)",
         Description = "Gravar a receita é o PUT api/produtos/{id}/composicao (Gerente).")]
     [ProducesResponseType(StatusCodes.Status200OK)]
