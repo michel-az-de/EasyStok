@@ -127,7 +127,9 @@ export function PainelFicha({ aoAbrirCardapio }) {
                 bloqueado={estaBloqueada(selecionada)}
               />
             </Bloco>
+            {/* #1510: formulário "Recebi" e confirmações não atravessam de uma conversa para outra. */}
             <BlocoCobranca
+              key={selecionada.id}
               pedido={pedido}
               agora={agora}
               editavel={editavel}
@@ -144,6 +146,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
             />
             {pedido.ocorrencia && (
               <BlocoOcorrencia
+                key={selecionada.id}
                 ocorrencia={pedido.ocorrencia}
                 conversaId={selecionada.id}
                 nomeCliente={selecionada.nome}
@@ -169,7 +172,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
 
       {pedido && editavel && (
         <BarraProximoPasso
-          key={avancoEm ?? 'sem-avanco'}
+          key={`${selecionada.id}:${avancoEm ?? 'sem-avanco'}`}
           emDesfazer={Boolean(avancoEm)}
           pedido={pedido}
           agora={agora}

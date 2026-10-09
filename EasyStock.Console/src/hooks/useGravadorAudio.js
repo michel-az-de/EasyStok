@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 // Grava áudio do microfone (MediaRecorder). Puro wrapper de API de navegador,
 // sem domínio: quem chama decide o que fazer com { dataUrl, duracaoMs } que
@@ -19,6 +19,7 @@ export function useGravadorAudio({ escolherTipo } = {}) {
   const pedacosRef = useRef([])
   const inicioRef = useRef(0)
   const timerRef = useRef(null)
+  const montadoRef = useRef(false)
 
   const pararTrilhas = () => {
     streamRef.current?.getTracks().forEach((trilha) => trilha.stop())
@@ -30,6 +31,22 @@ export function useGravadorAudio({ escolherTipo } = {}) {
     timerRef.current = null
   }
 
+  // #1510: ao desmontar (trocar de conversa, sair da tela) o microfone e o relógio param
+  // junto; antes seguiam vivos e o indicador de gravação do navegador ficava aceso.
+  useEffect(() => {
+    montadoRef.current = true
+    return () => {
+      montadoRef.current = false
+      if (timerRef.current) clearInterval(timerRef.current)
+      timerRef.current = null
+      const gravador = gravadorRef.current
+      if (gravador && gravador.state !== 'inactive') gravador.stop()
+      streamRef.current?.getTracks().forEach((trilha) => trilha.stop())
+      streamRef.current = null
+      pedacosRef.current = []
+    }
+  }, [])
+
   const iniciar = useCallback(async () => {
     setErro(null)
     setEstado('pedindo')
@@ -38,6 +55,8 @@ export function useGravadorAudio({ escolherTipo } = {}) {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
       })
+      // Permissão concedida depois de desmontar: devolve o microfone em vez de gravar no vazio.
+      if (!montadoRef.current) { stream.getTracks().forEach((trilha) => trilha.stop()); return }
       streamRef.current = stream
       const tipo = escolherTipo?.((t) => MediaRecorder.isTypeSupported(t)) ?? null
       const gravador = tipo ? new MediaRecorder(stream, { mimeType: tipo }) : new MediaRecorder(stream)
