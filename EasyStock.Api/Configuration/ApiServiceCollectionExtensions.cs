@@ -74,6 +74,7 @@ public static class ApiServiceCollectionExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
         services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, ModuloAuthorizationHandler>();
+        services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, PermissaoAuthorizationHandler>();
         services.AddScoped<AdminAuditService>();
         services.AddScoped<GeradorNotificacoesAutomaticas>();
         services.AddSingleton<EasyStock.Api.Services.Impressao.PedidoImpressoHtml>(); // S49: impresso do pedido
@@ -127,6 +128,9 @@ public static class ApiServiceCollectionExtensions
             opts.AddPolicy("Admin",    p => p.RequireClaim("nivel", "SuperAdmin", "Admin"));
             opts.AddPolicy("Gerente",  p => p.RequireClaim("nivel", "SuperAdmin", "Admin", "Gerente"));
             opts.AddPolicy("Operador", p => p.RequireClaim("nivel", "SuperAdmin", "Admin", "Gerente", "Operador"));
+            // #1508: permissão fina pelo perfil (explícito ou fallback do nível), não só o nível.
+            opts.AddPolicy(PoliticasPermissao.VisualizarRelatorios, p => p.RequireAuthenticatedUser()
+                .AddRequirements(new PermissaoRequirement(Permissao.VisualizarRelatorios)));
             opts.AddInternalCronJobPolicy();
             opts.AddImpressaoFilaPolicy();
         });
