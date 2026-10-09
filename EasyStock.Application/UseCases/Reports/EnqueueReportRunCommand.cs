@@ -50,11 +50,8 @@ public sealed class EnqueueReportRunUseCase
         // 1. Definição existe?
         var definition = _registry.Get(command.ReportKey);
 
-        // 2. Permissão
-        if (_user.Nivel != EasyStock.Domain.Enums.NivelAcesso.SuperAdmin &&
-            !HasPermissao(definition.PermissaoRequerida))
-            throw new UnauthorizedAccessException(
-                $"Sem permissão para o relatório '{command.ReportKey}'.");
+        // 2. Permissão (mesma regra do preview e do data)
+        ReportAcesso.Garantir(_user, definition);
 
         // 3. Format suportado?
         if (!definition.FormatosSuportados.Contains(command.Format))
@@ -110,10 +107,6 @@ public sealed class EnqueueReportRunUseCase
         _user.Nivel == EasyStock.Domain.Enums.NivelAcesso.SuperAdmin
             ? (Guid?)null
             : _user.EmpresaId;
-
-    private bool HasPermissao(string permissaoRequerida) =>
-        // Permissão simples via NivelAcesso ou Claims — verifica por nome
-        _user.Nivel == EasyStock.Domain.Enums.NivelAcesso.SuperAdmin;
 
     private static string ComputeHash(string reportKey, string paramsJson, ReportFormat format)
     {

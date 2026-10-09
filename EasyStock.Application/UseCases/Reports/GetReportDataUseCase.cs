@@ -11,8 +11,9 @@ namespace EasyStock.Application.UseCases.Reports;
 /// Máx. pageSize = 200. Requer <see cref="IReportExecutionScope"/> inicializado.
 /// </summary>
 public sealed class GetReportDataUseCase(
-    ReportRegistry   registry,
-    IServiceProvider serviceProvider)
+    ReportRegistry       registry,
+    IServiceProvider     serviceProvider,
+    ICurrentUserAccessor currentUser)
 {
     public const int MaxPageSize = 200;
 
@@ -27,6 +28,8 @@ public sealed class GetReportDataUseCase(
         var definition = registry.Find(query.ReportKey);
         if (definition is null)
             return null;
+
+        ReportAcesso.Garantir(currentUser, definition);
 
         int pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
         int page     = Math.Max(1, query.Page);

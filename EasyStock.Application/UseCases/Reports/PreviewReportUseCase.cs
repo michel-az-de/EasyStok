@@ -12,7 +12,8 @@ namespace EasyStock.Application.UseCases.Reports;
 /// </summary>
 public sealed class PreviewReportUseCase(
     ReportRegistry       registry,
-    IServiceProvider     serviceProvider)
+    IServiceProvider     serviceProvider,
+    ICurrentUserAccessor currentUser)
 {
     // Reflection handle para o wrapper genérico — evita CS8416 (não é possível await foreach em dynamic)
     private static readonly MethodInfo s_wrapMethod =
@@ -25,6 +26,8 @@ public sealed class PreviewReportUseCase(
         var definition = registry.Find(query.ReportKey);
         if (definition is null)
             return null;
+
+        ReportAcesso.Garantir(currentUser, definition);
 
         // Dynamic dispatch — resolve handler pelo tipo concreto de TParams/TRow
         var handlerType = typeof(IReportHandler<,>)
