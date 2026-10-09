@@ -108,7 +108,8 @@ public class PermissoesLegadasMigrationTests
             }
             (await db.UsuariosPerfis.IgnoreQueryFilters().CountAsync()).Should().Be(5);
             var reverter = () => db.GetService<IMigrator>().MigrateAsync("20261009170822_AddPerfilModuloInicial");
-            await reverter.Should().ThrowAsync<NotSupportedException>().WithMessage("*Restaure o arquivo*");
+            // #1504: com perfil arquivado, o banco recusa o Down e a migration continua aplicada.
+            await reverter.Should().ThrowAsync<Npgsql.PostgresException>().WithMessage("*Restaure o arquivo*");
             (await db.Database.GetPendingMigrationsAsync()).Should().BeEmpty();
         }
 
