@@ -243,12 +243,15 @@ public class SyncController(
         var serverTime = _relogio.GetUtcNow().ToUnixTimeMilliseconds();
 
         var device = HttpContext.GetMobileDevice();
-        var lojaId = device?.LojaId;
-        var empresaId = device?.EmpresaId;
+        // #1509: sem device nao ha empresa para filtrar; as tabelas mobile_* ficam fora do filtro
+        // global de tenant e o pull devolvia dados de todas as empresas.
+        if (device is null) return Unauthorized(new { error = "device não pareado" });
+        Guid? lojaId = device.LojaId;
+        Guid? empresaId = device.EmpresaId;
 
         var mutations = new List<MutationDto>();
 
-        var productsQ = _db.Set<Product>().Where(p => p.UpdatedAt > sinceDate && p.LastDeviceId != deviceId);
+        var productsQ = _db.Set<Product>().Where(p => p.EmpresaId == empresaId && p.UpdatedAt > sinceDate && p.LastDeviceId != deviceId);
         if (lojaId.HasValue)
             productsQ = productsQ.Where(p => p.LojaId == lojaId || p.LojaId == null);
         var products = await productsQ.ToListAsync();
@@ -263,7 +266,7 @@ public class SyncController(
                 "product.upsert", SyncDtoConverters.Serialize(SyncDtoConverters.ToDto(p, tipoEmbMap)),
                 new DateTimeOffset(p.UpdatedAt).ToUnixTimeMilliseconds()));
 
-        var clientsQ = _db.Set<Client>().Where(c => c.UpdatedAt > sinceDate && c.LastDeviceId != deviceId);
+        var clientsQ = _db.Set<Client>().Where(c => c.EmpresaId == empresaId && c.UpdatedAt > sinceDate && c.LastDeviceId != deviceId);
         if (lojaId.HasValue)
             clientsQ = clientsQ.Where(c => c.LojaId == lojaId || c.LojaId == null);
         var clients = await clientsQ.ToListAsync();
@@ -273,7 +276,7 @@ public class SyncController(
                 new DateTimeOffset(c.UpdatedAt).ToUnixTimeMilliseconds()));
 
         var ordersQ = _db.Set<Order>().Include(o => o.Items)
-            .Where(o => o.UpdatedAt > sinceDate && o.LastDeviceId != deviceId);
+            .Where(o => o.EmpresaId == empresaId && o.UpdatedAt > sinceDate && o.LastDeviceId != deviceId);
         if (lojaId.HasValue)
             ordersQ = ordersQ.Where(o => o.LojaId == lojaId || o.LojaId == null);
         var orders = await ordersQ.ToListAsync();
@@ -283,7 +286,7 @@ public class SyncController(
                 new DateTimeOffset(o.UpdatedAt).ToUnixTimeMilliseconds()));
 
         var batchesQ = _db.Set<Batch>().Include(b => b.Items)
-            .Where(b => b.CreatedAt > sinceDate && b.LastDeviceId != deviceId);
+            .Where(b => b.EmpresaId == empresaId && b.CreatedAt > sinceDate && b.LastDeviceId != deviceId);
         if (lojaId.HasValue)
             batchesQ = batchesQ.Where(b => b.LojaId == lojaId || b.LojaId == null);
         var batches = await batchesQ.ToListAsync();
@@ -292,7 +295,7 @@ public class SyncController(
                 "batch.upsert", SyncDtoConverters.Serialize(SyncDtoConverters.ToDto(b)),
                 new DateTimeOffset(b.CreatedAt).ToUnixTimeMilliseconds()));
 
-        var cashQ = _db.Set<CashEntry>().Where(c => c.CreatedAt > sinceDate && c.LastDeviceId != deviceId);
+        var cashQ = _db.Set<CashEntry>().Where(c => c.EmpresaId == empresaId && c.CreatedAt > sinceDate && c.LastDeviceId != deviceId);
         if (lojaId.HasValue)
             cashQ = cashQ.Where(c => c.LojaId == lojaId || c.LojaId == null);
         var cash = await cashQ.ToListAsync();

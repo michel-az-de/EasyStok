@@ -1,5 +1,6 @@
 using EasyStock.Api.Mobile.Controllers;
 using EasyStock.Api.Mobile.DTOs;
+using EasyStock.Api.Mobile.Security;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities.Mobile;
@@ -23,12 +24,13 @@ namespace EasyStock.Api.UnitTests.Mobile;
 public sealed class SyncPullServerTimeTests : IDisposable
 {
     private readonly EasyStockDbContext _db;
+    private readonly Guid _empresaId = Guid.NewGuid();
 
     public SyncPullServerTimeTests()
     {
         var currentUser = Substitute.For<ICurrentUserAccessor>();
         currentUser.IsAuthenticated.Returns(true);
-        currentUser.EmpresaId.Returns(Guid.NewGuid());
+        currentUser.EmpresaId.Returns(_empresaId);
 
         _db = new EasyStockDbContext(
             new DbContextOptionsBuilder<EasyStockDbContext>()
@@ -60,13 +62,20 @@ public sealed class SyncPullServerTimeTests : IDisposable
             Id = "p-1",
             Name = "Lasanha",
             UpdatedAt = DateTime.UtcNow.AddMinutes(-1),
-            LastDeviceId = "outro-aparelho"
+            LastDeviceId = "outro-aparelho",
+            EmpresaId = _empresaId
         });
         await _db.SaveChangesAsync();
         _db.ChangeTracker.Clear();
 
         var agora = DateTimeOffset.UtcNow;
         var relogio = new RelogioEspiao(_db, agora);
+        // #1509: o pull exige aparelho pareado (filtra pela empresa dele).
+        var http = new DefaultHttpContext();
+        http.Items[MobileAuth.HttpContextItemDevice] = new MobileDevice
+        {
+            Id = "este-aparelho", ApiKeyHash = "h", EmpresaId = _empresaId, LojaId = Guid.Empty
+        };
         var controller = new SyncController(
             _db, null!, null!, null!, null!,
             Substitute.For<IProdutoRepository>(),
@@ -74,7 +83,7 @@ public sealed class SyncPullServerTimeTests : IDisposable
             relogio,
             NullLogger<SyncController>.Instance)
         {
-            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+            ControllerContext = new ControllerContext { HttpContext = http }
         };
 
         var resultado = await controller.Pull(0, "este-aparelho");
