@@ -236,9 +236,22 @@ export function meiosDaPagina(meios) {
 // do cardápio, nada de transformar qualquer URL.
 const LINK_NO_TEXTO = /(\S*#\/cardapio-link\/\S+)/ // mesmo caminho de PREFIXO_ROTA
 
-export function partesComLinkDoCardapio(texto) {
+// #1510: o clique abre a URL com a origem do console, então só vira link o
+// http(s) da própria `origem` (a mesma de `linkDoCardapio`). `javascript:`,
+// `data:` ou host de fora com o caminho do cardápio no fim ficam texto.
+function linkSeguro(parte, origem) {
+  if (!origem || !LINK_NO_TEXTO.test(parte)) return false
+  try {
+    const url = new URL(parte)
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.origin === new URL(origem).origin
+  } catch {
+    return false
+  }
+}
+
+export function partesComLinkDoCardapio(texto, origem) {
   return String(texto ?? '')
     .split(LINK_NO_TEXTO)
     .filter((parte) => parte !== '')
-    .map((parte) => ({ tipo: LINK_NO_TEXTO.test(parte) ? 'link' : 'texto', texto: parte }))
+    .map((parte) => ({ tipo: linkSeguro(parte, origem) ? 'link' : 'texto', texto: parte }))
 }

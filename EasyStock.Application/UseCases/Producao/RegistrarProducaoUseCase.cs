@@ -133,7 +133,10 @@ public class RegistrarProducaoUseCase(
         {
             ct.ThrowIfCancellationRequested();
             var produto = produtos[it.ProdutoId];
-            var validadeEm = dataProducao.AddDays(it.ValidadeDias);
+            // #1506: validade conta a partir do dia de Brasilia da producao (data civil como
+            // meia-noite UTC). Somar dias ao instante UTC dava +1 dia nas producoes apos as 21h.
+            var validadeEm = HorarioBrasil.CivilComoInstanteUtc(
+                HorarioBrasil.DataOperacional(dataProducao).AddDays(it.ValidadeDias));
             var custo = it.CustoUnitario ?? (decimal?)produto.CustoReferencia ?? 0m;
 
             var entrada = await registrarEntradaUC.ExecuteAsync(new RegistrarEntradaEstoqueCommand(

@@ -1,11 +1,9 @@
-using EasyStock.Application.Events.Storefront.Handlers;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Domain.Entities.Pagamentos;
-using EasyStock.Domain.Events.Storefront;
 using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -36,7 +34,7 @@ public enum ResultadoExpiracaoCobranca
 ///   <item>Pedido fora de <c>AguardandoPagamento</c> (pago, na fila na entrega, cancelado): só expira a cobrança.</item>
 ///   <item>Tentativa 1 e pedido da conversa: gera a tentativa 2 e envia o link na conversa.</item>
 ///   <item>Tentativa 2, ou pedido do site (sem conversa): <see cref="CancelarPedidoUseCase"/> com motivo
-///     <c>pagamento_expirado</c>, libera a vaga (<see cref="LiberarVagaOnPedidoCanceladoHandler"/>) e avisa
+///     <c>pagamento_expirado</c>, libera a vaga (pelo próprio <see cref="CancelarPedidoUseCase"/>, #1506) e avisa
 ///     na conversa quando houver. Aviso ao cliente do site: S13.</item>
 /// </list>
 ///
@@ -51,7 +49,6 @@ public sealed class ProcessarCobrancaVencidaUseCase(
     ICobrancaPedidoRepository cobrancaRepository,
     GerarCobrancaPedidoUseCase gerarCobranca,
     CancelarPedidoUseCase cancelarPedido,
-    LiberarVagaOnPedidoCanceladoHandler liberarVaga,
     AvisoCobrancaConversa aviso,
     IMercadoPagoClient mercadoPagoClient,
     ConfirmarPagamentoPedidoUseCase confirmarPagamento,
@@ -135,7 +132,6 @@ public sealed class ProcessarCobrancaVencidaUseCase(
 
         await cancelarPedido.ExecuteAsync(new CancelarPedidoCommand(
             item.EmpresaId, item.PedidoId, UsuarioNome: "Sistema", Motivo: MotivoCancelamento, Origem: "sistema"));
-        await liberarVaga.HandleAsync(new PedidoCanceladoEvent(item.PedidoId, Guid.Empty, MotivoCancelamento), ct);
         return (ResultadoExpiracaoCobranca.PedidoCancelado, cobranca.ConversaId, null);
     }
 }

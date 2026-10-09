@@ -33,6 +33,8 @@ public class SyncMutationDispatcher(
     {
         var parts = m.Type.Split('.');
         if (parts.Length != 2) throw new ArgumentException($"Tipo invalido: {m.Type}");
+        // #1509: texto maior que a coluna derrubava o SaveChanges do lote inteiro (22001).
+        operatorName = Cortar(operatorName, 64);
 
         switch (parts[0])
         {
@@ -49,7 +51,7 @@ public class SyncMutationDispatcher(
     private async Task ApplyProduct(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
-        var dto = m.Payload.Deserialize<ProductDto>(SyncDtoConverters.JsonOpts)!;
+        var dto = CaberNasColunas(m.Payload.Deserialize<ProductDto>(SyncDtoConverters.JsonOpts)!);
         // Auditoria 2026-04-30 (CRITICAL fix): tenant guard.
         var existing = await _db.Set<Product>()
             .FirstOrDefaultAsync(p => p.Id == dto.Id && p.EmpresaId == empresaId);
@@ -113,7 +115,7 @@ public class SyncMutationDispatcher(
     private async Task ApplyClient(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
-        var dto = m.Payload.Deserialize<ClientDto>(SyncDtoConverters.JsonOpts)!;
+        var dto = CaberNasColunas(m.Payload.Deserialize<ClientDto>(SyncDtoConverters.JsonOpts)!);
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<Client>()
             .FirstOrDefaultAsync(c => c.Id == dto.Id && c.EmpresaId == empresaId);
@@ -149,7 +151,7 @@ public class SyncMutationDispatcher(
     private async Task ApplyOrder(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
-        var dto = m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts)!;
+        var dto = CaberNasColunas(m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts)!);
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<Order>().Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == dto.Id && o.EmpresaId == empresaId);
@@ -317,7 +319,7 @@ public class SyncMutationDispatcher(
     private async Task ApplyBatch(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
-        var dto = m.Payload.Deserialize<BatchDto>(SyncDtoConverters.JsonOpts)!;
+        var dto = CaberNasColunas(m.Payload.Deserialize<BatchDto>(SyncDtoConverters.JsonOpts)!);
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<Batch>().Include(b => b.Items)
             .FirstOrDefaultAsync(b => b.Id == dto.Id && b.EmpresaId == empresaId);
@@ -403,7 +405,47 @@ public class SyncMutationDispatcher(
         b.DiscardReason = dto.Discarded == true ? Cortar(dto.DiscardReason, 200) : null;
     }
 
-    private static string? Cortar(string? s, int max) => s is { Length: > 0 } && s.Length > max ? s[..max] : s;
+    private static string? Cortar(string? s, int max)
+    {
+        if (s is null || s.Length <= max) return s;
+        // Nao parte emoji (par substituto) no meio: o Npgsql recusa UTF-16 invalido.
+        var fim = char.IsHighSurrogate(s[max - 1]) ? max - 1 : max;
+        return s[..fim];
+    }
+
+    // #1509: corta os textos livres no tamanho da coluna (mobile_* VARCHAR, ver entidades em
+    // Domain/Entities/Mobile). Um texto longo rejeitado pelo banco derrubava o lote inteiro.
+    private static ProductDto CaberNasColunas(ProductDto d) => d with
+    {
+        Name = Cortar(d.Name, 120)!, Emoji = Cortar(d.Emoji, 16), Category = Cortar(d.Category, 16)!,
+        Unit = Cortar(d.Unit, 32), Sku = Cortar(d.Sku, 32)
+    };
+
+    private static ClientDto CaberNasColunas(ClientDto d) => d with
+    {
+        Name = Cortar(d.Name, 120)!, Apt = Cortar(d.Apt, 32), Address = Cortar(d.Address, 255),
+        Phone = Cortar(d.Phone, 32)
+    };
+
+    private static OrderDto CaberNasColunas(OrderDto d) => d with
+    {
+        ClientSnapshot = d.ClientSnapshot is { } cs
+            ? cs with { Name = Cortar(cs.Name, 120)!, Ref = Cortar(cs.Ref, 255) }
+            : d.ClientSnapshot!,
+        Items = d.Items?.Select(i => i with { Name = Cortar(i.Name, 120)!, Emoji = Cortar(i.Emoji, 16), Unit = Cortar(i.Unit, 32) }).ToList()!,
+        ConfirmedBy = Cortar(d.ConfirmedBy, 64)
+    };
+
+    private static BatchDto CaberNasColunas(BatchDto d) => d with
+    {
+        Code = Cortar(d.Code, 32)!, Lote = Cortar(d.Lote, 32),
+        Items = d.Items?.Select(i => i with { Name = Cortar(i.Name, 120)!, Emoji = Cortar(i.Emoji, 16), Unit = Cortar(i.Unit, 32) }).ToList()!
+    };
+
+    private static CashEntryDto CaberNasColunas(CashEntryDto d) => d with
+    {
+        Description = Cortar(d.Description, 255)!
+    };
 
     private static DateTime? MsParaUtc(long? ms) =>
         ms.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(ms.Value).UtcDateTime : null;
@@ -411,7 +453,7 @@ public class SyncMutationDispatcher(
     private async Task ApplyCashEntry(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
-        var dto = m.Payload.Deserialize<CashEntryDto>(SyncDtoConverters.JsonOpts)!;
+        var dto = CaberNasColunas(m.Payload.Deserialize<CashEntryDto>(SyncDtoConverters.JsonOpts)!);
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<CashEntry>()
             .FirstOrDefaultAsync(c => c.Id == dto.Id && c.EmpresaId == empresaId);

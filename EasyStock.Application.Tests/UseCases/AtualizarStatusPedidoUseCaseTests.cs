@@ -1,6 +1,9 @@
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Domain.Entities.Financeiro;
+using EasyStock.Domain.Enums.Financeiro;
 using EasyStock.Application.Services;
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
@@ -14,14 +17,14 @@ namespace EasyStock.Application.Tests.UseCases;
 
 public class AtualizarStatusPedidoUseCaseTests
 {
-    private static (AtualizarStatusPedidoUseCase uc, IPedidoRepository repo, IItemEstoqueRepository itemRepo, IMovimentacaoEstoqueRepository movRepo, IUnitOfWork uow, IPublicadorEventoIntegracao publicador) Build(bool permiteNegativo = true, IOperacaoEventPublisher? operacaoEventos = null, IPrazoPreparoPedidoQueries? prazoQueries = null)
+    private static (AtualizarStatusPedidoUseCase uc, IPedidoRepository repo, IItemEstoqueRepository itemRepo, IMovimentacaoEstoqueRepository movRepo, IUnitOfWork uow, IPublicadorEventoIntegracao publicador) Build(bool permiteNegativo = true, IOperacaoEventPublisher? operacaoEventos = null, IPrazoPreparoPedidoQueries? prazoQueries = null, IContaReceberRepository? crRepo = null, IVagaOcupadaRepository? vagaRepo = null)
     {
         var pedidoRepo = Substitute.For<IPedidoRepository>();
         var itemRepo = Substitute.For<IItemEstoqueRepository>();
         var movRepo = Substitute.For<IMovimentacaoEstoqueRepository>();
         var uow = Substitute.For<IUnitOfWork>();
         var configRepo = Substitute.For<IConfiguracaoLojaRepository>();
-        var contaReceberRepo = Substitute.For<IContaReceberRepository>();
+        var contaReceberRepo = crRepo ?? Substitute.For<IContaReceberRepository>();
         var categoriaRepo = Substitute.For<ICategoriaFinanceiraRepository>();
         var publicador = Substitute.For<IPublicadorEventoIntegracao>();
         var criarContaReceber = new CriarContaReceberUseCase(contaReceberRepo, categoriaRepo,
@@ -32,7 +35,9 @@ public class AtualizarStatusPedidoUseCaseTests
         var integ = new PedidoEstoqueIntegrationService(itemRepo, movRepo, Substitute.For<IPublicadorEventoIntegracao>(), opts, NullLogger<PedidoEstoqueIntegrationService>.Instance);
         var uc = new AtualizarStatusPedidoUseCase(pedidoRepo, integ, configRepo, gerarCr, publicador,
             operacaoEventos ?? Substitute.For<IOperacaoEventPublisher>(), uow, NullLogger<AtualizarStatusPedidoUseCase>.Instance,
-            new CalculadoraInicioPrevistoPedido(prazoQueries ?? Substitute.For<IPrazoPreparoPedidoQueries>()));
+            new CalculadoraInicioPrevistoPedido(prazoQueries ?? Substitute.For<IPrazoPreparoPedidoQueries>()),
+            new EfeitosCancelamentoPedido(contaReceberRepo, vagaRepo ?? Substitute.For<IVagaOcupadaRepository>(),
+                NullLogger<EfeitosCancelamentoPedido>.Instance));
         return (uc, pedidoRepo, itemRepo, movRepo, uow, publicador);
     }
 
@@ -70,6 +75,45 @@ public class AtualizarStatusPedidoUseCaseTests
         await uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "aguardando"));
 
         pedido.InicioPrevistoEm.Should().Be(entrega.AddMinutes(-100));
+    }
+
+    [Fact]
+    public async Task Cancelar_pela_troca_de_status_cancela_conta_receber_e_libera_vaga()
+    {
+        // #1506: o KDS/PWA cancela por aqui; antes a ContaReceber seguia aberta e a vaga da
+        // janela ficava presa ("esgotado" no site). Mesmos efeitos do CancelarPedidoUseCase.
+        var crRepo = Substitute.For<IContaReceberRepository>();
+        var vagaRepo = Substitute.For<IVagaOcupadaRepository>();
+        var (uc, repo, _, _, uow, _) = Build(crRepo: crRepo, vagaRepo: vagaRepo);
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedido(empresaId, Guid.NewGuid(), Guid.NewGuid(), 1, "entregue");
+        repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        var conta = ContaReceber.Criar(empresaId, null, Guid.NewGuid(), "Pedido", DateTime.UtcNow,
+            origem: OrigemContaFinanceira.Pedido, origemRefId: pedido.Id);
+        crRepo.GetByOrigemAsync(empresaId, OrigemContaFinanceira.Pedido, pedido.Id).Returns(conta);
+
+        await uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "cancelado"));
+
+        conta.Status.Should().Be(StatusContaFinanceira.Cancelada);
+        await crRepo.Received(1).UpdateAsync(conta);
+        await vagaRepo.Received(1).LiberarPorPedidoAsync(pedido.Id, Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task Avancar_status_nao_toca_conta_receber_nem_vaga()
+    {
+        var crRepo = Substitute.For<IContaReceberRepository>();
+        var vagaRepo = Substitute.For<IVagaOcupadaRepository>();
+        var (uc, repo, _, _, _, _) = Build(crRepo: crRepo, vagaRepo: vagaRepo);
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedido(empresaId, Guid.NewGuid(), Guid.NewGuid(), 1);
+        repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        await uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "preparando"));
+
+        await vagaRepo.DidNotReceiveWithAnyArgs().LiberarPorPedidoAsync(default, default!, default);
+        await crRepo.DidNotReceiveWithAnyArgs().GetByOrigemAsync(default, default, default);
     }
 
     [Fact]

@@ -171,6 +171,11 @@ public sealed class CheckoutCoreService(
         var cardapioItens = await CarregarItensCardapioAsync(
             storefront.Id, input.Itens!.Select(i => i.CardapioItemId), ct);
 
+        // #1506: janela já encerrada (ou data passada) nunca vale, com ou sem prazo mínimo.
+        if (CalculadoraPrazoPedido.JanelaJaPassou(input.DataEntrega, janela.HoraFim, timeProvider.GetUtcNow().UtcDateTime))
+            throw new RegraDeDominioVioladaException(
+                $"A janela {janela.Label} de {input.DataEntrega.ToString("dd/MM/yyyy", PtBr)} já passou. Escolha outro horário.");
+
         // ── Prazo mínimo (S16, RN-21) ─────────────────────────────────────
         // Revalida o corte da listagem: a janela pode ter ficado curta entre listar e criar.
         if (input.Prazo is { } prazo)

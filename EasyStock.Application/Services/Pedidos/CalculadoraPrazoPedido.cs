@@ -32,4 +32,12 @@ public static class CalculadoraPrazoPedido
         var limite = HorarioBrasil.ConverterParaBrasilia(agoraUtc).AddMinutes(prazoMinimoMinutos);
         return data.ToDateTime(horaInicio) >= limite;
     }
+
+    /// <summary>
+    /// #1506: a janela de <paramref name="data"/> já terminou (fim no passado, fuso da loja). Vale mesmo
+    /// sem prazo mínimo (site): antes o site listava e aceitava janela de hoje já encerrada ou de data
+    /// passada, e o cliente pagava por um horário que não existia mais.
+    /// </summary>
+    public static bool JanelaJaPassou(DateOnly data, TimeOnly horaFim, DateTime agoraUtc)
+        => data.ToDateTime(horaFim) <= HorarioBrasil.ConverterParaBrasilia(agoraUtc);
 }

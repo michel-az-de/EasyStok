@@ -24,7 +24,7 @@ function useFormulario(inicial) {
 }
 
 export function CadastroEntregaApi() {
-  const { janelas, zonas, bloqueios, erro, acoes, limparErro } = useCadastroEntregaApi()
+  const { janelas, zonas, bloqueios, erro, enviando, acoes, limparErro } = useCadastroEntregaApi()
   const z = useFormulario(ZONA_VAZIA)
   const b = useFormulario(BLOQUEIO_VAZIO)
   const enviar = (acao, f, corpo) => (e) => {
@@ -47,7 +47,7 @@ export function CadastroEntregaApi() {
           <Botao variante="texto" onClick={limparErro}>Fechar</Botao>
         </p>
       )}
-      <JanelasDaLoja janelas={janelas} acoes={acoes} />
+      <JanelasDaLoja janelas={janelas} acoes={acoes} ocupado={enviando} />
 
       <section className={css.secao} aria-label="Zonas de frete">
         <h3>Zonas de frete</h3>
@@ -68,7 +68,7 @@ export function CadastroEntregaApi() {
               </>
             )
             : <CampoTexto rotulo="Bairros (separados por vírgula)" {...z.campo('bairros')} required />}
-          <Botao tipo="submit" variante="primario">Criar zona</Botao>
+          <Botao tipo="submit" variante="primario" disabled={enviando}>Criar zona</Botao>
         </form>
         <ul className={css.lista}>
           {zonas.map((x) => (
@@ -89,7 +89,7 @@ export function CadastroEntregaApi() {
           <CampoTexto rotulo="Data" tipo="date" {...b.campo('data')} required />
           <CampoSelecao rotulo="Janela" opcoes={opcoesJanela} {...b.campo('janelaEspecificaId')} />
           <CampoTexto rotulo="Motivo" {...b.campo('motivo')} required />
-          <Botao tipo="submit" variante="primario">Bloquear</Botao>
+          <Botao tipo="submit" variante="primario" disabled={enviando}>Bloquear</Botao>
         </form>
         <ul className={css.lista}>
           {bloqueios.map((x) => (

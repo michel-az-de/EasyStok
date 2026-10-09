@@ -77,7 +77,7 @@ public class ListarJanelasDisponiveisUseCaseTests
         f.BloqueioRepo,
         f.VagaRepo,
         f.FreteZonaRepo,
-        relogio ?? TimeProvider.System);
+        relogio ?? new FakeTimeProvider(new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero))); // #1506: antes das datas fixas
 
     // ── Helper: cria janela para o dia da semana de uma data específica ──
 
@@ -307,15 +307,35 @@ public class ListarJanelasDisponiveisUseCaseTests
     [Fact]
     public async Task SemPrazoMinimo_NaoCorta()
     {
+        // 11:00 em Brasilia; a janela 12-13h ficaria fora com prazo de 100 min, sem prazo fica.
         var f = BuildFakes();
         var hoje = new DateOnly(2026, 6, 2);
         var relogio = new FakeTimeProvider(new DateTimeOffset(2026, 6, 2, 14, 0, 0, TimeSpan.Zero));
-        var janela = JanelaEntrega.Criar(f.Storefront.Id, (int)hoje.DayOfWeek, new TimeOnly(9, 0), new TimeOnly(10, 0), 5, "9h");
+        var janela = JanelaEntrega.Criar(f.Storefront.Id, (int)hoje.DayOfWeek, new TimeOnly(12, 0), new TimeOnly(13, 0), 5, "12h");
         f.JanelaRepo.GetAtivasDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
             .Returns(new List<JanelaEntrega> { janela });
 
         var result = await BuildUseCase(f, relogio).ExecuteAsync(new ListarJanelasDisponiveisInput(SlugValido, hoje, hoje, null));
 
         result.Should().ContainSingle(r => r.JanelaId == janela.Id);
+    }
+
+    [Fact]
+    public async Task JanelaQueJaTerminou_SaiMesmoSemPrazo()
+    {
+        // #1506: 11:00 em Brasilia; a janela 9-10h de hoje acabou e o site a oferecia (cliente pagava
+        // por horario passado). Data passada inteira tambem sai.
+        var f = BuildFakes();
+        var hoje = new DateOnly(2026, 6, 2);
+        var ontem = hoje.AddDays(-1);
+        var relogio = new FakeTimeProvider(new DateTimeOffset(2026, 6, 2, 14, 0, 0, TimeSpan.Zero));
+        var encerrada = JanelaEntrega.Criar(f.Storefront.Id, (int)hoje.DayOfWeek, new TimeOnly(9, 0), new TimeOnly(10, 0), 5, "9h");
+        var deOntem = JanelaEntrega.Criar(f.Storefront.Id, (int)ontem.DayOfWeek, new TimeOnly(15, 0), new TimeOnly(16, 0), 5, "15h");
+        f.JanelaRepo.GetAtivasDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new List<JanelaEntrega> { encerrada, deOntem });
+
+        var result = await BuildUseCase(f, relogio).ExecuteAsync(new ListarJanelasDisponiveisInput(SlugValido, ontem, hoje, null));
+
+        result.Should().BeEmpty();
     }
 }

@@ -42,7 +42,9 @@ public class CriarLoteUseCase(
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
 
         var dataProd = cmd.DataProducao ?? DateTime.UtcNow;
-        var data = DateOnly.FromDateTime(dataProd);
+        // #1506: o dia do codigo e o dia de Brasilia; DateOnly.FromDateTime(UtcNow) pulava para o
+        // dia seguinte nas producoes depois das 21h.
+        var data = HorarioBrasil.DataOperacional(dataProd);
 
         string codigo;
         if (!string.IsNullOrWhiteSpace(cmd.CodigoCustom))

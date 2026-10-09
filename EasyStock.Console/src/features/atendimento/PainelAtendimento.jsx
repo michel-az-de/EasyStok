@@ -154,7 +154,9 @@ export function PainelAtendimento({
         />
       </div>
 
+      {/* #1510: remonta por conversa; anexo em espera e gravação não passam para a próxima. */}
       <Composer
+        key={selecionada.id}
         conversa={selecionada}
         canal={canal}
         podeEscrever={pode}
