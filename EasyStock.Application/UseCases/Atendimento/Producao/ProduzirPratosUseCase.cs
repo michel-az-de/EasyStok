@@ -32,7 +32,7 @@ public sealed class ProduzirPratosUseCase(
     RegistrarProducaoUseCase registrarProducao,
     IUnitOfWork unitOfWork)
 {
-    public const string CategoriaDeEstoque = "Cardápio";
+    public const string CategoriaPratos = "Cardápio";
 
     public async Task<ProduzirPratosResult> ExecuteAsync(ProduzirPratosCommand cmd, CancellationToken ct = default)
     {
@@ -77,7 +77,8 @@ public sealed class ProduzirPratosUseCase(
         var avulsos = pratos.Where(p => !p.ProdutoId.HasValue).ToList();
         if (avulsos.Count == 0) return;
 
-        var categoriaId = await CategoriaDeEstoqueAsync(cmd.EmpresaId);
+        var categoriaId = await CategoriaDeEstoque.ObterOuCriarAsync(categoriaRepository, unitOfWork, cmd.EmpresaId,
+            CategoriaPratos, "Pratos produzidos pela casa (criada pela produção do console)");
         foreach (var prato in avulsos)
         {
             var produto = await cadastrarProduto.ExecuteAsync(new CadastrarProdutoCommand(
@@ -86,24 +87,6 @@ public sealed class ProduzirPratosUseCase(
             prato.VincularProduto(produto.ProdutoId);
         }
         await unitOfWork.CommitAsync();
-    }
-
-    private async Task<Guid> CategoriaDeEstoqueAsync(Guid empresaId)
-    {
-        var existente = (await categoriaRepository.GetByEmpresaAsync(empresaId))
-            .FirstOrDefault(c => string.Equals(c.Nome.Trim(), CategoriaDeEstoque, StringComparison.OrdinalIgnoreCase));
-        if (existente is not null) return existente.Id;
-
-        var agora = DateTime.UtcNow;
-        var categoria = new Categoria
-        {
-            Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = CategoriaDeEstoque,
-            Descricao = "Pratos produzidos pela casa (criada pela produção do console)",
-            CriadoEm = agora, AlteradoEm = agora,
-        };
-        await categoriaRepository.AddAsync(categoria);
-        await unitOfWork.CommitAsync();
-        return categoria.Id;
     }
 
     // O nome do avulso é gravado em minúsculo (factory do item): o produto nasce com inicial maiúscula.

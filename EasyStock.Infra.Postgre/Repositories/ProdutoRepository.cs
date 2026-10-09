@@ -201,6 +201,13 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .CountAsync(p => p.EmpresaId == empresaId);
 
         /// <inheritdoc/>
+        public async Task<IReadOnlyList<Produto>> GetInsumosAsync(Guid empresaId, CancellationToken ct = default) =>
+            await dbContext.Produtos
+                .AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && p.EhInsumo && p.Status == StatusProduto.Ativo)
+                .OrderBy(p => p.Nome)
+                .ToListAsync(ct);
+
         public async Task<IReadOnlyDictionary<Guid, TipoEmbalagem>> GetTipoEmbalagemMapAsync(
             Guid empresaId, IEnumerable<Guid> produtoIds)
         {

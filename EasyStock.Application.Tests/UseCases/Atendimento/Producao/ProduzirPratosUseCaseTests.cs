@@ -85,7 +85,7 @@ public class ProduzirPratosUseCaseTests
 
         ravioli.ProdutoId.Should().NotBeNull("o que a casa produz é vinculado");
         _produtos[ravioli.ProdutoId!.Value].Nome.Should().Be("Ravióli de queijo");
-        _categoriasGravadas.Should().ContainSingle(c => c.Nome == ProduzirPratosUseCase.CategoriaDeEstoque);
+        _categoriasGravadas.Should().ContainSingle(c => c.Nome == ProduzirPratosUseCase.CategoriaPratos);
         r.Pratos.Single().Should().Match<PratoProduzidoResult>(p => p.Porcoes == 2 && p.SobraG == 144 && p.CardapioItemId == ravioli.Id);
         r.TotalEtiquetas.Should().Be(2);
     }

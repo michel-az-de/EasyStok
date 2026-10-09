@@ -7,6 +7,9 @@ namespace EasyStock.Api.Controllers;
 
 public sealed record ProduzirPratosRequest(IReadOnlyList<PratoProduzidoInput>? Pratos, string? Observacao = null);
 
+/// <param name="Unidade">G, Kg, Ml, L, Un...; null = não mexe (no cadastro, Un).</param>
+public sealed record InsumoRequest(string? Nome, UnidadeMedida? Unidade, int? Minimo, decimal? Custo);
+
 /// <summary>
 /// Produção pelo console (M2, plano docs/plan/erp-casa-da-baba/03-m2-producao.md). D-M2-06 (Felipe,
 /// 09/10/2026): quem cozinha lança a produção e vê o estoque do dia; ver e mexer no estoque ainda
@@ -19,8 +22,56 @@ public sealed record ProduzirPratosRequest(IReadOnlyList<PratoProduzidoInput>? P
 public class AtendimentoProducaoController(
     EstoqueDoDiaUseCase estoqueDoDia,
     ProduzirPratosUseCase produzirPratos,
+    InsumosDaProducaoUseCase insumos,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
+    [SwaggerOperation(Summary = "Production supplies (EhInsumo) with stock, minimum, cost and recipes using them (M2.3)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [HttpGet("insumos")]
+    public async Task<IActionResult> Insumos(CancellationToken ct)
+    {
+        if (!currentUser.TemPermissao(Permissao.GerenciarEstoque)) return Forbid();
+        return DataOk(await insumos.ListarAsync(currentUser.EmpresaId, ct));
+    }
+
+    [SwaggerOperation(Summary = "Quick supply registration: name, unit, minimum and cost (Gerente)")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize(Policy = "Gerente")]
+    [HttpPost("insumos")]
+    public async Task<IActionResult> CriarInsumo([FromBody] InsumoRequest req, CancellationToken ct)
+    {
+        try
+        {
+            var id = await insumos.CriarAsync(currentUser.EmpresaId, currentUser.UsuarioId,
+                new InsumoInput(req.Nome, req.Unidade, req.Minimo, req.Custo), ct);
+            return DataCreated($"/api/produtos/{id}", new { produtoId = id });
+        }
+        catch (Exception ex) when (ex is UseCaseValidationException or RegraDeDominioVioladaException)
+        {
+            return DataBadRequest(ex.Message);
+        }
+    }
+
+    [SwaggerOperation(Summary = "Adjust a supply's minimum, cost or unit (null = keep; Gerente)")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize(Policy = "Gerente")]
+    [HttpPut("insumos/{produtoId:guid}")]
+    public async Task<IActionResult> AtualizarInsumo(Guid produtoId, [FromBody] InsumoRequest req, CancellationToken ct)
+    {
+        try
+        {
+            await insumos.AtualizarAsync(currentUser.EmpresaId, produtoId, new InsumoInput(null, req.Unidade, req.Minimo, req.Custo), ct);
+            return NoContent();
+        }
+        catch (UseCaseValidationException ex)
+        {
+            return DataBadRequest(ex.Message);
+        }
+    }
+
     [SwaggerOperation(Summary = "Register today's production by menu dish: lot, labels and stock entry in portions (M2.2)",
         Description = "Envie Idempotency-Key: repetir com a mesma chave não cria lote novo. Prato avulso ganha produto de estoque.")]
     [ProducesResponseType(StatusCodes.Status201Created)]

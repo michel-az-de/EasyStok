@@ -37,6 +37,9 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// se peso e obrigatorio (RDC 727/2022 - peso so obrigatorio para Embalado).
         /// Inserido 2026-05-16 (correcao C2).
         /// </summary>
+        /// <summary>M2.3 (#1496): insumos ativos da empresa (<c>EhInsumo</c>), por nome, numa query só.</summary>
+        Task<IReadOnlyList<Produto>> GetInsumosAsync(Guid empresaId, CancellationToken ct = default);
+
         Task<IReadOnlyDictionary<Guid, TipoEmbalagem>> GetTipoEmbalagemMapAsync(
             Guid empresaId, IEnumerable<Guid> produtoIds);
     }
