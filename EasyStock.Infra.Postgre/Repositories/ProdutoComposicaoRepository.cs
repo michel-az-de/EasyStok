@@ -79,6 +79,14 @@ public class ProdutoComposicaoRepository(EasyStockDbContext context) : IProdutoC
             .ToListAsync(ct)
             .ContinueWith(t => (IReadOnlyCollection<ProdutoComposicao>)t.Result, ct);
 
+    public async Task<IReadOnlyDictionary<Guid, int>> ContarReceitasPorInsumoAsync(Guid empresaId, CancellationToken ct = default) =>
+        await context.ProdutosComposicao
+            .AsNoTracking()
+            .Where(c => c.EmpresaId == empresaId)
+            .GroupBy(c => c.InsumoId)
+            .Select(g => new { g.Key, Receitas = g.Select(c => c.ProdutoFinalId).Distinct().Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Receitas, ct);
+
     public async Task<bool> ExisteCicloAsync(
         Guid empresaId, Guid produtoFinalId, Guid insumoCandidatoId, CancellationToken ct = default)
     {

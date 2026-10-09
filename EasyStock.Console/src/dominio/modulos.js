@@ -37,6 +37,8 @@ export const MODULOS = [
       { id: 'estoque', rotulo: 'Estoque do dia', tipo: TELA_AJUSTE, aba: 'estoque-do-dia', soApi: true },
       // M2.2 (#1491): lançar a produção do dia por prato, com as etiquetas.
       { id: 'producao', rotulo: 'Produção do dia', tipo: TELA_AJUSTE, aba: 'producao-do-dia', soApi: true },
+      // M2.3 (#1496): insumos (intermediário e embalagem), com o que comprar.
+      { id: 'insumos', rotulo: 'Insumos', tipo: TELA_AJUSTE, aba: 'insumos', soApi: true },
     ],
   },
   {

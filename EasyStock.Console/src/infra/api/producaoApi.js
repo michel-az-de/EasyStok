@@ -61,3 +61,19 @@ export const etiquetasDaApi = (r) => (r?.etiquetas ?? []).map((e) => ({
   produzidoEm: e.loteCriadoEm ?? null,
   validadeEm: e.loteValidadeEm ?? null,
 }))
+
+// M2.3 (#1496): insumos da produção (intermediário e embalagem). Cadastro e ajuste são do Gerente.
+export const listarInsumos = () => chamarApi(`${PRODUCAO}/insumos`)
+export const criarInsumo = (dados) => chamarApi(`${PRODUCAO}/insumos`, { metodo: 'POST', corpo: dados })
+export const atualizarInsumo = (id, dados) => chamarApi(`${PRODUCAO}/insumos/${id}`, { metodo: 'PUT', corpo: dados })
+
+export const insumoDaApi = (i) => ({
+  id: i.produtoId,
+  nome: i.nome,
+  unidade: i.unidade,
+  saldo: i.saldo,
+  minimo: i.minimo ?? null,
+  custo: i.custo ?? null,
+  receitas: i.receitas,
+  comprar: i.abaixoDoMinimo === true,
+})

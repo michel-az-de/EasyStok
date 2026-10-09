@@ -18,6 +18,7 @@ import { AbaCardapioApi } from './cardapio/AbaCardapioApi'
 import { AbaCategoriasApi } from './cardapio/AbaCategoriasApi'
 import { AbaEstoqueDoDiaApi } from './producao/AbaEstoqueDoDiaApi'
 import { AbaProducaoDoDiaApi } from './producao/AbaProducaoDoDiaApi'
+import { AbaInsumosApi } from './producao/AbaInsumosApi'
 import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
 
@@ -63,6 +64,8 @@ export function PainelDeAjuste({ aba, janelasApi = null }) {
     'estoque-do-dia': <AbaEstoqueDoDiaApi />,
     // M2.2 (#1491): produção do dia por prato (só modo API).
     'producao-do-dia': <AbaProducaoDoDiaApi />,
+    // M2.3 (#1496): insumos (só modo API).
+    insumos: <AbaInsumosApi />,
   }), [fonteApi, janelasApi])
   const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada texto={AINDA_NAO_LIGADO[aba]}>{painel}</AbaNaoLigada>
