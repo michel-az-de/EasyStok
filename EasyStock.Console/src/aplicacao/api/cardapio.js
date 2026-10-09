@@ -34,6 +34,9 @@ export async function lerAlertasDeEstoque() {
 export function criarAcoesCardapioApi({ despachar, estadoRef }) {
   const avisar = (mensagem) => despachar({ tipo: acao.AVISO_API, mensagem })
   const itemDe = (sku) => itemPorSku(estadoRef.current.catalogo?.cardapio ?? [], sku)
+  // #1510: −/+ seguidos do mesmo sku entram em fila; cada toque conta a partir do resultado do
+  // anterior e só sai depois dele (antes iam juntos com a mesma contagem e o último a chegar valia).
+  const filaDoSaldo = new Map() // sku -> { alvo, fim }
 
   async function recarregarCardapio() {
     try {
@@ -74,9 +77,15 @@ export function criarAcoesCardapioApi({ despachar, estadoRef }) {
         avisar(`${item.nome}: este item não controla saldo no EasyStok.`)
         return Promise.resolve(false)
       }
-      const contada = Math.max(item.estoque + delta, 0)
+      const pendente = filaDoSaldo.get(sku)
+      const contada = Math.max((pendente ? pendente.alvo : item.estoque) + delta, 0)
       despachar({ tipo: acao.AJUSTAR_SALDO, sku, delta })
-      return gravar('Saldo', () => ajustarSaldoDoItem(sku, contada, MOTIVO_DO_BALCAO))
+      const fim = (pendente?.fim ?? Promise.resolve())
+        .then(() => gravar('Saldo', () => ajustarSaldoDoItem(sku, contada, MOTIVO_DO_BALCAO)))
+      const registro = { alvo: contada, fim }
+      filaDoSaldo.set(sku, registro)
+      fim.then(() => { if (filaDoSaldo.get(sku) === registro) filaDoSaldo.delete(sku) })
+      return fim
     },
 
     // Adicionais e "novidade até" não têm campo no EasyStok: ficam de fora do corpo.
