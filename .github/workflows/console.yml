@@ -56,3 +56,4 @@ jobs:
       - run: node ferramentas/prova-1498-receitas.mjs
       - run: node ferramentas/prova-1499-baixa-insumo.mjs
       - run: node ferramentas/prova-1502-planejamento.mjs
+      - run: node ferramentas/prova-1511-perdas.mjs

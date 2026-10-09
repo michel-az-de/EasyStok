@@ -43,6 +43,8 @@ export const MODULOS = [
       { id: 'receitas', rotulo: 'Receitas', tipo: TELA_AJUSTE, aba: 'receitas', soApi: true },
       // M2.5 (#1502): quanto produzir, insumos, faltas e lista de compras.
       { id: 'planejamento', rotulo: 'Planejamento', tipo: TELA_AJUSTE, aba: 'planejamento', soApi: true },
+      // M2.6 (#1511): perdas com motivo, resumo do período e vencidos sugeridos.
+      { id: 'perdas', rotulo: 'Perdas', tipo: TELA_AJUSTE, aba: 'perdas', soApi: true },
     ],
   },
   {

@@ -456,5 +456,14 @@ namespace EasyStock.Infra.Postgre.Repositories
                 _ => null
             };
         }
+
+        public async Task<IReadOnlyList<ItemEstoque>> GetComSaldoEValidadeAteAsync(Guid empresaId, DateTime validadeAteUtc, CancellationToken ct = default) =>
+            await dbContext.ItensEstoque
+                .AsNoTracking()
+                .Include(i => i.Produto)
+                .Where(i => i.EmpresaId == empresaId && (decimal)i.QuantidadeAtual > 0
+                    && i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= validadeAteUtc)
+                .OrderBy(i => (DateTime?)i.ValidadeEm)
+                .ToListAsync(ct);
     }
 }
