@@ -566,4 +566,33 @@ public class CardapioItemTests
 
         act.Should().Throw<RegraDeDominioVioladaException>();
     }
+
+    // M1.2 (#1482, US-029): a novidade some sozinha depois do prazo (relógio fixo).
+    [Fact]
+    public void Novidade_ValeAteODiaInclusive_ESomeDepois()
+    {
+        var item = CardapioItem.CriarAvulso(Guid.NewGuid(), "Torta", 60m);
+        item.DefinirNovidade(new DateOnly(2026, 10, 20));
+
+        item.EhNovidade(new DateOnly(2026, 10, 20)).Should().BeTrue();
+        item.EhNovidade(new DateOnly(2026, 10, 21)).Should().BeFalse();
+        item.DefinirNovidade(null);
+        item.EhNovidade(new DateOnly(2026, 10, 1)).Should().BeFalse();
+    }
+
+    // M1.2 (#1482, D-M1-07): arquivar não mexe no site nem no dia, e repor volta.
+    [Fact]
+    public void Arquivar_NaoMexeNoSiteNemNoDia_ERepoeVolta()
+    {
+        var item = CardapioItem.CriarAvulso(Guid.NewGuid(), "Torta", 60m);
+        item.TornarVisivel();
+
+        item.Arquivar(new DateTime(2026, 10, 8, 12, 0, 0, DateTimeKind.Utc));
+        item.EstaArquivado.Should().BeTrue();
+        item.Visivel.Should().BeTrue();
+        item.Disponivel.Should().BeTrue();
+
+        item.Repor();
+        item.EstaArquivado.Should().BeFalse();
+    }
 }

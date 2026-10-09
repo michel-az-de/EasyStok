@@ -1,42 +1,55 @@
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.AdicionarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.EditarCardapioItemAdmin;
-using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ListarCardapioAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidadeCardapioItemAdmin;
+using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 
 namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 
-/// <param name="Linha">null = não mexe.</param>
-public sealed record DadosItemCardapio(string? Nome, LinhaProduto? Linha, string? Porcao, decimal? Preco, string? Categoria);
+/// <summary>Campos do item que o console edita. null = não mexe.</summary>
+/// <param name="MexerNovidade">true: <paramref name="NovidadeAte"/> vale, inclusive null (tira a novidade).</param>
+public sealed record DadosItemCardapio(
+    string? Nome, LinhaProduto? Linha, string? Porcao, decimal? Preco, string? Categoria,
+    string? Descricao = null, string? Ingredientes = null, string? Alergenos = null,
+    int? TempoPreparoMinutos = null, string? InstrucaoFinalizacao = null,
+    bool MexerNovidade = false, DateOnly? NovidadeAte = null);
 
 public sealed record ItemForaDoCardapio(Guid CardapioItemId, string Nome, decimal Preco, string? Porcao, string? Categoria, string? FotoUrl);
 
 public sealed record VisibilidadeItemResult(Guid CardapioItemId, bool Visivel);
 
-/// <summary>Linha da tela de gestão do cardápio (M1.1): tudo o que a lista mostra e liga.</summary>
+public sealed record ArquivamentoItemResult(Guid CardapioItemId, bool Arquivado);
+
+/// <summary>O item inteiro para o formulário de edição (a comanda lê o menu público, sem a ficha).</summary>
+public sealed record DetalheItemCardapio(
+    Guid CardapioItemId, string Nome, LinhaProduto Linha, string? Porcao, decimal Preco, string? Categoria,
+    string? Descricao, string? Ingredientes, string? Alergenos, int? TempoPreparoMinutos, string? InstrucaoFinalizacao,
+    DateOnly? NovidadeAte, bool EmValidacao, bool Arquivado);
+
+/// <summary>Linha da tela de gestão do cardápio (M1.1, M1.2): tudo o que a lista mostra e liga.</summary>
 /// <param name="ControlaSaldo">Item ligado a um produto do estoque (avulso não tem saldo).</param>
 public sealed record ItemGestaoCardapio(
     Guid CardapioItemId, string Nome, LinhaProduto Linha, string? Porcao, decimal Preco, string? Categoria,
-    string? FotoUrl, bool Visivel, bool Disponivel, double Ordem, bool ControlaSaldo);
+    string? FotoUrl, bool Visivel, bool Disponivel, double Ordem, bool ControlaSaldo,
+    bool Arquivado = false, bool EmValidacao = false, DateOnly? NovidadeAte = null);
 
 public enum DirecaoMover { Subir, Descer }
 
 public sealed record OrdemItemResult(Guid CardapioItemId, double Ordem);
 
 /// <summary>
-/// Itens do cardápio pelo console (#1241, F11, S45). Decisão do Felipe (08/10/2026): incluir, editar
-/// e tirar item são do Gerente. Reusa os use cases da vitrine (mesmas validações e guardas de HTML)
-/// na vitrine da empresa logada. "Tirar" é esconder (visível = falso), nunca apagar: pedido antigo
-/// continua achando o item, e a lista de fora deixa repor.
+/// Itens do cardápio pelo console (#1241, M1.1, M1.2). Decisões do Felipe (08/10/2026): incluir,
+/// editar e tirar item são do Gerente; tirar <b>arquiva</b> e é diferente de ocultar do site
+/// (D-M1-07); item novo nasce em validação e o agente não oferece até ela confirmar (D-M1-08).
+/// Reusa os use cases da vitrine (mesmas validações e guardas de HTML) na vitrine da empresa logada.
 /// </summary>
 public sealed class ItensDoCardapioComandaUseCase(
     IStorefrontRepository storefrontRepository,
     AdicionarCardapioItemAdminUseCase adicionar,
     EditarCardapioItemAdminUseCase editar,
     ToggleVisibilidadeCardapioItemAdminUseCase toggleVisivel,
-    ListarCardapioAdminUseCase listar,
     ICardapioItemRepository cardapioRepository,
     IUnitOfWork unitOfWork)
 {
@@ -48,11 +61,19 @@ public sealed class ItensDoCardapioComandaUseCase(
             throw new UseCaseValidationException("Informe o preço do item.");
         var storefrontId = await VitrineAsync(empresaId, ct);
 
-        // Item avulso (sem produto do estoque), visível. Ordem alta: entra no fim da lista.
-        return await adicionar.ExecuteAsync(new AdicionarCardapioItemAdminCommand(
+        // Item avulso (sem produto do estoque), visível no balcão e no site. Ordem alta: fim da lista.
+        var r = await adicionar.ExecuteAsync(new AdicionarCardapioItemAdminCommand(
             storefrontId, null, dados.Nome.Trim(), dados.Categoria, 10_000, true,
-            null, null, null, null, null, null, dados.Preco, null, dados.Porcao, null,
-            empresaId, Linha: dados.Linha));
+            dados.Descricao, dados.Ingredientes, dados.Alergenos, null, null, null, dados.Preco, null, dados.Porcao, null,
+            empresaId, Linha: dados.Linha, TempoPreparoMinutos: dados.TempoPreparoMinutos,
+            InstrucaoFinalizacao: dados.InstrucaoFinalizacao));
+
+        // RN-15: nasce em validação (o agente não oferece) e, se ela pediu, já como novidade.
+        var item = await ItemAsync(storefrontId, r.ItemId, empresaId, ct);
+        item.MarcarEmValidacao();
+        if (dados.MexerNovidade) item.DefinirNovidade(dados.NovidadeAte);
+        await unitOfWork.CommitAsync();
+        return r;
     }
 
     public async Task EditarAsync(Guid empresaId, Guid itemId, DadosItemCardapio dados, CancellationToken ct = default)
@@ -60,35 +81,73 @@ public sealed class ItensDoCardapioComandaUseCase(
         var storefrontId = await VitrineAsync(empresaId, ct);
         await editar.ExecuteAsync(new EditarCardapioItemAdminCommand(
             storefrontId, itemId, dados.Nome?.Trim(), dados.Categoria,
-            null, null, null, null, null, null, dados.Preco, null, dados.Porcao, null,
-            empresaId, Linha: dados.Linha));
+            dados.Descricao, dados.Ingredientes, dados.Alergenos, null, null, null, dados.Preco, null, dados.Porcao, null,
+            empresaId, Linha: dados.Linha, TempoPreparoMinutos: dados.TempoPreparoMinutos,
+            InstrucaoFinalizacao: dados.InstrucaoFinalizacao));
+
+        if (!dados.MexerNovidade) return;
+        var item = await ItemAsync(storefrontId, itemId, empresaId, ct);
+        item.DefinirNovidade(dados.NovidadeAte);
+        await unitOfWork.CommitAsync();
     }
 
     public async Task<VisibilidadeItemResult> DefinirVisivelAsync(Guid empresaId, Guid itemId, bool visivel, CancellationToken ct = default)
     {
         var storefrontId = await VitrineAsync(empresaId, ct);
-        var item = await cardapioRepository.GetByIdAndScopeAsync(storefrontId, itemId, empresaId, ct)
-            ?? throw new CardapioItemNaoEncontradoException(storefrontId, itemId);
+        var item = await ItemAsync(storefrontId, itemId, empresaId, ct);
         if (item.Visivel == visivel) return new VisibilidadeItemResult(item.Id, item.Visivel);
 
         var r = await toggleVisivel.ExecuteAsync(new ToggleVisibilidadeCardapioItemAdminCommand(storefrontId, itemId, empresaId));
         return new VisibilidadeItemResult(r.ItemId, r.VisivelAgora);
     }
 
-    /// <summary>Itens escondidos (fora do cardápio de hoje), para o console mostrar "Repor".</summary>
+    public async Task<DetalheItemCardapio> ObterAsync(Guid empresaId, Guid itemId, CancellationToken ct = default)
+    {
+        var storefrontId = await VitrineAsync(empresaId, ct);
+        var i = await ItemAsync(storefrontId, itemId, empresaId, ct);
+        return new DetalheItemCardapio(
+            i.Id, i.NomeEfetivo() ?? "(sem nome)", i.Linha, i.PesoExibicao, i.PrecoEfetivo(), i.CategoriaEfetiva(),
+            i.DescricaoPublica, i.Ingredientes, i.Alergenos, i.TempoPreparoMinutos, i.InstrucaoFinalizacao,
+            i.NovidadeAte, i.EmValidacao, i.EstaArquivado);
+    }
+
+    /// <summary>Tirar (arquivar) ou repor, por valor: o clique repetido não inverte de volta.</summary>
+    public async Task<ArquivamentoItemResult> DefinirArquivadoAsync(Guid empresaId, Guid itemId, bool arquivado, CancellationToken ct = default)
+    {
+        var storefrontId = await VitrineAsync(empresaId, ct);
+        var item = await ItemAsync(storefrontId, itemId, empresaId, ct);
+        if (item.EstaArquivado == arquivado) return new ArquivamentoItemResult(item.Id, arquivado);
+
+        if (arquivado) item.Arquivar(DateTime.UtcNow);
+        else item.Repor();
+        await unitOfWork.CommitAsync();
+        return new ArquivamentoItemResult(item.Id, item.EstaArquivado);
+    }
+
+    /// <summary>RN-15: a dona confirma que o item novo vale ficar; o agente passa a oferecer.</summary>
+    public async Task ConfirmarValidacaoAsync(Guid empresaId, Guid itemId, CancellationToken ct = default)
+    {
+        var storefrontId = await VitrineAsync(empresaId, ct);
+        var item = await ItemAsync(storefrontId, itemId, empresaId, ct);
+        if (!item.EmValidacao) return;
+        item.ConfirmarValidacao();
+        await unitOfWork.CommitAsync();
+    }
+
+    /// <summary>Itens tirados do cardápio (arquivados), para o console mostrar "Repor".</summary>
     public async Task<IReadOnlyList<ItemForaDoCardapio>> ListarForaAsync(Guid empresaId, CancellationToken ct = default)
     {
         var storefrontId = await VitrineAsync(empresaId, ct);
-        var lista = await listar.ExecuteAsync(new ListarCardapioAdminCommand(storefrontId, empresaId));
-        return lista.Itens
-            .Where(i => !i.Visivel)
-            .Select(i => new ItemForaDoCardapio(i.Id, i.NomeEfetivo, i.PrecoEfetivo, i.PesoExibicao, i.CategoriaTexto, i.FotoUrl))
+        return NaOrdem(await cardapioRepository.GetTodosDoStorefrontAsync(storefrontId, ct))
+            .Where(i => i.EstaArquivado)
+            .Select(i => new ItemForaDoCardapio(i.Id, i.NomeEfetivo() ?? "(sem nome)", i.PrecoEfetivo(), i.PesoExibicao,
+                i.CategoriaEfetiva(), i.FotoUrl))
             .ToList();
     }
 
     /// <summary>
-    /// Gestão do cardápio (M1.1): todos os itens da vitrine, inclusive os ocultos do site e os
-    /// desligados do dia (RN-16: desligar não tira da lista), na ordem de exibição.
+    /// Gestão do cardápio (M1.1): todos os itens da vitrine, inclusive os ocultos do site, os
+    /// desligados do dia (RN-16) e os arquivados (para repor), na ordem de exibição.
     /// </summary>
     public async Task<IReadOnlyList<ItemGestaoCardapio>> ListarGestaoAsync(Guid empresaId, CancellationToken ct = default)
     {
@@ -97,7 +156,8 @@ public sealed class ItensDoCardapioComandaUseCase(
         return NaOrdem(itens)
             .Select(i => new ItemGestaoCardapio(
                 i.Id, i.NomeEfetivo() ?? "(sem nome)", i.Linha, i.PesoExibicao, i.PrecoEfetivo(), i.CategoriaEfetiva(),
-                i.FotoUrl, i.Visivel, i.Disponivel, i.OrdemExibicao, i.ProdutoId.HasValue))
+                i.FotoUrl, i.Visivel, i.Disponivel, i.OrdemExibicao, i.ProdutoId.HasValue,
+                i.EstaArquivado, i.EmValidacao, i.NovidadeAte))
             .ToList();
     }
 
@@ -132,8 +192,12 @@ public sealed class ItensDoCardapioComandaUseCase(
     }
 
     // Mesmo desempate do menu público (ordem, criado em, id): a lista que ela vê é a que muda.
-    private static IEnumerable<Domain.Entities.Storefront.CardapioItem> NaOrdem(IEnumerable<Domain.Entities.Storefront.CardapioItem> itens) =>
+    private static IEnumerable<CardapioItem> NaOrdem(IEnumerable<CardapioItem> itens) =>
         itens.OrderBy(i => i.OrdemExibicao).ThenBy(i => i.CriadoEm).ThenBy(i => i.Id);
+
+    private async Task<CardapioItem> ItemAsync(Guid storefrontId, Guid itemId, Guid empresaId, CancellationToken ct) =>
+        await cardapioRepository.GetByIdAndScopeAsync(storefrontId, itemId, empresaId, ct)
+        ?? throw new CardapioItemNaoEncontradoException(storefrontId, itemId);
 
     private async Task<Guid> VitrineAsync(Guid empresaId, CancellationToken ct)
     {

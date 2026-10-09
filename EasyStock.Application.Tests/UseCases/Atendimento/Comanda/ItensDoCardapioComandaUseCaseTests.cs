@@ -5,7 +5,6 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.AdicionarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.EditarCardapioItemAdmin;
-using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ListarCardapioAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidadeCardapioItemAdmin;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Domain.Entities.Storefront;
@@ -41,7 +40,6 @@ public class ItensDoCardapioComandaUseCaseTests
             new AdicionarCardapioItemAdminUseCase(_storefronts, _cardapio, Substitute.For<IProdutoRepository>(), _uow),
             new EditarCardapioItemAdminUseCase(_cardapio, _uow),
             new ToggleVisibilidadeCardapioItemAdminUseCase(_cardapio, _uow, aviso),
-            new ListarCardapioAdminUseCase(_storefronts, _cardapio),
             _cardapio,
             _uow);
     }
@@ -77,15 +75,65 @@ public class ItensDoCardapioComandaUseCaseTests
     }
 
     [Fact]
-    public async Task ListarFora_TrazSoOsEscondidos()
+    public async Task ListarFora_TrazSoOsArquivados_NaoOsOcultosDoSite()
     {
-        var fora = Item("Nhoque", visivel: false);
-        var dentro = Item("Lasanha", visivel: true);
-        _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id).Returns([fora, dentro]);
+        // D-M1-07: tirar (arquivar) é diferente de ocultar do site.
+        var arquivado = Item("Nhoque", visivel: true);
+        arquivado.Arquivar(DateTime.UtcNow);
+        var oculto = Item("Lasanha", visivel: false);
+        _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id).Returns([arquivado, oculto]);
 
         var lista = await Sut().ListarForaAsync(EmpresaId);
 
-        lista.Should().ContainSingle().Which.CardapioItemId.Should().Be(fora.Id);
+        lista.Should().ContainSingle().Which.CardapioItemId.Should().Be(arquivado.Id);
+    }
+
+    [Fact]
+    public async Task Obter_TrazAFichaParaEditar()
+    {
+        var item = Item("Lasanha", visivel: true);
+        item.AtualizarMetadata(ingredientes: "massa, ragu", alergenos: "glúten, lactose");
+
+        var d = await Sut().ObterAsync(EmpresaId, item.Id);
+
+        d.Ingredientes.Should().Be("massa, ragu");
+        d.Alergenos.Should().Be("glúten, lactose");
+    }
+
+    [Fact]
+    public async Task Arquivar_EIdempotente_ERepoeDepois()
+    {
+        var item = Item("Lasanha", visivel: true);
+
+        (await Sut().DefinirArquivadoAsync(EmpresaId, item.Id, true)).Arquivado.Should().BeTrue();
+        (await Sut().DefinirArquivadoAsync(EmpresaId, item.Id, true)).Arquivado.Should().BeTrue("o clique repetido não repõe");
+        item.Visivel.Should().BeTrue("arquivar não mexe no site");
+        (await Sut().DefinirArquivadoAsync(EmpresaId, item.Id, false)).Arquivado.Should().BeFalse();
+
+        await _uow.Received(2).CommitAsync();
+        await _cardapio.DidNotReceiveWithAnyArgs().RemoveAsync(default!);
+    }
+
+    [Fact]
+    public async Task Incluir_NasceEmValidacao_EConfirmarLibera()
+    {
+        CardapioItem? criado = null;
+        await _cardapio.AddAsync(Arg.Do<CardapioItem>(i =>
+        {
+            criado = i;
+            _cardapio.GetByIdAndScopeAsync(_vitrine.Id, i.Id, EmpresaId, Arg.Any<CancellationToken>()).Returns(i);
+        }), Arg.Any<CancellationToken>());
+
+        var r = await Sut().IncluirAsync(EmpresaId, new DadosItemCardapio(
+            "Torta de frango", LinhaProduto.PrepararEmCasa, "6 fatias", 60m, null,
+            MexerNovidade: true, NovidadeAte: new DateOnly(2026, 10, 20)));
+
+        criado.Should().NotBeNull();
+        criado!.EmValidacao.Should().BeTrue("RN-15: o agente não oferece até ela confirmar");
+        criado.NovidadeAte.Should().Be(new DateOnly(2026, 10, 20));
+
+        await Sut().ConfirmarValidacaoAsync(EmpresaId, r.ItemId);
+        criado.EmValidacao.Should().BeFalse();
     }
 
     [Fact]

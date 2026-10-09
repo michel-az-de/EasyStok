@@ -79,11 +79,11 @@ function montar(rotas) {
   return { acoes, chamadas, despachados }
 }
 
-await confere('item do cardápio saiu da lista de não ligadas (validar continua avisando)', () => {
-  for (const nome of ['incluirItemCardapio', 'editarItemCardapio', 'alternarRemocaoItemCardapio']) {
+// M1.2 (#1482): validar também passou a ser ligado.
+await confere('item do cardápio saiu da lista de não ligadas', () => {
+  for (const nome of ['incluirItemCardapio', 'editarItemCardapio', 'alternarRemocaoItemCardapio', 'confirmarValidacaoItem']) {
     assert.equal(NAO_LIGADAS[nome], undefined, nome)
   }
-  assert.ok(NAO_LIGADAS.confirmarValidacaoItem, 'sem campo no EasyStok, avisa')
 })
 
 await confere('lerCardapio junta os de dentro e os de fora, marcados como removidos', async () => {
@@ -117,12 +117,14 @@ await confere('editar manda PUT do item', async () => {
   assert.deepEqual(put.corpo, { nome: 'Lasanha bolonhesa', linha: 'ParaServir', porcao: '1 kg', preco: 48 })
 })
 
-await confere('tirar esconde (visivel=false) e repor mostra (visivel=true)', async () => {
-  const { acoes, chamadas } = montar([[(m, u) => m === 'POST' && u.includes('/visivel'), { data: {} }]])
+// M1.2 (#1482, D-M1-07): tirar arquiva (não oculta do site) e repor desarquiva.
+await confere('tirar arquiva e repor desarquiva, sem mexer no site', async () => {
+  const { acoes, chamadas } = montar([[(m, u) => m === 'POST' && u.includes('/arquivar'), { data: {} }]])
   await acoes.alternarRemocaoItemCardapio('i-1', Date.now())
   await acoes.alternarRemocaoItemCardapio('i-9', Date.now())
   const posts = chamadas.filter((c) => c.metodo === 'POST')
-  assert.deepEqual(posts.map((c) => [c.url.split('/').at(-2), c.corpo.visivel]), [['i-1', false], ['i-9', true]])
+  assert.deepEqual(posts.map((c) => [c.url.split('/').at(-2), c.corpo.arquivado]), [['i-1', true], ['i-9', false]])
+  assert.ok(!chamadas.some((c) => c.url.includes('/visivel')), 'não oculta do site')
   assert.ok(!chamadas.some((c) => c.metodo === 'DELETE'), 'nunca apaga')
 })
 

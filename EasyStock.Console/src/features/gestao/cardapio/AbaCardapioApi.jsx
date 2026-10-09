@@ -11,6 +11,9 @@ import css from './abaCardapio.module.css'
 // no balcão (Gerir) até a M1.2 trazer o formulário completo para cá.
 const LINHA = { servir: 'Para servir', casa: 'Preparar em casa' }
 
+// "2026-10-20" → "20/10".
+const dataCurta = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
+
 function normalizar(texto) {
   return (texto ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 }
@@ -46,7 +49,9 @@ export function AbaCardapioApi() {
       <div className={css.topo}>
         <p className={css.descricao}>
           Todos os pratos da vitrine, na ordem do cardápio. <strong>Hoje</strong> liga e desliga o prato no dia;
-          {' '}<strong>No site</strong> mostra ou esconde na página do cliente. Nada aqui apaga um item.
+          {' '}<strong>No site</strong> mostra ou esconde na página do cliente; <strong>Tirar</strong> põe fora do
+          {' '}cardápio (dá para repor). Item novo fica <strong>em validação</strong>: o assistente só oferece depois
+          {' '}que você validar. Nada aqui apaga um item.
         </p>
         <input
           className={css.busca}
@@ -82,6 +87,9 @@ export function AbaCardapioApi() {
               </div>
               <span className={css.preco}>{moeda(item.preco)}</span>
               <div className={css.estados}>
+                {item.arquivado && <Pilula tom="neutro" fina>Fora do cardápio</Pilula>}
+                {item.emValidacao && <Pilula tom="aviso" fina>Em validação</Pilula>}
+                {item.novidadeAte && <Pilula tom="ok" fina>Novidade até {dataCurta(item.novidadeAte)}</Pilula>}
                 {!item.hoje && <Pilula tom="aviso" fina>Fora de hoje</Pilula>}
                 {!item.noSite && <Pilula tom="neutro" fina>Oculto no site</Pilula>}
               </div>
@@ -104,6 +112,16 @@ export function AbaCardapioApi() {
                   />
                   No site
                 </label>
+                {item.emValidacao && (
+                  <Botao variante="texto" disabled={ocupado === item.sku}
+                    onClick={() => fazer(item.sku, () => gestao.validar(item.sku))}>
+                    Validar
+                  </Botao>
+                )}
+                <Botao variante="texto" disabled={ocupado === item.sku}
+                  onClick={() => fazer(item.sku, () => gestao.alternarArquivado(item.sku))}>
+                  {item.arquivado ? 'Repor' : 'Tirar'}
+                </Botao>
                 {ordenando && (
                   <span className={css.ordem}>
                     <Botao

@@ -125,6 +125,57 @@ public class CardapioItem
     /// <summary>Tag (assinatura, novo, vegetariano). Null = sem tag.</summary>
     public string? Tag { get; private set; }
 
+    /// <summary>
+    /// Tirado do cardápio (M1.2, D-M1-07). Diferente de <see cref="Visivel"/> (só o site): arquivado
+    /// sai do site, da comanda e do agente, mas continua achável por pedido antigo e pode voltar.
+    /// </summary>
+    public DateTime? ArquivadoEm { get; private set; }
+
+    /// <summary>Item novo ainda não confirmado pela dona (M1.2, RN-15, D-M1-08): o agente não oferece.</summary>
+    public bool EmValidacao { get; private set; }
+
+    /// <summary>Novidade até esta data, inclusive (M1.2, US-029). Depois some sozinha.</summary>
+    public DateOnly? NovidadeAte { get; private set; }
+
+    public bool EstaArquivado => ArquivadoEm.HasValue;
+
+    public bool EhNovidade(DateOnly hoje) => NovidadeAte is { } ate && ate >= hoje;
+
+    public void Arquivar(DateTime agora)
+    {
+        if (EstaArquivado) return;
+        ArquivadoEm = agora;
+        AlteradoEm = agora;
+    }
+
+    public void Repor()
+    {
+        if (!EstaArquivado) return;
+        ArquivadoEm = null;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    public void MarcarEmValidacao()
+    {
+        if (EmValidacao) return;
+        EmValidacao = true;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    public void ConfirmarValidacao()
+    {
+        if (!EmValidacao) return;
+        EmValidacao = false;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    public void DefinirNovidade(DateOnly? ate)
+    {
+        if (NovidadeAte == ate) return;
+        NovidadeAte = ate;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
     /// <summary>JSON array de strings, ex: <c>["sem-gluten","vegano"]</c>. Default <c>"[]"</c>.</summary>
     public string FiltrosJson { get; private set; } = "[]";
 

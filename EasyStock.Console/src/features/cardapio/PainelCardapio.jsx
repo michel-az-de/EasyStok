@@ -477,6 +477,48 @@ function FormularioItemCardapio({
   const [comNovidade, setComNovidade] = useState(Boolean(item?.novidadeAte))
   const [prazo, setPrazo] = useState(dataDoIso(item?.novidadeAte))
   const [erro, setErro] = useState(null)
+  // M1.2 (#1482): a ficha do item. No modo API ela vem do EasyStok antes de editar (o cardápio da
+  // comanda não traz ingredientes nem alérgenos); só o que ela mudou vai na gravação.
+  const { obterItemCardapio } = useAcoes()
+  const fichaVazia = { descricao: '', ingredientes: '', alergenos: '', preparo: '', instrucao: '' }
+  const [fichaInicial, setFichaInicial] = useState(null)
+  const [ficha, setFicha] = useState(fichaVazia)
+  const carregandoFicha = Boolean(item && obterItemCardapio && !fichaInicial)
+
+  useEffect(() => {
+    if (!item || !obterItemCardapio) return undefined
+    let vivo = true
+    Promise.resolve(obterItemCardapio(item.sku)).then((d) => {
+      if (!vivo) return
+      const inicial = d ? {
+        descricao: d.descricao, ingredientes: d.ingredientes, alergenos: d.alergenos,
+        preparo: d.tempoPreparoMinutos == null ? '' : String(d.tempoPreparoMinutos), instrucao: d.instrucaoFinalizacao,
+      } : fichaVazia
+      setFichaInicial(inicial)
+      setFicha(inicial)
+      if (d) {
+        setComNovidade(Boolean(d.novidadeAte))
+        setPrazo(dataDoIso(d.novidadeAte))
+      }
+    })
+    return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item?.sku, obterItemCardapio])
+
+  const mudarFicha = (campo) => (e) => setFicha((atual) => ({ ...atual, [campo]: e.target.value }))
+
+  // Campo da ficha só vai quando mudou (null = não mexe no EasyStok); preparo vazio também não vai.
+  function camposDaFicha() {
+    const base = fichaInicial ?? fichaVazia
+    const mudou = (campo) => ficha[campo].trim() !== (base[campo] ?? '').trim()
+    const saida = {}
+    if (mudou('descricao')) saida.descricao = ficha.descricao.trim()
+    if (mudou('ingredientes')) saida.ingredientes = ficha.ingredientes.trim()
+    if (mudou('alergenos')) saida.alergenos = ficha.alergenos.trim()
+    if (mudou('instrucao')) saida.instrucaoFinalizacao = ficha.instrucao.trim()
+    if (mudou('preparo') && ficha.preparo.trim()) saida.tempoPreparoMinutos = Number(ficha.preparo)
+    return saida
+  }
 
   const candidatosAdicionais = catalogoDeAdicionais(cardapio, adicionaisMap, item?.sku ?? null)
   const excedeu = moedaAltaDemais(centavos)
@@ -490,6 +532,9 @@ function FormularioItemCardapio({
     if (!porcao.trim()) { setErro('Diga a porção.'); return }
     if (centavos <= 0 || excedeu) { setErro('Preço inválido.'); return }
     if (comNovidade && !prazo) { setErro('Dê um prazo para a novidade.'); return }
+    if (ficha.preparo.trim() && !(Number.isInteger(Number(ficha.preparo)) && Number(ficha.preparo) > 0)) {
+      setErro('O preparo é em minutos inteiros.'); return
+    }
     const dados = {
       nome: nome.trim(),
       linha,
@@ -497,6 +542,7 @@ function FormularioItemCardapio({
       preco: centavos / 100,
       novidadeAte: comNovidade ? isoFimDoDia(prazo) : null,
       adicionaisSelecionados: selecionados,
+      ...camposDaFicha(),
     }
     if (item) aoEditar(item.sku, dados)
     else aoIncluir(dados)
@@ -570,6 +616,32 @@ function FormularioItemCardapio({
             <input type="date" value={prazo} onChange={(e) => setPrazo(e.target.value)} />
           </label>
         )}
+
+        <fieldset className={css.camposAdicionais} disabled={carregandoFicha}>
+          <legend>{carregandoFicha ? 'Ficha do prato (carregando…)' : 'Ficha do prato'}</legend>
+          <label className={css.campoFormulario}>
+            Descrição para o cliente
+            <textarea rows={2} maxLength={240} value={ficha.descricao} onChange={mudarFicha('descricao')} />
+          </label>
+          <label className={css.campoFormulario}>
+            Ingredientes
+            <textarea rows={2} maxLength={500} value={ficha.ingredientes} onChange={mudarFicha('ingredientes')} />
+          </label>
+          <label className={css.campoFormulario}>
+            Alérgenos
+            <input maxLength={200} value={ficha.alergenos} onChange={mudarFicha('alergenos')} placeholder="Ex.: glúten, lactose, ovo" />
+          </label>
+          <label className={css.campoFormulario}>
+            Preparo (minutos)
+            <input inputMode="numeric" value={ficha.preparo} onChange={mudarFicha('preparo')} placeholder="Padrão da loja" />
+          </label>
+          {linha === 'casa' && (
+            <label className={css.campoFormulario}>
+              Como finalizar em casa
+              <textarea rows={2} maxLength={500} value={ficha.instrucao} onChange={mudarFicha('instrucao')} />
+            </label>
+          )}
+        </fieldset>
 
         {erro && <p className={css.erroFormulario} role="alert">{erro}</p>}
 
