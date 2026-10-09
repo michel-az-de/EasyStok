@@ -72,40 +72,59 @@ public sealed class LivroSaidasHandler(
         var statusAutorizada = StatusNfe.Autorizada.ToString();
         var statusCancelada  = StatusNfe.Cancelada.ToString();
 
-        var documentos = tenantQuery.Query<NfeDocumento>()
+        var documentosDoPeriodo = tenantQuery.Query<NfeDocumento>()
             .Where(n => (n.Status == StatusNfe.Autorizada || n.Status == StatusNfe.Cancelada)
-                        && n.DataAutorizacao >= de && n.DataAutorizacao <= ate)
+                        && n.DataAutorizacao >= de && n.DataAutorizacao <= ate);
+
+        // Itens do período numa query só, agregados por documento antes do laço (padrão do MapMensalHandler, #1507).
+        // Antes eram 2 queries por NF-e (N+1), disparadas com o leitor do streaming de documentos ainda aberto.
+        var itensDoPeriodo = await db.NfeItens
+            .Where(i => documentosDoPeriodo.Select(n => n.Id).Contains(i.NfeDocumentoId))
+            .Select(i => new
+            {
+                i.NfeDocumentoId,
+                i.CfopSnapshot,
+                i.Subtotal,
+                i.BaseIcms,
+                i.ValorIcms,
+                i.Pis,
+                i.Cofins,
+            })
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        var agregadosPorDocumento = itensDoPeriodo
+            .GroupBy(i => i.NfeDocumentoId)
+            .ToDictionary(
+                g => g.Key,
+                g => (
+                    // CFOP principal: derivado do item com maior subtotal no documento.
+                    CfopPrincipal: g.Where(i => i.CfopSnapshot != null)
+                        .OrderByDescending(i => i.Subtotal.Valor)
+                        .Select(i => i.CfopSnapshot)
+                        .FirstOrDefault(),
+                    // Tributos: agrega itens. NULL em todos os tributos = legada (pré-PR-D).
+                    TemTributos: g.Any(i => i.BaseIcms.HasValue),
+                    BaseIcms:    g.Sum(i => i.BaseIcms ?? 0m),
+                    ValorIcms:   g.Sum(i => i.ValorIcms ?? 0m),
+                    Pis:         g.Sum(i => i.Pis ?? 0m),
+                    Cofins:      g.Sum(i => i.Cofins ?? 0m)));
+
+        var documentos = documentosDoPeriodo
             .OrderBy(n => n.DataAutorizacao)
             .AsNoTracking()
             .AsAsyncEnumerable();
 
         await foreach (var doc in documentos.WithCancellation(ct))
         {
-            // CFOP principal: derivado do item com maior subtotal no documento.
-            // Carregado client-side para evitar GROUP BY complexo em streaming.
-            var cfopPrincipal = await db.NfeItens
-                .Where(i => i.NfeDocumentoId == doc.Id && i.CfopSnapshot != null)
-                .OrderByDescending(i => i.Subtotal)
-                .Select(i => i.CfopSnapshot)
-                .FirstOrDefaultAsync(ct);
-
-            // Tributos: agrega itens. NULL em todos os tributos = legada (pré-PR-D).
-            var itens = await db.NfeItens
-                .Where(i => i.NfeDocumentoId == doc.Id)
-                .Select(i => new
-                {
-                    i.BaseIcms,
-                    i.ValorIcms,
-                    i.Pis,
-                    i.Cofins,
-                })
-                .ToListAsync(ct);
-
-            var temTributos   = itens.Any(i => i.BaseIcms.HasValue);
-            var baseIcms      = itens.Sum(i => i.BaseIcms ?? 0m);
-            var valorIcms     = itens.Sum(i => i.ValorIcms ?? 0m);
-            var pis           = itens.Sum(i => i.Pis ?? 0m);
-            var cofins        = itens.Sum(i => i.Cofins ?? 0m);
+            // Nota sem itens: sem CFOP, sem tributos rastreados e totais zerados, como antes.
+            var temAgregado   = agregadosPorDocumento.TryGetValue(doc.Id, out var agregado);
+            var cfopPrincipal = temAgregado ? agregado.CfopPrincipal : null;
+            var temTributos   = temAgregado && agregado.TemTributos;
+            var baseIcms      = temAgregado ? agregado.BaseIcms : 0m;
+            var valorIcms     = temAgregado ? agregado.ValorIcms : 0m;
+            var pis           = temAgregado ? agregado.Pis : 0m;
+            var cofins        = temAgregado ? agregado.Cofins : 0m;
 
             yield return new LivroSaidasRow(
                 DataAutorizacao:   doc.DataAutorizacao,
