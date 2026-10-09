@@ -27,3 +27,7 @@ export function deveRelerPedido(resumo, guardado, { selecionadaId = null, cicloL
   if (STATUS_FINAIS_DO_PEDIDO.has(guardado.dados?.status)) return false
   return resumo.id === selecionadaId || guardado.ultima !== resumo.ultimaMensagemEm || cicloLento
 }
+
+// #1241: só falta de rede vira queda de conexão (faixa do papel). Erro do EasyStok (500,
+// 403...) é outro aviso: a internet está lá, o canhoto não precisa assumir.
+export const quedaDaSincronizacao = (erro) => erro?.codigo === 'SEM_CONEXAO'

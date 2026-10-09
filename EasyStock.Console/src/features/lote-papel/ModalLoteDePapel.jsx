@@ -16,10 +16,13 @@ import css from './ModalLoteDePapel.module.css'
 // papel são lançados na tela em lote"). "Nada de tela nova se couber numa
 // modal" — cabe: banner enquanto está caída, pílula + modal quando volta.
 export function ModalLoteDePapel() {
-  const { conversas, conexao, agora } = useAtendimento()
+  const { conversas, conexao, agora, fonteApi } = useAtendimento()
   const { conexaoVoltou, lancarLotePapel } = useAcoes()
   const [modalAberta, setModalAberta] = useState(false)
   const [selecoes, setSelecoes] = useState({})
+  // #1241 (modo API): o EasyStok responde o que recusou; a modal mostra antes de fechar.
+  const [recusas, setRecusas] = useState([])
+  const [lancando, setLancando] = useState(false)
   const eraOnlineRef = useRef(conexao.online)
   const faixaRef = useRef(null)
 
@@ -57,10 +60,22 @@ export function ModalLoteDePapel() {
 
   const marcar = (conversaId, passoId) => setSelecoes((atual) => ({ ...atual, [conversaId]: passoId }))
 
-  const confirmar = () => {
-    lancarLotePapel(selecoes, agora)
-    setSelecoes({})
+  const fechar = () => {
+    setRecusas([])
     setModalAberta(false)
+  }
+
+  // No modo demonstração o lote é aplicado na hora. No modo API a ação devolve uma promessa:
+  // `null` quando nem chegou ao EasyStok (a modal fica para tentar de novo), ou o resultado
+  // com as recusas, que ficam na tela até ela fechar.
+  const confirmar = async () => {
+    setLancando(true)
+    const resultado = await lancarLotePapel(selecoes, agora)
+    setLancando(false)
+    if (resultado === null) return
+    setSelecoes({})
+    if (resultado?.rejeitados?.length) setRecusas(resultado.rejeitados)
+    else fechar()
   }
 
   const algumAvanco = candidatos.some((c) => {
@@ -94,15 +109,29 @@ export function ModalLoteDePapel() {
       {modalAberta && (
         <Modal
           titulo="Lançar o que foi feito no papel"
-          descricao={`Sem conexão de ${horaCurta(conexao.offlineDesde)} até ${horaCurta(conexao.voltouEm)}. Marque até onde cada pedido andou no canhoto: confirmar lança tudo de uma vez, na ordem da esteira, e cada cliente recebe um aviso só, com o passo final.`}
-          aoFechar={() => setModalAberta(false)}
-          rodape={(
+          descricao={`Sem conexão de ${horaCurta(conexao.offlineDesde)} até ${horaCurta(conexao.voltouEm)}. Marque até onde cada pedido andou no canhoto: confirmar lança tudo de uma vez, na ordem da esteira, ${fonteApi
+            ? 'no EasyStok. O cliente não recebe aviso do que já passou.'
+            : 'e cada cliente recebe um aviso só, com o passo final.'}`}
+          aoFechar={fechar}
+          rodape={recusas.length > 0 ? (
+            <Botao variante="primario" onClick={fechar}>Entendi</Botao>
+          ) : (
             <>
-              <Botao variante="texto" onClick={() => setModalAberta(false)}>Depois</Botao>
-              <Botao variante="primario" disabled={!algumAvanco} onClick={confirmar}>Confirmar</Botao>
+              <Botao variante="texto" onClick={fechar}>Depois</Botao>
+              <Botao variante="primario" disabled={!algumAvanco || lancando} onClick={confirmar}>
+                {lancando ? 'Lançando…' : 'Confirmar'}
+              </Botao>
             </>
           )}
         >
+          {recusas.length > 0 && (
+            <div role="alert">
+              <p>O resto foi lançado. Estes ficaram de fora, ajuste no pedido:</p>
+              <ul className={css.lista}>
+                {recusas.map((r) => <li key={r.numero} className={css.avisoCancelado}>{r.numero}: {r.motivo}</li>)}
+              </ul>
+            </div>
+          )}
           {candidatos.length === 0 && <p>Nenhum pedido estava aberto quando a conexão caiu.</p>}
           <ul className={css.lista}>
             {candidatos.map((c) => {
