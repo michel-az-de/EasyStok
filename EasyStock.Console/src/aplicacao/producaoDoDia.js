@@ -21,6 +21,8 @@ export function criarProducaoDoDia({ gerarChave = () => crypto.randomUUID() } = 
           codigo: r.codigoLote,
           etiquetas: r.totalEtiquetas,
           pratos: (r.pratos ?? []).map((p) => ({ sku: p.cardapioItemId, nome: p.nome, porcoes: p.porcoes, sobraG: p.sobraG })),
+          // D-M2-01 (#1499): falta de insumo na baixa automática avisa, não trava.
+          avisos: r.avisos ?? [],
         }
       } catch (e) {
         return { ok: false, erro: e.message }
