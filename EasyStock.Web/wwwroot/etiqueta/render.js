@@ -165,8 +165,9 @@ function renderImage(el, dados) {
 
 function resolveAsset(asset, dados) {
   if (!asset) return null;
-  if (asset === 'system:logo-easystok')    return '/etiqueta/assets/logo-easystok.svg';
-  if (asset === 'system:lockup-easystok') return '/etiqueta/assets/lockup-easystok.svg';
+  // #1509: relativo ao modulo; o caminho absoluto /etiqueta/ dava 404 com o PWA servido em /pwa/.
+  if (asset === 'system:logo-easystok')    return new URL('./assets/logo-easystok.svg', import.meta.url).href;
+  if (asset === 'system:lockup-easystok') return new URL('./assets/lockup-easystok.svg', import.meta.url).href;
   if (asset === 'loja:logo')              return dados?.empresa?.LogoUrl ?? null;
   return null;
 }
