@@ -363,6 +363,7 @@ Felipe aprovou a continuação após o levantamento. As seções anteriores pres
 - Sync PWA: erro de gravação mantém o cursor para reenvio; timeout não pula dados antigos ainda não recebidos. Duas regressões foram reproduzidas antes da correção. Isso não implementa a resolução de conflitos entre edições offline, que continua na onda 7.
 - Provas da cozinha e da revisão #1474 incluídas no workflow do console. Avisos adicionados à entrada da `.knowledge` para distinguir os snapshots antigos da base atual.
 - PR #1401 integrada em `master` como `96516cb2` após build/testes, análise CodeQL e secret-scan aprovados. O job manual de homologação HTTP do GitHub foi ignorado; a prova HTTP desta seção foi executada localmente.
+- PR #1480 integrada em `master` como `1a8cbdb9` após build/testes, CodeQL, secret-scan, console e PWA aprovados. A homologação HTTP manual do GitHub permaneceu ignorada; não houve deploy. As correções da revisão e a conciliação com M2 foram preservadas.
 - Durante esta execução, outro trabalho integrou #1492 e #1495: estoque do dia e produção por prato com peso real/etiquetas. Essas entregas foram conciliadas, preservadas e revalidadas aqui. Não são implementações feitas por esta revisão; o inventário inicial as listava antes do merge. A seção de M2 em `03-m2-producao.md` contém seu escopo atualizado.
 
 ### Evidência local
@@ -380,16 +381,20 @@ Felipe aprovou a continuação após o levantamento. As seções anteriores pres
 | PWA | 167 aprovados, 1 ignorado por IndexedDB ausente no sandbox; 2 scripts ESM não executados pelo runner |
 | Gate de commit | build aprovado e 36 testes de arquitetura aprovados |
 | Verificador HTTP | 8 testes aprovados e console/API locais respondendo com o mesmo SHA `d7a21b59` |
-| Conciliação com #1492/#1495 | 242 testes de aplicação aprovados; qualidade do console e provas 1490, 1491, 1447 e ambas 1474 aprovadas novamente |
+| Conciliação com #1492/#1495 | 242 testes de aplicação e 11 de integração PostgreSQL aprovados; qualidade do console e provas 1490, 1491, 1447 e ambas 1474 aprovadas novamente |
 
 Jornada executada por `scripts/homologacao/onda0-http.ps1` em API real com autenticação JWT e PostgreSQL 17 descartável, sem usar os bancos das outras stacks. Abriu loja/caixa, criou pedido avulso de 2,5 unidades a R$ 10, confirmou a cozinha, recebeu R$ 25, percorreu preparando/pronto/entregue e releu cada estado. Recebeu/cancelou outro pedido de R$ 15 e conferiu fechamento de R$ 125, incluindo R$ 100 de abertura. Identificadores de teste: entregue `9520d7ca-59be-4a2a-808a-d0016ac02c3a`; cancelado `c281d1ba-d3f7-490a-bf7a-95e7a7326412`.
 
 Backup local: `pg_dump -Fc` e `pg_restore --exit-on-error` para outra base descartável. Quantidade e hash do conteúdo de pedidos (2), itens (2), pagamentos (2) e fechamentos (1) iguais ao original. SHA-256 do dump de teste: `CA7D215D0AE30FCA1513678D2380FF8ADF8D617E44B0777A543B12D0F788CC4C`. Logs/TRX/dump ficam no worktree em `.build/onda0-tests`, fora do Git.
 
+Backup externo: acesso SSH `hostinger` confirmado. O log de 09/10 registra envio e `cryptcheck` de dois arquivos sem diferenças. Executado o script existente `scripts/infra/backup-externo/testar-restauracao.ps1`: baixou `diario/2026-10-09`, restaurou o dump em PostgreSQL 17 descartável na VPS e confirmou **159 tabelas** e **230 entradas legíveis** no tar de uploads. Execução com saída 0; container descartável removido pelo próprio script, sem restauração sobre o banco de produção. Isso verifica recuperação técnica do backup, não aceite funcional da aplicação restaurada.
+
+Pendências encontradas no backup: a cópia de `enviar.sh` instalada na VPS registra `tmp: unbound variable` na limpeza após o envio; o arquivo canônico local já usa expansão antecipada no trap. Reconciliar essa instalação separadamente. O rclone emite aviso sobre descontinuação do `client_id` compartilhado do Google Drive; configurar cliente próprio com o responsável pela conta antes de depender da continuidade desse acesso. Nenhuma credencial foi alterada nesta execução.
+
 ### Limites e próximos aceites
 
 - Revisão e teste local não são publicação. Os SHAs públicos registrados na seção 3 não foram substituídos por um deploy nesta execução.
 - A abertura do navegador automatizado falhou no início por `windows sandbox failed: apply deny-read ACLs`. O aceite visual autenticado permanece pendente; as provas JavaScript e HTTP não o substituem.
-- Scripts de backup externo da VPS foram lidos, mas a disponibilidade e a restauração do backup real da produção não foram verificadas. A prova acima usa somente massa sintética local.
+- Recuperação técnica do backup externo comprovada acima. Teste funcional da aplicação restaurada, correção do script instalado e continuidade da autenticação do rclone seguem pendentes.
 - Não há workflow `build-casa-da-baba-apk.yml` na árvore atual, nem cópia MAUI ativa para sincronizar. O workflow PWA vigente roda `node tests/pwa/run.js`; não foi gerado APK nem testada a Oasis.
-- Não fechar a onda 0 como homologada visualmente. A próxima fatia é completar esse aceite, verificar recuperação da VPS antes de publicar e então apresentar navegação/DS/perfis da onda 1 para aprovação das telas representativas.
+- Não fechar a onda 0 como homologada visualmente. A próxima fatia é completar esse aceite e então apresentar navegação/DS/perfis da onda 1 para aprovação das telas representativas. API pública `701dbf4b` e console público `888eeab7` foram reconferidos após os testes e continuam anteriores às correções; não houve deploy nesta execução.
