@@ -31,6 +31,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                     .Include(u => u.Empresas)
                     .Include(u => u.Perfis!)
                     .ThenInclude(up => up.Perfil)
+                        .ThenInclude(p => p!.Permissoes)
                     .FirstOrDefaultAsync(u => u.Id == id);
             }
         }

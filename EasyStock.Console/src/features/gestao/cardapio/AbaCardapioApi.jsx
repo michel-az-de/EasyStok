@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Pilula } from '../../../componentes/Pilula'
 import { useGestaoCardapioApi } from '../../../aplicacao/useGestaoCardapioApi'
+import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { moeda } from '../../../dominio/formato'
 import css from './abaCardapio.module.css'
 
@@ -19,6 +20,8 @@ function normalizar(texto) {
 }
 
 export function AbaCardapioApi() {
+  const { acoes } = useAcessoModulos()
+  const podeEditar = acoes.editarCardapio === true
   const gestao = useGestaoCardapioApi()
   const [busca, setBusca] = useState('')
   const [ocupado, setOcupado] = useState(null)
@@ -68,6 +71,7 @@ export function AbaCardapioApi() {
           {gestao.aviso} <Botao variante="texto" onClick={gestao.fecharAviso}>Fechar</Botao>
         </p>
       )}
+      {!podeEditar && <p className={css.descricao}>Você pode consultar os pratos e ajustar a disponibilidade de hoje. As outras alterações ficam com a dona.</p>}
       {!ordenando && <p className={css.descricao}>Limpe a busca para mudar a ordem.</p>}
 
       {itens.length === 0 ? (
@@ -107,22 +111,22 @@ export function AbaCardapioApi() {
                   <input
                     type="checkbox"
                     checked={item.noSite}
-                    disabled={ocupado === item.sku}
+                    disabled={!podeEditar || ocupado === item.sku}
                     onChange={() => fazer(item.sku, () => gestao.alternarNoSite(item.sku))}
                   />
                   No site
                 </label>
                 {item.emValidacao && (
-                  <Botao variante="texto" disabled={ocupado === item.sku}
+                  <Botao variante="texto" disabled={!podeEditar || ocupado === item.sku}
                     onClick={() => fazer(item.sku, () => gestao.validar(item.sku))}>
                     Validar
                   </Botao>
                 )}
-                <Botao variante="texto" disabled={ocupado === item.sku}
+                <Botao variante="texto" disabled={!podeEditar || ocupado === item.sku}
                   onClick={() => fazer(item.sku, () => gestao.alternarArquivado(item.sku))}>
                   {item.arquivado ? 'Repor' : 'Tirar'}
                 </Botao>
-                {ordenando && (
+                {podeEditar && ordenando && (
                   <span className={css.ordem}>
                     <Botao
                       variante="texto"

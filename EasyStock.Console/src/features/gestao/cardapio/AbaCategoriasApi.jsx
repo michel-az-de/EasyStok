@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Pilula } from '../../../componentes/Pilula'
 import { useSecoesCardapioApi } from '../../../aplicacao/useSecoesCardapioApi'
+import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import css from './abaCardapio.module.css'
 
 // M1 › Categorias (M1.3, #1483). As categorias que o cliente vê no site e que agrupam a comanda,
@@ -78,6 +79,7 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
 }
 
 export function AbaCategoriasApi() {
+  const { acoes } = useAcessoModulos()
   const gestao = useSecoesCardapioApi()
   const [nova, setNova] = useState('')
   const [criando, setCriando] = useState(false)
@@ -99,6 +101,16 @@ export function AbaCategoriasApi() {
     )
   }
 
+  if (acoes.editarCardapio !== true) return (
+    <div className={css.aba}>
+      <p className={css.descricao}>Você pode consultar as categorias. As alterações ficam com a dona.</p>
+      {gestao.secoes.length === 0 ? <p>Nenhuma categoria cadastrada.</p> : (
+        <ol className={css.lista}>{gestao.secoes.map((secao) => (
+          <li className={css.linha} key={secao.id}><span className={css.nome}>{secao.nome}</span><span>{secao.itens} prato(s)</span></li>
+        ))}</ol>
+      )}
+    </div>
+  )
   return (
     <div className={css.aba}>
       <div className={css.topo}>

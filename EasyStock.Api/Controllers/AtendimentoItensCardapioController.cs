@@ -30,7 +30,7 @@ public sealed record MoverItemRequest(DirecaoMover Direcao);
 [SwaggerTag("Attendance order ticket (console)")]
 [ApiController]
 [Route("api/atendimento/comanda/cardapio")]
-[Authorize(Policy = "Gerente")]
+[Authorize(Policy = "Operador")]
 public class AtendimentoItensCardapioController(
     ItensDoCardapioComandaUseCase itens,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
@@ -38,6 +38,7 @@ public class AtendimentoItensCardapioController(
     [SwaggerOperation(Summary = "Menu items taken off the menu (hidden), to put back")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [HttpGet("fora")]
+    [Authorize(Policy = "Gerente")]
     public Task<IActionResult> Fora(CancellationToken ct)
         => Tratar(async () => DataOk(await itens.ListarForaAsync(currentUser.EmpresaId, ct)));
 
@@ -52,6 +53,7 @@ public class AtendimentoItensCardapioController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpPost("{itemId:guid}/mover")]
+    [Authorize(Policy = "Gerente")]
     public Task<IActionResult> Mover(Guid itemId, [FromBody] MoverItemRequest req, CancellationToken ct)
         => Tratar(async () => DataOk(await itens.MoverAsync(currentUser.EmpresaId, itemId, req.Direcao, ct)));
 
@@ -66,6 +68,7 @@ public class AtendimentoItensCardapioController(
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [HttpPost]
+    [Authorize(Policy = "Gerente")]
     public Task<IActionResult> Incluir([FromBody] ItemCardapioRequest req, CancellationToken ct)
         => Tratar(async () =>
         {
@@ -77,6 +80,7 @@ public class AtendimentoItensCardapioController(
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpPut("{itemId:guid}")]
+    [Authorize(Policy = "Gerente")]
     public Task<IActionResult> Editar(Guid itemId, [FromBody] ItemCardapioRequest req, CancellationToken ct)
         => Tratar(async () =>
         {
@@ -88,6 +92,7 @@ public class AtendimentoItensCardapioController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpPost("{itemId:guid}/arquivar")]
+    [Authorize(Policy = "Gerente")]
     public Task<IActionResult> Arquivar(Guid itemId, [FromBody] DefinirArquivadoItemRequest req, CancellationToken ct)
         => Tratar(async () => DataOk(await itens.DefinirArquivadoAsync(currentUser.EmpresaId, itemId, req.Arquivado, ct)));
 
@@ -95,6 +100,7 @@ public class AtendimentoItensCardapioController(
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpPost("{itemId:guid}/validar")]
+    [Authorize(Policy = "Gerente")]
     public Task<IActionResult> Validar(Guid itemId, CancellationToken ct)
         => Tratar(async () =>
         {
@@ -106,6 +112,7 @@ public class AtendimentoItensCardapioController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpPost("{itemId:guid}/visivel")]
+    [Authorize(Policy = "Gerente")]
     public Task<IActionResult> Visivel(Guid itemId, [FromBody] DefinirVisibilidadeItemRequest req, CancellationToken ct)
         => Tratar(async () => DataOk(await itens.DefinirVisivelAsync(currentUser.EmpresaId, itemId, req.Visivel, ct)));
 

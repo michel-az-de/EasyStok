@@ -13,7 +13,8 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
         string Nome,
         string Email,
         NivelAcesso Nivel,
-        IReadOnlyCollection<Permissao> Permissoes);
+        IReadOnlyCollection<Permissao> Permissoes,
+        string? ModuloInicial = null);
 
     public class AutenticarUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
@@ -112,7 +113,8 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                     Nome: usuario.Nome,
                     Email: usuario.Email,
                     Nivel: NivelAcesso.SuperAdmin,
-                    Permissoes: permissoesSuper);
+                    Permissoes: permissoesSuper,
+                    ModuloInicial: perfilSuperAdmin.ModuloInicial);
             }
 
             if (empresaId.HasValue)
@@ -126,6 +128,7 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
 
             var nivel = NivelAcesso.Visualizador;
             IReadOnlyCollection<Permissao> permissoes = [];
+            string? moduloInicial = null;
 
             if (empresaId.HasValue && usuario.Perfis is not null)
             {
@@ -137,6 +140,7 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 if (perfilDaEmpresa?.Perfil is not null)
                 {
                     nivel = perfilDaEmpresa.Perfil.Nivel;
+                    moduloInicial = perfilDaEmpresa.Perfil.ModuloInicial;
                     permissoes = perfilDaEmpresa.Perfil.Permissoes?
                         .Select(p => p.Permissao)
                         .Distinct()
@@ -154,7 +158,8 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 Nome: usuario.Nome,
                 Email: usuario.Email,
                 Nivel: nivel,
-                Permissoes: permissoes);
+                Permissoes: permissoes,
+                ModuloInicial: moduloInicial);
         }
 
         private static Guid? PrimeiraEmpresaAtiva(Domain.Entities.Usuario usuario) =>

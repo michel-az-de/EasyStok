@@ -12,6 +12,9 @@ public static class PoliticaPermissao
         if (explicitas.Count > 0)
             return explicitas.Contains(permissao);
 
+        if (AcessoModulos.EhPermissaoDeModulo(permissao))
+            return AcessoModulos.Fallback(nivel, permissao);
+
         return nivel switch
         {
             NivelAcesso.SuperAdmin => true,

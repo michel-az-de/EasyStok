@@ -6,6 +6,7 @@ namespace EasyStock.Domain.Entities
         public Guid? EmpresaId { get; set; }
         public string Nome { get; set; } = null!;
         public string? Descricao { get; set; }
+        public string? ModuloInicial { get; set; }
         public NivelAcesso Nivel { get; set; }
         public DateTime CriadoEm { get; set; }
 

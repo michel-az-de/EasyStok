@@ -439,3 +439,48 @@ A cópia instalada de `/home/felipe/backup-externo/enviar.sh` diferia da canôni
 Confirmada a ausência de `client_id` próprio do Google Drive, sem imprimir valores de credenciais. Essa configuração depende do acesso à conta/projeto OAuth responsável e permanece pendente.
 
 **A onda 1 não está integralmente concluída.** Próxima fatia: M0.3, matriz Dona/Atendimento/Cozinha aplicada pela API e shell, porta por perfil, bloqueio de rota digitada e classificação dos controllers. Sino real transversal e sessão longa da cozinha também permanecem pendentes. Tenant, permissões de backend e migrations não foram alterados nesta fatia. Mercado Pago real, transportadoras/geolocalização e Oasis mantêm os aceites das respectivas ondas. Não houve deploy da aplicação nesta execução.
+
+## 14. Continuação autorizada: perfis e acesso aos módulos, 09/10/2026
+
+Fatia funcional da M0.3 implementada sobre `771da5c6`, incluindo produção M2.4b. Não representa encerramento da onda 1 nem deploy. A referência anterior da seção 13 passa a ser histórica.
+
+| Perfil | Módulos liberados | Entrada |
+|---|---|---|
+| Dona | Todos os 8 | Sala de módulos |
+| Atendimento | Cardápio, Atendimento, Cozinha, Financeiro e Entregas | Balcão |
+| Cozinha | Produção e Cozinha | Fila de preparo |
+
+### O que mudou
+
+- Enum de módulos, oito permissões de acesso e fallback por nível conforme a matriz decidida. Lista explícita continua prevalecendo sobre o nível. Claims explícitas inválidas negam acesso, sem transformá-las em fallback permissivo.
+- `GET /api/auth/me/modulos` fornece matriz, entrada e capacidade de editar o Cardápio. O identificador do caixa é `financeiro`, compatível com as rotas existentes do Console.
+- Classificação explícita de todos os controllers em `Api/Authorization/ModulosConvention.cs`. Um controller novo sem classificação falha no teste e na inicialização. A convenção MVC acrescenta requisito de módulo às policies e permissões finas existentes. Catálogo compartilhado, leitura KDS de Entregas e impressão têm exceções restritas. Controllers públicos, de infraestrutura, do bastidor Web e do backup Mobile permanecem com seus contratos próprios.
+- Migração aditiva `20261009170822_AddPerfilModuloInicial`: uma coluna anulável de até 30 caracteres. Login por senha, finalização de login Google e refresh transportam a entrada no JWT.
+- Seed idempotente de Dona, Atendimento e Cozinha na empresa resolvida pela configuração existente `Auth:Google:EmpresaPadrao`. Não cria usuários, não atribui perfis automaticamente e não sobrescreve perfis existentes de mesmo nome. Sem empresa configurada, registra que o seed não foi executado. Não usa empresa fictícia como destino de produção.
+- Corrigido defeito encontrado no teste HTTP: `UsuarioRepository.GetByIdAsync` não carregava as permissões, e o refresh ampliava o acesso ao fallback do nível. A consulta agora carrega permissões, com teste de regressão em contexto novo e confirmação HTTP.
+- Console aguarda a matriz antes de montar módulos, filtra cartões e atalhos, respeita entrada por perfil, bloqueia links digitados e aliases e oferece saída/retentativa quando a matriz falha. A produção da Cozinha lê o catálogo sem carregar conversas, expediente ou respostas prontas. Eventos de conversa não são enviados ao SSE da Cozinha/Entregas sem acesso a Atendimento.
+- Atendimento consulta itens e categorias do Cardápio. Edição de cadastro continua exigindo Gerente na API; controles reservados ficam desabilitados/ocultos. Ligar/desligar a disponibilidade de hoje mantém a regra anterior de Operador. Fechamento de caixa continua reservado a Gerente.
+
+### Evidência da fatia
+
+| Verificação | Resultado |
+|---|---|
+| API unitária | 952 testes aprovados, incluindo classificação, requisitos, seed, claims, refresh e SSE |
+| Domínio | 53 testes de acesso/permissão aprovados; inclui 5 níveis × 8 módulos |
+| Login | 12 testes de aplicação aprovados |
+| Console | Lint, camadas, 264 pares de contraste e build aprovados; 54 provas JavaScript aprovadas |
+| PostgreSQL 17 local | 157 migrations aplicadas em base nova; reinícios preservaram um perfil de cada nome, com 19/7/3 permissões |
+| HTTP real | 51 verificações em `scripts/homologacao/onda1-perfis-http.ps1`; três logins, matriz, portas, 200/401/403, consulta de Cardápio, bloqueio de edição/fechamento e refresh sem ampliar acesso |
+| Navegador real | Três logins e saídas; 8/5/2 cartões; entrada correta; Cozinha navega na produção sem buscar conversas; rotas proibidas não consultam caixa; consulta de Cardápio pelo Atendimento; falha de carga de permissões bloqueia e permite retentar; sem erros JavaScript |
+| Limites | Base de teste local, sem OAuth Google real, usuários reais, envio a clientes ou pagamento externo |
+
+Capturas: [Dona](evidencias-onda1/perfis-dona-hall.png), [Atendimento](evidencias-onda1/perfis-atendimento-hall.png), [Cozinha](evidencias-onda1/perfis-cozinha-hall.png) e [rota bloqueada no celular](evidencias-onda1/perfis-cozinha-negado-celular.png). Logs, TRX e roteiro do navegador ficam em `C:\rep\EasyStok\.build\validacao-casa-da-baba-20261009\perfis`, fora do Git. O banco isolado chama-se `easystock_onda1_perfis`.
+
+### Pendências e próxima sequência
+
+1. **M0.3 ainda parcial:** mantidas as 18 permissões legadas no enum nesta entrega. Sua retirada e a limpeza de dados exigem a migration e o teste de login legado previstos na especificação. Não apagar a última permissão explícita de um perfil sem avaliar o efeito do fallback. A lista atual tem 37 membros, não os 19 finais.
+2. Preparar a publicação e conferir a empresa configurada e os vínculos de pessoas reais. Perfis antigos e seus vínculos foram preservados. Perfil com lista explícita sem permissões de módulo será negado no Console, conforme a regra decidida; a implantação precisa revisar esses perfis. Nenhuma atribuição de função a pessoa real foi inferida.
+3. Completar a UX por ação dos outros módulos, sino transversal e sessão longa da Cozinha. O CRUD/editor de perfis permanece na M7.2. Algumas telas antigas continuam exibindo aviso de ainda não ligadas.
+4. Seguir para a onda 2: ciclo completo de pedido, interação e exceções no balcão. Mercado Pago, entregas/geolocalização e impressão física Oasis conservam seus próprios aceites e dependências. A matriz de perfis não comprova essas integrações.
+
+Não houve deploy nem alteração do banco de produção nesta execução.

@@ -15,7 +15,7 @@ import { avisoDoCardapio, deveRelerMensagens, deveRelerPedido, quedaDaSincroniza
 const INTERVALO_MS = 5000
 const CICLOS_POR_MINUTO = 12
 
-export function useSincronizacaoApi({ ativo, usuario, despachar, selecionadaId = null }) {
+export function useSincronizacaoApi({ ativo, comConversas = true, usuario, despachar, selecionadaId = null }) {
   // A seleção muda a cada clique; num ref, o laço não recomeça por causa dela.
   const selecionadaRef = useRef(selecionadaId)
   useEffect(() => { selecionadaRef.current = selecionadaId }, [selecionadaId])
@@ -61,7 +61,7 @@ export function useSincronizacaoApi({ ativo, usuario, despachar, selecionadaId =
     let avisouCardapio = false
     async function cardapio() {
       try {
-        const itens = await lerCardapio()
+        const itens = await lerCardapio({ incluirFora: comConversas })
         if (!vivo) return
         despachar({ tipo: acao.SINCRONIZAR_CARDAPIO, cardapio: itens })
         if (avisouCardapio) {
@@ -82,7 +82,7 @@ export function useSincronizacaoApi({ ativo, usuario, despachar, selecionadaId =
       if (cicloLento) await cardapio()
       ciclos += 1
       try {
-        const lista = await listarTodasConversas()
+        const lista = comConversas ? await listarTodasConversas() : []
         const conversas = await Promise.all(lista.map(async (resumo) => {
           const [mensagens, pedido] = await Promise.all([mensagensDe(resumo), pedidoDe(resumo, cicloLento)])
           return { ...conversaDaApi(resumo, mensagens, usuario), pedido: pedidoDaApi(pedido) }
@@ -107,5 +107,5 @@ export function useSincronizacaoApi({ ativo, usuario, despachar, selecionadaId =
       vivo = false
       clearTimeout(proximo)
     }
-  }, [ativo, usuario, despachar])
+  }, [ativo, comConversas, usuario, despachar])
 }

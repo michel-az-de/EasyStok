@@ -13,6 +13,10 @@ import { DESKTOP, useTamanhoTela } from '../hooks/useTamanhoTela'
 import { INSTANTE_INICIAL, LINHAS_PRODUTO } from '../infra/catalogo'
 import { FONTE_API } from '../infra/fonteDados'
 import { useSessaoApi } from '../aplicacao/useSessaoApi'
+import { ContextoAcessoModulos, useAcessoModulos, useModulosDaSessao } from '../aplicacao/acessoModulos'
+import { moduloDaRota, permiteModulo, permiteRota } from '../dominio/acessoModulos'
+import { Vazio } from '../componentes/Vazio'
+import { Botao } from '../componentes/Botao'
 import { TelaLogin } from '../features/login/TelaLogin'
 import { FaixaApi, LimparAvisoAoNavegar } from './FaixaApi'
 import { contarPrecisaDeVoce, precisaDeVoce } from '../dominio/automatico'
@@ -267,6 +271,7 @@ const INICIO_DO_RELOGIO = FONTE_API ? Date.now() : INSTANTE_INICIAL
 // as telas de ajuste (as abas da antiga Gestão) abrem na moldura do módulo. As
 // três dividem o mesmo `AtendimentoProvider`, então ir e voltar não recarrega nada.
 function TelaDaRota({ rota, aoSair }) {
+  const { sessao, agora } = useAtendimento()
   if (rota.tipo === ROTA_PRINCIPAL) return <Composicao aoSair={aoSair} />
   // Na demonstração, navegar no mesmo tab mantém a origem do espelho viva.
   // Os apelidos avulsos continuam sem outro provider, como as janelas do tablet.
@@ -275,7 +280,7 @@ function TelaDaRota({ rota, aoSair }) {
   return (
     <>
       {rota.tipo === ROTA_HALL
-        ? <HallDeModulos />
+        ? <HallDeModulos fonteApi={FONTE_API} sessao={sessao} agora={agora} />
         : (
           <MolduraDoModulo moduloId={rota.modulo} telaId={rota.tela} fonteApi={FONTE_API}>
             {/* #1440: no modo API, Entregas › Janelas de entrega é o cadastro da S45 (o mesmo de
@@ -292,9 +297,10 @@ function TelaDaRota({ rota, aoSair }) {
 
 function AppPrincipal({ rota, sessao, aoSair }) {
   const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: FONTE_API })
+  const { permite } = useAcessoModulos()
   return (
     // `key`: trocar de usuário ou empresa recomeça o estado, sem conversa de outra empresa na tela.
-    <AtendimentoProvider key={sessao?.token ?? 'demo'} agora={agora} sessao={sessao}>
+    <AtendimentoProvider key={sessao?.token ?? 'demo'} agora={agora} sessao={sessao} atendimentoAtivo={permite('atendimento')}>
       <LimparAvisoAoNavegar />
       <TelaDaRota rota={rota} aoSair={aoSair} />
     </AtendimentoProvider>
@@ -305,8 +311,8 @@ function AppPrincipal({ rota, sessao, aoSair }) {
 // ganham a barra do módulo para voltar; pelo apelido antigo (`#/cozinha`, a janela
 // avulsa do tablet) abrem como sempre, sem barra.
 function NoModulo({ rota, children }) {
-  if (!rota.modulo) return children
-  return <MolduraDoModulo moduloId={rota.modulo} telaId={rota.tela} fonteApi={FONTE_API} operacao>{children}</MolduraDoModulo>
+  if (!rota.modulo && !FONTE_API) return children
+  return <MolduraDoModulo moduloId={moduloDaRota(rota)} telaId={rota.tela} fonteApi={FONTE_API} operacao>{children}</MolduraDoModulo>
 }
 
 // Cozinha no modo API (F05): a fila vem do KDS, não do espelho do Balcão. Sem
@@ -325,9 +331,34 @@ export function App() {
   const { sessao, entrarNaEmpresa, google, encerrarSessao } = useSessaoApi()
   const rota = rotaDaHash(hash, { fonteApi: FONTE_API })
   if (FONTE_API && !sessao) return <TelaLogin entrarNaEmpresa={entrarNaEmpresa} google={google} />
+  if (FONTE_API) return <AppComAcesso key={sessao.token} rota={rota} sessao={sessao} aoSair={encerrarSessao} />
   if (!FONTE_API && rota.modulo) return <AppPrincipal rota={rota} sessao={sessao} aoSair={encerrarSessao} />
   if (rota.tipo === ROTA_ENTREGAS) return FONTE_API ? <EntregasApi rota={rota} sessao={sessao} /> : <NoModulo rota={rota}><TelaEntregas /></NoModulo>
   if (rota.tipo === ROTA_COZINHA) return FONTE_API ? <CozinhaApi rota={rota} sessao={sessao} /> : <NoModulo rota={rota}><TelaCozinha /></NoModulo>
   if (rota.tipo === ROTA_CARDAPIO_LINK) return FONTE_API ? <AvisoCardapioDoSite /> : <TelaCardapioLink />
   return <AppPrincipal rota={rota} sessao={sessao} aoSair={encerrarSessao} />
+}
+
+function AppComAcesso({ rota, sessao, aoSair }) {
+  const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: true })
+  const { dados, erro, tentarNovamente } = useModulosDaSessao(sessao)
+  if (!dados) return (
+    <Vazio titulo={erro ? 'Não foi possível carregar seu acesso' : 'Carregando seus módulos'}
+      acao={<>{erro && <Botao onClick={tentarNovamente}>Tentar novamente</Botao>}<Botao variante="texto" onClick={aoSair}>Sair</Botao></>}>
+      {erro ?? 'Aguarde um instante.'}
+    </Vazio>
+  )
+  const acesso = { permite: (id) => permiteModulo(dados, id), acoes: dados.acoes ?? {}, aoSair }
+  let tela
+  if (!permiteRota(dados, rota)) tela = (
+    <Vazio titulo="Seu perfil não tem acesso a este módulo" acao={<><a href={HASH_HALL}>Voltar aos módulos</a><Botao variante="texto" onClick={aoSair}>Sair</Botao></>}>
+      Peça à dona para revisar seu acesso, se precisar trabalhar aqui.
+    </Vazio>
+  )
+  else if (rota.tipo === ROTA_HALL) tela = <HallDeModulos fonteApi sessao={sessao} agora={agora} />
+  else if (rota.tipo === ROTA_COZINHA) tela = <CozinhaApi rota={rota} sessao={sessao} />
+  else if (rota.tipo === ROTA_ENTREGAS) tela = <EntregasApi rota={rota} sessao={sessao} />
+  else if (rota.tipo === ROTA_CARDAPIO_LINK) tela = <AvisoCardapioDoSite />
+  else tela = <AppPrincipal rota={rota} sessao={sessao} aoSair={aoSair} />
+  return <ContextoAcessoModulos.Provider value={acesso}>{tela}</ContextoAcessoModulos.Provider>
 }

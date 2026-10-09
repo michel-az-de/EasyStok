@@ -7,6 +7,7 @@ import { Botao } from '../componentes/Botao'
 import { Icone } from '../componentes/Icone'
 import { Pilula } from '../componentes/Pilula'
 import { useAcoes, useAtendimento } from '../aplicacao/contextos'
+import { useAcessoModulos } from '../aplicacao/acessoModulos'
 import { contarAbertas, contarNaEsteira } from '../dominio/conversa'
 import { contarAtivas } from '../dominio/automacao'
 import { useEscape } from '../hooks/useEscape'
@@ -60,6 +61,7 @@ function grupoDoDia(emAndamento, naEsteira) {
 function MenuMais({
   refBotao, aoAbrirEntregas, aoAbrirGestao, emAndamento, naEsteira,
 }) {
+  const { permite } = useAcessoModulos()
   const [aberto, setAberto] = useState(false)
   const fechar = useCallback(() => setAberto(false), [])
 
@@ -86,7 +88,7 @@ function MenuMais({
         // estreito passa a ser só por aqui.
         // #1447: a Gestão virou o hall de módulos; o item leva para lá.
         { chave: '__gestao', titulo: 'Módulos', detalhe: 'Cozinha, entregas, financeiro e os outros módulos' },
-      ],
+      ].filter((item) => item.chave !== '__entregas' || permite('entregas')),
     },
     grupoDoDia(emAndamento, naEsteira),
   ]
@@ -249,6 +251,7 @@ const rotuloAutomaticas = (regras) => (regras ? `Automáticas, ${contarAtivas(re
 function Cabecalho({
   conversas, regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas,
 }) {
+  const { permite } = useAcessoModulos()
   const compacto = useTopoCompacto()
   const botaoMaisRef = useRef(null)
   const emAndamento = contarAbertas(conversas)
@@ -265,9 +268,9 @@ function Cabecalho({
         {/* Sininho é o primeiro do grupo, à esquerda de Automáticas (seção 8
             da direção visual). A faixa de lembretes abaixo do topo saiu. */}
         <Sininho />
-        <Botao variante="texto" icone="cooking-pot" onClick={abrirCozinha}>
+        {permite('cozinha') && <Botao variante="texto" icone="cooking-pot" onClick={abrirCozinha}>
           Cozinha
-        </Botao>
+        </Botao>}
         {/* Achado 6, P3 (banca 10): no celular a regra `.controles > button`
             zera o font-size do texto (caber em 390 px) e só sobrava
             ícone+número, sem palavra nenhuma. `.rotuloCurto` mostra uma
@@ -300,7 +303,7 @@ function Cabecalho({
         ) : (
           // Rodada 2: a ocupação das janelas mora no topo, porque capacidade
           // estourada é a coisa que ela mais teme e não pode custar dois cliques.
-          <ResumoEntregas aoAbrir={aoAbrirEntregas} />
+          permite('entregas') && <ResumoEntregas aoAbrir={aoAbrirEntregas} />
         )}
       </div>
     </header>
@@ -314,6 +317,7 @@ function Trilho({
   regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, simulando, aoAlternarSimulacoes,
   atendente,
 }) {
+  const { permite } = useAcessoModulos()
   return (
     <nav className={css.trilho} aria-label="Navegação">
       <Marca compacta />
@@ -336,14 +340,14 @@ function Trilho({
         <span>Balcão</span>
       </span>
       {/* #1474: no modo API Entregas abre a tela do módulo (com "← Módulos"), não a gaveta. */}
-      <ResumoEntregas
+      {permite('entregas') && <ResumoEntregas
         aoAbrir={FONTE_API ? () => { window.location.hash = HASH_MODULO_ENTREGAS } : aoAbrirEntregas}
         noTrilho classeItem={css.itemTrilho} classeSelo={css.seloTrilho}
-      />
-      <Botao variante="texto" className={css.itemTrilho} onClick={abrirCozinha} title={FONTE_API ? 'Cozinha' : 'Cozinha (abre em outra janela)'}>
+      />}
+      {permite('cozinha') && <Botao variante="texto" className={css.itemTrilho} onClick={abrirCozinha} title={FONTE_API ? 'Cozinha' : 'Cozinha (abre em outra janela)'}>
         <Icone nome="cooking-pot" tamanho={22} />
         <span>Cozinha</span>
-      </Botao>
+      </Botao>}
       <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAutomacoes} aria-label={rotuloAutomaticas(regras)} title="Automáticas">
         <Icone nome="raio" tamanho={22} />
         <span>Automáticas</span>

@@ -73,6 +73,7 @@ public static class ApiServiceCollectionExtensions
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
+        services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, ModuloAuthorizationHandler>();
         services.AddScoped<AdminAuditService>();
         services.AddScoped<GeradorNotificacoesAutomaticas>();
         services.AddSingleton<EasyStock.Api.Services.Impressao.PedidoImpressoHtml>(); // S49: impresso do pedido

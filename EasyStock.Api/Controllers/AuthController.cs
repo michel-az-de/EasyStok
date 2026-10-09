@@ -321,6 +321,28 @@ public class AuthController(
         => DataOk(await obterUsuarioAtualUseCase.ExecuteAsync(new ObterUsuarioAtualCommand()));
 
     [Authorize]
+    [HttpGet("me/modulos")]
+    public IActionResult GetModulos([FromServices] ICurrentUserAccessor usuario)
+    {
+        var modulos = Enum.GetValues<Modulo>().Select(m => new
+        {
+            id = Domain.Services.AcessoModulos.IdDe(m),
+            liberado = usuario.EmpresaId != Guid.Empty && usuario.TemPermissao(Domain.Services.AcessoModulos.PermissaoDe(m))
+        }).ToArray();
+        var inicial = User.FindFirst("moduloInicial")?.Value;
+        return DataOk(new
+        {
+            modulos,
+            portaDeEntrada = modulos.Any(m => m.id == inicial && m.liberado) ? inicial : null,
+            acoes = new
+            {
+                editarCardapio = modulos.Any(m => m.id == "cardapio" && m.liberado)
+                    && usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin or NivelAcesso.Gerente
+            }
+        });
+    }
+
+    [Authorize]
     [EnableRateLimiting("auth")]
     [SwaggerOperation(
         Summary = "Update current user profile",

@@ -13,6 +13,18 @@ public class OperacaoEventBrokerTests
     private readonly OperacaoEventBroker _broker = new(NullLogger<OperacaoEventBroker>.Instance);
 
     [Fact]
+    public void FiltroDoPerfil_NaoEntregaConversaParaCozinhaDaMesmaEmpresa()
+    {
+        var empresa = Guid.NewGuid();
+        using var cozinha = _broker.SubscribeOperacao("cozinha", empresa, evento => evento.StartsWith("pedido."));
+        using var atendimento = _broker.SubscribeOperacao("atendimento", empresa);
+        _broker.PublicarOperacao(empresa, "conversa.mensagem_recebida", new { texto = "Privado" });
+        _broker.PublicarOperacao(empresa, "pedido.mudou_status", new { status = "preparando" });
+        cozinha.Slot.Queue.Should().ContainSingle().Which.Evento.Should().Be("pedido.mudou_status");
+        atendimento.Slot.Queue.Should().HaveCount(2);
+    }
+
+    [Fact]
     public void FiltraPorEmpresa()
     {
         var empresaA = Guid.NewGuid();

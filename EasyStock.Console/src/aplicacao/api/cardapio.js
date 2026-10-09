@@ -16,8 +16,8 @@ const MOTIVO_DO_BALCAO = 'Ajuste de saldo pelo balcão (console)'
 
 // Cardápio de hoje + os itens tirados (para o "Repor"). A lista de fora é do Gerente: para quem
 // não pode, fica só o de dentro, sem aviso (não é falha, é permissão).
-export async function lerCardapio() {
-  const [dentro, fora] = await Promise.all([listarCardapio(), listarFora().catch(() => [])])
+export async function lerCardapio({ incluirFora = true } = {}) {
+  const [dentro, fora] = await Promise.all([listarCardapio(), incluirFora ? listarFora().catch(() => []) : []])
   const skus = new Set(dentro.map((i) => i.sku))
   return [...dentro, ...(fora ?? []).map(itemForaDaApi).filter((i) => !skus.has(i.sku))]
 }

@@ -44,7 +44,11 @@ public class OperacaoEventosController(
             ? DateTimeOffset.FromUnixTimeSeconds(exp)
             : null;
 
-        using var inscricao = broker.SubscribeOperacao($"{empresaId:N}:{Guid.NewGuid():N}", empresaId);
+        var atendimento = currentUser.TemPermissao(Permissao.AcessarModuloAtendimento);
+        // Cozinha/Entregas recebem a atualização da operação, sem eventos de conversa/cliente.
+        using var inscricao = broker.SubscribeOperacao($"{empresaId:N}:{Guid.NewGuid():N}", empresaId,
+            evento => atendimento || evento.StartsWith("pedido.", StringComparison.Ordinal)
+                || evento.StartsWith("impressao.", StringComparison.Ordinal));
         await TransmissaoSse.TransmitirAsync(
             Response, inscricao.Slot, IntervaloHeartbeat, expiraEm, _ => validadorSessao.ValidarAsync(jwt), relogio, ct);
     }

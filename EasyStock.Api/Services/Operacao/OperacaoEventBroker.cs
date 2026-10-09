@@ -75,6 +75,7 @@ public class OperacaoEventBroker(ILogger<OperacaoEventBroker> log)
         public Guid? EmpresaId { get; init; }
         public Guid? LojaId { get; init; }
         public string? DeviceId { get; init; }
+        public Func<string, bool>? AceitaEvento { get; init; }
         public ConcurrentQueue<MensagemSse> Queue { get; } = new();
         public SemaphoreSlim Signal { get; } = new(0);
         public bool Cancelled { get; private set; }
@@ -100,9 +101,9 @@ public class OperacaoEventBroker(ILogger<OperacaoEventBroker> log)
     }
 
     /// <summary>Registra um ouvinte do console (S18) que recebe os eventos de operação da empresa.</summary>
-    public Subscription SubscribeOperacao(string key, Guid empresaId)
+    public Subscription SubscribeOperacao(string key, Guid empresaId, Func<string, bool>? aceitaEvento = null)
     {
-        var slot = new ListenerSlot { Canal = CanalSse.Operacao, EmpresaId = empresaId };
+        var slot = new ListenerSlot { Canal = CanalSse.Operacao, EmpresaId = empresaId, AceitaEvento = aceitaEvento };
         _listeners[key] = slot;
         _log.LogDebug("SSE operacao inscrito: key={Key} empresa={EmpresaId} total={Total}",
             key, empresaId, _listeners.Count);
@@ -113,7 +114,8 @@ public class OperacaoEventBroker(ILogger<OperacaoEventBroker> log)
     public void PublicarOperacao(Guid empresaId, string evento, object payload)
     {
         var mensagem = new MensagemSse(evento, JsonSerializer.Serialize(payload, JsonWeb));
-        Broadcast(slot => slot.Canal == CanalSse.Operacao && slot.EmpresaId == empresaId, mensagem);
+        Broadcast(slot => slot.Canal == CanalSse.Operacao && slot.EmpresaId == empresaId
+            && (slot.AceitaEvento?.Invoke(evento) ?? true), mensagem);
     }
 
     /// <summary>

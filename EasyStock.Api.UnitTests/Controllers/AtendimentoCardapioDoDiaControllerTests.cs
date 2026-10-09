@@ -41,10 +41,13 @@ public class AtendimentoCardapioDoDiaControllerTests
 public class AtendimentoItensCardapioControllerTests
 {
     [Fact]
-    public void ItensDoCardapio_SaoDoGerente()
+    public void ItensDoCardapio_OperadorConsultaGerenteAltera()
     {
         typeof(AtendimentoItensCardapioController).GetCustomAttributes<AuthorizeAttribute>(inherit: true)
-            .Select(a => a.Policy).Should().ContainSingle().Which.Should().Be("Gerente");
+            .Select(a => a.Policy).Should().ContainSingle().Which.Should().Be("Operador");
+        foreach (var nome in new[] { "Fora", "Mover", "Incluir", "Editar", "Arquivar", "Validar", "Visivel" })
+            typeof(AtendimentoItensCardapioController).GetMethod(nome)!.GetCustomAttributes<AuthorizeAttribute>()
+                .Select(a => a.Policy).Should().Contain("Gerente", $"a ação {nome} continua reservada ao Gerente");
     }
 }
 
@@ -52,10 +55,13 @@ public class AtendimentoItensCardapioControllerTests
 public class AtendimentoSecoesCardapioControllerTests
 {
     [Fact]
-    public void CategoriasDoCardapio_SaoDoGerente()
+    public void CategoriasDoCardapio_OperadorConsultaGerenteAltera()
     {
         typeof(AtendimentoSecoesCardapioController).GetCustomAttributes<AuthorizeAttribute>(inherit: true)
-            .Select(a => a.Policy).Should().ContainSingle().Which.Should().Be("Gerente");
+            .Select(a => a.Policy).Should().ContainSingle().Which.Should().Be("Operador");
+        foreach (var nome in new[] { "Criar", "Renomear", "Visivel", "Mover", "Excluir", "MigrarCategorias" })
+            typeof(AtendimentoSecoesCardapioController).GetMethod(nome)!.GetCustomAttributes<AuthorizeAttribute>()
+                .Select(a => a.Policy).Should().Contain("Gerente", $"a ação {nome} continua reservada ao Gerente");
     }
 }
 

@@ -6,7 +6,8 @@ import { Icone } from '../../componentes/Icone'
 import { useState } from 'react'
 import { Marca } from '../../componentes/Marca'
 import { CampoTexto } from '../../componentes/Campo'
-import { useAtendimento } from '../../aplicacao/contextos'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { Botao } from '../../componentes/Botao'
 import { filtrarModulos, hashDoModulo, modulosDoHall, saudacaoDoHall } from '../../dominio/modulos'
 import css from './hall.module.css'
 
@@ -46,10 +47,10 @@ function CartaoModulo({ modulo, buscando }) {
   )
 }
 
-export function HallDeModulos() {
-  const { fonteApi, sessao, agora } = useAtendimento()
+export function HallDeModulos({ fonteApi = false, sessao = null, agora }) {
+  const { permite, aoSair } = useAcessoModulos()
   const [busca, setBusca] = useState('')
-  const modulos = filtrarModulos(modulosDoHall({ fonteApi }), busca)
+  const modulos = filtrarModulos(modulosDoHall({ fonteApi }).filter((m) => permite(m.id)), busca)
   return (
     <div className={css.hall}>
       <header className={css.topo}>
@@ -57,11 +58,13 @@ export function HallDeModulos() {
         <div className={css.busca}>
           <CampoTexto rotulo="Buscar módulo ou tela" tipo="search" value={busca} onChange={(e) => setBusca(e.target.value)} />
         </div>
+        {aoSair && <Botao variante="texto" onClick={aoSair}>Sair</Botao>}
       </header>
       <main className={css.conteudo}>
         <div className={css.cabeca}>
           <h1 className={css.titulo}>{saudacaoDoHall(agora, sessao?.usuario?.nome)}</h1>
           <p className={css.apoio}>Escolha o módulo para começar.</p>
+          {modulos.length === 0 && !busca && <output>Seu perfil ainda não tem módulos liberados. Peça à dona para revisar seu acesso.</output>}
         </div>
         <ul className={css.grade} aria-label="Módulos">
           {modulos.map((modulo) => <CartaoModulo key={modulo.id} modulo={modulo} buscando={Boolean(busca.trim())} />)}

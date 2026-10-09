@@ -14,7 +14,7 @@ public sealed record NomeSecaoRequest(string Nome);
 [SwaggerTag("Attendance order ticket (console)")]
 [ApiController]
 [Route("api/atendimento/comanda/cardapio/secoes")]
-[Authorize(Policy = "Gerente")]
+[Authorize(Policy = "Operador")]
 public class AtendimentoSecoesCardapioController(
     SecoesDoCardapioComandaUseCase secoes,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
@@ -27,6 +27,7 @@ public class AtendimentoSecoesCardapioController(
     [SwaggerOperation(Summary = "Create a menu category at the end of the list")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [HttpPost]
+    [Authorize(Policy = "Gerente")]
     public Task<IActionResult> Criar([FromBody] NomeSecaoRequest req, CancellationToken ct)
         => Tratar(async () =>
         {
@@ -36,6 +37,7 @@ public class AtendimentoSecoesCardapioController(
 
     [SwaggerOperation(Summary = "Rename a menu category")]
     [HttpPut("{secaoId:guid}")]
+    [Authorize(Policy = "Gerente")]
     public Task<IActionResult> Renomear(Guid secaoId, [FromBody] NomeSecaoRequest req, CancellationToken ct)
         => Tratar(async () =>
         {
@@ -45,6 +47,7 @@ public class AtendimentoSecoesCardapioController(
 
     [SwaggerOperation(Summary = "Show or hide a whole category on the site and the order ticket")]
     [HttpPost("{secaoId:guid}/visivel")]
+    [Authorize(Policy = "Gerente")]
     public Task<IActionResult> Visivel(Guid secaoId, [FromBody] DefinirVisibilidadeItemRequest req, CancellationToken ct)
         => Tratar(async () =>
         {
@@ -54,6 +57,7 @@ public class AtendimentoSecoesCardapioController(
 
     [SwaggerOperation(Summary = "Move a category one position (server renumbers 1..n)")]
     [HttpPost("{secaoId:guid}/mover")]
+    [Authorize(Policy = "Gerente")]
     public Task<IActionResult> Mover(Guid secaoId, [FromBody] MoverItemRequest req, CancellationToken ct)
         => Tratar(async () =>
         {
@@ -63,6 +67,7 @@ public class AtendimentoSecoesCardapioController(
 
     [SwaggerOperation(Summary = "Delete an empty category (with dishes: 400)")]
     [HttpDelete("{secaoId:guid}")]
+    [Authorize(Policy = "Gerente")]
     public Task<IActionResult> Excluir(Guid secaoId, CancellationToken ct)
         => Tratar(async () =>
         {
@@ -73,6 +78,7 @@ public class AtendimentoSecoesCardapioController(
     [SwaggerOperation(Summary = "Turn the old free-text categories into sections (idempotent)",
         Description = "Uma seção por texto distinto; liga os pratos sem seção. Não apaga o texto antigo.")]
     [HttpPost("migrar-categorias")]
+    [Authorize(Policy = "Gerente")]
     public Task<IActionResult> MigrarCategorias(CancellationToken ct)
         => Tratar(async () => DataOk(await secoes.MigrarCategoriasAsync(currentUser.EmpresaId, ct)));
 

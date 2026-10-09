@@ -254,6 +254,8 @@ só de URL bonita. `rotaDaHash` continua pura em `dominio/` e cresce com testes.
 
 ## M0.3 · Perfis × módulos na API
 
+> Execução de 09/10/2026: matriz, seed idempotente, porta por perfil, proteção da API e do Console implementados e validados localmente. Evidências e limites na [seção 14 do levantamento](11-levantamento-e-ondas-2026-10-09.md#14-continuação-autorizada-perfis-e-acesso-aos-módulos-09102026). Remoção das 18 permissões legadas e sua migration continuam pendentes; M0.3 não está integralmente encerrada. Não houve deploy.
+
 **Fato medido.**
 
 | Peça | Estado | Onde |

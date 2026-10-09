@@ -9,8 +9,8 @@
 // `soApi`: só existe no modo API (no modo demonstração não há o que gravar).
 //
 // Módulo sem tela no console aparece "Em breve" e não navega. Quem decide se o
-// perfil pode abrir o módulo é a API (M0.3, ainda não entregue): esta lista não
-// esconde nada por nível.
+// perfil pode abrir o módulo é a API (M0.3): este catálogo descreve telas,
+// e o shell filtra a lista usando a matriz devolvida pelo servidor.
 
 import { partesNoFuso } from './formato'
 

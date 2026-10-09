@@ -59,14 +59,14 @@ public class CurrentUserAccessorTests
     }
 
     [Fact]
-    public void TemPermissao_DeveIgnorarClaimInvalida_EAplicarFallbackPorNivel()
+    public void TemPermissao_ClaimExplicitaInvalida_NaoPodeLiberarFallback()
     {
         var accessor = CreateAccessor(
             isAuthenticated: true,
             new Claim("nivel", NivelAcesso.Gerente.ToString()),
             new Claim("permissao", "permissao-invalida"));
 
-        accessor.TemPermissao(Permissao.GerenciarProdutos).Should().BeTrue();
+        accessor.TemPermissao(Permissao.GerenciarProdutos).Should().BeFalse();
         accessor.TemPermissao(Permissao.GerenciarUsuarios).Should().BeFalse();
     }
 

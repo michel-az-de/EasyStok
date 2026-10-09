@@ -25,6 +25,7 @@ export function useSessaoApi() {
   const encerrarSessao = useCallback(() => {
     sair()
     setSessao(null)
+    window.location.hash = '#/'
   }, [])
 
   // #1354: identidade estável; um objeto novo a cada render redesenhava o botão do Google.

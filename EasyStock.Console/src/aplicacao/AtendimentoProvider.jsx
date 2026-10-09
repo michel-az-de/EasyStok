@@ -54,7 +54,7 @@ const carregar = () => ({
   som: lerPreferenciaSom(),
 })
 
-export function AtendimentoProvider({ agora, sessao = null, children }) {
+export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = true, children }) {
   const [estado, despachar] = useReducer(reducer, null, () => ({
     ...estadoInicial(carregar()),
     // Modo API (F01): a lista nasce vazia e chega pelo polling.
@@ -68,7 +68,7 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
     ...(FONTE_API ? { rascunhos: lerRascunhos(sessao) } : {}),
   }))
   useEffect(() => { if (FONTE_API) gravarRascunhos(sessao, estado.rascunhos) }, [sessao, estado.rascunhos])
-  useSincronizacaoApi({ ativo: FONTE_API, usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId })
+  useSincronizacaoApi({ ativo: FONTE_API, comConversas: atendimentoAtivo, usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId })
 
   // Relógio da tela mais o deslocamento do painel de simulações (seção 7,
   // "+10 min"/"+30 min"/"Agora"): as ações carimbam o mesmo instante que a
@@ -299,10 +299,10 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
 
   // Modo API (F02): o expediente vem da API uma vez ao entrar; depois, a cada gravação.
   useEffect(() => {
-    if (FONTE_API) acoesAtivas.recarregarExpediente()
+    if (FONTE_API && atendimentoAtivo) acoesAtivas.recarregarExpediente()
     // #1441: respostas prontas e automáticas também vêm do EasyStok ao entrar.
-    if (FONTE_API) acoesAtivas.recarregarRespostas()
-  }, [acoesAtivas])
+    if (FONTE_API && atendimentoAtivo) acoesAtivas.recarregarRespostas()
+  }, [acoesAtivas, atendimentoAtivo])
   useEffect(() => () => acoesAtivas.cancelarHorarioPendente?.(), [acoesAtivas])
 
   // #1474: a conversa restaurada na carga (ou escolhida pela sincronização antes de qualquer
