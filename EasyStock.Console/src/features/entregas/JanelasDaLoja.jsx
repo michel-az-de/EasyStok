@@ -68,7 +68,7 @@ function FormularioJanela({ inicial, editando, aoSalvar, aoCancelar, ocupado }) 
   )
 }
 
-function LinhaJanela({ janela, acoes }) {
+function LinhaJanela({ janela, acoes, ocupado }) {
   const [modo, setModo] = useState(null) // null | 'editar' | 'excluir'
   const faixa = faixaDeHorarios(String(janela.horaInicio).slice(0, 5), String(janela.horaFim).slice(0, 5))
   const mostraNome = janela.label && janela.label !== faixa
@@ -79,6 +79,7 @@ function LinhaJanela({ janela, acoes }) {
         <FormularioJanela
           inicial={camposDaJanela(janela)}
           editando
+          ocupado={ocupado}
           aoSalvar={(f) => acoes.atualizarJanela(janela.id, corpoJanela({ ...f, diaDaSemana: f.dias[0], label: f.label || faixaDeHorarios(f.horaInicio, f.horaFim) }))
             .then((ok) => { if (ok) setModo(null) })}
           aoCancelar={() => setModo(null)}
@@ -114,7 +115,7 @@ function LinhaJanela({ janela, acoes }) {
   )
 }
 
-export function JanelasDaLoja({ janelas, acoes }) {
+export function JanelasDaLoja({ janelas, acoes, ocupado }) {
   const [criando, setCriando] = useState(false)
   const lista = janelas ?? []
   const dias = ORDEM_DA_SEMANA.filter((d) => lista.some((j) => j.diaDaSemana === d))
@@ -133,7 +134,7 @@ export function JanelasDaLoja({ janelas, acoes }) {
       </p>
       {criando && (
         <div className={css.cartao}>
-          <FormularioJanela inicial={JANELA_NOVA} aoSalvar={(f) => acoes.criarJanelas(corposJanela(f))} />
+          <FormularioJanela inicial={JANELA_NOVA} ocupado={ocupado} aoSalvar={(f) => acoes.criarJanelas(corposJanela(f))} />
         </div>
       )}
       {lista.length === 0 && !criando && <p className={css.vazio}>Nenhuma janela cadastrada. Sem janela, o cliente não tem horário para escolher.</p>}
@@ -144,7 +145,7 @@ export function JanelasDaLoja({ janelas, acoes }) {
             {lista
               .filter((j) => j.diaDaSemana === d)
               .sort((a, b) => String(a.horaInicio).localeCompare(String(b.horaInicio)))
-              .map((j) => <LinhaJanela key={j.id} janela={j} acoes={acoes} />)}
+              .map((j) => <LinhaJanela key={j.id} janela={j} acoes={acoes} ocupado={ocupado} />)}
           </ul>
         </div>
       ))}
