@@ -173,10 +173,21 @@ function ConfiguracaoDoAtendimento() {
       <div className={css.topo}>
         <h3 id="gestao-atend-config">Como o automático atende</h3>
         <label className={css.chave}>
-          <input type="checkbox" checked={form.ativo} onChange={mudar('ativo', (e) => e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={form.ativo}
+            aria-describedby="gestao-atend-config-efeito"
+            onChange={mudar('ativo', (e) => e.target.checked)}
+          />
           Atendimento automático {form.ativo ? 'ligado' : 'desligado'}
         </label>
       </div>
+      {/* #1475: o backend lê este campo; desligado, o agente não responde e a conversa vai para a dona. */}
+      <p id="gestao-atend-config-efeito" className={css.descricao}>
+        {form.ativo
+          ? 'O agente responde o cliente no WhatsApp e passa a conversa para você quando precisa.'
+          : 'O agente não responde: toda conversa que chegar vai direto para você. A saudação continua saindo.'}
+      </p>
       <CampoTexto
         rotulo="Tom"
         dica="Curto, por exemplo: acolhedor, direto, sem gíria."
