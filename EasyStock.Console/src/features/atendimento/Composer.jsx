@@ -16,6 +16,7 @@ import { textoConviteCardapio } from '../../dominio/cardapioLink'
 import { avisoDeVariaveisNaoResolvidas } from '../../dominio/respostas'
 import { ModalEnviarCardapio } from './ModalEnviarCardapio'
 import { SeletorRespostas } from './SeletorRespostas'
+import { ModalProgramarMensagem } from './ModalProgramarMensagem'
 import css from './atendimento.module.css'
 
 export function Composer({
@@ -41,6 +42,8 @@ export function Composer({
   // Link do cardápio para a prévia (#1353): `{ url, daLoja }` depois de obtido; null fecha.
   const [linkCardapio, setLinkCardapio] = useState(null)
   const [buscandoLink, setBuscandoLink] = useState(false)
+  // #1424: modal de programar mensagem, guardada pelo id da conversa (trocar de conversa fecha).
+  const [programarEm, setProgramarEm] = useState(null)
   const { ler } = useArquivoComoDataUrl()
   const gravador = useGravadorAudio({ escolherTipo: escolherFormatoGravacao })
   const gravando = gravador.estado !== 'ocioso'
@@ -232,6 +235,19 @@ export function Composer({
               >
                 <Icone nome="cardapio" /><span className={css.rotuloAcao}>Link do cardápio</span>
               </Botao>
+              {/* #1424: a mensagem programada vai para o cliente cadastrado (a API exige o
+                  clienteId). Não depende do `podeEscrever`: fora da janela sai por modelo. */}
+              <Botao
+                title={conversa.clienteId
+                  ? 'Programar mensagem para sair depois, no horário escolhido'
+                  : 'Cadastre o cliente primeiro: a mensagem programada vai para um cliente cadastrado'}
+                className={css.acaoComRotulo}
+                aria-haspopup="dialog"
+                disabled={!conversa.clienteId}
+                onClick={() => setProgramarEm(conversa.id)}
+              >
+                <Icone nome="relogio" /><span className={css.rotuloAcao}>Programar</span>
+              </Botao>
               <Botao title="Nota interna: fica na ficha, o cliente nunca vê" aria-label="Nota interna" className={css.acaoComRotulo} onClick={aoAbrirNota}>
                 <Icone nome="nota" /><span className={css.rotuloAcao}>Nota</span>
               </Botao>
@@ -259,6 +275,17 @@ export function Composer({
 
           {restricao && <p className={css.restricao}>{restricao}</p>}
         </>
+      )}
+
+      {programarEm === conversa.id && (
+        <ModalProgramarMensagem
+          conversa={conversa}
+          canal={canal}
+          rascunho={rascunho}
+          // Texto programado a partir do rascunho sai do campo, para não ir de novo agora.
+          aoAgendar={(texto) => { if (texto && texto.trim() === rascunho.trim()) aoMudarRascunho('') }}
+          aoFechar={() => setProgramarEm(null)}
+        />
       )}
 
       {linkDaConversa && (

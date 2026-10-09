@@ -6,6 +6,13 @@ namespace EasyStock.Api.UnitTests.Middleware;
 public class IdempotencyOptionsTests
 {
     [Fact]
+    public void Programacao_de_mensagem_usa_a_protecao_de_retentativa()
+    {
+        EasyStock.Api.Hosting.PipelineExtensions.ConfigurarRotasIdempotentes(new IdempotencyOptions())
+            .PathMatchesAny("/api/atendimento/mensagens-programadas").Should().BeTrue();
+    }
+
+    [Fact]
     public void PathMatchesAny_sem_prefixos_sempre_falso()
     {
         var opts = new IdempotencyOptions();

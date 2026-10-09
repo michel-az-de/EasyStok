@@ -39,6 +39,8 @@ public sealed class AgendarMensagemProgramadaUseCase(
     {
         var cliente = await clientes.GetByIdAsync(command.EmpresaId, command.ClienteId)
             ?? throw new UseCaseValidationException($"Cliente {command.ClienteId} não encontrado nesta empresa.");
+        if (cliente.Bloqueado)
+            throw new UseCaseValidationException("Cliente bloqueado: desbloqueie o cadastro antes de programar mensagens.");
 
         MensagemProgramada mensagem;
         try
@@ -83,20 +85,24 @@ public sealed class ListarMensagensProgramadasUseCase(IMensagemProgramadaReposit
 public sealed class CancelarMensagemProgramadaUseCase(
     IMensagemProgramadaRepository repository, IUnitOfWork unitOfWork, TimeProvider relogio)
 {
-    public async Task<MensagemProgramadaResult> ExecuteAsync(Guid empresaId, Guid id, CancellationToken ct = default)
-    {
-        var mensagem = await repository.ObterAsync(empresaId, id, ct) ?? throw new MensagemProgramadaNaoEncontradaException(id);
-        try
+    public Task<MensagemProgramadaResult> ExecuteAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
+        unitOfWork.ExecuteInTransactionAsync(async token =>
         {
-            mensagem.Cancelar(relogio.GetUtcNow().UtcDateTime);
-        }
-        catch (RegraDeDominioVioladaException ex)
-        {
-            throw new UseCaseValidationException(ex.Message);
-        }
-        await unitOfWork.CommitAsync();
-        return MensagemProgramadaResult.De(mensagem);
-    }
+            // A reserva do disparador e o cancelamento precisam disputar a mesma linha antes
+            // de ler a situação; uma leitura anterior ao lock poderia desfazer uma reserva.
+            var mensagem = await repository.ObterComLockAsync(empresaId, id, token);
+            if (mensagem is null || mensagem.EmpresaId != empresaId) throw new MensagemProgramadaNaoEncontradaException(id);
+            try
+            {
+                mensagem.Cancelar(relogio.GetUtcNow().UtcDateTime);
+            }
+            catch (RegraDeDominioVioladaException ex)
+            {
+                throw new UseCaseValidationException(ex.Message);
+            }
+            await unitOfWork.CommitAsync();
+            return MensagemProgramadaResult.De(mensagem);
+        }, ct);
 }
 
 /// <summary>
