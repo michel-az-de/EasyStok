@@ -5,6 +5,7 @@ import {
   ajustarSaldoDoItem, alertaDaApi, definirArquivado, definirDisponibilidade, detalheDaApi, editarItem, incluirItem,
   itemForaDaApi, listarDesacertos, listarFora, obterItem, validarItem,
 } from '../../infra/api/cardapioApi'
+import { listarSecoes, secaoDaApi } from '../../infra/api/secoesApi'
 
 // Cardápio no modo API (#1241, F11, S45/S17/S22). Antes, ligar/desligar, o saldo e o item só
 // mudavam a memória do navegador e voltavam na releitura do minuto seguinte. Agora tudo grava no
@@ -92,6 +93,9 @@ export function criarAcoesCardapioApi({ despachar, estadoRef }) {
 
     // RN-15: a dona confirma o item novo; o agente passa a oferecer.
     confirmarValidacaoItem: (sku) => gravar('Cardápio', () => validarItem(sku)),
+
+    // M1.3 (#1483): as categorias para o seletor do formulário. Sem permissão (não Gerente), nenhuma.
+    listarCategoriasCardapio: () => listarSecoes().then((l) => (l ?? []).map(secaoDaApi)).catch(() => []),
 
     // O formulário de edição precisa da ficha, que o cardápio da comanda não traz.
     obterItemCardapio: (sku) => obterItem(sku).then(detalheDaApi).catch((erro) => {

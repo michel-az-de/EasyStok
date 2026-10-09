@@ -15,6 +15,7 @@ import { AbaAtendimento } from './atendimento/AbaAtendimento'
 import { AbaRespostas } from './respostas/AbaRespostas'
 import { TelaCanais } from './canais/TelaCanais'
 import { AbaCardapioApi } from './cardapio/AbaCardapioApi'
+import { AbaCategoriasApi } from './cardapio/AbaCategoriasApi'
 import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
 
@@ -54,6 +55,8 @@ export function PainelDeAjuste({ aba, janelasApi = null }) {
     canais: <TelaCanais />,
     // M1.1 (#1481): gestão do cardápio (só modo API).
     cardapio: <AbaCardapioApi />,
+    // M1.3 (#1483): categorias do cardápio (só modo API).
+    categorias: <AbaCategoriasApi />,
   }), [fonteApi, janelasApi])
   const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada texto={AINDA_NAO_LIGADO[aba]}>{painel}</AbaNaoLigada>

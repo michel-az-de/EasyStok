@@ -215,6 +215,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Repositories.Storefront.StorefrontRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.ICardapioItemRepository,
                 Repositories.Storefront.CardapioItemRepository>();
+            // M1.3 (#1483): seções do cardápio.
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.ICardapioSecaoRepository,
+                Repositories.Storefront.CardapioSecaoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IFreteZonaRepository,
                 Repositories.Storefront.FreteZonaRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IJanelaEntregaRepository,

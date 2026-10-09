@@ -24,6 +24,7 @@ public class ItensDoCardapioComandaUseCaseTests
     private readonly IStorefrontRepository _storefronts = Substitute.For<IStorefrontRepository>();
     private readonly ICardapioItemRepository _cardapio = Substitute.For<ICardapioItemRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly ICardapioSecaoRepository _secoesRepo = Substitute.For<ICardapioSecaoRepository>();
 
     public ItensDoCardapioComandaUseCaseTests()
     {
@@ -41,6 +42,7 @@ public class ItensDoCardapioComandaUseCaseTests
             new EditarCardapioItemAdminUseCase(_cardapio, _uow),
             new ToggleVisibilidadeCardapioItemAdminUseCase(_cardapio, _uow, aviso),
             _cardapio,
+            _secoesRepo,
             _uow);
     }
 
@@ -198,5 +200,34 @@ public class ItensDoCardapioComandaUseCaseTests
         var act = () => Sut().IncluirAsync(EmpresaId, new DadosItemCardapio(nome, LinhaProduto.ParaServir, "500 g", preco, null));
 
         await act.Should().ThrowAsync<UseCaseValidationException>();
+    }
+
+    // M1.3 (#1483): a categoria do prato tem de ser da mesma vitrine.
+    [Fact]
+    public async Task Editar_ComCategoriaDeOutraVitrine_400()
+    {
+        var item = Item("Lasanha", visivel: true);
+        var deOutra = Guid.NewGuid();
+        _secoesRepo.GetByIdAsync(_vitrine.Id, deOutra, Arg.Any<CancellationToken>()).Returns((CardapioSecao?)null);
+
+        var act = () => Sut().EditarAsync(EmpresaId, item.Id, new DadosItemCardapio(null, null, null, null, null,
+            MexerSecao: true, SecaoId: deOutra));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Categoria*");
+        item.SecaoId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Editar_PoeETiraDaCategoria()
+    {
+        var item = Item("Lasanha", visivel: true);
+        var massas = CardapioSecao.CriarRaiz(_vitrine.Id, "Massas");
+        _secoesRepo.GetByIdAsync(_vitrine.Id, massas.Id, Arg.Any<CancellationToken>()).Returns(massas);
+
+        await Sut().EditarAsync(EmpresaId, item.Id, new DadosItemCardapio(null, null, null, null, null, MexerSecao: true, SecaoId: massas.Id));
+        item.SecaoId.Should().Be(massas.Id);
+
+        await Sut().EditarAsync(EmpresaId, item.Id, new DadosItemCardapio(null, null, null, null, null, MexerSecao: true, SecaoId: null));
+        item.SecaoId.Should().BeNull();
     }
 }

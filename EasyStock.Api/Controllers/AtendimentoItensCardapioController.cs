@@ -8,10 +8,12 @@ namespace EasyStock.Api.Controllers;
 
 /// <param name="Linha">ParaServir | PrepararEmCasa; null = não mexe.</param>
 /// <param name="NovidadeAte">"aaaa-mm-dd" define, "" tira a novidade, null não mexe (mesma convenção da tag).</param>
+/// <param name="SecaoId">id da categoria (M1.3), "" tira da categoria, null não mexe.</param>
 public sealed record ItemCardapioRequest(
     string? Nome, LinhaProduto? Linha, string? Porcao, decimal? Preco, string? Categoria,
     string? Descricao = null, string? Ingredientes = null, string? Alergenos = null,
-    int? TempoPreparoMinutos = null, string? InstrucaoFinalizacao = null, string? NovidadeAte = null);
+    int? TempoPreparoMinutos = null, string? InstrucaoFinalizacao = null, string? NovidadeAte = null,
+    string? SecaoId = null);
 
 public sealed record DefinirVisibilidadeItemRequest(bool Visivel);
 
@@ -115,9 +117,13 @@ public class AtendimentoItensCardapioController(
             novidade = DateOnly.TryParse(r.NovidadeAte, System.Globalization.CultureInfo.InvariantCulture, out var data)
                 ? data
                 : throw new UseCaseValidationException("Data da novidade inválida (use aaaa-mm-dd).");
+        var mexerSecao = r.SecaoId is not null;
+        Guid? secao = null;
+        if (!string.IsNullOrEmpty(r.SecaoId))
+            secao = Guid.TryParse(r.SecaoId, out var id) ? id : throw new UseCaseValidationException("Categoria inválida.");
         return new DadosItemCardapio(r.Nome, r.Linha, r.Porcao, r.Preco, r.Categoria,
             r.Descricao, r.Ingredientes, r.Alergenos, r.TempoPreparoMinutos, r.InstrucaoFinalizacao,
-            mexerNovidade, novidade);
+            mexerNovidade, novidade, mexerSecao, secao);
     }
 
     private async Task<IActionResult> Tratar(Func<Task<IActionResult>> acao)

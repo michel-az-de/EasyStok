@@ -47,3 +47,14 @@ public class AtendimentoItensCardapioControllerTests
             .Select(a => a.Policy).Should().ContainSingle().Which.Should().Be("Gerente");
     }
 }
+
+/// <summary>M1.3 (#1483): as categorias do cardápio são do Gerente, como o resto da autoria.</summary>
+public class AtendimentoSecoesCardapioControllerTests
+{
+    [Fact]
+    public void CategoriasDoCardapio_SaoDoGerente()
+    {
+        typeof(AtendimentoSecoesCardapioController).GetCustomAttributes<AuthorizeAttribute>(inherit: true)
+            .Select(a => a.Policy).Should().ContainSingle().Which.Should().Be("Gerente");
+    }
+}
