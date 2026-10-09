@@ -28,6 +28,45 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Migrations;
 public class PermissoesLegadasMigrationTests
 {
     [Fact]
+    public async Task DownVazioReaplicaMasRlsNaoPodeEsconderPerfisDoGuard()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
+        await postgres.StartAsync();
+        var options = new DbContextOptionsBuilder<EasyStockDbContext>().UseNpgsql(postgres.GetConnectionString()).Options;
+        await using var db = new EasyStockDbContext(options);
+        const string anterior = "20261009170822_AddPerfilModuloInicial";
+        const string atual = "20261009175941_RemoverPermissoesLegadas";
+        var migrator = db.GetService<IMigrator>();
+        await db.Database.MigrateAsync();
+        await migrator.MigrateAsync(anterior);
+        (await db.Database.GetPendingMigrationsAsync()).Should().Contain(atual);
+        await db.Database.MigrateAsync();
+        var empresa = Empresa.Criar("Arquivo oculto teste", null);
+        db.Empresas.Add(empresa);
+        db.Perfis.Add(new Perfil { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Perfil preservado",
+            Nivel = NivelAcesso.Operador, PermissoesExplicitas = true, CriadoEm = DateTime.UtcNow });
+        await db.SaveChangesAsync();
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE ROLE migrador_teste NOSUPERUSER NOBYPASSRLS;
+            GRANT USAGE ON SCHEMA public TO migrador_teste;
+            GRANT ALL ON TABLE "__EFMigrationsHistory" TO migrador_teste;
+            ALTER TABLE perfis OWNER TO migrador_teste;
+            """);
+        var script = migrator.GenerateScript(atual, anterior);
+        await using var conn = new Npgsql.NpgsqlConnection(postgres.GetConnectionString());
+        await conn.OpenAsync();
+        await new Npgsql.NpgsqlCommand("SET ROLE migrador_teste", conn).ExecuteNonQueryAsync();
+        var visiveis = await new Npgsql.NpgsqlCommand("SELECT count(*) FROM perfis", conn).ExecuteScalarAsync();
+        visiveis.Should().Be(0L, "a policy esconde o perfil de outra empresa deste papel");
+        var reverter = () => new Npgsql.NpgsqlCommand(script, conn).ExecuteNonQueryAsync();
+        var erro = await reverter.Should().ThrowAsync<Npgsql.PostgresException>().WithMessage("*RLS pode ocultar*");
+        erro.Which.SqlState.Should().Be("P0001");
+        await new Npgsql.NpgsqlCommand("ROLLBACK; RESET ROLE", conn).ExecuteNonQueryAsync();
+        (await db.Database.GetPendingMigrationsAsync()).Should().BeEmpty();
+        (await db.Perfis.IgnoreQueryFilters().SingleAsync()).PermissoesExplicitas.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ArquivamentoDaCasaPreservaLoginRefreshEFallbackSemAlterarOutrasEmpresas()
     {
         await using var postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
@@ -108,7 +147,8 @@ public class PermissoesLegadasMigrationTests
             }
             (await db.UsuariosPerfis.IgnoreQueryFilters().CountAsync()).Should().Be(5);
             var reverter = () => db.GetService<IMigrator>().MigrateAsync("20261009170822_AddPerfilModuloInicial");
-            await reverter.Should().ThrowAsync<NotSupportedException>().WithMessage("*Restaure o arquivo*");
+            // #1504: com perfil arquivado, o banco recusa o Down e a migration continua aplicada.
+            await reverter.Should().ThrowAsync<Npgsql.PostgresException>().WithMessage("*Restaure o arquivo*");
             (await db.Database.GetPendingMigrationsAsync()).Should().BeEmpty();
         }
 
