@@ -29,7 +29,7 @@ public sealed class GetReportDataUseCase(
         if (definition is null)
             return null;
 
-        ReportAcesso.Garantir(currentUser, definition);
+        ReportAcesso.GarantirLeitura(currentUser, definition);
 
         int pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
         int page     = Math.Max(1, query.Page);

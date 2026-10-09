@@ -27,7 +27,7 @@ public sealed class PreviewReportUseCase(
         if (definition is null)
             return null;
 
-        ReportAcesso.Garantir(currentUser, definition);
+        ReportAcesso.GarantirLeitura(currentUser, definition);
 
         // Dynamic dispatch — resolve handler pelo tipo concreto de TParams/TRow
         var handlerType = typeof(IReportHandler<,>)

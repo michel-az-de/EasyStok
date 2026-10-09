@@ -20,12 +20,12 @@ public sealed class ReportAcessoTests
         return new ReportRegistry([definicao]);
     }
 
-    private static ICurrentUserAccessor Usuario(NivelAcesso nivel)
+    private static ICurrentUserAccessor Usuario(NivelAcesso nivel, bool veRelatorios = true)
     {
         var usuario = Substitute.For<ICurrentUserAccessor>();
         usuario.Nivel.Returns(nivel);
         usuario.EmpresaId.Returns(Guid.NewGuid());
-        usuario.TemPermissao(Arg.Any<Permissao>()).Returns(true);
+        usuario.TemPermissao(Arg.Any<Permissao>()).Returns(veRelatorios);
         return usuario;
     }
 
@@ -33,7 +33,7 @@ public sealed class ReportAcessoTests
     public async Task Preview_SemPermissaoDoRelatorio_RecusaAntesDeExecutar()
     {
         var servicos = Substitute.For<IServiceProvider>();
-        var useCase = new PreviewReportUseCase(Registry(), servicos, Usuario(NivelAcesso.Admin));
+        var useCase = new PreviewReportUseCase(Registry(), servicos, Usuario(NivelAcesso.Operador, veRelatorios: false));
 
         var act = () => useCase.ExecuteAsync(new PreviewReportQuery(Chave, "{}"), CancellationToken.None);
 
@@ -45,7 +45,7 @@ public sealed class ReportAcessoTests
     public async Task Data_SemPermissaoDoRelatorio_RecusaAntesDeExecutar()
     {
         var servicos = Substitute.For<IServiceProvider>();
-        var useCase = new GetReportDataUseCase(Registry(), servicos, Usuario(NivelAcesso.Operador));
+        var useCase = new GetReportDataUseCase(Registry(), servicos, Usuario(NivelAcesso.Operador, veRelatorios: false));
 
         var act = () => useCase.ExecuteAsync(new GetReportDataQuery(Chave, "{}"), CancellationToken.None);
 
@@ -73,6 +73,18 @@ public sealed class ReportAcessoTests
         var definicao = Registry().Get(Chave);
 
         var act = () => ReportAcesso.Garantir(Usuario(nivel), definicao);
+
+        if (permitido) act.Should().NotThrow();
+        else act.Should().Throw<UnauthorizedAccessException>();
+    }
+
+    [Theory]
+    [InlineData(NivelAcesso.SuperAdmin, false, true)]
+    [InlineData(NivelAcesso.Admin, true, true)]      // Dona: mantem o preview que ja usava
+    [InlineData(NivelAcesso.Operador, false, false)] // Atendimento/Cozinha
+    public void Leitura_ExigeVisualizarRelatorios(NivelAcesso nivel, bool veRelatorios, bool permitido)
+    {
+        var act = () => ReportAcesso.GarantirLeitura(Usuario(nivel, veRelatorios), Registry().Get(Chave));
 
         if (permitido) act.Should().NotThrow();
         else act.Should().Throw<UnauthorizedAccessException>();
