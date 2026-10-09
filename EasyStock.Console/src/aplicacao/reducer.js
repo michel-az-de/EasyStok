@@ -683,9 +683,24 @@ const CASOS = {
     }, { id: mensagemId, agora }))
   },
 
+  // #1241: o "Entendi" de um alerta do EasyStok vale até recarregar a página; sem isso a
+  // releitura do minuto seguinte traria o mesmo cartão de volta.
   [acao.FECHAR_ALERTA]: (estado, { alertaId }) => ({
-    ...estado, alertasEstoque: estado.alertasEstoque.filter((a) => a.id !== alertaId),
+    ...estado,
+    alertasEstoque: estado.alertasEstoque.filter((a) => a.id !== alertaId),
+    alertasFechados: [...(estado.alertasFechados ?? []), alertaId],
   }),
+
+  [acao.ALERTAS_DE_ESTOQUE_DA_API]: (estado, { alertas }) => {
+    const fechados = new Set(estado.alertasFechados ?? [])
+    return {
+      ...estado,
+      alertasEstoque: [
+        ...estado.alertasEstoque.filter((a) => !a.daApi),
+        ...alertas.filter((a) => !fechados.has(a.id)),
+      ],
+    }
+  },
 
   [acao.ALTERNAR_REGRA]: (estado, { regraId }) => ({
     ...estado,

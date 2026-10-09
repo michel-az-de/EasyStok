@@ -13563,6 +13563,25 @@ function renderClientesScreen() {
   }).join('');
 }
 
+// #1466: o lote conta no saldo local enquanto nao esta excluido nem descartado.
+// Descarte anterior ao #1466 nunca baixou o saldo, entao continua contando.
+const DESCARTE_BAIXA_SALDO_DESDE = Date.UTC(2026, 9, 8);
+function loteContaNoSaldo(batch) {
+  if (batch.deleted) return false;
+  if (batch.discarded) return !((batch.discardedAt || 0) >= DESCARTE_BAIXA_SALDO_DESDE);
+  return true;
+}
+// Aplica no saldo a diferenca entre contar antes e contar agora. Nunca fica negativo.
+function ajustarSaldoDoLote(batch, contavaAntes) {
+  const contaAgora = loteContaNoSaldo(batch);
+  if (contavaAntes === contaAgora) return;
+  const sinal = contaAgora ? 1 : -1;
+  (batch.items || []).forEach(it => {
+    const p = products.find(x => x.id === it.productId);
+    if (p) p.stock = Math.max(0, (p.stock || 0) + sinal * (Number(it.qty) || 0));
+  });
+}
+
 // Soft delete de batch — marca como deletado, reverte estoque, audit log.
 // Recuperavel via restoreBatch. NAO bloqueia se estoque ja foi consumido em
 // vendas: usa Math.max(0, ...) pra evitar negativo (rastreado em audit log).
@@ -13573,13 +13592,11 @@ function deleteBatch(batchId) {
   const total = (batch.items || []).reduce((s, i) => s + (Number(i.qty)||0), 0);
   // Soft-delete + undo toast (5s pra reverter sem confirm bloqueante).
   // Reverte estoque imediatamente; restoreBatch via undo restaura.
-  (batch.items || []).forEach(it => {
-    const p = products.find(x => x.id === it.productId);
-    if (p) p.stock = Math.max(0, (p.stock || 0) - (Number(it.qty) || 0));
-  });
+  const contavaAntes = loteContaNoSaldo(batch);
   batch.deleted = true;
   batch.deletedAt = Date.now();
   batch.deletedBy = operatorName || null;
+  ajustarSaldoDoLote(batch, contavaAntes);
   persistAll();
   if (typeof renderHome === 'function') renderHome();
   if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
@@ -13603,13 +13620,11 @@ function deleteBatch(batchId) {
 function _silentRestoreBatch(batchId) {
   const batch = (batches || []).find(b => b.id === batchId);
   if (!batch || !batch.deleted) return;
-  (batch.items || []).forEach(it => {
-    const p = products.find(x => x.id === it.productId);
-    if (p) p.stock = (p.stock || 0) + (Number(it.qty) || 0);
-  });
+  const contavaAntes = loteContaNoSaldo(batch);
   batch.deleted = false;
   batch.deletedAt = null;
   batch.deletedBy = null;
+  ajustarSaldoDoLote(batch, contavaAntes);
   persistAll();
   if (typeof renderHome === 'function') renderHome();
   if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
@@ -13624,13 +13639,11 @@ function restoreBatch(batchId) {
   if (!batch.deleted) { showToast('Lote não está excluído'); return; }
   const total = (batch.items || []).reduce((s, i) => s + (Number(i.qty)||0), 0);
   if (!confirm(`Recuperar lote ${batch.lote || batch.code}?\n\n${total} unidade(s) volta(m) ao estoque.`)) return;
-  (batch.items || []).forEach(it => {
-    const p = products.find(x => x.id === it.productId);
-    if (p) p.stock = (p.stock || 0) + (Number(it.qty) || 0);
-  });
+  const contavaAntes = loteContaNoSaldo(batch);
   batch.deleted = false;
   batch.deletedAt = null;
   batch.deletedBy = null;
+  ajustarSaldoDoLote(batch, contavaAntes);
   persistAll();
   logAction({
     action: 'batch.restore', entityType: 'batch', entityId: batchId,
@@ -18295,10 +18308,12 @@ function confirmBatchDiscard() {
   const activeChip = document.querySelector('#batchDiscardChips .cash-type-pill.active');
   const reason = activeChip ? (activeChip.dataset.reason || 'outro') : 'outro';
   const note = (document.getElementById('batchDiscardNote')?.value || '').trim();
+  const contavaAntes = loteContaNoSaldo(batch);
   batch.discarded = true;
   batch.discardedAt = Date.now();
   batch.discardedBy = operatorName || null;
   batch.discardReason = reason + (note ? ' · ' + note : '');
+  ajustarSaldoDoLote(batch, contavaAntes);
   const lote = batch.lote || batch.code || batch.id;
   logAction({ action: 'batch.discard', entityType: 'batch', entityId: batch.id, summary: 'Descarte: lote ' + lote + ' · ' + reason + (note ? ' · ' + note : '') });
   persistAll();
@@ -18314,7 +18329,9 @@ function confirmBatchDiscard() {
 function revertBatchDiscard(batchId) {
   const batch = (batches || []).find(function (b) { return b.id === batchId; });
   if (!batch) return;
+  const contavaAntes = loteContaNoSaldo(batch);
   delete batch.discarded; delete batch.discardedAt; delete batch.discardedBy; delete batch.discardReason;
+  ajustarSaldoDoLote(batch, contavaAntes);
   logAction({ action: 'batch.discard_revert', entityType: 'batch', entityId: batch.id, summary: 'Descarte revertido: lote ' + (batch.lote || batch.code || batch.id) });
   persistAll();
   pendingSync++;

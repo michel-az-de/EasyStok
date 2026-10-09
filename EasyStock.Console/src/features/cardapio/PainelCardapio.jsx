@@ -605,8 +605,8 @@ export function PainelCardapio({
     alternarRemocaoItemCardapio, confirmarValidacaoItem, enviarMidia,
   } = useAcoes()
   const [papel, setPapel] = useState('escolher')
-  // #1474 (R2): saldo, disponibilidade e edição do cardápio não têm endpoint para o operador
-  // no modo API (a vitrine só aceita Admin); a aba "Gerir o dia" some em vez de só avisar.
+  // #1474 (R2): a aba "Gerir o dia" só aparece quando a ação está ligada (#1241 ligou no modo API);
+  // ação não ligada some em vez de só avisar.
   const podeGerir = useAcaoDisponivel()('alternarDisponibilidade')
   const papeis = podeGerir ? PAPEIS : PAPEIS.filter((p) => p.id !== 'gerir')
   const [modal, setModal] = useState(null)

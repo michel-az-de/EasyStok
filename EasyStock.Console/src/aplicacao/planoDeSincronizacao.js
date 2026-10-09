@@ -40,3 +40,7 @@ export function avisoDoCardapio(erro) {
   }
   return `Cardápio: ${erro?.message ?? 'não carregou.'}`
 }
+
+// #1241: só falta de rede vira queda de conexão (faixa do papel). Erro do EasyStok (500,
+// 403...) é outro aviso: a internet está lá, o canhoto não precisa assumir.
+export const quedaDaSincronizacao = (erro) => erro?.codigo === 'SEM_CONEXAO'

@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.Caixa;
@@ -486,8 +487,8 @@ public class CaixaUseCasesTests
     {
         var empresaId = Guid.NewGuid();
         var mov = MovimentoCaixa.Criar(empresaId, "entrada", 100m);
-        // Dia operacional de Brasília, o mesmo do use case: em UTC o teste falhava entre 21h e 24h.
-        var data = EasyStock.Application.Common.HorarioBrasil.DataOperacional(mov.DataMovimento);
+        // #1478: mesma data do use case (operacional do Brasil); em UTC falhava entre 00h e 03h.
+        var data = HorarioBrasil.DataOperacional(mov.DataMovimento);
         _repo.GetMovimentoAsync(empresaId, mov.Id).Returns(mov);
         _repo.GetFechamentoDoDiaAsync(empresaId, data, mov.LojaId)
             .Returns(FechamentoCaixa.Criar(empresaId, data, 0, 0, 0, 0, 0));
@@ -509,7 +510,8 @@ public class CaixaUseCasesTests
         var empresaId = Guid.NewGuid();
         var operadorId = Guid.NewGuid();
         var mov = MovimentoCaixa.Criar(empresaId, "saida", 30m);
-        var data = DateOnly.FromDateTime(mov.DataMovimento);
+        // #1478: mesma data do use case (operacional do Brasil); em UTC falhava entre 00h e 03h.
+        var data = HorarioBrasil.DataOperacional(mov.DataMovimento);
         _repo.GetMovimentoAsync(empresaId, mov.Id).Returns(mov);
         _repo.GetFechamentoDoDiaAsync(empresaId, data, mov.LojaId).Returns((FechamentoCaixa?)null);
 

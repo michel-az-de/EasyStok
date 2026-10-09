@@ -21,6 +21,8 @@ export const SO_DA_TELA = [
   'marcarCanhotoImpresso',
   // Fechar o modal do gesto da loja (#1443): abrir e fechar de verdade são ligadas.
   'fecharGestoLoja',
+  // Queda e volta da conexão (#1241): só a faixa e a foto dos pedidos abertos; o lote é ligado.
+  'conexaoCaiu', 'conexaoVoltou',
 ]
 
 const grupo = (rotulo, nomes) => Object.fromEntries(nomes.map((nome) => [nome, rotulo]))
@@ -30,8 +32,9 @@ export const NAO_LIGADAS = {
   reabrir: 'Reabrir conversa',
   trocarJanela: 'Trocar a janela do pedido',
   ...grupo('Lembretes', ['criarLembrete', 'concluirLembrete']),
-  ...grupo('Cardápio do dia', ['alternarDisponibilidade', 'ajustarSaldo']),
-  ...grupo('Cardápio', ['incluirItemCardapio', 'editarItemCardapio', 'alternarRemocaoItemCardapio', 'confirmarValidacaoItem']),
+  // #1241: incluir, editar e tirar são ligados; o EasyStok não tem o "em validação".
+  // #1474: o bloqueio do cliente foi ligado (POST /api/clientes/{id}/bloquear).
+  confirmarValidacaoItem: 'Validar item do cardápio',
   mudarEnderecoDoPedido: 'Endereço do pedido',
   marcarRecebidoEntrega: 'Recebido na entrega',
   refazerCobranca: 'Refazer cobrança',
@@ -47,7 +50,6 @@ export const NAO_LIGADAS = {
   ]),
   decidirAreaEntrega: 'Área de entrega',
   ...grupo('Galeria de fotos', ['incluirPeca', 'editarPeca', 'tirarPeca']),
-  ...grupo('Lote de papel', ['conexaoCaiu', 'conexaoVoltou', 'lancarLotePapel']),
   ...grupo('Janelas de entrega', ['criarJanela', 'editarJanela', 'pausarJanela', 'reativarJanela', 'excluirJanela', 'ajustarRespiroMinimo']),
   ...grupo('Produção', ['registrarProducao', 'ajustarContagemProducao']),
   // Caixa (#1443): abrir, lançar, estornar e fechar ligados; a venda avulsa ainda não tem rota.

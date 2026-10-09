@@ -157,10 +157,12 @@ await confere('R1 avançar a esteira está ligado; cancelar, estornar e voltar e
 // ── R2 ─────────────────────────────────────────────────────────────────────
 await confere('R2 botões de ação sem endpoint somem no modo API', () => {
   for (const nome of ['reabrir', 'aplicarCupom', 'marcarRecebidoEntrega', 'refazerCobranca', 'marcarComprovante',
-    'aceitarDivergencia', 'mudarEnderecoDoPedido', 'resgatarRecompensa', 'alternarDisponibilidade', 'ajustarSaldo']) {
+    'aceitarDivergencia', 'mudarEnderecoDoPedido', 'resgatarRecompensa']) {
     assert.equal(naoLigadas.acaoDisponivel(nome, { fonteApi: true }), false, nome)
   }
   assert.equal(naoLigadas.acaoDisponivel('enviar', { fonteApi: true }), true)
+  // #1241 ligou o cardápio do dia no modo API: a aba "Gerir o dia" volta a aparecer.
+  assert.equal(naoLigadas.acaoDisponivel('alternarDisponibilidade', { fonteApi: true }), true)
 })
 await confere('R2 bloquear cliente está ligado: POST /api/clientes/{id}/bloquear e relê o dossiê', async () => {
   assert.equal(naoLigadas.acaoDisponivel('bloquearCliente', { fonteApi: true }), true)
