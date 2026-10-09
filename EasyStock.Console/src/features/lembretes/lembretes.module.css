@@ -122,7 +122,8 @@ button.pilula { border-radius: 999px; min-height: var(--toque); }
 .horarioManual { margin-top: var(--e-2); }
 
 @media (max-width: 759px) {
-  .painel { right: auto; left: 0; width: min(400px, calc(100vw - var(--e-5))); }
+  .sininho { position: static; }
+  .painel { right: var(--e-3); left: var(--e-3); width: auto; }
 }
 
 @keyframes abrirPainel {

@@ -12,6 +12,9 @@ export const TIPOS = { DONA: 'dona' }
 
 export const ORIGENS = { MANUAL: 'manual', PASSAGEM: 'passagem', PAGAMENTO: 'pagamento' }
 
+// As notificações InApp ficam no sino transversal. Aqui só entram lembretes.
+export const FONTES = { LEMBRETE: 'lembrete' }
+
 export const MINUTOS_SEM_RESPOSTA = 10
 export const MINUTOS_SEM_PAGAMENTO = 15
 

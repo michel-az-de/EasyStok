@@ -53,6 +53,8 @@ export const EDITAR_REGRA = 'editar-regra'
 export const CRIAR_LEMBRETE = 'criar-lembrete'
 export const CONCLUIR_LEMBRETE = 'concluir-lembrete'
 export const SINCRONIZAR_LEMBRETES = 'sincronizar-lembretes'
+// Modo API (#1426): lembretes manuais e notificações que vêm do EasyStok, por fonte.
+export const SINCRONIZAR_LEMBRETES_API = 'sincronizar-lembretes-api'
 
 // Bloqueio de cliente por cadastro.
 export const BLOQUEAR_CLIENTE = 'bloquear-cliente'
