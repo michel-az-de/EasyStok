@@ -77,6 +77,14 @@ public class Order
     public DateTime? ScheduledDeliveryAt { get; set; }
 
     /// <summary>
+    /// #1493 — forma de pagamento informada no PWA ao entregar
+    /// ("pix" | "dinheiro" | "credito" | "debito" | "transferencia" | "outro").
+    /// NULL = aparelho antigo que nao pergunta; o pagamento automatico cai em "dinheiro".
+    /// </summary>
+    [Column("metodo"), MaxLength(20)]
+    public string? Metodo { get; set; }
+
+    /// <summary>
     /// Idempotência das notificações de agendamento (AgendamentoNotificacaoService).
     /// NULL = ainda nao enviada; preenchido = enviada naquele momento. So pedidos com
     /// ScheduledDeliveryAt != null sao candidatos. Nao apagar — preserva historico.
