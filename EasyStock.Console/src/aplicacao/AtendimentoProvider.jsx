@@ -33,6 +33,7 @@ import { comApi } from './acoesApi'
 import { criarAcoes } from './criarAcoes'
 import { useSincronizacaoApi } from './useSincronizacaoApi'
 import { deveCarregarDossie } from './planoDeSincronizacao'
+import { useLembretesApi } from './useLembretesApi'
 import { gravarRascunhos, lerRascunhos } from '../infra/api/rascunhosDaSessao'
 
 const carregar = () => ({
@@ -91,6 +92,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   // não precisarem de dependência e não recriarem o objeto de ações.
   const estadoRef = useRef(estado)
   useEffect(() => { estadoRef.current = estado }, [estado])
+  const consultaLembretes = useLembretesApi({ ativo: FONTE_API && atendimentoAtivo, despachar, estadoRef })
 
   // Sincronia com a janela de Entregas (seção 6): esta janela é sempre a
   // "principal" do canal. Sem nenhuma janela de Entregas aberta, o canal só
@@ -371,6 +373,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       eventosSonoros,
       pagamentosNaoVistos,
       permissaoNotificacao,
+      consultaLembretes,
       // `ui.encerrando` (seção 5): id da conversa com a modal de
       // encerramento aberta, ou `null`.
       encerrando: estado.ui.encerrando,
@@ -394,7 +397,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       cargaDasRegras: estado.cargaDasRegras,
       sessao,
     }
-  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao])
+  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao, consultaLembretes])
 
   return (
     <ContextoCatalogo.Provider value={estado.catalogo}>

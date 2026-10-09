@@ -13,7 +13,7 @@ import * as acao from '../acoes'
 
 export const SO_DA_TELA = [
   'mudarFiltro', 'definirRascunho', 'abrirEncerramento', 'fecharEncerramento', 'fecharAlerta',
-  'trocarModoAgente', 'limparAgente', 'alternarSom', 'ouvirAmostraDeSom', 'marcarLembretesVistos',
+  'trocarModoAgente', 'limparAgente', 'alternarSom', 'ouvirAmostraDeSom',
   'pedirNotificacaoDoNavegador',
   // Rascunho da comanda: o meio escolhido segue no corpo do pedido (F03).
   'escolherMeioPagamento',
@@ -31,7 +31,6 @@ const grupo = (rotulo, nomes) => Object.fromEntries(nomes.map((nome) => [nome, r
 export const NAO_LIGADAS = {
   reabrir: 'Reabrir conversa',
   trocarJanela: 'Trocar a janela do pedido',
-  ...grupo('Lembretes', ['criarLembrete', 'concluirLembrete']),
   mudarEnderecoDoPedido: 'Endereço do pedido',
   marcarRecebidoEntrega: 'Recebido na entrega',
   refazerCobranca: 'Refazer cobrança',
@@ -86,6 +85,7 @@ export const acaoDisponivel = (nome, { fonteApi = false } = {}) =>
 // Variações do `enviar` (ligado só para texto livre) que a API ainda não tem (#1287): modelo
 // aprovado da Meta e mensagem automática disparada pela biblioteca. Mandar como texto livre
 // assumiria a conversa e cairia no 409 fora da janela, que é justamente onde o modelo serve.
+// O modelo aprovado já sai pela mensagem programada (#1424, `api/mensagensProgramadas.js`).
 export const ENVIOS_NAO_LIGADOS = {
   modelo: 'Modelo aprovado',
   automatica: 'Mensagem automática pela biblioteca',

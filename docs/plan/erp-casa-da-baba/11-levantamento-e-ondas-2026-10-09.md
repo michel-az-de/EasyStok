@@ -106,7 +106,7 @@ Snapshot do GitHub de 09/10. PR aberta não é entrega incorporada. Checks aprov
 | [PR 1401](https://github.com/michel-az-de/EasyStok/pull/1401) / #1399 | Estorno de estoque, descoberto e lote do pedido | Corrigir antes de homologar cancelamento na onda 2; regressão na 7 |
 | [PR 1293](https://github.com/michel-az-de/EasyStok/pull/1293) / #1283 | Número do pedido do dia e congelado na comanda | Onda 5 |
 | [PR 1425](https://github.com/michel-az-de/EasyStok/pull/1425) / #1424 | Mensagem programada no compositor | Onda 2 e validação do automático na 9 |
-| [PR 1428](https://github.com/michel-az-de/EasyStok/pull/1428) / #1426 | Sino, lembretes e Web Push | Onda 2; avisos reutilizados nos demais módulos |
+| [PR 1428](https://github.com/michel-az-de/EasyStok/pull/1428) / #1426 | Sino, lembretes e Web Push | Integrada e homologada localmente na seção 21; entrega externa de push pendente |
 | [PR 1429](https://github.com/michel-az-de/EasyStok/pull/1429) / #1427 | SLA de primeira resposta | Onda 2 e homologação na 9 |
 | [PR 1431](https://github.com/michel-az-de/EasyStok/pull/1431) / #1430 | Identificação do lead do site | Onda 2 |
 | [PR 1433](https://github.com/michel-az-de/EasyStok/pull/1433) / #1432 | Atendimento por e-mail | Onda 9, após fechar WhatsApp/site |
@@ -576,3 +576,74 @@ Após essa integração: **2.344 testes de aplicação**, **984 da API** e **6 d
 Conferência local da impressão: a fila do Windows contém a HP Smart Tank e impressoras virtuais; nenhuma Oasis está instalada nessa lista. A busca por dispositivos presentes com nomes Oasis/OIA-8381/Label Printer/Thermal Printer também não encontrou correspondência. Isso não comprova ausência física; conexão, driver e teste de saída 100 × 150 mm da OIA-8381-B permanecem pendentes. Nenhuma impressão foi disparada.
 
 Próxima sequência: completar os gestos do balcão com as PRs existentes de lembretes, mensagens programadas e SLA; revisar as ações por perfil das telas restantes; manter pagamentos reais, fornecedor de entregas, Google externo e impressão física Oasis nos aceites próprios. As correções acima não concluem a onda inteira nem comprovam essas integrações.
+
+## 20. Continuação: mensagens programadas no balcão, 09/10/2026
+
+Primeira fatia da onda 2 integrada em `5df6b5e1`, sobre `a447b476`. Incorpora a PR #1425, incluindo a exposição de `programada` no histórico, e resolve seus conflitos preservando as funcionalidades atuais do Console. Lembretes/WebPush (#1428) e SLA (#1429) continuam pendentes; esta entrega não encerra a onda 2.
+
+### Comportamento entregue
+
+- O botão **Programar** permite escolher data/hora, finalidade e texto ou modelo aprovado, consultar as mensagens da conversa e cancelar as que continuam agendadas. Datas locais são convertidas para UTC; erros de horário, janela, consentimento e destino ficam visíveis. O histórico identifica a mensagem enviada como programada.
+- Cliques concorrentes compartilham a mesma chamada. Uma retentativa após perda da resposta conserva a chave de idempotência até a confirmação; a rota da API agora participa do middleware existente. O rascunho só é limpo após sucesso. Marcadores sem valor, como `{pedido}`, são recusados antes do envio.
+- Falha ao atualizar a lista preserva os itens já conhecidos e oferece nova consulta. Falha no cancelamento preserva a situação anterior. Campos e fechamento ficam bloqueados durante a operação, com prazo de 15 segundos nas chamadas do Console para permitir recuperação.
+- Cliente bloqueado não recebe novos agendamentos. O disparador confere novamente o bloqueio antes de enviar texto ou modelo. A consulta e o cancelamento dos agendamentos existentes continuam disponíveis.
+- Corrigida uma disputa reproduzida no PostgreSQL: o cancelamento lia `Agendada` enquanto o disparador reservava a mensagem e podia sobrescrever `Enviando`. Agora a leitura para cancelar usa lock da linha dentro de transação, com filtro de empresa e checagem no caso de uso. Se o disparo já foi reservado, o cancelamento é recusado com o motivo correto. Não houve migration nem dependência nova.
+
+### Evidência
+
+| Verificação | Resultado |
+|---|---|
+| Aplicação | 2.346 testes aprovados, incluindo cliente bloqueado antes e depois do agendamento |
+| API | 986 testes aprovados, incluindo rota idempotente e selo no histórico |
+| PostgreSQL real | 3 testes aprovados, sem ignorados: isolamento por empresa/cancelamento, dois disparadores concorrentes e cancelamento concorrente com a reserva; a última regressão falhou antes da correção |
+| Console | 58 provas JavaScript aprovadas; lint, camadas, 264 pares de contraste e build aprovados |
+| Gate do commit | Build de `EasyStok.CI.slnf` e 36 testes de arquitetura aprovados |
+| HTTP e Chromium | Sem login: 401; Cozinha: 403 ao listar/programar. Rascunho, duplo clique com um POST, persistência após recarregar e em outra sessão, falhas 503 recuperáveis, resposta perdida após gravação sem duplicar, consentimento, marcador e bloqueio de cliente conferidos |
+| Apresentação | Tema escuro no computador e fluxo de agendar/cancelar em 390 × 844 px, com modal dentro da tela, sem rolagem horizontal e sem erros JavaScript |
+| Disparo | Serviço real entregou exatamente uma mensagem ao ChatSite local de teste; histórico e caixa do visitante confirmaram o mesmo texto e o selo `programada` |
+
+Scripts, capturas, logs e TRX estão em `C:\rep\EasyStok\.build\onda2-balcao`, fora do Git. A API usou banco isolado `easystock_onda2_balcao` e dados sintéticos. As provas de navegador estão em `programadas-browser.cjs` e `programadas-celular.cjs`, com resultados JSON; o roteiro do celular começa diretamente em 390 px e comprova a área visível da modal. O ChatSite desta validação é local: não houve envio a cliente real, homologação de modelo na Meta ou teste de entrega externa de WhatsApp/SMS/e-mail. Não foi executado deploy nesta sessão.
+
+### Próximo trecho executável
+
+1. Revisar e integrar a PR #1428 de lembretes/WebPush, conciliando seus avisos com o sino transversal já entregue na seção 17. Homologar destinatário, leitura, falha e retentativa antes de declarar conclusão.
+2. Revisar e integrar a PR #1429 de SLA, incluindo os controles permitidos por perfil e a persistência da configuração.
+3. Continuar o ciclo completo de pedido e as exceções do balcão. Homologação externa dos canais, pagamentos, entregas e impressão física conserva os aceites próprios.
+
+## 21. Continuação: lembretes persistidos e WebPush por conta, 09/10/2026
+
+A PR #1428 foi incorporada em `0aafbafb`, sobre `b45dc855`. Os avisos InApp continuam exclusivamente no sino transversal da seção 17; o painel do balcão consulta os lembretes manuais e conserva os automáticos calculados das conversas. A configuração de avisos no aparelho fica no sino transversal, disponível nos módulos autorizados. A Cozinha não consulta nem oferece os lembretes do balcão.
+
+### Comportamento entregue
+
+- **Gravação e retentativa:** programar aguarda a API antes de fechar a modal. Falha conserva texto e horário; dois cliques compartilham uma chamada. Se a resposta se perder depois da gravação, a nova tentativa conserva a chave de idempotência e o instante escolhido. A rota usa o middleware existente. Consulta iniciada antes da gravação não apaga o item novo.
+- **Consulta, visto e conclusão:** a falha de consulta fica visível, conserva a lista e permite atualizar. Visto e conclusão são gravados no servidor. Falha ao concluir mantém o item; resposta atrasada não o faz reaparecer após a confirmação. Não se cria mensagem de sistema só no navegador.
+- **Empresa e destinatário:** o caso de uso valida conversa, pedido e vínculo ativo do destinatário com a empresa. A lista padrão, a marcação de visto e a conclusão conferem empresa e destinatário além do filtro do repositório. O contrato existente de consulta da equipe com `todos=true` permanece. Lembretes gerais mantêm o visto compartilhado definido pela API.
+- **WebPush:** a permissão é solicitada pelo clique. Sem VAPID, bloqueio do navegador e falha de inscrição têm estados próprios. Ativação só aparece após confirmação da API. A inscrição pertence à pessoa e empresa atuais; outra conta não pode reassociar nem desativar o endpoint. O envio também filtra empresa e destinatário, inclusive se o repositório devolver assinaturas de outra empresa.
+- **Saída e troca de conta:** desligar ou sair invalida a assinatura no navegador e fecha os avisos já exibidos. Uma ativação cuja resposta chega depois da saída é invalidada. Login de outra conta não reaproveita a assinatura anterior. Essa invalidação é do navegador; não equivale a atualizar a linha do servidor no logout. O transporte existente desativa endpoints que respondem 404/410.
+- **Celular:** a prova em 390 px reproduziu o painel saindo pela direita, com o botão de programar fora da tela. O painel agora se posiciona pela barra inteira. Ajustados os espaços e o botão Mais para conservar o acesso aos controles; tema escuro e modal também conferidos.
+
+Esta fatia não adiciona dependência nem migration. Durante o trabalho, `47bf16a2` chegou ao master com a correção de formas de pagamento do PWA; essa atualização foi incorporada sem conflito, preservando a entrega da outra frente. A base combinada passou em 1.007 testes da API e repetiu os dois testes PostgreSQL com sucesso, sem ignorados.
+
+### Evidência local
+
+| Verificação | Resultado |
+|---|---|
+| Aplicação | 2.352 testes aprovados, sem ignorados |
+| API após integrar o master | 1.007 testes aprovados, sem ignorados; eram 994 antes de incorporar a atualização de pagamentos |
+| PostgreSQL real | 2 testes aprovados, sem ignorados: avaliador/idempotência e persistência de visto/conclusão com isolamento de empresa e destinatário |
+| Console | 59 provas JavaScript; lint, camadas, 264 pares de contraste e build aprovados |
+| Gate do código | Build de `EasyStok.CI.slnf` e 36 testes de arquitetura aprovados |
+| HTTP e Chromium | 401 sem login; 403 para a Cozinha; vínculos inválidos recusados; destinatário protegido; rascunho preservado; um POST no duplo clique; resposta perdida sem duplicar; visto após recarregar; consulta/conclusão 503 com recuperação |
+| Apresentação | Fluxo completo no computador e gravação em 390 × 844 px; painel, botão de programar, Mais e modal acessíveis; temas claro/escuro; nenhum erro JavaScript |
+| Push | Inscrição 201 real na API/PostgreSQL, recusa de reassociação e desativação alheias, troca de conta e desligamento comprovados com PushManager controlado; VAPID ausente retorna 404 real e não mostra ativação; bloqueio nativo do Chromium respeitado |
+
+Scripts, capturas, logs e TRX estão em `C:\rep\EasyStok\.build\onda2-lembretes`. O navegador usou a API local e o banco isolado `easystock_onda2_lembretes`, com usuários e dados sintéticos. `lembretes-browser.cjs`, `push-browser.cjs` e `celular-escuro.cjs` registram os fluxos; a prova versionada `prova-1426-notificacoes-console.mjs` cobre os contratos, as retentativas, as trocas de conta e os eventos do service worker.
+
+**Limite:** não foi comprovada entrega externa por Google, Apple ou outro serviço de WebPush. A prova de inscrição controla PushManager e permissão; o teste do service worker usa eventos controlados. A entrega real exige VAPID e aceite no aparelho/ambiente final. Não foi executado deploy nesta sessão. Esses resultados não encerram a onda 2 nem substituem os aceites de pagamentos reais, entregas, Google externo e impressão física.
+
+### Próximo trecho executável
+
+1. Revisar e integrar a PR #1429 de SLA de primeira resposta por loja, incluindo persistência, permissões de edição e comportamento visual do atraso.
+2. Continuar o ciclo completo do pedido e as exceções do balcão; revisar as ações restantes por perfil.
+3. Homologar entrega externa dos avisos e os demais canais no ambiente próprio, com as dependências já registradas neste plano.

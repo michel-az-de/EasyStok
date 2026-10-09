@@ -125,7 +125,7 @@
 }
 /* Celular: gap mais apertado, o resto do topo já empurra sozinho pra direita. */
 @media (max-width: 759px) {
-  .topo { gap: var(--e-2); }
+  .topo { gap: var(--e-1); padding-inline: var(--e-2); }
 }
 /* Botão "Simular" (seção 7 da direção visual): fixo no canto inferior
    esquerdo, sempre por cima do resto da tela, nos três arranjos. Pílula de
@@ -222,7 +222,8 @@
   .tema .rotuloTema { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .tema > button { padding: 0 10px; }
   .topo { flex-wrap: nowrap; }
-  .controles { flex-wrap: nowrap; }
+  .controles { flex-wrap: nowrap; gap: var(--e-1); }
+  .controles > .comPopover > button { padding: 0; width: var(--toque); }
 }
 @media (max-width: 759px) {
   .controles > button { font-size: 0; gap: 6px; padding: 0 10px; }

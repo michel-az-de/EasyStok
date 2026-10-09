@@ -55,6 +55,8 @@ public sealed class DispararMensagemProgramadaUseCase(
         {
             var cliente = await clientes.GetByIdAsync(empresaId, mensagem.ClienteId)
                 ?? throw new RegraDeDominioVioladaException("Cliente não existe mais.");
+            if (cliente.Bloqueado)
+                throw new RegraDeDominioVioladaException("Cliente bloqueado: mensagem programada não enviada.");
             conversa = await DestinoMensagemProgramada.ConversaAsync(conversas, empresaId, cliente, mensagem.Canal, mensagem.ConversaId, ct);
             var contato = DestinoMensagemProgramada.Contato(cliente, mensagem.Canal, conversa);
 

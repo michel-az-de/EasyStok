@@ -43,6 +43,8 @@ public class PwaPushController(
     [HttpPost("subscribe")]
     public async Task<IActionResult> Subscribe([FromBody] SubscribeRequest req, CancellationToken ct)
     {
+        if (currentUser.EmpresaId == Guid.Empty || currentUser.UsuarioId == Guid.Empty)
+            return DataBadRequest("Empresa e usuário são obrigatórios para ativar avisos.");
         if (string.IsNullOrWhiteSpace(req.Endpoint)
             || string.IsNullOrWhiteSpace(req.P256dh)
             || string.IsNullOrWhiteSpace(req.Auth))
@@ -51,14 +53,13 @@ public class PwaPushController(
         var existing = await repo.GetByEndpointAsync(req.Endpoint, ct);
         if (existing is not null)
         {
+            if (existing.EmpresaId != currentUser.EmpresaId || existing.UsuarioId != currentUser.UsuarioId)
+                return DataBadRequest("Esta inscrição pertence a outra conta. Desative os avisos no aparelho antes de ativar novamente.");
             existing.P256dh = req.P256dh;
             existing.Auth = req.Auth;
             existing.UserAgent = req.UserAgent ?? existing.UserAgent;
             existing.Ativo = true;
             existing.MarcarUso();
-            // Re-vincula a empresa/usuario atual (pode ter mudado de conta no mesmo browser).
-            existing.EmpresaId = currentUser.EmpresaId == Guid.Empty ? null : currentUser.EmpresaId;
-            existing.UsuarioId = currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId;
             await repo.UpdateAsync(existing, ct);
             return DataOk(new { id = existing.Id, atualizado = true });
         }
@@ -67,8 +68,8 @@ public class PwaPushController(
             endpoint: req.Endpoint,
             p256dh: req.P256dh,
             auth: req.Auth,
-            empresaId: currentUser.EmpresaId == Guid.Empty ? null : currentUser.EmpresaId,
-            usuarioId: currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
+            empresaId: currentUser.EmpresaId,
+            usuarioId: currentUser.UsuarioId,
             userAgent: req.UserAgent);
         await repo.AddAsync(sub, ct);
         return DataCreated($"/api/pwa/push/{sub.Id}", new { id = sub.Id, atualizado = false });
@@ -79,6 +80,9 @@ public class PwaPushController(
     public async Task<IActionResult> Unsubscribe([FromQuery] string endpoint, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(endpoint)) return DataBadRequest("Endpoint obrigatorio.");
+        var existing = await repo.GetByEndpointAsync(endpoint, ct);
+        if (existing is null || existing.EmpresaId != currentUser.EmpresaId || existing.UsuarioId != currentUser.UsuarioId)
+            return DataNotFound("Inscrição não encontrada para esta conta.");
         await repo.DesativarAsync(endpoint, ct);
         return NoContent();
     }

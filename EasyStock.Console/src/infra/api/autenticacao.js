@@ -1,6 +1,7 @@
 import { chamarApi } from './cliente'
-import { atualizarTokens, empresaDoToken, gravarSessao, lerSessao, limparSessao } from './sessao'
+import { atualizarTokens, empresaDoToken, gravarSessao, identidadeDaSessao, lerSessao, limparSessao } from './sessao'
 import { esquecerRascunhos } from './rascunhosDaSessao'
+import { prepararPushParaSessao } from '../pushNavegador'
 
 // Casa da Baba (M0.2): a API resolve a empresa ativa; nunca escolhemos uma no navegador.
 export async function entrar(email, senha) {
@@ -33,7 +34,8 @@ export async function entrarComGoogle(idToken) {
   return abrirSessao(dados, empresaId ? { id: empresaId, nome: null } : null)
 }
 
-function abrirSessao(dados, empresa) {
+async function abrirSessao(dados, empresa) {
+  await prepararPushParaSessao(identidadeDaSessao({ usuario: dados.usuario, empresa }))
   return gravarSessao(atualizarTokens({ usuario: dados.usuario, empresa }, dados))
 }
 
