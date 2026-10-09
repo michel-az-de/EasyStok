@@ -86,6 +86,7 @@ public static class NotificationsInfraServiceCollectionExtensions
         services.AddHttpClient("ZenviaSms");
         services.AddHttpClient("TwilioWhatsApp");
         services.AddHttpClient("MetaWhatsApp");
+        services.AddHttpClient(WebPushCanal.NomeHttpClient);
 
         return services;
     }
