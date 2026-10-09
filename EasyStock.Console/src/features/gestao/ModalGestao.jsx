@@ -16,6 +16,7 @@ import { AbaRespostas } from './respostas/AbaRespostas'
 import { TelaCanais } from './canais/TelaCanais'
 import { AbaCardapioApi } from './cardapio/AbaCardapioApi'
 import { AbaCategoriasApi } from './cardapio/AbaCategoriasApi'
+import { AbaEstoqueDoDiaApi } from './producao/AbaEstoqueDoDiaApi'
 import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
 
@@ -57,6 +58,8 @@ export function PainelDeAjuste({ aba, janelasApi = null }) {
     cardapio: <AbaCardapioApi />,
     // M1.3 (#1483): categorias do cardápio (só modo API).
     categorias: <AbaCategoriasApi />,
+    // M2.1 (#1490): estoque do dia em porções (só modo API).
+    'estoque-do-dia': <AbaEstoqueDoDiaApi />,
   }), [fonteApi, janelasApi])
   const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada texto={AINDA_NAO_LIGADO[aba]}>{painel}</AbaNaoLigada>
