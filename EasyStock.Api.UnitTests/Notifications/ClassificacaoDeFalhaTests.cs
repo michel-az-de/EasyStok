@@ -24,6 +24,7 @@ namespace EasyStock.Api.UnitTests.Notifications;
 /// </summary>
 public class ClassificacaoDeFalhaTests
 {
+    private static readonly Guid EmpresaPush = Guid.NewGuid();
     private const string Telefone = "+5511999990001";
     private const string Email = "maria.souza@example.com";
 
@@ -169,11 +170,27 @@ public class ClassificacaoDeFalhaTests
         return WebPushSubscription.Criar(endpoint,
             System.Buffers.Text.Base64Url.EncodeToString(p256dh),
             System.Buffers.Text.Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(16)),
-            usuarioId: usuarioId);
+            empresaId: EmpresaPush, usuarioId: usuarioId);
     }
 
     private static MensagemPronta MensagemPush(Guid usuarioId) =>
-        Mensagem(CanalNotificacao.Push, $"usuario:{usuarioId}");
+        Mensagem(CanalNotificacao.Push, $"usuario:{usuarioId}") with { EmpresaId = EmpresaPush };
+
+    [Fact]
+    public async Task WebPush_NaoEntregaEmOutraEmpresaOuOutroDestinatario()
+    {
+        var usuarioId = Guid.NewGuid();
+        var outraEmpresa = Inscricao(usuarioId);
+        outraEmpresa.EmpresaId = Guid.NewGuid();
+        var outroUsuario = Inscricao(Guid.NewGuid());
+        var (canal, _, handler) = CanalWebPush(usuarioId, _ => new HttpResponseMessage(HttpStatusCode.Created),
+            outraEmpresa, outroUsuario);
+
+        var resultado = await canal.EnviarAsync(MensagemPush(usuarioId));
+
+        resultado.ErroDetalhado.Should().Be("NENHUMA_SUBSCRIPTION_ATIVA");
+        handler.Chamadas.Should().Be(0);
+    }
 
     private sealed class HandlerWebPush(Func<HttpRequestMessage, HttpResponseMessage> responder) : HttpMessageHandler
     {

@@ -11,6 +11,8 @@ public interface IMensagemProgramadaRepository
     /// <summary>Rastreado.</summary>
     Task<MensagemProgramada?> ObterAsync(Guid empresaId, Guid id, CancellationToken ct = default);
 
+    Task<MensagemProgramada?> ObterComLockAsync(Guid empresaId, Guid id, CancellationToken ct = default);
+
     Task<IReadOnlyList<MensagemProgramada>> ListarAsync(
         Guid empresaId, Guid? clienteId, SituacaoMensagemProgramada? situacao, int limite, CancellationToken ct = default);
 

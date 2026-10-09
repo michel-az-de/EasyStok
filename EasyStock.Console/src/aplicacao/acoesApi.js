@@ -8,6 +8,7 @@ import { avisoDeVariaveisNaoResolvidas } from '../dominio/respostas'
 import { deveCarregarDossie } from './planoDeSincronizacao'
 import { criarAcoesExpedienteApi } from './api/expediente'
 import { criarAcoesCaixaApi } from './api/caixa'
+import { criarAcoesLembretesApi } from './api/lembretes'
 import { criarAcoesConfiguracaoApi } from './api/configuracao'
 import { criarAcoesAssistenteApi } from './api/assistente'
 import { criarAcoesAgenteApi } from './api/agente'
@@ -19,6 +20,7 @@ import { criarAcoesRespostasApi } from './api/respostas'
 import { criarAcoesTagsApi } from './api/tags'
 import { criarAcoesLoteApi } from './api/lote'
 import { criarAcoesCardapioApi } from './api/cardapio'
+import { criarAcoesMensagensProgramadasApi } from './api/mensagensProgramadas'
 import { criarAvisosNaoLigadas, envioNaoLigado, textoNaoLigado } from './api/naoLigadas'
 
 const FORA_DA_JANELA = 'fora_da_janela_24h'
@@ -41,9 +43,9 @@ const falhaDoEnvio = (id, mensagemId, erro) => ({
   ...(erro.dados?.id ? { mensagem: mensagemDaApi(erro.dados, id) } : { semIdServidor: true }),
 })
 
-// Modo API (F01, F02, F03, F06, #1276, #1420): as ações que a caixa de entrada, o expediente, a
+// Modo API (F01, F02, F03, F06, #1276, #1420, #1424): as ações que a caixa de entrada, o expediente, a
 // configuração, o assistente, a sugestão do agente, os avisos da Ficha, a comanda (pedido e cobrança), o cadastro do
-// cliente, o encerramento e a foto já ligam passam a valer no EasyStok.
+// cliente, o encerramento, a foto e a mensagem programada já ligam passam a valer no EasyStok.
 // O despacho local vem antes, para a tela responder na hora; a próxima sincronização
 // traz o estado do servidor. As ações ainda não ligadas (lista única em
 // `api/naoLigadas.js`) não mexem na memória do navegador: só avisam na faixa.
@@ -59,6 +61,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     fecharAvisoApi: ({ fixo = false } = {}) => despachar({ tipo: acao.FECHAR_AVISO_API, fixo }),
     ...criarAcoesExpedienteApi({ despachar, estadoRef }),
     ...criarAcoesCaixaApi(),
+    ...criarAcoesLembretesApi({ despachar }),
     ...criarAcoesConfiguracaoApi(),
     ...criarAcoesAssistenteApi(),
     ...criarAcoesAgenteApi({ despachar }),
@@ -72,6 +75,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     ...criarAcoesLoteApi({ despachar, estadoRef }),
     // #1241: cardápio do dia (disponibilidade e saldo) no EasyStok.
     ...criarAcoesCardapioApi({ despachar, estadoRef }),
+    ...criarAcoesMensagensProgramadasApi({ estadoRef }),
     enviar: (id, texto, opcoes = {}) => {
       // #1287: texto vazio a API recusa (400); modelo e automática ainda não têm endpoint.
       if (!texto?.trim()) return

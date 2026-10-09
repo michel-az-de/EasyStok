@@ -19,10 +19,30 @@ public sealed record CriarLembreteCommand(
     Guid EmpresaId, Guid UsuarioId, string Texto, DateTime? VenceEm, Guid? ParaUsuarioId, Guid? ConversaId, Guid? PedidoId);
 
 /// <summary>S43: lembrete manual da dona. Sem horário, vence na hora e o avaliador avisa na próxima rodada.</summary>
-public sealed class CriarLembreteUseCase(ILembreteRepository repository, IUnitOfWork unitOfWork, TimeProvider relogio)
+public sealed class CriarLembreteUseCase(
+    ILembreteRepository repository, IUnitOfWork unitOfWork, TimeProvider relogio,
+    IConversaRepository conversas, IPedidoRepository pedidos, IUsuarioRepository usuarios)
 {
     public async Task<LembreteResult> ExecuteAsync(CriarLembreteCommand command, CancellationToken ct = default)
     {
+        if (command.ConversaId is { } conversaId && conversaId != Guid.Empty)
+        {
+            var conversa = await conversas.ObterPorIdAsync(command.EmpresaId, conversaId, ct);
+            if (conversa is null || conversa.EmpresaId != command.EmpresaId)
+                throw new UseCaseValidationException("Conversa não encontrada nesta empresa.");
+        }
+        if (command.PedidoId is { } pedidoId && pedidoId != Guid.Empty)
+        {
+            var pedido = await pedidos.GetByIdAsync(command.EmpresaId, pedidoId);
+            if (pedido is null || pedido.EmpresaId != command.EmpresaId)
+                throw new UseCaseValidationException("Pedido não encontrado nesta empresa.");
+        }
+        if (command.ParaUsuarioId is { } usuarioId && usuarioId != Guid.Empty)
+        {
+            var usuario = await usuarios.GetByIdAsync(usuarioId);
+            if (usuario is null || !usuario.Ativo || !usuario.Empresas.Any(e => e.EmpresaId == command.EmpresaId && e.Ativo))
+                throw new UseCaseValidationException("Destinatário não está ativo nesta empresa.");
+        }
         Lembrete lembrete;
         try
         {
@@ -51,6 +71,7 @@ public sealed class ListarLembretesUseCase(ILembreteRepository repository)
     public async Task<IReadOnlyList<LembreteResult>> ExecuteAsync(
         Guid empresaId, Guid usuarioId, bool todos, bool incluirConcluidos, CancellationToken ct = default) =>
         (await repository.ListarAsync(empresaId, todos ? null : usuarioId, incluirConcluidos, LimitePadrao, ct))
+            .Where(l => l.EmpresaId == empresaId && (todos || l.ParaUsuarioId == null || l.ParaUsuarioId == usuarioId))
             .Select(LembreteResult.De).ToList();
 }
 
@@ -59,7 +80,9 @@ public sealed class ConcluirLembreteUseCase(ILembreteRepository repository, IUni
 {
     public async Task<LembreteResult> ExecuteAsync(Guid empresaId, Guid usuarioId, Guid id, CancellationToken ct = default)
     {
-        var lembrete = await repository.ObterAsync(empresaId, id, ct) ?? throw new LembreteNaoEncontradoException(id);
+        var lembrete = await repository.ObterAsync(empresaId, id, ct);
+        if (lembrete is null || lembrete.EmpresaId != empresaId || (lembrete.ParaUsuarioId is { } destinatario && destinatario != usuarioId))
+            throw new LembreteNaoEncontradoException(id);
         lembrete.Concluir(relogio.GetUtcNow().UtcDateTime, usuarioId);
         await unitOfWork.CommitAsync();
         return LembreteResult.De(lembrete);
@@ -73,7 +96,8 @@ public sealed class MarcarLembretesVistosUseCase(ILembreteRepository repository,
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
         var naoVistos = (await repository.ListarAsync(empresaId, usuarioId, incluirConcluidos: false, int.MaxValue, ct))
-            .Where(l => l.VistoEm is null && l.VenceEm <= agora)
+            .Where(l => l.EmpresaId == empresaId && (l.ParaUsuarioId == null || l.ParaUsuarioId == usuarioId)
+                && l.VistoEm is null && l.VenceEm <= agora)
             .ToList();
         if (naoVistos.Count == 0) return 0;
 

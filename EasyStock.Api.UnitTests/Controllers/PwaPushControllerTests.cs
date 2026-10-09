@@ -10,70 +10,68 @@ using NSubstitute;
 
 namespace EasyStock.Api.UnitTests.Controllers;
 
-/// <summary>
-/// #1508: o endpoint da inscrição aceitava qualquer URL (SSRF cego pelo worker) e o unsubscribe desativava a
-/// inscrição de qualquer usuário que soubesse o endpoint.
-/// </summary>
 public class PwaPushControllerTests
 {
-    private const string EndpointFcm = "https://fcm.googleapis.com/fcm/send/abc";
-
+    private readonly Guid _empresa = Guid.NewGuid();
+    private readonly Guid _usuario = Guid.NewGuid();
     private readonly IWebPushSubscriptionRepository _repo = Substitute.For<IWebPushSubscriptionRepository>();
-    private readonly ICurrentUserAccessor _usuario = Substitute.For<ICurrentUserAccessor>();
-    private readonly Guid _usuarioId = Guid.NewGuid();
-    private readonly Guid _empresaId = Guid.NewGuid();
+    private readonly ICurrentUserAccessor _sessao = Substitute.For<ICurrentUserAccessor>();
+    private readonly PwaPushController _controller;
+    private static readonly PwaPushController.SubscribeRequest Inscricao = new("https://fcm.googleapis.com/fcm/send/aviso", /* #1508: so servico de push */ "chave", "segredo", "teste");
 
-    private PwaPushController Controller()
+    public PwaPushControllerTests()
     {
-        _usuario.UsuarioId.Returns(_usuarioId);
-        _usuario.EmpresaId.Returns(_empresaId);
-        return new PwaPushController(_repo, _usuario, Options.Create(new WebPushOptions()));
+        _sessao.EmpresaId.Returns(_empresa);
+        _sessao.UsuarioId.Returns(_usuario);
+        _controller = new PwaPushController(_repo, _sessao, Options.Create(new WebPushOptions()));
     }
 
     [Theory]
-    [InlineData("http://169.254.169.254/latest/meta-data")]
-    [InlineData("https://intranet.local/push")]
-    public async Task Subscribe_endpoint_fora_da_allowlist_retorna_400_sem_gravar(string endpoint)
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task InscreverOuDesativar_RecusaEndpointDeOutraConta(bool outraEmpresa)
     {
-        var result = await Controller().Subscribe(
-            new PwaPushController.SubscribeRequest(endpoint, "p256dh", "auth", null), CancellationToken.None);
+        var anterior = WebPushSubscription.Criar(Inscricao.Endpoint, "original", "original",
+            outraEmpresa ? Guid.NewGuid() : _empresa, outraEmpresa ? _usuario : Guid.NewGuid());
+        _repo.GetByEndpointAsync(Inscricao.Endpoint, default).Returns(anterior);
 
-        result.Should().BeOfType<BadRequestObjectResult>();
-        await _repo.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
-        await _repo.DidNotReceiveWithAnyArgs().GetByEndpointAsync(default!, default);
-    }
+        (await _controller.Subscribe(Inscricao, default)).Should().BeOfType<BadRequestObjectResult>();
+        (await _controller.Unsubscribe(Inscricao.Endpoint, default)).Should().BeOfType<NotFoundObjectResult>();
 
-    [Fact]
-    public async Task Subscribe_endpoint_de_servico_de_push_grava()
-    {
-        var result = await Controller().Subscribe(
-            new PwaPushController.SubscribeRequest(EndpointFcm, "p256dh", "auth", null), CancellationToken.None);
-
-        result.Should().BeOfType<CreatedResult>();
-        await _repo.Received(1).AddAsync(Arg.Is<WebPushSubscription>(s => s.Endpoint == EndpointFcm), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task Unsubscribe_de_inscricao_de_outro_usuario_nao_desativa()
-    {
-        _repo.GetByEndpointAsync(EndpointFcm, Arg.Any<CancellationToken>())
-            .Returns(WebPushSubscription.Criar(EndpointFcm, "p", "a", _empresaId, Guid.NewGuid()));
-
-        var result = await Controller().Unsubscribe(EndpointFcm, CancellationToken.None);
-
-        result.Should().BeOfType<NoContentResult>();
+        anterior.P256dh.Should().Be("original");
+        anterior.Ativo.Should().BeTrue();
+        await _repo.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default);
         await _repo.DidNotReceiveWithAnyArgs().DesativarAsync(default!, default);
     }
 
     [Fact]
-    public async Task Unsubscribe_da_propria_inscricao_desativa()
+    public async Task Inscrever_UsaEmpresaEUsuarioDaSessao()
     {
-        _repo.GetByEndpointAsync(EndpointFcm, Arg.Any<CancellationToken>())
-            .Returns(WebPushSubscription.Criar(EndpointFcm, "p", "a", _empresaId, _usuarioId));
+        (await _controller.Subscribe(Inscricao, default)).Should().BeOfType<CreatedResult>();
+        await _repo.Received(1).AddAsync(Arg.Is<WebPushSubscription>(s => s.EmpresaId == _empresa && s.UsuarioId == _usuario), default);
+    }
 
-        var result = await Controller().Unsubscribe(EndpointFcm, CancellationToken.None);
+    [Fact]
+    public async Task MesmaConta_ReinscreveEDesativa()
+    {
+        var anterior = WebPushSubscription.Criar(Inscricao.Endpoint, "antiga", "antigo", _empresa, _usuario);
+        anterior.Desativar();
+        _repo.GetByEndpointAsync(Inscricao.Endpoint, default).Returns(anterior);
+        (await _controller.Subscribe(Inscricao, default)).Should().BeOfType<OkObjectResult>();
+        anterior.P256dh.Should().Be(Inscricao.P256dh);
+        anterior.Ativo.Should().BeTrue();
+        (await _controller.Unsubscribe(Inscricao.Endpoint, default)).Should().BeOfType<NoContentResult>();
+        await _repo.Received(1).DesativarAsync(Inscricao.Endpoint, default);
+    }
 
-        result.Should().BeOfType<NoContentResult>();
-        await _repo.Received(1).DesativarAsync(EndpointFcm, Arg.Any<CancellationToken>());
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Inscrever_SemEmpresaOuUsuario_Recusa(bool semEmpresa)
+    {
+        if (semEmpresa) _sessao.EmpresaId.Returns(Guid.Empty);
+        else _sessao.UsuarioId.Returns(Guid.Empty);
+        (await _controller.Subscribe(Inscricao, default)).Should().BeOfType<BadRequestObjectResult>();
+        await _repo.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
     }
 }

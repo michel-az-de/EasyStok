@@ -47,7 +47,8 @@ public sealed class WebPushCanal(
                 DuracaoMs: sw.ElapsedMilliseconds, FalhaPermanente: true);
         }
 
-        var subs = await ResolverSubscriptionsAsync(mensagem, ct);
+        var subs = (await ResolverSubscriptionsAsync(mensagem, ct))
+            .Where(s => s.EmpresaId == mensagem.EmpresaId && s.Ativo).ToList();
         if (subs.Count == 0)
         {
             sw.Stop();
@@ -128,9 +129,9 @@ public sealed class WebPushCanal(
     {
         var dest = msg.Destinatario.Trim();
         if (dest.StartsWith("usuario:", StringComparison.OrdinalIgnoreCase) && Guid.TryParse(dest[8..], out var usuarioId))
-            return await repo.GetByUsuarioAsync(usuarioId, ct);
+            return (await repo.GetByUsuarioAsync(usuarioId, ct)).Where(s => s.UsuarioId == usuarioId).ToList();
         if (dest.StartsWith("empresa:", StringComparison.OrdinalIgnoreCase) && Guid.TryParse(dest[8..], out var empId))
-            return await repo.GetByEmpresaAsync(empId, ct);
+            return empId == msg.EmpresaId ? await repo.GetByEmpresaAsync(empId, ct) : [];
         // Fallback: empresa da mensagem.
         return await repo.GetByEmpresaAsync(msg.EmpresaId, ct);
     }
