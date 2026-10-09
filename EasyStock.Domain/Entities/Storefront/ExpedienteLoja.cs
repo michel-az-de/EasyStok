@@ -126,6 +126,35 @@ public class ExpedienteLoja
         _ => DentroDoHorario(ParaLocal(agoraUtc)),
     };
 
+    // Sem histórico de controles manuais, o estado atual vale para todo o intervalo,
+    // como no Console. No automático, soma somente a interseção com cada turno.
+    public double MinutosAbertosEntre(DateTime inicioUtc, DateTime fimUtc, double limite = double.PositiveInfinity)
+    {
+        var inicio = Utc(inicioUtc);
+        var fim = Utc(fimUtc);
+        if (fim <= inicio || ControleManual == ControleManualLoja.ForcarFechada) return 0;
+        if (ControleManual == ControleManualLoja.ForcarAberta) return (fim - inicio).TotalMinutes;
+        var horarios = Horarios.ToDictionary(h => h.DiaDaSemana);
+        if (horarios.Count == 0) return 0;
+        var ultimoDia = ParaLocal(fim).Date;
+        var total = 0d;
+        var contadoAte = inicio;
+        for (var dia = ParaLocal(inicio).Date.AddDays(-1); dia <= ultimoDia && total <= limite; dia = dia.AddDays(1))
+        {
+            if (!horarios.TryGetValue((int)dia.DayOfWeek, out var turno)) continue;
+            var abre = TimeZoneInfo.ConvertTimeToUtc(dia.Add(turno.Abre.ToTimeSpan()), Fuso);
+            var fecha = TimeZoneInfo.ConvertTimeToUtc(dia.AddDays(turno.ViraMeiaNoite ? 1 : 0).Add(turno.Fecha.ToTimeSpan()), Fuso);
+            var de = contadoAte > abre ? contadoAte : abre;
+            var ate = fim < fecha ? fim : fecha;
+            if (ate > de)
+            {
+                total += (ate - de).TotalMinutes;
+                contadoAte = ate;
+            }
+        }
+        return total;
+    }
+
     /// <summary>
     /// Se o relógio está dentro de algum turno, ignorando o controle manual (#1443): é o que decide se
     /// fechar na mão é "fechar no horário de funcionamento", que pede gerente e justificativa.

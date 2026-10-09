@@ -84,6 +84,15 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   // porque quem lê "Precisa de você", o Balcão e o aviso sonoro precisam da
   // MESMA resposta.
   const aberta = estaAberta(agoraEfetivo, { funcionamento: estado.funcionamento, lojaAberta: estado.lojaAberta })
+  // #1427: o SLA de primeira resposta só conta com a loja aberta. Mesmo par
+  // de `aberta`, entregue inteiro para o domínio andar pelo horário.
+  const horarioDaLoja = useMemo(
+    () => ({
+      funcionamento: estado.funcionamento,
+      lojaAberta: FONTE_API && !estado.expediente.carregado ? false : estado.lojaAberta,
+    }),
+    [estado.funcionamento, estado.lojaAberta, estado.expediente.carregado],
+  )
 
   const pendentes = useRef([])
   useEffect(() => () => pendentes.current.forEach(clearTimeout), [])
@@ -209,7 +218,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   // o registro de sons recentes do Sininho (achado 7, item 7) e a marca de
   // "pagamento não visto" independente do sinal verde (item 2).
   useAvisoSonoro({
-    conversas: estado.conversas, som: estado.som, agora: agoraEfetivo, aberta,
+    conversas: estado.conversas, som: estado.som, agora: agoraEfetivo, aberta, expediente: horarioDaLoja,
     janelas: estado.catalogo.janelas,
     aoTocar: (evento, conversaId) => {
       setEventosSonoros((atual) => [
@@ -259,7 +268,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   useEffect(() => {
     despachar({
       tipo: acao.SINCRONIZAR_LEMBRETES,
-      automaticos: lembretesAutomaticos(conversasAgora, agoraRef.current),
+      automaticos: FONTE_API ? [] : lembretesAutomaticos(conversasAgora, agoraRef.current),
     })
   }, [conversasAgora, agoraEfetivo])
 
@@ -326,6 +335,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       funcionamento: estado.funcionamento,
       lojaAberta: estado.lojaAberta,
       aberta,
+      horarioDaLoja,
       modoAgente: estado.modoAgente,
       agente: estado.agente,
       automaticoPausado: estado.automaticoPausado,
@@ -338,6 +348,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       visiveis: ordenarBalcao(
         conversasDoBalcao(
           estado.conversas, estado.filtros, agoraEfetivo, estado.automaticoPausado, aberta, estado.catalogo.janelas,
+          horarioDaLoja,
         ),
         agoraEfetivo,
         {
@@ -345,6 +356,8 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
           automaticoPausado: estado.automaticoPausado,
           janelas: estado.catalogo.janelas,
           aberta,
+          expediente: horarioDaLoja,
+          aba: estado.filtros.aba,
         },
       ),
       // Os dois grupos recolhidos do fim de "Todas" (seção 1): mesmo canal e
@@ -397,7 +410,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       cargaDasRegras: estado.cargaDasRegras,
       sessao,
     }
-  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao, consultaLembretes])
+  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, horarioDaLoja, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao, consultaLembretes])
 
   return (
     <ContextoCatalogo.Provider value={estado.catalogo}>

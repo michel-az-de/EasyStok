@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261007100720_AddSlaRespostaConfiguracaoAtendimento")]
+    partial class AddSlaRespostaConfiguracaoAtendimento
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -4338,9 +4341,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<int?>("PesoG")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("PesoRealG")
-                        .HasColumnType("integer");
-
                     b.Property<Guid?>("ProdutoId")
                         .HasColumnType("uuid");
 
@@ -4381,29 +4381,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<string>("DeletedBy")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("deleted_by");
-
-                    b.Property<string>("DiscardReason")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("discard_reason");
-
-                    b.Property<DateTime?>("DiscardedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("discarded_at");
-
-                    b.Property<string>("DiscardedBy")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("discarded_by");
 
                     b.Property<Guid?>("EmpresaId")
                         .HasColumnType("uuid")
@@ -4534,11 +4511,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid?>("LojaId")
                         .HasColumnType("uuid")
                         .HasColumnName("loja_id");
-
-                    b.Property<string>("Metodo")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("metodo");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -4916,11 +4888,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("loja_id");
 
-                    b.Property<string>("Metodo")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("metodo");
-
                     b.Property<string>("Notes")
                         .HasColumnType("text");
 
@@ -5011,10 +4978,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
-                    b.Property<decimal?>("Cost")
-                        .HasColumnType("numeric(10,2)")
-                        .HasColumnName("cost");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -5060,10 +5023,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid?>("LojaId")
                         .HasColumnType("uuid")
                         .HasColumnName("loja_id");
-
-                    b.Property<int?>("MinStock")
-                        .HasColumnType("integer")
-                        .HasColumnName("min_stock");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -6965,10 +6924,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid?>("EmpresaId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ModuloInicial")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
                     b.Property<string>("Nivel")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -6978,12 +6933,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired()
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
-
-                    b.Property<bool>("PermissoesExplicitas")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("PermissoesLegadas")
-                        .HasColumnType("jsonb");
 
                     b.HasKey("Id");
 
@@ -7106,11 +7055,6 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<string>("AtributosJson")
                         .HasColumnType("jsonb");
-
-                    b.Property<bool>("BaixaInsumoAutomatica")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
 
                     b.Property<Guid>("CategoriaId")
                         .HasColumnType("uuid");
@@ -7753,9 +7697,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime>("AlteradoEm")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime?>("ArquivadoEm")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("CategoriaTexto")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -7772,11 +7713,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
-                    b.Property<bool>("EmValidacao")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
                     b.Property<string>("FiltrosJson")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -7786,12 +7722,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("FotoUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
-
-                    b.Property<string>("FotosJson")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("jsonb")
-                        .HasDefaultValue("[]");
 
                     b.Property<string>("Ingredientes")
                         .HasMaxLength(500)
@@ -7809,9 +7739,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("NomePublico")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
-
-                    b.Property<DateOnly?>("NovidadeAte")
-                        .HasColumnType("date");
 
                     b.Property<double>("OrdemExibicao")
                         .ValueGeneratedOnAdd()

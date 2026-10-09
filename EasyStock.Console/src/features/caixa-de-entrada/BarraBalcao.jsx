@@ -56,18 +56,18 @@ function ChipCanal({ canal, rotulo, abertas, precisam, ligado, aoTrocar }) {
 export function BarraBalcao({ filtros, aoMudar }) {
   const [ordenarAberto, setOrdenarAberto] = useState(false)
   const { canais, janelas } = useCatalogo()
-  const { conversas, agora, automaticoPausado, aberta } = useAtendimento()
+  const { conversas, agora, automaticoPausado, aberta, horarioDaLoja } = useAtendimento()
 
   // As duas contagens das abas já respeitam o canal ligado na linha C e a
   // busca da linha A (seção 1): trocar canal ou digitar não pode deixar o
   // número da aba discordando da lista embaixo.
   const doUniverso = conversas.filter((c) => combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca))
   const quantasPrecisam = doUniverso
-    .filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas)).length
+    .filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas, horarioDaLoja)).length
 
   // Tempo real: derivado de `conversas` a cada render, sem contador guardado
   // que possa divergir. Conversa nova da simulação (F2) já sobe o número.
-  const contagemPorCanal = contarPorCanal(conversas, canais, agora, automaticoPausado, aberta, janelas)
+  const contagemPorCanal = contarPorCanal(conversas, canais, agora, automaticoPausado, aberta, janelas, horarioDaLoja)
 
   function trocarCanal(nome) {
     const ligados = filtros.canais.includes(nome)

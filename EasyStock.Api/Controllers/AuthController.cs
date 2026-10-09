@@ -339,7 +339,10 @@ public class AuthController(
             {
                 editarCardapio = gerente && modulos.Any(m => m.id == "cardapio" && m.liberado),
                 editarProducao = gerente && modulos.Any(m => m.id == "producao" && m.liberado),
-                gerenciarCaixa = gerente && modulos.Any(m => m.id == "financeiro" && m.liberado)
+                gerenciarCaixa = gerente && modulos.Any(m => m.id == "financeiro" && m.liberado),
+                editarAtendimento = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin
+                    && modulos.Any(m => m.id == "atendimento" && m.liberado),
+                controlarLoja = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado)
             }
         });
     }

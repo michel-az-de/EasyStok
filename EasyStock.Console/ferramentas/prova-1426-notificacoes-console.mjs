@@ -25,7 +25,7 @@ globalThis.fetch = async (url, opts = {}) => {
   return new Response(data === null ? null : JSON.stringify(data), { status })
 }
 const api = await import('../src/infra/api/notificacoesApi.js')
-const { lembreteDaApi, lembreteEhManual } = await import('../src/infra/api/traducaoNotificacoes.js')
+const { lembreteDaApi } = await import('../src/infra/api/traducaoNotificacoes.js')
 const { criarAcoesLembretesApi, lerLembretesDaApi } = await import('../src/aplicacao/api/lembretes.js')
 const acao = await import('../src/aplicacao/acoes.js')
 const { reducer } = await import('../src/aplicacao/reducer.js')
@@ -35,7 +35,6 @@ const push = await import('../src/infra/pushNavegador.js')
 const dto = { id: 'l1', tipo: 'Manual', texto: 'Ligar', venceEm: '2026-10-09T12:00:00', conversaId: CONVERSA }
 const l = lembreteDaApi(dto)
 assert.equal(l.quando, Date.parse('2026-10-09T12:00:00Z'))
-assert.equal(lembreteEhManual({ tipo: 'ClienteSemResposta' }), false)
 await api.listarLembretes()
 await api.marcarLembretesVistosNaApi()
 await api.concluirLembreteNaApi('l1')
@@ -48,7 +47,7 @@ assert.deepEqual(chamadas.map(c => `${c.metodo} ${c.url}`), [
 assert.equal(chamadas[4].headers.Authorization, undefined)
 assert.equal(chamadas[0].headers.Authorization, 'Bearer tk')
 responder = () => [200, { data: [dto, { ...dto, id: 'auto', tipo: 'ClienteSemResposta' }] }]
-assert.deepEqual(await lerLembretesDaApi(), [l], 'não duplica os automáticos nem consulta InApp')
+assert.deepEqual(await lerLembretesDaApi(), [l, lembreteDaApi({ ...dto, id: 'auto', tipo: 'ClienteSemResposta' })], 'o avaliador fornece também os automáticos, sem consultar InApp')
 responder = () => [503, { error: { message: 'Indisponível' } }]
 await assert.rejects(lerLembretesDaApi(), /Indisponível/)
 

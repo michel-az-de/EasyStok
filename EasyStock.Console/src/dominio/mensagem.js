@@ -33,7 +33,7 @@ const ehAvisoDeEsteira = (mensagem) => Boolean(mensagem?.automatica) && (mensage
 // Resposta que conversa de verdade com o cliente: a dona escrevendo, ou o
 // automático respondendo alguma coisa que não seja aviso de esteira (FAQ,
 // captura de lead, agradecimento pós-entrega...). Nota de sistema não conta.
-export const respondeAoCliente = (mensagem) => mensagem.dir === 'out' && !ehAvisoDeEsteira(mensagem)
+export const respondeAoCliente = (mensagem) => mensagem.dir === 'out' && !['falhou', 'enviando'].includes(mensagem.status) && !ehAvisoDeEsteira(mensagem)
 
 // Mensagens do cliente ainda sem essa resposta, na ordem em que chegaram.
 // Anda de trás para frente: aviso de esteira e nota de sistema são
