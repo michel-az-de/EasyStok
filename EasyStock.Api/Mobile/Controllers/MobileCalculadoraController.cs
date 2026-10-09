@@ -1,3 +1,4 @@
+using EasyStock.Api.Mobile.Security;
 using EasyStock.Application.UseCases.CalcularProducao;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.CriarSugestaoCompra;
@@ -14,6 +15,10 @@ namespace EasyStock.Api.Mobile.Controllers;
 ///   middleware IdempotencyMiddleware faz cache 24h via /api/mobile/calculadora/criar-compra whitelist
 /// - GET /produtos-com-receita: lista produtos-finais com receita cadastrada (busca por nome)
 /// Tenant guard via MobileManagementControllerBase.
+/// #1474: as rotas somente-leitura (calcular, calcular-cesta, preview-compra,
+/// produtos-com-receita) tambem aceitam o aparelho pareado (X-Mobile-Api-Key).
+/// O PWA nunca tem JWT, entao antes recebia 401. Com device, o tenant e o do
+/// aparelho; empresaId divergente na request = 403. criar-compra segue so JWT.
 /// </summary>
 [ApiController]
 [Route("api/mobile/calculadora")]
@@ -27,11 +32,13 @@ public class MobileCalculadoraController(
     ICurrentUserAccessor currentUser) : MobileManagementControllerBase(currentUser)
 {
     [HttpPost("calcular")]
+    [AllowAnonymous]
+    [MobileApiKey]
     public async Task<IActionResult> Calcular(
         [FromBody] CalcularRequest body,
         CancellationToken ct)
     {
-        if (!TryResolveEmpresaId(body.EmpresaId, out var emp, out var err)) return err!;
+        if (!TryResolveEmpresaIdDeviceOuUsuario(body.EmpresaId, out var emp, out var err)) return err!;
 
         if (!Enum.TryParse<UnidadeMedida>(body.UnidadeDesejada, true, out var unidadeDesejada))
             throw new UseCaseValidationException("UNIT_INCOMPATIBLE", $"Unidade desejada invalida: {body.UnidadeDesejada}.");
@@ -44,11 +51,13 @@ public class MobileCalculadoraController(
     }
 
     [HttpPost("calcular-cesta")]
+    [AllowAnonymous]
+    [MobileApiKey]
     public async Task<IActionResult> CalcularCesta(
         [FromBody] CalcularCestaRequest body,
         CancellationToken ct)
     {
-        if (!TryResolveEmpresaId(body.EmpresaId, out var emp, out var err)) return err!;
+        if (!TryResolveEmpresaIdDeviceOuUsuario(body.EmpresaId, out var emp, out var err)) return err!;
 
         if (body.Itens == null || body.Itens.Count == 0)
             throw new UseCaseValidationException("EMPTY_CESTA", "Cesta deve ter pelo menos 1 item.");
@@ -68,11 +77,13 @@ public class MobileCalculadoraController(
     }
 
     [HttpPost("preview-compra")]
+    [AllowAnonymous]
+    [MobileApiKey]
     public async Task<IActionResult> PreviewCompra(
         [FromBody] PreviewCompraRequest body,
         CancellationToken ct)
     {
-        if (!TryResolveEmpresaId(body.EmpresaId, out var emp, out var err)) return err!;
+        if (!TryResolveEmpresaIdDeviceOuUsuario(body.EmpresaId, out var emp, out var err)) return err!;
 
         var insumos = body.Insumos.Select(i =>
         {
@@ -118,6 +129,8 @@ public class MobileCalculadoraController(
     }
 
     [HttpGet("produtos-com-receita")]
+    [AllowAnonymous]
+    [MobileApiKey]
     public async Task<IActionResult> ProdutosComReceita(
         [FromQuery] Guid? empresaId,
         [FromQuery] string? q,
@@ -125,7 +138,7 @@ public class MobileCalculadoraController(
         [FromQuery] Guid? lojaId = null,
         CancellationToken ct = default)
     {
-        if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
+        if (!TryResolveEmpresaIdDeviceOuUsuario(empresaId, out var emp, out var err)) return err!;
 
         var produtos = await composicaoRepository.BuscarProdutosFinaisAsync(emp, q, limit, lojaId, ct);
 
@@ -139,6 +152,37 @@ public class MobileCalculadoraController(
         });
 
         return Ok(new { data = resultado });
+    }
+
+    /// <summary>
+    /// #1474: aparelho pareado resolve o tenant pelo device (o filtro
+    /// <see cref="MobileApiKeyAttribute"/> ja fixou o tenant do DbContext).
+    /// Sem device, cai no guard do usuario autenticado; sem nenhum dos dois, 401.
+    /// </summary>
+    private bool TryResolveEmpresaIdDeviceOuUsuario(Guid? requestedEmpresaId, out Guid empresaId, out IActionResult? error)
+    {
+        var device = HttpContext.GetMobileDevice();
+        if (device is not null)
+        {
+            if (requestedEmpresaId is { } req && req != Guid.Empty && req != device.EmpresaId)
+            {
+                empresaId = Guid.Empty;
+                error = StatusCode(StatusCodes.Status403Forbidden, new { error = "empresaId não pertence ao aparelho" });
+                return false;
+            }
+            empresaId = device.EmpresaId;
+            error = null;
+            return true;
+        }
+
+        if (!CurrentUser.IsAuthenticated)
+        {
+            empresaId = Guid.Empty;
+            error = Unauthorized(new { error = "aparelho não pareado" });
+            return false;
+        }
+
+        return TryResolveEmpresaId(requestedEmpresaId, out empresaId, out error);
     }
 }
 

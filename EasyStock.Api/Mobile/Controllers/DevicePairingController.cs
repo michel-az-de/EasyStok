@@ -154,7 +154,33 @@ public class DevicePairingController(
         var apiKeyHash = TokenHashHelper.ComputeSha256Hash(apiKey);
         var now = DateTime.UtcNow;
 
-        if (device.Id.StartsWith("pending-"))
+        // #1474: o aparelho já pareado antes (ou revogado) volta com o mesmo deviceId. Inserir
+        // de novo esbarrava na PK (409); reaproveita o registro com a loja e a key novas.
+        var jaPareado = device.Id.StartsWith("pending-")
+            ? await _db.Set<MobileDevice>().FirstOrDefaultAsync(d => d.Id == deviceFromApp, ct)
+            : null;
+        if (jaPareado is not null)
+        {
+            jaPareado.ApiKeyHash = apiKeyHash;
+            jaPareado.EmpresaId = device.EmpresaId;
+            jaPareado.LojaId = device.LojaId;
+            jaPareado.PairedByUserId = device.PairedByUserId;
+            if (!string.IsNullOrWhiteSpace(req.Label)) jaPareado.Label = req.Label;
+            else if (!string.IsNullOrWhiteSpace(device.Label)) jaPareado.Label = device.Label;
+            jaPareado.Revoked = false;
+            jaPareado.RevokedAt = null;
+            jaPareado.RevokedByUserId = null;
+            jaPareado.PairingCode = null;
+            jaPareado.PairingExpiresAt = null;
+            jaPareado.PairedAt = now;
+            jaPareado.LastSeenAt = now;
+            jaPareado.LastSeenIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+            jaPareado.UpdatedAt = now;
+            _db.Set<MobileDevice>().Remove(device);
+            await _db.SaveChangesAsync(ct);
+            device = jaPareado;
+        }
+        else if (device.Id.StartsWith("pending-"))
         {
             // Como Id é PK, não podemos UPDATE — vamos inserir novo + remover antigo
             // num único batch transacional. Em compensação, mantém EmpresaId etc.
@@ -196,6 +222,7 @@ public class DevicePairingController(
         _log.LogInformation("Device pareado: id={DeviceId} empresa={EmpresaId} loja={LojaId}",
             device.Id, device.EmpresaId, device.LojaId);
 
+        var (empresaNome, lojaNome) = await NomesEmpresaELojaAsync(device.EmpresaId, device.LojaId, ct);
         return Ok(new PairResponse(
             DeviceId: device.Id,
             ApiKey: apiKey,
@@ -203,7 +230,9 @@ public class DevicePairingController(
             LojaId: device.LojaId,
             Label: device.Label,
             DefaultOperatorName: device.DefaultOperatorName,
-            PairedAt: device.PairedAt!.Value
+            PairedAt: device.PairedAt!.Value,
+            EmpresaNome: empresaNome,
+            LojaNome: lojaNome
         ));
     }
 
@@ -307,6 +336,7 @@ public class DevicePairingController(
             _log.LogInformation("Device re-auto-pareado: id={DeviceId} empresa={EmpresaId} loja={LojaId}",
                 existing.Id, empresaId, lojaId);
 
+            var (empresaNomeRe, lojaNomeRe) = await NomesEmpresaELojaAsync(empresaId, lojaId, ct);
             return Ok(new PairResponse(
                 DeviceId: existing.Id,
                 ApiKey: apiKey,
@@ -314,7 +344,9 @@ public class DevicePairingController(
                 LojaId: existing.LojaId,
                 Label: existing.Label,
                 DefaultOperatorName: existing.DefaultOperatorName,
-                PairedAt: existing.PairedAt!.Value
+                PairedAt: existing.PairedAt!.Value,
+                EmpresaNome: empresaNomeRe,
+                LojaNome: lojaNomeRe
             ));
         }
 
@@ -340,6 +372,7 @@ public class DevicePairingController(
         _log.LogInformation("Device auto-pareado: id={DeviceId} empresa={EmpresaId} loja={LojaId} label={Label}",
             device.Id, empresaId, lojaId, labelFinal);
 
+        var (empresaNomeNovo, lojaNomeNovo) = await NomesEmpresaELojaAsync(empresaId, lojaId, ct);
         return Ok(new PairResponse(
             DeviceId: device.Id,
             ApiKey: apiKey,
@@ -347,8 +380,41 @@ public class DevicePairingController(
             LojaId: lojaId,
             Label: device.Label,
             DefaultOperatorName: null,
-            PairedAt: now
+            PairedAt: now,
+            EmpresaNome: empresaNomeNovo,
+            LojaNome: lojaNomeNovo
         ));
+    }
+
+    /// <summary>
+    /// #1474: nome da empresa (fantasia, senão razão) e da loja para o PWA trocar o
+    /// "Minha empresa" do topo logo após parear. Endpoint anônimo: fixa o tenant do
+    /// device antes de ler a loja (RLS tenant_isolation). Falha aqui não derruba o
+    /// pareamento; o app só segue sem o nome.
+    /// </summary>
+    private async Task<(string? EmpresaNome, string? LojaNome)> NomesEmpresaELojaAsync(
+        Guid empresaId, Guid lojaId, CancellationToken ct)
+    {
+        try
+        {
+            _db.SetMobileTenantContext(empresaId);
+            var empresa = await _db.Set<Empresa>().IgnoreQueryFilters().AsNoTracking()
+                .Where(e => e.Id == empresaId)
+                .Select(e => new { e.Nome, e.NomeFantasia })
+                .FirstOrDefaultAsync(ct);
+            var lojaNome = await _db.Set<Loja>().IgnoreQueryFilters().AsNoTracking()
+                .Where(l => l.Id == lojaId && l.EmpresaId == empresaId)
+                .Select(l => l.Nome)
+                .FirstOrDefaultAsync(ct);
+            var empresaNome = empresa is null ? null
+                : string.IsNullOrWhiteSpace(empresa.NomeFantasia) ? empresa.Nome : empresa.NomeFantasia;
+            return (empresaNome, lojaNome);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Pareamento sem nome de empresa/loja empresa={EmpresaId} loja={LojaId}", empresaId, lojaId);
+            return (null, null);
+        }
     }
 
     /// <summary>Web autenticado — lista devices pareados de uma empresa.</summary>
@@ -639,7 +705,10 @@ public record PairResponse(
     Guid LojaId,
     string? Label,
     string? DefaultOperatorName,
-    DateTime PairedAt
+    DateTime PairedAt,
+    // #1474: o PWA usa para trocar o "Minha empresa" do topo apos parear.
+    string? EmpresaNome = null,
+    string? LojaNome = null
 );
 
 public record DeviceSummary(

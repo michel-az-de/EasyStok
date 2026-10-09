@@ -1,3 +1,4 @@
+using EasyStock.Application.Services.Storefront;
 using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
@@ -95,9 +96,10 @@ public class SyncReversePullService(
         var pedidos = await pedidosQ.ToListAsync();
         foreach (var p in pedidos)
         {
-            var items = p.Itens.Select(i => new OrderItemDto(
+            // #1474: a linha de frete não é produto a preparar; o nome segue o da vitrine.
+            var items = p.Itens.Where(i => !i.EhLinhaDeFrete).Select(i => new OrderItemDto(
                 ProductId: i.ProdutoId?.ToString() ?? "",
-                Name: i.Nome ?? "",
+                Name: NomeCardapio.Exibicao(i.Nome) ?? "",
                 Emoji: i.Emoji,
                 Unit: i.Unidade,
                 Qty: (int)i.Quantidade,
