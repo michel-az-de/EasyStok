@@ -7,11 +7,13 @@ import { Pilula } from '../../componentes/Pilula'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { moeda } from '../../dominio/formato'
 import {
-  agruparPorLinha, itensDetalhados, numeroCurto, pedidoEncerrado, totalDoPedido,
+  agruparPorLinha, itensDetalhados, numeroDaComanda, pedidoEncerrado, totalDoPedido,
 } from '../../dominio/pedido'
 import { diferencaAposPagamento, totalPago } from '../../dominio/pagamento'
 import { situacaoDoItem } from '../../dominio/cardapio'
-import { ROTULO_ENVIAR, avisoDoEnvio, situacaoDoEnvio } from '../../dominio/resumoPedido'
+import {
+  LINHA_COMANDA_VAI_JUNTO, ROTULO_ENVIAR, avisoDoEnvio, rotuloDoTotal, situacaoDoEnvio,
+} from '../../dominio/resumoPedido'
 import { Cabecalho } from './Cabecalho'
 import { ModalCanhoto } from './Canhoto'
 import { SeletorJanela } from './SeletorJanela'
@@ -178,12 +180,15 @@ export function BlocoPedido({
         ref={soltarRef}
         id="comanda-pedido"
         className={`${css.comanda} ${alvoDoArrasto ? css.alvoArrasto : ''}`}
-        aria-label={`Comanda número ${numeroCurto(pedido.numero)}`}
+        aria-label={numeroDaComanda(pedido, { fonteApi }) ? `Comanda número ${numeroDaComanda(pedido, { fonteApi })}` : 'Comanda em rascunho'}
       >
+        {/* #1474 (R6, R3): o número é o do EasyStok quando o pedido existe; sem janela, o
+            cabeçalho avisa. A faixa do modo API vem do seletor, não do catálogo local. */}
         <Cabecalho
-          numero={pedido.numero}
+          numero={numeroDaComanda(pedido, { fonteApi })}
           nomeCliente={nomeCliente}
           faixa={faixa}
+          semJanela={!fechado && !pedido.janela}
           enviadaEm={pedido.cobranca?.criadaEm ?? null}
         />
         <hr className={css.separador} />
@@ -220,7 +225,7 @@ export function BlocoPedido({
           <p className={css.vazio}>Frete {moeda(pedido.frete)}</p>
         )}
         <p className={css.total}>
-          <span>Total</span>
+          <span>{rotuloDoTotal(pedido, { fonteApi })}</span>
           <b>{moeda(pedido.totalApi ?? total)}</b>
         </p>
         {diferencaPosPagamento > 0 && (
@@ -232,13 +237,23 @@ export function BlocoPedido({
         )}
       </section>
 
+      {/* F03: no modo API a janela é da vitrine, com data, e só se escolhe antes do envio.
+          #1474 (R3): vem antes das ações, logo abaixo da comanda, onde o motivo da barra aponta. */}
+      {!fechado && fonteApi && !pedido.pedidoId && (
+        <SeletorJanelaApi pedido={pedido} editavel={editavel} aoEscolher={aoTrocarJanela} />
+      )}
+
       <div className={css.acoesPedido}>
         {!fechado && (
           <>
-            <Botao largo onClick={aoAbrirCardapio}>Abrir cardápio</Botao>
+            <Botao largo onClick={aoAbrirCardapio}>Adicionar itens</Botao>
             {/* Rodada 12 (issue #14): sem botão morto. Ou ele envia, ou a
-                linha diz por que não; comanda vazia já se explica no papel. */}
-            {(podeGerar || envio.chave === 'vazia') ? (
+                linha diz por que não; comanda vazia já se explica no papel.
+                #1474 (R4): no modo API quem cria o pedido é a barra fixa ("Gerar cobrança e
+                enviar"); aqui só a linha que diz que a comanda vai junto. */}
+            {fonteApi && (podeGerar || envio.chave === 'vazia') ? (
+              <p className={css.situacaoEnvio}>{LINHA_COMANDA_VAI_JUNTO}</p>
+            ) : (podeGerar || envio.chave === 'vazia') ? (
               <Botao
                 largo variante="primario" icone="enviar" disabled={!podeGerar || enviando}
                 onClick={() => (pedido.meio ? enviar(pedido.meio) : setPedindoMeio(true))}
@@ -285,10 +300,6 @@ export function BlocoPedido({
         />
       )}
 
-      {/* F03: no modo API a janela é da vitrine, com data, e só se escolhe antes do envio. */}
-      {!fechado && fonteApi && !pedido.pedidoId && (
-        <SeletorJanelaApi pedido={pedido} editavel={editavel} aoEscolher={aoTrocarJanela} />
-      )}
       {!fechado && !fonteApi && (
         <SeletorJanela
           pedido={pedido}

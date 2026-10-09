@@ -64,6 +64,42 @@ public class CriarPedidoAtendimentoUseCaseTests
     }
 
     [Fact]
+    public async Task PedidoNasceComNomeTelefoneEAptoDoCliente()
+    {
+        // #1474 B4: sem o retrato do cliente, o KDS e as Entregas mostravam "Cliente sem nome".
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var empresaId = c.Storefront.EmpresaId;
+
+        var cliente = new Cliente
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria Souza", Telefone = "+5511999998888", Apt = "12B"
+        };
+        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true };
+        cliente.Enderecos.Add(endereco);
+        var clienteRepo = Substitute.For<IClienteRepository>();
+        clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
+
+        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
+        var conversaRepo = Substitute.For<IConversaRepository>();
+        conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, Substitute.For<IUnitOfWork>());
+
+        var reservado = await useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
+            EmpresaId: empresaId,
+            ConversaId: conversa.Id,
+            ClienteId: cliente.Id,
+            Itens: new List<ItemPedidoCheckout> { new(c.CardapioItemId, 1) },
+            JanelaId: c.JanelaId,
+            DataEntrega: c.DataEntrega,
+            EnderecoId: endereco.Id));
+
+        reservado.Pedido.ClienteNome.Should().Be("Maria Souza");
+        reservado.Pedido.ClienteTelefone.Should().Be("+5511999998888");
+        reservado.Pedido.ClienteApt.Should().Be("12B");
+    }
+
+    [Fact]
     public async Task ConversaDeOutroCliente_RecusaSemCriarPedido()
     {
         var c = new CheckoutCoreServiceTests.Cenario();
@@ -91,11 +127,44 @@ public class CriarPedidoAtendimentoUseCaseTests
             DataEntrega: c.DataEntrega,
             EnderecoId: endereco.Id));
 
-        await act.Should().ThrowAsync<RegraDeDominioVioladaException>();
+        var erro = await act.Should().ThrowAsync<RegraDeDominioVioladaException>();
+        // #1474: o console mostra o detail para a dona; nada de GUID na mensagem.
+        erro.Which.Message.Should().NotContain(cliente.Id.ToString()).And.NotContain(conversa.Id.ToString());
         await c.VagaRepo.DidNotReceiveWithAnyArgs().OcuparAsync(default, default, default, default);
         conversa.PedidoEmAndamentoId.Should().BeNull();
         await unitOfWork.DidNotReceive().CommitAsync();
     }
+    [Fact]
+    public async Task EnderecoDeOutroCliente_RecusaComTextoHumano()
+    {
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var empresaId = c.Storefront.EmpresaId;
+
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria" };
+        cliente.Enderecos.Add(new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true });
+        var clienteRepo = Substitute.For<IClienteRepository>();
+        clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
+
+        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
+        var conversaRepo = Substitute.For<IConversaRepository>();
+        conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, Substitute.For<IUnitOfWork>());
+        var enderecoAlheio = Guid.NewGuid();
+
+        var act = () => useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
+            EmpresaId: empresaId,
+            ConversaId: conversa.Id,
+            ClienteId: cliente.Id,
+            Itens: new List<ItemPedidoCheckout> { new(c.CardapioItemId, 1) },
+            JanelaId: c.JanelaId,
+            DataEntrega: c.DataEntrega,
+            EnderecoId: enderecoAlheio));
+
+        var erro = await act.Should().ThrowAsync<RegraDeDominioVioladaException>();
+        erro.Which.Message.Should().Contain("endereço").And.NotContain(enderecoAlheio.ToString());
+    }
+
     [Fact]
     public async Task JanelaAbaixoDoPrazoDaConfiguracao_Recusa()
     {

@@ -11,16 +11,19 @@
 // `dominio/pagamento.js: pagamentosDoPedido` já devolve) e o resumo do caixa
 // SOMA os dois mundos sem misturar os dados de um dentro do outro.
 
+import { moeda } from './formato.js'
 import { pagamentosDoPedido } from './pagamento.js'
 
 export const TIPOS_MOVIMENTO = {
   ABERTURA: 'abertura', ENTRADA: 'entrada', SAIDA: 'saida', FECHAMENTO: 'fechamento',
 }
 
-// Sugestões de categoria da saída (mapa EasyStok: "sangria e despesa são
-// `saida` com categoria diferente"). Texto livre por baixo: a dona pode
-// digitar outra categoria, estas três são só atalho de um toque.
-export const CATEGORIAS_SAIDA_SUGERIDAS = ['Sangria', 'Despesa', 'Suprimento']
+// Sugestões de categoria (mapa EasyStok: "sangria e despesa são `saida` com
+// categoria diferente"). Texto livre por baixo: a dona pode digitar outra
+// categoria, estas são só atalho de um toque. #1474: suprimento é reforço de
+// troco, dinheiro que ENTRA na gaveta; como saída ele subtraía da conta dela.
+export const CATEGORIAS_SAIDA_SUGERIDAS = ['Sangria', 'Despesa']
+export const CATEGORIAS_ENTRADA_SUGERIDAS = ['Suprimento']
 
 // Métodos de pagamento do CAIXA (mapa EasyStok, campo fechado, diferente do
 // meio da cobrança por conversa: pix/dinheiro/credito/debito/transferencia/outro).
@@ -295,4 +298,54 @@ export function fecharCaixaMovimento(resumo, contado, agora, autorNome) {
       diferenca: saldoContado - resumo.saldoEsperado,
     },
   }
+}
+
+// --- Caixa do dia no modo API: gaveta separada (#1474) ----------------------
+// O "saldo esperado" da API soma tudo que entrou no dia, Pix e cartão também. A dona
+// confere a GAVETA, então a conta dela é só dinheiro: saldo inicial + entradas em
+// dinheiro - saídas em dinheiro + pagamentos e vendas em dinheiro. Lançamento estornado
+// não conta. Movimento sem método é do caixa físico (nasceu antes de o método existir);
+// pagamento sem método fica fora da gaveta, porque ninguém sabe onde ele caiu.
+const centavos = (v) => Math.round((Number(v) || 0) * 100)
+const ehDinheiro = (meio, semMetodoEhDinheiro) => meio === 'dinheiro' || (meio == null && semMetodoEhDinheiro)
+const sinalDoMovimento = (tipo) => (tipo === TIPOS_MOVIMENTO.ENTRADA ? 1 : tipo === TIPOS_MOVIMENTO.SAIDA ? -1 : 0)
+
+export function gavetaDoDia(dia) {
+  let gaveta = centavos(dia?.saldoInicial)
+  let fora = 0
+  for (const m of dia?.movimentos ?? []) {
+    if (m.estornadoEm) continue
+    const valor = sinalDoMovimento(m.tipo) * centavos(m.valor)
+    if (ehDinheiro(m.meio, true)) gaveta += valor
+    else fora += valor
+  }
+  for (const l of dia?.linhasExtras ?? []) {
+    if (ehDinheiro(l.meio, false)) gaveta += centavos(l.valor)
+    else fora += centavos(l.valor)
+  }
+  return { naGaveta: gaveta / 100, pixECartao: fora / 100 }
+}
+
+// Lançamentos do dia numa lista só, na ordem da hora (movimentos e pagamentos vinham em
+// dois blocos e a sangria das 20:30 aparecia entre 20:18 e 20:28). DateTime sem fuso vem
+// da API em UTC: o Z completa antes de comparar.
+const instanteDe = (valor) => Date.parse(/[zZ]|[+-]\d{2}:\d{2}$/.test(valor ?? '') ? valor : `${valor}Z`)
+
+export function lancamentosEmOrdem(dia) {
+  const movimentos = (dia?.movimentos ?? [])
+    .filter((m) => m.tipo !== TIPOS_MOVIMENTO.FECHAMENTO)
+    .map((m) => ({ ...m, origemLinha: 'movimento' }))
+  const extras = (dia?.linhasExtras ?? []).map((l) => ({ ...l, origemLinha: 'extra' }))
+  return [...movimentos, ...extras].sort((a, b) => instanteDe(a.em) - instanteDe(b.em))
+}
+
+// Conferência da gaveta (#1474): o campo "contei" nasce vazio (`null`), porque nascer com o
+// esperado mostrava "bate certo" sem ninguém contar. Diferença dita do jeito que ela fala:
+// faltam, sobram ou bate certo. Até 5 reais de diferença é aviso; acima, perigo.
+export function conferenciaDaGaveta(centavosContados, esperado) {
+  if (centavosContados == null) return { pronta: false, texto: null, tom: 'neutro', diferenca: null }
+  const diferenca = (centavosContados - centavos(esperado)) / 100
+  if (diferenca === 0) return { pronta: true, texto: 'Bate certo', tom: 'ok', diferenca }
+  const texto = `${diferenca < 0 ? 'Faltam' : 'Sobram'} ${moeda(Math.abs(diferenca))}`
+  return { pronta: true, texto, tom: Math.abs(diferenca) <= 5 ? 'aviso' : 'perigo', diferenca }
 }

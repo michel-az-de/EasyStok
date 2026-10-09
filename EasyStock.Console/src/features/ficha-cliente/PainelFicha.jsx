@@ -7,7 +7,8 @@ import { conversaEncerrada, estaBloqueada } from '../../dominio/conversa'
 import { faltaPagar } from '../../dominio/cobranca'
 import { faixaDaJanela } from '../../dominio/entrega'
 import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
-import { numeroCurto } from '../../dominio/pedido'
+import { numeroDaComanda } from '../../dominio/pedido'
+import { motivoAntesDeCobrar } from '../../dominio/resumoPedido'
 import { BarraProximoPasso } from './BarraProximoPasso'
 import { BlocoCobranca } from './BlocoCobranca'
 import { BlocoCapturaAutomatica } from './BlocoCapturaAutomatica'
@@ -20,7 +21,7 @@ import css from './ficha.module.css'
 
 export function PainelFicha({ aoAbrirCardapio }) {
   const {
-    selecionada, visiveis, alertasEstoque, ultimoAvanco, agora, automaticoPausado,
+    selecionada, visiveis, alertasEstoque, ultimoAvanco, agora, automaticoPausado, fonteApi,
   } = useAtendimento()
   const {
     avancarEsteira, cadastrarEndereco, fecharAlerta,
@@ -28,7 +29,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
     gerarCobranca, reenviarCobranca, confirmarPagamento,
     marcarComprovante, aceitarDivergencia, escolherJanela, forcarEncaixe,
     cancelarPedido, marcarEstorno, abrirEncerramento, decidirAreaEntrega, escolherMeioPagamento,
-    alterarMeioPagamento, desfazerPagamento,
+    alterarMeioPagamento, desfazerPagamento, aprovarPedido,
   } = useAcoes()
   const { janelas, prefixosCepAtendidos } = useCatalogo()
 
@@ -53,6 +54,12 @@ export function PainelFicha({ aoAbrirCardapio }) {
   const faixa = faixaDaJanela(janelas, pedido?.janela)
   const avancoEm = ultimoAvanco?.conversaId === selecionada.id ? ultimoAvanco.em : null
   const primeiroNome = selecionada.nome.split(' ')[0]
+  const numero = pedido ? numeroDaComanda(pedido, { fonteApi }) : null
+  // #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que se resolve. A barra
+  // mostra o motivo e desabilita o botão em vez de deixar o EasyStok recusar depois.
+  const prerequisito = pedido
+    ? motivoAntesDeCobrar({ pedido, clienteId: selecionada.clienteId, endereco: cliente.endereco }, { fonteApi })
+    : null
 
   // Texto pronto que o cliente lê ao cancelar (mesmo padrão de ENVIAR_MIDIA e
   // GERAR_PEDIDO: o domínio não escreve copy, quem monta é a tela). Reusado
@@ -90,8 +97,10 @@ export function PainelFicha({ aoAbrirCardapio }) {
         {cliente.enderecoCapturado && !cliente.endereco && (
           <BlocoEnderecoCapturado
             endereco={cliente.enderecoCapturado}
-            situacaoArea={situacaoDoCep(cliente.enderecoCapturado, prefixosCepAtendidos)}
-            faixasDeDistancia={faixasDeDistancia(cliente.enderecoCapturado, prefixosCepAtendidos)}
+            // #1474 (R9): no modo API os prefixos de CEP são da demonstração; quem diz se o
+            // endereço está na área é o EasyStok, ao cadastrar (aviso "fora da área").
+            situacaoArea={fonteApi ? null : situacaoDoCep(cliente.enderecoCapturado, prefixosCepAtendidos)}
+            faixasDeDistancia={fonteApi ? null : faixasDeDistancia(cliente.enderecoCapturado, prefixosCepAtendidos)}
             aoConfirmar={() => cadastrarEndereco(selecionada.id)}
             aoDecidirArea={(decisao) => decidirAreaEntrega(selecionada.id, decisao, agora)}
           />
@@ -102,7 +111,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
         {pedido ? (
           <>
             {/* #1442: a comanda recolhe e lembra, como as seções do cliente. */}
-            <Bloco titulo="Comanda" chave="comanda" resumo={`Nº ${numeroCurto(pedido.numero)}`}>
+            <Bloco titulo="Comanda" chave="comanda" resumo={numero ? `Nº ${numero}` : 'Rascunho'}>
               <BlocoPedido
                 pedido={pedido}
                 editavel={editavel}
@@ -149,7 +158,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
               Nenhuma comanda aberta. O resumo e a cobrança nascem do pedido.
             </p>
             <Botao largo disabled={!editavel} onClick={aoAbrirCardapio}>
-              Abrir cardápio
+              Adicionar itens
             </Botao>
           </Bloco>
         )}
@@ -166,10 +175,12 @@ export function PainelFicha({ aoAbrirCardapio }) {
           agora={agora}
           nomeCliente={primeiroNome}
           bloqueado={estaBloqueada(selecionada)}
+          prerequisito={prerequisito}
           aoAvancar={(passo, entregador) => avancarEsteira(selecionada.id, passo, entregador)}
           aoDesfazer={() => desfazerEsteira(selecionada.id, ultimoAvanco.mensagemId, ultimoAvanco.posEntregaId)}
-          aoGerarPix={(meio) => { escolherMeioPagamento(selecionada.id, meio); gerarCobranca(selecionada.id, pedido, meio) }}
+          aoGerarPix={(meio) => { escolherMeioPagamento(selecionada.id, meio); return gerarCobranca(selecionada.id, pedido, meio) }}
           aoReenviarPix={(valorForcado) => reenviarCobranca(selecionada.id, pedido, valorForcado ?? null)}
+          aoAprovarPedido={aprovarPedido ? () => aprovarPedido(selecionada.id) : null}
           aoConfirmarPagamento={(valorPago, metodo) => confirmarPagamento(selecionada.id, valorPago ?? null, metodo)}
           aoAceitarDivergencia={() => aceitarDivergencia(selecionada.id)}
           aoCobrarDiferenca={() => reenviarCobranca(selecionada.id, pedido, faltaPagar(pedido.cobranca))}

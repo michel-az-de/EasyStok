@@ -22,8 +22,11 @@ export function totalDoPedido(pedido, cardapio) {
 // fixo aqui vira mentira assim que o pedido despachar sem a dona escolher
 // quem leva (`dominio/viagem.js: entregadorResolvido`, `dominio/esteira.js:
 // avisoDoPasso`).
+//
+// `janela` também nasce `null` (#1474): o 'j3' fixo virava "Janela 18h30 às 19h30" na comanda
+// sem ninguém ter escolhido janela nenhuma.
 export const novoPedido = (numero) => ({
-  numero, estado: 'aguardando', janela: 'j3', entregador: null, itens: [],
+  numero, estado: 'aguardando', janela: null, entregador: null, itens: [],
   agradecimentoEnviado: false, pagamentos: [],
 })
 
@@ -67,6 +70,13 @@ export const pedidoEncerrado = (pedido) =>
 // Número curto de quatro dígitos, o mesmo formato que a comanda e o canhoto
 // usam de relance (ex.: "2026-0186" vira "0186").
 export const numeroCurto = (numero) => String(numero).split('-').at(-1)
+
+// #1474 (R6): no modo API o número é o do EasyStok (8 letras, o mesmo da Cozinha e das
+// Entregas). Antes de o pedido existir não há número: o "0001" local seria inventado.
+export function numeroDaComanda(pedido, { fonteApi = false } = {}) {
+  if (pedido?.pedidoId) return numeroCurto(pedido.numero)
+  return fonteApi ? null : numeroCurto(pedido?.numero ?? '')
+}
 
 // Ordem fixa da linha de produção na cozinha: quem prepara na hora primeiro,
 // quem é para levar e finalizar em casa depois (QA2-19, conteúdo do canhoto).

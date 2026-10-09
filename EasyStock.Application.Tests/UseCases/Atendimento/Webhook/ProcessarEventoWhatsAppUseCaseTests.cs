@@ -17,6 +17,7 @@ using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Atendimento;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using ClienteEntity = EasyStock.Domain.Entities.Cliente;
 
 namespace EasyStock.Application.Tests.UseCases.Atendimento.Webhook;
@@ -43,6 +44,9 @@ public class ProcessarEventoWhatsAppUseCaseTests
     private readonly ICanalMensageria _canalWhatsApp = Substitute.For<ICanalMensageria>();
     private readonly INotificadorService _notificador = Substitute.For<INotificadorService>();
     private readonly IPublicadorEventoIntegracao _publicadorEventos = Substitute.For<IPublicadorEventoIntegracao>();
+    private readonly IExpedienteLojaRepository _expedientes = Substitute.For<IExpedienteLojaRepository>();
+    // 12:00 em São Paulo: dentro do expediente padrão (08–22 h); quem testa loja fechada muda o relógio.
+    private readonly FakeTimeProvider _relogio = new(new DateTimeOffset(2026, 10, 8, 15, 0, 0, TimeSpan.Zero));
     private readonly Guid _empresaId = Guid.NewGuid();
     private readonly ProcessarEventoWhatsAppUseCase _useCase;
 
@@ -70,6 +74,8 @@ public class ProcessarEventoWhatsAppUseCaseTests
             new OptOutPorPalavra(_consentimentoRepository, _conversaRepository, new ResolvedorCanal([_canalWhatsApp]),
                 _unitOfWork, NullLogger<OptOutPorPalavra>.Instance),
             new EscalarConversaUseCase(_conversaRepository, _notificador, _eventPublisher),
+            _expedientes,
+            _relogio,
             NullLogger<ProcessarEventoWhatsAppUseCase>.Instance,
             _publicadorEventos,
             transcritor);
@@ -441,6 +447,59 @@ public class ProcessarEventoWhatsAppUseCaseTests
 
         await _clienteRepository.Received(1).AddAsync(Arg.Is<ClienteEntity>(c => c.Nome == "Fulano" && c.OrderCount == 0));
         textoSaudacao.Should().StartWith(ConfiguracaoAtendimento.CriarPadrao(_empresaId).SaudacaoPrimeiroContato.Split('{')[0]);
+    }
+
+    [Fact]
+    public async Task PrimeiraMensagemForaDoHorarioMandaOAvisoDoExpedienteNoLugarDaSaudacao()
+    {
+        // #1474 B3: 00:00 em São Paulo, expediente das 08 às 22 h. A frase de espera ("já te ajudo") prometeria
+        // uma resposta que não vem; sai o aviso do expediente, com {abre} preenchido.
+        _relogio.SetUtcNow(new DateTimeOffset(2026, 10, 9, 3, 0, 0, TimeSpan.Zero));
+        var expediente = ExpedienteLoja.CriarPadrao(_empresaId);
+        _expedientes.GetByEmpresaIdAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(expediente);
+        string? enviado = null;
+        _cloudClient.EnviarTextoAsync(ContatoWaId, Arg.Do<string>(t => enviado = t), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new EnvioWhatsAppResult("wamid.expediente"));
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.madrugada", "Oi"));
+
+        enviado.Should().Be(expediente.MensagemParaCliente(_relogio.GetUtcNow().UtcDateTime))
+            .And.Contain("hoje às 08:00")
+            .And.NotContain(ConfiguracaoAtendimento.CriarPadrao(_empresaId).FraseEspera);
+        await _conversaRepository.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Autor == AutorMensagem.Sistema && m.ExternoId == "wamid.expediente" && m.Texto == enviado),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PrimeiraMensagemComALojaFechadaNaMaoMandaOAvisoDeLojaFechada()
+    {
+        var expediente = ExpedienteLoja.CriarPadrao(_empresaId);
+        expediente.DefinirControle(EasyStock.Domain.Enums.Storefront.ControleManualLoja.ForcarFechada, null, DateTime.UtcNow);
+        _expedientes.GetByEmpresaIdAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(expediente);
+        string? enviado = null;
+        _cloudClient.EnviarTextoAsync(ContatoWaId, Arg.Do<string>(t => enviado = t), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new EnvioWhatsAppResult("wamid.fechada"));
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.fechada-na-mao", "Oi"));
+
+        enviado.Should().Be(expediente.MensagemLojaFechada);
+    }
+
+    [Fact]
+    public async Task PrimeiraMensagemComALojaAbertaMandaASaudacao()
+    {
+        _expedientes.GetByEmpresaIdAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(ExpedienteLoja.CriarPadrao(_empresaId));
+        string? enviado = null;
+        _cloudClient.EnviarTextoAsync(ContatoWaId, Arg.Do<string>(t => enviado = t), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new EnvioWhatsAppResult("wamid.saudacao"));
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.meio-dia", "Oi"));
+
+        var padrao = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        enviado.Should().StartWith(padrao.SaudacaoPrimeiroContato.Split('{')[0])
+            .And.Contain("/cardapio")
+            .And.EndWith(padrao.FraseEspera);
     }
 
     [Fact]

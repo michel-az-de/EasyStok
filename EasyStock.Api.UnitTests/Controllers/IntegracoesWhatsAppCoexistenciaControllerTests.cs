@@ -44,7 +44,8 @@ public class IntegracoesWhatsAppCoexistenciaControllerTests
 
     private static IntegracoesWhatsAppController Controller(
         MetaCloudWhatsAppOptions? meta = null, ICurrentUserAccessor? usuario = null, Dictionary<string, string?>? config = null) =>
-        new(new ObterStatusIntegracaoWhatsAppUseCase(Substitute.For<ITenantFeatureFlagRepository>(), Substitute.For<IEmpresaRepository>()),
+        new(new ObterStatusIntegracaoWhatsAppUseCase(Substitute.For<ITenantFeatureFlagRepository>(), Substitute.For<IEmpresaRepository>(),
+                Substitute.For<IConfiguracaoAtendimentoRepository>()),
             Options.Create(meta ?? new MetaCloudWhatsAppOptions()),
             new ConfigurationBuilder().AddInMemoryCollection(config ?? []).Build(),
             usuario ?? Substitute.For<ICurrentUserAccessor>());

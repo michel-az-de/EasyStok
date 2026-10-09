@@ -202,9 +202,9 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
         </p>
       ) : (
         <div className={css.faixaNumeros}>
-          <div><b>{cliente.desde}</b><span>Cliente desde</span></div>
+          {cliente.desde && <div><b>{cliente.desde}</b><span>Cliente desde</span></div>}
           <div><b>{cliente.pedidos}</b><span>{cliente.pedidos === 1 ? 'pedido' : 'pedidos'}</span></div>
-          <div><b>{moeda(financeiro.total)}</b><span>gastos</span></div>
+          <div><b>{moeda(financeiro.total)}</b><span>total comprado</span></div>
           <div><b>{moeda(financeiro.ticketMedio)}</b><span>Ticket médio</span></div>
         </div>
       )}

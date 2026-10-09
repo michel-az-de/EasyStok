@@ -19,6 +19,7 @@ import { envioBloqueado } from '../dominio/janela'
 import { ORIGENS } from '../dominio/lembrete'
 import { dataHora, mesPorExtenso, moeda } from '../dominio/formato'
 import { faixaParaCliente, janelaPorId } from '../dominio/entrega'
+import { legendaDoItem } from '../dominio/vitrineCardapio'
 import {
   TEXTO_DE_CONFERENCIA, aceitarDivergencia, aplicarPagamento, cancelarCobranca, criarCobranca,
   estornarCobranca, liberaEsteira, marcarComprovante, reemitirCobranca, textoDaCobranca,
@@ -248,17 +249,22 @@ const CASOS_API = {
         mescladas.map((c) => [c.id, c.pausaApi ?? false]),
       ),
       // O aviso de ação recusada fica até a dona fechar (F06): o ciclo de 5 s não o apaga.
-      sincronizacao: { estado: 'ok', mensagem: null, em: Date.now(), aviso: estado.sincronizacao?.aviso ?? null },
+      sincronizacao: {
+        estado: 'ok', mensagem: null, em: Date.now(),
+        aviso: estado.sincronizacao?.aviso ?? null, avisoFixo: estado.sincronizacao?.avisoFixo ?? null,
+      },
     }
   },
 
   // #1276: cliente da conversa como o EasyStok tem (cadastro pelo console ou dossiê ao abrir).
-  [acao.CLIENTE_DA_API]: (estado, { id, clienteId, nome, cliente }) =>
+  [acao.CLIENTE_DA_API]: (estado, { id, clienteId, nome, cliente, bloqueio }) =>
     mapear(estado, id, (c) => ({
       ...c,
       clienteId,
       conta: 'cliente',
       nome: nome || c.nome,
+      // #1474: o bloqueio do cadastro vem do dossiê; sem o campo, fica o que estava.
+      bloqueio: bloqueio === undefined ? c.bloqueio : bloqueio,
       cliente: { ...c.cliente, ...cliente, enderecoCapturado: null, daApi: true },
     })),
 
@@ -294,11 +300,17 @@ const CASOS_API = {
       }),
     })),
 
-  [acao.AVISO_API]: (estado, { mensagem }) => ({
-    ...estado, sincronizacao: { ...estado.sincronizacao, aviso: mensagem },
+  // #1474: aviso de configuração (loja online desligada) é `persistente` e mora em `avisoFixo`:
+  // só sai quando a dona fecha (`fixo: true`). A limpeza automática (trocar de tela, ação que
+  // deu certo) apaga só o aviso de ação, que é o `aviso`.
+  [acao.AVISO_API]: (estado, { mensagem, persistente }) => ({
+    ...estado,
+    sincronizacao: { ...estado.sincronizacao, ...(persistente ? { avisoFixo: mensagem } : { aviso: mensagem }) },
   }),
 
-  [acao.FECHAR_AVISO_API]: (estado) => ({
+  [acao.FECHAR_AVISO_API]: (estado, { fixo } = {}) => (fixo ? {
+    ...estado, sincronizacao: { ...estado.sincronizacao, aviso: null, avisoFixo: null },
+  } : {
     ...estado, sincronizacao: { ...estado.sincronizacao, aviso: null },
   }),
 
@@ -310,7 +322,7 @@ const CASOS_API = {
       ...estado.catalogo, cardapio, adicionais: {},
       galeria: cardapio.flatMap((item) => (item.fotos ?? []).map((foto, indice) => ({
         id: `${item.sku}-foto-${indice}`, nome: item.nome,
-        descricao: `${item.porcao} · Foto ${indice + 1}`, foto, doCardapio: true,
+        descricao: `${item.porcao} · Foto ${indice + 1}`, legenda: legendaDoItem(item), foto, doCardapio: true,
         cardapioItemId: item.sku, indice,
       }))),
     },

@@ -58,21 +58,21 @@ public sealed class CriarPedidoAtendimentoUseCase(
         ArgumentNullException.ThrowIfNull(input);
 
         var conversa = await conversaRepository.ObterPorIdAsync(input.EmpresaId, input.ConversaId, ct)
-            ?? throw new RegraDeDominioVioladaException($"Conversa {input.ConversaId} não encontrada.");
+            ?? throw new RegraDeDominioVioladaException("Conversa não encontrada. Atualize a tela e tente de novo.");
 
         if (conversa.ClienteId != input.ClienteId)
             throw new RegraDeDominioVioladaException(
-                $"Cliente {input.ClienteId} não é o cliente vinculado à conversa {input.ConversaId}.");
+                "O cliente escolhido não é o cliente desta conversa.");
 
         var cliente = await clienteRepository.GetByIdWithDetailsAsync(input.EmpresaId, input.ClienteId)
-            ?? throw new RegraDeDominioVioladaException($"Cliente {input.ClienteId} não encontrado.");
+            ?? throw new RegraDeDominioVioladaException("Cliente não encontrado. Atualize a tela e tente de novo.");
 
         // S24: bloqueio vale em todos os canais; nada de vaga ocupada nem pedido.
         if (cliente.Bloqueado)
             throw new ClienteBloqueadoException(cliente.Id);
 
         var endereco = cliente.Enderecos.FirstOrDefault(e => e.Id == input.EnderecoId)
-            ?? throw new RegraDeDominioVioladaException($"Endereço {input.EnderecoId} não pertence ao cliente.");
+            ?? throw new RegraDeDominioVioladaException("O endereço escolhido não é deste cliente. Escolha um endereço do cadastro dele.");
 
         var configuracao = await configuracaoRepository.GetOrDefaultAsync(input.EmpresaId);
 
@@ -114,6 +114,12 @@ public sealed class CriarPedidoAtendimentoUseCase(
                 Prazo: new PrazoPreparoCheckout(configuracao.TempoPreparoPadraoMinutos, configuracao.RespiroMinutos),
                 Numero: endereco.Numero),
             ct);
+
+        // Retrato do cliente, como o Pedido.Criar e o checkout guest gravam: sem ele o KDS e as Entregas
+        // mostram "Cliente sem nome" (#1474).
+        reservado.Pedido.ClienteNome = cliente.Nome;
+        reservado.Pedido.ClienteTelefone = cliente.Telefone;
+        reservado.Pedido.ClienteApt = cliente.Apt;
 
         // S14: a dona liberou o lead fora de área; pago, o pedido espera por ela (S12/S13), não vai para a cozinha.
         if (ContextoConversaJson.Ler<bool>(conversa, ContextoConversaJson.ForaDeAreaLiberado))

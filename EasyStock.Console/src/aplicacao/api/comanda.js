@@ -1,37 +1,37 @@
 import * as acao from '../acoes'
 import {
-  FORMA_ONLINE, corpoDoPedido, formaDoMeio, gerarPedido, janelaDoId, listarJanelas, obterPedido, pedidoDaApi,
-  reemitirCobranca, trocarFormaPagamento, registrarPagamentoManual, desfazerPagamentoManual,
+  FORMA_NA_ENTREGA, FORMA_ONLINE, corpoDoPedido, formaDoMeio, gerarPedido, janelaDoId, listarJanelas, obterPedido, pedidoDaApi,
+  reemitirCobranca, trocarFormaPagamento, registrarPagamentoManual, desfazerPagamentoManual, STATUS_DO_PASSO,
 } from '../../infra/api/comandaApi'
+import { mudarStatusKds } from '../../infra/api/kdsApi'
+import { aprovarPedido as aprovarPedidoApi } from '../../infra/api/entregasApi'
+import { MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, baixaCancelaCobrancaOnline, baixaEsperaAprovacao } from '../../dominio/cobranca'
+import { SO_NO_EASYSTOK } from './naoLigadas'
 
 // Comanda e cobrança no modo API (F03, S10/S11). Montar a comanda (itens, observação,
-// janela, meio) continua local até o envio; "Enviar ao cliente" cria o pedido no EasyStok,
-// que cobra pelo Mercado Pago e manda o resumo com o link pela conversa. Depois disso o
-// pedido é do EasyStok: a polling traz pago, expirado e o resto da esteira.
+// janela, meio) continua local até o envio; "Gerar cobrança e enviar" cria o pedido no
+// EasyStok, que cobra pelo Mercado Pago e manda o resumo com o link pela conversa. Depois
+// disso o pedido é do EasyStok: a polling traz pago, expirado e o resto da esteira.
 //
-// O que ainda não está ligado (estorno, cancelar, esteira, reenvio avulso) não
-// mexe na memória do navegador com pedido já criado: avisa e deixa como está, para a tela
-// nunca mostrar um estado que o EasyStok não tem.
+// A esteira (#1474) anda pelo mesmo PATCH da Cozinha; o aviso ao cliente sai do EasyStok.
+// O que ainda não está ligado (estorno, cancelar, voltar etapa, comprovante) não mexe na
+// memória do navegador com pedido já criado: avisa e deixa como está, e a Ficha nem mostra
+// o botão (`acaoDisponivel`).
 //
 // Sem pedido criado (#1271) vale o mesmo: só a comanda é rascunho local. Gerar ou reenviar a
 // cobrança cria o pedido (o EasyStok cobra e manda o resumo); pagamento e esteira avisam,
 // porque um rascunho "Pago" ou "Em preparo" nunca chega à cozinha.
 const NAO_LIGADO = 'ainda não está ligado ao EasyStok (F04 em diante). Use o EasyStok para isso.'
 const SEM_PEDIDO = 'o pedido ainda não está no EasyStok. Gere a cobrança ou envie ao cliente primeiro.'
+const LINK_CANCELADO_ESPERA_APROVACAO = 'O link foi cancelado e o pedido agora espera aprovação. '
+  + 'Use "Aprovar pedido" na Ficha e registre o pagamento de novo.'
 
 const EDITA_COMANDA = ['adicionarItem', 'removerItem', 'ajustarQuantidade', 'ajustarObservacao', 'escolherJanela', 'forcarEncaixe']
-const SO_NO_EASYSTOK = {
-  marcarComprovante: 'Comprovante',
-  aceitarDivergencia: 'Aceitar diferença',
-  marcarEstorno: 'Estorno',
-  cancelarPedido: 'Cancelar pedido',
-  avancarEsteira: 'Avançar a esteira',
-  corrigirPasso: 'Voltar a etapa',
-  desfazerEsteira: 'Desfazer a etapa',
-}
 
 export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   const avisar = (mensagem) => despachar({ tipo: acao.AVISO_API, mensagem })
+  // #1474: o aviso de uma tentativa que falhou some quando a ação seguinte dá certo.
+  const limparAviso = () => despachar({ tipo: acao.FECHAR_AVISO_API })
   const pedidoDe = (id) => estadoRef.current.conversas.find((c) => c.id === id)?.pedido ?? null
   const pedidoCriado = (id) => pedidoDe(id)?.pedidoId ?? null
 
@@ -39,6 +39,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   async function recarregar(id) {
     const pedido = pedidoDaApi(await obterPedido(id), pedidoDe(id))
     if (pedido) despachar({ tipo: acao.SINCRONIZAR_PEDIDO, id, pedido })
+    return pedido
   }
 
   // Uma ida ao EasyStok por conversa (#1287): o segundo clique com a primeira em voo
@@ -54,7 +55,11 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   }
 
   const soSemPedidoCriado = (nome) => (id, ...resto) => {
-    if (!pedidoCriado(id)) return acoes[nome](id, ...resto)
+    if (!pedidoCriado(id)) {
+      // Escolher a janela resolve o "Escolha a janela de entrega" que ficou na faixa (#1474).
+      if (nome === 'escolherJanela') limparAviso()
+      return acoes[nome](id, ...resto)
+    }
     avisar('Comanda: o pedido já está no EasyStok e não muda por aqui.')
     return undefined
   }
@@ -69,7 +74,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
     despachar({ tipo: acao.ESCOLHER_MEIO_PAGAMENTO, id, meio })
     // Falhou: o meio local já mudou, então volta ao que o EasyStok tem (F07, item 5).
     return trocarFormaPagamento(pedidoId, formaDoMeio(meio))
-      .then(() => recarregar(id))
+      .then(() => { limparAviso(); return recarregar(id) })
       .catch((erro) => {
         avisar(`Forma de pagamento: ${erro.message}`)
         return recarregar(id).catch(() => {})
@@ -98,6 +103,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
           faltas.push('o resumo não saiu ao cliente (conversa fora da janela de 24 h ou canal fora do ar)')
         }
         const aviso = faltas.length > 0 ? `Pedido criado no EasyStok, mas ${faltas.join('; e ')}.` : null
+        limparAviso()
         if (aviso) avisar(aviso)
         return recarregar(id).catch(() => avisar(aviso ? `${aviso} Atualizando a tela…` : 'Pedido criado no EasyStok, atualizando a tela…'))
       },
@@ -107,7 +113,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
 
   // Pedido criado sem link (Mercado Pago fora na hora): a operadora pede a emissão (S11).
   const reemitir = (id) => umaPorConversa(id, () => reemitirCobranca(pedidoCriado(id)).then(
-    () => recarregar(id).catch(() => {}),
+    () => { limparAviso(); return recarregar(id).catch(() => {}) },
     (erro) => avisar(`Cobrança: ${erro.message}`),
   ))
 
@@ -122,18 +128,71 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
     return undefined
   }
 
+  // #1474: com o link do Mercado Pago pendente o EasyStok recusa a baixa à mão (pedido ainda
+  // pré-operacional). Primeiro a forma vira "na entrega" (cancela o link, o pedido entra na
+  // fila), depois o recebido é registrado. A tela já avisou a dona antes de confirmar.
   const receber = (id, valor, metodo) => {
-    if (!pedidoCriado(id)) return soNoEasyStok('Receber pagamento')(id)
+    const pedidoId = pedidoCriado(id)
+    if (!pedidoId) return soNoEasyStok('Receber pagamento')(id)
     if (!metodo) { avisar('Selecione como recebeu o pagamento.'); return undefined }
-    return umaPorConversa(id, () => registrarPagamentoManual(pedidoCriado(id), valor, metodo).then(
-      () => recarregar(id).catch(() => avisar('Pagamento registrado. Atualizando a tela…')),
-      (erro) => avisar(`Pagamento não registrado: ${erro.message}`),
+    // #1474 (R8): pedido que exige aprovação (fora da área liberado) é pré-operacional até a
+    // dona aprovar; o EasyStok recusaria a baixa. Nada sai antes disso.
+    if (baixaEsperaAprovacao(pedidoDe(id))) {
+      avisar(MOTIVO_BAIXA_SEM_APROVACAO)
+      return Promise.resolve({ erro: MOTIVO_BAIXA_SEM_APROVACAO })
+    }
+    const cancelarLink = baixaCancelaCobrancaOnline(pedidoDe(id))
+    return umaPorConversa(id, () => (cancelarLink ? trocarFormaPagamento(pedidoId, FORMA_NA_ENTREGA) : Promise.resolve())
+      .then(() => registrarPagamentoManual(pedidoId, valor, metodo))
+      .then(
+        () => {
+          limparAviso()
+          return recarregar(id).catch(() => avisar('Pagamento registrado. Atualizando a tela…'))
+        },
+        (erro) => {
+          const naoRegistrado = `Pagamento não registrado: ${erro.message}`
+          if (!cancelarLink) { avisar(naoRegistrado); return undefined }
+          // O link pode já ter sido cancelado: a tela mostra o pedido como o EasyStok ficou. Sem
+          // o `requerAprovacao` no pedido da conversa, só depois da troca se sabe que ele passou
+          // a esperar aprovação; o aviso diz o próximo passo em vez do erro cru.
+          return recarregar(id)
+            .then((atual) => avisar(aguardaAprovacao(atual) ? LINK_CANCELADO_ESPERA_APROVACAO : naoRegistrado))
+            .catch(() => avisar(naoRegistrado))
+        },
+      ))
+  }
+
+  // #1474 (R1): a esteira da Ficha anda pelo mesmo PATCH da Cozinha (máquina de estados da
+  // API). O aviso ao cliente em preparo, saída e entrega sai do EasyStok. O erro volta para a
+  // barra mostrar ao lado do botão; nada muda na tela até a API responder.
+  const avancar = (id, passo) => {
+    const pedidoId = pedidoCriado(id)
+    if (!pedidoId) return soNoEasyStok('Avançar a esteira')(id)
+    const status = STATUS_DO_PASSO[passo]
+    if (!status) return Promise.resolve({ erro: 'Esta etapa não se marca pela Ficha.' })
+    return umaPorConversa(id, () => mudarStatusKds(pedidoId, status).then(
+      () => { limparAviso(); return recarregar(id).then(() => undefined, () => undefined) },
+      (erro) => ({ erro: erro.message }),
+    ))
+  }
+
+  // #1474 (R8): pedido fora da área liberado espera a aprovação da dona antes da fila e da
+  // baixa à mão. Mesmo endpoint da gaveta Entregas.
+  const aprovar = (id) => {
+    const pedidoId = pedidoCriado(id)
+    if (!pedidoId) return soNoEasyStok('Aprovar pedido')(id)
+    return umaPorConversa(id, () => aprovarPedidoApi(pedidoId).then(
+      () => { limparAviso(); return recarregar(id).then(() => undefined, () => undefined) },
+      (erro) => {
+        avisar(`Pedido não aprovado: ${erro.message}`)
+        return { erro: erro.message }
+      },
     ))
   }
   const desfazer = (id, motivo) => {
     if (!pedidoCriado(id)) return soNoEasyStok('Desfazer pagamento')(id)
     return umaPorConversa(id, () => desfazerPagamentoManual(pedidoCriado(id), motivo).then(
-      () => recarregar(id).catch(() => avisar('Pagamento desfeito. Atualizando a tela…')),
+      () => { limparAviso(); return recarregar(id).catch(() => avisar('Pagamento desfeito. Atualizando a tela…')) },
       (erro) => avisar(`Pagamento não desfeito: ${erro.message}`),
     ))
   }
@@ -141,6 +200,8 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   return {
     confirmarPagamento: receber,
     desfazerPagamento: desfazer,
+    avancarEsteira: avancar,
+    aprovarPedido: aprovar,
     ...Object.fromEntries(EDITA_COMANDA.map((nome) => [nome, soSemPedidoCriado(nome)])),
     ...Object.fromEntries(Object.entries(SO_NO_EASYSTOK).map(([nome, rotulo]) => [nome, soNoEasyStok(rotulo)])),
 

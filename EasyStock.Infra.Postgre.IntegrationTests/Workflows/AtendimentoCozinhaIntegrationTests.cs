@@ -92,7 +92,8 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         card.Id.Should().Be(pedidoId);
         card.Status.Should().Be("aguardando");
         card.InicioPrevistoEm.Should().NotBeNull();
-        card.Itens.Should().Contain(i => i.Nome == "brigadeiro" && i.Qtd == 2 && i.Observacao == "Sem molho");
+        // #1474: a cozinha mostra o nome como no cardápio (o avulso é gravado minúsculo).
+        card.Itens.Should().Contain(i => i.Nome == "Brigadeiro" && i.Qtd == 2 && i.Observacao == "Sem molho");
         (await LerFilaAsync(provider, cenario with { EmpresaId = Guid.NewGuid() })).Should().BeEmpty();
 
         // Uma nova requisição não pode criar um segundo pedido ou uma segunda vaga na mesma conversa.

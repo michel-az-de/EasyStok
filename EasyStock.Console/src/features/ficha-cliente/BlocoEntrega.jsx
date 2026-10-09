@@ -17,21 +17,27 @@ export function BlocoEntrega({ conversa }) {
   if (!pedido || !PASSOS_COM_ENTREGA.has(pedido.estado)) return null
   const registro = registroDaEntrega(conversa)
   const quem = registro?.entregador ?? entregadorResolvido(pedido)
+  // #1474 (R6): pedido do EasyStok tem um número só, o da Cozinha e das Entregas. Quem leva é
+  // decidido na viagem (gaveta Entregas), não no despacho da Ficha.
+  const doEasyStok = Boolean(pedido.pedidoId)
+  const numero = doEasyStok
+    ? numeroParaEntregador(pedido)
+    : `${numeroParaEntregador(pedido)} (comanda ${numeroCurto(pedido.numero)} é interna)`
 
   return (
     <Bloco titulo="Entrega">
       <ListaDados
         itens={[
-          { rotulo: 'Pedido para o entregador', valor: `${numeroParaEntregador(pedido)} (comanda ${numeroCurto(pedido.numero)} é interna)` },
+          { rotulo: 'Pedido para o entregador', valor: numero },
           {
             rotulo: pedido.estado === 'entregue' ? 'Quem levou' : 'Quem leva',
-            valor: textoDoEntregador(quem) ?? 'A definir no despacho',
+            valor: textoDoEntregador(quem) ?? (doEasyStok ? 'Definido na viagem, em Entregas' : 'A definir no despacho'),
           },
           { rotulo: 'Saiu', valor: registro?.saiuEm ? horaCurta(registro.saiuEm) : null },
           { rotulo: 'Entregue', valor: registro?.entregueEm ? horaCurta(registro.entregueEm) : null },
         ]}
       />
-      {!quem && pedido.estado === 'embalado' && (
+      {!quem && !doEasyStok && pedido.estado === 'embalado' && (
         <p className={css.corpoBloco}>Quem leva é perguntado no despacho, com veículo e placa.</p>
       )}
     </Bloco>

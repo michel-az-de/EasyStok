@@ -15,15 +15,16 @@ const ROTULO_DO_FORMATO = {
 // dona, nada quando foi o cliente. Devolve `{ prefixo, corpo }` em vez de uma
 // string só porque só o prefixo é 600 (seção 1); quem monta o texto plano
 // (título, aria-label) faz `prefixo + corpo`.
+//
+// #1474 (R11): nota de sistema ("escalado para a dona", "retomado pelo usuário") é evento da
+// conversa, não fala. A prévia mostra a última mensagem do cliente ou da loja.
 export function previaDaConversa(conversa) {
-  const ultima = conversa.mensagens.at(-1)
+  const ultima = conversa.mensagens.findLast((m) => m.dir !== 'sistema')
   // Modo API: conversa encerrada não carrega mensagens na inbox; o resumo traz o texto (#1287).
   if (!ultima) return { prefixo: '', corpo: conversa.ultimaMensagemTexto || 'Sem mensagens' }
-  const prefixo = ultima.dir === 'sistema'
-    ? 'Sistema: '
-    : ultima.dir === 'out'
-      ? (ultima.automatica ? 'Automático: ' : 'Você: ')
-      : ''
+  const prefixo = ultima.dir === 'out'
+    ? (ultima.automatica ? 'Automático: ' : 'Você: ')
+    : ''
   return { prefixo, corpo: ROTULO_DO_FORMATO[ultima.formato] ?? ultima.texto }
 }
 

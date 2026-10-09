@@ -166,6 +166,7 @@ public class CheckoutCoreServiceTests
         reservado.Pedido.Total.Valor.Should().Be(25m); // 2 x 10 + frete 5
         reservado.Total.Should().Be(25m);
         reservado.Storefront.Should().BeSameAs(c.Storefront);
+        reservado.Janela!.Id.Should().Be(JanelaId, "o resumo ao cliente mostra o horário da janela (#1474)");
 
         reservado.Itens.Should().ContainSingle();
         var item = reservado.Itens[0];
@@ -189,7 +190,9 @@ public class CheckoutCoreServiceTests
 
         var act = () => c.Servico().CriarPedidoComReservaAsync(Input(c));
 
-        await act.Should().ThrowAsync<JanelaSemVagasException>();
+        var erro = await act.Should().ThrowAsync<JanelaSemVagasException>();
+        erro.Which.Message.Should().Contain("Manhã 9-12h").And.Contain("02/06/2026")
+            .And.NotContain(JanelaId.ToString(), "o console mostra o detail para a dona (#1474)");
         var pedido = c.PedidosAdicionados.Should().ContainSingle().Subject;
         pedido.Status.Should().Be(StatusPedidoMapper.Cancelado);
         pedido.CanceladoEm.Should().NotBeNull();
@@ -262,8 +265,10 @@ public class CheckoutCoreServiceTests
 
         var act = () => c.Servico().CriarPedidoComReservaAsync(Input(c));
 
-        await act.Should().ThrowAsync<RegraDeDominioVioladaException>()
-            .WithMessage($"*{CardapioItemId}*indisponível*");
+        // #1474: o console mostra o detail do erro para a dona; nada de GUID, o nome do item.
+        var erro = await act.Should().ThrowAsync<RegraDeDominioVioladaException>();
+        erro.Which.Message.Should().Contain("Brigadeiro").And.Contain("indisponível")
+            .And.NotContain(CardapioItemId.ToString());
         c.PedidosAdicionados.Should().BeEmpty("item esgotado não pode virar pedido");
         await c.VagaRepo.DidNotReceive().OcuparAsync(
             Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
@@ -312,5 +317,53 @@ public class CheckoutCoreServiceTests
 
         reservado.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
         reservado.ItemFrete.PrecoUnitario.Should().Be(15m);
+    }
+
+    // ── #1474: mensagens que chegam à dona pelo detail do erro, sem GUID ──────────────
+
+    [Fact]
+    public void QuantidadeInvalida_NaoMostraOIdDoItem()
+    {
+        var act = () => CheckoutCoreService.ValidarEntrada(Cep, new List<(Guid, int)> { (CardapioItemId, 0) });
+
+        act.Should().Throw<RegraDeDominioVioladaException>()
+            .Which.Message.Should().Contain("quantidade").And.NotContain(CardapioItemId.ToString());
+    }
+
+    [Fact]
+    public async Task ItemForaDoCardapio_NaoMostraOId()
+    {
+        var c = new Cenario();
+        c.CardapioRepo.GetByIdAsync(c.Storefront.Id, CardapioItemId, Arg.Any<CancellationToken>())
+            .Returns((CardapioItem?)null);
+
+        var act = () => c.Servico().CriarPedidoComReservaAsync(Input(c));
+
+        var erro = await act.Should().ThrowAsync<RegraDeDominioVioladaException>();
+        erro.Which.Message.Should().Contain("cardápio").And.NotContain(CardapioItemId.ToString());
+    }
+
+    [Fact]
+    public async Task JanelaInexistente_DizQueNaoEstaMaisDisponivelSemId()
+    {
+        var c = new Cenario();
+        c.JanelaRepo.GetByIdAsync(JanelaId, Arg.Any<CancellationToken>()).Returns((JanelaEntrega?)null);
+
+        var act = () => c.Servico().CriarPedidoComReservaAsync(Input(c));
+
+        var erro = await act.Should().ThrowAsync<RegraDeDominioVioladaException>();
+        erro.Which.Message.Should().Contain("não está mais disponível").And.NotContain(JanelaId.ToString());
+    }
+
+    [Fact]
+    public async Task JanelaDeOutroDia_UsaORotuloDaJanelaSemId()
+    {
+        var c = new Cenario();
+        var input = Input(c) with { DataEntrega = DataEntrega.AddDays(1) };
+
+        var act = () => c.Servico().CriarPedidoComReservaAsync(input);
+
+        var erro = await act.Should().ThrowAsync<RegraDeDominioVioladaException>();
+        erro.Which.Message.Should().Contain("Manhã 9-12h").And.NotContain(JanelaId.ToString());
     }
 }

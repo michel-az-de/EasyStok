@@ -4,6 +4,8 @@ import {
 } from '../infra/api/conversasApi'
 import { mensagemDaApi, naoEntregueDaApi } from '../infra/api/traducaoConversas'
 import { proximoId } from '../infra/repositorioConversas'
+import { avisoDeVariaveisNaoResolvidas } from '../dominio/respostas'
+import { deveCarregarDossie } from './planoDeSincronizacao'
 import { criarAcoesExpedienteApi } from './api/expediente'
 import { criarAcoesCaixaApi } from './api/caixa'
 import { criarAcoesConfiguracaoApi } from './api/configuracao'
@@ -53,7 +55,8 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     ...acoes,
     ...criarAvisosNaoLigadas(despachar),
     ...criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio }),
-    fecharAvisoApi: () => despachar({ tipo: acao.FECHAR_AVISO_API }),
+    // #1474: sem `fixo`, fecha só o aviso de ação; o persistente (configuração) só com `fixo: true`.
+    fecharAvisoApi: ({ fixo = false } = {}) => despachar({ tipo: acao.FECHAR_AVISO_API, fixo }),
     ...criarAcoesExpedienteApi({ despachar, estadoRef }),
     ...criarAcoesCaixaApi(),
     ...criarAcoesConfiguracaoApi(),
@@ -75,6 +78,12 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
       const naoLigado = envioNaoLigado(opcoes)
       if (naoLigado) {
         despachar({ tipo: acao.AVISO_API, mensagem: textoNaoLigado(naoLigado) })
+        return
+      }
+      // #1474: defesa em profundidade do composer. Variável sem valor não sai literal ao cliente.
+      const variavelSobrando = avisoDeVariaveisNaoResolvidas(texto)
+      if (variavelSobrando) {
+        despachar({ tipo: acao.AVISO_API, mensagem: variavelSobrando })
         return
       }
       const mensagemId = proximoId('msg')
@@ -103,7 +112,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
       marcarLida(id).catch(() => {})
       // Conversa com cliente e Ficha ainda não lida do EasyStok: o dossiê preenche (#1276).
       const c = estadoRef.current.conversas.find((x) => x.id === id)
-      if (c?.clienteId && !c.cliente?.daApi) clienteApi.carregarClienteDaConversa(id)
+      if (deveCarregarDossie(c)) clienteApi.carregarClienteDaConversa(id)
     },
     assumirAtendimento: (id) => {
       despachar({ tipo: acao.ASSUMIR_ATENDIMENTO, id })

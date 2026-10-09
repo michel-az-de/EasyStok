@@ -7,6 +7,7 @@ import { CampoTexto } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
 import { Popover } from '../../componentes/Popover'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import {
   bloqueioDe, conversasDoCadastro, ehLead, estaBloqueada, resumoDoBloqueio,
 } from '../../dominio/conversa'
@@ -17,7 +18,7 @@ import {
 import { indiceDoPasso } from '../../dominio/esteira'
 import { numeroCurto, pedidoEncerrado } from '../../dominio/pedido'
 import { SITUACOES, situacaoDoCep } from '../../dominio/areaEntrega'
-import { chegouQuando, mesmoDomicilio, resumoFinanceiro } from '../../dominio/cliente'
+import { chegouQuando, dicaDoCep, mesmoDomicilio, resumoFinanceiro } from '../../dominio/cliente'
 import { SELO_CAPTADO, automaticoConduzindo } from '../../dominio/captura'
 import { historicoElegivelParaFidelidade, saldoDePontos } from '../../dominio/fidelidade'
 import { notasRecentes } from '../../dominio/notas'
@@ -63,7 +64,9 @@ function SeloCaptado({ quando }) {
 
 export function BlocoCliente({ conversa }) {
   const { cliente } = conversa
-  const { conversas, historico, agora, automaticoPausado, fidelidade } = useAtendimento()
+  const { conversas, historico, agora, automaticoPausado, fidelidade, fonteApi } = useAtendimento()
+  // #1474 (R2): no modo API, mudar a entrega do pedido e os pontos não têm endpoint e somem.
+  const disponivel = useAcaoDisponivel()
   const { canais, motivosBloqueio, prefixosCepAtendidos } = useCatalogo()
   const {
     bloquearCliente, desbloquearCliente, selecionar,
@@ -138,9 +141,12 @@ export function BlocoCliente({ conversa }) {
 
   function aoSalvarEndereco(valor) {
     editarDadoCliente(conversa.id, 'endereco', valor, agora)
+    // Modo API: rascunho de comanda leva o endereço do cadastro quando vira pedido, então não
+    // há o que perguntar; pedido já criado segue com o endereço antigo (sem endpoint para trocar).
+    if (fonteApi && !conversa.pedido?.pedidoId) return
     if (conversa.pedido && !pedidoEncerrado(conversa.pedido)) {
       const antesDeEntrega = indiceDoPasso(conversa.pedido.estado) < indiceDoPasso('entrega')
-      setAvisoEndereco(antesDeEntrega ? 'perguntar' : 'aviso')
+      setAvisoEndereco(antesDeEntrega && disponivel('mudarEnderecoDoPedido') ? 'perguntar' : 'aviso')
     }
   }
 
@@ -162,7 +168,8 @@ export function BlocoCliente({ conversa }) {
             </div>
             {lead ? (
               <span className={css.situacao}>Lead · {chegouQuando(conversa, agora)}</span>
-            ) : (
+            ) : cliente.desde && (
+              // #1474: o cadastro da API não traz a data; sem ela, a linha não aparece vazia.
               <span className={css.situacao}>Cliente desde {cliente.desde}</span>
             )}
           </div>
@@ -233,7 +240,7 @@ export function BlocoCliente({ conversa }) {
                   valor={form.cep}
                   aoMudarDigitos={(d) => setForm((f) => ({ ...f, cep: mascaraCep(d) }))}
                   placeholder="00000-000"
-                  dica={cepForaDaArea ? 'Fora da área de entrega' : undefined}
+                  dica={dicaDoCep(cepForaDaArea, { fonteApi })}
                 />
               </>
             )}
@@ -287,7 +294,11 @@ export function BlocoCliente({ conversa }) {
               </p>
             )}
             {avisoEndereco === 'aviso' && (
-              <p className={css.avisoEmLinha}>Pedido {numeroCurto(conversa.pedido.numero)} já saiu com o endereço antigo.</p>
+              <p className={css.avisoEmLinha}>
+                {indiceDoPasso(conversa.pedido.estado) < indiceDoPasso('entrega')
+                  ? `O cadastro mudou; o pedido ${numeroCurto(conversa.pedido.numero)} segue com o endereço antigo.`
+                  : `Pedido ${numeroCurto(conversa.pedido.numero)} já saiu com o endereço antigo.`}
+              </p>
             )}
           </div>
         )}
@@ -343,7 +354,7 @@ export function BlocoCliente({ conversa }) {
 
         {/* Selo discreto de fidelidade (pedido do Felipe: "sem sujar a UX
             atual"): só saldo e o botão de resgate, o catálogo mora na Gestão. */}
-        {!lead && (
+        {!lead && disponivel('resgatarRecompensa') && (
           <div className={css.linhaFidelidade}>
             <span className={css.seloPontos}>
               <Icone nome="estrela" tamanho={13} /> {saldoPontos} {saldoPontos === 1 ? 'ponto' : 'pontos'}
@@ -364,7 +375,7 @@ export function BlocoCliente({ conversa }) {
             quantasConversas={doCadastro}
             motivos={motivosBloqueio}
             aoFechar={() => setModal(null)}
-            aoConfirmar={(motivo) => { bloquearCliente(conversa.nome, motivo); setModal(null) }}
+            aoConfirmar={(motivo) => { bloquearCliente(conversa.nome, motivo, conversa.id); setModal(null) }}
           />
         )}
 
@@ -372,7 +383,7 @@ export function BlocoCliente({ conversa }) {
           <ModalDesbloqueio
             nome={conversa.nome}
             aoFechar={() => setModal(null)}
-            aoConfirmar={() => { desbloquearCliente(conversa.nome); setModal(null) }}
+            aoConfirmar={() => { desbloquearCliente(conversa.nome, conversa.id); setModal(null) }}
           />
         )}
 

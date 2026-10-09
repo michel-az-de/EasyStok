@@ -21,6 +21,42 @@
   const DEVICE_ID_KEY = 'cdb-device-id';
   const QUEUE_KEY = 'cdb-sync-queue';
   const LAST_FULL_SYNC_KEY = 'cdb-last-sync';
+  // #1474: cursor do pull separado do carimbo do flush. Antes o pull usava
+  // cdb-last-sync (Date.now() do aparelho no fim de cada flush) como `since`:
+  // aparelho recem-pareado fazia flush e o primeiro pull saia com since=agora,
+  // entao o catalogo que ja existia no ERP nunca chegava (produto duplicado ao
+  // produzir pelo catalogo local). Agora o cursor so avanca com o serverTime da
+  // resposta do proprio pull. Pareamento e troca de loja gravam '0' (pull
+  // completo: o catalogo do ERP precisa chegar inteiro).
+  const PULL_CURSOR_KEY = 'cdb-pull-cursor';
+  // W1: cursor AUSENTE = aparelho que ja estava pareado antes desta versao.
+  // since=0 ali traria o historico inteiro (batches com BatchPhoto em data
+  // URL, cashEntries, fechamentos), ressuscitaria pedidos purgados
+  // (purgeOldData, >30 dias) e podia estourar a cota do localStorage. O
+  // cursor nasce de cdb-last-sync (relogio do aparelho) menos uma margem que
+  // cobre a diferenca de relogio; sem cdb-last-sync = sem historico = since=0.
+  const PULL_SEED_MARGIN_MS = 10 * 60 * 1000;
+  // Pull completo demora mais que o incremental; com o abort de 15 s ele
+  // nunca terminava. O prazo maior não autoriza pular dados que não chegaram.
+  const PULL_TIMEOUT_MS = 15000;
+  const FULL_PULL_TIMEOUT_MS = 90000;
+  const FULL_PULL_TIMEOUTS_KEY = 'cdb-pull-full-fails';
+  function resetPullCursor() {
+    try {
+      localStorage.setItem(PULL_CURSOR_KEY, '0');
+      localStorage.removeItem(FULL_PULL_TIMEOUTS_KEY);
+    } catch (_) {}
+  }
+  function readPullCursor() {
+    let cursor = null;
+    try { cursor = localStorage.getItem(PULL_CURSOR_KEY); } catch (_) {}
+    if (cursor) return cursor;
+    let lastSync = 0;
+    try { lastSync = parseInt(localStorage.getItem(LAST_FULL_SYNC_KEY) || '0', 10) || 0; } catch (_) {}
+    const seed = lastSync > 0 ? String(Math.max(0, lastSync - PULL_SEED_MARGIN_MS)) : '0';
+    try { localStorage.setItem(PULL_CURSOR_KEY, seed); } catch (_) {}
+    return seed;
+  }
   // B4: versao do formato de mutations enfileiradas. Independente de
   // PWA_REQUIRED_API_VERSION (que aponta pro schema do server). Quando este
   // valor bumpar, mutations enfileiradas em formato anterior devem passar
@@ -77,6 +113,7 @@
       'hasPairingCode: ' + (!!cfg.forcedPairingCode),
       'paired: ' + (!!pair),
       'lastSync: ' + (localStorage.getItem(LAST_FULL_SYNC_KEY) || '(none)'),
+      'pullCursor: ' + (localStorage.getItem(PULL_CURSOR_KEY) || '(none)'),
       'queueLen: ' + (function () { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]').length; } catch (_) { return -1; } })(),
       'userAgent: ' + (navigator.userAgent || '').slice(0, 200),
       ''
@@ -161,6 +198,20 @@
     // Reseta flag de invalido — sem pairing, comportamento volta ao
     // legado (request anonimo). App segue offline-first.
     _pairingInvalid = false;
+  }
+  // #1474: troca o "Minha empresa" do topo pelo nome que o pareamento devolveu.
+  // Nao sobrescreve nome que o operador ja personalizou em Ajustes.
+  const DEFAULT_EMPRESA_NAME = 'Minha empresa';
+  function applyEmpresaNomeDoPareamento(nome) {
+    const n = String(nome || '').trim();
+    if (!n) return false;
+    try {
+      const atual = (localStorage.getItem('cdb-empresa-name') || '').trim();
+      if (atual && atual !== DEFAULT_EMPRESA_NAME) return false;
+      localStorage.setItem('cdb-empresa-name', n);
+    } catch (_) { return false; }
+    try { if (typeof window.renderBrandName === 'function') window.renderBrandName(); } catch (_) {}
+    return true;
   }
   function getApiKey() {
     const p = loadPairing();
@@ -711,11 +762,12 @@
   async function pull() {
     if (!navigator.onLine) return;
     if (_pairingInvalid) return;
+    let since = null;
     try {
-      const since = localStorage.getItem(LAST_FULL_SYNC_KEY) || '0';
+      since = readPullCursor();
       const url = API_BASE_URL + API_PREFIX + '/sync/pull?' + new URLSearchParams({ since, deviceId });
       const ctrl = new AbortController();
-      const timeoutId = setTimeout(() => ctrl.abort(), 15000);
+      const timeoutId = setTimeout(() => ctrl.abort(), since === '0' ? FULL_PULL_TIMEOUT_MS : PULL_TIMEOUT_MS);
       let resp;
       try {
         resp = await fetch(url, { headers: baseHeaders(), signal: ctrl.signal });
@@ -736,9 +788,15 @@
         return;
       }
       const data = await resp.json();
-      if (data && data.mutations && Array.isArray(data.mutations)) {
-        applyServerMutations(data.mutations);
-      }
+      // Só confirma o cursor depois de persistir todas as mutações. Se faltar
+      // espaço no aparelho, a próxima tentativa precisa receber os mesmos dados.
+      const serverTime = data && Number(data.serverTime);
+      if (!Number.isFinite(serverTime) || serverTime <= 0 || !Array.isArray(data.mutations))
+        throw new Error('Resposta de sincronização inválida.');
+      if (!applyServerMutations(data.mutations))
+        throw new Error('Não foi possível gravar todos os dados recebidos. A sincronização será repetida.');
+      localStorage.setItem(PULL_CURSOR_KEY, String(serverTime));
+      localStorage.removeItem(FULL_PULL_TIMEOUTS_KEY);
       _consecutivePullFailures = 0;
     } catch (e) {
       _consecutivePullFailures++;
@@ -772,7 +830,8 @@
   let _consecutiveApplyFailures = 0;
 
   function applyServerMutations(mutations) {
-    if (!mutations.length || !window.cdbApp) return;
+    if (!mutations.length) return true;
+    if (!window.cdbApp) return false;
     const state = window.cdbApp.getState();
     let changed = false;
     let errorsThisBatch = 0;
@@ -782,7 +841,7 @@
         const map = _SERVER_MUTATION_MAP[type];
         if (!map) return; // tipo desconhecido — ignora silenciosamente
         const coll = state[map.stateKey];
-        if (!coll) return;
+        if (!coll) throw new Error('Coleção local indisponível: ' + map.stateKey);
         const idx = coll.findIndex(x => x.id === m.payload.id);
 
         // F7-B: cashEntry com estornado=true → mobile esconde do operador
@@ -790,7 +849,7 @@
         // pull pos-restauracao, server reenvia. Soft-delete visual.
         if (type === 'cashEntry' && m.payload && m.payload.estornado === true) {
           if (idx >= 0) { coll.splice(idx, 1); changed = true; }
-          try { localStorage.setItem(map.storage, JSON.stringify(coll)); } catch (_) {}
+          localStorage.setItem(map.storage, JSON.stringify(coll));
           return;
         }
 
@@ -801,7 +860,7 @@
         } else if (op === 'delete') {
           if (idx >= 0) { coll.splice(idx, 1); changed = true; }
         }
-        try { localStorage.setItem(map.storage, JSON.stringify(coll)); } catch (_) {}
+        localStorage.setItem(map.storage, JSON.stringify(coll));
       } catch (e) {
         errorsThisBatch++;
         try {
@@ -829,13 +888,14 @@
       _consecutiveApplyFailures = 0;
     }
 
-    if (changed) {
+    if (changed && errorsThisBatch === 0) {
       console.log('Mudanças do servidor aplicadas, recarregando...');
       (async () => {
         try { await flush(); } catch (e) { console.warn('flush before reload falhou', e); }
         setTimeout(() => location.reload(), 100);
       })();
     }
+    return errorsThisBatch === 0;
   }
 
   // ---- Hook de persistência: chamado pelo app a cada save ----
@@ -1413,7 +1473,7 @@
     if (resp.status === 401) { _pairingInvalid = true; throw new Error('pareamento invalidado'); }
     if (!resp.ok) {
       let msg = 'falha ao trocar loja';
-      try { const e = await resp.json(); if (e && e.error) msg = e.error; } catch (_) {}
+      try { const e = await resp.json(); const m = motivoDoErro(e); if (m) msg = m; } catch (_) {}
       throw new Error(msg);
     }
     const data = await resp.json();
@@ -1425,6 +1485,8 @@
         p.label = p.label; // preserva
         savePairing(p);
       }
+      // #1474: loja nova = pull completo, nao a partir do cursor da antiga.
+      resetPullCursor();
       // Drena fila atual + pega dados da loja nova
       try { await flush(); } catch (_) {}
       try { await pull(); } catch (_) {}
@@ -2060,8 +2122,14 @@
       label: data.label,
       defaultOperatorName: data.defaultOperatorName,
       pairedAt: data.pairedAt,
-      deviceId: data.deviceId
+      deviceId: data.deviceId,
+      empresaNome: data.empresaNome || null,
+      lojaNome: data.lojaNome || null
     });
+    // #1474: pareamento novo (ou re-pareamento em outra empresa/loja) parte
+    // de pull completo — o catalogo do ERP precisa chegar inteiro.
+    resetPullCursor();
+    applyEmpresaNomeDoPareamento(data.empresaNome);
     _pairingInvalid = false;
     try { await pingVersion(); } catch (_) {}
     // Marca a UI pra mostrar modal de relatorio apos o pull inicial.
@@ -2087,6 +2155,14 @@
   // Troca codigo de 6 digitos por apiKey + contexto (empresa/loja).
   // Ao pareamento bem-sucedido, persiste em cdb-pairing e proximas chamadas
   // ja saem com X-Mobile-Api-Key automaticamente.
+  // #1474: a API responde {error:"texto"} nos endpoints mobile antigos e
+  // {error:{message, detail}} no GlobalExceptionHandler; o operador lê o motivo.
+  function motivoDoErro(e) {
+    if (!e || !e.error) return null;
+    if (typeof e.error === 'string') return e.error;
+    return e.error.detail || e.error.message || null;
+  }
+
   async function pairWithCode(code, label) {
     if (!navigator.onLine) throw new Error('sem rede');
     const url = API_BASE_URL + API_PREFIX + '/devices/pair';
@@ -2111,7 +2187,7 @@
     }
     if (!resp.ok) {
       let msg = 'codigo invalido';
-      try { const e = await resp.json(); if (e && e.error) msg = e.error; } catch (_) {}
+      try { const e = await resp.json(); const m = motivoDoErro(e); if (m) msg = m; } catch (_) {}
       throw new Error(msg);
     }
     const data = await resp.json();
@@ -2122,8 +2198,14 @@
       label: data.label,
       defaultOperatorName: data.defaultOperatorName,
       pairedAt: data.pairedAt,
-      deviceId: data.deviceId
+      deviceId: data.deviceId,
+      empresaNome: data.empresaNome || null,
+      lojaNome: data.lojaNome || null
     });
+    // #1474: pareamento novo (ou re-pareamento em outra empresa/loja) parte
+    // de pull completo — o catalogo do ERP precisa chegar inteiro.
+    resetPullCursor();
+    applyEmpresaNomeDoPareamento(data.empresaNome);
     // Pareou com sucesso — destrava flush/pull caso estavam bloqueados
     // por pairing invalidado em sessao anterior.
     _pairingInvalid = false;

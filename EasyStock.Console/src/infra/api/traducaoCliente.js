@@ -24,6 +24,11 @@ export function clienteDoDossie(dossie) {
   return {
     clienteId: dados.id,
     nome: dados.nome || null,
+    // #1474 (R2): bloqueio do cadastro, no formato de `dominio/conversa.js` (novoBloqueio). O
+    // dossiê não traz quando nem quem bloqueou; `resumoDoBloqueio` lida com os dois nulos.
+    bloqueio: dossie.bloqueado
+      ? { motivo: dados.motivoBloqueio || 'Sem motivo registrado.', em: null, por: null, alcance: 'todos os canais' }
+      : null,
     cliente: {
       telefone: dados.telefone || null,
       endereco: endereco || null,

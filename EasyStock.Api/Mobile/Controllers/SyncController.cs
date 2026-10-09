@@ -33,6 +33,7 @@ public class SyncController(
     OperacaoEventBroker eventBroker,
     IProdutoRepository produtoRepo,
     IConfiguration appConfig,
+    TimeProvider relogio,
     ILogger<SyncController> log) : ControllerBase
 {
     private readonly EasyStockDbContext _db = db;
@@ -42,6 +43,7 @@ public class SyncController(
     private readonly OperacaoEventBroker _eventBroker = eventBroker;
     private readonly IProdutoRepository _produtoRepo = produtoRepo;
     private readonly IConfiguration _appConfig = appConfig;
+    private readonly TimeProvider _relogio = relogio;
     private readonly ILogger<SyncController> _log = log;
 
     [HttpPost]
@@ -235,6 +237,10 @@ public class SyncController(
     public async Task<ActionResult<SyncPullResponse>> Pull([FromQuery] long since, [FromQuery] string deviceId)
     {
         var sinceDate = DateTimeOffset.FromUnixTimeMilliseconds(since).UtcDateTime;
+        // #1474: o cursor devolvido ao aparelho e o instante ANTES das consultas. Lido depois, uma
+        // linha gravada durante a consulta (UpdatedAt menor que esse instante) ficava atras do
+        // cursor e nunca mais vinha. O upsert do PWA e idempotente; repetir alguns registros nao faz mal.
+        var serverTime = _relogio.GetUtcNow().ToUnixTimeMilliseconds();
 
         var device = HttpContext.GetMobileDevice();
         var lojaId = device?.LojaId;
@@ -308,7 +314,7 @@ public class SyncController(
             }
         }
 
-        return Ok(new SyncPullResponse(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), mutations));
+        return Ok(new SyncPullResponse(serverTime, mutations));
     }
 }
 

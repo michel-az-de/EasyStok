@@ -26,6 +26,10 @@ export const ROTA_CARDAPIO_LINK = 'cardapio-link'
 export const HASH_HALL = '#/'
 export const HASH_ENTREGAS = '#/entregas'
 export const HASH_COZINHA = '#/cozinha'
+// #1474: a barra lateral abre a tela de operação do módulo, com a barra "← Módulos" para
+// voltar. Os apelidos de cima seguem para a janela avulsa do tablet.
+export const HASH_MODULO_COZINHA = '#/m/cozinha'
+export const HASH_MODULO_ENTREGAS = '#/m/entregas'
 
 const PREFIXO_MODULO = '#/m/'
 

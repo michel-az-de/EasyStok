@@ -141,6 +141,24 @@ const ROTA = '/api/public/cardapio/fotos/e/s/i/angulo.webp'
   confere('manda id do item, índice 0 e legenda com porção e preço', corpo.cardapioItemId === 'item-1' && corpo.indice === 0
     && /^Lasanha Bolonhesa Clássica\n600 g · R\$\s?38,00$/.test(corpo.legenda ?? ''), JSON.stringify(corpo))
   confere('o navegador não baixa a foto', !chamadas.some((c) => String(c.url).includes('/files/') || String(c.url).includes('/cardapio/fotos/')))
+
+  // #1474: nome que já traz o peso não repete a porção; "Foto N" da galeria nunca vai ao cliente.
+  const comPeso = produtoDaApi({
+    id: 'item-2', nome: 'Lasanha Bolonhesa Clássica 600 g', pesoExibicao: '600 g', precoCentavos: 3800, imagemUrl: ANTIGA,
+  })
+  chamadas.length = 0
+  await api.enviarMidia('c1', vitrine.mensagemDaFotoDoItem(comPeso))
+  const corpoComPeso = chamadas[0] && typeof chamadas[0].corpo === 'string' ? JSON.parse(chamadas[0].corpo) : {}
+  confere('nome com o peso: legenda sem porção repetida', /^Lasanha Bolonhesa Clássica 600 g\nR\$\s?38,00$/.test(corpoComPeso.legenda ?? ''),
+    JSON.stringify(corpoComPeso))
+  const { reducer } = await import('../src/aplicacao/reducer.js')
+  const { mensagemDePeca } = await import('../src/dominio/anexos.js')
+  const galeria = reducer({ catalogo: { cardapio: [], galeria: [] } }, { tipo: acao.SINCRONIZAR_CARDAPIO, cardapio: [comPeso] }).catalogo.galeria
+  chamadas.length = 0
+  await api.enviarMidia('c1', mensagemDePeca(galeria[0]))
+  const corpoGaleria = chamadas[0] && typeof chamadas[0].corpo === 'string' ? JSON.parse(chamadas[0].corpo) : {}
+  confere('peça da galeria "Fotos": mesma legenda, sem "Foto 1"', corpoGaleria.legenda === corpoComPeso.legenda
+    && /Foto 1/.test(galeria[0].descricao), JSON.stringify(corpoGaleria))
   confere('espera a confirmação do EasyStok', despachos.at(-1)?.tipo === acao.CONFIRMAR_ENVIO_API)
 }
 

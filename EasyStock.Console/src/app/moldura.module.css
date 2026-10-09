@@ -103,6 +103,8 @@
   line-height: var(--lh-compacto); letter-spacing: var(--ls-titulo);
 }
 .tituloColuna .contagem { margin-left: auto; font-family: var(--f-dado); font-weight: 400; color: var(--tinta-3); font-size: var(--t-apoio); }
+/* #1474: pé da Ficha onde a fila de canhotos entra; vazio, não ocupa altura. */
+.slotFila { flex-shrink: 0; }
 .rodape {
   display: flex; gap: var(--e-3); flex-wrap: wrap; align-items: center; flex-shrink: 0;
   padding: var(--e-2) var(--e-4); padding-bottom: calc(var(--e-2) + env(safe-area-inset-bottom, 0px));

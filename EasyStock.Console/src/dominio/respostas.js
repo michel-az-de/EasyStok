@@ -11,6 +11,7 @@
 // mesma que a outra tela mostra.
 import { primeiroNome } from './mensagem.js'
 import { PASSOS } from './esteira.js'
+import { VARIAVEIS } from './automacao.js'
 
 const semAcento = (texto) => texto.normalize('NFD').replace(/[̀-ͯ]/g, '')
 
@@ -111,6 +112,35 @@ export function resolverVariaveis(texto, conversa, extras = {}) {
 export const avisoDeFaltando = (faltando) => (faltando.length === 0
   ? null
   : `Sem ${faltando.map((c) => ROTULO_VARIAVEL[c]).join(' e ')} nesta conversa.`)
+
+// #1474: variável do sistema que sobrou no texto do campo ("Pedido {pedido}.") sairia literal
+// para o cliente. Só as que o sistema conhece bloqueiam (as de `VARIAVEIS`, mais as de
+// ROTULO_VARIAVEL); texto da dona entre chaves, como {CUPOM10} ou {1}, segue. Reconhece a
+// variável escrita com acento, maiúscula ou espaço ({endereço}, {Pedido}, { nome }), porque
+// também sairia literal. Uma por grafia, na ordem em que aparece, do jeito que ela escreveu.
+const ROTULOS_DO_SISTEMA = {
+  ...Object.fromEntries(VARIAVEIS.map((v) => [v.chave, v.descricao])),
+  abre: 'horário em que a loja abre de novo',
+  linkCardapio: 'link do cardápio',
+  endereco: 'endereço de entrega',
+  ...ROTULO_VARIAVEL,
+}
+const chaveNormalizada = (chave) => semAcento(chave).toLowerCase()
+const ROTULO_POR_CHAVE = new Map(Object.entries(ROTULOS_DO_SISTEMA).map(([chave, rotulo]) => [chaveNormalizada(chave), rotulo]))
+const MARCADOR = /\{\s*([\p{L}\p{N}_]+)\s*\}/gu
+
+const marcadoresDoSistema = (texto) =>
+  [...String(texto ?? '').matchAll(MARCADOR)].filter((m) => ROTULO_POR_CHAVE.has(chaveNormalizada(m[1])))
+
+export const variaveisNaoResolvidas = (texto) => [...new Set(marcadoresDoSistema(texto).map((m) => m[0]))]
+
+export function avisoDeVariaveisNaoResolvidas(texto) {
+  const frases = variaveisNaoResolvidas(texto).map((marcador) => {
+    const chave = chaveNormalizada(marcador.slice(1, -1).trim())
+    return `Esta conversa não tem ${ROTULO_POR_CHAVE.get(chave)}: apague ${marcador} ou escreva no lugar.`
+  })
+  return frases.length === 0 ? null : frases.join(' ')
+}
 
 // ---------------------------------------------------------------------------
 // Leitura unificada para a biblioteca (Modal e atalho "/" no composer):

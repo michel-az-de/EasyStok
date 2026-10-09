@@ -4,7 +4,8 @@ import { CampoArea } from '../../componentes/Campo'
 import { CampoMascarado } from '../../componentes/CampoMascarado'
 import { EscolhaDeEntregador } from '../../componentes/EscolhaDeEntregador'
 import { Icone } from '../../componentes/Icone'
-import { faltaPagar, podeDesfazerPagamento, situacaoDaCobranca } from '../../dominio/cobranca'
+import { aguardaAprovacao, faltaPagar, podeDesfazerPagamento, situacaoDaCobranca } from '../../dominio/cobranca'
+import { ROTULO_GERAR_E_ENVIAR } from '../../dominio/resumoPedido'
 import {
   PASSOS, motivoParaNaoAvancar, passoAnterior, passoPorId, proximoPasso, situacaoDoPasso,
   SEGUNDOS_PARA_DESFAZER,
@@ -15,6 +16,7 @@ import {
 import { entregadorResolvido } from '../../dominio/viagem'
 import { numeroParaEntregador, opcoesDoDespacho } from '../../dominio/despacho'
 import { useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { BaixaAMao } from './BlocoCobranca'
 import { MenuDoPedido } from './MenuDoPedido'
 import { EscolhaDeMeio } from './EscolhaDeMeio'
@@ -47,15 +49,17 @@ const PROXIMO_DE_AGUARDANDO = proximoPasso('aguardando')?.rotulo ?? 'Pago'
 // O passo "aguardando pagamento" não tem um botão único: o próximo passo
 // muda com a situação da cobrança (secao 2, "Alerta do Pix"). Substitui a
 // antiga trava, que só mostrava texto e travava a barra inteira.
-function acaoDoPix(situacaoCob, { temItens, aoAbrirBaixa, aoGerarPix, aoReenviarPix }) {
+function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, aoAbrirBaixa, aoGerarPix, aoReenviarPix }) {
   switch (situacaoCob.chave) {
     case 'nenhuma':
       return {
         rotuloEstado: 'Cobrança não gerada',
-        motivo: temItens ? null : 'A comanda está vazia.',
+        // #1474 (R3): o que falta vem pronto de quem monta a barra (comanda vazia, cadastro,
+        // endereço, janela), para o botão nascer desabilitado com o motivo à vista.
+        motivo: prerequisito,
         // Atalho da barra: gera no meio marcado nos chips do bloco Cobrança;
         // sem meio marcado, pergunta antes (ponta a da integração).
-        botoes: [{ rotulo: 'Gerar cobrança', icone: 'dollar-sign', onClick: aoGerarPix, desabilitado: !temItens }],
+        botoes: [{ rotulo: rotuloGerar, icone: 'dollar-sign', onClick: aoGerarPix, desabilitado: Boolean(prerequisito) }],
       }
     case 'expirada':
       return {
@@ -81,9 +85,9 @@ function acaoDoPix(situacaoCob, { temItens, aoAbrirBaixa, aoGerarPix, aoReenviar
 // alvo só, fixo no rodapé da coluna Ficha, no lugar de `BlocoEsteira` (que
 // listava os seis passos soltos) e da barra antiga somados.
 export function BarraProximoPasso({
-  pedido, nomeCliente, agora, emDesfazer, bloqueado = false, aoAvancar, aoDesfazer,
+  pedido, nomeCliente, agora, emDesfazer, bloqueado = false, prerequisito = null, aoAvancar, aoDesfazer,
   aoGerarPix, aoReenviarPix, aoConfirmarPagamento, aoAceitarDivergencia, aoCobrarDiferenca,
-  aoVoltarEtapa, aoCancelarPedido, aoMarcarEstorno, aoEncerrarAtendimento, aoDesfazerPagamento,
+  aoVoltarEtapa, aoCancelarPedido, aoMarcarEstorno, aoEncerrarAtendimento, aoDesfazerPagamento, aoAprovarPedido,
 }) {
   const [restam, setRestam] = useState(() => (emDesfazer ? SEGUNDOS_PARA_DESFAZER : 0))
   const [confirmando, setConfirmando] = useState(null) // 'cancelar' | 'estornar' | 'voltar' | 'desfazer'
@@ -91,8 +95,13 @@ export function BarraProximoPasso({
   const [pedindoMeio, setPedindoMeio] = useState(false)
   const [pedindoEntregador, setPedindoEntregador] = useState(false)
   // Issue #17: entregador de um toque e os campos de veículo, placa e empresa.
-  const { conversas } = useAtendimento()
+  const { conversas, fonteApi } = useAtendimento()
   const { entregadores } = useCatalogo()
+  // #1474 (R1/R2): no modo API a esteira é do EasyStok; cancelar, estornar e voltar etapa não
+  // estão ligados e não aparecem. O erro da API aparece aqui, ao lado do botão.
+  const disponivel = useAcaoDisponivel()
+  const [erroAcao, setErroAcao] = useState(null)
+  const [emVoo, setEmVoo] = useState(false)
   // UC-06 passo 5: motivo é obrigatório, valor nasce com o que foi pago e dá
   // para editar para um estorno parcial (RN-36 não promete sempre o total).
   // Em centavos por dentro (seção 4 da direção visual, passo zero): a tela só
@@ -101,6 +110,20 @@ export function BarraProximoPasso({
   const [centavosEstorno, setCentavosEstorno] = useState(0)
   // Rodada 12 (issue #13): motivo do "Desfazer pagamento", obrigatório.
   const [motivoDesfazer, setMotivoDesfazer] = useState('')
+
+  // Ação que vai ao EasyStok devolve uma promessa; `{ erro }` fica ao lado do botão até o
+  // pedido mudar de etapa. Clique repetido com a primeira em voo é ignorado.
+  const executar = (fazer) => {
+    if (emVoo) return
+    setErroAcao(null)
+    const ida = fazer()
+    if (!ida?.then) return
+    setEmVoo(true)
+    const estadoNaHora = pedido.estado
+    ida.then((r) => { if (r?.erro) setErroAcao({ estado: estadoNaHora, texto: r.erro }) })
+      .finally(() => setEmVoo(false))
+  }
+  const erroVisivel = erroAcao?.estado === pedido.estado ? erroAcao.texto : null
 
   useEffect(() => {
     if (!emDesfazer) return undefined
@@ -147,10 +170,12 @@ export function BarraProximoPasso({
   if (pedido.estado === 'aguardando') {
     const situacaoCob = situacaoDaCobranca(pedido.cobranca, agora)
     const info = acaoDoPix(situacaoCob, {
-      temItens: pedido.itens.length > 0,
+      prerequisito: prerequisito ?? (pedido.itens.length > 0 ? null : 'A comanda está vazia.'),
+      // #1474 (R4): no modo API este é o único botão que cria o pedido (cobra e manda a comanda).
+      rotuloGerar: fonteApi && !pedido.pedidoId ? ROTULO_GERAR_E_ENVIAR : 'Gerar cobrança',
       aoAbrirBaixa: () => setAbrindoBaixa(true),
-      aoGerarPix: () => (pedido.meio ? aoGerarPix(pedido.meio) : setPedindoMeio(true)),
-      aoReenviarPix: () => aoReenviarPix(),
+      aoGerarPix: () => (pedido.meio ? executar(() => aoGerarPix(pedido.meio)) : setPedindoMeio(true)),
+      aoReenviarPix: () => executar(() => aoReenviarPix()),
     })
     rotuloEstado = info.rotuloEstado
 
@@ -158,7 +183,9 @@ export function BarraProximoPasso({
       const falta = faltaPagar(pedido.cobranca)
       corpoAcao = (
         <div className={css.botoesPrimarios}>
-          <Botao largo variante="primario" onClick={aoAceitarDivergencia}>Aceitar diferença</Botao>
+          {disponivel('aceitarDivergencia') && (
+            <Botao largo variante="primario" onClick={aoAceitarDivergencia}>Aceitar diferença</Botao>
+          )}
           {falta > 0 && (
             <Botao largo variante="secundario" onClick={aoCobrarDiferenca}>Cobrar diferença</Botao>
           )}
@@ -171,7 +198,7 @@ export function BarraProximoPasso({
           {info.botoes.map((b) => (
             <Botao
               key={b.rotulo} largo variante="primario" icone={b.icone}
-              disabled={b.desabilitado} onClick={b.onClick}
+              disabled={b.desabilitado || emVoo} onClick={b.onClick}
             >
               {b.rotulo}
             </Botao>
@@ -179,7 +206,7 @@ export function BarraProximoPasso({
           {pedindoMeio && situacaoCob.chave === 'nenhuma' && !pedido.meio && (
             <EscolhaDeMeio
               escolhido={null}
-              aoEscolher={(meio) => { setPedindoMeio(false); aoGerarPix(meio) }}
+              aoEscolher={(meio) => { setPedindoMeio(false); executar(() => aoGerarPix(meio)) }}
               pergunta="Como o cliente vai pagar?"
             />
           )}
@@ -210,7 +237,20 @@ export function BarraProximoPasso({
       </Botao>
     )
 
-    if (!proximo) {
+    if (aguardaAprovacao(pedido)) {
+      // #1474 (R8): pedido fora da área liberado espera a dona aprovar antes da fila e da baixa
+      // à mão. "Iniciar preparo" aqui só voltaria erro da máquina de estados.
+      rotuloEstado = 'Esperando sua aprovação'
+      depoisTexto = 'Próximo: Em preparo'
+      corpoAcao = (
+        <div className={css.botoesPrimarios}>
+          <Botao largo variante="primario" icone="circle-check" disabled={emVoo || !aoAprovarPedido}
+            onClick={() => executar(aoAprovarPedido)}>
+            Aprovar pedido
+          </Botao>
+        </div>
+      )
+    } else if (!proximo) {
       corpoAcao = (
         <div className={css.botoesPrimarios}>
           <Botao largo variante="primario" icone="log-out" onClick={aoEncerrarAtendimento}>
@@ -224,15 +264,16 @@ export function BarraProximoPasso({
       // US-040: despachar sem saber quem leva é a mensagem fixa mentindo
       // pro cliente. Mesma forma de "sem meio marcado" acima: primeiro
       // toque pergunta em vez de avançar direto.
-      const precisaDeEntregador = proximo.id === 'entrega' && !entregadorResolvido(pedido)
+      // No modo API o aviso de saída é do EasyStok e não leva o nome: não pergunta quem leva.
+      const precisaDeEntregador = !fonteApi && proximo.id === 'entrega' && !entregadorResolvido(pedido)
       // RN-14 / US-019: mesma resposta que o reducer usa para recusar.
       const motivo = motivoParaNaoAvancar(proximo.id, { bloqueado })
       corpoAcao = (
         <div className={css.botoesPrimarios}>
           {motivo && <p className={css.motivoDesabilitado}>{motivo}</p>}
           <Botao
-            largo variante="primario" icone={acao.icone} disabled={Boolean(motivo)}
-            onClick={() => (precisaDeEntregador ? setPedindoEntregador(true) : aoAvancar(proximo.id))}
+            largo variante="primario" icone={acao.icone} disabled={Boolean(motivo) || emVoo}
+            onClick={() => (precisaDeEntregador ? setPedindoEntregador(true) : executar(() => aoAvancar(proximo.id)))}
           >
             {acao.rotulo}
           </Botao>
@@ -250,13 +291,13 @@ export function BarraProximoPasso({
   }
 
   const naFilaSemQuitar = Boolean(pedido.pedidoId) && pedido.totalPagoApi < pedido.totalApi
-  if (naFilaSemQuitar && pedido.estado === 'pago') rotuloEstado = 'Na fila de preparo'
-  const podeVoltarEtapa = Boolean(anterior)
-  const podeCancelar = pedido.estado === 'aguardando'
+  if (naFilaSemQuitar && pedido.estado === 'pago' && !aguardaAprovacao(pedido)) rotuloEstado = 'Na fila de preparo'
+  const podeVoltarEtapa = Boolean(anterior) && disponivel('corrigirPasso')
+  const podeCancelar = pedido.estado === 'aguardando' && disponivel('cancelarPedido')
   // Estornar é devolver dinheiro que entrou. Pedido sem cobrança paga (venda
   // antiga, massa de teste) não tem o que devolver, e oferecer o item aqui
   // levava a confirmar "você já devolveu R$ 0,00" (QA7, achado 1).
-  const podeEstornar = pedido.estado !== 'aguardando' && Boolean(pedido.cobranca?.pagaEm)
+  const podeEstornar = pedido.estado !== 'aguardando' && Boolean(pedido.cobranca?.pagaEm) && disponivel('marcarEstorno')
   const valorPago = pedido.cobranca?.valorPago ?? pedido.cobranca?.valor ?? 0
   const podeDesfazer = podeDesfazerPagamento(pedido)
   const valorParaDesfazer = pedido.pagamentosApi?.toSorted((a, b) => b.em - a.em)[0]?.valor ?? valorPago
@@ -323,12 +364,18 @@ export function BarraProximoPasso({
         </div>
       )}
 
+      {erroVisivel && confirmando === null && !abrindoBaixa && (
+        <p className={css.motivoDesabilitado} role="alert">{erroVisivel}</p>
+      )}
+
       {pedido.totalPagoApi > 0 && pedido.totalPagoApi < pedido.totalApi && (
         <p className={css.corpoBloco}>Recebido: {moeda(pedido.totalPagoApi)}. Falta: {moeda(pedido.totalApi - pedido.totalPagoApi)}.</p>
       )}
       {abrindoBaixa && (
         <BaixaAMao
           valorCobrado={Math.max(0, (pedido.totalApi ?? pedido.cobranca.valor) - (pedido.totalPagoApi ?? 0))}
+          pedido={pedido}
+          aoAprovar={aoAprovarPedido}
           aoCancelar={() => setAbrindoBaixa(false)}
           aoConfirmar={(valor, metodo) => { setAbrindoBaixa(false); aoConfirmarPagamento(valor, metodo) }}
         />

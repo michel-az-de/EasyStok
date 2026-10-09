@@ -9,6 +9,8 @@
 // nome do EasyStok (ItemEstoque): venda acima do saldo não bloqueia nem fica
 // negativa, fica "descoberta" até a contagem física repor (RN-48, D7).
 
+import { plural } from './formato.js'
+
 // Peso sempre em grama nesta rodada (UnidadeMedida do EasyStok tem Mg/G/Kg/
 // Ml/L/Un/Dz/Cx; produção de prato pronto usa G). Registrado como limite.
 export const UNIDADE_PESO = 'G'
@@ -27,6 +29,10 @@ export const rotuloDestino = (destino) =>
   DESTINOS_PORCAO.find((d) => d.valor === destino)?.rotulo ?? destino
 
 export const PADRAO_DIAS_AVISO_VENCIMENTO = 1 // RN-51: proposta de prazo para a Thati, ajustável.
+
+// Saldo da tabela "Saldo por item" (#1474): item sem controle de saldo (API devolve nulo)
+// mostra "—", não "null porções".
+export const rotuloDoSaldo = (estoque) => (estoque == null ? '—' : plural(estoque, 'porção', 'porções'))
 
 // ---------------------------------------------------------------------------
 // Lote de produção (UC-08). `porcoes` já chega em porção de venda (RN-46),

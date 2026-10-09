@@ -368,7 +368,7 @@ public class IniciarCheckoutUseCaseTests
 
         await uc.Invoking(u => u.ExecuteAsync(InputValido()))
             .Should().ThrowAsync<RegraDeDominioVioladaException>()
-            .WithMessage("*não encontrado*");
+            .WithMessage("*não está mais no cardápio*");
     }
 
     [Fact]
@@ -420,7 +420,7 @@ public class IniciarCheckoutUseCaseTests
 
         await uc.Invoking(u => u.ExecuteAsync(InputValido()))
             .Should().ThrowAsync<RegraDeDominioVioladaException>()
-            .WithMessage("*inválida*");
+            .WithMessage("*não está mais disponível*");
     }
 
     [Fact]

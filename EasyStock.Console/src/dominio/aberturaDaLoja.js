@@ -3,6 +3,7 @@
 // motivo da retificação. Fechar a loja dentro do horário pede justificativa (a API recusa sem).
 // Puro: o caixa chega já traduzido (`infra/api/caixaApi.js`) e "agora" chega por parâmetro.
 
+import { gavetaDoDia } from './caixa.js'
 import { moeda } from './formato.js'
 import { dentroDoHorario } from './funcionamento.js'
 
@@ -19,12 +20,19 @@ export const diaMes = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` :
 //   fechadoHoje  o caixa de hoje já fechou e não reabre (regra da API);
 //   aberto       o caixa de hoje já está aberto; a loja abre direto;
 //   novo         abre o caixa de hoje; o saldo sugerido é o que ficou na gaveta no último fechamento.
+// #1474: `naGaveta` é o que ela confere (só dinheiro, `gavetaDoDia`); `saldoEsperado` é o total do
+// dia da API, que soma Pix e cartão e por isso não serve para contar a gaveta.
 export function situacaoDoCaixaParaAbrirLoja(dia, ultimoFechamento) {
   if (dia?.esquecidoAberto) {
-    return { tipo: 'esquecido', desde: dia.abertoDesde, saldoEsperado: dia.saldoEsperado, ultimo: ultimoFechamento ?? null }
+    return {
+      tipo: 'esquecido', desde: dia.abertoDesde, saldoEsperado: dia.saldoEsperado,
+      naGaveta: gavetaDoDia(dia).naGaveta, ultimo: ultimoFechamento ?? null,
+    }
   }
   if (dia?.fechado) return { tipo: 'fechadoHoje', fechamento: dia.fechamento }
-  if (dia?.aberto) return { tipo: 'aberto', saldoInicial: dia.saldoInicial, saldoEsperado: dia.saldoEsperado }
+  if (dia?.aberto) {
+    return { tipo: 'aberto', saldoInicial: dia.saldoInicial, saldoEsperado: dia.saldoEsperado, naGaveta: gavetaDoDia(dia).naGaveta }
+  }
   return { tipo: 'novo', ultimo: ultimoFechamento ?? null, saldoSugerido: ultimoFechamento?.saldoFinal ?? 0 }
 }
 

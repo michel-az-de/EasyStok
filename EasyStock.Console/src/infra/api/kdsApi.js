@@ -4,7 +4,9 @@ import { chamarApi } from './cliente'
 // PDF de 80 mm do protótipo, montado no console (issue #1446).
 // Mudança de status passa pela máquina de estados da API; transição inválida
 // volta 400 com a mensagem pronta para a tela.
-export const listarPedidosKds = () => chamarApi('/api/kds/pedidos')
+// `data` (YYYY-MM-DD, #1474): sem ela a API devolve a fila de hoje.
+export const listarPedidosKds = (data = null) =>
+  chamarApi(data ? `/api/kds/pedidos?data=${encodeURIComponent(data)}` : '/api/kds/pedidos')
 
 export const mudarStatusKds = (id, status) =>
   chamarApi(`/api/kds/pedidos/${id}/status`, { metodo: 'PATCH', corpo: { status } })

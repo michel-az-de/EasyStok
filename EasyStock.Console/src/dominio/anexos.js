@@ -210,9 +210,11 @@ export function mensagemDeAudio({ dataUrl, duracaoMs }) {
 }
 
 // Peça do cardápio (#1437) leva o id do item e o índice da foto: o EasyStok envia pelo id.
-export function mensagemDePeca({ nome, descricao, foto, cardapioItemId, indice }) {
+export function mensagemDePeca({ nome, descricao, legenda, foto, cardapioItemId, indice }) {
   return {
     formato: 'peca', arte: foto, nome, descricao, texto: nome,
+    // #1474: peça do cardápio traz a legenda pronta para o cliente (sem "Foto N").
+    ...(legenda ? { legenda } : {}),
     ...(cardapioItemId ? { cardapioItemId, indice } : {}),
   }
 }

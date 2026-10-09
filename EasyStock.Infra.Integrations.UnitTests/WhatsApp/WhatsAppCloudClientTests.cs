@@ -392,6 +392,23 @@ public class WhatsAppCloudClientTests
         audio.GetProperty("voice").GetBoolean().Should().Be(notaDeVoz);
     }
 
+    [Theory]
+    [InlineData("/files/empresa/foto.jpg")]
+    [InlineData("files/foto.jpg")]
+    [InlineData("ftp://cdn.test/foto.jpg")]
+    public async Task MidiaComUrlNaoAbsolutaFalhaAntesDeIrAMeta(string url)
+    {
+        // #1474 B2: a Meta só busca mídia por URL absoluta http(s); "/files/..." vem de FileStorage__PublicBaseUrl vazio.
+        var client = CreateClient(HttpStatusCode.OK, RespostaEnvioOk, out var handler);
+
+        var imagem = async () => await client.EnviarImagemAsync("5511999998888", url);
+        var audio = async () => await client.EnviarAudioAsync("5511999998888", url, notaDeVoz: false);
+
+        (await imagem.Should().ThrowAsync<ArgumentException>()).Which.Message.Should().Contain("FileStorage__PublicBaseUrl");
+        (await audio.Should().ThrowAsync<ArgumentException>()).Which.Message.Should().Contain("FileStorage__PublicBaseUrl");
+        handler.Chamadas.Should().Be(0);
+    }
+
     private sealed class SequenceHandler : HttpMessageHandler
     {
         private readonly Queue<(HttpStatusCode Status, string Body, Exception? Falha)> _respostas = new();

@@ -248,14 +248,16 @@ public partial class AtendimentoConversasControllerTests
     {
         var conversa = ConversaComClienteAgora();
         conversa.Assumir(DateTime.UtcNow, _usuarioId);
+        LogadoComo("Thati");
 
         var result = await _controller.LiberarAutomatico(conversa.Id, default);
 
         result.Should().BeOfType<OkObjectResult>();
         conversa.Situacao.Should().Be(SituacaoConversa.Automatica);
         conversa.AssumidaPorUsuarioId.Should().BeNull();
+        // #1474: a nota é lida pela dona no fio; leva o nome de quem liberou, nunca o id.
         _repositorio.Mensagens.Should().ContainSingle(m => m.Autor == AutorMensagem.Sistema
-            && m.ExternoId == null && m.Texto!.Contains(_usuarioId.ToString()));
+            && m.ExternoId == null && m.Texto!.Contains("Thati") && !m.Texto.Contains(_usuarioId.ToString()));
         await _unitOfWork.Received(1).CommitAsync();
     }
 
@@ -399,6 +401,16 @@ public partial class AtendimentoConversasControllerTests
         return (T)ok.Value!.GetType().GetProperty("Data")!.GetValue(ok.Value)!;
     }
 
+    private void LogadoComo(string nome) =>
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+                    [new System.Security.Claims.Claim("sub", _usuarioId.ToString()), new System.Security.Claims.Claim("nome", nome)], "teste")),
+            },
+        };
+
     private void Atendente(Guid usuarioId, NivelAcesso nivel = NivelAcesso.Operador, params Permissao[] explicitas) =>
         _atendentes.ObterUsuarioAtivoAsync(_empresaId, usuarioId, Arg.Any<CancellationToken>())
             .Returns(new UsuarioDaEmpresa(usuarioId, "Bia", "bia@x.com", [new PerfilNaEmpresa(nivel, explicitas)]));
@@ -439,13 +451,15 @@ public partial class AtendimentoConversasControllerTests
         conversa.Assumir(DateTime.UtcNow, _usuarioId);
         var bia = Guid.NewGuid();
         Atendente(bia);
+        LogadoComo("Thati");
 
         var result = await _controller.Transferir(conversa.Id, new TransferirConversaBody(bia), default);
 
         Dados<ConversaSituacaoResult>(result).AssumidaPorUsuarioId.Should().Be(bia);
         conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
         _repositorio.Mensagens.Should().ContainSingle(m => m.Autor == AutorMensagem.Sistema
-            && m.Texto!.Contains(_usuarioId.ToString()) && m.Texto.Contains(bia.ToString()));
+            && m.Texto!.Contains("Thati") && m.Texto.Contains("Bia")
+            && !m.Texto.Contains(_usuarioId.ToString()) && !m.Texto.Contains(bia.ToString()));
         await _unitOfWork.Received(1).CommitAsync();
     }
 

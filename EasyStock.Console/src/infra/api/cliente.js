@@ -25,6 +25,20 @@ const MENSAGEM_POR_STATUS = {
   502: 'O canal não respondeu. Tente de novo.',
 }
 
+// #1474: títulos genéricos do GlobalExceptionHandler da API. Com eles o motivo útil está no
+// `detail` ("Requisição inválida" sozinho não diz à dona o que fazer).
+const MENSAGENS_GENERICAS = new Set([
+  'Requisição inválida', 'Violação de regra de negócio', 'Argumento invalido', 'Operacao invalida',
+  'Formato invalido', 'Quantidade inválida', 'Registro duplicado', 'Conflito de concorrência',
+])
+
+function mensagemDoErro(json, status) {
+  const mensagem = json?.error?.message
+  const detalhe = json?.error?.detail
+  if (typeof detalhe === 'string' && detalhe.trim() && (!mensagem || MENSAGENS_GENERICAS.has(mensagem))) return detalhe
+  return mensagem ?? MENSAGEM_POR_STATUS[status] ?? (json?.title ? 'Confira os campos.' : 'Não deu certo. Tente de novo.')
+}
+
 const comoJson = (texto) => {
   if (!texto) return null
   try { return JSON.parse(texto) } catch { return null }
@@ -67,6 +81,6 @@ export async function chamarApi(caminho, {
     window.dispatchEvent(new Event(EVENTO_SESSAO_EXPIRADA))
   }
   const codigo = json?.error?.code ?? json?.erro ?? `HTTP_${resposta.status}`
-  const mensagem = json?.error?.message ?? MENSAGEM_POR_STATUS[resposta.status] ?? (json?.title ? 'Confira os campos.' : 'Não deu certo. Tente de novo.')
+  const mensagem = mensagemDoErro(json, resposta.status)
   throw new ErroApi(resposta.status, codigo, mensagem, json?.error?.detail ?? null, json?.error?.details ?? null)
 }

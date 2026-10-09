@@ -1,3 +1,4 @@
+import { dataIsoNoFuso, horaCurta } from './formato'
 import { agruparPorLinha } from './pedido'
 
 // KDS sobre Pedido (S19), usado pela cozinha no modo API (F05). Os status são os
@@ -24,6 +25,7 @@ export function proximoStatusKds(status) {
   return { status: proximo, toque: COLUNAS_KDS.find((c) => c.status === status).toque }
 }
 
+const UMA_HORA_MS = 60 * 60 * 1000
 const minutos = (ms) => Math.max(1, Math.round(Math.abs(ms) / 60000))
 
 // S21: quando o preparo precisa começar e se já passou. `atrasado` vem da API
@@ -35,9 +37,16 @@ export function avisoDeInicio({ inicioPrevistoEm, atrasado, status }, agora) {
   if (status && status !== 'aguardando' && !atrasado) return null
   const falta = Date.parse(inicioPrevistoEm) - agora
   if (atrasado) return { atrasado: true, texto: `Atrasado ${minutos(falta)} min: devia ter começado` }
-  return falta > 0
-    ? { atrasado: false, texto: `Começar em ${minutos(falta)} min` }
-    : { atrasado: false, texto: 'Começar agora' }
+  if (falta <= 0) return { atrasado: false, texto: 'Começar agora' }
+  // #1474: com mais de 1 h pela frente, a hora diz mais que "Começar em 754 min".
+  if (falta > UMA_HORA_MS) {
+    const dia = dataIsoNoFuso(Date.parse(inicioPrevistoEm))
+    const quando = dia === dataIsoNoFuso(agora) ? ''
+      : dia === dataIsoNoFuso(agora + 24 * UMA_HORA_MS) ? 'amanhã '
+        : `em ${dia.slice(8, 10)}/${dia.slice(5, 7)} `
+    return { atrasado: false, texto: `Começar ${quando}às ${horaCurta(inicioPrevistoEm)}` }
+  }
+  return { atrasado: false, texto: `Começar em ${minutos(falta)} min` }
 }
 
 // --- Cozinha viva (issue #1446): o que a cozinha do protótipo faz, sobre o cartão do KDS ---
@@ -143,3 +152,9 @@ export function tempoAteInicio(pedido, agora) {
   if (!(total > 0)) return agora >= inicio ? 0 : 1
   return Math.min(1, Math.max(0, (inicio - agora) / total))
 }
+
+// Fila vazia (#1474): a cozinha mostra um dia por vez. O pedido pago para amanhã não aparece
+// em Hoje, e a tela dizia "Cozinha em dia" como se nada faltasse.
+export const textoDaCozinhaVazia = ({ amanha }) => (amanha
+  ? 'Nenhum pedido pago para amanhã ainda.'
+  : 'Cozinha em dia hoje. O pedido pago para hoje aparece aqui sozinho; o de amanhã, em Amanhã.')
