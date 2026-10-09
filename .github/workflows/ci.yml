@@ -32,7 +32,7 @@ jobs:
     # restore-test-rotulos.yml.
     services:
       postgres:
-        image: postgres:16
+        image: public.ecr.aws/docker/library/postgres:16 # espelho da imagem oficial: o Docker Hub anonimo estoura o limite de pull (#1514)
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: easystock_ci
