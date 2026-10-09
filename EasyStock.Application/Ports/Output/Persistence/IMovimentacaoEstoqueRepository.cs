@@ -47,5 +47,13 @@ namespace EasyStock.Application.Ports.Output.Persistence
             string referenciaDocumento,
             NaturezaMovimentacaoEstoque natureza,
             CancellationToken ct = default);
+
+        /// <summary>
+        /// M2.6 (#1511): saídas das naturezas pedidas no período [de, ate), com o produto e o lote
+        /// (para o relatório de perdas). Inclui as estornadas, que o relatório mostra como desfeitas.
+        /// </summary>
+        Task<IReadOnlyList<MovimentacaoEstoque>> GetSaidasPorNaturezaAsync(
+            Guid empresaId, IReadOnlyCollection<NaturezaMovimentacaoEstoque> naturezas, DateTime deUtc, DateTime ateUtc,
+            CancellationToken ct = default);
     }
 }

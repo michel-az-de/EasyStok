@@ -1,6 +1,10 @@
 using System.Reflection;
 using EasyStock.Api.Controllers;
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Atendimento.Producao;
+using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
@@ -80,13 +84,43 @@ public class AtendimentoProducaoControllerTests
     {
         var currentUser = Substitute.For<ICurrentUserAccessor>();
         currentUser.TemPermissao(Permissao.GerenciarEstoque).Returns(false);
-        var controller = new AtendimentoProducaoController(null!, null!, null!, null!, null!, currentUser);
+        var controller = new AtendimentoProducaoController(null!, null!, null!, null!, null!, null!, currentUser);
 
         (await controller.EstoqueDoDia(CancellationToken.None)).Should().BeOfType<ForbidResult>();
         (await controller.Insumos(CancellationToken.None)).Should().BeOfType<ForbidResult>();
         (await controller.Receitas(CancellationToken.None)).Should().BeOfType<ForbidResult>();
         (await controller.Sugestao(null, CancellationToken.None)).Should().BeOfType<ForbidResult>();
         (await controller.Planejar(new PlanejamentoRequest([]), CancellationToken.None)).Should().BeOfType<ForbidResult>();
+        (await controller.Perdas(null, null, CancellationToken.None)).Should().BeOfType<ForbidResult>();
+        (await controller.Vencidos(CancellationToken.None)).Should().BeOfType<ForbidResult>();
+        (await controller.LancarPerda(new PerdaRequest(Guid.NewGuid(), null, 1, MotivoPerda.Vencido, null), CancellationToken.None))
+            .Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task PerdaAcimaDoLimite_SemGerente_403ComAMensagem()
+    {
+        // M2.6 (#1511, D-M2-06): Operador com permissão de estoque, perda de R$ 100 > R$ 50.
+        var empresaId = Guid.NewGuid();
+        var currentUser = Substitute.For<ICurrentUserAccessor>();
+        currentUser.TemPermissao(Permissao.GerenciarEstoque).Returns(true);
+        currentUser.Nivel.Returns(NivelAcesso.Operador);
+        currentUser.EmpresaId.Returns(empresaId);
+        var produtoId = Guid.NewGuid();
+        var itens = Substitute.For<IItemEstoqueRepository>();
+        itens.GetLotesDisponiveisParaSaidaAsync(empresaId, produtoId, null, true, true).Returns([new ItemEstoque
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId,
+            QuantidadeAtual = EasyStock.Domain.ValueObjects.Quantidade.From(1), CustoUnitario = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(100m),
+        }]);
+        var perdas = new PerdasDaProducaoUseCase(itens, Substitute.For<IMovimentacaoEstoqueRepository>(), null!, TimeProvider.System);
+        var controller = new AtendimentoProducaoController(null!, null!, null!, null!, null!, perdas, currentUser);
+
+        var r = await controller.LancarPerda(new PerdaRequest(produtoId, null, 1, MotivoPerda.PerdaNoPreparo, null), CancellationToken.None);
+
+        var objeto = r.Should().BeOfType<ObjectResult>().Subject;
+        objeto.StatusCode.Should().Be(403);
+        objeto.Value.Should().BeOfType<ApiErrorResponse>().Which.Error.Message.Should().Contain("só o Gerente lança");
     }
 
     [Theory]

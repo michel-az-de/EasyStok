@@ -17,6 +17,7 @@ const loteDaApi = (l) => ({
 export const estoqueDoDiaDaApi = (r) => ({
   pratos: (r?.pratos ?? []).map((p) => ({
     sku: p.cardapioItemId,
+    produtoId: p.produtoId ?? null,
     nome: p.nome,
     porcao: p.porcao ?? '',
     saldo: p.saldo,
@@ -157,4 +158,34 @@ export const planejamentoDaApi = (r) => ({
 export const gerarListaDeCompras = ({ nome, itens }) => chamarApi('/api/listas-compras/gerar', {
   metodo: 'POST',
   corpo: { nome, itens, origem: 'console' },
+})
+
+// M2.6 (#1511): perdas com motivo (D-M2-02). Lançar acima de R$ 50 é do Gerente (D-M2-06);
+// desfazer é o estorno de saída que já existe (Gerente).
+const query = (pares) => {
+  const q = Object.entries(pares).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&')
+  return q ? `?${q}` : ''
+}
+export const obterPerdas = (de, ate) => chamarApi(`${PRODUCAO}/perdas${query({ de, ate })}`)
+export const obterVencidos = () => chamarApi(`${PRODUCAO}/perdas/vencidos`)
+export const lancarPerda = ({ produtoId, itemEstoqueId = null, quantidade, motivo, texto = null }) =>
+  chamarApi(`${PRODUCAO}/perdas`, { metodo: 'POST', corpo: { produtoId, itemEstoqueId, quantidade, motivo, texto } })
+export const estornarSaida = (movimentacaoId, motivo) =>
+  chamarApi(`/api/estoque/estorno/${movimentacaoId}`, { metodo: 'POST', corpo: { motivo } })
+
+export const resumoDePerdasDaApi = (r) => ({
+  de: r?.de ?? null,
+  ate: r?.ate ?? null,
+  valor: r?.valor ?? 0,
+  porMotivo: (r?.porMotivo ?? []).map((m) => ({ motivo: m.motivo, rotulo: m.rotulo, quantidade: m.quantidade, valor: m.valor })),
+  porProduto: (r?.porProduto ?? []).map((p) => ({ produtoId: p.produtoId, nome: p.produto, quantidade: p.quantidade, valor: p.valor })),
+  lancamentos: (r?.lancamentos ?? []).map((l) => ({
+    id: l.movimentacaoId, data: l.data, produtoId: l.produtoId, nome: l.produto, lote: l.lote ?? null,
+    quantidade: l.quantidade, valor: l.valor, motivo: l.motivo, descricao: l.descricao ?? null, desfeita: l.desfeita === true,
+  })),
+})
+
+export const vencidoDaApi = (v) => ({
+  itemEstoqueId: v.itemEstoqueId, produtoId: v.produtoId, nome: v.produto, lote: v.lote ?? null,
+  quantidade: v.quantidade, validade: v.validadeEm ? v.validadeEm.slice(0, 10) : null, diasVencido: v.diasVencido, valor: v.valor,
 })
