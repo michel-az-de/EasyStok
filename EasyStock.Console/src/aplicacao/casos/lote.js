@@ -63,4 +63,10 @@ export const casosLote = {
     })), estado)
     return { ...comLancamentos, conexao: { ...comLancamentos.conexao, pedidosAbertos: [], offlineDesde: null } }
   },
+
+  // #1241 (modo API): o EasyStok já aplicou os passos e não avisa o cliente retroativo, então
+  // nada entra na conversa. O pedido novo chega pela releitura; aqui só fecha a pendência.
+  [acao.LOTE_PAPEL_LANCADO_API]: (estado) => ({
+    ...estado, conexao: { ...estado.conexao, pedidosAbertos: [], offlineDesde: null },
+  }),
 }

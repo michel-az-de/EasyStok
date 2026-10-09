@@ -193,6 +193,10 @@ export const ALTERNAR_ARQUIVAMENTO_RESPOSTA_PRONTA = 'alternar-arquivamento-resp
 export const CONEXAO_CAIU = 'conexao-caiu'
 export const CONEXAO_VOLTOU = 'conexao-voltou'
 export const LANCAR_LOTE_PAPEL = 'lancar-lote-papel'
+// #1241: no modo API o EasyStok aplicou o lote; a tela só fecha a pendência, sem mensagem.
+export const LOTE_PAPEL_LANCADO_API = 'lote-papel-lancado-api'
+// #1241: alertas de produto vendido sem saldo lidos do EasyStok (S22).
+export const ALERTAS_DE_ESTOQUE_DA_API = 'alertas-de-estoque-da-api'
 
 // Frente Simulação (rodada 10, pedido do dono 25/09/2026 23h42): o cliente
 // simulado reage às ações da Thatiane, não só manda falas por tempo fixo.
