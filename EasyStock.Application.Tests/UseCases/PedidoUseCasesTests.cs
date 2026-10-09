@@ -25,6 +25,9 @@ public class PedidoUseCasesTests
     private readonly IItemEstoqueRepository _itemEstoqueRepo = Substitute.For<IItemEstoqueRepository>();
     private readonly IMovimentacaoEstoqueRepository _movRepo = Substitute.For<IMovimentacaoEstoqueRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IContaReceberRepository _contaReceberRepo = Substitute.For<IContaReceberRepository>();
+    private readonly EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository _vagaRepo =
+        Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>();
 
     public PedidoUseCasesTests()
     {
@@ -48,7 +51,8 @@ public class PedidoUseCasesTests
     private CriarPedidoUseCase CriarPedidoUC() => new(_pedidoRepo, _clienteRepo, _produtoRepo, _uow,
         Substitute.For<ILogger<CriarPedidoUseCase>>(), new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
     private CancelarPedidoUseCase CancelarUC() => new(_pedidoRepo, EstoqueSvc(),
-        Substitute.For<IContaReceberRepository>(),
+        new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(_contaReceberRepo, _vagaRepo,
+            Substitute.For<ILogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>>()),
         _uow, Substitute.For<ILogger<CancelarPedidoUseCase>>());
     private RegistrarPagamentoPedidoUseCase PagamentoUC() => new(_pedidoRepo, _uow,
         Substitute.For<ILogger<RegistrarPagamentoPedidoUseCase>>(), new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()), QuitacaoPedidoTeste.Criar(_pedidoRepo));
@@ -426,6 +430,21 @@ public class PedidoUseCasesTests
     }
 
     [Fact]
+    public async Task CancelarPedido_LiberaVagaDaJanela()
+    {
+        // #1506: cancelar pelo console deixava a vaga ocupada e a janela "esgotada" no site.
+        var empresaId = Guid.NewGuid();
+        var pedido = Pedido.Criar(empresaId);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        await CancelarUC().ExecuteAsync(new CancelarPedidoCommand(empresaId, pedido.Id, Motivo: "cliente desistiu"));
+
+        await _vagaRepo.Received(1).LiberarPorPedidoAsync(pedido.Id,
+            Arg.Is<string>(m => m.Contains("cliente desistiu")), Arg.Any<CancellationToken>());
+        await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
     public async Task CancelarPedido_DeveSerIdempotente_QuandoJaCancelado()
     {
         var empresaId = Guid.NewGuid();
@@ -609,6 +628,7 @@ public class PedidoUseCasesTests
     [InlineData("rascunho")]
     [InlineData("aguardando_pagamento")]
     [InlineData("aguardando_aprovacao_baba")]
+    [InlineData("cancelado")] // #1506: pedido cancelado nao recebe pagamento manual
     public async Task RegistrarPagamento_DeveRejeitar_QuandoStatusPreOperacional(string statusPre)
     {
         var empresaId = Guid.NewGuid();

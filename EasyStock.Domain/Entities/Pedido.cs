@@ -365,7 +365,9 @@ namespace EasyStock.Domain.Entities
 
         public void RecalcularSubtotal()
         {
-            Subtotal = Quantidade * PrecoUnitario;
+            // #1506: centavos como a coluna numeric(14,2) grava. Sem arredondar, 0,35 kg x 47,90
+            // (16,765) somava 33,53 no Total em memoria e 33,54 depois de recarregar do banco.
+            Subtotal = Math.Round(Quantidade * PrecoUnitario, 2, MidpointRounding.AwayFromZero);
         }
     }
 

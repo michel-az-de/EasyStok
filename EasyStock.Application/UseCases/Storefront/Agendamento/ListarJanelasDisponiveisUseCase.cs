@@ -122,6 +122,9 @@ public sealed class ListarJanelasDisponiveisUseCase(
                 if (bloqueioEspecifico[(data, janela.Id)].Any())
                     continue;
 
+                if (CalculadoraPrazoPedido.JanelaJaPassou(data, janela.HoraFim, agoraUtc))
+                    continue;
+
                 if (input.PrazoMinimoMinutos is { } prazo
                     && !CalculadoraPrazoPedido.AtendePrazo(data, janela.HoraInicio, agoraUtc, prazo))
                     continue;

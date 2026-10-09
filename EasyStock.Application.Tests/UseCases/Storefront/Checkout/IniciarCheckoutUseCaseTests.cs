@@ -214,7 +214,7 @@ public class IniciarCheckoutUseCaseTests
             f.PedidoRepo,
             f.ExpedienteRepo,
             NullLogger<CheckoutCoreService>.Instance,
-            TimeProvider.System);
+            new EasyStock.TestHelpers.FakeTimeProvider(new DateTimeOffset(2026, 6, 1, 15, 0, 0, TimeSpan.Zero)) /* #1506: antes das entregas de 02/06 */);
         return new(
             core,
             f.StorefrontRepo,
