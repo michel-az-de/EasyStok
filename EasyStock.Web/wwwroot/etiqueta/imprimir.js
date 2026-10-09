@@ -1,6 +1,9 @@
 import { renderEtiqueta } from './render.js';
 import { renderCodes }   from './codes.js';
 
+// #1509: base absoluta do modulo para o HTML da janela de impressao (o caminho absoluto /etiqueta/ dava 404 em /pwa/).
+const ETQ_BASE = new URL('./', import.meta.url).href;
+
 // ── State ────────────────────────────────────────────────────────────────────
 let _payload    = null;   // EtiquetaRenderPayload from API
 let _templates  = [];     // EtiquetaTemplateListItem[]
@@ -320,7 +323,7 @@ function _buildPrintHtml(ids, layout) {
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Etiquetas — ${_payload.Etiquetas[0]?.LoteCodigo ?? ''}</title>
-<link rel="stylesheet" href="/etiqueta/etiqueta.css">
+<link rel="stylesheet" href="${ETQ_BASE}etiqueta.css">
 <style>
   @page { size: ${wMm}mm ${hMm}mm; margin: 0; }
   body  { margin: 0; padding: 0; }
@@ -328,10 +331,10 @@ function _buildPrintHtml(ids, layout) {
 </style>
 </head><body>
 ${labelHtmls}
-<script src="/etiqueta/vendor/qrcode.min.js"><\/script>
-<script src="/etiqueta/vendor/jsbarcode.min.js"><\/script>
+<script src="${ETQ_BASE}vendor/qrcode.min.js"><\/script>
+<script src="${ETQ_BASE}vendor/jsbarcode.min.js"><\/script>
 <script type="module">
-  import { renderCodes } from '/etiqueta/codes.js';
+  import { renderCodes } from '${ETQ_BASE}codes.js';
   // #ETQ1: imprime SO apos (a) recursos carregados (load) e (b) TODOS os QR/barcode
   // renderizados. Antes o loop era fire-and-forget e o print disparava em load+500ms,
   // entao etiqueta regulada (RDC 727) saia SEM codigo se o render passasse de 500ms
