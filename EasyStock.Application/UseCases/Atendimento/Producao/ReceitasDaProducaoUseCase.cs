@@ -5,9 +5,10 @@ using EasyStock.Domain.Exceptions.Storefront;
 namespace EasyStock.Application.UseCases.Atendimento.Producao;
 
 /// <param name="CustoPorRendimento">Custo da receita ÷ rendimento (por porção quando o rendimento é em Un). Null = algum insumo sem custo.</param>
+/// <param name="BaixaAutomatica">D-M2-01 (#1499): produzir o prato baixa os insumos da receita.</param>
 public sealed record ReceitaDoPrato(
     Guid CardapioItemId, Guid ProdutoId, string Nome, decimal RendimentoBase, UnidadeMedida RendimentoUnidade,
-    int Linhas, decimal? CustoTotal, decimal? CustoPorRendimento);
+    int Linhas, decimal? CustoTotal, decimal? CustoPorRendimento, bool BaixaAutomatica = false);
 
 /// <param name="Custo">Custo da linha na unidade do insumo. Null = insumo sem custo ou unidades incompatíveis.</param>
 public sealed record LinhaDaReceita(
@@ -15,7 +16,7 @@ public sealed record LinhaDaReceita(
 
 public sealed record DetalheDaReceita(
     Guid ProdutoId, string Nome, decimal RendimentoBase, UnidadeMedida RendimentoUnidade, UnidadeMedida UnidadeMedidaBase,
-    IReadOnlyList<LinhaDaReceita> Linhas, decimal? CustoTotal, decimal? CustoPorRendimento);
+    IReadOnlyList<LinhaDaReceita> Linhas, decimal? CustoTotal, decimal? CustoPorRendimento, bool BaixaAutomatica = false);
 
 /// <summary>
 /// Receitas pelo console (M2.4a, #1498). Na API a "ficha técnica" é a nutricional; aqui é a
@@ -27,7 +28,8 @@ public sealed class ReceitasDaProducaoUseCase(
     IStorefrontRepository storefrontRepository,
     ICardapioItemRepository cardapioRepository,
     IProdutoRepository produtoRepository,
-    IProdutoComposicaoRepository composicaoRepository)
+    IProdutoComposicaoRepository composicaoRepository,
+    IUnitOfWork unitOfWork)
 {
     public async Task<IReadOnlyList<ReceitaDoPrato>> ListarAsync(Guid empresaId, CancellationToken ct = default)
     {
@@ -47,7 +49,7 @@ public sealed class ReceitasDaProducaoUseCase(
             var linhas = await composicaoRepository.GetByProdutoFinalAsync(empresaId, produto.Id, null, ct);
             var (total, porRendimento) = Custos(linhas.Select(Linha).ToList(), produto.RendimentoBase);
             lista.Add(new ReceitaDoPrato(prato.Id, produto.Id, prato.NomeEfetivo() ?? produto.Nome,
-                produto.RendimentoBase, produto.RendimentoUnidade, linhas.Count, total, porRendimento));
+                produto.RendimentoBase, produto.RendimentoUnidade, linhas.Count, total, porRendimento, produto.BaixaInsumoAutomatica));
         }
         return lista;
     }
@@ -61,7 +63,22 @@ public sealed class ReceitasDaProducaoUseCase(
             .OrderBy(c => c.OrdemExibicao).Select(Linha).ToList();
         var (total, porRendimento) = Custos(linhas, produto.RendimentoBase);
         return new DetalheDaReceita(produto.Id, produto.Nome, produto.RendimentoBase, produto.RendimentoUnidade,
-            produto.UnidadeMedidaBase, linhas, total, porRendimento);
+            produto.UnidadeMedidaBase, linhas, total, porRendimento, produto.BaixaInsumoAutomatica);
+    }
+
+    /// <summary>D-M2-01 (#1499): liga ou desliga a baixa de insumo na produção. Ligar exige receita.</summary>
+    public async Task MarcarBaixaAutomaticaAsync(Guid empresaId, Guid produtoId, bool ligada, CancellationToken ct = default)
+    {
+        UseCaseGuards.EnsureEmpresaId(empresaId);
+        var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
+            ?? throw new UseCaseValidationException("Prato não encontrado.");
+        if (ligada && (await composicaoRepository.GetByProdutoFinalAsync(empresaId, produtoId, null, ct)).Count == 0)
+            throw new UseCaseValidationException("Monte a receita antes de ligar a baixa automática.");
+
+        produto.BaixaInsumoAutomatica = ligada;
+        produto.AlteradoEm = DateTime.UtcNow;
+        await produtoRepository.UpdateAsync(produto);
+        await unitOfWork.CommitAsync();
     }
 
     private static LinhaDaReceita Linha(ProdutoComposicao c)

@@ -107,6 +107,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<RemoverItemLoteUseCase>();
         services.AddScoped<FinalizarLoteUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Producao.RegistrarProducaoUseCase>(); // S23 (#1137)
+        services.AddScoped<EasyStock.Application.UseCases.Producao.BaixaDeInsumosDaProducao>(); // D-M2-01 (#1499)
         services.AddScoped<AtualizarPesoLoteItemUseCase>(); // C2 backfill (R3 bloqueio)
         services.AddScoped<ListarLotesUseCase>();
         services.AddScoped<ObterLoteDetalhesUseCase>();

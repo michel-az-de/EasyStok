@@ -1,6 +1,7 @@
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.Producao;
+using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
@@ -78,6 +79,71 @@ public class RegistrarProducaoIntegrationTests(PostgreSqlDatabaseFixture fixture
         assert.SetMobileTenantContext(empresaId);
         (await assert.Set<Lote>().CountAsync()).Should().Be(0);
         (await assert.Set<ItemEstoque>().CountAsync()).Should().Be(0);
+    }
+
+    [SkippableFact]
+    public async Task PratoMarcado_BaixaInsumoNaMesmaTransacao_EFaltaViraDescoberto()
+    {
+        // D-M2-01 (#1499): 300 g de molho por porção, 2 porções = 600 g; só há 500 g. A produção
+        // passa, o molho sai inteiro e os 100 g que faltaram ficam descobertos no lote do insumo.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var (empresaId, pratoId) = await SeedAsync(StatusProduto.Ativo);
+        var molhoId = await SeedReceitaAsync(empresaId, pratoId);
+
+        await using var provider = BuildProductionProvider();
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().SetMobileTenantContext(empresaId);
+            await scope.ServiceProvider.GetRequiredService<RegistrarEntradaEstoqueUseCase>().ExecuteAsync(
+                new RegistrarEntradaEstoqueCommand(empresaId, molhoId, null, 500, 0.03m, null, DateTime.UtcNow.AddDays(-1),
+                    NaturezaMovimentacaoEstoque.Compra, null, null, null, null, null, null, null, null, null, null, null, null, null));
+        }
+
+        RegistrarProducaoResult result;
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().SetMobileTenantContext(empresaId);
+            result = await scope.ServiceProvider.GetRequiredService<RegistrarProducaoUseCase>()
+                .ExecuteAsync(new RegistrarProducaoCommand(empresaId, null, DateTime.UtcNow,
+                    [new RegistrarProducaoItemInput(pratoId, 2, 500, 5, 10m)]));
+        }
+
+        result.Avisos.Should().ContainSingle().Which.Should().Contain("Faltou 100 G de Molho");
+
+        await using var assert = fixture.CreateDbContext();
+        assert.SetMobileTenantContext(empresaId);
+        var molho = await assert.Set<ItemEstoque>().SingleAsync(i => i.ProdutoId == molhoId);
+        molho.QuantidadeAtual.Value.Should().Be(0);
+        molho.QuantidadeDescoberta.Value.Should().Be(100);
+        var saida = await assert.Set<MovimentacaoEstoque>().SingleAsync(m => m.ProdutoId == molhoId && m.Tipo == TipoMovimentacaoEstoque.Saida);
+        saida.Natureza.Should().Be(NaturezaMovimentacaoEstoque.UsoInterno);
+        saida.Quantidade.Value.Should().Be(600);
+        (await assert.Set<ItemEstoque>().SingleAsync(i => i.ProdutoId == pratoId)).QuantidadeAtual.Value.Should().Be(2);
+    }
+
+    private async Task<Guid> SeedReceitaAsync(Guid empresaId, Guid pratoId)
+    {
+        await using var seed = fixture.CreateDbContext();
+        seed.SetMobileTenantContext(empresaId);
+        var prato = await seed.Set<Produto>().SingleAsync(p => p.Id == pratoId);
+        prato.BaixaInsumoAutomatica = true;
+        prato.RendimentoBase = 1;
+        prato.RendimentoUnidade = UnidadeMedida.Un;
+        var molho = new Produto
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, CategoriaId = prato.CategoriaId, Nome = "Molho",
+            Status = StatusProduto.Ativo, EhInsumo = true, UnidadeMedidaBase = UnidadeMedida.G,
+            CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+        };
+        seed.Set<Produto>().Add(molho);
+        seed.Set<ProdutoComposicao>().Add(new ProdutoComposicao
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoFinalId = pratoId, InsumoId = molho.Id,
+            Quantidade = 300, Unidade = UnidadeMedida.G, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+        });
+        await seed.SaveChangesAsync();
+        return molho.Id;
     }
 
     private async Task<(Guid EmpresaId, Guid ProdutoId)> SeedAsync(StatusProduto status)

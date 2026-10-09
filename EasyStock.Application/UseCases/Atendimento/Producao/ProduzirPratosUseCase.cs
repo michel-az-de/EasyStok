@@ -14,7 +14,9 @@ public sealed record ProduzirPratosCommand(
 
 public sealed record PratoProduzidoResult(Guid CardapioItemId, string Nome, int Porcoes, int? SobraG, DateTime ValidadeEm);
 
-public sealed record ProduzirPratosResult(Guid LoteId, string CodigoLote, int TotalEtiquetas, IReadOnlyList<PratoProduzidoResult> Pratos);
+/// <param name="Avisos">D-M2-01 (#1499): falta de insumo na baixa automática. Avisa, não trava.</param>
+public sealed record ProduzirPratosResult(
+    Guid LoteId, string CodigoLote, int TotalEtiquetas, IReadOnlyList<PratoProduzidoResult> Pratos, IReadOnlyList<string>? Avisos = null);
 
 /// <summary>
 /// Produção do dia pelo console (M2.2, #1491). Ela escolhe o prato do cardápio; o produto do estoque
@@ -22,7 +24,7 @@ public sealed record ProduzirPratosResult(Guid LoteId, string CodigoLote, int To
 /// na primeira produção, na categoria de estoque "Cardápio", e fica ligado a ele (D-M1-01: o que a
 /// casa produz é vinculado). Depois delega ao <see cref="RegistrarProducaoUseCase"/> (S23): lote,
 /// etiquetas e entrada em porções numa transação. D-M2-04: o destino vem da linha do prato.
-/// D-M2-01: a baixa de insumo pela receita entra com a M2.4.
+/// D-M2-01 (#1499): a S23 baixa os insumos do prato marcado e devolve os avisos de falta.
 /// </summary>
 public sealed class ProduzirPratosUseCase(
     IStorefrontRepository storefrontRepository,
@@ -69,7 +71,8 @@ public sealed class ProduzirPratosUseCase(
         return new ProduzirPratosResult(
             producao.LoteId, producao.CodigoLote, producao.TotalEtiquetas,
             producao.Itens.Select((r, i) => new PratoProduzidoResult(
-                pratos[i].Id, Exibicao(pratos[i].NomeEfetivo()), r.Porcoes, r.SobraG, r.ValidadeEm)).ToList());
+                pratos[i].Id, Exibicao(pratos[i].NomeEfetivo()), r.Porcoes, r.SobraG, r.ValidadeEm)).ToList(),
+            producao.Avisos ?? []);
     }
 
     private async Task VincularAvulsosAsync(ProduzirPratosCommand cmd, IReadOnlyList<CardapioItem> pratos, CancellationToken ct)

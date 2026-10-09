@@ -16,6 +16,7 @@ public class ReceitasDaProducaoUseCaseTests
     private readonly ICardapioItemRepository _cardapio = Substitute.For<ICardapioItemRepository>();
     private readonly IProdutoRepository _produtos = Substitute.For<IProdutoRepository>();
     private readonly IProdutoComposicaoRepository _composicao = Substitute.For<IProdutoComposicaoRepository>();
+    private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     public ReceitasDaProducaoUseCaseTests()
     {
@@ -23,7 +24,7 @@ public class ReceitasDaProducaoUseCaseTests
         _storefronts.GetByEmpresaAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns(_vitrine);
     }
 
-    private ReceitasDaProducaoUseCase Sut() => new(_storefronts, _cardapio, _produtos, _composicao);
+    private ReceitasDaProducaoUseCase Sut() => new(_storefronts, _cardapio, _produtos, _composicao, _uow);
 
     private Produto Prato(decimal rendimento)
     {
@@ -86,5 +87,34 @@ public class ReceitasDaProducaoUseCaseTests
         var lista = await Sut().ListarAsync(EmpresaId);
 
         lista.Should().ContainSingle().Which.ProdutoId.Should().Be(lasanha.Id);
+    }
+
+    [Fact]
+    public async Task MarcarBaixaAutomatica_LigaEDesliga_EGrava()
+    {
+        var lasanha = Prato(6);
+        Receita(lasanha, (Insumo("Molho", UnidadeMedida.G, 0.03m), 600, UnidadeMedida.G));
+
+        await Sut().MarcarBaixaAutomaticaAsync(EmpresaId, lasanha.Id, true);
+        lasanha.BaixaInsumoAutomatica.Should().BeTrue();
+        (await Sut().ObterAsync(EmpresaId, lasanha.Id)).BaixaAutomatica.Should().BeTrue();
+
+        await Sut().MarcarBaixaAutomaticaAsync(EmpresaId, lasanha.Id, false);
+        lasanha.BaixaInsumoAutomatica.Should().BeFalse();
+        await _produtos.Received(2).UpdateAsync(lasanha);
+        await _uow.Received(2).CommitAsync();
+    }
+
+    [Fact]
+    public async Task LigarBaixaSemReceita_Recusa()
+    {
+        var lasanha = Prato(6);
+        Receita(lasanha);
+
+        var act = () => Sut().MarcarBaixaAutomaticaAsync(EmpresaId, lasanha.Id, true);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*receita*");
+        lasanha.BaixaInsumoAutomatica.Should().BeFalse();
+        await _uow.DidNotReceive().CommitAsync();
     }
 }

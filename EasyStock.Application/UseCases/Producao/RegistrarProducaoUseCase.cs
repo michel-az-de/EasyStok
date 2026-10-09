@@ -30,7 +30,9 @@ public sealed record RegistrarProducaoResult(
     Guid LoteId,
     string CodigoLote,
     int TotalEtiquetas,
-    IReadOnlyList<RegistrarProducaoItemResult> Itens);
+    IReadOnlyList<RegistrarProducaoItemResult> Itens,
+    // D-M2-01 (#1499): falta de insumo na baixa automatica avisa, nao trava.
+    IReadOnlyList<string>? Avisos = null);
 
 /// <summary>
 /// S23 (#1137): registra uma producao em porcoes numa TRANSACAO UNICA:
@@ -51,7 +53,8 @@ public class RegistrarProducaoUseCase(
     RegistrarEntradaEstoqueUseCase registrarEntradaUC,
     IProdutoRepository produtoRepository,
     IUnitOfWork uow,
-    ILogger<RegistrarProducaoUseCase> logger)
+    ILogger<RegistrarProducaoUseCase> logger,
+    BaixaDeInsumosDaProducao? baixaDeInsumos = null)
 {
     public async Task<RegistrarProducaoResult> ExecuteAsync(RegistrarProducaoCommand cmd, CancellationToken ct = default)
     {
@@ -161,10 +164,17 @@ public class RegistrarProducaoUseCase(
                 it.ProdutoId, entrada.ItemEstoqueId, entrada.MovimentacaoId, it.Porcoes, validadeEm, Sobra(it)));
         }
 
-        logger.LogInformation("Producao registrada: lote {Codigo} com {Itens} item(ns) e {Etiquetas} etiqueta(s).",
-            finalizado.Codigo, resultados.Count, finalizado.TotalUnidades);
+        // D-M2-01 (#1499): baixa dos insumos na MESMA transacao (a saida reusa a transacao aberta).
+        var avisos = baixaDeInsumos is null
+            ? []
+            : await baixaDeInsumos.BaixarAsync(cmd.EmpresaId,
+                itens.Select(i => new PratoParaBaixa(produtos[i.ProdutoId], i.Porcoes, i.PesoRealG ?? i.Porcoes * i.PesoPorPorcaoG)).ToList(),
+                finalizado.Codigo, dataProducao, ct);
 
-        return new RegistrarProducaoResult(finalizado.Id, finalizado.Codigo, finalizado.TotalUnidades, resultados);
+        logger.LogInformation("Producao registrada: lote {Codigo} com {Itens} item(ns), {Etiquetas} etiqueta(s) e {Avisos} aviso(s) de insumo.",
+            finalizado.Codigo, resultados.Count, finalizado.TotalUnidades, avisos.Count);
+
+        return new RegistrarProducaoResult(finalizado.Id, finalizado.Codigo, finalizado.TotalUnidades, resultados, avisos);
     }
 
     private static string Truncar(string s, int max) => s.Length > max ? s[..max] : s;

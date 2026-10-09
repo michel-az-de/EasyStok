@@ -10,7 +10,7 @@ import css from '../cardapio/abaCardapio.module.css'
 // M2 › Receitas (M2.4a, #1498). Por prato do cardápio ligado ao estoque: quanto rende e os insumos
 // com quantidade e unidade. O custo por porção vem do EasyStok, com a unidade convertida (a receita
 // pode pedir 1,2 kg de um molho que custa por grama). Na API "ficha técnica" é a nutricional; aqui
-// é a receita. Gravar é do Gerente.
+// é a receita. Gravar é do Gerente. D-M2-01 (#1499): o prato marcado baixa os insumos ao produzir.
 const custoPor = (r) => (r.custoPorRendimento == null
   ? (r.linhas === 0 ? 'sem receita' : 'custo incompleto (insumo sem custo)')
   : `${moeda(r.custoPorRendimento)} por ${r.unidadeRendimento === 'Un' ? 'porção' : r.unidadeRendimento}`)
@@ -118,11 +118,17 @@ export function AbaReceitasApi() {
               </div>
               <div className={css.estados}>
                 <Pilula tom={r.custoPorRendimento == null ? 'neutro' : 'ok'} fina>{custoPor(r)}</Pilula>
+                {r.baixaAutomatica && <Pilula tom="ok" fina>baixa insumos ao produzir</Pilula>}
               </div>
               <div className={css.acoes}>
                 <Botao variante="texto" onClick={() => setEditando(editando === r.produtoId ? null : r.produtoId)}>
                   {r.linhas === 0 ? 'Montar receita' : 'Editar receita'}
                 </Botao>
+                {r.linhas > 0 && (
+                  <Botao variante="texto" onClick={() => gestao.marcarBaixa(r.produtoId, !r.baixaAutomatica)}>
+                    {r.baixaAutomatica ? 'Parar de baixar insumos' : 'Baixar insumos ao produzir'}
+                  </Botao>
+                )}
               </div>
               {editando === r.produtoId && (
                 <EditorReceita prato={r} aoSalvar={gestao.salvar} aoFechar={() => setEditando(null)} />

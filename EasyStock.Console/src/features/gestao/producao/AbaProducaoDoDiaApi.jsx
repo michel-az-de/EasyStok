@@ -72,6 +72,11 @@ export function AbaProducaoDoDiaApi() {
           <strong>Lote {feito.codigo}</strong> lançado: {feito.pratos.map((p) => `${p.porcoes}× ${p.nome}${p.sobraG ? ` (sobra ${p.sobraG} g)` : ''}`).join(', ')}.
           {' '}<Botao variante="primario" onClick={imprimir}>Imprimir {feito.etiquetas} etiqueta(s)</Botao>
           {' '}<Botao variante="texto" onClick={() => { setFeito(null); setEtiquetas(null) }}>Fechar</Botao>
+          {feito.avisos.length > 0 && (
+            <ul aria-label="Avisos de insumo">
+              {feito.avisos.map((a) => <li key={a}>{a}</li>)}
+            </ul>
+          )}
         </output>
       )}
 
