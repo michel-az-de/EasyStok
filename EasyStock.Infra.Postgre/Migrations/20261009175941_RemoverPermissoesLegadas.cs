@@ -23,7 +23,18 @@ namespace EasyStock.Infra.Postgre.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             // Sem restauração prévia, apagar o marcador pode ampliar acesso e apagar o arquivo perde o histórico.
-            throw new NotSupportedException("Restaure o arquivo de permissões e revise os perfis explícitos antes de reverter.");
+            // #1504: a trava vale só quando há o que proteger. O RAISE aborta a transação da migration, que
+            // continua aplicada; sem perfil explícito nem arquivo, as colunas saem como em qualquer Down aditivo.
+            migrationBuilder.Sql("""
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM perfis WHERE "PermissoesExplicitas" OR "PermissoesLegadas" IS NOT NULL) THEN
+                        RAISE EXCEPTION 'Restaure o arquivo de permissões e revise os perfis explícitos antes de reverter.';
+                    END IF;
+                END $$;
+                """);
+            migrationBuilder.DropColumn(name: "PermissoesLegadas", table: "perfis");
+            migrationBuilder.DropColumn(name: "PermissoesExplicitas", table: "perfis");
         }
     }
 }
