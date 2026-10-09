@@ -139,6 +139,21 @@ public class CardapioItem
 
     public bool EstaArquivado => ArquivadoEm.HasValue;
 
+    /// <summary>
+    /// Liga o prato avulso a um produto do estoque (M2.2, D-M1-01: o que a casa produz é vinculado).
+    /// O nome e o preço do cardápio continuam os do item. Prato já vinculado não troca de produto.
+    /// </summary>
+    public void VincularProduto(Guid produtoId)
+    {
+        if (produtoId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("Produto deve ter Id válido.");
+        if (ProdutoId == produtoId) return;
+        if (ProdutoId.HasValue)
+            throw new RegraDeDominioVioladaException("O prato já está ligado a outro produto do estoque.");
+        ProdutoId = produtoId;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
     public bool EhNovidade(DateOnly hoje) => NovidadeAte is { } ate && ate >= hoje;
 
     public void Arquivar(DateTime agora)

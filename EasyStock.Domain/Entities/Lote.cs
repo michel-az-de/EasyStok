@@ -90,6 +90,12 @@ namespace EasyStock.Domain.Entities
         public int Quantidade { get; set; }
         /// <summary>Peso unitário em gramas (vai na etiqueta).</summary>
         public int? PesoG { get; set; }
+
+        /// <summary>
+        /// Peso real produzido, em gramas (M2.2, RN-45, US-061): "572 g reais atendem uma porção de
+        /// 500". A sobra é <c>PesoRealG - Quantidade * PesoG</c>. Null = não pesado.
+        /// </summary>
+        public int? PesoRealG { get; set; }
         /// <summary>Validade em dias a partir de DataProducao do lote.</summary>
         public int? ValidadeDias { get; set; }
         /// <summary>Calculado no save: DataProducao + ValidadeDias.</summary>

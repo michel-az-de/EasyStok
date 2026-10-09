@@ -120,4 +120,31 @@ public class RegistrarProducaoUseCaseTests
         await _uow.DidNotReceiveWithAnyArgs().ExecuteInTransactionSemRetryAsync<RegistrarProducaoResult>(default!, default);
         await _loteRepo.DidNotReceive().AddAsync(Arg.Any<Lote>());
     }
+
+    // M2.2 (#1491, US-061): o peso real fecha as porções; o que passa é sobra.
+    [Theory]
+    [InlineData(1000, 0)]
+    [InlineData(1144, 144)]
+    public async Task PesoReal_DaASobraDaProducao(int pesoReal, int sobra)
+    {
+        var produto = NovoProduto(TipoEmbalagem.Avulso);
+        _loteRepo.FindByCodigoAsync(_empresaId, Arg.Any<string>()).Returns(_ => _loteGravado);
+
+        var r = await Sut().ExecuteAsync(new RegistrarProducaoCommand(_empresaId, null, _dataProducao,
+            [new RegistrarProducaoItemInput(produto.Id, 2, 500, 5, null, pesoReal)]));
+
+        r.Itens.Single().SobraG.Should().Be(sobra);
+        _loteGravado!.Itens.Single().PesoRealG.Should().Be(pesoReal);
+    }
+
+    [Fact]
+    public async Task PesoRealMenorQueAsPorcoes_400()
+    {
+        var produto = NovoProduto(TipoEmbalagem.Avulso);
+
+        var act = () => Sut().ExecuteAsync(new RegistrarProducaoCommand(_empresaId, null, _dataProducao,
+            [new RegistrarProducaoItemInput(produto.Id, 2, 500, 5, null, 900)]));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*peso real*");
+    }
 }
