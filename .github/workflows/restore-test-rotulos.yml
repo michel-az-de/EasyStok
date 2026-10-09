@@ -34,7 +34,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16
+        image: public.ecr.aws/docker/library/postgres:16 # espelho da imagem oficial: o Docker Hub anonimo estoura o limite de pull (#1514)
         env:
           POSTGRES_PASSWORD: restoretest
           POSTGRES_DB: easystok_restore_test
