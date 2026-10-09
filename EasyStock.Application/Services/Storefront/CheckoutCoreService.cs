@@ -44,14 +44,16 @@ public sealed record PrazoPreparoCheckout(int TempoPreparoPadraoMinutos, int Res
 /// <summary>
 /// Pedido em <c>AguardandoPagamento</c> com a vaga ocupada. <see cref="Itens"/> são os itens do
 /// cardápio na ordem da entrada; o frete vem à parte em <see cref="ItemFrete"/>. <see cref="Total"/> é
-/// o somatório sem arredondamento, o mesmo que a cobrança usa.
+/// o somatório sem arredondamento, o mesmo que a cobrança usa. <see cref="Janela"/> é a janela reservada,
+/// para o resumo ao cliente mostrar o horário (#1474).
 /// </summary>
 public sealed record PedidoReservado(
     DomainPedido Pedido,
     StorefrontEntity Storefront,
     IReadOnlyList<DomainPedidoItem> Itens,
     DomainPedidoItem ItemFrete,
-    decimal Total);
+    decimal Total,
+    JanelaEntrega? Janela = null);
 
 /// <summary>
 /// Núcleo do checkout compartilhado (S10): fases 1 e 2 do ADR-0014, as mesmas para o site
@@ -89,6 +91,9 @@ public sealed class CheckoutCoreService(
 {
     private static readonly Regex CepDigitosRegex = new(@"^\d{8}$", RegexOptions.Compiled);
 
+    // #1474: as recusas chegam à dona pelo detail do erro; datas no formato dela e sem GUID.
+    private static readonly System.Globalization.CultureInfo PtBr = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+
     /// <summary>Motivo da recusa quando a janela começa antes de agora + prazo mínimo (S16).</summary>
     public const string JanelaAbaixoDoPrazo = "janela_abaixo_do_prazo";
 
@@ -111,7 +116,7 @@ public sealed class CheckoutCoreService(
         {
             if (qtd <= 0)
                 throw new RegraDeDominioVioladaException(
-                    $"Quantidade inválida para item {cardapioItemId}: deve ser > 0.");
+                    "A quantidade de cada item precisa ser maior que zero.");
         }
 
         return cepNormalizado;
@@ -146,11 +151,11 @@ public sealed class CheckoutCoreService(
         var janela = await janelaEntregaRepository.GetByIdAsync(input.JanelaId, ct);
         if (janela is null || !janela.Ativa || janela.StorefrontId != storefront.Id)
             throw new RegraDeDominioVioladaException(
-                $"Janela de entrega {input.JanelaId} inválida ou inativa.");
+                "A janela de entrega escolhida não está mais disponível. Escolha outro horário.");
 
         if (janela.DiaDaSemana != (int)input.DataEntrega.DayOfWeek)
             throw new RegraDeDominioVioladaException(
-                $"Janela {input.JanelaId} não atende o dia {input.DataEntrega:ddd}.");
+                $"A janela {janela.Label} não atende o dia {input.DataEntrega.ToString("dd/MM/yyyy", PtBr)}. Escolha outro horário.");
 
         var bloqueios = await bloqueioEntregaRepository.GetByStorefrontPeriodoAsync(
             storefront.Id, input.DataEntrega, input.DataEntrega, ct);
@@ -160,7 +165,7 @@ public sealed class CheckoutCoreService(
 
         if (diaBloqueado || janelaEspecificaBloqueada)
             throw new RegraDeDominioVioladaException(
-                $"Data {input.DataEntrega:yyyy-MM-dd} bloqueada para entrega.");
+                $"Não há entrega no dia {input.DataEntrega.ToString("dd/MM/yyyy", PtBr)}. Escolha outra data.");
 
         // ── Validar e carregar itens do cardápio ──────────────────────────
         var cardapioItens = await CarregarItensCardapioAsync(
@@ -248,8 +253,10 @@ public sealed class CheckoutCoreService(
                 input.JanelaId, input.DataEntrega, pedido.Id);
 
             throw new JanelaSemVagasException(
-                $"Janela {input.JanelaId} esgotada para {input.DataEntrega:yyyy-MM-dd}. " +
-                $"Alternativas: [{string.Join(", ", alternativas)}]");
+                $"A janela {janela.Label} esgotou para {input.DataEntrega.ToString("dd/MM/yyyy", PtBr)}. " +
+                (alternativas.Count > 0
+                    ? $"Ainda tem vaga em: {string.Join(", ", alternativas)}."
+                    : "Escolha outro horário."));
         }
 
         pedido.Status = StatusPedidoMapper.AguardandoPagamento;
@@ -260,7 +267,7 @@ public sealed class CheckoutCoreService(
             "Checkout fase-2 ok pedidoId={PedidoId} janelaId={JanelaId} data={Data} elapsed={Ms}ms",
             pedido.Id, input.JanelaId, input.DataEntrega, swFase2.ElapsedMilliseconds);
 
-        return new PedidoReservado(pedido, storefront, itens, itemFrete, total);
+        return new PedidoReservado(pedido, storefront, itens, itemFrete, total, janela);
     }
 
     /// <summary>
@@ -309,8 +316,9 @@ public sealed class CheckoutCoreService(
         {
             var ci = await cardapioItemRepository.GetByIdAsync(storefrontId, itemId, ct);
             if (ci is null || !ci.Visivel || !ci.Disponivel)
-                throw new RegraDeDominioVioladaException(
-                    $"Item de cardápio {itemId} não encontrado ou indisponível.");
+                throw new RegraDeDominioVioladaException(ci?.NomeEfetivo() is { Length: > 0 } nome
+                    ? $"{nome} está indisponível no cardápio agora."
+                    : "Um item do pedido não está mais no cardápio.");
             cardapioItens[itemId] = ci;
         }
 

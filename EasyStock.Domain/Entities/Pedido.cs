@@ -319,6 +319,12 @@ namespace EasyStock.Domain.Entities
     /// <summary>Item do pedido. Snapshot de nome/preço pra preservar histórico.</summary>
     public class PedidoItem
     {
+        /// <summary>
+        /// Linha de frete do checkout ("Entrega — Zona"): sem item de cardápio, produto nem linha
+        /// de preparo. Não é prato; cozinha e PWA não a tratam como item (#1474).
+        /// </summary>
+        public bool EhLinhaDeFrete => CardapioItemId is null && ProdutoId is null && LinhaSnapshot is null;
+
         public Guid Id { get; set; }
         public Guid PedidoId { get; set; }
 

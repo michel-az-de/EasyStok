@@ -47,6 +47,7 @@ public sealed class WhatsAppCloudClient(
     public Task<EnvioWhatsAppResult> EnviarImagemAsync(
         string waId, string urlPublica, string? legenda = null, CancellationToken ct = default)
     {
+        ExigirUrlAbsoluta(urlPublica);
         var payload = new
         {
             messaging_product = "whatsapp",
@@ -61,6 +62,7 @@ public sealed class WhatsAppCloudClient(
     public Task<EnvioWhatsAppResult> EnviarAudioAsync(
         string waId, string urlPublica, bool notaDeVoz, CancellationToken ct = default)
     {
+        ExigirUrlAbsoluta(urlPublica);
         var payload = new
         {
             messaging_product = "whatsapp",
@@ -70,6 +72,20 @@ public sealed class WhatsAppCloudClient(
         };
 
         return EnviarEExtrairWamidAsync(payload, ct);
+    }
+
+    // #1474: a Meta só busca mídia por URL absoluta http(s). Sem FileStorage__PublicBaseUrl o storage devolve
+    // "/files/..." e a Meta recusa; falha antes do POST, com ArgumentException (classificada como permanente).
+    private static void ExigirUrlAbsoluta(string urlPublica)
+    {
+        if (Uri.TryCreate(urlPublica, UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp))
+            return;
+
+        throw new ArgumentException(
+            $"A mídia precisa de URL pública absoluta (http/https) para a Meta buscar, mas veio \"{urlPublica}\". " +
+            "Configure FileStorage__PublicBaseUrl com o endereço público da Api (ex.: https://api.exemplo.com/files).",
+            nameof(urlPublica));
     }
 
     public Task<EnvioWhatsAppResult> EnviarBotoesAsync(

@@ -91,6 +91,67 @@ public sealed class KdsPedidoQueriesPostgresTests(PostgreSqlDatabaseFixture fixt
         lidos.Select(p => p.Id).Should().Equal(paraAprovar.Id);
     }
 
+    /// <summary>
+    /// #1474 B4: pedido nascido sem o retrato do cliente (comanda da conversa antes da correção, checkout
+    /// logado do site) mostra o nome do cadastro; o retrato gravado continua mandando.
+    /// </summary>
+    [SkippableFact]
+    public async Task SemRetratoDoClienteUsaONomeDoCadastro()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await using var db = fixture.CreateDbContext();
+
+        var empresa = Guid.NewGuid();
+        db.SetMobileTenantContext(empresa);
+        db.Empresas.Add(NovaEmpresa(empresa));
+        var cliente = Cliente.Criar(empresa, "Maria Souza");
+        db.Clientes.Add(cliente);
+
+        var semRetrato = NovoPedido(empresa, StatusPedidoMapper.Aguardando);
+        semRetrato.ClienteId = cliente.Id;
+        var comRetrato = NovoPedido(empresa, StatusPedidoMapper.Aguardando);
+        comRetrato.ClienteId = cliente.Id;
+        comRetrato.ClienteNome = "Maria (retrato)";
+        db.Pedidos.AddRange(semRetrato, comRetrato);
+        await db.SaveChangesAsync();
+
+        var hoje = HorarioBrasil.Hoje();
+        var lidos = await new KdsPedidoQueries(db).ListarAsync(empresa, [StatusPedidoMapper.Aguardando], hoje.AddDays(-1), hoje);
+
+        lidos.Single(p => p.Id == semRetrato.Id).ClienteNome.Should().Be("Maria Souza");
+        lidos.Single(p => p.Id == comRetrato.Id).ClienteNome.Should().Be("Maria (retrato)");
+    }
+
+    /// <summary>
+    /// #1474: a linha de frete ("Entrega — Butantã") não é prato: não vai para o cartão da cozinha.
+    /// E o nome do item avulso, gravado minúsculo, aparece como no cardápio.
+    /// </summary>
+    [SkippableFact]
+    public async Task CartaoSemLinhaDeFreteEComNomeDoCardapio()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await using var db = fixture.CreateDbContext();
+
+        var empresa = Guid.NewGuid();
+        db.SetMobileTenantContext(empresa);
+        db.Empresas.Add(NovaEmpresa(empresa));
+        var pedido = NovoPedido(empresa, StatusPedidoMapper.Aguardando);
+        pedido.Itens.Single().Nome = "nhoque artesanal 500 g";
+        pedido.Itens.Add(new PedidoItem
+        {
+            Id = Guid.NewGuid(), PedidoId = pedido.Id, Nome = "Entrega — Butantã",
+            Quantidade = 1, PrecoUnitario = 12m, Subtotal = 12m, CriadoEm = DateTime.UtcNow,
+        });
+        db.Pedidos.Add(pedido);
+        await db.SaveChangesAsync();
+
+        var hoje = HorarioBrasil.Hoje();
+        var lido = (await new KdsPedidoQueries(db).ListarAsync(empresa, [StatusPedidoMapper.Aguardando], hoje.AddDays(-1), hoje))
+            .Single(p => p.Id == pedido.Id);
+
+        lido.Itens.Select(i => i.Nome).Should().Equal("Nhoque Artesanal 500 g");
+    }
+
     private static Empresa NovaEmpresa(Guid empresaId) => new()
     {
         Id = empresaId,

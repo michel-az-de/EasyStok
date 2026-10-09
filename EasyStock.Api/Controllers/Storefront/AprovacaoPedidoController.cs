@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using EasyStock.Api.Authentication;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.Storefront.Aprovacao;
 using EasyStock.Application.UseCases.Storefront.Aprovacao.Exceptions;
@@ -179,14 +180,17 @@ public sealed class AprovacaoPedidoController(
             Details = new { statusAtual = ex.StatusAtualString, resolvidoEm = ex.ResolvidoEm },
         }));
 
+    // Identity.Name é o "sub" (id); o nome legível vem da claim "nome" (#1474).
     private string? ObterNomeUsuario()
     {
-        var nome = User.Identity?.Name;
+        var nome = User.NomeExibicao();
+        if (nome is not null) return nome;
+
+        nome = User.Identity?.Name;
         if (!string.IsNullOrWhiteSpace(nome)) return nome;
 
         return User.FindFirstValue(ClaimTypes.Name)
-               ?? User.FindFirstValue("name")
-               ?? User.FindFirstValue(ClaimTypes.Email);
+               ?? User.FindFirstValue("name");
     }
 }
 
