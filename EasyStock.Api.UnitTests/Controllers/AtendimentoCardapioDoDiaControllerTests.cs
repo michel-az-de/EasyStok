@@ -80,16 +80,19 @@ public class AtendimentoProducaoControllerTests
     {
         var currentUser = Substitute.For<ICurrentUserAccessor>();
         currentUser.TemPermissao(Permissao.GerenciarEstoque).Returns(false);
-        var controller = new AtendimentoProducaoController(null!, null!, null!, null!, currentUser);
+        var controller = new AtendimentoProducaoController(null!, null!, null!, null!, null!, currentUser);
 
         (await controller.EstoqueDoDia(CancellationToken.None)).Should().BeOfType<ForbidResult>();
         (await controller.Insumos(CancellationToken.None)).Should().BeOfType<ForbidResult>();
         (await controller.Receitas(CancellationToken.None)).Should().BeOfType<ForbidResult>();
+        (await controller.Sugestao(null, CancellationToken.None)).Should().BeOfType<ForbidResult>();
+        (await controller.Planejar(new PlanejamentoRequest([]), CancellationToken.None)).Should().BeOfType<ForbidResult>();
     }
 
     [Theory]
     [InlineData(nameof(AtendimentoProducaoController.CriarInsumo))]
     [InlineData(nameof(AtendimentoProducaoController.AtualizarInsumo))]
+    [InlineData(nameof(AtendimentoProducaoController.MarcarBaixaAutomatica))]
     public void CadastroDeInsumo_EDoGerente(string acao)
     {
         typeof(AtendimentoProducaoController).GetMethod(acao)!.GetCustomAttributes<AuthorizeAttribute>()

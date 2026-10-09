@@ -57,11 +57,9 @@ public sealed class EstoqueDoDiaUseCase(
                 .OrderBy(i => i.ValidadeEm?.DataValidade ?? DateTime.MaxValue).ThenBy(i => i.EntradaEm)
                 .Select(i => Lote(i, hoje))
                 .ToList();
+            var (saldo, descoberto) = SaldoEDescoberto(lotes, hoje);
             return new EstoqueDoPrato(
-                p.Id, p.ProdutoId!.Value, p.NomeEfetivo() ?? "(sem nome)", p.PesoExibicao,
-                comSaldo.Where(x => !x.Vencido).Sum(x => x.Quantidade),
-                lotes.Sum(i => i.QuantidadeDescoberta.Value),
-                comSaldo);
+                p.Id, p.ProdutoId!.Value, p.NomeEfetivo() ?? "(sem nome)", p.PesoExibicao, saldo, descoberto, comSaldo);
         }).ToList();
 
         var pratoDoProduto = pratos.GroupBy(p => p.ProdutoId!.Value).ToDictionary(g => g.Key, g => g.First().Id);
@@ -71,6 +69,16 @@ public sealed class EstoqueDoDiaUseCase(
             .ToList();
 
         return new EstoqueDoDiaResult(estoque, alertas);
+    }
+
+    /// <summary>Saldo = porções em lotes não vencidos; descoberto = o que saiu sem saldo. Usado também pela M2.5.</summary>
+    public static (decimal Saldo, decimal Descoberto) SaldoEDescoberto(IEnumerable<ItemEstoque> lotes, DateOnly hoje)
+    {
+        var lista = lotes as IReadOnlyCollection<ItemEstoque> ?? lotes.ToList();
+        var saldo = lista
+            .Where(i => i.QuantidadeAtual.Value > 0 && i.ValidadeEm?.DiasAteVencimento(hoje) is not < 0)
+            .Sum(i => i.QuantidadeAtual.Value);
+        return (saldo, lista.Sum(i => i.QuantidadeDescoberta.Value));
     }
 
     private static LoteDoDia Lote(ItemEstoque i, DateOnly hoje)

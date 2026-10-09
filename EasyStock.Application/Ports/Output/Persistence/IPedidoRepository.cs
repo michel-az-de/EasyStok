@@ -44,5 +44,14 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// itens em produção/preparação.
         /// </summary>
         Task<bool> ExistemPedidosAbertosComProdutoAsync(Guid empresaId, Guid produtoId);
+
+        /// <summary>
+        /// M2.5 (#1502): porções dos pedidos agendados antes de <paramref name="antesDeUtc"/> que ainda vão
+        /// consumir estoque (<see cref="PedidoStateMachine.DemandaAConsumir"/>), somadas por prato.
+        /// </summary>
+        Task<IReadOnlyList<DemandaDePedido>> GetDemandaAgendadaAsync(Guid empresaId, DateTime antesDeUtc, CancellationToken ct = default);
     }
+
+    /// <summary>Porções pedidas de um prato (pelo item do cardápio e/ou pelo produto do estoque).</summary>
+    public sealed record DemandaDePedido(Guid? CardapioItemId, Guid? ProdutoId, decimal Quantidade);
 }

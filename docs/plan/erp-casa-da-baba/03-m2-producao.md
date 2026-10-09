@@ -180,6 +180,10 @@ PWA (`EasyStock.Api/wwwroot/pwa/index.html:17385,17501,17625,17663,17958`). Pedi
 api/producao/planejamento` reaproveita `CalcularCestaProducaoUseCase` e devolve insumos necessários e faltas.
 O botão "Gerar lista de compras" usa o `criar-compra` existente e abre a lista no Web.
 
+> **Como ficou (#1502):** as rotas são `GET api/atendimento/producao/sugestao?ate=` e `POST .../planejamento`. A conta
+> é `max(mínimo + agendados + descoberto − saldo, 0)`: com saldo acima do mínimo, o saldo cobre os pedidos. A
+> lista de compras é gravada pelo `POST api/listas-compras/gerar` (faltas mais o que repõe o mínimo), sem o Web.
+
 **Console.** M2 › **Planejamento**: sugestão editável (ela muda as quantidades), insumos e faltas, "Lançar como
 produção" leva as quantidades para o M2.2.
 
@@ -260,7 +264,9 @@ das decisões abaixo.
 > - **D-M2-04 = a:** o destino da porção vem da linha do prato (servir × preparar em casa). Nada novo no lote.
 > - **D-M2-06 = a:** o Operador lança a produção e ajusta o saldo; ver e mexer no estoque ainda exige a permissão de estoque. Perda acima de um valor pede Gerente (M2.6).
 >
-> Seguem pendentes: D-M2-02, 03 e 05.
+> - **D-M2-05 = a** (09/10, M2.5, #1502): a sugestão é `max(mínimo + agendados + descoberto − saldo, 0)` por prato. Agendados são os pedidos antes de "pronto", que é quando o pedido baixa o estoque. A lista de compras fica no console, pelo `POST api/listas-compras/gerar`, e não abre no Web, que saiu (ADR-0059).
+>
+> Seguem pendentes: D-M2-02 e 03.
 
 **D-M2-01 · A produção baixa insumo pela receita?**
 - a) Sim, só para produto com receita marcada "baixa automática"; falta de insumo avisa, não trava **(Recomendado)**

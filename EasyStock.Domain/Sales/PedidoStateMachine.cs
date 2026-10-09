@@ -106,6 +106,14 @@ public static class PedidoStateMachine
         };
 
     /// <summary>
+    /// M2.5 (#1502): pedido firme que ainda vai consumir estoque. É o <see cref="Abertos"/> sem o
+    /// que já descontou (<see cref="ComEstoqueDescontado"/>) e sem o pré-operacional. Entra na
+    /// sugestão de produção como demanda.
+    /// </summary>
+    public static IReadOnlySet<StatusPedido> DemandaAConsumir { get; } =
+        new HashSet<StatusPedido> { StatusPedido.Aguardando, StatusPedido.Preparando, StatusPedido.AprovadoBaba };
+
+    /// <summary>
     /// Pode registrar pagamento manual? Só quando o pedido já é operacional — nunca em
     /// estado <see cref="PreOperacionais">pré-operacional</see> (montagem / pagamento-online
     /// pendente / aprovação do cardápio). Guarda de causa-raiz contra pagamento-fantasma.

@@ -191,7 +191,10 @@ public class CalcularCestaProducaoUseCase(
                 }
             }
 
-            decimal? custoEstimado = b.CustoUnitario.HasValue ? b.CustoUnitario.Value * b.Precisa : null;
+            // #1502: o custo e por unidade-base do insumo; Precisa esta na unidade da receita.
+            decimal? custoEstimado = b.CustoUnitario.HasValue
+                ? CalculoProducaoCore.CustoNaUnidadeDoInsumo(b.Precisa, b.UnidadeReceita, b.UnidadeSaldo, b.CustoUnitario.Value)
+                : null;
 
             result.Add(new InsumoConsolidadoResult(
                 InsumoId: b.InsumoId,
