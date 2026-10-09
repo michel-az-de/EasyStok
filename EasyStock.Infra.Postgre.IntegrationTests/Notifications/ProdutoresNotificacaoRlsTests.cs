@@ -35,16 +35,36 @@ public class ProdutoresNotificacaoRlsTests(PostgreSqlDatabaseFixture fixture) : 
 
         await tick.ExecutarAsync(CancellationToken.None);
 
-        // A 30 min da entrega valem o lembrete "no dia" e o de "1 hora"; o de 10 min ainda não.
+        // A 30 min da entrega venceram o lembrete "no dia" e o de "1 hora"; o de 10 min ainda não. Só o mais próximo
+        // da entrega sai (#1507); o "no dia" é carimbado sem disparar.
         var eventos = await _s.LerEventosDaEmpresaAsync(empresa);
         eventos.Select(e => e.Tipo).Should().BeEquivalentTo(
-            [TipoEventoNotificacao.PedidoAgendadoHoje, TipoEventoNotificacao.PedidoAgendadoEm1Hora],
+            [TipoEventoNotificacao.PedidoAgendadoEm1Hora],
             "o evento é gravado no escopo do tenant do pedido, sem 42501");
         await using var db = fixture.CreateDbContext();
         var gravado = await db.Set<Order>().AsNoTracking().IgnoreQueryFilters().SingleAsync(o => o.Id == pedido);
-        gravado.AgendamentoNotificadoDiaEm.Should().NotBeNull("o carimbo vem depois do commit do evento");
-        gravado.AgendamentoNotificado1hEm.Should().NotBeNull();
+        gravado.AgendamentoNotificadoDiaEm.Should().NotBeNull("o lembrete que ficou para trás é carimbado sem disparar");
+        gravado.AgendamentoNotificado1hEm.Should().NotBeNull("o carimbo vem depois do commit do evento");
         gravado.AgendamentoNotificado10minEm.Should().BeNull();
+    }
+
+    [SkippableFact]
+    public async Task Lembrete_de_entrega_ja_passada_so_carimba_sem_disparar()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = await _s.SemearEmpresaAsync();
+        var pedido = await SemearPedidoAgendadoAsync(empresa, DateTime.UtcNow.AddHours(-2));
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: true);
+        var tick = new LembretesPedidoAgendadoTick(provider, NullLogger<LembretesPedidoAgendadoTick>.Instance);
+
+        await tick.ExecutarAsync(CancellationToken.None);
+
+        (await _s.LerEventosDaEmpresaAsync(empresa)).Should().BeEmpty("#1507: entrega passada não recebe lembrete");
+        await using var db = fixture.CreateDbContext();
+        var gravado = await db.Set<Order>().AsNoTracking().IgnoreQueryFilters().SingleAsync(o => o.Id == pedido);
+        gravado.AgendamentoNotificadoDiaEm.Should().NotBeNull();
+        gravado.AgendamentoNotificado1hEm.Should().NotBeNull();
+        gravado.AgendamentoNotificado10minEm.Should().NotBeNull("carimbado para sair da varredura");
     }
 
     private async Task<string> SemearPedidoAgendadoAsync(Guid empresaId, DateTime entregaEm)
