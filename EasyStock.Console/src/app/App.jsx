@@ -37,7 +37,7 @@ import { TelaEntregasApi } from '../features/entregas/TelaEntregasApi'
 import { CadastroEntregaApi } from '../features/entregas/CadastroEntregaApi'
 import { TelaCozinha } from '../features/cozinha/TelaCozinha'
 import { TelaCozinhaApi } from '../features/cozinha/TelaCozinhaApi'
-import { TelaCardapioLink } from '../features/cardapio-link/TelaCardapioLink'
+import { AvisoCardapioDoSite, TelaCardapioLink } from '../features/cardapio-link/TelaCardapioLink'
 import { ModalEncerrar } from '../features/encerramento/ModalEncerrar'
 import { FilaCanhotos } from '../features/ficha-cliente/FilaCanhotos'
 import { GestoLoja } from '../features/loja/GestoLoja'
@@ -316,11 +316,11 @@ function CozinhaApi({ rota }) {
   return <NoModulo rota={rota}><TelaCozinhaApi key={sessao.token} linhas={LINHAS_PRODUTO} /></NoModulo>
 }
 
-// Cardápio por link no modo API (F06): sem canal entre janelas, e nada abre sem sessão.
+// Cardápio por link no modo API (#1241): o real é a página do site; esta rota só explica.
 function CardapioLinkApi() {
   const { sessao, listarEmpresas, entrarNaEmpresa, google } = useSessaoApi()
   if (!sessao) return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} google={google} />
-  return <TelaCardapioLink />
+  return <AvisoCardapioDoSite />
 }
 
 // Entregas no modo API (F04): janela própria lê a API, sem espelho do Balcão.
