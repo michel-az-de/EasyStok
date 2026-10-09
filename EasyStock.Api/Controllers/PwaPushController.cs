@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Infra.Notifications.Options;
+using EasyStock.Infra.Notifications.Push;
 using Microsoft.Extensions.Options;
 
 namespace EasyStock.Api.Controllers;
@@ -48,6 +49,10 @@ public class PwaPushController(
             || string.IsNullOrWhiteSpace(req.Auth))
             return DataBadRequest("Endpoint, P256dh e Auth sao obrigatorios.");
 
+        // #1508: o worker faz POST no endpoint; so servico de push conhecido, senao vira SSRF.
+        if (!EndpointPushPermitido.Valido(req.Endpoint))
+            return DataBadRequest("Endpoint de push nao permitido.");
+
         var existing = await repo.GetByEndpointAsync(req.Endpoint, ct);
         if (existing is not null)
         {
@@ -79,7 +84,19 @@ public class PwaPushController(
     public async Task<IActionResult> Unsubscribe([FromQuery] string endpoint, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(endpoint)) return DataBadRequest("Endpoint obrigatorio.");
-        await repo.DesativarAsync(endpoint, ct);
+
+        // #1508: so desativa a inscricao do proprio usuario (ou da propria empresa, quando nao ha usuario).
+        // Resposta igual nos dois casos para nao revelar se o endpoint existe.
+        var existing = await repo.GetByEndpointAsync(endpoint, ct);
+        if (existing is not null && PertenceAoUsuarioAtual(existing))
+            await repo.DesativarAsync(endpoint, ct);
         return NoContent();
+    }
+
+    private bool PertenceAoUsuarioAtual(WebPushSubscription sub)
+    {
+        var usuarioId = currentUser.UsuarioId == Guid.Empty ? (Guid?)null : currentUser.UsuarioId;
+        var empresaId = currentUser.EmpresaId == Guid.Empty ? (Guid?)null : currentUser.EmpresaId;
+        return sub.UsuarioId is not null ? sub.UsuarioId == usuarioId : sub.EmpresaId == empresaId;
     }
 }

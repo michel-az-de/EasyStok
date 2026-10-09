@@ -157,7 +157,7 @@ public class ClassificacaoDeFalhaTests
         return new WebPushOptions { Subject = "mailto:teste@example.com", PublicKey = chaves.PublicKey, PrivateKey = chaves.PrivateKey };
     }
 
-    private static WebPushSubscription Inscricao(Guid usuarioId, string endpoint = "https://push.example.test/send/abc")
+    private static WebPushSubscription Inscricao(Guid usuarioId, string endpoint = "https://fcm.googleapis.com/fcm/send/abc")
     {
         // Chave pública P-256 (65 bytes, formato não comprimido) e segredo de 16 bytes: o que o navegador envia.
         using var ecdh = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
@@ -287,13 +287,28 @@ public class ClassificacaoDeFalhaTests
             r => new HttpResponseMessage(r.RequestUri!.AbsolutePath.EndsWith("/boa", StringComparison.Ordinal)
                 ? HttpStatusCode.Created
                 : HttpStatusCode.BadRequest),
-            Inscricao(usuarioId, "https://push.example.test/send/boa"),
-            Inscricao(usuarioId, "https://push.example.test/send/ruim"));
+            Inscricao(usuarioId, "https://fcm.googleapis.com/fcm/send/boa"),
+            Inscricao(usuarioId, "https://fcm.googleapis.com/fcm/send/ruim"));
 
         var resultado = await canal.EnviarAsync(MensagemPush(usuarioId));
 
         resultado.Desfecho.Should().Be(DesfechoEnvio.Enviado);
         handler.Chamadas.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task WebPush_endpoint_fora_da_allowlist_nao_e_chamado_e_e_desativado()
+    {
+        // #1508: inscricao gravada antes da validacao nao pode virar SSRF a partir do worker.
+        var usuarioId = Guid.NewGuid();
+        var (canal, repo, handler) = CanalWebPush(usuarioId, _ => new HttpResponseMessage(HttpStatusCode.Created),
+            Inscricao(usuarioId, "http://169.254.169.254/latest/meta-data"));
+
+        var resultado = await canal.EnviarAsync(MensagemPush(usuarioId));
+
+        handler.Chamadas.Should().Be(0);
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaPermanente);
+        await repo.Received(1).DesativarAsync("http://169.254.169.254/latest/meta-data", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -305,8 +320,8 @@ public class ClassificacaoDeFalhaTests
             r => new HttpResponseMessage(r.RequestUri!.AbsolutePath.EndsWith("/ruim", StringComparison.Ordinal)
                 ? HttpStatusCode.BadRequest
                 : HttpStatusCode.ServiceUnavailable),
-            Inscricao(usuarioId, "https://push.example.test/send/ruim"),
-            Inscricao(usuarioId, "https://push.example.test/send/fora"));
+            Inscricao(usuarioId, "https://fcm.googleapis.com/fcm/send/ruim"),
+            Inscricao(usuarioId, "https://fcm.googleapis.com/fcm/send/fora"));
 
         var resultado = await canal.EnviarAsync(MensagemPush(usuarioId));
 
