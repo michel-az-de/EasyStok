@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import * as api from '../infra/api/entregasApi'
 import { dataIsoNoFuso } from '../dominio/formato'
 
@@ -13,6 +13,9 @@ export function useCadastroEntregaApi() {
   const [zonas, setZonas] = useState([])
   const [bloqueios, setBloqueios] = useState([])
   const [erro, setErro] = useState(null)
+  // #1510: um envio por vez; toque duplo em "Criar janela" duplicava a janela (overbooking).
+  const [enviando, setEnviando] = useState(false)
+  const enviandoRef = useRef(false)
 
   const recarregar = useCallback(() => {
     const hoje = new Date()
@@ -30,10 +33,24 @@ export function useCadastroEntregaApi() {
   useEffect(() => { recarregar() }, [recarregar])
 
   // Devolve se deu certo: o formulário só limpa (ou fecha) quando a API aceitou.
-  const executar = (chamada, falha) => chamada()
-    .then(() => recarregar())
-    .then(() => true)
-    .catch((e) => { setErro(`${falha}: ${e.message}`); return false })
+  // A lista recarrega também na falha: na criação em série parte das janelas já entrou.
+  const executar = async (chamada, falha) => {
+    if (enviandoRef.current) return false
+    enviandoRef.current = true
+    setEnviando(true)
+    let motivo = null
+    try {
+      await chamada()
+    } catch (e) {
+      motivo = `${falha}: ${e.message}`
+    } finally {
+      await recarregar()
+      if (motivo) setErro(motivo)
+      enviandoRef.current = false
+      setEnviando(false)
+    }
+    return !motivo
+  }
 
   const acoes = {
     criarJanela: (corpo) => executar(() => api.criarJanela(corpo), 'A janela não foi criada'),
@@ -51,5 +68,5 @@ export function useCadastroEntregaApi() {
     removerBloqueio: (id) => executar(() => api.removerBloqueio(id), 'O bloqueio não foi removido'),
   }
 
-  return { janelas, zonas, bloqueios, erro, acoes, limparErro: () => setErro(null) }
+  return { janelas, zonas, bloqueios, erro, enviando, acoes, limparErro: () => setErro(null) }
 }

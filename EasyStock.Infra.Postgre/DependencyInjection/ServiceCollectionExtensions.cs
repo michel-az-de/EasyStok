@@ -189,13 +189,15 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 EasyStock.Application.Events.Pedidos.Handlers.NotificarClientePedidoPagoHandler>(
                 EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
 
-            // S42: mensagens automáticas por gatilho, ao lado dos handlers acima.
-            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
-                EasyStock.Application.Events.Atendimento.AutomacaoPedidoPagoHandler>(
-                EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
             // #1228: pagamento confirmado fecha os interesses do cliente nos itens comprados (S31).
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Campanhas.FecharInteressesPedidoPagoHandler>(
+                EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+            // S42: mensagens automáticas por gatilho. #1506: a automática envia direto ao cliente, sem
+            // idempotência; fica por ÚLTIMO no tipo para que a falha de um handler seguinte não faça o
+            // outbox repetir o evento e o cliente receber a mesma mensagem de novo.
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.AutomacaoPedidoPagoHandler>(
                 EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Atendimento.AutomacaoPedidoEntregueHandler>(

@@ -245,6 +245,21 @@ public class CheckoutCoreServiceTests
     }
 
     [Fact]
+    public async Task SiteSemPrazo_RecusaJanelaQueJaTerminou()
+    {
+        // #1506: o site nao manda prazo; 15:00 em Brasilia, janela 9-12h do mesmo dia ja acabou.
+        var c = new Cenario();
+        c.Relogio.Advance(new DateTimeOffset(2026, 6, 2, 18, 0, 0, TimeSpan.Zero) - c.Relogio.GetUtcNow());
+
+        var act = () => c.Servico().CriarPedidoComReservaAsync(Input(c));
+
+        (await act.Should().ThrowAsync<RegraDeDominioVioladaException>()).WithMessage("*já passou*");
+        c.PedidosAdicionados.Should().BeEmpty();
+        await c.VagaRepo.DidNotReceive().OcuparAsync(
+            Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task AceitaJanelaNoPrazo()
     {
         // Agora 07:00 em Brasília; 100 min → 08:40, antes das 09:00.

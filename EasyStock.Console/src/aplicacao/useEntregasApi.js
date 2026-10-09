@@ -25,9 +25,18 @@ export function useEntregasApi() {
   // pelo que vem no pedido).
   const [dia, setDia] = useState(() => dataIsoNoFuso(Date.now()))
   const diaRef = useRef(dia)
+  // #1510: enquanto ela não escolhe outro dia, "hoje" é resolvido a cada recarga; o tablet
+  // aberto de um dia para o outro não fica mostrando o roteiro de ontem.
+  const seguindoHojeRef = useRef(true)
   const [doDia, setDoDia] = useState(null)
 
   const recarregar = useCallback(() => {
+    const hoje = dataIsoNoFuso(Date.now())
+    if (seguindoHojeRef.current && diaRef.current !== hoje) {
+      diaRef.current = hoje
+      setDia(hoje)
+      setDoDia(null)
+    }
     const data = diaRef.current
     return Promise.all([
       api.listarPedidosEntrega(STATUS_KDS_ENTREGAS),
@@ -51,7 +60,9 @@ export function useEntregasApi() {
   }, [])
 
   const mudarDia = useCallback((data) => {
-    if (!data || data === diaRef.current) return
+    if (!data) return
+    seguindoHojeRef.current = data === dataIsoNoFuso(Date.now())
+    if (data === diaRef.current) return
     diaRef.current = data
     setDia(data)
     setDoDia(null)

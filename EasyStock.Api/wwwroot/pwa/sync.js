@@ -287,11 +287,14 @@
   let _queueStoreReady = false;
 
   async function _initQueueStore() {
+    // #1509: le a copia sincrona ANTES do init (que apaga o localStorage 7 dias apos a migracao).
+    const filaLS = _loadQueueLS();
     try {
       if (typeof window.cdbQueueStore !== 'undefined') {
         const result = await window.cdbQueueStore.init();
         _queueStoreReady = true;
         _queueCache = await window.cdbQueueStore.loadAll();
+        _unirFilaDoLocalStorage(filaLS);
         _trace('boot', 'queue-store inicializado', { storage: result.storage, items: _queueCache.length, degraded: result.degraded });
         return result;
       }
@@ -300,8 +303,26 @@
     }
     // Fallback: carregar de localStorage
     _queueCache = _loadQueueLS();
+    _unirFilaDoLocalStorage(filaLS);
     _queueStoreReady = true;
     return { storage: 'localStorage', degraded: true };
+  }
+
+  // #1509: o IDB e gravado em segundo plano e o localStorage na hora. Venda feita logo antes
+  // de o app fechar podia estar so no localStorage, e o primeiro save depois do boot o
+  // sobrescrevia com a fila do IDB. Une as duas por id (reenvio de aceita e inofensivo: o
+  // servidor deduplica por MutationId) e ordena por ts, ja que o IDB devolve por id.
+  function _unirFilaDoLocalStorage(filaLS) {
+    const fila = Array.isArray(_queueCache) ? _queueCache : [];
+    const ids = new Set(fila.map(m => m && m.id));
+    const faltando = (Array.isArray(filaLS) ? filaLS : []).filter(m => m && m.id && !ids.has(m.id));
+    const unida = fila.concat(faltando).sort((a, b) => ((a && a.ts) || 0) - ((b && b.ts) || 0));
+    if (faltando.length > 0) {
+      _trace('boot', 'fila: recuperadas do localStorage', { items: faltando.length });
+      saveQueue(unida);
+    } else {
+      _queueCache = unida;
+    }
   }
 
   function _loadQueueLS() {
@@ -709,6 +730,8 @@
           // Remove os conflitados da fila (não vão ser aceitos mesmo).
           // Server retorna { mutationId, reason } — usar mutationId, não id.
           const conflictIds = new Set(conflicts.map(c => c.mutationId));
+          // #1509: guarda copia na fila de conflitos antes de tirar da fila (sumia sem rastro).
+          _guardarConflitos(loadQueue().filter(m => conflictIds.has(m.id)), conflicts);
           const remaining = loadQueue().filter(m => !conflictIds.has(m.id));
           saveQueue(remaining);
           // C3: server pode incluir winningPayload com a versao server vencedora;
@@ -727,6 +750,14 @@
         const toMigrate = result.rejected.filter(r => r.reason && r.reason.startsWith('migrate:'));
         if (toMigrate.length > 0) {
           applyMutationMigrationsAndRequeue(toMigrate);
+        }
+
+        // #1509: as demais recusas (validacao etc.) ficavam na fila para sempre. O servidor ja
+        // gravou a recusa pelo MutationId e responde igual a cada reenvio.
+        const recusadas = result.rejected.filter(r => r && r.mutationId && r.reason
+          && !r.reason.startsWith('conflict:') && !r.reason.startsWith('migrate:'));
+        if (recusadas.length > 0) {
+          _moverRecusadasParaDeadletter(recusadas);
         }
       }
       localStorage.setItem(LAST_FULL_SYNC_KEY, String(Date.now()));
@@ -753,6 +784,44 @@
       return 'retry';
     }
     // F10-C-1: o reset do flushPromise mora no `.finally(...)` do wrapper flush().
+  }
+
+  function _guardarConflitos(itens, conflicts) {
+    const qs = window.cdbQueueStore;
+    if (!qs || typeof qs.addConflict !== 'function') return;
+    const porId = new Map((conflicts || []).map(c => [c.mutationId, c]));
+    itens.forEach(m => {
+      const c = porId.get(m.id) || {};
+      const copia = Object.assign({}, m, { conflictReason: c.reason || null, winningPayload: c.winningPayload || null });
+      try {
+        Promise.resolve(qs.addConflict(copia)).catch(e => console.warn('[sync] addConflict falhou:', e && e.message));
+      } catch (e) { console.warn('[sync] addConflict falhou:', e && e.message); }
+    });
+  }
+
+  function _moverRecusadasParaDeadletter(recusadas) {
+    const motivos = new Map(recusadas.map(r => [r.mutationId, r.reason]));
+    const fila = loadQueue();
+    const itens = fila.filter(m => motivos.has(m.id));
+    if (itens.length === 0) return;
+    saveQueue(fila.filter(m => !motivos.has(m.id)));
+    const qs = window.cdbQueueStore;
+    itens.forEach(m => {
+      try {
+        if (qs && typeof qs.moveToDeadletter === 'function') {
+          Promise.resolve(qs.moveToDeadletter([m], motivos.get(m.id)))
+            .catch(e => console.warn('[sync] moveToDeadletter falhou:', e && e.message));
+        }
+      } catch (e) { console.warn('[sync] moveToDeadletter falhou:', e && e.message); }
+    });
+    _trace('flush', 'recusadas -> dead-letter', { items: itens.length });
+    try {
+      if (window.cdbApp && typeof window.cdbApp.showToast === 'function') {
+        window.cdbApp.showToast(itens.length === 1
+          ? '1 alteração não foi aceita pelo servidor. Veja em Ajustes > Diagnóstico.'
+          : itens.length + ' alterações não foram aceitas pelo servidor. Veja em Ajustes > Diagnóstico.');
+      }
+    } catch (_) {}
   }
 
   // ---- Pull: traz mudanças do servidor (outros devices) ----
@@ -2523,7 +2592,8 @@
       getLastSeenServerTs: () => _lastSeenServerTs,       // B3
       mutationMigrators: mutationMigrators,               // B4 (mutable: register migrators)
       mutationSchemaVersion: PWA_MUTATION_SCHEMA_VERSION, // B4
-      swSupported: () => _swSupported                     // D2
+      swSupported: () => _swSupported,                    // D2
+      initQueueStore: _initQueueStore                     // #1509
     },
     hasPublicBackupPlugin: () => !!_getPublicBackupPlugin(),
     lastLocalBackupAt: () => parseInt(localStorage.getItem(LAST_LOCAL_BACKUP_KEY) || '0', 10) || 0,

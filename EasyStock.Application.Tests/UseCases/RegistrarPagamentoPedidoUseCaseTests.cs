@@ -201,6 +201,25 @@ public class RegistrarPagamentoPedidoUseCaseTests
     }
 
     [Fact]
+    public async Task Caixa_de_ontem_esquecido_aberto_impede_abertura_automatica_de_hoje()
+    {
+        // #1506: abrir o dia por cima deixava a sessao de ontem orfa (nunca mais fechava).
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId);
+        _caixaRepo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), pedido.LojaId).Returns((FechamentoCaixa?)null);
+        _caixaRepo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), pedido.LojaId)
+            .Returns(Array.Empty<MovimentoCaixa>());
+        _caixaRepo.GetAberturaPendenteAsync(empresaId, pedido.LojaId)
+            .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 50m, DateTime.UtcNow.AddDays(-1), pedido.LojaId));
+
+        var result = await UC().ExecuteAsync(new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 100m));
+
+        result.Should().NotBeNull();
+        pedido.Pagamentos.Should().ContainSingle();
+        await _caixaRepo.DidNotReceiveWithAnyArgs().TryAddMovimentoAsync(default!, default);
+    }
+
+    [Fact]
     public async Task Sem_caixaRepo_injetado_pagamento_persiste_normalmente()
     {
         var empresaId = Guid.NewGuid();

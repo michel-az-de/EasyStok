@@ -80,10 +80,11 @@ public class PedidosControllerTests
             Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>(),
             _uow,
             NullLogger<AtualizarStatusPedidoUseCase>.Instance,
-            new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
+            new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()),
+            new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(Substitute.For<IContaReceberRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>(), NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance));
 
         var cancelar = new CancelarPedidoUseCase(
-            _pedidoRepo, estoqueIntegration, Substitute.For<IContaReceberRepository>(),
+            _pedidoRepo, estoqueIntegration, new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(Substitute.For<IContaReceberRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>(), NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance),
             _uow, NullLogger<CancelarPedidoUseCase>.Instance);
 
         var agendamento = new AlterarAgendamentoPedidoUseCase(
