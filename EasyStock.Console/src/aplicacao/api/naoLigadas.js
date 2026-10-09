@@ -13,7 +13,7 @@ import * as acao from '../acoes'
 
 export const SO_DA_TELA = [
   'mudarFiltro', 'definirRascunho', 'abrirEncerramento', 'fecharEncerramento', 'fecharAlerta',
-  'trocarModoAgente', 'limparAgente', 'alternarSom', 'ouvirAmostraDeSom', 'marcarLembretesVistos',
+  'trocarModoAgente', 'limparAgente', 'alternarSom', 'ouvirAmostraDeSom',
   'pedirNotificacaoDoNavegador',
   // Rascunho da comanda: o meio escolhido segue no corpo do pedido (F03).
   'escolherMeioPagamento',
@@ -31,7 +31,6 @@ const grupo = (rotulo, nomes) => Object.fromEntries(nomes.map((nome) => [nome, r
 export const NAO_LIGADAS = {
   reabrir: 'Reabrir conversa',
   trocarJanela: 'Trocar a janela do pedido',
-  ...grupo('Lembretes', ['criarLembrete', 'concluirLembrete']),
   mudarEnderecoDoPedido: 'Endereço do pedido',
   marcarRecebidoEntrega: 'Recebido na entrega',
   refazerCobranca: 'Refazer cobrança',
