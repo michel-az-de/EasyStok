@@ -52,7 +52,8 @@ internal static class SyncDtoConverters
                 : (long?)null,
             ScheduledDeliveryAt: o.ScheduledDeliveryAt.HasValue
                 ? new DateTimeOffset(o.ScheduledDeliveryAt.Value).ToUnixTimeMilliseconds()
-                : (long?)null);
+                : (long?)null,
+            Metodo: o.Metodo);
 
     internal static BatchDto ToDto(Batch b) =>
         new(b.Id, b.Code,
@@ -78,7 +79,8 @@ internal static class SyncDtoConverters
 
     internal static CashEntryDto ToDto(CashEntry c) =>
         new(c.Id, c.Type, c.Amount, c.Description,
-            new DateTimeOffset(c.CreatedAt).ToUnixTimeMilliseconds());
+            new DateTimeOffset(c.CreatedAt).ToUnixTimeMilliseconds(),
+            Metodo: c.Metodo);
 
     internal static JsonElement Serialize<T>(T obj)
     {

@@ -352,15 +352,18 @@ public sealed class OrderLinker(
         if (temPagamento) return;
 
         var pagamentoId = Guid.NewGuid();
+        var metodo = FormaPagamentoMobile.ParaErp(mobileO.Metodo);
         db.Add(new PedidoPagamento
         {
             Id = pagamentoId,
             PedidoId = pedido.Id,
-            Metodo = "dinheiro",
+            Metodo = metodo,
             Valor = pedido.Total.Valor,
             PagoEm = mobileO.UpdatedAt,
             RegistradoPorNome = mobileO.LastOperatorName,
-            Observacao = "Auto-registrado pelo F7-A (mobile→ERP). Refine método no admin se necessário."
+            Observacao = mobileO.Metodo is null
+                ? "Auto-registrado pelo F7-A (mobile→ERP). Aparelho sem forma de pagamento: assumido dinheiro."
+                : "Auto-registrado pelo F7-A (mobile→ERP) com a forma escolhida no PWA."
         });
 
         // BUG-004/#564: NAO criar MovimentoCaixa "entrada" espelho aqui. Ele duplicava o
@@ -372,7 +375,7 @@ public sealed class OrderLinker(
 
         await db.SaveChangesAsync();
         log.LogInformation(
-            "F7-A Pagamento CRIADO: pedido={ErpId} valor={Valor} metodo=dinheiro",
-            pedido.Id, pedido.Total.Valor);
+            "F7-A Pagamento CRIADO: pedido={ErpId} valor={Valor} metodo={Metodo}",
+            pedido.Id, pedido.Total.Valor, metodo);
     }
 }
