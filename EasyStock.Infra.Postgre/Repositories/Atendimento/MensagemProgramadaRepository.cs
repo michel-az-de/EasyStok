@@ -13,6 +13,13 @@ public sealed class MensagemProgramadaRepository(EasyStockDbContext db) : IMensa
     public Task<MensagemProgramada?> ObterAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
         db.MensagensProgramadas.FirstOrDefaultAsync(m => m.EmpresaId == empresaId && m.Id == id, ct);
 
+    public Task<MensagemProgramada?> ObterComLockAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
+        db.MensagensProgramadas.FromSqlInterpolated($"""
+            SELECT * FROM mensagens_programadas
+            WHERE "EmpresaId" = {empresaId} AND "Id" = {id}
+            FOR UPDATE
+            """).SingleOrDefaultAsync(ct);
+
     public async Task<IReadOnlyList<MensagemProgramada>> ListarAsync(
         Guid empresaId, Guid? clienteId, SituacaoMensagemProgramada? situacao, int limite, CancellationToken ct = default)
     {
