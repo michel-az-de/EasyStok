@@ -299,6 +299,15 @@ gravam na mesma API.
 
 ## 6. Decisões pendentes do Felipe
 
+> **Decididas em 08/10/2026 (Felipe, múltipla escolha):**
+> - **D-M1-01 = a:** o cardápio é dono do preço (item/porção) e da categoria (seção).
+> - **D-M1-05 = a:** o item fora do cardápio de hoje só volta quando ela religa.
+> - **D-M1-07 = a:** tirar arquiva e é diferente de ocultar do site; apagar só item nunca vendido.
+> - **D-M1-08 = a:** o item novo nasce em validação, e o agente não oferece até ela confirmar.
+>
+> Permissão no console (#1241): o Operador mexe no dia e no saldo; o Gerente inclui, edita e tira.
+> Seguem pendentes: D-M1-02, 03, 04 e 06.
+
 **D-M1-01 · Quem é dono do preço e da categoria que o cliente vê?**
 - a) O cardápio: preço no item ou na porção, categoria na seção; `PrecoReferencia` vira sugestão do bastidor **(Recomendado)**
 - b) O produto de estoque: `PrecoReferencia` e `Categoria` valem para o site

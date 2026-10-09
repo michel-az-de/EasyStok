@@ -39,3 +39,5 @@ jobs:
       - run: node ferramentas/prova-f11-cardapio-do-dia.mjs
       - run: node ferramentas/prova-f11-cardapio-itens.mjs
       - run: node ferramentas/prova-f11-link-na-conversa.mjs
+      - run: node ferramentas/prova-1447-hall-modulos.mjs
+      - run: node ferramentas/prova-1481-gestao-cardapio.mjs

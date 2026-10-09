@@ -1,0 +1,39 @@
+/* M1 › Itens do cardápio (M1.1, #1481): lista densa com divisórias, mesma família da aba
+   Respostas. Uma linha por prato: foto, nome e detalhe, preço, estado, interruptores e ordem. */
+.aba { display: grid; gap: var(--e-4); }
+
+.topo { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
+.descricao { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); max-width: 64ch; }
+.busca {
+  flex: 0 1 280px; min-height: var(--toque); padding: 0 var(--e-3);
+  border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1);
+  background: var(--papel); color: var(--tinta); font: inherit; font-size: var(--t-apoio);
+}
+.aviso {
+  margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-2);
+  background: var(--aviso-fundo); color: var(--aviso); font-size: var(--t-apoio);
+}
+
+.lista { list-style: none; margin: 0; padding: 0; border-top: var(--b-1) solid var(--linha); }
+.linha {
+  display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
+  padding: var(--e-3) 0; border-bottom: var(--b-1) solid var(--linha);
+}
+.linha[aria-busy='true'] { opacity: .6; }
+
+.foto, .semFoto { width: 48px; height: 48px; border-radius: var(--r-1); flex: none; object-fit: cover; }
+.semFoto { background: var(--linha); }
+
+.resumo { flex: 1 1 220px; min-width: 0; display: grid; gap: var(--e-1); }
+.nome { font-size: var(--t-apoio); font-weight: 600; color: var(--tinta); text-transform: capitalize; }
+.detalhe { font-size: var(--t-micro); color: var(--tinta-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preco { font-size: var(--t-apoio); font-weight: 600; color: var(--tinta); font-variant-numeric: tabular-nums; }
+.estados { display: flex; gap: var(--e-2); flex-wrap: wrap; min-width: 0; }
+
+.acoes { display: flex; align-items: center; gap: var(--e-3); margin-left: auto; }
+.chave {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  min-height: var(--toque); font-size: var(--t-apoio); color: var(--tinta);
+}
+.chave input { width: 20px; height: 20px; accent-color: var(--ragu); }
+.ordem { display: inline-flex; }

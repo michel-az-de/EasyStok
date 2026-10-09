@@ -6,6 +6,7 @@ using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.AdicionarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.EditarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ListarCardapioAdmin;
+using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ReordenarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidadeCardapioItemAdmin;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Domain.Entities.Storefront;
@@ -42,6 +43,7 @@ public class ItensDoCardapioComandaUseCaseTests
             new EditarCardapioItemAdminUseCase(_cardapio, _uow),
             new ToggleVisibilidadeCardapioItemAdminUseCase(_cardapio, _uow, aviso),
             new ListarCardapioAdminUseCase(_storefronts, _cardapio),
+            new ReordenarCardapioItemAdminUseCase(_cardapio, _uow),
             _cardapio);
     }
 
@@ -85,6 +87,34 @@ public class ItensDoCardapioComandaUseCaseTests
         var lista = await Sut().ListarForaAsync(EmpresaId);
 
         lista.Should().ContainSingle().Which.CardapioItemId.Should().Be(fora.Id);
+    }
+
+    [Fact]
+    public async Task ListarGestao_TrazOcultosEDesligadosNaOrdem()
+    {
+        var oculto = Item("Nhoque", visivel: false);
+        var desligado = Item("Lasanha", visivel: true);
+        desligado.MarcarEsgotado();
+        oculto.DefinirOrdem(2);
+        desligado.DefinirOrdem(1);
+        _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>()).Returns([desligado, oculto]);
+
+        var lista = await Sut().ListarGestaoAsync(EmpresaId);
+
+        lista.Select(i => (i.Nome, i.Visivel, i.Disponivel)).Should().Equal(
+            ("lasanha", true, false), ("nhoque", false, true));
+        lista.Should().OnlyContain(i => !i.ControlaSaldo, "itens avulsos não controlam saldo");
+    }
+
+    [Fact]
+    public async Task DefinirOrdem_GravaOValorEntreOsVizinhos()
+    {
+        var item = Item("Lasanha", visivel: true);
+
+        var r = await Sut().DefinirOrdemAsync(EmpresaId, item.Id, 1.5);
+
+        r.Ordem.Should().Be(1.5);
+        await _uow.Received(1).CommitAsync();
     }
 
     [Theory]
