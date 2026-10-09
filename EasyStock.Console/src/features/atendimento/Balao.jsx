@@ -35,7 +35,8 @@ function Corpo({ mensagem }) {
   if (mensagem.formato === 'avaliacaoResposta') return <BolhaAvaliacaoResposta mensagem={mensagem} />
   return (
     <p className={mensagem.regra === 'resumo' ? css.resumo : undefined}>
-      {partesComLinkDoCardapio(mensagem.texto).map((parte, i) => (parte.tipo === 'link'
+      {/* #1510: mensagem que chega do cliente nunca vira link; a nossa, só da própria origem. */}
+      {partesComLinkDoCardapio(mensagem.texto, mensagem.dir === 'in' ? null : window.location.origin).map((parte, i) => (parte.tipo === 'link'
         ? <LinkDoCardapio key={i} url={parte.texto} />
         : parte.texto))}
     </p>
@@ -48,10 +49,10 @@ function Corpo({ mensagem }) {
 function LinkDoCardapio({ url }) {
   const abrir = (evento) => {
     evento.preventDefault()
-    window.open(url, 'cdb-cardapio-cliente', 'width=420,height=860')
+    window.open(url, 'cdb-cardapio-cliente', 'width=420,height=860,noopener')
   }
   return (
-    <a className={css.linkCardapio} href={url} target="_blank" rel="noreferrer" title="Abrir como o cliente vê" onClick={abrir}>
+    <a className={css.linkCardapio} href={url} target="_blank" rel="noopener noreferrer" title="Abrir como o cliente vê" onClick={abrir}>
       {url}
     </a>
   )
