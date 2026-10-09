@@ -220,6 +220,26 @@ public class AgenteAtendimentoServiceTests
     }
 
     [Fact]
+    public async Task AtendimentoAutomaticoDesligadoNaConfiguracaoPassaParaADonaSemChamarOLlm()
+    {
+        // #1475: o interruptor "Atendimento automático" do console grava Ativo; desligado, o agente não responde.
+        var configuracao = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        configuracao.Atualizar(null, null, null, null, null, null, null, null, ativo: false);
+        _configuracaoRepository.GetByEmpresaIdAsync(_empresaId).Returns(configuracao);
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeFalse();
+        resultado.Respondeu.Should().BeFalse();
+        resultado.Escalou.Should().BeTrue();
+        await _llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa,
+            AgenteAtendimentoService.MotivoAtendimentoAutomaticoDesligado, Agora, Arg.Any<CancellationToken>());
+        await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
     public async Task TimeoutDoLlmComCtVivoEscala()
     {
         // #1288: o timeout do HttpClient chega como TaskCanceledException com o ct do turno vivo.
