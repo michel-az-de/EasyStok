@@ -15,7 +15,7 @@ public sealed record PerdaRequest(Guid ProdutoId, Guid? ItemEstoqueId, decimal Q
 public sealed record ProduzirPratosRequest(IReadOnlyList<PratoProduzidoInput>? Pratos, string? Observacao = null);
 
 /// <param name="Unidade">G, Kg, Ml, L, Un...; null = não mexe (no cadastro, Un).</param>
-public sealed record InsumoRequest(string? Nome, UnidadeMedida? Unidade, int? Minimo, decimal? Custo);
+public sealed record InsumoRequest(string? Nome, UnidadeMedida? Unidade, int? Minimo, decimal? Custo, bool? Embalagem = null);
 
 /// <summary>
 /// Produção pelo console (M2, plano docs/plan/erp-casa-da-baba/03-m2-producao.md). D-M2-06 (Felipe,
@@ -205,7 +205,7 @@ public class AtendimentoProducaoController(
         try
         {
             var id = await insumos.CriarAsync(currentUser.EmpresaId, currentUser.UsuarioId,
-                new InsumoInput(req.Nome, req.Unidade, req.Minimo, req.Custo), ct);
+                new InsumoInput(req.Nome, req.Unidade, req.Minimo, req.Custo, req.Embalagem), ct);
             return DataCreated($"/api/produtos/{id}", new { produtoId = id });
         }
         catch (Exception ex) when (ex is UseCaseValidationException or RegraDeDominioVioladaException)
@@ -223,7 +223,7 @@ public class AtendimentoProducaoController(
     {
         try
         {
-            await insumos.AtualizarAsync(currentUser.EmpresaId, produtoId, new InsumoInput(null, req.Unidade, req.Minimo, req.Custo), ct);
+            await insumos.AtualizarAsync(currentUser.EmpresaId, produtoId, new InsumoInput(null, req.Unidade, req.Minimo, req.Custo, req.Embalagem), ct);
             return NoContent();
         }
         catch (UseCaseValidationException ex)

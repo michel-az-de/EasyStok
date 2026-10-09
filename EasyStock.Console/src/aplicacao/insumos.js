@@ -28,13 +28,15 @@ export function criarGestaoInsumos({ recarregar, aoErro }) {
   }
 
   return {
-    criar: ({ nome, unidade, minimo, custo }) => {
+    criar: ({ nome, unidade, minimo, custo, embalagem = false }) => {
       if (!nome?.trim()) { aoErro('Informe o nome do insumo.'); return Promise.resolve(false) }
       const m = numeroOuNulo(minimo)
       const c = numeroOuNulo(custo)
       const erro = validar(m, c)
       if (erro) { aoErro(erro); return Promise.resolve(false) }
-      return gravar(() => criarInsumo({ nome: nome.trim(), unidade: unidade || 'Un', minimo: m, custo: c }))
+      return gravar(() => criarInsumo({
+        nome: nome.trim(), unidade: embalagem ? 'Un' : (unidade || 'Un'), minimo: m, custo: c, ...(embalagem ? { embalagem: true } : {}),
+      }))
     },
     atualizar: (id, { minimo, custo }) => {
       const m = numeroOuNulo(minimo)
@@ -43,5 +45,7 @@ export function criarGestaoInsumos({ recarregar, aoErro }) {
       if (erro) { aoErro(erro); return Promise.resolve(false) }
       return gravar(() => atualizarInsumo(id, { minimo: m, custo: c }))
     },
+    // M2.7 (#1523): marcar ou desmarcar como embalagem; mínimo e custo ficam como estão.
+    marcarEmbalagem: (id, embalagem) => gravar(() => atualizarInsumo(id, { minimo: null, custo: null, embalagem })),
   }
 }

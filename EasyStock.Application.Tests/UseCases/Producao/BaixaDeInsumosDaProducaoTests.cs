@@ -93,8 +93,35 @@ public class BaixaDeInsumosDaProducaoTests
         var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 12, null)], "LOT-1", _data);
 
         avisos.Should().BeEmpty();
-        _movimentos.Should().BeEmpty();
-        await _composicao.DidNotReceiveWithAnyArgs().GetByProdutoFinalAsync(default, default, default, default);
+        _movimentos.Should().BeEmpty("sem a marca, só embalagem desce, e esta receita não tem embalagem");
+    }
+
+    [Fact]
+    public async Task Embalagem_DesceMesmoSemAMarca_EORestoDaReceitaNao()
+    {
+        // Aceite M2.7 (#1523, D-M2-03): rende 6 com 6 bandejas (1 por porção); produziu 6 → 6 bandejas.
+        var lasanha = Prato(marcado: false);
+        var molho = Insumo("Molho", UnidadeMedida.G, 5000);
+        var bandeja = Insumo("Bandeja 800 g", UnidadeMedida.Un, 20);
+        bandeja.EhEmbalagem = true;
+        Receita(lasanha, (molho, 1.2m, UnidadeMedida.Kg), (bandeja, 6, UnidadeMedida.Un));
+
+        var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 6, null)], "LOT-1", _data);
+
+        avisos.Should().BeEmpty();
+        Baixado(bandeja).Should().Be(6m);
+        Baixado(molho).Should().Be(0m, "o prato não está marcado para baixar insumos (D-M2-01)");
+    }
+
+    [Fact]
+    public async Task PratoSemMarcaEsemReceita_NaoAvisa()
+    {
+        var lasanha = Prato(marcado: false);
+        Receita(lasanha);
+
+        var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 6, null)], "LOT-1", _data);
+
+        avisos.Should().BeEmpty("o aviso de receita faltando é só para quem pediu a baixa");
     }
 
     [Fact]

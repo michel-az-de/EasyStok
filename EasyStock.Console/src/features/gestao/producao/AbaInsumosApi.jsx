@@ -35,6 +35,7 @@ function LinhaInsumo({ insumo, gestao, podeEditar }) {
       <div className={css.estados}>
         {insumo.comprar && <Pilula tom="aviso" fina>Abaixo do mínimo ({insumo.minimo} {insumo.unidade})</Pilula>}
         {!insumo.comprar && insumo.minimo != null && <Pilula tom="neutro" fina>Mínimo {insumo.minimo} {insumo.unidade}</Pilula>}
+        {insumo.embalagem && <Pilula tom="marca" fina>Embalagem: desce em toda produção</Pilula>}
       </div>
       {podeEditar && (editando ? (
         <form className={css.topo} onSubmit={salvar}>
@@ -46,6 +47,9 @@ function LinhaInsumo({ insumo, gestao, podeEditar }) {
       ) : (
         <div className={css.acoes}>
           <Botao variante="texto" onClick={() => setEditando(true)}>Ajustar</Botao>
+          <Botao variante="texto" onClick={() => gestao.marcarEmbalagem(insumo.id, !insumo.embalagem)}>
+            {insumo.embalagem ? 'Não é embalagem' : 'É embalagem'}
+          </Botao>
         </div>
       ))}
     </li>
@@ -56,7 +60,7 @@ export function AbaInsumosApi() {
   const { acoes } = useAcessoModulos()
   const podeEditar = acoes.editarProducao === true
   const gestao = useInsumosApi()
-  const [novo, setNovo] = useState({ nome: '', unidade: 'G', minimo: '', custo: '' })
+  const [novo, setNovo] = useState({ nome: '', unidade: 'G', minimo: '', custo: '', embalagem: false })
 
   if (gestao.estado === 'carregando') return <p className={css.descricao}>Carregando os insumos…</p>
   if (gestao.estado === 'erro' && gestao.insumos.length === 0) {
@@ -72,7 +76,7 @@ export function AbaInsumosApi() {
   const mudarNovo = (campo) => (e) => setNovo((atual) => ({ ...atual, [campo]: e.target.value }))
   const cadastrar = (evento) => {
     evento.preventDefault()
-    Promise.resolve(gestao.criar(novo)).then((ok) => { if (ok !== false) setNovo({ nome: '', unidade: novo.unidade, minimo: '', custo: '' }) })
+    Promise.resolve(gestao.criar(novo)).then((ok) => { if (ok !== false) setNovo({ nome: '', unidade: novo.unidade, minimo: '', custo: '', embalagem: novo.embalagem }) })
   }
 
   return (
@@ -108,6 +112,10 @@ export function AbaInsumosApi() {
         </select>
         <input className={css.busca} inputMode="numeric" aria-label="Mínimo" placeholder="Mínimo" value={novo.minimo} onChange={mudarNovo('minimo')} />
         <input className={css.busca} inputMode="decimal" aria-label="Custo por unidade" placeholder="Custo por unidade" value={novo.custo} onChange={mudarNovo('custo')} />
+        <label className={css.detalhe}>
+          <input type="checkbox" checked={novo.embalagem} onChange={(e) => setNovo((atual) => ({ ...atual, embalagem: e.target.checked }))} />
+          {' '}É embalagem (bandeja, selo, pote: conta por unidade e desce em toda produção)
+        </label>
         <Botao tipo="submit" variante="primario" disabled={!novo.nome.trim()}>Cadastrar insumo</Botao>
       </form> : <p className={css.descricao}>Você pode consultar os insumos. O cadastro e os ajustes ficam com a dona ou gerente.</p>}
     </div>

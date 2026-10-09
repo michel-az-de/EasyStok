@@ -122,6 +122,57 @@ public class RegistrarProducaoIntegrationTests(PostgreSqlDatabaseFixture fixture
         (await assert.Set<ItemEstoque>().SingleAsync(i => i.ProdutoId == pratoId)).QuantidadeAtual.Value.Should().Be(2);
     }
 
+    [SkippableFact]
+    public async Task PratoSemMarca_BaixaSoAEmbalagemDaReceita()
+    {
+        // M2.7 (#1523, D-M2-03): 1 bandeja por porção, 2 porções → 2 bandejas; o molho não desce.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var (empresaId, pratoId) = await SeedAsync(StatusProduto.Ativo);
+        var molhoId = await SeedReceitaAsync(empresaId, pratoId);
+        var bandejaId = Guid.NewGuid();
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresaId);
+            var prato = await seed.Set<Produto>().SingleAsync(p => p.Id == pratoId);
+            prato.BaixaInsumoAutomatica = false;
+            seed.Set<Produto>().Add(new Produto
+            {
+                Id = bandejaId, EmpresaId = empresaId, CategoriaId = prato.CategoriaId, Nome = "Bandeja 800 g",
+                Status = StatusProduto.Ativo, EhInsumo = true, EhEmbalagem = true, UnidadeMedidaBase = UnidadeMedida.Un,
+                CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            });
+            seed.Set<ProdutoComposicao>().Add(new ProdutoComposicao
+            {
+                Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoFinalId = pratoId, InsumoId = bandejaId,
+                Quantidade = 1, Unidade = UnidadeMedida.Un, OrdemExibicao = 1, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        await using var provider = BuildProductionProvider();
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().SetMobileTenantContext(empresaId);
+            var entrada = scope.ServiceProvider.GetRequiredService<RegistrarEntradaEstoqueUseCase>();
+            foreach (var (id, qtd) in new[] { (molhoId, 1000m), (bandejaId, 20m) })
+                await entrada.ExecuteAsync(new RegistrarEntradaEstoqueCommand(empresaId, id, null, qtd, 0.1m, null, DateTime.UtcNow.AddDays(-1),
+                    NaturezaMovimentacaoEstoque.Compra, null, null, null, null, null, null, null, null, null, null, null, null, null));
+        }
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().SetMobileTenantContext(empresaId);
+            (await scope.ServiceProvider.GetRequiredService<RegistrarProducaoUseCase>()
+                .ExecuteAsync(new RegistrarProducaoCommand(empresaId, null, DateTime.UtcNow,
+                    [new RegistrarProducaoItemInput(pratoId, 2, 500, 5, 10m)]))).Avisos.Should().BeEmpty();
+        }
+
+        await using var assert = fixture.CreateDbContext();
+        assert.SetMobileTenantContext(empresaId);
+        (await assert.Set<ItemEstoque>().SingleAsync(i => i.ProdutoId == bandejaId)).QuantidadeAtual.Value.Should().Be(18);
+        (await assert.Set<ItemEstoque>().SingleAsync(i => i.ProdutoId == molhoId)).QuantidadeAtual.Value.Should().Be(1000, "o prato não está marcado");
+    }
+
     private async Task<Guid> SeedReceitaAsync(Guid empresaId, Guid pratoId)
     {
         await using var seed = fixture.CreateDbContext();
