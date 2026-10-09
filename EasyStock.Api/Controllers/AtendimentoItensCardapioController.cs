@@ -11,7 +11,7 @@ public sealed record ItemCardapioRequest(string? Nome, LinhaProduto? Linha, stri
 
 public sealed record DefinirVisibilidadeItemRequest(bool Visivel);
 
-public sealed record DefinirOrdemItemRequest(double NovaOrdem);
+public sealed record MoverItemRequest(DirecaoMover Direcao);
 
 /// <summary>
 /// Itens do cardápio pelo console (#1241, F11). Decisão do Felipe (08/10/2026): incluir, editar e
@@ -38,12 +38,13 @@ public class AtendimentoItensCardapioController(
     public Task<IActionResult> Gestao(CancellationToken ct)
         => Tratar(async () => DataOk(await itens.ListarGestaoAsync(currentUser.EmpresaId, ct)));
 
-    [SwaggerOperation(Summary = "Move a menu item (order between neighbours)")]
+    [SwaggerOperation(Summary = "Move a menu item one position up or down (server renumbers 1..n)",
+        Description = "direcao: Subir | Descer. Na ponta não muda nada.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [HttpPost("{itemId:guid}/ordem")]
-    public Task<IActionResult> Ordem(Guid itemId, [FromBody] DefinirOrdemItemRequest req, CancellationToken ct)
-        => Tratar(async () => DataOk(await itens.DefinirOrdemAsync(currentUser.EmpresaId, itemId, req.NovaOrdem, ct)));
+    [HttpPost("{itemId:guid}/mover")]
+    public Task<IActionResult> Mover(Guid itemId, [FromBody] MoverItemRequest req, CancellationToken ct)
+        => Tratar(async () => DataOk(await itens.MoverAsync(currentUser.EmpresaId, itemId, req.Direcao, ct)));
 
     [SwaggerOperation(Summary = "Add a standalone menu item (visible)")]
     [ProducesResponseType(StatusCodes.Status201Created)]

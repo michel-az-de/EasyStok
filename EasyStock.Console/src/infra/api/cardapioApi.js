@@ -53,7 +53,10 @@ export const alertaDaApi = (d) => ({ id: `desacerto-${d.produtoId}`, texto: d.te
 const LINHA_DA_GESTAO = { ParaServir: 'servir', PrepararEmCasa: 'casa' }
 
 export const listarGestao = () => chamarApi(`${CARDAPIO}/gestao`)
-export const definirOrdem = (id, novaOrdem) => chamarApi(`${ITEM(id)}/ordem`, { metodo: 'POST', corpo: { novaOrdem } })
+// O servidor troca de lugar e renumera de 1 a n (#1486).
+const DIRECAO_DA_API = { subir: 'Subir', descer: 'Descer' }
+export const moverItem = (id, direcao) =>
+  chamarApi(`${ITEM(id)}/mover`, { metodo: 'POST', corpo: { direcao: DIRECAO_DA_API[direcao] } })
 
 export const itemGestaoDaApi = (i) => ({
   sku: i.cardapioItemId,

@@ -215,14 +215,9 @@ export function catalogoDeAdicionais(cardapio, mapa, skuDoItem = null) {
   return skusUnicos.filter((sku) => sku !== skuDoItem).map((sku) => itemPorSku(cardapio, sku)).filter(Boolean)
 }
 
-// M1.1 (#1481): subir ou descer um item na lista de gestão. A ordem do EasyStok é um número com
-// casas (double), então o item vai para o meio dos novos vizinhos e só ele é gravado. Nas pontas,
-// uma unidade além do vizinho. Devolve null quando não há para onde ir.
-export function ordemAoMover(lista, indice, direcao) {
+// M1.1 (#1481, #1486): subir ou descer um item na lista de gestão. Quem renumera é o EasyStok (os
+// itens nascem com ordem 0 e a ordem não aceita negativo). Aqui só se sabe se há para onde ir.
+export function podeMover(lista, indice, direcao) {
   const alvo = indice + (direcao === 'subir' ? -1 : 1)
-  if (indice < 0 || indice >= lista.length || alvo < 0 || alvo >= lista.length) return null
-  const vizinho = lista[alvo].ordem
-  const alem = lista[alvo + (direcao === 'subir' ? -1 : 1)]
-  if (!alem) return direcao === 'subir' ? vizinho - 1 : vizinho + 1
-  return (vizinho + alem.ordem) / 2
+  return indice >= 0 && indice < lista.length && alvo >= 0 && alvo < lista.length
 }

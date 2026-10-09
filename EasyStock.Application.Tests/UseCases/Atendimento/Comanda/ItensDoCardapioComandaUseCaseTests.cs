@@ -6,7 +6,6 @@ using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.AdicionarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.EditarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ListarCardapioAdmin;
-using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ReordenarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidadeCardapioItemAdmin;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Domain.Entities.Storefront;
@@ -43,8 +42,8 @@ public class ItensDoCardapioComandaUseCaseTests
             new EditarCardapioItemAdminUseCase(_cardapio, _uow),
             new ToggleVisibilidadeCardapioItemAdminUseCase(_cardapio, _uow, aviso),
             new ListarCardapioAdminUseCase(_storefronts, _cardapio),
-            new ReordenarCardapioItemAdminUseCase(_cardapio, _uow),
-            _cardapio);
+            _cardapio,
+            _uow);
     }
 
     private CardapioItem Item(string nome, bool visivel)
@@ -107,14 +106,40 @@ public class ItensDoCardapioComandaUseCaseTests
     }
 
     [Fact]
-    public async Task DefinirOrdem_GravaOValorEntreOsVizinhos()
+    public async Task Mover_ComTodosEmpatadosEmZero_RenumeraESobe()
     {
-        var item = Item("Lasanha", visivel: true);
+        // Cardápio nunca reordenado: todos nascem com ordem 0 (#1486).
+        var a = Item("Lasanha", visivel: true);
+        var b = Item("Nhoque", visivel: true);
+        var c = Item("Torta", visivel: true);
+        _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>()).Returns([a, b, c]);
+        var naOrdem = new[] { a, b, c }.OrderBy(i => i.CriadoEm).ThenBy(i => i.Id).ToList();
+        var segundo = naOrdem[1];
 
-        var r = await Sut().DefinirOrdemAsync(EmpresaId, item.Id, 1.5);
+        var r = await Sut().MoverAsync(EmpresaId, segundo.Id, DirecaoMover.Subir);
 
-        r.Ordem.Should().Be(1.5);
+        r.Ordem.Should().Be(1);
+        segundo.OrdemExibicao.Should().Be(1);
+        naOrdem[0].OrdemExibicao.Should().Be(2);
+        naOrdem[2].OrdemExibicao.Should().Be(3);
         await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task Mover_NaPonta_NaoMudaNada()
+    {
+        var a = Item("Lasanha", visivel: true);
+        a.DefinirOrdem(1);
+        var b = Item("Nhoque", visivel: true);
+        b.DefinirOrdem(2);
+        _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>()).Returns([a, b]);
+
+        await Sut().MoverAsync(EmpresaId, a.Id, DirecaoMover.Subir);
+        await Sut().MoverAsync(EmpresaId, b.Id, DirecaoMover.Descer);
+
+        a.OrdemExibicao.Should().Be(1);
+        b.OrdemExibicao.Should().Be(2);
+        await _uow.DidNotReceive().CommitAsync();
     }
 
     [Theory]
