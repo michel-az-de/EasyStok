@@ -19109,7 +19109,7 @@ function etiquetaProducaoHtml(et, nota) {
   const horiz = currentEtqOrient === 'horizontal';
 
   const brand = `<div class="et-brand">
-    <img src="/etiqueta/assets/logo-easystok.svg" alt="">
+    <img src="etiqueta/assets/logo-easystok.svg" alt="">
     <span class="et-brand-name">Easy<b>Stok</b></span>
   </div>`;
   // #437: emoji antes do nome (dado já existe, nunca foi renderizado)
@@ -20331,7 +20331,7 @@ function orderLabelHtml(o, horizontal, nota) {
 
   const brandBlock = `
     <div class="et-brand" style="justify-content:center">
-      <img src="/etiqueta/assets/logo-easystok.svg" alt="">
+      <img src="etiqueta/assets/logo-easystok.svg" alt="">
       <span class="et-brand-name">Easy<b>Stok</b></span>
     </div>
     <div class="pa-kicker">Recibo de pedido</div>
@@ -22921,7 +22921,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <!-- ═══════════════════════════════════════════════════════════════════════
      Módulo de etiquetas — F4 (imprimir + modelos + ficha técnica)
      ══════════════════════════════════════════════════════════════════════ -->
-<link rel="stylesheet" href="/etiqueta/etiqueta.css">
+<link rel="stylesheet" href="etiqueta/etiqueta.css">
 
 <!-- Overlay: Imprimir etiquetas -->
 <div id="etq-imprimir-overlay" class="etq-overlay" role="dialog" aria-modal="true" style="display:none">
@@ -23029,10 +23029,10 @@ document.addEventListener('DOMContentLoaded', function () {
   </div>
 </div>
 
-<script type="module" src="/etiqueta/imprimir.js?v=2"></script>
+<script type="module" src="etiqueta/imprimir.js?v=2"></script>
 
 <!-- ── Editor visual de etiquetas (F5) ──────────────────────────────────── -->
-<link rel="stylesheet" href="/etiqueta/editor/editor.css">
+<link rel="stylesheet" href="etiqueta/editor/editor.css">
 <div id="etq-editor-overlay" style="display:none" role="dialog" aria-modal="true" aria-label="Editor de modelo de etiqueta">
   <!-- Toolbar -->
   <div class="etq-ed-toolbar"></div>
@@ -23082,7 +23082,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <div id="etq-ed-live" aria-live="polite" role="status"></div>
 
 <script type="module">
-import { initEditor } from '/etiqueta/editor/editor.js';
+import { initEditor } from './etiqueta/editor/editor.js';
 initEditor();
 </script>
 </body>
