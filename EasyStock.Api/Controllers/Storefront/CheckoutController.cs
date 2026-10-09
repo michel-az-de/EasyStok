@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
 using EasyStock.Domain.Exceptions.Storefront;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -202,7 +203,9 @@ public sealed class CheckoutController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    [EnableRateLimiting("public-post")]
     [HttpPost("guest")]
     public async Task<IActionResult> IniciarCheckoutGuest(
         [FromRoute] string slug,
