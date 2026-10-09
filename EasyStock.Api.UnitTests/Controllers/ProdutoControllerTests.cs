@@ -52,14 +52,6 @@ public class ProdutoControllerTests
             _logger);
 
         var gerenciarProdutoUseCase = new GerenciarProdutoUseCase(
-            _produtoRepository,
-            _categoriaRepository,
-            _produtoVariacaoRepository,
-            _produtoCaracteristicaRepository,
-            _produtoEmbalagemRepository,
-            _itemEstoqueRepository,
-            _movimentacaoEstoqueRepository,
-            _unitOfWork,
             new AtualizarLimiaresProdutoUseCase(_produtoRepository, _unitOfWork),
             new RemoverProdutoUseCase(_produtoRepository, _itemEstoqueRepository, _unitOfWork),
             new RestaurarProdutoUseCase(_produtoRepository, _unitOfWork),

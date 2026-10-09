@@ -16,11 +16,17 @@ public sealed class LembreteRepository(EasyStockDbContext db) : ILembreteReposit
     public async Task<IReadOnlyList<Lembrete>> ListarAsync(
         Guid empresaId, Guid? usuarioId, bool incluirConcluidos, int limite, CancellationToken ct = default)
     {
-        var query = db.Lembretes.Where(l => l.EmpresaId == empresaId);
+        var query = db.Lembretes.AsNoTracking().Where(l => l.EmpresaId == empresaId);
         if (!incluirConcluidos) query = query.Where(l => l.Situacao == SituacaoLembrete.Aberto);
         if (usuarioId is { } u) query = query.Where(l => l.ParaUsuarioId == null || l.ParaUsuarioId == u);
         return await query.OrderByDescending(l => l.VenceEm).Take(Math.Clamp(limite, 1, 500)).ToListAsync(ct);
     }
+
+    public Task<int> MarcarVencidosVistosAsync(Guid empresaId, Guid usuarioId, DateTime agoraUtc, CancellationToken ct = default) =>
+        db.Lembretes
+            .Where(l => l.EmpresaId == empresaId && (l.ParaUsuarioId == null || l.ParaUsuarioId == usuarioId)
+                && l.Situacao == SituacaoLembrete.Aberto && l.VistoEm == null && l.VenceEm <= agoraUtc)
+            .ExecuteUpdateAsync(s => s.SetProperty(l => l.VistoEm, agoraUtc), ct);
 
     public Task<bool> ExisteAutomaticoAsync(Guid empresaId, TipoLembrete tipo, string referencia, CancellationToken ct = default) =>
         db.Lembretes.IgnoreQueryFilters()

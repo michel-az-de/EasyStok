@@ -126,6 +126,47 @@ public sealed class CaixaRepositoryPagamentosPedidoIntegrationTests(PostgreSqlDa
         total.Should().Be(40m);
     }
 
+    [SkippableTheory]
+    [InlineData(NaturezaMovimentacaoEstoque.Perda)]
+    [InlineData(NaturezaMovimentacaoEstoque.Doacao)]
+    [InlineData(NaturezaMovimentacaoEstoque.Ajuste)]
+    [InlineData(NaturezaMovimentacaoEstoque.UsoInterno)]
+    public async Task Lista_de_vendas_exclui_saidas_sem_receita_e_respeita_empresa_loja_e_intervalo(
+        NaturezaMovimentacaoEstoque natureza)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await using var db = fixture.CreateDbContext();
+        var empresa = NovaEmpresa(Guid.NewGuid());
+        var outraEmpresa = NovaEmpresa(Guid.NewGuid());
+        var loja = Loja.Criar(empresa.Id, "Loja do caixa");
+        var outraLoja = Loja.Criar(empresa.Id, "Outra loja");
+        var inicio = new DateTime(2026, 10, 9, 3, 0, 0, DateTimeKind.Utc);
+        var fim = inicio.AddDays(1);
+        var venda = NovaVenda(empresa.Id, 12.50m, inicio);
+        venda.LojaId = loja.Id;
+        var semReceita = NovaVenda(empresa.Id, 90m, inicio);
+        semReceita.LojaId = loja.Id;
+        semReceita.Natureza = natureza;
+        var deOutraLoja = NovaVenda(empresa.Id, 70m, inicio);
+        deOutraLoja.LojaId = outraLoja.Id;
+        var foraDaJanela = NovaVenda(empresa.Id, 80m, fim);
+        foraDaJanela.LojaId = loja.Id;
+        db.Empresas.AddRange(empresa, outraEmpresa);
+        db.Lojas.AddRange(loja, outraLoja);
+        db.Vendas.AddRange(venda, semReceita, deOutraLoja, foraDaJanela, NovaVenda(outraEmpresa.Id, 100m, inicio));
+        await db.SaveChangesAsync();
+        db.SetMobileTenantContext(empresa.Id);
+        var repo = new CaixaRepository(db);
+
+        var linhas = await repo.GetVendasNoIntervaloAsync(empresa.Id, inicio, fim, loja.Id);
+        var total = await repo.GetTotalVendasNoIntervaloAsync(empresa.Id, inicio, fim, loja.Id);
+        var todasLojas = await repo.GetVendasNoIntervaloAsync(empresa.Id, inicio, fim);
+
+        linhas.Should().ContainSingle().Which.Id.Should().Be(venda.Id);
+        linhas.Sum(v => v.ValorTotal.Valor).Should().Be(total).And.Be(12.50m);
+        todasLojas.Select(v => v.Id).Should().BeEquivalentTo([venda.Id, deOutraLoja.Id]);
+    }
+
     private static Empresa NovaEmpresa(Guid empresaId) => new()
     {
         Id = empresaId,

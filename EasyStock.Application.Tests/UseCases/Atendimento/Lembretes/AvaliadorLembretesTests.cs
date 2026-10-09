@@ -148,6 +148,15 @@ public class AvaliadorLembretesTests
                     && (usuarioId is null || l.ParaUsuarioId is null || l.ParaUsuarioId == usuarioId))
                 .Take(limite).ToList());
 
+        public Task<int> MarcarVencidosVistosAsync(Guid empresaId, Guid usuarioId, DateTime agoraUtc, CancellationToken ct = default)
+        {
+            var vencidos = _itens.Where(l => l.EmpresaId == empresaId && l.EstaAberto
+                && (l.ParaUsuarioId is null || l.ParaUsuarioId == usuarioId)
+                && l.VistoEm is null && l.VenceEm <= agoraUtc).ToList();
+            foreach (var lembrete in vencidos) lembrete.MarcarVisto(agoraUtc);
+            return Task.FromResult(vencidos.Count);
+        }
+
         public Task<bool> ExisteAutomaticoAsync(Guid empresaId, TipoLembrete tipo, string referencia, CancellationToken ct = default) =>
             Task.FromResult(_itens.Any(l => l.EmpresaId == empresaId && l.Tipo == tipo && l.Referencia == referencia));
 

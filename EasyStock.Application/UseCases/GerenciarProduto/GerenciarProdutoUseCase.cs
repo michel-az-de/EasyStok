@@ -141,14 +141,6 @@ internal sealed record ProdutoFotoMetadata(
     DateTime CriadoEm);
 
 public sealed class GerenciarProdutoUseCase(
-    IProdutoRepository produtoRepository,
-    ICategoriaRepository categoriaRepository,
-    IProdutoVariacaoRepository produtoVariacaoRepository,
-    IProdutoCaracteristicaRepository caracteristicaRepository,
-    IProdutoEmbalagemRepository embalagemRepository,
-    IItemEstoqueRepository itemEstoqueRepository,
-    IMovimentacaoEstoqueRepository movimentacaoEstoqueRepository,
-    IUnitOfWork unitOfWork,
     Comandos.AtualizarLimiaresProdutoUseCase atualizarLimiaresUseCase,
     Comandos.RemoverProdutoUseCase removerUseCase,
     Comandos.RestaurarProdutoUseCase restaurarUseCase,
@@ -156,11 +148,7 @@ public sealed class GerenciarProdutoUseCase(
     Queries.ObterHistoricoProdutoUseCase obterHistoricoUseCase,
     Queries.ObterEstatisticasProdutoUseCase obterEstatisticasUseCase,
     Queries.ObterDetalheProdutoUseCase obterDetalheUseCase,
-    Comandos.AtualizarProdutoUseCase atualizarUseCase,
-    ICacheService? cacheService = null,
-    IProdutoAlteracaoRepository? alteracaoRepository = null,
-    IUsuarioRepository? usuarioRepository = null,
-    IPedidoRepository? pedidoRepository = null)
+    Comandos.AtualizarProdutoUseCase atualizarUseCase)
 {
     // F9b facade: delega para Comandos.AtualizarProdutoUseCase (o maior — 239 LoC originais).
     public Task AtualizarAsync(AtualizarProdutoCommand command) => atualizarUseCase.ExecuteAsync(command);
@@ -191,7 +179,4 @@ public sealed class GerenciarProdutoUseCase(
     // F9 facade: delega para Comandos.ReordenarFotosProdutoUseCase.
     public Task ReordenarFotosAsync(Guid empresaId, Guid produtoId, Guid[] novaOrdem)
         => reordenarFotosUseCase.ExecuteAsync(empresaId, produtoId, novaOrdem);
-
-    private static string? Normalizar(string? valor) =>
-        string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();
 }

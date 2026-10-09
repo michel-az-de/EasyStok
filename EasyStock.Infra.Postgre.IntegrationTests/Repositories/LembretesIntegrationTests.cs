@@ -137,7 +137,7 @@ public class LembretesIntegrationTests(PostgreSqlDatabaseFixture fixture)
             var repo = new LembreteRepository(db);
             var lista = await new ListarLembretesUseCase(repo).ExecuteAsync(casa.Id, pessoa, false, false);
             lista.Select(l => l.Id).Should().BeEquivalentTo([meu.Id, equipe.Id]);
-            (await new MarcarLembretesVistosUseCase(repo, db, new RelogioFixo(agora)).ExecuteAsync(casa.Id, pessoa)).Should().Be(2);
+            (await new MarcarLembretesVistosUseCase(repo, new RelogioFixo(agora)).ExecuteAsync(casa.Id, pessoa)).Should().Be(2);
             var concluir = new ConcluirLembreteUseCase(repo, db, new RelogioFixo(agora));
             var invadir = () => concluir.ExecuteAsync(casa.Id, pessoa, alheio.Id);
             await invadir.Should().ThrowAsync<LembreteNaoEncontradoException>();
