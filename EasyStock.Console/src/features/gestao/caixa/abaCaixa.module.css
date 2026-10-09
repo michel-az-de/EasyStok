@@ -3,7 +3,7 @@
 
 .painel { display: grid; gap: var(--e-4); }
 
-.cabecalho { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-3); }
+.cabecalho { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
 
 .tituloSecao { margin: 0 0 var(--e-1); font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
 
@@ -57,11 +57,11 @@
 .linhaEstornada { opacity: .6; }
 .linhaEstornada .linhaInfo strong { text-decoration: line-through; }
 
-.linhaInfo { display: flex; flex-direction: column; gap: 2px; }
+.linhaInfo { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 
 .linhaValor { display: flex; align-items: center; gap: var(--e-2); font-weight: 700; color: var(--tinta); white-space: nowrap; }
 
-.acaoEstorno { color: var(--erro); min-height: auto; padding: 0 var(--e-2); }
+.acaoEstorno { color: var(--erro); min-height: var(--toque); padding: 0 var(--e-2); }
 .acaoEstorno:hover:not(:disabled) { background: var(--erro-pastel); }
 
 .promptEstorno {
@@ -85,3 +85,9 @@
 .qtdValor { min-width: 1.5em; text-align: center; font-weight: 700; }
 
 .corpoDiferenca { display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-apoio); }
+
+@media (max-width: 640px) {
+  .linha, .itemVenda { flex-wrap: wrap; }
+  .linhaInfo, .infoItem { flex: 1 1 100%; min-width: 0; }
+  .linhaValor { width: 100%; flex-wrap: wrap; justify-content: space-between; }
+}

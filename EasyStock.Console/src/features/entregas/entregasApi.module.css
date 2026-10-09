@@ -1,6 +1,10 @@
 /* Entregas no modo API (F04): painéis simples sobre os dados reais. */
 .conteudo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--e-3) var(--e-4); display: flex; flex-direction: column; gap: var(--e-4); }
-.abas { display: flex; gap: var(--e-2); flex-wrap: wrap; }
+.navegacao { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; }
+.abas { display: flex; gap: var(--e-1); flex-wrap: wrap; flex: 0 1 560px; padding: var(--e-1); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--papel); }
+.abaInterna { flex: 1 1 auto; padding: var(--e-2); font-size: var(--t-apoio); }
+.abaInterna[aria-selected='true'], .abaInterna[aria-selected='true']:hover { background: var(--marca-claro); color: var(--marca); border-color: var(--linha-media); }
+.painel { display: flex; flex-direction: column; gap: var(--e-4); min-width: 0; }
 .secao { display: flex; flex-direction: column; gap: var(--e-2); }
 .secao h3 { margin: 0; font-size: var(--t-apoio); font-weight: 700; color: var(--tinta-2); text-transform: uppercase; letter-spacing: .04em; }
 .lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--e-2); }

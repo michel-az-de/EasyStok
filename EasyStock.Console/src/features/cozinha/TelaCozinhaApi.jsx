@@ -111,6 +111,7 @@ export function TelaCozinhaApi({ linhas }) {
   const fantasmas = reduzMovimento() ? [] : saindo
   const visiveis = filtrarPorLinha(lista, linhaFiltro)
   const vazia = pedidos !== null && lista.length === 0
+  const filtroVazio = !vazia && linhaFiltro !== null && visiveis.length === 0
 
   const aoLargar = () => { setArrastadoId(null); setSobreId(null) }
   const aoSoltar = ({ active, over }) => {
@@ -175,6 +176,12 @@ export function TelaCozinhaApi({ linhas }) {
               {vazia && (
                 <p className={css.cozinhaEmDia}>{textoDaCozinhaVazia({ amanha })}</p>
               )}
+              {filtroVazio && (
+                <div className={css.cozinhaEmDia}>
+                  <p role="status">Nenhum pedido nesta linha de produto.</p>
+                  <Botao variante="secundario" onClick={() => setLinhaFiltro(null)}>Ver todas as linhas</Botao>
+                </div>
+              )}
               <div className={css.colunas}>
                 {COLUNAS_KDS.map((coluna) => {
                   const cartoes = visiveis.filter((p) => p.status === coluna.status)
@@ -191,7 +198,7 @@ export function TelaCozinhaApi({ linhas }) {
                       </h2>
                       <ul className={css.listaColuna}>
                         {/* #1474: com a fila toda vazia o aviso do topo basta; não repete em cada coluna. */}
-                        {!vazia && cartoes.length === 0 && saindoDaqui.length === 0 && (
+                        {!vazia && !filtroVazio && cartoes.length === 0 && saindoDaqui.length === 0 && (
                           <li><Vazio titulo="Nenhum pedido">Os cartões aparecem aqui conforme o pedido avança.</Vazio></li>
                         )}
                         {cartoes.map((p) => (

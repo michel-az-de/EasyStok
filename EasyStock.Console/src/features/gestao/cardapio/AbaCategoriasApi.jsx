@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useSecoesCardapioApi } from '../../../aplicacao/useSecoesCardapioApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
@@ -28,8 +29,8 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
     <li className={css.linha} aria-busy={ocupado}>
       {editando ? (
         <form className={css.resumo} onSubmit={salvar}>
-          <input
-            className={css.busca}
+          <CampoTexto
+            rotulo="Nome da categoria"
             aria-label={`Novo nome de ${secao.nome}`}
             value={nome}
             maxLength={100}
@@ -127,11 +128,10 @@ export function AbaCategoriasApi() {
         </output>
       )}
 
-      <form className={css.topo} onSubmit={criar}>
-        <input
-          className={css.busca}
+      <form className={css.campos} onSubmit={criar}>
+        <CampoTexto
+          rotulo="Nome da nova categoria"
           placeholder="Nova categoria (ex.: Massas)"
-          aria-label="Nome da nova categoria"
           maxLength={100}
           value={nova}
           onChange={(e) => setNova(e.target.value)}

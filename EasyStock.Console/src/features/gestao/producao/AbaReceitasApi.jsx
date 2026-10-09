@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useReceitasApi } from '../../../aplicacao/useReceitasApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { lerReceita, UNIDADES_RECEITA } from '../../../aplicacao/receitas'
 import { lerInsumos } from '../../../aplicacao/insumos'
 import { moeda } from '../../../dominio/formato'
+import { hashDoModulo } from '../../../dominio/modulos'
 import css from '../cardapio/abaCardapio.module.css'
 
 // M2 › Receitas (M2.4a, #1498). Por prato do cardápio ligado ao estoque: quanto rende e os insumos
@@ -66,25 +68,23 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar }) {
 
   return (
     <form className={css.aba} onSubmit={salvar} aria-label={`Receita de ${prato.nome}`}>
-      <label className={css.topo}>
-        <span className={css.nome}>Rende</span>
-        <input className={css.busca} inputMode="decimal" aria-label="Rendimento" value={rendimento} onChange={(e) => setRendimento(e.target.value)} />
-        <span className={css.detalhe}>{detalhe.unidadeRendimento === 'Un' ? 'porções' : detalhe.unidadeRendimento}</span>
-      </label>
+      <div className={css.campoQuantidade}>
+        <CampoTexto rotulo="Rendimento" dica={detalhe.unidadeRendimento === 'Un' ? 'Em porções' : `Em ${detalhe.unidadeRendimento}`}
+          inputMode="decimal" value={rendimento} onChange={(e) => setRendimento(e.target.value)} />
+      </div>
       <ul className={css.lista}>
         {linhas.map((l, i) => (
-          <li key={`${l.insumoId}-${i}`} className={css.linha}>
-            <select className={css.busca} aria-label="Insumo" value={l.insumoId} onChange={mudar(i, 'insumoId')}>
-              <option value="">Escolha o insumo</option>
-              {insumos.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
-              {l.insumoId && !insumos.some((s) => s.id === l.insumoId) && <option value={l.insumoId}>{l.insumo}</option>}
-            </select>
-            <input className={css.busca} inputMode="decimal" aria-label="Quantidade" value={l.quantidade} onChange={mudar(i, 'quantidade')} />
-            <select className={css.busca} aria-label="Unidade" value={l.unidade} onChange={mudar(i, 'unidade')}>
-              {UNIDADES_RECEITA.map((u) => <option key={u} value={u}>{u}</option>)}
-            </select>
-            {l.custo != null && <span className={css.detalhe}>{moeda(l.custo)}</span>}
-            <Botao variante="texto" onClick={() => setLinhas((atual) => atual.filter((_, j) => j !== i))}>Tirar</Botao>
+          <li key={`${l.insumoId}-${i}`} className={`${css.campos} ${css.formulario}`}>
+            <CampoSelecao rotulo="Insumo" value={l.insumoId} onChange={mudar(i, 'insumoId')}
+              opcoes={[{ valor: '', rotulo: 'Escolha o insumo' }, ...insumos.map((s) => ({ valor: s.id, rotulo: s.nome })),
+                ...(l.insumoId && !insumos.some((s) => s.id === l.insumoId) ? [{ valor: l.insumoId, rotulo: l.insumo }] : [])]} />
+            <CampoTexto rotulo="Quantidade" inputMode="decimal" value={l.quantidade} onChange={mudar(i, 'quantidade')} />
+            <CampoSelecao rotulo="Unidade" value={l.unidade} onChange={mudar(i, 'unidade')}
+              opcoes={UNIDADES_RECEITA.map((u) => ({ valor: u, rotulo: u }))} />
+            <div className={css.rodapeForm}>
+              <span className={css.detalhe}>{l.custo != null ? `Custo: ${moeda(l.custo)}` : ''}</span>
+              <Botao variante="texto" onClick={() => setLinhas((atual) => atual.filter((_, j) => j !== i))}>Tirar</Botao>
+            </div>
           </li>
         ))}
       </ul>
@@ -93,7 +93,7 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar }) {
         <Botao variante="texto" onClick={aoFechar}>Cancelar</Botao>
         <Botao tipo="submit" variante="primario" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar receita'}</Botao>
       </div>
-      {insumos.length === 0 && <p className={css.descricao}>Cadastre os insumos em M2 › Insumos para montar a receita.</p>}
+      {insumos.length === 0 && <p className={css.descricao}>Para montar a receita, cadastre os insumos em <a className={css.link} href={hashDoModulo('producao', 'insumos')}>Insumos</a>.</p>}
     </form>
   )
 }

@@ -47,7 +47,7 @@ function EscolhaDoDia({ dia, mudarDia }) {
   )
 }
 
-function PedidoDoDia({ pedido, montando, ocupado, acoes }) {
+function PedidoDoDia({ pedido, montando, ocupado, acoes, aoVerViagens }) {
   const detalhes = [
     pedido.pago ? 'Pago' : 'Não pago',
     pedido.entregador ? `Leva ${textoDeQuemLeva(pedido.entregador)}` : null,
@@ -64,7 +64,10 @@ function PedidoDoDia({ pedido, montando, ocupado, acoes }) {
       <p className={css.apoio}>{detalhes}</p>
       {pedido.podePorNaViagem && (
         <div className={css.linha}>
-          {montando.length === 0 && <span className={css.apoio}>Abra uma viagem em Viagens para pôr este pedido.</span>}
+          {montando.length === 0 && <>
+            <span className={css.apoio}>Abra uma viagem para despachar este pedido.</span>
+            <Botao variante="texto" onClick={aoVerViagens}>Ver viagens</Botao>
+          </>}
           {montando.map((v, i) => (
             <Botao key={v.id} variante="texto" disabled={ocupado} onClick={() => acoes.incluirParada(v.id, pedido.id)}>
               Pôr na viagem {i + 1}
@@ -76,7 +79,7 @@ function PedidoDoDia({ pedido, montando, ocupado, acoes }) {
   )
 }
 
-function JanelaDoDia({ grupo, montando, ocupado, acoes }) {
+function JanelaDoDia({ grupo, montando, ocupado, acoes, aoVerViagens }) {
   const n = grupo.pedidos.length
   const titulo = grupo.chave === 'sem-janela' || grupo.label === grupo.faixa ? grupo.faixa : `${grupo.faixa} · ${grupo.label}`
   return (
@@ -91,14 +94,14 @@ function JanelaDoDia({ grupo, montando, ocupado, acoes }) {
       )}
       {n === 0 && <p className={css.vazio}>Nenhum pedido nesta janela.</p>}
       <ul className={css.lista}>
-        {grupo.pedidos.map((p) => <PedidoDoDia key={p.id} pedido={p} montando={montando} ocupado={ocupado} acoes={acoes} />)}
+        {grupo.pedidos.map((p) => <PedidoDoDia key={p.id} pedido={p} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} />)}
       </ul>
     </section>
   )
 }
 
 // `roteiro`: `roteiroDoDia` já montado por quem chama (nulo enquanto o dia carrega).
-export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes }) {
+export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes, aoAbrirCadastro, aoVerViagens }) {
   const [papel, setPapel] = useState('a4')
 
   return (
@@ -123,9 +126,12 @@ export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes
       </section>
       {!roteiro && <p className={css.vazio}>Carregando o dia…</p>}
       {roteiro?.grupos.length === 0 && (
-        <p className={css.vazio}>Nenhuma janela neste dia e nenhum pedido marcado. As janelas se cadastram em Janelas e frete.</p>
+        <div className={css.secao}>
+          <p className={css.vazio}>Nenhuma janela neste dia e nenhum pedido marcado.</p>
+          <Botao variante="secundario" onClick={aoAbrirCadastro}>Cadastrar janelas e frete</Botao>
+        </div>
       )}
-      {roteiro?.grupos.map((g) => <JanelaDoDia key={g.chave} grupo={g} montando={montando} ocupado={ocupado} acoes={acoes} />)}
+      {roteiro?.grupos.map((g) => <JanelaDoDia key={g.chave} grupo={g} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} />)}
     </>
   )
 }

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { FolhaImpressao } from '../../../componentes/FolhaImpressao'
 import { useCatalogo } from '../../../aplicacao/contextos'
 import { criarProducaoDoDia } from '../../../aplicacao/producaoDoDia'
@@ -90,17 +91,17 @@ export function AbaProducaoDoDiaApi() {
           {linhas.map((l) => {
             const sobra = sobraDaLinha(paraEnviar(l))
             return (
-              <li key={l.id} className={css.linha}>
-                <select className={css.busca} aria-label="Prato" value={l.sku} onChange={mudar(l.id, 'sku')}>
-                  <option value="">Escolha o prato</option>
-                  {pratos.map((p) => <option key={p.sku} value={p.sku}>{p.nome}{p.porcao ? ` · ${p.porcao}` : ''}</option>)}
-                </select>
-                <input className={css.busca} inputMode="numeric" aria-label="Porções" placeholder="Porções" value={l.porcoes} onChange={mudar(l.id, 'porcoes')} />
-                <input className={css.busca} inputMode="numeric" aria-label="Peso de cada porção (g)" placeholder="g por porção" value={l.pesoPorPorcaoG} onChange={mudar(l.id, 'pesoPorPorcaoG')} />
-                <input className={css.busca} inputMode="numeric" aria-label="Peso real total (g)" placeholder="Peso real (g)" value={l.pesoRealG} onChange={mudar(l.id, 'pesoRealG')} />
-                <input className={css.busca} inputMode="numeric" aria-label="Validade (dias)" placeholder="Validade (dias)" value={l.validadeDias} onChange={mudar(l.id, 'validadeDias')} />
-                <span className={css.detalhe}>{sobra == null ? '' : sobra < 0 ? 'peso real menor que as porções' : `sobra ${sobra} g`}</span>
-                <Botao variante="texto" disabled={linhas.length === 1} onClick={() => tirar(l.id)}>Tirar</Botao>
+              <li key={l.id} className={`${css.campos} ${css.formulario}`}>
+                <CampoSelecao rotulo="Prato" value={l.sku} onChange={mudar(l.id, 'sku')}
+                  opcoes={[{ valor: '', rotulo: 'Escolha o prato' }, ...pratos.map((p) => ({ valor: p.sku, rotulo: `${p.nome}${p.porcao ? ` · ${p.porcao}` : ''}` }))]} />
+                <CampoTexto inputMode="numeric" rotulo="Porções" placeholder="Porções" value={l.porcoes} onChange={mudar(l.id, 'porcoes')} />
+                <CampoTexto inputMode="numeric" rotulo="Peso de cada porção (g)" placeholder="g por porção" value={l.pesoPorPorcaoG} onChange={mudar(l.id, 'pesoPorPorcaoG')} />
+                <CampoTexto inputMode="numeric" rotulo="Peso real total (g)" placeholder="Peso real (g)" value={l.pesoRealG} onChange={mudar(l.id, 'pesoRealG')} />
+                <CampoTexto inputMode="numeric" rotulo="Validade (dias)" placeholder="Validade (dias)" value={l.validadeDias} onChange={mudar(l.id, 'validadeDias')} />
+                <div className={css.rodapeForm}>
+                  <span className={css.detalhe}>{sobra == null ? '' : sobra < 0 ? 'peso real menor que as porções' : `sobra ${sobra} g`}</span>
+                  <Botao variante="texto" disabled={linhas.length === 1} onClick={() => tirar(l.id)}>Tirar</Botao>
+                </div>
               </li>
             )
           })}

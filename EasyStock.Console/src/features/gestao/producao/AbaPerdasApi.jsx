@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { usePerdasApi } from '../../../aplicacao/usePerdasApi'
 import { MOTIVOS_PERDA } from '../../../aplicacao/perdas'
@@ -70,36 +71,27 @@ export function AbaPerdasApi() {
       )}
 
       <form className={css.aba} onSubmit={lancar} aria-label="Lançar perda">
-        <div className={css.topo}>
-          <select className={css.busca} aria-label="Prato ou insumo" value={rascunho.produtoId} onChange={mudar('produtoId')}>
-            <option value="">Prato ou insumo</option>
-            {gestao.opcoes.map((o) => (
-              <option key={o.produtoId} value={o.produtoId}>{o.nome} ({o.tipo}, tem {qtd(o.saldo)}{o.unidade ? ` ${o.unidade}` : ''})</option>
-            ))}
-          </select>
-          <input className={css.busca} inputMode="decimal" aria-label="Quantidade" placeholder="Quantidade" value={rascunho.quantidade} onChange={mudar('quantidade')} />
-          <select className={css.busca} aria-label="Motivo" value={rascunho.motivo} onChange={mudar('motivo')}>
-            {MOTIVOS_PERDA.map((m) => <option key={m.id} value={m.id}>{m.rotulo}</option>)}
-          </select>
+        <div className={`${css.campos} ${css.formulario}`}>
+          <CampoSelecao rotulo="Prato ou insumo" value={rascunho.produtoId} onChange={mudar('produtoId')}
+            opcoes={[{ valor: '', rotulo: 'Escolha o prato ou insumo' }, ...gestao.opcoes.map((o) => ({
+              valor: o.produtoId, rotulo: `${o.nome} (${o.tipo}, tem ${qtd(o.saldo)}${o.unidade ? ` ${o.unidade}` : ''})`,
+            }))]} />
+          <CampoTexto inputMode="decimal" rotulo="Quantidade" placeholder="Quantidade" value={rascunho.quantidade} onChange={mudar('quantidade')} />
+          <CampoSelecao rotulo="Motivo" value={rascunho.motivo} onChange={mudar('motivo')}
+            opcoes={MOTIVOS_PERDA.map((m) => ({ valor: m.id, rotulo: m.rotulo }))} />
           {rascunho.motivo === 'Outro' && (
-            <input className={css.busca} aria-label="Qual o motivo" placeholder="Qual o motivo" value={rascunho.texto} onChange={mudar('texto')} />
+            <CampoTexto rotulo="Qual o motivo" placeholder="Descreva o que aconteceu" value={rascunho.texto} onChange={mudar('texto')} />
           )}
           <Botao tipo="submit" variante="primario" disabled={enviando}>{enviando ? 'Lançando…' : 'Lançar perda'}</Botao>
         </div>
       </form>
 
       <section className={css.aba} aria-label="Resumo do período">
-        <div className={css.topo}>
-          <label className={css.topo}>
-            <span className={css.nome}>De</span>
-            <input className={css.busca} type="date" aria-label="De" value={gestao.periodo.de ?? resumo?.de ?? ''}
-              onChange={(e) => gestao.setPeriodo((p) => ({ ...p, de: e.target.value || null }))} />
-          </label>
-          <label className={css.topo}>
-            <span className={css.nome}>Até</span>
-            <input className={css.busca} type="date" aria-label="Até" value={gestao.periodo.ate ?? resumo?.ate ?? ''}
-              onChange={(e) => gestao.setPeriodo((p) => ({ ...p, ate: e.target.value || null }))} />
-          </label>
+        <div className={css.campos}>
+          <CampoTexto tipo="date" rotulo="De" value={gestao.periodo.de ?? resumo?.de ?? ''}
+            onChange={(e) => gestao.setPeriodo((p) => ({ ...p, de: e.target.value || null }))} />
+          <CampoTexto tipo="date" rotulo="Até" value={gestao.periodo.ate ?? resumo?.ate ?? ''}
+            onChange={(e) => gestao.setPeriodo((p) => ({ ...p, ate: e.target.value || null }))} />
           <Pilula tom={resumo?.valor > 0 ? 'aviso' : 'ok'} fina>{moeda(resumo?.valor ?? 0)} perdidos</Pilula>
         </div>
         {(resumo?.porMotivo ?? []).length > 0 && (
