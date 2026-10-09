@@ -7,9 +7,10 @@ namespace EasyStock.Application.UseCases.Atendimento.Producao;
 /// <param name="Receitas">Em quantas receitas o insumo entra (onde é usado).</param>
 public sealed record InsumoDaProducao(
     Guid ProdutoId, string Nome, UnidadeMedida Unidade, decimal Saldo, int? Minimo, decimal? Custo, int Receitas,
-    bool AbaixoDoMinimo);
+    bool AbaixoDoMinimo, bool Embalagem = false);
 
-public sealed record InsumoInput(string? Nome, UnidadeMedida? Unidade, int? Minimo, decimal? Custo);
+/// <param name="Embalagem">D-M2-03 (#1523): bandeja, selo, pote. Null = não mexe (no cadastro, não é).</param>
+public sealed record InsumoInput(string? Nome, UnidadeMedida? Unidade, int? Minimo, decimal? Custo, bool? Embalagem = null);
 
 /// <summary>
 /// Insumos da produção pelo console (M2.3, #1496): o intermediário (molho, recheio, massa laminada)
@@ -25,6 +26,7 @@ public sealed class InsumosDaProducaoUseCase(
     IUnitOfWork unitOfWork)
 {
     public const string CategoriaInsumos = "Insumos";
+    public const string CategoriaEmbalagens = "Embalagens";
 
     public async Task<IReadOnlyList<InsumoDaProducao>> ListarAsync(Guid empresaId, CancellationToken ct = default)
     {
@@ -38,7 +40,7 @@ public sealed class InsumosDaProducaoUseCase(
             var saldo = saldos.GetValueOrDefault(i.Id);
             return new InsumoDaProducao(
                 i.Id, i.Nome, i.UnidadeMedidaBase, saldo, i.QuantidadeMinima, i.CustoReferencia?.Valor,
-                receitas.GetValueOrDefault(i.Id), i.QuantidadeMinima is { } minimo && saldo < minimo);
+                receitas.GetValueOrDefault(i.Id), i.QuantidadeMinima is { } minimo && saldo < minimo, i.EhEmbalagem);
         }).ToList();
     }
 
@@ -49,12 +51,17 @@ public sealed class InsumosDaProducaoUseCase(
         if (string.IsNullOrWhiteSpace(dados.Nome)) throw new UseCaseValidationException("Informe o nome do insumo.");
         Validar(dados);
 
-        var categoriaId = await CategoriaDeEstoque.ObterOuCriarAsync(categoriaRepository, unitOfWork, empresaId,
-            CategoriaInsumos, "Insumos da produção (criada pelo console)");
+        var embalagem = dados.Embalagem == true;
+        var categoriaId = embalagem
+            ? await CategoriaDeEstoque.ObterOuCriarAsync(categoriaRepository, unitOfWork, empresaId,
+                CategoriaEmbalagens, "Bandejas, selos e potes da produção (criada pelo console)")
+            : await CategoriaDeEstoque.ObterOuCriarAsync(categoriaRepository, unitOfWork, empresaId,
+                CategoriaInsumos, "Insumos da produção (criada pelo console)");
         var r = await cadastrarProduto.ExecuteAsync(new CadastrarProdutoCommand(
             empresaId, categoriaId, null, dados.Nome.Trim(), null, null, TipoProduto.Alimento,
             null, null, true, null, dados.Custo, null, null, null, null, null, null, null, usuarioId,
-            EhInsumo: true, UnidadeMedidaBase: dados.Unidade ?? UnidadeMedida.Un, QuantidadeMinima: dados.Minimo));
+            EhInsumo: true, UnidadeMedidaBase: dados.Unidade ?? UnidadeMedida.Un, QuantidadeMinima: dados.Minimo,
+            EhEmbalagem: embalagem));
         return r.ProdutoId;
     }
 
@@ -69,6 +76,7 @@ public sealed class InsumosDaProducaoUseCase(
         if (dados.Minimo.HasValue) produto.QuantidadeMinima = dados.Minimo;
         if (dados.Custo.HasValue) produto.CustoReferencia = Dinheiro.FromDecimal(dados.Custo.Value);
         if (dados.Unidade.HasValue) produto.UnidadeMedidaBase = dados.Unidade.Value;
+        if (dados.Embalagem.HasValue) produto.EhEmbalagem = dados.Embalagem.Value;
         produto.AlteradoEm = DateTime.UtcNow;
         await produtoRepository.UpdateAsync(produto);
         await unitOfWork.CommitAsync();

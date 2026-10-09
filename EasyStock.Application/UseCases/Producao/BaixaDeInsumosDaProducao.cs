@@ -8,7 +8,8 @@ public sealed record PratoParaBaixa(Produto Prato, int Porcoes, int? PesoProduzi
 
 /// <summary>
 /// D-M2-01 (#1499): baixa dos insumos pela receita, dentro da transação da produção (S23).
-/// Só entra prato com <see cref="Produto.BaixaInsumoAutomatica"/>. Consumo de cada insumo =
+/// Entra o prato com <see cref="Produto.BaixaInsumoAutomatica"/> (a receita toda) e, em qualquer
+/// prato, a linha de embalagem (<see cref="Produto.EhEmbalagem"/>, D-M2-03). Consumo de cada insumo =
 /// quantidade da linha × produzido ÷ rendimento, convertido para a unidade-base do insumo.
 /// Falta de insumo AVISA e não trava: com algum saldo, a falta vira descoberto no lote (#540);
 /// sem saldo nenhum não há lote onde registrar, então só avisa. A saída é <c>UsoInterno</c>
@@ -28,9 +29,13 @@ public sealed class BaixaDeInsumosDaProducao(
         var avisos = new List<string>();
         var consumo = new Dictionary<Guid, (Produto Insumo, decimal Quantidade)>();
 
-        foreach (var p in pratos.Where(p => p.Prato.BaixaInsumoAutomatica))
+        foreach (var p in pratos)
         {
-            var linhas = await composicaoRepository.GetByProdutoFinalAsync(empresaId, p.Prato.Id, null, ct);
+            // D-M2-03 (#1523): embalagem desce em toda produção; o resto da receita só no prato marcado (D-M2-01).
+            var marcado = p.Prato.BaixaInsumoAutomatica;
+            var receita = await composicaoRepository.GetByProdutoFinalAsync(empresaId, p.Prato.Id, null, ct);
+            var linhas = marcado ? receita : receita.Where(l => l.Insumo?.EhEmbalagem == true).ToList();
+            if (!marcado && linhas.Count == 0) continue;
             if (linhas.Count == 0)
             {
                 avisos.Add($"{p.Prato.Nome}: marcado para baixar insumos, mas está sem receita.");

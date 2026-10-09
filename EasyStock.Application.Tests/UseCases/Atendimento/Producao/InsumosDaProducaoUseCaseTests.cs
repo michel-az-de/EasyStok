@@ -73,6 +73,44 @@ public class InsumosDaProducaoUseCaseTests
     }
 
     [Fact]
+    public async Task CriarEmbalagem_NaCategoriaEmbalagens_ComAMarca()
+    {
+        // M2.7 (#1523, D-M2-03): bandeja é insumo marcado como embalagem; desce em toda produção.
+        var id = await Sut().CriarAsync(EmpresaId, Guid.NewGuid(), new InsumoInput("Bandeja 800 g", null, 50, 0.4m, Embalagem: true));
+
+        var p = _gravados[id];
+        (p.EhInsumo, p.EhEmbalagem, p.UnidadeMedidaBase).Should().Be((true, true, UnidadeMedida.Un));
+        _categoriasGravadas.Should().ContainSingle(c => c.Nome == InsumosDaProducaoUseCase.CategoriaEmbalagens);
+    }
+
+    [Fact]
+    public async Task EmbalagemAbaixoDoMinimo_ApareceParaComprar_ComAMarca()
+    {
+        var bandeja = Insumo("Bandeja 800 g", 50, UnidadeMedida.Un);
+        bandeja.EhEmbalagem = true;
+        _produtos.GetInsumosAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns([bandeja]);
+        _estoque.GetSaldoDisponivelPorProdutosAsync(EmpresaId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, decimal> { [bandeja.Id] = 12 });
+        _composicao.ContarReceitasPorInsumoAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns(new Dictionary<Guid, int>());
+
+        var i = (await Sut().ListarAsync(EmpresaId)).Should().ContainSingle().Subject;
+
+        (i.AbaixoDoMinimo, i.Embalagem).Should().Be((true, true));
+    }
+
+    [Fact]
+    public async Task Atualizar_LigaEDesligaAEmbalagem_ENullNaoMexe()
+    {
+        var bandeja = Insumo("Bandeja 800 g", 50, UnidadeMedida.Un);
+        _gravados[bandeja.Id] = bandeja;
+
+        await Sut().AtualizarAsync(EmpresaId, bandeja.Id, new InsumoInput(null, null, null, null, Embalagem: true));
+        bandeja.EhEmbalagem.Should().BeTrue();
+        await Sut().AtualizarAsync(EmpresaId, bandeja.Id, new InsumoInput(null, null, 60, null));
+        (bandeja.EhEmbalagem, bandeja.QuantidadeMinima).Should().Be((true, 60));
+    }
+
+    [Fact]
     public async Task Atualizar_ProdutoQueNaoEInsumo_400()
     {
         var prato = new Produto { Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = "Lasanha", EhInsumo = false };

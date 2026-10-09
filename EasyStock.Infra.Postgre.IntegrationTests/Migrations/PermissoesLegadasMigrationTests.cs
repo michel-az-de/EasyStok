@@ -149,6 +149,9 @@ public class PermissoesLegadasMigrationTests
             var reverter = () => db.GetService<IMigrator>().MigrateAsync("20261009170822_AddPerfilModuloInicial");
             // #1504: com perfil arquivado, o banco recusa o Down e a migration continua aplicada.
             await reverter.Should().ThrowAsync<Npgsql.PostgresException>().WithMessage("*Restaure o arquivo*");
+            // A trava segura a própria migration; as posteriores (ex.: #1523) já foram desfeitas antes dela.
+            (await db.Database.GetAppliedMigrationsAsync()).Should().Contain(m => m.EndsWith("_RemoverPermissoesLegadas"));
+            await db.Database.MigrateAsync();
             (await db.Database.GetPendingMigrationsAsync()).Should().BeEmpty();
         }
 
