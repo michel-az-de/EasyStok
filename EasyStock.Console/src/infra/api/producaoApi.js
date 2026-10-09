@@ -94,6 +94,10 @@ export const salvarReceita = (produtoId, { rendimentoBase, rendimentoUnidade, un
     },
   })
 
+// D-M2-01 (#1499): produzir o prato baixa os insumos da receita (Gerente liga e desliga).
+export const marcarBaixaAutomatica = (produtoId, ligada) =>
+  chamarApi(`${PRODUCAO}/receitas/${produtoId}/baixa-automatica`, { metodo: 'PUT', corpo: { ligada } })
+
 export const receitaDaApi = (r) => ({
   sku: r.cardapioItemId,
   produtoId: r.produtoId,
@@ -103,6 +107,7 @@ export const receitaDaApi = (r) => ({
   linhas: r.linhas,
   custoTotal: r.custoTotal ?? null,
   custoPorRendimento: r.custoPorRendimento ?? null,
+  baixaAutomatica: r.baixaAutomatica === true,
 })
 
 export const detalheDaReceitaDaApi = (d) => ({

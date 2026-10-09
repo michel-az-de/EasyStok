@@ -1,4 +1,4 @@
-import { detalheDaReceitaDaApi, obterReceita, receitaDaApi, listarReceitas, salvarReceita } from '../infra/api/producaoApi'
+import { detalheDaReceitaDaApi, marcarBaixaAutomatica, obterReceita, receitaDaApi, listarReceitas, salvarReceita } from '../infra/api/producaoApi'
 
 // Receitas no modo API (M2.4a, #1498). A receita é gravada inteira (o EasyStok substitui as linhas
 // numa transação e guarda o diff). Valida antes o que a API recusaria, para avisar em português.
@@ -28,6 +28,18 @@ export function criarGestaoReceitas({ recarregar, aoErro }) {
           unidadeMedidaBase: rascunho.unidadeMedidaBase ?? 'Un',
           linhas: rascunho.linhas.map((l) => ({ insumoId: l.insumoId, quantidade: Number(l.quantidade), unidade: l.unidade })),
         })
+        return true
+      } catch (e) {
+        aoErro(e.message)
+        return false
+      } finally {
+        await recarregar()
+      }
+    },
+    // D-M2-01 (#1499): ligada, a produção baixa os insumos; faltou insumo, avisa e não trava.
+    marcarBaixa: async (produtoId, ligada) => {
+      try {
+        await marcarBaixaAutomatica(produtoId, ligada)
         return true
       } catch (e) {
         aoErro(e.message)

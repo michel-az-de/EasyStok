@@ -5,6 +5,8 @@ using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
 
+public sealed record BaixaAutomaticaRequest(bool Ligada);
+
 public sealed record ProduzirPratosRequest(IReadOnlyList<PratoProduzidoInput>? Pratos, string? Observacao = null);
 
 /// <param name="Unidade">G, Kg, Ml, L, Un...; null = não mexe (no cadastro, Un).</param>
@@ -54,6 +56,24 @@ public class AtendimentoProducaoController(
         try
         {
             return DataOk(await receitas.ObterAsync(currentUser.EmpresaId, produtoId, ct));
+        }
+        catch (UseCaseValidationException ex)
+        {
+            return DataBadRequest(ex.Message);
+        }
+    }
+
+    [SwaggerOperation(Summary = "Turn the automatic supply deduction on producing this dish on or off (D-M2-01; Gerente)")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize(Policy = "Gerente")]
+    [HttpPut("receitas/{produtoId:guid}/baixa-automatica")]
+    public async Task<IActionResult> MarcarBaixaAutomatica(Guid produtoId, [FromBody] BaixaAutomaticaRequest req, CancellationToken ct)
+    {
+        try
+        {
+            await receitas.MarcarBaixaAutomaticaAsync(currentUser.EmpresaId, produtoId, req.Ligada, ct);
+            return NoContent();
         }
         catch (UseCaseValidationException ex)
         {
