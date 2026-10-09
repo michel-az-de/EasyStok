@@ -484,3 +484,40 @@ Capturas: [Dona](evidencias-onda1/perfis-dona-hall.png), [Atendimento](evidencia
 4. Seguir para a onda 2: ciclo completo de pedido, interação e exceções no balcão. Mercado Pago, entregas/geolocalização e impressão física Oasis conservam seus próprios aceites e dependências. A matriz de perfis não comprova essas integrações.
 
 Não houve deploy nem alteração do banco de produção nesta execução.
+
+## 15. Continuação: arquivo de permissões antigas da Casa da Baba, 09/10/2026
+
+Implementado sobre `4ffef29a`. Os cinco workflows dessa base passaram no GitHub: CI, Console, CodeQL, imagens e secret-scan. Esta fatia conclui a limpeza da lista ativa no tenant configurado, com histórico preservado. Não encerra a onda 1 nem representa deploy.
+
+### Comportamento entregue
+
+- A migration `20261009175941_RemoverPermissoesLegadas` é aditiva: inclui `PermissoesExplicitas` e o arquivo JSON `PermissoesLegadas` em `perfis`. Apesar do nome histórico, ela não apaga nem modifica permissões existentes.
+- Na inicialização, o seed usa a empresa já resolvida por `Auth:Google:EmpresaPadrao`. Só os perfis cujo `EmpresaId` coincide com essa empresa têm as 18 permissões antigas retiradas da lista ativa. Perfis globais e de outras empresas permanecem intactos.
+- Cada registro retirado fica arquivado no próprio perfil com `Id`, `PerfilId` e o nome original da permissão. Arquivo, marcador de lista explícita e retirada são gravados na mesma transação do EF. Reexecutar o seed não duplica o arquivo. Não muda usuários ou seus vínculos.
+- Uma lista que fica vazia continua explícita e nega acesso; não passa a usar o nível do perfil. Login por senha, finalização do Google, JWT, refresh e seleção de atendente preservam essa decisão. O accessor HTTP do Worker respeita as claims; os jobs de sistema mantêm seu acesso anterior.
+- Perfis que já usavam fallback por nível continuam usando-o. Lista mista preserva as permissões atuais. Os três perfis iniciais mantêm as capacidades da seção 14.
+
+### Limite de compatibilidade e revisão de escopo
+
+O catálogo operacional da Casa da Baba tem as 19 permissões previstas. O enum continua com 37 membros para ler os dados preservados das demais empresas e dos perfis globais. Remover esses membros agora quebraria essa leitura. A poda global do enum permanece pendente de uma decisão explícita sobre esses dados e seu alcance; não declarar o aceite original de enum com 19 membros como concluído.
+
+A revisão automática recusou as propostas de limpeza global, inclusive a reversível, por ultrapassarem o escopo exclusivo da Casa da Baba. A implementação final aceita restringe a alteração de dados à empresa configurada e preserva um arquivo recuperável.
+
+O `Down` automático é bloqueado: apagar o arquivo ou retirar o marcador sem restauração prévia poderia perder histórico ou ampliar acesso. Reversão exige restauração planejada dos registros arquivados e revisão dos perfis explícitos, ou recuperação do backup anterior. Nenhuma reversão foi executada em produção.
+
+### Evidência
+
+- Suite da API: 961 testes aprovados, incluindo claims, lista explícita vazia, transferências, seed e Worker.
+- Domínio: 55 testes de acesso/permissão aprovados. Aplicação: 12 testes de login aprovados.
+- PostgreSQL 17 real: teste de migração desde a versão anterior, seed repetido, arquivo com os IDs originais, vínculos preservados e bloqueio de downgrade. Cinco cenários: apenas legado, lista mista, fallback vazio, outra empresa e perfil global. Login, finalização Google e refresh verificados com repositórios e JWT reais; transferência filtra os perfis bloqueados. O teste não autentica no provedor Google externo.
+- HTTP real: 51 verificações aprovadas no roteiro `scripts/homologacao/onda1-perfis-http.ps1`, incluindo login, módulos, portas, respostas 200/401/403 e refresh de Dona/Atendimento/Cozinha.
+- Logs e TRX desta fatia: `C:\rep\EasyStok\.build\validacao-casa-da-baba-20261009\permissoes-legadas`, fora do Git.
+
+### Próximo trecho executável
+
+1. Onda 1: revisar a UX das ações permitidas em cada módulo, concluir sino transversal e sessão longa da Cozinha. Validar navegação, saída, falha de sessão e operação em celular/computador.
+2. Onda 2: fechar o ciclo de pedido no balcão, da montagem/revisão à confirmação, preparo, entrega/retirada e cancelamento, incluindo exceções e histórico.
+3. Publicação continua separada: conferir a empresa real configurada, os perfis personalizados e os vínculos das pessoas, além de backup e homologação. Não foi inferido o papel de nenhuma pessoa real.
+4. Mercado Pago, transportadoras/geolocalização, impressão física Oasis e atendimento automático completo seguem com as dependências e aceites das ondas 3–5 e 9. Esta fatia não comprova essas integrações.
+
+Não houve deploy, alteração de banco de produção, envio externo ou cobrança real nesta execução.

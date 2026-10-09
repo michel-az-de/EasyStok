@@ -50,11 +50,11 @@ namespace EasyStock.Api.Services
             if (!IsAuthenticated)
                 return false;
 
-            // Claims explicitas mandam; sem elas, fallback por nivel (regra unica no dominio).
             var permissoes = GetPermissaoClaims();
-            // Claim desconhecida não transforma uma lista explícita em fallback permissivo.
-            if (permissoes.Count == 0 && CurrentUser!.HasClaim(c => c.Type == PermissaoClaim)) return false;
-            return PoliticaPermissao.Tem(Nivel, permissoes, permissao);
+            // Claims antigas removidas e listas explicitamente vazias nunca ativam o fallback.
+            var explicitas = CurrentUser!.HasClaim(c => c.Type == PermissaoClaim)
+                || CurrentUser.HasClaim("permissoesExplicitas", "true");
+            return PoliticaPermissao.Tem(Nivel, permissoes, permissao, explicitas);
         }
 
         private ClaimsPrincipal? CurrentUser => httpContextAccessor.HttpContext?.User;

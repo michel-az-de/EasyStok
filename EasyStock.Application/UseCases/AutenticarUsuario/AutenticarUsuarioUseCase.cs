@@ -14,7 +14,8 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
         string Email,
         NivelAcesso Nivel,
         IReadOnlyCollection<Permissao> Permissoes,
-        string? ModuloInicial = null);
+        string? ModuloInicial = null,
+        bool PermissoesExplicitas = false);
 
     public class AutenticarUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
@@ -114,7 +115,8 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                     Email: usuario.Email,
                     Nivel: NivelAcesso.SuperAdmin,
                     Permissoes: permissoesSuper,
-                    ModuloInicial: perfilSuperAdmin.ModuloInicial);
+                    ModuloInicial: perfilSuperAdmin.ModuloInicial,
+                    PermissoesExplicitas: perfilSuperAdmin.PermissoesExplicitas);
             }
 
             if (empresaId.HasValue)
@@ -129,6 +131,7 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
             var nivel = NivelAcesso.Visualizador;
             IReadOnlyCollection<Permissao> permissoes = [];
             string? moduloInicial = null;
+            var permissoesExplicitas = false;
 
             if (empresaId.HasValue && usuario.Perfis is not null)
             {
@@ -141,6 +144,7 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 {
                     nivel = perfilDaEmpresa.Perfil.Nivel;
                     moduloInicial = perfilDaEmpresa.Perfil.ModuloInicial;
+                    permissoesExplicitas = perfilDaEmpresa.Perfil.PermissoesExplicitas;
                     permissoes = perfilDaEmpresa.Perfil.Permissoes?
                         .Select(p => p.Permissao)
                         .Distinct()
@@ -159,7 +163,8 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 Email: usuario.Email,
                 Nivel: nivel,
                 Permissoes: permissoes,
-                ModuloInicial: moduloInicial);
+                ModuloInicial: moduloInicial,
+                PermissoesExplicitas: permissoesExplicitas);
         }
 
         private static Guid? PrimeiraEmpresaAtiva(Domain.Entities.Usuario usuario) =>

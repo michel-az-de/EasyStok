@@ -8,6 +8,26 @@ namespace EasyStock.Api.UnitTests.Services;
 
 public class CurrentUserAccessorTests
 {
+    [Theory]
+    [InlineData("permissoesExplicitas", "true")]
+    [InlineData("permissao", "ConfigurarSla")]
+    [InlineData("permissao", "15")]
+    public void ListaVaziaOuClaimRemovida_NaoLiberaFallback(string tipo, string valor)
+    {
+        var accessor = CreateAccessor(true, new Claim("nivel", "Admin"), new Claim(tipo, valor));
+        foreach (var permissao in Enum.GetValues<Permissao>().Except(EasyStock.Domain.Services.PermissoesLegadas.Valores))
+            accessor.TemPermissao(permissao).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ClaimRemovidaMisturadaComAtual_PreservaSomenteAPermissaoAtual()
+    {
+        var accessor = CreateAccessor(true, new Claim("nivel", "Admin"),
+            new Claim("permissao", "ConfigurarSla"), new Claim("permissao", "AtenderConversas"));
+        accessor.TemPermissao(Permissao.AtenderConversas).Should().BeTrue();
+        accessor.TemPermissao(Permissao.AcessarModuloConfiguracoes).Should().BeFalse();
+    }
+
     [Fact]
     public void EmpresaId_DeveRetornarGuidEmpty_QuandoClaimAusente()
     {
