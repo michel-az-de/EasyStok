@@ -5,6 +5,7 @@ import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { useCadastroEntregaApi } from '../../aplicacao/useCadastroEntregaApi'
 import { faixaDeHorarios } from '../../dominio/entrega'
 import { DIAS_DA_SEMANA, corpoBloqueio, corpoZona } from '../../dominio/entregasApi'
+import { dataCurtaComSemana, faixaDeCep, moeda } from '../../dominio/formato'
 import { JanelasDaLoja } from './JanelasDaLoja'
 import css from './entregasApi.module.css'
 
@@ -72,9 +73,9 @@ export function CadastroEntregaApi() {
         <ul className={css.lista}>
           {zonas.map((x) => (
             <li key={x.id} className={`${css.cartao} ${css.linha}`}>
-              <span className={css.cresce}>{x.label} · R$ {Number(x.valor).toFixed(2).replace('.', ',')} · {x.tempoEstimadoMinutos} min</span>
+              <span className={css.cresce}>{x.label} · {moeda(Number(x.valor) || 0)} · {x.tempoEstimadoMinutos} min</span>
               <span className={css.apoio}>
-                {x.cepInicio ? `CEP ${x.cepInicio}–${x.cepFim}` : x.bairros.join(', ')}{x.ativa ? '' : ' · desativada'}
+                {x.cepInicio ? `CEP ${faixaDeCep(x.cepInicio, x.cepFim)}` : x.bairros.join(', ')}{x.ativa ? '' : ' · desativada'}
               </span>
               <Botao variante="texto" onClick={() => acoes.alternarZona(x)}>{x.ativa ? 'Desativar' : 'Ativar'}</Botao>
             </li>
@@ -93,7 +94,7 @@ export function CadastroEntregaApi() {
         <ul className={css.lista}>
           {bloqueios.map((x) => (
             <li key={x.id} className={`${css.cartao} ${css.linha}`}>
-              <span className={css.cresce}>{x.data} · {x.motivo}</span>
+              <span className={css.cresce}>{dataCurtaComSemana(x.data)} · {x.motivo}</span>
               <span className={css.apoio}>{x.janelaEspecificaId ? rotuloJanelaPorId(x.janelaEspecificaId) : 'Dia inteiro'}</span>
               <Botao variante="texto" onClick={() => acoes.removerBloqueio(x.id)}>Remover</Botao>
             </li>

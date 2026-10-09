@@ -8,7 +8,12 @@ import { ListaDados } from '../../componentes/ListaDados'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
-import { nomeDoMeio, podeAlterarMeio, situacaoDaCobranca } from '../../dominio/cobranca'
+import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
+import {
+  AVISO_BAIXA_COM_LINK, MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, baixaEsperaAprovacao, baixaCancelaCobrancaOnline, metodoDaCobranca,
+  nomeDoMeio, podeAlterarMeio, situacaoDaCobranca,
+} from '../../dominio/cobranca'
+import { rotuloDoTotal } from '../../dominio/resumoPedido'
 import {
   horaCurta, lerMoeda, mascaraMoeda, moeda, moedaAltaDemais,
 } from '../../dominio/formato'
@@ -139,17 +144,46 @@ function CopiaECola({ codigo }) {
 // abre quando ele é clicado, então mora aqui para o bloco Pedido reusar.
 //
 // Recebimento manual exige escolher o método usado; a API decide se o pedido foi quitado.
-export function BaixaAMao({ valorCobrado, aoConfirmar, aoCancelar }) {
+// #1474: com `pedido`, o método nasce com o meio da cobrança e, se ainda há link do Mercado
+// Pago pendente, a tela avisa que ele será cancelado antes de ela confirmar.
+//
+// #1474 (R8): pedido que espera aprovação (fora da área liberado) não aceita baixa no EasyStok;
+// a tela diz o motivo e oferece aprovar antes, em vez de deixar falhar depois do clique.
+export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar, aoAprovar = null }) {
   // Nasce preenchida com o total cobrado, em centavos por dentro (seção 4 da
   // direção visual, passo zero): a tela só vê o texto já mascarado, "R$ X,XX".
   const [centavos, setCentavos] = useState(() => Math.round(valorCobrado * 100))
   const excedeu = moedaAltaDemais(centavos)
-  const [metodo, setMetodo] = useState('')
+  const [metodo, setMetodo] = useState(() => metodoDaCobranca(pedido?.cobranca))
   const [enviando, setEnviando] = useState(false)
   const valido = centavos > 0 && !excedeu && Boolean(metodo)
 
+  if (baixaEsperaAprovacao(pedido)) {
+    return (
+      <div className={css.baixaDivergente}>
+        <p className={css.motivoDesabilitado} role="note"><Icone nome="alerta" /> {MOTIVO_BAIXA_SEM_APROVACAO}</p>
+        <div className={css.acoesCobranca}>
+          <Botao largo onClick={aoCancelar}>Voltar</Botao>
+          {aoAprovar && aguardaAprovacao(pedido) && (
+            <Botao largo variante="primario" icone="circle-check" disabled={enviando} onClick={async () => {
+              setEnviando(true)
+              try { await aoAprovar() } finally { setEnviando(false) }
+            }}>
+              Aprovar pedido
+            </Botao>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={css.baixaDivergente}>
+      {baixaCancelaCobrancaOnline(pedido) && (
+        <div className={css.avisoDiferenca} role="note">
+          <p className={css.corpoBloco}><Icone nome="alerta" /> {AVISO_BAIXA_COM_LINK}</p>
+        </div>
+      )}
       <CampoSelecao rotulo="Como recebeu" value={metodo} onChange={(e) => setMetodo(e.target.value)}
         opcoes={[
           { valor: '', rotulo: 'Selecione' }, { valor: 'pix', rotulo: 'Pix' },
@@ -230,10 +264,13 @@ export function BlocoCobranca({
   aoAceitarDivergencia, aoAbrirCardapio, aoCancelarPedido, aoEncerrarAtendimento, aoAlterarMeio,
 }) {
   const { cardapio } = useCatalogo()
-  const { fidelidade } = useAtendimento()
+  const { fidelidade, fonteApi } = useAtendimento()
   const {
     confirmarPagamento, marcarRecebidoEntrega, refazerCobranca, escolherMeioPagamento, aplicarCupom, removerCupomDoPedido,
+    aprovarPedido,
   } = useAcoes()
+  // #1474 (R2): botão de ação que no modo API só avisaria não aparece.
+  const disponivel = useAcaoDisponivel()
   // Ponta (a): o chip marcado mora no pedido, para "Enviar comanda" e a
   // barra mandarem o mesmo meio. Nenhum vem marcado: ela escolhe.
   const meioEscolhido = pedido.meio ?? null
@@ -286,16 +323,19 @@ export function BlocoCobranca({
         <Bloco titulo="Cobrança">
           <Vazio
             titulo="Comanda vazia"
-            acao={<Botao onClick={aoAbrirCardapio} disabled={!editavel}>Abrir cardápio</Botao>}
+            acao={<Botao onClick={aoAbrirCardapio} disabled={!editavel}>Adicionar itens</Botao>}
           />
         </Bloco>
       )
     }
     const totalLiquido = total - (pedido.valorDesconto ?? 0)
+    // #1474 (R4): no modo API o pedido nasce do botão da barra fixa ("Gerar cobrança e enviar");
+    // aqui ficam o total e o meio, sem um segundo botão que cria o mesmo pedido.
+    const geraPelaBarra = fonteApi && !pedido.pedidoId
     return (
       <Bloco titulo="Cobrança">
         <p className={css.valorCobranca}>
-          <span>{pedido.cupom ? 'Subtotal' : 'Total'}</span>
+          <span>{pedido.cupom ? 'Subtotal' : rotuloDoTotal(pedido, { fonteApi })}</span>
           <b>{moeda(total)}</b>
         </p>
         {pedido.cupom && (
@@ -304,7 +344,7 @@ export function BlocoCobranca({
             <b>{moeda(totalLiquido)}</b>
           </p>
         )}
-        {editavel && (
+        {editavel && disponivel('aplicarCupom') && (
           <CampoCupom
             pedido={pedido}
             total={total}
@@ -319,15 +359,17 @@ export function BlocoCobranca({
           aoEscolher={(meio) => escolherMeioPagamento(conversaId, meio)}
           pergunta="Como o cliente vai pagar?"
         />
-        <Botao
-          largo
-          variante="primario"
-          icone="dollar-sign"
-          disabled={!editavel || !meioEscolhido}
-          onClick={() => geracao.emitir(meioEscolhido)}
-        >
-          Gerar cobrança
-        </Botao>
+        {!geraPelaBarra && (
+          <Botao
+            largo
+            variante="primario"
+            icone="dollar-sign"
+            disabled={!editavel || !meioEscolhido}
+            onClick={() => geracao.emitir(meioEscolhido)}
+          >
+            Gerar cobrança
+          </Botao>
+        )}
       </Bloco>
     )
   }
@@ -359,6 +401,8 @@ export function BlocoCobranca({
         </p>
         {recebendo && (
           <BaixaAMao valorCobrado={Math.max(0, (pedido.totalApi ?? cobranca.valor) - (pedido.totalPagoApi ?? 0))}
+            pedido={pedido}
+            aoAprovar={aprovarPedido ? () => aprovarPedido(conversaId) : null}
             aoCancelar={() => setRecebendo(false)}
             aoConfirmar={async (valor, metodo) => { await confirmarPagamento(conversaId, valor, metodo); setRecebendo(false) }} />
         )}
@@ -372,16 +416,18 @@ export function BlocoCobranca({
             >
               Recebi
             </Botao>
-            <Botao
-              largo
-              variante="secundario"
-              onClick={() => marcarRecebidoEntrega(conversaId, false, agora)}
-            >
-              Ainda não recebi
-            </Botao>
+            {disponivel('marcarRecebidoEntrega') && (
+              <Botao
+                largo
+                variante="secundario"
+                onClick={() => marcarRecebidoEntrega(conversaId, false, agora)}
+              >
+                Ainda não recebi
+              </Botao>
+            )}
           </div>
         )}
-        {editavel && (
+        {editavel && disponivel('refazerCobranca') && (
           <Botao
             variante="texto"
             className={css.trocarMeio}
@@ -454,7 +500,7 @@ export function BlocoCobranca({
 
       {emAberto && cobranca.copiaECola && <CopiaECola codigo={cobranca.copiaECola} />}
 
-      {situacao.chave === 'aguardando' && !cobranca.comprovanteEm && editavel && (
+      {situacao.chave === 'aguardando' && !cobranca.comprovanteEm && editavel && disponivel('marcarComprovante') && (
         <Botao largo variante="secundario" icone="imagem" onClick={aoMarcarComprovante}>
           Conferir comprovante
         </Botao>

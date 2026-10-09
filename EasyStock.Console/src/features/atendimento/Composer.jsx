@@ -13,6 +13,7 @@ import { useArquivoComoDataUrl } from '../../hooks/useArquivoComoDataUrl'
 import { useGravadorAudio } from '../../hooks/useGravadorAudio'
 import { BotaoAnexarArquivo, GravadorAudio, PreviaAnexo } from './ComposerAnexos'
 import { textoConviteCardapio } from '../../dominio/cardapioLink'
+import { avisoDeVariaveisNaoResolvidas } from '../../dominio/respostas'
 import { ModalEnviarCardapio } from './ModalEnviarCardapio'
 import { SeletorRespostas } from './SeletorRespostas'
 import css from './atendimento.module.css'
@@ -61,6 +62,9 @@ export function Composer({
   // de imagem, se houver); sem anexo, segue o fluxo de sempre. Um só botão,
   // uma só tecla Enter, sem o composer perguntar qual dos dois você quis.
   function enviarComposer() {
+    // #1474: {pedido} sem valor sairia literal para o cliente (texto ou legenda); o aviso está
+    // acima do campo e o Enviar fica desligado até ela trocar.
+    if (variavelSobrando) return
     if (anexo) {
       const molde = anexo.tipo === 'imagem'
         ? mensagemDeImagemAnexada({ nomeArquivo: anexo.nome, dataUrl: anexo.dataUrl, legenda: rascunho })
@@ -93,6 +97,7 @@ export function Composer({
   }
 
   const temTexto = rascunho.trim().length > 0
+  const variavelSobrando = avisoDeVariaveisNaoResolvidas(rascunho)
 
   // O canal manda no que o composer oferece. Botão que o canal não entrega
   // fica desabilitado com o motivo escrito, em vez de mandar e cair calado.
@@ -152,6 +157,7 @@ export function Composer({
           )}
 
           {erroAnexo && <p className={css.restricao} role="alert">{erroAnexo}</p>}
+          {variavelSobrando && <p className={css.restricao} role="alert">{variavelSobrando}</p>}
 
           {/* Rodada 6d: composer em uma linha, como no Mensagens. Ícones à
               esquerda, o campo numa pílula que cresce com o texto, o enviar
@@ -224,7 +230,7 @@ export function Composer({
                 disabled={!podeEscrever || buscandoLink}
                 onClick={abrirCardapio}
               >
-                <Icone nome="cardapio" /><span className={css.rotuloAcao}>Cardápio</span>
+                <Icone nome="cardapio" /><span className={css.rotuloAcao}>Link do cardápio</span>
               </Botao>
               <Botao title="Nota interna: fica na ficha, o cliente nunca vê" aria-label="Nota interna" className={css.acaoComRotulo} onClick={aoAbrirNota}>
                 <Icone nome="nota" /><span className={css.rotuloAcao}>Nota</span>
@@ -233,7 +239,7 @@ export function Composer({
                   não há anexo em espera (mesmo gesto do WhatsApp): campo vazio
                   não tem o que enviar como texto, mas tem o que gravar. */}
               {temTexto || anexo ? (
-                <Botao variante="primario" className={css.enviar} aria-label="Enviar" title="Enviar (Enter)" disabled={!podeEscrever} onClick={enviarComposer}>
+                <Botao variante="primario" className={css.enviar} aria-label="Enviar" title={variavelSobrando ?? 'Enviar (Enter)'} disabled={!podeEscrever || Boolean(variavelSobrando)} onClick={enviarComposer}>
                   <Icone nome="arrow-up" tamanho={20} />
                 </Botao>
               ) : (

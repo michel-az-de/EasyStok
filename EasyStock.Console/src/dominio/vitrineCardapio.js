@@ -53,14 +53,25 @@ export function filtrarCardapio(itens, termo) {
   })
 }
 
+// Legenda da foto que o cliente recebe (#1474): nome, porção e preço. A porção sai quando o
+// nome já a traz ("Lasanha 600 g" não vira "Lasanha 600 g / 600 g"), comparando sem acento,
+// caixa nem espaço. "Foto N" é só da tela da galeria, nunca vai ao cliente.
+const compacto = (texto) => semAcento(texto).replace(/\s+/g, '')
+export function legendaDoItem({ nome, porcao, preco }) {
+  const porcaoNova = porcao && !compacto(nome).includes(compacto(porcao)) ? porcao : null
+  const detalhe = [porcaoNova, Number.isFinite(preco) ? moeda(preco) : null].filter(Boolean).join(' · ')
+  return [nome, detalhe].filter(Boolean).join('\n')
+}
+
 // Enviar a foto do item ao cliente: a mesma peça da galeria (#1439), que o EasyStok envia pelo
-// id do item e índice, sem o navegador baixar a URL. A legenda leva nome, porção e preço.
+// id do item e índice, sem o navegador baixar a URL. A legenda vem de `legendaDoItem`.
 export function mensagemDaFotoDoItem(item) {
   const foto = fotoDoItem(item)
   if (!foto) return null
   return mensagemDePeca({
     nome: item.nome,
     descricao: [item.porcao, moeda(item.preco)].filter(Boolean).join(' · '),
+    legenda: legendaDoItem(item),
     foto,
     cardapioItemId: item.sku,
     indice: 0,

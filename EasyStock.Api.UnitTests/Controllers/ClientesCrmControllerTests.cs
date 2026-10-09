@@ -5,6 +5,7 @@ using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.UseCases.ClienteCrm;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities;
+using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -84,6 +85,22 @@ public class ClientesCrmControllerTests
         resultado.Should().BeOfType<BadRequestObjectResult>();
         await _crm.Received(1).PedidoEhDoClienteAsync(_empresaId, pedidoDeOutro, _cliente.Id, Arg.Any<CancellationToken>());
         await _crm.DidNotReceiveWithAnyArgs().AdicionarNotaAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task NotaGravaONomeDoUsuarioENaoOId()
+    {
+        // #1474 B1: o JWT usa NameClaimType = "sub"; Identity.Name devolve o id, não o nome.
+        var usuarioId = Guid.NewGuid();
+        _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim("sub", usuarioId.ToString()), new Claim("nome", "Thati"), new Claim("email", "thati@casa.com")],
+            "Bearer", "sub", "nivel"));
+
+        var resultado = await _controller.AdicionarNota(
+            _cliente.Id, new AdicionarNotaBody("prefere sem lactose"), null, CancellationToken.None);
+
+        resultado.Should().BeOfType<CreatedResult>();
+        await _crm.Received(1).AdicionarNotaAsync(Arg.Is<ClienteNota>(n => n.Autor == "Thati"), Arg.Any<CancellationToken>());
     }
 
     [Fact]

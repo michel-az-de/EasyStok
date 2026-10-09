@@ -44,6 +44,8 @@
   margin: 0; font-size: var(--t-titulo); font-weight: 700; line-height: var(--lh-compacto);
 }
 .numero { font-family: var(--f-papel); font-size: var(--t-titulo); }
+/* #1474 (R3): a janela ainda falta; em tom de aviso, com a palavra (a cor nunca informa sozinha). */
+.semJanela { color: var(--aviso); font-weight: 600; }
 .subCabecalho { margin: var(--e-1) 0 0; font-size: var(--t-corpo); color: var(--tinta-2); border-top: repeating-linear-gradient(to right, var(--linha-forte) 0 6px, transparent 6px 10px); padding-top: var(--e-2); }
 
 /* Tracejado de 2 px, traço de 6 px e vão de 4 px, entre cabeçalho, grupos e
@@ -174,9 +176,12 @@
   padding: var(--e-2) var(--e-2) var(--e-2) var(--e-3); border-radius: var(--r-pilula);
   background: var(--tinta); color: var(--papel); box-shadow: var(--sombra-alta);
 }
-.gavetaNoTitulo {
-  margin-left: auto; min-width: 0; display: flex; align-items: center; gap: var(--e-3);
-  padding: 2px 2px 2px var(--e-3); border-radius: var(--r-pilula);
+/* #1474: no pé da Ficha, faixa no fluxo da coluna (antes ficava na linha do título e
+   cobria o "Ficha"). Largura toda, texto à esquerda e "Imprimir" à direita. */
+.gavetaNoPe {
+  min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--e-3);
+  padding: var(--e-2) var(--e-2) var(--e-2) var(--e-4);
+  border-top: var(--b-1) solid var(--linha);
   background: var(--tinta); color: var(--papel);
 }
 .gavetaTexto { display: flex; align-items: center; gap: var(--e-2); min-width: 0; font-weight: 700; white-space: nowrap; }

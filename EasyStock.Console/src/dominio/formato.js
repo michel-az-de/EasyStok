@@ -131,6 +131,9 @@ export function mascaraCep(valor) {
   return digitos.length <= 5 ? digitos : `${digitos.slice(0, 5)}-${digitos.slice(5)}`
 }
 
+// Faixa de CEP da zona de frete (#1474): "05500-000 a 05599-999", não os oito dígitos crus.
+export const faixaDeCep = (inicio, fim) => `${mascaraCep(inicio)} a ${mascaraCep(fim)}`
+
 // Endereço em string só, formato da massa: "Rua X, 412, apto 71, Bairro,
 // CEP" (seção 2). `partesDoEndereco` separa para o cadastro rápido editar
 // campo a campo; `enderecoDasPartes` junta de volta na mesma ordem.
@@ -160,4 +163,14 @@ export function rotuloDoDia(iso, agora) {
   if (diffDias === 0) return 'Hoje'
   if (diffDias === 1) return 'Ontem'
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
+}
+
+// Data de calendário "2026-10-12" -> "seg, 12/10" (#1474). Só a data, sem hora nem fuso: o dia
+// da semana sai da própria data em UTC, então nunca escorrega para o dia anterior.
+const DIA_DA_SEMANA_CURTO = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
+export function dataCurtaComSemana(iso) {
+  const [ano, mes, dia] = String(iso ?? '').slice(0, 10).split('-').map(Number)
+  if (!ano || !mes || !dia) return iso ?? ''
+  const semana = DIA_DA_SEMANA_CURTO[new Date(Date.UTC(ano, mes - 1, dia)).getUTCDay()]
+  return `${semana}, ${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`
 }

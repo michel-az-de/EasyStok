@@ -3764,22 +3764,6 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 .ajustes-head .sub {
   font-size: 12px; color: var(--ink-mute); line-height: 1.45;
 }
-.ajustes-hero {
-  padding: 14px 16px; border-radius: 16px; margin-bottom: 16px;
-  background: linear-gradient(135deg, rgba(231,104,69,0.14), rgba(79,191,159,0.08));
-  border: 1px solid var(--border);
-}
-.ajustes-hero .eyebrow {
-  font-size: 10px; font-weight: 800; letter-spacing: 0.14em;
-  text-transform: uppercase; color: var(--ink-mute); margin-bottom: 6px;
-}
-.ajustes-hero .headline {
-  font-family: 'Fraunces', serif; font-size: 22px; line-height: 1.05;
-  margin: 0 0 4px;
-}
-.ajustes-hero .copy {
-  font-size: 12px; color: var(--ink-dim); line-height: 1.45;
-}
 .ajustes-section {
   margin-bottom: 14px;
   padding: 14px;
@@ -5129,6 +5113,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   padding: 10px 11px; font-size: 13px; font-family: inherit;
 }
 .pd-weight:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
+.pd-weight.invalid { border-color: #ef6b6b; box-shadow: 0 0 0 3px rgba(239,107,107,0.18); }
 .pd-validity-pills {
   display: flex; gap: 6px; flex-wrap: wrap;
 }
@@ -7261,7 +7246,7 @@ body.ux-calm [data-screen="producao"] .section-label {
 <div class="welcome hidden" id="welcomeScreen">
   <div class="emoji">👋</div>
   <h1>Bem-vindo ao Easy Stock Mobile</h1>
-  <p>Para comecar, informe seu nome. Ele aparece nos lotes e pedidos registrados e ajuda a manter a operacao rastreavel.</p>
+  <p>Para começar, informe seu nome. Ele aparece nos lotes e pedidos registrados e ajuda a manter a operação rastreável.</p>
   <input type="text" id="welcomeName" placeholder="Seu nome" maxlength="32" autocomplete="off" />
   <button id="welcomeContinue" disabled>Começar</button>
   <div class="hint">Você pode trocar depois tocando no seu nome no topo.</div>
@@ -8160,15 +8145,9 @@ body.ux-calm [data-screen="producao"] .section-label {
       <div class="ajustes-head">
         <div>
           <h3>Ajustes</h3>
-          <div class="sub">Identidade, cobranca, impressao e manutencao do app.</div>
+          <div class="sub">Identidade, cobrança, impressão e manutenção do app.</div>
         </div>
         <button class="cobranca-close" onclick="closeAjustes()" aria-label="Fechar">×</button>
-      </div>
-
-      <div class="ajustes-hero">
-        <div class="eyebrow">White label</div>
-        <div class="headline">Deixe a operacao com a cara da loja</div>
-        <div class="copy">O nome da empresa, a cobranca e a impressao termica saem daqui. Ajustes bem organizados ajudam o app a parecer produto, nao improviso.</div>
       </div>
 
       <!-- Tabs de Ajustes (chunking 7±2: 9 secoes em 3 grupos) -->
@@ -8180,7 +8159,7 @@ body.ux-calm [data-screen="producao"] .section-label {
 
       <div class="ajustes-section" data-group="loja">
         <h4>Operador</h4>
-        <p class="hint">Nome usado nos pedidos, historico e rastreabilidade da operacao.</p>
+        <p class="hint">Nome usado nos pedidos, histórico e rastreabilidade da operação.</p>
         <div class="field">
           <label>Seu nome</label>
           <input type="text" id="ajusteOperator" maxlength="32" autocomplete="off" />
@@ -8199,7 +8178,7 @@ body.ux-calm [data-screen="producao"] .section-label {
 
       <div class="ajustes-section" data-group="loja">
         <h4>Empresa</h4>
-        <p class="hint">Nome e logo exibidos no app, recibos e mensagens de cobranca.</p>
+        <p class="hint">Nome e logo exibidos no app, recibos e mensagens de cobrança.</p>
         <div class="field">
           <label>Nome da empresa</label>
           <input type="text" id="ajusteEmpresa" maxlength="48" autocomplete="off" placeholder="Nome da empresa" />
@@ -8224,12 +8203,12 @@ body.ux-calm [data-screen="producao"] .section-label {
         <h4>Formato das etiquetas</h4>
         <p class="hint">Defina o que aparece na etiqueta e como ela fica disposta. Vale para todas as etiquetas de produção.</p>
         <div class="field">
-          <label>Codigo impresso na produção</label>
+          <label>Código impresso na produção</label>
           <select id="ajusteProdScanMode" class="scan-mode-select">
-            <option value="both">QR + codigo de barras</option>
-            <option value="barcode">Somente codigo de barras</option>
+            <option value="both">QR + código de barras</option>
+            <option value="barcode">Somente código de barras</option>
             <option value="qr">Somente QR Code</option>
-            <option value="none">Sem codigo</option>
+            <option value="none">Sem código</option>
           </select>
           <div class="scan-mode-options" id="scanModeOptions">
             <button type="button" class="scan-mode-card" data-mode="both" aria-pressed="false" onclick="setScanModeChoice('both', true)">
@@ -8243,7 +8222,7 @@ body.ux-calm [data-screen="producao"] .section-label {
             <button type="button" class="scan-mode-card" data-mode="barcode" aria-pressed="false" onclick="setScanModeChoice('barcode', true)">
               <span class="scan-mode-icon">|||</span>
               <span class="scan-mode-text">
-                <strong>Codigo de barras</strong>
+                <strong>Código de barras</strong>
                 <span>Para quem usa leitor de mão. Conferência mais rápida.</span>
               </span>
               <span class="scan-mode-check">✓</span>
@@ -8259,7 +8238,7 @@ body.ux-calm [data-screen="producao"] .section-label {
             <button type="button" class="scan-mode-card" data-mode="none" aria-pressed="false" onclick="setScanModeChoice('none', true)">
               <span class="scan-mode-icon">—</span>
               <span class="scan-mode-text">
-                <strong>Sem codigo</strong>
+                <strong>Sem código</strong>
                 <span>Sem código nenhum. Operador identifica visualmente.</span>
               </span>
               <span class="scan-mode-check">✓</span>
@@ -8318,28 +8297,28 @@ body.ux-calm [data-screen="producao"] .section-label {
       </div>
 
       <div class="ajustes-section" data-group="eq">
-        <h4>Impressora termica</h4>
+        <h4>Impressora térmica</h4>
         <p class="hint">Hipertech WTP05 ou outra ESC/POS Bluetooth 58mm. Pareie pelo Android antes.</p>
         <div class="printer-status none" id="printerStatus">
           <span id="printerStatusLabel">Nenhuma impressora selecionada</span>
         </div>
         <div class="ajustes-actions-row">
           <button class="btn-ajustes-printer primary-soft" onclick="pickPrinter()" style="flex:1">Buscar impressora</button>
-          <button class="btn-ajustes-printer success-soft" onclick="testPrint()" style="flex:1">Testar impressao</button>
+          <button class="btn-ajustes-printer success-soft" onclick="testPrint()" style="flex:1">Testar impressão</button>
         </div>
-        <button class="btn-ajustes-printer subtle" onclick="printerDiagnostics()" style="margin-top:8px;width:100%;font-size:12px">Diagnostico</button>
+        <button class="btn-ajustes-printer subtle" onclick="printerDiagnostics()" style="margin-top:8px;width:100%;font-size:12px">Diagnóstico</button>
       </div>
 
       <div class="ajustes-section" data-group="eq">
-        <h4>Catalogo de produtos</h4>
+        <h4>Catálogo de produtos</h4>
         <p class="hint">Cadastre, edite ou arquive produtos sem afetar pedidos e lotes antigos.</p>
         <div id="catalogList" class="catalog-list"></div>
         <button class="btn-ajustes-printer primary-soft" onclick="closeAjustes(); openProductModal()">+ Novo produto</button>
       </div>
 
       <div class="ajustes-section" data-group="manut">
-        <h4>Backup e restauracao</h4>
-        <p class="hint">Exporte um JSON completo da operacao para guardar com seguranca e restaurar quando precisar.</p>
+        <h4>Backup e restauração</h4>
+        <p class="hint">Exporte um JSON completo da operação para guardar com segurança e restaurar quando precisar.</p>
         <div class="ajustes-actions-stack">
           <button class="btn-ajustes-printer" onclick="exportBackup()">Exportar backup (JSON)</button>
           <button class="btn-ajustes-printer" onclick="document.getElementById('backupFileInput').click()">Restaurar de arquivo</button>
@@ -8352,8 +8331,8 @@ body.ux-calm [data-screen="producao"] .section-label {
         <h4>🛠️ Operacional</h4>
         <p class="hint">Limpeza e manutenção. Use com cuidado — algumas ações são irreversíveis.</p>
         <div class="ajustes-actions-stack">
-          <button class="btn-ajustes-printer primary-soft" onclick="loadPresentationMode()">Ativar modo apresentacao</button>
-          <button class="btn-ajustes-printer subtle" onclick="clearPresentationMode()">Remover carga de apresentacao</button>
+          <button class="btn-ajustes-printer primary-soft" onclick="loadPresentationMode()">Ativar modo apresentação</button>
+          <button class="btn-ajustes-printer subtle" onclick="clearPresentationMode()">Remover carga de apresentação</button>
           <button class="btn-ajustes-printer subtle" onclick="purgeOldData()">Limpar pedidos antigos (&gt;30 dias)</button>
           <button class="btn-ajustes-printer danger" onclick="clearTestData()">🧪 Limpar dados de teste de hoje</button>
           <button class="btn-ajustes-printer danger" onclick="factoryReset()">⚠️ Reset total (apaga tudo)</button>
@@ -8369,10 +8348,10 @@ body.ux-calm [data-screen="producao"] .section-label {
       </div>
 
       <div class="ajustes-section" data-group="manut">
-        <h4>Atualizacao do app</h4>
-        <p class="hint">O app costuma se atualizar sozinho ao reabrir. Se precisar, force a verificacao manual.</p>
+        <h4>Atualização do app</h4>
+        <p class="hint">O app costuma se atualizar sozinho ao reabrir. Se precisar, force a verificação manual.</p>
         <div class="ajustes-actions-stack">
-          <button class="btn-ajustes-printer" onclick="forceCheckUpdate()">Verificar atualizacoes agora</button>
+          <button class="btn-ajustes-printer" onclick="forceCheckUpdate()">Verificar atualizações agora</button>
         </div>
       </div>
 
@@ -8919,6 +8898,18 @@ function parseProductWeightG(unit) {
   return null;
 }
 
+// #1474: peso por unidade pre-preenchido no "Registrar produção". Usa o peso
+// padrao do cadastro; sem ele, o peso declarado na unidade em g/kg ("300g").
+// ml/L ficam de fora: volume nao e peso, o operador informa.
+function pesoPadraoDoProduto(product) {
+  if (!product) return null;
+  const def = Number(product.defaultWeightG);
+  if (isFinite(def) && def > 0) return Math.round(def);
+  if (!/^\s*[\d.,]+\s*(g|kg)\s*$/i.test(String(product.unit || ''))) return null;
+  const g = parseProductWeightG(product.unit);
+  return g && g > 0 ? Math.round(g) : null;
+}
+
 function isProductWeightInsane(product, batchWeightG) {
   // Cross-check produto.unit ("300g") vs lote.weightG (999999).
   // Insano se ratio > 2x ou < 0.5x. Retorna { insane, declared, ratio }
@@ -9093,7 +9084,7 @@ function handleLogoFile(event) {
   if (!/^image\/(png|jpe?g|webp)$/i.test(file.type || '')) {
     showToast('Use PNG, JPG ou WEBP'); return;
   }
-  if (file.size > 900 * 1024) { showToast('Logo muito grande. Use ate 900 KB.'); return; }
+  if (file.size > 900 * 1024) { showToast('Logo muito grande. Use até 900 KB.'); return; }
   const reader = new FileReader();
   reader.onload = function (e) {
     try {
@@ -9105,9 +9096,9 @@ function handleLogoFile(event) {
       // QuotaExceededError é o cenário comum: localStorage ~5MB no Android,
       // 900KB de imagem vira ~1.2MB em base64 e empurra outras chaves.
       if (err && (err.name === 'QuotaExceededError' || err.code === 22)) {
-        showToast('Sem espaco no celular. Use uma imagem menor.');
+        showToast('Sem espaço no celular. Use uma imagem menor.');
       } else {
-        showToast('Nao foi possivel salvar a logo');
+        showToast('Não foi possível salvar a logo');
       }
     }
   };
@@ -9909,7 +9900,7 @@ document.addEventListener('DOMContentLoaded', function () {
 async function restoreFromPublicStorage() {
   try {
     if (!window.cdbSync || typeof window.cdbSync.pickBackupViaSAF !== 'function') {
-      alert('Recurso indisponivel nesta versao do app.');
+      alert('Recurso indisponível nesta versão do app.');
       return;
     }
     var picked = await window.cdbSync.pickBackupViaSAF();
@@ -9929,7 +9920,7 @@ async function restoreFromPublicStorage() {
       return;
     }
     if (picked.kind === 'snapshot' && picked.payload && picked.payload.data) {
-      if (!confirm('Restaurar snapshot automatico de ' + new Date(picked.payload.capturedAt || Date.now()).toLocaleString('pt-BR') + '?\n\nIsso vai SUBSTITUIR os dados atuais.')) return;
+      if (!confirm('Restaurar a cópia automática de ' + new Date(picked.payload.capturedAt || Date.now()).toLocaleString('pt-BR') + '?\n\nIsso vai SUBSTITUIR os dados atuais.')) return;
       var snap = picked.payload.data;
       Object.keys(snap).forEach(function (k) {
         if (k === 'cdb-device-id' && localStorage.getItem('cdb-device-id')) return;
@@ -9943,7 +9934,7 @@ async function restoreFromPublicStorage() {
       setTimeout(function () { location.reload(); }, 600);
       return;
     }
-    alert('Arquivo nao reconhecido como backup do app.');
+    alert('Arquivo não reconhecido como backup do app.');
   } catch (e) {
     console.error('[restoreFromPublicStorage]', e);
     alert('Erro ao restaurar: ' + (e && e.message || e));
@@ -10108,7 +10099,7 @@ function importBackup(event) {
     try {
       const payload = JSON.parse(String(e.target.result || ''));
       if (!payload || payload.appId !== 'casa-da-baba' || !payload.state) {
-        showToast('Arquivo invalido (nao e backup do Easy Stock Mobile)');
+        showToast('Arquivo inválido (não é backup do Easy Stock Mobile)');
         return;
       }
       const itemCount = (payload.state.products?.length || 0)
@@ -11380,7 +11371,7 @@ function globalSearchSelect(type, id) {
     }
     if (type === 'order-open' || type === 'order') {
       const o = (typeof getOrderById === 'function') ? getOrderById(id) : null;
-      if (!o) { showToast('Pedido nao encontrado'); return; }
+      if (!o) { showToast('Pedido não encontrado'); return; }
       // Pedido aberto: abre cobranca direto (ação mais comum)
       if (typeof openCobranca === 'function') {
         openCobranca(id);
@@ -11392,7 +11383,7 @@ function globalSearchSelect(type, id) {
     }
     if (type === 'order-final') {
       const o = (typeof getOrderById === 'function') ? getOrderById(id) : null;
-      if (!o) { showToast('Pedido nao encontrado'); return; }
+      if (!o) { showToast('Pedido não encontrado'); return; }
       // Pedido finalizado: abre historico (timeline + opcao reimprimir)
       if (typeof openHistorico === 'function') {
         openHistorico(id);
@@ -11405,7 +11396,7 @@ function globalSearchSelect(type, id) {
     }
     if (type === 'client') {
       const c = (clients || []).find(x => x.id === id);
-      if (!c) { showToast('Cliente nao encontrado'); return; }
+      if (!c) { showToast('Cliente não encontrado'); return; }
       // Vai pra novo pedido e pre-seleciona — fluxo mais util na operacao.
       go('pedidos');
       if (typeof goPedidosTab === 'function') goPedidosTab('novo');
@@ -11964,7 +11955,7 @@ function advanceOrder(id) {
   // Bloqueia pedido cancelado de ser avancado (cancelado nao esta em
   // ORDER_FLOW entao cairia no return abaixo, mas explicitamos pra
   // o operador receber feedback claro caso UI mostre botao por engano).
-  if (o.status === STATUS.CANCELADO) { showToast('Pedido cancelado nao pode avancar'); return; }
+  if (o.status === STATUS.CANCELADO) { showToast('Pedido cancelado não pode avançar'); return; }
   const idx = ORDER_FLOW.indexOf(o.status);
   if (idx < 0 || idx === ORDER_FLOW.length - 1) return;
   const nextStatus = ORDER_FLOW[idx + 1];
@@ -11977,7 +11968,7 @@ function cancelOrder(id) {
   const o = getOrderById(id);
   if (!o) return;
   // Idempotencia: pedido ja cancelado nao re-executa devolucao de estoque.
-  if (o.status === STATUS.CANCELADO) { showToast('Pedido ja esta cancelado'); return; }
+  if (o.status === STATUS.CANCELADO) { showToast('Pedido já está cancelado'); return; }
   // Confirmacao mais forte se ja foi entregue (afeta caixa do dia).
   const prev = o.status;
   const wasDelivered = prev === STATUS.ENTREGUE;
@@ -12218,7 +12209,7 @@ function renderProductGrid() {
       const hasPhoto = p.photo ? ' has-photo' : '';
       tile.innerHTML = `
         <div class="pt-main">
-          <div class="emoji">${p.emoji}</div>
+          <div class="emoji">${escapeHtml(p.emoji || '📦')}</div>
           <div class="pt-info">
             <div class="pname">${escapeHtml(p.name)}</div>
             <div class="punit">
@@ -12327,6 +12318,10 @@ function onPhotoPicked(e) {
 // PRODUÇÃO - confirmação/lote
 // =========================
 let currentBatchCode = '';
+// #1474: id do batch nasce na abertura do modal pra tela mostrar o MESMO
+// codigo de lote (codigoDoLote) que vai pra etiqueta e pro ERP. Consumido
+// (zerado) no confirmProduction pra nunca reaproveitar id entre lotes.
+let currentBatchId = '';
 
 function buildBatchCode(items) {
   const first = items[0];
@@ -12359,6 +12354,7 @@ function openProductionConfirm() {
   // Código do batch fica em variável — não aparece mais na tela de revisão.
   // É usado só internamente pra identificar o batch no banco.
   currentBatchCode = buildBatchCode(items);
+  currentBatchId = 'b-' + Date.now();
 
   const summary = document.getElementById('prodSummary');
   summary.innerHTML = items.map(i => {
@@ -12367,7 +12363,7 @@ function openProductionConfirm() {
     return `
     <div class="ps-item">
       <div class="n">
-        <span class="e">${i.emoji}</span>
+        <span class="e">${escapeHtml(i.emoji || '📦')}</span>
         <span style="display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25">
           <span>${escapeHtml(i.name)} <span style="color:var(--ink-mute);font-size:12px">${escapeHtml(i.unit||'')}</span></span>
           <span class="ps-after">${stockAtual} no estoque &rarr; ${apos} apos</span>
@@ -12380,9 +12376,7 @@ function openProductionConfirm() {
   // Lista de validade/peso por produto. Pré-preenche com defaults do cadastro.
   populateProdDetailList(items);
 
-  const now = new Date();
-  document.getElementById('batchDate').textContent =
-    `lote ${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')} às ${timeOf(now.getTime())} · ${getLoteDoDia(now)}`;
+  document.getElementById('batchDate').textContent = subtituloDoLote(new Date(), currentBatchId);
 
   document.getElementById('productionConfirmModal').classList.add('show');
 }
@@ -12393,7 +12387,7 @@ function populateProdDetailList(items) {
   const host = document.getElementById('prodDetailList');
   if (!host) return;
   host.innerHTML = items.map(p => {
-    const defWeight   = p.defaultWeightG ?? '';
+    const defWeight   = pesoPadraoDoProduto(p) ?? '';
     // Pré-seleciona 5d se o produto não tem default — evita o operador travar
     // em "Finalizar" achando que precisa preencher manualmente.
     const defValidity = p.defaultValidityDays ?? 5;
@@ -12446,6 +12440,8 @@ function readProdDetailValues() {
   let valid = true;
   rows.forEach(row => {
     row.classList.remove('invalid');
+    row.querySelector('.pd-weight')?.classList.remove('invalid');
+    row.querySelector('.pd-weight')?.removeAttribute('aria-invalid');
     const pid = row.dataset.pid;
     const weightRaw = row.querySelector('.pd-weight')?.value || '';
     const customRaw = row.querySelector('.pd-validity-custom')?.value || '';
@@ -12458,6 +12454,25 @@ function readProdDetailValues() {
     perProduct.set(pid, { weightG, validityDays });
   });
   return { valid, perProduct };
+}
+
+function marcarPesoFaltando(productIds) {
+  const rows = Array.from(document.querySelectorAll('#prodDetailList .pd-row'));
+  let primeiro = null;
+  rows.forEach(row => {
+    if (!productIds.includes(row.dataset.pid)) return;
+    row.classList.add('invalid');
+    const input = row.querySelector('.pd-weight');
+    if (input) {
+      input.classList.add('invalid');
+      input.setAttribute('aria-invalid', 'true');
+      if (!primeiro) primeiro = input;
+    }
+  });
+  if (primeiro) {
+    try { primeiro.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
+    try { primeiro.focus(); } catch (_) {}
+  }
 }
 
 function closeProductionConfirm() {
@@ -13423,7 +13438,7 @@ function buildClientReturnMessage(row) {
 
 function copyClientReturnMessage(clientId) {
   const row = buildClientInsights().find(x => x.client.id === clientId);
-  if (!row) { showToast('Cliente nao encontrado'); return; }
+  if (!row) { showToast('Cliente não encontrado'); return; }
   copyToClipboard(buildClientReturnMessage(row), 'Mensagem de retorno copiada');
 }
 
@@ -13642,10 +13657,11 @@ function restoreBatch(batchId) {
 
 function reprintFromBatchId(batchId) {
   const batch = batches.find(b => b.id === batchId);
-  if (!batch) { showToast('Lote nao encontrado neste aparelho'); return; }
+  if (!batch) { showToast('Lote não encontrado neste aparelho'); return; }
   const etiquetas = etiquetasFromBatch(batch);
   if (!etiquetas.length) { showToast('Lote sem itens pra etiquetar'); return; }
-  const lote = batch.lote || batch.code || batch.id;
+  // #1474: titulo com o mesmo codigo impresso na etiqueta (LOT-AAMMDD-xxxxxx).
+  const lote = codigoDoLote(batch);
   showEtiquetasPreview(
     etiquetas,
     'producao',
@@ -14215,6 +14231,14 @@ function getLoteDoDia(dt = new Date()) {
   const m = String(dt.getMonth()+1).padStart(2,'0');
   const d = String(dt.getDate()).padStart(2,'0');
   return `LOT-${y}${m}${d}`;
+}
+
+// #1474 W6: subtitulo do modal de producao. O confirmar recalcula com o mesmo
+// instante que grava no batch: aberto antes da meia-noite e confirmado depois,
+// o subtitulo, o batch e a etiqueta ficam com o lote do dia novo.
+function subtituloDoLote(now, batchId) {
+  const codigo = codigoDoLote({ id: batchId, lote: getLoteDoDia(now), createdAt: now.getTime() });
+  return `lote ${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')} às ${timeOf(now.getTime())} · ${codigo}`;
 }
 
 // #1471: codigo do lote igual ao do ERP (BatchLinker): lote do dia + '-' + ultimos 6
@@ -15194,16 +15218,26 @@ function collectServerInfo() {
 // Onda 1: dispara dialog pra digitar codigo de 6 digitos. Em dispositivos
 // sem prompt() decente (alguns WebView Android), ainda funciona — quem
 // quiser UI premium evolui pra modal HTML proprio.
+// #1474: o operador ve o nome da loja (ou da empresa), nunca o id.
+function nomeDoPareamento(data) {
+  const d = data || {};
+  return String(d.lojaNome || d.empresaNome || d.label || '').trim();
+}
+function textoPareadoCom(data) {
+  const nome = nomeDoPareamento(data);
+  return nome ? 'Pareado com ' + nome + ' ✓' : 'Pareado ✓';
+}
+
 async function pairDevicePrompt() {
   const code = (window.prompt('Digite o código de pareamento (6 dígitos):') || '').trim();
   if (!code) return;
   if (!window.cdbSync || typeof window.cdbSync.pairWithCode !== 'function') {
-    showToast('Sync indisponivel'); return;
+    showToast('Sincronização indisponível'); return;
   }
   showToast('Pareando…');
   try {
     const data = await window.cdbSync.pairWithCode(code, null);
-    showToast('Pareado com loja ' + (data.lojaId || '').slice(0, 8) + '… ✓');
+    showToast(textoPareadoCom(data));
     if (typeof openDiagnostics === 'function') openDiagnostics();
   } catch (e) {
     showToast('Falha: ' + (e && e.message ? e.message : 'erro desconhecido'));
@@ -15282,7 +15316,7 @@ function closeConflictModal() { toggleModal('conflictModal', false); }
 // Onda 8: dispara backup manual on-demand do localStorage pro servidor.
 async function diagBackupNow() {
   if (!window.cdbSync || typeof window.cdbSync.uploadBackup !== 'function') {
-    showToast('Sync indisponivel'); return;
+    showToast('Sincronização indisponível'); return;
   }
   showToast('Enviando backup…');
   try {
@@ -15371,24 +15405,24 @@ async function diagForcePairNow() {
     showToast('Tentando parear...');
     const result = await window.cdbSync.forcePairNow();
     if (result && result.apiKey) {
-      showToast('✓ Pareado com sucesso! Loja: ' + (result.label || result.lojaId || ''));
+      showToast(textoPareadoCom(result));
       setTimeout(() => location.reload(), 1500);
     } else {
-      showToast('Pareamento sem resposta. Veja "Copiar trace" pra detalhes.');
+      showToast('O pareamento não respondeu. Tente de novo em instantes.');
     }
   } catch (e) {
     try { logError(e, 'diagForcePairNow'); } catch (_) {}
-    showToast('Pareamento falhou: ' + (e.message || e) + '. Veja "Copiar trace".');
+    showToast('O pareamento falhou: ' + (e.message || e) + '. Tente de novo em instantes.');
   }
 }
 
 async function diagPushAll() {
   if (!window.cdbSync || typeof window.cdbSync.pushAllAndFlush !== 'function') {
-    showToast('Sync indisponivel'); return;
+    showToast('Sincronização indisponível'); return;
   }
   const p = window.cdbSync.getPairing && window.cdbSync.getPairing();
   if (!p) {
-    alert('Device não está pareado.\n\nFaça o pareamento primeiro pelo botão "Parear dispositivo".');
+    alert('Este aparelho não está pareado.\n\nFaça o pareamento primeiro pelo botão "Parear dispositivo".');
     return;
   }
   const lastLocal = window.cdbSync.lastLocalBackupAt ? window.cdbSync.lastLocalBackupAt() : 0;
@@ -15415,7 +15449,7 @@ async function diagPushAll() {
 // Onda 6: troca de loja sem re-parear. Empresa fixa.
 async function switchLojaPrompt() {
   if (!window.cdbSync || typeof window.cdbSync.listLojasDisponiveis !== 'function') {
-    showToast('Sync indisponivel'); return;
+    showToast('Sincronização indisponível'); return;
   }
   showToast('Carregando lojas…');
   let lojas;
@@ -15543,7 +15577,6 @@ function openDiagnostics() {
         + _diagRow('Plataforma', escapeHtml(d.app.platform))
         + _diagRow('Tema', escapeHtml(d.app.theme))
         + _diagRow('Operador', escapeHtml(d.app.operator))
-        + _diagRow('Device', escapeHtml(String(d.app.deviceId).slice(-12)))
       , '', '')
     + section('Sync', syncLevel, ''
         + _diagRow('Última sync', _fmtRelTime(d.sync.lastSync))
@@ -15659,8 +15692,6 @@ function openDiagnostics() {
           + (p
               ? '<button class="diag-action" onclick="diagPushAll()">Sincronizar tudo agora</button>'
               : '')
-          + '<button class="diag-action" onclick="diagCopyTrace()">Copiar trace</button>'
-          + '<button class="diag-action" onclick="diagSendTrace()">Enviar trace ao suporte</button>'
           + (p
               ? '<button class="diag-action danger" onclick="unpairDevice()">Desparear</button>'
               : '<button class="diag-action" onclick="diagForcePairNow()">Forçar pareamento agora</button>'
@@ -15701,7 +15732,17 @@ function openDiagnostics() {
       , ''
         + '<button class="diag-action danger" onclick="diagClearSyncQueue()">Limpar fila sync</button>'
         + '<button class="diag-action" onclick="location.reload()">Recarregar app</button>'
-      , '');
+      , '')
+    // #1474: id do aparelho e trace sao para o suporte; ficam recolhidos,
+    // fora do caminho do operador comum.
+    + '<details class="diag-advanced"><summary>Diagnóstico avançado</summary>'
+    + section('Suporte técnico', 'ok', ''
+        + _diagRow('Device', escapeHtml(String(d.app.deviceId).slice(-12)))
+      , ''
+        + '<button class="diag-action" onclick="diagCopyTrace()">Copiar trace</button>'
+        + '<button class="diag-action" onclick="diagSendTrace()">Enviar trace ao suporte</button>'
+      , '')
+    + '</details>';
 
   toggleModal('diagnosticsModal', true);
 
@@ -15733,7 +15774,7 @@ function diagClearErrorLog() {
 async function diagExportQueue() {
   try {
     var qs = window.cdbQueueStore;
-    if (!qs || !qs.exportAll) { showToast('Queue store indisponivel'); return; }
+    if (!qs || !qs.exportAll) { showToast('Fila local indisponível'); return; }
     var bundle = await qs.exportAll();
     var json = JSON.stringify(bundle, null, 2);
     var blob = new Blob([json], { type: 'application/json' });
@@ -15750,7 +15791,7 @@ async function diagExportQueue() {
 async function diagImportQueue() {
   try {
     var qs = window.cdbQueueStore;
-    if (!qs || !qs.importBundle) { showToast('Queue store indisponivel'); return; }
+    if (!qs || !qs.importBundle) { showToast('Fila local indisponível'); return; }
     var input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
@@ -15772,7 +15813,7 @@ async function diagImportQueue() {
 async function diagViewDeadletter() {
   try {
     var qs = window.cdbQueueStore;
-    if (!qs || !qs.getDeadletter) { showToast('Queue store indisponivel'); return; }
+    if (!qs || !qs.getDeadletter) { showToast('Fila local indisponível'); return; }
     var items = await qs.getDeadletter();
     if (items.length === 0) { showToast('Dead-letter vazia'); return; }
     var msg = items.slice(0, 20).map(function (i) {
@@ -15785,7 +15826,7 @@ async function diagViewDeadletter() {
 async function diagViewConflicts() {
   try {
     var qs = window.cdbQueueStore;
-    if (!qs || !qs.getConflicts) { showToast('Queue store indisponivel'); return; }
+    if (!qs || !qs.getConflicts) { showToast('Fila local indisponível'); return; }
     var items = await qs.getConflicts();
     if (items.length === 0) { showToast('Nenhum conflito pendente'); return; }
     var msg = items.slice(0, 20).map(function (i) {
@@ -15798,7 +15839,7 @@ async function diagViewConflicts() {
 // Onda 0: pinga /api/mobile/version e re-renderiza diagnostico com resposta
 async function diagPingServer() {
   if (!window.cdbSync || typeof window.cdbSync.pingVersion !== 'function') {
-    showToast('Sync indisponivel'); return;
+    showToast('Sincronização indisponível'); return;
   }
   showToast('Verificando servidor…');
   const r = await window.cdbSync.pingVersion();
@@ -15815,7 +15856,7 @@ function closeDiagnostics() { toggleModal('diagnosticsModal', false); }
 function diagForceFlush() {
   if (window.cdbSync && typeof window.cdbSync.flush === 'function') {
     window.cdbSync.flush().then(() => { showToast('Sync forçado'); openDiagnostics(); });
-  } else { showToast('Sync indisponível'); }
+  } else { showToast('Sincronização indisponível'); }
 }
 function diagForcePull() {
   if (window.cdbSync && typeof window.cdbSync.pull === 'function') {
@@ -16734,7 +16775,7 @@ async function uploadErrorLogToServer() {
   if (!arr.length) { showToast('Sem erros pra enviar'); return; }
   if (!navigator.onLine) { showToast('Sem rede — tente mais tarde'); return; }
   if (!window.cdbSync || typeof window.cdbSync.uploadErrorLog !== 'function') {
-    showToast('Sync indisponivel'); return;
+    showToast('Sincronização indisponível'); return;
   }
   showToast('Enviando ' + arr.length + ' erro(s)…');
   try {
@@ -17398,6 +17439,14 @@ function calcAuthHeaders() {
     const token = localStorage.getItem('cdb-auth-token') || localStorage.getItem('authToken');
     if (token) headers['Authorization'] = 'Bearer ' + token;
   } catch (_) {}
+  // #1474: o aparelho pareado nao tem JWT. Sem a api key do device a
+  // calculadora respondia 401 (produtos-com-receita, calcular, cesta).
+  try {
+    const pairing = window.cdbSync && typeof window.cdbSync.getPairing === 'function'
+      ? window.cdbSync.getPairing() : null;
+    if (pairing && pairing.apiKey) headers['X-Mobile-Api-Key'] = pairing.apiKey;
+    if (window.cdbSync && window.cdbSync.deviceId) headers['X-Device-Id'] = window.cdbSync.deviceId;
+  } catch (_) {}
   return headers;
 }
 
@@ -17415,7 +17464,7 @@ async function calcBuscarProdutos() {
     const q = document.getElementById('calcProdSearch').value.trim();
     const box = document.getElementById('calcProdSuggestions');
     if (!q) { box.classList.remove('show'); box.innerHTML = ''; return; }
-    if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+    if (!navigator.onLine) { showToast('A calculadora precisa de internet'); return; }
     try {
       const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
       const url = `${calcApiBase()}/api/mobile/calculadora/produtos-com-receita?q=${encodeURIComponent(q)}&limit=10${empresaId ? '&empresaId=' + empresaId : ''}`;
@@ -17455,7 +17504,7 @@ async function calcBuscarProdutos() {
       box.classList.remove('show');
       box.innerHTML = '';
       try { console.error('[calculadora]', e); } catch (_) {}
-      showToast('Erro ao buscar produtos. Verifique sua conexao.');
+      showToast('Erro ao buscar produtos. Verifique sua conexão.');
     }
   }, 300);
 }
@@ -17518,7 +17567,7 @@ function calcOnUnidadeChange() {
 
 async function calcExecutar() {
   if (!calcProdutoSelecionado) return;
-  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+  if (!navigator.onLine) { showToast('A calculadora precisa de internet'); return; }
 
   const qtd = parseFloat(document.getElementById('calcQtd').value.replace(',', '.'));
   const unidade = document.getElementById('calcUnidade').value;
@@ -17558,7 +17607,7 @@ async function calcExecutar() {
     calcRenderResultado(json.data);
     calcSalvarHistorico(calcProdutoSelecionado, qtd, unidade);
   } catch (e) {
-    showToast('Erro de conexao');
+    showToast('Erro de conexão');
     box.style.display = 'none';
   } finally {
     box.setAttribute('aria-busy', 'false');
@@ -17637,7 +17686,7 @@ function calcRenderResultado(r) {
 
 async function calcGerarCompra() {
   if (!calcUltimoResultado) return;
-  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+  if (!navigator.onLine) { showToast('A calculadora precisa de internet'); return; }
 
   const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
   const lojaId = (window.CDB_CONFIG && window.CDB_CONFIG.lojaId) || null;
@@ -17675,7 +17724,7 @@ async function calcGerarCompra() {
     const grupos = preview.porFornecedor || [];
     const semFornecedor = grupos.find(g => !g.fornecedorId);
     if (semFornecedor) {
-      showToast('Alguns insumos nao tem fornecedor preferido. Cadastre antes ou edite manualmente no admin.');
+      showToast('Alguns insumos não têm fornecedor preferido. Cadastre antes ou edite manualmente no admin.');
       return;
     }
     const resumo = grupos.map(g => `${g.fornecedorNome}: ${g.linhas.length} itens (R$ ${(g.subtotalEstimado || 0).toFixed(2)})`).join('\n');
@@ -17716,7 +17765,7 @@ async function calcGerarCompra() {
     }
     showToast(`${json2.data?.pedidosCriados?.length || 0} pedido(s) de compra criado(s).`);
   } catch (e) {
-    showToast('Erro de conexao');
+    showToast('Erro de conexão');
   }
 }
 
@@ -17753,7 +17802,7 @@ function adicionarFaltantesNaCompra(faltantes) {
     });
     added++;
   });
-  if (added === 0) { showToast('Faltantes ja estao na lista de Compras.'); return 0; }
+  if (added === 0) { showToast('Os faltantes já estão na lista de Compras.'); return 0; }
   persistAll();
   pendingSync++;
   updateSync();
@@ -17857,7 +17906,7 @@ function cestaCalcInstalarObservadorDraft() {
 }
 
 async function openCestaCalcFromDraft() {
-  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+  if (!navigator.onLine) { showToast('A calculadora precisa de internet'); return; }
   const items = (typeof currentOrderItems !== 'undefined' && Array.isArray(currentOrderItems)) ? currentOrderItems : [];
   if (items.length === 0) { showToast('Adicione itens ao pedido primeiro'); return; }
   await cestaCalcCarregarCacheReceitas();
@@ -17876,10 +17925,10 @@ async function openCestaCalcFromDraft() {
 }
 
 async function openCestaCalcFromOrder(orderId) {
-  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+  if (!navigator.onLine) { showToast('A calculadora precisa de internet'); return; }
   const ordersList = (typeof orders !== 'undefined' && Array.isArray(orders)) ? orders : [];
   const order = ordersList.find(o => o.id === orderId);
-  if (!order || !Array.isArray(order.items)) { showToast('Pedido nao encontrado'); return; }
+  if (!order || !Array.isArray(order.items)) { showToast('Pedido não encontrado'); return; }
   await cestaCalcCarregarCacheReceitas();
   const idShort = (order.id || '').slice(-6);
   cestaCalcContexto = {
@@ -17901,10 +17950,10 @@ async function openCestaCalcFromOrder(orderId) {
 // UMA vez no servidor (somar faltas de /calcular por produto double-contaria o
 // estoque compartilhado). So produtos do catalogo; itens ad-hoc sao ignorados.
 async function openCestaCalcFromDemand() {
-  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+  if (!navigator.onLine) { showToast('A calculadora precisa de internet'); return; }
   const { items: demanda } = aggregateProductionDemand();
   const items = (demanda || []).filter(i => i.productId && products.some(p => p.id === i.productId));
-  if (items.length === 0) { showToast('Nenhum produto do catalogo na demanda'); return; }
+  if (items.length === 0) { showToast('Nenhum produto do catálogo na demanda'); return; }
   await cestaCalcCarregarCacheReceitas();
   cestaCalcContexto = {
     tipo: 'demanda',
@@ -17970,7 +18019,7 @@ function cestaCalcAbrirModal() {
 }
 
 async function cestaCalcCalcular() {
-  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+  if (!navigator.onLine) { showToast('A calculadora precisa de internet'); return; }
   if (!cestaCalcContexto || cestaCalcContexto.items.length === 0) return;
 
   const btn = document.getElementById('cestaCalcBtnCalcular');
@@ -20056,7 +20105,7 @@ async function saveImageToDevice(blob, filename) {
         } catch (e) {
           console.warn('[save] FileOpener falhou:', e);
           alert('Salvo em Documentos:\n\n' + filename
-                + '\n\nNao foi possivel abrir automaticamente — abra pelo app Files.');
+                + '\n\nNão foi possível abrir automaticamente — abra pelo app Files.');
           return true;
         }
       }
@@ -20125,8 +20174,8 @@ async function shareImageNative(blob, filename) {
   // Fallback browser: Web Share API
   const file = new File([blob], filename, { type: blob.type || 'image/png' });
   if (!navigator.canShare || !navigator.canShare({ files: [file] })) {
-    alert('Compartilhamento nao disponivel neste dispositivo.\n\n'
-          + 'Use o botao Salvar.');
+    alert('Compartilhamento não disponível neste dispositivo.\n\n'
+          + 'Use o botão Salvar.');
     return false;
   }
   try {
@@ -20165,7 +20214,7 @@ async function etqAction(action) {
       // No APK (Capacitor) o shim DEVE estar pronto. Se nao esta, plugin
       // nativo nao foi registrado — situacao de erro real, instrui usuario.
       if (hasCapacitor && !hasNativePlugin) {
-        showToast('Plugin Bluetooth nao registrou — feche e reabra o app');
+        showToast('Plugin Bluetooth não registrou — feche e reabra o app');
         return;
       }
       // Sem plugin Bluetooth no browser puro: oferece configurar/share
@@ -20176,7 +20225,7 @@ async function etqAction(action) {
         if (typeof window.cdbInstallThermalShim === 'function') window.cdbInstallThermalShim();
         bs = window.bluetoothSerial;
       }
-      if (!bs) { showToast('Bluetooth indisponivel — tente de novo em 2s'); return; }
+      if (!bs) { showToast('Bluetooth indisponível — tente de novo em 2s'); return; }
       // Tem plugin mas operador nao selecionou impressora ainda: abre picker
       // direto e SALVA a escolha no localStorage. Apos selecionar, ele toca
       // Imprimir de novo (selectPrinter nao auto-dispara mais).
@@ -20621,7 +20670,9 @@ function confirmProduction() {
     }
   }
   if (semPeso.length > 0) {
-    showToast(`Peso obrigatório (RDC 727) em: ${semPeso.join(', ')}`);
+    // #1474: destaca o campo que falta (nao so o toast) e leva o foco pra ele.
+    marcarPesoFaltando(itemsRaw.filter(p => semPeso.includes(p.name)).map(p => p.id));
+    showToast(`Falta o peso de: ${semPeso.join(', ')} (vai na etiqueta)`);
     return;
   }
   // Sanitiza qty pra inteiro positivo (impede NaN/negativo escapando do prompt)
@@ -20670,8 +20721,12 @@ function confirmProduction() {
   });
 
   const code = currentBatchCode || buildBatchCode(itemsRaw);
+  const batchId = currentBatchId || ('b-' + nowMs);
+  currentBatchId = '';
+  // #1474 W6: mesmo lote/codigo do batch e da etiqueta, mesmo virando o dia.
+  try { document.getElementById('batchDate').textContent = subtituloDoLote(new Date(nowMs), batchId); } catch (_) {}
   const batch = {
-    id: 'b-' + nowMs,
+    id: batchId,
     code,
     items,
     batchPhoto: currentPhotoDataUrl,
@@ -20698,11 +20753,13 @@ function confirmProduction() {
 
   // Audit log: produção registrada
   const itemsSummary = items.map(i => `${i.qty}x ${i.name}`).join(', ');
+  // #1474: mesmo codigo da etiqueta e do ERP (LOT-AAMMDD-xxxxxx), nao o do dia.
+  const codigoLote = codigoDoLote(batch);
   logAction({
     action: 'batch.create',
     entityType: 'batch',
     entityId: batch.id,
-    summary: `Lote ${lote} · ${itemsSummary}`
+    summary: `Lote ${codigoLote} · ${itemsSummary}`
   });
 
   // Fluxo: confirmar -> registrar -> informar cadastrado (banner + toast)
@@ -20710,12 +20767,12 @@ function confirmProduction() {
   // O registro JÁ aconteceu acima (batches.push + persistAll); o preview
   // é apenas um passo opcional de impressão. Fechar o modal preserva o registro.
   const etiquetas = etiquetasFromBatch(batch);
-  showToast(`✓ Produção cadastrada · Lote ${lote}`);
+  showToast(`✓ Produção cadastrada · Lote ${codigoLote}`);
   if (etiquetas.length > 0) {
     showEtiquetasPreview(
       etiquetas,
       'producao',
-      `Lote ${lote} · ${etiquetas.length} etiqueta${etiquetas.length>1?'s':''}`,
+      `Lote ${codigoLote} · ${etiquetas.length} etiqueta${etiquetas.length>1?'s':''}`,
       `Produção cadastrada · imprima as etiquetas abaixo`
     );
   } else {
@@ -21109,7 +21166,7 @@ function renderItemPickerList(q) {
       ? `${p.stock} disp.`
       : (p.stock === 0 ? 'em falta' : `faltam ${Math.abs(p.stock)}`);
     const stockClass = p.stock <= 0 ? 'sr-warn' : '';
-    item.innerHTML = `<div class="sn">${p.emoji} ${escapeHtml(p.name)}</div><div class="sr">${escapeHtml(p.unit || '')}${priceLabel ? ' · ' + priceLabel : ' · sem preço'} · <span class="${stockClass}">${stockLabel}</span></div>`;
+    item.innerHTML = `<div class="sn">${escapeHtml(p.emoji || '📦')} ${escapeHtml(p.name)}</div><div class="sr">${escapeHtml(p.unit || '')}${priceLabel ? ' · ' + priceLabel : ' · sem preço'} · <span class="${stockClass}">${stockLabel}</span></div>`;
     item.onclick = () => {
       if (!hasPrice) { closeItemPicker(); openProductModalForEdit(p.id); return; }
       addItemToOrder(p);
@@ -21180,7 +21237,7 @@ function renderOrderItems() {
     const row = document.createElement('div');
     row.className = 'item-row';
     row.innerHTML = `
-      <div class="item-emoji">${it.emoji}</div>
+      <div class="item-emoji">${escapeHtml(it.emoji || '📦')}</div>
       <div class="item-info">
         <div class="item-name">${escapeHtml(it.name)}</div>
         <div class="item-price">${it.unitPrice ? money(it.unitPrice).replace(',00','') + ' un' : 'sem preço'}${it.unit ? ' · ' + escapeHtml(it.unit) : ''}</div>
@@ -21666,7 +21723,7 @@ function closeProductActionsMenu() {
 function archiveProduct(productId) {
   const p = products.find(x => x.id === productId);
   if (!p) return;
-  if (p.archived) { showToast('Produto ja arquivado'); return; }
+  if (p.archived) { showToast('Produto já arquivado'); return; }
   p.archived = true;
   persistAll();
   renderProductGrid();
@@ -22630,7 +22687,7 @@ function forceCheckUpdate() {
               && window.Capacitor.Plugins
               && window.Capacitor.Plugins.CapacitorUpdater;
     if (!Plugin) {
-      alert('Plugin LiveUpdater nao disponivel.\n\nIsso so funciona dentro do APK Android, nao no browser.');
+      alert('Plugin LiveUpdater não disponível.\n\nIsso só funciona dentro do APK Android, não no navegador.');
       return;
     }
     alert('Verificando atualizacoes no servidor...');
@@ -22647,7 +22704,7 @@ function forceCheckUpdate() {
           });
         });
       } else {
-        alert('Voce ja esta na ultima versao.\n\nNada a baixar.');
+        alert('Você já está na última versão.\n\nNada a baixar.');
       }
     }).catch(function (e) {
       console.warn('[LiveUpdater] forceCheckUpdate falhou:', e);

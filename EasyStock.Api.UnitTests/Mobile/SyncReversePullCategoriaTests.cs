@@ -71,5 +71,35 @@ public sealed class SyncReversePullCategoriaTests : IDisposable
             .Which.Payload.GetProperty("category").GetString().Should().Be(esperada);
     }
 
+    /// <summary>
+    /// #1474: pedido do console chegava ao PWA com a linha de frete ("Entrega — Butantã") como
+    /// produto, e a "Demanda dos pedidos abertos" pedia para produzir a entrega.
+    /// </summary>
+    [Fact]
+    public async Task PedidoDoErp_ChegaSemALinhaDeFrete()
+    {
+        var pedido = Pedido.Criar(_empresaId);
+        pedido.AlteradoEm = DateTime.UtcNow;
+        pedido.Itens.Add(new PedidoItem
+        {
+            Id = Guid.NewGuid(), PedidoId = pedido.Id, Nome = "nhoque artesanal 500 g",
+            Quantidade = 1, PrecoUnitario = 38m, Subtotal = 38m, CriadoEm = DateTime.UtcNow,
+        });
+        pedido.Itens.Add(new PedidoItem
+        {
+            Id = Guid.NewGuid(), PedidoId = pedido.Id, Nome = "Entrega — Butantã",
+            Quantidade = 1, PrecoUnitario = 12m, Subtotal = 12m, CriadoEm = DateTime.UtcNow,
+        });
+        _db.Add(pedido);
+        await _db.SaveChangesAsync();
+
+        var mutations = new List<MutationDto>();
+        await _servico.AppendAsync(mutations, DateTime.UtcNow.AddDays(-1), _empresaId, null);
+
+        var itens = mutations.Single(m => m.Type == "order.upsert").Payload.GetProperty("items");
+        itens.GetArrayLength().Should().Be(1);
+        itens[0].GetProperty("name").GetString().Should().Be("Nhoque Artesanal 500 g");
+    }
+
     public void Dispose() => _db.Dispose();
 }

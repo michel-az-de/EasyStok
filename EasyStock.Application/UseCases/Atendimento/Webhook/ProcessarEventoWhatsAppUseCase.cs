@@ -5,9 +5,11 @@ using EasyStock.Application.Events.Atendimento;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Atendimento;
 
 namespace EasyStock.Application.UseCases.Atendimento.Webhook;
@@ -34,6 +36,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     RoteadorAcoesBotao roteadorAcoes,
     OptOutPorPalavra optOut,
     IEscaladorConversa escalador,
+    IExpedienteLojaRepository expedientes,
+    TimeProvider relogio,
     ILogger<ProcessarEventoWhatsAppUseCase> logger,
     IPublicadorEventoIntegracao? publicadorEventos = null,
     Ports.Output.Ai.ITranscritorAudio? transcritor = null)
@@ -393,7 +397,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     {
         try
         {
-            var texto = await saudacao.MontarAsync(empresaId, configuracao, identificacao, ct);
+            var texto = await MontarPrimeiraRespostaAsync(empresaId, configuracao, identificacao, ct);
 
             Mensagem saida;
             try
@@ -420,6 +424,18 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             // Não deixa o insert pendente contaminar o commit da próxima mensagem do lote.
             unitOfWork.DescartarAlteracoesPendentes();
         }
+    }
+
+    /// <summary>
+    /// #1474: com a loja fora do horário ou fechada na mão, o aviso do expediente vai no lugar da saudação, cuja
+    /// frase de espera ("já te ajudo") prometeria uma resposta que não vem. Sem registro, vale o expediente padrão.
+    /// </summary>
+    private async Task<string> MontarPrimeiraRespostaAsync(
+        Guid empresaId, ConfiguracaoAtendimento configuracao, IdentificacaoCliente identificacao, CancellationToken ct)
+    {
+        var expediente = await expedientes.GetByEmpresaIdAsync(empresaId, ct) ?? ExpedienteLoja.CriarPadrao(empresaId);
+        return expediente.MensagemParaCliente(relogio.GetUtcNow().UtcDateTime)
+            ?? await saudacao.MontarAsync(empresaId, configuracao, identificacao, ct);
     }
 
     private async Task<ConfiguracaoAtendimento> AtualizarUltimaMensagemRecebidaAsync(Guid empresaId, DateTime agora)

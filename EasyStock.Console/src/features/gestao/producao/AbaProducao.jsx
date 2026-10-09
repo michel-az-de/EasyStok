@@ -11,9 +11,9 @@ import { Vazio } from '../../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../../aplicacao/contextos'
 import { itemPorSku, itensAtivos } from '../../../dominio/cardapio'
 import {
-  DESTINOS_PORCAO, rotuloDestino, situacaoDeVencimento, textoDescoberto,
+  DESTINOS_PORCAO, rotuloDestino, rotuloDoSaldo, situacaoDeVencimento, textoDescoberto,
 } from '../../../dominio/producao'
-import { dataHora, plural } from '../../../dominio/formato'
+import { dataHora } from '../../../dominio/formato'
 import css from './producao.module.css'
 
 // "800 g" / "1,5 kg" -> grama inteira. Sem casamento, cai em 500 g (porção
@@ -314,7 +314,7 @@ export function AbaProducao() {
                 <tr key={item.sku} className={css.linha}>
                   <td>{item.nome}</td>
                   <td>{item.porcao}</td>
-                  <td>{plural(item.estoque, 'porção', 'porções')}</td>
+                  <td>{rotuloDoSaldo(item.estoque)}</td>
                   <td>
                     {temLote
                       ? <Pilula tom="ragu">lote lançado</Pilula>

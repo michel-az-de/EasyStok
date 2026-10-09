@@ -6,7 +6,7 @@ import { Chip } from '../../../componentes/Chip'
 import { Pilula } from '../../../componentes/Pilula'
 import { useAcoes, useAtendimento, useCatalogo } from '../../../aplicacao/contextos'
 import {
-  CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, TIPOS_MOVIMENTO, caixaAberto, caixaAberturaDoDia,
+  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, TIPOS_MOVIMENTO, caixaAberto, caixaAberturaDoDia,
   caixaFechamentoDoDia, movimentosDoDia, nomeDoMetodoCaixa, resumoCaixa, vendasDoDia,
 } from '../../../dominio/caixa'
 import {
@@ -176,8 +176,8 @@ export function AbaCaixa() {
 
       <dl className={css.resumoLista}>
         <div><dt>Saldo inicial</dt><dd>{moeda(resumo.saldoInicial)}</dd></div>
-        <div><dt>Entradas extras</dt><dd>{moeda(resumo.totalEntradasExtras)}</dd></div>
-        <div><dt>Saídas extras</dt><dd>{moeda(resumo.totalSaidasExtras)}</dd></div>
+        <div><dt>Outras entradas</dt><dd>{moeda(resumo.totalEntradasExtras)}</dd></div>
+        <div><dt>Outras saídas</dt><dd>{moeda(resumo.totalSaidasExtras)}</dd></div>
         <div><dt>Pagamentos de pedidos ({resumo.quantidadeVendas})</dt><dd>{moeda(resumo.totalPagamentosPedidos)}</dd></div>
         <div className={css.resumoForte}><dt>Saldo esperado</dt><dd>{moeda(resumo.saldoEsperado)}</dd></div>
       </dl>
@@ -196,7 +196,7 @@ export function AbaCaixa() {
             Venda avulsa
           </Botao>
           <Botao variante="secundario" icone="log-out" onClick={() => setFecharAberto(true)}>
-            Fechar o dia
+            Fechar o caixa
           </Botao>
         </div>
       )}
@@ -222,20 +222,18 @@ export function AbaCaixa() {
             </Chip>
           </div>
 
-          {tipoLancamento === TIPOS_MOVIMENTO.SAIDA && (
-            <div className={css.categoriasSugeridas}>
-              {CATEGORIAS_SAIDA_SUGERIDAS.map((sugestao) => (
-                <Chip key={sugestao} papel="filtro" ativo={categoria === sugestao} onClick={() => setCategoria(sugestao)}>
-                  {sugestao}
-                </Chip>
-              ))}
-            </div>
-          )}
+          <div className={css.categoriasSugeridas}>
+            {(tipoLancamento === TIPOS_MOVIMENTO.SAIDA ? CATEGORIAS_SAIDA_SUGERIDAS : CATEGORIAS_ENTRADA_SUGERIDAS).map((sugestao) => (
+              <Chip key={sugestao} papel="filtro" ativo={categoria === sugestao} onClick={() => setCategoria(sugestao)}>
+                {sugestao}
+              </Chip>
+            ))}
+          </div>
 
           <div className={css.formGrade}>
             <CampoTexto
               rotulo="Categoria"
-              placeholder={tipoLancamento === TIPOS_MOVIMENTO.SAIDA ? 'Ex.: Sangria, Despesa, Suprimento' : 'Ex.: Adiantamento, Reforço de troco'}
+              placeholder={tipoLancamento === TIPOS_MOVIMENTO.SAIDA ? 'Ex.: Sangria, Despesa' : 'Ex.: Suprimento (reforço de troco)'}
               value={categoria}
               onChange={(e) => setCategoria(e.target.value)}
             />

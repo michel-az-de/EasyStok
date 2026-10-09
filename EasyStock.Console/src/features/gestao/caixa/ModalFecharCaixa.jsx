@@ -3,6 +3,7 @@ import { Botao } from '../../../componentes/Botao'
 import { CampoMascarado } from '../../../componentes/CampoMascarado'
 import { Modal } from '../../../componentes/Modal'
 import { Pilula } from '../../../componentes/Pilula'
+import { conferenciaDaGaveta } from '../../../dominio/caixa'
 import {
   lerMoeda, mascaraMoeda, moeda, moedaAltaDemais,
 } from '../../../dominio/formato'
@@ -13,16 +14,19 @@ import css from './abaCaixa.module.css'
 // saídas + pagamentos de pedido, igual ao FechamentoCaixa do EasyStok).
 // Diferença não trava o fechamento: é achado para ela decidir, não erro do
 // sistema (mesma filosofia de RN-06 "o sistema avisa, não trava a venda").
-export function ModalFecharCaixa({ resumo, aoFechar, aoConfirmar }) {
-  const [centavosContado, setCentavosContado] = useState(Math.round(resumo.saldoEsperado * 100))
-
-  const contado = centavosContado / 100
-  const diferenca = contado - resumo.saldoEsperado
-  const tomDiferenca = diferenca === 0 ? 'ok' : Math.abs(diferenca) <= 5 ? 'aviso' : 'perigo'
+//
+// #1474: com `gaveta` (modo API), o esperado é só o dinheiro da gaveta; Pix e cartão
+// aparecem à parte e não entram na diferença do que ela contou. O campo nasce vazio (nascer
+// com o esperado mostrava "bate certo" sem ninguém contar) e o botão espera a contagem.
+// "Fechar o caixa", não "fechar o dia": fechar a loja é outro gesto.
+export function ModalFecharCaixa({ resumo, gaveta = null, aoFechar, aoConfirmar }) {
+  const esperado = gaveta ? gaveta.naGaveta : resumo.saldoEsperado
+  const [centavosContado, setCentavosContado] = useState(null)
+  const conferencia = conferenciaDaGaveta(centavosContado, esperado)
 
   return (
     <Modal
-      titulo="Fechar o dia"
+      titulo="Fechar o caixa"
       descricao="Depois de fechado, os lançamentos de hoje não podem mais ser estornados."
       aoFechar={aoFechar}
       rodape={(
@@ -31,34 +35,42 @@ export function ModalFecharCaixa({ resumo, aoFechar, aoConfirmar }) {
           <Botao
             variante="primario"
             icone="log-out"
-            disabled={moedaAltaDemais(centavosContado)}
-            onClick={() => aoConfirmar(contado)}
+            disabled={!conferencia.pronta || moedaAltaDemais(centavosContado)}
+            onClick={() => aoConfirmar(centavosContado / 100)}
           >
-            Fechar o dia
+            Fechar o caixa
           </Botao>
         </>
       )}
     >
       <dl className={css.resumoLista}>
+        {gaveta ? (
+          <div className={css.resumoForte}><dt>Na gaveta (dinheiro)</dt><dd>{moeda(gaveta.naGaveta)}</dd></div>
+        ) : (
+          <div className={css.resumoForte}><dt>Saldo esperado</dt><dd>{moeda(resumo.saldoEsperado)}</dd></div>
+        )}
         <div><dt>Saldo inicial</dt><dd>{moeda(resumo.saldoInicial)}</dd></div>
-        <div><dt>Entradas extras</dt><dd>{moeda(resumo.totalEntradasExtras)}</dd></div>
-        <div><dt>Saídas extras</dt><dd>{moeda(resumo.totalSaidasExtras)}</dd></div>
+        <div><dt>Outras entradas</dt><dd>{moeda(resumo.totalEntradasExtras)}</dd></div>
+        <div><dt>Outras saídas</dt><dd>{moeda(resumo.totalSaidasExtras)}</dd></div>
         <div><dt>Pagamentos de pedidos</dt><dd>{moeda(resumo.totalPagamentosPedidos)}</dd></div>
-        <div className={css.resumoForte}><dt>Saldo esperado</dt><dd>{moeda(resumo.saldoEsperado)}</dd></div>
+        {gaveta && <div><dt>Pix e cartão (fora da gaveta)</dt><dd>{moeda(gaveta.pixECartao)}</dd></div>}
       </dl>
 
       <CampoMascarado
         tipo="moeda"
-        rotulo="Quanto você contou no caixa"
-        valor={mascaraMoeda(centavosContado)}
+        rotulo={gaveta ? 'Quanto você contou na gaveta (só dinheiro)' : 'Quanto você contou no caixa'}
+        placeholder="Digite o que contou"
+        valor={centavosContado == null ? '' : mascaraMoeda(centavosContado)}
         erro={moedaAltaDemais(centavosContado) ? 'Valor alto demais' : null}
-        aoMudarDigitos={(digitos) => setCentavosContado(Number(digitos || '0'))}
+        aoMudarDigitos={(digitos) => setCentavosContado(digitos ? Number(digitos) : null)}
         aoColarTexto={(texto) => setCentavosContado(lerMoeda(texto))}
       />
 
-      <p className={css.corpoDiferenca}>
-        Diferença: <Pilula tom={tomDiferenca}>{diferenca === 0 ? 'bate certo' : moeda(diferenca)}</Pilula>
-      </p>
+      {conferencia.pronta && (
+        <p className={css.corpoDiferenca}>
+          Diferença: <Pilula tom={conferencia.tom}>{conferencia.texto}</Pilula>
+        </p>
+      )}
     </Modal>
   )
 }

@@ -1,3 +1,4 @@
+using EasyStock.Api.Authentication;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento.Audio;
 using EasyStock.Application.UseCases.Atendimento;
@@ -210,7 +211,7 @@ public class AtendimentoConversasController(
     [HttpPost("{id:guid}/transferir")]
     public Task<IActionResult> Transferir(Guid id, [FromBody] TransferirConversaBody body, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await transferirUseCase.ExecuteAsync(
-            new TransferirConversaCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.ParaUsuarioId ?? Guid.Empty), ct)));
+            new TransferirConversaCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.ParaUsuarioId ?? Guid.Empty, User.NomeExibicao()), ct)));
 
     [SwaggerOperation(Summary = "Give the conversation back to the agent")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -281,7 +282,7 @@ public class AtendimentoConversasController(
         => Atendendo(async () => DataOk(await sugestaoUseCase.ExecuteAsync(
             new SugerirRespostaAgenteCommand(currentUser.EmpresaId, id), ct)));
 
-    private AcaoConversaCommand Acao(Guid id) => new(currentUser.EmpresaId, currentUser.UsuarioId, id);
+    private AcaoConversaCommand Acao(Guid id) => new(currentUser.EmpresaId, currentUser.UsuarioId, id, User.NomeExibicao());
 
     /// <summary>Ação que mexe na conversa: só quem atende (S41). Sem a permissão, 403 antes de tocar em nada.</summary>
     private Task<IActionResult> Atendendo(Func<Task<IActionResult>> acao)

@@ -38,6 +38,9 @@
 }
 .horariosDoDia { display: flex; gap: var(--e-2); flex-wrap: wrap; margin-left: auto; }
 .horariosDoDia input { min-height: var(--toque); }
+/* #1474: dia desligado diz "Fechado" no lugar dos horários. */
+.diaFechado { margin-left: auto; color: var(--tinta-3); font-weight: 600; }
+.acoesLoja { display: flex; gap: var(--e-2); flex-wrap: wrap; }
 
 /* Achado 8 (banca capricho R10): as sete linhas liam igual, sem marca do dia
    atual. Fundo e trilho sutis (mesmo tom de "selecionado" do resto do app,
@@ -103,7 +106,8 @@
   display: flex; align-items: baseline; gap: var(--e-2); flex-wrap: wrap;
   margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta-2);
 }
-.editando { margin: var(--e-2) 0 0; }
+.editando { display: block; margin: var(--e-2) 0 0; }
+.alerta { margin: var(--e-1) 0; font-size: var(--t-apoio); color: var(--atencao); }
 .acoes { display: flex; gap: var(--e-2); flex-wrap: wrap; margin-top: var(--e-3); }
 .toque { min-height: var(--toque); }
 

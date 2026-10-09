@@ -11,6 +11,9 @@ import { HASH_HALL } from '../../dominio/rota'
 import { hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
 import css from './moldura.module.css'
 
+const MODULO_DO_BALCAO = 'atendimento'
+const HASH_BALCAO = hashDoModulo(MODULO_DO_BALCAO, 'balcao')
+
 export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, children }) {
   const modulo = moduloPorId(moduloId)
   const telas = telasDoMenu(modulo, { fonteApi })
@@ -22,6 +25,12 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
         <a className={css.voltar} href={HASH_HALL}>
           <Icone nome="arrow-left" tamanho={18} /> <span>Módulos</span>
         </a>
+        {/* #1474: quem veio da barra lateral do Balcão volta para ele num toque. */}
+        {modulo.id !== MODULO_DO_BALCAO && (
+          <a className={css.voltar} href={HASH_BALCAO}>
+            <Icone nome="conversa" tamanho={18} /> <span>Balcão</span>
+          </a>
+        )}
         <span className={css.modulo}>
           <Icone nome={modulo.icone} tamanho={20} /> {modulo.nome}
         </span>
@@ -52,7 +61,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
                 </>
               ) : (
                 <Vazio titulo={`${modulo.nome}: em breve`} acao={<a className={css.link} href={HASH_HALL}>Voltar aos módulos</a>}>
-                  Este módulo ainda não tem tela no console. Ele entra pelo plano do ERP da Casa da Baba.
+                  Este módulo ainda não funciona por esta tela.
                 </Vazio>
               )}
             </div>

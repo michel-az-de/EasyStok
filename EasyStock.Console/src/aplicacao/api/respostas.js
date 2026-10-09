@@ -30,7 +30,10 @@ export function criarAcoesRespostasApi({ despachar, estadoRef }) {
   const respostaDe = (id) => (estadoRef.current.catalogo?.respostasProntas ?? []).find((r) => r.id === id) ?? null
 
   return {
-    recarregarRespostas: () => recarregarRespostas().catch((erro) => avisar(`Respostas prontas: ${erro.message}`)),
+    recarregarRespostas: () => recarregarRespostas().catch((erro) => {
+      despachar({ tipo: acao.REGRAS_FALHARAM, mensagem: erro.message })
+      avisar(`Respostas prontas: ${erro.message}`)
+    }),
 
     incluirRespostaPronta: (dados) => gravar('Resposta pronta', () => criarRespostaPronta(corpoDaResposta(dados))),
     editarRespostaPronta: (id, dados) => {

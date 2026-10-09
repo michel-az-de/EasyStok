@@ -7,7 +7,12 @@ using EasyStock.Domain.Enums.Atendimento;
 
 namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
-public sealed record AcaoConversaCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId);
+/// <param name="UsuarioNome">Nome de quem agiu, para as notas internas que a dona lê no fio (#1474: nunca o id).</param>
+public sealed record AcaoConversaCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string? UsuarioNome = null)
+{
+    /// <summary>Nome para a nota; sem nome, "a equipe" (o id não diz nada a quem lê).</summary>
+    public string QuemAgiu => string.IsNullOrWhiteSpace(UsuarioNome) ? "a equipe" : UsuarioNome.Trim();
+}
 
 /// <summary>
 /// Ações da dona sobre a conversa (S07): assumir sem escrever, devolver ao agente (D4: a retomada é
@@ -17,7 +22,7 @@ public sealed record AcaoConversaCommand(Guid EmpresaId, Guid UsuarioId, Guid Co
 public sealed class GerenciarConversaAtendimentoUseCase(
     IConversaRepository conversaRepository, IUnitOfWork unitOfWork, IPublicadorEventoIntegracao? publicador = null)
 {
-    public const string PrefixoLiberacao = "atendimento automático retomado pelo usuário ";
+    public const string PrefixoLiberacao = "atendimento automático retomado por ";
 
     public Task<ConversaSituacaoResult> AssumirAsync(AcaoConversaCommand command, CancellationToken ct = default) =>
         ExecutarAsync(command, (conversa, agora) =>
@@ -33,11 +38,11 @@ public sealed class GerenciarConversaAtendimentoUseCase(
             conversa.LiberarAutomatico();
             return conversaRepository.AddMensagemAsync(
                 Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora,
-                    TipoConteudoMensagem.Texto, PrefixoLiberacao + command.UsuarioId),
+                    TipoConteudoMensagem.Texto, PrefixoLiberacao + command.QuemAgiu),
                 ct);
         }, ct);
 
-    public const string PrefixoLiberacaoForaDeArea = "entrega fora da área liberada pelo usuário ";
+    public const string PrefixoLiberacaoForaDeArea = "entrega fora da área liberada por ";
 
     /// <summary>
     /// S14: a dona libera a entrega fora da área. Grava <c>foraDeAreaLiberado=true</c> e o motivo no contexto
@@ -49,7 +54,7 @@ public sealed class GerenciarConversaAtendimentoUseCase(
             var motivoLimpo = string.IsNullOrWhiteSpace(motivo) ? null : motivo.Trim();
             ContextoConversaJson.Gravar(conversa, ContextoConversaJson.ForaDeAreaLiberado, true);
             ContextoConversaJson.Gravar(conversa, ContextoConversaJson.ForaDeAreaMotivo, motivoLimpo);
-            var texto = PrefixoLiberacaoForaDeArea + command.UsuarioId + (motivoLimpo is null ? "" : $": {motivoLimpo}");
+            var texto = PrefixoLiberacaoForaDeArea + command.QuemAgiu + (motivoLimpo is null ? "" : $": {motivoLimpo}");
             if (texto.Length > Mensagem.TextoTamanhoMaximo) texto = texto[..Mensagem.TextoTamanhoMaximo];
             return conversaRepository.AddMensagemAsync(
                 Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto, texto),

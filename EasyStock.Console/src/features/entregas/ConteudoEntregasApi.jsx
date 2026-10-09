@@ -4,8 +4,8 @@ import { Icone } from '../../componentes/Icone'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { useEntregasApi } from '../../aplicacao/useEntregasApi'
 import {
-  EMPRESAS_ENTREGADOR, TIPOS_ENTREGADOR, motivoDaAprovacao, motivoDeSaida, paineisDeEntregas, rotuloSituacaoViagem,
-  situacaoDaLista,
+  EMPRESAS_ENTREGADOR, TIPOS_ENTREGADOR, confirmacaoDaRecusa, motivoDaAprovacao, motivoDeSaida, paineisDeEntregas,
+  rotuloSituacaoViagem, situacaoDaLista,
 } from '../../dominio/entregasApi'
 import { roteiroDoDia } from '../../dominio/roteiroDoDia'
 import { CadastroEntregaApi } from './CadastroEntregaApi'
@@ -56,6 +56,8 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
   const prontosFora = roteiro ? p.prontos.filter((x) => !roteiro.ids.has(x.id)) : []
   const pedidoPorId = new Map(pedidos.map((x) => [x.id, x]))
   const opcoesEntregador = [{ valor: '', rotulo: 'Sem entregador' }, ...entregadores.map((e) => ({ valor: e.id, rotulo: e.nome }))]
+  // #1474 (R7): recusar cancela, estorna e avisa o cliente; confirma em linha antes.
+  const [recusando, setRecusando] = useState(null)
 
   return (
     <>
@@ -71,10 +73,22 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
                   <span className={css.apoio}>{motivoDaAprovacao(x.motivoRequerAprovacao)}</span>
                 </div>
                 <Endereco texto={x.endereco} />
-                <div className={css.linha}>
-                  <Botao variante="primario" disabled={ocupado} onClick={() => acoes.aprovar(x.id)}>Aprovar</Botao>
-                  <Botao variante="texto" disabled={ocupado} onClick={() => acoes.recusar(x.id)}>Recusar</Botao>
-                </div>
+                {recusando === x.id ? (
+                  <div role="alertdialog" aria-label={`Recusar o pedido ${x.numeroCurto}`}>
+                    <p>{confirmacaoDaRecusa(x.numeroCurto, x.clienteNome)}</p>
+                    <div className={css.linha}>
+                      <Botao variante="texto" disabled={ocupado} onClick={() => setRecusando(null)}>Manter</Botao>
+                      <Botao variante="primario" disabled={ocupado} onClick={() => { setRecusando(null); acoes.recusar(x.id) }}>
+                        Recusar e devolver
+                      </Botao>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={css.linha}>
+                    <Botao variante="primario" disabled={ocupado} onClick={() => acoes.aprovar(x.id)}>Aprovar</Botao>
+                    <Botao variante="texto" disabled={ocupado} onClick={() => setRecusando(x.id)}>Recusar</Botao>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

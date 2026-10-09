@@ -87,15 +87,16 @@ export function FilaCanhotos() {
   }
 
   // Fixa no canto de baixo, a gaveta cobria o botão principal da esteira e o
-  // "Abrir cardápio" da ficha. No arranjo de três colunas ela mora na linha
-  // de título da Ficha, que só tem a palavra "Ficha"; sem essa linha (ficha
-  // em gaveta, celular), volta para o canto.
-  const tituloDaFicha = typeof document === 'undefined'
+  // "Abrir cardápio" da ficha. #1474: na linha de título ela cobria o "Ficha" e o
+  // topo da coluna. No arranjo de três colunas ela mora no pé da Ficha, no fluxo
+  // da coluna (o lugar reservado em app/Moldura.jsx), sem cobrir nada; sem ele
+  // (ficha em gaveta, celular), volta para o canto.
+  const peDaFicha = typeof document === 'undefined'
     ? null
-    : document.querySelector('section[aria-label="Ficha"] > header')
+    : document.querySelector('[data-fila-canhotos]')
 
   const gaveta = fila.length > 0 && (
-    <output className={tituloDaFicha ? css.gavetaNoTitulo : css.gavetaCanhoto} aria-live="polite">
+    <output className={peDaFicha ? css.gavetaNoPe : css.gavetaCanhoto} aria-live="polite">
       <span className={css.gavetaTexto}>
         <Icone nome="printer" tamanho={20} />
         <span className={css.gavetaLabel}>
@@ -110,7 +111,7 @@ export function FilaCanhotos() {
 
   return (
     <>
-      {gaveta && tituloDaFicha ? createPortal(gaveta, tituloDaFicha) : gaveta}
+      {gaveta && peDaFicha ? createPortal(gaveta, peDaFicha) : gaveta}
 
       {/* Portal de impressão do topo da fila, sempre montado enquanto ela
           existir: é o que deixa o botão "Imprimir" da gaveta sair sem abrir

@@ -3,9 +3,9 @@ import {
   DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, useDroppable, useSensor, useSensors,
 } from '@dnd-kit/core'
 import { useRelogio } from '../../hooks/useRelogio'
-import { horaCurta } from '../../dominio/formato'
+import { dataIsoNoFuso, horaCurta } from '../../dominio/formato'
 import {
-  COLUNAS_KDS, canhotoDoKds, filtrarPorLinha, impressoesDaCozinha, respostaAoSoltarKds,
+  COLUNAS_KDS, canhotoDoKds, filtrarPorLinha, impressoesDaCozinha, respostaAoSoltarKds, textoDaCozinhaVazia,
 } from '../../dominio/kds'
 import { ORDEM_DAS_LINHAS } from '../../dominio/pedido'
 import { pdfDoCanhoto } from '../../dominio/impressao'
@@ -30,6 +30,7 @@ import css from './cozinha.module.css'
 // A cozinha da demonstração (`TelaCozinha`, espelho do Balcão) segue intacta.
 const ABERTURA = Date.now()
 const MS_DA_RECUSA = 6000
+const UM_DIA_MS = 86400000
 
 const reduzMovimento = () => typeof window !== 'undefined'
   && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -57,10 +58,14 @@ const INSTRUCOES = {
 
 export function TelaCozinhaApi({ linhas }) {
   const agora = useRelogio(ABERTURA, undefined, { real: true })
+  // #1474: o pedido pago para amanhã não aparecia em lugar nenhum. Hoje ou Amanhã, como em
+  // Entregas do dia; a API recebe a data só quando não é hoje.
+  const [amanha, setAmanha] = useState(false)
+  const dataDaFila = amanha ? dataIsoNoFuso(agora + UM_DIA_MS) : null
   const {
     pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes,
     avancar, reimprimir, confirmarImpressao, avisar, limparErro,
-  } = useCozinhaApi()
+  } = useCozinhaApi({ data: dataDaFila })
   const [linhaFiltro, setLinhaFiltro] = useState(null)
   const [abertoId, setAbertoId] = useState(null)
   const [arrastadoId, setArrastadoId] = useState(null)
@@ -145,6 +150,10 @@ export function TelaCozinhaApi({ linhas }) {
           >
             <div className={css.conteudo}>
               <div className={css.filtros}>
+                <div className={css.chipsFiltro} role="radiogroup" aria-label="Dia da fila">
+                  <Chip papel="escolha" reservarIcone ativo={!amanha} onClick={() => setAmanha(false)}>Hoje</Chip>
+                  <Chip papel="escolha" reservarIcone ativo={amanha} onClick={() => setAmanha(true)}>Amanhã</Chip>
+                </div>
                 <div className={css.chipsFiltro} role="radiogroup" aria-label="Filtrar por linha de produto">
                   <Chip papel="escolha" ativo={linhaFiltro === null} onClick={() => setLinhaFiltro(null)}>
                     Todas as linhas
@@ -164,7 +173,7 @@ export function TelaCozinhaApi({ linhas }) {
                 )}
               </div>
               {vazia && (
-                <p className={css.cozinhaEmDia}>Cozinha em dia. O pedido pago aparece aqui sozinho.</p>
+                <p className={css.cozinhaEmDia}>{textoDaCozinhaVazia({ amanha })}</p>
               )}
               <div className={css.colunas}>
                 {COLUNAS_KDS.map((coluna) => {
@@ -181,7 +190,8 @@ export function TelaCozinhaApi({ linhas }) {
                         <span key={cartoes.length} className={`${css.contagem} ${css.contagemPula}`}>{cartoes.length}</span>
                       </h2>
                       <ul className={css.listaColuna}>
-                        {cartoes.length === 0 && saindoDaqui.length === 0 && (
+                        {/* #1474: com a fila toda vazia o aviso do topo basta; não repete em cada coluna. */}
+                        {!vazia && cartoes.length === 0 && saindoDaqui.length === 0 && (
                           <li><Vazio titulo="Nenhum pedido">Os cartões aparecem aqui conforme o pedido avança.</Vazio></li>
                         )}
                         {cartoes.map((p) => (

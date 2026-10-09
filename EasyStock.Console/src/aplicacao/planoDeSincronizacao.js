@@ -28,6 +28,19 @@ export function deveRelerPedido(resumo, guardado, { selecionadaId = null, cicloL
   return resumo.id === selecionadaId || guardado.ultima !== resumo.ultimaMensagemEm || cicloLento
 }
 
+// Dossiê do cliente (#1276, #1474): a Ficha lê telefone, tags e notas do cadastro. Vale para a
+// conversa aberta por clique e para a que a carga restaurou ou escolheu sozinha.
+export const deveCarregarDossie = (conversa) => Boolean(conversa?.clienteId && !conversa.cliente?.daApi)
+
+// Aviso da faixa quando o cardápio da vitrine não vem (#1474): a vitrine desligada é um 404
+// com texto técnico; a dona precisa saber o que ligar.
+export function avisoDoCardapio(erro) {
+  if (erro?.status === 404 && /vitrine ativa/i.test(erro.message ?? '')) {
+    return 'A loja online está desligada: o cardápio não carrega até ligar a vitrine.'
+  }
+  return `Cardápio: ${erro?.message ?? 'não carregou.'}`
+}
+
 // #1241: só falta de rede vira queda de conexão (faixa do papel). Erro do EasyStok (500,
 // 403...) é outro aviso: a internet está lá, o canhoto não precisa assumir.
 export const quedaDaSincronizacao = (erro) => erro?.codigo === 'SEM_CONEXAO'
