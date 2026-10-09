@@ -21,6 +21,9 @@ const porQue = (p) => [
 
 export function AbaPlanejamentoApi() {
   const [ate, setAte] = useState('')
+  // #1510: a data que busca é só a que ela escolhe; a que vem da resposta só preenche o campo
+  // (antes disparava uma 2ª busca que apagava as porções já editadas).
+  const [consulta, setConsulta] = useState('')
   const [carga, setCarga] = useState({ estado: 'carregando', erro: null })
   const [linhas, setLinhas] = useState([])
   const [plano, setPlano] = useState(null)
@@ -29,19 +32,23 @@ export function AbaPlanejamentoApi() {
 
   useEffect(() => {
     let vivo = true
-    lerSugestao(ate || null)
+    lerSugestao(consulta || null)
       .then((r) => {
         if (!vivo) return
-        if (!ate && r.ate) setAte(r.ate)
+        if (r.ate) setAte((atual) => atual || r.ate)
         setLinhas(r.pratos.map((p) => ({ ...p, porcoes: String(p.sugestao) })))
         setPlano(null)
         setCarga({ estado: 'ok', erro: null })
       })
       .catch((e) => { if (vivo) setCarga({ estado: 'erro', erro: e.message }) })
     return () => { vivo = false }
-  }, [ate])
+  }, [consulta])
 
-  const mudar = (sku) => (e) => setLinhas((atual) => atual.map((l) => (l.sku === sku ? { ...l, porcoes: e.target.value } : l)))
+  // #1510: porção mudada invalida o cálculo; a lista de compras não sai com faltas antigas.
+  const mudar = (sku) => (e) => {
+    setLinhas((atual) => atual.map((l) => (l.sku === sku ? { ...l, porcoes: e.target.value } : l)))
+    setPlano(null)
+  }
 
   async function calcular() {
     const erro = erroDasPorcoes(linhas)
@@ -81,7 +88,7 @@ export function AbaPlanejamentoApi() {
       </p>
       <label className={css.topo}>
         <span className={css.nome}>Pedidos até</span>
-        <input className={css.busca} type="date" aria-label="Pedidos até" value={ate} onChange={(e) => setAte(e.target.value)} />
+        <input className={css.busca} type="date" aria-label="Pedidos até" value={ate} onChange={(e) => { setAte(e.target.value); setConsulta(e.target.value) }} />
       </label>
       {aviso && <p className={css.aviso} role="alert">{aviso} <Botao variante="texto" onClick={() => setAviso(null)}>Fechar</Botao></p>}
 
