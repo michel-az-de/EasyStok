@@ -53,17 +53,9 @@ public sealed class InsumosDaProducaoUseCase(
             CategoriaInsumos, "Insumos da produção (criada pelo console)");
         var r = await cadastrarProduto.ExecuteAsync(new CadastrarProdutoCommand(
             empresaId, categoriaId, null, dados.Nome.Trim(), null, null, TipoProduto.Alimento,
-            null, null, true, null, dados.Custo, null, null, null, null, null, null, null, usuarioId));
-
-        var produto = await produtoRepository.GetByIdAsync(empresaId, r.ProdutoId)
-            ?? throw new UseCaseValidationException("Insumo não encontrado depois de criar.");
-        produto.EhInsumo = true;
-        produto.UnidadeMedidaBase = dados.Unidade ?? UnidadeMedida.Un;
-        produto.QuantidadeMinima = dados.Minimo;
-        produto.AlteradoEm = DateTime.UtcNow;
-        await produtoRepository.UpdateAsync(produto);
-        await unitOfWork.CommitAsync();
-        return produto.Id;
+            null, null, true, null, dados.Custo, null, null, null, null, null, null, null, usuarioId,
+            EhInsumo: true, UnidadeMedidaBase: dados.Unidade ?? UnidadeMedida.Un, QuantidadeMinima: dados.Minimo));
+        return r.ProdutoId;
     }
 
     /// <summary>Ajusta mínimo e custo (null = não mexe). Só insumo da empresa.</summary>
@@ -71,8 +63,8 @@ public sealed class InsumosDaProducaoUseCase(
     {
         UseCaseGuards.EnsureEmpresaId(empresaId);
         Validar(dados);
-        var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId);
-        if (produto is null || !produto.EhInsumo) throw new UseCaseValidationException("Insumo não encontrado.");
+        var produto = await produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId);
+        if (produto is null || produto.EmpresaId != empresaId || !produto.EhInsumo) throw new UseCaseValidationException("Insumo não encontrado.");
 
         if (dados.Minimo.HasValue) produto.QuantidadeMinima = dados.Minimo;
         if (dados.Custo.HasValue) produto.CustoReferencia = Dinheiro.FromDecimal(dados.Custo.Value);

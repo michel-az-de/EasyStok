@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Pilula } from '../../../componentes/Pilula'
 import { useReceitasApi } from '../../../aplicacao/useReceitasApi'
+import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { lerReceita, UNIDADES_RECEITA } from '../../../aplicacao/receitas'
 import { lerInsumos } from '../../../aplicacao/insumos'
 import { moeda } from '../../../dominio/formato'
@@ -15,26 +16,44 @@ const custoPor = (r) => (r.custoPorRendimento == null
   ? (r.linhas === 0 ? 'sem receita' : 'custo incompleto (insumo sem custo)')
   : `${moeda(r.custoPorRendimento)} por ${r.unidadeRendimento === 'Un' ? 'porção' : r.unidadeRendimento}`)
 
-function EditorReceita({ prato, aoSalvar, aoFechar }) {
+function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar }) {
   const [detalhe, setDetalhe] = useState(null)
   const [insumos, setInsumos] = useState([])
   const [rendimento, setRendimento] = useState('')
   const [linhas, setLinhas] = useState([])
   const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState(null)
 
   useEffect(() => {
     let vivo = true
-    Promise.all([lerReceita(prato.produtoId), lerInsumos().catch(() => [])]).then(([d, i]) => {
+    Promise.all([lerReceita(prato.produtoId), podeEditar ? lerInsumos().catch(() => []) : []]).then(([d, i]) => {
       if (!vivo) return
       setDetalhe(d)
       setInsumos(i)
       setRendimento(String(d.rendimento))
       setLinhas(d.linhas.map((l) => ({ ...l, quantidade: String(l.quantidade) })))
-    })
+    }).catch((e) => { if (vivo) setErro(e.message) })
     return () => { vivo = false }
-  }, [prato.produtoId])
+  }, [prato.produtoId, podeEditar])
+
+  if (erro) return <div role="alert"><p>Não consegui ler a receita: {erro}</p><Botao onClick={aoFechar}>Fechar</Botao></div>
 
   if (!detalhe) return <p className={css.descricao}>Carregando a receita…</p>
+
+  if (!podeEditar) return (
+    <section className={css.aba} aria-label={`Receita de ${prato.nome}`}>
+      <p className={css.nome}>Rende {detalhe.rendimento} {detalhe.unidadeRendimento === 'Un' ? 'porções' : detalhe.unidadeRendimento}</p>
+      {detalhe.linhas.length === 0 ? <p className={css.descricao}>Receita ainda sem insumos cadastrados.</p> : (
+        <ul className={css.lista}>
+          {detalhe.linhas.map((l) => <li key={l.insumoId} className={css.linha}>
+            <span className={css.nome}>{l.insumo}</span>
+            <span>{l.quantidade} {l.unidade}</span>
+          </li>)}
+        </ul>
+      )}
+      <Botao variante="texto" onClick={aoFechar}>Fechar receita</Botao>
+    </section>
+  )
 
   const mudar = (i, campo) => (e) => setLinhas((atual) => atual.map((l, j) => (j === i ? { ...l, [campo]: e.target.value } : l)))
   const salvar = (evento) => {
@@ -80,6 +99,8 @@ function EditorReceita({ prato, aoSalvar, aoFechar }) {
 }
 
 export function AbaReceitasApi() {
+  const { acoes } = useAcessoModulos()
+  const podeEditar = acoes.editarProducao === true
   const gestao = useReceitasApi()
   const [editando, setEditando] = useState(null)
 
@@ -99,6 +120,7 @@ export function AbaReceitasApi() {
         A receita de cada prato: quanto rende e os insumos. O custo por porção usa o custo dos insumos. Prato aparece
         aqui depois da primeira produção (é ela que liga o prato ao estoque).
       </p>
+      {!podeEditar && <p className={css.descricao}>Você pode consultar as receitas. A edição e a baixa automática ficam com a dona ou gerente.</p>}
       {gestao.aviso && (
         <p className={css.aviso} role="alert">
           {gestao.aviso} <Botao variante="texto" onClick={gestao.fecharAviso}>Fechar</Botao>
@@ -122,16 +144,16 @@ export function AbaReceitasApi() {
               </div>
               <div className={css.acoes}>
                 <Botao variante="texto" onClick={() => setEditando(editando === r.produtoId ? null : r.produtoId)}>
-                  {r.linhas === 0 ? 'Montar receita' : 'Editar receita'}
+                  {!podeEditar ? 'Ver receita' : r.linhas === 0 ? 'Montar receita' : 'Editar receita'}
                 </Botao>
-                {r.linhas > 0 && (
+                {podeEditar && r.linhas > 0 && (
                   <Botao variante="texto" onClick={() => gestao.marcarBaixa(r.produtoId, !r.baixaAutomatica)}>
                     {r.baixaAutomatica ? 'Parar de baixar insumos' : 'Baixar insumos ao produzir'}
                   </Botao>
                 )}
               </div>
               {editando === r.produtoId && (
-                <EditorReceita prato={r} aoSalvar={gestao.salvar} aoFechar={() => setEditando(null)} />
+                <EditorReceita prato={r} aoSalvar={gestao.salvar} aoFechar={() => setEditando(null)} podeEditar={podeEditar} />
               )}
             </li>
           ))}

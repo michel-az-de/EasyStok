@@ -2,17 +2,17 @@ import { useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Pilula } from '../../../componentes/Pilula'
 import { useInsumosApi } from '../../../aplicacao/useInsumosApi'
+import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { UNIDADES_INSUMO } from '../../../aplicacao/insumos'
 import { moeda } from '../../../dominio/formato'
 import css from '../cardapio/abaCardapio.module.css'
 
 // M2 › Insumos (M2.3, #1496). O intermediário (molho, recheio, massa laminada) e a embalagem, com o
 // saldo, o mínimo e em quantas receitas entra. Abaixo do mínimo aparece em "Comprar". Farinha e ovo
-// ficam fora (US-067). Cadastrar e ajustar são do Gerente: para outro perfil o EasyStok recusa e a
-// faixa avisa.
+// ficam fora (US-067). A Cozinha consulta; cadastrar e ajustar exigem a capacidade da sessão.
 const formatar = (n) => (Number.isInteger(n) ? String(n) : n.toLocaleString('pt-BR', { maximumFractionDigits: 2 }))
 
-function LinhaInsumo({ insumo, gestao }) {
+function LinhaInsumo({ insumo, gestao, podeEditar }) {
   const [editando, setEditando] = useState(false)
   const [minimo, setMinimo] = useState(insumo.minimo ?? '')
   const [custo, setCusto] = useState(insumo.custo ?? '')
@@ -36,7 +36,7 @@ function LinhaInsumo({ insumo, gestao }) {
         {insumo.comprar && <Pilula tom="aviso" fina>Abaixo do mínimo ({insumo.minimo} {insumo.unidade})</Pilula>}
         {!insumo.comprar && insumo.minimo != null && <Pilula tom="neutro" fina>Mínimo {insumo.minimo} {insumo.unidade}</Pilula>}
       </div>
-      {editando ? (
+      {podeEditar && (editando ? (
         <form className={css.topo} onSubmit={salvar}>
           <input className={css.busca} inputMode="numeric" aria-label={`Mínimo de ${insumo.nome}`} placeholder={`Mínimo (${insumo.unidade})`} value={minimo} onChange={(e) => setMinimo(e.target.value)} />
           <input className={css.busca} inputMode="decimal" aria-label={`Custo de ${insumo.nome}`} placeholder={`Custo por ${insumo.unidade}`} value={custo} onChange={(e) => setCusto(e.target.value)} />
@@ -47,12 +47,14 @@ function LinhaInsumo({ insumo, gestao }) {
         <div className={css.acoes}>
           <Botao variante="texto" onClick={() => setEditando(true)}>Ajustar</Botao>
         </div>
-      )}
+      ))}
     </li>
   )
 }
 
 export function AbaInsumosApi() {
+  const { acoes } = useAcessoModulos()
+  const podeEditar = acoes.editarProducao === true
   const gestao = useInsumosApi()
   const [novo, setNovo] = useState({ nome: '', unidade: 'G', minimo: '', custo: '' })
 
@@ -91,15 +93,15 @@ export function AbaInsumosApi() {
       <section aria-labelledby="insumos-lista">
         <h3 id="insumos-lista" className={css.nome}>Insumos</h3>
         {gestao.insumos.length === 0 ? (
-          <p className={css.descricao}>Nenhum insumo cadastrado. Cadastre o molho, o recheio ou a embalagem abaixo.</p>
+          <p className={css.descricao}>Nenhum insumo cadastrado.{podeEditar && ' Cadastre o molho, o recheio ou a embalagem abaixo.'}</p>
         ) : (
           <ul className={css.lista}>
-            {gestao.insumos.map((i) => <LinhaInsumo key={i.id} insumo={i} gestao={gestao} />)}
+            {gestao.insumos.map((i) => <LinhaInsumo key={i.id} insumo={i} gestao={gestao} podeEditar={podeEditar} />)}
           </ul>
         )}
       </section>
 
-      <form className={css.topo} onSubmit={cadastrar} aria-label="Cadastrar insumo">
+      {podeEditar ? <form className={css.topo} onSubmit={cadastrar} aria-label="Cadastrar insumo">
         <input className={css.busca} aria-label="Nome do insumo" placeholder="Novo insumo (ex.: molho sugo)" maxLength={180} value={novo.nome} onChange={mudarNovo('nome')} />
         <select className={css.busca} aria-label="Unidade" value={novo.unidade} onChange={mudarNovo('unidade')}>
           {UNIDADES_INSUMO.map((u) => <option key={u} value={u}>{u}</option>)}
@@ -107,7 +109,7 @@ export function AbaInsumosApi() {
         <input className={css.busca} inputMode="numeric" aria-label="Mínimo" placeholder="Mínimo" value={novo.minimo} onChange={mudarNovo('minimo')} />
         <input className={css.busca} inputMode="decimal" aria-label="Custo por unidade" placeholder="Custo por unidade" value={novo.custo} onChange={mudarNovo('custo')} />
         <Botao tipo="submit" variante="primario" disabled={!novo.nome.trim()}>Cadastrar insumo</Botao>
-      </form>
+      </form> : <p className={css.descricao}>Você pode consultar os insumos. O cadastro e os ajustes ficam com a dona ou gerente.</p>}
     </div>
   )
 }

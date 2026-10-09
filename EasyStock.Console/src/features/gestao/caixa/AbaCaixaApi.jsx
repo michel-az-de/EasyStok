@@ -9,6 +9,7 @@ import { Chip } from '../../../componentes/Chip'
 import { Pilula } from '../../../componentes/Pilula'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
 import { useCaixaDoDiaApi } from '../../../aplicacao/useCaixaDoDiaApi'
+import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import {
   diaMes, observacaoDaAbertura, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
 } from '../../../dominio/aberturaDaLoja'
@@ -150,13 +151,13 @@ function FormLancamento({ executar, enviando }) {
   )
 }
 
-function Lancamentos({ dia, executar }) {
+function Lancamentos({ dia, executar, podeGerenciar }) {
   const { agora } = useAtendimento()
   const { estornarMovimentoCaixa } = useAcoes()
   const [estornando, setEstornando] = useState(null)
   // #1474: movimentos e pagamentos numa lista só, na ordem da hora.
   const lancamentos = lancamentosEmOrdem(dia)
-  const podeEstornar = (m) => !dia.fechado && !m.estornadoEm && (m.tipo === TIPOS_MOVIMENTO.ENTRADA || m.tipo === TIPOS_MOVIMENTO.SAIDA)
+  const podeEstornar = (m) => podeGerenciar && !dia.fechado && !m.estornadoEm && (m.tipo === TIPOS_MOVIMENTO.ENTRADA || m.tipo === TIPOS_MOVIMENTO.SAIDA)
 
   if (lancamentos.length === 0) return null
   return (
@@ -173,7 +174,7 @@ function Lancamentos({ dia, executar }) {
               <span className={css.linhaValor}>+ {moeda(m.valor)}</span>
             </li>
           )
-          : estornando === m.id
+          : estornando === m.id && podeEstornar(m)
           ? (
             <li key={m.id}>
               <PromptEstorno
@@ -233,6 +234,8 @@ function UltimosFechamentos({ fechamentos }) {
 }
 
 export function AbaCaixaApi() {
+  const { acoes } = useAcessoModulos()
+  const podeGerenciar = acoes.gerenciarCaixa === true
   const { agora } = useAtendimento()
   const { fecharCaixa } = useAcoes()
   const caixa = useCaixaDoDiaApi({ fechamentos: 7 })
@@ -251,11 +254,13 @@ export function AbaCaixaApi() {
 
   const { dia, fechamentos } = caixa
   const erro = acao.erro && <p className={css.avisoFechado} role="alert">{acao.erro}</p>
+  const avisoDePermissao = !podeGerenciar && <p className={css.corpoBloco}>O fechamento e o estorno de lançamentos ficam com a dona ou gerente.</p>
 
   if (!dia.aberto && !dia.fechado) {
     return (
       <div className={css.painel}>
         <AbrirCaixa dia={dia} ultimo={fechamentos[0] ?? null} executar={executar} enviando={acao.enviando} />
+        {avisoDePermissao}
         {erro}
         <UltimosFechamentos fechamentos={fechamentos} />
       </div>
@@ -276,7 +281,7 @@ export function AbaCaixaApi() {
 
       {dia.esquecidoAberto && (
         <p className={css.avisoFechado}>
-          Este caixa ficou aberto desde {diaMes(dia.abertoDesde)}. Feche aquele dia (conferindo a gaveta) para abrir o de hoje.
+          Este caixa ficou aberto desde {diaMes(dia.abertoDesde)}. {podeGerenciar ? 'Feche aquele dia (conferindo a gaveta) para abrir o de hoje.' : 'Peça à dona ou gerente para fechar aquele dia antes de abrir o de hoje.'}
         </p>
       )}
       {dia.fechado && dia.fechamento && (
@@ -297,7 +302,7 @@ export function AbaCaixaApi() {
         <div><dt>{dia.fechado ? 'Total do dia' : 'Total esperado do dia'}</dt><dd>{moeda(dia.saldoEsperado)}</dd></div>
       </dl>
 
-      {dia.aberto && !dia.fechado && (
+      {podeGerenciar && dia.aberto && !dia.fechado && (
         <div className={css.acoesTopo}>
           <Botao variante="secundario" icone="log-out" onClick={() => setFecharAberto(true)}>
             {dia.esquecidoAberto ? `Fechar o caixa de ${diaMes(dia.abertoDesde)}` : 'Fechar o caixa'}
@@ -305,13 +310,14 @@ export function AbaCaixaApi() {
         </div>
       )}
       {erro}
+      {avisoDePermissao}
 
       {dia.aberto && !dia.fechado && !dia.esquecidoAberto && <FormLancamento executar={executar} enviando={acao.enviando} />}
 
-      <Lancamentos dia={dia} executar={executar} />
+      <Lancamentos dia={dia} executar={executar} podeGerenciar={podeGerenciar} />
       <UltimosFechamentos fechamentos={fechamentos} />
 
-      {fecharAberto && (
+      {podeGerenciar && fecharAberto && (
         <ModalFecharCaixa
           resumo={dia}
           gaveta={gaveta}

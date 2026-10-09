@@ -7,6 +7,29 @@ namespace EasyStock.Application.Tests.UseCases;
 
 public class CadastrarProdutoUseCaseTests
 {
+    [Theory]
+    [InlineData(false, StatusProduto.Inativo)]
+    [InlineData(true, StatusProduto.Ativo)]
+    public async Task SemPrecoDeVenda_SomenteInsumoNasceAtivo(bool insumo, StatusProduto esperado)
+    {
+        var produtos = Substitute.For<IProdutoRepository>();
+        var categorias = Substitute.For<ICategoriaRepository>();
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        categorias.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Teste" });
+        var sut = new CadastrarProdutoUseCase(produtos, categorias, Substitute.For<IProdutoCaracteristicaRepository>(),
+            Substitute.For<IProdutoEmbalagemRepository>(), Substitute.For<IProdutoVariacaoRepository>(),
+            new FakeUnitOfWork(), Substitute.For<ILogger<CadastrarProdutoUseCase>>());
+
+        await sut.ExecuteAsync(new CadastrarProdutoCommand(
+            empresaId, categoriaId, null, "Molho", null, null, TipoProduto.Alimento,
+            null, null, true, null, 0.02m, null, null, null, null, null, null, null,
+            EhInsumo: insumo));
+
+        await produtos.Received(1).InsertAsync(Arg.Is<Produto>(p => p.Status == esperado
+            && p.EhInsumo == insumo && p.PrecoReferencia == null));
+    }
+
     [Fact]
     public async Task Deve_cadastrar_produto_com_variacoes_caracteristicas_e_embalagens()
     {

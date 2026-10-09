@@ -12,6 +12,7 @@ using EasyStock.Application.UseCases.ObterUsuarioAtual;
 using EasyStock.Application.UseCases.RefreshToken;
 using EasyStock.Application.UseCases.ResetarSenha;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
@@ -180,6 +181,40 @@ public class AuthControllerTests
         await _refreshTokenRepository.Received(1).RevogarSessoesAtivasAsync(usuario.Id, Arg.Any<DateTime>());
         await _usuarioRepository.DidNotReceiveWithAnyArgs().AtualizarSessoesValidasDesdeAsync(default, default);
         usuario.SessoesValidasDesde.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(NivelAcesso.Admin, Modulo.Producao, true, true, false, false)]
+    [InlineData(NivelAcesso.Gerente, Modulo.Producao, true, true, false, false)]
+    [InlineData(NivelAcesso.SuperAdmin, Modulo.Producao, true, true, false, false)]
+    [InlineData(NivelAcesso.Operador, Modulo.Producao, true, false, false, false)]
+    [InlineData(NivelAcesso.Visualizador, Modulo.Producao, true, false, false, false)]
+    [InlineData(NivelAcesso.Admin, Modulo.Producao, false, false, false, false)]
+    [InlineData(NivelAcesso.Gerente, Modulo.Caixa, true, false, true, false)]
+    [InlineData(NivelAcesso.Operador, Modulo.Caixa, true, false, false, false)]
+    [InlineData(NivelAcesso.Gerente, Modulo.Cardapio, true, false, false, true)]
+    [InlineData(NivelAcesso.Operador, Modulo.Cardapio, true, false, false, false)]
+    public void CapacidadesDeEdicaoExigemNivelEmpresaEModulo(
+        NivelAcesso nivel, Modulo modulo, bool comEmpresa, bool producao, bool caixa, bool cardapio)
+    {
+        UsarContextoHttp();
+        _controller.HttpContext.User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+        [
+            new("nivel", nivel.ToString()),
+            new("empresaId", (comEmpresa ? Guid.NewGuid() : Guid.Empty).ToString()),
+            new("permissao", EasyStock.Domain.Services.AcessoModulos.PermissaoDe(modulo).ToString()),
+            new("permissoesExplicitas", "true")
+        ], "test"));
+        var usuario = new EasyStock.Api.Services.CurrentUserAccessor(
+            new Microsoft.AspNetCore.Http.HttpContextAccessor { HttpContext = _controller.HttpContext });
+
+        var resposta = (Microsoft.AspNetCore.Mvc.OkObjectResult)_controller.GetModulos(usuario);
+        var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
+
+        acoes.GetProperty("editarProducao").GetBoolean().Should().Be(producao);
+        acoes.GetProperty("gerenciarCaixa").GetBoolean().Should().Be(caixa);
+        acoes.GetProperty("editarCardapio").GetBoolean().Should().Be(cardapio);
     }
 
     // ── N8: esqueci a senha ───────────────────────────────────────────────────────────────────

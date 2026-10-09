@@ -4,6 +4,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
     {
         Task<Produto?> GetByIdAsync(Guid id);
         Task<Produto?> GetByIdAsync(Guid empresaId, Guid id);
+        Task<Produto?> GetByIdParaAtualizarAsync(Guid empresaId, Guid id);
         Task<Produto?> GetDetalheAsync(Guid empresaId, Guid id);
         Task<bool> ExistsSkuBaseAsync(Guid empresaId, string skuBase, Guid? ignoreProdutoId = null);
         Task<bool> ExistsCodigoBarrasAsync(Guid empresaId, string codigoBarras, Guid? ignoreProdutoId = null);

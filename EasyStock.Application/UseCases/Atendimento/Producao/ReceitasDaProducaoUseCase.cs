@@ -70,8 +70,9 @@ public sealed class ReceitasDaProducaoUseCase(
     public async Task MarcarBaixaAutomaticaAsync(Guid empresaId, Guid produtoId, bool ligada, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(empresaId);
-        var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
+        var produto = await produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId)
             ?? throw new UseCaseValidationException("Prato não encontrado.");
+        if (produto.EmpresaId != empresaId) throw new UseCaseValidationException("Prato não encontrado.");
         if (ligada && (await composicaoRepository.GetByProdutoFinalAsync(empresaId, produtoId, null, ct)).Count == 0)
             throw new UseCaseValidationException("Monte a receita antes de ligar a baixa automática.");
 

@@ -34,6 +34,9 @@ foreach($nome in @('Dona','Atendimento','Cozinha')) {
     Conferir (($liberados -join ',') -eq ($esperados[$nome] -join ',')) "$nome recebe somente seus módulos"
     $porta=if($nome -eq 'Dona'){$null}else{$nome.ToLowerInvariant()}
     Conferir ($acesso.portaDeEntrada -eq $porta) "$nome recebe sua porta de entrada"
+    foreach($acao in @('editarCardapio','editarProducao','gerenciarCaixa')) {
+        Conferir ($acesso.acoes.$acao -eq ($nome -eq 'Dona')) "$nome recebe a capacidade $acao correta"
+    }
     foreach($caso in @(
         @('/api/kds/pedidos',200), @('/api/impressao/pendentes',200),
         @('/api/atendimento/comanda/cardapio',200),
@@ -50,6 +53,11 @@ foreach($nome in @('Dona','Atendimento','Cozinha')) {
     }
     if($nome -ne 'Dona') {
         Conferir ((Request POST '/api/caixa/fechar' $sessao.token @{}).StatusCode -eq 403) "$nome não fecha o caixa"
+        Conferir ((Request POST '/api/caixa/movimentos/00000000-0000-0000-0000-000000000001/estornar' $sessao.token @{}).StatusCode -eq 403) "$nome não estorna lançamento"
+        Conferir ((Request POST '/api/atendimento/producao/insumos' $sessao.token @{nome='Nao deve gravar'}).StatusCode -eq 403) "$nome não cadastra insumo"
+        Conferir ((Request PUT '/api/atendimento/producao/insumos/00000000-0000-0000-0000-000000000001' $sessao.token @{}).StatusCode -eq 403) "$nome não edita insumo"
+        Conferir ((Request PUT '/api/atendimento/producao/receitas/00000000-0000-0000-0000-000000000001/baixa-automatica' $sessao.token @{ligada=$true}).StatusCode -eq 403) "$nome não altera baixa automática"
+        Conferir ((Request PUT '/api/produtos/00000000-0000-0000-0000-000000000001/composicao' $sessao.token @{}).StatusCode -eq 403) "$nome não edita receita"
         Conferir ((Request POST '/api/atendimento/comanda/cardapio/secoes' $sessao.token @{nome='Nao deve gravar'}).StatusCode -eq 403) "$nome não edita categorias"
     }
     $refresh=Request POST '/api/auth/refresh' $null @{refreshToken=$sessao.refreshToken}

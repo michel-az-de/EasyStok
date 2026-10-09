@@ -330,14 +330,16 @@ public class AuthController(
             liberado = usuario.EmpresaId != Guid.Empty && usuario.TemPermissao(Domain.Services.AcessoModulos.PermissaoDe(m))
         }).ToArray();
         var inicial = User.FindFirst("moduloInicial")?.Value;
+        var gerente = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin or NivelAcesso.Gerente;
         return DataOk(new
         {
             modulos,
             portaDeEntrada = modulos.Any(m => m.id == inicial && m.liberado) ? inicial : null,
             acoes = new
             {
-                editarCardapio = modulos.Any(m => m.id == "cardapio" && m.liberado)
-                    && usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin or NivelAcesso.Gerente
+                editarCardapio = gerente && modulos.Any(m => m.id == "cardapio" && m.liberado),
+                editarProducao = gerente && modulos.Any(m => m.id == "producao" && m.liberado),
+                gerenciarCaixa = gerente && modulos.Any(m => m.id == "financeiro" && m.liberado)
             }
         });
     }

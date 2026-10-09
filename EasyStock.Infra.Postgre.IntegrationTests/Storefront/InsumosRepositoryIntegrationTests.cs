@@ -3,6 +3,14 @@ using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using EasyStock.Application.DependencyInjection;
+using EasyStock.Application.Ports.Output;
+using EasyStock.Application.UseCases.Atendimento.Producao;
+using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Storefront;
 
@@ -13,6 +21,72 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Storefront;
 [Collection("PostgreSqlTestCollection")]
 public sealed class InsumosRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture)
 {
+    [SkippableFact]
+    public async Task CadastroReal_PersisteInsumoCompleto_EPermiteConsultarEAjustar()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        Guid empresaId;
+        await using (var seed = fixture.CreateDbContext())
+        {
+            var empresa = Empresa.Criar($"Insumos {Guid.NewGuid():N}", null);
+            empresaId = empresa.Id;
+            seed.SetMobileTenantContext(empresaId);
+            seed.Empresas.Add(empresa);
+            await seed.SaveChangesAsync();
+        }
+        var config = new ConfigurationBuilder().Build();
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(config);
+        services.AddLogging();
+        services.AddHttpContextAccessor();
+        services.AddSingleton(Substitute.For<ICurrentUserAccessor>());
+        services.AddMemoryCache();
+        services.AddSingleton(Substitute.For<ICacheService>());
+        services.AddEasyStockPostgreInfrastructure(fixture.ConnectionString, config);
+        services.AddEasyStockApplication();
+        await using var provider = services.BuildServiceProvider();
+        Guid id;
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().SetMobileTenantContext(empresaId);
+            var sut = scope.ServiceProvider.GetRequiredService<InsumosDaProducaoUseCase>();
+            id = await sut.CriarAsync(empresaId, Guid.Empty, new InsumoInput("Molho de teste", UnidadeMedida.G, 100, 0.02m));
+            var lista = await sut.ListarAsync(empresaId);
+            lista.Should().ContainSingle(i => i.ProdutoId == id && i.Unidade == UnidadeMedida.G
+                && i.Minimo == 100 && i.Custo == 0.02m && i.AbaixoDoMinimo);
+        }
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().SetMobileTenantContext(empresaId);
+            await scope.ServiceProvider.GetRequiredService<InsumosDaProducaoUseCase>()
+                .AtualizarAsync(empresaId, id, new InsumoInput(null, null, 200, 0.03m));
+        }
+        await using var verificar = fixture.CreateDbContext();
+        verificar.SetMobileTenantContext(empresaId);
+        var produto = await verificar.Produtos.SingleAsync(p => p.EmpresaId == empresaId);
+        produto.Id.Should().Be(id);
+        produto.EhInsumo.Should().BeTrue();
+        produto.Status.Should().Be(StatusProduto.Ativo);
+        produto.PrecoReferencia.Should().BeNull();
+        produto.QuantidadeMinima.Should().Be(200);
+        produto.CustoReferencia!.Valor.Should().Be(0.03m);
+
+        // Edição não pode perder isolamento nem sobrescrever uma versão concorrente.
+        var repo = new ProdutoRepository(verificar);
+        (await repo.GetByIdParaAtualizarAsync(Guid.NewGuid(), id)).Should().BeNull();
+        await using var concorrente = fixture.CreateDbContext();
+        concorrente.SetMobileTenantContext(empresaId);
+        var repoConcorrente = new ProdutoRepository(concorrente);
+        var copia = (await repoConcorrente.GetByIdParaAtualizarAsync(empresaId, id))!;
+        produto.QuantidadeMinima = 220;
+        await repo.UpdateAsync(produto);
+        await verificar.SaveChangesAsync();
+        copia.QuantidadeMinima = 230;
+        await repoConcorrente.UpdateAsync(copia);
+        var salvarVersaoAntiga = () => concorrente.SaveChangesAsync();
+        await salvarVersaoAntiga.Should().ThrowAsync<DbUpdateConcurrencyException>();
+    }
+
     [SkippableFact]
     public async Task InsumosDaEmpresa_EReceitasPorInsumo()
     {

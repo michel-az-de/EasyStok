@@ -25,6 +25,7 @@ public class InsumosDaProducaoUseCaseTests
         _categorias.GetByIdAsync(Arg.Any<Guid>()).Returns(c => _categoriasGravadas.FirstOrDefault(x => x.Id == c.Arg<Guid>()));
         _produtos.When(r => r.InsertAsync(Arg.Any<Produto>())).Do(c => _gravados[c.Arg<Produto>().Id] = c.Arg<Produto>());
         _produtos.GetByIdAsync(EmpresaId, Arg.Any<Guid>()).Returns(c => _gravados.GetValueOrDefault(c.ArgAt<Guid>(1)));
+        _produtos.GetByIdParaAtualizarAsync(EmpresaId, Arg.Any<Guid>()).Returns(c => _gravados.GetValueOrDefault(c.ArgAt<Guid>(1)));
     }
 
     private InsumosDaProducaoUseCase Sut() => new(_produtos, _composicao, _estoque, _categorias,
@@ -63,6 +64,9 @@ public class InsumosDaProducaoUseCaseTests
 
         var p = _gravados[id];
         p.EhInsumo.Should().BeTrue();
+        p.Status.Should().Be(StatusProduto.Ativo);
+        p.PrecoReferencia.Should().BeNull();
+        p.CustoReferencia!.Valor.Should().Be(0.05m);
         p.UnidadeMedidaBase.Should().Be(UnidadeMedida.G);
         p.QuantidadeMinima.Should().Be(1000);
         _categoriasGravadas.Should().ContainSingle(c => c.Nome == InsumosDaProducaoUseCase.CategoriaInsumos);

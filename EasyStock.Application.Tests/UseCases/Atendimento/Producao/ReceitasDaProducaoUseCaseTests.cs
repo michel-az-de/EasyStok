@@ -30,6 +30,7 @@ public class ReceitasDaProducaoUseCaseTests
     {
         var p = new Produto { Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = "Lasanha", RendimentoBase = rendimento, RendimentoUnidade = UnidadeMedida.Un };
         _produtos.GetByIdAsync(EmpresaId, p.Id).Returns(p);
+        _produtos.GetByIdParaAtualizarAsync(EmpresaId, p.Id).Returns(p);
         return p;
     }
 

@@ -35,6 +35,10 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Include(p => p.Variacoes)
                 .FirstOrDefaultAsync(p => p.EmpresaId == empresaId && p.Id == id);
 
+        // xmin é shadow property: a leitura rastreada preserva a versão original para o UPDATE.
+        public Task<Produto?> GetByIdParaAtualizarAsync(Guid empresaId, Guid id) =>
+            dbContext.Produtos.AsTracking().FirstOrDefaultAsync(p => p.EmpresaId == empresaId && p.Id == id);
+
         public Task<bool> ExistsSkuBaseAsync(Guid empresaId, string skuBase, Guid? ignoreProdutoId = null)
         {
             var sku = CodigoSku.From(skuBase.Trim());

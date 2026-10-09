@@ -25,7 +25,10 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
         IReadOnlyCollection<ProdutoVariacaoInput>? Variacoes,
         Guid UsuarioId = default,
         // C2 (RDC 727/2022): default Avulso para nao quebrar callers existentes.
-        TipoEmbalagem TipoEmbalagem = TipoEmbalagem.Avulso);
+        TipoEmbalagem TipoEmbalagem = TipoEmbalagem.Avulso,
+        bool EhInsumo = false,
+        UnidadeMedida UnidadeMedidaBase = UnidadeMedida.Un,
+        int? QuantidadeMinima = null);
 
     public sealed record CadastrarProdutoResult(
         Guid ProdutoId,
@@ -124,10 +127,10 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
             }
 
             var agora = DateTime.UtcNow;
-            // Gating de status: produto sem preco de venda nasce Inativo (rascunho).
+            // Insumo não exige preço de venda. Os demais produtos sem preço nascem Inativos.
             // Antes nascia sempre Ativo e podia ser exposto na vitrine sem preco, gerando
             // pedidos com R$0 e leitura gerencial errada (auditoria QA 2026-05-16).
-            var statusInicial = (command.PrecoReferencia.HasValue && command.PrecoReferencia.Value > 0)
+            var statusInicial = command.EhInsumo || (command.PrecoReferencia.HasValue && command.PrecoReferencia.Value > 0)
                 ? StatusProduto.Ativo
                 : StatusProduto.Inativo;
             if (statusInicial == StatusProduto.Inativo)
@@ -144,6 +147,9 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                 Marca = command.Marca?.Trim(),
                 Tipo = command.Tipo,
                 TipoEmbalagem = command.TipoEmbalagem, // C2 (RDC 727/2022)
+                EhInsumo = command.EhInsumo,
+                UnidadeMedidaBase = command.UnidadeMedidaBase,
+                QuantidadeMinima = command.QuantidadeMinima,
                 SkuBase = string.IsNullOrWhiteSpace(command.SkuBase) ? null : CodigoSku.From(command.SkuBase),
                 CodigoBarras = command.CodigoBarras?.Trim(),
                 ControlaValidade = command.ControlaValidade,
@@ -264,6 +270,8 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
         {
             UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
             UseCaseGuards.EnsureNotEmpty(command.CategoriaId, "CategoriaId");
+            if (command.QuantidadeMinima is < 0) throw new UseCaseValidationException("O mínimo não pode ser negativo.");
+            if (!Enum.IsDefined(command.UnidadeMedidaBase)) throw new UseCaseValidationException("Unidade de medida inválida.");
             if (string.IsNullOrWhiteSpace(command.Nome)) throw new UseCaseValidationException("Nome do produto é obrigatório.");
             UseCaseGuards.EnsureSemTagsHtml(command.Nome, "Nome do produto");
             // BUG-04 (QA v1.10 #674, refs #526): DescricaoBase tambem cai em sinks de UI (preview do
