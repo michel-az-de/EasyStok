@@ -9,6 +9,9 @@ public sealed record BaixaAutomaticaRequest(bool Ligada);
 
 public sealed record PlanejamentoRequest(IReadOnlyList<PratoPlanejado>? Pratos);
 
+/// <param name="ItemEstoqueId">Lote escolhido; null = FEFO.</param>
+public sealed record PerdaRequest(Guid ProdutoId, Guid? ItemEstoqueId, decimal Quantidade, MotivoPerda Motivo, string? Texto);
+
 public sealed record ProduzirPratosRequest(IReadOnlyList<PratoProduzidoInput>? Pratos, string? Observacao = null);
 
 /// <param name="Unidade">G, Kg, Ml, L, Un...; null = não mexe (no cadastro, Un).</param>
@@ -29,8 +32,64 @@ public class AtendimentoProducaoController(
     InsumosDaProducaoUseCase insumos,
     ReceitasDaProducaoUseCase receitas,
     PlanejamentoDaProducaoUseCase planejamento,
+    PerdasDaProducaoUseCase perdas,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
+    [SwaggerOperation(Summary = "Losses of the period by reason and product, in quantity and R$, with each entry (M2.6)",
+        Description = "de/ate em dia operacional (padrão: os últimos 7 dias). Não conta ajuste de contagem nem a baixa de insumo da produção.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [HttpGet("perdas")]
+    public async Task<IActionResult> Perdas([FromQuery] DateOnly? de, [FromQuery] DateOnly? ate, CancellationToken ct)
+    {
+        if (!currentUser.TemPermissao(Permissao.GerenciarEstoque)) return Forbid();
+        try
+        {
+            return DataOk(await perdas.ResumoAsync(currentUser.EmpresaId, de, ate, ct));
+        }
+        catch (UseCaseValidationException ex)
+        {
+            return DataBadRequest(ex.Message);
+        }
+    }
+
+    [SwaggerOperation(Summary = "Expired lots with stock, suggested as losses (never posted automatically, M2.6)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [HttpGet("perdas/vencidos")]
+    public async Task<IActionResult> Vencidos(CancellationToken ct)
+    {
+        if (!currentUser.TemPermissao(Permissao.GerenciarEstoque)) return Forbid();
+        return DataOk(await perdas.VencidosAsync(currentUser.EmpresaId, ct));
+    }
+
+    [SwaggerOperation(Summary = "Post a loss with a reason (D-M2-02) from the chosen lot or FEFO (M2.6)",
+        Description = "Acima de R$ 50 pelo custo dos lotes, só Gerente (D-M2-06). Desfazer: POST api/estoque/estorno/{movimentacaoId}.")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [HttpPost("perdas")]
+    public async Task<IActionResult> LancarPerda([FromBody] PerdaRequest req, CancellationToken ct)
+    {
+        if (!currentUser.TemPermissao(Permissao.GerenciarEstoque)) return Forbid();
+        var gerente = currentUser.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin or NivelAcesso.Gerente;
+        try
+        {
+            var r = await perdas.LancarAsync(currentUser.EmpresaId, gerente,
+                new LancarPerdaInput(req.ProdutoId, req.ItemEstoqueId, req.Quantidade, req.Motivo, req.Texto), ct);
+            return DataCreated("/api/atendimento/producao/perdas", r);
+        }
+        catch (UseCaseValidationException ex) when (ex.Code == PerdasDaProducaoUseCase.CodigoExigeGerente)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ApiErrorResponse(new ApiError(ex.Code, ex.Message, null, null)));
+        }
+        catch (Exception ex) when (ex is UseCaseValidationException or RegraDeDominioVioladaException)
+        {
+            return DataBadRequest(ex.Message);
+        }
+    }
+
     [SwaggerOperation(Summary = "Production suggestion per menu dish: minimum + scheduled orders + uncovered - stock (M2.5)",
         Description = "ate = último dia dos pedidos agendados (padrão: amanhã, no dia operacional do Brasil).")]
     [ProducesResponseType(StatusCodes.Status200OK)]
