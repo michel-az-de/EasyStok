@@ -26,7 +26,8 @@ internal static class RegraAtendente
     public static bool Atende(UsuarioDaEmpresa usuario)
     {
         var perfil = usuario.Perfis.OrderBy(p => (int)p.Nivel).FirstOrDefault();
-        return perfil is not null && PoliticaPermissao.Tem(perfil.Nivel, perfil.Permissoes, Permissao.AtenderConversas);
+        return perfil is not null && PoliticaPermissao.Tem(perfil.Nivel, perfil.Permissoes, Permissao.AtenderConversas,
+            perfil.PermissoesExplicitas);
     }
 }
 

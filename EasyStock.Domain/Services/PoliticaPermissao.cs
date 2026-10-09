@@ -2,14 +2,16 @@ namespace EasyStock.Domain.Services;
 
 /// <summary>
 /// Permissão efetiva de um usuário numa empresa. Com permissões explícitas no perfil, valem só elas;
-/// sem nenhuma, vale o fallback pelo nível. Usada para o usuário logado (claims do JWT) e para avaliar
+/// lista explicitamente vazia nega tudo; sem lista configurada, vale o fallback pelo nível. Usada para o usuário logado (claims do JWT) e para avaliar
 /// outro usuário no servidor, como o destino de uma transferência de conversa (S41).
 /// </summary>
 public static class PoliticaPermissao
 {
-    public static bool Tem(NivelAcesso nivel, IReadOnlyCollection<Permissao> explicitas, Permissao permissao)
+    public static bool Tem(NivelAcesso nivel, IReadOnlyCollection<Permissao> explicitas, Permissao permissao,
+        bool permissoesExplicitas = false)
     {
-        if (explicitas.Count > 0)
+        if (!Enum.IsDefined(permissao)) return false;
+        if (permissoesExplicitas || explicitas.Count > 0)
             return explicitas.Contains(permissao);
 
         if (AcessoModulos.EhPermissaoDeModulo(permissao))

@@ -34,6 +34,7 @@ public class PerfisCasaDaBabaSeedTests
         var resultado = await new UsuarioRepository(leitura).GetByIdAsync(usuario.Id);
         var carregado = resultado!.Perfis.Single().Perfil!;
         carregado.ModuloInicial.Should().Be("cozinha");
+        carregado.PermissoesExplicitas.Should().BeTrue();
         carregado.Permissoes.Select(p => p.Permissao).Should().BeEquivalentTo(
             new[] { Permissao.AcessarModuloProducao, Permissao.AcessarModuloCozinha, Permissao.GerenciarEstoque });
     }
@@ -58,6 +59,7 @@ public class PerfisCasaDaBabaSeedTests
         personalizado.Nivel.Should().Be(NivelAcesso.Gerente);
         personalizado.ModuloInicial.Should().Be("financeiro");
         personalizado.Permissoes.Should().BeEmpty();
+        personalizado.PermissoesExplicitas.Should().BeFalse();
         perfis.Single(p => p.Nome == "Dona").Permissoes.Should().HaveCount(19);
         perfis.Single(p => p.Nome == "Cozinha").Permissoes.Should().HaveCount(3);
         (await db.Usuarios.CountAsync()).Should().Be(0);

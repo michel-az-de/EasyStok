@@ -14,6 +14,22 @@ namespace EasyStock.Api.UnitTests.Services;
 /// </summary>
 public class JwtTokenServiceTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TokenPreservaDiferencaEntreListaVaziaEFallback(bool explicitas)
+    {
+        var configuracao = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Jwt:SecretKey"] = "chave-de-teste-do-jwt-com-mais-de-32-caracteres",
+        }).Build();
+        var token = new JwtTokenService(configuracao).GerarToken(new AutenticarUsuarioResult(
+            Guid.NewGuid(), Guid.NewGuid(), "Teste", "teste@local", NivelAcesso.Admin, [],
+            PermissoesExplicitas: explicitas));
+        var lido = new JwtSecurityTokenHandler().ReadJwtToken(token);
+        lido.Claims.Any(c => c.Type == "permissoesExplicitas" && c.Value == "true").Should().Be(explicitas);
+    }
+
     [Fact]
     public void TokenCarregaSubEIatEmSegundosInteirosParaOValidadorDeSessao()
     {

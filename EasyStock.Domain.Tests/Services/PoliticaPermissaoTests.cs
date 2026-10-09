@@ -10,6 +10,19 @@ namespace EasyStock.Domain.Tests.Services;
 /// </summary>
 public class PoliticaPermissaoTests
 {
+    [Fact]
+    public void ListaExplicitamenteVazia_NegaTudoEmTodosOsNiveis()
+    {
+        foreach (var nivel in Enum.GetValues<NivelAcesso>())
+        foreach (var permissao in Enum.GetValues<Permissao>())
+            PoliticaPermissao.Tem(nivel, [], permissao, permissoesExplicitas: true).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(999)]
+    public void ValorNumericoInvalido_NuncaConcedeAcesso(int valor) =>
+        PoliticaPermissao.Tem(NivelAcesso.SuperAdmin, [(Permissao)valor], (Permissao)valor).Should().BeFalse();
+
     [Theory]
     [InlineData(NivelAcesso.SuperAdmin)]
     [InlineData(NivelAcesso.Admin)]

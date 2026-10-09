@@ -473,8 +473,12 @@ public partial class AtendimentoConversasControllerTests
         var restrito = Guid.NewGuid();
         Atendente(restrito, NivelAcesso.Admin, Permissao.GerenciarProdutos);
         var desconhecido = Guid.NewGuid();
+        var semPermissoes = Guid.NewGuid();
+        _atendentes.ObterUsuarioAtivoAsync(_empresaId, semPermissoes, Arg.Any<CancellationToken>())
+            .Returns(new UsuarioDaEmpresa(semPermissoes, "Restrito", "restrito@local",
+                [new PerfilNaEmpresa(NivelAcesso.Admin, [], PermissoesExplicitas: true)]));
 
-        foreach (var destino in new[] { visualizador, restrito, desconhecido })
+        foreach (var destino in new[] { visualizador, restrito, desconhecido, semPermissoes })
         {
             var result = await _controller.Transferir(conversa.Id, new TransferirConversaBody(destino), default);
             result.Should().BeOfType<UnprocessableEntityObjectResult>();
@@ -514,7 +518,9 @@ public partial class AtendimentoConversasControllerTests
         // Com dois perfis vale o de maior nível (menor valor), como no login.
         var dupla = new UsuarioDaEmpresa(Guid.NewGuid(), "Duda", "duda@x.com",
             [new PerfilNaEmpresa(NivelAcesso.Visualizador, []), new PerfilNaEmpresa(NivelAcesso.Gerente, [])]);
-        _atendentes.ListarUsuariosAtivosAsync(_empresaId, Arg.Any<CancellationToken>()).Returns([ana, leitor, semPerfil, dupla]);
+        var restrito = new UsuarioDaEmpresa(Guid.NewGuid(), "Restrito", "restrito@local",
+            [new PerfilNaEmpresa(NivelAcesso.Admin, [], PermissoesExplicitas: true)]);
+        _atendentes.ListarUsuariosAtivosAsync(_empresaId, Arg.Any<CancellationToken>()).Returns([ana, leitor, semPerfil, dupla, restrito]);
         var controller = new AtendimentoAtendentesController(new ListarAtendentesUseCase(_atendentes), _currentUser);
 
         var lista = Dados<IReadOnlyList<AtendenteResult>>(await controller.Listar(default));
