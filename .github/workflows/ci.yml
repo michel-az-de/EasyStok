@@ -76,6 +76,11 @@ jobs:
           # estoura 500ms na primeira renderizacao de template -- flaky de timing (issue #910,
           # flaky-tests.md). NAO relaxa a guarda de producao, so o piso do runner lento.
           EASYSTOK_SCRIBAN_TIMEOUT_MS: '2000'
+          # #1514: os fixtures Testcontainers (postgres:16/17-alpine) puxam do Docker Hub, que estoura o
+          # limite anonimo. O prefixo manda as imagens oficiais para o espelho da AWS; o Ryuk (imagem
+          # testcontainers/ryuk, sem espelho la) fica desligado: o runner e descartado ao fim do job.
+          TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX: public.ecr.aws/docker/library
+          TESTCONTAINERS_RYUK_DISABLED: 'true'
         run: >-
           dotnet test EasyStok.CI.slnf
           -c Release --no-build --no-restore
