@@ -1,5 +1,5 @@
-import { ordemAoMover } from '../dominio/cardapio'
-import { definirDisponibilidade, definirOrdem, definirVisivel, itemGestaoDaApi, listarGestao } from '../infra/api/cardapioApi'
+import { podeMover } from '../dominio/cardapio'
+import { definirDisponibilidade, definirVisivel, itemGestaoDaApi, listarGestao, moverItem } from '../infra/api/cardapioApi'
 
 // Gestão do cardápio no modo API (M1.1, #1481). A lista vem do EasyStok e é relida depois de cada
 // gravação, certa ou errada: a tela mostra o que ficou salvo. Cada ação devolve `true` quando
@@ -31,8 +31,9 @@ export function criarGestaoCardapio({ obterItens, recarregar, aoErro }) {
     },
     mover: (sku, direcao) => {
       const lista = obterItens()
-      const novaOrdem = ordemAoMover(lista, lista.findIndex((i) => i.sku === sku), direcao)
-      return novaOrdem === null ? Promise.resolve(false) : gravar(() => definirOrdem(sku, novaOrdem))
+      return podeMover(lista, lista.findIndex((i) => i.sku === sku), direcao)
+        ? gravar(() => moverItem(sku, direcao))
+        : Promise.resolve(false)
     },
   }
 }

@@ -2,7 +2,6 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.AdicionarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.EditarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ListarCardapioAdmin;
-using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ReordenarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidadeCardapioItemAdmin;
 using EasyStock.Domain.Enums.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
@@ -22,6 +21,8 @@ public sealed record ItemGestaoCardapio(
     Guid CardapioItemId, string Nome, LinhaProduto Linha, string? Porcao, decimal Preco, string? Categoria,
     string? FotoUrl, bool Visivel, bool Disponivel, double Ordem, bool ControlaSaldo);
 
+public enum DirecaoMover { Subir, Descer }
+
 public sealed record OrdemItemResult(Guid CardapioItemId, double Ordem);
 
 /// <summary>
@@ -36,8 +37,8 @@ public sealed class ItensDoCardapioComandaUseCase(
     EditarCardapioItemAdminUseCase editar,
     ToggleVisibilidadeCardapioItemAdminUseCase toggleVisivel,
     ListarCardapioAdminUseCase listar,
-    ReordenarCardapioItemAdminUseCase reordenar,
-    ICardapioItemRepository cardapioRepository)
+    ICardapioItemRepository cardapioRepository,
+    IUnitOfWork unitOfWork)
 {
     public async Task<AdicionarCardapioItemAdminResult> IncluirAsync(Guid empresaId, DadosItemCardapio dados, CancellationToken ct = default)
     {
@@ -93,20 +94,46 @@ public sealed class ItensDoCardapioComandaUseCase(
     {
         var storefrontId = await VitrineAsync(empresaId, ct);
         var itens = await cardapioRepository.GetTodosDoStorefrontAsync(storefrontId, ct);
-        return itens
+        return NaOrdem(itens)
             .Select(i => new ItemGestaoCardapio(
                 i.Id, i.NomeEfetivo() ?? "(sem nome)", i.Linha, i.PesoExibicao, i.PrecoEfetivo(), i.CategoriaEfetiva(),
                 i.FotoUrl, i.Visivel, i.Disponivel, i.OrdemExibicao, i.ProdutoId.HasValue))
             .ToList();
     }
 
-    /// <summary>Ordem por arrastar: o console manda o valor entre os vizinhos (ordem é double).</summary>
-    public async Task<OrdemItemResult> DefinirOrdemAsync(Guid empresaId, Guid itemId, double novaOrdem, CancellationToken ct = default)
+    /// <summary>
+    /// Sobe ou desce o item uma posição (#1486). Os itens nascem com ordem 0 e a ordem não aceita
+    /// valor negativo, então o meio dos vizinhos não serve num cardápio nunca reordenado (todos
+    /// empatados). Aqui o servidor troca o item de lugar na lista de gestão (mesmo desempate) e
+    /// renumera de 1 a n, gravando só quem mudou, num commit. Na ponta, não muda nada.
+    /// </summary>
+    public async Task<OrdemItemResult> MoverAsync(Guid empresaId, Guid itemId, DirecaoMover direcao, CancellationToken ct = default)
     {
         var storefrontId = await VitrineAsync(empresaId, ct);
-        var r = await reordenar.ExecuteAsync(new ReordenarCardapioItemAdminCommand(storefrontId, itemId, novaOrdem, empresaId));
-        return new OrdemItemResult(r.ItemId, r.Ordem);
+        var lista = NaOrdem(await cardapioRepository.GetTodosDoStorefrontAsync(storefrontId, ct)).ToList();
+        var indice = lista.FindIndex(i => i.Id == itemId);
+        if (indice < 0) throw new CardapioItemNaoEncontradoException(storefrontId, itemId);
+
+        var alvo = indice + (direcao == DirecaoMover.Subir ? -1 : 1);
+        if (alvo < 0 || alvo >= lista.Count) return new OrdemItemResult(itemId, lista[indice].OrdemExibicao);
+        (lista[indice], lista[alvo]) = (lista[alvo], lista[indice]);
+
+        double ordemDoItem = 0;
+        for (var posicao = 0; posicao < lista.Count; posicao++)
+        {
+            var nova = posicao + 1;
+            if (lista[posicao].Id == itemId) ordemDoItem = nova;
+            if (Math.Abs(lista[posicao].OrdemExibicao - nova) < double.Epsilon) continue;
+            var rastreado = await cardapioRepository.GetByIdAndScopeAsync(storefrontId, lista[posicao].Id, empresaId, ct);
+            rastreado?.DefinirOrdem(nova);
+        }
+        await unitOfWork.CommitAsync();
+        return new OrdemItemResult(itemId, ordemDoItem);
     }
+
+    // Mesmo desempate do menu público (ordem, criado em, id): a lista que ela vê é a que muda.
+    private static IEnumerable<Domain.Entities.Storefront.CardapioItem> NaOrdem(IEnumerable<Domain.Entities.Storefront.CardapioItem> itens) =>
+        itens.OrderBy(i => i.OrdemExibicao).ThenBy(i => i.CriadoEm).ThenBy(i => i.Id);
 
     private async Task<Guid> VitrineAsync(Guid empresaId, CancellationToken ct)
     {

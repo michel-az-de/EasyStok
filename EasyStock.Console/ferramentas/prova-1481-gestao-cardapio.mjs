@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 // Prova da #1481 (M1.1): gestão do cardápio no console (modo API).
 //   - a lista traz todos os itens (ocultos e desligados) e liga o dia e o site;
-//   - subir e descer gravam só a ordem do item, no meio dos vizinhos;
+//   - subir e descer mandam só a direção; o EasyStok renumera (#1486);
 //   - erro avisa e relê; o módulo M1 ganha a tela só no modo API.
 //
 //   node ferramentas/prova-1481-gestao-cardapio.mjs
@@ -28,7 +28,7 @@ registerHooks({
   },
 })
 
-const { ordemAoMover } = await import('../src/dominio/cardapio.js')
+const { podeMover } = await import('../src/dominio/cardapio.js')
 const { criarGestaoCardapio, lerGestao } = await import('../src/aplicacao/gestaoCardapio.js')
 const { modulosDoHall, moduloPorId } = await import('../src/dominio/modulos.js')
 
@@ -66,14 +66,12 @@ const GESTAO = [(m, u) => m === 'GET' && u.endsWith('/api/atendimento/comanda/ca
   { cardapioItemId: 'c', nome: 'Torta', linha: 'ParaServir', porcao: null, preco: 60, visivel: true, disponivel: true, ordem: 4, controlaSaldo: false },
 ] }]
 
-await confere('ordemAoMover põe o item no meio dos novos vizinhos e uma unidade além nas pontas', () => {
-  const lista = [{ ordem: 1 }, { ordem: 2 }, { ordem: 4 }]
-  assert.equal(ordemAoMover(lista, 2, 'subir'), 1.5, 'entre o 1 e o 2')
-  assert.equal(ordemAoMover(lista, 0, 'descer'), 3, 'entre o 2 e o 4')
-  assert.equal(ordemAoMover(lista, 1, 'subir'), 0, 'antes do primeiro')
-  assert.equal(ordemAoMover(lista, 1, 'descer'), 5, 'depois do último')
-  assert.equal(ordemAoMover(lista, 0, 'subir'), null, 'o primeiro não sobe')
-  assert.equal(ordemAoMover(lista, 2, 'descer'), null, 'o último não desce')
+await confere('podeMover: o primeiro não sobe e o último não desce', () => {
+  const lista = [{ ordem: 0 }, { ordem: 0 }, { ordem: 0 }]
+  assert.equal(podeMover(lista, 1, 'subir'), true)
+  assert.equal(podeMover(lista, 1, 'descer'), true)
+  assert.equal(podeMover(lista, 0, 'subir'), false)
+  assert.equal(podeMover(lista, 2, 'descer'), false)
 })
 
 await confere('lerGestao traz todos, inclusive oculto do site e desligado de hoje (RN-16)', async () => {
@@ -106,13 +104,14 @@ await confere('hoje e no site gravam o valor oposto e relêem', async () => {
   assert.equal(m.relidas(), 2)
 })
 
-await confere('subir grava só a ordem do item que andou', async () => {
-  const m = await montar([[(mt, u) => mt === 'POST' && u.endsWith('/c/ordem'), { data: { ordem: 1.5 } }]])
+await confere('subir manda só a direção para o EasyStok renumerar (#1486)', async () => {
+  const m = await montar([[(mt, u) => mt === 'POST' && u.endsWith('/c/mover'), { data: { ordem: 2 } }]])
   const ok = await m.gestao.mover('c', 'subir')
   assert.equal(ok, true)
   const posts = m.chamadas.filter((c) => c.metodo === 'POST')
   assert.equal(posts.length, 1)
-  assert.deepEqual(posts[0].corpo, { novaOrdem: 1.5 })
+  assert.deepEqual(posts[0].corpo, { direcao: 'Subir' })
+  assert.equal(await m.gestao.mover('a', 'subir'), false, 'o primeiro não sobe nem chama a API')
 })
 
 await confere('erro da API avisa e relê a lista', async () => {
