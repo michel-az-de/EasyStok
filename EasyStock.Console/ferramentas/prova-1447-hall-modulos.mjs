@@ -46,13 +46,15 @@ confere('o hall lista os oito módulos do plano, numerados de 1 a 8 e na ordem',
   }
 })
 
-confere('Cardápio e Produção ainda não têm tela no console: aparecem como em breve', () => {
+// M1.1 (#1481): o Cardápio ganhou a gestão no modo API; na demonstração segue em breve.
+confere('Produção ainda não tem tela; Cardápio abre só no modo API', () => {
   const hall = modulosDoHall({ fonteApi: true })
   const porId = Object.fromEntries(hall.map((m) => [m.id, m]))
-  assert.equal(porId.cardapio.disponivel, false)
   assert.equal(porId.producao.disponivel, false)
-  assert.equal(porId.cardapio.href, null, 'card em breve não navega')
-  for (const id of ['atendimento', 'cozinha', 'financeiro', 'campanhas', 'configuracoes', 'entregas']) {
+  assert.equal(porId.producao.href, null, 'card em breve não navega')
+  const demonstracao = Object.fromEntries(modulosDoHall({ fonteApi: false }).map((m) => [m.id, m]))
+  assert.equal(demonstracao.cardapio.disponivel, false, 'sem API não há o que gerir')
+  for (const id of ['cardapio', 'atendimento', 'cozinha', 'financeiro', 'campanhas', 'configuracoes', 'entregas']) {
     assert.equal(porId[id].disponivel, true, `${id} abre`)
     assert.ok(porId[id].href.startsWith('#/m/' + id), `${id} aponta para a própria rota`)
   }

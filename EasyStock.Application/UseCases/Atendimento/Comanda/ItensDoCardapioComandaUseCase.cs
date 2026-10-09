@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.AdicionarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.EditarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ListarCardapioAdmin;
+using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ReordenarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidadeCardapioItemAdmin;
 using EasyStock.Domain.Enums.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
@@ -15,6 +16,14 @@ public sealed record ItemForaDoCardapio(Guid CardapioItemId, string Nome, decima
 
 public sealed record VisibilidadeItemResult(Guid CardapioItemId, bool Visivel);
 
+/// <summary>Linha da tela de gestão do cardápio (M1.1): tudo o que a lista mostra e liga.</summary>
+/// <param name="ControlaSaldo">Item ligado a um produto do estoque (avulso não tem saldo).</param>
+public sealed record ItemGestaoCardapio(
+    Guid CardapioItemId, string Nome, LinhaProduto Linha, string? Porcao, decimal Preco, string? Categoria,
+    string? FotoUrl, bool Visivel, bool Disponivel, double Ordem, bool ControlaSaldo);
+
+public sealed record OrdemItemResult(Guid CardapioItemId, double Ordem);
+
 /// <summary>
 /// Itens do cardápio pelo console (#1241, F11, S45). Decisão do Felipe (08/10/2026): incluir, editar
 /// e tirar item são do Gerente. Reusa os use cases da vitrine (mesmas validações e guardas de HTML)
@@ -27,6 +36,7 @@ public sealed class ItensDoCardapioComandaUseCase(
     EditarCardapioItemAdminUseCase editar,
     ToggleVisibilidadeCardapioItemAdminUseCase toggleVisivel,
     ListarCardapioAdminUseCase listar,
+    ReordenarCardapioItemAdminUseCase reordenar,
     ICardapioItemRepository cardapioRepository)
 {
     public async Task<AdicionarCardapioItemAdminResult> IncluirAsync(Guid empresaId, DadosItemCardapio dados, CancellationToken ct = default)
@@ -73,6 +83,29 @@ public sealed class ItensDoCardapioComandaUseCase(
             .Where(i => !i.Visivel)
             .Select(i => new ItemForaDoCardapio(i.Id, i.NomeEfetivo, i.PrecoEfetivo, i.PesoExibicao, i.CategoriaTexto, i.FotoUrl))
             .ToList();
+    }
+
+    /// <summary>
+    /// Gestão do cardápio (M1.1): todos os itens da vitrine, inclusive os ocultos do site e os
+    /// desligados do dia (RN-16: desligar não tira da lista), na ordem de exibição.
+    /// </summary>
+    public async Task<IReadOnlyList<ItemGestaoCardapio>> ListarGestaoAsync(Guid empresaId, CancellationToken ct = default)
+    {
+        var storefrontId = await VitrineAsync(empresaId, ct);
+        var itens = await cardapioRepository.GetTodosDoStorefrontAsync(storefrontId, ct);
+        return itens
+            .Select(i => new ItemGestaoCardapio(
+                i.Id, i.NomeEfetivo() ?? "(sem nome)", i.Linha, i.PesoExibicao, i.PrecoEfetivo(), i.CategoriaEfetiva(),
+                i.FotoUrl, i.Visivel, i.Disponivel, i.OrdemExibicao, i.ProdutoId.HasValue))
+            .ToList();
+    }
+
+    /// <summary>Ordem por arrastar: o console manda o valor entre os vizinhos (ordem é double).</summary>
+    public async Task<OrdemItemResult> DefinirOrdemAsync(Guid empresaId, Guid itemId, double novaOrdem, CancellationToken ct = default)
+    {
+        var storefrontId = await VitrineAsync(empresaId, ct);
+        var r = await reordenar.ExecuteAsync(new ReordenarCardapioItemAdminCommand(storefrontId, itemId, novaOrdem, empresaId));
+        return new OrdemItemResult(r.ItemId, r.Ordem);
     }
 
     private async Task<Guid> VitrineAsync(Guid empresaId, CancellationToken ct)

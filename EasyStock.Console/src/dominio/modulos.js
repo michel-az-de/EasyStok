@@ -21,7 +21,11 @@ export const MODULOS = [
   {
     numero: 1, id: 'cardapio', nome: 'Cardápio', icone: 'cardapio',
     resumo: 'Pratos, preços, combos e fotos',
-    telas: [],
+    // M1.1 (#1481): a gestão do cardápio lê e grava no EasyStok; no modo demonstração o
+    // cardápio continua no Gerir do balcão.
+    telas: [
+      { id: 'itens', rotulo: 'Itens do cardápio', tipo: TELA_AJUSTE, aba: 'cardapio', soApi: true },
+    ],
   },
   {
     numero: 2, id: 'producao', nome: 'Produção', icone: 'flask-conical',

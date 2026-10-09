@@ -100,6 +100,8 @@ const TRACOS = {
   'credit-card': 'M3 6h18a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1ZM2 10h20M6 15h4',
   'flask-conical': 'M9 3h6M10 3v6.5L4.5 19a1.5 1.5 0 0 0 1.3 2.3h12.4a1.5 1.5 0 0 0 1.3-2.3L14 9.5V3M7 16h10',
   'chevron-up': 'M6 15l6-6 6 6',
+  // M1.1 (#1481): descer um item na lista de gestão do cardápio.
+  'chevron-down': 'M6 9l6 6 6-6',
   'chevron-right': 'M9 18l6-6-6-6',
   // F2 · Ficha do cliente (rodada 5, seção 2): "Copiar telefone" no menu ⋯.
   // Rodada 6c: ícones do trilho, da ficha e do composer.

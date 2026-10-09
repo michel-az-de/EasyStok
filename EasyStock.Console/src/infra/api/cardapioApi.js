@@ -48,3 +48,23 @@ export const itemForaDaApi = (item) => ({
 // Produto vendido sem saldo (S22): o mesmo cartão de alerta da Ficha, com id estável.
 export const listarDesacertos = () => chamarApi('/api/estoque/desacertos')
 export const alertaDaApi = (d) => ({ id: `desacerto-${d.produtoId}`, texto: d.texto, daApi: true })
+
+// M1.1 (#1481): gestão do cardápio (Gerente). Todos os itens, inclusive ocultos e desligados.
+const LINHA_DA_GESTAO = { ParaServir: 'servir', PrepararEmCasa: 'casa' }
+
+export const listarGestao = () => chamarApi(`${CARDAPIO}/gestao`)
+export const definirOrdem = (id, novaOrdem) => chamarApi(`${ITEM(id)}/ordem`, { metodo: 'POST', corpo: { novaOrdem } })
+
+export const itemGestaoDaApi = (i) => ({
+  sku: i.cardapioItemId,
+  nome: i.nome,
+  linha: LINHA_DA_GESTAO[i.linha] ?? 'servir',
+  porcao: i.porcao ?? '',
+  preco: i.preco,
+  categoria: i.categoria ?? null,
+  foto: urlDeExibicaoDaFoto(i.fotoUrl, API_BASE),
+  noSite: i.visivel,
+  hoje: i.disponivel,
+  ordem: i.ordem,
+  controlaSaldo: i.controlaSaldo,
+})
