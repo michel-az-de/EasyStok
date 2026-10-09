@@ -174,15 +174,30 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<decimal> GetTotalVendasNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
         {
+            // So Natureza=Venda e receita: Perda/Doacao/Ajuste com preco nao entram no caixa.
             var q = db.Vendas.AsNoTracking()
-                .Where(v => v.EmpresaId == empresaId && v.DataVenda >= iniUtc && v.DataVenda < fimUtc);
+                .Where(v => v.EmpresaId == empresaId && v.Natureza == NaturezaMovimentacaoEstoque.Venda
+                            && v.DataVenda >= iniUtc && v.DataVenda < fimUtc);
             if (lojaId.HasValue) q = q.Where(v => v.LojaId == lojaId);
 
             // Projeta so a coluna ValorTotal (VO Dinheiro via HasConversion — o EF nao
             // traduz Sum() sobre VO-com-converter, entao a soma fica em memoria, mas o
             // SELECT deixa de trazer a entidade Venda inteira). Antes: SELECT * + materializa Venda.
             var valores = await q.Select(v => v.ValorTotal).ToListAsync();
-            return valores.Sum(v => v == null ? 0m : v.Valor);
+            var bruto = valores.Sum(v => v == null ? 0m : v.Valor);
+
+            // Estorno de saida devolve o dinheiro no dia do estorno (fluxo de caixa): abate das vendas
+            // estornadas dentro da janela, independentemente do dia em que a venda foi feita.
+            var qe = db.MovimentacoesEstoque.AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId && m.VendaId != null
+                            && m.Tipo == TipoMovimentacaoEstoque.Saida && m.Natureza == NaturezaMovimentacaoEstoque.Venda
+                            && m.EstornadaEm != null && m.EstornadaEm >= iniUtc && m.EstornadaEm < fimUtc);
+            if (lojaId.HasValue)
+                qe = qe.Where(m => db.Vendas.Any(v => v.Id == m.VendaId && v.LojaId == lojaId));
+            var estornados = await qe.Select(m => m.ValorTotal).ToListAsync();
+            var estornado = estornados.Sum(v => v == null ? 0m : v.Valor);
+
+            return bruto - estornado;
         }
 
         public Task<decimal> GetTotalPagamentosPedidosDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
