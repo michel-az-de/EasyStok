@@ -4530,6 +4530,11 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("loja_id");
 
+                    b.Property<string>("Metodo")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("metodo");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -4905,6 +4910,11 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid?>("LojaId")
                         .HasColumnType("uuid")
                         .HasColumnName("loja_id");
+
+                    b.Property<string>("Metodo")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("metodo");
 
                     b.Property<string>("Notes")
                         .HasColumnType("text");

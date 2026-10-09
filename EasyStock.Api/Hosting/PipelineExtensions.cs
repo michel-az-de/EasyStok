@@ -419,6 +419,8 @@ public static class PipelineExtensions
         .Add("/api/producao")
         // M2.2 (#1491): producao do dia pelo console (lote + entrada); retry nao pode duplicar.
         .Add("/api/atendimento/producao")
+        .Add("/api/atendimento/mensagens-programadas")
+        .Add("/api/atendimento/lembretes")
         // S20: retorno do consumidor da fila de impressão (impressa/falhou); opt-in por header.
         .Add("/api/impressao");
 }

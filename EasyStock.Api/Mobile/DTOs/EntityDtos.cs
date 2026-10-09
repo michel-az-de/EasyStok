@@ -62,7 +62,9 @@ public record OrderDto(
     long? ConfirmedAt = null,
     long? FactAt = null,
     // F5 — agendamento de pedido (MVP). NULL = pedido pra agora (caso padrão).
-    long? ScheduledDeliveryAt = null
+    long? ScheduledDeliveryAt = null,
+    // #1493 — forma de pagamento escolhida no PWA ao entregar. NULL = aparelho antigo.
+    string? Metodo = null
 );
 
 public record BatchItemDto(
@@ -108,6 +110,7 @@ public record CashEntryDto(
     bool? Estornado = null,
     // F7-C — fechamento de caixa pode carregar metodo/categoria. Mobile cria
     // entradas type=income/expense; web tem Metodo (pix/dinheiro/etc) opcional.
+    // #1493 — vale nos dois sentidos: o PWA tambem manda a forma escolhida.
     string? Metodo = null
 );
 

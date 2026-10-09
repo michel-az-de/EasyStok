@@ -21,6 +21,7 @@ import { AbaProducaoDoDiaApi } from './producao/AbaProducaoDoDiaApi'
 import { AbaInsumosApi } from './producao/AbaInsumosApi'
 import { AbaReceitasApi } from './producao/AbaReceitasApi'
 import { AbaPlanejamentoApi } from './producao/AbaPlanejamentoApi'
+import { AbaPerdasApi } from './producao/AbaPerdasApi'
 import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
 
@@ -72,6 +73,8 @@ export function PainelDeAjuste({ aba, janelasApi = null }) {
     receitas: <AbaReceitasApi />,
     // M2.5 (#1502): planejamento da produção (só modo API).
     planejamento: <AbaPlanejamentoApi />,
+    // M2.6 (#1511): controle de perdas (só modo API).
+    perdas: <AbaPerdasApi />,
   }), [fonteApi, janelasApi])
   const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada texto={AINDA_NAO_LIGADO[aba]}>{painel}</AbaNaoLigada>

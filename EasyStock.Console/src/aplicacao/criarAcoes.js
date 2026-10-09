@@ -26,6 +26,8 @@ import { criarAcoesIntegracoes } from './acoes/integracoes'
 import { criarAcoesFidelidade } from './acoes/fidelidade'
 import { linkDoCardapio } from '../dominio/cardapioLink'
 
+const PROGRAMADA_SO_NA_API = 'Mensagem programada só sai pelo EasyStok: na demonstração não há disparo.'
+
 const mesPorExtenso = (ms) =>
   new Date(ms).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
 
@@ -55,6 +57,11 @@ export function criarAcoes({
     obterLinkCardapio: async (id) => ({
       url: linkDoCardapio(window.location.origin + window.location.pathname, id), daLoja: false,
     }),
+    // Mensagem programada (#1424): quem agenda e dispara é o EasyStok (acoesApi.js). Na
+    // demonstração não há disparo, então não finge: a modal mostra este motivo.
+    programarMensagem: async () => { throw new Error(PROGRAMADA_SO_NA_API) },
+    listarProgramadas: async () => { throw new Error(PROGRAMADA_SO_NA_API) },
+    cancelarProgramada: async () => { throw new Error(PROGRAMADA_SO_NA_API) },
     consultarAgente,
     perguntarAssistente,
     selecionar: (id) => despachar({ tipo: acao.SELECIONAR_CONVERSA, id }),
