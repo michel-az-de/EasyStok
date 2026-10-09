@@ -41,11 +41,20 @@ public class ConsultarCardapioFerramentaTests
             _conversa = Conversa.Abrir(_storefront.EmpresaId, "5511999998888", Agora, "Maria", Guid.NewGuid());
         }
 
-        public void Item(string nome, string? alergenos = null, string? ingredientes = null)
+        public CardapioItem Item(string nome, string? alergenos = null, string? ingredientes = null)
         {
             var item = CardapioItem.CriarAvulso(_storefront.Id, nome, 30m);
             item.AtualizarMetadata(alergenos: alergenos, ingredientes: ingredientes);
             _itens.Add(item);
+            return item;
+        }
+
+        public async Task<IReadOnlyList<string>> NomesAsync()
+        {
+            var resultado = await _ferramenta.ExecutarAsync(
+                new ContextoTurnoAgente(_storefront.EmpresaId, _conversa, Agora), JsonSerializer.SerializeToElement(new { }));
+            return JsonDocument.Parse(resultado).RootElement.GetProperty("itens").EnumerateArray()
+                .Select(i => i.GetProperty("nome").GetString()!).ToList();
         }
 
         public async Task<JsonElement> ItemDoResultadoAsync(string nome)
@@ -82,5 +91,20 @@ public class ConsultarCardapioFerramentaTests
             item.TryGetProperty("alergenos", out _).Should().BeFalse(nome);
             item.TryGetProperty("ingredientes", out _).Should().BeFalse(nome);
         }
+    }
+
+    [Fact]
+    public async Task ItemEmValidacao_NaoEOferecidoAteConfirmar()
+    {
+        // M1.2 (#1482, RN-15).
+        var cenario = new Cenario();
+        cenario.Item("Lasanha");
+        var novo = cenario.Item("Torta");
+        novo.MarcarEmValidacao();
+
+        (await cenario.NomesAsync()).Should().NotContain(n => n.Contains("Torta"));
+
+        novo.ConfirmarValidacao();
+        (await cenario.NomesAsync()).Should().Contain(n => n.Contains("Torta"));
     }
 }

@@ -308,7 +308,8 @@ public sealed class CheckoutCoreService(
         foreach (var itemId in cardapioItemIds.Distinct())
         {
             var ci = await cardapioItemRepository.GetByIdAsync(storefrontId, itemId, ct);
-            if (ci is null || !ci.Visivel || !ci.Disponivel)
+            // M1.2 (#1482): item arquivado não se vende, nem por link antigo.
+            if (ci is null || !ci.Visivel || !ci.Disponivel || ci.EstaArquivado)
                 throw new RegraDeDominioVioladaException(
                     $"Item de cardápio {itemId} não encontrado ou indisponível.");
             cardapioItens[itemId] = ci;

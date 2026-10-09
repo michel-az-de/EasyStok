@@ -36,7 +36,8 @@ public sealed class ConsultarCardapioFerramenta(
             .ToDictionary(i => i.Id);
 
         var itens = cardapio.Itens
-            .Where(i => i.Disponivel)
+            // M1.2 (#1482, RN-15): item novo em validação não é oferecido até a dona confirmar.
+            .Where(i => i.Disponivel && !i.EmValidacao)
             .Select(i =>
             {
                 var ficha = fichas.GetValueOrDefault(i.Id);

@@ -52,7 +52,8 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
             .Include(c => c.Secao)
                 .ThenInclude(s => s!.SecaoPai)
                     .ThenInclude(s => s!.SecaoPai)
-            .Where(c => c.StorefrontId == storefrontId && c.Visivel)
+            // M1.2 (#1482): arquivado não vai ao site, à comanda nem ao agente.
+            .Where(c => c.StorefrontId == storefrontId && c.Visivel && c.ArquivadoEm == null)
             .OrderBy(c => c.Produto!.Categoria!.Nome)
             .ThenBy(c => c.OrdemExibicao)
             .ToListAsync(ct);

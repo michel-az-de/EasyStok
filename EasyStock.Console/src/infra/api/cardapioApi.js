@@ -15,18 +15,38 @@ export const ajustarSaldoDoItem = (id, quantidadeContada, motivo) =>
 
 const LINHA_DA_API = { servir: 'ParaServir', casa: 'PrepararEmCasa' }
 
-// Só o que o formulário do console edita; o resto do item fica como está no EasyStok.
+// Só o que o formulário do console edita; o resto do item fica como está no EasyStok. Campo que não
+// veio em `dados` fica fora do corpo (null = não mexe). Novidade: "" tira, "aaaa-mm-dd" define.
+const OPCIONAIS = ['descricao', 'ingredientes', 'alergenos', 'tempoPreparoMinutos', 'instrucaoFinalizacao']
 export const corpoDoItem = (dados) => ({
   nome: dados.nome?.trim(),
   linha: LINHA_DA_API[dados.linha] ?? null,
   porcao: dados.porcao?.trim() ?? null,
   preco: dados.preco,
+  ...Object.fromEntries(OPCIONAIS.filter((c) => dados[c] !== undefined).map((c) => [c, dados[c]])),
+  ...('novidadeAte' in dados ? { novidadeAte: dados.novidadeAte ? dados.novidadeAte.slice(0, 10) : '' } : {}),
 })
 
 export const incluirItem = (dados) => chamarApi(CARDAPIO, { metodo: 'POST', corpo: corpoDoItem(dados) })
 export const editarItem = (id, dados) => chamarApi(ITEM(id), { metodo: 'PUT', corpo: corpoDoItem(dados) })
 export const definirVisivel = (id, visivel) =>
   chamarApi(`${ITEM(id)}/visivel`, { metodo: 'POST', corpo: { visivel } })
+
+// M1.2 (#1482): tirar arquiva (≠ ocultar do site); validar libera o item novo para o agente.
+export const definirArquivado = (id, arquivado) =>
+  chamarApi(`${ITEM(id)}/arquivar`, { metodo: 'POST', corpo: { arquivado } })
+export const validarItem = (id) => chamarApi(`${ITEM(id)}/validar`, { metodo: 'POST' })
+export const obterItem = (id) => chamarApi(ITEM(id))
+
+// Detalhe → valores do formulário (a comanda não traz a ficha: ingredientes e alérgenos).
+export const detalheDaApi = (d) => ({
+  descricao: d.descricao ?? '',
+  ingredientes: d.ingredientes ?? '',
+  alergenos: d.alergenos ?? '',
+  tempoPreparoMinutos: d.tempoPreparoMinutos ?? null,
+  instrucaoFinalizacao: d.instrucaoFinalizacao ?? '',
+  novidadeAte: d.novidadeAte ? `${d.novidadeAte}T23:59:59-03:00` : null,
+})
 
 export const listarFora = () => chamarApi(`${CARDAPIO}/fora`)
 
@@ -70,4 +90,7 @@ export const itemGestaoDaApi = (i) => ({
   hoje: i.disponivel,
   ordem: i.ordem,
   controlaSaldo: i.controlaSaldo,
+  arquivado: i.arquivado === true,
+  emValidacao: i.emValidacao === true,
+  novidadeAte: i.novidadeAte ?? null,
 })

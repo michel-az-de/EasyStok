@@ -33,8 +33,6 @@ export const NAO_LIGADAS = {
   trocarJanela: 'Trocar a janela do pedido',
   ...grupo('Lembretes', ['criarLembrete', 'concluirLembrete']),
   ...grupo('Bloqueio do cliente', ['bloquearCliente', 'desbloquearCliente']),
-  // #1241: incluir, editar e tirar são ligados; o EasyStok não tem o "em validação".
-  confirmarValidacaoItem: 'Validar item do cardápio',
   mudarEnderecoDoPedido: 'Endereço do pedido',
   marcarRecebidoEntrega: 'Recebido na entrega',
   refazerCobranca: 'Refazer cobrança',

@@ -27,6 +27,9 @@ export const produtoDaApi = (item) => ({
   foto: urlDeExibicaoDaFoto(item.imagemUrl, API_BASE),
   fotos: (item.fotos?.length ? item.fotos : item.imagemUrl ? [item.imagemUrl] : [])
     .map((url) => urlDeExibicaoDaFoto(url, API_BASE)).filter(Boolean),
+  // M1.2 (#1482): item novo em validação (RN-15) e novidade com prazo (fim do dia, hora da loja).
+  emValidacao: item.emValidacao === true,
+  novidadeAte: item.novidadeAte ? `${item.novidadeAte}T23:59:59-03:00` : null,
 })
 
 const DIA_DA_SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']

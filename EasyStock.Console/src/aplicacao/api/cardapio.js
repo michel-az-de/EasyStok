@@ -2,8 +2,8 @@ import * as acao from '../acoes'
 import { estaRemovido, itemPorSku, semControleDeSaldo, disponivelHoje } from '../../dominio/cardapio'
 import { listarCardapio } from '../../infra/api/comandaApi'
 import {
-  ajustarSaldoDoItem, alertaDaApi, definirDisponibilidade, definirVisivel, editarItem, incluirItem, itemForaDaApi,
-  listarDesacertos, listarFora,
+  ajustarSaldoDoItem, alertaDaApi, definirArquivado, definirDisponibilidade, detalheDaApi, editarItem, incluirItem,
+  itemForaDaApi, listarDesacertos, listarFora, obterItem, validarItem,
 } from '../../infra/api/cardapioApi'
 
 // Cardápio no modo API (#1241, F11, S45/S17/S22). Antes, ligar/desligar, o saldo e o item só
@@ -82,11 +82,21 @@ export function criarAcoesCardapioApi({ despachar, estadoRef }) {
     incluirItemCardapio: (dados) => gravar('Cardápio', () => incluirItem(dados)),
     editarItemCardapio: (sku, dados) => gravar('Cardápio', () => editarItem(sku, dados)),
 
-    // Tira ou repõe pela mesma ação, como na tela: tirar esconde, nunca apaga.
+    // Tira ou repõe pela mesma ação, como na tela. M1.2 (D-M1-07): tirar arquiva, nunca apaga, e
+    // não mexe no "no site" (ocultar fica na gestão do cardápio).
     alternarRemocaoItemCardapio: (sku) => {
       const item = itemDe(sku)
       if (!item) return Promise.resolve(false)
-      return gravar('Cardápio', () => definirVisivel(sku, estaRemovido(item)))
+      return gravar('Cardápio', () => definirArquivado(sku, !estaRemovido(item)))
     },
+
+    // RN-15: a dona confirma o item novo; o agente passa a oferecer.
+    confirmarValidacaoItem: (sku) => gravar('Cardápio', () => validarItem(sku)),
+
+    // O formulário de edição precisa da ficha, que o cardápio da comanda não traz.
+    obterItemCardapio: (sku) => obterItem(sku).then(detalheDaApi).catch((erro) => {
+      avisar(`Cardápio: ${erro.message}`)
+      return null
+    }),
   }
 }

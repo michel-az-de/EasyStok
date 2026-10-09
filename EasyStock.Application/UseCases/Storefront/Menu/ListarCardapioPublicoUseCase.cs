@@ -93,7 +93,9 @@ public sealed class ListarCardapioPublicoUseCase(
                 PesoExibicao: i.PesoExibicao,
                 Linha: i.Linha.ParaContrato(),
                 TempoPreparoMinutos: i.TempoPreparoMinutos,
-                Fotos: i.ObterFotosGaleria()))
+                Fotos: i.ObterFotosGaleria(),
+                NovidadeAte: i.NovidadeAte,
+                EmValidacao: i.EmValidacao))
             .ToList();
 
         return new ListarCardapioPublicoResult(dtos, storefront.TituloPublico, storefront.Slug);
