@@ -1,25 +1,52 @@
-// Sessão do console no sessionStorage: some ao fechar a aba, não vaza para outra
-// pessoa que abrir o navegador depois. Sem refresh nesta fatia (F01): o refresh
-// da API recalcula a empresa e perde a escolha de quem tem mais de uma.
 const CHAVE = 'easystok.sessao'
+export const EVENTO_SESSAO_ALTERADA = 'easystok:sessao-alterada'
+let semStorage = null
+
+const ler = (storage) => {
+  try { return JSON.parse(globalThis[storage].getItem(CHAVE)) } catch { return null }
+}
+const remover = (storage) => {
+  try { globalThis[storage].removeItem(CHAVE) } catch { /* armazenamento indisponível */ }
+}
+
+export const permitePersistir = (token) => cargaDoToken(token)?.sessaoPersistente === 'true'
+export const identidadeDaSessao = (sessao) => `${sessao?.empresa?.id ?? '-'}:${sessao?.usuario?.id ?? '-'}`
 
 export function lerSessao() {
-  try {
-    const bruta = sessionStorage.getItem(CHAVE)
-    if (!bruta) return null
-    const sessao = JSON.parse(bruta)
-    return sessao.expiraEm > Date.now() ? sessao : null
-  } catch {
-    return null
-  }
+  const temporaria = ler('sessionStorage') ?? semStorage
+  if (temporaria) return temporaria.expiraEm > Date.now() ? temporaria : null
+  const persistida = ler('localStorage')
+  // A sessão vencida só serve para renovar. Nenhuma chamada usa seu JWT antigo.
+  return persistida?.persistente && persistida.refreshToken && permitePersistir(persistida.token) ? persistida : null
 }
 
 export function gravarSessao(sessao) {
-  try { sessionStorage.setItem(CHAVE, JSON.stringify(sessao)) } catch { /* sem storage: vale só nesta carga */ }
+  const persistente = Boolean(sessao.persistente && sessao.refreshToken && permitePersistir(sessao.token))
+  const atual = { ...sessao, persistente }
+  remover('sessionStorage')
+  remover('localStorage')
+  semStorage = null
+  try { globalThis[persistente ? 'localStorage' : 'sessionStorage'].setItem(CHAVE, JSON.stringify(atual)) }
+  catch {
+    // Sem disco disponível, não prometer permanência entre visitas.
+    semStorage = { ...atual, persistente: false }
+  }
+  window.dispatchEvent(new Event(EVENTO_SESSAO_ALTERADA))
+  return lerSessao()
 }
 
 export function limparSessao() {
-  try { sessionStorage.removeItem(CHAVE) } catch { /* nada a limpar */ }
+  remover('sessionStorage')
+  remover('localStorage')
+  semStorage = null
+  window.dispatchEvent(new Event(EVENTO_SESSAO_ALTERADA))
+}
+
+export function atualizarTokens(sessao, dados) {
+  const token = dados.accessToken ?? dados.token
+  const venceEm = vencimentoDoToken(token) ?? Date.now() + dados.expiresIn * 1000
+  return { ...sessao, token, refreshToken: dados.refreshToken, venceEm, expiraEm: venceEm - 60000,
+    persistente: permitePersistir(token) && Boolean(globalThis.navigator?.locks) }
 }
 
 // Vencimento do JWT lido do próprio token (`exp`, segundos), em ms. Token sem `exp` ou

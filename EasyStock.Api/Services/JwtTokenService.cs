@@ -37,6 +37,9 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
         if (resultado.PermissoesExplicitas)
             claims.Add(new Claim("permissoesExplicitas", "true"));
 
+        if (resultado.SessaoPersistente)
+            claims.Add(new Claim("sessaoPersistente", "true"));
+
         if (!string.IsNullOrWhiteSpace(resultado.ModuloInicial))
             claims.Add(new Claim("moduloInicial", resultado.ModuloInicial));
 

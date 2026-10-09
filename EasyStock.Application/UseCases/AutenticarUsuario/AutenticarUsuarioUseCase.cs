@@ -15,7 +15,8 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
         NivelAcesso Nivel,
         IReadOnlyCollection<Permissao> Permissoes,
         string? ModuloInicial = null,
-        bool PermissoesExplicitas = false);
+        bool PermissoesExplicitas = false,
+        bool SessaoPersistente = false);
 
     public class AutenticarUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
@@ -132,6 +133,7 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
             IReadOnlyCollection<Permissao> permissoes = [];
             string? moduloInicial = null;
             var permissoesExplicitas = false;
+            var sessaoPersistente = false;
 
             if (empresaId.HasValue && usuario.Perfis is not null)
             {
@@ -145,6 +147,8 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                     nivel = perfilDaEmpresa.Perfil.Nivel;
                     moduloInicial = perfilDaEmpresa.Perfil.ModuloInicial;
                     permissoesExplicitas = perfilDaEmpresa.Perfil.PermissoesExplicitas;
+                    sessaoPersistente = ResolveEmpresaIdPadrao(usuario) == empresaId
+                        && Domain.Services.PerfisCasaDaBaba.PermiteSessaoPersistente(perfilDaEmpresa.Perfil, empresaId.Value);
                     permissoes = perfilDaEmpresa.Perfil.Permissoes?
                         .Select(p => p.Permissao)
                         .Distinct()
@@ -164,7 +168,8 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 Nivel: nivel,
                 Permissoes: permissoes,
                 ModuloInicial: moduloInicial,
-                PermissoesExplicitas: permissoesExplicitas);
+                PermissoesExplicitas: permissoesExplicitas,
+                SessaoPersistente: sessaoPersistente);
         }
 
         private static Guid? PrimeiraEmpresaAtiva(Domain.Entities.Usuario usuario) =>

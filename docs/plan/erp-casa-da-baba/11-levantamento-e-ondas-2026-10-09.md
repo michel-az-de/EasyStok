@@ -521,3 +521,18 @@ O `Down` automático é bloqueado: apagar o arquivo ou retirar o marcador sem re
 4. Mercado Pago, transportadoras/geolocalização, impressão física Oasis e atendimento automático completo seguem com as dependências e aceites das ondas 3–5 e 9. Esta fatia não comprova essas integrações.
 
 Não houve deploy, alteração de banco de produção, envio externo ou cobrança real nesta execução.
+## 16. Continuação: sessão longa da Cozinha, 09/10/2026
+
+Implementada a decisão D-05 da M0.2 sobre `7c3314dd`. Login por senha e finalização Google emitem a capacidade de permanência somente para o perfil Cozinha da empresa ativa única, com nível e permissões da matriz inicial. Perfil global, outra empresa, nível maior, permissões adicionais ou usuário com várias empresas não recebem essa capacidade. Nenhum perfil ou vínculo foi alterado no banco.
+
+- A Cozinha conserva a sessão no aparelho e renova antes de consultar a API com o acesso vencido. Dona e Atendimento continuam no armazenamento da aba. Navegador sem coordenação segura entre abas ou sem armazenamento disponível usa sessão temporária.
+- A renovação usa o contrato existente de refresh, recalcula permissões e nunca troca silenciosamente de empresa. A validade continua a da API: 30 dias no refresh inicial e 7 dias a cada renovação; não é acesso indefinido sem validação.
+- Duas abas compartilham uma renovação. Falha de rede/429/5xx preserva a chave para retentar; credencial revogada encerra a sessão. Uma resposta antiga não encerra uma conta que entrou depois.
+- Sair limpa o aparelho e solicita a revogação no servidor. Se um refresh estava em andamento, sua chave recebida depois também é revogada. Falha de comunicação no logout é informada na tela de login.
+- A renovação mantém a busca, a rota e o estado de tela da mesma pessoa/empresa. A matriz é relida; troca de identidade reinicia o estado. O canal ao vivo também aguarda uma sessão válida antes de conectar.
+
+Validação: 970 testes da API aprovados, incluindo 9 cenários de senha/Google/refresh/logout; prova JavaScript de concorrência, offline, revogação e armazenamento; qualidade do Console aprovada (lint, camadas, 264 pares de contraste e build). As 54 provas anteriores foram executadas; a de login precisou incluir o EventTarget do navegador em sua fixture e passou após o ajuste. A nova prova da sessão também está no CI.
+
+Navegador Chromium e PostgreSQL reais: Dona/Atendimento pedem login em uma nova aba; Cozinha reabre o navegador com a sessão vencida e renova na API; duas abas geram um único refresh; a busca e o hall sobrevivem à renovação; offline conserva a chave e reconexão renova; logout invalida a chave (refresh retorna 401); celular de 390 px sem rolagem horizontal. Nenhum erro JavaScript. O roteiro HTTP de perfis manteve suas 51 verificações aprovadas. Google externo e tablet físico não foram usados nesta prova.
+
+Evidências em `C:\rep\EasyStok\.build\validacao-casa-da-baba-20261009\sessao`. Não houve deploy. O reparo do Down da migration anterior está na PR #1505 de outra frente, ainda não integrado neste registro. Sino transversal e revisão das ações dos módulos continuam na próxima fatia da onda 1.

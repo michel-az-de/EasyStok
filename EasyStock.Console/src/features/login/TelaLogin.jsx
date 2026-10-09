@@ -6,7 +6,7 @@ import { BotaoGoogle } from './BotaoGoogle'
 import css from './login.module.css'
 
 // Um passo, com a empresa resolvida pela API (M0.2).
-export function TelaLogin({ entrarNaEmpresa, google }) {
+export function TelaLogin({ entrarNaEmpresa, google, avisoSaida }) {
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState(null)
@@ -37,6 +37,7 @@ export function TelaLogin({ entrarNaEmpresa, google }) {
       <section className={css.cartao} aria-labelledby="titulo-login">
         <Marca />
         <h1 id="titulo-login" className={css.titulo}>Entrar na Casa da Baba</h1>
+        {avisoSaida && <p role="status">{avisoSaida}</p>}
         <form className={css.formulario} onSubmit={aoEnviar}>
           <CampoTexto
             rotulo="E-mail" tipo="email" autoComplete="username" required

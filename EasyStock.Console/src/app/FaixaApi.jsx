@@ -28,7 +28,7 @@ export function FaixaApi({ aoSair }) {
   const { fecharAvisoApi } = useAcoes()
   if (!fonteApi) return null
   // F07, item 6: 10 min antes do JWT vencer. Sessão antiga, sem `venceEm`, usa o `expiraEm`.
-  const vencimento = avisoDeVencimento(sessao?.venceEm ?? (sessao?.expiraEm ? sessao.expiraEm + 60000 : null), agora)
+  const vencimento = !sessao?.persistente && avisoDeVencimento(sessao?.venceEm ?? (sessao?.expiraEm ? sessao.expiraEm + 60000 : null), agora)
   const falhou = sincronizacao?.estado === 'erro'
   const carregando = sincronizacao?.estado === 'carregando'
   // O aviso de ação vem na frente; fechado ele, aparece o persistente, que só sai pelo botão.

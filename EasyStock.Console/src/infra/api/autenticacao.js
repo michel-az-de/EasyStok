@@ -1,5 +1,5 @@
 import { chamarApi } from './cliente'
-import { empresaDoToken, gravarSessao, limparSessao, vencimentoDoToken } from './sessao'
+import { atualizarTokens, empresaDoToken, gravarSessao, lerSessao, limparSessao } from './sessao'
 import { esquecerRascunhos } from './rascunhosDaSessao'
 
 // Casa da Baba (M0.2): a API resolve a empresa ativa; nunca escolhemos uma no navegador.
@@ -34,21 +34,15 @@ export async function entrarComGoogle(idToken) {
 }
 
 function abrirSessao(dados, empresa) {
-  const sessao = {
-    token: dados.token,
-    // Margem de 1 min para não mandar token vencendo no meio da chamada.
-    expiraEm: Date.now() + (dados.expiresIn - 60) * 1000,
-    // Vencimento real do token, para o aviso de 10 min antes (F07, item 6).
-    venceEm: vencimentoDoToken(dados.token) ?? Date.now() + dados.expiresIn * 1000,
-    usuario: dados.usuario,
-    empresa,
-  }
-  gravarSessao(sessao)
-  return sessao
+  return gravarSessao(atualizarTokens({ usuario: dados.usuario, empresa }, dados))
 }
 
 // Sair é decisão dela: os rascunhos guardados para depois do novo login vão junto.
 export function sair() {
+  const sessao = lerSessao()
   limparSessao()
   esquecerRascunhos()
+  return sessao?.refreshToken
+    ? chamarApi('/api/auth/logout', { metodo: 'POST', corpo: { refreshToken: sessao.refreshToken }, autenticado: false, sinal: AbortSignal.timeout(15000) })
+    : Promise.resolve()
 }

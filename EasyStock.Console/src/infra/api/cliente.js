@@ -1,5 +1,5 @@
 import { API_BASE } from '../fonteDados'
-import { lerSessao, limparSessao } from './sessao'
+import { atualizarTokens, empresaDoToken, gravarSessao, lerSessao, limparSessao } from './sessao'
 
 // Erro de chamada à API com o que a tela precisa para falar com a dona:
 // status HTTP, código da API (`error.code` ou `erro`), mensagem legível e o detalhe
@@ -17,6 +17,52 @@ export class ErroApi extends Error {
 
 // Quem escuta este evento (a sessão da aplicação) volta para o login.
 export const EVENTO_SESSAO_EXPIRADA = 'easystok:sessao-expirada'
+let renovacao = null
+
+function expirar(sessao) {
+  // Uma resposta atrasada de outra conta/renovação não encerra a sessão atual.
+  if (lerSessao()?.token !== sessao?.token) return
+  limparSessao()
+  window.dispatchEvent(new Event(EVENTO_SESSAO_EXPIRADA))
+}
+
+export async function garantirSessao() {
+  const sessao = lerSessao()
+  if (!sessao?.persistente || sessao.expiraEm > Date.now()) return sessao
+  if (!renovacao) {
+    const renovar = async () => {
+      const atual = lerSessao()
+      if (!atual?.persistente || atual.expiraEm > Date.now()) return atual
+      let dados
+      try {
+        dados = await chamarApi('/api/auth/refresh', {
+          metodo: 'POST', corpo: { refreshToken: atual.refreshToken }, autenticado: false,
+          sinal: AbortSignal.timeout(15000),
+        })
+      } catch (erro) {
+        if (erro.status === 401 || erro.status === 403) expirar(atual)
+        // Offline/5xx não apaga a chave: a próxima consulta pode renovar.
+        throw erro
+      }
+      if (lerSessao()?.refreshToken !== atual.refreshToken) {
+        // Sair durante o refresh também revoga a chave que chegou atrasada.
+        await chamarApi('/api/auth/logout', { metodo: 'POST', corpo: { refreshToken: dados?.refreshToken }, autenticado: false, sinal: AbortSignal.timeout(15000) }).catch(() => {})
+        throw new ErroApi(401, 'SESSAO_ALTERADA', 'A sessão foi encerrada ou trocada.')
+      }
+      if (!dados?.accessToken || !dados.refreshToken || empresaDoToken(dados.accessToken) !== atual.empresa.id) {
+        expirar(atual)
+        throw new ErroApi(401, 'EMPRESA_ALTERADA', 'Seu acesso mudou. Entre de novo.')
+      }
+      return gravarSessao(atualizarTokens(atual, dados))
+    }
+    // Uma renovação por vez, inclusive com várias abas do tablet abertas.
+    renovacao = globalThis.navigator?.locks
+      ? navigator.locks.request('easystok.renovar-sessao', renovar)
+      : renovar()
+    renovacao = renovacao.finally(() => { renovacao = null })
+  }
+  return renovacao
+}
 
 const MENSAGEM_POR_STATUS = {
   401: 'Sessão expirada. Entre de novo.',
@@ -51,13 +97,13 @@ const comoJson = (texto) => {
 // `arquivo`: binário fora do envelope (mídia da conversa, #1287); devolve o Blob.
 // `chave` (#1491): Idempotency-Key das rotas que criam algo caro de duplicar (produção, pedido).
 export async function chamarApi(caminho, {
-  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null,
+  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null, sinal,
 } = {}) {
+  const sessao = autenticado ? await garantirSessao() : null
   const cabecalhos = { Accept: arquivo ? '*/*' : 'application/json' }
   if (corpo !== undefined) cabecalhos['Content-Type'] = 'application/json'
   if (chave) cabecalhos['Idempotency-Key'] = chave
   if (autenticado) {
-    const sessao = lerSessao()
     if (sessao) cabecalhos.Authorization = `Bearer ${sessao.token}`
   }
   let resposta
@@ -66,6 +112,7 @@ export async function chamarApi(caminho, {
       method: metodo,
       headers: cabecalhos,
       body: formulario ?? (corpo === undefined ? undefined : JSON.stringify(corpo)),
+      signal: sinal,
     })
   } catch {
     throw new ErroApi(0, 'SEM_CONEXAO', 'Sem conexão com o EasyStok.')
@@ -77,8 +124,7 @@ export async function chamarApi(caminho, {
   if (resposta.ok) return json?.data ?? null
 
   if (resposta.status === 401 && autenticado) {
-    limparSessao()
-    window.dispatchEvent(new Event(EVENTO_SESSAO_EXPIRADA))
+    expirar(sessao)
   }
   const codigo = json?.error?.code ?? json?.erro ?? `HTTP_${resposta.status}`
   const mensagem = mensagemDoErro(json, resposta.status)

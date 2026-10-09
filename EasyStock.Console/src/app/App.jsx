@@ -12,6 +12,7 @@ import { useRelogio } from '../hooks/useRelogio'
 import { DESKTOP, useTamanhoTela } from '../hooks/useTamanhoTela'
 import { INSTANTE_INICIAL, LINHAS_PRODUTO } from '../infra/catalogo'
 import { FONTE_API } from '../infra/fonteDados'
+import { identidadeDaSessao } from '../infra/api/sessao'
 import { useSessaoApi } from '../aplicacao/useSessaoApi'
 import { ContextoAcessoModulos, useAcessoModulos, useModulosDaSessao } from '../aplicacao/acessoModulos'
 import { moduloDaRota, permiteModulo, permiteRota } from '../dominio/acessoModulos'
@@ -300,7 +301,7 @@ function AppPrincipal({ rota, sessao, aoSair }) {
   const { permite } = useAcessoModulos()
   return (
     // `key`: trocar de usuário ou empresa recomeça o estado, sem conversa de outra empresa na tela.
-    <AtendimentoProvider key={sessao?.token ?? 'demo'} agora={agora} sessao={sessao} atendimentoAtivo={permite('atendimento')}>
+    <AtendimentoProvider key={identidadeDaSessao(sessao)} agora={agora} sessao={sessao} atendimentoAtivo={permite('atendimento')}>
       <LimparAvisoAoNavegar />
       <TelaDaRota rota={rota} aoSair={aoSair} />
     </AtendimentoProvider>
@@ -318,20 +319,20 @@ function NoModulo({ rota, children }) {
 // Cozinha no modo API (F05): a fila vem do KDS, não do espelho do Balcão. Sem
 // sessão nesta aba, pede o login como a janela principal.
 function CozinhaApi({ rota, sessao }) {
-  return <NoModulo rota={rota}><TelaCozinhaApi key={sessao.token} linhas={LINHAS_PRODUTO} /></NoModulo>
+  return <NoModulo rota={rota}><TelaCozinhaApi key={identidadeDaSessao(sessao)} linhas={LINHAS_PRODUTO} /></NoModulo>
 }
 
 // Entregas no modo API (F04): janela própria lê a API, sem espelho do Balcão.
 function EntregasApi({ rota, sessao }) {
-  return <NoModulo rota={rota}><TelaEntregasApi key={sessao.token} /></NoModulo>
+  return <NoModulo rota={rota}><TelaEntregasApi key={identidadeDaSessao(sessao)} /></NoModulo>
 }
 
 export function App() {
   const hash = useHash()
-  const { sessao, entrarNaEmpresa, google, encerrarSessao } = useSessaoApi()
+  const { sessao, entrarNaEmpresa, google, encerrarSessao, avisoSaida } = useSessaoApi()
   const rota = rotaDaHash(hash, { fonteApi: FONTE_API })
-  if (FONTE_API && !sessao) return <TelaLogin entrarNaEmpresa={entrarNaEmpresa} google={google} />
-  if (FONTE_API) return <AppComAcesso key={sessao.token} rota={rota} sessao={sessao} aoSair={encerrarSessao} />
+  if (FONTE_API && !sessao) return <TelaLogin entrarNaEmpresa={entrarNaEmpresa} google={google} avisoSaida={avisoSaida} />
+  if (FONTE_API) return <AppComAcesso key={identidadeDaSessao(sessao)} rota={rota} sessao={sessao} aoSair={encerrarSessao} />
   if (!FONTE_API && rota.modulo) return <AppPrincipal rota={rota} sessao={sessao} aoSair={encerrarSessao} />
   if (rota.tipo === ROTA_ENTREGAS) return FONTE_API ? <EntregasApi rota={rota} sessao={sessao} /> : <NoModulo rota={rota}><TelaEntregas /></NoModulo>
   if (rota.tipo === ROTA_COZINHA) return FONTE_API ? <CozinhaApi rota={rota} sessao={sessao} /> : <NoModulo rota={rota}><TelaCozinha /></NoModulo>
@@ -348,7 +349,7 @@ function AppComAcesso({ rota, sessao, aoSair }) {
       {erro ?? 'Aguarde um instante.'}
     </Vazio>
   )
-  const acesso = { permite: (id) => permiteModulo(dados, id), acoes: dados.acoes ?? {}, aoSair }
+  const acesso = { permite: (id) => permiteModulo(dados, id), acoes: dados.acoes ?? {}, aoSair, sessaoPersistente: sessao.persistente }
   let tela
   if (!permiteRota(dados, rota)) tela = (
     <Vazio titulo="Seu perfil não tem acesso a este módulo" acao={<><a href={HASH_HALL}>Voltar aos módulos</a><Botao variante="texto" onClick={aoSair}>Sair</Botao></>}>

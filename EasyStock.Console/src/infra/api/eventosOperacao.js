@@ -1,5 +1,5 @@
 import { API_BASE } from '../fonteDados'
-import { lerSessao } from './sessao'
+import { garantirSessao } from './cliente'
 import { criarLeitorSse } from './leitorSse'
 
 // SSE de operação (S18): `GET api/operacao/eventos` com o JWT no header, lido por
@@ -8,10 +8,11 @@ import { criarLeitorSse } from './leitorSse'
 // (erro, 401/403 ou o servidor fechou); reconectar é decisão de quem chamou.
 export function conectarEventosOperacao({ aoEvento, aoCair }) {
   const controle = new AbortController()
-  const sessao = lerSessao()
 
   ;(async () => {
     try {
+      const sessao = await garantirSessao()
+      if (controle.signal.aborted) return
       const resposta = await fetch(`${API_BASE}/api/operacao/eventos`, {
         headers: { Accept: 'text/event-stream', ...(sessao ? { Authorization: `Bearer ${sessao.token}` } : {}) },
         signal: controle.signal,

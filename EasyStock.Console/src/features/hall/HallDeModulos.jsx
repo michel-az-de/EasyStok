@@ -58,12 +58,13 @@ export function HallDeModulos({ fonteApi = false, sessao = null, agora }) {
         <div className={css.busca}>
           <CampoTexto rotulo="Buscar módulo ou tela" tipo="search" value={busca} onChange={(e) => setBusca(e.target.value)} />
         </div>
-        {aoSair && <Botao variante="texto" onClick={aoSair}>Sair</Botao>}
+        {aoSair && <Botao variante="texto" onClick={aoSair}>{sessao?.persistente ? 'Sair deste aparelho' : 'Sair'}</Botao>}
       </header>
       <main className={css.conteudo}>
         <div className={css.cabeca}>
           <h1 className={css.titulo}>{saudacaoDoHall(agora, sessao?.usuario?.nome)}</h1>
           <p className={css.apoio}>Escolha o módulo para começar.</p>
+          {sessao?.persistente && <p className={css.apoio}>A Cozinha permanece conectada neste aparelho. Use Sair ao trocar de pessoa.</p>}
           {modulos.length === 0 && !busca && <output>Seu perfil ainda não tem módulos liberados. Peça à dona para revisar seu acesso.</output>}
         </div>
         <ul className={css.grade} aria-label="Módulos">

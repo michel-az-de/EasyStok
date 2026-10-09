@@ -16,6 +16,7 @@ assert.deepEqual(filtrarModulos(hall, 'xyz'), [])
 assert.deepEqual(filtrarModulos(hall, 'caixa').map((m) => m.id), ['financeiro'])
 
 const storage = new Map()
+globalThis.window = new EventTarget()
 globalThis.sessionStorage = { getItem: (k) => storage.get(k), setItem: (k, v) => storage.set(k, v), removeItem: (k) => storage.delete(k) }
 const { entrar } = await import('../src/infra/api/autenticacao.js')
 const empresaId = 'a1fd1e83-4d38-49b0-9000-390fa7390cfb'
