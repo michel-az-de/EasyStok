@@ -23,24 +23,6 @@
   font-family: var(--f-dado); font-weight: 700; color: var(--tinta-2);
 }
 
-/* Interruptor de tema como controle segmentado da Apple: trilho translúcido,
-   o lado ativo vira uma pastilha de papel com sombra. */
-.tema {
-  display: inline-flex; gap: 2px; padding: 3px; flex-wrap: nowrap;
-  background: var(--preenchimento); border-radius: calc(var(--r-1) + 3px);
-}
-.tema > button {
-  min-height: 38px; padding: 0 var(--e-3);
-  background: transparent; border-color: transparent; box-shadow: none;
-  color: var(--tinta-2); font-weight: 600;
-}
-.tema > button:hover:not(:disabled) { background: transparent; border-color: transparent; color: var(--tinta); }
-.tema > .temaAtiva,
-.tema > .temaAtiva:hover:not(:disabled) {
-  background: var(--papel); color: var(--tinta); border-color: var(--linha);
-  box-shadow: var(--sombra-media);
-}
-
 /* Estado da loja: um toque, Aberta ou Fechada, sempre visível no topo
    (pedido do dono, 24/09/2026). Botão sem casca própria, a Pilula já dá cor
    e texto; só precisa de área de toque e cursor de botão. */
@@ -198,29 +180,8 @@
 .sinoTrilho > div > button::after { content: 'Lembretes'; }
 .sinoTrilho section[aria-label='Lembretes'] { top: 0; left: calc(100% + 10px); right: auto; transform-origin: top left; }
 .espacoTrilho { flex: 1; }
-/* Tema no pé do trilho (achado 4, banca capricho R10): mesmo desenho de
-   ícone MAIS rótulo dos outros itens do trilho, só que em duas pastilhas
-   empilhadas em vez de uma linha. */
-.temaTrilho {
-  display: flex; flex-direction: column; gap: 2px; padding: 3px; margin-top: var(--e-2);
-  background: var(--preenchimento); border-radius: 14px;
-}
-.temaTrilho > button {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  width: 56px; min-height: 52px; padding: 0; border: 0; border-radius: 11px;
-  background: transparent; box-shadow: none; color: var(--tinta-3);
-  font-size: var(--t-minimo); font-weight: 600; line-height: 1.1;
-}
-.temaTrilho > button:hover:not(:disabled) { background: transparent; color: var(--tinta); }
-.temaTrilho > .temaAtiva,
-.temaTrilho > .temaAtiva:hover:not(:disabled) { background: var(--papel); color: var(--marca); box-shadow: var(--sombra-media); }
-.temaTrilho .rotuloTema { margin-left: 0; }
-.tema .rotuloTema { margin-left: 2px; }
-
-/* Celular: tema só com sol e lua, para o topo caber numa linha. */
+/* Controles compactos do Balcão. */
 @media (max-width: 759px) {
-  .tema .rotuloTema { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  .tema > button { padding: 0 10px; }
   .topo { flex-wrap: nowrap; }
   .controles { flex-wrap: nowrap; gap: var(--e-1); }
   .controles > .comPopover > button { padding: 0; width: var(--toque); }

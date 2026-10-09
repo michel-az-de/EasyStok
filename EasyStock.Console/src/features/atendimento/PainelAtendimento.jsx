@@ -41,14 +41,16 @@ export function PainelAtendimento({
     const primeira = visiveis[0]
     return (
       <Vazio
-        titulo="Nenhuma conversa aberta"
+        titulo={primeira ? 'Escolha uma conversa' : 'Nenhuma conversa para exibir'}
         acao={primeira && (
           <Botao variante="primario" onClick={() => selecionar(primeira.id)}>
             Abrir {primeira.nome.split(' ')[0]}
           </Botao>
         )}
       >
-        Quem espera mais tempo tem o trilho vermelho no cartão.
+        {primeira
+          ? 'Selecione um nome no Balcão para ver as mensagens e continuar o atendimento.'
+          : 'Confira a busca e os filtros do Balcão. As conversas recebidas aparecem por lá.'}
       </Vazio>
     )
   }
