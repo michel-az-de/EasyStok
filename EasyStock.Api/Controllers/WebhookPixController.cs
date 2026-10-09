@@ -15,12 +15,12 @@ public class WebhookPixController(
 {
     [HttpPost("pix")]
     [AllowAnonymous]
-    public async Task<IActionResult> Pix()
+    public async Task<IActionResult> Pix(CancellationToken ct)
     {
         // Lê body bruto pra calcular HMAC e desserializar.
         Request.EnableBuffering();
         using var reader = new StreamReader(Request.Body, Encoding.UTF8, leaveOpen: true);
-        var rawBody = await reader.ReadToEndAsync();
+        var rawBody = await reader.ReadToEndAsync(ct);
         Request.Body.Position = 0;
 
         if (!ValidarAssinatura(rawBody))
@@ -56,8 +56,13 @@ public class WebhookPixController(
                         valorPago = parsed;
                 }
 
-                await ProcessarPagamentoAsync(txid, valorPago);
+                await ProcessarPagamentoAsync(txid, valorPago, ct);
             }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Efi desistiu da conexao: nao e erro do servidor; ela reenvia e a reconciliacao e idempotente.
+            throw;
         }
         catch (Exception ex)
         {
@@ -127,7 +132,7 @@ public class WebhookPixController(
             Encoding.ASCII.GetBytes(headerSig.Trim().ToLowerInvariant()));
     }
 
-    private async Task ProcessarPagamentoAsync(string txid, decimal? valorPago)
+    private async Task ProcessarPagamentoAsync(string txid, decimal? valorPago, CancellationToken ct)
     {
         // Roteamento por prefixo de txid:
         // - "cr..." -> parcela ContaReceber (CAP/CAR module)
@@ -140,7 +145,7 @@ public class WebhookPixController(
         }
 
         var r = await reconciliarPixParcelaReceberUseCase.ExecuteAsync(
-            new ReconciliarPixParcelaReceberCommand(txid, valorPago, DateTime.UtcNow));
+            new ReconciliarPixParcelaReceberCommand(txid, valorPago, DateTime.UtcNow), ct);
         if (r.Reconciliado)
             logger.LogInformation("Webhook Pix: parcela CR reconciliada (txid={Txid} parcela={ParcelaId} conta={ContaId})",
                 txid, r.ParcelaId, r.ContaId);

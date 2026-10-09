@@ -47,7 +47,7 @@ public class WebhookPixControllerE2ETests(PostgreSqlDatabaseFixture fixture)
         var controller = CriarController();
         ConfigurarRequest(controller, payload, timestamp, signature);
 
-        var result = await controller.Pix();
+        var result = await controller.Pix(CancellationToken.None);
         result.Should().BeOfType<OkResult>();
 
         await using var assert = fixture.CreateDbContext();
@@ -76,7 +76,7 @@ public class WebhookPixControllerE2ETests(PostgreSqlDatabaseFixture fixture)
         var (timestamp, signature) = GerarAssinaturaEfi(payload, "outro-secret");
         ConfigurarRequest(controller, payload, timestamp, signature);
 
-        var result = await controller.Pix();
+        var result = await controller.Pix(CancellationToken.None);
         result.Should().BeOfType<UnauthorizedResult>();
 
         await using var assert = fixture.CreateDbContext();
@@ -103,7 +103,7 @@ public class WebhookPixControllerE2ETests(PostgreSqlDatabaseFixture fixture)
         var controller = CriarController();
         ConfigurarRequest(controller, payload, oldTimestamp, signature);
 
-        var result = await controller.Pix();
+        var result = await controller.Pix(CancellationToken.None);
         result.Should().BeOfType<UnauthorizedResult>();
     }
 
