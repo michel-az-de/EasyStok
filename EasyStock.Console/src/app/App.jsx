@@ -59,7 +59,7 @@ import { Moldura } from './Moldura'
 // Só o topo conhece todas as features. Feature nenhuma importa outra feature.
 function Composicao({ aoSair }) {
   const {
-    selecionada, regras, encerrando, encerrandoNumero, agente, modoAgente, agora, aberta,
+    selecionada, regras, encerrando, encerrandoNumero, agente, modoAgente, agora, aberta, horarioDaLoja,
     conversas, automaticoPausado,
   } = useAtendimento()
   const {
@@ -70,7 +70,7 @@ function Composicao({ aoSair }) {
 
   // Item 8 (rodada 10): título da aba com a contagem de "Precisa de você",
   // para quem trocou de janela no mesmo computador (US-010, saber sem olhar).
-  useTituloDaAba(contarPrecisaDeVoce(conversas, agora, automaticoPausado, aberta, janelas))
+  useTituloDaAba(contarPrecisaDeVoce(conversas, agora, automaticoPausado, aberta, janelas, horarioDaLoja))
   const [modal, setModal] = useState(null)
   const [pratoArrastando, setPratoArrastando] = useState(null)
   // Rodada 10 (registro 79): o cliente simulado que reage às ações da
@@ -131,7 +131,7 @@ function Composicao({ aoSair }) {
   const sugestaoAgente = selecionada ? (
     <PainelAgente
       key={selecionada.id}
-      passouParaVoce={precisaDeVoce(selecionada, agora, true, aberta, janelas)}
+      passouParaVoce={precisaDeVoce(selecionada, agora, true, aberta, janelas, horarioDaLoja)}
       bloqueada={envioBloqueado(selecionada, agora, canalDaConversa(canais, selecionada))}
       modo={modoAgente}
       estado={agente.conversaId === selecionada.id ? agente.estado : 'ocioso'}

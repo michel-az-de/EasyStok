@@ -3,38 +3,46 @@
    Pouca moldura: o cartão inteiro é o alvo do clique, os atalhos ficam por cima. */
 .hall {
   display: flex; flex-direction: column; height: 100%; min-height: 0; overflow-y: auto;
-  background: var(--creme); color: var(--tinta); font-family: var(--f-corpo);
+  background: var(--fundo); color: var(--tinta); font-family: var(--f-corpo);
 }
 
 .topo {
   display: flex; align-items: center; justify-content: space-between;
   gap: var(--e-4); flex-wrap: wrap;
-  padding: var(--e-4) var(--e-5);
+  padding: var(--e-3) var(--e-5);
+  background: var(--papel); border-bottom: var(--b-1) solid var(--linha);
 }
-.busca { width: min(360px, 100%); }
-.resultado { color: var(--tinta-2); font-size: var(--t-apoio); }
+.acoes { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); }
+.topo img { width: 84px; height: 56px; }
+.avisos { display: flex; }
+.abertura { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 400px); align-items: center; gap: var(--e-4); margin-bottom: var(--e-4); }
+.busca { display: flex; align-items: end; flex-wrap: wrap; gap: var(--e-2); }
+.busca > div { width: 100%; }
+.resultado { display: block; color: var(--tinta-2); font-size: var(--t-apoio); }
+.resultado:not(:empty) { margin-bottom: var(--e-4); }
 
-.conteudo { width: min(1120px, 100%); margin: 0 auto; padding: var(--e-3) var(--e-5) var(--e-6); }
+.conteudo { width: min(1280px, 100%); margin: 0 auto; padding: var(--e-5) var(--e-5) var(--e-6); }
 
-.cabeca { margin-bottom: var(--e-5); }
+.cabeca { min-width: 0; }
+.legenda { margin: 0 0 var(--e-2); font-size: var(--t-micro); font-weight: 700; color: var(--marca); }
 .titulo {
   margin: 0; font-family: var(--f-titulo-marca); font-weight: 600;
   font-size: var(--t-display); line-height: 1.15; color: var(--tinta);
 }
-.apoio { margin: var(--e-2) 0 0; font-size: var(--t-forte); color: var(--tinta-2); }
+.apoio { margin: var(--e-2) 0 0; font-size: var(--t-corpo); color: var(--tinta-2); }
 
 .grade {
   display: grid; gap: var(--e-4);
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
   margin: 0; padding: 0; list-style: none;
 }
 
 .cartao {
   position: relative;
   display: flex; flex-direction: column; gap: var(--e-2);
-  min-height: 11rem; padding: var(--e-4);
+  min-height: 11rem; min-width: 0; padding: var(--e-4);
   border: var(--b-1) solid var(--linha); border-radius: var(--r-3);
-  background: var(--papel);
+  background: var(--papel); box-shadow: var(--sombra);
   transition: border-color var(--dur-curta) var(--ease-padrao), transform var(--dur-curta) var(--ease-saida),
     box-shadow var(--dur-curta) var(--ease-padrao);
 }
@@ -45,29 +53,30 @@
   position: absolute; top: var(--e-4); right: var(--e-4);
   font-size: var(--t-apoio); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--tinta-2);
 }
-.icone { color: var(--marca); }
+.icone { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--r-1); background: var(--marca-claro); color: var(--marca); }
 .nome { font-family: var(--f-titulo-marca); font-size: var(--t-titulo); font-weight: 600; color: var(--tinta); }
 .resumo { font-size: var(--t-corpo); color: var(--tinta-2); }
 
 /* O link do nome cobre o cartão inteiro; foco aparece no cartão (regra acima). */
-.abrir { text-decoration: none; color: inherit; outline: none; }
+.abrir { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); text-decoration: none; color: inherit; outline: none; }
+.abrir > svg { flex: none; color: var(--marca); }
 .abrir::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
 
 .atalhos {
   position: relative; z-index: 1;
-  display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-3);
+  display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-2);
   margin: auto 0 0; padding: var(--e-2) 0 0; list-style: none;
   border-top: var(--b-1) solid var(--linha);
 }
 .atalho {
-  display: inline-flex; align-items: center; min-height: var(--toque);
-  font-size: var(--t-apoio); font-weight: 700; color: var(--marca); text-decoration: none;
+  display: flex; align-items: center; min-height: var(--toque); padding-inline: var(--e-2);
+  border-radius: var(--r-1); font-size: var(--t-apoio); font-weight: 600; color: var(--marca); text-decoration: none;
 }
-.atalho:hover { text-decoration: underline; }
+.atalho:hover { background: var(--marca-claro); text-decoration: underline; }
 .atalho:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
 
 /* Em breve: borda tracejada e cadeado, texto mantém contraste (sem opacidade). */
-.emBreve { border-style: dashed; background: transparent; }
+.emBreve { border-style: dashed; background: transparent; box-shadow: none; }
 .emBreve .icone, .emBreve .nome { color: var(--tinta-2); }
 .selo {
   display: inline-flex; align-items: center; gap: var(--e-1); margin-top: auto;
@@ -76,8 +85,19 @@
 
 @media (max-width: 640px) {
   .topo, .conteudo { padding-inline: var(--e-3); }
+  .topo { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--e-2); }
+  .acoes { display: contents; }
+  .acoes > [role='radiogroup'] { grid-row: 2; grid-column: 1; justify-self: start; }
+  .avisos { grid-row: 2; grid-column: 2; justify-self: end; }
+  .sair { grid-row: 1; grid-column: 2; max-width: 140px; }
+  .conteudo { padding-top: var(--e-4); }
+  .titulo { font-size: var(--t-valor); }
   .grade { grid-template-columns: 1fr; gap: var(--e-3); }
   .cartao { min-height: 0; }
+}
+
+@media (max-width: 900px) {
+  .abertura { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

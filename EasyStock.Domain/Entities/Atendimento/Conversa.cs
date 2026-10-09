@@ -66,6 +66,13 @@ public class Conversa
     public bool EstaAberta => Situacao != SituacaoConversa.Encerrada;
 
     /// <summary>
+    /// O cliente falou por ultimo e a conversa segue aberta: e o que o SLA de primeira resposta da loja
+    /// conta (#1427). Qualquer saida registrada depois (agente, dona ou sistema) zera a espera.
+    /// </summary>
+    public bool AguardaResposta =>
+        EstaAberta && UltimaMensagemEntradaEm is { } entrada && entrada >= UltimaMensagemEm;
+
+    /// <summary>
     /// O agente so responde no WhatsApp (envia pelo cliente da Cloud API). Nos demais canais quem
     /// atende e sempre a dona (#1288).
     /// </summary>

@@ -35,6 +35,27 @@ public class AvaliadorLembretesTests
         Microsoft.Extensions.Options.Options.Create(new EasyStock.Application.Services.Notifications.PrazosOptions()));
 
     [Fact]
+    public async Task FecharNaMaoNaoConcluiLembreteAindaSemRespostaNemDisparaAviso()
+    {
+        var conversaId = Guid.NewGuid();
+        var entradaId = Guid.NewGuid();
+        var expediente = EasyStock.Domain.Entities.Storefront.ExpedienteLoja.CriarPadrao(_empresaId);
+        var lembrete = Lembrete.Automatico(_empresaId, TipoLembrete.ClienteSemResposta, entradaId.ToString(),
+            "Sem resposta", Agora, conversaId: conversaId);
+        await _repo.AddAsync(lembrete);
+        expediente.DefinirControle(EasyStock.Domain.Enums.Storefront.ControleManualLoja.ForcarFechada, null, Agora);
+        _candidatos.ListarConversasSemRespostaAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns([new ConversaSemResposta(_empresaId, conversaId, entradaId, "Fulana", null, Agora.AddMinutes(-20), 5, expediente)]);
+        var resultado = await Avaliador().ExecuteAsync();
+        resultado.Resolvidos.Should().Be(0);
+        resultado.Avisados.Should().Be(0);
+        lembrete.EstaAberto.Should().BeTrue();
+        expediente.DefinirControle(EasyStock.Domain.Enums.Storefront.ControleManualLoja.ForcarAberta, null, Agora);
+        (await Avaliador().ExecuteAsync()).Avisados.Should().Be(1);
+        _repo.Todos.Should().ContainSingle();
+    }
+
+    [Fact]
     public async Task PagamentoSemBaixaIdempotente()
     {
         var pedidoId = Guid.NewGuid();
@@ -65,8 +86,8 @@ public class AvaliadorLembretesTests
         var conversaId = Guid.NewGuid();
         var entradaId = Guid.NewGuid();
         var atendente = Guid.NewGuid();
-        _candidatos.ListarConversasSemRespostaAsync(Agora - TimeSpan.FromMinutes(10), Arg.Any<CancellationToken>())
-            .Returns([new ConversaSemResposta(_empresaId, conversaId, entradaId, "Fulana", atendente)]);
+        _candidatos.ListarConversasSemRespostaAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns([new ConversaSemResposta(_empresaId, conversaId, entradaId, "Fulana", atendente, Agora.AddMinutes(-11))]);
 
         await Avaliador().ExecuteAsync();
 
@@ -126,6 +147,15 @@ public class AvaliadorLembretesTests
                 .Where(l => l.EmpresaId == empresaId && (incluirConcluidos || l.EstaAberto)
                     && (usuarioId is null || l.ParaUsuarioId is null || l.ParaUsuarioId == usuarioId))
                 .Take(limite).ToList());
+
+        public Task<int> MarcarVencidosVistosAsync(Guid empresaId, Guid usuarioId, DateTime agoraUtc, CancellationToken ct = default)
+        {
+            var vencidos = _itens.Where(l => l.EmpresaId == empresaId && l.EstaAberto
+                && (l.ParaUsuarioId is null || l.ParaUsuarioId == usuarioId)
+                && l.VistoEm is null && l.VenceEm <= agoraUtc).ToList();
+            foreach (var lembrete in vencidos) lembrete.MarcarVisto(agoraUtc);
+            return Task.FromResult(vencidos.Count);
+        }
 
         public Task<bool> ExisteAutomaticoAsync(Guid empresaId, TipoLembrete tipo, string referencia, CancellationToken ct = default) =>
             Task.FromResult(_itens.Any(l => l.EmpresaId == empresaId && l.Tipo == tipo && l.Referencia == referencia));

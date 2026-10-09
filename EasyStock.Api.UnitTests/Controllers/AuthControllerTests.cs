@@ -194,6 +194,11 @@ public class AuthControllerTests
     [InlineData(NivelAcesso.Operador, Modulo.Caixa, true, false, false, false)]
     [InlineData(NivelAcesso.Gerente, Modulo.Cardapio, true, false, false, true)]
     [InlineData(NivelAcesso.Operador, Modulo.Cardapio, true, false, false, false)]
+    [InlineData(NivelAcesso.Admin, Modulo.Atendimento, true, false, false, false)]
+    [InlineData(NivelAcesso.SuperAdmin, Modulo.Atendimento, true, false, false, false)]
+    [InlineData(NivelAcesso.Gerente, Modulo.Atendimento, true, false, false, false)]
+    [InlineData(NivelAcesso.Operador, Modulo.Atendimento, true, false, false, false)]
+    [InlineData(NivelAcesso.Admin, Modulo.Atendimento, false, false, false, false)]
     public void CapacidadesDeEdicaoExigemNivelEmpresaEModulo(
         NivelAcesso nivel, Modulo modulo, bool comEmpresa, bool producao, bool caixa, bool cardapio)
     {
@@ -215,6 +220,10 @@ public class AuthControllerTests
         acoes.GetProperty("editarProducao").GetBoolean().Should().Be(producao);
         acoes.GetProperty("gerenciarCaixa").GetBoolean().Should().Be(caixa);
         acoes.GetProperty("editarCardapio").GetBoolean().Should().Be(cardapio);
+        acoes.GetProperty("editarAtendimento").GetBoolean().Should().Be(
+            comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin);
+        acoes.GetProperty("controlarLoja").GetBoolean().Should().Be(
+            comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin or NivelAcesso.Gerente);
     }
 
     // ── N8: esqueci a senha ───────────────────────────────────────────────────────────────────

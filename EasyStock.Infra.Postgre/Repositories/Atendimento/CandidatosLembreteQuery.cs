@@ -35,15 +35,27 @@ public sealed class CandidatosLembreteQuery(EasyStockDbContext db) : ICandidatos
             from c in db.AtendimentoConversas.IgnoreQueryFilters()
             where c.Situacao == SituacaoConversa.Assumida
             let ultima = db.AtendimentoMensagens.IgnoreQueryFilters()
-                .Where(m => m.EmpresaId == c.EmpresaId && m.ConversaId == c.Id && m.Autor != AutorMensagem.Sistema)
+                .Where(m => m.EmpresaId == c.EmpresaId && m.ConversaId == c.Id
+                    && m.Status != StatusMensagem.Falhou && m.Status != StatusMensagem.Pendente)
                 .OrderByDescending(m => m.EnviadaEm)
+                .ThenByDescending(m => m.Id)
                 .Select(m => new { m.Id, m.Direcao, m.EnviadaEm })
                 .FirstOrDefault()
             where ultima != null && ultima.Direcao == DirecaoMensagem.Entrada && ultima.EnviadaEm < entradaAntesDe
+            // #1427: o SLA da loja vai junto; nulo quando a loja não gravou configuração (o avaliador usa o padrão).
+            let sla = db.ConfiguracoesAtendimento.IgnoreQueryFilters()
+                .Where(cfg => cfg.EmpresaId == c.EmpresaId)
+                .Select(cfg => (int?)cfg.SlaRespostaMinutos)
+                .FirstOrDefault()
             orderby ultima.EnviadaEm
-            select new { c.EmpresaId, c.Id, MensagemId = ultima.Id, c.ContatoNome, c.AssumidaPorUsuarioId })
+            select new { c.EmpresaId, c.Id, MensagemId = ultima.Id, c.ContatoNome, c.AssumidaPorUsuarioId, ultima.EnviadaEm, Sla = sla })
             .ToListAsync(ct);
 
-        return linhas.Select(l => new ConversaSemResposta(l.EmpresaId, l.Id, l.MensagemId, l.ContatoNome, l.AssumidaPorUsuarioId)).ToList();
+        var empresas = linhas.Select(l => l.EmpresaId).Distinct().ToArray();
+        var expedientes = await db.ExpedientesLoja.IgnoreQueryFilters().AsNoTracking()
+            .Where(e => empresas.Contains(e.EmpresaId)).ToDictionaryAsync(e => e.EmpresaId, ct);
+        return linhas.Select(l => new ConversaSemResposta(
+            l.EmpresaId, l.Id, l.MensagemId, l.ContatoNome, l.AssumidaPorUsuarioId, l.EnviadaEm, l.Sla,
+            expedientes.GetValueOrDefault(l.EmpresaId))).ToList();
     }
 }

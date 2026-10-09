@@ -37,7 +37,8 @@ public class LancarLotePapelUseCaseTests
             NullLogger<PedidoEstoqueIntegrationService>.Instance);
         var atualizar = new AtualizarStatusPedidoUseCase(_pedidoRepo, integ, configRepo, gerarCr, _publicador,
             Substitute.For<IOperacaoEventPublisher>(), uow, NullLogger<AtualizarStatusPedidoUseCase>.Instance,
-            new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
+            new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()),
+            new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(crRepo, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>(), NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance));
         var lote = new AtualizarStatusPedidosEmLoteUseCase(atualizar, uow,
             NullLogger<AtualizarStatusPedidosEmLoteUseCase>.Instance);
         _pedidoRepo.AddEventoAsync(Arg.Do<PedidoEvento>(_eventos.Add));

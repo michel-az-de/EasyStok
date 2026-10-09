@@ -230,17 +230,24 @@ public sealed class PedidoEstoqueIntegrationService(
         if (!await movRepo.ExisteReferenciaAsync(pedido.EmpresaId, item.ProdutoId.Value, refDocItem, NaturezaMovimentacaoEstoque.Venda, ct))
             return;
 
-        // Idempotência do estorno: se já há um Estorno referenciando este pedido+item, pula.
-        if (await movRepo.ExisteReferenciaAsync(pedido.EmpresaId, item.ProdutoId.Value, refDocItem, NaturezaMovimentacaoEstoque.Estorno, ct))
-            return;
-
         // Devolve para os lotes que de fato baixaram (um movimento de saida por lote), nao para
         // "o primeiro lote": a parte que virou descoberto e abatida antes de voltar ao saldo.
-        var saidas = (await movRepo.GetByProdutoAsync(pedido.EmpresaId, item.ProdutoId.Value))
+        var todasAsSaidas = (await movRepo.GetByProdutoAsync(pedido.EmpresaId, item.ProdutoId.Value))
             .Where(m => m.DocumentoReferencia == refDocItem
                         && m.Tipo == TipoMovimentacaoEstoque.Saida
                         && m.Natureza == NaturezaMovimentacaoEstoque.Venda)
             .ToList();
+
+        // Idempotencia do estorno (#1506): cada saida devolvida fica marcada (EstornadaEm), entao so
+        // volta o que ainda nao voltou. Antes, um estorno manual de UMA saida (mesmo
+        // DocumentoReferencia) fazia o cancelamento pular as demais e o estoque ficava a menos.
+        // Estorno sem nenhuma saida marcada e o legado anterior a esta regra: ja devolveu tudo.
+        if (todasAsSaidas.All(s => s.EstornadaEm is null)
+            && await movRepo.ExisteReferenciaAsync(pedido.EmpresaId, item.ProdutoId.Value, refDocItem, NaturezaMovimentacaoEstoque.Estorno, ct))
+            return;
+        var saidas = todasAsSaidas.Where(s => s.EstornadaEm is null).ToList();
+        if (todasAsSaidas.Count > 0 && saidas.Count == 0) return;
+
         var qtd = item.Quantidade;
         if (qtd <= 0m) return;
 
@@ -270,6 +277,11 @@ public sealed class PedidoEstoqueIntegrationService(
 
             lote.RestaurarSaidaEstornada(saida.Quantidade, agora);
             await itemEstoqueRepo.UpdateAsync(lote);
+            if (saida.Id != Guid.Empty)
+            {
+                saida.MarcarComoEstornada(agora);
+                await movRepo.UpdateAsync(saida);
+            }
 
             await movRepo.InsertAsync(new MovimentacaoEstoque
             {

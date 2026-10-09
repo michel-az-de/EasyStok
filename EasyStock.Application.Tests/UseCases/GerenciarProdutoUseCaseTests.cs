@@ -17,14 +17,6 @@ public class GerenciarProdutoUseCaseTests
     private readonly FakeUnitOfWork _unitOfWork = new();
 
     private GerenciarProdutoUseCase CriarUseCase() => new(
-        _produtoRepository,
-        _categoriaRepository,
-        _variacaoRepository,
-        _caracteristicaRepository,
-        _embalagemRepository,
-        _itemEstoqueRepository,
-        _movimentacaoRepository,
-        _unitOfWork,
         new EasyStock.Application.UseCases.GerenciarProduto.Comandos.AtualizarLimiaresProdutoUseCase(_produtoRepository, _unitOfWork),
         new EasyStock.Application.UseCases.GerenciarProduto.Comandos.RemoverProdutoUseCase(_produtoRepository, _itemEstoqueRepository, _unitOfWork),
         new EasyStock.Application.UseCases.GerenciarProduto.Comandos.RestaurarProdutoUseCase(_produtoRepository, _unitOfWork),

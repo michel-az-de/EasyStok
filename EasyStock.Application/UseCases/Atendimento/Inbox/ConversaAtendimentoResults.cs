@@ -5,6 +5,10 @@ namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
 /// <summary>Linha da inbox do console (S07).</summary>
 /// <param name="MotivoEscalada">Por que o agente passou para humano (#1238); nulo depois que alguém assume.</param>
+/// <param name="UltimaMensagemEntradaEm">Última fala do cliente (#1427): de onde o SLA de primeira resposta conta.</param>
+/// <param name="AguardaResposta">O cliente falou por último e a conversa segue aberta (#1427).</param>
+/// <param name="SlaRespostaMinutos">SLA de primeira resposta da loja (#1427), o mesmo em toda linha: a rota é de
+/// Operador e a configuração é de Admin, então é por aqui que todo atendente lê o prazo.</param>
 public sealed record ConversaResumoResult(
     Guid Id,
     CanalConversa Canal,
@@ -18,12 +22,15 @@ public sealed record ConversaResumoResult(
     Guid? PedidoEmAndamentoId,
     Guid? AssumidaPorUsuarioId,
     bool DentroDaJanela,
-    string? MotivoEscalada = null)
+    string? MotivoEscalada = null,
+    DateTime? UltimaMensagemEntradaEm = null,
+    bool AguardaResposta = false,
+    int SlaRespostaMinutos = ConfiguracaoAtendimento.SlaRespostaPadraoMinutos)
 {
-    internal static ConversaResumoResult De(Conversa c, string? ultimaMensagemTexto, DateTime agora) => new(
+    internal static ConversaResumoResult De(Conversa c, string? ultimaMensagemTexto, DateTime agora, int slaRespostaMinutos, bool? aguardaResposta = null) => new(
         c.Id, c.Canal, c.ContatoIdExterno, c.ContatoNome, c.ClienteId, c.Situacao, c.NaoLidas,
         c.UltimaMensagemEm, ultimaMensagemTexto, c.PedidoEmAndamentoId, c.AssumidaPorUsuarioId, c.DentroDaJanela(agora),
-        c.MotivoEscalada);
+        c.MotivoEscalada, c.UltimaMensagemEntradaEm, aguardaResposta ?? c.AguardaResposta, slaRespostaMinutos);
 }
 
 /// <summary>Mensagem como o console mostra. <c>MidiaChave</c> é interna: o arquivo é servido por endpoint autenticado.</summary>

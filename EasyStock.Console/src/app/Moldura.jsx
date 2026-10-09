@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlcaLargura } from '../componentes/AlcaLargura'
 import { Avatar } from '../componentes/Avatar'
 import { Marca } from '../componentes/Marca'
+import { InterruptorTema } from '../componentes/InterruptorTema'
+import { trocarTema } from '../hooks/useTema'
 import { BarraDeAbas } from '../componentes/BarraDeAbas'
 import { Botao } from '../componentes/Botao'
 import { Icone } from '../componentes/Icone'
@@ -129,86 +131,6 @@ function MenuMais({
         />
       )}
     </span>
-  )
-}
-
-const CHAVE_TEMA = 'casa-da-baba:tema'
-
-const OPCOES_TEMA = [
-  { valor: 'light', rotulo: 'Claro', icone: 'sun' },
-  { valor: 'dark', rotulo: 'Escuro', icone: 'moon' },
-]
-
-function lerTemaSalvo() {
-  try {
-    const salvo = window.localStorage.getItem(CHAVE_TEMA)
-    if (salvo === 'light' || salvo === 'dark') return salvo
-  } catch {
-    // sem storage, a tela segue o sistema
-  }
-  return 'sistema'
-}
-
-function aplicarTema(valor) {
-  if (valor === 'light' || valor === 'dark') {
-    document.documentElement.setAttribute('data-theme', valor)
-  } else {
-    document.documentElement.removeAttribute('data-theme')
-  }
-}
-
-// Troca de tema fora do interruptor (menu Mais do topo compacto): mesma
-// dissolvência e mesma gravação do interruptor.
-function trocarTema(valor) {
-  const trocar = () => aplicarTema(valor)
-  if (document.startViewTransition) document.startViewTransition(trocar)
-  else trocar()
-  gravarTema(valor)
-}
-
-function gravarTema(valor) {
-  try {
-    window.localStorage.setItem(CHAVE_TEMA, valor)
-  } catch {
-    // sem persistência, a escolha vale só para esta sessão
-  }
-}
-
-// Dois estados, Claro e Escuro (corte #2: "Seguir o sistema" era um terceiro
-// botão de tema sem pedido nenhum atrás). Rótulo escrito nos dois, nunca
-// ícone sozinho. A pintura inicial já sai certa do script inline no
-// index.html; aqui só refletimos o que ele decidiu.
-function InterruptorTema({ classe }) {
-  const [tema, setTema] = useState(lerTemaSalvo)
-
-  // A troca vira uma dissolvência única da tela (View Transitions), em vez de
-  // cada componente mudar de cor no seu ritmo. Sem suporte, troca direto.
-  function escolher(valor) {
-    const trocar = () => {
-      setTema(valor)
-      aplicarTema(valor)
-    }
-    if (document.startViewTransition && valor !== tema) document.startViewTransition(trocar)
-    else trocar()
-    gravarTema(valor)
-  }
-
-  return (
-    <div className={classe ?? css.tema} role="radiogroup" aria-label="Tema">
-      {OPCOES_TEMA.map((opcao) => (
-        <Botao
-          key={opcao.valor}
-          role="radio"
-          aria-checked={tema === opcao.valor}
-          className={tema === opcao.valor ? css.temaAtiva : ''}
-          onClick={() => escolher(opcao.valor)}
-          title={opcao.rotulo}
-        >
-          <Icone nome={opcao.icone} tamanho={18} />
-          <span className={css.rotuloTema}>{opcao.rotulo}</span>
-        </Botao>
-      ))}
-    </div>
   )
 }
 
@@ -371,7 +293,7 @@ function Trilho({
           <span>Simular</span>
         </Botao>
       )}
-      <InterruptorTema classe={css.temaTrilho} />
+      <InterruptorTema vertical />
       {atendente && (
         <span className={css.atendente} title={`${atendente}, atendendo`}>
           <Avatar nome={atendente} tamanho="medio" />

@@ -1,7 +1,7 @@
 using EasyStock.Application.Services;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos;
-using EasyStock.Domain.Enums.Financeiro;
 using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.UseCases.CancelarPedido;
@@ -19,7 +19,8 @@ public sealed record CancelarPedidoCommand(
 ///   1. Se o pedido ja tinha baixado estoque (Pronto/Entregue), DEVOLVE o estoque
 ///      via <see cref="PedidoEstoqueIntegrationService.DevolverAsync"/> (idempotente).
 ///   2. Muda o status para Cancelado.
-///   3. Cancela a ContaReceber gerada deste pedido, se houver (Origem=Pedido).
+///   3. Cancela a ContaReceber gerada deste pedido, se houver (Origem=Pedido), e libera a
+///      vaga da janela de entrega (<see cref="EfeitosCancelamentoPedido"/>).
 ///   4. O CAIXA estorna sozinho por agregacao: a soma de PedidoPagamento do dia
 ///      filtra Status != cancelado, entao o pagamento sai do caixa automaticamente.
 ///
@@ -30,7 +31,7 @@ public sealed record CancelarPedidoCommand(
 public class CancelarPedidoUseCase(
     IPedidoRepository pedidoRepo,
     PedidoEstoqueIntegrationService estoqueIntegration,
-    IContaReceberRepository contaReceberRepo,
+    EfeitosCancelamentoPedido efeitosCancelamento,
     IUnitOfWork uow,
     ILogger<CancelarPedidoUseCase> logger)
 {
@@ -72,29 +73,9 @@ public class CancelarPedidoUseCase(
 
         await pedidoRepo.UpdateAsync(pedido);
 
-        // 3. Estorno financeiro: cancela a ContaReceber gerada deste pedido (se houver e
-        //    ainda nao cancelada). Caixa nao precisa de acao: estorna por agregacao.
-        var contaReceber = await contaReceberRepo.GetByOrigemAsync(
-            cmd.EmpresaId, OrigemContaFinanceira.Pedido, pedido.Id);
-        var contaReceberCancelada = false;
-        if (contaReceber is not null
-            && contaReceber.Status != StatusContaFinanceira.Cancelada
-            && contaReceber.Status != StatusContaFinanceira.Paga)
-        {
-            // Cancelar lanca se a conta estiver Paga; por isso so cancelamos quando
-            // ainda esta cancelavel (Aberta/Rascunho/ParcialmentePaga/Vencida).
-            contaReceber.Cancelar(cmd.Motivo ?? "Pedido cancelado", cmd.UsuarioId);
-            await contaReceberRepo.UpdateAsync(contaReceber);
-            contaReceberCancelada = true;
-        }
-        else if (contaReceber is not null && contaReceber.Status == StatusContaFinanceira.Paga)
-        {
-            // CR paga: o estorno do pagamento (e do movimento de caixa associado a parcela)
-            // e cascata maior (EstornarPagamentoParcela) — fica pra fatia de estorno financeiro.
-            logger.LogWarning(
-                "Pedido {Id} cancelado, mas ContaReceber {CrId} esta PAGA — nao cancelada automaticamente. " +
-                "Estorne os pagamentos da conta manualmente.", pedido.Id, contaReceber.Id);
-        }
+        // 3. Estorno financeiro (ContaReceber) e vaga da janela (#1506). Caixa nao precisa de
+        //    acao: estorna por agregacao.
+        var contaReceberCancelada = await efeitosCancelamento.AplicarAsync(pedido, cmd.Motivo, cmd.UsuarioId);
 
         await uow.CommitAsync();
 

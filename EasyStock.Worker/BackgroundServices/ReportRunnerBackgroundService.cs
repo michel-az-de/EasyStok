@@ -160,6 +160,9 @@ public sealed class ReportRunnerBackgroundService(
                 return;
             }
 
+            // GetByIdAsync le sem tracking: sem marcar Modified o TryStart nao era gravado,
+            // a run seguia Pending, voltava no proximo polling e rodava em duplicata (#1507).
+            db.Entry(run).State = EntityState.Modified;
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
         }
@@ -225,26 +228,42 @@ public sealed class ReportRunnerBackgroundService(
             {
                 while (await heartbeatTimer.WaitForNextTickAsync(runCt))
                 {
-                    // Verifica se run ainda quer ser cancelada (status Canceling).
-                    using var hbScope = serviceProvider.CreateScope();
-                    var hbRepo = hbScope.ServiceProvider.GetRequiredService<IReportRunRepository>();
-                    var current = await hbRepo.GetByIdAsync(run.Id, CancellationToken.None);
-                    if (current?.Status == ReportStatus.Canceling)
+                    try
                     {
-                        logger.LogInformation("ReportRunner: run {RunId} entrou em Canceling — cancelando via token.", run.Id);
-                        runCts.Cancel();
-                        return;
+                        // Verifica se run ainda quer ser cancelada (status Canceling).
+                        using var hbScope = serviceProvider.CreateScope();
+                        var hbRepo = hbScope.ServiceProvider.GetRequiredService<IReportRunRepository>();
+                        var current = await hbRepo.GetByIdAsync(run.Id, CancellationToken.None);
+                        if (current?.Status == ReportStatus.Canceling)
+                        {
+                            logger.LogInformation("ReportRunner: run {RunId} entrou em Canceling — cancelando via token.", run.Id);
+                            runCts.Cancel();
+                            return;
+                        }
+                        await hbRepo.HeartbeatAsync(run.Id, leaseDuration, CancellationToken.None);
                     }
-                    await hbRepo.HeartbeatAsync(run.Id, leaseDuration, CancellationToken.None);
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        // Falha transitoria de banco nao pode matar o heartbeat (lease expira, run duplica):
+                        // loga e tenta de novo no proximo tick.
+                        logger.LogError(ex, "ReportRunner: heartbeat da run {RunId} falhou; nova tentativa no proximo tick.", run.Id);
+                    }
                 }
             }
             catch (OperationCanceledException) { /* esperado */ }
             catch (Exception ex)
             {
-                // Falha transitoria de banco nao pode matar o heartbeat em silencio (lease expira, run duplica).
-                logger.LogError(ex, "ReportRunner: heartbeat da run {RunId} falhou.", run.Id);
+                logger.LogError(ex, "ReportRunner: heartbeat da run {RunId} encerrado por falha inesperada.", run.Id);
             }
         }, CancellationToken.None);
+
+        // Para o heartbeat antes de gravar o estado final: o UPDATE dele avanca o xmin da
+        // linha e correria com o save final (falso conflito de concorrencia otimista).
+        async Task PararHeartbeatAsync()
+        {
+            heartbeatTimer.Dispose();
+            await heartbeatTask;
+        }
 
         long rowCount = 0;
         try
@@ -281,9 +300,10 @@ public sealed class ReportRunnerBackgroundService(
             var sizeBytes = hashStream.BytesWritten;
 
             // Commit: marca run como Succeeded em transação.
+            await PararHeartbeatAsync();
             await using var tx = await db.Database.BeginTransactionAsync(CancellationToken.None);
             run.MarkSucceeded(storageKey, sizeBytes, hexHash, rowCount);
-            db.Entry(run).State = EntityState.Modified;
+            await AlinharVersaoAsync(db, run);
             await db.SaveChangesAsync(CancellationToken.None);
             await tx.CommitAsync(CancellationToken.None);
 
@@ -328,6 +348,7 @@ public sealed class ReportRunnerBackgroundService(
         {
             // Cancelamento solicitado pelo usuário (status Canceling) ou host shutdown.
             logger.LogInformation("ReportRunner: run {RunId} cancelada.", run.Id);
+            await PararHeartbeatAsync();
             run.MarkCanceled();
             await SafeSaveAndCleanupAsync(db, run, storage, storageKey);
             metrics.RecordCompleted(
@@ -344,6 +365,7 @@ public sealed class ReportRunnerBackgroundService(
                 "ReportRunner: run {RunId} falhou (terminal={Terminal}, class={Class}).",
                 run.Id, isTerminal, errorClass);
 
+            await PararHeartbeatAsync();
             run.MarkFailed(errorClass, friendlyMsg, isTerminal);
             await SafeSaveAndCleanupAsync(db, run, storage, storageKey);
             metrics.RecordCompleted(
@@ -379,9 +401,8 @@ public sealed class ReportRunnerBackgroundService(
         }
         finally
         {
-            runCts.Cancel();          // Para o heartbeat timer.
-            heartbeatTimer.Dispose();
-            await heartbeatTask;      // Aguarda encerramento limpo.
+            runCts.Cancel();             // Para o heartbeat timer.
+            await PararHeartbeatAsync(); // Idempotente; aguarda encerramento limpo.
         }
     }
 
@@ -405,7 +426,7 @@ public sealed class ReportRunnerBackgroundService(
     {
         try
         {
-            db.Entry(run).State = EntityState.Modified;
+            await AlinharVersaoAsync(db, run);
             await db.SaveChangesAsync(CancellationToken.None);
         }
         catch (Exception saveEx)
@@ -416,6 +437,33 @@ public sealed class ReportRunnerBackgroundService(
         // Rollback compensatório: remove artefato parcialmente gravado.
         try { await storage.DeleteAsync(storageKey, CancellationToken.None); }
         catch { /* melhor esforço */ }
+    }
+
+    /// <summary>
+    /// Anexa a run como Modified e alinha o token de concorrência (xmin) à versão atual da linha.
+    /// O heartbeat estende o lease com UPDATE direto, o que avança o xmin; sem isso todo relatório
+    /// mais longo que um tick falharia por concorrência no save final. Só alinha se a linha ainda é
+    /// desta tentativa (Running/Canceling com o mesmo número de tentativas); se o watchdog reciclou
+    /// a run, o token antigo permanece e o save falha por concorrência, como deve.
+    /// </summary>
+    private static async Task AlinharVersaoAsync(EasyStockDbContext db, ReportRun run)
+    {
+        var versoes = await db.Database
+            .SqlQueryRaw<long>(
+                """
+                SELECT xmin::text::bigint AS "Value"
+                  FROM public.report_runs
+                 WHERE id         = {0}
+                   AND status     IN (1, 5)
+                   AND tentativas = {1}
+                """,
+                run.Id, run.Tentativas)
+            .ToListAsync(CancellationToken.None);
+
+        var entry = db.Entry(run);
+        entry.State = EntityState.Modified;
+        if (versoes.Count == 1)
+            entry.Property(r => r.Xmin).OriginalValue = (uint)versoes[0];
     }
 
     private static bool IsTerminalFailure(Exception ex) =>

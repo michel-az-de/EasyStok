@@ -53,7 +53,7 @@ public class AtendimentoExpedienteControllerTests
         typeof(AtendimentoExpedienteController).GetCustomAttributes<AuthorizeAttribute>()
             .Should().OnlyContain(a => a.Policy == null, "política na classe somaria (E) com a do controle e travaria o gerente");
 
-        Politica(nameof(AtendimentoExpedienteController.Get)).Should().Be("Admin");
+        Politica(nameof(AtendimentoExpedienteController.Get)).Should().Be("Operador");
         Politica(nameof(AtendimentoExpedienteController.Put)).Should().Be("Admin");
         Politica(nameof(AtendimentoExpedienteController.DefinirControle)).Should().Be("Gerente");
     }

@@ -7,15 +7,15 @@ const instante = (texto) => {
   return Number.isNaN(ms) ? Date.now() : ms
 }
 
-// Os automáticos locais já são calculados a partir das conversas.
-export const lembreteEhManual = (dto) => dto?.tipo === 'Manual'
+// No modo API, inclusive os automáticos vêm do avaliador persistido.
 export const lembreteDaApi = (dto) => ({
   ...novoLembrete({
     id: `api-lembrete-${dto.id}`,
     titulo: dto.texto,
     quando: instante(dto.venceEm),
     conversaId: dto.conversaId ?? null,
-    origem: ORIGENS.MANUAL,
+    origem: dto.tipo === 'ClienteSemResposta' ? ORIGENS.PASSAGEM
+      : dto.tipo === 'PagamentoSemBaixa' ? ORIGENS.PAGAMENTO : ORIGENS.MANUAL,
   }),
   fonte: FONTES.LEMBRETE,
   servidorId: dto.id,

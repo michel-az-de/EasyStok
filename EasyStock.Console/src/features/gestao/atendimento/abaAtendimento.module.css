@@ -27,3 +27,5 @@
 
 .retorno { font-size: var(--t-apoio); color: var(--tinta-2); }
 .erro { color: var(--erro); font-size: var(--t-apoio); margin: 0; }
+
+.campos { border: 0; padding: 0; margin: 0; min-width: 0; display: contents; }

@@ -1,4 +1,4 @@
-import { precisaDeVoce } from './automatico'
+import { precisaDeVoce, respostaAtrasada } from './automatico'
 import { inicioDoPedidoAtivo } from './entrega'
 
 export const ehLead = (conversa) => conversa.conta === 'lead'
@@ -90,11 +90,13 @@ const foraDoTopo = (conversa) => estaBloqueada(conversa) || conversa.estado === 
 // Lista principal do Balcão: nunca traz bloqueado nem encerrado (grupo próprio
 // no fim de "Todas"), respeita canal e busca sempre, e a aba "Precisa de você"
 // some com quem o automático ainda vai responder sozinho.
-export function conversasDoBalcao(conversas, filtros, agora, automaticoPausado = {}, aberta = true, janelas = []) {
+export function conversasDoBalcao(
+  conversas, filtros, agora, automaticoPausado = {}, aberta = true, janelas = [], expediente = null,
+) {
   const base = conversas.filter((c) =>
     !foraDoTopo(c) && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca))
   if (filtros.aba !== 'precisa') return base
-  return base.filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas))
+  return base.filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas, expediente))
 }
 
 // Os dois grupos recolhidos do fim de "Todas" (seção 1): mesma busca e mesmo
@@ -113,24 +115,38 @@ export const conversasBloqueadasDoBalcao = (conversas, filtros) =>
 // lista de cima (nem encerrada nem bloqueada) e, dentro disso, quantas
 // precisam de você. Ignora busca e canal ligado de propósito: ligar um canal
 // ou digitar na busca não pode mudar o número dos outros canais.
-export function contarPorCanal(conversas, canais, agora, automaticoPausado = {}, aberta = true, janelas = []) {
+export function contarPorCanal(conversas, canais, agora, automaticoPausado = {}, aberta = true, janelas = [], expediente = null) {
   return (canais ?? []).map((canal) => {
     const abertas = conversas.filter((c) => c.canal === canal.nome && !foraDoTopo(c))
     return {
       nome: canal.nome,
       abertas: abertas.length,
       precisam: abertas
-        .filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas)).length,
+        .filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas, expediente)).length,
     }
   })
 }
 
 // Três ordens (seção 1), um botão só. `janelas` só importa para "entrega": sem
 // pedido ativo ou sem janela escolhida, a conversa vai para o fim dessa ordem.
+//
+// #1427: na aba "Precisa de você" o SLA de resposta estourado vai para o topo
+// em qualquer das três ordens (a ordem escolhida vale dentro de cada grupo);
+// em "Urgência" ele já é o primeiro degrau de prioridade em qualquer aba.
 export function ordenarBalcao(conversas, agora, {
-  ordenacao = 'urgencia', automaticoPausado = {}, janelas = [], aberta = true,
+  ordenacao = 'urgencia', automaticoPausado = {}, janelas = [], aberta = true, expediente = null, aba = null,
 } = {}) {
-  const lista = [...conversas]
+  // Uma conta por conversa, não uma por comparação do sort: com expediente, o
+  // SLA anda pelo horário da loja.
+  const atrasadas = new Set(conversas
+    .filter((c) => respostaAtrasada(c, agora, automaticoPausado[c.id] ?? false, expediente)).map((c) => c.id))
+  const atrasada = (c) => atrasadas.has(c.id)
+  const ordenada = ordenarSemSla([...conversas], agora, { ordenacao, automaticoPausado, janelas, aberta, expediente, atrasada })
+  if (aba !== 'precisa' || ordenacao === 'urgencia') return ordenada
+  return [...ordenada.filter(atrasada), ...ordenada.filter((c) => !atrasada(c))]
+}
+
+function ordenarSemSla(lista, agora, { ordenacao, automaticoPausado, janelas, aberta, expediente, atrasada }) {
   if (ordenacao === 'recentes') {
     return lista.sort((a, b) => new Date(b.ultimaEm).getTime() - new Date(a.ultimaEm).getTime())
   }
@@ -142,11 +158,13 @@ export function ordenarBalcao(conversas, agora, {
       return new Date(a.ultimaEm).getTime() - new Date(b.ultimaEm).getTime()
     })
   }
-  // Padrão "Urgência": quem precisa dela sobe primeiro, e dentro de cada
-  // grupo quem espera há mais tempo sobe.
+  // Padrão "Urgência": SLA de resposta estourado no topo (#1427), depois quem
+  // precisa dela, e dentro de cada grupo quem espera há mais tempo sobe.
+  const prioridades = new Map(lista.map((c) => [c.id, atrasada(c) ? 2
+    : precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas, expediente) ? 1 : 0]))
   return lista.sort((a, b) => {
-    const prioridadeA = precisaDeVoce(a, agora, automaticoPausado[a.id] ?? false, aberta, janelas) ? 1 : 0
-    const prioridadeB = precisaDeVoce(b, agora, automaticoPausado[b.id] ?? false, aberta, janelas) ? 1 : 0
+    const prioridadeA = prioridades.get(a.id)
+    const prioridadeB = prioridades.get(b.id)
     if (prioridadeA !== prioridadeB) return prioridadeB - prioridadeA
     return new Date(a.ultimaEm).getTime() - new Date(b.ultimaEm).getTime()
   })

@@ -91,6 +91,13 @@ public sealed class MetaCloudWhatsAppProvider(
                 IdExterno = wamid
             };
         }
+        catch (TextoAposImagemFalhouException ex)
+        {
+            // #1507: a imagem já saiu. Repetir reenviaria a imagem, então a falha do texto não pode ser transitória.
+            logger.LogError(ex.InnerException, "Meta WhatsApp: imagem enviada, texto falhou: entrega indeterminada (outbox {OutboxId}).",
+                mensagem.OutboxId);
+            return Indeterminado(ex.Message, (ex.InnerException as WhatsAppCloudException)?.StatusHttp, sw);
+        }
         catch (WhatsAppCloudException ex) when (ex.Codigo == WhatsAppCloudException.CodigoForaDaJanela && template is null)
         {
             logger.LogWarning("Meta recusou texto fora da janela de 24 h (outbox {OutboxId}).", mensagem.OutboxId);
@@ -194,6 +201,7 @@ public sealed class MetaCloudWhatsAppProvider(
     /// <summary>
     /// Imagem com o texto como legenda (#1226: arte da campanha dentro da janela). Legenda acima do limite
     /// da Meta sai em duas mensagens: a imagem sem legenda e depois o texto, cujo id fica no histórico.
+    /// Falha do texto depois de a imagem sair sobe como <see cref="TextoAposImagemFalhouException"/> (Indeterminado).
     /// </summary>
     private static async Task<string> EnviarImagemComTextoAsync(
         ICanalMensageria canal, string contato, string imagem, string texto, CancellationToken ct)
@@ -202,8 +210,18 @@ public sealed class MetaCloudWhatsAppProvider(
             return await canal.EnviarImagemAsync(contato, imagem, texto, ct);
 
         await canal.EnviarImagemAsync(contato, imagem, null, ct);
-        return await canal.EnviarTextoAsync(contato, texto, ct);
+        try
+        {
+            return await canal.EnviarTextoAsync(contato, texto, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            throw new TextoAposImagemFalhouException(ex);
+        }
     }
+
+    /// <summary>A imagem saiu e o texto que a segue falhou: o envio já é parcial.</summary>
+    private sealed class TextoAposImagemFalhouException(Exception inner) : Exception(inner.Message, inner);
 
     /// <summary><c>imagem</c>: URL HTTPS pública (cabeçalho do template ou imagem com legenda na janela).</summary>
     private static string? LerImagem(IReadOnlyDictionary<string, string>? metadados) =>

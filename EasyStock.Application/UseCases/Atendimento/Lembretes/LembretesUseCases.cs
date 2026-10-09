@@ -90,20 +90,14 @@ public sealed class ConcluirLembreteUseCase(ILembreteRepository repository, IUni
 }
 
 /// <summary>S43: abrir o sininho marca como vistos os abertos que o usuário enxerga. Devolve quantos mudaram.</summary>
-public sealed class MarcarLembretesVistosUseCase(ILembreteRepository repository, IUnitOfWork unitOfWork, TimeProvider relogio)
+public sealed class MarcarLembretesVistosUseCase(ILembreteRepository repository, TimeProvider relogio)
 {
-    public async Task<int> ExecuteAsync(Guid empresaId, Guid usuarioId, CancellationToken ct = default)
+    public Task<int> ExecuteAsync(Guid empresaId, Guid usuarioId, CancellationToken ct = default)
     {
-        var agora = relogio.GetUtcNow().UtcDateTime;
-        var naoVistos = (await repository.ListarAsync(empresaId, usuarioId, incluirConcluidos: false, int.MaxValue, ct))
-            .Where(l => l.EmpresaId == empresaId && (l.ParaUsuarioId == null || l.ParaUsuarioId == usuarioId)
-                && l.VistoEm is null && l.VenceEm <= agora)
-            .ToList();
-        if (naoVistos.Count == 0) return 0;
+        UseCaseGuards.EnsureEmpresaId(empresaId);
+        if (usuarioId == Guid.Empty)
+            throw new UseCaseValidationException("Usuário é obrigatório para marcar lembretes como vistos.");
 
-        foreach (var lembrete in naoVistos)
-            lembrete.MarcarVisto(agora);
-        await unitOfWork.CommitAsync();
-        return naoVistos.Count;
+        return repository.MarcarVencidosVistosAsync(empresaId, usuarioId, relogio.GetUtcNow().UtcDateTime, ct);
     }
 }

@@ -7,7 +7,7 @@ namespace EasyStock.Application.Ports.Output.Persistence.Atendimento;
 public sealed record ConversaComMensagens(Conversa Conversa, IReadOnlyList<Mensagem> Mensagens);
 
 /// <summary>Linha da inbox do console (S07): a conversa e o texto da ultima mensagem, quando houver.</summary>
-public sealed record ConversaInboxItem(Conversa Conversa, string? UltimaMensagemTexto);
+public sealed record ConversaInboxItem(Conversa Conversa, string? UltimaMensagemTexto, bool? AguardaResposta = null);
 
 /// <summary>Mensagem que não chegou ao cliente, com a conversa dela (S59).</summary>
 public sealed record MensagemNaoEntregue(Conversa Conversa, Mensagem Mensagem);

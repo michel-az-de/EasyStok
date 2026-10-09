@@ -233,7 +233,8 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<IReadOnlyList<Venda>> GetVendasNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
         {
             var q = db.Vendas.AsNoTracking()
-                .Where(v => v.EmpresaId == empresaId && v.DataVenda >= iniUtc && v.DataVenda < fimUtc);
+                .Where(v => v.EmpresaId == empresaId && v.Natureza == NaturezaMovimentacaoEstoque.Venda
+                            && v.DataVenda >= iniUtc && v.DataVenda < fimUtc);
             if (lojaId.HasValue) q = q.Where(v => v.LojaId == lojaId);
             return await q.OrderBy(v => v.DataVenda).ToListAsync();
         }

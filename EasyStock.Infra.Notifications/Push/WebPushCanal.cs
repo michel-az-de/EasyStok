@@ -26,15 +26,27 @@ public sealed class WebPushCanal(
     IWebPushSubscriptionRepository repo,
     IOptions<WebPushOptions> options,
     ILogger<WebPushCanal> logger,
-    WebPushClient? client = null) : ICanalNotificacao
+    WebPushClient? client = null,
+    IHttpClientFactory? httpClientFactory = null) : ICanalNotificacao, IDisposable
 {
+    /// <summary>Nome do HttpClient registrado com <c>AddHttpClient</c> para o push service.</summary>
+    public const string NomeHttpClient = "WebPush";
+
     public CanalNotificacao Canal => CanalNotificacao.Push;
 
     private readonly WebPushOptions _opts = options.Value;
 
-    // O cliente HTTP do Web Push e injetavel so para teste (HttpClient com handler falso). Em runtime o container
-    // nao registra WebPushClient e o valor padrao (nulo) cai no cliente proprio.
-    private readonly WebPushClient _client = client ?? new();
+    // O WebPushClient e injetavel so para teste (HttpClient com handler falso); o container nao o registra. Em runtime
+    // o HttpClient vem da fabrica (#1507): o canal e scoped e um WebPushClient() proprio criava um HttpClient por escopo
+    // que nunca era descartado. Sem fabrica, o cliente proprio e descartado junto com o escopo (Dispose).
+    private readonly WebPushClient _client = client
+        ?? (httpClientFactory is not null ? new WebPushClient(httpClientFactory.CreateClient(NomeHttpClient)) : new());
+
+    public void Dispose()
+    {
+        // So descarta o que o canal criou; o HttpClient da fabrica nao e do WebPushClient e nao e fechado aqui.
+        if (client is null) _client.Dispose();
+    }
 
     public async Task<ResultadoEnvio> EnviarAsync(MensagemPronta mensagem, CancellationToken ct = default)
     {

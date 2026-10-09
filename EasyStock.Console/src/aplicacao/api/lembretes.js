@@ -2,13 +2,13 @@ import * as acao from '../acoes'
 import {
   concluirLembreteNaApi, criarLembreteNaApi, listarLembretes, marcarLembretesVistosNaApi,
 } from '../../infra/api/notificacoesApi'
-import { lembreteDaApi, lembreteEhManual } from '../../infra/api/traducaoNotificacoes'
+import { lembreteDaApi } from '../../infra/api/traducaoNotificacoes'
 import { FONTES } from '../../dominio/lembrete'
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function lerLembretesDaApi() {
-  return ((await listarLembretes()) ?? []).filter(lembreteEhManual).map(lembreteDaApi)
+  return ((await listarLembretes()) ?? []).map(lembreteDaApi)
 }
 
 export function criarAcoesLembretesApi({ despachar }) {

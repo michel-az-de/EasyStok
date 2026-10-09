@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoTexto } from '../../componentes/Campo'
 import { Marca } from '../../componentes/Marca'
+import { InterruptorTema } from '../../componentes/InterruptorTema'
 import { BotaoGoogle } from './BotaoGoogle'
 import css from './login.module.css'
 
@@ -36,16 +37,19 @@ export function TelaLogin({ entrarNaEmpresa, google, avisoSaida }) {
     <main className={css.tela}>
       <section className={css.cartao} aria-labelledby="titulo-login">
         <Marca />
-        <h1 id="titulo-login" className={css.titulo}>Entrar na Casa da Baba</h1>
+        <div>
+          <h1 id="titulo-login" className={css.titulo}>Entrar na Casa da Baba</h1>
+          <p className={css.apoio}>Use seu e-mail e senha para acessar a operação.</p>
+        </div>
         {avisoSaida && <p role="status">{avisoSaida}</p>}
-        <form className={css.formulario} onSubmit={aoEnviar}>
+        <form className={css.formulario} onSubmit={aoEnviar} aria-busy={ocupado}>
           <CampoTexto
             rotulo="E-mail" tipo="email" autoComplete="username" required
-            value={email} onChange={(e) => setEmail(e.target.value)}
+            value={email} onChange={(e) => setEmail(e.target.value)} readOnly={ocupado}
           />
           <CampoTexto
             rotulo="Senha" tipo="password" autoComplete="current-password" required
-            value={senha} onChange={(e) => setSenha(e.target.value)}
+            value={senha} onChange={(e) => setSenha(e.target.value)} readOnly={ocupado}
           />
           <Botao variante="primario" tipo="submit" largo disabled={ocupado}>
             {ocupado ? 'Entrando…' : 'Entrar'}
@@ -58,6 +62,7 @@ export function TelaLogin({ entrarNaEmpresa, google, avisoSaida }) {
         )}
 
         {erro && <p className={css.erro} role="alert">{erro}</p>}
+        <div className={css.preferencia}><InterruptorTema /></div>
       </section>
     </main>
   )

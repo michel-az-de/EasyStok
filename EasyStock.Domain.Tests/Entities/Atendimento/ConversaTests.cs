@@ -436,4 +436,42 @@ public class ConversaTests
 
         conversa.ContatoIdExterno.Should().Be("5511982254398");
     }
+
+    // ── Aguarda resposta (SLA de primeira resposta, #1427) ─────────────
+
+    [Fact]
+    public void AguardaResposta_ConversaNovaSemEntrada_Falso()
+    {
+        Nova().AguardaResposta.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AguardaResposta_ClienteFalouPorUltimo_Verdadeiro()
+    {
+        var conversa = Nova();
+        conversa.RegistrarSaida(Agora.AddMinutes(1));
+        conversa.RegistrarEntrada(Agora.AddMinutes(2));
+
+        conversa.AguardaResposta.Should().BeTrue();
+    }
+
+    [Fact]
+    public void AguardaResposta_DepoisDaResposta_Falso()
+    {
+        var conversa = Nova();
+        conversa.RegistrarEntrada(Agora.AddMinutes(1));
+        conversa.RegistrarSaida(Agora.AddMinutes(3));
+
+        conversa.AguardaResposta.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AguardaResposta_ConversaEncerrada_Falso()
+    {
+        var conversa = Nova();
+        conversa.RegistrarEntrada(Agora.AddMinutes(1));
+        conversa.Encerrar(Agora.AddMinutes(2));
+
+        conversa.AguardaResposta.Should().BeFalse();
+    }
 }

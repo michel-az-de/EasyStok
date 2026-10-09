@@ -69,6 +69,23 @@ public class CaixaUseCasesTests
     }
 
     [Fact]
+    public async Task AbrirCaixa_DeveLancarValidation_QuandoCaixaDeDiaAnteriorFicouAberto()
+    {
+        // #1506: abrir hoje por cima de uma sessao de ontem deixava ontem sem fechamento.
+        var empresaId = Guid.NewGuid();
+        _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
+        _repo.GetAberturaPendenteAsync(empresaId, null)
+            .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 80m, DateTime.UtcNow.AddDays(-1), null));
+
+        var useCase = new AbrirCaixaUseCase(_repo, _uow, Substitute.For<ILogger<AbrirCaixaUseCase>>());
+
+        var act = () => useCase.ExecuteAsync(new AbrirCaixaCommand(empresaId, 100m));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*ficou aberto*");
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
     public async Task AbrirCaixa_DeveCriarMovimentoAberturaECommitar_QuandoSucesso()
     {
         var empresaId = Guid.NewGuid();

@@ -31,6 +31,21 @@
 
 /* Avatar com o selo do canal no canto (rodada 6c). */
 .avatarCartao { position: relative; flex-shrink: 0; margin-top: 1px; }
+/* #1427: SLA de primeira resposta da loja estourado. O cartão pisca devagar
+   entre o papel e o pastel de alarme, com a borda interna em vermelho, até
+   alguém responder. Com movimento reduzido não pisca: fica o destaque fixo. */
+.cartao.slaEstourado {
+  box-shadow: inset 3px 0 0 var(--erro);
+  animation: entradaCartao var(--dur-media) var(--ease-saida), piscaSla 1.6s ease-in-out infinite;
+}
+.cartao.slaEstourado[aria-current='true'] { box-shadow: inset 3px 0 0 var(--erro); }
+@keyframes piscaSla {
+  0%, 100% { background: transparent; }
+  50% { background: var(--erro-pastel); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cartao.slaEstourado { animation: none; background: var(--erro-pastel); }
+}
 
 .corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 

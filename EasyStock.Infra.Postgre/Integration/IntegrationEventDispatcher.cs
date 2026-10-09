@@ -143,6 +143,10 @@ public sealed class IntegrationEventDispatcher : IIntegrationEventDispatcher
         }
         catch (Exception ex)
         {
+            // #1507: o lote divide o DbContext do escopo. O handler que falhou pode ter deixado entidades sujas
+            // rastreadas; sem descartá-las, o commit da falha (e o de cada evento seguinte) as reenviaria. O evento é
+            // reanexado pelo UpdateAsync do finally.
+            _uow.DescartarAlteracoesPendentes();
             var backoff = ComputarBackoff(evt.Tentativas + 1);
             evt.MarcarFalhaTentativa(ex.GetType().Name + ": " + ex.Message, backoff);
             _logger.LogError(ex,
@@ -162,6 +166,8 @@ public sealed class IntegrationEventDispatcher : IIntegrationEventDispatcher
                 _logger.LogError(persistEx,
                     "Outbox {EventId} persistência do estado pós-handler falhou — evento fica em EmEnvio; o watchdog o reclama após o lease e re-despacha (#928, handlers idempotentes).",
                     evt.Id);
+                // O commit que falhou deixou o evento sujo no contexto do lote: descarta para não envenenar o próximo.
+                _uow.DescartarAlteracoesPendentes();
             }
 
             sw.Stop();

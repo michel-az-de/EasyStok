@@ -82,22 +82,71 @@ public class AvaliarLembretesPrazoEstouradoTests
         Prazos().Should().BeEmpty("pagamento sem baixa fica só no Web Push (fora de Q2)");
     }
 
+    private void EsperandoDesde(int minutosAtras, int? slaDaLoja = null) =>
+        _candidatos.ListarConversasSemRespostaAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns([new ConversaSemResposta(_empresaId, Guid.NewGuid(), Guid.NewGuid(), "Fulana", null,
+                Agora.AddMinutes(-minutosAtras), slaDaLoja)]);
+
+    private int CriadosSemResposta() => _repo.ReceivedCalls()
+        .Count(c => c.GetMethodInfo().Name == nameof(ILembreteRepository.AddAsync)
+                    && ((Lembrete)c.GetArguments()[0]!).Tipo == TipoLembrete.ClienteSemResposta);
+
     [Fact]
-    public async Task LimiteVemDaConfiguracao()
+    public async Task ConsultaTrazDesdeOMenorSlaPossivel()
+    {
+        await Avaliador().ExecuteAsync();
+
+        await _candidatos.Received(1).ListarConversasSemRespostaAsync(Agora - TimeSpan.FromMinutes(1), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(4, 0)]
+    [InlineData(6, 1)]
+    public async Task SemConfiguracaoDaLojaOLimiteVemDasOpcoes(int minutosAtras, int criados)
     {
         _opcoes.ClienteSemRespostaMin = 5;
+        EsperandoDesde(minutosAtras);
 
         await Avaliador().ExecuteAsync();
 
-        await _candidatos.Received(1).ListarConversasSemRespostaAsync(Agora - TimeSpan.FromMinutes(5), Arg.Any<CancellationToken>());
+        CriadosSemResposta().Should().Be(criados);
+    }
+
+    [Theory]
+    [InlineData(9, 0)]
+    [InlineData(11, 1)]
+    public async Task SemConfiguracaoNenhumaOLimiteEDezMinutos(int minutosAtras, int criados)
+    {
+        EsperandoDesde(minutosAtras);
+
+        await Avaliador().ExecuteAsync();
+
+        CriadosSemResposta().Should().Be(criados);
+    }
+
+    [Theory]
+    [InlineData(2, 0)]
+    [InlineData(4, 1)]
+    public async Task SlaDaLojaVenceAsOpcoes(int minutosAtras, int criados)
+    {
+        EsperandoDesde(minutosAtras, slaDaLoja: 3);
+
+        await Avaliador().ExecuteAsync();
+
+        CriadosSemResposta().Should().Be(criados);
     }
 
     [Fact]
-    public async Task SemConfiguracaoOLimiteEDezMinutos()
+    public async Task LembreteEPrazoEstouradoDizemOSlaDaLoja()
     {
+        EsperandoDesde(20, slaDaLoja: 15);
+        _repo.When(r => r.AddAsync(Arg.Any<Lembrete>(), Arg.Any<CancellationToken>()))
+            .Do(c => _vencidos.Add(c.Arg<Lembrete>()));
+
         await Avaliador().ExecuteAsync();
 
-        await _candidatos.Received(1).ListarConversasSemRespostaAsync(Agora - TimeSpan.FromMinutes(10), Arg.Any<CancellationToken>());
+        _vencidos.Should().ContainSingle().Which.Texto.Should().Be("Fulana está há 15 min sem resposta.");
+        Payload(Prazos().Single()).GetProperty("prazo_texto").GetString().Should().Be("15 minutos");
     }
 
     [Fact]
