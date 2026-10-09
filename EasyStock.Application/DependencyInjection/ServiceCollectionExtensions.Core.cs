@@ -78,6 +78,7 @@ public static partial class ServiceCollectionExtensions
         // N11: miolo do CaixaEsquecidoJob (sino + PrazoEstourado).
         services.AddScoped<EasyStock.Application.UseCases.Caixa.AvisarCaixasEsquecidasUseCase>();
         services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>();
         services.AddScoped<CancelarPedidoUseCase>();
         services.AddScoped<ObterPedidoDetalhesUseCase>();
         services.AddScoped<AdicionarItemPedidoUseCase>();

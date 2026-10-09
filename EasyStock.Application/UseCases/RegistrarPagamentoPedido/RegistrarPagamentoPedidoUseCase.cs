@@ -71,8 +71,9 @@ public class RegistrarPagamentoPedidoUseCase(
                 && StatusPedidoMapper.TryParse(pedido.Status, out var statusPedido)
                 && !PedidoStateMachine.AceitaPagamento(statusPedido))
             {
-                throw new UseCaseValidationException(
-                    "Não é possível registrar pagamento: o pedido ainda não foi confirmado/aprovado.");
+                throw new UseCaseValidationException(statusPedido == StatusPedido.Cancelado
+                    ? "Não é possível registrar pagamento: o pedido está cancelado."
+                    : "Não é possível registrar pagamento: o pedido ainda não foi confirmado/aprovado.");
             }
 
             // issue 962 (BUG-002 do QA): o guard client-side do cockpit e' sobre dado carregado —
@@ -177,6 +178,16 @@ public class RegistrarPagamentoPedidoUseCase(
 
             var movimentos = await caixaRepo.GetMovimentosDoDiaAsync(cmd.EmpresaId, data, pedido.LojaId);
             if (movimentos.Any(m => m.Tipo == "abertura")) return;
+
+            // #1506: sessao de dia anterior ainda aberta: nao abre o dia por cima (a antiga ficaria
+            // orfa, sem fechamento). O pagamento ja esta gravado e entra no caixa do dia dele.
+            var pendente = await caixaRepo.GetAberturaPendenteAsync(cmd.EmpresaId, pedido.LojaId);
+            if (pendente != null && HorarioBrasil.DataOperacional(pendente.DataMovimento) < data)
+            {
+                logger.LogInformation("Caixa de {Pendente} ainda aberto; pagamento {PedidoId} não abre o caixa de {Data}.",
+                    HorarioBrasil.DataOperacional(pendente.DataMovimento), pedido.Id, data);
+                return;
+            }
 
             var abertura = MovimentoCaixa.Criar(cmd.EmpresaId, "abertura", 0m, pagoEm, pedido.LojaId);
             abertura.Descricao = "Abertura automática no primeiro pagamento de pedido do dia.";

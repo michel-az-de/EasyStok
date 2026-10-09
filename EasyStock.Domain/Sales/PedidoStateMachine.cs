@@ -116,9 +116,11 @@ public static class PedidoStateMachine
     /// <summary>
     /// Pode registrar pagamento manual? Só quando o pedido já é operacional — nunca em
     /// estado <see cref="PreOperacionais">pré-operacional</see> (montagem / pagamento-online
-    /// pendente / aprovação do cardápio). Guarda de causa-raiz contra pagamento-fantasma.
+    /// pendente / aprovação do cardápio) nem em pedido cancelado, cujo valor o caixa ignora
+    /// (#1506). Guarda de causa-raiz contra pagamento-fantasma.
     /// </summary>
-    public static bool AceitaPagamento(StatusPedido status) => !PreOperacionais.Contains(status);
+    public static bool AceitaPagamento(StatusPedido status)
+        => !PreOperacionais.Contains(status) && status != StatusPedido.Cancelado;
 
     /// <summary>
     /// Status em que um pagamento registrado à mão ainda pode ser desfeito (S11): o pedido está na
