@@ -58,3 +58,24 @@ public class AtendimentoSecoesCardapioControllerTests
             .Select(a => a.Policy).Should().ContainSingle().Which.Should().Be("Gerente");
     }
 }
+
+/// <summary>M2.1 (#1490): estoque do dia é do Operador, mas ver o estoque exige a permissão de estoque.</summary>
+public class AtendimentoProducaoControllerTests
+{
+    [Fact]
+    public void Producao_EDoOperador()
+    {
+        typeof(AtendimentoProducaoController).GetCustomAttributes<AuthorizeAttribute>(inherit: true)
+            .Select(a => a.Policy).Should().ContainSingle().Which.Should().Be("Operador");
+    }
+
+    [Fact]
+    public async Task EstoqueDoDia_SemPermissaoDeEstoque_403()
+    {
+        var currentUser = Substitute.For<ICurrentUserAccessor>();
+        currentUser.TemPermissao(Permissao.GerenciarEstoque).Returns(false);
+        var controller = new AtendimentoProducaoController(null!, currentUser);
+
+        (await controller.EstoqueDoDia(CancellationToken.None)).Should().BeOfType<ForbidResult>();
+    }
+}
