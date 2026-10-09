@@ -74,7 +74,7 @@ public class AtendimentoProducaoControllerTests
     {
         var currentUser = Substitute.For<ICurrentUserAccessor>();
         currentUser.TemPermissao(Permissao.GerenciarEstoque).Returns(false);
-        var controller = new AtendimentoProducaoController(null!, currentUser);
+        var controller = new AtendimentoProducaoController(null!, null!, currentUser);
 
         (await controller.EstoqueDoDia(CancellationToken.None)).Should().BeOfType<ForbidResult>();
     }

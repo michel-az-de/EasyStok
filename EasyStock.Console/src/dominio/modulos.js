@@ -35,6 +35,8 @@ export const MODULOS = [
     // M2.1 (#1490): o estoque do dia lê do EasyStok; na demonstração segue a aba da Cozinha.
     telas: [
       { id: 'estoque', rotulo: 'Estoque do dia', tipo: TELA_AJUSTE, aba: 'estoque-do-dia', soApi: true },
+      // M2.2 (#1491): lançar a produção do dia por prato, com as etiquetas.
+      { id: 'producao', rotulo: 'Produção do dia', tipo: TELA_AJUSTE, aba: 'producao-do-dia', soApi: true },
     ],
   },
   {

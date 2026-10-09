@@ -31,3 +31,33 @@ export const estoqueDoDiaDaApi = (r) => ({
     descoberto: a.quantidadeDescoberta,
   })),
 })
+
+// M2.2 (#1491): produção do dia por prato. A chave evita lote em dobro se ela clicar de novo.
+export const registrarProducao = (pratos, chave) => chamarApi(PRODUCAO, {
+  metodo: 'POST',
+  chave,
+  corpo: {
+    pratos: pratos.map((p) => ({
+      cardapioItemId: p.sku,
+      porcoes: p.porcoes,
+      pesoPorPorcaoG: p.pesoPorPorcaoG ?? null,
+      pesoRealG: p.pesoRealG ?? null,
+      validadeDias: p.validadeDias,
+    })),
+  },
+})
+
+// Etiquetas do lote (payload de impressão que o EasyStok já monta, LotesController).
+export const obterEtiquetasDoLote = (loteId) => chamarApi(`/api/lotes/${loteId}/etiquetas/render`)
+
+export const etiquetasDaApi = (r) => (r?.etiquetas ?? []).map((e) => ({
+  id: e.id,
+  sequencial: e.sequencial,
+  codigo: e.codigo,
+  nome: e.produto?.nome ?? '',
+  pesoG: e.produto?.pesoG ?? null,
+  alergenos: e.produto?.fichaAlergenos ?? [],
+  lote: e.loteCodigo ?? null,
+  produzidoEm: e.loteCriadoEm ?? null,
+  validadeEm: e.loteValidadeEm ?? null,
+}))
