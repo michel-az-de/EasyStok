@@ -172,6 +172,31 @@ public class CalcularCestaProducaoUseCaseTests
     }
 
     [Fact]
+    public async Task Custo_consolidado_converte_a_unidade_da_receita_para_a_do_insumo()
+    {
+        // #1502: 1,2 kg de molho que custa R$ 0,03 por grama = R$ 36 (antes saia R$ 0,036).
+        var empresaId = Guid.NewGuid();
+        var lasanha = BuildProduto(empresaId, "Lasanha", rendimento: 1m);
+        var molho = BuildProduto(empresaId, "Molho", baseUnidade: UnidadeMedida.G);
+        molho.CustoReferencia = Dinheiro.FromDecimal(0.03m);
+
+        _composicaoRepo.GetByProdutosFinaisAsync(empresaId, Arg.Any<IReadOnlyList<Guid>>(), null, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, IReadOnlyCollection<ProdutoComposicao>>
+            {
+                [lasanha.Id] = new[] { BuildComposicao(lasanha, molho, 1.2m, UnidadeMedida.Kg) }
+            });
+        _itemEstoqueRepo.GetByProdutosAsync(empresaId, Arg.Any<IEnumerable<Guid>>(), null, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, IReadOnlyCollection<ItemEstoque>>());
+
+        var result = await Build().ExecuteAsync(new CalcularCestaProducaoCommand(empresaId, null, new List<ItemCestaInput>
+        {
+            new(lasanha.Id, 1m, UnidadeMedida.Un)
+        }));
+
+        result.Consolidado.Should().ContainSingle().Which.CustoEstimado.Should().Be(36m);
+    }
+
+    [Fact]
     public async Task Mesmo_insumo_em_unidades_incompativeis_marca_consolidado_falha()
     {
         var empresaId = Guid.NewGuid();

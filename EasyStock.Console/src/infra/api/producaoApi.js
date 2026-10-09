@@ -120,3 +120,41 @@ export const detalheDaReceitaDaApi = (d) => ({
   custoTotal: d.custoTotal ?? null,
   custoPorRendimento: d.custoPorRendimento ?? null,
 })
+
+// M2.5 (#1502): sugestão de produção (mínimo + agendados + descoberto − saldo) e planejamento dos
+// insumos pela mesma cesta da calculadora mobile. Ler exige a permissão de estoque.
+export const obterSugestao = (ate) => chamarApi(`${PRODUCAO}/sugestao${ate ? `?ate=${ate}` : ''}`)
+export const planejarProducao = (pratos) => chamarApi(`${PRODUCAO}/planejamento`, { metodo: 'POST', corpo: { pratos } })
+
+export const sugestaoDaApi = (s) => ({
+  sku: s.cardapioItemId,
+  produtoId: s.produtoId,
+  nome: s.nome,
+  minimo: s.minimo,
+  saldo: s.saldo,
+  agendados: s.agendados,
+  descoberto: s.descoberto,
+  sugestao: s.sugestao,
+})
+
+export const planejamentoDaApi = (r) => ({
+  insumos: (r.consolidado ?? []).map((c) => ({
+    insumoId: c.insumoId,
+    nome: c.insumoNome,
+    precisa: c.precisa,
+    unidade: c.unidadeReceita,
+    saldo: c.saldo,
+    unidadeSaldo: c.unidadeSaldo,
+    falta: c.falta ?? null,
+    custo: c.custoEstimado ?? null,
+    aviso: c.aviso ?? null,
+  })),
+  pendentes: (r.itens ?? []).filter((i) => i.status !== 'Ok').map((i) => ({ produtoId: i.produtoFinalId, status: i.status, erro: i.erro ?? null })),
+  custoTotal: r.custoEstimadoTotal ?? null,
+})
+
+// Lista de compras (já existe na API, ListasComprasController). O console grava com origem "console".
+export const gerarListaDeCompras = ({ nome, itens }) => chamarApi('/api/listas-compras/gerar', {
+  metodo: 'POST',
+  corpo: { nome, itens, origem: 'console' },
+})

@@ -124,5 +124,22 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .SelectMany(p => p.Itens)
                 .AnyAsync(i => i.ProdutoId == produtoId);
         }
+
+        private static readonly string[] StatusDemanda = PedidoStateMachine.DemandaAConsumir
+            .Select(StatusPedidoMapper.Format)
+            .ToArray();
+
+        public async Task<IReadOnlyList<DemandaDePedido>> GetDemandaAgendadaAsync(Guid empresaId, DateTime antesDeUtc, CancellationToken ct = default)
+        {
+            var linhas = await db.Pedidos.AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && StatusDemanda.Contains(p.Status)
+                    && p.AgendadoParaEm != null && p.AgendadoParaEm < antesDeUtc)
+                .SelectMany(p => p.Itens)
+                .Where(i => i.CardapioItemId != null || i.ProdutoId != null)
+                .GroupBy(i => new { i.CardapioItemId, i.ProdutoId })
+                .Select(g => new { g.Key.CardapioItemId, g.Key.ProdutoId, Quantidade = g.Sum(i => i.Quantidade) })
+                .ToListAsync(ct);
+            return linhas.Select(l => new DemandaDePedido(l.CardapioItemId, l.ProdutoId, l.Quantidade)).ToList();
+        }
     }
 }
