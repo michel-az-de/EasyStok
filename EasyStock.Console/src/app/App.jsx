@@ -15,6 +15,7 @@ import { FONTE_API } from '../infra/fonteDados'
 import { identidadeDaSessao } from '../infra/api/sessao'
 import { useSessaoApi } from '../aplicacao/useSessaoApi'
 import { useNotificacoesDaSessao } from '../aplicacao/useNotificacoesDaSessao'
+import { useAvisosNoAparelho } from '../aplicacao/useAvisosNoAparelho'
 import { SinoDaSessao } from '../features/notificacoes/SinoDaSessao'
 import { ContextoAcessoModulos, useAcessoModulos, useModulosDaSessao } from '../aplicacao/acessoModulos'
 import { moduloDaRota, permiteModulo, permiteRota } from '../dominio/acessoModulos'
@@ -344,6 +345,7 @@ export function App() {
 
 function AppComAcesso({ rota, sessao, aoSair }) {
   const avisos = useNotificacoesDaSessao()
+  const avisosNoAparelho = useAvisosNoAparelho({ sessao })
   const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: true })
   const { dados, erro, tentarNovamente } = useModulosDaSessao(sessao)
   if (!dados) return (
@@ -353,7 +355,7 @@ function AppComAcesso({ rota, sessao, aoSair }) {
     </Vazio>
   )
   const acesso = { permite: (id) => permiteModulo(dados, id), acoes: dados.acoes ?? {}, aoSair, sessaoPersistente: sessao.persistente,
-    notificacoes: <SinoDaSessao avisos={avisos} /> }
+    notificacoes: <SinoDaSessao avisos={avisos} aparelho={avisosNoAparelho} /> }
   let tela
   if (!permiteRota(dados, rota)) tela = (
     <Vazio titulo="Seu perfil não tem acesso a este módulo" acao={<><a href={HASH_HALL}>Voltar aos módulos</a><Botao variante="texto" onClick={aoSair}>Sair</Botao></>}>

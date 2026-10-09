@@ -19,6 +19,9 @@ public sealed class BaixaDeInsumosDaProducao(
     IItemEstoqueRepository itemEstoqueRepository,
     RegistrarSaidaEstoqueUseCase registrarSaida)
 {
+    /// <summary>Início da descrição da saída de insumo. O relatório de perdas (M2.6) a separa da degustação.</summary>
+    public const string PrefixoDaDescricao = "Insumo da produção";
+
     public async Task<IReadOnlyList<string>> BaixarAsync(
         Guid empresaId, IReadOnlyList<PratoParaBaixa> pratos, string codigoLote, DateTime data, CancellationToken ct = default)
     {
@@ -73,7 +76,7 @@ public sealed class BaixaDeInsumosDaProducao(
             if (disponivel < quantidade)
                 avisos.Add($"Faltou {quantidade - disponivel:0.###} {unidade} de {insumo.Nome}: ficou descoberto no estoque.");
 
-            itens.Add(new RegistrarSaidaEstoqueItemCommand(insumoId, null, quantidade, 0m, $"Insumo da produção {codigoLote}"));
+            itens.Add(new RegistrarSaidaEstoqueItemCommand(insumoId, null, quantidade, 0m, $"{PrefixoDaDescricao} {codigoLote}"));
         }
 
         if (itens.Count > 0)

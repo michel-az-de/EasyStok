@@ -22,6 +22,48 @@ public class LembretesIntegrationTests(PostgreSqlDatabaseFixture fixture)
     : IClassFixture<PostgreSqlDatabaseFixture>
 {
     [SkippableFact]
+    public async Task Manual_PersisteVistoEConclusaoSemAlterarOutraEmpresaOuDestinatario()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var agora = DateTime.UtcNow;
+        var casa = Empresa.Criar("Casa lembretes manuais", null);
+        var outra = Empresa.Criar("Outra casa lembretes", null);
+        var pessoa = Guid.NewGuid();
+        var colega = Guid.NewGuid();
+        var meu = Lembrete.Manual(casa.Id, "Meu", agora, pessoa, agora, paraUsuarioId: pessoa);
+        var equipe = Lembrete.Manual(casa.Id, "Equipe", agora, pessoa, agora);
+        var alheio = Lembrete.Manual(casa.Id, "Colega", agora, colega, agora, paraUsuarioId: colega);
+        var externo = Lembrete.Manual(outra.Id, "Outra empresa", agora, pessoa, agora);
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.Empresas.AddRange(casa, outra);
+            db.Lembretes.AddRange(meu, equipe, alheio, externo);
+            await db.SaveChangesAsync();
+        }
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(casa.Id);
+            var repo = new LembreteRepository(db);
+            var lista = await new ListarLembretesUseCase(repo).ExecuteAsync(casa.Id, pessoa, false, false);
+            lista.Select(l => l.Id).Should().BeEquivalentTo([meu.Id, equipe.Id]);
+            (await new MarcarLembretesVistosUseCase(repo, db, new RelogioFixo(agora)).ExecuteAsync(casa.Id, pessoa)).Should().Be(2);
+            var concluir = new ConcluirLembreteUseCase(repo, db, new RelogioFixo(agora));
+            var invadir = () => concluir.ExecuteAsync(casa.Id, pessoa, alheio.Id);
+            await invadir.Should().ThrowAsync<LembreteNaoEncontradoException>();
+            var invadirEmpresa = () => concluir.ExecuteAsync(casa.Id, pessoa, externo.Id);
+            await invadirEmpresa.Should().ThrowAsync<LembreteNaoEncontradoException>();
+            await concluir.ExecuteAsync(casa.Id, pessoa, meu.Id);
+        }
+        await using (var db = fixture.CreateDbContext())
+        {
+            var gravados = await db.Lembretes.IgnoreQueryFilters().Where(l => l.EmpresaId == casa.Id || l.EmpresaId == outra.Id).ToListAsync();
+            gravados.Single(l => l.Id == meu.Id).ConcluidoPorUsuarioId.Should().Be(pessoa);
+            gravados.Single(l => l.Id == equipe.Id).VistoEm.Should().NotBeNull();
+            gravados.Where(l => l.Id == alheio.Id || l.Id == externo.Id).Should().OnlyContain(l => l.VistoEm == null && l.ConcluidoEm == null);
+        }
+    }
+
+    [SkippableFact]
     public async Task AvaliadorCriaUmPorFatoResolveAoResponderETemRls()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");

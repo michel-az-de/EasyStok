@@ -1,5 +1,8 @@
+import { desinscreverPushNoNavegador } from '../pushNavegador'
+
 const CHAVE = 'easystok.sessao'
 export const EVENTO_SESSAO_ALTERADA = 'easystok:sessao-alterada'
+export const EVENTO_FALHA_SAIDA_PUSH = 'easystok:falha-saida-push'
 let semStorage = null
 
 const ler = (storage) => {
@@ -36,10 +39,14 @@ export function gravarSessao(sessao) {
 }
 
 export function limparSessao() {
+  const anterior = ler('sessionStorage') ?? semStorage ?? ler('localStorage')
   remover('sessionStorage')
   remover('localStorage')
   semStorage = null
   window.dispatchEvent(new Event(EVENTO_SESSAO_ALTERADA))
+  if (anterior) desinscreverPushNoNavegador(identidadeDaSessao(anterior)).catch(() => {
+    window.dispatchEvent(new Event(EVENTO_FALHA_SAIDA_PUSH))
+  })
 }
 
 export function atualizarTokens(sessao, dados) {

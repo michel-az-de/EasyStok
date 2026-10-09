@@ -69,5 +69,11 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// itens como Modified e evitar round-trips individuais.
         /// </summary>
         Task UpdateRangeAsync(IEnumerable<ItemEstoque> itensEstoque);
+
+        /// <summary>
+        /// M2.6 (#1511): lotes com saldo e validade até <paramref name="validadeAteUtc"/>, com o produto.
+        /// O chamador confere o vencimento no dia operacional (a validade é data civil).
+        /// </summary>
+        Task<IReadOnlyList<ItemEstoque>> GetComSaldoEValidadeAteAsync(Guid empresaId, DateTime validadeAteUtc, CancellationToken ct = default);
     }
 }

@@ -45,7 +45,7 @@ function subtituloDoItem(lembrete, agora, conversas) {
 // Novos e Vistos usam o mesmo item, com Concluir. "Adiar 10 min" saiu (corte
 // #6): repetia o que Programar lembrete já faz, e o ponto à esquerda (seção
 // 8) só aparece em Novos, quem chama decide com `comPonto`.
-function ItemAtivo({ lembrete, agora, conversas, comPonto, aoAbrir, aoConcluir }) {
+function ItemAtivo({ lembrete, agora, conversas, comPonto, aoAbrir, aoConcluir, concluindo }) {
   return (
     <li className={css.item}>
       {/* Rodada 12 (issue #16): o ponto é "novo, ainda não visto". */}
@@ -62,6 +62,7 @@ function ItemAtivo({ lembrete, agora, conversas, comPonto, aoAbrir, aoConcluir }
       </button>
       <Botao
         variante="texto" className={css.acaoItem} title="Concluir" aria-label="Concluir"
+        disabled={concluindo}
         onClick={() => aoConcluir(lembrete)}
       >
         <Icone nome="check" tamanho={24} />
@@ -95,7 +96,9 @@ function ItemProgramado({ lembrete, agora, realcado, aoAbrir }) {
 // programar. Visto é estilo Instagram: some da lista quando o painel fecha,
 // não quando ela olha.
 export function Sininho() {
-  const { lembretes, agora, selecionada, vistos, conversas, eventosSonoros } = useAtendimento()
+  const {
+    lembretes, agora, selecionada, vistos, conversas, eventosSonoros, fonteApi, consultaLembretes,
+  } = useAtendimento()
   const {
     concluirLembrete, criarLembrete, marcarLembretesVistos, selecionar,
   } = useAcoes()
@@ -107,6 +110,9 @@ export function Sininho() {
   const [vistosExpandido, setVistosExpandido] = useState(false)
   const [balancar, setBalancar] = useState(false)
   const [realceId, setRealceId] = useState(null)
+  const [erro, setErro] = useState(null)
+  const [concluindo, setConcluindo] = useState(false)
+  const conclusao = useRef(false)
 
   const sinoRef = useRef(null)
   const wrapperRef = useRef(null)
@@ -172,7 +178,10 @@ export function Sininho() {
 
   const alternarPainel = () => {
     if (aberto) { fecharPainel(); return }
-    if (naoVistos.length > 0) marcarLembretesVistos(naoVistos.map(chaveLembrete))
+    setErro(null)
+    if (naoVistos.length > 0) Promise.resolve(marcarLembretesVistos(naoVistos.map(chaveLembrete)))
+      .catch((e) => setErro(`Não foi possível marcar como visto: ${e.message}`))
+    if (fonteApi) consultaLembretes.carregar()
     setCongelados(new Set(naoVistos.map(chaveLembrete)))
     setAberto(true)
   }
@@ -200,10 +209,21 @@ export function Sininho() {
     .sort((a, b) => b.quando - a.quando)
   const semNada = novos.length === 0 && vistosLista.length === 0 && programados.length === 0
 
-  const aoProgramar = ({ texto, quando, conversaId }) => {
+  const aoProgramar = async ({ texto, quando, conversaId }) => {
     aguardandoRealceRef.current = true
-    criarLembrete(novoLembrete({ titulo: texto, detalhe: null, quando, conversaId }))
+    try { await criarLembrete(novoLembrete({ titulo: texto, detalhe: null, quando, conversaId })) }
+    catch (e) { aguardandoRealceRef.current = false; throw e }
     setModalAberta(false)
+  }
+
+  const aoConcluir = async (lembrete) => {
+    if (conclusao.current) return
+    conclusao.current = true
+    setConcluindo(true)
+    setErro(null)
+    try { await concluirLembrete(lembrete) }
+    catch (e) { setErro(`Não foi possível concluir: ${e.message}`) }
+    finally { conclusao.current = false; setConcluindo(false) }
   }
 
   const rotuloBadge = contagem > 9 ? '9+' : String(contagem)
@@ -238,7 +258,13 @@ export function Sininho() {
             </Botao>
           </div>
 
-          {semNada && <p className={css.vazio}>Nada por agora</p>}
+          {erro && <p role="alert" className={css.erro}>{erro}</p>}
+          {fonteApi && <>
+            <Botao onClick={consultaLembretes.carregar} disabled={consultaLembretes.carregando || concluindo}>Atualizar lembretes</Botao>
+            {consultaLembretes.carregando && <p role="status">Carregando lembretes…</p>}
+            {consultaLembretes.erro && <p role="alert" className={css.erro}>Sem atualizar: {consultaLembretes.erro}</p>}
+          </>}
+          {semNada && !(fonteApi && (consultaLembretes.carregando || consultaLembretes.erro)) && <p className={css.vazio}>Nada por agora</p>}
 
           {novos.length > 0 && (
             <div className={css.secao}>
@@ -259,7 +285,8 @@ export function Sininho() {
                     conversas={conversas}
                     comPonto
                     aoAbrir={abrirConversa}
-                    aoConcluir={concluirLembrete}
+                    aoConcluir={aoConcluir}
+                    concluindo={concluindo}
                   />
                 ))}
               </ul>
@@ -284,7 +311,8 @@ export function Sininho() {
                       conversas={conversas}
                       comPonto={false}
                       aoAbrir={abrirConversa}
-                      aoConcluir={concluirLembrete}
+                      aoConcluir={aoConcluir}
+                      concluindo={concluindo}
                     />
                   ))}
                 </ul>
@@ -331,6 +359,7 @@ export function Sininho() {
               </ul>
             </div>
           )}
+
         </section>
       )}
 

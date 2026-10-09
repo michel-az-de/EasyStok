@@ -32,6 +32,7 @@ jobs:
           cache-dependency-path: EasyStock.Console/package-lock.json
       - run: npm ci
       - run: npm run qualidade
+      - run: node ferramentas/prova-1426-notificacoes-console.mjs
       - run: node ferramentas/prova-1255-pagamento-manual-api.mjs
       - run: node ferramentas/prova-1420-sugestao-agente-api.mjs
       - run: node ferramentas/prova-f06-honestidade.mjs
@@ -56,4 +57,5 @@ jobs:
       - run: node ferramentas/prova-1498-receitas.mjs
       - run: node ferramentas/prova-1499-baixa-insumo.mjs
       - run: node ferramentas/prova-1502-planejamento.mjs
+      - run: node ferramentas/prova-1511-perdas.mjs
       - run: node ferramentas/prova-1424-mensagem-programada-api.mjs

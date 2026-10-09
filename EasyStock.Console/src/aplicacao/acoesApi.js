@@ -8,6 +8,7 @@ import { avisoDeVariaveisNaoResolvidas } from '../dominio/respostas'
 import { deveCarregarDossie } from './planoDeSincronizacao'
 import { criarAcoesExpedienteApi } from './api/expediente'
 import { criarAcoesCaixaApi } from './api/caixa'
+import { criarAcoesLembretesApi } from './api/lembretes'
 import { criarAcoesConfiguracaoApi } from './api/configuracao'
 import { criarAcoesAssistenteApi } from './api/assistente'
 import { criarAcoesAgenteApi } from './api/agente'
@@ -60,6 +61,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     fecharAvisoApi: ({ fixo = false } = {}) => despachar({ tipo: acao.FECHAR_AVISO_API, fixo }),
     ...criarAcoesExpedienteApi({ despachar, estadoRef }),
     ...criarAcoesCaixaApi(),
+    ...criarAcoesLembretesApi({ despachar }),
     ...criarAcoesConfiguracaoApi(),
     ...criarAcoesAssistenteApi(),
     ...criarAcoesAgenteApi({ despachar }),
