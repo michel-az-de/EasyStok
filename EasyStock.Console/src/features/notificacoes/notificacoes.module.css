@@ -1,0 +1,6 @@
+.lista { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--e-3); }
+.aviso { border: var(--b-1) solid var(--linha); border-radius: var(--r-2); padding: var(--e-3); overflow-wrap: anywhere; }
+.aviso p { margin-block: var(--e-2); color: var(--tinta-2); }
+.cabeca { display: flex; flex-wrap: wrap; gap: var(--e-2); justify-content: space-between; }
+.cabeca span, .resumo { font-size: var(--t-apoio); color: var(--tinta-2); }
+.erro { color: var(--erro); }

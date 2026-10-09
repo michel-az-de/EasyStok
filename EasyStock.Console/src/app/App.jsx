@@ -14,6 +14,8 @@ import { INSTANTE_INICIAL, LINHAS_PRODUTO } from '../infra/catalogo'
 import { FONTE_API } from '../infra/fonteDados'
 import { identidadeDaSessao } from '../infra/api/sessao'
 import { useSessaoApi } from '../aplicacao/useSessaoApi'
+import { useNotificacoesDaSessao } from '../aplicacao/useNotificacoesDaSessao'
+import { SinoDaSessao } from '../features/notificacoes/SinoDaSessao'
 import { ContextoAcessoModulos, useAcessoModulos, useModulosDaSessao } from '../aplicacao/acessoModulos'
 import { moduloDaRota, permiteModulo, permiteRota } from '../dominio/acessoModulos'
 import { Vazio } from '../componentes/Vazio'
@@ -341,6 +343,7 @@ export function App() {
 }
 
 function AppComAcesso({ rota, sessao, aoSair }) {
+  const avisos = useNotificacoesDaSessao()
   const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: true })
   const { dados, erro, tentarNovamente } = useModulosDaSessao(sessao)
   if (!dados) return (
@@ -349,7 +352,8 @@ function AppComAcesso({ rota, sessao, aoSair }) {
       {erro ?? 'Aguarde um instante.'}
     </Vazio>
   )
-  const acesso = { permite: (id) => permiteModulo(dados, id), acoes: dados.acoes ?? {}, aoSair, sessaoPersistente: sessao.persistente }
+  const acesso = { permite: (id) => permiteModulo(dados, id), acoes: dados.acoes ?? {}, aoSair, sessaoPersistente: sessao.persistente,
+    notificacoes: <SinoDaSessao avisos={avisos} /> }
   let tela
   if (!permiteRota(dados, rota)) tela = (
     <Vazio titulo="Seu perfil não tem acesso a este módulo" acao={<><a href={HASH_HALL}>Voltar aos módulos</a><Botao variante="texto" onClick={aoSair}>Sair</Botao></>}>

@@ -27,7 +27,9 @@ public class NotificacaoController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        var (items, totalCount) = await notificacaoRepository.GetByEmpresaAsync(resolvedEmpresaId, lida, tipo, severidade, page, pageSize);
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        var (items, totalCount) = await notificacaoRepository.GetByEmpresaAsync(resolvedEmpresaId, lida, tipo, severidade, page, pageSize, currentUser.UsuarioId);
         var dtos = items.Select(n => new
         {
             id = n.Id.ToString(),
@@ -51,7 +53,7 @@ public class NotificacaoController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        var count = await notificacaoRepository.CountNaoLidasAsync(resolvedEmpresaId);
+        var count = await notificacaoRepository.CountNaoLidasAsync(resolvedEmpresaId, currentUser.UsuarioId);
         return DataOk(new { count });
     }
 
@@ -64,7 +66,7 @@ public class NotificacaoController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        var resumo = await notificacaoRepository.GetResumoAsync(resolvedEmpresaId);
+        var resumo = await notificacaoRepository.GetResumoAsync(resolvedEmpresaId, currentUser.UsuarioId);
         return DataOk(resumo);
     }
 
@@ -77,7 +79,7 @@ public class NotificacaoController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        var items = await notificacaoRepository.GetRecentesNaoLidasAsync(resolvedEmpresaId, Math.Min(limit, 10));
+        var items = await notificacaoRepository.GetRecentesNaoLidasAsync(resolvedEmpresaId, Math.Clamp(limit, 1, 10), currentUser.UsuarioId);
         var dtos = items.Select(n => new
         {
             id = n.Id.ToString(),
@@ -104,7 +106,8 @@ public class NotificacaoController(
             return DataNotFound();
 
         var notificacao = await notificacaoRepository.GetByIdAsync(id);
-        if (notificacao == null || notificacao.EmpresaId != resolvedEmpresaId) return DataNotFound();
+        if (notificacao == null || notificacao.EmpresaId != resolvedEmpresaId
+            || notificacao.UsuarioId.HasValue && notificacao.UsuarioId != currentUser.UsuarioId) return DataNotFound();
 
         notificacao.MarcarComoLida();
         await notificacaoRepository.UpdateAsync(notificacao);
@@ -123,7 +126,7 @@ public class NotificacaoController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        await notificacaoRepository.MarcarTodasComoLidasAsync(resolvedEmpresaId);
+        await notificacaoRepository.MarcarTodasComoLidasAsync(resolvedEmpresaId, currentUser.UsuarioId);
         await unitOfWork.CommitAsync();
         return NoContent();
     }
@@ -139,7 +142,8 @@ public class NotificacaoController(
             return DataNotFound();
 
         var notificacao = await notificacaoRepository.GetByIdAsync(id);
-        if (notificacao == null || notificacao.EmpresaId != resolvedEmpresaId) return DataNotFound();
+        if (notificacao == null || notificacao.EmpresaId != resolvedEmpresaId
+            || notificacao.UsuarioId.HasValue && notificacao.UsuarioId != currentUser.UsuarioId) return DataNotFound();
 
         await notificacaoRepository.DeleteAsync(resolvedEmpresaId, id);
         await unitOfWork.CommitAsync();

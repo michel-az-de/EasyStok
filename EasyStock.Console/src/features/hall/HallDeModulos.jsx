@@ -48,7 +48,7 @@ function CartaoModulo({ modulo, buscando }) {
 }
 
 export function HallDeModulos({ fonteApi = false, sessao = null, agora }) {
-  const { permite, aoSair } = useAcessoModulos()
+  const { permite, aoSair, notificacoes } = useAcessoModulos()
   const [busca, setBusca] = useState('')
   const modulos = filtrarModulos(modulosDoHall({ fonteApi }).filter((m) => permite(m.id)), busca)
   return (
@@ -58,6 +58,7 @@ export function HallDeModulos({ fonteApi = false, sessao = null, agora }) {
         <div className={css.busca}>
           <CampoTexto rotulo="Buscar módulo ou tela" tipo="search" value={busca} onChange={(e) => setBusca(e.target.value)} />
         </div>
+        {notificacoes}
         {aoSair && <Botao variante="texto" onClick={aoSair}>{sessao?.persistente ? 'Sair deste aparelho' : 'Sair'}</Botao>}
       </header>
       <main className={css.conteudo}>

@@ -536,3 +536,13 @@ Validação: 970 testes da API aprovados, incluindo 9 cenários de senha/Google/
 Navegador Chromium e PostgreSQL reais: Dona/Atendimento pedem login em uma nova aba; Cozinha reabre o navegador com a sessão vencida e renova na API; duas abas geram um único refresh; a busca e o hall sobrevivem à renovação; offline conserva a chave e reconexão renova; logout invalida a chave (refresh retorna 401); celular de 390 px sem rolagem horizontal. Nenhum erro JavaScript. O roteiro HTTP de perfis manteve suas 51 verificações aprovadas. Google externo e tablet físico não foram usados nesta prova.
 
 Evidências em `C:\rep\EasyStok\.build\validacao-casa-da-baba-20261009\sessao`. Não houve deploy. O reparo do Down da migration anterior está na PR #1505 de outra frente, ainda não integrado neste registro. Sino transversal e revisão das ações dos módulos continuam na próxima fatia da onda 1.
+
+## 17. Continuação: sino transversal e destinatários dos avisos, 09/10/2026
+
+O sino agora consulta badge e avisos recentes da API no hall, nos módulos e nas duas navegações do balcão. Não depende do contexto de Atendimento. A lista mostra até 10 avisos não lidos, permite atualizar e marcar individualmente como lido, mantém o aviso quando a gravação falha e distingue falha de consulta de uma lista vazia. Atualiza a cada 30 segundos enquanto a página está visível e ao voltar à página/conexão. Modal reutiliza foco, Esc e componentes do design system.
+
+Corrigida uma falha encontrada na conexão: a API filtrava a empresa mas não o `UsuarioId` das notificações InApp. Listagem, recentes, badge, resumo e marcação em lote agora recebem o usuário do JWT; leitura/exclusão individual recusam outro destinatário. Avisos sem destinatário continuam gerais da equipe e sua leitura é compartilhada, comportamento informado na tela. Nenhum aviso real foi enviado.
+
+Validação: 973 testes da API aprovados; teste de integração PostgreSQL com aviso geral, próprio, de colega e de outra empresa, incluindo marcação em lote; 56 provas JavaScript; lint, camadas, 264 contrastes e build do Console aprovados. Chromium com API/PostgreSQL locais confirmou ausência dos avisos da colega, respostas 404 para leitura/exclusão alheias, atualização do contador após gravação, preservação em erro 503, falha de rede sem falso vazio, retentativa, retorno de foco com Esc e uso no hall/balcão/Cozinha em 390 px. Capturas e logs em `C:\rep\EasyStok\.build\validacao-casa-da-baba-20261009\sessao`.
+
+Os lembretes do balcão permanecem separados. A PR #1428, ainda não integrada, inclui lembretes e Web Push; seu consumo de notificações deverá ser conciliado com este sino para evitar duplicação. Esta entrega não ativa Web Push nem notificações externas. Não houve deploy.

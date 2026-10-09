@@ -15,11 +15,12 @@ namespace EasyStock.Infra.Postgre.Repositories
             TipoAlertaEstoque? tipo = null,
             SeveridadeNotificacao? severidade = null,
             int page = 1,
-            int pageSize = 20)
+            int pageSize = 20,
+            Guid? usuarioId = null)
         {
             var query = dbContext.Notificacoes
                 .AsNoTracking()
-                .Where(n => n.EmpresaId == empresaId);
+                .Where(n => n.EmpresaId == empresaId && (!usuarioId.HasValue || n.UsuarioId == null || n.UsuarioId == usuarioId));
 
             if (lida.HasValue)
                 query = query.Where(n => n.Lida == lida.Value);
@@ -39,27 +40,27 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (items, totalCount);
         }
 
-        public async Task<IEnumerable<Notificacao>> GetRecentesNaoLidasAsync(Guid empresaId, int limit = 5)
+        public async Task<IEnumerable<Notificacao>> GetRecentesNaoLidasAsync(Guid empresaId, int limit = 5, Guid? usuarioId = null)
         {
             return await dbContext.Notificacoes
                 .AsNoTracking()
-                .Where(n => n.EmpresaId == empresaId && !n.Lida)
+                .Where(n => n.EmpresaId == empresaId && !n.Lida && (!usuarioId.HasValue || n.UsuarioId == null || n.UsuarioId == usuarioId))
                 .OrderByDescending(n => n.CriadaEm)
                 .ThenBy(n => n.Severidade)
                 .Take(limit)
                 .ToListAsync();
         }
 
-        public async Task<NotificacaoResumo> GetResumoAsync(Guid empresaId)
+        public async Task<NotificacaoResumo> GetResumoAsync(Guid empresaId, Guid? usuarioId = null)
         {
             var gruposPorSeveridade = await dbContext.Notificacoes
-                .Where(n => n.EmpresaId == empresaId && !n.Lida)
+                .Where(n => n.EmpresaId == empresaId && !n.Lida && (!usuarioId.HasValue || n.UsuarioId == null || n.UsuarioId == usuarioId))
                 .GroupBy(n => n.Severidade)
                 .Select(g => new { Severidade = g.Key, Count = g.Count() })
                 .ToListAsync();
 
             var gruposPorTipo = await dbContext.Notificacoes
-                .Where(n => n.EmpresaId == empresaId && !n.Lida)
+                .Where(n => n.EmpresaId == empresaId && !n.Lida && (!usuarioId.HasValue || n.UsuarioId == null || n.UsuarioId == usuarioId))
                 .GroupBy(n => n.TipoAlerta)
                 .Select(g => new { Tipo = g.Key, Count = g.Count() })
                 .ToListAsync();
@@ -96,8 +97,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                 n.CriadaEm < fim);
         }
 
-        public Task<int> CountNaoLidasAsync(Guid empresaId) =>
-            dbContext.Notificacoes.CountAsync(n => n.EmpresaId == empresaId && !n.Lida);
+        public Task<int> CountNaoLidasAsync(Guid empresaId, Guid? usuarioId = null) =>
+            dbContext.Notificacoes.CountAsync(n => n.EmpresaId == empresaId && !n.Lida
+                && (!usuarioId.HasValue || n.UsuarioId == null || n.UsuarioId == usuarioId));
 
         public Task AddAsync(Notificacao notificacao) =>
             dbContext.Notificacoes.AddAsync(notificacao).AsTask();
@@ -108,11 +110,11 @@ namespace EasyStock.Infra.Postgre.Repositories
             return Task.CompletedTask;
         }
 
-        public async Task MarcarTodasComoLidasAsync(Guid empresaId)
+        public async Task MarcarTodasComoLidasAsync(Guid empresaId, Guid? usuarioId = null)
         {
             var agora = DateTime.UtcNow;
             await dbContext.Notificacoes
-                .Where(n => n.EmpresaId == empresaId && !n.Lida)
+                .Where(n => n.EmpresaId == empresaId && !n.Lida && (!usuarioId.HasValue || n.UsuarioId == null || n.UsuarioId == usuarioId))
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(n => n.Lida, true)
                     .SetProperty(n => n.LidaEm, agora));

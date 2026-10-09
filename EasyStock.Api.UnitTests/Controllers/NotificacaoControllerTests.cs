@@ -19,6 +19,7 @@ public class NotificacaoControllerTests
 
     public NotificacaoControllerTests()
     {
+        _currentUser.UsuarioId.Returns(Guid.NewGuid());
         _controller = new NotificacaoController(_notificacaoRepository, _unitOfWork, _currentUser);
     }
 
@@ -26,7 +27,7 @@ public class NotificacaoControllerTests
     public async Task GetBadge_DeveRetornarEnvelope_ComCountDeNaoLidas()
     {
         var empresaId = Guid.NewGuid();
-        _notificacaoRepository.CountNaoLidasAsync(empresaId).Returns(4);
+        _notificacaoRepository.CountNaoLidasAsync(empresaId, _currentUser.UsuarioId).Returns(4);
 
         var result = await _controller.GetBadge(empresaId);
 
@@ -63,7 +64,7 @@ public class NotificacaoControllerTests
         var result = await _controller.MarcarTodasLidas(empresaId);
 
         result.Should().BeOfType<NoContentResult>();
-        await _notificacaoRepository.Received(1).MarcarTodasComoLidasAsync(empresaId);
+        await _notificacaoRepository.Received(1).MarcarTodasComoLidasAsync(empresaId, _currentUser.UsuarioId);
         await _unitOfWork.Received(1).CommitAsync();
     }
 
@@ -75,7 +76,7 @@ public class NotificacaoControllerTests
         {
             new() { Id = Guid.NewGuid(), EmpresaId = empresaId, Mensagem = "Estoque baixo", TipoAlerta = TipoAlertaEstoque.EstoqueBaixo }
         };
-        _notificacaoRepository.GetByEmpresaAsync(empresaId, null, null, null, 1, 20).Returns((notificacoes, 1));
+        _notificacaoRepository.GetByEmpresaAsync(empresaId, null, null, null, 1, 20, _currentUser.UsuarioId).Returns((notificacoes, 1));
 
         var result = await _controller.GetAll(empresaId);
 
@@ -88,5 +89,31 @@ public class NotificacaoControllerTests
         meta.Pages.Should().Be(1);
         meta.Page.Should().Be(1);
         meta.Limit.Should().Be(20);
+    }
+
+    [Fact]
+    public async Task RecentesEResumo_UsamDestinatarioDoJwtELimitamQuantidade()
+    {
+        var empresa = Guid.NewGuid();
+        _notificacaoRepository.GetRecentesNaoLidasAsync(empresa, 1, _currentUser.UsuarioId).Returns([]);
+        await _controller.GetRecentes(empresa, -1);
+        await _controller.GetResumo(empresa);
+        await _notificacaoRepository.Received(1).GetRecentesNaoLidasAsync(empresa, 1, _currentUser.UsuarioId);
+        await _notificacaoRepository.Received(1).GetResumoAsync(empresa, _currentUser.UsuarioId);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AvisoDeOutroDestinatario_NaoPodeSerLidoNemExcluido(bool outraEmpresa)
+    {
+        var empresa = Guid.NewGuid();
+        var aviso = new Notificacao { Id = Guid.NewGuid(), EmpresaId = outraEmpresa ? Guid.NewGuid() : empresa,
+            UsuarioId = Guid.NewGuid() };
+        _notificacaoRepository.GetByIdAsync(aviso.Id).Returns(aviso);
+        (await _controller.MarcarLida(aviso.Id, empresa)).Should().BeOfType<NotFoundObjectResult>();
+        (await _controller.Delete(aviso.Id, empresa)).Should().BeOfType<NotFoundObjectResult>();
+        aviso.Lida.Should().BeFalse();
+        await _unitOfWork.DidNotReceive().CommitAsync();
     }
 }

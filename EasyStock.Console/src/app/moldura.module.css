@@ -159,6 +159,7 @@
   position: relative; z-index: 20;
 }
 .itemTrilho,
+.avisosTrilho > button,
 .sinoTrilho > div > button {
   position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   width: 68px; min-height: 58px; padding: 6px 2px; border: 0; border-radius: 14px;

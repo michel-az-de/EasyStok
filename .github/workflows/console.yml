@@ -43,6 +43,7 @@ jobs:
       - run: node ferramentas/prova-onda1-shell.mjs
       - run: node ferramentas/prova-perfis-modulos.mjs
       - run: node ferramentas/prova-sessao-cozinha.mjs
+      - run: node ferramentas/prova-notificacoes-sessao.mjs
       - run: node ferramentas/prova-1446-cozinha-viva.mjs
       - run: node ferramentas/prova-1474-revisao-visual.mjs
       - run: node ferramentas/prova-1474-ficha-api.mjs

@@ -251,7 +251,7 @@ const rotuloAutomaticas = (regras) => (regras ? `Automáticas, ${contarAtivas(re
 function Cabecalho({
   conversas, regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas,
 }) {
-  const { permite } = useAcessoModulos()
+  const { permite, notificacoes } = useAcessoModulos()
   const compacto = useTopoCompacto()
   const botaoMaisRef = useRef(null)
   const emAndamento = contarAbertas(conversas)
@@ -268,6 +268,7 @@ function Cabecalho({
         {/* Sininho é o primeiro do grupo, à esquerda de Automáticas (seção 8
             da direção visual). A faixa de lembretes abaixo do topo saiu. */}
         <Sininho />
+        {notificacoes}
         {permite('cozinha') && <Botao variante="texto" icone="cooking-pot" onClick={abrirCozinha}>
           Cozinha
         </Botao>}
@@ -317,7 +318,7 @@ function Trilho({
   regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, simulando, aoAlternarSimulacoes,
   atendente,
 }) {
-  const { permite } = useAcessoModulos()
+  const { permite, notificacoes } = useAcessoModulos()
   return (
     <nav className={css.trilho} aria-label="Navegação">
       <Marca compacta />
@@ -362,6 +363,7 @@ function Trilho({
         <span>Módulos</span>
       </Botao>
       <div className={css.sinoTrilho}><Sininho /></div>
+      <div className={css.avisosTrilho}>{notificacoes}</div>
       <span className={css.espacoTrilho} />
       {aoAlternarSimulacoes && !simularEscondido() && (
         <Botao variante="texto" className={css.itemTrilho} aria-pressed={simulando} onClick={aoAlternarSimulacoes} title="Simular (F2)">

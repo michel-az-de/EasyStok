@@ -17,7 +17,7 @@ const MODULO_DO_BALCAO = 'atendimento'
 const HASH_BALCAO = hashDoModulo(MODULO_DO_BALCAO, 'balcao')
 
 export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, children }) {
-  const { permite, aoSair, sessaoPersistente } = useAcessoModulos()
+  const { permite, aoSair, sessaoPersistente, notificacoes } = useAcessoModulos()
   const modulo = moduloPorId(moduloId)
   const telas = telasDoMenu(modulo, { fonteApi })
   const tela = telas.find((t) => t.id === telaId) ?? null
@@ -51,6 +51,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
             ))}
           </nav>
         )}
+        {notificacoes}
         {aoSair && <Botao variante="texto" onClick={aoSair} title={sessaoPersistente ? 'A Cozinha permanece conectada ao fechar o navegador. Saia ao trocar de pessoa.' : undefined}>{sessaoPersistente ? 'Sair deste aparelho' : 'Sair'}</Botao>}
       </header>
       {operacao
