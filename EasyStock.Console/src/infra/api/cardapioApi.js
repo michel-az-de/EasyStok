@@ -25,6 +25,8 @@ export const corpoDoItem = (dados) => ({
   preco: dados.preco,
   ...Object.fromEntries(OPCIONAIS.filter((c) => dados[c] !== undefined).map((c) => [c, dados[c]])),
   ...('novidadeAte' in dados ? { novidadeAte: dados.novidadeAte ? dados.novidadeAte.slice(0, 10) : '' } : {}),
+  // M1.3 (#1483): "" tira da categoria, id põe nela; ausente não mexe.
+  ...('secaoId' in dados ? { secaoId: dados.secaoId ?? '' } : {}),
 })
 
 export const incluirItem = (dados) => chamarApi(CARDAPIO, { metodo: 'POST', corpo: corpoDoItem(dados) })
@@ -46,6 +48,7 @@ export const detalheDaApi = (d) => ({
   tempoPreparoMinutos: d.tempoPreparoMinutos ?? null,
   instrucaoFinalizacao: d.instrucaoFinalizacao ?? '',
   novidadeAte: d.novidadeAte ? `${d.novidadeAte}T23:59:59-03:00` : null,
+  secaoId: d.secaoId ?? null,
 })
 
 export const listarFora = () => chamarApi(`${CARDAPIO}/fora`)

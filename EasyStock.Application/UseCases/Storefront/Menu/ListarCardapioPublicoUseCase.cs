@@ -61,10 +61,15 @@ public sealed class ListarCardapioPublicoUseCase(
         var saldos = await ObterSaldosAsync(storefront.EmpresaId, itens, ct);
 
         var dtos = itens
+            // M1.3 (#1483): categoria escondida esconde os pratos dela (sem apagar nem soltar).
+            .Where(i => i.Secao is null || i.Secao.Visivel)
+            // M1.3: pratos com seção vêm primeiro, na ordem das seções que a dona definiu.
+            .OrderBy(i => i.Secao is null ? 1 : 0)
+            .ThenBy(i => i.Secao?.OrdemExibicao ?? 0)
             // CategoriaTexto ?? Produto.Categoria.Nome: avulsos usam CategoriaTexto;
             // vinculados usam Produto.Categoria.Nome como fallback.
             // Sentinela empurra itens sem categoria para o fim.
-            .OrderBy(i => i.CategoriaEfetiva() ?? SemCategoriaSentinela, StringComparer.Ordinal)
+            .ThenBy(i => i.CategoriaEfetiva() ?? SemCategoriaSentinela, StringComparer.Ordinal)
             .ThenBy(i => i.OrdemExibicao)
             // Desempate determinístico (CriadoEm → Id): itens nascem OrdemExibicao=0 (factory),
             // então um menu nunca-reordenado é todo-empate; sem desempate a ordem do array varia

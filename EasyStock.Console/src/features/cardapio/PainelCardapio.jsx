@@ -479,7 +479,17 @@ function FormularioItemCardapio({
   const [erro, setErro] = useState(null)
   // M1.2 (#1482): a ficha do item. No modo API ela vem do EasyStok antes de editar (o cardápio da
   // comanda não traz ingredientes nem alérgenos); só o que ela mudou vai na gravação.
-  const { obterItemCardapio } = useAcoes()
+  const { obterItemCardapio, listarCategoriasCardapio } = useAcoes()
+  // M1.3 (#1483): a categoria (seção) do prato. Só no modo API, onde as categorias existem.
+  const [categorias, setCategorias] = useState([])
+  const [secaoInicial, setSecaoInicial] = useState('')
+  const [secao, setSecao] = useState('')
+  useEffect(() => {
+    if (!listarCategoriasCardapio) return undefined
+    let vivo = true
+    Promise.resolve(listarCategoriasCardapio()).then((l) => { if (vivo) setCategorias(l ?? []) })
+    return () => { vivo = false }
+  }, [listarCategoriasCardapio])
   const fichaVazia = { descricao: '', ingredientes: '', alergenos: '', preparo: '', instrucao: '' }
   const [fichaInicial, setFichaInicial] = useState(null)
   const [ficha, setFicha] = useState(fichaVazia)
@@ -499,6 +509,8 @@ function FormularioItemCardapio({
       if (d) {
         setComNovidade(Boolean(d.novidadeAte))
         setPrazo(dataDoIso(d.novidadeAte))
+        setSecaoInicial(d.secaoId ?? '')
+        setSecao(d.secaoId ?? '')
       }
     })
     return () => { vivo = false }
@@ -517,6 +529,7 @@ function FormularioItemCardapio({
     if (mudou('alergenos')) saida.alergenos = ficha.alergenos.trim()
     if (mudou('instrucao')) saida.instrucaoFinalizacao = ficha.instrucao.trim()
     if (mudou('preparo') && ficha.preparo.trim()) saida.tempoPreparoMinutos = Number(ficha.preparo)
+    if (categorias.length > 0 && secao !== secaoInicial) saida.secaoId = secao || null
     return saida
   }
 
@@ -580,6 +593,16 @@ function FormularioItemCardapio({
           Porção
           <input value={porcao} onChange={(e) => setPorcao(e.target.value)} placeholder="Ex.: 800 g" />
         </label>
+
+        {categorias.length > 0 && (
+          <label className={css.campoFormulario}>
+            Categoria no cardápio
+            <select value={secao} disabled={carregandoFicha} onChange={(e) => setSecao(e.target.value)}>
+              <option value="">Sem categoria</option>
+              {categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+            </select>
+          </label>
+        )}
 
         <CampoMascarado
           tipo="moeda"

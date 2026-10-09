@@ -10,11 +10,13 @@ namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 
 /// <summary>Campos do item que o console edita. null = não mexe.</summary>
 /// <param name="MexerNovidade">true: <paramref name="NovidadeAte"/> vale, inclusive null (tira a novidade).</param>
+/// <param name="MexerSecao">true: <paramref name="SecaoId"/> vale, inclusive null (sem categoria). M1.3.</param>
 public sealed record DadosItemCardapio(
     string? Nome, LinhaProduto? Linha, string? Porcao, decimal? Preco, string? Categoria,
     string? Descricao = null, string? Ingredientes = null, string? Alergenos = null,
     int? TempoPreparoMinutos = null, string? InstrucaoFinalizacao = null,
-    bool MexerNovidade = false, DateOnly? NovidadeAte = null);
+    bool MexerNovidade = false, DateOnly? NovidadeAte = null,
+    bool MexerSecao = false, Guid? SecaoId = null);
 
 public sealed record ItemForaDoCardapio(Guid CardapioItemId, string Nome, decimal Preco, string? Porcao, string? Categoria, string? FotoUrl);
 
@@ -26,14 +28,14 @@ public sealed record ArquivamentoItemResult(Guid CardapioItemId, bool Arquivado)
 public sealed record DetalheItemCardapio(
     Guid CardapioItemId, string Nome, LinhaProduto Linha, string? Porcao, decimal Preco, string? Categoria,
     string? Descricao, string? Ingredientes, string? Alergenos, int? TempoPreparoMinutos, string? InstrucaoFinalizacao,
-    DateOnly? NovidadeAte, bool EmValidacao, bool Arquivado);
+    DateOnly? NovidadeAte, bool EmValidacao, bool Arquivado, Guid? SecaoId = null);
 
 /// <summary>Linha da tela de gestão do cardápio (M1.1, M1.2): tudo o que a lista mostra e liga.</summary>
 /// <param name="ControlaSaldo">Item ligado a um produto do estoque (avulso não tem saldo).</param>
 public sealed record ItemGestaoCardapio(
     Guid CardapioItemId, string Nome, LinhaProduto Linha, string? Porcao, decimal Preco, string? Categoria,
     string? FotoUrl, bool Visivel, bool Disponivel, double Ordem, bool ControlaSaldo,
-    bool Arquivado = false, bool EmValidacao = false, DateOnly? NovidadeAte = null);
+    bool Arquivado = false, bool EmValidacao = false, DateOnly? NovidadeAte = null, Guid? SecaoId = null);
 
 public enum DirecaoMover { Subir, Descer }
 
@@ -51,6 +53,7 @@ public sealed class ItensDoCardapioComandaUseCase(
     EditarCardapioItemAdminUseCase editar,
     ToggleVisibilidadeCardapioItemAdminUseCase toggleVisivel,
     ICardapioItemRepository cardapioRepository,
+    ICardapioSecaoRepository secaoRepository,
     IUnitOfWork unitOfWork)
 {
     public async Task<AdicionarCardapioItemAdminResult> IncluirAsync(Guid empresaId, DadosItemCardapio dados, CancellationToken ct = default)
@@ -68,10 +71,11 @@ public sealed class ItensDoCardapioComandaUseCase(
             empresaId, Linha: dados.Linha, TempoPreparoMinutos: dados.TempoPreparoMinutos,
             InstrucaoFinalizacao: dados.InstrucaoFinalizacao));
 
-        // RN-15: nasce em validação (o agente não oferece) e, se ela pediu, já como novidade.
+        // RN-15: nasce em validação (o agente não oferece) e, se ela pediu, já como novidade e na categoria.
         var item = await ItemAsync(storefrontId, r.ItemId, empresaId, ct);
         item.MarcarEmValidacao();
         if (dados.MexerNovidade) item.DefinirNovidade(dados.NovidadeAte);
+        if (dados.MexerSecao) item.DefinirSecao(await SecaoValidaAsync(storefrontId, dados.SecaoId, ct));
         await unitOfWork.CommitAsync();
         return r;
     }
@@ -85,9 +89,10 @@ public sealed class ItensDoCardapioComandaUseCase(
             empresaId, Linha: dados.Linha, TempoPreparoMinutos: dados.TempoPreparoMinutos,
             InstrucaoFinalizacao: dados.InstrucaoFinalizacao));
 
-        if (!dados.MexerNovidade) return;
+        if (!dados.MexerNovidade && !dados.MexerSecao) return;
         var item = await ItemAsync(storefrontId, itemId, empresaId, ct);
-        item.DefinirNovidade(dados.NovidadeAte);
+        if (dados.MexerNovidade) item.DefinirNovidade(dados.NovidadeAte);
+        if (dados.MexerSecao) item.DefinirSecao(await SecaoValidaAsync(storefrontId, dados.SecaoId, ct));
         await unitOfWork.CommitAsync();
     }
 
@@ -108,7 +113,7 @@ public sealed class ItensDoCardapioComandaUseCase(
         return new DetalheItemCardapio(
             i.Id, i.NomeEfetivo() ?? "(sem nome)", i.Linha, i.PesoExibicao, i.PrecoEfetivo(), i.CategoriaEfetiva(),
             i.DescricaoPublica, i.Ingredientes, i.Alergenos, i.TempoPreparoMinutos, i.InstrucaoFinalizacao,
-            i.NovidadeAte, i.EmValidacao, i.EstaArquivado);
+            i.NovidadeAte, i.EmValidacao, i.EstaArquivado, i.SecaoId);
     }
 
     /// <summary>Tirar (arquivar) ou repor, por valor: o clique repetido não inverte de volta.</summary>
@@ -157,7 +162,7 @@ public sealed class ItensDoCardapioComandaUseCase(
             .Select(i => new ItemGestaoCardapio(
                 i.Id, i.NomeEfetivo() ?? "(sem nome)", i.Linha, i.PesoExibicao, i.PrecoEfetivo(), i.CategoriaEfetiva(),
                 i.FotoUrl, i.Visivel, i.Disponivel, i.OrdemExibicao, i.ProdutoId.HasValue,
-                i.EstaArquivado, i.EmValidacao, i.NovidadeAte))
+                i.EstaArquivado, i.EmValidacao, i.NovidadeAte, i.SecaoId))
             .ToList();
     }
 
@@ -194,6 +199,15 @@ public sealed class ItensDoCardapioComandaUseCase(
     // Mesmo desempate do menu público (ordem, criado em, id): a lista que ela vê é a que muda.
     private static IEnumerable<CardapioItem> NaOrdem(IEnumerable<CardapioItem> itens) =>
         itens.OrderBy(i => i.OrdemExibicao).ThenBy(i => i.CriadoEm).ThenBy(i => i.Id);
+
+    // A categoria do prato tem de ser da mesma vitrine (nunca de outra empresa). null = sem categoria.
+    private async Task<Guid?> SecaoValidaAsync(Guid storefrontId, Guid? secaoId, CancellationToken ct)
+    {
+        if (secaoId is not { } id) return null;
+        _ = await secaoRepository.GetByIdAsync(storefrontId, id, ct)
+            ?? throw new UseCaseValidationException("Categoria não encontrada.");
+        return id;
+    }
 
     private async Task<CardapioItem> ItemAsync(Guid storefrontId, Guid itemId, Guid empresaId, CancellationToken ct) =>
         await cardapioRepository.GetByIdAndScopeAsync(storefrontId, itemId, empresaId, ct)

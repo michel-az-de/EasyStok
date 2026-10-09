@@ -42,3 +42,4 @@ jobs:
       - run: node ferramentas/prova-1447-hall-modulos.mjs
       - run: node ferramentas/prova-1481-gestao-cardapio.mjs
       - run: node ferramentas/prova-1482-item-cardapio.mjs
+      - run: node ferramentas/prova-1483-categorias-cardapio.mjs
