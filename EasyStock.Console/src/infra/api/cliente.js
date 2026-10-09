@@ -49,11 +49,13 @@ const comoJson = (texto) => {
 // `formulario` (FormData) vai como multipart: o navegador escreve o Content-Type com o boundary.
 // `texto`: página pronta fora do envelope (canhoto HTML da S20); devolve o corpo cru.
 // `arquivo`: binário fora do envelope (mídia da conversa, #1287); devolve o Blob.
+// `chave` (#1491): Idempotency-Key das rotas que criam algo caro de duplicar (produção, pedido).
 export async function chamarApi(caminho, {
-  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false,
+  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null,
 } = {}) {
   const cabecalhos = { Accept: arquivo ? '*/*' : 'application/json' }
   if (corpo !== undefined) cabecalhos['Content-Type'] = 'application/json'
+  if (chave) cabecalhos['Idempotency-Key'] = chave
   if (autenticado) {
     const sessao = lerSessao()
     if (sessao) cabecalhos.Authorization = `Bearer ${sessao.token}`

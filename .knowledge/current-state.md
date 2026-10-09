@@ -1,5 +1,7 @@
 # Current State — EasyStok (2026-05-06)
 
+> Snapshot histórico. Para o estado verificado em 09/10/2026, consulte o [levantamento e execução da onda 0](../docs/plan/erp-casa-da-baba/11-levantamento-e-ondas-2026-10-09.md). A base atual usa net10.0 e o Console é o frontend de destino. Nenhum resultado local deste plano comprova publicação ou integração física.
+
 > Snapshot ao final do dia. Atualize quando deploy ou auditoria mudar.
 
 ## Numbers

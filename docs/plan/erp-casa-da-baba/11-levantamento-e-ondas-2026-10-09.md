@@ -351,3 +351,45 @@ Não executados: suíte completa de backend, integração com banco real, teste 
 Começar pela onda 0, revisar a PR visual #1480 e a correção #1401 e preparar o roteiro único do pedido. Na sequência, fechar navegação/DS/perfis da onda 1 e a operação manual da onda 2. Em paralelo apenas no planejamento, confirmar driver/mídia da Oasis, conta de pagamentos e entregas para não descobrir esses bloqueios no fim.
 
 Não abrir outro conjunto de implementações duplicadas: atualizar as issues existentes com a onda e o aceite, abrindo novas somente para lacunas confirmadas. Este documento não cria nem modifica issues e não realiza merge ou deploy das PRs listadas.
+
+## 12. Execução autorizada da onda 0, 09/10/2026
+
+Felipe aprovou a continuação após o levantamento. As seções anteriores preservam o snapshot da análise inicial; esta seção registra o trabalho de implementação posterior. Desenvolvimento em worktree isolado, mantendo os demais trabalhos locais.
+
+### Correções e conciliação
+
+- PR #1401 revisada e atualizada para `425324a34fb48876ada782a982db3523f835137a`: estornos de estoque/caixa e consumo FEFO. A revisão reproduziu uma corrida em que o saldo diminuía entre a consulta inicial e o lock; agora o serviço recusa descoberto quando a política não permite estoque negativo. Novos testes cobrem saldo concorrente, quantidades fracionadas e devolução aos lotes originais.
+- PR #1480 revisada e atualizada para `d7a21b59aacb71fbff76a1bd6d46f41dcf201eb4`: três conflitos resolvidos preservando as entregas atuais do cardápio e do controle de atendimento. A revisão corrigiu itens avulsos excluídos da cozinha/PWA, pareamento cruzado entre empresas e seleção de cliente homônimo por nome. Bloqueio agora usa a conversa escolhida.
+- Sync PWA: erro de gravação mantém o cursor para reenvio; timeout não pula dados antigos ainda não recebidos. Duas regressões foram reproduzidas antes da correção. Isso não implementa a resolução de conflitos entre edições offline, que continua na onda 7.
+- Provas da cozinha e da revisão #1474 incluídas no workflow do console. Avisos adicionados à entrada da `.knowledge` para distinguir os snapshots antigos da base atual.
+- PR #1401 integrada em `master` como `96516cb2` após build/testes, análise CodeQL e secret-scan aprovados. O job manual de homologação HTTP do GitHub foi ignorado; a prova HTTP desta seção foi executada localmente.
+- Durante esta execução, outro trabalho integrou #1492 e #1495: estoque do dia e produção por prato com peso real/etiquetas. Essas entregas foram conciliadas, preservadas e revalidadas aqui. Não são implementações feitas por esta revisão; o inventário inicial as listava antes do merge. A seção de M2 em `03-m2-producao.md` contém seu escopo atualizado.
+
+### Evidência local
+
+| Verificação | Resultado |
+|---|---|
+| Correção de estoque, Application | 63 aprovados, sem ignorados |
+| ItemEstoque, Domain | 14 aprovados, sem ignorados |
+| Estoque, pedido, caixa, PostgreSQL real | 18 aprovados, sem ignorados |
+| Criação concorrente de pedido por HTTP, PostgreSQL real | 1 aprovado, sem ignorados |
+| Atendimento, checkout e cardápio, Application | 630 aprovados, sem ignorados |
+| Controllers, pareamento, calculadora e sync, API | 105 aprovados, sem ignorados |
+| Cozinha/KDS e atendimento, PostgreSQL real | 9 aprovados, sem ignorados |
+| Console | lint/camadas/build aprovados; 47 scripts de prova aprovados; ficha novamente aprovada com 23 verificações após correção de homônimos |
+| PWA | 167 aprovados, 1 ignorado por IndexedDB ausente no sandbox; 2 scripts ESM não executados pelo runner |
+| Gate de commit | build aprovado e 36 testes de arquitetura aprovados |
+| Verificador HTTP | 8 testes aprovados e console/API locais respondendo com o mesmo SHA `d7a21b59` |
+| Conciliação com #1492/#1495 | 242 testes de aplicação aprovados; qualidade do console e provas 1490, 1491, 1447 e ambas 1474 aprovadas novamente |
+
+Jornada executada por `scripts/homologacao/onda0-http.ps1` em API real com autenticação JWT e PostgreSQL 17 descartável, sem usar os bancos das outras stacks. Abriu loja/caixa, criou pedido avulso de 2,5 unidades a R$ 10, confirmou a cozinha, recebeu R$ 25, percorreu preparando/pronto/entregue e releu cada estado. Recebeu/cancelou outro pedido de R$ 15 e conferiu fechamento de R$ 125, incluindo R$ 100 de abertura. Identificadores de teste: entregue `9520d7ca-59be-4a2a-808a-d0016ac02c3a`; cancelado `c281d1ba-d3f7-490a-bf7a-95e7a7326412`.
+
+Backup local: `pg_dump -Fc` e `pg_restore --exit-on-error` para outra base descartável. Quantidade e hash do conteúdo de pedidos (2), itens (2), pagamentos (2) e fechamentos (1) iguais ao original. SHA-256 do dump de teste: `CA7D215D0AE30FCA1513678D2380FF8ADF8D617E44B0777A543B12D0F788CC4C`. Logs/TRX/dump ficam no worktree em `.build/onda0-tests`, fora do Git.
+
+### Limites e próximos aceites
+
+- Revisão e teste local não são publicação. Os SHAs públicos registrados na seção 3 não foram substituídos por um deploy nesta execução.
+- A abertura do navegador automatizado falhou no início por `windows sandbox failed: apply deny-read ACLs`. O aceite visual autenticado permanece pendente; as provas JavaScript e HTTP não o substituem.
+- Scripts de backup externo da VPS foram lidos, mas a disponibilidade e a restauração do backup real da produção não foram verificadas. A prova acima usa somente massa sintética local.
+- Não há workflow `build-casa-da-baba-apk.yml` na árvore atual, nem cópia MAUI ativa para sincronizar. O workflow PWA vigente roda `node tests/pwa/run.js`; não foi gerado APK nem testada a Oasis.
+- Não fechar a onda 0 como homologada visualmente. A próxima fatia é completar esse aceite, verificar recuperação da VPS antes de publicar e então apresentar navegação/DS/perfis da onda 1 para aprovação das telas representativas.

@@ -11,7 +11,8 @@ public sealed record CriarLoteItemInput(
     [property: MaxLength(32)] string? Unidade = null,
     int? PesoG = null,
     int? ValidadeDias = null,
-    string? FotoUrl = null);
+    string? FotoUrl = null,
+    int? PesoRealG = null);
 
 public sealed record CriarLoteCommand(
     [property: Required] Guid EmpresaId,
@@ -114,6 +115,7 @@ public class CriarLoteUseCase(
                     Unidade = input.Unidade,
                     Quantidade = input.Quantidade,
                     PesoG = input.PesoG,
+                    PesoRealG = input.PesoRealG,
                     ValidadeDias = input.ValidadeDias,
                     ExpiraEm = expira,
                     FotoUrl = input.FotoUrl,

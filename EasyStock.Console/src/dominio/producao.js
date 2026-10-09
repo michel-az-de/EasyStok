@@ -188,3 +188,22 @@ export function fecharDescoberto(descobertos, sku) {
 export function textoDescoberto(nome, porcao, quantidade) {
   return `Vendeu ${quantidade} ${nome}${porcao ? ' ' + porcao : ''} sem produção lançada.`
 }
+
+// M2.2 (#1491): uma linha da produção do dia lançada no EasyStok. A sobra é o peso real menos as
+// porções (US-061: 1.144 g em 2 de 500 g sobram 144 g); sem os dois pesos, não há sobra a mostrar.
+export function sobraDaLinha({ porcoes, pesoPorPorcaoG, pesoRealG }) {
+  if (!pesoRealG || !pesoPorPorcaoG || !porcoes) return null
+  return pesoRealG - porcoes * pesoPorPorcaoG
+}
+
+// O que impede lançar a linha, em português, ou null. Mesmas regras da API, para avisar antes.
+export function erroDaLinha(linha) {
+  if (!linha.sku) return 'Escolha o prato.'
+  if (!Number.isInteger(linha.porcoes) || linha.porcoes <= 0) return 'Quantas porções saíram?'
+  if (!Number.isInteger(linha.validadeDias) || linha.validadeDias <= 0) return 'Validade em dias inteiros.'
+  if (linha.pesoPorPorcaoG != null && linha.pesoPorPorcaoG <= 0) return 'Peso da porção inválido.'
+  if (linha.pesoRealG != null && linha.pesoRealG <= 0) return 'Peso real inválido.'
+  const sobra = sobraDaLinha(linha)
+  if (sobra != null && sobra < 0) return 'O peso real não fecha as porções.'
+  return null
+}

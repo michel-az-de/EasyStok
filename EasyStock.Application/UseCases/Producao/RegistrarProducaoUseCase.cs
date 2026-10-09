@@ -10,7 +10,9 @@ public sealed record RegistrarProducaoItemInput(
     int Porcoes,
     int? PesoPorPorcaoG,
     int ValidadeDias,
-    decimal? CustoUnitario);
+    decimal? CustoUnitario,
+    // M2.2 (#1491, RN-45): peso real produzido; a sobra é o que passa das porções.
+    int? PesoRealG = null);
 
 public sealed record RegistrarProducaoCommand(
     [property: Required] Guid EmpresaId,
@@ -21,7 +23,8 @@ public sealed record RegistrarProducaoCommand(
     Guid? OperadorUserId = null,
     [property: MaxLength(120)] string? OperadorNome = null);
 
-public sealed record RegistrarProducaoItemResult(Guid ProdutoId, Guid ItemEstoqueId, Guid MovimentacaoId, int Porcoes, DateTime ValidadeEm);
+public sealed record RegistrarProducaoItemResult(
+    Guid ProdutoId, Guid ItemEstoqueId, Guid MovimentacaoId, int Porcoes, DateTime ValidadeEm, int? SobraG = null);
 
 public sealed record RegistrarProducaoResult(
     Guid LoteId,
@@ -68,6 +71,11 @@ public class RegistrarProducaoUseCase(
                 throw new UseCaseValidationException("Peso por porcao deve ser maior que zero.");
             if (it.CustoUnitario is < 0)
                 throw new UseCaseValidationException("Custo unitario nao pode ser negativo.");
+            if (it.PesoRealG is <= 0)
+                throw new UseCaseValidationException("Peso real deve ser maior que zero.");
+            if (Sobra(it) is < 0)
+                throw new UseCaseValidationException(
+                    "O peso real nao fecha as porcoes: confira o peso ou o numero de porcoes.");
         }
 
         // Antecipa a regra RDC 727 do FinalizarLote: Embalado sem peso e rejeitado antes de gravar.
@@ -111,7 +119,8 @@ public class RegistrarProducaoUseCase(
                 ProdutoId: i.ProdutoId,
                 Unidade: "porcao",
                 PesoG: i.PesoPorPorcaoG,
-                ValidadeDias: i.ValidadeDias)).ToList()));
+                ValidadeDias: i.ValidadeDias,
+                PesoRealG: i.PesoRealG)).ToList()));
 
         var finalizado = await finalizarLoteUC.ExecuteAsync(new FinalizarLoteCommand(cmd.EmpresaId, lote.Id))
             ?? throw new InvalidOperationException($"Lote {lote.Id} nao encontrado dentro da transacao.");
@@ -149,7 +158,7 @@ public class RegistrarProducaoUseCase(
                 LojaId: cmd.LojaId));
 
             resultados.Add(new RegistrarProducaoItemResult(
-                it.ProdutoId, entrada.ItemEstoqueId, entrada.MovimentacaoId, it.Porcoes, validadeEm));
+                it.ProdutoId, entrada.ItemEstoqueId, entrada.MovimentacaoId, it.Porcoes, validadeEm, Sobra(it)));
         }
 
         logger.LogInformation("Producao registrada: lote {Codigo} com {Itens} item(ns) e {Etiquetas} etiqueta(s).",
@@ -159,4 +168,8 @@ public class RegistrarProducaoUseCase(
     }
 
     private static string Truncar(string s, int max) => s.Length > max ? s[..max] : s;
+
+    // US-061: 1.000 g em 2 porções de 500 g sobra 0; 1.144 g sobra 144 g. Sem os dois pesos, null.
+    private static int? Sobra(RegistrarProducaoItemInput it) =>
+        it.PesoRealG is { } real && it.PesoPorPorcaoG is { } porcao ? real - it.Porcoes * porcao : null;
 }

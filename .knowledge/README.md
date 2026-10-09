@@ -1,5 +1,7 @@
 # EasyStok — Knowledge Base
 
+> **Referência atual de execução, 09/10/2026:** leia o [levantamento e ondas Casa da Baba](../docs/plan/erp-casa-da-baba/11-levantamento-e-ondas-2026-10-09.md), incluindo a execução da onda 0. API e CI usam **.NET 10**, confirmado pelo csproj e build. Os [ADR-0056](../docs/adr/0056-erp-da-casa-da-baba-front-unico.md) e [ADR-0059](../docs/adr/0059-web-sai-pwa-continua-e-merge-de-conflitos.md) definem Console como destino dos módulos e PWA como backup offline. Os textos abaixo são snapshots históricos: não usar suas contagens, plataforma de deploy, MAUI ou bloqueio de billing como estado atual sem conferir código e ambiente. O CI voltou a executar; build/testes e deploy continuam sendo estados separados.
+
 > **Para o próximo agente que abrir este repo:** este é o single source of truth técnico do projeto. O `CLAUDE.md` da raiz aponta pra cá. Leia este README, depois decida quais arquivos abrir conforme a tarefa. Não leia tudo cego.
 
 ## O que é o projeto (em 3 frases)
