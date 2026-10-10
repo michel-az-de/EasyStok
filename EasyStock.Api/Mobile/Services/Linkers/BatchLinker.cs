@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Producao;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
@@ -10,12 +11,18 @@ namespace EasyStock.Api.Mobile.Services.Linkers;
 /// Idempotente via FindByMobileBatchIdAsync + CodigoInterno="lote:loteId:produtoId".
 ///
 /// Extraido do god-Service <c>SyncAutoLinker</c> (F8).
+/// <para>
+/// #1526: depois da entrada, baixa insumo e embalagem pela receita com a mesma regra da produção do
+/// console (<see cref="BaixaDeInsumosDaProducao"/>: prato marcado baixa a receita toda; embalagem desce
+/// sempre; falta avisa e não trava). No PWA, Qty conta pacotes: porções = Qty, peso = Qty × WeightG.
+/// </para>
 /// </summary>
 public sealed class BatchLinker(
     EasyStockDbContext db,
     ILoteRepository loteRepo,
     LoteMobileEstadoReconciler loteEstado,
-    ILogger<BatchLinker> log)
+    ILogger<BatchLinker> log,
+    BaixaDeInsumosDaProducao? baixaDeInsumos = null)
 {
     public async Task ExecuteAsync(IEnumerable<string> mobileBatchIds, Guid? empresaId)
     {
@@ -99,6 +106,7 @@ public sealed class BatchLinker(
                     bid, lote.Id, lote.Itens.Count);
 
                 await EnsureEntradaEstoqueDoLoteAsync(lote);
+                await BaixarInsumosDoLoteAsync(lote);
 
                 // #1464: lote que ja chega excluido/descartado no primeiro sync.
                 await loteEstado.AplicarAsync(mobileB);
@@ -115,6 +123,48 @@ public sealed class BatchLinker(
         log.LogInformation(
             "AutoLink Lote summary empresaId={EmpresaId} total={Total} created={Created} idempotent={Idempotent} errors={Errors}",
             empresaId, idsList.Count, created, idempotentSkip, errorSkip);
+    }
+
+    /// <summary>
+    /// #1526: baixa de insumo e embalagem do lote, uma vez só (a saída leva "Insumo da produção {codigo}").
+    /// Falha aqui não derruba o sync: o lote e a entrada já estão gravados.
+    /// </summary>
+    private async Task BaixarInsumosDoLoteAsync(Lote lote)
+    {
+        if (baixaDeInsumos is null) return;
+        try
+        {
+            var descricao = $"{BaixaDeInsumosDaProducao.PrefixoDaDescricao} {lote.Codigo}";
+            var jaBaixou = await db.Set<MovimentacaoEstoque>().IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(m => m.EmpresaId == lote.EmpresaId && m.Descricao == descricao);
+            if (jaBaixou) return;
+
+            var pratos = new List<PratoParaBaixa>();
+            foreach (var item in lote.Itens.Where(i => i.ProdutoId.HasValue && i.Quantidade > 0))
+            {
+                var produto = await db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
+                    .FirstOrDefaultAsync(p => p.Id == item.ProdutoId && p.EmpresaId == lote.EmpresaId);
+                if (produto is null) continue;
+                pratos.Add(new PratoParaBaixa(produto, item.Quantidade, item.PesoG is { } peso ? item.Quantidade * peso : null));
+            }
+            if (pratos.Count == 0) return;
+
+            var avisos = await baixaDeInsumos.BaixarAsync(lote.EmpresaId, pratos, lote.Codigo, lote.DataProducao);
+            if (avisos.Count == 0) return;
+            foreach (var aviso in avisos)
+                log.LogWarning("Baixa de insumo do lote {Codigo} (PWA): {Aviso}", lote.Codigo, aviso);
+            var rastreado = await db.Set<Lote>().FirstOrDefaultAsync(l => l.Id == lote.Id);
+            if (rastreado is not null)
+            {
+                rastreado.Observacoes = string.Join(" ", new[] { rastreado.Observacoes, $"Insumos: {string.Join(" ", avisos)}" }
+                    .Where(t => !string.IsNullOrWhiteSpace(t)));
+                await db.SaveChangesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Baixa de insumo do lote {LoteId} (PWA) FALHOU: {Tipo}: {Mensagem}", lote.Id, ex.GetType().Name, ex.Message);
+        }
     }
 
     /// <summary>
