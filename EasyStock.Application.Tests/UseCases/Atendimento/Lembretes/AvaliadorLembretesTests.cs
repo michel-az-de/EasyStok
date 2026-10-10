@@ -27,12 +27,102 @@ public class AvaliadorLembretesTests
 
     public AvaliadorLembretesTests()
     {
+        _candidatos.ListarPedidosAgendadosAsync(Arg.Any<CancellationToken>()).Returns([]);
         _candidatos.ListarPedidosSemBaixaAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([]);
         _candidatos.ListarConversasSemRespostaAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([]);
     }
 
     private AvaliarLembretesUseCase Avaliador() => new(_repo, _candidatos, _notificador, _publisher, _uow, _relogio,
         Microsoft.Extensions.Options.Options.Create(new EasyStock.Application.Services.Notifications.PrazosOptions()));
+
+    private PedidoAgendadoLembrete Agendado(DateTime entrega, DateTime? inicio = null,
+        EasyStock.Domain.Entities.Storefront.ExpedienteLoja? expediente = null) =>
+        new(_empresaId, Guid.NewGuid(), "Fulana", entrega, inicio, Guid.NewGuid(), expediente);
+
+    private void Agendar(PedidoAgendadoLembrete pedido) =>
+        _candidatos.ListarPedidosAgendadosAsync(Arg.Any<CancellationToken>()).Returns([pedido]);
+
+    [Fact]
+    public async Task VesperaNoInicioDoExpedienteUmaVezComSse()
+    {
+        var pedido = Agendado(Agora.Date.AddDays(2).AddHours(21));
+        Agendar(pedido);
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(0);
+        _relogio.Advance(TimeSpan.FromHours(20).Subtract(TimeSpan.FromSeconds(1))); // 07:59:59 BRT na véspera
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(0);
+        _relogio.Advance(TimeSpan.FromSeconds(1));
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(1);
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(0);
+        var lembrete = _repo.Todos.Should().ContainSingle().Subject;
+        lembrete.Tipo.Should().Be(TipoLembrete.PedidoAgendado);
+        lembrete.PedidoId.Should().Be(pedido.PedidoId);
+        lembrete.ConversaId.Should().Be(pedido.ConversaId);
+        lembrete.Texto.Should().Contain("entrega amanhã").And.Contain("às 18:00");
+        lembrete.Referencia!.Length.Should().BeLessThanOrEqualTo(Lembrete.ReferenciaTamanhoMaximo);
+        await _notificador.Received(1).EnfileirarEventoAsync(TipoEventoNotificacao.LembreteVencido,
+            _empresaId, Arg.Any<string>(), lembrete.Id, Arg.Any<CancellationToken>());
+        await _publisher.Received(1).PublicarAsync(AvaliarLembretesUseCase.EventoSse,
+            _empresaId, Arg.Is<object>(p => p.GetType().GetProperty("pedidoId")!.GetValue(p)!.Equals(pedido.PedidoId)), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InicioPrevistoTemOutroMarcoECancelamentoResolveSemNovoAviso()
+    {
+        var inicio = Agora.AddMinutes(10);
+        Agendar(Agendado(Agora.AddHours(3), inicio));
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(0);
+        _relogio.Advance(TimeSpan.FromMinutes(10));
+        (await Avaliador().ExecuteAsync()).Avisados.Should().Be(1);
+        (await Avaliador().ExecuteAsync()).Avisados.Should().Be(0);
+        var lembrete = _repo.Todos.Should().ContainSingle().Subject;
+        lembrete.Texto.Should().Contain("início previsto").And.Contain("às 12:10");
+        lembrete.Referencia!.Length.Should().BeLessThanOrEqualTo(Lembrete.ReferenciaTamanhoMaximo);
+        _candidatos.ListarPedidosAgendadosAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var cancelado = await Avaliador().ExecuteAsync();
+        cancelado.Resolvidos.Should().Be(1);
+        cancelado.Avisados.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ReagendamentoEncerraVesperaAntigaELembraNovaData()
+    {
+        var pedido = Agendado(Agora.AddDays(1), Agora.AddDays(1).AddHours(-1));
+        Agendar(pedido);
+        await Avaliador().ExecuteAsync();
+        var anterior = _repo.Todos.Should().ContainSingle().Subject;
+        var novo = pedido with { EntregaEm = pedido.EntregaEm.AddDays(2), InicioPrevistoEm = pedido.InicioPrevistoEm!.Value.AddDays(2) };
+        Agendar(novo);
+        (await Avaliador().ExecuteAsync()).Resolvidos.Should().Be(1);
+        _relogio.Advance(TimeSpan.FromDays(2));
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(1);
+        anterior.EstaAberto.Should().BeFalse();
+        _repo.Todos.Should().ContainSingle(l => l.EstaAberto && l.Referencia != anterior.Referencia);
+    }
+
+    [Fact]
+    public async Task VesperaUsaTurnoDaEmpresaENaoRetroageNoDiaDaEntrega()
+    {
+        var expediente = EasyStock.Domain.Entities.Storefront.ExpedienteLoja.CriarPadrao(_empresaId);
+        expediente.DefinirHorarios([new((int)Agora.DayOfWeek, new TimeOnly(13, 0), new TimeOnly(22, 0))]);
+        Agendar(Agendado(Agora.AddDays(1), expediente: expediente));
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(0); // 12h BRT, abre às 13h
+        _relogio.Advance(TimeSpan.FromHours(1));
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(1);
+        Agendar(Agendado(Agora.AddDays(1))); // outro pedido já no dia da entrega
+        _relogio.Advance(TimeSpan.FromDays(1));
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task SemTurnoNaVesperaOuExpedienteDeOutraEmpresaNaoCriaAviso()
+    {
+        var expediente = EasyStock.Domain.Entities.Storefront.ExpedienteLoja.CriarPadrao(_empresaId);
+        expediente.DefinirHorarios([]);
+        Agendar(Agendado(Agora.AddDays(1), expediente: expediente));
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(0);
+        Agendar(Agendado(Agora.AddDays(1), Agora, EasyStock.Domain.Entities.Storefront.ExpedienteLoja.CriarPadrao(Guid.NewGuid())));
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(0);
+    }
 
     [Fact]
     public async Task FecharNaMaoNaoConcluiLembreteAindaSemRespostaNemDisparaAviso()

@@ -276,17 +276,19 @@ No modo massa a atendente é fixa "Thatiane" (`Moldura.jsx:425`, `aplicacao/caso
 
 ### M3.8 · Lembrete de pedido agendado sobre `Pedido`
 
+**Executado e homologado localmente em 10/10/2026.** Evidências na seção 31 do plano de ondas. Encomenda pela comanda ganhou seleção de dia; a agenda completa do M8.2 continua pendente.
+
 **Problema.** O lembrete de agendado só enxerga `mobile_orders` (§3.5); encomenda do site ou do WhatsApp
 para outro dia não lembra ninguém.
 **Abordagem.**
-- Job novo no Worker sobre `Pedido` com vaga ativa ou `AgendadoParaEm`, status não final: na véspera (início do expediente do dia anterior) e no início previsto (S21) cria `Lembrete` (S43) do tipo novo `PedidoAgendado`, com `PedidoId` e `Referencia` = `{pedidoId}:{marco}` como trava (sem coluna nova).
-- Mesmo `PostgresAdvisoryLock`. O job antigo continua até a PWA sair (P05) e é removido junto.
+- O avaliador existente na API consulta `Pedido` com vaga ativa ou `AgendadoParaEm`, status não final: na véspera (abertura do expediente do dia anterior) e no início previsto (S21) cria `Lembrete` (S43) do tipo `PedidoAgendado`, com `PedidoId` e `Referencia` = `{pedidoId}:{marco}:{dataOuInstante}` como trava. Reagendamento conclui o aviso do marco antigo; cancelamento e conclusão retiram o pedido da avaliação.
+- Reuso do `PostgresAdvisoryLock`, outbox e SSE existentes, sem outro disparador. O job antigo de `mobile_orders` continua até a PWA sair (P05). `TipoLembrete` é persistido como inteiro; valor novo 4, sem coluna nem migração.
 **Aceite.**
-- [ ] Encomenda para depois de amanhã gera um lembrete na véspera e só um (rodar o job duas vezes).
-- [ ] Pedido cancelado não lembra.
-- [ ] Lembrete aparece na lista da F10 e no SSE.
-**Testes (Red).** `LembretePedidoAgendadoJobTests.VesperaUmaVez`, `...CanceladoNaoLembra` (relógio falso).
-**Depende de.** F10 para a tela; M8.2 para existir encomenda pelo console. **Tamanho.** P · **Tier.** baixo (enum, sem migração; conferir se `TipoLembrete` é gravado como texto ou inteiro antes de fechar o tier) · **Rollback.** revert.
+- [x] Encomenda para depois de amanhã gera um lembrete na véspera e só um (rodar o avaliador duas vezes, relógio falso).
+- [x] Pedido cancelado não lembra; avisos anteriores são concluídos.
+- [x] Lembrete aparece na lista da F10 e no SSE, com navegador e API locais.
+**Testes.** `AvaliadorLembretesTests` (relógio falso); `LembretesPedidoAgendadoIntegrationTests.VesperaUmaVezInicioPrevistoListaSseECancelamentoComRlsReal` e `VagaAtivaPrevaleceHistoricoLiberadoEJanelaOuConversaDeOutraEmpresaNaoEntram` (PostgreSQL real); `prova-m38-lembretes-agendados.mjs`.
+**Depende de.** F10 para a tela; seleção de dia do M8.2 entregue nesta fatia. **Tamanho.** P · **Tier.** baixo (enum inteiro, sem migração) · **Rollback.** revert.
 
 ### M3.9 · iFood como canal de pedido (condicional a D3-02)
 

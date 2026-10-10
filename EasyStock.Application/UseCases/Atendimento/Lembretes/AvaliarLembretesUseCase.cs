@@ -52,6 +52,25 @@ public sealed class AvaliarLembretesUseCase(
         var vigentes = new HashSet<(Guid EmpresaId, TipoLembrete Tipo, string Referencia)>();
         var criados = 0;
 
+        foreach (var pedido in await candidatos.ListarPedidosAgendadosAsync(ct))
+        {
+            var expediente = pedido.Expediente ?? ExpedienteLoja.CriarPadrao(pedido.EmpresaId);
+            if (expediente.EmpresaId != pedido.EmpresaId) continue;
+            var diaEntrega = HorarioBrasil.DataOperacional(pedido.EntregaEm);
+            var vespera = diaEntrega.AddDays(-1);
+            var turno = expediente.Horarios.FirstOrDefault(h => h.DiaDaSemana == (int)vespera.DayOfWeek);
+            var quem = string.IsNullOrWhiteSpace(pedido.ClienteNome) ? "Pedido agendado" : $"Pedido de {pedido.ClienteNome.Trim()}";
+            if (turno is not null)
+                criados += await LembrarAgendadoAsync(pedido, $"vespera:{diaEntrega:yyyyMMdd}",
+                    $"{quem}: entrega amanhã, {HorarioBrasil.ConverterParaBrasilia(pedido.EntregaEm):dd/MM 'às' HH:mm}.",
+                    agora >= HorarioBrasil.InstanteUtc(vespera, turno.Abre) && HorarioBrasil.DataOperacional(agora) == vespera,
+                    agora, vigentes, ct);
+            if (pedido.InicioPrevistoEm is { } inicio)
+                criados += await LembrarAgendadoAsync(pedido, $"inicio:{inicio:yyyyMMddHHmmss}",
+                    $"{quem}: início previsto do preparo em {HorarioBrasil.ConverterParaBrasilia(inicio):dd/MM 'às' HH:mm}.",
+                    agora >= inicio, agora, vigentes, ct);
+        }
+
         foreach (var pedido in await candidatos.ListarPedidosSemBaixaAsync(agora - PagamentoSemBaixaApos, ct))
         {
             var referencia = pedido.PedidoId.ToString();
@@ -111,6 +130,19 @@ public sealed class AvaliarLembretesUseCase(
 
     private static TimeSpan SlaDa(ConversaSemResposta conversa, TimeSpan padrao) =>
         conversa.SlaRespostaMinutos is { } minutos and > 0 ? TimeSpan.FromMinutes(minutos) : padrao;
+
+    private async Task<int> LembrarAgendadoAsync(PedidoAgendadoLembrete pedido, string marco, string texto, bool venceu,
+        DateTime agora, HashSet<(Guid EmpresaId, TipoLembrete Tipo, string Referencia)> vigentes, CancellationToken ct)
+    {
+        // O instante faz parte do marco: reagendar encerra o aviso anterior e permite lembrar a nova data.
+        var referencia = $"{pedido.PedidoId}:{marco}";
+        vigentes.Add((pedido.EmpresaId, TipoLembrete.PedidoAgendado, referencia));
+        if (!venceu || await repository.ExisteAutomaticoAsync(pedido.EmpresaId, TipoLembrete.PedidoAgendado, referencia, ct)) return 0;
+        await repository.AddAsync(Lembrete.Automatico(pedido.EmpresaId, TipoLembrete.PedidoAgendado, referencia,
+            texto.Length > Lembrete.TextoTamanhoMaximo ? texto[..Lembrete.TextoTamanhoMaximo] : texto,
+            agora, conversaId: pedido.ConversaId, pedidoId: pedido.PedidoId), ct);
+        return 1;
+    }
 
     // `slaPorEmpresa`: o SLA aplicado nesta rodada, para o PrazoEstourado dizer o mesmo prazo que criou o lembrete.
     private async Task<int> AvisarVencidosAsync(DateTime agora, IReadOnlyDictionary<Guid, TimeSpan> slaPorEmpresa,

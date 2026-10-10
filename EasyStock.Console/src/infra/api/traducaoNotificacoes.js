@@ -15,7 +15,8 @@ export const lembreteDaApi = (dto) => ({
     quando: instante(dto.venceEm),
     conversaId: dto.conversaId ?? null,
     origem: dto.tipo === 'ClienteSemResposta' ? ORIGENS.PASSAGEM
-      : dto.tipo === 'PagamentoSemBaixa' ? ORIGENS.PAGAMENTO : ORIGENS.MANUAL,
+      : dto.tipo === 'PagamentoSemBaixa' ? ORIGENS.PAGAMENTO
+        : dto.tipo === 'PedidoAgendado' ? ORIGENS.AGENDAMENTO : ORIGENS.MANUAL,
   }),
   fonte: FONTES.LEMBRETE,
   servidorId: dto.id,

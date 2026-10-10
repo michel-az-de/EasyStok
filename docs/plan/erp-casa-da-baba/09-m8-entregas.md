@@ -116,6 +116,8 @@ módulo próprio com cadastros e relatórios, e o painel do dia não pode piorar
 
 ### M8.2 · Encomenda para data futura e agenda
 
+**Execução parcial em 10/10/2026.** A comanda no modo API permite escolher o dia e consulta as janelas daquela data. Pedido criado pela tela para daqui a dez dias ocupou uma única vaga no PostgreSQL local; lembretes M3.8 também conferidos (seção 31 do plano de ondas). Agenda, limite futuro de D8-02, pagamento de D8-03 e os demais aceites deste item continuam pendentes. O limite existente de 60 dias trata a extensão da consulta, sem definir quantos dias à frente podem ser escolhidos.
+
 **Problema.** O backend reserva vaga em qualquer data dos próximos 60 dias, mas a tela não deixa escolher o
 dia: a comanda mostra as 10 primeiras janelas com vaga e nenhuma tela mostra o que está marcado para a
 semana. Encomenda de sábado feita na terça vira conversa e caderno.

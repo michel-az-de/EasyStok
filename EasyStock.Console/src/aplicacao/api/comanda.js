@@ -241,7 +241,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
     ...Object.fromEntries(Object.entries(SO_NO_EASYSTOK).map(([nome, rotulo]) => [nome, soNoEasyStok(rotulo)])),
 
     // Janelas com vaga no prazo dos itens da comanda (S16). Promessa direta para a tela.
-    carregarJanelasComanda: (itens) => listarJanelas({ itens }),
+    carregarJanelasComanda: (itens, data = '') => listarJanelas({ itens, dataInicio: data || null, dataFim: data || null }),
 
     gerarPedido: (id, meio = null) => criarPedido(id, meio),
 

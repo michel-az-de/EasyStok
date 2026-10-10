@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Sales;
@@ -11,6 +12,39 @@ namespace EasyStock.Infra.Postgre.Repositories.Atendimento;
 /// </summary>
 public sealed class CandidatosLembreteQuery(EasyStockDbContext db) : ICandidatosLembreteQuery
 {
+    private static readonly string[] StatusAgendados =
+    [
+        StatusPedidoMapper.AguardandoPagamento, StatusPedidoMapper.AguardandoAprovacaoBaba,
+        StatusPedidoMapper.AprovadoBaba, StatusPedidoMapper.Aguardando, StatusPedidoMapper.Preparando,
+        StatusPedidoMapper.Pronto, StatusPedidoMapper.SaiuParaEntrega,
+    ];
+
+    public async Task<IReadOnlyList<PedidoAgendadoLembrete>> ListarPedidosAgendadosAsync(CancellationToken ct = default)
+    {
+        var linhas = await (
+            from p in db.Pedidos.IgnoreQueryFilters().AsNoTracking()
+            where StatusAgendados.Contains(p.Status)
+            let vaga = (
+                from v in db.VagasOcupadas.IgnoreQueryFilters()
+                join j in db.JanelasEntrega.IgnoreQueryFilters() on v.JanelaEntregaId equals j.Id
+                join s in db.Storefronts.IgnoreQueryFilters() on j.StorefrontId equals s.Id
+                where v.PedidoId == p.Id && v.LiberadoEm == null && s.EmpresaId == p.EmpresaId
+                select new { v.DataEntrega, j.HoraInicio }).FirstOrDefault()
+            where vaga != null || p.AgendadoParaEm != null
+            let conversaId = db.AtendimentoConversas.IgnoreQueryFilters()
+                .Where(c => c.EmpresaId == p.EmpresaId && c.PedidoEmAndamentoId == p.Id && c.Situacao != SituacaoConversa.Encerrada)
+                .OrderBy(c => c.Id).Select(c => (Guid?)c.Id).FirstOrDefault()
+            select new { p.EmpresaId, p.Id, p.ClienteNome, p.AgendadoParaEm, p.InicioPrevistoEm, Vaga = vaga, ConversaId = conversaId })
+            .ToListAsync(ct);
+
+        var empresas = linhas.Select(l => l.EmpresaId).Distinct().ToArray();
+        var expedientes = await db.ExpedientesLoja.IgnoreQueryFilters().AsNoTracking()
+            .Where(e => empresas.Contains(e.EmpresaId)).ToDictionaryAsync(e => e.EmpresaId, ct);
+        return linhas.Select(l => new PedidoAgendadoLembrete(l.EmpresaId, l.Id, l.ClienteNome,
+            l.Vaga is { } v ? HorarioBrasil.InstanteUtc(v.DataEntrega, v.HoraInicio) : l.AgendadoParaEm!.Value,
+            l.InicioPrevistoEm, l.ConversaId, expedientes.GetValueOrDefault(l.EmpresaId))).ToList();
+    }
+
     // "Parado desde" = AlteradoEm: o pedido é carimbado ao entrar em AguardandoPagamento (checkout ou
     // desfazer pagamento), e não há coluna com o instante exato da transição.
     public async Task<IReadOnlyList<PedidoSemBaixa>> ListarPedidosSemBaixaAsync(DateTime paradoDesdeAntesDe, CancellationToken ct = default) =>

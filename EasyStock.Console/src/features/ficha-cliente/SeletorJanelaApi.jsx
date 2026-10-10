@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Bloco } from '../../componentes/Bloco'
+import { CampoTexto } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes } from '../../aplicacao/contextos'
 import { useReagendamentoPedido } from '../../aplicacao/useReagendamentoPedido'
@@ -22,12 +23,15 @@ function EscolhaRascunho({ pedido, editavel, aoEscolher }) {
   const { carregarJanelasComanda } = useAcoes()
   const [janelas, setJanelas] = useState(null)
   const [erro, setErro] = useState(null)
+  const [data, setData] = useState('')
   // Recarrega quando muda o que entra no prazo (os itens), não a cada quantidade.
   const skus = [...new Set(pedido.itens.map((l) => l.sku))].sort().join(',')
 
   useEffect(() => {
     let vivo = true
-    carregarJanelasComanda(skus ? skus.split(',') : [])
+    setJanelas(null)
+    setErro(null)
+    carregarJanelasComanda(skus ? skus.split(',') : [], data)
       .then((lidas) => {
         if (!vivo) return
         setJanelas(lidas.janelas)
@@ -35,13 +39,15 @@ function EscolhaRascunho({ pedido, editavel, aoEscolher }) {
       })
       .catch((e) => { if (vivo) setErro(`Janelas não carregaram: ${e.message}`) })
     return () => { vivo = false }
-  }, [skus, carregarJanelasComanda])
+  }, [skus, data, carregarJanelasComanda])
 
   return (
     <Bloco titulo="Janela de entrega">
+      <CampoTexto rotulo="Dia da entrega (opcional)" tipo="date" value={data} disabled={!editavel}
+        onChange={(e) => { setData(e.target.value); aoEscolher(null) }} />
       {janelas === null && !erro && <p className={css.corpoBloco}>Carregando janelas…</p>}
       {janelas?.length === 0 && !erro && (
-        <p className={css.corpoBloco}>Nenhuma janela com vaga no prazo dos itens nos próximos dias.</p>
+        <p className={css.corpoBloco}>Nenhuma janela com vaga no prazo dos itens. Escolha outro dia.</p>
       )}
       {janelas?.length > 0 && (
         <ul className={css.janelas}>

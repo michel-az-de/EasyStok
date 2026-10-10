@@ -29,6 +29,7 @@ public class AvaliarLembretesPrazoEstouradoTests
 
     public AvaliarLembretesPrazoEstouradoTests()
     {
+        _candidatos.ListarPedidosAgendadosAsync(Arg.Any<CancellationToken>()).Returns([]);
         _candidatos.ListarPedidosSemBaixaAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([]);
         _candidatos.ListarConversasSemRespostaAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([]);
         _repo.ListarAutomaticosAbertosAsync(Arg.Any<CancellationToken>()).Returns(_ => []);

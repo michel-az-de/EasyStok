@@ -17,6 +17,7 @@ const ICONE_ORIGEM = {
   [ORIGENS.MANUAL]: 'relogio',
   [ORIGENS.PASSAGEM]: 'conversa',
   [ORIGENS.PAGAMENTO]: 'dollar-sign',
+  [ORIGENS.AGENDAMENTO]: 'relogio',
 }
 
 // Item 7 (rodada 10): reaproveita ícone que já tem sentido em outro lugar da

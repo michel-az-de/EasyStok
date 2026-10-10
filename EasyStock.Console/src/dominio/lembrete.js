@@ -10,7 +10,7 @@ import { origemDaPassagem } from './passagem'
 
 export const TIPOS = { DONA: 'dona' }
 
-export const ORIGENS = { MANUAL: 'manual', PASSAGEM: 'passagem', PAGAMENTO: 'pagamento' }
+export const ORIGENS = { MANUAL: 'manual', PASSAGEM: 'passagem', PAGAMENTO: 'pagamento', AGENDAMENTO: 'agendamento' }
 
 // As notificações InApp ficam no sino transversal. Aqui só entram lembretes.
 export const FONTES = { LEMBRETE: 'lembrete' }

@@ -995,3 +995,39 @@ O roteiro inicial do navegador usava uma origem direta bloqueada pelo CORS; pass
 - O nome reflete o vínculo de usuário atual da empresa, inclusive no histórico. Não foi criado snapshot de nome por atribuição. Controles de transferência conservam seu escopo da F09.
 - Validação somente local com usuários e contatos sintéticos. Não houve envio a cliente real nem verificação de publicação pública.
 - Próxima fatia: M3.8, lembrete de pedido agendado sobre `Pedido`, conferindo a dependência de encomendas do M8.2. Aceites externos de canais e publicação seguem separados.
+
+## 31. Execução da Onda 2: lembretes de encomendas (M3.8), 10/10/2026
+
+### 31.1 Entrega
+
+- O avaliador de lembretes existente na API passa a ler pedidos agendados. Reutiliza o lock de avaliação, a persistência, o outbox e o SSE da F10. A proposta inicial de outro job no Worker foi substituída pelo reuso do avaliador já ativo, sem dois disparadores para o mesmo pedido. O job antigo de `mobile_orders` permanece para a retirada da PWA em P05.
+- A vaga ativa da mesma empresa define dia e início da janela; histórico liberado não entra. Sem vaga ativa, usa `AgendadoParaEm`. Pedidos cancelados, entregues e rascunhos ficam fora. Conversa vinculada e expediente respeitam a empresa do pedido, além dos filtros e do RLS nas leituras do operador.
+- Na véspera, o aviso começa na abertura do expediente daquele dia, em horário de Brasília. Sem expediente salvo, aplica o padrão existente de 08h às 22h. Dia anterior sem turno não recebe aviso de véspera; o avaliador não recupera esse aviso depois da data. O segundo marco usa `InicioPrevistoEm` já calculado por S21, sem regra nova de preparo.
+- `PedidoAgendado` usa o valor inteiro 4 do enum existente. Cada referência inclui o pedido, o marco e sua data ou instante. Repetir a avaliação não duplica o aviso, inclusive após conclusão manual. Reagendar conclui o marco antigo e permite lembrar a nova data; cancelar ou finalizar conclui os avisos que deixaram de ser vigentes. Não houve alteração de schema nem migração.
+- O painel de lembretes reconhece a origem Agendamento. A comanda no modo API ganhou Dia da entrega opcional, usando `dataInicio` e `dataFim` do contrato existente. Mudar o dia limpa a janela anteriormente escolhida. Esta é a dependência mínima de criação do M8.2, cuja agenda completa continua pendente.
+
+### 31.2 Validação local
+
+Evidências, TRX, scripts e capturas em `C:\rep\EasyStok\.build\onda2-agendados`. Banco sintético `easystock_onda2_agendados`, clonado da homologação anterior; os testes PostgreSQL usam Testcontainers separado. API local com notificações externas desabilitadas.
+
+| Camada | Evidência |
+|---|---|
+| Build | `EasyStok.CI.slnf` compilou sem erros; compilação após integração do master conserva avisos existentes de `ForwardedHeaders`/`IPNetwork` obsoletos |
+| Domain / Application / API / Arquitetura | 1.556, 2.484, 1.198 e 61 testes aprovados, sem ignorados; arquitetura com `Category!=ArchitectureDebt` |
+| PostgreSQL real | 13 testes aprovados, sem ignorados: lembretes, expediente e demanda agendada. Novos casos cobrem os dois marcos, repetição, cancelamento, vaga ativa, histórico liberado, vínculos de outra empresa e leitura sob RLS com usuário sem bypass |
+| Console | 75 provas aprovadas; lint, fronteiras de camada, 264 pares de contraste e build aprovados; `prova-m38-lembretes-agendados.mjs` incluída no workflow |
+| Chromium e API | Pedido criado pela comanda para daqui a dez dias, janela confirmada na API e uma única vaga ativa no banco. Troca de dia limpa a escolha anterior |
+| Avaliador em execução | Reagendamento do pedido sintético para amanhã gerou aviso de véspera na lista e no painel; conexão SSE recebeu `lembrete.vencido` com `PedidoId`. Início previsto controlado no banco local gerou o segundo aviso sem repetir o primeiro |
+| Cancelamento e permissão | Status controlado no banco local concluiu os dois avisos; recarga retirou ambos do painel. Cozinha recebeu 403 na consulta de lembretes |
+| Apresentação | Capturas inspecionadas em 1440 × 1000 e 390 × 844; lembrete visível no painel em ambas, sem erro JavaScript no roteiro |
+
+O roteiro local precisou ajustar os dados sintéticos de cardápio e frete e aguardar a posição do aviso no painel antes das capturas. Na repetição integrada, passou a expandir Vistos no celular para também encontrar o aviso já visto no computador; a tentativa que esperava o item recolhido foi incompleta. A execução completa posterior passou. Alterações controladas de início previsto e cancelamento servem como estímulos do avaliador; os casos automatizados também verificam esses estados. Não representam uma nova homologação do fluxo de cancelamento pela Ficha.
+
+As correções `604b64f9` e `e03ea319` chegaram ao master durante esta execução e foram incorporadas sem conflito. Na versão integrada, foram repetidos build, testes de Application/API/PostgreSQL/arquitetura, qualidade e todas as provas do Console, além do roteiro completo no navegador. As contagens da tabela refletem essa integração; Domain já havia passado e não recebeu alteração nesses commits. Os TRX anteriores e integrados foram preservados separadamente.
+
+### 31.3 Limites e próxima fatia
+
+- Homologação somente local, com usuários, pedidos e contatos sintéticos. Não houve mensagem para cliente real, entrega externa de WebPush nem deploy ou verificação de publicação pública.
+- O aviso é da equipe e usa os destinatários já definidos pela F10. Não foi criada atribuição específica por pedido nem alteração da política de notificações.
+- M8.2 continua parcial: falta a agenda de encomendas e decidir o horizonte futuro D8-02 e o pagamento D8-03. O limite atual de 60 dias restringe a extensão da consulta de janelas, sem definir o horizonte futuro. A escolha de dia desta fatia conserva o contrato existente.
+- Próxima fatia: completar agenda/encomendas do M8.2 com suas decisões operacionais. M3.9 permanece condicionado a D3-02 e ao contrato do iFood. Aceites externos de canais e publicação seguem separados.

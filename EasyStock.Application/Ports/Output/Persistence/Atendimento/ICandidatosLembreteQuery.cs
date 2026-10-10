@@ -5,6 +5,10 @@ namespace EasyStock.Application.Ports.Output.Persistence.Atendimento;
 /// <summary>Pedido parado em <c>AguardandoPagamento</c> (S43).</summary>
 public sealed record PedidoSemBaixa(Guid EmpresaId, Guid PedidoId, string? ClienteNome, Guid? ConversaId);
 
+public sealed record PedidoAgendadoLembrete(
+    Guid EmpresaId, Guid PedidoId, string? ClienteNome, DateTime EntregaEm, DateTime? InicioPrevistoEm,
+    Guid? ConversaId, ExpedienteLoja? Expediente);
+
 /// <summary>
 /// Conversa assumida cuja última mensagem que conta (nota interna do sistema não conta) é do
 /// cliente (S43). <see cref="MensagemEntradaId"/> é a referência do lembrete: se o cliente escrever de
@@ -23,6 +27,8 @@ public sealed record ConversaSemResposta(
 /// </summary>
 public interface ICandidatosLembreteQuery
 {
+    Task<IReadOnlyList<PedidoAgendadoLembrete>> ListarPedidosAgendadosAsync(CancellationToken ct = default);
+
     /// <summary>Pedidos em <c>AguardandoPagamento</c> sem alteração desde <paramref name="paradoDesdeAntesDe"/>.</summary>
     Task<IReadOnlyList<PedidoSemBaixa>> ListarPedidosSemBaixaAsync(DateTime paradoDesdeAntesDe, CancellationToken ct = default);
 
