@@ -15,7 +15,8 @@ using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 namespace EasyStock.Application.Services.Storefront;
 
 /// <summary>Item pedido no checkout: cardápio, quantidade e observação do item (RN-20).</summary>
-public sealed record ItemPedidoCheckout(Guid CardapioItemId, int Qtd, string? Observacao = null);
+/// <param name="VariacaoId">M1.4b (#1531): a porção pedida. Null em prato com porções = a padrão.</param>
+public sealed record ItemPedidoCheckout(Guid CardapioItemId, int Qtd, string? Observacao = null, Guid? VariacaoId = null);
 
 /// <summary>
 /// Entrada do núcleo do checkout (S10). A loja vem do <see cref="Slug"/> (site) ou da
@@ -170,6 +171,9 @@ public sealed class CheckoutCoreService(
         // ── Validar e carregar itens do cardápio ──────────────────────────
         var cardapioItens = await CarregarItensCardapioAsync(
             storefront.Id, input.Itens!.Select(i => i.CardapioItemId), ct);
+        // M1.4b (#1531): porção de outro prato ou esgotada recusa antes de criar o pedido e ocupar a vaga.
+        foreach (var i in input.Itens!)
+            cardapioItens[i.CardapioItemId].PorcaoParaVenda(i.VariacaoId);
 
         // #1506: janela já encerrada (ou data passada) nunca vale, com ou sem prazo mínimo.
         if (CalculadoraPrazoPedido.JanelaJaPassou(input.DataEntrega, janela.HoraFim, timeProvider.GetUtcNow().UtcDateTime))
@@ -217,8 +221,8 @@ public sealed class CheckoutCoreService(
         // via AddItemAsync (DbSet) e NÃO em pedido.Itens, então RecalcularTotal() computaria
         // 0 (coleção vazia); por isso atribuímos o Total diretamente. É o mesmo somatório
         // cobrado no MercadoPago (Fase 3), reutilizado aqui.
-        decimal total = input.Itens!.Sum(i => cardapioItens[i.CardapioItemId].PrecoEfetivo() * i.Qtd)
-                        + valorFrete;
+        // M1.4b (#1531): soma o que foi gravado em cada linha (preço da porção quando há).
+        decimal total = itens.Sum(i => i.Subtotal) + valorFrete;
         pedido.Total = Dinheiro.FromDecimal(total);
         pedido.AlteradoEm = DateTime.UtcNow;
         await pedidoRepository.UpdateAsync(pedido, ct);
@@ -345,13 +349,19 @@ public sealed class CheckoutCoreService(
         foreach (var inputItem in itens)
         {
             var ci = cardapioItens[inputItem.CardapioItemId];
-            var precoUnit = ci.PrecoEfetivo();
+            // M1.4b (#1531): com porção, o preço é o dela (absoluto, ADR-0035) e a linha guarda o retrato.
+            var porcao = ci.PorcaoParaVenda(inputItem.VariacaoId);
+            var precoUnit = porcao?.PrecoStorefront ?? ci.PrecoEfetivo();
             var item = new DomainPedidoItem
             {
                 Id = Guid.NewGuid(),
                 PedidoId = pedido.Id,
                 ProdutoId = ci.ProdutoId,
                 CardapioItemId = ci.Id,
+                CardapioItemVariacaoId = porcao?.Id,
+                ProdutoVariacaoId = porcao?.ProdutoVariacaoId,
+                VariacaoRotuloSnapshot = porcao?.Rotulo,
+                SkuSnapshot = porcao?.Sku?.Value,
                 LinhaSnapshot = ci.Linha.ParaContrato(),
                 Nome = ci.NomeEfetivo() ?? $"Item {ci.ProdutoId}",
                 Quantidade = inputItem.Qtd,

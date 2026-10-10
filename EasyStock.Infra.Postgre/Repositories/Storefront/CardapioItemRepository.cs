@@ -8,7 +8,10 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
 {
     public Task<CardapioItem?> GetByIdAsync(Guid storefrontId, Guid id, CancellationToken ct = default) =>
         db.CardapioItens
+            .AsSplitQuery()
             .Include(c => c.Produto)
+            // M1.4b (#1531): o checkout cobra o preço da porção.
+            .Include(c => c.Variacoes)
             .FirstOrDefaultAsync(c => c.StorefrontId == storefrontId && c.Id == id, ct);
 
     public Task<CardapioItem?> GetByIdAndScopeAsync(Guid storefrontId, Guid itemId, Guid? empresaId, CancellationToken ct = default)

@@ -13,6 +13,7 @@
 
 import { moeda } from './formato.js'
 import { pagamentosDoPedido } from './pagamento.js'
+import { itemPorSku } from './cardapio.js'
 
 export const TIPOS_MOVIMENTO = {
   ABERTURA: 'abertura', ENTRADA: 'entrada', SAIDA: 'saida', FECHAMENTO: 'fechamento',
@@ -237,7 +238,7 @@ export function resumoCaixa(movimentos, conversas, cardapio, agora) {
   // com estorno parcial continua vendido por inteiro, só recebeu menos.
   const totalVendas = pedidosPagosNoDia(conversas, agora)
     .reduce((soma, pedido) => soma + (pedido.itens ?? []).reduce((s, linha) => {
-      const item = (cardapio ?? []).find((i) => i.sku === linha.sku)
+      const item = itemPorSku(cardapio ?? [], linha.sku) // M1.4b: linha de porção tem sku composto
       return s + (item?.preco ?? 0) * linha.qtd
     }, 0), 0)
 

@@ -13,7 +13,7 @@ import { useEscape } from '../../hooks/useEscape'
 import { abrirSecao } from '../../hooks/useRecolhido'
 import {
   adicionaisDoItem, alternativasPara, catalogoDeAdicionais, contarDisponiveis, ehNovidade,
-  estaEmValidacao, itensAtivos, itensRemovidos, situacaoDoItem,
+  estaEmValidacao, itensAtivos, itensRemovidos, porcaoDoToque, produtoDaPorcao, situacaoDoItem,
 } from '../../dominio/cardapio'
 import { cartaDoItem } from '../../dominio/arteCardapio'
 import { aceitaFormato, canalDaConversa, motivoDeFormato } from '../../dominio/canal'
@@ -98,12 +98,17 @@ export function CartaoArrasto({ item }) {
 // linha, senão a lista muda de tamanho e a ordem dos hooks quebra.
 function ItemEscolher({
   item, situacao, quantos, alternativas, linhas, adicionais, cardapio, novidade, aoEscolher, aoAjustar, envioDeFoto,
-  podeGerir = true,
+  podeGerir = true, naComanda = () => 0,
 }) {
+  // M1.4b (#1531): prato com porções. O toque (e o arrasto) soma a porção padrão; cada porção tem
+  // o seu botão, com o preço dela, e a esgotada não entra.
+  const porcoes = item.porcoes ?? []
+  const padrao = porcaoDoToque(item)
+  const doToque = porcoes.length > 0 ? (padrao ? produtoDaPorcao(item, padrao) : null) : item
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: 'prato-' + item.sku,
-    data: { type: 'prato', item },
-    disabled: !situacao.vendavel,
+    data: { type: 'prato', item: doToque ?? item },
+    disabled: !situacao.vendavel || !doToque,
   })
 
   return (
@@ -117,9 +122,9 @@ function ItemEscolher({
           type="button"
           ref={setNodeRef}
           className={css.linha}
-          disabled={!situacao.vendavel}
+          disabled={!situacao.vendavel || !doToque}
           style={isDragging ? { opacity: 0.5 } : undefined}
-          onClick={() => aoEscolher(item)}
+          onClick={() => aoEscolher(doToque)}
           {...listeners}
           {...attributes}
         >
@@ -146,7 +151,7 @@ function ItemEscolher({
             sem sair do cardápio. Fora do botão da linha (largura própria,
             nunca por cima dele), então nunca disputa espaço com nome/preço
             nem depende de posição absoluta pra não se sobrepor. */}
-        {quantos > 0 && (
+        {quantos > 0 && porcoes.length === 0 && (
           <div className={css.ajusteNaLinha}>
             <span className={css.contagem}>{quantos} na comanda</span>
             <button
@@ -176,6 +181,40 @@ function ItemEscolher({
           </button>
         )}
       </div>
+
+      {porcoes.length > 0 && (
+        <ul className={css.lista} aria-label={'Porções de ' + item.nome}>
+          {porcoes.map((p) => {
+            const produto = produtoDaPorcao(item, p)
+            const qtd = naComanda(produto.sku)
+            return (
+              <li key={p.id} className={css.linhaComAjuste}>
+                <button
+                  type="button"
+                  className={css.linha}
+                  disabled={!situacao.vendavel || !p.disponivel}
+                  onClick={() => aoEscolher(produto)}
+                >
+                  <span className={css.nome}>
+                    {p.rotulo}
+                    <small>{p.disponivel ? (p.padrao ? 'padrão' : '') : 'esgotada'}</small>
+                  </span>
+                  <span className={css.preco}>{moeda(p.preco)}</span>
+                  {qtd === 0 && p.disponivel && <Icone nome="mais" rotulo={`Somar ${item.nome} ${p.rotulo} na comanda`} />}
+                </button>
+                {qtd > 0 && (
+                  <div className={css.ajusteNaLinha}>
+                    <span className={css.contagem}>{qtd} na comanda</span>
+                    <button type="button" className={css.botaoMenosCardapio} onClick={() => aoAjustar(produto.sku, -1)}>
+                      <Icone nome="menos" rotulo={`Tirar uma unidade de ${item.nome} ${p.rotulo}`} />
+                    </button>
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
 
       {/* O erro caro não é o item acabar, é a conversa morrer em "não tem".
           A alternativa nasce junto com a má notícia. */}
@@ -256,6 +295,7 @@ function Escolher({
                 aoAjustar={aoAjustar}
                 envioDeFoto={envioDeFoto}
                 podeGerir={podeGerir}
+                naComanda={naComanda}
               />
             )
           })}

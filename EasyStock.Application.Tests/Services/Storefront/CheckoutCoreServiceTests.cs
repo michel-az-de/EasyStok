@@ -153,6 +153,88 @@ public class CheckoutCoreServiceTests
         Origem: "storefront",
         Slug: "casa-da-baba");
 
+    // ── M1.4b (#1531): vender por porção ─────────────────────────────────
+
+    private static (CardapioItemVariacao P300, CardapioItemVariacao P800, Guid VariacaoEstoque) ComPorcoes(Cenario c)
+    {
+        var variacaoEstoque = Guid.NewGuid();
+        var p300 = CardapioItemVariacao.Criar(c.CardapioItem.Id, "300 g", 28m, ordemExibicao: 0, ehPadrao: true);
+        var p800 = CardapioItemVariacao.Criar(c.CardapioItem.Id, "800 g", 62m, ordemExibicao: 1,
+            sku: EasyStock.Domain.ValueObjects.CodigoSku.From("RAV-800"), produtoVariacaoId: variacaoEstoque);
+        c.CardapioItem.AdicionarVariacao(p300);
+        c.CardapioItem.AdicionarVariacao(p800);
+        return (p300, p800, variacaoEstoque);
+    }
+
+    private static CheckoutCoreInput InputDaPorcao(Guid? variacaoId) => new(
+        ClienteId: ClienteId,
+        Itens: new List<ItemPedidoCheckout> { new(CardapioItemId, 2, null, variacaoId) },
+        JanelaId: JanelaId, DataEntrega: DataEntrega, Cep: Cep, Origem: "atendimento", Slug: "casa-da-baba");
+
+    [Fact]
+    public async Task PorcaoEscolhida_CobraOPrecoDela_EGravaRotuloSkuEVariacaoDoEstoque()
+    {
+        var c = new Cenario();
+        var (_, p800, variacaoEstoque) = ComPorcoes(c);
+
+        var reservado = await c.Servico().CriarPedidoComReservaAsync(InputDaPorcao(p800.Id));
+
+        var item = reservado.Itens.Should().ContainSingle().Subject;
+        (item.PrecoUnitario, item.Subtotal).Should().Be((62m, 124m));
+        (item.CardapioItemVariacaoId, item.ProdutoVariacaoId, item.VariacaoRotuloSnapshot, item.SkuSnapshot)
+            .Should().Be((p800.Id, variacaoEstoque, "800 g", "RAV-800"));
+        reservado.Total.Should().Be(129m, "2 × 62 + frete 5");
+        reservado.Pedido.Total.Valor.Should().Be(129m);
+    }
+
+    [Fact]
+    public async Task ItemComPorcoes_SemPorcaoInformada_UsaAPadrao()
+    {
+        // Site e agente de hoje não conhecem porções: caem na padrão (ADR-0035).
+        var c = new Cenario();
+        var (p300, _, _) = ComPorcoes(c);
+
+        var reservado = await c.Servico().CriarPedidoComReservaAsync(InputDaPorcao(null));
+
+        var item = reservado.Itens.Single();
+        (item.PrecoUnitario, item.CardapioItemVariacaoId, item.VariacaoRotuloSnapshot).Should().Be((28m, p300.Id, "300 g"));
+    }
+
+    [Fact]
+    public async Task PorcaoEsgotada_Recusa_EAOutraPorcaoDoMesmoPratoEntra()
+    {
+        var c = new Cenario();
+        var (p300, p800, _) = ComPorcoes(c);
+        p800.MarcarEsgotado();
+
+        var esgotada = () => c.Servico().CriarPedidoComReservaAsync(InputDaPorcao(p800.Id));
+        await esgotada.Should().ThrowAsync<RegraDeDominioVioladaException>().WithMessage("*800 g*esgotad*");
+        c.PedidosAdicionados.Should().BeEmpty("a recusa vem antes de criar o pedido e ocupar a vaga");
+
+        (await c.Servico().CriarPedidoComReservaAsync(InputDaPorcao(p300.Id))).Itens.Single().PrecoUnitario.Should().Be(28m);
+    }
+
+    [Fact]
+    public async Task PorcaoQueNaoEDoPrato_Recusa()
+    {
+        var c = new Cenario();
+        ComPorcoes(c);
+
+        var act = () => c.Servico().CriarPedidoComReservaAsync(InputDaPorcao(Guid.NewGuid()));
+
+        await act.Should().ThrowAsync<RegraDeDominioVioladaException>().WithMessage("*porção*");
+    }
+
+    [Fact]
+    public async Task PratoSemPorcoes_SegueCobrandoOPrecoDoItem_SemRegistroDePorcao()
+    {
+        var c = new Cenario();
+
+        var item = (await c.Servico().CriarPedidoComReservaAsync(InputDaPorcao(null))).Itens.Single();
+
+        (item.PrecoUnitario, item.CardapioItemVariacaoId, item.VariacaoRotuloSnapshot).Should().Be((10m, null, null));
+    }
+
     [Fact]
     public async Task CriaPedidoEReservaVaga()
     {

@@ -26,12 +26,15 @@ public sealed record PedidoConversaResult(
 
 public sealed record PagamentoPedidoConversaResult(Guid Id, decimal Valor, string Metodo, DateTime PagoEm);
 
+/// <param name="VariacaoId">M1.4b (#1531): a porção vendida (null em prato sem porções).</param>
 public sealed record ItemPedidoConversaResult(
     Guid? CardapioItemId,
     string Nome,
     decimal Quantidade,
     decimal PrecoUnitario,
-    string? Observacao);
+    string? Observacao,
+    Guid? VariacaoId = null,
+    string? Porcao = null);
 
 /// <param name="Status">Nome do <see cref="StatusCobrancaPedido"/> (Pendente, Paga, Expirada, Cancelada, Estornada).</param>
 public sealed record CobrancaPedidoConversaResult(
@@ -84,7 +87,8 @@ public sealed class ObterPedidoConversaUseCase(
 
         return new PedidoConversaResult(
             pedido.Id, pedido.Status, pedido.Total.Valor, frete, pedido.CriadoEm, pedido.AgendadoParaEm,
-            itens.Select(i => new ItemPedidoConversaResult(i.CardapioItemId, i.Nome, i.Quantidade, i.PrecoUnitario, i.Observacao)).ToList(),
+            itens.Select(i => new ItemPedidoConversaResult(i.CardapioItemId, i.Nome, i.Quantidade, i.PrecoUnitario, i.Observacao,
+                i.CardapioItemVariacaoId, i.VariacaoRotuloSnapshot)).ToList(),
             vigente is null ? null : CobrancaPedidoConversaResult.De(vigente), pedido.TotalPago,
             pedido.Pagamentos.Select(p => new PagamentoPedidoConversaResult(p.Id, p.Valor, p.Metodo, p.PagoEm)).ToList(),
             // #1474: o console barra a baixa manual antes de cancelar o link quando falta aprovar.

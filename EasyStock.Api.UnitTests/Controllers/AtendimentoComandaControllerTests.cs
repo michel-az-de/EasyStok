@@ -46,7 +46,7 @@ public class AtendimentoComandaControllerTests
         _controller = new AtendimentoComandaController(
             new ListarCardapioComandaUseCase(_storefronts,
                 new ListarCardapioPublicoUseCase(_storefronts, _cardapio, Substitute.For<IItemEstoqueRepository>(),
-                    NullLogger<ListarCardapioPublicoUseCase>.Instance)),
+                    NullLogger<ListarCardapioPublicoUseCase>.Instance), _cardapio),
             new ListarJanelasAtendimentoUseCase(_storefronts, _cardapio, Substitute.For<IConfiguracaoAtendimentoRepository>(), listarJanelas),
             new ObterPedidoConversaUseCase(_conversas, _pedidos, Substitute.For<ICobrancaPedidoRepository>(), Substitute.For<IVagaOcupadaRepository>()),
             // Os casos daqui param antes do núcleo do checkout e da cobrança.
