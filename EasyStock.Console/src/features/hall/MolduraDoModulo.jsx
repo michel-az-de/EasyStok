@@ -17,6 +17,13 @@ import css from './moldura.module.css'
 
 const MODULO_DO_BALCAO = 'atendimento'
 const HASH_BALCAO = hashDoModulo(MODULO_DO_BALCAO, 'balcao')
+const ICONES_DAS_TELAS = {
+  itens: 'cardapio', categorias: 'modelo', estoque: 'package', producao: 'cooking-pot',
+  insumos: 'shopping-cart', receitas: 'nota', planejamento: 'relogio', perdas: 'lixeira',
+  balcao: 'inbox', horarios: 'relogio', respostas: 'respostas', fila: 'cooking-pot',
+  caixa: 'dollar-sign', fidelidade: 'presente', canais: 'conversa', integracoes: 'link',
+  painel: 'moto', janelas: 'relogio',
+}
 
 export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, children }) {
   const { permite, aoSair, sessaoPersistente, notificacoes } = useAcessoModulos()
@@ -58,8 +65,8 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
         </div>
         <div className={css.acoes}>
           <InterruptorTema />
-          {notificacoes}
-          {aoSair && <Botao variante="texto" onClick={aoSair} title={sessaoPersistente ? 'A Cozinha permanece conectada ao fechar o navegador. Saia ao trocar de pessoa.' : undefined}>{sessaoPersistente ? 'Sair deste aparelho' : 'Sair'}</Botao>}
+          {notificacoes && <div className={css.avisos}>{notificacoes}</div>}
+          {aoSair && <Botao className={css.sair} variante="texto" icone="log-out" onClick={aoSair} title={sessaoPersistente ? 'A Cozinha permanece conectada ao fechar o navegador. Saia ao trocar de pessoa.' : undefined}>{sessaoPersistente ? 'Sair deste aparelho' : 'Sair'}</Botao>}
         </div>
         {telas.length > 1 && (
           <nav ref={menuRef} className={css.menu} aria-label={`Telas de ${modulo.nome}`}>
@@ -70,7 +77,8 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
                 className={`${css.item} ${t.id === telaId ? css.itemAtivo : ''}`}
                 aria-current={t.id === telaId ? 'page' : undefined}
               >
-                {t.rotulo}
+                <Icone nome={ICONES_DAS_TELAS[t.id] ?? modulo.icone} tamanho={20} />
+                <span>{t.rotulo}</span>
               </a>
             ))}
           </nav>
@@ -83,13 +91,18 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
             <div className={css.folha}>
               {tela ? (
                 <>
-                  <h1 className={css.titulo}>{tela.rotulo}</h1>
-                  {children}
+                  <h1 className={css.titulo}>
+                    <Icone nome={ICONES_DAS_TELAS[tela.id] ?? modulo.icone} tamanho={22} />
+                    {tela.rotulo}
+                  </h1>
+                  <div className={css.conteudo}>{children}</div>
                 </>
               ) : (
-                <Vazio titulo={`${modulo.nome}: em breve`} acao={<a className={css.link} href={HASH_HALL}>Voltar aos módulos</a>}>
-                  Este módulo ainda não funciona por esta tela.
-                </Vazio>
+                <div className={css.conteudo}>
+                  <Vazio titulo={`${modulo.nome}: em breve`} acao={<a className={css.link} href={HASH_HALL}>Voltar aos módulos</a>}>
+                    Este módulo ainda não funciona por esta tela.
+                  </Vazio>
+                </div>
               )}
             </div>
           </main>
