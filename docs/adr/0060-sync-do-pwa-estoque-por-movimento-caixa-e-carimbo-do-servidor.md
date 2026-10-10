@@ -1,6 +1,6 @@
 # ADR-0060 · Sync do PWA: estoque por movimento, caixa com edição e exclusão, carimbo do servidor
 
-- Status: Proposto (tier alto: tem migração; vale quando o PR da #1520 for aprovado)
+- Status: Aceito (2026-10-10; Felipe delegou a decisão ao pedir a correção e a publicação da #1520)
 - Data: 2026-10-10
 - Decisor: Felipe
 - Emenda: nenhuma. Prepara o ADR-0059 D3 (módulo de merge), sem implementá-lo.
