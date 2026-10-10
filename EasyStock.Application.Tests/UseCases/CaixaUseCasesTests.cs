@@ -345,8 +345,93 @@ public class CaixaUseCasesTests
                 Descricao: "Sangria", Metodo: "dinheiro"));
 
         await act.Should().ThrowAsync<UseCaseValidationException>()
-            .WithMessage("*saldo*");
+            .WithMessage("*gaveta*");
         await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_DeveBloquearSaidaPorPix_QuandoMaiorQueSaldoDoDia()
+    {
+        var empresaId = Guid.NewGuid();
+        _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m) });
+
+        var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
+
+        var act = () => useCase.ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "saida", 500m, Descricao: "Fornecedor", Metodo: "pix"));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*saldo*");
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    // ─── #1521: saída em dinheiro respeita a gaveta, não o saldo com Pix e cartão ───
+
+    private RegistrarMovimentoCaixaUseCase UcComGavetaDe100EPixDe400(Guid empresaId)
+    {
+        _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m) });
+        _repo.GetTotalVendasDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns(0m);
+        _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns(400m);
+        _repo.GetPagamentosPedidosListaNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null)
+            .Returns(new[] { new PedidoPagamento { Id = Guid.NewGuid(), Metodo = "pix", Valor = 400m, PagoEm = DateTime.UtcNow } });
+        return new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_DeveBloquearSangriaEmDinheiro_AcimaDoDinheiroNaGaveta()
+    {
+        // Gaveta: R$100 de abertura. Os R$400 recebidos em Pix não estão na gaveta, então uma
+        // sangria de R$450 em dinheiro não existe fisicamente (antes passava: teto = R$500).
+        var empresaId = Guid.NewGuid();
+        var act = () => UcComGavetaDe100EPixDe400(empresaId).ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "saida", 450m, Descricao: "Sangria", Metodo: "dinheiro"));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*gaveta*");
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_DevePermitirSangriaEmDinheiro_DentroDaGaveta()
+    {
+        var empresaId = Guid.NewGuid();
+        await UcComGavetaDe100EPixDe400(empresaId).ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "saida", 80m, Descricao: "Sangria", Metodo: "Dinheiro"));
+
+        await _repo.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m => m.Tipo == "saida" && m.Valor == 80m));
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_VendaSemMetodoContaComoPossivelDinheiro_NoTetoDaSangria()
+    {
+        // Venda sem forma de pagamento (legado, PWA antigo) pode ser dinheiro: não trava a sangria.
+        var empresaId = Guid.NewGuid();
+        var useCase = UcComGavetaDe100EPixDe400(empresaId);
+        _repo.GetVendasNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null)
+            .Returns(new[] { new Venda { Id = Guid.NewGuid(), EmpresaId = empresaId, DataVenda = DateTime.UtcNow,
+                ValorTotal = Dinheiro.FromDecimal(300m), FormaPagamentoPrincipal = null } });
+
+        await useCase.ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "saida", 350m, Descricao: "Sangria", Metodo: "dinheiro"));
+
+        await _repo.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m => m.Valor == 350m));
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_SaidaPorPix_ContinuaLimitadaPeloSaldoDoDia()
+    {
+        // Saída que não sai da gaveta (Pix) segue a regra do #686: teto = saldo esperado do dia.
+        var empresaId = Guid.NewGuid();
+        await UcComGavetaDe100EPixDe400(empresaId).ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "saida", 450m, Descricao: "Pagamento fornecedor", Metodo: "pix"));
+
+        await _repo.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m => m.Valor == 450m));
     }
 
     [Fact]
@@ -425,6 +510,10 @@ public class CaixaUseCasesTests
             .Returns(new[] { aberturaOntem });
         _repo.GetTotalVendasNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null).Returns(4414m);
         _repo.GetTotalPagamentosPedidosNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null).Returns(0m);
+        // #1521: as vendas da sessão foram em dinheiro, então estão na gaveta.
+        _repo.GetVendasNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null)
+            .Returns(new[] { new Venda { Id = Guid.NewGuid(), EmpresaId = empresaId, DataVenda = DateTime.UtcNow,
+                ValorTotal = Dinheiro.FromDecimal(4414m), FormaPagamentoPrincipal = "dinheiro" } });
 
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
             new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
