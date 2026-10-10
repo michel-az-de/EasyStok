@@ -9,7 +9,7 @@ namespace EasyStock.Api.Controllers;
 public sealed record AbrirOcorrenciaRequest(Guid PedidoId, string? Categoria, string? Relato, Guid? ConversaId);
 
 /// <summary>Corpo de <c>POST api/ocorrencias/{id}/resolver</c>.</summary>
-public sealed record ResolverOcorrenciaRequest(string? Resolucao, bool Reembolsar, decimal? Valor);
+public sealed record ResolverOcorrenciaRequest(string? Resolucao, bool Reembolsar, decimal? Valor, Guid? EmpresaId = null);
 
 /// <summary>
 /// Ocorrências de pedido (S27, US-049, US-050). Abertura automática (avaliação negativa, agente) ou pela
@@ -20,6 +20,7 @@ public sealed record ResolverOcorrenciaRequest(string? Resolucao, bool Reembolsa
 [ApiController]
 [Route("api/ocorrencias")]
 [Authorize(Policy = "Operador")]
+[ValidateEmpresaId]
 public sealed class OcorrenciasController(
     ConsultarOcorrenciasUseCase consultar,
     AbrirOcorrenciaUseCase abrir,
@@ -74,12 +75,14 @@ public sealed class OcorrenciasController(
         try
         {
             var r = await resolver.ExecuteAsync(new ResolverOcorrenciaInput(
-                currentUser.EmpresaId, id, currentUser.UsuarioId, body.Resolucao ?? string.Empty, body.Reembolsar, body.Valor), ct);
+                currentUser.EmpresaId, id, currentUser.UsuarioId, body.Resolucao ?? string.Empty, body.Reembolsar, body.Valor, currentUser.Nivel, User.FindFirst("nome")?.Value), ct);
             if (r is null) return DataNotFound("Ocorrência não encontrada.");
             if (r.Reembolso?.Situacao == SituacaoReembolso.Falhou)
                 return StatusCode(StatusCodes.Status502BadGateway, new { data = r, error = r.Reembolso.Codigo });
             return DataOk(r);
         }
+        catch (EasyStock.Application.UseCases.Pedidos.Cobranca.CobrancaPedidoConflitoException ex)
+        { return Conflict(new ApiErrorResponse(new ApiError(ex.Codigo, ex.Message, null, null))); }
         catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
     }
 }

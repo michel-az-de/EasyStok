@@ -56,6 +56,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.DesfazerPagamentoManualUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.ConsultarEstornosManuaisUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.RegistrarEstornoManualUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.IEstornosOnlineService, EasyStock.Application.UseCases.Pedidos.Cobranca.EstornosOnlineService>();
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.ProcessarCobrancaVencidaUseCase>();
         services.AddScoped<EasyStock.Application.Services.Atendimento.AvisoCobrancaConversa>();
 

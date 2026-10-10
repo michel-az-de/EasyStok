@@ -38,6 +38,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task AddPagamentoAsync(PedidoPagamento pagamento);
         Task<IReadOnlyList<PedidoEstornoManual>> ListarEstornosManuaisAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default);
         Task AdicionarEstornoManualAsync(PedidoEstornoManual estorno);
+        Task<bool> TemEstornoOnlineAsync(Guid empresaId, Guid pagamentoId, CancellationToken ct = default);
         Task<bool> ExisteEventoAsync(Guid empresaId, Guid pedidoId, string tipo, CancellationToken ct = default);
 
         /// <summary>

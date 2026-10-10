@@ -344,7 +344,8 @@ public class AuthController(
                     && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 controlarLoja = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 cancelarPedidoPago = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
-                devolverPagamentoManual = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado)
+                devolverPagamentoManual = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
+                estornarPagamentoOnline = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado)
             }
         });
     }

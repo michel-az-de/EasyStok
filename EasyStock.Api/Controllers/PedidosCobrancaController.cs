@@ -4,6 +4,8 @@ using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
 
+public sealed record SolicitarEstornoOnlineRequest(Guid OperacaoId, Guid PagamentoId, decimal Valor, string Motivo, Guid? EmpresaId = null);
+
 public sealed record TrocarFormaPagamentoRequest(string Forma);
 
 public sealed record DesfazerPagamentoManualRequest(string Motivo, Guid? PagamentoId = null);
@@ -33,8 +35,27 @@ public sealed class PedidosCobrancaController(
     DesfazerPagamentoManualUseCase desfazerPagamento,
     ICurrentUserAccessor currentUser,
     ConsultarEstornosManuaisUseCase consultarEstornos,
-    RegistrarEstornoManualUseCase registrarEstorno) : EasyStockControllerBase
+    RegistrarEstornoManualUseCase registrarEstorno,
+    IEstornosOnlineService estornosOnline) : EasyStockControllerBase
 {
+    [HttpGet("{id}/estornos-online")]
+    [Authorize(Policy = "Operador")]
+    public Task<IActionResult> EstornosOnline(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await estornosOnline.ConsultarAsync(emp, id, ct)));
+
+    [HttpPost("{id}/estornos-online")]
+    [Authorize(Policy = "Gerente")]
+    public Task<IActionResult> SolicitarEstornoOnline(Guid id, [FromBody] SolicitarEstornoOnlineRequest request,
+        [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await estornosOnline.SolicitarAsync(new(
+            emp, id, request.OperacaoId, request.PagamentoId, request.Valor, request.Motivo,
+            currentUser.UsuarioId, User.FindFirst("nome")?.Value, currentUser.Nivel), ct)));
+
+    [HttpPost("{id}/estornos-online/{operacaoId:guid}/retomar")]
+    [Authorize(Policy = "Gerente")]
+    public Task<IActionResult> RetomarEstornoOnline(Guid id, Guid operacaoId, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await estornosOnline.RetomarAsync(emp, id, operacaoId, currentUser.Nivel, ct)));
+
     [HttpGet("{id}/estornos-manuais")]
     [Authorize(Policy = "Operador")]
     public Task<IActionResult> EstornosManuais(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>

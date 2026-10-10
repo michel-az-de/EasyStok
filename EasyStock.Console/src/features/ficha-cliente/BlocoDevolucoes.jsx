@@ -7,6 +7,7 @@ import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { CampoMascarado } from '../../componentes/CampoMascarado'
 import { lerMoeda, mascaraMoeda, moeda } from '../../dominio/formato'
 import css from './ficha.module.css'
+import { EstornosOnline } from './EstornosOnline'
 
 const meios = [
   { valor: 'dinheiro', rotulo: 'Dinheiro' }, { valor: 'pix', rotulo: 'Pix direto' },
@@ -49,14 +50,14 @@ export function BlocoDevolucoes({ pedidoId }) {
   }
 
   return (
-    <Bloco titulo="Devoluções" chave="devolucoes" resumo={totalDevolvido ? `${moeda(totalDevolvido)} devolvidos` : 'Pagamentos manuais'}>
+    <Bloco titulo="Devoluções" chave="devolucoes" resumo={totalDevolvido ? `${moeda(totalDevolvido)} devolvidos` : 'Recebimentos e estornos'}>
       <div className={css.acoesPedido}>
         {erro && <p role="alert" className={css.corpoBloco}>{erro}</p>}
         {aviso && <output className={css.corpoBloco}>{aviso}</output>}
         {!dados && <p className={css.corpoBloco}>{ocupado ? 'Consultando devoluções…' : 'Não foi possível consultar as devoluções.'}</p>}
         {dados && <>
           <p className={css.corpoBloco}>Recebido: {moeda(dados.pagamentos.reduce((s, p) => s + p.valor, 0))}. Devolução manual confirmada: {moeda(totalDevolvido)}.</p>
-          {dados.pagamentos.some((p) => !p.manual) && <p className={css.corpoBloco}>Pagamentos do Mercado Pago exigem estorno pelo provedor. Esse fluxo ainda não está disponível nesta ficha.</p>}
+          {dados.pagamentos.some((p) => !p.manual) && <EstornosOnline pedidoId={pedidoId} />}
           {dados.estornos.map((e) => <p key={e.id} className={css.corpoBloco}>
             <strong>{moeda(e.valor)} · {meios.find((m) => m.valor === e.metodo)?.rotulo ?? e.metodo}</strong><br />
             {data(e.registradoEm)}{e.usuarioNome ? ` · ${e.usuarioNome}` : ''}<br />

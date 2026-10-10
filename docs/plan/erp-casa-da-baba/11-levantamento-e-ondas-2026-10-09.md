@@ -803,3 +803,49 @@ Evidência fora do Git: `C:\rep\EasyStok\.build\onda2-estorno`, com TRX, logs, s
 - Não há correção/reversão de devolução confirmada nesta entrega. Reabertura, concorrência com fechamento e reconciliação financeira ampla pertencem ao M5 e precisam de validação própria.
 - Próxima fatia: estorno pelo Mercado Pago pela Ficha, com confirmação efetiva do provedor, tratamento de resposta pendente/indeterminada, soma de parciais e idempotência persistida. Integrar com ocorrência/webhook e Caixa sem duplicar saídas. A ação genérica `marcarEstorno` continua não ligada no modo API; a devolução manual usa o bloco próprio.
 - Continuar depois as ações restantes por perfil e os aceites operacionais, mantendo canais externos, logística e impressão física com evidências separadas.
+
+## 26. Continuação: estorno pelo Mercado Pago na Ficha (09/10/2026)
+
+**Fatia implementada:** solicitação parcial ou total pelo bloco Devoluções, com confirmação do provedor, intenção persistida e retomada da mesma operação. Ocorrência e webhook compartilham a conciliação financeira. A verificação local usa o cliente HTTP de produção contra um provedor controlado; a homologação externa continua pendente. Esta fatia não encerra M3.3, M5 ou a Onda 2.
+
+### 26.1 Implementado
+
+- Dona/gerente escolhe o recebimento do Mercado Pago, informa valor e motivo e confirma a solicitação. Atendimento consulta valores recebidos, devolvidos, disponíveis e em confirmação, além do histórico com responsável e referência do provedor. Devolução manual conserva o fluxo da seção 25.
+- Consulta, solicitação e retomada usam `api/pedidos/{id}/estornos-online`. A escrita exige Gerente e módulo Atendimento; a empresa, o responsável e o nível vêm da sessão. Pagamento, pedido, cobrança e registros são conferidos na mesma empresa, com filtro automático e RLS forçada na nova tabela.
+- `PedidoEstornoOnline` grava a intenção antes de chamar o provedor. O identificador persistido vira `X-Idempotency-Key`; recarga, resposta perdida, ocorrência e webhook retomam essa operação. Uma solicitação pendente reserva saldo e impede outra para o mesmo recebimento. Reutilizar o identificador com dados diferentes é conflito.
+- Só uma resposta `approved`, com identificador, pagamento e valor válidos, confirma o estorno. Respostas pendentes, ausentes ou divergentes não geram saída. Indisponibilidade conserva a intenção; uma recusa HTTP inicial 400/422 registra recusa, mas a mesma resposta após uma tentativa indeterminada mantém a reserva até conciliação.
+- Antes do primeiro envio, a consulta incorpora devoluções externas confirmadas e confere o total devolvido. A retomada consulta um estorno já identificado ou repete o POST com a mesma chave. O navegador guarda solicitações sem resposta por empresa, usuário e pedido e reconhece operações já persistidas após recarga.
+- Confirmação, saída do Caixa e evento no pedido são atômicos. Parciais acumulam sem superar o recebimento; a devolução integral encerra a cobrança. O recebimento original permanece como receita e cada estorno confirmado gera uma saída no dia da confirmação, inclusive após cancelamento ou consolidação em Venda. O identificador do movimento é gerado pelo servidor, separado da operação informada pelo cliente.
+- O webhook concilia parciais, estornos externos e contestação, sem repetir a saída nem retirar a receita novamente. Estornos integrais legados, sem registro na nova tabela, conservam o tratamento anterior. A ocorrência só declara reembolso efetuado depois da confirmação; recusa ou pendência mantém a ocorrência aberta. Aviso ao cliente continua pelo outbox existente.
+- Remoção de recebimento com intenção online é bloqueada. A saída usa a origem protegida `devolucao_pedido`. A migration `20261010020629_AddEstornosOnlinePedido` tem vínculos restritivos, unicidade por referência externa e guard de reversão, inclusive para solicitações ainda pendentes.
+
+O contrato do provedor foi conferido nas referências oficiais de [criação de estorno](https://www.mercadopago.com.br/developers/pt/reference/online-payments/checkout-pro-preferences/create-refund/post), [consulta de estorno](https://www.mercadopago.com.br/developers/pt/reference/online-payments/checkout-pro-preferences/get-refund/get) e [listagem de estornos](https://www.mercadopago.com.br/developers/pt/reference/online-payments/checkout-pro-preferences/get-refunds/get).
+
+### 26.2 Validação local
+
+Base integrada: `c1e12576`, incluindo a remoção do job legado de avaliação da PR #1530 (`a3f8e91e`) e a recuperação de janelas e contexto do Balcão. Evidências, TRX, logs, provedor controlado `mp-local.cjs`, script `browser.cjs` e capturas ficam em `C:\rep\EasyStok\.build\onda2-estorno-online`. Bancos sintéticos: `easystock_onda2_online` e `easystock_onda2_online_migration`.
+
+| Camada | Evidência local |
+|---|---|
+| Build | `EasyStok.CI.slnf` compilou sem erros; seis avisos existentes de obsolescência de `KnownNetworks`/`IPNetwork` em API/Web |
+| Domain / Application | 1.543 e 2.409 testes aprovados, sem ignorados |
+| API | 1.116 testes aprovados, sem ignorados, na execução sequencial |
+| Arquitetura | 61 testes do filtro de CI `Category!=ArchitectureDebt` aprovados, sem ignorados; dívidas históricas continuam fora desse filtro |
+| Gate de commit | Build e 37 testes obrigatórios de arquitetura aprovados |
+| Integrações | 196 testes aprovados, sem ignorados, incluindo recusa de respostas de estorno sem confirmação |
+| PostgreSQL real | 25 testes aprovados, sem ignorados: parciais, replay, concorrência, perda de resposta, rollback após aceite externo, estornos externos, contestação, legado, perfis, empresa, RLS, Caixa e colisão de identificadores |
+| Console | 65 scripts de prova aprovados; lint, camadas, contraste e build aprovados |
+| Migration | Aplicação, reversão vazia e reaplicação aprovadas; reversão com solicitações recusada, preservando registros e saídas; modelo sem mudanças pendentes |
+| HTTP / Chromium | Sete cenários completos com API/PostgreSQL reais e transporte controlado do Mercado Pago; duplo clique, `pending`, perda de conexão após aceite, 503 antes da API e retomada após recarga; cinco estornos somam R$100, com recebimento original preservado e nenhuma duplicação no replay |
+| Apresentação | Computador 1440 × 1000 e celular 390 × 844; sem rolagem horizontal ou erro JavaScript; histórico somente para consulta no Atendimento |
+
+As duas primeiras execuções completas da API tiveram uma falha temporal cada: renderização de impressão pelo Scriban e prazo do stream do ChatSite. A classe de impressão passou isoladamente e os 1.116 testes passaram depois com `xUnit.ParallelizeTestCollections=false` e `xUnit.MaxParallelThreads=1`, sem alterar os testes ou seus limites. Não se apresenta a execução paralela anterior como verde.
+
+Usuários e operações são sintéticos. A preparação associa pedido e conversa e cria a cobrança recebida no banco; pedidos, cancelamentos, solicitações, retomadas e consultas do Caixa passam pelas APIs reais. Nenhum saldo ou resultado de estorno é corrigido diretamente no banco durante os cenários.
+
+### 26.3 Limites e próxima fatia
+
+- Não houve transferência real, envio a cliente real ou publicação pública verificada. A prova exercita o adaptador HTTP real, mas não comprova credenciais, disponibilidade, liquidação ou regras da conta externa do Mercado Pago.
+- Solicitação nova é recusada se o Caixa do dia já estiver fechado. Se o provedor aceitar e o fechamento ocorrer antes da confirmação local, o fato financeiro é registrado sem reabrir o snapshot. Reconciliação com períodos fechados e concorrência ampla do fechamento continuam no M5.
+- A atualização da Ficha ocorre por consulta, retomada ou retorno do foco à janela. Não foi criado novo evento SSE para estornos. O atalho genérico `marcarEstorno` permanece fora do modo API; os dois tipos de devolução usam o bloco próprio.
+- Próxima fatia: conectar apuração e encerramento de ocorrências na Ficha e continuar as ações restantes por perfil. Depois, executar os aceites externos de pagamentos, canais, logística e impressão física com evidências próprias.

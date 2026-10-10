@@ -132,6 +132,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<EasyStock.Application.Ports.Output.Pagamentos.IGatewayRoutingRuleRepository,
                 Repositories.Pagamentos.GatewayRoutingRuleRepository>();
             // S11: cobrança do pedido
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Pagamentos.IEstornoOnlineRepository, Repositories.Pagamentos.EstornoOnlineRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository,
                 Repositories.Pagamentos.CobrancaPedidoRepository>();
             // S20: fila de impressão do canhoto

@@ -18,6 +18,9 @@ public class ModulosTests
     [Theory]
     [InlineData("RegistrarEstornoManual", "Gerente")]
     [InlineData("EstornosManuais", "Operador")]
+    [InlineData("EstornosOnline", "Operador")]
+    [InlineData("SolicitarEstornoOnline", "Gerente")]
+    [InlineData("RetomarEstornoOnline", "Gerente")]
     public void Devolucao_exige_nivel_e_modulo_no_servidor(string acao, string nivel)
     {
         var tipo = typeof(Api.Controllers.PedidosCobrancaController);
