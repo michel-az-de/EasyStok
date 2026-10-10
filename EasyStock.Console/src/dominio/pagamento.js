@@ -34,6 +34,9 @@ export const pagamentosDoPedido = (pedido) => pedido?.pagamentosApi ?? [
   ...(pedido?.cobranca?.pagaEm ? [registroDaCobranca(pedido.cobranca)] : []),
 ]
 
+// O pagamento que "Desfazer o último" mostra e manda: a tela e a chamada leem daqui.
+export const ultimoPagamentoApi = (pedido) => pedido?.pagamentosApi?.toSorted((a, b) => b.em - a.em)[0] ?? null
+
 // Dinheiro que entrou no pedido.
 export const totalPago = (pedido) =>
   pagamentosDoPedido(pedido).reduce((soma, p) => soma + p.valor, 0)

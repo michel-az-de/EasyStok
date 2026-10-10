@@ -6,6 +6,7 @@ import { CampoMascarado } from '../../componentes/CampoMascarado'
 import { EscolhaDeEntregador } from '../../componentes/EscolhaDeEntregador'
 import { Icone } from '../../componentes/Icone'
 import { aguardaAprovacao, faltaPagar, podeDesfazerPagamento, situacaoDaCobranca } from '../../dominio/cobranca'
+import { ultimoPagamentoApi } from '../../dominio/pagamento'
 import { ROTULO_GERAR_E_ENVIAR } from '../../dominio/resumoPedido'
 import {
   PASSOS, motivoParaNaoAvancar, passoAnterior, passoPorId, proximoPasso, situacaoDoPasso,
@@ -307,7 +308,7 @@ export function BarraProximoPasso({
   const podeEstornar = pedido.estado !== 'aguardando' && Boolean(pedido.cobranca?.pagaEm) && disponivel('marcarEstorno')
   const valorPago = pedido.cobranca?.valorPago ?? pedido.cobranca?.valor ?? 0
   const podeDesfazer = podeDesfazerPagamento(pedido)
-  const valorParaDesfazer = pedido.pagamentosApi?.toSorted((a, b) => b.em - a.em)[0]?.valor ?? valorPago
+  const valorParaDesfazer = ultimoPagamentoApi(pedido)?.valor ?? valorPago
 
   // UC-06 passo 5: o valor nasce pré-preenchido com o que foi pago, editável
   // para um estorno parcial. Motivo some ao fechar, para não vazar de um

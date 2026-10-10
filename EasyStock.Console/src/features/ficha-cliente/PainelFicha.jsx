@@ -147,7 +147,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
               aoAlterarMeio={(meio) => alterarMeioPagamento(selecionada.id, meio)}
             />
             {fonteApi && pedido.pedidoId && <BlocoDevolucoes
-              key={`${pedido.pedidoId}:${(pedido.pagamentosApi ?? []).map((p) => p.id).join(':')}`}
+              key={`${pedido.pedidoId}:${(pedido.pagamentosApi ?? []).map((p) => p.pagamentoId).join(':')}`}
               pedidoId={pedido.pedidoId}
             />}
             {fonteApi && pedido.pedidoId && <BlocoOcorrenciasApi key={pedido.pedidoId} pedidoId={pedido.pedidoId} conversaId={selecionada.id} />}
