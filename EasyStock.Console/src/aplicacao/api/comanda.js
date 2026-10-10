@@ -1,7 +1,7 @@
 import * as acao from '../acoes'
 import {
   FORMA_NA_ENTREGA, FORMA_ONLINE, corpoDoPedido, formaDoMeio, gerarPedido, janelaDoId, listarJanelas, obterPedido, pedidoDaApi,
-  reemitirCobranca, trocarFormaPagamento, registrarPagamentoManual, desfazerPagamentoManual, cancelarPedido, STATUS_DO_PASSO,
+  reemitirCobranca, trocarFormaPagamento, registrarPagamentoManual, desfazerPagamentoManual, cancelarPedido, trocarJanelaPedido, STATUS_DO_PASSO,
 } from '../../infra/api/comandaApi'
 import { mudarStatusKds } from '../../infra/api/kdsApi'
 import { aprovarPedido as aprovarPedidoApi } from '../../infra/api/entregasApi'
@@ -26,7 +26,7 @@ const SEM_PEDIDO = 'o pedido ainda não está no EasyStok. Gere a cobrança ou e
 const LINK_CANCELADO_ESPERA_APROVACAO = 'O link foi cancelado e o pedido agora espera aprovação. '
   + 'Use "Aprovar pedido" na Ficha e registre o pagamento de novo.'
 
-const EDITA_COMANDA = ['adicionarItem', 'removerItem', 'ajustarQuantidade', 'ajustarObservacao', 'escolherJanela', 'forcarEncaixe']
+const EDITA_COMANDA = ['adicionarItem', 'removerItem', 'ajustarQuantidade', 'ajustarObservacao', 'forcarEncaixe']
 
 export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   const avisar = (mensagem) => despachar({ tipo: acao.AVISO_API, mensagem })
@@ -61,8 +61,6 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
 
   const soSemPedidoCriado = (nome) => (id, ...resto) => {
     if (!pedidoCriado(id)) {
-      // Escolher a janela resolve o "Escolha a janela de entrega" que ficou na faixa (#1474).
-      if (nome === 'escolherJanela') limparAviso()
       return acoes[nome](id, ...resto)
     }
     avisar('Comanda: o pedido já está no EasyStok e não muda por aqui.')
@@ -203,6 +201,15 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   }
 
   return {
+    escolherJanela: (id, janela, avisarCliente = false) => {
+      if (!pedidoCriado(id)) { limparAviso(); return acoes.escolherJanela(id, janela) }
+      return umaPorConversa(id, 'reagendar', async () => {
+        const resultado = await trocarJanelaPedido(pedidoCriado(id), janela, avisarCliente)
+        limparAviso()
+        await recarregar(id).catch(() => avisar('Agendamento alterado. Não foi possível atualizar a Ficha; consulte novamente.'))
+        return resultado
+      })
+    },
     cancelarPedido: (id, motivo) => {
       if (!pedidoCriado(id)) return soNoEasyStok('Cancelar pedido')(id)
       if (!motivo?.trim() || motivo.trim().length < 3 || motivo.trim().length > 500)

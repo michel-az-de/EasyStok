@@ -106,7 +106,7 @@ canal", `Downloads/01-TRANSCRICAO.md:153`). **Inferência:** a casa não opera i
 | Avançar esteira, voltar etapa, pago à mão, comprovante, desfazer pagamento, estorno, cancelar | `PedidosController.cs:97,113,178,194`; `KdsController.cs:41` | avisam "Use o EasyStok" (`aplicacao/api/comanda.js:19-33`) | ❌ | **M3.3** |
 | Recebido na entrega, refazer cobrança | `PedidosController.cs:178`; S11 | avisam (`naoLigadas.js:39-40`) | ❌ | **M3.3** (o lado caixa é da F14) |
 | Aprovar ou recusar fora de área pela ficha | S12 (`api/storefront/pedidos/{id}/aprovar`) | ligado só na tela Entregas (F04); na ficha avisa (`naoLigadas.js:51`) | ❌ | **M3.3** |
-| Trocar janela do pedido criado | `AlterarAgendamentoPedidoUseCase.cs:41-42` troca só `AgendadoParaEm`, **não move a `VagaOcupada`** | avisa (`naoLigadas.js:30,44`) | ❌ | **M3.4** |
+| Trocar janela do pedido criado | `TrocarJanelaPedidoUseCase`: transação com liberação, ocupação, prazo e auditoria | Ficha e Entregas usam a vaga persistida | ✅ local | **M3.4**, seção 24 do plano de ondas |
 | Endereço do pedido diferente do cadastro | `Pedido` não tem endereço próprio (KDS lê o do cliente, `KdsPedidoQueries.cs:58-67`) | avisa (`naoLigadas.js:37`) | ❌ | **M8.3** |
 | Pedido pelo link do cardápio | S48, #1234 | F11 #1241 | ⬜ | nenhuma |
 | Aviso de status ao cliente | S13 | automático | ✅ | nenhuma |
@@ -203,7 +203,9 @@ tela Entregas) e nenhuma F seguinte as cita: a lacuna está órfã.
 
 ### M3.4 · Trocar a janela de um pedido criado
 
-**Problema.** Reagendar pela API hoje só troca `AgendadoParaEm` (`AlterarAgendamentoPedidoUseCase.cs:41-42`).
+**Executado em 09/10/2026:** troca atômica implementada e homologada localmente na Ficha e em Entregas. A leitura da Ficha passa a devolver a vaga persistida, inclusive após recarga. A rota antiga de agendamento recusa pedidos com vaga. O aviso opcional entra no outbox da S13, respeita preferências e usa a faixa validada pelo prazo de preparo; envio externo continua pendente. Evidências na [seção 24 do plano de ondas](11-levantamento-e-ondas-2026-10-09.md#24-continuação-reagendamento-com-troca-de-vaga-09102026).
+
+**Problema inicial.** Reagendar pela API trocava só `AgendadoParaEm`.
 Pedido com vaga continua preso à vaga antiga, porque o KDS manda pela vaga ativa
 (`KdsPedidoQueries.cs:34-40`): a cozinha vê o horário velho e a janela velha continua ocupada.
 **Abordagem.**
@@ -211,11 +213,11 @@ Pedido com vaga continua preso à vaga antiga, porque o KDS manda pela vaga ativ
 - `avisarCliente` usa o aviso de status (S13) com a faixa nova (RN-22, respiro).
 - Console: o seletor de janelas da comanda (`features/ficha-cliente/SeletorJanelaApi.jsx`) passa a funcionar com pedido criado; "Alterar agendamento" da gaveta (`features/entregas/ModalAlterarAgendamento.jsx`) usa a mesma ação.
 **Aceite.**
-- [ ] Janela cheia recusa com 409 e a vaga antiga continua ocupada.
-- [ ] Duas trocas simultâneas para a última vaga: só uma passa (teste com duas chamadas paralelas).
-- [ ] KDS mostra a janela nova; atraso (S21) recalculado.
-**Testes (Red).** `TrocarJanelaPedidoUseCaseTests.LiberaAntigaOcupaNova`, `...JanelaCheiaNaoMexe`, `...Concorrencia`.
-**Depende de.** nada. **Tamanho.** M · **Tier.** baixo (sem migração) · **Rollback.** revert; volta a avisar.
+- [x] Janela cheia recusa com 409 e a vaga antiga continua ocupada.
+- [x] Duas trocas simultâneas para a última vaga: só uma passa (duas transações PostgreSQL aguardando o mesmo lock de capacidade).
+- [x] KDS mostra a janela nova; atraso (S21) recalculado.
+**Testes executados.** `EasyStock.Infra.Postgre.IntegrationTests/Storefront/TrocarJanelaPedidoTests.cs`: 15 casos com PostgreSQL real, incluindo rollback após inserir a nova vaga, tenant, prazo, bloqueio, status final, idempotência e aviso persistido. Console: `prova-onda2-reagendamento.mjs` e Chromium com API local.
+**Depende de.** nada. **Tamanho.** M · **Tier.** baixo (sem migração) · **Rollback.** retirar a ação da interface preservando vagas e histórico; manter a proteção que impede a troca simples de data em pedido com vaga.
 
 ### M3.5 · Clientes fora da conversa
 

@@ -88,5 +88,6 @@ public enum TipoEventoNotificacao
     SenhaAlterada = 81,
 
     // Loja fechada na mao dentro do horario de funcionamento (#1443): aviso aos donos com quem fechou e a justificativa.
-    LojaFechadaNoHorario = 82
+    LojaFechadaNoHorario = 82,
+    PedidoReagendado = 83
 }

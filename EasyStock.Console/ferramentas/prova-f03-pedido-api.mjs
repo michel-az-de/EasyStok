@@ -56,6 +56,7 @@ const doServidor = (status, cobranca) => ({
   frete: 8,
   criadoEm: '2026-09-30T14:50:00',
   agendadoParaEm: null,
+  janela: { janelaId: JANELA, data: '2026-10-01', label: 'Almoço', horaInicio: '12:00:00', horaFim: '13:00:00' },
   itens: [{ cardapioItemId: LASANHA, nome: 'Lasanha', quantidade: 1, precoUnitario: 85, observacao: 'sem cebola' }],
   cobranca,
 })

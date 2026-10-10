@@ -115,7 +115,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
               <BlocoPedido
                 pedido={pedido}
                 editavel={editavel}
-                aoTrocarJanela={(janela) => escolherJanela(selecionada.id, janela)}
+                aoTrocarJanela={(janela, avisar) => escolherJanela(selecionada.id, janela, avisar)}
                 aoForcarEncaixe={(janela, faixa, motivo) => forcarEncaixe(selecionada.id, janela, faixa, motivo)}
                 aoAbrirCardapio={aoAbrirCardapio}
                 aoAjustar={(sku, delta) => ajustarQuantidade(selecionada.id, sku, delta)}

@@ -1,5 +1,7 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.UseCases.AlterarAgendamentoPedido;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Pagamentos;
@@ -19,7 +21,8 @@ public sealed record PedidoConversaResult(
     CobrancaPedidoConversaResult? Cobranca,
     decimal TotalPago = 0,
     IReadOnlyList<PagamentoPedidoConversaResult>? Pagamentos = null,
-    bool RequerAprovacao = false);
+    bool RequerAprovacao = false,
+    JanelaPedidoResult? Janela = null);
 
 public sealed record PagamentoPedidoConversaResult(Guid Id, decimal Valor, string Metodo, DateTime PagoEm);
 
@@ -57,7 +60,8 @@ public sealed record CobrancaPedidoConversaResult(
 public sealed class ObterPedidoConversaUseCase(
     IConversaRepository conversaRepository,
     IPedidoRepository pedidoRepository,
-    ICobrancaPedidoRepository cobrancaRepository)
+    ICobrancaPedidoRepository cobrancaRepository,
+    IVagaOcupadaRepository vagas)
 {
     public async Task<PedidoConversaResult?> ExecuteAsync(Guid empresaId, Guid conversaId, CancellationToken ct = default)
     {
@@ -67,7 +71,8 @@ public sealed class ObterPedidoConversaUseCase(
         if (conversa.PedidoEmAndamentoId is not { } pedidoId) return null;
 
         var pedido = await pedidoRepository.GetByIdWithDetailsAsync(empresaId, pedidoId);
-        if (pedido is null) return null;
+        if (pedido is null || pedido.EmpresaId != empresaId) return null;
+        var janela = (await vagas.GetByPedidoIdsAsync([pedido.Id], ct)).GetValueOrDefault(pedido.Id);
 
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(empresaId, pedido.Id, ct);
         var vigente = cobrancas.FirstOrDefault(c => c.Status == StatusCobrancaPedido.Paga)
@@ -83,6 +88,7 @@ public sealed class ObterPedidoConversaUseCase(
             vigente is null ? null : CobrancaPedidoConversaResult.De(vigente), pedido.TotalPago,
             pedido.Pagamentos.Select(p => new PagamentoPedidoConversaResult(p.Id, p.Valor, p.Metodo, p.PagoEm)).ToList(),
             // #1474: o console barra a baixa manual antes de cancelar o link quando falta aprovar.
-            pedido.RequerAprovacao && pedido.AprovadoEm is null);
+            pedido.RequerAprovacao && pedido.AprovadoEm is null,
+            janela.Vaga is { LiberadoEm: null } ? JanelaPedidoResult.De(janela.Vaga, janela.Janela) : null);
     }
 }

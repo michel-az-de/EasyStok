@@ -9,6 +9,7 @@ import { dataIsoNoFuso, listaEmPortugues, plural } from '../../dominio/formato'
 import { pdfDoRoteiro } from '../../dominio/impressao'
 import { resumoDoRoteiro, rotuloDaData, textoDeQuemLeva } from '../../dominio/roteiroDoDia'
 import css from './entregasApi.module.css'
+import { ModalAlterarAgendamentoApi } from './ModalAlterarAgendamento'
 
 // Entregas do dia por janela (issue #1440): para cada janela, os pedidos com a situação, o
 // endereço, quem leva e o que falta para sair. O roteiro impresso sai do mesmo dado
@@ -48,6 +49,7 @@ function EscolhaDoDia({ dia, mudarDia }) {
 }
 
 function PedidoDoDia({ pedido, montando, ocupado, acoes, aoVerViagens }) {
+  const [reagendando, setReagendando] = useState(false)
   const detalhes = [
     pedido.pago ? 'Pago' : 'Não pago',
     pedido.entregador ? `Leva ${textoDeQuemLeva(pedido.entregador)}` : null,
@@ -62,6 +64,11 @@ function PedidoDoDia({ pedido, montando, ocupado, acoes, aoVerViagens }) {
       </div>
       <Endereco texto={pedido.endereco} />
       <p className={css.apoio}>{detalhes}</p>
+      {!['entregue', 'cancelado'].includes(pedido.status) && (
+        <Botao variante="texto" disabled={ocupado} onClick={() => setReagendando(true)}>Alterar agendamento</Botao>
+      )}
+      {reagendando && <ModalAlterarAgendamentoApi pedidoId={pedido.id} nome={pedido.cliente}
+        aoFechar={() => setReagendando(false)} aoAlterado={acoes.recarregar} />}
       {pedido.podePorNaViagem && (
         <div className={css.linha}>
           {montando.length === 0 && <>

@@ -1,6 +1,7 @@
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Pedidos;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 
 namespace EasyStock.Application.UseCases.AlterarAgendamentoPedido;
 
@@ -16,9 +17,17 @@ public class AlterarAgendamentoPedidoUseCase(
     IPedidoRepository pedidoRepo,
     IUnitOfWork uow,
     ILogger<AlterarAgendamentoPedidoUseCase> logger,
-    CalculadoraInicioPrevistoPedido inicioPrevisto)
+    CalculadoraInicioPrevistoPedido inicioPrevisto,
+    IVagaOcupadaRepository vagas)
 {
-    public async Task<PedidoResult?> ExecuteAsync(AlterarAgendamentoPedidoCommand cmd)
+    public Task<PedidoResult?> ExecuteAsync(AlterarAgendamentoPedidoCommand cmd) =>
+        uow.ExecuteInTransactionSemRetryAsync(async ct =>
+        {
+            await pedidoRepo.TravarAsync(cmd.EmpresaId, cmd.PedidoId, ct);
+            return await AlterarAsync(cmd);
+        });
+
+    private async Task<PedidoResult?> AlterarAsync(AlterarAgendamentoPedidoCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         UseCaseGuards.EnsureNotEmpty(cmd.PedidoId, "PedidoId");
@@ -33,7 +42,11 @@ public class AlterarAgendamentoPedidoUseCase(
         // call-sites de CriarPedidoUseCase.Map() sem details, entao o PATCH de agendamento
         // respondia totalPago=0 e itensCount=0 pro caller.
         var pedido = await pedidoRepo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.PedidoId);
-        if (pedido == null) return null;
+        if (pedido == null || pedido.EmpresaId != cmd.EmpresaId) return null;
+
+        var atual = (await vagas.GetByPedidoIdsAsync([pedido.Id])).GetValueOrDefault(pedido.Id);
+        if (atual.Vaga is { LiberadoEm: null })
+            throw new UseCaseValidationException("Este pedido tem uma vaga de entrega. Use a troca de janela para reagendar.");
 
         if (pedido.Status == "entregue" || pedido.Status == "cancelado")
             throw new UseCaseValidationException("Não é possível alterar agendamento de pedido entregue ou cancelado.");

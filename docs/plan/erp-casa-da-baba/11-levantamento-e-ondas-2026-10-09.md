@@ -725,3 +725,38 @@ Scripts, capturas, logs e TRX estão em `C:\rep\EasyStok\.build\onda2-ciclo-pedi
 1. Continuar o ciclo completo e as exceções do pedido, incluindo reagendamento com troca efetiva da vaga (M3.4).
 2. Implementar e homologar o estorno pela Ficha com resposta do provedor e reflexo financeiro explícito, respeitando D3-04.
 3. Conferir as ações restantes por perfil e realizar o aceite da operação real. Canais externos, entregas e impressão física conservam seus aceites separados.
+
+
+## 24. Continuação: reagendamento com troca de vaga (09/10/2026)
+
+**Fatia executada:** M3.4 da Onda 2, reagendamento de pedido criado pela Ficha e por Entregas, com ocupação real da janela e validação local em desktop e celular.
+
+### 24.1 Implementado
+
+- `GET api/pedidos/{id}/janelas` consulta a vaga atual e as opções pelo prazo real dos itens, incluindo preparo padrão e respiro. `PATCH api/pedidos/{id}/janela` usa empresa e autor da sessão e exige o módulo Atendimento ou Entregas, além do nível Operador.
+- A troca trava o pedido e, na mesma transação, libera a vaga antiga com motivo `reagendado`, ocupa a nova com a regra de capacidade da S16, atualiza `AgendadoParaEm`, recalcula o início previsto e limpa o aviso de atraso. Janela cheia retorna 409; rollback preserva a reserva anterior.
+- A auditoria registra faixa, autor e situação do aviso. Repetir a mesma janela/data não duplica vaga, evento ou aviso. Depois do commit, `pedido.reagendado` atualiza os consumidores SSE, incluindo KDS e Entregas.
+- A consulta de vagas prioriza a ativa sobre o histórico. A Ficha passa a receber a janela do servidor e o reducer não restaura a escolha local antiga. A rota antiga `/agendamento` recusa pedidos com vaga para impedir a divergência entre horário e ocupação.
+- Ficha e Entregas compartilham a escolha de data/janela e a operação da API. Uma falha conserva a escolha, duplo clique envia uma chamada e recarga indisponível após confirmação não é apresentada como falha da gravação. Pedidos entregues ou cancelados não podem ser reagendados.
+- Aviso por WhatsApp é opcional e fica desmarcado inicialmente. Quando solicitado e permitido pelas preferências e pelo telefone do cliente, o evento `PedidoReagendado` entra no outbox de notificações na mesma transação, com faixa/data e chave distinta por troca. A tela diferencia aviso na fila de aviso não enfileirado.
+
+### 24.2 Validação executada
+
+| Camada | Evidência local |
+|---|---|
+| Application | 2.396 testes aprovados |
+| API | 1.050 testes aprovados, incluindo classificação de módulo do novo controller |
+| PostgreSQL | 25 testes aprovados, nenhum ignorado: 15 da troca e 10 de capacidade/KDS/jornada do atendimento |
+| Concorrência | Duas transações reais aguardaram o mesmo lock para a última vaga; uma confirmou e a outra restaurou a vaga antiga |
+| Atomicidade | Falha controlada ao gravar o aviso, depois do INSERT da nova vaga, reverteu a troca inteira e não publicou SSE |
+| Console | 65 scripts de prova aprovados; lint, camadas, contraste e build aprovados |
+| HTTP e navegador | Atendimento autorizado; Cozinha e empresa forjada 403; janela inválida 400; pedido inexistente 404; janela que lotou depois de abrir a Ficha recusada sem perder a reserva |
+| Jornada local | Chromium 1440 × 1000 e 390 × 844, tema claro/escuro: Ficha, Entregas, falha 503, duplo clique, recarga persistida, pagamento parcial conservado, KDS e SSE |
+
+Evidências fora do Git: `C:\rep\EasyStok\.build\onda2-reagendamento`, com TRX, logs, script de navegador, resultados e capturas. Banco de homologação isolado: `easystock_onda2_janela`, no PostgreSQL local. Sem migration ou dependência nova.
+
+### 24.3 Limites e próxima fatia
+
+- Gravação e fila de aviso homologadas localmente; não houve envio a cliente real. Entrega externa pelo WhatsApp depende do canal configurado. Fora da janela de 24 horas, é necessário configurar um modelo aprovado pela Meta; o seed não presume essa aprovação.
+- Não houve publicação pública verificada nesta fatia. Commit/push e deploy são estados distintos.
+- Próxima fatia: estorno pela Ficha, com resposta efetiva do provedor, reflexo financeiro e regra D3-04. Depois, continuar as ações restantes por perfil e os aceites operacionais, mantendo separados canais externos, logística e impressão física.

@@ -119,6 +119,7 @@ export function useEntregasApi() {
   }, [recarregar])
 
   const acoes = {
+    recarregar,
     criarViagem: (entregadorId) => executar(() => api.criarViagem(entregadorId), 'A viagem não foi criada'),
     definirEntregador: (id, entregadorId) => executar(() => api.definirEntregadorViagem(id, entregadorId), 'O entregador não mudou'),
     incluirParada: (id, pedidoId) => executar(() => api.incluirParada(id, pedidoId), 'O pedido não entrou na viagem'),

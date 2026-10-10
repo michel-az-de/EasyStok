@@ -42,6 +42,7 @@ public sealed class PoliticaValidadeNotificacao
 
             [TipoEventoNotificacao.PedidoPagoConfirmado] = TimeSpan.FromHours(2),
             [TipoEventoNotificacao.PedidoEmPreparo] = TimeSpan.FromHours(2),
+            [TipoEventoNotificacao.PedidoReagendado] = TimeSpan.FromHours(2),
             [TipoEventoNotificacao.PedidoSaiuParaEntrega] = TimeSpan.FromHours(2),
             [TipoEventoNotificacao.PedidoEntregue] = TimeSpan.FromHours(2),
             [TipoEventoNotificacao.AvaliacaoSolicitada] = TimeSpan.FromHours(2),
