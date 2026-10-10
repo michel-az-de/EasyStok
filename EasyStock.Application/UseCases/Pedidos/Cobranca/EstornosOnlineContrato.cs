@@ -12,6 +12,7 @@ public interface IEstornosOnlineService
 {
     Task<EstornosOnlineResult> ConsultarAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default);
     Task<PedidoEstornoOnline> SolicitarAsync(SolicitarEstornoOnlineInput input, CancellationToken ct = default);
+    Task<PedidoEstornoOnline> ReservarAsync(SolicitarEstornoOnlineInput input, CancellationToken ct = default);
     Task<PedidoEstornoOnline> RetomarAsync(Guid empresaId, Guid pedidoId, Guid operacaoId, NivelAcesso nivel, CancellationToken ct = default);
     Task<bool> SincronizarPagamentoAsync(PagamentoMercadoPago pagamento, CancellationToken ct = default);
 }

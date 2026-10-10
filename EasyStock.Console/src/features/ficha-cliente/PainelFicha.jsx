@@ -16,6 +16,7 @@ import { BlocoCapturaAutomatica } from './BlocoCapturaAutomatica'
 import { BlocoCliente } from './BlocoCliente'
 import { BlocoEnderecoCapturado } from './BlocoEnderecoCapturado'
 import { BlocoOcorrencia } from './BlocoOcorrencia'
+import { BlocoOcorrenciasApi } from './BlocoOcorrenciasApi'
 import { BlocoEntrega } from './BlocoEntrega'
 import { BlocoPedido } from './BlocoPedido'
 import css from './ficha.module.css'
@@ -149,7 +150,8 @@ export function PainelFicha({ aoAbrirCardapio }) {
               key={`${pedido.pedidoId}:${(pedido.pagamentosApi ?? []).map((p) => p.id).join(':')}`}
               pedidoId={pedido.pedidoId}
             />}
-            {pedido.ocorrencia && (
+            {fonteApi && pedido.pedidoId && <BlocoOcorrenciasApi key={pedido.pedidoId} pedidoId={pedido.pedidoId} conversaId={selecionada.id} />}
+            {!fonteApi && pedido.ocorrencia && (
               <BlocoOcorrencia
                 key={selecionada.id}
                 ocorrencia={pedido.ocorrencia}

@@ -35,8 +35,13 @@ public class Ocorrencia
     public DateTime? ReembolsoEm { get; private set; }
 
     public DateTime CriadaEm { get; private set; }
+    public DateTime? ApuradaEm { get; private set; }
+    public Guid? ApuradaPorUsuarioId { get; private set; }
+    public string? ApuradaPorNome { get; private set; }
+    public DateTime? ReembolsoSolicitadoEm { get; private set; }
     public DateTime? ResolvidaEm { get; private set; }
     public Guid? ResolvidaPorUsuarioId { get; private set; }
+    public string? ResolvidaPorNome { get; private set; }
 
     public bool EstaAberta => Status == StatusOcorrencia.Aberta;
 
@@ -69,7 +74,33 @@ public class Ocorrencia
         };
     }
 
-    public void Resolver(string resolucao, Guid usuarioId, DateTime agora)
+    public bool Apurar(Guid usuarioId, string? nome, DateTime agora)
+    {
+        if (usuarioId == Guid.Empty) throw new RegraDeDominioVioladaException("Quem apura é obrigatório.");
+        if (!EstaAberta || ApuradaEm is not null) return false;
+        ApuradaEm = agora;
+        ApuradaPorUsuarioId = usuarioId;
+        ApuradaPorNome = nome;
+        return true;
+    }
+
+    public void IniciarReembolso(string resolucao, decimal valor, DateTime agora)
+    {
+        if (!EstaAberta) throw new RegraDeDominioVioladaException("Ocorrência já resolvida.");
+        GarantirSemReembolso(valor);
+        Resolucao = Texto(resolucao, ResolucaoTamanhoMaximo, "Resolução");
+        ReembolsoValor = valor;
+        ReembolsoSolicitadoEm ??= agora;
+    }
+
+    public void LimparReembolsoRecusado()
+    {
+        if (ReembolsoEm is not null) throw new RegraDeDominioVioladaException("Reembolso já confirmado.");
+        ReembolsoSolicitadoEm = null;
+        ReembolsoValor = null;
+    }
+
+    public void Resolver(string resolucao, Guid usuarioId, DateTime agora, string? nome = null)
     {
         if (!EstaAberta) throw new RegraDeDominioVioladaException("Ocorrência já resolvida.");
         if (usuarioId == Guid.Empty) throw new RegraDeDominioVioladaException("Quem resolve é obrigatório.");
@@ -78,6 +109,7 @@ public class Ocorrencia
         Status = StatusOcorrencia.Resolvida;
         ResolvidaEm = agora;
         ResolvidaPorUsuarioId = usuarioId;
+        ResolvidaPorNome = nome;
     }
 
     /// <summary>Estorno confirmado pelo gateway.</summary>
