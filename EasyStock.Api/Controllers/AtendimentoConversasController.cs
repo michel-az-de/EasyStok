@@ -1,4 +1,6 @@
 using EasyStock.Api.Authentication;
+using EasyStock.Application.Ports.Output.Atendimento;
+using Microsoft.Extensions.Caching.Memory;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento.Audio;
 using EasyStock.Application.UseCases.Atendimento;
@@ -110,6 +112,30 @@ public class AtendimentoConversasController(
     public Task<IActionResult> EnviarMensagem(Guid id, [FromBody] EnviarMensagemConsoleBody body, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await enviarUseCase.EnviarTextoAsync(
             new EnviarTextoConsoleCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.Texto ?? string.Empty), ct)));
+
+    [HttpGet("~/api/atendimento/modelos")]
+    [ValidateEmpresaId]
+    public Task<IActionResult> ListarModelos(
+        [FromServices] ListarModelosAtendimentoUseCase useCase, [FromServices] IMemoryCache cache,
+        [FromQuery] bool atualizar = false, CancellationToken ct = default)
+        => Atendendo(async () =>
+        {
+            var chave = $"atendimento:modelos:{currentUser.EmpresaId}";
+            if (atualizar) cache.Remove(chave);
+            var modelos = await cache.GetOrCreateAsync(chave, async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1);
+                return await useCase.ExecuteAsync(currentUser.EmpresaId, ct);
+            });
+            return DataOk(modelos);
+        });
+
+    [HttpPost("{id:guid}/mensagens/modelo")]
+    [ValidateEmpresaId]
+    public Task<IActionResult> EnviarModelo(Guid id, [FromBody] EnviarModeloConversaBody body,
+        [FromServices] EnviarModeloConversaUseCase useCase, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await useCase.ExecuteAsync(new EnviarModeloConversaCommand(
+            currentUser.EmpresaId, currentUser.UsuarioId, id, body.TentativaId, body.Nome, body.Idioma, body.Parametros), ct)));
 
     [SwaggerOperation(Summary = "Messages that did not reach the customer (S59)",
         Description = "Saída que falhou, mais recente primeiro: inclui a que espera o cliente responder ao modelo de retomada e a que saiu por SMS.")]
@@ -343,10 +369,17 @@ public class AtendimentoConversasController(
             return StatusCode(StatusCodes.Status502BadGateway,
                 new ApiErrorResponse(new ApiError("CANAL_FALHOU", "Falha ao enviar pelo canal.", ex.Message, null) { Details = ex.Mensagem }));
         }
+        catch (CatalogoModelosException ex)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway,
+                new ApiErrorResponse(new ApiError("MODELOS_INDISPONIVEIS", ex.Message, null, null)));
+        }
     }
 }
 
 public sealed record EnviarMensagemConsoleBody(string Texto);
+
+public sealed record EnviarModeloConversaBody(Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros, Guid? EmpresaId = null);
 
 public sealed record EnviarImagemCardapioBody(Guid CardapioItemId, int Indice, string? Legenda);
 

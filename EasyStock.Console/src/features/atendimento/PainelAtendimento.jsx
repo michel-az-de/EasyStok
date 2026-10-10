@@ -10,7 +10,7 @@ import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { MOTIVO_BLOQUEIO, permissaoDeEscrita } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
-import { preencherModelo, primeiroNome } from '../../dominio/mensagem'
+import { primeiroNome } from '../../dominio/mensagem'
 import { faixaDaJanela, preencherFaixa } from '../../dominio/entrega'
 import { itemDaBibliotecaPelaRegra } from '../../dominio/respostas'
 import { BarraModo } from './BarraModo'
@@ -29,7 +29,7 @@ export function PainelAtendimento({
     enviar, reabrir, definirRascunho, assumirAtendimento, devolverAutomatico,
     selecionar, abrirEncerramento, reenviar,
   } = useAcoes()
-  const { cardapio, janelas, canais } = useCatalogo()
+  const { janelas, canais } = useCatalogo()
   const { acoes: capacidades } = useAcessoModulos()
   const reabrirLigado = useAcaoDisponivel()('reabrir')
   const podeReabrir = reabrirLigado && (!fonteApi || capacidades.reabrirConversa === true)
@@ -80,19 +80,12 @@ export function PainelAtendimento({
   // Rodada 11 (registro 92): resposta automática na fila e automático ainda
   // conduzindo. Assumir apaga o "digitando" no mesmo toque.
   const digitando = Boolean(selecionada.respostaPendente?.length) && !pausado && !bloqueada
-  const novidade = cardapio.find((i) => i.estoque > 0)
   const faixa = faixaDaJanela(janelas, selecionada.pedido?.janela)
 
   const aplicarTemplate = (template) => definirRascunho(
     selecionada.id,
     preencherFaixa(template.texto, faixa ?? 'o horário combinado')
       .replace('{nome}', primeiroNome(selecionada.nome)),
-  )
-
-  const enviarModelo = (modelo) => enviar(
-    selecionada.id,
-    preencherModelo(modelo, [primeiroNome(selecionada.nome), novidade?.nome ?? 'a novidade da casa']),
-    { modelo: true },
   )
 
   return (
@@ -179,7 +172,7 @@ export function PainelAtendimento({
         rascunho={rascunho}
         aoMudarRascunho={(texto) => definirRascunho(selecionada.id, texto)}
         aoEnviar={() => enviar(selecionada.id, rascunho.trim())}
-        aoEnviarModelo={enviarModelo}
+        podeEnviarModelo={podeReabrir && canal.aceitaModelo && !encerrada && !bloqueada}
         aoAplicarTemplate={aplicarTemplate}
         aoAbrirNota={aoAbrirNota}
         aoAbrirGaleria={aoAbrirGaleria}

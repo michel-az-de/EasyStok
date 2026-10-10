@@ -53,12 +53,13 @@ public sealed record MensagemAtendimentoResult(
     string? ErroMidia = null,
     bool MidiaFalhou = false,
     string? Transcricao = null,
-    bool Programada = false)
+    bool Programada = false,
+    ModeloMensagem? Modelo = null)
 {
     internal static MensagemAtendimentoResult De(Mensagem m) => new(
         m.Id, m.Direcao, m.Autor, m.TipoConteudo, m.Texto, m.BotaoId, m.MidiaChave, m.MidiaMime,
         m.Status, m.Erro, m.ExternoId, m.EnviadaEm, m.EnviadaPorUsuarioId, m.AguardaClienteDesde, m.ReservaSmsEm,
-        m.ErroMidia, m.MidiaFalhou, m.Transcricao, m.Programada);
+        m.ErroMidia, m.MidiaFalhou, m.Transcricao, m.Programada, m.Modelo);
 }
 
 /// <summary>Estado da conversa depois de uma ação do console.</summary>

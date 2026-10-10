@@ -42,6 +42,16 @@ public static class WhatsAppCloudClientServiceCollectionExtensions
 
         services.AddScoped<StubWhatsAppCloudClient>();
 
+        services.AddHttpClient<CatalogoModelosWhatsApp>((sp, client) =>
+        {
+            var opts = sp.GetRequiredService<IOptions<WhatsAppCloudOptions>>().Value;
+            client.BaseAddress = new Uri(opts.BaseUrlEfetiva.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(20);
+        });
+        services.AddScoped<ICatalogoModelosAtendimento>(sp =>
+            UsaClienteMeta(configuration[ChaveClienteAtendimento], configuration[ChaveProviderNotificacoes])
+                ? sp.GetRequiredService<CatalogoModelosWhatsApp>() : new CatalogoModelosIndisponivel());
+
         if (UsaClienteMeta(configuration[ChaveClienteAtendimento], configuration[ChaveProviderNotificacoes]))
             services.AddScoped<IWhatsAppCloudClient>(sp => sp.GetRequiredService<WhatsAppCloudClient>());
         else

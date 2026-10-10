@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EasyStock.Domain.Enums.Atendimento;
 
 namespace EasyStock.Domain.Entities.Atendimento;
@@ -33,6 +34,9 @@ public class Mensagem
     public AutorMensagem Autor { get; private set; }
     public TipoConteudoMensagem TipoConteudo { get; private set; }
     public string? Texto { get; private set; }
+
+    public string? ModeloJson { get; private set; }
+    public ModeloMensagem? Modelo => ModeloJson is null ? null : JsonSerializer.Deserialize<ModeloMensagem>(ModeloJson);
 
     /// <summary>Id do botao interativo respondido (ex.: <c>acao:avaliacao:positiva:{pedidoId}</c>).</summary>
     public string? BotaoId { get; private set; }
@@ -120,7 +124,7 @@ public class Mensagem
     /// <summary>Texto que falhou e pode ser reenviado (automático ou pelo console).</summary>
     public bool PodeReenviar =>
         Direcao == DirecaoMensagem.Saida && Status == StatusMensagem.Falhou
-        && TipoConteudo == TipoConteudoMensagem.Texto && !string.IsNullOrWhiteSpace(Texto);
+        && ModeloJson is null && TipoConteudo == TipoConteudoMensagem.Texto && !string.IsNullOrWhiteSpace(Texto);
 
     // EF Core ctor sem parametros
     private Mensagem() { }
@@ -156,6 +160,20 @@ public class Mensagem
         var msg = Criar(empresaId, conversaId, em, DirecaoMensagem.Saida, autor, tipoConteudo, texto, externoId, botaoId: null);
         msg.Status = externoId is null ? StatusMensagem.Pendente : StatusMensagem.Enviada;
         return msg;
+    }
+
+    // A intenção tem o id da tentativa do console e nasce persistida antes da chamada externa.
+    public static Mensagem SaidaModelo(Guid id, Guid empresaId, Guid conversaId, Guid usuarioId,
+        DateTime em, ModeloMensagem modelo, string texto)
+    {
+        if (id == Guid.Empty || usuarioId == Guid.Empty || string.IsNullOrWhiteSpace(modelo.Nome)
+            || string.IsNullOrWhiteSpace(modelo.Idioma))
+            throw new RegraDeDominioVioladaException("Tentativa, usuário, nome e idioma do modelo são obrigatórios.");
+        var mensagem = Saida(empresaId, conversaId, AutorMensagem.Dona, em, TipoConteudoMensagem.Modelo, texto);
+        mensagem.Id = id;
+        mensagem.ModeloJson = JsonSerializer.Serialize(modelo);
+        mensagem.RegistrarEnviadaPor(usuarioId);
+        return mensagem;
     }
 
     /// <summary>A Meta aceitou a mensagem e devolveu o <c>wamid</c>.</summary>

@@ -78,12 +78,8 @@ export const SO_NO_EASYSTOK = {
 export const acaoDisponivel = (nome, { fonteApi = false } = {}) =>
   !fonteApi || !(nome in NAO_LIGADAS || nome in SO_NO_EASYSTOK)
 
-// Variações do `enviar` (ligado só para texto livre) que a API ainda não tem (#1287): modelo
-// aprovado da Meta e mensagem automática disparada pela biblioteca. Mandar como texto livre
-// assumiria a conversa e cairia no 409 fora da janela, que é justamente onde o modelo serve.
-// O modelo aprovado já sai pela mensagem programada (#1424, `api/mensagensProgramadas.js`).
+// Modelos usam a ação própria enviarModelo. Automática pela biblioteca ainda não tem rota.
 export const ENVIOS_NAO_LIGADOS = {
-  modelo: 'Modelo aprovado',
   automatica: 'Mensagem automática pela biblioteca',
 }
 

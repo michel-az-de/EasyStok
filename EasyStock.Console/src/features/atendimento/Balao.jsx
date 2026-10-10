@@ -85,7 +85,7 @@ export function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReen
             <Icone nome="raio" /> automática
           </button>
         )}
-        {mensagem.modelo && <span className={css.selo}><Icone nome="modelo" /> modelo</span>}
+        {mensagem.modelo && <span className={css.selo} title={mensagem.modeloNome}><Icone nome="modelo" /> modelo</span>}
         {mensagem.programada && <span className={css.selo}><Icone nome="relogio" /> programada</span>}
         <time dateTime={mensagem.em}>{horaCurta(mensagem.em)}</time>
         {mensagem.status === 'falhou' && (
@@ -93,13 +93,13 @@ export function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReen
         )}
         {/* S57: texto que falhou volta a sair pelo mesmo canal. Só com a ação ligada (modo API). */}
         {mensagem.porSms && <span className={css.selo}><Icone nome="check" /> saiu por SMS</span>}
-        {mensagem.status === 'falhou' && mensagem.dir === 'out' && aoReenviar && !mensagem.semIdServidor && !mensagem.midia && !mensagem.aguardaCliente && (
+        {mensagem.status === 'falhou' && mensagem.dir === 'out' && aoReenviar && !mensagem.modelo && !mensagem.semIdServidor && !mensagem.midia && !mensagem.aguardaCliente && (
           <button type="button" className={`${css.selo} ${css.seloBotao}`} onClick={() => aoReenviar(mensagem.id)}>
             <Icone nome="raio" /> Reenviar
           </button>
         )}
         {mensagem.dir === 'out' && mensagem.status === 'enviando' && (
-          <span className={css.enviando}>enviando</span>
+          <span className={css.enviando}>{mensagem.modelo ? 'envio sem confirmação' : 'enviando'}</span>
         )}
         {mensagem.dir === 'out' && mensagem.status !== 'falhou' && mensagem.status !== 'enviando' && (
           <span>

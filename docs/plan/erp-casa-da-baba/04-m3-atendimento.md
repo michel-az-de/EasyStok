@@ -237,7 +237,7 @@ quem não escreveu hoje nem começa contato.
 
 ### M3.6 · Modelo aprovado e reabrir conversa
 
-**Execução de 10/10/2026.** Reabertura entregue e homologada localmente (seção 28 do plano de ondas): `POST conversas/{id}/reabrir`, capacidade da sessão, fila humana, histórico com autoria, bloqueio de cliente e conflito de contato, repetição e concorrência. A janela do canal é preservada. Modelos aprovados continuam pendentes nesta fatia.
+**Execução de 10/10/2026.** Reabertura entregue e homologada localmente (seção 28 do plano de ondas): `POST conversas/{id}/reabrir`, capacidade da sessão, fila humana, histórico com autoria, bloqueio de cliente e conflito de contato, repetição e concorrência. Modelos textuais aprovados ligados ao Composer e homologados com provedor HTTP local (seção 29): catálogo da conta, idioma, parâmetros, prévia, consentimento e intenção persistida antes do envio. Repetição e resposta perdida não duplicam o POST ao canal. A janela do canal é preservada. Recebimento no WhatsApp real continua sem aceite; modelos com mídia, botões ou parâmetros nomeados aparecem com motivo de indisponibilidade.
 
 **Problema.** Fora da janela de 24 h só modelo aprovado chega ao cliente, e o console não tem como mandar
 um (#1287 deixou avisando); conversa encerrada não reabre.
@@ -245,11 +245,12 @@ um (#1287 deixou avisando); conversa encerrada não reabre.
 As rotas de mensagem são só texto e imagem (`AtendimentoConversasController.cs:99,112`).
 `Conversa.RegistrarEntrada` exige conversa aberta (`Conversa.cs:225-228`).
 **Abordagem.**
-- `GET api/atendimento/modelos` (aprovados na Meta, cache curto) e `POST conversas/{id}/mensagens/modelo {nome, parametros}` com `AtenderConversas`.
+- `GET api/atendimento/modelos` (aprovados na Meta, cache de um minuto por empresa) e `POST conversas/{id}/mensagens/modelo {tentativaId, nome, idioma, parametros}` com `AtenderConversas`. Envio consulta a aprovação novamente. A conta e o token vêm da conexão por coexistência já existente.
 - `POST conversas/{id}/reabrir`: `Conversa.Reabrir` no domínio (volta a `Assumida`, limpa `EncerradaEm`, guarda evento).
 - Console: liga `ENVIOS_NAO_LIGADOS.modelo` e `reabrir`.
 **Aceite.**
 - [ ] Modelo enviado fora da janela chega ao WhatsApp (validação do Felipe) e aparece na thread.
+- [x] Modelo textual enviado fora da janela usa o contrato HTTP real com provedor controlado e aparece na thread no computador e celular; validação local, não entrega externa.
 - [x] Texto livre fora da janela continua recusado após reabertura (regra da S09 intacta; API local retorna 409).
 - [x] Reabrir põe a conversa em "Precisa de você" e a mensagem seguinte do cliente cai nela (ChatSite, API e navegador locais; canais externos ainda sem aceite).
 **Testes (Red).** `ConversaTests.ReabrirEncerrada`, `EnviarModeloConversaUseCaseTests.SoComAceitaModelo`.

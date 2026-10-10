@@ -23,6 +23,7 @@ import { criarAcoesTagsApi } from './api/tags'
 import { criarAcoesLoteApi } from './api/lote'
 import { criarAcoesCardapioApi } from './api/cardapio'
 import { criarAcoesMensagensProgramadasApi } from './api/mensagensProgramadas'
+import { criarAcoesModelosApi } from './api/modelos'
 import { criarAvisosNaoLigadas, envioNaoLigado, textoNaoLigado } from './api/naoLigadas'
 
 const FORA_DA_JANELA = 'fora_da_janela_24h'
@@ -79,9 +80,14 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     // #1241: cardápio do dia (disponibilidade e saldo) no EasyStok.
     ...criarAcoesCardapioApi({ despachar, estadoRef }),
     ...criarAcoesMensagensProgramadasApi({ estadoRef }),
+    ...criarAcoesModelosApi({ despachar }),
     enviar: (id, texto, opcoes = {}) => {
       // #1287: texto vazio a API recusa (400); modelo e automática ainda não têm endpoint.
       if (!texto?.trim()) return
+      if (opcoes.modelo) {
+        despachar({ tipo: acao.AVISO_API, mensagem: 'Escolha o modelo e preencha os parâmetros em Modelos aprovados.' })
+        return
+      }
       const naoLigado = envioNaoLigado(opcoes)
       if (naoLigado) {
         despachar({ tipo: acao.AVISO_API, mensagem: textoNaoLigado(naoLigado) })

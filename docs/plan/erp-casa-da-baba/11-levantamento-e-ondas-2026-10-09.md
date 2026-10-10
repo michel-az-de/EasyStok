@@ -919,5 +919,45 @@ Na primeira rodada, os testes detectaram que o registro de remetente aceitava ap
 ### 28.3 Limites e próxima fatia
 
 - A confirmação da própria ação é imediata após o POST; outras abas e o histórico usam a sincronização existente de cinco segundos. Não foi criado evento SSE nesta fatia.
-- Modelos aprovados na Meta e seu envio avulso pelo Composer continuam pendentes no M3.6. Mensagens programadas conservam a integração já entregue. Próxima fatia: concluir a parte de modelos do M3.6, seguida das ações por atendente do M3.7.
+- Modelos aprovados na Meta eram a próxima fatia do M3.6 e foram ligados na seção 29. Mensagens programadas conservam a integração já entregue. Ações por atendente do M3.7 seguem pendentes.
 - Não houve mensagem a cliente real, chamada à Meta nem verificação de publicação pública. Reabertura e roteamento seguintes foram homologados pelo ChatSite local; os aceites de canais externos continuam separados.
+
+## 29. Execução da Onda 2: modelos aprovados no Composer (M3.6), 10/10/2026
+
+### 29.1 Entrega
+
+- `GET api/atendimento/modelos` consulta os modelos aprovados da WABA vinculada à empresa pela conexão por coexistência existente. Confere número e credencial da mesma empresa, sem recorrer à conta global. Lista nome, idioma, categoria, corpo, parâmetros e motivo quando o formato não é suportado. Cache de um minuto por empresa; atualização explícita na tela. Paginação usa cursores na mesma origem e conta, sem seguir URLs que possam carregar tokens.
+- `POST api/atendimento/conversas/{id}/mensagens/modelo` recebe `tentativaId`, nome, idioma e parâmetros. Exige módulo Atendimento e `AtenderConversas`; empresa e autor vêm do JWT. `ValidateEmpresaId` recusa empresa divergente no corpo/query; use case, filtro global e RLS protegem a conversa. Cliente precisa estar cadastrado e desbloqueado. Conversa encerrada ou canal sem modelos são recusados.
+- A aprovação é consultada novamente antes de reservar o envio. Idioma, quantidade e conteúdo dos parâmetros são validados. Categoria da Meta determina a finalidade: marketing exige consentimento concedido; transacional respeita revogação. Cabeçalho/rodapé estáticos e parâmetros posicionais no corpo compõem a prévia persistida.
+- A tentativa nasce como mensagem pendente, com autoria e metadados, antes de chamar `ICanalMensageria.EnviarModeloAsync`. Transação e lock da conversa serializam a reserva. Repetir o mesmo identificador devolve a tentativa registrada; conteúdo ou autor divergentes são recusados. O POST externo não é repetido automaticamente. Falha de rede ou resultado incerto conserva o registro, inclusive após reinício; modelos não entram no reenvio de texto nem na reserva por SMS.
+- O Composer oferece seleção, preenchimento e prévia. Aguarda a resposta, protege clique duplo e conserva o identificador da tentativa durante perda de resposta/recarga na mesma aba. O histórico mostra o selo de modelo e o estado informado pelo servidor. Para iniciar outro envio após resultado incerto, o operador confirma que conferiu a conversa no WhatsApp. Enviar modelo não renova a janela de 24 horas.
+- Migration `20261010212747_AddModeloMensagemAtendimento` acrescenta apenas `ModeloJson` nullable em `atendimento_mensagens`. Tipo `Modelo` diferencia a mensagem do texto livre. Linhas existentes permanecem válidas. Na reversão de código, conservar a coluna e os dados; `Down` remove os metadados novos e exige backup prévio.
+
+Contrato de consulta conferido no [SDK oficial da Meta](https://github.com/facebook/facebook-python-business-sdk/blob/main/facebook_business/adobjects/whatsappbusinessaccount.py), método `get_message_templates`. O envio reutiliza o adaptador existente.
+
+### 29.2 Validação local
+
+Evidências, TRX, scripts e capturas em `C:\rep\EasyStok\.build\onda2-modelos`; banco sintético `easystock_onda2_modelos`, provedor HTTP em loopback e PostgreSQL de concorrência em Testcontainers.
+
+| Camada | Evidência |
+|---|---|
+| Build / schema | `EasyStok.CI.slnf` compilado; migration aplicada no banco com dados anteriores; EF sem alteração de modelo pendente |
+| Domain / Application | 1.556 e 2.471 testes aprovados, sem ignorados |
+| API / Integrações / Arquitetura | 1.179, 208 e 61 testes aprovados, sem ignorados; arquitetura usa o filtro do CI `Category!=ArchitectureDebt` |
+| Gate de commit | Build e 37 testes obrigatórios de arquitetura aprovados |
+| PostgreSQL real | 4 testes aprovados, sem ignorados: intenção visível antes da resposta externa, concorrência/replay, recuperação de pendente e falha sem reenvio, JSON persistido e RLS sem bypass |
+| Console | 71 provas aprovadas; lint, fronteiras de camada, 264 pares de contraste e build aprovados; nova prova incluída no CI |
+| HTTP / Chromium | 401/403/404, empresa forjada, modelo inexistente, idioma/parâmetros inválidos, marketing sem consentimento, cliente bloqueado e conversa encerrada recusados; texto livre continua 409 |
+| Envio e recuperação | Um envio ao provedor com duas requisições simultâneas; clique duplo, recarga, perda da resposta após aceite, aprovação revogada entre seleção/envio e conexão interrompida conferidos |
+| Apresentação | Computador 1440 × 1000 e celular 390 × 844; seleção, prévia, envio e histórico, sem erro JavaScript nem rolagem horizontal; botão reposicionado após inspeção visual do celular |
+
+A primeira execução HTTP mostrou que o campo extra `empresaId` era ignorado pelo DTO: a empresa continuava vindo do JWT, mas faltava a recusa explícita. O DTO e o filtro foram ajustados e a execução posterior confirmou 403. A prova antiga do envio genérico foi atualizada para exigir a orientação ao seletor de modelos, mantendo a proibição de enviar o modelo como texto livre.
+
+Após incorporar `b840ae96`, com a ficha do prato e as fotos do cardápio, foram repetidos build, testes de Domain/Application/API, qualidade e todas as provas do Console. O workflow conserva as provas de cardápio e modelos. Nova conferência no navegador validou prévia, envio único, recarga do histórico, texto livre desabilitado e layout móvel na versão integrada.
+
+### 29.3 Limites e próxima fatia
+
+- Homologação com conta, contatos e token sintéticos. Não houve contato com clientes reais, aceite de entrega na Meta nem verificação de publicação pública. Aceitação HTTP, entrega ao aparelho e publicação continuam sendo estados separados.
+- Modelos com mídia, botões, autenticação, parâmetros nomeados ou variáveis no cabeçalho não são enviados por esta tela; o catálogo informa a limitação. Criação e aprovação continuam no Gerenciador da Meta. Conta apenas com vínculo manual de número, sem a credencial/WABA da coexistência, recebe orientação para conectar em Integrações.
+- Mensagens programadas mantêm seu fluxo anterior. Esta fatia trata o envio avulso pelo Composer. Histórico em outras abas continua na sincronização existente de cinco segundos.
+- Próxima fatia do plano: M3.7, filtros Minhas/Sem dono/Todas e nome do atendente. Aceite externo do modelo textual segue pendente com Felipe.

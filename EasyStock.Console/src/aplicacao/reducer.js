@@ -291,6 +291,10 @@ const CASOS_API = {
       }
     }),
 
+  [acao.RECEBER_MODELO_API]: (estado, { id, mensagem }) => mapear(estado, id, c => ({
+    ...c, mensagens: [...c.mensagens.filter(m => m.id !== mensagem.id), { ...mensagem, aguardandoSync: true }],
+  })),
+
   // #1396: com a mensagem gravada pelo EasyStok, o balão local vira ela (id do servidor, que o Reenviar
   // usa); sem ela, fica marcado `semIdServidor` e não oferece Reenviar.
   [acao.FALHAR_ENVIO_API]: (estado, { id, mensagemId, erro, mensagem, semIdServidor }) =>

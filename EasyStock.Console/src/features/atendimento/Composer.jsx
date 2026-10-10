@@ -17,12 +17,13 @@ import { avisoDeVariaveisNaoResolvidas } from '../../dominio/respostas'
 import { ModalEnviarCardapio } from './ModalEnviarCardapio'
 import { SeletorRespostas } from './SeletorRespostas'
 import { ModalProgramarMensagem } from './ModalProgramarMensagem'
+import { ModalEnviarModelo } from './ModalEnviarModelo'
 import css from './atendimento.module.css'
 
 export function Composer({
   conversa, canal, podeEscrever, motivo, rascunho,
   aoMudarRascunho, aoEnviar, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
-  aoReabrir, reabrindo = false,
+  aoReabrir, reabrindo = false, podeEnviarModelo = false,
 }) {
   const { enviarMidia, enviar, obterLinkCardapio } = useAcoes()
   // Seletor rápido (#1441): "/" no campo ou o botão Respostas abrem a lista
@@ -45,6 +46,7 @@ export function Composer({
   const [buscandoLink, setBuscandoLink] = useState(false)
   // #1424: modal de programar mensagem, guardada pelo id da conversa (trocar de conversa fecha).
   const [programarEm, setProgramarEm] = useState(null)
+  const [modeloAberto, setModeloAberto] = useState(false)
   const { ler } = useArquivoComoDataUrl()
   const gravador = useGravadorAudio({ escolherTipo: escolherFormatoGravacao })
   const gravando = gravador.estado !== 'ocioso'
@@ -149,6 +151,10 @@ export function Composer({
         </p>
       )}
 
+      {podeEnviarModelo && <Botao className={css.abrirModelos} aria-haspopup="dialog" onClick={() => setModeloAberto(true)}>
+        <Icone nome="modelo" /> Modelos aprovados
+      </Botao>}
+
       {/* Gravando substitui o campo de texto e as ações: gravar e escrever ao
           mesmo tempo não é o gesto que o dono pediu ("gravar... cancelar ou
           enviar"), e um estado só por vez é mais fácil de entender. */}
@@ -175,7 +181,7 @@ export function Composer({
                 value={rascunho}
                 disabled={!podeEscrever}
                 placeholder={!podeEscrever
-                  ? 'Escolha um modelo em Respostas'
+                  ? (podeEnviarModelo ? 'Use Modelos aprovados para continuar' : 'Mensagem indisponível nesta conversa')
                   : anexo
                     ? 'Legenda (opcional)'
                     // O atalho / continua valendo, mas a dica não o repete: o botão
@@ -281,6 +287,8 @@ export function Composer({
           {restricao && <p className={css.restricao}>{restricao}</p>}
         </>
       )}
+
+      {modeloAberto && <ModalEnviarModelo conversa={conversa} aoFechar={() => setModeloAberto(false)} />}
 
       {programarEm === conversa.id && (
         <ModalProgramarMensagem

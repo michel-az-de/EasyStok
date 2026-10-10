@@ -270,6 +270,7 @@ export const SINCRONIZAR_CONVERSAS = 'sincronizar-conversas'
 export const CONFIRMAR_REABERTURA_API = 'confirmar-reabertura-api'
 export const SINCRONIZACAO_FALHOU = 'sincronizacao-falhou'
 export const CONFIRMAR_ENVIO_API = 'confirmar-envio-api'
+export const RECEBER_MODELO_API = 'receber-modelo-api'
 export const FALHAR_ENVIO_API = 'falhar-envio-api'
 export const AVISO_API = 'aviso-api'
 // F02: horário, controle manual e mensagens do expediente (S40) como a API devolveu.

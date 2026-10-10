@@ -644,6 +644,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("ModeloJson")
+                        .HasColumnType("jsonb");
+
                     b.Property<DateTime?>("ProcessadaEm")
                         .HasColumnType("timestamp with time zone");
 
