@@ -85,6 +85,20 @@ public class GerarCobrancaPedidoUseCaseTests
         (await act.Should().ThrowAsync<CobrancaPedidoConflitoException>()).Which.Codigo.Should().Be("pedido_ja_pago");
     }
 
+    // #1540: depois do estorno total a cobrança fica Estornada e o pagamento permanece. A confirmação
+    // (#1289) trata o próximo pagamento como duplicado e devolve sozinha, então o link não pode sair.
+    [Fact]
+    public async Task PagamentosJaCobremOTotal_SemCobrancaPaga_Recusa()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarPagamento(referencia: null);
+
+        var act = () => f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id));
+
+        (await act.Should().ThrowAsync<CobrancaPedidoConflitoException>()).Which.Codigo.Should().Be("pedido_ja_pago");
+        f.Preferencias.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task MercadoPagoFora_LancaIndisponivelSemGravar()
     {

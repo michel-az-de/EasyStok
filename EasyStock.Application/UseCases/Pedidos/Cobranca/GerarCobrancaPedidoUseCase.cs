@@ -113,6 +113,10 @@ public sealed class GerarCobrancaPedidoUseCase(
         if (PedidoStateMachine.EstaFinalizado(pedido.StatusEnum))
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoFinalizado,
                 "Pedido cancelado ou entregue não recebe cobrança.");
+        // Mesma conta da confirmação (#1289): com os pagamentos cobrindo o total, o webhook trataria
+        // o pagamento deste link como duplicado e o devolveria sozinho.
+        if (pedido.Total.Valor > 0m && pedido.TotalPago >= pedido.Total.Valor)
+            throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
 
         var storefront = await storefrontRepository.GetByEmpresaAsync(input.EmpresaId, ct);
         var dados = new DadosCobranca(
