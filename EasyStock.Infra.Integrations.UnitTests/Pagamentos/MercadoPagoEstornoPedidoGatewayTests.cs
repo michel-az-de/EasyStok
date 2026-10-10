@@ -39,6 +39,18 @@ public class MercadoPagoEstornoPedidoGatewayTests
         r.Erro.Should().Be(MercadoPagoEstornoPedidoGateway.CodigoRecusado);
     }
 
+    [Theory]
+    [InlineData("pending")]
+    [InlineData("in_process")]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task Somente_aprovado_confirma_o_estorno(string? status)
+    {
+        _mp.EstornarAsync("123", 30m, "oc-1", Arg.Any<CancellationToken>())
+            .Returns(new EstornoMercadoPagoResult("1234", 30m, status));
+        (await Gateway().EstornarAsync("123", 30m, "oc-1")).Sucesso.Should().BeFalse();
+    }
+
     [Fact]
     public async Task EstornoRejeitadoViraFalha()
     {

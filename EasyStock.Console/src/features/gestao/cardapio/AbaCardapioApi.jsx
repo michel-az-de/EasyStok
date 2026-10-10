@@ -53,12 +53,18 @@ export function AbaCardapioApi() {
   return (
     <div className={css.aba}>
       <div className={css.topo}>
-        <p className={css.descricao}>
-          Todos os pratos da vitrine, na ordem do cardápio. <strong>Hoje</strong> liga e desliga o prato no dia;
-          {' '}<strong>No site</strong> mostra ou esconde na página do cliente; <strong>Tirar</strong> põe fora do
-          {' '}cardápio (dá para repor). Item novo fica <strong>em validação</strong>: o assistente só oferece depois
-          {' '}que você validar. Nada aqui apaga um item.
-        </p>
+        <div className={css.orientacoes}>
+          <p className={css.descricao}>Disponibilidade, ordem e visibilidade dos pratos.</p>
+          <details className={css.ajudaControles}>
+            <summary>Como usar os controles</summary>
+            <p className={css.descricao}>
+              <strong>Hoje</strong> liga e desliga o prato no dia; <strong>No site</strong> mostra ou esconde
+              {' '}na página do cliente; <strong>Tirar</strong> põe fora do cardápio (dá para repor).
+              {' '}Item novo fica <strong>em validação</strong>: o assistente só oferece depois que você validar.
+              {' '}Nada aqui apaga um item.
+            </p>
+          </details>
+        </div>
         <div className={css.filtro}>
           <CampoTexto
             ref={buscaRef}

@@ -75,7 +75,7 @@ public static class NotificationsInfraServiceCollectionExtensions
             (sp, _) => sp.GetRequiredKeyedService<IProvedorWhatsApp>($"whatsapp:{waProvider}"));
 
         // #449: default nao-keyed. Consumidores que injetam IProvedorWhatsApp sem
-        // [FromKeyedServices] (ex.: EnviarLinkAvaliacaoWhatsAppHandler do storefront)
+        // [FromKeyedServices]
         // resolvem o provider ativo. Sem isto, o boot falha em Development (ValidateOnBuild)
         // e o handler nao resolveria em runtime (prod inclusive).
         services.AddScoped<IProvedorWhatsApp>(

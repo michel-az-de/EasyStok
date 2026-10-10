@@ -158,7 +158,7 @@ function Lancamentos({ dia, executar, podeGerenciar }) {
   const [estornando, setEstornando] = useState(null)
   // #1474: movimentos e pagamentos numa lista só, na ordem da hora.
   const lancamentos = lancamentosEmOrdem(dia)
-  const podeEstornar = (m) => podeGerenciar && !dia.fechado && !m.estornadoEm && (m.tipo === TIPOS_MOVIMENTO.ENTRADA || m.tipo === TIPOS_MOVIMENTO.SAIDA)
+  const podeEstornar = (m) => podeGerenciar && !dia.fechado && !m.estornadoEm && !m.devolucaoPedido && (m.tipo === TIPOS_MOVIMENTO.ENTRADA || m.tipo === TIPOS_MOVIMENTO.SAIDA)
 
   if (lancamentos.length === 0) return <p className={css.corpoBloco}>Nenhum lançamento neste caixa.</p>
   return (

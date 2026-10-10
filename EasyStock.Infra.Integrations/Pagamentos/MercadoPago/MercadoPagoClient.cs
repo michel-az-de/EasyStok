@@ -157,8 +157,31 @@ public sealed partial class MercadoPagoClient(
             ?? throw new InvalidOperationException("MercadoPago não retornou id do estorno.");
 
         logger.LogInformation("MP estorno criado paymentId={PaymentId}", id);
-        return new EstornoMercadoPagoResult(estornoId, Numero(root, "amount"), Texto(root, "status"));
+        return LerEstorno(root);
     }
+
+    public async Task<EstornoMercadoPagoResult?> ConsultarEstornoAsync(string pagamentoId, string estornoId, CancellationToken ct = default)
+    {
+        using var request = Requisicao(HttpMethod.Get, $"v1/payments/{ValidarPagamentoId(pagamentoId)}/refunds/{ValidarPagamentoId(estornoId)}");
+        using var response = await httpClient.SendAsync(request, ct);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        await GarantirSucessoAsync(response, ct);
+        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        return LerEstorno(doc.RootElement);
+    }
+
+    public async Task<IReadOnlyList<EstornoMercadoPagoResult>> ListarEstornosAsync(string pagamentoId, CancellationToken ct = default)
+    {
+        using var request = Requisicao(HttpMethod.Get, $"v1/payments/{ValidarPagamentoId(pagamentoId)}/refunds");
+        using var response = await httpClient.SendAsync(request, ct);
+        await GarantirSucessoAsync(response, ct);
+        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        return doc.RootElement.EnumerateArray().Select(LerEstorno).ToList();
+    }
+
+    private static EstornoMercadoPagoResult LerEstorno(JsonElement root) => new(
+        Texto(root, "id") ?? throw new InvalidOperationException("Mercado Pago não retornou o identificador do estorno."),
+        Numero(root, "amount"), Texto(root, "status"), Texto(root, "payment_id"), Data(root, "date_created"));
 
     public async Task ExpirarPreferenciaAsync(string preferenceId, DateTime expiraEm, CancellationToken ct = default)
     {
@@ -213,7 +236,8 @@ public sealed partial class MercadoPagoClient(
         TransactionAmount: Numero(p, "transaction_amount") ?? 0m,
         DateApproved: Data(p, "date_approved"),
         PaymentMethodId: Texto(p, "payment_method_id"),
-        PaymentTypeId: Texto(p, "payment_type_id"));
+        PaymentTypeId: Texto(p, "payment_type_id"),
+        TransactionAmountRefunded: Numero(p, "transaction_amount_refunded") ?? 0);
 
     /// <summary>String ou número (o Mercado Pago devolve ids numéricos) como texto; null/ausente = null.</summary>
     private static string? Texto(JsonElement e, string campo)

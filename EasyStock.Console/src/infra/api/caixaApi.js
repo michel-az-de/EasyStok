@@ -49,6 +49,7 @@ const movimentoDaApi = (m) => ({
   estornadoEm: m.estornadoEm ?? null,
   estornadoPorNome: m.estornadoPorNome ?? null,
   motivoEstorno: m.motivoEstorno ?? null,
+  devolucaoPedido: m.origem === 'devolucao_pedido',
 })
 
 // `aberturaPendenteCrossDay`: o caixa de um dia anterior ficou aberto e ainda não fechou (#596).

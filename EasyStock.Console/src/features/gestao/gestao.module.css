@@ -7,3 +7,80 @@
   font-size: var(--t-apoio); font-weight: 600;
 }
 .desligado { min-width: 0; margin: 0; padding: 0; border: 0; }
+
+.janelaGestao {
+  display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: start;
+  gap: var(--e-5); min-height: 440px; padding-top: var(--e-3);
+}
+.areasGestao {
+  position: sticky; top: 0; padding: var(--e-2);
+  background: var(--fundo); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+}
+.rotuloAreas { margin: var(--e-2) var(--e-3); color: var(--tinta-3); font-size: var(--t-micro); font-weight: 700; }
+.listaAreas { display: grid; gap: var(--e-1); }
+.areaGestao {
+  display: flex; align-items: center; gap: var(--e-2); width: 100%; min-height: 44px;
+  padding: var(--e-2) var(--e-3); text-align: left;
+  border: var(--b-1) solid transparent; border-radius: var(--r-1);
+  background: transparent; color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 600;
+  transition: background var(--dur-micro) var(--ease-padrao), box-shadow var(--dur-micro) var(--ease-padrao), color var(--dur-micro) var(--ease-padrao);
+}
+.areaGestao svg { flex: none; }
+.areaGestao:hover { background: var(--preenchimento); color: var(--tinta); }
+.areaGestao[aria-selected='true'] {
+  border-color: var(--linha); background: var(--papel); color: var(--marca-forte);
+  box-shadow: var(--sombra), var(--brilho); font-weight: 700;
+}
+.areaCompacta { display: none; }
+.corpoGestao { min-width: 0; }
+.cabecalhoArea { margin-bottom: var(--e-4); }
+.tituloArea {
+  display: flex; align-items: center; gap: var(--e-2); margin: 0 0 var(--e-3);
+  font-family: var(--f-titulo-marca); font-size: var(--t-titulo); font-weight: 600;
+}
+.tituloArea svg { flex: none; color: var(--marca); }
+.nomeTela { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+.subtelasGestao {
+  display: flex; gap: var(--e-1); overflow-x: auto; padding: var(--e-1);
+  border-radius: var(--r-2); background: var(--fundo); scrollbar-width: thin;
+}
+.subtelaGestao {
+  flex: none; min-height: 44px; padding: var(--e-2) var(--e-3);
+  border: var(--b-1) solid transparent; border-radius: var(--r-1); background: transparent;
+  color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 600; white-space: nowrap;
+  transition: background var(--dur-micro) var(--ease-padrao), box-shadow var(--dur-micro) var(--ease-padrao), color var(--dur-micro) var(--ease-padrao);
+}
+.subtelaGestao:hover { background: var(--preenchimento); color: var(--tinta); }
+.subtelaGestao[aria-selected='true'] {
+  border-color: var(--linha); background: var(--papel); color: var(--marca-forte);
+  box-shadow: var(--sombra), var(--brilho); font-weight: 700;
+}
+.painelGestao { min-width: 0; }
+.areaGestao:focus-visible, .subtelaGestao:focus-visible, .verModulos:focus-visible, .painelGestao:focus-visible {
+  outline: 2px solid var(--marca); outline-offset: 2px;
+}
+.rodapeGestao { width: 100%; min-width: 0; }
+.avisosGestao { margin-bottom: var(--e-3); }
+.avisosGestao:empty { display: none; }
+.acoesGestao { display: flex; justify-content: space-between; align-items: center; gap: var(--e-3); }
+.verModulos {
+  display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--toque);
+  color: var(--marca-forte); border-radius: var(--r-1); font-size: var(--t-apoio); font-weight: 600; text-decoration: none;
+}
+.verModulos:hover { text-decoration: underline; }
+
+@media (max-width: 759px) {
+  .janelaGestao { grid-template-columns: minmax(0, 1fr); gap: var(--e-4); min-height: 0; padding-top: var(--e-2); }
+  .areasGestao { display: none; }
+  .areaCompacta { display: grid; gap: var(--e-1); }
+  .areaCompacta label { color: var(--tinta-2); font-size: var(--t-micro); font-weight: 700; }
+  .seletorArea { display: flex; align-items: center; gap: var(--e-2); }
+  .seletorArea svg { flex: none; color: var(--marca); }
+  .seletorArea select {
+    flex: 1; min-width: 0; min-height: 44px; padding: var(--e-2) var(--e-3);
+    border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-1);
+    background: var(--papel); color: var(--tinta); font-weight: 600;
+  }
+  .tituloArea { display: none; }
+  .subtelasGestao { margin-inline: -2px; }
+}

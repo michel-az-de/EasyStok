@@ -220,10 +220,12 @@ namespace EasyStock.Infra.Postgre.Repositories
                       (pg, p) => new { pg, p })
                 .Where(x => x.p.EmpresaId == empresaId
                          // Cancelar a operação não devolve dinheiro. Só sai do saldo quando
-                         // o recebimento tem estorno confirmado na cobrança correspondente.
+                         // o legado já retirou o recebimento. Estorno com ledger mantém receita e saída.
                          && !db.Set<CobrancaPedido>().Any(c => c.EmpresaId == empresaId
                              && c.PedidoId == x.p.Id && c.Status == StatusCobrancaPedido.Estornada
-                             && x.pg.Referencia != null && c.PagamentoExternoId == x.pg.Referencia)
+                             && x.pg.Referencia != null && c.PagamentoExternoId == x.pg.Referencia
+                             && !db.Set<PedidoEstornoOnline>().Any(e => e.EmpresaId == empresaId
+                                 && e.PagamentoId == x.pg.Id && e.Situacao == PedidoEstornoOnline.Confirmado))
                          // So pedidos SEM Venda consolidada (balcao/web tem so PedidoPagamento).
                          // Pedido mobile entregue gera Venda (VendaId setado) e ja e contado por
                          // GetTotalVendas — sem este filtro o mesmo dinheiro somava 2x no caixa (#926).
@@ -256,7 +258,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(x => x.p.EmpresaId == empresaId
                          && !db.Set<CobrancaPedido>().Any(c => c.EmpresaId == empresaId
                              && c.PedidoId == x.p.Id && c.Status == StatusCobrancaPedido.Estornada
-                             && x.pg.Referencia != null && c.PagamentoExternoId == x.pg.Referencia)
+                             && x.pg.Referencia != null && c.PagamentoExternoId == x.pg.Referencia
+                             && !db.Set<PedidoEstornoOnline>().Any(e => e.EmpresaId == empresaId
+                                 && e.PagamentoId == x.pg.Id && e.Situacao == PedidoEstornoOnline.Confirmado))
                          // Mesmo filtro do total (#926): exclui pagamentos de pedidos com Venda
                          // consolidada, para a soma das linhas exibidas casar com o SaldoEsperado.
                          && x.p.VendaId == null

@@ -11,6 +11,7 @@ import { numeroDaComanda } from '../../dominio/pedido'
 import { motivoAntesDeCobrar } from '../../dominio/resumoPedido'
 import { BarraProximoPasso } from './BarraProximoPasso'
 import { BlocoCobranca } from './BlocoCobranca'
+import { BlocoDevolucoes } from './BlocoDevolucoes'
 import { BlocoCapturaAutomatica } from './BlocoCapturaAutomatica'
 import { BlocoCliente } from './BlocoCliente'
 import { BlocoEnderecoCapturado } from './BlocoEnderecoCapturado'
@@ -144,6 +145,10 @@ export function PainelFicha({ aoAbrirCardapio }) {
               aoEncerrarAtendimento={aoEncerrarAtendimento}
               aoAlterarMeio={(meio) => alterarMeioPagamento(selecionada.id, meio)}
             />
+            {fonteApi && pedido.pedidoId && <BlocoDevolucoes
+              key={`${pedido.pedidoId}:${(pedido.pagamentosApi ?? []).map((p) => p.id).join(':')}`}
+              pedidoId={pedido.pedidoId}
+            />}
             {pedido.ocorrencia && (
               <BlocoOcorrencia
                 key={selecionada.id}

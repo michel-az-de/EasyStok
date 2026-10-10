@@ -6,6 +6,20 @@ namespace EasyStock.Infra.Postgre.Repositories
 {
     public sealed class PedidoRepository(EasyStockDbContext db) : IPedidoRepository
     {
+        public Task<bool> TemEstornoOnlineAsync(Guid empresaId, Guid pagamentoId, CancellationToken ct = default) =>
+            db.Set<PedidoEstornoOnline>().AnyAsync(e => e.EmpresaId == empresaId && e.PagamentoId == pagamentoId, ct);
+
+        public async Task<IReadOnlyList<PedidoEstornoManual>> ListarEstornosManuaisAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default) =>
+            await db.Set<PedidoEstornoManual>().AsNoTracking()
+                .Where(e => e.EmpresaId == empresaId && e.PedidoId == pedidoId)
+                .OrderBy(e => e.RegistradoEm).ThenBy(e => e.Id).ToListAsync(ct);
+
+        public Task AdicionarEstornoManualAsync(PedidoEstornoManual estorno)
+        {
+            db.Set<PedidoEstornoManual>().Add(estorno);
+            return Task.CompletedTask;
+        }
+
         public async Task TravarAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default)
         {
             if (db.Database.CurrentTransaction is null)

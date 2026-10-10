@@ -1,4 +1,3 @@
-using EasyStock.Application.Events.Storefront.Handlers;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
@@ -133,6 +132,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<EasyStock.Application.Ports.Output.Pagamentos.IGatewayRoutingRuleRepository,
                 Repositories.Pagamentos.GatewayRoutingRuleRepository>();
             // S11: cobrança do pedido
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Pagamentos.IEstornoOnlineRepository, Repositories.Pagamentos.EstornoOnlineRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository,
                 Repositories.Pagamentos.CobrancaPedidoRepository>();
             // S20: fila de impressão do canhoto
@@ -296,8 +296,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<AbrirPaginaAvaliacaoUseCase>();
             services.AddScoped<CriarAvaliacaoPedidoUseCase>();
             services.AddScoped<ListarAvaliacoesPublicoUseCase>();
-            services.AddScoped<EnviarLinkAvaliacaoWhatsAppHandler>();
-            services.AddHostedService<AgendarSolicitacaoAvaliacaoBackgroundService>();
+            // #1519: o pedido de avaliação sai pelo outbox (S26, AvaliacaoSolicitada 30 min após Entregue, com
+            // botões). O job antigo do link +24h foi aposentado: nunca enviou (a varredura esbarrava na RLS) e,
+            // consertado, mandaria um segundo pedido de avaliação com link para página que o site não tem.
 
             return services;
         }

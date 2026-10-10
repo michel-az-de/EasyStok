@@ -6685,6 +6685,144 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("pedidos", (string)null);
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.PedidoEstornoManual", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Metodo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("PagamentoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PedidoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Referencia")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTime>("RegistradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UsuarioNome")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<decimal>("Valor")
+                        .HasColumnType("numeric(14,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PagamentoId");
+
+                    b.HasIndex("PedidoId");
+
+                    b.HasIndex("EmpresaId", "PedidoId");
+
+                    b.ToTable("pedido_estornos_manuais", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_estorno_manual_valor", "\"Valor\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.PedidoEstornoOnline", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ConfirmadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Detalhe")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("EnviadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EstornoExternoId")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("MovimentoCaixaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PagamentoExternoId")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("PagamentoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PedidoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Situacao")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UsuarioNome")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<decimal>("Valor")
+                        .HasColumnType("numeric(14,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MovimentoCaixaId")
+                        .IsUnique();
+
+                    b.HasIndex("PagamentoId");
+
+                    b.HasIndex("PedidoId");
+
+                    b.HasIndex("EmpresaId", "PedidoId");
+
+                    b.HasIndex("EmpresaId", "PagamentoExternoId", "EstornoExternoId")
+                        .IsUnique();
+
+                    b.ToTable("pedido_estornos_online", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_estorno_online_confirmacao", "(\"Situacao\" = 'confirmado') = (\"MovimentoCaixaId\" IS NOT NULL AND \"ConfirmadoEm\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_estorno_online_valor", "\"Valor\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.PedidoEvento", b =>
                 {
                     b.Property<Guid>("Id")
@@ -11032,6 +11170,47 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("Loja");
 
                     b.Navigation("Venda");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.PedidoEstornoManual", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.MovimentoCaixa", null)
+                        .WithOne()
+                        .HasForeignKey("EasyStock.Domain.Entities.PedidoEstornoManual", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EasyStock.Domain.Entities.PedidoPagamento", null)
+                        .WithMany()
+                        .HasForeignKey("PagamentoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EasyStock.Domain.Entities.Pedido", null)
+                        .WithMany()
+                        .HasForeignKey("PedidoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.PedidoEstornoOnline", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.MovimentoCaixa", null)
+                        .WithOne()
+                        .HasForeignKey("EasyStock.Domain.Entities.PedidoEstornoOnline", "MovimentoCaixaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EasyStock.Domain.Entities.PedidoPagamento", null)
+                        .WithMany()
+                        .HasForeignKey("PagamentoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EasyStock.Domain.Entities.Pedido", null)
+                        .WithMany()
+                        .HasForeignKey("PedidoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.PedidoEvento", b =>

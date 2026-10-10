@@ -4,9 +4,14 @@ using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
 
+public sealed record SolicitarEstornoOnlineRequest(Guid OperacaoId, Guid PagamentoId, decimal Valor, string Motivo, Guid? EmpresaId = null);
+
 public sealed record TrocarFormaPagamentoRequest(string Forma);
 
 public sealed record DesfazerPagamentoManualRequest(string Motivo, Guid? PagamentoId = null);
+
+public sealed record RegistrarEstornoManualRequest(Guid OperacaoId, Guid PagamentoId, decimal Valor,
+    string Metodo, string Motivo, string Referencia, bool ValorJaDevolvido, Guid? EmpresaId = null);
 
 /// <summary>
 /// Cobrança do pedido pela operadora (S11): reemitir o link, trocar a forma de pagamento e desfazer
@@ -28,8 +33,43 @@ public sealed class PedidosCobrancaController(
     GerarCobrancaPedidoUseCase gerarCobranca,
     TrocarFormaPagamentoPedidoUseCase trocarForma,
     DesfazerPagamentoManualUseCase desfazerPagamento,
-    ICurrentUserAccessor currentUser) : EasyStockControllerBase
+    ICurrentUserAccessor currentUser,
+    ConsultarEstornosManuaisUseCase consultarEstornos,
+    RegistrarEstornoManualUseCase registrarEstorno,
+    IEstornosOnlineService estornosOnline) : EasyStockControllerBase
 {
+    [HttpGet("{id}/estornos-online")]
+    [Authorize(Policy = "Operador")]
+    public Task<IActionResult> EstornosOnline(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await estornosOnline.ConsultarAsync(emp, id, ct)));
+
+    [HttpPost("{id}/estornos-online")]
+    [Authorize(Policy = "Gerente")]
+    public Task<IActionResult> SolicitarEstornoOnline(Guid id, [FromBody] SolicitarEstornoOnlineRequest request,
+        [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await estornosOnline.SolicitarAsync(new(
+            emp, id, request.OperacaoId, request.PagamentoId, request.Valor, request.Motivo,
+            currentUser.UsuarioId, User.FindFirst("nome")?.Value, currentUser.Nivel), ct)));
+
+    [HttpPost("{id}/estornos-online/{operacaoId:guid}/retomar")]
+    [Authorize(Policy = "Gerente")]
+    public Task<IActionResult> RetomarEstornoOnline(Guid id, Guid operacaoId, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await estornosOnline.RetomarAsync(emp, id, operacaoId, currentUser.Nivel, ct)));
+
+    [HttpGet("{id}/estornos-manuais")]
+    [Authorize(Policy = "Operador")]
+    public Task<IActionResult> EstornosManuais(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await consultarEstornos.ExecuteAsync(emp, id, ct)));
+
+    [HttpPost("{id}/estornos-manuais")]
+    [Authorize(Policy = "Gerente")]
+    public Task<IActionResult> RegistrarEstornoManual(Guid id, [FromBody] RegistrarEstornoManualRequest request,
+        [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await registrarEstorno.ExecuteAsync(new(
+            emp, id, request.OperacaoId, request.PagamentoId, request.Valor, request.Metodo, request.Motivo,
+            request.Referencia, request.ValorJaDevolvido, currentUser.UsuarioId, User.FindFirst("nome")?.Value,
+            currentUser.Nivel), ct)));
+
     [SwaggerOperation(Summary = "Reemitir o link de pagamento do pedido (Mercado Pago)")]
     [HttpPost("{id}/cobranca")]
     [Authorize(Policy = "Operador")]

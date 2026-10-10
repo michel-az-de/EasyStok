@@ -1,3 +1,16 @@
+.areaAtendimento {
+  position: relative; height: 100%; min-height: 0;
+  /* A densidade do protótipo, limitada ao Balcão e às suas janelas. */
+  --t-micro: .8125rem;
+  --t-apoio: .9375rem;
+  --t-corpo: 1rem;
+  --t-forte: 1.0625rem;
+  --t-titulo: 1.25rem;
+  --t-valor: 1.5rem;
+  --t-display: 2rem;
+  font-size: var(--t-corpo);
+}
+
 .app { display: flex; flex-direction: column; height: 100%; min-height: 100%; background: var(--fundo); }
 
 /* Topo em material de vidro (rodada 6): marca à esquerda, tema logo ao lado,
@@ -216,6 +229,7 @@
 /* 13: as três colunas com a mesma faixa de título, de 64 px, e ícone antes. */
 .tituloColuna { min-height: 64px; gap: 10px; }
 .tituloColuna > svg { color: var(--tinta-3); }
+.tituloCompacto { min-height: 52px; padding-block: 2px; }
 /* 15: divisor fino antes do Simular e quem atende no pé do trilho. */
 .espacoTrilho { display: flex; align-items: flex-end; justify-content: center; }
 .espacoTrilho::after { content: ''; width: 32px; height: 1px; margin-bottom: 4px; background: var(--linha-media); }

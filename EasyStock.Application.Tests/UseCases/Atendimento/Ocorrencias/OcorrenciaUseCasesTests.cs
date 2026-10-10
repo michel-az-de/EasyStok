@@ -1,6 +1,6 @@
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Notifications;
-using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
@@ -31,7 +31,8 @@ public class OcorrenciaUseCasesTests
     private readonly IEscaladorConversa _escalador = Substitute.For<IEscaladorConversa>();
     private readonly IOperacaoEventPublisher _eventos = Substitute.For<IOperacaoEventPublisher>();
     private readonly ICobrancaPedidoRepository _cobrancas = Substitute.For<ICobrancaPedidoRepository>();
-    private readonly IEstornoPedidoGateway _gateway = Substitute.For<IEstornoPedidoGateway>();
+    private readonly IEstornosOnlineService _estornos = Substitute.For<IEstornosOnlineService>();
+    private readonly Guid _pagamentoId = Guid.NewGuid();
     private readonly IClienteCrmRepository _crm = Substitute.For<IClienteCrmRepository>();
     private readonly INotificadorService _notificador = Substitute.For<INotificadorService>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
@@ -41,6 +42,7 @@ public class OcorrenciaUseCasesTests
         var pedido = Pedido.Criar(_empresaId, origem: "whatsapp");
         pedido.ClienteId = _clienteId;
         _pedidos.GetByIdAsync(_empresaId, pedido.Id).Returns(pedido);
+        _estornos.ConsultarAsync(_empresaId, pedido.Id, Arg.Any<CancellationToken>()).Returns(new EstornosOnlineResult([], []));
         return pedido;
     }
 
@@ -50,6 +52,8 @@ public class OcorrenciaUseCasesTests
             Agora.AddHours(1), 1, Agora.AddMinutes(-30));
         c.MarcarPaga("pay-123", valorPago, "pix", Agora.AddMinutes(-20));
         _cobrancas.ListarDoPedidoAsync(_empresaId, pedidoId, Arg.Any<CancellationToken>()).Returns(new[] { c });
+        _estornos.ConsultarAsync(_empresaId, pedidoId, Arg.Any<CancellationToken>()).Returns(new EstornosOnlineResult(
+            [new(_pagamentoId, "pix", valorPago, Agora, 0, 0, valorPago, false)], []));
         return c;
     }
 
@@ -71,7 +75,7 @@ public class OcorrenciaUseCasesTests
         new(_repo, _pedidos, _conversas, _escalador, _eventos, _uow, new RelogioFixo(Agora));
 
     private ReembolsarPedidoUseCase Reembolsar() =>
-        new(_cobrancas, _gateway, _crm, _notificador);
+        new(_cobrancas, _estornos, _crm, _notificador);
 
     private ResolverOcorrenciaUseCase Resolver() =>
         new(_repo, Reembolsar(), _uow, new RelogioFixo(Agora));
@@ -116,10 +120,10 @@ public class OcorrenciaUseCasesTests
         CobrancaPaga(pedido.Id, 80m);
         ClienteComTelefone();
         var ocorrencia = OcorrenciaAberta(pedido.Id);
-        _gateway.EstornarAsync("pay-123", 30m, ocorrencia.Id.ToString(), Arg.Any<CancellationToken>())
-            .Returns(EstornoPedidoResult.Ok("ref-9"));
+        _estornos.SolicitarAsync(Arg.Any<SolicitarEstornoOnlineInput>(), Arg.Any<CancellationToken>())
+            .Returns(new PedidoEstornoOnline { Id = ocorrencia.Id, Valor = 30m, Situacao = PedidoEstornoOnline.Confirmado, EstornoExternoId = "ref-9" });
 
-        var r = await Reembolsar().ExecuteAsync(ocorrencia, 30m, "bolo azedo", Agora);
+        var r = await Reembolsar().ExecuteAsync(ocorrencia, 30m, "bolo azedo", Agora, Guid.NewGuid(), "Dona", NivelAcesso.Admin);
 
         r.Situacao.Should().Be(SituacaoReembolso.Efetuado);
         ocorrencia.ReembolsoValor.Should().Be(30m);
@@ -140,13 +144,13 @@ public class OcorrenciaUseCasesTests
         CobrancaPaga(pedido.Id, 80m);
         ClienteComTelefone();
         var ocorrencia = OcorrenciaAberta(pedido.Id);
-        _gateway.EstornarAsync("pay-123", 30m, ocorrencia.Id.ToString(), Arg.Any<CancellationToken>())
-            .Returns(EstornoPedidoResult.Ok("ref-9"));
+        _estornos.SolicitarAsync(Arg.Any<SolicitarEstornoOnlineInput>(), Arg.Any<CancellationToken>())
+            .Returns(new PedidoEstornoOnline { Id = ocorrencia.Id, Valor = 30m, Situacao = PedidoEstornoOnline.Confirmado, EstornoExternoId = "ref-9" });
         string? payload = null;
         await _notificador.EnfileirarEventoAsync(TipoEventoNotificacao.ReembolsoEfetuado, _empresaId,
             Arg.Do<string>(p => payload = p), ocorrencia.Id, Arg.Any<CancellationToken>());
 
-        await Reembolsar().ExecuteAsync(ocorrencia, 30m, "bolo azedo", Agora);
+        await Reembolsar().ExecuteAsync(ocorrencia, 30m, "bolo azedo", Agora, Guid.NewGuid(), "Dona", NivelAcesso.Admin);
 
         payload.Should().NotBeNull();
         var json = System.Text.Json.JsonDocument.Parse(payload!).RootElement;
@@ -163,10 +167,10 @@ public class OcorrenciaUseCasesTests
         CobrancaPaga(pedido.Id, 80m);
         ClienteComTelefone(telefone: null);
         var ocorrencia = OcorrenciaAberta(pedido.Id);
-        _gateway.EstornarAsync("pay-123", 30m, ocorrencia.Id.ToString(), Arg.Any<CancellationToken>())
-            .Returns(EstornoPedidoResult.Ok("ref-9"));
+        _estornos.SolicitarAsync(Arg.Any<SolicitarEstornoOnlineInput>(), Arg.Any<CancellationToken>())
+            .Returns(new PedidoEstornoOnline { Id = ocorrencia.Id, Valor = 30m, Situacao = PedidoEstornoOnline.Confirmado, EstornoExternoId = "ref-9" });
 
-        var r = await Reembolsar().ExecuteAsync(ocorrencia, 30m, "bolo azedo", Agora);
+        var r = await Reembolsar().ExecuteAsync(ocorrencia, 30m, "bolo azedo", Agora, Guid.NewGuid(), "Dona", NivelAcesso.Admin);
 
         r.Situacao.Should().Be(SituacaoReembolso.Efetuado, "o dinheiro já voltou; só o aviso não tem para onde ir");
         await _notificador.DidNotReceiveWithAnyArgs().EnfileirarEventoAsync(default, default, default!, default, default);
@@ -179,10 +183,10 @@ public class OcorrenciaUseCasesTests
         CobrancaPaga(pedido.Id, 80m);
         var ocorrencia = OcorrenciaAberta(pedido.Id);
 
-        var act = () => Reembolsar().ExecuteAsync(ocorrencia, 80.01m, "x", Agora);
+        var act = () => Reembolsar().ExecuteAsync(ocorrencia, 80.01m, "x", Agora, Guid.NewGuid(), "Dona", NivelAcesso.Admin);
 
         await act.Should().ThrowAsync<UseCaseValidationException>();
-        await _gateway.DidNotReceiveWithAnyArgs().EstornarAsync(default!, default, default!, default);
+        await _estornos.DidNotReceiveWithAnyArgs().SolicitarAsync(default!, default);
     }
 
     [Fact]
@@ -192,13 +196,13 @@ public class OcorrenciaUseCasesTests
         _cobrancas.ListarDoPedidoAsync(_empresaId, pedido.Id, Arg.Any<CancellationToken>()).Returns(Array.Empty<CobrancaPedido>());
         var ocorrencia = OcorrenciaAberta(pedido.Id);
 
-        var r = await Reembolsar().ExecuteAsync(ocorrencia, 25m, "pix manual", Agora);
+        var r = await Reembolsar().ExecuteAsync(ocorrencia, 25m, "pix manual", Agora, Guid.NewGuid(), "Dona", NivelAcesso.Admin);
 
         r.Situacao.Should().Be(SituacaoReembolso.ManualNecessario);
         r.Codigo.Should().Be(ReembolsarPedidoUseCase.CodigoReembolsoManual);
         ocorrencia.ReembolsoValor.Should().Be(25m);
         ocorrencia.ReembolsoEm.Should().BeNull();
-        await _gateway.DidNotReceiveWithAnyArgs().EstornarAsync(default!, default, default!, default);
+        await _estornos.DidNotReceiveWithAnyArgs().SolicitarAsync(default!, default);
     }
 
     [Fact]
@@ -207,10 +211,10 @@ public class OcorrenciaUseCasesTests
         var pedido = NovoPedido();
         CobrancaPaga(pedido.Id, 80m);
         var ocorrencia = OcorrenciaAberta(pedido.Id);
-        _gateway.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(EstornoPedidoResult.Falha("insufficient_funds"));
+        _estornos.SolicitarAsync(Arg.Any<SolicitarEstornoOnlineInput>(), Arg.Any<CancellationToken>())
+            .Returns(new PedidoEstornoOnline { Id = ocorrencia.Id, Situacao = PedidoEstornoOnline.Recusado });
 
-        var r = await Reembolsar().ExecuteAsync(ocorrencia, 10m, "x", Agora);
+        var r = await Reembolsar().ExecuteAsync(ocorrencia, 10m, "x", Agora, Guid.NewGuid(), "Dona", NivelAcesso.Admin);
 
         r.Situacao.Should().Be(SituacaoReembolso.Falhou);
         ocorrencia.ReembolsoEm.Should().BeNull();
@@ -231,7 +235,7 @@ public class OcorrenciaUseCasesTests
         ocorrencia.Resolucao.Should().Be("cupom de 10% na próxima");
         ocorrencia.ResolvidaPorUsuarioId.Should().Be(usuario);
         ocorrencia.ResolvidaEm.Should().Be(Agora);
-        await _gateway.DidNotReceiveWithAnyArgs().EstornarAsync(default!, default, default!, default);
+        await _estornos.DidNotReceiveWithAnyArgs().SolicitarAsync(default!, default);
         await _uow.Received(1).CommitAsync();
     }
 
@@ -241,11 +245,11 @@ public class OcorrenciaUseCasesTests
         var pedido = NovoPedido();
         CobrancaPaga(pedido.Id, 80m);
         var ocorrencia = OcorrenciaAberta(pedido.Id);
-        _gateway.EstornarAsync("pay-123", 80m, ocorrencia.Id.ToString(), Arg.Any<CancellationToken>())
-            .Returns(EstornoPedidoResult.Ok("ref-1"));
+        _estornos.SolicitarAsync(Arg.Any<SolicitarEstornoOnlineInput>(), Arg.Any<CancellationToken>())
+            .Returns(new PedidoEstornoOnline { Id = ocorrencia.Id, Valor = 80m, Situacao = PedidoEstornoOnline.Confirmado, EstornoExternoId = "ref-1" });
 
         var r = await Resolver().ExecuteAsync(new ResolverOcorrenciaInput(
-            _empresaId, ocorrencia.Id, Guid.NewGuid(), "devolvido", Reembolsar: true, Valor: null));
+            _empresaId, ocorrencia.Id, Guid.NewGuid(), "devolvido", Reembolsar: true, Valor: null, NivelSolicitante: NivelAcesso.Admin));
 
         r!.Reembolso!.Situacao.Should().Be(SituacaoReembolso.Efetuado);
         ocorrencia.Status.Should().Be(StatusOcorrencia.Resolvida);
@@ -258,15 +262,33 @@ public class OcorrenciaUseCasesTests
         var pedido = NovoPedido();
         CobrancaPaga(pedido.Id, 80m);
         var ocorrencia = OcorrenciaAberta(pedido.Id);
-        _gateway.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(EstornoPedidoResult.Falha("erro"));
+        _estornos.SolicitarAsync(Arg.Any<SolicitarEstornoOnlineInput>(), Arg.Any<CancellationToken>())
+            .Returns(new PedidoEstornoOnline { Id = ocorrencia.Id, Situacao = PedidoEstornoOnline.Recusado });
 
         var r = await Resolver().ExecuteAsync(new ResolverOcorrenciaInput(
-            _empresaId, ocorrencia.Id, Guid.NewGuid(), "devolvido", Reembolsar: true, Valor: 10m));
+            _empresaId, ocorrencia.Id, Guid.NewGuid(), "devolvido", Reembolsar: true, Valor: 10m, NivelSolicitante: NivelAcesso.Admin));
 
         r!.Reembolso!.Situacao.Should().Be(SituacaoReembolso.Falhou);
         ocorrencia.Status.Should().Be(StatusOcorrencia.Aberta);
         await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task Atendimento_nao_reembolsa_e_pendente_nao_resolve_ocorrencia()
+    {
+        var pedido = NovoPedido();
+        CobrancaPaga(pedido.Id, 80);
+        var ocorrencia = OcorrenciaAberta(pedido.Id);
+        var input = new ResolverOcorrenciaInput(_empresaId, ocorrencia.Id, Guid.NewGuid(), "reembolso", true, 30);
+        await FluentActions.Invoking(() => Resolver().ExecuteAsync(input)).Should().ThrowAsync<UnauthorizedAccessException>();
+        await _estornos.DidNotReceiveWithAnyArgs().SolicitarAsync(default!, default);
+        _estornos.SolicitarAsync(Arg.Any<SolicitarEstornoOnlineInput>(), Arg.Any<CancellationToken>())
+            .Returns(new PedidoEstornoOnline { Id = ocorrencia.Id, Situacao = PedidoEstornoOnline.Pendente });
+        var r = await Resolver().ExecuteAsync(input with { NivelSolicitante = NivelAcesso.Admin });
+        r!.Reembolso!.Codigo.Should().Be("estorno_pendente");
+        ocorrencia.EstaAberta.Should().BeTrue();
+        ocorrencia.ReembolsoEm.Should().BeNull();
+        await _notificador.DidNotReceiveWithAnyArgs().EnfileirarEventoAsync(default, default, default!, default, default);
     }
 
     [Fact]

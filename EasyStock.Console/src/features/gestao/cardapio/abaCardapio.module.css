@@ -8,6 +8,10 @@
 .acoesReceita > :last-child { margin-left: auto; }
 .editorReceita { width: 100%; }
 .descricao { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); max-width: 64ch; }
+.orientacoes { flex: 1 1 320px; min-width: 0; }
+.ajudaControles { margin-top: var(--e-1); font-size: var(--t-apoio); }
+.ajudaControles summary { width: fit-content; color: var(--marca); cursor: pointer; padding-block: var(--e-2); }
+.ajudaControles[open] summary { margin-bottom: var(--e-1); }
 .busca {
   flex: 0 1 280px; min-width: 0; max-width: 100%; min-height: var(--toque); padding: 0 var(--e-3);
   border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1);
