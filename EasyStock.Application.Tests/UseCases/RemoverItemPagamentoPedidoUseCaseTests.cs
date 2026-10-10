@@ -16,6 +16,8 @@ public class RemoverItemPagamentoPedidoUseCaseTests
 {
     private readonly IPedidoRepository _repo = Substitute.For<IPedidoRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository _cobrancas =
+        Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>();
 
     public RemoverItemPagamentoPedidoUseCaseTests() =>
         _uow.SetupExecuteInTransactionSemRetry<EasyStock.Application.UseCases.Pedidos.PedidoResult?>();
@@ -30,7 +32,7 @@ public class RemoverItemPagamentoPedidoUseCaseTests
                 Substitute.For<ILogger<PedidoEstoqueIntegrationService>>()),
             _uow, Substitute.For<ILogger<RemoverItemPedidoUseCase>>());
     private RemoverPagamentoPedidoUseCase PagUC() =>
-        new(_repo, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>(), _uow,
+        new(_repo, _cobrancas, _uow,
             Substitute.For<ILogger<RemoverPagamentoPedidoUseCase>>(), QuitacaoPedidoTeste.Criar(_repo));
 
     private static PedidoItem NovoItem(Guid pedidoId, string nome, decimal qtd, decimal preco) => new()
@@ -93,17 +95,40 @@ public class RemoverItemPagamentoPedidoUseCaseTests
         var pedido = Pedido.Criar(empresaId);
         var pag = new PedidoPagamento
         {
-            Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "pix", Valor = 30m, PagoEm = DateTime.UtcNow,
-            RegistradoPorNome = "Mercado Pago", Referencia = "pay-9"
+            Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "pix", Valor = 30m, PagoEm = DateTime.UtcNow, Referencia = "pay-9"
         };
         pedido.Pagamentos.Add(pag);
         _repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        var cobranca = EasyStock.Domain.Entities.Pagamentos.CobrancaPedido.CriarOnline(empresaId, pedido.Id, 30m, "pref-1", "https://mp.test/pref-1",
+            DateTime.UtcNow.AddMinutes(30), 1, DateTime.UtcNow);
+        cobranca.MarcarPaga("pay-9", 30m, "pix", DateTime.UtcNow);
+        _cobrancas.ListarDoPedidoAsync(empresaId, pedido.Id, Arg.Any<CancellationToken>()).Returns(new List<EasyStock.Domain.Entities.Pagamentos.CobrancaPedido> { cobranca });
 
         var act = () => PagUC().ExecuteAsync(new RemoverPagamentoPedidoCommand(empresaId, pedido.Id, pag.Id));
 
         await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*estorno*");
         pedido.Pagamentos.Should().ContainSingle();
         await _uow.DidNotReceive().CommitAsync();
+    }
+
+    // O nome vem de quem registrou e não prova nada: sem cobrança online por trás, o pagamento é manual
+    // e continua removível (senão um nome falsificado criaria recebimento sem saída nenhuma).
+    [Fact]
+    public async Task RemoverPagamento_ComNomeMercadoPagoMasSemCobrancaOnline_Remove()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = Pedido.Criar(empresaId);
+        var pag = new PedidoPagamento
+        {
+            Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "pix", Valor = 30m, PagoEm = DateTime.UtcNow,
+            RegistradoPorNome = "Mercado Pago"
+        };
+        pedido.Pagamentos.Add(pag);
+        _repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        await PagUC().ExecuteAsync(new RemoverPagamentoPedidoCommand(empresaId, pedido.Id, pag.Id));
+
+        pedido.Pagamentos.Should().BeEmpty();
     }
 
     [Theory]

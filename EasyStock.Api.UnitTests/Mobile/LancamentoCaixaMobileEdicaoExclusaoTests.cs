@@ -189,8 +189,21 @@ public sealed class LancamentoCaixaMobileEdicaoExclusaoTests : IDisposable
     [Fact]
     public async Task Excluir_LancamentoAindaSemMovimento_NaoViraMovimentoDepois()
     {
-        // O vinculo com o ERP roda depois do SaveChanges, e o envio tem um SaveChanges so no fim:
-        // lancar e excluir offline chegam juntos, com o lancamento ainda nao gravado (#1540).
+        // O vinculo com o ERP roda depois do SaveChanges; a exclusao pode chegar antes dele.
+        await AplicarAsync("cashEntry.upsert", Dto("expense", 30m, "Gas", "dinheiro"));
+        await AplicarAsync("cashEntry.delete", new { id = Lancamento });
+
+        await _linker.ExecuteAsync([Lancamento], _empresaId);
+
+        LancamentoSalvo().DeletedAt.Should().NotBeNull();
+        Movimentos().Should().BeEmpty("lancamento excluido nao entra no caixa do ERP");
+    }
+
+    [Fact]
+    public async Task Excluir_NoMesmoEnvioDoLancamento_NaoViraMovimentoDepois()
+    {
+        // O envio tem um SaveChanges so no fim: lancar e excluir offline chegam juntos, com o
+        // lancamento ainda nao gravado (#1540).
         await AplicarAsync("cashEntry.upsert", Dto("expense", 30m, "Gas", "dinheiro"), salvar: false);
         await AplicarAsync("cashEntry.delete", new { id = Lancamento });
 

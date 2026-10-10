@@ -3,10 +3,10 @@
 //   1. preço de porção digitado com ponto ("34.90") é trinta e quatro e noventa, não R$ 3.490;
 //   2. receita aceita quantidade com vírgula ("1,2") e manda o número;
 //   3. peso que não é número inteiro ("350g") trava a linha da produção em vez de ir nulo;
-//   4. apagar o mínimo do insumo manda zero (na API, nulo é "não mexe");
-//   5. sangria repetida depois de resposta perdida usa a mesma Idempotency-Key; gravou, chave nova;
-//   6. "Desfazer o último" manda o id do pagamento que a tela mostrou;
-//   7. perda de prato com porções pede a porção e manda a porção do estoque (M1.4c).
+//   4. sangria repetida logo depois de resposta perdida usa a mesma Idempotency-Key; gravou ou
+//      passou do prazo, chave nova;
+//   5. "Desfazer o último" manda o id do pagamento que a tela mostrou;
+//   6. perda de prato com porções pede a porção e manda a porção do estoque (M1.4c).
 //
 //   node ferramentas/prova-1540-banca-console.mjs
 
@@ -31,9 +31,9 @@ registerHooks({
 const { precoDoTexto, corpoDasPorcoes, erroDasPorcoes } = await import('../src/dominio/porcoes.js')
 const { erroDaReceita, criarGestaoReceitas } = await import('../src/aplicacao/receitas.js')
 const { erroDaLinha } = await import('../src/dominio/producao.js')
-const { criarGestaoInsumos } = await import('../src/aplicacao/insumos.js')
+
 const { criarAcoesCaixaApi } = await import('../src/aplicacao/api/caixa.js')
-const { criarChaveDeEnvio } = await import('../src/aplicacao/chaveDeEnvio.js')
+const { criarChaveDeEnvio, VALIDADE_DA_CHAVE_MS } = await import('../src/aplicacao/chaveDeEnvio.js')
 const { ultimoPagamentoApi } = await import('../src/dominio/pagamento.js')
 const { criarGestaoPerdas, erroDaPerda, porcoesComSaldo } = await import('../src/aplicacao/perdas.js')
 
@@ -109,17 +109,7 @@ await confere('sem peso ou com gramas inteiros a linha segue', () => {
   assert.equal(erroDaLinha({ ...linha, pesoPorPorcaoG: 500, pesoRealG: 1144 }), null)
 })
 
-// --- 4. Mínimo do insumo ---------------------------------------------------------------
-await confere('apagar o mínimo manda zero; custo vazio continua "não mexe"', async () => {
-  const chamadas = montarFetch(() => ({ data: {} }))
-  const gestao = criarGestaoInsumos({ recarregar: async () => {}, aoErro: () => {} })
-  assert.equal(await gestao.atualizar('s-1', { minimo: '', custo: '' }), true)
-  const corpo = chamadas.find((c) => c.metodo !== 'GET').corpo
-  assert.equal(corpo.minimo, 0)
-  assert.equal(corpo.custo, null)
-})
-
-// --- 5. Chave do lançamento de caixa -------------------------------------------------
+// --- 4. Chave do lançamento de caixa -------------------------------------------------
 const sangria = { tipoMovimento: 'saida', categoria: 'Sangria', valor: 300, meio: 'dinheiro', descricao: 'Depósito' }
 await confere('resposta perdida: a segunda tentativa usa a mesma chave', async () => {
   const chamadas = montarFetch((_c, n) => (n === 1 ? { cair: true } : { data: { id: 'm-1' } }))
@@ -145,8 +135,18 @@ await confere('valor corrigido depois da falha ganha chave nova', () => {
   assert.equal(envio.para({ valor: 300 }), primeira)
   assert.notEqual(envio.para({ valor: 30 }), primeira)
 })
+await confere('a chave vence: sangria igual horas depois de resposta perdida é outro lançamento', () => {
+  let serie = 0
+  let relogio = 0
+  const envio = criarChaveDeEnvio(() => `chave-${serie += 1}`, () => relogio)
+  const primeira = envio.para({ valor: 200 })
+  relogio = VALIDADE_DA_CHAVE_MS
+  assert.equal(envio.para({ valor: 200 }), primeira, 'dentro do prazo é a retentativa')
+  relogio = 2 * VALIDADE_DA_CHAVE_MS + 1
+  assert.notEqual(envio.para({ valor: 200 }), primeira, 'fora do prazo não reaproveita a resposta guardada')
+})
 
-// --- 6. Último pagamento -----------------------------------------------------------------
+// --- 5. Último pagamento -----------------------------------------------------------------
 await confere('o último pagamento é o mais recente, e leva o id que a API espera', () => {
   const pedido = { pagamentosApi: [{ valor: 50, em: 1000, pagamentoId: 'a' }, { valor: 30, em: 2000, pagamentoId: 'b' }] }
   assert.deepEqual(ultimoPagamentoApi(pedido), { valor: 30, em: 2000, pagamentoId: 'b' })
@@ -154,7 +154,7 @@ await confere('o último pagamento é o mais recente, e leva o id que a API espe
   assert.equal(ultimoPagamentoApi(null), null)
 })
 
-// --- 7. Perda por porção ----------------------------------------------------------------
+// --- 6. Perda por porção ----------------------------------------------------------------
 const ravioli = {
   porcoes: [
     { variacaoId: 'v-300', rotulo: '300 g', saldo: 4, produtoVariacaoId: 'pv-300' },

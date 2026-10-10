@@ -46,11 +46,6 @@ public sealed class CardapioDoDiaComandaUseCase(
         var (_, item) = await ItemDaVitrineAsync(input.EmpresaId, input.CardapioItemId, ct);
         if (item.ProdutoId is not { } produtoId)
             throw new UseCaseValidationException("Este item não controla saldo: não está ligado a um produto do estoque.");
-        // M1.4c (D-M1-03): o saldo de prato com porções é de cada porção. A contagem única era repartida
-        // entre os lotes por data de entrada, sem olhar a porção, e deixava as duas erradas.
-        if (item.TemVariacoes())
-            throw new UseCaseValidationException(
-                "Este prato tem porções e o saldo é de cada uma. Acerte a diferença em Perdas ou na Produção do dia, escolhendo a porção.");
 
         return await ajustarSaldo.ExecuteAsync(new AjustarSaldoRapidoInput(
             input.EmpresaId, input.UsuarioId, produtoId, input.LojaId, input.QuantidadeContada, input.Motivo), ct);

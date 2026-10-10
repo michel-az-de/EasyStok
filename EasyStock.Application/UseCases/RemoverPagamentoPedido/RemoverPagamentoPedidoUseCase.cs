@@ -39,7 +39,7 @@ public class RemoverPagamentoPedidoUseCase(
             if (pag == null) return CriarPedidoUseCase.Map(pedido);
 
             // Recebimento do Mercado Pago apagado deixava a cobrança paga sem pagamento: nem estorno nem ocorrência fechavam.
-            if (!ConsultarEstornosManuaisUseCase.EhManual(pag, await cobrancas.ListarDoPedidoAsync(cmd.EmpresaId, pedido.Id, token)))
+            if (ConsultarEstornosManuaisUseCase.TemCobrancaOnline(pag, await cobrancas.ListarDoPedidoAsync(cmd.EmpresaId, pedido.Id, token)))
                 throw new UseCaseValidationException("Recebimento do Mercado Pago não se remove: use o estorno.");
 
             // Antes do preparo é o "marquei por engano" do atendimento. Depois, tirar dinheiro do pedido

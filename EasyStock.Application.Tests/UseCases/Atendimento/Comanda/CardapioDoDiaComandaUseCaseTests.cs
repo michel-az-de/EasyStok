@@ -94,19 +94,6 @@ public class CardapioDoDiaComandaUseCaseTests
         await _itens.Received(1).GetLotesParaAjusteAsync(EmpresaId, produtoId, null, Arg.Any<CancellationToken>());
     }
 
-    // #1540 (M1.4c): uma contagem só, repartida entre os lotes por data, bagunçava o saldo das duas porções.
-    [Fact]
-    public async Task AjustarSaldo_PratoComPorcoes_RecusaAContagemUnica()
-    {
-        var item = ItemDeProduto(Guid.NewGuid(), disponivel: true);
-        item.AdicionarVariacao(CardapioItemVariacao.Criar(item.Id, "300 g", 28m, ordemExibicao: 0, ehPadrao: true));
-
-        var act = () => Sut().AjustarSaldoAsync(new AjustarSaldoItemInput(EmpresaId, Guid.NewGuid(), item.Id, null, 4m, "contei"));
-
-        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*porções*");
-        await _itens.DidNotReceiveWithAnyArgs().GetLotesParaAjusteAsync(default, default, default, default);
-    }
-
     [Fact]
     public async Task AjustarSaldo_ItemAvulsoNaoControlaSaldo()
     {
