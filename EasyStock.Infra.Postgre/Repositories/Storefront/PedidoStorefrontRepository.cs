@@ -101,21 +101,6 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
             .ToListAsync(ct);
     }
 
-    public async Task<IReadOnlyList<Pedido>> GetEntreguesElegiveisPraAvaliacaoAsync(
-        DateTime entregueAntesDe,
-        int maxBatch = 50,
-        CancellationToken ct = default) =>
-        await db.Pedidos
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(p => p.Status == StatusPedidoMapper.Entregue
-                     && p.Origem == "storefront"
-                     && p.EntreguEm <= entregueAntesDe
-                     && p.AvaliacaoSolicitadaEm == null)
-            .OrderBy(p => p.EntreguEm)
-            .Take(maxBatch)
-            .ToListAsync(ct);
-
     public async Task<IReadOnlyList<Pedido>> ListarPorClienteAsync(
         Guid empresaId,
         Guid clienteId,
