@@ -55,17 +55,6 @@ public interface IPedidoStorefrontRepository
         CancellationToken ct = default);
 
     /// <summary>
-    /// Retorna pedidos Storefront com status <c>entregue</c>,
-    /// <c>entregue_em &lt;= entregueAntesDe</c> e <c>avaliacao_solicitada_em IS NULL</c>.
-    /// Inclui dados do cliente (<see cref="Pedido.ClienteNome"/>, <see cref="Pedido.ClienteTelefone"/>)
-    /// para envio do WhatsApp pelo handler de avaliação.
-    /// </summary>
-    Task<IReadOnlyList<Pedido>> GetEntreguesElegiveisPraAvaliacaoAsync(
-        DateTime entregueAntesDe,
-        int maxBatch = 50,
-        CancellationToken ct = default);
-
-    /// <summary>
     /// Lista os pedidos storefront do cliente autenticado dentro do tenant
     /// (<paramref name="empresaId"/>), ordenados por <c>CriadoEm DESC</c>.
     /// Inclui <see cref="Pedido.Itens"/> via eager-load para o use case montar
