@@ -128,6 +128,9 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 if (linkEmpresa is null)
                     throw new CredenciaisInvalidasException();
             }
+            // Desativar zera o vínculo, não o usuário: sem vínculo ativo não há sessão a abrir.
+            else if (usuario.Empresas?.Any(e => e.Ativo) != true)
+                throw new CredenciaisInvalidasException();
 
             var nivel = NivelAcesso.Visualizador;
             IReadOnlyCollection<Permissao> permissoes = [];

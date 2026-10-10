@@ -172,6 +172,8 @@ public class AuthControllerTests
         // #1352: logar em outro aparelho revoga só o refresh dos outros; o JWT deles segue valendo, então o
         // carimbo de sessão não pode mudar no login (logar o tablet derrubaria o balcão).
         var usuario = Usuario.Criar("Ana", "ana@casadababa.com", "hash");
+        // Sem vínculo ativo o login é recusado (#1541).
+        usuario.Empresas.Add(new UsuarioEmpresa { UsuarioId = usuario.Id, EmpresaId = Guid.NewGuid(), Ativo = true });
         _usuarioRepository.GetByEmailAsync(usuario.Email).Returns(usuario);
         _passwordHasher.Verify("Senha@12345", "hash").Returns(true);
         _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() };

@@ -68,14 +68,19 @@ internal static class DiagnosticoHtmlRenderer
                 if (e.Level is "ERROR" or "FATAL")
                 {
                     var badges = new System.Text.StringBuilder("<span class='log-ctx'>");
+                    // #955: estes campos saem do log e podem ter vindo de header do cliente.
+                    // O filtro lê o data-cid; valor de log não entra em JavaScript.
                     if (!string.IsNullOrEmpty(e.CorrelationId))
-                        badges.Append($"<span title='{e.CorrelationId}' style='cursor:pointer' onclick='document.getElementById(\"logFilter\").value=\"{e.CorrelationId[..Math.Min(8, e.CorrelationId.Length)]}\";filterLogs()'>CID:{e.CorrelationId[..Math.Min(8, e.CorrelationId.Length)]}</span>");
+                    {
+                        var cidCurto = Abreviado(e.CorrelationId);
+                        badges.Append($"<span title='{System.Net.WebUtility.HtmlEncode(e.CorrelationId)}' data-cid='{cidCurto}' style='cursor:pointer' onclick='document.getElementById(\"logFilter\").value=this.dataset.cid;filterLogs()'>CID:{cidCurto}</span>");
+                    }
                     if (!string.IsNullOrEmpty(e.ClientIp))
-                        badges.Append($"<span>IP:{e.ClientIp}</span>");
+                        badges.Append($"<span>IP:{System.Net.WebUtility.HtmlEncode(e.ClientIp)}</span>");
                     if (!string.IsNullOrEmpty(e.UserId))
-                        badges.Append($"<span>User:{e.UserId[..Math.Min(8, e.UserId.Length)]}</span>");
+                        badges.Append($"<span>User:{Abreviado(e.UserId)}</span>");
                     if (!string.IsNullOrEmpty(e.EmpresaId))
-                        badges.Append($"<span>Emp:{e.EmpresaId[..Math.Min(8, e.EmpresaId.Length)]}</span>");
+                        badges.Append($"<span>Emp:{Abreviado(e.EmpresaId)}</span>");
                     badges.Append("</span>");
                     if (badges.Length > "<span class='log-ctx'></span>".Length) ctx = badges.ToString();
                 }
@@ -304,6 +309,8 @@ internal static class DiagnosticoHtmlRenderer
             });
         }
 
+        // Texto que veio de log, banco ou cadastro só entra em innerHTML depois daqui (#955).
+        function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
         function showToast(msg,type='info'){
             const c=document.getElementById('toastContainer');if(!c)return;
             const t=document.createElement('div');
@@ -448,7 +455,7 @@ internal static class DiagnosticoHtmlRenderer
                 if(!d.disponivel){el.innerHTML=`<span style='color:#f59e0b;font-size:.85rem'>${d.motivo||'Extensao nao disponivel'}</span>${d.instrucoesPgStatStatements?`<pre style='font-size:.75rem;color:#94a3b8;margin-top:.5rem;white-space:pre-wrap'>${d.instrucoesPgStatStatements}</pre>`:''}`;return;}
                 if(!d.queries||!d.queries.length){el.innerHTML="<span style='color:#22c55e'>Nenhuma query lenta encontrada ✓</span>";return;}
                 el.innerHTML="<table style='width:100%;border-collapse:collapse;font-size:.8rem;margin-top:.5rem'><thead><tr style='color:#64748b;border-bottom:1px solid #334155'><th style='text-align:left;padding:.3rem .5rem'>Query</th><th style='padding:.3rem .5rem'>Calls</th><th style='padding:.3rem .5rem'>Avg ms</th><th style='padding:.3rem .5rem'>P95 ms</th><th style='padding:.3rem .5rem'>Rows</th></tr></thead><tbody>"
-                    +d.queries.map(q=>`<tr style='border-bottom:1px solid #1e293b'><td style='font-family:monospace;font-size:.75rem;padding:.25rem .5rem;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' title='${q.query||""}'>${(q.query||"").substring(0,70)}${q.query&&q.query.length>70?"...":""}</td><td style='text-align:right;padding:.25rem .5rem'>${q.calls}</td><td style='text-align:right;padding:.25rem .5rem;color:${q.avgMs>1000?"#ef4444":q.avgMs>200?"#f59e0b":"#22c55e"}'>${(q.avgMs||0).toFixed(1)}</td><td style='text-align:right;padding:.25rem .5rem;color:#94a3b8'>${q.p95Ms?q.p95Ms.toFixed(1):"—"}</td><td style='text-align:right;padding:.25rem .5rem;color:#94a3b8'>${q.avgRows?(q.avgRows).toFixed(0):"—"}</td></tr>`).join("")
+                    +d.queries.map(q=>`<tr style='border-bottom:1px solid #1e293b'><td style='font-family:monospace;font-size:.75rem;padding:.25rem .5rem;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' title='${esc(q.query)}'>${esc((q.query||"").substring(0,70))}${q.query&&q.query.length>70?"...":""}</td><td style='text-align:right;padding:.25rem .5rem'>${q.calls}</td><td style='text-align:right;padding:.25rem .5rem;color:${q.avgMs>1000?"#ef4444":q.avgMs>200?"#f59e0b":"#22c55e"}'>${(q.avgMs||0).toFixed(1)}</td><td style='text-align:right;padding:.25rem .5rem;color:#94a3b8'>${q.p95Ms?q.p95Ms.toFixed(1):"—"}</td><td style='text-align:right;padding:.25rem .5rem;color:#94a3b8'>${q.avgRows?(q.avgRows).toFixed(0):"—"}</td></tr>`).join("")
                     +"</tbody></table>";
             }catch(e){el.innerHTML=`<span style='color:#ef4444'>Erro: ${e.message}</span>`;}
         }
@@ -462,7 +469,7 @@ internal static class DiagnosticoHtmlRenderer
                 if(!d.empresas||!d.empresas.length){el.innerHTML="<span style='color:#94a3b8'>Nenhuma empresa encontrada.</span>";return;}
                 el.innerHTML=`<div style='font-size:.75rem;color:#94a3b8;margin-bottom:.5rem'>Total: ${d.totalAnalisadas} | <span style='color:#22c55e'>OK: ${d.ok}</span>${d.degraded>0?` | <span style='color:#ef4444'>Falha: ${d.degraded}</span>`:""} | ${d.duracaoMs}ms</div>`
                     +"<div style='display:flex;flex-wrap:wrap;gap:.4rem'>"
-                    +d.empresas.map(e=>`<div style='border:1px solid ${e.status==="ok"?"#052e16":"#450a0a"};background:${e.status==="ok"?"#020617":"#1c1917"};border-radius:.4rem;padding:.4rem .6rem;font-size:.75rem'><div style='color:#f1f5f9;font-weight:600'>${e.nome}</div><div style='color:${e.status==="ok"?"#22c55e":"#ef4444"}'>${e.status==="ok"?"✓ OK":"✗ "+( e.erro||"Falha")} ${e.latenciaMs?e.latenciaMs+"ms":""}</div></div>`).join("")
+                    +d.empresas.map(e=>`<div style='border:1px solid ${e.status==="ok"?"#052e16":"#450a0a"};background:${e.status==="ok"?"#020617":"#1c1917"};border-radius:.4rem;padding:.4rem .6rem;font-size:.75rem'><div style='color:#f1f5f9;font-weight:600'>${esc(e.nome)}</div><div style='color:${e.status==="ok"?"#22c55e":"#ef4444"}'>${e.status==="ok"?"✓ OK":"✗ "+esc(e.erro||"Falha")} ${e.latenciaMs?e.latenciaMs+"ms":""}</div></div>`).join("")
                     +"</div>";
             }catch(e){el.innerHTML=`<span style='color:#ef4444'>Erro: ${e.message}</span>`;}
         }
@@ -510,7 +517,7 @@ internal static class DiagnosticoHtmlRenderer
                     const l=r.querySelector('.log-level')?.textContent||'';
                     const m=r.querySelector('.log-msg')?.textContent||'';
                     const lc=l==='ERROR'||l==='FATAL'?'color:#f87171':l==='WARN'?'color:#fbbf24':'color:#cbd5e1';
-                    return `<div class='inv-log-entry'><span style='color:#64748b'>${t}</span> <span style='${lc};font-weight:600'>${l}</span> <span style='color:#cbd5e1'>${m.substring(0,120)}</span></div>`;
+                    return `<div class='inv-log-entry'><span style='color:#64748b'>${esc(t)}</span> <span style='${lc};font-weight:600'>${esc(l)}</span> <span style='color:#cbd5e1'>${esc(m.substring(0,120))}</span></div>`;
                 }).join('');
             } else {
                 html+=`<div style='font-size:.72rem;color:#475569'>Sem entradas visiveis no console para este padrao. Tente carregar mais logs ou ajustar o filtro.</div>`;
@@ -673,6 +680,9 @@ internal static class DiagnosticoHtmlRenderer
         </body></html>
         """;
     }
+
+    private static string Abreviado(string valor) =>
+        System.Net.WebUtility.HtmlEncode(valor[..Math.Min(8, valor.Length)]);
 
     private static string Badge(string status) => status switch
     {
