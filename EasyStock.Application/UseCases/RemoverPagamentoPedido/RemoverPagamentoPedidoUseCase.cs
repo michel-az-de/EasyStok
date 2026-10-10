@@ -33,6 +33,9 @@ public class RemoverPagamentoPedidoUseCase(
             var pag = pedido.Pagamentos.FirstOrDefault(p => p.Id == cmd.PagamentoId);
             if (pag == null) return CriarPedidoUseCase.Map(pedido);
 
+            if ((await repo.ListarEstornosManuaisAsync(cmd.EmpresaId, pedido.Id, token)).Any(e => e.PagamentoId == pag.Id))
+                throw new UseCaseValidationException("O recebimento possui devolução confirmada e deve permanecer no histórico.");
+
             // Remocao rastreada (mesmo motivo do RemoverItemPedidoUseCase, #768): FK
             // PedidoPagamento->Pedido required+Cascade, o DELETE participa do SaveChanges
             // do evento — atomico, sem ExecuteDeleteAsync imediato fora do UoW.

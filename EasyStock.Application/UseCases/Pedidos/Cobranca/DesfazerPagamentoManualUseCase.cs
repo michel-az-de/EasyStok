@@ -63,6 +63,9 @@ public sealed class DesfazerPagamentoManualUseCase(
         if (pagamento is null)
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.SemPagamento, "Pedido sem pagamento para desfazer.");
 
+        if ((await pedidoRepository.ListarEstornosManuaisAsync(input.EmpresaId, pedido.Id, ct)).Any(e => e.PagamentoId == pagamento.Id))
+            throw new CobrancaPedidoConflitoException("pagamento_com_devolucao", "O recebimento possui devolução confirmada e deve permanecer no histórico.");
+
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(input.EmpresaId, pedido.Id, ct);
         if (!string.IsNullOrEmpty(pagamento.Referencia)
             && cobrancas.Any(c => c.EhOnline && c.PagamentoExternoId == pagamento.Referencia))

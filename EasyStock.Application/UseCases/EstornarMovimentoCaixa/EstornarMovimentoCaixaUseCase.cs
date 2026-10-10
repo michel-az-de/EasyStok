@@ -24,6 +24,9 @@ public class EstornarMovimentoCaixaUseCase(
         if (mov == null) return null;
         if (mov.EstornadoEm != null) return AbrirCaixaUseCase.Map(mov);
 
+        if (mov.Origem == PedidoEstornoManual.OrigemCaixa)
+            throw new UseCaseValidationException("Esta saída confirma uma devolução ao cliente e não pode ser desfeita pelo Caixa.");
+
         // Abertura/fechamento definem a sessao do caixa; estornar quebraria saldo e reabertura.
         if (mov.Tipo is not ("entrada" or "saida"))
             throw new UseCaseValidationException("Somente movimentos de entrada ou saída podem ser estornados.");

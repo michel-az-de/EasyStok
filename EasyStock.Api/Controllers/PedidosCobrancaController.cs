@@ -8,6 +8,9 @@ public sealed record TrocarFormaPagamentoRequest(string Forma);
 
 public sealed record DesfazerPagamentoManualRequest(string Motivo, Guid? PagamentoId = null);
 
+public sealed record RegistrarEstornoManualRequest(Guid OperacaoId, Guid PagamentoId, decimal Valor,
+    string Metodo, string Motivo, string Referencia, bool ValorJaDevolvido, Guid? EmpresaId = null);
+
 /// <summary>
 /// Cobrança do pedido pela operadora (S11): reemitir o link, trocar a forma de pagamento e desfazer
 /// pagamento registrado à mão. Mesma rota de <see cref="PedidosController"/> (<c>api/pedidos</c>), em
@@ -28,8 +31,24 @@ public sealed class PedidosCobrancaController(
     GerarCobrancaPedidoUseCase gerarCobranca,
     TrocarFormaPagamentoPedidoUseCase trocarForma,
     DesfazerPagamentoManualUseCase desfazerPagamento,
-    ICurrentUserAccessor currentUser) : EasyStockControllerBase
+    ICurrentUserAccessor currentUser,
+    ConsultarEstornosManuaisUseCase consultarEstornos,
+    RegistrarEstornoManualUseCase registrarEstorno) : EasyStockControllerBase
 {
+    [HttpGet("{id}/estornos-manuais")]
+    [Authorize(Policy = "Operador")]
+    public Task<IActionResult> EstornosManuais(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await consultarEstornos.ExecuteAsync(emp, id, ct)));
+
+    [HttpPost("{id}/estornos-manuais")]
+    [Authorize(Policy = "Gerente")]
+    public Task<IActionResult> RegistrarEstornoManual(Guid id, [FromBody] RegistrarEstornoManualRequest request,
+        [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await registrarEstorno.ExecuteAsync(new(
+            emp, id, request.OperacaoId, request.PagamentoId, request.Valor, request.Metodo, request.Motivo,
+            request.Referencia, request.ValorJaDevolvido, currentUser.UsuarioId, User.FindFirst("nome")?.Value,
+            currentUser.Nivel), ct)));
+
     [SwaggerOperation(Summary = "Reemitir o link de pagamento do pedido (Mercado Pago)")]
     [HttpPost("{id}/cobranca")]
     [Authorize(Policy = "Operador")]

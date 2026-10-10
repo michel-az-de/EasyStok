@@ -12,6 +12,20 @@ public class DesfazerPagamentoManualUseCaseTests
     private static readonly Guid Usuario = Guid.NewGuid();
 
     [Fact]
+    public async Task Recebimento_com_devolucao_confirmada_nao_pode_ser_desfeito()
+    {
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Aguardando);
+        f.AdicionarPagamento(referencia: null);
+        var pagamento = f.Pedido.Pagamentos.Single();
+        f.PedidoRepo.ListarEstornosManuaisAsync(f.EmpresaId, f.Pedido.Id, Arg.Any<CancellationToken>())
+            .Returns(new List<EasyStock.Domain.Entities.PedidoEstornoManual> { new() { PagamentoId = pagamento.Id, Valor = 5 } });
+        await FluentActions.Invoking(() => f.Desfazer().ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "Engano")))
+            .Should().ThrowAsync<CobrancaPedidoConflitoException>().Where(e => e.Codigo == "pagamento_com_devolucao");
+        f.Pedido.Pagamentos.Should().ContainSingle();
+        await f.Uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
     public async Task VoltaAguardandoPagamento()
     {
         var f = new CobrancaPedidoFixture(StatusPedidoMapper.Aguardando);

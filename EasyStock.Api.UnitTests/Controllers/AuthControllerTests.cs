@@ -226,6 +226,8 @@ public class AuthControllerTests
             comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin or NivelAcesso.Gerente);
         acoes.GetProperty("cancelarPedidoPago").GetBoolean().Should().Be(
             comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin or NivelAcesso.Gerente);
+        acoes.GetProperty("devolverPagamentoManual").GetBoolean().Should().Be(
+            comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin or NivelAcesso.Gerente);
     }
 
     // ── N8: esqueci a senha ───────────────────────────────────────────────────────────────────

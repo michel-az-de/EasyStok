@@ -343,7 +343,8 @@ public class AuthController(
                 editarAtendimento = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin
                     && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 controlarLoja = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
-                cancelarPedidoPago = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado)
+                cancelarPedidoPago = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
+                devolverPagamentoManual = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado)
             }
         });
     }

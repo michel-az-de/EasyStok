@@ -54,6 +54,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.AtualizarCobrancaPorPagamentoUseCase>(); // S32
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.TrocarFormaPagamentoPedidoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.DesfazerPagamentoManualUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.ConsultarEstornosManuaisUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.RegistrarEstornoManualUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.ProcessarCobrancaVencidaUseCase>();
         services.AddScoped<EasyStock.Application.Services.Atendimento.AvisoCobrancaConversa>();
 
