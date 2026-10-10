@@ -69,6 +69,7 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
             new MobileSaleSyncService(_db, NullLogger<MobileSaleSyncService>.Instance),
             broker,
             produtoRepo,
+            DispatcherDeTeste.EstornoDeCaixa(_db),
             NullLogger<SyncMutationDispatcher>.Instance);
 
         // O vinculo com o ERP (linkers) roda depois do SaveChanges e fica fora destes cenarios.

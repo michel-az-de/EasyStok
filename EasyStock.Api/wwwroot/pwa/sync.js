@@ -575,6 +575,43 @@
     if (window.cdbApp) window.cdbApp.setPendingSync(q.length);
   }
 
+  // ---- #1520 (ADR-0060): exclusao de lancamento de caixa ----
+  // E mutation explicita ("cashEntry.delete"), nascida da acao do operador. Nunca por
+  // ausencia: purgeOldData e clearTestData tiram lancamentos do aparelho e isso nao pode
+  // virar exclusao no servidor. A pendencia fica gravada enquanto o "Desfazer" esta na tela;
+  // se o app fechar nesse intervalo, o boot confirma (o "Desfazer" ja nao existe).
+  const CASH_EXCLUSOES_KEY = 'cdb-cash-exclusoes-pendentes';
+  function _exclusoesPendentes() {
+    try { return JSON.parse(localStorage.getItem(CASH_EXCLUSOES_KEY) || '{}') || {}; } catch (_) { return {}; }
+  }
+  function _salvarExclusoesPendentes(p) {
+    try { localStorage.setItem(CASH_EXCLUSOES_KEY, JSON.stringify(p)); } catch (_) {}
+  }
+  function agendarExclusaoLancamento(entry) {
+    if (!entry || !entry.id) return;
+    const p = _exclusoesPendentes();
+    p[entry.id] = entry;
+    _salvarExclusoesPendentes(p);
+  }
+  function cancelarExclusaoLancamento(id) {
+    const p = _exclusoesPendentes();
+    if (!(id in p)) return;
+    delete p[id];
+    _salvarExclusoesPendentes(p);
+  }
+  function confirmarExclusaoLancamento(id) {
+    const p = _exclusoesPendentes();
+    if (!p[id]) return;
+    // Vai o lancamento inteiro: um servidor antigo trata como upsert e nao quebra o lote.
+    enqueue([{ type: 'cashEntry.delete', payload: p[id] }]);
+    delete p[id];
+    _salvarExclusoesPendentes(p);
+    flush();
+  }
+  function confirmarExclusoesPendentes() {
+    Object.keys(_exclusoesPendentes()).forEach(confirmarExclusaoLancamento);
+  }
+
   // ---- B4: schema migration de mutations ----
   // Registry de transformers: { targetVersion: (mutation) => migratedMutation }.
   // Inicialmente vazio porque PWA_MUTATION_SCHEMA_VERSION=1 e' o primeiro.
@@ -1125,6 +1162,8 @@
       }));
     }
     updatePendingCount();
+    // #1520: exclusao de lancamento que ficou no "Desfazer" quando o app fechou.
+    confirmarExclusoesPendentes();
     // A5: detecta reinstalacao + oferece restore via backup local. Roda em
     // paralelo com o resto do boot — emite evento cdb-restore-prompt que o
     // index.html escuta. Falha silenciosa nao bloqueia o app.
@@ -1913,7 +1952,7 @@
   let _mutationsBlocked = false;
   const CRITICAL_MUTATION_TYPES = {
     'order.upsert': true, 'order.update': true,
-    'cashEntry.upsert': true, 'cashEntry.update': true,
+    'cashEntry.upsert': true, 'cashEntry.update': true, 'cashEntry.delete': true,
     'batch.upsert': true, 'batch.update': true,
     'cashClosing.upsert': true,
     // #1520: movimento de estoque descartado nao tem como ser refeito depois.
@@ -2630,7 +2669,8 @@
       mutationSchemaVersion: PWA_MUTATION_SCHEMA_VERSION, // B4
       swSupported: () => _swSupported,                    // D2
       initQueueStore: _initQueueStore,                    // #1509
-      bloquearMutations: (v) => { _mutationsBlocked = !!v; } // #1520 (teste do bloqueio de OTA)
+      bloquearMutations: (v) => { _mutationsBlocked = !!v; }, // #1520 (teste do bloqueio de OTA)
+      confirmarExclusoesPendentes: confirmarExclusoesPendentes // #1520
     },
     hasPublicBackupPlugin: () => !!_getPublicBackupPlugin(),
     lastLocalBackupAt: () => parseInt(localStorage.getItem(LAST_LOCAL_BACKUP_KEY) || '0', 10) || 0,
@@ -2647,6 +2687,8 @@
       return { queueCount: q.length, deadletterCount: 0, conflictCount: 0, storage: 'localStorage', degraded: true };
     },
     pushAll, pushAllAndFlush,
+    // #1520: exclusao de lancamento de caixa (index.html > deleteCashEntry).
+    agendarExclusaoLancamento, cancelarExclusaoLancamento, confirmarExclusaoLancamento,
     // Onda 9 — OTA do PWA: ver maybeApplyPwaUpdate() no fluxo de pingVersion().
     forceUpdate: (opts) => triggerPwaUpdate(Object.assign({ reason: 'manual', force: true }, opts || {})),
     installedPwaVersion: getInstalledPwaVersion,

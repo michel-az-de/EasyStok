@@ -80,6 +80,8 @@ internal static class SyncDtoConverters
     internal static CashEntryDto ToDto(CashEntry c) =>
         new(c.Id, c.Type, c.Amount, c.Description,
             new DateTimeOffset(c.CreatedAt).ToUnixTimeMilliseconds(),
+            // #1520: excluido no PWA desce como estornado; o aparelho ja some com ele (F7-B).
+            Estornado: c.DeletedAt != null ? true : null,
             Metodo: c.Metodo);
 
     internal static JsonElement Serialize<T>(T obj)

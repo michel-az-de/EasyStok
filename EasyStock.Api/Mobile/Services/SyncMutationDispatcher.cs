@@ -1,6 +1,10 @@
 using System.Text.Json;
 using EasyStock.Api.Mobile.DTOs;
+using EasyStock.Api.Mobile.Services.Linkers;
 using EasyStock.Api.Services.Operacao;
+using EasyStock.Application.Common;
+using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 
@@ -18,6 +22,7 @@ public class SyncMutationDispatcher(
     MobileSaleSyncService saleSync,
     OperacaoEventBroker eventBroker,
     IProdutoRepository produtoRepo,
+    EstornarMovimentoCaixaUseCase estornarMovimentoCaixa,
     ILogger<SyncMutationDispatcher> log)
 {
     private readonly EasyStockDbContext _db = db;
@@ -26,6 +31,7 @@ public class SyncMutationDispatcher(
     private readonly MobileSaleSyncService _saleSync = saleSync;
     private readonly OperacaoEventBroker _eventBroker = eventBroker;
     private readonly IProdutoRepository _produtoRepo = produtoRepo;
+    private readonly EstornarMovimentoCaixaUseCase _estornarMovimentoCaixa = estornarMovimentoCaixa;
     private readonly ILogger<SyncMutationDispatcher> _log = log;
 
     // #1520 (ADR-0060): produtos que nasceram neste lote ja com o saldo do aparelho. Esse saldo
@@ -46,6 +52,9 @@ public class SyncMutationDispatcher(
             case "client":    await ApplyClient(m, deviceId, operatorName, empresaId, lojaId);    break;
             case "order":     await ApplyOrder(m, deviceId, operatorName, empresaId, lojaId);     break;
             case "batch":     await ApplyBatch(m, deviceId, operatorName, empresaId, lojaId);     break;
+            case "cashEntry" when parts[1] == "delete":
+                await ApplyCashEntryDelete(m, operatorName, empresaId);
+                break;
             case "cashEntry": await ApplyCashEntry(m, deviceId, operatorName, empresaId, lojaId); break;
             case "closing":   await ApplyClosing(m, deviceId, empresaId, lojaId);                 break;
             case "stock":     await ApplyStockDelta(m, deviceId, operatorName, empresaId);        break;
@@ -485,7 +494,11 @@ public class SyncMutationDispatcher(
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<CashEntry>()
             .FirstOrDefaultAsync(c => c.Id == dto.Id && c.EmpresaId == empresaId);
-        if (existing != null) return; // imutável
+        if (existing != null)
+        {
+            await EditarLancamentoAsync(existing, dto, deviceId, operatorName);
+            return;
+        }
 
         var createdAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.CreatedAt).UtcDateTime;
         _db.Add(new CashEntry
@@ -498,6 +511,79 @@ public class SyncMutationDispatcher(
             EmpresaId = empresaId,
             LojaId = lojaId
         });
+    }
+
+    /// <summary>
+    /// #1520 (ADR-0060) — edição de lançamento feita no PWA: atualiza tipo, valor, descrição e
+    /// forma no lançamento e no <see cref="MovimentoCaixa"/> vinculado. Reenvio sem mudança não
+    /// faz nada; lançamento excluído não volta por reenvio de outro aparelho.
+    /// </summary>
+    private async Task EditarLancamentoAsync(CashEntry existing, CashEntryDto dto, string deviceId, string? operatorName)
+    {
+        if (existing.DeletedAt != null) return;
+        // #1493 — reenvio sem forma (aparelho antigo) nao apaga a forma ja gravada.
+        var metodo = FormaPagamentoMobile.Normalizar(dto.Metodo) ?? existing.Metodo;
+        if (existing.Type == dto.Type && existing.Amount == dto.Amount
+            && existing.Description == dto.Description && existing.Metodo == metodo)
+            return;
+
+        await RecusarSeCaixaFechadoAsync(existing, "a alteração");
+        existing.Type = dto.Type;
+        existing.Amount = dto.Amount;
+        existing.Description = dto.Description;
+        existing.Metodo = metodo;
+        existing.LastDeviceId = deviceId;
+        existing.LastOperatorName = operatorName;
+
+        // Movimento ja estornado no ERP fica como estava: e a trilha do estorno.
+        var movimento = await MovimentoVinculadoAsync(existing);
+        if (movimento is { EstornadoEm: null }) CashEntryLinker.Espelhar(existing, movimento);
+    }
+
+    /// <summary>
+    /// #1520 (ADR-0060) — exclusão de lançamento, sempre explícita ("cashEntry.delete", nascida
+    /// da ação do operador). O PWA limpa lançamentos antigos sozinho, então ausência no aparelho
+    /// nunca é exclusão. A linha fica marcada e o movimento vinculado é estornado pelo caso de
+    /// uso do ERP. Reenvio e lançamento que o servidor não conhece: aceita sem efeito.
+    /// </summary>
+    private async Task ApplyCashEntryDelete(MutationDto m, string? operatorName, Guid? empresaId)
+    {
+        var id = m.Payload.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
+        if (string.IsNullOrEmpty(id)) throw new ArgumentException("Exclusão de lançamento sem id.");
+        var existing = await _db.Set<CashEntry>()
+            .FirstOrDefaultAsync(c => c.Id == id && c.EmpresaId == empresaId);
+        if (existing == null || existing.DeletedAt != null) return;
+
+        await RecusarSeCaixaFechadoAsync(existing, "a exclusão");
+        var movimento = await MovimentoVinculadoAsync(existing);
+        if (movimento != null)
+            await _estornarMovimentoCaixa.ExecuteAsync(new EstornarMovimentoCaixaCommand(
+                movimento.EmpresaId, movimento.Id,
+                Motivo: "Lançamento excluído no PWA", UsuarioNome: operatorName));
+
+        existing.DeletedAt = DateTime.UtcNow;
+        existing.DeletedBy = operatorName;
+    }
+
+    private async Task<MovimentoCaixa?> MovimentoVinculadoAsync(CashEntry entry)
+    {
+        // Pela referencia tambem: cobre o movimento ja promovido cujo id nao chegou a ser gravado.
+        var referencia = CashEntryLinker.ReferenciaDe(entry);
+        return await _db.Set<MovimentoCaixa>().IgnoreQueryFilters()
+            .FirstOrDefaultAsync(mv => mv.EmpresaId == entry.EmpresaId
+                && (mv.Id == entry.ErpMovimentoCaixaId || mv.Referencia == referencia));
+    }
+
+    /// <summary>Mesma regra do estorno no ERP: dia com caixa fechado não aceita mudança.</summary>
+    private async Task RecusarSeCaixaFechadoAsync(CashEntry entry, string oQue)
+    {
+        if (entry.EmpresaId is not { } empresaId) return;
+        var dia = HorarioBrasil.DataOperacional(entry.CreatedAt);
+        var fechado = await _db.Set<FechamentoCaixa>().IgnoreQueryFilters()
+            .AnyAsync(f => f.EmpresaId == empresaId && f.Data == dia && f.LojaId == entry.LojaId);
+        if (fechado)
+            throw new UseCaseValidationException(
+                $"O caixa de {dia:dd/MM/yyyy} já foi fechado: {oQue} do lançamento '{entry.Description}' não foi aplicada.");
     }
 
     /// <summary>
