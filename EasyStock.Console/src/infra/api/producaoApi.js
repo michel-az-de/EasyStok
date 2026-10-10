@@ -23,6 +23,8 @@ export const estoqueDoDiaDaApi = (r) => ({
     saldo: p.saldo,
     descoberto: p.descoberto,
     lotes: (p.lotes ?? []).map(loteDaApi),
+    // M1.4c (#1537): saldo de cada porção; variacaoId nulo é o que ficou sem porção.
+    porcoes: (p.porcoes ?? []).map((s) => ({ variacaoId: s.variacaoId ?? null, rotulo: s.rotulo, saldo: s.saldo })),
   })),
   alertas: (r?.alertas ?? []).map((a) => ({
     produtoId: a.produtoId,
@@ -40,6 +42,8 @@ export const registrarProducao = (pratos, chave) => chamarApi(PRODUCAO, {
   corpo: {
     pratos: pratos.map((p) => ({
       cardapioItemId: p.sku,
+      // M1.4c (#1537): a porção produzida, quando o prato tem porções.
+      ...(p.variacaoId ? { variacaoId: p.variacaoId } : {}),
       porcoes: p.porcoes,
       pesoPorPorcaoG: p.pesoPorPorcaoG ?? null,
       pesoRealG: p.pesoRealG ?? null,

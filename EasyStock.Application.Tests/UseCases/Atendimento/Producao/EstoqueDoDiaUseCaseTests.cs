@@ -53,6 +53,35 @@ public class EstoqueDoDiaUseCaseTests
     };
 
     [Fact]
+    public async Task PratoComPorcoes_MostraOSaldoDeCadaUma_EOQueFicouSemPorcao()
+    {
+        // M1.4c (#1537, D-M1-03): 300 g e 800 g têm saldo próprio; lote do PWA entra como "sem porção".
+        var ravioliId = Guid.NewGuid();
+        var ravioli = Prato(ravioliId, "Ravióli");
+        var v300 = Guid.NewGuid();
+        var v800 = Guid.NewGuid();
+        ravioli.AdicionarVariacao(CardapioItemVariacao.Criar(ravioli.Id, "300 g", 28m, ordemExibicao: 0, produtoVariacaoId: v300));
+        ravioli.AdicionarVariacao(CardapioItemVariacao.Criar(ravioli.Id, "800 g", 62m, ordemExibicao: 1, produtoVariacaoId: v800));
+        _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>()).Returns([ravioli]);
+        ItemEstoque Da(Guid? variacao, decimal saldo, int dia)
+        {
+            var l = Lote(ravioliId, saldo, new DateTime(2026, 10, dia));
+            l.ProdutoVariacaoId = variacao;
+            return l;
+        }
+        _itens.GetByProdutosAsync(EmpresaId, Arg.Any<IEnumerable<Guid>>(), null, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, IReadOnlyCollection<ItemEstoque>>
+            {
+                [ravioliId] = [Da(v300, 4, 20), Da(v300, 1, 8) /* vencido */, Da(v800, 6, 20), Da(null, 2, 20)],
+            });
+
+        var prato = (await Sut().ExecuteAsync(EmpresaId)).Pratos.Single();
+
+        prato.Saldo.Should().Be(12, "4 + 6 + 2; o vencido não conta");
+        prato.Porcoes!.Select(p => (p.Rotulo, p.Saldo)).Should().Equal(("300 g", 4m), ("800 g", 6m), ("sem porção", 2m));
+    }
+
+    [Fact]
     public async Task SaldoEmPorcoes_SoDeLoteNaoVencido_EVencendoDestacado()
     {
         var lasanhaId = Guid.NewGuid();

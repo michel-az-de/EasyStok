@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Inventario.Desacertos;
+using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 
 namespace EasyStock.Application.UseCases.Atendimento.Producao;
@@ -9,9 +10,13 @@ public sealed record LoteDoDia(string? Codigo, decimal Quantidade, DateTime? Val
 
 /// <param name="Saldo">Porções em lotes com saldo e não vencidos (mesmo critério do cardápio, #1171).</param>
 /// <param name="Descoberto">Porções vendidas sem saldo (S22), à espera de contagem.</param>
+/// <param name="Porcoes">M1.4c (#1537): saldo de cada porção. Vazio em prato sem porções.</param>
 public sealed record EstoqueDoPrato(
     Guid CardapioItemId, Guid ProdutoId, string Nome, string? Porcao, decimal Saldo, decimal Descoberto,
-    IReadOnlyList<LoteDoDia> Lotes);
+    IReadOnlyList<LoteDoDia> Lotes, IReadOnlyList<SaldoDaPorcao>? Porcoes = null);
+
+/// <param name="VariacaoId">A porção do cardápio. Null = saldo sem porção (estoque antigo ou lote do PWA).</param>
+public sealed record SaldoDaPorcao(Guid? VariacaoId, string Rotulo, decimal Saldo);
 
 /// <param name="CardapioItemId">O prato do alerta, para o console ajustar pela rota do item. Null se não está no cardápio.</param>
 public sealed record AlertaDeEstoque(Guid ProdutoId, Guid? CardapioItemId, string Nome, string Texto, decimal QuantidadeDescoberta);
@@ -59,7 +64,8 @@ public sealed class EstoqueDoDiaUseCase(
                 .ToList();
             var (saldo, descoberto) = SaldoEDescoberto(lotes, hoje);
             return new EstoqueDoPrato(
-                p.Id, p.ProdutoId!.Value, p.NomeEfetivo() ?? "(sem nome)", p.PesoExibicao, saldo, descoberto, comSaldo);
+                p.Id, p.ProdutoId!.Value, p.NomeEfetivo() ?? "(sem nome)", p.PesoExibicao, saldo, descoberto, comSaldo,
+                SaldosPorPorcao(p, lotes, hoje));
         }).ToList();
 
         var pratoDoProduto = pratos.GroupBy(p => p.ProdutoId!.Value).ToDictionary(g => g.Key, g => g.First().Id);
@@ -69,6 +75,22 @@ public sealed class EstoqueDoDiaUseCase(
             .ToList();
 
         return new EstoqueDoDiaResult(estoque, alertas);
+    }
+
+    // M1.4c (#1537, D-M1-03): o saldo de cada porção vem dos lotes da variação dela. O que sobrar sem
+    // porção (estoque antigo, lote do PWA) aparece à parte, porque a venda da porção cai nele quando
+    // a porção não tem lote nenhum.
+    private static List<SaldoDaPorcao> SaldosPorPorcao(CardapioItem prato, IReadOnlyCollection<ItemEstoque> lotes, DateOnly hoje)
+    {
+        if (!prato.TemVariacoes()) return [];
+        var saldos = prato.Variacoes
+            .OrderBy(v => v.OrdemExibicao).ThenBy(v => v.CriadoEm).ThenBy(v => v.Id)
+            .Select(v => new SaldoDaPorcao(v.Id, v.Rotulo,
+                v.ProdutoVariacaoId is { } id ? SaldoEDescoberto(lotes.Where(l => l.ProdutoVariacaoId == id), hoje).Saldo : 0m))
+            .ToList();
+        var semPorcao = SaldoEDescoberto(lotes.Where(l => l.ProdutoVariacaoId is null), hoje).Saldo;
+        if (semPorcao > 0) saldos.Add(new SaldoDaPorcao(null, "sem porção", semPorcao));
+        return saldos;
     }
 
     /// <summary>Saldo = porções em lotes não vencidos; descoberto = o que saiu sem saldo. Usado também pela M2.5.</summary>

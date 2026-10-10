@@ -199,6 +199,8 @@ export function sobraDaLinha({ porcoes, pesoPorPorcaoG, pesoRealG }) {
 // O que impede lançar a linha, em português, ou null. Mesmas regras da API, para avisar antes.
 export function erroDaLinha(linha) {
   if (!linha.sku) return 'Escolha o prato.'
+  // M1.4c (#1537): prato com porções produz uma porção; o saldo é dela.
+  if (linha.exigePorcao && !linha.variacaoId) return 'Escolha a porção produzida.'
   if (!Number.isInteger(linha.porcoes) || linha.porcoes <= 0) return 'Quantas porções saíram?'
   if (!Number.isInteger(linha.validadeDias) || linha.validadeDias <= 0) return 'Validade em dias inteiros.'
   if (linha.pesoPorPorcaoG != null && linha.pesoPorPorcaoG <= 0) return 'Peso da porção inválido.'

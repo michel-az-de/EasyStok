@@ -14,13 +14,17 @@ import css from '../cardapio/abaCardapio.module.css'
 // entrada em porções); prato que ainda não tinha estoque passa a ter. Depois, "Imprimir etiquetas"
 // imprime uma por porção. O destino vem da linha do prato (D-M2-04).
 const VALIDADE_PADRAO = 5
-const novaLinha = () => ({ id: crypto.randomUUID(), sku: '', porcoes: '', pesoPorPorcaoG: '', pesoRealG: '', validadeDias: String(VALIDADE_PADRAO) })
+const novaLinha = () => ({ id: crypto.randomUUID(), sku: '', variacaoId: '', porcoes: '', pesoPorPorcaoG: '', pesoRealG: '', validadeDias: String(VALIDADE_PADRAO) })
 const inteiro = (texto) => (String(texto).trim() === '' ? null : Number(texto))
 const dataCurta = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '')
 
-function paraEnviar(linha) {
+// M1.4c (#1537): prato com porções exige a porção produzida (o saldo é dela).
+function paraEnviar(linha, pratos = []) {
+  const porcoesDoPrato = pratos.find((p) => p.sku === linha.sku)?.porcoes ?? []
   return {
     sku: linha.sku,
+    variacaoId: linha.variacaoId || null,
+    exigePorcao: porcoesDoPrato.length > 0,
     porcoes: inteiro(linha.porcoes),
     pesoPorPorcaoG: inteiro(linha.pesoPorPorcaoG),
     pesoRealG: inteiro(linha.pesoRealG),
@@ -42,14 +46,17 @@ export function AbaProducaoDoDiaApi() {
   const [feito, setFeito] = useState(null)
   const [etiquetas, setEtiquetas] = useState(null)
 
-  const mudar = (id, campo) => (e) => setLinhas((atual) => atual.map((l) => (l.id === id ? { ...l, [campo]: e.target.value } : l)))
+  // Trocar o prato zera a porção: a porção escolhida era do prato anterior.
+  const mudar = (id, campo) => (e) => setLinhas((atual) => atual.map((l) => (l.id === id
+    ? { ...l, [campo]: e.target.value, ...(campo === 'sku' ? { variacaoId: '' } : {}) }
+    : l)))
   const tirar = (id) => setLinhas((atual) => (atual.length > 1 ? atual.filter((l) => l.id !== id) : atual))
 
   async function confirmar(evento) {
     evento.preventDefault()
     setEnviando(true)
     setErro(null)
-    const r = await producao.produzir(linhas.map(paraEnviar))
+    const r = await producao.produzir(linhas.map((l) => paraEnviar(l, pratos)))
     setEnviando(false)
     if (!r.ok) { setErro(r.erro); return }
     setFeito(r)
@@ -93,6 +100,10 @@ export function AbaProducaoDoDiaApi() {
               <li key={l.id} className={`${css.campos} ${css.formulario} ${css.loteProducao}`}>
                 <CampoSelecao rotulo="Prato" value={l.sku} onChange={mudar(l.id, 'sku')}
                   opcoes={[{ valor: '', rotulo: 'Escolha o prato' }, ...pratos.map((p) => ({ valor: p.sku, rotulo: `${p.nome}${p.porcao ? ` · ${p.porcao}` : ''}` }))]} />
+                {(pratos.find((p) => p.sku === l.sku)?.porcoes ?? []).length > 0 && (
+                  <CampoSelecao rotulo="Porção" value={l.variacaoId} onChange={mudar(l.id, 'variacaoId')}
+                    opcoes={[{ valor: '', rotulo: 'Escolha a porção' }, ...pratos.find((p) => p.sku === l.sku).porcoes.map((v) => ({ valor: v.id, rotulo: v.rotulo }))]} />
+                )}
                 <CampoTexto inputMode="numeric" rotulo="Porções" placeholder="Porções" value={l.porcoes} onChange={mudar(l.id, 'porcoes')} />
                 <CampoTexto inputMode="numeric" rotulo="Peso de cada porção (g)" placeholder="g por porção" value={l.pesoPorPorcaoG} onChange={mudar(l.id, 'pesoPorPorcaoG')} />
                 <CampoTexto inputMode="numeric" rotulo="Peso real total (g)" placeholder="Peso real (g)" value={l.pesoRealG} onChange={mudar(l.id, 'pesoRealG')} />
