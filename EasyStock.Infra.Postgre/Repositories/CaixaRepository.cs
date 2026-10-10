@@ -28,14 +28,15 @@ namespace EasyStock.Infra.Postgre.Repositories
             var total = await query.CountAsync();
             var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
 
-            query = sort?.ToLowerInvariant() switch
+            var ordenada = sort?.ToLowerInvariant() switch
             {
                 "valor" => desc ? query.OrderByDescending(m => m.Valor) : query.OrderBy(m => m.Valor),
                 "tipo"  => desc ? query.OrderByDescending(m => m.Tipo)  : query.OrderBy(m => m.Tipo),
                 _       => desc ? query.OrderByDescending(m => m.DataMovimento) : query.OrderBy(m => m.DataMovimento),
             };
 
-            var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            var items = await ordenada.ThenByDescending(m => m.Id)
+                .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
             return (items, total);
         }
 

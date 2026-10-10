@@ -46,7 +46,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var total = await query.CountAsync();
             var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
 
-            query = sort?.ToLowerInvariant() switch
+            var ordenada = sort?.ToLowerInvariant() switch
             {
                 "criadoem"    => desc ? query.OrderByDescending(c => c.CriadoEm)    : query.OrderBy(c => c.CriadoEm),
                 "lastorderat" => desc ? query.OrderByDescending(c => c.LastOrderAt) : query.OrderBy(c => c.LastOrderAt),
@@ -54,7 +54,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 _             => desc ? query.OrderByDescending(c => c.Nome)        : query.OrderBy(c => c.Nome),
             };
 
-            var clientes = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            var clientes = await ordenada.ThenByDescending(c => c.Id)
+                .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
             return (clientes, total);
         }
 

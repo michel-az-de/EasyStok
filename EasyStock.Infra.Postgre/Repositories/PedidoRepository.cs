@@ -83,7 +83,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
             var agora = DateTime.UtcNow;
 
-            query = sort?.ToLowerInvariant() switch
+            var ordenada = sort?.ToLowerInvariant() switch
             {
                 // Cockpit (#591): abertos antes de terminais → o cap de pagina nunca
                 // descarta pedido ativo; refino atrasado/agendado/recencia por cima.
@@ -94,7 +94,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 _         => desc ? query.OrderByDescending(p => p.CriadoEm)  : query.OrderBy(p => p.CriadoEm),
             };
 
-            var pedidos = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            var pedidos = await ordenada.ThenByDescending(p => p.Id)
+                .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
             return (pedidos, total);
         }
 
