@@ -56,8 +56,9 @@ public sealed class PedidoEstoqueIntegrationService(
 
     public async Task DescontarAsync(PedidoEntity pedido, CancellationToken ct = default)
     {
-        if (!pedido.LojaId.HasValue) { logger.LogDebug("Pedido {Id} sem LojaId — sem desconto de estoque.", pedido.Id); return; }
-        var lojaId = pedido.LojaId.Value;
+        // #1534: o pedido do site e da comanda nasce sem loja (tenant único, uma cozinha) e baixa do
+        // estoque da empresa; antes saía daqui sem descontar nada. Pedido com loja segue na loja dele.
+        var lojaId = pedido.LojaId;
 
         foreach (var item in pedido.Itens)
         {
@@ -79,7 +80,7 @@ public sealed class PedidoEstoqueIntegrationService(
             // zerado era sempre o escolhido, gerava descoberto falso e o lote com saldo nunca baixava.
             var itens = await itemEstoqueRepo.GetByProdutoAsync(pedido.EmpresaId, item.ProdutoId.Value);
             var candidatos = (itens ?? [])
-                .Where(i => i.LojaId == lojaId
+                .Where(i => DaLojaDoPedido(i, lojaId)
                             && i.Status != StatusItemEstoque.Bloqueado
                             && i.Status != StatusItemEstoque.Descartado)
                 .OrderBy(i => i.ValidadeEm ?? DateTime.MaxValue)
@@ -88,7 +89,7 @@ public sealed class PedidoEstoqueIntegrationService(
             {
                 if (RequerEstoqueExistente)
                     throw new UseCaseValidationException(
-                        $"Item '{item.Nome}': produto {item.ProdutoId} não tem estoque cadastrado na loja {lojaId}.");
+                        $"Item '{item.Nome}': produto {item.ProdutoId} não tem estoque cadastrado {(lojaId is null ? "na empresa" : $"na loja {lojaId}")}.");
 
                 logger.LogWarning("Pedido {Id}: produto {ProdId} sem ItemEstoque operavel na loja {LojaId} — ignorando desconto.",
                     pedido.Id, item.ProdutoId, lojaId);
@@ -202,10 +203,12 @@ public sealed class PedidoEstoqueIntegrationService(
         }
     }
 
+    // Pedido sem loja enxerga todos os lotes da empresa; com loja, só os dela.
+    private static bool DaLojaDoPedido(ItemEstoque lote, Guid? lojaDoPedido) =>
+        lojaDoPedido is null || lote.LojaId == lojaDoPedido;
+
     public async Task DevolverAsync(PedidoEntity pedido, CancellationToken ct = default)
     {
-        if (!pedido.LojaId.HasValue) return;
-
         foreach (var item in pedido.Itens)
             await DevolverItemAsync(pedido, item, ct);
     }
@@ -218,8 +221,7 @@ public sealed class PedidoEstoqueIntegrationService(
     /// </summary>
     public async Task DevolverItemAsync(PedidoEntity pedido, PedidoItem item, CancellationToken ct = default)
     {
-        if (!pedido.LojaId.HasValue) return;
-        var lojaId = pedido.LojaId.Value;
+        var lojaId = pedido.LojaId; // #1534: sem loja, o estoque é o da empresa.
 
         if (!item.ProdutoId.HasValue || item.Quantidade <= 0) return;
 
@@ -256,7 +258,7 @@ public sealed class PedidoEstoqueIntegrationService(
         {
             // Saida registrada mas movimento nao localizavel (dado legado): devolve ao primeiro lote da loja.
             var legado = (await itemEstoqueRepo.GetByProdutoAsync(pedido.EmpresaId, item.ProdutoId.Value))
-                ?.Where(i => i.LojaId == lojaId)
+                ?.Where(i => DaLojaDoPedido(i, lojaId))
                 .OrderBy(i => i.ValidadeEm ?? DateTime.MaxValue)
                 .FirstOrDefault();
             if (legado is null) return;
