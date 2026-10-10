@@ -377,6 +377,70 @@ public class PedidoEstoqueIntegrationServiceTests
         await movRepo.DidNotReceive().InsertAsync(Arg.Any<MovimentacaoEstoque>());
     }
 
+    private static Pedido PedidoSemLoja(Guid empresaId, Guid produtoId, decimal qty)
+    {
+        // Como o checkout do site e da comanda cria: Pedido.Criar(empresaId, origem), sem loja.
+        var p = Pedido.Criar(empresaId, cliente: null, lojaId: null, "atendimento");
+        p.Itens.Add(new PedidoItem { Id = Guid.NewGuid(), PedidoId = p.Id, ProdutoId = produtoId, Nome = "X", Quantidade = qty, PrecoUnitario = 10m });
+        return p;
+    }
+
+    [Fact] // #1534: pedido do site e da comanda nasce sem loja e não baixava nada.
+    public async Task DescontarAsync_pedido_sem_loja_baixa_do_estoque_da_empresa_em_fefo()
+    {
+        var (svc, itemRepo, movRepo) = Build();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoSemLoja(empresaId, produtoId, qty: 3);
+        // A produção do console grava o lote sem loja; o PWA grava com loja. Os dois são da empresa.
+        var semLoja = new ItemEstoque
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = null, ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(2), ValidadeEm = Validade.From(new DateTime(2026, 10, 12))
+        };
+        var comLoja = new ItemEstoque
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = Guid.NewGuid(), ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(5), ValidadeEm = Validade.From(new DateTime(2026, 10, 20))
+        };
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { comLoja, semLoja });
+        itemRepo.GetByIdComLockAsync(empresaId, semLoja.Id).Returns(semLoja);
+        itemRepo.GetByIdComLockAsync(empresaId, comLoja.Id).Returns(comLoja);
+
+        await svc.DescontarAsync(pedido);
+
+        (semLoja.QuantidadeAtual!.Value, comLoja.QuantidadeAtual!.Value).Should().Be((0m, 4m), "o que vence antes sai primeiro");
+        await movRepo.Received(2).InsertAsync(Arg.Is<MovimentacaoEstoque>(m => m.Natureza == NaturezaMovimentacaoEstoque.Venda));
+    }
+
+    [Fact] // #1534: o cancelamento do pedido sem loja também devolve.
+    public async Task DevolverAsync_pedido_sem_loja_devolve_ao_lote_que_baixou()
+    {
+        var (svc, itemRepo, movRepo) = Build();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoSemLoja(empresaId, produtoId, qty: 2);
+        var item = pedido.Itens.Single();
+        var refDoc = $"{pedido.Id}:{item.Id}";
+        var lote = new ItemEstoque { Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = null, ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(0) };
+        movRepo.ExisteReferenciaAsync(empresaId, produtoId, refDoc, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>()).Returns(true);
+        movRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[]
+        {
+            new MovimentacaoEstoque
+            {
+                Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, ItemEstoqueId = lote.Id, ItemEstoque = lote,
+                Tipo = TipoMovimentacaoEstoque.Saida, Natureza = NaturezaMovimentacaoEstoque.Venda,
+                Quantidade = Quantidade.From(2), DocumentoReferencia = refDoc
+            }
+        });
+        itemRepo.GetByIdComLockAsync(empresaId, lote.Id).Returns(lote);
+
+        await svc.DevolverAsync(pedido);
+
+        lote.QuantidadeAtual!.Value.Should().Be(2);
+        await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(m => m.Natureza == NaturezaMovimentacaoEstoque.Estorno));
+    }
+
     [Fact] // #939: estorno por item quando houve saída (Venda) anterior por este pedido+item.
     public async Task DevolverItemAsync_estorna_quando_houve_venda_anterior()
     {
