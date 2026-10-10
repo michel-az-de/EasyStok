@@ -13,19 +13,21 @@ const porcoes = (n) => (n === 1 ? '1 porção' : `${n} porções`)
 const dataCurta = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : 'sem validade')
 
 function quandoVence(lote) {
+  if (!lote.validade) return 'Sem validade informada'
   if (lote.vencido) return 'Venceu'
   if (lote.diasParaVencer === 0) return 'Vence hoje'
   if (lote.diasParaVencer === 1) return 'Vence amanhã'
   return `Vence ${dataCurta(lote.validade)}`
 }
 
-function FormularioAjuste({ alvo, aoSalvar, aoCancelar }) {
+function FormularioAjuste({ alvo, aoSalvar, aoCancelar, aviso, aoFecharAviso }) {
   const [contagem, setContagem] = useState(String(alvo.saldo ?? ''))
   const [motivo, setMotivo] = useState('')
   const [salvando, setSalvando] = useState(false)
 
   const salvar = (evento) => {
     evento.preventDefault()
+    if (salvando) return
     setSalvando(true)
     Promise.resolve(aoSalvar(contagem, motivo)).then((ok) => { if (ok !== false) aoCancelar() }).finally(() => setSalvando(false))
   }
@@ -37,6 +39,8 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar }) {
         inputMode="numeric"
         aria-label={`Quantas porções de ${alvo.nome} você contou`}
         value={contagem}
+        disabled={salvando}
+        dica="Informe o total que você contou, não a diferença em relação ao saldo."
         onChange={(e) => setContagem(e.target.value)}
       />
       <CampoTexto
@@ -44,11 +48,16 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar }) {
         placeholder="Ex.: contei o congelador"
         maxLength={500}
         value={motivo}
+        disabled={salvando}
         onChange={(e) => setMotivo(e.target.value)}
       />
+      {aviso && <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">
+        Não foi possível salvar a contagem. {aviso}
+        {' '}<Botao variante="texto" onClick={aoFecharAviso}>Fechar aviso</Botao>
+      </p>}
       <div className={css.rodapeForm}>
-        <Botao variante="texto" onClick={aoCancelar}>Cancelar</Botao>
-        <Botao tipo="submit" variante="primario" icone="check" disabled={salvando || !motivo.trim() || contagem === ''}>Salvar contagem</Botao>
+        <Botao variante="texto" disabled={salvando} onClick={aoCancelar}>Cancelar</Botao>
+        <Botao tipo="submit" variante="primario" icone="check" disabled={salvando || !motivo.trim() || contagem === ''}>{salvando ? 'Salvando…' : 'Salvar contagem'}</Botao>
       </div>
     </form>
   )
@@ -57,6 +66,18 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar }) {
 export function AbaEstoqueDoDiaApi() {
   const estoque = useEstoqueDoDiaApi()
   const [ajustando, setAjustando] = useState(null)
+  const [avisoDaContagem, setAvisoDaContagem] = useState(null)
+  const avisoNoFormulario = ajustando !== null && ajustando === avisoDaContagem
+
+  const trocarAjuste = (alvo) => {
+    setAvisoDaContagem(null)
+    setAjustando(alvo)
+  }
+  const salvarContagem = (alvo, sku, contagem, motivo) => {
+    estoque.fecharAviso()
+    setAvisoDaContagem(alvo)
+    return estoque.ajustar(sku, contagem, motivo)
+  }
 
   if (estoque.estado === 'carregando') return <output className={css.descricao}>Carregando o estoque…</output>
   if (estoque.estado === 'erro' && estoque.pratos.length === 0) {
@@ -75,7 +96,11 @@ export function AbaEstoqueDoDiaApi() {
 
   return (
     <div className={css.aba}>
-      {estoque.aviso && (
+      {estoque.estado === 'erro' && <p className={css.aviso} role="alert">
+        O estoque não foi atualizado. Os saldos abaixo podem estar desatualizados. {estoque.erro}
+        {' '}<Botao variante="texto" icone="refresh-cw" onClick={estoque.recarregar}>Recarregar estoque</Botao>
+      </p>}
+      {estoque.aviso && !avisoNoFormulario && (
         <p className={css.aviso} role="alert">
           {estoque.aviso} <Botao variante="texto" onClick={estoque.fecharAviso}>Fechar</Botao>
         </p>
@@ -96,12 +121,14 @@ export function AbaEstoqueDoDiaApi() {
                 {ajustando === a.produtoId ? (
                   <FormularioAjuste
                     alvo={{ nome: a.nome, saldo: saldoDe(a.sku) }}
-                    aoSalvar={(contagem, motivo) => estoque.ajustar(a.sku, contagem, motivo)}
-                    aoCancelar={() => setAjustando(null)}
+                    aoSalvar={(contagem, motivo) => salvarContagem(a.produtoId, a.sku, contagem, motivo)}
+                    aoCancelar={() => trocarAjuste(null)}
+                    aviso={avisoNoFormulario ? estoque.aviso : null}
+                    aoFecharAviso={estoque.fecharAviso}
                   />
                 ) : (
                   <div className={css.acoes}>
-                    <Botao variante="primario" icone="lapis" disabled={!a.sku} onClick={() => setAjustando(a.produtoId)}>Ajustar</Botao>
+                    <Botao variante="primario" icone="lapis" aria-label={`Ajustar contagem de ${a.nome}`} disabled={!a.sku} onClick={() => trocarAjuste(a.produtoId)}>Ajustar</Botao>
                   </div>
                 )}
               </li>
@@ -133,12 +160,14 @@ export function AbaEstoqueDoDiaApi() {
                 {ajustando === p.sku ? (
                   <FormularioAjuste
                     alvo={p}
-                    aoSalvar={(contagem, motivo) => estoque.ajustar(p.sku, contagem, motivo)}
-                    aoCancelar={() => setAjustando(null)}
+                    aoSalvar={(contagem, motivo) => salvarContagem(p.sku, p.sku, contagem, motivo)}
+                    aoCancelar={() => trocarAjuste(null)}
+                    aviso={avisoNoFormulario ? estoque.aviso : null}
+                    aoFecharAviso={estoque.fecharAviso}
                   />
                 ) : (
                   <div className={css.acoes}>
-                    <Botao variante="texto" icone="lapis" onClick={() => setAjustando(p.sku)}>Ajustar</Botao>
+                    <Botao variante="texto" icone="lapis" aria-label={`Ajustar contagem de ${p.nome}`} onClick={() => trocarAjuste(p.sku)}>Ajustar</Botao>
                   </div>
                 )}
               </li>

@@ -17,7 +17,7 @@ import css from './entregasApi.module.css'
 const ORDEM_DA_SEMANA = [1, 2, 3, 4, 5, 6, 0]
 const JANELA_NOVA = { dias: [], horaInicio: '12:00', horaFim: '14:00', capacidadeMaxima: '4', label: '' }
 
-function Dias({ dias, umSo, aoMudar }) {
+function Dias({ dias, umSo, aoMudar, ocupado }) {
   const alternar = (valor) => {
     if (umSo) { aoMudar([valor]); return }
     aoMudar(dias.includes(valor) ? dias.filter((d) => d !== valor) : [...dias, valor])
@@ -26,7 +26,7 @@ function Dias({ dias, umSo, aoMudar }) {
     <fieldset className={css.dias}>
       <legend className="sr">Dias da semana</legend>
       {ORDEM_DA_SEMANA.map((valor) => (
-        <Chip key={valor} papel="filtro" reservarIcone ativo={dias.includes(valor)} onClick={() => alternar(valor)}>
+        <Chip key={valor} papel="filtro" reservarIcone ativo={dias.includes(valor)} disabled={ocupado} onClick={() => alternar(valor)}>
           {DIAS_CURTOS.find((d) => d.valor === valor).rotulo}
         </Chip>
       ))}
@@ -39,7 +39,7 @@ function Dias({ dias, umSo, aoMudar }) {
 function FormularioJanela({ inicial, editando, aoSalvar, aoCancelar, ocupado }) {
   const [f, setF] = useState(inicial)
   const [erro, setErro] = useState(null)
-  const campo = (k) => ({ value: f[k], onChange: (e) => setF({ ...f, [k]: e.target.value }) })
+  const campo = (k) => ({ value: f[k], disabled: ocupado, onChange: (e) => setF({ ...f, [k]: e.target.value }) })
   const salvar = (e) => {
     e.preventDefault()
     const motivo = erroDoFormularioJanela(f)
@@ -50,7 +50,7 @@ function FormularioJanela({ inicial, editando, aoSalvar, aoCancelar, ocupado }) 
   const faixa = faixaDeHorarios(f.horaInicio, f.horaFim)
   return (
     <form className={css.edicaoJanela} onSubmit={salvar}>
-      <Dias dias={f.dias} umSo={editando} aoMudar={(dias) => setF({ ...f, dias })} />
+      <Dias dias={f.dias} umSo={editando} ocupado={ocupado} aoMudar={(dias) => setF({ ...f, dias })} />
       <div className={css.formulario}>
         <CampoTexto rotulo="Início" tipo="time" {...campo('horaInicio')} required />
         <CampoTexto rotulo="Fim" tipo="time" {...campo('horaFim')} required />
@@ -62,7 +62,7 @@ function FormularioJanela({ inicial, editando, aoSalvar, aoCancelar, ocupado }) 
         <Botao tipo="submit" variante="primario" disabled={ocupado}>
           {editando ? 'Salvar' : f.dias.length > 1 ? `Criar ${f.dias.length} janelas` : 'Criar janela'}
         </Botao>
-        {aoCancelar && <Botao variante="texto" onClick={aoCancelar}>Cancelar</Botao>}
+        {aoCancelar && <Botao variante="texto" disabled={ocupado} onClick={aoCancelar}>Cancelar</Botao>}
       </div>
     </form>
   )
@@ -98,17 +98,17 @@ function LinhaJanela({ janela, acoes, ocupado }) {
       </div>
       {modo === 'excluir' ? (
         <div className={css.linha}>
-          <span className={`${css.apoio} ${css.cresce}`}>Excluir de vez? Se já teve pedido, a loja recusa e o caminho é pausar.</span>
-          <Botao variante="secundario" onClick={() => acoes.excluirJanela(janela.id).then(() => setModo(null))}>Excluir</Botao>
-          <Botao variante="texto" onClick={() => setModo(null)}>Não</Botao>
+          <span className={`${css.apoio} ${css.cresce}`}>Excluir esta janela? Se ela já tiver pedidos, use Pausar para preservar o histórico.</span>
+          <Botao variante="secundario" disabled={ocupado} onClick={() => acoes.excluirJanela(janela.id).then((ok) => { if (ok) setModo(null) })}>Excluir janela</Botao>
+          <Botao variante="texto" disabled={ocupado} onClick={() => setModo(null)}>Manter janela</Botao>
         </div>
       ) : (
         <div className={css.linha}>
-          <Botao variante="texto" icone="lapis" onClick={() => setModo('editar')}>Editar</Botao>
-          <Botao variante="texto" icone={janela.ativa ? 'pause' : 'play'} onClick={() => acoes.alternarJanela(janela)}>
+          <Botao variante="texto" icone="lapis" disabled={ocupado} aria-label={`Editar janela ${faixa}`} onClick={() => setModo('editar')}>Editar</Botao>
+          <Botao variante="texto" disabled={ocupado} icone={janela.ativa ? 'pause' : 'play'} onClick={() => acoes.alternarJanela(janela)}>
             {janela.ativa ? 'Pausar' : 'Reativar'}
           </Botao>
-          <Botao variante="texto" icone="x" onClick={() => setModo('excluir')}>Excluir</Botao>
+          <Botao variante="texto" icone="x" disabled={ocupado} aria-label={`Excluir janela ${faixa}`} onClick={() => setModo('excluir')}>Excluir</Botao>
         </div>
       )}
     </li>
@@ -124,7 +124,7 @@ export function JanelasDaLoja({ janelas, acoes, ocupado }) {
     <section className={css.secao} aria-label="Janelas de entrega">
       <div className={css.linha}>
         <h3 className={css.cresce}>Janelas de entrega</h3>
-        <Botao variante={criando ? 'texto' : 'primario'} icone={criando ? undefined : 'plus'} aria-expanded={criando} onClick={() => setCriando((v) => !v)}>
+        <Botao variante={criando ? 'texto' : 'primario'} disabled={ocupado} icone={criando ? undefined : 'plus'} aria-expanded={criando} onClick={() => setCriando((v) => !v)}>
           {criando ? 'Cancelar' : 'Nova janela'}
         </Botao>
       </div>

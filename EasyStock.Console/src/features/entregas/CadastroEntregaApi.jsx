@@ -17,22 +17,30 @@ const rotuloDaJanela = (x) =>
 const ZONA_VAZIA = { label: '', valor: '', tempoEstimadoMinutos: '40', ordem: '1', cobertura: 'bairros', cepInicio: '', cepFim: '', bairros: '' }
 const BLOQUEIO_VAZIO = { data: '', motivo: '', janelaEspecificaId: '' }
 
-function useFormulario(inicial) {
+function useFormulario(inicial, ocupado) {
   const [form, setForm] = useState(inicial)
-  const campo = (k) => ({ value: form[k], onChange: (e) => setForm({ ...form, [k]: e.target.value }) })
+  const campo = (k) => ({ value: form[k], disabled: ocupado, onChange: (e) => setForm({ ...form, [k]: e.target.value }) })
   return { form, campo, limpar: () => setForm(inicial) }
 }
 
 export function CadastroEntregaApi() {
-  const { janelas, zonas, bloqueios, erro, enviando, acoes, limparErro } = useCadastroEntregaApi()
-  const z = useFormulario(ZONA_VAZIA)
-  const b = useFormulario(BLOQUEIO_VAZIO)
+  const { janelas, zonas, bloqueios, erro, enviando, acoes, recarregar, limparErro } = useCadastroEntregaApi()
+  const z = useFormulario(ZONA_VAZIA, enviando)
+  const b = useFormulario(BLOQUEIO_VAZIO, enviando)
   const enviar = (acao, f, corpo) => (e) => {
     e.preventDefault()
     acao(corpo(f.form)).then((ok) => { if (ok) f.limpar() })
   }
 
   if (janelas === null && !erro) return <p className={css.vazio}>Carregando o cadastro…</p>
+  const aviso = erro && (
+    <div className={`${css.faixa} ${css.faixaFixa}`} role="alert">
+      <Icone nome="circle-x" tamanho={16} /> <span className={css.cresce}>{erro}</span>
+      <Botao variante="secundario" disabled={enviando} onClick={recarregar}>Atualizar cadastro</Botao>
+      {janelas !== null && <Botao variante="texto" onClick={limparErro}>Fechar aviso</Botao>}
+    </div>
+  )
+  if (janelas === null) return aviso
   const rotuloJanelaPorId = (id) => {
     const janela = (janelas ?? []).find((w) => w.id === id)
     return janela ? rotuloDaJanela(janela) : 'Janela excluída'
@@ -41,12 +49,7 @@ export function CadastroEntregaApi() {
 
   return (
     <div className={css.cadastro}>
-      {erro && (
-        <p className={`${css.faixa} ${css.faixaFixa}`} role="alert">
-          <Icone nome="circle-x" tamanho={16} /> <span className={css.cresce}>{erro}</span>
-          <Botao variante="texto" onClick={limparErro}>Fechar</Botao>
-        </p>
-      )}
+      {aviso}
       <JanelasDaLoja janelas={janelas} acoes={acoes} ocupado={enviando} />
 
       <section className={css.secao} aria-label="Zonas de frete">
@@ -77,7 +80,7 @@ export function CadastroEntregaApi() {
               <span className={css.apoio}>
                 {x.cepInicio ? `CEP ${faixaDeCep(x.cepInicio, x.cepFim)}` : x.bairros.join(', ')}{x.ativa ? '' : ' · desativada'}
               </span>
-              <Botao variante="texto" onClick={() => acoes.alternarZona(x)}>{x.ativa ? 'Desativar' : 'Ativar'}</Botao>
+              <Botao variante="texto" disabled={enviando} aria-label={`${x.ativa ? 'Desativar' : 'Ativar'} zona ${x.label}`} onClick={() => acoes.alternarZona(x)}>{x.ativa ? 'Desativar' : 'Ativar'}</Botao>
             </li>
           ))}
         </ul>
@@ -96,7 +99,7 @@ export function CadastroEntregaApi() {
             <li key={x.id} className={`${css.cartao} ${css.linha}`}>
               <span className={css.cresce}>{dataCurtaComSemana(x.data)} · {x.motivo}</span>
               <span className={css.apoio}>{x.janelaEspecificaId ? rotuloJanelaPorId(x.janelaEspecificaId) : 'Dia inteiro'}</span>
-              <Botao variante="texto" onClick={() => acoes.removerBloqueio(x.id)}>Remover</Botao>
+              <Botao variante="texto" disabled={enviando} aria-label={`Remover bloqueio de ${dataCurtaComSemana(x.data)}`} onClick={() => acoes.removerBloqueio(x.id)}>Remover</Botao>
             </li>
           ))}
         </ul>

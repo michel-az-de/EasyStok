@@ -21,6 +21,12 @@ export function AbaPerdasApi() {
   const [rascunho, setRascunho] = useState(vazio)
   const [enviando, setEnviando] = useState(false)
 
+  async function executar(acao) {
+    if (enviando) return false
+    setEnviando(true)
+    try { return await acao() } finally { setEnviando(false) }
+  }
+
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando as perdas…</output>
   if (gestao.estado === 'erro' && !gestao.resumo) {
     return (
@@ -36,17 +42,19 @@ export function AbaPerdasApi() {
 
   async function lancar(evento) {
     evento.preventDefault()
-    setEnviando(true)
-    const ok = await gestao.lancar({ ...rascunho, nome: escolhido?.nome })
-    setEnviando(false)
+    const ok = await executar(() => gestao.lancar({ ...rascunho, nome: escolhido?.nome }))
     if (ok) setRascunho(vazio)
   }
 
   const resumo = gestao.resumo
   return (
     <div className={css.aba}>
+      {gestao.estado === 'erro' && <p className={css.aviso} role="alert">
+        As perdas não foram atualizadas. Os dados abaixo são da última consulta concluída. {gestao.erro}
+        {' '}<Botao variante="texto" icone="refresh-cw" disabled={enviando} onClick={gestao.recarregar}>Recarregar perdas</Botao>
+      </p>}
       <p className={css.descricao}>
-        O que se perdeu e por quê. A perda sai do lote mais antigo e entra com o custo dele. Acima de {moeda(50)} quem
+        O que se perdeu e por quê. A baixa segue a validade dos lotes e considera o custo de cada lote. Acima de {moeda(50)} quem
         lança é o Gerente. Ajuste de contagem não é perda e não entra aqui.
       </p>
       {gestao.aviso && <p className={css.aviso} role="alert">{gestao.aviso} <Botao variante="texto" onClick={gestao.fecharAviso}>Fechar</Botao></p>}
@@ -60,10 +68,10 @@ export function AbaPerdasApi() {
               <li key={v.itemEstoqueId} className={css.linha}>
                 <div className={css.resumo}>
                   <span className={css.nome}>{v.nome}</span>
-                  <span className={css.detalhe}>{v.lote ?? 'sem lote'} · {qtd(v.quantidade)} · venceu há {v.diasVencido} dia(s) · {moeda(v.valor)}</span>
+                  <span className={css.detalhe}>{v.lote ?? 'sem lote'} · {qtd(v.quantidade)} · venceu há {v.diasVencido} {v.diasVencido === 1 ? 'dia' : 'dias'} · {moeda(v.valor)}</span>
                 </div>
                 <div className={css.acoes}>
-                  <Botao variante="texto" onClick={() => gestao.lancarVencido(v)}>Lançar como vencido</Botao>
+                  <Botao variante="texto" disabled={enviando} aria-label={`Registrar perda de todo o lote ${v.lote ?? ''} de ${v.nome}`} onClick={() => executar(() => gestao.lancarVencido(v))}>Registrar perda do lote</Botao>
                 </div>
               </li>
             ))}
@@ -73,15 +81,15 @@ export function AbaPerdasApi() {
 
       <form className={css.aba} onSubmit={lancar} aria-label="Lançar perda">
         <div className={`${css.campos} ${css.formulario} ${css.lancamentoPerda}`}>
-          <CampoSelecao rotulo="Prato ou insumo" value={rascunho.produtoId} onChange={mudar('produtoId')}
+          <CampoSelecao disabled={enviando} rotulo="Prato ou insumo" value={rascunho.produtoId} onChange={mudar('produtoId')}
             opcoes={[{ valor: '', rotulo: 'Escolha o prato ou insumo' }, ...gestao.opcoes.map((o) => ({
               valor: o.produtoId, rotulo: `${o.nome} (${o.tipo}, tem ${qtd(o.saldo)}${o.unidade ? ` ${o.unidade}` : ''})`,
             }))]} />
-          <CampoTexto inputMode="decimal" rotulo="Quantidade" placeholder="Quantidade" value={rascunho.quantidade} onChange={mudar('quantidade')} />
-          <CampoSelecao rotulo="Motivo" value={rascunho.motivo} onChange={mudar('motivo')}
+          <CampoTexto disabled={enviando} inputMode="decimal" rotulo={escolhido?.unidade ? `Quantidade (${escolhido.unidade})` : 'Quantidade'} value={rascunho.quantidade} onChange={mudar('quantidade')} />
+          <CampoSelecao disabled={enviando} rotulo="Motivo" value={rascunho.motivo} onChange={mudar('motivo')}
             opcoes={MOTIVOS_PERDA.map((m) => ({ valor: m.id, rotulo: m.rotulo }))} />
           {rascunho.motivo === 'Outro' && (
-            <div className={css.linhaCompleta}><CampoTexto rotulo="Qual o motivo" placeholder="Descreva o que aconteceu" value={rascunho.texto} onChange={mudar('texto')} /></div>
+            <div className={css.linhaCompleta}><CampoTexto disabled={enviando} rotulo="Qual o motivo" dica="Descreva o que aconteceu com pelo menos 3 caracteres." value={rascunho.texto} onChange={mudar('texto')} /></div>
           )}
           <div className={css.rodapeForm}>
             <Botao tipo="submit" variante="primario" icone="plus" disabled={enviando}>{enviando ? 'Lançando…' : 'Lançar perda'}</Botao>
@@ -91,9 +99,9 @@ export function AbaPerdasApi() {
 
       <section className={css.aba} aria-label="Resumo do período">
         <div className={css.campos}>
-          <CampoTexto tipo="date" rotulo="De" value={gestao.periodo.de ?? resumo?.de ?? ''}
+          <CampoTexto disabled={enviando} tipo="date" rotulo="Data inicial" value={gestao.periodo.de ?? resumo?.de ?? ''}
             onChange={(e) => gestao.setPeriodo((p) => ({ ...p, de: e.target.value || null }))} />
-          <CampoTexto tipo="date" rotulo="Até" value={gestao.periodo.ate ?? resumo?.ate ?? ''}
+          <CampoTexto disabled={enviando} tipo="date" rotulo="Data final" value={gestao.periodo.ate ?? resumo?.ate ?? ''}
             onChange={(e) => gestao.setPeriodo((p) => ({ ...p, ate: e.target.value || null }))} />
           <Pilula tom={resumo?.valor > 0 ? 'aviso' : 'ok'} fina>{moeda(resumo?.valor ?? 0)} perdidos</Pilula>
         </div>
@@ -115,7 +123,7 @@ export function AbaPerdasApi() {
                 </div>
                 {!l.desfeita && (
                   <div className={css.acoes}>
-                    <Botao variante="texto" icone="undo-2" onClick={() => gestao.desfazer(l)}>Desfazer</Botao>
+                    <Botao variante="texto" icone="undo-2" disabled={enviando} aria-label={`Desfazer perda de ${l.nome}`} onClick={() => executar(() => gestao.desfazer(l))}>Desfazer</Botao>
                   </div>
                 )}
               </li>

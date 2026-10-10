@@ -27,7 +27,7 @@ function FormResposta({ inicial, aoSalvar, aoCancelar }) {
 
   function salvar(evento) {
     evento.preventDefault()
-    if (!pronto) return
+    if (salvando || !pronto) return
     setSalvando(true)
     const dados = { titulo: titulo.trim(), atalho: atalho.trim() || gerarAtalho(titulo), texto: texto.trim() }
     Promise.resolve(aoSalvar(dados)).finally(() => setSalvando(false))
@@ -36,18 +36,20 @@ function FormResposta({ inicial, aoSalvar, aoCancelar }) {
   return (
     <form className={css.form} onSubmit={salvar}>
       <div className={css.duas}>
-        <CampoTexto rotulo="Título" value={titulo} maxLength={80} onChange={(e) => setTitulo(e.target.value)} autoFocus />
+        <CampoTexto disabled={salvando} rotulo="Título" value={titulo} maxLength={80} onChange={(e) => setTitulo(e.target.value)} autoFocus />
         <CampoTexto
           rotulo="Atalho"
           value={atalho}
+          disabled={salvando}
+          dica="Sem preencher, o atalho é criado a partir do título."
           placeholder={titulo ? gerarAtalho(titulo) : '/pix'}
           onChange={(e) => setAtalho(e.target.value.replace(/\s/g, '-'))}
         />
       </div>
-      <CampoArea rotulo="Texto" rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} dica={VARIAVEIS_TEXTO} />
+      <CampoArea disabled={salvando} rotulo="Texto" rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} dica={VARIAVEIS_TEXTO} />
       <div className={css.acoes}>
         <Botao variante="primario" tipo="submit" icone="check" disabled={!pronto || salvando}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
-        <Botao variante="texto" onClick={aoCancelar}>Cancelar</Botao>
+        <Botao variante="texto" disabled={salvando} onClick={aoCancelar}>Cancelar</Botao>
       </div>
     </form>
   )
@@ -78,20 +80,20 @@ function SecaoRespostas() {
           <h3 id="gestao-respostas">Respostas prontas</h3>
           <p className={css.descricao}>{plural(ativas, 'ativa', 'ativas')}. No atendimento, digite / no campo ou toque em Respostas.</p>
         </div>
-        <Botao variante="primario" icone="plus" onClick={() => setEditando('nova')} disabled={editando === 'nova'}>Nova resposta</Botao>
+        <Botao variante="primario" icone="plus" onClick={() => setEditando('nova')} disabled={editando !== null}>Nova resposta</Botao>
       </header>
 
       <div className={css.filtros}>
         <div className={css.filtroBusca}>
-          <CampoTexto ref={buscaRef} tipo="search" rotulo="Buscar resposta pronta"
+          <CampoTexto ref={buscaRef} disabled={editando !== null} tipo="search" rotulo="Buscar resposta pronta"
             placeholder="Título, atalho ou trecho da resposta" value={busca} onChange={(e) => setBusca(e.target.value)} />
           {busca && <div className={css.retornoBusca}>
             <output className={css.descricao}>{plural(lista.length, 'resposta encontrada', 'respostas encontradas')}</output>
-            <Botao variante="texto" icone="x" onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>
+            <Botao variante="texto" icone="x" disabled={editando !== null} onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>
           </div>}
         </div>
         <label className={css.chave}>
-          <input type="checkbox" checked={verArquivadas} onChange={(e) => setVerArquivadas(e.target.checked)} />
+          <input type="checkbox" disabled={editando !== null} checked={verArquivadas} onChange={(e) => setVerArquivadas(e.target.checked)} />
           Mostrar arquivadas
         </label>
       </div>
@@ -126,8 +128,8 @@ function SecaoRespostas() {
                     <span className={css.texto}>{r.texto}</span>
                   </div>
                   <div className={css.acoesLinha}>
-                    {!r.arquivada && <Botao variante="texto" icone="lapis" onClick={() => setEditando(r.id)}>Editar</Botao>}
-                    <Botao variante="texto" icone={r.arquivada ? 'undo-2' : 'archive'} onClick={() => alternarArquivamentoRespostaPronta(r.id)}>
+                    {!r.arquivada && <Botao variante="texto" disabled={editando !== null} icone="lapis" aria-label={`Editar resposta ${r.titulo}`} onClick={() => setEditando(r.id)}>Editar</Botao>}
+                    <Botao variante="texto" disabled={editando !== null} aria-label={`${r.arquivada ? 'Restaurar' : 'Arquivar'} resposta ${r.titulo}`} icone={r.arquivada ? 'undo-2' : 'archive'} onClick={() => alternarArquivamentoRespostaPronta(r.id)}>
                       {r.arquivada ? 'Restaurar' : 'Arquivar'}
                     </Botao>
                   </div>
@@ -161,6 +163,7 @@ function LinhaAutomatica({ regra, fonteApi, emFoco }) {
   }, [emFoco])
 
   function salvar() {
+    if (salvando || !rascunho?.trim()) return
     setSalvando(true)
     depois(editarRegra(regra.id, { texto: rascunho.trim() }), () => setRascunho(null)).finally(() => setSalvando(false))
   }
@@ -175,6 +178,7 @@ function LinhaAutomatica({ regra, fonteApi, emFoco }) {
             type="checkbox"
             aria-label={`${regra.nome}, ${regra.ativa ? 'ligada' : 'desligada'}`}
             checked={regra.ativa}
+            disabled={salvando}
             onChange={() => alternarRegra(regra.id)}
           />
           {regra.ativa ? 'Ligada' : 'Desligada'}
@@ -200,13 +204,14 @@ function LinhaAutomatica({ regra, fonteApi, emFoco }) {
             rotuloOculto
             rows={3}
             value={rascunho}
+            disabled={salvando}
             onChange={(e) => setRascunho(e.target.value)}
             dica={fonteApi ? VARIAVEIS_TEXTO : null}
             autoFocus
           />
           <div className={css.acoes}>
             <Botao variante="primario" icone="check" disabled={!rascunho.trim() || salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
-            <Botao variante="texto" onClick={() => setRascunho(null)}>Cancelar</Botao>
+            <Botao variante="texto" disabled={salvando} onClick={() => setRascunho(null)}>Cancelar</Botao>
           </div>
         </div>
       ) : (

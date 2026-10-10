@@ -17,6 +17,7 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
   const [ocupado, setOcupado] = useState(false)
 
   const fazer = (acao) => {
+    if (ocupado) return Promise.resolve(false)
     setOcupado(true)
     return Promise.resolve(acao()).finally(() => setOcupado(false))
   }
@@ -34,6 +35,7 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
             rotulo="Nome da categoria"
             aria-label={`Novo nome de ${secao.nome}`}
             value={nome}
+            disabled={ocupado}
             maxLength={100}
             onChange={(e) => setNome(e.target.value)}
           />
@@ -45,25 +47,26 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
         </div>
       )}
       <div className={css.estados}>
-        {!secao.visivel && <Pilula tom="neutro" fina>Escondida</Pilula>}
+        {!secao.visivel && <Pilula tom="neutro" fina>Oculta no site</Pilula>}
       </div>
       <div className={css.acoes}>
         {editando ? (
           <>
-            <Botao variante="texto" onClick={() => { setNome(secao.nome); setEditando(false) }}>Cancelar</Botao>
-            <Botao variante="primario" icone="check" disabled={ocupado || !nome.trim()} onClick={salvar}>Salvar</Botao>
+            <Botao variante="texto" disabled={ocupado} onClick={() => { setNome(secao.nome); setEditando(false) }}>Cancelar</Botao>
+            <Botao variante="primario" icone="check" disabled={ocupado || !nome.trim()} onClick={salvar}>{ocupado ? 'Salvando…' : 'Salvar nome'}</Botao>
           </>
         ) : (
           <>
-            <Botao variante="texto" icone="lapis" disabled={ocupado} onClick={() => setEditando(true)}>Renomear</Botao>
+            <Botao variante="texto" icone="lapis" disabled={ocupado} aria-label={`Renomear ${secao.nome}`} onClick={() => { setNome(secao.nome); setEditando(true) }}>Renomear</Botao>
             <Botao variante="texto" disabled={ocupado} onClick={() => fazer(() => gestao.alternarVisivel(secao.id))}>
-              {secao.visivel ? 'Esconder' : 'Mostrar'}
+              {secao.visivel ? 'Ocultar no site' : 'Mostrar no site'}
             </Botao>
             <Botao
               className={css.acaoDiscreta}
               variante="texto"
               icone="lixeira"
               disabled={ocupado || secao.itens > 0}
+              aria-label={`Excluir ${secao.nome}`}
               title={secao.itens > 0 ? 'Mude os pratos de categoria antes de excluir' : undefined}
               onClick={() => fazer(() => gestao.excluir(secao.id))}
             >
@@ -87,10 +90,11 @@ export function AbaCategoriasApi() {
   const gestao = useSecoesCardapioApi()
   const [nova, setNova] = useState('')
   const [criando, setCriando] = useState(false)
+  const [convertendo, setConvertendo] = useState(false)
 
   const criar = (evento) => {
     evento.preventDefault()
-    if (!nova.trim()) return
+    if (criando || !nova.trim()) return
     setCriando(true)
     Promise.resolve(gestao.criar(nova)).then((ok) => { if (ok !== false) setNova('') }).finally(() => setCriando(false))
   }
@@ -107,22 +111,33 @@ export function AbaCategoriasApi() {
 
   if (acoes.editarCardapio !== true) return (
     <div className={css.aba}>
-      <p className={css.descricao}>Você pode consultar as categorias. As alterações ficam com a dona.</p>
+      {gestao.estado === 'erro' && <p className={css.aviso} role="alert">
+        As categorias não foram atualizadas. A lista abaixo pode estar desatualizada. {gestao.erro}
+        {' '}<Botao variante="texto" icone="refresh-cw" onClick={gestao.recarregar}>Recarregar categorias</Botao>
+      </p>}
+      <p className={css.descricao}>Você pode consultar as categorias. As alterações ficam com a dona ou gerente.</p>
       {gestao.secoes.length === 0 ? <p>Nenhuma categoria cadastrada.</p> : (
         <ol className={css.lista}>{gestao.secoes.map((secao) => (
-          <li className={css.linha} key={secao.id}><span className={css.nome}>{secao.nome}</span><span>{secao.itens} prato(s)</span></li>
+          <li className={css.linha} key={secao.id}><span className={css.nome}>{secao.nome}</span><span>{secao.itens} {secao.itens === 1 ? 'prato' : 'pratos'}</span></li>
         ))}</ol>
       )}
     </div>
   )
   return (
     <div className={css.aba}>
+      {gestao.estado === 'erro' && <p className={css.aviso} role="alert">
+        As categorias não foram atualizadas. A lista abaixo pode estar desatualizada. {gestao.erro}
+        {' '}<Botao variante="texto" icone="refresh-cw" onClick={gestao.recarregar}>Recarregar categorias</Botao>
+      </p>}
       <div className={css.topo}>
         <p className={css.descricao}>
-          As categorias que o cliente vê no site e que agrupam a comanda, nesta ordem. Esconder tira a categoria
+          As categorias que o cliente vê no site e que agrupam a comanda, nesta ordem. Ocultar tira a categoria
           inteira do site sem apagar os pratos. Só dá para excluir categoria vazia.
         </p>
-        <Botao onClick={gestao.migrar}>Converter as categorias antigas</Botao>
+        <Botao disabled={convertendo} onClick={() => {
+          setConvertendo(true)
+          Promise.resolve(gestao.migrar()).finally(() => setConvertendo(false))
+        }}>{convertendo ? 'Convertendo…' : 'Converter as categorias antigas'}</Botao>
       </div>
 
       {gestao.aviso && (
@@ -137,9 +152,10 @@ export function AbaCategoriasApi() {
           placeholder="Nova categoria (ex.: Massas)"
           maxLength={100}
           value={nova}
+          disabled={criando}
           onChange={(e) => setNova(e.target.value)}
         />
-        <Botao tipo="submit" variante="primario" icone="plus" disabled={criando || !nova.trim()}>Criar categoria</Botao>
+        <Botao tipo="submit" variante="primario" icone="plus" disabled={criando || !nova.trim()}>{criando ? 'Criando…' : 'Criar categoria'}</Botao>
       </form>
 
       {gestao.secoes.length === 0 ? (

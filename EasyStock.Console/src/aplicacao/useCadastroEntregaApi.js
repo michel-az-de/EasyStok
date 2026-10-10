@@ -68,5 +68,5 @@ export function useCadastroEntregaApi() {
     removerBloqueio: (id) => executar(() => api.removerBloqueio(id), 'O bloqueio não foi removido'),
   }
 
-  return { janelas, zonas, bloqueios, erro, enviando, acoes, limparErro: () => setErro(null) }
+  return { janelas, zonas, bloqueios, erro, enviando, acoes, recarregar, limparErro: () => setErro(null) }
 }

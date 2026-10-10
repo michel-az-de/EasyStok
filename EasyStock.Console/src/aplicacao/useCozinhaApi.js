@@ -106,6 +106,11 @@ export function useCozinhaApi({ data = null } = {}) {
     vivoRef.current = true
     geracao.nova()
     anteriorRef.current = null
+    setPedidos(null)
+    setErro(null)
+    setSaindo([])
+    setNovos(new Set())
+    setMudaram(new Set())
     const timers = timersRef.current
     let fechar = () => {}
     let espera = null
@@ -174,6 +179,6 @@ export function useCozinhaApi({ data = null } = {}) {
 
   return {
     pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes,
-    avancar, reimprimir, confirmarImpressao: confirmar, avisar: setErro, limparErro,
+    avancar, recarregar, reimprimir, confirmarImpressao: confirmar, avisar: setErro, limparErro,
   }
 }

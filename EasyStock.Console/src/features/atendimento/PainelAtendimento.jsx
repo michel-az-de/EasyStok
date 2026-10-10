@@ -98,7 +98,7 @@ export function PainelAtendimento({
             tamanho="grande"
           />
           <h2 tabIndex={-1} ref={cabecalhoRef} data-foco-reserva>
-            {selecionada.nome}
+            <span className={css.nomeCliente} title={selecionada.nome}>{selecionada.nome}</span>
             {/* Canal, histórico e janela em uma linha de dado. A janela era uma
                 pílula colorida disputando com o nome; agora é texto. */}
             <small>
@@ -125,7 +125,7 @@ export function PainelAtendimento({
               resumo (vazia até a F5 construir o conteúdo); com a conversa já
               encerrada, dá lugar ao "Reabrir conversa" que já existia. */}
           {!encerrada && !bloqueada && (
-            <Botao variante="secundario" icone="log-out" onClick={() => abrirEncerramento(selecionada.id)}>
+            <Botao variante="secundario" icone="log-out" className={css.encerrar} title="Encerrar atendimento" onClick={() => abrirEncerramento(selecionada.id)}>
               Encerrar
             </Botao>
           )}

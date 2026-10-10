@@ -24,28 +24,28 @@ const OPCOES_METODO = METODOS_CAIXA.map((id) => ({ valor: id, rotulo: nomeDoMeto
 // reaproveitando a MESMA ação `marcarEstorno`). Mesmo padrão de campo e
 // validação de `features/ficha-cliente/BlocoOcorrencia.jsx` ("Confirmar
 // reembolso"), só que sem valor parcial: aqui é o toque único do caixa.
-export function PromptEstorno({ rotulo, aoCancelar, aoConfirmar }) {
+export function PromptEstorno({ rotulo, aoCancelar, aoConfirmar, enviando = false }) {
   const [motivo, setMotivo] = useState('')
   return (
     <div className={css.promptEstorno}>
       <p className={css.corpoBloco}>Estornar {rotulo}?</p>
       <CampoArea
         rotulo="Motivo do estorno"
-        rotuloOculto
-        dica="Obrigatório. Fica gravado no lançamento."
+        dica="Descreva o motivo com pelo menos 3 caracteres. Fica gravado no lançamento."
         rows={2}
         value={motivo}
+        disabled={enviando}
         onChange={(e) => setMotivo(e.target.value)}
       />
       <p className={css.confirmarAcoes}>
-        <Botao variante="texto" onClick={aoCancelar}>Manter</Botao>
+        <Botao variante="texto" disabled={enviando} onClick={aoCancelar}>Manter lançamento</Botao>
         <Botao
           variante="primario"
           icone="undo-2"
-          disabled={motivo.trim().length < 3}
+          disabled={enviando || motivo.trim().length < 3}
           onClick={() => aoConfirmar(motivo.trim())}
         >
-          Confirmar estorno
+          {enviando ? 'Estornando…' : 'Confirmar estorno'}
         </Botao>
       </p>
     </div>
