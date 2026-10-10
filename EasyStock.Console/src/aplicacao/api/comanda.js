@@ -6,6 +6,8 @@ import {
 import { mudarStatusKds } from '../../infra/api/kdsApi'
 import { aprovarPedido as aprovarPedidoApi } from '../../infra/api/entregasApi'
 import { MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, baixaCancelaCobrancaOnline, baixaEsperaAprovacao } from '../../dominio/cobranca'
+import { ultimoPagamentoApi } from '../../dominio/pagamento'
+import { criarChaveDeEnvio } from '../chaveDeEnvio'
 import { SO_NO_EASYSTOK } from './naoLigadas'
 
 // Comanda e cobrança no modo API (F03, S10/S11). Montar a comanda (itens, observação,
@@ -34,6 +36,8 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   const limparAviso = () => despachar({ tipo: acao.FECHAR_AVISO_API })
   const pedidoDe = (id) => estadoRef.current.conversas.find((c) => c.id === id)?.pedido ?? null
   const pedidoCriado = (id) => pedidoDe(id)?.pedidoId ?? null
+  // Pagamento parcial repetido depois de "sem conexão" não pode entrar duas vezes.
+  const envioDoPagamento = criarChaveDeEnvio()
 
   // O meio escolhido na tela vai junto: a API devolve a forma, não o meio (F07, item 5).
   async function recarregar(id) {
@@ -145,10 +149,12 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
       return Promise.resolve({ erro: MOTIVO_BAIXA_SEM_APROVACAO })
     }
     const cancelarLink = baixaCancelaCobrancaOnline(pedidoDe(id))
+    const chave = envioDoPagamento.para({ pedidoId, valor, metodo })
     return umaPorConversa(id, 'receber', () => (cancelarLink ? trocarFormaPagamento(pedidoId, FORMA_NA_ENTREGA) : Promise.resolve())
-      .then(() => registrarPagamentoManual(pedidoId, valor, metodo))
+      .then(() => registrarPagamentoManual(pedidoId, valor, metodo, chave))
       .then(
         () => {
+          envioDoPagamento.confirmar(chave)
           limparAviso()
           return recarregar(id).catch(() => avisar('Pagamento registrado. Atualizando a tela…'))
         },
@@ -194,7 +200,8 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   }
   const desfazer = (id, motivo) => {
     if (!pedidoCriado(id)) return soNoEasyStok('Desfazer pagamento')(id)
-    return umaPorConversa(id, 'desfazer', () => desfazerPagamentoManual(pedidoCriado(id), motivo).then(
+    const pagamentoId = ultimoPagamentoApi(pedidoDe(id))?.pagamentoId ?? null
+    return umaPorConversa(id, 'desfazer', () => desfazerPagamentoManual(pedidoCriado(id), motivo, pagamentoId).then(
       () => { limparAviso(); return recarregar(id).catch(() => avisar('Pagamento desfeito. Atualizando a tela…')) },
       (erro) => avisar(`Pagamento não desfeito: ${erro.message}`),
     ))

@@ -19,6 +19,11 @@ export function useSincronizacaoApi({ ativo, comConversas = true, usuario, despa
   // A seleção muda a cada clique; num ref, o laço não recomeça por causa dela.
   const selecionadaRef = useRef(selecionadaId)
   useEffect(() => { selecionadaRef.current = selecionadaId }, [selecionadaId])
+  // O refresh do token recria o objeto do usuário, mesma pessoa. Num ref o laço não recomeça: recomeçar
+  // zerava os caches e relia o pedido de toda conversa da inbox de uma vez.
+  const usuarioRef = useRef(usuario)
+  useEffect(() => { usuarioRef.current = usuario }, [usuario])
+  const usuarioId = usuario?.id ?? null
 
   useEffect(() => {
     if (!ativo) return undefined
@@ -85,7 +90,7 @@ export function useSincronizacaoApi({ ativo, comConversas = true, usuario, despa
         const lista = comConversas ? await listarTodasConversas() : []
         const conversas = await Promise.all(lista.map(async (resumo) => {
           const [mensagens, pedido] = await Promise.all([mensagensDe(resumo), pedidoDe(resumo, cicloLento)])
-          return { ...conversaDaApi(resumo, mensagens, usuario), pedido: pedidoDaApi(pedido) }
+          return { ...conversaDaApi(resumo, mensagens, usuarioRef.current), pedido: pedidoDaApi(pedido) }
         }))
         if (vivo) {
           despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas })
@@ -107,5 +112,5 @@ export function useSincronizacaoApi({ ativo, comConversas = true, usuario, despa
       vivo = false
       clearTimeout(proximo)
     }
-  }, [ativo, comConversas, usuario, despachar])
+  }, [ativo, comConversas, usuarioId, despachar])
 }

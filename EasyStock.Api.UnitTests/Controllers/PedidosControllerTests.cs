@@ -110,7 +110,8 @@ public class PedidosControllerTests
             new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()), QuitacaoPedidoTeste.Criar(_pedidoRepo));
 
         var removePag = new RemoverPagamentoPedidoUseCase(
-            _pedidoRepo, _uow, NullLogger<RemoverPagamentoPedidoUseCase>.Instance, QuitacaoPedidoTeste.Criar(_pedidoRepo));
+            _pedidoRepo, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>(), _uow,
+            NullLogger<RemoverPagamentoPedidoUseCase>.Instance, QuitacaoPedidoTeste.Criar(_pedidoRepo));
 
         var criarCliente = new CriarClienteUseCase(
             _clienteRepo, _uow, NullLogger<CriarClienteUseCase>.Instance);
@@ -203,6 +204,27 @@ public class PedidosControllerTests
             new RegistrarPagamentoPedidoCommand(_empresaId, pedido.Id, "pix", 100m, ConfirmadoPeloProvedor: true));
         await executar.Should().ThrowAsync<EasyStock.Application.UseCases.Common.UseCaseValidationException>();
         await _pedidoRepo.DidNotReceive().AddPagamentoAsync(Arg.Any<PedidoPagamento>());
+    }
+
+    [Fact]
+    public async Task AddPagamento_AutorVemDaSessao_NaoDoCorpo()
+    {
+        _uow.SetupExecuteInTransactionSemRetry<EasyStock.Application.UseCases.Pedidos.PedidoResult?>();
+        var pedido = MakePedido(_empresaId);
+        _pedidoRepo.GetByIdWithDetailsAsync(_empresaId, pedido.Id).Returns(pedido);
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
+            {
+                User = new System.Security.Claims.ClaimsPrincipal(
+                    new System.Security.Claims.ClaimsIdentity([new System.Security.Claims.Claim("nome", "Ana")], "test"))
+            }
+        };
+
+        await _controller.AddPagamento(pedido.Id,
+            new RegistrarPagamentoPedidoCommand(_empresaId, pedido.Id, "pix", 100m, RegistradoPorNome: "Mercado Pago"));
+
+        await _pedidoRepo.Received(1).AddPagamentoAsync(Arg.Is<PedidoPagamento>(p => p.RegistradoPorNome == "Ana"));
     }
 
     // ── GetById ───────────────────────────────────────────────────────────────

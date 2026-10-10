@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { criarGestaoPerdas, lerResumoDePerdas, lerVencidos } from './perdas'
+import { criarGestaoPerdas, lerResumoDePerdas, lerVencidos, porcoesComSaldo } from './perdas'
 import { lerEstoqueDoDia } from './estoqueDoDia'
 import { lerInsumos } from './insumos'
 
 // Perdas lidas da API (M2.6, #1511): resumo do período, lotes vencidos e o que pode ser perdido
 // (pratos do estoque do dia e insumos). estado: carregando | ok | erro
 const opcoesDe = (estoque, insumos) => [
-  ...(estoque?.pratos ?? []).filter((p) => p.produtoId).map((p) => ({ produtoId: p.produtoId, nome: p.nome, tipo: 'prato', saldo: p.saldo })),
+  ...(estoque?.pratos ?? []).filter((p) => p.produtoId).map((p) => ({
+    produtoId: p.produtoId, nome: p.nome, tipo: 'prato', saldo: p.saldo, porcoes: porcoesComSaldo(p),
+  })),
   ...(insumos ?? []).map((i) => ({ produtoId: i.id, nome: i.nome, tipo: 'insumo', saldo: i.saldo, unidade: i.unidade })),
 ]
 

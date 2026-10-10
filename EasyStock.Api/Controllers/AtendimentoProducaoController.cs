@@ -10,7 +10,9 @@ public sealed record BaixaAutomaticaRequest(bool Ligada);
 public sealed record PlanejamentoRequest(IReadOnlyList<PratoPlanejado>? Pratos);
 
 /// <param name="ItemEstoqueId">Lote escolhido; null = FEFO.</param>
-public sealed record PerdaRequest(Guid ProdutoId, Guid? ItemEstoqueId, decimal Quantidade, MotivoPerda Motivo, string? Texto);
+/// <param name="ProdutoVariacaoId">Porção perdida, quando o prato tem porções (vem do estoque do dia).</param>
+public sealed record PerdaRequest(
+    Guid ProdutoId, Guid? ItemEstoqueId, decimal Quantidade, MotivoPerda Motivo, string? Texto, Guid? ProdutoVariacaoId = null);
 
 public sealed record ProduzirPratosRequest(IReadOnlyList<PratoProduzidoInput>? Pratos, string? Observacao = null);
 
@@ -77,7 +79,7 @@ public class AtendimentoProducaoController(
         try
         {
             var r = await perdas.LancarAsync(currentUser.EmpresaId, gerente,
-                new LancarPerdaInput(req.ProdutoId, req.ItemEstoqueId, req.Quantidade, req.Motivo, req.Texto), ct);
+                new LancarPerdaInput(req.ProdutoId, req.ItemEstoqueId, req.Quantidade, req.Motivo, req.Texto, req.ProdutoVariacaoId), ct);
             return DataCreated("/api/atendimento/producao/perdas", r);
         }
         catch (UseCaseValidationException ex) when (ex.Code == PerdasDaProducaoUseCase.CodigoExigeGerente)

@@ -216,13 +216,16 @@ export const reemitirCobranca = (pedidoId) =>
 export const trocarFormaPagamento = (pedidoId, forma) =>
   chamarApi(`/api/pedidos/${pedidoId}/cobranca/forma`, { metodo: 'POST', corpo: { forma } })
 
-export const registrarPagamentoManual = (pedidoId, valor, metodo) =>
+export const registrarPagamentoManual = (pedidoId, valor, metodo, chave = null) =>
   chamarApi(`/api/pedidos/${pedidoId}/pagamentos`, {
-    metodo: 'POST', corpo: { empresaId: lerSessao()?.empresa?.id, pedidoId, valor, metodo },
+    metodo: 'POST', chave, corpo: { empresaId: lerSessao()?.empresa?.id, pedidoId, valor, metodo },
   })
 
-export const desfazerPagamentoManual = (pedidoId, motivo) =>
-  chamarApi(`/api/pedidos/${pedidoId}/pagamento-manual/desfazer`, { metodo: 'POST', corpo: { motivo } })
+// Com o id, repetir o pedido depois de resposta perdida não desfaz o pagamento anterior.
+export const desfazerPagamentoManual = (pedidoId, motivo, pagamentoId = null) =>
+  chamarApi(`/api/pedidos/${pedidoId}/pagamento-manual/desfazer`, {
+    metodo: 'POST', corpo: pagamentoId ? { motivo, pagamentoId } : { motivo },
+  })
 
 export const cancelarPedido = (pedidoId, motivo) =>
   chamarApi(`/api/pedidos/${pedidoId}/cancelar`, {

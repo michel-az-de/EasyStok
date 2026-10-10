@@ -28,6 +28,10 @@ public sealed class ConsultarEstornosManuaisUseCase(IPedidoRepository pedidos, I
 
     internal static bool EhManual(PedidoPagamento pagamento, IReadOnlyList<CobrancaPedido> cobrancas) =>
         !string.Equals(pagamento.RegistradoPorNome, "Mercado Pago", StringComparison.OrdinalIgnoreCase)
-        && !cobrancas.Any(c => c.EhOnline && !string.IsNullOrEmpty(pagamento.Referencia)
-            && c.PagamentoExternoId == pagamento.Referencia);
+        && !TemCobrancaOnline(pagamento, cobrancas);
+
+    /// <summary>O pagamento confirmou uma cobrança online: só o estorno o devolve.</summary>
+    internal static bool TemCobrancaOnline(PedidoPagamento pagamento, IReadOnlyList<CobrancaPedido> cobrancas) =>
+        !string.IsNullOrEmpty(pagamento.Referencia)
+        && cobrancas.Any(c => c.EhOnline && c.PagamentoExternoId == pagamento.Referencia);
 }

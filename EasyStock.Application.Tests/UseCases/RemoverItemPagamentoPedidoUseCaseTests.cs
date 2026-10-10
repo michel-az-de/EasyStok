@@ -16,6 +16,8 @@ public class RemoverItemPagamentoPedidoUseCaseTests
 {
     private readonly IPedidoRepository _repo = Substitute.For<IPedidoRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository _cobrancas =
+        Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>();
 
     public RemoverItemPagamentoPedidoUseCaseTests() =>
         _uow.SetupExecuteInTransactionSemRetry<EasyStock.Application.UseCases.Pedidos.PedidoResult?>();
@@ -30,7 +32,8 @@ public class RemoverItemPagamentoPedidoUseCaseTests
                 Substitute.For<ILogger<PedidoEstoqueIntegrationService>>()),
             _uow, Substitute.For<ILogger<RemoverItemPedidoUseCase>>());
     private RemoverPagamentoPedidoUseCase PagUC() =>
-        new(_repo, _uow, Substitute.For<ILogger<RemoverPagamentoPedidoUseCase>>(), QuitacaoPedidoTeste.Criar(_repo));
+        new(_repo, _cobrancas, _uow,
+            Substitute.For<ILogger<RemoverPagamentoPedidoUseCase>>(), QuitacaoPedidoTeste.Criar(_repo));
 
     private static PedidoItem NovoItem(Guid pedidoId, string nome, decimal qtd, decimal preco) => new()
     {
@@ -82,5 +85,79 @@ public class RemoverItemPagamentoPedidoUseCaseTests
         pedido.Pagamentos.Should().BeEmpty();
         evento!.Tipo.Should().Be("pagamento_removido");
         await _uow.Received(1).CommitAsync();
+    }
+
+    // #1540: a rota antiga de remoção não tinha regra de dinheiro nenhuma.
+    [Fact]
+    public async Task RemoverPagamento_DoMercadoPago_Recusa_PorqueSeDevolvePeloEstorno()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = Pedido.Criar(empresaId);
+        var pag = new PedidoPagamento
+        {
+            Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "pix", Valor = 30m, PagoEm = DateTime.UtcNow, Referencia = "pay-9"
+        };
+        pedido.Pagamentos.Add(pag);
+        _repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        var cobranca = EasyStock.Domain.Entities.Pagamentos.CobrancaPedido.CriarOnline(empresaId, pedido.Id, 30m, "pref-1", "https://mp.test/pref-1",
+            DateTime.UtcNow.AddMinutes(30), 1, DateTime.UtcNow);
+        cobranca.MarcarPaga("pay-9", 30m, "pix", DateTime.UtcNow);
+        _cobrancas.ListarDoPedidoAsync(empresaId, pedido.Id, Arg.Any<CancellationToken>()).Returns(new List<EasyStock.Domain.Entities.Pagamentos.CobrancaPedido> { cobranca });
+
+        var act = () => PagUC().ExecuteAsync(new RemoverPagamentoPedidoCommand(empresaId, pedido.Id, pag.Id));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*estorno*");
+        pedido.Pagamentos.Should().ContainSingle();
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    // O nome vem de quem registrou e não prova nada: sem cobrança online por trás, o pagamento é manual
+    // e continua removível (senão um nome falsificado criaria recebimento sem saída nenhuma).
+    [Fact]
+    public async Task RemoverPagamento_ComNomeMercadoPagoMasSemCobrancaOnline_Remove()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = Pedido.Criar(empresaId);
+        var pag = new PedidoPagamento
+        {
+            Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "pix", Valor = 30m, PagoEm = DateTime.UtcNow,
+            RegistradoPorNome = "Mercado Pago"
+        };
+        pedido.Pagamentos.Add(pag);
+        _repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        await PagUC().ExecuteAsync(new RemoverPagamentoPedidoCommand(empresaId, pedido.Id, pag.Id));
+
+        pedido.Pagamentos.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(NivelAcesso.Operador, false)]
+    [InlineData(NivelAcesso.Gerente, true)]
+    public async Task RemoverPagamento_ComPreparoIniciado_SoAGestao(NivelAcesso nivel, bool remove)
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = Pedido.Criar(empresaId);
+        pedido.Status = EasyStock.Domain.Sales.StatusPedidoMapper.Preparando;
+        var pag = new PedidoPagamento
+        {
+            Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "dinheiro", Valor = 80m, PagoEm = DateTime.UtcNow
+        };
+        pedido.Pagamentos.Add(pag);
+        _repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        var act = () => PagUC().ExecuteAsync(
+            new RemoverPagamentoPedidoCommand(empresaId, pedido.Id, pag.Id, NivelSolicitante: nivel));
+
+        if (remove)
+        {
+            await act.Should().NotThrowAsync();
+            pedido.Pagamentos.Should().BeEmpty();
+        }
+        else
+        {
+            await act.Should().ThrowAsync<UnauthorizedAccessException>();
+            pedido.Pagamentos.Should().ContainSingle();
+        }
     }
 }

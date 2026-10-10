@@ -15,6 +15,13 @@ public class IdempotencyOptionsTests
     }
 
     [Fact]
+    public void Lancamento_de_caixa_usa_a_protecao_de_retentativa()
+    {
+        EasyStock.Api.Hosting.PipelineExtensions.ConfigurarRotasIdempotentes(new IdempotencyOptions())
+            .PathMatchesAny("/api/caixa/movimentos").Should().BeTrue();
+    }
+
+    [Fact]
     public void PathMatchesAny_sem_prefixos_sempre_falso()
     {
         var opts = new IdempotencyOptions();

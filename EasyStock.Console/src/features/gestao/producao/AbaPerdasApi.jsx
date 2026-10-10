@@ -14,7 +14,7 @@ import css from '../cardapio/abaCardapio.module.css'
 // aparece como sugestão e só sai quando ela confirma. Desfazer é o estorno (Gerente).
 const qtd = (n) => Number(n ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 })
 const quando = (iso) => (iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '')
-const vazio = { produtoId: '', quantidade: '', motivo: 'PerdaNoPreparo', texto: '' }
+const vazio = { produtoId: '', porcao: '', quantidade: '', motivo: 'PerdaNoPreparo', texto: '' }
 
 export function AbaPerdasApi() {
   const gestao = usePerdasApi()
@@ -39,10 +39,11 @@ export function AbaPerdasApi() {
 
   const mudar = (campo) => (e) => setRascunho((atual) => ({ ...atual, [campo]: e.target.value }))
   const escolhido = gestao.opcoes.find((o) => o.produtoId === rascunho.produtoId)
+  const porcoes = escolhido?.porcoes ?? []
 
   async function lancar(evento) {
     evento.preventDefault()
-    const ok = await executar(() => gestao.lancar({ ...rascunho, nome: escolhido?.nome }))
+    const ok = await executar(() => gestao.lancar({ ...rascunho, nome: escolhido?.nome, porcoes }))
     if (ok) setRascunho(vazio)
   }
 
@@ -81,10 +82,17 @@ export function AbaPerdasApi() {
 
       <form className={css.aba} onSubmit={lancar} aria-label="Lançar perda">
         <div className={`${css.campos} ${css.formulario} ${css.lancamentoPerda}`}>
-          <CampoSelecao disabled={enviando} rotulo="Prato ou insumo" value={rascunho.produtoId} onChange={mudar('produtoId')}
+          <CampoSelecao disabled={enviando} rotulo="Prato ou insumo" value={rascunho.produtoId}
+            onChange={(e) => setRascunho((atual) => ({ ...atual, produtoId: e.target.value, porcao: '' }))}
             opcoes={[{ valor: '', rotulo: 'Escolha o prato ou insumo' }, ...gestao.opcoes.map((o) => ({
               valor: o.produtoId, rotulo: `${o.nome} (${o.tipo}, tem ${qtd(o.saldo)}${o.unidade ? ` ${o.unidade}` : ''})`,
             }))]} />
+          {porcoes.length > 0 && (
+            <div className={css.linhaCompleta}>
+              <CampoSelecao disabled={enviando} rotulo="Porção" value={rascunho.porcao} onChange={mudar('porcao')}
+                opcoes={[{ valor: '', rotulo: 'Escolha a porção perdida' }, ...porcoes.map((s) => ({ valor: s.chave, rotulo: `${s.rotulo} (tem ${qtd(s.saldo)})` }))]} />
+            </div>
+          )}
           <CampoTexto disabled={enviando} inputMode="decimal" rotulo={escolhido?.unidade ? `Quantidade (${escolhido.unidade})` : 'Quantidade'} value={rascunho.quantidade} onChange={mudar('quantidade')} />
           <CampoSelecao disabled={enviando} rotulo="Motivo" value={rascunho.motivo} onChange={mudar('motivo')}
             opcoes={MOTIVOS_PERDA.map((m) => ({ valor: m.id, rotulo: m.rotulo }))} />

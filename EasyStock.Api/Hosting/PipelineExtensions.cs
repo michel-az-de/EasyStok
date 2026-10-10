@@ -421,6 +421,8 @@ public static class PipelineExtensions
         .Add("/api/atendimento/producao")
         .Add("/api/atendimento/mensagens-programadas")
         .Add("/api/atendimento/lembretes")
+        // #1540: sangria ou suprimento repetido depois de resposta perdida virava dois lançamentos.
+        .Add("/api/caixa/movimentos")
         // S20: retorno do consumidor da fila de impressão (impressa/falhou); opt-in por header.
         .Add("/api/impressao");
 }

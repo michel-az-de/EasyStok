@@ -13,8 +13,8 @@ export const abrirCaixa = ({ saldoInicial, observacoes }) =>
   chamarApi(`${BASE}/abrir`, { metodo: 'POST', corpo: { saldoInicial, observacoes } })
 
 // Saída pela web exige método e descrição (FIN-003); a tela já pede os dois.
-export const registrarMovimento = ({ tipo, valor, categoria, metodo, descricao }) =>
-  chamarApi(`${BASE}/movimentos`, { metodo: 'POST', corpo: { tipo, valor, categoria, metodo, descricao } })
+export const registrarMovimento = ({ tipo, valor, categoria, metodo, descricao }, chave = null) =>
+  chamarApi(`${BASE}/movimentos`, { metodo: 'POST', chave, corpo: { tipo, valor, categoria, metodo, descricao } })
 
 export const estornarMovimento = (id, motivo) =>
   chamarApi(`${BASE}/movimentos/${id}/estornar`, { metodo: 'POST', corpo: { motivo } })

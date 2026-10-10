@@ -565,9 +565,10 @@ public class SyncMutationDispatcher(
     {
         var id = m.Payload.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
         if (string.IsNullOrEmpty(id)) throw new ArgumentException("Exclusão de lançamento sem id.");
-        var existing = await _db.Set<CashEntry>()
-            .FirstOrDefaultAsync(c => c.Id == id && c.EmpresaId == empresaId);
-        if (existing == null || existing.DeletedAt != null) return;
+        // FindAsync enxerga o lançamento criado neste mesmo envio, ainda não salvo: offline, lançar e
+        // excluir sobem juntos, e a consulta ao banco aceitava a exclusão sem excluir nada.
+        var existing = await _db.Set<CashEntry>().FindAsync(id);
+        if (existing == null || existing.EmpresaId != empresaId || existing.DeletedAt != null) return;
 
         await RecusarSeCaixaFechadoAsync(existing, "a exclusão");
         var movimento = await MovimentoVinculadoAsync(existing);
