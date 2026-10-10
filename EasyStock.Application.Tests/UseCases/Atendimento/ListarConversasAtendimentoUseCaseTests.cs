@@ -18,9 +18,10 @@ public class ListarConversasAtendimentoUseCaseTests
         var repo = Substitute.For<IConversaRepository>();
         var config = Substitute.For<IConfiguracaoAtendimentoRepository>();
         var conversa = Conversa.Abrir(empresa, "5511999990001", DateTime.UtcNow);
+        conversa.Assumir(DateTime.UtcNow, Guid.NewGuid());
         var alheia = Conversa.Abrir(Guid.NewGuid(), "5511999990002", DateTime.UtcNow);
         repo.ListarInboxAsync(default, default, default, default, default, default, default)
-            .ReturnsForAnyArgs([new ConversaInboxItem(conversa, null, true), new ConversaInboxItem(alheia, null, true)]);
+            .ReturnsForAnyArgs([new ConversaInboxItem(conversa, null, true, "Ana"), new ConversaInboxItem(alheia, null, true, "Pessoa de fora")]);
         if (configurado is { } minutos)
         {
             var salvo = ConfiguracaoAtendimento.CriarPadrao(empresa);
@@ -33,5 +34,7 @@ public class ListarConversasAtendimentoUseCaseTests
         resumo.Id.Should().Be(conversa.Id);
         resumo.SlaRespostaMinutos.Should().Be(esperado);
         resumo.AguardaResposta.Should().BeTrue();
+        resumo.AssumidaPorNome.Should().Be("Ana");
+        resumo.AssumidaPorUsuarioId.Should().Be(conversa.AssumidaPorUsuarioId);
     }
 }

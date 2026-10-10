@@ -1,6 +1,6 @@
 # M3 Atendimento · balcão, pedidos, clientes, canais, status e histórico
 
-> **Atualização de 10/10/2026:** reabertura de conversa ligada à API, com histórico, janela do canal e fila humana preservados; homologação local no computador e celular (seção 28). Modelos aprovados do M3.6 continuam pendentes. Ocorrências por pedido ligadas à Ficha: Dona/gerente inicia apuração e encerra com resolução; Atendimento consulta histórico. Autoria, repetição idempotente, concorrência e retomada de reembolso pendente homologadas localmente (seção 27 do plano de ondas). Devolução manual confirmada e estorno pelo Mercado Pago também implementados na Ficha (seções 25 e 26); o provedor online foi validado com transporte HTTP controlado, sem transferência real. Cancelamento conserva D3-04: Atendimento sem pagamento; com qualquer valor recebido, só Dona/gerente. Cancelar não devolve dinheiro nem avisa automaticamente o cliente. M3.3 e os aceites externos continuam parciais.
+> **Atualização de 10/10/2026:** reabertura de conversa ligada à API, com histórico, janela do canal e fila humana preservados; homologação local no computador e celular (seção 28). Modelos textuais aprovados do M3.6 e filtros por atendente do M3.7 implementados e homologados localmente (seções 29 e 30); entrega real na Meta segue pendente. Ocorrências por pedido ligadas à Ficha: Dona/gerente inicia apuração e encerra com resolução; Atendimento consulta histórico. Autoria, repetição idempotente, concorrência e retomada de reembolso pendente homologadas localmente (seção 27 do plano de ondas). Devolução manual confirmada e estorno pelo Mercado Pago também implementados na Ficha (seções 25 e 26); o provedor online foi validado com transporte HTTP controlado, sem transferência real. Cancelamento conserva D3-04: Atendimento sem pagamento; com qualquer valor recebido, só Dona/gerente. Cancelar não devolve dinheiro nem avisa automaticamente o cliente. M3.3 e os aceites externos continuam parciais.
 
 Issue: #1316 · Decisão: [ADR-0056](../../adr/0056-erp-da-casa-da-baba-front-unico.md) · Data: 2026-10-01
 Base medida: master `b713263a`. Plano irmão (dono de S01–S53 e F01–F18):
@@ -259,6 +259,8 @@ As rotas de mensagem são só texto e imagem (`AtendimentoConversasController.cs
 
 ### M3.7 · Atendentes: minhas, sem dono, todas
 
+**Executado em 10/10/2026:** filtro por responsável no Balcão, padrão Todas e nome de quem assumiu a conversa. Minhas usa o ID da sessão, inclusive entre homônimos; Sem dono respeita a atribuição persistida. Busca, canais, contagens e históricos recolhidos usam o mesmo filtro. Com um atendente ativo, o controle adicional fica oculto. Assumir e devolver aguardam a confirmação da API; transferência entre dois usuários atualiza as listas pela sincronização existente. Homologação local e evidências na seção 30 do plano de ondas.
+
 **Problema.** A S41 permite atribuir e transferir, mas o balcão não separa o que é de quem.
 **Fato medido.** Atendente = usuário com `AtenderConversas` (`AtendentesUseCases.cs:24-31`). O console
 sabe se a conversa é "minha" ou de "Outro atendente", sem o nome (`infra/api/traducaoConversas.js:70-81`).
@@ -267,8 +269,8 @@ No modo massa a atendente é fixa "Thatiane" (`Moldura.jsx:425`, `aplicacao/caso
 **Abordagem.** Aditivo no resumo da conversa: `assumidaPorNome`. Filtro do balcão: Minhas, Sem dono, Todas
 (padrão Todas, para a casa de uma pessoa só não mudar nada). Selo com o nome. Transferir é da F09.
 **Aceite.**
-- [ ] Com dois usuários, cada um vê "Minhas" com as suas e o nome do outro no selo.
-- [ ] Com um usuário só, nada muda na tela (captura igual).
+- [x] Com dois usuários, cada um vê "Minhas" com as suas e o nome do outro no selo (API, PostgreSQL e Chromium locais).
+- [x] Com um atendente ativo no banco local, o controle adicional fica oculto e a lista padrão permanece Todas; captura 1440 px conferida.
 **Fora.** Distribuição automática; metas por atendente.
 **Depende de.** F09; D3-03. **Tamanho.** P · **Tier.** baixo · **Rollback.** revert.
 
@@ -317,10 +319,9 @@ F10 ─► M3.8 lembrete agendado (junto com M8.2)            M3.9 só depois de
 - B) Só o pedido do iFood entra (Cozinha e lista de pedidos), sem chat.
 - C) Pedido e chat do iFood como canal do balcão (D5 inteiro).
 
-**D3-03 · Atendentes múltiplos agora?**
-- A) (Recomendado) Só filtro Minhas/Sem dono e nome no selo (M3.7, pequeno).
-- B) Adiar até existir a segunda pessoa no atendimento.
-- C) Distribuição automática das conversas entre atendentes.
+**D3-03 · Escopo executado no M3.7 em 10/10/2026.**
+- Filtro Minhas/Sem dono/Todas e nome no selo, conforme a continuidade solicitada para esta fatia.
+- Distribuição automática e metas por atendente continuam fora do escopo.
 
 **D3-04 · Quem cancela pedido já pago pela ficha? Decidido por Felipe em 09/10/2026.**
 - Atendimento cancela sem pagamento. Com qualquer valor recebido, inclusive parcial, só Dona/gerente.

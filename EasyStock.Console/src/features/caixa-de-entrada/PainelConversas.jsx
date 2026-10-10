@@ -138,7 +138,10 @@ export function PainelConversas({ aoAbrir }) {
         {lista.length === 0 && semBusca && semCanal && filtros.aba === 'precisa' && (
           <VazioEmLinha texto="Ninguém esperando você." acao="Ver todas" aoAgir={() => mudarFiltro('aba', 'todas')} />
         )}
-        {lista.length === 0 && semBusca && semCanal && filtros.aba !== 'precisa' && (
+        {lista.length === 0 && semBusca && semCanal && filtros.aba !== 'precisa' && filtros.responsavel && filtros.responsavel !== 'todas' && (
+          <VazioEmLinha texto={filtros.responsavel === 'minhas' ? 'Nenhuma conversa sua aberta agora.' : 'Nenhuma conversa sem dono aberta agora.'} acao="Ver todas" aoAgir={() => mudarFiltro('responsavel', 'todas')} />
+        )}
+        {lista.length === 0 && semBusca && semCanal && filtros.aba !== 'precisa' && (!filtros.responsavel || filtros.responsavel === 'todas') && (
           <VazioEmLinha texto="Nenhuma conversa aberta agora." />
         )}
         {lista.map((conversa) => (

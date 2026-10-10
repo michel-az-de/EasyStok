@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { Popover } from '../../componentes/Popover'
-import { useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { precisaDeVoce } from '../../dominio/automatico'
-import { combinaBusca, combinaCanal, contarPorCanal } from '../../dominio/conversa'
+import { combinaBusca, combinaCanal, combinaResponsavel, contarPorCanal } from '../../dominio/conversa'
 import css from './caixa.module.css'
 
 const OPCOES_DE_ORDEM = [
@@ -56,18 +56,19 @@ function ChipCanal({ canal, rotulo, abertas, precisam, ligado, aoTrocar }) {
 export function BarraBalcao({ filtros, aoMudar }) {
   const [ordenarAberto, setOrdenarAberto] = useState(false)
   const { canais, janelas } = useCatalogo()
-  const { conversas, agora, automaticoPausado, aberta, horarioDaLoja } = useAtendimento()
+  const { conversas, agora, automaticoPausado, aberta, horarioDaLoja, sessao } = useAtendimento()
+  const doResponsavel = conversas.filter((c) => combinaResponsavel(c, filtros.responsavel, sessao?.usuario))
 
   // As duas contagens das abas já respeitam o canal ligado na linha C e a
   // busca da linha A (seção 1): trocar canal ou digitar não pode deixar o
   // número da aba discordando da lista embaixo.
-  const doUniverso = conversas.filter((c) => combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca))
+  const doUniverso = doResponsavel.filter((c) => combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca))
   const quantasPrecisam = doUniverso
     .filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas, horarioDaLoja)).length
 
   // Tempo real: derivado de `conversas` a cada render, sem contador guardado
   // que possa divergir. Conversa nova da simulação (F2) já sobe o número.
-  const contagemPorCanal = contarPorCanal(conversas, canais, agora, automaticoPausado, aberta, janelas, horarioDaLoja)
+  const contagemPorCanal = contarPorCanal(doResponsavel, canais, agora, automaticoPausado, aberta, janelas, horarioDaLoja)
 
   function trocarCanal(nome) {
     const ligados = filtros.canais.includes(nome)
@@ -182,6 +183,38 @@ export function BarraBalcao({ filtros, aoMudar }) {
           />
         ))}
       </fieldset>
+      <FiltroResponsavel valor={filtros.responsavel ?? 'todas'} aoMudar={(valor) => aoMudar('responsavel', valor)} />
     </div>
+  )
+}
+
+function FiltroResponsavel({ valor, aoMudar }) {
+  const { listarAtendentes } = useAcoes()
+  const [consulta, setConsulta] = useState({ estado: 'carregando', itens: [] })
+  const [tentativa, setTentativa] = useState(0)
+  useEffect(() => {
+    let vivo = true
+    listarAtendentes().then(
+      (itens) => { if (vivo) setConsulta({ estado: 'ok', itens }) },
+      () => { if (vivo) setConsulta({ estado: 'erro', itens: [] }) },
+    )
+    return () => { vivo = false }
+  }, [listarAtendentes, tentativa])
+  if (consulta.estado === 'erro') return (
+    <output className={css.vazioLinha}>
+      Não foi possível consultar os atendentes.
+      <button type="button" className={css.linkVazio} onClick={() => { setConsulta({ estado: 'carregando', itens: [] }); setTentativa((n) => n + 1) }}>Tentar novamente</button>
+    </output>
+  )
+  if (consulta.itens.length <= 1 && valor === 'todas') return null
+  return (
+    <label className={css.filtroResponsavel}>
+      Responsável
+      <select aria-label="Responsável pelas conversas" value={valor} onChange={(e) => aoMudar(e.target.value)}>
+        <option value="todas">Todas</option>
+        <option value="minhas">Minhas</option>
+        <option value="sem-dono">Sem dono</option>
+      </select>
+    </label>
   )
 }

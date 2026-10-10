@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { estadoInicial, reducer } from './reducer'
+import { ATENDENTE, estadoInicial, reducer } from './reducer'
 import * as acao from './acoes'
 import { ContextoAcoes, ContextoCatalogo, ContextoEstado } from './contextos'
 import { carregarConversas, proximoId } from '../infra/repositorioConversas'
@@ -327,6 +327,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
 
   const valor = useMemo(() => {
     const selecionada = estado.conversas.find((c) => c.id === estado.selecionadaId) ?? null
+    const usuario = FONTE_API ? sessao?.usuario : { nome: ATENDENTE }
     return {
       conversas: estado.conversas,
       selecionadaId: estado.selecionadaId,
@@ -348,7 +349,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       visiveis: ordenarBalcao(
         conversasDoBalcao(
           estado.conversas, estado.filtros, agoraEfetivo, estado.automaticoPausado, aberta, estado.catalogo.janelas,
-          horarioDaLoja,
+          horarioDaLoja, usuario,
         ),
         agoraEfetivo,
         {
@@ -363,8 +364,8 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       // Os dois grupos recolhidos do fim de "Todas" (seção 1): mesmo canal e
       // busca da lista de cima, sem aba, porque nenhum dos dois existe em
       // "Precisa de você".
-      encerradasDoBalcao: conversasEncerradasDoBalcao(estado.conversas, estado.filtros),
-      bloqueadasDoBalcao: conversasBloqueadasDoBalcao(estado.conversas, estado.filtros),
+      encerradasDoBalcao: conversasEncerradasDoBalcao(estado.conversas, estado.filtros, usuario),
+      bloqueadasDoBalcao: conversasBloqueadasDoBalcao(estado.conversas, estado.filtros, usuario),
       historico: selecionada ? historicoComPedidoVivo(selecionada.cliente?.historico ?? carregarHistorico(selecionada.id), selecionada.pedido) : [],
       ultimoAvanco: estado.ultimoAvanco,
       // Lote de papel (US-042): banner de queda e a modal de lançamento leem
