@@ -547,6 +547,25 @@ public class CardapioItem
     public decimal PrecoAPartirDe() => VariacaoPadrao()?.PrecoStorefront ?? PrecoEfetivo();
 
     /// <summary>
+    /// M1.4b (#1531): a porção que o pedido vai cobrar. Prato sem porções devolve null (vale o preço do
+    /// item). Com porções, vale a pedida ou, sem nenhuma informada, a <see cref="VariacaoPadrao"/>
+    /// (site e agente ainda não escolhem porção). Porção de outro prato ou esgotada recusa.
+    /// </summary>
+    public CardapioItemVariacao? PorcaoParaVenda(Guid? variacaoId)
+    {
+        var nome = NomeEfetivo() is { Length: > 0 } n ? n : "O item";
+        if (!TemVariacoes())
+            return variacaoId is null ? null : throw new RegraDeDominioVioladaException($"{nome} não tem essa porção.");
+
+        var porcao = variacaoId is { } id ? Variacoes.FirstOrDefault(v => v.Id == id) : VariacaoPadrao();
+        if (porcao is null)
+            throw new RegraDeDominioVioladaException($"{nome} não tem essa porção.");
+        if (!porcao.Disponivel)
+            throw new RegraDeDominioVioladaException($"{nome} {porcao.Rotulo} está esgotado agora.");
+        return porcao;
+    }
+
+    /// <summary>
     /// Há disponibilidade para venda: item sem opções segue <see cref="Disponivel"/>;
     /// item guarda-chuva precisa de ao menos uma opção disponível.
     /// </summary>

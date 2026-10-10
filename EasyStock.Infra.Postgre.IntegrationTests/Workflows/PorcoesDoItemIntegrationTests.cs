@@ -61,6 +61,37 @@ public class PorcoesDoItemIntegrationTests(PostgreSqlDatabaseFixture fixture)
         variacoes.Single(v => v.Id == p300.ProdutoVariacaoId).Nome.Should().Be("800 g");
     }
 
+    [SkippableFact]
+    public async Task OItemQueOCheckoutCarrega_VemComAsPorcoes_EAEsgotadaRecusa()
+    {
+        // M1.4b (#1531): o checkout cobra o preço da porção; a leitura dele precisa trazer as porções.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var (empresaId, _, itemId) = await SeedAsync();
+        await using var provider = BuildProductionProvider();
+        await Escopo(provider, empresaId, sp => sp.GetRequiredService<ItensDoCardapioComandaUseCase>().EditarAsync(empresaId, itemId,
+            new DadosItemCardapio(null, null, null, null, null, Porcoes:
+            [
+                new PorcaoDoItem(null, "300 g", 28m, Padrao: true),
+                new PorcaoDoItem(null, "800 g", 62m, Disponivel: false),
+            ])));
+
+        await Escopo(provider, empresaId, async sp =>
+        {
+            var db = sp.GetRequiredService<EasyStockDbContext>();
+            var storefrontId = await db.Set<CardapioItem>().Where(i => i.Id == itemId).Select(i => i.StorefrontId).SingleAsync();
+            var item = await sp.GetRequiredService<EasyStock.Application.Ports.Output.Persistence.Storefront.ICardapioItemRepository>()
+                .GetByIdAsync(storefrontId, itemId);
+
+            item!.Variacoes.Should().HaveCount(2);
+            var padrao = item.PorcaoParaVenda(null)!;
+            (padrao.Rotulo, padrao.PrecoStorefront).Should().Be(("300 g", 28m));
+            padrao.ProdutoVariacaoId.Should().NotBeNull("a linha do pedido grava a variação do estoque");
+            var esgotada = () => item.PorcaoParaVenda(item.Variacoes.Single(v => v.Rotulo == "800 g").Id);
+            esgotada.Should().Throw<EasyStock.Domain.Exceptions.RegraDeDominioVioladaException>().WithMessage("*esgotad*");
+        });
+    }
+
     private static async Task Escopo(ServiceProvider provider, Guid empresaId, Func<IServiceProvider, Task> acao)
     {
         await using var scope = provider.CreateAsyncScope();

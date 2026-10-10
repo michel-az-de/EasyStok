@@ -1,5 +1,6 @@
 import { API_BASE } from '../fonteDados'
 import { urlDeExibicaoDaFoto } from '../../dominio/vitrineCardapio'
+import { partesDoSku, skuDaPorcao } from '../../dominio/cardapio'
 import { chamarApi } from './cliente'
 import { instante } from './traducaoConversas'
 import { lerSessao } from './sessao'
@@ -14,8 +15,12 @@ const LINHA_DO_CONTRATO = { paraServir: 'servir', prepararEmCasa: 'casa' }
 
 // Item do cardápio público → produto do console. O `sku` é o `cardapioItemId`, que é o que
 // o pedido recebe. Sem controle de saldo, `estoque` fica nulo (o domínio lê como sem limite).
-export const produtoDaApi = (item) => ({
+export const produtoDaApi = (item, porcoes = []) => ({
   sku: item.id,
+  // M1.4b (#1531): porções do prato (só a comanda as vê por enquanto); vazio = preço único.
+  porcoes: (porcoes ?? []).map((p) => ({
+    id: p.id, rotulo: p.rotulo, preco: p.preco, peso: p.peso ?? '', disponivel: p.disponivel !== false, padrao: p.padrao === true,
+  })),
   nome: item.nome,
   linha: LINHA_DO_CONTRATO[item.linha] ?? 'servir',
   porcao: item.pesoExibicao ?? '',
@@ -132,7 +137,9 @@ export function pedidoDaApi(p, anterior = null) {
     janelaRotulo: p.janela ? janelaDaApi(p.janela).rotulo : null,
     entregador: anterior?.entregador ?? null,
     itens: p.itens.map((i) => ({
-      sku: i.cardapioItemId, qtd: i.quantidade, obs: i.observacao ?? '', acrescimo: false, entrouEm: null,
+      // M1.4b (#1531): linha de porção volta com o sku composto, o mesmo que a comanda somou.
+      sku: i.variacaoId ? skuDaPorcao(i.cardapioItemId, i.variacaoId) : i.cardapioItemId,
+      qtd: i.quantidade, obs: i.observacao ?? '', acrescimo: false, entrouEm: null,
     })),
     agradecimentoEnviado: anterior?.agradecimentoEnviado ?? false,
     pagamentos: [],
@@ -147,14 +154,16 @@ export function pedidoDaApi(p, anterior = null) {
   }
 }
 
-export const listarCardapio = async () =>
-  ((await chamarApi(`${BASE}/comanda/cardapio`))?.itens ?? []).map(produtoDaApi)
+export const listarCardapio = async () => {
+  const r = await chamarApi(`${BASE}/comanda/cardapio`)
+  return (r?.itens ?? []).map((item) => produtoDaApi(item, r?.porcoes?.[item.id]))
+}
 
 export async function listarJanelas({ itens = [], dataInicio = null, dataFim = null } = {}) {
   const busca = new URLSearchParams()
   if (dataInicio) busca.set('dataInicio', dataInicio)
   if (dataFim) busca.set('dataFim', dataFim)
-  for (const sku of itens) busca.append('itens', sku)
+  for (const sku of itens) busca.append('itens', partesDoSku(sku).itemSku)
   const resposta = await chamarApi(`${BASE}/comanda/janelas?${busca}`)
   return {
     lojaDisponivel: Boolean(resposta?.lojaDisponivel),
@@ -184,7 +193,10 @@ export const trocarJanelaPedido = (pedidoId, janela, avisarCliente) =>
 export function corpoDoPedido(pedido) {
   const janela = janelaDoId(pedido?.janela)
   return {
-    itens: (pedido?.itens ?? []).map((l) => ({ cardapioItemId: l.sku, qtd: l.qtd, observacao: l.obs || null })),
+    itens: (pedido?.itens ?? []).map((l) => {
+      const { itemSku, variacaoId } = partesDoSku(l.sku)
+      return { cardapioItemId: itemSku, qtd: l.qtd, observacao: l.obs || null, ...(variacaoId ? { variacaoId } : {}) }
+    }),
     janelaId: janela?.janelaId ?? null,
     dataEntrega: janela?.data ?? null,
     forma: formaDoMeio(pedido?.meio),
