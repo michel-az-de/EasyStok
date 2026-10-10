@@ -28,6 +28,10 @@ public class SyncMutationDispatcher(
     private readonly IProdutoRepository _produtoRepo = produtoRepo;
     private readonly ILogger<SyncMutationDispatcher> _log = log;
 
+    // #1520 (ADR-0060): produtos que nasceram neste lote ja com o saldo do aparelho. Esse saldo
+    // inclui os movimentos que vieram no mesmo lote; soma-los de novo contaria em dobro.
+    private readonly HashSet<string> _nascidosComSaldoDoAparelho = new(StringComparer.Ordinal);
+
     public async Task ApplyMutationAsync(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
@@ -44,6 +48,7 @@ public class SyncMutationDispatcher(
             case "batch":     await ApplyBatch(m, deviceId, operatorName, empresaId, lojaId);     break;
             case "cashEntry": await ApplyCashEntry(m, deviceId, operatorName, empresaId, lojaId); break;
             case "closing":   await ApplyClosing(m, deviceId, empresaId, lojaId);                 break;
+            case "stock":     await ApplyStockDelta(m, deviceId, operatorName, empresaId);        break;
             default: throw new ArgumentException($"Entidade desconhecida: {parts[0]}");
         }
     }
@@ -52,9 +57,13 @@ public class SyncMutationDispatcher(
         Guid? empresaId, Guid? lojaId)
     {
         var dto = CaberNasColunas(m.Payload.Deserialize<ProductDto>(SyncDtoConverters.JsonOpts)!);
+        // #1520: com movimento de estoque ("stock.delta") o saldo do cadastro nao e gravado em
+        // produto que ja existe; so vale quando o produto nasce aqui.
+        var saldoVemNoCadastro = dto.StockByDelta != true && m.Payload.TryGetProperty("stock", out _);
         // Auditoria 2026-04-30 (CRITICAL fix): tenant guard.
-        var existing = await _db.Set<Product>()
-            .FirstOrDefaultAsync(p => p.Id == dto.Id && p.EmpresaId == empresaId);
+        // FindAsync enxerga o produto criado neste mesmo lote, ainda nao salvo.
+        var existing = await _db.Set<Product>().FindAsync(dto.Id);
+        if (existing != null && existing.EmpresaId != empresaId) existing = null;
 
         // Onda 5: conflict detection. Tolerância de 2s pra clock skew.
         if (existing != null && m.Ts > 0)
@@ -86,6 +95,7 @@ public class SyncMutationDispatcher(
                 EmpresaId = empresaId,
                 LojaId = lojaId
             });
+            if (dto.StockByDelta == true) _nascidosComSaldoDoAparelho.Add(dto.Id);
         }
         else
         {
@@ -94,7 +104,7 @@ public class SyncMutationDispatcher(
             existing.Category = dto.Category;
             existing.Unit = dto.Unit;
             existing.Price = dto.Price;
-            existing.Stock = dto.Stock;
+            if (saldoVemNoCadastro) existing.Stock = dto.Stock;
             existing.UpdatedAt = DateTime.UtcNow;
             existing.LastDeviceId = deviceId;
             existing.LastOperatorName = operatorName;
@@ -107,6 +117,26 @@ public class SyncMutationDispatcher(
             if (m.Payload.TryGetProperty("cost", out _))     existing.Cost = CustoValido(dto.Cost);
             if (m.Payload.TryGetProperty("minStock", out _)) existing.MinStock = MinimoValido(dto.MinStock);
         }
+    }
+
+    /// <summary>
+    /// #1520 (ADR-0060) — soma um movimento de estoque do aparelho ao espelho do produto. E o
+    /// unico caminho, alem do saldo absoluto do cadastro de aparelho antigo, que altera
+    /// <c>mobile_products.Stock</c>: pedido e lote nao recontam o que o aparelho ja contou.
+    /// </summary>
+    private async Task ApplyStockDelta(MutationDto m, string deviceId, string? operatorName, Guid? empresaId)
+    {
+        var dto = m.Payload.Deserialize<StockDeltaDto>(SyncDtoConverters.JsonOpts)!;
+        // FindAsync enxerga o produto criado neste mesmo lote, ainda nao salvo.
+        var p = await _db.Set<Product>().FindAsync(dto.ProductId);
+        if (p == null || p.EmpresaId != empresaId)
+            throw new InvalidOperationException(
+                $"Movimento de estoque de {dto.Qty:+#;-#;0} não aplicado: o produto '{dto.ProductId}' não existe no servidor.");
+        if (dto.Qty == 0 || _nascidosComSaldoDoAparelho.Contains(p.Id)) return;
+        p.Stock += dto.Qty;
+        p.UpdatedAt = DateTime.UtcNow;
+        p.LastDeviceId = deviceId;
+        p.LastOperatorName = operatorName;
     }
 
     private static decimal? CustoValido(decimal? c) => c is >= 0 ? c : null;
@@ -275,9 +305,11 @@ public class SyncMutationDispatcher(
     }
 
     /// <summary>
-    /// Regra de estoque central: reconcilia movimentação ERP quando produto está linkado.
-    /// Onda 2 parte 2: quando ErpProductId preenchido, espelha em itens_estoque +
-    /// movimentacoes_estoque. Falha NÃO interrompe sync.
+    /// Leva ao ERP a baixa (ou a devolução) do pedido quando o produto está linkado: espelha em
+    /// itens_estoque + movimentacoes_estoque. Falha NÃO interrompe sync.
+    /// #1520 (ADR-0060): não mexe em <c>mobile_products.Stock</c>. O aparelho já contou esse
+    /// movimento e o manda em "stock.delta" (ou no saldo absoluto, se for aparelho antigo);
+    /// descontar aqui de novo deixava o servidor uma venda abaixo do aparelho.
     /// </summary>
     /// <summary>Status do Order mobile em que o estoque já foi descontado (espelha StatusPedido.ComEstoqueDescontado).</summary>
     public static bool StatusDescontaEstoque(string status)
@@ -293,11 +325,10 @@ public class SyncMutationDispatcher(
                 var p = await _db.Set<Product>()
                     .FirstOrDefaultAsync(x => x.Id == i.ProductId && x.EmpresaId == empresaId);
                 if (p == null) continue;
-                var reconciliouNoErp = await _stockReconciler.ApplyDeltaAsync(
+                await _stockReconciler.ApplyDeltaAsync(
                     p, -i.Qty, NaturezaMovimentacaoEstoque.Venda,
                     descricao: $"Pedido mobile {orderId ?? p.Id} -> {newStatus}",
                     referenciaDocumento: orderId);
-                if (!reconciliouNoErp) p.Stock -= i.Qty;
             }
         }
         if (StatusDescontaEstoque(oldStatus) && newStatus == "cancelado")
@@ -307,11 +338,10 @@ public class SyncMutationDispatcher(
                 var p = await _db.Set<Product>()
                     .FirstOrDefaultAsync(x => x.Id == i.ProductId && x.EmpresaId == empresaId);
                 if (p == null) continue;
-                var reconciliouNoErp = await _stockReconciler.ApplyDeltaAsync(
+                await _stockReconciler.ApplyDeltaAsync(
                     p, +i.Qty, NaturezaMovimentacaoEstoque.Estorno,
                     descricao: $"Cancelamento de pedido mobile {orderId ?? p.Id}",
                     referenciaDocumento: orderId);
-                if (!reconciliouNoErp) p.Stock += i.Qty;
             }
         }
     }
@@ -385,12 +415,10 @@ public class SyncMutationDispatcher(
                     ? DateTimeOffset.FromUnixTimeMilliseconds(i.ExpiresAt.Value).UtcDateTime
                     : (DateTime?)null
             });
-            var p = await _db.Set<Product>()
-                .FirstOrDefaultAsync(x => x.Id == i.ProductId && x.EmpresaId == empresaId);
-            if (p == null) continue;
             // #1458: a entrada no ERP e do BatchLinker (um ItemEstoque por lote, com validade).
             // Reconciliar aqui tambem somava o mesmo lote duas vezes no estoque.
-            p.Stock += i.Qty;
+            // #1520: o espelho mobile_products.Stock tambem nao e somado aqui; o aparelho ja
+            // somou o lote e manda esse movimento em "stock.delta" (ADR-0060).
         }
         _db.Add(batch);
     }

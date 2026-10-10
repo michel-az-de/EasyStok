@@ -37,7 +37,9 @@ module.exports = function ({ test, sandbox, assert }) {
     const sync = sandbox.window && sandbox.window.cdbSync;
     // #390: enqueue e privado; pushAll() e o caminho publico (le cdbApp.getState).
     assert.ok(sync && sync.pushAll && sync.queueSize, 'cdbSync.pushAll/queueSize devem existir apos boot');
-    sandbox.localStorage.removeItem('cdb-sync-queue');
+    // #1520: parte de fila vazia. pushAll tira os "stock.delta" pendentes (o saldo absoluto
+    // que ele manda ja os contem), entao sobra de outro teste fazia a fila encolher.
+    sync.clearQueue();
     sandbox.window.cdbApp = { getState: () => ({
       products: [{ id: 'p-compat-1', nome: 'C' }], clients: [], orders: [], cashEntries: [], batches: []
     }), setPendingSync: () => {} };

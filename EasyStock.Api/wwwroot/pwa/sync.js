@@ -360,6 +360,10 @@
 
   // Snapshot do estado anterior pra calcular delta
   let lastSnapshot = null;
+  // #1520 (ADR-0060): saldo dos produtos gravado quando o sync.js carrega. E a base do
+  // primeiro "stock.delta" enquanto o lastSnapshot ainda nao existe (primeiros 500 ms).
+  let _produtosNoBoot = [];
+  try { _produtosNoBoot = JSON.parse(localStorage.getItem('cdb-products') || '[]') || []; } catch (_) { _produtosNoBoot = []; }
 
   // ---- A6: strip de bytes pesados antes de enqueue ----
   // Batches carregam fotos do lote (batchPhoto) e fotos por item (items[].photo).
@@ -458,7 +462,17 @@
       });
     }
 
-    diffCollection(curr.products.map(({count, photo, ...r}) => r), prev && prev.products, 'product');
+    const produtos = curr.products.map(({count, photo, ...r}) => r);
+    diffCollection(produtos, prev && prev.products, 'product');
+    // #1520 (ADR-0060): o saldo do cadastro vai so de informacao (stockByDelta). Quem conta
+    // no servidor e o movimento abaixo, uma vez por MutationId e em qualquer ordem.
+    muts.forEach(m => { m.payload = Object.assign({}, m.payload, { stockByDelta: true }); });
+    const saldoAntes = new Map(((prev && prev.products) || _produtosNoBoot).map(x => [x.id, Number(x.stock) || 0]));
+    produtos.forEach(p => {
+      const qty = (Number(p.stock) || 0) - (saldoAntes.get(p.id) || 0);
+      // id proprio: a fila deduplica por (type, payload.id) e nao pode fundir dois movimentos.
+      if (qty !== 0) muts.push({ type: 'stock.delta', payload: { id: 'sd_' + generateMutationUuid(), productId: p.id, qty } });
+    });
     diffCollection(curr.clients, prev && prev.clients, 'client', c => c.lastOrder);
     diffCollection(curr.orders, prev && prev.orders, 'order', o => o.updatedAt);
     diffCollection(curr.cashEntries, prev && prev.cashEntries, 'cashEntry');
@@ -507,8 +521,13 @@
     if (!mutations.length) return;
     // F10-C-5: bloqueia enqueues nao-criticas durante OTA.
     if (_mutationsBlocked) {
+      // #1520: o cadastro que acompanha um movimento de estoque passa junto; sem ele o
+      // movimento de produto que o servidor ainda nao conhece seria recusado.
+      const comMovimento = new Set(mutations.filter(function (m) { return m.type === 'stock.delta'; })
+        .map(function (m) { return m.payload.productId; }));
       mutations = mutations.filter(function (m) {
-        return CRITICAL_MUTATION_TYPES[m.type] === true;
+        return CRITICAL_MUTATION_TYPES[m.type] === true
+          || (m.type === 'product.upsert' && comMovimento.has(m.payload.id));
       });
       if (!mutations.length) return;
     }
@@ -520,8 +539,12 @@
       // -> pronto) gasta payload/bateria sem ganho. Mutations sem payload.id
       // (caso degenerado) passam direto, mantendo comportamento anterior.
       if (m.payload && m.payload.id) {
+        // #1520: cadastro que vai por movimento (stockByDelta) nao tira da fila o saldo
+        // absoluto pendente ("Sincronizar tudo" ou versao antiga): ele ainda define o saldo.
+        const guardaAbsoluto = m.type === 'product.upsert' && m.payload.stockByDelta === true;
         queue = queue.filter(q =>
-          !(q.type === m.type && q.payload && q.payload.id === m.payload.id));
+          !(q.type === m.type && q.payload && q.payload.id === m.payload.id
+            && !(guardaAbsoluto && q.payload.stockByDelta !== true)));
       }
       queue.push({
         // F10-C-1: UUID v4 via crypto.randomUUID (Chrome 92+, garantido no
@@ -926,6 +949,14 @@
           if (idx >= 0) coll[idx] = m.payload;
           else coll.push(m.payload);
           changed = true;
+          // #1520: saldo que veio do servidor nao e movimento deste aparelho. Sem isto, um
+          // save antes do reload devolvia a diferenca ao servidor como "stock.delta".
+          if (type === 'product') {
+            const base = lastSnapshot ? lastSnapshot.products : _produtosNoBoot;
+            const i = base.findIndex(x => x.id === m.payload.id);
+            const copia = JSON.parse(JSON.stringify(m.payload));
+            if (i >= 0) base[i] = copia; else base.push(copia);
+          }
         } else if (op === 'delete') {
           if (idx >= 0) { coll.splice(idx, 1); changed = true; }
         }
@@ -1884,7 +1915,9 @@
     'order.upsert': true, 'order.update': true,
     'cashEntry.upsert': true, 'cashEntry.update': true,
     'batch.upsert': true, 'batch.update': true,
-    'cashClosing.upsert': true
+    'cashClosing.upsert': true,
+    // #1520: movimento de estoque descartado nao tem como ser refeito depois.
+    'stock.delta': true
   };
   // Schema minimo do servidor que esta versao do PWA requer. Bate com
   // MobileVersionController.mobileSchemaVersion. Bump quando o PWA passar a
@@ -2354,6 +2387,9 @@
     (s.batches || []).forEach(b => { if (b && b.id) muts.push({ type: 'batch.upsert', payload: stripBatchPhotoBytes(b) }); });
     (s.cashEntries || []).forEach(c => { if (c && c.id) muts.push({ type: 'cashEntry.upsert', payload: c }); });
     if (muts.length === 0) return { enqueued: 0, queueSize: loadQueue().length };
+    // #1520: aqui o cadastro vai sem stockByDelta, entao o servidor grava o saldo deste
+    // aparelho. Os movimentos pendentes ja estao dentro desse saldo; mandar os dois contava em dobro.
+    saveQueue(loadQueue().filter(q => q.type !== 'stock.delta'));
     enqueue(muts);
     return { enqueued: muts.length, queueSize: loadQueue().length };
   }
@@ -2593,7 +2629,8 @@
       mutationMigrators: mutationMigrators,               // B4 (mutable: register migrators)
       mutationSchemaVersion: PWA_MUTATION_SCHEMA_VERSION, // B4
       swSupported: () => _swSupported,                    // D2
-      initQueueStore: _initQueueStore                     // #1509
+      initQueueStore: _initQueueStore,                    // #1509
+      bloquearMutations: (v) => { _mutationsBlocked = !!v; } // #1520 (teste do bloqueio de OTA)
     },
     hasPublicBackupPlugin: () => !!_getPublicBackupPlugin(),
     lastLocalBackupAt: () => parseInt(localStorage.getItem(LAST_LOCAL_BACKUP_KEY) || '0', 10) || 0,

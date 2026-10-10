@@ -82,7 +82,11 @@ public class SyncController(
                 alreadyProcessed[e.MutationId] = e;
         }
 
-        foreach (var m in req.Mutations)
+        // #1520 (ADR-0060): movimento de estoque por ultimo no lote. A fila do aparelho reordena
+        // o cadastro do produto (dedup por id), entao o "stock.delta" pode chegar antes do produto
+        // que ele mexe. E, por ultimo, ele so e gravado no SaveChanges final, junto do registro do
+        // MutationId: um commit no meio do lote (ha quem faca) nao o deixa sem dedup para o reenvio.
+        foreach (var m in req.Mutations.OrderBy(m => m.Type?.StartsWith("stock.", StringComparison.Ordinal) == true ? 1 : 0))
         {
             if (!string.IsNullOrEmpty(m.Id) && alreadyProcessed.TryGetValue(m.Id, out var prev))
             {
