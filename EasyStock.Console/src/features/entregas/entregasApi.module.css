@@ -6,7 +6,7 @@
 .abaInterna[aria-selected='true'], .abaInterna[aria-selected='true']:hover { background: var(--marca-claro); color: var(--marca); border-color: var(--linha-media); }
 .painel { display: flex; flex-direction: column; gap: var(--e-4); min-width: 0; }
 .secao { display: flex; flex-direction: column; gap: var(--e-2); }
-.secao h3 { margin: 0; font-size: var(--t-apoio); font-weight: 700; color: var(--tinta-2); text-transform: uppercase; letter-spacing: .04em; }
+.secao h3 { margin: 0; font-size: var(--t-corpo); font-weight: 800; color: var(--tinta); }
 .lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--e-2); }
 .cartao {
   display: flex; flex-direction: column; gap: var(--e-1, 4px);
@@ -17,11 +17,11 @@
 .apoio { color: var(--tinta-2); font-size: var(--t-apoio); }
 .cresce { flex: 1; }
 .faixa {
-  display: flex; align-items: center; gap: var(--e-2); margin: 0;
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); margin: 0;
   padding: var(--e-2) var(--e-3); border-radius: var(--r-2);
   background: var(--preenchimento-forte); color: var(--tinta);
 }
-.formulario { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--e-2); align-items: end; }
+.formulario { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: var(--e-3); align-items: end; }
 .vazio { color: var(--tinta-2); margin: 0; }
 
 /* #1440: janelas da loja e entregas do dia por janela. */

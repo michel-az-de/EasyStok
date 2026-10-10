@@ -28,6 +28,10 @@
 .resumoLista dd { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
 .resumoForte dd { color: var(--marca); }
 .resumoForte { background: var(--marca-claro) !important; }
+.resumoLista .resumoTotal {
+  grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: baseline;
+  background: transparent; border-top: var(--b-1) solid var(--linha); border-radius: 0;
+}
 
 .porMetodo {
   margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: var(--e-2) var(--e-4);

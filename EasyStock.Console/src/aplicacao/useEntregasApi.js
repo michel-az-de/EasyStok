@@ -113,8 +113,8 @@ export function useEntregasApi() {
   const executar = useCallback((chamada, falha) => {
     setOcupado(true)
     return chamada()
-      .then(() => recarregar())
-      .catch((e) => setErro(`${falha}: ${e.message}`))
+      .then(async () => { await recarregar(); return true })
+      .catch((e) => { setErro(`${falha}: ${e.message}`); return false })
       .finally(() => setOcupado(false))
   }, [recarregar])
 

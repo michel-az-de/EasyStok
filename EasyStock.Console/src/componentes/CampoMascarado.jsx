@@ -16,9 +16,10 @@ import css from './CampoMascarado.module.css'
 //
 // Sem `maxLength` nunca (seção 2): ele corta o que foi colado sem avisar.
 export function CampoMascarado({
-  tipo, rotulo, rotuloOculto, dica, erro, valor, aoMudarDigitos, aoColarTexto, ...resto
+  tipo, rotulo, rotuloOculto, dica, erro, valor, aoMudarDigitos, aoColarTexto, id: idInformado, className, ...resto
 }) {
-  const id = useId()
+  const idGerado = useId()
+  const id = idInformado ?? idGerado
 
   function aoDigitar(evento) {
     aoMudarDigitos(evento.target.value.replace(/\D/g, ''))
@@ -31,12 +32,12 @@ export function CampoMascarado({
   }
 
   return (
-    <div>
+    <div className={css.campo}>
       <label className={rotuloOculto ? 'sr' : css.rotulo} htmlFor={id}>{rotulo}</label>
       <input
         id={id}
         inputMode="numeric"
-        className={[css.controle, erro ? css.erro : ''].filter(Boolean).join(' ')}
+        className={[css.controle, erro ? css.erro : '', className].filter(Boolean).join(' ')}
         value={valor}
         onChange={aoDigitar}
         onPaste={aoColar}

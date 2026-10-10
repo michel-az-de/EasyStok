@@ -4,6 +4,23 @@ import css from './Icone.module.css'
 // Origem: marca/sistema-visual-pranchas-v4; SVGs íntegros em assets/icones-marca-v4.
 // Mesmos nós e atributos, convertidos apenas para a grafia JSX; nenhuma entrada HTML.
 const DESENHOS = {
+  'producao': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 11H26V23C26 28 6 28 6 23Z M3 11H29 M6 15H3V20H6 M26 15H29V20H26 M9 7C11 5 8 4 10 2 M16 7C18 5 15 4 17 2 M23 7C25 5 22 4 24 2"/></g>,
+  'pedido-em-preparo': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 28V4H24V14 M8 28L11 26 14 28 17 26"/><path d="M11 8H20 M11 12H16 M18 22H29V27H18Z M17 22H30 M21 19V17 M26 19V17"/></g>,
+  'estoque': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4V28 M28 4V28 M4 16H28 M4 28H28"/><rect x="7" y="5" width="8" height="11" rx="1.5"/><rect x="18" y="8" width="7" height="8" rx="1.5"/><rect x="8" y="20" width="16" height="8" rx="1.5"/><path d="M11 5V9 M16 20V24"/></g>,
+  'ingredientes': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 29V5 M16 20C8 20 5 15 6 10C12 10 16 15 16 20 M16 13C23 13 27 8 26 4C19 4 16 8 16 13 M16 27C24 27 28 23 27 18C20 18 16 22 16 27"/></g>,
+  'receita': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5C9 3 13 4 16 7C20 4 25 3 28 5V27C24 25 20 26 16 28C12 25 8 25 5 27Z M16 7V28 M8 10H12 M8 14H12 M20 10H25 M20 14H25 M8 19H12 M20 19H24"/></g>,
+  'horarios': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="16" cy="16" r="12"/><path d="M16 8V16L22 19 M16 4V5 M28 16H27 M16 28V27 M4 16H5"/></g>,
+  'financeiro': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="16" cy="16" r="11"/><path d="M19 11H14C10 11 10 16 14 16H18C22 16 22 21 17 21H12 M16 8V24"/></g>,
+  'caixa': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 5H25L27 20H5Z M3 20H29V28H3Z M8 24H12"/><rect x="10" y="8" width="12" height="5" rx="1.5"/><path d="M11 17H12 M16 17H17 M21 17H22"/></g>,
+  'cupom': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7H28V12C22 12 22 20 28 20V25H4V20C10 20 10 12 4 12Z M18 8V10 M18 14V17 M18 21V24"/></g>,
+  'mensagem': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5H28V22H14L6 29V22H4Z M9 11H23 M9 16H19"/></g>,
+  'entrega': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7H20V23H3Z M20 12H25L29 18V23H20 M20 18H29"/><circle cx="8" cy="24" r="3"/><circle cx="24" cy="24" r="3"/><path d="M6 11H14 M6 15H11"/></g>,
+  'configuracoes': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8H12 M20 8H28 M4 24H19 M27 24H28 M16 4V12 M23 20V28 M4 16H5 M13 16H28"/><circle cx="16" cy="8" r="4"/><circle cx="9" cy="16" r="4"/><circle cx="23" cy="24" r="4"/></g>,
+  'link': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20 20 12 M10 17C4 22 4 28 9 29C12 30 15 27 18 24 M22 15C28 10 28 4 23 3C20 2 17 5 14 8"/></g>,
+  'atencao': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3 30 28H2Z M16 11V19"/><circle cx="16" cy="24" r="0.7"/></g>,
+  'anterior': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 5 10 16 21 27"/></g>,
+  'proximo': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 22 16 11 27"/></g>,
+  'bloqueado': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="14" width="22" height="15" rx="2"/><path d="M10 14V8C10-1 22-1 22 8V14 M16 20V24"/></g>,
   abaixo: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 11 16 22 27 11"/></g>,
   acima: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 21 16 10 27 21"/></g>,
   adicionar: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 5V27 M5 16H27"/></g>,

@@ -89,7 +89,7 @@ export function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReen
         {mensagem.programada && <span className={css.selo}><Icone nome="relogio" /> programada</span>}
         <time dateTime={mensagem.em}>{horaCurta(mensagem.em)}</time>
         {mensagem.status === 'falhou' && (
-          <span className={css.falhou} role="alert">⚠ {mensagem.erro ?? 'Não enviada.'}</span>
+          <span className={css.falhou} role="alert"><Icone nome="alerta" tamanho={14} /> {mensagem.erro ?? 'Não enviada.'}</span>
         )}
         {/* S57: texto que falhou volta a sair pelo mesmo canal. Só com a ação ligada (modo API). */}
         {mensagem.porSms && <span className={css.selo}><Icone nome="check" /> saiu por SMS</span>}

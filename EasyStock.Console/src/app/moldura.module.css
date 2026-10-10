@@ -94,22 +94,16 @@
   font-size: var(--t-apoio); color: var(--tinta-3);
 }
 /* Tablet: a ficha vira gaveta sobre o atendimento, deslizando da direita. */
-.gaveta {
-  position: absolute; inset: 0 0 0 auto; width: min(var(--gaveta), 90%);
-  background: var(--papel); border-left: var(--b-1) solid var(--linha);
-  box-shadow: var(--sombra-alta); z-index: 40;
-  display: flex; flex-direction: column;
-  animation: gavetaEntra var(--dur-longa) var(--ease-mola) both;
+.gaveta.gaveta {
+  position: fixed; inset: 0 0 0 auto; margin: 0 0 0 auto;
+  height: 100dvh; max-height: 100dvh; max-width: 90vw; border-radius: 0;
+  border: 0; border-left: var(--b-1) solid var(--linha);
+  box-shadow: var(--sombra-alta);
 }
+.gaveta.gaveta[open] { animation: gavetaEntra var(--dur-longa) var(--ease-mola) both; }
+/* A Ficha já tem seus próprios recuos e rolagem dentro da janela. */
+.gaveta > h2 + div { padding: 0; }
 @keyframes gavetaEntra { from { transform: translateX(100%); } to { transform: none; } }
-.cortina {
-  position: absolute; inset: 0; z-index: 39;
-  background: var(--cortina); border: 0; padding: 0; width: 100%;
-  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
-  animation: cortinaEntra var(--dur-media) var(--ease-padrao) both;
-}
-.cortina:active:not(:disabled) { transform: none; }
-@keyframes cortinaEntra { from { opacity: 0; } to { opacity: 1; } }
 .espaco { margin-left: auto; }
 /* Âncora do popover do topo. Sem isto a camada se posiciona pela barra toda. */
 .comPopover { position: relative; display: inline-flex; }

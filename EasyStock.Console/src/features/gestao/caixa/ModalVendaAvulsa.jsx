@@ -87,6 +87,7 @@ export function ModalVendaAvulsa({ cardapio, aoFechar, aoLancar }) {
           )
         })}
       </ul>
+      {cardapio.length === 0 && <p className={css.corpoBloco}>Não há pratos para adicionar. Cadastre os itens do cardápio antes de lançar a venda.</p>}
     </Modal>
   )
 }

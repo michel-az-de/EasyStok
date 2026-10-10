@@ -13,13 +13,14 @@ export function TelaLogin({ entrarNaEmpresa, google, avisoSaida }) {
   const [erro, setErro] = useState(null)
   const [ocupado, setOcupado] = useState(false)
 
-  const tentar = async (acao) => {
+  const tentar = async (acao, mensagem401) => {
     setErro(null)
     setOcupado(true)
     try {
       await acao()
     } catch (e) {
-      setErro(e.message)
+      const semMensagemDeAcesso = e.status === 401 && e.codigo === 'HTTP_401' && e.message === 'Sessão expirada. Entre de novo.'
+      setErro(semMensagemDeAcesso && mensagem401 ? mensagem401 : e.message)
     } finally {
       setOcupado(false)
     }
@@ -30,7 +31,7 @@ export function TelaLogin({ entrarNaEmpresa, google, avisoSaida }) {
 
   const aoEnviar = (evento) => {
     evento.preventDefault()
-    if (!ocupado) tentar(() => entrarNaEmpresa(email.trim(), senha))
+    if (!ocupado) tentar(() => entrarNaEmpresa(email.trim(), senha), 'Não foi possível entrar. Confira seu e-mail e senha.')
   }
 
   return (
@@ -41,7 +42,8 @@ export function TelaLogin({ entrarNaEmpresa, google, avisoSaida }) {
           <h1 id="titulo-login" className={css.titulo}>Entrar na Casa da Baba</h1>
           <p className={css.apoio}>Use seu e-mail e senha para acessar a operação.</p>
         </div>
-        {avisoSaida && <p role="status">{avisoSaida}</p>}
+        {avisoSaida && <p className={css.aviso} role="status">{avisoSaida}</p>}
+        {erro && <p className={css.erro} role="alert">{erro}</p>}
         <form className={css.formulario} onSubmit={aoEnviar} aria-busy={ocupado}>
           <CampoTexto
             rotulo="E-mail" tipo="email" autoComplete="username" required
@@ -61,7 +63,6 @@ export function TelaLogin({ entrarNaEmpresa, google, avisoSaida }) {
           </div>
         )}
 
-        {erro && <p className={css.erro} role="alert">{erro}</p>}
         <div className={css.preferencia}><InterruptorTema /></div>
       </section>
     </main>

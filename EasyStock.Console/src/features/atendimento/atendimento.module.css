@@ -1,4 +1,5 @@
 .cabecalho {
+  container-type: inline-size; container-name: topo-conversa;
   display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
   padding: var(--e-3) var(--e-4); background: var(--papel);
   border-bottom: var(--b-1) solid var(--linha); flex-shrink: 0;
@@ -6,8 +7,9 @@
 .identidade { display: flex; align-items: center; gap: var(--e-3); min-width: 0; flex: 1; }
 .cabecalho h2 {
   margin: 0; font-family: var(--f-corpo); font-size: var(--t-titulo); font-weight: 700;
-  font-weight: 600; line-height: var(--lh-compacto); letter-spacing: -.01em;
+  line-height: var(--lh-compacto); letter-spacing: -.01em;
 }
+.nomeCliente { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A linha de apoio corre como texto: o ícone do canal é bloco (Icone.jsx) e
    quebrava a linha sozinho. Ícone em linha, alinhado à base do texto. */
 .cabecalho h2 { min-width: 0; }
@@ -343,9 +345,9 @@
 /* Integração: no celular o Encerrar fica só com o ícone (o nome continua
    "Encerrar" para leitor de tela e para as provas), para o nome do cliente
    caber na linha. */
-@media (max-width: 759px) {
-  .direita > button { font-size: 0; gap: 0; padding: 0 10px; }
-  .direita > button svg { width: 20px; height: 20px; }
+@container topo-conversa (max-width: 439px) {
+  .direita > button.encerrar { font-size: 0; gap: 0; padding: 0 10px; }
+  .direita > button.encerrar svg { width: 20px; height: 20px; }
 }
 
 /* Rodada 9 (achado 5 da banca estética): no celular, canal + pedidos + janela

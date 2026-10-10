@@ -1,6 +1,6 @@
 import * as acao from './acoes'
 import {
-  assumir, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarNaoEntregues, marcarLida, reabrir, reenviarMensagem,
+  assumir, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarAtendentes, listarNaoEntregues, marcarLida, reabrir, reenviarMensagem,
 } from '../infra/api/conversasApi'
 import { mensagemDaApi, naoEntregueDaApi, situacaoConversaDaApi } from '../infra/api/traducaoConversas'
 import { lerSessao } from '../infra/api/sessao'
@@ -55,9 +55,13 @@ const falhaDoEnvio = (id, mensagemId, erro) => ({
 export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
   const avisar = (erro) => despachar({ tipo: acao.AVISO_API, mensagem: erro.message })
   const clienteApi = criarAcoesClienteApi({ despachar, estadoRef })
+  const confirmarResponsavel = (id, chamada) => chamada(id)
+    .then((resumo) => despachar({ tipo: acao.CONFIRMAR_RESPONSAVEL_API, id, situacao: situacaoConversaDaApi(resumo, lerSessao()?.usuario) }))
+    .catch(avisar)
 
   return {
     ...acoes,
+    listarAtendentes,
     ...criarAvisosNaoLigadas(despachar),
     ...criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio }),
     // #1474: sem `fixo`, fecha só o aviso de ação; o persistente (configuração) só com `fixo: true`.
@@ -127,14 +131,8 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
       const c = estadoRef.current.conversas.find((x) => x.id === id)
       if (deveCarregarDossie(c)) clienteApi.carregarClienteDaConversa(id)
     },
-    assumirAtendimento: (id) => {
-      despachar({ tipo: acao.ASSUMIR_ATENDIMENTO, id })
-      assumir(id).catch(avisar)
-    },
-    devolverAutomatico: (id) => {
-      despachar({ tipo: acao.DEVOLVER_AUTOMATICO, id })
-      liberarAutomatico(id).catch(avisar)
-    },
+    assumirAtendimento: (id) => confirmarResponsavel(id, assumir),
+    devolverAutomatico: (id) => confirmarResponsavel(id, liberarAutomatico),
     encerrarAtendimento: (id) => {
       despachar({ tipo: acao.ENCERRAR_ATENDIMENTO, id })
       encerrar(id).catch(avisar)

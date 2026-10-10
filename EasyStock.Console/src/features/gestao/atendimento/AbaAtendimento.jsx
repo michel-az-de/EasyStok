@@ -63,7 +63,7 @@ function LojaAgora() {
       <p className={css.descricao}>
         {lojaAberta == null
           ? 'Segue o horário configurado. O horário de cada dia se ajusta no Balcão, botão Automáticas (raio).'
-          : `Forçada ${lojaAberta ? 'aberta' : 'fechada'} na mão. Só volta ao horário quando você mandar.`}
+          : `${lojaAberta ? 'Aberta' : 'Fechada'} manualmente. Use "Voltar a seguir o horário" para retomar os horários configurados.`}
       </p>
       <div className={css.acoes}>
         {acoes.controlarLoja === true && <Botao className={css.toque} onClick={() => alternarLoja(agora)}>
@@ -94,6 +94,7 @@ function MensagensDoExpediente() {
 
   async function aoSalvar(evento) {
     evento.preventDefault()
+    if (!expediente.carregado || situacao.estado === 'salvando') return
     const { ok } = await salvar(() => salvarMensagensExpediente(valor))
     if (ok) setRascunho(null)
   }
@@ -101,19 +102,21 @@ function MensagensDoExpediente() {
   return (
     <form className={css.secao} aria-labelledby="gestao-atend-expediente" onSubmit={aoSalvar}>
       <h3 id="gestao-atend-expediente">Quando a loja não atende</h3>
-      {!expediente.carregado && <p className={css.descricao}>Carregando o expediente…</p>}
+      {!expediente.carregado && <output className={css.descricao}>Carregando o expediente…</output>}
       <CampoArea
         rotulo="Fora do horário"
         dica="O cliente recebe isto na primeira mensagem fora do horário, no lugar da saudação."
         maxLength={TAMANHO_MENSAGEM}
         value={valor.mensagemForaDoHorario}
+        disabled={!expediente.carregado || situacao.estado === 'salvando'}
         onChange={mudar('mensagemForaDoHorario')}
       />
       <CampoArea
         rotulo="Loja fechada"
-        dica="O cliente recebe isto na primeira mensagem com a loja fechada na mão, no lugar da saudação."
+        dica="O cliente recebe isto na primeira mensagem com a loja fechada manualmente, no lugar da saudação."
         maxLength={TAMANHO_MENSAGEM}
         value={valor.mensagemLojaFechada}
+        disabled={!expediente.carregado || situacao.estado === 'salvando'}
         onChange={mudar('mensagemLojaFechada')}
       />
       <div className={css.acoes}>
@@ -121,7 +124,7 @@ function MensagensDoExpediente() {
           variante="primario"
           tipo="submit"
           className={css.toque}
-          disabled={!rascunho || situacao.estado === 'salvando'}
+          disabled={!expediente.carregado || !rascunho || situacao.estado === 'salvando'}
         >
           Salvar mensagens
         </Botao>
@@ -231,7 +234,7 @@ function ConfiguracaoDoAtendimento() {
           value={form.fraseEspera}
           onChange={mudar('fraseEspera')}
         />
-        <CampoArea rotulo="Endereço fora da área" value={form.mensagemForaArea} onChange={mudar('mensagemForaArea')} />
+        <CampoArea rotulo="Mensagem para endereço fora da área" value={form.mensagemForaArea} onChange={mudar('mensagemForaArea')} />
         <CampoTexto
           rotulo="Modelo de retomada (WhatsApp)"
           dica="Nome do modelo aprovado na Meta, com uma variável: o primeiro nome do cliente. Sai quando a janela de 24 h venceu; a mensagem que falhou vai quando o cliente responder. Vazio: sem retomada."

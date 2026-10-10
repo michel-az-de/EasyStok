@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { BarraDeAbas } from '../../componentes/BarraDeAbas'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
@@ -183,6 +183,7 @@ function AbaAutomaticas({ envios }) {
 }
 
 export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
+  const id = useId()
   const [aba, setAba] = useState('pedidos')
   const { cliente } = conversa
   const lead = ehLead(conversa)
@@ -210,6 +211,8 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
       )}
 
       <BarraDeAbas
+        idPainel={`${id}-painel`}
+        prefixoId={`${id}-aba`}
         abas={[
           { id: 'pedidos', rotulo: 'Pedidos', contador: cliente.pedidos },
           { id: 'atendimentos', rotulo: 'Atendimentos', contador: (conversa.atendimentos ?? []).length },
@@ -220,7 +223,7 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
         aoTrocar={setAba}
       />
 
-      <div role="tabpanel" id="painel-da-aba" className={css.painelAba}>
+      <div role="tabpanel" id={`${id}-painel`} aria-labelledby={`${id}-aba-${aba}`} tabIndex={0} className={css.painelAba}>
         {aba === 'pedidos' && <AbaPedidos historico={historico} pedidosAnteriores={cliente.pedidos} />}
         {aba === 'atendimentos' && (
           <AbaAtendimentos conversaId={conversa.id} atendimentos={conversa.atendimentos ?? []} />

@@ -32,7 +32,7 @@ export function estadoDaLinha(conversa, { pausado = false, grupo = null, motivo 
       titulo: motivo.texto ?? null,
     }
   }
-  if (pausado === PAUSA_POR_OUTRO) return ESTADOS.outro
+  if (pausado === PAUSA_POR_OUTRO) return { ...ESTADOS.outro, texto: conversa.responsavel || ESTADOS.outro.texto }
   if (pausado || (conversa?.passagem && !conversa.passagem.assumida)) return ESTADOS.voce
   return ESTADOS.automatico
 }

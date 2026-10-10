@@ -51,12 +51,12 @@ export function SecaoWhatsApp({ embutida = false, aoConectar }) {
       </Botao>
       {estado === 'indisponivel' && (
         <p className={css.explicacao} role="note">
-          A conexão ainda não está habilitada neste servidor: falta configurar o app da Meta (AppId,
-          configuração do Embedded Signup e segredo). Veja docs/dev/whatsapp-coexistencia.md.
+          A conexão do WhatsApp ainda não está habilitada para esta loja. Peça ao responsável pela configuração
+          para concluir a ativação antes de conectar o número.
         </p>
       )}
       {estado === 'aguardando' && (
-        <p className={css.explicacao}>Siga os passos na janela da Meta. Esta tela termina sozinha quando ela fechar.</p>
+        <p className={css.explicacao}>Conclua os passos na janela da Meta. O resultado da conexão aparece aqui.</p>
       )}
       {erro && <p className={css.erro} role="alert">{erro}</p>}
       {resultado && <Resultado resultado={resultado} />}

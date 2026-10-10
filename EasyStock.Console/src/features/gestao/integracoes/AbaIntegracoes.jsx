@@ -37,6 +37,7 @@ function CartaoProvedor({ provedor, config, padrao, acoes }) {
         <strong className={css.nomeProvedor}>{provedor.rotulo}</strong>
         <Chip
           papel="filtro" ativo={ativo} className={css.chipLigar}
+          aria-label={`${provedor.rotulo}: ${ativo ? 'ligado' : 'desligado'}`}
           onClick={() => acoes.alternarProvedorLogistica(provedor.chave)}
         >
           {ativo ? 'Ligado' : 'Desligado'}
@@ -55,7 +56,7 @@ function CartaoProvedor({ provedor, config, padrao, acoes }) {
             </Botao>
           )}
           {mostrarCampo && (
-            <div className={css.formularioCredencial}>
+            <form className={css.formularioCredencial} onSubmit={(e) => { e.preventDefault(); salvarCredencial() }}>
               <CampoTexto
                 rotulo={`Credencial da ${provedor.rotulo} (simulada)`}
                 tipo="password"
@@ -65,14 +66,14 @@ function CartaoProvedor({ provedor, config, padrao, acoes }) {
                 onChange={(e) => setCredencial(e.target.value)}
               />
               <div className={css.botoesCredencial}>
-                <Botao variante="primario" icone="check" onClick={salvarCredencial} disabled={!credencial.trim()}>
-                  Salvar
+                <Botao tipo="submit" variante="primario" icone="check" disabled={!credencial.trim()}>
+                  Salvar credencial simulada
                 </Botao>
                 <Botao variante="texto" onClick={() => { setCredencial(''); setMostrarCampo(false) }}>
                   Cancelar
                 </Botao>
               </div>
-            </div>
+            </form>
           )}
         </div>
       )}
@@ -98,7 +99,7 @@ export function AbaIntegracoes() {
   if (!integracoesLogistica) {
     return (
       <div className={css.aba}>
-        <p role="status">Carregando integrações…</p>
+        <output>Carregando integrações…</output>
       </div>
     )
   }

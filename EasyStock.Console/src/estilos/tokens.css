@@ -125,7 +125,7 @@
   --coluna: 320px;
   --gaveta: 400px;
 
-  /* Fontes: títulos Lora; leitura e números Nunito Sans; papel monoespaçado. */
+  /* Nunito na operação; Lora nos marcos da marca; papel monoespaçado. */
   --f-corpo: 'Nunito Sans', 'Segoe UI', system-ui, sans-serif;
   --f-display: 'Lora', Georgia, serif;
   --f-dado: var(--f-corpo);
@@ -152,3 +152,7 @@
 
 :root[data-theme='light'] { color-scheme: only light; }
 :root[data-theme='dark'] { color-scheme: only dark; }
+
+@media (max-width: 759px), (pointer: coarse) {
+  :root { --toque: 44px; }
+}

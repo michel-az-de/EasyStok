@@ -1,7 +1,7 @@
 // Aba Caixa no modo API (#1443): o caixa de verdade do EasyStok (`api/caixa`). O resumo e o saldo
 // esperado vêm da API (a mesma conta do card do painel); a tela só mostra, lança e relê. A versão
 // de demonstração (`AbaCaixa.jsx`) continua com a massa local.
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoArea, CampoSelecao, CampoTexto } from '../../../componentes/Campo'
@@ -29,25 +29,31 @@ const OPCOES_METODO = METODOS_CAIXA.map((id) => ({ valor: id, rotulo: nomeDoMeto
 // Uma ação por vez, com o erro da API ao lado do botão; depois de gravar, relê o dia.
 function useAcaoComRecarga(recarregar) {
   const [situacao, setSituacao] = useState({ enviando: false, erro: null })
+  const emCurso = useRef(false)
   const executar = async (fn) => {
+    if (emCurso.current) return false
+    emCurso.current = true
     setSituacao({ enviando: true, erro: null })
     try {
       await fn()
-      setSituacao({ enviando: false, erro: null })
       await recarregar()
+      setSituacao({ enviando: false, erro: null })
       return true
     } catch (erro) {
       setSituacao({ enviando: false, erro: erro.message })
       return false
+    } finally {
+      emCurso.current = false
     }
   }
-  return [situacao, executar]
+  return [situacao, executar, () => setSituacao((atual) => ({ ...atual, erro: null }))]
 }
 
-function CampoDinheiro({ rotulo, dica, centavos, aoMudar }) {
+function CampoDinheiro({ rotulo, dica, centavos, aoMudar, disabled = false }) {
   return (
     <CampoMascarado
       tipo="moeda"
+      disabled={disabled}
       rotulo={rotulo}
       dica={dica}
       valor={mascaraMoeda(centavos)}
@@ -77,6 +83,7 @@ function AbrirCaixa({ dia, ultimo, executar, enviando }) {
         rotulo="Saldo inicial"
         dica="O dinheiro que está na gaveta ao abrir o dia."
         centavos={centavos}
+        disabled={enviando}
         aoMudar={setCentavos}
       />
       {retificacao.exigeMotivo && (
@@ -84,6 +91,7 @@ function AbrirCaixa({ dia, ultimo, executar, enviando }) {
           rotulo={`Motivo da diferença de ${moeda(retificacao.diferenca)}`}
           dica="Obrigatório quando o saldo não bate com o último fechamento."
           rows={2}
+          disabled={enviando}
           value={motivo}
           onChange={(e) => setMotivo(e.target.value)}
         />
@@ -95,7 +103,7 @@ function AbrirCaixa({ dia, ultimo, executar, enviando }) {
         disabled={enviando || moedaAltaDemais(centavos) || (retificacao.exigeMotivo && motivo.trim().length < 3)}
         onClick={() => executar(() => abrirCaixa(agora, saldoInicial, observacaoDaAbertura({ saldoInformado: saldoInicial, situacao, motivo })))}
       >
-        Abrir o caixa
+        {enviando ? 'Abrindo o caixa…' : 'Abrir o caixa'}
       </Botao>
     </div>
   )
@@ -118,6 +126,7 @@ function FormLancamento({ executar, enviando }) {
       className={css.formLancamento}
       onSubmit={async (e) => {
         e.preventDefault()
+        if (enviando || incompleto) return
         const ok = await executar(() => lancarMovimentoCaixa(agora, {
           tipoMovimento: tipo, categoria, valor: centavos / 100, meio: metodo, descricao,
         }))
@@ -126,33 +135,34 @@ function FormLancamento({ executar, enviando }) {
     >
       <h4 className={css.tituloSecao}>Lançar entrada ou saída</h4>
       <div className={css.tiposLancamento} role="radiogroup" aria-label="Tipo de lançamento">
-        <Chip papel="escolha" ativo={!saida} onClick={() => setTipo(TIPOS_MOVIMENTO.ENTRADA)}>Entrada</Chip>
-        <Chip papel="escolha" ativo={saida} onClick={() => setTipo(TIPOS_MOVIMENTO.SAIDA)}>Saída</Chip>
+        <Chip papel="escolha" disabled={enviando} ativo={!saida} onClick={() => setTipo(TIPOS_MOVIMENTO.ENTRADA)}>Entrada</Chip>
+        <Chip papel="escolha" disabled={enviando} ativo={saida} onClick={() => setTipo(TIPOS_MOVIMENTO.SAIDA)}>Saída</Chip>
       </div>
       {/* #1474: suprimento (reforço de troco) entra na gaveta; sangria e despesa saem. */}
       <div className={css.categoriasSugeridas}>
         {(saida ? CATEGORIAS_SAIDA_SUGERIDAS : CATEGORIAS_ENTRADA_SUGERIDAS).map((sugestao) => (
-          <Chip key={sugestao} papel="filtro" ativo={categoria === sugestao} onClick={() => setCategoria(sugestao)}>{sugestao}</Chip>
+          <Chip key={sugestao} papel="filtro" disabled={enviando} ativo={categoria === sugestao} onClick={() => setCategoria(sugestao)}>{sugestao}</Chip>
         ))}
       </div>
       <div className={css.formGrade}>
-        <CampoTexto rotulo="Categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)} />
-        <CampoSelecao rotulo="Método" opcoes={OPCOES_METODO} value={metodo} onChange={(e) => setMetodo(e.target.value)} />
+        <CampoTexto disabled={enviando} rotulo="Categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)} />
+        <CampoSelecao disabled={enviando} rotulo="Forma de pagamento" opcoes={OPCOES_METODO} value={metodo} onChange={(e) => setMetodo(e.target.value)} />
       </div>
-      <CampoDinheiro rotulo="Valor" centavos={centavos} aoMudar={setCentavos} />
+      <CampoDinheiro disabled={enviando} rotulo="Valor" centavos={centavos} aoMudar={setCentavos} />
       <CampoTexto
         rotulo={saida ? 'Descrição (obrigatória na saída)' : 'Descrição (opcional)'}
         value={descricao}
+        disabled={enviando}
         onChange={(e) => setDescricao(e.target.value)}
       />
       <Botao tipo="submit" variante="primario" icone={saida ? 'menos' : 'mais'} disabled={enviando || incompleto}>
-        Lançar {saida ? 'saída' : 'entrada'}
+        {enviando ? 'Registrando…' : `Lançar ${saida ? 'saída' : 'entrada'}`}
       </Botao>
     </form>
   )
 }
 
-function Lancamentos({ dia, executar, podeGerenciar }) {
+function Lancamentos({ dia, executar, podeGerenciar, enviando }) {
   const { agora } = useAtendimento()
   const { estornarMovimentoCaixa } = useAcoes()
   const [estornando, setEstornando] = useState(null)
@@ -180,6 +190,7 @@ function Lancamentos({ dia, executar, podeGerenciar }) {
             <li key={m.id}>
               <PromptEstorno
                 rotulo={m.categoria}
+                enviando={enviando}
                 aoCancelar={() => setEstornando(null)}
                 aoConfirmar={async (motivo) => {
                   if (await executar(() => estornarMovimentoCaixa(agora, m.id, motivo))) setEstornando(null)
@@ -201,7 +212,7 @@ function Lancamentos({ dia, executar, podeGerenciar }) {
               <span className={css.linhaValor}>
                 {m.tipo === TIPOS_MOVIMENTO.SAIDA ? '−' : '+'} {moeda(m.valor)}
                 {podeEstornar(m) && (
-                  <Botao variante="texto" className={css.acaoEstorno} icone="undo-2" aria-label={`Estornar ${m.categoria}`} onClick={() => setEstornando(m.id)}>
+                  <Botao variante="texto" className={css.acaoEstorno} icone="undo-2" disabled={enviando} aria-label={`Estornar ${m.categoria}`} onClick={() => setEstornando(m.id)}>
                     Estornar
                   </Botao>
                 )}
@@ -240,7 +251,7 @@ export function AbaCaixaApi() {
   const { agora } = useAtendimento()
   const { fecharCaixa } = useAcoes()
   const caixa = useCaixaDoDiaApi({ fechamentos: 7 })
-  const [acao, executar] = useAcaoComRecarga(caixa.recarregar)
+  const [acao, executar, limparErro] = useAcaoComRecarga(caixa.recarregar)
   const [fecharAberto, setFecharAberto] = useState(false)
 
   if (caixa.estado === 'carregando') return <output className={css.corpoBloco}>Carregando o caixa…</output>
@@ -255,11 +266,16 @@ export function AbaCaixaApi() {
 
   const { dia, fechamentos } = caixa
   const erro = acao.erro && <p className={css.avisoFechado} role="alert">{acao.erro}</p>
+  const erroDaConsulta = caixa.estado === 'erro' && <p className={css.avisoFechado} role="alert">
+    O caixa não foi atualizado. Os valores abaixo podem estar desatualizados. {caixa.erro}
+    {' '}<Botao variante="texto" icone="refresh-cw" disabled={acao.enviando} onClick={caixa.recarregar}>Recarregar caixa</Botao>
+  </p>
   const avisoDePermissao = !podeGerenciar && <p className={css.corpoBloco}>O fechamento e o estorno de lançamentos ficam com a dona ou gerente.</p>
 
   if (!dia.aberto && !dia.fechado) {
     return (
       <div className={css.painel}>
+        {erroDaConsulta}
         <AbrirCaixa dia={dia} ultimo={fechamentos[0] ?? null} executar={executar} enviando={acao.enviando} />
         {avisoDePermissao}
         {erro}
@@ -273,6 +289,7 @@ export function AbaCaixaApi() {
   const titulo = dia.esquecidoAberto ? `Caixa de ${diaMes(dia.abertoDesde)} (ainda aberto)` : 'Caixa de hoje'
   return (
     <div className={css.painel}>
+      {erroDaConsulta}
       <header className={css.cabecalho}>
         <h4 className={css.tituloSecao}>{titulo}</h4>
         <Pilula tom={dia.fechado ? 'neutro' : dia.esquecidoAberto ? 'aviso' : 'ok'} icone={dia.fechado ? 'lock' : undefined}>
@@ -300,12 +317,12 @@ export function AbaCaixaApi() {
         <div><dt>Outras saídas</dt><dd>{moeda(dia.totalSaidasExtras)}</dd></div>
         <div><dt>Pagamentos de pedidos</dt><dd>{moeda(dia.totalPagamentosPedidos)}</dd></div>
         <div><dt>Pix e cartão (fora da gaveta)</dt><dd>{moeda(gaveta.pixECartao)}</dd></div>
-        <div><dt>{dia.fechado ? 'Total do dia' : 'Total esperado do dia'}</dt><dd>{moeda(dia.saldoEsperado)}</dd></div>
+        <div className={css.resumoTotal}><dt>{dia.fechado ? 'Total do dia' : 'Total esperado do dia'}</dt><dd>{moeda(dia.saldoEsperado)}</dd></div>
       </dl>
 
       {podeGerenciar && dia.aberto && !dia.fechado && (
         <div className={css.acoesTopo}>
-          <Botao variante="secundario" icone="log-out" onClick={() => setFecharAberto(true)}>
+          <Botao variante="secundario" icone="log-out" disabled={acao.enviando} onClick={() => { limparErro(); setFecharAberto(true) }}>
             {dia.esquecidoAberto ? `Fechar o caixa de ${diaMes(dia.abertoDesde)}` : 'Fechar o caixa'}
           </Botao>
         </div>
@@ -315,17 +332,18 @@ export function AbaCaixaApi() {
 
       {dia.aberto && !dia.fechado && !dia.esquecidoAberto && <FormLancamento executar={executar} enviando={acao.enviando} />}
 
-      <Lancamentos dia={dia} executar={executar} podeGerenciar={podeGerenciar} />
+      <Lancamentos dia={dia} executar={executar} podeGerenciar={podeGerenciar} enviando={acao.enviando} />
       <UltimosFechamentos fechamentos={fechamentos} />
 
       {podeGerenciar && fecharAberto && (
         <ModalFecharCaixa
           resumo={dia}
           gaveta={gaveta}
+          enviando={acao.enviando}
+          erro={acao.erro}
           aoFechar={() => setFecharAberto(false)}
           aoConfirmar={async (contado) => {
-            setFecharAberto(false)
-            await executar(() => fecharCaixa(agora, contado, gaveta.naGaveta))
+            if (await executar(() => fecharCaixa(agora, contado, gaveta.naGaveta))) setFecharAberto(false)
           }}
         />
       )}

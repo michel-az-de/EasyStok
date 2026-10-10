@@ -28,7 +28,7 @@ function EstadoDoCanal() {
   return (
     <>
       <div className={css.estado} aria-live="polite">
-        {carregando && !resumo && <p className={css.apoio}>Conferindo o canal…</p>}
+        {carregando && <p className={css.apoio}>{resumo ? 'Atualizando o estado do canal…' : 'Conferindo o canal…'}</p>}
         {resumo && (
           <>
             <Pilula tom={resumo.tom}>{resumo.titulo}</Pilula>
@@ -39,8 +39,8 @@ function EstadoDoCanal() {
         )}
         {erro && (
           <p className={css.erro} role="alert">
-            O estado do canal não carregou: {erro}{' '}
-            <Botao variante="texto" onClick={recarregar}>Tentar de novo</Botao>
+            O estado do canal não carregou. {resumo && 'O estado exibido pode estar desatualizado. '}{erro}{' '}
+            <Botao variante="texto" disabled={carregando} onClick={recarregar}>Tentar de novo</Botao>
           </p>
         )}
       </div>
@@ -81,7 +81,7 @@ export function TelaCanais() {
         </ul>
       </nav>
 
-      <p className={css.apoio}>Instagram, Messenger e e-mail entram nesta tela quando forem ligados.</p>
+      <p className={css.apoio}>O canal disponível nesta tela é o WhatsApp Business.</p>
     </div>
   )
 }

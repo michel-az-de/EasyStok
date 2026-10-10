@@ -95,7 +95,8 @@ export function situacaoConversaDaApi(resumo, usuario) {
   return {
     estado: ESTADO_DA_SITUACAO[resumo.situacao] ?? 'Aberto',
     situacaoApi: resumo.situacao,
-    responsavel: resumo.assumidaPorUsuarioId ? (minha ? usuario.nome : 'Outro atendente') : null,
+    assumidaPorUsuarioId: resumo.assumidaPorUsuarioId ?? null,
+    responsavel: resumo.assumidaPorUsuarioId ? (resumo.assumidaPorNome?.trim() || (minha ? usuario.nome : 'Outro atendente')) : null,
     pausaApi: pausaDaSituacao(resumo, usuario?.id ?? null),
     passagem: passagemDaApi(resumo),
     naoLidas: resumo.naoLidas,

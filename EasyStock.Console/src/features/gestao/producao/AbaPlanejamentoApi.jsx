@@ -15,8 +15,8 @@ import css from '../cardapio/abaCardapio.module.css'
 const qtd = (n) => Number(n ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 })
 const porQue = (p) => [
   p.minimo ? `mínimo ${qtd(p.minimo)}` : null,
-  p.agendados ? `${qtd(p.agendados)} agendada(s)` : null,
-  p.descoberto ? `${qtd(p.descoberto)} descoberta(s)` : null,
+  p.agendados ? `${qtd(p.agendados)} ${p.agendados === 1 ? 'porção agendada' : 'porções agendadas'}` : null,
+  p.descoberto ? `${qtd(p.descoberto)} ${p.descoberto === 1 ? 'porção vendida sem saldo' : 'porções vendidas sem saldo'}` : null,
   `saldo ${qtd(p.saldo)}`,
 ].filter(Boolean).join(' · ')
 
@@ -53,6 +53,7 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
   }
 
   async function calcular() {
+    if (ocupado) return
     const erro = erroDasPorcoes(linhas)
     if (erro) { setAviso(erro); return }
     setOcupado(true)
@@ -67,11 +68,12 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
   }
 
   async function comprar() {
+    if (ocupado) return
     setOcupado(true)
     const cadastrados = await lerInsumos().catch(() => [])
     const r = await gerarCompras(itensDeCompra(plano?.insumos ?? [], cadastrados), ate)
     setOcupado(false)
-    setAviso(r.ok ? `Lista "${r.nome ?? 'de compras'}" criada com ${r.itens} item(ns).` : r.erro)
+    setAviso(r.ok ? `Lista "${r.nome ?? 'de compras'}" criada com ${r.itens} ${r.itens === 1 ? 'item' : 'itens'}.` : r.erro)
   }
 
   function lancar() {
@@ -80,7 +82,7 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
     else window.location.hash = hashDoModulo('producao', 'producao')
   }
 
-  if (carga.estado === 'carregando') return <p className={css.descricao}>Calculando a sugestão…</p>
+  if (carga.estado === 'carregando') return <output className={css.descricao}>Calculando a sugestão…</output>
   if (carga.estado === 'erro') return (
     <div className={css.aba} role="alert">
       <p className={css.aviso}>Não consegui ler a sugestão: {carga.erro}</p>
@@ -96,7 +98,7 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
       </p>
       <label className={css.dataPlanejamento}>
         <span className={css.nome}>Pedidos até</span>
-        <input className={css.busca} type="date" aria-label="Pedidos até" value={ate} onChange={(e) => { setAte(e.target.value); setConsulta(e.target.value) }} />
+        <input className={css.busca} type="date" aria-label="Pedidos até" disabled={ocupado} value={ate} onChange={(e) => { setAte(e.target.value); setConsulta(e.target.value) }} />
       </label>
       {aviso && <p className={css.aviso} role="alert">{aviso} <Botao variante="texto" onClick={() => setAviso(null)}>Fechar</Botao></p>}
 
@@ -114,7 +116,7 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
                 {l.sugestao > 0 && <Pilula tom="ok" fina>sugestão {qtd(l.sugestao)}</Pilula>}
               </div>
               <div className={css.campoQuantidade}>
-                <CampoTexto rotulo="Porções" inputMode="numeric" aria-label={`Porções de ${l.nome}`} value={l.porcoes} onChange={mudar(l.sku)} />
+                <CampoTexto disabled={ocupado} rotulo="Porções" inputMode="numeric" aria-label={`Porções de ${l.nome}`} value={l.porcoes} onChange={mudar(l.sku)} />
               </div>
             </li>
           ))}
@@ -123,7 +125,7 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
 
       <div className={css.topo}>
         <Botao variante="primario" icone="nota" onClick={calcular} disabled={ocupado || linhas.length === 0}>Calcular insumos</Botao>
-        <Botao icone="cooking-pot" onClick={lancar} disabled={ocupado || linhas.length === 0}>Lançar como produção</Botao>
+        <Botao icone="cooking-pot" onClick={lancar} disabled={ocupado || linhas.length === 0}>Revisar na produção</Botao>
       </div>
 
       {plano && (
@@ -149,7 +151,7 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
             </ul>
           )}
           {plano.pendentes.length > 0 && (
-            <p className={css.descricao}>{plano.pendentes.length} prato(s) sem receita ou com receita incompleta ficaram de fora da conta.</p>
+            <p className={css.descricao}>{plano.pendentes.length} {plano.pendentes.length === 1 ? 'prato sem receita ou com receita incompleta ficou' : 'pratos sem receita ou com receita incompleta ficaram'} de fora da conta.</p>
           )}
           <div className={css.topo}>
             {plano.custoTotal != null && <span className={css.detalhe}>Custo estimado {moeda(plano.custoTotal)}</span>}

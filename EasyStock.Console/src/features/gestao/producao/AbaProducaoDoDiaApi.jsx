@@ -54,6 +54,7 @@ export function AbaProducaoDoDiaApi() {
 
   async function confirmar(evento) {
     evento.preventDefault()
+    if (enviando) return
     setEnviando(true)
     setErro(null)
     const r = await producao.produzir(linhas.map((l) => paraEnviar(l, pratos)))
@@ -82,8 +83,8 @@ export function AbaProducaoDoDiaApi() {
       {feito && (
         <output className={css.aviso}>
           <strong>Lote {feito.codigo}</strong> lançado: {feito.pratos.map((p) => `${p.porcoes}× ${p.nome}${p.sobraG ? ` (sobra ${p.sobraG} g)` : ''}`).join(', ')}.
-          {' '}<Botao variante="primario" icone="printer" onClick={imprimir}>Imprimir {feito.etiquetas} etiqueta(s)</Botao>
-          {' '}<Botao variante="texto" onClick={() => { setFeito(null); setEtiquetas(null) }}>Fechar</Botao>
+          {' '}<Botao variante="primario" icone="printer" onClick={imprimir}>Imprimir {feito.etiquetas} {feito.etiquetas === 1 ? 'etiqueta' : 'etiquetas'}</Botao>
+          {' '}<Botao variante="texto" onClick={() => { setFeito(null); setEtiquetas(null) }}>Fechar confirmação</Botao>
           {feito.avisos.length > 0 && (
             <ul aria-label="Avisos de insumo">
               {feito.avisos.map((a) => <li key={a}>{a}</li>)}
@@ -94,30 +95,30 @@ export function AbaProducaoDoDiaApi() {
 
       <form onSubmit={confirmar} className={css.aba}>
         <ol className={css.listaFormularios}>
-          {linhas.map((l) => {
+          {linhas.map((l, indice) => {
             const sobra = sobraDaLinha(paraEnviar(l))
             return (
               <li key={l.id} className={`${css.campos} ${css.formulario} ${css.loteProducao}`}>
-                <CampoSelecao rotulo="Prato" value={l.sku} onChange={mudar(l.id, 'sku')}
+                <CampoSelecao disabled={enviando} rotulo="Prato" value={l.sku} onChange={mudar(l.id, 'sku')}
                   opcoes={[{ valor: '', rotulo: 'Escolha o prato' }, ...pratos.map((p) => ({ valor: p.sku, rotulo: `${p.nome}${p.porcao ? ` · ${p.porcao}` : ''}` }))]} />
                 {(pratos.find((p) => p.sku === l.sku)?.porcoes ?? []).length > 0 && (
-                  <CampoSelecao rotulo="Porção" value={l.variacaoId} onChange={mudar(l.id, 'variacaoId')}
+                  <CampoSelecao disabled={enviando} rotulo="Porção" value={l.variacaoId} onChange={mudar(l.id, 'variacaoId')}
                     opcoes={[{ valor: '', rotulo: 'Escolha a porção' }, ...pratos.find((p) => p.sku === l.sku).porcoes.map((v) => ({ valor: v.id, rotulo: v.rotulo }))]} />
                 )}
-                <CampoTexto inputMode="numeric" rotulo="Porções" placeholder="Porções" value={l.porcoes} onChange={mudar(l.id, 'porcoes')} />
-                <CampoTexto inputMode="numeric" rotulo="Peso de cada porção (g)" placeholder="g por porção" value={l.pesoPorPorcaoG} onChange={mudar(l.id, 'pesoPorPorcaoG')} />
-                <CampoTexto inputMode="numeric" rotulo="Peso real total (g)" placeholder="Peso real (g)" value={l.pesoRealG} onChange={mudar(l.id, 'pesoRealG')} />
-                <CampoTexto inputMode="numeric" rotulo="Validade (dias)" placeholder="Validade (dias)" value={l.validadeDias} onChange={mudar(l.id, 'validadeDias')} />
+                <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Porções" placeholder="Porções" value={l.porcoes} onChange={mudar(l.id, 'porcoes')} />
+                <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Peso de cada porção (g)" placeholder="g por porção" value={l.pesoPorPorcaoG} onChange={mudar(l.id, 'pesoPorPorcaoG')} />
+                <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Peso real total (g)" placeholder="Peso real (g)" value={l.pesoRealG} onChange={mudar(l.id, 'pesoRealG')} />
+                <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Validade (dias)" placeholder="Validade (dias)" value={l.validadeDias} onChange={mudar(l.id, 'validadeDias')} />
                 <div className={css.rodapeForm}>
                   <span className={css.detalhe}>{sobra == null ? '' : sobra < 0 ? 'peso real menor que as porções' : `sobra ${sobra} g`}</span>
-                  <Botao className={css.acaoDiscreta} variante="texto" icone="lixeira" disabled={linhas.length === 1} onClick={() => tirar(l.id)}>Tirar</Botao>
+                  <Botao className={css.acaoDiscreta} variante="texto" icone="lixeira" aria-label={`Remover prato ${indice + 1} da produção`} disabled={enviando || linhas.length === 1} onClick={() => tirar(l.id)}>Remover prato</Botao>
                 </div>
               </li>
             )
           })}
         </ol>
         <div className={css.acoesFormulario}>
-          <Botao icone="plus" onClick={() => setLinhas((atual) => [...atual, novaLinha()])}>Mais um prato</Botao>
+          <Botao icone="plus" disabled={enviando} onClick={() => setLinhas((atual) => [...atual, novaLinha()])}>Mais um prato</Botao>
           <Botao tipo="submit" variante="primario" icone="check" disabled={enviando}>{enviando ? 'Lançando…' : 'Confirmar produção'}</Botao>
         </div>
         {erro && <p className={css.aviso} role="alert">{erro}</p>}

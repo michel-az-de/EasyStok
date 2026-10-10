@@ -12,6 +12,8 @@ const PAGINAS_NO_MAXIMO = 10
 export const listarConversas = ({ limite = POR_PAGINA, pagina = 1 } = {}) =>
   chamarApi(`${BASE}?limite=${limite}&pagina=${pagina}`)
 
+export const listarAtendentes = () => chamarApi('/api/atendimento/atendentes')
+
 // Inbox inteira (F07, item 7): segue as páginas até uma vir incompleta. Conversa que
 // subiu de página entre uma chamada e outra aparece uma vez só.
 export async function listarTodasConversas() {

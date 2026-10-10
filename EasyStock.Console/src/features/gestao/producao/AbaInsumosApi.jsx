@@ -18,14 +18,21 @@ function LinhaInsumo({ insumo, gestao, podeEditar }) {
   const [editando, setEditando] = useState(false)
   const [minimo, setMinimo] = useState(insumo.minimo ?? '')
   const [custo, setCusto] = useState(insumo.custo ?? '')
+  const [ocupado, setOcupado] = useState(false)
+
+  const fazer = async (acao) => {
+    if (ocupado) return false
+    setOcupado(true)
+    try { return await acao() } finally { setOcupado(false) }
+  }
 
   const salvar = (evento) => {
     evento.preventDefault()
-    Promise.resolve(gestao.atualizar(insumo.id, { minimo, custo })).then((ok) => { if (ok !== false) setEditando(false) })
+    fazer(() => gestao.atualizar(insumo.id, { minimo, custo })).then((ok) => { if (ok !== false) setEditando(false) })
   }
 
   return (
-    <li className={css.linha}>
+    <li className={css.linha} aria-busy={ocupado}>
       <div className={css.resumo}>
         <span className={css.nome}>{insumo.nome}</span>
         <span className={css.detalhe}>
@@ -37,21 +44,23 @@ function LinhaInsumo({ insumo, gestao, podeEditar }) {
       <div className={css.estados}>
         {insumo.comprar && <Pilula tom="aviso" fina>Abaixo do mínimo ({insumo.minimo} {insumo.unidade})</Pilula>}
         {!insumo.comprar && insumo.minimo != null && <Pilula tom="neutro" fina>Mínimo {insumo.minimo} {insumo.unidade}</Pilula>}
-        {insumo.embalagem && <Pilula tom="marca" fina>Embalagem: desce em toda produção</Pilula>}
+        {insumo.embalagem && <Pilula tom="marca" fina>Embalagem usada em toda produção</Pilula>}
       </div>
       {podeEditar && (editando ? (
         <form className={`${css.campos} ${css.formulario} ${css.ajusteInsumo}`} onSubmit={salvar}>
-          <CampoTexto inputMode="numeric" rotulo={`Mínimo (${insumo.unidade})`} aria-label={`Mínimo de ${insumo.nome}`} value={minimo} onChange={(e) => setMinimo(e.target.value)} />
-          <CampoTexto inputMode="decimal" rotulo={`Custo por ${insumo.unidade} (R$)`} aria-label={`Custo de ${insumo.nome}`} value={custo} onChange={(e) => setCusto(e.target.value)} />
+          <CampoTexto disabled={ocupado} inputMode="numeric" rotulo={`Mínimo (${insumo.unidade})`} aria-label={`Mínimo de ${insumo.nome}`} value={minimo} onChange={(e) => setMinimo(e.target.value)} />
+          <CampoTexto disabled={ocupado} inputMode="decimal" rotulo={`Custo por ${insumo.unidade} (R$)`} aria-label={`Custo de ${insumo.nome}`} value={custo} onChange={(e) => setCusto(e.target.value)} />
           <div className={css.rodapeForm}>
-            <Botao variante="texto" onClick={() => setEditando(false)}>Cancelar</Botao>
-            <Botao tipo="submit" variante="primario" icone="check">Salvar</Botao>
+            <Botao variante="texto" disabled={ocupado} onClick={() => setEditando(false)}>Cancelar</Botao>
+            <Botao tipo="submit" variante="primario" icone="check" disabled={ocupado}>{ocupado ? 'Salvando…' : 'Salvar ajuste'}</Botao>
           </div>
         </form>
       ) : (
         <div className={css.acoes}>
-          <Botao variante="texto" icone="lapis" onClick={() => setEditando(true)}>Ajustar</Botao>
-          <Botao variante="texto" onClick={() => gestao.marcarEmbalagem(insumo.id, !insumo.embalagem)}>
+          <Botao variante="texto" icone="lapis" disabled={ocupado} aria-label={`Ajustar ${insumo.nome}`} onClick={() => {
+            setMinimo(insumo.minimo ?? ''); setCusto(insumo.custo ?? ''); setEditando(true)
+          }}>Ajustar</Botao>
+          <Botao variante="texto" disabled={ocupado} onClick={() => fazer(() => gestao.marcarEmbalagem(insumo.id, !insumo.embalagem))}>
             {insumo.embalagem ? 'Não é embalagem' : 'É embalagem'}
           </Botao>
         </div>
@@ -65,6 +74,7 @@ export function AbaInsumosApi() {
   const podeEditar = acoes.editarProducao === true
   const gestao = useInsumosApi()
   const [novo, setNovo] = useState({ nome: '', unidade: 'G', minimo: '', custo: '', embalagem: false })
+  const [criando, setCriando] = useState(false)
 
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando os insumos…</output>
   if (gestao.estado === 'erro' && gestao.insumos.length === 0) {
@@ -80,11 +90,17 @@ export function AbaInsumosApi() {
   const mudarNovo = (campo) => (e) => setNovo((atual) => ({ ...atual, [campo]: e.target.value }))
   const cadastrar = (evento) => {
     evento.preventDefault()
-    Promise.resolve(gestao.criar(novo)).then((ok) => { if (ok !== false) setNovo({ nome: '', unidade: novo.unidade, minimo: '', custo: '', embalagem: novo.embalagem }) })
+    if (criando) return
+    setCriando(true)
+    Promise.resolve(gestao.criar(novo)).then((ok) => { if (ok !== false) setNovo({ nome: '', unidade: novo.unidade, minimo: '', custo: '', embalagem: novo.embalagem }) }).finally(() => setCriando(false))
   }
 
   return (
     <div className={css.aba}>
+      {gestao.estado === 'erro' && <p className={css.aviso} role="alert">
+        Os insumos não foram atualizados. A lista abaixo pode estar desatualizada. {gestao.erro}
+        {' '}<Botao variante="texto" icone="refresh-cw" onClick={gestao.recarregar}>Recarregar insumos</Botao>
+      </p>}
       {gestao.aviso && (
         <p className={css.aviso} role="alert">
           {gestao.aviso} <Botao variante="texto" onClick={gestao.fecharAviso}>Fechar</Botao>
@@ -110,16 +126,16 @@ export function AbaInsumosApi() {
       </section>
 
       {podeEditar ? <form className={`${css.campos} ${css.formulario} ${css.cadastroInsumo}`} onSubmit={cadastrar} aria-label="Cadastrar insumo">
-        <CampoTexto rotulo="Nome do insumo" placeholder="Ex.: molho sugo" maxLength={180} value={novo.nome} onChange={mudarNovo('nome')} />
-        <CampoSelecao rotulo="Unidade" value={novo.unidade} onChange={mudarNovo('unidade')} opcoes={UNIDADES_INSUMO.map((u) => ({ valor: u, rotulo: u }))} />
-        <CampoTexto inputMode="numeric" rotulo="Mínimo" value={novo.minimo} onChange={mudarNovo('minimo')} />
-        <CampoTexto inputMode="decimal" rotulo="Custo por unidade (R$)" aria-label="Custo por unidade" value={novo.custo} onChange={mudarNovo('custo')} />
+        <CampoTexto disabled={criando} rotulo="Nome do insumo" placeholder="Ex.: molho sugo" maxLength={180} value={novo.nome} onChange={mudarNovo('nome')} />
+        <CampoSelecao disabled={criando} rotulo="Unidade" value={novo.unidade} onChange={mudarNovo('unidade')} opcoes={UNIDADES_INSUMO.map((u) => ({ valor: u, rotulo: u }))} />
+        <CampoTexto disabled={criando} inputMode="numeric" rotulo="Mínimo (opcional)" value={novo.minimo} onChange={mudarNovo('minimo')} />
+        <CampoTexto disabled={criando} inputMode="decimal" rotulo="Custo por unidade (R$)" aria-label="Custo por unidade" value={novo.custo} onChange={mudarNovo('custo')} />
         <div className={css.rodapeForm}>
           <label className={css.chave}>
-            <input type="checkbox" checked={novo.embalagem} onChange={(e) => setNovo((atual) => ({ ...atual, embalagem: e.target.checked }))} />
-            <span>É embalagem<span className={css.ajudaEmbalagem}>Bandeja, selo ou pote. Conta por unidade e desce em toda produção.</span></span>
+            <input type="checkbox" disabled={criando} checked={novo.embalagem} onChange={(e) => setNovo((atual) => ({ ...atual, embalagem: e.target.checked }))} />
+            <span>É embalagem<span className={css.ajudaEmbalagem}>Bandeja, selo ou pote. Conta por unidade e é descontada em toda produção.</span></span>
           </label>
-          <Botao tipo="submit" variante="primario" icone="plus" disabled={!novo.nome.trim()}>Cadastrar insumo</Botao>
+          <Botao tipo="submit" variante="primario" icone="plus" disabled={criando || !novo.nome.trim()}>{criando ? 'Cadastrando…' : 'Cadastrar insumo'}</Botao>
         </div>
       </form> : <p className={css.descricao}>Você pode consultar os insumos. O cadastro e os ajustes ficam com a dona ou gerente.</p>}
     </div>
