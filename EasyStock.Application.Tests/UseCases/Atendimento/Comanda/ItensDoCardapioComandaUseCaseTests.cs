@@ -25,12 +25,16 @@ public class ItensDoCardapioComandaUseCaseTests
     private readonly ICardapioItemRepository _cardapio = Substitute.For<ICardapioItemRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly ICardapioSecaoRepository _secoesRepo = Substitute.For<ICardapioSecaoRepository>();
+    private readonly IProdutoVariacaoRepository _variacoes = Substitute.For<IProdutoVariacaoRepository>();
+    private readonly List<ProdutoVariacao> _variacoesGravadas = [];
 
     public ItensDoCardapioComandaUseCaseTests()
     {
         _vitrine.Ativar();
         _storefronts.GetByEmpresaAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns(_vitrine);
         _storefronts.GetByIdAsync(_vitrine.Id).Returns(_vitrine);
+        _variacoes.GetByProdutoAsync(EmpresaId, Arg.Any<Guid>()).Returns(c => _variacoesGravadas.Where(v => v.ProdutoId == c.ArgAt<Guid>(1)).ToList());
+        _variacoes.When(v => v.InsertAsync(Arg.Any<ProdutoVariacao>())).Do(c => _variacoesGravadas.Add(c.Arg<ProdutoVariacao>()));
     }
 
     private ItensDoCardapioComandaUseCase Sut()
@@ -43,7 +47,91 @@ public class ItensDoCardapioComandaUseCaseTests
             new ToggleVisibilidadeCardapioItemAdminUseCase(_cardapio, _uow, aviso),
             _cardapio,
             _secoesRepo,
-            _uow);
+            _uow,
+            new VincularPorcoesAoEstoqueUseCase(_variacoes));
+    }
+
+    private CardapioItem ItemDoEstoque(string nome)
+    {
+        var produto = new Produto { Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = nome, PrecoReferencia = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(30m) };
+        var item = CardapioItem.CriarAPartirDeProduto(_vitrine.Id, produto);
+        _cardapio.GetByIdAndScopeAsync(_vitrine.Id, item.Id, EmpresaId, Arg.Any<CancellationToken>()).Returns(item);
+        return item;
+    }
+
+    private static DadosItemCardapio ComPorcoes(params PorcaoDoItem[] porcoes) =>
+        new(null, null, null, null, null, Porcoes: porcoes);
+
+    [Fact]
+    public async Task Porcoes_DePratoDoEstoque_GanhamAVariacaoDoEstoque_EOVinculoFica()
+    {
+        // M1.4a (#1529, D-M1-03 = a): cada porção tem saldo próprio pela variação do estoque.
+        var item = ItemDoEstoque("Ravióli");
+
+        await Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(
+            new PorcaoDoItem(null, "300 g", 28m, "300 g", Padrao: true), new PorcaoDoItem(null, "800 g", 62m, "800 g")));
+
+        _variacoesGravadas.Select(v => (v.Nome, v.ProdutoId)).Should().Equal(("300 g", item.ProdutoId!.Value), ("800 g", item.ProdutoId!.Value));
+        item.Variacoes.Select(v => v.ProdutoVariacaoId).Should().Equal(_variacoesGravadas.Select(v => (Guid?)v.Id));
+        item.Variacoes.Single(v => v.EhPadrao).Rotulo.Should().Be("300 g");
+
+        // Editar de novo, trocando o preço e o rótulo, não cria outra variação: renomeia a que existe.
+        var p800 = item.Variacoes.Single(v => v.Rotulo == "800 g");
+        await Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(
+            new PorcaoDoItem(item.Variacoes.Single(v => v.Rotulo == "300 g").Id, "300 g", 30m, Padrao: true),
+            new PorcaoDoItem(p800.Id, "1 kg", 75m)));
+
+        _variacoesGravadas.Should().HaveCount(2);
+        _variacoesGravadas.Single(v => v.Id == p800.ProdutoVariacaoId).Nome.Should().Be("1 kg");
+        await _variacoes.Received(1).UpdateAsync(Arg.Is<ProdutoVariacao>(v => v.Nome == "1 kg"));
+    }
+
+    [Fact]
+    public async Task Porcoes_DePratoAvulso_GravamSemVinculo()
+    {
+        var item = Item("Bolo", visivel: true);
+
+        await Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(new PorcaoDoItem(null, "Fatia", 12m)));
+
+        item.Variacoes.Should().ContainSingle().Which.ProdutoVariacaoId.Should().BeNull("o vínculo chega na primeira produção");
+        await _variacoes.DidNotReceiveWithAnyArgs().InsertAsync(default!);
+    }
+
+    [Theory]
+    [InlineData("", 10, "nome")]
+    [InlineData("300 g", 0, "preço")]
+    public async Task PorcaoSemNomeOuSemPreco_Recusa(string rotulo, decimal preco, string trecho)
+    {
+        var item = ItemDoEstoque("Ravióli");
+
+        var act = () => Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(new PorcaoDoItem(null, rotulo, preco)));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage($"*{trecho}*");
+        item.Variacoes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PorcoesComOMesmoNome_Recusa()
+    {
+        var item = ItemDoEstoque("Ravióli");
+
+        var act = () => Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(new PorcaoDoItem(null, "300 g", 28m), new PorcaoDoItem(null, "300 G", 30m)));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*mesmo nome*");
+    }
+
+    [Fact]
+    public async Task Obter_TrazAsPorcoes_EAListaMostraOAPartirDe()
+    {
+        var item = ItemDoEstoque("Ravióli");
+        await Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(new PorcaoDoItem(null, "800 g", 62m, Padrao: true), new PorcaoDoItem(null, "300 g", 28m)));
+        _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>()).Returns([item]);
+
+        var detalhe = await Sut().ObterAsync(EmpresaId, item.Id);
+        var linha = (await Sut().ListarGestaoAsync(EmpresaId)).Single();
+
+        detalhe.Porcoes!.Select(p => (p.Rotulo, p.Preco, p.Padrao)).Should().Equal(("800 g", 62m, true), ("300 g", 28m, false));
+        (linha.Preco, linha.Porcoes).Should().Be((28m, 2), "a partir da porção mais barata (ADR-0035 §5)");
     }
 
     private CardapioItem Item(string nome, bool visivel)

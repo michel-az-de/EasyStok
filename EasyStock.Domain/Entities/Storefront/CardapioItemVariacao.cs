@@ -145,6 +145,16 @@ public class CardapioItemVariacao
         AlteradoEm = DateTime.UtcNow;
     }
 
+    /// <summary>D-M1-03 (#1529): liga a porção à variação do estoque, que dá o saldo próprio dela.</summary>
+    public void VincularProdutoVariacao(Guid produtoVariacaoId)
+    {
+        if (produtoVariacaoId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("Variação do estoque inválida.");
+        if (ProdutoVariacaoId == produtoVariacaoId) return;
+        ProdutoVariacaoId = produtoVariacaoId;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
     public void MarcarEsgotado()
     {
         if (!Disponivel) return;

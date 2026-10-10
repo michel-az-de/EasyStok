@@ -191,6 +191,13 @@ busca só por produto (`PedidoEstoqueIntegrationService.cs:78-80`).
 **Console.** Comanda: item com porções abre a escolha da porção (como o site). M1 › Itens: editor de porções
 (rótulo, peso, preço, padrão, disponível).
 
+> **Como fica a entrega (09/10):** três fatias, com o console primeiro.
+> - **M1.4a (#1529):** editor de porções no console, cada porção ligada à sua `ProdutoVariacao`.
+> - **M1.4b:** vender por porção (pedido e comanda).
+> - **M1.4c:** saldo por porção (produção e baixa).
+>
+> O menu público com `opcoes` (lacuna 1, Fase 2) fica para depois da confirmação do site.
+
 **Decisão já tomada.** Preço da variação é absoluto, não delta (ADR-0035). Tier **alto** (pedido e contrato
 público; coordenar com o repositório do site antes da fase 2 do ADR-0035).
 
@@ -306,7 +313,14 @@ gravam na mesma API.
 > - **D-M1-08 = a:** o item novo nasce em validação, e o agente não oferece até ela confirmar.
 >
 > Permissão no console (#1241): o Operador mexe no dia e no saldo; o Gerente inclui, edita e tira.
-> Seguem pendentes: D-M1-02, 03, 04 e 06.
+> **Decididas em 09/10/2026 (Felipe, múltipla escolha):**
+> - **D-M1-02 = a:** o combo tem preço e componentes fixos, e cada componente baixa o próprio estoque.
+> - **D-M1-03 = a:** a porção tem saldo próprio pela `ProdutoVariacao`; a produção e a baixa passam a usar a porção.
+> - **D-M1-04 = a:** o adicional é item do próprio cardápio e entra como linha própria ligada ao prato, com saldo e preço.
+> - **D-M1-06 = a:** os alérgenos são uma lista fechada no item, mais um texto "outros".
+> - **ADR-0035, Fase 2:** as porções entram primeiro no console. O menu público só emite `opcoes` depois de o Felipe confirmar que o site lê o schema v2.
+>
+> Todas as decisões do M1 estão tomadas.
 
 **D-M1-01 · Quem é dono do preço e da categoria que o cliente vê?**
 - a) O cardápio: preço no item ou na porção, categoria na seção; `PrecoReferencia` vira sugestão do bastidor **(Recomendado)**

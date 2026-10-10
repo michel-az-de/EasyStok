@@ -26,6 +26,8 @@ import {
   agruparPorLinha, itensDetalhados, numeroDaComanda, totalDoPedido,
 } from '../../dominio/pedido'
 import { diferencaAposPagamento } from '../../dominio/pagamento'
+import { corpoDasPorcoes, erroDasPorcoes, porcoesMudaram, rascunhoDasPorcoes, resumoDoItem } from '../../dominio/porcoes'
+import { EditorPorcoes } from './EditorPorcoes'
 import css from './cardapio.module.css'
 
 // Dois papéis na mesma janela, porque são a mesma conversa com o cardápio: ela
@@ -484,6 +486,9 @@ function FormularioItemCardapio({
   const [comNovidade, setComNovidade] = useState(Boolean(item?.novidadeAte))
   const [prazo, setPrazo] = useState(dataDoIso(item?.novidadeAte))
   const [erro, setErro] = useState(null)
+  // M1.4a (#1529): porções do prato, só no modo API (é o EasyStok que as guarda).
+  const [porcoesIniciais, setPorcoesIniciais] = useState([])
+  const [porcoes, setPorcoes] = useState([])
   // M1.2 (#1482): a ficha do item. No modo API ela vem do EasyStok antes de editar (o cardápio da
   // comanda não traz ingredientes nem alérgenos); só o que ela mudou vai na gravação.
   const { obterItemCardapio, listarCategoriasCardapio } = useAcoes()
@@ -518,6 +523,8 @@ function FormularioItemCardapio({
         setPrazo(dataDoIso(d.novidadeAte))
         setSecaoInicial(d.secaoId ?? '')
         setSecao(d.secaoId ?? '')
+        setPorcoesIniciais(d.porcoes ?? [])
+        setPorcoes(rascunhoDasPorcoes(d.porcoes))
       }
     })
     return () => { vivo = false }
@@ -537,6 +544,7 @@ function FormularioItemCardapio({
     if (mudou('instrucao')) saida.instrucaoFinalizacao = ficha.instrucao.trim()
     if (mudou('preparo') && ficha.preparo.trim()) saida.tempoPreparoMinutos = Number(ficha.preparo)
     if (categorias.length > 0 && secao !== secaoInicial) saida.secaoId = secao || null
+    if (obterItemCardapio && porcoesMudaram(porcoesIniciais, porcoes)) saida.porcoes = corpoDasPorcoes(porcoes)
     return saida
   }
 
@@ -549,8 +557,12 @@ function FormularioItemCardapio({
 
   function confirmar() {
     if (!nome.trim()) { setErro('Dê um nome ao item.'); return }
-    if (!porcao.trim()) { setErro('Diga a porção.'); return }
-    if (centavos <= 0 || excedeu) { setErro('Preço inválido.'); return }
+    // Com porções, o preço e a porção do prato acompanham a porção padrão.
+    const resumo = porcoes.length > 0 ? resumoDoItem(porcoes) : null
+    const erroPorcoes = porcoes.length > 0 ? erroDasPorcoes(porcoes) : null
+    if (erroPorcoes) { setErro(erroPorcoes); return }
+    if (!resumo && !porcao.trim()) { setErro('Diga a porção.'); return }
+    if (!resumo && (centavos <= 0 || excedeu)) { setErro('Preço inválido.'); return }
     if (comNovidade && !prazo) { setErro('Dê um prazo para a novidade.'); return }
     if (ficha.preparo.trim() && !(Number.isInteger(Number(ficha.preparo)) && Number(ficha.preparo) > 0)) {
       setErro('O preparo é em minutos inteiros.'); return
@@ -558,8 +570,8 @@ function FormularioItemCardapio({
     const dados = {
       nome: nome.trim(),
       linha,
-      porcao: porcao.trim(),
-      preco: centavos / 100,
+      porcao: resumo ? resumo.porcao : porcao.trim(),
+      preco: resumo ? resumo.preco : centavos / 100,
       novidadeAte: comNovidade ? isoFimDoDia(prazo) : null,
       adicionaisSelecionados: selecionados,
       ...camposDaFicha(),
@@ -619,6 +631,8 @@ function FormularioItemCardapio({
           aoMudarDigitos={(digitos) => setCentavos(Number(digitos || '0'))}
           aoColarTexto={(texto) => setCentavos(lerMoeda(texto))}
         />
+
+        {obterItemCardapio && <EditorPorcoes linhas={porcoes} aoMudar={setPorcoes} desabilitado={carregandoFicha} />}
 
         {candidatosAdicionais.length > 0 && (
           <fieldset className={css.camposAdicionais}>
