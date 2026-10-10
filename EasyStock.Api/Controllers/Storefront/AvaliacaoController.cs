@@ -47,7 +47,8 @@ public sealed class AvaliacaoController(
                 HttpOnly = true,
                 Secure = true,
                 SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax,
-                Path = "/avaliar",
+                // __Host- exige Path=/; com /avaliar o navegador descartava o cookie e o POST dava 401 (#1508).
+                Path = "/",
                 MaxAge = TimeSpan.FromSeconds(CookieMaxAge),
             });
 

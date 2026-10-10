@@ -17,7 +17,7 @@ public class PwaPushControllerTests
     private readonly IWebPushSubscriptionRepository _repo = Substitute.For<IWebPushSubscriptionRepository>();
     private readonly ICurrentUserAccessor _sessao = Substitute.For<ICurrentUserAccessor>();
     private readonly PwaPushController _controller;
-    private static readonly PwaPushController.SubscribeRequest Inscricao = new("https://push.example.test/aviso", "chave", "segredo", "teste");
+    private static readonly PwaPushController.SubscribeRequest Inscricao = new("https://fcm.googleapis.com/fcm/send/aviso", /* #1508: so servico de push */ "chave", "segredo", "teste");
 
     public PwaPushControllerTests()
     {

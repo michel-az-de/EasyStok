@@ -8,6 +8,8 @@ namespace EasyStock.Api.Controllers;
 [ApiController]
 [Route("api/audit")]
 [Authorize]
+// #1508: trilha de alteracoes de qualquer entidade (pedido, cliente, pagamento) e dado de gestao.
+[Authorize(Policy = "Admin")]
 public class EntityAuditController(
     IEntityAuditQueries entityAudit,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase

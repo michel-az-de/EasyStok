@@ -3,7 +3,9 @@ using System.Text;
 using EasyStock.Infra.Async.Pagamentos.Webhooks;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 
 namespace EasyStock.Api.UnitTests.Pagamentos;
 
@@ -13,11 +15,14 @@ public class MercadoPagoSignatureValidatorTests
     private const string DataId = "pay_12345";
     private const string ReqId = "req_abcdef";
 
-    private static MercadoPagoSignatureValidator Build(Dictionary<string, string?>? cfg = null)
+    private static MercadoPagoSignatureValidator Build(
+        Dictionary<string, string?>? cfg = null, string environmentName = "Development")
     {
         cfg ??= new Dictionary<string, string?> { ["MercadoPago:WebhookSecret"] = Secret };
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(cfg).Build();
-        return new MercadoPagoSignatureValidator(configuration, NullLogger<MercadoPagoSignatureValidator>.Instance);
+        var ambiente = Substitute.For<IHostEnvironment>();
+        ambiente.EnvironmentName.Returns(environmentName);
+        return new MercadoPagoSignatureValidator(configuration, NullLogger<MercadoPagoSignatureValidator>.Instance, ambiente);
     }
 
     private static string Hmac(string secret, string body)
@@ -92,6 +97,14 @@ public class MercadoPagoSignatureValidatorTests
     {
         var v = Build(new Dictionary<string, string?> { ["MercadoPago:WebhookAllowUnsigned"] = "true" });
         v.Validar(Body(), new Dictionary<string, string?>()).Should().BeTrue();
+    }
+
+    // #1508: em Production a flag e ignorada (mesmo fail-secure do Efi Pix); senao pagamento forjado passa.
+    [Fact]
+    public void Validar_SemSecretComAllowUnsignedEmProducao_RetornaFalse()
+    {
+        var v = Build(new Dictionary<string, string?> { ["MercadoPago:WebhookAllowUnsigned"] = "true" }, "Production");
+        v.Validar(Body(), new Dictionary<string, string?>()).Should().BeFalse();
     }
 
     [Fact]

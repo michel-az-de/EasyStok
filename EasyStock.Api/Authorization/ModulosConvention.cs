@@ -43,6 +43,8 @@ public sealed class ModulosConvention : IApplicationModelConvention
         if (chave == "AtendimentoComanda" && acao == "Cardapio")
             return [Modulo.Cardapio, Modulo.Producao, Modulo.Atendimento, Modulo.Cozinha];
         if (chave == "Kds" && acao == "GetPedidos") return [Modulo.Cozinha, Modulo.Entregas];
+        // Upload transversal, menos a foto do produto: é edição de cardápio, como /api/produtos/{id}/fotos.
+        if (chave == "Uploads" && acao == "UploadFotoProduto") return [Modulo.Cardapio];
         return Mapa.GetValueOrDefault(chave);
     }
 

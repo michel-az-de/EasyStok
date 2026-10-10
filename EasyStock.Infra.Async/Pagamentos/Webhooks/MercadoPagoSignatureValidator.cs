@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Async.Pagamentos.Webhooks;
@@ -17,7 +18,8 @@ namespace EasyStock.Infra.Async.Pagamentos.Webhooks;
 /// </summary>
 public sealed class MercadoPagoSignatureValidator(
     IConfiguration configuration,
-    ILogger<MercadoPagoSignatureValidator> logger) : IWebhookSignatureValidator
+    ILogger<MercadoPagoSignatureValidator> logger,
+    IHostEnvironment hostEnvironment) : IWebhookSignatureValidator
 {
     public string Provedor => "MercadoPago";
 
@@ -26,9 +28,21 @@ public sealed class MercadoPagoSignatureValidator(
         var secret = configuration["MercadoPago:WebhookSecret"];
         if (string.IsNullOrWhiteSpace(secret))
         {
-            return string.Equals(
+            var allowUnsigned = string.Equals(
                 configuration["MercadoPago:WebhookAllowUnsigned"], "true",
                 StringComparison.OrdinalIgnoreCase);
+
+            // Fail-secure (#1508, mesmo padrao do Efi Pix): o escape hatch e so DEV/sandbox. Em Production, NUNCA
+            // aceitar webhook nao-assinado, mesmo com a flag ligada por engano. Configure MercadoPago:WebhookSecret.
+            if (allowUnsigned && hostEnvironment.IsProduction())
+            {
+                logger.LogError(
+                    "MercadoPago webhook: WebhookAllowUnsigned=true IGNORADO em Production — " +
+                    "webhook nao-assinado recusado. Configure MercadoPago:WebhookSecret.");
+                return false;
+            }
+
+            return allowUnsigned;
         }
 
         if (!headers.TryGetValue("x-signature", out var sigHeader) || string.IsNullOrWhiteSpace(sigHeader))

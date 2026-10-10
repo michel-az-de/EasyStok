@@ -83,6 +83,16 @@ public sealed class WebPushCanal(
         var permanentes = 0;
         foreach (var sub in subs)
         {
+            // #1508: inscricao gravada antes da allowlist nao pode virar SSRF. Desativa e conta como permanente.
+            if (!EndpointPushPermitido.Valido(sub.Endpoint))
+            {
+                logger.LogWarning("Subscription Web Push {SubscriptionId} com endpoint fora da allowlist desativada.", sub.Id);
+                await repo.DesativarAsync(sub.Endpoint, ct);
+                falhas++;
+                permanentes++;
+                continue;
+            }
+
             try
             {
                 var psub = new PushSubscription(sub.Endpoint, sub.P256dh, sub.Auth);

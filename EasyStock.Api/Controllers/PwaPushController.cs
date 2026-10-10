@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Infra.Notifications.Options;
+using EasyStock.Infra.Notifications.Push;
 using Microsoft.Extensions.Options;
 
 namespace EasyStock.Api.Controllers;
@@ -50,6 +51,10 @@ public class PwaPushController(
             || string.IsNullOrWhiteSpace(req.Auth))
             return DataBadRequest("Endpoint, P256dh e Auth sao obrigatorios.");
 
+        // #1508: o worker faz POST no endpoint; so servico de push conhecido, senao vira SSRF.
+        if (!EndpointPushPermitido.Valido(req.Endpoint))
+            return DataBadRequest("Endpoint de push nao permitido.");
+
         var existing = await repo.GetByEndpointAsync(req.Endpoint, ct);
         if (existing is not null)
         {
@@ -86,4 +91,5 @@ public class PwaPushController(
         await repo.DesativarAsync(endpoint, ct);
         return NoContent();
     }
+
 }
