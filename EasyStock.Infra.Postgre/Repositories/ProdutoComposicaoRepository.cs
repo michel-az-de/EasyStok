@@ -69,15 +69,14 @@ public class ProdutoComposicaoRepository(EasyStockDbContext context) : IProdutoC
         return resultado;
     }
 
-    public Task<IReadOnlyCollection<ProdutoComposicao>> GetOndeInsumoAsync(
+    public async Task<IReadOnlyCollection<ProdutoComposicao>> GetOndeInsumoAsync(
         Guid empresaId, Guid insumoId, CancellationToken ct = default) =>
-        context.ProdutosComposicao
+        await context.ProdutosComposicao
             .AsNoTracking()
             .Include(c => c.ProdutoFinal)
             .Where(c => c.EmpresaId == empresaId && c.InsumoId == insumoId)
             .OrderBy(c => c.ProdutoFinal!.Nome)
-            .ToListAsync(ct)
-            .ContinueWith(t => (IReadOnlyCollection<ProdutoComposicao>)t.Result, ct);
+            .ToListAsync(ct);
 
     public async Task<IReadOnlyDictionary<Guid, int>> ContarReceitasPorInsumoAsync(Guid empresaId, CancellationToken ct = default) =>
         await context.ProdutosComposicao

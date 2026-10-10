@@ -46,8 +46,7 @@ public sealed class GerarPedidoConversaUseCase(
     GerarCobrancaPedidoUseCase gerarCobranca,
     TrocarFormaPagamentoPedidoUseCase trocarForma,
     AvisoCobrancaConversa aviso,
-    TimeProvider relogio,
-    ILogger<GerarPedidoConversaUseCase> logger)
+    TimeProvider relogio)
 {
     public const string CabecalhoResumo = "Resumo do seu pedido:";
 

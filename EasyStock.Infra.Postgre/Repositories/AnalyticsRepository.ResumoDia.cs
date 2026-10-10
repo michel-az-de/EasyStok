@@ -41,7 +41,6 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Select(m => new { m.Tipo, m.DataMovimento })
                 .FirstOrDefaultAsync();
 
-            DateTime? aberturaEm = null;
             bool caixaAberta = false;
             bool caixaFechada = false;
 
@@ -50,7 +49,6 @@ namespace EasyStock.Infra.Postgre.Repositories
                 if (ultimoEventoCaixa.Tipo == "abertura")
                 {
                     caixaAberta = true;
-                    aberturaEm = ultimoEventoCaixa.DataMovimento;
                 }
                 else if (ultimoEventoCaixa.DataMovimento >= hojeIni)
                 {
@@ -58,10 +56,6 @@ namespace EasyStock.Infra.Postgre.Repositories
                 }
                 // Senao: ultimo evento foi fechamento de outro dia => "sem caixa hoje"
             }
-
-            // saldoInicio: desde a abertura (cross-day) se aberta, OU desde hoje 0h.
-            // Usado abaixo só para delimitar a janela do Pix do dia (pagamentos de pedido).
-            var saldoInicio = aberturaEm ?? hojeIni;
 
             // Saldo esperado do caixa: fonte ÚNICA (CaixaSaldoCalculator), a MESMA consumida
             // pela tela /caixa. Antes este bloco somava abertura+entrada-saída (+pagamentos) e
@@ -97,26 +91,18 @@ namespace EasyStock.Infra.Postgre.Repositories
             var pedidosPendentes = pendentes.Count;
             var valorPedidosPendentes = pendentes.Sum(t => (decimal)t);
 
-            // ── Pix do dia ──────────────────────────────────────────────
-            // PedidoPagamento nao e DbSet — acessa via navigation Pedido.Pagamentos.
-            // Os pagamentos JÁ entram no saldoCaixa via CaixaSaldoCalculator acima; esta query
-            // serve só para destacar o Pix recebido hoje (não soma de novo ao saldo).
-            var pagamentosNoSaldo = await dbContext.Pedidos.AsNoTracking()
+            // Pix é uma métrica do dia civil, inclusive antes da abertura do caixa.
+            // Contagem e soma ficam no PostgreSQL, sem materializar cada recebimento.
+            var pixHoje = await dbContext.Pedidos.AsNoTracking()
                 .Where(p => p.EmpresaId == empresaId
                          && (lojaId == null || p.LojaId == lojaId))
                 .SelectMany(p => p.Pagamentos)
-                .Where(pp => pp.PagoEm >= saldoInicio && pp.PagoEm < hojeFim)
-                .Select(pp => new { pp.PagoEm, pp.Metodo, pp.Valor })
-                .ToListAsync();
-
-            // Pix recebidos hoje — SO PedidoPagamento (decisao explicita pra evitar
-            // double-count com MovimentoCaixa.Metodo=pix). Considera apenas hoje
-            // (nao cross-day): "Pix de hoje" e metrica de dia, nao de caixa.
-            var pixHoje = pagamentosNoSaldo
-                .Where(p => p.Metodo == "pix" && p.PagoEm >= hojeIni && p.PagoEm < hojeFim)
-                .ToList();
-            var pixCount = pixHoje.Count;
-            var pixValor = pixHoje.Sum(p => p.Valor);
+                .Where(pp => pp.Metodo == "pix" && pp.PagoEm >= hojeIni && pp.PagoEm < hojeFim)
+                .GroupBy(pp => 1)
+                .Select(g => new { Quantidade = g.Count(), Valor = g.Sum(pp => pp.Valor) })
+                .FirstOrDefaultAsync();
+            var pixCount = pixHoje?.Quantidade ?? 0;
+            var pixValor = pixHoje?.Valor ?? 0m;
 
             // ── Onboarding checklist counts (1.1-B) ──────────────────────────
             // Conta linhas reais do tenant (sem janela de data). A exclusao dos

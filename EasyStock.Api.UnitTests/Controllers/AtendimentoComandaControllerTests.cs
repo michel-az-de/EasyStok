@@ -51,7 +51,7 @@ public class AtendimentoComandaControllerTests
             new ObterPedidoConversaUseCase(_conversas, _pedidos, Substitute.For<ICobrancaPedidoRepository>(), Substitute.For<IVagaOcupadaRepository>()),
             // Os casos daqui param antes do núcleo do checkout e da cobrança.
             new GerarPedidoConversaUseCase(_conversas, Substitute.For<IClienteRepository>(),
-                null!, null!, null!, null!, TimeProvider.System, NullLogger<GerarPedidoConversaUseCase>.Instance),
+                null!, null!, null!, null!, TimeProvider.System),
             _currentUser);
     }
 
