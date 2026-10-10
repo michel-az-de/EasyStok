@@ -62,7 +62,7 @@ public sealed class GerenciarConversaAtendimentoUseCase(
         }, ct);
 
     /// <summary>
-    /// Terminal: a próxima mensagem do contato abre outra conversa Automatica (S05). Idempotente também no
+    /// Sem reabertura explícita, a próxima mensagem do contato abre outra conversa Automatica (S05). Idempotente também no
     /// evento: conversa já encerrada não publica de novo (a automática de encerramento sairia 2x, #1292).
     /// </summary>
     public Task<ConversaSituacaoResult> EncerrarAsync(AcaoConversaCommand command, CancellationToken ct = default) =>

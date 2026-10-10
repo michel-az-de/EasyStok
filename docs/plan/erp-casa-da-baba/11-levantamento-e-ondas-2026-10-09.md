@@ -887,3 +887,36 @@ A primeira execução PostgreSQL falhou em dois testes novos por ambiguidade do 
 - O bloco trabalha ocorrências existentes; abertura automática e abertura manual pela API conservam seus contratos. Não foi adicionada uma nova tela de abertura. O aviso financeiro continua no outbox existente, sem envio externo comprovado.
 - Não houve transferência real, mensagem a cliente real ou verificação de publicação pública. A prova financeira usa o adaptador de produção com provedor HTTP local controlado.
 - Próxima fatia: continuar as ações operacionais ainda não ligadas no modo API, seguindo M3 e a matriz por perfil. Os aceites externos de pagamentos, canais, logística e impressão física seguem separados.
+
+## 28. Execução da Onda 2: reabertura de conversa (M3.6), 10/10/2026
+
+### 28.1 Entrega
+
+- `POST api/atendimento/conversas/{id}/reabrir` exige módulo Atendimento e `AtenderConversas`. A capacidade `reabrirConversa` da sessão controla o botão no Console. Empresa e autor vêm do JWT; tenant, identidade e propriedade são conferidos no caso de uso, no repositório e no RLS.
+- Conversa encerrada volta a `Assumida`, sem responsável, na fila humana. Limpa `EncerradaEm` e registra nota interna com nome, usuário e encerramento anterior. Conserva cliente, pedido, contexto, mensagens e última entrada do cliente. Reabrir não renova a janela de 24 horas nem envia mensagem ao canal.
+- Cliente bloqueado e outra conversa aberta do mesmo contato/canal impedem reabertura com 409. A consulta reconhece as grafias de WhatsApp com e sem nono dígito; no ChatSite também confere outra sessão do cliente vinculado. O operador recebe orientação para continuar pela conversa aberta.
+- Transação, trava do contato e releitura com lock da linha tornam repetição e reaberturas simultâneas idempotentes. Uma entrada concorrente com o mesmo identificador é protegida pelo índice único existente; conflito faz rollback completo, incluindo a nota. Não há migration.
+- O Console aguarda confirmação, bloqueia duplo clique e conserva o estado se a chamada falhar. A sincronização existente recupera confirmação cuja resposta se perdeu. O texto do cartão identifica reabertura humana. Despedida de encerramento ainda na fila é ignorada quando o disparador encontra a conversa novamente aberta.
+
+### 28.2 Validação local
+
+Evidências, TRX, scripts e capturas em `C:\rep\EasyStok\.build\onda2-reabrir`; banco sintético `easystock_onda2_reabrir`. PostgreSQL de concorrência usa Testcontainers separado.
+
+| Camada | Evidência |
+|---|---|
+| Build | `EasyStok.CI.slnf` compilado sem erros; avisos existentes de API obsoleta |
+| Domain / Application | 1.549 e 2.451 testes aprovados, sem ignorados |
+| API / Arquitetura | 1.172 testes de API e 61 do filtro `Category!=ArchitectureDebt` aprovados, sem ignorados |
+| PostgreSQL real | 5 testes aprovados, sem ignorados: repetição simultânea com estado já rastreado, disputa entre históricos com contato igual ou variante, disputa com entrada ainda não confirmada, rollback da nota e RLS com usuário sem bypass |
+| Console | 69 scripts de prova aprovados; lint, camadas, 264 pares de contraste e build aprovados |
+| HTTP / Chromium | Atendimento autorizado, Cozinha 403, sem sessão 401 e inexistente 404; cliente bloqueado e outra conversa aberta recusados; duplo clique, recarga, resposta perdida e nova entrada do ChatSite na mesma conversa conferidos; nota interna não aparece ao cliente |
+| Janela do WhatsApp | Conversa sintética reaberta na API real; texto livre fora da janela retorna 409 `fora_da_janela_24h`, antes de qualquer envio externo |
+| Apresentação | Computador 1440 × 1000 e celular 390 × 844; reabertura real nos dois, sem rolagem horizontal ou erros JavaScript |
+
+Na primeira rodada, os testes detectaram que o registro de remetente aceitava apenas mensagem enviada pela atendente. Foi criado o registro específico de autoria de nota interna, com validação de tipo e ausência de envio externo; os testes posteriores passaram. O roteiro do navegador foi corrigido para aguardar o carregamento do Balcão após recarga, inclusive no celular. As execuções iniciais não são apresentadas como aprovadas.
+
+### 28.3 Limites e próxima fatia
+
+- A confirmação da própria ação é imediata após o POST; outras abas e o histórico usam a sincronização existente de cinco segundos. Não foi criado evento SSE nesta fatia.
+- Modelos aprovados na Meta e seu envio avulso pelo Composer continuam pendentes no M3.6. Mensagens programadas conservam a integração já entregue. Próxima fatia: concluir a parte de modelos do M3.6, seguida das ações por atendente do M3.7.
+- Não houve mensagem a cliente real, chamada à Meta nem verificação de publicação pública. Reabertura e roteamento seguintes foram homologados pelo ChatSite local; os aceites de canais externos continuam separados.

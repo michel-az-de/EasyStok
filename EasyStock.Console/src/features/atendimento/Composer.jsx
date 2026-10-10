@@ -22,7 +22,7 @@ import css from './atendimento.module.css'
 export function Composer({
   conversa, canal, podeEscrever, motivo, rascunho,
   aoMudarRascunho, aoEnviar, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
-  aoReabrir,
+  aoReabrir, reabrindo = false,
 }) {
   const { enviarMidia, enviar, obterLinkCardapio } = useAcoes()
   // Seletor rápido (#1441): "/" no campo ou o botão Respostas abrem a lista
@@ -144,7 +144,7 @@ export function Composer({
           <strong>{motivo.titulo}</strong>
           <span>{motivo.detalhe}</span>
           {motivo.acao === 'reabrir' && aoReabrir && (
-            <Botao onClick={aoReabrir}>Reabrir conversa</Botao>
+            <Botao disabled={reabrindo} onClick={aoReabrir}>{reabrindo ? 'Reabrindo…' : 'Reabrir conversa'}</Botao>
           )}
         </p>
       )}

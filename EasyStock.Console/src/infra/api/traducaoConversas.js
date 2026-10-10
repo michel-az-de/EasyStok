@@ -83,7 +83,22 @@ function janelaExpiraEm(resumo, mensagens) {
 // opcional (F08); sem ele, o motivo padrão. A API não dá a hora da escalada.
 function passagemDaApi(resumo) {
   if (resumo.situacao !== 'Assumida' || resumo.assumidaPorUsuarioId) return null
-  return { motivo: resumo.motivoEscalada || null, em: null, assumida: false }
+  return {
+    motivo: resumo.motivoEscalada || null, em: null, assumida: false,
+    ...(resumo.motivoEscalada === 'Conversa reaberta para atendimento.' ? { origem: 'reabertura' } : {}),
+  }
+}
+
+export function situacaoConversaDaApi(resumo, usuario) {
+  const minha = resumo.assumidaPorUsuarioId && resumo.assumidaPorUsuarioId === usuario?.id
+  return {
+    estado: ESTADO_DA_SITUACAO[resumo.situacao] ?? 'Aberto',
+    situacaoApi: resumo.situacao,
+    responsavel: resumo.assumidaPorUsuarioId ? (minha ? usuario.nome : 'Outro atendente') : null,
+    pausaApi: pausaDaSituacao(resumo, usuario?.id ?? null),
+    passagem: passagemDaApi(resumo),
+    naoLidas: resumo.naoLidas,
+  }
 }
 
 // `agora` só pesa em `atrasada` (#1427): retrato do SLA na sincronização (a
@@ -91,7 +106,6 @@ function passagemDaApi(resumo) {
 // expediente da loja (`respostaAtrasada`, dominio/automatico.js).
 export function conversaDaApi(resumo, mensagensDaApi, usuario, agora = Date.now()) {
   const mensagens = (mensagensDaApi ?? []).map((m) => mensagemDaApi(m, resumo.id)).sort(cronologica)
-  const minha = resumo.assumidaPorUsuarioId && resumo.assumidaPorUsuarioId === usuario?.id
   const conversa = {
     id: resumo.id,
     conta: resumo.clienteId ? 'cliente' : 'lead',
@@ -100,17 +114,12 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario, agora = Date.now(
     nome: resumo.contatoNome || resumo.contatoIdExterno,
     contato: resumo.contatoIdExterno,
     canal: NOME_DO_CANAL[resumo.canal] ?? resumo.canal,
-    estado: ESTADO_DA_SITUACAO[resumo.situacao] ?? 'Aberto',
-    situacaoApi: resumo.situacao,
-    responsavel: resumo.assumidaPorUsuarioId ? (minha ? usuario.nome : 'Outro atendente') : null,
     // F07, item 3: quem pausou o automático (você, outro atendente ou a escalada) e a passagem.
-    pausaApi: pausaDaSituacao(resumo, usuario?.id ?? null),
-    passagem: passagemDaApi(resumo),
+    ...situacaoConversaDaApi(resumo, usuario),
     janelaExpiraEm: janelaExpiraEm(resumo, mensagens),
     ultimaEm: instante(resumo.ultimaMensagemEm),
     // Prévia do cartão quando as mensagens não foram carregadas (encerrada, #1287).
     ultimaMensagemTexto: resumo.ultimaMensagemTexto ?? null,
-    naoLidas: resumo.naoLidas,
     // #1427: SLA de primeira resposta da loja e de onde ele conta.
     slaMinutos: resumo.slaRespostaMinutos ?? null,
     aguardaResposta: resumo.aguardaResposta ?? false,

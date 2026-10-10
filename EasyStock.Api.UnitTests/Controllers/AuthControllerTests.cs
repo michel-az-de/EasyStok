@@ -230,6 +230,23 @@ public class AuthControllerTests
             comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin or NivelAcesso.Gerente);
     }
 
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    public void ReabrirExigeModuloEPermissaoDeAtender(bool modulo, bool atender, bool esperado)
+    {
+        UsarContextoHttp();
+        var usuario = NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.ICurrentUserAccessor>();
+        usuario.EmpresaId.Returns(Guid.NewGuid());
+        usuario.TemPermissao(EasyStock.Domain.Services.AcessoModulos.PermissaoDe(Modulo.Atendimento)).Returns(modulo);
+        usuario.TemPermissao(Permissao.AtenderConversas).Returns(atender);
+        var resposta = (Microsoft.AspNetCore.Mvc.OkObjectResult)_controller.GetModulos(usuario);
+        var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
+        acoes.GetProperty("reabrirConversa").GetBoolean().Should().Be(esperado);
+    }
+
     // ── N8: esqueci a senha ───────────────────────────────────────────────────────────────────
 
     private void UsarContextoHttp(string ip = "203.0.113.7")

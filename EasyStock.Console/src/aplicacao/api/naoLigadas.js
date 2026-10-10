@@ -29,7 +29,6 @@ const grupo = (rotulo, nomes) => Object.fromEntries(nomes.map((nome) => [nome, r
 
 // Nome da ação -> rótulo que abre o aviso ("<rótulo>: ainda não ligado nesta versão.").
 export const NAO_LIGADAS = {
-  reabrir: 'Reabrir conversa',
   trocarJanela: 'Trocar a janela do pedido',
   mudarEnderecoDoPedido: 'Endereço do pedido',
   marcarRecebidoEntrega: 'Recebido na entrega',

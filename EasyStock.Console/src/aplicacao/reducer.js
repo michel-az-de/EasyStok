@@ -236,6 +236,10 @@ function mesclarDoServidor(local, doServidor) {
 }
 
 const CASOS_API = {
+  [acao.CONFIRMAR_REABERTURA_API]: (estado, { id, situacao }) => ({
+    ...mapear(estado, id, (c) => ({ ...c, ...situacao })),
+    automaticoPausado: { ...estado.automaticoPausado, [id]: situacao.pausaApi ?? false },
+  }),
   [acao.SINCRONIZAR_CONVERSAS]: (estado, { conversas }) => {
     const locais = new Map(estado.conversas.map((c) => [c.id, c]))
     const mescladas = conversas.map((c) => mesclarDoServidor(locais.get(c.id), c))

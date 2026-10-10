@@ -1,8 +1,9 @@
 import * as acao from './acoes'
 import {
-  assumir, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarNaoEntregues, marcarLida, reenviarMensagem,
+  assumir, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarNaoEntregues, marcarLida, reabrir, reenviarMensagem,
 } from '../infra/api/conversasApi'
-import { mensagemDaApi, naoEntregueDaApi } from '../infra/api/traducaoConversas'
+import { mensagemDaApi, naoEntregueDaApi, situacaoConversaDaApi } from '../infra/api/traducaoConversas'
+import { lerSessao } from '../infra/api/sessao'
 import { proximoId } from '../infra/repositorioConversas'
 import { avisoDeVariaveisNaoResolvidas } from '../dominio/respostas'
 import { deveCarregarDossie } from './planoDeSincronizacao'
@@ -132,5 +133,12 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
       despachar({ tipo: acao.ENCERRAR_ATENDIMENTO, id })
       encerrar(id).catch(avisar)
     },
+    // A confirmação vem do servidor. Falha ou resposta perdida mantém a tela até a próxima leitura.
+    reabrir: (id) => reabrir(id)
+      .then((resumo) => despachar({
+        tipo: acao.CONFIRMAR_REABERTURA_API, id,
+        situacao: situacaoConversaDaApi(resumo, lerSessao()?.usuario),
+      }))
+      .catch(avisar),
   }
 }

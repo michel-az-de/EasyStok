@@ -62,9 +62,10 @@ public sealed record MensagemAtendimentoResult(
 }
 
 /// <summary>Estado da conversa depois de uma ação do console.</summary>
-public sealed record ConversaSituacaoResult(Guid Id, SituacaoConversa Situacao, Guid? AssumidaPorUsuarioId, int NaoLidas)
+public sealed record ConversaSituacaoResult(Guid Id, SituacaoConversa Situacao, Guid? AssumidaPorUsuarioId, int NaoLidas,
+    string? MotivoEscalada = null)
 {
-    internal static ConversaSituacaoResult De(Conversa c) => new(c.Id, c.Situacao, c.AssumidaPorUsuarioId, c.NaoLidas);
+    internal static ConversaSituacaoResult De(Conversa c) => new(c.Id, c.Situacao, c.AssumidaPorUsuarioId, c.NaoLidas, c.MotivoEscalada);
 }
 
 /// <summary>Conversa inexistente ou de outra empresa: 404, sem vazar existência.</summary>

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Avatar } from '../../componentes/Avatar'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
@@ -6,6 +6,7 @@ import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { MOTIVO_BLOQUEIO, permissaoDeEscrita } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
@@ -22,16 +23,27 @@ export function PainelAtendimento({
   focarAoTrocar = false,
 }) {
   const {
-    selecionada, visiveis, agora, automaticoPausado, rascunho,
+    selecionada, visiveis, agora, automaticoPausado, rascunho, fonteApi,
   } = useAtendimento()
   const {
     enviar, reabrir, definirRascunho, assumirAtendimento, devolverAutomatico,
     selecionar, abrirEncerramento, reenviar,
   } = useAcoes()
   const { cardapio, janelas, canais } = useCatalogo()
-  // #1474 (R2): reabrir conversa não tem endpoint no EasyStok; no modo API o botão some.
-  const podeReabrir = useAcaoDisponivel()('reabrir')
+  const { acoes: capacidades } = useAcessoModulos()
+  const reabrirLigado = useAcaoDisponivel()('reabrir')
+  const podeReabrir = reabrirLigado && (!fonteApi || capacidades.reabrirConversa === true)
   const cabecalhoRef = useRef(null)
+  const reabrindoRef = useRef(false)
+  const [reabrindo, setReabrindo] = useState(false)
+
+  async function aoReabrir() {
+    if (reabrindoRef.current || !selecionada) return
+    reabrindoRef.current = true
+    setReabrindo(true)
+    try { await reabrir(selecionada.id) }
+    finally { reabrindoRef.current = false; setReabrindo(false) }
+  }
 
   useEffect(() => {
     if (focarAoTrocar) cabecalhoRef.current?.focus()
@@ -125,8 +137,8 @@ export function PainelAtendimento({
             </Botao>
           )}
           {encerrada && !bloqueada && podeReabrir && (
-            <Botao variante="primario" className={css.acaoToque} onClick={() => reabrir(selecionada.id)}>
-              Reabrir conversa
+            <Botao variante="primario" className={css.acaoToque} disabled={reabrindo} onClick={aoReabrir}>
+              {reabrindo ? 'Reabrindo…' : 'Reabrir conversa'}
             </Botao>
           )}
         </div>
@@ -172,7 +184,8 @@ export function PainelAtendimento({
         aoAbrirNota={aoAbrirNota}
         aoAbrirGaleria={aoAbrirGaleria}
         aoAbrirBiblioteca={aoAbrirBiblioteca}
-        aoReabrir={podeReabrir ? () => reabrir(selecionada.id) : null}
+        aoReabrir={podeReabrir ? aoReabrir : null}
+        reabrindo={reabrindo}
       />
     </>
   )

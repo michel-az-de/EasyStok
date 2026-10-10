@@ -33,6 +33,16 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
     public Task<Conversa?> ObterPorIdAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
         db.AtendimentoConversas.FirstOrDefaultAsync(c => c.EmpresaId == empresaId && c.Id == id, ct);
 
+    public async Task<Conversa?> ObterPorIdComLockAsync(Guid empresaId, Guid id, CancellationToken ct = default)
+    {
+        var conversa = await db.AtendimentoConversas.FromSqlInterpolated($"""
+            SELECT * FROM atendimento_conversas WHERE "EmpresaId" = {empresaId} AND "Id" = {id} FOR UPDATE
+            """).SingleOrDefaultAsync(ct);
+        // A primeira leitura serve para travar o contato. Outra requisição pode ter reaberto enquanto esperávamos.
+        if (conversa is not null) await db.Entry(conversa).ReloadAsync(ct);
+        return conversa;
+    }
+
     public async Task<Guid?> TravarParaPedidoAsync(Guid empresaId, Guid id, CancellationToken ct = default)
     {
         // Leitura escalar de propósito: a entidade já rastreada no escopo (agente, console) não é

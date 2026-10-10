@@ -193,6 +193,16 @@ public class AtendimentoConversasController(
         => Atendendo(async () => DataOk(await imagemCardapioUseCase.ExecuteAsync(new EnviarImagemCardapioConsoleCommand(
             currentUser.EmpresaId, currentUser.UsuarioId, id, body?.CardapioItemId ?? Guid.Empty, body?.Indice ?? 0, body?.Legenda), ct)));
 
+    [SwaggerOperation(Summary = "Reopen a closed conversation in the human queue without renewing the channel window")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [HttpPost("{id:guid}/reabrir")]
+    public Task<IActionResult> Reabrir(Guid id, [FromServices] ReabrirConversaUseCase reabrirUseCase, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await reabrirUseCase.ExecuteAsync(Acao(id), ct)));
+
     [SwaggerOperation(Summary = "Take over the conversation without sending")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

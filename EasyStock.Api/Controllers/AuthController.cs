@@ -346,7 +346,9 @@ public class AuthController(
                 cancelarPedidoPago = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 devolverPagamentoManual = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 estornarPagamentoOnline = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
-                gerenciarOcorrencias = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado)
+                gerenciarOcorrencias = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
+                reabrirConversa = usuario.TemPermissao(Permissao.AtenderConversas)
+                    && modulos.Any(m => m.id == "atendimento" && m.liberado)
             }
         });
     }

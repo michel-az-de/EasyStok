@@ -52,7 +52,7 @@ public class Mensagem
     public bool Programada { get; private set; }
     public DateTime? ProcessadaEm { get; private set; }
 
-    /// <summary>Usuario do console que enviou a mensagem (S41). So em saida humana (<see cref="AutorMensagem.Dona"/>).</summary>
+    /// <summary>Usuário do console que enviou a mensagem (S41) ou praticou a ação registrada em nota interna.</summary>
     public Guid? EnviadaPorUsuarioId { get; private set; }
 
     /// <summary>S57 (#1355): esperas do reenvio automático depois de cada falha temporária.</summary>
@@ -303,6 +303,15 @@ public class Mensagem
             throw new RegraDeDominioVioladaException("So mensagem enviada por humano da empresa guarda quem enviou.");
         if (usuarioId == Guid.Empty)
             throw new RegraDeDominioVioladaException("Usuario que enviou e obrigatorio.");
+        EnviadaPorUsuarioId = usuarioId;
+    }
+
+    /// <summary>Autoria de ação humana registrada como nota interna, sem envio ao canal.</summary>
+    public void RegistrarAutorNotaInterna(Guid usuarioId)
+    {
+        if (Autor != AutorMensagem.Sistema || Direcao != DirecaoMensagem.Saida
+            || Status != StatusMensagem.Pendente || ExternoId is not null || usuarioId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("Nota interna exige usuário e mensagem do sistema sem envio ao canal.");
         EnviadaPorUsuarioId = usuarioId;
     }
 

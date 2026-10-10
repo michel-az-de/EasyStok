@@ -914,6 +914,9 @@ public partial class AtendimentoConversasControllerTests
         public Task<Conversa?> ObterPorIdAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
             Task.FromResult(Conversas.FirstOrDefault(c => c.EmpresaId == empresaId && c.Id == id));
 
+        public Task<Conversa?> ObterPorIdComLockAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
+            ObterPorIdAsync(empresaId, id, ct);
+
         public Task<Guid?> TravarParaPedidoAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
             Task.FromResult(Conversas.FirstOrDefault(c => c.EmpresaId == empresaId && c.Id == id)?.PedidoEmAndamentoId);
 

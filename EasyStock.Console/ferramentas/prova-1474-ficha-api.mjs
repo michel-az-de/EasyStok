@@ -157,11 +157,12 @@ await confere('R1 esteira e cancelamento ligados; estornar e voltar etapa somem 
 
 // ── R2 ─────────────────────────────────────────────────────────────────────
 await confere('R2 botões de ação sem endpoint somem no modo API', () => {
-  for (const nome of ['reabrir', 'aplicarCupom', 'marcarRecebidoEntrega', 'refazerCobranca', 'marcarComprovante',
+  for (const nome of ['aplicarCupom', 'marcarRecebidoEntrega', 'refazerCobranca', 'marcarComprovante',
     'aceitarDivergencia', 'mudarEnderecoDoPedido', 'resgatarRecompensa']) {
     assert.equal(naoLigadas.acaoDisponivel(nome, { fonteApi: true }), false, nome)
   }
   assert.equal(naoLigadas.acaoDisponivel('enviar', { fonteApi: true }), true)
+  assert.equal(naoLigadas.acaoDisponivel('reabrir', { fonteApi: true }), true)
   // #1241 ligou o cardápio do dia no modo API: a aba "Gerir o dia" volta a aparecer.
   assert.equal(naoLigadas.acaoDisponivel('alternarDisponibilidade', { fonteApi: true }), true)
 })

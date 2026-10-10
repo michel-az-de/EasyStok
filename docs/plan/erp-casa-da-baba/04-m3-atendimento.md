@@ -1,6 +1,6 @@
 # M3 Atendimento · balcão, pedidos, clientes, canais, status e histórico
 
-> **Atualização de 10/10/2026:** ocorrências por pedido ligadas à Ficha: Dona/gerente inicia apuração e encerra com resolução; Atendimento consulta histórico. Autoria, repetição idempotente, concorrência e retomada de reembolso pendente homologadas localmente (seção 27 do plano de ondas). Devolução manual confirmada e estorno pelo Mercado Pago também implementados na Ficha (seções 25 e 26); o provedor online foi validado com transporte HTTP controlado, sem transferência real. Cancelamento conserva D3-04: Atendimento sem pagamento; com qualquer valor recebido, só Dona/gerente. Cancelar não devolve dinheiro nem avisa automaticamente o cliente. M3.3 e os aceites externos continuam parciais.
+> **Atualização de 10/10/2026:** reabertura de conversa ligada à API, com histórico, janela do canal e fila humana preservados; homologação local no computador e celular (seção 28). Modelos aprovados do M3.6 continuam pendentes. Ocorrências por pedido ligadas à Ficha: Dona/gerente inicia apuração e encerra com resolução; Atendimento consulta histórico. Autoria, repetição idempotente, concorrência e retomada de reembolso pendente homologadas localmente (seção 27 do plano de ondas). Devolução manual confirmada e estorno pelo Mercado Pago também implementados na Ficha (seções 25 e 26); o provedor online foi validado com transporte HTTP controlado, sem transferência real. Cancelamento conserva D3-04: Atendimento sem pagamento; com qualquer valor recebido, só Dona/gerente. Cancelar não devolve dinheiro nem avisa automaticamente o cliente. M3.3 e os aceites externos continuam parciais.
 
 Issue: #1316 · Decisão: [ADR-0056](../../adr/0056-erp-da-casa-da-baba-front-unico.md) · Data: 2026-10-01
 Base medida: master `b713263a`. Plano irmão (dono de S01–S53 e F01–F18):
@@ -237,6 +237,8 @@ quem não escreveu hoje nem começa contato.
 
 ### M3.6 · Modelo aprovado e reabrir conversa
 
+**Execução de 10/10/2026.** Reabertura entregue e homologada localmente (seção 28 do plano de ondas): `POST conversas/{id}/reabrir`, capacidade da sessão, fila humana, histórico com autoria, bloqueio de cliente e conflito de contato, repetição e concorrência. A janela do canal é preservada. Modelos aprovados continuam pendentes nesta fatia.
+
 **Problema.** Fora da janela de 24 h só modelo aprovado chega ao cliente, e o console não tem como mandar
 um (#1287 deixou avisando); conversa encerrada não reabre.
 **Fato medido.** A porta de canal já envia modelo (`ICanalMensageria.cs:22-33`; campanhas e S26 usam).
@@ -248,8 +250,8 @@ As rotas de mensagem são só texto e imagem (`AtendimentoConversasController.cs
 - Console: liga `ENVIOS_NAO_LIGADOS.modelo` e `reabrir`.
 **Aceite.**
 - [ ] Modelo enviado fora da janela chega ao WhatsApp (validação do Felipe) e aparece na thread.
-- [ ] Texto livre fora da janela continua recusado (regra da S09 intacta).
-- [ ] Reabrir põe a conversa em "Precisa de você" e a mensagem seguinte do cliente cai nela.
+- [x] Texto livre fora da janela continua recusado após reabertura (regra da S09 intacta; API local retorna 409).
+- [x] Reabrir põe a conversa em "Precisa de você" e a mensagem seguinte do cliente cai nela (ChatSite, API e navegador locais; canais externos ainda sem aceite).
 **Testes (Red).** `ConversaTests.ReabrirEncerrada`, `EnviarModeloConversaUseCaseTests.SoComAceitaModelo`.
 **Fora.** Criar modelo na Meta pelo console (fica no Gerenciador da Meta).
 **Tamanho.** M · **Tier.** baixo · **Rollback.** revert; volta a avisar.

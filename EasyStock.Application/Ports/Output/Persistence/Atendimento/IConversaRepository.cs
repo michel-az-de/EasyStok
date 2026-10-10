@@ -33,6 +33,9 @@ public interface IConversaRepository
 
     Task<Conversa?> ObterPorIdAsync(Guid empresaId, Guid id, CancellationToken ct = default);
 
+    /// <summary>Trava a linha e relê o estado atual para reabertura, antes de qualquer alteração. Exige transação explícita.</summary>
+    Task<Conversa?> ObterPorIdComLockAsync(Guid empresaId, Guid id, CancellationToken ct = default);
+
     /// <summary>
     /// Trava a linha da conversa (<c>SELECT ... FOR UPDATE</c>) e devolve o <c>PedidoEmAndamentoId</c>
     /// lido do banco nesse instante, não o da entidade rastreada (#1238). Exige transação explícita

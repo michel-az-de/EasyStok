@@ -11,7 +11,7 @@ namespace EasyStock.Domain.Entities.Atendimento;
 /// E o estado que o agente e o console precisam: se a dona assumiu (o agente cala,
 /// RN-04), qual pedido esta em andamento, o contexto do carrinho e a janela de 24 h
 /// da Meta (contada da ultima mensagem de entrada). Uma conversa fica aberta ate ser
-/// encerrada; a proxima mensagem do contato abre outra. A unicidade "uma aberta por
+/// encerrada; sem reabertura explícita, a proxima mensagem do contato abre outra. A unicidade "uma aberta por
 /// canal, contato e empresa" e garantida por indice parcial no banco.
 /// </para>
 ///
@@ -231,12 +231,24 @@ public class Conversa
         MotivoEscalada = null;
     }
 
-    /// <summary>Terminal e idempotente: preserva o primeiro carimbo de encerramento.</summary>
+    /// <summary>Idempotente: preserva o carimbo até uma reabertura explícita.</summary>
     public void Encerrar(DateTime agora)
     {
         if (!EstaAberta) return;
         Situacao = SituacaoConversa.Encerrada;
         EncerradaEm = Utc(agora);
+    }
+
+    /// <summary>Volta à fila humana sem renovar a janela do canal. Repetição não toma o atendimento de ninguém.</summary>
+    public bool Reabrir(DateTime agora)
+    {
+        if (EstaAberta) return false;
+        Situacao = SituacaoConversa.Assumida;
+        EncerradaEm = null;
+        AssumidaPorUsuarioId = null;
+        MotivoEscalada = "Conversa reaberta para atendimento.";
+        UltimaMensagemEm = Max(UltimaMensagemEm, Utc(agora));
+        return true;
     }
 
     /// <summary>Mensagem do cliente: move a janela de 24 h e conta como nao lida.</summary>
