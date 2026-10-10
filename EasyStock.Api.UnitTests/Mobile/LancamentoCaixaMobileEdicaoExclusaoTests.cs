@@ -189,8 +189,9 @@ public sealed class LancamentoCaixaMobileEdicaoExclusaoTests : IDisposable
     [Fact]
     public async Task Excluir_LancamentoAindaSemMovimento_NaoViraMovimentoDepois()
     {
-        // O vinculo com o ERP roda depois do SaveChanges; a exclusao pode chegar no mesmo lote.
-        await AplicarAsync("cashEntry.upsert", Dto("expense", 30m, "Gas", "dinheiro"));
+        // O vinculo com o ERP roda depois do SaveChanges, e o envio tem um SaveChanges so no fim:
+        // lancar e excluir offline chegam juntos, com o lancamento ainda nao gravado (#1540).
+        await AplicarAsync("cashEntry.upsert", Dto("expense", 30m, "Gas", "dinheiro"), salvar: false);
         await AplicarAsync("cashEntry.delete", new { id = Lancamento });
 
         await _linker.ExecuteAsync([Lancamento], _empresaId);
@@ -265,14 +266,14 @@ public sealed class LancamentoCaixaMobileEdicaoExclusaoTests : IDisposable
     private CashEntryDto Dto(string tipo, decimal valor, string descricao, string? metodo) =>
         new(Lancamento, tipo, valor, descricao, _criadoEm, Metodo: metodo);
 
-    private async Task AplicarAsync(string tipo, object payload)
+    private async Task AplicarAsync(string tipo, object payload, bool salvar = true)
     {
         var mutation = new MutationDto(
             $"m-{Guid.NewGuid():N}", "dev-1", tipo,
             JsonSerializer.SerializeToElement(payload, Json),
             DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         await _dispatcher.ApplyMutationAsync(mutation, "dev-1", "Thati", _empresaId, _lojaId);
-        await _db.SaveChangesAsync();
+        if (salvar) await _db.SaveChangesAsync();
     }
 
     private async Task SincronizarAsync(CashEntryDto dto)
