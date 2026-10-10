@@ -203,8 +203,9 @@ export function erroDaLinha(linha) {
   if (linha.exigePorcao && !linha.variacaoId) return 'Escolha a porção produzida.'
   if (!Number.isInteger(linha.porcoes) || linha.porcoes <= 0) return 'Quantas porções saíram?'
   if (!Number.isInteger(linha.validadeDias) || linha.validadeDias <= 0) return 'Validade em dias inteiros.'
-  if (linha.pesoPorPorcaoG != null && linha.pesoPorPorcaoG <= 0) return 'Peso da porção inválido.'
-  if (linha.pesoRealG != null && linha.pesoRealG <= 0) return 'Peso real inválido.'
+  // "350g" ou "350,5" viram NaN, que não é <= 0: o lote nascia sem peso e a etiqueta sem gramas.
+  if (linha.pesoPorPorcaoG != null && !(Number.isInteger(linha.pesoPorPorcaoG) && linha.pesoPorPorcaoG > 0)) return 'Peso da porção em gramas inteiros.'
+  if (linha.pesoRealG != null && !(Number.isInteger(linha.pesoRealG) && linha.pesoRealG > 0)) return 'Peso real em gramas inteiros.'
   const sobra = sobraDaLinha(linha)
   if (sobra != null && sobra < 0) return 'O peso real não fecha as porções.'
   return null

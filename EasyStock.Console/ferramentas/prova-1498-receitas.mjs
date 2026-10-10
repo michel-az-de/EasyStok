@@ -99,7 +99,7 @@ await confere('salvar grava a receita inteira pelo PUT da composição e relê',
   const m = montar([[(mt, u) => mt === 'PUT' && u.endsWith('/api/produtos/p-1/composicao'), { status: 204 }]])
   const ok = await m.gestao.salvar('p-1', {
     rendimento: '6', unidadeRendimento: 'Un', unidadeMedidaBase: 'Un',
-    linhas: [{ insumoId: 's-1', quantidade: '1,2'.replace(',', '.'), unidade: 'Kg' }, { insumoId: 's-2', quantidade: '6', unidade: 'Un' }],
+    linhas: [{ insumoId: 's-1', quantidade: '1,2', unidade: 'Kg' }, { insumoId: 's-2', quantidade: '6', unidade: 'Un' }],
   })
   assert.equal(ok, true)
   const put = m.chamadas.find((c) => c.metodo === 'PUT')

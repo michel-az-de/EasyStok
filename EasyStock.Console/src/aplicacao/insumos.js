@@ -39,7 +39,8 @@ export function criarGestaoInsumos({ recarregar, aoErro }) {
       }))
     },
     atualizar: (id, { minimo, custo }) => {
-      const m = numeroOuNulo(minimo)
+      // Na API null é "não mexe": campo apagado tem de ir como zero, senão fecha como salvo e nada muda.
+      const m = numeroOuNulo(minimo) ?? 0
       const c = numeroOuNulo(custo)
       const erro = validar(m, c)
       if (erro) { aoErro(erro); return Promise.resolve(false) }

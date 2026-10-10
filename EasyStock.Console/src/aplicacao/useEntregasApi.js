@@ -109,12 +109,13 @@ export function useEntregasApi() {
     }
   }, [recarregar])
 
-  // Toda ação: trava os botões, chama a API, recarrega. O erro da API vira a faixa.
+  // Toda ação: trava os botões, chama a API, recarrega. O erro da API vira a faixa. Devolve se a
+  // API aceitou, para o formulário só se limpar quando gravou.
   const executar = useCallback((chamada, falha) => {
     setOcupado(true)
     return chamada()
       .then(() => recarregar())
-      .catch((e) => setErro(`${falha}: ${e.message}`))
+      .then(() => true, (e) => { setErro(`${falha}: ${e.message}`); return false })
       .finally(() => setOcupado(false))
   }, [recarregar])
 

@@ -230,7 +230,7 @@ function Chamados({ chamados, ocupado, acoes }) {
   const abrir = (e) => {
     e.preventDefault()
     if (!texto.trim()) return
-    acoes.abrirChamado(texto.trim(), null).then(() => setTexto(''))
+    acoes.abrirChamado(texto.trim(), null).then((ok) => { if (ok) setTexto('') })
   }
   return (
     <section className={css.secao} aria-label="Chamados de entregador">
@@ -262,7 +262,7 @@ function Entregadores({ entregadores, ocupado, acoes }) {
   const salvar = (e) => {
     e.preventDefault()
     if (!form.nome.trim()) return
-    acoes.criarEntregador({ ...form, nome: form.nome.trim() }).then(() => setForm(ENTREGADOR_VAZIO))
+    acoes.criarEntregador({ ...form, nome: form.nome.trim() }).then((ok) => { if (ok) setForm(ENTREGADOR_VAZIO) })
   }
   return (
     <section className={css.secao} aria-label="Entregadores">
