@@ -23,7 +23,11 @@ export function GavetaEntregas({ aoFechar }) {
   useEscape(true, () => {
     if (!document.querySelector('dialog[open], [role="menu"]')) aoFechar()
   })
-  useEffect(() => { tituloRef.current?.focus() }, [])
+  useEffect(() => {
+    const anterior = document.activeElement
+    tituloRef.current?.focus()
+    return () => { if (anterior?.isConnected) anterior.focus() }
+  }, [])
 
   // "Abrir conversa" fecha a gaveta além de selecionar: na janela própria
   // isso não existe, porque não há gaveta para fechar (`TelaEntregas.jsx`

@@ -119,18 +119,12 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela }) {
     }
   }
 
-  // Integração 50: o gatilho fixo no canto de baixo cobria o "⋯" da esteira e
-  // o botão largo do fim da Ficha. Com a conversa aberta ele mora no
-  // cabeçalho do Atendimento, ao lado de Encerrar; o balão continua
-  // flutuando. Sem esse cabeçalho (celular, gaveta), volta para o canto.
-  // Integração do visual: no celular o painel da conversa é a aba
-  // #painel-da-aba (sem aria-label "Atendimento"), então a busca inclui ela; e
-  // um observador reacha o cabeçalho quando a aba ou a conversa troca, em vez
-  // de decidir uma vez só na montagem. Sem cabeçalho, o gatilho fica no canto.
+  // Âncora explícita no cabeçalho de cada painel: procurar qualquer
+  // header com h2 inseria o assistente no papel da comanda. O slot mantém o botão
+  // acessível sem cobrir as ações fixas da Cobrança.
   const [cabecalhoDoAtendimento, setCabecalhoDoAtendimento] = useState(null)
   useEffect(() => {
-    const achar = () => [...document.querySelectorAll('section[aria-label="Atendimento"] header, #painel-da-aba header')]
-      .find((h) => h.querySelector('h2'))?.querySelector(':scope > div') ?? null
+    const achar = () => document.querySelector('[data-ancora-assistente]')
     setCabecalhoDoAtendimento(achar())
     const observador = new MutationObserver(() => {
       const novo = achar()

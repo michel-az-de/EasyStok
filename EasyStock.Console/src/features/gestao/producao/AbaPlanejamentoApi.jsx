@@ -20,7 +20,7 @@ const porQue = (p) => [
   `saldo ${qtd(p.saldo)}`,
 ].filter(Boolean).join(' · ')
 
-export function AbaPlanejamentoApi() {
+export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
   const [ate, setAte] = useState('')
   // #1510: a data que busca é só a que ela escolhe; a que vem da resposta só preenche o campo
   // (antes disparava uma 2ª busca que apagava as porções já editadas).
@@ -76,7 +76,8 @@ export function AbaPlanejamentoApi() {
 
   function lancar() {
     if (levarParaProducao(linhas) === 0) { setAviso('Diga quantas porções de ao menos um prato.'); return }
-    window.location.hash = hashDoModulo('producao', 'producao')
+    if (aoAbrirAba) aoAbrirAba('producao-do-dia')
+    else window.location.hash = hashDoModulo('producao', 'producao')
   }
 
   if (carga.estado === 'carregando') return <p className={css.descricao}>Calculando a sugestão…</p>

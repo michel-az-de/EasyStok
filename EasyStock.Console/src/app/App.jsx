@@ -21,8 +21,9 @@ import { ContextoAcessoModulos, useAcessoModulos, useModulosDaSessao } from '../
 import { moduloDaRota, permiteModulo, permiteRota } from '../dominio/acessoModulos'
 import { Vazio } from '../componentes/Vazio'
 import { Botao } from '../componentes/Botao'
+import { Modal } from '../componentes/Modal'
 import { TelaLogin } from '../features/login/TelaLogin'
-import { FaixaApi, LimparAvisoAoNavegar } from './FaixaApi'
+import { AvisoDaAcaoApi, FaixaApi, LimparAvisoAoNavegar } from './FaixaApi'
 import { contarPrecisaDeVoce, precisaDeVoce } from '../dominio/automatico'
 import { useTituloDaAba } from '../aplicacao/useTituloDaAba'
 import { canalDaConversa } from '../dominio/canal'
@@ -30,12 +31,11 @@ import { envioBloqueado } from '../dominio/janela'
 import {
   HASH_HALL, ROTA_CARDAPIO_LINK, ROTA_COZINHA, ROTA_ENTREGAS, ROTA_HALL, ROTA_PRINCIPAL, rotaDaHash,
 } from '../dominio/rota'
-import { hashDoModulo } from '../dominio/modulos'
 import { CartaoArrasto, PainelCardapio } from '../features/cardapio/PainelCardapio'
 import { ModalNota } from '../features/notas/ModalNota'
 import { PainelGaleria } from '../features/anexos/PainelGaleria'
 import { ModalAutomacoes } from '../features/automacoes/ModalAutomacoes'
-import { PainelDeAjuste } from '../features/gestao/ModalGestao'
+import { ModalGestao, PainelDeAjuste } from '../features/gestao/ModalGestao'
 import { HallDeModulos } from '../features/hall/HallDeModulos'
 import { MolduraDoModulo } from '../features/hall/MolduraDoModulo'
 import { GavetaEntregas } from '../features/entregas/GavetaEntregas'
@@ -55,6 +55,7 @@ import { useRoteiro } from '../features/simulacoes/useRoteiro'
 import { PainelAgente } from '../features/agente/PainelAgente'
 import { BalaoAssistente } from '../features/assistente/BalaoAssistente'
 import { Moldura } from './Moldura'
+import css from './moldura.module.css'
 
 // Só o topo conhece todas as features. Feature nenhuma importa outra feature.
 function Composicao({ aoSair }) {
@@ -72,6 +73,8 @@ function Composicao({ aoSair }) {
   // para quem trocou de janela no mesmo computador (US-010, saber sem olhar).
   useTituloDaAba(contarPrecisaDeVoce(conversas, agora, automaticoPausado, aberta, janelas, horarioDaLoja))
   const [modal, setModal] = useState(null)
+  const [focoBiblioteca, setFocoBiblioteca] = useState(null)
+  const [abaGestao, setAbaGestao] = useState(null)
   const [pratoArrastando, setPratoArrastando] = useState(null)
   // Rodada 10 (registro 79): o cliente simulado que reage às ações da
   // Thatiane, sempre ativo (não só quando a gaveta Simulações está aberta).
@@ -165,17 +168,15 @@ function Composicao({ aoSair }) {
       onDragEnd={aoTerminarArrasto}
       onDragCancel={() => setPratoArrastando(null)}
     >
+      <div className={css.areaAtendimento}>
       <Moldura
         tamanho={tamanho}
         aoAbrirNota={() => setModal('nota')}
         aoAbrirGaleria={() => setModal('galeria')}
-        // #1441: "Gerenciar respostas" do seletor e a etiqueta "automática" do balão abrem
-        // a tela Respostas e automáticas do módulo Atendimento.
-        aoAbrirBiblioteca={() => { window.location.hash = hashDoModulo('atendimento', 'respostas') }}
+        aoAbrirBiblioteca={(foco) => { setFocoBiblioteca(foco ?? null); setModal('respostas') }}
         aoAbrirCardapio={() => setModal('cardapio')}
         aoAbrirAutomacoes={() => setModal('automacoes')}
-        // #1447: o antigo modal Gestão virou o hall de módulos; o botão leva para lá.
-        aoAbrirGestao={() => { window.location.hash = HASH_HALL }}
+        aoAbrirGestao={() => setModal('gestao')}
         aoAbrirEntregas={() => setModal('entregas')}
         simulando={simulando}
         // Modo API (F06): sem Simular. Cenário simulado em conversa de verdade some em 5 s
@@ -218,6 +219,27 @@ function Composicao({ aoSair }) {
         <ModalAutomacoes regras={regras} aoAlternar={alternarRegra} aoFechar={fechar} />
       )}
 
+      {modal === 'gestao' && (
+        <ModalGestao
+          abaInicial={abaGestao}
+          aoTrocarAba={setAbaGestao}
+          janelasApi={FONTE_API ? <CadastroEntregaApi /> : null}
+          avisosApi={<AvisoDaAcaoApi />}
+          aoFechar={fechar}
+        />
+      )}
+
+      {modal === 'respostas' && (
+        <Modal
+          titulo="Respostas e automáticas"
+          largura="min(880px, calc(100vw - 24px))"
+          aoFechar={fechar}
+          rodape={<><AvisoDaAcaoApi /><Botao onClick={fechar}>Fechar</Botao></>}
+        >
+          <PainelDeAjuste aba="respostas" focoInicial={focoBiblioteca} />
+        </Modal>
+      )}
+
       {/* Rodada 5, seção 6 (passo zero): gaveta vazia, a F6 desenha a tela de
           verdade. `PainelEntregas.jsx` fica no lugar até a F6 apagar. */}
       {modal === 'entregas' && (FONTE_API ? <GavetaEntregasApi aoFechar={fechar} /> : <GavetaEntregas aoFechar={fechar} />)}
@@ -245,11 +267,11 @@ function Composicao({ aoSair }) {
 
       <BalaoAssistente sugestaoAgente={sugestaoAgente} aoAbrirTela={abrirTelaDoAssistente} />
 
-      <FaixaApi aoSair={aoSair} />
-
       <DragOverlay>
         {pratoArrastando && <CartaoArrasto item={pratoArrastando} />}
       </DragOverlay>
+      </div>
+      <FaixaApi aoSair={aoSair} />
     </DndContext>
   )
 }

@@ -179,6 +179,7 @@ export function BlocoPedido({
       <section
         ref={soltarRef}
         id="comanda-pedido"
+        tabIndex={-1}
         className={`${css.comanda} ${alvoDoArrasto ? css.alvoArrasto : ''}`}
         aria-label={numeroDaComanda(pedido, { fonteApi }) ? `Comanda número ${numeroDaComanda(pedido, { fonteApi })}` : 'Comanda em rascunho'}
       >
@@ -225,9 +226,10 @@ export function BlocoPedido({
           <p className={css.vazio}>Frete {moeda(pedido.frete)}</p>
         )}
         <p className={css.total}>
-          <span>{rotuloDoTotal(pedido, { fonteApi })}</span>
+          <span>{fonteApi && !pedido.pedidoId ? 'Total dos itens' : rotuloDoTotal(pedido, { fonteApi })}</span>
           <b>{moeda(pedido.totalApi ?? total)}</b>
         </p>
+        {fonteApi && !pedido.pedidoId && <p className={css.notaTotal}>O frete entra ao gerar a cobrança.</p>}
         {diferencaPosPagamento > 0 && (
           <p className={css.diferencaPaga} role="alert">
             <Icone nome="alerta" />

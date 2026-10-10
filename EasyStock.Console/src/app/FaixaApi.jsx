@@ -20,6 +20,19 @@ export function LimparAvisoAoNavegar() {
   return null
 }
 
+// O dialog torna o restante da página inerte; a resposta à ação precisa estar dentro dele.
+export function AvisoDaAcaoApi() {
+  const { fonteApi, sincronizacao } = useAtendimento()
+  const { fecharAvisoApi } = useAcoes()
+  if (!fonteApi || !sincronizacao?.aviso) return null
+  return (
+    <output className={css.avisoModal}>
+      <span>{sincronizacao.aviso}</span>
+      <button type="button" className={css.sair} onClick={() => fecharAvisoApi()}>Fechar aviso</button>
+    </output>
+  )
+}
+
 // Faixa fina do modo API (F01): quem está logado, em qual empresa, se a lista
 // está atualizando e o último aviso de ação recusada ou ainda não ligada. Some no
 // modo demonstração. O aviso fica até a dona fechar (F06): a sincronização não o apaga.
