@@ -54,13 +54,24 @@ public class RegistrarMovimentoCaixaUseCase(
             if (string.IsNullOrWhiteSpace(cmd.Descricao))
                 throw new UseCaseValidationException("Saída exige descrição (justificativa para auditoria).");
 
-            var saldoAtual = await CalcularSaldoDoDiaAsync(cmd.EmpresaId, data, cmd.LojaId);
-            if (cmd.Valor > saldoAtual)
+            var dia = await ObterCaixaDoDiaAsync(cmd.EmpresaId, data, cmd.LojaId);
+            var ptBr = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+            // #1521: saída em dinheiro (sangria, despesa paga da gaveta) sai da gaveta, e nela só há
+            // dinheiro. O saldo esperado soma Pix e cartão: com R$100 na gaveta e R$400 em Pix,
+            // uma sangria de R$450 passava e a gaveta "ficava negativa".
+            if (GavetaCaixa.EhDinheiro(cmd.Metodo))
             {
-                var ptBr = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+                var teto = GavetaCaixa.TetoSaidaEmDinheiro(dia);
+                if (cmd.Valor > teto)
+                    throw new UseCaseValidationException(
+                        $"Saída de {cmd.Valor.ToString("C", ptBr)} em dinheiro é maior que o dinheiro na gaveta " +
+                        $"({teto.ToString("C", ptBr)}). Pix e cartão não estão na gaveta.");
+            }
+            else if (cmd.Valor > dia.SaldoEsperado)
+            {
                 throw new UseCaseValidationException(
                     $"Saída de {cmd.Valor.ToString("C", ptBr)} é maior que o saldo disponível em caixa " +
-                    $"({saldoAtual.ToString("C", ptBr)}). O caixa não pode ficar negativo.");
+                    $"({dia.SaldoEsperado.ToString("C", ptBr)}). O caixa não pode ficar negativo.");
             }
         }
 
@@ -85,9 +96,6 @@ public class RegistrarMovimentoCaixaUseCase(
     // sessao aberta em dia anterior (#596). Reusa o ObterCaixaDiaUseCase como FONTE UNICA em
     // vez de recalcular. Antes este metodo agregava so a janela civil de hoje e divergia (card
     // R$4.514 vs validacao R$0), bloqueando saidas legitimas em sessao que atravessa a meia-noite.
-    private async Task<decimal> CalcularSaldoDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId)
-    {
-        var dia = await obterCaixaDia.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, data, lojaId));
-        return dia.SaldoEsperado;
-    }
+    private Task<CaixaDiaResult> ObterCaixaDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId) =>
+        obterCaixaDia.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, data, lojaId));
 }
