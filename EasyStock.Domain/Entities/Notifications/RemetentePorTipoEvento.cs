@@ -16,6 +16,7 @@ public static class RemetentePorTipoEvento
             or TipoEventoNotificacao.PedidoEmPreparo
             or TipoEventoNotificacao.PedidoSaiuParaEntrega
             or TipoEventoNotificacao.PedidoEntregue
+            or TipoEventoNotificacao.PedidoReagendado
             or TipoEventoNotificacao.AvaliacaoSolicitada
             or TipoEventoNotificacao.ReembolsoEfetuado
             or TipoEventoNotificacao.CampanhaMarketing

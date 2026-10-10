@@ -738,15 +738,17 @@ Scripts, capturas, logs e TRX estão em `C:\rep\EasyStok\.build\onda2-ciclo-pedi
 - A auditoria registra faixa, autor e situação do aviso. Repetir a mesma janela/data não duplica vaga, evento ou aviso. Depois do commit, `pedido.reagendado` atualiza os consumidores SSE, incluindo KDS e Entregas.
 - A consulta de vagas prioriza a ativa sobre o histórico. A Ficha passa a receber a janela do servidor e o reducer não restaura a escolha local antiga. A rota antiga `/agendamento` recusa pedidos com vaga para impedir a divergência entre horário e ocupação.
 - Ficha e Entregas compartilham a escolha de data/janela e a operação da API. Uma falha conserva a escolha, duplo clique envia uma chamada e recarga indisponível após confirmação não é apresentada como falha da gravação. Pedidos entregues ou cancelados não podem ser reagendados.
-- Aviso por WhatsApp é opcional e fica desmarcado inicialmente. Quando solicitado e permitido pelas preferências e pelo telefone do cliente, o evento `PedidoReagendado` entra no outbox de notificações na mesma transação, com faixa/data e chave distinta por troca. A tela diferencia aviso na fila de aviso não enfileirado.
+- Aviso por WhatsApp é opcional e fica desmarcado inicialmente. Quando solicitado e permitido pelas preferências e pelo telefone do cliente, o evento `PedidoReagendado` entra no outbox de notificações na mesma transação, com faixa/data e chave distinta por troca. O remetente é a Loja, declarado no catálogo e coberto por regressão no domínio. A tela diferencia aviso na fila de aviso não enfileirado.
 
 ### 24.2 Validação executada
 
 | Camada | Evidência local |
 |---|---|
-| Application | 2.396 testes aprovados |
+| Domain | 1.543 testes aprovados, incluindo classificação do remetente do reagendamento como Loja |
+| Application | 2.397 testes aprovados, incluindo mensagem de reagendamento com remetente Loja no outbox |
 | API | 1.050 testes aprovados, incluindo classificação de módulo do novo controller |
 | PostgreSQL | 25 testes aprovados, nenhum ignorado: 15 da troca e 10 de capacidade/KDS/jornada do atendimento |
+| Arquitetura | 37 testes aprovados no gate de commit, junto ao build da solução de CI |
 | Concorrência | Duas transações reais aguardaram o mesmo lock para a última vaga; uma confirmou e a outra restaurou a vaga antiga |
 | Atomicidade | Falha controlada ao gravar o aviso, depois do INSERT da nova vaga, reverteu a troca inteira e não publicou SSE |
 | Console | 65 scripts de prova aprovados; lint, camadas, contraste e build aprovados |
