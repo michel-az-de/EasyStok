@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   closestCenter, DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors,
 } from '@dnd-kit/core'
@@ -299,12 +299,33 @@ function TelaDaRota({ rota, aoSair }) {
   )
 }
 
-function AppPrincipal({ rota, sessao, aoSair }) {
+function RestaurarConversa({ ultimaConversa, aoLembrarConversa }) {
+  const { conversas, selecionadaId, sincronizacao } = useAtendimento()
+  const { selecionar } = useAcoes()
+  const restaurada = useRef(false)
+  useEffect(() => {
+    if (!restaurada.current) {
+      // Hall, Cozinha e Entregas não montam o Provider da API. Só restauramos após a lista chegar.
+      if (sincronizacao.estado !== 'ok') return
+      restaurada.current = true
+      const anterior = ultimaConversa.current
+      if (anterior && anterior !== selecionadaId && conversas.some((c) => c.id === anterior)) {
+        selecionar(anterior)
+        return
+      }
+    }
+    aoLembrarConversa(selecionadaId)
+  }, [conversas, selecionadaId, sincronizacao.estado, selecionar, ultimaConversa, aoLembrarConversa])
+  return null
+}
+
+function AppPrincipal({ rota, sessao, aoSair, ultimaConversa, aoLembrarConversa }) {
   const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: FONTE_API })
   const { permite } = useAcessoModulos()
   return (
     // `key`: trocar de usuário ou empresa recomeça o estado, sem conversa de outra empresa na tela.
     <AtendimentoProvider key={identidadeDaSessao(sessao)} agora={agora} sessao={sessao} atendimentoAtivo={permite('atendimento')}>
+      {ultimaConversa && <RestaurarConversa ultimaConversa={ultimaConversa} aoLembrarConversa={aoLembrarConversa} />}
       <LimparAvisoAoNavegar />
       <TelaDaRota rota={rota} aoSair={aoSair} />
     </AtendimentoProvider>
@@ -344,6 +365,8 @@ export function App() {
 }
 
 function AppComAcesso({ rota, sessao, aoSair }) {
+  const ultimaConversa = useRef(null)
+  const lembrarConversa = useCallback((id) => { ultimaConversa.current = id }, [])
   const avisos = useNotificacoesDaSessao()
   const avisosNoAparelho = useAvisosNoAparelho({ sessao })
   const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: true })
@@ -366,6 +389,6 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   else if (rota.tipo === ROTA_COZINHA) tela = <CozinhaApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_ENTREGAS) tela = <EntregasApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_CARDAPIO_LINK) tela = <AvisoCardapioDoSite />
-  else tela = <AppPrincipal rota={rota} sessao={sessao} aoSair={aoSair} />
+  else tela = <AppPrincipal rota={rota} sessao={sessao} aoSair={aoSair} ultimaConversa={ultimaConversa} aoLembrarConversa={lembrarConversa} />
   return <ContextoAcessoModulos.Provider value={acesso}>{tela}</ContextoAcessoModulos.Provider>
 }

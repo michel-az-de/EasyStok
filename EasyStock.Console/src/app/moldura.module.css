@@ -190,6 +190,11 @@
   .controles > button { font-size: 0; gap: 6px; padding: 0 10px; }
   .controles .conta { font-size: var(--t-micro); min-width: 22px; height: 22px; }
 }
+@media (max-width: 374px) {
+  .topo { flex-wrap: wrap; }
+  .controleLoja { margin-left: auto; }
+  .controles { flex-basis: 100%; justify-content: space-between; margin-left: 0; }
+}
 
 /* Achado 6, P3 (banca 10): "Automáticas" não pode virar só ícone+número no
    celular (achado: uma pista a menos pra quem já não achou onde enviar).

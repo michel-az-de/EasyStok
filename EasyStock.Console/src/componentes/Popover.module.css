@@ -1,6 +1,7 @@
 /* Popover (rodada 6): material de vidro sobre o que está atrás, raio de
    cartão, sombra alta e entrada curta a partir do gatilho. */
 .popover {
+  pointer-events: auto;
   position: absolute; bottom: calc(100% + var(--e-2)); left: var(--e-3); right: var(--e-3);
   max-height: min(340px, 50dvh); overflow-y: auto;
   background: var(--vidro); -webkit-backdrop-filter: var(--desfoque); backdrop-filter: var(--desfoque);

@@ -9,7 +9,9 @@ import css from './dashboard.module.css'
 // (`GavetaEntregas`), com o conteúdo lido da API real.
 export function GavetaEntregasApi({ aoFechar }) {
   const tituloRef = useRef(null)
-  useEscape(true, aoFechar)
+  useEscape(true, () => {
+    if (!document.querySelector('dialog[open], [role="menu"]')) aoFechar()
+  })
   useEffect(() => { tituloRef.current?.focus() }, [])
 
   return (

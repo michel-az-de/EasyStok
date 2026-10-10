@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { usePerdasApi } from '../../../aplicacao/usePerdasApi'
@@ -20,13 +21,13 @@ export function AbaPerdasApi() {
   const [rascunho, setRascunho] = useState(vazio)
   const [enviando, setEnviando] = useState(false)
 
-  if (gestao.estado === 'carregando') return <p className={css.descricao}>Carregando as perdas…</p>
+  if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando as perdas…</output>
   if (gestao.estado === 'erro' && !gestao.resumo) {
     return (
-      <div className={css.aba} role="alert">
-        <p>Não consegui ler as perdas: {gestao.erro}</p>
-        <Botao onClick={gestao.recarregar}>Tentar de novo</Botao>
-      </div>
+      <Vazio icone="alerta" role="alert" titulo="Não consegui ler as perdas"
+        acao={<Botao icone="refresh-cw" onClick={gestao.recarregar}>Tentar de novo</Botao>}>
+        {gestao.erro}
+      </Vazio>
     )
   }
 
@@ -71,7 +72,7 @@ export function AbaPerdasApi() {
       )}
 
       <form className={css.aba} onSubmit={lancar} aria-label="Lançar perda">
-        <div className={`${css.campos} ${css.formulario}`}>
+        <div className={`${css.campos} ${css.formulario} ${css.lancamentoPerda}`}>
           <CampoSelecao rotulo="Prato ou insumo" value={rascunho.produtoId} onChange={mudar('produtoId')}
             opcoes={[{ valor: '', rotulo: 'Escolha o prato ou insumo' }, ...gestao.opcoes.map((o) => ({
               valor: o.produtoId, rotulo: `${o.nome} (${o.tipo}, tem ${qtd(o.saldo)}${o.unidade ? ` ${o.unidade}` : ''})`,
@@ -80,9 +81,11 @@ export function AbaPerdasApi() {
           <CampoSelecao rotulo="Motivo" value={rascunho.motivo} onChange={mudar('motivo')}
             opcoes={MOTIVOS_PERDA.map((m) => ({ valor: m.id, rotulo: m.rotulo }))} />
           {rascunho.motivo === 'Outro' && (
-            <CampoTexto rotulo="Qual o motivo" placeholder="Descreva o que aconteceu" value={rascunho.texto} onChange={mudar('texto')} />
+            <div className={css.linhaCompleta}><CampoTexto rotulo="Qual o motivo" placeholder="Descreva o que aconteceu" value={rascunho.texto} onChange={mudar('texto')} /></div>
           )}
-          <Botao tipo="submit" variante="primario" disabled={enviando}>{enviando ? 'Lançando…' : 'Lançar perda'}</Botao>
+          <div className={css.rodapeForm}>
+            <Botao tipo="submit" variante="primario" icone="plus" disabled={enviando}>{enviando ? 'Lançando…' : 'Lançar perda'}</Botao>
+          </div>
         </div>
       </form>
 
@@ -112,7 +115,7 @@ export function AbaPerdasApi() {
                 </div>
                 {!l.desfeita && (
                   <div className={css.acoes}>
-                    <Botao variante="texto" onClick={() => gestao.desfazer(l)}>Desfazer</Botao>
+                    <Botao variante="texto" icone="undo-2" onClick={() => gestao.desfazer(l)}>Desfazer</Botao>
                   </div>
                 )}
               </li>

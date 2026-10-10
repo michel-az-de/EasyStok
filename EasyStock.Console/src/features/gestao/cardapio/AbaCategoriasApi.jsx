@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { Vazio } from '../../../componentes/Vazio'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useSecoesCardapioApi } from '../../../aplicacao/useSecoesCardapioApi'
@@ -94,13 +95,13 @@ export function AbaCategoriasApi() {
     Promise.resolve(gestao.criar(nova)).then((ok) => { if (ok !== false) setNova('') }).finally(() => setCriando(false))
   }
 
-  if (gestao.estado === 'carregando') return <p className={css.descricao}>Carregando as categorias…</p>
+  if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando as categorias…</output>
   if (gestao.estado === 'erro' && gestao.secoes.length === 0) {
     return (
-      <div className={css.aba} role="alert">
-        <p>Não consegui ler as categorias: {gestao.erro}</p>
-        <Botao onClick={gestao.recarregar}>Tentar de novo</Botao>
-      </div>
+      <Vazio icone="alerta" role="alert" titulo="Não consegui ler as categorias"
+        acao={<Botao icone="refresh-cw" onClick={gestao.recarregar}>Tentar de novo</Botao>}>
+        {gestao.erro}
+      </Vazio>
     )
   }
 

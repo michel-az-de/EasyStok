@@ -20,7 +20,9 @@ export function GavetaEntregas({ aoFechar }) {
   const acoesContexto = useAcoes()
   const tituloRef = useRef(null)
 
-  useEscape(true, aoFechar)
+  useEscape(true, () => {
+    if (!document.querySelector('dialog[open], [role="menu"]')) aoFechar()
+  })
   useEffect(() => { tituloRef.current?.focus() }, [])
 
   // "Abrir conversa" fecha a gaveta além de selecionar: na janela própria

@@ -42,9 +42,10 @@ export function CampoMascarado({
         onPaste={aoColar}
         aria-invalid={Boolean(erro) || undefined}
         {...resto}
+        aria-describedby={[resto['aria-describedby'], erro ? `${id}-erro` : dica ? `${id}-dica` : null].filter(Boolean).join(' ') || undefined}
       />
-      {erro && <p className={css.erroTexto} role="alert">{erro}</p>}
-      {!erro && dica && <p className={css.dica}>{dica}</p>}
+      {erro && <p id={`${id}-erro`} className={css.erroTexto} role="alert">{erro}</p>}
+      {!erro && dica && <p id={`${id}-dica`} className={css.dica}>{dica}</p>}
     </div>
   )
 }

@@ -53,6 +53,12 @@
 .loteProducao > :first-child { grid-column: 1 / -1; }
 .linhaReceita { grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); }
 .cadastroCurto { grid-template-columns: minmax(0, 1fr) auto; }
+.cadastroInsumo { grid-template-columns: minmax(0, 2fr) minmax(0, .7fr) minmax(0, 1fr) minmax(0, 1.3fr); }
+.ajusteInsumo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ajusteEstoque { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+.lancamentoPerda { grid-template-columns: minmax(0, 2fr) minmax(0, .8fr) minmax(0, 1.2fr); }
+.linhaCompleta { grid-column: 1 / -1; }
+.ajudaEmbalagem { display: block; max-width: 44ch; color: var(--tinta-2); font-size: var(--t-micro); }
 .dataPlanejamento { display: grid; gap: var(--e-2); width: min(100%, 280px); }
 .rodapeForm { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; }
 .formulario .acaoDiscreta:disabled, .acoes .acaoDiscreta:disabled { background: transparent; }
@@ -70,4 +76,8 @@
   .loteProducao, .linhaReceita { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .linhaReceita > :first-child { grid-column: 1 / -1; }
   .cadastroCurto { grid-template-columns: minmax(0, 1fr); }
+  .cadastroInsumo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cadastroInsumo > :first-child, .cadastroInsumo > :nth-child(4) { grid-column: 1 / -1; }
+  .ajusteEstoque, .ajusteInsumo, .lancamentoPerda { grid-template-columns: minmax(0, 1fr); }
+  .rodapeForm > :only-child { width: 100%; }
 }

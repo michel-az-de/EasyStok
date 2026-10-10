@@ -46,3 +46,7 @@
 .cadastro { display: flex; flex-direction: column; gap: var(--e-4); }
 /* O aviso de erro do cadastro fica visível mesmo com a lista rolada (Gestão rola o painel). */
 .faixaFixa { position: sticky; top: 0; z-index: 2; }
+@media (max-width: 640px) {
+  .faixa { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; }
+  .faixa > button { grid-column: 2; justify-self: start; }
+}

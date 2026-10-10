@@ -13,7 +13,7 @@
      que precisa parar antes do rodapé. */
   display: flex; flex-direction: column;
 }
-.caixa[open] { animation: entrar var(--dur-longa) var(--ease-mola) both; }
+.caixa[open] { animation: entrar var(--dur-media) var(--ease-mola) both; }
 .caixa::backdrop {
   background: var(--cortina);
   backdrop-filter: blur(6px) saturate(120%);
@@ -71,7 +71,9 @@
     margin: auto auto 0; width: 100vw; max-height: 92dvh;
     border-radius: var(--r-3) var(--r-3) 0 0;
   }
-  .rodape { padding-bottom: calc(var(--e-3) + env(safe-area-inset-bottom, 0px)); }
+  .caixa h2.titulo { padding: var(--e-4) 64px var(--e-2) var(--e-4); }
+  .conteudo { padding: var(--e-2) var(--e-4) var(--e-4); }
+  .rodape { padding: var(--e-3) var(--e-4) calc(var(--e-3) + env(safe-area-inset-bottom, 0px)); }
   .caixa[open] { animation-name: subirFolha; }
 }
 @keyframes subirFolha {
@@ -82,7 +84,7 @@
 .caixa { position: relative; }
 .fecharCanto {
   position: absolute; top: 14px; right: 14px; z-index: 2;
-  width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--r-pilula);
+  width: var(--toque); height: var(--toque); padding: 0; border: 0; border-radius: var(--r-pilula);
   display: grid; place-items: center; background: var(--preenchimento); color: var(--tinta-2);
 }
 .fecharCanto:hover { background: var(--preenchimento-forte); color: var(--tinta); }

@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { Vazio } from '../../../componentes/Vazio'
 import { CampoArea, CampoTexto } from '../../../componentes/Campo'
 import { useAcoes, useAtendimento, useCatalogo } from '../../../aplicacao/contextos'
 import {
@@ -48,7 +49,7 @@ function FormResposta({ inicial, aoSalvar, aoCancelar }) {
       </div>
       <CampoArea rotulo="Texto" rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} dica={VARIAVEIS_TEXTO} />
       <div className={css.acoes}>
-        <Botao variante="primario" tipo="submit" disabled={!pronto || salvando}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
+        <Botao variante="primario" tipo="submit" icone="check" disabled={!pronto || salvando}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
         <Botao variante="texto" onClick={aoCancelar}>Cancelar</Botao>
       </div>
     </form>
@@ -59,6 +60,7 @@ function SecaoRespostas() {
   const { respostasProntas } = useCatalogo()
   const { incluirRespostaPronta, editarRespostaPronta, alternarArquivamentoRespostaPronta } = useAcoes()
   const [busca, setBusca] = useState('')
+  const buscaRef = useRef(null)
   const [verArquivadas, setVerArquivadas] = useState(false)
   // 'nova', o id da resposta em edição, ou null.
   const [editando, setEditando] = useState(null)
@@ -83,14 +85,14 @@ function SecaoRespostas() {
       </header>
 
       <div className={css.filtros}>
-        <input
-          type="search"
-          className={css.busca}
-          aria-label="Buscar resposta pronta"
-          placeholder="Buscar"
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-        />
+        <div className={css.filtroBusca}>
+          <CampoTexto ref={buscaRef} tipo="search" rotulo="Buscar resposta pronta"
+            placeholder="Título, atalho ou trecho da resposta" value={busca} onChange={(e) => setBusca(e.target.value)} />
+          {busca && <div className={css.retornoBusca}>
+            <output className={css.descricao}>{plural(lista.length, 'resposta encontrada', 'respostas encontradas')}</output>
+            <Botao variante="texto" icone="x" onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>
+          </div>}
+        </div>
         <label className={css.chave}>
           <input type="checkbox" checked={verArquivadas} onChange={(e) => setVerArquivadas(e.target.checked)} />
           Mostrar arquivadas
@@ -105,7 +107,9 @@ function SecaoRespostas() {
       )}
 
       {lista.length === 0 ? (
-        <p className={css.vazio}>{busca ? 'Nada com essa busca.' : 'Nenhuma resposta pronta ainda.'}</p>
+        <Vazio icone={busca ? 'search' : 'respostas'} titulo={busca ? 'Nada com essa busca.' : 'Nenhuma resposta pronta ainda.'}>
+          {busca ? 'Tente outro título, atalho ou trecho da resposta.' : 'Use Nova resposta para guardar as mensagens que você envia com frequência.'}
+        </Vazio>
       ) : (
         <ul className={css.lista}>
           {lista.map((r) => (
@@ -125,8 +129,8 @@ function SecaoRespostas() {
                     <span className={css.texto}>{r.texto}</span>
                   </div>
                   <div className={css.acoesLinha}>
-                    {!r.arquivada && <Botao variante="texto" onClick={() => setEditando(r.id)}>Editar</Botao>}
-                    <Botao variante="texto" onClick={() => alternarArquivamentoRespostaPronta(r.id)}>
+                    {!r.arquivada && <Botao variante="texto" icone="lapis" onClick={() => setEditando(r.id)}>Editar</Botao>}
+                    <Botao variante="texto" icone={r.arquivada ? 'undo-2' : 'archive'} onClick={() => alternarArquivamentoRespostaPronta(r.id)}>
                       {r.arquivada ? 'Restaurar' : 'Arquivar'}
                     </Botao>
                   </div>
@@ -193,13 +197,13 @@ function LinhaAutomatica({ regra, fonteApi }) {
             autoFocus
           />
           <div className={css.acoes}>
-            <Botao variante="primario" disabled={!rascunho.trim() || salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
+            <Botao variante="primario" icone="check" disabled={!rascunho.trim() || salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
             <Botao variante="texto" onClick={() => setRascunho(null)}>Cancelar</Botao>
           </div>
         </div>
       ) : (
         <div className={css.acoesLinha}>
-          <Botao variante="texto" onClick={() => setRascunho(regra.texto || regra.sugestao || '')}>
+          <Botao variante="texto" icone="lapis" onClick={() => setRascunho(regra.texto || regra.sugestao || '')}>
             {regra.texto ? 'Editar texto' : 'Escrever texto'}
           </Botao>
         </div>

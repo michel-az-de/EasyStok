@@ -26,10 +26,15 @@ export function Popover({
 }) {
   const caixaRef = useRef(null)
   const marcadorRef = useRef(null)
+  const origemRef = useRef(null)
   const [retangulo, setRetangulo] = useState(null)
-  useEscape(true, aoFechar)
+  useEscape(true, () => {
+    aoFechar()
+    if (origemRef.current?.isConnected) origemRef.current.focus()
+  })
 
   useLayoutEffect(() => {
+    if (!origemRef.current) origemRef.current = document.activeElement
     if (!portal) return
     setRetangulo(marcadorRef.current?.parentElement?.getBoundingClientRect() ?? null)
   }, [portal])
@@ -41,13 +46,14 @@ export function Popover({
   useEffect(() => {
     if (semAutoFoco) return
     caixaRef.current?.querySelector('button')?.focus()
-  }, [semAutoFoco])
+  }, [semAutoFoco, retangulo])
 
   useEffect(() => {
     const aoClicarFora = (evento) => {
+      // O próprio gatilho alterna aberto/fechado no click, depois deste pointerdown.
+      if (origemRef.current?.matches('button') && origemRef.current.contains(evento.target)) return
       if (!caixaRef.current?.contains(evento.target)) aoFechar()
     }
-    // captura na fase de captura para o clique no gatilho também fechar
     document.addEventListener('pointerdown', aoClicarFora)
     return () => document.removeEventListener('pointerdown', aoClicarFora)
   }, [aoFechar])
@@ -58,6 +64,16 @@ export function Popover({
       role="menu"
       aria-label={rotulo}
       ref={caixaRef}
+      onKeyDown={(evento) => {
+        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(evento.key)
+          || !evento.target.matches('[role="menuitem"]')) return
+        const itens = [...caixaRef.current.querySelectorAll('[role="menuitem"]:not(:disabled)')]
+        const atual = itens.indexOf(document.activeElement)
+        const proximo = evento.key === 'Home' ? 0 : evento.key === 'End' ? itens.length - 1
+          : (atual + (evento.key === 'ArrowDown' ? 1 : -1) + itens.length) % itens.length
+        evento.preventDefault()
+        itens[proximo]?.focus()
+      }}
     >
       {children ?? grupos.map((grupo) => (
         <div className={css.grupo} key={grupo.titulo}>
@@ -91,7 +107,8 @@ export function Popover({
           width: retangulo.width,
           top: retangulo.top,
           height: retangulo.height,
-          zIndex: 30,
+          zIndex: 70,
+          pointerEvents: 'none',
         }}
         >
           {corpo}

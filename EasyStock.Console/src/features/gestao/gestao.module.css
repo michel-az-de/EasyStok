@@ -6,4 +6,4 @@
   border-radius: var(--r-2); background: var(--alerta-pastel); color: var(--alerta);
   font-size: var(--t-apoio); font-weight: 600;
 }
-.desligado { min-width: 0; margin: 0; padding: 0; border: 0; opacity: 0.6; }
+.desligado { min-width: 0; margin: 0; padding: 0; border: 0; }

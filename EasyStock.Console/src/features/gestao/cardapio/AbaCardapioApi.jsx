@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { Vazio } from '../../../componentes/Vazio'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useGestaoCardapioApi } from '../../../aplicacao/useGestaoCardapioApi'
@@ -38,13 +39,13 @@ export function AbaCardapioApi() {
     Promise.resolve(acao()).finally(() => setOcupado(null))
   }
 
-  if (gestao.estado === 'carregando') return <p className={css.descricao}>Carregando o cardápio…</p>
+  if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando o cardápio…</output>
   if (gestao.estado === 'erro' && gestao.itens.length === 0) {
     return (
-      <div className={css.aba} role="alert">
-        <p>Não consegui ler o cardápio: {gestao.erro}</p>
-        <Botao onClick={gestao.recarregar}>Tentar de novo</Botao>
-      </div>
+      <Vazio icone="alerta" role="alert" titulo="Não consegui ler o cardápio"
+        acao={<Botao icone="refresh-cw" onClick={gestao.recarregar}>Tentar de novo</Botao>}>
+        {gestao.erro}
+      </Vazio>
     )
   }
 
@@ -83,7 +84,9 @@ export function AbaCardapioApi() {
       {!ordenando && <p className={css.descricao}>Limpe a busca para mudar a ordem.</p>}
 
       {itens.length === 0 ? (
-        <p className={css.descricao}>{busca.trim() ? 'Nenhum prato ou categoria encontrado para esta busca.' : 'A vitrine ainda não tem pratos.'}</p>
+        <Vazio icone={busca.trim() ? 'search' : 'cardapio'} titulo={busca.trim() ? 'Nenhum prato ou categoria encontrado para esta busca.' : 'A vitrine ainda não tem pratos.'}>
+          {busca.trim() ? 'Tente outro nome ou limpe a busca para ver todos os pratos.' : null}
+        </Vazio>
       ) : (
         <ol className={css.lista}>
           {itens.map((item, indice) => (

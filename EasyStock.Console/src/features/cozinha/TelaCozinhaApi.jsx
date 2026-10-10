@@ -140,7 +140,7 @@ export function TelaCozinhaApi({ linhas }) {
         </p>
       )}
       {pedidos === null
-        ? <p className={css.aviso}>Carregando a fila da cozinha…</p>
+        ? !erro && <output className={css.aviso}>Carregando a fila da cozinha…</output>
         : (
           <DndContext
             sensors={sensores} collisionDetection={colisaoPorColuna}

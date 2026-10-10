@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { Vazio } from '../../../componentes/Vazio'
+import { CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useEstoqueDoDiaApi } from '../../../aplicacao/useEstoqueDoDiaApi'
 import css from '../cardapio/abaCardapio.module.css'
@@ -29,25 +31,25 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar }) {
   }
 
   return (
-    <form className={css.topo} onSubmit={salvar}>
-      <input
-        className={css.busca}
+    <form className={`${css.campos} ${css.formulario} ${css.ajusteEstoque}`} onSubmit={salvar}>
+      <CampoTexto
+        rotulo="Porções contadas"
         inputMode="numeric"
         aria-label={`Quantas porções de ${alvo.nome} você contou`}
-        placeholder="Porções contadas"
         value={contagem}
         onChange={(e) => setContagem(e.target.value)}
       />
-      <input
-        className={css.busca}
-        aria-label="Motivo do ajuste"
-        placeholder="Motivo (ex.: contei o congelador)"
+      <CampoTexto
+        rotulo="Motivo do ajuste"
+        placeholder="Ex.: contei o congelador"
         maxLength={500}
         value={motivo}
         onChange={(e) => setMotivo(e.target.value)}
       />
-      <Botao variante="texto" onClick={aoCancelar}>Cancelar</Botao>
-      <Botao tipo="submit" variante="primario" disabled={salvando || !motivo.trim() || contagem === ''}>Salvar contagem</Botao>
+      <div className={css.rodapeForm}>
+        <Botao variante="texto" onClick={aoCancelar}>Cancelar</Botao>
+        <Botao tipo="submit" variante="primario" icone="check" disabled={salvando || !motivo.trim() || contagem === ''}>Salvar contagem</Botao>
+      </div>
     </form>
   )
 }
@@ -56,13 +58,13 @@ export function AbaEstoqueDoDiaApi() {
   const estoque = useEstoqueDoDiaApi()
   const [ajustando, setAjustando] = useState(null)
 
-  if (estoque.estado === 'carregando') return <p className={css.descricao}>Carregando o estoque…</p>
+  if (estoque.estado === 'carregando') return <output className={css.descricao}>Carregando o estoque…</output>
   if (estoque.estado === 'erro' && estoque.pratos.length === 0) {
     return (
-      <div className={css.aba} role="alert">
-        <p>Não consegui ler o estoque: {estoque.erro}</p>
-        <Botao onClick={estoque.recarregar}>Tentar de novo</Botao>
-      </div>
+      <Vazio icone="alerta" role="alert" titulo="Não consegui ler o estoque"
+        acao={<Botao icone="refresh-cw" onClick={estoque.recarregar}>Tentar de novo</Botao>}>
+        {estoque.erro}
+      </Vazio>
     )
   }
 
@@ -99,7 +101,7 @@ export function AbaEstoqueDoDiaApi() {
                   />
                 ) : (
                   <div className={css.acoes}>
-                    <Botao variante="primario" disabled={!a.sku} onClick={() => setAjustando(a.produtoId)}>Ajustar</Botao>
+                    <Botao variante="primario" icone="lapis" disabled={!a.sku} onClick={() => setAjustando(a.produtoId)}>Ajustar</Botao>
                   </div>
                 )}
               </li>
@@ -134,7 +136,7 @@ export function AbaEstoqueDoDiaApi() {
                   />
                 ) : (
                   <div className={css.acoes}>
-                    <Botao variante="texto" onClick={() => setAjustando(p.sku)}>Ajustar</Botao>
+                    <Botao variante="texto" icone="lapis" onClick={() => setAjustando(p.sku)}>Ajustar</Botao>
                   </div>
                 )}
               </li>

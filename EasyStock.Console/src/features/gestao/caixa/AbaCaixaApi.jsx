@@ -3,6 +3,7 @@
 // de demonstração (`AbaCaixa.jsx`) continua com a massa local.
 import { useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { Vazio } from '../../../componentes/Vazio'
 import { CampoArea, CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { CampoMascarado } from '../../../componentes/CampoMascarado'
 import { Chip } from '../../../componentes/Chip'
@@ -242,13 +243,13 @@ export function AbaCaixaApi() {
   const [acao, executar] = useAcaoComRecarga(caixa.recarregar)
   const [fecharAberto, setFecharAberto] = useState(false)
 
-  if (caixa.estado === 'carregando') return <p className={css.corpoBloco}>Carregando o caixa…</p>
+  if (caixa.estado === 'carregando') return <output className={css.corpoBloco}>Carregando o caixa…</output>
   if (caixa.estado === 'erro' && !caixa.dia) {
     return (
-      <div className={css.painel}>
-        <p className={css.avisoFechado} role="alert">O caixa não carregou: {caixa.erro}</p>
-        <Botao variante="texto" onClick={caixa.recarregar}>Tentar de novo</Botao>
-      </div>
+      <Vazio icone="alerta" role="alert" titulo="O caixa não carregou"
+        acao={<Botao icone="refresh-cw" onClick={caixa.recarregar}>Tentar de novo</Botao>}>
+        {caixa.erro}
+      </Vazio>
     )
   }
 

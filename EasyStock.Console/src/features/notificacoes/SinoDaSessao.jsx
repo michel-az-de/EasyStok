@@ -31,7 +31,7 @@ export function SinoDaSessao({ avisos, aparelho }) {
       </div>}
       {erro && <p role="alert" className={css.erro}>Sem atualizar: {erro}</p>}
       {carregando && total === null && <p role="status">Carregando avisos…</p>}
-      {!erro && total === 0 && <p role="status">Nenhum aviso não lido.</p>}
+      {!erro && total === 0 && <p role="status">Nenhum aviso pendente.</p>}
       {total > 0 && <p className={css.resumo}>Mostrando {recentes.length} de {total} aviso(s) não lido(s). Os próximos aparecem conforme você marca como lidos.</p>}
       <ul className={css.lista}>
         {recentes.map((aviso) => <li key={aviso.id} className={css.aviso}>

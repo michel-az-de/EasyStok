@@ -50,7 +50,7 @@ function CartaoProvedor({ provedor, config, padrao, acoes }) {
             {salva ? 'Credencial salva' : 'Sem credencial'}
           </Pilula>
           {!mostrarCampo && (
-            <Botao variante="texto" onClick={() => setMostrarCampo(true)}>
+            <Botao variante="texto" icone="lapis" onClick={() => setMostrarCampo(true)}>
               {salva ? 'Trocar credencial' : 'Cadastrar credencial'}
             </Botao>
           )}
@@ -58,15 +58,14 @@ function CartaoProvedor({ provedor, config, padrao, acoes }) {
             <div className={css.formularioCredencial}>
               <CampoTexto
                 rotulo={`Credencial da ${provedor.rotulo} (simulada)`}
-                rotuloOculto
                 tipo="password"
                 autoComplete="off"
-                placeholder="Cole a chave de API simulada"
+                placeholder="Cole a credencial simulada"
                 value={credencial}
                 onChange={(e) => setCredencial(e.target.value)}
               />
               <div className={css.botoesCredencial}>
-                <Botao variante="primario" onClick={salvarCredencial} disabled={!credencial.trim()}>
+                <Botao variante="primario" icone="check" onClick={salvarCredencial} disabled={!credencial.trim()}>
                   Salvar
                 </Botao>
                 <Botao variante="texto" onClick={() => { setCredencial(''); setMostrarCampo(false) }}>
@@ -99,7 +98,7 @@ export function AbaIntegracoes() {
   if (!integracoesLogistica) {
     return (
       <div className={css.aba}>
-        <p>Carregando integrações…</p>
+        <p role="status">Carregando integrações…</p>
       </div>
     )
   }
@@ -121,8 +120,7 @@ export function AbaIntegracoes() {
         ))}
       </ul>
       <p className={css.rodape}>
-        Contrato do adapter (cotar, chamar, cancelar, consultar status e webhook) documentado para o
-        backend em <code>src/infra/provedoresDeEntrega.js</code> e no registro da rodada 13.
+        Só provedores ligados podem ser usados como padrão do despacho.
       </p>
     </div>
   )

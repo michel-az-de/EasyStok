@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { Vazio } from '../../../componentes/Vazio'
+import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useInsumosApi } from '../../../aplicacao/useInsumosApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
@@ -38,15 +40,17 @@ function LinhaInsumo({ insumo, gestao, podeEditar }) {
         {insumo.embalagem && <Pilula tom="marca" fina>Embalagem: desce em toda produção</Pilula>}
       </div>
       {podeEditar && (editando ? (
-        <form className={css.topo} onSubmit={salvar}>
-          <input className={css.busca} inputMode="numeric" aria-label={`Mínimo de ${insumo.nome}`} placeholder={`Mínimo (${insumo.unidade})`} value={minimo} onChange={(e) => setMinimo(e.target.value)} />
-          <input className={css.busca} inputMode="decimal" aria-label={`Custo de ${insumo.nome}`} placeholder={`Custo por ${insumo.unidade}`} value={custo} onChange={(e) => setCusto(e.target.value)} />
-          <Botao variante="texto" onClick={() => setEditando(false)}>Cancelar</Botao>
-          <Botao tipo="submit" variante="primario">Salvar</Botao>
+        <form className={`${css.campos} ${css.formulario} ${css.ajusteInsumo}`} onSubmit={salvar}>
+          <CampoTexto inputMode="numeric" rotulo={`Mínimo (${insumo.unidade})`} aria-label={`Mínimo de ${insumo.nome}`} value={minimo} onChange={(e) => setMinimo(e.target.value)} />
+          <CampoTexto inputMode="decimal" rotulo={`Custo por ${insumo.unidade} (R$)`} aria-label={`Custo de ${insumo.nome}`} value={custo} onChange={(e) => setCusto(e.target.value)} />
+          <div className={css.rodapeForm}>
+            <Botao variante="texto" onClick={() => setEditando(false)}>Cancelar</Botao>
+            <Botao tipo="submit" variante="primario" icone="check">Salvar</Botao>
+          </div>
         </form>
       ) : (
         <div className={css.acoes}>
-          <Botao variante="texto" onClick={() => setEditando(true)}>Ajustar</Botao>
+          <Botao variante="texto" icone="lapis" onClick={() => setEditando(true)}>Ajustar</Botao>
           <Botao variante="texto" onClick={() => gestao.marcarEmbalagem(insumo.id, !insumo.embalagem)}>
             {insumo.embalagem ? 'Não é embalagem' : 'É embalagem'}
           </Botao>
@@ -62,13 +66,13 @@ export function AbaInsumosApi() {
   const gestao = useInsumosApi()
   const [novo, setNovo] = useState({ nome: '', unidade: 'G', minimo: '', custo: '', embalagem: false })
 
-  if (gestao.estado === 'carregando') return <p className={css.descricao}>Carregando os insumos…</p>
+  if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando os insumos…</output>
   if (gestao.estado === 'erro' && gestao.insumos.length === 0) {
     return (
-      <div className={css.aba} role="alert">
-        <p>Não consegui ler os insumos: {gestao.erro}</p>
-        <Botao onClick={gestao.recarregar}>Tentar de novo</Botao>
-      </div>
+      <Vazio icone="alerta" role="alert" titulo="Não consegui ler os insumos"
+        acao={<Botao icone="refresh-cw" onClick={gestao.recarregar}>Tentar de novo</Botao>}>
+        {gestao.erro}
+      </Vazio>
     )
   }
 
@@ -105,18 +109,18 @@ export function AbaInsumosApi() {
         )}
       </section>
 
-      {podeEditar ? <form className={css.topo} onSubmit={cadastrar} aria-label="Cadastrar insumo">
-        <input className={css.busca} aria-label="Nome do insumo" placeholder="Novo insumo (ex.: molho sugo)" maxLength={180} value={novo.nome} onChange={mudarNovo('nome')} />
-        <select className={css.busca} aria-label="Unidade" value={novo.unidade} onChange={mudarNovo('unidade')}>
-          {UNIDADES_INSUMO.map((u) => <option key={u} value={u}>{u}</option>)}
-        </select>
-        <input className={css.busca} inputMode="numeric" aria-label="Mínimo" placeholder="Mínimo" value={novo.minimo} onChange={mudarNovo('minimo')} />
-        <input className={css.busca} inputMode="decimal" aria-label="Custo por unidade" placeholder="Custo por unidade" value={novo.custo} onChange={mudarNovo('custo')} />
-        <label className={css.detalhe}>
-          <input type="checkbox" checked={novo.embalagem} onChange={(e) => setNovo((atual) => ({ ...atual, embalagem: e.target.checked }))} />
-          {' '}É embalagem (bandeja, selo, pote: conta por unidade e desce em toda produção)
-        </label>
-        <Botao tipo="submit" variante="primario" disabled={!novo.nome.trim()}>Cadastrar insumo</Botao>
+      {podeEditar ? <form className={`${css.campos} ${css.formulario} ${css.cadastroInsumo}`} onSubmit={cadastrar} aria-label="Cadastrar insumo">
+        <CampoTexto rotulo="Nome do insumo" placeholder="Ex.: molho sugo" maxLength={180} value={novo.nome} onChange={mudarNovo('nome')} />
+        <CampoSelecao rotulo="Unidade" value={novo.unidade} onChange={mudarNovo('unidade')} opcoes={UNIDADES_INSUMO.map((u) => ({ valor: u, rotulo: u }))} />
+        <CampoTexto inputMode="numeric" rotulo="Mínimo" value={novo.minimo} onChange={mudarNovo('minimo')} />
+        <CampoTexto inputMode="decimal" rotulo="Custo por unidade (R$)" aria-label="Custo por unidade" value={novo.custo} onChange={mudarNovo('custo')} />
+        <div className={css.rodapeForm}>
+          <label className={css.chave}>
+            <input type="checkbox" checked={novo.embalagem} onChange={(e) => setNovo((atual) => ({ ...atual, embalagem: e.target.checked }))} />
+            <span>É embalagem<span className={css.ajudaEmbalagem}>Bandeja, selo ou pote. Conta por unidade e desce em toda produção.</span></span>
+          </label>
+          <Botao tipo="submit" variante="primario" icone="plus" disabled={!novo.nome.trim()}>Cadastrar insumo</Botao>
+        </div>
       </form> : <p className={css.descricao}>Você pode consultar os insumos. O cadastro e os ajustes ficam com a dona ou gerente.</p>}
     </div>
   )

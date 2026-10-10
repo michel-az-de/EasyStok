@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useReceitasApi } from '../../../aplicacao/useReceitasApi'
@@ -104,13 +105,13 @@ export function AbaReceitasApi() {
   const gestao = useReceitasApi()
   const [editando, setEditando] = useState(null)
 
-  if (gestao.estado === 'carregando') return <p className={css.descricao}>Carregando as receitas…</p>
+  if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando as receitas…</output>
   if (gestao.estado === 'erro' && gestao.receitas.length === 0) {
     return (
-      <div className={css.aba} role="alert">
-        <p>Não consegui ler as receitas: {gestao.erro}</p>
-        <Botao onClick={gestao.recarregar}>Tentar de novo</Botao>
-      </div>
+      <Vazio icone="alerta" role="alert" titulo="Não consegui ler as receitas"
+        acao={<Botao icone="refresh-cw" onClick={gestao.recarregar}>Tentar de novo</Botao>}>
+        {gestao.erro}
+      </Vazio>
     )
   }
 
@@ -127,7 +128,9 @@ export function AbaReceitasApi() {
         </p>
       )}
       {gestao.receitas.length === 0 ? (
-        <p className={css.descricao}>Nenhum prato ligado ao estoque ainda.</p>
+        <Vazio icone="nota" titulo="Nenhum prato ligado ao estoque ainda.">
+          A primeira produção liga o prato ao estoque. Depois, a receita aparece aqui.
+        </Vazio>
       ) : (
         <ul className={css.lista}>
           {gestao.receitas.map((r) => (
