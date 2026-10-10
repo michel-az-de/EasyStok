@@ -762,3 +762,44 @@ Evidências fora do Git: `C:\rep\EasyStok\.build\onda2-reagendamento`, com TRX, 
 - Gravação e fila de aviso homologadas localmente; não houve envio a cliente real. Entrega externa pelo WhatsApp depende do canal configurado. Fora da janela de 24 horas, é necessário configurar um modelo aprovado pela Meta; o seed não presume essa aprovação.
 - Não houve publicação pública verificada nesta fatia. Commit/push e deploy são estados distintos.
 - Próxima fatia: estorno pela Ficha, com resposta efetiva do provedor, reflexo financeiro e regra D3-04. Depois, continuar as ações restantes por perfil e os aceites operacionais, mantendo separados canais externos, logística e impressão física.
+
+## 25. Continuação: devolução manual pela Ficha e registro no Caixa (09/10/2026)
+
+**Fatia executada:** devolução manual de recebimentos fora do Mercado Pago, parcial ou total, com confirmação de Dona/gerente. O estorno online é a próxima fatia. Esta execução não encerra M3.3, M5 ou a Onda 2.
+
+**Decisão D3-05, informada por Felipe nesta rodada:** para dinheiro, Pix direto ou maquininha fora do Mercado Pago, Dona/gerente confirma que já devolveu o valor, informa motivo e comprovante/referência; o sistema registra no Caixa. A regra não autoriza tratar um pedido cancelado como dinheiro automaticamente devolvido.
+
+### 25.1 Implementado
+
+- A Ficha tem o bloco **Devoluções**, inclusive para pedidos cancelados. Mostra os recebimentos e as devoluções confirmadas, com valor, meio, motivo, referência, responsável e horário. Dona/gerente seleciona o recebimento, informa o valor parcial ou total e o meio efetivamente usado para devolver. Atendimento consulta o histórico.
+- `GET/POST api/pedidos/{id}/estornos-manuais` usam a empresa autenticada, exigem módulo Atendimento e, para gravar, nível Gerente. A capacidade `devolverPagamentoManual` segue a mesma regra. Empresa divergente no body é recusada; autor, nome e nível são derivados da sessão.
+- `PedidoEstornoManual` vincula a confirmação ao pagamento e à saída do Caixa. Recebimento original e cobrança manual permanecem intactos. A saída tem origem `devolucao_pedido` e a data do registro. A contagem do Caixa conserva receita no dia original e desconta a devolução no dia novo, inclusive se o pedido está cancelado ou consolidado em Venda.
+- Registro, saída e evento de auditoria são uma transação. O lock do pedido serializa a devolução com recebimentos, remoções e outras devoluções. A soma de parciais não supera o recebimento; repetir o identificador com os mesmos dados devolve o registro anterior, sem duplicar saída ou auditoria. Reutilizar o identificador com dados diferentes é conflito.
+- O registro exige confirmação explícita de que o dinheiro já foi devolvido, motivo, referência e valor positivo em centavos. Recebimento do Mercado Pago é recusado neste caminho. O dia do Caixa precisa estar sem fechamento; a operação não reabre períodos nem altera snapshots encerrados. A saída registra um fato confirmado, sem exigir que a receita esteja no Caixa do mesmo dia.
+- A solicitação sem resposta conclusiva fica no navegador, separada por empresa, usuário e pedido. Recarga consulta o histórico real para reconhecer uma confirmação já gravada; se necessário, repete a mesma solicitação. A tela orienta não devolver o dinheiro novamente. Recebimentos novos atualizam o bloco e há consulta manual ao histórico.
+- Os atalhos de desfazer/remover pagamento e de estornar lançamento do Caixa recusam recebimentos/saídas com devolução confirmada. A migration `20261010012555_AddEstornosManuaisPedido` tem chaves restritivas, filtro de empresa e RLS forçada. A reversão recusa apagar confirmações existentes.
+
+### 25.2 Validação executada
+
+As alterações de UX (`8317abee`), consultas financeiras (`6afa7ccb`) e segurança (`d52c1afd`) que chegaram ao master durante a rodada foram incorporadas. Aplicação, API, PostgreSQL, Console e navegador foram verificados novamente nessa base.
+
+| Camada | Evidência local |
+|---|---|
+| Domain | 1.543 testes aprovados, sem ignorados |
+| Application | 2.408 testes aprovados, sem ignorados, incluindo proteção do pagamento com devolução |
+| API | 1.111 testes aprovados, sem ignorados, incluindo políticas de consulta/gravação e capacidade por perfil |
+| PostgreSQL real | 19 testes aprovados, sem ignorados: parciais, excesso, replay, concorrência, rollback, Caixa em dias diferentes, pedido cancelado/consolidado, empresa, RLS, provedor e preservação do recebimento |
+| Arquitetura | 61 testes do filtro de CI `Category!=ArchitectureDebt` aprovados. Os dois testes históricos de dívida de tamanho do Program e dependência direta de controllers continuam fora desse filtro |
+| Console | 65 provas JavaScript aprovadas; lint, camadas, contraste e build aprovados |
+| Migration | Aplicação, reversão sem dados e reaplicação executadas. Reversão com devoluções confirmadas recusada pelo guard, preservando registros e saídas |
+| HTTP e Chromium | Perfis e empresa forjada; confirmação/referência obrigatórias; pedido cancelado; um POST no duplo clique; perda da resposta após commit; 503 antes do commit e retomada com o mesmo identificador após recarga; quatro parciais totalizando R$100; Caixa e histórico persistidos |
+| Apresentação | Computador 1440 × 1000 e celular 390 × 844, sem rolagem horizontal ou erro JavaScript. Nome do responsável conferido a partir da sessão |
+
+Evidência fora do Git: `C:\rep\EasyStok\.build\onda2-estorno`, com TRX, logs, script `browser.cjs`, resultados e capturas. Banco sintético isolado `easystock_onda2_estorno` no PostgreSQL local. Usuários, recebimentos, cancelamento e devoluções passam pelas APIs reais; o preparo da fixture habilita módulos e vincula pedido e conversa no banco. As falhas HTTP controladas exercitam perda de resposta e indisponibilidade sem alterar o resultado financeiro manualmente.
+
+### 25.3 Limites e próxima fatia
+
+- Não houve transferência de dinheiro real, envio a cliente real ou publicação pública verificada. A confirmação manual é uma declaração da responsável sobre uma devolução já realizada; referência é textual, sem upload de comprovante nesta fatia.
+- Não há correção/reversão de devolução confirmada nesta entrega. Reabertura, concorrência com fechamento e reconciliação financeira ampla pertencem ao M5 e precisam de validação própria.
+- Próxima fatia: estorno pelo Mercado Pago pela Ficha, com confirmação efetiva do provedor, tratamento de resposta pendente/indeterminada, soma de parciais e idempotência persistida. Integrar com ocorrência/webhook e Caixa sem duplicar saídas. A ação genérica `marcarEstorno` continua não ligada no modo API; a devolução manual usa o bloco próprio.
+- Continuar depois as ações restantes por perfil e os aceites operacionais, mantendo canais externos, logística e impressão física com evidências separadas.
