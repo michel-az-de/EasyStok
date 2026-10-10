@@ -85,6 +85,13 @@ public sealed class PedidoEstoqueIntegrationService(
                             && i.Status != StatusItemEstoque.Descartado)
                 .OrderBy(i => i.ValidadeEm ?? DateTime.MaxValue)
                 .ToList();
+            // M1.4c (#1537, D-M1-03): a linha de porção baixa do saldo da porção. Sem nenhum lote dela
+            // (estoque antigo, lote do PWA), cai nos lotes sem porção do prato; nunca na porção errada.
+            if (item.ProdutoVariacaoId is { } variacaoId)
+            {
+                var daPorcao = candidatos.Where(i => i.ProdutoVariacaoId == variacaoId).ToList();
+                candidatos = daPorcao.Count > 0 ? daPorcao : candidatos.Where(i => i.ProdutoVariacaoId is null).ToList();
+            }
             if (candidatos.Count == 0)
             {
                 if (RequerEstoqueExistente)
@@ -174,6 +181,7 @@ public sealed class PedidoEstoqueIntegrationService(
                     Id = Guid.NewGuid(),
                     EmpresaId = pedido.EmpresaId,
                     ProdutoId = item.ProdutoId.Value,
+                    ProdutoVariacaoId = lote.ProdutoVariacaoId,
                     ItemEstoqueId = lote.Id,
                     Tipo = TipoMovimentacaoEstoque.Saida,
                     Natureza = NaturezaMovimentacaoEstoque.Venda,
@@ -290,6 +298,7 @@ public sealed class PedidoEstoqueIntegrationService(
                 Id = Guid.NewGuid(),
                 EmpresaId = pedido.EmpresaId,
                 ProdutoId = item.ProdutoId.Value,
+                ProdutoVariacaoId = lote.ProdutoVariacaoId,
                 ItemEstoqueId = lote.Id,
                 Tipo = TipoMovimentacaoEstoque.Entrada,
                 Natureza = NaturezaMovimentacaoEstoque.Estorno,

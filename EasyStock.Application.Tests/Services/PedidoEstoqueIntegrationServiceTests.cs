@@ -441,6 +441,81 @@ public class PedidoEstoqueIntegrationServiceTests
         await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(m => m.Natureza == NaturezaMovimentacaoEstoque.Estorno));
     }
 
+    // ── M1.4c (#1537): a linha de porção baixa do saldo da porção ─────────
+
+    private static ItemEstoque LoteDaVariacao(Guid empresaId, Guid produtoId, Guid? variacaoId, decimal saldo, int diaValidade) => new()
+    {
+        Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, ProdutoVariacaoId = variacaoId,
+        QuantidadeAtual = Quantidade.From(saldo), ValidadeEm = Validade.From(new DateTime(2026, 10, diaValidade))
+    };
+
+    private static (Pedido Pedido, PedidoItem Item) PedidoDaPorcao(Guid empresaId, Guid produtoId, Guid variacaoId, decimal qty)
+    {
+        var p = PedidoSemLoja(empresaId, produtoId, qty);
+        var item = p.Itens.Single();
+        item.ProdutoVariacaoId = variacaoId;
+        item.VariacaoRotuloSnapshot = "800 g";
+        return (p, item);
+    }
+
+    [Fact]
+    public async Task DescontarAsync_linha_de_porcao_baixa_so_do_saldo_da_porcao_e_grava_a_variacao()
+    {
+        var (svc, itemRepo, movRepo) = Build();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var v800 = Guid.NewGuid();
+        var (pedido, _) = PedidoDaPorcao(empresaId, produtoId, v800, qty: 2);
+        // O lote da 300 g vence antes: sem o filtro, o FEFO o escolheria.
+        var lote300 = LoteDaVariacao(empresaId, produtoId, Guid.NewGuid(), 5, 11);
+        var lote800 = LoteDaVariacao(empresaId, produtoId, v800, 5, 20);
+        var semPorcao = LoteDaVariacao(empresaId, produtoId, null, 5, 10);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { semPorcao, lote300, lote800 });
+        foreach (var l in new[] { semPorcao, lote300, lote800 }) itemRepo.GetByIdComLockAsync(empresaId, l.Id).Returns(l);
+
+        await svc.DescontarAsync(pedido);
+
+        (lote300.QuantidadeAtual!.Value, lote800.QuantidadeAtual!.Value, semPorcao.QuantidadeAtual!.Value).Should().Be((5m, 3m, 5m));
+        await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(m => m.ItemEstoqueId == lote800.Id && m.ProdutoVariacaoId == v800));
+    }
+
+    [Fact]
+    public async Task DescontarAsync_sem_nenhum_lote_da_porcao_cai_no_lote_sem_porcao_do_prato()
+    {
+        // Estoque antigo e lote do PWA não têm porção: não podem ficar invisíveis para a venda.
+        var (svc, itemRepo, _) = Build();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var (pedido, _) = PedidoDaPorcao(empresaId, produtoId, Guid.NewGuid(), qty: 2);
+        var outraPorcao = LoteDaVariacao(empresaId, produtoId, Guid.NewGuid(), 5, 10);
+        var semPorcao = LoteDaVariacao(empresaId, produtoId, null, 5, 20);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { outraPorcao, semPorcao });
+        foreach (var l in new[] { outraPorcao, semPorcao }) itemRepo.GetByIdComLockAsync(empresaId, l.Id).Returns(l);
+
+        await svc.DescontarAsync(pedido);
+
+        (outraPorcao.QuantidadeAtual!.Value, semPorcao.QuantidadeAtual!.Value).Should().Be((5m, 3m), "nunca baixa da porção errada");
+    }
+
+    [Fact]
+    public async Task DescontarAsync_porcao_zerada_fica_descoberta_nela_e_nao_come_o_saldo_de_outra()
+    {
+        var (svc, itemRepo, _) = BuildComPublicador(permiteNegativo: true) is var b ? (b.svc, b.itemRepo, b.movRepo) : default;
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var v800 = Guid.NewGuid();
+        var (pedido, _) = PedidoDaPorcao(empresaId, produtoId, v800, qty: 2);
+        var lote300 = LoteDaVariacao(empresaId, produtoId, Guid.NewGuid(), 5, 10);
+        var lote800 = LoteDaVariacao(empresaId, produtoId, v800, 0, 20);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { lote300, lote800 });
+        foreach (var l in new[] { lote300, lote800 }) itemRepo.GetByIdComLockAsync(empresaId, l.Id).Returns(l);
+
+        await svc.DescontarAsync(pedido);
+
+        lote300.QuantidadeAtual!.Value.Should().Be(5m);
+        lote800.QuantidadeDescoberta.Value.Should().Be(2m, "vendeu a 800 g sem saldo: o descoberto é dela (S17)");
+    }
+
     [Fact] // #939: estorno por item quando houve saída (Venda) anterior por este pedido+item.
     public async Task DevolverItemAsync_estorna_quando_houve_venda_anterior()
     {
