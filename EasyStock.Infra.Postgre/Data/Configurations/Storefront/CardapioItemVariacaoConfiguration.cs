@@ -19,6 +19,9 @@ public class CardapioItemVariacaoConfiguration : IEntityTypeConfiguration<Cardap
     {
         builder.ToTable("cardapio_item_variacao");
         builder.HasKey(v => v.Id);
+        // #1529: PK gerada no app (Guid.NewGuid em CardapioItemVariacao.Criar). Sem ValueGeneratedNever, a
+        // porção nova adicionada a um item RASTREADO vira UPDATE de linha inexistente (mesmo caso do #512).
+        builder.Property(v => v.Id).ValueGeneratedNever();
 
         builder.Property(v => v.CardapioItemId).IsRequired();
 

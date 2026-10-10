@@ -9,11 +9,12 @@ namespace EasyStock.Api.Controllers;
 /// <param name="Linha">ParaServir | PrepararEmCasa; null = não mexe.</param>
 /// <param name="NovidadeAte">"aaaa-mm-dd" define, "" tira a novidade, null não mexe (mesma convenção da tag).</param>
 /// <param name="SecaoId">id da categoria (M1.3), "" tira da categoria, null não mexe.</param>
+/// <param name="Porcoes">M1.4a (#1529): a lista inteira de porções (ADR-0035); null não mexe.</param>
 public sealed record ItemCardapioRequest(
     string? Nome, LinhaProduto? Linha, string? Porcao, decimal? Preco, string? Categoria,
     string? Descricao = null, string? Ingredientes = null, string? Alergenos = null,
     int? TempoPreparoMinutos = null, string? InstrucaoFinalizacao = null, string? NovidadeAte = null,
-    string? SecaoId = null);
+    string? SecaoId = null, IReadOnlyList<PorcaoDoItem>? Porcoes = null);
 
 public sealed record DefinirVisibilidadeItemRequest(bool Visivel);
 
@@ -130,7 +131,7 @@ public class AtendimentoItensCardapioController(
             secao = Guid.TryParse(r.SecaoId, out var id) ? id : throw new UseCaseValidationException("Categoria inválida.");
         return new DadosItemCardapio(r.Nome, r.Linha, r.Porcao, r.Preco, r.Categoria,
             r.Descricao, r.Ingredientes, r.Alergenos, r.TempoPreparoMinutos, r.InstrucaoFinalizacao,
-            mexerNovidade, novidade, mexerSecao, secao);
+            mexerNovidade, novidade, mexerSecao, secao, r.Porcoes);
     }
 
     private async Task<IActionResult> Tratar(Func<Task<IActionResult>> acao)

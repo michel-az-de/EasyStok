@@ -59,6 +59,7 @@ jobs:
       - run: node ferramentas/prova-1502-planejamento.mjs
       - run: node ferramentas/prova-1511-perdas.mjs
       - run: node ferramentas/prova-1523-embalagens.mjs
+      - run: node ferramentas/prova-1529-porcoes.mjs
       - run: node ferramentas/prova-1424-mensagem-programada-api.mjs
       - run: node ferramentas/prova-1427-sla-resposta.mjs
       - run: node ferramentas/prova-onda2-cancelamento.mjs

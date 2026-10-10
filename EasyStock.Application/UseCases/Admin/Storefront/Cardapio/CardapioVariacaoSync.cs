@@ -38,7 +38,8 @@ internal static class CardapioVariacaoSync
             var sku = ConverterSku(op.Sku);
             if (op.Id.HasValue && existentes.TryGetValue(op.Id.Value, out var existente))
             {
-                existente.Atualizar(op.Rotulo, op.PrecoStorefront, op.OrdemExibicao, op.PesoExibicao, sku);
+                // #1529: o vínculo com a variação do estoque não vem do payload; preserva o que existe.
+                existente.Atualizar(op.Rotulo, op.PrecoStorefront, op.OrdemExibicao, op.PesoExibicao, sku, existente.ProdutoVariacaoId);
                 if (op.Disponivel) existente.MarcarDisponivel(); else existente.MarcarEsgotado();
                 resultantes.Add((op, existente));
             }
