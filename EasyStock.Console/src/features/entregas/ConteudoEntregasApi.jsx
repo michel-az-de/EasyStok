@@ -56,7 +56,8 @@ export function ConteudoEntregasApi() {
       {erro && (
         <p className={css.faixa} role="alert">
           <Icone nome="circle-x" tamanho={16} /> <span className={css.cresce}>{erro}</span>
-          <Botao variante="texto" onClick={limparErro}>Fechar</Botao>
+          <Botao variante="secundario" disabled={ocupado} onClick={acoes.recarregar}>Atualizar entregas</Botao>
+          {pedidos !== null && <Botao variante="texto" onClick={limparErro}>Fechar aviso</Botao>}
         </p>
       )}
       <div id={`${id}-painel`} role="tabpanel" aria-labelledby={`${id}-${aba}`} tabIndex={0} className={css.painel}>
@@ -227,20 +228,23 @@ function Viagem({ viagem, indice, opcoesEntregador, ocupado, acoes }) {
 
 function Chamados({ chamados, ocupado, acoes }) {
   const [texto, setTexto] = useState('')
+  const [confirmacao, setConfirmacao] = useState(null)
   const abrir = (e) => {
     e.preventDefault()
     if (!texto.trim()) return
-    acoes.abrirChamado(texto.trim(), null).then((ok) => { if (ok) setTexto('') })
+    setConfirmacao(null)
+    acoes.abrirChamado(texto.trim(), null).then((ok) => { if (ok) { setTexto(''); setConfirmacao('Chamado aberto. Acompanhe o atendimento na lista abaixo.') } })
   }
   return (
     <section className={css.secao} aria-label="Chamados de entregador">
       <h3>Chamar entregador</h3>
       <form className={css.linha} onSubmit={abrir}>
         <div className={css.cresce}>
-          <CampoTexto rotulo="O que precisa" value={texto} onChange={(e) => setTexto(e.target.value)} maxLength={500} />
+          <CampoTexto rotulo="O que precisa" value={texto} onChange={(e) => setTexto(e.target.value)} maxLength={500} disabled={ocupado} />
         </div>
         <Botao tipo="submit" variante="secundario" disabled={ocupado || !texto.trim()}>Chamar</Botao>
       </form>
+      {confirmacao && <p className={css.apoio} role="status">{confirmacao}</p>}
       <ul className={css.lista}>
         {chamados.map((c) => (
           <li key={c.id} className={`${css.cartao} ${css.linha}`}>
@@ -258,11 +262,15 @@ const ENTREGADOR_VAZIO = { nome: '', tipo: 'Motoboy', empresa: 'Propria', telefo
 
 function Entregadores({ entregadores, ocupado, acoes }) {
   const [form, setForm] = useState(ENTREGADOR_VAZIO)
-  const campo = (k) => ({ value: form[k], onChange: (e) => setForm({ ...form, [k]: e.target.value }) })
+  const [confirmacao, setConfirmacao] = useState(null)
+  const campo = (k) => ({ value: form[k], disabled: ocupado, onChange: (e) => setForm({ ...form, [k]: e.target.value }) })
   const salvar = (e) => {
     e.preventDefault()
     if (!form.nome.trim()) return
-    acoes.criarEntregador({ ...form, nome: form.nome.trim() }).then((ok) => { if (ok) setForm(ENTREGADOR_VAZIO) })
+    setConfirmacao(null)
+    acoes.criarEntregador({ ...form, nome: form.nome.trim() }).then((ok) => {
+      if (ok) { setForm(ENTREGADOR_VAZIO); setConfirmacao('Entregador cadastrado. Você já pode selecioná-lo nas viagens.') }
+    })
   }
   return (
     <section className={css.secao} aria-label="Entregadores">
@@ -271,11 +279,12 @@ function Entregadores({ entregadores, ocupado, acoes }) {
         <CampoTexto rotulo="Nome" {...campo('nome')} required />
         <CampoSelecao rotulo="Tipo" opcoes={TIPOS_ENTREGADOR} {...campo('tipo')} />
         <CampoSelecao rotulo="Empresa" opcoes={EMPRESAS_ENTREGADOR} {...campo('empresa')} />
-        <CampoTexto rotulo="Telefone" {...campo('telefone')} />
+        <CampoTexto rotulo="Telefone" tipo="tel" {...campo('telefone')} />
         <CampoTexto rotulo="Veículo" {...campo('veiculo')} />
         <CampoTexto rotulo="Placa" {...campo('placa')} />
         <Botao tipo="submit" variante="primario" disabled={ocupado || !form.nome.trim()}>Cadastrar</Botao>
       </form>
+      {confirmacao && <p className={css.apoio} role="status">{confirmacao}</p>}
       <h3>Ativos</h3>
       {entregadores.length === 0 && <p className={css.vazio}>Nenhum entregador cadastrado.</p>}
       <ul className={css.lista}>

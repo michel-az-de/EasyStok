@@ -25,12 +25,13 @@ public sealed record ConversaResumoResult(
     string? MotivoEscalada = null,
     DateTime? UltimaMensagemEntradaEm = null,
     bool AguardaResposta = false,
-    int SlaRespostaMinutos = ConfiguracaoAtendimento.SlaRespostaPadraoMinutos)
+    int SlaRespostaMinutos = ConfiguracaoAtendimento.SlaRespostaPadraoMinutos,
+    string? AssumidaPorNome = null)
 {
-    internal static ConversaResumoResult De(Conversa c, string? ultimaMensagemTexto, DateTime agora, int slaRespostaMinutos, bool? aguardaResposta = null) => new(
+    internal static ConversaResumoResult De(Conversa c, string? ultimaMensagemTexto, DateTime agora, int slaRespostaMinutos, bool? aguardaResposta = null, string? assumidaPorNome = null) => new(
         c.Id, c.Canal, c.ContatoIdExterno, c.ContatoNome, c.ClienteId, c.Situacao, c.NaoLidas,
         c.UltimaMensagemEm, ultimaMensagemTexto, c.PedidoEmAndamentoId, c.AssumidaPorUsuarioId, c.DentroDaJanela(agora),
-        c.MotivoEscalada, c.UltimaMensagemEntradaEm, aguardaResposta ?? c.AguardaResposta, slaRespostaMinutos);
+        c.MotivoEscalada, c.UltimaMensagemEntradaEm, aguardaResposta ?? c.AguardaResposta, slaRespostaMinutos, assumidaPorNome);
 }
 
 /// <summary>Mensagem como o console mostra. <c>MidiaChave</c> é interna: o arquivo é servido por endpoint autenticado.</summary>

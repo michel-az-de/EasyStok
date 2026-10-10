@@ -70,3 +70,5 @@ jobs:
       - run: node ferramentas/prova-m36-reabrir-conversa.mjs
       - run: node ferramentas/prova-editor-cardapio.mjs
       - run: node ferramentas/prova-m36-modelos.mjs
+      - run: node ferramentas/prova-m37-atendentes.mjs
+      - run: node ferramentas/prova-ux-sistema.mjs

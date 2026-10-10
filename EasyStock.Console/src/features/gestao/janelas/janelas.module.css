@@ -71,3 +71,4 @@
 }
 
 .acoesEdicao { display: flex; gap: var(--e-2); flex-wrap: wrap; margin-top: var(--e-2); }
+.grupoDias { border: 0; padding: 0; margin: 0; min-width: 0; }

@@ -960,4 +960,38 @@ Após incorporar `b840ae96`, com a ficha do prato e as fotos do cardápio, foram
 - Homologação com conta, contatos e token sintéticos. Não houve contato com clientes reais, aceite de entrega na Meta nem verificação de publicação pública. Aceitação HTTP, entrega ao aparelho e publicação continuam sendo estados separados.
 - Modelos com mídia, botões, autenticação, parâmetros nomeados ou variáveis no cabeçalho não são enviados por esta tela; o catálogo informa a limitação. Criação e aprovação continuam no Gerenciador da Meta. Conta apenas com vínculo manual de número, sem a credencial/WABA da coexistência, recebe orientação para conectar em Integrações.
 - Mensagens programadas mantêm seu fluxo anterior. Esta fatia trata o envio avulso pelo Composer. Histórico em outras abas continua na sincronização existente de cinco segundos.
-- Próxima fatia do plano: M3.7, filtros Minhas/Sem dono/Todas e nome do atendente. Aceite externo do modelo textual segue pendente com Felipe.
+- M3.7, filtros Minhas/Sem dono/Todas e nome do atendente, foi executado na seção 30. Aceite externo do modelo textual segue pendente com Felipe.
+
+## 30. Execução da Onda 2: responsáveis no Balcão (M3.7), 10/10/2026
+
+### 30.1 Entrega
+
+- O resumo da inbox acrescenta `assumidaPorNome`. O repositório consulta o nome junto com a conversa, pelo vínculo de usuário da mesma empresa. Não há consulta por cartão nem nova tabela. Filtro explícito de empresa, filtro global e RLS continuam ativos; um responsável sem vínculo nesta empresa recebe nome nulo.
+- O Balcão oferece Todas, Minhas e Sem dono. Todas é o padrão. Minhas compara `assumidaPorUsuarioId` com o ID da sessão, sem comparar nomes. Sem dono inclui conversas sem atribuição. Busca, canais, contagens, abertas, encerradas e bloqueadas respeitam o responsável escolhido. A conversa selecionada e o rascunho permanecem disponíveis ao trocar o filtro.
+- O selo de outra atendente mostra seu nome. Respostas anteriores, sem o campo novo, conservam o rótulo Outro atendente. A demonstração mantém Thatiane e o layout anterior.
+- O controle só aparece com mais de um atendente ativo, usando `GET api/atendimento/atendentes` existente. Falha nessa consulta mostra mensagem e Tentar novamente. O filtro de responsável atua sobre a inbox carregada; a API conserva seus filtros existentes `responsavel=eu|ninguem|{usuarioId}`.
+- Assumir e devolver ao automático atualizam o responsável após confirmação da API. Uma recusa conserva a atribuição. Transferências feitas pelo contrato existente entram na próxima sincronização da inbox. Não houve alteração na distribuição de conversas, permissões, regra do canal ou schema.
+
+### 30.2 Validação local
+
+Evidências, TRX, scripts e capturas em `C:\rep\EasyStok\.build\onda2-atendentes`. Banco sintético `easystock_onda2_atendentes`, clonado da homologação local anterior; os testes PostgreSQL usam Testcontainers separado.
+
+| Camada | Evidência |
+|---|---|
+| Build | `EasyStok.CI.slnf` compilou sem erros; avisos existentes de API obsoleta na primeira compilação |
+| Application / API / Arquitetura | 2.471, 1.179 e 61 testes aprovados, sem ignorados; arquitetura com `Category!=ArchitectureDebt` |
+| PostgreSQL real | 13 testes aprovados, sem ignorados: novos casos de nomes, homônimos, responsável de outra empresa, filtros e transferência, com e sem cliente sujeito a RLS; regressões existentes de atendentes e conversas |
+| Console | 72 provas aprovadas; lint, fronteiras de camada, 264 pares de contraste e build aprovados; `prova-m37-atendentes.mjs` incluída no workflow |
+| HTTP | Nomes reais dos usuários locais e filtros eu/ninguém conferidos; 401 sem sessão, 403 para Cozinha e 400 para responsável inválido |
+| Chromium | Dois usuários veem somente suas conversas em Minhas; nome do outro no selo; transferência entra/sai das listas; Assumir e Devolver confirmados na tela; recarga volta ao padrão Todas |
+| Equipe e falha | Com um atendente ativo no banco real, o controle fica oculto e as quatro conversas sintéticas seguem na lista padrão; falha de consulta mostra erro e a retentativa recupera o filtro |
+| Apresentação | Capturas em 1440 × 1000, 1024 × 768 e 390 × 844; sem erro JavaScript e sem rolagem horizontal no celular |
+
+O roteiro inicial do navegador usava uma origem direta bloqueada pelo CORS; passou a usar o proxy de desenvolvimento existente. A devolução ao automático em ChatSite foi recusada conforme o domínio e conservou a atendente. O fluxo permitido foi conferido em conversa sintética de WhatsApp. Também foram corrigidos o seletor do erro e a leitura da empresa no helper local; a captura da equipe com uma pessoa passou a aguardar o carregamento da inbox. As execuções incompletas não são apresentadas como aprovadas.
+
+### 30.3 Limites e próxima fatia
+
+- A inbox mantém a sincronização de cinco segundos e o limite existente de dez páginas de cem conversas. O filtro opera sobre esse conjunto carregado. A lista de atendentes é relida ao montar o Balcão ou tentar novamente após erro; não foi criado evento de alteração da equipe.
+- O nome reflete o vínculo de usuário atual da empresa, inclusive no histórico. Não foi criado snapshot de nome por atribuição. Controles de transferência conservam seu escopo da F09.
+- Validação somente local com usuários e contatos sintéticos. Não houve envio a cliente real nem verificação de publicação pública.
+- Próxima fatia: M3.8, lembrete de pedido agendado sobre `Pedido`, conferindo a dependência de encomendas do M8.2. Aceites externos de canais e publicação seguem separados.

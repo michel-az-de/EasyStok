@@ -18,7 +18,8 @@ import css from './Popover.module.css'
 // marcador `display:none` nasce no lugar de sempre só para achar, via
 // `parentElement`, o retângulo do ancestral `position:relative` de cada
 // chamador (todos já têm um, é a âncora do próprio popover hoje), e o
-// conteúdo de verdade é replantado em `document.body` nesse retângulo. O
+// conteúdo é replantado no dialog aberto mais próximo ou no body. Assim,
+// um menu da Ficha permanece na camada modal e não fica no fundo inerte. O
 // CSS de .popover continua o mesmo (bottom/top: 100% relativo ao wrapper
 // plantado), então quem não passa `portal` renderiza exatamente como antes.
 export function Popover({
@@ -28,16 +29,60 @@ export function Popover({
   const marcadorRef = useRef(null)
   const origemRef = useRef(null)
   const [retangulo, setRetangulo] = useState(null)
-  useEscape(true, () => {
+  useEscape(true, (evento) => {
+    // Uma janela aberta sobre este menu recebe seu próprio Escape nativo.
+    const janelaDoMenu = caixaRef.current?.closest('dialog[open]') ?? null
+    const janelaDoFoco = document.activeElement?.closest('dialog[open]') ?? null
+    if (janelaDoMenu !== janelaDoFoco) return
+    evento.preventDefault()
+    evento.stopImmediatePropagation()
     aoFechar()
     if (origemRef.current?.isConnected) origemRef.current.focus()
-  })
+  }, { capturar: true })
 
   useLayoutEffect(() => {
     if (!origemRef.current) origemRef.current = document.activeElement
     if (!portal) return
-    setRetangulo(marcadorRef.current?.parentElement?.getBoundingClientRect() ?? null)
+    const ancora = marcadorRef.current?.parentElement
+    if (!ancora) return
+    const medida = ancora.getBoundingClientRect()
+    const dialogo = ancora.closest('dialog[open]')
+    const referencia = dialogo?.getBoundingClientRect()
+    const escalaX = dialogo ? referencia.width / dialogo.offsetWidth : 1
+    const escalaY = dialogo ? referencia.height / dialogo.offsetHeight : 1
+    setRetangulo({
+      left: dialogo ? (medida.left - referencia.left) / escalaX + dialogo.scrollLeft - dialogo.clientLeft : medida.left,
+      top: dialogo ? (medida.top - referencia.top) / escalaY + dialogo.scrollTop - dialogo.clientTop : medida.top,
+      width: medida.width / escalaX, height: medida.height / escalaY,
+      destino: dialogo ?? document.body, emDialogo: !!dialogo,
+    })
   }, [portal])
+
+  useLayoutEffect(() => {
+    if (!retangulo?.emDialogo || posicao !== 'abaixo') return
+    const caixa = caixaRef.current
+    const dialogo = retangulo.destino
+    const estilo = getComputedStyle(caixa)
+    const margem = parseFloat(estilo.getPropertyValue('--e-4'))
+    const espaco = parseFloat(estilo.getPropertyValue('--e-2'))
+    const largura = Math.min(360, dialogo.clientWidth - 2 * margem)
+    const esquerda = Math.max(margem, Math.min(retangulo.left + retangulo.width - largura, dialogo.clientWidth - largura - margem))
+    // O dialog animado é um containing block. Mantém o menu dentro dele,
+    // sem o foco provocar rolagem horizontal ou esconder o último item.
+    Object.assign(caixa.style, {
+      position: 'absolute', width: `${largura}px`, left: `${esquerda - retangulo.left}px`, right: 'auto',
+      maxHeight: `${dialogo.clientHeight - 2 * margem}px`,
+    })
+    const abaixo = dialogo.clientHeight - retangulo.top - retangulo.height - espaco - margem
+    const acima = retangulo.top - espaco - margem
+    const inverter = caixa.offsetHeight > abaixo && acima > abaixo
+    Object.assign(caixa.style, {
+      top: inverter ? 'auto' : `${retangulo.height + espaco}px`,
+      bottom: inverter ? `${retangulo.height + espaco}px` : 'auto',
+      maxHeight: `${Math.max(1, inverter ? acima : abaixo)}px`,
+      transformOrigin: inverter ? 'bottom right' : 'top right',
+    })
+  }, [retangulo, posicao])
 
   // Sugestão presa ao campo de texto (atalho "/" do composer) não pode
   // roubar o foco: ela está digitando, e o Popover de clique de sempre foca
@@ -62,8 +107,14 @@ export function Popover({
     <div
       className={`${css.popover} ${posicao === 'abaixo' ? css.abaixo : ''}`}
       role="menu"
+      tabIndex={-1}
       aria-label={rotulo}
       ref={caixaRef}
+      onClickCapture={(evento) => {
+        // A ação pode desmontar o menu e abrir um Modal no mesmo clique.
+        // Devolve o foco antes disso, para a nova janela guardar o acionador.
+        if (evento.target.closest('[role="menuitem"]') && origemRef.current?.isConnected) origemRef.current.focus()
+      }}
       onKeyDown={(evento) => {
         if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(evento.key)
           || !evento.target.matches('[role="menuitem"]')) return
@@ -102,7 +153,7 @@ export function Popover({
       <span ref={marcadorRef} style={{ display: 'none' }} />
       {retangulo && createPortal(
         <div style={{
-          position: 'fixed',
+          position: retangulo.emDialogo ? 'absolute' : 'fixed',
           left: retangulo.left,
           width: retangulo.width,
           top: retangulo.top,
@@ -113,7 +164,7 @@ export function Popover({
         >
           {corpo}
         </div>,
-        document.body,
+        retangulo.destino,
       )}
     </>
   )

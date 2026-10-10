@@ -75,7 +75,7 @@ export function estadoInicial({
     // mesmo tempo e uma ordem só. `MUDAR_FILTRO` é genérico (chave/valor), a
     // forma nova só muda o que mora em cada chave. #1442: abre em "Todas";
     // "Precisa de você" virou filtro com contador.
-    filtros: { busca: '', aba: 'todas', canais: [], ordenacao: 'urgencia' },
+    filtros: { busca: '', aba: 'todas', canais: [], ordenacao: 'urgencia', responsavel: 'todas' },
     rascunhos: {},
     automaticoPausado: {},
     // Lista, não campo único: dois desacertos de saldo antes dela clicar
@@ -236,6 +236,10 @@ function mesclarDoServidor(local, doServidor) {
 }
 
 const CASOS_API = {
+  [acao.CONFIRMAR_RESPONSAVEL_API]: (estado, { id, situacao }) => ({
+    ...mapear(estado, id, (c) => ({ ...c, ...situacao })),
+    automaticoPausado: { ...estado.automaticoPausado, [id]: situacao.pausaApi ?? false },
+  }),
   [acao.CONFIRMAR_REABERTURA_API]: (estado, { id, situacao }) => ({
     ...mapear(estado, id, (c) => ({ ...c, ...situacao })),
     automaticoPausado: { ...estado.automaticoPausado, [id]: situacao.pausaApi ?? false },

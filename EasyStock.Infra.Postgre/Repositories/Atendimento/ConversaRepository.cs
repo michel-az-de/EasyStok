@@ -160,6 +160,9 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
             .Select(c => new
             {
                 Conversa = c,
+                AssumidaPorNome = db.UsuariosEmpresas
+                    .Where(ue => ue.EmpresaId == empresaId && ue.UsuarioId == c.AssumidaPorUsuarioId)
+                    .Select(ue => ue.Usuario!.Nome).FirstOrDefault(),
                 AguardaResposta = c.Situacao != SituacaoConversa.Encerrada && db.AtendimentoMensagens
                     .Where(m => m.EmpresaId == empresaId && m.ConversaId == c.Id
                         && m.Status != StatusMensagem.Falhou && m.Status != StatusMensagem.Pendente)
@@ -174,7 +177,7 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
             })
             .ToListAsync(ct);
 
-        return linhas.Select(l => new ConversaInboxItem(l.Conversa, l.UltimoTexto, l.AguardaResposta)).ToList();
+        return linhas.Select(l => new ConversaInboxItem(l.Conversa, l.UltimoTexto, l.AguardaResposta, l.AssumidaPorNome)).ToList();
     }
 
     public async Task<IReadOnlyList<Mensagem>> ListarMensagensAsync(

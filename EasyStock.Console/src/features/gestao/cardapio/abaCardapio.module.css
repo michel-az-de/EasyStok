@@ -7,6 +7,10 @@
 .acoesReceita { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .acoesReceita > :last-child { margin-left: auto; }
 .editorReceita { width: 100%; }
+.receita { align-items: flex-start; }
+.receita > .resumo { flex-basis: 50%; }
+.receita > .estados { padding-top: var(--e-1); }
+.receita > .acoesDaReceita { flex-basis: 100%; margin-left: 0; padding-top: 0; }
 .descricao { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); max-width: 64ch; }
 .orientacoes { flex: 1 1 320px; min-width: 0; }
 .ajudaControles { margin-top: var(--e-1); font-size: var(--t-apoio); }

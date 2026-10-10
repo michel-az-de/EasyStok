@@ -93,7 +93,7 @@ function FormularioProducao({ item, aoFechar, aoRegistrar }) {
   }
 
   return (
-    <div className={css.cartao}>
+    <form className={css.cartao} noValidate onSubmit={(e) => { e.preventDefault(); confirmar() }}>
       <h4 className={css.tituloCartao}>Registrar produção · {item.nome}</h4>
       <p className={css.legenda}>
         O peso real vira um lote com número e validade, já dividido em porções de venda.
@@ -140,14 +140,14 @@ function FormularioProducao({ item, aoFechar, aoRegistrar }) {
                 onChange={(e) => mudarLinha(indice, 'pesoPorcaoG', e.target.value)}
               />
               <CampoTexto
-                rotulo="Qtd." tipo="number" min="1" value={p.quantidade}
+                rotulo="Quantidade" tipo="number" min="1" value={p.quantidade}
                 onChange={(e) => mudarLinha(indice, 'quantidade', e.target.value)}
               />
               <CampoTexto
                 rotulo="Rótulo" value={p.rotulo} placeholder={`${p.pesoPorcaoG || '?'} g`}
                 onChange={(e) => mudarLinha(indice, 'rotulo', e.target.value)}
               />
-              <Botao variante="texto" onClick={() => sugerirQuantidade(indice)}>Sugerir qtd.</Botao>
+              <Botao variante="texto" onClick={() => sugerirQuantidade(indice)}>Sugerir quantidade</Botao>
               {porcoes.length > 1 && (
                 <Botao
                   variante="texto" icone="x" aria-label="Remover esta linha de porção"
@@ -166,9 +166,9 @@ function FormularioProducao({ item, aoFechar, aoRegistrar }) {
 
       <div className={css.acoesForm}>
         <Botao onClick={aoFechar}>Cancelar</Botao>
-        <Botao variante="primario" onClick={confirmar}>Registrar lote</Botao>
+        <Botao variante="primario" tipo="submit">Registrar lote</Botao>
       </div>
-    </div>
+    </form>
   )
 }
 
@@ -190,7 +190,7 @@ function FormularioAjuste({
   }
 
   return (
-    <div className={css.cartao}>
+    <form className={css.cartao} noValidate onSubmit={(e) => { e.preventDefault(); confirmar() }}>
       <h4 className={css.tituloCartao}>Ajustar contagem · {item.nome}</h4>
       <p className={css.legenda}>
         Conte o que tem de verdade e lance o ajuste. O saldo é corrigido e o
@@ -199,6 +199,7 @@ function FormularioAjuste({
       <div className={css.grade}>
         <CampoTexto
           rotulo="Porções contadas agora" tipo="number" min="0" value={novoSaldo}
+          dica="Informe o total que você contou, não a diferença em relação ao saldo."
           onChange={(e) => setNovoSaldo(e.target.value)}
         />
       </div>
@@ -209,9 +210,9 @@ function FormularioAjuste({
       {erro && <p className={css.erro} role="alert">{erro}</p>}
       <div className={css.acoesForm}>
         <Botao onClick={aoFechar}>Cancelar</Botao>
-        <Botao variante="primario" onClick={confirmar}>Salvar ajuste</Botao>
+        <Botao variante="primario" tipo="submit">Salvar ajuste</Botao>
       </div>
-    </div>
+    </form>
   )
 }
 
@@ -284,10 +285,11 @@ export function AbaProducao() {
       )}
 
       {itemRegistrar && (
-        <FormularioProducao item={itemRegistrar} aoFechar={() => setRegistrarPara(null)} aoRegistrar={registrar} />
+        <FormularioProducao key={itemRegistrar.sku} item={itemRegistrar} aoFechar={() => setRegistrarPara(null)} aoRegistrar={registrar} />
       )}
       {itemAjustar && (
         <FormularioAjuste
+          key={itemAjustar.sku}
           item={itemAjustar}
           saldoAtual={itemAjustar.estoque}
           aoFechar={() => setAjustarPara(null)}

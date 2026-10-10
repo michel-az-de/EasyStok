@@ -85,16 +85,24 @@ export function tagCorrespondida(conversa, busca) {
 export const combinaCanal = (conversa, canais) =>
   !canais || canais.length === 0 || canais.includes(conversa.canal)
 
+export function combinaResponsavel(conversa, filtro, usuario) {
+  if (filtro === 'sem-dono') return !conversa.assumidaPorUsuarioId && !conversa.responsavel
+  if (filtro !== 'minhas') return true
+  if (conversa.situacaoApi) return Boolean(usuario?.id && conversa.assumidaPorUsuarioId === usuario.id)
+  return Boolean(usuario?.nome && conversa.responsavel === usuario.nome)
+}
+
 const foraDoTopo = (conversa) => estaBloqueada(conversa) || conversa.estado === 'Encerrado'
 
 // Lista principal do Balcão: nunca traz bloqueado nem encerrado (grupo próprio
 // no fim de "Todas"), respeita canal e busca sempre, e a aba "Precisa de você"
 // some com quem o automático ainda vai responder sozinho.
 export function conversasDoBalcao(
-  conversas, filtros, agora, automaticoPausado = {}, aberta = true, janelas = [], expediente = null,
+  conversas, filtros, agora, automaticoPausado = {}, aberta = true, janelas = [], expediente = null, usuario = null,
 ) {
   const base = conversas.filter((c) =>
-    !foraDoTopo(c) && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca))
+    !foraDoTopo(c) && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca)
+    && combinaResponsavel(c, filtros.responsavel, usuario))
   if (filtros.aba !== 'precisa') return base
   return base.filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas, expediente))
 }
@@ -102,14 +110,14 @@ export function conversasDoBalcao(
 // Os dois grupos recolhidos do fim de "Todas" (seção 1): mesma busca e mesmo
 // canal da lista de cima, sem a aba, porque nenhum dos dois existe em
 // "Precisa de você".
-export const conversasEncerradasDoBalcao = (conversas, filtros) =>
+export const conversasEncerradasDoBalcao = (conversas, filtros, usuario = null) =>
   conversas.filter((c) =>
     !estaBloqueada(c) && c.estado === 'Encerrado'
-    && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca))
+    && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca) && combinaResponsavel(c, filtros.responsavel, usuario))
 
-export const conversasBloqueadasDoBalcao = (conversas, filtros) =>
+export const conversasBloqueadasDoBalcao = (conversas, filtros, usuario = null) =>
   conversas.filter((c) =>
-    estaBloqueada(c) && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca))
+    estaBloqueada(c) && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca) && combinaResponsavel(c, filtros.responsavel, usuario))
 
 // Contador por canal do topo do Balcão (issue #2). Conta o que está aberto na
 // lista de cima (nem encerrada nem bloqueada) e, dentro disso, quantas

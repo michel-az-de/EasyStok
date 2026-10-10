@@ -6,24 +6,18 @@
 // `operacao`: tela de trabalho (Cozinha, Entregas) ocupa a altura toda; tela de
 // ajuste ganha título e coluna de leitura. Módulo sem tela mostra "Em breve".
 import { useEffect, useRef } from 'react'
-import { Icone } from '../../componentes/Icone'
+import { MarcaIcone } from '../../componentes/MarcaIcone'
 import { Botao } from '../../componentes/Botao'
 import { InterruptorTema } from '../../componentes/InterruptorTema'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { Vazio } from '../../componentes/Vazio'
 import { HASH_HALL } from '../../dominio/rota'
 import { hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
+import { IconeDoModulo } from './IconeDoModulo'
 import css from './moldura.module.css'
 
 const MODULO_DO_BALCAO = 'atendimento'
 const HASH_BALCAO = hashDoModulo(MODULO_DO_BALCAO, 'balcao')
-const ICONES_DAS_TELAS = {
-  itens: 'cardapio', categorias: 'modelo', estoque: 'package', producao: 'cooking-pot',
-  insumos: 'shopping-cart', receitas: 'nota', planejamento: 'relogio', perdas: 'lixeira',
-  balcao: 'inbox', horarios: 'relogio', respostas: 'respostas', fila: 'cooking-pot',
-  caixa: 'dollar-sign', fidelidade: 'presente', canais: 'conversa', integracoes: 'link',
-  painel: 'moto', janelas: 'relogio',
-}
 
 export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, tituloVisivel = true, children }) {
   const { permite, aoSair, sessaoPersistente, notificacoes } = useAcessoModulos()
@@ -51,16 +45,16 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
       <header className={css.barra}>
         <div className={css.contexto}>
           <a className={css.voltar} href={HASH_HALL}>
-            <Icone nome="arrow-left" tamanho={18} /> <span>Módulos</span>
+            <MarcaIcone nome="anterior" tamanho={20} /> <span>Módulos</span>
           </a>
           {/* #1474: quem veio da barra lateral do Balcão volta para ele num toque. */}
           {modulo.id !== MODULO_DO_BALCAO && permite(MODULO_DO_BALCAO) && (
             <a className={css.voltar} href={HASH_BALCAO}>
-              <Icone nome="conversa" tamanho={18} /> <span>Balcão</span>
+              <MarcaIcone nome="mensagem" tamanho={24} /> <span>Balcão</span>
             </a>
           )}
           <span className={css.modulo}>
-            <Icone nome={modulo.icone} tamanho={20} /> {modulo.nome}
+            <IconeDoModulo modulo={modulo} /> {modulo.nome}
           </span>
         </div>
         <div className={css.acoes}>
@@ -77,7 +71,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
                 className={`${css.item} ${t.id === telaId ? css.itemAtivo : ''}`}
                 aria-current={t.id === telaId ? 'page' : undefined}
               >
-                <Icone nome={ICONES_DAS_TELAS[t.id] ?? modulo.icone} tamanho={20} />
+                <IconeDoModulo modulo={modulo} telaId={t.id} />
                 <span>{t.rotulo}</span>
               </a>
             ))}
@@ -92,7 +86,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
               {tela ? (
                 <>
                   <h1 className={tituloVisivel ? css.titulo : 'sr'}>
-                    <Icone nome={ICONES_DAS_TELAS[tela.id] ?? modulo.icone} tamanho={22} />
+                    <IconeDoModulo modulo={modulo} telaId={tela.id} />
                     {tela.rotulo}
                   </h1>
                   <div className={css.conteudo}>{children}</div>

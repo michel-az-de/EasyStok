@@ -81,7 +81,7 @@
 }
 
 .cabecaCartao { display: flex; align-items: center; gap: var(--e-2); }
-.numeroCartao { font-family: var(--f-display); font-size: var(--t-corpo); font-weight: 600; }
+.numeroCartao { font-family: var(--f-corpo); font-size: var(--t-corpo); font-weight: 700; line-height: 1.35; }
 
 .rotuloSituacao { margin: 0; font-size: var(--t-apoio); font-weight: 700; }
 .cor-esperando .rotuloSituacao { color: var(--info); }
@@ -169,7 +169,7 @@
   80% { transform: translateX(3px); }
 }
 .motivoRecusa {
-  margin: 0; display: flex; align-items: flex-start; gap: var(--e-1);
+  margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2);
   padding: var(--e-2); border-radius: var(--r-1);
   background: var(--erro-pastel); color: var(--erro); font-size: var(--t-apoio); font-weight: 600;
 }
@@ -272,6 +272,19 @@
 }
 
 .chipsFiltro { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; flex: 1; }
+.topoPagina > .chipsFiltro { flex: none; flex-wrap: nowrap; }
+
+@media (max-width: 640px) {
+  .topoPagina { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--e-1) var(--e-2); padding: var(--e-2) var(--e-3); }
+  .topoPagina > .chipsFiltro { justify-content: flex-end; }
+  .topoPagina > .aoVivo { grid-row: 2; grid-column: 1 / -1; padding-right: 56px; }
+  .horaTopo { grid-row: 2; grid-column: 2; justify-self: end; }
+  .filtros { padding: var(--e-2) var(--e-3); }
+  .filtros > .chipsFiltro { flex-wrap: nowrap; overflow-x: auto; min-width: 0; padding-bottom: var(--e-1); }
+  .filtros > .chipsFiltro > button { flex: none; }
+  .colunas { padding-inline: var(--e-3); gap: var(--e-2); }
+  .coluna { flex: 0 0 calc(100vw - 56px); min-width: 0; }
+}
 .gavetaCanhotos {
   display: inline-flex; align-items: center; gap: var(--e-2);
   padding: var(--e-1) var(--e-1) var(--e-1) var(--e-3); border-radius: var(--r-pilula);
@@ -282,7 +295,7 @@
 
 /* Comanda aberta da Cozinha (Modal). */
 .comanda { display: grid; gap: var(--e-3); }
-.comandaCliente { margin: 0; font-family: var(--f-display); font-size: var(--t-forte); font-weight: 700; }
+.comandaCliente { margin: 0; font-family: var(--f-corpo); font-size: var(--t-forte); font-weight: 700; }
 .comandaApoio { margin: 0; display: flex; align-items: center; gap: var(--e-1); flex-wrap: wrap; color: var(--tinta-2); font-size: var(--t-apoio); }
 .comandaAtraso { color: var(--erro); font-weight: 700; }
 .trilha { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-3); font-size: var(--t-apoio); }

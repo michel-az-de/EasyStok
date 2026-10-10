@@ -47,7 +47,7 @@ const ANUNCIOS = {
   },
   onDragEnd: ({ active, over }) => {
     const r = over ? respostaAoSoltarKds(active.data.current.status, over.id) : { aceita: false }
-    return r.aceita ? `Pedido de ${active.data.current.nome} foi para ${rotuloDaColuna(over.id)}.` : 'O pedido ficou onde estava.'
+    return r.aceita ? `Movendo o pedido de ${active.data.current.nome} para ${rotuloDaColuna(over.id)}.` : 'O pedido ficou onde estava.'
   },
   onDragCancel: () => 'Arrasto cancelado. O pedido ficou onde estava.',
 }
@@ -64,7 +64,7 @@ export function TelaCozinhaApi({ linhas }) {
   const dataDaFila = amanha ? dataIsoNoFuso(agora + UM_DIA_MS) : null
   const {
     pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes,
-    avancar, reimprimir, confirmarImpressao, avisar, limparErro,
+    avancar, recarregar, reimprimir, confirmarImpressao, avisar, limparErro,
   } = useCozinhaApi({ data: dataDaFila })
   const [linhaFiltro, setLinhaFiltro] = useState(null)
   const [abertoId, setAbertoId] = useState(null)
@@ -127,6 +127,10 @@ export function TelaCozinhaApi({ linhas }) {
     <div className={css.pagina}>
       <header className={css.topoPagina}>
         <h1>Cozinha</h1>
+        <div className={css.chipsFiltro} role="radiogroup" aria-label="Dia da fila">
+          <Chip papel="escolha" reservarIcone ativo={!amanha} onClick={() => setAmanha(false)}>Hoje</Chip>
+          <Chip papel="escolha" reservarIcone ativo={amanha} onClick={() => setAmanha(true)}>Amanhã</Chip>
+        </div>
         <span className={`${css.aoVivo} ${aoVivo ? css.aoVivoLigado : ''}`}>
           <span className={css.pontoVivo} aria-hidden="true" />
           {aoVivo ? 'Ao vivo' : 'Atualizando a cada 15 s'}
@@ -136,7 +140,8 @@ export function TelaCozinhaApi({ linhas }) {
       {erro && (
         <p className={css.motivoRecusa} role="alert">
           <Icone nome="circle-x" tamanho={16} /> {erro}
-          <Botao variante="texto" onClick={limparErro}>Fechar</Botao>
+          <Botao variante="secundario" onClick={recarregar}>Atualizar fila</Botao>
+          {pedidos !== null && <Botao variante="texto" onClick={limparErro}>Fechar aviso</Botao>}
         </p>
       )}
       {pedidos === null
@@ -151,10 +156,6 @@ export function TelaCozinhaApi({ linhas }) {
           >
             <div className={css.conteudo}>
               <div className={css.filtros}>
-                <div className={css.chipsFiltro} role="radiogroup" aria-label="Dia da fila">
-                  <Chip papel="escolha" reservarIcone ativo={!amanha} onClick={() => setAmanha(false)}>Hoje</Chip>
-                  <Chip papel="escolha" reservarIcone ativo={amanha} onClick={() => setAmanha(true)}>Amanhã</Chip>
-                </div>
                 <div className={css.chipsFiltro} role="radiogroup" aria-label="Filtrar por linha de produto">
                   <Chip papel="escolha" ativo={linhaFiltro === null} onClick={() => setLinhaFiltro(null)}>
                     Todas as linhas

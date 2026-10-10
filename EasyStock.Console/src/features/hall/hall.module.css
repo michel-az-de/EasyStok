@@ -54,7 +54,7 @@
   font-size: var(--t-apoio); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--tinta-2);
 }
 .icone { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--r-1); background: var(--marca-claro); color: var(--marca); }
-.nome { font-family: var(--f-titulo-marca); font-size: var(--t-titulo); font-weight: 600; color: var(--tinta); }
+.nome { font-family: var(--f-corpo); font-size: var(--t-titulo); font-weight: 700; color: var(--tinta); }
 .resumo { font-size: var(--t-corpo); color: var(--tinta-2); }
 
 /* O link do nome cobre o cartão inteiro; foco aparece no cartão (regra acima). */

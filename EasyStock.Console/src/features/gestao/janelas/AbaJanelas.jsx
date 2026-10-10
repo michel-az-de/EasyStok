@@ -73,9 +73,6 @@ function ToggleDias({ diasSemana, aoMudar }) {
       ? diasSemana.filter((v) => v !== valor)
       : [...diasSemana, valor])
   }
-  // Sem `role="group"`: o rótulo visível "Dias da semana" já vem logo antes
-  // (`.rotuloCampo`), e oxlint prefere o elemento semântico (fieldset) a um
-  // `role` solto quando ele existe.
   return (
     <div className={css.dias}>
       {DIAS_DA_SEMANA.map((dia) => (
@@ -103,7 +100,7 @@ function FormularioJanela({ valorInicial, rotuloSalvar, aoSalvar, aoCancelar }) 
   }
 
   return (
-    <div className={css.edicao}>
+    <form className={css.edicao} noValidate onSubmit={(e) => { e.preventDefault(); confirmar() }}>
       <div className={css.campoLinha}>
         <CampoTexto rotulo="Início" tipo="time" value={rascunho.horaInicio} onChange={(e) => mudar('horaInicio', e.target.value)} />
         <CampoTexto rotulo="Fim" tipo="time" value={rascunho.horaFim} onChange={(e) => mudar('horaFim', e.target.value)} />
@@ -119,10 +116,10 @@ function FormularioJanela({ valorInicial, rotuloSalvar, aoSalvar, aoCancelar }) 
           value={rascunho.corteMinutos} onChange={(e) => mudar('corteMinutos', e.target.value)}
         />
       </div>
-      <div>
-        <p className={css.rotuloCampo}>Dias da semana</p>
+      <fieldset className={css.grupoDias}>
+        <legend className={css.rotuloCampo}>Dias da semana</legend>
         <ToggleDias diasSemana={rascunho.diasSemana} aoMudar={(dias) => mudar('diasSemana', dias)} />
-      </div>
+      </fieldset>
 
       {/* Q2 em aberto (issue #42, capacidade quando o pedido mistura as duas
           linhas): proposta ajustável, desligada por padrão. Ligar mostra duas
@@ -146,18 +143,18 @@ function FormularioJanela({ valorInicial, rotuloSalvar, aoSalvar, aoCancelar }) 
             />
           </div>
           <p className={css.respiroDica}>
-            Pedido com item das duas linhas ocupa vaga nas duas. Ajuste os números até bater com o
-            tempo real da cozinha; ninguém decidiu o valor certo ainda.
+            Pedido com item das duas linhas ocupa vaga nas duas. Ajuste as capacidades ao que a cozinha
+            consegue preparar em cada janela.
           </p>
         </div>
       )}
 
       {erro && <p className={css.aviso} role="alert"><Icone nome="alerta" /> {erro}</p>}
       <div className={css.acoesEdicao}>
-        <Botao variante="primario" onClick={confirmar}>{rotuloSalvar}</Botao>
+        <Botao variante="primario" tipo="submit">{rotuloSalvar}</Botao>
         <Botao onClick={aoCancelar}>Cancelar</Botao>
       </div>
-    </div>
+    </form>
   )
 }
 

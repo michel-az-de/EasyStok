@@ -65,6 +65,7 @@ export function criarAcoes({
     listarModelos: async () => { throw new Error('Modelos aprovados exigem a conexão real com o EasyStok.') },
     enviarModelo: async () => { throw new Error('Modelos aprovados exigem a conexão real com o EasyStok.') },
     prepararOutroModelo: () => {},
+    listarAtendentes: async () => [{ nome: ATENDENTE }],
     consultarAgente,
     perguntarAssistente,
     selecionar: (id) => despachar({ tipo: acao.SELECIONAR_CONVERSA, id }),

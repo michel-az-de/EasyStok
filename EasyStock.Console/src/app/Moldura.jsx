@@ -6,13 +6,13 @@ import { InterruptorTema } from '../componentes/InterruptorTema'
 import { trocarTema } from '../hooks/useTema'
 import { BarraDeAbas } from '../componentes/BarraDeAbas'
 import { Botao } from '../componentes/Botao'
+import { Modal } from '../componentes/Modal'
 import { Icone } from '../componentes/Icone'
 import { Pilula } from '../componentes/Pilula'
 import { useAcoes, useAtendimento } from '../aplicacao/contextos'
 import { useAcessoModulos } from '../aplicacao/acessoModulos'
 import { contarAbertas, contarNaEsteira } from '../dominio/conversa'
 import { contarAtivas } from '../dominio/automacao'
-import { useEscape } from '../hooks/useEscape'
 import { DESKTOP, TABLET, useTopoCompacto } from '../hooks/useTamanhoTela'
 import { PainelConversas } from '../features/caixa-de-entrada/PainelConversas'
 import { PainelAtendimento } from '../features/atendimento/PainelAtendimento'
@@ -295,24 +295,10 @@ function Trilho({
 }
 
 function Gaveta({ titulo, aoFechar, children }) {
-  const conteudoRef = useRef(null)
-  useEscape(true, aoFechar)
-
-  useEffect(() => { conteudoRef.current?.focus() }, [])
-
   return (
-    <>
-      <button type="button" className={css.cortina} aria-label="Fechar ficha" onClick={aoFechar} />
-      <aside className={css.gaveta} aria-label={titulo}>
-        <header className={css.tituloColuna}>
-          <span tabIndex={-1} ref={conteudoRef}>{titulo}</span>
-          <span className={css.espaco}>
-            <Botao variante="discreto" onClick={aoFechar}><Icone nome="fechar" /> Fechar</Botao>
-          </span>
-        </header>
-        <div className={css.rolavel}>{children}</div>
-      </aside>
-    </>
+    <Modal titulo={titulo} className={css.gaveta} largura="min(480px, 90vw)" aoFechar={aoFechar}>
+      {children}
+    </Modal>
   )
 }
 
@@ -487,7 +473,7 @@ export function Moldura({
           <section className={`${css.coluna} ${css.centro}`} aria-label="Atendimento">{atendimento}</section>
           {gavetaAberta && (
             <Gaveta titulo="Ficha" aoFechar={fecharGaveta}>
-              <PainelFicha aoAbrirCardapio={aoAbrirCardapio} />
+              <PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} />
             </Gaveta>
           )}
         </div>
@@ -519,6 +505,7 @@ export function Moldura({
           role="tabpanel"
           id="painel-da-aba"
           aria-labelledby={`aba-${aba}`}
+          tabIndex={0}
         >
           {aba !== 'atendimento' && (
             <header className={`${css.tituloColuna} ${css.tituloCompacto}`}>

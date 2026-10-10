@@ -22,7 +22,7 @@
 .modulo {
   display: inline-flex; align-items: center; gap: var(--e-2); flex: none;
   padding-left: var(--e-3); border-left: var(--b-1) solid var(--linha);
-  font-family: var(--f-titulo-marca); font-size: var(--t-forte); font-weight: 600;
+  font-family: var(--f-corpo); font-size: var(--t-forte); font-weight: 700;
 }
 
 .menu {
@@ -47,7 +47,7 @@
 .titulo {
   display: flex; align-items: center; gap: var(--e-2); min-height: 64px;
   margin: 0; padding: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha);
-  font-family: var(--f-titulo-marca); font-size: var(--t-titulo); font-weight: 600; color: var(--tinta);
+  font-family: var(--f-corpo); font-size: var(--t-titulo); font-weight: 700; color: var(--tinta);
 }
 .titulo svg { color: var(--tinta-2); flex: none; }
 .conteudo { padding: var(--e-4); }

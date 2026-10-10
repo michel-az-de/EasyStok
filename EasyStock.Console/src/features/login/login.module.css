@@ -37,7 +37,9 @@
   background: var(--erro-pastel);
   color: var(--erro);
   font-size: var(--t-apoio);
+  overflow-wrap: anywhere;
 }
+.aviso { margin: 0; padding: var(--e-3); border-radius: var(--r-1); background: var(--preenchimento); color: var(--tinta-2); font-size: var(--t-apoio); }
 
 .google {
   display: flex;

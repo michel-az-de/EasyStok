@@ -19,7 +19,7 @@ import css from './abaCaixa.module.css'
 // aparecem à parte e não entram na diferença do que ela contou. O campo nasce vazio (nascer
 // com o esperado mostrava "bate certo" sem ninguém contar) e o botão espera a contagem.
 // "Fechar o caixa", não "fechar o dia": fechar a loja é outro gesto.
-export function ModalFecharCaixa({ resumo, gaveta = null, aoFechar, aoConfirmar }) {
+export function ModalFecharCaixa({ resumo, gaveta = null, aoFechar, aoConfirmar, enviando = false, erro = null }) {
   const esperado = gaveta ? gaveta.naGaveta : resumo.saldoEsperado
   const [centavosContado, setCentavosContado] = useState(null)
   const conferencia = conferenciaDaGaveta(centavosContado, esperado)
@@ -28,17 +28,17 @@ export function ModalFecharCaixa({ resumo, gaveta = null, aoFechar, aoConfirmar 
     <Modal
       titulo="Fechar o caixa"
       descricao="Depois de fechado, os lançamentos de hoje não podem mais ser estornados."
-      aoFechar={aoFechar}
+      aoFechar={() => { if (!enviando) aoFechar() }}
       rodape={(
         <>
-          <Botao variante="texto" onClick={aoFechar}>Cancelar</Botao>
+          <Botao variante="texto" disabled={enviando} onClick={aoFechar}>Cancelar</Botao>
           <Botao
             variante="primario"
             icone="log-out"
-            disabled={!conferencia.pronta || moedaAltaDemais(centavosContado)}
+            disabled={enviando || !conferencia.pronta || moedaAltaDemais(centavosContado)}
             onClick={() => aoConfirmar(centavosContado / 100)}
           >
-            Fechar o caixa
+            {enviando ? 'Fechando o caixa…' : 'Fechar o caixa'}
           </Botao>
         </>
       )}
@@ -58,6 +58,7 @@ export function ModalFecharCaixa({ resumo, gaveta = null, aoFechar, aoConfirmar 
 
       <CampoMascarado
         tipo="moeda"
+        disabled={enviando}
         rotulo={gaveta ? 'Quanto você contou na gaveta (só dinheiro)' : 'Quanto você contou no caixa'}
         placeholder="Digite o que contou"
         valor={centavosContado == null ? '' : mascaraMoeda(centavosContado)}
@@ -65,6 +66,8 @@ export function ModalFecharCaixa({ resumo, gaveta = null, aoFechar, aoConfirmar 
         aoMudarDigitos={(digitos) => setCentavosContado(digitos ? Number(digitos) : null)}
         aoColarTexto={(texto) => setCentavosContado(lerMoeda(texto))}
       />
+
+      {erro && <p className={css.avisoFechado} role="alert">Não foi possível confirmar o fechamento. {erro} Confira o valor e tente novamente.</p>}
 
       {conferencia.pronta && (
         <p className={css.corpoDiferenca}>

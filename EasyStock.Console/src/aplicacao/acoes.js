@@ -268,6 +268,7 @@ export const RESGATAR_RECOMPENSA = 'resgatar-recompensa'
 // é confirmado ou recusado pela API depois do balão otimista.
 export const SINCRONIZAR_CONVERSAS = 'sincronizar-conversas'
 export const CONFIRMAR_REABERTURA_API = 'confirmar-reabertura-api'
+export const CONFIRMAR_RESPONSAVEL_API = 'confirmar-responsavel-api'
 export const SINCRONIZACAO_FALHOU = 'sincronizacao-falhou'
 export const CONFIRMAR_ENVIO_API = 'confirmar-envio-api'
 export const RECEBER_MODELO_API = 'receber-modelo-api'

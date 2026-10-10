@@ -1,3 +1,4 @@
+.campo { min-width: 0; }
 .rotulo {
   display: block; font-size: var(--t-apoio); font-weight: 600;
   color: var(--tinta-2); margin-bottom: var(--e-2); line-height: var(--lh-compacto);
@@ -5,7 +6,7 @@
 /* 44 px em todo ponteiro, igual ao botão. Campo é papel com linha fina; no
    foco a linha vira marca e ganha halo, o anel de 3 px fica para teclado. */
 .controle {
-  width: 100%; min-height: var(--toque); padding: var(--e-2) var(--e-3);
+  width: 100%; min-width: 0; max-width: 100%; min-height: var(--toque); padding: var(--e-2) var(--e-3);
   border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1);
   background: var(--papel); color: var(--tinta);
   font-size: var(--t-corpo); line-height: var(--lh-corpo);
@@ -14,6 +15,7 @@
 }
 .controle:hover:not(:disabled) { border-color: var(--linha-forte); }
 .controle:focus { outline: none; border-color: var(--marca); box-shadow: 0 0 0 4px var(--halo); }
+.controle:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
 .controle:disabled { background: var(--preenchimento); color: var(--tinta-3); }
 .controle::placeholder { color: var(--tinta-3); }
 .area { min-height: 96px; resize: vertical; }

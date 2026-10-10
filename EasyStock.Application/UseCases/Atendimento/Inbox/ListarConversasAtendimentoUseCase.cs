@@ -30,6 +30,6 @@ public sealed class ListarConversasAtendimentoUseCase(
             throw new UseCaseValidationException("Configuração de outra empresa.");
         var sla = config?.SlaRespostaMinutos ?? prazos.Value.ClienteSemRespostaMin;
         return itens.Where(i => i.Conversa.EmpresaId == query.EmpresaId)
-            .Select(i => ConversaResumoResult.De(i.Conversa, i.UltimaMensagemTexto, agora, sla, i.AguardaResposta)).ToList();
+            .Select(i => ConversaResumoResult.De(i.Conversa, i.UltimaMensagemTexto, agora, sla, i.AguardaResposta, i.AssumidaPorNome)).ToList();
     }
 }

@@ -2,7 +2,7 @@
 // com os módulos do ERP da Casa da Baba numerados como no plano (ADR-0056). O
 // módulo ligado abre pela rota; o que ainda não tem tela aparece "Em breve" e
 // não navega. Os atalhos embaixo do nome são o menu do módulo (as outras telas).
-import { Icone } from '../../componentes/Icone'
+import { MarcaIcone } from '../../componentes/MarcaIcone'
 import { useRef, useState } from 'react'
 import { Marca } from '../../componentes/Marca'
 import { CampoTexto } from '../../componentes/Campo'
@@ -11,6 +11,7 @@ import { Botao } from '../../componentes/Botao'
 import { InterruptorTema } from '../../componentes/InterruptorTema'
 import { Vazio } from '../../componentes/Vazio'
 import { filtrarModulos, hashDoModulo, modulosDoHall, saudacaoDoHall } from '../../dominio/modulos'
+import { IconeDoModulo } from './IconeDoModulo'
 import css from './hall.module.css'
 
 const doisDigitos = (n) => String(n).padStart(2, '0')
@@ -21,20 +22,20 @@ function CartaoModulo({ modulo }) {
     return (
       <li className={`${css.cartao} ${css.emBreve}`}>
         <span className={css.numero}>{doisDigitos(modulo.numero)}</span>
-        <span className={css.icone}><Icone nome={modulo.icone} tamanho={28} /></span>
+        <span className={css.icone}><IconeDoModulo modulo={modulo} tamanho={32} /></span>
         <span className={css.nome}>{modulo.nome}</span>
         <span className={css.resumo}>{modulo.resumo}</span>
-        <span className={css.selo}><Icone nome="lock" tamanho={16} /> Em breve</span>
+        <span className={css.selo}><MarcaIcone nome="bloqueado" tamanho={20} /> Em breve</span>
       </li>
     )
   }
   return (
     <li className={css.cartao}>
       <span className={css.numero}>{doisDigitos(modulo.numero)}</span>
-      <span className={css.icone}><Icone nome={modulo.icone} tamanho={28} /></span>
+      <span className={css.icone}><IconeDoModulo modulo={modulo} tamanho={32} /></span>
       <a className={css.abrir} href={modulo.href}>
         <span className={css.nome}>{modulo.nome}</span>
-        <Icone nome="chevron-right" tamanho={20} />
+        <MarcaIcone nome="proximo" tamanho={20} />
       </a>
       <span className={css.resumo}>{modulo.resumo}</span>
       {atalhos.length > 0 && (
