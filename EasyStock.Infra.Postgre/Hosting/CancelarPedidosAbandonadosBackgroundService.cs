@@ -1,4 +1,4 @@
-﻿using EasyStock.Application.Events.Storefront.Handlers;
+using EasyStock.Application.Events.Storefront.Handlers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Events.Storefront;
@@ -65,7 +65,7 @@ public sealed class CancelarPedidosAbandonadosBackgroundService(
         {
             try
             {
-                await CancelarAsync(expirado.Id, expirado.EmpresaId, ct);
+                await CancelarAbandonadoAsync(expirado.Id, expirado.EmpresaId, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -81,7 +81,7 @@ public sealed class CancelarPedidosAbandonadosBackgroundService(
     /// <c>xmin</c> (a lista da varredura é sem rastreio) e uma falha não contamina os seguintes. Pedido que
     /// saiu de <c>AguardandoPagamento</c> no meio do caminho (pago, cobrado) fica como está.
     /// </summary>
-    private async Task CancelarAsync(Guid pedidoId, Guid empresaId, CancellationToken ct)
+    public async Task CancelarAbandonadoAsync(Guid pedidoId, Guid empresaId, CancellationToken ct = default)
     {
         using var scope = scopeFactory.CreateScope();
         var services = scope.ServiceProvider;
@@ -95,12 +95,14 @@ public sealed class CancelarPedidosAbandonadosBackgroundService(
         pedido.Status = StatusPedidoMapper.Cancelado;
         pedido.CanceladoEm = DateTime.UtcNow;
         pedido.AlteradoEm = DateTime.UtcNow;
-        await pedidoRepo.UpdateAsync(pedido, ct);
 
+        // #1302: a liberação só marca a entidade. Vem antes do UpdateAsync, o único SaveChanges
+        // do escopo, para o pedido cancelado e a vaga liberada gravarem juntos.
         var handler = new LiberarVagaOnPedidoCanceladoHandler(
             services.GetRequiredService<IVagaOcupadaRepository>(),
             services.GetRequiredService<ILogger<LiberarVagaOnPedidoCanceladoHandler>>());
         await handler.HandleAsync(new PedidoCanceladoEvent(pedido.Id, Guid.Empty, "Timeout 30 min sem pagamento"), ct);
+        await pedidoRepo.UpdateAsync(pedido, ct);
 
         logger.LogInformation("CancelarPedidosAbandonados cancelado pedidoId={PedidoId}.", pedido.Id);
     }
