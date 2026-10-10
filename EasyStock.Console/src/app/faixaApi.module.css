@@ -23,6 +23,14 @@
   background: var(--erro-pastel);
 }
 
+.avisoModal {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2);
+  width: 100%; padding: var(--e-3); border-radius: var(--r-1);
+  background: var(--alerta-pastel); color: var(--tinta);
+  font-size: var(--t-apoio);
+}
+.avisoModal > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+
 .quem {
   display: flex;
   gap: 12px;

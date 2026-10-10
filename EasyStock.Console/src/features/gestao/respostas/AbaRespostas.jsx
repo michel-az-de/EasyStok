@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoArea, CampoTexto } from '../../../componentes/Campo'
@@ -10,10 +10,7 @@ import { plural } from '../../../dominio/formato'
 import { gerarAtalho, normalizarBusca } from '../../../dominio/respostas'
 import css from './abaRespostas.module.css'
 
-// Aba "Respostas e automáticas" da Gestão (#1441). Saiu do caminho do atendimento:
-// lá fica só o seletor rápido. Aqui a dona cria, edita e arquiva as respostas
-// prontas e liga, desliga e escreve as mensagens automáticas. Lista densa, uma
-// linha por item, ações em texto; o formulário só abre na linha que ela escolheu.
+// Mesmo editor na janela contextual do Balcão e na rota direta de Atendimento.
 
 // A ação do modo API devolve `false` quando não gravou (o aviso já foi para a faixa);
 // a da demonstração não devolve nada. Nos dois casos sem `false`, o formulário fecha.
@@ -144,8 +141,9 @@ function SecaoRespostas() {
   )
 }
 
-function LinhaAutomatica({ regra, fonteApi }) {
+function LinhaAutomatica({ regra, fonteApi, emFoco }) {
   const { alternarRegra, editarRegra } = useAcoes()
+  const linhaRef = useRef(null)
   const [rascunho, setRascunho] = useState(null)
   const [salvando, setSalvando] = useState(false)
   const editando = rascunho !== null
@@ -153,13 +151,23 @@ function LinhaAutomatica({ regra, fonteApi }) {
   // #1474: no modo API a saudação de Horários e mensagens sai sempre na primeira mensagem.
   const avisoEntrada = fonteApi ? avisoDaAutomaticaDeEntrada(regra) : null
 
+  useEffect(() => {
+    if (!emFoco) return
+    const quadro = requestAnimationFrame(() => {
+      linhaRef.current?.focus({ preventScroll: true })
+      linhaRef.current?.scrollIntoView({ block: 'center' })
+    })
+    return () => cancelAnimationFrame(quadro)
+  }, [emFoco])
+
   function salvar() {
     setSalvando(true)
     depois(editarRegra(regra.id, { texto: rascunho.trim() }), () => setRascunho(null)).finally(() => setSalvando(false))
   }
 
   return (
-    <li className={`${css.linha} ${regra.ativa ? '' : css.desligada}`}>
+    <li ref={linhaRef} tabIndex={emFoco ? -1 : undefined}
+      className={`${css.linha} ${regra.ativa ? '' : css.desligada} ${emFoco ? css.emFoco : ''}`}>
       <div className={css.resumo}>
         <span className={css.titulo}>{regra.nome}</span>
         <label className={`${css.chave} ${css.chaveLinha}`}>
@@ -212,7 +220,7 @@ function LinhaAutomatica({ regra, fonteApi }) {
   )
 }
 
-function SecaoAutomaticas() {
+function SecaoAutomaticas({ focoInicial }) {
   const { regras, fonteApi, cargaDasRegras } = useAtendimento()
   // #1474: lista vazia não é "carregando": separa a espera, o erro e o vazio de verdade.
   const vazio = cargaDasRegras?.estado === 'carregando'
@@ -235,18 +243,18 @@ function SecaoAutomaticas() {
         <p className={css.vazio} role={cargaDasRegras?.estado === 'erro' ? 'alert' : undefined}>{vazio}</p>
       ) : (
         <ul className={css.lista}>
-          {regras.map((r) => <LinhaAutomatica key={r.id} regra={r} fonteApi={fonteApi} />)}
+          {regras.map((r) => <LinhaAutomatica key={r.id} regra={r} fonteApi={fonteApi} emFoco={focoInicial === `regra-${r.id}`} />)}
         </ul>
       )}
     </section>
   )
 }
 
-export function AbaRespostas() {
+export function AbaRespostas({ focoInicial = null }) {
   return (
     <div className={css.aba}>
       <SecaoRespostas />
-      <SecaoAutomaticas />
+      <SecaoAutomaticas focoInicial={focoInicial} />
     </div>
   )
 }

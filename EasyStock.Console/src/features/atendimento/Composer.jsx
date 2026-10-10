@@ -34,6 +34,7 @@ export function Composer({
   // (prop `portal` do Popover.jsx) mede o retângulo de `campoRef` por dentro
   // do próprio componente agora; aqui só sobra a ref.
   const campoRef = useRef(null)
+  const respostasRef = useRef(null)
 
   // Frente Anexos (rodada 7, pedido do dono 24/09/2026 04h12): anexo de
   // arquivo em espera (prévia antes de enviar) e o gravador de áudio.
@@ -191,7 +192,10 @@ export function Composer({
                   do próprio Popover) e planta o conteúdo em document.body,
                   fora do recorte de `.composer`. Visual idêntico ao de antes,
                   só que agora fora do overflow. */}
-              {barra.aberto && <SeletorRespostas seletor={barra} aoGerenciar={aoAbrirBiblioteca} />}
+              {barra.aberto && <SeletorRespostas seletor={barra} aoGerenciar={() => {
+                if (!barra.pelaBarra) respostasRef.current?.focus()
+                aoAbrirBiblioteca?.()
+              }} />}
             </div>
 
             <div className={css.acoes}>
@@ -202,6 +206,7 @@ export function Composer({
                   no trilho (ícone e palavra juntos); os vizinhos (Anexar,
                   Fotos, Cardápio, Nota, Enviar) continuam ícone só. */}
               <Botao
+                ref={respostasRef}
                 disabled={!podeEscrever}
                 aria-haspopup="listbox"
                 aria-expanded={barra.aberto}

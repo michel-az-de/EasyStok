@@ -6,6 +6,20 @@ namespace EasyStock.Infra.Postgre.Repositories
 {
     public sealed class PedidoRepository(EasyStockDbContext db) : IPedidoRepository
     {
+        public Task<bool> TemEstornoOnlineAsync(Guid empresaId, Guid pagamentoId, CancellationToken ct = default) =>
+            db.Set<PedidoEstornoOnline>().AnyAsync(e => e.EmpresaId == empresaId && e.PagamentoId == pagamentoId, ct);
+
+        public async Task<IReadOnlyList<PedidoEstornoManual>> ListarEstornosManuaisAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default) =>
+            await db.Set<PedidoEstornoManual>().AsNoTracking()
+                .Where(e => e.EmpresaId == empresaId && e.PedidoId == pedidoId)
+                .OrderBy(e => e.RegistradoEm).ThenBy(e => e.Id).ToListAsync(ct);
+
+        public Task AdicionarEstornoManualAsync(PedidoEstornoManual estorno)
+        {
+            db.Set<PedidoEstornoManual>().Add(estorno);
+            return Task.CompletedTask;
+        }
+
         public async Task TravarAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default)
         {
             if (db.Database.CurrentTransaction is null)
@@ -69,7 +83,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
             var agora = DateTime.UtcNow;
 
-            query = sort?.ToLowerInvariant() switch
+            var ordenada = sort?.ToLowerInvariant() switch
             {
                 // Cockpit (#591): abertos antes de terminais → o cap de pagina nunca
                 // descarta pedido ativo; refino atrasado/agendado/recencia por cima.
@@ -80,7 +94,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 _         => desc ? query.OrderByDescending(p => p.CriadoEm)  : query.OrderBy(p => p.CriadoEm),
             };
 
-            var pedidos = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            var pedidos = await ordenada.ThenByDescending(p => p.Id)
+                .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
             return (pedidos, total);
         }
 

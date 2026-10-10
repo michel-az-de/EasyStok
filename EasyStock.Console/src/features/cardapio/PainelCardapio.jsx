@@ -23,7 +23,7 @@ import {
 } from '../../dominio/vitrineCardapio'
 import { lerMoeda, mascaraMoeda, moeda, moedaAltaDemais } from '../../dominio/formato'
 import {
-  agruparPorLinha, itensDetalhados, numeroCurto, totalDoPedido,
+  agruparPorLinha, itensDetalhados, numeroDaComanda, totalDoPedido,
 } from '../../dominio/pedido'
 import { diferencaAposPagamento } from '../../dominio/pagamento'
 import { corpoDasPorcoes, erroDasPorcoes, porcoesMudaram, rascunhoDasPorcoes, resumoDoItem } from '../../dominio/porcoes'
@@ -142,9 +142,9 @@ function ItemEscolher({
             </small>
           </span>
           <span className={css.preco}>{moeda(item.preco)}</span>
-          {quantos === 0 && (
+          <span className={css.somar}>
             <Icone nome="mais" rotulo={'Somar ' + item.nome + ' na comanda, ou arrastar até a comanda'} />
-          )}
+          </span>
         </button>
 
         {/* Pílula "N na comanda" + "−" (seção 3.1): desfazer um toque errado
@@ -228,7 +228,7 @@ function ItemEscolher({
       )}
 
       <details className={css.detalhe}>
-        <summary>Porção, linha e adicionais</summary>
+        <summary><Icone nome="chevron-down" tamanho={16} /> Detalhes do prato</summary>
         <FichaDoItem
           item={item}
           linhas={linhas}
@@ -428,6 +428,7 @@ function Gerir({
 // do último prato somado porque quem está de olho na tela do cardápio,
 // não na comanda, precisa ouvir a confirmação, não só ver o número mudar.
 function RodapeComanda({ pedido, cardapio, linhas }) {
+  const { fonteApi } = useAtendimento()
   const [aberto, setAberto] = useState(false)
   const [eco, setEco] = useState('')
   const totalAnteriorRef = useRef(null)
@@ -468,7 +469,7 @@ function RodapeComanda({ pedido, cardapio, linhas }) {
         onClick={() => setAberto((v) => !v)}
       >
         <span className={css.rodapeTitulo}>
-          Comanda {numeroCurto(pedido.numero)} · {qtdItens} {qtdItens === 1 ? 'item' : 'itens'}
+          Comanda {numeroDaComanda(pedido, { fonteApi }) ?? 'em rascunho'} · {qtdItens} {qtdItens === 1 ? 'item' : 'itens'}
         </span>
         <span className={`${css.rodapeTotal} ${somaEmDestaque ? css.rodapeTotalSomando : ''}`}>
           {somaEmDestaque != null && <b className={css.rodapeSoma}>+ {moeda(somaEmDestaque)}</b>}
@@ -770,6 +771,19 @@ export function PainelCardapio({
   useEffect(() => {
     focoAnterior.current = document.activeElement
     fecharRef.current?.focus()
+    return () => {
+      if (focoAnterior.current?.isConnected) focoAnterior.current.focus()
+      else {
+        const comanda = document.getElementById('comanda-pedido')
+        comanda?.focus({ preventScroll: true })
+        comanda?.scrollIntoView({ block: 'start' })
+      }
+    }
+  }, [])
+
+  const temPedido = Boolean(pedido)
+  useEffect(() => {
+    if (!temPedido) return
     // Seção 3.1: abrir o cardápio rola a Ficha até a comanda, pra ela ficar
     // ao lado do painel em vez de escondida acima da dobra. `id` compartilhado
     // por atributo (não por import) porque cardápio e ficha-cliente são
@@ -783,9 +797,8 @@ export function PainelCardapio({
       ?.scrollIntoView({ behavior: reduzMovimento ? 'auto' : 'smooth', block: 'nearest' }))
     return () => {
       clearTimeout(rolar)
-      if (focoAnterior.current?.isConnected) focoAnterior.current.focus()
     }
-  }, [])
+  }, [temPedido])
 
   const ativos = itensAtivos(cardapio)
   const removidos = itensRemovidos(cardapio)

@@ -4,8 +4,8 @@
   border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--elevado); transition: background var(--dur-curta) var(--ease-padrao);
 }
 .linha:hover { background: var(--papel); }
-.nome { flex: 1; min-width: 120px; font-size: var(--t-corpo); }
-.nome small { display: block; color: var(--tinta-3); font-size: var(--t-apoio); }
+.nome { flex: 1; min-width: 0; font-size: var(--t-corpo); font-weight: 600; overflow-wrap: anywhere; }
+.nome small { display: block; color: var(--tinta-3); font-size: var(--t-apoio); font-weight: 400; }
 .preco { font-family: var(--f-dado); font-size: var(--t-apoio); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .lista { list-style: none; margin: 0; padding: 0; }
@@ -41,10 +41,11 @@
 
 .detalhe { margin: 0 0 var(--e-3); padding: 0 var(--e-3); font-size: var(--t-apoio); }
 .detalhe summary {
-  min-height: var(--toque); display: flex; align-items: center;
+  min-height: var(--toque); display: flex; align-items: center; gap: var(--e-1);
   color: var(--tinta-3); font-size: var(--t-apoio);
 }
 .detalhe summary:hover { color: var(--tinta); }
+.detalhe[open] summary svg { transform: rotate(180deg); }
 
 .ficha { display: flex; gap: var(--e-3); flex-wrap: wrap; padding-bottom: var(--e-2); }
 .carta { width: 160px; border-radius: var(--r-1); flex-shrink: 0; }
@@ -116,7 +117,7 @@
    ancorado à Ficha, sem cortina, com a própria alça de largura à esquerda.
    --------------------------------------------------------------------------- */
 .painel {
-  position: fixed; top: 0; bottom: 0; z-index: 45;
+  position: absolute; top: 0; bottom: 0; z-index: 45;
   display: flex; align-items: stretch;
   background: var(--papel); box-shadow: var(--sombra-alta);
   border-left: var(--b-1) solid var(--linha);
@@ -149,15 +150,13 @@
    errado sem sair do cardápio. `.ajusteNaLinha` é IRMÃO do <button> da linha
    (ver PainelCardapio.jsx: botão dentro de botão não existe em HTML), com
    largura própria ao lado dele — nunca por cima, nunca disputando espaço com
-   nome/preço por posição absoluta. `flex-wrap` deixa o grupo cair pra uma
-   segunda linha sozinho se o painel estiver estreito, em vez de espremer ou
-   cortar texto. */
-.linhaComAjuste { display: flex; flex-wrap: wrap; gap: var(--e-2); margin-bottom: var(--e-2); }
-.linhaComAjuste .linha { flex: 1; min-width: 220px; margin-bottom: 0; }
+   nome/preço por posição absoluta. O grid mantém o ajuste em uma segunda
+   linha, sem espremer ou cortar o texto do prato. */
+.linhaComAjuste { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--e-1); margin-bottom: var(--e-2); }
+.linhaComAjuste .linha { grid-column: 1 / -1; min-width: 0; margin-bottom: 0; }
 .ajusteNaLinha {
-  flex-shrink: 0; display: flex; align-items: center; gap: var(--e-2);
-  padding: var(--e-2); border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
-  background: var(--fundo);
+  display: flex; align-items: center; gap: var(--e-2); justify-self: start;
+  padding: var(--e-1) var(--e-2);
 }
 .botaoMenosCardapio {
   width: var(--toque); height: var(--toque); flex-shrink: 0;
@@ -180,10 +179,10 @@
 }
 .rodapeTitulo {
   flex: 1; min-width: 0; font-size: var(--t-corpo); font-weight: 600;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .rodapeTotal {
-  display: flex; align-items: baseline; gap: var(--e-2);
+  display: flex; flex-direction: column; align-items: flex-end; gap: 0; white-space: nowrap;
   font-family: var(--f-dado); font-size: var(--t-valor); font-weight: 600;
   padding: 2px var(--e-2); border-radius: var(--r-1);
   transition: background-color var(--dur-longa) var(--ease-padrao);
@@ -193,7 +192,7 @@
    transição a quase zero, então quem pediu menos movimento só troca o
    número, sem piscar de verdade. */
 .rodapeTotalSomando { background: var(--sucesso-pastel); }
-.rodapeSoma { color: var(--sucesso); font-family: var(--f-dado); font-size: var(--t-corpo); font-weight: 700; }
+.rodapeSoma { color: var(--sucesso); font-family: var(--f-dado); font-size: var(--t-micro); font-weight: 700; }
 
 .rodapeAcrescimo {
   display: flex; gap: var(--e-2); align-items: center; margin: 0;
@@ -307,12 +306,23 @@
 }
 .categoria span { font-family: var(--f-dado); font-weight: 400; color: var(--tinta-3); }
 
-/* Linha do item: sem moldura própria, a divisória separa. */
+/* A quantidade ocupa uma faixa própria, sem estreitar nome, foto ou preço. */
 .lista .linha {
-  margin-bottom: 0; padding: var(--e-2); border: 0; background: transparent;
+  display: grid; grid-template-columns: 56px minmax(0, 1fr) 32px;
+  column-gap: var(--e-3); row-gap: var(--e-1); align-items: center;
+  margin-bottom: 0; padding: var(--e-3); background: var(--papel);
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
 }
 .lista .linha:hover:not(:disabled) { background: var(--elevado); }
-.lista .linhaComAjuste { margin-bottom: 0; border-bottom: var(--b-1) solid var(--linha); padding: var(--e-1) 0; }
+.lista .linha .foto { grid-row: 1 / 3; }
+.lista .linha .nome { grid-column: 2; grid-row: 1; }
+.lista .linha .preco { grid-column: 2; grid-row: 2; white-space: nowrap; }
+.somar {
+  grid-column: 3; grid-row: 1 / 3; width: 32px; height: 32px;
+  display: grid; place-items: center; border-radius: var(--r-pilula);
+  background: var(--marca-claro); color: var(--marca-forte);
+}
+.lista .linhaComAjuste { margin-bottom: 0; padding: var(--e-1) 0; }
 .foto {
   width: 56px; height: 56px; flex-shrink: 0; object-fit: cover;
   border-radius: var(--r-1); background: var(--elevado);
@@ -320,6 +330,7 @@
 .carta, .miniatura { aspect-ratio: 16 / 10; object-fit: cover; background: var(--elevado); }
 
 .enviarFoto {
+  grid-column: 2; grid-row: 2;
   flex-shrink: 0; align-self: center; width: var(--toque); height: var(--toque);
   display: grid; place-items: center; background: none; border: 0;
   border-radius: var(--r-1); color: var(--tinta-2);

@@ -42,7 +42,8 @@ public sealed class MercadoPagoWebhookProcessor(
     IMercadoPagoClient mercadoPagoClient,
     ConfirmarPagamentoPedidoUseCase confirmarPagamento,
     AtualizarCobrancaPorPagamentoUseCase atualizarCobranca,
-    ILogger<MercadoPagoWebhookProcessor> logger) : IGatewayWebhookProcessor
+    ILogger<MercadoPagoWebhookProcessor> logger,
+    IEstornosOnlineService estornosOnline) : IGatewayWebhookProcessor
 {
     public const string TopicoPagamento = "payment";
 
@@ -74,10 +75,15 @@ public sealed class MercadoPagoWebhookProcessor(
                 pagamento.PaymentMethodId, pagamento.PaymentTypeId, pagamento.DateApproved), ct);
             logger.LogInformation("Webhook MercadoPago: pagamento {PagamentoId} pedido {PedidoId} confirmacao={Situacao}",
                 pagamentoId, pedidoId, r.Situacao);
+            if (pagamento.TransactionAmountRefunded > 0)
+                await estornosOnline.SincronizarPagamentoAsync(pagamento, ct);
             return r.Situacao is SituacaoConfirmacaoPagamento.SemCobranca or SituacaoConfirmacaoPagamento.PedidoNaoEncontrado
                 ? ResultadoWebhookGateway.Falha("pedido_sem_cobranca")
                 : ResultadoWebhookGateway.Ok;
         }
+
+        if (pagamento.Estornado && await estornosOnline.SincronizarPagamentoAsync(pagamento, ct))
+            return ResultadoWebhookGateway.Ok;
 
         var situacao = await atualizarCobranca.ExecuteAsync(
             new AtualizarCobrancaPorPagamentoInput(pedidoId, pagamentoId, pagamento.Status, pagamento.StatusDetail), ct);

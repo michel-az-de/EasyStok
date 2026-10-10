@@ -21,7 +21,7 @@ import { ResumoEntregas } from '../features/entregas/ResumoEntregas'
 import { Sininho } from '../features/lembretes/Sininho'
 import { Popover } from '../componentes/Popover'
 import { FONTE_API } from '../infra/fonteDados'
-import { HASH_MODULO_COZINHA, HASH_MODULO_ENTREGAS } from '../dominio/rota'
+import { HASH_MODULO_COZINHA } from '../dominio/rota'
 import css from './moldura.module.css'
 
 // Título de coluna sem ícone: quando todo título tem ícone, ícone nenhum marca.
@@ -88,8 +88,7 @@ function MenuMais({
         // Automáticas, e a 390 px isso empurrava "Mais" para fora da tela.
         // O botão saiu do topo; o caminho para Gestão no celular/tablet
         // estreito passa a ser só por aqui.
-        // #1447: a Gestão virou o hall de módulos; o item leva para lá.
-        { chave: '__gestao', titulo: 'Módulos', detalhe: 'Cozinha, entregas, financeiro e os outros módulos' },
+        { chave: '__gestao', titulo: 'Gestão', detalhe: 'Cardápio, produção e caixa sem sair do Balcão' },
       ].filter((item) => item.chave !== '__entregas' || permite('entregas')),
     },
     grupoDoDia(emAndamento, naEsteira),
@@ -97,6 +96,7 @@ function MenuMais({
 
   function escolher(item) {
     fechar()
+    if (item.chave === '__entregas' || item.chave === '__gestao') refBotao.current?.focus()
     if (item.chave === '__entregas') aoAbrirEntregas()
     if (item.chave === '__gestao') aoAbrirGestao()
     if (item.chave === '__claro') trocarTema('light')
@@ -139,18 +139,14 @@ function MenuMais({
 // que já existe: assim ela sempre acha o mesmo controle, larga ou estreita a
 // tela, sem duplicar o item em dois menus.
 //
-// #1474: no modo API a Cozinha lê o KDS sozinha (não depende desta janela), e a janela
-// avulsa em `#/cozinha` não tinha como voltar. Abre a tela do módulo, com "← Módulos".
+// Mantém o atendimento aberto. O KDS da API continua usando a rota protegida do módulo.
 function abrirCozinha() {
-  if (FONTE_API) {
-    window.location.hash = HASH_MODULO_COZINHA
-    return
-  }
-  const janela = window.open('#/cozinha', 'cdb-cozinha', 'width=1280,height=900')
+  const destino = FONTE_API ? HASH_MODULO_COZINHA : '#/cozinha'
+  const janela = window.open(destino, 'cdb-cozinha', 'width=1280,height=900')
   // Issue #40 (rodada 13, achado da varredura): popup bloqueado devolve
   // `null` e nada acontece. Cai para a mesma aba: `App.jsx` agora reage à
   // troca de hash (useHash), então a Cozinha aparece de qualquer jeito.
-  if (!janela) window.location.hash = '#/cozinha'
+  if (!janela) window.location.hash = destino
 }
 
 // Estado da loja (pedido do dono, 24/09/2026): um toque, Aberta ou Fechada,
@@ -191,7 +187,7 @@ function Cabecalho({
             da direção visual). A faixa de lembretes abaixo do topo saiu. */}
         <Sininho />
         {notificacoes}
-        {permite('cozinha') && <Botao variante="texto" icone="cooking-pot" onClick={abrirCozinha}>
+        {permite('cozinha') && <Botao variante="texto" icone="cooking-pot" onClick={abrirCozinha} title="Cozinha (abre em outra janela)">
           Cozinha
         </Botao>}
         {/* Achado 6, P3 (banca 10): no celular a regra `.controles > button`
@@ -210,9 +206,9 @@ function Cabecalho({
             topo largo (tablet 1024-1179 px, sem MenuMais); no compacto,
             Gestão mudou para dentro do Mais logo abaixo. */}
         {!compacto && (
-          <Botao icone="painel" onClick={aoAbrirGestao} aria-label="Módulos">
-            <span className={css.rotuloLongo}>Módulos</span>
-            <span className={css.rotuloCurto} aria-hidden="true">Módulos</span>
+          <Botao icone="painel" onClick={aoAbrirGestao} aria-label="Gestão" aria-haspopup="dialog">
+            <span className={css.rotuloLongo}>Gestão</span>
+            <span className={css.rotuloCurto} aria-hidden="true">Gestão</span>
           </Botao>
         )}
         {compacto ? (
@@ -262,12 +258,11 @@ function Trilho({
         <Icone nome="inbox" tamanho={22} />
         <span>Balcão</span>
       </span>
-      {/* #1474: no modo API Entregas abre a tela do módulo (com "← Módulos"), não a gaveta. */}
       {permite('entregas') && <ResumoEntregas
-        aoAbrir={FONTE_API ? () => { window.location.hash = HASH_MODULO_ENTREGAS } : aoAbrirEntregas}
+        aoAbrir={aoAbrirEntregas}
         noTrilho classeItem={css.itemTrilho} classeSelo={css.seloTrilho}
       />}
-      {permite('cozinha') && <Botao variante="texto" className={css.itemTrilho} onClick={abrirCozinha} title={FONTE_API ? 'Cozinha' : 'Cozinha (abre em outra janela)'}>
+      {permite('cozinha') && <Botao variante="texto" className={css.itemTrilho} onClick={abrirCozinha} title="Cozinha (abre em outra janela)">
         <Icone nome="cooking-pot" tamanho={22} />
         <span>Cozinha</span>
       </Botao>}
@@ -276,13 +271,9 @@ function Trilho({
         <span>Automáticas</span>
         {regras && <span className={css.contaTrilho} aria-hidden="true">{contarAtivas(regras)}</span>}
       </Botao>
-      {/* Casca da rodada 13: item de navegação novo, logo abaixo de
-          Automáticas, para as 5 frentes da rodada terem um lugar comum sem
-          mexer em navegação de novo depois. Desde a #1447 leva ao hall de
-          módulos (o modal Gestão saiu). */}
-      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirGestao} title="Módulos">
+      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirGestao} title="Gestão" aria-haspopup="dialog">
         <Icone nome="painel" tamanho={22} />
-        <span>Módulos</span>
+        <span>Gestão</span>
       </Botao>
       <div className={css.sinoTrilho}><Sininho /></div>
       <div className={css.avisosTrilho}>{notificacoes}</div>
@@ -500,6 +491,7 @@ export function Moldura({
             </Gaveta>
           )}
         </div>
+        <div className={css.slotFila} data-fila-canhotos="" />
         <footer className={css.rodape}>
           <Botao ref={botaoFichaRef} onClick={() => setGavetaAberta(true)}>
             Ficha de {selecionada?.nome.split(' ')[0] ?? 'cliente'}
@@ -528,9 +520,16 @@ export function Moldura({
           id="painel-da-aba"
           aria-labelledby={`aba-${aba}`}
         >
+          {aba !== 'atendimento' && (
+            <header className={`${css.tituloColuna} ${css.tituloCompacto}`}>
+              <span>{aba === 'ficha' ? `Ficha de ${selecionada?.nome.split(' ')[0] ?? 'cliente'}` : 'Balcão'}</span>
+              <span className={css.espaco} data-ancora-assistente />
+            </header>
+          )}
           {painelDaAba[aba]}
         </section>
       </div>
+      <div className={css.slotFila} data-fila-canhotos="" />
       <BarraDeAbas
         ativa={aba}
         aoTrocar={setAba}

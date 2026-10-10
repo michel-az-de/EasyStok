@@ -9,6 +9,12 @@ namespace EasyStock.Infra.Integrations.Pagamentos.MercadoPago;
 /// </summary>
 public sealed class StubMercadoPagoClient(ILogger<StubMercadoPagoClient> logger) : IMercadoPagoClient
 {
+    public Task<EstornoMercadoPagoResult?> ConsultarEstornoAsync(string pagamentoId, string estornoId, CancellationToken ct = default) =>
+        Task.FromResult<EstornoMercadoPagoResult?>(null);
+
+    public Task<IReadOnlyList<EstornoMercadoPagoResult>> ListarEstornosAsync(string pagamentoId, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<EstornoMercadoPagoResult>>([]);
+
     public Task<PreferenceCriadaResult> CriarPreferenceAsync(
         CriarPreferenceCommand command,
         CancellationToken ct = default)

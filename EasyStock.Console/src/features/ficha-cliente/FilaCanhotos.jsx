@@ -86,14 +86,19 @@ export function FilaCanhotos() {
     setFila((atual) => atual.slice(1))
   }
 
-  // Fixa no canto de baixo, a gaveta cobria o botão principal da esteira e o
-  // "Abrir cardápio" da ficha. #1474: na linha de título ela cobria o "Ficha" e o
-  // topo da coluna. No arranjo de três colunas ela mora no pé da Ficha, no fluxo
-  // da coluna (o lugar reservado em app/Moldura.jsx), sem cobrir nada; sem ele
-  // (ficha em gaveta, celular), volta para o canto.
-  const peDaFicha = typeof document === 'undefined'
-    ? null
-    : document.querySelector('[data-fila-canhotos]')
+  // Lugar reservado em cada arranjo, sem cobrir a navegação nem a Cobrança.
+  // Redimensionar troca esse nó; a fila global continua montada e conserva os canhotos.
+  const [peDaFicha, setPeDaFicha] = useState(null)
+  useEffect(() => {
+    const atualizar = () => {
+      const destino = document.querySelector('[data-fila-canhotos]')
+      setPeDaFicha((atual) => (atual === destino ? atual : destino))
+    }
+    const observador = new MutationObserver(atualizar)
+    observador.observe(document.body, { childList: true, subtree: true })
+    atualizar()
+    return () => observador.disconnect()
+  }, [])
 
   const gaveta = fila.length > 0 && (
     <output className={peDaFicha ? css.gavetaNoPe : css.gavetaCanhoto} aria-live="polite">

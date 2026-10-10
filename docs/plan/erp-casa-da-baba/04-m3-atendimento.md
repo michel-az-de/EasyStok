@@ -1,6 +1,6 @@
 # M3 Atendimento · balcão, pedidos, clientes, canais, status e histórico
 
-> **Atualização de 09/10/2026:** cancelamento operacional pela Ficha implementado e homologado localmente, com motivo, persistência e D3-04 decidida por Felipe. Com qualquer pagamento, inclusive parcial, só Dona/gerente cancela. Cancelar pela Ficha não executa estorno financeiro nem avisa automaticamente o cliente. Evidência e limites na [seção 23 do plano de ondas](11-levantamento-e-ondas-2026-10-09.md#23-continuação-cancelamento-operacional-na-ficha-09102026). M3.3 continua parcial.
+> **Atualização de 09/10/2026:** devolução manual pela Ficha implementada e homologada localmente, inclusive em pedido cancelado. Dona/gerente confirma que já devolveu o valor, informa motivo, meio e comprovante/referência; a saída entra no Caixa e preserva o recebimento original. Parciais, concorrência e retomada após falha de rede conferidas. Estorno pelo Mercado Pago permanece pendente na Ficha. Evidência na seção 25 do plano de ondas. Cancelamento operacional conserva D3-04: Atendimento sem pagamento; com qualquer valor recebido, só Dona/gerente. Cancelar não devolve dinheiro nem avisa automaticamente o cliente. M3.3 continua parcial.
 
 Issue: #1316 · Decisão: [ADR-0056](../../adr/0056-erp-da-casa-da-baba-front-unico.md) · Data: 2026-10-01
 Base medida: master `b713263a`. Plano irmão (dono de S01–S53 e F01–F18):
@@ -327,3 +327,9 @@ F10 ─► M3.8 lembrete agendado (junto com M8.2)            M3.9 só depois de
 **Já decidido (01/10), registrado para não reabrir:** pedido do checkout do site entra no balcão pela
 conversa `ChatSite` do cliente, com o pedido na Ficha, igual ao WhatsApp. Fatia dona: SI.6
 ([10-site-e-impressos.md](10-site-e-impressos.md)).
+
+**D3-05 · Devolução de dinheiro, Pix direto ou maquininha fora do Mercado Pago. Decidido por Felipe em 09/10/2026.**
+- Dona/gerente confirma que já devolveu o valor e informa motivo e comprovante/referência. O sistema registra a saída no Caixa.
+- A Ficha permite selecionar o recebimento e registrar valor parcial ou total, além do meio efetivamente usado na devolução. Atendimento consulta o histórico, sem confirmar devoluções.
+- Registro manual não transfere dinheiro nem aciona o provedor. Recebimentos do Mercado Pago são recusados neste caminho. Estorno online e devolução manual têm execuções separadas.
+- A saída tem a data do registro, exige Caixa do dia sem fechamento e não apaga o pagamento original. Correção de devolução e reabertura de Caixa permanecem fora desta fatia.

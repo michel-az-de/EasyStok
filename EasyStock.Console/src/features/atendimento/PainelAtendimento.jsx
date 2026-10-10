@@ -107,7 +107,7 @@ export function PainelAtendimento({
             </small>
           </h2>
         </span>
-        <div className={css.direita}>
+        <div className={css.direita} data-ancora-assistente>
           {/* Assumir e devolver ao automático moram na BarraModo, um lugar só.
               Aqui em cima fica o que é estado da conversa: bloqueio, encerrar
               e reabrir. */}

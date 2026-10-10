@@ -15,10 +15,14 @@ public sealed class RepositoryAsyncFailureTests
     [Theory]
     [InlineData("receitas", false)]
     [InlineData("relatorios", false)]
-    [InlineData("avaliacoes", false)]
+    [InlineData("pedidos-storefront", false)]
+    [InlineData("etiquetas-sistema", false)]
+    [InlineData("etiquetas-empresa", false)]
     [InlineData("receitas", true)]
     [InlineData("relatorios", true)]
-    [InlineData("avaliacoes", true)]
+    [InlineData("pedidos-storefront", true)]
+    [InlineData("etiquetas-sistema", true)]
+    [InlineData("etiquetas-empresa", true)]
     public async Task Consulta_propaga_falha_original_sem_AggregateException(string consulta, bool cancelamento)
     {
         Exception falha = cancelamento
@@ -35,8 +39,10 @@ public sealed class RepositoryAsyncFailureTests
                 .GetOndeInsumoAsync(Guid.NewGuid(), Guid.NewGuid()),
             "relatorios" => async () => await new ReportRunRepository(db)
                 .ListMineAsync(Guid.NewGuid(), Guid.NewGuid(), new ReportListFilter(), 0, 10, CancellationToken.None),
-            "avaliacoes" => async () => await new PedidoStorefrontRepository(db)
-                .GetEntreguesElegiveisPraAvaliacaoAsync(DateTime.UtcNow),
+            "pedidos-storefront" => async () => await new PedidoStorefrontRepository(db)
+                .GetAguardandoPagamentoExpiradosAsync(DateTime.UtcNow),
+            "etiquetas-sistema" => async () => await new EtiquetaTemplateRepository(db).ListSistemaAsync(),
+            "etiquetas-empresa" => async () => await new EtiquetaTemplateRepository(db).ListEmpresaAsync(Guid.NewGuid()),
             _ => throw new ArgumentOutOfRangeException(nameof(consulta))
         };
 
@@ -46,6 +52,10 @@ public sealed class RepositoryAsyncFailureTests
 
     private sealed class FalhaAoAbrirConexao(Exception falha) : DbConnectionInterceptor
     {
+        public override InterceptionResult ConnectionOpening(
+            DbConnection connection, ConnectionEventData eventData, InterceptionResult result) =>
+            throw new InvalidOperationException("A consulta Async tentou abrir a conexão de forma síncrona.");
+
         public override ValueTask<InterceptionResult> ConnectionOpeningAsync(
             DbConnection connection, ConnectionEventData eventData, InterceptionResult result,
             CancellationToken cancellationToken = default) => ValueTask.FromException<InterceptionResult>(falha);
