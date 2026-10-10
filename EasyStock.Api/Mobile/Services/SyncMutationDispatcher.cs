@@ -53,7 +53,7 @@ public class SyncMutationDispatcher(
             case "order":     await ApplyOrder(m, deviceId, operatorName, empresaId, lojaId);     break;
             case "batch":     await ApplyBatch(m, deviceId, operatorName, empresaId, lojaId);     break;
             case "cashEntry" when parts[1] == "delete":
-                await ApplyCashEntryDelete(m, operatorName, empresaId);
+                await ApplyCashEntryDelete(m, deviceId, operatorName, empresaId);
                 break;
             case "cashEntry": await ApplyCashEntry(m, deviceId, operatorName, empresaId, lojaId); break;
             case "closing":   await ApplyClosing(m, deviceId, empresaId, lojaId);                 break;
@@ -75,9 +75,10 @@ public class SyncMutationDispatcher(
         if (existing != null && existing.EmpresaId != empresaId) existing = null;
 
         // Onda 5: conflict detection. Tolerância de 2s pra clock skew.
+        // #1520: compara com o carimbo do servidor (quando ele gravou), nao com UpdatedAt.
         if (existing != null && m.Ts > 0)
         {
-            var serverTsMs = new DateTimeOffset(existing.UpdatedAt, TimeSpan.Zero).ToUnixTimeMilliseconds();
+            var serverTsMs = CarimboMs(existing.ServerUpdatedAt);
             if (serverTsMs > m.Ts + 2000 && existing.LastDeviceId != null && existing.LastDeviceId != deviceId)
             {
                 throw new ConflictException(
@@ -198,9 +199,12 @@ public class SyncMutationDispatcher(
         var updatedAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.UpdatedAt).UtcDateTime;
 
         // C3: conflict detection (last-write-loser). Tolerancia 2s pra clock skew.
+        // #1520 (ADR-0060): compara com o carimbo do servidor. O UpdatedAt do pedido e a hora do
+        // aparelho que editou por ultimo: relogio adiantado ali fazia todo outro aparelho perder
+        // (conflito falso), e relogio atrasado deixava edicao velha passar por cima da nova.
         if (existing != null && m.Ts > 0)
         {
-            var serverTsMs = new DateTimeOffset(existing.UpdatedAt, TimeSpan.Zero).ToUnixTimeMilliseconds();
+            var serverTsMs = CarimboMs(existing.ServerUpdatedAt);
             if (serverTsMs > m.Ts + 2000 && existing.LastDeviceId != null && existing.LastDeviceId != deviceId)
             {
                 throw new ConflictException(
@@ -365,7 +369,15 @@ public class SyncMutationDispatcher(
         if (existing != null)
         {
             // Itens sao imutaveis; o re-envio so traz as marcas de exclusao/descarte (#1464).
+            var marcasAntes = (existing.DeletedAt, existing.DeletedBy, existing.DiscardedAt, existing.DiscardedBy, existing.DiscardReason);
             AplicarMarcas(existing, dto);
+            // #1520: a marca agora desce no pull (carimbo do servidor). Quem marcou passa a ser o
+            // autor, para nao receber de volta o lote que acabou de alterar.
+            if (marcasAntes != (existing.DeletedAt, existing.DeletedBy, existing.DiscardedAt, existing.DiscardedBy, existing.DiscardReason))
+            {
+                existing.LastDeviceId = deviceId;
+                existing.LastOperatorName = operatorName;
+            }
             await _loteEstado.AplicarAsync(existing);
             return;
         }
@@ -484,6 +496,9 @@ public class SyncMutationDispatcher(
         Description = Cortar(d.Description, 255)!
     };
 
+    private static long CarimboMs(DateTime carimbo) =>
+        new DateTimeOffset(DateTime.SpecifyKind(carimbo, DateTimeKind.Utc)).ToUnixTimeMilliseconds();
+
     private static DateTime? MsParaUtc(long? ms) =>
         ms.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(ms.Value).UtcDateTime : null;
 
@@ -546,7 +561,7 @@ public class SyncMutationDispatcher(
     /// nunca é exclusão. A linha fica marcada e o movimento vinculado é estornado pelo caso de
     /// uso do ERP. Reenvio e lançamento que o servidor não conhece: aceita sem efeito.
     /// </summary>
-    private async Task ApplyCashEntryDelete(MutationDto m, string? operatorName, Guid? empresaId)
+    private async Task ApplyCashEntryDelete(MutationDto m, string deviceId, string? operatorName, Guid? empresaId)
     {
         var id = m.Payload.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
         if (string.IsNullOrEmpty(id)) throw new ArgumentException("Exclusão de lançamento sem id.");
@@ -563,6 +578,8 @@ public class SyncMutationDispatcher(
 
         existing.DeletedAt = DateTime.UtcNow;
         existing.DeletedBy = operatorName;
+        // Quem excluiu ja tirou o lancamento da tela; o pull leva a exclusao aos outros aparelhos.
+        existing.LastDeviceId = deviceId;
     }
 
     private async Task<MovimentoCaixa?> MovimentoVinculadoAsync(CashEntry entry)

@@ -41,6 +41,14 @@ public class Order
     [Column("updated_at")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    /// <summary>
+    /// #1520 (ADR-0060) — carimbo do relógio do SERVIDOR, gravado em toda inserção e alteração
+    /// pelo <c>AuditTimestampsInterceptor</c>. Nunca vem do aparelho. É o filtro e o cursor do
+    /// pull e a base da detecção de conflito; <see cref="UpdatedAt"/> traz a hora do aparelho.
+    /// </summary>
+    [Column("server_updated_at")]
+    public DateTime ServerUpdatedAt { get; set; } = DateTime.UtcNow;
+
     [Column("last_device_id"), MaxLength(64)]
     public string? LastDeviceId { get; set; }
 

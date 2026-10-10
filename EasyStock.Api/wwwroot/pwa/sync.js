@@ -956,6 +956,7 @@
     // F7-C: fechamento de caixa snapshot. Mobile mantem em cashClosings[].
     closing:   { stateKey: 'cashClosings', storage: 'cdb-cash-closings' }
   };
+  const _MARCAS_DE_LOTE = ['deleted', 'deletedAt', 'deletedBy', 'discarded', 'discardedAt', 'discardedBy', 'discardReason'];
   let _consecutiveApplyFailures = 0;
 
   function applyServerMutations(mutations) {
@@ -978,6 +979,20 @@
         // pull pos-restauracao, server reenvia. Soft-delete visual.
         if (type === 'cashEntry' && m.payload && m.payload.estornado === true) {
           if (idx >= 0) { coll.splice(idx, 1); changed = true; }
+          localStorage.setItem(map.storage, JSON.stringify(coll));
+          return;
+        }
+
+        // #1520: lote que o aparelho ja tem recebe so as marcas de exclusao e descarte, como
+        // o servidor faz (itens sao imutaveis). Trocar o lote inteiro apagava a foto e o status
+        // locais, que o servidor nao guarda. O saldo vem pelo produto, nao daqui.
+        if (type === 'batch' && op === 'upsert' && idx >= 0) {
+          _MARCAS_DE_LOTE.forEach(k => {
+            const novo = m.payload[k] == null ? undefined : m.payload[k];
+            if (coll[idx][k] == novo || (!coll[idx][k] && !novo)) return;
+            if (novo === undefined) delete coll[idx][k]; else coll[idx][k] = novo;
+            changed = true;
+          });
           localStorage.setItem(map.storage, JSON.stringify(coll));
           return;
         }
