@@ -3,6 +3,7 @@ import { Anel } from '../../componentes/Anel'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
+import { useAtendimento } from '../../aplicacao/contextos'
 import { faltaPagar, situacaoDaCobranca } from '../../dominio/cobranca'
 import { horaCurta, moeda } from '../../dominio/formato'
 import css from './RelogioPix.module.css'
@@ -69,7 +70,8 @@ export function RelogioPix({
   const zerado = situacao.chave === 'expirada' || (situacao.chave === 'aguardando' && restam <= 0)
 
   const [confirmando, setConfirmando] = useState(null)
-  // #1474 (R2): no modo API aceitar a diferença e cancelar o pedido não estão ligados.
+  const { fonteApi } = useAtendimento()
+  // No modo API o cancelamento fica na barra do pedido, com motivo e permissão.
   const disponivel = useAcaoDisponivel()
   const [recolhido, setRecolhido] = useState(false)
 
@@ -203,7 +205,7 @@ export function RelogioPix({
         {editavel && confirmando === null && (
           <div className={css.botoesZerado}>
             <Botao largo variante="primario" icone="refresh-cw" onClick={aoReenviar}>Reenviar cobrança</Botao>
-            {disponivel('cancelarPedido') && (
+            {!fonteApi && disponivel('cancelarPedido') && (
               <Botao largo variante="secundario" icone="circle-x" onClick={() => setConfirmando('cancelar')}>
                 Cancelar pedido
               </Botao>

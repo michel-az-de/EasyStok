@@ -325,6 +325,7 @@ Campos mínimos do acompanhamento: onda, fatia, resultado, dependência, respons
 | Endereço/origem, raio, valores, horários e capacidade | Ondas 3–4 | Conferir cadastro com a dona; snapshot antigo não prova estado atual |
 | Conta e acesso Mercado Pago em teste/produção | Onda 3 | Responsável configura em canal seguro; sem segredos na documentação |
 | Matriz de permissões e exceções de operação | Ondas 1–2 | Partir dos três perfis já decididos; confirmar apenas exceções |
+| D3-04: cancelamento de pedido pago | Onda 2 | Felipe decidiu em 09/10: Atendimento cancela sem pagamento; com qualquer valor recebido, inclusive parcial, só Dona/gerente. Implementação e limites na seção 23 |
 | Regras de combos, adicionais, insumos e embalagens | Ondas 6–7 | Resolver as D-M1/D-M2 correspondentes antes da fatia |
 | Destino do caixa offline da PWA | Onda 8 | Decisão pendente explicitamente no ADR-0059 |
 | Identidade de tela e ativos aprovados | Onda 1 | Validar aplicação visual; não refazer marca por conta própria |
@@ -687,3 +688,40 @@ Durante a finalização chegaram ao master `f8cec0ab` (espelho do PostgreSQL no 
 1. Continuar o ciclo completo do pedido e as exceções do balcão, com as decisões pendentes da seção 9 respeitadas.
 2. Revisar as ações restantes por perfil e homologar a rotina da operação real.
 3. Homologar WebPush e os demais canais externos no ambiente próprio. Pagamento real, fornecedor de entregas, Google externo e impressão física Oasis mantêm seus aceites separados.
+
+## 23. Continuação: cancelamento operacional na Ficha, 09/10/2026
+
+**Decisão D3-04 confirmada por Felipe:** Atendimento cancela pedido sem pagamento; com qualquer valor recebido, inclusive parcial, só Dona/gerente. A regra usa o nível da sessão autenticada, incluindo Admin/SuperAdmin para a Dona e Gerente para gestão. O corpo da requisição não pode elevar esse nível.
+
+### Comportamento entregue
+
+- **Ficha ligada à API:** Mais ações do pedido abre a confirmação com motivo de 3 a 500 caracteres. Duplo clique compartilha uma chamada; campos bloqueiam durante a gravação. Falha conserva o motivo e não simula cancelamento em memória. Falha ao reler depois de sucesso informa que o cancelamento foi confirmado e que a tela precisa ser atualizada.
+- **Permissão em todos os caminhos:** cancelamento direto, troca de status, KDS, lotes e recusa do site verificam pagamento recebido. Atendimento não vê a opção quando há pagamento; formulário aberto antes de um recebimento recebe 403 com explicação. A capacidade `cancelarPedidoPago` exige gestão e módulo Atendimento autorizado.
+- **Concorrência:** cancelamento usa o mesmo lock do pedido que o recebimento. Se o pagamento confirma primeiro, Atendimento perde a autorização; se o cancelamento confirma primeiro, o recebimento manual é recusado. A expiração automática reutiliza sua transação e só publica atualização da tela depois do commit externo.
+- **Efeitos persistidos:** status, motivo, autor, horário, evento de integração, liberação da vaga e devolução do estoque já baixado ficam na transação. Cobrança pendente é cancelada. Repetir a operação não duplica auditoria, evento, vaga ou devolução de estoque. O SSE publica `pedido.mudou_status` depois do commit; o horário informado pelo lote offline é preservado na auditoria.
+- **Dinheiro recebido:** cancelamento operacional não remove `PedidoPagamento` nem solicita devolução ao provedor. Corrigidas as consultas de total e lista do Caixa: pedido cancelado continua contribuindo com dinheiro recebido e ainda não devolvido. Cobrança com estorno confirmado exclui somente seu pagamento correspondente; pedido já consolidado em Venda continua sem contagem duplicada. O roteiro HTTP da onda 0 foi ajustado para esse comportamento.
+- **Comunicação honesta:** a confirmação informa que a devolução deve ser tratada separadamente e orienta avisar o cliente pela conversa. O fluxo existente de recusa do site conserva seu estorno, agora com a mesma proteção por perfil.
+
+Durante a finalização, as melhorias de telas em `ed2c95ba` e a embalagem pela receita em `5f152c11` chegaram ao master e foram incorporadas sem conflito. As contagens abaixo refletem a base combinada.
+
+### Evidência local
+
+| Verificação | Resultado |
+|---|---|
+| Aplicação | 2.396 testes aprovados, sem ignorados |
+| API | 1.049 testes aprovados, sem ignorados |
+| PostgreSQL real | 15 testes aprovados, sem ignorados: ciclo pedido/estoque/pagamento/caixa, vaga, idempotência, corrida pagamento/cancelamento nas duas ordens, soma/lista do Caixa e aprovação/recusa concorrentes |
+| Console | 64 provas JavaScript aprovadas; lint, camadas, contraste e build aprovados |
+| HTTP e Chromium | 403 para pagamento parcial, nível/empresa forjados, status e KDS; lotes rejeitam a linha; motivo obrigatório, falha 503 preservando texto, um POST no duplo clique e persistência após recarregar |
+| Fluxo ao vivo | Stream SSE real recebeu o cancelamento; Atendimento com tela anterior ao pagamento recebeu 403; Dona cancelou pedido parcial conservando o recebimento e uma auditoria |
+| Apresentação | Computador e celular 390 × 844 px, tema escuro, confirmação acessível sem rolagem horizontal; nenhum erro JavaScript |
+
+Scripts, capturas, logs e TRX estão em `C:\rep\EasyStok\.build\onda2-ciclo-pedido`. A prova `cancelamento-browser.cjs` usa API local e PostgreSQL real no banco isolado `easystock_onda2_ciclo`. Usuários, conversas e pedidos foram criados pelas APIs; a preparação da fixture habilita os módulos e vincula os pedidos às conversas no banco sintético. As ações testadas de cancelar e pagar passam pelas APIs reais, sem alteração manual de resultado.
+
+**Limites:** não houve envio a cliente real, devolução de dinheiro real, impressão física ou deploy. O estorno da Ficha e a homologação externa de pagamento continuam pendentes. Esta entrega fecha o cancelamento operacional desta fatia, sem encerrar M3.3 ou a onda 2.
+
+### Próximo trecho executável
+
+1. Continuar o ciclo completo e as exceções do pedido, incluindo reagendamento com troca efetiva da vaga (M3.4).
+2. Implementar e homologar o estorno pela Ficha com resposta do provedor e reflexo financeiro explícito, respeitando D3-04.
+3. Conferir as ações restantes por perfil e realizar o aceite da operação real. Canais externos, entregas e impressão física conservam seus aceites separados.

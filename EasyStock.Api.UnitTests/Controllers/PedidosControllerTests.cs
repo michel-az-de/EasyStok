@@ -71,6 +71,8 @@ public class PedidosControllerTests
             criarContaReceber,
             NullLogger<GerarContaReceberDePedidoUseCase>.Instance);
 
+        _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>()(ci.Arg<CancellationToken>()));
         var status = new AtualizarStatusPedidoUseCase(
             _pedidoRepo,
             estoqueIntegration,
@@ -81,11 +83,11 @@ public class PedidosControllerTests
             _uow,
             NullLogger<AtualizarStatusPedidoUseCase>.Instance,
             new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()),
-            new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(Substitute.For<IContaReceberRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>(), NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance));
+            new EasyStock.Application.UseCases.CancelarPedido.CancelarPedidoUseCase(_pedidoRepo, estoqueIntegration, new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(Substitute.For<IContaReceberRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>(), NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance), _uow, Microsoft.Extensions.Logging.Abstractions.NullLogger<EasyStock.Application.UseCases.CancelarPedido.CancelarPedidoUseCase>.Instance, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(), Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>()));
 
         var cancelar = new CancelarPedidoUseCase(
             _pedidoRepo, estoqueIntegration, new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(Substitute.For<IContaReceberRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>(), NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance),
-            _uow, NullLogger<CancelarPedidoUseCase>.Instance);
+            _uow, NullLogger<CancelarPedidoUseCase>.Instance, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(), Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>());
 
         var agendamento = new AlterarAgendamentoPedidoUseCase(
             _pedidoRepo, _uow, NullLogger<AlterarAgendamentoPedidoUseCase>.Instance,
@@ -232,6 +234,28 @@ public class PedidosControllerTests
     }
 
     // ── Cancelar ──────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Operador_nao_cancela_pago_mesmo_forjando_nivel_no_body(bool viaStatus)
+    {
+        _currentUser.Nivel.Returns(NivelAcesso.Operador);
+        _currentUser.EmpresaId.Returns(_empresaId);
+        var pedido = Pedido.Criar(_empresaId);
+        pedido.Pagamentos.Add(new PedidoPagamento { Valor = 10m, Metodo = "dinheiro" });
+        _pedidoRepo.GetByIdWithDetailsAsync(_empresaId, pedido.Id).Returns(pedido);
+
+        Func<Task> acao = viaStatus
+            ? () => _controller.UpdateStatus(pedido.Id, new AtualizarStatusPedidoCommand(
+                _empresaId, pedido.Id, "cancelado", NivelSolicitante: NivelAcesso.Admin))
+            : () => _controller.Cancelar(pedido.Id, new CancelarPedidoCommand(
+                _empresaId, pedido.Id, Motivo: "desistiu", NivelSolicitante: NivelAcesso.Admin));
+
+        await acao.Should().ThrowAsync<UnauthorizedAccessException>();
+        pedido.Status.Should().Be("aguardando");
+        await _uow.DidNotReceive().CommitAsync();
+    }
 
     [Fact]
     public async Task Cancelar_DeveRetornarOk_QuandoPedidoCancelado()

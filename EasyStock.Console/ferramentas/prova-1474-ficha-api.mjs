@@ -145,9 +145,10 @@ await confere('R1 sem pedido no EasyStok a esteira avisa e não chama a API', as
   assert.equal(chamadas.length, 0)
   assert.equal(despachos[0]?.tipo, acao.AVISO_API)
 })
-await confere('R1 avançar a esteira está ligado; cancelar, estornar e voltar etapa somem no modo API', () => {
+await confere('R1 esteira e cancelamento ligados; estornar e voltar etapa somem no modo API', () => {
   assert.equal(naoLigadas.acaoDisponivel('avancarEsteira', { fonteApi: true }), true)
-  for (const nome of ['cancelarPedido', 'marcarEstorno', 'corrigirPasso', 'desfazerEsteira']) {
+  assert.equal(naoLigadas.acaoDisponivel('cancelarPedido', { fonteApi: true }), true)
+  for (const nome of ['marcarEstorno', 'corrigirPasso', 'desfazerEsteira']) {
     assert.equal(naoLigadas.acaoDisponivel(nome, { fonteApi: true }), false, nome)
     assert.equal(naoLigadas.acaoDisponivel(nome, { fonteApi: false }), true, nome)
   }

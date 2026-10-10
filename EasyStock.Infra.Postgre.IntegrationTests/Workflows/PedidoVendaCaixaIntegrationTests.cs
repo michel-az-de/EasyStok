@@ -2,9 +2,12 @@ using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
+using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Entities.Storefront;
+using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
@@ -153,6 +156,15 @@ public class PedidoVendaCaixaIntegrationTests(PostgreSqlDatabaseFixture fixture)
             result!.TotalPago.Should().Be(80m);
         }
 
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(empresaId);
+            await FluentActions.Invoking(() => scope.ServiceProvider.GetRequiredService<CancelarPedidoUseCase>()
+                .ExecuteAsync(new CancelarPedidoCommand(empresaId, pedidoId, NivelSolicitante: NivelAcesso.Operador)))
+                .Should().ThrowAsync<UnauthorizedAccessException>();
+        }
+
         // ── 6. Pagamento restante: R$50 (dinheiro) ─────────────────────────
         await using (var scope = provider.CreateAsyncScope())
         {
@@ -225,6 +237,43 @@ public class PedidoVendaCaixaIntegrationTests(PostgreSqlDatabaseFixture fixture)
 
             var movimentos = await caixaRepo.GetMovimentosDoDiaAsync(empresaId, dataOp, lojaId);
             movimentos.Should().ContainSingle(m => m.Tipo == "abertura" && m.Origem == "auto-pagamento");
+        }
+
+        // Cancelamento operacional: vaga e estoque voltam uma vez; dinheiro recebido permanece.
+        await using (var db = fixture.CreateDbContext())
+        {
+            var vitrine = StorefrontEntity.Criar(empresaId, "teste-cancelamento", "Teste cancelamento", 0m);
+            var janela = JanelaEntrega.Criar(vitrine.Id, 1, new TimeOnly(12, 0), new TimeOnly(14, 0), 5, "Almoço");
+            db.Set<StorefrontEntity>().Add(vitrine);
+            db.Set<JanelaEntrega>().Add(janela);
+            db.Set<VagaOcupada>().Add(VagaOcupada.Ocupar(janela.Id, DateOnly.FromDateTime(DateTime.UtcNow), pedidoId));
+            await db.SaveChangesAsync();
+        }
+        for (var tentativa = 0; tentativa < 2; tentativa++)
+        {
+            await using var scope = provider.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(empresaId);
+            await scope.ServiceProvider.GetRequiredService<CancelarPedidoUseCase>().ExecuteAsync(
+                new CancelarPedidoCommand(empresaId, pedidoId, Motivo: "Cliente desistiu", NivelSolicitante: NivelAcesso.Gerente));
+        }
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresaId);
+            var pedido = await db.Pedidos.Include(p => p.Pagamentos).Include(p => p.Eventos).SingleAsync(p => p.Id == pedidoId);
+            pedido.Status.Should().Be("cancelado");
+            pedido.TotalPago.Should().Be(130m);
+            pedido.Eventos.Should().ContainSingle(e => e.Tipo == "cancelado" && e.Detalhes == "Cliente desistiu");
+            (await db.ItensEstoque.SingleAsync(i => i.ProdutoId == produtoId1)).QuantidadeAtual!.Value.Should().Be(10m);
+            (await db.ItensEstoque.SingleAsync(i => i.ProdutoId == produtoId2)).QuantidadeAtual!.Value.Should().Be(5m);
+            (await db.MovimentacoesEstoque.CountAsync(m => m.Natureza == NaturezaMovimentacaoEstoque.Estorno)).Should().Be(2);
+            (await db.Set<VagaOcupada>().SingleAsync(v => v.PedidoId == pedidoId)).LiberadoEm.Should().NotBeNull();
+            (await db.OutboxEventosIntegracao.Where(e => e.AggregateId == pedidoId && e.TipoEvento == "pedido.mudou_status")
+                .Select(e => e.PayloadJson).ToListAsync()).Should().ContainSingle(json => json.Contains("cancelado"));
+            var caixa = new EasyStock.Infra.Postgre.Repositories.CaixaRepository(db);
+            (await caixa.GetTotalPagamentosPedidosDoDiaAsync(empresaId,
+                EasyStock.Application.Common.HorarioBrasil.DataOperacional(pedido.Pagamentos.Min(p => p.PagoEm)), lojaId))
+                .Should().Be(130m, "cancelar não equivale a devolver o pagamento");
         }
     }
 

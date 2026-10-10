@@ -35,10 +35,12 @@ public class LancarLotePapelUseCaseTests
             Substitute.For<IPublicadorEventoIntegracao>(),
             Options.Create(new PedidoEstoqueOptions { PermiteEstoqueNegativo = true }),
             NullLogger<PedidoEstoqueIntegrationService>.Instance);
+        uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>()(ci.Arg<CancellationToken>()));
         var atualizar = new AtualizarStatusPedidoUseCase(_pedidoRepo, integ, configRepo, gerarCr, _publicador,
             Substitute.For<IOperacaoEventPublisher>(), uow, NullLogger<AtualizarStatusPedidoUseCase>.Instance,
             new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()),
-            new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(crRepo, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>(), NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance));
+            new EasyStock.Application.UseCases.CancelarPedido.CancelarPedidoUseCase(_pedidoRepo, integ, new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(crRepo, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>(), NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance), uow, Microsoft.Extensions.Logging.Abstractions.NullLogger<EasyStock.Application.UseCases.CancelarPedido.CancelarPedidoUseCase>.Instance, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>(), _publicador, Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>()));
         var lote = new AtualizarStatusPedidosEmLoteUseCase(atualizar, uow,
             NullLogger<AtualizarStatusPedidosEmLoteUseCase>.Instance);
         _pedidoRepo.AddEventoAsync(Arg.Do<PedidoEvento>(_eventos.Add));

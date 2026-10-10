@@ -76,6 +76,7 @@ const MENSAGEM_POR_STATUS = {
 const MENSAGENS_GENERICAS = new Set([
   'Requisição inválida', 'Violação de regra de negócio', 'Argumento invalido', 'Operacao invalida',
   'Formato invalido', 'Quantidade inválida', 'Registro duplicado', 'Conflito de concorrência',
+  'Acesso negado',
 ])
 
 function mensagemDoErro(json, status) {

@@ -194,3 +194,9 @@ export const registrarPagamentoManual = (pedidoId, valor, metodo) =>
 
 export const desfazerPagamentoManual = (pedidoId, motivo) =>
   chamarApi(`/api/pedidos/${pedidoId}/pagamento-manual/desfazer`, { metodo: 'POST', corpo: { motivo } })
+
+export const cancelarPedido = (pedidoId, motivo) =>
+  chamarApi(`/api/pedidos/${pedidoId}/cancelar`, {
+    metodo: 'POST', corpo: { empresaId: lerSessao()?.empresa?.id, id: pedidoId, motivo, origem: 'console' },
+    sinal: AbortSignal.timeout(15000),
+  })

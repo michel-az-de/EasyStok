@@ -11,7 +11,8 @@ public sealed record AtualizarStatusPedidosEmLoteCommand(
     Guid EmpresaId,
     IReadOnlyList<KdsStatusLoteItem> Itens,
     Guid? UsuarioId = null,
-    string? Origem = "kds") : ICommand;
+    string? Origem = "kds",
+    NivelAcesso NivelSolicitante = NivelAcesso.Operador) : ICommand;
 
 /// <summary>
 /// Marcação em lote do KDS quando a internet volta (S19, US-042): aplica em sequência, cada item no seu
@@ -46,7 +47,8 @@ public class AtualizarStatusPedidosEmLoteUseCase(
         try
         {
             var pedido = await atualizarStatus.ExecuteAsync(new AtualizarStatusPedidoCommand(
-                cmd.EmpresaId, item.Id, item.Status, cmd.UsuarioId, Origem: cmd.Origem, OcorridoEm: item.OcorridoEm));
+                cmd.EmpresaId, item.Id, item.Status, cmd.UsuarioId, Origem: cmd.Origem, OcorridoEm: item.OcorridoEm,
+                NivelSolicitante: cmd.NivelSolicitante));
             return pedido is null
                 ? new KdsStatusLoteResultado(item.Id, false, null, "Pedido não encontrado.")
                 : new KdsStatusLoteResultado(item.Id, true, pedido.Status, null);
@@ -56,7 +58,7 @@ public class AtualizarStatusPedidosEmLoteUseCase(
             // O item que falhou não pode vazar alteração rastreada para o commit do próximo.
             uow.DescartarAlteracoesPendentes();
             logger.LogWarning(ex, "KDS lote: pedido {PedidoId} não mudou para {Status}.", item.Id, item.Status);
-            var mensagem = ex is UseCaseValidationException or RegraDeDominioVioladaException
+            var mensagem = ex is UseCaseValidationException or RegraDeDominioVioladaException or UnauthorizedAccessException
                 ? ex.Message
                 : "Falha ao atualizar o status.";
             return new KdsStatusLoteResultado(item.Id, false, null, mensagem);

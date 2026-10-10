@@ -13,4 +13,5 @@ public sealed record RecusarPedidoStorefrontInput(
     Guid UsuarioId,
     MotivoRecusa Motivo,
     string? MensagemCliente = null,
-    string? UsuarioNome = null);
+    string? UsuarioNome = null,
+    NivelAcesso NivelSolicitante = NivelAcesso.Operador);

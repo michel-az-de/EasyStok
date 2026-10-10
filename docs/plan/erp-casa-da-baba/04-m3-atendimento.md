@@ -1,5 +1,7 @@
 # M3 Atendimento · balcão, pedidos, clientes, canais, status e histórico
 
+> **Atualização de 09/10/2026:** cancelamento operacional pela Ficha implementado e homologado localmente, com motivo, persistência e D3-04 decidida por Felipe. Com qualquer pagamento, inclusive parcial, só Dona/gerente cancela. Cancelar pela Ficha não executa estorno financeiro nem avisa automaticamente o cliente. Evidência e limites na [seção 23 do plano de ondas](11-levantamento-e-ondas-2026-10-09.md#23-continuação-cancelamento-operacional-na-ficha-09102026). M3.3 continua parcial.
+
 Issue: #1316 · Decisão: [ADR-0056](../../adr/0056-erp-da-casa-da-baba-front-unico.md) · Data: 2026-10-01
 Base medida: master `b713263a`. Plano irmão (dono de S01–S53 e F01–F18):
 [10-console.md](../atendimento-whatsapp/10-console.md), [11-console-fechamento.md](../atendimento-whatsapp/11-console-fechamento.md).
@@ -194,8 +196,8 @@ tela Entregas) e nenhuma F seguinte as cita: a lacuna está órfã.
 **Aceite.**
 - [ ] Avançar a esteira pela ficha muda o cartão na Cozinha (F05) sem recarregar.
 - [ ] Pago à mão grava `PedidoPagamento` e aparece em "Pagamentos de pedidos hoje" (F14).
-- [ ] Cancelar pedido pago obedece D3-04 (403 com texto para quem não pode).
-- [ ] `prova-f06-honestidade.mjs` continua verde com as ações movidas para "ligada".
+- [x] Cancelar pedido pago obedece D3-04 (403 com texto para quem não pode), homologado localmente em 09/10.
+- [x] `prova-f06-honestidade.mjs` continua verde com o cancelamento ligado; estorno e volta de etapa permanecem indisponíveis no modo API.
 **Fora.** Trocar janela (M3.4) e endereço do pedido (M8.3).
 **Depende de.** F14 para o lado do caixa. **Tamanho.** M · **Tier.** baixo (sem migração) · **Rollback.** revert; as ações voltam a avisar.
 
@@ -315,10 +317,10 @@ F10 ─► M3.8 lembrete agendado (junto com M8.2)            M3.9 só depois de
 - B) Adiar até existir a segunda pessoa no atendimento.
 - C) Distribuição automática das conversas entre atendentes.
 
-**D3-04 · Quem cancela pedido já pago pela ficha (dispara estorno)?**
-- A) (Recomendado) Operador cancela pedido não pago; pago só Gerente.
-- B) Qualquer Operador.
-- C) Só pelo EasyStok Web, nunca pelo console.
+**D3-04 · Quem cancela pedido já pago pela ficha? Decidido por Felipe em 09/10/2026.**
+- Atendimento cancela sem pagamento. Com qualquer valor recebido, inclusive parcial, só Dona/gerente.
+- A API aplica a regra também à troca de status, KDS, lotes e recusa do site. O nível vem da sessão autenticada.
+- A entrega da seção 23 é o cancelamento operacional com motivo. Estorno externo e comunicação ao cliente continuam com aceites próprios; a tela informa que a devolução é separada. A recusa do site conserva seu fluxo de estorno já existente, agora protegido pela mesma autorização.
 
 **Já decidido (01/10), registrado para não reabrir:** pedido do checkout do site entra no balcão pela
 conversa `ChatSite` do cliente, com o pedido na Ficha, igual ao WhatsApp. Fatia dona: SI.6

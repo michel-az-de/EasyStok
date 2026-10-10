@@ -1,7 +1,7 @@
 import * as acao from '../acoes'
 import {
   FORMA_NA_ENTREGA, FORMA_ONLINE, corpoDoPedido, formaDoMeio, gerarPedido, janelaDoId, listarJanelas, obterPedido, pedidoDaApi,
-  reemitirCobranca, trocarFormaPagamento, registrarPagamentoManual, desfazerPagamentoManual, STATUS_DO_PASSO,
+  reemitirCobranca, trocarFormaPagamento, registrarPagamentoManual, desfazerPagamentoManual, cancelarPedido, STATUS_DO_PASSO,
 } from '../../infra/api/comandaApi'
 import { mudarStatusKds } from '../../infra/api/kdsApi'
 import { aprovarPedido as aprovarPedidoApi } from '../../infra/api/entregasApi'
@@ -14,7 +14,7 @@ import { SO_NO_EASYSTOK } from './naoLigadas'
 // disso o pedido é do EasyStok: a polling traz pago, expirado e o resto da esteira.
 //
 // A esteira (#1474) anda pelo mesmo PATCH da Cozinha; o aviso ao cliente sai do EasyStok.
-// O que ainda não está ligado (estorno, cancelar, voltar etapa, comprovante) não mexe na
+// O que ainda não está ligado (estorno, voltar etapa, comprovante) não mexe na
 // memória do navegador com pedido já criado: avisa e deixa como está, e a Ficha nem mostra
 // o botão (`acaoDisponivel`).
 //
@@ -203,6 +203,22 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   }
 
   return {
+    cancelarPedido: (id, motivo) => {
+      if (!pedidoCriado(id)) return soNoEasyStok('Cancelar pedido')(id)
+      if (!motivo?.trim() || motivo.trim().length < 3 || motivo.trim().length > 500)
+        return Promise.resolve({ erro: 'Informe um motivo entre 3 e 500 caracteres.' })
+      return umaPorConversa(id, 'cancelar', async () => {
+        try {
+          await cancelarPedido(pedidoCriado(id), motivo.trim())
+        } catch (erro) {
+          avisar(`Não foi possível confirmar o cancelamento: ${erro.message}`)
+          return { erro: erro.message }
+        }
+        limparAviso()
+        await recarregar(id).catch(() => avisar('Pedido cancelado. Não foi possível atualizar a tela; consulte novamente.'))
+        return { ok: true }
+      })
+    },
     confirmarPagamento: receber,
     desfazerPagamento: desfazer,
     avancarEsteira: avancar,
