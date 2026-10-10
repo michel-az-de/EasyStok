@@ -25,7 +25,7 @@ const ICONES_DAS_TELAS = {
   painel: 'moto', janelas: 'relogio',
 }
 
-export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, children }) {
+export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, tituloVisivel = true, children }) {
   const { permite, aoSair, sessaoPersistente, notificacoes } = useAcessoModulos()
   const modulo = moduloPorId(moduloId)
   const telas = telasDoMenu(modulo, { fonteApi })
@@ -91,7 +91,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
             <div className={css.folha}>
               {tela ? (
                 <>
-                  <h1 className={css.titulo}>
+                  <h1 className={tituloVisivel ? css.titulo : 'sr'}>
                     <Icone nome={ICONES_DAS_TELAS[tela.id] ?? modulo.icone} tamanho={22} />
                     {tela.rotulo}
                   </h1>

@@ -190,6 +190,28 @@ public class ItensDoCardapioComandaUseCaseTests
         d.Alergenos.Should().Be("glúten, lactose");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Obter_TrazCapaGaleriaEVinculo_SemMudarNaEdicaoDeTexto(bool vinculado)
+    {
+        var item = vinculado ? ItemDoEstoque("Lasanha") : Item("Lasanha", visivel: true);
+        item.AdicionarFotoGaleria("https://cdn.example.test/angulo-1.webp");
+        item.AdicionarFotoGaleria("https://cdn.example.test/angulo-2.webp");
+        item.AtualizarMetadata(fotoUrl: "https://cdn.example.test/capa.webp");
+        var produtoId = item.ProdutoId;
+
+        await Sut().EditarAsync(EmpresaId, item.Id, new DadosItemCardapio(null, null, null, null, null,
+            Descricao: "Massa artesanal"));
+        var detalhe = await Sut().ObterAsync(EmpresaId, item.Id);
+
+        detalhe.FotoUrl.Should().Be("https://cdn.example.test/capa.webp");
+        detalhe.Fotos.Should().Equal("https://cdn.example.test/angulo-1.webp", "https://cdn.example.test/angulo-2.webp");
+        detalhe.ProdutoId.Should().Be(produtoId);
+        detalhe.Descricao.Should().Be("Massa artesanal");
+        (detalhe.ProdutoId is not null).Should().Be(vinculado);
+    }
+
     [Fact]
     public async Task Arquivar_EIdempotente_ERepoeDepois()
     {

@@ -44,7 +44,7 @@ function navegarAbas(evento, itens, indice, escolher, botoes, vertical = false) 
 
 // A janela e as rotas usam o mesmo catálogo, as mesmas permissões e o mesmo
 // PainelDeAjuste. Trocar uma aba aqui mantém a conversa e o pedido montados.
-export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, focoInicial = null, janelasApi = null, avisosApi = null }) {
+export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, focoInicial = null, janelasApi = null, avisosApi = null, renderizarEditorCardapio }) {
   const { fonteApi } = useAtendimento()
   const { permite } = useAcessoModulos()
   const areas = useMemo(() => MODULOS
@@ -170,7 +170,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
               className={css.painelGestao}
               onClickCapture={seguirLink}
             >
-              <PainelDeAjuste aba={tela.aba} focoInicial={focoInicial} janelasApi={janelasApi} aoAbrirAba={abrirAba} />
+              <PainelDeAjuste aba={tela.aba} focoInicial={focoInicial} janelasApi={janelasApi} aoAbrirAba={abrirAba} renderizarEditorCardapio={renderizarEditorCardapio} />
             </div>
           </section>
         </div>
@@ -202,7 +202,7 @@ function AbaNaoLigada({ texto, children }) {
 // Uma tela por aba: o objeto só decide qual elemento entra na árvore.
 // `janelasApi` (#1440): no modo API o App entrega aqui o cadastro de janelas, zonas e bloqueios
 // da S45 (o mesmo de Entregas › Janelas e frete), no lugar da aba de demonstração.
-export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoAbrirAba = null }) {
+export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoAbrirAba = null, renderizarEditorCardapio }) {
   const { fonteApi } = useAtendimento()
   const painelDaAba = useMemo(() => ({
     atendimento: <AbaAtendimento />,
@@ -216,7 +216,7 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
     integracoes: <AbaIntegracoes />,
     canais: <TelaCanais />,
     // M1.1 (#1481): gestão do cardápio (só modo API).
-    cardapio: <AbaCardapioApi />,
+    cardapio: <AbaCardapioApi renderizarEditor={renderizarEditorCardapio} />,
     // M1.3 (#1483): categorias do cardápio (só modo API).
     categorias: <AbaCategoriasApi />,
     // M2.1 (#1490): estoque do dia em porções (só modo API).
@@ -231,7 +231,7 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
     planejamento: <AbaPlanejamentoApi aoAbrirAba={aoAbrirAba} />,
     // M2.6 (#1511): controle de perdas (só modo API).
     perdas: <AbaPerdasApi />,
-  }), [fonteApi, focoInicial, janelasApi, aoAbrirAba])
+  }), [fonteApi, focoInicial, janelasApi, aoAbrirAba, renderizarEditorCardapio])
   const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada texto={AINDA_NAO_LIGADO[aba]}>{painel}</AbaNaoLigada>
   return painel

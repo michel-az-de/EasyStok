@@ -42,8 +42,21 @@ export const definirArquivado = (id, arquivado) =>
 export const validarItem = (id) => chamarApi(`${ITEM(id)}/validar`, { metodo: 'POST' })
 export const obterItem = (id) => chamarApi(ITEM(id))
 
+export const enviarFotoDoPrato = (id, arquivo, galeria = false) => {
+  const formulario = new FormData()
+  formulario.append('file', arquivo)
+  return chamarApi(`${ITEM(id)}/foto?galeria=${galeria}`, { metodo: 'POST', formulario })
+}
+
 // Detalhe → valores do formulário (a comanda não traz a ficha: ingredientes e alérgenos).
 export const detalheDaApi = (d) => ({
+  nome: d.nome ?? '',
+  linha: LINHA_DA_GESTAO[d.linha] ?? 'servir',
+  porcao: d.porcao ?? '',
+  preco: d.preco ?? 0,
+  foto: urlDeExibicaoDaFoto(d.fotoUrl, API_BASE),
+  fotos: (d.fotos ?? []).map((url) => urlDeExibicaoDaFoto(url, API_BASE)).filter(Boolean),
+  produtoId: d.produtoId ?? null,
   descricao: d.descricao ?? '',
   ingredientes: d.ingredientes ?? '',
   alergenos: d.alergenos ?? '',
@@ -87,6 +100,7 @@ export const moverItem = (id, direcao) =>
   chamarApi(`${ITEM(id)}/mover`, { metodo: 'POST', corpo: { direcao: DIRECAO_DA_API[direcao] } })
 
 export const itemGestaoDaApi = (i) => ({
+  porcoes: i.porcoes ?? 0,
   sku: i.cardapioItemId,
   nome: i.nome,
   linha: LINHA_DA_GESTAO[i.linha] ?? 'servir',

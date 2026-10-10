@@ -80,7 +80,7 @@
 .tituloColuna {
   display: flex; align-items: center; gap: var(--e-2); flex-shrink: 0;
   min-height: 52px; padding: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha);
-  font-family: var(--f-display); font-size: var(--t-titulo); color: var(--tinta); font-weight: 700;
+  font-family: var(--f-corpo); font-size: var(--t-titulo); color: var(--tinta); font-weight: 700;
   line-height: var(--lh-compacto); letter-spacing: var(--ls-titulo);
 }
 .tituloColuna .contagem { margin-left: auto; font-family: var(--f-dado); font-weight: 400; color: var(--tinta-3); font-size: var(--t-apoio); }

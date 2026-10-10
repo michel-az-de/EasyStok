@@ -22,7 +22,7 @@
   border-top: var(--b-1) solid var(--linha);
 }
 .total span {
-  font-family: var(--f-display); font-size: var(--t-forte); font-weight: 600;
+  font-family: var(--f-corpo); font-size: var(--t-forte); font-weight: 600;
   letter-spacing: -.01em;
 }
 .total b {

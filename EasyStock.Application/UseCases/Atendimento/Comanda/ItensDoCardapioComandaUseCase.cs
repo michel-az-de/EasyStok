@@ -40,7 +40,8 @@ public sealed record DetalheItemCardapio(
     Guid CardapioItemId, string Nome, LinhaProduto Linha, string? Porcao, decimal Preco, string? Categoria,
     string? Descricao, string? Ingredientes, string? Alergenos, int? TempoPreparoMinutos, string? InstrucaoFinalizacao,
     DateOnly? NovidadeAte, bool EmValidacao, bool Arquivado, Guid? SecaoId = null,
-    IReadOnlyList<PorcaoDoItem>? Porcoes = null);
+    IReadOnlyList<PorcaoDoItem>? Porcoes = null, string? FotoUrl = null,
+    IReadOnlyList<string>? Fotos = null, Guid? ProdutoId = null);
 
 /// <summary>Linha da tela de gestão do cardápio (M1.1, M1.2): tudo o que a lista mostra e liga.</summary>
 /// <param name="ControlaSaldo">Item ligado a um produto do estoque (avulso não tem saldo).</param>
@@ -152,7 +153,8 @@ public sealed class ItensDoCardapioComandaUseCase(
         return new DetalheItemCardapio(
             i.Id, i.NomeEfetivo() ?? "(sem nome)", i.Linha, i.PesoExibicao, i.PrecoEfetivo(), i.CategoriaEfetiva(),
             i.DescricaoPublica, i.Ingredientes, i.Alergenos, i.TempoPreparoMinutos, i.InstrucaoFinalizacao,
-            i.NovidadeAte, i.EmValidacao, i.EstaArquivado, i.SecaoId, PorcoesDe(i));
+            i.NovidadeAte, i.EmValidacao, i.EstaArquivado, i.SecaoId, PorcoesDe(i),
+            i.FotoUrl, i.ObterFotosGaleria(), i.ProdutoId);
     }
 
     /// <summary>Tirar (arquivar) ou repor, por valor: o clique repetido não inverte de volta.</summary>

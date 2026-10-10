@@ -181,7 +181,7 @@ public sealed class GerenciarUploadsUseCase(
     /// </summary>
     public async Task<UploadedFileResult> UploadFotoCardapioItemAsync(
         Guid empresaId, Guid itemId, string fileName, string contentType, byte[] content,
-        CancellationToken cancellationToken = default, bool galeria = false)
+        CancellationToken cancellationToken = default, bool galeria = false, bool sincronizarCapaGaleria = false)
     {
         ValidarImagem(fileName, contentType, content, 6 * 1024 * 1024); // ate 6MB antes de otimizar
 
@@ -207,7 +207,8 @@ public sealed class GerenciarUploadsUseCase(
             cancellationToken);
 
         var fotoAntiga = item.FotoUrl;
-        if (galeria) item.AdicionarFotoGaleria(stored.Url);
+        if (galeria) item.AdicionarFotoGaleria(stored.Url, preservarCapa: sincronizarCapaGaleria);
+        else if (sincronizarCapaGaleria) item.SubstituirCapaGaleria(stored.Url);
         else item.AtualizarMetadata(fotoUrl: stored.Url);
 
         await cardapioItemRepository.UpdateAsync(item, cancellationToken);

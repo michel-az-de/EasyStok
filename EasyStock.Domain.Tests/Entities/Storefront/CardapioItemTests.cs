@@ -22,6 +22,64 @@ namespace EasyStock.Domain.Tests.Entities.Storefront;
 /// </summary>
 public class CardapioItemTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(5)]
+    public void TrocarCapaGaleria_SubstituiSomenteAPrimeira_EConservaPrecoEProduto(int quantidade)
+    {
+        var item = NovoItemValido();
+        var produtoId = item.ProdutoId;
+        var preco = item.PrecoEfetivo();
+        var fotos = Enumerable.Range(1, quantidade).Select(n => $"https://exemplo.test/{n}.webp").ToList();
+        foreach (var foto in fotos) item.AdicionarFotoGaleria(foto);
+
+        item.SubstituirCapaGaleria("https://exemplo.test/nova.webp");
+        item.SubstituirCapaGaleria("https://exemplo.test/nova.webp");
+
+        item.FotoUrl.Should().Be("https://exemplo.test/nova.webp");
+        item.ObterFotosGaleria().Should().Equal(fotos.Skip(1).Prepend(item.FotoUrl));
+        item.ProdutoId.Should().Be(produtoId);
+        item.PrecoEfetivo().Should().Be(preco);
+    }
+
+    [Theory]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("file:///etc/passwd")]
+    [InlineData("")]
+    public void TrocarCapaGaleria_EnderecoInvalido_NaoPerdeCapaOuAngulos(string url)
+    {
+        var item = NovoItemValido();
+        item.AdicionarFotoGaleria("https://exemplo.test/capa.webp");
+        item.AdicionarFotoGaleria("https://exemplo.test/angulo.webp");
+
+        var trocar = () => item.SubstituirCapaGaleria(url);
+
+        trocar.Should().Throw<RegraDeDominioVioladaException>();
+        item.FotoUrl.Should().Be("https://exemplo.test/capa.webp");
+        item.ObterFotosGaleria().Should().Equal("https://exemplo.test/capa.webp", "https://exemplo.test/angulo.webp");
+    }
+
+    [Fact]
+    public void AdicionarAnguloPreservandoCapaLegada_ContaACapaNoLimite_ERecusaSemEscritaParcial()
+    {
+        var item = NovoItemValido();
+        const string capa = "https://exemplo.test/capa-legada.webp";
+        item.AtualizarMetadata(fotoUrl: capa);
+        var invalido = () => item.AdicionarFotoGaleria("javascript:alert(1)", preservarCapa: true);
+        invalido.Should().Throw<RegraDeDominioVioladaException>();
+        item.ObterFotosGaleria().Should().BeEmpty();
+        item.FotoUrl.Should().Be(capa);
+
+        var angulos = Enumerable.Range(1, 4).Select(n => $"https://exemplo.test/{n}.webp").ToList();
+        foreach (var angulo in angulos) item.AdicionarFotoGaleria(angulo, preservarCapa: true);
+        var excedente = () => item.AdicionarFotoGaleria("https://exemplo.test/excedente.webp", preservarCapa: true);
+
+        excedente.Should().Throw<RegraDeDominioVioladaException>();
+        item.FotoUrl.Should().Be(capa);
+        item.ObterFotosGaleria().Should().Equal(angulos.Prepend(capa));
+    }
+
     [Fact]
     public void Galeria_preserva_angulos_e_define_apenas_a_primeira_como_capa()
     {

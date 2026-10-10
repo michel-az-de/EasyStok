@@ -1,5 +1,6 @@
 using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Domain.Enums.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 using Swashbuckle.AspNetCore.Annotations;
@@ -34,7 +35,8 @@ public sealed record MoverItemRequest(DirecaoMover Direcao);
 [Authorize(Policy = "Operador")]
 public class AtendimentoItensCardapioController(
     ItensDoCardapioComandaUseCase itens,
-    ICurrentUserAccessor currentUser) : EasyStockControllerBase
+    ICurrentUserAccessor currentUser,
+    GerenciarUploadsUseCase uploads) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "Menu items taken off the menu (hidden), to put back")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -64,6 +66,31 @@ public class AtendimentoItensCardapioController(
     [HttpGet("{itemId:guid}")]
     public Task<IActionResult> Obter(Guid itemId, CancellationToken ct)
         => Tratar(async () => DataOk(await itens.ObterAsync(currentUser.EmpresaId, itemId, ct)));
+
+    [SwaggerOperation(Summary = "Upload menu item cover or gallery photo",
+        Description = "galeria=true acrescenta um ângulo (até 5); omitido ou false substitui a capa e a primeira foto, preservando os demais ângulos.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Policy = "Gerente")]
+    [RequestSizeLimit(6 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 6 * 1024 * 1024)]
+    [HttpPost("{itemId:guid}/foto")]
+    public Task<IActionResult> Foto(Guid itemId, IFormFile file, CancellationToken ct, [FromQuery] bool galeria = false)
+        => Tratar(async () =>
+        {
+            // Mesmo teto do upload administrativo, antes de alocar o buffer do arquivo.
+            if (file is null || file.Length == 0)
+                throw new UseCaseValidationException("Arquivo não informado ou vazio.");
+            if (file.Length > 6 * 1024 * 1024)
+                throw new UseCaseValidationException("A imagem não pode ser maior que 6 MB.");
+
+            await using var buffer = new MemoryStream();
+            await file.CopyToAsync(buffer, ct);
+            return DataOk(await uploads.UploadFotoCardapioItemAsync(
+                currentUser.EmpresaId, itemId, file.FileName, file.ContentType, buffer.ToArray(), ct, galeria,
+                sincronizarCapaGaleria: true));
+        });
 
     [SwaggerOperation(Summary = "Add a standalone menu item (visible)")]
     [ProducesResponseType(StatusCodes.Status201Created)]

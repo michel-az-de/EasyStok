@@ -101,15 +101,12 @@ public class CardapioItem
     public IReadOnlyList<string> ObterFotosGaleria() =>
         JsonSerializer.Deserialize<string[]>(FotosJson) ?? [];
 
-    public void AdicionarFotoGaleria(string url)
+    public void AdicionarFotoGaleria(string url, bool preservarCapa = false)
     {
-        ValidarTamanho(url, max: 500, nome: "URL da foto");
-        if (!url.StartsWith("/files/", StringComparison.Ordinal) &&
-            (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
-             (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp)))
-            throw new RegraDeDominioVioladaException("URL da foto inválida.");
-
+        ValidarUrlFoto(url);
         var fotos = ObterFotosGaleria().ToList();
+        if (preservarCapa && fotos.Count == 0 && !string.IsNullOrWhiteSpace(FotoUrl))
+            fotos.Add(FotoUrl);
         if (fotos.Contains(url)) return;
         if (fotos.Count >= 5)
             throw new RegraDeDominioVioladaException("O item já possui o limite de 5 fotos.");
@@ -117,6 +114,24 @@ public class CardapioItem
         FotosJson = JsonSerializer.Serialize(fotos);
         if (fotos.Count == 1) FotoUrl = url;
         AlteradoEm = DateTime.UtcNow;
+    }
+
+    public void SubstituirCapaGaleria(string url)
+    {
+        ValidarUrlFoto(url);
+        var fotos = ObterFotosGaleria().Skip(1).Where(f => f != url).Prepend(url).ToList();
+        FotosJson = JsonSerializer.Serialize(fotos);
+        FotoUrl = url;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    private static void ValidarUrlFoto(string url)
+    {
+        ValidarTamanho(url, max: 500, nome: "URL da foto");
+        if (!url.StartsWith("/files/", StringComparison.Ordinal) &&
+            (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+             (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp)))
+            throw new RegraDeDominioVioladaException("URL da foto inválida.");
     }
 
     /// <summary>Override do preço do <see cref="Produto"/>. Null = usa <c>Produto.PrecoReferencia</c>.</summary>

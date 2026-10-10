@@ -5,7 +5,7 @@
 }
 .identidade { display: flex; align-items: center; gap: var(--e-3); min-width: 0; flex: 1; }
 .cabecalho h2 {
-  margin: 0; font-family: var(--f-display); font-size: var(--t-titulo); font-weight: 700;
+  margin: 0; font-family: var(--f-corpo); font-size: var(--t-titulo); font-weight: 700;
   font-weight: 600; line-height: var(--lh-compacto); letter-spacing: -.01em;
 }
 /* A linha de apoio corre como texto: o ícone do canal é bloco (Icone.jsx) e

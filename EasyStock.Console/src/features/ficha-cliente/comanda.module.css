@@ -12,7 +12,7 @@
   padding: var(--e-4);
   margin-bottom: 8px;
   color: var(--tinta);
-  font-family: var(--f-papel);
+  font-family: var(--f-corpo);
 }
 
 /* O único gesto "de papel": dois triângulos diagonais por dente de 8×5 px,
@@ -43,7 +43,7 @@
 .linhaCabecalho h2 {
   margin: 0; font-size: var(--t-titulo); font-weight: 700; line-height: var(--lh-compacto);
 }
-.numero { font-family: var(--f-papel); font-size: var(--t-titulo); }
+.numero { font-family: var(--f-corpo); font-size: var(--t-titulo); }
 /* #1474 (R3): a janela ainda falta; em tom de aviso, com a palavra (a cor nunca informa sozinha). */
 .semJanela { color: var(--alerta); font-weight: 600; }
 .subCabecalho { margin: var(--e-1) 0 0; font-size: var(--t-corpo); color: var(--tinta-2); border-top: repeating-linear-gradient(to right, var(--linha-forte) 0 6px, transparent 6px 10px); padding-top: var(--e-2); }
@@ -118,7 +118,7 @@
   margin: 0; font-size: var(--t-corpo); font-weight: 700;
   padding-top: var(--e-3); border-top: 2px double var(--linha-forte);
 }
-.total b { font-family: var(--f-papel); font-weight: 700; font-size: var(--t-valor); font-variant-numeric: tabular-nums; }
+.total b { font-family: var(--f-corpo); font-weight: 700; font-size: var(--t-valor); font-variant-numeric: tabular-nums; }
 .total > span { flex: 1 1 140px; }
 .total b { white-space: nowrap; }
 .notaTotal { margin: var(--e-2) 0 0; font-family: var(--f-corpo); font-size: var(--t-apoio); color: var(--tinta-2); }

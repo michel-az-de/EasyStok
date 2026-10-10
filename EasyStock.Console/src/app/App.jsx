@@ -31,6 +31,7 @@ import { envioBloqueado } from '../dominio/janela'
 import {
   HASH_HALL, ROTA_CARDAPIO_LINK, ROTA_COZINHA, ROTA_ENTREGAS, ROTA_HALL, ROTA_PRINCIPAL, rotaDaHash,
 } from '../dominio/rota'
+import { EditorItemCardapio } from '../features/cardapio/EditorItemCardapio'
 import { CartaoArrasto, PainelCardapio } from '../features/cardapio/PainelCardapio'
 import { ModalNota } from '../features/notas/ModalNota'
 import { PainelGaleria } from '../features/anexos/PainelGaleria'
@@ -221,6 +222,7 @@ function Composicao({ aoSair }) {
 
       {modal === 'gestao' && (
         <ModalGestao
+          renderizarEditorCardapio={(props) => <EditorItemCardapio {...props} />}
           abaInicial={abaGestao}
           aoTrocarAba={setAbaGestao}
           janelasApi={FONTE_API ? <CadastroEntregaApi /> : null}
@@ -308,11 +310,11 @@ function TelaDaRota({ rota, aoSair }) {
       {rota.tipo === ROTA_HALL
         ? <HallDeModulos fonteApi={FONTE_API} sessao={sessao} agora={agora} />
         : (
-          <MolduraDoModulo moduloId={rota.modulo} telaId={rota.tela} fonteApi={FONTE_API}>
+          <MolduraDoModulo moduloId={rota.modulo} telaId={rota.tela} fonteApi={FONTE_API} tituloVisivel={!(FONTE_API && rota.modulo === 'cardapio' && rota.tela === 'itens')}>
             {/* #1440: no modo API, Entregas › Janelas de entrega é o cadastro da S45 (o mesmo de
                 Entregas › Janelas e frete). Feature não importa feature; quem compõe é o App. */}
             {rota.aba && (
-              <PainelDeAjuste key={rota.aba} aba={rota.aba} janelasApi={FONTE_API ? <CadastroEntregaApi /> : null} />
+              <PainelDeAjuste renderizarEditorCardapio={(props) => <EditorItemCardapio {...props} />} key={rota.aba} aba={rota.aba} janelasApi={FONTE_API ? <CadastroEntregaApi /> : null} />
             )}
           </MolduraDoModulo>
         )}

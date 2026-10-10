@@ -22,6 +22,8 @@ export const produtoDaApi = (item, porcoes = []) => ({
     id: p.id, rotulo: p.rotulo, preco: p.preco, peso: p.peso ?? '', disponivel: p.disponivel !== false, padrao: p.padrao === true,
   })),
   nome: item.nome,
+  descricao: item.descricao ?? '',
+  tempoPreparoMinutos: item.tempoPreparoMinutos ?? null,
   linha: LINHA_DO_CONTRATO[item.linha] ?? 'servir',
   porcao: item.pesoExibicao ?? '',
   preco: item.precoCentavos / 100,

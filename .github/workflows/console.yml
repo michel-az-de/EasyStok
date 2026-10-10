@@ -67,3 +67,4 @@ jobs:
       - run: node ferramentas/prova-onda2-cancelamento.mjs
       - run: node ferramentas/prova-onda2-reagendamento.mjs
       - run: node ferramentas/prova-m36-reabrir-conversa.mjs
+      - run: node ferramentas/prova-editor-cardapio.mjs

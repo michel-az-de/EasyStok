@@ -1,4 +1,5 @@
 using System.Reflection;
+using EasyStock.Api.Authorization;
 using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
@@ -8,6 +9,7 @@ using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NSubstitute;
 
@@ -49,9 +51,39 @@ public class AtendimentoItensCardapioControllerTests
     {
         typeof(AtendimentoItensCardapioController).GetCustomAttributes<AuthorizeAttribute>(inherit: true)
             .Select(a => a.Policy).Should().ContainSingle().Which.Should().Be("Operador");
-        foreach (var nome in new[] { "Fora", "Mover", "Incluir", "Editar", "Arquivar", "Validar", "Visivel" })
+        foreach (var nome in new[] { "Fora", "Mover", "Incluir", "Editar", "Arquivar", "Validar", "Visivel", "Foto" })
             typeof(AtendimentoItensCardapioController).GetMethod(nome)!.GetCustomAttributes<AuthorizeAttribute>()
                 .Select(a => a.Policy).Should().Contain("Gerente", $"a ação {nome} continua reservada ao Gerente");
+    }
+
+    [Fact]
+    public void FotoDoConsole_ExigeCardapio_SemAfrouxarUploadAdministrativo()
+    {
+        ModulosConvention.ModulosDe(typeof(AtendimentoItensCardapioController), nameof(AtendimentoItensCardapioController.Foto))
+            .Should().Equal(Modulo.Cardapio);
+        typeof(UploadsController).GetMethod(nameof(UploadsController.UploadFotoCardapioItem))!
+            .GetCustomAttributes<AuthorizeAttribute>().Select(a => a.Policy).Should().Equal("Admin");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(6 * 1024 * 1024 + 1)]
+    public async Task FotoDoConsole_RecusaTamanhoAntesDeLerArquivo(long tamanho)
+    {
+        var file = Substitute.For<IFormFile>();
+        file.Length.Returns(tamanho);
+        var controller = new AtendimentoItensCardapioController(null!, null!, null!);
+
+        (await controller.Foto(Guid.NewGuid(), file, CancellationToken.None)).Should().BeOfType<BadRequestObjectResult>();
+
+        await file.DidNotReceiveWithAnyArgs().CopyToAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task FotoDoConsole_SemArquivo_400()
+    {
+        var controller = new AtendimentoItensCardapioController(null!, null!, null!);
+        (await controller.Foto(Guid.NewGuid(), null!, CancellationToken.None)).Should().BeOfType<BadRequestObjectResult>();
     }
 }
 

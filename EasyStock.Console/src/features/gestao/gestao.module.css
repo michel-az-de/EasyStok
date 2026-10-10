@@ -36,7 +36,7 @@
 .cabecalhoArea { margin-bottom: var(--e-4); }
 .tituloArea {
   display: flex; align-items: center; gap: var(--e-2); margin: 0 0 var(--e-3);
-  font-family: var(--f-titulo-marca); font-size: var(--t-titulo); font-weight: 600;
+  font-family: var(--f-corpo); font-size: var(--t-titulo); font-weight: 600;
 }
 .tituloArea svg { flex: none; color: var(--marca); }
 .nomeTela { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
