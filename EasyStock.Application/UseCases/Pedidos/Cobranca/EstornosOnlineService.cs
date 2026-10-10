@@ -29,6 +29,12 @@ public sealed class EstornosOnlineService(IPedidoRepository pedidos, IEstornoOnl
 
     public async Task<PedidoEstornoOnline> SolicitarAsync(SolicitarEstornoOnlineInput input, CancellationToken ct = default)
     {
+        var operacao = await ReservarAsync(input, ct);
+        return operacao.Situacao == PedidoEstornoOnline.Pendente ? await ProcessarAsync(operacao, ct) : operacao;
+    }
+
+    public async Task<PedidoEstornoOnline> ReservarAsync(SolicitarEstornoOnlineInput input, CancellationToken ct = default)
+    {
         ExigirGerente(input.NivelSolicitante);
         UseCaseGuards.EnsureNotEmpty(input.OperacaoId, "OperacaoId");
         UseCaseGuards.EnsureNotEmpty(input.PagamentoId, "PagamentoId");
@@ -65,7 +71,7 @@ public sealed class EstornosOnlineService(IPedidoRepository pedidos, IEstornoOnl
             await repo.AdicionarAsync(nova, token);
             return nova;
         }, ct);
-        return operacao.Situacao == PedidoEstornoOnline.Pendente ? await ProcessarAsync(operacao, ct) : operacao;
+        return operacao;
     }
 
     public async Task<PedidoEstornoOnline> RetomarAsync(Guid empresaId, Guid pedidoId, Guid operacaoId, NivelAcesso nivel, CancellationToken ct = default)

@@ -10,6 +10,7 @@ using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Notifications;
+using EasyStock.Application.Tests.Helpers;
 
 namespace EasyStock.Application.Tests.UseCases.Atendimento.Ocorrencias;
 
@@ -36,6 +37,13 @@ public class OcorrenciaUseCasesTests
     private readonly IClienteCrmRepository _crm = Substitute.For<IClienteCrmRepository>();
     private readonly INotificadorService _notificador = Substitute.For<INotificadorService>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+
+    public OcorrenciaUseCasesTests()
+    {
+        _uow.SetupExecuteInTransactionSemRetry<Ocorrencia?>();
+        _uow.SetupExecuteInTransactionSemRetry<OcorrenciaDto?>();
+        _uow.SetupExecuteInTransactionSemRetry<ResolverOcorrenciaResult?>();
+    }
 
     private Pedido NovoPedido()
     {
@@ -68,6 +76,7 @@ public class OcorrenciaUseCasesTests
         var o = Ocorrencia.Abrir(_empresaId, pedidoId, _clienteId, null, OrigemOcorrencia.Dona,
             CategoriaOcorrencia.ProdutoImproprio, "bolo chegou azedo", Agora.AddMinutes(-5));
         _repo.ObterAsync(_empresaId, o.Id, Arg.Any<CancellationToken>()).Returns(o);
+        _repo.ObterTravadaAsync(_empresaId, o.Id, Arg.Any<CancellationToken>()).Returns(o);
         return o;
     }
 
@@ -123,7 +132,8 @@ public class OcorrenciaUseCasesTests
         _estornos.SolicitarAsync(Arg.Any<SolicitarEstornoOnlineInput>(), Arg.Any<CancellationToken>())
             .Returns(new PedidoEstornoOnline { Id = ocorrencia.Id, Valor = 30m, Situacao = PedidoEstornoOnline.Confirmado, EstornoExternoId = "ref-9" });
 
-        var r = await Reembolsar().ExecuteAsync(ocorrencia, 30m, "bolo azedo", Agora, Guid.NewGuid(), "Dona", NivelAcesso.Admin);
+        var resultado = await Resolver().ExecuteAsync(new(_empresaId, ocorrencia.Id, Guid.NewGuid(), "bolo azedo", true, 30m, NivelAcesso.Admin, "Dona"));
+        var r = resultado!.Reembolso!;
 
         r.Situacao.Should().Be(SituacaoReembolso.Efetuado);
         ocorrencia.ReembolsoValor.Should().Be(30m);
@@ -150,7 +160,7 @@ public class OcorrenciaUseCasesTests
         await _notificador.EnfileirarEventoAsync(TipoEventoNotificacao.ReembolsoEfetuado, _empresaId,
             Arg.Do<string>(p => payload = p), ocorrencia.Id, Arg.Any<CancellationToken>());
 
-        await Reembolsar().ExecuteAsync(ocorrencia, 30m, "bolo azedo", Agora, Guid.NewGuid(), "Dona", NivelAcesso.Admin);
+        await Resolver().ExecuteAsync(new(_empresaId, ocorrencia.Id, Guid.NewGuid(), "bolo azedo", true, 30m, NivelAcesso.Admin, "Dona"));
 
         payload.Should().NotBeNull();
         var json = System.Text.Json.JsonDocument.Parse(payload!).RootElement;
@@ -170,7 +180,8 @@ public class OcorrenciaUseCasesTests
         _estornos.SolicitarAsync(Arg.Any<SolicitarEstornoOnlineInput>(), Arg.Any<CancellationToken>())
             .Returns(new PedidoEstornoOnline { Id = ocorrencia.Id, Valor = 30m, Situacao = PedidoEstornoOnline.Confirmado, EstornoExternoId = "ref-9" });
 
-        var r = await Reembolsar().ExecuteAsync(ocorrencia, 30m, "bolo azedo", Agora, Guid.NewGuid(), "Dona", NivelAcesso.Admin);
+        var resultado = await Resolver().ExecuteAsync(new(_empresaId, ocorrencia.Id, Guid.NewGuid(), "bolo azedo", true, 30m, NivelAcesso.Admin, "Dona"));
+        var r = resultado!.Reembolso!;
 
         r.Situacao.Should().Be(SituacaoReembolso.Efetuado, "o dinheiro já voltou; só o aviso não tem para onde ir");
         await _notificador.DidNotReceiveWithAnyArgs().EnfileirarEventoAsync(default, default, default!, default, default);
@@ -196,7 +207,8 @@ public class OcorrenciaUseCasesTests
         _cobrancas.ListarDoPedidoAsync(_empresaId, pedido.Id, Arg.Any<CancellationToken>()).Returns(Array.Empty<CobrancaPedido>());
         var ocorrencia = OcorrenciaAberta(pedido.Id);
 
-        var r = await Reembolsar().ExecuteAsync(ocorrencia, 25m, "pix manual", Agora, Guid.NewGuid(), "Dona", NivelAcesso.Admin);
+        var resultado = await Resolver().ExecuteAsync(new(_empresaId, ocorrencia.Id, Guid.NewGuid(), "pix manual", true, 25m, NivelAcesso.Admin, "Dona"));
+        var r = resultado!.Reembolso!;
 
         r.Situacao.Should().Be(SituacaoReembolso.ManualNecessario);
         r.Codigo.Should().Be(ReembolsarPedidoUseCase.CodigoReembolsoManual);
@@ -229,7 +241,7 @@ public class OcorrenciaUseCasesTests
         var usuario = Guid.NewGuid();
 
         var r = await Resolver().ExecuteAsync(new ResolverOcorrenciaInput(
-            _empresaId, ocorrencia.Id, usuario, "cupom de 10% na próxima", Reembolsar: false, Valor: null));
+            _empresaId, ocorrencia.Id, usuario, "cupom de 10% na próxima", Reembolsar: false, Valor: null, NivelSolicitante: NivelAcesso.Admin));
 
         r!.Ocorrencia.Status.Should().Be("resolvida");
         ocorrencia.Resolucao.Should().Be("cupom de 10% na próxima");
@@ -270,7 +282,8 @@ public class OcorrenciaUseCasesTests
 
         r!.Reembolso!.Situacao.Should().Be(SituacaoReembolso.Falhou);
         ocorrencia.Status.Should().Be(StatusOcorrencia.Aberta);
-        await _uow.DidNotReceive().CommitAsync();
+        ocorrencia.ReembolsoSolicitadoEm.Should().Be(Agora);
+        await _uow.Received(1).CommitAsync();
     }
 
     [Fact]
@@ -295,8 +308,59 @@ public class OcorrenciaUseCasesTests
     public async Task ResolverOcorrencia_InexistenteDevolveNull()
     {
         var r = await Resolver().ExecuteAsync(new ResolverOcorrenciaInput(
-            _empresaId, Guid.NewGuid(), Guid.NewGuid(), "x", false, null));
+            _empresaId, Guid.NewGuid(), Guid.NewGuid(), "x", false, null, NivelAcesso.Admin));
 
         r.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Apurar_e_encerrar_preservam_autoria_e_repeticao_nao_duplica_nota()
+    {
+        var o = OcorrenciaAberta(NovoPedido().Id);
+        var usuario = Guid.NewGuid();
+        var apurar = new ApurarOcorrenciaUseCase(_repo, _uow, new RelogioFixo(Agora));
+        await apurar.ExecuteAsync(_empresaId, o.Id, usuario, "Gerente", NivelAcesso.Gerente);
+        await apurar.ExecuteAsync(_empresaId, o.Id, Guid.NewGuid(), "Outro", NivelAcesso.Admin);
+        o.ApuradaPorUsuarioId.Should().Be(usuario);
+        o.ApuradaPorNome.Should().Be("Gerente");
+        var input = new ResolverOcorrenciaInput(_empresaId, o.Id, usuario, new string('x', 1000), false, null, NivelAcesso.Gerente, "Gerente");
+        await Resolver().ExecuteAsync(input);
+        await Resolver().ExecuteAsync(input with { UsuarioNome = "Outro" });
+        o.ResolvidaPorNome.Should().Be("Gerente");
+        o.Resolucao.Should().HaveLength(1000);
+        await _crm.Received(1).AdicionarNotaAsync(Arg.Is<ClienteNota>(n => n.Texto.Length == 500 && n.Autor == "Gerente"), Arg.Any<CancellationToken>());
+        await FluentActions.Invoking(() => Resolver().ExecuteAsync(input with { Resolucao = "outra" }))
+            .Should().ThrowAsync<CobrancaPedidoConflitoException>();
+    }
+
+    [Fact]
+    public async Task Operador_nao_apura_nem_encerra_e_empresa_alheia_nao_altera()
+    {
+        var o = OcorrenciaAberta(NovoPedido().Id);
+        var apurar = new ApurarOcorrenciaUseCase(_repo, _uow, new RelogioFixo(Agora));
+        await FluentActions.Invoking(() => apurar.ExecuteAsync(_empresaId, o.Id, Guid.NewGuid(), "Atendimento", NivelAcesso.Operador))
+            .Should().ThrowAsync<UnauthorizedAccessException>();
+        var input = new ResolverOcorrenciaInput(_empresaId, o.Id, Guid.NewGuid(), "Resolvido", false, null);
+        await FluentActions.Invoking(() => Resolver().ExecuteAsync(input)).Should().ThrowAsync<UnauthorizedAccessException>();
+        var outra = Guid.NewGuid();
+        _repo.ObterTravadaAsync(outra, o.Id, Arg.Any<CancellationToken>()).Returns(o);
+        (await Resolver().ExecuteAsync(input with { EmpresaId = outra, NivelSolicitante = NivelAcesso.Admin })).Should().BeNull();
+        (await apurar.ExecuteAsync(outra, o.Id, input.UsuarioId, "Dona", NivelAcesso.Admin)).Should().BeNull();
+        o.ApuradaEm.Should().BeNull();
+        o.EstaAberta.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("pendente", false)]
+    [InlineData("confirmado", false)]
+    [InlineData("recusado", true)]
+    public async Task Reembolso_legado_impede_encerramento_sem_conferir_exceto_recusa(string situacao, bool permite)
+    {
+        var o = OcorrenciaAberta(NovoPedido().Id);
+        _estornos.ConsultarAsync(_empresaId, o.PedidoId, Arg.Any<CancellationToken>()).Returns(new EstornosOnlineResult([], [
+            new PedidoEstornoOnline { Id = o.Id, EmpresaId = _empresaId, PedidoId = o.PedidoId, Situacao = situacao }]));
+        var input = new ResolverOcorrenciaInput(_empresaId, o.Id, Guid.NewGuid(), "Resolvido", false, null, NivelAcesso.Admin);
+        if (permite) (await Resolver().ExecuteAsync(input))!.Ocorrencia.Status.Should().Be("resolvida");
+        else await FluentActions.Invoking(() => Resolver().ExecuteAsync(input)).Should().ThrowAsync<CobrancaPedidoConflitoException>();
     }
 }

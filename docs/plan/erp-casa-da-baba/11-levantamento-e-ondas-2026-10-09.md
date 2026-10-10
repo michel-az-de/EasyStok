@@ -849,3 +849,41 @@ Usuários e operações são sintéticos. A preparação associa pedido e conver
 - Solicitação nova é recusada se o Caixa do dia já estiver fechado. Se o provedor aceitar e o fechamento ocorrer antes da confirmação local, o fato financeiro é registrado sem reabrir o snapshot. Reconciliação com períodos fechados e concorrência ampla do fechamento continuam no M5.
 - A atualização da Ficha ocorre por consulta, retomada ou retorno do foco à janela. Não foi criado novo evento SSE para estornos. O atalho genérico `marcarEstorno` permanece fora do modo API; os dois tipos de devolução usam o bloco próprio.
 - Próxima fatia: conectar apuração e encerramento de ocorrências na Ficha e continuar as ações restantes por perfil. Depois, executar os aceites externos de pagamentos, canais, logística e impressão física com evidências próprias.
+
+## 27. Execução da Onda 2: apuração e encerramento de ocorrências na Ficha
+
+Data: 10/10/2026. Base de implementação: `d0a4cdb6`, incluindo as porções do cardápio e da comanda das PRs #1532 e #1533. Integração sobre `0ba8504c`, com a correção da gaveta de dinheiro da PR #1535; testes de aplicação e PostgreSQL repetidos sobre essa base. Fatia implementada e homologada localmente. M3 e a Onda 2 continuam parciais; publicação pública e aceites externos não foram verificados nesta rodada.
+
+### 27.1 Implementado
+
+- A Ficha consulta todas as ocorrências do pedido, incluindo encerradas, pelo filtro `pedidoId` de `api/ocorrencias`. Mostra relato, categoria, origem, apuração, responsável, data e resolução. Falha de consulta tem mensagem e retentativa; não vira histórico vazio. O modo simulado conserva seu fluxo próprio.
+- Dona/gerente inicia apuração e encerra com resolução obrigatória. Atendimento consulta; Cozinha não acessa o módulo. A capacidade `gerenciarOcorrencias` vem da sessão, e as rotas de abertura manual, apuração e resolução exigem Gerente e Atendimento. Empresa e autor vêm do JWT; os use cases conferem propriedade e nível, além dos filtros de tenant e RLS.
+- Apuração grava o primeiro responsável e horário sem reabrir uma ocorrência encerrada. Resolução repetida com o mesmo conteúdo devolve o resultado anterior; conteúdo divergente recebe 409. Lock da ocorrência e transação impedem sobrescrita concorrente e duplicação de nota. A resolução integral fica na ocorrência; o resumo no CRM respeita o limite de 500 caracteres da nota.
+- Intenção financeira e motivo da ocorrência são persistidos juntos antes do HTTP do provedor. O encerramento comum é impedido enquanto essa operação estiver pendente ou confirmada sem conclusão da ocorrência. A Ficha permite conferir a mesma solicitação e concluir; uma recusa definitiva permite registrar outra solução sem declarar devolução. Solicitações anteriores ao novo campo também são recuperadas do registro financeiro.
+- Confirmação da ocorrência, nota de reembolso e evento do outbox são gravados juntos, uma vez. Se essa conclusão falhar depois do aceite financeiro, a ocorrência permanece aberta e a retomada reutiliza o mesmo estorno, sem outra saída. O encerramento comum não gera transferência; novos estornos usam o bloco Devoluções. O valor manual legado continua explicitamente sem confirmação de dinheiro devolvido.
+- Migration `20261010121307_AddApuracaoOcorrencia`: cinco campos opcionais de auditoria e intenção. Reversão bloqueada quando apagaria auditoria ou solicitação persistida. O snapshot também incorpora o `ValueGeneratedNever` de variações já presente na configuração da PR #1532, sem DDL adicional para variações.
+
+### 27.2 Validação local
+
+Evidências, TRX, scripts, provedor HTTP controlado e capturas em `C:\rep\EasyStok\.build\onda2-ocorrencias`. Bancos sintéticos: `easystock_onda2_ocorrencias` e `easystock_onda2_ocorrencias_migration`. Somente esses ambientes locais foram usados.
+
+| Camada | Evidência |
+|---|---|
+| Build | `EasyStok.CI.slnf` compilou sem erros; avisos existentes de API obsoleta em API/Web |
+| Domain / Application | 1.544 e 2.433 testes aprovados, sem ignorados |
+| API / Arquitetura | 1.117 testes de API e 61 do filtro de CI `Category!=ArchitectureDebt` aprovados, sem ignorados |
+| Gate de commit | Build e 37 testes obrigatórios de arquitetura aprovados |
+| PostgreSQL real | 24 testes aprovados, sem ignorados: concorrência de apuração e resolução, dois reembolsos simultâneos com a mesma chave, tentativa de encerramento durante HTTP, rollback da nota após aceite financeiro, consulta com 102 ocorrências, tenant/RLS e regressões de estorno |
+| Console | 67 scripts de prova aprovados; lint, camadas, 264 pares de contraste e build aprovados |
+| Migration | Aplicação, reversão sem auditoria e reaplicação aprovadas; reversão com auditoria recusada e registro preservado; modelo sem alterações pendentes |
+| HTTP / Chromium | Perfis e empresa forjada bloqueados; resolução vazia recusada; duplo clique, replay, 409 divergente, resposta perdida após commit, falha de consulta e retomada de reembolso pendente conferidos com API/PostgreSQL reais |
+| Apresentação | Computador 1440 × 1000 e celular 390 × 844, incluindo encerramento real no celular; sem rolagem horizontal ou erros JavaScript; Atendimento somente consulta |
+
+A primeira execução PostgreSQL falhou em dois testes novos por ambiguidade do argumento do substituto de outbox. O helper foi corrigido e os 24 testes passaram na repetição, incluindo duas conclusões financeiras concorrentes. O primeiro roteiro do navegador também precisou delimitar o seletor do título, pois o cliente sintético tinha o mesmo nome do bloco. Nenhuma dessas execuções iniciais é apresentada como verde.
+
+### 27.3 Limites e próxima fatia
+
+- A consulta atualiza ao abrir a Ficha, retornar o foco, usar Atualizar ou concluir uma ação. Não há novo evento SSE de ocorrência nesta fatia. Formulários e respostas são isolados por pedido; não há mudança otimista de estado.
+- O bloco trabalha ocorrências existentes; abertura automática e abertura manual pela API conservam seus contratos. Não foi adicionada uma nova tela de abertura. O aviso financeiro continua no outbox existente, sem envio externo comprovado.
+- Não houve transferência real, mensagem a cliente real ou verificação de publicação pública. A prova financeira usa o adaptador de produção com provedor HTTP local controlado.
+- Próxima fatia: continuar as ações operacionais ainda não ligadas no modo API, seguindo M3 e a matriz por perfil. Os aceites externos de pagamentos, canais, logística e impressão física seguem separados.

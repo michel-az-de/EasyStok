@@ -13,6 +13,7 @@ import { criarAcoesConfiguracaoApi } from './api/configuracao'
 import { criarAcoesAssistenteApi } from './api/assistente'
 import { criarAcoesAgenteApi } from './api/agente'
 import { criarAcoesConsentimentosApi } from './api/consentimentos'
+import { criarAcoesOcorrenciasApi } from './api/ocorrencias'
 import { criarAcoesComandaApi } from './api/comanda'
 import { criarAcoesClienteApi } from './api/cliente'
 import { criarAcoesEncerramentoEMidiaApi } from './api/encerramentoEMidia'
@@ -66,6 +67,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     ...criarAcoesAssistenteApi(),
     ...criarAcoesAgenteApi({ despachar }),
     ...criarAcoesConsentimentosApi(),
+    ...criarAcoesOcorrenciasApi(),
     ...criarAcoesComandaApi(acoes, { despachar, estadoRef }),
     ...clienteApi,
     // #1441: respostas prontas, automáticas e tags do cliente.
