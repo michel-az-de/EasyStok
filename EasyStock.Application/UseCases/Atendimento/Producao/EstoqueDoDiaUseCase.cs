@@ -16,7 +16,8 @@ public sealed record EstoqueDoPrato(
     IReadOnlyList<LoteDoDia> Lotes, IReadOnlyList<SaldoDaPorcao>? Porcoes = null);
 
 /// <param name="VariacaoId">A porção do cardápio. Null = saldo sem porção (estoque antigo ou lote do PWA).</param>
-public sealed record SaldoDaPorcao(Guid? VariacaoId, string Rotulo, decimal Saldo);
+/// <param name="ProdutoVariacaoId">A mesma porção no estoque: é o que a perda manda de volta. Null enquanto a porção não tem lote.</param>
+public sealed record SaldoDaPorcao(Guid? VariacaoId, string Rotulo, decimal Saldo, Guid? ProdutoVariacaoId = null);
 
 /// <param name="CardapioItemId">O prato do alerta, para o console ajustar pela rota do item. Null se não está no cardápio.</param>
 public sealed record AlertaDeEstoque(Guid ProdutoId, Guid? CardapioItemId, string Nome, string Texto, decimal QuantidadeDescoberta);
@@ -86,7 +87,8 @@ public sealed class EstoqueDoDiaUseCase(
         var saldos = prato.Variacoes
             .OrderBy(v => v.OrdemExibicao).ThenBy(v => v.CriadoEm).ThenBy(v => v.Id)
             .Select(v => new SaldoDaPorcao(v.Id, v.Rotulo,
-                v.ProdutoVariacaoId is { } id ? SaldoEDescoberto(lotes.Where(l => l.ProdutoVariacaoId == id), hoje).Saldo : 0m))
+                v.ProdutoVariacaoId is { } id ? SaldoEDescoberto(lotes.Where(l => l.ProdutoVariacaoId == id), hoje).Saldo : 0m,
+                v.ProdutoVariacaoId))
             .ToList();
         var semPorcao = SaldoEDescoberto(lotes.Where(l => l.ProdutoVariacaoId is null), hoje).Saldo;
         if (semPorcao > 0) saldos.Add(new SaldoDaPorcao(null, "sem porção", semPorcao));

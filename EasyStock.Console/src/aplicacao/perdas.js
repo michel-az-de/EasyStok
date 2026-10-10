@@ -16,8 +16,15 @@ export const lerVencidos = async () => ((await obterVencidos()) ?? []).map(venci
 
 const numero = (texto) => (String(texto ?? '').trim() === '' ? NaN : Number(String(texto).replace(',', '.')))
 
-export function erroDaPerda({ produtoId, quantidade, motivo, texto }) {
+// M1.4c (#1540): o saldo de prato com porções é de cada porção, então a perda diz de qual saiu.
+// A chave separa "ainda não escolheu" de "o que ficou sem porção" (estoque antigo).
+const SEM_PORCAO = 'sem-porcao'
+export const porcoesComSaldo = (prato) => (prato?.porcoes ?? []).filter((s) => s.saldo > 0)
+  .map((s) => ({ chave: s.variacaoId ?? SEM_PORCAO, rotulo: s.rotulo, saldo: s.saldo, produtoVariacaoId: s.produtoVariacaoId ?? null }))
+
+export function erroDaPerda({ produtoId, quantidade, motivo, texto, porcoes = [], porcao = '' }) {
   if (!produtoId) return 'Escolha o prato ou o insumo perdido.'
+  if (porcoes.length > 0 && !porcoes.some((s) => s.chave === porcao)) return 'Escolha a porção perdida.'
   if (!(numero(quantidade) > 0)) return 'Quantidade perdida maior que zero.'
   if (!MOTIVOS_PERDA.some((m) => m.id === motivo)) return 'Escolha o motivo da perda.'
   if (motivo === 'Outro' && String(texto ?? '').trim().length < 3) return 'Em "Outro", escreva o motivo da perda.'
@@ -45,6 +52,7 @@ export function criarGestaoPerdas({ recarregar, aoErro, aoFeito = () => {} }) {
       return gravar(() => lancarPerda({
         produtoId: rascunho.produtoId,
         itemEstoqueId: rascunho.itemEstoqueId ?? null,
+        produtoVariacaoId: (rascunho.porcoes ?? []).find((s) => s.chave === rascunho.porcao)?.produtoVariacaoId ?? null,
         quantidade: numero(rascunho.quantidade),
         motivo: rascunho.motivo,
         texto: rascunho.motivo === 'Outro' ? String(rascunho.texto).trim() : null,

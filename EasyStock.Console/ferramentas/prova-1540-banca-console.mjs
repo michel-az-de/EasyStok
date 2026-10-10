@@ -5,7 +5,8 @@
 //   3. peso que não é número inteiro ("350g") trava a linha da produção em vez de ir nulo;
 //   4. apagar o mínimo do insumo manda zero (na API, nulo é "não mexe");
 //   5. sangria repetida depois de resposta perdida usa a mesma Idempotency-Key; gravou, chave nova;
-//   6. "Desfazer o último" manda o id do pagamento que a tela mostrou.
+//   6. "Desfazer o último" manda o id do pagamento que a tela mostrou;
+//   7. perda de prato com porções pede a porção e manda a porção do estoque (M1.4c).
 //
 //   node ferramentas/prova-1540-banca-console.mjs
 
@@ -34,6 +35,7 @@ const { criarGestaoInsumos } = await import('../src/aplicacao/insumos.js')
 const { criarAcoesCaixaApi } = await import('../src/aplicacao/api/caixa.js')
 const { criarChaveDeEnvio } = await import('../src/aplicacao/chaveDeEnvio.js')
 const { ultimoPagamentoApi } = await import('../src/dominio/pagamento.js')
+const { criarGestaoPerdas, erroDaPerda, porcoesComSaldo } = await import('../src/aplicacao/perdas.js')
 
 let passou = 0
 const falhas = []
@@ -150,6 +152,35 @@ await confere('o último pagamento é o mais recente, e leva o id que a API espe
   assert.deepEqual(ultimoPagamentoApi(pedido), { valor: 30, em: 2000, pagamentoId: 'b' })
   assert.equal(ultimoPagamentoApi({ pagamentosApi: [] }), null)
   assert.equal(ultimoPagamentoApi(null), null)
+})
+
+// --- 7. Perda por porção ----------------------------------------------------------------
+const ravioli = {
+  porcoes: [
+    { variacaoId: 'v-300', rotulo: '300 g', saldo: 4, produtoVariacaoId: 'pv-300' },
+    { variacaoId: 'v-800', rotulo: '800 g', saldo: 0, produtoVariacaoId: 'pv-800' },
+    { variacaoId: null, rotulo: 'sem porção', saldo: 2, produtoVariacaoId: null },
+  ],
+}
+const perda = { produtoId: 'p-1', quantidade: '1', motivo: 'PerdaNoPreparo', texto: '' }
+await confere('só porção com saldo vira opção, e a "sem porção" tem chave própria', () => {
+  assert.deepEqual(porcoesComSaldo(ravioli).map((s) => [s.chave, s.produtoVariacaoId]), [['v-300', 'pv-300'], ['sem-porcao', null]])
+  assert.deepEqual(porcoesComSaldo({ porcoes: [] }), [])
+})
+await confere('prato com porções exige a porção; insumo e prato sem porção seguem como antes', () => {
+  const porcoes = porcoesComSaldo(ravioli)
+  assert.equal(erroDaPerda({ ...perda, porcoes, porcao: '' }), 'Escolha a porção perdida.')
+  assert.equal(erroDaPerda({ ...perda, porcoes, porcao: 'v-300' }), null)
+  assert.equal(erroDaPerda(perda), null)
+})
+await confere('a perda manda a porção do estoque escolhida; "sem porção" não manda porção', async () => {
+  const chamadas = montarFetch(() => ({ data: { quantidade: 1 } }))
+  const gestao = criarGestaoPerdas({ recarregar: async () => {}, aoErro: () => {} })
+  const porcoes = porcoesComSaldo(ravioli)
+  assert.equal(await gestao.lancar({ ...perda, porcoes, porcao: 'v-300' }), true)
+  assert.equal(await gestao.lancar({ ...perda, porcoes, porcao: 'sem-porcao' }), true)
+  const enviados = chamadas.filter((c) => c.metodo === 'POST').map((c) => c.corpo.produtoVariacaoId ?? null)
+  assert.deepEqual(enviados, ['pv-300', null])
 })
 
 console.log(`\n${passou} verificações passaram, ${falhas.length} falharam.`)

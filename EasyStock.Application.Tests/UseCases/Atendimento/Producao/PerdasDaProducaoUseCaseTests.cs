@@ -165,4 +165,36 @@ public class PerdasDaProducaoUseCaseTests
         (v.Lote, v.DiasVencido, v.Valor).Should().Be(("LOT-ONTEM", 1, 12m));
         _gravadas.Should().BeEmpty("sugestão não lança sozinha");
     }
+
+    // #1540 (M1.4c): prato com porções só tem lote de porção. Sem a porção a perda respondia
+    // "Só há 0 em estoque" com saldo na prateleira.
+    [Fact]
+    public async Task PratoComPorcoes_PerdaSaiSoDosLotesDaPorcaoEscolhida()
+    {
+        var porcao300 = Guid.NewGuid();
+        var lote300 = Lote(4, 5m, new DateTime(2026, 10, 15), "LOT-300");
+        lote300.ProdutoVariacaoId = porcao300;
+        _itens.GetLotesDisponiveisParaSaidaAsync(_empresaId, _lasanha.Id, porcao300, true, true).Returns([lote300]);
+
+        var r = await Sut().LancarAsync(_empresaId, false,
+            new LancarPerdaInput(_lasanha.Id, null, 1, MotivoPerda.PerdaNoPreparo, ProdutoVariacaoId: porcao300));
+
+        r.Valor.Should().Be(5m);
+        _gravadas.Should().ContainSingle().Which.ItemEstoqueId.Should().Be(lote300.Id);
+        lote300.QuantidadeAtual.Value.Should().Be(3m);
+    }
+
+    [Fact]
+    public async Task PratoComPorcoes_SemEscolherAPorcao_PedeAPorcaoEmVezDeDizerQueNaoHaSaldo()
+    {
+        var lote300 = Lote(4, 5m, new DateTime(2026, 10, 15), "LOT-300");
+        lote300.ProdutoVariacaoId = Guid.NewGuid();
+        Fefo(true);
+        _itens.GetByProdutoAsync(_empresaId, _lasanha.Id).Returns([lote300]);
+
+        var act = () => Sut().LancarAsync(_empresaId, false, new LancarPerdaInput(_lasanha.Id, null, 1, MotivoPerda.PerdaNoPreparo));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*porção*");
+        _gravadas.Should().BeEmpty();
+    }
 }

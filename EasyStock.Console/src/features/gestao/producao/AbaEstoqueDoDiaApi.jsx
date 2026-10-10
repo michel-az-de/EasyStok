@@ -136,6 +136,9 @@ export function AbaEstoqueDoDiaApi() {
                     aoSalvar={(contagem, motivo) => estoque.ajustar(p.sku, contagem, motivo)}
                     aoCancelar={() => setAjustando(null)}
                   />
+                ) : p.porcoes.length > 0 ? (
+                  // O saldo é de cada porção: a contagem única do prato a API recusa (#1540).
+                  <span className={css.detalhe}>Para acertar, lance em Perdas ou na Produção do dia, pela porção.</span>
                 ) : (
                   <div className={css.acoes}>
                     <Botao variante="texto" icone="lapis" onClick={() => setAjustando(p.sku)}>Ajustar</Botao>

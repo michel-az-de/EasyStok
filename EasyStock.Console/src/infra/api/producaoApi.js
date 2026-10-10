@@ -24,7 +24,9 @@ export const estoqueDoDiaDaApi = (r) => ({
     descoberto: p.descoberto,
     lotes: (p.lotes ?? []).map(loteDaApi),
     // M1.4c (#1537): saldo de cada porção; variacaoId nulo é o que ficou sem porção.
-    porcoes: (p.porcoes ?? []).map((s) => ({ variacaoId: s.variacaoId ?? null, rotulo: s.rotulo, saldo: s.saldo })),
+    porcoes: (p.porcoes ?? []).map((s) => ({
+      variacaoId: s.variacaoId ?? null, rotulo: s.rotulo, saldo: s.saldo, produtoVariacaoId: s.produtoVariacaoId ?? null,
+    })),
   })),
   alertas: (r?.alertas ?? []).map((a) => ({
     produtoId: a.produtoId,
@@ -174,8 +176,8 @@ const query = (pares) => {
 }
 export const obterPerdas = (de, ate) => chamarApi(`${PRODUCAO}/perdas${query({ de, ate })}`)
 export const obterVencidos = () => chamarApi(`${PRODUCAO}/perdas/vencidos`)
-export const lancarPerda = ({ produtoId, itemEstoqueId = null, quantidade, motivo, texto = null }) =>
-  chamarApi(`${PRODUCAO}/perdas`, { metodo: 'POST', corpo: { produtoId, itemEstoqueId, quantidade, motivo, texto } })
+export const lancarPerda = ({ produtoId, itemEstoqueId = null, quantidade, motivo, texto = null, produtoVariacaoId = null }) =>
+  chamarApi(`${PRODUCAO}/perdas`, { metodo: 'POST', corpo: { produtoId, itemEstoqueId, quantidade, motivo, texto, ...(produtoVariacaoId ? { produtoVariacaoId } : {}) } })
 export const estornarSaida = (movimentacaoId, motivo) =>
   chamarApi(`/api/estoque/estorno/${movimentacaoId}`, { metodo: 'POST', corpo: { motivo } })
 

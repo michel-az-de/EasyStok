@@ -5,7 +5,9 @@ namespace EasyStock.Application.UseCases.Atendimento.Producao;
 
 /// <param name="ItemEstoqueId">Lote escolhido. Null = sai por FEFO.</param>
 /// <param name="Texto">Obrigatório quando o motivo é Outro.</param>
-public sealed record LancarPerdaInput(Guid ProdutoId, Guid? ItemEstoqueId, decimal Quantidade, MotivoPerda Motivo, string? Texto = null);
+/// <param name="ProdutoVariacaoId">Porção perdida (M1.4c): o FEFO fica nos lotes dela. Null = lotes sem porção.</param>
+public sealed record LancarPerdaInput(
+    Guid ProdutoId, Guid? ItemEstoqueId, decimal Quantidade, MotivoPerda Motivo, string? Texto = null, Guid? ProdutoVariacaoId = null);
 
 public sealed record PerdaLancada(IReadOnlyList<Guid> Movimentacoes, decimal Quantidade, decimal Valor);
 
@@ -147,7 +149,8 @@ public sealed class PerdasDaProducaoUseCase(
         }
         else
         {
-            lotes = await itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(empresaId, input.ProdutoId, null, true, permitirVencido);
+            lotes = await itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(
+                empresaId, input.ProdutoId, input.ProdutoVariacaoId, true, permitirVencido);
         }
 
         var plano = new List<(ItemEstoque, decimal)>();
@@ -159,6 +162,11 @@ public sealed class PerdasDaProducaoUseCase(
             plano.Add((lote, tirar));
             restante -= tirar;
         }
+        // O saldo de prato com porções é de cada porção (D-M1-03): sem ela, o FEFO só vê lote sem porção.
+        if (restante > 0 && input.ItemEstoqueId is null && input.ProdutoVariacaoId is null
+            && (await itemEstoqueRepository.GetByProdutoAsync(empresaId, input.ProdutoId))
+                .Any(l => l.ProdutoVariacaoId is not null && l.QuantidadeAtual.Value > 0))
+            throw new UseCaseValidationException("Escolha a porção perdida: o saldo deste prato é por porção.");
         if (restante > 0)
             throw new UseCaseValidationException(
                 $"Só há {input.Quantidade - restante:0.###} em estoque{(input.ItemEstoqueId is null ? "" : " nesse lote")}: confira a quantidade.");
