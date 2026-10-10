@@ -83,7 +83,7 @@ export function AbaPlanejamentoApi() {
   if (carga.estado === 'erro') return (
     <div className={css.aba} role="alert">
       <p className={css.aviso}>Não consegui ler a sugestão: {carga.erro}</p>
-      <Botao onClick={() => { setCarga({ estado: 'carregando', erro: null }); setTentativa((t) => t + 1) }}>Tentar novamente</Botao>
+      <Botao icone="refresh-cw" onClick={() => { setCarga({ estado: 'carregando', erro: null }); setTentativa((t) => t + 1) }}>Tentar novamente</Botao>
     </div>
   )
 
@@ -93,7 +93,7 @@ export function AbaPlanejamentoApi() {
         Quanto produzir de cada prato para atender os pedidos agendados até a data, cobrir o que saiu sem saldo e
         voltar ao mínimo. Mude as porções à vontade: calcular não mexe no estoque.
       </p>
-      <label className={css.topo}>
+      <label className={css.dataPlanejamento}>
         <span className={css.nome}>Pedidos até</span>
         <input className={css.busca} type="date" aria-label="Pedidos até" value={ate} onChange={(e) => { setAte(e.target.value); setConsulta(e.target.value) }} />
       </label>
@@ -121,8 +121,8 @@ export function AbaPlanejamentoApi() {
       )}
 
       <div className={css.topo}>
-        <Botao variante="primario" onClick={calcular} disabled={ocupado || linhas.length === 0}>Calcular insumos</Botao>
-        <Botao onClick={lancar} disabled={ocupado || linhas.length === 0}>Lançar como produção</Botao>
+        <Botao variante="primario" icone="nota" onClick={calcular} disabled={ocupado || linhas.length === 0}>Calcular insumos</Botao>
+        <Botao icone="cooking-pot" onClick={lancar} disabled={ocupado || linhas.length === 0}>Lançar como produção</Botao>
       </div>
 
       {plano && (
@@ -152,7 +152,7 @@ export function AbaPlanejamentoApi() {
           )}
           <div className={css.topo}>
             {plano.custoTotal != null && <span className={css.detalhe}>Custo estimado {moeda(plano.custoTotal)}</span>}
-            <Botao onClick={comprar} disabled={ocupado}>Gerar lista de compras</Botao>
+            <Botao icone="shopping-cart" onClick={comprar} disabled={ocupado}>Gerar lista de compras</Botao>
           </div>
         </section>
       )}

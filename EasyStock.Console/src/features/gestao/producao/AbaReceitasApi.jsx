@@ -67,14 +67,14 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar }) {
   }
 
   return (
-    <form className={css.aba} onSubmit={salvar} aria-label={`Receita de ${prato.nome}`}>
+    <form className={`${css.aba} ${css.editorReceita}`} onSubmit={salvar} aria-label={`Receita de ${prato.nome}`}>
       <div className={css.campoQuantidade}>
         <CampoTexto rotulo="Rendimento" dica={detalhe.unidadeRendimento === 'Un' ? 'Em porções' : `Em ${detalhe.unidadeRendimento}`}
           inputMode="decimal" value={rendimento} onChange={(e) => setRendimento(e.target.value)} />
       </div>
-      <ul className={css.lista}>
+      <ul className={css.listaFormularios}>
         {linhas.map((l, i) => (
-          <li key={`${l.insumoId}-${i}`} className={`${css.campos} ${css.formulario}`}>
+          <li key={`${l.insumoId}-${i}`} className={`${css.campos} ${css.formulario} ${css.linhaReceita}`}>
             <CampoSelecao rotulo="Insumo" value={l.insumoId} onChange={mudar(i, 'insumoId')}
               opcoes={[{ valor: '', rotulo: 'Escolha o insumo' }, ...insumos.map((s) => ({ valor: s.id, rotulo: s.nome })),
                 ...(l.insumoId && !insumos.some((s) => s.id === l.insumoId) ? [{ valor: l.insumoId, rotulo: l.insumo }] : [])]} />
@@ -83,15 +83,15 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar }) {
               opcoes={UNIDADES_RECEITA.map((u) => ({ valor: u, rotulo: u }))} />
             <div className={css.rodapeForm}>
               <span className={css.detalhe}>{l.custo != null ? `Custo: ${moeda(l.custo)}` : ''}</span>
-              <Botao variante="texto" onClick={() => setLinhas((atual) => atual.filter((_, j) => j !== i))}>Tirar</Botao>
+              <Botao variante="texto" icone="lixeira" onClick={() => setLinhas((atual) => atual.filter((_, j) => j !== i))}>Tirar</Botao>
             </div>
           </li>
         ))}
       </ul>
-      <div className={css.topo}>
-        <Botao onClick={() => setLinhas((atual) => [...atual, { insumoId: '', quantidade: '', unidade: 'G', custo: null }])}>Mais um insumo</Botao>
+      <div className={css.acoesReceita}>
+        <Botao icone="plus" onClick={() => setLinhas((atual) => [...atual, { insumoId: '', quantidade: '', unidade: 'G', custo: null }])}>Mais um insumo</Botao>
         <Botao variante="texto" onClick={aoFechar}>Cancelar</Botao>
-        <Botao tipo="submit" variante="primario" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar receita'}</Botao>
+        <Botao tipo="submit" variante="primario" icone="check" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar receita'}</Botao>
       </div>
       {insumos.length === 0 && <p className={css.descricao}>Para montar a receita, cadastre os insumos em <a className={css.link} href={hashDoModulo('producao', 'insumos')}>Insumos</a>.</p>}
     </form>
@@ -143,7 +143,7 @@ export function AbaReceitasApi() {
                 {r.baixaAutomatica && <Pilula tom="ok" fina>baixa insumos ao produzir</Pilula>}
               </div>
               <div className={css.acoes}>
-                <Botao variante="texto" onClick={() => setEditando(editando === r.produtoId ? null : r.produtoId)}>
+                <Botao variante="texto" icone={podeEditar ? 'lapis' : 'nota'} onClick={() => setEditando(editando === r.produtoId ? null : r.produtoId)}>
                   {!podeEditar ? 'Ver receita' : r.linhas === 0 ? 'Montar receita' : 'Editar receita'}
                 </Botao>
                 {podeEditar && r.linhas > 0 && (
