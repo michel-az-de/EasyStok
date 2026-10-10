@@ -291,6 +291,11 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<int>("SlaRespostaMinutos")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(5);
+
                     b.Property<int>("TempoPreparoPadraoMinutos")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -7128,6 +7133,11 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<string>("DescricaoBase")
                         .HasColumnType("text");
+
+                    b.Property<bool>("EhEmbalagem")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<bool>("EhInsumo")
                         .ValueGeneratedOnAdd()

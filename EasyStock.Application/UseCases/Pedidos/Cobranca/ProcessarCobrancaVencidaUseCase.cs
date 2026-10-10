@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
@@ -55,7 +56,8 @@ public sealed class ProcessarCobrancaVencidaUseCase(
     ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
-    ILogger<ProcessarCobrancaVencidaUseCase> logger)
+    ILogger<ProcessarCobrancaVencidaUseCase> logger,
+    IOperacaoEventPublisher operacaoEventos)
 {
     public const string MotivoCancelamento = "pagamento_expirado";
 
@@ -73,6 +75,10 @@ public sealed class ProcessarCobrancaVencidaUseCase(
 
         var (resultado, conversaId, link) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
             async token => await ProcessarNoLockAsync(item, token), ct);
+
+        if (resultado == ResultadoExpiracaoCobranca.PedidoCancelado)
+            await operacaoEventos.PublicarAsync(EventosOperacao.PedidoMudouStatus, item.EmpresaId,
+                new PedidoMudouStatusOperacao(item.PedidoId, StatusPedidoMapper.AguardandoPagamento, StatusPedidoMapper.Cancelado), ct);
 
         var agora = relogio.GetUtcNow().UtcDateTime;
         if (conversaId is { } conversa)
@@ -131,7 +137,8 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         }
 
         await cancelarPedido.ExecuteAsync(new CancelarPedidoCommand(
-            item.EmpresaId, item.PedidoId, UsuarioNome: "Sistema", Motivo: MotivoCancelamento, Origem: "sistema"));
+            item.EmpresaId, item.PedidoId, UsuarioNome: "Sistema", Motivo: MotivoCancelamento, Origem: "sistema"),
+            publicarOperacao: false); // O evento de UI espera o commit da transação externa.
         return (ResultadoExpiracaoCobranca.PedidoCancelado, cobranca.ConversaId, null);
     }
 }

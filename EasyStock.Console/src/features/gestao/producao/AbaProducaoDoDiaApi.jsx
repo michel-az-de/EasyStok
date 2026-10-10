@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { FolhaImpressao } from '../../../componentes/FolhaImpressao'
 import { useCatalogo } from '../../../aplicacao/contextos'
 import { criarProducaoDoDia } from '../../../aplicacao/producaoDoDia'
@@ -68,14 +69,13 @@ export function AbaProducaoDoDiaApi() {
   return (
     <div className={css.aba}>
       <p className={css.descricao}>
-        Anote o que saiu da cozinha. Cada linha é um prato: porções, peso de cada porção, o peso real que
-        você pesou e a validade. Confirmar cria o lote com as etiquetas e soma no estoque.
+        Anote o que saiu da cozinha. Confirmar cria o lote com as etiquetas e soma no estoque.
       </p>
 
       {feito && (
         <output className={css.aviso}>
           <strong>Lote {feito.codigo}</strong> lançado: {feito.pratos.map((p) => `${p.porcoes}× ${p.nome}${p.sobraG ? ` (sobra ${p.sobraG} g)` : ''}`).join(', ')}.
-          {' '}<Botao variante="primario" onClick={imprimir}>Imprimir {feito.etiquetas} etiqueta(s)</Botao>
+          {' '}<Botao variante="primario" icone="printer" onClick={imprimir}>Imprimir {feito.etiquetas} etiqueta(s)</Botao>
           {' '}<Botao variante="texto" onClick={() => { setFeito(null); setEtiquetas(null) }}>Fechar</Botao>
           {feito.avisos.length > 0 && (
             <ul aria-label="Avisos de insumo">
@@ -86,28 +86,28 @@ export function AbaProducaoDoDiaApi() {
       )}
 
       <form onSubmit={confirmar} className={css.aba}>
-        <ol className={css.lista}>
+        <ol className={css.listaFormularios}>
           {linhas.map((l) => {
             const sobra = sobraDaLinha(paraEnviar(l))
             return (
-              <li key={l.id} className={css.linha}>
-                <select className={css.busca} aria-label="Prato" value={l.sku} onChange={mudar(l.id, 'sku')}>
-                  <option value="">Escolha o prato</option>
-                  {pratos.map((p) => <option key={p.sku} value={p.sku}>{p.nome}{p.porcao ? ` · ${p.porcao}` : ''}</option>)}
-                </select>
-                <input className={css.busca} inputMode="numeric" aria-label="Porções" placeholder="Porções" value={l.porcoes} onChange={mudar(l.id, 'porcoes')} />
-                <input className={css.busca} inputMode="numeric" aria-label="Peso de cada porção (g)" placeholder="g por porção" value={l.pesoPorPorcaoG} onChange={mudar(l.id, 'pesoPorPorcaoG')} />
-                <input className={css.busca} inputMode="numeric" aria-label="Peso real total (g)" placeholder="Peso real (g)" value={l.pesoRealG} onChange={mudar(l.id, 'pesoRealG')} />
-                <input className={css.busca} inputMode="numeric" aria-label="Validade (dias)" placeholder="Validade (dias)" value={l.validadeDias} onChange={mudar(l.id, 'validadeDias')} />
-                <span className={css.detalhe}>{sobra == null ? '' : sobra < 0 ? 'peso real menor que as porções' : `sobra ${sobra} g`}</span>
-                <Botao variante="texto" disabled={linhas.length === 1} onClick={() => tirar(l.id)}>Tirar</Botao>
+              <li key={l.id} className={`${css.campos} ${css.formulario} ${css.loteProducao}`}>
+                <CampoSelecao rotulo="Prato" value={l.sku} onChange={mudar(l.id, 'sku')}
+                  opcoes={[{ valor: '', rotulo: 'Escolha o prato' }, ...pratos.map((p) => ({ valor: p.sku, rotulo: `${p.nome}${p.porcao ? ` · ${p.porcao}` : ''}` }))]} />
+                <CampoTexto inputMode="numeric" rotulo="Porções" placeholder="Porções" value={l.porcoes} onChange={mudar(l.id, 'porcoes')} />
+                <CampoTexto inputMode="numeric" rotulo="Peso de cada porção (g)" placeholder="g por porção" value={l.pesoPorPorcaoG} onChange={mudar(l.id, 'pesoPorPorcaoG')} />
+                <CampoTexto inputMode="numeric" rotulo="Peso real total (g)" placeholder="Peso real (g)" value={l.pesoRealG} onChange={mudar(l.id, 'pesoRealG')} />
+                <CampoTexto inputMode="numeric" rotulo="Validade (dias)" placeholder="Validade (dias)" value={l.validadeDias} onChange={mudar(l.id, 'validadeDias')} />
+                <div className={css.rodapeForm}>
+                  <span className={css.detalhe}>{sobra == null ? '' : sobra < 0 ? 'peso real menor que as porções' : `sobra ${sobra} g`}</span>
+                  <Botao className={css.acaoDiscreta} variante="texto" icone="lixeira" disabled={linhas.length === 1} onClick={() => tirar(l.id)}>Tirar</Botao>
+                </div>
               </li>
             )
           })}
         </ol>
-        <div className={css.topo}>
-          <Botao onClick={() => setLinhas((atual) => [...atual, novaLinha()])}>Mais um prato</Botao>
-          <Botao tipo="submit" variante="primario" disabled={enviando}>{enviando ? 'Lançando…' : 'Confirmar produção'}</Botao>
+        <div className={css.acoesFormulario}>
+          <Botao icone="plus" onClick={() => setLinhas((atual) => [...atual, novaLinha()])}>Mais um prato</Botao>
+          <Botao tipo="submit" variante="primario" icone="check" disabled={enviando}>{enviando ? 'Lançando…' : 'Confirmar produção'}</Botao>
         </div>
         {erro && <p className={css.aviso} role="alert">{erro}</p>}
       </form>

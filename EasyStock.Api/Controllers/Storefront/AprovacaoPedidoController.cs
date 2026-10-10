@@ -128,7 +128,8 @@ public sealed class AprovacaoPedidoController(
             UsuarioId: usuarioId,
             Motivo: motivo,
             MensagemCliente: body.MensagemCliente,
-            UsuarioNome: ObterNomeUsuario());
+            UsuarioNome: ObterNomeUsuario(),
+            NivelSolicitante: currentUser.Nivel);
 
         try
         {

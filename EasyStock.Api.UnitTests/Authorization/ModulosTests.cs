@@ -25,6 +25,11 @@ public class ModulosTests
     }
 
     [Fact]
+    public void Troca_de_janela_exige_modulo_atendimento_ou_entregas() =>
+        ModulosConvention.ModulosDe(typeof(Api.Controllers.PedidoJanelaController), "Trocar")!
+            .Should().Equal(Modulo.Atendimento, Modulo.Entregas);
+
+    [Fact]
     public void ConvencaoInstalaFiltroRealSemSubstituirOutrosFiltros()
     {
         var app = new ApplicationModel();

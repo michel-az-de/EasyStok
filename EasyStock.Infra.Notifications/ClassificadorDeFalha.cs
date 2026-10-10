@@ -50,9 +50,18 @@ internal static class ClassificadorDeFalha
     /// <summary>
     /// Timeout ou queda de conexão: não se sabe se o provider recebeu a mensagem. Um
     /// <see cref="OperationCanceledException"/> que chega aqui é timeout (do <c>HttpClient</c> ou da Polly), porque
-    /// o chamador que cancela é tratado antes.
+    /// o chamador que cancela é tratado antes. DNS, conexão recusada e falha de TLS não entram: a conexão nem abriu,
+    /// nada saiu, e a falha é transitória (mesma regra do <c>WhatsAppCloudClient</c>, #1507).
     /// </summary>
     public static bool EhFalhaDeTransporte(Exception ex) =>
-        ex is HttpRequestException or TimeoutException or IOException or SocketException
+        !ConexaoNemAbriu(ex)
+        && ex is HttpRequestException or TimeoutException or IOException or SocketException
             or OperationCanceledException or TimeoutRejectedException;
+
+    private static bool ConexaoNemAbriu(Exception ex) =>
+        ex is HttpRequestException
+        {
+            HttpRequestError: HttpRequestError.NameResolutionError or HttpRequestError.ConnectionError
+                or HttpRequestError.SecureConnectionError
+        };
 }

@@ -69,8 +69,8 @@ $null = Api POST "/api/pedidos/$($cancelar.id)/cancelar" @{
     empresaId=$empresaId; id=$cancelar.id; motivo='Cancelamento de teste local'
 }
 Conferir ((Api GET "/api/pedidos/$($cancelar.id)").pedido.status -eq 'cancelado') 'Cancelamento persistido'
-Conferir ((Api GET '/api/caixa/dia').saldoEsperado -eq 125) 'Cancelamento retira recebimento do caixa'
+Conferir ((Api GET '/api/caixa/dia').saldoEsperado -eq 140) 'Cancelamento preserva recebimento ainda não devolvido'
 $null = Api POST '/api/caixa/fechar' @{ empresaId=$empresaId; observacoes='Onda 0 conferida' }
 Conferir ((Api GET '/api/caixa/dia').fechado) 'Caixa fechado e relido'
 $null = Api POST '/api/atendimento/expediente/controle' @{ controle='ForcarFechada'; justificativa='Encerramento da homologacao' }
-[pscustomobject]@{ sha=$ExpectedSha; pedidoEntregue=$pedidoId; pedidoCancelado=$cancelar.id; saldoConferido=125; homologacao='HTTP local, sem provedores externos nem impressao fisica' } | ConvertTo-Json
+[pscustomobject]@{ sha=$ExpectedSha; pedidoEntregue=$pedidoId; pedidoCancelado=$cancelar.id; saldoConferido=140; homologacao='HTTP local, sem provedores externos nem impressao fisica' } | ConvertTo-Json

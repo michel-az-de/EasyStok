@@ -93,6 +93,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         Associar(Modulo.Entregas, "AtendimentoEntregadores", "AtendimentoViagens", "AtendimentoRelatoriosEntrega",
             "Storefront.TenantVitrineEntrega");
         mapa.Add("Storefront.AprovacaoPedido", [Modulo.Atendimento, Modulo.Entregas]);
+        mapa.Add("PedidoJanela", [Modulo.Atendimento, Modulo.Entregas]);
         mapa.Add("AtendimentoCardapioDoDia", [Modulo.Cardapio, Modulo.Producao, Modulo.Atendimento]);
         mapa.Add("OperacaoEventos", [Modulo.Atendimento, Modulo.Cozinha, Modulo.Entregas]);
         mapa.Add("Impressao", [Modulo.Atendimento, Modulo.Cozinha, Modulo.Entregas]);

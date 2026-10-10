@@ -77,6 +77,8 @@ export const insumoDaApi = (i) => ({
   custo: i.custo ?? null,
   receitas: i.receitas,
   comprar: i.abaixoDoMinimo === true,
+  // M2.7 (#1523, D-M2-03): embalagem desce em toda produção pela receita.
+  embalagem: i.embalagem === true,
 })
 
 // M2.4a (#1498): receitas dos pratos. Ler é do Operador com estoque; gravar é o PUT da composição

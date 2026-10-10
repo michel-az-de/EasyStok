@@ -1,5 +1,7 @@
 # M3 Atendimento · balcão, pedidos, clientes, canais, status e histórico
 
+> **Atualização de 09/10/2026:** cancelamento operacional pela Ficha implementado e homologado localmente, com motivo, persistência e D3-04 decidida por Felipe. Com qualquer pagamento, inclusive parcial, só Dona/gerente cancela. Cancelar pela Ficha não executa estorno financeiro nem avisa automaticamente o cliente. Evidência e limites na [seção 23 do plano de ondas](11-levantamento-e-ondas-2026-10-09.md#23-continuação-cancelamento-operacional-na-ficha-09102026). M3.3 continua parcial.
+
 Issue: #1316 · Decisão: [ADR-0056](../../adr/0056-erp-da-casa-da-baba-front-unico.md) · Data: 2026-10-01
 Base medida: master `b713263a`. Plano irmão (dono de S01–S53 e F01–F18):
 [10-console.md](../atendimento-whatsapp/10-console.md), [11-console-fechamento.md](../atendimento-whatsapp/11-console-fechamento.md).
@@ -104,7 +106,7 @@ canal", `Downloads/01-TRANSCRICAO.md:153`). **Inferência:** a casa não opera i
 | Avançar esteira, voltar etapa, pago à mão, comprovante, desfazer pagamento, estorno, cancelar | `PedidosController.cs:97,113,178,194`; `KdsController.cs:41` | avisam "Use o EasyStok" (`aplicacao/api/comanda.js:19-33`) | ❌ | **M3.3** |
 | Recebido na entrega, refazer cobrança | `PedidosController.cs:178`; S11 | avisam (`naoLigadas.js:39-40`) | ❌ | **M3.3** (o lado caixa é da F14) |
 | Aprovar ou recusar fora de área pela ficha | S12 (`api/storefront/pedidos/{id}/aprovar`) | ligado só na tela Entregas (F04); na ficha avisa (`naoLigadas.js:51`) | ❌ | **M3.3** |
-| Trocar janela do pedido criado | `AlterarAgendamentoPedidoUseCase.cs:41-42` troca só `AgendadoParaEm`, **não move a `VagaOcupada`** | avisa (`naoLigadas.js:30,44`) | ❌ | **M3.4** |
+| Trocar janela do pedido criado | `TrocarJanelaPedidoUseCase`: transação com liberação, ocupação, prazo e auditoria | Ficha e Entregas usam a vaga persistida | ✅ local | **M3.4**, seção 24 do plano de ondas |
 | Endereço do pedido diferente do cadastro | `Pedido` não tem endereço próprio (KDS lê o do cliente, `KdsPedidoQueries.cs:58-67`) | avisa (`naoLigadas.js:37`) | ❌ | **M8.3** |
 | Pedido pelo link do cardápio | S48, #1234 | F11 #1241 | ⬜ | nenhuma |
 | Aviso de status ao cliente | S13 | automático | ✅ | nenhuma |
@@ -194,14 +196,16 @@ tela Entregas) e nenhuma F seguinte as cita: a lacuna está órfã.
 **Aceite.**
 - [ ] Avançar a esteira pela ficha muda o cartão na Cozinha (F05) sem recarregar.
 - [ ] Pago à mão grava `PedidoPagamento` e aparece em "Pagamentos de pedidos hoje" (F14).
-- [ ] Cancelar pedido pago obedece D3-04 (403 com texto para quem não pode).
-- [ ] `prova-f06-honestidade.mjs` continua verde com as ações movidas para "ligada".
+- [x] Cancelar pedido pago obedece D3-04 (403 com texto para quem não pode), homologado localmente em 09/10.
+- [x] `prova-f06-honestidade.mjs` continua verde com o cancelamento ligado; estorno e volta de etapa permanecem indisponíveis no modo API.
 **Fora.** Trocar janela (M3.4) e endereço do pedido (M8.3).
 **Depende de.** F14 para o lado do caixa. **Tamanho.** M · **Tier.** baixo (sem migração) · **Rollback.** revert; as ações voltam a avisar.
 
 ### M3.4 · Trocar a janela de um pedido criado
 
-**Problema.** Reagendar pela API hoje só troca `AgendadoParaEm` (`AlterarAgendamentoPedidoUseCase.cs:41-42`).
+**Executado em 09/10/2026:** troca atômica implementada e homologada localmente na Ficha e em Entregas. A leitura da Ficha passa a devolver a vaga persistida, inclusive após recarga. A rota antiga de agendamento recusa pedidos com vaga. O aviso opcional entra no outbox da S13, respeita preferências e usa a faixa validada pelo prazo de preparo; envio externo continua pendente. Evidências na [seção 24 do plano de ondas](11-levantamento-e-ondas-2026-10-09.md#24-continuação-reagendamento-com-troca-de-vaga-09102026).
+
+**Problema inicial.** Reagendar pela API trocava só `AgendadoParaEm`.
 Pedido com vaga continua preso à vaga antiga, porque o KDS manda pela vaga ativa
 (`KdsPedidoQueries.cs:34-40`): a cozinha vê o horário velho e a janela velha continua ocupada.
 **Abordagem.**
@@ -209,11 +213,11 @@ Pedido com vaga continua preso à vaga antiga, porque o KDS manda pela vaga ativ
 - `avisarCliente` usa o aviso de status (S13) com a faixa nova (RN-22, respiro).
 - Console: o seletor de janelas da comanda (`features/ficha-cliente/SeletorJanelaApi.jsx`) passa a funcionar com pedido criado; "Alterar agendamento" da gaveta (`features/entregas/ModalAlterarAgendamento.jsx`) usa a mesma ação.
 **Aceite.**
-- [ ] Janela cheia recusa com 409 e a vaga antiga continua ocupada.
-- [ ] Duas trocas simultâneas para a última vaga: só uma passa (teste com duas chamadas paralelas).
-- [ ] KDS mostra a janela nova; atraso (S21) recalculado.
-**Testes (Red).** `TrocarJanelaPedidoUseCaseTests.LiberaAntigaOcupaNova`, `...JanelaCheiaNaoMexe`, `...Concorrencia`.
-**Depende de.** nada. **Tamanho.** M · **Tier.** baixo (sem migração) · **Rollback.** revert; volta a avisar.
+- [x] Janela cheia recusa com 409 e a vaga antiga continua ocupada.
+- [x] Duas trocas simultâneas para a última vaga: só uma passa (duas transações PostgreSQL aguardando o mesmo lock de capacidade).
+- [x] KDS mostra a janela nova; atraso (S21) recalculado.
+**Testes executados.** `EasyStock.Infra.Postgre.IntegrationTests/Storefront/TrocarJanelaPedidoTests.cs`: 15 casos com PostgreSQL real, incluindo rollback após inserir a nova vaga, tenant, prazo, bloqueio, status final, idempotência e aviso persistido. Console: `prova-onda2-reagendamento.mjs` e Chromium com API local.
+**Depende de.** nada. **Tamanho.** M · **Tier.** baixo (sem migração) · **Rollback.** retirar a ação da interface preservando vagas e histórico; manter a proteção que impede a troca simples de data em pedido com vaga.
 
 ### M3.5 · Clientes fora da conversa
 
@@ -315,10 +319,10 @@ F10 ─► M3.8 lembrete agendado (junto com M8.2)            M3.9 só depois de
 - B) Adiar até existir a segunda pessoa no atendimento.
 - C) Distribuição automática das conversas entre atendentes.
 
-**D3-04 · Quem cancela pedido já pago pela ficha (dispara estorno)?**
-- A) (Recomendado) Operador cancela pedido não pago; pago só Gerente.
-- B) Qualquer Operador.
-- C) Só pelo EasyStok Web, nunca pelo console.
+**D3-04 · Quem cancela pedido já pago pela ficha? Decidido por Felipe em 09/10/2026.**
+- Atendimento cancela sem pagamento. Com qualquer valor recebido, inclusive parcial, só Dona/gerente.
+- A API aplica a regra também à troca de status, KDS, lotes e recusa do site. O nível vem da sessão autenticada.
+- A entrega da seção 23 é o cancelamento operacional com motivo. Estorno externo e comunicação ao cliente continuam com aceites próprios; a tela informa que a devolução é separada. A recusa do site conserva seu fluxo de estorno já existente, agora protegido pela mesma autorização.
 
 **Já decidido (01/10), registrado para não reabrir:** pedido do checkout do site entra no balcão pela
 conversa `ChatSite` do cliente, com o pedido na Ficha, igual ao WhatsApp. Fatia dona: SI.6

@@ -1,17 +1,20 @@
-/* Moldura do módulo (#1447). Barra única e fina: volta, nome, menu. O menu é
-   uma fileira de abas que rola no celular em vez de quebrar linha. */
+/* Contexto e ações no topo; as telas têm uma fileira própria, rolável. */
 .moldura { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--fundo); }
 
 .barra {
-  display: flex; align-items: center; gap: var(--e-3); flex: none;
-  min-height: calc(var(--toque) + var(--e-3)); padding: var(--e-1) var(--e-4);
-  border-bottom: var(--b-1) solid var(--linha); background: var(--creme); color: var(--tinta);
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2) var(--e-3); flex: none;
+  padding: var(--e-2) var(--e-4) 0;
+  background: var(--fundo); color: var(--tinta);
 }
+.contexto { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); min-width: 0; }
+.acoes { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); margin-left: auto; }
+.avisos { display: flex; }
 
 .voltar {
   display: inline-flex; align-items: center; gap: var(--e-1); flex: none;
   min-height: var(--toque); padding: 0 var(--e-2); border-radius: var(--r-1);
   font-size: var(--t-apoio); font-weight: 700; color: var(--marca); text-decoration: none;
+  transition: background var(--dur-micro) var(--ease-padrao);
 }
 .voltar:hover { background: var(--preenchimento); }
 .voltar:focus-visible, .item:focus-visible, .link:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
@@ -23,30 +26,44 @@
 }
 
 .menu {
-  display: flex; gap: var(--e-1); min-width: 0; margin-left: var(--e-2);
-  overflow-x: auto; scrollbar-width: none;
+  position: relative; display: flex; gap: var(--e-1); min-width: 0; flex-basis: 100%;
+  overflow-x: auto; padding: var(--e-2) 2px; border-top: var(--b-1) solid var(--linha);
+  scrollbar-width: thin;
 }
-.menu::-webkit-scrollbar { display: none; }
 .item {
-  display: inline-flex; align-items: center; flex: none;
-  min-height: var(--toque); padding: 0 var(--e-3); border-radius: var(--r-1);
+  display: inline-flex; align-items: center; gap: var(--e-2); flex: none;
+  min-height: 44px; padding: 0 var(--e-3); border: var(--b-1) solid transparent; border-radius: var(--r-1);
   font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2); text-decoration: none; white-space: nowrap;
+  transition: background var(--dur-micro) var(--ease-padrao), box-shadow var(--dur-micro) var(--ease-padrao), color var(--dur-micro) var(--ease-padrao);
 }
 .item:hover { background: var(--preenchimento); color: var(--tinta); }
-.itemAtivo { color: var(--tinta); box-shadow: inset 0 -3px 0 var(--marca); border-radius: 0; }
+.item:active { background: var(--preenchimento-forte); }
+.itemAtivo, .itemAtivo:hover { color: var(--marca-forte); background: var(--papel); border-color: var(--linha); box-shadow: var(--sombra), var(--brilho); font-weight: 700; }
 
 .operacao { flex: 1; min-height: 0; }
 
-.ajuste { flex: 1; min-height: 0; overflow-y: auto; background: var(--papel); }
-.folha { width: min(920px, 100%); margin: 0 auto; padding: var(--e-5) var(--e-4) var(--e-6); }
+.ajuste { flex: 1; min-height: 0; overflow-y: auto; padding: var(--e-2) var(--e-4) var(--e-4); }
+.folha { width: min(1180px, 100%); margin: 0 auto; background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); box-shadow: var(--sombra), var(--brilho); }
 .titulo {
-  margin: 0 0 var(--e-4); font-family: var(--f-titulo-marca);
-  font-size: var(--t-valor); font-weight: 600; color: var(--tinta);
+  display: flex; align-items: center; gap: var(--e-2); min-height: 64px;
+  margin: 0; padding: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha);
+  font-family: var(--f-titulo-marca); font-size: var(--t-titulo); font-weight: 600; color: var(--tinta);
 }
+.titulo svg { color: var(--tinta-2); flex: none; }
+.conteudo { padding: var(--e-4); }
 .link { font-weight: 700; color: var(--marca); }
 
 @media (max-width: 640px) {
-  .barra { flex-wrap: wrap; padding-inline: var(--e-2); }
-  .menu { flex-basis: 100%; margin-left: 0; }
-  .folha { padding-inline: var(--e-3); }
+  .barra { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--e-2); padding-inline: var(--e-2); }
+  .contexto { grid-row: 1; grid-column: 1; gap: var(--e-1); }
+  .voltar { padding-inline: var(--e-1); }
+  .acoes { display: contents; }
+  .acoes > [role='radiogroup'] { grid-row: 2; grid-column: 1; justify-self: start; }
+  .avisos { grid-row: 2; grid-column: 2; justify-self: end; }
+  .sair { grid-row: 1; grid-column: 2; max-width: 140px; padding-inline: var(--e-2); }
+  .modulo { display: none; }
+  .menu { grid-column: 1 / -1; }
+  .ajuste { padding: var(--e-1) var(--e-2) var(--e-4); }
+  .titulo { min-height: 52px; padding: var(--e-3); }
+  .conteudo { padding: var(--e-3); }
 }

@@ -18,6 +18,12 @@ public class EfeitosCancelamentoPedido(
     IVagaOcupadaRepository vagaOcupadaRepo,
     ILogger<EfeitosCancelamentoPedido> logger)
 {
+    public static void ExigirPermissao(bool temPagamento, NivelAcesso nivel)
+    {
+        if (temPagamento && nivel is not (NivelAcesso.Gerente or NivelAcesso.Admin or NivelAcesso.SuperAdmin))
+            throw new UnauthorizedAccessException("Só a dona ou um gerente pode cancelar pedido com pagamento, inclusive parcial.");
+    }
+
     /// <returns>Se a ContaReceber do pedido foi cancelada agora.</returns>
     public async Task<bool> AplicarAsync(Pedido pedido, string? motivo, Guid? usuarioId, CancellationToken ct = default)
     {

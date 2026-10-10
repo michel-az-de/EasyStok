@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useSecoesCardapioApi } from '../../../aplicacao/useSecoesCardapioApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
@@ -28,8 +29,8 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
     <li className={css.linha} aria-busy={ocupado}>
       {editando ? (
         <form className={css.resumo} onSubmit={salvar}>
-          <input
-            className={css.busca}
+          <CampoTexto
+            rotulo="Nome da categoria"
             aria-label={`Novo nome de ${secao.nome}`}
             value={nome}
             maxLength={100}
@@ -49,16 +50,18 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
         {editando ? (
           <>
             <Botao variante="texto" onClick={() => { setNome(secao.nome); setEditando(false) }}>Cancelar</Botao>
-            <Botao variante="primario" disabled={ocupado || !nome.trim()} onClick={salvar}>Salvar</Botao>
+            <Botao variante="primario" icone="check" disabled={ocupado || !nome.trim()} onClick={salvar}>Salvar</Botao>
           </>
         ) : (
           <>
-            <Botao variante="texto" disabled={ocupado} onClick={() => setEditando(true)}>Renomear</Botao>
+            <Botao variante="texto" icone="lapis" disabled={ocupado} onClick={() => setEditando(true)}>Renomear</Botao>
             <Botao variante="texto" disabled={ocupado} onClick={() => fazer(() => gestao.alternarVisivel(secao.id))}>
               {secao.visivel ? 'Esconder' : 'Mostrar'}
             </Botao>
             <Botao
+              className={css.acaoDiscreta}
               variante="texto"
+              icone="lixeira"
               disabled={ocupado || secao.itens > 0}
               title={secao.itens > 0 ? 'Mude os pratos de categoria antes de excluir' : undefined}
               onClick={() => fazer(() => gestao.excluir(secao.id))}
@@ -66,9 +69,9 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
               Excluir
             </Botao>
             <span className={css.ordem}>
-              <Botao variante="texto" icone="chevron-up" aria-label={`Subir ${secao.nome}`}
+              <Botao className={css.acaoDiscreta} variante="texto" icone="chevron-up" aria-label={`Subir ${secao.nome}`}
                 disabled={primeira || ocupado} onClick={() => fazer(() => gestao.mover(secao.id, 'subir'))} />
-              <Botao variante="texto" icone="chevron-down" aria-label={`Descer ${secao.nome}`}
+              <Botao className={css.acaoDiscreta} variante="texto" icone="chevron-down" aria-label={`Descer ${secao.nome}`}
                 disabled={ultima || ocupado} onClick={() => fazer(() => gestao.mover(secao.id, 'descer'))} />
             </span>
           </>
@@ -127,16 +130,15 @@ export function AbaCategoriasApi() {
         </output>
       )}
 
-      <form className={css.topo} onSubmit={criar}>
-        <input
-          className={css.busca}
+      <form className={`${css.campos} ${css.cadastroCurto}`} onSubmit={criar}>
+        <CampoTexto
+          rotulo="Nome da nova categoria"
           placeholder="Nova categoria (ex.: Massas)"
-          aria-label="Nome da nova categoria"
           maxLength={100}
           value={nova}
           onChange={(e) => setNova(e.target.value)}
         />
-        <Botao tipo="submit" variante="primario" disabled={criando || !nova.trim()}>Criar categoria</Botao>
+        <Botao tipo="submit" variante="primario" icone="plus" disabled={criando || !nova.trim()}>Criar categoria</Botao>
       </form>
 
       {gestao.secoes.length === 0 ? (

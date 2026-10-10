@@ -46,7 +46,7 @@ public sealed class AvisoStatusPedidoCliente(
     /// </param>
     public async Task<bool> EnfileirarAsync(
         TipoEventoNotificacao tipo, Guid empresaId, Guid pedidoId, string marco, CancellationToken ct,
-        DateTime? enviarApos = null, bool respeitaPreferenciaAvisos = false)
+        DateTime? enviarApos = null, bool respeitaPreferenciaAvisos = false, string? previsao = null)
     {
         // O dispatcher de integração roda sem claim JWT: sem o tenant, o filtro global e a RLS zeram a busca.
         tenantContext.SetCurrentTenant(empresaId);
@@ -89,7 +89,7 @@ public sealed class AvisoStatusPedidoCliente(
             ["telefone"] = telefone,
             ["nome"] = PrimeiroNome(nome),
             ["numero"] = pedido.Id.ToString("N")[..8].ToUpperInvariant(),
-            ["previsao"] = await PrevisaoAsync(pedido.Id, ct),
+            ["previsao"] = previsao ?? await PrevisaoAsync(pedido.Id, ct),
             [NotificadorService.ChaveIdempotenciaPayload] = $"{pedido.Id:N}|{marco}",
         };
         if (enviarApos is { } instante)

@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useGestaoCardapioApi } from '../../../aplicacao/useGestaoCardapioApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
@@ -24,6 +25,7 @@ export function AbaCardapioApi() {
   const podeEditar = acoes.editarCardapio === true
   const gestao = useGestaoCardapioApi()
   const [busca, setBusca] = useState('')
+  const buscaRef = useRef(null)
   const [ocupado, setOcupado] = useState(null)
 
   const itens = useMemo(() => {
@@ -56,14 +58,20 @@ export function AbaCardapioApi() {
           {' '}cardápio (dá para repor). Item novo fica <strong>em validação</strong>: o assistente só oferece depois
           {' '}que você validar. Nada aqui apaga um item.
         </p>
-        <input
-          className={css.busca}
-          type="search"
-          placeholder="Buscar prato ou categoria"
-          aria-label="Buscar prato ou categoria"
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-        />
+        <div className={css.filtro}>
+          <CampoTexto
+            ref={buscaRef}
+            tipo="search"
+            rotulo="Buscar prato ou categoria"
+            placeholder="Nome do prato ou categoria"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+          />
+          <div className={css.resumoBusca}>
+            <output className={css.descricao}>{itens.length} de {gestao.itens.length} {gestao.itens.length === 1 ? 'prato' : 'pratos'}</output>
+            {busca && <Botao variante="texto" onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>}
+          </div>
+        </div>
       </div>
 
       {gestao.aviso && (
@@ -75,7 +83,7 @@ export function AbaCardapioApi() {
       {!ordenando && <p className={css.descricao}>Limpe a busca para mudar a ordem.</p>}
 
       {itens.length === 0 ? (
-        <p className={css.descricao}>{busca ? 'Nenhum prato com esse nome.' : 'A vitrine ainda não tem pratos.'}</p>
+        <p className={css.descricao}>{busca.trim() ? 'Nenhum prato ou categoria encontrado para esta busca.' : 'A vitrine ainda não tem pratos.'}</p>
       ) : (
         <ol className={css.lista}>
           {itens.map((item, indice) => (

@@ -57,10 +57,8 @@ export function Modal({ titulo, descricao, aoFechar, rodape, largura, children }
       style={largura ? { width: largura } : undefined}
       aria-label={titulo}
     >
-      {/* X no canto (banca, item 10). Nome "Sair" e não "Fechar": várias provas
-          clicam no botão "Fechar" do rodapé pelo nome, e dois iguais na mesma
-          janela quebrariam esse clique. */}
-      <button type="button" className={css.fecharCanto} aria-label="Sair" title="Fechar (Esc)" onClick={aoFechar}>
+      {/* Distingue fechar a janela de sair da sessão e do botão do rodapé. */}
+      <button type="button" className={css.fecharCanto} aria-label="Fechar janela" title="Fechar (Esc)" onClick={aoFechar}>
         <Icone nome="x" tamanho={18} />
       </button>
       {/* Integração: título e rodapé fora da rolagem. Folha comprida (resumo

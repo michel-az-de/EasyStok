@@ -1,6 +1,8 @@
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Enums.Pagamentos;
 
 namespace EasyStock.Infra.Postgre.Repositories
 {
@@ -217,7 +219,11 @@ namespace EasyStock.Infra.Postgre.Repositories
                       p => p.Id,
                       (pg, p) => new { pg, p })
                 .Where(x => x.p.EmpresaId == empresaId
-                         && x.p.Status != "cancelado"
+                         // Cancelar a operação não devolve dinheiro. Só sai do saldo quando
+                         // o recebimento tem estorno confirmado na cobrança correspondente.
+                         && !db.Set<CobrancaPedido>().Any(c => c.EmpresaId == empresaId
+                             && c.PedidoId == x.p.Id && c.Status == StatusCobrancaPedido.Estornada
+                             && x.pg.Referencia != null && c.PagamentoExternoId == x.pg.Referencia)
                          // So pedidos SEM Venda consolidada (balcao/web tem so PedidoPagamento).
                          // Pedido mobile entregue gera Venda (VendaId setado) e ja e contado por
                          // GetTotalVendas — sem este filtro o mesmo dinheiro somava 2x no caixa (#926).
@@ -233,7 +239,8 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<IReadOnlyList<Venda>> GetVendasNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
         {
             var q = db.Vendas.AsNoTracking()
-                .Where(v => v.EmpresaId == empresaId && v.DataVenda >= iniUtc && v.DataVenda < fimUtc);
+                .Where(v => v.EmpresaId == empresaId && v.Natureza == NaturezaMovimentacaoEstoque.Venda
+                            && v.DataVenda >= iniUtc && v.DataVenda < fimUtc);
             if (lojaId.HasValue) q = q.Where(v => v.LojaId == lojaId);
             return await q.OrderBy(v => v.DataVenda).ToListAsync();
         }
@@ -247,7 +254,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                       p => p.Id,
                       (pg, p) => new { pg, p })
                 .Where(x => x.p.EmpresaId == empresaId
-                         && x.p.Status != "cancelado"
+                         && !db.Set<CobrancaPedido>().Any(c => c.EmpresaId == empresaId
+                             && c.PedidoId == x.p.Id && c.Status == StatusCobrancaPedido.Estornada
+                             && x.pg.Referencia != null && c.PagamentoExternoId == x.pg.Referencia)
                          // Mesmo filtro do total (#926): exclui pagamentos de pedidos com Venda
                          // consolidada, para a soma das linhas exibidas casar com o SaldoEsperado.
                          && x.p.VendaId == null

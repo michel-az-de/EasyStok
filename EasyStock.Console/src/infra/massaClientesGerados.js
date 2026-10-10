@@ -13,7 +13,7 @@
 // rodada (cadastro e histórico) nascem coerentes uma com a outra, contagem
 // batendo cliente por cliente (mesma regra que `coerencia-da-massa.mjs` já
 // cobra da massa antiga).
-import { CARDAPIO, PREFIXOS_CEP_ATENDIDOS, RESTRICOES, MOTIVOS_BLOQUEIO } from './catalogo'
+import { CARDAPIO, RESTRICOES, MOTIVOS_BLOQUEIO } from './catalogo'
 import { comAvaliacoes } from './avaliacaoSemente'
 
 // PRNG pequeno e determinístico (mulberry32): sem dependência nova, sempre a
@@ -91,9 +91,6 @@ const NOTAS_RESTRICAO = {
   Alergia: 'Alergia alimentar registrada. Perguntar antes de qualquer novidade.',
 }
 
-const MESES = [
-  '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09',
-]
 const NOME_DO_MES = {
   '2026-01': 'janeiro de 2026', '2026-02': 'fevereiro de 2026', '2026-03': 'março de 2026',
   '2026-04': 'abril de 2026', '2026-05': 'maio de 2026', '2026-06': 'junho de 2026',

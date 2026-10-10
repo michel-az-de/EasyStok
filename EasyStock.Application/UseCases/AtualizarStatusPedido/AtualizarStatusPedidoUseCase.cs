@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Services;
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.CriarPedido;
+using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Application.UseCases.Financeiro.Integracao;
 using EasyStock.Application.UseCases.Pedidos;
 using EasyStock.Domain.Sales;
@@ -17,7 +18,8 @@ public sealed record AtualizarStatusPedidoCommand(
     Guid? UsuarioId = null,
     [property: MaxLength(120)] string? UsuarioNome = null,
     [property: MaxLength(20)] string? Origem = "web",
-    DateTime? OcorridoEm = null);
+    DateTime? OcorridoEm = null,
+    NivelAcesso NivelSolicitante = NivelAcesso.Operador);
 
 /// <summary>
 /// Atualiza o status do pedido (aguardando → preparando → pronto → entregue).
@@ -47,7 +49,7 @@ public class AtualizarStatusPedidoUseCase(
     IUnitOfWork uow,
     ILogger<AtualizarStatusPedidoUseCase> logger,
     CalculadoraInicioPrevistoPedido inicioPrevisto,
-    EfeitosCancelamentoPedido efeitosCancelamento)
+    CancelarPedidoUseCase cancelarPedido)
 {
     public async Task<PedidoResult?> ExecuteAsync(AtualizarStatusPedidoCommand cmd)
     {
@@ -57,11 +59,15 @@ public class AtualizarStatusPedidoUseCase(
         if (!StatusPedidoMapper.TryParse(cmd.Status, out var statusNovo))
             throw new UseCaseValidationException($"Status inválido: {cmd.Status}");
 
+        if (statusNovo == StatusPedido.Cancelado)
+            return await cancelarPedido.ExecuteAsync(new CancelarPedidoCommand(cmd.EmpresaId, cmd.Id,
+                cmd.UsuarioId, cmd.UsuarioNome, "Cancelado pela troca de status", cmd.Origem, cmd.NivelSolicitante, cmd.OcorridoEm));
+
         // CRITICAL: usar GetByIdWithDetailsAsync para carregar Itens (Include).
         // Sem isso, pedido.Itens vem vazio e a integração com estoque vira
         // no-op silencioso quando a transição deveria descontar.
         var pedido = await pedidoRepo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.Id);
-        if (pedido == null) return null;
+        if (pedido == null || pedido.EmpresaId != cmd.EmpresaId) return null;
 
         var statusAtual = pedido.StatusEnum;
 
@@ -91,10 +97,6 @@ public class AtualizarStatusPedidoUseCase(
         if (!eraEstoqueDescontado && seraEstoqueDescontado)
         {
             await estoqueIntegration.DescontarAsync(pedido);
-        }
-        else if (eraEstoqueDescontado && statusNovo == StatusPedido.Cancelado)
-        {
-            await estoqueIntegration.DevolverAsync(pedido);
         }
 
         // Estoque OK — agora aplica transição no agregado. MudarStatus é
@@ -139,11 +141,6 @@ public class AtualizarStatusPedidoUseCase(
                 OcorridoEm: DateTime.UtcNow),
             correlationId: pedido.Id.ToString());
 
-        // #1506: cancelar pela troca de status tem os mesmos efeitos do CancelarPedidoUseCase
-        // (ContaReceber cancelada e vaga da janela liberada), na mesma transacao.
-        if (statusNovo == StatusPedido.Cancelado)
-            await efeitosCancelamento.AplicarAsync(pedido, "Cancelado pela troca de status", cmd.UsuarioId);
-
         await pedidoRepo.UpdateAsync(pedido);
         await uow.CommitAsync();
 
@@ -185,7 +182,7 @@ public class AtualizarStatusPedidoUseCase(
     /// Instante do toque informado pelo aparelho (fila offline do KDS, S19), em UTC e nunca no futuro;
     /// sem ele, agora. Só alimenta o evento de auditoria.
     /// </summary>
-    private static DateTime OcorridoEmAuditoria(DateTime? informado)
+    internal static DateTime OcorridoEmAuditoria(DateTime? informado)
     {
         var agora = DateTime.UtcNow;
         if (informado is not { } o) return agora;

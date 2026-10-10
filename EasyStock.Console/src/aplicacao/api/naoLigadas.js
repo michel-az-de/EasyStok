@@ -65,14 +65,12 @@ export const NAO_LIGADAS = {
 export const textoNaoLigado = (rotulo) => `${rotulo}: ainda não ligado nesta versão.`
 
 // Ações da comanda que só o EasyStok faz (`api/comanda.js`): no modo API elas avisam e não
-// mexem no pedido. A esteira (#1474) saiu daqui: anda pelo PATCH do KDS. Cancelar, estornar e
-// voltar etapa continuam fora: o PATCH cancela sem estornar no Mercado Pago nem avisar o
-// cliente, e a máquina de estados da API não volta etapa.
+// mexem no pedido. A esteira anda pelo PATCH do KDS; cancelar usa a rota com motivo e
+// autorização por pagamento. Estorno e volta de etapa continuam fora.
 export const SO_NO_EASYSTOK = {
   marcarComprovante: 'Comprovante',
   aceitarDivergencia: 'Aceitar diferença',
   marcarEstorno: 'Estorno',
-  cancelarPedido: 'Cancelar pedido',
   corrigirPasso: 'Voltar a etapa',
   desfazerEsteira: 'Desfazer a etapa',
 }

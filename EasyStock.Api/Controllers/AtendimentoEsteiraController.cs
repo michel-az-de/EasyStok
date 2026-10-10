@@ -26,7 +26,7 @@ public class AtendimentoEsteiraController(
         try
         {
             return DataOk(await lancarLoteUseCase.ExecuteAsync(new LancarLotePapelCommand(
-                currentUser.EmpresaId, body.Linhas ?? [], currentUser.UsuarioId), ct));
+                currentUser.EmpresaId, body.Linhas ?? [], currentUser.UsuarioId, currentUser.Nivel), ct));
         }
         catch (UseCaseValidationException ex)
         {

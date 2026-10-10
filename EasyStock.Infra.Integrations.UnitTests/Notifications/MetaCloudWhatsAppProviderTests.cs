@@ -247,6 +247,34 @@ public class MetaCloudWhatsAppProviderTests
     }
 
     [Fact]
+    public async Task Resposta_interrompida_depois_do_envio_vira_Indeterminado()
+    {
+        // ResponseEnded: o pedido saiu e a resposta não chegou inteira. A Meta pode ter aceitado.
+        _canal.EnviarTextoAsync(Telefone, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException(HttpRequestError.ResponseEnded, "resposta encerrada"));
+
+        var resultado = await Provider().EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.Indeterminado);
+    }
+
+    [Theory]
+    [InlineData(HttpRequestError.NameResolutionError)]
+    [InlineData(HttpRequestError.ConnectionError)]
+    [InlineData(HttpRequestError.SecureConnectionError)]
+    public async Task Conexao_que_nem_abriu_segue_transitoria_porque_nada_saiu(HttpRequestError erro)
+    {
+        // #1507: DNS, conexão recusada ou TLS falham antes de o pedido sair. Indeterminado (terminal) perderia a mensagem.
+        _canal.EnviarTextoAsync(Telefone, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException(erro, "sem conexão"));
+
+        var resultado = await Provider().EnviarAsync(Mensagem());
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaTransitoria);
+        resultado.FalhaPermanente.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Http_5xx_da_Meta_vira_Indeterminado()
     {
         // 5xx: a Meta pode ter aceitado a mensagem antes de falhar. Reenviar duplicaria.
@@ -423,6 +451,23 @@ public class MetaCloudWhatsAppProviderTests
             _canal.EnviarImagemAsync(Telefone, Arte, null, Arg.Any<CancellationToken>());
             _canal.EnviarTextoAsync(Telefone, longo, Arg.Any<CancellationToken>());
         });
+    }
+
+    [Fact]
+    public async Task Texto_que_falha_depois_da_imagem_ja_enviada_vira_Indeterminado()
+    {
+        // #1507: a imagem já saiu; se a falha do texto fosse transitória, o outbox reenviaria a imagem ao cliente.
+        ConversaComEntradaHa(TimeSpan.FromHours(1));
+        var longo = new string('a', MetaCloudWhatsAppProvider.LegendaImagemTamanhoMaximo + 1);
+        _canal.EnviarImagemAsync(Telefone, Arte, null, Arg.Any<CancellationToken>()).Returns("wamid.imagem");
+        _canal.EnviarTextoAsync(Telefone, longo, Arg.Any<CancellationToken>())
+            .ThrowsAsync(new WhatsAppCloudException(130429, "Rate limit hit", ehPermanente: false, statusHttp: 429));
+
+        var resultado = await Provider().EnviarAsync(MensagemCampanha(longo));
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.Indeterminado);
+        resultado.Sucesso.Should().BeFalse();
+        await _canal.Received(1).EnviarImagemAsync(Telefone, Arte, null, Arg.Any<CancellationToken>());
     }
 
     [Fact]

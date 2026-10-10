@@ -159,7 +159,7 @@ function Lancamentos({ dia, executar, podeGerenciar }) {
   const lancamentos = lancamentosEmOrdem(dia)
   const podeEstornar = (m) => podeGerenciar && !dia.fechado && !m.estornadoEm && (m.tipo === TIPOS_MOVIMENTO.ENTRADA || m.tipo === TIPOS_MOVIMENTO.SAIDA)
 
-  if (lancamentos.length === 0) return null
+  if (lancamentos.length === 0) return <p className={css.corpoBloco}>Nenhum lançamento neste caixa.</p>
   return (
     <>
       <h4 className={css.tituloSecao}>Lançamentos</h4>
@@ -213,7 +213,7 @@ function Lancamentos({ dia, executar, podeGerenciar }) {
 }
 
 function UltimosFechamentos({ fechamentos }) {
-  if (fechamentos.length === 0) return null
+  if (fechamentos.length === 0) return <p className={css.corpoBloco}>Nenhum fechamento anterior registrado.</p>
   return (
     <>
       <h4 className={css.tituloSecao}>Últimos fechamentos</h4>

@@ -104,7 +104,9 @@ public class PedidosController(
             EmpresaId = emp,
             Id = id,
             UsuarioId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
-            Origem = command.Origem ?? "web"
+            UsuarioNome = User?.Identity?.Name,
+            Origem = command.Origem ?? "web",
+            NivelSolicitante = currentUser.Nivel
         });
         return result == null ? DataNotFound("Pedido não encontrado.") : DataOk(result);
     }
@@ -120,7 +122,9 @@ public class PedidosController(
             EmpresaId = emp,
             Id = id,
             UsuarioId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
-            Origem = command.Origem ?? "web"
+            UsuarioNome = User?.Identity?.Name,
+            Origem = command.Origem ?? "web",
+            NivelSolicitante = currentUser.Nivel
         });
         return result == null ? DataNotFound("Pedido não encontrado.") : DataOk(result);
     }

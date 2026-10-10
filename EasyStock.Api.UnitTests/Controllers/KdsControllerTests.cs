@@ -259,6 +259,8 @@ public class KdsControllerTests : IDisposable
             Substitute.For<IConfiguracaoLojaRepository>(),
             criarContaReceber,
             NullLogger<GerarContaReceberDePedidoUseCase>.Instance);
+        _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>()(ci.Arg<CancellationToken>()));
         return new AtualizarStatusPedidoUseCase(
             _pedidoRepo,
             estoque,
@@ -269,6 +271,6 @@ public class KdsControllerTests : IDisposable
             _uow,
             NullLogger<AtualizarStatusPedidoUseCase>.Instance,
             new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()),
-            new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(Substitute.For<IContaReceberRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>(), NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance));
+            new EasyStock.Application.UseCases.CancelarPedido.CancelarPedidoUseCase(_pedidoRepo, estoque, new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(Substitute.For<IContaReceberRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>(), NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance), _uow, Microsoft.Extensions.Logging.Abstractions.NullLogger<EasyStock.Application.UseCases.CancelarPedido.CancelarPedidoUseCase>.Instance, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(), Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>()));
     }
 }

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { CampoMascarado } from '../../componentes/CampoMascarado'
@@ -91,14 +92,17 @@ export function BarraProximoPasso({
 }) {
   const [restam, setRestam] = useState(() => (emDesfazer ? SEGUNDOS_PARA_DESFAZER : 0))
   const [confirmando, setConfirmando] = useState(null) // 'cancelar' | 'estornar' | 'voltar' | 'desfazer'
+  const [motivoCancelar, setMotivoCancelar] = useState('')
+  const [erroCancelar, setErroCancelar] = useState(null)
+  const cancelando = useRef(false)
+  const { acoes: capacidades } = useAcessoModulos()
   const [abrindoBaixa, setAbrindoBaixa] = useState(false)
   const [pedindoMeio, setPedindoMeio] = useState(false)
   const [pedindoEntregador, setPedindoEntregador] = useState(false)
   // Issue #17: entregador de um toque e os campos de veículo, placa e empresa.
   const { conversas, fonteApi } = useAtendimento()
   const { entregadores } = useCatalogo()
-  // #1474 (R1/R2): no modo API a esteira é do EasyStok; cancelar, estornar e voltar etapa não
-  // estão ligados e não aparecem. O erro da API aparece aqui, ao lado do botão.
+  // No modo API, só ações ligadas aparecem. O erro fica ao lado do botão.
   const disponivel = useAcaoDisponivel()
   const [erroAcao, setErroAcao] = useState(null)
   const [emVoo, setEmVoo] = useState(false)
@@ -293,7 +297,10 @@ export function BarraProximoPasso({
   const naFilaSemQuitar = Boolean(pedido.pedidoId) && pedido.totalPagoApi < pedido.totalApi
   if (naFilaSemQuitar && pedido.estado === 'pago' && !aguardaAprovacao(pedido)) rotuloEstado = 'Na fila de preparo'
   const podeVoltarEtapa = Boolean(anterior) && disponivel('corrigirPasso')
-  const podeCancelar = pedido.estado === 'aguardando' && disponivel('cancelarPedido')
+  const temPagamento = pedido.totalPagoApi > 0 || Boolean(pedido.cobranca?.pagaEm)
+  const podeCancelar = disponivel('cancelarPedido') && (fonteApi
+    ? Boolean(pedido.pedidoId) && (!temPagamento || capacidades?.cancelarPedidoPago === true)
+    : pedido.estado === 'aguardando')
   // Estornar é devolver dinheiro que entrou. Pedido sem cobrança paga (venda
   // antiga, massa de teste) não tem o que devolver, e oferecer o item aqui
   // levava a confirmar "você já devolveu R$ 0,00" (QA7, achado 1).
@@ -311,7 +318,21 @@ export function BarraProximoPasso({
       setCentavosEstorno(Math.round(valorPago * 100))
     }
     if (chave === 'desfazer') setMotivoDesfazer('')
+    if (chave === 'cancelar') { setMotivoCancelar(''); setErroCancelar(null) }
     setConfirmando(chave)
+  }
+
+  const confirmarCancelamento = async () => {
+    if (cancelando.current) return
+    cancelando.current = true
+    setEmVoo(true)
+    setErroCancelar(null)
+    try {
+      const resultado = await aoCancelarPedido(motivoCancelar.trim())
+      if (resultado?.erro) setErroCancelar(resultado.erro)
+      else setConfirmando(null)
+    } catch (erro) { setErroCancelar(erro.message || 'Não foi possível cancelar. Tente de novo.') }
+    finally { cancelando.current = false; setEmVoo(false) }
   }
 
   return (
@@ -384,12 +405,18 @@ export function BarraProximoPasso({
       {confirmando === 'cancelar' && (
         <div className={css.confirmarCorrecao}>
           <p className={css.corpoBloco}>
-            Cancelar o pedido {pedido.numero}? {nomeCliente} recebe aviso de cancelamento.
+            Cancelar o pedido {pedido.numero}? {fonteApi ? 'Avise o cliente pela conversa após confirmar.' : `${nomeCliente} recebe aviso de cancelamento.`}
           </p>
+          {fonteApi && <CampoArea rotulo="Motivo do cancelamento" value={motivoCancelar}
+            onChange={(e) => setMotivoCancelar(e.target.value)} maxLength={500} disabled={emVoo} />}
+          {fonteApi && temPagamento && <p className={css.corpoBloco}>
+            O cancelamento não devolve o pagamento automaticamente. A devolução deve ser tratada separadamente.
+          </p>}
+          {erroCancelar && <p className={css.motivoDesabilitado} role="alert">{erroCancelar}</p>}
           <p className={css.confirmarAcoes}>
-            <Botao variante="texto" onClick={() => setConfirmando(null)}>Manter</Botao>
-            <Botao variante="primario" onClick={() => { aoCancelarPedido(); setConfirmando(null) }}>
-              Cancelar pedido
+            <Botao variante="texto" disabled={emVoo} onClick={() => setConfirmando(null)}>Manter</Botao>
+            <Botao variante="primario" disabled={emVoo || (fonteApi && motivoCancelar.trim().length < 3)} onClick={confirmarCancelamento}>
+              {emVoo ? 'Cancelando…' : 'Cancelar pedido'}
             </Botao>
           </p>
         </div>

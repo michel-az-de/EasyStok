@@ -23,11 +23,11 @@ public class AtendimentoExpedienteController(
     DefinirControleExpedienteUseCase controleUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
-    [SwaggerOperation(Summary = "Get store opening hours (Admin only)",
+    [SwaggerOperation(Summary = "Get store opening hours (Operador+)",
         Description = "Sem registro, devolve o padrão (08–22 h todos os dias, automático) — nunca 404.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [HttpGet]
-    [Authorize(Policy = "Admin")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Get(CancellationToken ct)
         => DataOk(await obterUseCase.ExecuteAsync(currentUser.EmpresaId, ct));
 

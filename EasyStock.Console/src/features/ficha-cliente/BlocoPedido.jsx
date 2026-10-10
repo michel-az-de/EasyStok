@@ -187,7 +187,7 @@ export function BlocoPedido({
         <Cabecalho
           numero={numeroDaComanda(pedido, { fonteApi })}
           nomeCliente={nomeCliente}
-          faixa={faixa}
+          faixa={fonteApi ? pedido.janelaRotulo : faixa}
           semJanela={!fechado && !pedido.janela}
           enviadaEm={pedido.cobranca?.criadaEm ?? null}
         />
@@ -237,9 +237,9 @@ export function BlocoPedido({
         )}
       </section>
 
-      {/* F03: no modo API a janela é da vitrine, com data, e só se escolhe antes do envio.
+      {/* No modo API a janela é da vitrine, com data; pedido criado troca a vaga no servidor.
           #1474 (R3): vem antes das ações, logo abaixo da comanda, onde o motivo da barra aponta. */}
-      {!fechado && fonteApi && !pedido.pedidoId && (
+      {!fechado && fonteApi && (
         <SeletorJanelaApi pedido={pedido} editavel={editavel} aoEscolher={aoTrocarJanela} />
       )}
 

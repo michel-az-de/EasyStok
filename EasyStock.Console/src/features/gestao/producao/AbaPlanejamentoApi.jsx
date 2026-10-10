@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { erroDasPorcoes, gerarCompras, itensDeCompra, lerSugestao, levarParaProducao, planejar } from '../../../aplicacao/planejamento'
 import { lerInsumos } from '../../../aplicacao/insumos'
@@ -24,6 +25,7 @@ export function AbaPlanejamentoApi() {
   // #1510: a data que busca é só a que ela escolhe; a que vem da resposta só preenche o campo
   // (antes disparava uma 2ª busca que apagava as porções já editadas).
   const [consulta, setConsulta] = useState('')
+  const [tentativa, setTentativa] = useState(0)
   const [carga, setCarga] = useState({ estado: 'carregando', erro: null })
   const [linhas, setLinhas] = useState([])
   const [plano, setPlano] = useState(null)
@@ -42,7 +44,7 @@ export function AbaPlanejamentoApi() {
       })
       .catch((e) => { if (vivo) setCarga({ estado: 'erro', erro: e.message }) })
     return () => { vivo = false }
-  }, [consulta])
+  }, [consulta, tentativa])
 
   // #1510: porção mudada invalida o cálculo; a lista de compras não sai com faltas antigas.
   const mudar = (sku) => (e) => {
@@ -78,7 +80,12 @@ export function AbaPlanejamentoApi() {
   }
 
   if (carga.estado === 'carregando') return <p className={css.descricao}>Calculando a sugestão…</p>
-  if (carga.estado === 'erro') return <p className={css.aviso} role="alert">Não consegui ler a sugestão: {carga.erro}</p>
+  if (carga.estado === 'erro') return (
+    <div className={css.aba} role="alert">
+      <p className={css.aviso}>Não consegui ler a sugestão: {carga.erro}</p>
+      <Botao icone="refresh-cw" onClick={() => { setCarga({ estado: 'carregando', erro: null }); setTentativa((t) => t + 1) }}>Tentar novamente</Botao>
+    </div>
+  )
 
   return (
     <div className={css.aba}>
@@ -86,7 +93,7 @@ export function AbaPlanejamentoApi() {
         Quanto produzir de cada prato para atender os pedidos agendados até a data, cobrir o que saiu sem saldo e
         voltar ao mínimo. Mude as porções à vontade: calcular não mexe no estoque.
       </p>
-      <label className={css.topo}>
+      <label className={css.dataPlanejamento}>
         <span className={css.nome}>Pedidos até</span>
         <input className={css.busca} type="date" aria-label="Pedidos até" value={ate} onChange={(e) => { setAte(e.target.value); setConsulta(e.target.value) }} />
       </label>
@@ -105,21 +112,23 @@ export function AbaPlanejamentoApi() {
               <div className={css.estados}>
                 {l.sugestao > 0 && <Pilula tom="ok" fina>sugestão {qtd(l.sugestao)}</Pilula>}
               </div>
-              <input className={css.busca} inputMode="numeric" aria-label={`Porções de ${l.nome}`} value={l.porcoes} onChange={mudar(l.sku)} />
+              <div className={css.campoQuantidade}>
+                <CampoTexto rotulo="Porções" inputMode="numeric" aria-label={`Porções de ${l.nome}`} value={l.porcoes} onChange={mudar(l.sku)} />
+              </div>
             </li>
           ))}
         </ul>
       )}
 
       <div className={css.topo}>
-        <Botao variante="primario" onClick={calcular} disabled={ocupado || linhas.length === 0}>Calcular insumos</Botao>
-        <Botao onClick={lancar} disabled={ocupado || linhas.length === 0}>Lançar como produção</Botao>
+        <Botao variante="primario" icone="nota" onClick={calcular} disabled={ocupado || linhas.length === 0}>Calcular insumos</Botao>
+        <Botao icone="cooking-pot" onClick={lancar} disabled={ocupado || linhas.length === 0}>Lançar como produção</Botao>
       </div>
 
       {plano && (
         <section className={css.aba} aria-label="Insumos do planejamento">
           {plano.insumos.length === 0 ? (
-            <p className={css.descricao}>Os pratos planejados não têm receita: monte em M2 › Receitas.</p>
+            <p className={css.descricao}>Os pratos planejados não têm receita. Monte as <a className={css.link} href={hashDoModulo('producao', 'receitas')}>Receitas</a> para calcular os insumos.</p>
           ) : (
             <ul className={css.lista}>
               {plano.insumos.map((i) => (
@@ -143,7 +152,7 @@ export function AbaPlanejamentoApi() {
           )}
           <div className={css.topo}>
             {plano.custoTotal != null && <span className={css.detalhe}>Custo estimado {moeda(plano.custoTotal)}</span>}
-            <Botao onClick={comprar} disabled={ocupado}>Gerar lista de compras</Botao>
+            <Botao icone="shopping-cart" onClick={comprar} disabled={ocupado}>Gerar lista de compras</Botao>
           </div>
         </section>
       )}

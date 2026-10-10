@@ -91,7 +91,7 @@ public class LembretesUseCasesTests
     }
 
     [Fact]
-    public async Task ListarEVistos_DefendemEmpresaEDestinatarioMesmoSeRepositorioFalhar()
+    public async Task Listar_DefendeEmpresaEDestinatarioMesmoSeRepositorioFalhar()
     {
         var proprio = Lembrete.Manual(_empresaId, "Meu", Agora, _usuarioId, Agora, paraUsuarioId: _usuarioId);
         var equipe = Lembrete.Manual(_empresaId, "Equipe", Agora, _usuarioId, Agora);
@@ -101,29 +101,19 @@ public class LembretesUseCasesTests
             .Returns([proprio, equipe, alheio, externo]);
 
         var lista = await new ListarLembretesUseCase(_repo).ExecuteAsync(_empresaId, _usuarioId, false, false);
-        var vistos = await new MarcarLembretesVistosUseCase(_repo, _uow, _relogio).ExecuteAsync(_empresaId, _usuarioId);
 
         lista.Select(l => l.Id).Should().BeEquivalentTo([proprio.Id, equipe.Id]);
-        vistos.Should().Be(2);
-        alheio.VistoEm.Should().BeNull();
-        externo.VistoEm.Should().BeNull();
     }
 
-    [Fact]
-    public async Task MarcarVistos_SoOsVencidosAindaNaoVistos()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task MarcarVistos_RecusaContextoInvalidoSemGravar(bool empresaVazia)
     {
-        var vencido = Lembrete.Manual(_empresaId, "vencido", Agora.AddMinutes(-5), _usuarioId, Agora.AddMinutes(-10));
-        var futuro = Lembrete.Manual(_empresaId, "futuro", Agora.AddHours(1), _usuarioId, Agora);
-        var jaVisto = Lembrete.Manual(_empresaId, "visto", Agora.AddMinutes(-5), _usuarioId, Agora.AddMinutes(-10));
-        jaVisto.MarcarVisto(Agora.AddMinutes(-1));
-        _repo.ListarAsync(_empresaId, _usuarioId, false, Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns([vencido, futuro, jaVisto]);
+        var act = () => new MarcarLembretesVistosUseCase(_repo, _relogio)
+            .ExecuteAsync(empresaVazia ? Guid.Empty : _empresaId, empresaVazia ? _usuarioId : Guid.Empty);
 
-        var marcados = await new MarcarLembretesVistosUseCase(_repo, _uow, _relogio).ExecuteAsync(_empresaId, _usuarioId);
-
-        marcados.Should().Be(1);
-        vencido.VistoEm.Should().Be(Agora);
-        futuro.VistoEm.Should().BeNull("ainda não apareceu no sininho");
-        jaVisto.VistoEm.Should().Be(Agora.AddMinutes(-1));
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        await _repo.DidNotReceiveWithAnyArgs().MarcarVencidosVistosAsync(default, default, default, default);
     }
 }

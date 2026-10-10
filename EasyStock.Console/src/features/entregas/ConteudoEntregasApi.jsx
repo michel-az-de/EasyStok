@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
@@ -17,22 +17,41 @@ import css from './entregasApi.module.css'
 // viagens (S44, RN-32), entregadores, chamados e o cadastro da loja (S45). Desde a #1440
 // "Entregas de hoje" vem organizada por janela do dia, com o roteiro para imprimir.
 // A máquina de estados e as regras são da API; a tela só mostra e chama.
+const ABAS = [['hoje', 'Entregas de hoje'], ['entregadores', 'Entregadores'], ['cadastro', 'Janelas e frete']]
+
 export function ConteudoEntregasApi() {
   const [aba, setAba] = useState('hoje')
+  const id = useId()
+  const abasRef = useRef({})
   const {
     pedidos, viagens, entregadores, chamados, erro, aoVivo, ocupado, acoes, limparErro, dia, mudarDia, doDia,
   } = useEntregasApi()
   const situacao = situacaoDaLista(pedidos, erro)
+  const trocarAba = (proxima) => {
+    setAba(proxima)
+    abasRef.current[proxima]?.focus()
+  }
+  const navegarAbas = (evento, indice) => {
+    const destino = { ArrowRight: (indice + 1) % ABAS.length, ArrowLeft: (indice + ABAS.length - 1) % ABAS.length, Home: 0, End: ABAS.length - 1 }[evento.key]
+    if (destino === undefined) return
+    evento.preventDefault()
+    trocarAba(ABAS[destino][0])
+  }
 
   return (
     <div className={css.conteudo}>
-      <div className={css.abas} role="tablist">
-        {[['hoje', 'Entregas de hoje'], ['entregadores', 'Entregadores'], ['cadastro', 'Janelas e frete']].map(([id, rotulo]) => (
-          <Botao key={id} role="tab" aria-selected={aba === id} variante={aba === id ? 'primario' : 'secundario'} onClick={() => setAba(id)}>
-            {rotulo}
-          </Botao>
-        ))}
-        <span className={`${css.apoio} ${css.cresce}`}>{aoVivo ? 'Ao vivo' : 'Atualizando a cada 15 s'}</span>
+      <div className={css.navegacao}>
+        <div className={css.abas} role="tablist" aria-label="Seções de entregas">
+          {ABAS.map(([chave, rotulo], indice) => (
+            <Botao key={chave} ref={(elemento) => { abasRef.current[chave] = elemento }}
+              id={`${id}-${chave}`} role="tab" aria-selected={aba === chave} aria-controls={`${id}-painel`}
+              tabIndex={aba === chave ? 0 : -1} variante="texto" className={css.abaInterna}
+              onKeyDown={(evento) => navegarAbas(evento, indice)} onClick={() => trocarAba(chave)}>
+              {rotulo}
+            </Botao>
+          ))}
+        </div>
+        <span className={css.apoio} role="status">{aoVivo ? 'Ao vivo' : 'Atualizando a cada 15 s'}</span>
       </div>
       {erro && (
         <p className={css.faixa} role="alert">
@@ -40,16 +59,19 @@ export function ConteudoEntregasApi() {
           <Botao variante="texto" onClick={limparErro}>Fechar</Botao>
         </p>
       )}
-      {aba === 'hoje' && situacao === 'carregando' && <p className={css.vazio}>Carregando as entregas…</p>}
-      {aba === 'hoje' && situacao === 'falhou' && <p className={css.vazio}>Sem entregas para mostrar enquanto a carga falhar.</p>}
-      {aba === 'hoje' && situacao === 'pronta' && <Hoje {...{ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, mudarDia, doDia }} />}
-      {aba === 'entregadores' && <Entregadores entregadores={entregadores} ocupado={ocupado} acoes={acoes} />}
-      {aba === 'cadastro' && <CadastroEntregaApi />}
+      <div id={`${id}-painel`} role="tabpanel" aria-labelledby={`${id}-${aba}`} tabIndex={0} className={css.painel}>
+        {aba === 'hoje' && situacao === 'carregando' && <p className={css.vazio}>Carregando as entregas…</p>}
+        {aba === 'hoje' && situacao === 'falhou' && <p className={css.vazio}>Não foi possível carregar as entregas.</p>}
+        {aba === 'hoje' && situacao === 'pronta' && <Hoje {...{ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, mudarDia, doDia }} aoAbrirCadastro={() => trocarAba('cadastro')} />}
+        {aba === 'entregadores' && <Entregadores entregadores={entregadores} ocupado={ocupado} acoes={acoes} />}
+        {aba === 'cadastro' && <CadastroEntregaApi />}
+      </div>
     </div>
   )
 }
 
-function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, mudarDia, doDia }) {
+function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, mudarDia, doDia, aoAbrirCadastro }) {
+  const viagensRef = useRef(null)
   const p = paineisDeEntregas(pedidos, viagens)
   const roteiro = useMemo(() => (doDia ? roteiroDoDia({ ...doDia, viagens, entregadores }) : null), [doDia, viagens, entregadores])
   // Prontos que o dia escolhido não mostra (de outro dia), para nenhum ficar sem viagem.
@@ -95,7 +117,8 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
         </section>
       )}
 
-      <EntregasDoDia dia={dia} mudarDia={mudarDia} roteiro={roteiro} montando={p.montando} ocupado={ocupado} acoes={acoes} />
+      <EntregasDoDia dia={dia} mudarDia={mudarDia} roteiro={roteiro} montando={p.montando} ocupado={ocupado} acoes={acoes}
+        aoAbrirCadastro={aoAbrirCadastro} aoVerViagens={() => viagensRef.current?.focus()} />
 
       {prontosFora.length > 0 && (
         <section className={css.secao} aria-label="Prontos de outro dia">
@@ -122,7 +145,7 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
         </section>
       )}
 
-      <section className={css.secao} aria-label="Viagens">
+      <section ref={viagensRef} tabIndex={-1} className={css.secao} aria-label="Viagens">
         <div className={css.linha}>
           <h3 className={css.cresce}>Viagens</h3>
           <Botao variante="secundario" icone="plus" disabled={ocupado} onClick={() => acoes.criarViagem(null)}>Nova viagem</Botao>

@@ -89,6 +89,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.FinalizarVendaBalcao.FinalizarVendaBalcaoUseCase>();
         services.AddScoped<ListarPedidosUseCase>();
         services.AddScoped<AlterarAgendamentoPedidoUseCase>();
+        services.AddScoped<TrocarJanelaPedidoUseCase>();
 
         // Onda P3 — Caixa
         // Fonte ÚNICA do saldo esperado (consumida por /caixa e pelo Dashboard/Admin via

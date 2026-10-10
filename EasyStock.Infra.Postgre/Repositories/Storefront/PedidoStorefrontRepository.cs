@@ -41,10 +41,13 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
         // SISTEMA nao vem no SELECT * — sem ela o EF falha com "column e.xmin does not
         // exist" e TODO aprovar/recusar de pedido storefront morre (pego via #822).
         const string sql = "SELECT *, xmin FROM pedidos WHERE \"Id\" = {0} FOR UPDATE";
-        return await db.Pedidos
+        var pedido = await db.Pedidos
             .FromSqlRaw(sql, pedidoId)
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(ct);
+        if (pedido is not null)
+            await db.Entry(pedido).Collection(p => p.Pagamentos).LoadAsync(ct);
+        return pedido;
     }
 
     public async Task AddAsync(Pedido pedido, CancellationToken ct = default)

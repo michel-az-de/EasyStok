@@ -65,8 +65,8 @@ export function PainelFicha({ aoAbrirCardapio }) {
   // GERAR_PEDIDO: o domínio não escreve copy, quem monta é a tela). Reusado
   // pelo cancelamento direto e por "Encerrar atendimento" quando ele precisa
   // cancelar o pedido antes de fechar a conversa (secao 6, "ao zerar").
-  const aoCancelarPedido = () => cancelarPedido(
-    selecionada.id, 'Cancelei o pedido ' + pedido.numero + '. Qualquer coisa, é só chamar.',
+  const aoCancelarPedido = (motivo) => cancelarPedido(
+    selecionada.id, fonteApi ? motivo : 'Cancelei o pedido ' + pedido.numero + '. Qualquer coisa, é só chamar.',
   )
   // Ponta (c) da integração: a barra do pedido (Entregue, Cancelado) e o
   // anel zerado abrem a MESMA modal do cabeçalho e do menu ⋯, com o resumo.
@@ -115,7 +115,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
               <BlocoPedido
                 pedido={pedido}
                 editavel={editavel}
-                aoTrocarJanela={(janela) => escolherJanela(selecionada.id, janela)}
+                aoTrocarJanela={(janela, avisar) => escolherJanela(selecionada.id, janela, avisar)}
                 aoForcarEncaixe={(janela, faixa, motivo) => forcarEncaixe(selecionada.id, janela, faixa, motivo)}
                 aoAbrirCardapio={aoAbrirCardapio}
                 aoAjustar={(sku, delta) => ajustarQuantidade(selecionada.id, sku, delta)}

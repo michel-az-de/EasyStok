@@ -600,6 +600,15 @@ public static class NotificacoesGlobaisSeed
             corpoTemplate: "{{ nome }}, seu pedido nº {{ numero }} já está em preparo na nossa cozinha. Previsão de entrega: {{ previsao }}."),
             """{"template":"pedido_em_preparo","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ numero }}","param3":"{{ previsao }}"}""");
 
+        // Texto livre; fora da janela de 24 h depende de configurar um template aprovado na Meta.
+        yield return TemplateNotificacao.Criar(
+            codigo: "pedido_reagendado_whatsapp_v1",
+            nome: "Pedido Reagendado",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.PedidoReagendado,
+            assuntoTemplate: "",
+            corpoTemplate: "{{ nome }}, seu pedido nº {{ numero }} foi reagendado. Nova previsão de entrega: {{ previsao }}.");
+
         yield return ComMetadados(TemplateNotificacao.Criar(
             codigo: "pedido_saiu_whatsapp_v1",
             nome: "Pedido Saiu Para Entrega — WhatsApp",
@@ -1000,6 +1009,9 @@ public static class NotificacoesGlobaisSeed
             CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
         yield return MakeRotina("pedido_em_preparo_global", "Pedido Em Preparo — Aviso ao Cliente",
             TipoEventoNotificacao.PedidoEmPreparo, "pedido_em_preparo_whatsapp_v1",
+            CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
+        yield return MakeRotina("pedido_reagendado_global", "Pedido Reagendado",
+            TipoEventoNotificacao.PedidoReagendado, "pedido_reagendado_whatsapp_v1",
             CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
         yield return MakeRotina("pedido_saiu_para_entrega_global", "Pedido Saiu Para Entrega — Aviso ao Cliente",
             TipoEventoNotificacao.PedidoSaiuParaEntrega, "pedido_saiu_whatsapp_v1",

@@ -238,6 +238,10 @@ manual do M2.1 cobre.
 - [ ] Produzir 6 porções com receita que pede 1 bandeja por porção baixa 6 bandejas.
 - [ ] Bandeja abaixo do mínimo aparece em "Comprar" (M2.3).
 
+> **Como ficou (#1523):** a marca é `Produto.EhEmbalagem`, na categoria de estoque "Embalagens", com contagem em Un.
+> Ela se liga no cadastro rápido ou na lista de M2 › Insumos. No prato sem a marca, `BaixaDeInsumosDaProducao` baixa só as
+> linhas de embalagem da receita.
+
 **Fora.** Embalagem por canal de entrega (sacola do Lalamove).
 
 ## 4. Ordem sugerida
@@ -273,7 +277,9 @@ das decisões abaixo.
 > - **D-M2-02 = a** (09/10, M2.6, #1511): o motivo vem da lista e vira a natureza da saída (Vencido → Vencimento, Perda no preparo → Perda, Doação → Doação, Degustação → Uso interno, Outro → Prejuízo). Texto obrigatório só em "Outro".
 > - **D-M2-06, o limite** (09/10, #1511): perda acima de R$ 50, pelo custo dos lotes, só o Gerente lança. Desfazer é o estorno de saída (Gerente), pelo botão no console, porque o Web saiu.
 >
-> Segue pendente: D-M2-03.
+> - **D-M2-03 = a** (09/10, M2.7, #1523): a embalagem desce na produção, pela receita. A embalagem (`Produto.EhEmbalagem`) desce em **toda** produção, mesmo em prato sem a marca de baixa automática; os outros insumos seguem a D-M2-01.
+>
+> Todas as decisões do M2 estão tomadas.
 
 **D-M2-01 · A produção baixa insumo pela receita?**
 - a) Sim, só para produto com receita marcada "baixa automática"; falta de insumo avisa, não trava **(Recomendado)**

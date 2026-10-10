@@ -53,6 +53,12 @@ namespace EasyStock.Domain.Entities
         /// </summary>
         public bool BaixaInsumoAutomatica { get; set; }
 
+        /// <summary>
+        /// D-M2-03 (#1523): insumo que é embalagem (bandeja, selo, pote). Desce em TODA produção pela
+        /// receita, mesmo sem <see cref="BaixaInsumoAutomatica"/> no prato.
+        /// </summary>
+        public bool EhEmbalagem { get; set; }
+
         public StatusProduto Status { get; set; }
         public DateTime CriadoEm { get; set; }
         public DateTime AlteradoEm { get; set; }

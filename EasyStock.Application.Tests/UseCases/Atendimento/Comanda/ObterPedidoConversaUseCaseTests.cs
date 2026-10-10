@@ -23,7 +23,8 @@ public class ObterPedidoConversaUseCaseTests
 
     public ObterPedidoConversaUseCaseTests()
     {
-        _useCase = new ObterPedidoConversaUseCase(_conversas, _pedidos, _cobrancas);
+        _useCase = new ObterPedidoConversaUseCase(_conversas, _pedidos, _cobrancas,
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>());
     }
 
     private Conversa NovaConversa()

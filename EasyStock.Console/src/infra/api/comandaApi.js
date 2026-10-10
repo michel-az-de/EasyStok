@@ -49,7 +49,7 @@ export function janelaDoId(id) {
 
 export const janelaDaApi = (j) => ({
   id: idDaJanela(j.janelaId, j.data),
-  rotulo: `${rotuloDoDia(j.data)} · ${j.label}`,
+  rotulo: `${rotuloDoDia(j.data)} · ${j.horaInicio && j.horaFim ? `${j.horaInicio.slice(0, 5)} às ${j.horaFim.slice(0, 5)} · ` : ''}${j.label}`,
   vagas: j.vagasRestantes,
   capacidade: j.capacidade,
 })
@@ -116,8 +116,7 @@ function cobrancaDaApi(c, meioAnterior) {
   }
 }
 
-// Pedido da API → pedido do console. A janela escolhida e o meio ficam do lado de cá
-// (`anterior`): a API devolve o pedido, não a escolha da tela.
+// Pedido persistido: a janela vem da vaga no servidor, inclusive após recarregar a página.
 export function pedidoDaApi(p, anterior = null) {
   if (!p) return null
   const cobranca = cobrancaDaApi(p.cobranca, anterior?.meio)
@@ -129,7 +128,8 @@ export function pedidoDaApi(p, anterior = null) {
     statusApi: p.status,
     // #1474: pedido fora da área liberado espera aprovação; a baixa manual é barrada antes.
     requerAprovacao: Boolean(p.requerAprovacao),
-    janela: anterior?.janela ?? null,
+    janela: p.janela ? idDaJanela(p.janela.janelaId, p.janela.data) : null,
+    janelaRotulo: p.janela ? janelaDaApi(p.janela).rotulo : null,
     entregador: anterior?.entregador ?? null,
     itens: p.itens.map((i) => ({
       sku: i.cardapioItemId, qtd: i.quantidade, obs: i.observacao ?? '', acrescimo: false, entrouEm: null,
@@ -164,6 +164,21 @@ export async function listarJanelas({ itens = [], dataInicio = null, dataFim = n
 
 export const obterPedido = (conversaId) => chamarApi(pedidoDaConversa(conversaId))
 
+export async function listarJanelasPedido(pedidoId, data = '') {
+  const busca = data ? `?dataInicio=${encodeURIComponent(data)}&dataFim=${encodeURIComponent(data)}` : ''
+  const resposta = await chamarApi(`/api/pedidos/${pedidoId}/janelas${busca}`)
+  return {
+    lojaDisponivel: resposta.lojaDisponivel,
+    janelas: resposta.janelas.map(janelaDaApi),
+    atual: resposta.atual ? janelaDaApi(resposta.atual) : null,
+  }
+}
+
+export const trocarJanelaPedido = (pedidoId, janela, avisarCliente) =>
+  chamarApi(`/api/pedidos/${pedidoId}/janela`, {
+    metodo: 'PATCH', corpo: { ...janelaDoId(janela), avisarCliente }, sinal: AbortSignal.timeout(15000),
+  })
+
 // Comanda local → corpo do POST. Itens com o mesmo sku e anotações diferentes seguem como
 // linhas próprias (RN-20); acréscimo só existe depois do pagamento, fora deste caminho.
 export function corpoDoPedido(pedido) {
@@ -194,3 +209,9 @@ export const registrarPagamentoManual = (pedidoId, valor, metodo) =>
 
 export const desfazerPagamentoManual = (pedidoId, motivo) =>
   chamarApi(`/api/pedidos/${pedidoId}/pagamento-manual/desfazer`, { metodo: 'POST', corpo: { motivo } })
+
+export const cancelarPedido = (pedidoId, motivo) =>
+  chamarApi(`/api/pedidos/${pedidoId}/cancelar`, {
+    metodo: 'POST', corpo: { empresaId: lerSessao()?.empresa?.id, id: pedidoId, motivo, origem: 'console' },
+    sinal: AbortSignal.timeout(15000),
+  })

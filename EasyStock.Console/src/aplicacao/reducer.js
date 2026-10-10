@@ -201,7 +201,7 @@ function comMensagem(conversa, mensagem, { id, agora }) {
 const mensagemSoLocal = (m) => m.status === 'enviando' || m.status === 'falhou' || Boolean(m.aguardandoSync)
 
 // F03: sem pedido no servidor, a comanda que a dona monta (rascunho) fica. Com pedido, o do
-// servidor manda; a janela e o meio escolhidos na tela vêm junto (a API não os devolve).
+// servidor manda, inclusive a vaga de entrega; o meio escolhido na tela vem junto.
 // Pedido anterior já entregue ou cancelado não apaga a comanda nova que ela está montando.
 function pedidoMesclado(local, doServidor) {
   if (!doServidor) return local ?? null
@@ -210,7 +210,6 @@ function pedidoMesclado(local, doServidor) {
   if (!local || (!rascunho && local.pedidoId !== doServidor.pedidoId)) return doServidor
   return {
     ...doServidor,
-    janela: local.janela ?? doServidor.janela,
     meio: doServidor.cobranca?.meio ?? local.meio ?? doServidor.meio,
   }
 }

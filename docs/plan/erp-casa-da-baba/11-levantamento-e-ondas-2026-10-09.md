@@ -107,7 +107,7 @@ Snapshot do GitHub de 09/10. PR aberta não é entrega incorporada. Checks aprov
 | [PR 1293](https://github.com/michel-az-de/EasyStok/pull/1293) / #1283 | Número do pedido do dia e congelado na comanda | Onda 5 |
 | [PR 1425](https://github.com/michel-az-de/EasyStok/pull/1425) / #1424 | Mensagem programada no compositor | Onda 2 e validação do automático na 9 |
 | [PR 1428](https://github.com/michel-az-de/EasyStok/pull/1428) / #1426 | Sino, lembretes e Web Push | Integrada e homologada localmente na seção 21; entrega externa de push pendente |
-| [PR 1429](https://github.com/michel-az-de/EasyStok/pull/1429) / #1427 | SLA de primeira resposta | Onda 2 e homologação na 9 |
+| [PR 1429](https://github.com/michel-az-de/EasyStok/pull/1429) / #1427 | SLA de primeira resposta | Integrada e homologada localmente na seção 22; aceite operacional na onda 9 |
 | [PR 1431](https://github.com/michel-az-de/EasyStok/pull/1431) / #1430 | Identificação do lead do site | Onda 2 |
 | [PR 1433](https://github.com/michel-az-de/EasyStok/pull/1433) / #1432 | Atendimento por e-mail | Onda 9, após fechar WhatsApp/site |
 | [Issues 1407](https://github.com/michel-az-de/EasyStok/issues/1407) e [1408](https://github.com/michel-az-de/EasyStok/issues/1408) | Modelo aprovado e iniciar conversa | Onda 2 para operação manual; onda 9 para automação |
@@ -325,6 +325,7 @@ Campos mínimos do acompanhamento: onda, fatia, resultado, dependência, respons
 | Endereço/origem, raio, valores, horários e capacidade | Ondas 3–4 | Conferir cadastro com a dona; snapshot antigo não prova estado atual |
 | Conta e acesso Mercado Pago em teste/produção | Onda 3 | Responsável configura em canal seguro; sem segredos na documentação |
 | Matriz de permissões e exceções de operação | Ondas 1–2 | Partir dos três perfis já decididos; confirmar apenas exceções |
+| D3-04: cancelamento de pedido pago | Onda 2 | Felipe decidiu em 09/10: Atendimento cancela sem pagamento; com qualquer valor recebido, inclusive parcial, só Dona/gerente. Implementação e limites na seção 23 |
 | Regras de combos, adicionais, insumos e embalagens | Ondas 6–7 | Resolver as D-M1/D-M2 correspondentes antes da fatia |
 | Destino do caixa offline da PWA | Onda 8 | Decisão pendente explicitamente no ADR-0059 |
 | Identidade de tela e ativos aprovados | Onda 1 | Validar aplicação visual; não refazer marca por conta própria |
@@ -647,3 +648,115 @@ Scripts, capturas, logs e TRX estão em `C:\rep\EasyStok\.build\onda2-lembretes`
 1. Revisar e integrar a PR #1429 de SLA de primeira resposta por loja, incluindo persistência, permissões de edição e comportamento visual do atraso.
 2. Continuar o ciclo completo do pedido e as exceções do balcão; revisar as ações restantes por perfil.
 3. Homologar entrega externa dos avisos e os demais canais no ambiente próprio, com as dependências já registradas neste plano.
+
+## 22. Continuação: SLA de resposta e pausa pelo expediente, 09/10/2026
+
+A PR #1429 foi incorporada em `e560915c`, sobre `0be7a82a`, preservando as mensagens programadas, os lembretes e as funcionalidades atuais do Console. A revisão corrigiu divergências entre o relógio do navegador e o avaliador do servidor. Esta fatia substitui o comportamento descrito na seção 21 para os lembretes automáticos: no modo API, todos os lembretes do balcão vêm do servidor. O modo de demonstração conserva o cálculo local.
+
+### Comportamento entregue
+
+- **Prazo persistido:** configuração entre 1 e 240 minutos, com validação na API e no domínio. A migration `20261007100720_AddSlaRespostaConfiguracaoAtendimento` acrescenta a coluna com padrão de 5 minutos, inclusive nas configurações já existentes. O modelo atual guarda a configuração por empresa, sem um prazo separado por `LojaId`. Quando não existe configuração persistida, inbox e avaliador usam o fallback existente de `Notifications:Prazos`, cujo padrão é 10 minutos; criar/salvar a configuração aplica o valor escolhido.
+- **Expediente e atraso:** servidor e Console contam somente os minutos dos turnos configurados, incluindo virada de dia, semanas sucessivas e turnos sobrepostos sem contagem duplicada. Exatamente no limite ainda não há atraso; um segundo além já ultrapassa o prazo. O Console aguarda o carregamento do expediente antes de calcular. A conversa atrasada sobe em Precisa de você e pisca; movimento reduzido mantém destaque estático.
+- **Resposta efetiva:** envio pendente, envio falho e nota interna não encerram a espera. Uma resposta enviada ao cliente encerra o atraso e permite concluir o lembrete automático. Consultas e configurações validam a empresa também nos casos de uso.
+- **Lembretes coerentes:** fechar manualmente a loja ou aumentar o SLA não conclui falsamente um lembrete de conversa ainda sem resposta. O envio do aviso aguarda novamente o prazo aplicável; a retomada reutiliza o mesmo lembrete. O painel não acrescenta um segundo alerta local com prazo fixo de 10 minutos.
+- **Permissões:** o Atendimento pode ler o expediente para calcular o prazo. Configuração continua exigindo Admin/SuperAdmin, e controle manual de abertura continua exigindo Gerente/Admin/SuperAdmin. As capacidades `editarAtendimento` e `controlarLoja` refletem essas regras e exigem o módulo liberado. Sem capacidade, o Console não apresenta a ação; a API conserva suas políticas de gravação.
+- **Gravação recuperável:** falha mantém o rascunho, duplo clique produz uma chamada e campos ficam bloqueados enquanto a gravação está em andamento. Uma consulta atrasada não sobrescreve a edição. Chamadas têm prazo de 15 segundos. Alterar apenas o SLA não regrava o modelo de mensagem; se a alteração adicional do modelo falhar, a tela distingue essa falha da configuração já salva.
+
+**Limite do controle manual:** usa-se o estado atual. Forçar fechada conta zero; forçar aberta conta todo o intervalo. Não existe histórico de mudanças manuais para reconstruir pausas passadas, e esta entrega não cria esse histórico. Servidor e Console aplicam a mesma regra.
+
+### Evidência local
+
+| Verificação | Resultado |
+|---|---|
+| Domínio | 1.541 testes aprovados, sem ignorados |
+| Aplicação | 2.368 testes aprovados, sem ignorados |
+| API | 1.018 testes aprovados, sem ignorados, incluindo as capacidades de edição e controle manual |
+| PostgreSQL real | 5 testes aprovados, sem ignorados: persistência e destinatários, idempotência/conclusão, SLA por empresa, expediente/resposta efetiva e execução do SQL de Up/Down/Up da migration |
+| Migration | Up preenche 5 em linha existente; Down conserva os demais campos; novo Up restaura o padrão. EF não detectou alterações pendentes no modelo |
+| Console | 61 provas JavaScript aprovadas, incluindo 17 verificações de SLA; lint, camadas, 264 pares de contraste e build aprovados |
+| Gate do código | Build de `EasyStok.CI.slnf` e 36 testes de arquitetura aprovados |
+| HTTP e Chromium | Autenticação, faixa 1..240, edição da Dona e leitura do Atendimento; falha conserva rascunho e banco; duplo clique com um PUT; persistência após recarregar |
+| Fluxo real local | Conversa atrasada antes da recente; expediente fechado pausa e sua restauração retoma o destaque; resposta enviada ao ChatSite encerra o atraso na API e no cartão |
+| Apresentação | Movimento reduzido, tema escuro e gravação em 390 × 844 px sem rolagem horizontal; ausência de capacidade não libera edição; nenhum erro JavaScript nos três contextos |
+
+Scripts, capturas, logs e TRX estão em `C:\rep\EasyStok\.build\onda2-sla`, fora do Git. `sla-browser.cjs` usa API e PostgreSQL reais no banco isolado `easystock_onda2_sla`, com usuários e conversas sintéticos. Resultados estão em `browser-resultados.json`; capturas em `sla-configuracao.png`, `sla-balcao.png` e `sla-celular-escuro.png`. O ChatSite usado é local, sem envio a cliente real. Não houve deploy nem homologação de entrega externa nesta sessão.
+
+Durante a finalização chegaram ao master `f8cec0ab` (espelho do PostgreSQL no CI), `64af5147` (regras de pedidos), `0759e10d` (correções do Console) e `a3e0a521` (sincronização offline). Essas entregas de outra frente foram incorporadas sem conflito. A validação combinada passou em **1.542 testes de domínio**, **2.380 de aplicação**, **1.024 da API** e **5 de integração PostgreSQL**, sem ignorados. As **62 provas JavaScript** e a qualidade completa do Console também passaram após a integração. Os resultados adicionais usam os sufixos `combinado` e `integracao-final` na pasta de evidências. Isso comprova compatibilidade local, sem substituir a homologação operacional do ciclo completo do pedido.
+
+### Próximo trecho executável
+
+1. Continuar o ciclo completo do pedido e as exceções do balcão, com as decisões pendentes da seção 9 respeitadas.
+2. Revisar as ações restantes por perfil e homologar a rotina da operação real.
+3. Homologar WebPush e os demais canais externos no ambiente próprio. Pagamento real, fornecedor de entregas, Google externo e impressão física Oasis mantêm seus aceites separados.
+
+## 23. Continuação: cancelamento operacional na Ficha, 09/10/2026
+
+**Decisão D3-04 confirmada por Felipe:** Atendimento cancela pedido sem pagamento; com qualquer valor recebido, inclusive parcial, só Dona/gerente. A regra usa o nível da sessão autenticada, incluindo Admin/SuperAdmin para a Dona e Gerente para gestão. O corpo da requisição não pode elevar esse nível.
+
+### Comportamento entregue
+
+- **Ficha ligada à API:** Mais ações do pedido abre a confirmação com motivo de 3 a 500 caracteres. Duplo clique compartilha uma chamada; campos bloqueiam durante a gravação. Falha conserva o motivo e não simula cancelamento em memória. Falha ao reler depois de sucesso informa que o cancelamento foi confirmado e que a tela precisa ser atualizada.
+- **Permissão em todos os caminhos:** cancelamento direto, troca de status, KDS, lotes e recusa do site verificam pagamento recebido. Atendimento não vê a opção quando há pagamento; formulário aberto antes de um recebimento recebe 403 com explicação. A capacidade `cancelarPedidoPago` exige gestão e módulo Atendimento autorizado.
+- **Concorrência:** cancelamento usa o mesmo lock do pedido que o recebimento. Se o pagamento confirma primeiro, Atendimento perde a autorização; se o cancelamento confirma primeiro, o recebimento manual é recusado. A expiração automática reutiliza sua transação e só publica atualização da tela depois do commit externo.
+- **Efeitos persistidos:** status, motivo, autor, horário, evento de integração, liberação da vaga e devolução do estoque já baixado ficam na transação. Cobrança pendente é cancelada. Repetir a operação não duplica auditoria, evento, vaga ou devolução de estoque. O SSE publica `pedido.mudou_status` depois do commit; o horário informado pelo lote offline é preservado na auditoria.
+- **Dinheiro recebido:** cancelamento operacional não remove `PedidoPagamento` nem solicita devolução ao provedor. Corrigidas as consultas de total e lista do Caixa: pedido cancelado continua contribuindo com dinheiro recebido e ainda não devolvido. Cobrança com estorno confirmado exclui somente seu pagamento correspondente; pedido já consolidado em Venda continua sem contagem duplicada. O roteiro HTTP da onda 0 foi ajustado para esse comportamento.
+- **Comunicação honesta:** a confirmação informa que a devolução deve ser tratada separadamente e orienta avisar o cliente pela conversa. O fluxo existente de recusa do site conserva seu estorno, agora com a mesma proteção por perfil.
+
+Durante a finalização, as melhorias de telas em `ed2c95ba` e a embalagem pela receita em `5f152c11` chegaram ao master e foram incorporadas sem conflito. As contagens abaixo refletem a base combinada.
+
+### Evidência local
+
+| Verificação | Resultado |
+|---|---|
+| Aplicação | 2.396 testes aprovados, sem ignorados |
+| API | 1.049 testes aprovados, sem ignorados |
+| PostgreSQL real | 15 testes aprovados, sem ignorados: ciclo pedido/estoque/pagamento/caixa, vaga, idempotência, corrida pagamento/cancelamento nas duas ordens, soma/lista do Caixa e aprovação/recusa concorrentes |
+| Console | 64 provas JavaScript aprovadas; lint, camadas, contraste e build aprovados |
+| HTTP e Chromium | 403 para pagamento parcial, nível/empresa forjados, status e KDS; lotes rejeitam a linha; motivo obrigatório, falha 503 preservando texto, um POST no duplo clique e persistência após recarregar |
+| Fluxo ao vivo | Stream SSE real recebeu o cancelamento; Atendimento com tela anterior ao pagamento recebeu 403; Dona cancelou pedido parcial conservando o recebimento e uma auditoria |
+| Apresentação | Computador e celular 390 × 844 px, tema escuro, confirmação acessível sem rolagem horizontal; nenhum erro JavaScript |
+
+Scripts, capturas, logs e TRX estão em `C:\rep\EasyStok\.build\onda2-ciclo-pedido`. A prova `cancelamento-browser.cjs` usa API local e PostgreSQL real no banco isolado `easystock_onda2_ciclo`. Usuários, conversas e pedidos foram criados pelas APIs; a preparação da fixture habilita os módulos e vincula os pedidos às conversas no banco sintético. As ações testadas de cancelar e pagar passam pelas APIs reais, sem alteração manual de resultado.
+
+**Limites:** não houve envio a cliente real, devolução de dinheiro real, impressão física ou deploy. O estorno da Ficha e a homologação externa de pagamento continuam pendentes. Esta entrega fecha o cancelamento operacional desta fatia, sem encerrar M3.3 ou a onda 2.
+
+### Próximo trecho executável
+
+1. Continuar o ciclo completo e as exceções do pedido, incluindo reagendamento com troca efetiva da vaga (M3.4).
+2. Implementar e homologar o estorno pela Ficha com resposta do provedor e reflexo financeiro explícito, respeitando D3-04.
+3. Conferir as ações restantes por perfil e realizar o aceite da operação real. Canais externos, entregas e impressão física conservam seus aceites separados.
+
+
+## 24. Continuação: reagendamento com troca de vaga (09/10/2026)
+
+**Fatia executada:** M3.4 da Onda 2, reagendamento de pedido criado pela Ficha e por Entregas, com ocupação real da janela e validação local em desktop e celular.
+
+### 24.1 Implementado
+
+- `GET api/pedidos/{id}/janelas` consulta a vaga atual e as opções pelo prazo real dos itens, incluindo preparo padrão e respiro. `PATCH api/pedidos/{id}/janela` usa empresa e autor da sessão e exige o módulo Atendimento ou Entregas, além do nível Operador.
+- A troca trava o pedido e, na mesma transação, libera a vaga antiga com motivo `reagendado`, ocupa a nova com a regra de capacidade da S16, atualiza `AgendadoParaEm`, recalcula o início previsto e limpa o aviso de atraso. Janela cheia retorna 409; rollback preserva a reserva anterior.
+- A auditoria registra faixa, autor e situação do aviso. Repetir a mesma janela/data não duplica vaga, evento ou aviso. Depois do commit, `pedido.reagendado` atualiza os consumidores SSE, incluindo KDS e Entregas.
+- A consulta de vagas prioriza a ativa sobre o histórico. A Ficha passa a receber a janela do servidor e o reducer não restaura a escolha local antiga. A rota antiga `/agendamento` recusa pedidos com vaga para impedir a divergência entre horário e ocupação.
+- Ficha e Entregas compartilham a escolha de data/janela e a operação da API. Uma falha conserva a escolha, duplo clique envia uma chamada e recarga indisponível após confirmação não é apresentada como falha da gravação. Pedidos entregues ou cancelados não podem ser reagendados.
+- Aviso por WhatsApp é opcional e fica desmarcado inicialmente. Quando solicitado e permitido pelas preferências e pelo telefone do cliente, o evento `PedidoReagendado` entra no outbox de notificações na mesma transação, com faixa/data e chave distinta por troca. A tela diferencia aviso na fila de aviso não enfileirado.
+
+### 24.2 Validação executada
+
+| Camada | Evidência local |
+|---|---|
+| Application | 2.396 testes aprovados |
+| API | 1.050 testes aprovados, incluindo classificação de módulo do novo controller |
+| PostgreSQL | 25 testes aprovados, nenhum ignorado: 15 da troca e 10 de capacidade/KDS/jornada do atendimento |
+| Concorrência | Duas transações reais aguardaram o mesmo lock para a última vaga; uma confirmou e a outra restaurou a vaga antiga |
+| Atomicidade | Falha controlada ao gravar o aviso, depois do INSERT da nova vaga, reverteu a troca inteira e não publicou SSE |
+| Console | 65 scripts de prova aprovados; lint, camadas, contraste e build aprovados |
+| HTTP e navegador | Atendimento autorizado; Cozinha e empresa forjada 403; janela inválida 400; pedido inexistente 404; janela que lotou depois de abrir a Ficha recusada sem perder a reserva |
+| Jornada local | Chromium 1440 × 1000 e 390 × 844, tema claro/escuro: Ficha, Entregas, falha 503, duplo clique, recarga persistida, pagamento parcial conservado, KDS e SSE |
+
+Evidências fora do Git: `C:\rep\EasyStok\.build\onda2-reagendamento`, com TRX, logs, script de navegador, resultados e capturas. Banco de homologação isolado: `easystock_onda2_janela`, no PostgreSQL local. Sem migration ou dependência nova.
+
+### 24.3 Limites e próxima fatia
+
+- Gravação e fila de aviso homologadas localmente; não houve envio a cliente real. Entrega externa pelo WhatsApp depende do canal configurado. Fora da janela de 24 horas, é necessário configurar um modelo aprovado pela Meta; o seed não presume essa aprovação.
+- Não houve publicação pública verificada nesta fatia. Commit/push e deploy são estados distintos.
+- Próxima fatia: estorno pela Ficha, com resposta efetiva do provedor, reflexo financeiro e regra D3-04. Depois, continuar as ações restantes por perfil e os aceites operacionais, mantendo separados canais externos, logística e impressão física.

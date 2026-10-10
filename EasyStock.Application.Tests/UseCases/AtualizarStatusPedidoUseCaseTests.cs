@@ -33,11 +33,13 @@ public class AtualizarStatusPedidoUseCaseTests
             criarContaReceber, NullLogger<GerarContaReceberDePedidoUseCase>.Instance);
         var opts = Options.Create(new PedidoEstoqueOptions { PermiteEstoqueNegativo = permiteNegativo });
         var integ = new PedidoEstoqueIntegrationService(itemRepo, movRepo, Substitute.For<IPublicadorEventoIntegracao>(), opts, NullLogger<PedidoEstoqueIntegrationService>.Instance);
+        uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>()(ci.Arg<CancellationToken>()));
         var uc = new AtualizarStatusPedidoUseCase(pedidoRepo, integ, configRepo, gerarCr, publicador,
             operacaoEventos ?? Substitute.For<IOperacaoEventPublisher>(), uow, NullLogger<AtualizarStatusPedidoUseCase>.Instance,
             new CalculadoraInicioPrevistoPedido(prazoQueries ?? Substitute.For<IPrazoPreparoPedidoQueries>()),
-            new EfeitosCancelamentoPedido(contaReceberRepo, vagaRepo ?? Substitute.For<IVagaOcupadaRepository>(),
-                NullLogger<EfeitosCancelamentoPedido>.Instance));
+            new EasyStock.Application.UseCases.CancelarPedido.CancelarPedidoUseCase(pedidoRepo, integ, new EfeitosCancelamentoPedido(contaReceberRepo, vagaRepo ?? Substitute.For<IVagaOcupadaRepository>(),
+                NullLogger<EfeitosCancelamentoPedido>.Instance), uow, Microsoft.Extensions.Logging.Abstractions.NullLogger<EasyStock.Application.UseCases.CancelarPedido.CancelarPedidoUseCase>.Instance, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>(), publicador, operacaoEventos ?? Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>()));
         return (uc, pedidoRepo, itemRepo, movRepo, uow, publicador);
     }
 

@@ -1,7 +1,11 @@
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.CancelarPedido;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
 using FluentAssertions;
@@ -36,6 +40,72 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Workflows;
 public sealed class RegistrarPagamentoPedidoConcorrenciaIntegrationTests(PostgreSqlDatabaseFixture fixture)
     : IClassFixture<PostgreSqlDatabaseFixture>
 {
+    [SkippableTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Cancelamento_e_recebimento_concorrentes_respeitam_a_decisao_que_obteve_o_lock(bool pagamentoPrimeiro)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var empresaId = Guid.NewGuid();
+        var loja = Loja.Criar(empresaId, "Loja cancelamento");
+        var pedido = NovoPedidoOperacional(empresaId, loja.Id);
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.Empresas.Add(new Empresa { Id = empresaId, Nome = "Teste cancelamento", Documento = "11223344556677",
+                CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+            db.Lojas.Add(loja);
+            db.Pedidos.Add(pedido);
+            await db.SaveChangesAsync();
+        }
+        await using var provider = BuildProductionProvider();
+        var primeiroAplicado = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var liberarCommit = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        async Task Executar(bool pagar, bool primeiro)
+        {
+            await using var scope = provider.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(empresaId);
+            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().ExecuteInTransactionSemRetryAsync(async _ =>
+            {
+                if (pagar)
+                    await scope.ServiceProvider.GetRequiredService<RegistrarPagamentoPedidoUseCase>()
+                        .ExecuteAsync(new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "dinheiro", 10m));
+                else
+                    await scope.ServiceProvider.GetRequiredService<CancelarPedidoUseCase>().ExecuteAsync(
+                        new CancelarPedidoCommand(empresaId, pedido.Id, Motivo: "Desistência", NivelSolicitante: NivelAcesso.Operador),
+                        publicarOperacao: false);
+                if (primeiro)
+                {
+                    primeiroAplicado.SetResult();
+                    await liberarCommit.Task.WaitAsync(TimeSpan.FromSeconds(15));
+                }
+                return true;
+            });
+        }
+        var vencedor = Executar(pagamentoPrimeiro, true);
+        await primeiroAplicado.Task.WaitAsync(TimeSpan.FromSeconds(15));
+        var concorrente = Executar(!pagamentoPrimeiro, false);
+        try
+        {
+            await Task.Delay(200);
+            concorrente.IsCompleted.Should().BeFalse("a outra operação precisa esperar o lock do pedido");
+        }
+        finally { liberarCommit.TrySetResult(); }
+        await vencedor;
+        if (pagamentoPrimeiro)
+            await FluentActions.Invoking(() => concorrente).Should().ThrowAsync<UnauthorizedAccessException>();
+        else
+            await FluentActions.Invoking(() => concorrente).Should().ThrowAsync<UseCaseValidationException>()
+                .WithMessage("*cancelado*");
+
+        await using var conferir = fixture.CreateDbContext();
+        conferir.SetMobileTenantContext(empresaId);
+        var salvo = await conferir.Pedidos.Include(p => p.Pagamentos).SingleAsync(p => p.Id == pedido.Id);
+        salvo.Status.Should().Be(pagamentoPrimeiro ? "aguardando" : "cancelado");
+        salvo.TotalPago.Should().Be(pagamentoPrimeiro ? 10m : 0m);
+    }
+
     [SkippableFact]
     public async Task Dois_pagamentos_concorrentes_primeiros_do_dia_persistem_ambos_e_abrem_o_caixa_uma_vez()
     {

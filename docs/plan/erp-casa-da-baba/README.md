@@ -117,7 +117,7 @@ as marcadas com ⚑ (todas respondidas em 01/10, ✅); as demais só travam a fa
 | D3-01 | Configuração do atendimento | abrir/fechar loja no M3, resto no M7 | [04](04-m3-atendimento.md) |
 | D3-02 | iFood | fora até ter conta e volume | [04](04-m3-atendimento.md) |
 | D3-03 | Atendentes múltiplos | só filtro Minhas/Sem dono e nome no selo | [04](04-m3-atendimento.md) |
-| D3-04 | Quem cancela pedido pago | só Gerente | [04](04-m3-atendimento.md) |
+| ✅ D3-04 | Quem cancela pedido pago | **DECIDIDO em 09/10:** Atendimento sem pagamento; com qualquer valor recebido, só Dona/gerente | [04](04-m3-atendimento.md) |
 | D4-01 | Prioridade da fila | derivada do prazo, sem campo | [05](05-m4-cozinha.md) |
 | D4-02 | Rastreio por item | soma por item; status por pedido | [05](05-m4-cozinha.md) |
 | D4-03 | Encomendas na cozinha | Hoje/Amanhã/dia; futuro só leitura | [05](05-m4-cozinha.md) |

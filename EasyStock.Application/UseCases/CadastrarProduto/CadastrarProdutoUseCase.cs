@@ -28,7 +28,9 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
         TipoEmbalagem TipoEmbalagem = TipoEmbalagem.Avulso,
         bool EhInsumo = false,
         UnidadeMedida UnidadeMedidaBase = UnidadeMedida.Un,
-        int? QuantidadeMinima = null);
+        int? QuantidadeMinima = null,
+        // D-M2-03 (#1523): embalagem é insumo que desce em toda produção.
+        bool EhEmbalagem = false);
 
     public sealed record CadastrarProdutoResult(
         Guid ProdutoId,
@@ -150,6 +152,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                 EhInsumo = command.EhInsumo,
                 UnidadeMedidaBase = command.UnidadeMedidaBase,
                 QuantidadeMinima = command.QuantidadeMinima,
+                EhEmbalagem = command.EhEmbalagem,
                 SkuBase = string.IsNullOrWhiteSpace(command.SkuBase) ? null : CodigoSku.From(command.SkuBase),
                 CodigoBarras = command.CodigoBarras?.Trim(),
                 ControlaValidade = command.ControlaValidade,

@@ -12,7 +12,8 @@ namespace EasyStock.Infra.Postgre.Notifications.Agendamento;
 /// <summary>
 /// Um tick dos lembretes de pedidos agendados (<c>mobile_orders.scheduled_delivery_at</c>): varre pedidos
 /// <c>aguardando</c> ou <c>preparando</c> com entrega agendada e dispara até 3 eventos por pedido (no dia, 1 hora antes,
-/// 10 minutos antes). Idempotência pelas colunas <c>agendamento_notificado_*_em</c>.
+/// 10 minutos antes), no máximo um por tick: o mais próximo da entrega; os anteriores vencidos e os de entrega passada
+/// só são carimbados. Idempotência pelas colunas <c>agendamento_notificado_*_em</c>.
 /// <para>
 /// N1: cada pedido roda num escopo de DI próprio, com o tenant do pedido fixado antes da primeira conexão. Antes o tick
 /// publicava dentro do advisory lock, numa conexão sem tenant: o INSERT em <c>notif_eventos</c> violava o WITH CHECK
@@ -80,6 +81,15 @@ public sealed class LembretesPedidoAgendadoTick(
 
     private async Task ProcessarAgendamentoAsync(AgendamentoSnapshot snap, DateTime agora, CancellationToken ct)
     {
+        // Lembrete "no dia": dispara 24h antes do horario agendado. Janela
+        // ampla cobre fuso BR (UTC-3) sem precisar saber TZ da empresa —
+        // pedido pra 19h BR (22h UTC) ja entra no radar a partir das 22h UTC
+        // do dia anterior, que cobre todo o expediente do dia local.
+        var diaVencido = snap.NotificadoDiaEm is null && agora >= snap.ScheduledDeliveryAt.AddHours(-24);
+        var umaHoraVencido = snap.Notificado1hEm is null && agora >= snap.ScheduledDeliveryAt.AddHours(-1);
+        var dezMinutosVencido = snap.Notificado10minEm is null && agora >= snap.ScheduledDeliveryAt.AddMinutes(-10);
+        if (!diaVencido && !umaHoraVencido && !dezMinutosVencido) return;
+
         using var scope = serviceProvider.CreateScope();
         var sp = scope.ServiceProvider;
         // Antes da primeira conexão: o interceptor emite SET app.empresa_id na abertura.
@@ -87,33 +97,29 @@ public sealed class LembretesPedidoAgendadoTick(
         var db = sp.GetRequiredService<EasyStockDbContext>();
         var notificador = sp.GetRequiredService<INotificadorService>();
 
-        // Lembrete "no dia": dispara 24h antes do horario agendado. Janela
-        // ampla cobre fuso BR (UTC-3) sem precisar saber TZ da empresa —
-        // pedido pra 19h BR (22h UTC) ja entra no radar a partir das 22h UTC
-        // do dia anterior, que cobre todo o expediente do dia local.
-        if (snap.NotificadoDiaEm is null && agora >= snap.ScheduledDeliveryAt.AddHours(-24))
+        // #1507: sem limite superior, um pedido criado perto da entrega (ou o tick voltando de uma indisponibilidade)
+        // disparava os 3 lembretes de uma vez, até para entrega já passada. Agora só o lembrete mais próximo da entrega
+        // sai; os anteriores são carimbados sem disparar. Entrega passada: só carimba.
+        if (agora < snap.ScheduledDeliveryAt)
         {
-            await DispararAsync(snap, TipoEventoNotificacao.PedidoAgendadoHoje, "Dia", notificador, ct);
-            await db.Set<Order>()
-                .Where(o => o.Id == snap.OrderId)
-                .ExecuteUpdateAsync(s => s.SetProperty(o => o.AgendamentoNotificadoDiaEm, agora), ct);
+            if (dezMinutosVencido)
+                await DispararAsync(snap, TipoEventoNotificacao.PedidoAgendadoEm10Minutos, "10min", notificador, ct);
+            else if (umaHoraVencido)
+                await DispararAsync(snap, TipoEventoNotificacao.PedidoAgendadoEm1Hora, "1h", notificador, ct);
+            else
+                await DispararAsync(snap, TipoEventoNotificacao.PedidoAgendadoHoje, "Dia", notificador, ct);
         }
 
-        if (snap.Notificado1hEm is null && agora >= snap.ScheduledDeliveryAt.AddHours(-1))
-        {
-            await DispararAsync(snap, TipoEventoNotificacao.PedidoAgendadoEm1Hora, "1h", notificador, ct);
-            await db.Set<Order>()
-                .Where(o => o.Id == snap.OrderId)
-                .ExecuteUpdateAsync(s => s.SetProperty(o => o.AgendamentoNotificado1hEm, agora), ct);
-        }
-
-        if (snap.Notificado10minEm is null && agora >= snap.ScheduledDeliveryAt.AddMinutes(-10))
-        {
-            await DispararAsync(snap, TipoEventoNotificacao.PedidoAgendadoEm10Minutos, "10min", notificador, ct);
-            await db.Set<Order>()
-                .Where(o => o.Id == snap.OrderId)
-                .ExecuteUpdateAsync(s => s.SetProperty(o => o.AgendamentoNotificado10minEm, agora), ct);
-        }
+        // Carimbo depois de o evento ter sido gravado (N1), num UPDATE só para todos os vencidos.
+        await db.Set<Order>()
+            .Where(o => o.Id == snap.OrderId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(o => o.AgendamentoNotificadoDiaEm,
+                    o => diaVencido ? (DateTime?)agora : o.AgendamentoNotificadoDiaEm)
+                .SetProperty(o => o.AgendamentoNotificado1hEm,
+                    o => umaHoraVencido ? (DateTime?)agora : o.AgendamentoNotificado1hEm)
+                .SetProperty(o => o.AgendamentoNotificado10minEm,
+                    o => dezMinutosVencido ? (DateTime?)agora : o.AgendamentoNotificado10minEm), ct);
     }
 
     private static Task DispararAsync(

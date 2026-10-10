@@ -2,12 +2,23 @@ import { useEffect, useState } from 'react'
 import { Bloco } from '../../componentes/Bloco'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes } from '../../aplicacao/contextos'
+import { useReagendamentoPedido } from '../../aplicacao/useReagendamentoPedido'
+import { EscolhaJanelaPedido } from '../../componentes/EscolhaJanelaPedido'
 import css from './ficha.module.css'
 
-// Janelas no modo API (F03): as da vitrine com vaga que respeitam o prazo dos itens da
-// comanda (S16), já filtradas pelo EasyStok. Diferente do seletor da demonstração, a janela
-// tem data e a lotação é a do servidor; cheia não aparece porque não dá para reservar.
+// Rascunho escolhe a janela localmente; pedido criado troca a vaga no servidor (M3.4).
+// Ambos usam vagas da vitrine que respeitam o prazo de preparo (S16).
 export function SeletorJanelaApi({ pedido, editavel, aoEscolher }) {
+  if (pedido.pedidoId) return <ReagendamentoPedido key={pedido.pedidoId} pedidoId={pedido.pedidoId} aoEscolher={aoEscolher} />
+  return <EscolhaRascunho pedido={pedido} editavel={editavel} aoEscolher={aoEscolher} />
+}
+
+function ReagendamentoPedido({ pedidoId, aoEscolher }) {
+  const campos = useReagendamentoPedido(pedidoId, aoEscolher)
+  return <Bloco titulo="Janela de entrega"><EscolhaJanelaPedido {...campos} /></Bloco>
+}
+
+function EscolhaRascunho({ pedido, editavel, aoEscolher }) {
   const { carregarJanelasComanda } = useAcoes()
   const [janelas, setJanelas] = useState(null)
   const [erro, setErro] = useState(null)
