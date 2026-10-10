@@ -40,19 +40,22 @@ public class SyncMobileMigrationsTests(PostgreSqlDatabaseFixture fixture) : ICla
 
         // Linhas como o banco de antes guardava: hora do aparelho, inclusive adiantada.
         var sufixo = Guid.NewGuid().ToString("N")[..8];
-        await db.Database.ExecuteSqlRawAsync($"""
+        // Valores como parametro (ExecuteSqlAsync): interpolar direto no SQL e o EF1002 do build Release.
+        string idProduto = $"p-{sufixo}", idCliente = $"c-{sufixo}", idPedido = $"o-{sufixo}",
+            idPedidoFuturo = $"o-futuro-{sufixo}", idLote = $"b-{sufixo}", idLancamento = $"cash-{sufixo}";
+        await db.Database.ExecuteSqlAsync($"""
             INSERT INTO mobile_products ("Id", "Name", "Category", "Stock", is_custom, is_approved, created_at, updated_at)
-            VALUES ('p-{sufixo}', 'Lasanha', 'massa', 3, false, true, now() - interval '9 days', now() - interval '2 days');
+            VALUES ({idProduto}, 'Lasanha', 'massa', 3, false, true, now() - interval '9 days', now() - interval '2 days');
             INSERT INTO mobile_clients ("Id", "Name", last_order, order_count, created_at, updated_at)
-            VALUES ('c-{sufixo}', 'Ana', now(), 1, now() - interval '9 days', now() - interval '3 days');
+            VALUES ({idCliente}, 'Ana', now(), 1, now() - interval '9 days', now() - interval '3 days');
             INSERT INTO mobile_orders ("Id", client_snapshot_name, "Status", "Total", created_at, updated_at)
-            VALUES ('o-{sufixo}', 'Ana', 'pronto', 10, now() - interval '9 days', now() - interval '4 days');
+            VALUES ({idPedido}, 'Ana', 'pronto', 10, now() - interval '9 days', now() - interval '4 days');
             INSERT INTO mobile_orders ("Id", client_snapshot_name, "Status", "Total", created_at, updated_at)
-            VALUES ('o-futuro-{sufixo}', 'Ana', 'pronto', 10, now(), now() + interval '2 hours');
+            VALUES ({idPedidoFuturo}, 'Ana', 'pronto', 10, now(), now() + interval '2 hours');
             INSERT INTO mobile_batches ("Id", "Code", created_at)
-            VALUES ('b-{sufixo}', 'LOT-1', now() - interval '5 days');
+            VALUES ({idLote}, 'LOT-1', now() - interval '5 days');
             INSERT INTO mobile_cash_entries ("Id", "Type", "Amount", "Description", created_at)
-            VALUES ('cash-{sufixo}', 'expense', 30, 'Gas', now() - interval '6 days');
+            VALUES ({idLancamento}, 'expense', 30, 'Gas', now() - interval '6 days');
             """);
 
         await migrator.MigrateAsync(carimbo);
@@ -68,8 +71,9 @@ public class SyncMobileMigrationsTests(PostgreSqlDatabaseFixture fixture) : ICla
         (await ColunaExisteAsync(db, "mobile_cash_entries", "deleted_at")).Should().BeTrue();
 
         // Linha gravada por fora do EF recebe o default.
-        await db.Database.ExecuteSqlRawAsync($"""
-            INSERT INTO mobile_batches ("Id", "Code", created_at) VALUES ('b-novo-{sufixo}', 'LOT-2', now() - interval '1 day');
+        var idLoteNovo = $"b-novo-{sufixo}";
+        await db.Database.ExecuteSqlAsync($"""
+            INSERT INTO mobile_batches ("Id", "Code", created_at) VALUES ({idLoteNovo}, 'LOT-2', now() - interval '1 day');
             """);
         (await EscalarAsync<bool>(db, $"SELECT server_updated_at > now() - interval '1 minute' FROM mobile_batches WHERE \"Id\" = 'b-novo-{sufixo}'"))
             .Should().BeTrue();
