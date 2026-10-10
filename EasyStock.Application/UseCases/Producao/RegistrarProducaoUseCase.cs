@@ -12,7 +12,10 @@ public sealed record RegistrarProducaoItemInput(
     int ValidadeDias,
     decimal? CustoUnitario,
     // M2.2 (#1491, RN-45): peso real produzido; a sobra é o que passa das porções.
-    int? PesoRealG = null);
+    int? PesoRealG = null,
+    // M1.4c (#1537, D-M1-03): a porção produzida. A entrada vai para o saldo dela.
+    Guid? ProdutoVariacaoId = null,
+    [property: MaxLength(60)] string? Porcao = null);
 
 public sealed record RegistrarProducaoCommand(
     [property: Required] Guid EmpresaId,
@@ -117,7 +120,7 @@ public class RegistrarProducaoUseCase(
             Observacoes: cmd.Observacao,
             Origem: "producao",
             Itens: itens.Select(i => new CriarLoteItemInput(
-                Nome: Truncar(produtos[i.ProdutoId].Nome, 150),
+                Nome: Truncar(produtos[i.ProdutoId].Nome + (string.IsNullOrWhiteSpace(i.Porcao) ? "" : $" {i.Porcao.Trim()}"), 150),
                 Quantidade: i.Porcoes,
                 ProdutoId: i.ProdutoId,
                 Unidade: "porcao",
@@ -142,7 +145,7 @@ public class RegistrarProducaoUseCase(
             var entrada = await registrarEntradaUC.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
                 EmpresaId: cmd.EmpresaId,
                 ProdutoId: it.ProdutoId,
-                ProdutoVariacaoId: null,
+                ProdutoVariacaoId: it.ProdutoVariacaoId,
                 Quantidade: it.Porcoes,
                 CustoUnitario: custo,
                 PrecoVendaSugerido: null,

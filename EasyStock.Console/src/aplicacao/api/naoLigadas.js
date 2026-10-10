@@ -59,7 +59,6 @@ export const NAO_LIGADAS = {
     'alternarRecompensaAtiva', 'criarSorteio',
   ]),
   ...grupo('Cupom e recompensa no pedido', ['aplicarCupom', 'removerCupomDoPedido', 'resgatarRecompensa']),
-  ...grupo('Ocorrência', ['apurarOcorrencia', 'encerrarOcorrenciaSemEstorno']),
 }
 
 export const textoNaoLigado = (rotulo) => `${rotulo}: ainda não ligado nesta versão.`

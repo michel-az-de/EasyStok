@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261010121307_AddApuracaoOcorrencia")]
+    partial class AddApuracaoOcorrencia
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -4449,16 +4452,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("lote");
 
-                    b.Property<DateTime>("ServerUpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("server_updated_at")
-                        .HasDefaultValueSql("now()");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("EmpresaId", "ServerUpdatedAt")
-                        .HasDatabaseName("ix_mobile_batches_empresa_carimbo");
 
                     b.ToTable("mobile_batches");
                 });
@@ -4534,15 +4528,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<string>("DeletedBy")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("deleted_by");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -4575,21 +4560,12 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("metodo");
 
-                    b.Property<DateTime>("ServerUpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("server_updated_at")
-                        .HasDefaultValueSql("now()");
-
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("EmpresaId", "ServerUpdatedAt")
-                        .HasDatabaseName("ix_mobile_cash_entries_empresa_carimbo");
 
                     b.ToTable("mobile_cash_entries");
                 });
@@ -4659,20 +4635,11 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
-                    b.Property<DateTime>("ServerUpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("server_updated_at")
-                        .HasDefaultValueSql("now()");
-
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("EmpresaId", "ServerUpdatedAt")
-                        .HasDatabaseName("ix_mobile_clients_empresa_carimbo");
 
                     b.ToTable("mobile_clients");
                 });
@@ -4981,12 +4948,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("scheduled_delivery_at");
 
-                    b.Property<DateTime>("ServerUpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("server_updated_at")
-                        .HasDefaultValueSql("now()");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -5000,9 +4961,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("EmpresaId", "ServerUpdatedAt")
-                        .HasDatabaseName("ix_mobile_orders_empresa_carimbo");
 
                     b.ToTable("mobile_orders");
                 });
@@ -5135,12 +5093,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<decimal?>("Price")
                         .HasColumnType("numeric(10,2)");
 
-                    b.Property<DateTime>("ServerUpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("server_updated_at")
-                        .HasDefaultValueSql("now()");
-
                     b.Property<string>("Sku")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
@@ -5158,9 +5110,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("EmpresaId", "ServerUpdatedAt")
-                        .HasDatabaseName("ix_mobile_products_empresa_carimbo");
 
                     b.ToTable("mobile_products");
                 });

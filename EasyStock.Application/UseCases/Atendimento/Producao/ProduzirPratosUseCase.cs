@@ -7,7 +7,9 @@ using EasyStock.Domain.Exceptions.Storefront;
 namespace EasyStock.Application.UseCases.Atendimento.Producao;
 
 /// <summary>Um prato produzido, como ela anota: porções, peso de cada uma, peso real e validade.</summary>
-public sealed record PratoProduzidoInput(Guid CardapioItemId, int Porcoes, int? PesoPorPorcaoG, int? PesoRealG, int ValidadeDias);
+/// <param name="VariacaoId">M1.4c (#1537): a porção produzida (300 g × 800 g). Obrigatória em prato com porções.</param>
+public sealed record PratoProduzidoInput(
+    Guid CardapioItemId, int Porcoes, int? PesoPorPorcaoG, int? PesoRealG, int ValidadeDias, Guid? VariacaoId = null);
 
 public sealed record ProduzirPratosCommand(
     Guid EmpresaId, Guid UsuarioId, string? OperadorNome, IReadOnlyList<PratoProduzidoInput>? Pratos, string? Observacao = null);
@@ -32,7 +34,8 @@ public sealed class ProduzirPratosUseCase(
     ICategoriaRepository categoriaRepository,
     CadastrarProdutoUseCase cadastrarProduto,
     RegistrarProducaoUseCase registrarProducao,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    EasyStock.Application.UseCases.Atendimento.Comanda.VincularPorcoesAoEstoqueUseCase vincularPorcoes)
 {
     public const string CategoriaPratos = "Cardápio";
 
@@ -41,7 +44,8 @@ public sealed class ProduzirPratosUseCase(
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         if (cmd.Pratos is null || cmd.Pratos.Count == 0)
             throw new UseCaseValidationException("Informe ao menos um prato produzido.");
-        if (cmd.Pratos.GroupBy(p => p.CardapioItemId).Any(g => g.Count() > 1))
+        // M1.4c: o mesmo prato pode vir em duas linhas, desde que de porções diferentes.
+        if (cmd.Pratos.GroupBy(p => (p.CardapioItemId, p.VariacaoId)).Any(g => g.Count() > 1))
             throw new UseCaseValidationException("O mesmo prato apareceu duas vezes: some as porções numa linha só.");
 
         var storefront = await storefrontRepository.GetByEmpresaAsync(cmd.EmpresaId, ct);
@@ -55,15 +59,23 @@ public sealed class ProduzirPratosUseCase(
                 ?? throw new CardapioItemNaoEncontradoException(storefront.Id, p.CardapioItemId);
             if (item.EstaArquivado)
                 throw new UseCaseValidationException($"\"{item.NomeEfetivo()}\" está fora do cardápio: reponha antes de produzir.");
+            // M1.4c (#1537, D-M1-03): prato com porções produz uma porção; o saldo é dela.
+            if (item.TemVariacoes() && item.Variacoes.All(v => v.Id != p.VariacaoId))
+                throw new UseCaseValidationException($"Escolha a porção de \"{item.NomeEfetivo()}\" que você produziu.");
+            if (!item.TemVariacoes() && p.VariacaoId is not null)
+                throw new UseCaseValidationException($"\"{item.NomeEfetivo()}\" não tem essa porção.");
             pratos.Add(item);
         }
 
         await VincularAvulsosAsync(cmd, pratos, ct);
+        await VincularPorcoesAsync(cmd.EmpresaId, pratos);
+        var porcoes = cmd.Pratos.Select((p, i) => pratos[i].Variacoes.FirstOrDefault(v => v.Id == p.VariacaoId)).ToList();
 
         var producao = await registrarProducao.ExecuteAsync(new RegistrarProducaoCommand(
             cmd.EmpresaId, null, null,
             cmd.Pratos.Select((p, i) => new RegistrarProducaoItemInput(
-                pratos[i].ProdutoId!.Value, p.Porcoes, p.PesoPorPorcaoG, p.ValidadeDias, null, p.PesoRealG)).ToList(),
+                pratos[i].ProdutoId!.Value, p.Porcoes, p.PesoPorPorcaoG, p.ValidadeDias, null, p.PesoRealG,
+                porcoes[i]?.ProdutoVariacaoId, porcoes[i]?.Rotulo)).ToList(),
             cmd.Observacao,
             cmd.UsuarioId == Guid.Empty ? null : cmd.UsuarioId,
             cmd.OperadorNome), ct);
@@ -71,13 +83,14 @@ public sealed class ProduzirPratosUseCase(
         return new ProduzirPratosResult(
             producao.LoteId, producao.CodigoLote, producao.TotalEtiquetas,
             producao.Itens.Select((r, i) => new PratoProduzidoResult(
-                pratos[i].Id, Exibicao(pratos[i].NomeEfetivo()), r.Porcoes, r.SobraG, r.ValidadeEm)).ToList(),
+                pratos[i].Id, Exibicao(pratos[i].NomeEfetivo()) + (porcoes[i] is { } v ? $" {v.Rotulo}" : ""),
+                r.Porcoes, r.SobraG, r.ValidadeEm)).ToList(),
             producao.Avisos ?? []);
     }
 
     private async Task VincularAvulsosAsync(ProduzirPratosCommand cmd, IReadOnlyList<CardapioItem> pratos, CancellationToken ct)
     {
-        var avulsos = pratos.Where(p => !p.ProdutoId.HasValue).ToList();
+        var avulsos = pratos.Where(p => !p.ProdutoId.HasValue).Distinct().ToList();
         if (avulsos.Count == 0) return;
 
         var categoriaId = await CategoriaDeEstoque.ObterOuCriarAsync(categoriaRepository, unitOfWork, cmd.EmpresaId,
@@ -89,6 +102,16 @@ public sealed class ProduzirPratosUseCase(
                 null, null, true, null, null, prato.PrecoEfetivo(), null, null, null, null, null, null, cmd.UsuarioId));
             prato.VincularProduto(produto.ProdutoId);
         }
+        await unitOfWork.CommitAsync();
+    }
+
+    // M1.4c (#1537): porção sem variação do estoque (prato avulso recém-ligado, porção antiga) ganha a dela
+    // antes da entrada, para o saldo nascer na porção certa.
+    private async Task VincularPorcoesAsync(Guid empresaId, IReadOnlyList<CardapioItem> pratos)
+    {
+        var pendentes = pratos.Distinct().Where(p => p.Variacoes.Any(v => v.ProdutoVariacaoId is null)).ToList();
+        if (pendentes.Count == 0) return;
+        foreach (var prato in pendentes) await vincularPorcoes.ExecuteAsync(empresaId, prato);
         await unitOfWork.CommitAsync();
     }
 

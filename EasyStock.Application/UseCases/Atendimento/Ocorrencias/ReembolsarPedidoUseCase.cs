@@ -53,13 +53,13 @@ public sealed class ReembolsarPedidoUseCase(
             ?? dados.Pagamentos.LastOrDefault()?.Disponivel;
     }
 
-    public async Task<ReembolsoResultado> ExecuteAsync(
-        Ocorrencia ocorrencia, decimal valor, string motivo, DateTime agora, Guid usuarioId, string? usuarioNome, NivelAcesso nivel, CancellationToken ct = default)
+    private async Task<SolicitarEstornoOnlineInput?> SolicitacaoAsync(
+        Ocorrencia ocorrencia, decimal valor, string motivo, Guid usuarioId, string? usuarioNome, NivelAcesso nivel, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(ocorrencia);
         if (nivel is not (NivelAcesso.Gerente or NivelAcesso.Admin or NivelAcesso.SuperAdmin))
             throw new UnauthorizedAccessException("Só a dona ou um gerente pode solicitar reembolso.");
-        if (valor <= 0m) throw new UseCaseValidationException("Valor do reembolso deve ser maior que zero.");
+        if (valor <= 0m || valor != decimal.Round(valor, 2)) throw new UseCaseValidationException("Informe um valor positivo com até duas casas decimais.");
         if (ocorrencia.ReembolsoEm is not null) throw new UseCaseValidationException("Ocorrência já reembolsada.");
 
         var dados = await estornos.ConsultarAsync(ocorrencia.EmpresaId, ocorrencia.PedidoId, ct);
@@ -70,19 +70,41 @@ public sealed class ReembolsarPedidoUseCase(
             // Uma cobrança online sem recebimento conciliado não pode virar devolução manual.
             if ((await cobrancas.ListarDoPedidoAsync(ocorrencia.EmpresaId, ocorrencia.PedidoId, ct)).Any(c => c.EhOnline && c.PagamentoExternoId != null))
                 throw new UseCaseValidationException("Concilie o recebimento do Mercado Pago antes do reembolso.");
-            ocorrencia.RegistrarReembolsoManual(valor);
-            return new ReembolsoResultado(SituacaoReembolso.ManualNecessario, CodigoReembolsoManual, valor, null);
+            return null;
         }
         if (anterior is null && valor > pagamento.Disponivel)
             throw new UseCaseValidationException("O valor supera o saldo ainda disponível para devolução.");
-        var estorno = await estornos.SolicitarAsync(new(ocorrencia.EmpresaId, ocorrencia.PedidoId, ocorrencia.Id,
-            pagamento.Id, valor, motivo, usuarioId, usuarioNome, nivel), ct);
+        return new(ocorrencia.EmpresaId, ocorrencia.PedidoId, ocorrencia.Id, pagamento.Id, valor, motivo, usuarioId, usuarioNome, nivel);
+    }
+
+    public async Task<bool> ReservarAsync(Ocorrencia ocorrencia, decimal valor, string motivo, Guid usuarioId, string? nome, NivelAcesso nivel, CancellationToken ct)
+    {
+        var solicitacao = await SolicitacaoAsync(ocorrencia, valor, motivo, usuarioId, nome, nivel, ct);
+        if (solicitacao is null) return false;
+        await estornos.ReservarAsync(solicitacao, ct);
+        return true;
+    }
+
+    public async Task<PedidoEstornoOnline?> ConsultarReembolsoAsync(Ocorrencia o, CancellationToken ct) =>
+        (await estornos.ConsultarAsync(o.EmpresaId, o.PedidoId, ct)).Estornos
+            .FirstOrDefault(e => e.Id == o.Id);
+
+    public async Task<ReembolsoResultado> ExecuteAsync(
+        Ocorrencia ocorrencia, decimal valor, string motivo, DateTime agora, Guid usuarioId, string? usuarioNome, NivelAcesso nivel, CancellationToken ct = default)
+    {
+        var solicitacao = await SolicitacaoAsync(ocorrencia, valor, motivo, usuarioId, usuarioNome, nivel, ct);
+        if (solicitacao is null) return new(SituacaoReembolso.ManualNecessario, CodigoReembolsoManual, valor, null);
+        var estorno = await estornos.SolicitarAsync(solicitacao, ct);
         if (estorno.Situacao != PedidoEstornoOnline.Confirmado)
             return new ReembolsoResultado(SituacaoReembolso.Falhou,
                 estorno.Situacao == PedidoEstornoOnline.Pendente ? "estorno_pendente" : "estorno_recusado", valor, estorno.EstornoExternoId);
 
-        ocorrencia.RegistrarReembolso(valor, estorno.EstornoExternoId!, agora);
+        return new(SituacaoReembolso.Efetuado, CodigoReembolsoEfetuado, valor, estorno.EstornoExternoId!);
+    }
 
+    // O caller grava estes efeitos sob o lock da ocorrência, apenas na primeira conclusão.
+    public async Task RegistrarConclusaoAsync(Ocorrencia ocorrencia, decimal valor, string motivo, DateTime agora, CancellationToken ct)
+    {
         var motivoLimpo = string.IsNullOrWhiteSpace(motivo) ? ocorrencia.Relato : motivo.Trim();
         var texto = $"reembolso de {Reais(valor)}: {motivoLimpo}";
         if (texto.Length > ClienteNota.TextoTamanhoMaximo) texto = texto[..ClienteNota.TextoTamanhoMaximo];
@@ -106,7 +128,14 @@ public sealed class ReembolsarPedidoUseCase(
             await notificador.EnfileirarEventoAsync(TipoEventoNotificacao.ReembolsoEfetuado, ocorrencia.EmpresaId, payload, ocorrencia.Id, ct);
         }
 
-        return new ReembolsoResultado(SituacaoReembolso.Efetuado, CodigoReembolsoEfetuado, valor, estorno.EstornoExternoId!);
+    }
+
+    public Task RegistrarNotaResolucaoAsync(Ocorrencia o, string? nome, DateTime agora, CancellationToken ct)
+    {
+        var texto = $"Ocorrência encerrada: {o.Resolucao}";
+        if (texto.Length > ClienteNota.TextoTamanhoMaximo) texto = texto[..(ClienteNota.TextoTamanhoMaximo - 1)] + "…";
+        return crm.AdicionarNotaAsync(ClienteNota.Criar(o.EmpresaId, o.ClienteId,
+            texto, string.IsNullOrWhiteSpace(nome) ? AutorNota : nome, agora, o.PedidoId), ct);
     }
 
     private static string? TelefoneE164(string? telefone)

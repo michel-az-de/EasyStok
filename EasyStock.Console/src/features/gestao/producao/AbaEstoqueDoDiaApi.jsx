@@ -120,7 +120,9 @@ export function AbaEstoqueDoDiaApi() {
               <li key={p.sku} className={css.linha}>
                 <div className={css.resumo}>
                   <span className={css.nome}>{p.nome}</span>
-                  <span className={css.detalhe}>{p.porcao}</span>
+                  <span className={css.detalhe}>
+                    {p.porcoes.length > 0 ? p.porcoes.map((s) => `${s.rotulo}: ${s.saldo}`).join(' · ') : p.porcao}
+                  </span>
                 </div>
                 <span className={css.preco}>{porcoes(p.saldo)}</span>
                 <div className={css.estados}>

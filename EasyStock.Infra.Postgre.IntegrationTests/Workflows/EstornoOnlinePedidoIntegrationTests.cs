@@ -19,6 +19,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
+using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Atendimento.Ocorrencias;
+using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Entities.Notifications;
+using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.Enums.Notifications;
+using EasyStock.Infra.Postgre.Repositories.Atendimento;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Workflows;
 
@@ -61,6 +69,160 @@ public sealed class EstornoOnlinePedidoIntegrationTests(PostgreSqlDatabaseFixtur
         await using var db = fixture.CreateDbContext();
         db.SetMobileTenantContext(input.EmpresaId);
         return await Service(db, mp).SolicitarAsync(input);
+    }
+
+    private async Task<ResolverOcorrenciaInput> PrepararOcorrencia(SolicitarEstornoOnlineInput input)
+    {
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(input.EmpresaId);
+        var cliente = Cliente.Criar(input.EmpresaId, "Cliente de teste");
+        cliente.Telefone = "11999990001";
+        db.Clientes.Add(cliente);
+        (await db.Pedidos.SingleAsync()).ClienteId = cliente.Id;
+        var o = Ocorrencia.Abrir(input.EmpresaId, input.PedidoId, cliente.Id, null, OrigemOcorrencia.Dona, CategoriaOcorrencia.Atraso, "Atraso de teste", Agora);
+        db.Ocorrencias.Add(o);
+        await db.SaveChangesAsync();
+        return new(input.EmpresaId, o.Id, input.UsuarioId, "Cliente atendido", false, null, NivelAcesso.Admin, "Dona teste");
+    }
+
+    private async Task<ResolverOcorrenciaResult?> ResolverOcorrencia(ResolverOcorrenciaInput input, ProvedorHttp mp, bool falharNota = false)
+    {
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(input.EmpresaId);
+        IClienteCrmRepository crm = new ClienteCrmRepository(db);
+        if (falharNota)
+        {
+            crm = Substitute.For<IClienteCrmRepository>();
+            crm.AdicionarNotaAsync(Arg.Any<ClienteNota>(), Arg.Any<CancellationToken>())
+                .Returns<Task>(_ => throw new InvalidOperationException("Falha controlada da nota"));
+        }
+        var notificacoes = Substitute.For<INotificadorService>();
+        notificacoes.EnfileirarEventoAsync(Arg.Any<TipoEventoNotificacao>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>(), Arg.Any<string?>())
+            .Returns(async c =>
+            {
+                var evento = EventoNotificacao.Criar(c.ArgAt<TipoEventoNotificacao>(0), c.ArgAt<Guid>(1), c.ArgAt<string>(2), c.ArgAt<Guid?>(3));
+                await db.NotifEventos.AddAsync(evento);
+                return evento.Id;
+            });
+        var reembolsar = new ReembolsarPedidoUseCase(new CobrancaPedidoRepository(db), Service(db, mp), crm, notificacoes);
+        return await new ResolverOcorrenciaUseCase(new OcorrenciaRepository(db), reembolsar, db, new Relogio()).ExecuteAsync(input);
+    }
+
+    [SkippableFact]
+    public async Task Ocorrencia_apuracao_e_encerramento_concorrentes_preservam_autoria_e_uma_nota()
+    {
+        var financeiro = await Preparar();
+        var input = await PrepararOcorrencia(financeiro);
+        using var mp = new ProvedorHttp(financeiro.PedidoId);
+        async Task<OcorrenciaDto?> Apurar(Guid usuario, string nome)
+        {
+            await using var db = fixture.CreateDbContext();
+            db.SetMobileTenantContext(input.EmpresaId);
+            return await new ApurarOcorrenciaUseCase(new OcorrenciaRepository(db), db, new Relogio())
+                .ExecuteAsync(input.EmpresaId, input.OcorrenciaId, usuario, nome, NivelAcesso.Gerente);
+        }
+        var apuracoes = await Task.WhenAll(Apurar(input.UsuarioId, "Primeira"), Apurar(Guid.NewGuid(), "Segunda"));
+        apuracoes[0]!.ApuradaPorUsuarioId.Should().Be(apuracoes[1]!.ApuradaPorUsuarioId);
+        var resultados = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => ResolverOcorrencia(input, mp)));
+        resultados.Should().OnlyContain(r => r!.Ocorrencia.Status == "resolvida");
+        await FluentActions.Invoking(() => ResolverOcorrencia(input with { Resolucao = "Divergente" }, mp)).Should().ThrowAsync<CobrancaPedidoConflitoException>();
+        await using var conferir = fixture.CreateDbContext();
+        conferir.SetMobileTenantContext(input.EmpresaId);
+        (await conferir.ClienteNotas.CountAsync()).Should().Be(1);
+        (await conferir.NotifEventos.CountAsync()).Should().Be(0);
+        (await conferir.MovimentosCaixa.CountAsync()).Should().Be(0);
+        mp.Chaves.Should().BeEmpty();
+        (await Apurar(Guid.NewGuid(), "Depois"))!.ApuradaPorUsuarioId.Should().Be(apuracoes[0]!.ApuradaPorUsuarioId);
+    }
+
+    [SkippableFact]
+    public async Task Ocorrencia_reembolso_em_voo_impede_encerramento_e_conclusao_concorrente_nao_duplica_efeitos()
+    {
+        var financeiro = await Preparar();
+        var original = await PrepararOcorrencia(financeiro);
+        var input = original with { Reembolsar = true, Valor = 40 };
+        using var mp = new ProvedorHttp(financeiro.PedidoId);
+        var enviado = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reenviado = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var chamadas = 0;
+        using var liberar = new ManualResetEventSlim();
+        mp.AposPost = () =>
+        {
+            if (Interlocked.Increment(ref chamadas) == 1) enviado.TrySetResult(); else reenviado.TrySetResult();
+            liberar.Wait(TimeSpan.FromSeconds(30)).Should().BeTrue();
+        };
+        var primeira = Task.Run(() => ResolverOcorrencia(input, mp));
+        Task<ResolverOcorrenciaResult?>? segunda = null;
+        try
+        {
+            await enviado.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            segunda = Task.Run(() => ResolverOcorrencia(input, mp));
+            await reenviado.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            // Já há intenção persistida, mas o provedor ainda não entregou a resposta.
+            await FluentActions.Invoking(() => ResolverOcorrencia(original, mp)).Should().ThrowAsync<CobrancaPedidoConflitoException>();
+            await using var conferir = fixture.CreateDbContext();
+            conferir.SetMobileTenantContext(input.EmpresaId);
+            var aberta = await conferir.Ocorrencias.SingleAsync();
+            aberta.ReembolsoSolicitadoEm.Should().NotBeNull();
+            aberta.EstaAberta.Should().BeTrue();
+            (await conferir.ClienteNotas.CountAsync()).Should().Be(0);
+            (await conferir.MovimentosCaixa.CountAsync()).Should().Be(0);
+        }
+        finally { liberar.Set(); }
+        await primeira;
+        await segunda!;
+        await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => ResolverOcorrencia(input, mp)));
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(input.EmpresaId);
+        (await db.ClienteNotas.CountAsync()).Should().Be(1);
+        (await db.NotifEventos.CountAsync()).Should().Be(1);
+        (await db.MovimentosCaixa.CountAsync()).Should().Be(1);
+        mp.Estornos.Should().ContainSingle();
+        mp.Chaves.Should().HaveCount(2).And.OnlyContain(chave => chave == input.OcorrenciaId.ToString());
+    }
+
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Ocorrencia_falha_da_nota_reverte_encerramento_e_retoma_sem_repetir_dinheiro(bool reembolsar)
+    {
+        var financeiro = await Preparar();
+        var original = await PrepararOcorrencia(financeiro);
+        var input = original with { Reembolsar = reembolsar, Valor = reembolsar ? 40 : null };
+        using var mp = new ProvedorHttp(financeiro.PedidoId);
+        await FluentActions.Invoking(() => ResolverOcorrencia(input, mp, falharNota: true)).Should().ThrowAsync<InvalidOperationException>();
+        await using (var conferir = fixture.CreateDbContext())
+        {
+            conferir.SetMobileTenantContext(input.EmpresaId);
+            (await conferir.Ocorrencias.SingleAsync()).EstaAberta.Should().BeTrue();
+            (await conferir.ClienteNotas.CountAsync()).Should().Be(0);
+            (await conferir.NotifEventos.CountAsync()).Should().Be(0);
+            (await conferir.MovimentosCaixa.CountAsync()).Should().Be(reembolsar ? 1 : 0);
+        }
+        (await ResolverOcorrencia(input, mp))!.Ocorrencia.Status.Should().Be("resolvida");
+        mp.Chaves.Should().HaveCount(reembolsar ? 1 : 0);
+    }
+
+    [SkippableFact]
+    public async Task Ocorrencias_do_pedido_preservam_historico_alem_de_cem_e_nao_vazam_tenant()
+    {
+        var financeiro = await Preparar();
+        var input = await PrepararOcorrencia(financeiro);
+        using var mp = new ProvedorHttp(financeiro.PedidoId);
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(input.EmpresaId);
+        var o = await db.Ocorrencias.SingleAsync();
+        for (var i = 0; i < 101; i++) db.Ocorrencias.Add(Ocorrencia.Abrir(input.EmpresaId, financeiro.PedidoId, o.ClienteId, null,
+            OrigemOcorrencia.Dona, CategoriaOcorrencia.Outro, "Histórico", Agora.AddMinutes(-i - 1)));
+        await db.SaveChangesAsync();
+        var consulta = new ConsultarOcorrenciasUseCase(new OcorrenciaRepository(db), new PedidoRepository(db), Service(db, mp));
+        (await consulta.DoPedidoAsync(input.EmpresaId, financeiro.PedidoId))!.Should().HaveCount(102);
+        (await consulta.DoPedidoAsync(Guid.NewGuid(), financeiro.PedidoId)).Should().BeNull();
+        await using var rls = fixture.CreateRlsClientDbContext();
+        await rls.Database.OpenConnectionAsync();
+        await rls.Database.ExecuteSqlInterpolatedAsync($"SELECT set_config('app.empresa_id', {Guid.NewGuid().ToString()}, false)");
+        (await rls.Ocorrencias.IgnoreQueryFilters().CountAsync()).Should().Be(0);
+        (await rls.Database.ExecuteSqlInterpolatedAsync($"UPDATE ocorrencias SET \"Resolucao\" = 'forjada' WHERE \"Id\" = {o.Id}")).Should().Be(0);
     }
 
     [SkippableFact]

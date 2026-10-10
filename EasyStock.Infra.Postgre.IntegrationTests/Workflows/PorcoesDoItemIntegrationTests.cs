@@ -92,6 +92,66 @@ public class PorcoesDoItemIntegrationTests(PostgreSqlDatabaseFixture fixture)
         });
     }
 
+    [SkippableFact]
+    public async Task ProduzirDuasPorcoes_EVenderUma_BaixaSoDoSaldoDela()
+    {
+        // M1.4c (#1537, D-M1-03): 6 de 800 g e 4 de 300 g; um pedido de 2 de 800 g deixa 4 e 4.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var (empresaId, produtoId, itemId) = await SeedAsync();
+        await using var provider = BuildProductionProvider();
+        await Escopo(provider, empresaId, sp => sp.GetRequiredService<ItensDoCardapioComandaUseCase>().EditarAsync(empresaId, itemId,
+            new DadosItemCardapio(null, null, null, null, null, Porcoes:
+            [new PorcaoDoItem(null, "300 g", 28m, Padrao: true), new PorcaoDoItem(null, "800 g", 62m)])));
+        DetalheItemCardapio detalhe = null!;
+        await Escopo(provider, empresaId, async sp => detalhe = await sp.GetRequiredService<ItensDoCardapioComandaUseCase>().ObterAsync(empresaId, itemId));
+        var p300 = detalhe.Porcoes!.Single(p => p.Rotulo == "300 g");
+        var p800 = detalhe.Porcoes!.Single(p => p.Rotulo == "800 g");
+
+        await Escopo(provider, empresaId, sp => sp.GetRequiredService<EasyStock.Application.UseCases.Atendimento.Producao.ProduzirPratosUseCase>()
+            .ExecuteAsync(new EasyStock.Application.UseCases.Atendimento.Producao.ProduzirPratosCommand(empresaId, Guid.Empty, "Thati",
+            [
+                new EasyStock.Application.UseCases.Atendimento.Producao.PratoProduzidoInput(itemId, 6, 800, null, 5, p800.Id),
+                new EasyStock.Application.UseCases.Atendimento.Producao.PratoProduzidoInput(itemId, 4, 300, null, 5, p300.Id),
+            ])));
+
+        Guid pedidoId;
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresaId);
+            var pedido = Pedido.Criar(empresaId, cliente: null, lojaId: null, "atendimento");
+            pedido.Itens.Add(new PedidoItem
+            {
+                Id = Guid.NewGuid(), PedidoId = pedido.Id, ProdutoId = produtoId, CardapioItemId = itemId, CardapioItemVariacaoId = p800.Id,
+                ProdutoVariacaoId = p800.ProdutoVariacaoId, VariacaoRotuloSnapshot = "800 g", Nome = "Ravióli", Quantidade = 2,
+                PrecoUnitario = 62m, Subtotal = 124m, CriadoEm = DateTime.UtcNow
+            });
+            pedido.RecalcularTotal();
+            seed.Pedidos.Add(pedido);
+            pedidoId = pedido.Id;
+            await seed.SaveChangesAsync();
+        }
+        await Escopo(provider, empresaId, async sp =>
+        {
+            var status = sp.GetRequiredService<EasyStock.Application.UseCases.AtualizarStatusPedido.AtualizarStatusPedidoUseCase>();
+            await status.ExecuteAsync(new(empresaId, pedidoId, "preparando", null, null, "web"));
+            await status.ExecuteAsync(new(empresaId, pedidoId, "pronto", null, null, "web"));
+        });
+
+        await Escopo(provider, empresaId, async sp =>
+        {
+            var estoque = await sp.GetRequiredService<EasyStock.Application.UseCases.Atendimento.Producao.EstoqueDoDiaUseCase>().ExecuteAsync(empresaId);
+            var prato = estoque.Pratos.Single(p => p.CardapioItemId == itemId);
+            prato.Porcoes!.Select(p => (p.Rotulo, p.Saldo)).Should().Equal(("300 g", 4m), ("800 g", 4m));
+            prato.Saldo.Should().Be(8);
+        });
+
+        await using var assert = fixture.CreateDbContext();
+        assert.SetMobileTenantContext(empresaId);
+        var venda = await assert.Set<MovimentacaoEstoque>().SingleAsync(m => m.Natureza == NaturezaMovimentacaoEstoque.Venda);
+        venda.ProdutoVariacaoId.Should().Be(p800.ProdutoVariacaoId);
+    }
+
     private static async Task Escopo(ServiceProvider provider, Guid empresaId, Func<IServiceProvider, Task> acao)
     {
         await using var scope = provider.CreateAsyncScope();

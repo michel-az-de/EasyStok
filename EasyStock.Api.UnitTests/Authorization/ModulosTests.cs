@@ -16,6 +16,17 @@ namespace EasyStock.Api.UnitTests.Authorization;
 public class ModulosTests
 {
     [Theory]
+    [InlineData("Apurar")]
+    [InlineData("Resolver")]
+    [InlineData("Abrir")]
+    public void Alterar_ocorrencia_exige_gerente_e_atendimento(string acao)
+    {
+        var tipo = typeof(Api.Controllers.OcorrenciasController);
+        tipo.GetMethod(acao)!.GetCustomAttributes<AuthorizeAttribute>().Should().Contain(a => a.Policy == "Gerente");
+        ModulosConvention.ModulosDe(tipo, acao)!.Should().Equal(Modulo.Atendimento);
+    }
+
+    [Theory]
     [InlineData("RegistrarEstornoManual", "Gerente")]
     [InlineData("EstornosManuais", "Operador")]
     [InlineData("EstornosOnline", "Operador")]
