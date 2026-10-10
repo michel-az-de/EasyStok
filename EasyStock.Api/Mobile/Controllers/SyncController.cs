@@ -82,7 +82,11 @@ public class SyncController(
                 alreadyProcessed[e.MutationId] = e;
         }
 
-        foreach (var m in req.Mutations)
+        // #1520 (ADR-0060): movimento de estoque por ultimo no lote. A fila do aparelho reordena
+        // o cadastro do produto (dedup por id), entao o "stock.delta" pode chegar antes do produto
+        // que ele mexe. E, por ultimo, ele so e gravado no SaveChanges final, junto do registro do
+        // MutationId: um commit no meio do lote (ha quem faca) nao o deixa sem dedup para o reenvio.
+        foreach (var m in req.Mutations.OrderBy(m => m.Type?.StartsWith("stock.", StringComparison.Ordinal) == true ? 1 : 0))
         {
             if (!string.IsNullOrEmpty(m.Id) && alreadyProcessed.TryGetValue(m.Id, out var prev))
             {
@@ -238,8 +242,12 @@ public class SyncController(
     {
         var sinceDate = DateTimeOffset.FromUnixTimeMilliseconds(since).UtcDateTime;
         // #1474: o cursor devolvido ao aparelho e o instante ANTES das consultas. Lido depois, uma
-        // linha gravada durante a consulta (UpdatedAt menor que esse instante) ficava atras do
+        // linha gravada durante a consulta (carimbo menor que esse instante) ficava atras do
         // cursor e nunca mais vinha. O upsert do PWA e idempotente; repetir alguns registros nao faz mal.
+        // #1520 (ADR-0060): o filtro e o ts de cada mutation sao o carimbo do SERVIDOR
+        // (ServerUpdatedAt), o mesmo relogio do cursor. Antes eram UpdatedAt/CreatedAt, que no
+        // pedido, no lote e no lancamento trazem a hora do aparelho: edicao feita offline com hora
+        // antiga ficava atras do cursor dos outros aparelhos e nunca chegava.
         var serverTime = _relogio.GetUtcNow().ToUnixTimeMilliseconds();
 
         var device = HttpContext.GetMobileDevice();
@@ -251,7 +259,7 @@ public class SyncController(
 
         var mutations = new List<MutationDto>();
 
-        var productsQ = _db.Set<Product>().Where(p => p.EmpresaId == empresaId && p.UpdatedAt > sinceDate && p.LastDeviceId != deviceId);
+        var productsQ = _db.Set<Product>().Where(p => p.EmpresaId == empresaId && p.ServerUpdatedAt > sinceDate && p.LastDeviceId != deviceId);
         if (lojaId.HasValue)
             productsQ = productsQ.Where(p => p.LojaId == lojaId || p.LojaId == null);
         var products = await productsQ.ToListAsync();
@@ -264,45 +272,45 @@ public class SyncController(
         foreach (var p in products)
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), p.LastDeviceId ?? "server",
                 "product.upsert", SyncDtoConverters.Serialize(SyncDtoConverters.ToDto(p, tipoEmbMap)),
-                new DateTimeOffset(p.UpdatedAt).ToUnixTimeMilliseconds()));
+                new DateTimeOffset(p.ServerUpdatedAt).ToUnixTimeMilliseconds()));
 
-        var clientsQ = _db.Set<Client>().Where(c => c.EmpresaId == empresaId && c.UpdatedAt > sinceDate && c.LastDeviceId != deviceId);
+        var clientsQ = _db.Set<Client>().Where(c => c.EmpresaId == empresaId && c.ServerUpdatedAt > sinceDate && c.LastDeviceId != deviceId);
         if (lojaId.HasValue)
             clientsQ = clientsQ.Where(c => c.LojaId == lojaId || c.LojaId == null);
         var clients = await clientsQ.ToListAsync();
         foreach (var c in clients)
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), c.LastDeviceId ?? "server",
                 "client.upsert", SyncDtoConverters.Serialize(SyncDtoConverters.ToDto(c)),
-                new DateTimeOffset(c.UpdatedAt).ToUnixTimeMilliseconds()));
+                new DateTimeOffset(c.ServerUpdatedAt).ToUnixTimeMilliseconds()));
 
         var ordersQ = _db.Set<Order>().Include(o => o.Items)
-            .Where(o => o.EmpresaId == empresaId && o.UpdatedAt > sinceDate && o.LastDeviceId != deviceId);
+            .Where(o => o.EmpresaId == empresaId && o.ServerUpdatedAt > sinceDate && o.LastDeviceId != deviceId);
         if (lojaId.HasValue)
             ordersQ = ordersQ.Where(o => o.LojaId == lojaId || o.LojaId == null);
         var orders = await ordersQ.ToListAsync();
         foreach (var o in orders)
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), o.LastDeviceId ?? "server",
                 "order.upsert", SyncDtoConverters.Serialize(SyncDtoConverters.ToDto(o)),
-                new DateTimeOffset(o.UpdatedAt).ToUnixTimeMilliseconds()));
+                new DateTimeOffset(o.ServerUpdatedAt).ToUnixTimeMilliseconds()));
 
         var batchesQ = _db.Set<Batch>().Include(b => b.Items)
-            .Where(b => b.EmpresaId == empresaId && b.CreatedAt > sinceDate && b.LastDeviceId != deviceId);
+            .Where(b => b.EmpresaId == empresaId && b.ServerUpdatedAt > sinceDate && b.LastDeviceId != deviceId);
         if (lojaId.HasValue)
             batchesQ = batchesQ.Where(b => b.LojaId == lojaId || b.LojaId == null);
         var batches = await batchesQ.ToListAsync();
         foreach (var b in batches)
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), b.LastDeviceId ?? "server",
                 "batch.upsert", SyncDtoConverters.Serialize(SyncDtoConverters.ToDto(b)),
-                new DateTimeOffset(b.CreatedAt).ToUnixTimeMilliseconds()));
+                new DateTimeOffset(b.ServerUpdatedAt).ToUnixTimeMilliseconds()));
 
-        var cashQ = _db.Set<CashEntry>().Where(c => c.EmpresaId == empresaId && c.CreatedAt > sinceDate && c.LastDeviceId != deviceId);
+        var cashQ = _db.Set<CashEntry>().Where(c => c.EmpresaId == empresaId && c.ServerUpdatedAt > sinceDate && c.LastDeviceId != deviceId);
         if (lojaId.HasValue)
             cashQ = cashQ.Where(c => c.LojaId == lojaId || c.LojaId == null);
         var cash = await cashQ.ToListAsync();
         foreach (var c in cash)
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), c.LastDeviceId ?? "server",
                 "cashEntry.upsert", SyncDtoConverters.Serialize(SyncDtoConverters.ToDto(c)),
-                new DateTimeOffset(c.CreatedAt).ToUnixTimeMilliseconds()));
+                new DateTimeOffset(c.ServerUpdatedAt).ToUnixTimeMilliseconds()));
 
         // F6 — sync reverso web→mobile.
         if (empresaId.HasValue && _appConfig.GetValue<bool>("MobileSync:PullReverse:Enabled", true))

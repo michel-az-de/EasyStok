@@ -22079,12 +22079,15 @@ function deleteCashEntry(id) {
   const savedEntry = Object.assign({}, e);
   cashEntries = cashEntries.filter(x => x.id !== id);
   persistAll();
+  // #1520: a exclusao sobe ao servidor como mutation propria, so depois do "Desfazer".
+  try { window.cdbSync.agendarExclusaoLancamento(savedEntry); } catch (_) {}
   renderHome();
   if (typeof renderCashDetails === 'function') renderCashDetails();
   const label = (e.type === 'expense' ? 'Saída' : 'Entrada') + ' de ' + money(e.amount);
   showUndoToast(
     '<span class="hi">' + escapeHtml(label) + '</span> excluída',
     function () {
+      try { window.cdbSync.cancelarExclusaoLancamento(savedEntry.id); } catch (_) {}
       // Reinsere na lista (renderCashDetails ordena por createdAt desc)
       if (!cashEntries.find(x => x.id === savedEntry.id)) {
         cashEntries.push(savedEntry);
@@ -22097,6 +22100,7 @@ function deleteCashEntry(id) {
     {
       onCommit: function () {
         // Sync e audit log so' depois do delay (commit definitivo)
+        try { window.cdbSync.confirmarExclusaoLancamento(id); } catch (_) {}
         pendingSync++;
         updateSync();
         logAction({

@@ -48,6 +48,7 @@ public sealed class SyncTextoLongoTests : IDisposable
             new MobileSaleSyncService(_db, NullLogger<MobileSaleSyncService>.Instance),
             new OperacaoEventBroker(NullLogger<OperacaoEventBroker>.Instance),
             Substitute.For<IProdutoRepository>(),
+            DispatcherDeTeste.EstornoDeCaixa(_db),
             NullLogger<SyncMutationDispatcher>.Instance);
     }
 

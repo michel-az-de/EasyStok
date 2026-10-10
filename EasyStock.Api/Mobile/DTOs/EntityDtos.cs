@@ -22,8 +22,19 @@ public record ProductDto(
     string TipoEmbalagem = "Avulso",
     // #1467 — custo unitario e estoque minimo, nos dois sentidos.
     decimal? Cost = null,
-    int? MinStock = null
+    int? MinStock = null,
+    // #1520 (ADR-0060) — true: o aparelho manda cada movimento de estoque em "stock.delta" e o
+    // Stock daqui so vale quando o produto nasce no servidor. Ausente (aparelho antigo,
+    // "Sincronizar tudo"): Stock define o saldo.
+    bool? StockByDelta = null
 );
+
+/// <summary>
+/// #1520 (ADR-0060) — um movimento de estoque do PWA ("stock.delta"). <c>Qty</c> tem sinal:
+/// negativo sai (venda, descarte), positivo entra (producao, cancelamento). Contado uma vez
+/// pelo MutationId; a soma nao depende da ordem de chegada.
+/// </summary>
+public record StockDeltaDto(string Id, string ProductId, int Qty);
 
 public record ClientDto(
     string Id,

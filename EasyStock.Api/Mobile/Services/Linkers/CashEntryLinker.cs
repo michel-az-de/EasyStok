@@ -14,6 +14,24 @@ public sealed class CashEntryLinker(
     EasyStockDbContext db,
     ILogger<CashEntryLinker> log)
 {
+    /// <summary>Chave que liga o movimento do ERP ao lançamento do PWA.</summary>
+    public static string ReferenciaDe(CashEntry lancamento) => $"mobile:{lancamento.Id}";
+
+    private static string TipoErp(CashEntry lancamento) =>
+        string.Equals(lancamento.Type, "income", StringComparison.OrdinalIgnoreCase) ? "entrada" : "saida";
+
+    /// <summary>
+    /// Leva tipo, valor, descrição e forma do lançamento ao movimento. Usado ao promover e,
+    /// desde o #1520, quando o lançamento é editado no PWA.
+    /// </summary>
+    public static void Espelhar(CashEntry lancamento, MovimentoCaixa movimento)
+    {
+        movimento.Tipo = TipoErp(lancamento);
+        movimento.Valor = Math.Abs(lancamento.Amount);
+        movimento.Descricao = lancamento.Description;
+        movimento.Metodo = FormaPagamentoMobile.ParaErp(lancamento.Metodo);
+    }
+
     public async Task ExecuteAsync(IEnumerable<string> mobileCashIds, Guid? empresaId)
     {
         var idsList = mobileCashIds as ICollection<string> ?? mobileCashIds.ToList();
@@ -34,9 +52,11 @@ public sealed class CashEntryLinker(
                 var mobileCE = await db.Set<CashEntry>().IgnoreQueryFilters()
                     .FirstOrDefaultAsync(c => c.Id == ceid && c.EmpresaId == empresaId);
                 if (mobileCE == null) { idempotentSkip++; continue; }
+                // #1520: lancamento excluido no PWA antes de ser promovido nao entra no caixa do ERP.
+                if (mobileCE.DeletedAt != null) { idempotentSkip++; continue; }
                 if (mobileCE.ErpMovimentoCaixaId.HasValue && mobileCE.ErpMovimentoCaixaId.Value != Guid.Empty) { idempotentSkip++; continue; }
 
-                var referencia = $"mobile:{mobileCE.Id}";
+                var referencia = ReferenciaDe(mobileCE);
                 var jaPromovido = await db.Set<MovimentoCaixa>().IgnoreQueryFilters()
                     .FirstOrDefaultAsync(m => m.EmpresaId == empresaId && m.Referencia == referencia);
                 if (jaPromovido != null)
@@ -47,10 +67,9 @@ public sealed class CashEntryLinker(
                     continue;
                 }
 
-                var tipo = string.Equals(mobileCE.Type, "income", StringComparison.OrdinalIgnoreCase) ? "entrada" : "saida";
+                var tipo = TipoErp(mobileCE);
                 var mov = MovimentoCaixa.Criar(empresaId.Value, tipo, mobileCE.Amount, mobileCE.CreatedAt, mobileCE.LojaId);
-                mov.Descricao = mobileCE.Description;
-                mov.Metodo = FormaPagamentoMobile.ParaErp(mobileCE.Metodo);
+                Espelhar(mobileCE, mov);
                 mov.Origem = "mobile";
                 mov.RegistradoPorNome = mobileCE.LastOperatorName;
                 mov.Referencia = referencia;

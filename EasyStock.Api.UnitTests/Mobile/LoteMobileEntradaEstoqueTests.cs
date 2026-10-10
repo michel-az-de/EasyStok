@@ -61,6 +61,7 @@ public sealed class LoteMobileEntradaEstoqueTests : IDisposable
             new MobileSaleSyncService(_db, NullLogger<MobileSaleSyncService>.Instance),
             new OperacaoEventBroker(NullLogger<OperacaoEventBroker>.Instance),
             produtoRepo,
+            DispatcherDeTeste.EstornoDeCaixa(_db),
             NullLogger<SyncMutationDispatcher>.Instance);
         _linker = new BatchLinker(_db, new LoteRepository(_db), loteEstado, NullLogger<BatchLinker>.Instance);
 

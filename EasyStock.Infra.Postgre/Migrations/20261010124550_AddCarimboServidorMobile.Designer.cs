@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261010124550_AddCarimboServidorMobile")]
+    partial class AddCarimboServidorMobile
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -802,16 +805,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime?>("ApuradaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ApuradaPorNome")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<Guid?>("ApuradaPorUsuarioId")
-                        .HasColumnType("uuid");
-
                     b.Property<int>("Categoria")
                         .HasColumnType("integer");
 
@@ -840,9 +833,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
-                    b.Property<DateTime?>("ReembolsoSolicitadoEm")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<decimal?>("ReembolsoValor")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -858,10 +848,6 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<DateTime?>("ResolvidaEm")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ResolvidaPorNome")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
 
                     b.Property<Guid?>("ResolvidaPorUsuarioId")
                         .HasColumnType("uuid");

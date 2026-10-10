@@ -1,6 +1,10 @@
 using System.Text.Json;
 using EasyStock.Api.Mobile.DTOs;
+using EasyStock.Api.Mobile.Services.Linkers;
 using EasyStock.Api.Services.Operacao;
+using EasyStock.Application.Common;
+using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 
@@ -18,6 +22,7 @@ public class SyncMutationDispatcher(
     MobileSaleSyncService saleSync,
     OperacaoEventBroker eventBroker,
     IProdutoRepository produtoRepo,
+    EstornarMovimentoCaixaUseCase estornarMovimentoCaixa,
     ILogger<SyncMutationDispatcher> log)
 {
     private readonly EasyStockDbContext _db = db;
@@ -26,7 +31,12 @@ public class SyncMutationDispatcher(
     private readonly MobileSaleSyncService _saleSync = saleSync;
     private readonly OperacaoEventBroker _eventBroker = eventBroker;
     private readonly IProdutoRepository _produtoRepo = produtoRepo;
+    private readonly EstornarMovimentoCaixaUseCase _estornarMovimentoCaixa = estornarMovimentoCaixa;
     private readonly ILogger<SyncMutationDispatcher> _log = log;
+
+    // #1520 (ADR-0060): produtos que nasceram neste lote ja com o saldo do aparelho. Esse saldo
+    // inclui os movimentos que vieram no mesmo lote; soma-los de novo contaria em dobro.
+    private readonly HashSet<string> _nascidosComSaldoDoAparelho = new(StringComparer.Ordinal);
 
     public async Task ApplyMutationAsync(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
@@ -42,8 +52,12 @@ public class SyncMutationDispatcher(
             case "client":    await ApplyClient(m, deviceId, operatorName, empresaId, lojaId);    break;
             case "order":     await ApplyOrder(m, deviceId, operatorName, empresaId, lojaId);     break;
             case "batch":     await ApplyBatch(m, deviceId, operatorName, empresaId, lojaId);     break;
+            case "cashEntry" when parts[1] == "delete":
+                await ApplyCashEntryDelete(m, deviceId, operatorName, empresaId);
+                break;
             case "cashEntry": await ApplyCashEntry(m, deviceId, operatorName, empresaId, lojaId); break;
             case "closing":   await ApplyClosing(m, deviceId, empresaId, lojaId);                 break;
+            case "stock":     await ApplyStockDelta(m, deviceId, operatorName, empresaId);        break;
             default: throw new ArgumentException($"Entidade desconhecida: {parts[0]}");
         }
     }
@@ -52,14 +66,19 @@ public class SyncMutationDispatcher(
         Guid? empresaId, Guid? lojaId)
     {
         var dto = CaberNasColunas(m.Payload.Deserialize<ProductDto>(SyncDtoConverters.JsonOpts)!);
+        // #1520: com movimento de estoque ("stock.delta") o saldo do cadastro nao e gravado em
+        // produto que ja existe; so vale quando o produto nasce aqui.
+        var saldoVemNoCadastro = dto.StockByDelta != true && m.Payload.TryGetProperty("stock", out _);
         // Auditoria 2026-04-30 (CRITICAL fix): tenant guard.
-        var existing = await _db.Set<Product>()
-            .FirstOrDefaultAsync(p => p.Id == dto.Id && p.EmpresaId == empresaId);
+        // FindAsync enxerga o produto criado neste mesmo lote, ainda nao salvo.
+        var existing = await _db.Set<Product>().FindAsync(dto.Id);
+        if (existing != null && existing.EmpresaId != empresaId) existing = null;
 
         // Onda 5: conflict detection. Tolerância de 2s pra clock skew.
+        // #1520: compara com o carimbo do servidor (quando ele gravou), nao com UpdatedAt.
         if (existing != null && m.Ts > 0)
         {
-            var serverTsMs = new DateTimeOffset(existing.UpdatedAt, TimeSpan.Zero).ToUnixTimeMilliseconds();
+            var serverTsMs = CarimboMs(existing.ServerUpdatedAt);
             if (serverTsMs > m.Ts + 2000 && existing.LastDeviceId != null && existing.LastDeviceId != deviceId)
             {
                 throw new ConflictException(
@@ -86,6 +105,7 @@ public class SyncMutationDispatcher(
                 EmpresaId = empresaId,
                 LojaId = lojaId
             });
+            if (dto.StockByDelta == true) _nascidosComSaldoDoAparelho.Add(dto.Id);
         }
         else
         {
@@ -94,7 +114,7 @@ public class SyncMutationDispatcher(
             existing.Category = dto.Category;
             existing.Unit = dto.Unit;
             existing.Price = dto.Price;
-            existing.Stock = dto.Stock;
+            if (saldoVemNoCadastro) existing.Stock = dto.Stock;
             existing.UpdatedAt = DateTime.UtcNow;
             existing.LastDeviceId = deviceId;
             existing.LastOperatorName = operatorName;
@@ -107,6 +127,26 @@ public class SyncMutationDispatcher(
             if (m.Payload.TryGetProperty("cost", out _))     existing.Cost = CustoValido(dto.Cost);
             if (m.Payload.TryGetProperty("minStock", out _)) existing.MinStock = MinimoValido(dto.MinStock);
         }
+    }
+
+    /// <summary>
+    /// #1520 (ADR-0060) — soma um movimento de estoque do aparelho ao espelho do produto. E o
+    /// unico caminho, alem do saldo absoluto do cadastro de aparelho antigo, que altera
+    /// <c>mobile_products.Stock</c>: pedido e lote nao recontam o que o aparelho ja contou.
+    /// </summary>
+    private async Task ApplyStockDelta(MutationDto m, string deviceId, string? operatorName, Guid? empresaId)
+    {
+        var dto = m.Payload.Deserialize<StockDeltaDto>(SyncDtoConverters.JsonOpts)!;
+        // FindAsync enxerga o produto criado neste mesmo lote, ainda nao salvo.
+        var p = await _db.Set<Product>().FindAsync(dto.ProductId);
+        if (p == null || p.EmpresaId != empresaId)
+            throw new InvalidOperationException(
+                $"Movimento de estoque de {dto.Qty:+#;-#;0} não aplicado: o produto '{dto.ProductId}' não existe no servidor.");
+        if (dto.Qty == 0 || _nascidosComSaldoDoAparelho.Contains(p.Id)) return;
+        p.Stock += dto.Qty;
+        p.UpdatedAt = DateTime.UtcNow;
+        p.LastDeviceId = deviceId;
+        p.LastOperatorName = operatorName;
     }
 
     private static decimal? CustoValido(decimal? c) => c is >= 0 ? c : null;
@@ -159,9 +199,12 @@ public class SyncMutationDispatcher(
         var updatedAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.UpdatedAt).UtcDateTime;
 
         // C3: conflict detection (last-write-loser). Tolerancia 2s pra clock skew.
+        // #1520 (ADR-0060): compara com o carimbo do servidor. O UpdatedAt do pedido e a hora do
+        // aparelho que editou por ultimo: relogio adiantado ali fazia todo outro aparelho perder
+        // (conflito falso), e relogio atrasado deixava edicao velha passar por cima da nova.
         if (existing != null && m.Ts > 0)
         {
-            var serverTsMs = new DateTimeOffset(existing.UpdatedAt, TimeSpan.Zero).ToUnixTimeMilliseconds();
+            var serverTsMs = CarimboMs(existing.ServerUpdatedAt);
             if (serverTsMs > m.Ts + 2000 && existing.LastDeviceId != null && existing.LastDeviceId != deviceId)
             {
                 throw new ConflictException(
@@ -275,9 +318,11 @@ public class SyncMutationDispatcher(
     }
 
     /// <summary>
-    /// Regra de estoque central: reconcilia movimentação ERP quando produto está linkado.
-    /// Onda 2 parte 2: quando ErpProductId preenchido, espelha em itens_estoque +
-    /// movimentacoes_estoque. Falha NÃO interrompe sync.
+    /// Leva ao ERP a baixa (ou a devolução) do pedido quando o produto está linkado: espelha em
+    /// itens_estoque + movimentacoes_estoque. Falha NÃO interrompe sync.
+    /// #1520 (ADR-0060): não mexe em <c>mobile_products.Stock</c>. O aparelho já contou esse
+    /// movimento e o manda em "stock.delta" (ou no saldo absoluto, se for aparelho antigo);
+    /// descontar aqui de novo deixava o servidor uma venda abaixo do aparelho.
     /// </summary>
     /// <summary>Status do Order mobile em que o estoque já foi descontado (espelha StatusPedido.ComEstoqueDescontado).</summary>
     public static bool StatusDescontaEstoque(string status)
@@ -293,11 +338,10 @@ public class SyncMutationDispatcher(
                 var p = await _db.Set<Product>()
                     .FirstOrDefaultAsync(x => x.Id == i.ProductId && x.EmpresaId == empresaId);
                 if (p == null) continue;
-                var reconciliouNoErp = await _stockReconciler.ApplyDeltaAsync(
+                await _stockReconciler.ApplyDeltaAsync(
                     p, -i.Qty, NaturezaMovimentacaoEstoque.Venda,
                     descricao: $"Pedido mobile {orderId ?? p.Id} -> {newStatus}",
                     referenciaDocumento: orderId);
-                if (!reconciliouNoErp) p.Stock -= i.Qty;
             }
         }
         if (StatusDescontaEstoque(oldStatus) && newStatus == "cancelado")
@@ -307,11 +351,10 @@ public class SyncMutationDispatcher(
                 var p = await _db.Set<Product>()
                     .FirstOrDefaultAsync(x => x.Id == i.ProductId && x.EmpresaId == empresaId);
                 if (p == null) continue;
-                var reconciliouNoErp = await _stockReconciler.ApplyDeltaAsync(
+                await _stockReconciler.ApplyDeltaAsync(
                     p, +i.Qty, NaturezaMovimentacaoEstoque.Estorno,
                     descricao: $"Cancelamento de pedido mobile {orderId ?? p.Id}",
                     referenciaDocumento: orderId);
-                if (!reconciliouNoErp) p.Stock += i.Qty;
             }
         }
     }
@@ -326,7 +369,15 @@ public class SyncMutationDispatcher(
         if (existing != null)
         {
             // Itens sao imutaveis; o re-envio so traz as marcas de exclusao/descarte (#1464).
+            var marcasAntes = (existing.DeletedAt, existing.DeletedBy, existing.DiscardedAt, existing.DiscardedBy, existing.DiscardReason);
             AplicarMarcas(existing, dto);
+            // #1520: a marca agora desce no pull (carimbo do servidor). Quem marcou passa a ser o
+            // autor, para nao receber de volta o lote que acabou de alterar.
+            if (marcasAntes != (existing.DeletedAt, existing.DeletedBy, existing.DiscardedAt, existing.DiscardedBy, existing.DiscardReason))
+            {
+                existing.LastDeviceId = deviceId;
+                existing.LastOperatorName = operatorName;
+            }
             await _loteEstado.AplicarAsync(existing);
             return;
         }
@@ -385,12 +436,10 @@ public class SyncMutationDispatcher(
                     ? DateTimeOffset.FromUnixTimeMilliseconds(i.ExpiresAt.Value).UtcDateTime
                     : (DateTime?)null
             });
-            var p = await _db.Set<Product>()
-                .FirstOrDefaultAsync(x => x.Id == i.ProductId && x.EmpresaId == empresaId);
-            if (p == null) continue;
             // #1458: a entrada no ERP e do BatchLinker (um ItemEstoque por lote, com validade).
             // Reconciliar aqui tambem somava o mesmo lote duas vezes no estoque.
-            p.Stock += i.Qty;
+            // #1520: o espelho mobile_products.Stock tambem nao e somado aqui; o aparelho ja
+            // somou o lote e manda esse movimento em "stock.delta" (ADR-0060).
         }
         _db.Add(batch);
     }
@@ -447,6 +496,9 @@ public class SyncMutationDispatcher(
         Description = Cortar(d.Description, 255)!
     };
 
+    private static long CarimboMs(DateTime carimbo) =>
+        new DateTimeOffset(DateTime.SpecifyKind(carimbo, DateTimeKind.Utc)).ToUnixTimeMilliseconds();
+
     private static DateTime? MsParaUtc(long? ms) =>
         ms.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(ms.Value).UtcDateTime : null;
 
@@ -457,7 +509,11 @@ public class SyncMutationDispatcher(
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<CashEntry>()
             .FirstOrDefaultAsync(c => c.Id == dto.Id && c.EmpresaId == empresaId);
-        if (existing != null) return; // imutável
+        if (existing != null)
+        {
+            await EditarLancamentoAsync(existing, dto, deviceId, operatorName);
+            return;
+        }
 
         var createdAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.CreatedAt).UtcDateTime;
         _db.Add(new CashEntry
@@ -470,6 +526,81 @@ public class SyncMutationDispatcher(
             EmpresaId = empresaId,
             LojaId = lojaId
         });
+    }
+
+    /// <summary>
+    /// #1520 (ADR-0060) — edição de lançamento feita no PWA: atualiza tipo, valor, descrição e
+    /// forma no lançamento e no <see cref="MovimentoCaixa"/> vinculado. Reenvio sem mudança não
+    /// faz nada; lançamento excluído não volta por reenvio de outro aparelho.
+    /// </summary>
+    private async Task EditarLancamentoAsync(CashEntry existing, CashEntryDto dto, string deviceId, string? operatorName)
+    {
+        if (existing.DeletedAt != null) return;
+        // #1493 — reenvio sem forma (aparelho antigo) nao apaga a forma ja gravada.
+        var metodo = FormaPagamentoMobile.Normalizar(dto.Metodo) ?? existing.Metodo;
+        if (existing.Type == dto.Type && existing.Amount == dto.Amount
+            && existing.Description == dto.Description && existing.Metodo == metodo)
+            return;
+
+        await RecusarSeCaixaFechadoAsync(existing, "a alteração");
+        existing.Type = dto.Type;
+        existing.Amount = dto.Amount;
+        existing.Description = dto.Description;
+        existing.Metodo = metodo;
+        existing.LastDeviceId = deviceId;
+        existing.LastOperatorName = operatorName;
+
+        // Movimento ja estornado no ERP fica como estava: e a trilha do estorno.
+        var movimento = await MovimentoVinculadoAsync(existing);
+        if (movimento is { EstornadoEm: null }) CashEntryLinker.Espelhar(existing, movimento);
+    }
+
+    /// <summary>
+    /// #1520 (ADR-0060) — exclusão de lançamento, sempre explícita ("cashEntry.delete", nascida
+    /// da ação do operador). O PWA limpa lançamentos antigos sozinho, então ausência no aparelho
+    /// nunca é exclusão. A linha fica marcada e o movimento vinculado é estornado pelo caso de
+    /// uso do ERP. Reenvio e lançamento que o servidor não conhece: aceita sem efeito.
+    /// </summary>
+    private async Task ApplyCashEntryDelete(MutationDto m, string deviceId, string? operatorName, Guid? empresaId)
+    {
+        var id = m.Payload.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
+        if (string.IsNullOrEmpty(id)) throw new ArgumentException("Exclusão de lançamento sem id.");
+        var existing = await _db.Set<CashEntry>()
+            .FirstOrDefaultAsync(c => c.Id == id && c.EmpresaId == empresaId);
+        if (existing == null || existing.DeletedAt != null) return;
+
+        await RecusarSeCaixaFechadoAsync(existing, "a exclusão");
+        var movimento = await MovimentoVinculadoAsync(existing);
+        if (movimento != null)
+            await _estornarMovimentoCaixa.ExecuteAsync(new EstornarMovimentoCaixaCommand(
+                movimento.EmpresaId, movimento.Id,
+                Motivo: "Lançamento excluído no PWA", UsuarioNome: operatorName));
+
+        existing.DeletedAt = DateTime.UtcNow;
+        existing.DeletedBy = operatorName;
+        // Quem excluiu ja tirou o lancamento da tela; o pull leva a exclusao aos outros aparelhos.
+        existing.LastDeviceId = deviceId;
+    }
+
+    private async Task<MovimentoCaixa?> MovimentoVinculadoAsync(CashEntry entry)
+    {
+        // Pela referencia tambem: cobre o movimento ja promovido cujo id nao chegou a ser gravado.
+        var referencia = CashEntryLinker.ReferenciaDe(entry);
+        return await _db.Set<MovimentoCaixa>().IgnoreQueryFilters()
+            .FirstOrDefaultAsync(mv => mv.EmpresaId == entry.EmpresaId
+                && (mv.Id == entry.ErpMovimentoCaixaId || mv.Referencia == referencia));
+    }
+
+    /// <summary>Mesma regra do estorno no ERP: dia com caixa fechado não aceita mudança.</summary>
+    private async Task RecusarSeCaixaFechadoAsync(CashEntry entry, string oQue)
+    {
+        if (entry.EmpresaId is not { } empresaId) return;
+        var dia = HorarioBrasil.DataOperacional(entry.CreatedAt);
+        var fechado = await _db.Set<FechamentoCaixa>().IgnoreQueryFilters()
+            .AnyAsync(f => f.EmpresaId == empresaId && f.Data == dia && f.LojaId == entry.LojaId);
+        if (fechado)
+            throw new UseCaseValidationException(
+                $"O caixa de {dia:dd/MM/yyyy} já foi fechado: {oQue} do lançamento '{entry.Description}' não foi aplicada.");
     }
 
     /// <summary>

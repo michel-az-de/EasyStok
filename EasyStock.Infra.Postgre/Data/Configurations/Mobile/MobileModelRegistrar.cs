@@ -34,6 +34,35 @@ public static class MobileModelRegistrar
 
         mb.Entity<CashEntry>();
 
+        // #1520 (ADR-0060) — carimbo do servidor: o pull filtra por (empresa, carimbo).
+        // O default cobre a linha gravada por fora do EF; pelo EF quem carimba e o
+        // AuditTimestampsInterceptor.
+        mb.Entity<Product>(b =>
+        {
+            b.Property(x => x.ServerUpdatedAt).HasDefaultValueSql("now()");
+            b.HasIndex(x => new { x.EmpresaId, x.ServerUpdatedAt }).HasDatabaseName("ix_mobile_products_empresa_carimbo");
+        });
+        mb.Entity<Client>(b =>
+        {
+            b.Property(x => x.ServerUpdatedAt).HasDefaultValueSql("now()");
+            b.HasIndex(x => new { x.EmpresaId, x.ServerUpdatedAt }).HasDatabaseName("ix_mobile_clients_empresa_carimbo");
+        });
+        mb.Entity<Order>(b =>
+        {
+            b.Property(x => x.ServerUpdatedAt).HasDefaultValueSql("now()");
+            b.HasIndex(x => new { x.EmpresaId, x.ServerUpdatedAt }).HasDatabaseName("ix_mobile_orders_empresa_carimbo");
+        });
+        mb.Entity<Batch>(b =>
+        {
+            b.Property(x => x.ServerUpdatedAt).HasDefaultValueSql("now()");
+            b.HasIndex(x => new { x.EmpresaId, x.ServerUpdatedAt }).HasDatabaseName("ix_mobile_batches_empresa_carimbo");
+        });
+        mb.Entity<CashEntry>(b =>
+        {
+            b.Property(x => x.ServerUpdatedAt).HasDefaultValueSql("now()");
+            b.HasIndex(x => new { x.EmpresaId, x.ServerUpdatedAt }).HasDatabaseName("ix_mobile_cash_entries_empresa_carimbo");
+        });
+
         // Onda 1 — pareamento de devices.
         // Indexes para lookup eficiente:
         //   - api_key_hash (lookup do middleware MobileApiKey por hash, hot path)

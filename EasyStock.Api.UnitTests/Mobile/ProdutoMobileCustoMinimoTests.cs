@@ -52,6 +52,7 @@ public sealed class ProdutoMobileCustoMinimoTests : IDisposable
             new MobileSaleSyncService(_db, NullLogger<MobileSaleSyncService>.Instance),
             new OperacaoEventBroker(NullLogger<OperacaoEventBroker>.Instance),
             Substitute.For<IProdutoRepository>(),
+            DispatcherDeTeste.EstornoDeCaixa(_db),
             NullLogger<SyncMutationDispatcher>.Instance);
         _linker = new ProductLinker(_db, sysUser, NullLogger<ProductLinker>.Instance);
     }

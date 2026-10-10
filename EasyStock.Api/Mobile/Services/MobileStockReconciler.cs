@@ -153,9 +153,9 @@ public class MobileStockReconciler(
                 AlteradoEm = DateTime.UtcNow
             });
 
-            // Espelha a quantidade no mobile_product (fonte da verdade local pro app)
-            mobileProduct.Stock = (int)novo;
-            mobileProduct.UpdatedAt = DateTime.UtcNow;
+            // #1520 (ADR-0060): nao copia o saldo deste ItemEstoque para mobile_products.Stock.
+            // Desde o #1458 cada lote e um ItemEstoque, entao o saldo de um item nao e o do
+            // produto; e o espelho ja recebe este movimento do aparelho ("stock.delta").
 
             // Marcador de divergência: registra MovimentacaoEstoque adicional
             // de natureza Ajuste com Quantidade=0 e Descricao indicando o evento.
