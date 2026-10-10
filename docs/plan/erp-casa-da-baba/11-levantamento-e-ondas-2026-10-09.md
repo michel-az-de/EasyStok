@@ -907,6 +907,7 @@ Evidências, TRX, scripts e capturas em `C:\rep\EasyStok\.build\onda2-reabrir`; 
 | Build | `EasyStok.CI.slnf` compilado sem erros; avisos existentes de API obsoleta |
 | Domain / Application | 1.549 e 2.451 testes aprovados, sem ignorados |
 | API / Arquitetura | 1.172 testes de API e 61 do filtro `Category!=ArchitectureDebt` aprovados, sem ignorados |
+| Gate de commit | Build e 37 testes obrigatórios de arquitetura aprovados; prova de reabertura incluída no workflow do Console |
 | PostgreSQL real | 5 testes aprovados, sem ignorados: repetição simultânea com estado já rastreado, disputa entre históricos com contato igual ou variante, disputa com entrada ainda não confirmada, rollback da nota e RLS com usuário sem bypass |
 | Console | 69 scripts de prova aprovados; lint, camadas, 264 pares de contraste e build aprovados |
 | HTTP / Chromium | Atendimento autorizado, Cozinha 403, sem sessão 401 e inexistente 404; cliente bloqueado e outra conversa aberta recusados; duplo clique, recarga, resposta perdida e nova entrada do ChatSite na mesma conversa conferidos; nota interna não aparece ao cliente |
