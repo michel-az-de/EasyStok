@@ -189,6 +189,9 @@ public class PedidosController(
             EmpresaId = emp,
             PedidoId = id,
             RegistradoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            // Autor vem da sessão: o nome do corpo falsificava a trilha e, como "Mercado Pago",
+            // criava um recebimento que nenhuma devolução aceitava.
+            RegistradoPorNome = User?.FindFirst("nome")?.Value,
             Origem = "web",
             ConfirmadoPeloProvedor = false
         });
@@ -204,7 +207,7 @@ public class PedidosController(
         var result = await removePagUseCase.ExecuteAsync(new RemoverPagamentoPedidoCommand(
             emp, id, pagamentoId,
             currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
-            null, "web"));
+            null, "web", currentUser.Nivel));
         return result == null ? DataNotFound("Pedido não encontrado.") : DataOk(result);
     }
 }
