@@ -2,9 +2,9 @@ import { useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
-import { useAcoes } from '../../aplicacao/contextos'
+import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useAtalhoBarra } from '../../aplicacao/useAtalhoBarra'
-import { aceitaFormato, motivoDeFormato, restricoesDoCanal } from '../../dominio/canal'
+import { aceitaFormato, motivoDeAnexo, motivoDeFormato, restricoesDoCanal } from '../../dominio/canal'
 import {
   mensagemDeArquivoAnexado, mensagemDeAudio, mensagemDeImagemAnexada, tipoDeArquivo, validarArquivo,
 } from '../../dominio/anexos'
@@ -26,6 +26,8 @@ export function Composer({
   aoReabrir, reabrindo = false, podeEnviarModelo = false,
 }) {
   const { enviarMidia, enviar, obterLinkCardapio } = useAcoes()
+  // #1587: no modo API só a foto sai (e só no WhatsApp); o anexo é recusado ao escolher.
+  const { fonteApi } = useAtendimento()
   // Seletor rápido (#1441): "/" no campo ou o botão Respostas abrem a lista
   // compacta de respostas prontas; Enter insere no campo.
   const barra = useAtalhoBarra({ rascunho, conversa, aoInserir: aoMudarRascunho })
@@ -53,10 +55,10 @@ export function Composer({
 
   async function aoEscolherArquivo(arquivo) {
     setErroAnexo(null)
-    const { aceito, motivo: motivoRecusa } = validarArquivo({ tipo: arquivo.type, tamanho: arquivo.size })
+    const { aceito, motivo: motivoRecusa } = validarArquivo({ tipo: arquivo.type, tamanho: arquivo.size, soImagem: fonteApi })
     if (!aceito) { setErroAnexo(motivoRecusa); return }
     const tipo = tipoDeArquivo(arquivo.type)
-    const bloqueioCanal = motivoDeFormato(canal, tipo === 'imagem' ? 'foto' : 'arquivo')
+    const bloqueioCanal = motivoDeAnexo(canal, tipo, { fonteApi })
     if (bloqueioCanal) { setErroAnexo(bloqueioCanal); return }
     const dataUrl = await ler(arquivo)
     setAnexo({
@@ -198,7 +200,7 @@ export function Composer({
                   do próprio Popover) e planta o conteúdo em document.body,
                   fora do recorte de `.composer`. Visual idêntico ao de antes,
                   só que agora fora do overflow. */}
-              {barra.aberto && <SeletorRespostas seletor={barra} aoGerenciar={() => {
+              {barra.aberto && <SeletorRespostas seletor={barra} aoInserido={() => campoRef.current?.querySelector('textarea')?.focus()} aoGerenciar={() => {
                 if (!barra.pelaBarra) respostasRef.current?.focus()
                 aoAbrirBiblioteca?.()
               }} />}
@@ -229,7 +231,8 @@ export function Composer({
                   query e fica o title com a explicação inteira. */}
               <BotaoAnexarArquivo
                 disabled={!podeEscrever}
-                titulo="Anexar arquivo do computador: foto, cardápio em PDF ou comprovante (imagem ou PDF, até 8 MB)"
+                soImagem={fonteApi}
+                titulo={fonteApi ? 'Anexar foto do computador (imagem, até 8 MB)' : 'Anexar arquivo do computador: foto, cardápio em PDF ou comprovante (imagem ou PDF, até 8 MB)'}
                 rotulo="Anexar"
                 classeRotulo={css.rotuloAcao}
                 aoEscolher={aoEscolherArquivo}

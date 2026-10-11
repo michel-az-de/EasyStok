@@ -31,6 +31,9 @@ export const ROTULO_ENVIAR = 'Enviar ao cliente'
 // o mesmo pedido. Fica um botão só, o da barra fixa, e a comanda diz que vai junto.
 export const ROTULO_GERAR_E_ENVIAR = 'Gerar cobrança e enviar'
 export const LINHA_COMANDA_VAI_JUNTO = 'A comanda vai ao cliente junto com a cobrança.'
+// #1587: pedido já criado (`comandaTravada`). O console não troca item de pedido criado; a frase
+// diz só isso, sem prometer caminho que não existe.
+export const LINHA_COMANDA_TRAVADA = 'O pedido já está no EasyStok: os itens não mudam mais por aqui.'
 
 // #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que a dona resolve, para o
 // botão nascer desabilitado com o motivo à vista em vez de falhar depois do clique. Cadastro,

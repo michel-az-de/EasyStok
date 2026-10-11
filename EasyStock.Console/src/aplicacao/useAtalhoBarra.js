@@ -39,14 +39,17 @@ export function useAtalhoBarra({ rascunho, conversa, aoInserir }) {
   }
 
   // Pela barra, o texto substitui o "/termo"; pelo botão, entra depois do que já estava escrito.
-  function inserir(item) {
+  // #1587: `aoInserido` é de quem desenha a lista. Pelo botão o foco estava na busca, que some
+  // com a lista; sem devolver o foco ao campo de texto, o Enter seguinte não envia.
+  function inserir(item, aoInserido) {
     const texto = resolverVariaveis(item.texto, conversa).texto
     const antes = pelaBarra ? '' : (rascunho ?? '').trimEnd()
     aoInserir(antes ? `${antes} ${texto}` : texto)
     setBusca(null)
+    aoInserido?.()
   }
 
-  function aoTeclar(evento) {
+  function aoTeclar(evento, aoInserido) {
     if (!aberto) return false
     if (evento.key === 'ArrowDown' || evento.key === 'ArrowUp') {
       evento.preventDefault()
@@ -55,7 +58,7 @@ export function useAtalhoBarra({ rascunho, conversa, aoInserir }) {
     }
     if (evento.key === 'Enter' && !evento.shiftKey) {
       evento.preventDefault()
-      if (itens[destaque]) inserir(itens[destaque])
+      if (itens[destaque]) inserir(itens[destaque], aoInserido)
       return true
     }
     if (evento.key === 'Escape') {

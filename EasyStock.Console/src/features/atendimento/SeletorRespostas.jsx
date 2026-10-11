@@ -5,7 +5,9 @@ import css from './seletorRespostas.module.css'
 // Lista compacta de respostas prontas acima do compositor (#1441). Uma linha por
 // resposta: título, atalho e o começo do texto. Sem botão por linha: clicar ou Enter
 // insere no campo. Quem cria, edita e arquiva é a Gestão ("Gerenciar respostas").
-export function SeletorRespostas({ seletor, aoGerenciar }) {
+// `aoInserido` (#1587): chamado depois que a resposta entra no campo, pelo clique ou pelo Enter
+// da busca; o Composer devolve o foco ao campo de texto.
+export function SeletorRespostas({ seletor, aoGerenciar, aoInserido }) {
   const idLista = useId()
   const idDe = (indice) => `${idLista}-${indice}`
   const { itens, destaque } = seletor
@@ -24,7 +26,7 @@ export function SeletorRespostas({ seletor, aoGerenciar }) {
             placeholder="Buscar por título, atalho ou texto"
             value={seletor.busca}
             onChange={(e) => seletor.mudarBusca(e.target.value)}
-            onKeyDown={(e) => { seletor.aoTeclar(e) }}
+            onKeyDown={(e) => { seletor.aoTeclar(e, aoInserido) }}
           />
         )}
 
@@ -44,7 +46,7 @@ export function SeletorRespostas({ seletor, aoGerenciar }) {
                 onMouseEnter={() => seletor.destacar(i)}
                 // Não tira o foco do campo antes do clique valer.
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => seletor.inserir(r)}
+                onClick={() => seletor.inserir(r, aoInserido)}
               >
                 <span className={css.titulo}>{r.titulo}</span>
                 <span className={css.atalho}>{r.atalho}</span>
