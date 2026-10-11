@@ -104,7 +104,7 @@ function ItemComanda({
 
 export function BlocoPedido({
   pedido, editavel, aoTrocarJanela, aoAbrirCardapio, aoAjustar, aoAjustarObservacao, aoGerarPedido,
-  aoForcarEncaixe, nomeCliente, endereco, faixa, bloqueado = false,
+  aoForcarEncaixe, nomeCliente, endereco, faixa, bloqueado = false, conversaId,
 }) {
   const { cardapio, linhas } = useCatalogo()
   const { marcarCanhotoImpresso } = useAcoes()
@@ -240,9 +240,10 @@ export function BlocoPedido({
       </section>
 
       {/* No modo API a janela é da vitrine, com data; pedido criado troca a vaga no servidor.
-          #1474 (R3): vem antes das ações, logo abaixo da comanda, onde o motivo da barra aponta. */}
+          #1474 (R3): vem antes das ações, logo abaixo da comanda, onde o motivo da barra aponta.
+          #1551: remonta por conversa; o "Dia da entrega" de um cliente não vale para o seguinte. */}
       {!fechado && fonteApi && (
-        <SeletorJanelaApi pedido={pedido} editavel={editavel} aoEscolher={aoTrocarJanela} />
+        <SeletorJanelaApi key={conversaId} pedido={pedido} editavel={editavel} aoEscolher={aoTrocarJanela} />
       )}
 
       <div className={css.acoesPedido}>
