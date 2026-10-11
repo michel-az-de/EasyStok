@@ -16,14 +16,14 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 public class ModeloConversaIntegrationTests(PostgreSqlDatabaseFixture fixture) : IClassFixture<PostgreSqlDatabaseFixture>
 {
     private readonly ICanalMensageria _canal = Substitute.For<ICanalMensageria>();
-    private EnviarModeloConversaUseCase UseCase(EasyStockDbContext db)
+    private EnviarModeloConversaUseCase UseCase(EasyStockDbContext db, TimeProvider? relogio = null)
     {
         _canal.Canal.Returns(CanalConversa.WhatsApp);
         var catalogo = Substitute.For<ICatalogoModelosAtendimento>();
         catalogo.ListarAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns([
             new ModeloAtendimento("retomar", "pt_BR", "UTILITY", "Olá {{1}}", 1)]);
         return new(new ConversaRepository(db), new ClienteRepository(db), catalogo,
-            new(Substitute.For<IConsentimentoContatoRepository>()), new([_canal]), db, TimeProvider.System);
+            new(Substitute.For<IConsentimentoContatoRepository>()), new([_canal]), db, relogio ?? TimeProvider.System);
     }
 
     private async Task<EnviarModeloConversaCommand> Preparar()
@@ -141,6 +141,64 @@ public class ModeloConversaIntegrationTests(PostgreSqlDatabaseFixture fixture) :
         salvas[nota.Id].Status.Should().Be(StatusMensagem.Pendente, "nota interna não é intenção de modelo");
         salvas[texto.Id].Status.Should().Be(StatusMensagem.Pendente, "texto pendente não é intenção de modelo");
         _canal.ReceivedCalls().Count(c => c.GetMethodInfo().Name.StartsWith("Enviar", StringComparison.Ordinal)).Should().Be(0);
+    }
+
+    // #1599: a varredura marca a intenção como falha incerta com o POST ainda no ar e o canal confirma depois.
+    // A entrega vence: a mensagem fica enviada, sem o erro, a tentativa e o tipo de falha que a varredura gravou.
+    [SkippableFact]
+    public async Task CanalConfirmaDepoisDaVarredura_SucessoVenceELimpaAFalhaIncerta()
+    {
+        var command = await Preparar();
+        var agora = DateTime.UtcNow;
+        Mensagem? marcada = null;
+        var gravadaEm = agora - EasyStock.Application.UseCases.Atendimento.Reenvio.EncerrarIntencoesModeloSemDesfechoUseCase.PrazoSemDesfecho
+            - TimeSpan.FromMinutes(1);
+        _canal.EnviarModeloAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns(async _ =>
+            {
+                await using var varredura = fixture.CreateDbContext();
+                using var bypass = varredura.UseRowLevelSecurityBypass();
+                var encerrar = new EasyStock.Application.UseCases.Atendimento.Reenvio.EncerrarIntencoesModeloSemDesfechoUseCase(
+                    new ConversaRepository(varredura), varredura, new RelogioFixo(agora));
+                while (await encerrar.ExecuteAsync(50) > 0) { }
+                // Conferido fora daqui: o use case trata exceção do canal como falha de envio e engoliria a asserção.
+                marcada = await varredura.AtendimentoMensagens.IgnoreQueryFilters().AsNoTracking().SingleAsync(m => m.Id == command.TentativaId);
+                return "wamid.tardio";
+            });
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(command.EmpresaId);
+            await UseCase(db, new RelogioFixo(gravadaEm)).ExecuteAsync(command);
+        }
+
+        marcada.Should().NotBeNull("o canal foi chamado e a varredura rodou no meio do envio");
+        marcada!.Status.Should().Be(StatusMensagem.Falhou, "a varredura chegou antes da resposta do canal");
+        marcada.TentativasEnvio.Should().Be(1);
+
+        await using var conferir = fixture.CreateDbContext(); conferir.SetMobileTenantContext(command.EmpresaId);
+        var salva = await conferir.AtendimentoMensagens.AsNoTracking().SingleAsync(m => m.Id == command.TentativaId);
+        salva.Status.Should().Be(StatusMensagem.Enviada);
+        salva.ExternoId.Should().Be("wamid.tardio");
+        salva.Erro.Should().BeNull();
+        salva.TentativasEnvio.Should().Be(0);
+        salva.UltimaFalhaEnvio.Should().BeNull();
+        salva.ProximoReenvioEm.Should().BeNull();
+    }
+
+    // #1599: a varredura roda a cada 30 s; o índice parcial cobre exatamente o predicado dela.
+    [SkippableFact]
+    public async Task IndiceParcialDaVarreduraExisteComOFiltroDaConsulta()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason);
+        await using var db = fixture.CreateDbContext();
+        var definicoes = await db.Database
+            .SqlQuery<string>($"SELECT indexdef AS \"Value\" FROM pg_indexes WHERE tablename = 'atendimento_mensagens' AND indexname = 'ix_atendimento_mensagens_modelo_pendente'")
+            .ToListAsync();
+        var definicao = definicoes.Should().ContainSingle().Subject;
+        definicao.Should().Contain("USING btree (\"EnviadaEm\")");
+        definicao.Should().Contain("\"ModeloJson\" IS NOT NULL");
+        definicao.Should().Contain($"\"Status\" = {(int)StatusMensagem.Pendente}");
     }
 
     private sealed class RelogioFixo(DateTime agora) : TimeProvider

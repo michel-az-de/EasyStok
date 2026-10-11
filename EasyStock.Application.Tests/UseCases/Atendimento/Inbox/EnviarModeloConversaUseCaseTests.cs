@@ -34,6 +34,8 @@ public class EnviarModeloConversaUseCaseTests
         _clientes.GetByIdAsync(_empresa, _cliente.Id).Returns(_cliente);
         _conversas.ObterMensagemAsync(_empresa, _conversa.Id, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(c => _mensagens.FirstOrDefault(m => m.Id == c.ArgAt<Guid>(2)));
+        _conversas.ObterMensagemComLockAsync(_empresa, _conversa.Id, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(c => _mensagens.FirstOrDefault(m => m.Id == c.ArgAt<Guid>(2)));
         _conversas.AddMensagemAsync(Arg.Any<Mensagem>(), Arg.Any<CancellationToken>()).Returns(c =>
         { _mensagens.Add(c.Arg<Mensagem>()); return Task.CompletedTask; });
         _canal.Canal.Returns(CanalConversa.WhatsApp);
@@ -166,4 +168,36 @@ public class EnviarModeloConversaUseCaseTests
         await UseCase.ExecuteAsync(command);
         await _canal.Received(1).EnviarModeloAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>());
     }
+
+    // #1599: a varredura de intenção presa marcou falha incerta com o POST ainda no ar, e o canal confirmou
+    // depois. A entrega vence, e nada do que a varredura gravou fica pendurado na mensagem enviada.
+    [Fact]
+    public async Task CanalConfirmaDepoisDaVarreduraMarcarFalhaIncerta_SucessoVenceELimpaAFalha()
+    {
+        _canal.EnviarModeloAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns(_ => { VarreduraMarcaFalhaIncerta(); return "wamid.tardio"; });
+        var m = await UseCase.ExecuteAsync(Command);
+        m.Status.Should().Be(StatusMensagem.Enviada);
+        m.ExternoId.Should().Be("wamid.tardio");
+        m.Erro.Should().BeNull();
+        var salva = _mensagens.Single();
+        salva.TentativasEnvio.Should().Be(0);
+        salva.UltimaFalhaEnvio.Should().BeNull();
+        salva.ProximoReenvioEm.Should().BeNull();
+    }
+
+    // #1599: a varredura já encerrou a intenção e o canal falhou depois. A falha conta uma vez só.
+    [Fact]
+    public async Task CanalFalhaDepoisDaVarreduraMarcarFalhaIncerta_NaoSomaOutraFalha()
+    {
+        _canal.EnviarModeloAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns<string>(_ => { VarreduraMarcaFalhaIncerta(); throw new TimeoutException(); });
+        var m = await UseCase.ExecuteAsync(Command);
+        m.Status.Should().Be(StatusMensagem.Falhou);
+        _mensagens.Single().TentativasEnvio.Should().Be(1);
+        _mensagens.Single().UltimaFalhaEnvio.Should().Be(TipoFalhaEnvio.Incerta);
+    }
+
+    private void VarreduraMarcaFalhaIncerta() =>
+        _mensagens.Single().RegistrarFalhaEnvio(EnviarModeloConversaUseCase.AvisoEnvioIncerto, TipoFalhaEnvio.Incerta, DateTime.UtcNow);
 }

@@ -11,7 +11,11 @@ namespace EasyStock.Application.UseCases.Atendimento.Reenvio;
 /// </summary>
 public sealed class EncerrarIntencoesModeloSemDesfechoUseCase(IConversaRepository repository, IUnitOfWork unitOfWork, TimeProvider relogio)
 {
-    /// <summary>Folga sobre o envio em andamento: o POST ao canal desiste em segundos.</summary>
+    /// <summary>
+    /// Folga sobre o envio em andamento: o POST ao canal desiste em 30 s, pelo timeout do pipeline de envio do
+    /// WhatsApp (o cliente HTTP não define o seu e ficaria no padrão de 100 s). Se a varredura ainda assim chegar
+    /// antes da resposta, o envio relê a mensagem sob lock e a confirmação do canal vence (#1599).
+    /// </summary>
     public static readonly TimeSpan PrazoSemDesfecho = TimeSpan.FromMinutes(10);
 
     public Task<int> ExecuteAsync(int limite, CancellationToken ct = default) =>

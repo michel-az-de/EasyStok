@@ -253,6 +253,17 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
         db.AtendimentoMensagens.FirstOrDefaultAsync(
             m => m.EmpresaId == empresaId && m.ConversaId == conversaId && m.Id == mensagemId, ct);
 
+    public async Task<Mensagem?> ObterMensagemComLockAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default)
+    {
+        var mensagem = await db.AtendimentoMensagens.FromSqlInterpolated($"""
+            SELECT * FROM atendimento_mensagens
+            WHERE "EmpresaId" = {empresaId} AND "ConversaId" = {conversaId} AND "Id" = {mensagemId} FOR UPDATE
+            """).SingleOrDefaultAsync(ct);
+        // A leitura serve para travar. A instância já rastreada não é relida pelo EF: a varredura pode tê-la mudado (#1599).
+        if (mensagem is not null) await db.Entry(mensagem).ReloadAsync(ct);
+        return mensagem;
+    }
+
     // SQL cru de propósito: FOR UPDATE SKIP LOCKED não sai do LINQ. IgnoreQueryFilters mantém o SQL sem
     // composição; o serviço de reenvio é cross-tenant e roda com bypass de RLS ligado pelo host (S57).
     public async Task<IReadOnlyList<Mensagem>> ListarReenviosVencidosComLockAsync(DateTime agora, int limite, CancellationToken ct = default) =>

@@ -187,6 +187,22 @@ public class Mensagem
             Status = StatusMensagem.Enviada;
     }
 
+    /// <summary>
+    /// #1599: o canal confirmou depois de a varredura de intenção presa marcar falha incerta. A entrega vence:
+    /// sai de <see cref="StatusMensagem.Falhou"/> e desfaz o que aquela falha gravou.
+    /// </summary>
+    public void ConfirmarEnvioAposFalhaIncerta(string externoId)
+    {
+        if (Status != StatusMensagem.Falhou || UltimaFalhaEnvio != TipoFalhaEnvio.Incerta || ExternoId is not null)
+            throw new RegraDeDominioVioladaException("Só falha incerta sem confirmação anterior pode ser desfeita pelo canal.");
+        ConfirmarEnvio(externoId);
+        Status = StatusMensagem.Enviada;
+        Erro = null;
+        UltimaFalhaEnvio = null;
+        ProximoReenvioEm = null;
+        TentativasEnvio = Math.Max(0, TentativasEnvio - 1);
+    }
+
     /// <summary>Callback de status da Meta. Nunca regride; <see cref="StatusMensagem.Falhou"/> e terminal.</summary>
     public void AtualizarStatusEntrega(StatusMensagem novo, string? erro = null)
     {
@@ -225,7 +241,7 @@ public class Mensagem
     /// <summary>S57: tira do agendamento antes de enviar, para outro processo não pegar a mesma mensagem.</summary>
     public void ReservarReenvio() => ProximoReenvioEm = null;
 
-    /// <summary>S57: o reenvio saiu. Única saída de <see cref="StatusMensagem.Falhou"/>.</summary>
+    /// <summary>S57: o reenvio saiu. Saída de <see cref="StatusMensagem.Falhou"/> para texto reenviável.</summary>
     public void RegistrarReenviada(string externoId)
     {
         if (!PodeReenviar)
