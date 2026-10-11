@@ -46,6 +46,7 @@ jobs:
       - run: node ferramentas/prova-sessao-cozinha.mjs
       - run: node ferramentas/prova-notificacoes-sessao.mjs
       - run: node ferramentas/prova-1446-cozinha-viva.mjs
+      - run: node ferramentas/prova-1584-operacao-ux.mjs
       - run: node ferramentas/prova-1474-revisao-visual.mjs
       - run: node ferramentas/prova-1474-ficha-api.mjs
       - run: node ferramentas/prova-1481-gestao-cardapio.mjs
@@ -89,4 +90,3 @@ jobs:
       - run: node ferramentas/prova-premium-cozinha.mjs
       - run: node ferramentas/prova-premium-comanda.mjs
       - run: node ferramentas/prova-1582-navegacao-ux.mjs
-      - run: node ferramentas/prova-1584-operacao-ux.mjs
