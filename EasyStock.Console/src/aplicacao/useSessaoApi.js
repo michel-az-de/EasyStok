@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { configGoogle, entrar, entrarComGoogle, sair } from '../infra/api/autenticacao'
 import { EVENTO_SESSAO_EXPIRADA, garantirSessao } from '../infra/api/cliente'
 import { EVENTO_FALHA_SAIDA_PUSH, EVENTO_SESSAO_ALTERADA, lerSessao, limparSessao } from '../infra/api/sessao'
+import { AVISO_SESSAO_VENCIDA } from '../dominio/sessao'
 
 // Sessão do modo API (F01). Um 401 em qualquer chamada limpa a sessão e dispara
 // EVENTO_SESSAO_EXPIRADA; aqui isso vira "volta para o login".
@@ -10,11 +11,20 @@ export function useSessaoApi() {
   const [avisoSaida, setAvisoSaida] = useState(null)
 
   useEffect(() => {
-    const expirou = () => setSessao(null)
-    const atualizar = () => setSessao(lerSessao())
+    // #1582: quem cai no login por vencimento lê o motivo. A hash fica, então o novo login volta à mesma tela.
+    let havia = Boolean(lerSessao())
+    const expirou = () => { setAvisoSaida(AVISO_SESSAO_VENCIDA); setSessao(null) }
+    const atualizar = () => {
+      const atual = lerSessao()
+      havia = Boolean(atual)
+      setSessao(atual)
+    }
     const falhaPush = () => setAvisoSaida('Você saiu. Não foi possível desligar os avisos deste aparelho. Bloqueie as notificações nas configurações do navegador.')
     const conferir = () => {
-      if (!lerSessao()) limparSessao()
+      if (!lerSessao()) {
+        if (havia) setAvisoSaida(AVISO_SESSAO_VENCIDA)
+        limparSessao()
+      }
       else garantirSessao().catch(() => { /* a tela de trabalho mostra a falha e retenta */ })
     }
     window.addEventListener(EVENTO_SESSAO_EXPIRADA, expirou)
