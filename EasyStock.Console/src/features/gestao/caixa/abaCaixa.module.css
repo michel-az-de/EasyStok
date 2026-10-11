@@ -130,6 +130,17 @@
 .caixaApi .linhaValor { width: auto; flex: 0 0 auto; flex-direction: column; align-items: flex-end; flex-wrap: nowrap; gap: var(--e-1); font-size: var(--t-corpo); line-height: var(--lh-compacto); }
 .valorSaida { color: var(--erro); }
 
+/* #1624: fluxo dos últimos 7 dias. Tabela de verdade (dia, entrou, saiu, saldo, situação). */
+.rolagemFluxo { overflow-x: auto; }
+.fluxo { width: 100%; border-collapse: collapse; font-size: var(--t-apoio); font-variant-numeric: tabular-nums; }
+.fluxo th, .fluxo td { padding: var(--e-3); text-align: right; white-space: nowrap; color: var(--tinta); font-weight: 400; }
+.fluxo th:first-child, .fluxo th:last-child, .fluxo td:last-child { text-align: left; }
+.fluxo thead th { color: var(--tinta-2); font-size: var(--t-micro); border-bottom: var(--b-1) solid var(--linha); }
+.fluxo tbody th { font-weight: 700; }
+.fluxo tbody tr:nth-child(even) { background: var(--preenchimento); }
+.fluxo tfoot th, .fluxo tfoot td { border-top: var(--b-1) solid var(--linha-media); font-weight: 750; }
+.fluxo td.valorSaida { color: var(--erro); }
+
 @container (min-width: 601px) {
   .caixaApi > .resumoLista dt { min-height: calc(2em * var(--lh-corpo)); }
 }

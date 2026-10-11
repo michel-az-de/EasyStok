@@ -1,23 +1,36 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
+import { Chip } from '../../../componentes/Chip'
 import { FolhaImpressao } from '../../../componentes/FolhaImpressao'
+import { Icone } from '../../../componentes/Icone'
 import { useCatalogo } from '../../../aplicacao/contextos'
+import { useEstoqueDoDiaApi } from '../../../aplicacao/useEstoqueDoDiaApi'
 import { aoLancarLote, dispensarLote, guardarRascunho, linhasDoRascunho, lotesLancados, producaoDoDia } from '../../../aplicacao/producaoDoDia'
-import { retirarProducaoPlanejada } from '../../../aplicacao/planejamento'
+import { lerSugestao, retirarProducaoPlanejada } from '../../../aplicacao/planejamento'
 import { estaRemovido } from '../../../dominio/cardapio'
+import { plural } from '../../../dominio/formato'
+import {
+  VALIDADES_RAPIDAS, cartoesDaGrade, categoriasDaGrade, definirNoLote, faltaProduzir, filtrarGrade, nomeDoCartao,
+  porcoesNoLote, resumoDoLote, somarNoLote, tamanhoNoCartao,
+} from '../../../dominio/gradeDeProducao'
+import { hashDoModulo } from '../../../dominio/modulos'
 import { sobraDaLinha } from '../../../dominio/producao'
-import { linhaComPorcao, linhaComPrato } from '../../../dominio/porcoes'
+import { linhaComPorcao } from '../../../dominio/porcoes'
 import css from '../cardapio/abaCardapio.module.css'
+import grade from './producaoDoDia.module.css'
 
-// M2 › Produção do dia (M2.2, #1491). Ela escolhe o prato do cardápio e anota o que saiu: porções,
-// peso de cada porção, peso real e validade. Confirmar cria o lote no EasyStok (etiquetas e
-// entrada em porções); prato que ainda não tinha estoque passa a ter. Depois, "Imprimir etiquetas"
-// imprime uma por porção. O destino vem da linha do prato (D-M2-04).
+// M2 › Produção do dia (M2.2, #1491). #1624: a dona produz como no PWA. Toca no prato para somar uma
+// porção, vê o saldo no cartão e o que falta para os pedidos, confere validade e peso no lote e
+// confirma. Confirmar cria o lote no EasyStok (etiquetas e entrada em porções); prato que ainda não
+// tinha estoque passa a ter. Depois, "Imprimir etiquetas" imprime uma por porção (D-M2-04).
 const VALIDADE_PADRAO = 5
+const ID_DO_LOTE = 'lote-da-producao'
+const ID_DOS_AVISOS = 'lotes-lancados'
 const novaLinha = () => ({ id: crypto.randomUUID(), sku: '', variacaoId: '', porcoes: '', pesoPorPorcaoG: '', pesoRealG: '', validadeDias: String(VALIDADE_PADRAO) })
 const inteiro = (texto) => (String(texto).trim() === '' ? null : Number(texto))
 const dataCurta = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '')
+const diaCurto = (iso) => (iso ? iso.split('-').reverse().slice(0, 2).join('/') : 'amanhã')
 
 // M1.4c (#1537): prato com porções exige a porção produzida (o saldo é dela).
 function paraEnviar(linha, pratos = []) {
@@ -39,33 +52,75 @@ function paraEnviar(linha, pratos = []) {
 export function AbaProducaoDoDiaApi() {
   const { cardapio } = useCatalogo()
   const pratos = useMemo(() => (cardapio ?? []).filter((i) => !estaRemovido(i)), [cardapio])
-  // M2.5 (#1502): vindo do Planejamento, as porções planejadas já entram como linhas.
+  // O saldo de cada cartão. Sem ele (API fora, prato sem estoque ligado) a grade continua servindo.
+  const estoque = useEstoqueDoDiaApi()
+  const recarregarEstoque = estoque.recarregar
+  // M2.5 (#1502): vindo do Planejamento, as porções planejadas já entram no lote.
   // #1585: a tela desmonta a cada troca de rota; ela abre com o que ficou guardado.
   const [linhas, setLinhas] = useState(() => {
     const guardadas = linhasDoRascunho(retirarProducaoPlanejada())
-    return guardadas ? guardadas.map((l) => ({ ...novaLinha(), ...l })) : [novaLinha()]
+    return guardadas ? guardadas.map((l) => ({ ...novaLinha(), ...l })) : []
   })
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState(null)
   const [lotes, setLotes] = useState(lotesLancados)
   // O que está na folha, de qual lote: { loteId } buscando, com `etiquetas` pronta, com `erro` falhou.
   const [impressao, setImpressao] = useState(null)
+  // "Falta produzir": a sugestão do planejamento. Sem permissão ou sem rede, o bloco não aparece.
+  const [sugestao, setSugestao] = useState(null)
+  const [leitura, setLeitura] = useState(0)
+  const [categoria, setCategoria] = useState(null)
+  const [busca, setBusca] = useState('')
 
   useEffect(() => { guardarRascunho(linhas) }, [linhas])
   // O lote gravado entra na lista e as linhas dele saem, mesmo quando o envio partiu antes de ela
   // sair da tela e voltar. A folha do lote anterior sai junto: não imprime etiqueta de outro lote.
+  // O saldo dos cartões e o que falta produzir mudaram: os dois são relidos.
   useEffect(() => aoLancarLote(() => {
     setLotes(lotesLancados())
-    setLinhas([novaLinha()])
+    setLinhas([])
     setImpressao(null)
-  }), [])
+    setLeitura((n) => n + 1)
+    recarregarEstoque()
+  }), [recarregarEstoque])
+  // O aviso (erro ou lote lançado) tem de aparecer para quem tocou na barra: em tela estreita o lote
+  // fica abaixo da grade e, ao lado, ele rola por dentro. A rolagem vem depois de o aviso existir.
+  useEffect(() => {
+    if (erro) globalThis.document?.querySelector(`#${ID_DO_LOTE} [role="alert"]`)?.scrollIntoView({ block: 'nearest' })
+  }, [erro])
+  useEffect(() => {
+    if (leitura > 0) globalThis.document?.getElementById(ID_DOS_AVISOS)?.scrollIntoView({ block: 'nearest' })
+  }, [leitura])
+  useEffect(() => {
+    let vivo = true
+    lerSugestao().then((r) => { if (vivo) setSugestao(r) }).catch(() => { if (vivo) setSugestao(null) })
+    return () => { vivo = false }
+  }, [leitura])
 
+  const cartoes = useMemo(() => cartoesDaGrade(pratos, estoque.pratos), [pratos, estoque.pratos])
+  const categorias = categoriasDaGrade(cartoes)
+  const visiveis = filtrarGrade(cartoes, { categoria, busca })
+  const falta = faltaProduzir(sugestao?.pratos, cartoes)
+  const resumo = resumoDoLote(linhas)
+  const apoio = { pratos, novaLinha }
+
+  const somar = (cartao, delta) => setLinhas((atual) => somarNoLote(atual, cartao, delta, apoio))
+  // Um toque no que falta: prato de um tamanho só entra no lote com a quantidade (nunca abaixo do
+  // que ela já pôs); prato com porções mostra os tamanhos dele na grade.
+  const atender = (item) => {
+    if (item.cartao) {
+      setLinhas((atual) => definirNoLote(atual, item.cartao, Math.max(item.quantidade, porcoesNoLote(atual, item.cartao)), apoio))
+      return
+    }
+    setCategoria(null)
+    setBusca(item.nome)
+  }
   const mudar = (id, campo) => (e) => setLinhas((atual) => atual.map((l) => (l.id === id ? { ...l, [campo]: e.target.value } : l)))
-  // Trocar o prato zera a porção e o peso que veio dela. M1.4e (#1552): escolher a porção traz o peso
-  // dela, que é o que faz a receita em peso baixar o insumo certo; o que ela digitou fica.
-  const escolherPrato = (id) => (e) => setLinhas((atual) => atual.map((l) => (l.id === id ? linhaComPrato(l, pratos, e.target.value) : l)))
+  const definirValidade = (id, dias) => setLinhas((atual) => atual.map((l) => (l.id === id ? { ...l, validadeDias: String(dias) } : l)))
+  // M1.4e (#1552): escolher a porção traz o peso dela, que é o que faz a receita em peso baixar o
+  // insumo certo; o que ela digitou fica.
   const escolherPorcao = (id) => (e) => setLinhas((atual) => atual.map((l) => (l.id === id ? linhaComPorcao(l, pratos, e.target.value) : l)))
-  const tirar = (id) => setLinhas((atual) => (atual.length > 1 ? atual.filter((l) => l.id !== id) : atual))
+  const tirar = (id) => setLinhas((atual) => atual.filter((l) => l.id !== id))
 
   async function confirmar(evento) {
     evento.preventDefault()
@@ -101,69 +156,174 @@ export function AbaProducaoDoDiaApi() {
   return (
     <div className={css.aba}>
       <p className={css.descricao}>
-        Anote o que saiu da cozinha. Confirmar cria o lote com as etiquetas e soma no estoque.
+        Toque no prato que saiu da cozinha: cada toque soma uma porção. Confirmar cria o lote com as etiquetas e soma no estoque.
       </p>
 
-      {/* #1585: um aviso por lote lançado na visita, o mais novo primeiro, até ela dispensar. */}
-      {lotes.length > 0 && (
-        <section className={css.secao} aria-label="Lotes lançados nesta visita">
-          {lotes.map((lote) => (
-            <output key={lote.loteId} className={css.aviso}>
-              <strong>Lote {lote.codigo}</strong> lançado: {lote.pratos.map((p) => `${p.porcoes}× ${p.nome}${p.sobraG ? ` (sobra ${p.sobraG} g)` : ''}`).join(', ')}.
-              {' '}<Botao variante="primario" icone="printer" disabled={buscandoEtiquetas} aria-label={`Imprimir ${lote.etiquetas} ${lote.etiquetas === 1 ? 'etiqueta' : 'etiquetas'} do lote ${lote.codigo}`} onClick={() => imprimir(lote.loteId)}>Imprimir {lote.etiquetas} {lote.etiquetas === 1 ? 'etiqueta' : 'etiquetas'}</Botao>
-              {' '}<Botao variante="texto" disabled={buscandoEtiquetas} aria-label={`Dispensar o aviso do lote ${lote.codigo}`} onClick={() => dispensar(lote.loteId)}>Dispensar</Botao>
-              {impressao?.loteId === lote.loteId && impressao.erro && <>{' '}<strong>Não consegui buscar as etiquetas deste lote. {impressao.erro}</strong></>}
-              {lote.avisos.length > 0 && (
-                <ul aria-label="Avisos de insumo">
-                  {lote.avisos.map((a) => <li key={a}>{a}</li>)}
-                </ul>
-              )}
-            </output>
-          ))}
+      {falta.length > 0 && (
+        <section className={grade.falta} aria-label="Falta produzir">
+          <div>
+            <h3 className={css.tituloSecao}>Falta produzir</h3>
+            <p className={css.detalhe}>
+              Para os pedidos até {diaCurto(sugestao?.ate)}, o mínimo e o que saiu sem saldo. Toque para pôr no lote.
+              {' '}<a className={css.link} href={hashDoModulo('producao', 'planejamento')}>Ver a conta no Planejamento</a>
+            </p>
+          </div>
+          <div className={grade.chips}>
+            {falta.map((item) => (
+              <Chip key={item.sku} papel="acao" disabled={enviando}
+                icone={item.cartao && porcoesNoLote(linhas, item.cartao) >= item.quantidade ? 'check' : undefined}
+                onClick={() => atender(item)}>
+                {item.quantidade}× {item.nome}
+              </Chip>
+            ))}
+          </div>
         </section>
       )}
 
-      <form onSubmit={confirmar} className={css.aba}>
-        <ol className={css.listaFormularios}>
-          {linhas.map((l, indice) => {
-            const sobra = sobraDaLinha(paraEnviar(l))
-            return (
-              <li key={l.id} className={`${css.campos} ${css.formulario} ${css.loteProducao}`}>
-                <div className={css.cabecalhoFormulario}>
-                  <span className={css.numeroPrato}>{String(indice + 1).padStart(2, '0')}</span>
-                  <div>
-                    <h3 className={css.tituloFormulario}>{pratos.find((p) => p.sku === l.sku)?.nome ?? 'Escolha o prato produzido'}</h3>
-                    <p className={css.detalhe}>Quantidade, peso e validade deste lote.</p>
-                  </div>
+      <div className={grade.palco}>
+        <div className={grade.bancada}>
+          <section className={grade.cardapio} aria-label="Pratos para produzir">
+            <div className={grade.filtros}>
+              {categorias.length > 1 && (
+                <div className={grade.chips}>
+                  <Chip papel="filtro" ativo={!categoria} onClick={() => setCategoria(null)}>Todos</Chip>
+                  {categorias.map((c) => (
+                    <Chip key={c} papel="filtro" ativo={categoria === c} onClick={() => setCategoria(categoria === c ? null : c)}>{c}</Chip>
+                  ))}
                 </div>
-                <div className={css.linhaCompleta}>
-                  <CampoSelecao disabled={enviando} rotulo="Prato" value={l.sku} onChange={escolherPrato(l.id)}
-                    opcoes={[{ valor: '', rotulo: 'Escolha o prato' }, ...pratos.map((p) => ({ valor: p.sku, rotulo: `${p.nome}${p.porcao ? ` · ${p.porcao}` : ''}` }))]} />
-                </div>
-                {(pratos.find((p) => p.sku === l.sku)?.porcoes ?? []).length > 0 && (
-                  <div className={css.linhaCompleta}>
-                    <CampoSelecao disabled={enviando} rotulo="Porção" value={l.variacaoId} onChange={escolherPorcao(l.id)}
-                      opcoes={[{ valor: '', rotulo: 'Escolha a porção' }, ...pratos.find((p) => p.sku === l.sku).porcoes.map((v) => ({ valor: v.id, rotulo: v.rotulo }))]} />
-                  </div>
-                )}
-                <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Porções" placeholder="Porções" value={l.porcoes} onChange={mudar(l.id, 'porcoes')} />
-                <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Peso de cada porção (g)" placeholder="g por porção" value={l.pesoPorPorcaoG} onChange={mudar(l.id, 'pesoPorPorcaoG')} />
-                <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Peso real total (g)" placeholder="Peso real (g)" value={l.pesoRealG} onChange={mudar(l.id, 'pesoRealG')} />
-                <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Validade (dias)" placeholder="Validade (dias)" value={l.validadeDias} onChange={mudar(l.id, 'validadeDias')} />
-                <div className={css.rodapeForm}>
-                  <span className={css.detalhe}>{sobra == null ? 'O saldo será atualizado ao confirmar.' : sobra < 0 ? 'Peso real menor que as porções' : `Sobra ${sobra} g`}</span>
-                  <Botao className={css.acaoDiscreta} variante="texto" icone="lixeira" aria-label={`Remover prato ${indice + 1} da produção`} disabled={enviando || linhas.length === 1} onClick={() => tirar(l.id)}>Remover prato</Botao>
-                </div>
-              </li>
-            )
-          })}
-        </ol>
-        <div className={css.acoesFormulario}>
-          <Botao icone="plus" disabled={enviando} onClick={() => setLinhas((atual) => [...atual, novaLinha()])}>Mais um prato</Botao>
-          <Botao tipo="submit" variante="primario" icone="check" disabled={enviando}>{enviando ? 'Lançando…' : 'Confirmar produção'}</Botao>
+              )}
+              <div className={grade.busca}>
+                <CampoTexto rotulo="Buscar prato" rotuloOculto tipo="search" placeholder="Buscar prato" value={busca} onChange={(e) => setBusca(e.target.value)} />
+              </div>
+            </div>
+            {estoque.estado === 'erro' && (
+              <p className={css.aviso}>
+                Não consegui ler o saldo dos pratos agora. Dá para lançar a produção assim mesmo.
+                {' '}<Botao variante="texto" icone="refresh-cw" onClick={recarregarEstoque}>Tentar de novo</Botao>
+              </p>
+            )}
+            {visiveis.length === 0 ? (
+              <p className={css.descricao}>
+                {cartoes.length === 0 ? 'O cardápio ainda não tem pratos.' : 'Nenhum prato com esse nome.'}
+                {cartoes.length > 0 && <>{' '}<Botao variante="texto" onClick={() => { setBusca(''); setCategoria(null) }}>Ver todos os pratos</Botao></>}
+              </p>
+            ) : (
+              <ul className={grade.grade}>
+                {visiveis.map((cartao) => {
+                  const noLote = porcoesNoLote(linhas, cartao)
+                  const nome = nomeDoCartao(cartao)
+                  // O rótulo do botão diz a ação; o saldo vem como descrição, para o leitor de tela também.
+                  const idDoSaldo = cartao.saldo == null ? undefined : `saldo-${cartao.chave}`
+                  return (
+                    <li key={cartao.chave} data-prato={cartao.chave} className={`${grade.cartao} ${noLote > 0 ? grade.noLote : ''}`}>
+                      <button type="button" className={grade.tocar} disabled={enviando} aria-label={`Somar 1 porção de ${nome}`} aria-describedby={idDoSaldo} onClick={() => somar(cartao, 1)}>
+                        <span className={grade.nomeDoPrato}>{cartao.nome}</span>
+                        {tamanhoNoCartao(cartao) && <span className={grade.tamanho}>{cartao.tamanho}</span>}
+                        {cartao.saldo != null && (
+                          <span id={idDoSaldo} className={grade.saldo}>
+                            {cartao.saldo} no estoque{noLote > 0 && <strong> · {cartao.saldo + noLote} depois</strong>}
+                          </span>
+                        )}
+                      </button>
+                      {noLote > 0 && (
+                        <div className={grade.passo}>
+                          <span className={grade.contagem} aria-hidden="true">{noLote}</span>
+                          <button type="button" className={grade.menos} disabled={enviando} aria-label={`Tirar 1 porção de ${nome}`} onClick={() => somar(cartao, -1)}>
+                            <Icone nome="menos" tamanho={20} />
+                          </button>
+                        </div>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </section>
+
+          <div className={grade.colunaDoLote}>
+            {/* #1585: um aviso por lote lançado na visita, o mais novo primeiro, até ela dispensar. */}
+            {lotes.length > 0 && (
+              <section id={ID_DOS_AVISOS} className={`${css.secao} ${grade.aparecer}`} aria-label="Lotes lançados nesta visita">
+                {lotes.map((lote) => (
+                  <output key={lote.loteId} className={css.aviso}>
+                    <strong>Lote {lote.codigo}</strong> lançado: {lote.pratos.map((p) => `${p.porcoes}× ${p.nome}${p.sobraG ? ` (sobra ${p.sobraG} g)` : ''}`).join(', ')}.
+                    <span className={grade.acoesDoAviso}>
+                      <Botao variante="primario" icone="printer" disabled={buscandoEtiquetas} aria-label={`Imprimir ${lote.etiquetas} ${lote.etiquetas === 1 ? 'etiqueta' : 'etiquetas'} do lote ${lote.codigo}`} onClick={() => imprimir(lote.loteId)}>Imprimir {lote.etiquetas} {lote.etiquetas === 1 ? 'etiqueta' : 'etiquetas'}</Botao>
+                      <Botao variante="texto" disabled={buscandoEtiquetas} aria-label={`Dispensar o aviso do lote ${lote.codigo}`} onClick={() => dispensar(lote.loteId)}>Dispensar</Botao>
+                    </span>
+                    {impressao?.loteId === lote.loteId && impressao.erro && <>{' '}<strong>Não consegui buscar as etiquetas deste lote. {impressao.erro}</strong></>}
+                    {lote.avisos.length > 0 && (
+                      <ul aria-label="Avisos de insumo">
+                        {lote.avisos.map((a) => <li key={a}>{a}</li>)}
+                      </ul>
+                    )}
+                  </output>
+                ))}
+              </section>
+            )}
+
+            <form id={ID_DO_LOTE} className={grade.lote} aria-label="Lote de hoje" onSubmit={confirmar}>
+              <div>
+                <h3 className={css.tituloSecao}>Lote de hoje</h3>
+                <p className={css.detalhe}>
+                  {linhas.length === 0 ? 'Os pratos que você tocar aparecem aqui.' : 'Confira a validade e o peso antes de confirmar.'}
+                </p>
+              </div>
+              {erro && <p className={`${css.aviso} ${grade.aparecer}`} role="alert">{erro}</p>}
+              {linhas.length > 0 && (
+                <ol className={grade.itens}>
+                  {linhas.map((l, indice) => {
+                    const prato = pratos.find((p) => p.sku === l.sku)
+                    const porcoesDoPrato = prato?.porcoes ?? []
+                    const tamanho = porcoesDoPrato.length > 0 ? porcoesDoPrato.find((v) => v.id === l.variacaoId)?.rotulo : prato?.porcao
+                    const nome = nomeDoCartao({ nome: prato?.nome ?? 'Prato fora do cardápio', tamanho: tamanho ?? '' })
+                    const sobra = sobraDaLinha(paraEnviar(l))
+                    return (
+                      <li key={l.id} className={grade.itemDoLote}>
+                        <div className={grade.topoDoItem}>
+                          <span className={css.numeroPrato}>{String(indice + 1).padStart(2, '0')}</span>
+                          <h4 className={grade.nomeDoItem}>{nome}</h4>
+                          <Botao className={css.acaoDiscreta} variante="texto" icone="lixeira" aria-label={`Tirar ${nome} do lote`} disabled={enviando} onClick={() => tirar(l.id)} />
+                        </div>
+                        {porcoesDoPrato.length > 0 && (
+                          <CampoSelecao disabled={enviando} rotulo="Porção" value={l.variacaoId} onChange={escolherPorcao(l.id)}
+                            opcoes={[{ valor: '', rotulo: 'Escolha a porção' }, ...porcoesDoPrato.map((v) => ({ valor: v.id, rotulo: v.rotulo }))]} />
+                        )}
+                        <div className={grade.camposDoItem}>
+                          <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Porções" value={l.porcoes} onChange={mudar(l.id, 'porcoes')} />
+                          <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Validade (dias)" value={l.validadeDias} onChange={mudar(l.id, 'validadeDias')} />
+                        </div>
+                        <div className={grade.chips} role="radiogroup" aria-label={`Validade de ${nome}`}>
+                          {VALIDADES_RAPIDAS.map((dias) => (
+                            <Chip key={dias} papel="escolha" disabled={enviando} ativo={String(l.validadeDias).trim() === String(dias)} onClick={() => definirValidade(l.id, dias)}>
+                              {dias} dias
+                            </Chip>
+                          ))}
+                        </div>
+                        <div className={grade.camposDoItem}>
+                          <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Peso de cada porção (g)" placeholder="g por porção" value={l.pesoPorPorcaoG} onChange={mudar(l.id, 'pesoPorPorcaoG')} />
+                          <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Peso real total (g)" placeholder="Opcional" value={l.pesoRealG} onChange={mudar(l.id, 'pesoRealG')} />
+                        </div>
+                        {sobra != null && <p className={css.detalhe}>{sobra < 0 ? 'Peso real menor que as porções' : `Sobra ${sobra} g`}</p>}
+                      </li>
+                    )
+                  })}
+                </ol>
+              )}
+            </form>
+          </div>
         </div>
-        {erro && <p className={css.aviso} role="alert">{erro}</p>}
-      </form>
+
+        <div className={grade.barraDoLote}>
+          <p className={grade.resumoDoLote} aria-live="polite">
+            {resumo.pratos === 0 ? 'Nenhum prato no lote' : `${plural(resumo.porcoes, 'porção', 'porções')} · ${plural(resumo.pratos, 'prato', 'pratos')}`}
+          </p>
+          <div className={grade.acoesDoLote}>
+            <Botao variante="texto" disabled={enviando || linhas.length === 0} onClick={() => { setLinhas([]); setErro(null) }}>Limpar</Botao>
+            <Botao tipo="submit" form={ID_DO_LOTE} variante="primario" icone="check" disabled={enviando || linhas.length === 0}>{enviando ? 'Lançando…' : 'Confirmar produção'}</Botao>
+          </div>
+        </div>
+      </div>
 
       {impressao?.etiquetas && (
         <FolhaImpressao>

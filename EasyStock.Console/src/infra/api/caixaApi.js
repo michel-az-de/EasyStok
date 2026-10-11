@@ -4,7 +4,8 @@ import { chamarApi } from './cliente'
 // API (a mesma fonte do card do painel), nunca pelo console. A empresa sai do token.
 const BASE = '/api/caixa'
 
-export const obterCaixaDoDia = () => chamarApi(`${BASE}/dia`).then(caixaDiaDaApi)
+// Sem data, a API devolve o dia de hoje da loja. Com data (#1624), o resumo daquele dia.
+export const obterCaixaDoDia = (data = null) => chamarApi(`${BASE}/dia${data ? `?data=${data}` : ''}`).then(caixaDiaDaApi)
 
 export const listarFechamentos = (quantos = 7) =>
   chamarApi(`${BASE}/fechamentos?page=1&pageSize=${quantos}`).then((itens) => (itens ?? []).map(fechamentoDaApi))

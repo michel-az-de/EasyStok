@@ -71,7 +71,6 @@
 .cabecalhoFormulario .detalhe { margin-top: var(--e-1); }
 .listaFormularios { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-3); }
 .listaFormularios > .formulario { margin: 0; }
-.loteProducao { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .linhaReceita { grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); }
 .cadastroCurto { grid-template-columns: minmax(0, 1fr) auto; }
 .cadastroInsumo { grid-template-columns: minmax(0, 2fr) minmax(0, .7fr) minmax(0, 1fr) minmax(0, 1.3fr); }
@@ -95,7 +94,7 @@
   .linha > .resumo { flex-basis: 100%; }
   .campoQuantidade { width: 100%; }
   .formulario, .linha { padding: var(--e-16); }
-  .loteProducao, .linhaReceita { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .linhaReceita { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .linhaReceita > :first-child { grid-column: 1 / -1; }
   .cadastroCurto { grid-template-columns: minmax(0, 1fr); }
   .cadastroInsumo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -110,7 +109,7 @@
   .resumoOperacao dd { font-size: var(--t-titulo); }
   .resumoOperacao dt { font-size: var(--t-minimo); }
   .formulario, .linha { padding: var(--e-3); }
-  .loteProducao, .cadastroInsumo { grid-template-columns: minmax(0, 1fr); }
+  .cadastroInsumo { grid-template-columns: minmax(0, 1fr); }
   .resumo { flex-basis: 100%; }
   .estados { flex-basis: 100%; }
   .acoes > button { padding-inline: var(--e-2); }
