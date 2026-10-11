@@ -4,6 +4,7 @@ import {
 } from '../infra/api/kdsApi'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
 import { transicaoDaFila } from '../dominio/kds'
+import { criarRecargaDeAcao } from './recargaDeAcao'
 
 // Cozinha no modo API (F05). A fila vem do KDS sobre Pedido (S19) e recarrega a
 // cada evento de pedido do SSE de operação (S18). Com o SSE caído, a tela não
@@ -13,7 +14,6 @@ import { transicaoDaFila } from '../dominio/kds'
 // quem entrou, quem mudou de coluna e quem saiu, para a tela animar; e lê a fila de
 // impressão da API (S20), que a aba da Cozinha consome como a gaveta do protótipo.
 // O canhoto em si é o PDF de 80 mm do protótipo, montado na tela (`features/cozinha`).
-const ESPERA_RECARGA_MS = 300
 const POLLING_SEM_SSE_MS = 15000
 const RECONECTAR_MS = 10000
 const RECARREGA_COM = (evento) => evento === 'ready' || evento.startsWith('pedido.') || evento.startsWith('impressao.')
@@ -56,6 +56,7 @@ export function useCozinhaApi({ data = null } = {}) {
   const vivoRef = useRef(true)
   const anteriorRef = useRef(null)
   const timersRef = useRef(new Set())
+  const recargaRef = useRef(null)
 
   const depois = useCallback((ms, fazer) => {
     const t = setTimeout(() => {
@@ -113,26 +114,27 @@ export function useCozinhaApi({ data = null } = {}) {
     setMudaram(new Set())
     const timers = timersRef.current
     let fechar = () => {}
-    let espera = null
     let reconexao = null
     let polling = null
+    let noAr = false
+    // #1577: o evento da própria ação já relê a fila; a ação não relê de novo na resposta.
+    const recarga = criarRecargaDeAcao({ recarregar: () => recarregar(), aoVivo: () => noAr })
+    recargaRef.current = recarga
 
-    const agendarRecarga = () => {
-      clearTimeout(espera)
-      espera = setTimeout(recarregar, ESPERA_RECARGA_MS)
-    }
     const conectar = () => {
       fechar = conectarEventosOperacao({
         aoEvento: ({ evento }) => {
           if (evento === 'ready') {
+            noAr = true
             setAoVivo(true)
             clearInterval(polling)
             polling = null
           }
-          if (RECARREGA_COM(evento)) agendarRecarga()
+          if (RECARREGA_COM(evento)) recarga.aoEvento()
         },
         aoCair: () => {
           if (!vivoRef.current) return
+          noAr = false
           setAoVivo(false)
           if (!polling) polling = setInterval(recarregar, POLLING_SEM_SSE_MS)
           reconexao = setTimeout(conectar, RECONECTAR_MS)
@@ -145,7 +147,7 @@ export function useCozinhaApi({ data = null } = {}) {
     return () => {
       vivoRef.current = false
       fechar()
-      clearTimeout(espera)
+      recarga.desligar()
       clearTimeout(reconexao)
       clearInterval(polling)
       timers.forEach(clearTimeout)
@@ -153,15 +155,17 @@ export function useCozinhaApi({ data = null } = {}) {
     }
   }, [recarregar, geracao])
 
-  // Um toque (ou um soltar): a chamada vai, o cartão fica "movendo" até a API responder; a
-  // lista nova chega pela resposta e pelo `pedido.mudou_status` do SSE.
+  // Um toque (ou um soltar): a chamada vai e o cartão fica "movendo" até a fila nova chegar, pelo
+  // `pedido.mudou_status` do SSE; sem ele (caído, ou mudo por 2 s), pela releitura da própria ação.
   const avancar = useCallback((id, status) => {
     setMovendo((s) => comId(s, id, true))
+    const recarga = recargaRef.current
+    const marca = recarga.marcar()
     return mudarStatusKds(id, status)
-      .then(() => recarregar())
+      .then(() => recarga.depoisDaAcao(marca))
       .catch((e) => setErro(`O pedido não mudou: ${e.message}`))
       .finally(() => setMovendo((s) => comId(s, id, false)))
-  }, [recarregar])
+  }, [])
 
   const reimprimir = useCallback((id) => reimprimirCanhoto(id)
     .then(() => recarregarImpressoes())
