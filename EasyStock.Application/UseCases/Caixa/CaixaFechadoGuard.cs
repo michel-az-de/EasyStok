@@ -14,9 +14,17 @@ public static class CaixaFechadoGuard
     public static async Task ExigirDiaAbertoAsync(ICaixaRepository caixa, Guid empresaId, DateTime instanteUtc,
         Guid? lojaId, string mensagem)
     {
-        if ((await FechamentosQueRetratamAsync(caixa, empresaId, instanteUtc, lojaId)).Count > 0)
+        if (await DiaFechadoAsync(caixa, empresaId, instanteUtc, lojaId))
             throw new UseCaseValidationException(mensagem);
     }
+
+    /// <summary>
+    /// #1598: a mesma regra para quem não recusa, só decide o que fazer com o dia já retratado
+    /// (não tocar o movimento, não abrir o Caixa de novo).
+    /// </summary>
+    public static async Task<bool> DiaFechadoAsync(ICaixaRepository caixa, Guid empresaId, DateTime instanteUtc,
+        Guid? lojaId) =>
+        (await FechamentosQueRetratamAsync(caixa, empresaId, instanteUtc, lojaId)).Count > 0;
 
     /// <summary>
     /// Remover ou desfazer um recebimento: só recusa o que o fechamento do dia retratou. Recebimento

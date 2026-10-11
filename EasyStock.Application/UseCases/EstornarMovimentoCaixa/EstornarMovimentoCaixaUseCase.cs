@@ -32,10 +32,8 @@ public class EstornarMovimentoCaixaUseCase(
             throw new UseCaseValidationException("Somente movimentos de entrada ou saída podem ser estornados.");
 
         // Bloquear estorno se o dia já foi fechado.
-        var data = HorarioBrasil.DataOperacional(mov.DataMovimento);
-        var fechamento = await repo.GetFechamentoDoDiaAsync(mov.EmpresaId, data, mov.LojaId);
-        if (fechamento != null)
-            throw new UseCaseValidationException("Não é possível estornar movimento de dia já fechado.");
+        await CaixaFechadoGuard.ExigirDiaAbertoAsync(repo, mov.EmpresaId, mov.DataMovimento, mov.LojaId,
+            "Não é possível estornar movimento de dia já fechado.");
 
         mov.Estornar(cmd.UsuarioId, cmd.UsuarioNome, cmd.Motivo);
         await repo.UpdateMovimentoAsync(mov);

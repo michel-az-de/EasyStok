@@ -39,9 +39,8 @@ public class RegistrarMovimentoCaixaUseCase(
         var data = HorarioBrasil.DataOperacional(dataMov);    // dia operacional em Brasilia (alinha com o card; BUG-09)
 
         // Bloquear lançamento em dia já fechado (preserva integridade do snapshot).
-        var fechamento = await repo.GetFechamentoDoDiaAsync(cmd.EmpresaId, data, cmd.LojaId);
-        if (fechamento != null)
-            throw new UseCaseValidationException("Caixa do dia já foi fechado. Lance em outra data ou faça estorno.");
+        await CaixaFechadoGuard.ExigirDiaAbertoAsync(repo, cmd.EmpresaId, dataMov, cmd.LojaId,
+            "Caixa do dia já foi fechado. Lance em outra data ou faça estorno.");
 
         // FIN-003: saída interativa (não-mobile) exige rastro de auditoria e não pode estourar o
         // saldo do dia — caixa físico não fica negativo. O mobile promove fatos já registrados no
