@@ -383,7 +383,10 @@ function Gerir({
                       />
                       Hoje
                     </label>
-                    {item.estoque != null ? <span className={css.saldo}>
+                    {item.estoque != null && (item.porcoes ?? []).length > 0 ? (
+                      // #1542: o saldo é de cada porção; um toque aqui não diz qual.
+                      <span className={css.semSaldo}>{item.estoque} no total. Acerte por porção em Estoque do dia.</span>
+                    ) : item.estoque != null ? <span className={css.saldo}>
                       <button
                         type="button"
                         onClick={() => aoAjustar(item.sku, -1)}

@@ -10,8 +10,9 @@ const ITEM = (id) => `${CARDAPIO}/${id}`
 export const definirDisponibilidade = (id, disponivel) =>
   chamarApi(`${ITEM(id)}/disponivel`, { metodo: 'POST', corpo: { disponivel } })
 
-export const ajustarSaldoDoItem = (id, quantidadeContada, motivo) =>
-  chamarApi(`${ITEM(id)}/saldo`, { metodo: 'POST', corpo: { quantidadeContada, motivo } })
+// `porcao` (#1542): `{ variacaoId }` ou `{ semPorcao: true }` em prato com porções; sem ela, o prato inteiro.
+export const ajustarSaldoDoItem = (id, quantidadeContada, motivo, porcao = null) =>
+  chamarApi(`${ITEM(id)}/saldo`, { metodo: 'POST', corpo: { quantidadeContada, motivo, ...(porcao ?? {}) } })
 
 const LINHA_DA_API = { servir: 'ParaServir', casa: 'PrepararEmCasa' }
 

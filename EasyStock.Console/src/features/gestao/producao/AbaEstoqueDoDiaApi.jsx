@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
-import { CampoTexto } from '../../../componentes/Campo'
+import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useEstoqueDoDiaApi } from '../../../aplicacao/useEstoqueDoDiaApi'
+import { contagemInicial, porcaoSugerida, porcoesParaAjuste, vencidasNaContagem } from '../../../aplicacao/estoqueDoDia'
 import css from '../cardapio/abaCardapio.module.css'
 
 // M2 › Estoque do dia (M2.1, #1490). O que a Thati usa todo dia, lido do EasyStok: os alertas de
 // venda sem saldo (avisa, não trava; RN-48), o saldo em porções por prato e os lotes com o
 // vencimento destacado (US-065). "Ajustar" é a contagem dela com o motivo e fecha o alerta.
+// Em prato com porções (#1542) a contagem é de uma porção: o saldo é dela.
 const porcoes = (n) => (n === 1 ? '1 porção' : `${n} porções`)
+const saldoDaPorcao = (s) => `${s.rotulo}: ${s.saldo}${s.descoberto > 0 ? ` (${s.descoberto} sem saldo)` : ''}`
 const dataCurta = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : 'sem validade')
 
 function quandoVence(lote) {
@@ -21,19 +24,40 @@ function quandoVence(lote) {
 }
 
 function FormularioAjuste({ alvo, aoSalvar, aoCancelar, aviso, aoFecharAviso }) {
-  const [contagem, setContagem] = useState(String(alvo.saldo ?? ''))
+  const opcoes = porcoesParaAjuste(alvo)
+  const porPorcao = opcoes.length > 0
+  const [porcao, setPorcao] = useState(() => porcaoSugerida(opcoes))
+  // O que está sendo contado: a porção escolhida ou, sem porções, o prato.
+  const contado = porPorcao ? opcoes.find((s) => s.chave === porcao) ?? null : alvo
+  const [contagem, setContagem] = useState(() => String(contagemInicial(contado)))
   const [motivo, setMotivo] = useState('')
   const [salvando, setSalvando] = useState(false)
+  const vencidas = vencidasNaContagem(contado)
+
+  const trocarPorcao = (evento) => {
+    const chave = evento.target.value
+    setPorcao(chave)
+    setContagem(String(contagemInicial(opcoes.find((s) => s.chave === chave) ?? null)))
+  }
 
   const salvar = (evento) => {
     evento.preventDefault()
     if (salvando) return
     setSalvando(true)
-    Promise.resolve(aoSalvar(contagem, motivo)).then((ok) => { if (ok !== false) aoCancelar() }).finally(() => setSalvando(false))
+    Promise.resolve(aoSalvar(contagem, motivo, { porcoes: opcoes, porcao }))
+      .then((ok) => { if (ok !== false) aoCancelar() }).finally(() => setSalvando(false))
   }
 
   return (
     <form className={`${css.campos} ${css.formulario} ${css.ajusteEstoque}`} onSubmit={salvar}>
+      {porPorcao && (
+        <div className={css.linhaCompleta}>
+          <CampoSelecao rotulo="Porção contada" value={porcao} disabled={salvando} onChange={trocarPorcao}
+            dica="O saldo deste prato é de cada porção. Conte uma de cada vez."
+            opcoes={[{ valor: '', rotulo: 'Escolha a porção que você contou' },
+              ...opcoes.map((s) => ({ valor: s.chave, rotulo: `${s.rotulo} (tem ${s.fisico} guardadas)` }))]} />
+        </div>
+      )}
       <CampoTexto
         rotulo="Porções contadas"
         inputMode="numeric"
@@ -51,13 +75,17 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar, aviso, aoFecharAviso }) 
         disabled={salvando}
         onChange={(e) => setMotivo(e.target.value)}
       />
+      {vencidas > 0 && <p className={`${css.detalhe} ${css.linhaCompleta}`}>
+        A contagem inclui {vencidas === 1 ? '1 vencida' : `${vencidas} vencidas`} que ainda {vencidas === 1 ? 'está guardada' : 'estão guardadas'}.
+        {' '}Conte tudo o que está na prateleira; para tirar as vencidas, lance em Perdas.
+      </p>}
       {aviso && <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">
         Não foi possível salvar a contagem. {aviso}
         {' '}<Botao variante="texto" onClick={aoFecharAviso}>Fechar aviso</Botao>
       </p>}
       <div className={css.rodapeForm}>
         <Botao variante="texto" disabled={salvando} onClick={aoCancelar}>Cancelar</Botao>
-        <Botao tipo="submit" variante="primario" icone="check" disabled={salvando || !motivo.trim() || contagem === ''}>{salvando ? 'Salvando…' : 'Salvar contagem'}</Botao>
+        <Botao tipo="submit" variante="primario" icone="check" disabled={salvando || !motivo.trim() || contagem === '' || (porPorcao && !contado)}>{salvando ? 'Salvando…' : 'Salvar contagem'}</Botao>
       </div>
     </form>
   )
@@ -73,10 +101,10 @@ export function AbaEstoqueDoDiaApi() {
     setAvisoDaContagem(null)
     setAjustando(alvo)
   }
-  const salvarContagem = (alvo, sku, contagem, motivo) => {
+  const salvarContagem = (alvo, sku, contagem, motivo, porcao) => {
     estoque.fecharAviso()
     setAvisoDaContagem(alvo)
-    return estoque.ajustar(sku, contagem, motivo)
+    return estoque.ajustar(sku, contagem, motivo, porcao)
   }
 
   if (estoque.estado === 'carregando') return <output className={css.descricao}>Carregando o estoque…</output>
@@ -89,7 +117,8 @@ export function AbaEstoqueDoDiaApi() {
     )
   }
 
-  const saldoDe = (sku) => estoque.pratos.find((p) => p.sku === sku)?.saldo ?? 0
+  // O alerta é do produto; o que se conta (porções, guardado, vencidas) vem do prato dele.
+  const pratoDoAlerta = (a) => ({ saldo: 0, fisico: 0, porcoes: [], ...estoque.pratos.find((p) => p.sku === a.sku), nome: a.nome })
   const lotes = estoque.pratos
     .flatMap((p) => p.lotes.map((l) => ({ ...l, prato: p.nome })))
     .sort((a, b) => (a.validade ?? '9999').localeCompare(b.validade ?? '9999'))
@@ -120,8 +149,8 @@ export function AbaEstoqueDoDiaApi() {
                 </div>
                 {ajustando === a.produtoId ? (
                   <FormularioAjuste
-                    alvo={{ nome: a.nome, saldo: saldoDe(a.sku) }}
-                    aoSalvar={(contagem, motivo) => salvarContagem(a.produtoId, a.sku, contagem, motivo)}
+                    alvo={pratoDoAlerta(a)}
+                    aoSalvar={(contagem, motivo, porcao) => salvarContagem(a.produtoId, a.sku, contagem, motivo, porcao)}
                     aoCancelar={() => trocarAjuste(null)}
                     aviso={avisoNoFormulario ? estoque.aviso : null}
                     aoFecharAviso={estoque.fecharAviso}
@@ -148,7 +177,7 @@ export function AbaEstoqueDoDiaApi() {
                 <div className={css.resumo}>
                   <span className={css.nome}>{p.nome}</span>
                   <span className={css.detalhe}>
-                    {p.porcoes.length > 0 ? p.porcoes.map((s) => `${s.rotulo}: ${s.saldo}`).join(' · ') : p.porcao}
+                    {p.porcoes.length > 0 ? p.porcoes.map(saldoDaPorcao).join(' · ') : p.porcao}
                   </span>
                 </div>
                 <span className={css.preco}>{porcoes(p.saldo)}</span>
@@ -160,7 +189,7 @@ export function AbaEstoqueDoDiaApi() {
                 {ajustando === p.sku ? (
                   <FormularioAjuste
                     alvo={p}
-                    aoSalvar={(contagem, motivo) => salvarContagem(p.sku, p.sku, contagem, motivo)}
+                    aoSalvar={(contagem, motivo, porcao) => salvarContagem(p.sku, p.sku, contagem, motivo, porcao)}
                     aoCancelar={() => trocarAjuste(null)}
                     aviso={avisoNoFormulario ? estoque.aviso : null}
                     aoFecharAviso={estoque.fecharAviso}
