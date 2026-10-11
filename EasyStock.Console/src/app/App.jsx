@@ -41,7 +41,7 @@ import { ModalAutomacoes } from '../features/automacoes/ModalAutomacoes'
 import { ModalGestao, PainelDeAjuste } from '../features/gestao/ModalGestao'
 import { HallDeModulos } from '../features/hall/HallDeModulos'
 import { PainelAgora } from '../features/agora/PainelAgora'
-import { filasDoAgora } from '../dominio/agora'
+import { avisoDeResponder, filasDoAgora } from '../dominio/agora'
 import { hashDoModulo } from '../dominio/modulos'
 import { MolduraDoModulo } from '../features/hall/MolduraDoModulo'
 import { GavetaEntregas } from '../features/entregas/GavetaEntregas'
@@ -144,7 +144,7 @@ function Composicao({ rota, aoSair }) {
       key={selecionada.id}
       passouParaVoce={precisaDeVoce(selecionada, agora, true, aberta, janelas, horarioDaLoja)}
       bloqueada={envioBloqueado(selecionada, agora, canalDaConversa(canais, selecionada))}
-      modo={modoAgente}
+      modo={FONTE_API ? 'api' : modoAgente}
       estado={agente.conversaId === selecionada.id ? agente.estado : 'ocioso'}
       sugestao={agente.conversaId === selecionada.id ? agente.sugestao : null}
       erro={agente.conversaId === selecionada.id ? agente.erro : null}
@@ -341,13 +341,14 @@ function TelaDaRota({ rota, aoSair }) {
 // (`traducaoConversas.js`), então Cozinhar e Despachar só aparecem na demonstração: fila que
 // marcasse zero com pedido no fogo mentiria. Responder vale nos dois modos.
 function AgoraDoHall() {
-  const { conversas, agora, aberta, horarioDaLoja, automaticoPausado } = useAtendimento()
+  const { conversas, agora, aberta, horarioDaLoja, automaticoPausado, sincronizacao } = useAtendimento()
   const { selecionar } = useAcoes()
   const { janelas } = useCatalogo()
   const { permite } = useAcessoModulos()
   const filas = filasDoAgora(conversas, agora, { automaticoPausado, aberta, janelas, expediente: horarioDaLoja })
   return (
     <PainelAgora filas={filas}
+      avisoResponder={avisoDeResponder({ fonteApi: FONTE_API, estado: sincronizacao.estado, total: conversas.length })}
       podeVer={{ atendimento: permite('atendimento'), cozinha: !FONTE_API && permite('cozinha'), entregas: !FONTE_API && permite('entregas') }}
       aoAbrirConversa={(id) => { selecionar(id); window.location.hash = hashDoModulo('atendimento', 'balcao') }} />
   )

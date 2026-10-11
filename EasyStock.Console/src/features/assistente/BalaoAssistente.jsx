@@ -157,7 +157,10 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela }) {
       {aberto && (
         <section className={css.painel} id={painelId} role="dialog" aria-modal="false" aria-labelledby={tituloId} tabIndex={-1} ref={painelRef}>
           <div className={css.cabecalho}>
-            <h2 id={tituloId}><Icone nome="agente" /> Assistente</h2>
+            <div className={css.identidade}>
+              <h2 id={tituloId}><Icone nome="agente" /> Assistente</h2>
+              {selecionada && <p className={css.clienteDoPainel}>{selecionada.nome}</p>}
+            </div>
             {/* "Fechar" sozinho, não "Fechar assistente": o gatilho já usa esse
                 rótulo (alterna Abrir/Fechar assistente), e o landmark
                 aria-label="Assistente" do painel já dá o contexto para quem
@@ -178,7 +181,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela }) {
 
             {selecionada && (
               <>
-                <p className={css.contexto}>Conversa com <strong>{selecionada.nome}</strong>. As sugestões ficam aqui até você escolher uma ação.</p>
+                <p className={css.contexto}>Revise as sugestões. Cada ação só acontece quando você confirma.</p>
                 <div className={css.cartoes}>
                   {cliente && !dispensados.has('cliente') && (
                     <CartaoCliente dado={cliente} aoDispensar={(e) => dispensar('cliente', e)} />
@@ -208,8 +211,9 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela }) {
                     <div className={css.trocas}>
                       {trocas.map((t) => (
                         <div key={t.id} className={css.troca}>
-                          <p className={css.perguntaDaThatiane}>{t.pergunta}</p>
-                          {t.resposta && <p className={css.respostaDoAssistente}>{t.resposta}</p>}
+                          <div className={css.perguntaDaThatiane}><span className={css.autor}>Você</span><p>{t.pergunta}</p></div>
+                          {t.resposta && <div className={css.respostaDoAssistente}><span className={css.autor}>Assistente</span><p>{t.resposta}</p></div>}
+                          {t.acoes.length > 0 && <p className={css.tituloAcoes}>Ações para confirmar</p>}
                           <AcoesPropostas
                             acoes={t.acoes}
                             nomeCliente={selecionada.nome}
@@ -231,35 +235,37 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela }) {
                       ))}
                     </div>
                   )}
-                  <form className={css.formPergunta} onSubmit={enviarPergunta}>
-                    <CampoArea
-                      ref={campoRef}
-                      rotulo="Pergunte ao assistente sobre esta conversa"
-                      rotuloOculto
-                      className={css.campoPergunta}
-                      value={pergunta}
-                      onChange={(e) => setPergunta(e.target.value)}
-                      placeholder="Ex.: sugira uma resposta ou prepare uma nota"
-                      rows={2}
-                      maxLength={2000}
-                      dica="Ctrl+Enter para perguntar. Enter cria uma nova linha."
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent?.isComposing) enviarPergunta(e)
-                      }}
-                    />
-                    <Botao
-                      tipo="submit"
-                      variante="primario"
-                      className={css.botaoEnviar}
-                      icone="enviar"
-                      aria-label="Perguntar"
-                      disabled={perguntando || !pergunta.trim()}
-                    />
-                  </form>
                 </div>
               </>
             )}
           </div>
+          {selecionada && (
+            <form className={css.formPergunta} onSubmit={enviarPergunta} aria-busy={perguntando}>
+              <CampoArea
+                ref={campoRef}
+                rotulo="Pergunte ao assistente sobre esta conversa"
+                rotuloOculto
+                className={css.campoPergunta}
+                value={pergunta}
+                onChange={(e) => setPergunta(e.target.value)}
+                placeholder="Ex.: sugira uma resposta ou prepare uma nota"
+                rows={2}
+                maxLength={2000}
+                dica="Ctrl+Enter para perguntar. Enter cria uma nova linha."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent?.isComposing) enviarPergunta(e)
+                }}
+              />
+              <Botao
+                tipo="submit"
+                variante="primario"
+                className={css.botaoEnviar}
+                icone="enviar"
+                aria-label="Perguntar"
+                disabled={perguntando || !pergunta.trim()}
+              />
+            </form>
+          )}
         </section>
       )}
     </>
