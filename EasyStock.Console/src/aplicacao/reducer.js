@@ -53,6 +53,7 @@ import { casosFidelidade } from './casos/fidelidade'
 import { FUNCIONAMENTO_PADRAO } from '../dominio/funcionamento'
 import { REGRA_FIDELIDADE_PADRAO, pontosGanhosNoPedido } from '../dominio/fidelidade'
 import { FIDELIDADE_SEMENTE } from '../infra/fidelidadeSemente'
+import { mesmoConteudo } from './igualdade'
 
 export const ATENDENTE = 'Thatiane'
 
@@ -200,13 +201,18 @@ function comMensagem(conversa, mensagem, { id, agora }) {
 // porque a leitura em voo pode ter saído antes de o servidor gravá-la.
 const mensagemSoLocal = (m) => m.status === 'enviando' || m.status === 'falhou' || Boolean(m.aguardandoSync)
 
+// #1565: o pedido relido igual fica o mesmo objeto na tela, com a `leitura` de quando entrou. A ordem da
+// releitura mais nova que o confirmou fica aqui, para a regra da #1548 continuar valendo.
+const confirmadoNaLeitura = new WeakMap()
+const leituraDe = (pedido) => (pedido ? Math.max(pedido.leitura ?? -Infinity, confirmadoNaLeitura.get(pedido) ?? -Infinity) : undefined)
+
 // F03: sem pedido no servidor, a comanda que a dona monta (rascunho) fica. Com pedido, o do
 // servidor manda, inclusive a vaga de entrega; o meio escolhido na tela vem junto.
 // Pedido anterior já entregue ou cancelado não apaga a comanda nova que ela está montando.
 function pedidoMesclado(local, doServidor) {
   if (!doServidor) return local ?? null
   // #1548: leitura que saiu antes da que já está na tela chegou atrasada e não desfaz a mais nova.
-  if (local?.leitura > doServidor.leitura) return local
+  if (leituraDe(local) > doServidor.leitura) return local
   const rascunho = Boolean(local) && !local.pedidoId
   if (rascunho && pedidoEncerrado(doServidor)) return local
   if (!local || (!rascunho && local.pedidoId !== doServidor.pedidoId)) return doServidor
@@ -216,25 +222,36 @@ function pedidoMesclado(local, doServidor) {
   }
 }
 
+const mesmaLista = (a, b) => a.length === b.length && a.every((item, i) => item === b[i])
+
 // O resumo da inbox não traz o cadastro; o cliente lido do EasyStok (#1276) fica enquanto
 // a conversa seguir com o mesmo cliente.
 const clienteDaApiMantido = (local, doServidor) =>
   local.cliente?.daApi && local.clienteId && local.clienteId === doServidor.clienteId
 
+// #1565: `leitura` é só a ordem em que a consulta saiu; o mesmo pedido relido não é mudança.
+const mesmoPedido = (a, b) => Boolean(a) && Boolean(b) && mesmoConteudo({ ...a, leitura: null }, { ...b, leitura: null })
+
+// #1565: a polling relê a cada 5 s. Leitura igual à que já está na tela devolve a MESMA conversa, para a
+// tela parada não re-renderizar inteira.
 function mesclarDoServidor(local, doServidor) {
   if (!local) return doServidor
   const doServidorIds = new Set(doServidor.mensagens.map((m) => m.id))
   const soLocais = local.mensagens.filter((m) => mensagemSoLocal(m) && !doServidorIds.has(m.id))
   const mantido = clienteDaApiMantido(local, doServidor)
   const rascunhoDoNome = local.nomeDaDona && !doServidor.clienteId
-  return {
+  const lido = pedidoMesclado(local.pedido, doServidor.pedido)
+  const pedido = mesmoPedido(local.pedido, lido) ? local.pedido : lido
+  if (pedido !== lido && lido.leitura > leituraDe(pedido)) confirmadoNaLeitura.set(pedido, lido.leitura)
+  const mesclada = {
     ...local,
     ...doServidor,
     ...(mantido ? { nome: local.nome, cliente: local.cliente } : {}),
     ...(rascunhoDoNome ? { nome: local.nome, nomeDaDona: true } : {}),
-    pedido: pedidoMesclado(local.pedido, doServidor.pedido),
+    pedido,
     mensagens: [...doServidor.mensagens, ...soLocais],
   }
+  return mesmoConteudo(local, mesclada) ? local : mesclada
 }
 
 const CASOS_API = {
@@ -248,21 +265,22 @@ const CASOS_API = {
   }),
   [acao.SINCRONIZAR_CONVERSAS]: (estado, { conversas }) => {
     const locais = new Map(estado.conversas.map((c) => [c.id, c]))
-    const mescladas = conversas.map((c) => mesclarDoServidor(locais.get(c.id), c))
+    const lidas = conversas.map((c) => mesclarDoServidor(locais.get(c.id), c))
+    const mescladas = mesmaLista(estado.conversas, lidas) ? estado.conversas : lidas
     const aindaExiste = mescladas.some((c) => c.id === estado.selecionadaId)
-    return {
-      ...estado,
-      conversas: mescladas,
-      selecionadaId: aindaExiste ? estado.selecionadaId : (mescladas[0]?.id ?? null),
-      automaticoPausado: Object.fromEntries(
-        mescladas.map((c) => [c.id, c.pausaApi ?? false]),
-      ),
-      // O aviso de ação recusada fica até a dona fechar (F06): o ciclo de 5 s não o apaga.
-      sincronizacao: {
-        estado: 'ok', mensagem: null, em: Date.now(),
-        aviso: estado.sincronizacao?.aviso ?? null, avisoFixo: estado.sincronizacao?.avisoFixo ?? null,
-      },
+    const selecionadaId = aindaExiste ? estado.selecionadaId : (mescladas[0]?.id ?? null)
+    const pausas = Object.fromEntries(mescladas.map((c) => [c.id, c.pausaApi ?? false]))
+    const automaticoPausado = mesmoConteudo(estado.automaticoPausado, pausas) ? estado.automaticoPausado : pausas
+    // O aviso de ação recusada fica até a dona fechar (F06): o ciclo de 5 s não o apaga.
+    const emDia = estado.sincronizacao?.estado === 'ok' && estado.sincronizacao.mensagem == null
+    const sincronizacao = emDia ? estado.sincronizacao : {
+      estado: 'ok', mensagem: null,
+      aviso: estado.sincronizacao?.aviso ?? null, avisoFixo: estado.sincronizacao?.avisoFixo ?? null,
     }
+    // #1565: volta sem novidade devolve o mesmo estado; o Provider não recalcula nem a tela re-renderiza.
+    if (mescladas === estado.conversas && selecionadaId === estado.selecionadaId
+      && automaticoPausado === estado.automaticoPausado && sincronizacao === estado.sincronizacao) return estado
+    return { ...estado, conversas: mescladas, selecionadaId, automaticoPausado, sincronizacao }
   },
 
   // #1276: cliente da conversa como o EasyStok tem (cadastro pelo console ou dossiê ao abrir).

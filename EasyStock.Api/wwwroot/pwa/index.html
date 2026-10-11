@@ -16764,6 +16764,10 @@ function findAnyByCode(code) {
 // Pra abrir: openScanner('busca' | 'tela').
 let scannerStream = null;
 let scannerRaf = null;
+let scannerDetector = null;
+// Sobe a cada fechar: laco e timer de uma abertura anterior nao mexem na seguinte.
+let scannerGeracao = 0;
+const SCAN_INTERVALO_MS = 100;
 let scannerActive = false;
 let scannerOrigin = null;
 // Ring buffer dos ultimos erros do BarcodeDetector — antes era catch{} mudo,
@@ -17011,35 +17015,9 @@ async function openScanner(origin) {
     } else {
       statusEl.textContent = 'Lendo: ' + fmtScanFormatsLabel(active);
     }
-    const detector = new window.BarcodeDetector({ formats: active });
+    scannerDetector = new window.BarcodeDetector({ formats: active });
     _scannerConsecutiveErrors = 0;
-    const detectLoop = async () => {
-      if (!scannerActive) return;
-      try {
-        const codes = await detector.detect(video);
-        _scannerConsecutiveErrors = 0;
-        if (codes && codes.length > 0) {
-          const c = codes[0];
-          handleScannedCode(c.rawValue, c.format);
-          return;
-        }
-      } catch (e) {
-        // Frames isolados podem falhar legitimamente (autofocus, frame
-        // truncado). Mas se cair em sequencia, tem algo de errado: cam
-        // ocupada por outro app, permissao revogada mid-scan, OOM.
-        recordCameraError((e && e.message) || String(e));
-        _scannerConsecutiveErrors++;
-        if (_scannerConsecutiveErrors >= 5) {
-          statusEl.className = 'scan-status error';
-          statusEl.textContent = 'Câmera com erro · veja Diagnóstico';
-          // Fecha apos 1.5s pra operador ler a mensagem
-          setTimeout(function () { if (scannerActive) closeScanner(); }, 1500);
-          return;
-        }
-      }
-      scannerRaf = requestAnimationFrame(detectLoop);
-    };
-    detectLoop();
+    startScanLoop();
   } catch (err) {
     statusEl.className = 'scan-status error';
     const msg = (err && err.message) || String(err);
@@ -17051,10 +17029,60 @@ async function openScanner(origin) {
   }
 }
 
+// Laco de leitura do scanner (#1565). Ao achar um codigo ele para e zera `scannerRaf`:
+// handleScannedCode fecha o scanner ou, se o codigo nao bate, religa por aqui. Com o id antigo
+// no ar o religar nunca rodava e a camera ficava ligada sem ler nada.
+// detect() roda no maximo a cada SCAN_INTERVALO_MS: a cada quadro (60/s) gastava bateria a toa.
+function startScanLoop() {
+  const video = document.getElementById('scannerVideo');
+  const statusEl = document.getElementById('scannerStatus');
+  const detector = scannerDetector;
+  const geracao = scannerGeracao;
+  let ultimaLeitura = 0;
+  const loop = async () => {
+    if (geracao !== scannerGeracao) return;
+    if (!scannerActive) { scannerRaf = null; return; }
+    const agora = Date.now();
+    if (agora - ultimaLeitura >= SCAN_INTERVALO_MS) {
+      ultimaLeitura = agora;
+      try {
+        const codes = await detector.detect(video);
+        if (geracao !== scannerGeracao) return;
+        if (!scannerActive) { scannerRaf = null; return; }
+        _scannerConsecutiveErrors = 0;
+        if (codes && codes.length > 0 && codes[0].rawValue) {
+          scannerRaf = null;
+          handleScannedCode(codes[0].rawValue, codes[0].format);
+          return;
+        }
+      } catch (e) {
+        if (geracao !== scannerGeracao) return;
+        // Frames isolados podem falhar legitimamente (autofocus, frame
+        // truncado). Mas se cair em sequencia, tem algo de errado: cam
+        // ocupada por outro app, permissao revogada mid-scan, OOM.
+        recordCameraError((e && e.message) || String(e));
+        _scannerConsecutiveErrors++;
+        if (_scannerConsecutiveErrors >= 5) {
+          scannerRaf = null;
+          statusEl.className = 'scan-status error';
+          statusEl.textContent = 'Câmera com erro · veja Diagnóstico';
+          // Fecha apos 1.5s pra operador ler a mensagem
+          setTimeout(function () { if (scannerActive) closeScanner(); }, 1500);
+          return;
+        }
+      }
+    }
+    scannerRaf = requestAnimationFrame(loop);
+  };
+  loop();
+}
+
 function closeScanner() {
   scannerActive = false;
   if (scannerRaf) cancelAnimationFrame(scannerRaf);
   scannerRaf = null;
+  scannerDetector = null;
+  scannerGeracao++;
   const video = document.getElementById('scannerVideo');
   if (video) { try { video.pause(); } catch (e) {} video.srcObject = null; }
   if (scannerStream) {
@@ -17102,26 +17130,14 @@ function handleScannedCode(rawValue, format) {
   // Não achou — não fecha; continua tentando.
   statusEl.className = 'scan-status error';
   statusEl.textContent = (fmtLabel ? '['+fmtLabel+'] ' : '') + 'Código "' + candidate + '" não bate com pedido ou lote deste aparelho';
+  const geracao = scannerGeracao;
   setTimeout(async () => {
-    if (!scannerActive) return;
+    if (!scannerActive || geracao !== scannerGeracao) return;
     statusEl.className = 'scan-status';
     const active = await getActiveScanFormats();
+    if (!scannerActive || geracao !== scannerGeracao) return;
     statusEl.textContent = 'Lendo: ' + fmtScanFormatsLabel(active);
-    if (!scannerRaf) {
-      const video = document.getElementById('scannerVideo');
-      if (video && video.srcObject) {
-        const detector = new window.BarcodeDetector({ formats: active });
-        const loop = async () => {
-          if (!scannerActive) return;
-          try {
-            const codes = await detector.detect(video);
-            if (codes && codes.length > 0) { handleScannedCode(codes[0].rawValue, codes[0].format); return; }
-          } catch (e) {}
-          scannerRaf = requestAnimationFrame(loop);
-        };
-        loop();
-      }
-    }
+    if (!scannerRaf && scannerStream && scannerDetector) startScanLoop();
   }, 1500);
 }
 function _clearConferInputs() {

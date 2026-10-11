@@ -97,10 +97,18 @@ const comoJson = (texto) => {
 // `texto`: página pronta fora do envelope (canhoto HTML da S20); devolve o corpo cru.
 // `arquivo`: binário fora do envelope (mídia da conversa, #1287); devolve o Blob.
 // `chave` (#1491): Idempotency-Key das rotas que criam algo caro de duplicar (produção, pedido).
+// #1565: leitura sem prazo ficava pendurada em rede ruim; a polling de 5 s parava calada e as de intervalo
+// fixo empilhavam requisição. Arquivo (mídia, PDF) pode demorar e fica sem prazo, como as escritas.
+// O prazo estourado tem código próprio: a internet pode estar lá, então não é a queda que liga o papel.
+const PRAZO_DE_LEITURA_MS = 20000
+const semResposta = () => new ErroApi(0, 'SEM_RESPOSTA', 'O EasyStok demorou a responder.')
+
 export async function chamarApi(caminho, {
   metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null, sinal,
 } = {}) {
   const sessao = autenticado ? await garantirSessao() : null
+  // Conta a partir daqui: a renovação da sessão não gasta o prazo da leitura.
+  const prazo = !sinal && metodo === 'GET' && !arquivo ? AbortSignal.timeout(PRAZO_DE_LEITURA_MS) : null
   const cabecalhos = { Accept: arquivo ? '*/*' : 'application/json' }
   if (corpo !== undefined) cabecalhos['Content-Type'] = 'application/json'
   if (chave) cabecalhos['Idempotency-Key'] = chave
@@ -113,13 +121,21 @@ export async function chamarApi(caminho, {
       method: metodo,
       headers: cabecalhos,
       body: formulario ?? (corpo === undefined ? undefined : JSON.stringify(corpo)),
-      signal: sinal,
+      signal: sinal ?? prazo ?? undefined,
     })
   } catch {
+    if (prazo?.aborted) throw semResposta()
     throw new ErroApi(0, 'SEM_CONEXAO', 'Sem conexão com o EasyStok.')
   }
   if (resposta.ok && arquivo) return resposta.blob()
-  const bruto = await resposta.text()
+  let bruto
+  try {
+    bruto = await resposta.text()
+  } catch {
+    // Cortou no meio do corpo: mesmo erro de quando a resposta nem chegou.
+    if (prazo?.aborted) throw semResposta()
+    throw new ErroApi(0, 'SEM_CONEXAO', 'Sem conexão com o EasyStok.')
+  }
   if (resposta.ok && texto) return bruto
   const json = comoJson(bruto)
   if (resposta.ok) return json?.data ?? null
