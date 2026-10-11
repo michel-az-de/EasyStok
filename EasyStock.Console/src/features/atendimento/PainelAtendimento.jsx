@@ -172,7 +172,8 @@ export function PainelAtendimento({
         rascunho={rascunho}
         aoMudarRascunho={(texto) => definirRascunho(selecionada.id, texto)}
         aoEnviar={() => enviar(selecionada.id, rascunho.trim())}
-        podeEnviarModelo={podeReabrir && canal.aceitaModelo && !encerrada && !bloqueada}
+        // #1551: modelo aprovado só existe com a API; na demonstração o botão só devolvia erro.
+        podeEnviarModelo={fonteApi && podeReabrir && canal.aceitaModelo && !encerrada && !bloqueada}
         aoAplicarTemplate={aplicarTemplate}
         aoAbrirNota={aoAbrirNota}
         aoAbrirGaleria={aoAbrirGaleria}
