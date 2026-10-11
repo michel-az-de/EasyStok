@@ -86,10 +86,12 @@ await confere('cadastrar manda nome, unidade, mínimo e custo (vírgula vira pon
   assert.equal(m.relidas(), 1)
 })
 
-await confere('ajustar manda só mínimo e custo; vazio vira null (não mexe)', async () => {
+// #1600: esta linha guardava o defeito (custo apagado ia só como null, que a API lê como "não
+// mexe"). Campo apagado agora limpa de forma explícita.
+await confere('ajustar manda só mínimo e custo; vazio vira null e pede para limpar', async () => {
   const m = montar([[(mt, u) => mt === 'PUT' && u.endsWith(`${BASE}/p1`), { status: 204 }]])
   await m.gestao.atualizar('p1', { minimo: '2500', custo: '' })
-  assert.deepEqual(m.chamadas.find((c) => c.metodo === 'PUT').corpo, { minimo: 2500, custo: null })
+  assert.deepEqual(m.chamadas.find((c) => c.metodo === 'PUT').corpo, { minimo: 2500, custo: null, limparCusto: true })
 })
 
 await confere('nome vazio, mínimo quebrado ou custo negativo não chamam a API', async () => {

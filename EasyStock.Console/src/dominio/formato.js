@@ -39,6 +39,19 @@ export function instanteNoFuso({ ano, mes, dia, horas = 0, minutos = 0 }) {
   return ms
 }
 
+// #1600: o dia e a hora de parede que o domínio calcula são os DA LOJA. `setHours` no lugar disto
+// lê o fuso do aparelho: depois das 21 h de Brasília o UTC já é amanhã, e em Tóquio é amanhã desde
+// o meio-dia. `ms` aceita instante em ms ou ISO; data inválida dá NaN, como o `setHours` dava
+// (`partesNoFuso` lançaria e derrubaria a tela por um registro sem data).
+export const noDiaDaLojaAs = (ms, horas = 0, minutos = 0) => {
+  if (Number.isNaN(new Date(ms).getTime())) return NaN
+  const { ano, mes, dia } = partesNoFuso(ms)
+  return instanteNoFuso({ ano, mes, dia, horas, minutos })
+}
+export const inicioDoDiaNoFuso = (ms) => noDiaDaLojaAs(ms)
+// Dias de calendário da loja entre dois instantes (0 = mesmo dia, 1 = ontem).
+export const diasDeCalendarioEntre = (de, ate) => Math.round((inicioDoDiaNoFuso(ate) - inicioDoDiaNoFuso(de)) / 86400000)
+
 // "2026-09-30" do dia da loja, não do UTC (depois das 21 h o UTC já é amanhã).
 export const dataIsoNoFuso = (ms) => {
   const { ano, mes, dia } = partesNoFuso(ms)
@@ -176,17 +189,12 @@ export const enderecoDasPartes = ({ rua, numero, complemento, bairro, cep }) =>
 
 // Rótulo do dia para o separador do fio da conversa (achado 8, pendência 18
 // da banca 64): "Hoje", "Ontem" ou a data por extenso, sempre contra o dia de
-// `agora` (o relógio simulado da tela), nunca o dia real da máquina.
-const inicioDoDiaMs = (ms) => {
-  const d = new Date(ms)
-  d.setHours(0, 0, 0, 0)
-  return d.getTime()
-}
+// `agora` (o relógio simulado da tela), nunca o dia real da máquina. #1600: dia da loja.
 export function rotuloDoDia(iso, agora) {
-  const diffDias = Math.round((inicioDoDiaMs(agora) - inicioDoDiaMs(new Date(iso).getTime())) / 86400000)
+  const diffDias = diasDeCalendarioEntre(iso, agora)
   if (diffDias === 0) return 'Hoje'
   if (diffDias === 1) return 'Ontem'
-  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', timeZone: FUSO })
 }
 
 // Data de calendário "2026-10-12" -> "seg, 12/10" (#1474). Só a data, sem hora nem fuso: o dia

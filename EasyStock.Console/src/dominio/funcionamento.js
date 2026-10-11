@@ -2,7 +2,7 @@
 // dono, 24/09/2026). Puro: nenhum import fora de `dominio`, "agora" sempre
 // chega por parâmetro (mesma regra de fronteira de `dominio/simulacoes.js`).
 
-import { horaCurta, partesNoFuso } from './formato.js'
+import { diasDeCalendarioEntre, horaCurta, instanteNoFuso, partesNoFuso } from './formato.js'
 
 export const DIAS_DA_SEMANA = [
   { chave: 'domingo', indice: 0, rotulo: 'Domingo' },
@@ -105,25 +105,19 @@ export function minutosAbertos(inicioMs, fimMs, { funcionamento = FUNCIONAMENTO_
   return total
 }
 
-const inicioDoDia = (ms) => {
-  const data = new Date(ms)
-  data.setHours(0, 0, 0, 0)
-  return data.getTime()
-}
-
 // Próxima abertura pelo HORÁRIO CONFIGURADO (ignora o estado manual da loja
 // de propósito: é o que a regra "Fora do horário" promete ao cliente, e o
 // dono pode abrir ou fechar na mão antes disso, mas o texto fala do
 // horário). Varre até 8 dias; `null` quando a semana inteira está fechada.
 export function proximaAbertura(agora, funcionamento = FUNCIONAMENTO_PADRAO) {
+  // #1600: dia da semana e hora de abrir são os da loja, como em `dentroDoHorario`.
+  const hoje = partesNoFuso(agora)
   for (let offset = 0; offset <= 7; offset += 1) {
-    const data = new Date(agora)
-    data.setDate(data.getDate() + offset)
-    const dia = funcionamento[diaPorIndice(data.getDay()).chave]
+    const dia = funcionamento[diaPorIndice((hoje.diaDaSemana + offset) % 7).chave]
     if (!dia || dia.fechado || !dia.abre) continue
-    const [hora, minuto] = dia.abre.split(':').map(Number)
-    data.setHours(hora, minuto, 0, 0)
-    if (data.getTime() > agora) return data.getTime()
+    const [horas, minutos] = dia.abre.split(':').map(Number)
+    const abertura = instanteNoFuso({ ano: hoje.ano, mes: hoje.mes, dia: hoje.dia + offset, horas, minutos })
+    if (abertura > agora) return abertura
   }
   return null
 }
@@ -134,9 +128,9 @@ export function proximaAbertura(agora, funcionamento = FUNCIONAMENTO_PADRAO) {
 export function descreverProximaAbertura(agora, funcionamento = FUNCIONAMENTO_PADRAO) {
   const abertura = proximaAbertura(agora, funcionamento)
   if (abertura == null) return 'ainda não temos o próximo horário configurado'
-  const diffDias = Math.round((inicioDoDia(abertura) - inicioDoDia(agora)) / 86400000)
+  const diffDias = diasDeCalendarioEntre(agora, abertura)
   const hora = horaCurta(abertura)
   if (diffDias === 0) return `hoje às ${hora}`
   if (diffDias === 1) return `amanhã às ${hora}`
-  return `${diaPorIndice(new Date(abertura).getDay()).rotulo} às ${hora}`
+  return `${diaPorIndice(partesNoFuso(abertura).diaDaSemana).rotulo} às ${hora}`
 }

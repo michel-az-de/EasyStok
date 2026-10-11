@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
-import { rotuloDoDia } from '../../dominio/formato'
+import { inicioDoDiaNoFuso, rotuloDoDia } from '../../dominio/formato'
 import { intercalarNotas } from '../../dominio/notas'
 import { useChamadaEstavel } from '../../hooks/useChamadaEstavel'
 import { Balao } from './Balao'
@@ -60,11 +60,6 @@ function PostIt({ nota }) {
   )
 }
 
-const diaDe = (iso) => {
-  const d = new Date(iso)
-  return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate()
-}
-
 export function Thread({
   mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, digitando = false, notas = [],
 }) {
@@ -84,6 +79,7 @@ export function Thread({
   let proxima = 0
   const linhas = []
   let i = -1
+  let diaAnterior = null
   for (const item of intercalarNotas(mensagens, notas)) {
     if (item.tipo === 'nota') {
       linhas.push({ tipo: 'nota', chave: `nota-${item.nota.id}`, nota: item.nota })
@@ -95,9 +91,13 @@ export function Thread({
       linhas.push({ tipo: 'divisoria', chave: `divisoria-${fronteiras[proxima].numero}`, numero: fronteiras[proxima].numero })
       proxima += 1
     }
-    if (i === 0 || diaDe(m.em) !== diaDe(mensagens[i - 1].em)) {
+    // #1600: quebra no dia da loja, o mesmo critério de `rotuloDoDia`. O dia da mensagem anterior
+    // fica guardado: cada conta de fuso custa caro num fio longo.
+    const diaDaMensagem = inicioDoDiaNoFuso(m.em)
+    if (i === 0 || diaDaMensagem !== diaAnterior) {
       linhas.push({ tipo: 'dia', chave: `dia-${m.id}`, rotulo: rotuloDoDia(m.em, agora) })
     }
+    diaAnterior = diaDaMensagem
     linhas.push({
       tipo: 'mensagem', chave: m.id, mensagem: m, trocaDeVoz: i > 0 && mensagens[i - 1].dir !== m.dir,
     })

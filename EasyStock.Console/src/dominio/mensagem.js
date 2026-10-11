@@ -48,7 +48,9 @@ export function mensagensSemRespostaReal(conversa) {
   const pendentes = []
   for (let i = mensagens.length - 1; i >= 0; i -= 1) {
     const mensagem = mensagens[i]
-    if (respondeAoCliente(mensagem)) break
+    // #1600: conversa reaberta recomeça na nota de reabertura (mesma regra da lista da API): a
+    // entrada de antes do encerramento não volta como cliente esperando há dias.
+    if (respondeAoCliente(mensagem) || mensagem.reabertura) break
     if (mensagem.dir === 'in') pendentes.unshift(mensagem)
   }
   return pendentes
