@@ -18,17 +18,20 @@ public sealed class CreditoComandaIntegrationTests(PostgreSqlDatabaseFixture fix
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
         await using var db = fixture.CreateDbContext();
         var aplicadas = (await db.Database.GetAppliedMigrationsAsync()).ToList();
-        aplicadas[^1].Should().EndWith("ComandaClienteCompartilhada");
-        await db.GetService<IMigrator>().MigrateAsync(aplicadas[^2]);
+        var indice = aplicadas.FindIndex(m => m.EndsWith("ComandaClienteCompartilhada", StringComparison.Ordinal));
+        indice.Should().BePositive();
         var empresa = Guid.NewGuid(); var agora = DateTime.UtcNow;
         db.SetMobileTenantContext(empresa);
         var conversa = Conversa.Abrir(empresa, "5511999994444", agora);
         db.AtendimentoConversas.Add(conversa); await db.SaveChangesAsync();
+        await db.GetService<IMigrator>().MigrateAsync(aplicadas[indice - 1]);
         var id = Guid.NewGuid(); var hash = new string('a', 64);
         await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO links_cardapio_conversa (\"Id\", \"EmpresaId\", \"ConversaId\", \"TokenHash\", \"CriadoEm\", \"ExpiraEm\") VALUES ({id}, {empresa}, {conversa.Id}, {hash}, {agora}, {agora.AddDays(1)})");
         await db.GetService<IMigrator>().MigrateAsync();
+        db.ChangeTracker.Clear();
         var legado = await db.LinksCardapioConversa.SingleAsync(l => l.Id == id);
         legado.RascunhoJson.Should().Be("{}"); legado.Revisao.Should().Be(0); legado.UsadoEm.Should().BeNull();
+        (await db.AtendimentoConversas.SingleAsync(c => c.Id == conversa.Id)).NumeroComanda.Should().BePositive();
     }
 
     [SkippableFact]

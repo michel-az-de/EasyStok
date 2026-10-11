@@ -130,7 +130,7 @@ export function pedidoDaApi(p, anterior = null) {
   return {
     pedidoId: p.pedidoId,
     // Mesmo código curto do backend (VariaveisAtendimento.CodigoCurto): o que o cliente lê.
-    numero: p.pedidoId.replace(/-/g, '').slice(0, 8).toUpperCase(),
+    numero: p.numeroComanda || p.pedidoId.replace(/-/g, '').slice(0, 8).toUpperCase(),
     estado: ESTADO_DO_STATUS[p.status] ?? 'aguardando',
     statusApi: p.status,
     // #1474: pedido fora da área liberado espera aprovação; a baixa manual é barrada antes.

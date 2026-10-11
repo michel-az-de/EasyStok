@@ -6,6 +6,15 @@ namespace EasyStock.Infra.Postgre.Repositories.Atendimento;
 
 public sealed class LinkCardapioConversaRepository(EasyStockDbContext db) : ILinkCardapioConversaRepository
 {
+    public async Task<string?> SubstituirRascunhosAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default)
+    {
+        var pendentes = db.LinksCardapioConversa.Where(l => l.EmpresaId == empresaId && l.ConversaId == conversaId && l.UsadoEm == null && l.ExpiraEm > agora);
+        var ultimo = await pendentes.AsNoTracking().OrderByDescending(l => l.CriadoEm).FirstOrDefaultAsync(ct);
+        await pendentes.ExecuteUpdateAsync(s => s.SetProperty(l => l.ExpiraEm, agora), ct);
+        return ultimo is not null && EasyStock.Application.Common.HorarioBrasil.DataOperacional(ultimo.CriadoEm)
+            == EasyStock.Application.Common.HorarioBrasil.DataOperacional(agora) ? ultimo.RascunhoJson : null;
+    }
+
     public async Task<LinkCardapioConversa?> ObterComLockAsync(Guid empresaId, Guid linkId, CancellationToken ct = default)
     {
         var link = await db.LinksCardapioConversa.FromSqlInterpolated(

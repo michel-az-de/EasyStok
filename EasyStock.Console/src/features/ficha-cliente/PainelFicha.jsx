@@ -19,9 +19,10 @@ import { BlocoOcorrencia } from './BlocoOcorrencia'
 import { BlocoOcorrenciasApi } from './BlocoOcorrenciasApi'
 import { BlocoEntrega } from './BlocoEntrega'
 import { BlocoPedido } from './BlocoPedido'
+import { ComandaDoCliente } from './ComandaDoCliente'
 import css from './ficha.module.css'
 
-export function PainelFicha({ aoAbrirCardapio }) {
+export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
   const {
     selecionada, visiveis, alertasEstoque, ultimoAvanco, agora, automaticoPausado, fonteApi,
   } = useAtendimento()
@@ -56,7 +57,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
   const faixa = faixaDaJanela(janelas, pedido?.janela)
   const avancoEm = ultimoAvanco?.conversaId === selecionada.id ? ultimoAvanco.em : null
   const primeiroNome = selecionada.nome.split(' ')[0]
-  const numero = pedido ? numeroDaComanda(pedido, { fonteApi }) : null
+  const numero = selecionada.numeroComanda || (pedido ? numeroDaComanda(pedido, { fonteApi }) : null)
   // #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que se resolve. A barra
   // mostra o motivo e desabilita o botão em vez de deixar o EasyStok recusar depois.
   const prerequisito = pedido
@@ -90,6 +91,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
       ))}
 
       <div className={css.conteudo}>
+        <ComandaDoCliente key={selecionada.id} conversaId={selecionada.id} numeroComanda={numero} ativo={fonteApi} acaoCompartilhar={acaoCompartilhar} />
         {/* Rodada 11 (registro 92): onde o automático está no caminho do
             UC-01, enquanto ele monta o cadastro pela conversa. */}
         {selecionada.captura && selecionada.conta === 'lead' && (
@@ -128,6 +130,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
                 faixa={faixa}
                 bloqueado={estaBloqueada(selecionada)}
                 conversaId={selecionada.id}
+                numeroComanda={numero}
               />
             </Bloco>
             {/* #1510: formulário "Recebi" e confirmações não atravessam de uma conversa para outra. */}

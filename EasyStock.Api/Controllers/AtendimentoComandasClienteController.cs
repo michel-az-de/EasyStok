@@ -17,9 +17,10 @@ public sealed class AtendimentoComandasClienteController(ILinkCardapioConversaRe
     {
         if (!usuario.TemPermissao(Permissao.AtenderConversas)) return Forbid();
         if (await conversas.ObterPorIdAsync(usuario.EmpresaId, conversaId, ct) is null) return NotFound();
-        var lista = await links.ListarDaConversaAsync(usuario.EmpresaId, conversaId, relogio.GetUtcNow().UtcDateTime.AddDays(-1), ct);
+        var agora = relogio.GetUtcNow().UtcDateTime;
+        var lista = await links.ListarDaConversaAsync(usuario.EmpresaId, conversaId, agora.AddDays(-1), ct);
         var resultado = new List<ComandaClienteResult>();
-        foreach (var link in lista.Where(l => l.Revisao > 0)) resultado.Add(await comanda.EstadoAsync(link, ct));
+        foreach (var link in lista.Where(l => l.Revisao > 0 || l.EstaValido(agora))) resultado.Add(await comanda.EstadoAsync(link, ct));
         Response.Headers.CacheControl = "no-store";
         return Ok(new { data = resultado });
     }

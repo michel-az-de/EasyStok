@@ -35,7 +35,9 @@ public class PromptAtendimentoTests
         for (var i = 1; i <= 8; i++)
             prompt.Should().Contain($"RN-0{i}");
         prompt.Should().Contain("D3").And.Contain(configuracao.Tom).And.Contain("[interno]");
-        prompt.Should().Contain("Para fechar um pedido use criar_pedido"); // S11: pedido e link pela conversa
+        prompt.Should().Contain("Para montar um pedido compartilhe a comanda pessoal")
+            .And.Contain("nunca use criar_pedido para repetir esse envio")
+            .And.Contain("Use criar_pedido somente quando o cliente pedir explicitamente");
 
         // Snapshot: mudança no system prompt é deliberada e revisada no diff deste arquivo.
         var snapshot = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Services", "Atendimento", "PromptAtendimento.snapshot.txt"));

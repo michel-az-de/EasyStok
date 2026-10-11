@@ -119,6 +119,7 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario, agora = Date.now(
   const mensagens = (mensagensDaApi ?? []).map((m) => mensagemDaApi(m, resumo.id)).sort(cronologica)
   const conversa = {
     id: resumo.id,
+    numeroComanda: resumo.numeroComanda || null,
     conta: resumo.clienteId ? 'cliente' : 'lead',
     // Chave do cadastro na API: consentimento (S38) e o que mais for por cliente.
     clienteId: resumo.clienteId ?? null,

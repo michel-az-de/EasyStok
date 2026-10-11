@@ -401,6 +401,12 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<int>("NaoLidas")
                         .HasColumnType("integer");
 
+                    b.Property<long>("NumeroComanda")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("NumeroComanda"));
+
                     b.Property<Guid?>("PedidoEmAndamentoId")
                         .HasColumnType("uuid");
 
@@ -416,6 +422,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ClienteId");
+
+                    b.HasIndex("NumeroComanda")
+                        .IsUnique();
 
                     b.HasIndex("EmpresaId", "ClienteId")
                         .HasDatabaseName("ix_atendimento_conversas_empresa_cliente");

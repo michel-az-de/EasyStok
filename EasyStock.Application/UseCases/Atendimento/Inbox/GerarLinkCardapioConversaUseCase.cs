@@ -16,11 +16,11 @@ public sealed class GerarLinkCardapioConversaUseCase(
 {
     public async Task<LinkCardapioConversaGerado> ExecuteAsync(Guid empresaId, Guid conversaId, CancellationToken ct = default)
     {
-        _ = await conversaRepository.ObterPorIdAsync(empresaId, conversaId, ct)
+        var conversa = await conversaRepository.ObterPorIdAsync(empresaId, conversaId, ct)
             ?? throw new ConversaNaoEncontradaException(conversaId);
 
         var link = await linkCardapio.GerarAsync(empresaId, conversaId, relogio.GetUtcNow().UtcDateTime, ct);
         await unitOfWork.CommitAsync();
-        return link;
+        return link with { NumeroComanda = conversa.NumeroComanda };
     }
 }

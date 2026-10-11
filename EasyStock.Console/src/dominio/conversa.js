@@ -63,6 +63,7 @@ export const combinaBusca = (conversa, busca) => {
   const termo = (busca ?? '').trim().toLowerCase()
   if (!termo) return true
   return conversa.nome.toLowerCase().includes(termo)
+    || conversa.numeroComanda != null && ('comanda ' + conversa.numeroComanda).includes(termo)
     || (conversa.cliente?.telefone ?? '').includes(termo)
     || (conversa.cliente?.tags ?? []).some((tag) => tag.toLowerCase().includes(termo))
     || conversa.mensagens.some((m) => (m.texto ?? '').toLowerCase().includes(termo))

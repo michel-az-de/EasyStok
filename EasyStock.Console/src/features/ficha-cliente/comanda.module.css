@@ -20,6 +20,10 @@
 .clienteCompartilhado ul { list-style: none; padding: 0; }
 .clienteCompartilhado li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2); padding: var(--e-2) 0; }
 .clienteCompartilhado small { width: 100%; }
+.adicionarCompartilhado { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2); }
+.observacaoCompartilhada { display: grid; width: 100%; gap: var(--e-1); margin-block: var(--e-2); }
+.clienteCompartilhado input, .clienteCompartilhado textarea, .clienteCompartilhado select { max-width: 100%; min-width: 0; width: 100%; min-height: 44px; padding: var(--e-2); border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-1); color: var(--tinta); background: var(--papel); font: inherit; }
+.comparativo { padding: var(--e-2); border-left: 3px solid var(--linha-forte); }
 
 /* O único gesto "de papel": dois triângulos diagonais por dente de 8×5 px,
    pintados na cor da comanda. Onde não há tinta, o fundo por trás aparece,

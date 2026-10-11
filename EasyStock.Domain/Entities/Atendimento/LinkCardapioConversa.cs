@@ -38,6 +38,8 @@ public class LinkCardapioConversa
         ResultadoJson = json;
     }
 
+    public void Expirar(DateTime agora) => ExpiraEm = Utc(agora);
+
     // EF Core ctor sem parametros
     private LinkCardapioConversa() { }
 

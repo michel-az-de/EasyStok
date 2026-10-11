@@ -14,7 +14,7 @@ namespace EasyStock.Application.Services.Atendimento;
 /// </summary>
 public static class ResumoPedidoConversa
 {
-    public static string Texto(PedidoReservado reservado, DateOnly dataEntrega, string forma, string cabecalho)
+    public static string Texto(PedidoReservado reservado, DateOnly dataEntrega, string forma, string cabecalho, bool cobrarTotal = false)
     {
         ArgumentNullException.ThrowIfNull(reservado);
         var reais = CultureInfo.GetCultureInfo("pt-BR");
@@ -29,7 +29,9 @@ public static class ResumoPedidoConversa
         sb.Append("\nFrete: ").Append(reservado.ItemFrete.PrecoUnitario.ToString("C", reais));
         sb.Append("\nTotal: ").Append(reservado.Total.ToString("C", reais));
         sb.Append("\nEntrega: ").Append(Entrega(dataEntrega, reservado.Janela));
-        if (PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
+        if (cobrarTotal)
+            sb.Append("\nPagamento: este envio cobra o saldo integral; acréscimos posteriores cobram apenas a diferença.");
+        else if (PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
         {
             var sinal = PlanoPagamentoEncomenda.Sinal(reservado.Total);
             sb.Append("\nSinal agora por link: ").Append(sinal.ToString("C", reais));

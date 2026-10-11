@@ -20,9 +20,10 @@
   color: var(--tinta-3); line-height: var(--lh-compacto);
 }
 .direita {
-  margin-left: auto; display: flex; gap: var(--e-2); align-items: center;
+  width: 100%; display: flex; gap: var(--e-2); align-items: center;
   flex-wrap: wrap; flex-shrink: 0;
 }
+.identidade { flex-basis: 100%; }
 
 /* Uma área rolável só na coluna do meio: barra de modo, thread e painel do
    agente rolam juntos, o cabeçalho fica no teto e o composer no piso. Antes os

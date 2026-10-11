@@ -28,6 +28,7 @@ public class Conversa
     public const int MotivoEscaladaTamanhoMaximo = 500;
 
     public Guid Id { get; private set; }
+    public long NumeroComanda { get; private set; }
     public Guid EmpresaId { get; private set; }
     public Guid? ClienteId { get; private set; }
 

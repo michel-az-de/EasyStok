@@ -7,6 +7,7 @@ namespace EasyStock.Application.Ports.Output.Atendimento;
 public static class EventosOperacao
 {
     public const string PedidoPago = "pedido.pago";
+    public const string PedidoPagamentoAtualizado = "pedido.pagamento_atualizado";
     public const string PedidoMudouStatus = "pedido.mudou_status";
     public const string PedidoReagendado = "pedido.reagendado";
     public const string CardapioItemComInteresse = "cardapio.item_com_interesse";

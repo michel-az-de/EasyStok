@@ -20,6 +20,14 @@ public class LinkCardapioConversaServiceTests
     {
         public List<LinkCardapioConversa> Links { get; } = new();
 
+        public Task<string?> SubstituirRascunhosAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default)
+        {
+            var anteriores = Links.Where(l => l.EmpresaId == empresaId && l.ConversaId == conversaId && l.EstaValido(agora)).OrderByDescending(l => l.CriadoEm).ToList();
+            var rascunho = anteriores.FirstOrDefault()?.RascunhoJson;
+            foreach (var link in anteriores) link.Expirar(agora);
+            return Task.FromResult(rascunho);
+        }
+
         public Task<LinkCardapioConversa?> ObterComLockAsync(Guid empresaId, Guid linkId, CancellationToken ct = default) =>
             Task.FromResult(Links.FirstOrDefault(l => l.EmpresaId == empresaId && l.Id == linkId));
         public Task<IReadOnlyList<LinkCardapioConversa>> ListarDaConversaAsync(Guid empresaId, Guid conversaId, DateTime desde, CancellationToken ct = default) =>

@@ -6,6 +6,7 @@ namespace EasyStock.Application.Ports.Output.Persistence.Atendimento;
 public interface ILinkCardapioConversaRepository
 {
     Task AddAsync(LinkCardapioConversa link, CancellationToken ct = default);
+    Task<string?> SubstituirRascunhosAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default);
 
     /// <summary>
     /// Busca pelo hash em todas as empresas (bypass de RLS): a requisição do site é anônima e a URL não
