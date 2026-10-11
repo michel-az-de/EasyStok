@@ -42,19 +42,31 @@ export function corpoDasPorcoes(linhas) {
 }
 
 // "300 g", "800g", "1,2 kg" e "1.200 g" viram gramas inteiros; texto sem peso ("Individual") vira null.
-// O peso para mostrar vale antes do nome da porção.
-const PESO = /(\d+(?:[.,]\d+)?)\s*(kg|quilos?|gramas?|gr|g)(?![a-zà-ú])/i
-export function gramasDaPorcao(porcao) {
-  for (const texto of [porcao?.peso, porcao?.rotulo]) {
-    const achado = PESO.exec(String(texto ?? ''))
-    if (!achado) continue
-    const [, numero, unidade] = achado
-    const emQuilos = /^(k|q)/i.test(unidade)
-    const valor = !emQuilos && /^\d{1,3}[.,]\d{3}$/.test(numero) ? Number(numero.replace(/[.,]/, '')) : Number(numero.replace(',', '.'))
-    const gramas = Math.round(valor * (emQuilos ? 1000 : 1))
-    if (gramas > 0) return gramas
-  }
-  return null
+// O peso para mostrar vale antes do nome da porção. Peso errado é pior que campo vazio (vai para a
+// etiqueta e para a baixa do insumo), então só vale o texto que começa pelo peso: "2x300 g", "1/2 kg",
+// "350 a 400 g" e "1 500 g" não são lidos. Ponto de milhar só em gramas ("1.200 g"); vírgula é decimal.
+const PESO = /^\D*(\d+(?:[.,]\d+)?)\s*(kg|quilos?|gramas?|gr|g)(?![a-zà-ú])/i
+const PESO_MINIMO_G = 5
+const PESO_MAXIMO_G = 20000
+function gramasDoTexto(texto) {
+  const achado = PESO.exec(String(texto ?? ''))
+  if (!achado) return null
+  const [, numero, unidade] = achado
+  const emQuilos = /^(k|q)/i.test(unidade)
+  const valor = !emQuilos && /^\d{1,3}\.\d{3}$/.test(numero) ? Number(numero.replace('.', '')) : Number(numero.replace(',', '.'))
+  // 1,1 × 1000 dá 1100,0000000000002 em ponto flutuante: quilo arredonda ao grama; grama tem de vir inteiro.
+  const gramas = emQuilos ? Math.round(valor * 1000) : valor
+  return Number.isInteger(gramas) && gramas >= PESO_MINIMO_G && gramas <= PESO_MAXIMO_G ? gramas : null
+}
+export const gramasDaPorcao = (porcao) => gramasDoTexto(porcao?.peso) ?? gramasDoTexto(porcao?.rotulo)
+
+// O peso de uma porção do prato, para o planejamento: o da porção padrão (ou da primeira) e, em prato
+// de um tamanho só, o do texto da porção do item.
+export function pesoDeReferenciaDoPrato(prato) {
+  const porcoes = prato?.porcoes ?? []
+  return porcoes.length > 0
+    ? gramasDaPorcao(porcoes.find((p) => p.padrao) ?? porcoes[0])
+    : gramasDoTexto(prato?.porcao)
 }
 
 // M1.4e (#1552): escolher a porção na produção já traz o peso dela, que é o que faz a receita em peso
@@ -66,6 +78,20 @@ export function pesoAoEscolherPorcao(pesoAtual, porcaoAnterior, porcaoEscolhida)
   const novo = gramasDaPorcao(porcaoEscolhida)
   return novo == null ? '' : String(novo)
 }
+
+// A linha da produção do dia quando ela troca o prato ou a porção. Trocar o prato zera a porção (era do
+// prato anterior) e leva junto o peso que tinha vindo dela: senão os 300 g da porção de um prato ficavam
+// como "digitados" e iam para os 800 g do outro.
+const porcaoDaLinha = (linha, pratos) =>
+  (pratos.find((p) => p.sku === linha.sku)?.porcoes ?? []).find((v) => v.id === linha.variacaoId) ?? null
+export const linhaComPrato = (linha, pratos, sku) => ({
+  ...linha, sku, variacaoId: '', pesoPorPorcaoG: pesoAoEscolherPorcao(linha.pesoPorPorcaoG, porcaoDaLinha(linha, pratos), null),
+})
+export const linhaComPorcao = (linha, pratos, variacaoId) => ({
+  ...linha,
+  variacaoId,
+  pesoPorPorcaoG: pesoAoEscolherPorcao(linha.pesoPorPorcaoG, porcaoDaLinha(linha, pratos), porcaoDaLinha({ ...linha, variacaoId }, pratos)),
+})
 
 // Compara o que vai com o que veio: sem mudança, o formulário não manda as porções (null = não mexe).
 export const porcoesMudaram = (iniciais, linhas) =>

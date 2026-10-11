@@ -33,7 +33,10 @@ registerHooks({
   },
 })
 
-const { corpoDasPorcoes, gramasDaPorcao, pesoAoEscolherPorcao, porcaoNova, porcoesMudaram, rascunhoDasPorcoes } = await import('../src/dominio/porcoes.js')
+const {
+  corpoDasPorcoes, gramasDaPorcao, linhaComPorcao, linhaComPrato, pesoAoEscolherPorcao, pesoDeReferenciaDoPrato, porcaoNova, porcoesMudaram, rascunhoDasPorcoes,
+} = await import('../src/dominio/porcoes.js')
+const { motivosDosPendentes, planejar } = await import('../src/aplicacao/planejamento.js')
 const { detalheDaApi } = await import('../src/infra/api/cardapioApi.js')
 const { insumoDaApi, receitaDaApi } = await import('../src/infra/api/producaoApi.js')
 const { lerEmbalagensDaPorcao } = await import('../src/aplicacao/edicaoCardapio.js')
@@ -173,10 +176,18 @@ await confere('embalagem na receita: diz quando ela não desce e onde escolher a
 await confere('o peso da porção sai do peso para mostrar ou do nome', () => {
   const casos = [
     [{ peso: '300 g', rotulo: 'Individual' }, 300], [{ peso: '', rotulo: '800g' }, 800], [{ rotulo: '1,2 kg' }, 1200],
-    [{ rotulo: '1.200 g' }, 1200], [{ peso: '0,5 kg' }, 500], [{ peso: '800 g · serve 2 pessoas' }, 800],
-    [{ rotulo: '500 gramas' }, 500], [{ rotulo: 'Família' }, null], [{ rotulo: 'Grande' }, null], [null, null],
+    [{ rotulo: '1,1 kg' }, 1100], [{ rotulo: '1.200 g' }, 1200], [{ peso: '0,5 kg' }, 500], [{ peso: '800 g · serve 2 pessoas' }, 800],
+    [{ rotulo: '500 gramas' }, 500], [{ rotulo: 'Individual (300 g)' }, 300], [{ rotulo: 'Família' }, null], [{ rotulo: 'Grande' }, null], [null, null],
   ]
   for (const [porcao, esperado] of casos) assert.equal(gramasDaPorcao(porcao), esperado, JSON.stringify(porcao))
+})
+
+await confere('texto ambíguo não vira peso: campo vazio é melhor que peso errado na etiqueta e na baixa', () => {
+  // Antes: "1/2 kg" virava 2 kg, "2x300 g" virava 300, "350 a 400 g" virava 400 e "1 500 g" virava 500.
+  for (const rotulo of ['1/2 kg', '2x300 g', '350 a 400 g', '1 500 g', 'serve 2 · 800 g', '1,200 g', '300,5 g', '2 g', '50 kg', '500 ml', '12 unidades']) {
+    assert.equal(gramasDaPorcao({ rotulo }), null, rotulo)
+  }
+  assert.equal(gramasDaPorcao({ peso: '2x300 g', rotulo: '600 g' }), 600, 'o peso para mostrar não deu: vale o nome')
 })
 
 await confere('escolher a porção traz o peso dela, troca o que veio da porção anterior e respeita o digitado', () => {
@@ -188,6 +199,57 @@ await confere('escolher a porção traz o peso dela, troca o que veio da porçã
   assert.equal(pesoAoEscolherPorcao('320', p300, p800), '320', 'ela pesou 320 g: o número é dela')
   assert.equal(pesoAoEscolherPorcao('', null, semPeso), '')
   assert.equal(pesoAoEscolherPorcao('300', p300, semPeso), '', 'porção sem peso no nome não herda o da anterior')
+})
+
+await confere('trocar o prato leva junto o peso que veio da porção: os 300 g da lasanha não vão para os 800 g do nhoque', () => {
+  const pratos = [
+    { sku: 'lasanha', porcoes: [{ id: 'l-300', rotulo: '300 g' }, { id: 'l-800', rotulo: '800 g' }] },
+    { sku: 'nhoque', porcoes: [{ id: 'n-800', rotulo: '800 g' }] },
+    { sku: 'bolo', porcoes: [] },
+  ]
+  const vazia = { id: 'x', sku: '', variacaoId: '', porcoes: '4', pesoPorPorcaoG: '', pesoRealG: '', validadeDias: '5' }
+  const lasanha300 = linhaComPorcao(linhaComPrato(vazia, pratos, 'lasanha'), pratos, 'l-300')
+  assert.deepEqual([lasanha300.sku, lasanha300.variacaoId, lasanha300.pesoPorPorcaoG, lasanha300.porcoes], ['lasanha', 'l-300', '300', '4'])
+
+  const nhoque = linhaComPrato(lasanha300, pratos, 'nhoque')
+  assert.deepEqual([nhoque.variacaoId, nhoque.pesoPorPorcaoG], ['', ''], 'porção zerada e o peso dela também')
+  assert.equal(linhaComPorcao(nhoque, pratos, 'n-800').pesoPorPorcaoG, '800')
+
+  const pesada = linhaComPrato({ ...lasanha300, pesoPorPorcaoG: '320' }, pratos, 'nhoque')
+  assert.equal(pesada.pesoPorPorcaoG, '320', 'o peso que ela digitou não some ao trocar o prato')
+  assert.equal(linhaComPrato({ ...vazia, sku: 'bolo', pesoPorPorcaoG: '500' }, pratos, 'lasanha').pesoPorPorcaoG, '500', 'prato sem porções: o peso é dela')
+})
+
+// --- 6. Planejamento com receita em peso -------------------------------------------------------------
+await confere('o planejamento manda o peso da porção padrão; sem peso no cardápio, manda só as porções', async () => {
+  const cardapio = [
+    { sku: 'i-lasanha', porcao: '300 g', porcoes: [{ id: 'l-800', rotulo: '800 g', padrao: false }, { id: 'l-300', rotulo: '300 g', padrao: true }] },
+    { sku: 'i-nhoque', porcao: '500 g · serve 1', porcoes: [] },
+    { sku: 'i-bolo', porcao: 'Fatia', porcoes: [] },
+  ]
+  assert.deepEqual(cardapio.map(pesoDeReferenciaDoPrato), [300, 500, null])
+
+  const chamadas = montarFetch(() => ({ data: { consolidado: [], itens: [] } }))
+  await planejar([
+    { sku: 'i-lasanha', produtoId: 'p-lasanha', porcoes: '10' }, { sku: 'i-nhoque', produtoId: 'p-nhoque', porcoes: '4' },
+    { sku: 'i-bolo', produtoId: 'p-bolo', porcoes: '2' }, { sku: 'i-fora', produtoId: 'p-fora', porcoes: '0' },
+  ], cardapio)
+  assert.deepEqual(chamadas[0].corpo.pratos, [
+    { produtoId: 'p-lasanha', porcoes: 10, pesoPorPorcaoG: 300 },
+    { produtoId: 'p-nhoque', porcoes: 4, pesoPorPorcaoG: 500 },
+    { produtoId: 'p-bolo', porcoes: 2 },
+  ])
+})
+
+await confere('prato que fica de fora do planejamento aparece com o nome e o que fazer', () => {
+  const linhas = [{ produtoId: 'p-lasanha', nome: 'Lasanha' }, { produtoId: 'p-bolo', nome: 'Bolo' }]
+  const [peso, receita] = motivosDosPendentes([
+    { produtoId: 'p-lasanha', status: 'Erro', erro: 'Unidade desejada (Un) incompativel com rendimento do produto (Kg)' },
+    { produtoId: 'p-bolo', status: 'SemReceita', erro: null },
+  ], linhas)
+  assert.match(peso, /^Lasanha ficou de fora: a receita rende em peso/)
+  assert.match(receita, /^Bolo ficou de fora: está sem receita/)
+  assert.deepEqual(motivosDosPendentes([], linhas), [])
 })
 
 console.log(`\n${passou} verificações passaram, ${falhas.length} falharam.`)

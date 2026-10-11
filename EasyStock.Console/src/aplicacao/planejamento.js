@@ -1,4 +1,5 @@
 import { gerarListaDeCompras, obterSugestao, planejamentoDaApi, planejarProducao, sugestaoDaApi } from '../infra/api/producaoApi'
+import { pesoDeReferenciaDoPrato } from '../dominio/porcoes'
 
 // Planejamento da produção no modo API (M2.5, #1502). A sugestão vem do EasyStok
 // (D-M2-05: mínimo + agendados + descoberto − saldo); ela muda as porções, calcula os insumos e
@@ -16,8 +17,22 @@ export function erroDasPorcoes(linhas) {
   return null
 }
 
-export const planejar = async (linhas) => planejamentoDaApi(await planejarProducao(
-  linhas.filter((l) => porcoesDe(l.porcoes) > 0).map((l) => ({ produtoId: l.produtoId, porcoes: porcoesDe(l.porcoes) }))))
+// M1.4e (#1552): a receita que rende em peso é planejada pelo peso, e o planejamento só conta porções.
+// Vai junto o peso de uma porção do prato (o da padrão), tirado do cardápio; o EasyStok só o usa quando
+// a receita rende em peso. Sem esse peso, o prato de receita em peso fica de fora da conta.
+export const planejar = async (linhas, cardapio = []) => planejamentoDaApi(await planejarProducao(
+  linhas.filter((l) => porcoesDe(l.porcoes) > 0).map((l) => {
+    const peso = pesoDeReferenciaDoPrato(cardapio.find((p) => p.sku === l.sku))
+    return { produtoId: l.produtoId, porcoes: porcoesDe(l.porcoes), ...(peso ? { pesoPorPorcaoG: peso } : {}) }
+  })))
+
+// Por que cada prato ficou de fora da conta dos insumos, com o nome dele e o que fazer.
+export function motivosDosPendentes(pendentes, linhas) {
+  const nome = (p) => linhas.find((l) => l.produtoId === p.produtoId)?.nome ?? 'Um prato'
+  return (pendentes ?? []).map((p) => (p.status === 'Erro' && /incompat/i.test(p.erro ?? '')
+    ? `${nome(p)} ficou de fora: a receita rende em peso e o cardápio não diz o peso da porção. Escreva o peso na porção (ex.: 300 g).`
+    : `${nome(p)} ficou de fora: está sem receita ou com a receita incompleta.`))
+}
 
 // O que comprar: a falta do planejamento e, para o insumo que não falta, o que repõe o mínimo.
 export function itensDeCompra(insumosPlanejados, insumosCadastrados) {

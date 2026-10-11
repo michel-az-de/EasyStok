@@ -105,7 +105,8 @@ public sealed class ItensDoCardapioComandaUseCase(
     {
         var opcoes = OpcoesDe(dados.Porcoes);
         var storefrontId = await VitrineAsync(empresaId, ct);
-        await ValidarEmbalagensAsync(empresaId, dados.Porcoes);
+        if (dados.Porcoes?.Any(p => p.MexerEmbalagem) == true)
+            await ValidarEmbalagensAsync(empresaId, dados.Porcoes, await ItemAsync(storefrontId, itemId, empresaId, ct));
         await editar.ExecuteAsync(new EditarCardapioItemAdminCommand(
             storefrontId, itemId, dados.Nome?.Trim(), dados.Categoria,
             dados.Descricao, dados.Ingredientes, dados.Alergenos, null, null, null, dados.Preco, null, dados.Porcao, null,
@@ -121,19 +122,26 @@ public sealed class ItensDoCardapioComandaUseCase(
         await unitOfWork.CommitAsync();
     }
 
-    // M1.4e (#1552): a embalagem escolhida tem de ser um insumo da empresa, marcado como embalagem e contado
-    // por unidade (a produção baixa uma por porção). Vem antes de gravar: recusa não deixa nada pela metade.
-    private async Task ValidarEmbalagensAsync(Guid empresaId, IReadOnlyList<PorcaoDoItem>? porcoes)
+    // M1.4e (#1552): a embalagem escolhida tem de ser um produto da empresa que sirva de embalagem de porção
+    // (EmbalagemDePorcao). Vem antes de gravar: recusa não deixa nada pela metade. A que a porção já tinha
+    // não é revalidada: se ela deixou de servir depois, editar o preço do prato não pode travar por isso
+    // (a produção avisa e baixa a da receita).
+    private async Task ValidarEmbalagensAsync(Guid empresaId, IReadOnlyList<PorcaoDoItem>? porcoes, CardapioItem? atual = null)
     {
-        var escolhidas = (porcoes ?? []).Where(p => p.MexerEmbalagem && p.EmbalagemId.HasValue).Select(p => p.EmbalagemId!.Value).Distinct();
-        foreach (var id in escolhidas)
+        var jaEscolhidas = (atual?.Variacoes ?? [])
+            .Where(v => v.EmbalagemProdutoId.HasValue)
+            .Select(v => (Porcao: (Guid?)v.Id, Embalagem: v.EmbalagemProdutoId!.Value))
+            .ToHashSet();
+        var novas = (porcoes ?? [])
+            .Where(p => p.MexerEmbalagem && p.EmbalagemId is { } id && !jaEscolhidas.Contains((p.Id, id)))
+            .Select(p => p.EmbalagemId!.Value)
+            .Distinct();
+        foreach (var id in novas)
         {
             var embalagem = await produtoRepository.GetByIdAsync(empresaId, id)
                 ?? throw new UseCaseValidationException("Embalagem não encontrada. Cadastre a embalagem em Insumos.");
-            if (!embalagem.EhEmbalagem)
-                throw new UseCaseValidationException($"{embalagem.Nome} não está marcado como embalagem em Insumos.");
-            if (embalagem.UnidadeMedidaBase != UnidadeMedida.Un)
-                throw new UseCaseValidationException($"A embalagem da porção é contada por unidade, e {embalagem.Nome} está em {embalagem.UnidadeMedidaBase}.");
+            if (EasyStock.Application.UseCases.Producao.EmbalagemDePorcao.MotivoParaNaoUsar(embalagem) is { } motivo)
+                throw new UseCaseValidationException($"Essa embalagem não serve para a porção: {motivo}.");
         }
     }
 

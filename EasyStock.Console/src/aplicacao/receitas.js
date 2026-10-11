@@ -30,9 +30,10 @@ export function orientacoesDaReceita({ prato, unidadeRendimento, linhas = [], in
 
   const nomes = embalagens.join(', ')
   if (comEmbalagem > 0 && comEmbalagem >= tamanhos) {
-    lista.push(`As porções deste prato têm embalagem própria, escolhida no cardápio. A embalagem desta receita (${nomes}) não desce na produção delas e pode sair da receita.`)
+    // Não manda tirar da receita: a produção lançada sem porção (a do aplicativo do celular) só conhece a receita.
+    lista.push(`As porções deste prato têm embalagem própria, escolhida no cardápio. A embalagem desta receita (${nomes}) não desce na produção delas; continua valendo para a produção lançada sem porção, como a do aplicativo do celular.`)
   } else if (comEmbalagem > 0) {
-    lista.push(`${comEmbalagem} de ${tamanhos} porções deste prato têm embalagem própria, escolhida no cardápio. A embalagem desta receita (${nomes}) só desce na produção das outras.`)
+    lista.push(`${comEmbalagem} de ${tamanhos} porções deste prato têm embalagem própria, escolhida no cardápio. A embalagem desta receita (${nomes}) só desce na produção das outras e na lançada sem porção.`)
   } else if (tamanhos > 1 && unidadeRendimento !== 'Un') {
     lista.push(`Com o rendimento em peso, a embalagem desta receita (${nomes}) desce pelo peso, e não uma por porção. Escolha a embalagem de cada porção no cardápio.`)
   }

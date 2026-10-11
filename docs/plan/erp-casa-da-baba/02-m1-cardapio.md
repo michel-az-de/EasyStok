@@ -232,10 +232,20 @@ busca só por produto (`PedidoEstoqueIntegrationService.cs:78-80`).
 >   porção já traz o peso dela ("300 g" → 300), que é o que a receita em peso usa.
 > - **Aviso da #1542:** some quando a receita rende em peso e a porção tem embalagem própria. Onde ainda não está
 >   montado, o aviso continua e diz o que fazer (rendimento em peso; embalagem da porção no cardápio).
+> - **Planejamento:** ele conta porções por prato, e a receita em peso pede peso. O console manda junto o peso de uma
+>   porção (o da padrão, lido do cardápio) e o EasyStok planeja pelo peso quando a receita rende em peso. Sem peso
+>   escrito na porção, o prato fica de fora da conta e a tela diz qual e o que fazer. Em prato com mais de um tamanho
+>   a conta é uma aproximação pela porção padrão: o planejamento ainda não separa por tamanho.
 > - **Guardas:** o console anterior não manda a embalagem, e o EasyStok então não mexe nela (`mexerEmbalagem`). Se a
->   embalagem escolhida for desmarcada, trocar de unidade ou sair do estoque, a produção avisa e baixa a da receita.
-> - **Limite conhecido:** uma embalagem por porção. Quem usa bandeja e selo na mesma porção escolhe a bandeja na
->   porção; o selo que estiver na receita deixa de descer para ela. O editor da receita avisa disso.
+>   embalagem escolhida for tirada do estoque (o que só a inativa), desmarcada ou trocar de unidade, a produção avisa
+>   e baixa a da receita; a escolha que a porção já tinha não trava a edição do prato. O peso só é lido do texto da
+>   porção quando o texto começa por ele ("300 g", "1,2 kg"); "2x300 g" ou "1/2 kg" ficam para ela digitar.
+> - **Limites conhecidos:** uma embalagem por porção. Quem usa bandeja e selo na mesma porção escolhe a bandeja na
+>   porção; o selo que estiver na receita deixa de descer para ela, e o editor da receita avisa. A produção lançada
+>   sem porção (aplicativo do celular) só conhece a receita: por isso o editor não manda tirar a embalagem de lá.
+> - **Revisão independente do diff (11/10):** sem regressão no caminho sem embalagem na porção; 4 defeitos em volta,
+>   corrigidos antes do PR (peso da porção que ficava ao trocar de prato, receita em peso tirando o prato do
+>   planejamento, embalagem inativada que deixava de descer, e o aviso que mandava tirar a embalagem da receita).
 > - **Aba Insumos:** a embalagem escolhida numa porção aparece como "embalagem de N porções" (antes diria "não entra
 >   em receita"), e o rótulo dela passa a "Embalagem de porção, uma por porção produzida".
 > - **Fora desta fatia:** o custo por porção com a embalagem dela (o custo da receita segue sem a embalagem da porção).

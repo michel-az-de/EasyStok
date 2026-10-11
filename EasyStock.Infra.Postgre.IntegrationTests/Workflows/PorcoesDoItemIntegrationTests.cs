@@ -194,6 +194,28 @@ public class PorcoesDoItemIntegrationTests(PostgreSqlDatabaseFixture fixture)
                     NaturezaMovimentacaoEstoque.Compra, null, null, null, null, null, null, null, null, null, null, null, null, null));
         });
 
+        // Bandeja de outra empresa não entra: a busca é pelo par (empresa, id), e a recusa vem antes de gravar.
+        var bandejaAlheiaId = Guid.NewGuid();
+        await using (var outra = fixture.CreateDbContext())
+        {
+            var (outraEmpresaId, categoriaAlheiaId) = (Guid.NewGuid(), Guid.NewGuid());
+            outra.Set<Empresa>().Add(new Empresa
+            {
+                Id = outraEmpresaId, Nome = "Outra casa", Documento = $"{Random.Shared.Next(100000, 999999)}", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            });
+            outra.Set<Categoria>().Add(new Categoria { Id = categoriaAlheiaId, EmpresaId = outraEmpresaId, Nome = "Embalagens", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+            outra.Set<Produto>().Add(new Produto
+            {
+                Id = bandejaAlheiaId, EmpresaId = outraEmpresaId, CategoriaId = categoriaAlheiaId, Nome = "Bandeja alheia", Status = StatusProduto.Ativo,
+                EhInsumo = true, EhEmbalagem = true, UnidadeMedidaBase = UnidadeMedida.Un, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            });
+            await outra.SaveChangesAsync();
+        }
+        var comBandejaAlheia = () => Escopo(provider, empresaId, sp => sp.GetRequiredService<ItensDoCardapioComandaUseCase>().EditarAsync(empresaId, itemId,
+            new DadosItemCardapio(null, null, null, null, null, Porcoes:
+            [new PorcaoDoItem(null, "300 g", 28m, EmbalagemId: bandejaAlheiaId, MexerEmbalagem: true)])));
+        await comBandejaAlheia.Should().ThrowAsync<EasyStock.Application.UseCases.Common.UseCaseValidationException>().WithMessage("*Embalagem não encontrada*");
+
         // A embalagem é escolhida na porção, no cardápio. A porção nova ainda não tem id.
         await Escopo(provider, empresaId, sp => sp.GetRequiredService<ItensDoCardapioComandaUseCase>().EditarAsync(empresaId, itemId,
             new DadosItemCardapio(null, null, null, null, null, Porcoes:

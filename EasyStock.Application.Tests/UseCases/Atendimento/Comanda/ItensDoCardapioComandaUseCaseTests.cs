@@ -140,7 +140,7 @@ public class ItensDoCardapioComandaUseCaseTests
 
     private Produto EmbalagemDoEstoque(string nome, bool marcada = true, UnidadeMedida unidade = UnidadeMedida.Un)
     {
-        var p = new Produto { Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = nome, EhInsumo = true, EhEmbalagem = marcada, UnidadeMedidaBase = unidade };
+        var p = new Produto { Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = nome, EhInsumo = true, EhEmbalagem = marcada, UnidadeMedidaBase = unidade, Status = StatusProduto.Ativo };
         _produtos.GetByIdAsync(EmpresaId, p.Id).Returns(p);
         return p;
     }
@@ -185,12 +185,14 @@ public class ItensDoCardapioComandaUseCaseTests
     }
 
     [Theory]
-    [InlineData(false, UnidadeMedida.Un, "marcado como embalagem")]
-    [InlineData(true, UnidadeMedida.Kg, "contada por unidade")]
-    public async Task EmbalagemQueNaoServe_RecusaAntesDeGravarAsPorcoes(bool marcada, UnidadeMedida unidade, string trecho)
+    [InlineData(false, UnidadeMedida.Un, StatusProduto.Ativo, "marcada como embalagem")]
+    [InlineData(true, UnidadeMedida.Kg, StatusProduto.Ativo, "contada por unidade")]
+    [InlineData(true, UnidadeMedida.Un, StatusProduto.Inativo, "fora do estoque")]
+    public async Task EmbalagemQueNaoServe_RecusaAntesDeGravarAsPorcoes(bool marcada, UnidadeMedida unidade, StatusProduto status, string trecho)
     {
         var item = ItemDoEstoque("Ravióli");
         var filme = EmbalagemDoEstoque("Filme", marcada, unidade);
+        filme.Status = status;
 
         var act = () => Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(
             new PorcaoDoItem(null, "300 g", 28m, EmbalagemId: filme.Id, MexerEmbalagem: true)));
@@ -200,8 +202,10 @@ public class ItensDoCardapioComandaUseCaseTests
     }
 
     [Fact]
-    public async Task EmbalagemQueNaoEDaEmpresa_Recusa()
+    public async Task EmbalagemQueORepositorioNaoAcha_Recusa()
     {
+        // O repositório busca pelo par (empresa, id): produto de outra empresa volta nulo, igual a id que não existe.
+        // O escopo de verdade está provado contra Postgres em PorcoesDoItemIntegrationTests.
         var item = ItemDoEstoque("Ravióli");
 
         var act = () => Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(
@@ -209,6 +213,32 @@ public class ItensDoCardapioComandaUseCaseTests
 
         await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Embalagem não encontrada*");
         item.Variacoes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task EmbalagemQueDeixouDeServir_NaoTravaAEdicaoDoPrato_EOutraPorcaoNaoPodeEscolherEla()
+    {
+        // Ela desmarcou a bandeja em Insumos depois de escolher. Mudar o preço da porção tem de passar; a
+        // produção é quem avisa. Mas escolher essa mesma bandeja em outra porção é escolha nova: recusa.
+        var item = ItemDoEstoque("Ravióli");
+        var bandeja = EmbalagemDoEstoque("Bandeja 300 g");
+        await Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(
+            new PorcaoDoItem(null, "300 g", 28m, EmbalagemId: bandeja.Id, MexerEmbalagem: true), new PorcaoDoItem(null, "800 g", 62m)));
+        var p300 = item.Variacoes.Single(v => v.Rotulo == "300 g");
+        var p800 = item.Variacoes.Single(v => v.Rotulo == "800 g");
+        bandeja.EhEmbalagem = false;
+
+        await Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(
+            new PorcaoDoItem(p300.Id, "300 g", 30m, EmbalagemId: bandeja.Id, MexerEmbalagem: true),
+            new PorcaoDoItem(p800.Id, "800 g", 62m, EmbalagemId: null, MexerEmbalagem: true)));
+
+        (p300.PrecoStorefront, p300.EmbalagemProdutoId).Should().Be((30m, (Guid?)bandeja.Id));
+
+        var outraPorcao = () => Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(
+            new PorcaoDoItem(p300.Id, "300 g", 30m, EmbalagemId: bandeja.Id, MexerEmbalagem: true),
+            new PorcaoDoItem(p800.Id, "800 g", 62m, EmbalagemId: bandeja.Id, MexerEmbalagem: true)));
+        await outraPorcao.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*marcada como embalagem*");
+        p800.EmbalagemProdutoId.Should().BeNull();
     }
 
     private CardapioItem Item(string nome, bool visivel)

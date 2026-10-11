@@ -11,7 +11,8 @@ public sealed record SugestaoDoPrato(
 
 public sealed record SugestaoDeProducaoResult(DateOnly Ate, IReadOnlyList<SugestaoDoPrato> Pratos);
 
-public sealed record PratoPlanejado(Guid ProdutoId, decimal Porcoes);
+/// <param name="PesoPorPorcaoG">M1.4e (#1552): peso de uma porção. Só entra na conta quando a receita rende em peso.</param>
+public sealed record PratoPlanejado(Guid ProdutoId, decimal Porcoes, int? PesoPorPorcaoG = null);
 
 /// <summary>
 /// Planejamento da produção no console (M2.5, #1502).
@@ -74,15 +75,26 @@ public sealed class PlanejamentoDaProducaoUseCase(
         return new SugestaoDeProducaoResult(limite, lista);
     }
 
-    public Task<CalcularCestaProducaoResult> PlanejarAsync(Guid empresaId, IReadOnlyList<PratoPlanejado>? pratos, CancellationToken ct = default)
+    public async Task<CalcularCestaProducaoResult> PlanejarAsync(Guid empresaId, IReadOnlyList<PratoPlanejado>? pratos, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(empresaId);
-        var itens = (pratos ?? [])
-            .Where(p => p.Porcoes > 0)
-            .GroupBy(p => p.ProdutoId)
-            .Select(g => new ItemCestaInput(g.Key, g.Sum(p => p.Porcoes), UnidadeMedida.Un))
-            .ToList();
+        var itens = new List<ItemCestaInput>();
+        foreach (var doPrato in (pratos ?? []).Where(p => p.Porcoes > 0).GroupBy(p => p.ProdutoId))
+            itens.Add(await ItemDaCestaAsync(empresaId, doPrato.Key, doPrato.ToList()));
         if (itens.Count == 0) throw new UseCaseValidationException("Diga quantas porções de ao menos um prato.");
-        return cesta.ExecuteAsync(new CalcularCestaProducaoCommand(empresaId, null, itens), ct);
+        return await cesta.ExecuteAsync(new CalcularCestaProducaoCommand(empresaId, null, itens), ct);
+    }
+
+    // M1.4e (#1552): a receita que rende em peso é planejada pelo peso (porções × peso de cada uma). Sem o
+    // peso, o prato vai em porções e a cesta o deixa de fora por unidade incompatível, como sempre foi.
+    private async Task<ItemCestaInput> ItemDaCestaAsync(Guid empresaId, Guid produtoId, IReadOnlyList<PratoPlanejado> linhas)
+    {
+        var emPorcoes = new ItemCestaInput(produtoId, linhas.Sum(p => p.Porcoes), UnidadeMedida.Un);
+        if (linhas.Any(p => p.PesoPorPorcaoG is not > 0)) return emPorcoes;
+
+        var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId);
+        return produto is null || produto.RendimentoUnidade == UnidadeMedida.Un
+            ? emPorcoes
+            : new ItemCestaInput(produtoId, linhas.Sum(p => p.Porcoes * p.PesoPorPorcaoG!.Value), UnidadeMedida.G);
     }
 }

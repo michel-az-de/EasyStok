@@ -121,23 +121,17 @@ public sealed class BaixaDeInsumosDaProducao(
     private static string Quem(PratoParaBaixa p) =>
         string.IsNullOrWhiteSpace(p.Porcao) ? p.Prato.Nome : $"{p.Prato.Nome} {p.Porcao.Trim()}";
 
-    // A escolha é validada ao gravar a porção, mas a embalagem pode mudar depois em Insumos (desmarcada, outra
-    // unidade, apagada). Aí avisa e devolve null: vale a embalagem da receita, para a baixa não sumir.
+    // A escolha é validada ao gravar a porção, mas a embalagem pode mudar depois (tirada do estoque, que só
+    // inativa; desmarcada; outra unidade). Aí avisa e devolve null: vale a embalagem da receita, para a
+    // baixa não sumir, e a saída de produto inativo não derruba a produção.
     private async Task<Produto?> EmbalagemDaPorcaoAsync(Guid empresaId, PratoParaBaixa p, List<string> avisos)
     {
         if (p.EmbalagemDaPorcaoId is not { } id) return null;
 
         var embalagem = await produtoRepository.GetByIdAsync(empresaId, id);
-        var motivo = embalagem switch
-        {
-            null => "a embalagem escolhida para a porção não foi encontrada",
-            { EhEmbalagem: false } => $"{embalagem.Nome} não está mais marcada como embalagem",
-            { UnidadeMedidaBase: not UnidadeMedida.Un } => $"{embalagem.Nome} não é contada por unidade",
-            _ => null,
-        };
-        if (motivo is null) return embalagem;
+        if (EmbalagemDePorcao.MotivoParaNaoUsar(embalagem) is not { } motivo) return embalagem;
 
-        avisos.Add($"{Quem(p)}: {motivo}, então desceu a embalagem da receita. Escolha a embalagem da porção no cardápio.");
+        avisos.Add($"{Quem(p)}: {motivo}. A embalagem da porção não desceu; vale a da receita, se ela tiver. Escolha outra embalagem para a porção no cardápio.");
         return null;
     }
 

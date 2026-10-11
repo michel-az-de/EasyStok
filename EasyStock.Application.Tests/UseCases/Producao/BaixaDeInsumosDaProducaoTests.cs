@@ -356,7 +356,25 @@ public class BaixaDeInsumosDaProducaoTests
     }
 
     [Fact]
-    public async Task EmbalagemDaPorcaoApagadaDoEstoque_AvisaEUsaADaReceita()
+    public async Task EmbalagemDaPorcaoTiradaDoEstoque_AvisaEUsaADaReceita()
+    {
+        // "Remover" um produto só o inativa. Sem olhar o status, a porção ficava sem embalagem nenhuma, e a
+        // saída de produto inativo com saldo estoura dentro da transação da produção.
+        var lasanha = Prato(marcado: false);
+        var generica = Embalagem("Bandeja");
+        var inativa = Embalagem("Bandeja 300 g");
+        inativa.Status = StatusProduto.Inativo;
+        Receita(lasanha, (generica, 6, UnidadeMedida.Un));
+
+        var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 6, null, "300 g", inativa.Id)], "LOT-1", _data);
+
+        avisos.Should().ContainSingle().Which.Should().Contain("Bandeja 300 g").And.Contain("fora do estoque");
+        Baixado(generica).Should().Be(6m);
+        Baixado(inativa).Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task EmbalagemDaPorcaoQueORepositorioNaoAcha_AvisaEUsaADaReceita()
     {
         var lasanha = Prato(marcado: false);
         var generica = Embalagem("Bandeja");
