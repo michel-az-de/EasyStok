@@ -342,7 +342,19 @@ public class SyncMutationDispatcher(
         // O cancelamento devolve o que o pedido baixou por este caminho, venha de onde vier; se nada saiu, nada volta.
         var devolver = newStatus == "cancelado" && oldStatus is not null and not "cancelado";
         if (!baixar && !devolver) return;
-        if (baixar && await NasceuNoErpAsync(orderId, pedidoErpVinculado, empresaId)) return;
+        var nasceuNoErp = await NasceuNoErpAsync(orderId, pedidoErpVinculado, empresaId);
+        if (baixar && nasceuNoErp) return;
+        // #1571: no pedido que nasceu aqui e ja virou Pedido do ERP, o console pode ter baixado antes
+        // (com outro documento). A baixa desconta o que ele ja baixou; o cancelamento devolve as duas.
+        // No pedido que nasceu no ERP, a esteira e a dona: este caminho nao toca nas saidas dela.
+        var pedidoDoErp = nasceuNoErp ? null : pedidoErpVinculado;
+
+        if (devolver)
+        {
+            if (empresaId is { } empresa)
+                await _stockReconciler.DevolverVendaAsync(empresa, orderId, $"Cancelamento de pedido mobile {orderId}", pedidoDoErp);
+            return;
+        }
 
         var linhas = new List<(Product Produto, int Quantidade)>();
         foreach (var doProduto in items.Where(i => !string.IsNullOrWhiteSpace(i.ProductId)).GroupBy(i => i.ProductId))
@@ -352,13 +364,8 @@ public class SyncMutationDispatcher(
             if (p != null && p.EmpresaId == empresaId) linhas.Add((p, doProduto.Sum(i => i.Qty)));
         }
         foreach (var (produto, quantidade) in MobileStockReconciler.PorProdutoDoErp(linhas))
-        {
-            if (baixar)
-                await _stockReconciler.BaixarVendaAsync(produto, quantidade, orderId, lojaDoPedido,
-                    $"Pedido mobile {orderId} -> {newStatus}");
-            else
-                await _stockReconciler.DevolverVendaAsync(produto, orderId, $"Cancelamento de pedido mobile {orderId}");
-        }
+            await _stockReconciler.BaixarVendaAsync(produto, quantidade, orderId, lojaDoPedido,
+                $"Pedido mobile {orderId} -> {newStatus}", pedidoDoErp);
     }
 
     /// <summary>
