@@ -45,6 +45,61 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Workflows;
 public sealed class RegistrarPagamentoPedidoConcorrenciaIntegrationTests(PostgreSqlDatabaseFixture fixture)
     : IClassFixture<PostgreSqlDatabaseFixture>
 {
+    [SkippableTheory]
+    [InlineData("0.001", false)]
+    [InlineData("0.005", false)]
+    [InlineData("199.999", false)]
+    [InlineData("0.01", true)]
+    [InlineData("199.99", true)]
+    [InlineData("200.000", true)]
+    public async Task Recebimento_preserva_centavos_sem_arredondamento_implicito_no_postgres(string valorInformado, bool aceitar)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var empresaId = Guid.NewGuid();
+        var loja = Loja.Criar(empresaId, "Loja centavos");
+        var pedido = NovoPedidoOperacional(empresaId, loja.Id);
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.Empresas.Add(new Empresa { Id = empresaId, Nome = "Teste centavos", Documento = "11223344556677",
+                CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+            seed.Lojas.Add(loja);
+            seed.Pedidos.Add(pedido);
+            await seed.SaveChangesAsync();
+        }
+
+        var valor = decimal.Parse(valorInformado, System.Globalization.CultureInfo.InvariantCulture);
+        await using var provider = BuildProductionProvider();
+        await using var scope = provider.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().SetMobileTenantContext(empresaId);
+        EasyStock.Application.UseCases.Pedidos.PedidoResult? resultado = null;
+        var erro = await Record.ExceptionAsync(async () => resultado = await scope.ServiceProvider
+            .GetRequiredService<RegistrarPagamentoPedidoUseCase>().ExecuteAsync(
+                new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "dinheiro", valor)));
+
+        await using var conferir = fixture.CreateDbContext();
+        conferir.SetMobileTenantContext(empresaId);
+        var salvo = await conferir.Pedidos.Include(p => p.Pagamentos).SingleAsync(p => p.Id == pedido.Id);
+        if (aceitar)
+        {
+            erro.Should().BeNull();
+            resultado.Should().NotBeNull();
+            resultado!.TotalPago.Should().Be(valor);
+            salvo.Pagamentos.Should().ContainSingle(p => p.Valor == valor);
+            salvo.TotalPago.Should().Be(resultado.TotalPago);
+        }
+        else
+        {
+            erro.Should().BeOfType<UseCaseValidationException>(
+                $"o valor {valorInformado} não cabe em centavos; resposta TotalPago={resultado?.TotalPago}, banco TotalPago={salvo.TotalPago}");
+            salvo.Pagamentos.Should().BeEmpty();
+            (await conferir.Set<PedidoEvento>().AnyAsync(e => e.PedidoId == pedido.Id)).Should().BeFalse();
+            (await conferir.MovimentosCaixa.AnyAsync(m => m.EmpresaId == empresaId)).Should().BeFalse();
+            (await conferir.CobrancasPedido.AnyAsync(c => c.PedidoId == pedido.Id)).Should().BeFalse();
+            (await conferir.ImpressoesPendentes.AnyAsync(i => i.PedidoId == pedido.Id)).Should().BeFalse();
+        }
+    }
+
     [SkippableFact]
     public async Task Saldo_de_encomenda_apos_sinal_online_quita_uma_vez_no_postgres()
     {
