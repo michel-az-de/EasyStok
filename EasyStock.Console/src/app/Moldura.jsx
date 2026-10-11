@@ -22,6 +22,7 @@ import { Sininho } from '../features/lembretes/Sininho'
 import { Popover } from '../componentes/Popover'
 import { FONTE_API } from '../infra/fonteDados'
 import { HASH_MODULO_COZINHA } from '../dominio/rota'
+import { AvisoDaAcaoApi } from './FaixaApi'
 import css from './moldura.module.css'
 
 // Título de coluna sem ícone: quando todo título tem ícone, ícone nenhum marca.
@@ -294,9 +295,11 @@ function Trilho({
   )
 }
 
+// #1551: a gaveta é um <dialog> e a FaixaApi fica atrás da cortina. O aviso da ação da API
+// (janela faltando, pedido não criado, cobrança que não saiu) vem para o rodapé dela.
 function Gaveta({ titulo, aoFechar, children }) {
   return (
-    <Modal titulo={titulo} className={css.gaveta} largura="min(480px, 90vw)" aoFechar={aoFechar}>
+    <Modal titulo={titulo} className={css.gaveta} largura="min(480px, 90vw)" aoFechar={aoFechar} rodape={<AvisoDaAcaoApi />}>
       {children}
     </Modal>
   )

@@ -103,6 +103,8 @@
 .gaveta.gaveta[open] { animation: gavetaEntra var(--dur-longa) var(--ease-mola) both; }
 /* A Ficha já tem seus próprios recuos e rolagem dentro da janela. */
 .gaveta > h2 + div { padding: 0; }
+/* #1551: o rodapé da gaveta só existe para o aviso da ação da API; sem aviso, some. */
+.gaveta > h2 + div + div:empty { display: none; }
 @keyframes gavetaEntra { from { transform: translateX(100%); } to { transform: none; } }
 .espaco { margin-left: auto; }
 /* Âncora do popover do topo. Sem isto a camada se posiciona pela barra toda. */
