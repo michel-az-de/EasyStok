@@ -2,6 +2,7 @@ using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Application.UseCases.Common;
@@ -13,6 +14,7 @@ using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
+using EasyStock.Infra.Notifications.Templating;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -350,6 +352,7 @@ public sealed class RegistrarPagamentoPedidoConcorrenciaIntegrationTests(Postgre
         services.AddSingleton(Substitute.For<ICacheService>());
         services.AddEasyStockPostgreInfrastructure(fixture.ConnectionString, config);
         services.AddEasyStockApplication();
+        services.AddSingleton<IRendererTemplate, ScribanRenderer>();
         return services.BuildServiceProvider();
     }
 }
