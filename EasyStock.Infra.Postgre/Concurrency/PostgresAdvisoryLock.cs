@@ -1,4 +1,5 @@
 using EasyStock.Infra.Postgre.Data;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Postgre.Concurrency;
@@ -11,6 +12,17 @@ public sealed class PostgresAdvisoryLock(
     EasyStockDbContext db,
     ILogger<PostgresAdvisoryLock> logger)
 {
+    /// <summary>
+    /// Rodada de job com a trava numa conexão própria (escopo separado): a rodada segue abrindo os escopos
+    /// dela, com o tenant e o RLS que já usava. Para serviço registrado em mais de um host (#1575).
+    /// </summary>
+    public static async Task<bool> TentarExecutarEmEscopoProprioAsync(
+        IServiceScopeFactory scopeFactory, long lockKey, Func<CancellationToken, Task> action, CancellationToken ct)
+    {
+        using var scope = scopeFactory.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<PostgresAdvisoryLock>().TentarExecutarAsync(lockKey, action, ct);
+    }
+
     /// <summary>
     /// Tenta adquirir um advisory lock e executa <paramref name="action"/>.
     /// Se o lock não estiver disponível (outra réplica), retorna false sem executar.

@@ -4,6 +4,7 @@ import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useAtendimento } from '../../aplicacao/contextos'
+import { useTiqueLocal } from '../../hooks/useTiqueLocal'
 import { faltaPagar, situacaoDaCobranca } from '../../dominio/cobranca'
 import { horaCurta, moeda } from '../../dominio/formato'
 import css from './RelogioPix.module.css'
@@ -35,24 +36,6 @@ const mmss = (restamMs) => {
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v))
 
-// Tique local de 1s por cima do relogio da tela, que anda de 30 em 30s. A
-// contagem base vem de `situacaoDaCobranca` (o dominio continua sendo a
-// fonte); aqui so interpolamos os segundos entre um tique grande e outro.
-// `ancora` muda a cada tique grande OU a cada cobranca nova (reenvio), e e
-// nesse instante que o tique local zera.
-function useTiqueLocal(restamMsBase, ancora) {
-  const [decorrido, setDecorrido] = useState(0)
-
-  useEffect(() => {
-    setDecorrido(0)
-    const id = setInterval(() => setDecorrido((d) => d + 1000), 1000)
-    return () => clearInterval(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ancora])
-
-  return Math.max(restamMsBase - decorrido, 0)
-}
-
 export function RelogioPix({
   cobranca, agora, editavel, numeroPedido, nomeCliente,
   aoReenviar, aoCancelarPedido, aoEncerrarAtendimento, aoAceitarDivergencia, aoCobrarDiferenca,
@@ -62,11 +45,10 @@ export function RelogioPix({
   // O relógio grande do app anda de 30 em 30s: entre um tique e outro, o
   // tique local do anel pode chegar a zero antes dele, ou o tique grande
   // pode alcançar "expirada" antes do anel. Os dois caminhos levam ao mesmo
-  // "ao zerar", nunca a um reinício de contagem.
-  const restam = useTiqueLocal(
-    situacao.chave === 'aguardando' ? situacao.restamMs : 0,
-    agora + '·' + cobranca.id,
-  )
+  // "ao zerar", nunca a um reinício de contagem. Só "aguardando" tem contagem:
+  // nos outros estados o tique local nem liga (#1577).
+  const contando = situacao.chave === 'aguardando'
+  const restam = useTiqueLocal(contando ? situacao.restamMs : 0, agora + '·' + cobranca.id, contando)
   const zerado = situacao.chave === 'expirada' || (situacao.chave === 'aguardando' && restam <= 0)
 
   const [confirmando, setConfirmando] = useState(null)

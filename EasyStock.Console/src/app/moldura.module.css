@@ -15,13 +15,16 @@
 .app { display: flex; flex-direction: column; height: 100%; min-height: 100%; background: var(--fundo); }
 
 /* Topo em material de vidro (rodada 6): marca à esquerda, tema logo ao lado,
-   grupo de controles à direita. Linha fina de 1 px separa a região. */
+   grupo de controles à direita. Linha fina de 1 px separa a região.
+   #1577: sem `backdrop-filter`. O topo e o rodapé ficam no fluxo da coluna, com o palco rolando
+   por dentro: atrás deles só há o fundo liso, e desfocar cor lisa custava uma camada com filtro
+   no tablet para mudar menos de 1/255 da cor. */
 .topo {
   position: relative; z-index: 10;
   display: flex; align-items: center; gap: var(--e-16); flex-wrap: wrap;
   min-height: 64px;
   padding: var(--e-2) var(--e-4); padding-top: calc(var(--e-2) + env(safe-area-inset-top, 0px));
-  background: var(--vidro); -webkit-backdrop-filter: var(--desfoque); backdrop-filter: var(--desfoque);
+  background: var(--vidro);
   border-bottom: var(--b-1) solid var(--linha); flex-shrink: 0;
 }
 /* Assinatura oficial completa, com placa clara também no tema escuro. */
@@ -90,7 +93,7 @@
 .rodape {
   display: flex; gap: var(--e-3); flex-wrap: wrap; align-items: center; flex-shrink: 0;
   padding: var(--e-2) var(--e-4); padding-bottom: calc(var(--e-2) + env(safe-area-inset-bottom, 0px));
-  background: var(--vidro); -webkit-backdrop-filter: var(--desfoque); backdrop-filter: var(--desfoque);
+  background: var(--vidro);
   border-top: var(--b-1) solid var(--linha);
   font-size: var(--t-apoio); color: var(--tinta-3);
 }

@@ -52,7 +52,8 @@ public sealed class PlanejamentoDaProducaoUseCase(
         if (pratos.Count == 0) return new SugestaoDeProducaoResult(limite, []);
 
         var produtoIds = pratos.Select(p => p.ProdutoId!.Value).Distinct().ToList();
-        var lotes = await itemEstoqueRepository.GetByProdutosAsync(empresaId, produtoIds, null, ct);
+        // #1575: aqui os lotes só entram em SaldoEDescoberto, que ignora lote zerado e sem descoberto.
+        var lotes = await itemEstoqueRepository.GetByProdutosAsync(empresaId, produtoIds, null, ct, apenasComSaldoOuDescoberto: true);
         var demanda = await pedidoRepository.GetDemandaAgendadaAsync(empresaId, HorarioBrasil.JanelaDiaUtc(limite).FimUtc, ct);
         var produtos = (await produtoRepository.GetByIdsAsync(empresaId, produtoIds, ct)).ToDictionary(p => p.Id);
 
