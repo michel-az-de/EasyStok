@@ -89,3 +89,4 @@ jobs:
       - run: node ferramentas/prova-premium-hall.mjs
       - run: node ferramentas/prova-premium-cozinha.mjs
       - run: node ferramentas/prova-premium-comanda.mjs
+      - run: node ferramentas/prova-1582-navegacao-ux.mjs

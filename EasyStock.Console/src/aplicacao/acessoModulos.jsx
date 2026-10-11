@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { chamarApi } from '../infra/api/cliente'
 import { FONTE_API } from '../infra/fonteDados'
-import { entradaDoPerfil } from '../dominio/acessoModulos'
+import { aposFalhaDeLeitura, entradaDoPerfil } from '../dominio/acessoModulos'
 
 export const ContextoAcessoModulos = createContext({ permite: () => !FONTE_API, acoes: {}, aoSair: null })
 export const useAcessoModulos = () => useContext(ContextoAcessoModulos)
@@ -18,7 +18,7 @@ export function useModulosDaSessao(sessao) {
       if (!entrou.current && (!window.location.hash || window.location.hash === '#/')) window.location.hash = entradaDoPerfil(dados)
       entrou.current = true
       setEstado({ dados, erro: null })
-    }).catch((erro) => { if (ativo) setEstado({ dados: null, erro: erro.message }) })
+    }).catch((erro) => { if (ativo) setEstado((atual) => aposFalhaDeLeitura(atual, erro.message)) })
     return () => { ativo = false }
   }, [sessao.token, tentativa])
   return { ...estado, tentarNovamente: () => {
