@@ -127,13 +127,13 @@ public class IniciarCheckoutGuestUseCaseTests
                 Geocoding, Substitute.For<IRotaClient>(), NullLogger<CalcularFreteUseCase>.Instance);
             var core = new CheckoutCoreService(StorefrontRepo, CardapioRepo, JanelaRepo, BloqueioRepo, frete,
                 VagaRepo, PedidoRepo, ExpedienteRepo, NullLogger<CheckoutCoreService>.Instance,
-                new EasyStock.TestHelpers.FakeTimeProvider(new DateTimeOffset(2026, 6, 1, 15, 0, 0, TimeSpan.Zero)) /* #1506: antes das entregas de 02/06 */);
+                new EasyStock.TestHelpers.FakeTimeProvider(new DateTimeOffset(2026, 6, 1, 15, 0, 0, TimeSpan.Zero)) /* #1506: antes das entregas de 02/06 */, EnderecoEntregaPedidoTeste.Criar());
             var cobranca = new GerarCobrancaPedidoUseCase(Substitute.For<IPedidoRepository>(), StorefrontRepo, CobrancaRepo,
                 MpClient, core, Uow, TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
             return new IniciarCheckoutGuestUseCase(StorefrontRepo, core, cobranca, ClienteRepo, PedidoRepo, Uow,
                 new AcompanhamentoTokenService(config, TimeProvider.System),
                 new AtribuicaoPedidoCampanha(CampanhaRepo, TimeProvider.System), Tenant, TimeProvider.System,
-                NullLogger<IniciarCheckoutGuestUseCase>.Instance);
+                NullLogger<IniciarCheckoutGuestUseCase>.Instance, EnderecoEntregaPedidoTeste.Criar());
         }
     }
 

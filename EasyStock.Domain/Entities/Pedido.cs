@@ -42,6 +42,13 @@ namespace EasyStock.Domain.Entities
         public string? ClienteApt { get; set; }
         public string? ClienteTelefone { get; set; }
 
+        public string? EnderecoEntrega { get; set; }
+        public string? BairroEntrega { get; set; }
+        public string? CepEntrega { get; set; }
+        public double? EntregaLat { get; set; }
+        public double? EntregaLng { get; set; }
+        public DateTime? EnderecoConfirmadoEm { get; set; }
+
         /// <summary>
         /// Status legado em string lowercase: "aguardando" | "preparando" |
         /// "pronto" | "entregue" | "cancelado". Mantido público e mutable

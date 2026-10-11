@@ -67,6 +67,7 @@ public static partial class ServiceCollectionExtensions
         services.AddOptions<PedidoEstoqueOptions>();
         services.AddScoped<PedidoEstoqueIntegrationService>();
         services.AddScoped<CriarPedidoUseCase>();
+            services.AddScoped<EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido>();
         services.AddScoped<AtualizarStatusPedidoUseCase>();
         // S19: KDS do console sobre Pedido
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Kds.ListarPedidosKdsUseCase>();

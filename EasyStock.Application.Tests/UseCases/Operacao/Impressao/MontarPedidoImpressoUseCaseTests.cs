@@ -11,6 +11,14 @@ namespace EasyStock.Application.Tests.UseCases.Operacao.Impressao;
 /// </summary>
 public class MontarPedidoImpressoUseCaseTests
 {
+    [Fact]
+    public async Task Impresso_preserva_endereco_do_pedido_sem_acrescentar_dados_do_cadastro()
+    {
+        var leitura = Leitura();
+        var dto = await Montar(leitura with { Cliente = leitura.Cliente with { EnderecoEntrega = "Rua da encomenda, 42" } });
+        dto!.Cliente.Endereco.Should().Be("Rua da encomenda, 42");
+    }
+
     private static readonly Guid EmpresaId = Guid.NewGuid();
     private static readonly Guid PedidoId = Guid.Parse("a7f3c21b-0000-4000-8000-000000000001");
     private static readonly Guid ClienteId = Guid.Parse("0412abcd-0000-4000-8000-000000000002");

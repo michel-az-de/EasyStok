@@ -57,7 +57,7 @@ public class PedidoUseCasesTests
         Substitute.For<ILogger<PedidoEstoqueIntegrationService>>());
 
     private CriarPedidoUseCase CriarPedidoUC() => new(_pedidoRepo, _clienteRepo, _produtoRepo, _uow,
-        Substitute.For<ILogger<CriarPedidoUseCase>>(), new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
+        Substitute.For<ILogger<CriarPedidoUseCase>>(), new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()), EnderecoEntregaPedidoTeste.Criar());
     private CancelarPedidoUseCase CancelarUC() => new(_pedidoRepo, EstoqueSvc(),
         new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(_contaReceberRepo, _vagaRepo,
             Substitute.For<ILogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>>()),

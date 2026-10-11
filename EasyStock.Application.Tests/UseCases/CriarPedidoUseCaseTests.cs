@@ -7,6 +7,30 @@ namespace EasyStock.Application.Tests.UseCases;
 
 public class CriarPedidoUseCaseTests
 {
+    [Fact]
+    public async Task Recusa_cliente_de_outra_empresa_antes_de_gravar_snapshot()
+    {
+        var empresaId = Guid.NewGuid();
+        var cliente = Cliente.Criar(Guid.NewGuid(), "Outra empresa");
+        _clienteRepo.GetByIdAsync(empresaId, cliente.Id).Returns(cliente);
+        var executar = () => Sut().ExecuteAsync(new CriarPedidoCommand(empresaId, ClienteId: cliente.Id));
+        await executar.Should().ThrowAsync<EasyStock.Application.UseCases.Common.UseCaseValidationException>();
+        await _pedidoRepo.DidNotReceive().AddAsync(Arg.Any<Pedido>());
+    }
+
+    [Theory]
+    [InlineData("web", "Rua da encomenda, 42")]
+    [InlineData("balcao", null)]
+    public async Task Criacao_preserva_endereco_de_entrega_e_retirada_deixa_nulo(string origem, string? esperado)
+    {
+        var empresaId = Guid.NewGuid();
+        var cliente = Cliente.Criar(empresaId, "Maria");
+        cliente.Endereco = "Rua da encomenda, 42";
+        _clienteRepo.GetByIdAsync(empresaId, cliente.Id).Returns(cliente);
+        await Sut().ExecuteAsync(new CriarPedidoCommand(empresaId, ClienteId: cliente.Id, Origem: origem));
+        await _pedidoRepo.Received(1).AddAsync(Arg.Is<Pedido>(p => p.EnderecoEntrega == esperado));
+    }
+
     private readonly IPedidoRepository _pedidoRepo = Substitute.For<IPedidoRepository>();
     private readonly IClienteRepository _clienteRepo = Substitute.For<IClienteRepository>();
     private readonly IProdutoRepository _produtoRepo = Substitute.For<IProdutoRepository>();
@@ -14,7 +38,7 @@ public class CriarPedidoUseCaseTests
     private readonly IPrazoPreparoPedidoQueries _prazoQueries = Substitute.For<IPrazoPreparoPedidoQueries>();
 
     private CriarPedidoUseCase Sut() => new(_pedidoRepo, _clienteRepo, _produtoRepo, _uow,
-        Substitute.For<ILogger<CriarPedidoUseCase>>(), new CalculadoraInicioPrevistoPedido(_prazoQueries));
+        Substitute.For<ILogger<CriarPedidoUseCase>>(), new CalculadoraInicioPrevistoPedido(_prazoQueries), EnderecoEntregaPedidoTeste.Criar());
 
     [Fact]
     public async Task DeveNormalizarAgendadoParaEm_ParaUtc_QuandoClienteEnviaDataSemFuso()

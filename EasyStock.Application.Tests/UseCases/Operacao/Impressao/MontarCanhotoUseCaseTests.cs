@@ -12,6 +12,16 @@ namespace EasyStock.Application.Tests.UseCases.Operacao.Impressao;
 /// </summary>
 public class MontarCanhotoUseCaseTests
 {
+    [Fact]
+    public async Task Canhoto_preserva_endereco_do_pedido_apos_mudar_cadastro()
+    {
+        var c = new Cenario();
+        c.Pedido.EnderecoEntrega = "Rua da encomenda, 42";
+        c.Cliente.Endereco = "Rua do cadastro alterado, 99";
+        var dto = await c.UseCase().ExecuteAsync(new MontarCanhotoInput(c.EmpresaId, c.Pedido.Id));
+        dto!.Cabecalho.Endereco.Should().Be("Rua da encomenda, 42");
+    }
+
     internal sealed class Cenario
     {
         public Guid EmpresaId { get; } = Guid.NewGuid();

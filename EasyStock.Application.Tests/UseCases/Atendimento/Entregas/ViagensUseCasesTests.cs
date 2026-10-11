@@ -11,6 +11,25 @@ namespace EasyStock.Application.Tests.UseCases.Atendimento.Entregas;
 /// <summary>S44: montar a viagem, bloqueio de cliente, retrato e rota no Maps.</summary>
 public class ViagensUseCasesTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Viagem_usa_endereco_do_pedido_com_fallback_apenas_para_legado(bool legado)
+    {
+        var pedido = Pedido.Criar(_empresaId);
+        pedido.ClienteId = Guid.NewGuid();
+        pedido.EnderecoEntrega = legado ? null : "Rua da encomenda, 42";
+        _pedidos.GetByIdAsync(_empresaId, pedido.Id).Returns(pedido);
+        _clientes.GetByIdAsync(_empresaId, pedido.ClienteId.Value)
+            .Returns(new Cliente { Endereco = "Rua do cadastro, 99" });
+        var viagem = Viagem.Criar(_empresaId, Agora);
+        viagem.IncluirParada(pedido.Id, false);
+        _viagens.ObterAsync(_empresaId, viagem.Id, Arg.Any<CancellationToken>()).Returns(viagem);
+        var dto = await new ObterViagemUseCase(_viagens, _pedidos, _clientes).ExecuteAsync(_empresaId, viagem.Id);
+        dto.Paradas.Single().Endereco.Should().Be(legado ? "Rua do cadastro, 99" : "Rua da encomenda, 42");
+        dto.RotaUrl.Should().Contain(Uri.EscapeDataString(legado ? "Rua do cadastro, 99" : "Rua da encomenda, 42"));
+    }
+
     private static readonly DateTime Agora = new(2026, 9, 30, 18, 0, 0, DateTimeKind.Utc);
 
     private readonly Guid _empresaId = Guid.NewGuid();

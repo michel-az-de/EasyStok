@@ -6651,8 +6651,16 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("avaliacao_solicitada_em");
 
+                    b.Property<string>("BairroEntrega")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
                     b.Property<DateTime?>("CanceladoEm")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CepEntrega")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
 
                     b.Property<string>("ClienteApt")
                         .HasMaxLength(32)
@@ -6674,6 +6682,18 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("EnderecoConfirmadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EnderecoEntrega")
+                        .HasColumnType("text");
+
+                    b.Property<double?>("EntregaLat")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("EntregaLng")
+                        .HasColumnType("double precision");
 
                     b.Property<DateTime?>("EntreguEm")
                         .HasColumnType("timestamp with time zone");
