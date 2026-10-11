@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.Ports.Output.Integration;
@@ -252,6 +253,11 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
             .ExecuteAsync(new ListarPedidosKdsQuery(cenario.EmpresaId, Data: cenario.Data));
     }
 
+    private sealed class RelogioFixo(DateTime utc) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(utc, TimeSpan.Zero);
+    }
+
     private sealed record Cenario(Guid EmpresaId, Guid ConversaId, Guid ItemId, Guid JanelaId, DateOnly Data);
 
     private async Task<Cenario> SemearAsync()
@@ -264,7 +270,8 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         var loja = StorefrontEntity.Criar(empresaId, $"jornada-{empresaId:N}"[..20], "Jornada cozinha", 0m);
         loja.Ativar();
         db.Storefronts.Add(loja);
-        var data = DateOnly.FromDateTime(agora).AddDays(7);
+        // Entrega no dia: encomenda futura cobra sinal por link (PlanoPagamentoEncomenda) e é outra jornada.
+        var data = HorarioBrasil.Hoje();
         var janela = JanelaEntrega.Criar(loja.Id, (int)data.DayOfWeek, new TimeOnly(9, 0), new TimeOnly(12, 0), 10, "Manhã");
         db.JanelasEntrega.Add(janela);
         db.FreteZonas.Add(FreteZona.CriarPorCep(loja.Id, "Centro", "01000000", "01999999", 5m, 60));
@@ -292,7 +299,8 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         services.AddSingleton(Substitute.For<ICacheService>());
         services.AddEasyStockPostgreInfrastructure(fixture.ConnectionString, config);
         services.AddEasyStockApplication();
-        services.AddSingleton(TimeProvider.System);
+        // 06:00 de Brasília de hoje: a janela da manhã ainda cabe no prazo, seja qual for a hora da execução.
+        services.AddSingleton<TimeProvider>(new RelogioFixo(HorarioBrasil.InstanteUtc(HorarioBrasil.Hoje(), new TimeOnly(6, 0))));
         services.AddSingleton(eventos);
         if (publicador is not null) services.AddSingleton(publicador);
         services.AddSingleton(Substitute.For<ICepLookupClient>());
