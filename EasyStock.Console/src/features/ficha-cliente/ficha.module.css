@@ -58,6 +58,10 @@
   transition: width var(--dur-longa) var(--ease-mola);
 }
 .trilhaItem { position: relative; z-index: 1; display: grid; justify-items: center; gap: 6px; }
+@container (max-width: 360px) {
+  .trilha { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-flow: row; row-gap: var(--e-3); }
+  .trilha::before, .trilha::after { display: none; }
+}
 .rotuloPasso { font-size: var(--t-minimo); font-weight: 600; color: var(--tinta-3); line-height: 1.1; white-space: nowrap; }
 .trilhaItem.feito .rotuloPasso, .trilhaItem.atual .rotuloPasso { color: var(--tinta); }
 .circuloPasso {
@@ -172,6 +176,7 @@
 
 /* Barra do próximo passo: alvo fixo, sempre no mesmo lugar, sempre visível. */
 .barraPasso {
+  container-type: inline-size;
   flex-shrink: 0; display: grid; gap: var(--e-2);
   padding: var(--e-3) var(--e-4);
   padding-bottom: calc(var(--e-3) + env(safe-area-inset-bottom, 0px));
