@@ -51,15 +51,16 @@ public sealed class PlanejamentoDaProducaoUseCase(
             .ToList();
         if (pratos.Count == 0) return new SugestaoDeProducaoResult(limite, []);
 
-        var lotes = await itemEstoqueRepository.GetByProdutosAsync(empresaId, pratos.Select(p => p.ProdutoId!.Value).Distinct(), null, ct);
+        var produtoIds = pratos.Select(p => p.ProdutoId!.Value).Distinct().ToList();
+        var lotes = await itemEstoqueRepository.GetByProdutosAsync(empresaId, produtoIds, null, ct);
         var demanda = await pedidoRepository.GetDemandaAgendadaAsync(empresaId, HorarioBrasil.JanelaDiaUtc(limite).FimUtc, ct);
+        var produtos = (await produtoRepository.GetByIdsAsync(empresaId, produtoIds, ct)).ToDictionary(p => p.Id);
 
         var lista = new List<SugestaoDoPrato>(pratos.Count);
         foreach (var prato in pratos)
         {
             var produtoId = prato.ProdutoId!.Value;
-            var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId);
-            if (produto is null) continue;
+            if (!produtos.TryGetValue(produtoId, out var produto)) continue;
 
             var (saldo, descoberto) = EstoqueDoDiaUseCase.SaldoEDescoberto(lotes.TryGetValue(produtoId, out var l) ? l : [], hoje);
             // O item do pedido aponta para o prato do cardápio; o antigo (sem prato) cai pelo produto.

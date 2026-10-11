@@ -33,6 +33,14 @@ public interface IOutboxNotificacaoRepository
     /// <returns>Quantas mensagens foram reclamadas.</returns>
     Task<int> ReclamarLeasesVencidosAsync(int limite, CancellationToken ct = default);
 
+    /// <summary>
+    /// Atalho do wakeup ocioso (#1566): existe alguma mensagem <c>Pendente</c> ou <c>EmEnvio</c>, de qualquer empresa e
+    /// de qualquer data? A expiração e a reserva só mexem em <c>Pendente</c> e a reclamação de lease só em
+    /// <c>EmEnvio</c>, então sem nenhuma delas o dispatcher não tem o que fazer. Cross-tenant: o chamador liga o bypass
+    /// pela porta, como no <see cref="ReservarParaEnvioAsync"/>.
+    /// </summary>
+    Task<bool> ExisteMensagemAbertaAsync(CancellationToken ct = default);
+
     /// <summary>A mensagem da empresa pelo id, rastreada. A empresa vai no <c>WHERE</c> porque no Worker o filtro do EF está desligado.</summary>
     Task<OutboxMensagemNotificacao?> ObterAsync(Guid empresaId, Guid id, CancellationToken ct = default);
 

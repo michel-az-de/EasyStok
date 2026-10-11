@@ -13,7 +13,8 @@ public sealed class ListarMensagensConversaUseCase(IConversaRepository conversaR
     public async Task<IReadOnlyList<MensagemAtendimentoResult>> ExecuteAsync(
         ListarMensagensConversaQuery query, CancellationToken ct = default)
     {
-        _ = await conversaRepository.ObterPorIdAsync(query.EmpresaId, query.ConversaId, ct)
+        // Só para saber se a conversa existe na empresa: a leitura leve não rastreia nem traz o contexto (#1566).
+        _ = await conversaRepository.ObterSituacaoAsync(query.EmpresaId, query.ConversaId, ct)
             ?? throw new ConversaNaoEncontradaException(query.ConversaId);
 
         var limite = query.Limite <= 0 ? LimitePadrao : Math.Min(query.Limite, LimiteMaximo);
