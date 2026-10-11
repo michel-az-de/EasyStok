@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
@@ -8,10 +9,23 @@ import css from './cozinha.module.css'
 // leva, legível no tablet, com a trilha de etapas e o próximo toque. Mesmo
 // agrupamento do canhoto (`gruposDoKds`), então a tela e o papel não divergem.
 // Os itens não se editam aqui: o pedido já está no EasyStok (F03).
-export function ComandaKds({ pedido, agora, linhas, movendo, aoAvancar, aoImprimir, aoReimprimir, aoFechar }) {
+// #1584: o erro da tela (`erro`) aparece aqui dentro; desenhado só na página, ficava inerte
+// atrás do modal e "Marcar pronto" parecia não ter feito nada.
+export function ComandaKds({
+  pedido, agora, linhas, movendo, erro, aoAvancar, aoImprimir, aoReimprimir, aoLimparErro, aoFechar,
+}) {
   const proximo = proximoStatusKds(pedido.status)
   const aviso = avisoDeInicio(pedido, agora)
   const atual = ETAPAS_KDS.findIndex((e) => e.status === pedido.status)
+  // #1584: "Reimprimir na fila" não dava retorno. A ação guarda a própria falha no erro da
+  // tela, então o erro antigo sai antes e a confirmação só vale se nenhum erro voltar.
+  const [reimpressao, setReimpressao] = useState(null) // null | 'enviando' | 'feita'
+  const reimprimir = async () => {
+    aoLimparErro?.()
+    setReimpressao('enviando')
+    await aoReimprimir(pedido.id)
+    setReimpressao('feita')
+  }
 
   return (
     <Modal
@@ -19,7 +33,9 @@ export function ComandaKds({ pedido, agora, linhas, movendo, aoAvancar, aoImprim
       aoFechar={aoFechar}
       rodape={(
         <>
-          <Botao variante="texto" onClick={() => aoReimprimir(pedido.id)}>Reimprimir na fila</Botao>
+          <Botao variante="texto" disabled={reimpressao === 'enviando'} onClick={reimprimir}>
+            {reimpressao === 'enviando' ? 'Reenviando…' : 'Reimprimir na fila'}
+          </Botao>
           <Botao icone="printer" onClick={() => aoImprimir(pedido)}>Imprimir canhoto</Botao>
           {proximo && (
             <Botao variante="primario" disabled={movendo} onClick={() => aoAvancar(pedido.id, proximo.status)}>
@@ -30,6 +46,16 @@ export function ComandaKds({ pedido, agora, linhas, movendo, aoAvancar, aoImprim
       )}
     >
       <div className={css.comanda}>
+        {erro && (
+          <p className={css.motivoRecusa} role="alert">
+            <Icone nome="circle-x" tamanho={16} /> {erro}
+          </p>
+        )}
+        {reimpressao === 'feita' && !erro && (
+          <output className={css.comandaApoio}>
+            <Icone nome="check" tamanho={16} /> Canhoto de volta na fila de impressão.
+          </output>
+        )}
         <p className={css.comandaCliente}>{nomeNaComanda(pedido)}</p>
         {pedido.endereco && <p className={css.comandaApoio}>{pedido.endereco}</p>}
         <p className={css.comandaApoio}>

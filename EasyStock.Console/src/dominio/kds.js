@@ -158,3 +158,13 @@ export function tempoAteInicio(pedido, agora) {
 export const textoDaCozinhaVazia = ({ amanha }) => (amanha
   ? 'Nenhum pedido pago para amanhã ainda.'
   : 'Cozinha em dia hoje. O pedido pago para hoje aparece aqui sozinho; o de amanhã, em Amanhã.')
+
+// Dia da fila (#1584): "Amanhã" vale só no dia da loja em que foi escolhido (`amanhaDesde`,
+// YYYY-MM-DD). Virou o dia, a fila volta para Hoje: o amanhã de ontem é o hoje de agora, e o
+// tablet aberto passava a mostrar depois de amanhã e escondia os pedidos do dia.
+// `data` vai para a API só quando não é hoje.
+const UM_DIA_MS = 86400000
+export function diaDaFilaDaCozinha(amanhaDesde, agora) {
+  const amanha = Boolean(amanhaDesde) && amanhaDesde === dataIsoNoFuso(agora)
+  return { amanha, data: amanha ? dataIsoNoFuso(agora + UM_DIA_MS) : null }
+}

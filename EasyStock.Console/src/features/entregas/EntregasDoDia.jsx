@@ -8,6 +8,7 @@ import { Pilula } from '../../componentes/Pilula'
 import { dataIsoNoFuso, listaEmPortugues, plural } from '../../dominio/formato'
 import { pdfDoRoteiro } from '../../dominio/impressao'
 import { resumoDoRoteiro, rotuloDaData, textoDeQuemLeva } from '../../dominio/roteiroDoDia'
+import { useRelogio } from '../../hooks/useRelogio'
 import css from './entregasApi.module.css'
 import { ModalAlterarAgendamentoApi } from './ModalAlterarAgendamento'
 
@@ -32,7 +33,9 @@ const tomDaEtapa = (p) => {
 }
 
 function EscolhaDoDia({ dia, mudarDia }) {
-  const [agora] = useState(() => Date.now())
+  // #1584: hoje e amanhã saem do relógio que anda. Congelados na montagem, com a tela aberta
+  // de um dia para o outro o chip "Hoje" abria ontem.
+  const agora = useRelogio(null, undefined, { real: true })
   const hoje = dataIsoNoFuso(agora)
   const amanha = dataIsoNoFuso(agora + UM_DIA_MS)
   return (
@@ -48,8 +51,7 @@ function EscolhaDoDia({ dia, mudarDia }) {
   )
 }
 
-function PedidoDoDia({ pedido, montando, ocupado, acoes, aoVerViagens }) {
-  const [reagendando, setReagendando] = useState(false)
+function PedidoDoDia({ pedido, montando, ocupado, acoes, aoVerViagens, aoReagendar }) {
   const detalhes = [
     pedido.pago ? 'Pago' : 'Não pago',
     pedido.entregador ? `Leva ${textoDeQuemLeva(pedido.entregador)}` : null,
@@ -65,10 +67,8 @@ function PedidoDoDia({ pedido, montando, ocupado, acoes, aoVerViagens }) {
       <Endereco texto={pedido.endereco} />
       <p className={css.apoio}>{detalhes}</p>
       {!['entregue', 'cancelado'].includes(pedido.status) && (
-        <Botao variante="texto" disabled={ocupado} onClick={() => setReagendando(true)}>Alterar agendamento</Botao>
+        <Botao variante="texto" disabled={ocupado} onClick={() => aoReagendar(pedido)}>Alterar agendamento</Botao>
       )}
-      {reagendando && <ModalAlterarAgendamentoApi pedidoId={pedido.id} nome={pedido.cliente}
-        aoFechar={() => setReagendando(false)} aoAlterado={acoes.recarregar} />}
       {pedido.podePorNaViagem && (
         <div className={css.linha}>
           {montando.length === 0 && <>
@@ -86,7 +86,7 @@ function PedidoDoDia({ pedido, montando, ocupado, acoes, aoVerViagens }) {
   )
 }
 
-function JanelaDoDia({ grupo, montando, ocupado, acoes, aoVerViagens }) {
+function JanelaDoDia({ grupo, montando, ocupado, acoes, aoVerViagens, aoReagendar }) {
   const n = grupo.pedidos.length
   const titulo = grupo.chave === 'sem-janela' || grupo.label === grupo.faixa ? grupo.faixa : `${grupo.faixa} · ${grupo.label}`
   return (
@@ -101,7 +101,7 @@ function JanelaDoDia({ grupo, montando, ocupado, acoes, aoVerViagens }) {
       )}
       {n === 0 && <p className={css.vazio}>Nenhum pedido nesta janela.</p>}
       <ul className={css.lista}>
-        {grupo.pedidos.map((p) => <PedidoDoDia key={p.id} pedido={p} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} />)}
+        {grupo.pedidos.map((p) => <PedidoDoDia key={p.id} pedido={p} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} aoReagendar={aoReagendar} />)}
       </ul>
     </section>
   )
@@ -110,6 +110,10 @@ function JanelaDoDia({ grupo, montando, ocupado, acoes, aoVerViagens }) {
 // `roteiro`: `roteiroDoDia` já montado por quem chama (nulo enquanto o dia carrega).
 export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes, aoAbrirCadastro, aoVerViagens }) {
   const [papel, setPapel] = useState('a4')
+  // #1584: o pedido em reagendamento mora aqui, fora da lista. Quando ele muda de janela (ou
+  // de dia) o item dele desmonta; o modal ficava dentro do item e sumia com a frase de resultado.
+  const [reagendando, setReagendando] = useState(null) // null | { id, nome }
+  const aoReagendar = (pedido) => setReagendando({ id: pedido.id, nome: pedido.cliente })
 
   return (
     <>
@@ -138,7 +142,9 @@ export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes
           <Botao variante="secundario" onClick={aoAbrirCadastro}>Cadastrar janelas e frete</Botao>
         </div>
       )}
-      {roteiro?.grupos.map((g) => <JanelaDoDia key={g.chave} grupo={g} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} />)}
+      {roteiro?.grupos.map((g) => <JanelaDoDia key={g.chave} grupo={g} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} aoReagendar={aoReagendar} />)}
+      {reagendando && <ModalAlterarAgendamentoApi pedidoId={reagendando.id} nome={reagendando.nome}
+        aoFechar={() => setReagendando(null)} aoAlterado={acoes.recarregar} />}
     </>
   )
 }
