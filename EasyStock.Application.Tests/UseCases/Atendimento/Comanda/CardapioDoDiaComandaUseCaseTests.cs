@@ -94,6 +94,75 @@ public class CardapioDoDiaComandaUseCaseTests
         await _itens.Received(1).GetLotesParaAjusteAsync(EmpresaId, produtoId, null, Arg.Any<CancellationToken>());
     }
 
+    // ── #1542 (M1.4d): a contagem de prato com porções é de uma porção ─────────────────────────
+
+    private (CardapioItem Item, Guid ProdutoId, CardapioItemVariacao P300, ItemEstoque Lote300, ItemEstoque Lote800) RavioliComPorcoes()
+    {
+        var produtoId = Guid.NewGuid();
+        var item = ItemDeProduto(produtoId, disponivel: true);
+        var p300 = CardapioItemVariacao.Criar(item.Id, "300 g", 28m, ordemExibicao: 0, ehPadrao: true, produtoVariacaoId: Guid.NewGuid());
+        var p800 = CardapioItemVariacao.Criar(item.Id, "800 g", 62m, ordemExibicao: 1, produtoVariacaoId: Guid.NewGuid());
+        item.AdicionarVariacao(p300);
+        item.AdicionarVariacao(p800);
+        ItemEstoque Lote(Guid? porcao, decimal atual, int diasAtras) => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = EmpresaId, ProdutoId = produtoId, ProdutoVariacaoId = porcao,
+            QuantidadeInicial = EasyStock.Domain.ValueObjects.Quantidade.From(10),
+            QuantidadeAtual = EasyStock.Domain.ValueObjects.Quantidade.From(atual),
+            CustoUnitario = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(4m), Status = StatusItemEstoque.Ok,
+            EntradaEm = DateTime.UtcNow.AddDays(-diasAtras), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow,
+        };
+        var lote300 = Lote(p300.ProdutoVariacaoId, 4m, 5);
+        var lote800 = Lote(p800.ProdutoVariacaoId, 3m, 1);
+        _itens.GetLotesParaAjusteAsync(EmpresaId, produtoId, null, Arg.Any<CancellationToken>()).Returns([lote300, lote800]);
+        return (item, produtoId, p300, lote300, lote800);
+    }
+
+    [Fact]
+    public async Task AjustarSaldo_DaPorcao_ContaSoOsLotesDela()
+    {
+        var (item, _, p300, lote300, lote800) = RavioliComPorcoes();
+
+        await Sut().AjustarSaldoAsync(new AjustarSaldoItemInput(EmpresaId, Guid.NewGuid(), item.Id, null, 6m, "contei", VariacaoId: p300.Id));
+
+        lote300.QuantidadeAtual.Value.Should().Be(6m);
+        lote800.QuantidadeAtual.Value.Should().Be(3m);
+    }
+
+    [Fact]
+    public async Task AjustarSaldo_PorcaoQueNaoEDoPrato_Recusa()
+    {
+        var (item, _, _, lote300, _) = RavioliComPorcoes();
+
+        var act = () => Sut().AjustarSaldoAsync(new AjustarSaldoItemInput(EmpresaId, Guid.NewGuid(), item.Id, null, 6m, "contei", VariacaoId: Guid.NewGuid()));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*não tem essa porção*");
+        lote300.QuantidadeAtual.Value.Should().Be(4m);
+    }
+
+    [Fact]
+    public async Task AjustarSaldo_PorcaoAindaSemEstoque_PedeProducao()
+    {
+        var item = ItemDeProduto(Guid.NewGuid(), disponivel: true);
+        var semLote = CardapioItemVariacao.Criar(item.Id, "300 g", 28m, ordemExibicao: 0, ehPadrao: true);
+        item.AdicionarVariacao(semLote);
+
+        var act = () => Sut().AjustarSaldoAsync(new AjustarSaldoItemInput(EmpresaId, Guid.NewGuid(), item.Id, null, 6m, "contei", VariacaoId: semLote.Id));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*produção*");
+    }
+
+    [Fact]
+    public async Task AjustarSaldo_PratoComPorcoesSemPorcaoInformada_SegueContandoOPratoInteiro()
+    {
+        // Aba antiga do console ainda manda a contagem do prato: a rota não pode passar a recusar.
+        var (item, _, _, lote300, lote800) = RavioliComPorcoes();
+
+        await Sut().AjustarSaldoAsync(new AjustarSaldoItemInput(EmpresaId, Guid.NewGuid(), item.Id, null, 9m, "contei"));
+
+        (lote300.QuantidadeAtual.Value + lote800.QuantidadeAtual.Value).Should().Be(9m);
+    }
+
     [Fact]
     public async Task AjustarSaldo_ItemAvulsoNaoControlaSaldo()
     {

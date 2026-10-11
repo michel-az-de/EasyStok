@@ -22,10 +22,15 @@ export const estoqueDoDiaDaApi = (r) => ({
     porcao: p.porcao ?? '',
     saldo: p.saldo,
     descoberto: p.descoberto,
+    // #1542: o que está guardado, vencido incluído. É o que a contagem do ajuste cobre.
+    fisico: p.fisico ?? p.saldo,
+    // API anterior à contagem por porção não manda o campo: ela ignoraria a porção e contaria o prato inteiro.
+    contagemPorPorcao: p.fisico !== undefined,
     lotes: (p.lotes ?? []).map(loteDaApi),
     // M1.4c (#1537): saldo de cada porção; variacaoId nulo é o que ficou sem porção.
     porcoes: (p.porcoes ?? []).map((s) => ({
       variacaoId: s.variacaoId ?? null, rotulo: s.rotulo, saldo: s.saldo, produtoVariacaoId: s.produtoVariacaoId ?? null,
+      descoberto: s.descoberto ?? 0, fisico: s.fisico ?? s.saldo, temLote: s.temLote === true,
     })),
   })),
   alertas: (r?.alertas ?? []).map((a) => ({

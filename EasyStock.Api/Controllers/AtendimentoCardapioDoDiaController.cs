@@ -7,7 +7,9 @@ namespace EasyStock.Api.Controllers;
 
 public sealed record DefinirDisponibilidadeItemRequest(bool Disponivel);
 
-public sealed record AjustarSaldoItemRequest(decimal QuantidadeContada, string? Motivo, Guid? LojaId = null);
+/// <param name="VariacaoId">A porção contada, em prato com porções; ou <paramref name="SemPorcao"/> para o que ficou sem porção.</param>
+public sealed record AjustarSaldoItemRequest(
+    decimal QuantidadeContada, string? Motivo, Guid? LojaId = null, Guid? VariacaoId = null, bool SemPorcao = false);
 
 /// <summary>
 /// Cardápio do dia pelo console (#1241, F11). Decisão do Felipe (08/10/2026): o operador do balcão
@@ -42,7 +44,8 @@ public class AtendimentoCardapioDoDiaController(
     {
         if (!currentUser.TemPermissao(Permissao.GerenciarEstoque)) return Task.FromResult<IActionResult>(Forbid());
         return Tratar(async () => DataOk(await cardapioDoDia.AjustarSaldoAsync(new AjustarSaldoItemInput(
-            currentUser.EmpresaId, currentUser.UsuarioId, itemId, req.LojaId, req.QuantidadeContada, req.Motivo ?? string.Empty), ct)));
+            currentUser.EmpresaId, currentUser.UsuarioId, itemId, req.LojaId, req.QuantidadeContada, req.Motivo ?? string.Empty,
+            req.VariacaoId, req.SemPorcao), ct)));
     }
 
     private async Task<IActionResult> Tratar(Func<Task<IActionResult>> acao)
