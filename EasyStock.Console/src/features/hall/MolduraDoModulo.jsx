@@ -13,11 +13,34 @@ import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { Vazio } from '../../componentes/Vazio'
 import { HASH_HALL } from '../../dominio/rota'
 import { hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
+import { ehJanelaAvulsa, origemForaDoBalcao } from '../../dominio/janelaAvulsa'
 import { IconeDoModulo } from './IconeDoModulo'
 import css from './moldura.module.css'
 
 const MODULO_DO_BALCAO = 'atendimento'
 const HASH_BALCAO = hashDoModulo(MODULO_DO_BALCAO, 'balcao')
+
+// A janela que abriu esta (o Balcão), se ainda estiver aberta.
+function janelaDeOrigem() {
+  try {
+    const origem = window.opener
+    return origem && !origem.closed ? origem : null
+  } catch { return null }
+}
+
+// #1616: na janela avulsa a volta é para o Balcão que já está aberto, não um segundo Balcão
+// aqui dentro. Se a origem saiu do Balcão, volta para ele; se fechou, esta janela assume.
+function voltarAoBalcao(fonteApi) {
+  const origem = janelaDeOrigem()
+  if (!origem) { window.location.hash = HASH_BALCAO; return }
+  try {
+    if (origemForaDoBalcao(origem.location.hash, { fonteApi })) origem.location.hash = HASH_BALCAO
+  } catch { /* origem em outro endereço: só vem para a frente */ }
+  origem.focus()
+  // Aba de tablet e navegador que não troca de janela deixam o foco aqui: fechar esta janela
+  // devolve a pessoa ao Balcão.
+  setTimeout(() => { if (document.hasFocus()) window.close() }, 250)
+}
 
 export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, tituloVisivel = true, ajuda, children }) {
   const { permite, aoSair, sessaoPersistente, notificacoes } = useAcessoModulos()
@@ -25,6 +48,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
   const telas = telasDoMenu(modulo, { fonteApi })
   const tela = telas.find((t) => t.id === telaId) ?? null
   const menuRef = useRef(null)
+  const avulsa = ehJanelaAvulsa({ nome: window.name, origemAberta: janelaDeOrigem() !== null })
 
   useEffect(() => {
     const menu = menuRef.current
@@ -44,14 +68,22 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
     <div className={css.moldura} data-conteudo-console>
       <header className={css.barra}>
         <div className={css.contexto}>
-          <a className={css.voltar} href={HASH_HALL}>
-            <MarcaIcone nome="anterior" tamanho={20} /> <span>Módulos</span>
-          </a>
-          {/* #1474: quem veio da barra lateral do Balcão volta para ele num toque. */}
-          {modulo.id !== MODULO_DO_BALCAO && permite(MODULO_DO_BALCAO) && (
-            <a className={css.voltar} href={HASH_BALCAO}>
-              <MarcaIcone nome="mensagem" tamanho={24} /> <span>Balcão</span>
-            </a>
+          {avulsa ? (
+            <button type="button" className={`${css.voltar} ${css.voltarBotao}`} onClick={() => voltarAoBalcao(fonteApi)}>
+              <MarcaIcone nome="anterior" tamanho={20} /> <span>Voltar ao Balcão</span>
+            </button>
+          ) : (
+            <>
+              <a className={css.voltar} href={HASH_HALL}>
+                <MarcaIcone nome="anterior" tamanho={20} /> <span>Módulos</span>
+              </a>
+              {/* #1474: quem veio da barra lateral do Balcão volta para ele num toque. */}
+              {modulo.id !== MODULO_DO_BALCAO && permite(MODULO_DO_BALCAO) && (
+                <a className={css.voltar} href={HASH_BALCAO}>
+                  <MarcaIcone nome="mensagem" tamanho={24} /> <span>Balcão</span>
+                </a>
+              )}
+            </>
           )}
           <span className={css.modulo}>
             <IconeDoModulo modulo={modulo} /> {modulo.nome}

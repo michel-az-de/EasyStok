@@ -3,13 +3,14 @@ import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { useEscape } from '../../hooks/useEscape'
 import { HASH_MODULO_ENTREGAS } from '../../dominio/rota'
+import { JANELA_ENTREGAS } from '../../dominio/janelaAvulsa'
 import { ConteudoEntregasApi } from './ConteudoEntregasApi'
 import css from './dashboard.module.css'
 
 // #1582: a rota do módulo marca "Painel de entregas" no menu da janela (o apelido `#/entregas`
 // abria sem tela marcada). Popup bloqueado cai para a mesma aba, como a Cozinha já faz.
 function abrirEmOutraJanela() {
-  const janela = window.open(HASH_MODULO_ENTREGAS, 'cdb-entregas', 'width=1280,height=900')
+  const janela = window.open(HASH_MODULO_ENTREGAS, JANELA_ENTREGAS, 'width=1280,height=900')
   if (!janela) window.location.hash = HASH_MODULO_ENTREGAS
 }
 

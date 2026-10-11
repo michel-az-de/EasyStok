@@ -16,6 +16,8 @@
   font-size: var(--t-micro); font-weight: 600; color: var(--tinta-2); text-decoration: none;
   transition: background var(--dur-micro) var(--ease-padrao);
 }
+/* #1616: na janela avulsa a volta é um botão (traz a janela do Balcão), com a mesma cara do link. */
+.voltarBotao { border: 0; background: transparent; font-family: inherit; cursor: pointer; }
 .voltar:hover { background: var(--preenchimento); }
 .voltar:focus-visible, .item:focus-visible, .link:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
 

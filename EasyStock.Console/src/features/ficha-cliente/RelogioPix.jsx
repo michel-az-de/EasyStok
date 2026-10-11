@@ -5,7 +5,7 @@ import { Icone } from '../../componentes/Icone'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useAtendimento } from '../../aplicacao/contextos'
 import { useTiqueLocal } from '../../hooks/useTiqueLocal'
-import { faltaPagar, situacaoDaCobranca } from '../../dominio/cobranca'
+import { avisoDeLinkVencidoApi, faltaPagar, situacaoDaCobranca } from '../../dominio/cobranca'
 import { horaCurta, moeda } from '../../dominio/formato'
 import css from './RelogioPix.module.css'
 
@@ -184,9 +184,14 @@ export function RelogioPix({
           <span className={css.numero}>0:00</span>
           <span className={css.legenda}>Venceu</span>
         </Anel>
+        {/* #1616: no modo API quem trata o link vencido é o job do EasyStok (segundo link, depois
+            cancelamento). O botão só avisava no rodapé; no lugar dele, o que vai acontecer. */}
+        {fonteApi && <p className={css.legenda}>{avisoDeLinkVencidoApi(cobranca)}</p>}
         {editavel && confirmando === null && (
           <div className={css.botoesZerado}>
-            <Botao largo variante="primario" icone="refresh-cw" onClick={aoReenviar}>Reenviar cobrança</Botao>
+            {!fonteApi && (
+              <Botao largo variante="primario" icone="refresh-cw" onClick={aoReenviar}>Reenviar cobrança</Botao>
+            )}
             {!fonteApi && disponivel('cancelarPedido') && (
               <Botao largo variante="secundario" icone="circle-x" onClick={() => setConfirmando('cancelar')}>
                 Cancelar pedido

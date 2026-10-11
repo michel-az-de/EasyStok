@@ -155,7 +155,8 @@ confere('link para o Balcão dentro da Gestão fecha a janela em vez de ficar mo
 
 confere('Entregas em outra janela abre a rota do módulo e não some com popup bloqueado', () => {
   const gaveta = fonte('features/entregas/GavetaEntregasApi.jsx')
-  assert.match(gaveta, /window\.open\(HASH_MODULO_ENTREGAS, 'cdb-entregas'/)
+  // #1616: o nome da janela virou constante (`JANELA_ENTREGAS`); a prova da #1616 confere o valor.
+  assert.match(gaveta, /window\.open\(HASH_MODULO_ENTREGAS, JANELA_ENTREGAS,/)
   assert.match(gaveta, /if \(!janela\) window\.location\.hash = HASH_MODULO_ENTREGAS/)
   assert.equal(rota(HASH_MODULO_ENTREGAS).tela, 'painel')
 })
