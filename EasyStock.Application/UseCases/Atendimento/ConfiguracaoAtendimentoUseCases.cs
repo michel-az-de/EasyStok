@@ -58,7 +58,8 @@ public sealed record AtualizarConfiguracaoAtendimentoCommand(
     int? SlaRespostaMinutos = null);
 
 public sealed class AtualizarConfiguracaoAtendimentoUseCase(
-    IConfiguracaoAtendimentoRepository repository, IUnitOfWork unitOfWork)
+    IConfiguracaoAtendimentoRepository repository, IUnitOfWork unitOfWork, ICacheService? cacheService = null,
+    ILogger<AtualizarConfiguracaoAtendimentoUseCase>? logger = null)
 {
     public async Task<ConfiguracaoAtendimentoResult> ExecuteAsync(AtualizarConfiguracaoAtendimentoCommand command)
     {
@@ -90,6 +91,17 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
         else await repository.UpdateAsync(configuracao);
 
         await unitOfWork.CommitAsync();
+
+        // #1566: a inbox guarda o SLA em cache; sem isto o prazo novo só apareceria depois do TTL. Melhor esforço: a
+        // configuração já foi persistida, então a falha do cache vira aviso e o TTL cobre.
+        if (cacheService is not null)
+        {
+            try { await cacheService.RemoveAsync(CacheKeys.AtendimentoSlaResposta(command.EmpresaId)); }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger?.LogWarning(ex, "Configuracao do atendimento salva, mas o cache do SLA nao foi invalidado (empresa {EmpresaId})", command.EmpresaId);
+            }
+        }
 
         return ObterConfiguracaoAtendimentoUseCase.ToResult(configuracao);
     }

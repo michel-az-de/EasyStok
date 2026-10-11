@@ -25,6 +25,7 @@ public class PlanejamentoDaProducaoUseCaseTests
     private readonly IProdutoComposicaoRepository _composicao = Substitute.For<IProdutoComposicaoRepository>();
     private readonly Dictionary<Guid, IReadOnlyCollection<ItemEstoque>> _lotes = [];
     private readonly List<CardapioItem> _pratos = [];
+    private readonly List<Produto> _catalogo = [];
 
     public PlanejamentoDaProducaoUseCaseTests()
     {
@@ -33,6 +34,8 @@ public class PlanejamentoDaProducaoUseCaseTests
         _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>()).Returns(_ => _pratos);
         _itens.GetByProdutosAsync(EmpresaId, Arg.Any<IEnumerable<Guid>>(), null, Arg.Any<CancellationToken>()).Returns(_ => _lotes);
         _pedidos.GetDemandaAgendadaAsync(EmpresaId, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([]);
+        _produtos.GetByIdsAsync(EmpresaId, Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => _catalogo.Where(p => ci.ArgAt<IEnumerable<Guid>>(1).Contains(p.Id)).ToList());
     }
 
     private CalcularCestaProducaoUseCase Cesta() => new(_composicao, _itens, Substitute.For<ILogger<CalcularCestaProducaoUseCase>>());
@@ -42,7 +45,7 @@ public class PlanejamentoDaProducaoUseCaseTests
     private CardapioItem Prato(string nome, int? minimo, params decimal[] saldos)
     {
         var produto = new Produto { Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = nome, QuantidadeMinima = minimo };
-        _produtos.GetByIdAsync(EmpresaId, produto.Id).Returns(produto);
+        _catalogo.Add(produto);
         _lotes[produto.Id] = saldos.Select(s => Lote(produto.Id, s)).ToList();
         var vazio = (Produto)Activator.CreateInstance(typeof(Produto), nonPublic: true)!;
         typeof(Produto).GetProperty("Id")!.SetValue(vazio, produto.Id);
@@ -99,6 +102,33 @@ public class PlanejamentoDaProducaoUseCaseTests
         var r = await Sut().SugestaoAsync(EmpresaId);
 
         r.Pratos.Select(p => (p.Nome, p.Agendados)).Should().Equal(("lasanha", 3m), ("canelone", 4m));
+    }
+
+    [Fact]
+    public async Task Sugestao_BuscaOsProdutosDosPratosNumaConsultaSo()
+    {
+        // #1566: era um GetByIdAsync por prato do cardápio.
+        Prato("Lasanha", 5, 4);
+        Prato("Nhoque", 2, 10);
+        Prato("Ravióli", 0);
+
+        var r = await Sut().SugestaoAsync(EmpresaId);
+
+        r.Pratos.Select(p => p.Nome).Should().Equal("lasanha", "nhoque", "ravióli");
+        await _produtos.Received(1).GetByIdsAsync(EmpresaId, Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>());
+        await _produtos.DidNotReceive().GetByIdAsync(EmpresaId, Arg.Any<Guid>());
+    }
+
+    [Fact]
+    public async Task Sugestao_PratoCujoProdutoSumiu_FicaDeFora()
+    {
+        var orfao = Prato("Canelone", 1);
+        _catalogo.RemoveAll(p => p.Id == orfao.ProdutoId);
+        Prato("Lasanha", 5, 4);
+
+        var r = await Sut().SugestaoAsync(EmpresaId);
+
+        r.Pratos.Select(p => p.Nome).Should().Equal("lasanha");
     }
 
     [Fact]

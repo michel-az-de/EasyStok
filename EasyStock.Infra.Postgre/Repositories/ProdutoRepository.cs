@@ -27,6 +27,19 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AsNoTracking()
                 .FirstOrDefaultAsync(p => p.EmpresaId == empresaId && p.Id == id);
 
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<Produto>> GetByIdsAsync(Guid empresaId, IEnumerable<Guid> ids, CancellationToken ct = default)
+        {
+            var lista = ids?.Distinct().ToList() ?? new List<Guid>();
+            if (lista.Count == 0)
+                return [];
+
+            return await dbContext.Produtos
+                .AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && lista.Contains(p.Id))
+                .ToListAsync(ct);
+        }
+
         public Task<Produto?> GetDetalheAsync(Guid empresaId, Guid id) =>
             dbContext.Produtos
                 .AsNoTracking()
