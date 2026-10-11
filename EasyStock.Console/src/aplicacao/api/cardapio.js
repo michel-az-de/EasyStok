@@ -2,8 +2,8 @@ import * as acao from '../acoes'
 import { estaRemovido, itemPorSku, semControleDeSaldo, disponivelHoje } from '../../dominio/cardapio'
 import { listarCardapio } from '../../infra/api/comandaApi'
 import {
-  ajustarSaldoDoItem, alertaDaApi, definirArquivado, definirDisponibilidade, detalheDaApi, editarItem, incluirItem,
-  itemForaDaApi, listarDesacertos, listarFora, obterItem, validarItem,
+  ajustarSaldoDoItem, alertaDaApi, definirArquivado, definirDisponibilidade, editarItem, incluirItem,
+  itemForaDaApi, listarDesacertos, listarFora, validarItem,
 } from '../../infra/api/cardapioApi'
 import { listarSecoes, secaoDaApi } from '../../infra/api/secoesApi'
 
@@ -105,11 +105,5 @@ export function criarAcoesCardapioApi({ despachar, estadoRef }) {
 
     // M1.3 (#1483): as categorias para o seletor do formulário. Sem permissão (não Gerente), nenhuma.
     listarCategoriasCardapio: () => listarSecoes().then((l) => (l ?? []).map(secaoDaApi)).catch(() => []),
-
-    // O formulário de edição precisa da ficha, que o cardápio da comanda não traz.
-    obterItemCardapio: (sku) => obterItem(sku).then(detalheDaApi).catch((erro) => {
-      avisar(`Cardápio: ${erro.message}`)
-      return null
-    }),
   }
 }

@@ -139,7 +139,9 @@ assert.equal(programadaDaApi(resultado({ canal: 'ChatSite' })).canal, 'Chat do s
 
 // 8. Regras da modal.
 const local = '2026-10-08T09:30'
-assert.equal(regras.horarioLocalParaUtc(local), new Date(local).toISOString())
+// #1563: a asserção comparava com `new Date(local)`, que é o fuso do aparelho, e por isso guardava
+// o defeito (passava só com o aparelho no fuso da loja). O horário digitado é o da loja.
+assert.equal(regras.horarioLocalParaUtc(local), '2026-10-08T12:30:00.000Z')
 assert.equal(regras.horarioLocalParaUtc(''), null)
 assert.match(regras.horarioLocalPadrao(Date.parse('2026-10-07T10:00:30Z')), /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
 const agora = Date.parse('2026-10-07T12:00:00Z')
