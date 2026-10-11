@@ -237,7 +237,8 @@ public class InsumosDaProducaoUseCaseTests
 
         await Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, null, null, LimparMinimo: true, LimparCusto: true));
 
-        (molho.QuantidadeMinima, molho.CustoReferencia).Should().Be((null, null));
+        molho.QuantidadeMinima.Should().BeNull();
+        molho.CustoReferencia.Should().BeNull();
     }
 
     [Fact]
