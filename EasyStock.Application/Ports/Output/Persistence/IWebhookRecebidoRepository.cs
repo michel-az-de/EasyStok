@@ -29,6 +29,9 @@ public interface IWebhookRecebidoRepository
     /// </summary>
     Task<WebhookRecebido?> ObterAsync(string provedor, string eventIdExterno, CancellationToken ct = default);
 
-    /// <summary>Marca processamento concluido (sucesso ou falha).</summary>
+    /// <summary>
+    /// Marca processamento concluido (sucesso ou falha). Na falha, descarta antes as alteracoes pendentes do
+    /// contexto: o processamento nao confirmou e nada dele pode ser gravado junto com a marca (#1562).
+    /// </summary>
     Task MarcarProcessadoAsync(Guid id, bool sucesso, string? erro = null, CancellationToken ct = default);
 }
