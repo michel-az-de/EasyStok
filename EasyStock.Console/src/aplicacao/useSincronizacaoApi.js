@@ -1,26 +1,27 @@
 import { useEffect, useRef } from 'react'
 import * as acao from './acoes'
-import { listarTodasConversas, listarMensagens } from '../infra/api/conversasApi'
-import { conversaDaApi } from '../infra/api/traducaoConversas'
-import { obterPedido, pedidoDaApi } from '../infra/api/comandaApi'
 import { lerAlertasDeEstoque, lerCardapio } from './api/cardapio'
-import { avisoDoCardapio, deveRelerMensagens, deveRelerPedido, quedaDaSincronizacao } from './planoDeSincronizacao'
+import { avisoDoCardapio } from './planoDeSincronizacao'
+import { criarCicloDeSincronizacao, criarMemoriaDoLaco } from './cicloDeSincronizacao'
 
-// Polling da inbox (F01): não existe SSE de conversas ainda (S18). A lista vem a
-// cada ciclo, paginada (F07); o que mais se relê está em `planoDeSincronizacao.js`:
-// a conversa aberta sempre, as outras só quando mudaram.
+// Polling da inbox (F01): não existe SSE de conversas ainda (S18). Este hook só dá o
+// ritmo; a volta está em `cicloDeSincronizacao.js` e o que ela relê em
+// `planoDeSincronizacao.js`: a conversa aberta sempre, as outras só quando mudaram.
+// #1576: a inbox inteira (F07) vem ao entrar e a cada minuto; as outras voltas leem a página 1.
 //
 // F03: o pedido da conversa (`pedidoEmAndamentoId`) vem junto. O cardápio da vitrine
 // vem ao entrar e a cada minuto (saldo).
 const INTERVALO_MS = 5000
 const CICLOS_POR_MINUTO = 12
 
-export function useSincronizacaoApi({ ativo, comConversas = true, usuario, despachar, selecionadaId = null }) {
+// `memoria` (#1576): os caches do laço, criados acima do Balcão para a volta do Hall, da Cozinha ou
+// das Entregas não reler tudo. Sem ela (demonstração, provas) o laço usa a sua, que morre com ele.
+export function useSincronizacaoApi({ ativo, comConversas = true, usuario, despachar, selecionadaId = null, memoria = null }) {
   // A seleção muda a cada clique; num ref, o laço não recomeça por causa dela.
   const selecionadaRef = useRef(selecionadaId)
   useEffect(() => { selecionadaRef.current = selecionadaId }, [selecionadaId])
   // O refresh do token recria o objeto do usuário, mesma pessoa. Num ref o laço não recomeça: recomeçar
-  // zerava os caches e relia o pedido de toda conversa da inbox de uma vez.
+  // refaz a varredura da inbox e relê o pedido aberto de toda conversa.
   const usuarioRef = useRef(usuario)
   useEffect(() => { usuarioRef.current = usuario }, [usuario])
   const usuarioId = usuario?.id ?? null
@@ -30,35 +31,10 @@ export function useSincronizacaoApi({ ativo, comConversas = true, usuario, despa
     let vivo = true
     let proximo = null
     let ciclos = 0
-    const cache = new Map()
-    const pedidos = new Map()
-
-    async function mensagensDe(resumo) {
-      const guardado = cache.get(resumo.id)
-      if (!deveRelerMensagens(resumo, guardado, selecionadaRef.current)) return guardado?.mensagens ?? []
-      try {
-        const mensagens = await listarMensagens(resumo.id)
-        cache.set(resumo.id, { ultima: resumo.ultimaMensagemEm, mensagens })
-        return mensagens
-      } catch {
-        return guardado?.mensagens ?? []
-      }
-    }
-
-    async function pedidoDe(resumo, cicloLento) {
-      if (!resumo.pedidoEmAndamentoId) return null
-      const guardado = pedidos.get(resumo.id)
-      if (!deveRelerPedido(resumo, guardado, { selecionadaId: selecionadaRef.current, cicloLento })) {
-        return guardado.dados
-      }
-      try {
-        const dados = await obterPedido(resumo.id)
-        pedidos.set(resumo.id, { pedidoId: resumo.pedidoEmAndamentoId, ultima: resumo.ultimaMensagemEm, dados })
-        return dados
-      } catch {
-        return guardado?.dados ?? null
-      }
-    }
+    const sincronizar = criarCicloDeSincronizacao({
+      despachar, comConversas, memoria: memoria ?? criarMemoriaDoLaco(), dono: usuarioId,
+      lerSelecionada: () => selecionadaRef.current, lerUsuario: () => usuarioRef.current, estaVivo: () => vivo,
+    })
 
     // #1241: com os itens tirados (Repor) e os alertas de produto vendido sem saldo.
     // #1474: o aviso do cardápio (loja online desligada) é estado de configuração, não de ação:
@@ -86,24 +62,7 @@ export function useSincronizacaoApi({ ativo, comConversas = true, usuario, despa
       const cicloLento = ciclos % CICLOS_POR_MINUTO === 0
       if (cicloLento) await cardapio()
       ciclos += 1
-      try {
-        const lista = comConversas ? await listarTodasConversas() : []
-        const conversas = await Promise.all(lista.map(async (resumo) => {
-          const [mensagens, pedido] = await Promise.all([mensagensDe(resumo), pedidoDe(resumo, cicloLento)])
-          return { ...conversaDaApi(resumo, mensagens, usuarioRef.current), pedido: pedidoDaApi(pedido) }
-        }))
-        if (vivo) {
-          despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas })
-          // #1241: a volta da rede abre o lançamento do papel (o reducer ignora se já estava online).
-          despachar({ tipo: acao.CONEXAO_VOLTOU, agora: Date.now() })
-        }
-      } catch (erro) {
-        if (vivo) {
-          despachar({ tipo: acao.SINCRONIZACAO_FALHOU, mensagem: erro.message })
-          // #1241: sem rede, a faixa do papel liga e guarda quem estava aberto.
-          if (quedaDaSincronizacao(erro)) despachar({ tipo: acao.CONEXAO_CAIU, agora: Date.now() })
-        }
-      }
+      await sincronizar({ cicloLento })
       if (vivo) proximo = setTimeout(ciclo, INTERVALO_MS)
     }
 
@@ -112,5 +71,5 @@ export function useSincronizacaoApi({ ativo, comConversas = true, usuario, despa
       vivo = false
       clearTimeout(proximo)
     }
-  }, [ativo, comConversas, usuarioId, despachar])
+  }, [ativo, comConversas, usuarioId, despachar, memoria])
 }
