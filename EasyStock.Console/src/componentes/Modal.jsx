@@ -35,9 +35,9 @@ export function Modal({ titulo, descricao, aoFechar, rodape, largura, className,
     focoAnterior.current = document.activeElement
     if (!dialogo.open) dialogo.showModal()
 
-    const aoCancelar = (evento) => { evento.preventDefault(); aoFecharRef.current() }
+    const aoCancelar = (evento) => { evento.preventDefault(); aoFecharRef.current?.() }
     // Clique no ::backdrop chega no próprio <dialog>, nunca no conteúdo.
-    const aoClicar = (evento) => { if (evento.target === dialogo) aoFecharRef.current() }
+    const aoClicar = (evento) => { if (evento.target === dialogo) aoFecharRef.current?.() }
     dialogo.addEventListener('cancel', aoCancelar)
     dialogo.addEventListener('click', aoClicar)
 
@@ -69,7 +69,7 @@ export function Modal({ titulo, descricao, aoFechar, rodape, largura, className,
       aria-modal="true"
     >
       {/* Distingue fechar a janela de sair da sessão e do botão do rodapé. */}
-      <button type="button" className={css.fecharCanto} aria-label="Fechar janela" title="Fechar (Esc)" onClick={aoFechar}>
+      <button type="button" className={css.fecharCanto} aria-label="Fechar janela" title="Fechar (Esc)" disabled={!aoFechar} onClick={aoFechar}>
         <Icone nome="x" tamanho={18} />
       </button>
       {/* Integração: título e rodapé fora da rolagem. Folha comprida (resumo

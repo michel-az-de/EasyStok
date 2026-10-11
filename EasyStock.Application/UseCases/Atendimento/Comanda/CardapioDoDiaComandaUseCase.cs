@@ -9,8 +9,11 @@ public sealed record DefinirDisponibilidadeItemInput(Guid EmpresaId, Guid Cardap
 
 public sealed record DisponibilidadeItemResult(Guid CardapioItemId, bool Disponivel);
 
+/// <param name="VariacaoId">M1.4d (#1542): a porção contada, em prato com porções.</param>
+/// <param name="SemPorcao">A contagem é do que ficou sem porção (estoque antigo, lote do PWA).</param>
 public sealed record AjustarSaldoItemInput(
-    Guid EmpresaId, Guid UsuarioId, Guid CardapioItemId, Guid? LojaId, decimal QuantidadeContada, string Motivo);
+    Guid EmpresaId, Guid UsuarioId, Guid CardapioItemId, Guid? LojaId, decimal QuantidadeContada, string Motivo,
+    Guid? VariacaoId = null, bool SemPorcao = false);
 
 /// <summary>
 /// Cardápio do dia pelo console (#1241, F11, S45/S17). O operador do balcão liga e desliga o item
@@ -48,7 +51,20 @@ public sealed class CardapioDoDiaComandaUseCase(
             throw new UseCaseValidationException("Este item não controla saldo: não está ligado a um produto do estoque.");
 
         return await ajustarSaldo.ExecuteAsync(new AjustarSaldoRapidoInput(
-            input.EmpresaId, input.UsuarioId, produtoId, input.LojaId, input.QuantidadeContada, input.Motivo), ct);
+            input.EmpresaId, input.UsuarioId, produtoId, input.LojaId, input.QuantidadeContada, input.Motivo,
+            PorcaoDe(item, input)), ct);
+    }
+
+    // Sem porção informada segue a contagem do prato inteiro: é o que uma aba antiga do console manda.
+    private static PorcaoDoAjuste? PorcaoDe(Domain.Entities.Storefront.CardapioItem item, AjustarSaldoItemInput input)
+    {
+        if (input.VariacaoId is not { } variacaoId) return input.SemPorcao ? new PorcaoDoAjuste(null) : null;
+
+        var variacao = item.Variacoes.FirstOrDefault(v => v.Id == variacaoId)
+            ?? throw new UseCaseValidationException($"\"{item.NomeEfetivo()}\" não tem essa porção.");
+        if (variacao.ProdutoVariacaoId is not { } noEstoque)
+            throw new UseCaseValidationException($"A porção {variacao.Rotulo} ainda não tem estoque: lance a produção em vez de ajustar.");
+        return new PorcaoDoAjuste(noEstoque);
     }
 
     private async Task<(Guid StorefrontId, Domain.Entities.Storefront.CardapioItem Item)> ItemDaVitrineAsync(

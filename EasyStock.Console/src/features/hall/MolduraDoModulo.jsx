@@ -19,7 +19,7 @@ import css from './moldura.module.css'
 const MODULO_DO_BALCAO = 'atendimento'
 const HASH_BALCAO = hashDoModulo(MODULO_DO_BALCAO, 'balcao')
 
-export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, tituloVisivel = true, children }) {
+export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, tituloVisivel = true, ajuda, children }) {
   const { permite, aoSair, sessaoPersistente, notificacoes } = useAcessoModulos()
   const modulo = moduloPorId(moduloId)
   const telas = telasDoMenu(modulo, { fonteApi })
@@ -41,7 +41,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
   }, [telaId])
 
   return (
-    <div className={css.moldura}>
+    <div className={css.moldura} data-conteudo-console>
       <header className={css.barra}>
         <div className={css.contexto}>
           <a className={css.voltar} href={HASH_HALL}>
@@ -58,6 +58,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
           </span>
         </div>
         <div className={css.acoes}>
+          {ajuda}
           <InterruptorTema />
           {notificacoes && <div className={css.avisos}>{notificacoes}</div>}
           {aoSair && <Botao className={css.sair} variante="texto" icone="log-out" onClick={aoSair} title={sessaoPersistente ? 'A Cozinha permanece conectada ao fechar o navegador. Saia ao trocar de pessoa.' : undefined}>{sessaoPersistente ? 'Sair deste aparelho' : 'Sair'}</Botao>}
@@ -79,9 +80,9 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
         )}
       </header>
       {operacao
-        ? <div className={css.operacao}>{children}</div>
+        ? <main className={css.operacao} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label={tela?.rotulo ?? modulo.nome}>{children}</main>
         : (
-          <main className={css.ajuste}>
+          <main className={css.ajuste} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label={tela?.rotulo ?? modulo.nome}>
             <div className={css.folha}>
               {tela ? (
                 <>

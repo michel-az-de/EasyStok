@@ -8,6 +8,7 @@ import { BarraDeAbas } from '../componentes/BarraDeAbas'
 import { Botao } from '../componentes/Botao'
 import { Modal } from '../componentes/Modal'
 import { Icone } from '../componentes/Icone'
+import { MarcaIcone } from '../componentes/MarcaIcone'
 import { Pilula } from '../componentes/Pilula'
 import { useAcoes, useAtendimento } from '../aplicacao/contextos'
 import { useAcessoModulos } from '../aplicacao/acessoModulos'
@@ -21,7 +22,7 @@ import { ResumoEntregas } from '../features/entregas/ResumoEntregas'
 import { Sininho } from '../features/lembretes/Sininho'
 import { Popover } from '../componentes/Popover'
 import { FONTE_API } from '../infra/fonteDados'
-import { HASH_MODULO_COZINHA } from '../dominio/rota'
+import { HASH_HALL, HASH_MODULO_COZINHA } from '../dominio/rota'
 import { AvisoDaAcaoApi } from './FaixaApi'
 import css from './moldura.module.css'
 
@@ -49,6 +50,7 @@ function grupoDoDia(emAndamento, naEsteira) {
     titulo: 'Hoje',
     itens: [{
       chave: '__hoje',
+      informativo: true,
       titulo: `${emAndamento} em andamento`,
       detalhe: `${naEsteira} na esteira`,
     }],
@@ -62,7 +64,7 @@ function grupoDoDia(emAndamento, naEsteira) {
 // próprio Balcão, e "Dois lugares para a mesma pergunta" era exatamente o
 // problema que a direção resolveu.
 function MenuMais({
-  refBotao, aoAbrirEntregas, aoAbrirGestao, emAndamento, naEsteira,
+  refBotao, aoAbrirEntregas, aoAbrirGestao, aoAbrirAjuda, emAndamento, naEsteira,
 }) {
   const { permite } = useAcessoModulos()
   const [aberto, setAberto] = useState(false)
@@ -79,6 +81,7 @@ function MenuMais({
     {
       titulo: 'Ver',
       itens: [
+        { chave: '__modulos', titulo: 'Módulos', detalhe: 'Escolher outra área de trabalho' },
         {
           chave: '__entregas',
           titulo: 'Entregas',
@@ -92,14 +95,17 @@ function MenuMais({
         { chave: '__gestao', titulo: 'Gestão', detalhe: 'Cardápio, produção e caixa sem sair do Balcão' },
       ].filter((item) => item.chave !== '__entregas' || permite('entregas')),
     },
+    { titulo: 'Ajuda', itens: [{ chave: '__ajuda', titulo: 'Ajuda e diagnóstico', detalhe: 'Orientação para esta tela e dados para a equipe' }] },
     grupoDoDia(emAndamento, naEsteira),
   ]
 
   function escolher(item) {
     fechar()
-    if (item.chave === '__entregas' || item.chave === '__gestao') refBotao.current?.focus()
+    if (['__entregas', '__gestao', '__ajuda'].includes(item.chave)) refBotao.current?.focus()
+    if (item.chave === '__modulos') window.location.hash = HASH_HALL
     if (item.chave === '__entregas') aoAbrirEntregas()
     if (item.chave === '__gestao') aoAbrirGestao()
+    if (item.chave === '__ajuda') aoAbrirAjuda()
     if (item.chave === '__claro') trocarTema('light')
     if (item.chave === '__escuro') trocarTema('dark')
   }
@@ -168,7 +174,7 @@ function ControleLoja({ aberta, aoAlternar }) {
 const rotuloAutomaticas = (regras) => (regras ? `Automáticas, ${contarAtivas(regras)} ligadas` : 'Automáticas')
 
 function Cabecalho({
-  conversas, regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas,
+  conversas, regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, aoAbrirAjuda,
 }) {
   const { permite, notificacoes } = useAcessoModulos()
   const compacto = useTopoCompacto()
@@ -217,13 +223,15 @@ function Cabecalho({
             refBotao={botaoMaisRef}
             aoAbrirEntregas={aoAbrirEntregas}
             aoAbrirGestao={aoAbrirGestao}
+            aoAbrirAjuda={aoAbrirAjuda}
             emAndamento={emAndamento}
             naEsteira={naEsteira}
           />
         ) : (
           // Rodada 2: a ocupação das janelas mora no topo, porque capacidade
           // estourada é a coisa que ela mais teme e não pode custar dois cliques.
-          permite('entregas') && <ResumoEntregas aoAbrir={aoAbrirEntregas} />
+          <>{permite('entregas') && <ResumoEntregas aoAbrir={aoAbrirEntregas} />}
+            <Botao variante="texto" icone="ajuda" aria-haspopup="dialog" onClick={aoAbrirAjuda}>Ajuda</Botao></>
         )}
       </div>
     </header>
@@ -235,12 +243,14 @@ function Cabecalho({
 // controles, os mesmos handlers; Balcão é a tela atual, não um botão.
 function Trilho({
   regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, simulando, aoAlternarSimulacoes,
-  atendente,
+  atendente, aoAbrirAjuda,
 }) {
   const { permite, notificacoes } = useAcessoModulos()
   return (
     <nav className={css.trilho} aria-label="Navegação">
-      <Marca compacta />
+      <a className={css.inicioTrilho} href={HASH_HALL} aria-label="Ir para os módulos" title="Módulos">
+        <Marca compacta /><span>Módulos</span>
+      </a>
       <h1 className="sr">Casa da Baba</h1>
       {/* Estado da loja logo abaixo da marca: é o que vale para tudo embaixo.
           Mesmo texto e mesmo nome do controle do topo da main ("Loja aberta"
@@ -278,6 +288,9 @@ function Trilho({
       </Botao>
       <div className={css.sinoTrilho}><Sininho /></div>
       <div className={css.avisosTrilho}>{notificacoes}</div>
+      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAjuda} aria-haspopup="dialog" title="Ajuda e diagnóstico">
+        <MarcaIcone nome="informacao" tamanho={22} /><span>Ajuda</span>
+      </Botao>
       <span className={css.espacoTrilho} />
       {aoAlternarSimulacoes && !simularEscondido() && (
         <Botao variante="texto" className={css.itemTrilho} aria-pressed={simulando} onClick={aoAlternarSimulacoes} title="Simular (F2)">
@@ -337,7 +350,7 @@ function BotaoSimular({ ativo, aoAlternar }) {
 // Três arranjos para o mesmo conteúdo. Os painéis não sabem em qual estão.
 export function Moldura({
   tamanho, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca, aoAbrirCardapio, aoAbrirAutomacoes, aoAbrirGestao,
-  aoAbrirEntregas, simulando, aoAlternarSimulacoes, larguras, aoRedimensionar,
+  aoAbrirEntregas, aoAbrirAjuda, simulando, aoAlternarSimulacoes, larguras, aoRedimensionar,
 }) {
   const {
     visiveis, selecionada, conversas, regras: regrasDaMassa, agora, aberta, fonteApi, sessao,
@@ -404,6 +417,7 @@ export function Moldura({
       aoAbrirAutomacoes={aoAbrirAutomacoes}
       aoAbrirGestao={aoAbrirGestao}
       aoAbrirEntregas={aoAbrirEntregas}
+      aoAbrirAjuda={aoAbrirAjuda}
     />
   )
 
@@ -427,8 +441,9 @@ export function Moldura({
           simulando={simulando}
           aoAlternarSimulacoes={aoAlternarSimulacoes}
           atendente={atendente}
+          aoAbrirAjuda={aoAbrirAjuda}
         />
-        <div className={`${css.palco} ${css.palcoTres}`}>
+        <main className={`${css.palco} ${css.palcoTres}`} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Balcão">
           {/* Sem contagem ao lado do título (seção 1, corte #11): a aba
               "Precisa de você"/"Todas" já conta, duas vezes é ruído. */}
           <Coluna variante="entrada" titulo="Balcão">
@@ -458,7 +473,7 @@ export function Moldura({
                 coluna: a pílula não cobre mais o título nem o topo da coluna. Vazio, não ocupa. */}
             <div className={css.slotFila} data-fila-canhotos="" />
           </Coluna>
-        </div>
+        </main>
       </div>
     )
   }
@@ -467,7 +482,7 @@ export function Moldura({
     return (
       <div className={css.app}>
         {cabecalho}
-        <div className={css.palco}>
+        <main className={css.palco} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Balcão">
           {/* Sem contagem ao lado do título (seção 1, corte #11): a aba
               "Precisa de você"/"Todas" já conta, duas vezes é ruído. */}
           <Coluna variante="entrada" titulo="Balcão">
@@ -479,7 +494,7 @@ export function Moldura({
               <PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} />
             </Gaveta>
           )}
-        </div>
+        </main>
         <div className={css.slotFila} data-fila-canhotos="" />
         <footer className={css.rodape}>
           <Botao ref={botaoFichaRef} onClick={() => setGavetaAberta(true)}>
@@ -502,7 +517,7 @@ export function Moldura({
       {cabecalho}
       {/* Sem rolagem nesta seção: cada painel tem a área rolável dele por
           dentro, e é isso que mantém o composer preso no pé do celular. */}
-      <div className={css.palco}>
+      <main className={css.palco} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Balcão">
         <section
           className={`${css.coluna} ${css.centro}`}
           role="tabpanel"
@@ -518,7 +533,7 @@ export function Moldura({
           )}
           {painelDaAba[aba]}
         </section>
-      </div>
+      </main>
       <div className={css.slotFila} data-fila-canhotos="" />
       <BarraDeAbas
         ativa={aba}

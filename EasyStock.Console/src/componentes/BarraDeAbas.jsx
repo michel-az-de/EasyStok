@@ -6,7 +6,7 @@ import css from './BarraDeAbas.module.css'
 const ICONE_DA_ABA = { balcao: 'inbox', atendimento: 'conversa', ficha: 'ficha' }
 
 // Navegação entre painéis quando a tela não comporta as três colunas.
-export function BarraDeAbas({ abas, ativa, aoTrocar, idPainel = 'painel-da-aba', prefixoId = 'aba' }) {
+export function BarraDeAbas({ abas, ativa, aoTrocar, idPainel = 'painel-da-aba', prefixoId = 'aba', desabilitada = false }) {
   const [focada, setFocada] = useState(null)
   const entrada = abas.some((aba) => aba.id === focada) ? focada : ativa
 
@@ -35,6 +35,7 @@ export function BarraDeAbas({ abas, ativa, aoTrocar, idPainel = 'painel-da-aba',
             type="button"
             key={aba.id}
             role="tab"
+            disabled={desabilitada}
             id={`${prefixoId}-${aba.id}`}
             aria-selected={aba.id === ativa}
             aria-controls={idPainel}

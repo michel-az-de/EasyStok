@@ -89,4 +89,5 @@
   width: var(--toque); height: var(--toque); padding: 0; border: 0; border-radius: var(--r-pilula);
   display: grid; place-items: center; background: var(--preenchimento); color: var(--tinta-2);
 }
-.fecharCanto:hover { background: var(--preenchimento-forte); color: var(--tinta); }
+.fecharCanto:hover:not(:disabled) { background: var(--preenchimento-forte); color: var(--tinta); }
+.fecharCanto:disabled { color: var(--tinta-3); cursor: not-allowed; }

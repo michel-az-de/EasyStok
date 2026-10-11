@@ -3,6 +3,10 @@ import { createPortal } from 'react-dom'
 import { useEscape } from '../hooks/useEscape'
 import css from './Popover.module.css'
 
+const SELETOR_ITENS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]'
+const itensHabilitados = (caixa) => [...(caixa?.querySelectorAll(SELETOR_ITENS) ?? [])]
+  .filter((item) => !item.disabled && item.getAttribute('aria-disabled') !== 'true')
+
 // `posicao` decide de que lado a camada abre. O padrão continua sendo acima,
 // que é onde o composer precisa; 'abaixo' serve para gatilho no topo da tela.
 // `children` substitui `grupos`/`aoEscolher` quando o conteúdo não é lista de
@@ -23,7 +27,7 @@ import css from './Popover.module.css'
 // CSS de .popover continua o mesmo (bottom/top: 100% relativo ao wrapper
 // plantado), então quem não passa `portal` renderiza exatamente como antes.
 export function Popover({
-  rotulo, grupos, aoEscolher, aoFechar, posicao = 'acima', children, semAutoFoco = false, portal = false,
+  rotulo, grupos, aoEscolher, aoFechar, posicao = 'acima', children, semAutoFoco = false, portal = false, papel = 'menu',
 }) {
   const caixaRef = useRef(null)
   const marcadorRef = useRef(null)
@@ -90,8 +94,11 @@ export function Popover({
   // prop continua exatamente igual.
   useEffect(() => {
     if (semAutoFoco) return
-    caixaRef.current?.querySelector('button')?.focus()
-  }, [semAutoFoco, retangulo])
+    const itens = itensHabilitados(caixaRef.current)
+    if (papel === 'menu') itens.forEach((item) => { item.tabIndex = -1 })
+    const destino = papel === 'menu' ? itens[0] : caixaRef.current?.querySelector('button, input, select, textarea')
+    destino?.focus()
+  }, [semAutoFoco, retangulo, papel])
 
   useEffect(() => {
     const aoClicarFora = (evento) => {
@@ -104,21 +111,29 @@ export function Popover({
   }, [aoFechar])
 
   const corpo = (
+    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Papel explícito varia entre menu de ações e grupo com busca/listbox.
     <div
       className={`${css.popover} ${posicao === 'abaixo' ? css.abaixo : ''}`}
-      role="menu"
+      role={papel === 'group' ? 'group' : 'menu'}
       tabIndex={-1}
       aria-label={rotulo}
       ref={caixaRef}
       onClickCapture={(evento) => {
         // A ação pode desmontar o menu e abrir um Modal no mesmo clique.
         // Devolve o foco antes disso, para a nova janela guardar o acionador.
-        if (evento.target.closest('[role="menuitem"]') && origemRef.current?.isConnected) origemRef.current.focus()
+        if (evento.target.closest(SELETOR_ITENS) && origemRef.current?.isConnected) origemRef.current.focus()
       }}
       onKeyDown={(evento) => {
+        if (papel !== 'menu' || evento.altKey || evento.ctrlKey || evento.metaKey
+          || !evento.target.closest(SELETOR_ITENS)) return
+        if (evento.key === 'Tab') {
+          origemRef.current?.focus()
+          aoFechar()
+          return
+        }
         if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(evento.key)
-          || !evento.target.matches('[role="menuitem"]')) return
-        const itens = [...caixaRef.current.querySelectorAll('[role="menuitem"]:not(:disabled)')]
+          || !evento.target.matches(SELETOR_ITENS)) return
+        const itens = itensHabilitados(caixaRef.current)
         const atual = itens.indexOf(document.activeElement)
         const proximo = evento.key === 'Home' ? 0 : evento.key === 'End' ? itens.length - 1
           : (atual + (evento.key === 'ArrowDown' ? 1 : -1) + itens.length) % itens.length
@@ -129,10 +144,16 @@ export function Popover({
       {children ?? grupos.map((grupo) => (
         <div className={css.grupo} key={grupo.titulo}>
           <p className={css.titulo}>{grupo.titulo}</p>
-          {grupo.itens.map((item) => (
+          {grupo.itens.map((item) => item.informativo ? (
+            <div className={`${css.item} ${css.informativo}`} key={item.chave}>
+              <strong>{item.titulo}</strong>
+              <span>{item.detalhe}</span>
+            </div>
+          ) : (
             <button
               type="button"
               role="menuitem"
+              tabIndex={-1}
               className={css.item}
               key={item.chave}
               onClick={() => aoEscolher(item)}

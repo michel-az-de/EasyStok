@@ -63,6 +63,7 @@ jobs:
       - run: node ferramentas/prova-1531-porcao-no-pedido.mjs
       - run: node ferramentas/prova-1537-saldo-por-porcao.mjs
       - run: node ferramentas/prova-1540-banca-console.mjs
+      - run: node ferramentas/prova-1542-ajuste-por-porcao.mjs
       - run: node ferramentas/prova-1551-delta-console.mjs
       - run: node ferramentas/prova-1548-banca-console.mjs
       - run: node ferramentas/prova-1424-mensagem-programada-api.mjs
@@ -75,3 +76,7 @@ jobs:
       - run: node ferramentas/prova-m37-atendentes.mjs
       - run: node ferramentas/prova-m38-lembretes-agendados.mjs
       - run: node ferramentas/prova-ux-sistema.mjs
+      - run: node ferramentas/prova-superbanca-confirmacao.mjs
+      - run: node ferramentas/prova-superbanca-acessibilidade.mjs
+      - run: node ferramentas/prova-superbanca-ia.mjs
+      - run: node ferramentas/prova-superbanca-navegacao.mjs

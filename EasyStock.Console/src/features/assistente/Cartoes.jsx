@@ -13,7 +13,7 @@ function Cartao({ icone, titulo, tom, aoDispensar, children }) {
     <article className={`${css.cartao} ${tom ? css[tom] : ''}`}>
       <div className={css.cartaoTopo}>
         <h3><Icone nome={icone} tamanho={20} /> {titulo}</h3>
-        <Botao variante="texto" className={css.dispensar} aria-label="Ok, entendi, dispensar cartão" title="Ok, entendi" onClick={aoDispensar}>
+        <Botao variante="texto" className={css.dispensar} aria-label={`Dispensar ${titulo.toLowerCase()}`} title="Ok, entendi" onClick={aoDispensar}>
           <Icone nome="check" tamanho={18} />
         </Botao>
       </div>
@@ -47,9 +47,10 @@ const ROTULO_SENTIMENTO = { positivo: 'Positivo', negativo: 'Negativo', neutro: 
 
 export function CartaoSentimento({ dado, aoDispensar }) {
   return (
-    <Cartao icone="termometro" titulo="Sentimento da conversa" tom={dado.classificacao === 'negativo' ? 'perigo' : 'ok'} aoDispensar={aoDispensar}>
+    <Cartao icone="termometro" titulo="Tom da conversa" tom={dado.classificacao === 'negativo' ? 'perigo' : 'ok'} aoDispensar={aoDispensar}>
       <p><Pilula tom={TOM_SENTIMENTO[dado.classificacao]}>{ROTULO_SENTIMENTO[dado.classificacao]}</Pilula></p>
       {dado.trecho && <p>"{dado.trecho}"</p>}
+      <p>Leitura das palavras da mensagem. Confirme pelo contexto.</p>
     </Cartao>
   )
 }
@@ -70,8 +71,9 @@ export function CartaoCDC({ dado, aoDispensar }) {
 // apressada ler "confiança 80%" como prova.
 export function CartaoFotoSuspeita({ dado, aoDispensar }) {
   return (
-    <Cartao icone="camera" titulo="Foto suspeita de imagem gerada por IA" tom="perigo" aoDispensar={aoDispensar}>
-      <p>Confiança do indício: <b>{Math.round(dado.confianca * 100)}%</b></p>
+    <Cartao icone="camera" titulo="Exemplo de análise de foto" tom="perigo" aoDispensar={aoDispensar}>
+      <p>Demonstração do protótipo. Esta foto não foi analisada.</p>
+      <p>Valor simulado: <b>{Math.round(dado.confianca * 100)}%</b></p>
       <ul>
         {dado.motivos.map((motivo) => <li key={motivo}>{motivo}</li>)}
       </ul>
@@ -91,11 +93,11 @@ export function CartaoPadraoDeCompra({ dado, aoAplicar, aoDispensar }) {
         {dado.dia && <> · costuma pedir {dado.dia}</>}
         {dado.prato && <> · favorito: {dado.prato}</>}
       </p>
-      <div className={css.acaoCartao}>
+      {aoAplicar && <div className={css.acaoCartao}>
         <Botao variante="secundario" icone="modelo" onClick={() => aoAplicar(dado.sugestaoTexto)}>
           Usar sugestão no rascunho
         </Botao>
-      </div>
+      </div>}
     </Cartao>
   )
 }

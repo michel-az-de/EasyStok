@@ -91,11 +91,19 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
       const clienteId = conversaDe(id)?.clienteId
       if (!clienteId) {
         avisar('Cadastre o cliente (Salvar cadastro na Ficha) antes de anotar.')
-        return undefined
+        return false
       }
       return adicionarNotaCliente(clienteId, texto.trim())
-        .then(() => carregar(id))
-        .catch((erro) => avisar(`Nota do cliente: ${erro.message}`))
+        .then(async () => {
+          // A nota já foi gravada: falha na leitura não deve incentivar outro POST.
+          try { await carregar(id) }
+          catch (erro) { avisar(`Nota salva, mas a ficha não atualizou: ${erro.message}`) }
+          return true
+        })
+        .catch((erro) => {
+          avisar(`Nota do cliente: ${erro.message}`)
+          return false
+        })
     },
 
     // #1474: o clique em `selecionar` e o efeito da conversa restaurada podem pedir o mesmo
