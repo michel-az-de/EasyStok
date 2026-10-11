@@ -24,6 +24,8 @@ public class RegistrarMovimentoCaixaUseCase(
     ObterCaixaDiaUseCase obterCaixaDia,
     ILogger<RegistrarMovimentoCaixaUseCase> logger)
 {
+    private static readonly TimeSpan ToleranciaDeRelogio = TimeSpan.FromMinutes(5);
+
     public async Task<MovimentoCaixaResult> ExecuteAsync(RegistrarMovimentoCaixaCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
@@ -37,6 +39,12 @@ public class RegistrarMovimentoCaixaUseCase(
 
         var dataMov = cmd.DataMovimento ?? DateTime.UtcNow;   // timestamp do movimento (UTC, armazenado)
         var data = HorarioBrasil.DataOperacional(dataMov);    // dia operacional em Brasilia (alinha com o card; BUG-09)
+        var origem = (cmd.Origem ?? "web").Trim().ToLowerInvariant();
+
+        // #1615: lançamento retroativo é uso legítimo; no futuro ele some do caixa de hoje e cai num
+        // dia que ainda não abriu. O mobile fica de fora: a hora vem do relógio do aparelho.
+        if (origem != "mobile" && dataMov > DateTime.UtcNow.Add(ToleranciaDeRelogio))
+            throw new UseCaseValidationException("Data do lançamento não pode estar no futuro.");
 
         // Bloquear lançamento em dia já fechado (preserva integridade do snapshot).
         await CaixaFechadoGuard.ExigirDiaAbertoAsync(repo, cmd.EmpresaId, dataMov, cmd.LojaId,
@@ -45,7 +53,6 @@ public class RegistrarMovimentoCaixaUseCase(
         // FIN-003: saída interativa (não-mobile) exige rastro de auditoria e não pode estourar o
         // saldo do dia — caixa físico não fica negativo. O mobile promove fatos já registrados no
         // device (sync); não passa por estas guardas pra não bloquear lançamento legítimo.
-        var origem = (cmd.Origem ?? "web").Trim().ToLowerInvariant();
         if (tipo == "saida" && origem != "mobile")
         {
             if (string.IsNullOrWhiteSpace(cmd.Metodo))

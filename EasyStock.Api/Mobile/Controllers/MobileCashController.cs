@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using EasyStock.Api.Mobile.Services.Linkers;
 using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
@@ -53,6 +54,21 @@ public class MobileCashController(
             return BadRequest(new { error = "mobile_cash_entry sem empresa associada" });
         if (entry.ErpMovimentoCaixaId.HasValue)
             return BadRequest(new { error = "Já está linkado a um movimento ERP." });
+        if (entry.DeletedAt != null)
+            return BadRequest(new { error = "Lançamento excluído no aparelho não entra no caixa." });
+
+        // #1615: mesma referência do vínculo automático. Desvincular não estorna o movimento;
+        // promover de novo criava um segundo e o valor entrava duas vezes no caixa.
+        var referencia = CashEntryLinker.ReferenciaDe(entry);
+        var jaPromovido = await db.Set<MovimentoCaixa>().IgnoreQueryFilters()
+            .Where(m => m.EmpresaId == emp && m.Referencia == referencia)
+            .Select(m => (Guid?)m.Id).FirstOrDefaultAsync(ct);
+        if (jaPromovido is { } existente)
+        {
+            entry.ErpMovimentoCaixaId = existente;
+            await db.SaveChangesAsync(ct);
+            return Ok(new { erpMovimentoCaixaId = existente });
+        }
 
         // expense -> saida, income -> entrada
         var tipo = entry.Type?.ToLowerInvariant() == "income" ? "entrada" : "saida";
@@ -63,6 +79,8 @@ public class MobileCashController(
             Valor: entry.Amount,
             Descricao: entry.Description,
             LojaId: entry.LojaId,
+            Metodo: entry.Metodo,
+            Referencia: referencia,
             DataMovimento: entry.CreatedAt,
             RegistradoPorUserId: ResolveUserId(),
             RegistradoPorNome: entry.LastOperatorName,

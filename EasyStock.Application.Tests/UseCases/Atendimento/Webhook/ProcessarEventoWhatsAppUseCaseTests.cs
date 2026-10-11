@@ -216,6 +216,34 @@ public class ProcessarEventoWhatsAppUseCaseTests
     }
 
     [Fact]
+    public async Task TextoAcimaDoLimiteEGravadoCortado()
+    {
+        // #1615: o texto longo estourava a regra do domínio, o webhook respondia 200 e a mensagem sumia.
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.longo1", new string('a', Mensagem.TextoTamanhoMaximo + 500)));
+
+        await _conversaRepository.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Texto!.Length == Mensagem.TextoTamanhoMaximo && m.Texto.EndsWith('…')),
+            Arg.Any<CancellationToken>());
+        await _webhookRecebidoRepository.Received(1).MarcarProcessadoAsync(
+            Arg.Any<Guid>(), sucesso: true, Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InterativoSemBotaoEGravadoComoOutro()
+    {
+        // #1615: resposta de lista não traz button_reply; sem o id, "Botao" estourava a regra e a mensagem sumia.
+        var payload = PayloadBotaoAcao("wamid.lista1", "x")
+            .Replace("\"type\":\"button_reply\",\"button_reply\":{\"id\":\"x\",\"title\":\"Confirmar\"}",
+                     "\"type\":\"nfm_reply\",\"nfm_reply\":{\"name\":\"flow\"}");
+
+        await _useCase.ExecuteAsync(payload);
+
+        await _conversaRepository.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.TipoConteudo == TipoConteudoMensagem.Outro && m.ExternoId == "wamid.lista1"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task BotaoAcaoNaoChamaAgente()
     {
         await _useCase.ExecuteAsync(PayloadBotaoAcao("wamid.botao1", "acao:confirmar_endereco:123"));

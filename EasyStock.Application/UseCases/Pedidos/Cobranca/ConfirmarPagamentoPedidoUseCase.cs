@@ -309,7 +309,19 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             return cobrancas.FirstOrDefault(c => c.Provedor == input.Provedor && c.ReferenciaExterna == input.ReferenciaExterna);
 
         var online = cobrancas.Where(c => c.Provedor == input.Provedor).ToList();
-        return online.FirstOrDefault(c => c.EstaPendente) ?? online.OrderByDescending(c => c.CriadaEm).FirstOrDefault();
+        var pendente = online.FirstOrDefault(c => c.EstaPendente);
+
+        // #1615: o link trocado (item a mais, sinal que virou total) continua pagável no Mercado Pago, e o
+        // webhook não diz qual link foi pago. Valor menor que a cobrança atual e igual ao de uma substituída
+        // é o link antigo: o dinheiro entra nela e o saldo fica para a entrega, em vez de ficar retido.
+        if (pendente is not null && input.ValorPago < pendente.Valor)
+            return online
+                .Where(c => c.Valor == input.ValorPago
+                            && c.Status is StatusCobrancaPedido.Cancelada or StatusCobrancaPedido.Expirada)
+                .OrderByDescending(c => c.CriadaEm)
+                .FirstOrDefault() ?? pendente;
+
+        return pendente ?? online.OrderByDescending(c => c.CriadaEm).FirstOrDefault();
     }
 
     private async Task<ConfirmarPagamentoPedidoResult> RecusarAsync(
