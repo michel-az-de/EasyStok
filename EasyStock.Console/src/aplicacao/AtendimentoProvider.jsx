@@ -56,7 +56,7 @@ const carregar = () => ({
   som: lerPreferenciaSom(),
 })
 
-export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = true, lerComandasDaVisita, aoGuardarComandas, children }) {
+export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = true, lerComandasDaVisita, aoGuardarComandas, memoriaDoLaco = null, children }) {
   const reduzir = (atual, evento) => reducer(restaurarComandasDaVisita(atual, evento, lerComandasDaVisita?.()), evento)
   const [estado, despachar] = useReducer(reduzir, null, () => ({
     ...estadoInicial(carregar()),
@@ -74,7 +74,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
     if (estado.sincronizacao.estado === 'ok' || estado.conversas.length) aoGuardarComandas?.(comandasLocaisDaVisita(estado.conversas))
   }, [aoGuardarComandas, estado.conversas, estado.sincronizacao.estado])
   useEffect(() => { if (FONTE_API) gravarRascunhos(sessao, estado.rascunhos) }, [sessao, estado.rascunhos])
-  useSincronizacaoApi({ ativo: FONTE_API, comConversas: atendimentoAtivo, usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId })
+  useSincronizacaoApi({ ativo: FONTE_API, comConversas: atendimentoAtivo, usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId, memoria: memoriaDoLaco })
 
   // Relógio da tela mais o deslocamento do painel de simulações (seção 7,
   // "+10 min"/"+30 min"/"Agora"): as ações carimbam o mesmo instante que a

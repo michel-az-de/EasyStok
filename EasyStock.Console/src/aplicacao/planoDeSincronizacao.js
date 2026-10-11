@@ -5,10 +5,12 @@
 // (Falhou, Entregue) não mexe em `ultimaMensagemEm` e a dona precisa ver que a
 // mensagem não saiu. As outras só quando a conversa mudou.
 //
-// Pedido: a API ainda não traz o status do pedido no resumo (dependência de
-// backend registrada na #1237), então o pedido aberto é relido para a
-// selecionada, para a que mudou e, nas outras, só no ciclo lento (1 min).
-// Pedido entregue ou cancelado fica no cache até o id mudar.
+// Pedido: relido para a selecionada, para a que mudou e, nas outras, só no ciclo
+// lento (1 min). Pedido entregue ou cancelado fica no cache até o id mudar.
+// #1576: "mudou" é o status do pedido quando o resumo o traz (`pedidoStatus`);
+// na API que ainda não manda o campo, é qualquer mensagem nova da conversa.
+import { instante } from '../infra/api/traducaoConversas'
+
 export const STATUS_FINAIS_DO_PEDIDO = new Set(['entregue', 'cancelado'])
 
 //
@@ -24,8 +26,60 @@ export function deveRelerMensagens(resumo, guardado, selecionadaId) {
 export function deveRelerPedido(resumo, guardado, { selecionadaId = null, cicloLento = false } = {}) {
   if (!resumo.pedidoEmAndamentoId) return false
   if (!guardado || guardado.pedidoId !== resumo.pedidoEmAndamentoId) return true
+  // Status no resumo diferente do que está no cache relê mesmo o pedido que já tinha fechado. A comparação
+  // é com o status que o RESUMO trazia na última leitura: se um dia ele divergir do formato do pedido lido,
+  // a diferença relê uma vez, não a cada volta.
+  const comStatus = resumo.pedidoStatus != null
+  if (comStatus && (guardado.statusDoResumo ?? guardado.dados?.status) !== resumo.pedidoStatus) return true
   if (STATUS_FINAIS_DO_PEDIDO.has(guardado.dados?.status)) return false
-  return resumo.id === selecionadaId || guardado.ultima !== resumo.ultimaMensagemEm || cicloLento
+  const mudou = !comStatus && guardado.ultima !== resumo.ultimaMensagemEm
+  return resumo.id === selecionadaId || mudou || cicloLento
+}
+
+// #1576: a volta rápida lê só a página 1 da inbox e o laço guarda o resto. `mapa` é id -> resumo,
+// já na ordem da tela. A varredura completa troca o mapa (quem sumiu sai); a página 1 atualiza quem
+// veio. O reducer substitui a lista pelo que recebe, então o laço despacha sempre o mapa inteiro.
+//
+// Ordem: a da API, mais recente primeiro. Ela não desempata `ultimaMensagemEm` igual, então o
+// empate fica como já estava (conversa nova depois): sem isso a lista pula e a tela parada re-renderiza.
+const quando = (resumo) => Date.parse(instante(resumo.ultimaMensagemEm)) || 0
+
+export function fundirPagina(mapa, itens, { completa = false } = {}) {
+  const lidos = new Map()
+  for (const item of itens) if (!lidos.has(item.id)) lidos.set(item.id, item)
+  const fila = []
+  for (const [id, anterior] of mapa) {
+    if (lidos.has(id)) fila.push(lidos.get(id))
+    else if (!completa) fila.push(anterior)
+  }
+  for (const [id, item] of lidos) if (!mapa.has(id)) fila.push(item)
+  const tempo = new Map(fila.map((resumo) => [resumo.id, quando(resumo)]))
+  // `sort` é estável: quem empata fica na ordem da fila.
+  fila.sort((a, b) => tempo.get(b.id) - tempo.get(a.id))
+  return new Map(fila.map((resumo) => [resumo.id, resumo]))
+}
+
+// #1576: `fn` roda em no máximo `limite` itens por vez (o pool do banco tem 10 conexões e a carga
+// da inbox abria uma leitura por conversa de uma vez). Resultado na ordem de entrada; a primeira
+// rejeição propaga, como em `Promise.all`, e a fila para de puxar.
+export async function emFila(itens, limite, fn) {
+  const resultado = Array.from({ length: itens.length })
+  let proximo = 0
+  let quebrou = false
+  async function puxar() {
+    while (proximo < itens.length && !quebrou) {
+      const i = proximo
+      proximo += 1
+      try {
+        resultado[i] = await fn(itens[i], i)
+      } catch (erro) {
+        quebrou = true
+        throw erro
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limite, itens.length) }, puxar))
+  return resultado
 }
 
 // Dossiê do cliente (#1276, #1474): a Ficha lê telefone, tags e notas do cadastro. Vale para a

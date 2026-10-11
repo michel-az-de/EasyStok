@@ -234,8 +234,13 @@ const mesmoPedido = (a, b) => Boolean(a) && Boolean(b) && mesmoConteudo({ ...a, 
 
 // #1565: a polling relê a cada 5 s. Leitura igual à que já está na tela devolve a MESMA conversa, para a
 // tela parada não re-renderizar inteira.
-function mesclarDoServidor(local, doServidor) {
-  if (!local) return doServidor
+// #1576: `semMensagens` é a conversa cujas mensagens o laço não conseguiu ler e não tinha em cache. Não é
+// conversa vazia: ficam as mensagens da tela e o que se calcula delas (janela de 24 h, atraso).
+function mesclarDoServidor(local, lida, semMensagens = false) {
+  if (!local) return lida
+  const doServidor = semMensagens
+    ? { ...lida, mensagens: local.mensagens, janelaExpiraEm: local.janelaExpiraEm, atrasada: local.atrasada }
+    : lida
   const doServidorIds = new Set(doServidor.mensagens.map((m) => m.id))
   const soLocais = local.mensagens.filter((m) => mensagemSoLocal(m) && !doServidorIds.has(m.id))
   const mantido = clienteDaApiMantido(local, doServidor)
@@ -263,9 +268,9 @@ const CASOS_API = {
     ...mapear(estado, id, (c) => ({ ...c, ...situacao })),
     automaticoPausado: { ...estado.automaticoPausado, [id]: situacao.pausaApi ?? false },
   }),
-  [acao.SINCRONIZAR_CONVERSAS]: (estado, { conversas }) => {
+  [acao.SINCRONIZAR_CONVERSAS]: (estado, { conversas, semMensagens }) => {
     const locais = new Map(estado.conversas.map((c) => [c.id, c]))
-    const lidas = conversas.map((c) => mesclarDoServidor(locais.get(c.id), c))
+    const lidas = conversas.map((c) => mesclarDoServidor(locais.get(c.id), c, semMensagens?.includes(c.id)))
     const mescladas = mesmaLista(estado.conversas, lidas) ? estado.conversas : lidas
     const aindaExiste = mescladas.some((c) => c.id === estado.selecionadaId)
     const selecionadaId = aindaExiste ? estado.selecionadaId : (mescladas[0]?.id ?? null)

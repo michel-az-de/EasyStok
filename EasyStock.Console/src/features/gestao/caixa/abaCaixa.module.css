@@ -109,3 +109,46 @@
   .linhaInfo, .infoItem { flex: 1 1 100%; min-width: 0; }
   .linhaValor { width: 100%; flex-wrap: wrap; justify-content: space-between; }
 }
+
+.caixaApi { gap: var(--e-4); }
+.identificacao { display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap; min-width: 0; }
+.caixaApi .cabecalho { align-items: center; }
+.caixaApi > .resumoLista { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e-4); }
+.caixaApi > .resumoLista div { justify-content: flex-start; }
+.caixaApi > .resumoLista dt { line-height: var(--lh-corpo); }
+.caixaApi > .resumoLista dd { font-size: var(--t-forte); line-height: var(--lh-compacto); white-space: nowrap; }
+.caixaApi > .resumoLista .resumoForte dd { font-size: var(--t-titulo); }
+.caixaApi > .resumoLista .resumoTotal { grid-column: auto; flex-direction: column; align-items: flex-start; padding: 0; }
+.notaGaveta { margin: 0; color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-corpo); }
+.caixaApi .extrato { gap: var(--e-6); }
+.caixaApi .lista { gap: 0; }
+.caixaApi .linha { align-items: flex-start; flex-wrap: nowrap; padding: var(--e-3); }
+.caixaApi .linha:nth-child(even) { background: var(--preenchimento); }
+.caixaApi .linhaInfo { flex: 1 1 0; gap: var(--e-1); }
+.caixaApi .linhaInfo strong { font-size: var(--t-corpo); font-weight: 700; line-height: var(--lh-compacto); }
+.caixaApi .dicaItem { line-height: var(--lh-corpo); }
+.caixaApi .linhaValor { width: auto; flex: 0 0 auto; flex-direction: column; align-items: flex-end; flex-wrap: nowrap; gap: var(--e-1); font-size: var(--t-corpo); line-height: var(--lh-compacto); }
+.valorSaida { color: var(--erro); }
+
+@container (min-width: 601px) {
+  .caixaApi > .resumoLista dt { min-height: calc(2em * var(--lh-corpo)); }
+}
+
+@container (min-width: 1040px) {
+  .caixaApi > .resumoLista { grid-template-columns: minmax(150px, 1.2fr) repeat(6, minmax(0, 1fr)); }
+}
+
+@container (max-width: 600px) {
+  .caixaApi > .resumoLista { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3); }
+  .caixaApi > .resumoLista .resumoForte { grid-column: auto; }
+  .caixaApi > .resumoLista .resumoTotal { grid-column: 1 / -1; flex-direction: row; align-items: baseline; gap: var(--e-2); }
+  .caixaApi .linha { gap: var(--e-2); padding-inline: var(--e-2); }
+  .caixaApi .linhaInfo strong, .caixaApi .linhaValor { font-size: var(--t-apoio); }
+}
+
+@container (max-width: 360px) {
+  .caixaApi .acoesTopo { gap: var(--e-1); }
+  .caixaApi .acoesTopo > button { padding-inline: var(--e-2); }
+  .caixaApi > .resumoLista .resumoForte { grid-column: 1 / -1; }
+  .caixaApi > .resumoLista .resumoTotal { grid-column: auto; flex-direction: column; align-items: flex-start; gap: var(--e-1); }
+}

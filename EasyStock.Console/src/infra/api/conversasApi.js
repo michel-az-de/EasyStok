@@ -14,16 +14,19 @@ export const listarConversas = ({ limite = POR_PAGINA, pagina = 1 } = {}) =>
 
 export const listarAtendentes = () => chamarApi('/api/atendimento/atendentes')
 
-// Inbox inteira (F07, item 7): segue as páginas até uma vir incompleta. Conversa que
-// subiu de página entre uma chamada e outra aparece uma vez só.
-export async function listarTodasConversas() {
+// Leitura da polling. Inbox inteira (F07, item 7): segue as páginas até uma vir incompleta;
+// conversa que subiu de página entre uma chamada e outra aparece uma vez só.
+// #1576: sem `completa`, para na página 1, que traz quem recebeu mensagem por último, ou segue até
+// achar as conversas de `ate` (ids). `completa` na resposta diz se o que veio é a inbox inteira.
+export async function listarInbox({ completa = false, ate = [] } = {}) {
   const vistas = new Map()
   for (let pagina = 1; pagina <= PAGINAS_NO_MAXIMO; pagina += 1) {
     const itens = (await listarConversas({ pagina })) ?? []
     for (const item of itens) if (!vistas.has(item.id)) vistas.set(item.id, item)
-    if (itens.length < POR_PAGINA) break
+    if (itens.length < POR_PAGINA) return { itens: [...vistas.values()], completa: true }
+    if (!completa && ate.every((id) => vistas.has(id))) break
   }
-  return [...vistas.values()]
+  return { itens: [...vistas.values()], completa }
 }
 
 export const listarMensagens = (id, { limite = 100 } = {}) =>
