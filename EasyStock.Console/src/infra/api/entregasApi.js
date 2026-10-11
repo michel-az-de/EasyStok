@@ -7,6 +7,9 @@ import { chamarApi } from './cliente'
 export const listarPedidosEntrega = (status, data) =>
   chamarApi(`/api/kds/pedidos?status=${encodeURIComponent(status)}${data ? `&data=${data}` : ''}`)
 
+export const listarAgendaEncomendas = (de, ate) =>
+  chamarApi(`/api/atendimento/agenda?de=${encodeURIComponent(de)}&ate=${encodeURIComponent(ate)}`)
+
 // Entregadores (policy Operador).
 export const listarEntregadores = () => chamarApi('/api/atendimento/entregadores')
 export const criarEntregador = (corpo) => chamarApi('/api/atendimento/entregadores', { metodo: 'POST', corpo })

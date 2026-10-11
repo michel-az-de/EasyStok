@@ -372,7 +372,7 @@ function CozinhaApi({ rota, sessao }) {
 
 // Entregas no modo API (F04): janela própria lê a API, sem espelho do Balcão.
 function EntregasApi({ rota, sessao }) {
-  return <NoModulo rota={rota}><TelaEntregasApi key={identidadeDaSessao(sessao)} /></NoModulo>
+  return <NoModulo rota={rota}><TelaEntregasApi key={`${identidadeDaSessao(sessao)}:${rota.tela}`} tela={rota.tela} /></NoModulo>
 }
 
 export function App() {

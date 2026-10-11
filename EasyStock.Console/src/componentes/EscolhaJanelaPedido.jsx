@@ -2,13 +2,14 @@ import { Botao } from './Botao'
 import { CampoSelecao, CampoTexto } from './Campo'
 
 export function EscolhaJanelaPedido({ data, mudarData, leitura, escolhida, escolher,
-  avisar, mudarAviso, erro, aviso, enviando, salvar, recarregar }) {
+  avisar, mudarAviso, erro, aviso, enviando, salvar, recarregar, min, max }) {
   const alternativas = leitura?.janelas.filter((j) => j.id !== leitura.atual?.id) ?? []
   return (
     <div>
       {leitura?.atual && <p>Agendamento atual: <strong>{leitura.atual.rotulo}</strong></p>}
       {leitura && !leitura.atual && <p>Este pedido ainda não tem vaga de entrega.</p>}
       <CampoTexto rotulo="Dia da nova entrega (opcional)" tipo="date" value={data}
+        min={min} max={max}
         disabled={enviando} onChange={(e) => mudarData(e.target.value)} />
       {!leitura && !erro && <p role="status">Consultando as vagas…</p>}
       {leitura && !leitura.lojaDisponivel && <p>A empresa não tem vitrine ativa para entrega.</p>}

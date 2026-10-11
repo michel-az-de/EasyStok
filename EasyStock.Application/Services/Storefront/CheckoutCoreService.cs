@@ -132,6 +132,7 @@ public sealed class CheckoutCoreService(
         var sw = Stopwatch.StartNew();
 
         var cep = ValidarEntrada(input.Cep, input.Itens?.Select(i => (i.CardapioItemId, i.Qtd)).ToList());
+        HorizonteAgendamento.Validar(input.DataEntrega, HorarioBrasil.DataOperacional(timeProvider.GetUtcNow().UtcDateTime));
 
         // ── Resolver storefront ───────────────────────────────────────────
         var storefront = await ResolverStorefrontAsync(input, ct);

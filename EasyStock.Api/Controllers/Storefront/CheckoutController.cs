@@ -3,6 +3,7 @@ using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Exceptions.Storefront;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Net.Http.Headers;
@@ -124,6 +125,10 @@ public sealed class CheckoutController(
             return DataNotFound(ex.Message);
         }
         catch (CepInvalidoException ex)
+        {
+            return DataBadRequest(ex.Message);
+        }
+        catch (UseCaseValidationException ex)
         {
             return DataBadRequest(ex.Message);
         }
@@ -268,6 +273,10 @@ public sealed class CheckoutController(
             return DataNotFound(ex.Message);
         }
         catch (CepInvalidoException ex)
+        {
+            return DataBadRequest(ex.Message);
+        }
+        catch (UseCaseValidationException ex)
         {
             return DataBadRequest(ex.Message);
         }
