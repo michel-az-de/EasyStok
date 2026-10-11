@@ -388,6 +388,20 @@ public class CheckoutCoreServiceTests
             Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task ItemSemPrecoRecusaOCheckout()
+    {
+        // #1615 (resto da #656): item do cardápio a R$ 0 virava pedido de total zero que seguia até Entregue.
+        var c = new Cenario();
+        typeof(CardapioItem).GetProperty(nameof(CardapioItem.PrecoStorefront))!.SetValue(c.CardapioItem, 0m);
+
+        var act = () => c.Servico().CriarPedidoComReservaAsync(Input(c));
+
+        var erro = await act.Should().ThrowAsync<RegraDeDominioVioladaException>();
+        erro.Which.Message.Should().Contain("Brigadeiro").And.Contain("sem preço");
+        c.PedidosAdicionados.Should().BeEmpty("item sem preço não pode virar pedido");
+    }
+
     /// <summary>
     /// Cozinha em (0,0): no equador, geocode em (0; 0,025) com rota medida de 1.800 m cai na faixa até 2 km
     /// (R$ 15), diferente da zona do CEP (R$ 5).

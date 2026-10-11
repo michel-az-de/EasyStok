@@ -175,8 +175,7 @@ public sealed class CheckoutCoreService(
         var cardapioItens = await CarregarItensCardapioAsync(
             storefront.Id, input.Itens!.Select(i => i.CardapioItemId), ct);
         // M1.4b (#1531): porção de outro prato ou esgotada recusa antes de criar o pedido e ocupar a vaga.
-        foreach (var i in input.Itens!)
-            cardapioItens[i.CardapioItemId].PorcaoParaVenda(i.VariacaoId);
+        ValidarItens(input.Itens!, cardapioItens);
 
         // #1506: janela já encerrada (ou data passada) nunca vale, com ou sem prazo mínimo.
         if (CalculadoraPrazoPedido.JanelaJaPassou(input.DataEntrega, janela.HoraFim, timeProvider.GetUtcNow().UtcDateTime))
@@ -342,6 +341,30 @@ public sealed class CheckoutCoreService(
     }
 
     /// <summary>
+    /// Recusa, antes de criar o pedido e ocupar a vaga, porção de outro prato ou esgotada (M1.4b, #1531)
+    /// e item sem preço (#1615).
+    /// </summary>
+    public static void ValidarItens(IEnumerable<ItemPedidoCheckout> itens, IReadOnlyDictionary<Guid, CardapioItem> cardapioItens)
+    {
+        foreach (var i in itens)
+            PorcaoEPreco(cardapioItens[i.CardapioItemId], i.VariacaoId);
+    }
+
+    /// <summary>
+    /// M1.4b (#1531): com porção, o preço é o dela (absoluto, ADR-0035). PED-01 (#656): item a R$ 0 não
+    /// vira pedido; a guarda existia só no pedido digitado e no balcão.
+    /// </summary>
+    private static (CardapioItemVariacao? Porcao, decimal Preco) PorcaoEPreco(CardapioItem ci, Guid? variacaoId)
+    {
+        var porcao = ci.PorcaoParaVenda(variacaoId);
+        var preco = porcao?.PrecoStorefront ?? ci.PrecoEfetivo();
+        if (preco <= 0m)
+            throw new RegraDeDominioVioladaException(
+                $"{(ci.NomeEfetivo() is { Length: > 0 } nome ? nome : "Um item")} está sem preço no cardápio.");
+        return (porcao, preco);
+    }
+
+    /// <summary>
     /// Grava um <see cref="DomainPedidoItem"/> por item pedido, com o snapshot do cardápio (nome,
     /// preço efetivo, <c>CardapioItemId</c>) e a observação do item. Devolve na ordem da entrada.
     /// </summary>
@@ -355,9 +378,7 @@ public sealed class CheckoutCoreService(
         foreach (var inputItem in itens)
         {
             var ci = cardapioItens[inputItem.CardapioItemId];
-            // M1.4b (#1531): com porção, o preço é o dela (absoluto, ADR-0035) e a linha guarda o retrato.
-            var porcao = ci.PorcaoParaVenda(inputItem.VariacaoId);
-            var precoUnit = porcao?.PrecoStorefront ?? ci.PrecoEfetivo();
+            var (porcao, precoUnit) = PorcaoEPreco(ci, inputItem.VariacaoId);
             var item = new DomainPedidoItem
             {
                 Id = Guid.NewGuid(),

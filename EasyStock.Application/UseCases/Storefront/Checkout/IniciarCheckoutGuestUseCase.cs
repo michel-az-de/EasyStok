@@ -152,6 +152,7 @@ public sealed class IniciarCheckoutGuestUseCase(
         var itensPedidos = input.Items!.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd)).ToList();
         var cardapioItens = await checkoutCore.CarregarItensCardapioAsync(
             storefrontId, itensPedidos.Select(i => i.CardapioItemId), ct);
+        CheckoutCoreService.ValidarItens(itensPedidos, cardapioItens);
 
         var pedido = DomainPedido.Criar(empresaId: empresaId, cliente: cliente, origem: OrigemPedido.StorefrontGuest);
         await enderecoEntrega.RegistrarAsync(pedido,
