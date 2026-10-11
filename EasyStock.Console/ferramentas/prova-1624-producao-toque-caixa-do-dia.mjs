@@ -142,7 +142,7 @@ const andar = (no, fn, achados = []) => {
   return andar(no.props?.children, fn, achados)
 }
 const texto = (no) => (no == null ? '' : typeof no !== 'object' ? String(no) : Array.isArray(no) ? no.map(texto).join('') : texto(no.props?.children))
-const limpo = (no) => texto(no).replace(/ /g, ' ')
+const limpo = (no) => texto(no).replace(/\u00a0/g, ' ')
 const doTipo = (no, tipo) => andar(no, (n) => n.type === tipo)
 const comRotulo = (no, rotulo) => andar(no, (n) => n.props?.['aria-label'] === rotulo)
 const campos = (no, rotulo) => andar(no, (n) => n.type === 'CampoTexto' && n.props.rotulo === rotulo)
@@ -180,6 +180,12 @@ await confere('grade: um cartão por prato de tamanho único e um por porção, 
     ['Talharim', '500 g', '', 4], ['Lasanha', '600 g', 'v-6', 2], ['Lasanha', 'Família', 'v-8', 0], ['Molho sugo', '300 g', '', null],
   ])
   assert.equal(new Set(cartoes.map((c) => c.chave)).size, 4, 'cada cartão tem a própria chave')
+  // O tamanho só some do cartão quando o nome termina com ele; "Panqueca de Frango" contém "p" e "g".
+  const { nomeDoCartao, tamanhoNoCartao } = await import('../src/dominio/gradeDeProducao.js')
+  assert.equal(tamanhoNoCartao({ nome: 'Talharim 500 g', tamanho: '500 g' }), '')
+  assert.equal(nomeDoCartao({ nome: 'Talharim 500 g', tamanho: '500 g' }), 'Talharim 500 g')
+  assert.deepEqual(['P', 'G'].map((tamanho) => nomeDoCartao({ nome: 'Panqueca de Frango', tamanho })), ['Panqueca de Frango P', 'Panqueca de Frango G'])
+  assert.equal(nomeDoCartao({ nome: 'Molho 1500 ml', tamanho: '500 ml' }), 'Molho 1500 ml 500 ml')
 })
 
 await confere('lote: somar cria a linha com o peso do prato, somar de novo aumenta, zerar tira a linha', async () => {
@@ -233,6 +239,10 @@ await confere('Produção do dia: a tela abre com a grade e o saldo; nada no lot
   assert.match(texto(cartoesDaTela(t.arvore)[0]), /Talharim.*500 g.*4 no estoque/)
   assert.match(texto(cartoesDaTela(t.arvore)[2]), /Lasanha.*Família.*0 no estoque/)
   assert.doesNotMatch(texto(cartoesDaTela(t.arvore)[3]), /no estoque/, 'prato sem estoque ligado não mostra saldo inventado')
+  const botaoDe = (indice) => doTipo(cartoesDaTela(t.arvore)[indice], 'button')[0]
+  const descricao = andar(cartoesDaTela(t.arvore)[0], (n) => n.props?.id === botaoDe(0).props['aria-describedby'])[0]
+  assert.match(texto(descricao), /4 no estoque/, 'o saldo é a descrição do botão, para o leitor de tela')
+  assert.equal(botaoDe(3).props['aria-describedby'], undefined)
   assert.equal(itensDoLote(t.arvore).length, 0)
   assert.equal(doTipo(t.arvore, 'CampoSelecao').filter((c) => c.props.rotulo === 'Prato').length, 0, 'não há mais lista suspensa de pratos')
   assert.equal(doTipo(t.arvore, 'Botao').find((b) => b.props.tipo === 'submit').props.disabled, true)
@@ -301,12 +311,13 @@ await confere('Produção do dia: sem saldo nem sugestão (API fora) a grade con
   await t.assentar()
   assert.equal(cartoesDaTela(t.arvore).length, 4)
   assert.equal(andar(t.arvore, (n) => n.props?.['aria-label'] === 'Falta produzir').length, 0)
+  assert.match(texto(t.arvore), /Não consegui ler o saldo dos pratos agora\./, 'a falha do saldo é dita, com o tentar de novo')
   tocar(t, 'Molho sugo 300 g')
   assert.equal(campos(t.arvore, 'Porções')[0].props.value, '1')
 })
 
 // === Caixa do dia =======================================================================
-const moedaDe = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/ /g, ' ')
+const moedaDe = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/\u00a0/g, ' ')
 const dia = (extra = {}) => ({
   data: '2026-10-11', aberto: false, fechado: false, esquecidoAberto: false, abertoDesde: null, fechamento: null,
   saldoInicial: 0, totalVendas: 0, totalPagamentosPedidos: 0, totalEntradasExtras: 0, totalSaidasExtras: 0, saldoEsperado: 0,

@@ -8,7 +8,8 @@ import { obterCaixaDoDia } from '../infra/api/caixaApi'
 //
 // estado: carregando | ok | erro
 export function useFluxoDeCaixaApi(hoje, diasAntes = 6) {
-  const [carga, setCarga] = useState({ estado: 'carregando', dias: [], erro: null })
+  // Sem a data de hoje não há dia anterior para pedir: a tabela fica só com a linha de hoje.
+  const [carga, setCarga] = useState(() => ({ estado: hoje ? 'carregando' : 'ok', dias: [], erro: null }))
   const [tentativa, setTentativa] = useState(0)
 
   useEffect(() => {

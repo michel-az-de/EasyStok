@@ -24,12 +24,15 @@ export function cartoesDaGrade(pratos, estoque = []) {
   })
 }
 
-const semAcento = (valor) => String(valor ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase('pt-BR')
+const semAcento = (valor) => String(valor ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
 
 // O cardápio da casa já escreve o tamanho no nome ("Talharim 500 g", porção "500 g"): repetir no
-// cartão só ocupa espaço. O tamanho aparece quando o nome não o diz.
-export const tamanhoNoCartao = (cartao) =>
-  (cartao.tamanho && !semAcento(cartao.nome).includes(semAcento(cartao.tamanho)) ? cartao.tamanho : '')
+// cartão só ocupa espaço. O tamanho some só quando o nome termina com ele, palavra por palavra:
+// "Panqueca de Frango" contém "p" e "g", e as porções P e G têm de continuar escritas.
+export function tamanhoNoCartao(cartao) {
+  const tamanho = semAcento(cartao.tamanho).trim()
+  return tamanho && !` ${semAcento(cartao.nome).trim()}`.endsWith(` ${tamanho}`) ? cartao.tamanho : ''
+}
 
 // Como a dona chama o cartão: "Talharim 500 g".
 export const nomeDoCartao = (cartao) => [cartao.nome, tamanhoNoCartao(cartao)].filter(Boolean).join(' ')

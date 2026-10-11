@@ -26,6 +26,7 @@ import grade from './producaoDoDia.module.css'
 // tinha estoque passa a ter. Depois, "Imprimir etiquetas" imprime uma por porção (D-M2-04).
 const VALIDADE_PADRAO = 5
 const ID_DO_LOTE = 'lote-da-producao'
+const ID_DOS_AVISOS = 'lotes-lancados'
 const novaLinha = () => ({ id: crypto.randomUUID(), sku: '', variacaoId: '', porcoes: '', pesoPorPorcaoG: '', pesoRealG: '', validadeDias: String(VALIDADE_PADRAO) })
 const inteiro = (texto) => (String(texto).trim() === '' ? null : Number(texto))
 const dataCurta = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '')
@@ -81,8 +82,15 @@ export function AbaProducaoDoDiaApi() {
     setImpressao(null)
     setLeitura((n) => n + 1)
     recarregarEstoque()
-    globalThis.document?.getElementById(ID_DO_LOTE)?.scrollIntoView({ block: 'nearest' })
   }), [recarregarEstoque])
+  // O aviso (erro ou lote lançado) tem de aparecer para quem tocou na barra: em tela estreita o lote
+  // fica abaixo da grade e, ao lado, ele rola por dentro. A rolagem vem depois de o aviso existir.
+  useEffect(() => {
+    if (erro) globalThis.document?.querySelector(`#${ID_DO_LOTE} [role="alert"]`)?.scrollIntoView({ block: 'nearest' })
+  }, [erro])
+  useEffect(() => {
+    if (leitura > 0) globalThis.document?.getElementById(ID_DOS_AVISOS)?.scrollIntoView({ block: 'nearest' })
+  }, [leitura])
   useEffect(() => {
     let vivo = true
     lerSugestao().then((r) => { if (vivo) setSugestao(r) }).catch(() => { if (vivo) setSugestao(null) })
@@ -117,16 +125,12 @@ export function AbaProducaoDoDiaApi() {
   async function confirmar(evento) {
     evento.preventDefault()
     if (enviando) return
-    const formulario = evento.currentTarget
     setEnviando(true)
     setErro(null)
     // Gravou: quem mostra o lote e zera as linhas é o `aoLancarLote` acima.
     const r = await producaoDoDia.produzir(linhas.map((l) => paraEnviar(l, pratos)))
     setEnviando(false)
-    if (r.ok) return
-    setErro(r.erro)
-    // Em tela estreita o lote fica abaixo da grade: o aviso tem de aparecer para quem tocou na barra.
-    formulario?.scrollIntoView?.({ block: 'nearest' })
+    if (!r.ok) setErro(r.erro)
   }
 
   // #1585: cada lote imprime as próprias etiquetas. A folha esvazia antes de buscar: se a busca
@@ -192,6 +196,12 @@ export function AbaProducaoDoDiaApi() {
                 <CampoTexto rotulo="Buscar prato" rotuloOculto tipo="search" placeholder="Buscar prato" value={busca} onChange={(e) => setBusca(e.target.value)} />
               </div>
             </div>
+            {estoque.estado === 'erro' && (
+              <p className={css.aviso}>
+                Não consegui ler o saldo dos pratos agora. Dá para lançar a produção assim mesmo.
+                {' '}<Botao variante="texto" icone="refresh-cw" onClick={recarregarEstoque}>Tentar de novo</Botao>
+              </p>
+            )}
             {visiveis.length === 0 ? (
               <p className={css.descricao}>
                 {cartoes.length === 0 ? 'O cardápio ainda não tem pratos.' : 'Nenhum prato com esse nome.'}
@@ -202,13 +212,15 @@ export function AbaProducaoDoDiaApi() {
                 {visiveis.map((cartao) => {
                   const noLote = porcoesNoLote(linhas, cartao)
                   const nome = nomeDoCartao(cartao)
+                  // O rótulo do botão diz a ação; o saldo vem como descrição, para o leitor de tela também.
+                  const idDoSaldo = cartao.saldo == null ? undefined : `saldo-${cartao.chave}`
                   return (
                     <li key={cartao.chave} data-prato={cartao.chave} className={`${grade.cartao} ${noLote > 0 ? grade.noLote : ''}`}>
-                      <button type="button" className={grade.tocar} disabled={enviando} aria-label={`Somar 1 porção de ${nome}`} onClick={() => somar(cartao, 1)}>
+                      <button type="button" className={grade.tocar} disabled={enviando} aria-label={`Somar 1 porção de ${nome}`} aria-describedby={idDoSaldo} onClick={() => somar(cartao, 1)}>
                         <span className={grade.nomeDoPrato}>{cartao.nome}</span>
                         {tamanhoNoCartao(cartao) && <span className={grade.tamanho}>{cartao.tamanho}</span>}
                         {cartao.saldo != null && (
-                          <span className={grade.saldo}>
+                          <span id={idDoSaldo} className={grade.saldo}>
                             {cartao.saldo} no estoque{noLote > 0 && <strong> · {cartao.saldo + noLote} depois</strong>}
                           </span>
                         )}
@@ -231,7 +243,7 @@ export function AbaProducaoDoDiaApi() {
           <div className={grade.colunaDoLote}>
             {/* #1585: um aviso por lote lançado na visita, o mais novo primeiro, até ela dispensar. */}
             {lotes.length > 0 && (
-              <section className={css.secao} aria-label="Lotes lançados nesta visita">
+              <section id={ID_DOS_AVISOS} className={`${css.secao} ${grade.aparecer}`} aria-label="Lotes lançados nesta visita">
                 {lotes.map((lote) => (
                   <output key={lote.loteId} className={css.aviso}>
                     <strong>Lote {lote.codigo}</strong> lançado: {lote.pratos.map((p) => `${p.porcoes}× ${p.nome}${p.sobraG ? ` (sobra ${p.sobraG} g)` : ''}`).join(', ')}.
@@ -257,7 +269,7 @@ export function AbaProducaoDoDiaApi() {
                   {linhas.length === 0 ? 'Os pratos que você tocar aparecem aqui.' : 'Confira a validade e o peso antes de confirmar.'}
                 </p>
               </div>
-              {erro && <p className={css.aviso} role="alert">{erro}</p>}
+              {erro && <p className={`${css.aviso} ${grade.aparecer}`} role="alert">{erro}</p>}
               {linhas.length > 0 && (
                 <ol className={grade.itens}>
                   {linhas.map((l, indice) => {

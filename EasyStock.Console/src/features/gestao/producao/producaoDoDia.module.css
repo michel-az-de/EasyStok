@@ -51,6 +51,10 @@
 }
 .menos:hover:not(:disabled) { background: var(--preenchimento); }
 
+/* Aviso que a tela rola até ele (erro, lote lançado): a margem deixa lugar para a barra fixa do
+   rodapé, que senão fica por cima do aviso. */
+.aparecer { scroll-margin-block: var(--e-4) 148px; }
+
 /* O aviso do lote lançado: o texto em cima, os botões numa linha só deles. */
 .acoesDoAviso { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; margin-top: var(--e-2); }
 
