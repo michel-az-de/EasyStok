@@ -77,6 +77,8 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 Endereco: endereco is null ? null : new(endereco.Cep ?? "", endereco.Logradouro ?? "", endereco.Numero ?? "",
                     endereco.Bairro ?? "", endereco.Cidade ?? "", endereco.Estado ?? "", endereco.Complemento));
         }
+        if (link.UsadoEm is null && pedido is not null && dados.PedidoId == pedido.Id)
+            dados = dados with { PedidoAtualizadoEm = pedido.AlteradoEm };
         var selecao = await SelecionarAsync(link.EmpresaId, dados.Itens, pedido, ct, validar: false);
         var detalhe = pedido is null ? null : await obterPedido.ExecuteAsync(link.EmpresaId, conversa.Id, ct, pedido.Id);
         if (detalhe is not null && pedido is not null)
@@ -142,7 +144,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 return Ler<EnvioComandaCliente>(link.ResultadoJson) ?? throw new ComandaClienteConflitoException("O envio está em confirmação. Atualize em instantes.");
             var estado = await EstadoAsync(link, t);
             if (!estado.PodeEditar) throw new LinkCardapioConversaIndisponivelException();
-            var dados = estado.Rascunho;
+            var dados = Ler<RascunhoComandaCliente>(link.RascunhoJson) is { Itens: not null } salvo ? salvo : estado.Rascunho;
             Validar(dados);
             if (dados.Itens.Count == 0) throw new UseCaseValidationException("Escolha ao menos um prato.");
             var agora = relogio.GetUtcNow().UtcDateTime;

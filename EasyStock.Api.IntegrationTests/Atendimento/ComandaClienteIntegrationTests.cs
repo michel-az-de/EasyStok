@@ -103,14 +103,20 @@ public sealed partial class PedidoConversaConcorrenciaTests
         envios[0].Saldo.Should().Be(15);
         preferencias.Should().ContainSingle();
         await ConfirmarPagamento(factory, envios[0].PedidoId, "100001", 15);
-        await Etapa("preparando");
-        await Etapa("pronto");
-        (await SaldoEstoque()).Should().Be(4);
 
         var novo = await Link(factory, c.ConversaId);
         var compartilhada = await Estado(client, novo);
         await Salvar(client, novo, compartilhada, compartilhada.Rascunho with { Itens = [new(c.CardapioItemId, 2, "sem granulado")] });
-        var acrescimo = await Enviar(client, novo, 1);
+        await Etapa("preparando");
+        await Etapa("pronto");
+        (await SaldoEstoque()).Should().Be(4);
+        var desatualizado = await client.PostAsJsonAsync($"{Rota(novo)}/confirmar", new { revisao = 1 });
+        desatualizado.StatusCode.Should().Be(HttpStatusCode.Conflict, "o preparo mudou desde a seleção salva");
+        var atual = await Estado(client, novo);
+        atual.Rascunho.Itens.Single().Qtd.Should().Be(2, "a conferência preserva a seleção do cliente");
+        atual.Rascunho.PedidoAtualizadoEm.Should().NotBe(compartilhada.Rascunho.PedidoAtualizadoEm);
+        await Salvar(client, novo, atual, atual.Rascunho);
+        var acrescimo = await Enviar(client, novo, 2);
         acrescimo.PedidoId.Should().Be(envios[0].PedidoId);
         acrescimo.Total.Should().Be(25);
         acrescimo.Saldo.Should().Be(10);
