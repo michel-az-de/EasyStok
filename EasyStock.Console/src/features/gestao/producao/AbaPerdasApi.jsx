@@ -4,6 +4,7 @@ import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { usePerdasApi } from '../../../aplicacao/usePerdasApi'
+import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { MOTIVOS_PERDA } from '../../../aplicacao/perdas'
 import { moeda } from '../../../dominio/formato'
 import css from '../cardapio/abaCardapio.module.css'
@@ -20,12 +21,17 @@ export function AbaPerdasApi() {
   const gestao = usePerdasApi()
   const [rascunho, setRascunho] = useState(vazio)
   const [enviando, setEnviando] = useState(false)
+  // #1584: desfazer é o estorno de saída, que a API só aceita do Gerente; quem não tem a ação
+  // não vê o botão. Baixar o lote e desfazer pedem confirmação em linha, como "Excluir janela".
+  const podeDesfazer = useAcessoModulos().acoes.editarProducao === true
+  const [confirmando, setConfirmando] = useState(null) // null | 'vencido:<lote>' | 'desfazer:<perda>'
 
   async function executar(acao) {
     if (enviando) return false
     setEnviando(true)
     try { return await acao() } finally { setEnviando(false) }
   }
+  const confirmar = (acao) => executar(acao).then((ok) => { if (ok) setConfirmando(null) })
 
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando as perdas…</output>
   if (gestao.estado === 'erro' && !gestao.resumo) {
@@ -72,7 +78,15 @@ export function AbaPerdasApi() {
                   <span className={css.detalhe}>{v.lote ?? 'sem lote'} · {qtd(v.quantidade)} · venceu há {v.diasVencido} {v.diasVencido === 1 ? 'dia' : 'dias'} · {moeda(v.valor)}</span>
                 </div>
                 <div className={css.acoes}>
-                  <Botao variante="texto" disabled={enviando} aria-label={`Registrar perda de todo o lote ${v.lote ?? ''} de ${v.nome}`} onClick={() => executar(() => gestao.lancarVencido(v))}>Registrar perda do lote</Botao>
+                  {confirmando === `vencido:${v.itemEstoqueId}` ? (
+                    <>
+                      <span className={css.descricao}>Lançar o lote inteiro como perda por vencimento?</span>
+                      <Botao variante="secundario" disabled={enviando} onClick={() => confirmar(() => gestao.lancarVencido(v))}>Registrar perda</Botao>
+                      <Botao variante="texto" disabled={enviando} onClick={() => setConfirmando(null)}>Manter lote</Botao>
+                    </>
+                  ) : (
+                    <Botao variante="texto" disabled={enviando} aria-label={`Registrar perda de todo o lote ${v.lote ?? ''} de ${v.nome}`} onClick={() => setConfirmando(`vencido:${v.itemEstoqueId}`)}>Registrar perda do lote</Botao>
+                  )}
                 </div>
               </li>
             ))}
@@ -129,9 +143,17 @@ export function AbaPerdasApi() {
                 <div className={css.estados}>
                   {l.desfeita ? <Pilula fina>desfeita</Pilula> : <span className={css.detalhe}>{moeda(l.valor)}</span>}
                 </div>
-                {!l.desfeita && (
+                {!l.desfeita && podeDesfazer && (
                   <div className={css.acoes}>
-                    <Botao variante="texto" icone="undo-2" disabled={enviando} aria-label={`Desfazer perda de ${l.nome}`} onClick={() => executar(() => gestao.desfazer(l))}>Desfazer</Botao>
+                    {confirmando === `desfazer:${l.id}` ? (
+                      <>
+                        <span className={css.descricao}>Desfazer esta perda? A quantidade volta para o estoque.</span>
+                        <Botao variante="secundario" disabled={enviando} onClick={() => confirmar(() => gestao.desfazer(l))}>Desfazer perda</Botao>
+                        <Botao variante="texto" disabled={enviando} onClick={() => setConfirmando(null)}>Manter perda</Botao>
+                      </>
+                    ) : (
+                      <Botao variante="texto" icone="undo-2" disabled={enviando} aria-label={`Desfazer perda de ${l.nome}`} onClick={() => setConfirmando(`desfazer:${l.id}`)}>Desfazer</Botao>
+                    )}
                   </div>
                 )}
               </li>

@@ -16,7 +16,7 @@ import {
   diaMes, observacaoDaAbertura, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
 } from '../../../dominio/aberturaDaLoja'
 import {
-  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, TIPOS_MOVIMENTO, gavetaDoDia, lancamentosEmOrdem, nomeDoMetodoCaixa,
+  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, TIPOS_MOVIMENTO, categoriaAoTrocarTipo, gavetaDoDia, lancamentosEmOrdem, nomeDoMetodoCaixa,
 } from '../../../dominio/caixa'
 import {
   horaCurta, lerMoeda, mascaraMoeda, moeda, moedaAltaDemais,
@@ -119,6 +119,8 @@ function FormLancamento({ executar, enviando, aoRegistrar }) {
   const [metodo, setMetodo] = useState('dinheiro')
   const [descricao, setDescricao] = useState('')
   const saida = tipo === TIPOS_MOVIMENTO.SAIDA
+  // #1584: a categoria sugerida do tipo anterior não acompanha a troca.
+  const trocarTipo = (novo) => { setTipo(novo); setCategoria((atual) => categoriaAoTrocarTipo(atual, novo)) }
   // Saída pela web exige descrição (FIN-003): é o rastro da auditoria.
   const incompleto = !categoria.trim() || centavos <= 0 || moedaAltaDemais(centavos) || (saida && !descricao.trim())
 
@@ -135,8 +137,8 @@ function FormLancamento({ executar, enviando, aoRegistrar }) {
       }}
     >
       <div className={css.tiposLancamento} role="radiogroup" aria-label="Tipo de lançamento">
-        <Chip papel="escolha" disabled={enviando} ativo={!saida} onClick={() => setTipo(TIPOS_MOVIMENTO.ENTRADA)}>Entrada</Chip>
-        <Chip papel="escolha" disabled={enviando} ativo={saida} onClick={() => setTipo(TIPOS_MOVIMENTO.SAIDA)}>Saída</Chip>
+        <Chip papel="escolha" disabled={enviando} ativo={!saida} onClick={() => trocarTipo(TIPOS_MOVIMENTO.ENTRADA)}>Entrada</Chip>
+        <Chip papel="escolha" disabled={enviando} ativo={saida} onClick={() => trocarTipo(TIPOS_MOVIMENTO.SAIDA)}>Saída</Chip>
       </div>
       {/* #1474: suprimento (reforço de troco) entra na gaveta; sangria e despesa saem. */}
       <div className={css.categoriasSugeridas}>

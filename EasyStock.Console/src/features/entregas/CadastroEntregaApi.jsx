@@ -27,6 +27,8 @@ export function CadastroEntregaApi() {
   const { janelas, zonas, bloqueios, erro, enviando, acoes, recarregar, limparErro } = useCadastroEntregaApi()
   const z = useFormulario(ZONA_VAZIA, enviando)
   const b = useFormulario(BLOQUEIO_VAZIO, enviando)
+  // #1584: remover o bloqueio reabre a data para pedidos; confirma em linha, como "Excluir janela".
+  const [removendo, setRemovendo] = useState(null)
   const enviar = (acao, f, corpo) => (e) => {
     e.preventDefault()
     acao(corpo(f.form)).then((ok) => { if (ok) f.limpar() })
@@ -99,7 +101,15 @@ export function CadastroEntregaApi() {
             <li key={x.id} className={`${css.cartao} ${css.linha}`}>
               <span className={css.cresce}>{dataCurtaComSemana(x.data)} · {x.motivo}</span>
               <span className={css.apoio}>{x.janelaEspecificaId ? rotuloJanelaPorId(x.janelaEspecificaId) : 'Dia inteiro'}</span>
-              <Botao variante="texto" disabled={enviando} aria-label={`Remover bloqueio de ${dataCurtaComSemana(x.data)}`} onClick={() => acoes.removerBloqueio(x.id)}>Remover</Botao>
+              {removendo === x.id ? (
+                <div className={css.linha}>
+                  <span className={`${css.apoio} ${css.cresce}`}>Remover este bloqueio? O horário volta a ficar disponível para os clientes.</span>
+                  <Botao variante="secundario" disabled={enviando} onClick={() => acoes.removerBloqueio(x.id).then((ok) => { if (ok) setRemovendo(null) })}>Remover bloqueio</Botao>
+                  <Botao variante="texto" disabled={enviando} onClick={() => setRemovendo(null)}>Manter bloqueio</Botao>
+                </div>
+              ) : (
+                <Botao variante="texto" disabled={enviando} aria-label={`Remover bloqueio de ${dataCurtaComSemana(x.data)}`} onClick={() => setRemovendo(x.id)}>Remover</Botao>
+              )}
             </li>
           ))}
         </ul>
