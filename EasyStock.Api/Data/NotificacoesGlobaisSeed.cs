@@ -589,7 +589,7 @@ public static class NotificacoesGlobaisSeed
             tipoEvento: TipoEventoNotificacao.PedidoPagoConfirmado,
             assuntoTemplate: "",
             corpoTemplate: "Oi, {{ nome }}! Recebemos seu pagamento. Pedido nº {{ numero }} confirmado, previsão de entrega: {{ previsao }}. Obrigada pela preferência!"),
-            """{"template":"pedido_pago","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ numero }}","param3":"{{ previsao }}"}""");
+            """{"template":"pedido_pago","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ numero }}","param3":"{{ previsao }}","clienteId":"{{ clienteId }}"}""").ComVersao(2);
 
         yield return ComMetadados(TemplateNotificacao.Criar(
             codigo: "pedido_em_preparo_whatsapp_v1",
@@ -601,6 +601,16 @@ public static class NotificacoesGlobaisSeed
             """{"template":"pedido_em_preparo","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ numero }}","param3":"{{ previsao }}"}""");
 
         // Texto livre; fora da janela de 24 h depende de configurar um template aprovado na Meta.
+        var comandaAtualizada = TemplateNotificacao.Criar(
+            codigo: "comanda_atualizada_whatsapp_v1",
+            nome: "Comanda Atualizada",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.ComandaAtualizada,
+            assuntoTemplate: "",
+            corpoTemplate: "{{ nome }}, comanda nº {{ numero }}. {{ mensagem }}");
+        comandaAtualizada.DefinirMetadados("""{"clienteId":"{{ clienteId }}"}""");
+        yield return comandaAtualizada;
+
         yield return TemplateNotificacao.Criar(
             codigo: "pedido_reagendado_whatsapp_v1",
             nome: "Pedido Reagendado",
@@ -1012,6 +1022,10 @@ public static class NotificacoesGlobaisSeed
             CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
         yield return MakeRotina("pedido_reagendado_global", "Pedido Reagendado",
             TipoEventoNotificacao.PedidoReagendado, "pedido_reagendado_whatsapp_v1",
+            CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
+
+        yield return MakeRotina("comanda_atualizada_global", "Comanda Atualizada — Aviso ao Cliente",
+            TipoEventoNotificacao.ComandaAtualizada, "comanda_atualizada_whatsapp_v1",
             CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
         yield return MakeRotina("pedido_saiu_para_entrega_global", "Pedido Saiu Para Entrega — Aviso ao Cliente",
             TipoEventoNotificacao.PedidoSaiuParaEntrega, "pedido_saiu_whatsapp_v1",

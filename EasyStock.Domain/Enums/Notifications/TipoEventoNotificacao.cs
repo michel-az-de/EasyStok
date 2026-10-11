@@ -89,5 +89,6 @@ public enum TipoEventoNotificacao
 
     // Loja fechada na mao dentro do horario de funcionamento (#1443): aviso aos donos com quem fechou e a justificativa.
     LojaFechadaNoHorario = 82,
-    PedidoReagendado = 83
+    PedidoReagendado = 83,
+    ComandaAtualizada = 84
 }

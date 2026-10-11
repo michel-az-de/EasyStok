@@ -1,5 +1,8 @@
 using System.Text.Json;
 using EasyStock.Application.UseCases.ObterPedidoDetalhes;
+using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.Comanda;
 
 namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 
@@ -11,7 +14,9 @@ namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 public sealed class ConsultarPedidoFerramenta(
     IPedidoRepository pedidoRepository,
     ObterPedidoDetalhesUseCase obterPedidoDetalhes,
-    IConfiguracaoAtendimentoRepository configuracaoRepository) : IFerramentaAgente
+    IConfiguracaoAtendimentoRepository configuracaoRepository, SaldoFinanceiroPedido saldos,
+    ICreditoClienteComandaRepository creditos, ComandaClienteUseCase? comanda = null,
+    ILinkCardapioConversaRepository? links = null) : IFerramentaAgente
 {
     public string Nome => "consultar_pedido";
 
@@ -46,13 +51,32 @@ public sealed class ConsultarPedidoFerramenta(
 
         var configuracao = await configuracaoRepository.GetByEmpresaIdAsync(contexto.EmpresaId);
         var p = detalhe.Pedido;
+        var pedido = await pedidoRepository.GetByIdWithDetailsAsync(contexto.EmpresaId, p.Id);
+        if (pedido is null || pedido.EmpresaId != contexto.EmpresaId || pedido.ClienteId != clienteId)
+            return FerramentaJson.Serializar(new { erro = "pedido_nao_encontrado" });
+        var financeiro = await saldos.ConsultarAsync(pedido, ct);
+        ComandaClienteResult? estado = null;
+        if (links is not null && comanda is not null)
+        {
+            var ultimo = (await links.ListarDaConversaAsync(contexto.EmpresaId, conversa.Id, contexto.Agora.AddDays(-1), ct))
+                .FirstOrDefault(l => l.PedidoRegistradoId == pedido.Id);
+            if (ultimo is not null) estado = await comanda.EstadoAsync(ultimo, ct);
+        }
 
         return FerramentaJson.Serializar(new
         {
             pedidoId = p.Id,
+            numeroComanda = conversa.NumeroComanda,
             status = p.Status,
             total = FerramentaJson.FormatarReais(p.Total),
-            pago = FerramentaJson.FormatarReais(p.TotalPago),
+            pago = FerramentaJson.FormatarReais(financeiro.Alocado),
+            recebido = FerramentaJson.FormatarReais(financeiro.Recebido),
+            faltaPagar = FerramentaJson.FormatarReais(Math.Max(0, p.Total - financeiro.Alocado)),
+            financeiro,
+            acerto = estado?.Acerto,
+            cupomAplicado = estado?.Envio?.CupomAplicado,
+            cupons = (await creditos.ListarAsync(contexto.EmpresaId, clienteId, ct))
+                .Select(c => new { codigo = c.Codigo, saldo = c.Saldo }),
             criadoEm = Brasilia(p.CriadoEm),
             agendadoPara = p.AgendadoParaEm is { } a ? Brasilia(a) : null,
             entregueEm = p.EntreguEm is { } e ? Brasilia(e) : null,

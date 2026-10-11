@@ -70,6 +70,14 @@ public sealed class ConstrutorMensagemOutbox(ITemplateRepository templateReposit
                 && !string.IsNullOrWhiteSpace(assunto))
                 assunto = NotificadorService.PrefixoTeste + assunto;
             metadadosJson = await RenderizarMetadadosAsync(template.MetadadosJson, vars, ct);
+            if (canal == CanalNotificacao.WhatsApp && RemetentePorTipoEvento.De(evento.Tipo) == OrigemRemetente.Loja
+                && vars.TryGetValue("clienteId", out var clienteId) && Guid.TryParse(clienteId?.ToString(), out var idCliente)
+                && idCliente != Guid.Empty)
+            {
+                var metadados = JsonSerializer.Deserialize<Dictionary<string, string>>(metadadosJson ?? "{}") ?? new();
+                metadados["clienteId"] = idCliente.ToString();
+                metadadosJson = JsonSerializer.Serialize(metadados);
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

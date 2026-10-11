@@ -1,11 +1,14 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
+using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Domain.Enums;
@@ -32,13 +35,8 @@ public sealed partial class PedidoConversaConcorrenciaTests
         Skip.If(string.IsNullOrWhiteSpace(arquivo), "Fixture interativa requer EASYSTOK_COMANDA_BROWSER_FIXTURE explícito.");
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
         var mp = Provedor(new());
-        var estornos = new ConcurrentDictionary<string, string>();
-        var estornoId = 900000;
-        mp.ListarEstornosAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Array.Empty<EasyStock.Application.Ports.Output.Pagamentos.EstornoMercadoPagoResult>());
-        mp.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(c =>
-            new EasyStock.Application.Ports.Output.Pagamentos.EstornoMercadoPagoResult(
-                estornos.GetOrAdd(c.ArgAt<string>(2), _ => Interlocked.Increment(ref estornoId).ToString()),
-                c.Arg<decimal>(), "approved", c.ArgAt<string>(0), DateTime.UtcNow));
+        var estornos = new EstornosBrowserControlados(mp);
+        var llm = new LlmBrowserControlado();
         var mensagens = new ConcurrentQueue<string>();
         var cloud = Substitute.For<IWhatsAppCloudClient>();
         cloud.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(c =>
@@ -47,14 +45,22 @@ public sealed partial class PedidoConversaConcorrenciaTests
             return new EnvioWhatsAppResult($"wamid.fixture.{Guid.NewGuid():N}");
         });
         await using var factory = CriarFactory(mp, NivelAcesso.Admin).WithWebHostBuilder(b =>
+        {
+            b.UseSetting("Notifications:WhatsApp:Provider", "meta");
+            b.UseSetting("Notifications:WhatsApp:Meta:AccessToken", "fixture-controlada-sem-acesso-externo");
+            b.UseSetting("Notifications:WhatsApp:Meta:AppSecret", "fixture-controlada-sem-acesso-externo");
+            b.UseSetting("Notifications:WhatsApp:Meta:VerifyToken", "fixture-controlada-sem-acesso-externo");
             b.ConfigureTestServices(s =>
             {
                 s.AddSingleton(cloud);
-                s.AddSingleton<IStartupFilter>(new ComandaBrowserBridge(mp, mensagens));
-            }));
+                s.AddSingleton<IAgenteLlmClient>(llm);
+                s.AddSingleton<IStartupFilter>(new ComandaBrowserBridge(mp, mensagens, estornos, llm));
+            });
+        });
         factory.UseKestrel(0);
         using var client = factory.CreateClient();
         var cenario = await SemearAsync(factory, "casa-da-baba");
+        await PrepararAvisos(factory, cenario.ConversaId);
         string token;
         using (var scope = factory.Services.CreateScope())
         {
@@ -83,9 +89,11 @@ public sealed partial class PedidoConversaConcorrenciaTests
 
     private sealed record PagamentoBrowser(Guid PedidoId, decimal Valor);
     private sealed record AgenteBrowser(Guid ConversaId);
+    private sealed record TurnoBrowser(Guid ConversaId, string Texto);
+    private sealed record EstornoBrowser(Guid PedidoId, string Situacao);
 
     private sealed class ComandaBrowserBridge(EasyStock.Application.Ports.Output.Pagamentos.IMercadoPagoClient mp,
-        ConcurrentQueue<string> mensagens) : IStartupFilter
+        ConcurrentQueue<string> mensagens, EstornosBrowserControlados estornos, LlmBrowserControlado llm) : IStartupFilter
     {
         private int _pagamentoId = 800000;
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
@@ -98,6 +106,47 @@ public sealed partial class PedidoConversaConcorrenciaTests
                 if (context.Request.Path == "/__comanda-teste/mensagens")
                 {
                     await context.Response.WriteAsJsonAsync(mensagens.ToArray()); return;
+                }
+                if (context.Request.Method == "POST" && context.Request.Path == "/__comanda-teste/notificacoes")
+                {
+                    await context.RequestServices.GetRequiredService<IIntegrationEventDispatcher>().ExecutarRodadaAsync(100, CancellationToken.None);
+                    await context.RequestServices.GetRequiredService<INotificacoesAvaliadorOrchestrator>().ExecutarRodadaAsync(TimeSpan.FromMinutes(1));
+                    await context.RequestServices.GetRequiredService<INotificacoesDispatcherOrchestrator>().ExecutarRodadaAsync(1, 100);
+                    var db = context.RequestServices.GetRequiredService<EasyStockDbContext>();
+                    await context.Response.WriteAsJsonAsync(await db.NotifOutboxMensagens.AsNoTracking().Select(o => new
+                        { o.Id, o.IdempotencyKey, o.CorpoRenderizado, o.Status, o.EnviadoEm, o.ProviderMensagemId, o.ErroUltimaTentativa }).ToListAsync()); return;
+                }
+                if (context.Request.Method == "POST" && context.Request.Path == "/__comanda-teste/estorno-modo")
+                {
+                    var dados = (await context.Request.ReadFromJsonAsync<EstornoBrowser>())!;
+                    estornos.DefinirModo(dados.Situacao); await context.Response.WriteAsJsonAsync(new { configurado = true }); return;
+                }
+                if (context.Request.Method == "POST" && context.Request.Path == "/__comanda-teste/conciliar-estorno")
+                {
+                    var dados = (await context.Request.ReadFromJsonAsync<EstornoBrowser>())!;
+                    var db = context.RequestServices.GetRequiredService<EasyStockDbContext>();
+                    var pendentes = await db.Set<PedidoEstornoOnline>().AsNoTracking().Where(e => e.EmpresaId == EmpresaId
+                        && e.PedidoId == dados.PedidoId).Select(e => e.PagamentoExternoId).Distinct().ToListAsync();
+                    foreach (var pagamentoId in pendentes)
+                    {
+                        estornos.Conciliar(pagamentoId, dados.Situacao);
+                        var pagamento = await mp.ConsultarPagamentoAsync(pagamentoId);
+                        await context.RequestServices.GetRequiredService<IEstornosOnlineService>().SincronizarPagamentoAsync(pagamento!);
+                    }
+                    await context.Response.WriteAsJsonAsync(new { conciliado = true }); return;
+                }
+                if (context.Request.Method == "POST" && context.Request.Path == "/__comanda-teste/atendimento-automatico")
+                {
+                    var dados = (await context.Request.ReadFromJsonAsync<TurnoBrowser>())!;
+                    var db = context.RequestServices.GetRequiredService<EasyStockDbContext>();
+                    var conversa = await db.AtendimentoConversas.SingleAsync(c => c.EmpresaId == EmpresaId && c.Id == dados.ConversaId);
+                    conversa.LiberarAutomatico(); conversa.RegistrarEntrada(DateTime.UtcNow);
+                    db.AtendimentoMensagens.Add(Mensagem.Entrada(EmpresaId, conversa.Id, DateTime.UtcNow,
+                        TipoConteudoMensagem.Texto, dados.Texto, $"wamid.fixture.in.{Guid.NewGuid():N}"));
+                    await db.SaveChangesAsync();
+                    var resultado = await context.RequestServices.GetRequiredService<AgenteAtendimentoService>()
+                        .ProcessarTurnoAsync(EmpresaId, conversa.Id, DateTime.UtcNow);
+                    await context.Response.WriteAsJsonAsync(new { resultado, ferramentas = llm.Resultados.ToArray() }); return;
                 }
                 if (context.Request.Method == "POST" && context.Request.Path == "/__comanda-teste/pagamento")
                 {

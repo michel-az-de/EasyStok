@@ -122,7 +122,7 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
     IEstornoPedidoGateway estorno,
     AvisoCobrancaConversa aviso,
     IPedidoRepository pedidos,
-    SaldoFinanceiroPedido? saldoFinanceiro = null)
+    SaldoFinanceiroPedido? saldoFinanceiro = null, AvisoStatusPedidoCliente? avisoCliente = null)
 {
     public const string StatusAprovado = "approved";
     private const string Origem = "mercadopago";
@@ -271,6 +271,11 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             await cobrancaRepository.AddAsync(naEntrega, ct);
         }
 
+        if (alvo.Complementar && comPagamentos.Pagamentos.Count > 1 && efeito is null && avisoCliente is not null)
+            await avisoCliente.EnfileirarAsync(Domain.Enums.Notifications.TipoEventoNotificacao.ComandaAtualizada,
+                empresaId, pedido.Id, $"pagamento:{alvo.Id:N}:{input.PagamentoExternoId}", ct,
+                mensagem: $"Pagamento complementar de {input.ValorPago.ToString("C", Cultura.PtBr)} confirmado pelo Mercado Pago ({metodo}). " +
+                    $"Saldo a pagar: {Math.Max(0, comPagamentos.Total.Valor - alocadoDepois).ToString("C", Cultura.PtBr)}.");
         await unitOfWork.CommitAsync();
 
         logger.LogInformation(

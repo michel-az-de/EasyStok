@@ -34,10 +34,44 @@ public class MetaCloudWhatsAppProviderTests
     public MetaCloudWhatsAppProviderTests()
     {
         _canal.Canal.Returns(CanalConversa.WhatsApp);
+        ConversaComEntradaHa(TimeSpan.FromHours(1));
     }
 
     private MetaCloudWhatsAppProvider Provider() => new(
         new ResolvedorCanal([_canal]), _conversas, _tenant, _uow, NullLogger<MetaCloudWhatsAppProvider>.Instance);
+
+    [Theory]
+    [InlineData("bloqueado", false)]
+    [InlineData("revogado", false)]
+    [InlineData("outra_empresa", false)]
+    [InlineData("bloqueado", true)]
+    [InlineData("revogado", true)]
+    [InlineData("outra_empresa", true)]
+    public async Task RevalidaClienteAntesDeDespacharAvisoJaEnfileirado(string impedimento, bool conversaEncerrada)
+    {
+        var conversa = ConversaComEntradaHa(TimeSpan.FromHours(1));
+        var cliente = EasyStock.Domain.Entities.Cliente.Criar(impedimento == "outra_empresa" ? Guid.NewGuid() : _empresaId, "Maria");
+        conversa.VincularCliente(cliente.Id);
+        if (conversaEncerrada)
+            _conversas.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((Conversa?)null);
+        if (impedimento == "bloqueado") cliente.Bloquear("teste", DateTime.UtcNow);
+        var clientes = Substitute.For<IClienteRepository>();
+        clientes.GetByIdAsync(_empresaId, cliente.Id).Returns(cliente);
+        var consentimentos = Substitute.For<IConsentimentoContatoRepository>();
+        if (impedimento == "revogado")
+            consentimentos.ListarDoClienteAsync(_empresaId, cliente.Id, Arg.Any<CancellationToken>()).Returns(
+                [ConsentimentoContato.Registrar(_empresaId, cliente.Id, CanalConversa.WhatsApp, FinalidadeContato.Transacional,
+                    SituacaoConsentimento.Revogado, "teste", DateTime.UtcNow)]);
+        var provider = new MetaCloudWhatsAppProvider(new ResolvedorCanal([_canal]), _conversas, _tenant, _uow,
+            NullLogger<MetaCloudWhatsAppProvider>.Instance, clientes, new PoliticaEnvioCliente(consentimentos));
+
+        var resultado = await provider.EnviarAsync(Mensagem(new Dictionary<string, string> { ["clienteId"] = cliente.Id.ToString() }), CancellationToken.None);
+
+        resultado.Sucesso.Should().BeFalse();
+        resultado.ErroDetalhado.Should().Be(impedimento == "revogado" ? "contato_transacional_revogado" : "cliente_bloqueado_ou_indisponivel");
+        await _canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+        await _canal.DidNotReceiveWithAnyArgs().EnviarModeloAsync(default!, default!, default!, default!, default);
+    }
 
     private MensagemPronta Mensagem(IReadOnlyDictionary<string, string>? metadados = null) => new(
         Guid.NewGuid(), _empresaId, "+" + Telefone, "Seu pedido", "Seu pedido #123 foi pago.",
@@ -146,6 +180,7 @@ public class MetaCloudWhatsAppProviderTests
     [Fact]
     public async Task SemConversaEnviaTemplateENaoGravaMensagem()
     {
+        _conversas.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((Conversa?)null);
         _canal.EnviarModeloAsync(Telefone, "pedido_pago", "pt_BR", Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
             .Returns("wamid.template");
 
@@ -157,8 +192,9 @@ public class MetaCloudWhatsAppProviderTests
     }
 
     [Fact]
-    public async Task SemConversaSemTemplateMetaRecusaForaDaJanelaFalhaPermanente()
+    public async Task SemConversaSemTemplateBloqueiaAntesDeChamarMeta()
     {
+        _conversas.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((Conversa?)null);
         _canal.EnviarTextoAsync(Telefone, Arg.Any<string>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new WhatsAppCloudException(131047, "Re-engagement message", ehPermanente: false));
 
@@ -167,6 +203,7 @@ public class MetaCloudWhatsAppProviderTests
         resultado.Sucesso.Should().BeFalse();
         resultado.FalhaPermanente.Should().BeTrue();
         resultado.ErroDetalhado.Should().Be("fora_da_janela_24h_sem_template");
+        await _canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
     }
 
     [Fact]
@@ -198,6 +235,7 @@ public class MetaCloudWhatsAppProviderTests
     [Fact]
     public async Task Sucesso_de_template_tambem_devolve_o_wamid_em_IdExterno()
     {
+        ConversaComEntradaHa(TimeSpan.FromHours(25));
         _canal.EnviarModeloAsync(Telefone, "pedido_pago", "pt_BR", Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
             .Returns("wamid.template");
 

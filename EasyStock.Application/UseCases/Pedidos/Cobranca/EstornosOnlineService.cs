@@ -4,12 +4,16 @@ using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 
 public sealed class EstornosOnlineService(IPedidoRepository pedidos, IEstornoOnlineRepository repo,
     ICobrancaPedidoRepository cobrancas, IMercadoPagoClient mp, ICaixaRepository caixa, IUnitOfWork uow,
-    ITenantContextAccessor tenant, TimeProvider relogio, SaldoFinanceiroPedido? saldos = null) : IEstornosOnlineService
+    ITenantContextAccessor tenant, TimeProvider relogio, SaldoFinanceiroPedido? saldos = null,
+    AvisoStatusPedidoCliente? avisoCliente = null, IOperacaoEventPublisher? eventos = null) : IEstornosOnlineService
 {
     private DateTime Agora => relogio.GetUtcNow().UtcDateTime;
 
@@ -164,7 +168,9 @@ public sealed class EstornosOnlineService(IPedidoRepository pedidos, IEstornoOnl
             var resposta = operacao.EstornoExternoId is { } id
                 ? await mp.ConsultarEstornoAsync(operacao.PagamentoExternoId, id, ct)
                 : await mp.EstornarAsync(operacao.PagamentoExternoId, operacao.Valor, operacao.Id.ToString(), ct);
-            return await AplicarAsync(operacao, resposta, ct);
+            var atualizado = await AplicarAsync(operacao, resposta, ct);
+            await AvisarAtualizacaoAsync(atualizado.EmpresaId, atualizado.PedidoId, ct);
+            return atualizado;
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or JsonException
             || ex is TaskCanceledException && !ct.IsCancellationRequested)
@@ -196,6 +202,10 @@ public sealed class EstornosOnlineService(IPedidoRepository pedidos, IEstornoOnl
                 {
                     atual.Situacao = PedidoEstornoOnline.Recusado;
                     atual.Detalhe = "Estorno recusado pelo Mercado Pago. Nenhuma saída foi registrada.";
+                    if (avisoCliente is not null)
+                        await avisoCliente.EnfileirarAsync(TipoEventoNotificacao.ComandaAtualizada, atual.EmpresaId,
+                            atual.PedidoId, $"estorno:{atual.Id:N}:recusado", token,
+                            mensagem: $"A devolução de {atual.Valor.ToString("C", Cultura.PtBr)} foi recusada pelo Mercado Pago. Nenhum valor foi registrado como devolvido nesta solicitação. Fale com o atendimento para conferir o acerto.");
                 }
                 else atual.Detalhe = "O Mercado Pago ainda não confirmou a devolução. Confira esta solicitação novamente.";
             }
@@ -203,16 +213,24 @@ public sealed class EstornosOnlineService(IPedidoRepository pedidos, IEstornoOnl
             return atual;
         }, ct);
 
-    private Task<PedidoEstornoOnline> DetalharAsync(PedidoEstornoOnline operacao, string detalhe, CancellationToken ct, bool recusado = false) =>
-        ComPedidoTravadoAsync(operacao.EmpresaId, operacao.PedidoId, async (_, estornos, token) =>
+    private async Task<PedidoEstornoOnline> DetalharAsync(PedidoEstornoOnline operacao, string detalhe, CancellationToken ct, bool recusado = false)
+    {
+        var resultado = await ComPedidoTravadoAsync(operacao.EmpresaId, operacao.PedidoId, async (_, estornos, token) =>
         {
             var atual = estornos.Single(e => e.Id == operacao.Id);
             if (atual.Situacao != PedidoEstornoOnline.Pendente) return atual;
             atual.Detalhe = detalhe;
             if (recusado) atual.Situacao = PedidoEstornoOnline.Recusado;
             await repo.AtualizarAsync(atual, token);
+            if (recusado && avisoCliente is not null)
+                await avisoCliente.EnfileirarAsync(TipoEventoNotificacao.ComandaAtualizada, atual.EmpresaId,
+                    atual.PedidoId, $"estorno:{atual.Id:N}:recusado", token,
+                    mensagem: $"A devolução de {atual.Valor.ToString("C", Cultura.PtBr)} foi recusada. Nenhuma devolução foi confirmada. Fale com o atendimento.");
             return atual;
         }, ct);
+        await AvisarAtualizacaoAsync(resultado.EmpresaId, resultado.PedidoId, ct);
+        return resultado;
+    }
 
     public async Task<bool> SincronizarPagamentoAsync(PagamentoMercadoPago pagamento, CancellationToken ct = default)
     {
@@ -249,6 +267,7 @@ public sealed class EstornosOnlineService(IPedidoRepository pedidos, IEstornoOnl
                     throw new InvalidOperationException("A lista de estornos ainda não confirma o total devolvido; repetir o webhook.");
                 return true;
             }, ct);
+        await AvisarAtualizacaoAsync(empresaId.Value, pedidoId, ct);
         return true;
     }
 
@@ -306,7 +325,14 @@ public sealed class EstornosOnlineService(IPedidoRepository pedidos, IEstornoOnl
             Tipo = "devolucao_online", OcorridoEm = Agora, UsuarioId = estorno.UsuarioId, UsuarioNome = estorno.UsuarioNome,
             Origem = "mercadopago", Detalhes = $"Devolução confirmada: {estorno.Valor.ToString("C", Cultura.PtBr)}. Motivo: {estorno.Motivo}. Estorno: {estorno.EstornoExternoId}. Operação: {estorno.Id}" });
         if (total == pagamento.Valor) await repo.MarcarCobrancaEstornadaAsync(estorno.EmpresaId, pagamento.CobrancaId, Agora, ct);
+        if (avisoCliente is not null)
+            await avisoCliente.EnfileirarAsync(TipoEventoNotificacao.ComandaAtualizada, estorno.EmpresaId, estorno.PedidoId,
+                $"estorno:{estorno.Id:N}:confirmado", ct,
+                mensagem: $"Estorno de {estorno.Valor.ToString("C", Cultura.PtBr)} confirmado pelo Mercado Pago para o meio original ({pagamento.Metodo}). Acompanhe o crédito pelo seu meio de pagamento.");
     }
+
+    private Task AvisarAtualizacaoAsync(Guid empresaId, Guid pedidoId, CancellationToken ct) =>
+        eventos?.PublicarAsync(EventosOperacao.PedidoEstornoAtualizado, empresaId, new { pedidoId }, ct) ?? Task.CompletedTask;
 
     private Task<T> ComPedidoTravadoAsync<T>(Guid empresaId, Guid pedidoId,
         Func<IReadOnlyList<RecebimentoOnline>, List<PedidoEstornoOnline>, CancellationToken, Task<T>> acao, CancellationToken ct) =>

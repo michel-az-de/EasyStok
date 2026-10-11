@@ -226,12 +226,13 @@ public class NotificarClienteStatusPedidoHandlerTests
             "pay-1", "pix", 25m, StatusPedidoMapper.Aguardando, DateTime.UtcNow);
 
         await handler.HandleAsync(Evento(PedidoPagoEvent.TipoEvento, payload), CancellationToken.None);
+        await handler.HandleAsync(Evento(PedidoPagoEvent.TipoEvento, payload), CancellationToken.None);
         await AvaliarEventosAsync();
 
         var mensagem = _outbox.Should().ContainSingle().Subject;
         mensagem.CorpoRenderizado.Should().Contain("Recebemos seu pagamento").And.Contain("Tarde (14h às 18h), 01/10");
         mensagem.IdempotencyKey.Should().Be(OutboxMensagemNotificacao.ComputarIdempotencyKey(
-            $"{_pedido.Id:N}|pago", CanalNotificacao.WhatsApp));
+            $"{_pedido.Id:N}|pagamento:{payload.CobrancaPedidoId:N}:{payload.PagamentoExternoId}", CanalNotificacao.WhatsApp));
     }
 
     private async Task MudarStatusAsync(string antigo, string novo, DateTime? ocorridoEm = null)
@@ -252,6 +253,29 @@ public class NotificarClienteStatusPedidoHandlerTests
     private AvisoStatusPedidoCliente Aviso() => new(
         _pedidos, _clientes, _vagas, _storefronts, new PoliticaEnvioCliente(_consentimentos), _notificador, _tenant,
         NullLogger<AvisoStatusPedidoCliente>.Instance);
+
+    [Fact]
+    public async Task AlteracoesDistintasTemAvisosDistintosERepeticaoNaoDuplicaOutbox()
+    {
+        Configurar(TipoEventoNotificacao.ComandaAtualizada, "comanda_atualizada_whatsapp_v1", "{{ mensagem }}");
+        var aviso = Aviso();
+        foreach (var marco in new[] { "pagamento:primeiro", "pagamento:complementar", "pagamento:complementar" })
+            await aviso.EnfileirarAsync(TipoEventoNotificacao.ComandaAtualizada, _empresaId, _pedido.Id, marco,
+                CancellationToken.None, mensagem: "Recebemos R$ 10,00 via pix.");
+        await AvaliarEventosAsync();
+
+        _outbox.Should().HaveCount(2);
+        _outbox.Select(o => o.IdempotencyKey).Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
+    public async Task ClienteBloqueadoNaoEnfileiraAlteracao()
+    {
+        _cliente.Bloquear("teste", DateTime.UtcNow);
+        (await Aviso().EnfileirarAsync(TipoEventoNotificacao.ComandaAtualizada, _empresaId, _pedido.Id,
+            "comanda:teste", CancellationToken.None, mensagem: "Ajuste confirmado")).Should().BeFalse();
+        _eventos.Should().BeEmpty();
+    }
 
     private OutboxEventoIntegracao Evento<T>(string tipo, T payload) =>
         OutboxEventoIntegracao.Criar(_empresaId, tipo, "pedido", _pedido.Id, JsonSerializer.Serialize(payload, Camel));

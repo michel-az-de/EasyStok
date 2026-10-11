@@ -21,12 +21,11 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
     IPedidoRepository pedidos, IStorefrontRepository vitrines, CheckoutCoreService checkout,
     ComandaClienteUseCase comanda, SaldoFinanceiroPedido saldos, ICreditoClienteComandaRepository creditos,
     IEstornosOnlineService estornos, GerarCobrancaPedidoUseCase cobrar, ICobrancaPedidoRepository cobrancas,
-    PedidoEstoqueIntegrationService estoque, AvisoCobrancaConversa aviso, IUnitOfWork uow, TimeProvider relogio)
+    PedidoEstoqueIntegrationService estoque, AvisoStatusPedidoCliente aviso, IUnitOfWork uow, TimeProvider relogio)
 {
     public async Task<EnvioComandaCliente> ExecuteAsync(ConfirmarAlteracaoComandaInput input, CancellationToken ct)
     {
         var estornosParaRetomar = new List<Guid>();
-        var alterado = false;
         var result = await uow.ExecuteInTransactionSemRetryAsync(async t =>
         {
             var link = await links.ObterComLockAsync(input.EmpresaId, input.LinkId, t);
@@ -43,7 +42,6 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
                 }
                 return anterior;
             }
-            alterado = true;
             var dados = ComandaClienteUseCase.Ler<RascunhoComandaCliente>(link.RascunhoJson)
                 ?? throw new ComandaClienteConflitoException("Seleção não encontrada.");
             await pedidos.TravarAsync(input.EmpresaId, anterior.PedidoId, t);
@@ -56,6 +54,8 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
             {
                 var recusado = anterior with { Situacao = "alteracao_recusada" };
                 link.RegistrarResultado(pedido.Id, JsonSerializer.Serialize(recusado, ComandaClienteUseCase.Json));
+                await aviso.EnfileirarAsync(Domain.Enums.Notifications.TipoEventoNotificacao.ComandaAtualizada,
+                    input.EmpresaId, pedido.Id, $"comanda:{link.Id:N}:recusada", t, mensagem: Texto(recusado));
                 await uow.CommitAsync();
                 return recusado;
             }
@@ -126,14 +126,16 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
                     if (restantes > 0) throw new UseCaseValidationException("O pagamento exige devolução manual. Registre a devolução pela Ficha ou combine cupom com o cliente.");
                 }
             }
-            await comanda.AplicarCupomAsync(pedido, dados.CodigoCupom, t);
+            var cupomAplicado = await comanda.AplicarCupomAsync(pedido, dados.CodigoCupom, t);
             var saldo = pedido.Total.Valor - (await saldos.ConsultarAsync(pedido, t)).Alocado;
             CobrancaPedidoResult? cobranca = null;
             if (saldo > 0) cobranca = await cobrar.ExecuteAsync(new(input.EmpresaId, pedido.Id, input.ConversaId, CobrarSaldo: true), t);
             var situacao = devolucao > 0 ? codigoCupom is null ? "estorno_pendente" : "cupom_emitido"
                 : saldo > 0 ? "aguardando_pagamento" : "alteracao_confirmada";
-            var resposta = new EnvioComandaCliente(pedido.Id, situacao, pedido.Total.Valor, saldo, cobranca?.LinkPagamento, codigoCupom);
+            var resposta = new EnvioComandaCliente(pedido.Id, situacao, pedido.Total.Valor, saldo, cobranca?.LinkPagamento, codigoCupom, cupomAplicado);
             link.RegistrarResultado(pedido.Id, JsonSerializer.Serialize(resposta, ComandaClienteUseCase.Json));
+            await aviso.EnfileirarAsync(Domain.Enums.Notifications.TipoEventoNotificacao.ComandaAtualizada,
+                input.EmpresaId, pedido.Id, $"comanda:{link.Id:N}:{situacao}", t, mensagem: Texto(resposta, devolucao));
             await uow.CommitAsync();
             return resposta;
         }, ct);
@@ -153,11 +155,9 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
                     await uow.CommitAsync();
                     return true;
                 }, ct);
-                alterado = true;
             }
         }
         await comanda.AvisarAsync(input.EmpresaId, input.ConversaId, ct);
-        if (alterado) await aviso.EnviarAsync(input.EmpresaId, input.ConversaId, Texto(result), relogio.GetUtcNow().UtcDateTime, ct);
         return result;
     }
 
@@ -166,11 +166,10 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
             selecao.Any(n => n.CardapioItemId == g.Key.CardapioItemId && n.VariacaoId == g.Key.CardapioItemVariacaoId
                 && n.Qtd >= g.Sum(a => a.Quantidade) && g.All(a => (n.Observacao ?? "") == (a.Observacao ?? ""))));
     public static Guid IdEstorno(Guid linkId, Guid pagamentoId) => new(SHA256.HashData(Encoding.UTF8.GetBytes($"comanda:{linkId:N}:{pagamentoId:N}"))[..16]);
-    private static string Texto(EnvioComandaCliente r) => r.Situacao == "alteracao_recusada"
+    private static string Texto(EnvioComandaCliente r, decimal devolucao = 0) => r.Situacao == "alteracao_recusada"
         ? "A alteração precisa de outro ajuste. Seu pedido original foi mantido; fale com o atendimento."
         : $"Comanda atualizada. Total {r.Total.ToString("C", Cultura.PtBr)}. " + (r.CodigoCupom is { } cupom
-            ? $"Seu cupom para uma próxima compra: {cupom}."
-            : r.Situacao == "estorno_pendente" ? "A devolução foi solicitada e está em acompanhamento."
-            : r.Situacao == "estorno_confirmado" ? "A devolução foi confirmada pelo Mercado Pago."
-            : r.LinkPagamento is { } link ? $"Pague apenas a diferença: {link}" : "Seu pagamento já cobre esse pedido.");
+            ? $"Crédito de {devolucao.ToString("C", Cultura.PtBr)} emitido no cupom {cupom}. Isso é crédito para compras, não devolução em dinheiro."
+            : r.Situacao == "estorno_pendente" ? $"Devolução de {devolucao.ToString("C", Cultura.PtBr)} solicitada ao Mercado Pago. Aguarde a confirmação; ela ainda não foi registrada como devolvida."
+            : r.LinkPagamento is { } link ? $"Saldo a pagar: {Math.Max(0, r.Saldo).ToString("C", Cultura.PtBr)}. Pague apenas a diferença: {link}" : "O valor alocado já cobre esse pedido.");
 }

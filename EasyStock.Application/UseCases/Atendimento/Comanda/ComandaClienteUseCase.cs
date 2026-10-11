@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Pedidos;
@@ -21,12 +22,18 @@ public sealed record RascunhoComandaCliente(IReadOnlyList<ItemPedidoCheckout> It
     string Acerto = "estorno", string? CodigoCupom = null, Guid? PedidoId = null, DateTime? PedidoAtualizadoEm = null,
     string? PedidoResumoHash = null);
 public sealed record ItemSelecionadoComanda(Guid CardapioItemId, Guid? VariacaoId, string Nome, int Qtd, decimal Preco, string? Observacao);
-public sealed record EnvioComandaCliente(Guid PedidoId, string Situacao, decimal Total, decimal Saldo, string? LinkPagamento = null, string? CodigoCupom = null);
-public sealed record CupomComandaCliente(string Codigo, decimal Saldo);
+public sealed record CupomAplicadoComandaCliente(Guid UsoId, string Codigo, decimal Valor, decimal SaldoCupom);
+public sealed record EnvioComandaCliente(Guid PedidoId, string Situacao, decimal Total, decimal Saldo, string? LinkPagamento = null,
+    string? CodigoCupom = null, CupomAplicadoComandaCliente? CupomAplicado = null);
+public sealed record CupomComandaCliente(string Codigo, decimal Saldo, decimal? ValorEmitido = null, DateTime? CriadoEm = null);
+public sealed record DevolucaoComandaCliente(Guid OperacaoId, decimal Valor, string Situacao, string? Meio, string Provedor,
+    DateTime CriadoEm, DateTime? ConfirmadoEm, string? Referencia);
+public sealed record AcertoComandaCliente(string Tipo, decimal Valor, string Situacao, IReadOnlyList<DevolucaoComandaCliente> Devolucoes,
+    string? CodigoCupom = null, DateTime? ConfirmadoEm = null, decimal? SaldoCupom = null);
 public sealed record ComandaClienteResult(Guid LinkId, string Nome, DateOnly Dia, DateTime ExpiraEm, int Revisao, bool PodeEditar,
     RascunhoComandaCliente Rascunho, IReadOnlyList<ItemSelecionadoComanda> Selecao, PedidoConversaResult? Pedido,
     EnvioComandaCliente? Envio, IReadOnlyList<CupomComandaCliente> Cupons, decimal? TotalPrevisto = null,
-    long NumeroComanda = 0, Guid ConversaId = default);
+    long NumeroComanda = 0, Guid ConversaId = default, SaldoFinanceiroComanda? Financeiro = null, AcertoComandaCliente? Acerto = null);
 public sealed class ComandaClienteConflitoException(string mensagem) : Exception(mensagem);
 
 public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links, IConversaRepository conversas,
@@ -34,7 +41,8 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     CriarPedidoPeloCardapioConversaUseCase criarPedido, ObterPedidoConversaUseCase obterPedido, SaldoFinanceiroPedido saldoFinanceiro,
     ICreditoClienteComandaRepository creditos, GerarCobrancaPedidoUseCase cobrar, IUnitOfWork uow,
     ITenantContextAccessor tenant, IOperacaoEventPublisher eventos, TimeProvider relogio,
-    CalculadoraInicioPrevistoPedido inicioPrevisto, QuitacaoPedido quitacao, LinkCardapioConversaService gerarLink)
+    CalculadoraInicioPrevistoPedido inicioPrevisto, QuitacaoPedido quitacao, LinkCardapioConversaService gerarLink,
+    IEstornoOnlineRepository estornos, AvisoStatusPedidoCliente avisoCliente)
 {
     public const string Evento = "conversa.comanda_atualizada";
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -101,16 +109,45 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             dados = dados with { PedidoAtualizadoEm = pedido.AlteradoEm };
         var selecao = await SelecionarAsync(link.EmpresaId, dados.Itens, pedido, ct, validar: false);
         var detalhe = pedido is null ? null : await obterPedido.ExecuteAsync(link.EmpresaId, conversa.Id, ct, pedido.Id);
-        if (detalhe is not null && pedido is not null)
-            detalhe = detalhe with { TotalPago = (await saldoFinanceiro.ConsultarAsync(pedido, ct)).Alocado };
+        var financeiro = pedido is null ? null : await saldoFinanceiro.ConsultarAsync(pedido, ct);
+        if (detalhe is not null && financeiro is not null) detalhe = detalhe with { TotalPago = financeiro.Alocado };
+        var acerto = pedido is null ? null : await AcertoAsync(link, pedido, ct);
+        var envio = Ler<EnvioComandaCliente>(link.ResultadoJson);
+        if (envio?.CupomAplicado is { } usado)
+        {
+            var cupom = await creditos.ObterPorCodigoAsync(link.EmpresaId, cliente.Id, usado.Codigo, ct);
+            if (cupom is not null) envio = envio with { CupomAplicado = usado with { SaldoCupom = cupom.Saldo } };
+        }
+        if (envio is not null && acerto?.Tipo == "estorno")
+            envio = envio with { Situacao = acerto.Situacao switch
+            {
+                "confirmado" => "estorno_confirmado", "recusado" => "estorno_recusado", _ => "estorno_pendente"
+            } };
         var pode = link.EstaValido(relogio.GetUtcNow().UtcDateTime)
             && conversa.EstaAberta
             && HorarioBrasil.DataOperacional(link.CriadoEm) == HorarioBrasil.DataOperacional(relogio.GetUtcNow().UtcDateTime)
             && (pedido is null || PodeAlterar(pedido));
         return new(link.Id, cliente.Nome.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "",
             HorarioBrasil.DataOperacional(link.CriadoEm), link.ExpiraEm, link.Revisao, pode, dados, selecao, detalhe,
-            Ler<EnvioComandaCliente>(link.ResultadoJson), (await creditos.ListarAsync(link.EmpresaId, cliente.Id, ct)).Select(c => new CupomComandaCliente(c.Codigo, c.Saldo)).ToList(),
-            selecao.Sum(i => i.Qtd * i.Preco) + (detalhe?.Frete ?? 0m), conversa.NumeroComanda, conversa.Id);
+            envio, (await creditos.ListarAsync(link.EmpresaId, cliente.Id, ct)).Select(c => new CupomComandaCliente(c.Codigo, c.Saldo, c.Valor, c.CriadoEm)).ToList(),
+            selecao.Sum(i => i.Qtd * i.Preco) + (detalhe?.Frete ?? 0m), conversa.NumeroComanda, conversa.Id, financeiro, acerto);
+    }
+
+    private async Task<AcertoComandaCliente?> AcertoAsync(LinkCardapioConversa link, PedidoEntity pedido, CancellationToken ct)
+    {
+        var credito = await creditos.ObterPorOperacaoAsync(link.EmpresaId, link.Id, ct);
+        if (credito is not null && credito.PedidoOrigemId == pedido.Id)
+            return new("cupom", credito.Valor, "confirmado", [], credito.Codigo, credito.CriadoEm, credito.Saldo);
+        var proprios = (await estornos.ListarAsync(link.EmpresaId, pedido.Id, ct))
+            .Where(e => e.Id == ConfirmarAlteracaoComandaUseCase.IdEstorno(link.Id, e.PagamentoId)).ToList();
+        if (proprios.Count == 0) return null;
+        var pagamentos = await estornos.RecebimentosAsync(link.EmpresaId, pedido.Id, ct);
+        var situacao = proprios.Any(e => e.Situacao == PedidoEstornoOnline.Pendente) ? "pendente"
+            : proprios.All(e => e.Situacao == PedidoEstornoOnline.Confirmado) ? "confirmado" : "recusado";
+        return new("estorno", proprios.Sum(e => e.Valor), situacao, proprios.Select(e => new DevolucaoComandaCliente(
+            e.Id, e.Valor, e.Situacao, pagamentos.SingleOrDefault(p => p.PagamentoId == e.PagamentoId)?.Metodo,
+            "mercadopago", e.CriadoEm, e.ConfirmadoEm, e.EstornoExternoId)).ToList(),
+            ConfirmadoEm: situacao == "confirmado" ? proprios.Max(e => e.ConfirmadoEm) : null);
     }
 
     public async Task<ComandaClienteResult> SalvarAsync(string token, int revisao, RascunhoComandaCliente dados, CancellationToken ct)
@@ -196,7 +233,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 link = await links.ObterComLockAsync(acesso.EmpresaId, acesso.Id, t) ?? throw new LinkCardapioConversaIndisponivelException();
                 var pedido = await pedidos.GetByIdWithDetailsAsync(link.EmpresaId, criado.PedidoId)
                     ?? throw new InvalidOperationException("Pedido criado sem persistência.");
-                await AplicarCupomAsync(pedido, dados.CodigoCupom, t);
+                var cupomAplicado = await AplicarCupomAsync(pedido, dados.CodigoCupom, t);
                 var saldo = pedido.Total.Valor - (await saldoFinanceiro.ConsultarAsync(pedido, t)).Alocado;
                 CobrancaPedidoResult? cobranca = null;
                 if (saldo > 0)
@@ -208,7 +245,8 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                     await pedidos.UpdateAsync(pedido);
                     efeitos = await quitacao.PrepararCreditoAsync(pedido, link.ConversaId, agora, t);
                 }
-                resultado = new(pedido.Id, saldo > 0 ? "aguardando_pagamento" : "pedido_confirmado", pedido.Total.Valor, saldo, cobranca?.LinkPagamento);
+                resultado = new(pedido.Id, saldo > 0 ? "aguardando_pagamento" : "pedido_confirmado", pedido.Total.Valor, saldo,
+                    cobranca?.LinkPagamento, CupomAplicado: cupomAplicado);
             }
             link.RegistrarResultado(resultado.PedidoId, JsonSerializer.Serialize(resultado, Json));
             await uow.CommitAsync();
@@ -219,9 +257,9 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         return resposta;
     }
 
-    public async Task AplicarCupomAsync(PedidoEntity pedido, string? codigo, CancellationToken ct)
+    public async Task<CupomAplicadoComandaCliente?> AplicarCupomAsync(PedidoEntity pedido, string? codigo, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(codigo)) return;
+        if (string.IsNullOrWhiteSpace(codigo)) return null;
         if (pedido.ClienteId is not { } clienteId) throw new UseCaseValidationException("Cliente não identificado.");
         var credito = await creditos.ObterComLockAsync(pedido.EmpresaId, clienteId, codigo.Trim().ToUpperInvariant(), ct)
             ?? throw new UseCaseValidationException("Este cupom não está disponível para seu cadastro.");
@@ -232,7 +270,11 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         await creditos.AdicionarUsoAsync(uso, ct);
         await pedidos.AddEventoAsync(new() { Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = "cupom_cliente_aplicado",
             Origem = "comanda_cliente", OcorridoEm = relogio.GetUtcNow().UtcDateTime, Detalhes = $"{credito.Codigo}: {valor}" });
+        await avisoCliente.EnfileirarAsync(Domain.Enums.Notifications.TipoEventoNotificacao.ComandaAtualizada,
+            pedido.EmpresaId, pedido.Id, $"cupom-usado:{uso.Id:N}", ct,
+            mensagem: $"Cupom {credito.Codigo}: crédito de {valor.ToString("C", Cultura.PtBr)} aplicado neste pedido. Saldo do cupom: {credito.Saldo.ToString("C", Cultura.PtBr)}.");
         await uow.CommitAsync();
+        return new(uso.Id, credito.Codigo, uso.Valor, credito.Saldo);
     }
 
     public async Task<IReadOnlyList<ItemSelecionadoComanda>> SelecionarAsync(Guid empresaId, IReadOnlyList<ItemPedidoCheckout> itens,

@@ -10,6 +10,8 @@ public sealed class CreditoClienteComandaRepository(EasyStockDbContext db) : ICr
     public Task AdicionarUsoAsync(UsoCreditoClienteComanda uso, CancellationToken ct) => db.Set<UsoCreditoClienteComanda>().AddAsync(uso, ct).AsTask();
     public Task<CreditoClienteComanda?> ObterPorOperacaoAsync(Guid empresaId, Guid operacaoId, CancellationToken ct) =>
         db.Set<CreditoClienteComanda>().FirstOrDefaultAsync(c => c.EmpresaId == empresaId && c.OperacaoId == operacaoId, ct);
+    public Task<CreditoClienteComanda?> ObterPorCodigoAsync(Guid empresaId, Guid clienteId, string codigo, CancellationToken ct) =>
+        db.Set<CreditoClienteComanda>().AsNoTracking().FirstOrDefaultAsync(c => c.EmpresaId == empresaId && c.ClienteId == clienteId && c.Codigo == codigo, ct);
 
     public async Task<CreditoClienteComanda?> ObterComLockAsync(Guid empresaId, Guid clienteId, string codigo, CancellationToken ct)
     {

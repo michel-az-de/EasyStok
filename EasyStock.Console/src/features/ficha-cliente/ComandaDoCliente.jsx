@@ -8,6 +8,36 @@ import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { useComandasCliente } from '../../aplicacao/useComandasCliente'
 import css from './comanda.module.css'
 
+function AcertoDaComanda({ comanda: c }) {
+  const f = c.financeiro, a = c.acerto, uso = c.envio?.cupomAplicado
+  if (!f && !a && !uso) return null
+  const situacao = { pendente: 'Em acompanhamento', confirmado: 'Confirmado', recusado: 'Não confirmado' }
+  return <section className={css.comparativo} aria-label="Acerto da comanda">
+    {f && <>
+      <p>Dinheiro recebido: {moeda(f.recebido)}</p>
+      <p>Dinheiro devolvido: {moeda(f.devolvido)}</p>
+      <p>Convertido em cupom: {moeda(f.convertidoEmCupom)}</p>
+      <p>Cupom aplicado: {moeda(f.cupomAplicado)}</p>
+      <p>Cobertura atual do pedido: {moeda(f.alocado)}</p>
+      {f.reservado > 0 && <p>Reservado para acerto: {moeda(f.reservado)}</p>}
+      <p>Disponível no pagamento para acerto: {moeda(f.dinheiroDisponivel)}</p>
+    </>}
+    {a && <>
+      <b>{a.tipo === 'cupom' ? 'Cupom desta edição' : 'Devolução desta edição'} · {a.situacao === 'recusado' ? 'Precisa de conferência' : situacao[a.situacao] ?? 'Em acompanhamento'} · {moeda(a.valor)}</b>
+      {a.codigoCupom && <p>Código do cupom: {a.codigoCupom}</p>}
+      {a.tipo === 'cupom' && a.saldoCupom != null && <p>Saldo atual do cupom: {moeda(a.saldoCupom)}</p>}
+      {a.devolucoes?.map(d => <p key={d.operacaoId}>{moeda(d.valor)} · {d.meio} · {situacao[d.situacao] ?? 'Em acompanhamento'}</p>)}
+      {a.tipo === 'estorno' && a.situacao === 'confirmado' && <p>Confirmação registrada no provedor. O prazo para aparecer na conta depende do meio de pagamento.</p>}
+      {a.situacao === 'pendente' && <p>O acerto ainda não foi confirmado. O cliente acompanha a atualização nesta mesma comanda.</p>}
+      {a.situacao === 'recusado' && <p>O acerto ainda exige conferência. Confira os valores confirmados e não confirmados antes de solicitar outra devolução.</p>}
+    </>}
+    {uso && <>
+      <b>Cupom aplicado neste envio</b>
+      <p>{uso.codigo} · {moeda(uso.valor)} utilizados · Saldo atual: {moeda(uso.saldoCupom)}</p>
+    </>}
+  </section>
+}
+
 function SelecaoCompartilhada({ comanda: c, ocupado, salvar, confirmar, cardapio, podeDevolver }) {
   const [edicao, setEdicao] = useState(null)
   const [prato, setPrato] = useState('')
@@ -86,6 +116,7 @@ function SelecaoCompartilhada({ comanda: c, ocupado, salvar, confirmar, cardapio
     </> : c.rascunho.observacoes && <p>Observação: {c.rascunho.observacoes}</p>}
     <p>Total {edicao ? 'da seleção salva' : 'previsto'}: <strong>{moeda(c.totalPrevisto ?? 0)}</strong>{c.pedido && <> · Já coberto: {moeda(c.pedido.alocado ?? c.pedido.totalPago)}</>}</p>
     {c.pedido && <p>{saldo < 0 ? 'A devolver: ' + moeda(-saldo) + ' em ' + (c.rascunho.acerto === 'cupom' ? 'cupom' : 'estorno') + '.' : saldo > 0 ? 'Mais a pagar: ' + moeda(saldo) + '.' : 'Sem diferença de pagamento.'}</p>}
+    <AcertoDaComanda comanda={c} />
     {exigeGerente && !podeDevolver && <p>A dona ou um gerente precisa conferir esta devolução. Avise pelo atendimento.</p>}
     {pendente && <div>
       <Botao disabled={ocupado} onClick={() => confirmar(c.linkId, false)}>Manter pedido original</Botao>
@@ -100,7 +131,7 @@ export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompart
   const { cardapio } = useCatalogo()
   const { acoes } = useAcessoModulos()
   if (!ativo) return null
-  const visiveis = dados.filter(c => c.podeEditar || ['alteracao_aguardando_confirmacao', 'estorno_pendente'].includes(c.envio?.situacao)
+  const visiveis = dados.filter(c => c.podeEditar || ['alteracao_aguardando_confirmacao', 'estorno_pendente', 'estorno_recusado'].includes(c.envio?.situacao)
     || c.linkId === dados[0]?.linkId && c.envio)
   return <section className={css.clienteCompartilhado} aria-label="Comanda compartilhada com o cliente">
     <div className={css.adicionarCompartilhado}><b>{numeroComanda ? 'Comanda ' + numeroComanda : 'Comanda do cliente'}</b>{acaoCompartilhar}</div>

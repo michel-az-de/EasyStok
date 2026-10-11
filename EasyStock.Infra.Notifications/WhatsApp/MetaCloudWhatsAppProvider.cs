@@ -21,7 +21,7 @@ namespace EasyStock.Infra.Notifications.WhatsApp;
 /// e, com <c>Metadados["imagem"]</c> (arte da campanha, #1226), a imagem no cabeçalho;</item>
 /// <item>dentro da janela com <c>Metadados["imagem"]</c>: imagem com o texto como legenda;</item>
 /// <item>conversa aberta fora da janela sem template: falha permanente, sem chamar a Meta;</item>
-/// <item>sem conversa e sem template: tenta o texto; se a Meta recusar com 131047, falha permanente.</item>
+/// <item>sem conversa e sem template: falha permanente; não existe janela comprovada.</item>
 /// </list>
 /// Com conversa aberta, a saída é copiada para o histórico como <c>Mensagem(Saida, Sistema)</c> com o <c>wamid</c>.
 /// <para>
@@ -36,7 +36,8 @@ public sealed class MetaCloudWhatsAppProvider(
     IConversaRepository conversaRepository,
     ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
-    ILogger<MetaCloudWhatsAppProvider> logger) : IProvedorWhatsApp
+    ILogger<MetaCloudWhatsAppProvider> logger, IClienteRepository? clientes = null,
+    PoliticaEnvioCliente? politica = null) : IProvedorWhatsApp
 {
     public const string ErroForaDaJanelaSemTemplate = "fora_da_janela_24h_sem_template";
 
@@ -61,9 +62,21 @@ public sealed class MetaCloudWhatsAppProvider(
             var agora = DateTime.UtcNow;
             var contato = Conversa.NormalizarContato(CanalConversa.WhatsApp, mensagem.Destinatario);
             var conversa = await ObterConversaAbertaAsync(mensagem.EmpresaId, contato, ct);
+            var clienteAtualId = conversa?.ClienteId;
+            if (clienteAtualId is null && mensagem.Metadados is { } metadata && metadata.TryGetValue("clienteId", out var id)
+                && Guid.TryParse(id, out var clienteEnfileiradoId)) clienteAtualId = clienteEnfileiradoId;
+            if (clienteAtualId is { } clienteId && clientes is not null)
+            {
+                var cliente = await clientes.GetByIdAsync(mensagem.EmpresaId, clienteId);
+                if (cliente is null || cliente.EmpresaId != mensagem.EmpresaId || cliente.Bloqueado)
+                    return Falha("cliente_bloqueado_ou_indisponivel", permanente: true, sw);
+                if (politica is not null && mensagem.Categoria == Domain.Enums.Notifications.CategoriaConteudoNotificacao.Transacional
+                    && !await politica.PodeEnviarAsync(mensagem.EmpresaId, clienteId, CanalConversa.WhatsApp, FinalidadeContato.Transacional, ct))
+                    return Falha("contato_transacional_revogado", permanente: true, sw);
+            }
             var dentroDaJanela = conversa?.DentroDaJanela(agora) == true;
 
-            if (conversa is not null && !dentroDaJanela && template is null)
+            if (!dentroDaJanela && template is null)
                 return Falha(ErroForaDaJanelaSemTemplate, permanente: true, sw);
 
             var canal = resolvedorCanal.Obter(CanalConversa.WhatsApp);

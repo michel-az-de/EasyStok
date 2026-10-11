@@ -224,6 +224,8 @@ public sealed partial class PedidoConversaConcorrenciaTests
         var db = finalScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         (await db.Pedidos.CountAsync()).Should().Be(1);
         (await db.Set<PedidoPagamento>().CountAsync()).Should().Be(2);
+        (await db.NotifEventos.AsNoTracking().ToListAsync()).Count(e => e.PayloadJson.Contains("pagamento:") && e.PayloadJson.Contains("100002"))
+            .Should().Be(1, "pagamento complementar tem marco próprio e seu replay não enfileira outro aviso");
 
         async Task Etapa(string status)
         {
@@ -265,6 +267,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
             resposta.StatusCode.Should().Be(HttpStatusCode.OK, await resposta.Content.ReadAsStringAsync());
         }
         string codigo;
+        (await Estado(client, ajuste)).Acerto!.Valor.Should().Be(20);
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
@@ -288,6 +291,9 @@ public sealed partial class PedidoConversaConcorrenciaTests
         pagoComCupom.Saldo.Should().Be(0); pagoComCupom.LinkPagamento.Should().BeNull();
         preferencias.Should().ContainSingle("o segundo pedido foi coberto pelo cupom");
         (await Estado(client, seguinte)).Pedido!.TotalPago.Should().Be(15);
+        (await Estado(client, seguinte)).Envio!.CupomAplicado!.Valor.Should().Be(15);
+        (await Estado(client, seguinte)).Envio!.CupomAplicado!.SaldoCupom.Should().Be(5);
+        (await Estado(client, ajuste)).Acerto!.SaldoCupom.Should().Be(5, "recibo antigo acompanha saldo atual após uso parcial");
         using var finalScope = factory.Services.CreateScope();
         var finalDb = finalScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         (await finalDb.Set<CreditoClienteComanda>().SingleAsync()).Saldo.Should().Be(5);
@@ -298,6 +304,13 @@ public sealed partial class PedidoConversaConcorrenciaTests
         await cancelar.ExecuteAsync(new(EmpresaId, pagoComCupom.PedidoId, UsuarioId, "Teste", "Cancelamento do pedido com crédito", NivelSolicitante: NivelAcesso.Admin));
         var carteira = await cancelarScope.ServiceProvider.GetRequiredService<ICreditoClienteComandaRepository>().ListarAsync(EmpresaId, c.ClienteId, CancellationToken.None);
         carteira.Sum(credito => credito.Saldo).Should().Be(20, "o crédito usado no pedido cancelado volta à carteira");
+        var consumirSaldo = await Link(factory, c.ConversaId); estado = await Estado(client, consumirSaldo);
+        await Salvar(client, consumirSaldo, estado, estado.Rascunho with { Itens = [new(c.CardapioItemId, 2)], JanelaId = c.JanelaId,
+            DataEntrega = c.DataEntrega, CodigoCupom = codigo });
+        var consumo = await Enviar(client, consumirSaldo, 1);
+        consumo.CupomAplicado!.Valor.Should().Be(5); consumo.CupomAplicado.SaldoCupom.Should().Be(0);
+        (await Estado(client, consumirSaldo)).Envio!.CupomAplicado!.SaldoCupom.Should().Be(0);
+        (await Estado(client, ajuste)).Acerto!.SaldoCupom.Should().Be(0, "ausência na carteira não é usada para inferir saldo zero");
     }
 
     [SkippableFact]

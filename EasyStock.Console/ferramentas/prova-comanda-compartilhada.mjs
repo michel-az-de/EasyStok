@@ -94,6 +94,31 @@ assert.equal(render().find(e => e.props.children === 'Confirmar alteração').pr
 comanda.envio = { situacao: 'pedido_confirmado', saldo: 10 }
 comanda.pedido = { total: 40, alocado: 40 }
 assert.ok(render().some(e => e.type === 'p' && e.props.children === 'Sem diferença de pagamento.'), 'pagamento complementar elimina saldo histórico do envio')
+comanda.financeiro = { recebido: 25, devolvido: 10, convertidoEmCupom: 0, cupomAplicado: 0, reservado: 0, alocado: 15, dinheiroDisponivel: 15 }
+comanda.acerto = { tipo: 'estorno', valor: 10, situacao: 'pendente', devolucoes: [{ operacaoId: 'estorno', valor: 10, meio: 'Pix', situacao: 'pendente' }] }
+arvore = render()
+assert.ok(arvore.some(e => e.type === 'p' && e.props.children?.[0] === 'Dinheiro recebido: ' && e.props.children[1] === 'R$ 25,00'), 'recebimento original preservado')
+assert.ok(arvore.some(e => e.type === 'p' && e.props.children?.[0] === 'Cobertura atual do pedido: ' && e.props.children[1] === 'R$ 15,00'), 'cobertura líquida distinta do dinheiro bruto')
+assert.ok(arvore.some(e => e.type === 'b' && e.props.children.includes('Em acompanhamento') && e.props.children.includes('R$ 10,00')), 'estorno pendente conserva valor sem confirmação prematura')
+comanda.acerto.situacao = 'confirmado'; comanda.acerto.devolucoes[0].situacao = 'confirmado'
+arvore = render()
+assert.ok(arvore.some(e => e.type === 'b' && e.props.children.includes('Confirmado') && e.props.children.includes('R$ 10,00')), 'estorno confirmado conserva valor da operação')
+assert.ok(arvore.some(e => e.type === 'p' && typeof e.props.children === 'string' && e.props.children.includes('prazo para aparecer na conta')), 'confirmação do provedor não promete crédito bancário observado')
+comanda.acerto = { tipo: 'cupom', valor: 10, situacao: 'confirmado', codigoCupom: 'CASA10', saldoCupom: 0, devolucoes: [] }
+assert.ok(render().some(e => e.type === 'p' && e.props.children?.[0] === 'Código do cupom: ' && e.props.children[1] === 'CASA10'), 'cupom tem código e valor próprios')
+assert.ok(render().some(e => e.type === 'p' && e.props.children?.[0] === 'Saldo atual do cupom: ' && e.props.children[1] === 'R$ 0,00'), 'cupom consumido conserva código e saldo zero autoritativo')
+comanda.acerto = { tipo: 'estorno', valor: 20, situacao: 'recusado', devolucoes: [{ operacaoId: 'confirmado', valor: 10, meio: 'Pix', situacao: 'confirmado' }, { operacaoId: 'recusado', valor: 10, meio: 'Cartão', situacao: 'recusado' }] }
+assert.ok(render().some(e => e.type === 'p' && typeof e.props.children === 'string' && e.props.children.includes('valores confirmados e não confirmados')), 'recusa permite conferir devoluções parcialmente confirmadas')
+assert.ok(render().some(e => e.type === 'b' && e.props.children.includes('Precisa de conferência')), 'acerto parcial não esconde a operação já confirmada')
+for (const [meio, status] of [['Pix', 'Confirmado'], ['Cartão', 'Não confirmado']]) assert.ok(render().some(e => e.type === 'p' && e.props.children?.includes?.(meio) && e.props.children.includes(status)), 'cada devolução mantém seu estado: ' + meio)
+comanda.acerto = null
+comanda.financeiro.cupomAplicado = 10; comanda.financeiro.alocado = 25
+comanda.envio.cupomAplicado = { usoId: 'uso', codigo: 'CASA10', valor: 10, saldoCupom: 0 }
+arvore = render()
+assert.ok(arvore.some(e => e.type === 'b' && e.props.children === 'Cupom aplicado neste envio'), 'uso do cupom tem recibo nesta edição')
+assert.ok(arvore.some(e => e.type === 'p' && e.props.children?.[0] === 'CASA10' && e.props.children.includes('R$ 10,00') && e.props.children.includes('R$ 0,00')), 'valor utilizado e saldo atual vêm do uso persistido')
+delete comanda.envio.cupomAplicado
+delete comanda.financeiro; delete comanda.acerto
 const pedido = { pedidoId: 'pedido', totalApi: 50, alocadoApi: 30, pagamentosApi: [{ valor: 40, coberto: 40 }], frete: 0, itens: [] }
 assert.equal(totalPago(pedido), 40)
 assert.equal(faltaPagar(pedido, []), 20)
