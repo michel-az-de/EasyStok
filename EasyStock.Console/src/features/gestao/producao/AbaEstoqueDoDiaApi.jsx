@@ -5,6 +5,7 @@ import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useEstoqueDoDiaApi } from '../../../aplicacao/useEstoqueDoDiaApi'
 import { contagemInicial, porcaoSugerida, porcoesParaAjuste, vencidasNaContagem } from '../../../aplicacao/estoqueDoDia'
+import { hashDoModulo } from '../../../dominio/modulos'
 import css from '../cardapio/abaCardapio.module.css'
 
 // M2 › Estoque do dia (M2.1, #1490). O que a Thati usa todo dia, lido do EasyStok: os alertas de
@@ -79,7 +80,7 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar, aviso, aoFecharAviso }) 
       />
       {vencidas > 0 && <p className={`${css.detalhe} ${css.linhaCompleta}`}>
         A contagem inclui {vencidas === 1 ? '1 vencida' : `${vencidas} vencidas`} que ainda {vencidas === 1 ? 'está guardada' : 'estão guardadas'}.
-        {' '}Conte tudo o que está na prateleira; para tirar as vencidas, lance em Perdas.
+        {' '}Conte tudo o que está na prateleira; para tirar as vencidas, lance em <a className={css.link} href={hashDoModulo('producao', 'perdas')}>Perdas</a>.
       </p>}
       {aviso && <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">
         Não foi possível salvar a contagem. {aviso}
@@ -176,7 +177,7 @@ export function AbaEstoqueDoDiaApi() {
       <section className={css.secao} aria-labelledby="estoque-saldo">
         <h3 id="estoque-saldo" className={css.tituloSecao}>Saldo por prato</h3>
         {estoque.pratos.length === 0 ? (
-          <p className={css.descricao}>Nenhum prato do cardápio está ligado ao estoque ainda. A primeira produção liga.</p>
+          <p className={css.descricao}>Nenhum prato do cardápio está ligado ao estoque ainda. A primeira produção liga: lance em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.</p>
         ) : (
           <ul className={css.lista}>
             {estoque.pratos.map((p) => (

@@ -3,7 +3,7 @@ import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useCatalogo } from '../../../aplicacao/contextos'
-import { erroDasPorcoes, gerarCompras, itensDeCompra, lerSugestao, levarParaProducao, motivosDosPendentes, planejar } from '../../../aplicacao/planejamento'
+import { assinaturaDoPlano, comprasGuardadas, erroDasPorcoes, gerarCompras, guardarCompras, itensDeCompra, lerSugestao, levarParaProducao, motivosDosPendentes, planejar } from '../../../aplicacao/planejamento'
 import { lerInsumos } from '../../../aplicacao/insumos'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { moeda } from '../../../dominio/formato'
@@ -33,6 +33,8 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
   const [plano, setPlano] = useState(null)
   const [aviso, setAviso] = useState(null)
   const [ocupado, setOcupado] = useState(false)
+  // #1585: a última lista gerada, com as porções e a data que a pediram.
+  const [compras, setCompras] = useState(comprasGuardadas)
 
   useEffect(() => {
     let vivo = true
@@ -73,8 +75,10 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
     if (ocupado) return
     setOcupado(true)
     const cadastrados = await lerInsumos().catch(() => [])
-    const r = await gerarCompras(itensDeCompra(plano?.insumos ?? [], cadastrados), ate)
+    const itens = itensDeCompra(plano?.insumos ?? [], cadastrados)
+    const r = await gerarCompras(itens, ate)
     setOcupado(false)
+    if (r.ok) setCompras(guardarCompras(linhas, ate, { nome: r.nome, itens }))
     setAviso(r.ok ? `Lista "${r.nome ?? 'de compras'}" criada com ${r.itens} ${r.itens === 1 ? 'item' : 'itens'}.` : r.erro)
   }
 
@@ -92,6 +96,9 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
     </div>
   )
 
+  // A lista já gerada vale enquanto as porções e a data forem as mesmas.
+  const listaGerada = compras?.assinatura === assinaturaDoPlano(linhas, ate) ? compras : null
+
   return (
     <div className={css.aba}>
       <p className={css.descricao}>
@@ -105,7 +112,7 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
       {aviso && <p className={css.aviso} role="alert">{aviso} <Botao variante="texto" onClick={() => setAviso(null)}>Fechar</Botao></p>}
 
       {linhas.length === 0 ? (
-        <p className={css.descricao}>Nenhum prato ligado ao estoque ainda: a primeira produção liga o prato.</p>
+        <p className={css.descricao}>Nenhum prato ligado ao estoque ainda: a primeira produção liga o prato. Lance em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.</p>
       ) : (
         <ul className={css.lista}>
           {linhas.map((l) => (
@@ -155,8 +162,25 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
           {motivosDosPendentes(plano.pendentes, linhas).map((texto) => <p key={texto} className={css.descricao}>{texto}</p>)}
           <div className={css.topo}>
             {plano.custoTotal != null && <span className={css.detalhe}>Custo estimado {moeda(plano.custoTotal)}</span>}
-            <Botao icone="shopping-cart" onClick={comprar} disabled={ocupado}>Gerar lista de compras</Botao>
+            <Botao icone="shopping-cart" onClick={comprar} disabled={ocupado || listaGerada !== null}>{listaGerada ? 'Lista de compras gerada' : 'Gerar lista de compras'}</Botao>
           </div>
+          {listaGerada && (
+            <section className={css.secao} aria-label="Lista de compras gerada">
+              <h3 className={css.tituloSecao}>{listaGerada.nome ?? 'Lista de compras'}</h3>
+              <ul className={css.lista}>
+                {listaGerada.itens.map((i) => (
+                  <li key={i.produtoId} className={css.linha}>
+                    <div className={css.resumo}>
+                      <span className={css.nome}>{i.texto}</span>
+                      <span className={css.detalhe}>{i.categoria === 'Mínimo' ? 'repõe o mínimo' : 'falta para a produção'}</span>
+                    </div>
+                    <span className={css.preco}>{qtd(i.quantidade)} {i.unidade}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className={css.descricao}>Para gerar outra lista, mude as porções ou a data.</p>
+            </section>
+          )}
         </section>
       )}
     </div>

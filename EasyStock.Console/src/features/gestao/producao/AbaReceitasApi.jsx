@@ -162,7 +162,8 @@ export function AbaReceitasApi() {
       </p>}
       <p className={css.descricao}>
         A receita de cada prato: quanto rende e os insumos. O custo por porção usa o custo dos insumos. Prato aparece
-        aqui depois da primeira produção (é ela que liga o prato ao estoque).
+        aqui depois da primeira produção, lançada em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a> (é
+        ela que liga o prato ao estoque).
       </p>
       {!podeEditar && <p className={css.descricao}>Você pode consultar as receitas. A edição e a baixa automática ficam com a dona ou gerente.</p>}
       {gestao.aviso && !avisoNoEditor && (
@@ -172,7 +173,8 @@ export function AbaReceitasApi() {
       )}
       {gestao.receitas.length === 0 ? (
         <Vazio icone="nota" titulo="Nenhum prato ligado ao estoque ainda.">
-          A primeira produção liga o prato ao estoque. Depois, a receita aparece aqui.
+          A primeira produção liga o prato ao estoque: lance em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>. Depois,
+          a receita aparece aqui.
         </Vazio>
       ) : (
         <ul className={css.lista}>

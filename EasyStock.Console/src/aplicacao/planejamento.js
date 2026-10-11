@@ -59,6 +59,18 @@ export async function gerarCompras(itens, ate) {
   }
 }
 
+// #1585: a lista gerada fica na memória com as porções e a data que a pediram. A tela mostra o que
+// comprar e só gera outra quando as porções ou a data mudam: cada clique criava uma lista igual.
+export const assinaturaDoPlano = (linhas, ate) => JSON.stringify([
+  ate || null, linhas.filter((l) => porcoesDe(l.porcoes) > 0).map((l) => [l.sku, porcoesDe(l.porcoes)]),
+])
+let compras = null
+export const guardarCompras = (linhas, ate, { nome, itens }) => {
+  compras = { assinatura: assinaturaDoPlano(linhas, ate), nome, itens }
+  return compras
+}
+export const comprasGuardadas = () => compras
+
 // "Lançar como produção": as porções planejadas viram linhas da produção do dia (M2.2). Fica em
 // memória e é retirada uma vez pela tela de produção.
 let planejadas = null
