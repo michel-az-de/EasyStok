@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Chip } from '../../componentes/Chip'
 import { CampoTexto } from '../../componentes/Campo'
@@ -9,6 +9,7 @@ import {
 } from '../../dominio/entregasApi'
 import { plural } from '../../dominio/formato'
 import css from './entregasApi.module.css'
+import layout from './cadastroEntrega.module.css'
 
 // Janelas de entrega da loja (S45, issue #1440): criar marcando os dias de uma vez, editar,
 // pausar, reativar e excluir. Mesma seção em Entregas › Janelas e frete e em Gestão › Janelas
@@ -39,6 +40,8 @@ function Dias({ dias, umSo, aoMudar, ocupado }) {
 function FormularioJanela({ inicial, editando, aoSalvar, aoCancelar, ocupado }) {
   const [f, setF] = useState(inicial)
   const [erro, setErro] = useState(null)
+  const formularioRef = useRef(null)
+  useEffect(() => { formularioRef.current?.querySelector('button')?.focus() }, [])
   const campo = (k) => ({ value: f[k], disabled: ocupado, onChange: (e) => setF({ ...f, [k]: e.target.value }) })
   const salvar = (e) => {
     e.preventDefault()
@@ -49,9 +52,9 @@ function FormularioJanela({ inicial, editando, aoSalvar, aoCancelar, ocupado }) 
   }
   const faixa = faixaDeHorarios(f.horaInicio, f.horaFim)
   return (
-    <form className={css.edicaoJanela} onSubmit={salvar}>
+    <form ref={formularioRef} className={`${css.edicaoJanela} ${layout.edicao}`} onSubmit={salvar}>
       <Dias dias={f.dias} umSo={editando} ocupado={ocupado} aoMudar={(dias) => setF({ ...f, dias })} />
-      <div className={css.formulario}>
+      <div className={`${css.formulario} ${layout.formularioJanela}`}>
         <CampoTexto rotulo="Início" tipo="time" {...campo('horaInicio')} required />
         <CampoTexto rotulo="Fim" tipo="time" {...campo('horaFim')} required />
         <CampoTexto rotulo="Vagas (pedidos)" tipo="number" min="1" step="1" {...campo('capacidadeMaxima')} required />
@@ -68,8 +71,14 @@ function FormularioJanela({ inicial, editando, aoSalvar, aoCancelar, ocupado }) 
   )
 }
 
-function LinhaJanela({ janela, acoes, ocupado }) {
+function LinhaJanela({ janela, acoes, ocupado, aoExcluir, focoAlternativo }) {
   const [modo, setModo] = useState(null) // null | 'editar' | 'excluir'
+  const editarRef = useRef(null)
+  const fechar = () => {
+    setModo(null)
+    // Trocar o dia desmonta a linha no grupo antigo; o cadastro conserva a saída por teclado.
+    requestAnimationFrame(() => (editarRef.current ?? focoAlternativo.current)?.focus())
+  }
   const faixa = faixaDeHorarios(String(janela.horaInicio).slice(0, 5), String(janela.horaFim).slice(0, 5))
   const mostraNome = janela.label && janela.label !== faixa
 
@@ -81,30 +90,31 @@ function LinhaJanela({ janela, acoes, ocupado }) {
           editando
           ocupado={ocupado}
           aoSalvar={(f) => acoes.atualizarJanela(janela.id, corpoJanela({ ...f, diaDaSemana: f.dias[0], label: f.label || faixaDeHorarios(f.horaInicio, f.horaFim) }))
-            .then((ok) => { if (ok) setModo(null) })}
-          aoCancelar={() => setModo(null)}
+            .then((ok) => { if (ok) fechar() })}
+          aoCancelar={fechar}
         />
       </li>
     )
   }
   return (
-    <li className={`${css.cartao} ${janela.ativa ? '' : css.pausada}`}>
-      <div className={css.linha}>
-        <span className={`${css.cresce} ${css.numero}`}>
-          {faixa}{mostraNome && <span className={css.nomeJanela}> · {janela.label}</span>}
-        </span>
-        {!janela.ativa && <Pilula tom="neutro">Pausada</Pilula>}
-        <span className={css.apoio}>{plural(janela.capacidadeMaxima, 'vaga', 'vagas')}</span>
+    <li className={`${css.cartao} ${layout.janela}`}>
+      <div className={layout.identidade}>
+        <strong className={layout.horario}>{faixa}</strong>
+        {mostraNome && <span className={css.apoio}>{janela.label}</span>}
+      </div>
+      <div className={layout.capacidade}>
+        <strong>{plural(janela.capacidadeMaxima, 'vaga', 'vagas')}</strong>
+        <Pilula tom={janela.ativa ? 'ok' : 'neutro'}>{janela.ativa ? 'Ativa' : 'Pausada'}</Pilula>
       </div>
       {modo === 'excluir' ? (
-        <div className={css.linha}>
+        <div className={`${css.linha} ${layout.confirmacao}`}>
           <span className={`${css.apoio} ${css.cresce}`}>Excluir esta janela? Se ela já tiver pedidos, use Pausar para preservar o histórico.</span>
-          <Botao variante="secundario" disabled={ocupado} onClick={() => acoes.excluirJanela(janela.id).then((ok) => { if (ok) setModo(null) })}>Excluir janela</Botao>
-          <Botao variante="texto" disabled={ocupado} onClick={() => setModo(null)}>Manter janela</Botao>
+          <Botao variante="secundario" disabled={ocupado} onClick={aoExcluir}>Excluir janela</Botao>
+          <Botao variante="texto" disabled={ocupado} onClick={fechar}>Manter janela</Botao>
         </div>
       ) : (
-        <div className={css.linha}>
-          <Botao variante="texto" icone="lapis" disabled={ocupado} aria-label={`Editar janela ${faixa}`} onClick={() => setModo('editar')}>Editar</Botao>
+        <div className={`${css.linha} ${layout.acoes}`}>
+          <Botao ref={editarRef} variante="texto" icone="lapis" disabled={ocupado} aria-label={`Editar janela ${faixa}`} onClick={() => setModo('editar')}>Editar</Botao>
           <Botao variante="texto" disabled={ocupado} icone={janela.ativa ? 'pause' : 'play'} onClick={() => acoes.alternarJanela(janela)}>
             {janela.ativa ? 'Pausar' : 'Reativar'}
           </Botao>
@@ -117,35 +127,40 @@ function LinhaJanela({ janela, acoes, ocupado }) {
 
 export function JanelasDaLoja({ janelas, acoes, ocupado }) {
   const [criando, setCriando] = useState(false)
+  const criarRef = useRef(null)
   const lista = janelas ?? []
   const dias = ORDEM_DA_SEMANA.filter((d) => lista.some((j) => j.diaDaSemana === d))
 
   return (
     <section className={css.secao} aria-label="Janelas de entrega">
-      <div className={css.linha}>
-        <h3 className={css.cresce}>Janelas de entrega</h3>
-        <Botao variante={criando ? 'texto' : 'primario'} disabled={ocupado} icone={criando ? undefined : 'plus'} aria-expanded={criando} onClick={() => setCriando((v) => !v)}>
+      <div className={layout.cabecalho}>
+        <h2>Horários da semana</h2>
+        <Botao ref={criarRef} variante={criando ? 'texto' : 'primario'} disabled={ocupado} icone={criando ? undefined : 'plus'} aria-expanded={criando} onClick={() => setCriando((v) => !v)}>
           {criando ? 'Cancelar' : 'Nova janela'}
         </Botao>
       </div>
       <p className={css.apoio}>
-        Cada janela é um horário de entrega num dia da semana, com o número de pedidos que cabem nele.
-        Para fechar um dia específico (feriado, chuva), use Bloqueios.
+        Horário e capacidade por dia. Fechamentos pontuais ficam em Bloqueios.
       </p>
       {criando && (
         <div className={css.cartao}>
-          <FormularioJanela inicial={JANELA_NOVA} ocupado={ocupado} aoSalvar={(f) => acoes.criarJanelas(corposJanela(f))} />
+          <FormularioJanela inicial={JANELA_NOVA} ocupado={ocupado} aoSalvar={(f) => acoes.criarJanelas(corposJanela(f)).then((ok) => {
+            if (ok) { setCriando(false); requestAnimationFrame(() => criarRef.current?.focus()) }
+            return ok
+          })} />
         </div>
       )}
       {lista.length === 0 && !criando && <p className={css.vazio}>Nenhuma janela cadastrada. Sem janela, o cliente não tem horário para escolher.</p>}
       {dias.map((d) => (
         <div key={d} className={css.diaDaSemana}>
-          <h4>{DIAS_DA_SEMANA[d]}</h4>
+          <h3 className={layout.dia}>{DIAS_DA_SEMANA[d]}</h3>
           <ul className={css.lista}>
             {lista
               .filter((j) => j.diaDaSemana === d)
               .sort((a, b) => String(a.horaInicio).localeCompare(String(b.horaInicio)))
-              .map((j) => <LinhaJanela key={j.id} janela={j} acoes={acoes} ocupado={ocupado} />)}
+              .map((j) => <LinhaJanela key={j.id} janela={j} acoes={acoes} ocupado={ocupado} focoAlternativo={criarRef} aoExcluir={() => acoes.excluirJanela(j.id).then((ok) => {
+                if (ok) requestAnimationFrame(() => criarRef.current?.focus())
+              })} />)}
           </ul>
         </div>
       ))}

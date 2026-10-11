@@ -36,9 +36,11 @@ const hooks = {
     return [atual.valores[i], (novo) => { atual.valores[i] = typeof novo === 'function' ? novo(atual.valores[i]) : novo }]
   },
   useRef(valor) { return host.valores[host.i++] ??= { current: valor } },
+  useId() { return host.valores[host.i++] ??= `prova-${host.i}` },
   useEffect() { host.i++ },
 }
 const g = globalThis.__prova1584 = { hooks, agora: 0, cozinha: { api: null, args: null }, perdas: null, cadastro: null, caixa: null, acoes: null, acesso: { acoes: {} } }
+globalThis.requestAnimationFrame = (callback) => callback()
 
 const inline = (source) => ({ format: 'module', shortCircuit: true, source })
 const DE_FORA = 'globalThis.__prova1584'
@@ -46,7 +48,7 @@ const DE_FORA = 'globalThis.__prova1584'
 const nomesExportados = (fonte) => [...fonte.matchAll(/^export\s+(?:async\s+)?(?:function|const)\s+([A-Za-z_$][\w$]*)/gm)].map((m) => m[1])
 registerHooks({
   resolve(spec, ctx, next) {
-    if (spec === 'react') return { url: `data:text/javascript,export const {useState,useRef,useEffect}=${DE_FORA}.hooks`, shortCircuit: true }
+    if (spec === 'react') return { url: `data:text/javascript,export const {useState,useRef,useEffect,useId}=${DE_FORA}.hooks`, shortCircuit: true }
     if (spec === 'react/jsx-runtime') return { url: 'data:text/javascript,export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="fragment"', shortCircuit: true }
     if (spec === '@dnd-kit/core') return { url: 'data:text/javascript,' + encodeURIComponent(`
       export const DndContext='dnd',DragOverlay='overlay',KeyboardSensor='keyboard',MouseSensor='mouse',TouchSensor='touch';
@@ -423,6 +425,7 @@ await confere('Bloqueios: "Remover" pede confirmação; só "Remover bloqueio" c
     acoes: { criarZona() {}, alternarZona() {}, criarBloqueio() {}, removerBloqueio: async (id) => { removidos.push(id); return resultado } },
   }
   const t = montar(CadastroEntregaApi)
+  botao(t.renderizar(), 'Bloqueios 1').props.onClick()
   botao(t.renderizar(), 'Remover').props.onClick()
   let el = t.renderizar()
   assert.deepEqual(removidos, [], 'um toque removeu o bloqueio')
