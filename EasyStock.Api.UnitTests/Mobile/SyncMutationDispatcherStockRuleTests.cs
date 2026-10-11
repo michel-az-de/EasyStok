@@ -190,6 +190,140 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
         Estoque().Should().Be(10);
     }
 
+    // ---------- #1543: a baixa do pedido no ERP ----------
+
+    [Fact]
+    public async Task VendaComVinculo_BaixaDoLoteQueVencePrimeiro_EAtravessaOsLotes()
+    {
+        // Antes a baixa caia num lote qualquer (o primeiro que o banco devolvesse) e parava nele.
+        SemearProduto(estoque: 8, comVinculo: true);
+        var venceDepois = SemearItemEstoque(5, venceEmDias: 10);
+        var venceAntes = SemearItemEstoque(3, venceEmDias: 2);
+        SemearPedido("preparando", qtd: 4);
+
+        await Push("dev-a", PedidoEm("pronto", 4));
+
+        (SaldoDoLote(venceAntes), SaldoDoLote(venceDepois)).Should().Be((0m, 4m), "sai primeiro do lote que vence antes");
+        SaidasDeVendaNoErp().Should().Be(2, "uma saida por lote que baixou");
+    }
+
+    [Fact]
+    public async Task VendaMaiorQueOSaldo_AFaltaViraDescobertoNoLote()
+    {
+        // Antes o saldo era truncado em zero e a falta sumia: ficava so um movimento marcador.
+        SemearProduto(estoque: 5, comVinculo: true);
+        var lote = SemearItemEstoque(2);
+        SemearPedido("preparando", qtd: 5);
+
+        await Push("dev-a", PedidoEm("pronto", 5));
+
+        (SaldoDoLote(lote), DescobertoDoLote(lote)).Should().Be((0m, 3m));
+        _db.Set<MovimentacaoEstoque>().IgnoreQueryFilters().Should().ContainSingle()
+            .Which.Quantidade.Value.Should().Be(5m, "a saida registra o que o pedido levou, inclusive a parte a descoberto");
+    }
+
+    [Fact]
+    public async Task CancelarPedidoQueNaoBaixouNoErp_NaoDevolveNada()
+    {
+        // O pedido ja estava "pronto" no servidor sem nenhuma saida no ERP. Antes o cancelamento somava +1.
+        SemearProduto(estoque: 10, comVinculo: true);
+        var lote = SemearItemEstoque(10);
+        SemearPedido("pronto", qtd: 1);
+
+        await Push("dev-a", PedidoEm("cancelado", 1));
+
+        SaldoDoLote(lote).Should().Be(10m, "nao saiu nada por este pedido: nao ha o que devolver");
+        _db.Set<MovimentacaoEstoque>().IgnoreQueryFilters().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CancelarPedidoQueBaixou_DevolveAosLotesDeOndeSaiu_UmaVez()
+    {
+        SemearProduto(estoque: 8, comVinculo: true);
+        var venceDepois = SemearItemEstoque(5, venceEmDias: 10);
+        var venceAntes = SemearItemEstoque(3, venceEmDias: 2);
+        SemearPedido("preparando", qtd: 4);
+        await Push("dev-a", PedidoEm("pronto", 4));
+
+        await Push("dev-a", PedidoEm("cancelado", 4));
+        await Push("dev-a", PedidoEm("cancelado", 4));
+
+        (SaldoDoLote(venceAntes), SaldoDoLote(venceDepois)).Should().Be((3m, 5m));
+        var movimentos = _db.Set<MovimentacaoEstoque>().IgnoreQueryFilters().AsNoTracking().ToList();
+        movimentos.Count(m => m.Natureza == NaturezaMovimentacaoEstoque.Estorno).Should().Be(2, "um estorno por saida, uma vez so");
+        movimentos.Where(m => m.Natureza == NaturezaMovimentacaoEstoque.Venda).Should().OnlyContain(m => m.EstornadaEm != null);
+    }
+
+    [Fact]
+    public async Task CancelarVendaComDescoberto_AbateODescobertoEmVezDeFabricarSaldo()
+    {
+        SemearProduto(estoque: 5, comVinculo: true);
+        var lote = SemearItemEstoque(2);
+        SemearPedido("preparando", qtd: 5);
+        await Push("dev-a", PedidoEm("pronto", 5));
+
+        await Push("dev-a", PedidoEm("cancelado", 5));
+
+        (SaldoDoLote(lote), DescobertoDoLote(lote)).Should().Be((2m, 0m), "voltam as 2 que sairam; as 3 a descoberto nunca sairam");
+    }
+
+    [Fact]
+    public async Task PedidoQueChegaJaPronto_BaixaNoErp_EOReenvioNaoBaixaDeNovo()
+    {
+        // Antes so a troca de status baixava: pedido que nascia "pronto" no servidor ficava sem saida.
+        SemearProduto(estoque: 10, comVinculo: true);
+        var lote = SemearItemEstoque(10);
+
+        await Push("dev-a", PedidoEm("pronto", 2));
+        await Push("dev-a", PedidoEm("pronto", 2));
+        await Push("dev-a", PedidoEm("entregue", 2));
+
+        SaldoDoLote(lote).Should().Be(8m);
+        SaidasDeVendaNoErp().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task VendaNaoTocaOLoteDeOutraLoja()
+    {
+        SemearProduto(estoque: 5, comVinculo: true);
+        var daLoja = SemearItemEstoque(2);
+        var deOutraLoja = SemearItemEstoque(9, lojaId: Guid.NewGuid());
+        SemearPedido("preparando", qtd: 3);
+
+        await Push("dev-a", PedidoEm("pronto", 3));
+
+        (SaldoDoLote(daLoja), DescobertoDoLote(daLoja), SaldoDoLote(deOutraLoja)).Should().Be((0m, 1m, 9m));
+    }
+
+    [Fact]
+    public async Task CancelarEReabrirOPedido_BaixaDeNovo()
+    {
+        SemearProduto(estoque: 10, comVinculo: true);
+        var lote = SemearItemEstoque(10);
+        SemearPedido("preparando", qtd: 2);
+        await Push("dev-a", PedidoEm("pronto", 2));
+        await Push("dev-a", PedidoEm("cancelado", 2));
+
+        await Push("dev-a", PedidoEm("pronto", 2));
+
+        SaldoDoLote(lote).Should().Be(8m, "a saida anterior foi estornada; a reabertura e uma saida nova");
+    }
+
+    [Fact]
+    public async Task PedidoDoErpEcoadoPeloPwa_NaoBaixaPeloCaminhoDoPwa()
+    {
+        // O pedido nasceu no console e desceu para o aparelho com o id do ERP. O estoque dele e da
+        // esteira do ERP (que baixa pelos itens do pedido); baixar aqui tambem contaria duas vezes.
+        var pedidoErp = SemearPedidoDoErp();
+        SemearProduto(estoque: 10, comVinculo: true);
+        var lote = SemearItemEstoque(10);
+
+        await Push("dev-a", PedidoEm("pronto", 2, id: pedidoErp.ToString()));
+
+        SaldoDoLote(lote).Should().Be(10m);
+        SaidasDeVendaNoErp().Should().Be(0);
+    }
+
     // ---------- producao e descarte de lote ----------
 
     [Fact]
@@ -337,11 +471,11 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
     private MutationDto Movimento(int qtd) => Mutation("stock.delta",
         new { id = $"sd_{Guid.NewGuid():N}", productId = Produto, qty = qtd });
 
-    private MutationDto PedidoEm(string status, int qtd)
+    private MutationDto PedidoEm(string status, int qtd, string id = Pedido)
     {
         var agora = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         return Mutation("order.upsert", new OrderDto(
-            Pedido, null, new ClientSnapshotDto("Ana", null),
+            id, null, new ClientSnapshotDto("Ana", null),
             [new OrderItemDto(Produto, "Lasanha", null, "un", qtd, 30m)],
             null, 30m * qtd, status, agora, agora));
     }
@@ -371,17 +505,29 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
         _db.ChangeTracker.Clear();
     }
 
-    private void SemearItemEstoque(int quantidade)
+    private Guid SemearItemEstoque(int quantidade, int? venceEmDias = null, Guid? lojaId = null)
     {
         var produto = _db.Set<Produto>().IgnoreQueryFilters().Single(p => p.Id == _produtoErpId);
+        var validade = venceEmDias is { } dias ? Validade.From(DateTime.UtcNow.Date.AddDays(dias)) : null;
         var item = ItemEstoque.CriarParaEntrada(
             Guid.NewGuid(), _empresaId, produto, null, Quantidade.From(quantidade), Dinheiro.Zero, null,
-            DateTime.UtcNow, $"T-{Guid.NewGuid():N}"[..10], null, null, null, null, null, null, null, null, null, null,
+            DateTime.UtcNow, $"T-{Guid.NewGuid():N}"[..10], null, null, null, null, null, null, null, null, validade, null,
             DateTime.UtcNow);
-        item.LojaId = _lojaId;
+        item.LojaId = lojaId ?? _lojaId;
         _db.Add(item);
         _db.SaveChanges();
         _db.ChangeTracker.Clear();
+        return item.Id;
+    }
+
+    /// <summary>Pedido que nasceu no ERP (console ou site), com o id que o pull leva ao aparelho.</summary>
+    private Guid SemearPedidoDoErp()
+    {
+        var pedido = EasyStock.Domain.Entities.Pedido.Criar(_empresaId, cliente: null, lojaId: _lojaId, "web");
+        _db.Add(pedido);
+        _db.SaveChanges();
+        _db.ChangeTracker.Clear();
+        return pedido.Id;
     }
 
     private void SemearPedido(string status, int qtd)
@@ -402,6 +548,10 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
     private decimal SaldoErp() => _db.Set<ItemEstoque>().IgnoreQueryFilters().AsNoTracking()
         .Where(i => i.EmpresaId == _empresaId && i.ProdutoId == _produtoErpId)
         .AsEnumerable().Sum(i => i.QuantidadeAtual?.Value ?? 0);
+
+    private ItemEstoque LoteDoErp(Guid id) => _db.Set<ItemEstoque>().IgnoreQueryFilters().AsNoTracking().Single(i => i.Id == id);
+    private decimal SaldoDoLote(Guid id) => LoteDoErp(id).QuantidadeAtual?.Value ?? 0;
+    private decimal DescobertoDoLote(Guid id) => LoteDoErp(id).QuantidadeDescoberta?.Value ?? 0;
 
     private int SaidasDeVendaNoErp() => _db.Set<MovimentacaoEstoque>().IgnoreQueryFilters()
         .Count(m => m.EmpresaId == _empresaId && m.ProdutoId == _produtoErpId

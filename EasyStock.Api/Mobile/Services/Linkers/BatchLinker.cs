@@ -45,7 +45,12 @@ public sealed class BatchLinker(
                     .Include(b => b.Items)
                     .FirstOrDefaultAsync(b => b.Id == bid && b.EmpresaId == empresaId);
                 if (mobileB == null) { idempotentSkip++; continue; }
-                if (mobileB.ErpLoteId.HasValue && mobileB.ErpLoteId.Value != Guid.Empty) { idempotentSkip++; continue; }
+                if (mobileB.ErpLoteId.HasValue && mobileB.ErpLoteId.Value != Guid.Empty)
+                {
+                    await RefazerInsumosDoLoteRestauradoAsync(mobileB);
+                    idempotentSkip++;
+                    continue;
+                }
 
                 var jaPromovido = await loteRepo.FindByMobileBatchIdAsync(empresaId.Value, mobileB.Id);
                 if (jaPromovido != null)
@@ -106,7 +111,8 @@ public sealed class BatchLinker(
                     bid, lote.Id, lote.Itens.Count);
 
                 await EnsureEntradaEstoqueDoLoteAsync(lote);
-                await BaixarInsumosDoLoteAsync(lote);
+                // #1543: lote que ja chega excluido (registrado por engano) nao consumiu insumo.
+                if (!mobileB.Excluido) await BaixarInsumosDoLoteAsync(lote);
 
                 // #1464: lote que ja chega excluido/descartado no primeiro sync.
                 await loteEstado.AplicarAsync(mobileB);
@@ -126,6 +132,25 @@ public sealed class BatchLinker(
     }
 
     /// <summary>
+    /// #1543: a exclusão do lote devolve o insumo (<see cref="LoteMobileEstadoReconciler"/>); se o lote
+    /// volta a valer, a baixa é refeita. Só refaz o que já existiu e foi estornado: lote antigo, que
+    /// nunca teve baixa, não passa a ter por causa de um reenvio.
+    /// </summary>
+    private async Task RefazerInsumosDoLoteRestauradoAsync(Batch mobileB)
+    {
+        if (baixaDeInsumos is null || mobileB.Excluido) return;
+        var lote = await db.Set<Lote>().IgnoreQueryFilters().Include(l => l.Itens)
+            .FirstOrDefaultAsync(l => l.Id == mobileB.ErpLoteId && l.EmpresaId == mobileB.EmpresaId);
+        if (lote is null) return;
+
+        var descricao = $"{BaixaDeInsumosDaProducao.PrefixoDaDescricao} {lote.Codigo}";
+        var foiEstornada = await db.Set<MovimentacaoEstoque>().IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(m => m.EmpresaId == lote.EmpresaId && m.Descricao == descricao
+                           && m.Tipo == TipoMovimentacaoEstoque.Saida && m.EstornadaEm != null);
+        if (foiEstornada) await BaixarInsumosDoLoteAsync(lote);
+    }
+
+    /// <summary>
     /// #1526: baixa de insumo e embalagem do lote, uma vez só (a saída leva "Insumo da produção {codigo}").
     /// Falha aqui não derruba o sync: o lote e a entrada já estão gravados.
     /// </summary>
@@ -134,10 +159,8 @@ public sealed class BatchLinker(
         if (baixaDeInsumos is null) return;
         try
         {
-            var descricao = $"{BaixaDeInsumosDaProducao.PrefixoDaDescricao} {lote.Codigo}";
-            var jaBaixou = await db.Set<MovimentacaoEstoque>().IgnoreQueryFilters().AsNoTracking()
-                .AnyAsync(m => m.EmpresaId == lote.EmpresaId && m.Descricao == descricao);
-            if (jaBaixou) return;
+            // Saida estornada nao conta: o lote foi excluido e voltou (#1543).
+            if (await LoteMobileEstadoReconciler.SaidasDeInsumoAbertas(db, lote).AsNoTracking().AnyAsync()) return;
 
             var pratos = new List<PratoParaBaixa>();
             foreach (var item in lote.Itens.Where(i => i.ProdutoId.HasValue && i.Quantidade > 0))
@@ -163,6 +186,9 @@ public sealed class BatchLinker(
         }
         catch (Exception ex)
         {
+            // #1543: a baixa pode ter falhado no meio. O que ela deixou no contexto nao pode ir ao banco
+            // no proximo SaveChanges (insumo baixado pela metade, sem a saida que o explica).
+            db.DescartarMudancasPendentes();
             log.LogError(ex, "Baixa de insumo do lote {LoteId} (PWA) FALHOU: {Tipo}: {Mensagem}", lote.Id, ex.GetType().Name, ex.Message);
         }
     }
@@ -246,6 +272,9 @@ public sealed class BatchLinker(
             }
             catch (Exception ex)
             {
+                // #1543: a entrada que nao gravou sai do contexto; senao o proximo SaveChanges a tenta de novo
+                // junto com o que vier depois.
+                db.DescartarMudancasPendentes();
                 log.LogError(ex,
                     "F8-A FALHOU pra lote={LoteId} produto={ProdutoId}: {Tipo}: {Mensagem}",
                     lote.Id, item.ProdutoId, ex.GetType().Name, ex.Message);

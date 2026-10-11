@@ -144,6 +144,28 @@ Regras que fecham os cantos:
 - O snapshot do EF foi regenerado e perdeu um `ValueGeneratedOnAdd` de `CardapioItemVariacao.Id`
   que já divergia do modelo desde a #1529. Não gera DDL.
 
+## Adendo de 11/10/2026 (#1543): o que o sync leva ao estoque e ao pedido do ERP
+
+Achados da banca de 10/10, todos latentes (produção sem aparelho pareado nem estoque na medição de
+11/10). Sem migração.
+
+| Tema | Antes | Agora |
+|---|---|---|
+| Baixa do pedido do aparelho no ERP | Um lote qualquer do produto; saldo truncado em zero, a falta sumia; só a troca de status baixava | FEFO entre os lotes da loja do aparelho; a falta vira descoberto no lote (#540); pedido que já chega "pronto" baixa; uma vez por pedido e produto |
+| Cancelamento do pedido do aparelho | Somava a quantidade do pedido, tivesse saído ou não | Estorna as saídas que este pedido fez, nos lotes de onde saíram. Sem saída, não devolve |
+| Pedido que nasceu no ERP e o aparelho avançou | Status gravado direto na tabela (sem máquina de estados, estoque nem outbox), e o aparelho ainda baixava por conta própria | A troca passa pelo caso de uso do ERP, com nível de Operador; o estoque é só o da esteira, pelos itens do pedido. Recusa da esteira fica no log e o ERP não muda |
+| Lote excluído no aparelho | Tirava as porções do estoque e deixava insumo e embalagem baixados | Estorna a baixa de insumo; restaurar o lote refaz a baixa. Descarte não devolve (a comida foi feita) |
+| Passo do vínculo que falha | A falha era engolida e o `SaveChanges` seguinte gravava a metade que ficou no contexto | Quem engole a falha descarta antes o que ficou pendente |
+| Fechamento de caixa do aparelho (#954) | Casava "da loja, ou sem loja, ou qualquer": sobrescrevia o fechamento da empresa ou de outra loja | Casa pelo escopo exato: loja com loja, empresa com empresa |
+
+**Quem é dono do quê.** Pedido nascido no aparelho: o aparelho manda, o Pedido do ERP espelha e o
+estoque sai pelo `MobileStockReconciler`. Pedido nascido no ERP (`Origem` diferente de `mobile`): o
+ERP manda. O pagamento automático na entrega pelo aparelho continua valendo para os dois.
+
+**Limites que ficam.** O Pedido do ERP criado a partir do aparelho guarda os itens do primeiro envio;
+editar itens no aparelho depois não os atualiza lá. A baixa do aparelho não ajusta quando os itens
+mudam com o pedido já pronto. O destino do caixa do PWA segue na D-M5-02.
+
 ## Rollback
 
 | Parte | Como desfazer | Efeito |

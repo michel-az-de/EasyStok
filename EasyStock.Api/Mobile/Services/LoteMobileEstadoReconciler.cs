@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Producao;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
@@ -91,9 +92,49 @@ public class LoteMobileEstadoReconciler(
             }
         }
 
+        // #1543: lote excluido foi registrado por engano, entao nao consumiu insumo nem embalagem. O
+        // descarte e diferente: a comida foi feita e jogada fora, o insumo saiu de verdade.
+        if (desejado == StatusExcluido)
+            await EstornarInsumosAsync(lote, agora, ct);
+
         lote.Status = desejado;
         lote.AlteradoEm = agora;
         log.LogInformation("Lote mobile {BatchId} → ERP {LoteId}: {De} → {Para}", batch.Id, lote.Id, atual, desejado);
+    }
+
+    /// <summary>
+    /// Devolve a baixa de insumo e embalagem que a produção deste lote fez
+    /// (<see cref="BaixaDeInsumosDaProducao"/>). Mesma operação do estorno de saída do ERP: a parte que
+    /// ficou a descoberto é abatida antes de voltar ao saldo. Restaurar o lote refaz a baixa
+    /// (<see cref="Linkers.BatchLinker"/>).
+    /// </summary>
+    private async Task EstornarInsumosAsync(Lote lote, DateTime agora, CancellationToken ct)
+    {
+        var saidas = await SaidasDeInsumoAbertas(db, lote).ToListAsync(ct);
+        if (saidas.Count == 0) return;
+
+        var idsDosLotes = saidas.Select(s => s.ItemEstoqueId).Distinct().ToList();
+        var insumos = await db.Set<ItemEstoque>().IgnoreQueryFilters()
+            .Where(i => i.EmpresaId == lote.EmpresaId && idsDosLotes.Contains(i.Id))
+            .ToDictionaryAsync(i => i.Id, ct);
+        foreach (var saida in saidas)
+        {
+            if (insumos.TryGetValue(saida.ItemEstoqueId, out var insumo))
+                insumo.RestaurarSaidaEstornada(saida.Quantidade, agora);
+            saida.MarcarComoEstornada(agora);
+            db.Add(MovimentacaoEstoque.CriarEstorno(
+                Guid.NewGuid(), saida, agora,
+                $"Estorno: lote {lote.Codigo} excluido (registrado por engano)", agora));
+        }
+    }
+
+    /// <summary>As saídas de insumo da produção do lote que ainda valem (não estornadas).</summary>
+    public static IQueryable<MovimentacaoEstoque> SaidasDeInsumoAbertas(EasyStockDbContext db, Lote lote)
+    {
+        var descricao = $"{BaixaDeInsumosDaProducao.PrefixoDaDescricao} {lote.Codigo}";
+        return db.Set<MovimentacaoEstoque>().IgnoreQueryFilters()
+            .Where(m => m.EmpresaId == lote.EmpresaId && m.Descricao == descricao
+                        && m.Tipo == TipoMovimentacaoEstoque.Saida && m.EstornadaEm == null);
     }
 
     private async Task EstornarSaidasAsync(

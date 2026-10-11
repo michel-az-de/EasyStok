@@ -65,6 +65,59 @@ public class LotePwaBaixaInsumoIntegrationTests(PostgreSqlDatabaseFixture fixtur
             .QuantidadeAtual.Value.Should().Be(4, "a entrada do lote (F8-A) segue igual");
     }
 
+    [SkippableFact]
+    public async Task LoteExcluido_DevolveInsumoEEmbalagem_RestauradoBaixaDeNovo_EDescartadoNaoDevolve()
+    {
+        // #1543: lote excluido foi registrado por engano e nao consumiu insumo. Antes a exclusao tirava
+        // as porcoes do estoque e deixava a bandeja e o molho baixados.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var s = await SeedAsync();
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(s.EmpresaId);
+            (await db.Set<Produto>().SingleAsync(p => p.Id == s.PratoId)).BaixaInsumoAutomatica = true;
+            await db.SaveChangesAsync();
+        }
+        await using var provider = BuildProductionProvider();
+        await Escopo(provider, s.EmpresaId, async sp =>
+        {
+            var entrada = sp.GetRequiredService<RegistrarEntradaEstoqueUseCase>();
+            foreach (var (id, qtd) in new[] { (s.MolhoId, 1000m), (s.BandejaId, 20m) })
+                await entrada.ExecuteAsync(new RegistrarEntradaEstoqueCommand(s.EmpresaId, id, null, qtd, 0.1m, null, DateTime.UtcNow.AddDays(-1),
+                    NaturezaMovimentacaoEstoque.Compra, null, null, null, null, null, null, null, null, null, null, null, null, null));
+        });
+        async Task<(decimal Bandeja, decimal Molho, decimal Prato)> Saldos() =>
+            (await Saldo(s.EmpresaId, s.BandejaId), await Saldo(s.EmpresaId, s.MolhoId), await Saldo(s.EmpresaId, s.PratoId));
+
+        await Sincronizar(provider, s, "b-1", 3);
+        (await Saldos()).Should().Be((17m, 100m, 3m), "3 porções: 3 bandejas e 900 g de molho");
+
+        await Marcar(provider, s, "b-1", b => { b.DeletedAt = DateTime.UtcNow; b.DeletedBy = "Thati"; });
+        (await Saldos()).Should().Be((20m, 1000m, 0m), "o lote nunca existiu: bandeja e molho voltam");
+
+        await Marcar(provider, s, "b-1", b => b.DeletedBy = "Thati");
+        (await Saldos()).Should().Be((20m, 1000m, 0m), "reenviar a exclusão não devolve de novo");
+
+        await Marcar(provider, s, "b-1", b => { b.DeletedAt = null; b.DeletedBy = null; });
+        (await Saldos()).Should().Be((17m, 100m, 3m), "lote restaurado volta a ter a baixa, uma vez");
+
+        await Marcar(provider, s, "b-1", b => { b.DiscardedAt = DateTime.UtcNow; b.DiscardedBy = "Thati"; b.DiscardReason = "caiu no chão"; });
+        (await Saldos()).Should().Be((17m, 100m, 0m), "descarte é comida feita e jogada fora: o insumo saiu de verdade");
+    }
+
+    /// <summary>Marca o lote como o envio do aparelho faz: marcas e estado num SaveChanges só; o vínculo vem depois.</summary>
+    private static Task Marcar(ServiceProvider provider, Semente s, string batchId, Action<Batch> marca) =>
+        Escopo(provider, s.EmpresaId, async sp =>
+        {
+            var db = sp.GetRequiredService<EasyStockDbContext>();
+            var batch = await db.Set<Batch>().IgnoreQueryFilters().Include(b => b.Items).SingleAsync(b => b.Id == batchId);
+            marca(batch);
+            await sp.GetRequiredService<LoteMobileEstadoReconciler>().AplicarAsync(batch);
+            await db.SaveChangesAsync();
+            await sp.GetRequiredService<BatchLinker>().ExecuteAsync([batchId], s.EmpresaId);
+        });
+
     private sealed record Semente(Guid EmpresaId, Guid PratoId, Guid MolhoId, Guid BandejaId);
 
     private async Task Sincronizar(ServiceProvider provider, Semente s, string batchId, int porcoes, bool criar = true)
