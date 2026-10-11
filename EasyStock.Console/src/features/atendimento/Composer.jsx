@@ -13,9 +13,7 @@ import { escolherFormatoGravacao } from '../../dominio/audio'
 import { useArquivoComoDataUrl } from '../../hooks/useArquivoComoDataUrl'
 import { useGravadorAudio } from '../../hooks/useGravadorAudio'
 import { BotaoAnexarArquivo, GravadorAudio, PreviaAnexo } from './ComposerAnexos'
-import { textoConviteCardapio } from '../../dominio/cardapioLink'
 import { avisoDeVariaveisNaoResolvidas } from '../../dominio/respostas'
-import { ModalEnviarCardapio } from './ModalEnviarCardapio'
 import { SeletorRespostas } from './SeletorRespostas'
 import { ModalProgramarMensagem } from './ModalProgramarMensagem'
 import { ModalEnviarModelo } from './ModalEnviarModelo'
@@ -26,7 +24,7 @@ export function Composer({
   aoEnviar, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
   aoReabrir, reabrindo = false, podeEnviarModelo = false,
 }) {
-  const { enviarMidia, enviar, obterLinkCardapio } = useAcoes()
+  const { enviarMidia } = useAcoes()
   // #1577: a tecla muda só este campo. O rascunho global recebe o texto na pausa da digitação, ou na hora
   // em blur, envio e saída da tela; `aoMudarRascunho` (resposta pronta, limpar) também vai na hora.
   const { texto: rascunho, digitar, escrever: aoMudarRascunho, descarregar } = useRascunhoLocal({
@@ -49,9 +47,6 @@ export function Composer({
   // arquivo em espera (prévia antes de enviar) e o gravador de áudio.
   const [anexo, setAnexo] = useState(null)
   const [erroAnexo, setErroAnexo] = useState(null)
-  // Link do cardápio para a prévia (#1353): `{ url, daLoja }` depois de obtido; null fecha.
-  const [linkCardapio, setLinkCardapio] = useState(null)
-  const [buscandoLink, setBuscandoLink] = useState(false)
   // #1424: modal de programar mensagem, guardada pelo id da conversa (trocar de conversa fecha).
   const [programarEm, setProgramarEm] = useState(null)
   const [modeloAberto, setModeloAberto] = useState(false)
@@ -122,31 +117,6 @@ export function Composer({
   // porque só ali dá pra saber qual dos dois ela quis mandar.
   const podeAudio = aceitaFormato(canal, 'audio')
   const restricao = restricoesDoCanal(canal)
-
-  // US-021 (link do cardápio com carrinho): manda o convite com o link de
-  // uma vez, no mesmo texto livre que Respostas já usa, respeitando o mesmo
-  // `podeEscrever` do canal. A janela do site é quem monta o pedido e devolve
-  // pela conversa (infra/canalEntreJanelas.js), nunca cola nada aqui.
-  // Rodada 12 (issue #16): o botão abre a prévia com o link e a origem
-  // dele; o envio é o mesmo de antes, só que depois de ela ver.
-  // #1353: no modo API o link vem da loja (o mesmo do agente), então a prévia só abre
-  // depois de ele chegar; falha vira aviso na faixa e a prévia não abre.
-  const abrirCardapio = async () => {
-    const conversaId = conversa.id
-    setBuscandoLink(true)
-    try {
-      const link = await obterLinkCardapio(conversaId)
-      if (link) setLinkCardapio({ ...link, conversaId })
-    } finally {
-      setBuscandoLink(false)
-    }
-  }
-  const linkDaConversa = linkCardapio?.conversaId === conversa.id ? linkCardapio : null
-  const textoCardapio = linkDaConversa ? textoConviteCardapio(conversa.nome, linkDaConversa.url) : ''
-  const aoEnviarCardapio = () => {
-    enviar(conversa.id, textoCardapio)
-    setLinkCardapio(null)
-  }
 
   return (
     <div className={css.composer}>
@@ -249,15 +219,6 @@ export function Composer({
               <Botao title="Fotos dos pratos cadastrados na casa" className={css.acaoComRotulo} disabled={!podeEscrever} onClick={aoAbrirGaleria}>
                 <Icone nome="imagem" /><span className={css.rotuloAcao}>Fotos</span>
               </Botao>
-              <Botao
-                title="Enviar ao cliente o link do cardápio de hoje (mostra o link antes de enviar)"
-                className={css.acaoComRotulo}
-                aria-haspopup="dialog"
-                disabled={!podeEscrever || buscandoLink}
-                onClick={abrirCardapio}
-              >
-                <Icone nome="cardapio" /><span className={css.rotuloAcao}>{fonteApi ? 'Comanda do cliente' : 'Link do cardápio'}</span>
-              </Botao>
               {/* #1424: a mensagem programada vai para o cliente cadastrado (a API exige o
                   clienteId). Não depende do `podeEscrever`: fora da janela sai por modelo. */}
               <Botao
@@ -313,17 +274,6 @@ export function Composer({
         />
       )}
 
-      {linkDaConversa && (
-        <ModalEnviarCardapio
-          nomeCliente={conversa.nome}
-          canalNome={canal.nome}
-          link={linkDaConversa.url}
-          daLoja={linkDaConversa.daLoja}
-          texto={textoCardapio}
-          aoEnviar={aoEnviarCardapio}
-          aoFechar={() => setLinkCardapio(null)}
-        />
-      )}
     </div>
   )
 }

@@ -87,12 +87,12 @@ export function BarraBalcao({ filtros, aoMudar }) {
       <div className={css.linhaA}>
         <span className={css.campoBusca}>
           <Icone nome="search" tamanho={20} />
-          <label className="sr" htmlFor="balcao-busca">Buscar nome, telefone, mensagem ou tag</label>
+          <label className="sr" htmlFor="balcao-busca">Buscar comanda, nome, telefone, mensagem ou tag</label>
           <input
             id="balcao-busca"
             type="search"
             className={css.entradaBusca}
-            placeholder="Buscar, ou uma tag"
+            placeholder="Nome, comanda ou tag"
             value={filtros.busca}
             onChange={(e) => {
               // Integração: buscar um nome estando em "Precisa de você" dava

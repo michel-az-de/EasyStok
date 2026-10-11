@@ -160,7 +160,7 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
             .Take(tamanho)
             .Select(c => new
             {
-                c.Id, c.EmpresaId, c.Canal, c.ContatoIdExterno, c.ContatoNome, c.ClienteId, c.Situacao, c.NaoLidas,
+                c.Id, c.NumeroComanda, c.EmpresaId, c.Canal, c.ContatoIdExterno, c.ContatoNome, c.ClienteId, c.Situacao, c.NaoLidas,
                 c.UltimaMensagemEm, c.UltimaMensagemEntradaEm, c.PedidoEmAndamentoId, c.AssumidaPorUsuarioId, c.MotivoEscalada,
                 AssumidaPorNome = db.UsuariosEmpresas
                     .Where(ue => ue.EmpresaId == empresaId && ue.UsuarioId == c.AssumidaPorUsuarioId)
@@ -186,7 +186,7 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
         return linhas.Select(l => new ConversaInboxItem(
             l.Id, l.EmpresaId, l.Canal, l.ContatoIdExterno, l.ContatoNome, l.ClienteId, l.Situacao, l.NaoLidas,
             l.UltimaMensagemEm, l.UltimaMensagemEntradaEm, l.PedidoEmAndamentoId, l.AssumidaPorUsuarioId, l.MotivoEscalada,
-            l.UltimoTexto, l.AguardaResposta, l.AssumidaPorNome, l.PedidoStatus)).ToList();
+            l.UltimoTexto, l.AguardaResposta, l.AssumidaPorNome, l.PedidoStatus, l.NumeroComanda)).ToList();
     }
 
     public async Task<IReadOnlyList<Mensagem>> ListarMensagensAsync(

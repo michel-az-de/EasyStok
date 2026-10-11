@@ -412,7 +412,7 @@ public partial class AtendimentoConversasControllerTests
         var link = Dados<LinkCardapioConversaGerado>(await _controller.LinkCardapio(conversa.Id, default));
 
         // #1353: o mesmo link que o agente manda (S48), não a tela do console.
-        link.Url.Should().StartWith($"{SaudacaoAtendimento.BaseUrlPadrao}{SaudacaoAtendimento.CaminhoCardapio}?c=");
+        link.Url.Should().StartWith($"{SaudacaoAtendimento.BaseUrlPadrao}/comanda.html?c=");
         await _links.Received(1).AddAsync(Arg.Is<LinkCardapioConversa>(l => l.ConversaId == conversa.Id), Arg.Any<CancellationToken>());
         await _unitOfWork.Received(1).CommitAsync();
     }

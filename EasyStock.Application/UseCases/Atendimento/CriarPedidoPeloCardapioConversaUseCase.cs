@@ -113,7 +113,7 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
         conversa.RegistrarSaida(agora);
         var resumo = Mensagem.Saida(link.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
             ResumoPedidoConversa.Texto(reservado, input.DataEntrega, forma,
-                "Pedido montado pelo cliente no cardápio do site:"));
+                "Pedido montado pelo cliente no cardápio do site:", cobrarTotal: input.SemCobranca));
         await conversaRepository.AddMensagemAsync(resumo, ct);
         await unitOfWork.CommitAsync();
         if (!input.SemCobranca) await AvisarConsoleAsync(reservado, resumo, ct);

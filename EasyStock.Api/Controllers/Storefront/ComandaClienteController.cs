@@ -35,7 +35,7 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
         Tratar(async () => await comanda.SalvarAsync(token, body.Revisao, body.Rascunho, ct));
 
     [HttpPost("confirmar")]
-    [EnableRateLimiting("public-post")]
+    [EnableRateLimiting("comanda-envio")]
     public Task<IActionResult> Enviar(string token, [FromBody] EnviarComandaClienteBody body, CancellationToken ct) => Tratar(async () =>
     {
         var resultado = await comanda.EnviarAsync(token, body.Revisao, ct);
@@ -56,6 +56,11 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
         }
         return resultado;
     });
+
+    [HttpPost("nova-edicao")]
+    [EnableRateLimiting("comanda-envio")]
+    public Task<IActionResult> NovaEdicao(string token, CancellationToken ct) =>
+        Tratar(async () => await comanda.NovaEdicaoAsync(token, ct));
 
     [HttpGet("eventos")]
     [EnableRateLimiting("comanda-stream")]

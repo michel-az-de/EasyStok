@@ -15,7 +15,6 @@ import {
   LINHA_COMANDA_TRAVADA, LINHA_COMANDA_VAI_JUNTO, ROTULO_ENVIAR, avisoDoEnvio, rotuloDoTotal, situacaoDoEnvio,
 } from '../../dominio/resumoPedido'
 import { Cabecalho } from './Cabecalho'
-import { ComandaDoCliente } from './ComandaDoCliente'
 import { ModalCanhoto } from './Canhoto'
 import { SeletorJanela } from './SeletorJanela'
 import { SeletorJanelaApi } from './SeletorJanelaApi'
@@ -105,7 +104,7 @@ function ItemComanda({
 
 export function BlocoPedido({
   pedido, editavel, aoTrocarJanela, aoAbrirCardapio, aoAjustar, aoAjustarObservacao, aoGerarPedido,
-  aoForcarEncaixe, nomeCliente, endereco, faixa, bloqueado = false, conversaId,
+  aoForcarEncaixe, nomeCliente, endereco, faixa, bloqueado = false, conversaId, numeroComanda,
 }) {
   const { cardapio, linhas } = useCatalogo()
   const { marcarCanhotoImpresso } = useAcoes()
@@ -186,19 +185,18 @@ export function BlocoPedido({
         id="comanda-pedido"
         tabIndex={-1}
         className={`${css.comanda} ${alvoDoArrasto ? css.alvoArrasto : ''}`}
-        aria-label={numeroDaComanda(pedido, { fonteApi }) ? `Comanda número ${numeroDaComanda(pedido, { fonteApi })}` : 'Comanda em rascunho'}
+        aria-label={numeroComanda ? `Comanda número ${numeroComanda}` : 'Comanda em rascunho'}
       >
         {/* #1474 (R6, R3): o número é o do EasyStok quando o pedido existe; sem janela, o
             cabeçalho avisa. A faixa do modo API vem do seletor, não do catálogo local. */}
         <Cabecalho
-          numero={numeroDaComanda(pedido, { fonteApi })}
+          numero={numeroComanda || numeroDaComanda(pedido, { fonteApi })}
           nomeCliente={nomeCliente}
           faixa={fonteApi ? pedido.janelaRotulo : faixa}
           semJanela={!fechado && !pedido.janela}
           enviadaEm={pedido.cobranca?.criadaEm ?? null}
         />
         <hr className={css.separador} />
-        <ComandaDoCliente key={conversaId} conversaId={conversaId} ativo={fonteApi} />
 
         {alvoDoArrasto && <p className={css.soltarAqui}>Soltar aqui</p>}
 

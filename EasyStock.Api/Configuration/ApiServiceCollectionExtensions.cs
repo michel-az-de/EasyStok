@@ -264,6 +264,9 @@ public static class ApiServiceCollectionExtensions
             options.AddPolicy("comanda-rascunho", context => RateLimitPartition.GetFixedWindowLimiter(
                 context.Request.RouteValues["token"]?.ToString() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anon",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy("comanda-envio", context => RateLimitPartition.GetFixedWindowLimiter(
+                context.Request.RouteValues["token"]?.ToString() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             options.AddPolicy("comanda-stream", context => RateLimitPartition.GetConcurrencyLimiter(
                 context.Request.RouteValues["token"]?.ToString() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anon",
                 _ => new ConcurrencyLimiterOptions { PermitLimit = 3, QueueLimit = 0 }));

@@ -123,7 +123,7 @@ export const CartaoConversa = memo(function CartaoConversa({
       <span className={css.corpo}>
         <span className={css.topo}>
           <strong className={pendentes > 0 ? css.semResposta : ''} title={conversa.nome}>
-            {conversa.nome}
+            {conversa.nome}{conversa.numeroComanda && <small> · Comanda {conversa.numeroComanda}</small>}
           </strong>
           {selecionada && <span className="sr">, conversa aberta</span>}
           {slaEstourado && <span className="sr">, prazo de resposta estourado</span>}

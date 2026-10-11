@@ -31,7 +31,8 @@ export const rotaDoCardapioLink = (conversaId) => PREFIXO_ROTA + conversaId
 export const linkDoCardapio = (origem, conversaId) => origem + rotaDoCardapioLink(conversaId)
 
 // Convite que sai na conversa (US-021, seção C): nome e link, sem travessão.
-export function textoConviteCardapio(nomeCliente, link) {
+export function textoConviteCardapio(nomeCliente, link, numeroComanda) {
+  if (numeroComanda) return `Oi ${primeiroNome(nomeCliente)}! Sua comanda ${numeroComanda}: ${link}\nEscolha os pratos e confirme. A Casa acompanha em tempo real. Depois você pode acompanhar e pedir alterações. Cada pedido ou acréscimo tem seu pagamento.`
   return `Oi ${primeiroNome(nomeCliente)}! Segue o cardápio de hoje, é só escolher, `
     + `pagar e a gente já recebe tudo por aqui: ${link}`
 }
@@ -234,7 +235,7 @@ export function meiosDaPagina(meios) {
 // O convite na conversa é texto; o link dele vira trecho clicável na bolha
 // para abrir a página do cliente (features/atendimento/Balao.jsx). Só o link
 // do cardápio, nada de transformar qualquer URL.
-const LINK_NO_TEXTO = /(\S*#\/cardapio-link\/\S+)/ // mesmo caminho de PREFIXO_ROTA
+const LINK_NO_TEXTO = /(\S*#\/cardapio-link\/\S+|https:\/\/[^\s<>]+\/comanda\.html\?[^\s<>]+)/
 
 // #1510: o clique abre a URL com a origem do console, então só vira link o
 // http(s) da própria `origem` (a mesma de `linkDoCardapio`). `javascript:`,
@@ -243,7 +244,10 @@ function linkSeguro(parte, origem) {
   if (!origem || !LINK_NO_TEXTO.test(parte)) return false
   try {
     const url = new URL(parte)
-    return (url.protocol === 'http:' || url.protocol === 'https:') && url.origin === new URL(origem).origin
+    const loja = url.protocol === 'https:' && ['casadababa.com', 'www.casadababa.com'].includes(url.hostname)
+      && !url.username && !url.password && !url.port && url.pathname === '/comanda.html'
+      && (url.searchParams.has('c') || url.searchParams.has('pedido_conversa'))
+    return loja || (url.protocol === 'http:' || url.protocol === 'https:') && url.origin === new URL(origem).origin && url.hash.startsWith('#/cardapio-link/')
   } catch {
     return false
   }

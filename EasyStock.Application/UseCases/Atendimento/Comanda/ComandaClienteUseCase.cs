@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
@@ -16,13 +18,15 @@ namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 
 public sealed record RascunhoComandaCliente(IReadOnlyList<ItemPedidoCheckout> Itens, string? Observacoes = null,
     Guid? JanelaId = null, DateOnly? DataEntrega = null, EnderecoCheckout? Endereco = null,
-    string Acerto = "estorno", string? CodigoCupom = null, Guid? PedidoId = null, DateTime? PedidoAtualizadoEm = null);
+    string Acerto = "estorno", string? CodigoCupom = null, Guid? PedidoId = null, DateTime? PedidoAtualizadoEm = null,
+    string? PedidoResumoHash = null);
 public sealed record ItemSelecionadoComanda(Guid CardapioItemId, Guid? VariacaoId, string Nome, int Qtd, decimal Preco, string? Observacao);
 public sealed record EnvioComandaCliente(Guid PedidoId, string Situacao, decimal Total, decimal Saldo, string? LinkPagamento = null, string? CodigoCupom = null);
 public sealed record CupomComandaCliente(string Codigo, decimal Saldo);
 public sealed record ComandaClienteResult(Guid LinkId, string Nome, DateOnly Dia, DateTime ExpiraEm, int Revisao, bool PodeEditar,
     RascunhoComandaCliente Rascunho, IReadOnlyList<ItemSelecionadoComanda> Selecao, PedidoConversaResult? Pedido,
-    EnvioComandaCliente? Envio, IReadOnlyList<CupomComandaCliente> Cupons, decimal? TotalPrevisto = null);
+    EnvioComandaCliente? Envio, IReadOnlyList<CupomComandaCliente> Cupons, decimal? TotalPrevisto = null,
+    long NumeroComanda = 0, Guid ConversaId = default);
 public sealed class ComandaClienteConflitoException(string mensagem) : Exception(mensagem);
 
 public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links, IConversaRepository conversas,
@@ -30,7 +34,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     CriarPedidoPeloCardapioConversaUseCase criarPedido, ObterPedidoConversaUseCase obterPedido, SaldoFinanceiroPedido saldoFinanceiro,
     ICreditoClienteComandaRepository creditos, GerarCobrancaPedidoUseCase cobrar, IUnitOfWork uow,
     ITenantContextAccessor tenant, IOperacaoEventPublisher eventos, TimeProvider relogio,
-    CalculadoraInicioPrevistoPedido inicioPrevisto, QuitacaoPedido quitacao)
+    CalculadoraInicioPrevistoPedido inicioPrevisto, QuitacaoPedido quitacao, LinkCardapioConversaService gerarLink)
 {
     public const string Evento = "conversa.comanda_atualizada";
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -53,6 +57,22 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     {
         var link = await AcessoAsync(token, ct);
         return await EstadoAsync(link, ct);
+    }
+
+    public async Task<LinkCardapioConversaGerado> NovaEdicaoAsync(string token, CancellationToken ct)
+    {
+        var link = await AcessoAsync(token, ct);
+        var estado = await EstadoAsync(link, ct);
+        if (link.UsadoEm is null || estado.Pedido is null || estado.Envio?.Situacao is "alteracao_aguardando_confirmacao" or "estorno_pendente")
+            throw new ComandaClienteConflitoException("Aguarde a confirmação deste envio antes de abrir outra edição.");
+        var pedido = await pedidos.GetByIdWithDetailsAsync(link.EmpresaId, estado.Pedido.PedidoId);
+        if (pedido is null || !PodeAlterar(pedido)) throw new LinkCardapioConversaIndisponivelException();
+        // Repetir a solicitação após perder a resposta recupera a mesma credencial, sem armazenar token cru.
+        var novoToken = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes($"nova-edicao:{link.Id:N}:{token.Trim()}")))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        var novo = await gerarLink.GerarAsync(link.EmpresaId, link.ConversaId, relogio.GetUtcNow().UtcDateTime, ct, novoToken);
+        await AvisarAsync(link.EmpresaId, link.ConversaId, ct);
+        return novo;
     }
 
     public async Task<ComandaClienteResult> EstadoAsync(LinkCardapioConversa link, CancellationToken ct)
@@ -90,7 +110,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         return new(link.Id, cliente.Nome.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "",
             HorarioBrasil.DataOperacional(link.CriadoEm), link.ExpiraEm, link.Revisao, pode, dados, selecao, detalhe,
             Ler<EnvioComandaCliente>(link.ResultadoJson), (await creditos.ListarAsync(link.EmpresaId, cliente.Id, ct)).Select(c => new CupomComandaCliente(c.Codigo, c.Saldo)).ToList(),
-            selecao.Sum(i => i.Qtd * i.Preco) + (detalhe?.Frete ?? 0m));
+            selecao.Sum(i => i.Qtd * i.Preco) + (detalhe?.Frete ?? 0m), conversa.NumeroComanda, conversa.Id);
     }
 
     public async Task<ComandaClienteResult> SalvarAsync(string token, int revisao, RascunhoComandaCliente dados, CancellationToken ct)
@@ -116,6 +136,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     {
         await uow.ExecuteInTransactionSemRetryAsync(async t =>
         {
+            await conversas.TravarParaPedidoAsync(acesso.EmpresaId, acesso.ConversaId, t);
             var link = await links.ObterComLockAsync(acesso.EmpresaId, acesso.Id, t) ?? throw new LinkCardapioConversaIndisponivelException();
             var estado = await EstadoAsync(link, t);
             if (!estado.PodeEditar) throw new LinkCardapioConversaIndisponivelException();
@@ -125,6 +146,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             if (pedido is not null && pedido.AlteradoEm != dados.PedidoAtualizadoEm)
                 throw new ComandaClienteConflitoException("O atendimento atualizou o pedido. Recarregue antes de alterar.");
             await SelecionarAsync(link.EmpresaId, dados.Itens, pedido, t);
+            dados = dados with { PedidoResumoHash = pedido is null ? null : ResumoHash(pedido) };
             link.SalvarRascunho(revisao, JsonSerializer.Serialize(dados, Json), relogio.GetUtcNow().UtcDateTime);
             await uow.CommitAsync();
             return true;
@@ -138,6 +160,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         EfeitosQuitacao? efeitos = null;
         var resposta = await uow.ExecuteInTransactionSemRetryAsync(async t =>
         {
+            await conversas.TravarParaPedidoAsync(acesso.EmpresaId, acesso.ConversaId, t);
             var link = await links.ObterComLockAsync(acesso.EmpresaId, acesso.Id, t) ?? throw new LinkCardapioConversaIndisponivelException();
             if (link.Revisao != revisao) throw new ComandaClienteConflitoException("A seleção mudou. Confira a comanda antes de enviar.");
             if (link.UsadoEm is not null)
@@ -244,4 +267,10 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             || dados.Observacoes?.Length > 2000 || dados.Acerto is not ("estorno" or "cupom") || dados.CodigoCupom?.Length > 35)
             throw new UseCaseValidationException("Confira os itens, quantidades e observações da comanda.");
     }
+
+    public static string ResumoHash(PedidoEntity pedido) => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
+    {
+        pedido.Observacoes, pedido.AgendadoParaEm,
+        Itens = pedido.Itens.OrderBy(i => i.Id).Select(i => new { i.Id, i.CardapioItemId, i.CardapioItemVariacaoId, i.Quantidade, i.PrecoUnitario, i.Observacao })
+    }, Json)));
 }

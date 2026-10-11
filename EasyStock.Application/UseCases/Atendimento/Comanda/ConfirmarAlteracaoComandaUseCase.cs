@@ -59,7 +59,8 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
                 await uow.CommitAsync();
                 return recusado;
             }
-            if (!ComandaClienteUseCase.PodeAlterar(pedido) || pedido.AlteradoEm != dados.PedidoAtualizadoEm)
+            if (!ComandaClienteUseCase.PodeAlterar(pedido) || pedido.AlteradoEm != dados.PedidoAtualizadoEm
+                && (dados.PedidoResumoHash is null || dados.PedidoResumoHash != ComandaClienteUseCase.ResumoHash(pedido)))
                 throw new ComandaClienteConflitoException("O pedido mudou desde a solicitação. Gere um novo link para o cliente conferir.");
             var selecao = await comanda.SelecionarAsync(input.EmpresaId, dados.Itens, pedido, t);
             var antigos = pedido.Itens.Where(i => i.CardapioItemId is not null).ToList();

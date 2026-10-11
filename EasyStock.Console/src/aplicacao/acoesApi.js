@@ -130,7 +130,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
         }),
     // #1353: a tela do link no console não tem dado no modo API; o link é o da loja.
     obterLinkCardapio: (id) => gerarLinkCardapio(id)
-      .then((link) => ({ url: link.url, daLoja: true }))
+      .then((link) => ({ url: link.url, numeroComanda: link.numeroComanda, daLoja: true }))
       .catch((erro) => {
         avisar(erro)
         return null

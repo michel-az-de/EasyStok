@@ -15,6 +15,7 @@ import { faixaDaJanela, preencherFaixa } from '../../dominio/entrega'
 import { itemDaBibliotecaPelaRegra } from '../../dominio/respostas'
 import { BarraModo } from './BarraModo'
 import { Composer } from './Composer'
+import { CompartilharComanda } from './CompartilharComanda'
 import { Thread } from './Thread'
 import css from './atendimento.module.css'
 
@@ -102,6 +103,7 @@ export function PainelAtendimento({
             {/* Canal, histórico e janela em uma linha de dado. A janela era uma
                 pílula colorida disputando com o nome; agora é texto. */}
             <small>
+              {selecionada.numeroComanda && <>Comanda {selecionada.numeroComanda} · </>}
               <Icone nome={canal.icone} className={css['canal_' + canal.icone]} /> {canal.nome}
               {' · '}{selecionada.cliente.pedidos} {selecionada.cliente.pedidos === 1 ? 'pedido' : 'pedidos'}
               {' · '}<span title={canal.explicacao[0]}>
@@ -113,6 +115,7 @@ export function PainelAtendimento({
           </h2>
         </span>
         <div className={css.direita} data-ancora-assistente>
+          {!encerrada && !bloqueada && <CompartilharComanda key={selecionada.id} conversa={selecionada} canalNome={canal.nome} podeEnviar={pode} />}
           {/* Assumir e devolver ao automático moram na BarraModo, um lugar só.
               Aqui em cima fica o que é estado da conversa: bloqueio, encerrar
               e reabrir. */}

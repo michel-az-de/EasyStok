@@ -98,7 +98,7 @@ public sealed partial class PedidoConversaConcorrenciaTests : IAsyncLifetime
 
     private sealed record Cenario(Guid ConversaId, Guid ClienteId, Guid CardapioItemId, Guid JanelaId, DateOnly DataEntrega);
 
-    private static async Task<Cenario> SemearAsync(WebApplicationFactory<Program> factory)
+    private static async Task<Cenario> SemearAsync(WebApplicationFactory<Program> factory, string? slug = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
@@ -113,7 +113,7 @@ public sealed partial class PedidoConversaConcorrenciaTests : IAsyncLifetime
             AlteradoEm = agora,
         });
 
-        var storefront = StorefrontEntity.Criar(EmpresaId, $"sf-conv-{Guid.NewGuid():N}"[..20], "SF Conversa", 0m);
+        var storefront = StorefrontEntity.Criar(EmpresaId, slug ?? $"sf-conv-{Guid.NewGuid():N}"[..20], "SF Conversa", 0m);
         storefront.Ativar();
         db.Storefronts.Add(storefront);
 
@@ -210,7 +210,8 @@ public sealed partial class PedidoConversaConcorrenciaTests : IAsyncLifetime
     private sealed class TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
-        UrlEncoder encoder)
+        UrlEncoder encoder,
+        ICurrentUserAccessor currentUser)
         : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
     {
         public const string SchemeName = "TestAuth";
@@ -223,7 +224,7 @@ public sealed partial class PedidoConversaConcorrenciaTests : IAsyncLifetime
                 new Claim(ClaimTypes.Name, "Operadora"),
                 new Claim("sub", UsuarioId.ToString()),
                 new Claim("empresaId", EmpresaId.ToString()),
-                new Claim("nivel", NivelAcesso.Operador.ToString()),
+                new Claim("nivel", currentUser.Nivel.ToString()),
             };
             var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemeName));
             return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, SchemeName)));

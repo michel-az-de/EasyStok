@@ -167,6 +167,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             await operacaoEventos.PublicarAsync(EventosOperacao.PedidoPago, empresaId.Value, pago, ct);
         if (impressao is not null)
             await operacaoEventos.PublicarAsync(EventosOperacao.ImpressaoPendente, empresaId.Value, impressao, ct);
+        if (resultado.Confirmado)
+            await operacaoEventos.PublicarAsync(EventosOperacao.PedidoPagamentoAtualizado, empresaId.Value, new { pedidoId = input.PedidoId }, ct);
         return resultado;
     }
 

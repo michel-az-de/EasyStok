@@ -17,6 +17,7 @@ import { contarAtivas } from '../dominio/automacao'
 import { DESKTOP, TABLET, useTopoCompacto } from '../hooks/useTamanhoTela'
 import { PainelConversas } from '../features/caixa-de-entrada/PainelConversas'
 import { PainelAtendimento } from '../features/atendimento/PainelAtendimento'
+import { CompartilharComanda } from '../features/atendimento/CompartilharComanda'
 import { PainelFicha } from '../features/ficha-cliente/PainelFicha'
 import { ResumoEntregas } from '../features/entregas/ResumoEntregas'
 import { Sininho } from '../features/lembretes/Sininho'
@@ -376,6 +377,7 @@ export function Moldura({
   // própria renderização (padrão do React para "estado que segue uma prop"),
   // não em efeito.
   const selecionadaId = selecionada?.id ?? null
+  const acaoCompartilhar = selecionada && <CompartilharComanda key={selecionada.id} conversa={selecionada} />
   const [selecaoVista, setSelecaoVista] = useState(selecionadaId)
   if (selecionadaId !== selecaoVista) {
     setSelecaoVista(selecionadaId)
@@ -472,7 +474,7 @@ export function Moldura({
             aoMudar={(valor) => aoRedimensionar('ficha', valor)}
           />
           <Coluna variante="ficha" titulo="Ficha">
-            <div className={css.rolavel}><PainelFicha aoAbrirCardapio={aoAbrirCardapio} /></div>
+            <div className={css.rolavel}><PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} /></div>
             {/* #1474: lugar da fila de canhotos (FilaCanhotos), no pé da Ficha e no fluxo da
                 coluna: a pílula não cobre mais o título nem o topo da coluna. Vazio, não ocupa. */}
             <div className={css.slotFila} data-fila-canhotos="" />
@@ -495,7 +497,7 @@ export function Moldura({
           <section className={`${css.coluna} ${css.centro}`} aria-label="Atendimento">{atendimento}</section>
           {gavetaAberta && (
             <Gaveta titulo="Ficha" aoFechar={fecharGaveta}>
-              <PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} />
+              <PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} acaoCompartilhar={acaoCompartilhar} />
             </Gaveta>
           )}
         </main>
@@ -513,7 +515,7 @@ export function Moldura({
   const painelDaAba = {
     balcao: <PainelConversas aoAbrir={irParaAtendimento} />,
     atendimento,
-    ficha: <PainelFicha aoAbrirCardapio={aoAbrirCardapio} />,
+    ficha: <PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} />,
   }
 
   return (
