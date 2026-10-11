@@ -23,8 +23,7 @@ public sealed record CardapioDaComandaResult(
 /// </summary>
 public sealed class ListarCardapioComandaUseCase(
     IStorefrontRepository storefrontRepository,
-    ListarCardapioPublicoUseCase listarCardapio,
-    ICardapioItemRepository cardapioRepository)
+    ListarCardapioPublicoUseCase listarCardapio)
 {
     public async Task<CardapioDaComandaResult> ExecuteAsync(Guid empresaId, CancellationToken ct = default)
     {
@@ -32,10 +31,11 @@ public sealed class ListarCardapioComandaUseCase(
         var storefront = await storefrontRepository.GetByEmpresaAsync(empresaId, ct);
         if (storefront is null || !storefront.Ativo)
             throw new StorefrontNaoEncontradoException();
-        var menu = await listarCardapio.ExecuteAsync(new ListarCardapioPublicoInput(storefront.Slug), ct);
+        // #1575: o menu e as porções saem da mesma leitura do cardápio.
+        var (menu, itens) = await listarCardapio.ExecuteComItensAsync(new ListarCardapioPublicoInput(storefront.Slug), ct);
 
         var noMenu = menu.Itens.Select(i => i.Id).ToHashSet();
-        var porcoes = (await cardapioRepository.GetVisiveisDoStorefrontAsync(storefront.Id, ct))
+        var porcoes = itens
             .Where(i => noMenu.Contains(i.Id) && i.TemVariacoes())
             .ToDictionary(i => i.Id, i => (IReadOnlyList<PorcaoDaComanda>)i.Variacoes
                 .OrderBy(v => v.OrdemExibicao).ThenBy(v => v.CriadoEm).ThenBy(v => v.Id)

@@ -45,6 +45,14 @@ export const motivoDaAprovacao = (motivo) => (motivo ? MOTIVOS_APROVACAO[motivo]
 // Recarrega no `ready` (a API não tem replay) e a cada evento de pedido do SSE (S18).
 export const recarregaEntregasCom = (evento) => evento === 'ready' || evento.startsWith('pedido.')
 
+// #1577: entregadores, janelas e bloqueios são cadastro e quase não mudam; relê-los a cada evento de
+// pedido eram 3 GETs a mais por recarga. Voltam quando a leitura é inteira (montagem, `ready`, ação
+// que mexe no cadastro), quando o dia do roteiro mudou e, por garantia, quando a última leitura passa
+// de 5 min: o cadastro pode ter sido mexido em outro aparelho, e o `ready` só vem a cada login.
+export const VALIDADE_DO_CADASTRO_MS = 5 * 60000
+export const releCadastroDeEntregas = ({ soOperacao, dia, cadastro, agora }) =>
+  !soOperacao || !cadastro || cadastro.dia !== dia || agora - cadastro.lidoEm >= VALIDADE_DO_CADASTRO_MS
+
 // #1434: sem pedidos e com erro, a primeira carga falhou; não fica "Carregando" para sempre.
 export const situacaoDaLista = (pedidos, erro) => {
   if (pedidos !== null) return 'pronta'

@@ -69,12 +69,9 @@ public sealed class IntegrationEventDispatcher : IIntegrationEventDispatcher
 
         // Single shard nesta versão. Multi-shard com advisory lock fica pra
         // F4.d quando volume justificar (>10k eventos pendentes simultâneos).
-        var pendentes = new List<OutboxEventoIntegracao>();
-        for (int shard = 0; shard < 4 && pendentes.Count < batchSize; shard++)
-        {
-            var batch = await _repo.ProximosPendentesAsync(shard, batchSize - pendentes.Count, ct);
-            pendentes.AddRange(batch);
-        }
+        // #1575: uma consulta para todos os shards, na ordem em que o laço os percorria (a rodada ociosa
+        // custava uma consulta por shard a cada tick).
+        var pendentes = await _repo.ProximosPendentesDeTodosOsShardsAsync(batchSize, ct);
 
         if (pendentes.Count == 0) return 0;
 

@@ -48,15 +48,15 @@ public class InboxResponsavelIntegrationTests(PostgreSqlDatabaseFixture fixture)
         }
         var repo = new ConversaRepository(db);
         var todas = await repo.ListarInboxAsync(empresa.Id, null, null, null, 1, 100);
-        todas.Should().HaveCount(4).And.NotContain(c => c.Conversa.Id == alheia.Id);
-        todas.Single(c => c.Conversa.Id == minha.Id).AssumidaPorNome.Should().Be("Ana");
-        todas.Single(c => c.Conversa.Id == deOutra.Id).AssumidaPorNome.Should().Be("Ana");
-        todas.Single(c => c.Conversa.Id == vinculoInvalido.Id).AssumidaPorNome.Should().BeNull();
-        todas.Single(c => c.Conversa.Id == semDono.Id).AssumidaPorNome.Should().BeNull();
+        todas.Should().HaveCount(4).And.NotContain(c => c.Id == alheia.Id);
+        todas.Single(c => c.Id == minha.Id).AssumidaPorNome.Should().Be("Ana");
+        todas.Single(c => c.Id == deOutra.Id).AssumidaPorNome.Should().Be("Ana");
+        todas.Single(c => c.Id == vinculoInvalido.Id).AssumidaPorNome.Should().BeNull();
+        todas.Single(c => c.Id == semDono.Id).AssumidaPorNome.Should().BeNull();
         (await repo.ListarInboxAsync(empresa.Id, null, null, new(ana.Id), 1, 100))
-            .Should().ContainSingle(c => c.Conversa.Id == minha.Id);
+            .Should().ContainSingle(c => c.Id == minha.Id);
         (await repo.ListarInboxAsync(empresa.Id, null, null, FiltroResponsavel.Ninguem, 1, 100))
-            .Should().ContainSingle(c => c.Conversa.Id == semDono.Id);
+            .Should().ContainSingle(c => c.Id == semDono.Id);
         await using (var alterar = fixture.CreateDbContext())
         {
             alterar.SetMobileTenantContext(empresa.Id);

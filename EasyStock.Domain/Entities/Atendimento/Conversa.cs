@@ -307,10 +307,13 @@ public class Conversa
     /// 24 h depois da ultima mensagem do cliente. Canal sem janela (site, e-mail, SMS) esta
     /// sempre dentro.
     /// </summary>
-    public bool DentroDaJanela(DateTime agora)
+    public bool DentroDaJanela(DateTime agora) => DentroDaJanela(Canal, UltimaMensagemEntradaEm, agora);
+
+    /// <summary>A mesma janela para quem leu so as colunas da conversa, sem a entidade (inbox, #1575).</summary>
+    public static bool DentroDaJanela(CanalConversa canal, DateTime? ultimaMensagemEntradaEm, DateTime agora)
     {
-        if (Capacidades.HorasJanela is not { } horas) return true;
-        return UltimaMensagemEntradaEm is { } ultima && Utc(agora) - ultima < TimeSpan.FromHours(horas);
+        if (CapacidadesCanal.Para(canal).HorasJanela is not { } horas) return true;
+        return ultimaMensagemEntradaEm is { } ultima && Utc(agora) - ultima < TimeSpan.FromHours(horas);
     }
 
     /// <summary>

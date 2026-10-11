@@ -32,7 +32,7 @@ public class PlanejamentoDaProducaoUseCaseTests
         _vitrine.Ativar();
         _storefronts.GetByEmpresaAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns(_vitrine);
         _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>()).Returns(_ => _pratos);
-        _itens.GetByProdutosAsync(EmpresaId, Arg.Any<IEnumerable<Guid>>(), null, Arg.Any<CancellationToken>()).Returns(_ => _lotes);
+        _itens.GetByProdutosAsync(EmpresaId, Arg.Any<IEnumerable<Guid>>(), null, Arg.Any<CancellationToken>(), Arg.Any<bool>()).Returns(_ => _lotes);
         _pedidos.GetDemandaAgendadaAsync(EmpresaId, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([]);
         _produtos.GetByIdsAsync(EmpresaId, Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(ci => _catalogo.Where(p => ci.ArgAt<IEnumerable<Guid>>(1).Contains(p.Id)).ToList());
@@ -89,6 +89,18 @@ public class PlanejamentoDaProducaoUseCaseTests
         var r = await Sut().SugestaoAsync(EmpresaId);
 
         r.Pratos.Select(p => (p.Nome, p.Sugestao)).Should().Equal(("nhoque", 0m), ("ravióli", 2m));
+    }
+
+    [Fact]
+    public async Task Sugestao_PedeSoOsLotesComSaldoOuDescoberto()
+    {
+        // #1575: a sugestão só soma saldo e descoberto; o lote zerado fica no banco.
+        Prato("Nhoque", 2, 10);
+
+        await Sut().SugestaoAsync(EmpresaId);
+
+        await _itens.Received(1).GetByProdutosAsync(
+            EmpresaId, Arg.Any<IEnumerable<Guid>>(), null, Arg.Any<CancellationToken>(), apenasComSaldoOuDescoberto: true);
     }
 
     [Fact]

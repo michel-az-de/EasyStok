@@ -226,7 +226,7 @@ public sealed class ItensDoCardapioComandaUseCase(
     public async Task<IReadOnlyList<ItemForaDoCardapio>> ListarForaAsync(Guid empresaId, CancellationToken ct = default)
     {
         var storefrontId = await VitrineAsync(empresaId, ct);
-        return NaOrdem(await cardapioRepository.GetTodosDoStorefrontAsync(storefrontId, ct))
+        return NaOrdem(await cardapioRepository.GetArquivadosDoStorefrontAsync(storefrontId, ct))
             .Where(i => i.EstaArquivado)
             .Select(i => new ItemForaDoCardapio(i.Id, i.NomeEfetivo() ?? "(sem nome)", i.PrecoEfetivo(), i.PesoExibicao,
                 i.CategoriaEfetiva(), i.FotoUrl))

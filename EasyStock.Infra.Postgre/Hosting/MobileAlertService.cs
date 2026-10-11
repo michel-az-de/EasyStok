@@ -1,4 +1,5 @@
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -42,7 +43,7 @@ public sealed class MobileAlertService : BackgroundService
         {
             try
             {
-                await CheckDeviceHealthAsync(stoppingToken);
+                await RodadaAsync(stoppingToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -52,6 +53,13 @@ public sealed class MobileAlertService : BackgroundService
             await Task.Delay(CheckInterval, stoppingToken);
         }
     }
+
+    /// <summary>
+    /// Uma rodada com a trava (#1575): API e Worker registram este serviço e quem não pega a trava pula.
+    /// Pública para os testes de integração; o loop a chama.
+    /// </summary>
+    public Task RodadaAsync(CancellationToken ct) => PostgresAdvisoryLock.TentarExecutarEmEscopoProprioAsync(
+        _scopeFactory, LockKeys.MobileAlerta, CheckDeviceHealthAsync, ct);
 
     private async Task CheckDeviceHealthAsync(CancellationToken ct)
     {

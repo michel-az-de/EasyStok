@@ -34,17 +34,30 @@
 /* #1427: SLA de primeira resposta da loja estourado. O cartão pisca devagar
    entre o papel e o pastel de alarme, com a borda interna em vermelho, até
    alguém responder. Com movimento reduzido não pisca: fica o destaque fixo. */
-.cartao.slaEstourado {
-  box-shadow: inset 3px 0 0 var(--erro);
-  animation: entradaCartao var(--dur-media) var(--ease-saida), piscaSla 1.6s ease-in-out infinite;
-}
+.cartao.slaEstourado { position: relative; isolation: isolate; box-shadow: inset 3px 0 0 var(--erro); }
 .cartao.slaEstourado[aria-current='true'] { box-shadow: inset 3px 0 0 var(--erro); }
+/* #1577: o pisca animava o `background` do cartão e repintava a linha a cada quadro, até alguém
+   responder. Agora é uma placa atrás do conteúdo, com o mesmo pastel e a mesma borda vermelha, que
+   só muda de `opacity`: quem anima é o compositor. */
+.cartao.slaEstourado::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+  background: var(--erro-pastel); box-shadow: inset 3px 0 0 var(--erro);
+  opacity: 0; pointer-events: none;
+  animation: piscaSla 1.6s ease-in-out infinite;
+}
 @keyframes piscaSla {
-  0%, 100% { background: transparent; }
-  50% { background: var(--erro-pastel); }
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+/* O pisca antigo, por ser animação, cobria o fundo de mouse em cima, de toque e de selecionada:
+   o cartão ia do papel ao pastel em qualquer estado. Continua assim. */
+@media (prefers-reduced-motion: no-preference) {
+  .cartao.slaEstourado, .cartao.slaEstourado:hover,
+  .cartao.slaEstourado:active:not(:disabled), .cartao.slaEstourado[aria-current='true'] { background: transparent; }
 }
 @media (prefers-reduced-motion: reduce) {
   .cartao.slaEstourado { animation: none; background: var(--erro-pastel); }
+  .cartao.slaEstourado::before { display: none; }
 }
 
 .corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }

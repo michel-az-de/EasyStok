@@ -27,8 +27,8 @@ public sealed class ListarConversasAtendimentoUseCase(
 
         var agora = DateTime.UtcNow;
         var sla = await SlaRespostaAsync(query.EmpresaId);
-        return itens.Where(i => i.Conversa.EmpresaId == query.EmpresaId)
-            .Select(i => ConversaResumoResult.De(i.Conversa, i.UltimaMensagemTexto, agora, sla, i.AguardaResposta, i.AssumidaPorNome)).ToList();
+        return itens.Where(i => i.EmpresaId == query.EmpresaId)
+            .Select(i => ConversaResumoResult.De(i, agora, sla)).ToList();
     }
 
     /// <summary>

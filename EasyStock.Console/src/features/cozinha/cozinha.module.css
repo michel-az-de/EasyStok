@@ -202,7 +202,7 @@ escritos e desliga as animações, inclusive a volta do overlay. */
 
 @media (prefers-reduced-motion: reduce) {
   .cartaoErguido { transform: none; }
-  .cartao, .dicaColuna, .contagemPula, .gavetaCanhotos, .pontoVivo { animation: none !important; }
+  .cartao, .dicaColuna, .contagemPula, .gavetaCanhotos, .pontoVivo, .pontoVivo::after { animation: none !important; }
   .coluna, .barraTempo > span { transition: none !important; }
 }
 
@@ -261,12 +261,21 @@ escritos e desliga as animações, inclusive a volta do overlay. */
 }
 
 .aoVivo { display: inline-flex; align-items: center; gap: var(--e-1); color: var(--tinta-2); font-size: var(--t-apoio); }
-.pontoVivo { width: 8px; height: 8px; border-radius: 50%; background: var(--tinta-3); }
-.aoVivoLigado .pontoVivo { background: var(--sucesso); animation: pulsarVivo 2s var(--ease-padrao) infinite; }
+.pontoVivo { position: relative; width: 8px; height: 8px; border-radius: 50%; background: var(--tinta-3); }
+.aoVivoLigado .pontoVivo { background: var(--sucesso); }
+/* #1577: o anel do "ao vivo" pulsa o dia inteiro no KDS. Em `box-shadow`, cada quadro repintava
+   a página; num disco sobre o ponto, só com `transform` e `opacity`, quem anima é o compositor.
+   O desenho é o mesmo: o disco vai de 8 a 20 px (o ponto mais 6 px de anel de cada lado) e de 50%
+   a transparente, e sobre o ponto a cor dele é a do próprio ponto. */
+.aoVivoLigado .pontoVivo::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  background: var(--sucesso); opacity: 0; pointer-events: none;
+  animation: pulsarVivo 2s var(--ease-padrao) infinite;
+}
 @keyframes pulsarVivo {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--sucesso) 50%, transparent); }
-  70% { box-shadow: 0 0 0 6px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
+  0% { transform: scale(1); opacity: .5; }
+  70% { transform: scale(2.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 0; }
 }
 
 .chipsFiltro { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; flex: 1; }
