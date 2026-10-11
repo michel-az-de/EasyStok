@@ -68,5 +68,12 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<IReadOnlyList<MovimentacaoEstoque>> GetSaidasPorNaturezaAsync(
             Guid empresaId, IReadOnlyCollection<NaturezaMovimentacaoEstoque> naturezas, DateTime deUtc, DateTime ateUtc,
             string? excetoDescricaoComPrefixo = null, CancellationToken ct = default);
+
+        /// <summary>
+        /// Saídas da natureza pedida com este documento que ainda valem (não estornadas), de qualquer
+        /// produto (#1571: o que o PWA baixou por um pedido, com o id do pedido de lá). Somente leitura.
+        /// </summary>
+        Task<IReadOnlyList<MovimentacaoEstoque>> GetSaidasAbertasPorDocumentoAsync(
+            Guid empresaId, string documento, NaturezaMovimentacaoEstoque natureza, CancellationToken ct = default);
     }
 }
