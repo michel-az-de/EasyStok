@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Atendimento.Producao;
 using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Domain.Entities.Storefront;
+using EasyStock.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
@@ -185,6 +186,58 @@ public class InsumosDaProducaoUseCaseTests
 
         await act.Should().ThrowAsync<UseCaseValidationException>();
         molho.QuantidadeMinima.Should().Be(2000);
+    }
+
+    [Fact]
+    public async Task Atualizar_LimparCusto_GravaNulo_ENaoMexeNoMinimo()
+    {
+        // #1600: null no custo é "não mexe"; limpar é explícito e volta a "sem custo informado".
+        var molho = Insumo("Molho sugo", 2000);
+        molho.CustoReferencia = Dinheiro.FromDecimal(0.04m);
+        _gravados[molho.Id] = molho;
+
+        await Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, null, null, LimparCusto: true));
+
+        molho.CustoReferencia.Should().BeNull();
+        molho.QuantidadeMinima.Should().Be(2000);
+    }
+
+    [Fact]
+    public async Task Atualizar_SemLimparCusto_NullNaoMexe_EValorGrava()
+    {
+        var molho = Insumo("Molho sugo", 2000);
+        molho.CustoReferencia = Dinheiro.FromDecimal(0.04m);
+        _gravados[molho.Id] = molho;
+
+        await Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, 2500, null));
+        molho.CustoReferencia!.Valor.Should().Be(0.04m);
+        await Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, null, 0.05m));
+        molho.CustoReferencia!.Valor.Should().Be(0.05m);
+    }
+
+    [Fact]
+    public async Task Atualizar_LimparCustoComValor_400_ENaoMexe()
+    {
+        var molho = Insumo("Molho sugo", 2000);
+        molho.CustoReferencia = Dinheiro.FromDecimal(0.04m);
+        _gravados[molho.Id] = molho;
+
+        var act = () => Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, null, 0.10m, LimparCusto: true));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        molho.CustoReferencia!.Valor.Should().Be(0.04m);
+    }
+
+    [Fact]
+    public async Task Atualizar_LimparMinimoECusto_Juntos_GravaOsDoisNulos()
+    {
+        var molho = Insumo("Molho sugo", 2000);
+        molho.CustoReferencia = Dinheiro.FromDecimal(0.04m);
+        _gravados[molho.Id] = molho;
+
+        await Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, null, null, LimparMinimo: true, LimparCusto: true));
+
+        (molho.QuantidadeMinima, molho.CustoReferencia).Should().Be((null, null));
     }
 
     [Fact]
