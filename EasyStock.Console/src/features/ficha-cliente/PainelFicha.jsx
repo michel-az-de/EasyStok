@@ -127,6 +127,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
                 endereco={cliente.endereco}
                 faixa={faixa}
                 bloqueado={estaBloqueada(selecionada)}
+                conversaId={selecionada.id}
               />
             </Bloco>
             {/* #1510: formulário "Recebi" e confirmações não atravessam de uma conversa para outra. */}
