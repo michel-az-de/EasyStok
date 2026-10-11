@@ -256,8 +256,11 @@ public class SyncMutationDispatcher(
                     Emoji = i.Emoji, Unit = i.Unit, Qty = i.Qty, UnitPrice = i.UnitPrice
                 });
             _db.Add(order);
-            // Onda 3 — pedido criado direto como "entregue" (retroativo) cria Venda.
-            if (order.Status == "entregue")
+            // #1543: pedido que ja chega "pronto" (ou adiante) baixa aqui; antes so a troca de status baixava.
+            await ApplyStockRule(null, dto.Status, dto.Items, empresaId, dto.Id, lojaId);
+            // Onda 3 — pedido criado direto como "entregue" (retroativo) cria Venda. #1543: a do pedido
+            // que nasceu no ERP so nasce depois que a esteira aceita a entrega (OrderLinker).
+            if (order.Status == "entregue" && !await NasceuNoErpAsync(dto.Id, null, empresaId))
             {
                 await _saleSync.CreateVendaForDeliveredOrderAsync(order, dto.Items);
             }
@@ -267,7 +270,8 @@ public class SyncMutationDispatcher(
             var oldStatus = existing.Status;
             if (oldStatus != dto.Status)
             {
-                await ApplyStockRule(oldStatus, dto.Status, dto.Items, empresaId, dto.Id);
+                await ApplyStockRule(oldStatus, dto.Status, dto.Items, empresaId, dto.Id,
+                    existing.LojaId ?? lojaId, existing.ErpPedidoId);
             }
             existing.Status = dto.Status;
             existing.Notes = dto.Notes;
@@ -293,14 +297,14 @@ public class SyncMutationDispatcher(
                     Emoji = i.Emoji, Unit = i.Unit, Qty = i.Qty, UnitPrice = i.UnitPrice
                 });
 
-            // Onda 3 — vendas mobile -> ERP.
-            if (oldStatus != "entregue" && dto.Status == "entregue")
+            // Onda 3 — vendas mobile -> ERP. #1543: a Venda do pedido que nasceu no ERP so nasce, ou e
+            // cancelada, depois que a esteira aceita a troca; quem cuida dela e o OrderLinker.
+            var entregou = oldStatus != "entregue" && dto.Status == "entregue";
+            var cancelouEntregue = oldStatus == "entregue" && dto.Status == "cancelado";
+            if ((entregou || cancelouEntregue) && !await NasceuNoErpAsync(dto.Id, existing.ErpPedidoId, empresaId))
             {
-                await _saleSync.CreateVendaForDeliveredOrderAsync(existing, dto.Items);
-            }
-            else if (oldStatus == "entregue" && dto.Status == "cancelado")
-            {
-                await _saleSync.CancelVendaForOrderAsync(existing);
+                if (entregou) await _saleSync.CreateVendaForDeliveredOrderAsync(existing, dto.Items);
+                else await _saleSync.CancelVendaForOrderAsync(existing);
             }
 
             // C4 — Transicao para "pronto" alerta garcom em outros devices via SSE.
@@ -328,36 +332,58 @@ public class SyncMutationDispatcher(
     public static bool StatusDescontaEstoque(string status)
         => status is "pronto" or "saiu_para_entrega" or "entregue";
 
-    private async Task ApplyStockRule(string oldStatus, string newStatus, List<OrderItemDto> items,
-        Guid? empresaId, string? orderId = null)
+    /// <param name="oldStatus">Status que o servidor tinha; null quando o pedido nasce neste envio.</param>
+    /// <param name="lojaDoPedido">Loja do pedido (a do aparelho que o criou): é do estoque dela que a venda sai.</param>
+    /// <param name="pedidoErpVinculado">Pedido do ERP a que este pedido do aparelho já está ligado, se estiver.</param>
+    private async Task ApplyStockRule(string? oldStatus, string newStatus, List<OrderItemDto> items,
+        Guid? empresaId, string orderId, Guid? lojaDoPedido, Guid? pedidoErpVinculado = null)
     {
-        if (!StatusDescontaEstoque(oldStatus) && StatusDescontaEstoque(newStatus))
+        var baixar = StatusDescontaEstoque(newStatus) && (oldStatus is null || !StatusDescontaEstoque(oldStatus));
+        // O cancelamento devolve o que o pedido baixou por este caminho, venha de onde vier; se nada saiu, nada volta.
+        var devolver = newStatus == "cancelado" && oldStatus is not null and not "cancelado";
+        if (!baixar && !devolver) return;
+        if (baixar && await NasceuNoErpAsync(orderId, pedidoErpVinculado, empresaId)) return;
+
+        var linhas = new List<(Product Produto, int Quantidade)>();
+        foreach (var doProduto in items.Where(i => !string.IsNullOrWhiteSpace(i.ProductId)).GroupBy(i => i.ProductId))
         {
-            foreach (var i in items)
-            {
-                var p = await _db.Set<Product>()
-                    .FirstOrDefaultAsync(x => x.Id == i.ProductId && x.EmpresaId == empresaId);
-                if (p == null) continue;
-                await _stockReconciler.ApplyDeltaAsync(
-                    p, -i.Qty, NaturezaMovimentacaoEstoque.Venda,
-                    descricao: $"Pedido mobile {orderId ?? p.Id} -> {newStatus}",
-                    referenciaDocumento: orderId);
-            }
+            // FindAsync enxerga o produto criado neste mesmo lote, ainda nao salvo.
+            var p = await _db.Set<Product>().FindAsync(doProduto.Key);
+            if (p != null && p.EmpresaId == empresaId) linhas.Add((p, doProduto.Sum(i => i.Qty)));
         }
-        if (StatusDescontaEstoque(oldStatus) && newStatus == "cancelado")
+        foreach (var (produto, quantidade) in MobileStockReconciler.PorProdutoDoErp(linhas))
         {
-            foreach (var i in items)
-            {
-                var p = await _db.Set<Product>()
-                    .FirstOrDefaultAsync(x => x.Id == i.ProductId && x.EmpresaId == empresaId);
-                if (p == null) continue;
-                await _stockReconciler.ApplyDeltaAsync(
-                    p, +i.Qty, NaturezaMovimentacaoEstoque.Estorno,
-                    descricao: $"Cancelamento de pedido mobile {orderId ?? p.Id}",
-                    referenciaDocumento: orderId);
-            }
+            if (baixar)
+                await _stockReconciler.BaixarVendaAsync(produto, quantidade, orderId, lojaDoPedido,
+                    $"Pedido mobile {orderId} -> {newStatus}");
+            else
+                await _stockReconciler.DevolverVendaAsync(produto, orderId, $"Cancelamento de pedido mobile {orderId}");
         }
     }
+
+    /// <summary>
+    /// #1543 — pedido que nasceu no ERP (console, site, atendimento) desce para o aparelho com o id do
+    /// ERP, e o aparelho o devolve quando avança o status. O estoque desse pedido é da esteira do ERP,
+    /// que baixa pelos itens do pedido (<see cref="Linkers.OrderLinker"/> leva o status até ela).
+    /// Baixar aqui também contaria a mesma venda duas vezes. Vale também para o pedido do aparelho que
+    /// alguém ligou à mão a um pedido do ERP: quem decide é o pedido do ERP vinculado.
+    /// </summary>
+    private async Task<bool> NasceuNoErpAsync(string orderId, Guid? pedidoErpVinculado, Guid? empresaId)
+    {
+        var pedidoId = pedidoErpVinculado ?? (Guid.TryParse(orderId, out var doProprioId) ? doProprioId : (Guid?)null);
+        return pedidoId is { } id && await PedidoNasceuNoErpAsync(_db, empresaId, id);
+    }
+
+    /// <summary>
+    /// O pedido do ERP foi criado fora do aparelho? Uma pergunta só, para o envio (este dispatcher) e o
+    /// vínculo (<see cref="Linkers.OrderLinker"/>) darem a mesma resposta sobre quem é dono do estoque.
+    /// </summary>
+    public static Task<bool> PedidoNasceuNoErpAsync(EasyStockDbContext db, Guid? empresaId, Guid pedidoId) =>
+        db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(p => p.Id == pedidoId && p.EmpresaId == empresaId && p.Origem != OrigemDoPwa);
+
+    /// <summary>Origem gravada no pedido do ERP que o <see cref="Linkers.OrderLinker"/> cria a partir do aparelho.</summary>
+    public const string OrigemDoPwa = "mobile";
 
     private async Task ApplyBatch(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
@@ -617,9 +643,11 @@ public class SyncMutationDispatcher(
         if (dto == null) return;
         if (!DateOnly.TryParse(dto.DateKey, out var data)) return;
 
+        // #1543 (#954): o fechamento e do escopo de quem fechou, loja com loja e empresa com empresa. O
+        // casamento frouxo sobrescrevia o fechamento da empresa com os numeros de uma loja e, no
+        // aparelho sem loja, o de uma loja qualquer. O indice unico ja e por (empresa, loja, dia).
         var existing = await _db.Set<FechamentoCaixa>().IgnoreQueryFilters()
-            .FirstOrDefaultAsync(f => f.EmpresaId == empresaId && f.Data == data
-                && (lojaId == null || f.LojaId == lojaId || f.LojaId == null));
+            .FirstOrDefaultAsync(f => f.EmpresaId == empresaId && f.Data == data && f.LojaId == lojaId);
 
         var closedAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.ClosedAt).UtcDateTime;
         if (existing == null)

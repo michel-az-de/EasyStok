@@ -5,25 +5,24 @@ using EasyStock.Infra.Postgre.Data;
 namespace EasyStock.Api.Mobile.Services;
 
 /// <summary>
-/// Onda 2 parte 2 — reconciliação de estoque mobile (Product) com ERP (Produto).
+/// Leva ao estoque do ERP a venda de um pedido do PWA, quando o produto do aparelho está ligado a
+/// um <see cref="Produto"/> (<c>ErpProductId</c>). Mesma regra da baixa do pedido no ERP
+/// (<c>PedidoEstoqueIntegrationService</c>), sobre os lotes da loja do pedido (pedido sem loja: todos
+/// os lotes da empresa, como no ERP):
+/// <list type="bullet">
+/// <item>sai primeiro do lote que vence antes (FEFO) e atravessa os lotes; bloqueado e descartado não baixam;</item>
+/// <item>falta de saldo não trava: o saldo vai a zero e a falta vira <c>QuantidadeDescoberta</c> no lote (#540);</item>
+/// <item>uma saída por lote, com o id do pedido em <c>DocumentoReferencia</c>; pedido e produto baixam uma vez só;</item>
+/// <item>o cancelamento devolve o que este pedido baixou, aos lotes de onde saiu. Sem saída, não devolve nada.</item>
+/// </list>
 /// <para>
-/// Quando um <see cref="Product"/> mobile está linkado a um Produto
-/// ERP (ErpProductId != null) E pertence a uma loja (LojaId != null),
-/// mutações de estoque vindas do app refletem-se também em
-/// itens_estoque e movimentacoes_estoque do ERP.
+/// #1543: antes a baixa caía num lote qualquer, truncava o saldo em zero sem registrar a falta, e o
+/// cancelamento somava a quantidade do pedido mesmo que nada tivesse saído por ele.
 /// </para>
 /// <para>
-/// Estratégia: localiza ItemEstoque por (ProdutoId, LojaId, EmpresaId);
-/// se existe, aplica delta na QuantidadeAtual via Add/Subtract e cria
-/// MovimentacaoEstoque com natureza apropriada (Venda, Producao, Estorno).
-/// Se nao existe, loga warning — operador web cria via /produtos-mobile
-/// (aba "Divergencias") ou via fluxo normal do ERP. Nao bloqueia o sync,
-/// app continua offline-first.
-/// </para>
-/// <para>
-/// FAIL-SAFE: qualquer excecao neste fluxo e loggada mas NAO propaga.
-/// Sync do app nao pode quebrar por falha do ERP — fila persiste local
-/// e reconciler tenta de novo no proximo flush.
+/// Não chama <c>SaveChanges</c>: as mudanças vão no commit de quem chamou (o lote do sync). Falha aqui
+/// não derruba o sync do aparelho: é registrada e devolve <c>false</c>. Tudo é lido antes de qualquer
+/// alteração, para a falha não deixar meia baixa no contexto.
 /// </para>
 /// </summary>
 public class MobileStockReconciler(
@@ -31,166 +30,198 @@ public class MobileStockReconciler(
     MobileSystemUserResolver systemUserResolver,
     ILogger<MobileStockReconciler> log)
 {
-    private readonly EasyStockDbContext _db = db;
-    private readonly MobileSystemUserResolver _systemUserResolver = systemUserResolver;
-    private readonly ILogger<MobileStockReconciler> _log = log;
-
-    /// <summary>
-    /// Aplica delta de estoque no ERP, refletindo uma operação do app.
-    /// </summary>
-    /// <param name="mobileProduct">Produto mobile (lê ErpProductId, EmpresaId, LojaId).</param>
-    /// <param name="deltaQty">Delta SIGNED. Negativo = saída (venda); positivo = entrada (produção/estorno).</param>
-    /// <param name="natureza">Natureza da movimentação no ERP.</param>
-    /// <param name="descricao">Texto livre pra audit (ex: "Pedido #abc123 entregue").</param>
-    /// <param name="referenciaDocumento">Id do documento origem (ex: order.Id, batch.Id).</param>
-    /// <param name="ct">Token de cancelamento.</param>
-    /// <returns>true se reconciliou, false se pulou (não linkado, ou ItemEstoque ausente).</returns>
-    public async Task<bool> ApplyDeltaAsync(
-        Product mobileProduct,
-        int deltaQty,
-        NaturezaMovimentacaoEstoque natureza,
-        string descricao,
-        string? referenciaDocumento,
+    /// <summary>Baixa a venda de um produto do pedido. Devolve false quando não há o que fazer (sem vínculo, sem lote, já baixado).</summary>
+    public async Task<bool> BaixarVendaAsync(
+        Product produtoDoAparelho, int quantidade, string pedidoId, Guid? lojaDoPedido, string descricao,
         CancellationToken ct = default)
     {
         try
         {
-            // Sem link ERP ou sem loja: sync local apenas, sem reconciliação.
-            if (mobileProduct.ErpProductId == null) return false;
-            if (mobileProduct.EmpresaId == null) return false;
-            if (deltaQty == 0) return false;
+            if (Alvo(produtoDoAparelho) is not { } alvo || quantidade <= 0) return false;
+            if ((await SaidasDoPedidoAsync(alvo, pedidoId, ct)).Count > 0) return false;
 
-            var produtoId = mobileProduct.ErpProductId.Value;
-            var empresaId = mobileProduct.EmpresaId.Value;
-            var lojaId = mobileProduct.LojaId; // nullable — ItemEstoque pode ser sem loja
-
-            // Procura ItemEstoque existente. Match exato por loja primeiro;
-            // só cai pro fallback (loja=null) se o app está em modo sem loja
-            // amarrada. Isso evita que device A consuma estoque da loja B
-            // silenciosamente em multi-loja.
-            // IgnoreQueryFilters: chamado de endpoints mobile sem JWT (CurrentTenantId=Empty),
-            // o Global Query Filter zeraria o resultado. Tenant isolation ja garantido
-            // pelo filtro manual i.EmpresaId == empresaId (vem de mobileProduct.EmpresaId).
-            var item = lojaId.HasValue
-                ? await _db.Set<ItemEstoque>().IgnoreQueryFilters().FirstOrDefaultAsync(i =>
-                    i.EmpresaId == empresaId &&
-                    i.ProdutoId == produtoId &&
-                    i.LojaId == lojaId, ct)
-                : await _db.Set<ItemEstoque>().IgnoreQueryFilters().FirstOrDefaultAsync(i =>
-                    i.EmpresaId == empresaId &&
-                    i.ProdutoId == produtoId &&
-                    i.LojaId == null, ct);
-
-            if (item == null)
+            var lotes = await LotesEmFefoAsync(alvo, lojaDoPedido, ct);
+            if (lotes.Count == 0)
             {
-                _log.LogWarning(
-                    "Reconciliação mobile->ERP: ItemEstoque ausente pra produto {ErpProductId} loja {LojaId} (mobile_product.Id={MobileId}). Crie manualmente no ERP pra ativar reconciliação.",
-                    produtoId, lojaId, mobileProduct.Id);
+                log.LogWarning(
+                    "Venda do PWA sem lote no ERP: produto {ProdutoId} loja {LojaId} (produto do aparelho {MobileId}). Nada foi baixado.",
+                    alvo.ProdutoId, lojaDoPedido, produtoDoAparelho.Id);
                 return false;
             }
+            var usuarioSistema = await systemUserResolver.GetOrCreateAsync(alvo.EmpresaId, ct);
 
-            // Aplica delta na QuantidadeAtual. Se resulta em negativo,
-            // ainda aplica o delta possível (até zero) e ENFILEIRA divergência
-            // para reconciliação manual. Antes era clamp silencioso → divergência permanente
-            // sem rastro. Agora gera entrada em ProdutoAlteracao com tipo "DivergenciaSync"
-            // pra operador investigar.
-            var atual = item.QuantidadeAtual?.Value ?? 0;
-            var novo = atual + deltaQty;
-            var divergiu = false;
-            if (novo < 0)
+            var agora = DateTime.UtcNow;
+            var restante = (decimal)quantidade;
+            var saidas = new List<(ItemEstoque Lote, decimal Quantidade)>();
+            foreach (var lote in lotes.Where(l => Saldo(l) > 0m))
             {
-                divergiu = true;
-                _log.LogError(
-                    "Divergência mobile↔ERP: delta {Delta} resultaria em estoque negativo (atual={Atual}) item={ItemId} produto={ProdId} loja={Loja}. Clampando para 0 e registrando divergência.",
-                    deltaQty, atual, item.Id, produtoId, lojaId);
-                novo = 0;
+                if (restante <= 0m) break;
+                var consumir = Math.Min(restante, Saldo(lote));
+                lote.RegistrarSaida(Quantidade.From(consumir), agora, agora, permitirVencido: true);
+                saidas.Add((lote, consumir));
+                restante -= consumir;
             }
-            item.QuantidadeAtual = Quantidade.From(novo);
-            item.UltimaMovimentacaoEm = DateTime.UtcNow;
-            item.AlteradoEm = DateTime.UtcNow;
 
-            // Cria MovimentacaoEstoque correspondente.
-            var tipo = deltaQty < 0 ? TipoMovimentacaoEstoque.Saida : TipoMovimentacaoEstoque.Entrada;
-            var qty = Quantidade.From(Math.Abs(deltaQty));
-            var movimentacao = new MovimentacaoEstoque
+            var falta = restante;
+            if (falta > 0m)
             {
-                Id = Guid.NewGuid(),
-                EmpresaId = empresaId,
-                ItemEstoqueId = item.Id,
-                ProdutoId = produtoId,
-                ProdutoVariacaoId = item.ProdutoVariacaoId,
-                Tipo = tipo,
-                Natureza = natureza,
-                Quantidade = qty,
-                ValorUnitario = item.CustoUnitario,
-                ValorTotal = item.CustoUnitario != null
-                    ? Dinheiro.FromDecimal(item.CustoUnitario.Valor * Math.Abs(deltaQty))
-                    : null,
-                DataMovimentacao = DateTime.UtcNow,
-                Descricao = descricao,
-                DocumentoReferencia = referenciaDocumento,
-                CriadoEm = DateTime.UtcNow
-            };
-            _db.Add(movimentacao);
+                // A falta fica no ultimo lote que baixou; sem nenhum com saldo, no que vence primeiro.
+                var comFalta = saidas.Count > 0 ? saidas[^1].Lote : lotes[0];
+                comFalta.RegistrarSaidaPermitindoDescoberto(Quantidade.From(falta), agora, agora, permitirVencido: true);
+                var indice = saidas.FindIndex(s => s.Lote.Id == comFalta.Id);
+                if (indice >= 0) saidas[indice] = (comFalta, saidas[indice].Quantidade + falta);
+                else saidas.Add((comFalta, falta));
+                log.LogWarning(
+                    "Venda do PWA sem saldo: pedido {PedidoId} produto {ProdutoId} pediu {Quantidade} e faltaram {Falta}. Ficou a descoberto no lote {LoteId}.",
+                    pedidoId, alvo.ProdutoId, quantidade, falta, comFalta.Id);
+            }
 
-            // F9-F: audit criacao da movimentacao em movimentacao_estoque_alteracoes.
-            // UsuarioId NOT NULL no schema; resolve "Sistema Mobile Sync" lazily.
-            var sysUserId = await _systemUserResolver.GetOrCreateAsync(empresaId, ct);
-            _db.Add(new MovimentacaoEstoqueAlteracao
+            foreach (var (lote, quantidadeDoLote) in saidas)
             {
-                Id = Guid.NewGuid(),
-                EmpresaId = empresaId,
-                MovimentacaoEstoqueId = movimentacao.Id,
-                UsuarioId = sysUserId,
-                NomeUsuario = "Sistema Mobile Sync",
-                EmailUsuario = null,
-                Acao = "criada",
-                Motivo = $"Sync mobile · {natureza}",
-                Observacao = descricao,
-                AlteracoesJson = null,
-                Ip = null,
-                UserAgent = $"mobile_product={mobileProduct.Id}; doc={referenciaDocumento}",
-                AlteradoEm = DateTime.UtcNow
-            });
-
-            // #1520 (ADR-0060): nao copia o saldo deste ItemEstoque para mobile_products.Stock.
-            // Desde o #1458 cada lote e um ItemEstoque, entao o saldo de um item nao e o do
-            // produto; e o espelho ja recebe este movimento do aparelho ("stock.delta").
-
-            // Marcador de divergência: registra MovimentacaoEstoque adicional
-            // de natureza Ajuste com Quantidade=0 e Descricao indicando o evento.
-            // Operador filtra por descrição "DIVERGENCIA_SYNC" pra investigar.
-            if (divergiu)
-            {
-                _db.Add(new MovimentacaoEstoque
+                var temFalta = falta > 0m && lote.Id == saidas[^1].Lote.Id;
+                Registrar(new MovimentacaoEstoque
                 {
                     Id = Guid.NewGuid(),
-                    EmpresaId = empresaId,
-                    ItemEstoqueId = item.Id,
-                    ProdutoId = produtoId,
+                    EmpresaId = alvo.EmpresaId,
+                    ItemEstoqueId = lote.Id,
+                    ProdutoId = alvo.ProdutoId,
+                    ProdutoVariacaoId = lote.ProdutoVariacaoId,
                     Tipo = TipoMovimentacaoEstoque.Saida,
-                    Natureza = NaturezaMovimentacaoEstoque.Ajuste,
-                    Quantidade = Quantidade.From(Math.Abs(deltaQty + atual)),
-                    DataMovimentacao = DateTime.UtcNow,
-                    Descricao = $"DIVERGENCIA_SYNC: mobile pediu delta {deltaQty} mas estoque atual era {atual}. Aplicado clamp pra 0. Doc={referenciaDocumento}",
-                    DocumentoReferencia = referenciaDocumento,
-                    CriadoEm = DateTime.UtcNow
-                });
+                    Natureza = NaturezaMovimentacaoEstoque.Venda,
+                    Quantidade = Quantidade.From(quantidadeDoLote),
+                    ValorUnitario = lote.CustoUnitario,
+                    ValorTotal = lote.CustoUnitario != null
+                        ? Dinheiro.FromDecimal(lote.CustoUnitario.Valor * quantidadeDoLote)
+                        : null,
+                    DataMovimentacao = agora,
+                    Descricao = temFalta ? $"{descricao} · {falta:0.###} a descoberto" : descricao,
+                    DocumentoReferencia = pedidoId,
+                    CriadoEm = agora
+                }, usuarioSistema, produtoDoAparelho, agora);
             }
-
-            _log.LogInformation(
-                "Reconciliação mobile->ERP {Status}: produto={ErpId} loja={LojaId} delta={Delta} novoEstoque={Novo} natureza={Nat} doc={Doc}",
-                divergiu ? "com divergência" : "OK", produtoId, lojaId, deltaQty, novo, natureza, referenciaDocumento);
             return true;
         }
         catch (Exception ex)
         {
-            // FAIL-SAFE absoluto: log e segue. Sync do app não pode quebrar
-            // porque ERP teve hiccup — fila persiste local e tenta de novo.
-            _log.LogError(ex,
-                "Falha em MobileStockReconciler.ApplyDeltaAsync para produto={MobileId}. Sync segue, reconciliação pendente.",
-                mobileProduct.Id);
+            log.LogError(ex, "Falha ao baixar no ERP a venda do pedido {PedidoId} (produto do aparelho {MobileId}). O sync segue.",
+                pedidoId, produtoDoAparelho.Id);
             return false;
         }
+    }
+
+    /// <summary>Devolve o que este pedido baixou deste produto. Devolve false quando não havia saída a devolver.</summary>
+    public async Task<bool> DevolverVendaAsync(
+        Product produtoDoAparelho, string pedidoId, string descricao, CancellationToken ct = default)
+    {
+        try
+        {
+            if (Alvo(produtoDoAparelho) is not { } alvo) return false;
+            var saidas = await SaidasDoPedidoAsync(alvo, pedidoId, ct);
+            if (saidas.Count == 0) return false;
+
+            var idsDosLotes = saidas.Select(s => s.ItemEstoqueId).Distinct().ToList();
+            var lotes = await db.Set<ItemEstoque>().IgnoreQueryFilters()
+                .Where(i => i.EmpresaId == alvo.EmpresaId && idsDosLotes.Contains(i.Id))
+                .ToDictionaryAsync(i => i.Id, ct);
+            var usuarioSistema = await systemUserResolver.GetOrCreateAsync(alvo.EmpresaId, ct);
+
+            var agora = DateTime.UtcNow;
+            foreach (var saida in saidas)
+            {
+                // A parte que ficou a descoberto nunca saiu do lote: e abatida antes de voltar ao saldo.
+                if (lotes.TryGetValue(saida.ItemEstoqueId, out var lote))
+                    lote.RestaurarSaidaEstornada(saida.Quantidade, agora);
+                saida.MarcarComoEstornada(agora);
+                Registrar(MovimentacaoEstoque.CriarEstorno(Guid.NewGuid(), saida, agora, descricao, agora),
+                    usuarioSistema, produtoDoAparelho, agora);
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao devolver ao ERP a venda do pedido {PedidoId} (produto do aparelho {MobileId}). O sync segue.",
+                pedidoId, produtoDoAparelho.Id);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Junta as linhas do pedido pelo produto do ERP: duas linhas do mesmo produto, ou dois produtos do
+    /// aparelho ligados ao mesmo produto, são uma baixa só. Produto sem vínculo fica de fora.
+    /// </summary>
+    public static IEnumerable<(Product Produto, int Quantidade)> PorProdutoDoErp(
+        IEnumerable<(Product Produto, int Quantidade)> linhas) =>
+        linhas.Where(l => l.Produto.ErpProductId.HasValue)
+            .GroupBy(l => l.Produto.ErpProductId)
+            .Select(g => (g.First().Produto, g.Sum(l => l.Quantidade)));
+
+    private sealed record AlvoNoErp(Guid EmpresaId, Guid ProdutoId);
+
+    // Sem vinculo com o ERP, ou aparelho sem empresa: a venda fica so no espelho do aparelho.
+    private static AlvoNoErp? Alvo(Product p) =>
+        p is { ErpProductId: { } produtoId, EmpresaId: { } empresaId } ? new AlvoNoErp(empresaId, produtoId) : null;
+
+    private static decimal Saldo(ItemEstoque lote) => lote.QuantidadeAtual?.Value ?? 0m;
+
+    // Lotes da loja do pedido, para a venda de uma loja nao consumir o estoque de outra; pedido sem
+    // loja enxerga todos os lotes da empresa (mesma regra de PedidoEstoqueIntegrationService, #1534).
+    // A loja e a do pedido, nao a de quem cadastrou o produto. IgnoreQueryFilters: o sync do aparelho
+    // nao tem JWT; o isolamento e o filtro por empresa, que vem do proprio aparelho.
+    private async Task<List<ItemEstoque>> LotesEmFefoAsync(AlvoNoErp alvo, Guid? lojaDoPedido, CancellationToken ct)
+    {
+        var lotes = await db.Set<ItemEstoque>().IgnoreQueryFilters()
+            .Where(i => i.EmpresaId == alvo.EmpresaId && i.ProdutoId == alvo.ProdutoId
+                        && (lojaDoPedido == null || i.LojaId == lojaDoPedido)
+                        && i.Status != StatusItemEstoque.Bloqueado && i.Status != StatusItemEstoque.Descartado)
+            .ToListAsync(ct);
+        return lotes
+            .OrderBy(i => i.ValidadeEm ?? DateTime.MaxValue)
+            .ThenBy(i => i.EntradaEm)
+            .ThenBy(i => i.CriadoEm)
+            .ToList();
+    }
+
+    // Saidas de venda deste pedido e produto ainda nao estornadas. Olha tambem o que foi registrado
+    // neste mesmo lote do sync e ainda nao foi gravado.
+    private async Task<List<MovimentacaoEstoque>> SaidasDoPedidoAsync(AlvoNoErp alvo, string pedidoId, CancellationToken ct)
+    {
+        bool DoPedido(MovimentacaoEstoque m) =>
+            m.EmpresaId == alvo.EmpresaId && m.ProdutoId == alvo.ProdutoId && m.DocumentoReferencia == pedidoId
+            && m.Tipo == TipoMovimentacaoEstoque.Saida && m.Natureza == NaturezaMovimentacaoEstoque.Venda
+            && m.EstornadaEm == null;
+
+        var gravadas = await db.Set<MovimentacaoEstoque>().IgnoreQueryFilters()
+            .Where(m => m.EmpresaId == alvo.EmpresaId && m.ProdutoId == alvo.ProdutoId && m.DocumentoReferencia == pedidoId
+                        && m.Tipo == TipoMovimentacaoEstoque.Saida && m.Natureza == NaturezaMovimentacaoEstoque.Venda
+                        && m.EstornadaEm == null)
+            .ToListAsync(ct);
+        var doLote = db.ChangeTracker.Entries<MovimentacaoEstoque>()
+            .Where(e => e.State == EntityState.Added)
+            .Select(e => e.Entity)
+            .Where(DoPedido);
+        // Uma saida gravada pode ter sido estornada neste mesmo lote (ainda sem commit): DoPedido relê o estado atual.
+        return gravadas.Where(DoPedido).Concat(doLote).DistinctBy(m => m.Id).ToList();
+    }
+
+    // F9-F: toda movimentacao criada pelo sync leva a trilha em movimentacao_estoque_alteracoes.
+    private void Registrar(MovimentacaoEstoque movimentacao, Guid usuarioSistema, Product produtoDoAparelho, DateTime agora)
+    {
+        db.Add(movimentacao);
+        db.Add(new MovimentacaoEstoqueAlteracao
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = movimentacao.EmpresaId,
+            MovimentacaoEstoqueId = movimentacao.Id,
+            UsuarioId = usuarioSistema,
+            NomeUsuario = "Sistema Mobile Sync",
+            EmailUsuario = null,
+            Acao = "criada",
+            Motivo = $"Sync mobile · {movimentacao.Natureza}",
+            Observacao = movimentacao.Descricao,
+            AlteracoesJson = null,
+            Ip = null,
+            UserAgent = $"mobile_product={produtoDoAparelho.Id}; doc={movimentacao.DocumentoReferencia}",
+            AlteradoEm = agora
+        });
     }
 }

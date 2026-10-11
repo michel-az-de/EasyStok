@@ -5,9 +5,11 @@ using EasyStock.Api.Mobile.Services;
 using EasyStock.Api.Mobile.Services.Linkers;
 using EasyStock.Api.Services.Operacao;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.UseCases.Producao;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Repositories;
@@ -95,15 +97,20 @@ public sealed class LoteMobileEntradaEstoqueTests : IDisposable
 
     private async Task SincronizarAsync(BatchDto dto)
     {
-        var batchId = dto.Id;
+        await AplicarAsync(dto);
+        await _linker.ExecuteAsync([dto.Id], _empresaId);
+    }
+
+    /// <summary>O envio do lote, num SaveChanges só, sem o vínculo com o ERP (que vem depois).</summary>
+    private async Task AplicarAsync(BatchDto dto)
+    {
         var mutation = new MutationDto(
-            $"m-{batchId}-{Guid.NewGuid():N}", "dev-1", "batch.upsert",
+            $"m-{dto.Id}-{Guid.NewGuid():N}", "dev-1", "batch.upsert",
             JsonSerializer.SerializeToElement(dto, Json),
             DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
         await _dispatcher.ApplyMutationAsync(mutation, "dev-1", "Thati", _empresaId, _lojaId);
         await _db.SaveChangesAsync();
-        await _linker.ExecuteAsync([batchId], _empresaId);
     }
 
     private decimal SaldoDoProdutoNaLoja() => _db.Set<ItemEstoque>().IgnoreQueryFilters()
@@ -203,6 +210,48 @@ public sealed class LoteMobileEntradaEstoqueTests : IDisposable
 
         SaldoDoProdutoNaLoja().Should().Be(0);
         StatusDoLoteErp("b-1").Should().Be("excluido");
+    }
+
+    [Fact]
+    public async Task BaixaDeInsumoQueFalhaNoMeio_NaoDeixaMetadeGravada()
+    {
+        // #1543: a baixa de insumo do lote mexeu num lote de molho e estourou. O linker engole a falha
+        // (o lote e a entrada do prato ficam), mas o proximo SaveChanges gravava a metade que sobrou no
+        // contexto: molho baixado sem a saida que o explica.
+        var molho = new Produto
+        {
+            Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Molho", Tipo = TipoProduto.Fisico,
+            Status = StatusProduto.Ativo, CategoriaId = Guid.NewGuid()
+        };
+        var loteDeMolho = ItemEstoque.CriarParaEntrada(
+            Guid.NewGuid(), _empresaId, molho, null, Quantidade.From(10), Dinheiro.Zero, null,
+            DateTime.UtcNow, "MOLHO-1", null, null, null, null, null, null, null, null, null, null, DateTime.UtcNow);
+        _db.AddRange(molho, loteDeMolho);
+        _db.SaveChanges();
+
+        var receita = Substitute.For<IProdutoComposicaoRepository>();
+        receita.GetByProdutoFinalAsync(_empresaId, _produtoErpId, null, Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyCollection<ProdutoComposicao>>(_ =>
+            {
+                _db.Set<ItemEstoque>().IgnoreQueryFilters().Single(i => i.Id == loteDeMolho.Id)
+                    .RegistrarSaida(Quantidade.From(4), DateTime.UtcNow, DateTime.UtcNow);
+                throw new InvalidOperationException("a baixa parou no meio");
+            });
+        var baixaQueFalha = new BaixaDeInsumosDaProducao(
+            receita, Substitute.For<IItemEstoqueRepository>(), null!, Substitute.For<IProdutoRepository>());
+        var linker = new BatchLinker(_db, new LoteRepository(_db),
+            new LoteMobileEstadoReconciler(_db, NullLogger<LoteMobileEstadoReconciler>.Instance),
+            NullLogger<BatchLinker>.Instance, baixaQueFalha);
+
+        await AplicarAsync(Lote("b-1", 5));
+        await linker.ExecuteAsync(["b-1"], _empresaId);
+        await _db.SaveChangesAsync();
+
+        _db.ChangeTracker.Clear();
+        _db.Set<ItemEstoque>().IgnoreQueryFilters().Single(i => i.Id == loteDeMolho.Id).QuantidadeAtual.Value
+            .Should().Be(10m, "a baixa falhou: nada dela pode ficar gravado");
+        SaldoDoProdutoNaLoja().Should().Be(5, "o lote e a entrada do prato nao dependem da baixa de insumo");
+        StatusDoLoteErp("b-1").Should().Be("finalizado");
     }
 
     [Fact]
