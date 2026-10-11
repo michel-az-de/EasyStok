@@ -305,6 +305,50 @@ public class CaixaUseCasesTests
         await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
     }
 
+    // 15h UTC = meio-dia em Brasília: o dia operacional não depende do fuso de quem roda o teste.
+    private static readonly DateTime InstanteFixo = new(2026, 10, 5, 15, 0, 0, DateTimeKind.Utc);
+    private static readonly DateOnly DiaFixo = HorarioBrasil.DataOperacional(InstanteFixo);
+
+    // #1598: o fechamento sem loja é o da empresa e soma os movimentos de todas as lojas.
+    [Fact]
+    public async Task RegistrarMovimento_de_loja_e_recusado_quando_a_empresa_ja_fechou_o_dia()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        _repo.GetFechamentoDoDiaAsync(empresaId, DiaFixo, null)
+            .Returns(FechamentoCaixa.Criar(empresaId, DiaFixo, 0, 0, 0, 0, 0));
+
+        var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
+
+        var act = () => useCase.ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "entrada", 50m, LojaId: lojaId, DataMovimento: InstanteFixo));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*já foi fechado*");
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    // #1598, direção inversa: o fechamento de uma loja só soma o que é dela.
+    [Fact]
+    public async Task RegistrarMovimento_sem_loja_segue_livre_quando_so_uma_loja_fechou_o_dia()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        _repo.GetFechamentoDoDiaAsync(empresaId, DiaFixo, lojaId)
+            .Returns(FechamentoCaixa.Criar(empresaId, DiaFixo, 0, 0, 0, 0, 0, lojaId));
+
+        var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
+
+        await useCase.ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "entrada", 50m, DataMovimento: InstanteFixo));
+
+        await _repo.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m => m.LojaId == null));
+    }
+
     [Fact]
     public async Task RegistrarMovimento_DeveCommitarMovimento_QuandoEntradaValida()
     {
@@ -643,6 +687,44 @@ public class CaixaUseCasesTests
         await act.Should().ThrowAsync<UseCaseValidationException>()
             .WithMessage("*dia já fechado*");
         await _repo.DidNotReceive().UpdateMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task EstornarMovimento_de_loja_e_recusado_quando_a_empresa_ja_fechou_o_dia()
+    {
+        var empresaId = Guid.NewGuid();
+        var mov = MovimentoCaixa.Criar(empresaId, "entrada", 100m, InstanteFixo, Guid.NewGuid());
+        _repo.GetMovimentoAsync(empresaId, mov.Id).Returns(mov);
+        _repo.GetFechamentoDoDiaAsync(empresaId, DiaFixo, null)
+            .Returns(FechamentoCaixa.Criar(empresaId, DiaFixo, 0, 0, 0, 0, 0));
+
+        var useCase = new EstornarMovimentoCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<EstornarMovimentoCaixaUseCase>>());
+
+        var act = () => useCase.ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, mov.Id));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*dia já fechado*");
+        mov.EstornadoEm.Should().BeNull();
+        await _repo.DidNotReceive().UpdateMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task EstornarMovimento_sem_loja_segue_livre_quando_so_uma_loja_fechou_o_dia()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var mov = MovimentoCaixa.Criar(empresaId, "entrada", 100m, InstanteFixo);
+        _repo.GetMovimentoAsync(empresaId, mov.Id).Returns(mov);
+        _repo.GetFechamentoDoDiaAsync(empresaId, DiaFixo, lojaId)
+            .Returns(FechamentoCaixa.Criar(empresaId, DiaFixo, 0, 0, 0, 0, 0, lojaId));
+
+        var useCase = new EstornarMovimentoCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<EstornarMovimentoCaixaUseCase>>());
+
+        var result = await useCase.ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, mov.Id));
+
+        result!.EstornadoEm.Should().NotBeNull();
     }
 
     [Fact]

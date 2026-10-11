@@ -1,4 +1,5 @@
 using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos;
 using EasyStock.Domain.Sales;
@@ -169,8 +170,8 @@ public class RegistrarPagamentoPedidoUseCase(
             // Não reabre caixa fechado (replica regra de AbrirCaixaUseCase). Pagamentos
             // retroativos em dia fechado ficam apenas como PedidoPagamento; aparecem
             // na agregação do dia via GetTotalPagamentosPedidosDoDiaAsync.
-            var fechamento = await caixaRepo.GetFechamentoDoDiaAsync(cmd.EmpresaId, data, pedido.LojaId);
-            if (fechamento != null)
+            // #1598: vale o fechamento da loja do pedido ou o da empresa (CaixaFechadoGuard).
+            if (await CaixaFechadoGuard.DiaFechadoAsync(caixaRepo, cmd.EmpresaId, pagoEm, pedido.LojaId))
             {
                 logger.LogInformation("Caixa de {Data} já fechado; pagamento {PedidoId} não dispara abertura automática.", data, pedido.Id);
                 return;

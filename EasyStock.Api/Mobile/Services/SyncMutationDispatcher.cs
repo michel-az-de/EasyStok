@@ -631,7 +631,8 @@ public class SyncMutationDispatcher(
         if (entry.EmpresaId is not { } empresaId) return;
         var dia = HorarioBrasil.DataOperacional(entry.CreatedAt);
         var fechado = await _db.Set<FechamentoCaixa>().IgnoreQueryFilters()
-            .AnyAsync(f => f.EmpresaId == empresaId && f.Data == dia && f.LojaId == entry.LojaId);
+            // Fechamento sem loja é o da empresa e retrata também o lançamento de loja (CaixaFechadoGuard, #1598).
+            .AnyAsync(f => f.EmpresaId == empresaId && f.Data == dia && (f.LojaId == entry.LojaId || f.LojaId == null));
         if (fechado)
             throw new UseCaseValidationException(
                 $"O caixa de {dia:dd/MM/yyyy} já foi fechado: {oQue} do lançamento '{entry.Description}' não foi aplicada.");

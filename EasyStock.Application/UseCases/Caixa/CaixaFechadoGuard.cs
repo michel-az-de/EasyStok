@@ -14,9 +14,17 @@ public static class CaixaFechadoGuard
     public static async Task ExigirDiaAbertoAsync(ICaixaRepository caixa, Guid empresaId, DateTime instanteUtc,
         Guid? lojaId, string mensagem)
     {
-        if ((await FechamentosQueRetratamAsync(caixa, empresaId, instanteUtc, lojaId)).Count > 0)
+        if (await DiaFechadoAsync(caixa, empresaId, instanteUtc, lojaId))
             throw new UseCaseValidationException(mensagem);
     }
+
+    /// <summary>
+    /// #1598: a mesma regra para quem não recusa, só decide o que fazer com o dia já retratado
+    /// (não tocar o movimento, não abrir o Caixa de novo).
+    /// </summary>
+    public static async Task<bool> DiaFechadoAsync(ICaixaRepository caixa, Guid empresaId, DateTime instanteUtc,
+        Guid? lojaId) =>
+        (await FechamentosQueRetratamAsync(caixa, empresaId, instanteUtc, lojaId)).Count > 0;
 
     /// <summary>
     /// Remover ou desfazer um recebimento: só recusa o que o fechamento do dia retratou. Recebimento
@@ -25,10 +33,17 @@ public static class CaixaFechadoGuard
     public static async Task ExigirRecebimentoForaDoRetratoAsync(ICaixaRepository caixa, Guid empresaId,
         DateTime pagoEmUtc, Guid? lojaId)
     {
-        var fechamentos = await FechamentosQueRetratamAsync(caixa, empresaId, pagoEmUtc, lojaId);
-        if (fechamentos.Any(f => pagoEmUtc <= f.FechadoEm))
+        if (await RetratadoAsync(caixa, empresaId, pagoEmUtc, lojaId))
             throw new UseCaseValidationException(RecebimentoEmDiaFechado);
     }
+
+    /// <summary>
+    /// O lançamento deste instante entrou no retrato de algum fechamento do dia. O que foi lançado
+    /// depois de o Caixa fechar ficou de fora e continua podendo ser mexido.
+    /// </summary>
+    public static async Task<bool> RetratadoAsync(ICaixaRepository caixa, Guid empresaId, DateTime instanteUtc,
+        Guid? lojaId) =>
+        (await FechamentosQueRetratamAsync(caixa, empresaId, instanteUtc, lojaId)).Any(f => instanteUtc <= f.FechadoEm);
 
     /// <summary>
     /// #1562: o fechamento sem loja é o da empresa e soma os recebimentos de todas as lojas (Console e Web
