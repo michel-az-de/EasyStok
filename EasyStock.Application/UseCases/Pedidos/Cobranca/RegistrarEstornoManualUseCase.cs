@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -57,8 +58,8 @@ public sealed class RegistrarEstornoManualUseCase(IPedidoRepository pedidos, ICo
             if (input.Valor > disponivel)
                 throw new CobrancaPedidoConflitoException("valor_ja_devolvido", "O valor excede o saldo ainda não devolvido deste recebimento. Atualize a ficha.");
             var agora = relogio.GetUtcNow().UtcDateTime;
-            if (await caixa.GetFechamentoDoDiaAsync(input.EmpresaId, HorarioBrasil.DataOperacional(agora), pedido.LojaId) is not null)
-                throw new UseCaseValidationException("O Caixa de hoje já foi fechado. A devolução ainda não foi registrada.");
+            await CaixaFechadoGuard.ExigirDiaAbertoAsync(caixa, input.EmpresaId, agora, pedido.LojaId,
+                "O Caixa de hoje já foi fechado. A devolução ainda não foi registrada.");
 
             var estorno = new PedidoEstornoManual
             {

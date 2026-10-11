@@ -25,6 +25,23 @@ public class DesfazerPagamentoManualUseCaseTests
         await f.Uow.DidNotReceive().CommitAsync();
     }
 
+    // #1547: mesma guarda do estorno manual, no dia operacional do recebimento.
+    [Fact]
+    public async Task Recebimento_de_dia_com_caixa_fechado_nao_pode_ser_desfeito()
+    {
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Aguardando);
+        f.AdicionarPagamento(referencia: null);
+        var dia = EasyStock.Application.Common.HorarioBrasil.DataOperacional(f.Pedido.Pagamentos.Single().PagoEm);
+        f.CaixaRepo.GetFechamentoDoDiaAsync(f.EmpresaId, dia, f.Pedido.LojaId)
+            .Returns(EasyStock.Domain.Entities.FechamentoCaixa.Criar(f.EmpresaId, dia, 0, 0, 25, 0, 0, f.Pedido.LojaId));
+
+        await FluentActions.Invoking(() => f.Desfazer().ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "Engano")))
+            .Should().ThrowAsync<UseCaseValidationException>().WithMessage("*já foi fechado*devolução*");
+
+        f.Pedido.Pagamentos.Should().ContainSingle();
+        await f.Uow.DidNotReceive().CommitAsync();
+    }
+
     [Fact]
     public async Task VoltaAguardandoPagamento()
     {

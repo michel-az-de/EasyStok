@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -59,8 +60,8 @@ public sealed class EstornosOnlineService(IPedidoRepository pedidos, IEstornoOnl
                 throw Conflito("estorno_pendente", "Confira a solicitação pendente antes de pedir outra devolução.");
             if (pagamento.Estornada || input.Valor > pagamento.Valor - Confirmado(estornos, pagamento))
                 throw Conflito("valor_ja_devolvido", "O valor excede o saldo ainda não devolvido deste recebimento.");
-            if (await caixa.GetFechamentoDoDiaAsync(input.EmpresaId, HorarioBrasil.DataOperacional(Agora), pagamento.LojaId) is not null)
-                throw new UseCaseValidationException("O Caixa de hoje já foi fechado. A devolução não foi solicitada.");
+            await CaixaFechadoGuard.ExigirDiaAbertoAsync(caixa, input.EmpresaId, Agora, pagamento.LojaId,
+                "O Caixa de hoje já foi fechado. A devolução não foi solicitada.");
             var nova = new PedidoEstornoOnline
             {
                 Id = input.OperacaoId, EmpresaId = input.EmpresaId, PedidoId = input.PedidoId,

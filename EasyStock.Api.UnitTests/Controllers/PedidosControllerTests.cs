@@ -111,7 +111,8 @@ public class PedidosControllerTests
 
         var removePag = new RemoverPagamentoPedidoUseCase(
             _pedidoRepo, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>(), _uow,
-            NullLogger<RemoverPagamentoPedidoUseCase>.Instance, QuitacaoPedidoTeste.Criar(_pedidoRepo));
+            NullLogger<RemoverPagamentoPedidoUseCase>.Instance, QuitacaoPedidoTeste.Criar(_pedidoRepo),
+            Substitute.For<ICaixaRepository>());
 
         var criarCliente = new CriarClienteUseCase(
             _clienteRepo, _uow, NullLogger<CriarClienteUseCase>.Instance);

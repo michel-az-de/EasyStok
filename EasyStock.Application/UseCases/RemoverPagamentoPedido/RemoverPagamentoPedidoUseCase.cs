@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -21,7 +22,8 @@ public class RemoverPagamentoPedidoUseCase(
     ICobrancaPedidoRepository cobrancas,
     IUnitOfWork uow,
     ILogger<RemoverPagamentoPedidoUseCase> logger,
-    QuitacaoPedido quitacao)
+    QuitacaoPedido quitacao,
+    ICaixaRepository caixa)
 {
     public async Task<PedidoResult?> ExecuteAsync(RemoverPagamentoPedidoCommand cmd)
     {
@@ -51,6 +53,10 @@ public class RemoverPagamentoPedidoUseCase(
             if (await repo.TemEstornoOnlineAsync(cmd.EmpresaId, pag.Id, token)
                 || (await repo.ListarEstornosManuaisAsync(cmd.EmpresaId, pedido.Id, token)).Any(e => e.PagamentoId == pag.Id))
                 throw new UseCaseValidationException("O recebimento possui devolução confirmada e deve permanecer no histórico.");
+
+            // #1547: o recebimento já entrou no retrato de um dia fechado. Mesma guarda da devolução.
+            await CaixaFechadoGuard.ExigirDiaAbertoAsync(caixa, cmd.EmpresaId, pag.PagoEm, pedido.LojaId,
+                CaixaFechadoGuard.RecebimentoEmDiaFechado);
 
             // Remocao rastreada (mesmo motivo do RemoverItemPedidoUseCase, #768): FK
             // PedidoPagamento->Pedido required+Cascade, o DELETE participa do SaveChanges

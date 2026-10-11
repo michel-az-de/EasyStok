@@ -61,6 +61,7 @@ internal sealed class CobrancaPedidoFixture
     public IConversaRepository ConversaRepo { get; } = Substitute.For<IConversaRepository>();
     public IVagaOcupadaRepository VagaRepo { get; } = Substitute.For<IVagaOcupadaRepository>();
     public IUnitOfWork Uow { get; } = Substitute.For<IUnitOfWork>();
+    public ICaixaRepository CaixaRepo { get; } = Substitute.For<ICaixaRepository>();
     public INotificadorService Notificador { get; } = Substitute.For<INotificadorService>();
     public EasyStock.Application.Services.Notifications.PrazosOptions Prazos { get; } = new();
     public IImpressaoPendenteRepository ImpressaoRepo { get; } = Substitute.For<IImpressaoPendenteRepository>();
@@ -202,7 +203,7 @@ internal sealed class CobrancaPedidoFixture
             NullLogger<AtualizarCobrancaPorPagamentoUseCase>.Instance);
 
     public DesfazerPagamentoManualUseCase Desfazer() =>
-        new(PedidoStorefrontRepo, PedidoRepo, CobrancaRepo, Publicador, Uow, Relogio, Quitacao());
+        new(PedidoStorefrontRepo, PedidoRepo, CobrancaRepo, Publicador, Uow, Relogio, Quitacao(), CaixaRepo);
 
     public ProcessarCobrancaVencidaUseCase ProcessarVencida()
     {
