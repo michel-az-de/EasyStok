@@ -1,6 +1,8 @@
 // Domínio da Frente 2 · Ficha do lead e do cliente (rodada 5, seção 2).
 // Funções puras: conversas, catálogo e relógio chegam por parâmetro, nada
 // aqui importa infra nem React (regra de ferramentas/verificar-camadas.mjs).
+// Extensão .js: `dominio/assistente.js` chega aqui pelo Node puro.
+import { diasDeCalendarioEntre } from './formato.js'
 
 // Restrição decide campanha (RN-39) e o que o agente não responde sozinho
 // (RN-52): vem sempre primeiro entre as tags. Substring sem caixa porque a
@@ -30,11 +32,8 @@ export function mesmoDomicilio(conversa, conversas) {
 
 // "Chegou hoje pelo Instagram" (situação do lead). Sem hora: a dona lê o
 // dia, o minuto cru não ajuda nela a entender o caso.
-export function diasEntre(iso, agora) {
-  const inicio = new Date(iso); inicio.setHours(0, 0, 0, 0)
-  const hoje = new Date(agora); hoje.setHours(0, 0, 0, 0)
-  return Math.round((hoje - inicio) / 86400000)
-}
+// #1600: dias de calendário da loja, não do aparelho.
+export const diasEntre = (iso, agora) => diasDeCalendarioEntre(iso, agora)
 
 // "hoje" / "ontem" / "há N dias": mesmo texto usado na situação do lead
 // (Bloco Cliente) e na faixa de números da modal Histórico.

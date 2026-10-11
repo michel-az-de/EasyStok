@@ -34,6 +34,12 @@ export const instante = (valor) => {
   return /[zZ]|[+-]\d{2}:\d{2}$/.test(valor) ? valor : `${valor}Z`
 }
 
+// #1600: a nota de reabertura é a "última palavra" da conversa, como na lista da API (#1570,
+// `UltimaPalavraConversa`). O DTO não tem tipo de nota: vale o critério de lá, nota de sistema com
+// autor humano e o prefixo de `ReabrirConversaUseCase.PrefixoNotaReabertura`.
+const PREFIXO_NOTA_REABERTURA = 'Conversa reaberta por '
+const ehNotaDeReabertura = (m) => Boolean(m.enviadaPorUsuarioId) && (m.texto ?? '').startsWith(PREFIXO_NOTA_REABERTURA)
+
 // `conversaId` vem da listagem: com ele, a mensagem com arquivo leva o endereço para o balão
 // buscar a mídia no endpoint autenticado (#1287). Sem ele (confirmação de envio), só o rótulo.
 export function mensagemDaApi(m, conversaId = null) {
@@ -41,7 +47,10 @@ export function mensagemDaApi(m, conversaId = null) {
   // #1474: nota interna do sistema (ex.: escalada para a dona) nunca vai ao canal: sem id externo
   // e Pendente para sempre. Vira evento na conversa, não balão "automática · enviando".
   if (saida && m.autor === 'Sistema' && !m.externoId && m.status === 'Pendente') {
-    return { id: m.id, dir: 'sistema', texto: m.texto || '', em: instante(m.enviadaEm) }
+    return {
+      id: m.id, dir: 'sistema', texto: m.texto || '', em: instante(m.enviadaEm),
+      ...(ehNotaDeReabertura(m) ? { reabertura: true } : {}),
+    }
   }
   return {
     id: m.id,

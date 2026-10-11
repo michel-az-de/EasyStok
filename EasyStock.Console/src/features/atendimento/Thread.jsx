@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
-import { rotuloDoDia } from '../../dominio/formato'
+import { dataIsoNoFuso, rotuloDoDia } from '../../dominio/formato'
 import { intercalarNotas } from '../../dominio/notas'
 import { useChamadaEstavel } from '../../hooks/useChamadaEstavel'
 import { Balao } from './Balao'
@@ -60,11 +60,6 @@ function PostIt({ nota }) {
   )
 }
 
-const diaDe = (iso) => {
-  const d = new Date(iso)
-  return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate()
-}
-
 export function Thread({
   mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, digitando = false, notas = [],
 }) {
@@ -95,7 +90,8 @@ export function Thread({
       linhas.push({ tipo: 'divisoria', chave: `divisoria-${fronteiras[proxima].numero}`, numero: fronteiras[proxima].numero })
       proxima += 1
     }
-    if (i === 0 || diaDe(m.em) !== diaDe(mensagens[i - 1].em)) {
+    // #1600: quebra no dia da loja, o mesmo critério de `rotuloDoDia`.
+    if (i === 0 || dataIsoNoFuso(m.em) !== dataIsoNoFuso(mensagens[i - 1].em)) {
       linhas.push({ tipo: 'dia', chave: `dia-${m.id}`, rotulo: rotuloDoDia(m.em, agora) })
     }
     linhas.push({

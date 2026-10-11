@@ -207,16 +207,18 @@ await confere('mínimo apagado manda limparMinimo, nunca zero', async () => {
   assert.equal(await m.gestao.atualizar('p1', { minimo: '', custo: '0,05' }), true)
   assert.deepEqual(m.corpoDoPut(), { minimo: null, custo: 0.05, limparMinimo: true })
   const soEspacos = montarGestao()
+  // #1600: custo apagado passou a limpar também (antes era "não mexe", o defeito do custo).
   await soEspacos.gestao.atualizar('p1', { minimo: '  ', custo: '' })
-  assert.deepEqual(soEspacos.corpoDoPut(), { minimo: null, custo: null, limparMinimo: true })
+  assert.deepEqual(soEspacos.corpoDoPut(), { minimo: null, custo: null, limparMinimo: true, limparCusto: true })
 })
 await confere('mínimo com valor (inclusive zero digitado) vai como antes, sem o campo novo', async () => {
   const m = montarGestao()
-  await m.gestao.atualizar('p1', { minimo: '2500', custo: '' })
-  assert.deepEqual(m.corpoDoPut(), { minimo: 2500, custo: null })
+  // #1600: com o custo preenchido, para o corpo continuar sem campo de limpar nenhum.
+  await m.gestao.atualizar('p1', { minimo: '2500', custo: '0,05' })
+  assert.deepEqual(m.corpoDoPut(), { minimo: 2500, custo: 0.05 })
   const zero = montarGestao()
-  await zero.gestao.atualizar('p1', { minimo: '0', custo: '' })
-  assert.deepEqual(zero.corpoDoPut(), { minimo: 0, custo: null })
+  await zero.gestao.atualizar('p1', { minimo: '0', custo: '0,05' })
+  assert.deepEqual(zero.corpoDoPut(), { minimo: 0, custo: 0.05 })
 })
 await confere('marcar embalagem não limpa o mínimo', async () => {
   const m = montarGestao()
