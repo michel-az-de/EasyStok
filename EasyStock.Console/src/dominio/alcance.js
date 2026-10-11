@@ -51,6 +51,8 @@ const inicioDoDia = inicioDoDiaNoFuso
 function emMs(em) {
   if (typeof em !== 'string' || em.length !== 10) return Date.parse(em)
   const [ano, mes, dia] = em.split('-').map(Number)
+  // Fora de AAAA-MM-DD fica de fora da conta, como antes; `instanteNoFuso` lançaria no render.
+  if (![ano, mes, dia].every(Number.isFinite)) return NaN
   return instanteNoFuso({ ano, mes, dia, horas: 12 })
 }
 

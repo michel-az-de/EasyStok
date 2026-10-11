@@ -219,7 +219,8 @@ await confere('separador de dia da conversa: Hoje, Ontem e a data são os da loj
 await confere('o fio quebra o dia no mesmo critério do rótulo', () => {
   const fio = ler('features/atendimento/Thread.jsx')
   assert.ok(fio.includes("import { inicioDoDiaNoFuso, rotuloDoDia } from '../../dominio/formato'"))
-  assert.ok(fio.includes('if (i === 0 || inicioDoDiaNoFuso(m.em) !== inicioDoDiaNoFuso(mensagens[i - 1].em)) {'))
+  assert.ok(fio.includes('const diaDaMensagem = inicioDoDiaNoFuso(m.em)'))
+  assert.ok(fio.includes('if (i === 0 || diaDaMensagem !== diaAnterior) {'))
   assert.ok(!fio.includes('.getDate()'), 'o fio voltou a ler o dia do aparelho')
   assert.deepEqual(emCadaFuso(() => iso(formato.inicioDoDiaNoFuso('2026-10-09T01:00:00Z'))), todos('2026-10-08T03:00:00.000Z'))
 })

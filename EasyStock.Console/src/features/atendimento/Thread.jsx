@@ -79,6 +79,7 @@ export function Thread({
   let proxima = 0
   const linhas = []
   let i = -1
+  let diaAnterior = null
   for (const item of intercalarNotas(mensagens, notas)) {
     if (item.tipo === 'nota') {
       linhas.push({ tipo: 'nota', chave: `nota-${item.nota.id}`, nota: item.nota })
@@ -90,10 +91,13 @@ export function Thread({
       linhas.push({ tipo: 'divisoria', chave: `divisoria-${fronteiras[proxima].numero}`, numero: fronteiras[proxima].numero })
       proxima += 1
     }
-    // #1600: quebra no dia da loja, o mesmo critério de `rotuloDoDia`.
-    if (i === 0 || inicioDoDiaNoFuso(m.em) !== inicioDoDiaNoFuso(mensagens[i - 1].em)) {
+    // #1600: quebra no dia da loja, o mesmo critério de `rotuloDoDia`. O dia da mensagem anterior
+    // fica guardado: cada conta de fuso custa caro num fio longo.
+    const diaDaMensagem = inicioDoDiaNoFuso(m.em)
+    if (i === 0 || diaDaMensagem !== diaAnterior) {
       linhas.push({ tipo: 'dia', chave: `dia-${m.id}`, rotulo: rotuloDoDia(m.em, agora) })
     }
+    diaAnterior = diaDaMensagem
     linhas.push({
       tipo: 'mensagem', chave: m.id, mensagem: m, trocaDeVoz: i > 0 && mensagens[i - 1].dir !== m.dir,
     })
