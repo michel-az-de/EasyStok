@@ -2,9 +2,10 @@ import { useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
-import { useAcoes } from '../../aplicacao/contextos'
+import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useAtalhoBarra } from '../../aplicacao/useAtalhoBarra'
-import { aceitaFormato, motivoDeFormato, restricoesDoCanal } from '../../dominio/canal'
+import { useRascunhoLocal } from '../../aplicacao/useRascunhoLocal'
+import { aceitaFormato, motivoDeAnexo, motivoDeFormato, restricoesDoCanal } from '../../dominio/canal'
 import {
   mensagemDeArquivoAnexado, mensagemDeAudio, mensagemDeImagemAnexada, tipoDeArquivo, validarArquivo,
 } from '../../dominio/anexos'
@@ -21,11 +22,18 @@ import { ModalEnviarModelo } from './ModalEnviarModelo'
 import css from './atendimento.module.css'
 
 export function Composer({
-  conversa, canal, podeEscrever, motivo, rascunho,
-  aoMudarRascunho, aoEnviar, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
+  conversa, canal, podeEscrever, motivo, rascunho: rascunhoGlobal, escritaDeFora,
+  aoEnviar, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
   aoReabrir, reabrindo = false, podeEnviarModelo = false,
 }) {
   const { enviarMidia, enviar, obterLinkCardapio } = useAcoes()
+  // #1577: a tecla muda só este campo. O rascunho global recebe o texto na pausa da digitação, ou na hora
+  // em blur, envio e saída da tela; `aoMudarRascunho` (resposta pronta, limpar) também vai na hora.
+  const { texto: rascunho, digitar, escrever: aoMudarRascunho, descarregar } = useRascunhoLocal({
+    conversaId: conversa.id, rascunho: rascunhoGlobal, escritaDeFora,
+  })
+  // #1587: no modo API só a foto sai (e só no WhatsApp); o anexo é recusado ao escolher.
+  const { fonteApi } = useAtendimento()
   // Seletor rápido (#1441): "/" no campo ou o botão Respostas abrem a lista
   // compacta de respostas prontas; Enter insere no campo.
   const barra = useAtalhoBarra({ rascunho, conversa, aoInserir: aoMudarRascunho })
@@ -53,10 +61,10 @@ export function Composer({
 
   async function aoEscolherArquivo(arquivo) {
     setErroAnexo(null)
-    const { aceito, motivo: motivoRecusa } = validarArquivo({ tipo: arquivo.type, tamanho: arquivo.size })
+    const { aceito, motivo: motivoRecusa } = validarArquivo({ tipo: arquivo.type, tamanho: arquivo.size, soImagem: fonteApi })
     if (!aceito) { setErroAnexo(motivoRecusa); return }
     const tipo = tipoDeArquivo(arquivo.type)
-    const bloqueioCanal = motivoDeFormato(canal, tipo === 'imagem' ? 'foto' : 'arquivo')
+    const bloqueioCanal = motivoDeAnexo(canal, tipo, { fonteApi })
     if (bloqueioCanal) { setErroAnexo(bloqueioCanal); return }
     const dataUrl = await ler(arquivo)
     setAnexo({
@@ -82,7 +90,9 @@ export function Composer({
     }
     // Enter com o campo vazio não manda balão vazio (#1287).
     if (!rascunho.trim()) return
-    aoEnviar()
+    // O campo é quem tem o texto de agora; o rascunho global pode estar uma pausa atrás.
+    descarregar()
+    aoEnviar(rascunho)
   }
 
   // #1444 (homologação 07/10: "não sei se ele tá enviando"): o gravador fica no lugar mostrando o
@@ -188,7 +198,8 @@ export function Composer({
                     // Respostas, com rótulo, já mostra o caminho, e a frase longa
                     // quebrava em três linhas no campo (rodada 10, integração).
                     : `Escreva para ${conversa.nome.split(' ')[0]}`}
-                onChange={(e) => aoMudarRascunho(e.target.value)}
+                onChange={(e) => digitar(e.target.value)}
+                onBlur={() => descarregar()}
                 onKeyDown={(e) => {
                   if (barra.aoTeclar(e)) return
                   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarComposer() }
@@ -198,7 +209,7 @@ export function Composer({
                   do próprio Popover) e planta o conteúdo em document.body,
                   fora do recorte de `.composer`. Visual idêntico ao de antes,
                   só que agora fora do overflow. */}
-              {barra.aberto && <SeletorRespostas seletor={barra} aoGerenciar={() => {
+              {barra.aberto && <SeletorRespostas seletor={barra} aoInserido={() => campoRef.current?.querySelector('textarea')?.focus()} aoGerenciar={() => {
                 if (!barra.pelaBarra) respostasRef.current?.focus()
                 aoAbrirBiblioteca?.()
               }} />}
@@ -229,7 +240,8 @@ export function Composer({
                   query e fica o title com a explicação inteira. */}
               <BotaoAnexarArquivo
                 disabled={!podeEscrever}
-                titulo="Anexar arquivo do computador: foto, cardápio em PDF ou comprovante (imagem ou PDF, até 8 MB)"
+                soImagem={fonteApi}
+                titulo={fonteApi ? 'Anexar foto do computador (imagem, até 8 MB)' : 'Anexar arquivo do computador: foto, cardápio em PDF ou comprovante (imagem ou PDF, até 8 MB)'}
                 rotulo="Anexar"
                 classeRotulo={css.rotuloAcao}
                 aoEscolher={aoEscolherArquivo}

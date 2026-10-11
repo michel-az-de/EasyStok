@@ -5,7 +5,9 @@ import { CampoArea } from '../../componentes/Campo'
 import { CampoMascarado } from '../../componentes/CampoMascarado'
 import { EscolhaDeEntregador } from '../../componentes/EscolhaDeEntregador'
 import { Icone } from '../../componentes/Icone'
-import { aguardaAprovacao, faltaPagar, podeDesfazerPagamento, situacaoDaCobranca } from '../../dominio/cobranca'
+import {
+  aguardaAprovacao, avisoDeLinkVencidoApi, faltaPagar, podeDesfazerPagamento, situacaoDaCobranca,
+} from '../../dominio/cobranca'
 import { ultimoPagamentoApi } from '../../dominio/pagamento'
 import { ROTULO_GERAR_E_ENVIAR } from '../../dominio/resumoPedido'
 import {
@@ -52,7 +54,7 @@ const PROXIMO_DE_AGUARDANDO = proximoPasso('aguardando')?.rotulo ?? 'Pago'
 // O passo "aguardando pagamento" não tem um botão único: o próximo passo
 // muda com a situação da cobrança (secao 2, "Alerta do Pix"). Substitui a
 // antiga trava, que só mostrava texto e travava a barra inteira.
-function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, aoAbrirBaixa, aoGerarPix, aoReenviarPix }) {
+function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, linkVencidoApi, aoAbrirBaixa, aoGerarPix, aoReenviarPix }) {
   switch (situacaoCob.chave) {
     case 'nenhuma':
       return {
@@ -65,6 +67,9 @@ function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, aoAbrirBaixa, aoGer
         botoes: [{ rotulo: rotuloGerar, icone: 'dollar-sign', onClick: aoGerarPix, desabilitado: Boolean(prerequisito) }],
       }
     case 'expirada':
+      // #1586: no modo API quem reemite (ou cancela) é o job do EasyStok; o botão só avisava.
+      // No lugar dele, o texto diz o que vai acontecer.
+      if (linkVencidoApi) return { rotuloEstado: 'Cobrança venceu', motivo: linkVencidoApi, botoes: [] }
       return {
         rotuloEstado: 'Cobrança venceu',
         botoes: [{ rotulo: 'Reenviar cobrança', icone: 'refresh-cw', onClick: aoReenviarPix }],
@@ -132,6 +137,8 @@ export function BarraProximoPasso({
   const [centavosEstorno, setCentavosEstorno] = useState(0)
   // Rodada 12 (issue #13): motivo do "Desfazer pagamento", obrigatório.
   const [motivoDesfazer, setMotivoDesfazer] = useState('')
+  const [erroDesfazer, setErroDesfazer] = useState(null)
+  const desfazendo = useRef(false)
 
   // O retorno pertence ao pedido e à etapa que iniciaram a ação. A espera só termina
   // com a Promise, inclusive quando o rascunho ganha pedidoId durante a recarga.
@@ -197,6 +204,7 @@ export function BarraProximoPasso({
       prerequisito: prerequisito ?? (pedido.itens.length > 0 ? null : 'A comanda está vazia.'),
       // #1474 (R4): no modo API este é o único botão que cria o pedido (cobra e manda a comanda).
       rotuloGerar: fonteApi && !pedido.pedidoId ? ROTULO_GERAR_E_ENVIAR : 'Gerar cobrança',
+      linkVencidoApi: fonteApi && pedido.pedidoId ? avisoDeLinkVencidoApi(pedido.cobranca) : null,
       aoAbrirBaixa: () => setAbrindoBaixa(true),
       aoGerarPix: () => (pedido.meio ? executar(() => aoGerarPix(pedido.meio)) : setPedindoMeio(true)),
       aoReenviarPix: () => executar(() => aoReenviarPix()),
@@ -337,7 +345,7 @@ export function BarraProximoPasso({
       setMotivoEstorno('')
       setCentavosEstorno(Math.round(valorPago * 100))
     }
-    if (chave === 'desfazer') setMotivoDesfazer('')
+    if (chave === 'desfazer') { setMotivoDesfazer(''); setErroDesfazer(null) }
     if (chave === 'cancelar') { setMotivoCancelar(''); setErroCancelar(null) }
     setConfirmando(chave)
   }
@@ -353,6 +361,32 @@ export function BarraProximoPasso({
       else setConfirmando(null)
     } catch (erro) { setErroCancelar(erro.message || 'Não foi possível cancelar. Tente de novo.') }
     finally { cancelando.current = false; setMarcoEmVoo(null) }
+  }
+
+  // #1586: dinheiro segue o padrão do cancelamento. "Desfazer pagamento" espera a resposta e só
+  // fecha no sucesso; na recusa o motivo digitado fica e o erro aparece ao lado.
+  const confirmarDesfazer = async () => {
+    if (desfazendo.current) return
+    desfazendo.current = true
+    setMarcoEmVoo(marco)
+    setErroDesfazer(null)
+    try {
+      const resultado = await aoDesfazerPagamento(motivoDesfazer.trim())
+      if (resultado?.erro) setErroDesfazer(resultado.erro)
+      else setConfirmando(null)
+    } catch (erro) { setErroDesfazer(erro.message || 'Não foi possível desfazer o pagamento. Tente de novo.') }
+    finally { desfazendo.current = false; setMarcoEmVoo(null) }
+  }
+
+  // "Marcar pago": o formulário (`BaixaAMao`) fica aberto até a resposta e mostra a recusa,
+  // com o valor e o método que ela digitou. Ele mesmo trava o segundo toque.
+  const confirmarBaixa = async (valor, metodo) => {
+    setMarcoEmVoo(marco)
+    try {
+      const resultado = await aoConfirmarPagamento(valor, metodo)
+      if (!resultado?.erro) setAbrindoBaixa(false)
+      return resultado
+    } finally { setMarcoEmVoo(null) }
   }
 
   return (
@@ -432,7 +466,7 @@ export function BarraProximoPasso({
           pedido={pedido}
           aoAprovar={aoAprovarPedido}
           aoCancelar={() => setAbrindoBaixa(false)}
-          aoConfirmar={(valor, metodo) => { setAbrindoBaixa(false); aoConfirmarPagamento(valor, metodo) }}
+          aoConfirmar={confirmarBaixa}
         />
       )}
 
@@ -510,15 +544,17 @@ export function BarraProximoPasso({
             rows={2}
             value={motivoDesfazer}
             onChange={(e) => setMotivoDesfazer(e.target.value)}
+            disabled={emVoo}
           />
+          {erroDesfazer && <p className={css.motivoDesabilitado} role="alert">{erroDesfazer}</p>}
           <p className={css.confirmarAcoes}>
-            <Botao variante="texto" onClick={() => setConfirmando(null)}>Manter</Botao>
+            <Botao variante="texto" disabled={emVoo} onClick={() => setConfirmando(null)}>Manter</Botao>
             <Botao
               variante="primario"
-              disabled={motivoDesfazer.trim().length < 3}
-              onClick={() => { aoDesfazerPagamento(motivoDesfazer.trim()); setConfirmando(null) }}
+              disabled={emVoo || motivoDesfazer.trim().length < 3}
+              onClick={confirmarDesfazer}
             >
-              Desfazer pagamento
+              {emVoo ? 'Desfazendo…' : 'Desfazer pagamento'}
             </Botao>
           </p>
         </div>

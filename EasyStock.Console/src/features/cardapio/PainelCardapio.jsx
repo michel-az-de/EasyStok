@@ -21,9 +21,12 @@ import {
 } from '../../dominio/vitrineCardapio'
 import { moeda } from '../../dominio/formato'
 import {
-  agruparPorLinha, itensDetalhados, numeroDaComanda, totalDoPedido,
+  agruparPorLinha, comandaTravada, itensDetalhados, numeroDaComanda, totalDoPedido,
 } from '../../dominio/pedido'
 import { diferencaAposPagamento } from '../../dominio/pagamento'
+import { FOTO_NAO_ENVIADA } from '../../dominio/anexos'
+import { primeiroNome } from '../../dominio/mensagem'
+import { LINHA_COMANDA_TRAVADA } from '../../dominio/resumoPedido'
 import { EditorItemCardapio } from './EditorItemCardapio'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { lerFichaDoPrato } from '../../aplicacao/edicaoCardapio'
@@ -116,7 +119,7 @@ export function CartaoArrasto({ item }) {
 // linha, senão a lista muda de tamanho e a ordem dos hooks quebra.
 function ItemEscolher({
   item, situacao, quantos, alternativas, linhas, adicionais, cardapio, novidade, aoEscolher, aoAjustar, envioDeFoto,
-  podeGerir = true, naComanda = () => 0, aoEditar,
+  podeGerir = true, naComanda = () => 0, aoEditar, travada = false,
 }) {
   const [detalheAberto, setDetalheAberto] = useState(false)
   // M1.4b (#1531): prato com porções. O toque (e o arrasto) soma a porção padrão; cada porção tem
@@ -127,7 +130,7 @@ function ItemEscolher({
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: 'prato-' + item.sku,
     data: { type: 'prato', item: doToque ?? item },
-    disabled: !situacao.vendavel || !doToque,
+    disabled: !situacao.vendavel || !doToque || travada,
   })
 
   return (
@@ -141,7 +144,8 @@ function ItemEscolher({
           type="button"
           ref={setNodeRef}
           className={css.linha}
-          disabled={!situacao.vendavel || !doToque}
+          disabled={!situacao.vendavel || !doToque || travada}
+          title={travada ? LINHA_COMANDA_TRAVADA : undefined}
           style={isDragging ? { opacity: 0.5 } : undefined}
           onClick={() => aoEscolher(doToque)}
           {...listeners}
@@ -161,9 +165,11 @@ function ItemEscolher({
             </small>
           </span>
           <span className={css.preco}>{moeda(item.preco)}</span>
-          <span className={css.somar}>
-            <Icone nome="mais" rotulo={'Somar ' + item.nome + ' na comanda, ou arrastar até a comanda'} />
-          </span>
+          {!travada && (
+            <span className={css.somar}>
+              <Icone nome="mais" rotulo={'Somar ' + item.nome + ' na comanda, ou arrastar até a comanda'} />
+            </span>
+          )}
         </button>
 
         {/* Pílula "N na comanda" + "−" (seção 3.1): desfazer um toque errado
@@ -173,13 +179,15 @@ function ItemEscolher({
         {quantos > 0 && porcoes.length === 0 && (
           <div className={css.ajusteNaLinha}>
             <span className={css.contagem}>{quantos} na comanda</span>
-            <button
-              type="button"
-              className={css.botaoMenosCardapio}
-              onClick={() => aoAjustar(item.sku, -1)}
-            >
-              <Icone nome="menos" rotulo={'Tirar uma unidade de ' + item.nome} />
-            </button>
+            {!travada && (
+              <button
+                type="button"
+                className={css.botaoMenosCardapio}
+                onClick={() => aoAjustar(item.sku, -1)}
+              >
+                <Icone nome="menos" rotulo={'Tirar uma unidade de ' + item.nome} />
+              </button>
+            )}
           </div>
         )}
 
@@ -195,7 +203,8 @@ function ItemEscolher({
                 <button
                   type="button"
                   className={css.botaoPorcao}
-                  disabled={!situacao.vendavel || !p.disponivel}
+                  disabled={!situacao.vendavel || !p.disponivel || travada}
+                  title={travada ? LINHA_COMANDA_TRAVADA : undefined}
                   onClick={() => aoEscolher(produto)}
                 >
                   <span className={css.nome}>
@@ -203,14 +212,16 @@ function ItemEscolher({
                     <small>{p.disponivel ? (p.padrao ? 'padrão' : '') : 'esgotada'}</small>
                   </span>
                   <span className={css.preco}>{moeda(p.preco)}</span>
-                  {qtd === 0 && p.disponivel && <Icone nome="mais" rotulo={`Somar ${item.nome} ${p.rotulo} na comanda`} />}
+                  {qtd === 0 && p.disponivel && !travada && <Icone nome="mais" rotulo={`Somar ${item.nome} ${p.rotulo} na comanda`} />}
                 </button>
                 {qtd > 0 && (
                   <div className={css.ajusteNaLinha}>
                     <span className={css.contagem}>{qtd} na comanda</span>
-                    <button type="button" className={css.botaoMenosCardapio} onClick={() => aoAjustar(produto.sku, -1)}>
-                      <Icone nome="menos" rotulo={`Tirar uma unidade de ${item.nome} ${p.rotulo}`} />
-                    </button>
+                    {!travada && (
+                      <button type="button" className={css.botaoMenosCardapio} onClick={() => aoAjustar(produto.sku, -1)}>
+                        <Icone nome="menos" rotulo={`Tirar uma unidade de ${item.nome} ${p.rotulo}`} />
+                      </button>
+                    )}
                   </div>
                 )}
               </li>
@@ -243,6 +254,8 @@ function ItemEscolher({
             {envioDeFoto.enviando === item.sku ? 'Enviando…' : envioDeFoto.enviado === item.sku ? 'Foto enviada' : 'Enviar foto'}
           </button>
         )}
+        {/* #1587: a falha fica escrita junto do botão; antes ele só voltava a "Enviar foto". */}
+        {envioDeFoto?.falhou === item.sku && <p className={css.falhaFoto} role="alert">{FOTO_NAO_ENVIADA}</p>}
       </div>
       {detalheAberto && <FichaDoItem
           item={item}
@@ -281,7 +294,7 @@ function PorCategoria({ itens, children }) {
 }
 
 function Escolher({
-  cardapio, visiveis, linhas, adicionais, pedido, agora, aoEscolher, aoAjustar, envioDeFoto, podeGerir, aoEditar,
+  cardapio, visiveis, linhas, adicionais, pedido, agora, aoEscolher, aoAjustar, envioDeFoto, podeGerir, aoEditar, travada,
 }) {
   const naComanda = (sku) => pedido?.itens.find((l) => l.sku === sku)?.qtd ?? 0
 
@@ -312,6 +325,7 @@ function Escolher({
                 podeGerir={podeGerir}
                 naComanda={naComanda}
                 aoEditar={aoEditar}
+                travada={travada}
               />
             )
           })}
@@ -444,7 +458,7 @@ function Gerir({
 // conferir a comanda inteira sem fechar o cardápio. `aria-live` fala o nome
 // do último prato somado porque quem está de olho na tela do cardápio,
 // não na comanda, precisa ouvir a confirmação, não só ver o número mudar.
-function RodapeComanda({ pedido, cardapio, linhas }) {
+function RodapeComanda({ pedido, cardapio, linhas, nomeCliente }) {
   const { fonteApi } = useAtendimento()
   const [aberto, setAberto] = useState(false)
   const [eco, setEco] = useState('')
@@ -476,6 +490,7 @@ function RodapeComanda({ pedido, cardapio, linhas }) {
   }, [qtdItens])
 
   if (qtdItens === 0) return null
+  const numero = numeroDaComanda(pedido, { fonteApi })
 
   return (
     <div className={css.rodapeComanda}>
@@ -486,7 +501,8 @@ function RodapeComanda({ pedido, cardapio, linhas }) {
         onClick={() => setAberto((v) => !v)}
       >
         <span className={css.rodapeTitulo}>
-          Comanda {numeroDaComanda(pedido, { fonteApi }) ?? 'em rascunho'} · {qtdItens} {qtdItens === 1 ? 'item' : 'itens'}
+          {/* #1587: de quem é a comanda, sempre à vista (o painel não fecha ao trocar de conversa). */}
+          Comanda{nomeCliente ? ` de ${nomeCliente}` : ''} · {numero ? `Nº ${numero}` : 'rascunho'} · {qtdItens} {qtdItens === 1 ? 'item' : 'itens'}
         </span>
         <span className={`${css.rodapeTotal} ${somaEmDestaque ? css.rodapeTotalSomando : ''}`}>
           {somaEmDestaque != null && <b className={css.rodapeSoma}>+ {moeda(somaEmDestaque)}</b>}
@@ -550,6 +566,12 @@ export function PainelCardapio({
   const [busca, setBusca] = useState('')
   const [enviandoSku, setEnviandoSku] = useState(null)
   const [enviadoSku, setEnviadoSku] = useState(null)
+  // Falha do envio de foto (#1587), com a conversa em que aconteceu: não segue para a próxima.
+  const [falhaFoto, setFalhaFoto] = useState(null)
+  // #1587: o painel não é modal e o "+" soma na conversa selecionada NAQUELE instante. O nome
+  // do cliente fica no cabeçalho e no rodapé, para a troca de conversa não passar em silêncio.
+  const nomeCliente = selecionada?.nome ? primeiroNome(selecionada.nome) : ''
+  const travada = comandaTravada(pedido, { fonteApi })
   const fecharRef = useRef(null)
   const focoAnterior = useRef(null)
 
@@ -605,15 +627,19 @@ export function PainelCardapio({
     const mensagem = mensagemDaFotoDoItem(item)
     if (!mensagem || !selecionada) return
     setEnviandoSku(item.sku)
+    setFalhaFoto(null)
     const enviado = await enviarMidia(selecionada.id, mensagem)
     setEnviandoSku(null)
-    if (enviado === false) return
+    if (enviado === false) { setFalhaFoto({ sku: item.sku, conversaId: selecionada.id }); return }
     setEnviadoSku(item.sku)
     setTimeout(() => setEnviadoSku((atual) => (atual === item.sku ? null : atual)), 1400)
   }
 
   const envioDeFoto = selecionada
-    ? { pode: !motivoFoto, motivo: motivoFoto, enviando: enviandoSku, enviado: enviadoSku, enviar: enviarFoto }
+    ? {
+      pode: !motivoFoto, motivo: motivoFoto, enviando: enviandoSku, enviado: enviadoSku, enviar: enviarFoto,
+      falhou: falhaFoto?.conversaId === selecionada.id ? falhaFoto.sku : null,
+    }
     : null
 
   return (
@@ -636,6 +662,7 @@ export function PainelCardapio({
         <header className={css.cabecalhoPainel}>
           <div>
             <h2>Cardápio de hoje</h2>
+            {nomeCliente && <p className={css.donoDaComanda} aria-live="polite">Comanda de <b>{nomeCliente}</b></p>}
             <p className={css.subPainel}>{noDia} de {ativos.length} itens no dia.</p>
           </div>
           <button type="button" ref={fecharRef} className={css.fechar} onClick={aoFechar}>
@@ -704,6 +731,7 @@ export function PainelCardapio({
               envioDeFoto={envioDeFoto}
               podeGerir={podeGerir}
               aoEditar={podeEditar ? (item) => setModal({ modo: 'editar', item }) : undefined}
+              travada={travada}
             />
           )}
 
@@ -729,7 +757,9 @@ export function PainelCardapio({
         {/* `cardapio` cheio (não só `ativos`) de propósito: um item já anotado
             na comanda continua precificando certo mesmo depois de tirado do
             cardápio (RN de não apagar histórico). */}
-        {papel === 'escolher' && pedido && <RodapeComanda pedido={pedido} cardapio={cardapio} linhas={linhas} />}
+        {/* #1587: pedido já criado não soma nem tira por aqui; o motivo fica escrito acima do total. */}
+        {papel === 'escolher' && travada && <output className={css.comandaTravada}>{LINHA_COMANDA_TRAVADA}</output>}
+        {papel === 'escolher' && pedido && <RodapeComanda pedido={pedido} cardapio={cardapio} linhas={linhas} nomeCliente={nomeCliente} />}
       </div>
 
       {modal && (

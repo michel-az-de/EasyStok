@@ -26,6 +26,13 @@ export const TIPOS_MOVIMENTO = {
 export const CATEGORIAS_SAIDA_SUGERIDAS = ['Sangria', 'Despesa']
 export const CATEGORIAS_ENTRADA_SUGERIDAS = ['Suprimento']
 
+// #1584: a sugestão é do tipo. Trocar Entrada/Saída com "Sangria" marcada gravava uma entrada
+// rotulada Sangria. A sugerida do outro tipo sai; a que a dona digitou fica.
+export function categoriaAoTrocarTipo(categoria, novoTipo) {
+  const doOutroTipo = novoTipo === TIPOS_MOVIMENTO.SAIDA ? CATEGORIAS_ENTRADA_SUGERIDAS : CATEGORIAS_SAIDA_SUGERIDAS
+  return doOutroTipo.includes(categoria) ? '' : categoria
+}
+
 // Métodos de pagamento do CAIXA (mapa EasyStok, campo fechado, diferente do
 // meio da cobrança por conversa: pix/dinheiro/credito/debito/transferencia/outro).
 export const METODOS_CAIXA = ['pix', 'dinheiro', 'credito', 'debito', 'transferencia', 'outro']

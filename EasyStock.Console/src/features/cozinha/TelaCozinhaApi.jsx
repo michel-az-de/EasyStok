@@ -5,7 +5,7 @@ import {
 import { useRelogio } from '../../hooks/useRelogio'
 import { dataIsoNoFuso, horaCurta } from '../../dominio/formato'
 import {
-  COLUNAS_KDS, canhotoDoKds, filtrarPorLinha, impressoesDaCozinha, respostaAoSoltarKds, textoDaCozinhaVazia,
+  COLUNAS_KDS, canhotoDoKds, diaDaFilaDaCozinha, filtrarPorLinha, impressoesDaCozinha, respostaAoSoltarKds, textoDaCozinhaVazia,
 } from '../../dominio/kds'
 import { ORDEM_DAS_LINHAS } from '../../dominio/pedido'
 import { pdfDoCanhoto } from '../../dominio/impressao'
@@ -31,7 +31,6 @@ import css from './cozinha.module.css'
 // A cozinha da demonstração (`TelaCozinha`, espelho do Balcão) segue intacta.
 const ABERTURA = Date.now()
 const MS_DA_RECUSA = 6000
-const UM_DIA_MS = 86400000
 
 const reduzMovimento = () => typeof window !== 'undefined'
   && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -61,8 +60,9 @@ export function TelaCozinhaApi({ linhas }) {
   const agora = useRelogio(ABERTURA, undefined, { real: true })
   // #1474: o pedido pago para amanhã não aparecia em lugar nenhum. Hoje ou Amanhã, como em
   // Entregas do dia; a API recebe a data só quando não é hoje.
-  const [amanha, setAmanha] = useState(false)
-  const dataDaFila = amanha ? dataIsoNoFuso(agora + UM_DIA_MS) : null
+  // #1584: guarda o dia em que "Amanhã" foi escolhido; na virada a fila volta sozinha para Hoje.
+  const [amanhaDesde, setAmanhaDesde] = useState(null)
+  const { amanha, data: dataDaFila } = diaDaFilaDaCozinha(amanhaDesde, agora)
   const {
     pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes,
     avancar, recarregar, reimprimir, confirmarImpressao, avisar, limparErro,
@@ -159,8 +159,8 @@ export function TelaCozinhaApi({ linhas }) {
       <header className={css.topoPagina}>
         <h1>Cozinha</h1>
         <div className={css.chipsFiltro} role="radiogroup" aria-label="Dia da fila">
-          <Chip papel="escolha" reservarIcone ativo={!amanha} onClick={() => setAmanha(false)}>Hoje</Chip>
-          <Chip papel="escolha" reservarIcone ativo={amanha} onClick={() => setAmanha(true)}>Amanhã</Chip>
+          <Chip papel="escolha" reservarIcone ativo={!amanha} onClick={() => setAmanhaDesde(null)}>Hoje</Chip>
+          <Chip papel="escolha" reservarIcone ativo={amanha} onClick={() => setAmanhaDesde(dataIsoNoFuso(agora))}>Amanhã</Chip>
         </div>
         <span className={`${css.aoVivo} ${aoVivo ? css.aoVivoLigado : ''}`}>
           <span className={css.pontoVivo} aria-hidden="true" />
@@ -264,8 +264,9 @@ export function TelaCozinhaApi({ linhas }) {
         )}
       {aberto && (
         <ComandaKds
-          pedido={aberto} agora={agora} linhas={linhas} movendo={movendo.has(aberto.id)}
-          aoAvancar={avancar} aoImprimir={imprimir} aoReimprimir={reimprimir} aoFechar={() => setAbertoId(null)}
+          pedido={aberto} agora={agora} linhas={linhas} movendo={movendo.has(aberto.id)} erro={erro}
+          aoAvancar={avancar} aoImprimir={imprimir} aoReimprimir={reimprimir} aoLimparErro={limparErro}
+          aoFechar={() => setAbertoId(null)}
         />
       )}
     </div>

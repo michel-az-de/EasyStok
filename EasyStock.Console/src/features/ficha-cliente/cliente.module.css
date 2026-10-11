@@ -15,7 +15,10 @@
   background: none; border: 0; border-radius: var(--r-1); min-height: var(--toque);
   padding: var(--e-2); font-size: var(--t-apoio); color: var(--tinta);
 }
-.itemMenu:hover { background: var(--elevado); }
+.itemMenu:hover:not(:disabled) { background: var(--elevado); }
+/* #1586: item que não se aplica fica desabilitado, com o motivo escrito logo abaixo. */
+.itemMenu:disabled { color: var(--tinta-3); cursor: not-allowed; }
+.motivoMenu { margin: 0; padding: 0 var(--e-2) var(--e-2); font-size: var(--t-apoio); color: var(--tinta-2); }
 
 .avisoBloqueio {
   margin: var(--e-3) 0; padding: var(--e-3);
@@ -107,6 +110,7 @@
   background: none; border: 0; color: var(--tinta-2);
 }
 .erroEmLinha { margin: var(--e-1) 0 0; color: var(--erro); font-size: var(--t-apoio); }
+.salvandoEmLinha { display: block; margin: var(--e-1) 0 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 
 /* --- Tags (TagsDoCliente.jsx) ---------------------------------------------- */
 .blocoTags { margin-bottom: var(--e-3); }

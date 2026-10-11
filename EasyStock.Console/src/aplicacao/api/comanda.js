@@ -138,6 +138,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   // #1474: com o link do Mercado Pago pendente o EasyStok recusa a baixa à mão (pedido ainda
   // pré-operacional). Primeiro a forma vira "na entrega" (cancela o link, o pedido entra na
   // fila), depois o recebido é registrado. A tela já avisou a dona antes de confirmar.
+  // #1586: a recusa volta como `{ erro }`; o formulário só fecha no sucesso, com valor e método.
   const receber = (id, valor, metodo) => {
     const pedidoId = pedidoCriado(id)
     if (!pedidoId) return soNoEasyStok('Receber pagamento')(id)
@@ -160,13 +161,14 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
         },
         (erro) => {
           const naoRegistrado = `Pagamento não registrado: ${erro.message}`
-          if (!cancelarLink) { avisar(naoRegistrado); return undefined }
+          const recusar = (mensagem) => { avisar(mensagem); return { erro: mensagem } }
+          if (!cancelarLink) return recusar(naoRegistrado)
           // O link pode já ter sido cancelado: a tela mostra o pedido como o EasyStok ficou. Sem
           // o `requerAprovacao` no pedido da conversa, só depois da troca se sabe que ele passou
           // a esperar aprovação; o aviso diz o próximo passo em vez do erro cru.
           return recarregar(id)
-            .then((atual) => avisar(aguardaAprovacao(atual) ? LINK_CANCELADO_ESPERA_APROVACAO : naoRegistrado))
-            .catch(() => avisar(naoRegistrado))
+            .then((atual) => recusar(aguardaAprovacao(atual) ? LINK_CANCELADO_ESPERA_APROVACAO : naoRegistrado))
+            .catch(() => recusar(naoRegistrado))
         },
       ))
   }
@@ -201,9 +203,14 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   const desfazer = (id, motivo) => {
     if (!pedidoCriado(id)) return soNoEasyStok('Desfazer pagamento')(id)
     const pagamentoId = ultimoPagamentoApi(pedidoDe(id))?.pagamentoId ?? null
+    // #1586: como na baixa, a recusa volta como `{ erro }` e o motivo digitado fica na tela.
     return umaPorConversa(id, 'desfazer', () => desfazerPagamentoManual(pedidoCriado(id), motivo, pagamentoId).then(
       () => { limparAviso(); return recarregar(id).catch(() => avisar('Pagamento desfeito. Atualizando a tela…')) },
-      (erro) => avisar(`Pagamento não desfeito: ${erro.message}`),
+      (erro) => {
+        const mensagem = `Pagamento não desfeito: ${erro.message}`
+        avisar(mensagem)
+        return { erro: mensagem }
+      },
     ))
   }
 

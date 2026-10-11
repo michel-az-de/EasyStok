@@ -21,8 +21,13 @@ export function tipoDeArquivo(mime) {
   return null
 }
 
-export function validarArquivo({ tipo, tamanho }) {
+// #1587: no modo API o EasyStok só envia foto (`soImagem`). PDF é recusado ao escolher o arquivo,
+// em vez de entrar na prévia e só avisar no rodapé depois de limpar anexo e legenda.
+export const SO_FOTO_NO_EASYSTOK = 'Por aqui sai só foto (JPG, PNG, WEBP ou GIF). PDF ainda não é enviado pelo EasyStok.'
+
+export function validarArquivo({ tipo, tamanho, soImagem = false }) {
   const reconhecido = tipoDeArquivo(tipo)
+  if (soImagem && reconhecido !== 'imagem') return { aceito: false, motivo: SO_FOTO_NO_EASYSTOK }
   if (!reconhecido) return { aceito: false, motivo: 'Envie uma imagem (JPG, PNG, WEBP, GIF) ou um PDF.' }
   if (tamanho <= 0) return { aceito: false, motivo: 'Arquivo vazio.' }
   if (tamanho > LIMITE_ARQUIVO_BYTES) return { aceito: false, motivo: 'Arquivo muito grande. O limite é 8 MB.' }
@@ -208,6 +213,10 @@ export function mensagemDeArquivoAnexado({ nomeArquivo, tamanho, dataUrl }) {
 export function mensagemDeAudio({ dataUrl, duracaoMs }) {
   return { formato: 'audio', arte: dataUrl, duracaoMs, texto: 'Mensagem de áudio' }
 }
+
+// #1587: foto que não saiu pela galeria ou pelo cardápio. Fica escrita ao lado do botão, com a
+// mesma frase do áudio no composer: o balão "não enviada" da conversa tem o motivo.
+export const FOTO_NAO_ENVIADA = 'A foto não foi enviada. O motivo está no balão da conversa.'
 
 // Peça do cardápio (#1437) leva o id do item e o índice da foto: o EasyStok envia pelo id.
 export function mensagemDePeca({ nome, descricao, legenda, foto, cardapioItemId, indice }) {

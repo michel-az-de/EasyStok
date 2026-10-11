@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
+import { useChamadaEstavel } from '../../hooks/useChamadaEstavel'
 import { CartaoConversa } from './CartaoConversa'
 import { BarraBalcao } from './BarraBalcao'
 import { NaoEntregues } from './NaoEntregues'
@@ -10,7 +11,7 @@ import css from './caixa.module.css'
 // um com sua própria lista e sua própria memória de aberto/fechado — abrir um
 // não deve fechar o outro.
 function GrupoRecolhido({
-  titulo, conversas, aberto, aoAlternar, agora, automaticoPausado, aoAbrir, chave, busca,
+  titulo, conversas, aberto, aoAlternar, agora, automaticoPausado, pagamentosNaoVistos, aoAbrir, chave, busca,
 }) {
   if (conversas.length === 0) return null
   return (
@@ -30,7 +31,8 @@ function GrupoRecolhido({
           conversa={conversa}
           selecionada={false}
           agora={agora}
-          automaticoPausado={automaticoPausado}
+          pausado={automaticoPausado?.[conversa.id] ?? false}
+          pagamentoNaoVisto={pagamentosNaoVistos?.has(conversa.id) ?? false}
           grupo={chave}
           busca={busca}
           aoAbrir={aoAbrir}
@@ -53,7 +55,7 @@ function VazioEmLinha({ texto, acao, aoAgir }) {
 export function PainelConversas({ aoAbrir }) {
   const {
     visiveis, encerradasDoBalcao, bloqueadasDoBalcao, selecionadaId, filtros, agora,
-    automaticoPausado, aberta, horarioDaLoja,
+    automaticoPausado, aberta, horarioDaLoja, pagamentosNaoVistos,
   } = useAtendimento()
   const { mudarFiltro, selecionar } = useAcoes()
   const [gruposAbertos, setGruposAbertos] = useState({ encerradas: false, bloqueados: false })
@@ -68,10 +70,11 @@ export function PainelConversas({ aoAbrir }) {
     setGruposAbertos({ encerradas: abrir, bloqueados: abrir })
   }
 
-  function abrir(id) {
+  // #1577: identidade fixa, senão o `memo` do cartão não segura.
+  const abrir = useChamadaEstavel((id) => {
     selecionar(id)
     aoAbrir?.(id)
-  }
+  })
 
   function alternarGrupo(chave) {
     setGruposAbertos((atual) => ({ ...atual, [chave]: !atual[chave] }))
@@ -150,7 +153,8 @@ export function PainelConversas({ aoAbrir }) {
             conversa={conversa}
             selecionada={conversa.id === selecionadaId}
             agora={agora}
-            automaticoPausado={automaticoPausado}
+            pausado={automaticoPausado?.[conversa.id] ?? false}
+            pagamentoNaoVisto={pagamentosNaoVistos?.has(conversa.id) ?? false}
             aberta={aberta}
             expediente={horarioDaLoja}
             busca={filtros.busca}
@@ -167,6 +171,7 @@ export function PainelConversas({ aoAbrir }) {
               aoAlternar={() => alternarGrupo('encerradas')}
               agora={agora}
               automaticoPausado={automaticoPausado}
+              pagamentosNaoVistos={pagamentosNaoVistos}
               busca={filtros.busca}
               aoAbrir={abrir}
             />
@@ -178,6 +183,7 @@ export function PainelConversas({ aoAbrir }) {
               aoAlternar={() => alternarGrupo('bloqueados')}
               agora={agora}
               automaticoPausado={automaticoPausado}
+              pagamentosNaoVistos={pagamentosNaoVistos}
               busca={filtros.busca}
               aoAbrir={abrir}
             />

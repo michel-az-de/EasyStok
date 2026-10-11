@@ -44,6 +44,19 @@ export function motivoDeFormato(canal, formato) {
   return `${canal.nome} não aceita ${NOME_DO_FORMATO[formato] ?? formato}.`
 }
 
+// #1587: o que o EasyStok envia de verdade no modo API é foto, e só no WhatsApp (o envio de
+// mídia da API avisa "ainda não ligado" para o resto). O anexo do composer é recusado ao
+// escolher, com o motivo no lugar, em vez de limpar a prévia e avisar no rodapé.
+const CANAL_COM_FOTO_NA_API = 'WhatsApp'
+
+export function motivoDeAnexo(canal, tipo, { fonteApi = false } = {}) {
+  const formato = tipo === 'imagem' ? 'foto' : 'arquivo'
+  const bloqueio = motivoDeFormato(canal, formato)
+  if (bloqueio || !fonteApi) return bloqueio
+  if (formato === 'foto' && canal.nome === CANAL_COM_FOTO_NA_API) return null
+  return `${canal.nome} ainda não recebe ${NOME_DO_FORMATO[formato]} pelo EasyStok.`
+}
+
 // Uma linha só com tudo que o canal não aceita, para o pé do composer.
 // Integração: só o que o composer oferece hoje. Figurinha saiu no corte (23,
 // #54) e continua fora. Rodada 7 (frente Anexos, pedido do dono 24/09):
