@@ -58,12 +58,18 @@
   .contexto { grid-row: 1; grid-column: 1; gap: var(--e-1); }
   .voltar { padding-inline: var(--e-1); }
   .acoes { display: contents; }
-  .acoes > [role='radiogroup'] { grid-row: 2; grid-column: 1; justify-self: start; }
+  .acoes > [role='radiogroup'] { grid-row: 2; grid-column: 1 / -1; justify-self: start; }
+  .acoes > :global([data-ajuda-console]) { grid-row: 1; grid-column: 2; justify-self: start; }
   .avisos { grid-row: 2; grid-column: 2; justify-self: end; }
-  .sair { grid-row: 1; grid-column: 2; max-width: 140px; padding-inline: var(--e-2); }
+  .sair { grid-row: 1; grid-column: 2; max-width: 140px; padding-inline: var(--e-2); justify-self: end; margin-left: 84px; }
   .modulo { display: none; }
   .menu { grid-column: 1 / -1; }
   .ajuste { padding: var(--e-1) var(--e-2) var(--e-4); }
   .titulo { min-height: 52px; padding: var(--e-3); }
   .conteudo { padding: var(--e-3); }
+}
+
+@media (max-width: 360px) {
+  .acoes > :global([data-ajuda-console]) { width: 44px; padding-inline: 0; font-size: 0; gap: 0; }
+  .sair { margin-left: 44px; }
 }

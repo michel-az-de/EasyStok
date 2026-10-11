@@ -11,7 +11,7 @@ export function SeletorRespostas({ seletor, aoGerenciar }) {
   const { itens, destaque } = seletor
 
   return (
-    <Popover rotulo="Respostas rápidas" aoFechar={seletor.fechar} semAutoFoco portal>
+    <Popover rotulo="Respostas rápidas" papel="group" aoFechar={seletor.fechar} semAutoFoco portal>
       <div className={css.seletor}>
         {!seletor.pelaBarra && (
           <input

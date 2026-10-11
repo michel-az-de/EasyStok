@@ -129,7 +129,7 @@ export function BarraBalcao({ filtros, aoMudar }) {
           </Botao>
           {ordenarAberto && (
             <Popover rotulo="Ordenar" posicao="abaixo" aoFechar={() => setOrdenarAberto(false)}>
-              <div className={css.menuOrdem} role="menu" aria-label="Ordenar">
+              <div className={css.menuOrdem}>
                 {OPCOES_DE_ORDEM.map((opcao) => (
                   <button
                     key={opcao.chave}

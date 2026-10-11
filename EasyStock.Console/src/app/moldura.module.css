@@ -10,6 +10,7 @@
   --t-display: 2rem;
   font-size: var(--t-corpo);
 }
+.estadoAcesso { display: grid; place-items: center; height: 100%; overflow-y: auto; padding: var(--e-4); }
 
 .app { display: flex; flex-direction: column; height: 100%; min-height: 100%; background: var(--fundo); }
 
@@ -149,6 +150,9 @@
   padding-top: calc(var(--e-3) + env(safe-area-inset-top, 0px));
   position: relative; z-index: 20;
 }
+.inicioTrilho { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--tinta-2); text-decoration: none; font-size: var(--t-minimo); font-weight: 600; border-radius: var(--r-1); }
+.inicioTrilho:focus-visible { outline: 2px solid var(--marca); outline-offset: 3px; }
+.inicioTrilho:hover { color: var(--marca); }
 .itemTrilho,
 .avisosTrilho > button,
 .sinoTrilho > div > button {

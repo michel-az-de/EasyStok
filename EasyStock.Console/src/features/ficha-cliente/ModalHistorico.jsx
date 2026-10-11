@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { BarraDeAbas } from '../../componentes/BarraDeAbas'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
@@ -121,15 +121,33 @@ function AbaAtendimentos({ conversaId, atendimentos }) {
   )
 }
 
-function AbaNotas({ conversa }) {
+function AbaNotas({ conversa, ocupado, aoOcupar }) {
   const { salvarNota } = useAcoes()
   const [texto, setTexto] = useState('')
+  const [aviso, setAviso] = useState(null)
+  const salvando = useRef(false)
+  const campo = useRef(null)
   const notas = conversa.cliente.notas
 
-  function salvar() {
-    if (!texto.trim()) return
-    salvarNota(conversa.id, texto.trim())
-    setTexto('')
+  async function salvar() {
+    if (!texto.trim() || salvando.current) return
+    salvando.current = true
+    campo.current?.focus()
+    aoOcupar(true)
+    setAviso(null)
+    try {
+      if (await salvarNota(conversa.id, texto.trim()) === false) {
+        setAviso({ erro: true, texto: 'Sem confirmação da nota. Seu texto continua aqui. Confira a ficha antes de tentar de novo.' })
+      } else {
+        setTexto('')
+        setAviso({ erro: false, texto: 'Nota salva.' })
+      }
+    } catch (erro) {
+      setAviso({ erro: true, texto: erro.message || 'Não foi possível salvar a nota. Seu texto continua aqui.' })
+    } finally {
+      salvando.current = false
+      aoOcupar(false)
+    }
   }
 
   return (
@@ -139,11 +157,15 @@ function AbaNotas({ conversa }) {
           rotulo="Nova nota"
           rows={2}
           value={texto}
+          ref={campo}
+          readOnly={ocupado}
+          aria-busy={ocupado}
           onChange={(e) => setTexto(e.target.value)}
           placeholder="Nunca chega ao cliente."
         />
-        <Botao variante="primario" disabled={!texto.trim()} onClick={salvar}>Salvar nota</Botao>
+        <Botao variante="primario" disabled={!texto.trim() || ocupado} onClick={salvar}>{ocupado ? 'Salvando…' : 'Salvar nota'}</Botao>
       </div>
+      {aviso && <p className={aviso.erro ? css.avisoErro : css.corpoBloco} role={aviso.erro ? 'alert' : 'status'}>{aviso.texto}</p>}
       {notas.length === 0
         ? <p className={css.corpoBloco}>Nenhuma nota.</p>
         : (
@@ -185,6 +207,7 @@ function AbaAutomaticas({ envios }) {
 export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
   const id = useId()
   const [aba, setAba] = useState('pedidos')
+  const [salvandoNota, setSalvandoNota] = useState(false)
   const { cliente } = conversa
   const lead = ehLead(conversa)
   const financeiro = resumoFinanceiro(historico)
@@ -193,9 +216,9 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
   return (
     <Modal
       titulo={`Histórico · ${conversa.nome}`}
-      aoFechar={aoFechar}
+      aoFechar={salvandoNota ? undefined : aoFechar}
       largura="min(880px, calc(100vw - 32px))"
-      rodape={<Botao onClick={aoFechar}>Fechar</Botao>}
+      rodape={<Botao disabled={salvandoNota} onClick={aoFechar}>Fechar</Botao>}
     >
       {lead ? (
         <p className={css.faixaLead}>
@@ -211,6 +234,7 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
       )}
 
       <BarraDeAbas
+        desabilitada={salvandoNota}
         idPainel={`${id}-painel`}
         prefixoId={`${id}-aba`}
         abas={[
@@ -220,7 +244,7 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
           { id: 'automaticas', rotulo: 'Automáticas', contador: automaticas.length },
         ]}
         ativa={aba}
-        aoTrocar={setAba}
+        aoTrocar={(novaAba) => { if (!salvandoNota) setAba(novaAba) }}
       />
 
       <div role="tabpanel" id={`${id}-painel`} aria-labelledby={`${id}-aba-${aba}`} tabIndex={0} className={css.painelAba}>
@@ -228,7 +252,9 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
         {aba === 'atendimentos' && (
           <AbaAtendimentos conversaId={conversa.id} atendimentos={conversa.atendimentos ?? []} />
         )}
-        {aba === 'notas' && <AbaNotas conversa={conversa} />}
+        <div hidden={aba !== 'notas'}>
+          <AbaNotas conversa={conversa} ocupado={salvandoNota} aoOcupar={setSalvandoNota} />
+        </div>
         {aba === 'automaticas' && <AbaAutomaticas envios={automaticas} />}
       </div>
     </Modal>

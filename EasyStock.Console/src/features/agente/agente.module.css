@@ -46,7 +46,7 @@
 .rodapeSugestao {
   display: flex; gap: var(--e-2); align-items: center; flex-wrap: wrap; margin-top: var(--e-2);
 }
-.pensando { color: var(--tinta-3); font-size: var(--t-apoio); margin: var(--e-2) 0 0; }
+.pensando { display: block; color: var(--tinta-3); font-size: var(--t-apoio); margin: var(--e-2) 0 0; }
 
 /* Falha de transporte: fica na tela, com texto, em vez de um "Lendo" eterno. */
 .erro {
@@ -103,3 +103,9 @@
 }
 /* Modo de conexão: dado de bancada, em texto, não pílula. */
 .conexao { font-size: var(--t-apoio); color: var(--tinta-2); }
+
+@media (max-width: 759px) {
+  .painel { padding: var(--e-3); }
+  .cabeca .direita { margin-left: 0; width: 100%; }
+  .direita button { min-height: 44px; }
+}

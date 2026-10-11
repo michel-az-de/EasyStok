@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { ATENDENTE, estadoInicial, reducer } from './reducer'
 import * as acao from './acoes'
 import { ContextoAcoes, ContextoCatalogo, ContextoEstado } from './contextos'
@@ -35,6 +35,7 @@ import { useSincronizacaoApi } from './useSincronizacaoApi'
 import { deveCarregarDossie } from './planoDeSincronizacao'
 import { useLembretesApi } from './useLembretesApi'
 import { gravarRascunhos, lerRascunhos } from '../infra/api/rascunhosDaSessao'
+import { comandasLocaisDaVisita, restaurarComandasDaVisita } from './comandasDaVisita'
 
 const carregar = () => ({
   conversas: carregarConversas(),
@@ -55,8 +56,9 @@ const carregar = () => ({
   som: lerPreferenciaSom(),
 })
 
-export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = true, children }) {
-  const [estado, despachar] = useReducer(reducer, null, () => ({
+export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = true, lerComandasDaVisita, aoGuardarComandas, children }) {
+  const reduzir = (atual, evento) => reducer(restaurarComandasDaVisita(atual, evento, lerComandasDaVisita?.()), evento)
+  const [estado, despachar] = useReducer(reduzir, null, () => ({
     ...estadoInicial(carregar()),
     // Modo API (F01): a lista nasce vazia e chega pelo polling.
     sincronizacao: { estado: FONTE_API ? 'carregando' : 'desligada', mensagem: null, aviso: null },
@@ -68,6 +70,9 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
     // F07, item 6: o rascunho de antes do 401 volta depois do novo login.
     ...(FONTE_API ? { rascunhos: lerRascunhos(sessao) } : {}),
   }))
+  useLayoutEffect(() => {
+    if (estado.sincronizacao.estado === 'ok' || estado.conversas.length) aoGuardarComandas?.(comandasLocaisDaVisita(estado.conversas))
+  }, [aoGuardarComandas, estado.conversas, estado.sincronizacao.estado])
   useEffect(() => { if (FONTE_API) gravarRascunhos(sessao, estado.rascunhos) }, [sessao, estado.rascunhos])
   useSincronizacaoApi({ ativo: FONTE_API, comConversas: atendimentoAtivo, usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId })
 

@@ -50,10 +50,10 @@ export function FaixaApi({ aoSair }) {
   const texto = carregando
     ? 'Carregando conversas…'
     : falhou
-      ? `Sem atualizar: ${sincronizacao.mensagem}`
+      ? `Conversas sem atualização: ${sincronizacao.mensagem || 'a consulta não foi concluída.'} A próxima tentativa é automática.`
       : aviso ?? 'Conversas ao vivo do EasyStok'
   return (
-    <div className={`${css.faixa} ${falhou || aviso ? css.alerta : ''}`} role="status">
+    <output className={`${css.faixa} ${falhou || aviso ? css.alerta : ''}`}>
       <span className={css.texto}>
         {texto}
         {aviso && (
@@ -65,6 +65,6 @@ export function FaixaApi({ aoSair }) {
         {rotuloDaSessao(sessao)}
         <button type="button" className={css.sair} onClick={aoSair}>Sair</button>
       </span>
-    </div>
+    </output>
   )
 }

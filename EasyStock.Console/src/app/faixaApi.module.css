@@ -1,7 +1,7 @@
 /* A sessão ocupa espaço no layout: avisos longos não cobrem as abas do celular. */
 @media screen {
   :global(#root):has(.faixa) { display: flex; flex-direction: column; }
-  :global(#root):has(.faixa) > :first-child { flex: 1; min-height: 0; height: auto; }
+  :global(#root):has(.faixa) > :global([data-conteudo-console]) { flex: 1; min-height: 0; height: auto; }
 }
 
 .faixa {

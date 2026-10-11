@@ -1,9 +1,14 @@
+import { useLayoutEffect, useRef } from 'react'
 import css from './Chip.module.css'
 import { Icone } from './Icone'
+
+const radiosHabilitados = (grupo) => [...(grupo?.querySelectorAll('[role="radio"]') ?? [])]
+  .filter((item) => !item.disabled && item.getAttribute('aria-disabled') !== 'true')
 
 // Chip com três papéis (seção 1, 2 e 4 da direção visual, passo zero):
 //   filtro   liga e desliga (aria-pressed), zero ou mais ligados ao mesmo tempo.
 //   escolha  um dentro de um `role="radiogroup"` do pai (aria-checked).
+//   acao     executa imediatamente, sem estado de seleção.
 //   tag      do cliente, com × para tirar e texto editável em toque.
 // `emBreve` desabilita o clique e escreve o motivo no próprio rótulo (a
 // palavra "em breve" já vem em `children`, o componente só estiliza).
@@ -11,8 +16,37 @@ import { Icone } from './Icone'
 // largura a cada toque (dias da semana).
 export function Chip({
   papel = 'filtro', ativo = false, emBreve = false, tracejado = false, reservarIcone = false, icone, className,
-  onClick, onRemover, rotuloRemover, children,
+  onClick, onRemover, rotuloRemover, children, ...resto
 }) {
+  const referencia = useRef(null)
+  useLayoutEffect(() => {
+    if (papel !== 'escolha') return
+    const grupo = referencia.current?.closest('[role="radiogroup"]')
+    const itens = radiosHabilitados(grupo)
+    const entrada = itens.find((item) => item.getAttribute('aria-checked') === 'true') ?? itens[0]
+    grupo?.querySelectorAll('[role="radio"]').forEach((item) => { item.tabIndex = item === entrada ? 0 : -1 })
+  }, [papel, ativo, emBreve, resto.disabled])
+
+  const aoTeclar = (evento) => {
+    resto.onKeyDown?.(evento)
+    if (evento.defaultPrevented || evento.altKey || evento.ctrlKey || evento.metaKey) return
+    const itens = radiosHabilitados(evento.currentTarget.closest('[role="radiogroup"]'))
+    const indice = itens.indexOf(evento.currentTarget)
+    if (indice < 0) return
+    let destino
+    switch (evento.key) {
+      case 'ArrowRight': case 'ArrowDown': destino = (indice + 1) % itens.length; break
+      case 'ArrowLeft': case 'ArrowUp': destino = (indice - 1 + itens.length) % itens.length; break
+      case 'Home': destino = 0; break
+      case 'End': destino = itens.length - 1; break
+      default: return
+    }
+    evento.preventDefault()
+    evento.stopPropagation()
+    itens[destino].focus()
+    itens[destino].click()
+  }
+
   const classes = [
     css.chip, ativo ? css.ativo : '', emBreve ? css.emBreve : '', tracejado ? css.tracejado : '',
     className ?? '',
@@ -34,7 +68,7 @@ export function Chip({
 
   const papelAria = papel === 'escolha'
     ? { role: 'radio', 'aria-checked': ativo }
-    : { 'aria-pressed': ativo }
+    : papel === 'acao' ? {} : { 'aria-pressed': ativo }
 
   return (
     <button
@@ -42,7 +76,11 @@ export function Chip({
       className={classes}
       aria-disabled={emBreve || undefined}
       onClick={emBreve ? undefined : onClick}
+      ref={referencia}
+      tabIndex={papel === 'escolha' ? ativo ? 0 : -1 : undefined}
       {...papelAria}
+      {...resto}
+      onKeyDown={papel === 'escolha' ? aoTeclar : resto.onKeyDown}
     >
       {ativo && <Icone nome="check" tamanho={20} />}
       {icone && !ativo && <Icone nome={icone} tamanho={20} />}

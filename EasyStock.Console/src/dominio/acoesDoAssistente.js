@@ -75,11 +75,15 @@ export async function executarAcaoDoAssistente(acao, conversa, portas) {
     case ACOES_DO_ASSISTENTE.ENVIAR_CARDAPIO: {
       const link = await portas.obterLinkCardapio(conversa.id)
       if (!link?.url) throw new Error('Não consegui gerar o link do cardápio.')
-      await portas.enviar(conversa.id, textoConviteCardapio(conversa.nome, link.url))
+      if (await portas.enviar(conversa.id, textoConviteCardapio(conversa.nome, link.url)) === false) {
+        throw new Error('Sem confirmação do envio. Confira a conversa antes de tentar de novo.')
+      }
       return
     }
     case ACOES_DO_ASSISTENTE.NOTA_INTERNA:
-      await portas.salvarNota(conversa.id, acao.texto)
+      if (await portas.salvarNota(conversa.id, acao.texto) === false) {
+        throw new Error('Sem confirmação da nota. Confira a ficha antes de tentar de novo.')
+      }
       return
     case ACOES_DO_ASSISTENTE.RASCUNHO:
       portas.definirRascunho(conversa.id, acao.texto)

@@ -8,14 +8,26 @@ import { sugestaoDaApi } from '../../infra/api/traducaoConversas'
 // A marca "Precisa de você" e a ocorrência do modo simulado não nascem aqui: no modo API quem as
 // grava é o EasyStok, e o navegador não finge o que o servidor não fez (F06).
 export function criarAcoesAgenteApi({ despachar }) {
+  let consultaAtual = 0
+  let conversaAtual = null
+  const pendentes = new Map()
   return {
-    consultarAgente: async (id) => {
+    consultarAgente: (id) => {
+      if (pendentes.has(id) && conversaAtual === id) return pendentes.get(id).resposta
+      const consulta = ++consultaAtual
+      conversaAtual = id
       despachar({ tipo: acao.AGENTE_PEDINDO, id })
-      try {
-        despachar({ tipo: acao.AGENTE_RESPONDEU, id, sugestao: sugestaoDaApi(await sugerirResposta(id)) })
-      } catch (erro) {
-        despachar({ tipo: acao.AGENTE_FALHOU, id, erro: erro.message })
-      }
+      const registro = { chamada: pendentes.get(id)?.chamada ?? sugerirResposta(id) }
+      registro.resposta = registro.chamada
+        .then(dados => {
+          if (consulta === consultaAtual) despachar({ tipo: acao.AGENTE_RESPONDEU, id, sugestao: sugestaoDaApi(dados) })
+        })
+        .catch(erro => {
+          if (consulta === consultaAtual) despachar({ tipo: acao.AGENTE_FALHOU, id, erro: erro.message })
+        })
+        .finally(() => { if (pendentes.get(id) === registro) pendentes.delete(id) })
+      pendentes.set(id, registro)
+      return registro.resposta
     },
   }
 }

@@ -87,27 +87,33 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     ...criarAcoesModelosApi({ despachar }),
     enviar: (id, texto, opcoes = {}) => {
       // #1287: texto vazio a API recusa (400); modelo e automática ainda não têm endpoint.
-      if (!texto?.trim()) return
+      if (!texto?.trim()) return false
       if (opcoes.modelo) {
         despachar({ tipo: acao.AVISO_API, mensagem: 'Escolha o modelo e preencha os parâmetros em Modelos aprovados.' })
-        return
+        return false
       }
       const naoLigado = envioNaoLigado(opcoes)
       if (naoLigado) {
         despachar({ tipo: acao.AVISO_API, mensagem: textoNaoLigado(naoLigado) })
-        return
+        return false
       }
       // #1474: defesa em profundidade do composer. Variável sem valor não sai literal ao cliente.
       const variavelSobrando = avisoDeVariaveisNaoResolvidas(texto)
       if (variavelSobrando) {
         despachar({ tipo: acao.AVISO_API, mensagem: variavelSobrando })
-        return
+        return false
       }
       const mensagemId = proximoId('msg')
       despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, agora: agoraRef.current })
-      enviarTexto(id, texto)
-        .then((m) => despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m) }))
-        .catch((erro) => despachar(falhaDoEnvio(id, mensagemId, erro)))
+      return enviarTexto(id, texto)
+        .then((m) => {
+          despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m) })
+          return true
+        })
+        .catch((erro) => {
+          despachar(falhaDoEnvio(id, mensagemId, erro))
+          return false
+        })
     },
     // S57: só no modo API (a massa local não tem envio de verdade). A resposta substitui o balão.
     reenviar: (id, mensagemId) =>

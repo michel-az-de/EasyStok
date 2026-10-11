@@ -51,7 +51,7 @@ function CartaoModulo({ modulo }) {
   )
 }
 
-export function HallDeModulos({ fonteApi = false, sessao = null, agora }) {
+export function HallDeModulos({ fonteApi = false, sessao = null, agora, ajuda }) {
   const { permite, aoSair, notificacoes } = useAcessoModulos()
   const [busca, setBusca] = useState('')
   const buscaRef = useRef(null)
@@ -66,6 +66,7 @@ export function HallDeModulos({ fonteApi = false, sessao = null, agora }) {
       <header className={css.topo}>
         <Marca />
         <div className={css.acoes}>
+          {ajuda}
           <InterruptorTema />
           {notificacoes && <div className={css.avisos}>{notificacoes}</div>}
           {aoSair && <Botao className={css.sair} variante="texto" onClick={aoSair}>{sessao?.persistente ? 'Sair deste aparelho' : 'Sair'}</Botao>}
@@ -75,7 +76,7 @@ export function HallDeModulos({ fonteApi = false, sessao = null, agora }) {
         <div className={css.abertura}>
         <div className={css.cabeca}>
           <p className={css.legenda}>Módulos da casa</p>
-          <h1 className={css.titulo}>{saudacaoDoHall(agora, sessao?.usuario?.nome)}</h1>
+          <h1 className={css.titulo} tabIndex={-1} data-inicio-tela id="conteudo-principal">{saudacaoDoHall(agora, sessao?.usuario?.nome)}</h1>
           <p className={css.apoio}>Escolha uma área ou vá direto à tela que precisa.</p>
           {sessao?.persistente && <p className={css.apoio}>A Cozinha permanece conectada neste aparelho. Use Sair ao trocar de pessoa.</p>}
           {modulos.length === 0 && !busca && <output>Seu perfil ainda não tem módulos liberados. Peça à dona para revisar seu acesso.</output>}
