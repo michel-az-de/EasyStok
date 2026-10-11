@@ -13,7 +13,7 @@ namespace EasyStock.Application.Ports.Output.Notifications;
 /// <param name="SimuladoNaUltimaHora">Mensagens que terminaram <c>Simulado</c> (stub ou console) na última hora.</param>
 /// <param name="IndeterminadoNaUltimaHora">Mensagens que terminaram <c>Indeterminado</c> na última hora.</param>
 /// <param name="ExpiradoNaUltimaHora">Mensagens que expiraram por prazo na última hora.</param>
-/// <param name="ProcessadoSemOutboxEm24h">Eventos <c>Processado</c> nas últimas 24 h sem nenhuma mensagem no outbox.</param>
+/// <param name="ProcessadoSemOutboxEm24h">Eventos <c>Processado</c> nas últimas 24 h (e ocorridos nas últimas 48 h) sem nenhuma mensagem no outbox.</param>
 public sealed record BacklogNotificacoes(
     TimeSpan? IdadeDoPendenteElegivelMaisAntigo,
     TimeSpan? IdadeDoEventoPendenteMaisAntigo,
