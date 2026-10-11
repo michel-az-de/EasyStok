@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { listarJanelasPedido, trocarJanelaPedido } from '../infra/api/comandaApi'
+import { dataIsoNoFuso, somarDiasIso } from '../dominio/formato'
 
 export function useReagendamentoPedido(pedidoId, aoSalvar = null, aoAlterado = null) {
   const [data, setData] = useState('')
+  const [hoje] = useState(() => dataIsoNoFuso(Date.now()))
   const [leitura, setLeitura] = useState(null)
   const [escolhida, setEscolhida] = useState('')
   const [avisar, setAvisar] = useState(false)
@@ -47,7 +49,7 @@ export function useReagendamentoPedido(pedidoId, aoSalvar = null, aoAlterado = n
     }
   }
 
-  return { data, mudarData: (valor) => { setData(valor); setEscolhida(''); setErro(null) },
+  return { data, min: hoje, max: somarDiasIso(hoje, 14), mudarData: (valor) => { setData(valor); setEscolhida(''); setErro(null) },
     leitura, escolhida, escolher: setEscolhida, avisar, mudarAviso: setAvisar, erro, aviso, enviando, salvar,
     recarregar: () => { setErro(null); setRevisao((v) => v + 1) } }
 }

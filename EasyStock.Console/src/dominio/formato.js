@@ -31,6 +31,9 @@ export const dataIsoNoFuso = (ms) => {
   return `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
 }
 
+export const somarDiasIso = (data, quantidade) =>
+  new Date(new Date(`${data}T12:00:00Z`).getTime() + quantidade * 86400000).toISOString().slice(0, 10)
+
 // Hora em mono sem dois-pontos ("12h30"), para o contexto do cartão do Balcão
 // (seção 1, rodada 5) e o sininho. Mesma conta de `horaComH` em dominio/lembrete.js,
 // exportada aqui porque os dois passam a precisar dela.

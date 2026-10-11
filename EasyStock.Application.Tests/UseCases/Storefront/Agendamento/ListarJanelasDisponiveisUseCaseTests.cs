@@ -237,6 +237,24 @@ public class ListarJanelasDisponiveisUseCaseTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_LimiteDe14Dias_AceitaUltimoDiaERecusaSeguinte()
+    {
+        var f = BuildFakes();
+        var hoje = new DateOnly(2026, 6, 1);
+        var ultimoDia = hoje.AddDays(14);
+        var janela = CriarJanela(f.Storefront.Id, ultimoDia);
+        f.JanelaRepo.GetAtivasDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new List<JanelaEntrega> { janela });
+
+        var useCase = BuildUseCase(f);
+        var dentro = await useCase.ExecuteAsync(new(SlugValido, ultimoDia, ultimoDia, null));
+        dentro.Should().ContainSingle(j => j.Data == ultimoDia);
+
+        var fora = () => useCase.ExecuteAsync(new(SlugValido, ultimoDia.AddDays(1), ultimoDia.AddDays(1), null));
+        await fora.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*14 dias*");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_StorefrontInexistente_LancaStorefrontNaoEncontradoException()
     {
         var f = BuildFakes();

@@ -153,6 +153,19 @@ public class CheckoutCoreServiceTests
         Origem: "storefront",
         Slug: "casa-da-baba");
 
+    [Fact]
+    public async Task Reserva_RecusaDataApos14DiasSemCriarPedido()
+    {
+        var c = new Cenario();
+        var dataFora = DataEntrega.AddDays(14);
+
+        var acao = () => c.Servico().CriarPedidoComReservaAsync(Input(c) with { DataEntrega = dataFora });
+
+        await acao.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*14 dias*");
+        c.PedidosAdicionados.Should().BeEmpty();
+        await c.VagaRepo.DidNotReceiveWithAnyArgs().OcuparAsync(default, default, default, default);
+    }
+
     // ── M1.4b (#1531): vender por porção ─────────────────────────────────
 
     private static (CardapioItemVariacao P300, CardapioItemVariacao P800, Guid VariacaoEstoque) ComPorcoes(Cenario c)

@@ -116,23 +116,22 @@ módulo próprio com cadastros e relatórios, e o painel do dia não pode piorar
 
 ### M8.2 · Encomenda para data futura e agenda
 
-**Execução parcial em 10/10/2026.** A comanda no modo API permite escolher o dia e consulta as janelas daquela data. Pedido criado pela tela para daqui a dez dias ocupou uma única vaga no PostgreSQL local; lembretes M3.8 também conferidos (seção 31 do plano de ondas). Agenda, limite futuro de D8-02, pagamento de D8-03 e os demais aceites deste item continuam pendentes. O limite existente de 60 dias trata a extensão da consulta, sem definir quantos dias à frente podem ser escolhidos.
+**Execução parcial em 10/10/2026.** A comanda escolhe o dia, a agenda de sete dias lê pedidos e vagas ativas por janela, e a API limita oferta, reserva e reagendamento a hoje + 14 dias, conforme D8-02. O limite de 60 dias continua sendo apenas o tamanho máximo da consulta. D8-03 foi decidido: sinal de 50% na reserva e restante na entrega. O fluxo de duas cobranças é uma fatia própria e ainda não foi ativado; o checkout atual continua cobrando o valor integral.
 
-**Problema.** O backend reserva vaga em qualquer data dos próximos 60 dias, mas a tela não deixa escolher o
-dia: a comanda mostra as 10 primeiras janelas com vaga e nenhuma tela mostra o que está marcado para a
-semana. Encomenda de sábado feita na terça vira conversa e caderno.
+**Problema original.** A reserva não tinha horizonte futuro e a comanda mostrava apenas as primeiras
+janelas com vaga, sem uma agenda dos próximos dias. Encomenda de sábado feita na terça virava conversa e caderno.
 **Abordagem.**
 - Comanda (`SeletorJanelaApi.jsx`): seletor de dia (hoje, amanhã, calendário até o limite de D8-02) que manda `DataInicio`/`DataFim`, já aceitos por `ListarJanelasAtendimentoInput` (`ListarJanelasAtendimentoUseCase.cs:8-13`); a lista mostra as janelas daquele dia.
 - Agenda `#/m/entregas/agenda`: `GET api/atendimento/agenda?de&ate` (Operador), leitura nova que agrega `VagaOcupada` ativa por data e janela (ocupadas de capacidade) e lista os pedidos de cada janela; bloqueios (S45) aparecem como dia fechado.
 - O agente (`listar_janelas`) já usa o mesmo use case: só ganha o parâmetro de data, sem regra nova.
-- Pagamento da encomenda segue D8-03; com a opção A não muda nada (RN-23: pedido antes, cobrança na hora, link reemitido pelo job da S11).
+- Pagamento segue D8-03 B, em fatia própria: sinal de 50% na reserva e saldo na entrega. Ajustar confirmação parcial, reemissão, quitação e Caixa antes de ativar a cobrança.
 **Aceite.**
-- [ ] Pedido criado na conversa para daqui a 10 dias ocupa a vaga daquele dia e aparece na agenda.
-- [ ] Dia bloqueado não oferece janela; data além do limite volta 400 com o motivo.
-- [ ] A agenda e a oferta contam a mesma vaga (uma regra só, ADR-0014).
-- [ ] Encomenda de amanhã aparece em "Amanhã" na cozinha (M4.6) e gera o lembrete da véspera (M3.8).
+- [x] Pedido criado na conversa para daqui a 10 dias ocupa a vaga daquele dia e aparece na agenda (provas locais das seções 31 e 32 do plano de ondas).
+- [x] Dia bloqueado não oferece janela; data além do limite volta 400 com o motivo (teste de bloqueio e HTTP local do 15º dia).
+- [x] A agenda e a oferta contam a mesma vaga (comparação HTTP local, ADR-0014).
+- [x] Encomenda de amanhã aparece em "Amanhã" na cozinha (M4.6) e gera o lembrete da véspera (M3.8, seção 31).
 **Testes (Red).** `AgendaEntregasQueryTests.ContaVagasPorJanelaEData`, `...BloqueioFechaDia`; `prova-m8-agenda.mjs`.
-**Fora.** Encomenda com sinal ou pagamento parcial (D8-03 B); recorrência ("toda sexta").
+**Fora desta fatia.** Cobrança em duas partes (D8-03 B); recorrência ("toda sexta").
 **Depende de.** M8.1. **Tamanho.** M · **Tier.** baixo (sem migração) · **Rollback.** revert; a comanda volta às 10 primeiras.
 
 ### M8.3 · Endereço de entrega no próprio pedido
@@ -218,11 +217,13 @@ F12 paridade do painel (plano irmão) · M8.5 relatórios (independente)
 - C) Os dois: link agora, login para quem for fixo da casa.
 
 **D8-02 · Até quantos dias à frente a encomenda pode ser marcada**
+- **Decidido por Felipe em 10/10/2026: C, 14 dias.**
 - A) (Recomendado) 60 dias, o limite que o código já impõe.
 - B) 30 dias.
 - C) 14 dias, o padrão atual da oferta.
 
 **D8-03 · Pagamento da encomenda**
+- **Decidido por Felipe em 10/10/2026: B, sinal de 50% na reserva e restante na entrega. Implementação pendente em fatia própria.**
 - A) (Recomendado) Igual ao pedido do dia: pedido e cobrança na hora (RN-23), link reemitido pelo job da S11.
 - B) Sinal na hora e o resto perto da data (cobrança em duas partes, fatia nova).
 - C) Cobrar só perto da data, com a vaga reservada sem pagamento.

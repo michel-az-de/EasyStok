@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { Bloco } from '../../componentes/Bloco'
 import { CampoTexto } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
+import { dataIsoNoFuso, somarDiasIso } from '../../dominio/formato'
 import { useAcoes } from '../../aplicacao/contextos'
 import { useReagendamentoPedido } from '../../aplicacao/useReagendamentoPedido'
 import { EscolhaJanelaPedido } from '../../componentes/EscolhaJanelaPedido'
 import css from './ficha.module.css'
+
 
 // Rascunho escolhe a janela localmente; pedido criado troca a vaga no servidor (M3.4).
 // Ambos usam vagas da vitrine que respeitam o prazo de preparo (S16).
@@ -24,6 +26,7 @@ function EscolhaRascunho({ pedido, editavel, aoEscolher }) {
   const [janelas, setJanelas] = useState(null)
   const [erro, setErro] = useState(null)
   const [data, setData] = useState('')
+  const [hoje] = useState(() => dataIsoNoFuso(Date.now()))
   // Recarrega quando muda o que entra no prazo (os itens), não a cada quantidade.
   const skus = [...new Set(pedido.itens.map((l) => l.sku))].sort().join(',')
 
@@ -44,6 +47,7 @@ function EscolhaRascunho({ pedido, editavel, aoEscolher }) {
   return (
     <Bloco titulo="Janela de entrega">
       <CampoTexto rotulo="Dia da entrega (opcional)" tipo="date" value={data} disabled={!editavel}
+        min={hoje} max={somarDiasIso(hoje, 14)}
         onChange={(e) => { setData(e.target.value); aoEscolher(null) }} />
       {janelas === null && !erro && <p className={css.corpoBloco}>Carregando janelas…</p>}
       {janelas?.length === 0 && !erro && (
