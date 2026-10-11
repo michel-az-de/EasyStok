@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
@@ -22,6 +22,7 @@ import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { BaixaAMao } from './BlocoCobranca'
 import { MenuDoPedido } from './MenuDoPedido'
 import { EscolhaDeMeio } from './EscolhaDeMeio'
+import { criarExecucaoDaEtapa, houveAvancoConfirmado, marcoDaComanda } from './progressoDaComanda'
 import css from './ficha.module.css'
 
 // Rótulo curto sob cada ícone da trilha (banca estética, item 3). O nome
@@ -87,7 +88,7 @@ function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, aoAbrirBaixa, aoGer
 // alvo só, fixo no rodapé da coluna Ficha, no lugar de `BlocoEsteira` (que
 // listava os seis passos soltos) e da barra antiga somados.
 export function BarraProximoPasso({
-  pedido, nomeCliente, agora, emDesfazer, bloqueado = false, prerequisito = null, aoAvancar, aoDesfazer,
+  pedido, conversaId, nomeCliente, agora, emDesfazer, bloqueado = false, prerequisito = null, aoAvancar, aoDesfazer,
   aoGerarPix, aoReenviarPix, aoConfirmarPagamento, aoAceitarDivergencia, aoCobrarDiferenca,
   aoVoltarEtapa, aoCancelarPedido, aoMarcarEstorno, aoEncerrarAtendimento, aoDesfazerPagamento, aoAprovarPedido,
 }) {
@@ -106,7 +107,23 @@ export function BarraProximoPasso({
   // No modo API, só ações ligadas aparecem. O erro fica ao lado do botão.
   const disponivel = useAcaoDisponivel()
   const [erroAcao, setErroAcao] = useState(null)
-  const [emVoo, setEmVoo] = useState(false)
+  const [marcoEmVoo, setMarcoEmVoo] = useState(null)
+  const emVoo = Boolean(marcoEmVoo)
+  const [executarUmaVez] = useState(criarExecucaoDaEtapa)
+  const [trilhaAberta, setTrilhaAberta] = useState(false)
+  const idTrilha = useId()
+  const marco = marcoDaComanda(pedido, conversaId)
+  const [marcoVisto, setMarcoVisto] = useState(marco)
+  const [confirmacao, setConfirmacao] = useState(null)
+  if (marco.chave !== marcoVisto.chave || marco.estado !== marcoVisto.estado) {
+    setMarcoVisto(marco)
+    setConfirmacao(houveAvancoConfirmado(marcoVisto, marco) ? marco.estado : null)
+  }
+  useEffect(() => {
+    if (!confirmacao) return undefined
+    const id = setTimeout(() => setConfirmacao(null), 2400)
+    return () => clearTimeout(id)
+  }, [confirmacao])
   // UC-06 passo 5: motivo é obrigatório, valor nasce com o que foi pago e dá
   // para editar para um estorno parcial (RN-36 não promete sempre o total).
   // Em centavos por dentro (seção 4 da direção visual, passo zero): a tela só
@@ -116,19 +133,21 @@ export function BarraProximoPasso({
   // Rodada 12 (issue #13): motivo do "Desfazer pagamento", obrigatório.
   const [motivoDesfazer, setMotivoDesfazer] = useState('')
 
-  // Ação que vai ao EasyStok devolve uma promessa; `{ erro }` fica ao lado do botão até o
-  // pedido mudar de etapa. Clique repetido com a primeira em voo é ignorado.
+  // O retorno pertence ao pedido e à etapa que iniciaram a ação. A espera só termina
+  // com a Promise, inclusive quando o rascunho ganha pedidoId durante a recarga.
   const executar = (fazer) => {
     if (emVoo) return
     setErroAcao(null)
-    const ida = fazer()
-    if (!ida?.then) return
-    setEmVoo(true)
-    const estadoNaHora = pedido.estado
-    ida.then((r) => { if (r?.erro) setErroAcao({ estado: estadoNaHora, texto: r.erro }) })
-      .finally(() => setEmVoo(false))
+    const marcoNaHora = marco
+    return executarUmaVez(fazer, {
+      aoOcupar: () => setMarcoEmVoo(marcoNaHora),
+      aoFalhar: texto => setErroAcao({ ...marcoNaHora, texto }),
+      aoLiberar: () => setMarcoEmVoo(null),
+    })
   }
-  const erroVisivel = erroAcao?.estado === pedido.estado ? erroAcao.texto : null
+  const erroVisivel = erroAcao?.chave === marco.chave && erroAcao.estado === marco.estado ? erroAcao.texto : null
+  const textoDaEspera = marcoEmVoo?.chave === marco.chave
+    ? 'Confirmando alteração…' : 'Concluindo a ação iniciada nesta conversa…'
 
   useEffect(() => {
     if (!emDesfazer) return undefined
@@ -138,7 +157,7 @@ export function BarraProximoPasso({
 
   if (emDesfazer && restam > 0) {
     return (
-      <div className={`${css.barraPasso} ${css.barraDesfazer}`}>
+      <div className={`${css.barraPasso} ${css.barraDesfazer}`} data-etapa-confirmada>
         <Icone nome="check" />
         <span className={css.barraTexto}>{nomeCliente} avisada</span>
         <Botao onClick={aoDesfazer}>Desfazer · {restam}</Botao>
@@ -326,21 +345,28 @@ export function BarraProximoPasso({
   const confirmarCancelamento = async () => {
     if (cancelando.current) return
     cancelando.current = true
-    setEmVoo(true)
+    setMarcoEmVoo(marco)
     setErroCancelar(null)
     try {
       const resultado = await aoCancelarPedido(motivoCancelar.trim())
       if (resultado?.erro) setErroCancelar(resultado.erro)
       else setConfirmando(null)
     } catch (erro) { setErroCancelar(erro.message || 'Não foi possível cancelar. Tente de novo.') }
-    finally { cancelando.current = false; setEmVoo(false) }
+    finally { cancelando.current = false; setMarcoEmVoo(null) }
   }
 
   return (
-    <div className={css.barraPasso}>
+    <div className={css.barraPasso} data-etapa-confirmada={confirmacao ? '' : undefined}>
+      <button type="button" className={css.resumoAndamento} aria-expanded={trilhaAberta}
+        aria-controls={idTrilha} onClick={() => setTrilhaAberta(aberta => !aberta)}>
+        <span>Andamento <span className={css.contagemEtapa}>Etapa {marco.indice + 1} de {marco.total}</span></span>
+        <span className={css.abrirEtapas}>{trilhaAberta ? 'Recolher' : 'Ver etapas'}<Icone nome={trilhaAberta ? 'chevron-up' : 'chevron-down'} tamanho={16} /></span>
+      </button>
+      <div id={idTrilha} hidden={!trilhaAberta}>
       <ol
         className={css.trilha}
-        style={{ '--progresso': Math.max(0, PASSOS.findIndex((p) => situacaoDoPasso(p.id, pedido.estado).chave === 'atual')) / (PASSOS.length - 1) }}
+        aria-label="Etapas do pedido"
+        style={{ '--progresso': Math.max(0, marco.indice) / (marco.total - 1) }}
       >
         {PASSOS.map((passo) => {
           const situacao = situacaoDoPasso(passo.id, pedido.estado)
@@ -348,6 +374,7 @@ export function BarraProximoPasso({
           return (
             <li
               key={passo.id}
+              aria-current={situacao.chave === 'atual' ? 'step' : undefined}
               className={`${css.trilhaItem} ${css[situacao.chave === 'proximo' ? 'futuro' : situacao.chave]} ${concluido ? css.concluido : ''}`}
               aria-label={`${naFilaSemQuitar && passo.id === 'pago' ? 'Fila' : passo.rotulo}, ${situacao.rotulo}`}
             >
@@ -359,6 +386,7 @@ export function BarraProximoPasso({
           )
         })}
       </ol>
+      </div>
 
       <div className={css.ondeEsta}>
         <Icone nome={iconeEstado} tamanho={32} />
@@ -373,8 +401,13 @@ export function BarraProximoPasso({
         </div>
       </div>
 
+      {(emVoo || confirmacao) && <output className={css.retornoEtapa} aria-live="polite">
+        <Icone nome={emVoo ? 'relogio' : 'check'} tamanho={16} />
+        {emVoo ? textoDaEspera : 'Etapa atualizada.'}
+      </output>}
+
       {confirmando === null && !abrindoBaixa && (
-        <div className={css.linhaAcao}>
+        <div className={css.linhaAcao} aria-busy={emVoo}>
           {corpoAcao}
           <MenuDoPedido
             podeCancelar={podeCancelar}

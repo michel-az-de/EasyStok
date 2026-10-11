@@ -14,14 +14,14 @@
      que precisa parar antes do rodapé. */
   display: flex; flex-direction: column;
 }
-.caixa[open] { animation: entrar var(--dur-media) var(--ease-mola) both; }
+.caixa[open] { animation: entrar var(--dur-media) var(--ease-saida) both; }
 .caixa::backdrop {
   background: var(--cortina);
   backdrop-filter: blur(6px) saturate(120%);
   animation: cortina var(--dur-media) var(--ease-padrao) both;
 }
 @keyframes entrar {
-  from { opacity: 0; transform: translateY(12px) scale(.96); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
 @keyframes cortina { from { opacity: 0; } to { opacity: 1; } }
