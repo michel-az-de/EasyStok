@@ -92,6 +92,7 @@ export const MODULOS = [
     resumo: 'Janelas, entregadores e viagens',
     telas: [
       { id: 'painel', rotulo: 'Painel de entregas', tipo: TELA_OPERACAO },
+      { id: 'agenda', rotulo: 'Agenda de encomendas', tipo: TELA_OPERACAO, soApi: true },
       { id: 'janelas', rotulo: 'Janelas de entrega', tipo: TELA_AJUSTE, aba: 'janelas' },
     ],
   },

@@ -86,6 +86,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IViagemRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ViagemRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IChamadoEntregadorRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ChamadoEntregadorRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IEntregasPorBairroQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.EntregasPorBairroQuery>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IAgendaPedidosQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.AgendaPedidosQuery>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICandidatosLembreteQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.CandidatosLembreteQuery>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IExpedienteLojaRepository, EasyStock.Infra.Postgre.Repositories.Storefront.ExpedienteLojaRepository>();
             services.AddScoped<IPreferenciaMenuRepository, PreferenciaMenuRepository>();

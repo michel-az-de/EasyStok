@@ -38,6 +38,7 @@ const ROTA_DA_OPERACAO = {
   'atendimento/balcao': ROTA_PRINCIPAL,
   'cozinha/fila': ROTA_COZINHA,
   'entregas/painel': ROTA_ENTREGAS,
+  'entregas/agenda': ROTA_ENTREGAS,
 }
 
 function rotaDoModulo(caminho, fonteApi) {
