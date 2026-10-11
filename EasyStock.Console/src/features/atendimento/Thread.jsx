@@ -3,6 +3,7 @@ import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
 import { rotuloDoDia } from '../../dominio/formato'
 import { intercalarNotas } from '../../dominio/notas'
+import { useChamadaEstavel } from '../../hooks/useChamadaEstavel'
 import { Balao } from './Balao'
 import css from './atendimento.module.css'
 
@@ -67,6 +68,9 @@ export function Thread({
   mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, digitando = false, notas = [],
 }) {
   const fim = useRef(null)
+  // #1577: o pai recria os dois handlers a cada render; com identidade fixa o `memo` do balão segura.
+  const abrirDefinicaoAutomatica = useChamadaEstavel(aoAbrirDefinicaoAutomatica)
+  const reenviar = useChamadaEstavel(aoReenviar)
 
   useEffect(() => {
     fim.current?.scrollIntoView({ block: 'end' })
@@ -110,8 +114,9 @@ export function Thread({
             key={l.chave}
             mensagem={l.mensagem}
             trocaDeVoz={l.trocaDeVoz}
-            aoAbrirDefinicaoAutomatica={aoAbrirDefinicaoAutomatica}
-            aoReenviar={aoReenviar}
+            aoAbrirDefinicaoAutomatica={abrirDefinicaoAutomatica}
+            // Sem a ação (demonstração) o balão não mostra o Reenviar.
+            aoReenviar={aoReenviar ? reenviar : undefined}
           />
         )
       })}

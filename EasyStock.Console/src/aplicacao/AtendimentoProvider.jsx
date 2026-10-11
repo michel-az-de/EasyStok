@@ -35,6 +35,7 @@ import { useSincronizacaoApi } from './useSincronizacaoApi'
 import { deveCarregarDossie } from './planoDeSincronizacao'
 import { useLembretesApi } from './useLembretesApi'
 import { gravarRascunhos, lerRascunhos } from '../infra/api/rascunhosDaSessao'
+import { comRascunhoDoCampo } from './rascunhoLocal'
 import { comandasLocaisDaVisita, restaurarComandasDaVisita } from './comandasDaVisita'
 
 const carregar = () => ({
@@ -107,6 +108,14 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   const estadoRef = useRef(estado)
   useEffect(() => { estadoRef.current = estado }, [estado])
   const consultaLembretes = useLembretesApi({ ativo: FONTE_API && atendimentoAtivo, despachar, estadoRef })
+
+  // #1577: o campo de escrever descarrega com a tela saindo (401, ida ao Hall, aba oculta). O despacho pode
+  // não render mais e o efeito de `gravarRascunhos` lá em cima não roda; aqui o texto vai direto ao storage.
+  const sessaoRef = useRef(sessao)
+  useEffect(() => { sessaoRef.current = sessao }, [sessao])
+  const guardarRascunhoJa = useCallback((despacho) => {
+    if (FONTE_API) gravarRascunhos(sessaoRef.current, comRascunhoDoCampo(estadoRef.current, despacho).rascunhos)
+  }, [])
 
   // Sincronia com a janela de Entregas (seção 6): esta janela é sempre a
   // "principal" do canal. Sem nenhuma janela de Entregas aberta, o canal só
@@ -208,7 +217,8 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
 
   const acoes = useMemo(() => criarAcoes({
     despachar, agoraRef, estadoRef, pendentes, consultarAgente, perguntarAssistente, pedirNotificacaoDoNavegador,
-  }), [consultarAgente, perguntarAssistente, pedirNotificacaoDoNavegador])
+    guardarRascunhoJa,
+  }), [consultarAgente, perguntarAssistente, pedirNotificacaoDoNavegador, guardarRascunhoJa])
 
   // Item 7 (Sininho revê o que soou enquanto ela estava fora) e item 2 (selo
   // "novo, não visto" do pagamento, independente do prazo de 10 min do sinal
@@ -347,6 +357,8 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       automaticoPausado: estado.automaticoPausado,
       alertasEstoque: estado.alertasEstoque,
       rascunho: estado.rascunhos[estado.selecionadaId] ?? '',
+      // #1577: carimbo de escrita de fora do campo; é por ele que o campo adota o rascunho global.
+      escritaDeFora: estado.escritasDeFora?.[estado.selecionadaId] ?? 0,
       // Ordenado aqui, uma vez só: quem lê `visiveis` (Balcão e o "abrir
       // primeira conversa" da ficha e do atendimento) precisa enxergar a
       // mesma ordem, senão o botão de estado vazio abre uma conversa

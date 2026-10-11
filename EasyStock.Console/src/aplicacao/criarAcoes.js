@@ -37,6 +37,7 @@ const mesPorExtenso = (ms) =>
 // `pendentes` guarda os timers da entrega simulada, para o Provider limpar ao desmontar.
 export function criarAcoes({
   despachar, agoraRef, estadoRef, pendentes, consultarAgente, perguntarAssistente, pedirNotificacaoDoNavegador,
+  guardarRascunhoJa,
 }) {
   const enviar = (id, texto, opcoes = {}) => {
     const mensagemId = proximoId('msg')
@@ -87,6 +88,12 @@ export function criarAcoes({
     ajustarObservacao: (id, sku, texto) => despachar({ tipo: acao.AJUSTAR_OBSERVACAO, id, sku, texto }),
     mudarFiltro: (chave, valor) => despachar({ tipo: acao.MUDAR_FILTRO, chave, valor }),
     definirRascunho: (id, texto) => despachar({ tipo: acao.DEFINIR_RASCUNHO, id, texto }),
+    // #1577: texto do campo de escrever, que chega na pausa da digitação. `ja` é a tela saindo (401, Hall,
+    // aba oculta): o despacho pode não render mais, então o Provider também grava direto.
+    descarregarRascunho: (despacho, { ja = false } = {}) => {
+      despachar({ tipo: acao.DEFINIR_RASCUNHO, ...despacho, doCampo: true })
+      if (ja) guardarRascunhoJa?.(despacho)
+    },
     reabrir: (id) => despachar({ tipo: acao.REABRIR_CONVERSA, id }),
     trocarJanela: (id, janela) => despachar({ tipo: acao.TROCAR_JANELA, id, janela }),
     removerItem: (id, sku) => despachar({ tipo: acao.REMOVER_ITEM, id, sku }),

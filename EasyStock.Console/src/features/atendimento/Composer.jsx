@@ -4,6 +4,7 @@ import { CampoArea } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes } from '../../aplicacao/contextos'
 import { useAtalhoBarra } from '../../aplicacao/useAtalhoBarra'
+import { useRascunhoLocal } from '../../aplicacao/useRascunhoLocal'
 import { aceitaFormato, motivoDeFormato, restricoesDoCanal } from '../../dominio/canal'
 import {
   mensagemDeArquivoAnexado, mensagemDeAudio, mensagemDeImagemAnexada, tipoDeArquivo, validarArquivo,
@@ -21,11 +22,16 @@ import { ModalEnviarModelo } from './ModalEnviarModelo'
 import css from './atendimento.module.css'
 
 export function Composer({
-  conversa, canal, podeEscrever, motivo, rascunho,
-  aoMudarRascunho, aoEnviar, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
+  conversa, canal, podeEscrever, motivo, rascunho: rascunhoGlobal, escritaDeFora,
+  aoEnviar, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
   aoReabrir, reabrindo = false, podeEnviarModelo = false,
 }) {
   const { enviarMidia, enviar, obterLinkCardapio } = useAcoes()
+  // #1577: a tecla muda só este campo. O rascunho global recebe o texto na pausa da digitação, ou na hora
+  // em blur, envio e saída da tela; `aoMudarRascunho` (resposta pronta, limpar) também vai na hora.
+  const { texto: rascunho, digitar, escrever: aoMudarRascunho, descarregar } = useRascunhoLocal({
+    conversaId: conversa.id, rascunho: rascunhoGlobal, escritaDeFora,
+  })
   // Seletor rápido (#1441): "/" no campo ou o botão Respostas abrem a lista
   // compacta de respostas prontas; Enter insere no campo.
   const barra = useAtalhoBarra({ rascunho, conversa, aoInserir: aoMudarRascunho })
@@ -82,7 +88,9 @@ export function Composer({
     }
     // Enter com o campo vazio não manda balão vazio (#1287).
     if (!rascunho.trim()) return
-    aoEnviar()
+    // O campo é quem tem o texto de agora; o rascunho global pode estar uma pausa atrás.
+    descarregar()
+    aoEnviar(rascunho)
   }
 
   // #1444 (homologação 07/10: "não sei se ele tá enviando"): o gravador fica no lugar mostrando o
@@ -188,7 +196,8 @@ export function Composer({
                     // Respostas, com rótulo, já mostra o caminho, e a frase longa
                     // quebrava em três linhas no campo (rodada 10, integração).
                     : `Escreva para ${conversa.nome.split(' ')[0]}`}
-                onChange={(e) => aoMudarRascunho(e.target.value)}
+                onChange={(e) => digitar(e.target.value)}
+                onBlur={() => descarregar()}
                 onKeyDown={(e) => {
                   if (barra.aoTeclar(e)) return
                   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarComposer() }

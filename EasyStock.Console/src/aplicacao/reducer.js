@@ -54,6 +54,7 @@ import { FUNCIONAMENTO_PADRAO } from '../dominio/funcionamento'
 import { REGRA_FIDELIDADE_PADRAO, pontosGanhosNoPedido } from '../dominio/fidelidade'
 import { FIDELIDADE_SEMENTE } from '../infra/fidelidadeSemente'
 import { mesmoConteudo } from './igualdade'
+import { comRascunhoDeFora, comRascunhoDoCampo } from './rascunhoLocal'
 
 export const ATENDENTE = 'Thatiane'
 
@@ -78,6 +79,8 @@ export function estadoInicial({
     // "Precisa de você" virou filtro com contador.
     filtros: { busca: '', aba: 'todas', canais: [], ordenacao: 'urgencia', responsavel: 'todas' },
     rascunhos: {},
+    // #1577: quantas vezes cada rascunho foi escrito de fora do campo (ver rascunhoLocal.js).
+    escritasDeFora: {},
     automaticoPausado: {},
     // Lista, não campo único: dois desacertos de saldo antes dela clicar
     // "Entendi" no primeiro não podem apagar um ao outro (QA2-16).
@@ -390,9 +393,9 @@ const CASOS = {
 
   // O rascunho vive no estado da conversa, não dentro do componente. Assim o
   // agente e as respostas rápidas escrevem nele sem truque de remontagem.
-  [acao.DEFINIR_RASCUNHO]: (estado, { id, texto }) => ({
-    ...estado, rascunhos: { ...estado.rascunhos, [id]: texto },
-  }),
+  // #1577: o campo de escrever manda o texto na pausa da digitação (`doCampo`); o resto é escrita de fora.
+  [acao.DEFINIR_RASCUNHO]: (estado, { id, texto, doCampo = false, escritaVista }) =>
+    (doCampo ? comRascunhoDoCampo(estado, { id, texto, escritaVista }) : comRascunhoDeFora(estado, id, texto)),
 
   [acao.ENVIAR_MENSAGEM]: (estado, { id, texto, agora, mensagemId, modelo = false, automatica = false, regra = null }) => {
     if (recusaEnvio(estado, id, agora)) return estado
@@ -404,7 +407,7 @@ const CASOS = {
       estado: c.estado === 'Aberto' ? 'Em atendimento' : c.estado,
       responsavel: c.responsavel ?? ATENDENTE,
     }))
-    const comRascunhoLimpo = { ...base, rascunhos: { ...base.rascunhos, [id]: '' } }
+    const comRascunhoLimpo = comRascunhoDeFora(base, id, '')
     if (automatica) return comRascunhoLimpo
     return {
       ...comRascunhoLimpo,

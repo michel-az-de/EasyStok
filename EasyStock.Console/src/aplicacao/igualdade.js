@@ -13,3 +13,11 @@ export function mesmoConteudo(a, b) {
   return chaves.length === Object.keys(b).length
     && chaves.every((chave) => Object.hasOwn(b, chave) && mesmoConteudo(a[chave], b[chave]))
 }
+
+// Comparação de props para `memo` (#1577): cada prop é a mesma ou, nas chaves de `porConteudo`, tem o mesmo
+// conteúdo. Serve ao dado que a sincronização relê como objeto novo sem ter mudado (mensagem da conversa).
+export function mesmasProps(antes, depois, porConteudo = []) {
+  const chaves = Object.keys(antes)
+  return chaves.length === Object.keys(depois).length && chaves.every((chave) => Object.hasOwn(depois, chave)
+    && (Object.is(antes[chave], depois[chave]) || (porConteudo.includes(chave) && mesmoConteudo(antes[chave], depois[chave]))))
+}

@@ -1,6 +1,7 @@
+import { memo } from 'react'
 import { Avatar } from '../../componentes/Avatar'
 import { Icone } from '../../componentes/Icone'
-import { useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { useCatalogo } from '../../aplicacao/contextos'
 import { sinalVerde } from '../../dominio/cobranca'
 import { ehLead, previaDaConversa, tagCorrespondida } from '../../dominio/conversa'
 import { motivoDePrecisar, respostaAtrasada } from '../../dominio/automatico'
@@ -68,22 +69,22 @@ function motivoDaLinha(motivo) {
 // resposta; e, miúdo, quem está com a conversa (ou o motivo de precisar dela)
 // seguido do contexto que existir (origem da passagem, pedido, entrega,
 // janela, tag).
-export function CartaoConversa({
-  conversa, selecionada, agora, automaticoPausado, aberta = true, expediente = null, grupo, busca, aoAbrir,
+// #1577: em `memo`, e sem ler o estado do Balcão. O que é da conversa (`pausado`, `pagamentoNaoVisto`) desce
+// já resolvido, senão a mudança de UMA conversa re-renderizava a lista inteira.
+export const CartaoConversa = memo(function CartaoConversa({
+  conversa, selecionada, agora, pausado = false, pagamentoNaoVisto = false, aberta = true, expediente = null,
+  grupo, busca, aoAbrir,
 }) {
   const { canais, janelas } = useCatalogo()
-  const { pagamentosNaoVistos } = useAtendimento()
   const canal = canalDaConversa(canais, conversa)
-  const pausado = automaticoPausado?.[conversa.id] ?? false
   const motivo = grupo ? null : motivoDaLinha(motivoDePrecisar(conversa, agora, pausado, aberta, janelas, expediente))
   const slaEstourado = !grupo && respostaAtrasada(conversa, agora, pausado, expediente)
   const estado = estadoDaLinha(conversa, { pausado, grupo, motivo })
   // Rodada 12 (issue #16): "Passou para você" sem origem obrigava a abrir a
   // conversa para saber por quê. O contexto diz quem passou, a hora e o motivo.
   const origem = motivo?.chave === 'passagem' ? origemDaPassagem(conversa.passagem) : null
-  // Item 2 (rodada 10, achado 4): selo "novo, não visto" do pagamento,
+  // Item 2 (rodada 10, achado 4): selo "novo, não visto" do pagamento (`pagamentoNaoVisto`),
   // independente do sinal verde (RN-25) já ter expirado.
-  const pagamentoNaoVisto = pagamentosNaoVistos?.has(conversa.id) ?? false
 
   // Janela de 24 h fechada (só modelo) vence a hora do pedido; a tag que achou
   // só aparece quando o nome sozinho não explicaria a busca (US-016).
@@ -171,4 +172,4 @@ export function CartaoConversa({
       </span>
     </button>
   )
-}
+})
