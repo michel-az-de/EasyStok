@@ -41,8 +41,10 @@ export function instanteNoFuso({ ano, mes, dia, horas = 0, minutos = 0 }) {
 
 // #1600: o dia e a hora de parede que o domínio calcula são os DA LOJA. `setHours` no lugar disto
 // lê o fuso do aparelho: depois das 21 h de Brasília o UTC já é amanhã, e em Tóquio é amanhã desde
-// o meio-dia. `ms` aceita instante em ms ou ISO.
+// o meio-dia. `ms` aceita instante em ms ou ISO; data inválida dá NaN, como o `setHours` dava
+// (`partesNoFuso` lançaria e derrubaria a tela por um registro sem data).
 export const noDiaDaLojaAs = (ms, horas = 0, minutos = 0) => {
+  if (Number.isNaN(new Date(ms).getTime())) return NaN
   const { ano, mes, dia } = partesNoFuso(ms)
   return instanteNoFuso({ ano, mes, dia, horas, minutos })
 }

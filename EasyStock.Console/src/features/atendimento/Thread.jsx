@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
-import { dataIsoNoFuso, rotuloDoDia } from '../../dominio/formato'
+import { inicioDoDiaNoFuso, rotuloDoDia } from '../../dominio/formato'
 import { intercalarNotas } from '../../dominio/notas'
 import { useChamadaEstavel } from '../../hooks/useChamadaEstavel'
 import { Balao } from './Balao'
@@ -91,7 +91,7 @@ export function Thread({
       proxima += 1
     }
     // #1600: quebra no dia da loja, o mesmo critério de `rotuloDoDia`.
-    if (i === 0 || dataIsoNoFuso(m.em) !== dataIsoNoFuso(mensagens[i - 1].em)) {
+    if (i === 0 || inicioDoDiaNoFuso(m.em) !== inicioDoDiaNoFuso(mensagens[i - 1].em)) {
       linhas.push({ tipo: 'dia', chave: `dia-${m.id}`, rotulo: rotuloDoDia(m.em, agora) })
     }
     linhas.push({

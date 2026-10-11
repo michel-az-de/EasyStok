@@ -218,10 +218,10 @@ await confere('separador de dia da conversa: Hoje, Ontem e a data são os da loj
 })
 await confere('o fio quebra o dia no mesmo critério do rótulo', () => {
   const fio = ler('features/atendimento/Thread.jsx')
-  assert.ok(fio.includes("import { dataIsoNoFuso, rotuloDoDia } from '../../dominio/formato'"))
-  assert.ok(fio.includes('if (i === 0 || dataIsoNoFuso(m.em) !== dataIsoNoFuso(mensagens[i - 1].em)) {'))
+  assert.ok(fio.includes("import { inicioDoDiaNoFuso, rotuloDoDia } from '../../dominio/formato'"))
+  assert.ok(fio.includes('if (i === 0 || inicioDoDiaNoFuso(m.em) !== inicioDoDiaNoFuso(mensagens[i - 1].em)) {'))
   assert.ok(!fio.includes('.getDate()'), 'o fio voltou a ler o dia do aparelho')
-  assert.deepEqual(emCadaFuso(() => formato.dataIsoNoFuso('2026-10-09T01:00:00Z')), todos('2026-10-08'))
+  assert.deepEqual(emCadaFuso(() => iso(formato.inicioDoDiaNoFuso('2026-10-09T01:00:00Z'))), todos('2026-10-08T03:00:00.000Z'))
 })
 await confere('"chegou hoje / ontem / há N dias" conta dias de calendário da loja', () => {
   assert.deepEqual(emCadaFuso(() => cliente.diasEntre('2026-10-09T01:00:00Z', MADRUGADA)), todos(1))
@@ -254,6 +254,13 @@ await confere('dia do caixa (demonstração) é o dia da loja', () => {
   assert.deepEqual(emCadaFuso(() => caixa.movimentosDoDia(movimentos, VIRADA).length), todos(1))
   assert.deepEqual(emCadaFuso(() => caixa.movimentosDoDia(movimentos, MADRUGADA).length), todos(0))
   assert.deepEqual(emCadaFuso(() => caixa.caixaAberto(movimentos, MADRUGADA)), todos(false))
+})
+await confere('registro sem data não derruba a tela: dá NaN e fica fora do dia, como antes', () => {
+  assert.ok(Number.isNaN(formato.inicioDoDiaNoFuso(undefined)))
+  assert.ok(Number.isNaN(formato.noDiaDaLojaAs('não é data', 9, 30)))
+  assert.equal(entrega.inicioDaFaixa('11h30 às 12h30', undefined), NaN)
+  assert.equal(caixa.movimentosDoDia([{ id: 'm1', tipo: caixa.TIPOS_MOVIMENTO.ABERTURA }], NOITE).length, 0)
+  assert.ok(Number.isNaN(cliente.diasEntre(undefined, NOITE)))
 })
 await confere('nenhum setHours no domínio fora do relógio do painel de simulações', () => {
   const comSetHours = ['entrega', 'funcionamento', 'ocorrencia', 'viagem', 'alcance', 'caixa', 'cliente', 'formato', 'simulacoes']

@@ -11,7 +11,7 @@
 // `dominio/pagamento.js: pagamentosDoPedido` já devolve) e o resumo do caixa
 // SOMA os dois mundos sem misturar os dados de um dentro do outro.
 
-import { dataIsoNoFuso, moeda } from './formato.js'
+import { inicioDoDiaNoFuso, moeda } from './formato.js'
 import { pagamentosDoPedido } from './pagamento.js'
 import { itemPorSku } from './cardapio.js'
 
@@ -59,7 +59,7 @@ export const metodoCaixaDoMeio = (meio) => (
 
 // Mesmo dia de calendário (o dia do caixa segue o relógio simulado da tela,
 // nunca o relógio real da máquina). #1600: dia da loja, não do aparelho.
-const mesmoDia = (a, b) => dataIsoNoFuso(a) === dataIsoNoFuso(b)
+const mesmoDia = (a, b) => inicioDoDiaNoFuso(a) === inicioDoDiaNoFuso(b)
 
 export const movimentosDoDia = (movimentos, agora) =>
   (movimentos ?? []).filter((m) => mesmoDia(m.criadoEm, agora))
