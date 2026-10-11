@@ -58,6 +58,7 @@ jobs:
       - run: node ferramentas/prova-1499-baixa-insumo.mjs
       - run: node ferramentas/prova-1502-planejamento.mjs
       - run: node ferramentas/prova-1511-perdas.mjs
+      - run: node ferramentas/prova-1585-producao-ux.mjs
       - run: node ferramentas/prova-1523-embalagens.mjs
       - run: node ferramentas/prova-1529-porcoes.mjs
       - run: node ferramentas/prova-1531-porcao-no-pedido.mjs
@@ -89,4 +90,3 @@ jobs:
       - run: node ferramentas/prova-premium-cozinha.mjs
       - run: node ferramentas/prova-premium-comanda.mjs
       - run: node ferramentas/prova-1582-navegacao-ux.mjs
-      - run: node ferramentas/prova-1585-producao-ux.mjs
