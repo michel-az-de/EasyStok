@@ -1,20 +1,22 @@
 import { erroDaLinha } from '../dominio/producao'
-import { etiquetasDaApi, obterEtiquetasDoLote, registrarProducao } from '../infra/api/producaoApi'
+import { corpoDaProducao, etiquetasDaApi, obterEtiquetasDoLote, registrarProducao } from '../infra/api/producaoApi'
+import { criarChaveDeEnvio } from './chaveDeEnvio'
 
-// Produção do dia no modo API (M2.2, #1491). A chave de idempotência nasce na primeira tentativa e
-// só é trocada depois de gravar: se a rede cair e ela clicar de novo, o EasyStok devolve o mesmo
-// lote em vez de criar outro. Separado do componente para a prova rodar sem React.
-export function criarProducaoDoDia({ gerarChave = () => crypto.randomUUID() } = {}) {
-  let chave = null
+// Produção do dia no modo API (M2.2, #1491). A chave de idempotência vale para o mesmo corpo até
+// gravar: se a rede cair e ela clicar de novo, o EasyStok devolve o mesmo lote em vez de criar
+// outro. Corpo corrigido depois da falha é outra produção e ganha chave nova (#1548): a API recusa
+// a mesma chave com outro corpo. Separado do componente para a prova rodar sem React.
+export function criarProducaoDoDia({ gerarChave, agora } = {}) {
+  const envio = criarChaveDeEnvio(gerarChave, agora)
 
   return {
     produzir: async (linhas) => {
       const erro = linhas.length === 0 ? 'Adicione ao menos um prato.' : linhas.map(erroDaLinha).find(Boolean)
       if (erro) return { ok: false, erro }
-      chave ??= gerarChave()
+      const chave = envio.para(corpoDaProducao(linhas))
       try {
         const r = await registrarProducao(linhas, chave)
-        chave = null
+        envio.confirmar(chave)
         return {
           ok: true,
           loteId: r.loteId,

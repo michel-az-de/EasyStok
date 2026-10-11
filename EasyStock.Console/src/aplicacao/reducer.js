@@ -205,6 +205,8 @@ const mensagemSoLocal = (m) => m.status === 'enviando' || m.status === 'falhou' 
 // Pedido anterior já entregue ou cancelado não apaga a comanda nova que ela está montando.
 function pedidoMesclado(local, doServidor) {
   if (!doServidor) return local ?? null
+  // #1548: leitura que saiu antes da que já está na tela chegou atrasada e não desfaz a mais nova.
+  if (local?.leitura > doServidor.leitura) return local
   const rascunho = Boolean(local) && !local.pedidoId
   if (rascunho && pedidoEncerrado(doServidor)) return local
   if (!local || (!rascunho && local.pedidoId !== doServidor.pedidoId)) return doServidor
