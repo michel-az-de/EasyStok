@@ -177,7 +177,8 @@ public class PedidoEstoqueIntegrationServiceTests
             Natureza = NaturezaMovimentacaoEstoque.Venda, Quantidade = Quantidade.From(quantidade)
         };
         movRepo.ExisteReferenciaAsync(empresaId, produtoId, referencia, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>()).Returns(true);
-        movRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { Saida(primeiro, 2), Saida(segundo, 3) });
+        movRepo.GetPorReferenciaAsync(empresaId, produtoId, referencia, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>())
+            .Returns(new[] { Saida(primeiro, 2), Saida(segundo, 3) });
         itemRepo.GetByIdComLockAsync(empresaId, primeiro.Id).Returns(primeiro);
         itemRepo.GetByIdComLockAsync(empresaId, segundo.Id).Returns(segundo);
 
@@ -424,7 +425,7 @@ public class PedidoEstoqueIntegrationServiceTests
         var refDoc = $"{pedido.Id}:{item.Id}";
         var lote = new ItemEstoque { Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = null, ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(0) };
         movRepo.ExisteReferenciaAsync(empresaId, produtoId, refDoc, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>()).Returns(true);
-        movRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[]
+        movRepo.GetPorReferenciaAsync(empresaId, produtoId, refDoc, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>()).Returns(new[]
         {
             new MovimentacaoEstoque
             {
@@ -569,7 +570,8 @@ public class PedidoEstoqueIntegrationServiceTests
         jaEstornada.MarcarComoEstornada(DateTime.UtcNow.AddHours(-1));
         var pendente = Saida(segundo, 3);
         movRepo.ExisteReferenciaAsync(empresaId, produtoId, referencia, Arg.Any<NaturezaMovimentacaoEstoque>(), Arg.Any<CancellationToken>()).Returns(true);
-        movRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { jaEstornada, pendente });
+        movRepo.GetPorReferenciaAsync(empresaId, produtoId, referencia, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>())
+            .Returns(new[] { jaEstornada, pendente });
         itemRepo.GetByIdComLockAsync(empresaId, primeiro.Id).Returns(primeiro);
         itemRepo.GetByIdComLockAsync(empresaId, segundo.Id).Returns(segundo);
 
@@ -583,6 +585,40 @@ public class PedidoEstoqueIntegrationServiceTests
         // Segunda chamada (retry) nao devolve de novo.
         await svc.DevolverItemAsync(pedido, item);
         segundo.QuantidadeAtual.Value.Should().Be(3);
+    }
+
+    [Fact] // #1564: o cancelamento pede só as saídas do pedido+item, e não o histórico do produto.
+    public async Task DevolverItemAsync_consulta_so_as_saidas_do_pedido_item()
+    {
+        var (svc, itemRepo, movRepo) = Build();
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 2);
+        var item = pedido.Itens.Single();
+        var referencia = $"{pedido.Id}:{item.Id}";
+        var lote = new ItemEstoque
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(0)
+        };
+        movRepo.ExisteReferenciaAsync(empresaId, produtoId, referencia, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>()).Returns(true);
+        movRepo.GetPorReferenciaAsync(empresaId, produtoId, referencia, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>())
+            .Returns(new[]
+            {
+                new MovimentacaoEstoque
+                {
+                    Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, ItemEstoqueId = lote.Id,
+                    DocumentoReferencia = referencia, Tipo = TipoMovimentacaoEstoque.Saida,
+                    Natureza = NaturezaMovimentacaoEstoque.Venda, Quantidade = Quantidade.From(2)
+                }
+            });
+        itemRepo.GetByIdComLockAsync(empresaId, lote.Id).Returns(lote);
+
+        await svc.DevolverItemAsync(pedido, item);
+
+        lote.QuantidadeAtual.Value.Should().Be(2);
+        await movRepo.Received(1).GetPorReferenciaAsync(empresaId, produtoId, referencia, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>());
+        await movRepo.DidNotReceive().GetByProdutoAsync(Arg.Any<Guid>(), Arg.Any<Guid>());
     }
 
     [Fact] // #939: sem Venda anterior, não há o que estornar (idempotência).
