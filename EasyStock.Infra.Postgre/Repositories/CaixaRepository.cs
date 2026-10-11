@@ -150,6 +150,12 @@ namespace EasyStock.Infra.Postgre.Repositories
             return false;
         }
 
+        public Task TravarSaidasAsync(Guid empresaId, Guid? lojaId, CancellationToken ct = default)
+        {
+            var chave = $"caixa-saida:{empresaId:N}:{lojaId:N}";
+            return db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({chave}))", ct);
+        }
+
         public Task<FechamentoCaixa?> GetFechamentoDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null) =>
             db.FechamentosCaixa.FirstOrDefaultAsync(f =>
                 f.EmpresaId == empresaId && f.Data == data && f.LojaId == lojaId);

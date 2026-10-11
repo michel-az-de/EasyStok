@@ -71,6 +71,13 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// </summary>
         Task<bool> TryAddMovimentoAsync(MovimentoCaixa movimento, CancellationToken ct = default);
 
+        /// <summary>
+        /// Serializa as saídas interativas do caixa de uma empresa/loja até o fim da transação
+        /// (<c>pg_advisory_xact_lock</c>): conferência de saldo é checagem de limite, e o índice não
+        /// serializa isso sozinho (#1547). Precisa de transação explícita em andamento.
+        /// </summary>
+        Task TravarSaidasAsync(Guid empresaId, Guid? lojaId, CancellationToken ct = default);
+
         // ── Fechamentos ───────────────────────────────────────────
         Task<FechamentoCaixa?> GetFechamentoDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null);
 
