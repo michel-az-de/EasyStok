@@ -149,6 +149,9 @@ function CopiaECola({ codigo }) {
 //
 // #1474 (R8): pedido que espera aprovação (fora da área liberado) não aceita baixa no EasyStok;
 // a tela diz o motivo e oferece aprovar antes, em vez de deixar falhar depois do clique.
+//
+// #1586: `aoConfirmar` devolve `{ erro }` na recusa. O erro aparece aqui, com o valor e o
+// método digitados; quem abriu o formulário só o fecha no sucesso.
 export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar, aoAprovar = null }) {
   // Nasce preenchida com o total cobrado, em centavos por dentro (seção 4 da
   // direção visual, passo zero): a tela só vê o texto já mascarado, "R$ X,XX".
@@ -156,6 +159,7 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
   const excedeu = moedaAltaDemais(centavos)
   const [metodo, setMetodo] = useState(() => metodoDaCobranca(pedido?.cobranca))
   const [enviando, setEnviando] = useState(false)
+  const [recusa, setRecusa] = useState(null)
   const valido = centavos > 0 && !excedeu && Boolean(metodo)
 
   if (baixaEsperaAprovacao(pedido)) {
@@ -199,13 +203,20 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
         aoMudarDigitos={(digitos) => setCentavos(Number(digitos || '0'))}
         aoColarTexto={(texto) => setCentavos(lerMoeda(texto))}
       />
+      {recusa && <p className={css.motivoDesabilitado} role="alert">{recusa}</p>}
       <div className={css.acoesCobranca}>
-        <Botao largo onClick={aoCancelar}>Voltar</Botao>
+        <Botao largo disabled={enviando} onClick={aoCancelar}>Voltar</Botao>
         <Botao largo variante="primario" disabled={!valido || enviando} onClick={async () => {
           setEnviando(true)
-          try { await aoConfirmar(centavos / 100, metodo) } finally { setEnviando(false) }
+          setRecusa(null)
+          try {
+            const resultado = await aoConfirmar(centavos / 100, metodo)
+            if (resultado?.erro) setRecusa(resultado.erro)
+          } catch (erro) {
+            setRecusa(erro.message || 'Não foi possível registrar o pagamento. Tente de novo.')
+          } finally { setEnviando(false) }
         }}>
-          Confirmar
+          {enviando ? 'Registrando…' : 'Confirmar'}
         </Botao>
       </div>
     </div>
@@ -407,7 +418,12 @@ export function BlocoCobranca({
             pedido={pedido}
             aoAprovar={aprovarPedido ? () => aprovarPedido(conversaId) : null}
             aoCancelar={() => setRecebendo(false)}
-            aoConfirmar={async (valor, metodo) => { await confirmarPagamento(conversaId, valor, metodo); setRecebendo(false) }} />
+            aoConfirmar={async (valor, metodo) => {
+              // #1586: "Recebi" só fecha no sucesso; a recusa volta para o formulário.
+              const resultado = await confirmarPagamento(conversaId, valor, metodo)
+              if (!resultado?.erro) setRecebendo(false)
+              return resultado
+            }} />
         )}
         {editavel && !recebendo && (
           <div className={css.acoesCobranca}>

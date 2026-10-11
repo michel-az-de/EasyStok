@@ -70,8 +70,10 @@ function GrupoAvaliacao({ rotulo, opcoes, valor, editavel, aoEscolher }) {
 // (`ModalEncerrar.jsx` monta as duas cópias, igual ao canhoto). `editavel`
 // falso é a impressão OU um atendimento já encerrado (ela não edita resumo
 // congelado); nos dois casos os controles viram texto puro.
+// `comAvaliacaoEAnotacao` falso (#1586) tira avaliação e anotação da folha: no modo API nada
+// disso é gravado, e controle que não grava não aparece.
 export function FolhaResumo({
-  nomeCliente, canalNome, telefone, resumo, editavel, impresso = false,
+  nomeCliente, canalNome, telefone, resumo, editavel, impresso = false, comAvaliacaoEAnotacao = true,
   aoMarcarAvaliacaoCliente, aoMarcarAutoavaliacao, aoMudarAnotacao, aoMudarGuardarNota,
 }) {
   const { mensagens, receita, vendas, marcos } = resumo
@@ -203,51 +205,55 @@ export function FolhaResumo({
         </div>
       )}
 
-      <div className={css.avaliacoes}>
-        <GrupoAvaliacao
-          rotulo="Avaliação do cliente"
-          opcoes={AVALIACOES_CLIENTE}
-          valor={resumo.avaliacaoCliente}
-          editavel={editavel}
-          aoEscolher={aoMarcarAvaliacaoCliente}
-        />
-        <GrupoAvaliacao
-          rotulo="Como foi para você"
-          opcoes={AUTOAVALIACOES}
-          valor={resumo.autoavaliacao}
-          editavel={editavel}
-          aoEscolher={aoMarcarAutoavaliacao}
-        />
-      </div>
+      {comAvaliacaoEAnotacao && (
+        <>
+          <div className={css.avaliacoes}>
+            <GrupoAvaliacao
+              rotulo="Avaliação do cliente"
+              opcoes={AVALIACOES_CLIENTE}
+              valor={resumo.avaliacaoCliente}
+              editavel={editavel}
+              aoEscolher={aoMarcarAvaliacaoCliente}
+            />
+            <GrupoAvaliacao
+              rotulo="Como foi para você"
+              opcoes={AUTOAVALIACOES}
+              valor={resumo.autoavaliacao}
+              editavel={editavel}
+              aoEscolher={aoMarcarAutoavaliacao}
+            />
+          </div>
 
-      <div className={css.secao}>
-        <p className={css.tituloSecao}>Anotação</p>
-        {editavel
-          ? (
-            <>
-              <CampoArea
-                rotulo="Anotação do fechamento"
-                rotuloOculto
-                rows={3}
-                value={resumo.anotacao}
-                onChange={(evento) => aoMudarAnotacao(evento.target.value)}
-              />
-              <label className={css.checkboxNota}>
-                <input
-                  type="checkbox"
-                  checked={resumo.guardarNota}
-                  onChange={(evento) => aoMudarGuardarNota(evento.target.checked)}
-                />
-                Guardar também nas notas do cliente
-              </label>
-            </>
-          )
-          : (
-            <p className={css.anotacaoImpressa}>
-              {resumo.anotacao.trim() || 'Sem anotação.'}
-            </p>
-          )}
-      </div>
+          <div className={css.secao}>
+            <p className={css.tituloSecao}>Anotação</p>
+            {editavel
+              ? (
+                <>
+                  <CampoArea
+                    rotulo="Anotação do fechamento"
+                    rotuloOculto
+                    rows={3}
+                    value={resumo.anotacao}
+                    onChange={(evento) => aoMudarAnotacao(evento.target.value)}
+                  />
+                  <label className={css.checkboxNota}>
+                    <input
+                      type="checkbox"
+                      checked={resumo.guardarNota}
+                      onChange={(evento) => aoMudarGuardarNota(evento.target.checked)}
+                    />
+                    Guardar também nas notas do cliente
+                  </label>
+                </>
+              )
+              : (
+                <p className={css.anotacaoImpressa}>
+                  {resumo.anotacao.trim() || 'Sem anotação.'}
+                </p>
+              )}
+          </div>
+        </>
+      )}
 
       <footer className={css.rodape}>
         <span>
