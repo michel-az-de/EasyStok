@@ -977,6 +977,10 @@ public partial class AtendimentoConversasControllerTests
         public Task<IReadOnlyList<Mensagem>> ListarReenviosVencidosComLockAsync(DateTime agora, int limite, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<Mensagem>>(Mensagens.Where(m => m.ProximoReenvioEm <= agora).Take(limite).ToList());
 
+        public Task<IReadOnlyList<Mensagem>> ListarIntencoesModeloSemDesfechoComLockAsync(DateTime gravadaAntesDe, int limite, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<Mensagem>>(Mensagens
+                .Where(m => m.Status == StatusMensagem.Pendente && m.ModeloJson != null && m.EnviadaEm < gravadaAntesDe).Take(limite).ToList());
+
         public Task<IReadOnlyList<Mensagem>> ListarMidiasPendentesComLockAsync(DateTime agora, int limite, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<Mensagem>>(Mensagens.Where(m => m.ProximaTentativaMidiaEm <= agora && m.MidiaChave == null).Take(limite).ToList());
 
