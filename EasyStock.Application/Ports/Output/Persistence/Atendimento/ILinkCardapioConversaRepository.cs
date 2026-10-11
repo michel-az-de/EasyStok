@@ -21,4 +21,6 @@ public interface ILinkCardapioConversaRepository
 
     /// <summary>Desfaz o uso quando o pedido foi recusado, para o cliente corrigir o carrinho e reenviar.</summary>
     Task LiberarAsync(Guid empresaId, Guid linkId, CancellationToken ct = default);
+    Task<LinkCardapioConversa?> ObterComLockAsync(Guid empresaId, Guid linkId, CancellationToken ct = default);
+    Task<IReadOnlyList<LinkCardapioConversa>> ListarDaConversaAsync(Guid empresaId, Guid conversaId, DateTime desde, CancellationToken ct = default);
 }

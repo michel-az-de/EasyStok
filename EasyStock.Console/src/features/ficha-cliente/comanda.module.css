@@ -15,6 +15,12 @@
   font-family: var(--f-corpo);
 }
 
+.clienteCompartilhado { border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-1); padding: var(--e-3); margin-bottom: var(--e-3); }
+.clienteCompartilhado p { margin: var(--e-2) 0; }
+.clienteCompartilhado ul { list-style: none; padding: 0; }
+.clienteCompartilhado li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2); padding: var(--e-2) 0; }
+.clienteCompartilhado small { width: 100%; }
+
 /* O único gesto "de papel": dois triângulos diagonais por dente de 8×5 px,
    pintados na cor da comanda. Onde não há tinta, o fundo por trás aparece,
    então a faixa "recorta" a borda de baixo em vez de desenhar uma linha reta. */

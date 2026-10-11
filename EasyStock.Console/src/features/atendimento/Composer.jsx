@@ -256,7 +256,7 @@ export function Composer({
                 disabled={!podeEscrever || buscandoLink}
                 onClick={abrirCardapio}
               >
-                <Icone nome="cardapio" /><span className={css.rotuloAcao}>Link do cardápio</span>
+                <Icone nome="cardapio" /><span className={css.rotuloAcao}>{fonteApi ? 'Comanda do cliente' : 'Link do cardápio'}</span>
               </Botao>
               {/* #1424: a mensagem programada vai para o cliente cadastrado (a API exige o
                   clienteId). Não depende do `podeEscrever`: fora da janela sai por modelo. */}

@@ -6,6 +6,18 @@ namespace EasyStock.Infra.Postgre.Repositories.Atendimento;
 
 public sealed class LinkCardapioConversaRepository(EasyStockDbContext db) : ILinkCardapioConversaRepository
 {
+    public async Task<LinkCardapioConversa?> ObterComLockAsync(Guid empresaId, Guid linkId, CancellationToken ct = default)
+    {
+        var link = await db.LinksCardapioConversa.FromSqlInterpolated(
+            $"SELECT * FROM links_cardapio_conversa WHERE \"EmpresaId\" = {empresaId} AND \"Id\" = {linkId} FOR UPDATE").SingleOrDefaultAsync(ct);
+        if (link is not null) await db.Entry(link).ReloadAsync(ct);
+        return link;
+    }
+
+    public async Task<IReadOnlyList<LinkCardapioConversa>> ListarDaConversaAsync(Guid empresaId, Guid conversaId, DateTime desde, CancellationToken ct = default) =>
+        await db.LinksCardapioConversa.AsNoTracking().Where(l => l.EmpresaId == empresaId && l.ConversaId == conversaId && l.CriadoEm >= desde)
+            .OrderByDescending(l => l.CriadoEm).Take(30).ToListAsync(ct);
+
     public Task AddAsync(LinkCardapioConversa link, CancellationToken ct = default) =>
         db.LinksCardapioConversa.AddAsync(link, ct).AsTask();
 

@@ -295,6 +295,13 @@ namespace EasyStock.Domain.Entities
 
         public void MarcarEntregue() => MudarStatus(StatusPedido.Entregue);
 
+        public void RetomarPreparoPorAlteracao()
+        {
+            if (StatusEnum != StatusPedido.Pronto) throw new RegraDeDominioVioladaException("Só pedido pronto pode retomar o preparo por alteração.");
+            Status = StatusPedidoMapper.Preparando;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
         public void Cancelar() => MudarStatus(StatusPedido.Cancelado);
 
         /// <summary>

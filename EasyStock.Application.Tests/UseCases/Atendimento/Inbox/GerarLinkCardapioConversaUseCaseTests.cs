@@ -42,7 +42,7 @@ public class GerarLinkCardapioConversaUseCaseTests
 
         var link = await _useCase.ExecuteAsync(EmpresaId, conversa.Id);
 
-        link.Url.Should().StartWith("https://casadababa.com/cardapio?c=");
+        link.Url.Should().StartWith("https://casadababa.com/comanda.html?c=");
         link.ExpiraEm.Should().Be(Agora.AddHours(24));
         _links.Links.Should().ContainSingle(l => l.ConversaId == conversa.Id && l.EmpresaId == EmpresaId);
         await _unitOfWork.Received(1).CommitAsync();

@@ -1,4 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Financeiro;
 
 namespace EasyStock.Application.Services.Pedidos;
@@ -16,7 +18,8 @@ namespace EasyStock.Application.Services.Pedidos;
 public class EfeitosCancelamentoPedido(
     IContaReceberRepository contaReceberRepo,
     IVagaOcupadaRepository vagaOcupadaRepo,
-    ILogger<EfeitosCancelamentoPedido> logger)
+    ILogger<EfeitosCancelamentoPedido> logger,
+    SaldoFinanceiroPedido? saldos = null, ICreditoClienteComandaRepository? creditos = null)
 {
     public static void ExigirPermissao(bool temPagamento, NivelAcesso nivel)
     {
@@ -31,6 +34,15 @@ public class EfeitosCancelamentoPedido(
         var motivoTexto = string.IsNullOrWhiteSpace(motivo) ? "Pedido cancelado" : motivo;
 
         await vagaOcupadaRepo.LiberarPorPedidoAsync(pedido.Id, $"Pedido cancelado: {motivoTexto}", ct);
+        // Créditos usados voltam à carteira; recebimentos em dinheiro seguem a devolução existente.
+        if (saldos is not null && creditos is not null && pedido.ClienteId is { } clienteId
+            && await creditos.ObterPorOperacaoAsync(pedido.EmpresaId, pedido.Id, ct) is null)
+        {
+            var saldo = await saldos.ConsultarAsync(pedido, ct);
+            var devolver = Math.Min(Math.Max(0, saldo.CupomAplicado - saldo.ConvertidoEmCupom), Math.Max(0, saldo.Alocado));
+            if (devolver > 0) await creditos.AddAsync(CreditoClienteComanda.Criar(pedido.EmpresaId, clienteId,
+                pedido.Id, pedido.Id, devolver, DateTime.UtcNow), ct);
+        }
 
         var contaReceber = await contaReceberRepo.GetByOrigemAsync(
             pedido.EmpresaId, OrigemContaFinanceira.Pedido, pedido.Id);

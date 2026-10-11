@@ -3,12 +3,13 @@ using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
+using EasyStock.Application.Services.Pedidos;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 
 public sealed class EstornosOnlineService(IPedidoRepository pedidos, IEstornoOnlineRepository repo,
     ICobrancaPedidoRepository cobrancas, IMercadoPagoClient mp, ICaixaRepository caixa, IUnitOfWork uow,
-    ITenantContextAccessor tenant, TimeProvider relogio) : IEstornosOnlineService
+    ITenantContextAccessor tenant, TimeProvider relogio, SaldoFinanceiroPedido? saldos = null) : IEstornosOnlineService
 {
     private DateTime Agora => relogio.GetUtcNow().UtcDateTime;
 
@@ -60,6 +61,14 @@ public sealed class EstornosOnlineService(IPedidoRepository pedidos, IEstornoOnl
                 throw Conflito("estorno_pendente", "Confira a solicitação pendente antes de pedir outra devolução.");
             if (pagamento.Estornada || input.Valor > pagamento.Valor - Confirmado(estornos, pagamento))
                 throw Conflito("valor_ja_devolvido", "O valor excede o saldo ainda não devolvido deste recebimento.");
+            if (saldos is not null)
+            {
+                var pedido = await pedidos.GetByIdWithDetailsAsync(input.EmpresaId, input.PedidoId)
+                    ?? throw new CobrancaPedidoNaoEncontradoException(input.PedidoId);
+                var saldo = await saldos.ConsultarAsync(pedido, token);
+                if (input.Valor > saldo.DinheiroDisponivel)
+                    throw Conflito("valor_ja_destinado", "Este valor já foi devolvido, reservado ou convertido em cupom.");
+            }
             await CaixaFechadoGuard.ExigirDiaAbertoAsync(caixa, input.EmpresaId, Agora, pagamento.LojaId,
                 "O Caixa de hoje já foi fechado. A devolução não foi solicitada.");
             var nova = new PedidoEstornoOnline

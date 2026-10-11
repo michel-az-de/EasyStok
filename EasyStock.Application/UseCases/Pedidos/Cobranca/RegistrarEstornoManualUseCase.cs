@@ -1,5 +1,6 @@
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
+using EasyStock.Application.Services.Pedidos;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 
@@ -8,7 +9,7 @@ public sealed record RegistrarEstornoManualInput(Guid EmpresaId, Guid PedidoId, 
     Guid UsuarioId, string? UsuarioNome, NivelAcesso NivelSolicitante);
 
 public sealed class RegistrarEstornoManualUseCase(IPedidoRepository pedidos, ICobrancaPedidoRepository cobrancas,
-    ICaixaRepository caixa, IUnitOfWork uow, TimeProvider relogio)
+    ICaixaRepository caixa, IUnitOfWork uow, TimeProvider relogio, SaldoFinanceiroPedido? saldos = null)
 {
     public Task<PedidoEstornoManual> ExecuteAsync(RegistrarEstornoManualInput input, CancellationToken ct = default)
     {
@@ -57,6 +58,12 @@ public sealed class RegistrarEstornoManualUseCase(IPedidoRepository pedidos, ICo
             var disponivel = pagamento.Valor - estornos.Where(e => e.PagamentoId == pagamento.Id).Sum(e => e.Valor);
             if (input.Valor > disponivel)
                 throw new CobrancaPedidoConflitoException("valor_ja_devolvido", "O valor excede o saldo ainda não devolvido deste recebimento. Atualize a ficha.");
+            if (saldos is not null)
+            {
+                var saldo = await saldos.ConsultarAsync(pedido, token);
+                if (input.Valor > saldo.DinheiroDisponivel)
+                    throw new CobrancaPedidoConflitoException("valor_ja_destinado", "Este valor já foi devolvido, reservado ou convertido em cupom.");
+            }
             var agora = relogio.GetUtcNow().UtcDateTime;
             await CaixaFechadoGuard.ExigirDiaAbertoAsync(caixa, input.EmpresaId, agora, pedido.LojaId,
                 "O Caixa de hoje já foi fechado. A devolução ainda não foi registrada.");

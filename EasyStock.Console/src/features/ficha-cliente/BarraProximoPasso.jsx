@@ -322,10 +322,11 @@ export function BarraProximoPasso({
     }
   }
 
-  const naFilaSemQuitar = Boolean(pedido.pedidoId) && pedido.totalPagoApi < pedido.totalApi
+  const alocadoApi = pedido.alocadoApi ?? pedido.totalPagoApi
+  const naFilaSemQuitar = Boolean(pedido.pedidoId) && alocadoApi < pedido.totalApi
   if (naFilaSemQuitar && pedido.estado === 'pago' && !aguardaAprovacao(pedido)) rotuloEstado = 'Na fila de preparo'
   const podeVoltarEtapa = Boolean(anterior) && disponivel('corrigirPasso')
-  const temPagamento = pedido.totalPagoApi > 0 || Boolean(pedido.cobranca?.pagaEm)
+  const temPagamento = alocadoApi > 0 || pedido.totalPagoApi > 0 || Boolean(pedido.cobranca?.pagaEm)
   const podeCancelar = disponivel('cancelarPedido') && (fonteApi
     ? Boolean(pedido.pedidoId) && (!temPagamento || capacidades?.cancelarPedidoPago === true)
     : pedido.estado === 'aguardando')
@@ -457,12 +458,12 @@ export function BarraProximoPasso({
         <p className={css.motivoDesabilitado} role="alert">{erroVisivel}</p>
       )}
 
-      {pedido.totalPagoApi > 0 && pedido.totalPagoApi < pedido.totalApi && (
-        <p className={css.corpoBloco}>Recebido: {moeda(pedido.totalPagoApi)}. Falta: {moeda(pedido.totalApi - pedido.totalPagoApi)}.</p>
+      {alocadoApi > 0 && alocadoApi < pedido.totalApi && (
+        <p className={css.corpoBloco}>Já coberto: {moeda(alocadoApi)}. Falta: {moeda(pedido.totalApi - alocadoApi)}.</p>
       )}
       {abrindoBaixa && (
         <BaixaAMao
-          valorCobrado={Math.max(0, (pedido.totalApi ?? pedido.cobranca.valor) - (pedido.totalPagoApi ?? 0))}
+          valorCobrado={Math.max(0, (pedido.totalApi ?? pedido.cobranca.valor) - (alocadoApi ?? 0))}
           pedido={pedido}
           aoAprovar={aoAprovarPedido}
           aoCancelar={() => setAbrindoBaixa(false)}

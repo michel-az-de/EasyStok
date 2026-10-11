@@ -27,13 +27,13 @@ export function ModalEnviarCardapio({
 
   return (
     <Modal
-      titulo="Enviar o cardápio"
-      descricao={`Vai para ${primeiroNome(nomeCliente)} pelo ${canalNome}, com o link para escolher os pratos.`}
+      titulo="Enviar comanda ao cliente"
+      descricao={`Vai para ${primeiroNome(nomeCliente)} pelo ${canalNome}. A seleção aparece nesta ficha enquanto ele escolhe.`}
       aoFechar={aoFechar}
       rodape={(
         <>
           <Botao onClick={aoFechar}>Cancelar</Botao>
-          <Botao variante="primario" icone="enviar" onClick={aoEnviar}>Enviar cardápio</Botao>
+          <Botao variante="primario" icone="enviar" onClick={aoEnviar}>Enviar comanda</Botao>
         </>
       )}
     >
@@ -45,8 +45,9 @@ export function ModalEnviarCardapio({
         {daLoja ? (
           // #1353: o mesmo link que o agente manda (S48). Vale 24 h e um pedido.
           <p>
-            É o cardápio da Casa da Baba no site (<strong>{endereco}</strong>), o mesmo link que o
-            atendimento automático manda. Mostra só o que está disponível hoje e vale por 24 horas.
+            É a comanda pessoal no site da Casa da Baba (<strong>{endereco}</strong>). Cliente e
+            atendimento acompanham a mesma seleção. Cada link aceita uma confirmação; outro link permite
+            acrescentar ou solicitar uma troca antes da entrega. O pagamento é por pedido ou diferença.
           </p>
         ) : (
           <p>
@@ -57,6 +58,7 @@ export function ModalEnviarCardapio({
         )}
         <p className={css.cardapioLink}>
           <code>{link}</code>
+          <a href={link} target="_blank" rel="noreferrer">Abrir comanda</a>
           <Botao variante="texto" onClick={copiar}>{copiado ? 'Link copiado' : 'Copiar link'}</Botao>
         </p>
       </div>

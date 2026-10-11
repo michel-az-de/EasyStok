@@ -21,7 +21,8 @@ public sealed record CriarPedidoPeloCardapioConversaInput(
     Guid? EnderecoId = null,
     string? Forma = null,
     string? Observacoes = null,
-    EnderecoCheckout? Endereco = null);
+    EnderecoCheckout? Endereco = null,
+    bool SemCobranca = false);
 
 /// <param name="LinkPagamento">Nulo na entrega. Mercado Pago fora: <see cref="MercadoPagoIndisponivelException"/> com o pedido desfeito e o link do cardápio devolvido (#1301).</param>
 public sealed record PedidoPeloCardapioConversaResult(
@@ -115,7 +116,10 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
                 "Pedido montado pelo cliente no cardápio do site:"));
         await conversaRepository.AddMensagemAsync(resumo, ct);
         await unitOfWork.CommitAsync();
-        await AvisarConsoleAsync(reservado, resumo, ct);
+        if (!input.SemCobranca) await AvisarConsoleAsync(reservado, resumo, ct);
+
+        if (input.SemCobranca)
+            return new PedidoPeloCardapioConversaResult(reservado.Pedido.Id, reservado.Total, forma, null, null);
 
         CobrancaPedidoResult? cobranca;
         try

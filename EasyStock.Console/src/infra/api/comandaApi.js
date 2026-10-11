@@ -146,6 +146,7 @@ export function pedidoDaApi(p, anterior = null) {
     agradecimentoEnviado: anterior?.agradecimentoEnviado ?? false,
     pagamentos: [],
     totalPagoApi: p.totalPago ?? 0,
+    alocadoApi: p.alocado ?? undefined,
     sinalNaReserva: Boolean(p.sinalNaReserva),
     pagamentosApi: p.pagamentos?.map((pag) => ({
       valor: pag.valor, coberto: pag.valor, em: ms(pag.pagoEm), meio: pag.metodo, pagamentoId: pag.id,

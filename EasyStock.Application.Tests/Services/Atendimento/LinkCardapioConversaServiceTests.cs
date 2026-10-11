@@ -20,6 +20,11 @@ public class LinkCardapioConversaServiceTests
     {
         public List<LinkCardapioConversa> Links { get; } = new();
 
+        public Task<LinkCardapioConversa?> ObterComLockAsync(Guid empresaId, Guid linkId, CancellationToken ct = default) =>
+            Task.FromResult(Links.FirstOrDefault(l => l.EmpresaId == empresaId && l.Id == linkId));
+        public Task<IReadOnlyList<LinkCardapioConversa>> ListarDaConversaAsync(Guid empresaId, Guid conversaId, DateTime desde, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<LinkCardapioConversa>>(Links.Where(l => l.EmpresaId == empresaId && l.ConversaId == conversaId && l.CriadoEm >= desde).ToList());
+
         public Task AddAsync(LinkCardapioConversa link, CancellationToken ct = default)
         {
             Links.Add(link);
@@ -107,7 +112,7 @@ public class LinkCardapioConversaServiceTests
 
         var gerado = await _servico.GerarAsync(EmpresaId, conversa.Id, Agora);
 
-        gerado.Url.Should().StartWith($"{SaudacaoAtendimento.BaseUrlPadrao}{SaudacaoAtendimento.CaminhoCardapio}?c=");
+        gerado.Url.Should().StartWith($"{SaudacaoAtendimento.BaseUrlPadrao}/comanda.html?c=");
         gerado.Url.Should().EndWith(gerado.Token);
         gerado.ExpiraEm.Should().Be(Agora.Add(LinkCardapioConversa.Validade));
         foreach (var proibido in new[]

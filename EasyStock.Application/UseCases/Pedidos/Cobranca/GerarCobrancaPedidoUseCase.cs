@@ -10,7 +10,7 @@ using EasyStock.Domain.Sales;
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 
 /// <summary>Reemissão ou cobrança de um pedido já gravado (job, troca de forma, operadora).</summary>
-public sealed record GerarCobrancaPedidoInput(Guid EmpresaId, Guid PedidoId, Guid? ConversaId = null, int Tentativa = 1);
+public sealed record GerarCobrancaPedidoInput(Guid EmpresaId, Guid PedidoId, Guid? ConversaId = null, int Tentativa = 1, bool CobrarSaldo = false);
 
 public sealed record CobrancaPedidoResult(
     Guid CobrancaId,
@@ -54,7 +54,8 @@ public sealed class GerarCobrancaPedidoUseCase(
     CheckoutCoreService checkoutCore,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
-    ILogger<GerarCobrancaPedidoUseCase> logger)
+    ILogger<GerarCobrancaPedidoUseCase> logger,
+    SaldoFinanceiroPedido? saldoFinanceiro = null)
 {
     public static readonly TimeSpan Validade = TimeSpan.FromMinutes(30);
 
@@ -116,25 +117,27 @@ public sealed class GerarCobrancaPedidoUseCase(
                 "Pedido cancelado ou entregue não recebe cobrança.");
         // Mesma conta da confirmação (#1289): com os pagamentos cobrindo o total, o webhook trataria
         // o pagamento deste link como duplicado e o devolveria sozinho.
-        if (pedido.Total.Valor > 0m && pedido.TotalPago >= pedido.Total.Valor)
+        var alocado = input.CobrarSaldo && saldoFinanceiro is not null
+            ? (await saldoFinanceiro.ConsultarAsync(pedido, ct)).Alocado : pedido.TotalPago;
+        if (pedido.Total.Valor > 0m && alocado >= pedido.Total.Valor)
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
 
         var storefront = await storefrontRepository.GetByEmpresaAsync(input.EmpresaId, ct);
         var dados = new DadosCobranca(
             pedido.EmpresaId, pedido.Id, storefront?.Id ?? Guid.Empty, storefront?.TituloPublico ?? string.Empty,
-            pedido.Total.Valor, pedido.Itens.ToList(), pedido.AgendadoParaEm);
+            pedido.Total.Valor, pedido.Itens.ToList(), pedido.AgendadoParaEm, input.CobrarSaldo ? alocado : 0m, input.CobrarSaldo);
         return await CobrarAsync(dados, input.ConversaId, input.Tentativa, ct);
     }
 
     private async Task<CobrancaPedidoResult> CobrarAsync(DadosCobranca dados, Guid? conversaId, int tentativa, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
-        var valorCobrado = PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, agora)
+        var valorCobrado = dados.CobrarSaldo ? dados.Total - dados.Alocado : PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, agora)
             ? PlanoPagamentoEncomenda.Sinal(dados.Total)
             : dados.Total;
         var existentes = await cobrancaRepository.ListarDoPedidoAsync(dados.EmpresaId, dados.PedidoId, ct);
 
-        if (existentes.Any(c => c.Status == Domain.Enums.Pagamentos.StatusCobrancaPedido.Paga))
+        if (!dados.CobrarSaldo && existentes.Any(c => c.Status == Domain.Enums.Pagamentos.StatusCobrancaPedido.Paga))
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
 
         var pendente = existentes.FirstOrDefault(c => c.EstaPendente);
@@ -157,7 +160,7 @@ public sealed class GerarCobrancaPedidoUseCase(
             ValorTotal: valorCobrado,
             Items: valorCobrado == dados.Total
                 ? dados.Itens.Where(i => i.PrecoUnitario > 0m).Select(ItemDaPreferencia).ToList()
-                : [new PreferenceItemCommand("Sinal da encomenda (50%)", 1, valorCobrado)],
+                : [new PreferenceItemCommand(dados.CobrarSaldo ? "Saldo da comanda" : "Sinal da encomenda (50%)", 1, valorCobrado)],
             ExpiraEm: expiraEm,
             IdempotencyKey: $"{dados.PedidoId:N}-{existentes.Count + 1}");
 
@@ -166,6 +169,7 @@ public sealed class GerarCobrancaPedidoUseCase(
         var cobranca = CobrancaPedido.CriarOnline(
             dados.EmpresaId, dados.PedidoId, valorCobrado, preferencia.PreferenceId, preferencia.InitPointUrl,
             expiraEm, tentativa, agora, conversaId);
+        if (dados.CobrarSaldo) cobranca.MarcarComplementar();
         await cobrancaRepository.AddAsync(cobranca, ct);
         await unitOfWork.CommitAsync();
 
@@ -212,5 +216,5 @@ public sealed class GerarCobrancaPedidoUseCase(
 
     private sealed record DadosCobranca(
         Guid EmpresaId, Guid PedidoId, Guid StorefrontId, string StorefrontNome, decimal Total,
-        IReadOnlyList<PedidoItem> Itens, DateTime? AgendadoParaEm);
+        IReadOnlyList<PedidoItem> Itens, DateTime? AgendadoParaEm, decimal Alocado = 0m, bool CobrarSaldo = false);
 }

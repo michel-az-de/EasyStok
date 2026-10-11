@@ -29,6 +29,7 @@ public sealed class LinkCardapioConversaService(ILinkCardapioConversaRepository 
         await repository.AddAsync(link, ct);
 
         var cardapio = await saudacao.ResolverLinkCardapioAsync(empresaId, ct);
+        cardapio = cardapio[..^SaudacaoAtendimento.CaminhoCardapio.Length] + "/comanda.html";
         var separador = cardapio.Contains('?', StringComparison.Ordinal) ? '&' : '?';
         return new LinkCardapioConversaGerado(token, $"{cardapio}{separador}{ParametroToken}={token}", link.ExpiraEm);
     }

@@ -15,6 +15,7 @@ import {
   LINHA_COMANDA_TRAVADA, LINHA_COMANDA_VAI_JUNTO, ROTULO_ENVIAR, avisoDoEnvio, rotuloDoTotal, situacaoDoEnvio,
 } from '../../dominio/resumoPedido'
 import { Cabecalho } from './Cabecalho'
+import { ComandaDoCliente } from './ComandaDoCliente'
 import { ModalCanhoto } from './Canhoto'
 import { SeletorJanela } from './SeletorJanela'
 import { SeletorJanelaApi } from './SeletorJanelaApi'
@@ -197,6 +198,7 @@ export function BlocoPedido({
           enviadaEm={pedido.cobranca?.criadaEm ?? null}
         />
         <hr className={css.separador} />
+        <ComandaDoCliente key={conversaId} conversaId={conversaId} ativo={fonteApi} />
 
         {alvoDoArrasto && <p className={css.soltarAqui}>Soltar aqui</p>}
 

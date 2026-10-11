@@ -16,7 +16,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         "Internal.NotificacoesJobs", "Webhooks.WebhookMensageriaMeta", "Webhooks.WebhookWhatsApp",
         "Webhooks.WebhookWhatsAppPlataforma",
         "Storefront.Agendamento", "Storefront.Auth", "Storefront.Avaliacao", "Storefront.CardapioConversa",
-        "Storefront.ChatSite", "Storefront.ChatSiteMidia", "Storefront.Checkout", "Storefront.FotosCardapioPublicas",
+        "Storefront.ChatSite", "Storefront.ChatSiteMidia", "Storefront.Checkout", "Storefront.ComandaCliente", "Storefront.FotosCardapioPublicas",
         "Storefront.Frete", "Storefront.Menu", "Storefront.PedidosCliente",
         // O backup PWA usa o contrato próprio de dispositivo/loja, fora do shell do Console.
         "Mobile.DeviceBackup", "Mobile.DevicePairing", "Mobile.MobileBatches", "Mobile.MobileCalculadora",
@@ -81,7 +81,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         Associar(Modulo.Producao, "Producao", "ProdutoComposicao", "Lotes", "ItemEstoque", "Movimentacao",
             "EstoqueDesacertos", "ListasCompras", "EtiquetaTemplates", "AtendimentoProducao");
         Associar(Modulo.Atendimento, "AtendimentoAtendentes", "AtendimentoCaderno", "AtendimentoAssistente",
-            "AtendimentoComanda", "AtendimentoConfiguracao", "AtendimentoConsentimentos", "AtendimentoConversas",
+            "AtendimentoComanda", "AtendimentoComandasCliente", "AtendimentoConfiguracao", "AtendimentoConsentimentos", "AtendimentoConversas",
             "AtendimentoAutomacoes", "AtendimentoEsteira", "AtendimentoExpediente", "AtendimentoMensagensProgramadas",
             "AtendimentoLembretes", "AtendimentoRespostasProntas", "Clientes", "ClientesCrm", "ClienteInteresses",
             "Ocorrencias", "Pedidos", "PedidosCobranca");

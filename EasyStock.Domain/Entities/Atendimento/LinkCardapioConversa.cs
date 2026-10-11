@@ -19,6 +19,24 @@ public class LinkCardapioConversa
 
     /// <summary>Quando o pedido foi enviado pela página. Preenchido, o link não serve mais.</summary>
     public DateTime? UsadoEm { get; private set; }
+    public int Revisao { get; private set; }
+    public string RascunhoJson { get; private set; } = "{}";
+    public Guid? PedidoRegistradoId { get; private set; }
+    public string? ResultadoJson { get; private set; }
+
+    public void SalvarRascunho(int revisao, string json, DateTime agora)
+    {
+        if (!EstaValido(agora)) throw new RegraDeDominioVioladaException("Este link já foi enviado ou venceu.");
+        if (Revisao != revisao) throw new RegraDeDominioVioladaException("A comanda mudou em outra tela. Atualize antes de continuar.");
+        RascunhoJson = json;
+        Revisao++;
+    }
+
+    public void RegistrarResultado(Guid pedidoId, string json)
+    {
+        PedidoRegistradoId = pedidoId;
+        ResultadoJson = json;
+    }
 
     // EF Core ctor sem parametros
     private LinkCardapioConversa() { }

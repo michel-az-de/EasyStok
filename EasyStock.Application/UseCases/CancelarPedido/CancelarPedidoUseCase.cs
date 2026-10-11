@@ -29,7 +29,8 @@ public class CancelarPedidoUseCase(
     ILogger<CancelarPedidoUseCase> logger,
     ICobrancaPedidoRepository cobrancaRepo,
     IPublicadorEventoIntegracao publicadorEventos,
-    IOperacaoEventPublisher operacaoEventos)
+    IOperacaoEventPublisher operacaoEventos,
+    SaldoFinanceiroPedido? saldos = null)
 {
     public async Task<PedidoResult?> ExecuteAsync(CancelarPedidoCommand cmd, bool publicarOperacao = true)
     {
@@ -51,7 +52,8 @@ public class CancelarPedidoUseCase(
             if (cobrancas.Any(c => c.EmpresaId != cmd.EmpresaId || c.PedidoId != cmd.Id))
                 throw new UseCaseValidationException("Cobrança não pertence ao pedido.");
             EfeitosCancelamentoPedido.ExigirPermissao(
-                pedido.TotalPago > 0 || cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga), cmd.NivelSolicitante);
+                pedido.TotalPago > 0 || cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga)
+                    || saldos is not null && (await saldos.ConsultarAsync(pedido, ct)).Alocado > 0, cmd.NivelSolicitante);
             if (pedido.StatusEnum == StatusPedido.Cancelado) return CriarPedidoUseCase.Map(pedido);
 
             statusAntigo = pedido.Status;

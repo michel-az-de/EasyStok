@@ -121,7 +121,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
     CalculadoraInicioPrevistoPedido inicioPrevisto,
     IEstornoPedidoGateway estorno,
     AvisoCobrancaConversa aviso,
-    IPedidoRepository pedidos)
+    IPedidoRepository pedidos,
+    SaldoFinanceiroPedido? saldoFinanceiro = null)
 {
     public const string StatusAprovado = "approved";
     private const string Origem = "mercadopago";
@@ -257,9 +258,11 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
 
         var comPagamentos = await pedidos.GetByIdWithDetailsAsync(empresaId, pedido.Id) ?? pedido;
         EfeitosQuitacao? efeito = null;
-        if (comPagamentos.TotalPago >= comPagamentos.Total.Valor)
+        var alocadoDepois = alvo.Complementar && saldoFinanceiro is not null
+            ? (await saldoFinanceiro.ConsultarAsync(comPagamentos, ct)).Alocado : comPagamentos.TotalPago;
+        if (alocadoDepois >= comPagamentos.Total.Valor)
             efeito = await quitacao.PrepararAsync(comPagamentos, alvo, pagoEm, ct);
-        else if (alvo.Valor < comPagamentos.Total.Valor)
+        else if (!alvo.Complementar && alvo.Valor < comPagamentos.Total.Valor)
         {
             var saldo = comPagamentos.Total.Valor - comPagamentos.TotalPago;
             var naEntrega = CobrancaPedido.CriarNaEntrega(empresaId, pedido.Id, saldo, pagoEm, alvo.ConversaId);
@@ -308,11 +311,16 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         PedidoEntity pedido, IReadOnlyList<CobrancaPedido> cobrancas, ConfirmarPagamentoPedidoInput input,
         Guid empresaId, CancellationToken ct)
     {
-        if (cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga && c.PagamentoExternoId != input.PagamentoExternoId))
+        var alvo = EscolherCobranca(cobrancas, input);
+        if (alvo?.Complementar != true && cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga && c.PagamentoExternoId != input.PagamentoExternoId))
             return true;
 
         var comPagamentos = await pedidos.GetByIdWithDetailsAsync(empresaId, pedido.Id) ?? pedido;
-        return comPagamentos.Total.Valor > 0m && comPagamentos.TotalPago >= comPagamentos.Total.Valor;
+        var alocado = saldoFinanceiro is not null && alvo?.Complementar == true
+            ? (await saldoFinanceiro.ConsultarAsync(comPagamentos, ct)).Alocado : comPagamentos.TotalPago;
+        // Preferência antiga paga depois de uma edição não vira complemento de valor diferente.
+        return comPagamentos.Total.Valor > 0m && (alocado >= comPagamentos.Total.Valor
+            || alvo?.Complementar == true && input.ValorPago > comPagamentos.Total.Valor - alocado);
     }
 
     private static CobrancaPedido? EscolherCobranca(IReadOnlyList<CobrancaPedido> cobrancas, ConfirmarPagamentoPedidoInput input)

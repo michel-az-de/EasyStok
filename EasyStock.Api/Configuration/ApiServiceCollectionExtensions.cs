@@ -260,6 +260,14 @@ public static class ApiServiceCollectionExtensions
                     });
             });
 
+            // Autosave e SSE usam a credencial individual; clientes no mesmo IP não dividem a cota.
+            options.AddPolicy("comanda-rascunho", context => RateLimitPartition.GetFixedWindowLimiter(
+                context.Request.RouteValues["token"]?.ToString() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy("comanda-stream", context => RateLimitPartition.GetConcurrencyLimiter(
+                context.Request.RouteValues["token"]?.ToString() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                _ => new ConcurrencyLimiterOptions { PermitLimit = 3, QueueLimit = 0 }));
+
             // Webhooks da Meta (WhatsApp, Instagram, Messenger). A Meta entrega em rajada a
             // partir de poucos IPs; 429 faz ela reenviar e, insistindo, desativar a assinatura.
             // O endpoint ja exige HMAC (X-Hub-Signature-256), entao aqui e so teto contra flood

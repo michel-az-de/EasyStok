@@ -33,7 +33,8 @@ public class RegistrarPagamentoPedidoUseCase(
     ILogger<RegistrarPagamentoPedidoUseCase> logger,
     CalculadoraInicioPrevistoPedido inicioPrevisto,
     QuitacaoPedido quitacao,
-    ICaixaRepository? caixaRepo = null)
+    ICaixaRepository? caixaRepo = null,
+    SaldoFinanceiroPedido? saldos = null)
 {
     private static readonly HashSet<string> MetodosValidos = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -84,7 +85,8 @@ public class RegistrarPagamentoPedidoUseCase(
             // superpagamento acidental, e o servidor aceitava por design (#607) sem distinguir
             // deliberado de acidental. Overpay so passa com PermitirExcedente=true, enviado
             // SOMENTE pelo Detail.cshtml (onde o aviso de gorjeta/arredondamento ja existe).
-            var pendente = Math.Max(0m, pedido.Total.Valor - pedido.TotalPago);
+            var alocado = saldos is null ? pedido.TotalPago : (await saldos.ConsultarAsync(pedido, token)).Alocado;
+            var pendente = Math.Max(0m, pedido.Total.Valor - alocado);
             if (cmd.Valor > pendente && !cmd.PermitirExcedente)
             {
                 throw new UseCaseValidationException(
