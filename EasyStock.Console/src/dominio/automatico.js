@@ -19,6 +19,7 @@ import { MOTIVO_PADRAO, origemDaPassagem } from './passagem.js'
 import { pedidoEncerrado } from './pedido.js'
 import { ehPerguntaSemResposta, mensagensSemRespostaReal } from './mensagem.js'
 import { minutosAbertos } from './funcionamento.js'
+import { sinalDoCliente } from './agente.js'
 
 export const MODOS = {
   LIGADO: 'ligado',
@@ -345,6 +346,53 @@ function aguardandoAbertura(conversa, aberta) {
   }
 }
 
+// #1606: fala pendente que a casa nunca resolve sozinha sobe NA HORA, sem
+// esperar o SLA e sem depender de terminar em "?" ou de a passagem ter sido
+// gravada. É o mesmo classificador do agente (dominio/agente.js), lido só nas
+// mensagens ainda sem resposta. Sem texto carregado (resumo da API), não opina.
+const COBRANCA_SEM_PAGAMENTO = ['aguardando', 'expirada']
+
+function sinalUrgente(conversa, agora) {
+  const pendentes = mensagensSemRespostaReal(conversa).filter((m) => m.texto)
+  if (pendentes.length === 0) return null
+  const pedido = conversa.pedido
+  const { paraDona, alegaPagamento, perguntaDoPedido } = sinalDoCliente({ ...conversa, mensagens: pendentes })
+  const semPagamento = Boolean(pedido?.cobranca)
+    && COBRANCA_SEM_PAGAMENTO.includes(situacaoDaCobranca(pedido.cobranca, agora).chave)
+  if (paraDona === 'devolucao') {
+    return {
+      chave: 'devolucao',
+      rotulo: 'Problema no pedido',
+      tom: 'perigo',
+      texto: 'Cliente reclamou do pedido ou pediu o dinheiro de volta',
+    }
+  }
+  if (paraDona === 'restricao') {
+    return { chave: 'restricao', rotulo: 'Restrição alimentar', tom: 'aviso', texto: MOTIVO_POR_INTENCAO.restricao }
+  }
+  if (alegaPagamento && semPagamento) {
+    return {
+      chave: 'diz-que-pagou',
+      rotulo: 'Diz que pagou',
+      tom: 'aviso',
+      texto: `Diz que pagou o pedido ${pedido.numero} e o pagamento não caiu, confira`,
+    }
+  }
+  // "Já paguei" com o dinheiro reconhecido é assunto encerrado, não pendência.
+  if (paraDona === 'pede-a-dona' && !(alegaPagamento && !semPagamento)) {
+    return { chave: 'pede-a-dona', rotulo: 'Precisa de você', tom: 'aviso', texto: MOTIVO_PADRAO }
+  }
+  if (perguntaDoPedido && pendentes.length >= 2 && pedido && !pedidoEncerrado(pedido)) {
+    return {
+      chave: 'insistencia',
+      rotulo: 'Cobrando o pedido',
+      tom: 'perigo',
+      texto: `Cliente perguntou ${pendentes.length} vezes do pedido ${pedido.numero} e ninguém respondeu`,
+    }
+  }
+  return null
+}
+
 // `janelas` é novo na rodada 10 (achado 3): default `[]` para quem ainda não
 // passa o catálogo continuar funcionando exatamente como antes (pedido
 // atrasado simplesmente não entra na conta, nunca quebra).
@@ -363,6 +411,7 @@ export function motivoDePrecisar(conversa, agora, pausado = true, aberta = true,
   if (foraDeAlcance(conversa)) return null
   return aguardandoAbertura(conversa, aberta)
     ?? ocorrenciaPendente(conversa)
+    ?? sinalUrgente(conversa, agora)
     ?? pedidoAtrasadoVisivel(conversa, janelas, agora)
     ?? esperaDoCliente(conversa, agora, pausado, expediente)
     ?? cobrancaVencida(conversa, agora)

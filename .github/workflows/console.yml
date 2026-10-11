@@ -79,6 +79,7 @@ jobs:
       - run: node ferramentas/prova-1600-custo-fuso-reabertura.mjs
       - run: node ferramentas/prova-1424-mensagem-programada-api.mjs
       - run: node ferramentas/prova-1427-sla-resposta.mjs
+      - run: node ferramentas/prova-1606-triagem-urgente.mjs
       - run: node ferramentas/prova-onda2-cancelamento.mjs
       - run: node ferramentas/prova-onda2-reagendamento.mjs
       - run: node ferramentas/prova-m36-reabrir-conversa.mjs
