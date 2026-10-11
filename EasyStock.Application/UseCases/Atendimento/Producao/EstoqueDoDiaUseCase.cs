@@ -11,13 +11,17 @@ public sealed record LoteDoDia(string? Codigo, decimal Quantidade, DateTime? Val
 /// <param name="Saldo">Porções em lotes com saldo e não vencidos (mesmo critério do cardápio, #1171).</param>
 /// <param name="Descoberto">Porções vendidas sem saldo (S22), à espera de contagem.</param>
 /// <param name="Porcoes">M1.4c (#1537): saldo de cada porção. Vazio em prato sem porções.</param>
+/// <param name="Fisico">Tudo o que está guardado, vencido incluído: é o que a contagem do ajuste cobre (#1542).</param>
 public sealed record EstoqueDoPrato(
     Guid CardapioItemId, Guid ProdutoId, string Nome, string? Porcao, decimal Saldo, decimal Descoberto,
-    IReadOnlyList<LoteDoDia> Lotes, IReadOnlyList<SaldoDaPorcao>? Porcoes = null);
+    IReadOnlyList<LoteDoDia> Lotes, IReadOnlyList<SaldoDaPorcao>? Porcoes = null, decimal Fisico = 0m);
 
 /// <param name="VariacaoId">A porção do cardápio. Null = saldo sem porção (estoque antigo ou lote do PWA).</param>
 /// <param name="ProdutoVariacaoId">A mesma porção no estoque: é o que a perda manda de volta. Null enquanto a porção não tem lote.</param>
-public sealed record SaldoDaPorcao(Guid? VariacaoId, string Rotulo, decimal Saldo, Guid? ProdutoVariacaoId = null);
+/// <param name="Descoberto">Vendas sem saldo que caíram nos lotes desta porção: é ela que a contagem precisa acertar.</param>
+/// <param name="Fisico">Tudo o que está guardado desta porção, vencido incluído.</param>
+public sealed record SaldoDaPorcao(
+    Guid? VariacaoId, string Rotulo, decimal Saldo, Guid? ProdutoVariacaoId = null, decimal Descoberto = 0m, decimal Fisico = 0m);
 
 /// <param name="CardapioItemId">O prato do alerta, para o console ajustar pela rota do item. Null se não está no cardápio.</param>
 public sealed record AlertaDeEstoque(Guid ProdutoId, Guid? CardapioItemId, string Nome, string Texto, decimal QuantidadeDescoberta);
@@ -66,7 +70,7 @@ public sealed class EstoqueDoDiaUseCase(
             var (saldo, descoberto) = SaldoEDescoberto(lotes, hoje);
             return new EstoqueDoPrato(
                 p.Id, p.ProdutoId!.Value, p.NomeEfetivo() ?? "(sem nome)", p.PesoExibicao, saldo, descoberto, comSaldo,
-                SaldosPorPorcao(p, lotes, hoje));
+                SaldosPorPorcao(p, lotes, hoje), FisicoDe(lotes));
         }).ToList();
 
         var pratoDoProduto = pratos.GroupBy(p => p.ProdutoId!.Value).ToDictionary(g => g.Key, g => g.First().Id);
@@ -84,16 +88,26 @@ public sealed class EstoqueDoDiaUseCase(
     private static List<SaldoDaPorcao> SaldosPorPorcao(CardapioItem prato, IReadOnlyCollection<ItemEstoque> lotes, DateOnly hoje)
     {
         if (!prato.TemVariacoes()) return [];
+        SaldoDaPorcao Da(Guid? variacaoId, string rotulo, Guid? noEstoque, bool temLotes)
+        {
+            var dela = temLotes ? lotes.Where(l => l.ProdutoVariacaoId == noEstoque).ToList() : [];
+            var (saldo, descoberto) = SaldoEDescoberto(dela, hoje);
+            return new SaldoDaPorcao(variacaoId, rotulo, saldo, noEstoque, descoberto, FisicoDe(dela));
+        }
+
         var saldos = prato.Variacoes
             .OrderBy(v => v.OrdemExibicao).ThenBy(v => v.CriadoEm).ThenBy(v => v.Id)
-            .Select(v => new SaldoDaPorcao(v.Id, v.Rotulo,
-                v.ProdutoVariacaoId is { } id ? SaldoEDescoberto(lotes.Where(l => l.ProdutoVariacaoId == id), hoje).Saldo : 0m,
-                v.ProdutoVariacaoId))
+            .Select(v => Da(v.Id, v.Rotulo, v.ProdutoVariacaoId, temLotes: v.ProdutoVariacaoId is not null))
             .ToList();
-        var semPorcao = SaldoEDescoberto(lotes.Where(l => l.ProdutoVariacaoId is null), hoje).Saldo;
-        if (semPorcao > 0) saldos.Add(new SaldoDaPorcao(null, "sem porção", semPorcao));
+        // Aparece também quando só tem venda sem saldo: é a contagem dele que fecha o alerta.
+        var semPorcao = Da(null, "sem porção", null, temLotes: true);
+        if (semPorcao.Saldo > 0 || semPorcao.Descoberto > 0 || semPorcao.Fisico > 0) saldos.Add(semPorcao);
         return saldos;
     }
+
+    // Os mesmos lotes que o ajuste rápido conta (`GetLotesParaAjusteAsync`): tudo menos o descartado.
+    private static decimal FisicoDe(IEnumerable<ItemEstoque> lotes) =>
+        lotes.Where(i => i.Status != StatusItemEstoque.Descartado).Sum(i => i.QuantidadeAtual.Value);
 
     /// <summary>Saldo = porções em lotes não vencidos; descoberto = o que saiu sem saldo. Usado também pela M2.5.</summary>
     public static (decimal Saldo, decimal Descoberto) SaldoEDescoberto(IEnumerable<ItemEstoque> lotes, DateOnly hoje)

@@ -79,6 +79,30 @@ public class EstoqueDoDiaUseCaseTests
 
         prato.Saldo.Should().Be(12, "4 + 6 + 2; o vencido não conta");
         prato.Porcoes!.Select(p => (p.Rotulo, p.Saldo)).Should().Equal(("300 g", 4m), ("800 g", 6m), ("sem porção", 2m));
+        // #1542: o que a contagem cobre é tudo o que está guardado, vencido incluído.
+        prato.Fisico.Should().Be(13);
+        prato.Porcoes!.Select(p => p.Fisico).Should().Equal(5m, 6m, 2m);
+    }
+
+    [Fact]
+    public async Task PratoComPorcoes_MostraOndeEstaAVendaSemSaldo()
+    {
+        // #1542: o alerta é do prato; a contagem que o fecha é da porção, então a tela precisa saber qual.
+        var ravioliId = Guid.NewGuid();
+        var ravioli = Prato(ravioliId, "Ravióli");
+        var v300 = Guid.NewGuid();
+        ravioli.AdicionarVariacao(CardapioItemVariacao.Criar(ravioli.Id, "300 g", 28m, ordemExibicao: 0, produtoVariacaoId: v300));
+        _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>()).Returns([ravioli]);
+        var da300 = Lote(ravioliId, 0, new DateTime(2026, 10, 20), descoberto: 2);
+        da300.ProdutoVariacaoId = v300;
+        var semPorcao = Lote(ravioliId, 0, new DateTime(2026, 10, 20), descoberto: 1);
+        _itens.GetByProdutosAsync(EmpresaId, Arg.Any<IEnumerable<Guid>>(), null, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, IReadOnlyCollection<ItemEstoque>> { [ravioliId] = [da300, semPorcao] });
+
+        var prato = (await Sut().ExecuteAsync(EmpresaId)).Pratos.Single();
+
+        prato.Porcoes!.Select(p => (p.Rotulo, p.Saldo, p.Descoberto)).Should().Equal(
+            ("300 g", 0m, 2m), ("sem porção", 0m, 1m));
     }
 
     [Fact]
@@ -104,6 +128,7 @@ public class EstoqueDoDiaUseCaseTests
 
         var prato = r.Pratos.Should().ContainSingle("o avulso não tem saldo").Subject;
         prato.Saldo.Should().Be(8, "3 + 5; o lote vencido não conta");
+        prato.Fisico.Should().Be(10, "a contagem cobre os 2 vencidos que ainda estão guardados");
         prato.Descoberto.Should().Be(1);
         prato.Lotes.Select(l => (l.Codigo, l.Vencendo, l.Vencido)).Should().Equal(
             ("LOT-VENCIDO", false, true), ("LOT-AMANHA", true, false), ("LOT-LONGE", false, false));
