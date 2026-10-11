@@ -1,10 +1,10 @@
 /* Entregas no modo API (F04): painéis simples sobre os dados reais. */
-.conteudo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--e-3) var(--e-4); display: flex; flex-direction: column; gap: var(--e-4); }
+.conteudo { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: var(--e-3) var(--e-4); display: flex; flex-direction: column; gap: var(--e-3); }
 .navegacao { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; }
-.abas { display: flex; gap: var(--e-1); flex-wrap: wrap; flex: 0 1 560px; border-bottom: var(--b-1) solid var(--linha); }
-.abaInterna { flex: 1 1 auto; padding: var(--e-2); font-size: var(--t-apoio); }
+.abas { display: flex; gap: var(--e-1); flex: 0 1 auto; min-width: 0; border-bottom: var(--b-1) solid var(--linha); }
+.abaInterna { flex: 1 1 auto; min-width: 0; padding: var(--e-2) var(--e-3); font-size: var(--t-apoio); }
 .abas .abaInterna { border-radius: 0; border: 0; border-bottom: var(--b-2) solid transparent; box-shadow: none; }
-.abaInterna[aria-selected='true'], .abaInterna[aria-selected='true']:hover { background: var(--marca-claro); color: var(--marca-forte); border-bottom-color: var(--marca); }
+.abaInterna[aria-selected='true'], .abaInterna[aria-selected='true']:hover { background: transparent; color: var(--marca); border-bottom-color: var(--marca); }
 .painel { display: flex; flex-direction: column; gap: var(--e-4); min-width: 0; }
 .secao { display: flex; flex-direction: column; gap: var(--e-2); }
 .secao h3 { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
@@ -17,7 +17,7 @@
 .linha { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .numero { font-family: var(--f-dado); font-weight: 700; font-variant-numeric: tabular-nums; }
 .apoio { color: var(--tinta-2); font-size: var(--t-apoio); }
-.cresce { flex: 1; }
+.cresce { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .faixa {
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); margin: 0;
   padding: var(--e-2) var(--e-3); border-radius: var(--r-2);
@@ -49,7 +49,77 @@
 .cadastro { display: flex; flex-direction: column; gap: var(--e-4); }
 /* O aviso de erro do cadastro fica visível mesmo com a lista rolada (Gestão rola o painel). */
 .faixaFixa { position: sticky; top: 0; z-index: 2; }
+
+.painelDia { display: flex; flex-direction: column; gap: var(--e-4); min-width: 0; }
+.painelDia .lista { gap: 0; }
+.painelDia .cartao { padding: var(--e-3) 0; background: transparent; border: 0; border-bottom: var(--b-1) solid var(--linha); border-radius: 0; }
+.painelDia .cartao .linha > svg { flex-shrink: 0; }
+.painelDia .cartao p { margin: 0; overflow-wrap: anywhere; }
+.painelDia .cartao > .linha:first-child .cresce { font-weight: 700; flex-basis: 12rem; }
+.painelDia .janelaDoDia { gap: var(--e-2); }
+.painelDia .janelaDoDia .lista { display: flex; gap: 0; }
+.painelDia .janelaDoDia > .linha:first-child { padding-bottom: var(--e-2); border-bottom: var(--b-1) solid var(--linha); }
+.painelDia .cabecalhoDoDia { gap: var(--e-2); }
+.escolhaDoDia > .campoData { flex: 1 1 140px; min-width: 140px; max-width: 160px; }
+.escolhaDoDia [role='radiogroup'] button { padding-inline: var(--e-3); }
+.impressaoDoDia { max-width: 100%; }
+.impressaoDoDia summary { min-height: var(--toque); padding-block: var(--e-3); color: var(--tinta-2); font-size: var(--t-apoio); cursor: pointer; }
+.impressaoDoDia summary:hover { color: var(--marca); }
+.impressaoDoDia[open] { flex-basis: 100%; }
+.impressaoDoDia > .linha { padding-bottom: var(--e-2); }
+
+.agenda { container: agenda / inline-size; }
+.periodoAgenda { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-3); }
+.controlesAgenda { display: grid; grid-template-columns: var(--toque) minmax(0, 160px) var(--toque); align-items: center; gap: var(--e-1); }
+.controlesAgenda > * { min-width: 0; }
+.controlesAgenda input { width: 100%; }
+.passoSemana { padding: 0; }
+.passoSemana:first-child svg { transform: rotate(180deg); }
+.intervaloAgenda { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+.periodoAgenda > button { margin-left: auto; }
+.notaAgenda { margin: 0; }
+.semanaAgenda { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.diaAgenda { min-width: 0; padding: var(--e-3) 0; border-top: var(--b-1) solid var(--linha); }
+.cabecalhoAgenda { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--e-1) var(--e-2); margin-bottom: var(--e-2); }
+.cabecalhoAgenda h2 { display: flex; align-items: baseline; gap: var(--e-2); margin: 0; font-family: var(--f-corpo); font-size: var(--t-corpo); font-weight: 800; }
+.cabecalhoAgenda h2 > span { text-transform: capitalize; }
+.cabecalhoAgenda p { margin: 0; }
+.diaAgenda[aria-current='date'] .cabecalhoAgenda h2 { color: var(--marca); }
+.janelasAgenda { display: grid; gap: var(--e-3); }
+.janelaAgenda { display: flex; flex-direction: column; gap: var(--e-2); min-width: 0; }
+.janelaAgenda + .janelaAgenda { padding-top: var(--e-3); border-top: var(--b-1) solid var(--linha); }
+.tituloJanelaAgenda { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e-1) var(--e-2); }
+.tituloJanelaAgenda h3 { margin: 0; font-size: var(--t-apoio); font-weight: 800; font-variant-numeric: tabular-nums; }
+.rotuloJanelaAgenda { font-size: var(--t-apoio); overflow-wrap: anywhere; }
+.ocupacaoAgenda { font-size: var(--t-apoio); font-variant-numeric: tabular-nums; color: var(--tinta-2); }
+.estadoAgenda { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e-1) var(--e-2); margin: 0; font-size: var(--t-apoio); overflow-wrap: anywhere; }
+.estadoAgenda > span { max-width: 100%; white-space: normal; }
+.vazioAgenda { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+.pedidosAgenda { display: grid; gap: var(--e-2); list-style: none; margin: 0; padding: 0; }
+.pedidosAgenda li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 var(--e-2); min-width: 0; overflow-wrap: anywhere; }
+.pedidosAgenda li > .apoio { grid-column: 2; }
+@container agenda (min-width: 1000px) {
+  .semanaAgenda { grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: stretch; }
+  .diaAgenda { padding: var(--e-3); border-left: var(--b-1) solid var(--linha); }
+  .diaAgenda:first-child { border-left: 0; padding-left: 0; }
+  .diaAgenda:last-child { padding-right: 0; }
+  .cabecalhoAgenda { display: block; margin-bottom: var(--e-3); }
+  .cabecalhoAgenda h2 { flex-direction: column; gap: 0; margin-bottom: var(--e-1); }
+  .cabecalhoAgenda h2 time { font-size: var(--t-forte); }
+  .tituloJanelaAgenda { display: grid; gap: 0; }
+  .pedidosAgenda li { display: flex; flex-direction: column; }
+}
 @media (max-width: 640px) {
+  .navegacao { gap: var(--e-1); }
+  .abas { flex-basis: 100%; }
+  .abaInterna { padding-inline: var(--e-1); font-size: .875rem; line-height: 1.25; }
+  .navegacao > .apoio { font-size: .8125rem; }
+  .painelDia { gap: var(--e-3); }
+  .painelDia .cartao > .linha:first-child .cresce { flex-basis: 8rem; }
+  .painelDia .cabecalhoDoDia > .cresce { flex-basis: 100%; }
+  .periodoAgenda { column-gap: var(--e-1); }
+  .controlesAgenda { flex-basis: 100%; grid-template-columns: var(--toque) minmax(0, 1fr) var(--toque); }
+  .periodoAgenda > button { padding-inline: var(--e-1); font-size: .875rem; }
   .faixa { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; }
   .faixa > button { grid-column: 2; justify-self: start; }
 }

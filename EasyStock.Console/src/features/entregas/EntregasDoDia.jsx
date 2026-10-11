@@ -36,7 +36,7 @@ function EscolhaDoDia({ dia, mudarDia }) {
   const hoje = dataIsoNoFuso(agora)
   const amanha = dataIsoNoFuso(agora + UM_DIA_MS)
   return (
-    <div className={css.linha}>
+    <div className={`${css.linha} ${css.escolhaDoDia}`}>
       <div className={css.linha} role="radiogroup" aria-label="Dia das entregas">
         <Chip papel="escolha" ativo={dia === hoje} onClick={() => mudarDia(hoje)}>Hoje</Chip>
         <Chip papel="escolha" ativo={dia === amanha} onClick={() => mudarDia(amanha)}>Amanhã</Chip>
@@ -122,12 +122,15 @@ export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes
               <p className={css.apoio}>{resumoDoRoteiro(roteiro)}</p>
               {roteiro.bloqueioDoDia && <p className={css.linha}><Pilula tom="aviso">Dia bloqueado</Pilula> <span className={css.apoio}>{roteiro.bloqueioDoDia}</span></p>}
             </div>
-            <div className={css.linha}>
-              <div className={css.campoData}>
-                <CampoSelecao rotulo="Papel" rotuloOculto opcoes={PAPEIS} value={papel} onChange={(e) => setPapel(e.target.value)} />
+            <details className={css.impressaoDoDia}>
+              <summary>Roteiro e impressão</summary>
+              <div className={css.linha}>
+                <div className={css.campoData}>
+                  <CampoSelecao rotulo="Papel" rotuloOculto opcoes={PAPEIS} value={papel} onChange={(e) => setPapel(e.target.value)} />
+                </div>
+                <AcoesPdf varianteImprimir="secundario" gerar={() => pdfDoRoteiro({ roteiro, papel, agora: Date.now() })} />
               </div>
-              <AcoesPdf varianteImprimir="secundario" gerar={() => pdfDoRoteiro({ roteiro, papel, agora: Date.now() })} />
-            </div>
+            </details>
           </div>
         )}
       </section>

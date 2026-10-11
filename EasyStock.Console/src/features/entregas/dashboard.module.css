@@ -38,15 +38,15 @@
   flex-shrink: 0;
 }
 .topoPagina h1 { margin: 0; font-size: var(--t-forte); font-weight: 700; flex: 1; }
-.paginaApi { --t-apoio: .9375rem; --t-corpo: 1rem; background: color-mix(in srgb, var(--papel) 55%, var(--fundo)); }
+.paginaApi { --t-apoio: .9375rem; --t-corpo: 1rem; min-width: 0; background: var(--papel); }
 .paginaApi > * { width: 100%; max-width: 1384px; margin-inline: auto; }
-.paginaApi .topoPagina { padding: var(--e-24) var(--e-5) var(--e-4); }
-.paginaApi .topoPagina h1 { font-family: var(--f-display); font-size: var(--t-display); font-weight: 500; line-height: var(--lh-compacto); }
-.paginaApi > :last-child { padding: var(--e-4) var(--e-5); }
+.paginaApi .topoPagina { padding: var(--e-4) var(--e-5) var(--e-3); border-bottom: 0; }
+.paginaApi .topoPagina h1 { font-family: var(--f-corpo); font-size: var(--t-titulo); font-weight: 800; line-height: var(--lh-compacto); }
+.paginaApi > :last-child { padding: 0 var(--e-5) var(--e-4); }
 @media (max-width: 640px) {
-  .paginaApi .topoPagina { padding: var(--e-4) var(--e-3) var(--e-3); }
-  .paginaApi .topoPagina h1 { font-size: var(--t-valor); }
-  .paginaApi > :last-child { padding: var(--e-3); }
+  .paginaApi .topoPagina { padding: var(--e-3); }
+  .paginaApi .topoPagina h1 { font-size: var(--t-titulo); }
+  .paginaApi > :last-child { padding: 0 var(--e-3) var(--e-3); }
 }
 .horaTopo { font-family: var(--f-dado); color: var(--tinta-2); font-size: var(--t-apoio); }
 

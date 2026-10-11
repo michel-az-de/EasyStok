@@ -86,7 +86,7 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
   const [recusando, setRecusando] = useState(null)
 
   return (
-    <>
+    <div className={css.painelDia}>
       {p.aprovacao.length > 0 && (
         <section className={css.secao} aria-label="Aguardando sua aprovação">
           <h3>Aguardando sua aprovação</h3>
@@ -165,7 +165,7 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
       ))}
 
       <Chamados chamados={chamados} ocupado={ocupado} acoes={acoes} />
-    </>
+    </div>
   )
 }
 
