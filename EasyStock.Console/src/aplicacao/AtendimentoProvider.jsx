@@ -340,6 +340,10 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   useEffect(() => {
     if (precisaDossie) acoesAtivas.carregarClienteDaConversa(estado.selecionadaId)
   }, [precisaDossie, estado.selecionadaId, acoesAtivas])
+  const pedidoDoCliente = FONTE_API && estado.conversas.find((c) => c.id === estado.selecionadaId)?.pedido?.pedidoId
+  useEffect(() => {
+    if (pedidoDoCliente) acoesAtivas.carregarClienteDaConversa(estado.selecionadaId)
+  }, [pedidoDoCliente, estado.selecionadaId, acoesAtivas])
 
   const valor = useMemo(() => {
     const selecionada = estado.conversas.find((c) => c.id === estado.selecionadaId) ?? null
