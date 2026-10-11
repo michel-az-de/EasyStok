@@ -6,6 +6,12 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<Cliente?> GetByIdAsync(Guid id);
         Task<Cliente?> GetByIdAsync(Guid empresaId, Guid id);
 
+        /// <summary>
+        /// Vários clientes da empresa em uma consulta (#1564), sem as coleções. Somente leitura.
+        /// Id que não existe ou é de outra empresa não vem na lista.
+        /// </summary>
+        Task<IReadOnlyList<Cliente>> ListarPorIdsAsync(Guid empresaId, IReadOnlyCollection<Guid> ids, CancellationToken ct = default);
+
         /// <summary>Carrega cliente com todas as coleções (endereços, telefones, etc) — pra tela de detalhe.</summary>
         Task<Cliente?> GetByIdWithDetailsAsync(Guid empresaId, Guid id);
 

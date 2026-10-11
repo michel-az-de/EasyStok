@@ -33,13 +33,34 @@ public sealed class ObterViagemUseCase(IViagemRepository viagens, IPedidoReposit
         return await MontarAsync(viagem, ct);
     }
 
-    internal async Task<ViagemResult> MontarAsync(Viagem viagem, CancellationToken ct)
+    internal async Task<ViagemResult> MontarAsync(Viagem viagem, CancellationToken ct) =>
+        (await MontarAsync(viagem.EmpresaId, [viagem], ct))[0];
+
+    /// <summary>
+    /// #1564: os pedidos e os clientes de todas as paradas vêm em uma consulta cada, e não uma por parada.
+    /// Todas as viagens são de <paramref name="empresaId"/>.
+    /// </summary>
+    internal async Task<IReadOnlyList<ViagemResult>> MontarAsync(Guid empresaId, IReadOnlyList<Viagem> lista, CancellationToken ct)
+    {
+        var pedidoIds = lista.SelectMany(v => v.Paradas).Select(p => p.PedidoId).Distinct().ToList();
+        var pedidosPorId = pedidoIds.Count == 0
+            ? []
+            : (await pedidos.ListarPorIdsAsync(empresaId, pedidoIds, ct)).ToDictionary(p => p.Id);
+        var clienteIds = pedidosPorId.Values.Where(p => p.ClienteId.HasValue).Select(p => p.ClienteId!.Value).Distinct().ToList();
+        var clientesPorId = clienteIds.Count == 0
+            ? []
+            : (await clientes.ListarPorIdsAsync(empresaId, clienteIds, ct)).ToDictionary(c => c.Id);
+        return lista.Select(v => Montar(v, pedidosPorId, clientesPorId)).ToList();
+    }
+
+    private static ViagemResult Montar(
+        Viagem viagem, Dictionary<Guid, Domain.Entities.Pedido> pedidosPorId, Dictionary<Guid, Domain.Entities.Cliente> clientesPorId)
     {
         var paradas = new List<ParadaViagemResult>();
         foreach (var p in viagem.Paradas.OrderBy(p => p.Ordem))
         {
-            var pedido = await pedidos.GetByIdAsync(viagem.EmpresaId, p.PedidoId);
-            var cliente = pedido?.ClienteId is { } cid ? await clientes.GetByIdAsync(viagem.EmpresaId, cid) : null;
+            var pedido = pedidosPorId.GetValueOrDefault(p.PedidoId);
+            var cliente = pedido?.ClienteId is { } cid ? clientesPorId.GetValueOrDefault(cid) : null;
             paradas.Add(new ParadaViagemResult(
                 p.PedidoId, NumeroPedido(p.PedidoId), p.Ordem, cliente?.Nome ?? pedido?.ClienteNome,
                 pedido?.EnderecoEntrega ?? Endereco(cliente),
@@ -66,10 +87,7 @@ public sealed class ListarViagensUseCase(IViagemRepository viagens, ObterViagemU
 
     public async Task<IReadOnlyList<ViagemResult>> ExecuteAsync(Guid empresaId, SituacaoViagem? situacao, CancellationToken ct = default)
     {
-        var resultado = new List<ViagemResult>();
-        foreach (var v in await viagens.ListarAsync(empresaId, situacao, LimitePadrao, ct))
-            resultado.Add(await obter.MontarAsync(v, ct));
-        return resultado;
+        return await obter.MontarAsync(empresaId, await viagens.ListarAsync(empresaId, situacao, LimitePadrao, ct), ct);
     }
 }
 
