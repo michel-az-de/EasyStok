@@ -1,3 +1,4 @@
+using EasyStock.Application.Services;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
@@ -16,6 +17,12 @@ namespace EasyStock.Api.Mobile.Services;
 /// <item>o cancelamento devolve o que este pedido baixou, aos lotes de onde saiu. Sem saída, não devolve nada.</item>
 /// </list>
 /// <para>
+/// #1571: o pedido que nasceu no aparelho vira Pedido do ERP, e o console ou o KDS pode avançá-lo. Aí
+/// a esteira baixa com outro documento (<c>{pedido}:{item}</c>). É a mesma venda com duas chaves: cada
+/// lado baixa só o que o outro ainda não baixou daquele produto, e o cancelamento, venha de onde vier,
+/// devolve o que está aberto pelas duas. A outra metade da regra está em <see cref="PedidoEstoqueIntegrationService"/>.
+/// </para>
+/// <para>
 /// #1543: antes a baixa caía num lote qualquer, truncava o saldo em zero sem registrar a falta, e o
 /// cancelamento somava a quantidade do pedido mesmo que nada tivesse saído por ele.
 /// </para>
@@ -31,14 +38,24 @@ public class MobileStockReconciler(
     ILogger<MobileStockReconciler> log)
 {
     /// <summary>Baixa a venda de um produto do pedido. Devolve false quando não há o que fazer (sem vínculo, sem lote, já baixado).</summary>
+    /// <param name="pedidoDoErp">
+    /// Pedido do ERP criado a partir deste pedido do aparelho, quando já existe. #1571: o console ou o
+    /// KDS pode tê-lo avançado, e a esteira baixa com outro documento (<c>{pedido}:{item}</c>). O que
+    /// ela já baixou deste produto não sai de novo; sai só a diferença.
+    /// </param>
     public async Task<bool> BaixarVendaAsync(
         Product produtoDoAparelho, int quantidade, string pedidoId, Guid? lojaDoPedido, string descricao,
-        CancellationToken ct = default)
+        Guid? pedidoDoErp = null, CancellationToken ct = default)
     {
         try
         {
             if (Alvo(produtoDoAparelho) is not { } alvo || quantidade <= 0) return false;
-            if ((await SaidasDoPedidoAsync(alvo, pedidoId, ct)).Count > 0) return false;
+            if ((await SaidasAbertasAsync(alvo.EmpresaId, alvo.ProdutoId, pedidoId, null, ct)).Count > 0) return false;
+
+            var aBaixar = (decimal)quantidade;
+            if (pedidoDoErp is { } doErp)
+                aBaixar -= (await SaidasAbertasAsync(alvo.EmpresaId, alvo.ProdutoId, null, doErp, ct)).Sum(s => s.Quantidade.Value);
+            if (aBaixar <= 0m) return false;
 
             var lotes = await LotesEmFefoAsync(alvo, lojaDoPedido, ct);
             if (lotes.Count == 0)
@@ -51,7 +68,7 @@ public class MobileStockReconciler(
             var usuarioSistema = await systemUserResolver.GetOrCreateAsync(alvo.EmpresaId, ct);
 
             var agora = DateTime.UtcNow;
-            var restante = (decimal)quantidade;
+            var restante = aBaixar;
             var saidas = new List<(ItemEstoque Lote, decimal Quantidade)>();
             foreach (var lote in lotes.Where(l => Saldo(l) > 0m))
             {
@@ -73,7 +90,7 @@ public class MobileStockReconciler(
                 else saidas.Add((comFalta, falta));
                 log.LogWarning(
                     "Venda do PWA sem saldo: pedido {PedidoId} produto {ProdutoId} pediu {Quantidade} e faltaram {Falta}. Ficou a descoberto no lote {LoteId}.",
-                    pedidoId, alvo.ProdutoId, quantidade, falta, comFalta.Id);
+                    pedidoId, alvo.ProdutoId, aBaixar, falta, comFalta.Id);
             }
 
             foreach (var (lote, quantidadeDoLote) in saidas)
@@ -97,7 +114,7 @@ public class MobileStockReconciler(
                     Descricao = temFalta ? $"{descricao} · {falta:0.###} a descoberto" : descricao,
                     DocumentoReferencia = pedidoId,
                     CriadoEm = agora
-                }, usuarioSistema, produtoDoAparelho, agora);
+                }, usuarioSistema, $"mobile_product={produtoDoAparelho.Id}", agora);
             }
             return true;
         }
@@ -109,21 +126,28 @@ public class MobileStockReconciler(
         }
     }
 
-    /// <summary>Devolve o que este pedido baixou deste produto. Devolve false quando não havia saída a devolver.</summary>
+    /// <summary>
+    /// Devolve tudo o que este pedido baixou e ainda vale, de qualquer produto (inclusive o do item que
+    /// saiu do pedido depois de baixar). Devolve false quando não havia saída a devolver.
+    /// </summary>
+    /// <param name="pedidoDoErp">
+    /// Só no pedido que <b>nasceu no aparelho</b>: o Pedido do ERP criado a partir dele. #1571: devolve
+    /// também o que a esteira baixou por esse pedido (o console avançou antes). No pedido que nasceu no
+    /// ERP fica nulo: lá quem devolve é o cancelamento da esteira, que pode recusar.
+    /// </param>
     public async Task<bool> DevolverVendaAsync(
-        Product produtoDoAparelho, string pedidoId, string descricao, CancellationToken ct = default)
+        Guid empresaId, string pedidoId, string descricao, Guid? pedidoDoErp = null, CancellationToken ct = default)
     {
         try
         {
-            if (Alvo(produtoDoAparelho) is not { } alvo) return false;
-            var saidas = await SaidasDoPedidoAsync(alvo, pedidoId, ct);
+            var saidas = await SaidasAbertasAsync(empresaId, null, pedidoId, pedidoDoErp, ct);
             if (saidas.Count == 0) return false;
 
             var idsDosLotes = saidas.Select(s => s.ItemEstoqueId).Distinct().ToList();
             var lotes = await db.Set<ItemEstoque>().IgnoreQueryFilters()
-                .Where(i => i.EmpresaId == alvo.EmpresaId && idsDosLotes.Contains(i.Id))
+                .Where(i => i.EmpresaId == empresaId && idsDosLotes.Contains(i.Id))
                 .ToDictionaryAsync(i => i.Id, ct);
-            var usuarioSistema = await systemUserResolver.GetOrCreateAsync(alvo.EmpresaId, ct);
+            var usuarioSistema = await systemUserResolver.GetOrCreateAsync(empresaId, ct);
 
             var agora = DateTime.UtcNow;
             foreach (var saida in saidas)
@@ -132,15 +156,16 @@ public class MobileStockReconciler(
                 if (lotes.TryGetValue(saida.ItemEstoqueId, out var lote))
                     lote.RestaurarSaidaEstornada(saida.Quantidade, agora);
                 saida.MarcarComoEstornada(agora);
-                Registrar(MovimentacaoEstoque.CriarEstorno(Guid.NewGuid(), saida, agora, descricao, agora),
-                    usuarioSistema, produtoDoAparelho, agora);
+                Registrar(
+                    MovimentacaoEstoque.CriarEstorno(Guid.NewGuid(), saida, agora, descricao, agora,
+                        motivoEstorno: PedidoEstoqueIntegrationService.MotivoDoEstornoPorCancelamento),
+                    usuarioSistema, $"mobile_order={pedidoId}", agora);
             }
             return true;
         }
         catch (Exception ex)
         {
-            log.LogError(ex, "Falha ao devolver ao ERP a venda do pedido {PedidoId} (produto do aparelho {MobileId}). O sync segue.",
-                pedidoId, produtoDoAparelho.Id);
+            log.LogError(ex, "Falha ao devolver ao ERP a venda do pedido {PedidoId}. O sync segue.", pedidoId);
             return false;
         }
     }
@@ -181,17 +206,25 @@ public class MobileStockReconciler(
             .ToList();
     }
 
-    // Saidas de venda deste pedido e produto ainda nao estornadas. Olha tambem o que foi registrado
-    // neste mesmo lote do sync e ainda nao foi gravado.
-    private async Task<List<MovimentacaoEstoque>> SaidasDoPedidoAsync(AlvoNoErp alvo, string pedidoId, CancellationToken ct)
+    // Saidas de venda ainda nao estornadas de um pedido: as do aparelho (documento = id do pedido de
+    // la), as da esteira do ERP (documento = "{pedido do ERP}:{item}"), ou as duas. produtoId nulo =
+    // de qualquer produto. Olha tambem o que foi registrado neste mesmo lote do sync e ainda nao foi gravado.
+    private async Task<List<MovimentacaoEstoque>> SaidasAbertasAsync(
+        Guid empresaId, Guid? produtoId, string? pedidoDoAparelho, Guid? pedidoDoErp, CancellationToken ct)
     {
+        var daEsteira = pedidoDoErp is { } doErp ? $"{doErp}:" : null;
         bool DoPedido(MovimentacaoEstoque m) =>
-            m.EmpresaId == alvo.EmpresaId && m.ProdutoId == alvo.ProdutoId && m.DocumentoReferencia == pedidoId
+            m.EmpresaId == empresaId && (produtoId == null || m.ProdutoId == produtoId)
+            && m.DocumentoReferencia != null
+            && ((pedidoDoAparelho != null && m.DocumentoReferencia == pedidoDoAparelho)
+                || (daEsteira != null && m.DocumentoReferencia.StartsWith(daEsteira, StringComparison.Ordinal)))
             && m.Tipo == TipoMovimentacaoEstoque.Saida && m.Natureza == NaturezaMovimentacaoEstoque.Venda
             && m.EstornadaEm == null;
 
         var gravadas = await db.Set<MovimentacaoEstoque>().IgnoreQueryFilters()
-            .Where(m => m.EmpresaId == alvo.EmpresaId && m.ProdutoId == alvo.ProdutoId && m.DocumentoReferencia == pedidoId
+            .Where(m => m.EmpresaId == empresaId && (produtoId == null || m.ProdutoId == produtoId)
+                        && ((pedidoDoAparelho != null && m.DocumentoReferencia == pedidoDoAparelho)
+                            || (daEsteira != null && m.DocumentoReferencia!.StartsWith(daEsteira)))
                         && m.Tipo == TipoMovimentacaoEstoque.Saida && m.Natureza == NaturezaMovimentacaoEstoque.Venda
                         && m.EstornadaEm == null)
             .ToListAsync(ct);
@@ -204,7 +237,7 @@ public class MobileStockReconciler(
     }
 
     // F9-F: toda movimentacao criada pelo sync leva a trilha em movimentacao_estoque_alteracoes.
-    private void Registrar(MovimentacaoEstoque movimentacao, Guid usuarioSistema, Product produtoDoAparelho, DateTime agora)
+    private void Registrar(MovimentacaoEstoque movimentacao, Guid usuarioSistema, string origem, DateTime agora)
     {
         db.Add(movimentacao);
         db.Add(new MovimentacaoEstoqueAlteracao
@@ -220,7 +253,7 @@ public class MobileStockReconciler(
             Observacao = movimentacao.Descricao,
             AlteracoesJson = null,
             Ip = null,
-            UserAgent = $"mobile_product={produtoDoAparelho.Id}; doc={movimentacao.DocumentoReferencia}",
+            UserAgent = $"{origem}; doc={movimentacao.DocumentoReferencia}",
             AlteradoEm = agora
         });
     }

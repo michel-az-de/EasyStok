@@ -195,9 +195,46 @@ aparelho continua valendo para os dois.
 
 **Limites que ficam.** O Pedido do ERP criado a partir do aparelho guarda os itens do primeiro envio;
 editar itens no aparelho depois não os atualiza lá. A baixa do aparelho não ajusta quando os itens
-mudam com o pedido já pronto. Pedido nascido no aparelho e avançado também no console ou no KDS baixa
-duas vezes, uma por cada caminho (já era assim; #1571). O destino do caixa do PWA
-segue na D-M5-02.
+mudam com o pedido já pronto. O destino do caixa do PWA segue na D-M5-02.
+
+## Adendo de 11/10/2026 (#1571): uma venda, duas chaves de documento
+
+O pedido que nasce no aparelho vira Pedido do ERP, e o console ou o KDS pode avançá-lo. O aparelho
+baixa com o id do pedido de lá no documento; a esteira do ERP, com `{pedido}:{item}`. Uma
+idempotência não enxergava a outra. Sem migração.
+
+| Situação | Antes | Agora |
+|---|---|---|
+| Console dá o pedido como pronto e depois o aparelho também | Baixava duas vezes | O aparelho baixa só o que a esteira ainda não baixou daquele produto |
+| Aparelho baixa e o console avança ou acrescenta item | A esteira baixava de novo tudo que ainda não tinha o documento dela | A esteira baixa só a diferença |
+| Console cancela o pedido que o aparelho baixou | Não devolvia nada (a esteira só conhecia as saídas dela) | Devolve também as saídas do aparelho |
+| Aparelho cancela o pedido que o console baixou | Não devolvia nada | Devolve também as saídas da esteira |
+| Aparelho cancela depois de tirar um item do pedido | A baixa do item tirado ficava | Devolve tudo o que o pedido baixou |
+| Pedido com mais de um produto | O vínculo ligava o produto ao item do ERP pela ordem do id do item, que é sorteado: o par saía trocado e o console baixava o produto errado | Casa pelo conteúdo com que o item foi criado (nome, quantidade, preço) |
+
+**Regra.** Cada lado baixa só o que o outro ainda não baixou daquele produto por aquele pedido. O
+item que o console acrescenta sai inteiro: o aparelho não sabe dele, então a baixa do aparelho não o
+cobre. O cancelamento, venha de onde vier, devolve o que está aberto pelas duas chaves, e cada saída
+devolvida fica marcada, então não volta duas vezes. Vale só para o pedido que nasceu no aparelho: no
+pedido que nasceu no ERP a esteira segue dona única (adendo da #1543).
+
+**O cancelamento do pedido do aparelho devolve pelo que está baixado, não pelo status.** O status do
+ERP espelha o do aparelho, e um aparelho atrasado pode levá-lo de volta a "aguardando" com a baixa
+já feita. A saída é relida com trava antes de voltar ao lote, para o cancelamento simultâneo dos dois
+lados não devolver em dobro.
+
+**Devolução por cancelamento não é estorno à mão.** O estorno feito pelo cancelamento leva o motivo
+"Devolução automática: pedido cancelado" (com o prefixo, para não coincidir com o que alguém digita
+no estorno manual). Se o pedido voltar a valer, a baixa é refeita. Isso acontece com qualquer reenvio
+do pedido num status que desconta, inclusive o backfill, e não só com a entrega: no pedido que nasceu
+no aparelho o cancelamento feito pelo console vale até o aparelho dizer o contrário. Estorno feito à
+mão no ERP não volta com o reenvio.
+
+**O que não foi feito, de propósito.** O console não avisa o aparelho quando avança um pedido que
+nasceu lá. Espelhar o status sem espelhar o saldo deixaria o estoque do PWA uma venda acima do real
+(o aparelho só conta o movimento que ele mesmo faz), e devolver o saldo do servidor ao aparelho é a
+pendência 2 deste ADR. Enquanto isso o operador avança o pedido nos dois lugares e o estoque do ERP
+fica certo.
 
 ## Rollback
 

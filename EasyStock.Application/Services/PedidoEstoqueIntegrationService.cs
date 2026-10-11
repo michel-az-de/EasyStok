@@ -54,11 +54,29 @@ public sealed class PedidoEstoqueIntegrationService(
     private bool PermiteEstoqueNegativo => options.Value.PermiteEstoqueNegativo;
     private bool RequerEstoqueExistente => options.Value.RequerEstoqueExistente;
 
-    public async Task DescontarAsync(PedidoEntity pedido, CancellationToken ct = default)
+    /// <summary>
+    /// Motivo gravado no estorno da saída que o cancelamento do pedido devolveu (#1571). Separa a
+    /// devolução por cancelamento, que se refaz se o pedido voltar a valer, do estorno feito à mão.
+    /// </summary>
+    /// <remarks>
+    /// O texto leva o prefixo para não coincidir com o motivo que alguém digita no estorno manual
+    /// ("Pedido cancelado" é um motivo plausível lá).
+    /// </remarks>
+    public const string MotivoDoEstornoPorCancelamento = "Devolução automática: pedido cancelado";
+
+    public Task DescontarAsync(PedidoEntity pedido, CancellationToken ct = default) =>
+        DescontarAsync(pedido, itemNovo: null, ct);
+
+    /// <param name="itemNovo">
+    /// O item que acabou de entrar num pedido que já tinha baixado (#939). O aparelho não sabe dele,
+    /// então a baixa do aparelho não o cobre (#1571): ele sai inteiro.
+    /// </param>
+    public async Task DescontarAsync(PedidoEntity pedido, PedidoItem? itemNovo, CancellationToken ct = default)
     {
         // #1534: o pedido do site e da comanda nasce sem loja (tenant único, uma cozinha) e baixa do
         // estoque da empresa; antes saía daqui sem descontar nada. Pedido com loja segue na loja dele.
         var lojaId = pedido.LojaId;
+        var baixadoPeloAparelho = await BaixadoPeloAparelhoAsync(pedido, ct);
 
         foreach (var item in pedido.Itens)
         {
@@ -73,6 +91,18 @@ public sealed class PedidoEstoqueIntegrationService(
             {
                 logger.LogDebug("Pedido {Id} item {ItemId}: movimentação já registrada (idempotência).", pedido.Id, item.Id);
                 continue;
+            }
+
+            // #1571: o que o aparelho já baixou deste produto por este pedido não sai de novo; sai só a
+            // diferença. O item que acabou de entrar fica fora dessa conta: o aparelho não o conhece.
+            var qtd = item.Quantidade;
+            if (item.Id != itemNovo?.Id
+                && baixadoPeloAparelho.GetValueOrDefault(item.ProdutoId.Value) is var cobertura and > 0m)
+            {
+                var abatido = Math.Min(cobertura, qtd);
+                baixadoPeloAparelho[item.ProdutoId.Value] = cobertura - abatido;
+                qtd -= abatido;
+                if (qtd <= 0m) continue;
             }
 
             // Lotes elegiveis da loja em FEFO. Bloqueado/Descartado nunca baixam; vencido segue
@@ -105,7 +135,6 @@ public sealed class PedidoEstoqueIntegrationService(
 
             // Quantidade agora é decimal — suporta frações (kg, litros, etc.).
             // Cap superior: 99.999 evita valores absurdos.
-            var qtd = item.Quantidade;
             if (qtd > 99_999m)
                 throw new UseCaseValidationException(
                     $"Item '{item.Nome}': quantidade {qtd} excede o teto de 99.999 unidades.");
@@ -219,6 +248,53 @@ public sealed class PedidoEstoqueIntegrationService(
     {
         foreach (var item in pedido.Itens)
             await DevolverItemAsync(pedido, item, ct);
+        await DevolverBaixaDoAparelhoAsync(pedido, ct);
+    }
+
+    /// <summary>
+    /// #1571 — o pedido que nasceu no PWA baixa também pelo aparelho, com o id do pedido de lá no
+    /// documento (<c>MobileStockReconciler</c>), e não com <c>{pedido}:{item}</c>. São duas chaves para
+    /// a mesma venda: sem olhar a do outro lado, o console baixava de novo o que o aparelho já tinha
+    /// baixado, e o cancelamento pelo console não devolvia a baixa do aparelho.
+    /// </summary>
+    /// <returns>Quanto o aparelho já baixou, por produto. Vazio no pedido que não veio do aparelho.</returns>
+    private async Task<Dictionary<Guid, decimal>> BaixadoPeloAparelhoAsync(PedidoEntity pedido, CancellationToken ct) =>
+        (await SaidasAbertasDoAparelhoAsync(pedido, ct))
+            .GroupBy(s => s.ProdutoId)
+            .ToDictionary(g => g.Key, g => g.Sum(s => s.Quantidade.Value));
+
+    private async Task<IReadOnlyList<MovimentacaoEstoque>> SaidasAbertasDoAparelhoAsync(PedidoEntity pedido, CancellationToken ct) =>
+        string.IsNullOrWhiteSpace(pedido.MobileOrderId)
+            ? []
+            : await movRepo.GetSaidasAbertasPorDocumentoAsync(
+                pedido.EmpresaId, pedido.MobileOrderId, NaturezaMovimentacaoEstoque.Venda, ct);
+
+    /// <summary>
+    /// O cancelamento pelo ERP devolve também o que o aparelho baixou por este pedido, aos lotes de
+    /// onde saiu. Cada saída devolvida fica marcada, então o cancelamento do aparelho, se vier depois,
+    /// não devolve de novo.
+    /// </summary>
+    private async Task DevolverBaixaDoAparelhoAsync(PedidoEntity pedido, CancellationToken ct)
+    {
+        var agora = DateTime.UtcNow;
+        foreach (var lida in await SaidasAbertasDoAparelhoAsync(pedido, ct))
+        {
+            var lote = await itemEstoqueRepo.GetByIdComLockAsync(pedido.EmpresaId, lida.ItemEstoqueId);
+            // Relê a saída com trava: o aparelho pode ter cancelado (e devolvido) entre a leitura e aqui.
+            var saida = await movRepo.GetByIdComLockAsync(pedido.EmpresaId, lida.Id, ct);
+            if (saida is null || saida.EstornadaEm is not null) continue;
+
+            if (lote is not null)
+            {
+                lote.RestaurarSaidaEstornada(saida.Quantidade, agora);
+                await itemEstoqueRepo.UpdateAsync(lote);
+            }
+            saida.MarcarComoEstornada(agora);
+            await movRepo.UpdateAsync(saida);
+            await movRepo.InsertAsync(MovimentacaoEstoque.CriarEstorno(
+                Guid.NewGuid(), saida, agora, $"Cancelamento pedido {pedido.Id}", agora,
+                motivoEstorno: MotivoDoEstornoPorCancelamento));
+        }
     }
 
     /// <summary>

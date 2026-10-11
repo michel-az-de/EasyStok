@@ -1,4 +1,5 @@
 using EasyStock.Api.Mobile.DTOs;
+using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Domain.Entities.Mobile;
@@ -154,17 +155,23 @@ public sealed class OrderLinker(
                                 .Where(p => productIds.Contains(p.Id) && p.EmpresaId == empresaId)
                                 .ToDictionaryAsync(p => p.Id, p => p.ErpProductId);
 
-                            var pedidoItens = await db.Set<PedidoItem>().IgnoreQueryFilters()
+                            // #1571: o id do item é sorteado, então casar por posição na ordem do id ligava
+                            // o produto ao item errado em pedido com mais de um produto (e a esteira baixava
+                            // o produto trocado). Casa pelo conteúdo com que o item acabou de ser criado.
+                            var semProduto = await db.Set<PedidoItem>().IgnoreQueryFilters()
                                 .Where(pi => pi.PedidoId == result.Id)
-                                .OrderBy(pi => pi.Id).ToListAsync();
-                            for (int idx = 0; idx < Math.Min(pedidoItens.Count, mobileO.Items.Count); idx++)
+                                .ToListAsync();
+                            foreach (var mobItem in mobileO.Items)
                             {
-                                var mobItem = mobileO.Items[idx];
+                                var doItem = semProduto.FirstOrDefault(pi =>
+                                    pi.Nome == mobItem.Name.Trim() && pi.Quantidade == mobItem.Qty && pi.PrecoUnitario == mobItem.UnitPrice);
+                                if (doItem is null) continue;
+                                semProduto.Remove(doItem);
                                 if (!string.IsNullOrWhiteSpace(mobItem.ProductId)
                                     && produtoMap.TryGetValue(mobItem.ProductId, out var prodFk)
                                     && prodFk.HasValue)
                                 {
-                                    pedidoItens[idx].ProdutoId = prodFk;
+                                    doItem.ProdutoId = prodFk;
                                 }
                             }
                             if (db.ChangeTracker.HasChanges()) await db.SaveChangesAsync();
@@ -446,17 +453,26 @@ public sealed class OrderLinker(
     /// <summary>
     /// F8-J — garante a saída de estoque do pedido do aparelho que já desconta. O envio do pedido já
     /// baixa (dispatcher); isto cobre o produto que só ganhou vínculo com o ERP depois. Não repete o
-    /// que já saiu por este pedido, nem refaz saída que alguém estornou no ERP.
+    /// que já saiu por este pedido (pelo aparelho ou pela esteira, #1571), nem refaz saída que alguém
+    /// estornou à mão no ERP.
+    /// <para>
+    /// A saída que um cancelamento devolveu é outra coisa: se o pedido voltou a valer (o console
+    /// cancelou e o aparelho, que não sabia, entregou), ela sai de novo.
+    /// </para>
     /// </summary>
     private async Task EnsureStockSaidaAsync(Order mobileO)
     {
         try
         {
             if (mobileO.EmpresaId == null) return;
-            var jaSaiu = await db.Set<MovimentacaoEstoque>()
+            var estornadoAMao = await db.Set<MovimentacaoEstoque>()
                 .IgnoreQueryFilters().AsNoTracking()
                 .Where(m => m.EmpresaId == mobileO.EmpresaId && m.DocumentoReferencia == mobileO.Id
-                            && m.Natureza == NaturezaMovimentacaoEstoque.Venda)
+                            && m.Natureza == NaturezaMovimentacaoEstoque.Venda
+                            && m.Tipo == TipoMovimentacaoEstoque.Saida && m.EstornadaEm != null
+                            && !db.Set<MovimentacaoEstoque>().IgnoreQueryFilters().Any(e =>
+                                e.MovimentacaoEstornadaId == m.Id
+                                && e.MotivoEstorno == PedidoEstoqueIntegrationService.MotivoDoEstornoPorCancelamento))
                 .Select(m => m.ProdutoId).Distinct().ToListAsync();
 
             var linhas = new List<(Product Produto, int Quantidade)>();
@@ -468,9 +484,9 @@ public sealed class OrderLinker(
             }
             foreach (var (produto, quantidade) in MobileStockReconciler.PorProdutoDoErp(linhas))
             {
-                if (jaSaiu.Contains(produto.ErpProductId!.Value)) continue;
+                if (estornadoAMao.Contains(produto.ErpProductId!.Value)) continue;
                 await stockReconciler.BaixarVendaAsync(produto, quantidade, mobileO.Id, mobileO.LojaId,
-                    $"Pedido mobile {mobileO.Id} -> {mobileO.Status}");
+                    $"Pedido mobile {mobileO.Id} -> {mobileO.Status}", mobileO.ErpPedidoId);
             }
             if (db.ChangeTracker.HasChanges()) await db.SaveChangesAsync();
         }
