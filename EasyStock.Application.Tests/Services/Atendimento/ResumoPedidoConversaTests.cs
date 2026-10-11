@@ -40,4 +40,17 @@ public class ResumoPedidoConversaTests
 
         texto.Should().Contain("- 1x Bolo de Cenoura da Vó: R$").And.Contain("\nEntrega: sex 09/10\n");
     }
+
+    [Fact]
+    public void EncomendaFutura_ExplicaSinalESaldoMesmoComFormaNaEntrega()
+    {
+        var reservado = Reservado("Bolo de Cenoura", null);
+        reservado.Pedido.AgendadoParaEm = reservado.Pedido.CriadoEm.AddDays(2);
+
+        var texto = ResumoPedidoConversa.Texto(reservado, SextaFeira,
+            TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega, "Resumo:");
+
+        texto.Should().Contain("Sinal agora por link: R$ 22,50")
+            .And.Contain("Restante na entrega: R$ 22,50");
+    }
 }

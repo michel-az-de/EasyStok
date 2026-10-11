@@ -154,7 +154,9 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
     private async Task<CobrancaPedidoResult?> CobrarAsync(
         PedidoReservado reservado, Guid conversaId, string forma, CancellationToken ct)
     {
-        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega)
+        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
+            && !EasyStock.Application.Services.Pedidos.PlanoPagamentoEncomenda.TemSinal(
+                reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
             return (await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(
                 reservado.Pedido.EmpresaId, reservado.Pedido.Id, forma, UsuarioNome: "cardápio da conversa"), ct)).Cobranca;
         return await gerarCobranca.ExecuteAsync(reservado, conversaId, ct);

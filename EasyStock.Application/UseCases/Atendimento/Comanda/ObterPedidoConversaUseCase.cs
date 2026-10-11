@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.AlterarAgendamentoPedido;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Pagamentos;
@@ -22,7 +23,8 @@ public sealed record PedidoConversaResult(
     decimal TotalPago = 0,
     IReadOnlyList<PagamentoPedidoConversaResult>? Pagamentos = null,
     bool RequerAprovacao = false,
-    JanelaPedidoResult? Janela = null);
+    JanelaPedidoResult? Janela = null,
+    bool SinalNaReserva = false);
 
 public sealed record PagamentoPedidoConversaResult(Guid Id, decimal Valor, string Metodo, DateTime PagoEm);
 
@@ -78,7 +80,8 @@ public sealed class ObterPedidoConversaUseCase(
         var janela = (await vagas.GetByPedidoIdsAsync([pedido.Id], ct)).GetValueOrDefault(pedido.Id);
 
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(empresaId, pedido.Id, ct);
-        var vigente = cobrancas.FirstOrDefault(c => c.Status == StatusCobrancaPedido.Paga)
+        var vigente = cobrancas.FirstOrDefault(c => c.EstaPendente)
+            ?? cobrancas.FirstOrDefault(c => c.Status == StatusCobrancaPedido.Paga)
             ?? cobrancas.OrderByDescending(c => c.CriadaEm).FirstOrDefault();
 
         // O frete é a linha sem item de cardápio nem produto (CheckoutCoreService.AdicionarItemFreteAsync).
@@ -93,6 +96,7 @@ public sealed class ObterPedidoConversaUseCase(
             pedido.Pagamentos.Select(p => new PagamentoPedidoConversaResult(p.Id, p.Valor, p.Metodo, p.PagoEm)).ToList(),
             // #1474: o console barra a baixa manual antes de cancelar o link quando falta aprovar.
             pedido.RequerAprovacao && pedido.AprovadoEm is null,
-            janela.Vaga is { LiberadoEm: null } ? JanelaPedidoResult.De(janela.Vaga, janela.Janela) : null);
+            janela.Vaga is { LiberadoEm: null } ? JanelaPedidoResult.De(janela.Vaga, janela.Janela) : null,
+            PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm));
     }
 }

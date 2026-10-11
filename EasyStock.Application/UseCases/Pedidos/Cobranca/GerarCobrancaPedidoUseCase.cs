@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
@@ -71,7 +72,7 @@ public sealed class GerarCobrancaPedidoUseCase(
         var itens = reservado.Itens.Append(reservado.ItemFrete).ToList();
         var dados = new DadosCobranca(
             reservado.Pedido.EmpresaId, reservado.Pedido.Id, reservado.Storefront.Id,
-            reservado.Storefront.TituloPublico, reservado.Total, itens);
+            reservado.Storefront.TituloPublico, reservado.Total, itens, reservado.Pedido.AgendadoParaEm);
         try
         {
             return await CobrarAsync(dados, conversaId, tentativa: 1, ct);
@@ -121,13 +122,16 @@ public sealed class GerarCobrancaPedidoUseCase(
         var storefront = await storefrontRepository.GetByEmpresaAsync(input.EmpresaId, ct);
         var dados = new DadosCobranca(
             pedido.EmpresaId, pedido.Id, storefront?.Id ?? Guid.Empty, storefront?.TituloPublico ?? string.Empty,
-            pedido.Total.Valor, pedido.Itens.ToList());
+            pedido.Total.Valor, pedido.Itens.ToList(), pedido.AgendadoParaEm);
         return await CobrarAsync(dados, input.ConversaId, input.Tentativa, ct);
     }
 
     private async Task<CobrancaPedidoResult> CobrarAsync(DadosCobranca dados, Guid? conversaId, int tentativa, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
+        var valorCobrado = PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, agora)
+            ? PlanoPagamentoEncomenda.Sinal(dados.Total)
+            : dados.Total;
         var existentes = await cobrancaRepository.ListarDoPedidoAsync(dados.EmpresaId, dados.PedidoId, ct);
 
         if (existentes.Any(c => c.Status == Domain.Enums.Pagamentos.StatusCobrancaPedido.Paga))
@@ -139,7 +143,7 @@ public sealed class GerarCobrancaPedidoUseCase(
                 "O pedido está combinado para pagar na entrega; troque a forma para gerar link.");
         if (pendente is not null && pendente.Venceu(agora))
             pendente.Expirar(agora);
-        else if (pendente is not null && pendente.Valor != dados.Total)
+        else if (pendente is not null && pendente.Valor != valorCobrado)
             // #1291: item editado em AguardandoPagamento; o link antigo cobraria o valor velho.
             pendente.Cancelar(MotivoValorAlterado, agora);
         else if (pendente is not null)
@@ -150,18 +154,17 @@ public sealed class GerarCobrancaPedidoUseCase(
             PedidoId: dados.PedidoId,
             StorefrontId: dados.StorefrontId,
             StorefrontNome: dados.StorefrontNome,
-            ValorTotal: dados.Total,
-            Items: dados.Itens
-                .Where(i => i.PrecoUnitario > 0m)
-                .Select(ItemDaPreferencia)
-                .ToList(),
+            ValorTotal: valorCobrado,
+            Items: valorCobrado == dados.Total
+                ? dados.Itens.Where(i => i.PrecoUnitario > 0m).Select(ItemDaPreferencia).ToList()
+                : [new PreferenceItemCommand("Sinal da encomenda (50%)", 1, valorCobrado)],
             ExpiraEm: expiraEm,
             IdempotencyKey: $"{dados.PedidoId:N}-{existentes.Count + 1}");
 
         var preferencia = await CriarPreferenciaAsync(command, ct);
 
         var cobranca = CobrancaPedido.CriarOnline(
-            dados.EmpresaId, dados.PedidoId, dados.Total, preferencia.PreferenceId, preferencia.InitPointUrl,
+            dados.EmpresaId, dados.PedidoId, valorCobrado, preferencia.PreferenceId, preferencia.InitPointUrl,
             expiraEm, tentativa, agora, conversaId);
         await cobrancaRepository.AddAsync(cobranca, ct);
         await unitOfWork.CommitAsync();
@@ -208,5 +211,6 @@ public sealed class GerarCobrancaPedidoUseCase(
     }
 
     private sealed record DadosCobranca(
-        Guid EmpresaId, Guid PedidoId, Guid StorefrontId, string StorefrontNome, decimal Total, IReadOnlyList<PedidoItem> Itens);
+        Guid EmpresaId, Guid PedidoId, Guid StorefrontId, string StorefrontNome, decimal Total,
+        IReadOnlyList<PedidoItem> Itens, DateTime? AgendadoParaEm);
 }

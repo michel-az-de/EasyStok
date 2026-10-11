@@ -209,6 +209,25 @@ await confere('C5 confirmar pagamento chama cobranca/forma na_entrega e depois p
   assert.ok(posts[1].url.endsWith('/pagamentos') && posts[1].corpo.metodo === 'pix', posts[1].url)
   respostaFetch = () => ({ data: null })
 })
+await confere('C5 saldo de encomenda pago na Ficha não troca a forma nem cancela o sinal', async () => {
+  chamadas.length = 0
+  const resposta = {
+    ...PEDIDO_ONLINE, status: 'aguardando', totalPago: 12.5, sinalNaReserva: true,
+    pagamentos: [{ id: 'pag-sinal', valor: 12.5, metodo: 'pix', pagoEm: '2026-10-08T15:00:00Z' }],
+    cobranca: { ...PEDIDO_ONLINE.cobranca, provedor: 'na_entrega', valor: 12.5, linkPagamento: null },
+  }
+  respostaFetch = () => ({ data: resposta })
+  const pedido = pedidoDaApi(resposta)
+  assert.equal(cobranca.baixaCancelaCobrancaOnline(pedido), false)
+  assert.equal(cobranca.podeAlterarMeio(pedido), false)
+  const api = criarAcoesComandaApi({}, { despachar: () => {}, estadoRef: { current: { conversas: [{ id: 'c1', pedido }] } } })
+  await api.confirmarPagamento('c1', 12.5, 'dinheiro')
+  const posts = chamadas.filter((c) => c.metodo === 'POST')
+  assert.equal(posts.length, 1, posts.map((c) => c.url).join(', '))
+  assert.ok(posts[0].url.endsWith('/pagamentos'), posts[0].url)
+  assert.equal(posts[0].corpo.valor, 12.5)
+  respostaFetch = () => ({ data: null })
+})
 
 // ── C6 ─────────────────────────────────────────────────────────────────────
 await confere('C6 legendaDoItem omite a porção já presente no nome e inclui o preço', () => {

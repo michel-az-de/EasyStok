@@ -1,9 +1,14 @@
 using EasyStock.Application.DependencyInjection;
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
+using EasyStock.Application.UseCases.Pedidos.Cobranca;
+using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
@@ -40,6 +45,73 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Workflows;
 public sealed class RegistrarPagamentoPedidoConcorrenciaIntegrationTests(PostgreSqlDatabaseFixture fixture)
     : IClassFixture<PostgreSqlDatabaseFixture>
 {
+    [SkippableFact]
+    public async Task Saldo_de_encomenda_apos_sinal_online_quita_uma_vez_no_postgres()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var empresaId = Guid.NewGuid();
+        var loja = Loja.Criar(empresaId, "Loja encomenda");
+        var pedido = NovoPedidoOperacional(empresaId, loja.Id);
+        pedido.Status = "aguardando_pagamento";
+        pedido.AgendadoParaEm = DateTime.UtcNow.AddDays(2);
+        var agora = DateTime.UtcNow;
+        var sinal = CobrancaPedido.CriarOnline(empresaId, pedido.Id, 100m, "pref-sinal",
+            "https://mp.test/sinal", agora.AddMinutes(30), 1, agora);
+
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.Empresas.Add(new Empresa { Id = empresaId, Nome = "Teste encomenda",
+                Documento = "99887766554433", CriadoEm = agora, AlteradoEm = agora });
+            seed.Lojas.Add(loja);
+            seed.Pedidos.Add(pedido);
+            seed.CobrancasPedido.Add(sinal);
+            await seed.SaveChangesAsync();
+        }
+
+        await using var provider = BuildProductionProvider();
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ConfirmarPagamentoPedidoUseCase>().ExecuteAsync(
+                new ConfirmarPagamentoPedidoInput(pedido.Id, "pay-sinal", "approved", 100m,
+                    MetodoPagamentoExterno: "pix", PagoEm: agora, ReferenciaExterna: "pref-sinal"));
+        }
+        Guid saldoId;
+        await using (var parcial = fixture.CreateDbContext())
+        {
+            parcial.SetMobileTenantContext(empresaId);
+            var pagamentoParcial = await parcial.Pedidos.Include(p => p.Pagamentos).SingleAsync(p => p.Id == pedido.Id);
+            pagamentoParcial.TotalPago.Should().Be(100m);
+            var saldo = await parcial.CobrancasPedido.SingleAsync(c => c.PedidoId == pedido.Id && c.Provedor == "na_entrega");
+            saldo.Valor.Should().Be(100m);
+            saldo.Status.Should().Be(StatusCobrancaPedido.Pendente);
+            saldoId = saldo.Id;
+            (await parcial.Set<PedidoEvento>().CountAsync(e => e.PedidoId == pedido.Id && e.Tipo == "quitacao_confirmada"))
+                .Should().Be(0);
+        }
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().SetMobileTenantContext(empresaId);
+            await scope.ServiceProvider.GetRequiredService<RegistrarPagamentoPedidoUseCase>().ExecuteAsync(
+                new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "dinheiro", 100m, Origem: "web"));
+        }
+
+        await using var conferir = fixture.CreateDbContext();
+        conferir.SetMobileTenantContext(empresaId);
+        var salvo = await conferir.Pedidos.Include(p => p.Pagamentos).SingleAsync(p => p.Id == pedido.Id);
+        salvo.TotalPago.Should().Be(200m);
+        (await conferir.CobrancasPedido.SingleAsync(c => c.Id == saldoId)).Status.Should().Be(StatusCobrancaPedido.Paga);
+        (await conferir.CobrancasPedido.SingleAsync(c => c.Id == sinal.Id)).Status.Should().Be(StatusCobrancaPedido.Paga);
+        (await conferir.Set<PedidoEvento>().CountAsync(e => e.PedidoId == pedido.Id && e.Tipo == "quitacao_confirmada"))
+            .Should().Be(1);
+        (await conferir.ImpressoesPendentes.CountAsync(i => i.PedidoId == pedido.Id)).Should().Be(1);
+        await using var caixaScope = provider.CreateAsyncScope();
+        caixaScope.ServiceProvider.GetRequiredService<EasyStockDbContext>().SetMobileTenantContext(empresaId);
+        (await caixaScope.ServiceProvider.GetRequiredService<ICaixaRepository>()
+            .GetTotalPagamentosPedidosDoDiaAsync(empresaId, HorarioBrasil.DataOperacional(DateTime.UtcNow), loja.Id))
+            .Should().Be(200m);
+    }
+
     [SkippableTheory]
     [InlineData(true)]
     [InlineData(false)]
@@ -218,6 +290,7 @@ public sealed class RegistrarPagamentoPedidoConcorrenciaIntegrationTests(Postgre
         services.AddLogging();
         services.AddHttpContextAccessor();
         services.AddSingleton(Substitute.For<ICurrentUserAccessor>());
+        services.AddSingleton(Substitute.For<IEstornoPedidoGateway>());
         services.AddMemoryCache();
         services.AddSingleton(Substitute.For<ICacheService>());
         services.AddEasyStockPostgreInfrastructure(fixture.ConnectionString, config);

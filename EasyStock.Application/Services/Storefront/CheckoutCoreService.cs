@@ -212,6 +212,7 @@ public sealed class CheckoutCoreService(
         pedido.ClienteId = input.ClienteId;
         pedido.Status = StatusPedidoMapper.Rascunho;
         pedido.Observacoes = input.Observacoes;
+        pedido.AgendadoParaEm = HorarioBrasil.InstanteUtc(input.DataEntrega, janela.HoraInicio);
 
         await pedidoRepository.AddAsync(pedido, ct);
 

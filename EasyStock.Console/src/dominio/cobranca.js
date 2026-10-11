@@ -325,6 +325,7 @@ export function travaDaEsteira(pedido, agora) {
 export function podeAlterarMeio(pedido) {
   const cobranca = pedido?.cobranca
   if (!cobranca || pedido.estado === 'cancelado' || pedido.estado === 'entregue') return false
+  if ((pedido.totalPagoApi ?? 0) > 0 || (pedido.sinalNaReserva && (pedido.totalApi ?? 0) > cobranca.valor)) return false
   return !cobranca.pagaEm && !cobranca.canceladaEm && !cobranca.estornadaEm
 }
 
@@ -392,7 +393,9 @@ export const aguardaAprovacao = (pedido) => Boolean(pedido?.pedidoId) && pedido.
 export const baixaEsperaAprovacao = (pedido) => aguardaAprovacao(pedido)
   || (Boolean(pedido?.pedidoId) && pedido.requerAprovacao === true)
 
-export const baixaCancelaCobrancaOnline = (pedido) => Boolean(pedido?.pedidoId)
+export const baixaCancelaCobrancaOnline = (pedido) => Boolean(
+  pedido?.pedidoId && pedido.cobranca?.link && !pedido.cobranca.pagaEm && !pedido.cobranca.canceladaEm,
+)
   && pedido.statusApi === 'aguardando_pagamento'
   && !pedido.cobranca?.manual
   && !pedido.cobranca?.pagaEm

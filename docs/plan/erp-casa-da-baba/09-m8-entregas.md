@@ -116,7 +116,7 @@ módulo próprio com cadastros e relatórios, e o painel do dia não pode piorar
 
 ### M8.2 · Encomenda para data futura e agenda
 
-**Execução parcial em 10/10/2026.** A comanda escolhe o dia, a agenda de sete dias lê pedidos e vagas ativas por janela, e a API limita oferta, reserva e reagendamento a hoje + 14 dias, conforme D8-02. O limite de 60 dias continua sendo apenas o tamanho máximo da consulta. D8-03 foi decidido: sinal de 50% na reserva e restante na entrega. O fluxo de duas cobranças é uma fatia própria e ainda não foi ativado; o checkout atual continua cobrando o valor integral.
+**Execução parcial em 10/10/2026.** A comanda escolhe o dia, a agenda de sete dias lê pedidos e vagas ativas por janela, e a API limita oferta, reserva e reagendamento a hoje + 14 dias, conforme D8-02. O limite de 60 dias continua sendo apenas o tamanho máximo da consulta. D8-03 foi implementado e validado localmente: a reserva futura emite link do Mercado Pago para o sinal de 50%, arredondado ao centavo; após a confirmação, o saldo fica pendente para receber na entrega pela Ficha. O pedido só é quitado após o saldo. Homologação com Mercado Pago real permanece pendente.
 
 **Problema original.** A reserva não tinha horizonte futuro e a comanda mostrava apenas as primeiras
 janelas com vaga, sem uma agenda dos próximos dias. Encomenda de sábado feita na terça virava conversa e caderno.
@@ -124,14 +124,14 @@ janelas com vaga, sem uma agenda dos próximos dias. Encomenda de sábado feita 
 - Comanda (`SeletorJanelaApi.jsx`): seletor de dia (hoje, amanhã, calendário até o limite de D8-02) que manda `DataInicio`/`DataFim`, já aceitos por `ListarJanelasAtendimentoInput` (`ListarJanelasAtendimentoUseCase.cs:8-13`); a lista mostra as janelas daquele dia.
 - Agenda `#/m/entregas/agenda`: `GET api/atendimento/agenda?de&ate` (Operador), leitura nova que agrega `VagaOcupada` ativa por data e janela (ocupadas de capacidade) e lista os pedidos de cada janela; bloqueios (S45) aparecem como dia fechado.
 - O agente (`listar_janelas`) já usa o mesmo use case: só ganha o parâmetro de data, sem regra nova.
-- Pagamento segue D8-03 B, em fatia própria: sinal de 50% na reserva e saldo na entrega. Ajustar confirmação parcial, reemissão, quitação e Caixa antes de ativar a cobrança.
+- Pagamento segue D8-03 B: sinal de 50% por link na reserva futura e saldo manual na entrega. Reemissão conserva o valor do sinal; confirmação parcial cria a cobrança do saldo sem emitir quitação; a baixa final registra o pagamento no Caixa e emite a confirmação uma vez.
 **Aceite.**
 - [x] Pedido criado na conversa para daqui a 10 dias ocupa a vaga daquele dia e aparece na agenda (provas locais das seções 31 e 32 do plano de ondas).
 - [x] Dia bloqueado não oferece janela; data além do limite volta 400 com o motivo (teste de bloqueio e HTTP local do 15º dia).
 - [x] A agenda e a oferta contam a mesma vaga (comparação HTTP local, ADR-0014).
 - [x] Encomenda de amanhã aparece em "Amanhã" na cozinha (M4.6) e gera o lembrete da véspera (M3.8, seção 31).
 **Testes (Red).** `AgendaEntregasQueryTests.ContaVagasPorJanelaEData`, `...BloqueioFechaDia`; `prova-m8-agenda.mjs`.
-**Fora desta fatia.** Cobrança em duas partes (D8-03 B); recorrência ("toda sexta").
+**Fora desta fatia.** Recorrência ("toda sexta") e homologação financeira com Mercado Pago real.
 **Depende de.** M8.1. **Tamanho.** M · **Tier.** baixo (sem migração) · **Rollback.** revert; a comanda volta às 10 primeiras.
 
 ### M8.3 · Endereço de entrega no próprio pedido
@@ -223,7 +223,7 @@ F12 paridade do painel (plano irmão) · M8.5 relatórios (independente)
 - C) 14 dias, o padrão atual da oferta.
 
 **D8-03 · Pagamento da encomenda**
-- **Decidido por Felipe em 10/10/2026: B, sinal de 50% na reserva e restante na entrega. Implementação pendente em fatia própria.**
+- **Decidido por Felipe em 10/10/2026: B, sinal de 50% na reserva e restante na entrega. Implementação e validação locais concluídas; homologação externa pendente.**
 - A) (Recomendado) Igual ao pedido do dia: pedido e cobrança na hora (RN-23), link reemitido pelo job da S11.
 - B) Sinal na hora e o resto perto da data (cobrança em duas partes, fatia nova).
 - C) Cobrar só perto da data, com a vaga reservada sem pagamento.

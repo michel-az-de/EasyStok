@@ -27,17 +27,20 @@ public sealed class QuitacaoPedido(
     public async Task<EfeitosQuitacao?> ConcluirManualAsync(Pedido pedido, PedidoPagamento pagamento, CancellationToken ct)
     {
         if (pedido.Total.Valor <= 0 || pedido.TotalPago < pedido.Total.Valor || pedido.Origem == "balcao") return null;
+        if (await pedidos.ExisteEventoAsync(pedido.EmpresaId, pedido.Id, Marco, ct)) return null;
         var lista = await cobrancas.ListarDoPedidoAsync(pedido.EmpresaId, pedido.Id, ct);
-        if (lista.Any(c => c.Status == StatusCobrancaPedido.Paga)) return null;
+        var pagoOnline = lista.Where(c => c.EhOnline && c.Status == StatusCobrancaPedido.Paga)
+            .Sum(c => c.ValorPago ?? 0m);
         var manual = lista.FirstOrDefault(c => c.EstaPendente && !c.EhOnline);
         if (manual is null)
         {
             var conversaId = lista.Select(c => c.ConversaId).FirstOrDefault(id => id is not null)
                 ?? await conversas.ObterIdPorPedidoAsync(pedido.EmpresaId, pedido.Id, ct);
-            manual = CobrancaPedido.CriarNaEntrega(pedido.EmpresaId, pedido.Id, pedido.Total.Valor, pagamento.PagoEm, conversaId);
+            manual = CobrancaPedido.CriarNaEntrega(pedido.EmpresaId, pedido.Id,
+                pedido.Total.Valor - pagoOnline, pagamento.PagoEm, conversaId);
             await cobrancas.AddAsync(manual, ct);
         }
-        manual.MarcarPaga($"manual-{pagamento.Id:N}", pedido.TotalPago, pagamento.Metodo, pagamento.PagoEm);
+        manual.MarcarPaga($"manual-{pagamento.Id:N}", pedido.TotalPago - pagoOnline, pagamento.Metodo, pagamento.PagoEm);
         foreach (var outra in lista.Where(c => c.EstaPendente && c.Id != manual.Id))
             outra.Cancelar("quitacao_manual", pagamento.PagoEm);
         return await PrepararAsync(pedido, manual, pagamento.PagoEm, ct);
@@ -45,6 +48,7 @@ public sealed class QuitacaoPedido(
 
     public async Task<EfeitosQuitacao?> PrepararAsync(Pedido pedido, CobrancaPedido cobranca, DateTime agora, CancellationToken ct)
     {
+        if (pedido.Total.Valor <= 0 || pedido.TotalPago < pedido.Total.Valor) return null;
         if (await pedidos.ExisteEventoAsync(pedido.EmpresaId, pedido.Id, Marco, ct)) return null;
         await pedidos.AddEventoAsync(new PedidoEvento
         {

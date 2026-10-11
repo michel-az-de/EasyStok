@@ -71,7 +71,7 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
         // #1230: o pedido que vai pagar na entrega entra na fila; o início previsto vale como no Mercado Pago.
         var f = new CobrancaPedidoFixture();
         f.AdicionarOnline();
-        var entrega = new DateTime(2026, 10, 2, 15, 0, 0, DateTimeKind.Utc);
+        var entrega = new DateTime(2026, 9, 29, 18, 0, 0, DateTimeKind.Utc);
         f.Pedido.AgendadoParaEm = entrega;
         f.PrazoQueries.ObterAsync(f.EmpresaId, f.Pedido.Id, Arg.Any<CancellationToken>())
             .Returns(new PrazoPreparoPedidoLeitura(null, null, [null], TempoPreparoPadraoMinutos: 60, RespiroMinutos: 40));
@@ -80,6 +80,21 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
             new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega", Usuario, "Operadora"));
 
         f.Pedido.InicioPrevistoEm.Should().Be(entrega.AddMinutes(-100));
+    }
+
+    [Fact]
+    public async Task EncomendaFutura_NaoPermiteTrocarSinalPorPagamentoNaEntrega()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddDays(2);
+
+        var act = () => f.Trocar().ExecuteAsync(
+            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega"));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*exige sinal de 50%*");
+        f.Cobrancas.Should().ContainSingle(c => c.EstaPendente && c.EhOnline);
     }
 
     [Fact]

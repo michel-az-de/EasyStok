@@ -286,6 +286,9 @@ public class IniciarCheckoutUseCaseTests
         result.ExpiresIn.Should().Be(1800);
 
         await f.VagaRepo.Received(1).OcuparAsync(JanelaId, DataEntrega, result.PedidoId, Arg.Any<CancellationToken>());
+        await f.PedidoRepo.Received().AddAsync(
+            Arg.Is<Pedido>(p => p.AgendadoParaEm == EasyStock.Application.Common.HorarioBrasil.InstanteUtc(DataEntrega, f.Janela.HoraInicio)),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

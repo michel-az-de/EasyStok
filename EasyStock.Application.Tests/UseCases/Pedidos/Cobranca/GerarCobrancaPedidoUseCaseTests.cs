@@ -14,6 +14,33 @@ namespace EasyStock.Application.Tests.UseCases.Pedidos.Cobranca;
 public class GerarCobrancaPedidoUseCaseTests
 {
     [Fact]
+    public async Task EncomendaFutura_CobraSinalArredondadoEReutilizaLink()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddDays(2);
+        f.Pedido.Total = CobrancaPedidoFixture.Reais(25.01m);
+
+        var uc = f.Gerar();
+        var input = new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id);
+        var primeira = await uc.ExecuteAsync(input);
+        var segunda = await uc.ExecuteAsync(input);
+
+        primeira.Valor.Should().Be(12.51m);
+        segunda.CobrancaId.Should().Be(primeira.CobrancaId);
+        segunda.Reutilizada.Should().BeTrue();
+        var preferencia = f.Preferencias.Should().ContainSingle().Subject;
+        preferencia.ValorTotal.Should().Be(12.51m);
+        preferencia.Items.Should().ContainSingle().Which.Should().BeEquivalentTo(
+            new PreferenceItemCommand("Sinal da encomenda (50%)", 1, 12.51m));
+
+        f.Relogio.Agora = CobrancaPedidoFixture.Agora.AddMinutes(31);
+        var reemitida = await uc.ExecuteAsync(input);
+        reemitida.Valor.Should().Be(12.51m);
+        reemitida.CobrancaId.Should().NotBe(primeira.CobrancaId);
+        f.Preferencias.Should().HaveCount(2);
+    }
+
+    [Fact]
     public async Task PreferenciaComExternalReferenceEExpiracao()
     {
         var f = new CobrancaPedidoFixture();

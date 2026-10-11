@@ -399,6 +399,9 @@ export function BlocoCobranca({
         <p className={css.linhaNaEntrega}>
           <Icone nome="credit-card" /> Receber na entrega · {nome} <b>{moeda(cobranca.valor)}</b>
         </p>
+        {fonteApi && pedido.sinalNaReserva && pedido.totalPagoApi > 0 && pedido.totalPagoApi < pedido.totalApi && (
+          <p className={css.corpoBloco}>Sinal recebido: {moeda(pedido.totalPagoApi)}. Saldo na entrega: {moeda(pedido.totalApi - pedido.totalPagoApi)}.</p>
+        )}
         {recebendo && (
           <BaixaAMao valorCobrado={Math.max(0, (pedido.totalApi ?? cobranca.valor) - (pedido.totalPagoApi ?? 0))}
             pedido={pedido}
@@ -452,6 +455,9 @@ export function BlocoCobranca({
         <Pilula tom="neutro" fina>{nome}</Pilula>
         {cobranca.tentativa > 1 && <span className={css.tentativa}>{cobranca.tentativa}ª cobrança</span>}
       </div>
+      {fonteApi && pedido.sinalNaReserva && pedido.totalApi > cobranca.valor && !cobranca.pagaEm && (
+        <p className={css.corpoBloco}>Sinal agora: {moeda(cobranca.valor)}. Restante na entrega: {moeda(pedido.totalApi - cobranca.valor)}.</p>
+      )}
 
       {diferencaPosPagamento > 0 && (
         <div className={css.avisoDiferenca} role="alert">

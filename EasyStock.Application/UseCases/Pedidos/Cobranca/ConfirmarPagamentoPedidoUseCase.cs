@@ -229,8 +229,6 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
                 correlationId: pedido.Id.ToString(), ct: ct);
         }
 
-        var efeito = await quitacao.PrepararAsync(pedido, alvo, pagoEm, ct);
-
         // Registra o PedidoPagamento na mesma transação (o use case reusa a transação aberta e faz o flush).
         // Excedente permitido: o valor veio do provedor, não de digitação.
         await registrarPagamento.ExecuteAsync(new RegistrarPagamentoPedidoCommand(
@@ -244,6 +242,17 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             Origem: Origem,
             PermitirExcedente: true,
             ConfirmadoPeloProvedor: true), ct);
+
+        var comPagamentos = await pedidos.GetByIdWithDetailsAsync(empresaId, pedido.Id) ?? pedido;
+        EfeitosQuitacao? efeito = null;
+        if (comPagamentos.TotalPago >= comPagamentos.Total.Valor)
+            efeito = await quitacao.PrepararAsync(comPagamentos, alvo, pagoEm, ct);
+        else if (alvo.Valor < comPagamentos.Total.Valor)
+        {
+            var saldo = comPagamentos.Total.Valor - comPagamentos.TotalPago;
+            var naEntrega = CobrancaPedido.CriarNaEntrega(empresaId, pedido.Id, saldo, pagoEm, alvo.ConversaId);
+            await cobrancaRepository.AddAsync(naEntrega, ct);
+        }
 
         await unitOfWork.CommitAsync();
 

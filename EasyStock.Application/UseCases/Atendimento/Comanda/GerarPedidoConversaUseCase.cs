@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Exceptions.Storefront;
@@ -89,7 +90,8 @@ public sealed class GerarPedidoConversaUseCase(
     private async Task<CobrancaPedidoResult?> CobrarAsync(
         PedidoReservado reservado, Guid conversaId, string forma, string? usuarioNome, CancellationToken ct)
     {
-        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega)
+        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
+            && !PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
             return (await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(
                 reservado.Pedido.EmpresaId, reservado.Pedido.Id, forma, UsuarioNome: usuarioNome ?? "console"), ct)).Cobranca;
         return await gerarCobranca.ExecuteAsync(reservado, conversaId, ct);
@@ -98,7 +100,8 @@ public sealed class GerarPedidoConversaUseCase(
     private static string TextoAoCliente(PedidoReservado reservado, DateOnly dataEntrega, string forma, CobrancaPedidoResult? cobranca)
     {
         var resumo = ResumoPedidoConversa.Texto(reservado, dataEntrega, forma, CabecalhoResumo);
-        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega) return resumo;
+        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
+            && !PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm)) return resumo;
         var pagamento = cobranca?.LinkPagamento is { } link
             ? $"Pague por este link, válido por 30 minutos: {link}"
             : "O link de pagamento chega em instantes.";
