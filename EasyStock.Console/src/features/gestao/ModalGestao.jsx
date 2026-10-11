@@ -190,15 +190,14 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
 // Modo API (F06, decisão do Felipe em 30/09): as abas sem backend não somem. Abrem com a
 // faixa e os controles desabilitados até a fatia de cada uma entrar. Nada é gravado: as
 // ações delas também avisam (`aplicacao/api/naoLigadas.js`), e Integrações nunca guarda chave.
+// #1582: `saida` aponta as telas que já fazem o trabalho da aba, quando existem.
 const AINDA_NAO_LIGADO = {
-  producao: 'Produção e cardápio ainda não funcionam por esta tela. Nada aqui é gravado.',
-  fidelidade: 'Fidelidade e cupons ainda não funcionam por esta tela. Nada aqui é gravado.',
-  integracoes: 'As integrações ainda não funcionam por esta tela. Nenhuma chave é guardada no navegador.',
-}
-
-// #1582: a aba que ainda não grava aponta as telas que já fazem o trabalho, quando existem.
-const SAIDA_DA_NAO_LIGADA = {
-  producao: { modulo: 'producao', telas: ['producao', 'estoque'] },
+  producao: {
+    texto: 'Produção e cardápio ainda não funcionam por esta tela. Nada aqui é gravado.',
+    saida: { modulo: 'producao', telas: ['producao', 'estoque'] },
+  },
+  fidelidade: { texto: 'Fidelidade e cupons ainda não funcionam por esta tela. Nada aqui é gravado.' },
+  integracoes: { texto: 'As integrações ainda não funcionam por esta tela. Nenhuma chave é guardada no navegador.' },
 }
 
 function AbaNaoLigada({ texto, saida = null, children }) {
@@ -258,6 +257,6 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
     perdas: <AbaPerdasApi />,
   }), [fonteApi, focoInicial, janelasApi, aoAbrirAba, renderizarEditorCardapio])
   const painel = painelDaAba[aba] ?? null
-  if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada texto={AINDA_NAO_LIGADO[aba]} saida={SAIDA_DA_NAO_LIGADA[aba]}>{painel}</AbaNaoLigada>
+  if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada {...AINDA_NAO_LIGADO[aba]}>{painel}</AbaNaoLigada>
   return painel
 }

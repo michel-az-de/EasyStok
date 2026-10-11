@@ -142,7 +142,8 @@
   .cartao { padding-right: 0; }
 }
 
-@media (max-width: 420px) {
+/* Até 460 px o Ajuda fica só com o ícone: com "Sair deste aparelho" (140 px) as três colunas não cabem. */
+@media (max-width: 460px) {
   .acoes > :global([data-ajuda-console]) { width: 44px; padding-inline: 0; font-size: 0; gap: 0; }
 }
 

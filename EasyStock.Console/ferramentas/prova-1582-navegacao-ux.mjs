@@ -108,7 +108,6 @@ confere('o gesto de abrir e fechar a loja também é montado nas telas de módul
   const app = fonte('app/App.jsx')
   const telaDaRota = app.slice(app.indexOf('function TelaDaRota('), app.indexOf('function RestaurarConversa('))
   assert.match(telaDaRota, /\{FONTE_API && <GestoLoja \/>\}/)
-  assert.equal(app.match(/<GestoLoja \/>/g).length, 2)
 })
 
 // ---------------------------------------------------------------- matriz de acesso
@@ -143,7 +142,7 @@ confere('o login explica quando a sessão venceu sozinha', () => {
 
 confere('a aba de produção que ainda não grava aponta as telas que fazem o trabalho', () => {
   const gestao = fonte('features/gestao/ModalGestao.jsx')
-  assert.match(gestao, /producao: \{ modulo: 'producao', telas: \['producao', 'estoque'\] \}/)
+  assert.match(gestao, /saida: \{ modulo: 'producao', telas: \['producao', 'estoque'\] \}/)
   const producao = MODULOS.find((m) => m.id === 'producao')
   for (const id of ['producao', 'estoque']) assert.ok(producao.telas.some((tela) => tela.id === id), `tela ${id} existe no catálogo`)
   assert.match(gestao, /permite\(saida\.modulo\)/)

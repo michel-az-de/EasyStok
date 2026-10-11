@@ -6,13 +6,12 @@
 // só existe no Balcão e vai na frente, para caber em aba estreita.
 
 import { moduloPorId } from './modulos'
-import { ROTA_CARDAPIO_LINK, ROTA_COZINHA, ROTA_ENTREGAS, ROTA_PRINCIPAL } from './rota'
+import { ROTA_CARDAPIO_LINK, ROTA_COZINHA, ROTA_ENTREGAS } from './rota'
 
 export const TITULO_BASE = 'Casa da Baba'
 
 // Janela avulsa aberta pelo apelido (`#/cozinha`, `#/entregas`): não tem módulo na rota.
 const NOME_DO_APELIDO = {
-  [ROTA_PRINCIPAL]: 'Balcão',
   [ROTA_COZINHA]: 'Cozinha',
   [ROTA_ENTREGAS]: 'Entregas',
   [ROTA_CARDAPIO_LINK]: 'Cardápio',
