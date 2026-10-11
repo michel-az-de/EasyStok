@@ -4,8 +4,8 @@ import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
-import { MODULOS, TELA_AJUSTE, hashDoModulo, telasDoMenu } from '../../dominio/modulos'
-import { HASH_HALL, rotaDaHash } from '../../dominio/rota'
+import { MODULOS, TELA_AJUSTE, hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
+import { HASH_HALL, ROTA_PRINCIPAL, rotaDaHash } from '../../dominio/rota'
 import { AbaProducao } from './producao/AbaProducao'
 import { AbaCaixa } from './caixa/AbaCaixa'
 import { AbaCaixaApi } from './caixa/AbaCaixaApi'
@@ -77,6 +77,12 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
     const href = link.getAttribute('href')
     if (!href?.startsWith('#/m/')) return
     const destino = rotaDaHash(href, { fonteApi })
+    // #1582: esta janela só abre por cima do Balcão; link para o Balcão é fechar a janela.
+    if (destino.tipo === ROTA_PRINCIPAL) {
+      evento.preventDefault()
+      aoFechar()
+      return
+    }
     const permitido = areas.some((modulo) => modulo.id === destino.modulo && modulo.telas.some((item) => item.aba === destino.aba))
     if (!permitido || ![hashDoModulo(destino.modulo), hashDoModulo(destino.modulo, destino.tela)].includes(href)) return
     evento.preventDefault()
@@ -184,16 +190,34 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
 // Modo API (F06, decisão do Felipe em 30/09): as abas sem backend não somem. Abrem com a
 // faixa e os controles desabilitados até a fatia de cada uma entrar. Nada é gravado: as
 // ações delas também avisam (`aplicacao/api/naoLigadas.js`), e Integrações nunca guarda chave.
+// #1582: `saida` aponta as telas que já fazem o trabalho da aba, quando existem.
 const AINDA_NAO_LIGADO = {
-  producao: 'Produção e cardápio ainda não funcionam por esta tela. Nada aqui é gravado.',
-  fidelidade: 'Fidelidade e cupons ainda não funcionam por esta tela. Nada aqui é gravado.',
-  integracoes: 'As integrações ainda não funcionam por esta tela. Nenhuma chave é guardada no navegador.',
+  producao: {
+    texto: 'Produção e cardápio ainda não funcionam por esta tela. Nada aqui é gravado.',
+    saida: { modulo: 'producao', telas: ['producao', 'estoque'] },
+  },
+  fidelidade: { texto: 'Fidelidade e cupons ainda não funcionam por esta tela. Nada aqui é gravado.' },
+  integracoes: { texto: 'As integrações ainda não funcionam por esta tela. Nenhuma chave é guardada no navegador.' },
 }
 
-function AbaNaoLigada({ texto, children }) {
+function AbaNaoLigada({ texto, saida = null, children }) {
+  const { permite } = useAcessoModulos()
+  const modulo = saida && permite(saida.modulo) ? moduloPorId(saida.modulo) : null
+  const telas = modulo ? saida.telas.map((id) => modulo.telas.find((tela) => tela.id === id)).filter(Boolean) : []
   return (
     <>
-      <p className={css.naoLigado} role="note">{texto}</p>
+      <p className={css.naoLigado} role="note">
+        {texto}
+        {telas.length > 0 && (
+          <>
+            {' Use '}
+            {telas.map((tela, indice) => (
+              <span key={tela.id}>{indice > 0 && ' ou '}<a href={hashDoModulo(modulo.id, tela.id)}>{tela.rotulo}</a></span>
+            ))}
+            {`, em ${modulo.nome}.`}
+          </>
+        )}
+      </p>
       <fieldset disabled className={css.desligado}>{children}</fieldset>
     </>
   )
@@ -233,6 +257,6 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
     perdas: <AbaPerdasApi />,
   }), [fonteApi, focoInicial, janelasApi, aoAbrirAba, renderizarEditorCardapio])
   const painel = painelDaAba[aba] ?? null
-  if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada texto={AINDA_NAO_LIGADO[aba]}>{painel}</AbaNaoLigada>
+  if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada {...AINDA_NAO_LIGADO[aba]}>{painel}</AbaNaoLigada>
   return painel
 }

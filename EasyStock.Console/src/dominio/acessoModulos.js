@@ -8,3 +8,7 @@ export const permiteRota = (acesso, rota) => !moduloDaRota(rota) || permiteModul
 
 export const entradaDoPerfil = (acesso) => permiteModulo(acesso, acesso?.portaDeEntrada)
   ? `#/m/${acesso.portaDeEntrada}` : '#/'
+
+// #1582: a matriz é relida a cada token novo (tablet da cozinha, sessão que se renova). Releitura
+// que falha não derruba a tela: vale a matriz já carregada. Só a primeira carga mostra o erro.
+export const aposFalhaDeLeitura = (atual, mensagem) => (atual?.dados ? atual : { dados: null, erro: mensagem })
