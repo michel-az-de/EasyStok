@@ -25,6 +25,20 @@ export function partesNoFuso(ms) {
   }
 }
 
+// Inverso de `partesNoFuso` (#1563): relógio de parede da loja -> instante em ms. Hora digitada
+// na tela é hora da loja; `new Date('2026-10-08T09:30')` e `setHours` leem no fuso do aparelho.
+// Dia, hora e minuto fora da faixa transbordam (dia 32 vira o dia 1 do mês seguinte).
+export function instanteNoFuso({ ano, mes, dia, horas = 0, minutos = 0 }) {
+  const parede = Date.UTC(ano, mes - 1, dia, horas, minutos)
+  let ms = parede
+  // Duas passadas: a segunda acerta a virada de um eventual horário de verão.
+  for (let i = 0; i < 2; i += 1) {
+    const p = partesNoFuso(ms)
+    ms -= Date.UTC(p.ano, p.mes - 1, p.dia, p.horas, p.minutos) - parede
+  }
+  return ms
+}
+
 // "2026-09-30" do dia da loja, não do UTC (depois das 21 h o UTC já é amanhã).
 export const dataIsoNoFuso = (ms) => {
   const { ano, mes, dia } = partesNoFuso(ms)
