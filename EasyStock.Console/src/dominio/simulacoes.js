@@ -127,7 +127,7 @@ export function respostaParaMensagemDeCliente({
     const areaInsistida = precisaEscalarPorArea(conversaComMensagem, prefixosCepAtendidos)
     return {
       respostaAutomatica: null,
-      passarParaDona: motivoDaPassagem(leitura.intencao.chave, semSaldo, areaInsistida),
+      passarParaDona: motivoDaPassagem(leitura.intencao.chave, semSaldo, areaInsistida, leitura.pedidoParaDona?.texto),
       concilia: temCobrancaPendente(conversaComMensagem) && comprovante,
     }
   }

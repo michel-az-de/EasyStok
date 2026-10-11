@@ -171,6 +171,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
             leitura.intencao.chave,
             itensSemSaldoCitados(conversa, atual.catalogo),
             precisaEscalarPorArea(conversa),
+            leitura.pedidoParaDona?.texto,
           ),
         })
       }

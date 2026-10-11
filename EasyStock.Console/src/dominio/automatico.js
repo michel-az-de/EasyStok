@@ -148,6 +148,7 @@ const MOTIVO_POR_INTENCAO = {
   'pergunta-entrega': 'Pergunta de entrega fora do combinado',
   'fechar-pedido': 'Fechamento de pedido que o automático não conclui',
   acompanhar: 'Cobrança de prazo que só você pode confirmar',
+  'pedido-especial': 'Pede algo que o automático não resolve sozinho',
 }
 
 
@@ -155,11 +156,14 @@ const MOTIVO_POR_INTENCAO = {
 // (o lead pode ter insistido com uma frase que não bate pista nenhuma).
 const MOTIVO_AREA_FORA = 'Lead fora da área de entrega insistiu, decida a exceção'
 
-export function motivoDaPassagem(intencaoChave, semSaldo = [], areaForaInsistida = false) {
+// `textoDoPedido` (#1613) é o que a cliente pediu com nome próprio: cancelar,
+// desconto, ameaça. Vem de `classificarIntencao(...).pedidoParaDona?.texto`.
+export function motivoDaPassagem(intencaoChave, semSaldo = [], areaForaInsistida = false, textoDoPedido = null) {
   if (areaForaInsistida) return MOTIVO_AREA_FORA
   if (semSaldo.length > 0) {
     return `${semSaldo[0].nome} sem saldo, o automático não vende`
   }
+  if (textoDoPedido) return textoDoPedido
   return MOTIVO_POR_INTENCAO[intencaoChave] ?? MOTIVO_PADRAO
 }
 
@@ -356,7 +360,7 @@ function sinalUrgente(conversa, agora) {
   const pendentes = mensagensSemRespostaReal(conversa).filter((m) => m.texto)
   if (pendentes.length === 0) return null
   const pedido = conversa.pedido
-  const { paraDona, alegaPagamento, perguntaDoPedido } = sinalDoCliente({ ...conversa, mensagens: pendentes })
+  const { paraDona, textoParaDona, alegaPagamento, perguntaDoPedido } = sinalDoCliente({ ...conversa, mensagens: pendentes })
   const semPagamento = Boolean(pedido?.cobranca)
     && COBRANCA_SEM_PAGAMENTO.includes(situacaoDaCobranca(pedido.cobranca, agora).chave)
   if (paraDona === 'devolucao') {
@@ -380,7 +384,7 @@ function sinalUrgente(conversa, agora) {
   }
   // "Já paguei" com o dinheiro reconhecido é assunto encerrado, não pendência.
   if (paraDona === 'pede-a-dona' && !(alegaPagamento && !semPagamento)) {
-    return { chave: 'pede-a-dona', rotulo: 'Precisa de você', tom: 'aviso', texto: MOTIVO_PADRAO }
+    return { chave: 'pede-a-dona', rotulo: 'Precisa de você', tom: 'aviso', texto: textoParaDona ?? MOTIVO_PADRAO }
   }
   if (perguntaDoPedido && pendentes.length >= 2 && pedido && !pedidoEncerrado(pedido)) {
     return {
