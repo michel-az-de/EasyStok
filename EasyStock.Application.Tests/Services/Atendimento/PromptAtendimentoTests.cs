@@ -43,6 +43,20 @@ public class PromptAtendimentoTests
     }
 
     [Fact]
+    public void DinheiroPedidoEAmeaca_VaoParaADona_SemPrometerNada()
+    {
+        var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));
+
+        // #1613: o agente não decide cancelamento, reembolso, desconto nem responde ameaça.
+        prompt.Should().Contain("Dinheiro, pedido e ameaça são da dona")
+            .And.Contain("cancelar ou mudar um pedido")
+            .And.Contain("dinheiro de volta")
+            .And.Contain("desconto ou frete grátis")
+            .And.Contain("Procon")
+            .And.Contain("sem prometer nada");
+    }
+
+    [Fact]
     public void Alergia_SoComAFicha_NuncaGaranteAusencia()
     {
         var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));

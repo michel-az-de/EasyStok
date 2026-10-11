@@ -32,6 +32,7 @@ const {
   ACOES, INTENCOES, acaoSugerida, classificarIntencao, montarPrompt, rascunhoSugerido, sinalDoCliente,
 } = await import('../src/dominio/agente.js')
 const { motivoDePrecisar } = await import('../src/dominio/automatico.js')
+const { respostaParaMensagemDeCliente } = await import('../src/dominio/simulacoes.js')
 const { moeda } = await import('../src/dominio/formato.js')
 const { CARDAPIO, JANELAS_ENTREGA, PREFIXOS_CEP_ATENDIDOS } = await import('../src/infra/catalogo.js')
 
@@ -170,6 +171,57 @@ confere('"paguei" não confirma pagamento: promete conferir', () => {
   const r = analisa(fala('Pronto, paguei'))
   assert.match(r.texto, /conferir/)
   assert.doesNotMatch(r.texto, /confirmado|caiu|recebi/i)
+})
+
+// --- Revisão da PR: precedência e cortesia ------------------------------------
+confere('restrição com pista própria ganha de pedido especial na mesma fala', () => {
+  for (const texto of ['Sou celíaca, posso retirar aí na loja?', 'Tenho alergia a amendoim, quero falar com o responsável']) {
+    const r = analisa(fala(texto))
+    assert.equal(r.leitura.intencao.chave, INTENCOES.RESTRICAO.chave, texto)
+    assert.equal(r.sinal.paraDona, 'restricao', texto)
+    assert.equal(r.acao, ACOES.PASSAR_PARA_DONA, texto)
+  }
+})
+
+confere('"como tinha combinado" é cortesia, não reclamação', () => {
+  const r = analisa(fala('Como tinha combinado, quero a lasanha clássica de sempre'))
+  assert.equal(r.acao, ACOES.PROPOR)
+  assert.equal(r.sinal.paraDona, null)
+})
+
+confere('pedido com a forma de pagamento no meio segue o fechamento', () => {
+  const r = analisa(fala('Quero a lasanha clássica e vou pagar no pix'))
+  assert.equal(r.leitura.intencao.chave, INTENCOES.PAGAMENTO.chave)
+  assert.match(r.texto, /^Fechado/)
+})
+
+confere('com cobrança já enviada, "como pago?" aponta o link da conversa', () => {
+  const pedido = { numero: '2026-0190', estado: 'aguardando', cobranca: { valor: 85, criadaEm: AGORA - 60000, expiraEm: AGORA + 600000 } }
+  const r = analisa(fala('Como eu pago?', { pedido }))
+  assert.match(r.texto, /pedido 2026-0190/)
+  assert.doesNotMatch(r.texto, /quando o pedido fecha/)
+})
+
+confere('nota interna e aviso do sistema não "oferecem" item para virar Fechado', () => {
+  const c = conversa([
+    { dir: 'nota', texto: 'Gosta de lasanha clássica', em: ha(30) },
+    cliente('Quero jantar hoje'),
+  ])
+  assert.doesNotMatch(analisa(c).texto, /^Fechado/)
+})
+
+confere('o motivo escrito chega à passagem pelo mesmo caminho do automático', () => {
+  const r = respostaParaMensagemDeCliente({
+    conversaComMensagem: fala('Cancela meu pedido, demorou demais'),
+    primeiraMensagemDoCliente: false,
+    cadastroConhecido: true,
+    catalogo,
+    regras: [],
+    agora: AGORA,
+    prefixosCepAtendidos: PREFIXOS_CEP_ATENDIDOS,
+  })
+  assert.equal(r.respostaAutomatica, null)
+  assert.equal(r.passarParaDona, 'Quer cancelar ou mudar o pedido')
 })
 
 // --- Modelo (modo Claude) recebe a mesma regra --------------------------------

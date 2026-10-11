@@ -113,8 +113,9 @@ const PISTAS_RECLAMACAO_DE_PRODUTO = [
   'faltou', 'faltando', 'faltaram', 'queimad', 'derramad', 'derramou', 'vazou', 'amassad',
   'chegou frio', 'chegou fria', 'chegou gelad', 'veio frio', 'veio fria', 'veio gelad',
   'estava frio', 'estava fria', 'estava gelad', 'pessim', 'horrivel', 'que lixo',
-  // Atraso já ocorrido: o "tinha combinado" e a hora de chegada são a queixa.
-  'chegou tarde', 'chegou atrasad', 'atrasou', 'tinha combinado',
+  // Atraso já ocorrido. "Tinha combinado" fica de fora: "como tinha combinado,
+  // quero a de sempre" é cortesia, e a hora de chegada já pega o atraso.
+  'chegou tarde', 'chegou atrasad', 'atrasou',
 ]
 const RECLAMACAO_POR_PADRAO = [/\bchegou (as )?\d{1,2}h/]
 const pareceReclamacaoDeProduto = (texto) => PISTAS_RECLAMACAO_DE_PRODUTO.some((p) => texto.includes(p))
@@ -312,21 +313,24 @@ export function classificarIntencao(conversa) {
     const origem = mensagemComPista(conversa, pareceReclamacaoDeProduto) ?? ultima
     return { intencao: INTENCOES.ELOGIO_OU_QUEIXA, trecho: origem.texto, reclamacaoDeProduto: true }
   }
-  // Restrição antes do pedido especial: "não pode comer ovo, quero cancelar"
-  // tem dois assuntos, e o que fere a cliente é o alimento.
   // Composição vem antes das outras pistas, de propósito: "me manda sem
   // cebola" também bate a pista genérica de "fechar pedido", mas restrição
   // não pode perder para um casamento de palavra menos específico. Só a
   // pista de RESTRICAO propriamente dita ou uma frase marcada como segura
   // furam esta checagem primeiro.
   if (pareceComposicao(texto)) return { intencao: INTENCOES.RESTRICAO, trecho: ultima.texto, reclamacaoDeProduto: false }
+  const achada = PISTAS.find(([, pistas]) => pistas.some((p) => texto.includes(normalizar(p))))
+  // #1613: restrição (por pista) antes do pedido especial: "sou celíaca, posso
+  // retirar aí?" tem dois assuntos, e o que fere a cliente é o alimento.
+  if (achada?.[0] === INTENCOES.RESTRICAO) {
+    return { intencao: INTENCOES.RESTRICAO, trecho: ultima.texto, reclamacaoDeProduto: false }
+  }
   const pedido = pedidoParaDona(conversa)
   if (pedido) {
     return {
       intencao: INTENCOES.PEDIDO_ESPECIAL, trecho: ultima.texto, reclamacaoDeProduto: false, pedidoParaDona: pedido,
     }
   }
-  const achada = PISTAS.find(([, pistas]) => pistas.some((p) => texto.includes(normalizar(p))))
   return { intencao: achada ? achada[0] : INTENCOES.OUTRO, trecho: ultima.texto, reclamacaoDeProduto: false }
 }
 
@@ -338,9 +342,12 @@ const PISTAS_DE_PAGAMENTO_FEITO = ['paguei', 'comprovante', 'mandei o pix', 'fiz
 const INTENCOES_SOBRE_O_PEDIDO = [INTENCOES.ACOMPANHAR.chave, INTENCOES.PERGUNTA_ENTREGA.chave]
 
 export function sinalDoCliente(conversa) {
-  const { intencao, reclamacaoDeProduto } = classificarIntencao(conversa)
+  const leitura = classificarIntencao(conversa)
+  const { intencao, reclamacaoDeProduto } = leitura
   const texto = falaRecenteDoCliente(conversa)
-  const pedido = pedidoParaDona(conversa)
+  // `classificarIntencao` já olhou: só vem preenchido quando nem reclamação
+  // nem restrição ganharam, que é a mesma precedência daqui.
+  const pedido = leitura.pedidoParaDona ?? null
   let paraDona = null
   if (reclamacaoDeProduto) paraDona = 'devolucao'
   else if (intencao.chave === INTENCOES.RESTRICAO.chave) paraDona = 'restricao'
@@ -400,7 +407,9 @@ export function rascunhoSugerido({ intencao, reclamacaoDeProduto = false }, conv
   const semSaldo = itensSemSaldoCitados(conversa, catalogo)
   // O item pode ter sido dito pela casa e a cliente só confirmar ("pode ser"),
   // então a leitura de "já é um pedido?" olha as duas pontas das últimas falas.
-  const recentes = conversa.mensagens.slice(-4).map((m) => ({ ...m, dir: 'in' }))
+  // Só fala de gente: nota interna e aviso do sistema não "oferecem" item.
+  const recentes = conversa.mensagens.filter((m) => m.dir === 'in' || m.dir === 'out')
+    .slice(-4).map((m) => ({ ...m, dir: 'in' }))
   const itemEmMaos = itensOferecidosCitados({ ...conversa, mensagens: recentes }, catalogo)
   const textoDaCliente = falaRecenteDoCliente(conversa, 2)
 
@@ -443,6 +452,14 @@ export function rascunhoSugerido({ intencao, reclamacaoDeProduto = false }, conv
         + 'Te mando o link agora, é só escolher e jogar no carrinho.'
     }
     case INTENCOES.PAGAMENTO.chave:
+      // "Quero 2 lasanhas clássicas e pago no pix" é pedido com a forma de
+      // pagamento no meio: segue o fechamento, não vira aula de pagamento.
+      if (!conversa.pedido && itensOferecidosCitados(conversa, catalogo).length > 0) {
+        return `Fechado, ${nome}! Confirma o endereço e eu já gero o pedido com o link de pagamento.`
+      }
+      if (conversa.pedido?.cobranca) {
+        return `Oi ${nome}! O pagamento do pedido ${conversa.pedido.numero} é pelo link que mandei aqui na conversa.`
+      }
       return `Oi ${nome}! O pagamento é pelo link que eu mando quando o pedido fecha, em Pix ou cartão.`
     case INTENCOES.FECHAR_PEDIDO.chave:
       // "Quero um jantar" ainda não é pedido: sem item na mão nem pedido
