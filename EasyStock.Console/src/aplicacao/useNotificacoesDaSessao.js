@@ -1,24 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { carregarNotificacoesDaSessao, lerNotificacaoDaSessao } from '../infra/api/notificacoesDaSessao'
+import { aoComecarConsulta, aoConcluirConsulta, aoFalharConsulta } from './situacaoDeConsulta'
 
 export function useNotificacoesDaSessao() {
   const [estado, setEstado] = useState({ total: null, recentes: [], erro: null, carregando: true, lendo: null })
   const ativo = useRef(false)
   const geracao = useRef(0)
-  const carregar = useCallback(async () => {
+  const carregar = useCallback(async ({ silenciosa = false } = {}) => {
     const atual = ++geracao.current
-    setEstado((s) => ({ ...s, carregando: true }))
+    setEstado((s) => aoComecarConsulta(s, { silenciosa }))
     try {
       const dados = await carregarNotificacoesDaSessao()
-      if (ativo.current && atual === geracao.current) setEstado((s) => ({ ...s, ...dados, erro: null, carregando: false }))
+      if (ativo.current && atual === geracao.current) setEstado((s) => aoConcluirConsulta(s, dados))
     } catch (erro) {
-      if (ativo.current && atual === geracao.current) setEstado((s) => ({ ...s, erro: erro.message, carregando: false }))
+      if (ativo.current && atual === geracao.current) setEstado((s) => aoFalharConsulta(s, erro.message))
     }
   }, [])
   useEffect(() => {
     ativo.current = true
-    carregar()
-    const conferir = () => { if (document.visibilityState === 'visible') carregar() }
+    carregar({ silenciosa: true })
+    const conferir = () => { if (document.visibilityState === 'visible') carregar({ silenciosa: true }) }
     const intervalo = setInterval(conferir, 30000)
     document.addEventListener('visibilitychange', conferir)
     window.addEventListener('online', conferir)

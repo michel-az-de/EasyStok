@@ -79,4 +79,91 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     assert.match(txt, /A comprar \(0\)/);
     assert.match(txt, /nenhum item pendente/);
   });
+  // #1565: o laco de leitura parava ao ler um codigo que nao bate e nunca religava (o id do
+  // rAF antigo ficava no ar): camera ligada, nada lido, ate o operador fechar e abrir de novo.
+  test('scanner: codigo que nao bate religa a leitura e le o proximo', async () => {
+    runInSandbox(`
+      globalThis.__leituras = 0;
+      scannerActive = true;
+      scannerStream = {};
+      scannerDetector = { detect: async () => (++globalThis.__leituras === 1
+        ? [{ rawValue: 'NAO-EXISTE-ZZZ999', format: 'qr_code' }] : []) };
+      startScanLoop();
+    `);
+    try {
+      await new Promise(r => setTimeout(r, 300));
+      const parado = runInSandbox('({ leituras: globalThis.__leituras, raf: scannerRaf })');
+      assert.strictEqual(parado.leituras, 1, 'achou o codigo e parou de ler');
+      assert.strictEqual(parado.raf, null, 'o id do laco zera quando ele para');
+      await new Promise(r => setTimeout(r, 2200));
+      const religado = runInSandbox('globalThis.__leituras');
+      assert.ok(religado > 1, 'depois do aviso o laco voltou a ler (leituras: ' + religado + ')');
+    } finally { runInSandbox('closeScanner()'); }
+  });
+
+  test('scanner: fechar e abrir antes do aviso sumir nao deixa dois lacos lendo', async () => {
+    runInSandbox(`
+      globalThis.__leituras = 0;
+      scannerActive = true;
+      scannerStream = { getTracks: () => [] };
+      scannerDetector = { detect: async () => [{ rawValue: 'NAO-EXISTE-ZZZ999', format: 'qr_code' }] };
+      startScanLoop();
+    `);
+    try {
+      await new Promise(r => setTimeout(r, 200));
+      // Fecha e abre de novo com o timer de 1,5 s do aviso ainda pendente.
+      runInSandbox(`
+        closeScanner();
+        globalThis.__leituras = 0;
+        globalThis.__emVoo = 0;
+        globalThis.__picoEmVoo = 0;
+        scannerActive = true;
+        scannerStream = { getTracks: () => [] };
+        scannerDetector = { detect: () => new Promise(ok => {
+          globalThis.__leituras++;
+          globalThis.__picoEmVoo = Math.max(globalThis.__picoEmVoo, ++globalThis.__emVoo);
+          setTimeout(() => { globalThis.__emVoo--; ok([]); }, 60);
+        }) };
+        startScanLoop();
+      `);
+      await new Promise(r => setTimeout(r, 1900));
+      const r = runInSandbox('({ n: globalThis.__leituras, pico: globalThis.__picoEmVoo })');
+      assert.ok(r.n > 2, 'a abertura nova le (leituras: ' + r.n + ')');
+      assert.strictEqual(r.pico, 1, 'um laco so: nunca duas leituras ao mesmo tempo');
+    } finally { runInSandbox('closeScanner()'); }
+  });
+
+  test('scanner: le no maximo a cada SCAN_INTERVALO_MS, nao a cada quadro', async () => {
+    runInSandbox(`
+      globalThis.__leituras = 0;
+      scannerActive = true;
+      scannerStream = {};
+      scannerDetector = { detect: async () => { globalThis.__leituras++; return []; } };
+      startScanLoop();
+    `);
+    try {
+      await new Promise(r => setTimeout(r, 1000));
+      const r = runInSandbox('({ n: globalThis.__leituras, passo: SCAN_INTERVALO_MS })');
+      assert.ok(r.n >= 3, 'continua lendo (leituras: ' + r.n + ')');
+      assert.ok(r.n <= Math.ceil(1000 / r.passo) + 1, 'leituras em 1 s: ' + r.n + ' (quadros seriam ~60)');
+    } finally { runInSandbox('closeScanner()'); }
+  });
+
+  test('scanner: fechar para o laco e solta o detector', async () => {
+    runInSandbox(`
+      globalThis.__leituras = 0;
+      scannerActive = true;
+      scannerStream = { getTracks: () => [] };
+      scannerDetector = { detect: async () => { globalThis.__leituras++; return []; } };
+      startScanLoop();
+    `);
+    await new Promise(r => setTimeout(r, 250));
+    runInSandbox('closeScanner()');
+    const antes = runInSandbox('globalThis.__leituras');
+    await new Promise(r => setTimeout(r, 400));
+    const r = runInSandbox('({ n: globalThis.__leituras, raf: scannerRaf, det: scannerDetector })');
+    assert.strictEqual(r.n, antes, 'nenhuma leitura depois de fechar');
+    assert.strictEqual(r.raf, null);
+    assert.strictEqual(r.det, null);
+  });
 };

@@ -12,7 +12,9 @@ public sealed record InsumoDaProducao(
     bool AbaixoDoMinimo, bool Embalagem = false, int Porcoes = 0);
 
 /// <param name="Embalagem">D-M2-03 (#1523): bandeja, selo, pote. Null = não mexe (no cadastro, não é).</param>
-public sealed record InsumoInput(string? Nome, UnidadeMedida? Unidade, int? Minimo, decimal? Custo, bool? Embalagem = null);
+/// <param name="LimparMinimo">#1563: no ajuste, grava o mínimo nulo (volta a herdar da categoria e da loja). Mínimo null sozinho continua "não mexe".</param>
+public sealed record InsumoInput(string? Nome, UnidadeMedida? Unidade, int? Minimo, decimal? Custo, bool? Embalagem = null,
+    bool LimparMinimo = false);
 
 /// <summary>
 /// Insumos da produção pelo console (M2.3, #1496): o intermediário (molho, recheio, massa laminada)
@@ -84,15 +86,19 @@ public sealed class InsumosDaProducaoUseCase(
         return r.ProdutoId;
     }
 
-    /// <summary>Ajusta mínimo e custo (null = não mexe). Só insumo da empresa.</summary>
+    /// <summary>Ajusta mínimo e custo (null = não mexe; <c>LimparMinimo</c> apaga o mínimo). Só insumo da empresa.</summary>
     public async Task AtualizarAsync(Guid empresaId, Guid produtoId, InsumoInput dados, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(empresaId);
         Validar(dados);
+        if (dados.LimparMinimo && dados.Minimo.HasValue)
+            throw new UseCaseValidationException("Informe o mínimo ou limpe o mínimo, não os dois.");
         var produto = await produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId);
         if (produto is null || produto.EmpresaId != empresaId || !produto.EhInsumo) throw new UseCaseValidationException("Insumo não encontrado.");
 
-        if (dados.Minimo.HasValue) produto.QuantidadeMinima = dados.Minimo;
+        // #1563: zero não serve para limpar, porque vence a herança da categoria e da loja (LimiarEstoqueResolver).
+        if (dados.LimparMinimo) produto.QuantidadeMinima = null;
+        else if (dados.Minimo.HasValue) produto.QuantidadeMinima = dados.Minimo;
         if (dados.Custo.HasValue) produto.CustoReferencia = Dinheiro.FromDecimal(dados.Custo.Value);
         if (dados.Unidade.HasValue) produto.UnidadeMedidaBase = dados.Unidade.Value;
         if (dados.Embalagem.HasValue) produto.EhEmbalagem = dados.Embalagem.Value;
