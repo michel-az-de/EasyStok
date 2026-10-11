@@ -9,6 +9,7 @@ using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.Tests.Helpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using EasyStock.Domain.Entities.Operacao;
+using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Operacao;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Sales;
@@ -173,6 +174,50 @@ public class ConfirmarPagamentoPedidoUseCaseTests
         cobranca.Status.Should().Be(StatusCobrancaPedido.Pendente);
         cobranca.Motivo.Should().Contain("valor_menor");
         f.Eventos.Should().Contain(e => e.Tipo == "pagamento_divergente");
+    }
+
+    [Fact]
+    public async Task LinkAntigoPagoDepoisDeOPedidoAumentar_RegistraOValorEDeixaOSaldoNaEntrega()
+    {
+        // #1615: o pedido ganhou um item, o link de 15 foi trocado pelo de 25 e o cliente pagou o antigo, que
+        // continua pagável no Mercado Pago. O dinheiro ficava retido como valor_menor e o pedido era cancelado.
+        var f = new CobrancaPedidoFixture();
+        var antiga = CobrancaPedido.CriarOnline(f.EmpresaId, f.Pedido.Id, 15m, "pref-antiga",
+            "https://mp.test/pref-antiga", CobrancaPedidoFixture.Agora.AddMinutes(30), 1, CobrancaPedidoFixture.Agora.AddMinutes(-5));
+        antiga.Cancelar("valor_do_pedido_alterado", CobrancaPedidoFixture.Agora.AddMinutes(-2));
+        f.Cobrancas.Add(antiga);
+        var nova = f.AdicionarOnline(tentativa: 2, referencia: "pref-nova");
+
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, valor: 15m));
+
+        r.Confirmado.Should().BeTrue();
+        antiga.Status.Should().Be(StatusCobrancaPedido.Paga);
+        nova.Status.Should().Be(StatusCobrancaPedido.Cancelada);
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.Valor.Should().Be(15m);
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
+        var saldo = f.Cobrancas.Should().ContainSingle(c => c.Provedor == "na_entrega").Subject;
+        saldo.Valor.Should().Be(10m);
+        saldo.EstaPendente.Should().BeTrue();
+        f.Eventos.Should().Contain(e => e.Tipo == "pagamento_link_antigo", "a dona vê no histórico por que ficou saldo");
+    }
+
+    [Fact]
+    public async Task LinkAntigoPago_ComOLinkNovoJaVencido_TambemRegistra()
+    {
+        // Sem cobrança pendente o alvo era a mais recente (25) e o pagamento de 15 voltava a ficar retido.
+        var f = new CobrancaPedidoFixture();
+        var antiga = CobrancaPedido.CriarOnline(f.EmpresaId, f.Pedido.Id, 15m, "pref-antiga",
+            "https://mp.test/pref-antiga", CobrancaPedidoFixture.Agora.AddMinutes(30), 1, CobrancaPedidoFixture.Agora.AddMinutes(-5));
+        antiga.Cancelar("valor_do_pedido_alterado", CobrancaPedidoFixture.Agora.AddMinutes(-2));
+        f.Cobrancas.Add(antiga);
+        var nova = f.AdicionarOnline(tentativa: 2, referencia: "pref-nova");
+        nova.Cancelar("forma_trocada", CobrancaPedidoFixture.Agora);
+
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, valor: 15m));
+
+        r.Confirmado.Should().BeTrue();
+        antiga.Status.Should().Be(StatusCobrancaPedido.Paga);
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.Valor.Should().Be(15m);
     }
 
     [Fact]
