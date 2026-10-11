@@ -300,24 +300,31 @@ globalThis.window = { print: () => { impressoes += 1 } }
 globalThis.__prova1585.catalogo = { cardapio: [{ sku: 'i-1', nome: 'Ravióli', porcoes: [] }, { sku: 'i-2', nome: 'Lasanha', porcoes: [] }] }
 
 const AbaProducaoDoDiaApi = await tela('AbaProducaoDoDiaApi')
-const cartoes = (no) => andar(no, (n) => n.type === 'li' && String(n.props.className).includes('loteProducao'))
+const cartoes = (no) => andar(no, (n) => n.type === 'li' && String(n.props.className).includes('itemDoLote'))
 const avisosDeLote = (no) => andar(no, (n) => n.type === 'output')
 const folha = (t) => andar(t.renderizar(), (n) => n.type === 'FolhaImpressao')
-// Preenche o cartão `indice` com o prato e as porções.
-const preencher = (t, indice, sku, porcoes) => {
-  campos(t.renderizar(), 'CampoSelecao', 'Prato')[indice].props.onChange(digitar(sku))
-  campos(t.renderizar(), 'CampoTexto', 'Porções')[indice].props.onChange(digitar(porcoes))
+const enviados = (chamadas) => chamadas.filter((c) => c.metodo === 'POST')
+// #1624: o prato entra no lote pelo toque no cartão da grade (não há mais lista de pratos); as
+// porções ela corrige no campo do lote. O prato tocado por último é o último cartão do lote.
+const tocarNoPrato = (t, sku) => {
+  const cartao = andar(t.renderizar(), (n) => n.type === 'li' && n.props['data-prato'] === `${sku}|`)[0]
+  andar(cartao, (n) => n.type === 'button' && String(n.props['aria-label']).startsWith('Somar 1 porção'))[0].props.onClick()
+  return t.renderizar()
+}
+const preencher = (t, sku, porcoes) => {
+  tocarNoPrato(t, sku)
+  campos(t.arvore, 'CampoTexto', 'Porções').at(-1).props.onChange(digitar(porcoes))
   return t.renderizar()
 }
 const confirmar = async (t) => { await formulario(t.renderizar()).props.onSubmit(evento); return t.renderizar() }
 
 await confere('Produção do dia: sair da tela e voltar não apaga o que ela digitou', () => {
   zerar()
+  montarFetch()
   const antes = montar(AbaProducaoDoDiaApi)
-  assert.equal(cartoes(antes.renderizar()).length, 1)
-  preencher(antes, 0, 'i-1', '12')
-  botoes(antes.arvore, 'Mais um prato')[0].props.onClick()
-  antes.renderizar()
+  assert.equal(cartoes(antes.renderizar()).length, 0)
+  preencher(antes, 'i-1', '12')
+  tocarNoPrato(antes, 'i-2')
   const depois = montar(AbaProducaoDoDiaApi)
   assert.equal(cartoes(depois.renderizar()).length, 2)
   assert.equal(campos(depois.arvore, 'CampoTexto', 'Porções')[0].props.value, '12')
@@ -331,26 +338,27 @@ await confere('Produção do dia: o erro nomeia o prato, fica no formulário e n
   const t = montar(AbaProducaoDoDiaApi)
   await confirmar(t)
   assert.equal(texto(alertas(formulario(t.arvore))[0]), 'Prato 02: Escolha o prato.')
-  preencher(t, 1, 'i-2', '')
+  // A linha sem prato sai do lote; a Lasanha entra pelo toque e fica sem as porções.
+  botoes(t.arvore, '').find((b) => /^Tirar Prato fora do cardápio/.test(b.props['aria-label'] ?? '')).props.onClick()
+  preencher(t, 'i-2', '')
   await confirmar(t)
   assert.equal(texto(alertas(formulario(t.arvore))[0]), 'Prato 02 (Lasanha): Quantas porções saíram?')
-  assert.equal(chamadas.length, 0)
+  assert.equal(enviados(chamadas).length, 0)
 })
 
 await confere('Produção do dia: confirmar mostra o lote e zera as linhas; outro lote soma; a volta mantém os botões', async () => {
   zerar()
   const chamadas = montarProducao(lote(1), lote(2, { totalEtiquetas: 6, avisos: ['Molho: faltaram 200 g.'] }))
   const t = montar(AbaProducaoDoDiaApi)
-  preencher(t, 0, 'i-1', '2')
+  preencher(t, 'i-1', '2')
   await confirmar(t)
   assert.match(texto(avisosDeLote(t.arvore)[0]), /Lote LOT-261011-001 lançado: 2× Ravióli\./)
-  assert.equal(cartoes(t.arvore).length, 1)
-  assert.equal(campos(t.arvore, 'CampoTexto', 'Porções')[0].props.value, '')
-  preencher(t, 0, 'i-1', '6')
+  assert.equal(cartoes(t.arvore).length, 0, 'o lote gravou e saiu da tela')
+  preencher(t, 'i-1', '6')
   await confirmar(t)
   assert.deepEqual(avisosDeLote(t.arvore).map((o) => texto(o).match(/LOT-[\d-]+/)[0]), ['LOT-261011-002', 'LOT-261011-001'])
   assert.match(texto(avisosDeLote(t.arvore)[0]), /Molho: faltaram 200 g\./)
-  assert.equal(chamadas.length, 2)
+  assert.equal(enviados(chamadas).length, 2)
   const volta = montar(AbaProducaoDoDiaApi)
   assert.deepEqual(botoes(volta.renderizar(), 'Imprimir').map(texto), ['Imprimir 6 etiquetas', 'Imprimir 2 etiquetas'])
 })
@@ -389,7 +397,7 @@ await confere('Produção do dia: cada lote imprime as próprias etiquetas, o er
   await esperar(80)
   assert.match(texto(folha(t)[0]), /Lote LOT-261011-001 · 2\/2/)
   assert.equal(impressoes, 2)
-  assert.equal(chamadas.length, 3)
+  assert.equal(chamadas.filter((c) => c.url.includes('/etiquetas/')).length, 3)
   // Dispensar o lote 1 leva a folha dele; o lote 2 continua.
   botoes(t.arvore, 'Dispensar')[1].props.onClick()
   assert.equal(folha(t).length, 0)
@@ -400,25 +408,29 @@ await confere('Produção do dia: cada lote imprime as próprias etiquetas, o er
 await confere('Produção do dia: envio que termina depois de sair e voltar mostra o lote e tira as linhas', async () => {
   zerar()
   let responder = null
-  globalThis.fetch = () => new Promise((resolver) => { responder = () => resolver(new Response(JSON.stringify(lote(3)), { status: 201 })) })
+  // Só o envio da produção fica em voo; o saldo e a sugestão que a tela lê ao abrir respondem na hora.
+  globalThis.fetch = (url, { method = 'GET' } = {}) => (method === 'POST'
+    ? new Promise((resolver) => { responder = () => resolver(new Response(JSON.stringify(lote(3)), { status: 201 })) })
+    : Promise.resolve(new Response(JSON.stringify({ data: null }), { status: 200 })))
   const antes = montar(AbaProducaoDoDiaApi)
-  preencher(antes, 0, 'i-1', '4')
+  preencher(antes, 'i-1', '4')
   const envio = formulario(antes.arvore).props.onSubmit(evento)
   for (let i = 0; i < 50 && !responder; i += 1) await esperar(0)
   const depois = montar(AbaProducaoDoDiaApi)
   assert.equal(campos(depois.renderizar(), 'CampoTexto', 'Porções')[0].props.value, '4', 'com o envio em voo, as linhas ainda estão lá')
   responder()
   await envio
-  assert.equal(campos(depois.renderizar(), 'CampoTexto', 'Porções')[0].props.value, '')
+  assert.equal(cartoes(depois.renderizar()).length, 0)
   assert.match(texto(avisosDeLote(depois.arvore)[0]), /LOT-261011-003/)
 })
 
 await confere('Produção do dia: as porções vindas do Planejamento entram junto do que já estava digitado', () => {
   zerar()
-  preencher(montar(AbaProducaoDoDiaApi), 0, 'i-1', '5')
+  montarFetch()
+  preencher(montar(AbaProducaoDoDiaApi), 'i-1', '5')
   assert.equal(levarParaProducao([{ sku: 'i-2', porcoes: '8' }, { sku: 'i-9', porcoes: '0' }]), 1)
   const t = montar(AbaProducaoDoDiaApi)
-  assert.deepEqual(cartoes(t.renderizar()).map((c) => texto(andar(c, (n) => n.type === 'h3')[0])), ['Ravióli', 'Lasanha'])
+  assert.deepEqual(cartoes(t.renderizar()).map((c) => texto(andar(c, (n) => n.type === 'h4')[0])), ['Ravióli', 'Lasanha'])
   assert.deepEqual(campos(t.arvore, 'CampoTexto', 'Porções').map((c) => c.props.value), ['5', '8'])
   assert.equal(campos(t.arvore, 'CampoTexto', 'Validade (dias)')[1].props.value, '5', 'a planejada ganha a validade padrão')
   zerar()

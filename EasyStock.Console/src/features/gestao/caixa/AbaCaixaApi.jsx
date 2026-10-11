@@ -11,15 +11,17 @@ import { Pilula } from '../../../componentes/Pilula'
 import { Modal } from '../../../componentes/Modal'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
 import { useCaixaDoDiaApi } from '../../../aplicacao/useCaixaDoDiaApi'
+import { useFluxoDeCaixaApi } from '../../../aplicacao/useFluxoDeCaixaApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import {
   diaMes, observacaoDaAbertura, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
 } from '../../../dominio/aberturaDaLoja'
 import {
-  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, TIPOS_MOVIMENTO, categoriaAoTrocarTipo, gavetaDoDia, lancamentosEmOrdem, nomeDoMetodoCaixa,
+  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, TIPOS_MOVIMENTO, categoriaAoTrocarTipo, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
+  nomeDoMetodoCaixa, temMovimentoNoDia, totaisDoFluxo,
 } from '../../../dominio/caixa'
 import {
-  horaCurta, lerMoeda, mascaraMoeda, moeda, moedaAltaDemais,
+  horaCurta, lerMoeda, mascaraMoeda, moeda, moedaAltaDemais, plural,
 } from '../../../dominio/formato'
 import { PromptEstorno } from './AbaCaixa'
 import { ModalFecharCaixa } from './ModalFecharCaixa'
@@ -247,6 +249,83 @@ function UltimosFechamentos({ fechamentos }) {
   )
 }
 
+// #1474: a gaveta primeiro, porque é o número que ela confere na mão. #1624: a linha de vendas
+// entra quando há venda; sem ela as linhas não somavam o total.
+function ResumoDoDia({ dia, gaveta }) {
+  return (
+    <>
+      <dl className={css.resumoLista}>
+        <div className={css.resumoForte}><dt>Na gaveta (dinheiro)</dt><dd>{moeda(gaveta.naGaveta)}</dd></div>
+        <div><dt>Saldo inicial</dt><dd>{moeda(dia.saldoInicial)}</dd></div>
+        {dia.totalVendas !== 0 && <div><dt>Vendas</dt><dd>{moeda(dia.totalVendas)}</dd></div>}
+        <div><dt>Outras entradas</dt><dd>{moeda(dia.totalEntradasExtras)}</dd></div>
+        <div><dt>Outras saídas</dt><dd>{moeda(dia.totalSaidasExtras)}</dd></div>
+        <div><dt>Pagamentos de pedidos</dt><dd>{moeda(dia.totalPagamentosPedidos)}</dd></div>
+        <div><dt>Pix e cartão (fora da gaveta)</dt><dd>{moeda(gaveta.pixECartao)}</dd></div>
+        <div className={css.resumoTotal}><dt>{dia.fechado ? 'Total do dia' : 'Total esperado do dia'}</dt><dd>{moeda(dia.saldoEsperado)}</dd></div>
+      </dl>
+      <p className={css.notaGaveta}>Pix e cartão não compõem o dinheiro da gaveta.</p>
+    </>
+  )
+}
+
+const SITUACAO_DO_DIA = {
+  fechado: { tom: 'neutro', rotulo: 'Fechado' },
+  aberto: { tom: 'ok', rotulo: 'Aberto' },
+  'sem-abertura': { tom: 'aviso', rotulo: 'Sem abertura' },
+  'sem-movimento': { tom: 'neutro', rotulo: 'Sem movimento' },
+}
+const diaDaSemana = (data) => new Date(`${data}T12:00:00Z`).toLocaleDateString('pt-BR', { weekday: 'short', timeZone: 'UTC' })
+
+// #1624: o fluxo de caixa que faltava no Financeiro. Hoje vem do caixa do dia (relido a cada
+// lançamento); os seis dias anteriores, da mesma conta, lida dia a dia.
+function FluxoDaSemana({ hoje }) {
+  const anteriores = useFluxoDeCaixaApi(hoje.data)
+  const linhas = linhasDoFluxo(hoje, anteriores.dias)
+  const total = totaisDoFluxo(linhas)
+  return (
+    <section className={css.grupoRegistros} aria-label="Fluxo de caixa dos últimos 7 dias">
+      <h3 className={css.tituloSecao}>Últimos 7 dias</h3>
+      {anteriores.estado === 'carregando' && <output className={css.corpoBloco}>Carregando os dias anteriores…</output>}
+      {anteriores.estado === 'erro' && (
+        <p className={css.avisoFechado} role="alert">
+          Os dias anteriores não carregaram. {anteriores.erro}
+          {' '}<Botao variante="texto" icone="refresh-cw" onClick={anteriores.recarregar}>Tentar de novo</Botao>
+        </p>
+      )}
+      <div className={css.rolagemFluxo}>
+        <table className={css.fluxo}>
+          <thead>
+            <tr><th scope="col">Dia</th><th scope="col">Entrou</th><th scope="col">Saiu</th><th scope="col">Saldo do dia</th><th scope="col">Caixa</th></tr>
+          </thead>
+          <tbody>
+            {linhas.map((l, indice) => (
+              <tr key={l.data}>
+                <th scope="row">{l.desde ? `Desde ${diaMes(l.desde)}` : indice === 0 ? `Hoje, ${diaMes(l.data)}` : `${diaDaSemana(l.data)}, ${diaMes(l.data)}`}</th>
+                <td>{moeda(l.entrou)}</td>
+                <td>{moeda(l.saiu)}</td>
+                <td className={l.saldo < 0 ? css.valorSaida : undefined}>{moeda(l.saldo)}</td>
+                <td><Pilula tom={SITUACAO_DO_DIA[l.situacao].tom} fina>{SITUACAO_DO_DIA[l.situacao].rotulo}</Pilula></td>
+              </tr>
+            ))}
+          </tbody>
+          {anteriores.estado === 'ok' && (
+            <tfoot>
+              <tr>
+                <th scope="row">7 dias</th>
+                <td>{moeda(total.entrou)}</td>
+                <td>{moeda(total.saiu)}</td>
+                <td className={total.saldo < 0 ? css.valorSaida : undefined}>{moeda(total.saldo)}</td>
+                <td>{plural(linhas.filter((l) => l.situacao !== 'sem-movimento').length, 'dia com movimento', 'dias com movimento')}</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </section>
+  )
+}
+
 export function AbaCaixaApi() {
   const { acoes } = useAcessoModulos()
   const podeGerenciar = acoes.gerenciarCaixa === true
@@ -275,20 +354,41 @@ export function AbaCaixaApi() {
   </p>
   const avisoDePermissao = !podeGerenciar && <p className={css.corpoBloco}>O fechamento e o estorno de lançamentos ficam com a dona ou gerente.</p>
 
+  // #1474: a dona confere a gaveta; Pix e cartão não estão nela.
+  const gaveta = gavetaDoDia(dia)
+
+  // #1624: sem abertura o dia já pode ter dinheiro (Pix de pedido, venda, lançamento do PWA, que não
+  // abre caixa). A tela mostrava só o campo do saldo inicial; agora o movimento aparece junto.
   if (!dia.aberto && !dia.fechado) {
+    const comMovimento = temMovimentoNoDia(dia)
     return (
-      <div className={`${css.painel} ${css.abertura}`}>
+      <div className={`${css.painel} ${css.caixaApi}`}>
         {erroDaConsulta}
-        <AbrirCaixa dia={dia} ultimo={fechamentos[0] ?? null} executar={executar} enviando={acao.enviando} />
-        {avisoDePermissao}
-        {erro}
-        <UltimosFechamentos fechamentos={fechamentos} />
+        <div className={`${css.painel} ${css.abertura}`}>
+          <AbrirCaixa dia={dia} ultimo={fechamentos[0] ?? null} executar={executar} enviando={acao.enviando} />
+          {avisoDePermissao}
+          {erro}
+        </div>
+        <h3 className={css.tituloSecao}>Movimento de hoje</h3>
+        {comMovimento
+          ? <p className={css.corpoBloco}>Já tem dinheiro no dia, mesmo sem abrir o caixa. Abrir o caixa só registra o que está na gaveta.</p>
+          : <p className={css.corpoBloco}>Nada entrou nem saiu hoje ainda.</p>}
+        {comMovimento && <ResumoDoDia dia={dia} gaveta={gaveta} />}
+        <section className={css.extrato} aria-label="Movimentação do caixa">
+          {comMovimento && (
+            <div className={css.grupoRegistros}>
+              <Lancamentos dia={dia} executar={executar} podeGerenciar={podeGerenciar} enviando={acao.enviando} />
+            </div>
+          )}
+          <FluxoDaSemana hoje={dia} />
+          <div className={css.grupoRegistros}>
+            <UltimosFechamentos fechamentos={fechamentos} />
+          </div>
+        </section>
       </div>
     )
   }
 
-  // #1474: a dona confere a gaveta; Pix e cartão não estão nela.
-  const gaveta = gavetaDoDia(dia)
   const titulo = dia.esquecidoAberto ? `Aberto desde ${diaMes(dia.abertoDesde)}` : 'Hoje'
   const podeLancar = dia.aberto && !dia.fechado && !dia.esquecidoAberto
   const fecharLancamento = () => { limparErro(); setLancamentoAberto(false) }
@@ -328,17 +428,7 @@ export function AbaCaixaApi() {
         </p>
       )}
 
-      {/* #1474: a gaveta primeiro, porque é o número que ela confere na mão. */}
-      <dl className={css.resumoLista}>
-        <div className={css.resumoForte}><dt>Na gaveta (dinheiro)</dt><dd>{moeda(gaveta.naGaveta)}</dd></div>
-        <div><dt>Saldo inicial</dt><dd>{moeda(dia.saldoInicial)}</dd></div>
-        <div><dt>Outras entradas</dt><dd>{moeda(dia.totalEntradasExtras)}</dd></div>
-        <div><dt>Outras saídas</dt><dd>{moeda(dia.totalSaidasExtras)}</dd></div>
-        <div><dt>Pagamentos de pedidos</dt><dd>{moeda(dia.totalPagamentosPedidos)}</dd></div>
-        <div><dt>Pix e cartão (fora da gaveta)</dt><dd>{moeda(gaveta.pixECartao)}</dd></div>
-        <div className={css.resumoTotal}><dt>{dia.fechado ? 'Total do dia' : 'Total esperado do dia'}</dt><dd>{moeda(dia.saldoEsperado)}</dd></div>
-      </dl>
-      <p className={css.notaGaveta}>Pix e cartão não compõem o dinheiro da gaveta.</p>
+      <ResumoDoDia dia={dia} gaveta={gaveta} />
       {!(podeLancar && lancamentoAberto) && erro}
       {avisoDePermissao}
 
@@ -346,6 +436,7 @@ export function AbaCaixaApi() {
         <div className={css.grupoRegistros}>
           <Lancamentos dia={dia} executar={executar} podeGerenciar={podeGerenciar} enviando={acao.enviando} />
         </div>
+        <FluxoDaSemana hoje={dia} />
         <div className={css.grupoRegistros}>
           <UltimosFechamentos fechamentos={fechamentos} />
         </div>

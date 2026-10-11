@@ -326,6 +326,40 @@ export function gavetaDoDia(dia) {
   return { naGaveta: gaveta / 100, pixECartao: fora / 100 }
 }
 
+// --- Fluxo de caixa de vários dias (#1624) ----------------------------------
+// Uma linha por dia, com as palavras da dona: entrou (vendas, pagamentos de pedido e outras
+// entradas), saiu (saídas) e o saldo do dia. O saldo inicial fica de fora: é dinheiro que já
+// estava na gaveta, não entrou no dia. `sem-abertura` é dia com dinheiro e sem "abrir o caixa":
+// o PWA não abre caixa, e Pix de pedido entra de qualquer jeito.
+export function linhaDoFluxo(dia) {
+  const entrou = centavos(dia?.totalVendas) + centavos(dia?.totalPagamentosPedidos) + centavos(dia?.totalEntradasExtras)
+  const saiu = centavos(dia?.totalSaidasExtras)
+  const situacao = dia?.fechado ? 'fechado' : dia?.aberto ? 'aberto' : entrou !== 0 || saiu !== 0 ? 'sem-abertura' : 'sem-movimento'
+  return { data: dia?.data ?? null, entrou: entrou / 100, saiu: saiu / 100, saldo: (entrou - saiu) / 100, situacao }
+}
+
+// As linhas da tabela: hoje primeiro, depois os dias anteriores. Caixa esquecido aberto (#596): a
+// linha de hoje soma a sessão desde a abertura, então os dias que já estão dentro dela saem da
+// tabela (somariam duas vezes) e a linha diz desde quando (`desde`).
+export function linhasDoFluxo(hoje, anteriores) {
+  const desde = hoje?.esquecidoAberto ? hoje.abertoDesde ?? null : null
+  return [
+    { ...linhaDoFluxo(hoje), desde },
+    ...(anteriores ?? []).filter((d) => !desde || d.data < desde).map((d) => ({ ...linhaDoFluxo(d), desde: null })),
+  ]
+}
+
+export function totaisDoFluxo(linhas) {
+  const soma = (campo) => (linhas ?? []).reduce((total, l) => total + centavos(l[campo]), 0) / 100
+  return { entrou: soma('entrou'), saiu: soma('saiu'), saldo: soma('saldo') }
+}
+
+// O dia tem dinheiro para mostrar mesmo sem abertura? Lançamento estornado também conta: está na lista.
+export const temMovimentoNoDia = (dia) =>
+  (dia?.movimentos ?? []).some((m) => m.tipo !== TIPOS_MOVIMENTO.ABERTURA && m.tipo !== TIPOS_MOVIMENTO.FECHAMENTO)
+  || (dia?.linhasExtras ?? []).length > 0
+  || [dia?.totalVendas, dia?.totalPagamentosPedidos, dia?.totalEntradasExtras, dia?.totalSaidasExtras].some((v) => centavos(v) !== 0)
+
 // Lançamentos do dia numa lista só, na ordem da hora (movimentos e pagamentos vinham em
 // dois blocos e a sangria das 20:30 aparecia entre 20:18 e 20:28). DateTime sem fuso vem
 // da API em UTC: o Z completa antes de comparar.
