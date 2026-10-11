@@ -144,7 +144,7 @@ function Composicao({ rota, aoSair }) {
       key={selecionada.id}
       passouParaVoce={precisaDeVoce(selecionada, agora, true, aberta, janelas, horarioDaLoja)}
       bloqueada={envioBloqueado(selecionada, agora, canalDaConversa(canais, selecionada))}
-      modo={modoAgente}
+      modo={FONTE_API ? 'api' : modoAgente}
       estado={agente.conversaId === selecionada.id ? agente.estado : 'ocioso'}
       sugestao={agente.conversaId === selecionada.id ? agente.sugestao : null}
       erro={agente.conversaId === selecionada.id ? agente.erro : null}
