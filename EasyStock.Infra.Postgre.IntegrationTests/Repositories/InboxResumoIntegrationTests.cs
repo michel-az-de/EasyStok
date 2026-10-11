@@ -71,6 +71,7 @@ public sealed class InboxResumoIntegrationTests(PostgreSqlDatabaseFixture fixtur
                 aguardaResposta = true,
                 slaRespostaMinutos = 9,
                 assumidaPorNome = "Ana",
+                numeroComanda = cenario.ComPedido.NumeroComanda,
             },
             new
             {
@@ -91,6 +92,7 @@ public sealed class InboxResumoIntegrationTests(PostgreSqlDatabaseFixture fixtur
                 aguardaResposta = false,
                 slaRespostaMinutos = 9,
                 assumidaPorNome = (string?)null,
+                numeroComanda = cenario.Escalada.NumeroComanda,
             },
         }, Json)!;
 
