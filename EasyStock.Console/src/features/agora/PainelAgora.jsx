@@ -8,8 +8,25 @@ import css from './agora.module.css'
 
 const LIMITE = 4
 
-function Fila({ titulo, apoio, itens, emDia, href, rotuloDoLink, renderizar }) {
+// `aviso` (#1611): a fila ainda não sabe a contagem (lista carregando ou falhou).
+// Sai o número e sai o "em dia": zero sem lista não é fila vazia.
+function Fila({ titulo, apoio, itens, emDia, href, rotuloDoLink, renderizar, aviso = null }) {
   const resto = itens.length - LIMITE
+  if (aviso) {
+    return (
+      <section className={css.fila} aria-label={titulo}>
+        <header className={css.cabeca}>
+          <span className={css.numero} data-vazio="true" aria-hidden="true">–</span>
+          <div>
+            <h2 className={css.titulo}>{titulo}</h2>
+            <p className={css.apoio}>{apoio}</p>
+          </div>
+        </header>
+        <p className={css.emDia} role="status">{aviso}</p>
+        <a className={css.abrir} href={href}>Abrir {rotuloDoLink}<MarcaIcone nome="proximo" tamanho={16} /></a>
+      </section>
+    )
+  }
   return (
     <section className={css.fila} aria-label={`${titulo}: ${itens.length}`}>
       <header className={css.cabeca}>
@@ -38,14 +55,14 @@ const Pedido = (item) => (
   </div>
 )
 
-export function PainelAgora({ filas, podeVer, aoAbrirConversa }) {
+export function PainelAgora({ filas, podeVer, aoAbrirConversa, avisoResponder = null }) {
   if (!podeVer.atendimento && !podeVer.cozinha && !podeVer.entregas) return null
   return (
     <section className={css.painel} aria-label="Agora">
       <p className={css.legenda}>Agora</p>
       <div className={css.filas}>
         {podeVer.atendimento && <Fila titulo="Responder" apoio="Só o que o automático não resolve"
-          itens={filas.responder} emDia="Ninguém esperando você."
+          itens={filas.responder} emDia="Ninguém esperando você." aviso={avisoResponder}
           href={hashDoModulo('atendimento', 'balcao')} rotuloDoLink="Balcão"
           renderizar={(item) => (
             <button type="button" className={css.item} data-tom={item.tom} onClick={() => aoAbrirConversa(item.id)}>
