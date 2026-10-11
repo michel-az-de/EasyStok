@@ -199,13 +199,13 @@ public class ConversaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixtur
 
         var repo = new ConversaRepository(db);
         var todas = await repo.ListarInboxAsync(empresa, situacao: null, busca: null, responsavel: null, pagina: 1, tamanhoPagina: 10);
-        todas.Select(i => i.Conversa.Id).Should().ContainInOrder(maria.Id, joao.Id);
+        todas.Select(i => i.Id).Should().ContainInOrder(maria.Id, joao.Id);
         todas[0].UltimaMensagemTexto.Should().Be("ultima");
         todas[1].UltimaMensagemTexto.Should().BeNull();
 
         var busca = await repo.ListarInboxAsync(empresa, null, "souza", null, 1, 10);
-        busca.Should().ContainSingle(i => i.Conversa.Id == maria.Id);
-        (await repo.ListarInboxAsync(empresa, null, "990012", null, 1, 10)).Should().ContainSingle(i => i.Conversa.Id == joao.Id);
+        busca.Should().ContainSingle(i => i.Id == maria.Id);
+        (await repo.ListarInboxAsync(empresa, null, "990012", null, 1, 10)).Should().ContainSingle(i => i.Id == joao.Id);
     }
 
     [SkippableFact]
@@ -225,9 +225,9 @@ public class ConversaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixtur
 
         var repo = new ConversaRepository(db);
         (await repo.ListarInboxAsync(empresa, null, null, new(ana), 1, 10))
-            .Should().ContainSingle(i => i.Conversa.Id == daAna.Id);
+            .Should().ContainSingle(i => i.Id == daAna.Id);
         (await repo.ListarInboxAsync(empresa, null, null, Application.Ports.Output.Persistence.Atendimento.FiltroResponsavel.Ninguem, 1, 10))
-            .Should().ContainSingle(i => i.Conversa.Id == livre.Id);
+            .Should().ContainSingle(i => i.Id == livre.Id);
     }
 
     [SkippableFact]

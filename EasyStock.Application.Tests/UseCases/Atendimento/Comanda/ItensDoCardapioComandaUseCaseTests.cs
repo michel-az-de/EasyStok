@@ -278,11 +278,13 @@ public class ItensDoCardapioComandaUseCaseTests
         var arquivado = Item("Nhoque", visivel: true);
         arquivado.Arquivar(DateTime.UtcNow);
         var oculto = Item("Lasanha", visivel: false);
-        _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id).Returns([arquivado, oculto]);
+        _cardapio.GetArquivadosDoStorefrontAsync(_vitrine.Id).Returns([arquivado, oculto]);
 
         var lista = await Sut().ListarForaAsync(EmpresaId);
 
         lista.Should().ContainSingle().Which.CardapioItemId.Should().Be(arquivado.Id);
+        // #1575: o filtro vai no SQL; a rota não carrega mais o cardápio inteiro.
+        await _cardapio.DidNotReceive().GetTodosDoStorefrontAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -32,7 +32,10 @@ public sealed class ReportRunnerBackgroundService(
     private static readonly TimeSpan DefaultLeaseDuration   = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan DefaultHeartbeatPeriod = TimeSpan.FromSeconds(30);
     private const int  DefaultBatchSize              = 20;
-    private const int  DefaultMaxConcurrentInstances = 20;
+    // #1575: cada run em voo segura 1 conexão no stream e abre outra no heartbeat. Com o pool padrão de 10
+    // (Postgres:Pool:Max), 2 runs usam até 4 e sobram 6 para dispatcher, outbox, lembretes e jobs do mesmo
+    // processo. Quem quiser mais sobe Reporting:Runner:MaxConcurrentRunsPerInstance junto com o pool.
+    private const int  DefaultMaxConcurrentInstances = 2;
 
     // Controla paralelismo máximo desta instância.
     private SemaphoreSlim? _instanceSemaphore;

@@ -44,6 +44,15 @@ public sealed class ListarCardapioPublicoUseCase(
 
     public async Task<ListarCardapioPublicoResult> ExecuteAsync(
         ListarCardapioPublicoInput input,
+        CancellationToken ct = default) =>
+        (await ExecuteComItensAsync(input, ct)).Menu;
+
+    /// <summary>
+    /// #1575: o mesmo menu e os itens que ele leu, para a comanda montar as porções sem carregar o
+    /// cardápio de novo na mesma requisição.
+    /// </summary>
+    internal async Task<(ListarCardapioPublicoResult Menu, IReadOnlyList<CardapioItem> Itens)> ExecuteComItensAsync(
+        ListarCardapioPublicoInput input,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -104,7 +113,7 @@ public sealed class ListarCardapioPublicoUseCase(
                 EmValidacao: i.EmValidacao))
             .ToList();
 
-        return new ListarCardapioPublicoResult(dtos, storefront.TituloPublico, storefront.Slug);
+        return (new ListarCardapioPublicoResult(dtos, storefront.TituloPublico, storefront.Slug), itens);
     }
 
     /// <summary>

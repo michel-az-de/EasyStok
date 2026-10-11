@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 
@@ -9,6 +10,7 @@ namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 /// <param name="AguardaResposta">O cliente falou por último e a conversa segue aberta (#1427).</param>
 /// <param name="SlaRespostaMinutos">SLA de primeira resposta da loja (#1427), o mesmo em toda linha: a rota é de
 /// Operador e a configuração é de Admin, então é por aqui que todo atendente lê o prazo.</param>
+/// <param name="PedidoStatus">Status canônico do pedido em andamento (#1575), o mesmo texto da rota do pedido; nulo sem pedido.</param>
 public sealed record ConversaResumoResult(
     Guid Id,
     CanalConversa Canal,
@@ -26,12 +28,14 @@ public sealed record ConversaResumoResult(
     DateTime? UltimaMensagemEntradaEm = null,
     bool AguardaResposta = false,
     int SlaRespostaMinutos = ConfiguracaoAtendimento.SlaRespostaPadraoMinutos,
-    string? AssumidaPorNome = null)
+    string? AssumidaPorNome = null,
+    string? PedidoStatus = null)
 {
-    internal static ConversaResumoResult De(Conversa c, string? ultimaMensagemTexto, DateTime agora, int slaRespostaMinutos, bool? aguardaResposta = null, string? assumidaPorNome = null) => new(
-        c.Id, c.Canal, c.ContatoIdExterno, c.ContatoNome, c.ClienteId, c.Situacao, c.NaoLidas,
-        c.UltimaMensagemEm, ultimaMensagemTexto, c.PedidoEmAndamentoId, c.AssumidaPorUsuarioId, c.DentroDaJanela(agora),
-        c.MotivoEscalada, c.UltimaMensagemEntradaEm, aguardaResposta ?? c.AguardaResposta, slaRespostaMinutos, assumidaPorNome);
+    internal static ConversaResumoResult De(ConversaInboxItem i, DateTime agora, int slaRespostaMinutos) => new(
+        i.Id, i.Canal, i.ContatoIdExterno, i.ContatoNome, i.ClienteId, i.Situacao, i.NaoLidas,
+        i.UltimaMensagemEm, i.UltimaMensagemTexto, i.PedidoEmAndamentoId, i.AssumidaPorUsuarioId,
+        Conversa.DentroDaJanela(i.Canal, i.UltimaMensagemEntradaEm, agora),
+        i.MotivoEscalada, i.UltimaMensagemEntradaEm, i.AguardaResposta, slaRespostaMinutos, i.AssumidaPorNome, i.PedidoStatus);
 }
 
 /// <summary>Mensagem como o console mostra. <c>MidiaChave</c> é interna: o arquivo é servido por endpoint autenticado.</summary>
