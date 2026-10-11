@@ -198,6 +198,26 @@ public class ConfirmarPagamentoPedidoUseCaseTests
         var saldo = f.Cobrancas.Should().ContainSingle(c => c.Provedor == "na_entrega").Subject;
         saldo.Valor.Should().Be(10m);
         saldo.EstaPendente.Should().BeTrue();
+        f.Eventos.Should().Contain(e => e.Tipo == "pagamento_link_antigo", "a dona vê no histórico por que ficou saldo");
+    }
+
+    [Fact]
+    public async Task LinkAntigoPago_ComOLinkNovoJaVencido_TambemRegistra()
+    {
+        // Sem cobrança pendente o alvo era a mais recente (25) e o pagamento de 15 voltava a ficar retido.
+        var f = new CobrancaPedidoFixture();
+        var antiga = CobrancaPedido.CriarOnline(f.EmpresaId, f.Pedido.Id, 15m, "pref-antiga",
+            "https://mp.test/pref-antiga", CobrancaPedidoFixture.Agora.AddMinutes(30), 1, CobrancaPedidoFixture.Agora.AddMinutes(-5));
+        antiga.Cancelar("valor_do_pedido_alterado", CobrancaPedidoFixture.Agora.AddMinutes(-2));
+        f.Cobrancas.Add(antiga);
+        var nova = f.AdicionarOnline(tentativa: 2, referencia: "pref-nova");
+        nova.Cancelar("forma_trocada", CobrancaPedidoFixture.Agora);
+
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, valor: 15m));
+
+        r.Confirmado.Should().BeTrue();
+        antiga.Status.Should().Be(StatusCobrancaPedido.Paga);
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.Valor.Should().Be(15m);
     }
 
     [Fact]

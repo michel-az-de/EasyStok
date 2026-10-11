@@ -207,6 +207,18 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
 
         var pagoEm = input.PagoEm ?? agora;
         var metodo = CobrancaPedido.MapearMetodo(input.MetodoPagamentoExterno, input.TipoPagamentoExterno);
+        // #1615: a dona não escolheu receber o resto na entrega; o histórico do pedido diz por que ficou assim.
+        if (EhLinkSubstituido(alvo) && input.ValorPago < pedido.Total.Valor)
+            await pedidoRepository.AddEventoAsync(new PedidoEvento
+            {
+                Id = Guid.NewGuid(),
+                PedidoId = pedido.Id,
+                Tipo = "pagamento_link_antigo",
+                Detalhes = $"Cliente pagou o link antigo de {input.ValorPago.ToString("F2", Cultura.PtBr)}; o saldo fica para a entrega.",
+                UsuarioNome = "Mercado Pago",
+                Origem = Origem,
+                OcorridoEm = agora,
+            }, ct);
         alvo.MarcarPaga(input.PagamentoExternoId, input.ValorPago, metodo, pagoEm);
         foreach (var outra in cobrancas.Where(c => c.EstaPendente && c.Id != alvo.Id))
             outra.Cancelar($"pago_por_outra_cobranca: {alvo.Id}", agora);
@@ -309,20 +321,19 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             return cobrancas.FirstOrDefault(c => c.Provedor == input.Provedor && c.ReferenciaExterna == input.ReferenciaExterna);
 
         var online = cobrancas.Where(c => c.Provedor == input.Provedor).ToList();
-        var pendente = online.FirstOrDefault(c => c.EstaPendente);
+        var atual = online.FirstOrDefault(c => c.EstaPendente) ?? online.OrderByDescending(c => c.CriadaEm).FirstOrDefault();
+        if (atual is null || input.ValorPago >= atual.Valor) return atual;
 
         // #1615: o link trocado (item a mais, sinal que virou total) continua pagável no Mercado Pago, e o
         // webhook não diz qual link foi pago. Valor menor que a cobrança atual e igual ao de uma substituída
         // é o link antigo: o dinheiro entra nela e o saldo fica para a entrega, em vez de ficar retido.
-        if (pendente is not null && input.ValorPago < pendente.Valor)
-            return online
-                .Where(c => c.Valor == input.ValorPago
-                            && c.Status is StatusCobrancaPedido.Cancelada or StatusCobrancaPedido.Expirada)
-                .OrderByDescending(c => c.CriadaEm)
-                .FirstOrDefault() ?? pendente;
-
-        return pendente ?? online.OrderByDescending(c => c.CriadaEm).FirstOrDefault();
+        return online.Where(c => EhLinkSubstituido(c) && c.Valor == input.ValorPago)
+            .OrderByDescending(c => c.CriadaEm)
+            .FirstOrDefault() ?? atual;
     }
+
+    private static bool EhLinkSubstituido(CobrancaPedido c) =>
+        c.Status is StatusCobrancaPedido.Cancelada or StatusCobrancaPedido.Expirada;
 
     private async Task<ConfirmarPagamentoPedidoResult> RecusarAsync(
         PedidoEntity pedido, CobrancaPedido alvo, string motivo, SituacaoConfirmacaoPagamento situacao, DateTime agora, CancellationToken ct)

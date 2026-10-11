@@ -183,9 +183,12 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     private static string? CortarNoLimite(string? texto)
     {
         var limpo = texto?.Trim();
-        return limpo is { Length: > Mensagem.TextoTamanhoMaximo }
-            ? limpo[..(Mensagem.TextoTamanhoMaximo - 1)] + "…"
-            : limpo;
+        if (limpo is not { Length: > Mensagem.TextoTamanhoMaximo }) return limpo;
+
+        // Não corta um emoji ao meio: a metade solta de um par não grava no banco.
+        var corte = Mensagem.TextoTamanhoMaximo - 1;
+        if (char.IsHighSurrogate(limpo[corte - 1])) corte--;
+        return limpo[..corte] + "…";
     }
 
     private async Task<bool> ProcessarMensagemAsync(Guid empresaId, EntradaWhatsApp entrada, MensagemRecebidaWhatsApp msg, CancellationToken ct)

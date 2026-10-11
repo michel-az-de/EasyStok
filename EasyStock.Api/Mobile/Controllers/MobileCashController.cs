@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using EasyStock.Api.Mobile.Services;
 using EasyStock.Api.Mobile.Services.Linkers;
 using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
 using EasyStock.Domain.Entities.Mobile;
@@ -62,24 +63,29 @@ public class MobileCashController(
         var referencia = CashEntryLinker.ReferenciaDe(entry);
         var jaPromovido = await db.Set<MovimentoCaixa>().IgnoreQueryFilters()
             .Where(m => m.EmpresaId == emp && m.Referencia == referencia)
-            .Select(m => (Guid?)m.Id).FirstOrDefaultAsync(ct);
-        if (jaPromovido is { } existente)
+            .OrderBy(m => m.EstornadoEm != null)
+            .Select(m => new { m.Id, m.EstornadoEm }).FirstOrDefaultAsync(ct);
+        // Religar num movimento estornado mostraria "vinculado" com o valor fora do caixa.
+        if (jaPromovido?.EstornadoEm != null)
+            return BadRequest(new { error = "O movimento deste lançamento foi estornado no caixa. Lance de novo pelo caixa." });
+        if (jaPromovido != null)
         {
-            entry.ErpMovimentoCaixaId = existente;
+            entry.ErpMovimentoCaixaId = jaPromovido.Id;
             await db.SaveChangesAsync(ct);
-            return Ok(new { erpMovimentoCaixaId = existente });
+            return Ok(new { erpMovimentoCaixaId = jaPromovido.Id });
         }
 
         // expense -> saida, income -> entrada
         var tipo = entry.Type?.ToLowerInvariant() == "income" ? "entrada" : "saida";
 
+        // Valor e forma como no vínculo automático (CashEntryLinker.Espelhar).
         var result = await registrarMovUseCase.ExecuteAsync(new RegistrarMovimentoCaixaCommand(
             EmpresaId: entry.EmpresaId.Value,
             Tipo: tipo,
-            Valor: entry.Amount,
+            Valor: Math.Abs(entry.Amount),
             Descricao: entry.Description,
             LojaId: entry.LojaId,
-            Metodo: entry.Metodo,
+            Metodo: FormaPagamentoMobile.ParaErp(entry.Metodo),
             Referencia: referencia,
             DataMovimento: entry.CreatedAt,
             RegistradoPorUserId: ResolveUserId(),

@@ -75,6 +75,24 @@ public sealed class MobileCashPromoverTests : IDisposable
     }
 
     [Fact]
+    public async Task Promover_ComMovimentoEstornado_RecusaEmVezDeReligar()
+    {
+        Semear();
+        await _controller.Promover(Lancamento, null, default);
+        var movimento = _db.Set<MovimentoCaixa>().IgnoreQueryFilters().Single(m => m.EmpresaId == _empresaId);
+        movimento.Estornar(null, "Gerente", "lancado errado");
+        _db.SaveChanges();
+        _db.ChangeTracker.Clear();
+        await _controller.Unlink(Lancamento, null, default);
+
+        var resposta = await _controller.Promover(Lancamento, null, default);
+
+        resposta.Should().BeOfType<BadRequestObjectResult>();
+        Movimentos().Should().ContainSingle();
+        _db.Set<CashEntry>().AsNoTracking().Single().ErpMovimentoCaixaId.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Promover_LancamentoExcluidoNoPwa_Recusa()
     {
         Semear(excluido: true);
