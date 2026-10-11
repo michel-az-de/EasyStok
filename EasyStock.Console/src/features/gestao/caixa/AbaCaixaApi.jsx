@@ -274,7 +274,7 @@ export function AbaCaixaApi() {
 
   if (!dia.aberto && !dia.fechado) {
     return (
-      <div className={css.painel}>
+      <div className={`${css.painel} ${css.abertura}`}>
         {erroDaConsulta}
         <AbrirCaixa dia={dia} ultimo={fechamentos[0] ?? null} executar={executar} enviando={acao.enviando} />
         {avisoDePermissao}
@@ -330,10 +330,17 @@ export function AbaCaixaApi() {
       {erro}
       {avisoDePermissao}
 
-      {dia.aberto && !dia.fechado && !dia.esquecidoAberto && <FormLancamento executar={executar} enviando={acao.enviando} />}
-
-      <Lancamentos dia={dia} executar={executar} podeGerenciar={podeGerenciar} enviando={acao.enviando} />
-      <UltimosFechamentos fechamentos={fechamentos} />
+      <div className={css.areaTrabalho}>
+        {dia.aberto && !dia.fechado && !dia.esquecidoAberto && <FormLancamento executar={executar} enviando={acao.enviando} />}
+        <section className={css.extrato} aria-label="Movimentação do caixa">
+          <div className={css.grupoRegistros}>
+            <Lancamentos dia={dia} executar={executar} podeGerenciar={podeGerenciar} enviando={acao.enviando} />
+          </div>
+          <div className={css.grupoRegistros}>
+            <UltimosFechamentos fechamentos={fechamentos} />
+          </div>
+        </section>
+      </div>
 
       {podeGerenciar && fecharAberto && (
         <ModalFecharCaixa

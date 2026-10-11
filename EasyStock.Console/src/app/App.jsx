@@ -316,7 +316,7 @@ function TelaDaRota({ rota, aoSair }) {
       {rota.tipo === ROTA_HALL
         ? <HallDeModulos fonteApi={FONTE_API} sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />} />
         : (
-          <MolduraDoModulo moduloId={rota.modulo} telaId={rota.tela} fonteApi={FONTE_API} ajuda={<ControleAjuda rota={rota} />} tituloVisivel={!(FONTE_API && rota.modulo === 'cardapio' && rota.tela === 'itens')}>
+          <MolduraDoModulo moduloId={rota.modulo} telaId={rota.tela} fonteApi={FONTE_API} ajuda={<ControleAjuda rota={rota} />}>
             {/* #1440: no modo API, Entregas › Janelas de entrega é o cadastro da S45 (o mesmo de
                 Entregas › Janelas e frete). Feature não importa feature; quem compõe é o App. */}
             {rota.aba && (

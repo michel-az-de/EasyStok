@@ -146,7 +146,7 @@ export function AbaCategoriasApi() {
         </output>
       )}
 
-      <form className={`${css.campos} ${css.cadastroCurto}`} onSubmit={criar}>
+      <form className={`${css.campos} ${css.formulario} ${css.cadastroCurto}`} onSubmit={criar}>
         <CampoTexto
           rotulo="Nome da nova categoria"
           placeholder="Nova categoria (ex.: Massas)"

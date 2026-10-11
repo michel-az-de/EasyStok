@@ -69,9 +69,7 @@ export function AbaCardapioApi({ renderizarEditor }) {
     <div className={css.aba}>
       <header className={css.cabecalho}>
         <div className={css.apresentacao}>
-          <span className={css.marca}><MarcaIcone nome="produto" tamanho={28} /></span>
           <div>
-            <h3>Pratos da casa</h3>
             <p className={css.descricao}>Fotos, informações e o que está disponível hoje.</p>
           </div>
         </div>
@@ -124,8 +122,9 @@ export function AbaCardapioApi({ renderizarEditor }) {
                   </button>
                 ) : <div className={css.abrirFoto}><FotoDoPrato item={item} /></div>}
                 <div className={css.resumo}>
-                  <h4 className={css.nome}>{item.nome}</h4>
-                  <p className={css.detalhe}>{[LINHA[item.linha], item.categoria, item.porcoes > 0 ? `${item.porcoes} ${item.porcoes === 1 ? 'porção' : 'porções'}` : item.porcao].filter(Boolean).join(' · ')}</p>
+                  {item.categoria && <span className={css.categoria}>{item.categoria}</span>}
+                  <h3 className={css.nome}>{item.nome}</h3>
+                  <p className={css.detalhe}>{[LINHA[item.linha], item.porcoes > 0 ? `${item.porcoes} ${item.porcoes === 1 ? 'porção' : 'porções'}` : item.porcao].filter(Boolean).join(' · ')}</p>
                   {(item.arquivado || item.emValidacao || !item.noSite || item.novidadeAte) && (
                     <p className={css.situacao}>{[
                       item.arquivado && 'Fora do cardápio',

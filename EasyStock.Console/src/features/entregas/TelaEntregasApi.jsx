@@ -7,7 +7,7 @@ import css from './dashboard.module.css'
 export function TelaEntregasApi({ tela }) {
   const agenda = tela === 'agenda'
   return (
-    <div className={css.pagina}>
+    <div className={`${css.pagina} ${css.paginaApi}`}>
       <header className={css.topoPagina}>
         <h1>{agenda ? 'Agenda de encomendas' : 'Entregas'}</h1>
       </header>

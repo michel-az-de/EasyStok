@@ -101,18 +101,29 @@ export function AbaProducaoDoDiaApi() {
             const sobra = sobraDaLinha(paraEnviar(l))
             return (
               <li key={l.id} className={`${css.campos} ${css.formulario} ${css.loteProducao}`}>
-                <CampoSelecao disabled={enviando} rotulo="Prato" value={l.sku} onChange={escolherPrato(l.id)}
-                  opcoes={[{ valor: '', rotulo: 'Escolha o prato' }, ...pratos.map((p) => ({ valor: p.sku, rotulo: `${p.nome}${p.porcao ? ` · ${p.porcao}` : ''}` }))]} />
+                <div className={css.cabecalhoFormulario}>
+                  <span className={css.numeroPrato}>{String(indice + 1).padStart(2, '0')}</span>
+                  <div>
+                    <h3 className={css.tituloFormulario}>{pratos.find((p) => p.sku === l.sku)?.nome ?? 'Escolha o prato produzido'}</h3>
+                    <p className={css.detalhe}>Quantidade, peso e validade deste lote.</p>
+                  </div>
+                </div>
+                <div className={css.linhaCompleta}>
+                  <CampoSelecao disabled={enviando} rotulo="Prato" value={l.sku} onChange={escolherPrato(l.id)}
+                    opcoes={[{ valor: '', rotulo: 'Escolha o prato' }, ...pratos.map((p) => ({ valor: p.sku, rotulo: `${p.nome}${p.porcao ? ` · ${p.porcao}` : ''}` }))]} />
+                </div>
                 {(pratos.find((p) => p.sku === l.sku)?.porcoes ?? []).length > 0 && (
-                  <CampoSelecao disabled={enviando} rotulo="Porção" value={l.variacaoId} onChange={escolherPorcao(l.id)}
-                    opcoes={[{ valor: '', rotulo: 'Escolha a porção' }, ...pratos.find((p) => p.sku === l.sku).porcoes.map((v) => ({ valor: v.id, rotulo: v.rotulo }))]} />
+                  <div className={css.linhaCompleta}>
+                    <CampoSelecao disabled={enviando} rotulo="Porção" value={l.variacaoId} onChange={escolherPorcao(l.id)}
+                      opcoes={[{ valor: '', rotulo: 'Escolha a porção' }, ...pratos.find((p) => p.sku === l.sku).porcoes.map((v) => ({ valor: v.id, rotulo: v.rotulo }))]} />
+                  </div>
                 )}
                 <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Porções" placeholder="Porções" value={l.porcoes} onChange={mudar(l.id, 'porcoes')} />
                 <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Peso de cada porção (g)" placeholder="g por porção" value={l.pesoPorPorcaoG} onChange={mudar(l.id, 'pesoPorPorcaoG')} />
                 <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Peso real total (g)" placeholder="Peso real (g)" value={l.pesoRealG} onChange={mudar(l.id, 'pesoRealG')} />
                 <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Validade (dias)" placeholder="Validade (dias)" value={l.validadeDias} onChange={mudar(l.id, 'validadeDias')} />
                 <div className={css.rodapeForm}>
-                  <span className={css.detalhe}>{sobra == null ? '' : sobra < 0 ? 'peso real menor que as porções' : `sobra ${sobra} g`}</span>
+                  <span className={css.detalhe}>{sobra == null ? 'O saldo será atualizado ao confirmar.' : sobra < 0 ? 'Peso real menor que as porções' : `Sobra ${sobra} g`}</span>
                   <Botao className={css.acaoDiscreta} variante="texto" icone="lixeira" aria-label={`Remover prato ${indice + 1} da produção`} disabled={enviando || linhas.length === 1} onClick={() => tirar(l.id)}>Remover prato</Botao>
                 </div>
               </li>

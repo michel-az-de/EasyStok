@@ -107,15 +107,15 @@ export function AbaInsumosApi() {
         </p>
       )}
 
-      <section aria-labelledby="insumos-comprar">
-        <h3 id="insumos-comprar" className={css.nome}>Comprar</h3>
+      <section className={css.secao} aria-labelledby="insumos-comprar">
+        <h3 id="insumos-comprar" className={css.tituloSecao}>Comprar</h3>
         {comprar.length === 0
           ? <p className={css.descricao}>Nenhum insumo abaixo do mínimo.</p>
           : <p className={css.descricao}>{comprar.map((i) => `${i.nome} (tem ${formatar(i.saldo)} ${i.unidade}, mínimo ${i.minimo})`).join(' · ')}</p>}
       </section>
 
-      <section aria-labelledby="insumos-lista">
-        <h3 id="insumos-lista" className={css.nome}>Insumos</h3>
+      <section className={css.secao} aria-labelledby="insumos-lista">
+        <h3 id="insumos-lista" className={css.tituloSecao}>Insumos cadastrados</h3>
         {gestao.insumos.length === 0 ? (
           <p className={css.descricao}>Nenhum insumo cadastrado.{podeEditar && ' Cadastre o molho, o recheio ou a embalagem abaixo.'}</p>
         ) : (
@@ -126,6 +126,7 @@ export function AbaInsumosApi() {
       </section>
 
       {podeEditar ? <form className={`${css.campos} ${css.formulario} ${css.cadastroInsumo}`} onSubmit={cadastrar} aria-label="Cadastrar insumo">
+        <h3 className={`${css.tituloFormulario} ${css.linhaCompleta}`}>Cadastrar insumo</h3>
         <CampoTexto disabled={criando} rotulo="Nome do insumo" placeholder="Ex.: molho sugo" maxLength={180} value={novo.nome} onChange={mudarNovo('nome')} />
         <CampoSelecao disabled={criando} rotulo="Unidade" value={novo.unidade} onChange={mudarNovo('unidade')} opcoes={UNIDADES_INSUMO.map((u) => ({ valor: u, rotulo: u }))} />
         <CampoTexto disabled={criando} inputMode="numeric" rotulo="Mínimo (opcional)" value={novo.minimo} onChange={mudarNovo('minimo')} />

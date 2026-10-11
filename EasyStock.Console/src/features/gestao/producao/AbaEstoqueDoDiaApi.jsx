@@ -127,6 +127,11 @@ export function AbaEstoqueDoDiaApi() {
 
   return (
     <div className={css.aba}>
+      <dl className={css.resumoOperacao} aria-label="Resumo do estoque">
+        <div><dt>Pratos no estoque</dt><dd>{estoque.pratos.length}</dd></div>
+        <div><dt>Lotes com saldo</dt><dd>{lotes.length}</dd></div>
+        <div><dt>Alertas de saldo</dt><dd>{estoque.alertas.length}</dd></div>
+      </dl>
       {estoque.estado === 'erro' && <p className={css.aviso} role="alert">
         O estoque não foi atualizado. Os saldos abaixo podem estar desatualizados. {estoque.erro}
         {' '}<Botao variante="texto" icone="refresh-cw" onClick={estoque.recarregar}>Recarregar estoque</Botao>
@@ -137,8 +142,8 @@ export function AbaEstoqueDoDiaApi() {
         </p>
       )}
 
-      <section aria-labelledby="estoque-alertas">
-        <h3 id="estoque-alertas" className={css.nome}>Venda sem saldo</h3>
+      <section className={css.secao} aria-labelledby="estoque-alertas">
+        <h3 id="estoque-alertas" className={css.tituloSecao}>Venda sem saldo</h3>
         {estoque.alertas.length === 0 ? (
           <p className={css.descricao}>Nenhum prato vendido sem produção lançada.</p>
         ) : (
@@ -168,8 +173,8 @@ export function AbaEstoqueDoDiaApi() {
         )}
       </section>
 
-      <section aria-labelledby="estoque-saldo">
-        <h3 id="estoque-saldo" className={css.nome}>Saldo por prato</h3>
+      <section className={css.secao} aria-labelledby="estoque-saldo">
+        <h3 id="estoque-saldo" className={css.tituloSecao}>Saldo por prato</h3>
         {estoque.pratos.length === 0 ? (
           <p className={css.descricao}>Nenhum prato do cardápio está ligado ao estoque ainda. A primeira produção liga.</p>
         ) : (
@@ -207,8 +212,8 @@ export function AbaEstoqueDoDiaApi() {
         )}
       </section>
 
-      <section aria-labelledby="estoque-lotes">
-        <h3 id="estoque-lotes" className={css.nome}>Lotes ativos</h3>
+      <section className={css.secao} aria-labelledby="estoque-lotes">
+        <h3 id="estoque-lotes" className={css.tituloSecao}>Lotes ativos</h3>
         {lotes.length === 0 ? (
           <p className={css.descricao}>Nenhum lote com saldo.</p>
         ) : (

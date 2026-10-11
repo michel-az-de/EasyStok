@@ -1,17 +1,24 @@
 /* M1 › Itens do cardápio (M1.1, #1481): lista densa com divisórias, mesma família da aba
    Respostas. Uma linha por prato: foto, nome e detalhe, preço, estado, interruptores e ordem. */
-.aba { display: grid; gap: var(--e-4); }
+.aba { display: grid; gap: var(--e-24); min-width: 0; container-type: inline-size; }
+.secao { display: grid; gap: var(--e-3); min-width: 0; }
+.tituloSecao { margin: 0; color: var(--tinta); font-size: var(--t-forte); line-height: var(--lh-compacto); font-weight: 750; letter-spacing: var(--ls-titulo); }
+.resumoOperacao { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding-block: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha); gap: var(--e-4); }
+.resumoOperacao > div { display: flex; flex-direction: column; gap: var(--e-1); min-width: 0; }
+.resumoOperacao > div + div { padding-left: var(--e-4); border-left: var(--b-1) solid var(--linha); }
+.resumoOperacao dt { color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-compacto); }
+.resumoOperacao dd { order: -1; margin: 0; color: var(--tinta); font-size: var(--t-valor); font-weight: 750; line-height: 1.15; font-variant-numeric: tabular-nums; letter-spacing: var(--ls-display); }
 
 .topo { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
-.acoesFormulario { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
+.acoesFormulario { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; padding-top: var(--e-4); border-top: var(--b-1) solid var(--linha); }
 .acoesReceita { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .acoesReceita > :last-child { margin-left: auto; }
-.editorReceita { width: 100%; }
+.editorReceita { width: 100%; padding-top: var(--e-4); border-top: var(--b-1) solid var(--linha); }
 .receita { align-items: flex-start; }
 .receita > .resumo { flex-basis: 50%; }
 .receita > .estados { padding-top: var(--e-1); }
 .receita > .acoesDaReceita { flex-basis: 100%; margin-left: 0; padding-top: 0; }
-.descricao { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); max-width: 64ch; }
+.descricao { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); max-width: 70ch; line-height: var(--lh-corpo); }
 .orientacoes { flex: 1 1 320px; min-width: 0; }
 .ajudaControles { margin-top: var(--e-1); font-size: var(--t-apoio); }
 .ajudaControles summary { width: fit-content; color: var(--marca); cursor: pointer; padding-block: var(--e-2); }
@@ -26,23 +33,26 @@
   background: var(--alerta-pastel); color: var(--alerta); font-size: var(--t-apoio);
 }
 
-.lista { list-style: none; margin: 0; padding: 0; border-top: var(--b-1) solid var(--linha); }
+.lista { list-style: none; margin: 0; padding: 0; border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--papel); overflow: clip; }
 .linha {
-  display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
-  padding: var(--e-3) 0; border-bottom: var(--b-1) solid var(--linha);
+  display: flex; align-items: center; gap: var(--e-3) var(--e-4); flex-wrap: wrap;
+  padding: var(--e-4); min-width: 0;
 }
+.linha + .linha { border-top: var(--b-1) solid var(--linha); }
+.linha:focus-within { background: var(--elevado); }
 .linha[aria-busy='true'] { opacity: .6; }
 
 .foto, .semFoto { width: 48px; height: 48px; border-radius: var(--r-1); flex: none; object-fit: cover; }
 .semFoto { background: var(--linha); }
 
-.resumo { flex: 1 1 220px; min-width: 0; display: grid; gap: var(--e-1); }
-.nome { font-size: var(--t-apoio); font-weight: 700; color: var(--tinta); }
-.detalhe { font-size: var(--t-apoio); color: var(--tinta-3); overflow-wrap: anywhere; line-height: var(--lh-corpo); }
-.preco { font-size: var(--t-apoio); font-weight: 600; color: var(--tinta); font-variant-numeric: tabular-nums; }
+.resumo { flex: 1 1 220px; min-width: 0; display: grid; gap: 6px; }
+.nome { margin: 0; font-size: var(--t-corpo); font-weight: 750; color: var(--tinta); line-height: var(--lh-compacto); overflow-wrap: anywhere; }
+.detalhe { margin: 0; font-size: var(--t-micro); color: var(--tinta-3); overflow-wrap: anywhere; line-height: var(--lh-corpo); }
+.preco { font-size: var(--t-forte); font-weight: 750; color: var(--tinta); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .estados { display: flex; gap: var(--e-2); flex-wrap: wrap; min-width: 0; }
 
-.acoes { display: flex; align-items: center; gap: var(--e-2); margin-left: auto; flex-wrap: wrap; max-width: 100%; }
+.acoes { display: flex; align-items: center; gap: var(--e-1); margin-left: auto; flex-wrap: wrap; max-width: 100%; }
+.acoes > button { font-size: var(--t-micro); }
 .chave {
   display: inline-flex; align-items: center; gap: var(--e-2);
   min-height: var(--toque); font-size: var(--t-apoio); color: var(--tinta);
@@ -54,11 +64,14 @@
 .resumoBusca { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; }
 .campos { display: grid; gap: var(--e-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); align-items: end; width: 100%; }
 .campos > * { min-width: 0; }
-.formulario { padding: var(--e-4); margin: var(--e-3) 0; border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--elevado); box-shadow: var(--brilho); }
+.formulario { padding: var(--e-24); margin: 0; border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--papel); }
+.cabecalhoFormulario { display: flex; align-items: center; gap: var(--e-3); grid-column: 1 / -1; padding-bottom: var(--e-4); margin-bottom: var(--e-2); border-bottom: var(--b-1) solid var(--linha); }
+.numeroPrato { align-self: flex-start; color: var(--marca); font-family: var(--f-papel); font-size: var(--t-titulo); line-height: var(--lh-compacto); }
+.tituloFormulario { margin: 0; color: var(--tinta); font-size: var(--t-forte); font-weight: 750; line-height: var(--lh-compacto); letter-spacing: var(--ls-titulo); }
+.cabecalhoFormulario .detalhe { margin-top: var(--e-1); }
 .listaFormularios { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-3); }
 .listaFormularios > .formulario { margin: 0; }
 .loteProducao { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.loteProducao > :first-child { grid-column: 1 / -1; }
 .linhaReceita { grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); }
 .cadastroCurto { grid-template-columns: minmax(0, 1fr) auto; }
 .cadastroInsumo { grid-template-columns: minmax(0, 2fr) minmax(0, .7fr) minmax(0, 1fr) minmax(0, 1.3fr); }
@@ -68,20 +81,20 @@
 .linhaCompleta { grid-column: 1 / -1; }
 .ajudaEmbalagem { display: block; max-width: 44ch; color: var(--tinta-2); font-size: var(--t-micro); }
 .dataPlanejamento { display: grid; gap: var(--e-2); width: min(100%, 280px); }
-.rodapeForm { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; }
+.rodapeForm { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; margin-top: var(--e-2); padding-top: var(--e-3); border-top: var(--b-1) solid var(--linha); }
 .formulario .acaoDiscreta:disabled, .acoes .acaoDiscreta:disabled { background: transparent; }
 .campoQuantidade { width: 180px; max-width: 100%; }
 .rendimentoDaReceita { grid-template-columns: repeat(2, minmax(0, 220px)); align-items: start; }
 .link { color: var(--marca); text-underline-offset: 3px; }
 
-@media (max-width: 640px) {
+@container (max-width: 640px) {
   .acoesFormulario { display: grid; grid-template-columns: minmax(0, 1fr); }
   .acoesReceita { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
   .acoesReceita > :last-child { grid-column: 1 / -1; margin-left: 0; }
   .acoes { width: 100%; margin-left: 0; padding-top: var(--e-2); }
-  .resumo { flex-basis: calc(100% - 64px); }
+  .linha > .resumo { flex-basis: 100%; }
   .campoQuantidade { width: 100%; }
-  .formulario { padding: var(--e-3); }
+  .formulario, .linha { padding: var(--e-16); }
   .loteProducao, .linhaReceita { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .linhaReceita > :first-child { grid-column: 1 / -1; }
   .cadastroCurto { grid-template-columns: minmax(0, 1fr); }
@@ -89,4 +102,16 @@
   .cadastroInsumo > :first-child, .cadastroInsumo > :nth-child(4) { grid-column: 1 / -1; }
   .ajusteEstoque, .ajusteInsumo, .lancamentoPerda { grid-template-columns: minmax(0, 1fr); }
   .rodapeForm > :only-child { width: 100%; }
+}
+
+@container (max-width: 360px) {
+  .resumoOperacao { gap: var(--e-2); }
+  .resumoOperacao > div + div { padding-left: var(--e-2); }
+  .resumoOperacao dd { font-size: var(--t-titulo); }
+  .resumoOperacao dt { font-size: var(--t-minimo); }
+  .formulario, .linha { padding: var(--e-3); }
+  .loteProducao, .cadastroInsumo { grid-template-columns: minmax(0, 1fr); }
+  .resumo { flex-basis: 100%; }
+  .estados { flex-basis: 100%; }
+  .acoes > button { padding-inline: var(--e-2); }
 }
