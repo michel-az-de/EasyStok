@@ -98,8 +98,18 @@ public class CardapioItem
     public string? FotoUrl { get; private set; }
     public string FotosJson { get; private set; } = "[]";
 
+    public const int LimiteFotosGaleria = 5;
+    public const string MensagemLimiteFotos = "O item já possui o limite de 5 fotos.";
+
     public IReadOnlyList<string> ObterFotosGaleria() =>
         JsonSerializer.Deserialize<string[]>(FotosJson) ?? [];
+
+    /// <summary>
+    /// Legado: capa gravada fora da galeria. Trocar a capa por uma foto nova não tem quem substituir e
+    /// precisa de uma vaga; com a galeria cheia, a troca é recusada em vez de descartar um ângulo.
+    /// </summary>
+    public bool GaleriaSemVagaParaNovaCapa =>
+        ObterFotosGaleria() is { Count: >= LimiteFotosGaleria } fotos && fotos[0] != FotoUrl;
 
     public void AdicionarFotoGaleria(string url, bool preservarCapa = false)
     {
@@ -108,8 +118,8 @@ public class CardapioItem
         if (preservarCapa && fotos.Count == 0 && !string.IsNullOrWhiteSpace(FotoUrl))
             fotos.Add(FotoUrl);
         if (fotos.Contains(url)) return;
-        if (fotos.Count >= 5)
-            throw new RegraDeDominioVioladaException("O item já possui o limite de 5 fotos.");
+        if (fotos.Count >= LimiteFotosGaleria)
+            throw new RegraDeDominioVioladaException(MensagemLimiteFotos);
         fotos.Add(url);
         FotosJson = JsonSerializer.Serialize(fotos);
         if (fotos.Count == 1) FotoUrl = url;
@@ -119,7 +129,12 @@ public class CardapioItem
     public void SubstituirCapaGaleria(string url)
     {
         ValidarUrlFoto(url);
-        var fotos = ObterFotosGaleria().Skip(1).Where(f => f != url).Prepend(url).ToList();
+        // A primeira foto só é a capa antiga quando coincide com FotoUrl. No legado (capa fora da galeria)
+        // ela é um ângulo e fica: a capa nova entra na frente, respeitando o limite.
+        var atuais = ObterFotosGaleria();
+        var fotos = atuais.Skip(atuais.Count > 0 && atuais[0] == FotoUrl ? 1 : 0).Where(f => f != url).Prepend(url).ToList();
+        if (fotos.Count > LimiteFotosGaleria)
+            throw new RegraDeDominioVioladaException(MensagemLimiteFotos);
         FotosJson = JsonSerializer.Serialize(fotos);
         FotoUrl = url;
         AlteradoEm = DateTime.UtcNow;

@@ -253,6 +253,64 @@ public sealed class EstornoOnlinePedidoIntegrationTests(PostgreSqlDatabaseFixtur
         (await db.MovimentosCaixa.CountAsync()).Should().Be(2);
     }
 
+    // #1547: a loja devolveu por Pix direto. A intenção reservada só saía sendo enviada (devolução em dobro).
+    [SkippableFact]
+    public async Task Descartar_intencao_nao_enviada_libera_o_saldo_sem_post_e_sem_caixa()
+    {
+        var input = await Preparar();
+        using var mp = new ProvedorHttp(input.PedidoId);
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(input.EmpresaId);
+        var service = Service(db, mp);
+        (await service.ReservarAsync(input)).EnviadoEm.Should().BeNull();
+        (await service.ConsultarAsync(input.EmpresaId, input.PedidoId)).Pagamentos.Single().Reservado.Should().Be(40);
+
+        await FluentActions.Invoking(() => service.DescartarAsync(input.EmpresaId, input.PedidoId, input.OperacaoId, input.UsuarioId, "Operadora", NivelAcesso.Operador))
+            .Should().ThrowAsync<UnauthorizedAccessException>();
+        await FluentActions.Invoking(() => service.DescartarAsync(Guid.NewGuid(), input.PedidoId, input.OperacaoId, input.UsuarioId, "Outra", NivelAcesso.Admin))
+            .Should().ThrowAsync<CobrancaPedidoNaoEncontradoException>();
+        var descartada = await service.DescartarAsync(input.EmpresaId, input.PedidoId, input.OperacaoId, input.UsuarioId, "Dona teste", NivelAcesso.Gerente);
+
+        descartada.Situacao.Should().Be(PedidoEstornoOnline.Recusado);
+        descartada.EnviadoEm.Should().BeNull();
+        descartada.Detalhe.Should().Contain("Descartada antes do envio");
+        var consulta = await service.ConsultarAsync(input.EmpresaId, input.PedidoId);
+        consulta.Pagamentos.Single().Reservado.Should().Be(0);
+        consulta.Pagamentos.Single().Disponivel.Should().Be(100);
+        // Retomar e o webhook não ressuscitam a intenção descartada.
+        (await service.RetomarAsync(input.EmpresaId, input.PedidoId, input.OperacaoId, NivelAcesso.Admin)).Situacao.Should().Be(PedidoEstornoOnline.Recusado);
+        await service.SincronizarPagamentoAsync(mp.Pagamento());
+        mp.Chaves.Should().BeEmpty("nenhum POST de estorno pode sair de uma intenção descartada");
+        (await db.MovimentosCaixa.CountAsync()).Should().Be(0);
+        var evento = await db.Set<PedidoEvento>().SingleAsync(e => e.PedidoId == input.PedidoId && e.Tipo == "devolucao_online_descartada");
+        evento.UsuarioId.Should().Be(input.UsuarioId);
+        evento.UsuarioNome.Should().Be("Dona teste");
+        evento.Detalhes.Should().Contain(input.OperacaoId.ToString());
+        (await FluentActions.Invoking(() => service.DescartarAsync(input.EmpresaId, input.PedidoId, input.OperacaoId, input.UsuarioId, "Dona teste", NivelAcesso.Gerente))
+            .Should().ThrowAsync<CobrancaPedidoConflitoException>()).Which.Codigo.Should().Be("estorno_nao_pendente");
+    }
+
+    [SkippableFact]
+    public async Task Descartar_intencao_ja_enviada_recusa_e_conserva_a_reserva()
+    {
+        var input = await Preparar();
+        using var mp = new ProvedorHttp(input.PedidoId) { PerderResposta = true };
+        var pendente = await Executar(input, mp);
+        pendente.Situacao.Should().Be(PedidoEstornoOnline.Pendente);
+        pendente.EnviadoEm.Should().NotBeNull();
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(input.EmpresaId);
+        var service = Service(db, mp);
+
+        (await FluentActions.Invoking(() => service.DescartarAsync(input.EmpresaId, input.PedidoId, input.OperacaoId, input.UsuarioId, "Dona teste", NivelAcesso.Gerente))
+            .Should().ThrowAsync<CobrancaPedidoConflitoException>()).Which.Codigo.Should().Be("estorno_ja_enviado");
+
+        var consulta = await service.ConsultarAsync(input.EmpresaId, input.PedidoId);
+        consulta.Estornos.Single().Situacao.Should().Be(PedidoEstornoOnline.Pendente);
+        consulta.Pagamentos.Single().Reservado.Should().Be(40);
+        (await db.Set<PedidoEvento>().AnyAsync(e => e.Tipo == "devolucao_online_descartada")).Should().BeFalse();
+    }
+
     [SkippableFact]
     public async Task Resposta_perdida_reserva_saldo_e_replay_usa_a_mesma_chave()
     {

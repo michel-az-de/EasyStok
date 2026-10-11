@@ -131,6 +131,26 @@ public class EnviarModeloConversaUseCaseTests
         _catalogo.ReceivedCalls().Should().BeEmpty();
     }
 
+    // #1550: recusa levantada antes da rede (empresa sem phone_number_id) é permanente e nada saiu. O "2xx sem
+    // message id" continua incerto (a Meta respondeu e algo pode ter saído), assim como o 5xx.
+    [Theory]
+    [InlineData(true, null, TipoFalhaEnvio.Permanente)]
+    [InlineData(true, 400, TipoFalhaEnvio.Permanente)]
+    [InlineData(false, 429, TipoFalhaEnvio.Permanente)]
+    [InlineData(true, 200, TipoFalhaEnvio.Incerta)]
+    [InlineData(false, 503, TipoFalhaEnvio.Incerta)]
+    [InlineData(false, null, TipoFalhaEnvio.Incerta)]
+    public async Task FalhaDoCanal_ClassificaPeloQuePodeTerSaido(bool ehPermanente, int? statusHttp, TipoFalhaEnvio esperado)
+    {
+        _canal.EnviarModeloAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns<string>(_ => throw new WhatsAppCloudException(0, "falha", ehPermanente, statusHttp));
+        var m = await UseCase.ExecuteAsync(Command);
+        m.Status.Should().Be(StatusMensagem.Falhou);
+        _mensagens.Single().UltimaFalhaEnvio.Should().Be(esperado);
+        (m.Erro!.Contains("incerto")).Should().Be(esperado == TipoFalhaEnvio.Incerta);
+        _mensagens.Single().ProximoReenvioEm.Should().BeNull();
+    }
+
     [Fact]
     public async Task Timeout_ConservaIntencao_NaoAgendaReenvioNemSms_NemRepeteAoRetomar()
     {

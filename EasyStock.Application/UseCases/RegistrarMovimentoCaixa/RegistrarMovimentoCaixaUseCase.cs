@@ -54,27 +54,45 @@ public class RegistrarMovimentoCaixaUseCase(
             if (string.IsNullOrWhiteSpace(cmd.Descricao))
                 throw new UseCaseValidationException("Saída exige descrição (justificativa para auditoria).");
 
-            var dia = await ObterCaixaDoDiaAsync(cmd.EmpresaId, data, cmd.LojaId);
-            var ptBr = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
-            // #1521: saída em dinheiro (sangria, despesa paga da gaveta) sai da gaveta, e nela só há
-            // dinheiro. O saldo esperado soma Pix e cartão: com R$100 na gaveta e R$400 em Pix,
-            // uma sangria de R$450 passava e a gaveta "ficava negativa".
-            if (GavetaCaixa.EhDinheiro(cmd.Metodo))
+            // #1547: duas saídas simultâneas liam o mesmo saldo e as duas passavam do teto. A conferência
+            // e a gravação ficam na mesma transação, atrás da trava do caixa da loja: a segunda só lê o
+            // saldo depois que a primeira gravou.
+            return await uow.ExecuteInTransactionSemRetryAsync(async ct =>
             {
-                var teto = GavetaCaixa.TetoSaidaEmDinheiro(dia);
-                if (cmd.Valor > teto)
-                    throw new UseCaseValidationException(
-                        $"Saída de {cmd.Valor.ToString("C", ptBr)} em dinheiro é maior que o dinheiro na gaveta " +
-                        $"({teto.ToString("C", ptBr)}). Pix e cartão não estão na gaveta.");
-            }
-            else if (cmd.Valor > dia.SaldoEsperado)
-            {
-                throw new UseCaseValidationException(
-                    $"Saída de {cmd.Valor.ToString("C", ptBr)} é maior que o saldo disponível em caixa " +
-                    $"({dia.SaldoEsperado.ToString("C", ptBr)}). O caixa não pode ficar negativo.");
-            }
+                await repo.TravarSaidasAsync(cmd.EmpresaId, cmd.LojaId, ct);
+                await ConferirSaldoParaSaidaAsync(cmd, data);
+                return await GravarAsync(cmd, tipo, origem, dataMov);
+            });
         }
 
+        return await GravarAsync(cmd, tipo, origem, dataMov);
+    }
+
+    private async Task ConferirSaldoParaSaidaAsync(RegistrarMovimentoCaixaCommand cmd, DateOnly data)
+    {
+        var dia = await ObterCaixaDoDiaAsync(cmd.EmpresaId, data, cmd.LojaId);
+        var ptBr = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+        // #1521: saída em dinheiro (sangria, despesa paga da gaveta) sai da gaveta, e nela só há
+        // dinheiro. O saldo esperado soma Pix e cartão: com R$100 na gaveta e R$400 em Pix,
+        // uma sangria de R$450 passava e a gaveta "ficava negativa".
+        if (GavetaCaixa.EhDinheiro(cmd.Metodo))
+        {
+            var teto = GavetaCaixa.TetoSaidaEmDinheiro(dia);
+            if (cmd.Valor > teto)
+                throw new UseCaseValidationException(
+                    $"Saída de {cmd.Valor.ToString("C", ptBr)} em dinheiro é maior que o dinheiro na gaveta " +
+                    $"({teto.ToString("C", ptBr)}). Pix e cartão não estão na gaveta.");
+        }
+        else if (cmd.Valor > dia.SaldoEsperado)
+        {
+            throw new UseCaseValidationException(
+                $"Saída de {cmd.Valor.ToString("C", ptBr)} é maior que o saldo disponível em caixa " +
+                $"({dia.SaldoEsperado.ToString("C", ptBr)}). O caixa não pode ficar negativo.");
+        }
+    }
+
+    private async Task<MovimentoCaixaResult> GravarAsync(RegistrarMovimentoCaixaCommand cmd, string tipo, string origem, DateTime dataMov)
+    {
         var mov = MovimentoCaixa.Criar(cmd.EmpresaId, tipo, cmd.Valor, dataMov, cmd.LojaId);
         mov.Descricao = cmd.Descricao;
         mov.Metodo = cmd.Metodo;

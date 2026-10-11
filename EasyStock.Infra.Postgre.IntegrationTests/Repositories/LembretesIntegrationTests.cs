@@ -292,6 +292,55 @@ public class LembretesIntegrationTests(PostgreSqlDatabaseFixture fixture)
         }
     }
 
+    // #1550: a conversa foi encerrada com o cliente falando por último ("obrigada"). Reabrir dias depois não
+    // pode cobrar essa entrada como SLA estourado; a que chegar depois da reabertura conta normalmente.
+    [SkippableFact]
+    public async Task ReabrirNaoCobraAEntradaAntigaMasCobraAQueChegaDepois()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var entradaAntiga = DateTimeOffset.Parse("2026-10-05T14:00:00-03:00").UtcDateTime;
+        var reabertaEm = DateTimeOffset.Parse("2026-10-09T10:00:00-03:00").UtcDateTime;
+        var casa = Empresa.Criar("Reabertura sem cobrança", null);
+        var conversa = Conversa.Abrir(casa.Id, "5511999990155", entradaAntiga, "Cliente reaberta");
+        conversa.RegistrarEntrada(entradaAntiga);
+        conversa.Encerrar(entradaAntiga.AddMinutes(30));
+        var obrigada = Mensagem.Entrada(casa.Id, conversa.Id, entradaAntiga, TipoConteudoMensagem.Texto, "obrigada");
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.Empresas.Add(casa);
+            db.AtendimentoConversas.Add(conversa);
+            db.AtendimentoMensagens.Add(obrigada);
+            await db.SaveChangesAsync();
+        }
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(casa.Id);
+            var reaberta = await new ReabrirConversaUseCase(new ConversaRepository(db),
+                    new EasyStock.Infra.Postgre.Repositories.ClienteRepository(db), db, new RelogioFixo(reabertaEm))
+                .ExecuteAsync(new AcaoConversaCommand(casa.Id, Guid.NewGuid(), conversa.Id, "Atendente"));
+            reaberta.Situacao.Should().Be(SituacaoConversa.Assumida);
+        }
+
+        await RodarAvaliadorAsync(reabertaEm.AddMinutes(1));
+        await using (var db = fixture.CreateDbContext())
+            (await db.Lembretes.IgnoreQueryFilters().CountAsync(l => l.EmpresaId == casa.Id)).Should().Be(0);
+
+        var nova = Mensagem.Entrada(casa.Id, conversa.Id, reabertaEm.AddMinutes(5), TipoConteudoMensagem.Texto, "ainda tem nhoque?");
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.AtendimentoMensagens.Add(nova);
+            await db.SaveChangesAsync();
+        }
+        await RodarAvaliadorAsync(reabertaEm.AddMinutes(20));
+        await using (var db = fixture.CreateDbContext())
+        {
+            var aviso = await db.Lembretes.IgnoreQueryFilters().SingleAsync(l => l.EmpresaId == casa.Id);
+            aviso.Tipo.Should().Be(TipoLembrete.ClienteSemResposta);
+            aviso.Referencia.Should().Be(nova.Id.ToString());
+            aviso.ConversaId.Should().Be(conversa.Id);
+        }
+    }
+
     private async Task RodarAvaliadorAsync(DateTime instante)
     {
         await using var db = fixture.CreateDbContext();

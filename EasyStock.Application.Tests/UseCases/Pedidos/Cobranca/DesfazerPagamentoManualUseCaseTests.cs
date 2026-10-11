@@ -25,6 +25,40 @@ public class DesfazerPagamentoManualUseCaseTests
         await f.Uow.DidNotReceive().CommitAsync();
     }
 
+    // #1547: mesma guarda do estorno manual, no dia operacional do recebimento.
+    [Fact]
+    public async Task Recebimento_de_dia_com_caixa_fechado_nao_pode_ser_desfeito()
+    {
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Aguardando);
+        f.AdicionarPagamento(referencia: null);
+        var dia = EasyStock.Application.Common.HorarioBrasil.DataOperacional(f.Pedido.Pagamentos.Single().PagoEm);
+        f.CaixaRepo.GetFechamentoDoDiaAsync(f.EmpresaId, dia, f.Pedido.LojaId)
+            .Returns(EasyStock.Domain.Entities.FechamentoCaixa.Criar(f.EmpresaId, dia, 0, 0, 25, 0, 0, f.Pedido.LojaId));
+
+        await FluentActions.Invoking(() => f.Desfazer().ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "Engano")))
+            .Should().ThrowAsync<UseCaseValidationException>().WithMessage("*já foi fechado*devolução*");
+
+        f.Pedido.Pagamentos.Should().ContainSingle();
+        await f.Uow.DidNotReceive().CommitAsync();
+    }
+
+    // #1547: recebimento lançado DEPOIS de o Caixa fechar não entrou no retrato do dia e segue desfazível.
+    [Fact]
+    public async Task Recebimento_lancado_depois_do_fechamento_pode_ser_desfeito()
+    {
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Aguardando);
+        f.AdicionarPagamento(referencia: null);
+        var pagoEm = f.Pedido.Pagamentos.Single().PagoEm;
+        var dia = EasyStock.Application.Common.HorarioBrasil.DataOperacional(pagoEm);
+        var fechamento = EasyStock.Domain.Entities.FechamentoCaixa.Criar(f.EmpresaId, dia, 0, 0, 0, 0, 0, f.Pedido.LojaId);
+        fechamento.FechadoEm = pagoEm.AddMinutes(-30);
+        f.CaixaRepo.GetFechamentoDoDiaAsync(f.EmpresaId, dia, f.Pedido.LojaId).Returns(fechamento);
+
+        await f.Desfazer().ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "Engano"));
+
+        f.Pedido.Pagamentos.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task VoltaAguardandoPagamento()
     {

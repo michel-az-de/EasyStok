@@ -77,6 +77,45 @@ public class PedidoAvaliacaoTests
         aval.RespondidaEmPorBaba.Should().BeNull();
     }
 
+    // ── Factory: FotoUrl (#1547) ───────────────────────────────────────
+
+    [Theory]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("data:image/png;base64,AAAA")]
+    [InlineData("ftp://cdn.exemplo.com/foto.jpg")]
+    [InlineData("/files/foto.jpg")]
+    [InlineData("foto.jpg")]
+    [InlineData("//cdn.exemplo.com/foto.jpg")]
+    public void Criar_rejeita_foto_que_nao_e_url_http_absoluta(string fotoUrl)
+    {
+        var act = () => PedidoAvaliacao.Criar(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 5, null, true, fotoUrl, DateTime.UtcNow);
+
+        act.Should().Throw<RegraDeDominioVioladaException>().WithMessage("*URL da foto*");
+    }
+
+    [Fact]
+    public void Criar_rejeita_foto_maior_que_a_coluna()
+    {
+        var url = "https://cdn.exemplo.com/" + new string('a', PedidoAvaliacao.FotoUrlMax);
+
+        var act = () => PedidoAvaliacao.Criar(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 5, null, true, url, DateTime.UtcNow);
+
+        act.Should().Throw<RegraDeDominioVioladaException>().WithMessage("*URL da foto*");
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("", null)]
+    [InlineData("   ", null)]
+    [InlineData(" https://cdn.exemplo.com/a/foto.webp?v=2 ", "https://cdn.exemplo.com/a/foto.webp?v=2")]
+    [InlineData("http://cdn.exemplo.com/foto.jpg", "http://cdn.exemplo.com/foto.jpg")]
+    public void Criar_aceita_sem_foto_e_url_http_absoluta(string? fotoUrl, string? esperado)
+    {
+        var aval = PedidoAvaliacao.Criar(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 5, null, true, fotoUrl, DateTime.UtcNow);
+
+        aval.FotoUrl.Should().Be(esperado);
+    }
+
     // ── Factory: validações de Estrelas ───────────────────────────────
 
     [Theory]

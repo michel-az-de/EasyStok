@@ -111,7 +111,8 @@ public class PedidosControllerTests
 
         var removePag = new RemoverPagamentoPedidoUseCase(
             _pedidoRepo, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>(), _uow,
-            NullLogger<RemoverPagamentoPedidoUseCase>.Instance, QuitacaoPedidoTeste.Criar(_pedidoRepo));
+            NullLogger<RemoverPagamentoPedidoUseCase>.Instance, QuitacaoPedidoTeste.Criar(_pedidoRepo),
+            Substitute.For<ICaixaRepository>());
 
         var criarCliente = new CriarClienteUseCase(
             _clienteRepo, _uow, NullLogger<CriarClienteUseCase>.Instance);
@@ -225,6 +226,40 @@ public class PedidosControllerTests
             new RegistrarPagamentoPedidoCommand(_empresaId, pedido.Id, "pix", 100m, RegistradoPorNome: "Mercado Pago"));
 
         await _pedidoRepo.Received(1).AddPagamentoAsync(Arg.Is<PedidoPagamento>(p => p.RegistradoPorNome == "Ana"));
+    }
+
+    // #1547: a venda de balcão levava criadoPorNome do corpo para o autor do pagamento.
+    [Theory]
+    [InlineData("Ana", "Ana")]
+    [InlineData(null, "Nome do corpo")]
+    public async Task CreateBalcao_AutorDoPagamentoVemDaSessao_ECorpoSoValeSemSessao(string? nomeDaSessao, string esperado)
+    {
+        _uow.SetupExecuteInTransactionSemRetry<EasyStock.Application.UseCases.Pedidos.PedidoResult?>();
+        _uow.SetupExecuteInTransactionSemRetry<FinalizarVendaBalcaoResult>();
+        _clienteRepo.SearchAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<int>())
+            .Returns(Task.FromResult<IEnumerable<Cliente>>([]));
+        var produtoId = Guid.NewGuid();
+        _produtoRepo.GetByIdAsync(_empresaId, produtoId)
+            .Returns(new Produto { Id = produtoId, EmpresaId = _empresaId, Nome = "Marmita", Status = StatusProduto.Ativo });
+        Pedido? criado = null;
+        await _pedidoRepo.AddAsync(Arg.Do<Pedido>(x => criado = x));
+        _pedidoRepo.GetByIdWithDetailsAsync(_empresaId, Arg.Any<Guid>()).Returns(_ => criado);
+        _pedidoRepo.GetByIdAsync(_empresaId, Arg.Any<Guid>()).Returns(_ => criado);
+        var claims = nomeDaSessao is null ? [] : new[] { new System.Security.Claims.Claim("nome", nomeDaSessao) };
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
+            {
+                User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(claims, "test"))
+            }
+        };
+
+        await _controller.CreateBalcao(new FinalizarVendaBalcaoCommand(_empresaId,
+            ClienteNomeAdHoc: "Cliente do balcão",
+            Itens: [new FinalizarVendaBalcaoItemInput("Marmita", 1, 30m, ProdutoId: produtoId)],
+            Pagou: true, FormaPagamento: "pix", CriadoPorNome: "Nome do corpo"));
+
+        await _pedidoRepo.Received(1).AddPagamentoAsync(Arg.Is<PedidoPagamento>(x => x.RegistradoPorNome == esperado));
     }
 
     // ── GetById ───────────────────────────────────────────────────────────────

@@ -14,5 +14,8 @@ public interface IEstornosOnlineService
     Task<PedidoEstornoOnline> SolicitarAsync(SolicitarEstornoOnlineInput input, CancellationToken ct = default);
     Task<PedidoEstornoOnline> ReservarAsync(SolicitarEstornoOnlineInput input, CancellationToken ct = default);
     Task<PedidoEstornoOnline> RetomarAsync(Guid empresaId, Guid pedidoId, Guid operacaoId, NivelAcesso nivel, CancellationToken ct = default);
+    /// <summary>Encerra sem enviar a intenção pendente que ainda não foi ao provedor (409 se já enviada).</summary>
+    Task<PedidoEstornoOnline> DescartarAsync(Guid empresaId, Guid pedidoId, Guid operacaoId, Guid? usuarioId,
+        string? usuarioNome, NivelAcesso nivel, CancellationToken ct = default);
     Task<bool> SincronizarPagamentoAsync(PagamentoMercadoPago pagamento, CancellationToken ct = default);
 }

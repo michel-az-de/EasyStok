@@ -1,3 +1,4 @@
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AbrirCaixa;
@@ -20,6 +21,9 @@ public class CaixaUseCasesTests
 {
     private readonly ICaixaRepository _repo = Substitute.For<ICaixaRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+
+    // #1547: a saída interativa roda dentro de ExecuteInTransactionSemRetryAsync.
+    public CaixaUseCasesTests() => _uow.SetupExecuteInTransactionSemRetry<MovimentoCaixaResult>();
 
     // ════════════════════════════════════════════════════════════════════
     // AbrirCaixa
@@ -366,6 +370,37 @@ public class CaixaUseCasesTests
 
         await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*saldo*");
         await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    // #1547: a saída interativa confere o saldo e grava atrás da trava do caixa, na mesma transação.
+    // A corrida em si é provada contra Postgres em SangriaSimultaneaIntegrationTests.
+    [Fact]
+    public async Task RegistrarMovimento_SaidaInterativa_TravaOCaixaAntesDeLerOSaldo_EMobileNaoTrava()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), lojaId).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), lojaId)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m, null, lojaId) });
+        var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
+
+        await useCase.ExecuteAsync(new RegistrarMovimentoCaixaCommand(empresaId, "saida", 80m,
+            Descricao: "Sangria", LojaId: lojaId, Metodo: "dinheiro"));
+
+        Received.InOrder(() =>
+        {
+            _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<MovimentoCaixaResult>>>(), Arg.Any<CancellationToken>());
+            _repo.TravarSaidasAsync(empresaId, lojaId, Arg.Any<CancellationToken>());
+            _repo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), lojaId);
+            _repo.AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m => m.Tipo == "saida" && m.Valor == 80m));
+        });
+
+        _repo.ClearReceivedCalls();
+        await useCase.ExecuteAsync(new RegistrarMovimentoCaixaCommand(empresaId, "saida", 80m, LojaId: lojaId, Origem: "mobile"));
+        await _repo.DidNotReceive().TravarSaidasAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+        await _repo.Received(1).AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
     }
 
     // ─── #1521: saída em dinheiro respeita a gaveta, não o saldo com Pix e cartão ───

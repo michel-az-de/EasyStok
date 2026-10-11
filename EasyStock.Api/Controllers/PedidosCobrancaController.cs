@@ -56,6 +56,13 @@ public sealed class PedidosCobrancaController(
     public Task<IActionResult> RetomarEstornoOnline(Guid id, Guid operacaoId, [FromQuery] Guid? empresaId, CancellationToken ct) =>
         ExecutarAsync(empresaId, async emp => DataOk(await estornosOnline.RetomarAsync(emp, id, operacaoId, currentUser.Nivel, ct)));
 
+    [SwaggerOperation(Summary = "Descartar solicitação de estorno online ainda não enviada ao Mercado Pago")]
+    [HttpPost("{id}/estornos-online/{operacaoId:guid}/descartar")]
+    [Authorize(Policy = "Gerente")]
+    public Task<IActionResult> DescartarEstornoOnline(Guid id, Guid operacaoId, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await estornosOnline.DescartarAsync(
+            emp, id, operacaoId, UsuarioId(), User.FindFirst("nome")?.Value, currentUser.Nivel, ct)));
+
     [HttpGet("{id}/estornos-manuais")]
     [Authorize(Policy = "Operador")]
     public Task<IActionResult> EstornosManuais(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>

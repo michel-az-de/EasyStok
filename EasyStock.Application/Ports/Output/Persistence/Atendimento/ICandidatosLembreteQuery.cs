@@ -5,9 +5,12 @@ namespace EasyStock.Application.Ports.Output.Persistence.Atendimento;
 /// <summary>Pedido parado em <c>AguardandoPagamento</c> (S43).</summary>
 public sealed record PedidoSemBaixa(Guid EmpresaId, Guid PedidoId, string? ClienteNome, Guid? ConversaId);
 
+/// <param name="PreparoIniciado">
+/// O pedido já está em preparo, pronto ou a caminho (#1550): o marco de início previsto deixou de valer.
+/// </param>
 public sealed record PedidoAgendadoLembrete(
     Guid EmpresaId, Guid PedidoId, string? ClienteNome, DateTime EntregaEm, DateTime? InicioPrevistoEm,
-    Guid? ConversaId, ExpedienteLoja? Expediente);
+    Guid? ConversaId, ExpedienteLoja? Expediente, bool PreparoIniciado = false);
 
 /// <summary>
 /// Conversa assumida cuja última mensagem que conta (nota interna do sistema não conta) é do
