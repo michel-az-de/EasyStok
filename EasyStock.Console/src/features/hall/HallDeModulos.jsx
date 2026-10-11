@@ -83,7 +83,7 @@ export function HallDeModulos(props) {
   return <HallPersonalizado key={chavePreferencia ?? 'visita'} {...props} chavePreferencia={chavePreferencia} />
 }
 
-function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, chavePreferencia }) {
+function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, painel = null, chavePreferencia }) {
   const { permite, aoSair, notificacoes } = useAcessoModulos()
   const [busca, setBusca] = useState('')
   const [organizar, setOrganizar] = useState(false)
@@ -155,6 +155,8 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, chav
             {buscando && <Botao variante="texto" onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>}
           </div>
         </div>
+        {/* #1608: o que fazer agora vem antes da lista de módulos. Quem compõe é o App. */}
+        {!buscando && painel}
         {!buscando && favoritos.length > 0 && <nav className={css.rotina} aria-label="Favoritos da sua rotina">
           <div className={css.cabecaRotina}><span className={css.rotinaTitulo}>Sua rotina</span><span className={css.rotinaApoio}>Um toque para começar</span></div>
           <ul className={css.linksRotina}>{favoritos.map((modulo) => <li key={modulo.id}>

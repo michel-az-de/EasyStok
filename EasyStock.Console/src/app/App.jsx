@@ -40,6 +40,9 @@ import { PainelGaleria } from '../features/anexos/PainelGaleria'
 import { ModalAutomacoes } from '../features/automacoes/ModalAutomacoes'
 import { ModalGestao, PainelDeAjuste } from '../features/gestao/ModalGestao'
 import { HallDeModulos } from '../features/hall/HallDeModulos'
+import { PainelAgora } from '../features/agora/PainelAgora'
+import { filasDoAgora } from '../dominio/agora'
+import { hashDoModulo } from '../dominio/modulos'
 import { MolduraDoModulo } from '../features/hall/MolduraDoModulo'
 import { GavetaEntregas } from '../features/entregas/GavetaEntregas'
 import { TelaEntregas } from '../features/entregas/TelaEntregas'
@@ -316,7 +319,7 @@ function TelaDaRota({ rota, aoSair }) {
   return (
     <>
       {rota.tipo === ROTA_HALL
-        ? <HallDeModulos fonteApi={FONTE_API} sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />} />
+        ? <HallDeModulos fonteApi={FONTE_API} sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />} painel={<AgoraDoHall />} />
         : (
           <MolduraDoModulo moduloId={rota.modulo} telaId={rota.tela} fonteApi={FONTE_API} ajuda={<ControleAjuda rota={rota} />}>
             {/* #1440: no modo API, Entregas › Janelas de entrega é o cadastro da S45 (o mesmo de
@@ -331,6 +334,22 @@ function TelaDaRota({ rota, aoSair }) {
       {FONTE_API && <GestoLoja />}
       <FaixaApi aoSair={aoSair} />
     </>
+  )
+}
+
+// #1608: painel "Agora" da entrada. No modo API a lista de conversas chega sem o pedido
+// (`traducaoConversas.js`), então Cozinhar e Despachar só aparecem na demonstração: fila que
+// marcasse zero com pedido no fogo mentiria. Responder vale nos dois modos.
+function AgoraDoHall() {
+  const { conversas, agora, aberta, horarioDaLoja, automaticoPausado } = useAtendimento()
+  const { selecionar } = useAcoes()
+  const { janelas } = useCatalogo()
+  const { permite } = useAcessoModulos()
+  const filas = filasDoAgora(conversas, agora, { automaticoPausado, aberta, janelas, expediente: horarioDaLoja })
+  return (
+    <PainelAgora filas={filas}
+      podeVer={{ atendimento: permite('atendimento'), cozinha: !FONTE_API && permite('cozinha'), entregas: !FONTE_API && permite('entregas') }}
+      aoAbrirConversa={(id) => { selecionar(id); window.location.hash = hashDoModulo('atendimento', 'balcao') }} />
   )
 }
 
