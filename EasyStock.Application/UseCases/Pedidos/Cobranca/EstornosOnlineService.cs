@@ -84,6 +84,31 @@ public sealed class EstornosOnlineService(IPedidoRepository pedidos, IEstornoOnl
         return operacao.Situacao == PedidoEstornoOnline.Pendente ? await ProcessarAsync(operacao, ct) : operacao;
     }
 
+    // #1547: a intenção ainda não enviada só saía sendo enviada. Com a devolução feita por fora
+    // (Pix direto), retomar mandava o POST e devolvia em dobro. O lock do pedido é o mesmo do envio:
+    // quem marca EnviadoEm primeiro vence, e o descarte perde com 409.
+    public Task<PedidoEstornoOnline> DescartarAsync(Guid empresaId, Guid pedidoId, Guid operacaoId, Guid? usuarioId,
+        string? usuarioNome, NivelAcesso nivel, CancellationToken ct = default)
+    {
+        ExigirGerente(nivel);
+        return ComPedidoTravadoAsync(empresaId, pedidoId, async (_, estornos, token) =>
+        {
+            var atual = estornos.SingleOrDefault(e => e.Id == operacaoId)
+                ?? throw Conflito("estorno_nao_encontrado", "Solicitação não encontrada neste pedido.");
+            if (atual.Situacao != PedidoEstornoOnline.Pendente)
+                throw Conflito("estorno_nao_pendente", "Esta solicitação já foi encerrada.");
+            if (atual.EnviadoEm is not null)
+                throw Conflito("estorno_ja_enviado", "A solicitação já foi enviada ao Mercado Pago e não pode ser descartada. Confira o estorno pendente.");
+            atual.Situacao = PedidoEstornoOnline.Recusado;
+            atual.Detalhe = "Descartada antes do envio. Nenhuma solicitação foi feita ao Mercado Pago.";
+            await repo.AtualizarAsync(atual, token);
+            await pedidos.AddEventoAsync(new PedidoEvento { Id = Guid.NewGuid(), PedidoId = atual.PedidoId,
+                Tipo = "devolucao_online_descartada", OcorridoEm = Agora, UsuarioId = usuarioId, UsuarioNome = usuarioNome,
+                Origem = "web", Detalhes = $"Solicitação de devolução descartada antes do envio: {atual.Valor.ToString("C", Cultura.PtBr)}. Motivo original: {atual.Motivo}. Operação: {atual.Id}" });
+            return atual;
+        }, ct);
+    }
+
     private async Task<PedidoEstornoOnline> ProcessarAsync(PedidoEstornoOnline operacao, CancellationToken ct)
     {
         var primeiroEnvio = false;
