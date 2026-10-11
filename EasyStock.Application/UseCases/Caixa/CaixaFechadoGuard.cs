@@ -17,4 +17,16 @@ public static class CaixaFechadoGuard
         if (await caixa.GetFechamentoDoDiaAsync(empresaId, HorarioBrasil.DataOperacional(instanteUtc), lojaId) is not null)
             throw new UseCaseValidationException(mensagem);
     }
+
+    /// <summary>
+    /// Remover ou desfazer um recebimento: só recusa o que o fechamento do dia retratou. Recebimento
+    /// lançado depois de o Caixa fechar não entrou no retrato e continua podendo ser desfeito.
+    /// </summary>
+    public static async Task ExigirRecebimentoForaDoRetratoAsync(ICaixaRepository caixa, Guid empresaId,
+        DateTime pagoEmUtc, Guid? lojaId)
+    {
+        var fechamento = await caixa.GetFechamentoDoDiaAsync(empresaId, HorarioBrasil.DataOperacional(pagoEmUtc), lojaId);
+        if (fechamento is not null && pagoEmUtc <= fechamento.FechadoEm)
+            throw new UseCaseValidationException(RecebimentoEmDiaFechado);
+    }
 }

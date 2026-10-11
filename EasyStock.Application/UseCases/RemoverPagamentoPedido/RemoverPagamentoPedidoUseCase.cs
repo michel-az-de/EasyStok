@@ -55,8 +55,7 @@ public class RemoverPagamentoPedidoUseCase(
                 throw new UseCaseValidationException("O recebimento possui devolução confirmada e deve permanecer no histórico.");
 
             // #1547: o recebimento já entrou no retrato de um dia fechado. Mesma guarda da devolução.
-            await CaixaFechadoGuard.ExigirDiaAbertoAsync(caixa, cmd.EmpresaId, pag.PagoEm, pedido.LojaId,
-                CaixaFechadoGuard.RecebimentoEmDiaFechado);
+            await CaixaFechadoGuard.ExigirRecebimentoForaDoRetratoAsync(caixa, cmd.EmpresaId, pag.PagoEm, pedido.LojaId);
 
             // Remocao rastreada (mesmo motivo do RemoverItemPedidoUseCase, #768): FK
             // PedidoPagamento->Pedido required+Cascade, o DELETE participa do SaveChanges

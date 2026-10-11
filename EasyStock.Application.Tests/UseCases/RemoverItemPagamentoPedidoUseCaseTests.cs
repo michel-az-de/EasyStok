@@ -114,6 +114,28 @@ public class RemoverItemPagamentoPedidoUseCaseTests
         await _uow.DidNotReceive().CommitAsync();
     }
 
+    // #1547: recebimento lançado DEPOIS de o Caixa fechar não entrou no retrato do dia e segue removível.
+    [Fact]
+    public async Task RemoverPagamento_LancadoDepoisDoFechamento_ContinuaRemovivel()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = Pedido.Criar(empresaId);
+        var pagoEm = new DateTime(2026, 10, 8, 23, 30, 0, DateTimeKind.Utc);
+        var pag = new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "dinheiro", Valor = 30m, PagoEm = pagoEm };
+        pedido.Pagamentos.Add(pag);
+        _repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        var dia = new DateOnly(2026, 10, 8);
+        var fechamento = FechamentoCaixa.Criar(empresaId, dia, 0, 0, 0, 0, 0, pedido.LojaId);
+        fechamento.FechadoEm = pagoEm.AddMinutes(-30);
+        _caixa.GetFechamentoDoDiaAsync(empresaId, dia, pedido.LojaId).Returns(fechamento);
+
+        await PagUC().ExecuteAsync(new RemoverPagamentoPedidoCommand(empresaId, pedido.Id, pag.Id,
+            NivelSolicitante: NivelAcesso.Admin));
+
+        pedido.Pagamentos.Should().BeEmpty();
+        await _uow.Received(1).CommitAsync();
+    }
+
     // #1540: a rota antiga de remoção não tinha regra de dinheiro nenhuma.
     [Fact]
     public async Task RemoverPagamento_DoMercadoPago_Recusa_PorqueSeDevolvePeloEstorno()

@@ -79,8 +79,7 @@ public sealed class DesfazerPagamentoManualUseCase(
                 "O preparo já começou (ou o pedido não está na fila): o pagamento não se desfaz por aqui.");
 
         // #1547: o recebimento já entrou no retrato de um dia fechado. Mesma guarda da devolução.
-        await CaixaFechadoGuard.ExigirDiaAbertoAsync(caixa, input.EmpresaId, pagamento.PagoEm, pedido.LojaId,
-            CaixaFechadoGuard.RecebimentoEmDiaFechado);
+        await CaixaFechadoGuard.ExigirRecebimentoForaDoRetratoAsync(caixa, input.EmpresaId, pagamento.PagoEm, pedido.LojaId);
 
         // Remoção rastreada (mesmo padrão de RemoverPagamentoPedidoUseCase, #768): o DELETE entra no commit.
         pedido.Pagamentos.Remove(pagamento);
