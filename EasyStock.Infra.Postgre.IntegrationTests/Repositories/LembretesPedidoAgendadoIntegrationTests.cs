@@ -68,13 +68,17 @@ public class LembretesPedidoAgendadoIntegrationTests(PostgreSqlDatabaseFixture f
         await using (var db = fixture.CreateDbContext())
         {
             var avisos = await db.Lembretes.IgnoreQueryFilters().Where(l => l.PedidoId == pedido.Id).ToListAsync();
-            avisos.Should().HaveCount(2).And.OnlyContain(l => l.AvisadoEm != null && l.EstaAberto);
+            avisos.Should().HaveCount(2).And.OnlyContain(l => l.AvisadoEm != null);
+            // #1550: o início previsto cai no dia da entrega, quando "entrega amanhã" já é falso. A véspera
+            // fecha sozinha e só o início segue aberto.
+            avisos.Should().ContainSingle(l => l.EstaAberto).Which.Referencia.Should().Contain(":inicio:");
+            avisos.Should().ContainSingle(l => !l.EstaAberto).Which.Referencia.Should().Contain(":vespera:");
             (await db.Lembretes.IgnoreQueryFilters().AnyAsync(l => l.PedidoId == cancelado.Id || l.PedidoId == concluido.Id)).Should().BeFalse();
             var salvo = await db.Pedidos.IgnoreQueryFilters().SingleAsync(p => p.Id == pedido.Id);
             salvo.Status = StatusPedidoMapper.Cancelado;
             await db.SaveChangesAsync();
         }
-        (await RodarAsync(pedido.InicioPrevistoEm.Value.AddMinutes(1), publisher)).Resolvidos.Should().Be(2);
+        (await RodarAsync(pedido.InicioPrevistoEm.Value.AddMinutes(1), publisher)).Resolvidos.Should().Be(1);
         await using (var db = fixture.CreateDbContext())
             (await db.Lembretes.IgnoreQueryFilters().Where(l => l.PedidoId == pedido.Id).ToListAsync())
                 .Should().OnlyContain(l => l.Situacao == SituacaoLembrete.Concluido);
@@ -129,6 +133,36 @@ public class LembretesPedidoAgendadoIntegrationTests(PostgreSqlDatabaseFixture f
         }
         (await RodarAsync(Agora.AddHours(1))).Criados.Should().Be(0);
         (await RodarAsync(Agora.AddMinutes(90))).Criados.Should().Be(2);
+    }
+
+    // #1550: o marco de início previsto só vale antes do preparo; quem diz em que fase o pedido está é a consulta.
+    [SkippableFact]
+    public async Task PreparoIniciadoVemDoStatusDoPedido()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var casa = Empresa.Criar("Preparo iniciado lembrete", null);
+        string[] antes = [StatusPedidoMapper.AguardandoPagamento, StatusPedidoMapper.AguardandoAprovacaoBaba,
+            StatusPedidoMapper.AprovadoBaba, StatusPedidoMapper.Aguardando];
+        string[] depois = [StatusPedidoMapper.Preparando, StatusPedidoMapper.Pronto, StatusPedidoMapper.SaiuParaEntrega];
+        var naFila = antes.Select(s => NovoPedido(casa.Id, s, Agora.AddDays(5))).ToList();
+        var iniciados = depois.Select(s => NovoPedido(casa.Id, s, Agora.AddDays(5))).ToList();
+        // As outras provas da classe rodam o avaliador para todas as empresas: o pedido aguardando pagamento
+        // fica fora do alcance do aviso de pagamento sem baixa delas.
+        foreach (var pedido in naFila) pedido.AlteradoEm = Agora.AddYears(1);
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.Empresas.Add(casa);
+            db.Pedidos.AddRange(naFila.Concat(iniciados));
+            await db.SaveChangesAsync();
+        }
+        await using (var db = fixture.CreateDbContext())
+        {
+            using var bypass = db.UseRowLevelSecurityBypass();
+            var candidatos = (await new CandidatosLembreteQuery(db).ListarPedidosAgendadosAsync())
+                .Where(c => c.EmpresaId == casa.Id).ToList();
+            candidatos.Where(c => c.PreparoIniciado).Select(c => c.PedidoId).Should().BeEquivalentTo(iniciados.Select(p => p.Id));
+            candidatos.Where(c => !c.PreparoIniciado).Select(c => c.PedidoId).Should().BeEquivalentTo(naFila.Select(p => p.Id));
+        }
     }
 
     private async Task<ResultadoAvaliacaoLembretes> RodarAsync(DateTime instante, IOperacaoEventPublisher? publisher = null)

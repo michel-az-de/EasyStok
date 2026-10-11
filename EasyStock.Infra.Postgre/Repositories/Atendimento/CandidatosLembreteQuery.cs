@@ -1,5 +1,6 @@
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
@@ -19,6 +20,9 @@ public sealed class CandidatosLembreteQuery(EasyStockDbContext db) : ICandidatos
         StatusPedidoMapper.Pronto, StatusPedidoMapper.SaiuParaEntrega,
     ];
 
+    private static readonly string[] StatusComPreparoIniciado =
+        [StatusPedidoMapper.Preparando, StatusPedidoMapper.Pronto, StatusPedidoMapper.SaiuParaEntrega];
+
     public async Task<IReadOnlyList<PedidoAgendadoLembrete>> ListarPedidosAgendadosAsync(CancellationToken ct = default)
     {
         var linhas = await (
@@ -34,7 +38,11 @@ public sealed class CandidatosLembreteQuery(EasyStockDbContext db) : ICandidatos
             let conversaId = db.AtendimentoConversas.IgnoreQueryFilters()
                 .Where(c => c.EmpresaId == p.EmpresaId && c.PedidoEmAndamentoId == p.Id && c.Situacao != SituacaoConversa.Encerrada)
                 .OrderBy(c => c.Id).Select(c => (Guid?)c.Id).FirstOrDefault()
-            select new { p.EmpresaId, p.Id, p.ClienteNome, p.AgendadoParaEm, p.InicioPrevistoEm, Vaga = vaga, ConversaId = conversaId })
+            select new
+            {
+                p.EmpresaId, p.Id, p.ClienteNome, p.AgendadoParaEm, p.InicioPrevistoEm, Vaga = vaga, ConversaId = conversaId,
+                PreparoIniciado = StatusComPreparoIniciado.Contains(p.Status),
+            })
             .ToListAsync(ct);
 
         var empresas = linhas.Select(l => l.EmpresaId).Distinct().ToArray();
@@ -42,7 +50,7 @@ public sealed class CandidatosLembreteQuery(EasyStockDbContext db) : ICandidatos
             .Where(e => empresas.Contains(e.EmpresaId)).ToDictionaryAsync(e => e.EmpresaId, ct);
         return linhas.Select(l => new PedidoAgendadoLembrete(l.EmpresaId, l.Id, l.ClienteNome,
             l.Vaga is { } v ? HorarioBrasil.InstanteUtc(v.DataEntrega, v.HoraInicio) : l.AgendadoParaEm!.Value,
-            l.InicioPrevistoEm, l.ConversaId, expedientes.GetValueOrDefault(l.EmpresaId))).ToList();
+            l.InicioPrevistoEm, l.ConversaId, expedientes.GetValueOrDefault(l.EmpresaId), l.PreparoIniciado)).ToList();
     }
 
     // "Parado desde" = AlteradoEm: o pedido é carimbado ao entrar em AguardandoPagamento (checkout ou
@@ -62,7 +70,9 @@ public sealed class CandidatosLembreteQuery(EasyStockDbContext db) : ICandidatos
             .ToListAsync(ct);
 
     // Nota interna do sistema (ex.: "escalado para a dona") não é resposta ao cliente: fica de fora ao
-    // procurar a última mensagem da conversa.
+    // procurar a última mensagem da conversa. A exceção é a nota de reabertura (#1550): ela conta como a
+    // última palavra, senão a entrada de antes do encerramento voltaria com o SLA estourado há dias. Entrada
+    // que chega depois da reabertura é mais nova que a nota e é cobrada normalmente.
     public async Task<IReadOnlyList<ConversaSemResposta>> ListarConversasSemRespostaAsync(DateTime entradaAntesDe, CancellationToken ct = default)
     {
         var linhas = await (
@@ -70,7 +80,9 @@ public sealed class CandidatosLembreteQuery(EasyStockDbContext db) : ICandidatos
             where c.Situacao == SituacaoConversa.Assumida
             let ultima = db.AtendimentoMensagens.IgnoreQueryFilters()
                 .Where(m => m.EmpresaId == c.EmpresaId && m.ConversaId == c.Id
-                    && m.Status != StatusMensagem.Falhou && m.Status != StatusMensagem.Pendente)
+                    && ((m.Status != StatusMensagem.Falhou && m.Status != StatusMensagem.Pendente)
+                        || (m.Autor == AutorMensagem.Sistema && m.EnviadaPorUsuarioId != null
+                            && m.Texto!.StartsWith(ReabrirConversaUseCase.PrefixoNotaReabertura))))
                 .OrderByDescending(m => m.EnviadaEm)
                 .ThenByDescending(m => m.Id)
                 .Select(m => new { m.Id, m.Direcao, m.EnviadaEm })

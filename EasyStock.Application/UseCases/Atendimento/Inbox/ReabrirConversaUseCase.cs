@@ -8,6 +8,11 @@ namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 public sealed class ReabrirConversaUseCase(
     IConversaRepository conversas, IClienteRepository clientes, IUnitOfWork unitOfWork, TimeProvider relogio)
 {
+    /// <summary>
+    /// Início da nota que registra a reabertura. O avaliador de lembretes a reconhece por ele (#1550): a
+    /// entrada anterior à reabertura não conta como cliente sem resposta.
+    /// </summary>
+    public const string PrefixoNotaReabertura = "Conversa reaberta por ";
     public const string ConflitoContato = "Este contato já tem outra conversa aberta neste canal. Continue por ela no Balcão.";
 
     public async Task<ConversaSituacaoResult> ExecuteAsync(AcaoConversaCommand command, CancellationToken ct = default)
@@ -48,7 +53,7 @@ public sealed class ReabrirConversaUseCase(
                 var encerradaEm = conversa.EncerradaEm;
                 conversa.Reabrir(agora);
                 var nota = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora,
-                    TipoConteudoMensagem.Texto, $"Conversa reaberta por {command.QuemAgiu}. Encerramento anterior: {encerradaEm:dd/MM/yyyy HH:mm:ss} UTC.");
+                    TipoConteudoMensagem.Texto, $"{PrefixoNotaReabertura}{command.QuemAgiu}. Encerramento anterior: {encerradaEm:dd/MM/yyyy HH:mm:ss} UTC.");
                 nota.RegistrarAutorNotaInterna(command.UsuarioId);
                 await conversas.AddMensagemAsync(nota, token);
                 await unitOfWork.CommitAsync();
