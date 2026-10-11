@@ -300,7 +300,9 @@ public sealed class WhatsAppCloudClient(
         var body = await response.Content.ReadFromJsonAsync<MetaSendMessageResponse>(cancellationToken: ct);
         var wamid = body?.Messages?.FirstOrDefault()?.Id;
         if (string.IsNullOrEmpty(wamid))
-            throw new WhatsAppCloudException(0, "Meta retornou 2xx sem message id.", ehPermanente: true);
+            // O status segue na exceção (#1550): distingue esta resposta, em que algo pode ter saído, da recusa
+            // levantada antes da rede, que não tem status.
+            throw new WhatsAppCloudException(0, "Meta retornou 2xx sem message id.", ehPermanente: true, (int)response.StatusCode);
 
         return new EnvioWhatsAppResult(wamid);
     }
