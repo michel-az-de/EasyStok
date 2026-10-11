@@ -19,6 +19,8 @@ public class RemoverItemPagamentoPedidoUseCaseTests
     private readonly EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository _cobrancas =
         Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>();
 
+    private readonly ICaixaRepository _caixa = Substitute.For<ICaixaRepository>();
+
     public RemoverItemPagamentoPedidoUseCaseTests() =>
         _uow.SetupExecuteInTransactionSemRetry<EasyStock.Application.UseCases.Pedidos.PedidoResult?>();
 
@@ -33,7 +35,7 @@ public class RemoverItemPagamentoPedidoUseCaseTests
             _uow, Substitute.For<ILogger<RemoverItemPedidoUseCase>>());
     private RemoverPagamentoPedidoUseCase PagUC() =>
         new(_repo, _cobrancas, _uow,
-            Substitute.For<ILogger<RemoverPagamentoPedidoUseCase>>(), QuitacaoPedidoTeste.Criar(_repo));
+            Substitute.For<ILogger<RemoverPagamentoPedidoUseCase>>(), QuitacaoPedidoTeste.Criar(_repo), _caixa);
 
     private static PedidoItem NovoItem(Guid pedidoId, string nome, decimal qtd, decimal preco) => new()
     {
@@ -84,6 +86,53 @@ public class RemoverItemPagamentoPedidoUseCaseTests
 
         pedido.Pagamentos.Should().BeEmpty();
         evento!.Tipo.Should().Be("pagamento_removido");
+        await _uow.Received(1).CommitAsync();
+    }
+
+    // #1547: o estorno manual recusava com o caixa fechado; remover o mesmo recebimento passava e o
+    // fechamento do dia ficava com um total que o Caixa não soma mais.
+    [Fact]
+    public async Task RemoverPagamento_DeDiaComCaixaFechado_Recusa_NaLojaDoPedido()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = Pedido.Criar(empresaId);
+        pedido.LojaId = Guid.NewGuid();
+        // 02:30 UTC de 09/10 ainda é 08/10 em Brasília: o dia da guarda é o operacional do recebimento.
+        var pagoEm = new DateTime(2026, 10, 9, 2, 30, 0, DateTimeKind.Utc);
+        var pag = new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "dinheiro", Valor = 30m, PagoEm = pagoEm };
+        pedido.Pagamentos.Add(pag);
+        _repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        var dia = new DateOnly(2026, 10, 8);
+        _caixa.GetFechamentoDoDiaAsync(empresaId, dia, pedido.LojaId)
+            .Returns(FechamentoCaixa.Criar(empresaId, dia, 0, 0, 30, 0, 0, pedido.LojaId));
+
+        var act = () => PagUC().ExecuteAsync(new RemoverPagamentoPedidoCommand(empresaId, pedido.Id, pag.Id,
+            NivelSolicitante: NivelAcesso.Admin));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*já foi fechado*devolução*");
+        pedido.Pagamentos.Should().ContainSingle();
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    // #1547: recebimento lançado DEPOIS de o Caixa fechar não entrou no retrato do dia e segue removível.
+    [Fact]
+    public async Task RemoverPagamento_LancadoDepoisDoFechamento_ContinuaRemovivel()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = Pedido.Criar(empresaId);
+        var pagoEm = new DateTime(2026, 10, 8, 23, 30, 0, DateTimeKind.Utc);
+        var pag = new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "dinheiro", Valor = 30m, PagoEm = pagoEm };
+        pedido.Pagamentos.Add(pag);
+        _repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        var dia = new DateOnly(2026, 10, 8);
+        var fechamento = FechamentoCaixa.Criar(empresaId, dia, 0, 0, 0, 0, 0, pedido.LojaId);
+        fechamento.FechadoEm = pagoEm.AddMinutes(-30);
+        _caixa.GetFechamentoDoDiaAsync(empresaId, dia, pedido.LojaId).Returns(fechamento);
+
+        await PagUC().ExecuteAsync(new RemoverPagamentoPedidoCommand(empresaId, pedido.Id, pag.Id,
+            NivelSolicitante: NivelAcesso.Admin));
+
+        pedido.Pagamentos.Should().BeEmpty();
         await _uow.Received(1).CommitAsync();
     }
 

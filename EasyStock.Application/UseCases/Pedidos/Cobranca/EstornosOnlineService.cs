@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -59,8 +60,8 @@ public sealed class EstornosOnlineService(IPedidoRepository pedidos, IEstornoOnl
                 throw Conflito("estorno_pendente", "Confira a solicitação pendente antes de pedir outra devolução.");
             if (pagamento.Estornada || input.Valor > pagamento.Valor - Confirmado(estornos, pagamento))
                 throw Conflito("valor_ja_devolvido", "O valor excede o saldo ainda não devolvido deste recebimento.");
-            if (await caixa.GetFechamentoDoDiaAsync(input.EmpresaId, HorarioBrasil.DataOperacional(Agora), pagamento.LojaId) is not null)
-                throw new UseCaseValidationException("O Caixa de hoje já foi fechado. A devolução não foi solicitada.");
+            await CaixaFechadoGuard.ExigirDiaAbertoAsync(caixa, input.EmpresaId, Agora, pagamento.LojaId,
+                "O Caixa de hoje já foi fechado. A devolução não foi solicitada.");
             var nova = new PedidoEstornoOnline
             {
                 Id = input.OperacaoId, EmpresaId = input.EmpresaId, PedidoId = input.PedidoId,
@@ -81,6 +82,31 @@ public sealed class EstornosOnlineService(IPedidoRepository pedidos, IEstornoOnl
         var operacao = (await repo.ListarAsync(empresaId, pedidoId, ct)).SingleOrDefault(e => e.Id == operacaoId)
             ?? throw Conflito("estorno_nao_encontrado", "Solicitação não encontrada neste pedido.");
         return operacao.Situacao == PedidoEstornoOnline.Pendente ? await ProcessarAsync(operacao, ct) : operacao;
+    }
+
+    // #1547: a intenção ainda não enviada só saía sendo enviada. Com a devolução feita por fora
+    // (Pix direto), retomar mandava o POST e devolvia em dobro. O lock do pedido é o mesmo do envio:
+    // quem marca EnviadoEm primeiro vence, e o descarte perde com 409.
+    public Task<PedidoEstornoOnline> DescartarAsync(Guid empresaId, Guid pedidoId, Guid operacaoId, Guid? usuarioId,
+        string? usuarioNome, NivelAcesso nivel, CancellationToken ct = default)
+    {
+        ExigirGerente(nivel);
+        return ComPedidoTravadoAsync(empresaId, pedidoId, async (_, estornos, token) =>
+        {
+            var atual = estornos.SingleOrDefault(e => e.Id == operacaoId)
+                ?? throw Conflito("estorno_nao_encontrado", "Solicitação não encontrada neste pedido.");
+            if (atual.Situacao != PedidoEstornoOnline.Pendente)
+                throw Conflito("estorno_nao_pendente", "Esta solicitação já foi encerrada.");
+            if (atual.EnviadoEm is not null)
+                throw Conflito("estorno_ja_enviado", "A solicitação já foi enviada ao Mercado Pago e não pode ser descartada. Confira o estorno pendente.");
+            atual.Situacao = PedidoEstornoOnline.Recusado;
+            atual.Detalhe = "Descartada antes do envio. Nenhuma solicitação foi feita ao Mercado Pago.";
+            await repo.AtualizarAsync(atual, token);
+            await pedidos.AddEventoAsync(new PedidoEvento { Id = Guid.NewGuid(), PedidoId = atual.PedidoId,
+                Tipo = "devolucao_online_descartada", OcorridoEm = Agora, UsuarioId = usuarioId, UsuarioNome = usuarioNome,
+                Origem = "web", Detalhes = $"Solicitação de devolução descartada antes do envio: {atual.Valor.ToString("C", Cultura.PtBr)}. Motivo original: {atual.Motivo}. Operação: {atual.Id}" });
+            return atual;
+        }, ct);
     }
 
     private async Task<PedidoEstornoOnline> ProcessarAsync(PedidoEstornoOnline operacao, CancellationToken ct)
