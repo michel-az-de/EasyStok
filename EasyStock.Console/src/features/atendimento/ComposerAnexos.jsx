@@ -18,8 +18,9 @@ import css from './composerAnexos.module.css'
 // sistema), igual a um botão de verdade.
 // `rotulo`/`classeRotulo` (rodada 12, issue #16): o nome visível ao lado do
 // clipe. Sem `classeRotulo`, o nome continua só para leitor de tela.
+// `soImagem` (#1587): no modo API o seletor do sistema nem oferece PDF, que o EasyStok não envia.
 export function BotaoAnexarArquivo({
-  disabled, titulo, rotulo = 'Anexar', classeRotulo = 'sr', aoEscolher,
+  disabled, titulo, rotulo = 'Anexar', classeRotulo = 'sr', soImagem = false, aoEscolher,
 }) {
   return (
     <label className={`${css.botaoAnexo} ${disabled ? css.desabilitado : ''}`} title={titulo}>
@@ -28,7 +29,7 @@ export function BotaoAnexarArquivo({
         type="file"
         className="sr"
         disabled={disabled}
-        accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+        accept={`image/jpeg,image/png,image/webp,image/gif${soImagem ? '' : ',application/pdf'}`}
         onChange={(evento) => {
           const arquivo = evento.target.files?.[0]
           evento.target.value = '' // permite escolher o mesmo arquivo de novo em seguida

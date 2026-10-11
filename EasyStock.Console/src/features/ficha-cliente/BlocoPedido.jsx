@@ -7,12 +7,12 @@ import { Pilula } from '../../componentes/Pilula'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { moeda } from '../../dominio/formato'
 import {
-  agruparPorLinha, itensDetalhados, numeroDaComanda, pedidoEncerrado, totalDoPedido,
+  agruparPorLinha, comandaTravada, itensDetalhados, numeroDaComanda, pedidoEncerrado, totalDoPedido,
 } from '../../dominio/pedido'
 import { diferencaAposPagamento, totalPago } from '../../dominio/pagamento'
 import { situacaoDoItem } from '../../dominio/cardapio'
 import {
-  LINHA_COMANDA_VAI_JUNTO, ROTULO_ENVIAR, avisoDoEnvio, rotuloDoTotal, situacaoDoEnvio,
+  LINHA_COMANDA_TRAVADA, LINHA_COMANDA_VAI_JUNTO, ROTULO_ENVIAR, avisoDoEnvio, rotuloDoTotal, situacaoDoEnvio,
 } from '../../dominio/resumoPedido'
 import { Cabecalho } from './Cabecalho'
 import { ModalCanhoto } from './Canhoto'
@@ -134,6 +134,10 @@ export function BlocoPedido({
   // toque, não fica sempre à vista").
   const [obsAbertas, setObsAbertas] = useState(() => new Set())
   const fechado = pedidoEncerrado(pedido) || !editavel
+  // #1587: pedido já criado no EasyStok não troca item por aqui. Antes o "+", o "−" e o
+  // "Adicionar itens" seguiam ativos e só avisavam no rodapé; agora os itens travam e a linha
+  // diz o motivo. Janela e cobrança continuam como estavam (dependem só de `fechado`).
+  const itensTravados = fechado || comandaTravada(pedido, { fonteApi })
 
   // Soltar aqui (seção 9): só acende quando o que está sendo arrastado é um
   // prato do cardápio. useDndContext em vez de prop: BlocoPedido não muda de
@@ -143,13 +147,13 @@ export function BlocoPedido({
   const arrastandoPrato = active?.data?.current?.type === 'prato'
   const alvoDoArrasto = arrastandoPrato && over?.id === 'comanda-solta'
   const { setNodeRef: soltarRef } = useDroppable({
-    id: 'comanda-solta', data: { type: 'comanda' }, disabled: fechado,
+    id: 'comanda-solta', data: { type: 'comanda' }, disabled: itensTravados,
   })
   // A mensagem com a observação já saiu assim que a comanda foi mandada
   // (mesmo sinal que o resto da tela usa para "já mandou": `pedido.cobranca`
   // nasce em GERAR_PEDIDO). Reescrever o campo depois disso não reenvia nada,
   // e a ficha passava a divergir do que o cliente já leu (achado QA5).
-  const observacaoTravada = fechado || Boolean(pedido.cobranca)
+  const observacaoTravada = itensTravados || Boolean(pedido.cobranca)
   const envio = situacaoDoEnvio(pedido, { bloqueado })
   const podeGerar = envio.pode
   const enviar = (meio) => {
@@ -208,7 +212,7 @@ export function BlocoPedido({
                 <ItemComanda
                   key={linha.sku}
                   linha={linha}
-                  fechado={fechado}
+                  fechado={itensTravados}
                   observacaoTravada={observacaoTravada}
                   obsAberta={obsAbertas.has(linha.sku)}
                   aoAlternarObs={() => alternarObs(linha.sku)}
@@ -249,13 +253,16 @@ export function BlocoPedido({
       <div className={css.acoesPedido}>
         {!fechado && (
           <>
-            <Botao largo onClick={aoAbrirCardapio}>Adicionar itens</Botao>
+            {/* #1587: travada, o cardápio segue abrindo para consulta e foto, com o nome certo. */}
+            {itensTravados && <p className={css.situacaoEnvio}>{LINHA_COMANDA_TRAVADA}</p>}
+            <Botao largo onClick={aoAbrirCardapio}>{itensTravados ? 'Ver cardápio' : 'Adicionar itens'}</Botao>
             {/* Rodada 12 (issue #14): sem botão morto. Ou ele envia, ou a
                 linha diz por que não; comanda vazia já se explica no papel.
                 #1474 (R4): no modo API quem cria o pedido é a barra fixa ("Gerar cobrança e
-                enviar"); aqui só a linha que diz que a comanda vai junto. */}
+                enviar"); aqui só a linha que diz que a comanda vai junto.
+                #1587: com o pedido já criado ela não vai mais a lugar nenhum; fica só o motivo acima. */}
             {fonteApi && (podeGerar || envio.chave === 'vazia') ? (
-              <p className={css.situacaoEnvio}>{LINHA_COMANDA_VAI_JUNTO}</p>
+              !itensTravados && <p className={css.situacaoEnvio}>{LINHA_COMANDA_VAI_JUNTO}</p>
             ) : (podeGerar || envio.chave === 'vazia') ? (
               <Botao
                 largo variante="primario" icone="enviar" disabled={!podeGerar || enviando}

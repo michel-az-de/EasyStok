@@ -34,12 +34,14 @@ jobs:
       - run: npm run qualidade
       - run: node ferramentas/prova-1426-notificacoes-console.mjs
       - run: node ferramentas/prova-1255-pagamento-manual-api.mjs
+      - run: node ferramentas/prova-1586-encerrar-ficha-ux.mjs
       - run: node ferramentas/prova-1420-sugestao-agente-api.mjs
       - run: node ferramentas/prova-f06-honestidade.mjs
       - run: node ferramentas/prova-f11-lote-papel.mjs
       - run: node ferramentas/prova-f11-cardapio-do-dia.mjs
       - run: node ferramentas/prova-f11-cardapio-itens.mjs
       - run: node ferramentas/prova-f11-link-na-conversa.mjs
+      - run: node ferramentas/prova-1587-conversa-comanda-ux.mjs
       - run: node ferramentas/prova-1447-hall-modulos.mjs
       - run: node ferramentas/prova-onda1-shell.mjs
       - run: node ferramentas/prova-perfis-modulos.mjs
@@ -59,6 +61,7 @@ jobs:
       - run: node ferramentas/prova-1499-baixa-insumo.mjs
       - run: node ferramentas/prova-1502-planejamento.mjs
       - run: node ferramentas/prova-1511-perdas.mjs
+      - run: node ferramentas/prova-1585-producao-ux.mjs
       - run: node ferramentas/prova-1523-embalagens.mjs
       - run: node ferramentas/prova-1529-porcoes.mjs
       - run: node ferramentas/prova-1531-porcao-no-pedido.mjs

@@ -32,10 +32,12 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
       .catch((erro) => avisar(`Bloqueio do cliente: ${erro.message}`))
   }
 
+  // #1586: a recusa volta como `{ erro }` para a Ficha mostrar no campo ou ao lado do botão; a
+  // tela só diz "Salvo" depois desta resposta.
   function cadastrar(id, { nome = null, telefone = null, endereco = null }) {
     const corpo = { nome: nome?.trim() || null, telefone: telefone || null, endereco: endereco ? enderecoParaApi(endereco) : null }
     return cadastrarClienteDaConversa(id, corpo)
-      .then((salvo) => {
+      .then(async (salvo) => {
         // O telefone já era de outro cadastro: a conversa foi ligada a ele, com o nome dele.
         if (salvo && salvo.novo === false && corpo.nome && salvo.nome !== corpo.nome) {
           avisar(`Este telefone já é de ${salvo.nome}: a conversa foi ligada a esse cadastro.`)
@@ -43,9 +45,14 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
         if (salvo?.dentroDaArea === false) {
           avisar(`Cadastro salvo, mas o endereço está fora da área de entrega. ${salvo.mensagemForaArea ?? ''}`.trim())
         }
-        return carregar(id)
+        // O cadastro já foi gravado: falha na leitura não é recusa (mesma regra da nota, abaixo).
+        try { await carregar(id) }
+        catch (erro) { avisar(`Cadastro salvo, mas a ficha não atualizou: ${erro.message}`) }
+        return undefined
+      }, (erro) => {
+        avisar(`Cadastro do cliente: ${erro.message}`)
+        return { erro: erro.message }
       })
-      .catch((erro) => avisar(`Cadastro do cliente: ${erro.message}`))
   }
 
   return {
@@ -57,8 +64,9 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
     salvarCadastroRapido: (id, dados) => {
       const c = conversaDe(id)
       if (c?.canal === 'Chat do site' && !c.nomeDaDona) {
-        avisar('Escreva o nome do cliente (lápis ao lado do nome) antes de salvar o cadastro.')
-        return undefined
+        const mensagem = 'Escreva o nome do cliente (lápis ao lado do nome) antes de salvar o cadastro.'
+        avisar(mensagem)
+        return { erro: mensagem }
       }
       return cadastrar(id, { ...dados, nome: c?.nomeDaDona ? c.nome : dados?.nome })
     },

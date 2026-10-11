@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { FolhaImpressao } from '../../../componentes/FolhaImpressao'
 import { useCatalogo } from '../../../aplicacao/contextos'
-import { criarProducaoDoDia } from '../../../aplicacao/producaoDoDia'
+import { aoLancarLote, dispensarLote, guardarRascunho, linhasDoRascunho, lotesLancados, producaoDoDia } from '../../../aplicacao/producaoDoDia'
 import { retirarProducaoPlanejada } from '../../../aplicacao/planejamento'
 import { estaRemovido } from '../../../dominio/cardapio'
 import { sobraDaLinha } from '../../../dominio/producao'
@@ -21,9 +21,12 @@ const dataCurta = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { da
 
 // M1.4c (#1537): prato com porções exige a porção produzida (o saldo é dela).
 function paraEnviar(linha, pratos = []) {
-  const porcoesDoPrato = pratos.find((p) => p.sku === linha.sku)?.porcoes ?? []
+  const prato = pratos.find((p) => p.sku === linha.sku)
+  const porcoesDoPrato = prato?.porcoes ?? []
   return {
     sku: linha.sku,
+    // #1585: só para o erro dizer de qual prato é; não vai no corpo.
+    nome: prato?.nome ?? null,
     variacaoId: linha.variacaoId || null,
     exigePorcao: porcoesDoPrato.length > 0,
     porcoes: inteiro(linha.porcoes),
@@ -35,17 +38,27 @@ function paraEnviar(linha, pratos = []) {
 
 export function AbaProducaoDoDiaApi() {
   const { cardapio } = useCatalogo()
-  const producao = useMemo(() => criarProducaoDoDia(), [])
   const pratos = useMemo(() => (cardapio ?? []).filter((i) => !estaRemovido(i)), [cardapio])
   // M2.5 (#1502): vindo do Planejamento, as porções planejadas já entram como linhas.
+  // #1585: a tela desmonta a cada troca de rota; ela abre com o que ficou guardado.
   const [linhas, setLinhas] = useState(() => {
-    const planejadas = retirarProducaoPlanejada()
-    return planejadas?.length ? planejadas.map((p) => ({ ...novaLinha(), ...p })) : [novaLinha()]
+    const guardadas = linhasDoRascunho(retirarProducaoPlanejada())
+    return guardadas ? guardadas.map((l) => ({ ...novaLinha(), ...l })) : [novaLinha()]
   })
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState(null)
-  const [feito, setFeito] = useState(null)
-  const [etiquetas, setEtiquetas] = useState(null)
+  const [lotes, setLotes] = useState(lotesLancados)
+  // O que está na folha, de qual lote: { loteId } buscando, com `etiquetas` pronta, com `erro` falhou.
+  const [impressao, setImpressao] = useState(null)
+
+  useEffect(() => { guardarRascunho(linhas) }, [linhas])
+  // O lote gravado entra na lista e as linhas dele saem, mesmo quando o envio partiu antes de ela
+  // sair da tela e voltar. A folha do lote anterior sai junto: não imprime etiqueta de outro lote.
+  useEffect(() => aoLancarLote(() => {
+    setLotes(lotesLancados())
+    setLinhas([novaLinha()])
+    setImpressao(null)
+  }), [])
 
   const mudar = (id, campo) => (e) => setLinhas((atual) => atual.map((l) => (l.id === id ? { ...l, [campo]: e.target.value } : l)))
   // Trocar o prato zera a porção e o peso que veio dela. M1.4e (#1552): escolher a porção traz o peso
@@ -59,22 +72,31 @@ export function AbaProducaoDoDiaApi() {
     if (enviando) return
     setEnviando(true)
     setErro(null)
-    const r = await producao.produzir(linhas.map((l) => paraEnviar(l, pratos)))
+    // Gravou: quem mostra o lote e zera as linhas é o `aoLancarLote` acima.
+    const r = await producaoDoDia.produzir(linhas.map((l) => paraEnviar(l, pratos)))
     setEnviando(false)
-    if (!r.ok) { setErro(r.erro); return }
-    setFeito(r)
-    setLinhas([novaLinha()])
+    if (!r.ok) setErro(r.erro)
   }
 
-  async function imprimir() {
+  // #1585: cada lote imprime as próprias etiquetas. A folha esvazia antes de buscar: se a busca
+  // falhar, não sobra a do lote anterior, e o erro aparece junto do botão do lote.
+  async function imprimir(loteId) {
+    setImpressao({ loteId })
     try {
-      const lista = await producao.etiquetas(feito.loteId)
-      setEtiquetas(lista)
+      const etiquetas = await producaoDoDia.etiquetas(loteId)
+      setImpressao({ loteId, etiquetas })
       setTimeout(() => window.print(), 50)
     } catch (e) {
-      setErro(`Etiquetas: ${e.message}`)
+      setImpressao({ loteId, erro: e.message })
     }
   }
+
+  function dispensar(loteId) {
+    setLotes(dispensarLote(loteId))
+    if (impressao?.loteId === loteId) setImpressao(null)
+  }
+
+  const buscandoEtiquetas = impressao !== null && !impressao.etiquetas && !impressao.erro
 
   return (
     <div className={css.aba}>
@@ -82,17 +104,23 @@ export function AbaProducaoDoDiaApi() {
         Anote o que saiu da cozinha. Confirmar cria o lote com as etiquetas e soma no estoque.
       </p>
 
-      {feito && (
-        <output className={css.aviso}>
-          <strong>Lote {feito.codigo}</strong> lançado: {feito.pratos.map((p) => `${p.porcoes}× ${p.nome}${p.sobraG ? ` (sobra ${p.sobraG} g)` : ''}`).join(', ')}.
-          {' '}<Botao variante="primario" icone="printer" onClick={imprimir}>Imprimir {feito.etiquetas} {feito.etiquetas === 1 ? 'etiqueta' : 'etiquetas'}</Botao>
-          {' '}<Botao variante="texto" onClick={() => { setFeito(null); setEtiquetas(null) }}>Fechar confirmação</Botao>
-          {feito.avisos.length > 0 && (
-            <ul aria-label="Avisos de insumo">
-              {feito.avisos.map((a) => <li key={a}>{a}</li>)}
-            </ul>
-          )}
-        </output>
+      {/* #1585: um aviso por lote lançado na visita, o mais novo primeiro, até ela dispensar. */}
+      {lotes.length > 0 && (
+        <section className={css.secao} aria-label="Lotes lançados nesta visita">
+          {lotes.map((lote) => (
+            <output key={lote.loteId} className={css.aviso}>
+              <strong>Lote {lote.codigo}</strong> lançado: {lote.pratos.map((p) => `${p.porcoes}× ${p.nome}${p.sobraG ? ` (sobra ${p.sobraG} g)` : ''}`).join(', ')}.
+              {' '}<Botao variante="primario" icone="printer" disabled={buscandoEtiquetas} aria-label={`Imprimir ${lote.etiquetas} ${lote.etiquetas === 1 ? 'etiqueta' : 'etiquetas'} do lote ${lote.codigo}`} onClick={() => imprimir(lote.loteId)}>Imprimir {lote.etiquetas} {lote.etiquetas === 1 ? 'etiqueta' : 'etiquetas'}</Botao>
+              {' '}<Botao variante="texto" disabled={buscandoEtiquetas} aria-label={`Dispensar o aviso do lote ${lote.codigo}`} onClick={() => dispensar(lote.loteId)}>Dispensar</Botao>
+              {impressao?.loteId === lote.loteId && impressao.erro && <>{' '}<strong>Não consegui buscar as etiquetas deste lote. {impressao.erro}</strong></>}
+              {lote.avisos.length > 0 && (
+                <ul aria-label="Avisos de insumo">
+                  {lote.avisos.map((a) => <li key={a}>{a}</li>)}
+                </ul>
+              )}
+            </output>
+          ))}
+        </section>
       )}
 
       <form onSubmit={confirmar} className={css.aba}>
@@ -137,12 +165,12 @@ export function AbaProducaoDoDiaApi() {
         {erro && <p className={css.aviso} role="alert">{erro}</p>}
       </form>
 
-      {etiquetas && (
+      {impressao?.etiquetas && (
         <FolhaImpressao>
-          {etiquetas.map((e) => (
+          {impressao.etiquetas.map((e) => (
             <div key={e.id} style={{ breakInside: 'avoid', border: '1px solid var(--impressao-tinta)', padding: '4mm', marginBottom: '3mm', color: 'var(--impressao-tinta)' }}>
               <strong>{e.nome}</strong>{e.pesoG ? ` · ${e.pesoG} g` : ''}
-              <div>Lote {e.lote} · {e.sequencial}/{etiquetas.length}</div>
+              <div>Lote {e.lote} · {e.sequencial}/{impressao.etiquetas.length}</div>
               <div>Produzido {dataCurta(e.produzidoEm)} · Validade {dataCurta(e.validadeEm)}</div>
               {e.alergenos.length > 0 && <div>Alérgenos: {e.alergenos.join(', ')}</div>}
               <div>{e.codigo}</div>

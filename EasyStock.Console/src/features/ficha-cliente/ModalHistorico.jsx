@@ -6,7 +6,7 @@ import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
-import { useAcoes } from '../../aplicacao/contextos'
+import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { ehLead } from '../../dominio/conversa'
 import { enviosAutomaticos } from '../../dominio/automacao'
 import { diasEntre, quandoRelativo, resumoFinanceiro } from '../../dominio/cliente'
@@ -208,6 +208,9 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
   const id = useId()
   const [aba, setAba] = useState('pedidos')
   const [salvandoNota, setSalvandoNota] = useState(false)
+  // #1586: o resumo de cada encerramento só existe na demonstração; no modo API o EasyStok não
+  // guarda, e a aba ficaria sempre vazia.
+  const { fonteApi } = useAtendimento()
   const { cliente } = conversa
   const lead = ehLead(conversa)
   const financeiro = resumoFinanceiro(historico)
@@ -239,7 +242,7 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
         prefixoId={`${id}-aba`}
         abas={[
           { id: 'pedidos', rotulo: 'Pedidos', contador: cliente.pedidos },
-          { id: 'atendimentos', rotulo: 'Atendimentos', contador: (conversa.atendimentos ?? []).length },
+          ...(fonteApi ? [] : [{ id: 'atendimentos', rotulo: 'Atendimentos', contador: (conversa.atendimentos ?? []).length }]),
           { id: 'notas', rotulo: 'Notas', contador: cliente.notas.length },
           { id: 'automaticas', rotulo: 'Automáticas', contador: automaticas.length },
         ]}

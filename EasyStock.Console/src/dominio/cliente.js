@@ -103,6 +103,12 @@ function gostosConhecidos(conversas, cadastroIdAtual, restricoes) {
 export const dicaDoCep = (foraDaArea, { fonteApi = false } = {}) =>
   (foraDaArea && !fonteApi ? 'Fora da área de entrega' : undefined)
 
+// #1586: no modo API o bloqueio é do cadastro no EasyStok. Lead sem cadastro salvo não tem o
+// que bloquear: o menu diz o motivo em vez de recusar depois das duas etapas do modal.
+export const MOTIVO_BLOQUEIO_SEM_CADASTRO = 'Salve o cadastro do cliente antes de bloquear.'
+export const motivoParaNaoBloquear = (conversa, { fonteApi = false } = {}) =>
+  (fonteApi && !conversa?.clienteId ? MOTIVO_BLOQUEIO_SEM_CADASTRO : null)
+
 export const rotuloDaTag = (tag) => String(tag ?? '').replace(/_/g, ' ')
 export const chaveDaTag = (tag) => rotuloDaTag(tag).normalize('NFD').replace(/[̀-ͯ]/g, '')
   .toLowerCase().replace(/\s+/g, ' ').trim()

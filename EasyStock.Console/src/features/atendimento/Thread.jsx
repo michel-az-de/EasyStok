@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
 import { rotuloDoDia } from '../../dominio/formato'
 import { intercalarNotas } from '../../dominio/notas'
 import { useChamadaEstavel } from '../../hooks/useChamadaEstavel'
 import { Balao } from './Balao'
+import { useRolagemDoFio } from './useRolagemDoFio'
 import css from './atendimento.module.css'
 
 // Divisória entre atendimentos (decisão 46, "Encerrar" v2): encerrado nunca
@@ -72,9 +73,8 @@ export function Thread({
   const abrirDefinicaoAutomatica = useChamadaEstavel(aoAbrirDefinicaoAutomatica)
   const reenviar = useChamadaEstavel(aoReenviar)
 
-  useEffect(() => {
-    fim.current?.scrollIntoView({ block: 'end' })
-  }, [mensagens.length, chaveRolagem, digitando, notas.length])
+  // #1587: não rola mais a cada mensagem; a regra está no hook.
+  useRolagemDoFio(fim, { mensagens, chaveRolagem, digitando, totalDeNotas: notas.length })
 
   // Intercala as divisórias na posição certa: por ÍNDICE (`aposIndice`), não
   // por horário — o relógio simulado anda em passos e duas mensagens de
