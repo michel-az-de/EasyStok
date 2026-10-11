@@ -174,7 +174,7 @@ public class RegistrarProducaoUseCase(
         var avisos = baixaDeInsumos is null
             ? []
             : await baixaDeInsumos.BaixarAsync(cmd.EmpresaId,
-                itens.Select(i => new PratoParaBaixa(produtos[i.ProdutoId], i.Porcoes, i.PesoRealG ?? i.Porcoes * i.PesoPorPorcaoG)).ToList(),
+                itens.Select(i => new PratoParaBaixa(produtos[i.ProdutoId], i.Porcoes, i.PesoRealG ?? i.Porcoes * i.PesoPorPorcaoG, i.Porcao)).ToList(),
                 finalizado.Codigo, dataProducao, ct);
 
         logger.LogInformation("Producao registrada: lote {Codigo} com {Itens} item(ns), {Etiquetas} etiqueta(s) e {Avisos} aviso(s) de insumo.",

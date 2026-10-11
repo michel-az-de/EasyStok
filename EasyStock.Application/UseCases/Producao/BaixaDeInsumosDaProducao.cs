@@ -4,7 +4,8 @@ using EasyStock.Domain.ValueObjects;
 namespace EasyStock.Application.UseCases.Producao;
 
 /// <summary>Um prato que acabou de ser produzido, com o que a baixa precisa saber dele.</summary>
-public sealed record PratoParaBaixa(Produto Prato, int Porcoes, int? PesoProduzidoG);
+/// <param name="Porcao">Rótulo da porção produzida (M1.4c), quando o prato tem porções.</param>
+public sealed record PratoParaBaixa(Produto Prato, int Porcoes, int? PesoProduzidoG, string? Porcao = null);
 
 /// <summary>
 /// D-M2-01 (#1499): baixa dos insumos pela receita, dentro da transação da produção (S23).
@@ -14,6 +15,11 @@ public sealed record PratoParaBaixa(Produto Prato, int Porcoes, int? PesoProduzi
 /// Falta de insumo AVISA e não trava: com algum saldo, a falta vira descoberto no lote (#540);
 /// sem saldo nenhum não há lote onde registrar, então só avisa. A saída é <c>UsoInterno</c>
 /// e cita o código do lote produzido.
+/// <para>
+/// A receita é do prato, não da porção (#1542). Produzida uma porção, a conta não muda, mas avisa onde
+/// ela não acompanha o tamanho: receita que rende em porções baixa o mesmo insumo para 300 g e 800 g,
+/// e receita que rende em peso baixa a embalagem pelo peso em vez de uma por porção.
+/// </para>
 /// </summary>
 public sealed class BaixaDeInsumosDaProducao(
     IProdutoComposicaoRepository composicaoRepository,
@@ -48,6 +54,8 @@ public sealed class BaixaDeInsumosDaProducao(
                 avisos.Add($"{p.Prato.Nome}: insumos não baixados ({erroFator}).");
                 continue;
             }
+
+            if (AvisoDoTamanhoDaPorcao(p, linhas) is { } avisoDaPorcao) avisos.Add(avisoDaPorcao);
 
             foreach (var linha in linhas)
             {
@@ -91,6 +99,22 @@ public sealed class BaixaDeInsumosDaProducao(
                 $"Insumos da produção {codigoLote}", PermitirDescoberto: true));
 
         return avisos;
+    }
+
+    private static string? AvisoDoTamanhoDaPorcao(PratoParaBaixa p, IReadOnlyCollection<ProdutoComposicao> linhas)
+    {
+        if (string.IsNullOrWhiteSpace(p.Porcao)) return null;
+        var quem = $"{p.Prato.Nome} {p.Porcao.Trim()}";
+
+        if (p.Prato.RendimentoUnidade == UnidadeMedida.Un)
+            return linhas.Any(l => l.Insumo?.EhEmbalagem != true)
+                ? $"{quem}: a receita rende em porções e não distingue o tamanho, então os insumos desceram como {p.Porcoes} porções iguais. Confira o estoque dos insumos."
+                : null;
+
+        var embalagens = linhas.Where(l => l.Insumo?.EhEmbalagem == true).Select(l => l.Insumo!.Nome).ToList();
+        return embalagens.Count > 0
+            ? $"{quem}: a receita rende em {p.Prato.RendimentoUnidade}, então a embalagem desceu pelo peso e não uma por porção. Confira o saldo de {string.Join(", ", embalagens)}."
+            : null;
     }
 
     // Receita em Un rende porções; em massa/volume, a produção é medida pelo peso produzido.

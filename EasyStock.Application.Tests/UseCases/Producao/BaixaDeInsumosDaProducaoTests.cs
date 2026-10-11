@@ -194,4 +194,50 @@ public class BaixaDeInsumosDaProducaoTests
         Baixado(molho).Should().Be(1200m);
         _movimentos.Should().ContainSingle();
     }
+
+    // ── #1542: a receita é do prato e não sabe o tamanho da porção produzida. Avisa, não trava. ──
+
+    [Fact]
+    public async Task PorcaoProduzida_ReceitaQueRendeEmPorcoes_AvisaQueOInsumoNaoSegueOTamanho()
+    {
+        // Rende 6 com 1,2 kg de molho. 10 de 300 g ou 10 de 800 g baixam os mesmos 2 kg.
+        var lasanha = Prato(marcado: true);
+        var molho = Insumo("Molho", UnidadeMedida.G, 5000);
+        Receita(lasanha, (molho, 1.2m, UnidadeMedida.Kg));
+
+        var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 10, null, "300 g")], "LOT-1", _data);
+
+        Baixado(molho).Should().Be(2000m, "a conta não muda: só passa a avisar");
+        avisos.Should().ContainSingle().Which.Should().Contain("Lasanha 300 g").And.Contain("tamanho");
+    }
+
+    [Fact]
+    public async Task PorcaoProduzida_ReceitaQueRendeEmPeso_AvisaQueAEmbalagemDesceuPeloPeso()
+    {
+        // Rende 3 kg com 6 bandejas. 10 porções de 300 g são 3 kg: descem 6 bandejas, e ela usou 10.
+        var lasanha = Prato(marcado: false, rendimento: 3, unidade: UnidadeMedida.Kg);
+        var bandeja = Insumo("Bandeja", UnidadeMedida.Un, 20);
+        bandeja.EhEmbalagem = true;
+        Receita(lasanha, (bandeja, 6, UnidadeMedida.Un));
+
+        var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 10, 3000, "300 g")], "LOT-1", _data);
+
+        Baixado(bandeja).Should().Be(6m, "a conta não muda: só passa a avisar");
+        avisos.Should().ContainSingle().Which.Should().Contain("Lasanha 300 g").And.Contain("Bandeja").And.Contain("peso");
+    }
+
+    [Fact]
+    public async Task PorcaoProduzida_SoEmbalagemEmReceitaQueRendeEmPorcoes_NaoAvisa()
+    {
+        // 1 bandeja por porção vale para qualquer tamanho: a conta por porção está certa.
+        var lasanha = Prato(marcado: false);
+        var bandeja = Insumo("Bandeja", UnidadeMedida.Un, 20);
+        bandeja.EhEmbalagem = true;
+        Receita(lasanha, (bandeja, 6, UnidadeMedida.Un));
+
+        var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 10, null, "300 g")], "LOT-1", _data);
+
+        Baixado(bandeja).Should().Be(10m);
+        avisos.Should().BeEmpty();
+    }
 }
