@@ -46,6 +46,8 @@ public class RegistrarPagamentoPedidoUseCase(
         UseCaseGuards.EnsureNotEmpty(cmd.PedidoId, "PedidoId");
         if (cmd.Valor <= 0)
             throw new UseCaseValidationException("Valor do pagamento deve ser maior que zero.");
+        if (cmd.Valor != decimal.Round(cmd.Valor, 2))
+            throw new UseCaseValidationException("Valor do pagamento deve ter até duas casas decimais.");
         // Teto de sanidade anti-fat-finger (espelha LimitesProduto.ValorMaximo). NAO bloqueia
         // overpay (pagar acima do pendente e cenario real: gorjeta/arredondamento) -- o aviso
         // de overpay e so no frontend (Detail.cshtml). QA v1.10 r3 BUG-004 (issue 607).

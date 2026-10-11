@@ -118,9 +118,16 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     // S57: só no modo API (a massa local não tem envio de verdade). A resposta substitui o balão.
     reenviar: (id, mensagemId) =>
       reenviarMensagem(id, mensagemId)
-        .then((m) => despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m, id) }))
+        .then((m) => {
+          const mensagem = mensagemDaApi(m, id)
+          despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem })
+          return mensagem
+        })
         // #1396: o erro do reenvio fica no próprio balão, que segue com o id do servidor.
-        .catch((erro) => despachar({ tipo: acao.FALHAR_ENVIO_API, id, mensagemId, erro: motivoDaRecusa(erro) })),
+        .catch((erro) => {
+          despachar({ tipo: acao.FALHAR_ENVIO_API, id, mensagemId, erro: motivoDaRecusa(erro) })
+          return null
+        }),
     // #1353: a tela do link no console não tem dado no modo API; o link é o da loja.
     obterLinkCardapio: (id) => gerarLinkCardapio(id)
       .then((link) => ({ url: link.url, daLoja: true }))
