@@ -56,6 +56,8 @@ public sealed class BatchLinker(
                 if (jaPromovido != null)
                 {
                     mobileB.ErpLoteId = jaPromovido.Id;
+                    // Grava já: o vínculo não pode depender do lote seguinte dar certo.
+                    await db.SaveChangesAsync();
                     idempotentSkip++;
                     log.LogInformation("AutoLink Lote (idempotente): mobile={MobileId} → erp={ErpId}", bid, jaPromovido.Id);
                     continue;
@@ -111,16 +113,20 @@ public sealed class BatchLinker(
                     bid, lote.Id, lote.Itens.Count);
 
                 await EnsureEntradaEstoqueDoLoteAsync(lote);
-                // #1543: lote que ja chega excluido (registrado por engano) nao consumiu insumo.
-                if (!mobileB.Excluido) await BaixarInsumosDoLoteAsync(lote);
+                await BaixarInsumosDoLoteAsync(lote);
 
-                // #1464: lote que ja chega excluido/descartado no primeiro sync.
+                // #1464: lote que ja chega excluido/descartado no primeiro sync. #1543: o excluido baixa
+                // o insumo acima e o devolve aqui, como qualquer outro; assim, se for restaurado depois,
+                // a baixa e refeita pelo mesmo caminho.
                 await loteEstado.AplicarAsync(mobileB);
                 if (db.ChangeTracker.HasChanges()) await db.SaveChangesAsync();
             }
             catch (Exception ex)
             {
                 errorSkip++;
+                // #1543: o que este lote deixou pela metade nao pode ir ao banco com o proximo lote nem
+                // com os pedidos, que agora sao vinculados depois.
+                db.DescartarMudancasPendentes();
                 log.LogError(ex,
                     "F2 AutoLink Lote FALHOU mobile={MobileId} empresaId={EmpresaId} exType={ExType}: {Mensagem}",
                     bid, empresaId, ex.GetType().Name, ex.Message);
@@ -133,8 +139,9 @@ public sealed class BatchLinker(
 
     /// <summary>
     /// #1543: a exclusão do lote devolve o insumo (<see cref="LoteMobileEstadoReconciler"/>); se o lote
-    /// volta a valer, a baixa é refeita. Só refaz o que já existiu e foi estornado: lote antigo, que
-    /// nunca teve baixa, não passa a ter por causa de um reenvio.
+    /// volta a valer, a baixa é refeita. Só refaz quando a última baixa do lote foi devolvida pela
+    /// exclusão: lote antigo, que nunca teve baixa, e baixa que alguém estornou à mão no ERP não
+    /// voltam por causa de um reenvio.
     /// </summary>
     private async Task RefazerInsumosDoLoteRestauradoAsync(Batch mobileB)
     {
@@ -144,10 +151,25 @@ public sealed class BatchLinker(
         if (lote is null) return;
 
         var descricao = $"{BaixaDeInsumosDaProducao.PrefixoDaDescricao} {lote.Codigo}";
-        var foiEstornada = await db.Set<MovimentacaoEstoque>().IgnoreQueryFilters().AsNoTracking()
-            .AnyAsync(m => m.EmpresaId == lote.EmpresaId && m.Descricao == descricao
-                           && m.Tipo == TipoMovimentacaoEstoque.Saida && m.EstornadaEm != null);
-        if (foiEstornada) await BaixarInsumosDoLoteAsync(lote);
+        var saidas = await db.Set<MovimentacaoEstoque>().IgnoreQueryFilters().AsNoTracking()
+            .Where(m => m.EmpresaId == lote.EmpresaId && m.Descricao == descricao && m.Tipo == TipoMovimentacaoEstoque.Saida)
+            .Select(m => new { m.Id, m.CriadoEm, m.EstornadaEm })
+            .ToListAsync();
+        // Nunca baixou, ou a baixa esta valendo: nada a refazer.
+        if (saidas.Count == 0 || saidas.Any(s => s.EstornadaEm is null)) return;
+
+        // A ultima baixa e o conjunto de saidas do mesmo instante (uma por lote de insumo). So volta
+        // inteira: se alguem estornou parte dela a mao, refazer pela receita desfaria essa correcao.
+        var instante = saidas.Max(s => s.CriadoEm);
+        var ultimaBaixa = saidas.Where(s => s.CriadoEm == instante).Select(s => (Guid?)s.Id).ToList();
+        var devolvidasPelaExclusao = await db.Set<MovimentacaoEstoque>().IgnoreQueryFilters().AsNoTracking()
+            .CountAsync(m => m.EmpresaId == lote.EmpresaId && ultimaBaixa.Contains(m.MovimentacaoEstornadaId)
+                             && m.MotivoEstorno == LoteMobileEstadoReconciler.MotivoDoEstornoDeInsumo);
+        if (devolvidasPelaExclusao == ultimaBaixa.Count) await BaixarInsumosDoLoteAsync(lote);
+        else if (devolvidasPelaExclusao > 0)
+            log.LogWarning(
+                "Lote {Codigo} restaurado: parte da baixa de insumo foi estornada à mão no ERP, então ela não foi refeita. Confira o insumo do lote.",
+                lote.Codigo);
     }
 
     /// <summary>

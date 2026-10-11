@@ -2,6 +2,9 @@ using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Enums.Pagamentos;
+using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.Mobile.Services.Linkers;
@@ -186,19 +189,25 @@ public sealed class OrderLinker(
                 // O vinculo fica gravado antes do status: se a esteira recusar a troca, o que ela
                 // deixou pela metade e descartado sem levar o vinculo junto.
                 if (db.ChangeTracker.HasChanges()) await db.SaveChangesAsync();
-                var nasceuNoErp = await NasceuNoErpAsync(pedidoIdResolvido.Value);
+                var nasceuNoErp = await SyncMutationDispatcher.PedidoNasceuNoErpAsync(db, empresaId, pedidoIdResolvido.Value);
 
                 // F8-F: o status do aparelho chega ao Pedido do ERP.
-                if (nasceuNoErp) await LevarStatusAEsteiraAsync(pedidoIdResolvido.Value, mobileO);
+                var erpAcompanhou = true;
+                if (nasceuNoErp) erpAcompanhou = await LevarStatusAEsteiraAsync(pedidoIdResolvido.Value, mobileO);
                 else await EnsureStatusSyncAsync(pedidoIdResolvido.Value, mobileO);
                 await EnsureClienteLinkAsync(pedidoIdResolvido.Value, mobileO);
 
                 // F7-A — Pagamento auto quando mobileO.Status == "entregue" (entregar no aparelho e receber).
-                if (string.Equals(mobileO.Status, "entregue", StringComparison.OrdinalIgnoreCase))
+                // Se a esteira recusou a entrega do pedido do ERP, ele não está entregue: não recebe.
+                if (erpAcompanhou && string.Equals(mobileO.Status, "entregue", StringComparison.OrdinalIgnoreCase))
                 {
                     await EnsurePagamentoEntregueAsync(pedidoIdResolvido.Value, mobileO);
                     await EnsureVendaAsync(mobileO);
                 }
+                // A Venda do pedido do ERP é deste vínculo (o envio não mexe nela): só é marcada como
+                // cancelada quando a esteira aceitou o cancelamento.
+                else if (nasceuNoErp && erpAcompanhou && string.Equals(mobileO.Status, "cancelado", StringComparison.OrdinalIgnoreCase))
+                    await CancelarVendaAsync(mobileO);
                 // #1543: o estoque do pedido do ERP e da esteira dele. No pedido do aparelho, o produto pode
                 // ter sido ligado ao ERP so agora (nasceu no mesmo envio); a baixa que nao pode sair no
                 // envio sai aqui, em qualquer status que ja desconta.
@@ -208,6 +217,8 @@ public sealed class OrderLinker(
             catch (Exception ex)
             {
                 errorSkip++;
+                // O que este pedido deixou pela metade não pode ir ao banco junto com o próximo.
+                db.DescartarMudancasPendentes();
                 log.LogError(ex,
                     "AutoLink Pedido FALHOU mobile={MobileId} empresaId={EmpresaId} exType={ExType}: {Mensagem}",
                     oid, empresaId, ex.GetType().Name, ex.Message);
@@ -220,49 +231,119 @@ public sealed class OrderLinker(
 
     private static readonly HashSet<string> StatusQueOAparelhoManda = ["aguardando", "preparando", "pronto", "entregue", "cancelado"];
 
-    private async Task<bool> NasceuNoErpAsync(Guid pedidoId)
-    {
-        var origem = await db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
-            .Where(p => p.Id == pedidoId).Select(p => p.Origem).FirstOrDefaultAsync();
-        return origem != SyncMutationDispatcher.OrigemDoPwa;
-    }
+    /// <summary>Início da observação do recebimento que este vínculo registra sozinho na entrega (F7-A).</summary>
+    public const string MarcaDoRecebimentoAutomatico = "Auto-registrado pelo F7-A";
 
     /// <summary>
     /// #1543 — o aparelho avançou (ou cancelou) um pedido que nasceu no ERP. A troca passa pelo caso de
-    /// uso do ERP, com o nível de Operador: valida a transição, baixa ou devolve o estoque pelos itens do
-    /// pedido, grava o evento e publica no outbox. Se a esteira recusa (transição inválida, cancelamento
-    /// de pedido pago, que é do Gerente), o status do ERP fica como estava e a recusa vai para o log.
+    /// uso do ERP: valida a transição, baixa ou devolve o estoque pelos itens do pedido, grava o evento
+    /// e publica no outbox.
+    /// <para>
+    /// O aparelho junta na fila os toques do mesmo pedido e manda só o último status ("pronto" para um
+    /// pedido que o ERP ainda tem em "aguardando"). A esteira não aceita salto, então o caminho é
+    /// percorrido passo a passo (<see cref="PedidoStateMachine.CaminhoPelaCozinha"/>).
+    /// </para>
+    /// <para>
+    /// Sem caminho (pedido aguardando pagamento ou aprovação, pedido já cancelado no ERP), o ERP fica
+    /// como estava. Se a esteira recusa um passo, os passos já dados ficam (cada um é uma troca válida
+    /// e gravada) e o pedido para ali. O motivo vai para o log, e o próximo envio do pedido, ou o
+    /// backfill, retoma de onde parou.
+    /// </para>
     /// </summary>
-    private async Task LevarStatusAEsteiraAsync(Guid pedidoId, Order mobileO)
+    /// <returns>Se o pedido do ERP terminou no status que o aparelho mandou.</returns>
+    private async Task<bool> LevarStatusAEsteiraAsync(Guid pedidoId, Order mobileO)
     {
-        var alvo = (mobileO.Status ?? "").ToLowerInvariant();
-        if (!StatusQueOAparelhoManda.Contains(alvo) || mobileO.EmpresaId is not { } empresaId) return;
+        var alvoTexto = (mobileO.Status ?? "").ToLowerInvariant();
+        if (!StatusQueOAparelhoManda.Contains(alvoTexto) || mobileO.EmpresaId is not { } empresaId) return false;
+        if (!StatusPedidoMapper.TryParse(alvoTexto, out var alvo)) return false;
         try
         {
-            var atual = await db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
-                .Where(p => p.Id == pedidoId).Select(p => p.Status).FirstOrDefaultAsync();
-            if (atual is null || atual == alvo) return;
+            var atualTexto = await db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
+                .Where(p => p.Id == pedidoId && p.EmpresaId == empresaId).Select(p => p.Status).FirstOrDefaultAsync();
+            if (!StatusPedidoMapper.TryParse(atualTexto, out var atual)) return false;
+            if (atual == alvo) return true;
             if (atualizarStatus is null)
             {
                 log.LogWarning("Pedido do ERP {ErpId}: o aparelho pediu {Status}, mas a esteira não está disponível neste contexto. Nada foi gravado.",
-                    pedidoId, alvo);
-                return;
+                    pedidoId, alvoTexto);
+                return false;
+            }
+            if (PedidoStateMachine.CaminhoPelaCozinha(atual, alvo) is not { } caminho)
+            {
+                log.LogWarning("Pedido do ERP {ErpId}: está em {De} e o aparelho {Device} pediu {Para}. Não há caminho na esteira; o ERP fica como está.",
+                    pedidoId, atualTexto, mobileO.LastDeviceId, alvoTexto);
+                return false;
             }
 
-            await atualizarStatus.ExecuteAsync(new AtualizarStatusPedidoCommand(
-                empresaId, pedidoId, alvo,
-                UsuarioNome: mobileO.LastOperatorName,
-                Origem: SyncMutationDispatcher.OrigemDoPwa,
-                OcorridoEm: mobileO.UpdatedAt));
+            var nivel = alvo == StatusPedido.Cancelado && await SoTemRecebimentoDoProprioVinculoAsync(pedidoId, empresaId)
+                ? NivelAcesso.Gerente
+                : NivelAcesso.Operador;
+            for (var i = 0; i < caminho.Count; i++)
+            {
+                // Cada passo com o seu instante (o último é o do toque), para a trilha do pedido sair na ordem.
+                var ocorridoEm = mobileO.UpdatedAt.AddMilliseconds(i - (caminho.Count - 1));
+                var resultado = await atualizarStatus.ExecuteAsync(new AtualizarStatusPedidoCommand(
+                    empresaId, pedidoId, StatusPedidoMapper.Format(caminho[i]),
+                    UsuarioNome: mobileO.LastOperatorName,
+                    Origem: SyncMutationDispatcher.OrigemDoPwa,
+                    OcorridoEm: ocorridoEm,
+                    NivelSolicitante: nivel));
+                if (resultado is null)
+                {
+                    log.LogWarning("Pedido do ERP {ErpId}: a esteira não achou o pedido ao levar {Status}.", pedidoId, alvoTexto);
+                    return false;
+                }
+            }
             log.LogInformation("Pedido do ERP {ErpId}: {De} → {Para} pela esteira, a pedido do aparelho {Device}.",
-                pedidoId, atual, alvo, mobileO.LastDeviceId);
+                pedidoId, atualTexto, alvoTexto, mobileO.LastDeviceId);
+            return true;
         }
         catch (Exception ex)
         {
             // O caso de uso pode ter mexido em entidades antes de recusar; nada disso vai ao banco.
             db.DescartarMudancasPendentes();
             log.LogWarning(ex, "Pedido do ERP {ErpId}: a esteira recusou {Status} vindo do aparelho: {Msg}",
-                pedidoId, alvo, ex.Message);
+                pedidoId, alvoTexto, ex.Message);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// O aparelho cancela um pedido já entregue, e o único recebimento dele é o que este vínculo
+    /// registrou sozinho no ato da entrega (<see cref="EnsurePagamentoEntregueAsync"/>). É o aparelho
+    /// desfazendo a entrega que ele mesmo registrou: no ERP o cancelamento de pedido pago é do gerente,
+    /// e sem este caso o pedido ficaria entregue e pago para sempre, com o aparelho dizendo cancelado.
+    /// Recebimento lançado por alguém no ERP (tem usuário, ou não leva a marca do automático), ou
+    /// cobrança paga no provedor, segue a regra do ERP.
+    /// </summary>
+    private async Task<bool> SoTemRecebimentoDoProprioVinculoAsync(Guid pedidoId, Guid empresaId)
+    {
+        var recebimentos = await db.Set<PedidoPagamento>().IgnoreQueryFilters().AsNoTracking()
+            .Where(pp => pp.PedidoId == pedidoId)
+            .Select(pp => new { pp.Observacao, pp.RegistradoPorUserId })
+            .ToListAsync();
+        if (recebimentos.Count == 0) return false;
+        if (recebimentos.Any(r => r.RegistradoPorUserId is not null
+                                  || r.Observacao?.StartsWith(MarcaDoRecebimentoAutomatico, StringComparison.Ordinal) != true))
+            return false;
+        return !await db.Set<CobrancaPedido>().IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(c => c.PedidoId == pedidoId && c.EmpresaId == empresaId && c.Status == StatusCobrancaPedido.Paga);
+    }
+
+    /// <summary>Marca como cancelada a Venda que a entrega pelo aparelho criou. Idempotente.</summary>
+    private async Task CancelarVendaAsync(Order mobileO)
+    {
+        try
+        {
+            var rastreado = await db.Set<Order>().IgnoreQueryFilters()
+                .FirstOrDefaultAsync(o => o.Id == mobileO.Id && o.EmpresaId == mobileO.EmpresaId);
+            if (rastreado is not null && await saleSync.CancelVendaForOrderAsync(rastreado) && db.ChangeTracker.HasChanges())
+                await db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            db.DescartarMudancasPendentes();
+            log.LogWarning(ex, "Venda do pedido_mobile={MobileId} não foi marcada como cancelada: {Msg}", mobileO.Id, ex.Message);
         }
     }
 
@@ -325,6 +406,7 @@ public sealed class OrderLinker(
         }
         catch (Exception ex)
         {
+            db.DescartarMudancasPendentes();
             log.LogWarning(ex, "F8-G Venda falhou pedido_mobile={MobileId}: {Msg}", mobileO.Id, ex.Message);
         }
     }
@@ -377,18 +459,25 @@ public sealed class OrderLinker(
                             && m.Natureza == NaturezaMovimentacaoEstoque.Venda)
                 .Select(m => m.ProdutoId).Distinct().ToListAsync();
 
+            var linhas = new List<(Product Produto, int Quantidade)>();
             foreach (var doProduto in mobileO.Items.Where(i => !string.IsNullOrWhiteSpace(i.ProductId)).GroupBy(i => i.ProductId))
             {
                 var p = await db.Set<Product>().IgnoreQueryFilters()
                     .FirstOrDefaultAsync(x => x.Id == doProduto.Key && x.EmpresaId == mobileO.EmpresaId);
-                if (p?.ErpProductId is not { } produtoErp || jaSaiu.Contains(produtoErp)) continue;
-                await stockReconciler.BaixarVendaAsync(p, doProduto.Sum(i => i.Qty), mobileO.Id,
+                if (p is not null) linhas.Add((p, doProduto.Sum(i => i.Qty)));
+            }
+            foreach (var (produto, quantidade) in MobileStockReconciler.PorProdutoDoErp(linhas))
+            {
+                if (jaSaiu.Contains(produto.ErpProductId!.Value)) continue;
+                await stockReconciler.BaixarVendaAsync(produto, quantidade, mobileO.Id, mobileO.LojaId,
                     $"Pedido mobile {mobileO.Id} -> {mobileO.Status}");
             }
             if (db.ChangeTracker.HasChanges()) await db.SaveChangesAsync();
         }
         catch (Exception ex)
         {
+            // A baixa que não gravou sai do contexto; senão derruba o SaveChanges dos pedidos seguintes.
+            db.DescartarMudancasPendentes();
             log.LogWarning(ex, "F8-J StockSaida falhou pedido_mobile={MobileId}: {Msg}", mobileO.Id, ex.Message);
         }
     }
@@ -419,8 +508,8 @@ public sealed class OrderLinker(
             PagoEm = mobileO.UpdatedAt,
             RegistradoPorNome = mobileO.LastOperatorName,
             Observacao = mobileO.Metodo is null
-                ? "Auto-registrado pelo F7-A (mobile→ERP). Aparelho sem forma de pagamento: assumido dinheiro."
-                : "Auto-registrado pelo F7-A (mobile→ERP) com a forma escolhida no PWA."
+                ? $"{MarcaDoRecebimentoAutomatico} (mobile→ERP). Aparelho sem forma de pagamento: assumido dinheiro."
+                : $"{MarcaDoRecebimentoAutomatico} (mobile→ERP) com a forma escolhida no PWA."
         });
 
         // BUG-004/#564: NAO criar MovimentoCaixa "entrada" espelho aqui. Ele duplicava o

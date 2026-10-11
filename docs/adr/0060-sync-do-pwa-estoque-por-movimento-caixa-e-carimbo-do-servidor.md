@@ -151,20 +151,53 @@ Achados da banca de 10/10, todos latentes (produção sem aparelho pareado nem e
 
 | Tema | Antes | Agora |
 |---|---|---|
-| Baixa do pedido do aparelho no ERP | Um lote qualquer do produto; saldo truncado em zero, a falta sumia; só a troca de status baixava | FEFO entre os lotes da loja do aparelho; a falta vira descoberto no lote (#540); pedido que já chega "pronto" baixa; uma vez por pedido e produto |
+| Baixa do pedido do aparelho no ERP | Um lote qualquer do produto; saldo truncado em zero, a falta sumia; só a troca de status baixava | FEFO entre os lotes da loja do pedido (a do aparelho que o criou, não a de quem cadastrou o produto); a falta vira descoberto no lote (#540); pedido que já chega "pronto" baixa; uma vez por pedido e produto do ERP |
 | Cancelamento do pedido do aparelho | Somava a quantidade do pedido, tivesse saído ou não | Estorna as saídas que este pedido fez, nos lotes de onde saíram. Sem saída, não devolve |
-| Pedido que nasceu no ERP e o aparelho avançou | Status gravado direto na tabela (sem máquina de estados, estoque nem outbox), e o aparelho ainda baixava por conta própria | A troca passa pelo caso de uso do ERP, com nível de Operador; o estoque é só o da esteira, pelos itens do pedido. Recusa da esteira fica no log e o ERP não muda |
+| Pedido que nasceu no ERP e o aparelho avançou | Status gravado direto na tabela (sem máquina de estados, estoque nem outbox), e o aparelho ainda baixava por conta própria | A troca passa pelo caso de uso do ERP; o estoque é só o da esteira, pelos itens do pedido. Recusa da esteira fica no log e o ERP não muda |
 | Lote excluído no aparelho | Tirava as porções do estoque e deixava insumo e embalagem baixados | Estorna a baixa de insumo; restaurar o lote refaz a baixa. Descarte não devolve (a comida foi feita) |
 | Passo do vínculo que falha | A falha era engolida e o `SaveChanges` seguinte gravava a metade que ficou no contexto | Quem engole a falha descarta antes o que ficou pendente |
 | Fechamento de caixa do aparelho (#954) | Casava "da loja, ou sem loja, ou qualquer": sobrescrevia o fechamento da empresa ou de outra loja | Casa pelo escopo exato: loja com loja, empresa com empresa |
+| Ordem do vínculo | Pedidos antes de lotes: o pedido que chegava entregue junto com o lote não achava estoque e a baixa sumia | Lotes antes de pedidos |
 
 **Quem é dono do quê.** Pedido nascido no aparelho: o aparelho manda, o Pedido do ERP espelha e o
 estoque sai pelo `MobileStockReconciler`. Pedido nascido no ERP (`Origem` diferente de `mobile`): o
-ERP manda. O pagamento automático na entrega pelo aparelho continua valendo para os dois.
+ERP manda. A pergunta é uma só para o envio e para o vínculo, e olha o Pedido do ERP ligado ao pedido
+do aparelho, inclusive quando alguém fez essa ligação à mão. O pagamento automático na entrega pelo
+aparelho continua valendo para os dois.
+
+**Decisões da revisão independente (11/10).**
+
+1. *O aparelho manda só o último status.* A fila do PWA funde os toques do mesmo pedido, então um
+   pedido que o ERP tem em "aguardando" pode chegar como "pronto" ou "entregue". A esteira não aceita
+   salto: o vínculo percorre o caminho passo a passo (`PedidoStateMachine.CaminhoPelaCozinha`), só
+   pela linha da cozinha. Pagamento e aprovação nunca são pulados nem dados por feitos: do pedido
+   pré-operacional só sai o cancelamento. Sem caminho, o ERP fica como está. Se a esteira recusa um
+   passo, os passos já dados ficam e o pedido para ali; o próximo envio do pedido, ou o backfill,
+   retoma. Pedido do ERP que a esteira não levou até "entregue" não recebe pagamento nem vira Venda.
+2. *Cancelar no aparelho um pedido já entregue.* A entrega pelo aparelho registra o recebimento
+   sozinha, e no ERP cancelar pedido pago é do gerente. Quando o único recebimento do pedido é esse
+   automático (sem usuário, com a marca do vínculo, e sem cobrança paga no provedor), o cancelamento
+   vai com nível de gerente: é o aparelho desfazendo a entrega que ele mesmo registrou. Como em todo
+   cancelamento do ERP, o recebimento fica registrado; devolver dinheiro é outro ato. Recebimento
+   lançado por alguém no ERP segue a regra do ERP, e o aparelho fica divergente até um gerente
+   cancelar no console. Antes da #1543 qualquer aparelho cancelava qualquer pedido, sem regra nenhuma.
+3. *Lote excluído devolve o insumo do lote inteiro*, mesmo que o FEFO já tenha atribuído venda a ele.
+   Excluir é dizer que o lote foi registrado por engano: se ele não existiu, a porção vendida saiu,
+   na prática, de outro lote. Lote que existiu e foi vendido em parte se resolve com descarte ou
+   ajuste, não com exclusão.
+4. *Lote que já chega excluído* baixa o insumo e o devolve no mesmo vínculo, como qualquer outro; é o
+   que permite refazer a baixa se ele for restaurado. A baixa só é refeita quando a última baixa
+   inteira foi devolvida pela exclusão (motivo do estorno). Se alguém estornou à mão no ERP, no todo
+   ou em parte, ela não volta sozinha e o log avisa.
+5. *A Venda do pedido do ERP é do vínculo.* No envio ela nascia (ou era marcada como cancelada) antes
+   de a esteira dizer se aceitava a troca. Agora só o vínculo mexe nela, depois do aceite. No pedido
+   nascido no aparelho nada muda: a Venda segue nascendo no envio.
 
 **Limites que ficam.** O Pedido do ERP criado a partir do aparelho guarda os itens do primeiro envio;
 editar itens no aparelho depois não os atualiza lá. A baixa do aparelho não ajusta quando os itens
-mudam com o pedido já pronto. O destino do caixa do PWA segue na D-M5-02.
+mudam com o pedido já pronto. Pedido nascido no aparelho e avançado também no console ou no KDS baixa
+duas vezes, uma por cada caminho (já era assim; #1571). O destino do caixa do PWA
+segue na D-M5-02.
 
 ## Rollback
 

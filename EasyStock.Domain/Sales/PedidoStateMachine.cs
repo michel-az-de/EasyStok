@@ -146,6 +146,36 @@ public static class PedidoStateMachine
             throw new TransicaoInvalidaException(de, para);
     }
 
+    private static readonly StatusPedido[] LinhaDaCozinha = [StatusPedido.Preparando, StatusPedido.Pronto];
+
+    /// <summary>
+    /// Passos para levar o pedido de <paramref name="de"/> até <paramref name="para"/> quando quem pede
+    /// só sabe o destino (#1543: o aparelho junta os toques feitos sem rede e manda só o último status).
+    /// Atravessa apenas a linha da cozinha (<see cref="StatusPedido.Preparando"/>,
+    /// <see cref="StatusPedido.Pronto"/>): pagamento e aprovação têm dono e nunca são pulados nem
+    /// dados por feitos, então do pedido <see cref="PreOperacionais">pré-operacional</see> só sai o
+    /// cancelamento. Vazio quando o pedido já está lá; <c>null</c> quando não há caminho.
+    /// </summary>
+    public static IReadOnlyList<StatusPedido>? CaminhoPelaCozinha(StatusPedido de, StatusPedido para)
+    {
+        if (de == para) return [];
+        if (PreOperacionais.Contains(de) && para != StatusPedido.Cancelado) return null;
+
+        var passos = new List<StatusPedido>();
+        var atual = de;
+        foreach (var meio in LinhaDaCozinha)
+        {
+            if (PodeTransicionar(atual, para)) break;
+            if (!PodeTransicionar(atual, meio)) continue;
+            passos.Add(meio);
+            atual = meio;
+        }
+        if (!PodeTransicionar(atual, para)) return null;
+
+        passos.Add(para);
+        return passos;
+    }
+
     public static bool EstaAberto(StatusPedido status) => Abertos.Contains(status);
     public static bool EstaFinalizado(StatusPedido status) => Finais.Contains(status);
     public static bool DescontaEstoque(StatusPedido status) => ComEstoqueDescontado.Contains(status);

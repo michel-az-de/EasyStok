@@ -94,6 +94,9 @@ public class LoteMobileEstadoReconciler(
 
         // #1543: lote excluido foi registrado por engano, entao nao consumiu insumo nem embalagem. O
         // descarte e diferente: a comida foi feita e jogada fora, o insumo saiu de verdade.
+        // Devolve o insumo do lote inteiro, mesmo que o FEFO ja tenha atribuido venda a ele: se o lote
+        // nao existiu, a porcao vendida saiu, na pratica, de outro lote. Lote que existiu e foi
+        // vendido em parte nao e caso de exclusao (ADR-0060, adendo de 11/10/2026).
         if (desejado == StatusExcluido)
             await EstornarInsumosAsync(lote, agora, ct);
 
@@ -124,9 +127,17 @@ public class LoteMobileEstadoReconciler(
             saida.MarcarComoEstornada(agora);
             db.Add(MovimentacaoEstoque.CriarEstorno(
                 Guid.NewGuid(), saida, agora,
-                $"Estorno: lote {lote.Codigo} excluido (registrado por engano)", agora));
+                $"Estorno: lote {lote.Codigo} excluido (registrado por engano)", agora,
+                motivoEstorno: MotivoDoEstornoDeInsumo));
         }
     }
+
+    /// <summary>
+    /// Motivo gravado no estorno de insumo feito pela exclusão do lote. É por ele que o
+    /// <see cref="Linkers.BatchLinker"/> sabe que a baixa saiu por exclusão (e volta se o lote for
+    /// restaurado), e não por um estorno feito à mão no ERP.
+    /// </summary>
+    public const string MotivoDoEstornoDeInsumo = "Lote do PWA excluído";
 
     /// <summary>As saídas de insumo da produção do lote que ainda valem (não estornadas).</summary>
     public static IQueryable<MovimentacaoEstoque> SaidasDeInsumoAbertas(EasyStockDbContext db, Lote lote)

@@ -7,7 +7,8 @@ namespace EasyStock.Api.Mobile.Services;
 /// <summary>
 /// Leva ao estoque do ERP a venda de um pedido do PWA, quando o produto do aparelho está ligado a
 /// um <see cref="Produto"/> (<c>ErpProductId</c>). Mesma regra da baixa do pedido no ERP
-/// (<c>PedidoEstoqueIntegrationService</c>), sobre os lotes da loja do aparelho:
+/// (<c>PedidoEstoqueIntegrationService</c>), sobre os lotes da loja do pedido (pedido sem loja: todos
+/// os lotes da empresa, como no ERP):
 /// <list type="bullet">
 /// <item>sai primeiro do lote que vence antes (FEFO) e atravessa os lotes; bloqueado e descartado não baixam;</item>
 /// <item>falta de saldo não trava: o saldo vai a zero e a falta vira <c>QuantidadeDescoberta</c> no lote (#540);</item>
@@ -31,19 +32,20 @@ public class MobileStockReconciler(
 {
     /// <summary>Baixa a venda de um produto do pedido. Devolve false quando não há o que fazer (sem vínculo, sem lote, já baixado).</summary>
     public async Task<bool> BaixarVendaAsync(
-        Product produtoDoAparelho, int quantidade, string pedidoId, string descricao, CancellationToken ct = default)
+        Product produtoDoAparelho, int quantidade, string pedidoId, Guid? lojaDoPedido, string descricao,
+        CancellationToken ct = default)
     {
         try
         {
             if (Alvo(produtoDoAparelho) is not { } alvo || quantidade <= 0) return false;
             if ((await SaidasDoPedidoAsync(alvo, pedidoId, ct)).Count > 0) return false;
 
-            var lotes = await LotesEmFefoAsync(alvo, ct);
+            var lotes = await LotesEmFefoAsync(alvo, lojaDoPedido, ct);
             if (lotes.Count == 0)
             {
                 log.LogWarning(
                     "Venda do PWA sem lote no ERP: produto {ProdutoId} loja {LojaId} (produto do aparelho {MobileId}). Nada foi baixado.",
-                    alvo.ProdutoId, alvo.LojaId, produtoDoAparelho.Id);
+                    alvo.ProdutoId, lojaDoPedido, produtoDoAparelho.Id);
                 return false;
             }
             var usuarioSistema = await systemUserResolver.GetOrCreateAsync(alvo.EmpresaId, ct);
@@ -143,21 +145,33 @@ public class MobileStockReconciler(
         }
     }
 
-    private sealed record AlvoNoErp(Guid EmpresaId, Guid ProdutoId, Guid? LojaId);
+    /// <summary>
+    /// Junta as linhas do pedido pelo produto do ERP: duas linhas do mesmo produto, ou dois produtos do
+    /// aparelho ligados ao mesmo produto, são uma baixa só. Produto sem vínculo fica de fora.
+    /// </summary>
+    public static IEnumerable<(Product Produto, int Quantidade)> PorProdutoDoErp(
+        IEnumerable<(Product Produto, int Quantidade)> linhas) =>
+        linhas.Where(l => l.Produto.ErpProductId.HasValue)
+            .GroupBy(l => l.Produto.ErpProductId)
+            .Select(g => (g.First().Produto, g.Sum(l => l.Quantidade)));
+
+    private sealed record AlvoNoErp(Guid EmpresaId, Guid ProdutoId);
 
     // Sem vinculo com o ERP, ou aparelho sem empresa: a venda fica so no espelho do aparelho.
     private static AlvoNoErp? Alvo(Product p) =>
-        p is { ErpProductId: { } produtoId, EmpresaId: { } empresaId } ? new AlvoNoErp(empresaId, produtoId, p.LojaId) : null;
+        p is { ErpProductId: { } produtoId, EmpresaId: { } empresaId } ? new AlvoNoErp(empresaId, produtoId) : null;
 
     private static decimal Saldo(ItemEstoque lote) => lote.QuantidadeAtual?.Value ?? 0m;
 
-    // Lotes da loja do aparelho (aparelho sem loja: lotes sem loja), para um aparelho nao consumir o
-    // estoque de outra loja. IgnoreQueryFilters: o sync do aparelho nao tem JWT; o isolamento e o
-    // filtro por empresa, que vem do proprio aparelho.
-    private async Task<List<ItemEstoque>> LotesEmFefoAsync(AlvoNoErp alvo, CancellationToken ct)
+    // Lotes da loja do pedido, para a venda de uma loja nao consumir o estoque de outra; pedido sem
+    // loja enxerga todos os lotes da empresa (mesma regra de PedidoEstoqueIntegrationService, #1534).
+    // A loja e a do pedido, nao a de quem cadastrou o produto. IgnoreQueryFilters: o sync do aparelho
+    // nao tem JWT; o isolamento e o filtro por empresa, que vem do proprio aparelho.
+    private async Task<List<ItemEstoque>> LotesEmFefoAsync(AlvoNoErp alvo, Guid? lojaDoPedido, CancellationToken ct)
     {
         var lotes = await db.Set<ItemEstoque>().IgnoreQueryFilters()
-            .Where(i => i.EmpresaId == alvo.EmpresaId && i.ProdutoId == alvo.ProdutoId && i.LojaId == alvo.LojaId
+            .Where(i => i.EmpresaId == alvo.EmpresaId && i.ProdutoId == alvo.ProdutoId
+                        && (lojaDoPedido == null || i.LojaId == lojaDoPedido)
                         && i.Status != StatusItemEstoque.Bloqueado && i.Status != StatusItemEstoque.Descartado)
             .ToListAsync(ct);
         return lotes
