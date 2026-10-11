@@ -66,6 +66,7 @@ jobs:
       - run: node ferramentas/prova-1542-ajuste-por-porcao.mjs
       - run: node ferramentas/prova-1552-receita-por-porcao.mjs
       - run: node ferramentas/prova-1551-delta-console.mjs
+      - run: node ferramentas/prova-1565-console-ocioso.mjs
       - run: node ferramentas/prova-1548-banca-console.mjs
       - run: node ferramentas/prova-1424-mensagem-programada-api.mjs
       - run: node ferramentas/prova-1427-sla-resposta.mjs
