@@ -242,7 +242,9 @@ public sealed class PedidoEstoqueIntegrationService(
 
         // Devolve para os lotes que de fato baixaram (um movimento de saida por lote), nao para
         // "o primeiro lote": a parte que virou descoberto e abatida antes de voltar ao saldo.
-        var todasAsSaidas = (await movRepo.GetByProdutoAsync(pedido.EmpresaId, item.ProdutoId.Value))
+        // #1564: o banco devolve só as deste pedido+item, e não o histórico inteiro do produto.
+        var todasAsSaidas = (await movRepo.GetPorReferenciaAsync(
+                pedido.EmpresaId, item.ProdutoId.Value, refDocItem, NaturezaMovimentacaoEstoque.Venda, ct))
             .Where(m => m.DocumentoReferencia == refDocItem
                         && m.Tipo == TipoMovimentacaoEstoque.Saida
                         && m.Natureza == NaturezaMovimentacaoEstoque.Venda)

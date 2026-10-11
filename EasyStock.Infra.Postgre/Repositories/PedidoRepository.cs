@@ -35,6 +35,9 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task<Pedido?> GetByIdAsync(Guid empresaId, Guid id) =>
             db.Pedidos.FirstOrDefaultAsync(p => p.EmpresaId == empresaId && p.Id == id);
 
+        public async Task<IReadOnlyList<Pedido>> ListarPorIdsAsync(Guid empresaId, IReadOnlyCollection<Guid> ids, CancellationToken ct = default) =>
+            await db.Pedidos.AsNoTracking().Where(p => p.EmpresaId == empresaId && ids.Contains(p.Id)).ToListAsync(ct);
+
         public Task<Pedido?> GetByIdWithDetailsAsync(Guid empresaId, Guid id) =>
             db.Pedidos
                 .Include(p => p.Itens)

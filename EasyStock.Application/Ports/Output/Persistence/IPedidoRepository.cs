@@ -5,6 +5,12 @@ namespace EasyStock.Application.Ports.Output.Persistence
         // ── Pedido raiz ───────────────────────────────────────────
         Task<Pedido?> GetByIdAsync(Guid empresaId, Guid id);
 
+        /// <summary>
+        /// Vários pedidos da empresa em uma consulta (#1564), sem itens nem pagamentos. Somente leitura.
+        /// Id que não existe ou é de outra empresa não vem na lista.
+        /// </summary>
+        Task<IReadOnlyList<Pedido>> ListarPorIdsAsync(Guid empresaId, IReadOnlyCollection<Guid> ids, CancellationToken ct = default);
+
         /// <summary>Carrega pedido com itens, eventos e pagamentos — pra tela de detalhe.</summary>
         Task<Pedido?> GetByIdWithDetailsAsync(Guid empresaId, Guid id);
 

@@ -199,6 +199,38 @@ public class AvaliadorLembretesTests
         _repo.Todos.Should().ContainSingle();
     }
 
+    // #1564: a rodada pergunta ao banco uma vez por tipo de fato, e não uma vez por candidato.
+    [Fact]
+    public async Task ExistenciaEmLoteUmaConsultaPorTipoENadaNasceDuasVezes()
+    {
+        var inicio = Agora.AddMinutes(-5);
+        var agendados = Enumerable.Range(0, 4).Select(_ => Agendado(Agora.AddHours(3), inicio)).ToList();
+        var semBaixa = Enumerable.Range(0, 3).Select(_ => new PedidoSemBaixa(_empresaId, Guid.NewGuid(), "Fulana", null)).ToList();
+        var conversas = Enumerable.Range(0, 2).Select(_ =>
+            new ConversaSemResposta(_empresaId, Guid.NewGuid(), Guid.NewGuid(), "Fulana", null, Agora.AddMinutes(-11))).ToList();
+        // O mesmo fato repetido na consulta não vira dois lembretes (o índice único recusaria o segundo).
+        _candidatos.ListarPedidosAgendadosAsync(Arg.Any<CancellationToken>()).Returns([.. agendados, agendados[0]]);
+        _candidatos.ListarPedidosSemBaixaAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([.. semBaixa, semBaixa[0]]);
+        _candidatos.ListarConversasSemRespostaAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([.. conversas, conversas[0]]);
+
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(9);
+        _repo.ConsultasDeExistentes.Should().Be(3, "uma por tipo: agendado, pagamento sem baixa e cliente sem resposta");
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(0);
+        _repo.ConsultasDeExistentes.Should().Be(6);
+        _repo.Todos.Should().HaveCount(9);
+        _repo.Todos.Select(l => (l.Tipo, l.Referencia)).Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
+    public async Task SemFatoVencidoNaoConsultaExistencia()
+    {
+        Agendar(Agendado(Agora.AddHours(3), Agora.AddMinutes(10)));
+
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(0);
+
+        _repo.ConsultasDeExistentes.Should().Be(0);
+    }
+
     [Fact]
     public async Task PagamentoSemBaixaIdempotente()
     {
@@ -301,8 +333,15 @@ public class AvaliadorLembretesTests
             return Task.FromResult(vencidos.Count);
         }
 
-        public Task<bool> ExisteAutomaticoAsync(Guid empresaId, TipoLembrete tipo, string referencia, CancellationToken ct = default) =>
-            Task.FromResult(_itens.Any(l => l.EmpresaId == empresaId && l.Tipo == tipo && l.Referencia == referencia));
+        public int ConsultasDeExistentes { get; private set; }
+
+        public Task<IReadOnlyCollection<(Guid EmpresaId, string Referencia)>> ListarAutomaticosExistentesAsync(
+            TipoLembrete tipo, IReadOnlyCollection<(Guid EmpresaId, string Referencia)> fatos, CancellationToken ct = default)
+        {
+            ConsultasDeExistentes++;
+            return Task.FromResult<IReadOnlyCollection<(Guid EmpresaId, string Referencia)>>(fatos
+                .Where(f => _itens.Any(l => l.EmpresaId == f.EmpresaId && l.Tipo == tipo && l.Referencia == f.Referencia)).ToList());
+        }
 
         public Task<IReadOnlyList<Lembrete>> ListarAutomaticosAbertosAsync(CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<Lembrete>>(_itens.Where(l => l.Tipo != TipoLembrete.Manual && l.EstaAberto).ToList());
