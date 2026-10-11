@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Events.Storefront;
 using EasyStock.Domain.Sales;
+using EasyStock.Infra.Postgre.Concurrency;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -36,7 +37,7 @@ public sealed class CancelarPedidosAbandonadosBackgroundService(
 
             try
             {
-                await ProcessarBatchAsync(stoppingToken).ConfigureAwait(false);
+                await RodadaAsync(stoppingToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -44,6 +45,13 @@ public sealed class CancelarPedidosAbandonadosBackgroundService(
             }
         }
     }
+
+    /// <summary>
+    /// Uma rodada com a trava (#1575): API e Worker registram este serviço e quem não pega a trava pula,
+    /// para o mesmo pedido não ser cancelado pelos dois ao mesmo tempo. Pública para os testes de integração.
+    /// </summary>
+    public Task RodadaAsync(CancellationToken ct) => PostgresAdvisoryLock.TentarExecutarEmEscopoProprioAsync(
+        scopeFactory, LockKeys.PedidosAbandonados, ProcessarBatchAsync, ct);
 
     private async Task ProcessarBatchAsync(CancellationToken ct)
     {

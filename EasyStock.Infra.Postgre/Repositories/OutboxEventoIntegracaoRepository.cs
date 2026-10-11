@@ -37,6 +37,22 @@ public sealed class OutboxEventoIntegracaoRepository(EasyStockDbContext db) : IO
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<OutboxEventoIntegracao>> ProximosPendentesDeTodosOsShardsAsync(
+        int max,
+        CancellationToken ct = default)
+    {
+        var agora = DateTime.UtcNow;
+        return await db.Set<OutboxEventoIntegracao>()
+            .IgnoreQueryFilters()
+            .Where(e => e.Status == StatusOutboxIntegracao.Pendente
+                     && e.ProximaTentativaEm <= agora)
+            // Mesma ordem do laço por shard que isto substitui: shard 0 a 3 e, em cada um, FIFO.
+            .OrderBy(e => e.ShardKey)
+            .ThenBy(e => e.CriadoEm)
+            .Take(max)
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<OutboxEventoIntegracao>> ListarPorEmpresaAsync(
         Guid empresaId,
         StatusOutboxIntegracao? status = null,

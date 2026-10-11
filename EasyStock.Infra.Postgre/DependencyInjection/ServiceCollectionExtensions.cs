@@ -5,6 +5,7 @@ using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Storefront.Avaliacao;
+using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Configuration;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Data.Interceptors;
@@ -282,6 +283,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 services.AddScoped<IGeradorAutoPreenchimento, GeradorAutoPreenchimentoStub>();
             }
 
+            // #1575: API e Worker chamam este método, então os três serviços abaixo sobem nos dois hosts.
+            // Cada rodada pega um advisory lock e quem não pega pula.
+            services.TryAddScoped<PostgresAdvisoryLock>();
             // F10-B: Retention service — limpa entity_alteracoes antigas (1x/dia).
             services.AddHostedService<EntityAlteracaoRetentionService>();
             // F10-D: Mobile alert service — verifica devices offline a cada 30min.

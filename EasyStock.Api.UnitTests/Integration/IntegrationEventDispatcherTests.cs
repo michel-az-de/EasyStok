@@ -23,8 +23,7 @@ public class IntegrationEventDispatcherTests
     {
         var evento = OutboxEventoIntegracao.Criar(Guid.NewGuid(), Tipo, "Pedido", Guid.NewGuid(), "{}");
         var repo = Substitute.For<IOutboxEventoIntegracaoRepository>();
-        repo.ProximosPendentesAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([]);
-        repo.ProximosPendentesAsync(Arg.Is(0), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([evento]);
+        repo.ProximosPendentesDeTodosOsShardsAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([evento]);
         var uow = Substitute.For<IUnitOfWork>();
         var chamadas = new List<string>();
         uow.When(u => u.DescartarAlteracoesPendentes()).Do(_ => chamadas.Add("descartar"));
@@ -42,5 +41,21 @@ public class IntegrationEventDispatcherTests
         chamadas.Should().Equal("commit", "descartar", "commit");
         evento.Tentativas.Should().Be(1);
         evento.ErroUltimaTentativa.Should().Contain("handler quebrou");
+    }
+
+    [Fact]
+    public async Task Rodada_busca_os_pendentes_numa_consulta_so()
+    {
+        // #1575: o Worker roda a cada 30 s; a rodada ociosa custava uma consulta por shard.
+        var repo = Substitute.For<IOutboxEventoIntegracaoRepository>();
+        repo.ProximosPendentesDeTodosOsShardsAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([]);
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        var dispatcher = new IntegrationEventDispatcher(
+            repo, Substitute.For<IUnitOfWork>(), provider, NullLogger<IntegrationEventDispatcher>.Instance);
+
+        (await dispatcher.ExecutarRodadaAsync(50, CancellationToken.None)).Should().Be(0);
+
+        await repo.Received(1).ProximosPendentesDeTodosOsShardsAsync(50, Arg.Any<CancellationToken>());
+        await repo.DidNotReceive().ProximosPendentesAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 }
