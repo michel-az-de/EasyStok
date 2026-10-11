@@ -67,6 +67,7 @@ jobs:
       - run: node ferramentas/prova-1552-receita-por-porcao.mjs
       - run: node ferramentas/prova-1551-delta-console.mjs
       - run: node ferramentas/prova-1548-banca-console.mjs
+      - run: node ferramentas/prova-1563-estorno-fuso-minimo.mjs
       - run: node ferramentas/prova-1424-mensagem-programada-api.mjs
       - run: node ferramentas/prova-1427-sla-resposta.mjs
       - run: node ferramentas/prova-onda2-cancelamento.mjs

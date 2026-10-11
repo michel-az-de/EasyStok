@@ -150,6 +150,44 @@ public class InsumosDaProducaoUseCaseTests
     }
 
     [Fact]
+    public async Task Atualizar_LimparMinimo_GravaNulo_EVoltaAHerdarDaCategoria()
+    {
+        // #1563: null no mínimo é "não mexe" e zero vence a herança; limpar é explícito.
+        var molho = Insumo("Molho sugo", 2000);
+        _gravados[molho.Id] = molho;
+        var categoria = new Categoria { QuantidadeMinima = 300 };
+
+        await Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, null, null, LimparMinimo: true));
+
+        molho.QuantidadeMinima.Should().BeNull();
+        EasyStock.Domain.Services.LimiarEstoqueResolver.Resolver(molho, categoria, null).QuantidadeMinima.Should().Be(300);
+    }
+
+    [Fact]
+    public async Task Atualizar_SemLimparMinimo_NullNaoMexe_EValorGrava()
+    {
+        var molho = Insumo("Molho sugo", 2000);
+        _gravados[molho.Id] = molho;
+
+        await Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, null, 0.04m));
+        molho.QuantidadeMinima.Should().Be(2000);
+        await Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, 2500, null));
+        molho.QuantidadeMinima.Should().Be(2500);
+    }
+
+    [Fact]
+    public async Task Atualizar_LimparMinimoComValor_400_ENaoMexe()
+    {
+        var molho = Insumo("Molho sugo", 2000);
+        _gravados[molho.Id] = molho;
+
+        var act = () => Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, 10, null, LimparMinimo: true));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        molho.QuantidadeMinima.Should().Be(2000);
+    }
+
+    [Fact]
     public async Task Atualizar_ProdutoQueNaoEInsumo_400()
     {
         var prato = new Produto { Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = "Lasanha", EhInsumo = false };

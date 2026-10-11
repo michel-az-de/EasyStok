@@ -8,11 +8,14 @@ import { lerMoeda, mascaraMoeda, moeda } from '../../dominio/formato'
 import css from './ficha.module.css'
 
 const data = (valor) => new Date(valor).toLocaleString('pt-BR')
+// Só a intenção que nunca saiu daqui pode ser descartada; depois do envio a API responde 409.
+const podeDescartar = (estorno) => estorno.situacao === 'pendente' && estorno.enviadoEm == null
 const situacoes = { pendente: 'Aguardando confirmação', confirmado: 'Confirmado', recusado: 'Recusado' }
 
 export function EstornosOnline({ pedidoId }) {
   const { acoes } = useAcessoModulos()
-  const { dados, erro, aviso, semResposta, ocupado, atualizar, solicitar, retomar } = useEstornosOnline(pedidoId)
+  const { dados, erro, aviso, semResposta, ocupado, atualizar, solicitar, retomar, descartar } = useEstornosOnline(pedidoId)
+  const [descartando, setDescartando] = useState(null)
   const [aberto, setAberto] = useState(false)
   const [pagamentoId, setPagamentoId] = useState('')
   const [centavos, setCentavos] = useState('')
@@ -55,6 +58,13 @@ export function EstornosOnline({ pedidoId }) {
         {e.detalhe && <><br />{e.detalhe}</>}
       </p>
       {e.situacao === 'pendente' && podeSolicitar && <Botao disabled={ocupado} onClick={() => retomar(e.id)}>Conferir estorno pendente</Botao>}
+      {/* #1563: "Conferir" envia ao Mercado Pago. Quem desistiu descarta, e só enquanto nada foi enviado. */}
+      {podeDescartar(e) && podeSolicitar && descartando !== e.id && <Botao disabled={ocupado} onClick={() => setDescartando(e.id)}>Descartar solicitação não enviada</Botao>}
+      {podeDescartar(e) && podeSolicitar && descartando === e.id && <>
+        <p className={css.corpoBloco}>Descartar a solicitação de {moeda(e.valor)}? Nada foi enviado ao Mercado Pago: o cliente não recebe a devolução e o valor volta a ficar disponível para estorno.</p>
+        <Botao variante="primario" disabled={ocupado} onClick={async () => { await descartar(e.id); setDescartando(null) }}>{ocupado ? 'Descartando…' : 'Confirmar descarte'}</Botao>
+        <Botao disabled={ocupado} onClick={() => setDescartando(null)}>Voltar</Botao>
+      </>}
     </div>)}
     {semResposta && <>
       <output className={css.corpoBloco}>Solicitação de {moeda(semResposta.valor)} sem resposta conclusiva. Atualize ou retome esta mesma solicitação. Não devolva por outro meio.</output>

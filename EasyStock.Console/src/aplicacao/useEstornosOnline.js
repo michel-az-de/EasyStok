@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  listarEstornosOnline, solicitarEstornoOnline, retomarEstornoOnline,
+  listarEstornosOnline, solicitarEstornoOnline, retomarEstornoOnline, descartarEstornoOnline,
   lerEstornoSemResposta, guardarEstornoSemResposta, limparEstornoSemResposta,
 } from '../infra/api/estornosOnlineApi'
 
@@ -63,5 +63,24 @@ export function useEstornosOnline(pedidoId) {
     } finally { emVoo.current = false; if (ativo.current) setOcupado(false) }
   }
 
-  return { dados, erro, aviso, semResposta, ocupado, atualizar, solicitar: (campos) => enviar(campos), retomar: (id) => enviar(null, id) }
+  // #1563: "retomar" envia ao Mercado Pago; descartar encerra a solicitação que nunca foi enviada.
+  // No 409 (já enviada, já encerrada) a lista é relida: o botão some e a situação real aparece.
+  async function descartar(operacaoId) {
+    if (emVoo.current) return false
+    emVoo.current = true; setOcupado(true); setErro(null); setAviso(null)
+    let recebido = false
+    try {
+      const resposta = await descartarEstornoOnline(pedidoId, operacaoId)
+      recebido = true
+      if (ativo.current) setAviso(resposta.detalhe)
+      await carregar()
+      return true
+    } catch (e) {
+      if (!recebido && e.status === 409) await carregar().catch(() => {})
+      if (ativo.current) setErro(recebido ? 'A solicitação foi descartada. Atualize para conferir a situação e o saldo.' : e.message)
+      return recebido
+    } finally { emVoo.current = false; if (ativo.current) setOcupado(false) }
+  }
+
+  return { dados, erro, aviso, semResposta, ocupado, atualizar, solicitar: (campos) => enviar(campos), retomar: (id) => enviar(null, id), descartar }
 }
