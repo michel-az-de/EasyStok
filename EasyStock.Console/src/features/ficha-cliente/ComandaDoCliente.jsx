@@ -57,7 +57,7 @@ function SelecaoCompartilhada({ comanda: c, ocupado, salvar, confirmar, cardapio
             <button type="button" disabled={ocupado || i.qtd >= 99} aria-label={'Adicionar uma unidade de ' + nome} onClick={() => mudarItem(n, { qtd: i.qtd + 1 })}>+</button>
           </span>
           <label className={css.observacaoCompartilhada}>Observação de {nome}
-            <input value={i.observacao ?? ''} maxLength={1000} disabled={ocupado} onChange={e => mudarItem(n, { observacao: e.target.value })} />
+            <input value={i.observacao ?? ''} maxLength={500} disabled={ocupado} onChange={e => mudarItem(n, { observacao: e.target.value })} />
           </label>
         </> : i.observacao && <small>{i.observacao}</small>}
       </li>

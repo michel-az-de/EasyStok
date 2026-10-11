@@ -33,6 +33,9 @@ public sealed partial class PedidoConversaConcorrenciaTests
         var c = await SemearAsync(factory);
         var primeiro = await Gerar(); var inicial = await Estado(client, primeiro.Token);
         inicial.NumeroComanda.Should().BePositive(); inicial.ConversaId.Should().Be(c.ConversaId);
+        var listaInicial = await ListarNoAtendimento();
+        listaInicial.Should().ContainSingle(e => e.LinkId == inicial.LinkId && e.Revisao == 0 && e.PodeEditar,
+            "o atendimento já pode editar a seleção antes do primeiro salvamento do cliente");
         await Salvar(client, primeiro.Token, inicial, inicial.Rascunho with { Itens = [new(c.CardapioItemId, 1)], Observacoes = "Preservar seleção",
             JanelaId = c.JanelaId, DataEntrega = c.DataEntrega });
         var segundo = await Gerar(); segundo.NumeroComanda.Should().Be(inicial.NumeroComanda);
@@ -55,6 +58,11 @@ public sealed partial class PedidoConversaConcorrenciaTests
         var atual = await Estado(client, links[0]!.Token);
         atual.NumeroComanda.Should().Be(inicial.NumeroComanda); atual.Pedido!.NumeroComanda.Should().Be(inicial.NumeroComanda);
         atual.Pedido.PedidoId.Should().Be(envios[0].PedidoId);
+        var listaAtual = await ListarNoAtendimento();
+        listaAtual.Should().Contain(e => e.LinkId == atual.LinkId && e.Revisao == 0 && e.PodeEditar,
+            "a nova edição do cliente aparece imediatamente para o atendimento");
+        listaAtual.Should().Contain(e => e.LinkId == vigente.LinkId && !e.PodeEditar,
+            "o envio anterior permanece como comprovante");
         (await Estado(client, segundo.Token)).PodeEditar.Should().BeFalse("o link consumido acompanha o pedido");
         await Enviar(client, segundo.Token, vigente.Revisao);
         preferencias.Should().ContainSingle();
@@ -82,6 +90,14 @@ public sealed partial class PedidoConversaConcorrenciaTests
             resposta.StatusCode.Should().Be(HttpStatusCode.OK, await resposta.Content.ReadAsStringAsync());
             var json = System.Text.Json.JsonDocument.Parse(await resposta.Content.ReadAsStringAsync());
             return json.RootElement.GetProperty("data").Deserialize<EasyStock.Application.Services.Atendimento.LinkCardapioConversaGerado>(ComandaClienteUseCase.Json)!;
+        }
+
+        async Task<IReadOnlyList<ComandaClienteResult>> ListarNoAtendimento()
+        {
+            using var resposta = await client.GetAsync($"/api/atendimento/conversas/{c.ConversaId}/comandas-cliente");
+            resposta.StatusCode.Should().Be(HttpStatusCode.OK, await resposta.Content.ReadAsStringAsync());
+            using var json = JsonDocument.Parse(await resposta.Content.ReadAsStringAsync());
+            return json.RootElement.GetProperty("data").Deserialize<List<ComandaClienteResult>>(ComandaClienteUseCase.Json)!;
         }
     }
 
