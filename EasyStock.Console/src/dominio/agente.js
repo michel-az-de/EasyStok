@@ -71,7 +71,7 @@ const PADRAO_COMPOSICAO = /\b(leva|contem|contém|possui|é feito|e feito|vai co
 // aberta a novo item, não uma tentativa de cobrir todo ingrediente do mundo.
 const PALAVRAS_SEM_SEM_RESTRICAO = new Set([
   'pressa', 'problema', 'problemas', 'duvida', 'falta', 'crise', 'chance',
-  'graca', 'vergonha', 'nocao', 'essa', 'esse', 'nenhuma', 'nenhum', 'mais', 'troco',
+  'graca', 'vergonha', 'nocao', 'essa', 'esse', 'nenhuma', 'nenhum', 'mais', 'troco', 'querer',
 ])
 const PADRAO_SEM_ALGO = /\bsem\s+(\w+)/
 const pareceComposicao = (texto) => {
@@ -223,6 +223,27 @@ export function classificarIntencao(conversa) {
   if (pareceComposicao(texto)) return { intencao: INTENCOES.RESTRICAO, trecho: ultima.texto, reclamacaoDeProduto: false }
   const achada = PISTAS.find(([, pistas]) => pistas.some((p) => texto.includes(normalizar(p))))
   return { intencao: achada ? achada[0] : INTENCOES.OUTRO, trecho: ultima.texto, reclamacaoDeProduto: false }
+}
+
+// #1606: o que as falas do cliente pedem da dona, sem precisar de catálogo. O
+// Balcão (dominio/automatico.js) passa só as mensagens ainda sem resposta e usa
+// isto para subir a conversa mesmo quando a passagem não foi gravada. Saldo e
+// área ficam de fora de propósito: dependem do catálogo e já viram passagem.
+const PISTAS_DE_PAGAMENTO_FEITO = ['paguei', 'comprovante', 'mandei o pix', 'fiz o pix', 'transferi']
+const INTENCOES_SOBRE_O_PEDIDO = [INTENCOES.ACOMPANHAR.chave, INTENCOES.PERGUNTA_ENTREGA.chave]
+
+export function sinalDoCliente(conversa) {
+  const { intencao, reclamacaoDeProduto } = classificarIntencao(conversa)
+  const texto = falaRecenteDoCliente(conversa)
+  let paraDona = null
+  if (reclamacaoDeProduto) paraDona = 'devolucao'
+  else if (intencao.chave === INTENCOES.RESTRICAO.chave) paraDona = 'restricao'
+  else if (pedeADona(conversa)) paraDona = 'pede-a-dona'
+  return {
+    paraDona,
+    alegaPagamento: PISTAS_DE_PAGAMENTO_FEITO.some((p) => texto.includes(p)),
+    perguntaDoPedido: INTENCOES_SOBRE_O_PEDIDO.includes(intencao.chave),
+  }
 }
 
 // A ação que o modo simulado recomenda. Segue as mesmas travas do prompt.
