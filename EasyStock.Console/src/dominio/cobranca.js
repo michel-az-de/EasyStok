@@ -400,6 +400,15 @@ export const baixaCancelaCobrancaOnline = (pedido) => Boolean(
   && !pedido.cobranca?.manual
   && !pedido.cobranca?.pagaEm
 
+// --- Link vencido no modo API (#1586) ----------------------------------------
+// Quem trata é o job de expiração do EasyStok (`CobrancaPedidoJob`, a cada 60 s): na primeira
+// vez gera a segunda cobrança e manda o link novo na conversa; na segunda cancela o pedido,
+// libera a vaga e avisa o cliente. A Ficha não reenvia nada, então diz o que vai acontecer.
+const ULTIMA_TENTATIVA_DE_COBRANCA = 2
+export const avisoDeLinkVencidoApi = (cobranca) => ((cobranca?.tentativa ?? 1) < ULTIMA_TENTATIVA_DE_COBRANCA
+  ? 'O EasyStok manda um link novo ao cliente sozinho. Se esse também vencer, o pedido é cancelado e o cliente é avisado.'
+  : 'Segundo link vencido: o EasyStok cancela o pedido sozinho e avisa o cliente.')
+
 // "Como recebeu" já preenchido com o meio da cobrança quando ele é um dos métodos
 // da baixa; link de cartão não diz se foi crédito ou débito, então fica em branco.
 const METODOS_DA_BAIXA = new Set(['pix', 'dinheiro', 'credito', 'debito', 'transferencia'])

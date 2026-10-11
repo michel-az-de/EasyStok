@@ -34,6 +34,7 @@ jobs:
       - run: npm run qualidade
       - run: node ferramentas/prova-1426-notificacoes-console.mjs
       - run: node ferramentas/prova-1255-pagamento-manual-api.mjs
+      - run: node ferramentas/prova-1586-encerrar-ficha-ux.mjs
       - run: node ferramentas/prova-1420-sugestao-agente-api.mjs
       - run: node ferramentas/prova-f06-honestidade.mjs
       - run: node ferramentas/prova-f11-lote-papel.mjs

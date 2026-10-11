@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Avatar } from '../../componentes/Avatar'
 import { Bloco } from '../../componentes/Bloco'
 import { Botao } from '../../componentes/Botao'
@@ -18,7 +18,9 @@ import {
 import { indiceDoPasso } from '../../dominio/esteira'
 import { numeroCurto, pedidoEncerrado } from '../../dominio/pedido'
 import { SITUACOES, situacaoDoCep } from '../../dominio/areaEntrega'
-import { chegouQuando, dicaDoCep, mesmoDomicilio, resumoFinanceiro } from '../../dominio/cliente'
+import {
+  chegouQuando, dicaDoCep, mesmoDomicilio, motivoParaNaoBloquear, resumoFinanceiro,
+} from '../../dominio/cliente'
 import { SELO_CAPTADO, automaticoConduzindo } from '../../dominio/captura'
 import { historicoElegivelParaFidelidade, saldoDePontos } from '../../dominio/fidelidade'
 import { notasRecentes } from '../../dominio/notas'
@@ -77,6 +79,11 @@ export function BlocoCliente({ conversa }) {
   const [menuAberto, setMenuAberto] = useState(false)
   const [avisoEndereco, setAvisoEndereco] = useState(null)
   const [form, setForm] = useState(() => estadoInicialDoForm(conversa))
+  // #1586: espera e erro do "Salvar cadastro", presos à conversa que iniciou (a Ficha troca de
+  // conversa sem remontar este bloco). A ref trava o segundo toque.
+  const [cadastro, setCadastro] = useState({ id: null, salvando: false, erro: null })
+  const cadastrando = useRef(false)
+  const idMotivoBloqueio = useId()
 
   // Troca de conversa: recarrega o rascunho do cadastro rápido e limpa avisos
   // que eram da conversa anterior. Só depende do id: editar o formulário não
@@ -129,18 +136,35 @@ export function BlocoCliente({ conversa }) {
   const situacaoCep = form.cep ? situacaoDoCep(form.cep, prefixosCepAtendidos) : SITUACOES.SEM_CEP
   const cepForaDaArea = situacaoCep === SITUACOES.FORA || situacaoCep === SITUACOES.LIMITE
   const podeSalvarCadastro = form.nome.trim() && form.telefone.replace(/\D/g, '').length >= 10
+  const salvandoCadastro = cadastro.salvando && cadastro.id === conversa.id
+  const erroCadastro = cadastro.id === conversa.id ? cadastro.erro : null
+  // #1586: lead sem cadastro no modo API não tem o que bloquear; o item nasce desabilitado.
+  const motivoSemBloqueio = bloqueada ? null : motivoParaNaoBloquear(conversa, { fonteApi })
 
-  function aoSalvarCadastro() {
+  // Na demonstração a ação é síncrona e não devolve nada: o `await` segue como sucesso.
+  async function aoSalvarCadastro() {
+    if (cadastrando.current) return
+    cadastrando.current = true
+    const id = conversa.id
     const endereco = [form.enderecoSemCep.trim(), form.cep ? mascaraCep(form.cep) : '']
       .filter(Boolean).join(', ') || null
-    salvarCadastroRapido(conversa.id, { nome: form.nome, telefone: form.telefone, endereco }, agora)
+    setCadastro({ id, salvando: true, erro: null })
+    let erro = null
+    try {
+      const resultado = await salvarCadastroRapido(id, { nome: form.nome, telefone: form.telefone, endereco }, agora)
+      erro = resultado?.erro ?? null
+    } catch (falha) {
+      erro = falha.message || 'Não foi possível salvar o cadastro. Tente de novo.'
+    } finally {
+      cadastrando.current = false
+    }
+    setCadastro({ id, salvando: false, erro })
   }
 
   const validarNome = (v) => (v.trim() ? null : 'Escreva o nome')
   const validarTelefone = (v) => (v.replace(/\D/g, '').length >= 10 ? null : 'Telefone com DDD')
 
-  function aoSalvarEndereco(valor) {
-    editarDadoCliente(conversa.id, 'endereco', valor, agora)
+  function avisarDoEnderecoNoPedido() {
     // Modo API: rascunho de comanda leva o endereço do cadastro quando vira pedido, então não
     // há o que perguntar; pedido já criado segue com o endereço antigo (sem endpoint para trocar).
     if (fonteApi && !conversa.pedido?.pedidoId) return
@@ -148,6 +172,17 @@ export function BlocoCliente({ conversa }) {
       const antesDeEntrega = indiceDoPasso(conversa.pedido.estado) < indiceDoPasso('entrega')
       setAvisoEndereco(antesDeEntrega && disponivel('mudarEnderecoDoPedido') ? 'perguntar' : 'aviso')
     }
+  }
+
+  // #1586: devolve a ida ao EasyStok para o campo esperar; o aviso sobre o pedido só vale
+  // depois de o cadastro mudar de verdade.
+  function aoSalvarEndereco(valor) {
+    const ida = editarDadoCliente(conversa.id, 'endereco', valor, agora)
+    if (!ida?.then) { avisarDoEnderecoNoPedido(); return ida }
+    return ida.then((resultado) => {
+      if (!resultado?.erro) avisarDoEnderecoNoPedido()
+      return resultado
+    })
   }
 
   // #1442: quatro seções que recolhem e lembram (Bloco com `chave`), para a
@@ -189,11 +224,14 @@ export function BlocoCliente({ conversa }) {
                 <div className={css.menuAcoes}>
                   <button
                     type="button" role="menuitem" className={css.itemMenu}
+                    disabled={Boolean(motivoSemBloqueio)}
+                    aria-describedby={motivoSemBloqueio ? idMotivoBloqueio : undefined}
                     onClick={() => { setMenuAberto(false); setModal(bloqueada ? 'desbloquear' : 'bloquear') }}
                   >
                     <Icone nome="bloqueio" />
                     {bloqueada ? 'Desbloquear cliente' : 'Bloquear cliente'}
                   </button>
+                  {motivoSemBloqueio && <p id={idMotivoBloqueio} className={css.motivoMenu}>{motivoSemBloqueio}</p>}
                 </div>
               </Popover>
             )}
@@ -244,8 +282,9 @@ export function BlocoCliente({ conversa }) {
                 />
               </>
             )}
-            <Botao largo variante="primario" icone="user-plus" disabled={!podeSalvarCadastro} onClick={aoSalvarCadastro}>
-              Salvar cadastro
+            {erroCadastro && <p className={css.erroEmLinha} role="alert">{erroCadastro}</p>}
+            <Botao largo variante="primario" icone="user-plus" disabled={!podeSalvarCadastro || cadastro.salvando} onClick={aoSalvarCadastro}>
+              {salvandoCadastro ? 'Salvando…' : 'Salvar cadastro'}
             </Botao>
           </div>
         ) : (
