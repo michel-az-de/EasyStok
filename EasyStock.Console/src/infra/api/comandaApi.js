@@ -153,6 +153,7 @@ export function pedidoDaApi(p, anterior = null) {
     cobranca,
     frete: p.frete,
     totalApi: p.total,
+    ...(p.leitura ? { leitura: p.leitura } : {}),
   }
 }
 
@@ -173,7 +174,15 @@ export async function listarJanelas({ itens = [], dataInicio = null, dataFim = n
   }
 }
 
-export const obterPedido = (conversaId) => chamarApi(pedidoDaConversa(conversaId))
+// #1548: a API não carimba o pedido, então cada leitura leva a ordem em que SAIU. A polling e a
+// recarga de uma ação se cruzam; o reducer descarta a que saiu antes (`pedidoMesclado`).
+let ultimaLeitura = 0
+export async function obterPedido(conversaId) {
+  ultimaLeitura = Math.max(Date.now(), ultimaLeitura + 1)
+  const leitura = ultimaLeitura
+  const pedido = await chamarApi(pedidoDaConversa(conversaId))
+  return pedido && { ...pedido, leitura }
+}
 
 export async function listarJanelasPedido(pedidoId, data = '') {
   const busca = data ? `?dataInicio=${encodeURIComponent(data)}&dataFim=${encodeURIComponent(data)}` : ''
