@@ -4,6 +4,41 @@ import { detalheDaReceitaDaApi, marcarBaixaAutomatica, obterReceita, receitaDaAp
 // numa transação e guarda o diff). Valida antes o que a API recusaria, para avisar em português.
 export const UNIDADES_RECEITA = ['G', 'Kg', 'Ml', 'L', 'Un']
 
+// M1.4e (#1552): em que a receita rende. Em peso, a produção baixa o insumo pelo peso produzido, e por
+// isso acompanha o tamanho da porção. Litro e mililitro não entram: a produção é pesada em gramas.
+export const UNIDADES_RENDIMENTO = [
+  { valor: 'Un', rotulo: 'porções' },
+  { valor: 'Kg', rotulo: 'kg' },
+  { valor: 'G', rotulo: 'g' },
+]
+export const rotuloDoRendimento = (unidade) => UNIDADES_RENDIMENTO.find((u) => u.valor === unidade)?.rotulo ?? unidade
+
+// O que a receita deste prato ainda não acompanha no tamanho da porção, dito onde ela resolve.
+export function orientacoesDaReceita({ prato, unidadeRendimento, linhas = [], insumos = [] }) {
+  const tamanhos = prato?.porcoes ?? 0
+  const comEmbalagem = prato?.porcoesComEmbalagem ?? 0
+  const embalagens = linhas
+    .map((l) => insumos.find((s) => s.id === l.insumoId))
+    .filter((s) => s?.embalagem)
+    .map((s) => s.nome)
+  const lista = []
+
+  if (tamanhos > 1 && unidadeRendimento === 'Un') {
+    lista.push('Este prato tem porções de tamanhos diferentes. Com o rendimento em porções, a produção baixa o mesmo insumo para qualquer tamanho. Informe quanto a receita rende em peso (kg) para a baixa acompanhar o tamanho.')
+  }
+  if (embalagens.length === 0) return lista
+
+  const nomes = embalagens.join(', ')
+  if (comEmbalagem > 0 && comEmbalagem >= tamanhos) {
+    lista.push(`As porções deste prato têm embalagem própria, escolhida no cardápio. A embalagem desta receita (${nomes}) não desce na produção delas e pode sair da receita.`)
+  } else if (comEmbalagem > 0) {
+    lista.push(`${comEmbalagem} de ${tamanhos} porções deste prato têm embalagem própria, escolhida no cardápio. A embalagem desta receita (${nomes}) só desce na produção das outras.`)
+  } else if (tamanhos > 1 && unidadeRendimento !== 'Un') {
+    lista.push(`Com o rendimento em peso, a embalagem desta receita (${nomes}) desce pelo peso, e não uma por porção. Escolha a embalagem de cada porção no cardápio.`)
+  }
+  return lista
+}
+
 export const lerReceitas = async () => ((await listarReceitas()) ?? []).map(receitaDaApi)
 export const lerReceita = async (produtoId) => detalheDaReceitaDaApi(await obterReceita(produtoId))
 

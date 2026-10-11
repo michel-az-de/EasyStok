@@ -1,9 +1,20 @@
 import { detalheDaApi, editarItem, enviarFotoDoPrato, incluirItem, obterItem } from '../infra/api/cardapioApi'
 import { listarSecoes, secaoDaApi } from '../infra/api/secoesApi'
+import { lerInsumos } from './insumos'
 
 // O editor mantém o erro junto do rascunho e recebe o id criado antes de enviar fotos.
 export const lerFichaDoPrato = async (id) => detalheDaApi(await obterItem(id))
 export const lerCategoriasDoPrato = async () => ((await listarSecoes()) ?? []).map(secaoDaApi)
+
+// M1.4e (#1552): as embalagens que uma porção pode usar (insumo marcado como embalagem, contado por
+// unidade). Quem não lê Insumos fica sem a escolha no editor; o resto da ficha abre do mesmo jeito.
+export async function lerEmbalagensDaPorcao() {
+  try {
+    return (await lerInsumos()).filter((i) => i.embalagem && i.unidade === 'Un').map((i) => ({ id: i.id, nome: i.nome }))
+  } catch {
+    return []
+  }
+}
 export async function salvarFichaDoPrato(id, dados) {
   if (id) { await editarItem(id, dados); return id }
   const criado = await incluirItem(dados)

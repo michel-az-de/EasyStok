@@ -27,6 +27,7 @@ public class ItensDoCardapioComandaUseCaseTests
     private readonly ICardapioSecaoRepository _secoesRepo = Substitute.For<ICardapioSecaoRepository>();
     private readonly IProdutoVariacaoRepository _variacoes = Substitute.For<IProdutoVariacaoRepository>();
     private readonly List<ProdutoVariacao> _variacoesGravadas = [];
+    private readonly IProdutoRepository _produtos = Substitute.For<IProdutoRepository>();
 
     public ItensDoCardapioComandaUseCaseTests()
     {
@@ -48,7 +49,8 @@ public class ItensDoCardapioComandaUseCaseTests
             _cardapio,
             _secoesRepo,
             _uow,
-            new VincularPorcoesAoEstoqueUseCase(_variacoes));
+            new VincularPorcoesAoEstoqueUseCase(_variacoes),
+            _produtos);
     }
 
     private CardapioItem ItemDoEstoque(string nome)
@@ -132,6 +134,81 @@ public class ItensDoCardapioComandaUseCaseTests
 
         detalhe.Porcoes!.Select(p => (p.Rotulo, p.Preco, p.Padrao)).Should().Equal(("800 g", 62m, true), ("300 g", 28m, false));
         (linha.Preco, linha.Porcoes).Should().Be((28m, 2), "a partir da porção mais barata (ADR-0035 §5)");
+    }
+
+    // ── M1.4e (#1552): a embalagem é da porção. ──
+
+    private Produto EmbalagemDoEstoque(string nome, bool marcada = true, UnidadeMedida unidade = UnidadeMedida.Un)
+    {
+        var p = new Produto { Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = nome, EhInsumo = true, EhEmbalagem = marcada, UnidadeMedidaBase = unidade };
+        _produtos.GetByIdAsync(EmpresaId, p.Id).Returns(p);
+        return p;
+    }
+
+    [Fact]
+    public async Task EmbalagemDaPorcao_Grava_ApareceNoDetalhe_ETira()
+    {
+        var item = ItemDoEstoque("Ravióli");
+        var bandeja300 = EmbalagemDoEstoque("Bandeja 300 g");
+
+        // A porção nova ainda não tem id: a embalagem acha a porção pelo rótulo.
+        await Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(
+            new PorcaoDoItem(null, "300 g", 28m, Padrao: true, EmbalagemId: bandeja300.Id, MexerEmbalagem: true),
+            new PorcaoDoItem(null, "800 g", 62m)));
+
+        var detalhe = await Sut().ObterAsync(EmpresaId, item.Id);
+        detalhe.Porcoes!.Select(p => (p.Rotulo, p.EmbalagemId)).Should().Equal(("300 g", (Guid?)bandeja300.Id), ("800 g", (Guid?)null));
+
+        var p300 = item.Variacoes.Single(v => v.Rotulo == "300 g");
+        var p800 = item.Variacoes.Single(v => v.Rotulo == "800 g");
+        await Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(
+            new PorcaoDoItem(p300.Id, "300 g", 28m, Padrao: true, EmbalagemId: null, MexerEmbalagem: true),
+            new PorcaoDoItem(p800.Id, "800 g", 62m)));
+
+        p300.EmbalagemProdutoId.Should().BeNull("mexer com a embalagem vazia tira a escolha");
+    }
+
+    [Fact]
+    public async Task ConsoleAnterior_QueNaoMandaAEmbalagem_NaoApagaAEscolha()
+    {
+        var item = ItemDoEstoque("Ravióli");
+        var bandeja300 = EmbalagemDoEstoque("Bandeja 300 g");
+        await Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(
+            new PorcaoDoItem(null, "300 g", 28m, EmbalagemId: bandeja300.Id, MexerEmbalagem: true)));
+        var p300 = item.Variacoes.Single();
+
+        // Aba aberta antes da publicação: a porção vem sem os campos novos.
+        await Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(new PorcaoDoItem(p300.Id, "300 g", 30m)));
+
+        p300.PrecoStorefront.Should().Be(30m);
+        p300.EmbalagemProdutoId.Should().Be(bandeja300.Id, "quem não manda a embalagem não mexe nela");
+    }
+
+    [Theory]
+    [InlineData(false, UnidadeMedida.Un, "marcado como embalagem")]
+    [InlineData(true, UnidadeMedida.Kg, "contada por unidade")]
+    public async Task EmbalagemQueNaoServe_RecusaAntesDeGravarAsPorcoes(bool marcada, UnidadeMedida unidade, string trecho)
+    {
+        var item = ItemDoEstoque("Ravióli");
+        var filme = EmbalagemDoEstoque("Filme", marcada, unidade);
+
+        var act = () => Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(
+            new PorcaoDoItem(null, "300 g", 28m, EmbalagemId: filme.Id, MexerEmbalagem: true)));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage($"*{trecho}*");
+        item.Variacoes.Should().BeEmpty("a recusa vem antes de gravar: nada fica pela metade");
+    }
+
+    [Fact]
+    public async Task EmbalagemQueNaoEDaEmpresa_Recusa()
+    {
+        var item = ItemDoEstoque("Ravióli");
+
+        var act = () => Sut().EditarAsync(EmpresaId, item.Id, ComPorcoes(
+            new PorcaoDoItem(null, "300 g", 28m, EmbalagemId: Guid.NewGuid(), MexerEmbalagem: true)));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Embalagem não encontrada*");
+        item.Variacoes.Should().BeEmpty();
     }
 
     private CardapioItem Item(string nome, bool visivel)

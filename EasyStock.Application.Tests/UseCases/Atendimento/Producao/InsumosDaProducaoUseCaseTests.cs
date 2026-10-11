@@ -1,7 +1,10 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Atendimento.Producao;
 using EasyStock.Application.UseCases.CadastrarProduto;
+using EasyStock.Domain.Entities.Storefront;
 using Microsoft.Extensions.Logging;
+using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
 namespace EasyStock.Application.Tests.UseCases.Atendimento.Producao;
 
@@ -28,11 +31,47 @@ public class InsumosDaProducaoUseCaseTests
         _produtos.GetByIdParaAtualizarAsync(EmpresaId, Arg.Any<Guid>()).Returns(c => _gravados.GetValueOrDefault(c.ArgAt<Guid>(1)));
     }
 
+    private readonly IStorefrontRepository _storefronts = Substitute.For<IStorefrontRepository>();
+    private readonly ICardapioItemRepository _cardapio = Substitute.For<ICardapioItemRepository>();
+
     private InsumosDaProducaoUseCase Sut() => new(_produtos, _composicao, _estoque, _categorias,
         new CadastrarProdutoUseCase(_produtos, _categorias, Substitute.For<IProdutoCaracteristicaRepository>(),
             Substitute.For<IProdutoEmbalagemRepository>(), Substitute.For<IProdutoVariacaoRepository>(), _uow,
             Substitute.For<ILogger<CadastrarProdutoUseCase>>()),
-        _uow);
+        _uow, _storefronts, _cardapio);
+
+    [Fact]
+    public async Task Listar_ContaAsPorcoesQueUsamAEmbalagem_SemContarPratoArquivado()
+    {
+        // M1.4e (#1552): a bandeja escolhida numa porção não entra em receita, mas está em uso.
+        var bandeja = Insumo("Bandeja 300 g", 10, UnidadeMedida.Un);
+        bandeja.EhEmbalagem = true;
+        _produtos.GetInsumosAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns([bandeja]);
+        _estoque.GetSaldoDisponivelPorProdutosAsync(EmpresaId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, decimal>());
+        _composicao.ContarReceitasPorInsumoAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns(new Dictionary<Guid, int>());
+        var vitrine = StorefrontEntity.Criar(EmpresaId, "casa-da-baba", "Casa da Baba", 0m);
+        _storefronts.GetByEmpresaAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns(vitrine);
+        CardapioItem PratoComABandeja(string nome, params string[] porcoes)
+        {
+            var item = CardapioItem.CriarAvulso(vitrine.Id, nome, 30m);
+            foreach (var rotulo in porcoes)
+            {
+                var porcao = CardapioItemVariacao.Criar(item.Id, rotulo, 28m);
+                porcao.DefinirEmbalagem(bandeja.Id);
+                item.AdicionarVariacao(porcao);
+            }
+            return item;
+        }
+        var fora = PratoComABandeja("Nhoque", "300 g");
+        fora.Arquivar(DateTime.UtcNow);
+        _cardapio.GetTodosDoStorefrontAsync(vitrine.Id, Arg.Any<CancellationToken>())
+            .Returns([PratoComABandeja("Lasanha", "300 g", "Individual"), fora]);
+
+        var insumo = (await Sut().ListarAsync(EmpresaId)).Should().ContainSingle().Subject;
+
+        (insumo.Receitas, insumo.Porcoes).Should().Be((0, 2));
+    }
 
     private static Produto Insumo(string nome, int? minimo, UnidadeMedida unidade = UnidadeMedida.G) => new()
     {

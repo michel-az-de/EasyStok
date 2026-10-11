@@ -6,6 +6,21 @@ export const UNIDADES_INSUMO = ['G', 'Kg', 'Ml', 'L', 'Un']
 
 export const lerInsumos = async () => ((await listarInsumos()) ?? []).map(insumoDaApi)
 
+// Onde o insumo é usado. M1.4e (#1552): a embalagem escolhida numa porção não entra em receita, mas
+// desce do estoque a cada porção produzida; dizer "não entra em receita" e parar aí seria enganar.
+const tantas = (n, um, varios) => (n === 1 ? `1 ${um}` : `${n} ${varios}`)
+export function ondeOInsumoEUsado({ receitas = 0, porcoes = 0 }) {
+  const usos = [
+    receitas > 0 ? `usado em ${tantas(receitas, 'receita', 'receitas')}` : null,
+    porcoes > 0 ? `embalagem de ${tantas(porcoes, 'porção', 'porções')}` : null,
+  ].filter(Boolean)
+  return usos.length > 0 ? usos.join(' · ') : 'não entra em receita'
+}
+
+// A embalagem da receita desce em toda produção do prato; a da porção, só quando aquela porção é produzida.
+export const rotuloDaEmbalagem = ({ receitas = 0, porcoes = 0 }) =>
+  (porcoes > 0 && receitas === 0 ? 'Embalagem de porção, uma por porção produzida' : 'Embalagem usada em toda produção')
+
 const numeroOuNulo = (texto) => (String(texto ?? '').trim() === '' ? null : Number(String(texto).replace(',', '.')))
 
 export function criarGestaoInsumos({ recarregar, aoErro }) {

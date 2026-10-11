@@ -151,4 +151,30 @@ public class CardapioItemVariacaoTests
         v.DefinirPadrao(false);
         v.EhPadrao.Should().BeFalse();
     }
+
+    [Fact]
+    public void DefinirEmbalagem_escolhe_tira_e_sobrevive_a_edicao_da_porcao()
+    {
+        // M1.4e (#1552): a embalagem é da porção. Editar rótulo e preço não mexe nela.
+        var v = CardapioItemVariacao.Criar(ItemId, "300g", 28m);
+        var bandeja = Guid.NewGuid();
+        v.EmbalagemProdutoId.Should().BeNull("sem escolha, vale a embalagem da receita");
+
+        v.DefinirEmbalagem(bandeja);
+        v.Atualizar("300 g", 30m, ordemExibicao: 1);
+        v.EmbalagemProdutoId.Should().Be(bandeja);
+
+        v.DefinirEmbalagem(null);
+        v.EmbalagemProdutoId.Should().BeNull();
+    }
+
+    [Fact]
+    public void DefinirEmbalagem_vazia_throws()
+    {
+        var v = CardapioItemVariacao.Criar(ItemId, "300g", 28m);
+
+        var act = () => v.DefinirEmbalagem(Guid.Empty);
+
+        act.Should().Throw<RegraDeDominioVioladaException>().WithMessage("*Embalagem*");
+    }
 }

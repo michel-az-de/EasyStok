@@ -216,9 +216,29 @@ busca só por produto (`PedidoEstoqueIntegrationService.cs:78-80`).
 > - **O que a contagem cobre (decidido):** tudo o que está guardado, vencido incluído, que é como a API reparte entre os
 >   lotes. O saldo da tela não conta vencido, então o formulário começa pelo guardado e diz quantas são vencidas; para
 >   tirá-las, Perdas.
-> - **Receita por tamanho de porção (em aberto, #1552):** a receita é do prato. Produzida uma porção, a conta não muda,
->   mas a produção de prato com mais de um tamanho avisa onde ela não acompanha: receita que rende em porções baixa o
->   mesmo insumo para 300 g e 800 g; receita que rende em peso baixa a embalagem pelo peso, não uma por porção.
+> - **Receita por tamanho de porção:** a receita é do prato. Na #1542 a produção de prato com mais de um tamanho passou
+>   a avisar onde a conta não acompanha o tamanho; a conta em si ficou para a M1.4e.
+>
+> **M1.4e (#1552, 11/10): receita e embalagem por tamanho de porção.** Decidido na sessão de 11/10, com a autorização do
+> Felipe para decidir sem gerar regressão. As duas recomendações da issue valem.
+> - **Embalagem (decisão 1):** é da porção. Cada porção do cardápio escolhe a sua embalagem (um insumo marcado como
+>   embalagem e contado por unidade), e a produção baixa **uma por porção produzida**, em qualquer prato, com ou sem
+>   receita e com ou sem a baixa automática (segue a D-M2-03). Porção com embalagem própria **não usa a embalagem da
+>   receita**. Porção sem escolha segue como antes: vale a embalagem da receita. Coluna nova
+>   `cardapio_item_variacao."EmbalagemProdutoId"`, opcional, com `ON DELETE SET NULL`.
+> - **Comida (decisão 2):** prato com mais de um tamanho usa receita que **rende em peso**. A baixa já escala pelo
+>   peso produzido; faltava o console deixar escolher a unidade do rendimento (ele só gravava "porções"). O editor da
+>   receita ganhou "Rende em" (porções, kg, g) e orienta quando o prato tem mais de um tamanho. Na produção, escolher a
+>   porção já traz o peso dela ("300 g" → 300), que é o que a receita em peso usa.
+> - **Aviso da #1542:** some quando a receita rende em peso e a porção tem embalagem própria. Onde ainda não está
+>   montado, o aviso continua e diz o que fazer (rendimento em peso; embalagem da porção no cardápio).
+> - **Guardas:** o console anterior não manda a embalagem, e o EasyStok então não mexe nela (`mexerEmbalagem`). Se a
+>   embalagem escolhida for desmarcada, trocar de unidade ou sair do estoque, a produção avisa e baixa a da receita.
+> - **Limite conhecido:** uma embalagem por porção. Quem usa bandeja e selo na mesma porção escolhe a bandeja na
+>   porção; o selo que estiver na receita deixa de descer para ela. O editor da receita avisa disso.
+> - **Aba Insumos:** a embalagem escolhida numa porção aparece como "embalagem de N porções" (antes diria "não entra
+>   em receita"), e o rótulo dela passa a "Embalagem de porção, uma por porção produzida".
+> - **Fora desta fatia:** o custo por porção com a embalagem dela (o custo da receita segue sem a embalagem da porção).
 
 **Decisão já tomada.** Preço da variação é absoluto, não delta (ADR-0035). Tier **alto** (pedido e contrato
 público; coordenar com o repositório do site antes da fase 2 do ADR-0035).

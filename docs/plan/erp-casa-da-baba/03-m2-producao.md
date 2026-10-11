@@ -278,6 +278,7 @@ das decisões abaixo.
 > - **D-M2-06, o limite** (09/10, #1511): perda acima de R$ 50, pelo custo dos lotes, só o Gerente lança. Desfazer é o estorno de saída (Gerente), pelo botão no console, porque o Web saiu.
 >
 > - **D-M2-03 = a** (09/10, M2.7, #1523): a embalagem desce na produção, pela receita. A embalagem (`Produto.EhEmbalagem`) desce em **toda** produção, mesmo em prato sem a marca de baixa automática; os outros insumos seguem a D-M2-01.
+>   **Ajuste de 11/10 (M1.4e, #1552):** em prato com porções, a embalagem é da porção (escolhida no cardápio) e desce uma por porção produzida; a da receita só vale para porção sem embalagem própria. Detalhe em [02](02-m1-cardapio.md).
 >
 > Todas as decisões do M2 estão tomadas.
 

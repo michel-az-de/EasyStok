@@ -152,6 +152,79 @@ public class PorcoesDoItemIntegrationTests(PostgreSqlDatabaseFixture fixture)
         venda.ProdutoVariacaoId.Should().Be(p800.ProdutoVariacaoId);
     }
 
+    [SkippableFact]
+    public async Task ProduzirDoisTamanhos_BaixaOInsumoPeloPeso_EABandejaDeCadaPorcao()
+    {
+        // M1.4e (#1552), aceite: a receita rende 3 kg com 1,2 kg de molho. 10 de 300 g (3 kg) e 10 de 800 g
+        // (8 kg) baixam 4,4 kg de molho, 10 bandejas de 300 g e 10 de 800 g, sem aviso.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var (empresaId, produtoId, itemId) = await SeedAsync();
+        var (molhoId, bandeja300Id, bandeja800Id) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresaId);
+            var prato = await seed.Set<Produto>().SingleAsync(p => p.Id == produtoId);
+            prato.BaixaInsumoAutomatica = true;
+            prato.RendimentoBase = 3;
+            prato.RendimentoUnidade = UnidadeMedida.Kg;
+            Produto Insumo(Guid id, string nome, UnidadeMedida unidade, bool embalagem) => new()
+            {
+                Id = id, EmpresaId = empresaId, CategoriaId = prato.CategoriaId, Nome = nome, Status = StatusProduto.Ativo,
+                EhInsumo = true, EhEmbalagem = embalagem, UnidadeMedidaBase = unidade, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            };
+            seed.Set<Produto>().AddRange(
+                Insumo(molhoId, "Molho", UnidadeMedida.G, false),
+                Insumo(bandeja300Id, "Bandeja 300 g", UnidadeMedida.Un, true),
+                Insumo(bandeja800Id, "Bandeja 800 g", UnidadeMedida.Un, true));
+            seed.Set<ProdutoComposicao>().Add(new ProdutoComposicao
+            {
+                Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoFinalId = produtoId, InsumoId = molhoId,
+                Quantidade = 1.2m, Unidade = UnidadeMedida.Kg, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        await using var provider = BuildProductionProvider();
+        await Escopo(provider, empresaId, async sp =>
+        {
+            var entrada = sp.GetRequiredService<EasyStock.Application.UseCases.RegistrarEntradaEstoque.RegistrarEntradaEstoqueUseCase>();
+            foreach (var (id, qtd) in new[] { (molhoId, 10_000m), (bandeja300Id, 50m), (bandeja800Id, 50m) })
+                await entrada.ExecuteAsync(new(empresaId, id, null, qtd, 0.1m, null, DateTime.UtcNow.AddDays(-1),
+                    NaturezaMovimentacaoEstoque.Compra, null, null, null, null, null, null, null, null, null, null, null, null, null));
+        });
+
+        // A embalagem é escolhida na porção, no cardápio. A porção nova ainda não tem id.
+        await Escopo(provider, empresaId, sp => sp.GetRequiredService<ItensDoCardapioComandaUseCase>().EditarAsync(empresaId, itemId,
+            new DadosItemCardapio(null, null, null, null, null, Porcoes:
+            [
+                new PorcaoDoItem(null, "300 g", 28m, "300 g", Padrao: true, EmbalagemId: bandeja300Id, MexerEmbalagem: true),
+                new PorcaoDoItem(null, "800 g", 62m, "800 g", EmbalagemId: bandeja800Id, MexerEmbalagem: true),
+            ])));
+        DetalheItemCardapio detalhe = null!;
+        await Escopo(provider, empresaId, async sp => detalhe = await sp.GetRequiredService<ItensDoCardapioComandaUseCase>().ObterAsync(empresaId, itemId));
+        var p300 = detalhe.Porcoes!.Single(p => p.Rotulo == "300 g");
+        var p800 = detalhe.Porcoes!.Single(p => p.Rotulo == "800 g");
+        (p300.EmbalagemId, p800.EmbalagemId).Should().Be((bandeja300Id, bandeja800Id), "a escolha gravou e volta no detalhe");
+
+        EasyStock.Application.UseCases.Atendimento.Producao.ProduzirPratosResult producao = null!;
+        await Escopo(provider, empresaId, async sp => producao = await sp
+            .GetRequiredService<EasyStock.Application.UseCases.Atendimento.Producao.ProduzirPratosUseCase>()
+            .ExecuteAsync(new EasyStock.Application.UseCases.Atendimento.Producao.ProduzirPratosCommand(empresaId, Guid.Empty, "Thati",
+            [
+                new EasyStock.Application.UseCases.Atendimento.Producao.PratoProduzidoInput(itemId, 10, 300, null, 5, p300.Id),
+                new EasyStock.Application.UseCases.Atendimento.Producao.PratoProduzidoInput(itemId, 10, 800, null, 5, p800.Id),
+            ])));
+
+        producao.Avisos.Should().BeEmpty("a conta acompanha o tamanho: o aviso da #1542 some");
+        await using var assert = fixture.CreateDbContext();
+        assert.SetMobileTenantContext(empresaId);
+        async Task<decimal> Saldo(Guid id) => (await assert.Set<ItemEstoque>().SingleAsync(i => i.ProdutoId == id)).QuantidadeAtual.Value;
+        (await Saldo(molhoId)).Should().Be(5_600m, "3 kg e 8 kg de uma receita que rende 3 kg com 1,2 kg de molho");
+        (await Saldo(bandeja300Id)).Should().Be(40m);
+        (await Saldo(bandeja800Id)).Should().Be(40m);
+    }
+
     private static async Task Escopo(ServiceProvider provider, Guid empresaId, Func<IServiceProvider, Task> acao)
     {
         await using var scope = provider.CreateAsyncScope();

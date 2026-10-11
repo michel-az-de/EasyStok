@@ -75,7 +75,8 @@ public sealed class ProduzirPratosUseCase(
             cmd.EmpresaId, null, null,
             cmd.Pratos.Select((p, i) => new RegistrarProducaoItemInput(
                 pratos[i].ProdutoId!.Value, p.Porcoes, p.PesoPorPorcaoG, p.ValidadeDias, null, p.PesoRealG,
-                porcoes[i]?.ProdutoVariacaoId, porcoes[i]?.Rotulo, VariosTamanhos: pratos[i].Variacoes.Count > 1)).ToList(),
+                porcoes[i]?.ProdutoVariacaoId, porcoes[i]?.Rotulo, VariosTamanhos: pratos[i].Variacoes.Count > 1,
+                EmbalagemDaPorcaoId: porcoes[i]?.EmbalagemProdutoId)).ToList(),
             cmd.Observacao,
             cmd.UsuarioId == Guid.Empty ? null : cmd.UsuarioId,
             cmd.OperadorNome), ct);

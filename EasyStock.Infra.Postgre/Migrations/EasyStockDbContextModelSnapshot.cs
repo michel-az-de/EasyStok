@@ -8112,6 +8112,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<Guid?>("EmbalagemProdutoId")
+                        .HasColumnType("uuid");
+
                     b.Property<double>("OrdemExibicao")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("double precision")
@@ -8137,6 +8140,8 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EmbalagemProdutoId");
 
                     b.HasIndex("ProdutoVariacaoId");
 
@@ -11727,12 +11732,19 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("EasyStock.Domain.Entities.Produto", "Embalagem")
+                        .WithMany()
+                        .HasForeignKey("EmbalagemProdutoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("EasyStock.Domain.Entities.ProdutoVariacao", "ProdutoVariacao")
                         .WithMany()
                         .HasForeignKey("ProdutoVariacaoId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("CardapioItem");
+
+                    b.Navigation("Embalagem");
 
                     b.Navigation("ProdutoVariacao");
                 });

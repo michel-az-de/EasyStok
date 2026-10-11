@@ -91,6 +91,24 @@ public class ReceitasDaProducaoUseCaseTests
     }
 
     [Fact]
+    public async Task Listar_DizQuantosTamanhosOPratoTem_EQuantosComEmbalagemPropria()
+    {
+        // M1.4e (#1552): o editor da receita orienta o rendimento em peso e avisa da embalagem na porção.
+        var lasanha = Prato(6);
+        Receita(lasanha);
+        var item = CardapioItem.CriarAPartirDeProduto(_vitrine.Id, lasanha);
+        var p300 = CardapioItemVariacao.Criar(item.Id, "300 g", 28m, ehPadrao: true);
+        p300.DefinirEmbalagem(Guid.NewGuid());
+        item.AdicionarVariacao(p300);
+        item.AdicionarVariacao(CardapioItemVariacao.Criar(item.Id, "800 g", 62m, ordemExibicao: 1));
+        _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>()).Returns([item]);
+
+        var receita = (await Sut().ListarAsync(EmpresaId)).Single();
+
+        (receita.Porcoes, receita.PorcoesComEmbalagem).Should().Be((2, 1));
+    }
+
+    [Fact]
     public async Task MarcarBaixaAutomatica_LigaEDesliga_EGrava()
     {
         var lasanha = Prato(6);

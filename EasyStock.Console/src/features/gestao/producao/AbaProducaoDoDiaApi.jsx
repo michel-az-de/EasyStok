@@ -7,6 +7,7 @@ import { criarProducaoDoDia } from '../../../aplicacao/producaoDoDia'
 import { retirarProducaoPlanejada } from '../../../aplicacao/planejamento'
 import { estaRemovido } from '../../../dominio/cardapio'
 import { sobraDaLinha } from '../../../dominio/producao'
+import { pesoAoEscolherPorcao } from '../../../dominio/porcoes'
 import css from '../cardapio/abaCardapio.module.css'
 
 // M2 › Produção do dia (M2.2, #1491). Ela escolhe o prato do cardápio e anota o que saiu: porções,
@@ -50,6 +51,13 @@ export function AbaProducaoDoDiaApi() {
   const mudar = (id, campo) => (e) => setLinhas((atual) => atual.map((l) => (l.id === id
     ? { ...l, [campo]: e.target.value, ...(campo === 'sku' ? { variacaoId: '' } : {}) }
     : l)))
+  // M1.4e (#1552): escolher a porção traz o peso dela. É o peso que faz a receita em peso baixar o insumo certo.
+  const escolherPorcao = (id) => (e) => setLinhas((atual) => atual.map((l) => {
+    if (l.id !== id) return l
+    const porcoesDoPrato = pratos.find((p) => p.sku === l.sku)?.porcoes ?? []
+    const porcao = (variacaoId) => porcoesDoPrato.find((v) => v.id === variacaoId) ?? null
+    return { ...l, variacaoId: e.target.value, pesoPorPorcaoG: pesoAoEscolherPorcao(l.pesoPorPorcaoG, porcao(l.variacaoId), porcao(e.target.value)) }
+  }))
   const tirar = (id) => setLinhas((atual) => (atual.length > 1 ? atual.filter((l) => l.id !== id) : atual))
 
   async function confirmar(evento) {
@@ -102,7 +110,7 @@ export function AbaProducaoDoDiaApi() {
                 <CampoSelecao disabled={enviando} rotulo="Prato" value={l.sku} onChange={mudar(l.id, 'sku')}
                   opcoes={[{ valor: '', rotulo: 'Escolha o prato' }, ...pratos.map((p) => ({ valor: p.sku, rotulo: `${p.nome}${p.porcao ? ` · ${p.porcao}` : ''}` }))]} />
                 {(pratos.find((p) => p.sku === l.sku)?.porcoes ?? []).length > 0 && (
-                  <CampoSelecao disabled={enviando} rotulo="Porção" value={l.variacaoId} onChange={mudar(l.id, 'variacaoId')}
+                  <CampoSelecao disabled={enviando} rotulo="Porção" value={l.variacaoId} onChange={escolherPorcao(l.id)}
                     opcoes={[{ valor: '', rotulo: 'Escolha a porção' }, ...pratos.find((p) => p.sku === l.sku).porcoes.map((v) => ({ valor: v.id, rotulo: v.rotulo }))]} />
                 )}
                 <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Porções" placeholder="Porções" value={l.porcoes} onChange={mudar(l.id, 'porcoes')} />
