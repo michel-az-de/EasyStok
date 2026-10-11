@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
@@ -17,7 +18,7 @@ const corDoCartao = (pedido, urgencia) => COR_DA_URGENCIA[urgencia]
 
 export function CartaoKds({
   pedido, agora, linhas, linhaFiltro, movendo = false, novo = false, mudou = false, saindo = false, recusa = null,
-  aoAvancar, aoImprimir, aoAbrir,
+  aoAvancar, aoImprimir, aoAbrir, retomarFoco = false, aoConsumirFoco,
 }) {
   const proximo = saindo ? null : proximoStatusKds(pedido.status)
   const urgencia = urgenciaDoPedido(pedido, agora)
@@ -27,6 +28,13 @@ export function CartaoKds({
     attributes: { roleDescription: 'pedido arrastável' },
     data: { numero: pedido.numeroCurto, nome: nomeNaComanda(pedido), status: pedido.status },
   })
+  const alcaRef = useRef(null)
+  useEffect(() => {
+    if (retomarFoco && document.activeElement === document.body && !document.querySelector('dialog[open]')) {
+      alcaRef.current?.focus({ preventScroll: true })
+    }
+    if (retomarFoco) aoConsumirFoco?.()
+  }, [retomarFoco, aoConsumirFoco])
 
   const classes = [
     css.cartao, css[corDoCartao(pedido, urgencia)],
@@ -42,7 +50,8 @@ export function CartaoKds({
         pedido={pedido} agora={agora} linhas={linhas} linhaFiltro={linhaFiltro} urgencia={urgencia}
         alca={proximo && (
           <button
-            ref={setActivatorNodeRef} type="button" className={css.alca}
+            ref={(no) => { alcaRef.current = no; setActivatorNodeRef(no) }} type="button" className={css.alca}
+            disabled={movendo}
             aria-label={`Mover pedido ${pedido.numeroCurto} de ${nomeNaComanda(pedido)}`} {...attributes}
           >
             <Icone nome="grip-vertical" tamanho={20} />

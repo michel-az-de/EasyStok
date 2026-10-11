@@ -12,6 +12,7 @@ import { passoPorId } from '../../dominio/esteira'
 import { PASSOS_DA_COZINHA, ROTULO_DO_TOQUE, pedidosNaCozinha, respostaAoSoltar } from '../../dominio/cozinha'
 import { opcoesDoDespacho } from '../../dominio/despacho'
 import { CartaoCozinha, CartaoErguido } from './CartaoCozinha'
+import { FeedbackArrasto } from './FeedbackArrasto'
 import { colisaoPorColuna, coordenadasEntreColunas } from './arrastoEntreColunas'
 import css from './cozinha.module.css'
 
@@ -51,7 +52,7 @@ const ANUNCIOS = {
   onDragEnd: ({ active, over }) => {
     const d = active.data.current
     const resposta = over ? respostaDoArrasto(d, over.id) : { aceita: false, motivo: null }
-    if (resposta.aceita) return `Pedido de ${d.nome} foi para ${rotuloDaColuna(over.id)}.`
+    if (resposta.aceita) return `Pedido de ${d.nome} solto em ${rotuloDaColuna(over.id)}. Aguardando confirmação da fila.`
     if (resposta.motivo) return `Pedido de ${d.nome} voltou para ${rotuloDaColuna(d.estado)}. ${resposta.motivo}`
     return `Pedido de ${d.nome} ficou em ${rotuloDaColuna(d.estado)}.`
   },
@@ -86,7 +87,7 @@ function ColunaCozinha({ passo, resposta, arrastando, acao, children }) {
     arrastando && !aceita && !isOver && css.colunaQuieta,
   ].filter(Boolean).join(' ')
   return (
-    <section ref={setNodeRef} className={classes} aria-label={passo.rotulo}>
+    <section ref={setNodeRef} className={classes} aria-label={passo.rotulo} data-destino-arrasto={aceita ? (isOver ? 'sobre' : 'disponivel') : undefined}>
       {children}
       {aceita && (
         <p className={css.dicaColuna} aria-hidden="true">
@@ -123,6 +124,8 @@ export function ConteudoCozinha({
   const [recusa, setRecusa] = useState(null)
   const [assentando, setAssentando] = useState(null)
   const [pedindoEntregadorDe, setPedindoEntregadorDe] = useState(null)
+  const [feedback, setFeedback] = useState(null)
+  const [porTeclado, setPorTeclado] = useState(false)
 
   useEffect(() => {
     if (!recusa) return undefined
@@ -139,6 +142,11 @@ export function ConteudoCozinha({
   )
 
   const pedidos = pedidosNaCozinha(conversas)
+  if (feedback?.destino && !feedback.confirmado
+    && pedidos.some((c) => c.id === feedback.id && c.pedido.estado === feedback.destino)) {
+    setFeedback({ ...feedback, confirmado: true,
+      texto: `Pedido de ${feedback.nome} confirmado em ${rotuloDaColuna(feedback.destino)}.` })
+  }
   // Issue #17: despacho com entregador de um toque (cadastrado ou digitado
   // hoje) e os campos de veículo, placa e empresa.
   const opcoesDespacho = opcoesDoDespacho(conversas, entregadores)
@@ -166,14 +174,20 @@ export function ConteudoCozinha({
     cartoes: pedidos.filter((c) => c.pedido.estado === passo.id).filter(passaNoFiltro),
   }))
 
-  const aoPegar = ({ active }) => {
+  const aoPegar = ({ active, activatorEvent }) => {
     setArrastadoId(active.id)
     setRecusa(null)
+    setPorTeclado(activatorEvent?.type === 'keydown')
+    setFeedback({ texto: `Pedido ${active.data.current.numero} de ${active.data.current.nome}. Escolha o próximo passo destacado.` })
   }
   const aoPassar = ({ over }) => setSobreId(over?.id ?? null)
   const aoLargar = () => {
     setArrastadoId(null)
     setSobreId(null)
+  }
+  const aoCancelar = () => {
+    aoLargar()
+    setFeedback({ texto: 'Arrasto cancelado. O pedido ficou onde estava.' })
   }
   // Soltar = o mesmo toque do botão (RN-31): o mesmo `acoes.avancarEsteira`,
   // e por ele o mesmo reducer, o mesmo aviso ao cliente (RN-32) e a mesma
@@ -182,19 +196,27 @@ export function ConteudoCozinha({
   const aoSoltar = ({ active, over }) => {
     aoLargar()
     const conversa = pedidos.find((c) => c.id === active.id)
-    if (!over || !conversa) return
+    if (!conversa) return
+    if (!over) {
+      setFeedback({ texto: `Pedido de ${conversa.nome} ficou em ${rotuloDaColuna(conversa.pedido.estado)}.` })
+      return
+    }
     const resposta = respostaAoSoltar(conversa.pedido.estado, over.id, { bloqueado: estaBloqueada(conversa) })
     if (!resposta.aceita) {
       if (resposta.motivo) setRecusa({ id: conversa.id, motivo: resposta.motivo })
+      setFeedback({ texto: `Pedido de ${conversa.nome} ficou em ${rotuloDaColuna(conversa.pedido.estado)}.${resposta.motivo ? ` ${resposta.motivo}` : ''}` })
       return
     }
     // US-040: sem entregador resolvido, a MESMA pergunta que o botão abre.
     if (active.data.current?.precisaDeEntregador) {
       setPedindoEntregadorDe(conversa.id)
+      setFeedback({ texto: `Escolha quem leva o pedido de ${conversa.nome} para continuar.` })
       return
     }
     acoes.avancarEsteira(conversa.id, over.id)
     setAssentando({ id: conversa.id, destino: over.id })
+    setFeedback({ id: conversa.id, nome: conversa.nome, destino: over.id, porTeclado,
+      texto: `Pedido de ${conversa.nome} solto em ${rotuloDaColuna(over.id)}. Aguardando confirmação da fila.` })
   }
 
   const respostaSobre = sobreId ? respostaPara(sobreId) : null
@@ -204,7 +226,7 @@ export function ConteudoCozinha({
     <DndContext
       sensors={sensores} collisionDetection={colisaoPorColuna}
       accessibility={{ announcements: ANUNCIOS, screenReaderInstructions: INSTRUCOES }}
-      onDragStart={aoPegar} onDragOver={aoPassar} onDragEnd={aoSoltar} onDragCancel={aoLargar}
+      onDragStart={aoPegar} onDragOver={aoPassar} onDragEnd={aoSoltar} onDragCancel={aoCancelar}
     >
       <div className={css.conteudo}>
         <div className={css.filtros} role="radiogroup" aria-label="Filtrar por linha de produto">
@@ -218,6 +240,7 @@ export function ConteudoCozinha({
           ))}
         </div>
 
+        <FeedbackArrasto feedback={feedback} />
         <div className={css.colunas}>
           {colunas.map(({ passo, cartoes }) => {
             const recolhivel = passo.id === 'entregue'
@@ -229,6 +252,15 @@ export function ConteudoCozinha({
                 {recolhivel ? (
                   <button
                     type="button"
+                    ref={(no) => {
+                      if (!no || !feedback?.confirmado || feedback.destino !== 'entregue' || !feedback.porTeclado) return
+                      // Entregue começa recolhida e não tem alça. O título é
+                      // o destino estável do teclado, inclusive sem cartão.
+                      if (document.activeElement === document.body && !document.querySelector('dialog[open]')) {
+                        no.focus({ preventScroll: true })
+                      }
+                      setFeedback((atual) => atual === feedback ? { ...atual, porTeclado: false } : atual)
+                    }}
                     className={css.tituloRecolhivel}
                     aria-expanded={entregueAberto}
                     onClick={() => setEntregueAberto((v) => !v)}
@@ -261,6 +293,8 @@ export function ConteudoCozinha({
                         destacado={destacados?.has(conversa.id) ?? false}
                         recusa={recusa?.id === conversa.id ? recusa.motivo : null}
                         assentando={chegou && assentando.id === conversa.id}
+                        retomarFoco={feedback?.id === conversa.id && feedback.confirmado && feedback.porTeclado}
+                        aoConsumirFoco={() => setFeedback((atual) => atual === feedback ? { ...atual, porTeclado: false } : atual)}
                         aCaminho={!chegou && assentando?.id === conversa.id}
                         pedindoEntregador={pedindoEntregadorDe === conversa.id}
                         aoPedirEntregador={(aberto) => setPedindoEntregadorDe(aberto ? conversa.id : null)}

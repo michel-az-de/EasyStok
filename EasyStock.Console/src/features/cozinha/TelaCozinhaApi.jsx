@@ -17,6 +17,7 @@ import { Icone } from '../../componentes/Icone'
 import { Vazio } from '../../componentes/Vazio'
 import { CartaoKds, CartaoKdsErguido } from './CartaoKds'
 import { ComandaKds } from './ComandaKds'
+import { FeedbackArrasto } from './FeedbackArrasto'
 import { colisaoPorColuna, coordenadasEntreColunas } from './arrastoEntreColunas'
 import css from './cozinha.module.css'
 
@@ -71,6 +72,8 @@ export function TelaCozinhaApi({ linhas }) {
   const [arrastadoId, setArrastadoId] = useState(null)
   const [sobreId, setSobreId] = useState(null)
   const [recusa, setRecusa] = useState(null)
+  const [feedback, setFeedback] = useState(null)
+  const [porTeclado, setPorTeclado] = useState(false)
 
   useEffect(() => {
     if (!recusa) return undefined
@@ -113,14 +116,42 @@ export function TelaCozinhaApi({ linhas }) {
   const vazia = pedidos !== null && lista.length === 0
   const filtroVazio = !vazia && linhaFiltro !== null && visiveis.length === 0
 
+  // O hook conserva o erro e pode terminar sem atualizar a fila. Só o estado
+  // observado confirma o destino; o fim da Promise não prova a mudança.
+  if (feedback?.destino && !feedback.confirmado
+    && lista.some((p) => p.id === feedback.id && p.status === feedback.destino)) {
+    setFeedback({ ...feedback, confirmado: true, requerConferencia: false,
+      texto: `Pedido ${feedback.numero} confirmado em ${rotuloDaColuna(feedback.destino)}.` })
+  } else if (feedback?.destino && !feedback.confirmado && !feedback.requerConferencia
+    && erro && !movendo.has(feedback.id)) {
+    // Uma leitura posterior pode limpar o alerta sem confirmar o destino.
+    // Esse pedido continua pedindo conferência até chegar o estado real.
+    setFeedback({ ...feedback, requerConferencia: true })
+  }
+
   const aoLargar = () => { setArrastadoId(null); setSobreId(null) }
+  const aoCancelar = () => {
+    aoLargar()
+    setFeedback({ texto: 'Arrasto cancelado. O pedido ficou onde estava.' })
+  }
   const aoSoltar = ({ active, over }) => {
     aoLargar()
     const pedido = lista.find((p) => p.id === active.id)
-    if (!over || !pedido) return
+    if (!pedido) return
+    if (!over) {
+      setFeedback({ texto: `Pedido ${pedido.numeroCurto} ficou em ${rotuloDaColuna(pedido.status)}.` })
+      return
+    }
+    if (movendo.has(pedido.id)) return
     const r = respostaAoSoltarKds(pedido.status, over.id)
-    if (r.aceita) avancar(pedido.id, over.id)
-    else if (r.motivo) setRecusa({ id: pedido.id, motivo: r.motivo })
+    if (r.aceita) {
+      setFeedback({ id: pedido.id, numero: pedido.numeroCurto, destino: over.id, porTeclado,
+        texto: `Pedido ${pedido.numeroCurto} solto em ${rotuloDaColuna(over.id)}. Aguardando confirmação da fila.` })
+      avancar(pedido.id, over.id)
+    } else {
+      if (r.motivo) setRecusa({ id: pedido.id, motivo: r.motivo })
+      setFeedback({ texto: `Pedido ${pedido.numeroCurto} ficou em ${rotuloDaColuna(pedido.status)}.${r.motivo ? ` ${r.motivo}` : ''}` })
+    }
   }
 
   return (
@@ -150,9 +181,13 @@ export function TelaCozinhaApi({ linhas }) {
           <DndContext
             sensors={sensores} collisionDetection={colisaoPorColuna}
             accessibility={{ announcements: ANUNCIOS, screenReaderInstructions: INSTRUCOES }}
-            onDragStart={({ active }) => { setArrastadoId(active.id); setRecusa(null) }}
+            onDragStart={({ active, activatorEvent }) => {
+              setArrastadoId(active.id); setRecusa(null)
+              setPorTeclado(activatorEvent?.type === 'keydown')
+              setFeedback({ texto: `Pedido ${active.data.current.numero} de ${active.data.current.nome}. Escolha o próximo passo destacado.` })
+            }}
             onDragOver={({ over }) => setSobreId(over?.id ?? null)}
-            onDragEnd={aoSoltar} onDragCancel={aoLargar}
+            onDragEnd={aoSoltar} onDragCancel={aoCancelar}
           >
             <div className={css.conteudo}>
               <div className={css.filtros}>
@@ -174,6 +209,7 @@ export function TelaCozinhaApi({ linhas }) {
                   </output>
                 )}
               </div>
+              <FeedbackArrasto feedback={feedback} erro={Boolean(erro) && !movendo.has(feedback?.id)} />
               {vazia && (
                 <p className={css.cozinhaEmDia}>{textoDaCozinhaVazia({ amanha })}</p>
               )}
@@ -207,6 +243,8 @@ export function TelaCozinhaApi({ linhas }) {
                             key={p.id} pedido={p} agora={agora} linhas={linhas} linhaFiltro={linhaFiltro}
                             movendo={movendo.has(p.id)} novo={novos.has(p.id)} mudou={mudaram.has(p.id)}
                             recusa={recusa?.id === p.id ? recusa.motivo : null}
+                            retomarFoco={feedback?.id === p.id && feedback.confirmado && feedback.porTeclado && !movendo.has(p.id)}
+                            aoConsumirFoco={() => setFeedback((atual) => atual === feedback ? { ...atual, porTeclado: false } : atual)}
                             aoAvancar={avancar} aoImprimir={imprimir} aoAbrir={setAbertoId}
                           />
                         ))}
@@ -244,7 +282,7 @@ function ColunaKds({ coluna, resposta, arrastando, acao, children }) {
     arrastando && !aceita && !isOver && css.colunaQuieta,
   ].filter(Boolean).join(' ')
   return (
-    <section ref={setNodeRef} className={classes} aria-label={coluna.rotulo}>
+    <section ref={setNodeRef} className={classes} aria-label={coluna.rotulo} data-destino-arrasto={aceita ? (isOver ? 'sobre' : 'disponivel') : undefined}>
       {children}
       {aceita && (
         <p className={css.dicaColuna} aria-hidden="true">

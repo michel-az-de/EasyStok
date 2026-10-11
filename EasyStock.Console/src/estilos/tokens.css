@@ -135,10 +135,10 @@
   /* --- movimento -----------------------------------------------------------
      micro: toque e hover. curta: troca de estado. media: entrada de camada.
      longa: painel e celebração. Saída sempre mais curta que a entrada. */
-  --dur-micro: 110ms;
-  --dur-curta: 180ms;
-  --dur-media: 280ms;
-  --dur-longa: 460ms;
+  --dur-micro: 90ms;
+  --dur-curta: 150ms;
+  --dur-media: 220ms;
+  --dur-longa: 320ms;
   --ease-padrao: cubic-bezier(.2, 0, 0, 1);
   --ease-saida: cubic-bezier(.16, 1, .3, 1);     /* desacelera: quem ENTRA */
   --ease-entrada: cubic-bezier(.4, 0, 1, 1);     /* acelera: quem SAI */

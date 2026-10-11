@@ -183,6 +183,7 @@ export function PainelFicha({ aoAbrirCardapio }) {
           key={`${selecionada.id}:${avancoEm ?? 'sem-avanco'}`}
           emDesfazer={Boolean(avancoEm)}
           pedido={pedido}
+          conversaId={selecionada.id}
           agora={agora}
           nomeCliente={primeiroNome}
           bloqueado={estaBloqueada(selecionada)}

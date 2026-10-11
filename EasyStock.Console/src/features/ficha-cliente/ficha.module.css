@@ -58,6 +58,10 @@
   transition: width var(--dur-longa) var(--ease-mola);
 }
 .trilhaItem { position: relative; z-index: 1; display: grid; justify-items: center; gap: 6px; }
+@container (max-width: 360px) {
+  .trilha { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-flow: row; row-gap: var(--e-3); }
+  .trilha::before, .trilha::after { display: none; }
+}
 .rotuloPasso { font-size: var(--t-minimo); font-weight: 600; color: var(--tinta-3); line-height: 1.1; white-space: nowrap; }
 .trilhaItem.feito .rotuloPasso, .trilhaItem.atual .rotuloPasso { color: var(--tinta); }
 .circuloPasso {
@@ -74,15 +78,9 @@
 .trilhaItem.atual .circuloPasso {
   --halo: light-dark(rgba(29, 29, 31, .16), rgba(244, 239, 233, .18));
   transform: scale(1.11); border: 2px solid var(--tinta); background: var(--papel); color: var(--tinta);
-  box-shadow: 0 0 0 0 var(--halo); animation: pulsoAtualizacao 2.4s var(--ease-padrao) infinite;
+  box-shadow: 0 0 0 3px var(--halo);
 }
 .trilhaItem.futuro .circuloPasso { color: var(--tinta-3); border-color: var(--linha-media); background: var(--papel); }
-
-@keyframes pulsoAtualizacao {
-  0% { box-shadow: 0 0 0 0 var(--halo); }
-  60% { box-shadow: 0 0 0 10px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
-}
 
 /* Onde está: ícone do passo atual, rótulo e "Próximo: X" (secao 5, item 2). */
 .ondeEsta { display: flex; align-items: flex-start; gap: var(--e-3); }
@@ -90,6 +88,25 @@
 .ondeEsta > div { display: flex; flex-direction: column; gap: var(--e-1); }
 .rotuloEstado { display: block; font-size: var(--t-titulo); font-weight: 700; }
 .depoisTexto { display: block; font-size: var(--t-apoio); color: var(--tinta-3); }
+.resumoAndamento {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
+  width: 100%; min-height: 44px; padding: 0; border: 0; background: transparent;
+  color: var(--tinta); font-family: var(--f-corpo); font-size: var(--t-apoio); font-weight: 600;
+  text-align: left; cursor: pointer; border-radius: var(--r-1);
+}
+.resumoAndamento:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.contagemEtapa { display: block; color: var(--tinta-2); font-size: var(--t-micro); font-weight: 400; }
+.abrirEtapas { display: inline-flex; align-items: center; gap: var(--e-1); color: var(--marca); white-space: nowrap; }
+.retornoEtapa { display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-apoio); color: var(--tinta-2); }
+.barraPasso[data-etapa-confirmada] { animation: confirmarEtapa 650ms var(--ease-saida) 1; }
+@keyframes confirmarEtapa {
+  from { box-shadow: inset 3px 0 var(--sucesso); background: var(--sucesso-pastel); }
+  to { box-shadow: inset 0 0 transparent; background: var(--papel); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .barraPasso[data-etapa-confirmada] { animation: none; }
+  .trilha::after, .circuloPasso { transition: none; }
+}
 .marcaEstorno { color: var(--erro); font-weight: 600; }
 .motivoDesabilitado { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
 
@@ -159,6 +176,7 @@
 
 /* Barra do próximo passo: alvo fixo, sempre no mesmo lugar, sempre visível. */
 .barraPasso {
+  container-type: inline-size;
   flex-shrink: 0; display: grid; gap: var(--e-2);
   padding: var(--e-3) var(--e-4);
   padding-bottom: calc(var(--e-3) + env(safe-area-inset-bottom, 0px));
