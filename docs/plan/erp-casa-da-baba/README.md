@@ -110,7 +110,7 @@ as marcadas com ⚑ (todas respondidas em 01/10, ✅); as demais só travam a fa
 | D-M1-08 | Item novo em validação (RN-15) | sim | [02](02-m1-cardapio.md) |
 | D-M2-01 | Produção baixa insumo pela receita | só produto marcado; avisa, não trava | [03](03-m2-producao.md) |
 | D-M2-02 | Perda exige motivo | lista; texto só em "Outro" | [03](03-m2-producao.md) |
-| D-M2-03 | Onde a embalagem desce | na produção, pela receita | [03](03-m2-producao.md) |
+| D-M2-03 | Onde a embalagem desce | na produção: pela porção quando ela tem embalagem própria (#1552), senão pela receita | [03](03-m2-producao.md) |
 | D-M2-04 | Destino da porção no lote | vem da linha do item (RN-17) | [03](03-m2-producao.md) |
 | D-M2-05 | Sugestão de produção | mínimo − saldo + agendados + descoberto | [03](03-m2-producao.md) |
 | D-M2-06 | Quem lança produção e perda | perfis do M2; perda grande pede Gerente | [03](03-m2-producao.md) |

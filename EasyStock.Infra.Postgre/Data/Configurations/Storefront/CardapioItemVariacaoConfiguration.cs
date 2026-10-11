@@ -69,6 +69,14 @@ public class CardapioItemVariacaoConfiguration : IEntityTypeConfiguration<Cardap
             .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // M1.4e (#1552): embalagem da porção. SET NULL: apagar a embalagem do estoque não apaga a porção,
+        // que volta a usar a embalagem da receita.
+        builder.HasOne(v => v.Embalagem)
+            .WithMany()
+            .HasForeignKey(v => v.EmbalagemProdutoId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // Carregar/ordenar opções de um item.
         builder.HasIndex(v => new { v.CardapioItemId, v.OrdemExibicao })
             .HasDatabaseName("ix_cardapio_item_variacao_item_ordem");

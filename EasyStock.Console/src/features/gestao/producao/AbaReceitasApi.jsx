@@ -5,7 +5,7 @@ import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useReceitasApi } from '../../../aplicacao/useReceitasApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
-import { lerReceita, UNIDADES_RECEITA } from '../../../aplicacao/receitas'
+import { lerReceita, orientacoesDaReceita, rotuloDoRendimento, UNIDADES_RECEITA, UNIDADES_RENDIMENTO } from '../../../aplicacao/receitas'
 import { lerInsumos } from '../../../aplicacao/insumos'
 import { moeda } from '../../../dominio/formato'
 import { hashDoModulo } from '../../../dominio/modulos'
@@ -15,14 +15,16 @@ import css from '../cardapio/abaCardapio.module.css'
 // com quantidade e unidade. O custo por porção vem do EasyStok, com a unidade convertida (a receita
 // pode pedir 1,2 kg de um molho que custa por grama). Na API "ficha técnica" é a nutricional; aqui
 // é a receita. Gravar é do Gerente. D-M2-01 (#1499): o prato marcado baixa os insumos ao produzir.
+// M1.4e (#1552): a receita pode render em porções ou em peso; em peso, a baixa acompanha o tamanho da porção.
 const custoPor = (r) => (r.custoPorRendimento == null
   ? (r.linhas === 0 ? 'sem receita' : 'custo incompleto (insumo sem custo)')
-  : `${moeda(r.custoPorRendimento)} por ${r.unidadeRendimento === 'Un' ? 'porção' : r.unidadeRendimento}`)
+  : `${moeda(r.custoPorRendimento)} por ${r.unidadeRendimento === 'Un' ? 'porção' : rotuloDoRendimento(r.unidadeRendimento)}`)
 
 function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharAviso }) {
   const [detalhe, setDetalhe] = useState(null)
   const [insumos, setInsumos] = useState([])
   const [rendimento, setRendimento] = useState('')
+  const [unidade, setUnidade] = useState('Un')
   const [linhas, setLinhas] = useState([])
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState(null)
@@ -35,6 +37,7 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
       setDetalhe(d)
       setInsumos(i)
       setRendimento(String(d.rendimento))
+      setUnidade(d.unidadeRendimento)
       setLinhas(d.linhas.map((l) => ({ ...l, quantidade: String(l.quantidade) })))
     }).catch((e) => { if (vivo) setErro(e.message) })
     return () => { vivo = false }
@@ -52,7 +55,7 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
 
   if (!podeEditar) return (
     <section className={css.aba} aria-label={`Receita de ${prato.nome}`}>
-      <p className={css.nome}>Rende {detalhe.rendimento} {detalhe.unidadeRendimento === 'Un' ? 'porções' : detalhe.unidadeRendimento}</p>
+      <p className={css.nome}>Rende {detalhe.rendimento} {rotuloDoRendimento(detalhe.unidadeRendimento)}</p>
       {detalhe.linhas.length === 0 ? <p className={css.descricao}>Receita ainda sem insumos cadastrados.</p> : (
         <ul className={css.lista}>
           {detalhe.linhas.map((l) => <li key={l.insumoId} className={css.linha}>
@@ -71,16 +74,25 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
     if (salvando) return
     setSalvando(true)
     Promise.resolve(aoSalvar(prato.produtoId, {
-      rendimento, unidadeRendimento: detalhe.unidadeRendimento, unidadeMedidaBase: detalhe.unidadeMedidaBase, linhas,
+      rendimento, unidadeRendimento: unidade, unidadeMedidaBase: detalhe.unidadeMedidaBase, linhas,
     })).then((ok) => { if (ok !== false) aoFechar() }).finally(() => setSalvando(false))
   }
+  // A receita que já rende em litro ou mililitro mantém a unidade dela na lista.
+  const unidadesDoRendimento = UNIDADES_RENDIMENTO.some((u) => u.valor === unidade)
+    ? UNIDADES_RENDIMENTO
+    : [...UNIDADES_RENDIMENTO, { valor: unidade, rotulo: unidade }]
+  const orientacoes = orientacoesDaReceita({ prato, unidadeRendimento: unidade, linhas, insumos })
 
   return (
     <form className={`${css.aba} ${css.editorReceita}`} onSubmit={salvar} aria-label={`Receita de ${prato.nome}`}>
-      <div className={css.campoQuantidade}>
-        <CampoTexto rotulo="Rendimento" dica={detalhe.unidadeRendimento === 'Un' ? 'Em porções' : `Em ${detalhe.unidadeRendimento}`}
+      <div className={`${css.campos} ${css.rendimentoDaReceita}`}>
+        <CampoTexto rotulo="Rendimento" dica={`Quanto a receita rende, em ${rotuloDoRendimento(unidade)}`}
           disabled={salvando} inputMode="decimal" value={rendimento} onChange={(e) => setRendimento(e.target.value)} />
+        <CampoSelecao rotulo="Rende em" dica="Em peso, a baixa acompanha o tamanho da porção"
+          disabled={salvando} value={unidade} onChange={(e) => setUnidade(e.target.value)}
+          opcoes={unidadesDoRendimento} />
       </div>
+      {orientacoes.map((texto) => <p key={texto} className={css.aviso}>{texto}</p>)}
       <ul className={css.listaFormularios}>
         {linhas.map((l, i) => (
           <li key={`${l.insumoId}-${i}`} className={`${css.campos} ${css.formulario} ${css.linhaReceita}`}>
@@ -169,7 +181,7 @@ export function AbaReceitasApi() {
               <div className={css.resumo}>
                 <span className={css.nome}>{r.nome}</span>
                 <span className={css.detalhe}>
-                  {r.linhas === 0 ? 'sem insumos' : `${r.linhas} ${r.linhas === 1 ? 'insumo' : 'insumos'} · rende ${r.rendimento} ${r.unidadeRendimento === 'Un' ? 'porções' : r.unidadeRendimento}`}
+                  {r.linhas === 0 ? 'sem insumos' : `${r.linhas} ${r.linhas === 1 ? 'insumo' : 'insumos'} · rende ${r.rendimento} ${rotuloDoRendimento(r.unidadeRendimento)}`}
                 </span>
               </div>
               <div className={css.estados}>

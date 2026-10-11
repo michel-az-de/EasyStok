@@ -34,7 +34,7 @@ public class BaixaDeInsumosDaProducaoTests
 
     private BaixaDeInsumosDaProducao Sut() => new(_composicao, _itens, new RegistrarSaidaEstoqueUseCase(
         _produtos, _itens, _vendas, _itensVenda, _movs, _uow,
-        Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>(), publicadorEventos: Substitute.For<IPublicadorEventos>()));
+        Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>(), publicadorEventos: Substitute.For<IPublicadorEventos>()), _produtos);
 
     private Produto Prato(bool marcado, decimal rendimento = 6, UnidadeMedida unidade = UnidadeMedida.Un) => new()
     {
@@ -208,7 +208,8 @@ public class BaixaDeInsumosDaProducaoTests
         var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 10, null, "300 g")], "LOT-1", _data);
 
         Baixado(molho).Should().Be(2000m, "a conta não muda: só passa a avisar");
-        avisos.Should().ContainSingle().Which.Should().Contain("Lasanha 300 g").And.Contain("tamanho");
+        avisos.Should().ContainSingle().Which.Should().Contain("Lasanha 300 g").And.Contain("tamanho")
+            .And.Contain("rendimento da receita em peso", "#1552: o aviso diz como fazer a conta acompanhar o tamanho");
     }
 
     [Fact]
@@ -223,7 +224,8 @@ public class BaixaDeInsumosDaProducaoTests
         var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 10, 3000, "300 g")], "LOT-1", _data);
 
         Baixado(bandeja).Should().Be(6m, "a conta não muda: só passa a avisar");
-        avisos.Should().ContainSingle().Which.Should().Contain("Lasanha 300 g").And.Contain("Bandeja").And.Contain("peso");
+        avisos.Should().ContainSingle().Which.Should().Contain("Lasanha 300 g").And.Contain("Bandeja").And.Contain("peso")
+            .And.Contain("embalagem da porção no cardápio", "#1552: o aviso diz onde se escolhe a embalagem do tamanho");
     }
 
     [Theory]
@@ -255,5 +257,143 @@ public class BaixaDeInsumosDaProducaoTests
 
         Baixado(bandeja).Should().Be(10m);
         avisos.Should().BeEmpty();
+    }
+
+    // ── M1.4e (#1552): a embalagem é da porção (uma por porção produzida) e a comida segue o peso produzido. ──
+
+    private Produto Embalagem(string nome, UnidadeMedida unidade = UnidadeMedida.Un, bool marcada = true)
+    {
+        var p = Insumo(nome, unidade, 50);
+        p.EhEmbalagem = marcada;
+        _produtos.GetByIdAsync(_empresaId, p.Id).Returns(p);
+        return p;
+    }
+
+    [Fact]
+    public async Task DuasPorcoes_ReceitaEmPeso_InsumoSegueOPeso_EABandejaEADoTamanho()
+    {
+        // Aceite: rende 3 kg com 1,2 kg de molho. 10 de 300 g são 3 kg (1,2 kg de molho) e 10 de 800 g são
+        // 8 kg (3,2 kg de molho). Cada porção desce a bandeja do tamanho dela, uma por porção.
+        var lasanha = Prato(marcado: true, rendimento: 3, unidade: UnidadeMedida.Kg);
+        var molho = Insumo("Molho", UnidadeMedida.G, 10000);
+        var bandeja300 = Embalagem("Bandeja 300 g");
+        var bandeja800 = Embalagem("Bandeja 800 g");
+        Receita(lasanha, (molho, 1.2m, UnidadeMedida.Kg));
+
+        var avisos = await Sut().BaixarAsync(_empresaId,
+        [
+            new PratoParaBaixa(lasanha, 10, 3000, "300 g", bandeja300.Id),
+            new PratoParaBaixa(lasanha, 10, 8000, "800 g", bandeja800.Id),
+        ], "LOT-1", _data);
+
+        avisos.Should().BeEmpty("a conta acompanha o tamanho: o aviso da #1542 some");
+        Baixado(molho).Should().Be(4400m);
+        Baixado(bandeja300).Should().Be(10m);
+        Baixado(bandeja800).Should().Be(10m);
+    }
+
+    [Fact]
+    public async Task PorcaoComEmbalagemPropria_NaoUsaAEmbalagemDaReceita()
+    {
+        // Receita por peso com 6 bandejas genéricas para 3 kg. A porção com bandeja própria baixa só a dela.
+        var lasanha = Prato(marcado: false, rendimento: 3, unidade: UnidadeMedida.Kg);
+        var generica = Embalagem("Bandeja");
+        var bandeja300 = Embalagem("Bandeja 300 g");
+        Receita(lasanha, (generica, 6, UnidadeMedida.Un));
+
+        var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 10, 3000, "300 g", bandeja300.Id)], "LOT-1", _data);
+
+        avisos.Should().BeEmpty();
+        Baixado(bandeja300).Should().Be(10m);
+        Baixado(generica).Should().Be(0m, "a embalagem saiu da receita: vale a da porção");
+    }
+
+    [Fact]
+    public async Task PorcaoComEmbalagemPropria_DesceMesmoEmPratoSemReceitaESemMarca()
+    {
+        // D-M2-03: embalagem desce em toda produção. A da porção não depende de receita nem da marca.
+        var lasanha = Prato(marcado: false);
+        var bandeja300 = Embalagem("Bandeja 300 g");
+        Receita(lasanha);
+
+        var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 4, null, null, bandeja300.Id)], "LOT-1", _data);
+
+        avisos.Should().BeEmpty();
+        Baixado(bandeja300).Should().Be(4m);
+    }
+
+    [Fact]
+    public async Task PratoMarcadoSoComEmbalagemNaReceita_EPorcaoComEmbalagemPropria_NaoAvisaReceitaFaltando()
+    {
+        var lasanha = Prato(marcado: true);
+        var generica = Embalagem("Bandeja");
+        var bandeja300 = Embalagem("Bandeja 300 g");
+        Receita(lasanha, (generica, 6, UnidadeMedida.Un));
+
+        var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 6, null, "300 g", bandeja300.Id)], "LOT-1", _data);
+
+        avisos.Should().BeEmpty("a receita existe; só não sobrou linha para baixar");
+        Baixado(bandeja300).Should().Be(6m);
+        Baixado(generica).Should().Be(0m);
+    }
+
+    [Theory]
+    [InlineData(false, UnidadeMedida.Un, "não está mais marcada como embalagem")]
+    [InlineData(true, UnidadeMedida.Kg, "não é contada por unidade")]
+    public async Task EmbalagemDaPorcaoQueNaoServeMais_AvisaEUsaADaReceita(bool marcada, UnidadeMedida unidade, string motivo)
+    {
+        // Ela desmarcou a embalagem ou trocou a unidade em Insumos depois de escolher na porção: a baixa não some.
+        var lasanha = Prato(marcado: false);
+        var generica = Embalagem("Bandeja");
+        var daPorcao = Embalagem("Bandeja antiga", unidade, marcada);
+        Receita(lasanha, (generica, 6, UnidadeMedida.Un));
+
+        var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 6, null, "300 g", daPorcao.Id)], "LOT-1", _data);
+
+        avisos.Should().ContainSingle().Which.Should().Contain("Lasanha 300 g").And.Contain("Bandeja antiga").And.Contain(motivo);
+        Baixado(generica).Should().Be(6m, "sem a embalagem da porção, vale a da receita");
+        Baixado(daPorcao).Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task EmbalagemDaPorcaoTiradaDoEstoque_AvisaEUsaADaReceita()
+    {
+        // "Remover" um produto só o inativa. Sem olhar o status, a porção ficava sem embalagem nenhuma, e a
+        // saída de produto inativo com saldo estoura dentro da transação da produção.
+        var lasanha = Prato(marcado: false);
+        var generica = Embalagem("Bandeja");
+        var inativa = Embalagem("Bandeja 300 g");
+        inativa.Status = StatusProduto.Inativo;
+        Receita(lasanha, (generica, 6, UnidadeMedida.Un));
+
+        var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 6, null, "300 g", inativa.Id)], "LOT-1", _data);
+
+        avisos.Should().ContainSingle().Which.Should().Contain("Bandeja 300 g").And.Contain("fora do estoque");
+        Baixado(generica).Should().Be(6m);
+        Baixado(inativa).Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task EmbalagemDaPorcaoQueORepositorioNaoAcha_AvisaEUsaADaReceita()
+    {
+        var lasanha = Prato(marcado: false);
+        var generica = Embalagem("Bandeja");
+        Receita(lasanha, (generica, 6, UnidadeMedida.Un));
+
+        var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 6, null, null, Guid.NewGuid())], "LOT-1", _data);
+
+        avisos.Should().ContainSingle().Which.Should().Contain("Lasanha").And.Contain("não foi encontrada");
+        Baixado(generica).Should().Be(6m);
+    }
+
+    [Fact]
+    public void AEmbalagemDaPorcao_VaiDoItemProduzidoParaABaixa()
+    {
+        var lasanha = Prato(marcado: true);
+        var embalagemId = Guid.NewGuid();
+        var item = new RegistrarProducaoItemInput(lasanha.Id, Porcoes: 4, PesoPorPorcaoG: 300, ValidadeDias: 5, CustoUnitario: null,
+            EmbalagemDaPorcaoId: embalagemId);
+
+        PratoParaBaixa.Da(lasanha, item).EmbalagemDaPorcaoId.Should().Be(embalagemId);
     }
 }

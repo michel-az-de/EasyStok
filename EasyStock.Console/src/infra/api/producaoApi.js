@@ -93,6 +93,8 @@ export const insumoDaApi = (i) => ({
   comprar: i.abaixoDoMinimo === true,
   // M2.7 (#1523, D-M2-03): embalagem desce em toda produção pela receita.
   embalagem: i.embalagem === true,
+  // M1.4e (#1552): em quantas porções do cardápio o insumo é a embalagem escolhida.
+  porcoes: i.porcoes ?? 0,
 })
 
 // M2.4a (#1498): receitas dos pratos. Ler é do Operador com estoque; gravar é o PUT da composição
@@ -125,6 +127,9 @@ export const receitaDaApi = (r) => ({
   custoTotal: r.custoTotal ?? null,
   custoPorRendimento: r.custoPorRendimento ?? null,
   baixaAutomatica: r.baixaAutomatica === true,
+  // M1.4e (#1552): quantos tamanhos de porção o prato tem e quantos têm embalagem própria.
+  porcoes: r.porcoes ?? 0,
+  porcoesComEmbalagem: r.porcoesComEmbalagem ?? 0,
 })
 
 export const detalheDaReceitaDaApi = (d) => ({

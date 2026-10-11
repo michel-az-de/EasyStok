@@ -40,6 +40,7 @@
 .galeria img { width: 64px; height: 64px; border-radius: 6px; object-fit: cover; }
 .porcao { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, .8fr); gap: 8px 12px; padding: 16px 0; border-bottom: 1px solid var(--linha); }
 .porcao .opcao { font-size: .8125rem; }
+.porcao .embalagemDaPorcao { grid-column: 1 / -1; }
 .porcao > button { justify-self: end; }
 @media (max-width: 700px) {
   .editor { grid-template-columns: minmax(0, 1fr); gap: 24px; }

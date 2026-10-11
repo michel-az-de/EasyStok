@@ -6,7 +6,7 @@ import { MarcaIcone } from '../../componentes/MarcaIcone'
 import { CampoMascarado } from '../../componentes/CampoMascarado'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
-import { lerCategoriasDoPrato, lerFichaDoPrato, salvarFichaDoPrato, salvarFotoDoPrato } from '../../aplicacao/edicaoCardapio'
+import { lerCategoriasDoPrato, lerEmbalagensDaPorcao, lerFichaDoPrato, salvarFichaDoPrato, salvarFotoDoPrato } from '../../aplicacao/edicaoCardapio'
 import { catalogoDeAdicionais } from '../../dominio/cardapio'
 import { fotoDoItem } from '../../dominio/vitrineCardapio'
 import { lerMoeda, mascaraMoeda, moeda, moedaAltaDemais } from '../../dominio/formato'
@@ -35,6 +35,7 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
   const [comNovidade, setComNovidade] = useState(Boolean(item?.novidadeAte))
   const [secao, setSecao] = useState('')
   const [categorias, setCategorias] = useState([])
+  const [embalagens, setEmbalagens] = useState([])
   const [detalhe, setDetalhe] = useState(null)
   const [ficha, setFicha] = useState(VAZIA)
   const [porcoes, setPorcoes] = useState([])
@@ -66,10 +67,11 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
   useEffect(() => {
     if (!fonteApi) return undefined
     let vivo = true
-    Promise.all([item ? lerFichaDoPrato(item.sku) : null, podeEditar ? lerCategoriasDoPrato() : []])
-      .then(([d, categoriasLidas]) => {
+    Promise.all([item ? lerFichaDoPrato(item.sku) : null, podeEditar ? lerCategoriasDoPrato() : [], podeEditar ? lerEmbalagensDaPorcao() : []])
+      .then(([d, categoriasLidas, embalagensLidas]) => {
         if (!vivo) return
         setCategorias(categoriasLidas)
+        setEmbalagens(embalagensLidas)
         if (d) {
           setNome(d.nome); setLinha(d.linha); setPorcao(d.porcao); setCentavos(Math.round(d.preco * 100))
           setDetalhe(d); setFicha(camposDe(d)); setSecao(d.secaoId ?? '')
@@ -230,7 +232,7 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
                 <label className={css.campo}>Porção<input required value={porcao} onChange={(e) => setPorcao(e.target.value)} placeholder="Ex.: 800 g · serve 2 pessoas" /></label>
                 <CampoMascarado tipo="moeda" rotulo="Preço" valor={mascaraMoeda(centavos)} erro={moedaAltaDemais(centavos) ? 'Valor alto demais' : null} aoMudarDigitos={(d) => { setCentavos(Number(d || '0')); setAlterado(true) }} aoColarTexto={(t) => { setCentavos(lerMoeda(t)); setAlterado(true) }} />
               </div>}
-              {fonteApi && <EditorPorcoes linhas={porcoes} aoMudar={(p) => { setPorcoes(p); setAlterado(true) }} />}
+              {fonteApi && <EditorPorcoes linhas={porcoes} embalagens={embalagens} aoMudar={(p) => { setPorcoes(p); setAlterado(true) }} />}
             </section>
             <section className={css.secao}>
               <h3>Informações para atender bem</h3>

@@ -17,7 +17,9 @@ public sealed record RegistrarProducaoItemInput(
     Guid? ProdutoVariacaoId = null,
     [property: MaxLength(60)] string? Porcao = null,
     // #1542: o prato tem mais de um tamanho de porção; a baixa de insumo avisa onde a receita não acompanha.
-    bool VariosTamanhos = false);
+    bool VariosTamanhos = false,
+    // M1.4e (#1552): a embalagem da porção produzida; desce uma por porção, no lugar da embalagem da receita.
+    Guid? EmbalagemDaPorcaoId = null);
 
 public sealed record RegistrarProducaoCommand(
     [property: Required] Guid EmpresaId,

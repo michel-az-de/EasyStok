@@ -71,6 +71,7 @@
 .rodapeForm { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; }
 .formulario .acaoDiscreta:disabled, .acoes .acaoDiscreta:disabled { background: transparent; }
 .campoQuantidade { width: 180px; max-width: 100%; }
+.rendimentoDaReceita { grid-template-columns: repeat(2, minmax(0, 220px)); align-items: start; }
 .link { color: var(--marca); text-underline-offset: 3px; }
 
 @media (max-width: 640px) {

@@ -13,9 +13,11 @@ namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 /// Uma porção do prato (M1.4a, #1529): rótulo, peso, preço absoluto (ADR-0035), disponível e padrão.
 /// Id null = porção nova. O vínculo com o estoque é do EasyStok, não do console.
 /// </summary>
+/// <param name="EmbalagemId">M1.4e (#1552): a embalagem da porção, um insumo marcado como embalagem. A produção baixa uma por porção.</param>
+/// <param name="MexerEmbalagem">true: <paramref name="EmbalagemId"/> vale, inclusive null (tira). false não mexe: o console anterior não manda o campo.</param>
 public sealed record PorcaoDoItem(
     Guid? Id, string Rotulo, decimal Preco, string? Peso = null, bool Disponivel = true, bool Padrao = false,
-    string? Sku = null, Guid? ProdutoVariacaoId = null);
+    string? Sku = null, Guid? ProdutoVariacaoId = null, Guid? EmbalagemId = null, bool MexerEmbalagem = false);
 
 /// <summary>Campos do item que o console edita. null = não mexe.</summary>
 /// <param name="Porcoes">M1.4a (#1529): null não mexe; lista (mesmo vazia) é a lista inteira de porções.</param>
@@ -69,7 +71,8 @@ public sealed class ItensDoCardapioComandaUseCase(
     ICardapioItemRepository cardapioRepository,
     ICardapioSecaoRepository secaoRepository,
     IUnitOfWork unitOfWork,
-    VincularPorcoesAoEstoqueUseCase vincularPorcoes)
+    VincularPorcoesAoEstoqueUseCase vincularPorcoes,
+    IProdutoRepository produtoRepository)
 {
     public async Task<AdicionarCardapioItemAdminResult> IncluirAsync(Guid empresaId, DadosItemCardapio dados, CancellationToken ct = default)
     {
@@ -79,6 +82,7 @@ public sealed class ItensDoCardapioComandaUseCase(
             throw new UseCaseValidationException("Informe o preço do item.");
         var opcoes = OpcoesDe(dados.Porcoes);
         var storefrontId = await VitrineAsync(empresaId, ct);
+        await ValidarEmbalagensAsync(empresaId, dados.Porcoes);
 
         // Item avulso (sem produto do estoque), visível no balcão e no site. Ordem alta: fim da lista.
         var r = await adicionar.ExecuteAsync(new AdicionarCardapioItemAdminCommand(
@@ -92,6 +96,7 @@ public sealed class ItensDoCardapioComandaUseCase(
         item.MarcarEmValidacao();
         if (dados.MexerNovidade) item.DefinirNovidade(dados.NovidadeAte);
         if (dados.MexerSecao) item.DefinirSecao(await SecaoValidaAsync(storefrontId, dados.SecaoId, ct));
+        AplicarEmbalagens(item, dados.Porcoes);
         await unitOfWork.CommitAsync();
         return r;
     }
@@ -100,6 +105,8 @@ public sealed class ItensDoCardapioComandaUseCase(
     {
         var opcoes = OpcoesDe(dados.Porcoes);
         var storefrontId = await VitrineAsync(empresaId, ct);
+        if (dados.Porcoes?.Any(p => p.MexerEmbalagem) == true)
+            await ValidarEmbalagensAsync(empresaId, dados.Porcoes, await ItemAsync(storefrontId, itemId, empresaId, ct));
         await editar.ExecuteAsync(new EditarCardapioItemAdminCommand(
             storefrontId, itemId, dados.Nome?.Trim(), dados.Categoria,
             dados.Descricao, dados.Ingredientes, dados.Alergenos, null, null, null, dados.Preco, null, dados.Porcao, null,
@@ -111,7 +118,42 @@ public sealed class ItensDoCardapioComandaUseCase(
         if (dados.MexerNovidade) item.DefinirNovidade(dados.NovidadeAte);
         if (dados.MexerSecao) item.DefinirSecao(await SecaoValidaAsync(storefrontId, dados.SecaoId, ct));
         if (opcoes is not null) await vincularPorcoes.ExecuteAsync(empresaId, item);
+        AplicarEmbalagens(item, dados.Porcoes);
         await unitOfWork.CommitAsync();
+    }
+
+    // M1.4e (#1552): a embalagem escolhida tem de ser um produto da empresa que sirva de embalagem de porção
+    // (EmbalagemDePorcao). Vem antes de gravar: recusa não deixa nada pela metade. A que a porção já tinha
+    // não é revalidada: se ela deixou de servir depois, editar o preço do prato não pode travar por isso
+    // (a produção avisa e baixa a da receita).
+    private async Task ValidarEmbalagensAsync(Guid empresaId, IReadOnlyList<PorcaoDoItem>? porcoes, CardapioItem? atual = null)
+    {
+        var jaEscolhidas = (atual?.Variacoes ?? [])
+            .Where(v => v.EmbalagemProdutoId.HasValue)
+            .Select(v => (Porcao: (Guid?)v.Id, Embalagem: v.EmbalagemProdutoId!.Value))
+            .ToHashSet();
+        var novas = (porcoes ?? [])
+            .Where(p => p.MexerEmbalagem && p.EmbalagemId is { } id && !jaEscolhidas.Contains((p.Id, id)))
+            .Select(p => p.EmbalagemId!.Value)
+            .Distinct();
+        foreach (var id in novas)
+        {
+            var embalagem = await produtoRepository.GetByIdAsync(empresaId, id)
+                ?? throw new UseCaseValidationException("Embalagem não encontrada. Cadastre a embalagem em Insumos.");
+            if (EasyStock.Application.UseCases.Producao.EmbalagemDePorcao.MotivoParaNaoUsar(embalagem) is { } motivo)
+                throw new UseCaseValidationException($"Essa embalagem não serve para a porção: {motivo}.");
+        }
+    }
+
+    // A porção nova ainda não tem id no que o console mandou: casa pelo rótulo, que é único no prato.
+    private static void AplicarEmbalagens(CardapioItem item, IReadOnlyList<PorcaoDoItem>? porcoes)
+    {
+        foreach (var porcao in (porcoes ?? []).Where(p => p.MexerEmbalagem))
+        {
+            var variacao = item.Variacoes.FirstOrDefault(v => v.Id == porcao.Id)
+                ?? item.Variacoes.FirstOrDefault(v => string.Equals(v.Rotulo, porcao.Rotulo.Trim(), StringComparison.OrdinalIgnoreCase));
+            variacao?.DefinirEmbalagem(porcao.EmbalagemId);
+        }
     }
 
     // M1.4a (#1529): porção do console → opção da vitrine (reconciliação keyed-by-Id, ADR-0035).
@@ -133,7 +175,7 @@ public sealed class ItensDoCardapioComandaUseCase(
     private static List<PorcaoDoItem> PorcoesDe(CardapioItem item) => item.Variacoes
         .OrderBy(v => v.OrdemExibicao).ThenBy(v => v.CriadoEm)
         .Select(v => new PorcaoDoItem(v.Id, v.Rotulo, v.PrecoStorefront, v.PesoExibicao, v.Disponivel, v.EhPadrao,
-            v.Sku?.Value, v.ProdutoVariacaoId))
+            v.Sku?.Value, v.ProdutoVariacaoId, v.EmbalagemProdutoId))
         .ToList();
 
     public async Task<VisibilidadeItemResult> DefinirVisivelAsync(Guid empresaId, Guid itemId, bool visivel, CancellationToken ct = default)

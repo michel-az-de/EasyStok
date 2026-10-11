@@ -5,7 +5,7 @@ import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useInsumosApi } from '../../../aplicacao/useInsumosApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
-import { UNIDADES_INSUMO } from '../../../aplicacao/insumos'
+import { ondeOInsumoEUsado, rotuloDaEmbalagem, UNIDADES_INSUMO } from '../../../aplicacao/insumos'
 import { moeda } from '../../../dominio/formato'
 import css from '../cardapio/abaCardapio.module.css'
 
@@ -36,7 +36,7 @@ function LinhaInsumo({ insumo, gestao, podeEditar }) {
       <div className={css.resumo}>
         <span className={css.nome}>{insumo.nome}</span>
         <span className={css.detalhe}>
-          {insumo.receitas === 0 ? 'não entra em receita' : insumo.receitas === 1 ? 'usado em 1 receita' : `usado em ${insumo.receitas} receitas`}
+          {ondeOInsumoEUsado(insumo)}
           {insumo.custo != null ? ` · custo ${moeda(insumo.custo)} por ${insumo.unidade}` : ''}
         </span>
       </div>
@@ -44,7 +44,7 @@ function LinhaInsumo({ insumo, gestao, podeEditar }) {
       <div className={css.estados}>
         {insumo.comprar && <Pilula tom="aviso" fina>Abaixo do mínimo ({insumo.minimo} {insumo.unidade})</Pilula>}
         {!insumo.comprar && insumo.minimo != null && <Pilula tom="neutro" fina>Mínimo {insumo.minimo} {insumo.unidade}</Pilula>}
-        {insumo.embalagem && <Pilula tom="marca" fina>Embalagem usada em toda produção</Pilula>}
+        {insumo.embalagem && <Pilula tom="marca" fina>{rotuloDaEmbalagem(insumo)}</Pilula>}
       </div>
       {podeEditar && (editando ? (
         <form className={`${css.campos} ${css.formulario} ${css.ajusteInsumo}`} onSubmit={salvar}>

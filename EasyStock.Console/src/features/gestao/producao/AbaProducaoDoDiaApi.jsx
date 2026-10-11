@@ -7,6 +7,7 @@ import { criarProducaoDoDia } from '../../../aplicacao/producaoDoDia'
 import { retirarProducaoPlanejada } from '../../../aplicacao/planejamento'
 import { estaRemovido } from '../../../dominio/cardapio'
 import { sobraDaLinha } from '../../../dominio/producao'
+import { linhaComPorcao, linhaComPrato } from '../../../dominio/porcoes'
 import css from '../cardapio/abaCardapio.module.css'
 
 // M2 › Produção do dia (M2.2, #1491). Ela escolhe o prato do cardápio e anota o que saiu: porções,
@@ -46,10 +47,11 @@ export function AbaProducaoDoDiaApi() {
   const [feito, setFeito] = useState(null)
   const [etiquetas, setEtiquetas] = useState(null)
 
-  // Trocar o prato zera a porção: a porção escolhida era do prato anterior.
-  const mudar = (id, campo) => (e) => setLinhas((atual) => atual.map((l) => (l.id === id
-    ? { ...l, [campo]: e.target.value, ...(campo === 'sku' ? { variacaoId: '' } : {}) }
-    : l)))
+  const mudar = (id, campo) => (e) => setLinhas((atual) => atual.map((l) => (l.id === id ? { ...l, [campo]: e.target.value } : l)))
+  // Trocar o prato zera a porção e o peso que veio dela. M1.4e (#1552): escolher a porção traz o peso
+  // dela, que é o que faz a receita em peso baixar o insumo certo; o que ela digitou fica.
+  const escolherPrato = (id) => (e) => setLinhas((atual) => atual.map((l) => (l.id === id ? linhaComPrato(l, pratos, e.target.value) : l)))
+  const escolherPorcao = (id) => (e) => setLinhas((atual) => atual.map((l) => (l.id === id ? linhaComPorcao(l, pratos, e.target.value) : l)))
   const tirar = (id) => setLinhas((atual) => (atual.length > 1 ? atual.filter((l) => l.id !== id) : atual))
 
   async function confirmar(evento) {
@@ -99,10 +101,10 @@ export function AbaProducaoDoDiaApi() {
             const sobra = sobraDaLinha(paraEnviar(l))
             return (
               <li key={l.id} className={`${css.campos} ${css.formulario} ${css.loteProducao}`}>
-                <CampoSelecao disabled={enviando} rotulo="Prato" value={l.sku} onChange={mudar(l.id, 'sku')}
+                <CampoSelecao disabled={enviando} rotulo="Prato" value={l.sku} onChange={escolherPrato(l.id)}
                   opcoes={[{ valor: '', rotulo: 'Escolha o prato' }, ...pratos.map((p) => ({ valor: p.sku, rotulo: `${p.nome}${p.porcao ? ` · ${p.porcao}` : ''}` }))]} />
                 {(pratos.find((p) => p.sku === l.sku)?.porcoes ?? []).length > 0 && (
-                  <CampoSelecao disabled={enviando} rotulo="Porção" value={l.variacaoId} onChange={mudar(l.id, 'variacaoId')}
+                  <CampoSelecao disabled={enviando} rotulo="Porção" value={l.variacaoId} onChange={escolherPorcao(l.id)}
                     opcoes={[{ valor: '', rotulo: 'Escolha a porção' }, ...pratos.find((p) => p.sku === l.sku).porcoes.map((v) => ({ valor: v.id, rotulo: v.rotulo }))]} />
                 )}
                 <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Porções" placeholder="Porções" value={l.porcoes} onChange={mudar(l.id, 'porcoes')} />

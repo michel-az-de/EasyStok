@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
-import { erroDasPorcoes, gerarCompras, itensDeCompra, lerSugestao, levarParaProducao, planejar } from '../../../aplicacao/planejamento'
+import { useCatalogo } from '../../../aplicacao/contextos'
+import { erroDasPorcoes, gerarCompras, itensDeCompra, lerSugestao, levarParaProducao, motivosDosPendentes, planejar } from '../../../aplicacao/planejamento'
 import { lerInsumos } from '../../../aplicacao/insumos'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { moeda } from '../../../dominio/formato'
@@ -21,6 +22,7 @@ const porQue = (p) => [
 ].filter(Boolean).join(' · ')
 
 export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
+  const { cardapio } = useCatalogo()
   const [ate, setAte] = useState('')
   // #1510: a data que busca é só a que ela escolhe; a que vem da resposta só preenche o campo
   // (antes disparava uma 2ª busca que apagava as porções já editadas).
@@ -59,7 +61,7 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
     setOcupado(true)
     setAviso(null)
     try {
-      setPlano(await planejar(linhas))
+      setPlano(await planejar(linhas, cardapio ?? []))
     } catch (e) {
       setAviso(e.message)
     } finally {
@@ -150,9 +152,7 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
               ))}
             </ul>
           )}
-          {plano.pendentes.length > 0 && (
-            <p className={css.descricao}>{plano.pendentes.length} {plano.pendentes.length === 1 ? 'prato sem receita ou com receita incompleta ficou' : 'pratos sem receita ou com receita incompleta ficaram'} de fora da conta.</p>
-          )}
+          {motivosDosPendentes(plano.pendentes, linhas).map((texto) => <p key={texto} className={css.descricao}>{texto}</p>)}
           <div className={css.topo}>
             {plano.custoTotal != null && <span className={css.detalhe}>Custo estimado {moeda(plano.custoTotal)}</span>}
             <Botao icone="shopping-cart" onClick={comprar} disabled={ocupado}>Gerar lista de compras</Botao>

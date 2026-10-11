@@ -6,9 +6,12 @@ namespace EasyStock.Application.UseCases.Atendimento.Producao;
 
 /// <param name="CustoPorRendimento">Custo da receita ÷ rendimento (por porção quando o rendimento é em Un). Null = algum insumo sem custo.</param>
 /// <param name="BaixaAutomatica">D-M2-01 (#1499): produzir o prato baixa os insumos da receita.</param>
+/// <param name="Porcoes">M1.4e (#1552): quantos tamanhos de porção o prato tem. Com mais de um, a receita deve render em peso.</param>
+/// <param name="PorcoesComEmbalagem">M1.4e (#1552): quantas porções têm embalagem própria (elas não usam a embalagem da receita).</param>
 public sealed record ReceitaDoPrato(
     Guid CardapioItemId, Guid ProdutoId, string Nome, decimal RendimentoBase, UnidadeMedida RendimentoUnidade,
-    int Linhas, decimal? CustoTotal, decimal? CustoPorRendimento, bool BaixaAutomatica = false);
+    int Linhas, decimal? CustoTotal, decimal? CustoPorRendimento, bool BaixaAutomatica = false,
+    int Porcoes = 0, int PorcoesComEmbalagem = 0);
 
 /// <param name="Custo">Custo da linha na unidade do insumo. Null = insumo sem custo ou unidades incompatíveis.</param>
 public sealed record LinhaDaReceita(
@@ -49,7 +52,8 @@ public sealed class ReceitasDaProducaoUseCase(
             var linhas = await composicaoRepository.GetByProdutoFinalAsync(empresaId, produto.Id, null, ct);
             var (total, porRendimento) = Custos(linhas.Select(Linha).ToList(), produto.RendimentoBase);
             lista.Add(new ReceitaDoPrato(prato.Id, produto.Id, prato.NomeEfetivo() ?? produto.Nome,
-                produto.RendimentoBase, produto.RendimentoUnidade, linhas.Count, total, porRendimento, produto.BaixaInsumoAutomatica));
+                produto.RendimentoBase, produto.RendimentoUnidade, linhas.Count, total, porRendimento, produto.BaixaInsumoAutomatica,
+                prato.Variacoes.Count, prato.Variacoes.Count(v => v.EmbalagemProdutoId.HasValue)));
         }
         return lista;
     }

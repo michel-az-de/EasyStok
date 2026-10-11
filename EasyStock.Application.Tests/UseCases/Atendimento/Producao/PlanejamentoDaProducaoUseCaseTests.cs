@@ -145,6 +145,58 @@ public class PlanejamentoDaProducaoUseCaseTests
         insumo.CustoEstimado.Should().Be(72m);
     }
 
+    private Produto LasanhaComMolho(decimal rendimento, UnidadeMedida unidade)
+    {
+        var lasanha = new Produto { Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = "Lasanha", RendimentoBase = rendimento, RendimentoUnidade = unidade };
+        var molho = new Produto { Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = "Molho", UnidadeMedidaBase = UnidadeMedida.G };
+        _produtos.GetByIdAsync(EmpresaId, lasanha.Id).Returns(lasanha);
+        _composicao.GetByProdutosFinaisAsync(EmpresaId, Arg.Any<IReadOnlyList<Guid>>(), null, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, IReadOnlyCollection<ProdutoComposicao>>
+            {
+                [lasanha.Id] = [new ProdutoComposicao
+                {
+                    Id = Guid.NewGuid(), EmpresaId = EmpresaId, ProdutoFinalId = lasanha.Id, InsumoId = molho.Id,
+                    Quantidade = 1.2m, Unidade = UnidadeMedida.Kg, ProdutoFinal = lasanha, Insumo = molho,
+                }],
+            });
+        return lasanha;
+    }
+
+    [Fact]
+    public async Task Planejar_ReceitaQueRendeEmPeso_ContaPeloPesoDaPorcao()
+    {
+        // M1.4e (#1552): rende 3 kg com 1,2 kg de molho. 10 porções de 300 g são 3 kg: 1,2 kg de molho.
+        // Antes o prato caía fora da conta (porções contra kg) e o molho sumia da lista de compras.
+        var lasanha = LasanhaComMolho(3, UnidadeMedida.Kg);
+
+        var plano = await Sut().PlanejarAsync(EmpresaId, [new PratoPlanejado(lasanha.Id, 10, 300)]);
+
+        plano.Itens.Should().ContainSingle().Which.Status.Should().Be(ItemCestaStatus.Ok);
+        plano.Consolidado.Should().ContainSingle().Which.Precisa.Should().Be(1.2m);
+    }
+
+    [Fact]
+    public async Task Planejar_ReceitaEmPesoSemOPesoDaPorcao_FicaDeForaComoAntes()
+    {
+        var lasanha = LasanhaComMolho(3, UnidadeMedida.Kg);
+
+        var plano = await Sut().PlanejarAsync(EmpresaId, [new PratoPlanejado(lasanha.Id, 10)]);
+
+        plano.Itens.Should().ContainSingle().Which.Status.Should().Be(ItemCestaStatus.Erro);
+        plano.Consolidado.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Planejar_ReceitaQueRendeEmPorcoes_IgnoraOPeso()
+    {
+        // Rende 6 porções com 1,2 kg de molho: 12 porções pedem 2,4 kg, com ou sem o peso informado.
+        var lasanha = LasanhaComMolho(6, UnidadeMedida.Un);
+
+        var plano = await Sut().PlanejarAsync(EmpresaId, [new PratoPlanejado(lasanha.Id, 12, 300)]);
+
+        plano.Consolidado.Should().ContainSingle().Which.Precisa.Should().Be(2.4m);
+    }
+
     [Fact]
     public async Task PlanejarSemPorcoes_Recusa()
     {

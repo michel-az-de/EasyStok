@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Domain.ValueObjects;
 
@@ -5,9 +6,10 @@ namespace EasyStock.Application.UseCases.Atendimento.Producao;
 
 /// <param name="Saldo">Na unidade base, de lotes com saldo e não vencidos.</param>
 /// <param name="Receitas">Em quantas receitas o insumo entra (onde é usado).</param>
+/// <param name="Porcoes">M1.4e (#1552): em quantas porções do cardápio o insumo é a embalagem escolhida.</param>
 public sealed record InsumoDaProducao(
     Guid ProdutoId, string Nome, UnidadeMedida Unidade, decimal Saldo, int? Minimo, decimal? Custo, int Receitas,
-    bool AbaixoDoMinimo, bool Embalagem = false);
+    bool AbaixoDoMinimo, bool Embalagem = false, int Porcoes = 0);
 
 /// <param name="Embalagem">D-M2-03 (#1523): bandeja, selo, pote. Null = não mexe (no cadastro, não é).</param>
 public sealed record InsumoInput(string? Nome, UnidadeMedida? Unidade, int? Minimo, decimal? Custo, bool? Embalagem = null);
@@ -23,7 +25,9 @@ public sealed class InsumosDaProducaoUseCase(
     IItemEstoqueRepository itemEstoqueRepository,
     ICategoriaRepository categoriaRepository,
     CadastrarProdutoUseCase cadastrarProduto,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IStorefrontRepository storefrontRepository,
+    ICardapioItemRepository cardapioRepository)
 {
     public const string CategoriaInsumos = "Insumos";
     public const string CategoriaEmbalagens = "Embalagens";
@@ -35,13 +39,28 @@ public sealed class InsumosDaProducaoUseCase(
         if (insumos.Count == 0) return [];
         var saldos = await itemEstoqueRepository.GetSaldoDisponivelPorProdutosAsync(empresaId, insumos.Select(i => i.Id).ToList(), ct);
         var receitas = await composicaoRepository.ContarReceitasPorInsumoAsync(empresaId, ct);
+        var porcoes = await PorcoesPorEmbalagemAsync(empresaId, ct);
         return insumos.Select(i =>
         {
             var saldo = saldos.GetValueOrDefault(i.Id);
             return new InsumoDaProducao(
                 i.Id, i.Nome, i.UnidadeMedidaBase, saldo, i.QuantidadeMinima, i.CustoReferencia?.Valor,
-                receitas.GetValueOrDefault(i.Id), i.QuantidadeMinima is { } minimo && saldo < minimo, i.EhEmbalagem);
+                receitas.GetValueOrDefault(i.Id), i.QuantidadeMinima is { } minimo && saldo < minimo, i.EhEmbalagem,
+                porcoes.GetValueOrDefault(i.Id));
         }).ToList();
+    }
+
+    // M1.4e (#1552): a embalagem escolhida numa porção não entra em receita, mas está em uso. Prato tirado do cardápio não conta.
+    private async Task<Dictionary<Guid, int>> PorcoesPorEmbalagemAsync(Guid empresaId, CancellationToken ct)
+    {
+        var storefront = await storefrontRepository.GetByEmpresaAsync(empresaId, ct);
+        if (storefront is null) return [];
+        return (await cardapioRepository.GetTodosDoStorefrontAsync(storefront.Id, ct))
+            .Where(i => !i.EstaArquivado)
+            .SelectMany(i => i.Variacoes)
+            .Where(v => v.EmbalagemProdutoId.HasValue)
+            .GroupBy(v => v.EmbalagemProdutoId!.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
     }
 
     /// <summary>Cadastro rápido: nome, unidade, mínimo e custo. O resto do produto fica no padrão.</summary>

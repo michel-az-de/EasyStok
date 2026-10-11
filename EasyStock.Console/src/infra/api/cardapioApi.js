@@ -67,6 +67,8 @@ export const detalheDaApi = (d) => ({
   secaoId: d.secaoId ?? null,
   porcoes: (d.porcoes ?? []).map((p) => ({
     id: p.id, rotulo: p.rotulo, preco: p.preco, peso: p.peso ?? '', disponivel: p.disponivel !== false, padrao: p.padrao === true, sku: p.sku ?? null,
+    // M1.4e (#1552): a embalagem da porção. API anterior não manda o campo, e o console então não mexe nela.
+    ...(p.embalagemId !== undefined ? { embalagemId: p.embalagemId ?? null } : {}),
   })),
 })
 
