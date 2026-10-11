@@ -86,6 +86,11 @@ public sealed class OutboxNotificacaoRepository(EasyStockDbContext db) : IOutbox
         return vencidas.Count;
     }
 
+    // Sem filtro de data: o índice (Status, ProximaTentativaEm) responde pelos dois status.
+    public Task<bool> ExisteMensagemAbertaAsync(CancellationToken ct = default) =>
+        db.NotifOutboxMensagens.IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(m => m.Status == StatusOutbox.Pendente || m.Status == StatusOutbox.EmEnvio, ct);
+
     public Task<OutboxMensagemNotificacao?> ObterAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
         db.NotifOutboxMensagens.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.EmpresaId == empresaId && m.Id == id, ct);
 

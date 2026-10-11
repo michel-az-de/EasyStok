@@ -1,7 +1,11 @@
+using System.Collections.Concurrent;
+using System.Reflection;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
+using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Repositories.Notifications;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -220,6 +224,112 @@ public class MotorNotificacoesComportamentoTests(PostgreSqlDatabaseFixture fixtu
         (await _s.LerMensagemAsync(whatsappDentroDoLease.Id)).Status.Should().Be(StatusOutbox.EmEnvio, "o lease ainda vale");
     }
 
+    // ----- atalho do ocioso (#1566) -----
+
+    /// <summary>Sem nada aberto no outbox da classe: sobras de outros testes viram <c>Cancelado</c>.</summary>
+    private async Task FecharMensagensAbertasAsync()
+    {
+        await using var db = fixture.CreateDbContext();
+        using var _ = db.UseRowLevelSecurityBypass();
+        await db.NotifOutboxMensagens.IgnoreQueryFilters()
+            .Where(m => m.Status == StatusOutbox.Pendente || m.Status == StatusOutbox.EmEnvio)
+            .ExecuteUpdateAsync(s => s.SetProperty(m => m.Status, StatusOutbox.Cancelado));
+    }
+
+    /// <summary>Provider do Worker com o repositório do outbox embrulhado: guarda o nome de cada método chamado.</summary>
+    private ServiceProvider ProviderComOutboxContado(ConcurrentQueue<string> chamadas, params ICanalNotificacao[] canais) =>
+        _s.ConstruirProviderDoWorker(papelRls: false, ajustar: services =>
+            services.AddScoped(sp => OutboxContado.Embrulhar(
+                new OutboxNotificacaoRepository(sp.GetRequiredService<EasyStockDbContext>()), chamadas)), canais: canais);
+
+    [SkippableFact]
+    public async Task Dispatcher_sem_mensagem_aberta_termina_o_wakeup_so_com_a_consulta_de_existencia()
+    {
+        // #1566: o loop acorda a cada 10 s; ocioso, abria transação, expirava (uma consulta por grupo de prazo),
+        // reclamava lease e reservava, tudo para nada.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        await FecharMensagensAbertasAsync();
+        var s = await _s.SemearAsync(CanalNotificacao.Email);
+        var terminada = await _s.SemearMensagemAsync(s, CanalNotificacao.Email,
+            ajustar: m => m.MarcarFalhaTentativa("550", TimeSpan.Zero, permanente: true));
+        var chamadas = new ConcurrentQueue<string>();
+        var email = new CanalFalso(CanalNotificacao.Email, _ => new ResultadoEnvio(true, "smtp"));
+        await using var provider = ProviderComOutboxContado(chamadas, email);
+
+        var processadas = await RodarDispatcherAsync(provider);
+
+        processadas.Should().Be(0);
+        chamadas.Should().Equal(nameof(IOutboxNotificacaoRepository.ExisteMensagemAbertaAsync));
+        email.ChamadasDaEmpresa(s.EmpresaId).Should().Be(0);
+        var gravada = await _s.LerMensagemAsync(terminada.Id);
+        gravada.Status.Should().Be(StatusOutbox.Falhado);
+        gravada.ProximaTentativaEm.Should().BeCloseTo(terminada.ProximaTentativaEm, TimeSpan.FromMilliseconds(1));
+        await using var scope = provider.CreateAsyncScope();
+        (await scope.ServiceProvider.GetRequiredService<IOutboxNotificacaoRepository>().ExisteMensagemAbertaAsync()).Should().BeFalse();
+    }
+
+    [SkippableFact]
+    public async Task Dispatcher_com_uma_so_Pendente_vencida_expira_no_wakeup_e_nao_envia()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        await FecharMensagensAbertasAsync();
+        var s = await _s.SemearAsync(CanalNotificacao.WhatsApp, tipo: TipoEventoNotificacao.PedidoPagoConfirmado);
+        var vencida = await _s.SemearMensagemAsync(s, CanalNotificacao.WhatsApp,
+            ajustar: m => m.ProximaTentativaEm = DateTime.UtcNow.AddHours(-3));
+        var whatsapp = new CanalFalso(CanalNotificacao.WhatsApp, _ => new ResultadoEnvio(true, "meta"));
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: false, canais: whatsapp);
+
+        await RodarDispatcherAsync(provider);
+
+        (await _s.LerMensagemAsync(vencida.Id)).Status.Should().Be(StatusOutbox.Expirado, "a quarentena segue antes da reserva");
+        whatsapp.ChamadasDe(vencida.Id).Should().Be(0);
+    }
+
+    [SkippableFact]
+    public async Task Dispatcher_com_uma_so_EmEnvio_de_lease_vencido_reclama_no_wakeup()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        await FecharMensagensAbertasAsync();
+        var s = await _s.SemearAsync(CanalNotificacao.Email);
+        var presa = await _s.SemearMensagemAsync(s, CanalNotificacao.Email, ajustar: m =>
+        {
+            m.Status = StatusOutbox.EmEnvio;
+            m.ProximaTentativaEm = DateTime.UtcNow.AddMinutes(-1);
+        });
+        var email = new CanalFalso(CanalNotificacao.Email, _ => new ResultadoEnvio(true, "smtp"));
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: false, canais: email);
+
+        await RodarDispatcherAsync(provider);
+
+        var gravada = await _s.LerMensagemAsync(presa.Id);
+        gravada.Status.Should().Be(StatusOutbox.Enviado, "EmEnvio conta como mensagem aberta: o lease vencido é reclamado e ela sai");
+        gravada.Tentativas.Should().Be(1);
+        email.ChamadasDe(presa.Id).Should().Be(1);
+    }
+
+    [SkippableFact]
+    public async Task Backlog_conta_processado_sem_outbox_so_entre_os_eventos_ocorridos_em_48_horas()
+    {
+        // #1566: a contagem varria o histórico inteiro de notif_eventos; o corte por OcorridoEm usa o índice (Status, OcorridoEm).
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var agora = DateTime.UtcNow;
+        var empresa = await _s.SemearEmpresaAsync();
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: false);
+        async Task<int> ProcessadoSemOutboxAsync()
+        {
+            await using var scope = provider.CreateAsyncScope();
+            return (await scope.ServiceProvider.GetRequiredService<IBacklogNotificacoes>().MedirAsync()).ProcessadoSemOutboxEm24h;
+        }
+        var antes = await ProcessadoSemOutboxAsync();
+
+        // SemearAsync grava o evento já Processado agora, sem mensagem no outbox.
+        await _s.SemearAsync(CanalNotificacao.Email, ocorridoEm: agora.AddHours(-2), empresaId: empresa);
+        await _s.SemearAsync(CanalNotificacao.Email, ocorridoEm: agora.AddHours(-47), empresaId: empresa);
+        await _s.SemearAsync(CanalNotificacao.Email, ocorridoEm: agora.AddHours(-72), empresaId: empresa);
+
+        (await ProcessadoSemOutboxAsync() - antes).Should().Be(2, "o evento ocorrido há 72 h fica fora da varredura");
+    }
+
     // ----- quarentena e kill switch -----
 
     [SkippableFact]
@@ -324,5 +434,27 @@ public class MotorNotificacoesComportamentoTests(PostgreSqlDatabaseFixture fixtu
         email.ChamadasDe(msgEmpresa.Id).Should().Be(0);
 
         (await _s.LerMensagemAsync(msgLivre.Id)).Status.Should().Be(StatusOutbox.Enviado, "o bloqueio de outra empresa não atinge esta");
+    }
+}
+
+/// <summary>Embrulha o repositório real do outbox e guarda o nome de cada método chamado (#1566).</summary>
+public class OutboxContado : DispatchProxy
+{
+    private IOutboxNotificacaoRepository _alvo = null!;
+    private ConcurrentQueue<string> _chamadas = null!;
+
+    public static IOutboxNotificacaoRepository Embrulhar(IOutboxNotificacaoRepository alvo, ConcurrentQueue<string> chamadas)
+    {
+        var proxy = Create<IOutboxNotificacaoRepository, OutboxContado>();
+        var contado = (OutboxContado)(object)proxy;
+        contado._alvo = alvo;
+        contado._chamadas = chamadas;
+        return proxy;
+    }
+
+    protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+    {
+        _chamadas.Enqueue(targetMethod!.Name);
+        return targetMethod.Invoke(_alvo, args);
     }
 }

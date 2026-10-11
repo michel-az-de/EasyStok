@@ -7,7 +7,8 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task AddAsync(EmailConfirmationToken token);
         Task UpdateAsync(EmailConfirmationToken token);
         Task DeleteAsync(Guid id);
-        Task DeleteExpiredAsync();
+        /// <summary>Apaga em lote (<c>ExecuteDelete</c>) os tokens de confirmação que expiraram antes de <paramref name="expiradosAntesDe"/>, confirmados ou não.</summary>
+        Task<int> DeleteExpiredAsync(DateTime expiradosAntesDe, CancellationToken ct = default);
         Task<int> DeleteAllByUsuarioIdAsync(Guid usuarioId);
     }
 }

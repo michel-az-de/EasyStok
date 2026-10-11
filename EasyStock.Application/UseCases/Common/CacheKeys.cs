@@ -53,6 +53,16 @@ public static class CacheKeys
     public static readonly TimeSpan SessaoTtl = TimeSpan.FromSeconds(60);
 
     /// <summary>
+    /// SLA de primeira resposta que a inbox do atendimento repete em toda linha (#1566): minutos efetivos, por empresa.
+    /// Salvar a configuração apaga a chave; sem cache compartilhado entre réplicas o valor novo aparece em até
+    /// <see cref="AtendimentoSlaRespostaTtl"/>.
+    /// </summary>
+    public static string AtendimentoSlaResposta(Guid empresaId) =>
+        $"atendimento:sla-resposta:{empresaId}";
+
+    public static readonly TimeSpan AtendimentoSlaRespostaTtl = TimeSpan.FromSeconds(60);
+
+    /// <summary>
     /// Retorna todas as chaves de cache relacionadas a um produto específico.
     /// </summary>
     public static IReadOnlyList<string> ProdutoRelacionadas(Guid empresaId, Guid produtoId) =>

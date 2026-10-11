@@ -4,6 +4,10 @@ namespace EasyStock.Application.Ports.Output.Persistence
     {
         Task<Produto?> GetByIdAsync(Guid id);
         Task<Produto?> GetByIdAsync(Guid empresaId, Guid id);
+
+        /// <summary>#1566: os produtos da empresa pelos ids, sem tracking, numa query só. Id ausente ou de outra empresa não volta.</summary>
+        Task<IReadOnlyList<Produto>> GetByIdsAsync(Guid empresaId, IEnumerable<Guid> ids, CancellationToken ct = default);
+
         Task<Produto?> GetByIdParaAtualizarAsync(Guid empresaId, Guid id);
         Task<Produto?> GetDetalheAsync(Guid empresaId, Guid id);
         Task<bool> ExistsSkuBaseAsync(Guid empresaId, string skuBase, Guid? ignoreProdutoId = null);

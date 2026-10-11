@@ -156,6 +156,21 @@ namespace EasyStock.Infra.Postgre.Repositories
                                m.DocumentoReferencia == referenciaDocumento &&
                                m.Natureza == natureza, ct);
 
+        public async Task<IReadOnlyList<MovimentacaoEstoque>> GetPorReferenciaAsync(
+            Guid empresaId,
+            Guid produtoId,
+            string referenciaDocumento,
+            NaturezaMovimentacaoEstoque natureza,
+            CancellationToken ct = default) =>
+            await dbContext.MovimentacoesEstoque
+                .AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId &&
+                            m.ProdutoId == produtoId &&
+                            m.DocumentoReferencia == referenciaDocumento &&
+                            m.Natureza == natureza)
+                .OrderByDescending(m => m.DataMovimentacao)
+                .ToListAsync(ct);
+
         public async Task<decimal> GetTaxaSaidaDiariaAsync(Guid empresaId, Guid? produtoId, DateTime de, DateTime ate)
         {
             var query = dbContext.MovimentacoesEstoque
@@ -248,14 +263,17 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<IReadOnlyList<MovimentacaoEstoque>> GetSaidasPorNaturezaAsync(
             Guid empresaId, IReadOnlyCollection<NaturezaMovimentacaoEstoque> naturezas, DateTime deUtc, DateTime ateUtc,
-            CancellationToken ct = default) =>
-            await dbContext.MovimentacoesEstoque
+            string? excetoDescricaoComPrefixo = null, CancellationToken ct = default)
+        {
+            var query = dbContext.MovimentacoesEstoque
                 .AsNoTracking()
                 .Include(m => m.Produto)
                 .Include(m => m.ItemEstoque)
                 .Where(m => m.EmpresaId == empresaId && m.Tipo == TipoMovimentacaoEstoque.Saida
-                    && naturezas.Contains(m.Natureza) && m.DataMovimentacao >= deUtc && m.DataMovimentacao < ateUtc)
-                .OrderByDescending(m => m.DataMovimentacao)
-                .ToListAsync(ct);
+                    && naturezas.Contains(m.Natureza) && m.DataMovimentacao >= deUtc && m.DataMovimentacao < ateUtc);
+            if (!string.IsNullOrEmpty(excetoDescricaoComPrefixo))
+                query = query.Where(m => m.Descricao == null || !m.Descricao.StartsWith(excetoDescricaoComPrefixo));
+            return await query.OrderByDescending(m => m.DataMovimentacao).ToListAsync(ct);
+        }
     }
 }

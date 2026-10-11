@@ -126,6 +126,7 @@ export function ModalProgramarMensagem({
         <fieldset className={css.programarCampos} disabled={salvando || bloqueado}>
         <CampoTexto
           rotulo="Quando enviar"
+          dica="Horário da loja (Brasília)."
           tipo="datetime-local"
           value={quando}
           onChange={(e) => setQuando(e.target.value)}

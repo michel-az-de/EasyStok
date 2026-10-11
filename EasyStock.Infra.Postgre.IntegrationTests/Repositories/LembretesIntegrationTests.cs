@@ -324,6 +324,8 @@ public class LembretesIntegrationTests(PostgreSqlDatabaseFixture fixture)
         await RodarAvaliadorAsync(reabertaEm.AddMinutes(1));
         await using (var db = fixture.CreateDbContext())
             (await db.Lembretes.IgnoreQueryFilters().CountAsync(l => l.EmpresaId == casa.Id)).Should().Be(0);
+        // #1562: a inbox segue a mesma regra do lembrete.
+        (await AguardaRespostaNaInboxAsync(casa.Id)).Should().BeFalse("a nota de reabertura é a última palavra");
 
         var nova = Mensagem.Entrada(casa.Id, conversa.Id, reabertaEm.AddMinutes(5), TipoConteudoMensagem.Texto, "ainda tem nhoque?");
         await using (var db = fixture.CreateDbContext())
@@ -331,6 +333,7 @@ public class LembretesIntegrationTests(PostgreSqlDatabaseFixture fixture)
             db.AtendimentoMensagens.Add(nova);
             await db.SaveChangesAsync();
         }
+        (await AguardaRespostaNaInboxAsync(casa.Id)).Should().BeTrue("entrada depois da reabertura espera resposta");
         await RodarAvaliadorAsync(reabertaEm.AddMinutes(20));
         await using (var db = fixture.CreateDbContext())
         {
@@ -339,6 +342,13 @@ public class LembretesIntegrationTests(PostgreSqlDatabaseFixture fixture)
             aviso.Referencia.Should().Be(nova.Id.ToString());
             aviso.ConversaId.Should().Be(conversa.Id);
         }
+    }
+
+    private async Task<bool?> AguardaRespostaNaInboxAsync(Guid empresaId)
+    {
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresaId);
+        return (await new ConversaRepository(db).ListarInboxAsync(empresaId, null, null, null, 1, 10)).Single().AguardaResposta;
     }
 
     private async Task RodarAvaliadorAsync(DateTime instante)

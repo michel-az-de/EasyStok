@@ -91,10 +91,12 @@ public sealed class PerdasDaProducaoUseCase(
         if (inicio > fim) throw new UseCaseValidationException("O início do período vem depois do fim.");
 
         var movimentos = await movimentacaoRepository.GetSaidasPorNaturezaAsync(empresaId, NaturezasDePerda,
-            HorarioBrasil.JanelaDiaUtc(inicio).IniUtc, HorarioBrasil.JanelaDiaUtc(fim).FimUtc, ct);
+            HorarioBrasil.JanelaDiaUtc(inicio).IniUtc, HorarioBrasil.JanelaDiaUtc(fim).FimUtc,
+            BaixaDeInsumosDaProducao.PrefixoDaDescricao, ct);
 
         var lancamentos = movimentos
-            // M2.4b: a baixa de insumo da produção também é UsoInterno, mas não é perda.
+            // M2.4b: a baixa de insumo da produção também é UsoInterno, mas não é perda. O banco já não a
+            // devolve (#1564); o filtro daqui é a regra, e segue valendo para qualquer repositório.
             .Where(m => !(m.Descricao ?? "").StartsWith(BaixaDeInsumosDaProducao.PrefixoDaDescricao, StringComparison.Ordinal))
             .Select(m => new LancamentoDePerda(
                 m.Id, m.DataMovimentacao, m.ProdutoId, m.Produto?.Nome ?? "(produto)", m.ItemEstoque?.CodigoLote?.Value,

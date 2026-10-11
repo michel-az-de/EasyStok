@@ -93,6 +93,61 @@ public class ModeloConversaIntegrationTests(PostgreSqlDatabaseFixture fixture) :
         _canal.ReceivedCalls().Count(c => c.GetMethodInfo().Name.StartsWith("Enviar", StringComparison.Ordinal)).Should().Be(0);
     }
 
+    // #1562: o processo caiu entre gravar a intenção e o POST. Passado o prazo ela vira falha incerta; a nota
+    // interna, o texto e a intenção recente continuam pendentes, e repetir a tentativa não chama o canal.
+    [SkippableFact]
+    public async Task IntencaoPresaAlemDoPrazoViraFalhaIncerta_SemReenvio()
+    {
+        var command = await Preparar();
+        var agora = DateTime.UtcNow;
+        var prazo = EasyStock.Application.UseCases.Atendimento.Reenvio.EncerrarIntencoesModeloSemDesfechoUseCase.PrazoSemDesfecho;
+        var modelo = new ModeloMensagem(command.Nome, command.Idioma, command.Parametros);
+        var presa = Mensagem.SaidaModelo(command.TentativaId, command.EmpresaId, command.ConversaId, command.UsuarioId,
+            agora - prazo - TimeSpan.FromMinutes(1), modelo, "Olá Ana");
+        var recente = Mensagem.SaidaModelo(Guid.NewGuid(), command.EmpresaId, command.ConversaId, command.UsuarioId,
+            agora - prazo + TimeSpan.FromMinutes(1), modelo, "Olá Ana");
+        var nota = Mensagem.Saida(command.EmpresaId, command.ConversaId, AutorMensagem.Sistema, agora.AddDays(-1),
+            TipoConteudoMensagem.Texto, "Nota interna");
+        var texto = Mensagem.Saida(command.EmpresaId, command.ConversaId, AutorMensagem.Dona, agora.AddDays(-1),
+            TipoConteudoMensagem.Texto, "Texto sem confirmação");
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(command.EmpresaId);
+            seed.AtendimentoMensagens.AddRange(presa, recente, nota, texto);
+            await seed.SaveChangesAsync();
+        }
+
+        // Duas rodadas: a segunda não acha mais a intenção e não soma outra falha.
+        for (var rodada = 0; rodada < 2; rodada++)
+        {
+            await using var varredura = fixture.CreateDbContext();
+            using var bypass = varredura.UseRowLevelSecurityBypass();
+            await new EasyStock.Application.UseCases.Atendimento.Reenvio.EncerrarIntencoesModeloSemDesfechoUseCase(
+                new ConversaRepository(varredura), varredura, new RelogioFixo(agora)).ExecuteAsync(50);
+        }
+
+        await using var db = fixture.CreateDbContext(); db.SetMobileTenantContext(command.EmpresaId);
+        var repetida = await UseCase(db).ExecuteAsync(command);
+        repetida.Status.Should().Be(StatusMensagem.Falhou);
+        var salvas = await db.AtendimentoMensagens.AsNoTracking().ToDictionaryAsync(m => m.Id);
+        var encerrada = salvas[presa.Id];
+        encerrada.Status.Should().Be(StatusMensagem.Falhou);
+        encerrada.UltimaFalhaEnvio.Should().Be(TipoFalhaEnvio.Incerta);
+        encerrada.Erro.Should().Contain(EnviarModeloConversaUseCase.AvisoEnvioIncerto);
+        encerrada.TentativasEnvio.Should().Be(1);
+        encerrada.ProximoReenvioEm.Should().BeNull();
+        encerrada.PodeReenviar.Should().BeFalse(); encerrada.PrecisaDeReservaSms.Should().BeFalse();
+        salvas[recente.Id].Status.Should().Be(StatusMensagem.Pendente, "o envio ainda pode estar em andamento");
+        salvas[nota.Id].Status.Should().Be(StatusMensagem.Pendente, "nota interna não é intenção de modelo");
+        salvas[texto.Id].Status.Should().Be(StatusMensagem.Pendente, "texto pendente não é intenção de modelo");
+        _canal.ReceivedCalls().Count(c => c.GetMethodInfo().Name.StartsWith("Enviar", StringComparison.Ordinal)).Should().Be(0);
+    }
+
+    private sealed class RelogioFixo(DateTime agora) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(agora, TimeSpan.Zero);
+    }
+
     [SkippableFact]
     public async Task RlsImpedeConsultarOuEnviarModeloDeOutraEmpresa()
     {

@@ -134,7 +134,7 @@ public class PerdasDaProducaoUseCaseTests
     {
         IReadOnlyCollection<NaturezaMovimentacaoEstoque>? pedidas = null;
         _movs.GetSaidasPorNaturezaAsync(_empresaId, Arg.Do<IReadOnlyCollection<NaturezaMovimentacaoEstoque>>(n => pedidas = n),
-                Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+                Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns([
                 Mov(NaturezaMovimentacaoEstoque.Perda, 2, 10m, "Perda · Perda no preparo"),
                 Mov(NaturezaMovimentacaoEstoque.UsoInterno, 1, 3m, "Perda · Degustação"),
@@ -150,6 +150,18 @@ public class PerdasDaProducaoUseCaseTests
         r.PorProduto.Should().ContainSingle().Which.Quantidade.Should().Be(3m);
         r.Lancamentos.Should().HaveCount(3).And.ContainSingle(l => l.Desfeita);
         pedidas.Should().NotContain(NaturezaMovimentacaoEstoque.Ajuste).And.NotContain(NaturezaMovimentacaoEstoque.Venda);
+    }
+
+    // #1564: a baixa de insumo da produção fica no banco; o período pedido vai inteiro, sem teto.
+    [Fact]
+    public async Task Resumo_PedeAoBancoOPeriodoSemABaixaDeInsumo()
+    {
+        await Sut().ResumoAsync(_empresaId, new DateOnly(2025, 1, 1), new DateOnly(2026, 10, 9));
+
+        await _movs.Received(1).GetSaidasPorNaturezaAsync(_empresaId, Arg.Any<IReadOnlyCollection<NaturezaMovimentacaoEstoque>>(),
+            EasyStock.Application.Common.HorarioBrasil.JanelaDiaUtc(new DateOnly(2025, 1, 1)).IniUtc,
+            EasyStock.Application.Common.HorarioBrasil.JanelaDiaUtc(new DateOnly(2026, 10, 9)).FimUtc,
+            "Insumo da produção", Arg.Any<CancellationToken>());
     }
 
     [Fact]

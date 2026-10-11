@@ -14,7 +14,7 @@ public static class CaixaFechadoGuard
     public static async Task ExigirDiaAbertoAsync(ICaixaRepository caixa, Guid empresaId, DateTime instanteUtc,
         Guid? lojaId, string mensagem)
     {
-        if (await caixa.GetFechamentoDoDiaAsync(empresaId, HorarioBrasil.DataOperacional(instanteUtc), lojaId) is not null)
+        if ((await FechamentosQueRetratamAsync(caixa, empresaId, instanteUtc, lojaId)).Count > 0)
             throw new UseCaseValidationException(mensagem);
     }
 
@@ -25,8 +25,24 @@ public static class CaixaFechadoGuard
     public static async Task ExigirRecebimentoForaDoRetratoAsync(ICaixaRepository caixa, Guid empresaId,
         DateTime pagoEmUtc, Guid? lojaId)
     {
-        var fechamento = await caixa.GetFechamentoDoDiaAsync(empresaId, HorarioBrasil.DataOperacional(pagoEmUtc), lojaId);
-        if (fechamento is not null && pagoEmUtc <= fechamento.FechadoEm)
+        var fechamentos = await FechamentosQueRetratamAsync(caixa, empresaId, pagoEmUtc, lojaId);
+        if (fechamentos.Any(f => pagoEmUtc <= f.FechadoEm))
             throw new UseCaseValidationException(RecebimentoEmDiaFechado);
+    }
+
+    /// <summary>
+    /// #1562: o fechamento sem loja é o da empresa e soma os recebimentos de todas as lojas (Console e Web
+    /// fecham assim), então retrata também o pedido que tem loja. O inverso não vale: o fechamento de uma
+    /// loja só soma os pedidos dela, e não retrata pedido de outra loja nem pedido sem loja.
+    /// </summary>
+    private static async Task<IReadOnlyList<FechamentoCaixa>> FechamentosQueRetratamAsync(ICaixaRepository caixa,
+        Guid empresaId, DateTime instanteUtc, Guid? lojaId)
+    {
+        var dia = HorarioBrasil.DataOperacional(instanteUtc);
+        var fechamentos = new List<FechamentoCaixa>(2);
+        if (await caixa.GetFechamentoDoDiaAsync(empresaId, dia, lojaId) is { } daLoja) fechamentos.Add(daLoja);
+        if (lojaId is not null && await caixa.GetFechamentoDoDiaAsync(empresaId, dia, null) is { } daEmpresa)
+            fechamentos.Add(daEmpresa);
+        return fechamentos;
     }
 }

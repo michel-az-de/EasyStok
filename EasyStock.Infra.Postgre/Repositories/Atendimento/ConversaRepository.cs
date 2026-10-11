@@ -164,8 +164,8 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
                     .Where(ue => ue.EmpresaId == empresaId && ue.UsuarioId == c.AssumidaPorUsuarioId)
                     .Select(ue => ue.Usuario!.Nome).FirstOrDefault(),
                 AguardaResposta = c.Situacao != SituacaoConversa.Encerrada && db.AtendimentoMensagens
-                    .Where(m => m.EmpresaId == empresaId && m.ConversaId == c.Id
-                        && m.Status != StatusMensagem.Falhou && m.Status != StatusMensagem.Pendente)
+                    .Where(m => m.EmpresaId == empresaId && m.ConversaId == c.Id)
+                    .Where(UltimaPalavraConversa.Conta)
                     .OrderByDescending(m => m.EnviadaEm).ThenByDescending(m => m.Id)
                     .Select(m => (DirecaoMensagem?)m.Direcao).FirstOrDefault() == DirecaoMensagem.Entrada,
                 UltimoTexto = db.AtendimentoMensagens
@@ -252,6 +252,20 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
                 SELECT * FROM atendimento_mensagens
                 WHERE "Status" = {(int)StatusMensagem.Falhou} AND "ProximoReenvioEm" <= {agora}
                 ORDER BY "ProximoReenvioEm"
+                LIMIT {limite}
+                FOR UPDATE SKIP LOCKED
+                """)
+            .IgnoreQueryFilters()
+            .ToListAsync(ct);
+
+    // SQL cru: FOR UPDATE SKIP LOCKED não sai do LINQ. Cross-tenant, com bypass de RLS ligado pelo host (#1562).
+    // Só a intenção de modelo tem ModeloJson: nota interna e texto também ficam pendentes e não entram.
+    public async Task<IReadOnlyList<Mensagem>> ListarIntencoesModeloSemDesfechoComLockAsync(DateTime gravadaAntesDe, int limite, CancellationToken ct = default) =>
+        await db.AtendimentoMensagens
+            .FromSqlInterpolated($"""
+                SELECT * FROM atendimento_mensagens
+                WHERE "Status" = {(int)StatusMensagem.Pendente} AND "ModeloJson" IS NOT NULL AND "EnviadaEm" < {gravadaAntesDe}
+                ORDER BY "EnviadaEm"
                 LIMIT {limite}
                 FOR UPDATE SKIP LOCKED
                 """)
