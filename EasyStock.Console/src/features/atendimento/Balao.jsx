@@ -1,4 +1,6 @@
+import { memo } from 'react'
 import { Icone } from '../../componentes/Icone'
+import { mesmasProps } from '../../aplicacao/igualdade'
 import { horaCurta } from '../../dominio/formato'
 import { partesComLinkDoCardapio } from '../../dominio/cardapioLink'
 import { BolhaArquivo, BolhaAudio, BolhaPeca } from './BolhaAnexo'
@@ -58,7 +60,9 @@ function LinkDoCardapio({ url }) {
   )
 }
 
-export function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReenviar }) {
+// #1577: em `memo`. Mensagem nova na conversa não re-renderiza os balões antigos (até 100, cada um com a
+// regex de link). A mensagem compara por conteúdo: a leitura da API a devolve como objeto novo sem ter mudado.
+export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReenviar }) {
   if (mensagem.dir === 'sistema') {
     return (
       <p className={`${css.balao} ${css.sistema} ${trocaDeVoz ? css.trocaDeVoz : ''}`}>
@@ -110,4 +114,4 @@ export function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReen
       </span>
     </div>
   )
-}
+}, (antes, depois) => mesmasProps(antes, depois, ['mensagem']))

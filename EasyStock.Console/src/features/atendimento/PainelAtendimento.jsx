@@ -23,7 +23,7 @@ export function PainelAtendimento({
   focarAoTrocar = false,
 }) {
   const {
-    selecionada, visiveis, agora, automaticoPausado, rascunho, fonteApi,
+    selecionada, visiveis, agora, automaticoPausado, rascunho, escritaDeFora, fonteApi,
   } = useAtendimento()
   const {
     enviar, reabrir, definirRascunho, assumirAtendimento, devolverAutomatico,
@@ -169,9 +169,11 @@ export function PainelAtendimento({
         podeEscrever={pode}
         motivo={motivo}
         ofereceModelo={ofereceModelo}
+        // #1577: o texto digitado mora no campo; daqui desce o rascunho global e o carimbo de quem
+        // escreveu nele de fora (sugestão, assistente, limpar do envio).
         rascunho={rascunho}
-        aoMudarRascunho={(texto) => definirRascunho(selecionada.id, texto)}
-        aoEnviar={() => enviar(selecionada.id, rascunho.trim())}
+        escritaDeFora={escritaDeFora}
+        aoEnviar={(texto) => enviar(selecionada.id, texto.trim())}
         // #1551: modelo aprovado só existe com a API; na demonstração o botão só devolvia erro.
         podeEnviarModelo={fonteApi && podeReabrir && canal.aceitaModelo && !encerrada && !bloqueada}
         aoAplicarTemplate={aplicarTemplate}
