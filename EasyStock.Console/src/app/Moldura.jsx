@@ -23,6 +23,7 @@ import { Sininho } from '../features/lembretes/Sininho'
 import { Popover } from '../componentes/Popover'
 import { FONTE_API } from '../infra/fonteDados'
 import { HASH_HALL, HASH_MODULO_COZINHA } from '../dominio/rota'
+import { JANELA_COZINHA } from '../dominio/janelaAvulsa'
 import { AvisoDaAcaoApi } from './FaixaApi'
 import css from './moldura.module.css'
 
@@ -149,7 +150,7 @@ function MenuMais({
 // Mantém o atendimento aberto. O KDS da API continua usando a rota protegida do módulo.
 function abrirCozinha() {
   const destino = FONTE_API ? HASH_MODULO_COZINHA : '#/cozinha'
-  const janela = window.open(destino, 'cdb-cozinha', 'width=1280,height=900')
+  const janela = window.open(destino, JANELA_COZINHA, 'width=1280,height=900')
   // Issue #40 (rodada 13, achado da varredura): popup bloqueado devolve
   // `null` e nada acontece. Cai para a mesma aba: `App.jsx` agora reage à
   // troca de hash (useHash), então a Cozinha aparece de qualquer jeito.

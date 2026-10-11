@@ -4,6 +4,7 @@ import { Icone } from '../../componentes/Icone'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useEscape } from '../../hooks/useEscape'
 import { horaCurta } from '../../dominio/formato'
+import { JANELA_ENTREGAS } from '../../dominio/janelaAvulsa'
 import { ConteudoEntregas } from './ConteudoEntregas'
 import css from './dashboard.module.css'
 
@@ -35,7 +36,7 @@ export function GavetaEntregas({ aoFechar }) {
   const acoes = { ...acoesContexto, selecionar: (id) => { acoesContexto.selecionar(id); aoFechar() } }
 
   const abrirOutraJanela = () => {
-    window.open('#/entregas', 'cdb-entregas', 'width=1280,height=900')
+    window.open('#/entregas', JANELA_ENTREGAS, 'width=1280,height=900')
   }
 
   return (
