@@ -6,17 +6,31 @@ import { ajustarSaldoDoItem } from '../infra/api/cardapioApi'
 export const lerEstoqueDoDia = async () => estoqueDoDiaDaApi(await obterEstoqueDoDia())
 
 // M1.4d (#1542): em prato com porções o saldo é de cada porção, então a contagem também. Só entra
-// porção que já tem lote (a API conta os lotes dela); o que ficou sem porção tem chave própria.
+// porção que já tem lote (a contagem cai nos lotes dela; sem lote, quem cria é a produção); o que
+// ficou sem porção tem chave própria. No fim vem sempre o prato inteiro, a contagem de antes: é a
+// saída para lote de porção que saiu do cardápio e para quando nenhuma porção tem lote.
 const SEM_PORCAO = 'sem-porcao'
-export const porcoesParaAjuste = (prato) => (prato?.porcoes ?? [])
-  .filter((s) => s.variacaoId === null || s.produtoVariacaoId)
-  .map((s) => ({
-    chave: s.variacaoId ?? SEM_PORCAO, rotulo: s.rotulo, saldo: s.saldo, descoberto: s.descoberto, fisico: s.fisico,
-    corpo: s.variacaoId ? { variacaoId: s.variacaoId } : { semPorcao: true },
-  }))
+const PRATO_INTEIRO = 'prato-inteiro'
+export function porcoesParaAjuste(prato) {
+  // API anterior à contagem por porção ignoraria a porção e contaria o prato inteiro sem avisar.
+  if (!prato?.contagemPorPorcao || (prato.porcoes ?? []).length === 0) return []
+  return [
+    ...prato.porcoes.filter((s) => s.temLote).map((s) => ({
+      chave: s.variacaoId ?? SEM_PORCAO, rotulo: s.rotulo, saldo: s.saldo, descoberto: s.descoberto, fisico: s.fisico,
+      corpo: s.variacaoId ? { variacaoId: s.variacaoId } : { semPorcao: true },
+    })),
+    {
+      chave: PRATO_INTEIRO, rotulo: 'O prato inteiro, sem separar por porção',
+      saldo: prato.saldo, descoberto: prato.descoberto, fisico: prato.fisico, corpo: null,
+    },
+  ]
+}
 
-// A porção em que o formulário abre: a única que existe, ou a única com venda sem saldo.
-export function porcaoSugerida(porcoes) {
+// A opção em que o formulário abre: a única porção com lote, ou a única com venda sem saldo. Sem
+// porção nenhuma com lote, só resta o prato inteiro.
+export function porcaoSugerida(opcoes) {
+  const porcoes = opcoes.filter((s) => s.corpo)
+  if (porcoes.length === 0) return opcoes[0]?.chave ?? ''
   if (porcoes.length === 1) return porcoes[0].chave
   const comVendaSemSaldo = porcoes.filter((s) => s.descoberto > 0)
   return comVendaSemSaldo.length === 1 ? comVendaSemSaldo[0].chave : ''

@@ -103,6 +103,23 @@ public class EstoqueDoDiaUseCaseTests
 
         prato.Porcoes!.Select(p => (p.Rotulo, p.Saldo, p.Descoberto)).Should().Equal(
             ("300 g", 0m, 2m), ("sem porção", 0m, 1m));
+        prato.Porcoes!.Should().OnlyContain(p => p.TemLote);
+    }
+
+    [Fact]
+    public async Task PorcaoLigadaAoEstoqueMasSemLote_NaoTemOndeAContagemCair()
+    {
+        // O vínculo nasce ao editar o prato; o lote, só na produção. A contagem dessa porção a API recusa.
+        var ravioliId = Guid.NewGuid();
+        var ravioli = Prato(ravioliId, "Ravióli");
+        ravioli.AdicionarVariacao(CardapioItemVariacao.Criar(ravioli.Id, "300 g", 28m, ordemExibicao: 0, produtoVariacaoId: Guid.NewGuid()));
+        _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>()).Returns([ravioli]);
+        _itens.GetByProdutosAsync(EmpresaId, Arg.Any<IEnumerable<Guid>>(), null, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, IReadOnlyCollection<ItemEstoque>>());
+
+        var prato = (await Sut().ExecuteAsync(EmpresaId)).Pratos.Single();
+
+        prato.Porcoes!.Single().TemLote.Should().BeFalse();
     }
 
     [Fact]

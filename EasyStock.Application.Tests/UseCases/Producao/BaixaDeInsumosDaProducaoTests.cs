@@ -226,6 +226,22 @@ public class BaixaDeInsumosDaProducaoTests
         avisos.Should().ContainSingle().Which.Should().Contain("Lasanha 300 g").And.Contain("Bandeja").And.Contain("peso");
     }
 
+    [Theory]
+    [InlineData(true, "300 g")]
+    [InlineData(false, null)]
+    public void SoPratoComMaisDeUmTamanho_LevaAPorcaoParaOAviso(bool variosTamanhos, string? esperada)
+    {
+        // Prato com uma porção só não tem outro tamanho com que a receita se confunda: sem aviso.
+        var lasanha = Prato(marcado: true);
+        var item = new RegistrarProducaoItemInput(lasanha.Id, Porcoes: 4, PesoPorPorcaoG: 300, ValidadeDias: 5, CustoUnitario: null,
+            Porcao: "300 g", VariosTamanhos: variosTamanhos);
+
+        var prato = PratoParaBaixa.Da(lasanha, item);
+
+        prato.Porcao.Should().Be(esperada);
+        (prato.Porcoes, prato.PesoProduzidoG).Should().Be((4, 1200));
+    }
+
     [Fact]
     public async Task PorcaoProduzida_SoEmbalagemEmReceitaQueRendeEmPorcoes_NaoAvisa()
     {

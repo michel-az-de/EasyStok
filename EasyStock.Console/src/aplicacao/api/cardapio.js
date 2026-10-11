@@ -77,11 +77,6 @@ export function criarAcoesCardapioApi({ despachar, estadoRef }) {
         avisar(`${item.nome}: este item não controla saldo no EasyStok.`)
         return Promise.resolve(false)
       }
-      // #1542: o saldo de prato com porções é de cada porção; um toque aqui não diz qual.
-      if ((item.porcoes ?? []).length > 0) {
-        avisar(`${item.nome}: o saldo é de cada porção. Acerte em Produção › Estoque do dia.`)
-        return Promise.resolve(false)
-      }
       const pendente = filaDoSaldo.get(sku)
       const contada = Math.max((pendente ? pendente.alvo : item.estoque) + delta, 0)
       despachar({ tipo: acao.AJUSTAR_SALDO, sku, delta })

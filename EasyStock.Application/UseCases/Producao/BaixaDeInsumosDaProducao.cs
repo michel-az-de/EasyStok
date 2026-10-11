@@ -4,8 +4,13 @@ using EasyStock.Domain.ValueObjects;
 namespace EasyStock.Application.UseCases.Producao;
 
 /// <summary>Um prato que acabou de ser produzido, com o que a baixa precisa saber dele.</summary>
-/// <param name="Porcao">Rótulo da porção produzida (M1.4c), quando o prato tem porções.</param>
-public sealed record PratoParaBaixa(Produto Prato, int Porcoes, int? PesoProduzidoG, string? Porcao = null);
+/// <param name="Porcao">Rótulo da porção produzida, só quando o prato tem mais de um tamanho de porção.</param>
+public sealed record PratoParaBaixa(Produto Prato, int Porcoes, int? PesoProduzidoG, string? Porcao = null)
+{
+    public static PratoParaBaixa Da(Produto prato, RegistrarProducaoItemInput item) => new(
+        prato, item.Porcoes, item.PesoRealG ?? item.Porcoes * item.PesoPorPorcaoG,
+        item.VariosTamanhos ? item.Porcao : null);
+}
 
 /// <summary>
 /// D-M2-01 (#1499): baixa dos insumos pela receita, dentro da transação da produção (S23).

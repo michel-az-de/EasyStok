@@ -20,8 +20,10 @@ public sealed record EstoqueDoPrato(
 /// <param name="ProdutoVariacaoId">A mesma porção no estoque: é o que a perda manda de volta. Null enquanto a porção não tem lote.</param>
 /// <param name="Descoberto">Vendas sem saldo que caíram nos lotes desta porção: é ela que a contagem precisa acertar.</param>
 /// <param name="Fisico">Tudo o que está guardado desta porção, vencido incluído.</param>
+/// <param name="TemLote">Há lote onde a contagem pode cair. Sem lote, quem cria é a produção.</param>
 public sealed record SaldoDaPorcao(
-    Guid? VariacaoId, string Rotulo, decimal Saldo, Guid? ProdutoVariacaoId = null, decimal Descoberto = 0m, decimal Fisico = 0m);
+    Guid? VariacaoId, string Rotulo, decimal Saldo, Guid? ProdutoVariacaoId = null, decimal Descoberto = 0m, decimal Fisico = 0m,
+    bool TemLote = false);
 
 /// <param name="CardapioItemId">O prato do alerta, para o console ajustar pela rota do item. Null se não está no cardápio.</param>
 public sealed record AlertaDeEstoque(Guid ProdutoId, Guid? CardapioItemId, string Nome, string Texto, decimal QuantidadeDescoberta);
@@ -92,7 +94,8 @@ public sealed class EstoqueDoDiaUseCase(
         {
             var dela = temLotes ? lotes.Where(l => l.ProdutoVariacaoId == noEstoque).ToList() : [];
             var (saldo, descoberto) = SaldoEDescoberto(dela, hoje);
-            return new SaldoDaPorcao(variacaoId, rotulo, saldo, noEstoque, descoberto, FisicoDe(dela));
+            return new SaldoDaPorcao(variacaoId, rotulo, saldo, noEstoque, descoberto, FisicoDe(dela),
+                TemLote: dela.Any(l => l.Status != StatusItemEstoque.Descartado));
         }
 
         var saldos = prato.Variacoes

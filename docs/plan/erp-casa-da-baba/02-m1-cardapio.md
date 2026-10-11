@@ -207,13 +207,18 @@ busca só por produto (`PedidoEstoqueIntegrationService.cs:78-80`).
 > - **Ajuste de contagem:** em prato com porções o formulário pede a porção (abre na que tem venda sem saldo) e a
 >   contagem só mexe nos lotes dela. O alerta do prato fecha quando nenhuma porção tem venda sem saldo. A rota aceita
 >   `variacaoId` ou `semPorcao`; sem nenhum dos dois segue contando o prato inteiro, que é o que uma aba antiga manda.
->   Os botões − e + do cardápio do dia não contam prato com porções e apontam para o Estoque do dia.
+>   Só entra na escolha a porção que já tem lote, e "o prato inteiro" fica sempre como última opção: é a saída para
+>   lote de porção que saiu do cardápio e para quando nenhuma porção tem lote.
+> - **Botões − e + do cardápio do dia (não mudaram):** seguem contando o prato inteiro. Em produção (10/10) os
+>   usuários estão em perfis antigos, e o Operador antigo acerta saldo pelo balcão sem ter o módulo de Produção;
+>   bloquear os botões tiraria o único caminho dele. Para contar por porção ali, o cardápio da comanda precisa trazer
+>   o saldo de cada porção.
 > - **O que a contagem cobre (decidido):** tudo o que está guardado, vencido incluído, que é como a API reparte entre os
 >   lotes. O saldo da tela não conta vencido, então o formulário começa pelo guardado e diz quantas são vencidas; para
 >   tirá-las, Perdas.
 > - **Receita por tamanho de porção (em aberto, #1552):** a receita é do prato. Produzida uma porção, a conta não muda,
->   mas a produção avisa onde ela não acompanha o tamanho: receita que rende em porções baixa o mesmo insumo para
->   300 g e 800 g; receita que rende em peso baixa a embalagem pelo peso, não uma por porção.
+>   mas a produção de prato com mais de um tamanho avisa onde ela não acompanha: receita que rende em porções baixa o
+>   mesmo insumo para 300 g e 800 g; receita que rende em peso baixa a embalagem pelo peso, não uma por porção.
 
 **Decisão já tomada.** Preço da variação é absoluto, não delta (ADR-0035). Tier **alto** (pedido e contrato
 público; coordenar com o repositório do site antes da fase 2 do ADR-0035).

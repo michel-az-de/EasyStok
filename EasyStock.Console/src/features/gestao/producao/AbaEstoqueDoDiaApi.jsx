@@ -30,6 +30,8 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar, aviso, aoFecharAviso }) 
   // O que está sendo contado: a porção escolhida ou, sem porções, o prato.
   const contado = porPorcao ? opcoes.find((s) => s.chave === porcao) ?? null : alvo
   const [contagem, setContagem] = useState(() => String(contagemInicial(contado)))
+  // Depois que ela digita, o número é dela: escolher a porção em seguida não o troca pelo do sistema.
+  const [digitada, setDigitada] = useState(false)
   const [motivo, setMotivo] = useState('')
   const [salvando, setSalvando] = useState(false)
   const vencidas = vencidasNaContagem(contado)
@@ -37,7 +39,7 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar, aviso, aoFecharAviso }) 
   const trocarPorcao = (evento) => {
     const chave = evento.target.value
     setPorcao(chave)
-    setContagem(String(contagemInicial(opcoes.find((s) => s.chave === chave) ?? null)))
+    if (!digitada) setContagem(String(contagemInicial(opcoes.find((s) => s.chave === chave) ?? null)))
   }
 
   const salvar = (evento) => {
@@ -52,7 +54,7 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar, aviso, aoFecharAviso }) 
     <form className={`${css.campos} ${css.formulario} ${css.ajusteEstoque}`} onSubmit={salvar}>
       {porPorcao && (
         <div className={css.linhaCompleta}>
-          <CampoSelecao rotulo="Porção contada" value={porcao} disabled={salvando} onChange={trocarPorcao}
+          <CampoSelecao rotulo="O que você contou" value={porcao} disabled={salvando} onChange={trocarPorcao}
             dica="O saldo deste prato é de cada porção. Conte uma de cada vez."
             opcoes={[{ valor: '', rotulo: 'Escolha a porção que você contou' },
               ...opcoes.map((s) => ({ valor: s.chave, rotulo: `${s.rotulo} (tem ${s.fisico} guardadas)` }))]} />
@@ -65,7 +67,7 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar, aviso, aoFecharAviso }) 
         value={contagem}
         disabled={salvando}
         dica="Informe o total que você contou, não a diferença em relação ao saldo."
-        onChange={(e) => setContagem(e.target.value)}
+        onChange={(e) => { setDigitada(true); setContagem(e.target.value) }}
       />
       <CampoTexto
         rotulo="Motivo do ajuste"

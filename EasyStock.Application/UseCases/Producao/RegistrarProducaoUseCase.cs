@@ -15,7 +15,9 @@ public sealed record RegistrarProducaoItemInput(
     int? PesoRealG = null,
     // M1.4c (#1537, D-M1-03): a porção produzida. A entrada vai para o saldo dela.
     Guid? ProdutoVariacaoId = null,
-    [property: MaxLength(60)] string? Porcao = null);
+    [property: MaxLength(60)] string? Porcao = null,
+    // #1542: o prato tem mais de um tamanho de porção; a baixa de insumo avisa onde a receita não acompanha.
+    bool VariosTamanhos = false);
 
 public sealed record RegistrarProducaoCommand(
     [property: Required] Guid EmpresaId,
@@ -174,7 +176,7 @@ public class RegistrarProducaoUseCase(
         var avisos = baixaDeInsumos is null
             ? []
             : await baixaDeInsumos.BaixarAsync(cmd.EmpresaId,
-                itens.Select(i => new PratoParaBaixa(produtos[i.ProdutoId], i.Porcoes, i.PesoRealG ?? i.Porcoes * i.PesoPorPorcaoG, i.Porcao)).ToList(),
+                itens.Select(i => PratoParaBaixa.Da(produtos[i.ProdutoId], i)).ToList(),
                 finalizado.Codigo, dataProducao, ct);
 
         logger.LogInformation("Producao registrada: lote {Codigo} com {Itens} item(ns), {Etiquetas} etiqueta(s) e {Avisos} aviso(s) de insumo.",
