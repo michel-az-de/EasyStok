@@ -171,6 +171,18 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .OrderByDescending(m => m.DataMovimentacao)
                 .ToListAsync(ct);
 
+        public async Task<IReadOnlyList<MovimentacaoEstoque>> GetSaidasAbertasPorDocumentoAsync(
+            Guid empresaId, string documento, NaturezaMovimentacaoEstoque natureza, CancellationToken ct = default) =>
+            await dbContext.MovimentacoesEstoque
+                .AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId &&
+                            m.DocumentoReferencia == documento &&
+                            m.Natureza == natureza &&
+                            m.Tipo == TipoMovimentacaoEstoque.Saida &&
+                            m.EstornadaEm == null)
+                .OrderBy(m => m.DataMovimentacao)
+                .ToListAsync(ct);
+
         public async Task<decimal> GetTaxaSaidaDiariaAsync(Guid empresaId, Guid? produtoId, DateTime de, DateTime ate)
         {
             var query = dbContext.MovimentacoesEstoque

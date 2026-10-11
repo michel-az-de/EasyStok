@@ -391,6 +391,88 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
         SaldoDoLote(lote).Should().Be(10m, "a saida que este caminho registrou nao pode ficar orfa");
     }
 
+    // ---------- #1571: pedido que nasceu no aparelho e o console tambem avancou ----------
+    // O aparelho baixa com o id do pedido de la; a esteira do ERP, com "{pedido}:{item}". Sem olhar
+    // a chave do outro lado, a mesma venda saia duas vezes e o cancelamento devolvia so metade.
+
+    [Fact]
+    public async Task ConsoleJaBaixou_AparelhoNaoBaixaDeNovo()
+    {
+        SemearProduto(estoque: 10, comVinculo: true);
+        var lote = SemearItemEstoque(10);
+        var pedidoErp = SemearPedidoDoErp(origem: "mobile");
+        SemearPedido("preparando", qtd: 2, erpPedidoId: pedidoErp);
+        SemearSaidaDaEsteira(pedidoErp, lote, 2);
+
+        await Push("dev-a", PedidoEm("pronto", 2));
+
+        (SaldoDoLote(lote), SaidasDeVendaNoErp()).Should().Be((8m, 1), "o console ja tinha dado o pedido como pronto");
+    }
+
+    [Fact]
+    public async Task ConsoleBaixouMenosDoQueOAparelhoVendeu_AparelhoBaixaADiferenca()
+    {
+        // O Pedido do ERP guarda os itens do primeiro envio (2); no aparelho o pedido cresceu para 3.
+        SemearProduto(estoque: 10, comVinculo: true);
+        var lote = SemearItemEstoque(10);
+        var pedidoErp = SemearPedidoDoErp(origem: "mobile");
+        SemearPedido("preparando", qtd: 3, erpPedidoId: pedidoErp);
+        SemearSaidaDaEsteira(pedidoErp, lote, 2);
+
+        await Push("dev-a", PedidoEm("pronto", 3));
+
+        SaldoDoLote(lote).Should().Be(7m, "saiu o que o aparelho vendeu, uma vez");
+    }
+
+    [Fact]
+    public async Task ConsoleBaixou_AparelhoCancela_DevolveABaixaDoConsole()
+    {
+        SemearProduto(estoque: 10, comVinculo: true);
+        var lote = SemearItemEstoque(10);
+        var pedidoErp = SemearPedidoDoErp(origem: "mobile");
+        SemearPedido("pronto", qtd: 2, erpPedidoId: pedidoErp);
+        SemearSaidaDaEsteira(pedidoErp, lote, 2);
+
+        await Push("dev-a", PedidoEm("cancelado", 2));
+        SaldoDoLote(lote).Should().Be(10m, "o pedido e do aparelho: o cancelamento dele devolve o que saiu, por qualquer das chaves");
+
+        await Push("dev-a", PedidoEm("cancelado", 2));
+        SaldoDoLote(lote).Should().Be(10m, "uma vez so");
+    }
+
+    [Fact]
+    public async Task PedidoDoErp_AparelhoCancela_NaoDevolvePorFora_OQueAEsteiraBaixou()
+    {
+        // No pedido que nasceu no ERP quem devolve e o cancelamento da esteira, que pode recusar
+        // (pedido pago). Devolver aqui deixaria o estoque de volta com o pedido ainda entregue.
+        SemearProduto(estoque: 10, comVinculo: true);
+        var lote = SemearItemEstoque(10);
+        var pedidoErp = SemearPedidoDoErp();
+        SemearPedido("pronto", qtd: 2, erpPedidoId: pedidoErp);
+        SemearSaidaDaEsteira(pedidoErp, lote, 2);
+
+        await Push("dev-a", PedidoEm("cancelado", 2));
+
+        SaldoDoLote(lote).Should().Be(8m);
+    }
+
+    [Fact]
+    public async Task CancelarDevolveTudoOQueOPedidoBaixou_MesmoOItemQueSaiuDoPedidoDepois()
+    {
+        SemearProduto(estoque: 10, comVinculo: true);
+        var lote = SemearItemEstoque(10);
+        SemearPedido("preparando", qtd: 2);
+        await Push("dev-a", PedidoEm("pronto", 2));
+        SaldoDoLote(lote).Should().Be(8m);
+        var agora = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        // O operador tirou o item do pedido e depois cancelou: o envio do cancelamento ja vem sem ele.
+        await Push("dev-a", Mutation("order.upsert", new OrderDto(
+            Pedido, null, new ClientSnapshotDto("Ana", null), [], null, 0m, "cancelado", agora, agora + 1)));
+
+        SaldoDoLote(lote).Should().Be(10m);
+    }
+
     [Fact]
     public async Task VendaSaiDaLojaDoPedido_NaoDaLojaDeQuemCadastrouOProduto()
     {
@@ -629,9 +711,10 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
     }
 
     /// <summary>Pedido que nasceu no ERP (console ou site), com o id que o pull leva ao aparelho.</summary>
-    private Guid SemearPedidoDoErp()
+    private Guid SemearPedidoDoErp(string origem = "web")
     {
-        var pedido = EasyStock.Domain.Entities.Pedido.Criar(_empresaId, cliente: null, lojaId: _lojaId, "web");
+        var pedido = EasyStock.Domain.Entities.Pedido.Criar(_empresaId, cliente: null, lojaId: _lojaId, origem);
+        if (origem == SyncMutationDispatcher.OrigemDoPwa) pedido.MobileOrderId = Pedido;
         _db.Add(pedido);
         _db.SaveChanges();
         _db.ChangeTracker.Clear();
@@ -660,6 +743,23 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
     private ItemEstoque LoteDoErp(Guid id) => _db.Set<ItemEstoque>().IgnoreQueryFilters().AsNoTracking().Single(i => i.Id == id);
     private decimal SaldoDoLote(Guid id) => LoteDoErp(id).QuantidadeAtual?.Value ?? 0;
     private decimal DescobertoDoLote(Guid id) => LoteDoErp(id).QuantidadeDescoberta?.Value ?? 0;
+
+    /// <summary>O console (ou o KDS) deu o pedido como pronto: a esteira baixou, com "{pedido}:{item}" no documento.</summary>
+    private void SemearSaidaDaEsteira(Guid pedidoErp, Guid loteId, int quantidade)
+    {
+        var lote = _db.Set<ItemEstoque>().IgnoreQueryFilters().Single(i => i.Id == loteId);
+        var agora = DateTime.UtcNow;
+        lote.RegistrarSaida(Quantidade.From(quantidade), agora, agora, permitirVencido: true);
+        _db.Add(new MovimentacaoEstoque
+        {
+            Id = Guid.NewGuid(), EmpresaId = _empresaId, ProdutoId = _produtoErpId, ItemEstoqueId = lote.Id,
+            Tipo = TipoMovimentacaoEstoque.Saida, Natureza = NaturezaMovimentacaoEstoque.Venda,
+            Quantidade = Quantidade.From(quantidade), DocumentoReferencia = $"{pedidoErp}:{Guid.NewGuid()}",
+            DataMovimentacao = agora, CriadoEm = agora
+        });
+        _db.SaveChanges();
+        _db.ChangeTracker.Clear();
+    }
 
     private int SaidasDeVendaNoErp() => _db.Set<MovimentacaoEstoque>().IgnoreQueryFilters()
         .Count(m => m.EmpresaId == _empresaId && m.ProdutoId == _produtoErpId

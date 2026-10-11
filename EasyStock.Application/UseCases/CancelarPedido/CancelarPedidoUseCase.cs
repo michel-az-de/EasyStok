@@ -55,7 +55,10 @@ public class CancelarPedidoUseCase(
             if (pedido.StatusEnum == StatusPedido.Cancelado) return CriarPedidoUseCase.Map(pedido);
 
             statusAntigo = pedido.Status;
-            if (PedidoStateMachine.DescontaEstoque(pedido.StatusEnum))
+            // #1571: no pedido que veio do aparelho o status do ERP espelha o do aparelho, e um
+            // aparelho atrasado pode tê-lo levado de volta a "aguardando" com a baixa já feita. Aí
+            // devolve-se pelo que está baixado, não pelo status (a devolução só mexe em saída aberta).
+            if (PedidoStateMachine.DescontaEstoque(pedido.StatusEnum) || !string.IsNullOrWhiteSpace(pedido.MobileOrderId))
                 await estoqueIntegration.DevolverAsync(pedido);
             pedido.Cancelar();
             var agora = DateTime.UtcNow;
