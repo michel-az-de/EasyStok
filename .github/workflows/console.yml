@@ -81,6 +81,7 @@ jobs:
       - run: node ferramentas/prova-m37-atendentes.mjs
       - run: node ferramentas/prova-m38-lembretes-agendados.mjs
       - run: node ferramentas/prova-ux-sistema.mjs
+      - run: node ferramentas/prova-1595-moeda-cursor.mjs
       - run: node ferramentas/prova-superbanca-confirmacao.mjs
       - run: node ferramentas/prova-superbanca-acessibilidade.mjs
       - run: node ferramentas/prova-superbanca-ia.mjs
