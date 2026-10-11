@@ -322,7 +322,7 @@ export function AbaCaixaApi() {
 
       {podeGerenciar && dia.aberto && !dia.fechado && (
         <div className={css.acoesTopo}>
-          <Botao variante="secundario" icone="log-out" disabled={acao.enviando} onClick={() => { limparErro(); setFecharAberto(true) }}>
+          <Botao variante="texto" icone="log-out" disabled={acao.enviando} onClick={() => { limparErro(); setFecharAberto(true) }}>
             {dia.esquecidoAberto ? `Fechar o caixa de ${diaMes(dia.abertoDesde)}` : 'Fechar o caixa'}
           </Botao>
         </div>
