@@ -24,8 +24,12 @@ public interface ILembreteRepository
     /// <summary>Persiste os vistos em uma operação: abertos, vencidos, ainda não vistos e visíveis ao usuário. Devolve quantos mudaram.</summary>
     Task<int> MarcarVencidosVistosAsync(Guid empresaId, Guid usuarioId, DateTime agoraUtc, CancellationToken ct = default);
 
-    /// <summary>Idempotência do avaliador: já existe lembrete (em qualquer situação) para o fato?</summary>
-    Task<bool> ExisteAutomaticoAsync(Guid empresaId, TipoLembrete tipo, string referencia, CancellationToken ct = default);
+    /// <summary>
+    /// Cross-tenant. Idempotência do avaliador, em uma consulta por tipo (#1564): dos <paramref name="fatos"/>,
+    /// quais já têm lembrete, em qualquer situação (o concluído também conta: não renasce).
+    /// </summary>
+    Task<IReadOnlyCollection<(Guid EmpresaId, string Referencia)>> ListarAutomaticosExistentesAsync(
+        TipoLembrete tipo, IReadOnlyCollection<(Guid EmpresaId, string Referencia)> fatos, CancellationToken ct = default);
 
     /// <summary>Cross-tenant: automáticos abertos, para o avaliador resolver os que deixaram de valer. Rastreado.</summary>
     Task<IReadOnlyList<Lembrete>> ListarAutomaticosAbertosAsync(CancellationToken ct = default);
