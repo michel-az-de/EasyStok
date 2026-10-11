@@ -3,6 +3,7 @@ import {
   closestCenter, DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors,
 } from '@dnd-kit/core'
 import { AtendimentoProvider } from '../aplicacao/AtendimentoProvider'
+import { criarMemoriaDoLaco } from '../aplicacao/cicloDeSincronizacao'
 import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
 import { useReacaoClienteSimulado } from '../aplicacao/useReacaoClienteSimulado'
 import { useDigitacaoAutomatica } from '../aplicacao/useDigitacaoAutomatica'
@@ -349,12 +350,12 @@ function RestaurarConversa({ ultimaConversa, aoLembrarConversa }) {
   return null
 }
 
-function AppPrincipal({ rota, sessao, aoSair, ultimaConversa, aoLembrarConversa, lerComandasDaVisita, aoGuardarComandas }) {
+function AppPrincipal({ rota, sessao, aoSair, ultimaConversa, aoLembrarConversa, lerComandasDaVisita, aoGuardarComandas, memoriaDoLaco }) {
   const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: FONTE_API })
   const { permite } = useAcessoModulos()
   return (
     // `key`: trocar de usuário ou empresa recomeça o estado, sem conversa de outra empresa na tela.
-    <AtendimentoProvider key={identidadeDaSessao(sessao)} agora={agora} sessao={sessao} atendimentoAtivo={permite('atendimento')} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={aoGuardarComandas}>
+    <AtendimentoProvider key={identidadeDaSessao(sessao)} agora={agora} sessao={sessao} atendimentoAtivo={permite('atendimento')} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={aoGuardarComandas} memoriaDoLaco={memoriaDoLaco}>
       {ultimaConversa && <RestaurarConversa ultimaConversa={ultimaConversa} aoLembrarConversa={aoLembrarConversa} />}
       <LimparAvisoAoNavegar />
       <TelaDaRota rota={rota} aoSair={aoSair} />
@@ -403,6 +404,9 @@ export function App() {
 function AppComAcesso({ rota, sessao, aoSair }) {
   const ultimaConversa = useRef(null)
   const comandasDaVisita = useRef({})
+  // #1576: mensagens e pedidos já lidos ficam aqui enquanto a dona está no Hall, na Cozinha ou nas
+  // Entregas; a `key` da sessão no AppComAcesso recria tudo quando troca o usuário ou a empresa.
+  const [memoriaDoLaco] = useState(criarMemoriaDoLaco)
   const lerComandasDaVisita = useCallback(() => comandasDaVisita.current, [])
   const guardarComandas = useCallback((comandas) => { comandasDaVisita.current = comandas }, [])
   const lembrarConversa = useCallback((id) => { ultimaConversa.current = id }, [])
@@ -432,6 +436,6 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   else if (rota.tipo === ROTA_COZINHA) tela = <CozinhaApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_ENTREGAS) tela = <EntregasApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_CARDAPIO_LINK) tela = <AvisoCardapioDoSite />
-  else tela = <AppPrincipal rota={rota} sessao={sessao} aoSair={aoSair} ultimaConversa={ultimaConversa} aoLembrarConversa={lembrarConversa} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={guardarComandas} />
+  else tela = <AppPrincipal rota={rota} sessao={sessao} aoSair={aoSair} ultimaConversa={ultimaConversa} aoLembrarConversa={lembrarConversa} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={guardarComandas} memoriaDoLaco={memoriaDoLaco} />
   return <ContextoAcessoModulos.Provider value={acesso}>{tela}</ContextoAcessoModulos.Provider>
 }
