@@ -174,9 +174,11 @@ confere('o cartão ganha a classe de pisca só com o SLA estourado', () => {
 
 confere('com movimento reduzido não pisca: fica só o destaque de cor', () => {
   const folha = readFileSync(new URL('../src/features/caixa-de-entrada/caixa.module.css', import.meta.url), 'utf8')
-  assert.match(folha, /\.cartao\.slaEstourado\s*\{[^}]*animation:[^}]*piscaSla[^}]*infinite/)
+  // #1577: quem pisca é a placa atrás do conteúdo (`::before`), só em `opacity`.
+  assert.match(folha, /\.cartao\.slaEstourado::before\s*\{[^}]*animation:[^}]*piscaSla[^}]*infinite/)
   const reduzido = folha.slice(folha.indexOf('@media (prefers-reduced-motion: reduce)'))
   assert.match(reduzido, /\.cartao\.slaEstourado\s*\{\s*animation:\s*none;\s*background:\s*var\(--erro-pastel\)/)
+  assert.match(reduzido, /\.cartao\.slaEstourado::before\s*\{\s*display:\s*none/)
 })
 
 confere('um segundo além do SLA já estoura, sem minuto extra', () => {

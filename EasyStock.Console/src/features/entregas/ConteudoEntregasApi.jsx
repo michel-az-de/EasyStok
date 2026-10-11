@@ -28,6 +28,9 @@ export function ConteudoEntregasApi() {
   } = useEntregasApi()
   const situacao = situacaoDaLista(pedidos, erro)
   const trocarAba = (proxima) => {
+    // #1577: o roteiro não relê mais janelas e bloqueios a cada evento de pedido; o que ela
+    // mexeu em "Janelas e frete" volta para ele na saída da aba.
+    if (aba === 'cadastro' && proxima !== 'cadastro') acoes.recarregar()
     setAba(proxima)
     abasRef.current[proxima]?.focus()
   }
