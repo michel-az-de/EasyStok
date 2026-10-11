@@ -1,6 +1,5 @@
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
-using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
@@ -69,20 +68,15 @@ public sealed class CandidatosLembreteQuery(EasyStockDbContext db) : ICandidatos
                     .FirstOrDefault()))
             .ToListAsync(ct);
 
-    // Nota interna do sistema (ex.: "escalado para a dona") não é resposta ao cliente: fica de fora ao
-    // procurar a última mensagem da conversa. A exceção é a nota de reabertura (#1550): ela conta como a
-    // última palavra, senão a entrada de antes do encerramento voltaria com o SLA estourado há dias. Entrada
-    // que chega depois da reabertura é mais nova que a nota e é cobrada normalmente.
+    // Quem falou por último segue UltimaPalavraConversa (#1550), o mesmo critério da inbox.
     public async Task<IReadOnlyList<ConversaSemResposta>> ListarConversasSemRespostaAsync(DateTime entradaAntesDe, CancellationToken ct = default)
     {
         var linhas = await (
             from c in db.AtendimentoConversas.IgnoreQueryFilters()
             where c.Situacao == SituacaoConversa.Assumida
             let ultima = db.AtendimentoMensagens.IgnoreQueryFilters()
-                .Where(m => m.EmpresaId == c.EmpresaId && m.ConversaId == c.Id
-                    && ((m.Status != StatusMensagem.Falhou && m.Status != StatusMensagem.Pendente)
-                        || (m.Autor == AutorMensagem.Sistema && m.EnviadaPorUsuarioId != null
-                            && m.Texto!.StartsWith(ReabrirConversaUseCase.PrefixoNotaReabertura))))
+                .Where(m => m.EmpresaId == c.EmpresaId && m.ConversaId == c.Id)
+                .Where(UltimaPalavraConversa.Conta)
                 .OrderByDescending(m => m.EnviadaEm)
                 .ThenByDescending(m => m.Id)
                 .Select(m => new { m.Id, m.Direcao, m.EnviadaEm })

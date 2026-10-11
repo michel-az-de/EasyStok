@@ -14,6 +14,9 @@ public sealed partial class EnviarModeloConversaUseCase(
     IConversaRepository conversas, IClienteRepository clientes, ICatalogoModelosAtendimento catalogo,
     PoliticaEnvioCliente politica, ResolvedorCanal canais, IUnitOfWork unitOfWork, TimeProvider relogio)
 {
+    /// <summary>Aviso da falha incerta: ninguém sabe se o modelo saiu, e por isso ele nunca é reenviado sozinho.</summary>
+    public const string AvisoEnvioIncerto = "Confira a conversa no WhatsApp antes de iniciar outro envio.";
+
     public async Task<MensagemAtendimentoResult> ExecuteAsync(EnviarModeloConversaCommand command, CancellationToken ct = default)
     {
         if (command.EmpresaId == Guid.Empty || command.UsuarioId == Guid.Empty || command.ConversaId == Guid.Empty
@@ -84,7 +87,7 @@ public sealed partial class EnviarModeloConversaUseCase(
                     or WhatsAppCloudException { EhPermanente: true, StatusHttp: null }
                 ? TipoFalhaEnvio.Permanente : TipoFalhaEnvio.Incerta;
             mensagem.RegistrarFalhaEnvio(tipo == TipoFalhaEnvio.Incerta
-                ? "Confira a conversa no WhatsApp antes de iniciar outro envio."
+                ? AvisoEnvioIncerto
                 : "O WhatsApp não confirmou o envio deste modelo. Confira a conexão e o modelo antes de tentar novamente.", tipo,
                 relogio.GetUtcNow().UtcDateTime);
         }

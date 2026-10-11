@@ -113,6 +113,13 @@ public interface IConversaRepository
     Task<IReadOnlyList<Mensagem>> ListarReenviosVencidosComLockAsync(DateTime agora, int limite, CancellationToken ct = default);
 
     /// <summary>
+    /// #1562: trava (<c>FOR UPDATE SKIP LOCKED</c>) até <paramref name="limite"/> intenções de modelo aprovado que
+    /// seguem pendentes e foram gravadas antes de <paramref name="gravadaAntesDe"/>, de todas as empresas. Exige
+    /// bypass de RLS e transação explícita.
+    /// </summary>
+    Task<IReadOnlyList<Mensagem>> ListarIntencoesModeloSemDesfechoComLockAsync(DateTime gravadaAntesDe, int limite, CancellationToken ct = default);
+
+    /// <summary>
     /// #1397: trava (<c>FOR UPDATE SKIP LOCKED</c>) até <paramref name="limite"/> mensagens com anexo ainda não
     /// baixado e tentativa vencida, de todas as empresas. Exige bypass de RLS e transação explícita.
     /// </summary>
