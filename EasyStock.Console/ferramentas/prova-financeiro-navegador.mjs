@@ -17,6 +17,10 @@ const pagamentoId = '66666666-6666-4666-8666-666666666666'
 const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
 const instante = `${hoje}T12:00:00-03:00`
 const conta = { id: contaId, empresaId, descricao: 'Compra de embalagens', categoriaFinanceiraId: categoriaId, centroCustoId: null, valorTotal: 100, totalPago: 0, totalRecebido: 0, pendente: 100, status: 'Aberta', dataEmissao: instante, observacoes: 'Conferir comprovante', parcelas: [{ id: parcelaId, numero: 1, valor: 100, valorPago: 0, saldo: 100, status: 'Pendente', dataVencimento: instante, pagamentos: [] }] }
+const contaReceber = structuredClone(conta)
+contaReceber.id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+contaReceber.descricao = 'Venda de encomenda'
+contaReceber.parcelas[0].id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 const acoes = Object.fromEntries(['visualizarContasPagar', 'visualizarContasReceber', 'gerenciarContasPagar', 'gerenciarContasReceber', 'gerenciarCategoriasFinanceiras', 'gerenciarCentrosCusto', 'gerenciarCaixa', 'editarProducao', 'editarCardapio', 'editarAtendimento'].map((nome) => [nome, true]))
 const escritas = []
 const erros = []
@@ -30,6 +34,8 @@ try {
     const request = route.request(), url = new URL(request.url()), caminho = url.pathname, metodo = request.method()
     if (!caminho.startsWith('/api/')) return route.continue()
     const ok = (data, meta = {}) => route.fulfill({ json: { data, meta } })
+    const aReceber = caminho.startsWith('/api/contas-a-receber')
+    const contaAtual = aReceber ? contaReceber : conta
     if (metodo !== 'GET') {
       const corpo = request.postDataJSON()
       escritas.push({ caminho, metodo, corpo })
@@ -38,26 +44,26 @@ try {
         if (corpo) assert.equal(corpo.empresaId, empresaId)
         if (caminho.endsWith('/pagamentos')) {
           assert.equal(corpo.valor, 100); assert.ok(corpo.gatewayTransactionId)
-          conta.parcelas[0].saldo = 0; conta.parcelas[0].valorPago = 100
-          conta.parcelas[0].pagamentos = [{ id: pagamentoId, valor: 100, metodo: corpo.metodo, status: 'Confirmado', dataPagamento: corpo.dataPagamento, movimentoCaixaId: '77777777-7777-4777-8777-777777777777' }]
-          conta.totalPago = 100; conta.totalRecebido = 100; conta.pendente = 0; conta.status = 'Paga'
+          contaAtual.parcelas[0].saldo = 0; contaAtual.parcelas[0].valorPago = 100
+          contaAtual.parcelas[0].pagamentos = [{ id: aReceber ? 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' : pagamentoId, valor: 100, metodo: corpo.metodo, status: 'Confirmado', dataPagamento: corpo.dataPagamento, movimentoCaixaId: aReceber ? 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' : '77777777-7777-4777-8777-777777777777' }]
+          contaAtual.totalPago = 100; contaAtual.totalRecebido = 100; contaAtual.pendente = 0; contaAtual.status = 'Paga'
         }
-        if (caminho.endsWith('/estornar')) { conta.parcelas[0].pagamentos[0].status = 'Estornado'; conta.parcelas[0].saldo = 100; conta.pendente = 100; conta.totalPago = 0; conta.status = 'Aberta' }
-        if (caminho.endsWith('/cancelar')) conta.status = 'Cancelada'
-        if (caminho.endsWith('/emitir')) conta.status = 'Aberta'
-        if (metodo === 'PATCH') conta.descricao = corpo.descricao ?? conta.descricao
+        if (caminho.endsWith('/estornar')) { contaAtual.parcelas[0].pagamentos[0].status = 'Estornado'; contaAtual.parcelas[0].saldo = 100; contaAtual.pendente = 100; contaAtual.totalPago = 0; contaAtual.totalRecebido = 0; contaAtual.status = 'Aberta' }
+        if (caminho.endsWith('/cancelar')) contaAtual.status = 'Cancelada'
+        if (caminho.endsWith('/emitir')) contaAtual.status = 'Aberta'
+        if (metodo === 'PATCH') contaAtual.descricao = corpo.descricao ?? contaAtual.descricao
       }
-      return ok(conta)
+      return ok(contaAtual)
     }
     if (caminho === '/api/auth/me/modulos') return ok({ modulos: ['cardapio', 'producao', 'atendimento', 'cozinha', 'financeiro', 'campanhas', 'configuracoes', 'entregas'].map((id) => ({ id, liberado: true })), acoes })
     if (caminho === '/api/financeiro/categorias') return ok([{ id: categoriaId, nome: 'Operação', tipo: 'Ambas', ativa: true }])
     if (caminho === '/api/financeiro/centros-custo') return ok([])
     if (caminho === '/api/financeiro/dashboard') return ok({ totalAVencer30dPagar: 100, totalAVencer30dReceber: 100, totalVencidoPagar: 0, totalVencidoReceber: 0, totalPagoMes: 100, totalRecebidoMes: 200, qtdContasPagarAVencer30d: 1, qtdContasReceberAVencer30d: 1 })
     if (caminho === '/api/financeiro/fluxo-caixa') return ok([{ inicioBucket: instante, fimBucket: instante, rotulo: 'Outubro', previstoPagar: 100, previstoReceber: 200, realizadoPagar: 50, realizadoReceber: 200 }])
-    if (/^\/api\/contas-a-(pagar|receber)$/.test(caminho)) return ok([conta], { total: 1, page: 1, limit: 20 })
-    if (/^\/api\/contas-a-(pagar|receber)\//.test(caminho)) return ok(conta)
+    if (/^\/api\/contas-a-(pagar|receber)$/.test(caminho)) return ok([contaAtual], { total: 1, page: 1, limit: 20 })
+    if (/^\/api\/contas-a-(pagar|receber)\//.test(caminho)) return ok(contaAtual)
     if (caminho === '/api/caixa/movimentos') return ok([{ id: '88888888-8888-4888-8888-888888888888', tipo: 'saida', descricao: 'Despesa avulsa', valor: 30, dataMovimento: instante, metodo: 'dinheiro' }], { total: 1, page: 1, limit: 100 })
-    if (caminho === '/api/caixa/dia') return ok({ data: hoje, aberto: true, fechado: false, saldoInicial: 100, saldoEsperado: 100, movimentos: [], linhasExtras: [] })
+    if (caminho === '/api/caixa/dia') return ok({ data: url.searchParams.get('data') ?? hoje, aberto: true, fechado: false, saldoInicial: 100, saldoEsperado: 100, movimentos: [], linhasExtras: [] })
     if (caminho === '/api/atendimento/configuracao') return ok({})
     if (caminho === '/api/atendimento/producao/insumos') return ok([{ produtoId: 'insumo', nome: 'Molho sugo', unidade: 'G', saldo: 1000, minimo: 500, custo: 0.02, receitas: 1 }])
     if (caminho === '/api/atendimento/producao/perdas') return ok({ de: hoje, ate: hoje, valor: 0, porMotivo: [], porProduto: [], lancamentos: [] })
@@ -68,6 +74,9 @@ try {
   const page = await context.newPage()
   paginaProva = page
   page.on('pageerror', (erro) => erros.push(erro.message))
+  page.on('console', (mensagem) => {
+    if (mensagem.type() === 'error' && !/Failed to load resource: the server responded with a status of 400/.test(mensagem.text())) erros.push(mensagem.text())
+  })
   await page.goto(origem + '/#/m/financeiro/pagar')
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).waitFor()
   assert.equal(await page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true }).getByRole('link').count(), 8)
@@ -97,6 +106,23 @@ try {
   await modal.waitFor({ state: 'hidden' })
   assert.equal(await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).evaluate((no) => no === document.activeElement), true)
   await page.screenshot({ path: join(evidencias, 'financeiro-contas-desktop.png') })
+  await page.goto(origem + '/#/m/financeiro/receber')
+  await page.getByRole('button', { name: 'Abrir conta Venda de encomenda' }).click()
+  modal = page.getByRole('dialog', { name: 'Venda de encomenda', exact: true })
+  await modal.getByRole('button', { name: 'Registrar recebimento', exact: true }).click()
+  const recebimento = page.getByRole('dialog', { name: 'Registrar recebimento', exact: true })
+  await recebimento.getByRole('button', { name: 'Confirmar registro', exact: true }).click()
+  await recebimento.waitFor({ state: 'hidden' })
+  assert.ok(escritas.some((item) => item.caminho === `/api/contas-a-receber/${contaReceber.id}/parcelas/${contaReceber.parcelas[0].id}/pagamentos`))
+  assert.equal(await modal.getByRole('button', { name: 'Registrar recebimento', exact: true }).count(), 0)
+  await modal.getByRole('button', { name: 'Estornar', exact: true }).click()
+  const estornoRecebimento = page.getByRole('dialog', { name: 'Estornar registro', exact: true })
+  await estornoRecebimento.getByLabel('Motivo', { exact: true }).fill('Recebimento de teste incorreto')
+  await estornoRecebimento.getByRole('button', { name: 'Confirmar', exact: true }).click()
+  await estornoRecebimento.waitFor({ state: 'hidden' })
+  await modal.getByRole('button', { name: 'Registrar recebimento', exact: true }).waitFor()
+  await page.keyboard.press('Escape')
+  await modal.waitFor({ state: 'hidden' })
   await page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true }).getByRole('link', { name: 'Extrato', exact: true }).click()
   await page.getByRole('button', { name: 'Detalhes de Despesa avulsa' }).waitFor()
   await page.getByRole('button', { name: 'Detalhes de Despesa avulsa' }).click()
@@ -185,7 +211,7 @@ try {
   await page.reload()
   await page.getByText('Seu perfil não pode consultar estas contas', { exact: true }).waitFor()
   assert.deepEqual(erros, [])
-  console.log(`OK: navegação lateral, criação, baixa, estorno, foco, modais aninhadas, erro preservando formulário, extrato, relatório, CSV, cadastros de Produção/Cardápio, permissões, tema escuro e celular; ${escritas.length} escritas controladas; sem erros de página.`)
+  console.log(`OK: navegação lateral, criação, pagamento, recebimento, estornos, foco, modais aninhadas, erro preservando formulário, extrato, relatório, CSV, cadastros de Produção/Cardápio, permissões, tema escuro e celular; ${escritas.length} escritas controladas; sem erros de página ou console.`)
 } catch (erro) {
   console.error('Erros de página:', erros)
   if (paginaProva) {
