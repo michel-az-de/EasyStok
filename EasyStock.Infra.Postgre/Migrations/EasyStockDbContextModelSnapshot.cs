@@ -697,6 +697,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasDatabaseName("ix_atendimento_mensagens_aguarda_cliente")
                         .HasFilter("\"AguardaClienteDesde\" IS NOT NULL");
 
+                    b.HasIndex("EnviadaEm")
+                        .HasDatabaseName("ix_atendimento_mensagens_modelo_pendente")
+                        .HasFilter("\"ModeloJson\" IS NOT NULL AND \"Status\" = 1");
+
                     b.HasIndex("ProximaTentativaMidiaEm")
                         .HasDatabaseName("ix_atendimento_mensagens_proxima_tentativa_midia")
                         .HasFilter("\"ProximaTentativaMidiaEm\" IS NOT NULL");

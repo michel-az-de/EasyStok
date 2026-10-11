@@ -73,26 +73,52 @@ public sealed partial class EnviarModeloConversaUseCase(
 
         // A reserva já está gravada: repetição, cancelamento HTTP ou reinício nunca repetem o POST do canal.
         // Uma falha ao salvar o resultado deixa a intenção visível como sem confirmação.
+        string? externoId = null;
+        Exception? falha = null;
         try
         {
-            var externoId = await canais.Obter(conversa.Canal).EnviarModeloAsync(
+            externoId = await canais.Obter(conversa.Canal).EnviarModeloAsync(
                 conversa.ContatoIdExterno, modelo.Nome, modelo.Idioma, modelo.Parametros, ct);
-            mensagem.ConfirmarEnvio(externoId);
         }
         catch (Exception ex)
         {
-            // Nada saiu: a Meta recusou (4xx) ou o cliente barrou antes da rede (permanente e sem status, ex.:
-            // empresa sem phone_number_id). O resto fica incerto, inclusive o "2xx sem message id".
-            var tipo = ex is WhatsAppCloudException { StatusHttp: >= 400 and < 500 }
-                    or WhatsAppCloudException { EhPermanente: true, StatusHttp: null }
-                ? TipoFalhaEnvio.Permanente : TipoFalhaEnvio.Incerta;
-            mensagem.RegistrarFalhaEnvio(tipo == TipoFalhaEnvio.Incerta
-                ? AvisoEnvioIncerto
-                : "O WhatsApp não confirmou o envio deste modelo. Confira a conexão e o modelo antes de tentar novamente.", tipo,
-                relogio.GetUtcNow().UtcDateTime);
+            falha = ex;
         }
-        await unitOfWork.CommitAsync();
-        return MensagemAtendimentoResult.De(mensagem);
+
+        // #1599: a varredura de intenção presa pode ter marcado falha incerta com o POST ainda no ar. O desfecho é
+        // gravado sobre a linha relida sob lock, e sem o token da requisição: cancelar o HTTP não descarta o resultado.
+        return await unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+        {
+            var atual = await conversas.ObterMensagemComLockAsync(command.EmpresaId, command.ConversaId, mensagem.Id, token) ?? mensagem;
+            if (falha is null)
+            {
+                try
+                {
+                    // O canal entregou: a confirmação vence a falha incerta que a varredura gravou.
+                    if (atual.Status == StatusMensagem.Falhou) atual.ConfirmarEnvioAposFalhaIncerta(externoId!);
+                    else atual.ConfirmarEnvio(externoId!);
+                }
+                catch (Exception ex)
+                {
+                    falha = ex;
+                }
+            }
+            // Falha depois de a varredura já ter encerrado a intenção não soma outra tentativa.
+            if (falha is not null && atual.Status == StatusMensagem.Pendente)
+            {
+                // Nada saiu: a Meta recusou (4xx) ou o cliente barrou antes da rede (permanente e sem status, ex.:
+                // empresa sem phone_number_id). O resto fica incerto, inclusive o "2xx sem message id".
+                var tipo = falha is WhatsAppCloudException { StatusHttp: >= 400 and < 500 }
+                        or WhatsAppCloudException { EhPermanente: true, StatusHttp: null }
+                    ? TipoFalhaEnvio.Permanente : TipoFalhaEnvio.Incerta;
+                atual.RegistrarFalhaEnvio(tipo == TipoFalhaEnvio.Incerta
+                    ? AvisoEnvioIncerto
+                    : "O WhatsApp não confirmou o envio deste modelo. Confira a conexão e o modelo antes de tentar novamente.", tipo,
+                    relogio.GetUtcNow().UtcDateTime);
+            }
+            await unitOfWork.CommitAsync();
+            return MensagemAtendimentoResult.De(atual);
+        }, CancellationToken.None);
     }
 
     private async Task<Mensagem?> ObterTentativaAsync(EnviarModeloConversaCommand command, ModeloMensagem modelo, CancellationToken ct)

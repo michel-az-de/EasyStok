@@ -135,6 +135,12 @@ public interface IConversaRepository
     Task<Mensagem?> ObterMensagemParaAlterarAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default);
 
     /// <summary>
+    /// #1599: trava a linha da mensagem (<c>FOR UPDATE</c>) e devolve o estado gravado agora, mesmo que a instância
+    /// já esteja rastreada no escopo. Exige transação explícita.
+    /// </summary>
+    Task<Mensagem?> ObterMensagemComLockAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default);
+
+    /// <summary>
     /// S57: trava (<c>FOR UPDATE SKIP LOCKED</c>) até <paramref name="limite"/> mensagens com reenvio vencido, de
     /// todas as empresas. Exige bypass de RLS e transação explícita.
     /// </summary>

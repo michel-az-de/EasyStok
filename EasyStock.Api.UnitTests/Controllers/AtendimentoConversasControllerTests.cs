@@ -974,6 +974,9 @@ public partial class AtendimentoConversasControllerTests
         public Task<Mensagem?> ObterMensagemParaAlterarAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
             ObterMensagemAsync(empresaId, conversaId, mensagemId, ct);
 
+        public Task<Mensagem?> ObterMensagemComLockAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
+            ObterMensagemAsync(empresaId, conversaId, mensagemId, ct);
+
         public Task<IReadOnlyList<Mensagem>> ListarReenviosVencidosComLockAsync(DateTime agora, int limite, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<Mensagem>>(Mensagens.Where(m => m.ProximoReenvioEm <= agora).Take(limite).ToList());
 

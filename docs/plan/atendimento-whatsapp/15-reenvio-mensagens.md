@@ -44,5 +44,7 @@ Console ── POST api/atendimento/conversas/{id}/mensagens/{mensagemId}/reenvi
 **Banco.** `atendimento_mensagens.TentativasEnvio` (int, 0) e `ProximoReenvioEm` (timestamptz, nulo) com
 índice parcial `ix_atendimento_mensagens_proximo_reenvio`.
 
-**Rollback.** `BackgroundJobs:EnableReenvioMensagens=false` desliga o automático; o botão continua. A migração
+**Rollback.** `BackgroundJobs:EnableReenvioMensagens=false` desliga o automático; o botão continua. O mesmo
+serviço roda a varredura de modelo preso (#1562, #1599): com a flag desligada, a intenção de modelo que ficou sem
+desfecho segue pendente, sem virar envio incerto depois de 10 minutos, até a flag voltar. A migração
 é aditiva (colunas novas com default), o `Down` remove.

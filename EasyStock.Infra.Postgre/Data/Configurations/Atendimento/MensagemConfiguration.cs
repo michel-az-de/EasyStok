@@ -53,6 +53,11 @@ public class MensagemConfiguration : IEntityTypeConfiguration<Mensagem>
             .HasFilter("\"ProximoReenvioEm\" IS NOT NULL")
             .HasDatabaseName("ix_atendimento_mensagens_proximo_reenvio");
 
+        // #1599: a varredura de intenção de modelo presa só procura modelo ainda pendente (StatusMensagem.Pendente = 1).
+        builder.HasIndex(m => m.EnviadaEm)
+            .HasFilter("\"ModeloJson\" IS NOT NULL AND \"Status\" = 1")
+            .HasDatabaseName("ix_atendimento_mensagens_modelo_pendente");
+
         // Idempotencia do webhook: o mesmo wamid nao entra duas vezes na mesma empresa.
         builder.HasIndex(m => new { m.EmpresaId, m.ExternoId })
             .IsUnique()
