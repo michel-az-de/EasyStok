@@ -394,8 +394,8 @@ const CASOS = {
   // O rascunho vive no estado da conversa, não dentro do componente. Assim o
   // agente e as respostas rápidas escrevem nele sem truque de remontagem.
   // #1577: o campo de escrever manda o texto na pausa da digitação (`doCampo`); o resto é escrita de fora.
-  [acao.DEFINIR_RASCUNHO]: (estado, { id, texto, doCampo = false, escritaVista }) =>
-    (doCampo ? comRascunhoDoCampo(estado, { id, texto, escritaVista }) : comRascunhoDeFora(estado, id, texto)),
+  [acao.DEFINIR_RASCUNHO]: (estado, { id, texto, doCampo = false, escritaVista, adotar = false }) =>
+    (doCampo ? comRascunhoDoCampo(estado, { id, texto, escritaVista, adotar }) : comRascunhoDeFora(estado, id, texto)),
 
   [acao.ENVIAR_MENSAGEM]: (estado, { id, texto, agora, mensagemId, modelo = false, automatica = false, regra = null }) => {
     if (recusaEnvio(estado, id, agora)) return estado

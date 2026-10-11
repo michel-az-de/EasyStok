@@ -352,6 +352,66 @@ await confere('A. campo: sair da tela ou esconder a aba descarrega na hora e ped
   assert.equal(despachos.length, 1)
 }))
 
+await confere('A. campo: digitação sem pausa de 400 ms descarrega no teto de 2 s', comCampo(undefined, ({ campo, despachos, andar }) => {
+  let texto = ''
+  for (let i = 0; i < 25; i += 1) {
+    texto += 'a'
+    campo.digitar(texto)
+    andar(200)
+  }
+  assert.deepEqual(despachos.map((d) => d.texto.length), [10, 20], 'cinco segundos digitando sem parar e o estado global não recebeu nada a tempo')
+  andar(400)
+  assert.deepEqual(despachos.map((d) => d.texto.length), [10, 20, 25])
+  andar(5000)
+  assert.equal(despachos.length, 3, 'parada, o teto não despacha de novo')
+}))
+
+await confere('A. campo: a saída da tela grava mesmo o texto que a pausa já despachou', comCampo(undefined, ({ campo, despachos, andar }) => {
+  campo.digitar('quase pronto')
+  andar(400)
+  assert.equal(despachos.length, 1)
+  // O despacho da pausa pode não ter rendido quando a tela sai (401 logo depois): a gravação direta vai de novo.
+  campo.descarregar({ ja: true })
+  assert.deepEqual(despachos[1], { id: 'c-1', texto: 'quase pronto', escritaVista: 0, ja: true })
+  campo.descarregar()
+  assert.equal(despachos.length, 2, 'sem urgência, texto já despachado não despacha de novo')
+}))
+
+await confere('A. campo: a tela troca de arranjo no meio da digitação (girar o tablet) e o campo novo adota o texto', () => {
+  existe(rascunhoLocal, 'criarRascunhoLocal')
+  mock.timers.enable({ apis: ['setTimeout'] })
+  try {
+    const id = 'c-1'
+    let estado = { rascunhos: {}, escritasDeFora: {} }
+    const aoDespachar = (despacho, opcoes) => {
+      estado = reducer(estado, { tipo: acao.DEFINIR_RASCUNHO, ...despacho, doCampo: true, adotar: opcoes?.desmontando === true })
+    }
+    const global = () => ({ conversaId: id, rascunho: estado.rascunhos[id] ?? '', escritaDeFora: estado.escritasDeFora[id] ?? 0 })
+    const velho = rascunhoLocal.criarRascunhoLocal({ ...global(), aoDespachar })
+    velho.digitar('Oi, seu pedido sai as 19h')
+    // O campo novo monta no mesmo commit, com o global ainda sem o texto; só depois o velho desmonta.
+    const campoNovo = rascunhoLocal.criarRascunhoLocal({ ...global(), aoDespachar })
+    velho.descarregar({ ja: true, desmontando: true })
+    campoNovo.ver(global())
+    assert.equal(campoNovo.texto(), 'Oi, seu pedido sai as 19h', 'o texto digitado sumiu do campo na remontagem')
+    campoNovo.digitar('Oi, seu pedido sai as 19h!')
+    mock.timers.tick(400)
+    assert.equal(estado.rascunhos[id], 'Oi, seu pedido sai as 19h!')
+  } finally { mock.timers.reset() }
+})
+
+await confere('A. reducer: só o despacho de desmontagem soma o carimbo, e escrita de fora mais nova ainda vence', () => {
+  const base = baseDoEstado()
+  const daPausa = rascunhoLocal.comRascunhoDoCampo(base, { id: 'c-1', texto: 'oi!', escritaVista: 0 })
+  assert.equal(daPausa.escritasDeFora['c-1'] ?? 0, 0)
+  const daDesmontagem = rascunhoLocal.comRascunhoDoCampo(base, { id: 'c-1', texto: 'oi!', escritaVista: 0, adotar: true })
+  assert.equal(daDesmontagem.rascunhos['c-1'], 'oi!')
+  assert.equal(daDesmontagem.escritasDeFora['c-1'], 1)
+  const comSugestao = rascunhoLocal.comRascunhoDeFora(base, 'c-1', 'Sugestão')
+  assert.equal(rascunhoLocal.comRascunhoDoCampo(comSugestao, { id: 'c-1', texto: 'oi!', escritaVista: 0, adotar: true }), comSugestao)
+  assert.equal(rascunhoLocal.comRascunhoDoCampo(base, { id: 'c-1', texto: 'oi', escritaVista: 0, adotar: true }), base, 'texto igual não mexe em nada')
+})
+
 await confere('A. campo: avisa quem assina a cada mudança do texto (é o que re-renderiza só o campo)', comCampo(undefined, ({ campo }) => {
   let avisos = 0
   const desligar = campo.assinar(() => { avisos += 1 })
@@ -382,10 +442,14 @@ await confere('A. ação: a descarga despacha como texto do campo e só a urgent
   const acoes = criarAcoes({ despachar: (a) => despachos.push(a), guardarRascunhoJa: (d) => guardados.push(d) })
   existe(acoes, 'descarregarRascunho')
   acoes.descarregarRascunho({ id: 'c-1', texto: 'oi', escritaVista: 2 })
-  assert.deepEqual(despachos, [{ tipo: acao.DEFINIR_RASCUNHO, id: 'c-1', texto: 'oi', escritaVista: 2, doCampo: true }])
+  assert.deepEqual(despachos, [{ tipo: acao.DEFINIR_RASCUNHO, id: 'c-1', texto: 'oi', escritaVista: 2, doCampo: true, adotar: false }])
   assert.equal(guardados.length, 0)
   acoes.descarregarRascunho({ id: 'c-1', texto: 'oi!', escritaVista: 2 }, { ja: true })
   assert.deepEqual(guardados, [{ id: 'c-1', texto: 'oi!', escritaVista: 2 }])
+  assert.equal(despachos.at(-1).adotar, false, 'aba oculta não é desmontagem: o campo continua na tela')
+  acoes.descarregarRascunho({ id: 'c-1', texto: 'oi!!', escritaVista: 2 }, { ja: true, desmontando: true })
+  assert.equal(despachos.at(-1).adotar, true, 'a desmontagem pede que o campo novo adote o texto')
+  assert.equal(guardados.length, 2)
   acoes.definirRascunho('c-1', 'de fora')
   assert.deepEqual(despachos.at(-1), { tipo: acao.DEFINIR_RASCUNHO, id: 'c-1', texto: 'de fora' }, 'quem escreve de fora despacha como antes')
 })

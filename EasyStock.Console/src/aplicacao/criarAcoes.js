@@ -90,8 +90,8 @@ export function criarAcoes({
     definirRascunho: (id, texto) => despachar({ tipo: acao.DEFINIR_RASCUNHO, id, texto }),
     // #1577: texto do campo de escrever, que chega na pausa da digitação. `ja` é a tela saindo (401, Hall,
     // aba oculta): o despacho pode não render mais, então o Provider também grava direto.
-    descarregarRascunho: (despacho, { ja = false } = {}) => {
-      despachar({ tipo: acao.DEFINIR_RASCUNHO, ...despacho, doCampo: true })
+    descarregarRascunho: (despacho, { ja = false, desmontando = false } = {}) => {
+      despachar({ tipo: acao.DEFINIR_RASCUNHO, ...despacho, doCampo: true, adotar: desmontando })
       if (ja) guardarRascunhoJa?.(despacho)
     },
     reabrir: (id) => despachar({ tipo: acao.REABRIR_CONVERSA, id }),

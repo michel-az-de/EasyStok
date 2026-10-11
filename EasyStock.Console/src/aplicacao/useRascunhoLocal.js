@@ -16,7 +16,8 @@ export function useRascunhoLocal({ conversaId, rascunho, escritaDeFora }) {
     campo.ver({ conversaId, rascunho, escritaDeFora })
   }, [campo, conversaId, rascunho, escritaDeFora])
 
-  // Tela desmontando (troca de conversa, 401, ida ao Hall) ou aba saindo: o atraso não espera.
+  // Tela desmontando (401, ida ao Hall, troca de arranjo ao girar o tablet) ou aba saindo: o atraso não
+  // espera. Só a desmontagem avisa `desmontando`: o campo que nascer no lugar precisa adotar o texto.
   useEffect(() => {
     const aoSair = () => campo.descarregar({ ja: true })
     const aoEsconder = () => { if (document.visibilityState === 'hidden') aoSair() }
@@ -25,7 +26,7 @@ export function useRascunhoLocal({ conversaId, rascunho, escritaDeFora }) {
     return () => {
       window.removeEventListener('pagehide', aoSair)
       document.removeEventListener('visibilitychange', aoEsconder)
-      aoSair()
+      campo.descarregar({ ja: true, desmontando: true })
     }
   }, [campo])
 
