@@ -179,7 +179,7 @@ internal sealed class CobrancaPedidoFixture
             new CalcularFreteUseCase(StorefrontRepo, Substitute.For<IFreteZonaRepository>(), Substitute.For<ICepLookupClient>(),
                 Substitute.For<IGeocodingClient>(), Substitute.For<IRotaClient>(), NullLogger<CalcularFreteUseCase>.Instance),
             VagaRepo, PedidoStorefrontRepo, Substitute.For<IExpedienteLojaRepository>(),
-            NullLogger<CheckoutCoreService>.Instance, Relogio);
+            NullLogger<CheckoutCoreService>.Instance, Relogio, EnderecoEntregaPedidoTeste.Criar());
 
     private QuitacaoPedido Quitacao() => QuitacaoPedidoTeste.Criar(PedidoRepo, CobrancaRepo, ConversaRepo, ImpressaoRepo, Publicador, OperacaoEventos);
 

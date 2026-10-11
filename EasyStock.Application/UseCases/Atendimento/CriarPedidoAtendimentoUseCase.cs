@@ -112,7 +112,8 @@ public sealed class CriarPedidoAtendimentoUseCase(
                 EmpresaId: input.EmpresaId,
                 Observacoes: input.Observacoes,
                 Prazo: new PrazoPreparoCheckout(configuracao.TempoPreparoPadraoMinutos, configuracao.RespiroMinutos),
-                Numero: endereco.Numero),
+                Numero: endereco.Numero,
+                EnderecoEntrega: EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega.De(endereco)),
             ct);
 
         // Retrato do cliente, como o Pedido.Criar e o checkout guest gravam: sem ele o KDS e as Entregas

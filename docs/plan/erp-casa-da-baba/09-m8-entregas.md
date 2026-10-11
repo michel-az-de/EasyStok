@@ -136,6 +136,8 @@ janelas com vaga, sem uma agenda dos próximos dias. Encomenda de sábado feita 
 
 ### M8.3 · Endereço de entrega no próprio pedido
 
+**Execução parcial em 11/10/2026.** A criação pela conversa, pelo site (logado e guest, inclusive sem janela) e pela API grava o endereço no pedido. Retirada de balcão mantém os campos nulos. A geocodificação é best-effort pela porta já existente, sem coordenadas inventadas quando indisponível ou imprecisa. KDS, viagens, canhoto, impresso e agregação por bairro preferem o registro do pedido; somente o legado usa o cadastro atual. Migração aditiva validada em PostgreSQL/Testcontainers. O `PATCH` de troca do endereço, a revalidação de cobertura/frete e o aviso operacional no Console ficam para a próxima fatia; M8.3 ainda não está encerrada.
+
 **Problema.** Pedido não guarda para onde vai: KDS e viagem leem o endereço do cadastro do cliente
 (`KdsPedidoQueries.cs:58-67`). Se o cliente muda o endereço depois, o pedido de ontem muda junto; não há como
 entregar um pedido em outro endereço (`mudarEnderecoDoPedido` avisa, `naoLigadas.js:37`); e a F17 precisa
@@ -146,7 +148,7 @@ de coordenadas por parada sem geocodificar a cada cotação.
 - `PATCH api/pedidos/{id}/endereco` (Operador) antes de sair para entrega, revalidando a área (S14) e o frete; fora da área vira aprovação (S12).
 - Leitura (KDS, viagens, Minhas viagens, impressos) usa o do pedido e cai no do cliente quando o pedido é antigo.
 **Aceite.**
-- [ ] Mudar o endereço do cliente não muda o endereço de pedido já criado (teste de integração).
+- [x] Mudar o endereço do cliente não muda o endereço de pedido já criado (teste de integração com PostgreSQL, 11/10/2026).
 - [ ] Pedido criado pela conversa grava lat/lng quando o Google responde; sem chave, grava o texto e avisa.
 - [ ] Trocar o endereço para fora da área põe o pedido em aprovação.
 - [ ] Isolamento por empresa no `PATCH`.

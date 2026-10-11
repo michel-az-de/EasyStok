@@ -41,7 +41,7 @@ public sealed class MontarPedidoImpressoUseCase(IPedidoImpressoQueries queries, 
                 c.Id is { } id ? id.ToString("N")[..6].ToUpperInvariant() : null,
                 Limpo(c.Nome),
                 Limpo(c.Telefone),
-                EnderecoImpresso.Montar(c.Endereco, c.Complemento, c.Apt, c.Bairro, c.Cidade, c.Cep)),
+                c.EnderecoEntrega ?? EnderecoImpresso.Montar(c.Endereco, c.Complemento, c.Apt, c.Bairro, c.Cidade, c.Cep)),
             p.Entrega is { } e ? new PedidoImpressoEntregaDto(e.Tipo, Limpo(e.Nome)) : null,
             p.Itens.Select(i => new PedidoImpressoItemDto(
                     i.Quantidade,

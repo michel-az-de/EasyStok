@@ -41,7 +41,8 @@ public sealed class ObterViagemUseCase(IViagemRepository viagens, IPedidoReposit
             var pedido = await pedidos.GetByIdAsync(viagem.EmpresaId, p.PedidoId);
             var cliente = pedido?.ClienteId is { } cid ? await clientes.GetByIdAsync(viagem.EmpresaId, cid) : null;
             paradas.Add(new ParadaViagemResult(
-                p.PedidoId, NumeroPedido(p.PedidoId), p.Ordem, cliente?.Nome ?? pedido?.ClienteNome, Endereco(cliente),
+                p.PedidoId, NumeroPedido(p.PedidoId), p.Ordem, cliente?.Nome ?? pedido?.ClienteNome,
+                pedido?.EnderecoEntrega ?? Endereco(cliente),
                 p.EntregueEm, p.EntregadorNome, p.Veiculo, p.Placa, p.EmpresaEntregador));
         }
         return new ViagemResult(viagem.Id, viagem.EntregadorId, viagem.Situacao, viagem.CriadaEm, viagem.SaiuEm,

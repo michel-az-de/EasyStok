@@ -69,7 +69,7 @@ public sealed class MontarCanhotoUseCase(
             pedido.Id.ToString("N")[..8].ToUpperInvariant(),
             Limpo(pedido.ClienteNome) ?? Limpo(cliente?.Nome),
             Limpo(pedido.ClienteTelefone) ?? Limpo(cliente?.Telefone),
-            MontarEndereco(cliente, pedido.ClienteApt),
+            pedido.EnderecoEntrega ?? MontarEndereco(cliente, pedido.ClienteApt),
             pedido.AgendadoParaEm is { } agendado ? HorarioBrasil.ConverterParaBrasilia(agendado) : null,
             pagoEm is { } pago ? HorarioBrasil.ConverterParaBrasilia(pago) : null);
 

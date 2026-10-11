@@ -76,7 +76,7 @@ public sealed class EntregasPorBairroQuery(EasyStockDbContext db) : IEntregasPor
             .Where(p => p.EmpresaId == empresaId
                 && p.Status == StatusPedidoMapper.Entregue
                 && p.EntreguEm >= inicio && p.EntreguEm < fim)
-            .Select(p => new { Bairro = p.Cliente != null ? p.Cliente.Bairro : null, p.Total })
+            .Select(p => new { Bairro = p.EnderecoEntrega != null ? p.BairroEntrega : p.Cliente != null ? p.Cliente.Bairro : null, p.Total })
             .ToListAsync(ct);
         return linhas.Select(l => new PedidoEntregueLinha(l.Bairro, l.Total.Valor)).ToList();
     }

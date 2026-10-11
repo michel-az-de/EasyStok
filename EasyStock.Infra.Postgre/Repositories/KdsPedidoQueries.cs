@@ -108,7 +108,7 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
                         Linha: i.LinhaSnapshot,
                         Molho: i.CardapioItemId is { } c ? molhos.GetValueOrDefault(c) : null))
                     .ToList(),
-                Endereco: cliente?.Endereco,
+                Endereco: p.EnderecoEntrega ?? cliente?.Endereco,
                 RequerAprovacao: p.RequerAprovacao,
                 MotivoRequerAprovacao: p.MotivoRequerAprovacao);
         }).ToList();

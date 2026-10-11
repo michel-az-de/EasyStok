@@ -34,7 +34,8 @@ public sealed record CheckoutCoreInput(
     Guid? EmpresaId = null,
     string? Observacoes = null,
     PrazoPreparoCheckout? Prazo = null,
-    string? Numero = null);
+    string? Numero = null,
+    DadosEnderecoEntrega? EnderecoEntrega = null);
 
 /// <summary>
 /// Parâmetros do prazo mínimo (S16, RN-21): com eles o núcleo recusa a janela cujo início seja antes de
@@ -88,7 +89,8 @@ public sealed class CheckoutCoreService(
     IPedidoStorefrontRepository pedidoRepository,
     IExpedienteLojaRepository expedienteLojaRepository,
     ILogger<CheckoutCoreService> logger,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    EnderecoEntregaPedido enderecoEntrega)
 {
     private static readonly Regex CepDigitosRegex = new(@"^\d{8}$", RegexOptions.Compiled);
 
@@ -213,6 +215,8 @@ public sealed class CheckoutCoreService(
         pedido.Status = StatusPedidoMapper.Rascunho;
         pedido.Observacoes = input.Observacoes;
         pedido.AgendadoParaEm = HorarioBrasil.InstanteUtc(input.DataEntrega, janela.HoraInicio);
+        await enderecoEntrega.RegistrarAsync(pedido,
+            input.EnderecoEntrega ?? new DadosEnderecoEntrega(null, input.Numero, null, null, null, null, cep), ct);
 
         await pedidoRepository.AddAsync(pedido, ct);
 

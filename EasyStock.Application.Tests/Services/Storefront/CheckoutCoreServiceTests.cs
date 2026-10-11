@@ -37,6 +37,8 @@ public class CheckoutCoreServiceTests
 
         /// <summary>Geocode e rota do frete por raio (#1291); sem config de raio na loja, nem são chamados.</summary>
         public IGeocodingClient Geocoding { get; } = Substitute.For<IGeocodingClient>();
+        public ICepLookupClient CepLookup { get; } = Substitute.For<ICepLookupClient>();
+        public IGeocodingClient EntregaGeocoding { get; } = Substitute.For<IGeocodingClient>();
         public IRotaClient Rotas { get; } = Substitute.For<IRotaClient>();
         public IVagaOcupadaRepository VagaRepo { get; } = Substitute.For<IVagaOcupadaRepository>();
         public IPedidoStorefrontRepository PedidoRepo { get; } = Substitute.For<IPedidoStorefrontRepository>();
@@ -126,7 +128,9 @@ public class CheckoutCoreServiceTests
 
         public CheckoutCoreService Servico() => new(
             StorefrontRepo, CardapioRepo, JanelaRepo, BloqueioRepo, Frete(), VagaRepo, PedidoRepo,
-            ExpedienteRepo, NullLogger<CheckoutCoreService>.Instance, Relogio);
+            ExpedienteRepo, NullLogger<CheckoutCoreService>.Instance, Relogio,
+            new EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido(CepLookup, EntregaGeocoding, Relogio,
+                NullLogger<EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido>.Instance));
 
         /// <summary>
         /// Núcleo do pedido da conversa (S10) sobre este cenário. O mock da transação executa o bloco

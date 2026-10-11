@@ -49,7 +49,8 @@ public sealed class IniciarCheckoutGuestUseCase(
     AtribuicaoPedidoCampanha atribuicaoCampanha,
     ITenantContextAccessor tenantContext,
     TimeProvider timeProvider,
-    ILogger<IniciarCheckoutGuestUseCase> logger)
+    ILogger<IniciarCheckoutGuestUseCase> logger,
+    EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido enderecoEntrega)
 {
     /// <summary>Validade do link, em segundos (a mesma do checkout logado).</summary>
     private static readonly int ExpiresInSeconds = (int)GerarCobrancaPedidoUseCase.Validade.TotalSeconds;
@@ -153,6 +154,8 @@ public sealed class IniciarCheckoutGuestUseCase(
             storefrontId, itensPedidos.Select(i => i.CardapioItemId), ct);
 
         var pedido = DomainPedido.Criar(empresaId: empresaId, cliente: cliente, origem: OrigemPedido.StorefrontGuest);
+        await enderecoEntrega.RegistrarAsync(pedido,
+            new EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega(null, input.Numero, null, null, null, null, input.Cep), ct);
         pedido.ClienteNome = nome;
         pedido.ClienteTelefone = telefoneE164;
         pedido.Status = StatusPedidoMapper.AguardandoAprovacaoBaba;

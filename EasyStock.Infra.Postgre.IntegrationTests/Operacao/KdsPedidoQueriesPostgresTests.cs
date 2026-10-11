@@ -16,6 +16,59 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Operacao;
 public sealed class KdsPedidoQueriesPostgresTests(PostgreSqlDatabaseFixture fixture)
 {
     [SkippableFact]
+    public async Task Endereco_do_pedido_vence_cadastro_alterado_e_legado_conserva_fallback()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresa = Guid.NewGuid();
+        var outraEmpresa = Guid.NewGuid();
+        Guid pedidoId, legadoId;
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresa);
+            db.Empresas.AddRange(NovaEmpresa(empresa), NovaEmpresa(outraEmpresa));
+            var cliente = Cliente.Criar(empresa, "Maria");
+            cliente.Endereco = "Rua original, 42";
+            cliente.Bairro = "Centro";
+            cliente.Cep = "01001000";
+            db.Clientes.Add(cliente);
+            var pedido = NovoPedido(empresa, StatusPedidoMapper.Aguardando);
+            pedido.ClienteId = cliente.Id;
+            var legado = NovoPedido(empresa, StatusPedidoMapper.Aguardando);
+            legado.ClienteId = cliente.Id;
+            var registrar = new EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido(
+                NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.Lookup.ICepLookupClient>(),
+                NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.Lookup.IGeocodingClient>(), TimeProvider.System,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido>.Instance);
+            await registrar.RegistrarAsync(pedido, EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega.De(cliente));
+            db.Pedidos.AddRange(pedido, legado);
+            await db.SaveChangesAsync();
+            pedidoId = pedido.Id;
+            legadoId = legado.Id;
+            cliente.Endereco = "Rua alterada, 99";
+            cliente.Bairro = "Outro bairro";
+            await db.SaveChangesAsync();
+        }
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(empresa);
+        var hoje = HorarioBrasil.Hoje();
+        var kds = await new KdsPedidoQueries(leitura).ListarAsync(empresa, [StatusPedidoMapper.Aguardando], hoje, hoje);
+        kds.Single(p => p.Id == pedidoId).Endereco.Should().Be("Rua original, 42 - Centro - CEP 01001-000");
+        kds.Single(p => p.Id == legadoId).Endereco.Should().Contain("Rua alterada").And.Contain("Outro bairro");
+        var impresso = await new PedidoImpressoQueries(leitura).ObterAsync(empresa, pedidoId);
+        impresso!.Cliente.EnderecoEntrega.Should().Be("Rua original, 42 - Centro - CEP 01001-000");
+        (await new KdsPedidoQueries(leitura).ListarAsync(outraEmpresa, [StatusPedidoMapper.Aguardando], hoje, hoje))
+            .Should().BeEmpty();
+        var entregue = await leitura.Pedidos.FindAsync(pedidoId);
+        var agora = DateTime.UtcNow;
+        entregue!.Status = StatusPedidoMapper.Entregue;
+        entregue.EntreguEm = agora;
+        await leitura.SaveChangesAsync();
+        var bairros = await new EasyStock.Infra.Postgre.Repositories.Atendimento.EntregasPorBairroQuery(leitura)
+            .ListarEntreguesAsync(empresa, agora.AddMinutes(-1), agora.AddMinutes(1));
+        bairros.Should().ContainSingle().Which.Bairro.Should().Be("Centro");
+    }
+
+    [SkippableFact]
     public async Task ListaDoDiaPelaVagaOuCriacao_SoDaEmpresa_ComJanela()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");

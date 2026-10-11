@@ -120,7 +120,7 @@ public sealed class PedidoImpressoQueries(EasyStockDbContext db) : IPedidoImpres
                 cliente?.Bairro,
                 cliente?.Cidade,
                 cliente?.Cep,
-                alergias),
+                alergias, p.EnderecoEntrega),
             Observacoes: p.Observacoes,
             Total: p.Total.Valor,
             Pagamentos: p.Pagamentos.Select(g => new PedidoImpressoPagamentoLeitura(g.Valor, g.PagoEm, g.Metodo)).ToList(),

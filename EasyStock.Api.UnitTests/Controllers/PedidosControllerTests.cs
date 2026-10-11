@@ -48,7 +48,11 @@ public class PedidosControllerTests
 
         var criar = new CriarPedidoUseCase(
             _pedidoRepo, _clienteRepo, _produtoRepo, _uow,
-            NullLogger<CriarPedidoUseCase>.Instance, new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
+            NullLogger<CriarPedidoUseCase>.Instance, new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()),
+            new EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido(
+                Substitute.For<EasyStock.Application.Ports.Output.Lookup.ICepLookupClient>(),
+                Substitute.For<EasyStock.Application.Ports.Output.Lookup.IGeocodingClient>(), TimeProvider.System,
+                NullLogger<EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido>.Instance));
 
         var estoqueIntegration = new PedidoEstoqueIntegrationService(
             Substitute.For<IItemEstoqueRepository>(),

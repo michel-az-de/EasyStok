@@ -44,7 +44,8 @@ public class CriarPedidoUseCase(
     IProdutoRepository produtoRepo,
     IUnitOfWork uow,
     ILogger<CriarPedidoUseCase> logger,
-    CalculadoraInicioPrevistoPedido inicioPrevisto)
+    CalculadoraInicioPrevistoPedido inicioPrevisto,
+    EnderecoEntregaPedido enderecoEntrega)
 {
     public async Task<PedidoResult> ExecuteAsync(CriarPedidoCommand cmd)
     {
@@ -84,7 +85,7 @@ public class CriarPedidoUseCase(
         if (cmd.ClienteId.HasValue && cmd.ClienteId.Value != Guid.Empty)
         {
             cliente = await clienteRepo.GetByIdAsync(cmd.EmpresaId, cmd.ClienteId.Value);
-            if (cliente == null)
+            if (cliente is null || cliente.EmpresaId != cmd.EmpresaId)
                 throw new UseCaseValidationException("Cliente não encontrado nesta empresa.");
         }
 
@@ -99,6 +100,8 @@ public class CriarPedidoUseCase(
         pedido.Observacoes = cmd.Observacoes;
         pedido.MobileOrderId = cmd.MobileOrderId;
         pedido.AgendadoParaEm = agendadoParaEm;
+        if (cliente is not null && pedido.Origem != "balcao")
+            await enderecoEntrega.RegistrarAsync(pedido, DadosEnderecoEntrega.De(cliente));
 
         // Adiciona itens.
         if (cmd.Itens != null)

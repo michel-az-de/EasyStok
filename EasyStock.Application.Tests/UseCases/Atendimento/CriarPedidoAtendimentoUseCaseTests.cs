@@ -23,7 +23,11 @@ public class CriarPedidoAtendimentoUseCaseTests
         var empresaId = c.Storefront.EmpresaId;
 
         var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria" };
-        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true };
+        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true,
+            Logradouro = "Rua escolhida", Numero = "42", Bairro = "Centro", Cidade = "São Paulo", Estado = "SP" };
+        cliente.Endereco = "Rua do cadastro antigo, 10";
+        c.EntregaGeocoding.GeocodificarAsync(Arg.Any<EasyStock.Application.Ports.Output.Lookup.GeocodeQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new EasyStock.Application.Ports.Output.Lookup.GeocodeResultado(-23.55, -46.63, true));
         cliente.Enderecos.Add(endereco);
         var clienteRepo = Substitute.For<IClienteRepository>();
         clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
@@ -51,6 +55,13 @@ public class CriarPedidoAtendimentoUseCaseTests
         pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
         pedido.ClienteId.Should().Be(cliente.Id);
         pedido.Observacoes.Should().Be("tocar a campainha");
+        pedido.EnderecoEntrega.Should().Be("Rua escolhida, 42 - Centro, São Paulo - CEP 01310-100");
+        pedido.EntregaLat.Should().Be(-23.55);
+        pedido.EntregaLng.Should().Be(-46.63);
+        pedido.EnderecoConfirmadoEm.Should().Be(c.Relogio.GetUtcNow().UtcDateTime);
+        endereco.Logradouro = "Rua alterada depois";
+        cliente.Endereco = "Outro cadastro";
+        pedido.EnderecoEntrega.Should().Contain("Rua escolhida").And.NotContain("alterada");
 
         var item = reservado.Itens.Should().ContainSingle().Subject;
         item.CardapioItemId.Should().Be(c.CardapioItemId);
