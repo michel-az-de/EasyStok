@@ -14,7 +14,7 @@ import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
-import { tipoDeArquivo, validarArquivo, validarPeca, mensagemDePeca } from '../../dominio/anexos'
+import { FOTO_NAO_ENVIADA, tipoDeArquivo, validarArquivo, validarPeca, mensagemDePeca } from '../../dominio/anexos'
 import { aceitaFormato, canalDaConversa, motivoDeFormato } from '../../dominio/canal'
 import { permissaoDeEscrita } from '../../dominio/janela'
 import { useArquivoComoDataUrl } from '../../hooks/useArquivoComoDataUrl'
@@ -135,6 +135,8 @@ export function PainelGaleria({ aoFechar }) {
   const [confirmandoTirar, setConfirmandoTirar] = useState(null)
   const [enviadoId, setEnviadoId] = useState(null)
   const [enviandoId, setEnviandoId] = useState(null)
+  // #1587: a falha fica escrita no cartão; antes o botão só voltava a "Enviar", sem dizer nada.
+  const [falhouId, setFalhouId] = useState(null)
 
   const canal = canalDaConversa(canais, selecionada)
   const { pode, motivo } = permissaoDeEscrita(selecionada, agora, canal)
@@ -143,9 +145,10 @@ export function PainelGaleria({ aoFechar }) {
 
   async function aoCliqueEnviar(peca) {
     setEnviandoId(peca.id)
+    setFalhouId(null)
     const enviado = await enviarMidia(selecionada.id, mensagemDePeca(peca))
     setEnviandoId(null)
-    if (enviado === false) return
+    if (enviado === false) { setFalhouId(peca.id); return }
     setEnviadoId(peca.id)
     setTimeout(() => setEnviadoId((atual) => (atual === peca.id ? null : atual)), 1400)
   }
@@ -222,6 +225,7 @@ export function PainelGaleria({ aoFechar }) {
                   {enviandoId === peca.id ? 'Enviando…' : enviadoId === peca.id ? <><Icone nome="check" /> Enviado</> : 'Enviar'}
                 </Botao>
               </div>
+              {falhouId === peca.id && <p className={css.cartaoFalha} role="alert">{FOTO_NAO_ENVIADA}</p>}
             </li>
           ))}
           {!fonteApi && <li className={css.cartaoNovo}>

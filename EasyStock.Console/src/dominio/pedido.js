@@ -67,6 +67,10 @@ export function comObservacao(pedido, sku, texto) {
 export const pedidoEncerrado = (pedido) =>
   pedido?.estado === 'entregue' || pedido?.estado === 'cancelado'
 
+// #1587: no modo API o pedido já criado é do EasyStok e o console não tem como mudar os itens
+// dele (a ação só avisava no rodapé). A tela trava somar, tirar e anotar, e diz o motivo no lugar.
+export const comandaTravada = (pedido, { fonteApi = false } = {}) => fonteApi && Boolean(pedido?.pedidoId)
+
 // Número curto de quatro dígitos, o mesmo formato que a comanda e o canhoto
 // usam de relance (ex.: "2026-0186" vira "0186").
 export const numeroCurto = (numero) => String(numero).split('-').at(-1)

@@ -32,6 +32,8 @@
 .cartaoIcone:hover { background: var(--elevado); }
 .confirmarTirar { width: auto; padding: 0 var(--e-2); color: var(--erro); background: var(--erro-pastel); }
 .cartaoEnviar { margin-left: auto; }
+/* #1587: foto que não saiu, escrita logo abaixo do botão do próprio cartão. */
+.cartaoFalha { margin: 0; padding: 0 var(--e-3) var(--e-2); color: var(--erro); font-size: var(--t-apoio); text-align: right; }
 
 .formulario { display: grid; gap: var(--e-3); }
 .campoFoto {
