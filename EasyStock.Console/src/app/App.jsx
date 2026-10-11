@@ -27,6 +27,7 @@ import { TelaLogin } from '../features/login/TelaLogin'
 import { AvisoDaAcaoApi, FaixaApi, LimparAvisoAoNavegar } from './FaixaApi'
 import { contarPrecisaDeVoce, precisaDeVoce } from '../dominio/automatico'
 import { useTituloDaAba } from '../aplicacao/useTituloDaAba'
+import { TITULO_BASE, tituloDaAba } from '../dominio/tituloDaAba'
 import { canalDaConversa } from '../dominio/canal'
 import { envioBloqueado } from '../dominio/janela'
 import {
@@ -75,7 +76,7 @@ function Composicao({ rota, aoSair }) {
 
   // Item 8 (rodada 10): título da aba com a contagem de "Precisa de você",
   // para quem trocou de janela no mesmo computador (US-010, saber sem olhar).
-  useTituloDaAba(contarPrecisaDeVoce(conversas, agora, automaticoPausado, aberta, janelas, horarioDaLoja))
+  useTituloDaAba(tituloDaAba(rota, contarPrecisaDeVoce(conversas, agora, automaticoPausado, aberta, janelas, horarioDaLoja)))
   const [modal, setModal] = useState(null)
   const [focoBiblioteca, setFocoBiblioteca] = useState(null)
   const [abaGestao, setAbaGestao] = useState(null)
@@ -325,6 +326,9 @@ function TelaDaRota({ rota, aoSair }) {
             )}
           </MolduraDoModulo>
         )}
+      {/* #1582: Horários e mensagens também abre e fecha a loja; sem isto o gesto só aparecia
+          depois, sozinho, ao voltar para o Balcão. */}
+      {FONTE_API && <GestoLoja />}
       <FaixaApi aoSair={aoSair} />
     </>
   )
@@ -392,6 +396,8 @@ export function App() {
   const hash = useHash()
   const { sessao, entrarNaEmpresa, google, encerrarSessao, avisoSaida } = useSessaoApi()
   const rota = rotaDaHash(hash, { fonteApi: FONTE_API })
+  // #1582: cada tela diz o próprio nome na aba. No Balcão quem escreve é a `Composicao`, com a contagem.
+  useTituloDaAba(FONTE_API && !sessao ? TITULO_BASE : rota.tipo === ROTA_PRINCIPAL ? null : tituloDaAba(rota))
   if (FONTE_API && !sessao) return <TelaLogin entrarNaEmpresa={entrarNaEmpresa} google={google} avisoSaida={avisoSaida} />
   if (FONTE_API) return <><NavegacaoDoConsole hash={hash} /><AppComAcesso key={identidadeDaSessao(sessao)} rota={rota} sessao={sessao} aoSair={encerrarSessao} /></>
   if (!FONTE_API && rota.modulo) return <AppPrincipal rota={rota} sessao={sessao} aoSair={encerrarSessao} />

@@ -184,9 +184,12 @@ function Cabecalho({
 
   return (
     <header className={css.topo}>
-      <h1 className={css.marca}>
+      {/* #1582: entre 1024 e 1179 px não há menu Mais nem trilho; a marca é o caminho ao hall,
+          como no trilho do desktop. */}
+      <a className={css.marca} href={HASH_HALL} aria-label="Ir para os módulos" title="Módulos">
         <Marca compacta />
-      </h1>
+      </a>
+      <h1 className="sr">Casa da Baba</h1>
       {!compacto && <InterruptorTema />}
       <ControleLoja aberta={aberta} aoAlternar={aoAlternarLoja} />
       <div className={css.controles}>
