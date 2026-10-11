@@ -33,10 +33,17 @@ public static class CaixaFechadoGuard
     public static async Task ExigirRecebimentoForaDoRetratoAsync(ICaixaRepository caixa, Guid empresaId,
         DateTime pagoEmUtc, Guid? lojaId)
     {
-        var fechamentos = await FechamentosQueRetratamAsync(caixa, empresaId, pagoEmUtc, lojaId);
-        if (fechamentos.Any(f => pagoEmUtc <= f.FechadoEm))
+        if (await RetratadoAsync(caixa, empresaId, pagoEmUtc, lojaId))
             throw new UseCaseValidationException(RecebimentoEmDiaFechado);
     }
+
+    /// <summary>
+    /// O lançamento deste instante entrou no retrato de algum fechamento do dia. O que foi lançado
+    /// depois de o Caixa fechar ficou de fora e continua podendo ser mexido.
+    /// </summary>
+    public static async Task<bool> RetratadoAsync(ICaixaRepository caixa, Guid empresaId, DateTime instanteUtc,
+        Guid? lojaId) =>
+        (await FechamentosQueRetratamAsync(caixa, empresaId, instanteUtc, lojaId)).Any(f => instanteUtc <= f.FechadoEm);
 
     /// <summary>
     /// #1562: o fechamento sem loja é o da empresa e soma os recebimentos de todas as lojas (Console e Web
