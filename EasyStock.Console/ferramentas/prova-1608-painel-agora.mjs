@@ -25,7 +25,7 @@ registerHooks({
   },
 })
 
-const { filasDoAgora } = await import('../src/dominio/agora.js')
+const { avisoDeResponder, filasDoAgora } = await import('../src/dominio/agora.js')
 const { contarPrecisaDeVoce } = await import('../src/dominio/automatico.js')
 
 let passou = 0
@@ -66,10 +66,34 @@ confere('Responder bate com a contagem de "Precisa de você" do Balcão', () => 
   assert.ok(!filas.responder.some((i) => i.id === 'c3'))
 })
 
-confere('Responder leva o motivo escrito e põe o que é perigo primeiro', () => {
-  const tons = filas.responder.map((i) => i.tom)
-  assert.deepEqual(tons, [...tons].sort((a, b) => (a === 'perigo' ? 0 : 1) - (b === 'perigo' ? 0 : 1)))
+confere('Responder leva o motivo escrito', () => {
   assert.ok(filas.responder.every((i) => i.rotulo && i.texto && i.nome))
+})
+
+// #1611: mesma ordem de urgência do Balcão (dominio/conversa.js, ordenarBalcao):
+// quem espera há mais tempo sobe, não a ordem em que a lista chegou.
+confere('Responder segue a ordem do Balcão: quem espera há mais tempo primeiro', () => {
+  const espera = (id, minutos) => conversa(id, id, {
+    ultimaEm: ha(minutos), mensagens: [{ dir: 'in', texto: 'Tem lasanha hoje?', em: ha(minutos) }],
+  })
+  const { responder } = filasDoAgora([espera('doze', 12), espera('tres-horas', 196), espera('vinte', 20)], AGORA)
+  assert.deepEqual(responder.map((i) => i.id), ['tres-horas', 'vinte', 'doze'])
+})
+
+confere('conversa bloqueada não entra em Responder', () => {
+  const bloqueada = conversa('b1', 'Bloqueado', {
+    bloqueio: { motivo: 'x' }, passagem: { assumida: false, motivo: 'y' },
+  })
+  assert.deepEqual(filasDoAgora([bloqueada], AGORA).responder, [])
+})
+
+// #1611: sem lista carregada no modo API, zero não é "em dia".
+confere('modo API sem lista: avisa que carrega ou que falhou, nunca "em dia"', () => {
+  assert.match(avisoDeResponder({ fonteApi: true, estado: 'carregando', total: 0 }), /Carregando/)
+  assert.match(avisoDeResponder({ fonteApi: true, estado: 'erro', total: 0 }), /Não consegui/)
+  assert.equal(avisoDeResponder({ fonteApi: true, estado: 'ok', total: 0 }), null)
+  assert.equal(avisoDeResponder({ fonteApi: true, estado: 'erro', total: 12 }), null)
+  assert.equal(avisoDeResponder({ fonteApi: false, estado: 'desligada', total: 0 }), null)
 })
 
 confere('conversa encerrada não entra em Responder', () => {
