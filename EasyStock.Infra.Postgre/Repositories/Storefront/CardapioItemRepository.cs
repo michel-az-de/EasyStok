@@ -74,6 +74,18 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
             .OrderBy(c => c.OrdemExibicao)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<CardapioItem>> GetArquivadosDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default) =>
+        // #1575: a tela "tirados do cardápio" filtra no banco. Mesma carga de GetTodosDoStorefrontAsync.
+        await db.CardapioItens
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(c => c.Produto)
+            .Include(c => c.Variacoes)
+            .Include(c => c.Secao)
+            .Where(c => c.StorefrontId == storefrontId && c.ArquivadoEm != null)
+            .OrderBy(c => c.OrdemExibicao)
+            .ToListAsync(ct);
+
     public Task AddAsync(CardapioItem item, CancellationToken ct = default)
     {
         db.CardapioItens.Add(item);

@@ -30,7 +30,7 @@ public class ListarCardapioComandaUseCaseTests
 
     private ListarCardapioComandaUseCase Sut() => new(_storefronts,
         new ListarCardapioPublicoUseCase(_storefronts, _cardapio, Substitute.For<IItemEstoqueRepository>(),
-            Substitute.For<ILogger<ListarCardapioPublicoUseCase>>()), _cardapio);
+            Substitute.For<ILogger<ListarCardapioPublicoUseCase>>()));
 
     private CardapioItem Prato(string nome, decimal preco)
     {
@@ -56,6 +56,19 @@ public class ListarCardapioComandaUseCaseTests
         r.Porcoes.Keys.Should().Equal(ravioli.Id);
         r.Porcoes[ravioli.Id].Select(p => (p.Rotulo, p.Preco, p.Disponivel, p.Padrao)).Should().Equal(
             ("300 g", 28m, true, true), ("800 g", 62m, false, false));
+    }
+
+    [Fact]
+    public async Task CarregaOCardapioUmaVezPorRequisicao()
+    {
+        // #1575: o menu e as porções saem da mesma leitura (a comanda consulta a cada 60 s e a cada toque).
+        var ravioli = Prato("Ravióli", 28m);
+        ravioli.AdicionarVariacao(CardapioItemVariacao.Criar(ravioli.Id, "300 g", 28m));
+
+        var r = await Sut().ExecuteAsync(_vitrine.EmpresaId);
+
+        r.Porcoes.Keys.Should().Equal(ravioli.Id);
+        await _cardapio.Received(1).GetVisiveisDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>());
     }
 
     [Fact]

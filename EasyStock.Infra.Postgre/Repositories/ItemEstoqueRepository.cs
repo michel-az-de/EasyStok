@@ -239,7 +239,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToListAsync();
 
         public async Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<ItemEstoque>>> GetByProdutosAsync(
-            Guid empresaId, IEnumerable<Guid> produtoIds, Guid? lojaId, CancellationToken ct = default)
+            Guid empresaId, IEnumerable<Guid> produtoIds, Guid? lojaId, CancellationToken ct = default,
+            bool apenasComSaldoOuDescoberto = false)
         {
             var ids = produtoIds.Distinct().ToList();
             if (ids.Count == 0)
@@ -251,6 +252,10 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             if (lojaId.HasValue)
                 query = query.Where(i => i.LojaId == lojaId.Value);
+
+            // #1575: lote zerado e sem descoberto soma zero no saldo e no descoberto; fica no banco.
+            if (apenasComSaldoOuDescoberto)
+                query = query.Where(i => (decimal)i.QuantidadeAtual > 0 || (decimal)i.QuantidadeDescoberta != 0);
 
             var todos = await query
                 .OrderByDescending(i => i.EntradaEm)

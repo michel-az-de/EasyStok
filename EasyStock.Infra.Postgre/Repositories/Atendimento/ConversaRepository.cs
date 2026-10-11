@@ -153,13 +153,15 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
                                      || EF.Functions.ILike(c.ContatoIdExterno, padrao));
         }
 
+        // #1575: só as colunas do resumo. O ContextoJson (jsonb do carrinho) fica no banco: a inbox faz polling.
         var linhas = await query
             .OrderByDescending(c => c.UltimaMensagemEm)
             .Skip((paginaEfetiva - 1) * tamanho)
             .Take(tamanho)
             .Select(c => new
             {
-                Conversa = c,
+                c.Id, c.EmpresaId, c.Canal, c.ContatoIdExterno, c.ContatoNome, c.ClienteId, c.Situacao, c.NaoLidas,
+                c.UltimaMensagemEm, c.UltimaMensagemEntradaEm, c.PedidoEmAndamentoId, c.AssumidaPorUsuarioId, c.MotivoEscalada,
                 AssumidaPorNome = db.UsuariosEmpresas
                     .Where(ue => ue.EmpresaId == empresaId && ue.UsuarioId == c.AssumidaPorUsuarioId)
                     .Select(ue => ue.Usuario!.Nome).FirstOrDefault(),
@@ -174,10 +176,17 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
                     .ThenByDescending(m => m.Id)
                     .Select(m => m.Texto)
                     .FirstOrDefault(),
+                // O mesmo texto que a rota do pedido da conversa devolve em "status" (Pedido.Status, sem conversão).
+                PedidoStatus = db.Pedidos
+                    .Where(p => p.EmpresaId == empresaId && p.Id == c.PedidoEmAndamentoId)
+                    .Select(p => p.Status).FirstOrDefault(),
             })
             .ToListAsync(ct);
 
-        return linhas.Select(l => new ConversaInboxItem(l.Conversa, l.UltimoTexto, l.AguardaResposta, l.AssumidaPorNome)).ToList();
+        return linhas.Select(l => new ConversaInboxItem(
+            l.Id, l.EmpresaId, l.Canal, l.ContatoIdExterno, l.ContatoNome, l.ClienteId, l.Situacao, l.NaoLidas,
+            l.UltimaMensagemEm, l.UltimaMensagemEntradaEm, l.PedidoEmAndamentoId, l.AssumidaPorUsuarioId, l.MotivoEscalada,
+            l.UltimoTexto, l.AguardaResposta, l.AssumidaPorNome, l.PedidoStatus)).ToList();
     }
 
     public async Task<IReadOnlyList<Mensagem>> ListarMensagensAsync(

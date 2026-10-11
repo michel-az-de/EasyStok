@@ -947,7 +947,7 @@ public partial class AtendimentoConversasControllerTests
                 .Where(c => c.EmpresaId == empresaId && (situacao is null || c.Situacao == situacao))
                 .Where(c => responsavel is null || c.AssumidaPorUsuarioId == responsavel.UsuarioId)
                 .Where(c => busca is null || (c.ContatoNome ?? "").Contains(busca, StringComparison.OrdinalIgnoreCase) || c.ContatoIdExterno.Contains(busca))
-                .Select(c => new ConversaInboxItem(c, Mensagens.Where(m => m.ConversaId == c.Id).OrderBy(m => m.EnviadaEm).LastOrDefault()?.Texto))
+                .Select(c => ConversaInboxItem.De(c, Mensagens.Where(m => m.ConversaId == c.Id).OrderBy(m => m.EnviadaEm).LastOrDefault()?.Texto))
                 .ToList());
 
         public Task<IReadOnlyList<Mensagem>> ListarMensagensAsync(
