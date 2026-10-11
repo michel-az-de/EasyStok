@@ -193,6 +193,9 @@ public sealed class GerenciarUploadsUseCase(
 
         if (galeria && item.ObterFotosGaleria().Count >= 5)
             throw new UseCaseValidationException("O item já possui o limite de 5 fotos.");
+        // #1550: recusa antes do upload, como acima, para não deixar arquivo órfão no storage.
+        if (!galeria && sincronizarCapaGaleria && item.GaleriaSemVagaParaNovaCapa)
+            throw new UseCaseValidationException(EasyStock.Domain.Entities.Storefront.CardapioItem.MensagemLimiteFotos);
 
         var (optimized, optContentType, optExt) = await Task.Run(
             () => imageProcessor.Optimize(content, contentType, maxSide: 1920, quality: 85),

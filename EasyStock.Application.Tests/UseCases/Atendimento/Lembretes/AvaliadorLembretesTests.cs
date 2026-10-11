@@ -83,6 +83,60 @@ public class AvaliadorLembretesTests
         cancelado.Avisados.Should().Be(0);
     }
 
+    // #1550: o marco de início só vale antes do preparo e enquanto é recente. Sem isso, o primeiro tick
+    // avisava todo pedido antigo e o pedido já na cozinha recebia "início previsto do preparo".
+    [Theory]
+    [InlineData(true, 5)]
+    [InlineData(false, 24 * 60 + 1)]
+    public async Task InicioPrevistoNaoLembraPreparoIniciadoNemInicioAntigo(bool preparoIniciado, int minutosAtras)
+    {
+        Agendar(Agendado(Agora.AddDays(3), Agora.AddMinutes(-minutosAtras)) with { PreparoIniciado = preparoIniciado });
+        var resultado = await Avaliador().ExecuteAsync();
+        resultado.Criados.Should().Be(0);
+        resultado.Avisados.Should().Be(0);
+        _repo.Todos.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task InicioPrevistoValeAteOLimiteEFechaQuandoOPreparoComeca()
+    {
+        var pedido = Agendado(Agora.AddDays(3), Agora - AvaliarLembretesUseCase.InicioPrevistoValePor);
+        Agendar(pedido);
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(1);
+        var lembrete = _repo.Todos.Should().ContainSingle().Subject;
+        Agendar(pedido with { PreparoIniciado = true });
+        var emPreparo = await Avaliador().ExecuteAsync();
+        emPreparo.Resolvidos.Should().Be(1);
+        emPreparo.Criados.Should().Be(0);
+        lembrete.EstaAberto.Should().BeFalse();
+        // Voltar à fila não recria: a referência já existe, mesmo concluída.
+        Agendar(pedido);
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(0);
+        _repo.Todos.Should().ContainSingle();
+    }
+
+    // #1550: no dia da entrega o texto "entrega amanhã" já é falso; o aviso fecha sozinho e não renasce.
+    [Fact]
+    public async Task VesperaFechaSozinhaNoDiaDaEntregaENaoRenasce()
+    {
+        Agendar(Agendado(Agora.AddDays(1)));
+        (await Avaliador().ExecuteAsync()).Criados.Should().Be(1);
+        var lembrete = _repo.Todos.Should().ContainSingle().Subject;
+        _relogio.Advance(TimeSpan.FromHours(11).Add(TimeSpan.FromMinutes(59))); // 23:59 BRT, ainda véspera
+        (await Avaliador().ExecuteAsync()).Resolvidos.Should().Be(0);
+        lembrete.EstaAberto.Should().BeTrue();
+        _relogio.Advance(TimeSpan.FromMinutes(1)); // 00:00 BRT do dia da entrega
+        var noDia = await Avaliador().ExecuteAsync();
+        noDia.Resolvidos.Should().Be(1);
+        noDia.Criados.Should().Be(0);
+        lembrete.EstaAberto.Should().BeFalse();
+        _relogio.Advance(TimeSpan.FromDays(1));
+        var depois = await Avaliador().ExecuteAsync();
+        depois.Criados.Should().Be(0);
+        depois.Resolvidos.Should().Be(0);
+        _repo.Todos.Should().ContainSingle();
+    }
+
     [Fact]
     public async Task ReagendamentoEncerraVesperaAntigaELembraNovaData()
     {

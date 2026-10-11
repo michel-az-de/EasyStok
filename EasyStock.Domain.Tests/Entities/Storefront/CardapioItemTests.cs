@@ -43,6 +43,41 @@ public class CardapioItemTests
         item.PrecoEfetivo().Should().Be(preco);
     }
 
+    // #1550: estado legado, capa gravada fora da galeria. A primeira foto não é a capa e não pode sumir.
+    [Fact]
+    public void TrocarCapaGaleria_CapaLegadaForaDaGaleria_NaoDescartaOPrimeiroAngulo()
+    {
+        var item = NovoItemValido();
+        item.AdicionarFotoGaleria("https://exemplo.test/a.webp");
+        item.AdicionarFotoGaleria("https://exemplo.test/b.webp");
+        item.AtualizarMetadata(fotoUrl: "https://exemplo.test/capa-legada.webp");
+
+        item.SubstituirCapaGaleria("https://exemplo.test/nova.webp");
+
+        item.FotoUrl.Should().Be("https://exemplo.test/nova.webp");
+        item.ObterFotosGaleria().Should().Equal(
+            "https://exemplo.test/nova.webp", "https://exemplo.test/a.webp", "https://exemplo.test/b.webp");
+    }
+
+    [Fact]
+    public void TrocarCapaGaleria_CapaLegadaComGaleriaCheia_RecusaSemPerderFoto()
+    {
+        var item = NovoItemValido();
+        var fotos = Enumerable.Range(1, 5).Select(n => $"https://exemplo.test/{n}.webp").ToList();
+        foreach (var foto in fotos) item.AdicionarFotoGaleria(foto);
+        item.AtualizarMetadata(fotoUrl: "https://exemplo.test/capa-legada.webp");
+        item.GaleriaSemVagaParaNovaCapa.Should().BeTrue();
+
+        var trocar = () => item.SubstituirCapaGaleria("https://exemplo.test/nova.webp");
+
+        trocar.Should().Throw<RegraDeDominioVioladaException>().WithMessage("*limite de 5 fotos*");
+        item.FotoUrl.Should().Be("https://exemplo.test/capa-legada.webp");
+        item.ObterFotosGaleria().Should().Equal(fotos);
+        // Promover a capa uma foto que já está na galeria não aumenta a contagem.
+        item.SubstituirCapaGaleria(fotos[2]);
+        item.ObterFotosGaleria().Should().BeEquivalentTo(fotos).And.StartWith(fotos[2]);
+    }
+
     [Theory]
     [InlineData("javascript:alert(1)")]
     [InlineData("file:///etc/passwd")]

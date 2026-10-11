@@ -78,7 +78,10 @@ public sealed partial class EnviarModeloConversaUseCase(
         }
         catch (Exception ex)
         {
+            // Nada saiu: a Meta recusou (4xx) ou o cliente barrou antes da rede (permanente e sem status, ex.:
+            // empresa sem phone_number_id). O resto fica incerto, inclusive o "2xx sem message id".
             var tipo = ex is WhatsAppCloudException { StatusHttp: >= 400 and < 500 }
+                    or WhatsAppCloudException { EhPermanente: true, StatusHttp: null }
                 ? TipoFalhaEnvio.Permanente : TipoFalhaEnvio.Incerta;
             mensagem.RegistrarFalhaEnvio(tipo == TipoFalhaEnvio.Incerta
                 ? "Confira a conversa no WhatsApp antes de iniciar outro envio."

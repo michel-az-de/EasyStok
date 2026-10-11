@@ -253,6 +253,25 @@ public class WhatsAppCloudClientTests
         ex.Which.Codigo.Should().Be(2);
     }
 
+    // #1550: o envio de modelo pelo Balcão separa "nada saiu" de "pode ter saído" pelo status. A recusa antes
+    // da rede não tem status; a resposta 2xx sem message id carrega o dela.
+    [Fact]
+    public async Task DoisXxSemMessageIdCarregaOStatusERecusaAntesDaRedeNao()
+    {
+        var respondeu = CreateClient(HttpStatusCode.OK, """{"messaging_product":"whatsapp","messages":[]}""", out _);
+        var semId = await ((Func<Task>)(() => respondeu.EnviarTextoAsync("5511999998888", "Oi!")))
+            .Should().ThrowAsync<WhatsAppCloudException>();
+        semId.Which.StatusHttp.Should().Be(200);
+        semId.Which.EhPermanente.Should().BeTrue();
+
+        var handler = new SequenceHandler();
+        var semNumero = BuildClient(handler, phoneNumberIdDoTenant: null, haTenant: true);
+        var antesDaRede = await ((Func<Task>)(() => semNumero.EnviarTextoAsync("5511999998888", "Oi!")))
+            .Should().ThrowAsync<WhatsAppCloudException>();
+        antesDaRede.Which.StatusHttp.Should().BeNull();
+        antesDaRede.Which.EhPermanente.Should().BeTrue();
+    }
+
     [Fact]
     public async Task ErroSemCorpoDaMetaTambemCarregaOStatusHttp()
     {

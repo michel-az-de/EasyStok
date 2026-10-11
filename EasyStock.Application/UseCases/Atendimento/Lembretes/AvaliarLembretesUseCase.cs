@@ -43,6 +43,11 @@ public sealed class AvaliarLembretesUseCase(
     /// <see cref="PrazosOptions.ClienteSemRespostaMin"/> (N11). Com configuração, vale o SLA da loja (#1427).
     /// </summary>
     public static readonly TimeSpan SemRespostaApos = TimeSpan.FromMinutes(10);
+    /// <summary>
+    /// Por quanto tempo o início previsto do preparo ainda é notícia (#1550). Depois disso o marco sai de
+    /// vigência: pedido antigo com início no passado não gera aviso quando o avaliador liga.
+    /// </summary>
+    public static readonly TimeSpan InicioPrevistoValePor = TimeSpan.FromHours(24);
     public const string EventoSse = "lembrete.vencido";
     public const int AvisosPorRodada = 100;
 
@@ -60,12 +65,17 @@ public sealed class AvaliarLembretesUseCase(
             var vespera = diaEntrega.AddDays(-1);
             var turno = expediente.Horarios.FirstOrDefault(h => h.DiaDaSemana == (int)vespera.DayOfWeek);
             var quem = string.IsNullOrWhiteSpace(pedido.ClienteNome) ? "Pedido agendado" : $"Pedido de {pedido.ClienteNome.Trim()}";
-            if (turno is not null)
+            // #1550: passada a véspera, "entrega amanhã" é falso. O marco sai de vigência e o aviso aberto
+            // fecha sozinho; não renasce porque só nasce na própria véspera e a referência já existe.
+            var hoje = HorarioBrasil.DataOperacional(agora);
+            if (turno is not null && hoje <= vespera)
                 criados += await LembrarAgendadoAsync(pedido, $"vespera:{diaEntrega:yyyyMMdd}",
                     $"{quem}: entrega amanhã, {HorarioBrasil.ConverterParaBrasilia(pedido.EntregaEm):dd/MM 'às' HH:mm}.",
-                    agora >= HorarioBrasil.InstanteUtc(vespera, turno.Abre) && HorarioBrasil.DataOperacional(agora) == vespera,
+                    agora >= HorarioBrasil.InstanteUtc(vespera, turno.Abre) && hoje == vespera,
                     agora, vigentes, ct);
-            if (pedido.InicioPrevistoEm is { } inicio)
+            // #1550: o início previsto é aviso para quem ainda não começou. Com o preparo iniciado, ou com o
+            // início velho demais para ser notícia, o marco sai de vigência e o aviso aberto fecha sozinho.
+            if (pedido.InicioPrevistoEm is { } inicio && !pedido.PreparoIniciado && agora - inicio <= InicioPrevistoValePor)
                 criados += await LembrarAgendadoAsync(pedido, $"inicio:{inicio:yyyyMMddHHmmss}",
                     $"{quem}: início previsto do preparo em {HorarioBrasil.ConverterParaBrasilia(inicio):dd/MM 'às' HH:mm}.",
                     agora >= inicio, agora, vigentes, ct);
