@@ -58,7 +58,9 @@ export function criarGestaoInsumos({ recarregar, aoErro }) {
       const c = numeroOuNulo(custo)
       const erro = validar(m, c)
       if (erro) { aoErro(erro); return Promise.resolve(false) }
-      return gravar(() => atualizarInsumo(id, { minimo: m, custo: c }))
+      // #1563: na API `minimo: null` é "não mexe" e zero vence a herança da categoria. Campo apagado
+      // limpa de forma explícita; API antiga ignora o campo e se comporta como antes.
+      return gravar(() => atualizarInsumo(id, { minimo: m, custo: c, ...(m == null ? { limparMinimo: true } : {}) }))
     },
     // M2.7 (#1523): marcar ou desmarcar como embalagem; mínimo e custo ficam como estão.
     marcarEmbalagem: (id, embalagem) => gravar(() => atualizarInsumo(id, { minimo: null, custo: null, embalagem })),

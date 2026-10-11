@@ -17,7 +17,8 @@ public sealed record PerdaRequest(
 public sealed record ProduzirPratosRequest(IReadOnlyList<PratoProduzidoInput>? Pratos, string? Observacao = null);
 
 /// <param name="Unidade">G, Kg, Ml, L, Un...; null = não mexe (no cadastro, Un).</param>
-public sealed record InsumoRequest(string? Nome, UnidadeMedida? Unidade, int? Minimo, decimal? Custo, bool? Embalagem = null);
+public sealed record InsumoRequest(string? Nome, UnidadeMedida? Unidade, int? Minimo, decimal? Custo, bool? Embalagem = null,
+    bool LimparMinimo = false);
 
 /// <summary>
 /// Produção pelo console (M2, plano docs/plan/erp-casa-da-baba/03-m2-producao.md). D-M2-06 (Felipe,
@@ -216,7 +217,7 @@ public class AtendimentoProducaoController(
         }
     }
 
-    [SwaggerOperation(Summary = "Adjust a supply's minimum, cost or unit (null = keep; Gerente)")]
+    [SwaggerOperation(Summary = "Adjust a supply's minimum, cost or unit (null = keep; limparMinimo = true clears the minimum; Gerente)")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [Authorize(Policy = "Gerente")]
@@ -225,7 +226,7 @@ public class AtendimentoProducaoController(
     {
         try
         {
-            await insumos.AtualizarAsync(currentUser.EmpresaId, produtoId, new InsumoInput(null, req.Unidade, req.Minimo, req.Custo, req.Embalagem), ct);
+            await insumos.AtualizarAsync(currentUser.EmpresaId, produtoId, new InsumoInput(null, req.Unidade, req.Minimo, req.Custo, req.Embalagem, req.LimparMinimo), ct);
             return NoContent();
         }
         catch (UseCaseValidationException ex)

@@ -5,6 +5,7 @@
 // Puro. O relógio chega por parâmetro e nada aqui olha Date.now(), senão o
 // relógio da tela e o do lembrete andariam separados.
 
+import { FUSO, dataIsoNoFuso, horaMono, instanteNoFuso, partesNoFuso } from './formato'
 import { mensagensSemRespostaReal, primeiroNome } from './mensagem'
 import { origemDaPassagem } from './passagem'
 
@@ -43,7 +44,7 @@ export function descreverPrazo(quando, agora) {
   const horas = Math.round(minutos / 60)
   if (horas < 24) return `em ${horas} h`
   return new Date(quando).toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: FUSO,
   })
 }
 
@@ -170,38 +171,32 @@ export const OPCOES_QUANDO = [
 
 export const OPCAO_OUTRO_HORARIO = 'outro'
 
-const horaComH = (ms) => {
-  const data = new Date(ms)
-  return `${data.getHours()}h${String(data.getMinutes()).padStart(2, '0')}`
-}
-
+// #1563: "amanhã às 9" e "outro horário" são hora DA LOJA, a mesma que o sininho mostra. Um
+// aparelho em outro fuso não desloca o lembrete.
 export function quandoDaOpcao(opcaoId, agora) {
   const opcao = OPCOES_QUANDO.find((o) => o.id === opcaoId)
   if (!opcao) return agora
   if (opcao.minutos != null) return agora + opcao.minutos * 60000
-  const alvo = new Date(agora)
-  alvo.setDate(alvo.getDate() + 1)
-  alvo.setHours(opcao.hora, 0, 0, 0)
-  return alvo.getTime()
+  const { ano, mes, dia } = partesNoFuso(agora)
+  return instanteNoFuso({ ano, mes, dia: dia + 1, horas: opcao.hora })
 }
 
 export const rotuloDaOpcao = (opcaoId, agora) => {
   const opcao = OPCOES_QUANDO.find((o) => o.id === opcaoId)
-  return opcao ? `${opcao.prefixo} · ${horaComH(quandoDaOpcao(opcaoId, agora))}` : ''
+  return opcao ? `${opcao.prefixo} · ${horaMono(quandoDaOpcao(opcaoId, agora))}` : ''
 }
 
 // "Outro horário": ela escolhe a hora do relógio. Se já passou hoje, vale
 // amanhã, porque um horário no passado não é lembrete, é registro.
 export function quandoDoHorario(horario, agora) {
-  const [h, m] = horario.split(':').map(Number)
-  const alvo = new Date(agora)
-  alvo.setHours(h, m, 0, 0)
-  if (alvo.getTime() <= agora) alvo.setDate(alvo.getDate() + 1)
-  return alvo.getTime()
+  const [horas, minutos] = horario.split(':').map(Number)
+  const { ano, mes, dia } = partesNoFuso(agora)
+  const hoje = instanteNoFuso({ ano, mes, dia, horas, minutos })
+  return hoje > agora ? hoje : instanteNoFuso({ ano, mes, dia: dia + 1, horas, minutos })
 }
 
 export function rotuloDoHorario(horario, agora) {
   const quando = quandoDoHorario(horario, agora)
-  const amanha = new Date(quando).getDate() !== new Date(agora).getDate()
-  return `${amanha ? 'Amanhã' : 'Hoje'} · ${horaComH(quando)}`
+  const amanha = dataIsoNoFuso(quando) !== dataIsoNoFuso(agora)
+  return `${amanha ? 'Amanhã' : 'Hoje'} · ${horaMono(quando)}`
 }
