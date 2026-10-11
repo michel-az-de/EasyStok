@@ -8,6 +8,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using EasyStock.TestHelpers;
 using NSubstitute;
 
 namespace EasyStock.Api.UnitTests.Middleware;
@@ -318,5 +319,91 @@ public class IdempotencyMiddlewareTests
 
         called[0].Should().Be(0);
         ctx.Response.StatusCode.Should().Be(StatusCodes.Status409Conflict);
+    }
+    // #1578: a tabela nunca era limpa. A requisição idempotente apaga as chaves expiradas da própria
+    // empresa, no máximo uma vez por hora, com o tenant que ela já tem.
+    private static (IdempotencyMiddleware mw, IIdempotencyKeyRepository repo, Func<Guid, string, Task<HttpContext>> pedir) SetupLimpeza(
+        TimeProvider relogio)
+    {
+        var repo = Substitute.For<IIdempotencyKeyRepository>();
+        repo.TryBeginAsync(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+            .Returns(c => (IdempotencyKey.CriarPendente(c.ArgAt<string>(0), c.ArgAt<Guid>(1), c.ArgAt<string>(2), c.ArgAt<string?>(3), c.ArgAt<TimeSpan>(4)), true));
+        RequestDelegate next = c => { c.Response.StatusCode = StatusCodes.Status200OK; return Task.CompletedTask; };
+        var mw = new IdempotencyMiddleware(
+            next, new IdempotencyOptions().Add("/api/pedidos"), NullLogger<IdempotencyMiddleware>.Instance, relogio);
+
+        async Task<HttpContext> Pedir(Guid empresaId, string chave)
+        {
+            var services = new ServiceCollection();
+            var user = Substitute.For<ICurrentUserAccessor>();
+            user.EmpresaId.Returns(empresaId);
+            services.AddSingleton(user);
+            services.AddSingleton(repo);
+            var ctx = new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
+            ctx.Request.Method = HttpMethods.Post;
+            ctx.Request.Path = DefaultPath;
+            ctx.Request.Headers[Header] = chave;
+            var bytes = Encoding.UTF8.GetBytes(DefaultBody);
+            ctx.Request.Body = new MemoryStream(bytes);
+            ctx.Request.ContentLength = bytes.Length;
+            ctx.Response.Body = new MemoryStream();
+            await mw.InvokeAsync(ctx);
+            return ctx;
+        }
+
+        return (mw, repo, Pedir);
+    }
+
+    [Fact]
+    public async Task Requisicao_idempotente_limpa_as_chaves_expiradas_uma_vez_por_hora_por_empresa()
+    {
+        var relogio = new FakeTimeProvider(new DateTimeOffset(2026, 10, 11, 12, 0, 0, TimeSpan.Zero));
+        var (_, repo, pedir) = SetupLimpeza(relogio);
+        var empresa = Guid.NewGuid();
+
+        await pedir(empresa, "k-1");
+        await repo.Received(1).CleanupExpiredAsync(relogio.GetUtcNow().UtcDateTime, Arg.Any<CancellationToken>());
+
+        relogio.Advance(TimeSpan.FromMinutes(59));
+        await pedir(empresa, "k-2");
+        await repo.Received(1).CleanupExpiredAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+
+        relogio.Advance(TimeSpan.FromMinutes(1));
+        await pedir(empresa, "k-3");
+        await repo.Received(2).CleanupExpiredAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Limpeza_de_uma_empresa_nao_adia_a_de_outra()
+    {
+        var (_, repo, pedir) = SetupLimpeza(new FakeTimeProvider(DateTimeOffset.UtcNow));
+
+        await pedir(Guid.NewGuid(), "k-1");
+        await pedir(Guid.NewGuid(), "k-2");
+
+        await repo.Received(2).CleanupExpiredAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Falha_na_limpeza_nao_derruba_a_requisicao_nem_o_registro_da_chave()
+    {
+        var (_, repo, pedir) = SetupLimpeza(new FakeTimeProvider(DateTimeOffset.UtcNow));
+        repo.CleanupExpiredAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns<Task<int>>(_ => throw new InvalidOperationException("banco fora"));
+
+        var ctx = await pedir(Guid.NewGuid(), "k-1");
+
+        ctx.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+        await repo.Received(1).MarcarConcluidoAsync(Arg.Any<Guid>(), StatusCodes.Status200OK, Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Rota_fora_da_whitelist_nao_dispara_limpeza()
+    {
+        var (mw, ctx, repo, _) = Setup(path: "/api/produtos");
+
+        await mw.InvokeAsync(ctx);
+
+        await repo.DidNotReceiveWithAnyArgs().CleanupExpiredAsync(default, default);
     }
 }

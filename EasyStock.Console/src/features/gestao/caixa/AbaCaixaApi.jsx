@@ -8,6 +8,7 @@ import { CampoArea, CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { CampoMascarado } from '../../../componentes/CampoMascarado'
 import { Chip } from '../../../componentes/Chip'
 import { Pilula } from '../../../componentes/Pilula'
+import { Modal } from '../../../componentes/Modal'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
 import { useCaixaDoDiaApi } from '../../../aplicacao/useCaixaDoDiaApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
@@ -109,7 +110,7 @@ function AbrirCaixa({ dia, ultimo, executar, enviando }) {
   )
 }
 
-function FormLancamento({ executar, enviando }) {
+function FormLancamento({ executar, enviando, aoRegistrar }) {
   const { agora } = useAtendimento()
   const { lancarMovimentoCaixa } = useAcoes()
   const [tipo, setTipo] = useState(TIPOS_MOVIMENTO.SAIDA)
@@ -130,10 +131,9 @@ function FormLancamento({ executar, enviando }) {
         const ok = await executar(() => lancarMovimentoCaixa(agora, {
           tipoMovimento: tipo, categoria, valor: centavos / 100, meio: metodo, descricao,
         }))
-        if (ok) { setCategoria(''); setCentavos(0); setDescricao('') }
+        if (ok) { setCategoria(''); setCentavos(0); setDescricao(''); aoRegistrar() }
       }}
     >
-      <h4 className={css.tituloSecao}>Lançar entrada ou saída</h4>
       <div className={css.tiposLancamento} role="radiogroup" aria-label="Tipo de lançamento">
         <Chip papel="escolha" disabled={enviando} ativo={!saida} onClick={() => setTipo(TIPOS_MOVIMENTO.ENTRADA)}>Entrada</Chip>
         <Chip papel="escolha" disabled={enviando} ativo={saida} onClick={() => setTipo(TIPOS_MOVIMENTO.SAIDA)}>Saída</Chip>
@@ -173,7 +173,7 @@ function Lancamentos({ dia, executar, podeGerenciar, enviando }) {
   if (lancamentos.length === 0) return <p className={css.corpoBloco}>Nenhum lançamento neste caixa.</p>
   return (
     <>
-      <h4 className={css.tituloSecao}>Lançamentos</h4>
+      <h3 className={css.tituloSecao}>Lançamentos</h3>
       <ul className={css.lista}>
         {lancamentos.map((m) => (m.origemLinha === 'extra'
           ? (
@@ -210,7 +210,7 @@ function Lancamentos({ dia, executar, podeGerenciar, enviando }) {
                 {m.estornadoEm && <span className={css.dicaItem}>Estornado{m.estornadoPorNome ? ` por ${m.estornadoPorNome}` : ''} · {m.motivoEstorno}</span>}
               </span>
               <span className={css.linhaValor}>
-                {m.tipo === TIPOS_MOVIMENTO.SAIDA ? '−' : '+'} {moeda(m.valor)}
+                <span className={m.tipo === TIPOS_MOVIMENTO.SAIDA ? css.valorSaida : undefined}>{m.tipo === TIPOS_MOVIMENTO.SAIDA ? '−' : '+'} {moeda(m.valor)}</span>
                 {podeEstornar(m) && (
                   <Botao variante="texto" className={css.acaoEstorno} icone="undo-2" disabled={enviando} aria-label={`Estornar ${m.categoria}`} onClick={() => setEstornando(m.id)}>
                     Estornar
@@ -228,7 +228,7 @@ function UltimosFechamentos({ fechamentos }) {
   if (fechamentos.length === 0) return <p className={css.corpoBloco}>Nenhum fechamento anterior registrado.</p>
   return (
     <>
-      <h4 className={css.tituloSecao}>Últimos fechamentos</h4>
+      <h3 className={css.tituloSecao}>Últimos fechamentos</h3>
       <ul className={css.lista}>
         {fechamentos.map((f) => (
           <li key={f.id} className={css.linha}>
@@ -253,6 +253,7 @@ export function AbaCaixaApi() {
   const caixa = useCaixaDoDiaApi({ fechamentos: 7 })
   const [acao, executar, limparErro] = useAcaoComRecarga(caixa.recarregar)
   const [fecharAberto, setFecharAberto] = useState(false)
+  const [lancamentoAberto, setLancamentoAberto] = useState(false)
 
   if (caixa.estado === 'carregando') return <output className={css.corpoBloco}>Carregando o caixa…</output>
   if (caixa.estado === 'erro' && !caixa.dia) {
@@ -286,15 +287,31 @@ export function AbaCaixaApi() {
 
   // #1474: a dona confere a gaveta; Pix e cartão não estão nela.
   const gaveta = gavetaDoDia(dia)
-  const titulo = dia.esquecidoAberto ? `Caixa de ${diaMes(dia.abertoDesde)} (ainda aberto)` : 'Caixa de hoje'
+  const titulo = dia.esquecidoAberto ? `Aberto desde ${diaMes(dia.abertoDesde)}` : 'Hoje'
+  const podeLancar = dia.aberto && !dia.fechado && !dia.esquecidoAberto
+  const fecharLancamento = () => { limparErro(); setLancamentoAberto(false) }
   return (
-    <div className={css.painel}>
+    <div className={`${css.painel} ${css.caixaApi}`}>
       {erroDaConsulta}
       <header className={css.cabecalho}>
-        <h4 className={css.tituloSecao}>{titulo}</h4>
-        <Pilula tom={dia.fechado ? 'neutro' : dia.esquecidoAberto ? 'aviso' : 'ok'} icone={dia.fechado ? 'lock' : undefined}>
-          {dia.fechado ? 'Fechado' : 'Aberto'}
-        </Pilula>
+        <div className={css.identificacao}>
+          <p className={css.tituloSecao}>{titulo}</p>
+          <Pilula tom={dia.fechado ? 'neutro' : dia.esquecidoAberto ? 'aviso' : 'ok'} icone={dia.fechado ? 'lock' : undefined}>
+            {dia.fechado ? 'Fechado' : 'Aberto'}
+          </Pilula>
+        </div>
+        <div className={css.acoesTopo}>
+          {podeGerenciar && dia.aberto && !dia.fechado && (
+            <Botao variante="texto" icone="log-out" disabled={acao.enviando} onClick={() => { limparErro(); setFecharAberto(true) }}>
+              {dia.esquecidoAberto ? `Fechar o caixa de ${diaMes(dia.abertoDesde)}` : 'Fechar o caixa'}
+            </Botao>
+          )}
+          {podeLancar && (
+            <Botao variante="primario" icone="mais" disabled={acao.enviando} onClick={() => { limparErro(); setLancamentoAberto(true) }}>
+              Lançamento
+            </Botao>
+          )}
+        </div>
       </header>
 
       {dia.esquecidoAberto && (
@@ -319,28 +336,25 @@ export function AbaCaixaApi() {
         <div><dt>Pix e cartão (fora da gaveta)</dt><dd>{moeda(gaveta.pixECartao)}</dd></div>
         <div className={css.resumoTotal}><dt>{dia.fechado ? 'Total do dia' : 'Total esperado do dia'}</dt><dd>{moeda(dia.saldoEsperado)}</dd></div>
       </dl>
-
-      {podeGerenciar && dia.aberto && !dia.fechado && (
-        <div className={css.acoesTopo}>
-          <Botao variante="texto" icone="log-out" disabled={acao.enviando} onClick={() => { limparErro(); setFecharAberto(true) }}>
-            {dia.esquecidoAberto ? `Fechar o caixa de ${diaMes(dia.abertoDesde)}` : 'Fechar o caixa'}
-          </Botao>
-        </div>
-      )}
-      {erro}
+      <p className={css.notaGaveta}>Pix e cartão não compõem o dinheiro da gaveta.</p>
+      {!(podeLancar && lancamentoAberto) && erro}
       {avisoDePermissao}
 
-      <div className={css.areaTrabalho}>
-        {dia.aberto && !dia.fechado && !dia.esquecidoAberto && <FormLancamento executar={executar} enviando={acao.enviando} />}
-        <section className={css.extrato} aria-label="Movimentação do caixa">
-          <div className={css.grupoRegistros}>
-            <Lancamentos dia={dia} executar={executar} podeGerenciar={podeGerenciar} enviando={acao.enviando} />
-          </div>
-          <div className={css.grupoRegistros}>
-            <UltimosFechamentos fechamentos={fechamentos} />
-          </div>
-        </section>
-      </div>
+      <section className={css.extrato} aria-label="Movimentação do caixa">
+        <div className={css.grupoRegistros}>
+          <Lancamentos dia={dia} executar={executar} podeGerenciar={podeGerenciar} enviando={acao.enviando} />
+        </div>
+        <div className={css.grupoRegistros}>
+          <UltimosFechamentos fechamentos={fechamentos} />
+        </div>
+      </section>
+
+      {podeLancar && lancamentoAberto && (
+        <Modal titulo="Lançar entrada ou saída" aoFechar={acao.enviando ? undefined : fecharLancamento}>
+          {erro}
+          <FormLancamento executar={executar} enviando={acao.enviando} aoRegistrar={fecharLancamento} />
+        </Modal>
+      )}
 
       {podeGerenciar && fecharAberto && (
         <ModalFecharCaixa
