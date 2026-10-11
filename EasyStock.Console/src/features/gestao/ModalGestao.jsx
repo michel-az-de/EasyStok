@@ -1,6 +1,7 @@
 import { useId, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
+import { IconeDoModulo } from '../../componentes/IconeDoModulo'
 import { Modal } from '../../componentes/Modal'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
@@ -9,6 +10,7 @@ import { HASH_HALL, ROTA_PRINCIPAL, rotaDaHash } from '../../dominio/rota'
 import { AbaProducao } from './producao/AbaProducao'
 import { AbaCaixa } from './caixa/AbaCaixa'
 import { AbaCaixaApi } from './caixa/AbaCaixaApi'
+import { PainelFinanceiro } from './financeiro/PainelFinanceiro'
 import { AbaJanelas } from './janelas/AbaJanelas'
 import { AbaFidelidade } from './fidelidade/AbaFidelidade'
 import { AbaIntegracoes } from './integracoes/AbaIntegracoes'
@@ -125,7 +127,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
                   onClick={() => escolherArea(modulo)}
                   onKeyDown={(evento) => navegarAbas(evento, areas, indice, escolherArea, botoesArea, true)}
                 >
-                  <Icone nome={modulo.icone} tamanho={20} />
+                  <IconeDoModulo modulo={modulo} />
                   <span>{modulo.nome}</span>
                 </button>
               ))}
@@ -135,7 +137,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
           <div className={css.areaCompacta}>
             <label htmlFor={`${id}-escolher-area`}>Área da loja</label>
             <div className={css.seletorArea}>
-              <Icone nome={area.icone} tamanho={20} />
+              <IconeDoModulo modulo={area} />
               <select id={`${id}-escolher-area`} value={area.id} onChange={(evento) => escolherArea(areas.find((modulo) => modulo.id === evento.target.value))}>
                 {areas.map((modulo) => <option key={modulo.id} value={modulo.id}>{modulo.nome}</option>)}
               </select>
@@ -144,9 +146,9 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
 
           <section id={`${id}-area`} role="tabpanel" aria-label={area.nome} className={css.corpoGestao}>
             <header className={css.cabecalhoArea}>
-              <h3 className={css.tituloArea}><Icone nome={area.icone} tamanho={24} />{area.nome}</h3>
+              <h3 className={css.tituloArea}><IconeDoModulo modulo={area} />{area.nome}</h3>
               {area.telas.length > 1 ? (
-                <div className={css.subtelasGestao} role="tablist" aria-label={`Telas de ${area.nome}`}>
+                <div className={css.subtelasGestao} role="tablist" aria-label={`Telas de ${area.nome}`} aria-orientation="vertical">
                   {area.telas.map((item, indice) => (
                     <button
                       key={item.id}
@@ -159,9 +161,9 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
                       tabIndex={item.id === tela.id ? 0 : -1}
                       className={css.subtelaGestao}
                       onClick={() => escolherTela(item)}
-                      onKeyDown={(evento) => navegarAbas(evento, area.telas, indice, escolherTela, botoesTela)}
+                      onKeyDown={(evento) => navegarAbas(evento, area.telas, indice, escolherTela, botoesTela, true)}
                     >
-                      {item.rotulo}
+                      <IconeDoModulo modulo={area} telaId={item.id} />{item.rotulo}
                     </button>
                   ))}
                 </div>
@@ -256,6 +258,7 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
     // M2.6 (#1511): controle de perdas (só modo API).
     perdas: <AbaPerdasApi />,
   }), [fonteApi, focoInicial, janelasApi, aoAbrirAba, renderizarEditorCardapio])
+  if (fonteApi && aba?.startsWith('financeiro-')) return <PainelFinanceiro key={aba} tela={aba.slice('financeiro-'.length)} />
   const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada {...AINDA_NAO_LIGADO[aba]}>{painel}</AbaNaoLigada>
   return painel

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
@@ -21,6 +22,7 @@ export function AbaPerdasApi() {
   const gestao = usePerdasApi()
   const [rascunho, setRascunho] = useState(vazio)
   const [enviando, setEnviando] = useState(false)
+  const [lancamentoAberto, setLancamentoAberto] = useState(false)
   // #1584: desfazer é o estorno de saída, que a API só aceita do Gerente; quem não tem a ação
   // não vê o botão. Baixar o lote e desfazer pedem confirmação em linha, como "Excluir janela".
   const podeDesfazer = useAcessoModulos().acoes.editarProducao === true
@@ -50,7 +52,7 @@ export function AbaPerdasApi() {
   async function lancar(evento) {
     evento.preventDefault()
     const ok = await executar(() => gestao.lancar({ ...rascunho, nome: escolhido?.nome, porcoes }))
-    if (ok) setRascunho(vazio)
+    if (ok) { setRascunho(vazio); setLancamentoAberto(false) }
   }
 
   const resumo = gestao.resumo
@@ -94,7 +96,9 @@ export function AbaPerdasApi() {
         </section>
       )}
 
-      <form className={css.aba} onSubmit={lancar} aria-label="Lançar perda">
+      <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => { gestao.fecharAviso(); setLancamentoAberto(true) }}>Lançar perda</Botao>
+      {lancamentoAberto && <Modal titulo="Lançar perda" aoFechar={enviando ? undefined : () => setLancamentoAberto(false)} largura="min(720px, calc(100vw - 24px))"><form className={css.aba} onSubmit={lancar} aria-label="Lançar perda">
+        {gestao.aviso && <p className={css.aviso} role="alert">{gestao.aviso}</p>}
         <div className={`${css.campos} ${css.formulario} ${css.lancamentoPerda}`}>
           <CampoSelecao disabled={enviando} rotulo="Prato ou insumo" value={rascunho.produtoId}
             onChange={(e) => setRascunho((atual) => ({ ...atual, produtoId: e.target.value, porcao: '' }))}
@@ -117,7 +121,7 @@ export function AbaPerdasApi() {
             <Botao tipo="submit" variante="primario" icone="plus" disabled={enviando}>{enviando ? 'Lançando…' : 'Lançar perda'}</Botao>
           </div>
         </div>
-      </form>
+      </form></Modal>}
 
       <section className={css.aba} aria-label="Resumo do período">
         <div className={css.campos}>

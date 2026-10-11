@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
@@ -201,8 +202,10 @@ export function AbaReceitasApi() {
                 )}
               </div>
               {editando === r.produtoId && (
+                <Modal titulo={`Receita de ${r.nome}`} aoFechar={salvando ? undefined : () => trocarEditor(null)} largura="min(900px, calc(100vw - 24px))">
                 <EditorReceita prato={r} aoSalvar={salvarReceita} aoFechar={() => trocarEditor(null)} podeEditar={podeEditar}
                   aviso={avisoNoEditor ? gestao.aviso : null} aoFecharAviso={gestao.fecharAviso} />
+                </Modal>
               )}
             </li>
           ))}

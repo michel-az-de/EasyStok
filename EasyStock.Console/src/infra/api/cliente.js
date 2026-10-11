@@ -104,7 +104,7 @@ const PRAZO_DE_LEITURA_MS = 20000
 const semResposta = () => new ErroApi(0, 'SEM_RESPOSTA', 'O EasyStok demorou a responder.')
 
 export async function chamarApi(caminho, {
-  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null, sinal,
+  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null, sinal, envelope = false,
 } = {}) {
   const sessao = autenticado ? await garantirSessao() : null
   // Conta a partir daqui: a renovação da sessão não gasta o prazo da leitura.
@@ -138,7 +138,7 @@ export async function chamarApi(caminho, {
   }
   if (resposta.ok && texto) return bruto
   const json = comoJson(bruto)
-  if (resposta.ok) return json?.data ?? null
+  if (resposta.ok) return envelope ? json : json?.data ?? null
 
   if (resposta.status === 401 && autenticado) {
     expirar(sessao)

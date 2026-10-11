@@ -67,9 +67,16 @@ export const MODULOS = [
   },
   {
     numero: 5, id: 'financeiro', nome: 'Financeiro', icone: 'dollar-sign',
-    resumo: 'Caixa do dia, vendas e fechamento',
+    resumo: 'Caixa, contas a pagar e receber, extrato e relatórios',
     telas: [
       { id: 'caixa', rotulo: 'Caixa do dia', tipo: TELA_AJUSTE, aba: 'caixa' },
+      { id: 'visao-geral', rotulo: 'Visão geral', tipo: TELA_AJUSTE, aba: 'financeiro-resumo', soApi: true },
+      { id: 'pagar', rotulo: 'Contas a pagar', tipo: TELA_AJUSTE, aba: 'financeiro-pagar', soApi: true },
+      { id: 'receber', rotulo: 'Contas a receber', tipo: TELA_AJUSTE, aba: 'financeiro-receber', soApi: true },
+      { id: 'extrato', rotulo: 'Extrato', tipo: TELA_AJUSTE, aba: 'financeiro-extrato', soApi: true },
+      { id: 'relatorios', rotulo: 'Relatórios', tipo: TELA_AJUSTE, aba: 'financeiro-relatorios', soApi: true },
+      { id: 'categorias', rotulo: 'Categorias financeiras', tipo: TELA_AJUSTE, aba: 'financeiro-categorias', soApi: true },
+      { id: 'centros-custo', rotulo: 'Centros de custo', tipo: TELA_AJUSTE, aba: 'financeiro-centros', soApi: true },
     ],
   },
   {

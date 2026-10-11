@@ -331,6 +331,7 @@ public class AuthController(
         }).ToArray();
         var inicial = User.FindFirst("moduloInicial")?.Value;
         var gerente = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin or NivelAcesso.Gerente;
+        var financeiroLiberado = modulos.Any(m => m.id == "financeiro" && m.liberado);
         return DataOk(new
         {
             modulos,
@@ -340,6 +341,12 @@ public class AuthController(
                 editarCardapio = gerente && modulos.Any(m => m.id == "cardapio" && m.liberado),
                 editarProducao = gerente && modulos.Any(m => m.id == "producao" && m.liberado),
                 gerenciarCaixa = gerente && modulos.Any(m => m.id == "financeiro" && m.liberado),
+                visualizarContasPagar = financeiroLiberado && usuario.TemPermissao(Permissao.VisualizarContasAPagar),
+                visualizarContasReceber = financeiroLiberado && usuario.TemPermissao(Permissao.VisualizarContasAReceber),
+                gerenciarContasPagar = financeiroLiberado && usuario.TemPermissao(Permissao.GerenciarContasAPagar),
+                gerenciarContasReceber = financeiroLiberado && usuario.TemPermissao(Permissao.GerenciarContasAReceber),
+                gerenciarCategoriasFinanceiras = financeiroLiberado && usuario.TemPermissao(Permissao.GerenciarCategoriasFinanceiras),
+                gerenciarCentrosCusto = financeiroLiberado && usuario.TemPermissao(Permissao.GerenciarCentrosCusto),
                 editarAtendimento = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin
                     && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 controlarLoja = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),

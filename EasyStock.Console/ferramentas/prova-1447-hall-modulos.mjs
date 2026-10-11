@@ -137,7 +137,9 @@ confere('os apelidos de hoje continuam: #/cozinha, #/entregas e o cardápio por 
 confere('tela de ajuste abre dentro do módulo, com o módulo vindo da rota', () => {
   const rota = rotaDaHash('#/m/cozinha/producao')
   assert.deepEqual(rota, { tipo: ROTA_MODULO, modulo: 'cozinha', tela: 'producao', aba: 'producao' })
-  assert.equal(rotaDaHash('#/m/financeiro').aba, 'caixa', 'Financeiro abre no caixa')
+  assert.equal(rotaDaHash('#/m/financeiro', { fonteApi: true }).aba, 'caixa', 'A entrada mantém o Caixa disponível ao Atendimento')
+  assert.equal(rotaDaHash('#/m/financeiro/visao-geral', { fonteApi: true }).aba, 'financeiro-resumo', 'A dona pode abrir a visão financeira completa')
+  assert.equal(rotaDaHash('#/m/financeiro').aba, 'caixa', 'A demonstração conserva o Caixa')
   assert.equal(rotaDaHash('#/m/configuracoes/canais', { fonteApi: true }).aba, 'canais')
 })
 

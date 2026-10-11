@@ -47,6 +47,7 @@ jobs:
       - run: node ferramentas/prova-1608-painel-agora.mjs
       - run: node ferramentas/prova-onda1-shell.mjs
       - run: node ferramentas/prova-perfis-modulos.mjs
+      - run: node ferramentas/prova-financeiro.mjs
       - run: node ferramentas/prova-sessao-cozinha.mjs
       - run: node ferramentas/prova-notificacoes-sessao.mjs
       - run: node ferramentas/prova-1446-cozinha-viva.mjs

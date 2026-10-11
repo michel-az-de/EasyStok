@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoTexto } from '../../../componentes/Campo'
@@ -29,7 +30,7 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
 
   return (
     <li className={css.linha} aria-busy={ocupado}>
-      {editando ? (
+      {editando && <Modal titulo={`Renomear ${secao.nome}`} aoFechar={ocupado ? undefined : () => setEditando(false)}>
         <form className={css.resumo} onSubmit={salvar}>
           <CampoTexto
             rotulo="Nome da categoria"
@@ -39,25 +40,20 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
             maxLength={100}
             onChange={(e) => setNome(e.target.value)}
           />
+          {gestao.aviso && <p role="alert" className={css.aviso}>{gestao.aviso}</p>}
+          <div className={css.acoes}><Botao disabled={ocupado} onClick={() => setEditando(false)}>Cancelar</Botao><Botao tipo="submit" variante="primario" disabled={ocupado || !nome.trim()}>Salvar nome</Botao></div>
         </form>
-      ) : (
+      </Modal>}
         <div className={css.resumo}>
           <span className={css.nome}>{secao.nome}</span>
           <span className={css.detalhe}>{secao.itens === 1 ? '1 prato' : `${secao.itens} pratos`}</span>
         </div>
-      )}
       <div className={css.estados}>
         {!secao.visivel && <Pilula tom="neutro" fina>Oculta no site</Pilula>}
       </div>
       <div className={css.acoes}>
-        {editando ? (
           <>
-            <Botao variante="texto" disabled={ocupado} onClick={() => { setNome(secao.nome); setEditando(false) }}>Cancelar</Botao>
-            <Botao variante="primario" icone="check" disabled={ocupado || !nome.trim()} onClick={salvar}>{ocupado ? 'Salvando…' : 'Salvar nome'}</Botao>
-          </>
-        ) : (
-          <>
-            <Botao variante="texto" icone="lapis" disabled={ocupado} aria-label={`Renomear ${secao.nome}`} onClick={() => { setNome(secao.nome); setEditando(true) }}>Renomear</Botao>
+            <Botao variante="texto" icone="lapis" disabled={ocupado} aria-label={`Renomear ${secao.nome}`} aria-haspopup="dialog" onClick={() => { setNome(secao.nome); gestao.fecharAviso(); setEditando(true) }}>Renomear</Botao>
             <Botao variante="texto" disabled={ocupado} onClick={() => fazer(() => gestao.alternarVisivel(secao.id))}>
               {secao.visivel ? 'Ocultar no site' : 'Mostrar no site'}
             </Botao>
@@ -79,7 +75,6 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
                 disabled={ultima || ocupado} onClick={() => fazer(() => gestao.mover(secao.id, 'descer'))} />
             </span>
           </>
-        )}
       </div>
     </li>
   )
@@ -90,13 +85,14 @@ export function AbaCategoriasApi() {
   const gestao = useSecoesCardapioApi()
   const [nova, setNova] = useState('')
   const [criando, setCriando] = useState(false)
+  const [cadastroAberto, setCadastroAberto] = useState(false)
   const [convertendo, setConvertendo] = useState(false)
 
   const criar = (evento) => {
     evento.preventDefault()
     if (criando || !nova.trim()) return
     setCriando(true)
-    Promise.resolve(gestao.criar(nova)).then((ok) => { if (ok !== false) setNova('') }).finally(() => setCriando(false))
+    Promise.resolve(gestao.criar(nova)).then((ok) => { if (ok !== false) { setNova(''); setCadastroAberto(false) } }).finally(() => setCriando(false))
   }
 
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando as categorias…</output>
@@ -146,7 +142,8 @@ export function AbaCategoriasApi() {
         </output>
       )}
 
-      <form className={`${css.campos} ${css.formulario} ${css.cadastroCurto}`} onSubmit={criar}>
+      <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => { gestao.fecharAviso(); setCadastroAberto(true) }}>Nova categoria</Botao>
+      {cadastroAberto && <Modal titulo="Nova categoria do cardápio" aoFechar={criando ? undefined : () => setCadastroAberto(false)}><form className={`${css.campos} ${css.formulario} ${css.cadastroCurto}`} onSubmit={criar}>
         <CampoTexto
           rotulo="Nome da nova categoria"
           placeholder="Nova categoria (ex.: Massas)"
@@ -155,8 +152,9 @@ export function AbaCategoriasApi() {
           disabled={criando}
           onChange={(e) => setNova(e.target.value)}
         />
+        {gestao.aviso && <p className={css.aviso} role="alert">{gestao.aviso}</p>}
         <Botao tipo="submit" variante="primario" icone="plus" disabled={criando || !nova.trim()}>{criando ? 'Criando…' : 'Criar categoria'}</Botao>
-      </form>
+      </form></Modal>}
 
       {gestao.secoes.length === 0 ? (
         <p className={css.descricao}>Nenhuma categoria ainda. Crie uma ou converta as categorias antigas dos pratos.</p>

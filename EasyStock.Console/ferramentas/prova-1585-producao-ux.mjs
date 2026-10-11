@@ -448,6 +448,9 @@ await confere('Insumos: o aviso sai no formulário que o causou; sem formulário
   await t.assentar()
   const cadastro = () => formulario(t.arvore, 'Cadastrar insumo')
   const ajuste = () => formulario(t.arvore, 'ajusteInsumo')
+  assert.equal(cadastro(), undefined, 'cadastro fechado não ocupa o painel')
+  botoes(t.arvore, 'Cadastrar insumo')[0].props.onClick()
+  t.renderizar()
   // Cadastro com mínimo inválido: o aviso fica dentro do formulário, antes do botão, e nada é enviado.
   campos(cadastro(), 'CampoTexto', 'Nome do insumo')[0].props.onChange(digitar('Massa'))
   t.renderizar()
@@ -458,6 +461,9 @@ await confere('Insumos: o aviso sai no formulário que o causou; sem formulário
   assert.equal(alertas(t.arvore).length, 1)
   assert.equal(texto(alertas(cadastro())[0]), 'Não foi possível cadastrar o insumo. Mínimo em número inteiro, sem negativo. Fechar aviso')
   assert.equal(chamadas.filter((c) => c.metodo !== 'GET').length, 0)
+  andar(t.arvore, (n) => n.type === 'Modal' && n.props.titulo === 'Cadastrar insumo')[0].props.aoFechar()
+  t.renderizar()
+  assert.equal(cadastro(), undefined, 'fechar a modal conserva o painel de insumos')
   // Ajuste do segundo insumo recusado pela API: o aviso vai para o ajuste dele e sai do cadastro.
   botoes(t.arvore, 'Ajustar')[1].props.onClick()
   t.renderizar()

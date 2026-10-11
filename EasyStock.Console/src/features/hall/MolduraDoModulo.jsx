@@ -5,16 +5,18 @@
 //
 // `operacao`: tela de trabalho (Cozinha, Entregas) ocupa a altura toda; tela de
 // ajuste ganha título e coluna de leitura. Módulo sem tela mostra "Em breve".
-import { useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { MarcaIcone } from '../../componentes/MarcaIcone'
 import { Botao } from '../../componentes/Botao'
 import { InterruptorTema } from '../../componentes/InterruptorTema'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { Vazio } from '../../componentes/Vazio'
+import { Modal } from '../../componentes/Modal'
 import { HASH_HALL } from '../../dominio/rota'
 import { hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
 import { ehJanelaAvulsa, origemForaDoBalcao } from '../../dominio/janelaAvulsa'
 import { IconeDoModulo } from './IconeDoModulo'
+import { MenuDosModulos } from './MenuDosModulos'
 import css from './moldura.module.css'
 
 const MODULO_DO_BALCAO = 'atendimento'
@@ -47,27 +49,18 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
   const modulo = moduloPorId(moduloId)
   const telas = telasDoMenu(modulo, { fonteApi })
   const tela = telas.find((t) => t.id === telaId) ?? null
-  const menuRef = useRef(null)
+  const [menuAberto, setMenuAberto] = useState(false)
   const avulsa = ehJanelaAvulsa({ nome: window.name, origemAberta: janelaDeOrigem() !== null })
-
-  useEffect(() => {
-    const menu = menuRef.current
-    // Move só a fileira de telas, sem rolar o documento ou a operação.
-    const revelarAtivo = () => {
-      const ativo = menu?.querySelector('[aria-current="page"]')
-      if (ativo) menu.scrollLeft = ativo.offsetLeft - (menu.clientWidth - ativo.offsetWidth) / 2
-    }
-    revelarAtivo()
-    if (!menu) return
-    const tamanho = new ResizeObserver(revelarAtivo)
-    tamanho.observe(menu)
-    return () => tamanho.disconnect()
-  }, [telaId])
 
   return (
     <div className={css.moldura} data-conteudo-console>
+      <aside className={css.lateral}>
+        <MenuDosModulos moduloId={moduloId} telaId={telaId} fonteApi={fonteApi} />
+      </aside>
+      <div className={css.areaTrabalho}>
       <header className={css.barra}>
         <div className={css.contexto}>
+          <Botao className={css.abrirMenu} icone="painel" aria-label={`Menu de ${modulo.nome}`} aria-haspopup="dialog" onClick={() => setMenuAberto(true)}>Menu</Botao>
           {avulsa ? (
             <button type="button" className={`${css.voltar} ${css.voltarBotao}`} onClick={() => voltarAoBalcao(fonteApi)}>
               <MarcaIcone nome="anterior" tamanho={20} /> <span>Voltar ao Balcão</span>
@@ -95,21 +88,6 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
           {notificacoes && <div className={css.avisos}>{notificacoes}</div>}
           {aoSair && <Botao className={css.sair} variante="texto" icone="log-out" onClick={aoSair} title={sessaoPersistente ? 'A Cozinha permanece conectada ao fechar o navegador. Saia ao trocar de pessoa.' : undefined}>{sessaoPersistente ? 'Sair deste aparelho' : 'Sair'}</Botao>}
         </div>
-        {telas.length > 1 && (
-          <nav ref={menuRef} className={css.menu} aria-label={`Telas de ${modulo.nome}`}>
-            {telas.map((t) => (
-              <a
-                key={t.id}
-                href={hashDoModulo(modulo.id, t.id)}
-                className={`${css.item} ${t.id === telaId ? css.itemAtivo : ''}`}
-                aria-current={t.id === telaId ? 'page' : undefined}
-              >
-                <IconeDoModulo modulo={modulo} telaId={t.id} />
-                <span>{t.rotulo}</span>
-              </a>
-            ))}
-          </nav>
-        )}
       </header>
       {operacao
         ? <main className={css.operacao} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label={tela?.rotulo ?? modulo.nome}>{children}</main>
@@ -134,6 +112,10 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
             </div>
           </main>
         )}
+      </div>
+      {menuAberto && <Modal titulo={`Menu de ${modulo.nome}`} aoFechar={() => setMenuAberto(false)} largura="min(600px, calc(100vw - 24px))">
+        <div className={css.menuModal}><MenuDosModulos moduloId={moduloId} telaId={telaId} fonteApi={fonteApi} aoNavegar={(evento) => { if (evento.target.closest('a')) setMenuAberto(false) }} /></div>
+      </Modal>}
     </div>
   )
 }

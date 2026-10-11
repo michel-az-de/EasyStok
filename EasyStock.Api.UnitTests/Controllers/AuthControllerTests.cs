@@ -250,6 +250,32 @@ public class AuthControllerTests
     }
 
     // ── N8: esqueci a senha ───────────────────────────────────────────────────────────────────
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    public void FinanceiroExigeModuloECapacidadeEspecifica(bool modulo, bool capacidade, bool esperado)
+    {
+        UsarContextoHttp();
+        var usuario = NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.ICurrentUserAccessor>();
+        usuario.EmpresaId.Returns(Guid.NewGuid());
+        usuario.TemPermissao(EasyStock.Domain.Services.AcessoModulos.PermissaoDe(Modulo.Caixa)).Returns(modulo);
+        var capacidades = new Dictionary<string, Permissao>
+        {
+            ["visualizarContasPagar"] = Permissao.VisualizarContasAPagar,
+            ["visualizarContasReceber"] = Permissao.VisualizarContasAReceber,
+            ["gerenciarContasPagar"] = Permissao.GerenciarContasAPagar,
+            ["gerenciarContasReceber"] = Permissao.GerenciarContasAReceber,
+            ["gerenciarCategoriasFinanceiras"] = Permissao.GerenciarCategoriasFinanceiras,
+            ["gerenciarCentrosCusto"] = Permissao.GerenciarCentrosCusto
+        };
+        foreach (var permissao in capacidades.Values) usuario.TemPermissao(permissao).Returns(capacidade);
+        var resposta = (Microsoft.AspNetCore.Mvc.OkObjectResult)_controller.GetModulos(usuario);
+        var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
+        foreach (var nome in capacidades.Keys) acoes.GetProperty(nome).GetBoolean().Should().Be(esperado);
+    }
+
 
     private void UsarContextoHttp(string ip = "203.0.113.7")
     {
