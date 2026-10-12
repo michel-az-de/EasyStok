@@ -284,4 +284,6 @@
 }
 .listaInformado dt { font-size: var(--t-apoio); color: var(--tinta-3); }
 .listaInformado dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.contatoInformado .rodapeBloco { margin: 0; }
+.contatoInformado .rodapeBloco, .contatoInformado .erroEmLinha { margin: 0; }
+/* O telefone informado já é de um cadastro: a pergunta à dona, em texto de leitura (não de apoio). */
+.perguntaInformado { margin: 0; font-size: var(--t-corpo); color: var(--tinta); }

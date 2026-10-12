@@ -636,6 +636,51 @@ public partial class AtendimentoConversasControllerTests
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
+    // #1430: o telefone do formulário do chat do site já é de um cadastro. 409 com o nome, e nada é ligado
+    // até a operadora mandar de novo com a confirmação.
+    private (Conversa Conversa, ClienteEntity Existente, CadastrarClienteDaConversaUseCase UseCase) VisitanteComTelefoneDeCadastro()
+    {
+        var conversa = ConversaDoSite();
+        conversa.RegistrarContatoInformado(ContatoInformadoVisitante.Criar(
+            "Maria do site", "(11) 98765-4321", "maria@exemplo.com", aceitePrivacidade: true, DateTime.UtcNow.AddMinutes(-6)));
+        var (useCase, clientes) = CadastroDoCliente();
+        var existente = new ClienteEntity { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Maria Cadastrada", Telefone = "+5511987654321" };
+        clientes.FindByTelefoneAsync(_empresaId, "+5511987654321").Returns(existente);
+        clientes.GetByIdWithDetailsAsync(_empresaId, existente.Id).Returns(existente);
+        return (conversa, existente, useCase);
+    }
+
+    [Fact]
+    public async Task CadastrarClienteTelefoneDoVisitanteJaCadastrado409ComONomeESemLigar()
+    {
+        var (conversa, existente, useCase) = VisitanteComTelefoneDeCadastro();
+
+        var result = await _controller.CadastrarCliente(
+            conversa.Id, new CadastrarClienteConversaBody("Maria do site", "+5511987654321", null, "maria@exemplo.com"), useCase, default);
+
+        var erro = result.Should().BeOfType<ConflictObjectResult>().Which.Value.Should().BeOfType<ApiErrorResponse>().Which.Error;
+        erro.Code.Should().Be(TelefoneJaCadastradoException.Codigo);
+        erro.Message.Should().Contain("Maria Cadastrada");
+        erro.Details.Should().BeEquivalentTo(new { clienteId = existente.Id, nome = "Maria Cadastrada" });
+        conversa.ClienteId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CadastrarClienteComConfirmacaoLigaAoCadastroExistente()
+    {
+        var (conversa, existente, useCase) = VisitanteComTelefoneDeCadastro();
+
+        var dados = Dados<ClienteDaConversaResult>(await _controller.CadastrarCliente(
+            conversa.Id,
+            new CadastrarClienteConversaBody("Maria do site", "+5511987654321", null, "maria@exemplo.com", ConfirmarVinculoExistente: true),
+            useCase, default));
+
+        dados.ClienteId.Should().Be(existente.Id);
+        dados.Novo.Should().BeFalse();
+        conversa.ClienteId.Should().Be(existente.Id);
+        existente.Email.Should().BeNull();
+    }
+
     // #1287: mídia recebida do cliente sai do storage privado pelo endpoint autenticado.
     private (ObterMidiaMensagemUseCase UseCase, IFileStorage Storage) MidiaUseCase()
     {

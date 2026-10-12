@@ -255,18 +255,141 @@ public class CadastrarClienteDaConversaUseCaseTests
         existente.Email.Should().Be("maria@antigo.com");
     }
 
+    // Telefone digitado não prova que quem escreve é o dono do cadastro: o achado pelo telefone não ganha e-mail.
     [Fact]
-    public async Task CadastroAntigoSemEmail_RecebeOEmail()
+    public async Task CadastroAntigoSemEmail_NaoRecebeOEmailDigitado()
     {
-        var existente = new Cliente { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Maria Cadastrada", Telefone = "+5511987654321" };
-        _clientes.FindByTelefoneAsync(_empresaId, "+5511987654321").Returns(existente);
-        _clientes.GetByIdWithDetailsAsync(_empresaId, existente.Id).Returns(existente);
+        var existente = ClienteJaCadastrado();
         var conversa = ConversaDoSite();
 
         await UseCase().ExecuteAsync(Comando(conversa) with { Email = "maria@exemplo.com" });
 
-        existente.Email.Should().Be("maria@exemplo.com");
-        await _clientes.Received().UpdateAsync(existente);
+        existente.Email.Should().BeNull();
+        await _clientes.DidNotReceive().UpdateAsync(Arg.Any<Cliente>());
+    }
+
+    // ── #1430: o telefone do formulário já é de um cadastro. Ninguém verificou que o visitante é essa pessoa. ──
+
+    private Cliente ClienteJaCadastrado(string telefone = "+5511987654321")
+    {
+        var existente = new Cliente { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Maria Cadastrada", Telefone = telefone };
+        _clientes.FindByTelefoneAsync(_empresaId, telefone).Returns(existente);
+        _clientes.GetByIdWithDetailsAsync(_empresaId, existente.Id).Returns(existente);
+        _consentimentos.ListarDoClienteAsync(_empresaId, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<ConsentimentoContato>());
+        return existente;
+    }
+
+    [Fact]
+    public async Task TelefoneDoVisitanteJaCadastrado_SemConfirmacao_NaoLigaNemAlteraNada()
+    {
+        var existente = ClienteJaCadastrado();
+        var conversa = ConversaComContatoInformado();
+
+        var acao = () => UseCase().ExecuteAsync(Comando(conversa, nome: "Maria do site") with { Email = "maria@exemplo.com" });
+
+        var erro = (await acao.Should().ThrowAsync<TelefoneJaCadastradoException>()).Which;
+        erro.ClienteId.Should().Be(existente.Id);
+        erro.Nome.Should().Be("Maria Cadastrada");
+        conversa.ClienteId.Should().BeNull();
+        conversa.ContatoNome.Should().Be("Maria do site");
+        existente.Email.Should().BeNull();
+        await _clientes.DidNotReceive().AddAsync(Arg.Any<Cliente>());
+        await _clientes.DidNotReceive().UpdateAsync(Arg.Any<Cliente>());
+        await _consentimentos.DidNotReceive().AddAsync(Arg.Any<ConsentimentoContato>(), Arg.Any<CancellationToken>());
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task TelefoneDoVisitanteJaCadastrado_ComConfirmacao_LigaAConversaESoIsso()
+    {
+        var existente = ClienteJaCadastrado();
+        var conversa = ConversaComContatoInformado();
+
+        var r = await UseCase().ExecuteAsync(
+            Comando(conversa, nome: "Maria do site") with { Email = "maria@exemplo.com", ConfirmarVinculoExistente = true });
+
+        conversa.ClienteId.Should().Be(existente.Id);
+        r.ClienteId.Should().Be(existente.Id);
+        r.Novo.Should().BeFalse();
+        existente.Nome.Should().Be("Maria Cadastrada");
+        existente.Email.Should().BeNull();
+        await _clientes.DidNotReceive().UpdateAsync(Arg.Any<Cliente>());
+        await _consentimentos.DidNotReceive().AddAsync(Arg.Any<ConsentimentoContato>(), Arg.Any<CancellationToken>());
+        await _uow.Received().CommitAsync();
+    }
+
+    [Fact]
+    public async Task TelefoneDoVisitanteNovo_NasceComNomeTelefoneEmailEConsentimento()
+    {
+        var conversa = ConversaComContatoInformado();
+        _consentimentos.ListarDoClienteAsync(_empresaId, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<ConsentimentoContato>());
+
+        var r = await UseCase().ExecuteAsync(Comando(conversa, nome: "Maria do site") with { Email = "maria@exemplo.com" });
+
+        await _clientes.Received(1).AddAsync(Arg.Is<Cliente>(c =>
+            c.Nome == "Maria do site" && c.Telefone == "+5511987654321" && c.Email == "maria@exemplo.com"));
+        r.Novo.Should().BeTrue();
+        conversa.ClienteId.Should().Be(r.ClienteId);
+        await _consentimentos.Received(1).AddAsync(Arg.Is<ConsentimentoContato>(c =>
+            c.ClienteId == r.ClienteId && c.Situacao == SituacaoConsentimento.Concedido), Arg.Any<CancellationToken>());
+    }
+
+    // Depois de ligada, editar o cadastro pela Ficha não leva o aceite do visitante para dentro dele.
+    [Fact]
+    public async Task ConversaJaLigadaAoCadastro_NaoGanhaOConsentimentoDoFormulario()
+    {
+        var existente = ClienteJaCadastrado();
+        var conversa = ConversaComContatoInformado();
+        conversa.VincularCliente(existente.Id);
+
+        await UseCase().ExecuteAsync(Comando(conversa, nome: "Maria Cadastrada", telefone: null));
+
+        await _consentimentos.DidNotReceive().AddAsync(Arg.Any<ConsentimentoContato>(), Arg.Any<CancellationToken>());
+    }
+
+    // Segundo toque ou outra aba: o pedido de ligar chega de novo com os dados do visitante, e a conversa já está ligada.
+    [Fact]
+    public async Task LigarAoCadastroRepetido_NaoGravaOsDadosDoVisitanteNoCadastro()
+    {
+        var existente = ClienteJaCadastrado();
+        var conversa = ConversaComContatoInformado();
+        var ligar = Comando(conversa, nome: "Maria do site") with { Email = "maria@exemplo.com", ConfirmarVinculoExistente = true };
+
+        await UseCase().ExecuteAsync(ligar);
+        await UseCase().ExecuteAsync(ligar);
+
+        existente.Nome.Should().Be("Maria Cadastrada");
+        existente.Email.Should().BeNull();
+        await _clientes.DidNotReceive().UpdateAsync(Arg.Any<Cliente>());
+    }
+
+    // E-mail só chega pelo cartão do visitante: em conversa que já tem cliente, não é dado da operadora.
+    [Fact]
+    public async Task ConversaComCliente_NaoRecebeEmailPeloCadastroDaConversa()
+    {
+        var existente = ClienteJaCadastrado();
+        var conversa = ConversaDoSite(existente.Id);
+
+        await UseCase().ExecuteAsync(Comando(conversa, nome: null, telefone: null) with { Email = "maria@exemplo.com" });
+
+        existente.Email.Should().BeNull();
+    }
+
+    // Telefone que a operadora digitou (não o do formulário) segue o #1276: liga na hora, sem e-mail nem aceite.
+    [Fact]
+    public async Task TelefoneDigitadoPelaOperadora_JaCadastrado_LigaSemPedirConfirmacao()
+    {
+        var existente = ClienteJaCadastrado("+5511911112222");
+        var conversa = ConversaComContatoInformado();
+
+        var r = await UseCase().ExecuteAsync(Comando(conversa, telefone: "(11) 91111-2222") with { Email = "maria@exemplo.com" });
+
+        conversa.ClienteId.Should().Be(existente.Id);
+        r.Novo.Should().BeFalse();
+        existente.Email.Should().BeNull();
+        await _consentimentos.DidNotReceive().AddAsync(Arg.Any<ConsentimentoContato>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

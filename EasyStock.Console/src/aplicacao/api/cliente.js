@@ -16,6 +16,9 @@ import { textoNaoLigado } from './naoLigadas'
 export const precisaLerFicha = (c) => deveCarregarDossie(c)
   || Boolean(c && !c.clienteId && c.canal === 'Chat do site' && !c.contatoInformado)
 
+// Código do 409 de `POST .../cliente` quando o telefone informado pelo visitante já é de um cadastro (#1430).
+const TELEFONE_JA_CADASTRADO = 'TELEFONE_JA_CADASTRADO'
+
 export function criarAcoesClienteApi({ despachar, estadoRef }) {
   const avisar = (mensagem) => despachar({ tipo: acao.AVISO_API, mensagem })
   const conversaDe = (id) => estadoRef.current.conversas.find((c) => c.id === id) ?? null
@@ -45,13 +48,18 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
   // #1586: a recusa volta como `{ erro }` para a Ficha mostrar no campo ou ao lado do botão; a
   // tela só diz "Salvo" depois desta resposta.
   // E-mail só vai quando há (#1430): o corpo das outras edições continua o mesmo.
-  function cadastrar(id, { nome = null, telefone = null, endereco = null, email = null }) {
+  // `confirmarVinculoExistente` (#1430): o telefone que o visitante informou já é de um cadastro e
+  // a dona, depois de conferir com o cliente, manda ligar a conversa a ele. Sem isso a API não
+  // liga: responde de quem é o telefone, e isso volta em `jaCadastrado` para o cartão perguntar.
+  function cadastrar(id, { nome = null, telefone = null, endereco = null, email = null, confirmarVinculoExistente = false }) {
     const corpo = { nome: nome?.trim() || null, telefone: telefone || null, endereco: endereco ? enderecoParaApi(endereco) : null }
     if (email?.trim()) corpo.email = email.trim()
+    if (confirmarVinculoExistente) corpo.confirmarVinculoExistente = true
     return cadastrarClienteDaConversa(id, corpo)
       .then(async (salvo) => {
         // O telefone já era de outro cadastro: a conversa foi ligada a ele, com o nome dele.
-        if (salvo && salvo.novo === false && corpo.nome && salvo.nome !== corpo.nome) {
+        // Quando foi a dona que mandou ligar, ela já sabe.
+        if (!confirmarVinculoExistente && salvo && salvo.novo === false && corpo.nome && salvo.nome !== corpo.nome) {
           avisar(`Este telefone já é de ${salvo.nome}: a conversa foi ligada a esse cadastro.`)
         }
         if (salvo?.dentroDaArea === false) {
@@ -62,6 +70,8 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
         catch (erro) { avisar(`Cadastro salvo, mas a ficha não atualizou: ${erro.message}`) }
         return undefined
       }, (erro) => {
+        // Não é falha, é pergunta: nada foi ligado e a faixa fica quieta.
+        if (erro.codigo === TELEFONE_JA_CADASTRADO) return { erro: erro.message, jaCadastrado: { nome: erro.dados?.nome ?? null } }
         avisar(`Cadastro do cliente: ${erro.message}`)
         return { erro: erro.message }
       })

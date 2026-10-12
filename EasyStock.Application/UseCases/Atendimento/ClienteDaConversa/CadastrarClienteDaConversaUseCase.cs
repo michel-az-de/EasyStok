@@ -15,10 +15,28 @@ public sealed record EnderecoDaConversaInput(string? Cep, string? Logradouro, st
 
 /// <param name="Telefone">Obrigatório quando a conversa ainda não tem cliente: é por ele que o cadastro é achado.</param>
 /// <param name="Endereco">Opcional; com CEP, vira o endereço de entrega padrão do cliente.</param>
-/// <param name="Email">Opcional (#1430). Cadastro já existente achado pelo telefone só recebe se ainda não tinha e-mail.</param>
+/// <param name="Email">Opcional (#1430). Só entra em cadastro que nasce agora; o achado pelo telefone não recebe.</param>
+/// <param name="ConfirmarVinculoExistente">
+/// #1430: a operadora conferiu com o cliente e manda ligar a conversa ao cadastro que já tem o telefone informado
+/// pelo visitante. Sem isso, <see cref="TelefoneJaCadastradoException"/>.
+/// </param>
 public sealed record CadastrarClienteDaConversaCommand(
     Guid EmpresaId, Guid ConversaId, string? Nome, string? Telefone, EnderecoDaConversaInput? Endereco,
-    string? Email = null);
+    string? Email = null, bool ConfirmarVinculoExistente = false);
+
+/// <summary>
+/// #1430: o telefone que o visitante do chat do site digitou já é de um cadastro. Ninguém verificou que o
+/// visitante é essa pessoa, então nada foi ligado nem gravado: a operadora confere e repete o pedido com
+/// <see cref="CadastrarClienteDaConversaCommand.ConfirmarVinculoExistente"/>. 409 com o código e o nome.
+/// </summary>
+public sealed class TelefoneJaCadastradoException(Guid clienteId, string nome)
+    : Exception($"Este telefone já é de {nome}. Confira com o cliente antes de ligar esta conversa ao cadastro dele.")
+{
+    public const string Codigo = "TELEFONE_JA_CADASTRADO";
+
+    public Guid ClienteId { get; } = clienteId;
+    public string Nome { get; } = nome;
+}
 
 /// <param name="Novo">O cadastro nasceu agora (o telefone não existia na empresa).</param>
 /// <param name="DentroDaArea">Nulo sem endereço; falso quando o CEP está fora da área de entrega.</param>
@@ -35,9 +53,11 @@ public sealed record ClienteDaConversaResult(
 /// Com cliente já vinculado, atualiza nome e telefone informados. Endereço fora da área é gravado mesmo assim
 /// e volta com <c>DentroDaArea=false</c>: a dona decide (liberar fora da área ou corrigir).
 /// <para>
-/// #1430: é aqui que a loja confirma o contato informado pelo visitante do chat do site. O aceite da política
-/// que ele deu no formulário vira o consentimento transacional do canal (origem <see cref="OrigemAceiteChatSite"/>),
-/// sem passar por cima de uma revogação que o cadastro já tinha.
+/// #1430: é aqui que a loja confirma o contato informado pelo visitante do chat do site. Telefone digitado no
+/// formulário não é telefone verificado: se ele já é de um cadastro, a conversa só é ligada com
+/// <see cref="CadastrarClienteDaConversaCommand.ConfirmarVinculoExistente"/>, e esse cadastro não recebe o e-mail
+/// nem o aceite do visitante. Só o cadastro que nasce aqui leva o e-mail e o consentimento transacional do canal
+/// (origem <see cref="OrigemAceiteChatSite"/>).
 /// </para>
 /// </summary>
 public sealed class CadastrarClienteDaConversaUseCase(
@@ -70,9 +90,14 @@ public sealed class CadastrarClienteDaConversaUseCase(
         {
             cliente = await clienteRepository.GetByIdWithDetailsAsync(command.EmpresaId, clienteId)
                 ?? throw new RegraDeDominioVioladaException("O cliente desta conversa não existe mais.");
-            AtualizarDados(cliente, nome, telefone);
-            if (email is not null) cliente.Email = email;
-            await clienteRepository.UpdateAsync(cliente);
+            // #1430: pedido de ligar que chega de novo (segundo toque, outra aba) já está atendido; o nome e o
+            // telefone do visitante que vêm junto não entram no cadastro. E-mail nunca entra por aqui: só o
+            // cartão do visitante manda, e ele vale para o cadastro que nasce.
+            if (!command.ConfirmarVinculoExistente)
+            {
+                AtualizarDados(cliente, nome, telefone);
+                await clienteRepository.UpdateAsync(cliente);
+            }
         }
         else
         {
@@ -82,16 +107,18 @@ public sealed class CadastrarClienteDaConversaUseCase(
                 new IdentificarClientePorTelefoneInput(command.EmpresaId, telefone.TrimStart('+'), nome), ct);
             cliente = identificacao.Cliente;
             novo = identificacao.EhNovo;
+            // #1430: o telefone do formulário não prova que o visitante é o dono do cadastro. Sem a operadora
+            // confirmar, nada é ligado nem gravado (quem achou não criou, e o commit só vem depois daqui).
+            if (!novo && TelefoneVeioDoVisitante(conversa, telefone) && !command.ConfirmarVinculoExistente)
+                throw new TelefoneJaCadastradoException(cliente.Id, cliente.Nome);
             conversa.VincularCliente(cliente.Id);
-            // Cadastro antigo achado pelo telefone: o e-mail digitado não substitui o que ele já tinha.
-            if (email is not null && string.IsNullOrWhiteSpace(cliente.Email))
+            // E-mail e aceite só entram no cadastro que nasce desta conversa: o que já existia não muda.
+            if (novo)
             {
-                cliente.Email = email;
-                if (!novo) await clienteRepository.UpdateAsync(cliente);
+                if (email is not null) cliente.Email = email;
+                await RegistrarAceiteDoChatSiteAsync(command.EmpresaId, conversa, cliente.Id, ct);
             }
         }
-
-        await RegistrarAceiteDoChatSiteAsync(command.EmpresaId, conversa, cliente.Id, ct);
 
         // A inbox mostra o nome do contato: passa a ser o do cadastro (o do chat do site é genérico).
         conversa.AtualizarContatoNome(cliente.Nome);
@@ -119,6 +146,9 @@ public sealed class CadastrarClienteDaConversaUseCase(
             cliente.Id, cliente.Nome, cliente.Telefone, cliente.Endereco, cliente.Cep, novo, dentroDaArea, mensagemForaArea,
             cliente.Email);
     }
+
+    private static bool TelefoneVeioDoVisitante(Conversa conversa, string telefoneE164) =>
+        conversa.Canal == CanalConversa.ChatSite && conversa.ContatoTelefoneInformado == telefoneE164;
 
     private async Task RegistrarAceiteDoChatSiteAsync(Guid empresaId, Conversa conversa, Guid clienteId, CancellationToken ct)
     {

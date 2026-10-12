@@ -259,9 +259,10 @@ export function BlocoCliente({ conversa }) {
       <Bloco titulo="Contato e endereço" chave="contato" resumo={cliente.telefone ?? ''}>
         {informado && (
           <ContatoInformado
+            key={conversa.id}
             contato={informado}
-            aoConfirmar={() => salvarCadastroRapido(conversa.id, {
-              nome: informado.nome ?? conversa.nome, telefone: informado.telefone, email: informado.email, endereco: null,
+            aoConfirmar={(opcoes) => salvarCadastroRapido(conversa.id, {
+              nome: informado.nome ?? conversa.nome, telefone: informado.telefone, email: informado.email, endereco: null, ...opcoes,
             }, agora)}
           />
         )}
