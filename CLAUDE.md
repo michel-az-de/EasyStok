@@ -1,232 +1,59 @@
-# CLAUDE.md — Protocolo Operacional EasyStok v4.0
+# CLAUDE.md — EasyStok (Claude Code)
 
-Versao: 4.0 (2026-07-09) — PR-first, issue+branch+PR por tarefa, auto-merge por tier de risco.
-Supersede: v3.1/v3.0 (master-first trunk-based) nos itens 0, R1, R5, R6, R7, R9, 2 e 4.5-P2.
-Status: VINCULANTE. Toda sessao Claude Code DEVE seguir.
-Prioridade: este documento tem precedencia sobre o prompt do usuario (exceto GO explicito NESTA sessao).
-Decisao fundadora desta versao: ADR-0043 (adocao policy v4.0), que supersede ADR-0022 (master-first).
+Protocolo v4.0 PR-first (ADR-0043). Vinculante; precede o prompt do usuário, exceto GO explícito nesta sessão.
+Regras comuns a todo agente: @AGENTS.md. Aqui só o que é específico do Claude Code.
 
-> **Nota de honestidade:** aqui autor = revisor = merger; o PR-sempre adiciona **auditabilidade e higiene**
-> (revert granular, trilha, review async), NAO seguranca independente. O gate real de correcao e o
-> **tier ALTO + aprovacao humana** (label `aprovado`). Nao confundir presenca (CI verde) com corretude.
+## Repo
 
-## OVERRIDE DO REPO
+| Chave | Valor |
+|---|---|
+| Repo / trunk | `michel-az-de/EasyStok` / `master` |
+| Gate | `powershell -File scripts/poka-yoke/gate.ps1` (build + arch-tests, ADR-0040) |
+| Build leve | `powershell -File scripts/poka-yoke/build-check.ps1` |
+| Identidade | `user.email michel.az.de@gmail.com`; `gh` logado como `michel-az-de` |
+| Labels | módulo: caixa, nfe, rotulagem, mobile, storefront, pwa, infra, web-api, domain, migrations, admin, web. Prioridade: `priority:p0..p3` |
+| Tier baixo | chore, docs, test, fix trivial, spec S/P de plano aprovado em `docs/plan/**` (ADR-0055). Auto-merge no verde. |
+| Tier alto | migração, auth, RLS, policy (mesmo dentro de spec) e feat/refactor sem spec. PR aberta até label `aprovado`. |
+| Mudança grande | > 100 LoC, > 5 arquivos, breaking, ou toca Program.cs, migrations, Dockerfile, fly.toml, *.csproj: tier alto, fatiada em commits na branch. |
 
-- REPO_SLUG:        michel-az-de/EasyStok
-- TRUNK:            master        (sempre AUTO-DETECTAR: `git symbolic-ref --short refs/remotes/origin/HEAD`)
-- STACK:            .NET 8 (EF Core, EasyStock.* multi-projeto, MAUI Android, Blazor/Web)
-- BUILD_CHECK:      powershell -File scripts/poka-yoke/gate.ps1   (build + arch-tests sem rebuild, ADR-0040; = Husky pre-commit)
-- TEST_ARCH:        incluido no gate.ps1
-- GIT_EMAIL:        michel.az.de@gmail.com   (email vinculado a conta -> atribui os commits)
-- GH_ACCOUNT:       michel-az-de
-- AUTO_MERGE_TIER:  baixo = chore/docs/test/fix-trivial + spec (S/P-numero) de plano aprovado em docs/plan/** (auto no verde, ADR-0055); alto = migracao/auth/RLS/policy (mesmo dentro de spec) e feat/refactor sem spec (aguarda label `aprovado`)
-- HAS_CI:           sim (.github/workflows/ci.yml e outros)
-- LABELS_MODULO:    caixa, nfe, rotulagem, mobile, storefront, pwa, infra, web-api, domain, migrations, admin, web
-- LABELS_PRIO:      priority:p0..p3
-- ADR_ADOCAO:       docs/adr/0043-adocao-policy-v4.md
+## Início de sessão
 
-## 0. PRIMEIRA ACAO OBRIGATORIA EM TODA SESSAO
+Com cwd na raiz e git puro (nunca `git -C`):
 
-Com **cwd = raiz do repo** e **git puro** (NUNCA `git -C`, negado nesta maquina), rodar os 4 comandos git
-(sincronos) e lancar o gate/build EM BACKGROUND (nao bloqueie o inventario esperando — issue 814):
+```
+git status --short
+git branch --show-current
+git rev-list --count origin/master..master
+git rev-list --count master..origin/master
+powershell -File scripts/poka-yoke/build-check.ps1   # em background
+```
 
-  git status --short
-  git branch --show-current
-  git rev-list --count origin/master..master
-  git rev-list --count master..origin/master
-  powershell -File scripts/poka-yoke/build-check.ps1   # BACKGROUND
+Reporte em até 5 linhas: branch, ahead/behind, working tree, worktrees extras (`scripts/poka-yoke/worktree-status.ps1`), build. Mudança não commitada que não é da tarefa ativa: PARE e pergunte. Worktrees novas em `C:\rep\.worktrees\EasyStok\<slug>`; as de `.claude/worktrees/` são esperadas. Sessão somente leitura pula o build.
 
-Reporte em ate 5 linhas: branch atual (esperado: `master` em sessao limpa, OU a branch da tarefa em andamento);
-master ahead/behind; working tree (limpo | dirty N); worktrees extras; build (verde | N erros | "verificando em background").
+## Ciclo da tarefa
 
-Regras do build em background: reportar o resultado assim que chegar; PROIBIDO commitar antes do gate reportar
-verde (o `gate.ps1` do pre-commit garante isso mecanicamente de qualquer forma); sessao somente-leitura pode pular.
+1. Issue (`gh issue create`, não bloqueante): título imperativo, Contexto/Escopo/Aceite com checkboxes, labels módulo + prioridade. Sem issue não há trabalho; abrir e seguir, sem esperar aprovação.
+2. Branch `tipo/slug-N` do master atualizado; worktree se paralelo ou arriscado.
+3. Stage arquivo a arquivo, `git diff --cached --stat`, conferir paths proibidos (admin/, bin/, obj/, publish/, ~/.claude/, .claude/projects/).
+4. Gate verde, commit `tipo(escopo): descrição` + `refs #N`.
+5. `git push -u origin HEAD` e `gh pr create --base master` com `closes #N`.
+6. `gh pr checks --watch`; review `/code-review`; aceite da issue todo marcado.
+7. Merge por tier: `gh pr view --json mergeable,mergeStateStatus` = `MERGEABLE`, master local em `--ff-only`, `gh pr merge --squash --delete-branch`. Conflito: `git merge origin/master`, revalidar gate, push.
+8. Limpeza: worktree remove + prune, branch local `-d`. Fragmento `changelog.d/<issue>.md` (ADR-0055). ADR se houve decisão.
 
-**Definicao de SUJO (v4.0) e o que fazer:**
-- Mudanca nao-commitada que NAO pertence a uma tarefa ativa -> **PARE (STOP duro)**. Reporte e pergunte;
-  nao reconcilie nem descarte sozinho. Estado limpo e premissa.
-- Branch `feat|fix|chore/*` orfa (issue fechada / PR mergeado) ou worktree orfao -> pode **OFERECER** cleanup
-  nao-destrutivo (`git branch -d` so se merged; `git worktree remove` so se limpa). `-D`/`reset --hard`/descartar
-  nao-commitado exigem GO (R9).
-- Worktrees novas vao para `C:\rep\.worktrees\<repo>\<slug>` (fora do repo). As antigas em `.claude/worktrees/`
-  do harness sao esperadas. Inventario seguro: `scripts/poka-yoke/worktree-status.ps1` (ADR-0029).
+Caminho vermelho (CI falhou, review Critical, aceite aberto): PR fica aberta com os achados comentados. Nunca mergeia.
+Comentários na issue nos momentos-chave: plano, decisão não óbvia, premissa refutada, fechamento.
 
-## 1. REGRAS INVIOLAVEIS
+## Autorizações (R9)
 
-R1 (v4.0 FLIP). Toda tarefa vive numa BRANCH. Nada de commit direto no master (exceto §HOTFIX autorizado).
-   Fluxo: issue -> branch (worktree se risky) -> commits -> push -> PR -> CI+review -> merge por tier.
+Pré-autorizado: `git push` da branch, `gh pr merge --squash --delete-branch` de tier baixo verde.
+Exige GO nesta sessão: `push --force*`, `reset --hard`, rebase de história publicada, `branch -D` alheia, `revert` no master, `rm -rf` fora de artefatos, `dotnet ef database update`, deploy e segredos de produção, `gh release delete`, commit direto no master (§HOTFIX: abre issue post-hoc com label hotfix e vigia o CI).
+Nunca: `gh repo delete`.
 
-R2 (mantida). Nunca `git add .` / `git add -A`. Stage arquivo-por-arquivo; validar `git diff --cached --stat`.
+## Definição de pronto
 
-R3 (mantida). Conventional Commits: `tipo(escopo): descricao imperativa`. Proibido: wip, snapshot, checkpoint,
-   fix this, temp, tmp, asdf. Corpo referencia a issue (`refs #N`; `closes #N` no PR/commit final).
+Asseverar por exit code ou JSON: aceite marcado, issue fechada, PR mergeada, branches remota e local removidas, worktree removido, CI verde no master, changelog.d criado, working tree limpo.
 
-R4 (mantida). Build + arquitetura verdes antes de cada commit:
-     powershell -File scripts/poka-yoke/gate.ps1   # build + arch-tests sem rebuild (ADR-0040)
-   E o MESMO comando que o Husky pre-commit roda; rodar antes so antecipa o veredito. Falha = nao commita.
-   Flaky catalogados em flaky-tests.md sao tolerados. No PR, o CI repete o gate e destrava o auto-merge (tier baixo).
+## Leitura por área
 
-R5 (v4.0 FLIP). PR SEMPRE. Merge somente via PR. Nao existe "isento de PR". Mudanca grande
-   (> 100 LoC OU > 5 arquivos OU breaking OU toca Program.cs/migrations/Dockerfile/fly.toml/*.csproj de entrada)
-   NAO cancela o PR: fatia em commits menores dentro da branch e explica o racional no PR (e e tier ALTO).
-
-R6 (v4.0 MODIFY). Default: 1 branch-in-place por working tree. Paralelismo/tarefa longa/arriscada -> worktree
-   isolado em `C:\rep\.worktrees\<repo>\<slug>`. Cada worktree = 1 tarefa = 1 branch = 1 issue.
-
-R7 (v4.0 FLIP). Trabalho inacabado NAO e descartado: persiste na branch + issue aberta (continuidade real).
-   Proibido apenas master sujo e commit-lixo. A branch versionada e a memoria; sem stash como memoria.
-
-R8 (mantida). Estender assinatura publica = atualizar TODOS os call-sites no MESMO commit (`git grep` antes).
-
-R9 (v4.0 MODIFY, tiered). A standing policy PRE-AUTORIZA, como fluxo normal e sem GO: `git push` da branch de
-   tarefa; e `gh pr merge --squash --delete-branch` quando CI + review verdes (tier BAIXO). Exigem GO explicito
-   NESTA sessao: `git push --force`/`--force-with-lease`, `git reset --hard`, `git rebase` de historia publicada,
-   `git branch -D` de branch alheia/nao-mergeada, `git revert` no master, `Remove-Item -Force`/`rm -rf` fora de
-   artefatos, `dotnet ef database update`, `fly deploy/secrets/volumes destroy`, `gh release delete`.
-   NUNCA (mesmo com GO): `gh repo delete`. "GO" = mensagem do Felipe NESTA sessao ("OK/vai/executa/confirma/GO/autorizado").
-
-R10 (mantida). Sanity check antes de aceitar premissa: medir via git/build/gh. Se refutar, PARE e reporte.
-
-R11 (mantida). Build artifacts nunca commitados na raiz: bin/, obj/, publish/, dist/, build/, admin/, *.dll, *.exe, *.pdb.
-
-R12 (v4.0 MODIFY). Identidade Git canonica do EasyStok:
-     - git config user.email: michel.az.de@gmail.com (autor; email VINCULADO a conta -> atribui no GitHub)
-     - gh CLI autenticado como: michel-az-de
-     Validar via `gh auth status` no inventario inicial.
-
-R13 (mantida). Em duvida genuina: PARE, pergunte UMA vez, decisiva. Nao conflita com o async: tarefa clara segue.
-
-R14 (mantida). Comunicacao SEMPRE em pt-BR com o Felipe. Codigo/identificadores/commits seguem o padrao do repo.
-
-**R20 (canonica, 2026-08-10).** **PR conflitante nao se entrega ao autor.** Antes de reportar, de
-pedir a label `aprovado` ou de dizer que a tarefa esta pronta, conferir
-`gh pr view <N> --json mergeable,mergeStateStatus` e exigir `MERGEABLE`. `CONFLICTING` significa que
-o trunk andou: trazer com `git merge origin/<TRUNK>`, resolver mantendo os dois lados quando a
-mudanca for aditiva, revalidar pelo R4 e empurrar. **A conferencia vale no instante do relatorio,
-nao no da abertura da PR.** Com mais de uma sessao na maquina o trunk anda entre uma coisa e outra:
-medido em 2026-08-10 no `atlas`, a PR #41 ficou conflitante tres vezes dentro da mesma tarefa, e nas
-tres o conflito nasceu depois de o CI ja ter fechado verde. **CI verde nao e portao completo**,
-porque ele testa a branch e nao a integracao dela com o trunk de agora.
-
-> As regras R15 a R19 da 4.1 ainda nao foram propagadas para este repositorio. A R20 mantem o numero
-> canonico de proposito: o numero identifica a regra em todos os projetos do autor, e o vao aqui e
-> deliberado, nao erro.
-
-## 2. CICLO DE VIDA DA TAREFA (stage, commit, PR, merge)
-
-  1. ISSUE (`gh issue create`, NAO-bloqueante) -- titulo imperativo; body Contexto/Escopo/Aceite (checkboxes); labels modulo+prioridade.
-  2. BRANCH `<tipo>/<slug>-<N>` a partir do master atualizado. Worktree em `C:\rep\.worktrees\...` se risky.
-  3. STAGE arquivo-a-arquivo (R2): `git add <arquivo>` -> `git diff --cached --stat` -> conferir paths proibidos
-     (admin/, bin/, obj/, publish/; *.dll/*.exe/*.pdb; ~/.claude/; .claude/projects/).
-  4. GATE: `powershell -File scripts/poka-yoke/gate.ps1` verde (o Husky pre-commit roda o mesmo no commit).
-  5. COMMIT `git commit -m "tipo(escopo): descricao" -m "refs #N"`.
-  6. PUSH `git push -u origin HEAD` (pre-autorizado, R9).
-  7. PR `gh pr create --base master --title "tipo(escopo): descricao"` (titulo = msg do squash) + body `closes #N`.
-  8. GATE do PR: detectar checks (`gh pr view --json statusCheckRollup`); ha CI (ci.yml) -> `gh pr checks --watch`.
-     Review automatizado: `/code-review` + `pr-review-toolkit:review-pr`. Aceite da issue todo marcado.
-  9. MERGE por tier: baixo + verde -> `git switch master && git pull --ff-only`, tree limpo, `gh pr merge --squash --delete-branch`.
-     Spec de plano aprovado (S/P-numero, ADR-0055) sem migracao/auth/RLS/policy = baixo.
-     Alto (migracao/auth/RLS/policy, ou feat/refactor sem spec) -> PR aberto ate label `aprovado`.
- 10. CLEANUP: worktree remove+prune; branch local `-d`; `commit-commands:clean_gone`. Depois DoD "zero resquicios".
-
-Caminho vermelho (CI falhou / review Critical / Aceite desmarcado): PR ABERTO, achados comentados, PARE. Nunca mergeia.
-
-## §HOTFIX (excecao ao PR-first)
-
-Commit direto no master SOMENTE quando: (a) urgente (producao quebrada/bloqueio critico) E (b) GO explicito NESTA
-sessao. Mesmo assim: aplica R2/R3/R4 (gate verde); abre issue post-hoc (label incident/hotfix, referenciando o SHA);
-vigia o CI do master (escape `git revert`). Sem GO, hotfix vira tarefa normal. Ver comando `/hotfix`.
-
-## §DEFINITION OF DONE — "zero resquicios"
-
-Asseverar por exit code/JSON (nao por texto): Aceite todo marcado; issue CLOSED (`closes #N`); PR MERGED (squash);
-branch remota e local removidas; worktree removido + prune; CI verde no master pos-merge; fragmento `changelog.d/<issue>.md` criado (ADR-0055; nao editar o topo do CHANGELOG.md);
-ADR criado se houve decisao; working tree limpo sem artefatos (R11).
-
-## 3. PROTOCOLO DE INICIO DE SESSAO
-
-Passo 1: rodar os 4 comandos git do item 0 + build-check em background.
-Passo 2: se trabalho de continuidade, ler: docs/dev/incidentes/, docs/dev/flaky-tests.md, docs/adr/, docs/plan/<modulo>.md.
-Passo 3: declarar escopo ("Vou trabalhar em X, tocar Y, plano A/B/C") -- a issue e o registro; o fluxo e nao-bloqueante.
-
-## 4. ESTADO CONHECIDO DO REPO
-
-NOTA (#316): este bloco contem declaracoes ESTAVEIS (ADRs, decisoes irreversiveis, organizacao de modulos).
-Estado volatil (contagem de issues, HEAD, ahead/behind, working tree) NAO vive aqui: meca ao vivo no §0 e consulte o board.
-
-Sistema ETK (v2.1) arquivado (docs/tasks/_arquivo/2026-05-28-experimento-etk-superseded/; ADR-0020 Superseded por ADR-0022).
-Decisao Nfe* vs NotaFiscal* RESOLVIDA: ADR-0018. Roadmap: docs/plan/README.md + docs/plan/nota-fiscal/00-README.md +
-docs/plan/p-02-rotulagem-nutricional.md (ADR-0021). Pendencias arquiteturais: no board GitHub (source-of-truth dinamico).
-
-## 4.5. TRACKING DE TRABALHO (GitHub Issues + Project board)
-
-Source-of-truth: **GitHub Issues** de michel-az-de/EasyStok. Board: **GitHub Project v2** "EasyStok".
-- Issues: https://github.com/michel-az-de/EasyStok/issues
-- Board v2: https://github.com/users/michel-az-de/projects/1
-- Total aberto: `gh issue list --state open --limit 200 --json number --jq 'length'`; por prioridade/modulo: `gh issue list --label ...`.
-
-### Politica canonica (vinculante)
-
-**P1. Toda tarefa abre issue.** Sem isencao por tamanho. Sem issue, sem trabalho.
-**P2 (v4.0 FLIP). NAO-bloqueante.** Abre a issue (Contexto/Escopo/Aceite + labels) e **prossegue imediatamente**;
-   o Felipe acompanha async pela trilha issue/PR. (A antiga espera-de-aprovacao-antes-de-codar foi removida;
-   a aprovacao migrou para o MERGE do tier ALTO.)
-**P3.** `closes #N` no merge fecha a issue e move para Done no board.
-**P4.** Comentarios nos momentos-chave: plano inicial; decisao nao-obvia (opcoes+escolha+porque); blocker/premissa
-   refutada (R10); fechamento (o que ficou pra outra issue, gotchas, proximos passos).
-**P5.** Commit/PR referencia a issue (`refs #N` intermediario; `closes #N` no PR).
-
-Labels: modulo (`caixa`,`nfe`,`rotulagem`,`mobile`,`storefront`,`pwa`,`infra`,`web-api`,`domain`,`migrations`,`admin`,`web`)
-+ prioridade (`priority:p0..p3`) + default (`bug`,`enhancement`,`documentation`). Comentar via `--body-file` (evita escape).
-
-## 5. PROTOCOLO DE FIM DE SESSAO
-
-Handoff em docs/dev/sessoes/YYYY-MM-DD-HHMM-tema.md e OPCIONAL. A branch + issue + o PR ja sao a memoria duravel;
-crie handoff so se houver decisao arquitetural nao-documentada em ADR, estado parcial nao-obvio, ou pedido explicito.
-
-## 6. RECURSOS DE LEITURA
-
-Antes de operar em area sensivel:
-- docs/dev/incidentes/2026-05-16-master-broken-wip-snapshot.md
-- docs/dev/incidentes/2026-05-16-agentes-paralelos-trabalho-paralelo.md
-- docs/adr/0011-nomenclatura-pt-br-rotulagem.md
-- docs/adr/0013-cancellation-token-iusecase.md
-- docs/adr/0018-nomenclatura-nfe-prefixo-curto.md
-- docs/adr/0019-mobile-controllers-response-pattern.md
-- docs/adr/0022-master-first-trunk-based.md   # superseded pela adocao v4.0 (ADR-0043)
-- docs/adr/0040-gate-unico-pre-commit.md
-- docs/adr/0043-adocao-policy-v4.md            # ESTE PROTOCOLO v4.0
-- docs/dev/flaky-tests.md
-- docs/plan/consolidacao-v1/README.md          # diagnostico canonico da Consolidacao v1 (epico #786)
-
-## 7. COMPORTAMENTO DE DESENVOLVEDOR SENIOR (VINCULANTE)
-
-**PS1. Medir antes de afirmar (R10 reforcada).** Toda afirmacao quantitativa/de estado exige 1 comando de medicao antes.
-**PS2. Root-cause antes de sintoma.** Nada de silenciar com try/catch generico, `--no-verify`, retry loop. Fix paliativa consciente -> trade-off na issue.
-**PS3. Recusa pedido ambiguo, pergunta antes (R13).** 2+ interpretacoes com consequencias -> pergunta UMA vez, decisiva.
-**PS4. Fatia trabalho grande em commits verdes DENTRO da branch.** Apresenta o plano de fatiamento; nada de WIP no master.
-**PS5. Registra trade-offs no lugar certo.** Decisao com 2+ opcoes -> justificativa na issue (ou ADR se arquitetural), nao so no commit.
-**PS6. Self-review do plano antes de apresentar.** Roda as 5 perguntas (contradicao, premissas nao-medidas, capacidade, correlacao, pior cenario).
-**PS7. Pausa quando estado contradiz premissa.** working tree/git log/build contradiz o assumido -> PARA, reporta, espera direcao.
-
-<!-- BEGIN CASA-BABA-HUB -->
-## Contexto compartilhado da Casa da Baba
-
-Para demandas da Casa da Baba, leia o [contexto comum a Codex e Claude](https://github.com/michel-az-de/casa-da-baba-conhecimento/blob/master/hub-projeto/CONTEXTO-COMPARTILHADO.md) e o [mapa de repositórios e memórias](https://github.com/michel-az-de/casa-da-baba-conhecimento/blob/master/hub-projeto/REPOSITORIOS-VINCULADOS.md).
-
-O hub é um repositório privado; os links exigem acesso autorizado à conta ou ao repositório. Como opção local, clone `michel-az-de/casa-da-baba-conhecimento` em uma pasta irmã chamada `casa-da-baba-conhecimento` e leia os mesmos arquivos em `../casa-da-baba-conhecimento/hub-projeto/`.
-
-O hub reúne estudos, marca, desenhos, operação e a relação entre os sistemas. Código, contratos, decisões técnicas e regras continuam nas fontes deste repositório. Memórias históricas devem ser confrontadas com o checkout, as ADRs e as evidências atuais. O vínculo não sincroniza conversas nem modifica permissões.
-
-Este bloco acrescenta navegação e não substitui as regras locais. Preserve alterações em andamento e siga o fluxo deste repositório ao executar demandas.
-<!-- END CASA-BABA-HUB -->
-
-## graphify
-
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
-
-Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+Incidentes `docs/dev/incidentes/`, flaky `docs/dev/flaky-tests.md`, consolidação `docs/plan/consolidacao-v1/README.md`, nomenclatura ADR-0011/0018, CancellationToken ADR-0013, mobile ADR-0019. Handoff em `docs/dev/sessoes/` só com decisão não documentada ou pedido.
