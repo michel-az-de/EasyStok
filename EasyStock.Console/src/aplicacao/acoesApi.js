@@ -56,8 +56,8 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
   const avisar = (erro) => despachar({ tipo: acao.AVISO_API, mensagem: erro.message })
   const clienteApi = criarAcoesClienteApi({ despachar, estadoRef })
   const confirmarResponsavel = (id, chamada) => chamada(id)
-    .then((resumo) => despachar({ tipo: acao.CONFIRMAR_RESPONSAVEL_API, id, situacao: situacaoConversaDaApi(resumo, lerSessao()?.usuario) }))
-    .catch(avisar)
+    .then((resumo) => { despachar({ tipo: acao.CONFIRMAR_RESPONSAVEL_API, id, situacao: situacaoConversaDaApi(resumo, lerSessao()?.usuario) }); return true })
+    .catch((erro) => { avisar(erro); return false })
 
   return {
     ...acoes,

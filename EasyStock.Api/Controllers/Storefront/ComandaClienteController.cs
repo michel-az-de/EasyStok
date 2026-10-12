@@ -3,6 +3,7 @@ using EasyStock.Api.Services.Operacao;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Application.UseCases.Common;
+using EasyStock.Domain.Exceptions.Storefront;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace EasyStock.Api.Controllers.Storefront;
@@ -38,7 +39,9 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
     [EnableRateLimiting("comanda-envio")]
     public Task<IActionResult> Enviar(string token, [FromBody] EnviarComandaClienteBody body, CancellationToken ct) => Tratar(async () =>
     {
-        var resultado = await comanda.EnviarAsync(token, body.Revisao, ct);
+        EnvioComandaCliente resultado;
+        try { resultado = await comanda.EnviarAsync(token, body.Revisao, ct); }
+        catch (CepSemCoberturaException) { return await comanda.EncaminharEntregaAsync(token, body.Revisao, ct); }
         if (resultado.Situacao == "alteracao_aguardando_confirmacao")
         {
             var estado = await comanda.ObterAsync(token, ct);

@@ -29,7 +29,7 @@ import css from './assistente.module.css'
 export function BalaoAssistente({ sugestaoAgente, aoAbrirTela }) {
   const { selecionada, agora, historico, rascunho, fonteApi } = useAtendimento()
   const { canais } = useCatalogo()
-  const { definirRascunho, perguntarAssistente, obterLinkCardapio, enviar, salvarNota } = useAcoes()
+  const { definirRascunho, perguntarAssistente, obterLinkCardapio, enviar, salvarNota, devolverAutomatico } = useAcoes()
 
   const [aberto, setAberto] = useState(false)
   const [dispensados, setDispensados] = useState(() => new Set())
@@ -49,6 +49,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela }) {
       }
       return executarAcaoDoAssistente(proposta, conversa, {
         obterLinkCardapio,
+        devolverAutomatico: (...args) => { conferirContexto(); return devolverAutomatico(...args) },
         enviar: (...args) => { conferirContexto(); return enviar(...args) },
         salvarNota: (...args) => { conferirContexto(); return salvarNota(...args) },
         definirRascunho: (...args) => { conferirContexto(); return definirRascunho(...args) },

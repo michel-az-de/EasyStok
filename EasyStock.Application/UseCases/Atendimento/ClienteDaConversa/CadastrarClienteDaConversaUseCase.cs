@@ -9,12 +9,13 @@ using ClienteEntity = EasyStock.Domain.Entities.Cliente;
 namespace EasyStock.Application.UseCases.Atendimento.ClienteDaConversa;
 
 /// <summary>Endereço como a Ficha do console coleta: CEP e as partes digitadas.</summary>
-public sealed record EnderecoDaConversaInput(string? Cep, string? Logradouro, string? Numero, string? Complemento, string? Bairro);
+public sealed record EnderecoDaConversaInput(string? Cep, string? Logradouro, string? Numero, string? Complemento, string? Bairro,
+    string? Cidade = null, string? Uf = null);
 
 /// <param name="Telefone">Obrigatório quando a conversa ainda não tem cliente: é por ele que o cadastro é achado.</param>
 /// <param name="Endereco">Opcional; com CEP, vira o endereço de entrega padrão do cliente.</param>
 public sealed record CadastrarClienteDaConversaCommand(
-    Guid EmpresaId, Guid ConversaId, string? Nome, string? Telefone, EnderecoDaConversaInput? Endereco);
+    Guid EmpresaId, Guid ConversaId, string? Nome, string? Telefone, EnderecoDaConversaInput? Endereco, bool ReutilizarCadastro = true);
 
 /// <param name="Novo">O cadastro nasceu agora (o telefone não existia na empresa).</param>
 /// <param name="DentroDaArea">Nulo sem endereço; falso quando o CEP está fora da área de entrega.</param>
@@ -66,7 +67,7 @@ public sealed class CadastrarClienteDaConversaUseCase(
             if (telefone is null)
                 throw new UseCaseValidationException("Informe o telefone do cliente para cadastrar.");
             var identificacao = await identificarCliente.ExecuteAsync(
-                new IdentificarClientePorTelefoneInput(command.EmpresaId, telefone.TrimStart('+'), nome), ct);
+                new IdentificarClientePorTelefoneInput(command.EmpresaId, telefone.TrimStart('+'), nome, command.ReutilizarCadastro), ct);
             cliente = identificacao.Cliente;
             novo = identificacao.EhNovo;
             conversa.VincularCliente(cliente.Id);
@@ -84,7 +85,7 @@ public sealed class CadastrarClienteDaConversaUseCase(
         {
             var e = command.Endereco;
             var validacao = await validarEndereco.ExecuteAsync(
-                new ValidarEnderecoInput(command.EmpresaId, e.Cep, e.Logradouro, e.Numero, e.Complemento, e.Bairro), ct);
+                new ValidarEnderecoInput(command.EmpresaId, e.Cep, e.Logradouro, e.Numero, e.Complemento, e.Bairro, e.Cidade, e.Uf), ct);
             if (validacao.Motivo == ValidarEnderecoUseCase.MotivoCepInvalido)
                 throw new UseCaseValidationException("CEP inválido: informe os 8 dígitos.");
 

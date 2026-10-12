@@ -31,8 +31,9 @@ export const rotaDoCardapioLink = (conversaId) => PREFIXO_ROTA + conversaId
 export const linkDoCardapio = (origem, conversaId) => origem + rotaDoCardapioLink(conversaId)
 
 // Convite que sai na conversa (US-021, seção C): nome e link, sem travessão.
-export function textoConviteCardapio(nomeCliente, link, numeroComanda) {
-  return `Oi ${primeiroNome(nomeCliente)}! Faça seu pedido: ${link}\nEscolha os pratos, confirme e acompanhe por aqui.`
+export function textoConviteCardapio(nomeCliente, link, numeroComanda, conversaEmAndamento = true) {
+  return (conversaEmAndamento ? 'Aqui está sua comanda: ' : `Oi ${primeiroNome(nomeCliente)}! Monte seu pedido: `)
+    + `${link}\nEscolha os pratos, confira a entrega e acompanhe por aqui.`
     + (numeroComanda ? ` Comanda ${numeroComanda}.` : '')
 }
 

@@ -19,6 +19,7 @@ public sealed record AcaoPropostaAssistente(string Tipo, string? Texto, string? 
     public const string NotaInterna = "nota_interna";
     public const string Rascunho = "rascunho";
     public const string AbrirTela = "abrir_tela";
+    public const string RetomarAutomatico = "retomar_automatico";
 }
 
 /// <summary>Sem <c>Anthropic:Enabled</c>/<c>Anthropic:ApiKey</c> o assistente não responde (HTTP 503).</summary>
@@ -49,7 +50,8 @@ public sealed class AssistenteDonaUseCase(
         "repetir a pergunta. Quando citar o CDC, indique o artigo. Não invente fatos sobre o pedido. " +
         "Quando ela pedir uma ação, use a ferramenta certa em vez de explicar como fazer: mandar o cardápio, " +
         "anotar algo no cliente, escrever a resposta para o cliente (vai para o rascunho) ou abrir o cardápio " +
-        "ou a comanda. A ação só acontece depois que a atendente confirmar na tela: nunca diga que já " +
+        "ou a comanda. Quando pedir para você assumir, continuar ou conduzir o atendimento, proponha retomar o automático. " +
+        "A ação só acontece depois que a atendente confirmar na tela: nunca diga que já " +
         "enviou, anotou ou abriu. Texto para o cliente vai sempre pela ferramenta de rascunho, como " +
         "mensagem de WhatsApp de 1 a 3 frases curtas. Nunca use travessão.";
 
