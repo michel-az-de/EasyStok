@@ -1,5 +1,5 @@
 import { DOCUMENTOS, PAPEIS } from '../dominio/impressos'
-import { enviarLogoDaLoja, obterHtmlDoImpresso, obterLojaDaEmpresa } from '../infra/api/impressosApi'
+import { confirmarDocumentoImpresso, enviarLogoDaLoja, historicoDoPedido, obterOriginalImpresso, obterLojaDaEmpresa, prepararImpresso } from '../infra/api/impressosApi'
 import { gravarPreferenciasImpressao, lerPreferenciasImpressao } from '../infra/preferenciasImpressao'
 
 // Impressos em HTML da API (#1632) para as telas: preferências do aparelho, o logo da loja e
@@ -8,11 +8,16 @@ import { gravarPreferenciasImpressao, lerPreferenciasImpressao } from '../infra/
 export { enviarLogoDaLoja, gravarPreferenciasImpressao, lerPreferenciasImpressao, obterLojaDaEmpresa }
 
 // Propriedades de `componentes/ImprimirPedido` para um pedido que existe no EasyStok.
-export const impressaoDoPedido = (pedidoId) => ({
+export const impressaoDoPedido = (pedidoId, canhotoId = null) => ({
   documentos: DOCUMENTOS,
   papeis: PAPEIS,
   papelPadrao: (documento) => lerPreferenciasImpressao().papeis[documento],
-  buscarHtml: (documento, modelo) => obterHtmlDoImpresso(pedidoId, {
-    documento, modelo, logoTermica: lerPreferenciasImpressao().logoTermica,
-  }),
+  preparar: async (opcoes, sinal) => {
+    const registro = await prepararImpresso(pedidoId, { ...opcoes, logoTermica: lerPreferenciasImpressao().logoTermica }, sinal)
+    sinal.throwIfAborted()
+    const html = await obterOriginalImpresso(pedidoId, registro.id, sinal)
+    return { ...registro, html }
+  },
+  historico: (pagina, sinal) => historicoDoPedido(pedidoId, pagina, sinal),
+  confirmar: (registro) => confirmarDocumentoImpresso(registro.id, registro.originalId || registro.documento !== 'cozinha' ? null : canhotoId),
 })

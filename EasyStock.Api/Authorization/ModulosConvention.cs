@@ -98,6 +98,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         mapa.Add("OperacaoEventos", [Modulo.Atendimento, Modulo.Cozinha, Modulo.Entregas]);
         mapa.Add("Impressao", [Modulo.Atendimento, Modulo.Cozinha, Modulo.Entregas]);
         mapa.Add("PedidoImpresso", [Modulo.Atendimento, Modulo.Cozinha, Modulo.Entregas]);
+        mapa.Add("DocumentosImpressos", [Modulo.Atendimento, Modulo.Cozinha, Modulo.Entregas]);
         return mapa;
     }
 }
