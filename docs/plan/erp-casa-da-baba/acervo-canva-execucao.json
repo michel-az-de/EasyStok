@@ -86,5 +86,47 @@
     "banca_funcional": "6 testes independentes aprovados; correções revisadas",
     "banca_seguranca": "4 testes independentes aprovados, incluindo RLS NOSUPERUSER NOBYPASSRLS e caminhos HTTP alternativos",
     "integracao": "21 aprovados, 0 falhas, 0 ignorados; API real, PostgreSQL Testcontainers e armazenamento local"
+  },
+  "incremento_cobertura_1663": {
+    "issue": 1663,
+    "escopo": [
+      "Cobertura de todos os produtos e quatro canais, sem aprovar por proporção apenas",
+      "Origem e natureza separadas; classificação explícita de peças e imagens anteriores",
+      "Busca e filtros no servidor; vínculos de produto em JSONB e uso confirmado por canal",
+      "Briefings imutáveis com referências aprovadas, restrições e prompt; nova versão preserva produto",
+      "Fila existente com repetição idempotente, uma produção por versão, pendências e histórico",
+      "Resultado valida prompt, referências e proporção do snapshot; aprovação permanece explícita"
+    ],
+    "criterios": {
+      "site_whatsapp": "Lado menor de pelo menos 600 pixels e formato permitido",
+      "instagram": "Largura nativa de pelo menos 1080 pixels e formato permitido, critério conservador deste acervo",
+      "impressao": "Medidas físicas positivas até 2000 mm, proporção compatível e pelo menos 300 dpi nos dois eixos; prova física e arte final ainda necessárias",
+      "adequacao": "Versão aprovada, dimensões do arquivo original verificadas e uso do canal explicitamente confirmado"
+    },
+    "validacao": {
+      "gate": "Build e 40 testes de arquitetura aprovados",
+      "migracao": "Scripts EF Up e Down executados em PostgreSQL17 isolado; registro legado preservado, RLS ENABLE/FORCE nas duas tabelas e três índices únicos verificados",
+      "integracao": "Em execução; resultados finais devem substituir este campo",
+      "bancas": "Duas rodadas independentes solicitadas de experiência, funcionamento e segurança; correções em validação",
+      "producao": "Deploy e fluxos autenticados ainda pendentes"
+    },
+    "piloto": {
+      "produtos": [
+        "Lasanha bolonhesa",
+        "Nhoque de batata"
+      ],
+      "objetivo": "Lacuna de imagens 9:16 vinculadas a produto para Instagram",
+      "origem": "image_gen assistido; referências sintéticas aprovadas do lote anterior, inspecionadas antes da geração",
+      "dimensoes": "Dois originais nativos 941x1672, sem ampliação artificial",
+      "fidelidade": "Revisão visual às referências sintéticas, sem comprovação do produto real; aprovação humana pendente",
+      "estado": "Arquivos, hashes, prompts e referências registrados no catálogo local. Abaixo do critério de 1080 pixels; não publicados",
+      "evidencia": "hub-projeto/banco-imagens-2026-10-12/lote-2-registro.json"
+    },
+    "limites": [
+      "Consulta dos últimos 200 briefings e 200 solicitações concluídas; todas as pendentes permanecem visíveis",
+      "Referências novas escolhidas na página atual do acervo; escolhas preservadas quando filtros/respostas mudam",
+      "Não há OAuth, geração autônoma, confirmação automática de uso ou aprovação de novas imagens",
+      "Fotos públicas do cardápio são mapeadas separadamente até a origem e a adequação serem conferidas"
+    ]
   }
 }

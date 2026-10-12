@@ -31,5 +31,26 @@ public sealed class AcervoSolicitacaoConfiguration : IEntityTypeConfiguration<Ac
         b.ToTable("acervo_solicitacoes"); b.HasKey(x => x.Id);
         b.Property(x => x.ReferenciasJson).HasColumnType("jsonb");
         b.HasIndex(x => new { x.EmpresaId, x.ConcluidoEm, x.CriadoEm });
+        b.HasIndex(x => new { x.EmpresaId, x.BriefingId }).IsUnique().HasFilter("\"BriefingId\" IS NOT NULL");
+    }
+}
+
+public sealed class AcervoBriefingConfiguration : IEntityTypeConfiguration<AcervoBriefing>
+{
+    public void Configure(EntityTypeBuilder<AcervoBriefing> b)
+    {
+        b.ToTable("acervo_briefings"); b.HasKey(x => x.Id);
+        b.Property(x => x.ReferenciasJson).HasColumnType("jsonb");
+        b.Property(x => x.ConteudoHash).HasMaxLength(64);
+        b.HasIndex(x => new { x.EmpresaId, x.ConteudoHash }).IsUnique();
+        b.HasIndex(x => new { x.EmpresaId, x.RaizId, x.Versao }).IsUnique();
+    }
+}
+
+public sealed class AcervoUsoConfiguration : IEntityTypeConfiguration<AcervoUso>
+{
+    public void Configure(EntityTypeBuilder<AcervoUso> b)
+    {
+        b.ToTable("acervo_usos"); b.HasKey(x => new { x.EmpresaId, x.ImagemId, x.Canal });
     }
 }
