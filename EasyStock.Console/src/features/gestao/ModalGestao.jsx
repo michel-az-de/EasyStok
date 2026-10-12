@@ -15,6 +15,7 @@ import { AbaJanelas } from './janelas/AbaJanelas'
 import { AbaFidelidade } from './fidelidade/AbaFidelidade'
 import { AbaIntegracoes } from './integracoes/AbaIntegracoes'
 import { AbaAtendimento } from './atendimento/AbaAtendimento'
+import { AbaImpressao } from './impressao/AbaImpressao'
 import { AbaRespostas } from './respostas/AbaRespostas'
 import { TelaCanais } from './canais/TelaCanais'
 import { AbaCardapioApi } from './cardapio/AbaCardapioApi'
@@ -242,6 +243,8 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
     fidelidade: <AbaFidelidade />,
     integracoes: <AbaIntegracoes />,
     canais: <TelaCanais />,
+    // #1632: logo da loja e papel padrão dos impressos (só modo API).
+    impressao: <AbaImpressao />,
     // M1.1 (#1481): gestão do cardápio (só modo API).
     cardapio: <AbaCardapioApi renderizarEditor={renderizarEditorCardapio} />,
     // M1.3 (#1483): categorias do cardápio (só modo API).

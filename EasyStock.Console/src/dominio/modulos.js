@@ -93,6 +93,8 @@ export const MODULOS = [
     telas: [
       { id: 'canais', rotulo: 'Canais', tipo: TELA_AJUSTE, aba: 'canais', soApi: true },
       { id: 'integracoes', rotulo: 'Integrações de entrega', tipo: TELA_AJUSTE, aba: 'integracoes' },
+      // #1632: logo da loja e papel padrão dos impressos em HTML da API (só modo API).
+      { id: 'impressao', rotulo: 'Impressão', tipo: TELA_AJUSTE, aba: 'impressao', soApi: true },
     ],
   },
   {

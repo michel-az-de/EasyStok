@@ -1,0 +1,6 @@
+/* Escolha de documento e papel da ação "Imprimir" (#1632). */
+.campos { display: grid; gap: var(--e-3); padding-top: var(--e-2); }
+.erro {
+  margin: 0; padding: var(--e-2); border-radius: var(--r-1);
+  background: var(--erro-pastel); color: var(--erro); font-size: var(--t-apoio); font-weight: 600;
+}
