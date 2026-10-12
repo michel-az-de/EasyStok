@@ -188,7 +188,7 @@
 .compacto .cartao { border: 1px solid var(--linha); border-radius: var(--r-2); padding: var(--e-3); background: var(--papel); }
 .compacto .telasRecolhidas summary { display: list-item; cursor: pointer; min-height: 44px; padding-block: var(--e-2); color: var(--marca-forte); font-weight: 700; font-size: var(--t-apoio); }
 .configGrupo { border: 0; padding: 0; margin: 0 0 var(--e-5); min-width: 0; }
-.configGrupo legend { font-weight: 700; font-size: var(--t-titulo); }
+.configGrupo legend { font-weight: 700; font-size: var(--t-forte); }
 .configGrupo p { color: var(--tinta-2); font-size: var(--t-apoio); margin-block: var(--e-2); }
 .previaModelo { padding: var(--e-3); border-left: 3px solid var(--marca); background: var(--marca-claro); overflow-wrap: anywhere; }
 .modelos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e-2); }
@@ -196,7 +196,7 @@
 .modelo { border: 1px solid var(--linha); border-radius: var(--r-2); align-items: start; }
 .modelo:has(:checked) { border-color: var(--marca); background: var(--marca-claro); }
 .modelo input, .configOpcao input { width: 20px; height: 20px; flex: none; accent-color: var(--marca); }
-.configOpcao svg { flex: none; color: var(--marca-forte); }
+.configOpcao svg { flex: none; width: 32px; color: var(--marca-forte); }
 .acaoDestaque:focus-visible, .acaoIndicador:focus-visible, .telasRecolhidas summary:focus-visible, .modelo:has(:focus-visible), .configOpcao:has(:focus-visible) { outline: 3px solid var(--marca); outline-offset: 3px; }
 .semMovimentos *, .semMovimentos *::before, .semMovimentos *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 @media (max-width: 1000px) {
