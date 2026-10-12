@@ -82,28 +82,28 @@ function Regra({
         onChange={(e) => mudar('texto', e.target.value)}
       />
       <p className={css.variaveis}>
-        <span>Variáveis:</span>
+        <span>Campos automáticos:</span>
         {variaveis.map((v) => <span key={v.chave} className={css.tokenVariavel}>{`{${v.chave}}`}</span>)}
       </p>
       {foraDaApi.length > 0 && (
         <p className={css.alerta} role="alert">
-          {foraDaApi.map((v) => `{${v}}`).join(', ')} não é preenchida pelo EasyStok e sai escrita assim para o cliente.
+          O cliente receberá {foraDaApi.map((v) => `{${v}}`).join(', ')} sem preenchimento automático.
         </p>
       )}
       {avisoEntrada && <p className={css.alerta}>{avisoEntrada}</p>}
 
       {/* Prévia em bolha: é o que o cliente lê agora, com os dados desta conversa. */}
-      <p className={css.rotuloPrevia}>O cliente recebe assim agora:</p>
+      <p className={css.rotuloPrevia}>Prévia para o cliente</p>
       <p className={css.bolha}>{previa}</p>
 
       {editando && gravacao !== 'erro' && (
         <p className={css.editando}>
-          <Pilula tom="aviso" fina>editando, não salvo</Pilula>
+          <Pilula tom="aviso" fina>Alterações não salvas</Pilula>
         </p>
       )}
       {gravacao === 'erro' && (
         <p className={css.alerta} role="alert">
-          Não salvou. {avisoApi ?? 'Tente de novo.'} O texto continua aqui.
+          Não foi possível confirmar o salvamento. {avisoApi ?? 'Tente novamente.'} Sua edição foi mantida.
         </p>
       )}
       {gravacao === 'salvo' && !editando && (
@@ -128,7 +128,7 @@ function Regra({
             icone="enviar"
             className={css.toque}
             disabled={!podeEnviar}
-            title={!podeEnviar ? 'Abra uma conversa (com janela aberta para texto livre) para enviar.' : undefined}
+            title={!podeEnviar ? 'Selecione uma conversa que permita enviar texto.' : undefined}
             onClick={() => aoEnviar(regra, previa)}
           >
             {nomeConversa ? `Enviar para ${nomeConversa.split(' ')[0]}` : 'Enviar'}
@@ -228,7 +228,7 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
   return (
     <Modal
       titulo="Mensagens automáticas"
-      descricao="O que a casa fala sozinha, em nome dela."
+      descricao="Mensagens, horários e avisos da loja."
       aoFechar={aoFechar}
       rodape={<Botao className={css.toque} onClick={aoFechar}>Fechar</Botao>}
     >
@@ -243,8 +243,8 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
         </div>
         <p className={css.descricao}>
           {lojaAberta == null
-            ? 'Segue o horário configurado abaixo.'
-            : `Forçada ${lojaAberta ? 'aberta' : 'fechada'} na mão, por cima do horário.`}
+            ? 'Segue os horários da semana.'
+            : `${lojaAberta ? 'Aberta' : 'Fechada'} manualmente, sem seguir os horários da semana.`}
         </p>
         <div className={css.acoesLoja}>
           <Botao className={css.toque} onClick={() => alternarLoja(agora)}>
@@ -281,7 +281,7 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
           Som da cozinha {som ? 'ligado' : 'desligado'}
         </label>
         <p className={css.descricao}>
-          Avisa em {AVISOS_DE_SOM}.
+          Avisa sobre {AVISOS_DE_SOM}.
         </p>
         {som && audioBloqueado && (
           <output className={css.avisoAudio}>
@@ -319,7 +319,7 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
           </Pilula>
         </div>
         <p className={css.descricao}>
-          Avisa "Precisa de você" mesmo com a aba minimizada ou outra janela em foco.
+          Avisa sobre conversas em "Precisa de você", mesmo fora desta aba.
         </p>
         {permissaoNotificacao === 'default' && (
           <Botao className={css.toque} icone="globo" onClick={pedirNotificacaoDoNavegador}>
@@ -327,7 +327,7 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
           </Botao>
         )}
         {permissaoNotificacao === 'denied' && (
-          <p className={css.descricao}>Bloqueada nas configurações do navegador.</p>
+          <p className={css.descricao}>Para ativar, permita notificações nas configurações do navegador.</p>
         )}
       </div>
 

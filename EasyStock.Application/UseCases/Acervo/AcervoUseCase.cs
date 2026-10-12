@@ -8,11 +8,11 @@ namespace EasyStock.Application.UseCases.Acervo;
 
 public sealed record DadosImagem(string Titulo, string Origem, string Formato, Guid[] Itens,
     string Prompt = "", string Referencias = "", Guid? OriginalId = null, Guid? SolicitacaoId = null,
-    string? CanvaUrl = null, string? CanvaAssetId = null);
+    string? CanvaUrl = null, string? CanvaAssetId = null, string Natureza = "Produto", int Largura = 0, int Altura = 0);
 public sealed record PublicarImagem(Guid OperacaoId, Guid ItemId, bool Galeria, string? CapaEsperada);
 public sealed record SolicitarImagem(Guid OperacaoId, Guid ItemId, string Formato, string Brief, Guid[] Referencias);
 
-public sealed class AcervoUseCase(IAcervoRepository repo, IFileStorage storage, IImageProcessor processor, IUnitOfWork uow)
+public sealed partial class AcervoUseCase(IAcervoRepository repo, IFileStorage storage, IImageProcessor processor, IUnitOfWork uow)
 {
     public const int LimiteArquivo = 6 * 1024 * 1024;
     public Task<IReadOnlyList<AcervoImagem>> ListarAsync(Guid empresa, int pagina, CancellationToken ct) =>
@@ -52,7 +52,8 @@ public sealed class AcervoUseCase(IAcervoRepository repo, IFileStorage storage, 
                 if (pedido?.ConcluidoEm is not null)
                     throw new UseCaseValidationException("Esta solicitação já foi concluída. Abra outra para gerar uma nova versão.");
                 var imagem = new AcervoImagem { EmpresaId = empresa, CriadoPorId = autor, Titulo = dados.Titulo.Trim(),
-                    Origem = dados.Origem, Formato = dados.Formato, Sha256 = hash, ContentType = contentType, Tamanho = bytes.Length,
+                    Origem = dados.Origem, Formato = dados.Formato, Natureza = dados.Natureza, Largura = dados.Largura, Altura = dados.Altura,
+                    Sha256 = hash, ContentType = contentType, Tamanho = bytes.Length,
                     Prompt = dados.Prompt, Referencias = dados.Referencias, ItensJson = JsonSerializer.Serialize(dados.Itens.Distinct()),
                     OriginalId = dados.OriginalId, SolicitacaoId = dados.SolicitacaoId, CanvaUrl = ValidarCanva(dados.CanvaUrl), CanvaAssetId = dados.CanvaAssetId };
                 var pasta = $"acervo/{empresa}/{imagem.Id}";
@@ -175,6 +176,7 @@ public sealed class AcervoUseCase(IAcervoRepository repo, IFileStorage storage, 
         ValidarTextos(d.Titulo, d.Prompt, d.Referencias, d.CanvaUrl, d.CanvaAssetId);
         if (string.IsNullOrWhiteSpace(d.Titulo) || d.Titulo.Length > 160) throw new UseCaseValidationException("Informe um título de até 160 caracteres.");
         if (d.Origem is not ("IA" or "Fotografia" or "Canva")) throw new UseCaseValidationException("Origem inválida.");
+        if (d.Natureza is not ("Produto" or "Comunicacao")) throw new UseCaseValidationException("Natureza inválida.");
         Formato(d.Formato);
         if (d.Prompt is null || d.Referencias is null || d.Prompt.Length > 12000 || d.Referencias.Length > 6000) throw new UseCaseValidationException("Prompt ou referências muito longos.");
         if (d.Origem == "IA" && string.IsNullOrWhiteSpace(d.Prompt)) throw new UseCaseValidationException("Registre o prompt da geração.");
@@ -188,6 +190,16 @@ public sealed class AcervoUseCase(IAcervoRepository repo, IFileStorage storage, 
             var solicitacao = await repo.SolicitacaoAsync(empresa, pedido, ct) ?? throw new UseCaseValidationException("Solicitação não encontrada.");
             if (!d.Itens.Contains(solicitacao.ItemId) || d.Formato != solicitacao.Formato)
                 throw new UseCaseValidationException("A imagem precisa atender ao item e ao formato da solicitação.");
+            if (solicitacao.BriefingId is not null)
+            {
+                if (d.Origem != "IA" || d.Prompt != solicitacao.Brief || !ProporcaoConfere(d.Formato, d.Largura, d.Altura))
+                    throw new UseCaseValidationException("O resultado deve preservar o prompt registrado e o formato real do briefing.");
+                Guid[] referencias;
+                try { referencias = JsonSerializer.Deserialize<Guid[]>(d.Referencias) ?? []; }
+                catch (JsonException) { throw new UseCaseValidationException("Registre os IDs das referências do briefing."); }
+                if (!referencias.ToHashSet().SetEquals(JsonSerializer.Deserialize<Guid[]>(solicitacao.ReferenciasJson)!))
+                    throw new UseCaseValidationException("As referências do resultado precisam corresponder ao briefing.");
+            }
         }
         if (d.CanvaAssetId?.Length > 100) throw new UseCaseValidationException("Identificador do Canva inválido.");
     }
@@ -201,6 +213,7 @@ public sealed class AcervoUseCase(IAcervoRepository repo, IFileStorage storage, 
     private static AcervoImagem ConferirRepeticao(AcervoImagem imagem, DadosImagem d)
     {
         if (imagem.Titulo != d.Titulo.Trim() || imagem.Origem != d.Origem || imagem.Formato != d.Formato ||
+            (imagem.Natureza != "NaoClassificada" && imagem.Natureza != d.Natureza) ||
             imagem.Prompt != d.Prompt || imagem.Referencias != d.Referencias || imagem.OriginalId != d.OriginalId ||
             imagem.SolicitacaoId != d.SolicitacaoId || imagem.CanvaUrl != ValidarCanva(d.CanvaUrl) || imagem.CanvaAssetId != d.CanvaAssetId ||
             !JsonSerializer.Deserialize<Guid[]>(imagem.ItensJson)!.ToHashSet().SetEquals(d.Itens))

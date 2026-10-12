@@ -18,7 +18,12 @@
   border-top: 1px solid var(--linha);
 }
 
-.alerta {
+.aviso {
+  color: var(--tinta);
+  background: var(--alerta-pastel);
+}
+
+.falha {
   color: var(--erro);
   background: var(--erro-pastel);
 }

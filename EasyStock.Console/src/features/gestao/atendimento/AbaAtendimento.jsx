@@ -27,7 +27,7 @@ const valorComparavel = (valor) => String(valor ?? '')
 const camposMudaram = (atual, salvo, campos) => campos.some((campo) => valorComparavel(atual?.[campo]) !== valorComparavel(salvo?.[campo]))
 
 function Pendencia({ visivel }) {
-  return <output className={visivel ? css.pendencia : 'sr'}>{visivel ? 'Alterações não salvas. Rascunho mantido nesta sessão. Salve antes de sair ou desfaça a edição.' : ''}</output>
+  return <output className={visivel ? css.pendencia : 'sr'}>{visivel ? 'Alterações não salvas. Rascunho só nesta sessão; salve ou desfaça antes de sair.' : ''}</output>
 }
 
 function useAtualizarAposLimparRascunho(rascunho, situacao, recarregar, gravando) {
@@ -43,11 +43,11 @@ function useAtualizarAposLimparRascunho(rascunho, situacao, recarregar, gravando
 
 // Situação de um "Salvar", mostrada ao lado do botão: o erro da API nunca some calado.
 function Retorno({ situacao, gravando }) {
-  if (gravando && situacao.estado !== 'salvando') return <output className={css.retorno}>Uma gravação anterior está em andamento. Você pode editar; aguarde para salvar.</output>
+  if (gravando && situacao.estado !== 'salvando') return <output className={css.retorno}>Outro ajuste está sendo salvo. Você pode editar; aguarde para salvar.</output>
   if (situacao.estado === 'salvando') return <output className={css.retorno}>Salvando…</output>
   if (situacao.estado === 'salvo') return <output className={css.retorno}>Salvo no EasyStok.</output>
   if (situacao.estado === 'erro') {
-    return <output className={`${css.retorno} ${css.erro}`} role="alert">Falha ao salvar: {situacao.mensagem}</output>
+    return <output className={`${css.retorno} ${css.erro}`} role="alert">Não foi possível confirmar o salvamento. {situacao.mensagem}</output>
   }
   return null
 }
@@ -85,8 +85,8 @@ function LojaAgora({ horariosAtendimento }) {
       </div>
       <p className={css.descricao}>
         {lojaAberta == null
-          ? 'Segue o horário configurado. Confira ou ajuste os horários da semana.'
-          : `${lojaAberta ? 'Aberta' : 'Fechada'} manualmente. Use "Voltar a seguir o horário" para retomar os horários configurados.`}
+          ? 'Segue os horários da semana.'
+          : `${lojaAberta ? 'Aberta' : 'Fechada'} manualmente, sem seguir os horários da semana.`}
       </p>
       {horariosAtendimento && <div className={css.acoes}>{horariosAtendimento}</div>}
       <div className={css.acoes}>
@@ -140,7 +140,7 @@ function MensagensDoExpediente() {
       {!expediente.carregado && <output className={css.descricao}>Carregando o expediente…</output>}
       <CampoArea
         rotulo="Fora do horário"
-        dica="O cliente recebe isto na primeira mensagem fora do horário, no lugar da saudação."
+        dica="Substitui a saudação na primeira mensagem fora do horário."
         maxLength={TAMANHO_MENSAGEM}
         value={valor.mensagemForaDoHorario}
         disabled={!expediente.carregado || situacao.estado === 'salvando'}
@@ -148,7 +148,7 @@ function MensagensDoExpediente() {
       />
       <CampoArea
         rotulo="Loja fechada"
-        dica="O cliente recebe isto na primeira mensagem com a loja fechada manualmente, no lugar da saudação."
+        dica="Substitui a saudação na primeira mensagem com a loja fechada manualmente."
         maxLength={TAMANHO_MENSAGEM}
         value={valor.mensagemLojaFechada}
         disabled={!expediente.carregado || situacao.estado === 'salvando'}
@@ -215,7 +215,7 @@ function ConfiguracaoDoAtendimento() {
       <div className={css.secao} role="alert">
         <p className={css.erro}>A configuração não carregou: {carga.mensagem}</p>
         <div className={css.acoes}>
-          <Botao className={css.toque} onClick={tentarDeNovo}>Tentar de novo</Botao>
+          <Botao className={css.toque} onClick={tentarDeNovo}>Tentar novamente</Botao>
         </div>
       </div>
     )
@@ -271,12 +271,12 @@ function ConfiguracaoDoAtendimento() {
         {/* #1475: o backend lê este campo; desligado, o agente não responde e a conversa vai para a dona. */}
         <p id="gestao-atend-config-efeito" className={css.descricao}>
           {form.ativo
-            ? 'Com esta opção ligada, o agente responde no WhatsApp e passa a conversa para você quando precisa. A mudança só vale depois de salvar.'
-            : 'Com esta opção desligada, as conversas vão direto para você. A saudação continua saindo. A mudança só vale depois de salvar.'}
+            ? 'Responde no WhatsApp e chama você quando precisa. A mudança só vale depois de salvar.'
+            : 'As conversas vão para você; a saudação continua automática. A mudança só vale depois de salvar.'}
         </p>
         <CampoTexto
           rotulo="Tom"
-          dica="Curto, por exemplo: acolhedor, direto, sem gíria."
+          dica="Exemplos: acolhedor, direto, sem gírias."
           value={form.tom}
           required
           onChange={mudar('tom')}
@@ -296,7 +296,7 @@ function ConfiguracaoDoAtendimento() {
         <CampoArea rotulo="Saudação para quem volta" value={form.saudacaoRetorno} required onChange={mudar('saudacaoRetorno')} />
         <CampoArea
           rotulo="Frase de espera"
-          dica="Enviada junto da saudação, antes de o agente responder."
+          dica="Enviada com a saudação, antes da resposta automática."
           value={form.fraseEspera}
           required
           onChange={mudar('fraseEspera')}
@@ -304,7 +304,7 @@ function ConfiguracaoDoAtendimento() {
         <CampoArea rotulo="Mensagem para endereço fora da área" value={form.mensagemForaArea} required onChange={mudar('mensagemForaArea')} />
         <CampoTexto
           rotulo="Modelo de retomada (WhatsApp)"
-          dica="Nome do modelo aprovado na Meta, com uma variável: o primeiro nome do cliente. Sai quando a janela de 24 h venceu; a mensagem que falhou vai quando o cliente responder. Vazio: sem retomada."
+          dica="Nome do modelo aprovado pela Meta, com uma variável: primeiro nome do cliente. Retoma o contato quando um envio é bloqueado pelo limite de 24 h. A mensagem pendente segue quando o cliente responder. Vazio desativa."
           value={form.modeloRetomadaNome ?? ''}
           maxLength={512}
           pattern="[a-z0-9_]+"
@@ -313,7 +313,7 @@ function ConfiguracaoDoAtendimento() {
         />
         <div className={css.numeros}>
           <CampoTexto
-            rotulo="Respiro entre janelas (min)"
+            rotulo="Tempo extra de preparo (min)"
             tipo="number"
             min={0}
             required
@@ -334,7 +334,7 @@ function ConfiguracaoDoAtendimento() {
               cartão pisca no Balcão; fora do expediente a contagem para. */}
           <CampoTexto
             rotulo="Prazo de primeira resposta (min)"
-            dica="De 1 a 240. Passou disso, a conversa pisca. Fora do horário da loja o prazo para de contar."
+            dica="De 1 a 240 minutos. Ao vencer, a conversa ganha destaque. A contagem pausa fora do horário da loja."
             tipo="number"
             min={1}
             max={240}

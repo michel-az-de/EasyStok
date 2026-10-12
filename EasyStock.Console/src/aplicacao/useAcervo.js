@@ -8,6 +8,10 @@ export function useAcervo() {
   const [imagens, setImagens] = useState([])
   const [itens, setItens] = useState([])
   const [solicitacoes, setSolicitacoes] = useState([])
+  const [briefings, setBriefings] = useState([])
+  const [cobertura, setCobertura] = useState([])
+  const [usos, setUsos] = useState([])
+  const [filtros, definirFiltros] = useState({})
   const [pagina, setPagina] = useState(0)
   const [erro, setErro] = useState('')
   const [carregando, setCarregando] = useState(true)
@@ -15,26 +19,30 @@ export function useAcervo() {
   const [aviso, setAviso] = useState('')
   const requisicao = useRef(0)
   const trava = useRef(false)
-  const carregar = useCallback(async () => {
+  const carregar = useCallback(async (aposOperacao = false) => {
+    if (trava.current && !aposOperacao) return
     const atual = ++requisicao.current
     setCarregando(true)
     try {
-      const [lista, cardapio, pedidos] = await Promise.all([api.listarImagens(pagina), listarGestao(), api.listarSolicitacoes()])
-      if (atual === requisicao.current) { setImagens(lista); setItens(cardapio); setSolicitacoes(pedidos); setAviso(''); setErro('') }
-    } finally { if (atual === requisicao.current) setCarregando(false) }
-  }, [pagina])
+      const [lista, cardapio, pedidos, briefs, mapa, usosConfirmados] = await Promise.all([api.listarImagens(pagina, filtros), listarGestao(), api.listarSolicitacoes(), api.listarBriefings(), api.listarCobertura(), api.listarUsos()])
+      if (atual === requisicao.current) { setImagens(lista); setItens(cardapio); setSolicitacoes(pedidos); setBriefings(briefs); setCobertura(mapa); setUsos(usosConfirmados); setAviso(''); setErro('') }
+    } catch (e) { if (atual === requisicao.current) setErro(e.message); throw e }
+    finally { if (atual === requisicao.current) setCarregando(false) }
+  }, [pagina, filtros])
+  function setFiltros(novo) { setPagina(0); definirFiltros(novo) }
   useEffect(() => {
-    let ativo = true
-    carregar().catch((e) => { if (ativo) setErro(e.message) })
-    return () => { ativo = false; requisicao.current++ }
+    carregar().catch(() => {})
+    return () => { requisicao.current++ }
   }, [carregar])
   async function fazer(acao) {
     if (trava.current) return false
     trava.current = true
+    requisicao.current++
+    setCarregando(false)
     setOcupado(true); setErro('')
     try {
       const r = await acao()
-      try { await carregar() } catch { setAviso('Operação concluída. Não foi possível atualizar a lista; use Atualizar acervo.') }
+      try { await carregar(true) } catch { setAviso('Operação concluída. Não foi possível atualizar a lista; use Atualizar acervo.') }
       return r ?? true
     }
     catch (e) { setErro(e.message); return false }
@@ -49,7 +57,7 @@ export function useAcervo() {
       link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000)
     })
   }
-  return { imagens, itens, solicitacoes, pagina, setPagina, erro, setErro, aviso, carregar, carregando, ocupado, fazer, baixar,
+  return { imagens, itens, solicitacoes, briefings, cobertura, usos, filtros, setFiltros, pagina, setPagina, erro, setErro, aviso, carregar, carregando, ocupado, fazer, baixar,
     api, obterItem, fotoUrl: (url) => urlDeExibicaoDaFoto(url, API_BASE) }
 }
 

@@ -24,7 +24,7 @@ export function NomeInsumoPesquisado({ value, onChange, disabled }) {
     }, 700)
     return () => { clearTimeout(tempo); controle.abort() }
   }, [value, disabled])
-  return <div className={css.nome}><CampoTexto disabled={disabled} rotulo="Nome do insumo" dica="Autocomplete com referências públicas da Wikipédia" placeholder="Ex.: farinha de trigo" maxLength={180} value={value} onChange={onChange} list={id} autoComplete="off" />
+  return <div className={css.nome}><CampoTexto disabled={disabled} rotulo="Nome do insumo" dica="Sugestões da Wikipédia" placeholder="Ex.: farinha de trigo" maxLength={180} value={value} onChange={onChange} list={id} autoComplete="off" />
     <datalist id={id}>{fontes.map((fonte) => <option key={fonte.url} value={fonte.titulo} />)}</datalist>
     {erro && <p role="status">{erro}</p>}
     {!!fontes.length && <Fontes fontes={fontes} />}

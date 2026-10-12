@@ -23,8 +23,8 @@ import { SO_NO_EASYSTOK } from './naoLigadas'
 // Sem pedido criado (#1271) vale o mesmo: só a comanda é rascunho local. Gerar ou reenviar a
 // cobrança cria o pedido (o EasyStok cobra e manda o resumo); pagamento e esteira avisam,
 // porque um rascunho "Pago" ou "Em preparo" nunca chega à cozinha.
-const NAO_LIGADO = 'ainda não está ligado ao EasyStok (F04 em diante). Use o EasyStok para isso.'
-const SEM_PEDIDO = 'o pedido ainda não está no EasyStok. Gere a cobrança ou envie ao cliente primeiro.'
+const NAO_LIGADO = 'esta ação ainda não está disponível nesta tela.'
+const SEM_PEDIDO = 'o pedido ainda não foi criado. Gere a cobrança ou envie ao cliente primeiro.'
 const LINK_CANCELADO_ESPERA_APROVACAO = 'O link foi cancelado e o pedido agora espera aprovação. '
   + 'Use "Aprovar pedido" na Ficha e registre o pagamento de novo.'
 
