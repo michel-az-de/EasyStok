@@ -190,6 +190,14 @@ public class PedidoImpressoHtmlTests
     }
 
     [Fact]
+    public async Task LogoDeCaminhoRelativoViraEnderecoDaApi()
+    {
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(Exemplo(logo: "/uploads/lojas/logo.png"), PedidoImpressoHtml.Pedido, ImpressoHtml.A4));
+
+        corpo.Should().Contain("<img class=\"logo\" src=\"https://api.test/uploads/lojas/logo.png\"");
+    }
+
+    [Fact]
     public async Task SemWhatsAppDaCasaNaoHaQrNemConvite()
     {
         var corpo = SnapshotImpresso.Corpo(await Renderizar(Exemplo(whatsApp: null), PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom80));

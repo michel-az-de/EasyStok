@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
+import { ImprimirPedido } from '../../componentes/ImprimirPedido'
+import { impressaoDoPedido } from '../../aplicacao/impressos'
 import { avisoDeInicio, gruposDoKds, nomeNaComanda, proximoStatusKds, tempoAteInicio, urgenciaDoPedido } from '../../dominio/kds'
 import css from './cozinha.module.css'
 
@@ -73,6 +75,8 @@ export function CartaoKds({
         <div className={css.acoesCartao}>
           <Botao variante="texto" icone="nota" onClick={() => aoAbrir(pedido.id)}>Ver comanda</Botao>
           <Botao variante="texto" icone="printer" onClick={() => aoImprimir(pedido)}>Canhoto</Botao>
+          {/* #1632: impressos da API, com escolha de documento e papel. */}
+          <ImprimirPedido {...impressaoDoPedido(pedido.id)} documentoInicial="cozinha" variante="texto" />
         </div>
       )}
     </li>

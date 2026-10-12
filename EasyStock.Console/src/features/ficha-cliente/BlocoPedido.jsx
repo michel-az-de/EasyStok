@@ -307,6 +307,7 @@ export function BlocoPedido({
           faixa={faixa}
           aoFechar={() => setCanhotoAberto(false)}
           aoImprimir={() => marcarCanhotoImpresso(pedido.numero)}
+          pedidoIdApi={fonteApi ? pedido.pedidoId ?? null : null}
         />
       )}
 

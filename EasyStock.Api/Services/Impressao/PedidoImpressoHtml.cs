@@ -42,13 +42,13 @@ public sealed class PedidoImpressoHtml(IRendererTemplate renderer, IConfiguratio
 
         var corpo = await renderer.RenderizarAsync(
             Recurso($"{documento}.sbn"),
-            new Dictionary<string, object?> { ["m"] = Modelo(pedido, documento, modelo, opcoes ?? new ImpressoOpcoes()) },
+            new Dictionary<string, object?> { ["m"] = Modelo(pedido, documento, modelo, baseUrl, opcoes ?? new ImpressoOpcoes()) },
             htmlEscape: false,
             ct);
         return Pagina(Titulo(documento) + " #" + pedido.Numero, modelo, baseUrl, corpo);
     }
 
-    private Dictionary<string, object?> Modelo(PedidoImpressoDto p, string documento, string modelo, ImpressoOpcoes opcoes)
+    private Dictionary<string, object?> Modelo(PedidoImpressoDto p, string documento, string modelo, string baseUrl, ImpressoOpcoes opcoes)
     {
         var hoje = DateOnly.FromDateTime(p.ImpressoEm);
         var link = LinkWhatsApp(p.Casa.WhatsApp, p.Numero);
@@ -57,7 +57,7 @@ public sealed class PedidoImpressoHtml(IRendererTemplate renderer, IConfiguratio
         {
             ["papel"] = Papel(modelo, documento),
             ["numero"] = T(p.Numero),
-            ["logo"] = Logo(p.Casa.LogoUrl, modelo, opcoes.LogoNaTermica),
+            ["logo"] = Logo(p.Casa.LogoUrl, modelo, opcoes.LogoNaTermica, baseUrl),
             ["orn"] = Ornamento,
             ["assinatura"] = T(Assinatura(p.Casa.Nome)),
             ["casa"] = new Dictionary<string, object?>

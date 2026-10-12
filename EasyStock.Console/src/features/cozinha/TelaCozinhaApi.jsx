@@ -11,6 +11,8 @@ import { ORDEM_DAS_LINHAS } from '../../dominio/pedido'
 import { pdfDoCanhoto } from '../../dominio/impressao'
 import { useCozinhaApi } from '../../aplicacao/useCozinhaApi'
 import { imprimirPdf } from '../../componentes/pdfNoNavegador'
+import { ImprimirPedido } from '../../componentes/ImprimirPedido'
+import { impressaoDoPedido } from '../../aplicacao/impressos'
 import { Botao } from '../../componentes/Botao'
 import { Chip } from '../../componentes/Chip'
 import { Icone } from '../../componentes/Icone'
@@ -101,6 +103,8 @@ export function TelaCozinhaApi({ linhas }) {
 
   const lista = pedidos ?? []
   const filaDeCanhotos = impressoesDaCozinha(impressoes, lista)
+  // #1632: o topo da fila também sai pelo impresso da API (papel do aparelho); confirma igual ao PDF.
+  const topoDaFila = filaDeCanhotos[0] ?? null
   const imprimirDaFila = () => {
     const topo = filaDeCanhotos[0]
     const pedido = topo && lista.find((p) => p.id === topo.pedidoId)
@@ -206,6 +210,10 @@ export function TelaCozinhaApi({ linhas }) {
                     <Icone nome="printer" tamanho={20} />
                     <span>{filaDeCanhotos.length === 1 ? '1 canhoto na fila' : `${filaDeCanhotos.length} canhotos na fila`}</span>
                     <Botao variante="primario" icone="printer" onClick={imprimirDaFila}>Imprimir</Botao>
+                    <ImprimirPedido
+                      key={topoDaFila.id} {...impressaoDoPedido(topoDaFila.pedidoId)} documentoInicial="cozinha"
+                      rotulo="Escolher papel" aoImprimir={() => confirmarImpressao(topoDaFila.id)}
+                    />
                   </output>
                 )}
               </div>

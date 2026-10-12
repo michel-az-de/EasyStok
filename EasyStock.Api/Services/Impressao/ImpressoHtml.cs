@@ -97,8 +97,13 @@ public static class ImpressoHtml
     };
 
     /// <summary>Logo só entra onde sai bem: sempre no jato de tinta; na térmica, só se a loja pedir.</summary>
-    public static string? Logo(string? logoUrl, string modelo, bool logoNaTermica) =>
-        string.IsNullOrWhiteSpace(logoUrl) || (!JatoDeTinta(modelo) && !logoNaTermica) ? null : T(logoUrl.Trim());
+    /// <remarks>Caminho relativo (storage local) vira absoluto: o console imprime o HTML em outra origem.</remarks>
+    public static string? Logo(string? logoUrl, string modelo, bool logoNaTermica, string baseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(logoUrl) || (!JatoDeTinta(modelo) && !logoNaTermica)) return null;
+        var url = logoUrl.Trim();
+        return T(url.StartsWith('/') ? baseUrl.TrimEnd('/') + url : url);
+    }
 
     /// <summary>Prazo para os modelos, igual em todos os documentos.</summary>
     public static Dictionary<string, object?> Prazo(PedidoImpressoPrazoDto prazo, DateOnly hoje) => new()
