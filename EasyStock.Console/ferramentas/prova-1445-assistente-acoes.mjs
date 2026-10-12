@@ -108,8 +108,8 @@ assert.deepEqual(chamadas.map((c) => `${c.metodo} ${c.url}`), [
   'POST /api/atendimento/conversas/c1/link-cardapio',
   'POST /api/atendimento/conversas/c1/mensagens',
 ])
-assert.match(chamadas[1].corpo.texto, /^Oi Maria! Segue o cardápio de hoje/)
-assert.match(chamadas[1].corpo.texto, /https:\/\/loja\.test\/c\/abc$/)
+assert.match(chamadas[1].corpo.texto, /^Oi Maria! Faça seu pedido:/)
+assert.match(chamadas[1].corpo.texto, /https:\/\/loja\.test\/c\/abc\n/)
 
 // 5. Nota interna: vai ao cadastro do cliente (#1436), não à conversa.
 chamadas.length = 0

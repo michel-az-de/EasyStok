@@ -37,7 +37,7 @@ export function ModalEnviarCardapio({
         setCopiado(true)
       } catch {
         setCopiado(false)
-        setErro('Não foi possível copiar. Abra "Como funciona esta comanda" e selecione o endereço para copiá-lo.')
+        setErro('Não foi possível copiar. Abra "Detalhes do link" e selecione o endereço para copiá-lo.')
       }
     } catch (e) { setErro(e.message) }
     finally { trava.current = false; setCopiando(false) }
@@ -57,14 +57,14 @@ export function ModalEnviarCardapio({
 
   return (
     <Modal
-      titulo={numero ? `Compartilhar comanda ${numero}` : 'Compartilhar comanda'}
-      descricao={`Com ${primeiroNome(nomeCliente)}. A seleção aparece na ficha enquanto ele escolhe.`}
+      titulo="Link de compra"
+      descricao={`${primeiroNome(nomeCliente)}${numero ? ` · Comanda ${numero}` : ''} · ${canalNome}`}
       aoFechar={() => { if (!trava.current) aoFechar() }}
       rodape={(
         <>
-          <Botao disabled={ocupado} onClick={copiar}>{copiando ? 'Copiando…' : copiado ? 'Link copiado' : conteudo ? 'Copiar link' : 'Gerar e copiar link'}</Botao>
+          <Botao disabled={ocupado} onClick={copiar}>{copiando ? 'Copiando…' : copiado ? 'Link copiado' : conteudo ? 'Copiar link' : 'Gerar e copiar'}</Botao>
           <Botao variante="primario" icone="enviar" disabled={ocupado || !podeEnviar} onClick={enviar}>
-            {enviando ? 'Enviando…' : `${conteudo ? 'Enviar' : 'Gerar e enviar'} pelo ${canalNome}`}
+            {enviando ? 'Enviando…' : conteudo ? 'Enviar link' : 'Gerar e enviar'}
           </Botao>
         </>
       )}
@@ -72,15 +72,18 @@ export function ModalEnviarCardapio({
       <div className={css.cardapioEnvio}>
         {erro && <p role="alert">{erro}</p>}
         {!podeEnviar && <p>O canal não permite enviar texto agora. Você pode copiar o link ou usar um modelo aprovado na conversa.</p>}
-        {!conteudo && <p>Ao gerar uma nova edição, o link anterior ainda não confirmado, se houver, deixa de aceitar alterações.</p>}
-        <p className={css.cardapioRotulo}>Mensagem</p>
-        <p className={css.cardapioMensagem}>{conteudo?.texto || 'O link individual e a mensagem aparecerão aqui após a geração.'}</p>
+        {!conteudo && <>
+          <p>O cliente escolhe pelo link. Você acompanha a seleção nesta conversa.</p>
+          <p>Se houver um link ainda não confirmado, ele será substituído ao gerar outro.</p>
+        </>}
+        {conteudo && <><p className={css.cardapioRotulo}>Mensagem</p>
+          <p className={css.cardapioMensagem}>{conteudo.texto}</p></>}
 
         {conteudo && <><p className={css.cardapioLink}>
-          <a href={conteudo.link} target="_blank" rel="noreferrer">Abrir comanda {numero}</a>
+          <a href={conteudo.link} target="_blank" rel="noreferrer">Abrir página de compra</a>
         </p>
         <details>
-        <summary>Como funciona esta comanda</summary>
+        <summary>Detalhes do link</summary>
         {conteudo.daLoja ? (
           // #1353: o mesmo link que o agente manda (S48). Vale 24 h e um pedido.
           <p>

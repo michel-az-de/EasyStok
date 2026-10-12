@@ -386,6 +386,8 @@
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .cardapioLink { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
+.cardapioLink a { display: inline-flex; align-items: center; min-height: 44px; color: var(--tinta); text-underline-offset: 3px; }
+.cardapioEnvio summary { min-height: 44px; align-content: center; cursor: pointer; color: var(--tinta-2); }
 .cardapioLink code { overflow-wrap: anywhere; font-size: var(--t-apoio); color: var(--tinta-2); }
 
 /* #1424: programar mensagem ao cliente (formulário e lista das programadas da conversa). */

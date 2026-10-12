@@ -31,6 +31,18 @@ public class GeocodingProviderSelecaoTests
         });
 
         Assert.IsType<GoogleGeocodingClient>(client);
+        Assert.True(client.Disponivel);
+    }
+
+    [Fact]
+    public void Noop_avisa_que_nao_ha_geocodificador_ligado()
+    {
+        var client = Resolver(new()
+        {
+            [GeocodingServiceCollectionExtensions.FeatureFlagKey] = "false",
+        });
+
+        Assert.False(client.Disponivel);
     }
 
     [Fact]

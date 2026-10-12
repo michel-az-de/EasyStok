@@ -24,6 +24,8 @@
 .observacaoCompartilhada { display: grid; width: 100%; gap: var(--e-1); margin-block: var(--e-2); }
 .clienteCompartilhado input, .clienteCompartilhado textarea, .clienteCompartilhado select { max-width: 100%; min-width: 0; width: 100%; min-height: 44px; padding: var(--e-2); border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-1); color: var(--tinta); background: var(--papel); font: inherit; }
 .comparativo { padding: var(--e-2); border-left: 3px solid var(--linha-forte); }
+.historicoFinanceiro summary { display: list-item; min-height: 44px; align-content: center; cursor: pointer; color: var(--tinta); }
+.historicoFinanceiro summary:focus-visible { outline: 2px solid var(--tinta); outline-offset: 2px; }
 
 /* O único gesto "de papel": dois triângulos diagonais por dente de 8×5 px,
    pintados na cor da comanda. Onde não há tinta, o fundo por trás aparece,

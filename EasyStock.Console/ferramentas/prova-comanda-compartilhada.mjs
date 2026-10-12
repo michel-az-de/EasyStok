@@ -138,7 +138,7 @@ let concluirEnvio, envios = 0, fechamentos = 0
 const props = { nomeCliente: 'Maria', canalNome: 'WhatsApp', link, numeroComanda: 72, texto: 'Convite',
   aoEnviar: () => { envios++; return new Promise(resolve => { concluirEnvio = resolve }) }, aoFechar: () => { fechamentos++ } }
 function renderModal() { contexto.cursor = 0; return elementos(ModalEnviarCardapio(props)) }
-const botao = renderModal().find(e => e.props.children === 'Enviar pelo WhatsApp')
+const botao = renderModal().find(e => e.props.children === 'Enviar link')
 const primeiroEnvio = botao.props.onClick()
 await botao.props.onClick()
 assert.equal(envios, 1, 'cliques repetidos não repetem convite')
@@ -147,7 +147,7 @@ assert.equal(renderModal().find(e => e.props.children === 'Enviando…').props.d
 concluirEnvio(false); await primeiroEnvio
 assert.equal(fechamentos, 0, 'falha mantém link e modal acessíveis')
 assert.ok(renderModal().some(e => e.props.role === 'alert'))
-const novaTentativa = renderModal().find(e => e.props.children === 'Enviar pelo WhatsApp').props.onClick()
+const novaTentativa = renderModal().find(e => e.props.children === 'Enviar link').props.onClick()
 await Promise.resolve()
 concluirEnvio(true); await novaTentativa
 assert.equal(fechamentos, 1)
@@ -184,15 +184,15 @@ const propsNovo = { nomeCliente: 'Maria', canalNome: 'WhatsApp', numeroComanda: 
   aoEnviar: async mensagem => { mensagemEnviada = mensagem; return true }, aoFechar: () => { fechamentos++ } }
 function renderNovo() { contexto.cursor = 0; return elementos(ModalEnviarCardapio(propsNovo)) }
 assert.ok(!renderNovo().some(e => e.type === 'a'), 'prévia não inventa URL antes da geração')
-const copia = renderNovo().find(e => e.props.children === 'Gerar e copiar link').props.onClick()
-await renderNovo().find(e => e.props.children === 'Gerar e enviar pelo WhatsApp').props.onClick()
+const copia = renderNovo().find(e => e.props.children === 'Gerar e copiar').props.onClick()
+await renderNovo().find(e => e.props.children === 'Gerar e enviar').props.onClick()
 renderNovo().find(e => e.type.name === 'Modal').props.aoFechar()
 assert.equal(geracoes, 1, 'cópia e envio concorrentes compartilham a trava de geração')
 assert.equal(fechamentos, 0, 'não fecha no meio da geração')
 liberarGeracao(gerado); await copia
 assert.ok(renderNovo().some(e => e.props.role === 'alert'))
 assert.equal(renderNovo().find(e => e.type === 'a').props.href, link, 'falha de clipboard mantém a URL real para cópia manual')
-await renderNovo().find(e => e.props.children === 'Enviar pelo WhatsApp').props.onClick()
+await renderNovo().find(e => e.props.children === 'Enviar link').props.onClick()
 assert.equal(geracoes, 1, 'envio reutiliza o link já gerado, mesmo após falha na cópia')
 assert.equal(mensagemEnviada, gerado.texto)
 assert.equal(fechamentos, 1)

@@ -32,9 +32,8 @@ export const linkDoCardapio = (origem, conversaId) => origem + rotaDoCardapioLin
 
 // Convite que sai na conversa (US-021, seção C): nome e link, sem travessão.
 export function textoConviteCardapio(nomeCliente, link, numeroComanda) {
-  if (numeroComanda) return `Oi ${primeiroNome(nomeCliente)}! Sua comanda ${numeroComanda}: ${link}\nEscolha os pratos e confirme. A Casa acompanha em tempo real. Depois você pode acompanhar e pedir alterações. Cada pedido ou acréscimo tem seu pagamento.`
-  return `Oi ${primeiroNome(nomeCliente)}! Segue o cardápio de hoje, é só escolher, `
-    + `pagar e a gente já recebe tudo por aqui: ${link}`
+  return `Oi ${primeiroNome(nomeCliente)}! Faça seu pedido: ${link}\nEscolha os pratos, confirme e acompanhe por aqui.`
+    + (numeroComanda ? ` Comanda ${numeroComanda}.` : '')
 }
 
 // RN-16: só o que a casa vende hoje entra no link. Mesmo filtro que o

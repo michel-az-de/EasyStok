@@ -13,15 +13,16 @@ function AcertoDaComanda({ comanda: c }) {
   if (!f && !a && !uso) return null
   const situacao = { pendente: 'Em acompanhamento', confirmado: 'Confirmado', recusado: 'Não confirmado' }
   return <section className={css.comparativo} aria-label="Acerto da comanda">
-    {f && <>
+    {f && <details className={css.historicoFinanceiro}>
+      <summary>Histórico financeiro</summary>
       <p>Dinheiro recebido: {moeda(f.recebido)}</p>
       <p>Dinheiro devolvido: {moeda(f.devolvido)}</p>
       <p>Convertido em cupom: {moeda(f.convertidoEmCupom)}</p>
       <p>Cupom aplicado: {moeda(f.cupomAplicado)}</p>
       <p>Cobertura atual do pedido: {moeda(f.alocado)}</p>
-      {f.reservado > 0 && <p>Reservado para acerto: {moeda(f.reservado)}</p>}
-      <p>Disponível no pagamento para acerto: {moeda(f.dinheiroDisponivel)}</p>
-    </>}
+    </details>}
+    {f?.reservado > 0 && <p>Reservado para acerto: {moeda(f.reservado)}</p>}
+    {f?.dinheiroDisponivel > 0 && <p>Disponível no pagamento para acerto: {moeda(f.dinheiroDisponivel)}</p>}
     {a && <>
       <b>{a.tipo === 'cupom' ? 'Cupom desta edição' : 'Devolução desta edição'} · {a.situacao === 'recusado' ? 'Precisa de conferência' : situacao[a.situacao] ?? 'Em acompanhamento'} · {moeda(a.valor)}</b>
       {a.codigoCupom && <p>Código do cupom: {a.codigoCupom}</p>}
@@ -65,8 +66,8 @@ function SelecaoCompartilhada({ comanda: c, ocupado, salvar, confirmar, cardapio
     : (c.podeEditar || pendente ? c.totalPrevisto ?? 0 : c.pedido?.total ?? c.totalPrevisto ?? 0) - (c.pedido?.alocado ?? c.pedido?.totalPago ?? 0)
   const exigeGerente = saldo < 0 || c.envio?.situacao === 'estorno_pendente'
   return <div>
-    <p>{c.podeEditar ? c.pedido ? 'O pedido atual continua registrado. Esta seleção propõe um ajuste, aplicado após a confirmação do cliente e a conferência necessária da Casa.'
-      : 'Cliente e atendimento acompanham esta seleção. Só vira pedido após a confirmação do cliente.'
+    <p>{c.podeEditar ? c.pedido ? 'O pedido atual fica mantido até o cliente confirmar o ajuste e a Casa conferir.'
+      : 'Seleção compartilhada. O cliente precisa confirmar para enviar o pedido.'
       : c.envio?.situacao === 'estorno_pendente' ? 'Devolução em acompanhamento.'
         : pendente ? 'Confira a alteração solicitada antes de aplicar ao pedido.' : 'Envio registrado. Compartilhe uma nova edição para ajustar.'}</p>
     {conflito && <p role="alert">A seleção mudou enquanto você editava. Sua edição foi preservada. Confira a seleção atual abaixo antes de continuar.</p>}
