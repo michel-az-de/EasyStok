@@ -88,6 +88,11 @@ public class TenantVitrineEntregaController(
 
     // ── Frete por raio ─────────────────────────────────────────────────
 
+    [SwaggerOperation(Summary = "Get the stored distance shipping setup", Description = "O endereço da cozinha não é guardado; `configurado` diz se há coordenada.")]
+    [HttpGet("raio")]
+    public Task<IActionResult> ObterRaio(CancellationToken ct) =>
+        Tratar(async () => DataOk(await configurarRaio.ObterAsync(Empresa, ct)));
+
     [SwaggerOperation(Summary = "Set kitchen address, max radius and distance price bands", Description = "A cozinha é geocodificada no servidor; só grava com localização confiável.")]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     [HttpPut("raio")]

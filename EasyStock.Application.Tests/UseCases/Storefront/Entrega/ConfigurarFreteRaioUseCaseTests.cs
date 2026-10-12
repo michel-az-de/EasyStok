@@ -137,6 +137,56 @@ public class ConfigurarFreteRaioUseCaseTests
         await NadaGravado();
     }
 
+    // ── I2.2 (#1651): reler o que foi gravado e mexer nas faixas sem redigitar a cozinha ──
+
+    [Fact]
+    public async Task Obter_sem_raio_configurado_devolve_vazio()
+    {
+        var config = await UseCase().ObterAsync(_empresaId);
+
+        config.Configurado.Should().BeFalse();
+        config.RaioMaxMetros.Should().BeNull();
+        config.Faixas.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Obter_devolve_o_que_foi_gravado()
+    {
+        await UseCase().ExecuteAsync(_empresaId, Input());
+
+        var config = await UseCase().ObterAsync(_empresaId);
+
+        config.Configurado.Should().BeTrue();
+        config.RaioMaxMetros.Should().Be(5000);
+        config.FaixaGratisMetros.Should().Be(500);
+        config.FatorRota.Should().Be(1.4);
+        config.Faixas.Select(f => (f.AteMetros, f.ValorCentavos)).Should().Equal((2000, 1500), (5000, 2500));
+    }
+
+    [Fact]
+    public async Task Sem_endereco_mantem_a_cozinha_ja_gravada_e_troca_as_faixas()
+    {
+        await UseCase().ExecuteAsync(_empresaId, Input());
+        _geocoding.ClearReceivedCalls();
+        _geocoding.Disponivel.Returns(false); // manter a cozinha não depende do geocodificador
+
+        await UseCase().ExecuteAsync(_empresaId, Input(new FreteRaioFaixaInput(5000, 1900)) with { Cep = null, Numero = "" });
+
+        _loja.CozinhaLat.Should().Be(-23.57);
+        _loja.CozinhaLng.Should().Be(-46.71);
+        (await UseCase().ObterAsync(_empresaId)).Faixas.Select(f => f.ValorCentavos).Should().Equal(1900);
+        await _geocoding.DidNotReceive().GeocodificarAsync(Arg.Any<GeocodeQuery>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Sem_endereco_e_sem_cozinha_gravada_recusa()
+    {
+        var act = () => UseCase().ExecuteAsync(_empresaId, Input() with { Cep = null, Numero = null });
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        await NadaGravado();
+    }
+
     [Fact]
     public async Task Sem_vitrine_lanca()
     {
