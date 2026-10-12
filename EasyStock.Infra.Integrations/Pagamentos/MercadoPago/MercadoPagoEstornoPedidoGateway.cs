@@ -17,6 +17,9 @@ public sealed class MercadoPagoEstornoPedidoGateway(
     /// <summary>Sem resposta conclusiva: o estorno pode ter sido efetivado (I3.1, invariante 13).</summary>
     public const string CodigoIndeterminado = "estorno_indeterminado";
 
+    /// <summary>Credencial ausente ou recusada (401, 403): nada foi estornado e não é recusa do reembolso.</summary>
+    public const string CodigoSemCredencial = "mercado_pago_sem_credencial";
+
     public async Task<EstornoPedidoResult> EstornarAsync(
         string pagamentoExternoId, decimal valor, string chaveIdempotencia, CancellationToken ct = default)
     {
@@ -39,6 +42,13 @@ public sealed class MercadoPagoEstornoPedidoGateway(
             // Em análise, sem status ou resposta que não confere com o pedido: não é recusa.
             logger.LogWarning("Estorno {Chave} sem confirmação no Mercado Pago: status {Status}.", chaveIdempotencia, r.Status);
             return EstornoPedidoResult.Indeterminado(CodigoIndeterminado);
+        }
+        catch (HttpRequestException ex) when (ex is MercadoPagoNaoConfiguradoException
+                                              || ex.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+        {
+            // Sem credencial ou credencial recusada: o estorno não foi feito, e não foi o provedor que negou.
+            logger.LogError("Estorno {Chave} não enviado: Mercado Pago sem credencial válida.", chaveIdempotencia);
+            return EstornoPedidoResult.Falha(CodigoSemCredencial);
         }
         catch (HttpRequestException ex) when (EhRecusa(ex))
         {

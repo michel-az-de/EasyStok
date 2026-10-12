@@ -25,9 +25,9 @@ public static class MercadoPagoServiceCollectionExtensions
         var producao = FabricaDeSimulador.EmProducao(ambiente);
         var useStub = configuration.GetValue<bool>("MercadoPago:UseStub");
         var token = configuration["MercadoPago:AccessToken"];
-        var baseUrl = configuration["MercadoPago:BaseUrl"] is { Length: > 0 } configurada
-            ? configuration["MercadoPago:BaseUrl"]!
-            : "https://api.mercadopago.com/";
+        var baseUrl = string.IsNullOrWhiteSpace(configuration["MercadoPago:BaseUrl"])
+            ? "https://api.mercadopago.com/"
+            : configuration["MercadoPago:BaseUrl"]!.Trim();
 
         if (producao)
             RecusarConfiguracaoDeTeste(useStub, token, baseUrl);

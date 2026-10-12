@@ -70,6 +70,22 @@ public class MercadoPagoEstornoPedidoGatewayTests
         (await Gateway().EstornarAsync("123", 30m, "oc-1")).Desfecho.Should().Be(DesfechoEstornoPedido.Indeterminado);
     }
 
+    [Theory]
+    [InlineData(System.Net.HttpStatusCode.Unauthorized)]
+    [InlineData(System.Net.HttpStatusCode.Forbidden)]
+    [InlineData(null)]
+    public async Task Sem_credencial_valida_nao_e_recusa_do_provedor_nem_indeterminado(System.Net.HttpStatusCode? status)
+    {
+        Exception falha = status is null ? new MercadoPagoNaoConfiguradoException() : new HttpRequestException("credencial", null, status);
+        _mp.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal?>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(falha);
+
+        var r = await Gateway().EstornarAsync("123", 30m, "oc-1");
+
+        r.Sucesso.Should().BeFalse();
+        r.Erro.Should().Be(MercadoPagoEstornoPedidoGateway.CodigoSemCredencial);
+    }
+
     [Fact]
     public async Task Cancelamento_do_chamador_propaga()
     {
