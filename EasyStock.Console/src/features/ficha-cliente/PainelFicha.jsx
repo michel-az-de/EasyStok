@@ -167,9 +167,9 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
             <BlocoEntrega conversa={selecionada} />
           </>
         ) : (
-          <Bloco titulo="Comanda" chave="comanda">
+          <Bloco titulo="Pedido" chave="comanda">
             <p className={css.corpoBloco}>
-              Nenhuma comanda aberta. O resumo e a cobrança nascem do pedido.
+              Nenhum pedido confirmado ainda. O resumo e a cobrança aparecem após a confirmação.
             </p>
             <Botao largo disabled={!editavel} onClick={aoAbrirCardapio}>
               Adicionar itens

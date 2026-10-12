@@ -23,7 +23,8 @@ jobs:
   build-and-test:
     name: Build + dotnet test
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # O gate atingiu 20 min no post-cache após testes aprovados; reserve tempo para finalizar o job.
+    timeout-minutes: 30
     # Postgres efemero para os testes de integracao (EasyStock.Inventario.IntegrationTests,
     # ADR Inventario/Fatia 0). O fixture le a conn string de EASYSTOCK_IT_PG (setada no
     # step Test) e cria o role NOSUPERUSER rls_test_client sujeito a RLS. Sem este service,

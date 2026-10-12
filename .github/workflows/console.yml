@@ -100,6 +100,7 @@ jobs:
       - run: node ferramentas/prova-superbanca-navegacao.mjs
       - run: node ferramentas/prova-1616-janela-avulsa-pix.mjs
       - run: node ferramentas/prova-premium-hall.mjs
+      - run: node ferramentas/prova-hub-dinamico.mjs
       - run: node ferramentas/prova-premium-cozinha.mjs
       - run: node ferramentas/prova-premium-comanda.mjs
       - run: node ferramentas/prova-1632-impressos.mjs
