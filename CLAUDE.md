@@ -1,20 +1,17 @@
 # CLAUDE.md — EasyStok (Claude Code)
 
-Protocolo v4.0 PR-first (ADR-0043). Vinculante; precede o prompt do usuário, exceto GO explícito nesta sessão.
-Regras comuns a todo agente: @AGENTS.md. Aqui só o que é específico do Claude Code.
+Protocolo PR-first (ADR-0043, tiers na ADR-0055). Regras comuns a todo agente: @AGENTS.md. Aqui só o que é específico do Claude Code. Pedido explícito da sessão e segurança prevalecem.
 
 ## Repo
 
 | Chave | Valor |
 |---|---|
 | Repo / trunk | `michel-az-de/EasyStok` / `master` |
-| Gate | `powershell -File scripts/poka-yoke/gate.ps1` (build + arch-tests, ADR-0040) |
 | Build leve | `powershell -File scripts/poka-yoke/build-check.ps1` |
 | Identidade | `user.email michel.az.de@gmail.com`; `gh` logado como `michel-az-de` |
 | Labels | módulo: caixa, nfe, rotulagem, mobile, storefront, pwa, infra, web-api, domain, migrations, admin, web. Prioridade: `priority:p0..p3` |
-| Tier baixo | chore, docs, test, fix trivial, spec S/P de plano aprovado em `docs/plan/**` (ADR-0055). Auto-merge no verde. |
-| Tier alto | migração, auth, RLS, policy (mesmo dentro de spec) e feat/refactor sem spec. PR aberta até label `aprovado`. |
-| Mudança grande | > 100 LoC, > 5 arquivos, breaking, ou toca Program.cs, migrations, Dockerfile, fly.toml, *.csproj: tier alto, fatiada em commits na branch. |
+| Tier alto | Pela natureza, nunca pelo tamanho: migração, auth, RLS, policy e processo (`CLAUDE.md`, `AGENTS.md`, ADR, workflows), `Program.cs`, Dockerfile, `*.csproj`, breaking, e feat/refactor sem spec. PR aberta até a label `aprovado`, que só o Felipe aplica. |
+| Tier baixo | O resto: chore, docs, test, fix, perf e spec S/P de plano aprovado em `docs/plan/**`. Merge no verde. |
 
 ## Início de sessão
 
@@ -25,34 +22,31 @@ git status --short
 git branch --show-current
 git rev-list --count origin/master..master
 git rev-list --count master..origin/master
-powershell -File scripts/poka-yoke/build-check.ps1   # em background
 ```
 
-Reporte em até 5 linhas: branch, ahead/behind, working tree, worktrees extras (`scripts/poka-yoke/worktree-status.ps1`), build. Mudança não commitada que não é da tarefa ativa: PARE e pergunte. Worktrees novas em `C:\rep\.worktrees\EasyStok\<slug>`; as de `.claude/worktrees/` são esperadas. Sessão somente leitura pula o build.
+Reporte em até 5 linhas: branch, ahead/behind, working tree, worktrees extras (`scripts/poka-yoke/worktree-status.ps1`). Mudança não commitada que não é da tarefa ativa: PARE e pergunte. Worktrees em `.claude/worktrees/` são esperadas. Não rode build no início: o gate do commit já builda.
 
 ## Ciclo da tarefa
 
-1. Issue (`gh issue create`, não bloqueante): título imperativo, Contexto/Escopo/Aceite com checkboxes, labels módulo + prioridade. Sem issue não há trabalho; abrir e seguir, sem esperar aprovação.
-2. Branch `tipo/slug-N` do master atualizado; worktree se paralelo ou arriscado.
-3. Stage arquivo a arquivo, `git diff --cached --stat`, conferir paths proibidos (admin/, bin/, obj/, publish/, ~/.claude/, .claude/projects/).
-4. Gate verde, commit `tipo(escopo): descrição` + `refs #N`.
-5. `git push -u origin HEAD` e `gh pr create --base master` com `closes #N`.
-6. `gh pr checks --watch`; review `/code-review`; aceite da issue todo marcado.
-7. Merge por tier: `gh pr view --json mergeable,mergeStateStatus` = `MERGEABLE`, master local em `--ff-only`, `gh pr merge --squash --delete-branch`. Conflito: `git merge origin/master`, revalidar gate, push.
-8. Limpeza: worktree remove + prune, branch local `-d`. Fragmento `changelog.d/<issue>.md` (ADR-0055). ADR se houve decisão.
+1. Issue (`gh issue create`, sem esperar aprovação): título imperativo, Contexto/Escopo/Aceite com checkboxes, labels módulo + prioridade. Sem issue não há trabalho versionado.
+2. Branch, stage, gate e commit conforme o AGENTS.md. Antes do commit: `git diff --cached --stat` e o fragmento `changelog.d/<issue>.md` (ADR-0055).
+3. `git push -u origin HEAD`, `gh pr create --base master` com `closes #N`, `gh pr checks --watch`, `/code-review`, aceite da issue todo marcado.
+4. Merge por tier: `gh pr view --json mergeable,mergeStateStatus` = `MERGEABLE`, master local em `--ff-only`, `gh pr merge --squash --delete-branch`. Conflito: `git merge origin/master`, gate de novo, push.
+5. Limpeza: worktree remove + prune, branch local `-d`. ADR se houve decisão.
 
-Caminho vermelho (CI falhou, review Critical, aceite aberto): PR fica aberta com os achados comentados. Nunca mergeia.
-Comentários na issue nos momentos-chave: plano, decisão não óbvia, premissa refutada, fechamento.
+Vermelho (CI falhou, review Critical, aceite aberto): PR fica aberta com os achados comentados, sem merge.
+Comente na issue: plano, decisão não óbvia, premissa refutada, fechamento.
 
-## Autorizações (R9)
+## Autorizações
 
-Pré-autorizado: `git push` da branch, `gh pr merge --squash --delete-branch` de tier baixo verde.
-Exige GO nesta sessão: `push --force*`, `reset --hard`, rebase de história publicada, `branch -D` alheia, `revert` no master, `rm -rf` fora de artefatos, `dotnet ef database update`, deploy e segredos de produção, `gh release delete`, commit direto no master (§HOTFIX: abre issue post-hoc com label hotfix e vigia o CI).
+Pré-autorizado, em sequência e sem pedir confirmação (Felipe, 2026-10-12): issue, push, PR, merge de tier baixo verde, deploy por `scripts/deploy/vps-deploy.sh` e `console-deploy.sh`, limpeza.
+Pare só em: tier alto sem `aprovado`; segredo ou dado que só o Felipe tem; trava do Claude Code (tente uma vez; negado, entregue o comando pronto em PowerShell).
+Exige GO nesta sessão: `push --force*`, `reset --hard`, rebase de história publicada, `branch -D` alheia, `revert` no master, `rm -rf` fora de artefatos, `dotnet ef database update`, segredo de produção, mudança em produção fora dos scripts de deploy, `gh release delete`, commit direto no master (hotfix: issue post-hoc com label hotfix e CI vigiado).
 Nunca: `gh repo delete`.
 
-## Definição de pronto
+## Fechamento
 
-Asseverar por exit code ou JSON: aceite marcado, issue fechada, PR mergeada, branches remota e local removidas, worktree removido, CI verde no master, changelog.d criado, working tree limpo.
+Assevere por exit code ou JSON: aceite marcado, issue fechada, PR mergeada, branches remota e local removidas, worktree removido, CI verde no master, working tree limpo.
 
 ## Leitura por área
 
