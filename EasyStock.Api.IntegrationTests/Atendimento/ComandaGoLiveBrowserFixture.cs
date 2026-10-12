@@ -167,7 +167,8 @@ public sealed partial class PedidoConversaConcorrenciaTests
                 return Task.FromResult(AuthenticateResult.Fail("Identidade não cadastrada na fixture."));
             var claims = new[] { new Claim(ClaimTypes.NameIdentifier, id.ToString()), new Claim("sub", id.ToString()),
                 new Claim(ClaimTypes.Name, identidade.Nome), new Claim("nome", identidade.Nome),
-                new Claim("empresaId", identidade.EmpresaId.ToString()), new Claim("nivel", identidade.Nivel.ToString()) };
+                new Claim("empresaId", identidade.EmpresaId.ToString()), new Claim("nivel", identidade.Nivel.ToString()),
+                new Claim("iat", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture), ClaimValueTypes.Integer64) };
             return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity(claims, SchemeName)), SchemeName)));
         }
     }
