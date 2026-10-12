@@ -49,4 +49,14 @@ public sealed class CobrancaPedidoRepository(EasyStockDbContext db) : ICobrancaP
             .Select(c => new CobrancaPedidoVencida(c.Id, c.EmpresaId, c.PedidoId))
             .ToListAsync(ct);
     }
+
+    public async Task<bool> ExistePendenteOnlineAsync(CancellationToken ct = default)
+    {
+        using var _ = db.UseRowLevelSecurityBypass();
+        return await db.CobrancasPedido
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(c => c.Status == StatusCobrancaPedido.Pendente
+                           && c.Provedor == CobrancaPedido.ProvedorMercadoPago, ct);
+    }
 }

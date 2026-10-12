@@ -147,10 +147,12 @@ public static class ServiceCollectionExtensions
         {
             services.AddScoped<MercadoPagoGatewayAdapter>();
             services.AddScoped<IPagamentoGateway>(sp => DecorateGateway(sp, sp.GetRequiredService<MercadoPagoGatewayAdapter>()));
-            services.AddSingleton<IWebhookSignatureValidator, MercadoPagoSignatureValidator>();
-            // S32: sem processor o /api/webhooks/mercadopago respondia 500. Rollback: remover esta linha.
-            services.AddScoped<IGatewayWebhookProcessor, MercadoPagoWebhookProcessor>();
         }
+
+        // I3.1 (#1667): o webhook do Mercado Pago existe sempre, com ou sem token. Sem segredo configurado o
+        // validador recusa (401); antes a rota respondia 404 e a falta de configuração passava em silêncio.
+        services.AddSingleton<IWebhookSignatureValidator, MercadoPagoSignatureValidator>();
+        services.AddScoped<IGatewayWebhookProcessor, MercadoPagoWebhookProcessor>();
 
         return services;
     }

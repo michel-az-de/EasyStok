@@ -207,6 +207,12 @@ public sealed class GerarCobrancaPedidoUseCase(
             throw new MercadoPagoIndisponivelException(
                 "MercadoPago não respondeu no tempo limite. Tente novamente em instantes.");
         }
+        catch (MercadoPagoNaoConfiguradoException ex)
+        {
+            // I3.1: "não configurado" é dito como tal, não como instabilidade do provedor.
+            logger.LogWarning("Cobranca mp-nao-configurado pedidoId={PedidoId}", command.PedidoId);
+            throw new MercadoPagoIndisponivelException(ex.Message, ex);
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex, "Cobranca erro-mp pedidoId={PedidoId}", command.PedidoId);

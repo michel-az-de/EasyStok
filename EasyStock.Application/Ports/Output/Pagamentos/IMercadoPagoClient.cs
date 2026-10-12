@@ -1,4 +1,4 @@
-﻿namespace EasyStock.Application.Ports.Output.Pagamentos;
+namespace EasyStock.Application.Ports.Output.Pagamentos;
 
 /// <summary>
 /// Porta de saída para o gateway MercadoPago (ADR-0005).
@@ -30,11 +30,12 @@ public interface IMercadoPagoClient
 
     /// <summary>
     /// Estorna o pagamento (<c>POST v1/payments/{id}/refunds</c>, S32) com <c>X-Idempotency-Key</c>.
-    /// <paramref name="valor"/> null = estorno total. Sem chave, usa <c>estorno-{id}-{valor|total}</c>, então
-    /// o retry da mesma chamada não estorna duas vezes.
+    /// <paramref name="valor"/> null = estorno total. A chave é obrigatória e é de quem chama (I3.1): uma
+    /// chave por intenção de estorno. Repetir a mesma chave não estorna duas vezes; dois estornos parciais
+    /// de mesmo valor, com chaves diferentes, são dois reembolsos.
     /// </summary>
     Task<EstornoMercadoPagoResult> EstornarAsync(
-        string pagamentoId, decimal? valor = null, string? idempotencyKey = null, CancellationToken ct = default);
+        string pagamentoId, decimal? valor, string idempotencyKey, CancellationToken ct = default);
 
     Task<EstornoMercadoPagoResult?> ConsultarEstornoAsync(string pagamentoId, string estornoId, CancellationToken ct = default);
     Task<IReadOnlyList<EstornoMercadoPagoResult>> ListarEstornosAsync(string pagamentoId, CancellationToken ct = default);

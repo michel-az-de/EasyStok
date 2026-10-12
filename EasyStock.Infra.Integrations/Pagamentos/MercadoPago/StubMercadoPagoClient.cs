@@ -1,13 +1,15 @@
-﻿using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Pagamentos;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Integrations.Pagamentos.MercadoPago;
 
 /// <summary>
 /// Stub de desenvolvimento do MercadoPago — retorna URL fictícia imediatamente.
-/// Registrado quando <c>MercadoPago:UseStub=true</c> (ambiente Development).
+/// Registrado quando <c>MercadoPago:UseStub=true</c>, só fora de Production e só pela
+/// <c>FabricaDeSimulador</c> (I3.1).
 /// </summary>
-public sealed class StubMercadoPagoClient(ILogger<StubMercadoPagoClient> logger) : IMercadoPagoClient
+public sealed class StubMercadoPagoClient(ILogger<StubMercadoPagoClient> logger) : IMercadoPagoClient, ISimulador
 {
     public Task<EstornoMercadoPagoResult?> ConsultarEstornoAsync(string pagamentoId, string estornoId, CancellationToken ct = default) =>
         Task.FromResult<EstornoMercadoPagoResult?>(null);
@@ -42,10 +44,12 @@ public sealed class StubMercadoPagoClient(ILogger<StubMercadoPagoClient> logger)
         Task.FromResult<IReadOnlyList<PagamentoMercadoPago>>([]);
 
     public Task<EstornoMercadoPagoResult> EstornarAsync(
-        string pagamentoId, decimal? valor = null, string? idempotencyKey = null, CancellationToken ct = default)
+        string pagamentoId, decimal? valor, string idempotencyKey, CancellationToken ct = default)
     {
+        // I3.1: o simulador nunca devolve "approved"; quem consome vê que nenhum dinheiro voltou.
         logger.LogInformation("StubMercadoPago estorno simulado");
-        return Task.FromResult(new EstornoMercadoPagoResult($"stub-estorno-{Guid.NewGuid():N}", valor, "approved"));
+        return Task.FromResult(new EstornoMercadoPagoResult(
+            $"stub-estorno-{Guid.NewGuid():N}", valor, EstornoMercadoPagoResult.Simulado));
     }
 
     public Task ExpirarPreferenciaAsync(string preferenceId, DateTime expiraEm, CancellationToken ct = default) =>

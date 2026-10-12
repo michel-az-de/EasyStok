@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using Microsoft.Extensions.Logging;
 
@@ -43,7 +44,8 @@ public sealed class MercadoPagoWebhookProcessor(
     ConfirmarPagamentoPedidoUseCase confirmarPagamento,
     AtualizarCobrancaPorPagamentoUseCase atualizarCobranca,
     ILogger<MercadoPagoWebhookProcessor> logger,
-    IEstornosOnlineService estornosOnline) : IGatewayWebhookProcessor
+    IEstornosOnlineService estornosOnline,
+    ICobrancaPedidoRepository cobrancas) : IGatewayWebhookProcessor
 {
     public const string TopicoPagamento = "payment";
 
@@ -58,6 +60,14 @@ public sealed class MercadoPagoWebhookProcessor(
         var pagamento = await mercadoPagoClient.ConsultarPagamentoAsync(pagamentoId, ct);
         if (pagamento is null)
         {
+            // I3.1 (invariante 7): 404 na reconsulta com cobrança online esperando pede reenvio (5xx).
+            // Pode ser consulta com a credencial errada ou atraso do provedor; 200 perderia a baixa.
+            if (await cobrancas.ExistePendenteOnlineAsync(ct))
+            {
+                logger.LogError("Webhook MercadoPago: pagamento {PagamentoId} desconhecido na consulta e ha cobranca pendente. Pedindo reenvio.", pagamentoId);
+                throw new ReconsultaMercadoPagoSemRespostaException(pagamentoId);
+            }
+
             logger.LogWarning("Webhook MercadoPago: pagamento {PagamentoId} desconhecido na consulta. Ignorando.", pagamentoId);
             return ResultadoWebhookGateway.Falha("pagamento_desconhecido");
         }

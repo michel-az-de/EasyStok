@@ -14,24 +14,54 @@ public sealed class MercadoPagoEstornoPedidoGateway(
 {
     public const string CodigoRecusado = "estorno_recusado";
 
+    /// <summary>Sem resposta conclusiva: o estorno pode ter sido efetivado (I3.1, invariante 13).</summary>
+    public const string CodigoIndeterminado = "estorno_indeterminado";
+
     public async Task<EstornoPedidoResult> EstornarAsync(
         string pagamentoExternoId, decimal valor, string chaveIdempotencia, CancellationToken ct = default)
     {
         try
         {
             var r = await mercadoPago.EstornarAsync(pagamentoExternoId, valor, chaveIdempotencia, ct);
-            if (r.Status != "approved" || string.IsNullOrWhiteSpace(r.EstornoId) || r.Valor != valor)
+            var confere = !string.IsNullOrWhiteSpace(r.EstornoId) && r.Valor == valor;
+
+            if (confere && r.Status == EstornoMercadoPagoResult.Simulado)
+                return EstornoPedidoResult.Simulado(r.EstornoId);
+            if (confere && r.Status == PagamentoMercadoPago.Approved)
+                return EstornoPedidoResult.Ok(r.EstornoId);
+
+            if (r.Status is "rejected" or "cancelled")
             {
                 logger.LogWarning("MP recusou o estorno {Chave}: status {Status}.", chaveIdempotencia, r.Status);
                 return EstornoPedidoResult.Falha(CodigoRecusado);
             }
-            return EstornoPedidoResult.Ok(r.EstornoId);
+
+            // Em análise, sem status ou resposta que não confere com o pedido: não é recusa.
+            logger.LogWarning("Estorno {Chave} sem confirmação no Mercado Pago: status {Status}.", chaveIdempotencia, r.Status);
+            return EstornoPedidoResult.Indeterminado(CodigoIndeterminado);
         }
-        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or ArgumentException
+        catch (HttpRequestException ex) when (EhRecusa(ex))
+        {
+            logger.LogWarning("MP recusou o estorno {Chave}: HTTP {Status}.", chaveIdempotencia, (int)ex.StatusCode!.Value);
+            return EstornoPedidoResult.Falha(CodigoRecusado);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException
                                    || (ex is TaskCanceledException && !ct.IsCancellationRequested))
         {
-            logger.LogWarning(ex, "Falha no estorno {Chave} no Mercado Pago.", chaveIdempotencia);
+            // Timeout, 5xx, rede ou corpo ilegível: a escrita pode ter chegado ao provedor.
+            logger.LogWarning("Estorno {Chave} sem resposta conclusiva do Mercado Pago ({Excecao}).",
+                chaveIdempotencia, ex.GetType().Name);
+            return EstornoPedidoResult.Indeterminado(CodigoIndeterminado);
+        }
+        catch (ArgumentException ex)
+        {
+            logger.LogWarning(ex, "Estorno {Chave} com argumento inválido.", chaveIdempotencia);
             return EstornoPedidoResult.Falha(CodigoRecusado);
         }
     }
+
+    /// <summary>4xx que diz "não" (exceto 408 e 429, que não dizem nada sobre o estorno).</summary>
+    private static bool EhRecusa(HttpRequestException ex) =>
+        ex.StatusCode is { } s && (int)s is >= 400 and < 500
+        && s is not (System.Net.HttpStatusCode.RequestTimeout or System.Net.HttpStatusCode.TooManyRequests);
 }

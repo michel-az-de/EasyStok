@@ -44,7 +44,7 @@ public class MercadoPagoGatewayAdapterTests
     [Fact]
     public async Task EstornarDelegaAoClient()
     {
-        _client.EstornarAsync("123", 10m, null, Arg.Any<CancellationToken>())
+        _client.EstornarAsync("123", 10m, Arg.Is<string>(k => k.StartsWith("gateway-123-")), Arg.Any<CancellationToken>())
             .Returns(new EstornoMercadoPagoResult("r-1", 10m, "approved"));
 
         var r = await Adapter().EstornarAsync("123", 10m);

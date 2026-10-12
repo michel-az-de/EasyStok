@@ -99,7 +99,7 @@ builder.Services.AddEasyStockStorefrontUseCases();
 // #449: registra IMercadoPagoClient (StubMercadoPagoClient em Development via
 // MercadoPago:UseStub; cliente real em producao). Sem isto, IniciarCheckoutUseCase
 // nao resolve e o boot da API falha em Development (ValidateOnBuild).
-builder.Services.AddMercadoPagoClient(builder.Configuration);
+builder.Services.AddMercadoPagoClient(builder.Configuration, builder.Environment.EnvironmentName);
 builder.Services.AddReportingApi();
 builder.Services.Configure<EasyStock.Application.Services.PedidoEstoqueOptions>(
     builder.Configuration.GetSection("Pedidos"));
