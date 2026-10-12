@@ -605,6 +605,56 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("atendimento_conversas", (string)null);
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.CorridaExterna", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CorrigidoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CorrigidoPorUsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("CustoCentavos")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Motorista")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<int>("Origem")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Provedor")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("RegistradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RegistradoPorUsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ViagemId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ViagemId");
+
+                    b.HasIndex("EmpresaId", "ViagemId")
+                        .HasDatabaseName("ix_corridas_externas_empresa_viagem");
+
+                    b.ToTable("corridas_externas", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_corridas_externas_custo", "\"CustoCentavos\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.CreditoClienteComanda", b =>
                 {
                     b.Property<Guid>("Id")
@@ -10422,6 +10472,15 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .WithMany()
                         .HasForeignKey("ClienteId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.CorridaExterna", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Atendimento.Viagem", null)
+                        .WithMany()
+                        .HasForeignKey("ViagemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.CreditoClienteComanda", b =>
