@@ -17,6 +17,8 @@
     <ProjectReference Include="..\EasyStock.Infra.Integrations\EasyStock.Infra.Integrations.csproj" />
     <!-- S09: provider da Meta do outbox de notificações usa a porta de canal (S34). -->
     <ProjectReference Include="..\EasyStock.Infra.Notifications\EasyStock.Infra.Notifications.csproj" />
+    <!-- #1634: HttpFalso, handler HTTP único dos testes de adapter. -->
+    <ProjectReference Include="..\EasyStock.TestHelpers\EasyStock.TestHelpers.csproj" />
     <!-- EphemeralDataProtectionProvider (round-trip do cert) vive no shared framework. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
