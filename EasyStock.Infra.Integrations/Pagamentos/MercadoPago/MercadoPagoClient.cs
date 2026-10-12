@@ -93,7 +93,22 @@ public sealed partial class MercadoPagoClient(
             "MP preference criada pedidoId={PedidoId} preferenceId={PreferenceId}",
             command.PedidoId, id);
 
-        return new PreferenceCriadaResult(id, initPoint);
+        // I3.2: collector_id é a conta que vai receber; a cobrança guarda para conferir o pagamento depois.
+        return new PreferenceCriadaResult(id, initPoint, Texto(doc.RootElement, "collector_id"));
+    }
+
+    public async Task<string> ObterContaRecebedoraAsync(CancellationToken ct = default)
+    {
+        // Sem cache de propósito: é assim que credencial revogada (401) aparece antes de o job concluir
+        // que não houve pagamento.
+        using var request = Requisicao(HttpMethod.Get, "users/me");
+        using var response = await httpClient.SendAsync(request, ct);
+        await GarantirSucessoAsync(response, ct);
+
+        using var doc = await JsonDocument.ParseAsync(
+            await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        return Texto(doc.RootElement, "id")
+            ?? throw new InvalidOperationException("Mercado Pago não retornou o id da conta.");
     }
 
     public async Task<PagamentoMercadoPago?> ConsultarPagamentoAsync(string pagamentoId, CancellationToken ct = default)
@@ -238,7 +253,8 @@ public sealed partial class MercadoPagoClient(
         DateApproved: Data(p, "date_approved"),
         PaymentMethodId: Texto(p, "payment_method_id"),
         PaymentTypeId: Texto(p, "payment_type_id"),
-        TransactionAmountRefunded: Numero(p, "transaction_amount_refunded") ?? 0);
+        TransactionAmountRefunded: Numero(p, "transaction_amount_refunded") ?? 0,
+        CollectorId: Texto(p, "collector_id"));
 
     /// <summary>String ou número (o Mercado Pago devolve ids numéricos) como texto; null/ausente = null.</summary>
     private static string? Texto(JsonElement e, string campo)

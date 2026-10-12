@@ -89,34 +89,23 @@ public sealed class CobrancaPedidoJob(
         IReadOnlyList<CobrancaPedidoVencida> vencidas;
         using (var scope = serviceProvider.CreateScope())
         {
+            // I3.2: credencial de volta devolve à varredura as cobranças que esperavam por ela.
+            await scope.ServiceProvider.GetRequiredService<RetomarCobrancasAguardandoCredencialUseCase>().ExecuteAsync(ct);
+
             var repo = scope.ServiceProvider.GetRequiredService<ICobrancaPedidoRepository>();
             vencidas = await repo.ListarPendentesVencidasAsync(relogio.GetUtcNow().UtcDateTime, MaximoPorRodada, ct);
         }
         if (vencidas.Count == 0) return;
 
-        var falhas = 0;
-        foreach (var item in vencidas)
+        // Um escopo por cobrança: DbContext limpo e o tenant da cobrança só nele. Falha conta por loja (I3.2).
+        var resumo = await RodadaDeCobrancasVencidas.ProcessarAsync(vencidas, async (item, token) =>
         {
-            try
-            {
-                // Um escopo por cobrança: DbContext limpo e o tenant da cobrança só nele.
-                using var scope = serviceProvider.CreateScope();
-                var useCase = scope.ServiceProvider.GetRequiredService<ProcessarCobrancaVencidaUseCase>();
-                await useCase.ExecuteAsync(item, ct);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                falhas++;
-                logger.LogWarning(ex, "CobrancaPedidoJob: falha na cobranca {CobrancaId} pedido {PedidoId}",
-                    item.CobrancaId, item.PedidoId);
-                if (falhas >= 3)
-                {
-                    logger.LogWarning("CobrancaPedidoJob: 3 falhas na rodada — interrompendo.");
-                    break;
-                }
-            }
-        }
+            using var scope = serviceProvider.CreateScope();
+            var useCase = scope.ServiceProvider.GetRequiredService<ProcessarCobrancaVencidaUseCase>();
+            await useCase.ExecuteAsync(item, token);
+        }, logger, ct);
 
-        logger.LogInformation("CobrancaPedidoJob: vencidas={Total} falhas={Falhas}", vencidas.Count, falhas);
+        logger.LogInformation("CobrancaPedidoJob: vencidas={Total} falhas={Falhas} puladas={Puladas}",
+            vencidas.Count, resumo.Falhas, resumo.Puladas);
     }
 }

@@ -192,6 +192,50 @@ public class MercadoPagoClientTests
         handler.UltimaChamada!.Corpo.Should().BeNullOrEmpty("estorno total vai sem amount");
     }
 
+    // ── I3.2 (#1688): a conta recebedora ──
+
+    [Fact]
+    public async Task Preferencia_devolve_a_conta_que_vai_receber()
+    {
+        var (client, _) = Criar(HttpStatusCode.Created, """{"id":"pref-1","init_point":"https://mp.test/pref-1","collector_id":724484980}""");
+
+        var r = await client.CriarPreferenceAsync(new CriarPreferenceCommand(Guid.NewGuid(), Guid.NewGuid(), "Loja", 10m, []));
+
+        r.ContaRecebedoraId.Should().Be("724484980");
+    }
+
+    [Fact]
+    public async Task Pagamento_consultado_traz_a_conta_recebedora()
+    {
+        var (client, _) = Criar(HttpStatusCode.OK, """{"id":20359978,"status":"approved","transaction_amount":25.5,"collector_id":724484980}""");
+
+        (await client.ConsultarPagamentoAsync("20359978"))!.CollectorId.Should().Be("724484980");
+    }
+
+    [Fact]
+    public async Task Conta_da_credencial_vem_de_users_me()
+    {
+        var (client, handler) = Criar(HttpStatusCode.OK, """{"id":724484980,"nickname":"LOJA"}""");
+
+        var conta = await client.ObterContaRecebedoraAsync();
+
+        conta.Should().Be("724484980");
+        handler.UltimaChamada!.Metodo.Should().Be(HttpMethod.Get);
+        handler.UltimaChamada.Uri.AbsoluteUri.Should().Be("https://api.mp.test/users/me");
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public async Task Credencial_recusada_aparece_com_o_status_ao_consultar_a_conta(HttpStatusCode status)
+    {
+        var (client, _) = Criar(status, """{"message":"invalid access token"}""");
+
+        var act = () => client.ObterContaRecebedoraAsync();
+
+        (await act.Should().ThrowAsync<HttpRequestException>()).Which.StatusCode.Should().Be(status);
+    }
+
     // ── I3.1 (#1667): a chave de idempotência do estorno é de quem chama, nunca derivada do valor ──
 
     [Theory]

@@ -31,8 +31,13 @@ public sealed class StubMercadoPagoClient(ILogger<StubMercadoPagoClient> logger)
             "StubMercadoPago preference criada pedidoId={PedidoId} initPoint={InitPoint}",
             command.PedidoId, initPoint);
 
-        return Task.FromResult(new PreferenceCriadaResult(preferenceId, initPoint));
+        return Task.FromResult(new PreferenceCriadaResult(preferenceId, initPoint, ContaSimulada));
     }
+
+    /// <summary>Conta fixa do simulador: a mesma nas preferências e na consulta, para a cobrança não ficar aguardando credencial.</summary>
+    public const string ContaSimulada = "stub-conta";
+
+    public Task<string> ObterContaRecebedoraAsync(CancellationToken ct = default) => Task.FromResult(ContaSimulada);
 
     /// <summary>Stub não conhece pagamento nenhum: o webhook (que não chega em Development) seria ignorado.</summary>
     public Task<PagamentoMercadoPago?> ConsultarPagamentoAsync(string pagamentoId, CancellationToken ct = default) =>
