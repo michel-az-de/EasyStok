@@ -305,6 +305,32 @@ public class CalcularCestaProducaoUseCaseTests
         result.CustoEstimadoTotal.Should().Be(1m); // 0.2 kg * R$5/kg
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Custo_total_desconhecido_com_insumo_sem_custo_na_mesma_receita_ou_em_outro_produto(bool outraReceita)
+    {
+        var empresaId = Guid.NewGuid();
+        var massa = BuildProduto(empresaId, "Massa");
+        var omelete = outraReceita ? BuildProduto(empresaId, "Omelete") : massa;
+        var farinha = BuildProduto(empresaId, "Farinha", baseUnidade: UnidadeMedida.Kg);
+        farinha.CustoReferencia = Dinheiro.FromDecimal(5m);
+        var ovo = BuildProduto(empresaId, "Ovo");
+        var linhas = new[] { BuildComposicao(massa, farinha, 0.2m, UnidadeMedida.Kg), BuildComposicao(omelete, ovo, 1m, UnidadeMedida.Un) };
+        _composicaoRepo.GetByProdutosFinaisAsync(empresaId, Arg.Any<IReadOnlyList<Guid>>(), null, Arg.Any<CancellationToken>())
+            .Returns(linhas.GroupBy(l => l.ProdutoFinalId).ToDictionary(g => g.Key, g => (IReadOnlyCollection<ProdutoComposicao>)g.ToList()));
+        _itemEstoqueRepo.GetByProdutosAsync(empresaId, Arg.Any<IEnumerable<Guid>>(), null, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, IReadOnlyCollection<ItemEstoque>>());
+
+        var resultado = await Build().ExecuteAsync(new CalcularCestaProducaoCommand(empresaId, null,
+            linhas.Select(l => l.ProdutoFinalId).Distinct().Select(id => new ItemCestaInput(id, 1m, UnidadeMedida.Un)).ToList()));
+
+        resultado.Itens.Should().OnlyContain(i => i.Status == ItemCestaStatus.Ok);
+        resultado.Consolidado.Single(i => i.InsumoId == farinha.Id).CustoEstimado.Should().Be(1m);
+        resultado.Consolidado.Single(i => i.InsumoId == ovo.Id).CustoEstimado.Should().BeNull();
+        resultado.CustoEstimadoTotal.Should().BeNull();
+    }
+
     [Fact]
     public async Task Batch_query_receitas_chamado_1x_para_todos_produtos()
     {

@@ -72,6 +72,49 @@ public class ReceitasDaProducaoUseCaseTests
 
         r.CustoTotal.Should().BeNull("custo parcial pareceria barato demais");
         r.Linhas[0].Custo.Should().Be(30m);
+        r.Linhas[1].CustoReferencia.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CustoPorRendimento_DivideAntesDeArredondarONumerador(bool listar)
+    {
+        var prato = Prato(0.25m);
+        prato.RendimentoUnidade = UnidadeMedida.Kg;
+        Receita(prato, (Insumo("Molho", UnidadeMedida.Kg, 4.11m), 0.3m, UnidadeMedida.Kg));
+        _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>())
+            .Returns([CardapioItem.CriarAPartirDeProduto(_vitrine.Id, prato)]);
+
+        if (listar)
+        {
+            var resultado = (await Sut().ListarAsync(EmpresaId)).Single();
+            resultado.CustoTotal.Should().Be(1.23m);
+            resultado.CustoPorRendimento.Should().Be(4.93m);
+        }
+        else
+        {
+            var resultado = await Sut().ObterAsync(EmpresaId, prato.Id);
+            resultado.Linhas[0].Custo.Should().Be(1.233m);
+            resultado.CustoTotal.Should().Be(1.23m);
+            resultado.CustoPorRendimento.Should().Be(4.93m);
+        }
+    }
+
+    [Fact]
+    public async Task Linha_PreservaUnidadeECustoDoInsumoMesmoForaDoCatalogoDeInsumos()
+    {
+        var prato = Prato(1m);
+        var insumo = Insumo("Molho", UnidadeMedida.G, 0.03m);
+        insumo.EhInsumo = false;
+        Receita(prato, (insumo, 0.005m, UnidadeMedida.Kg));
+
+        var linha = (await Sut().ObterAsync(EmpresaId, prato.Id)).Linhas.Single();
+
+        linha.Unidade.Should().Be(UnidadeMedida.Kg);
+        linha.UnidadeDoInsumo.Should().Be(UnidadeMedida.G);
+        linha.Custo.Should().Be(0.15m);
+        linha.CustoReferencia.Should().Be(0.03m);
     }
 
     [Fact]

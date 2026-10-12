@@ -82,7 +82,7 @@ await confere('o corpo enviado leva o preço digitado com ponto sem multiplicar 
 
 // --- 2. Receita com vírgula -----------------------------------------------------------
 await confere('quantidade "1,2" e rendimento "2,5" passam na validação', () => {
-  assert.equal(erroDaReceita({ rendimento: '2,5', linhas: [{ insumoId: 's-1', quantidade: '1,2' }] }), null)
+  assert.equal(erroDaReceita({ rendimento: '2,5', linhas: [{ insumoId: 's-1', quantidade: '1,2', unidade: 'Kg' }] }), null)
   assert.equal(erroDaReceita({ rendimento: '6', linhas: [{ insumoId: 's-1', quantidade: '' }] }), 'Quantidade de cada insumo maior que zero.')
 })
 await confere('salvar manda 1.2, não NaN', async () => {
