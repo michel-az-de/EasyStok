@@ -44,6 +44,8 @@ registerHooks({
   load(url, ctx, next) {
     if (fontes.has(url)) return inline(fontes.get(url))
     if (url.endsWith('/aplicacao/useCozinhaApi.js')) return inline('export const useCozinhaApi=()=>globalThis.__premiumCozinha.api')
+    // #1632: a ação Imprimir dos impressos da API chega à API real; aqui só o id importa.
+    if (url.endsWith('/aplicacao/impressos.js')) return inline('export const impressaoDoPedido=pedidoId=>({pedidoId})')
     if (url.endsWith('/hooks/useRelogio.js')) return inline('export const useRelogio=()=>Date.parse("2026-10-11T12:00:00Z")')
     if (url.endsWith('.css')) return inline('export default new Proxy({},{get:(_,p)=>p})')
     if (url.endsWith('.json')) return inline('export default ' + readFileSync(new URL(url), 'utf8'))

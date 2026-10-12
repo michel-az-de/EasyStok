@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
+import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { Modal } from '../../componentes/Modal'
+import { impressaoDoPedido } from '../../aplicacao/impressos'
 import { ETAPAS_KDS, avisoDeInicio, gruposDoKds, nomeNaComanda, proximoStatusKds } from '../../dominio/kds'
 import css from './cozinha.module.css'
 
@@ -36,7 +38,9 @@ export function ComandaKds({
           <Botao variante="texto" disabled={reimpressao === 'enviando'} onClick={reimprimir}>
             {reimpressao === 'enviando' ? 'Reenviando…' : 'Reimprimir na fila'}
           </Botao>
+          {/* #1632: "Imprimir" escolhe documento e papel (impressos da API); o canhoto em PDF segue ao lado. */}
           <Botao icone="printer" onClick={() => aoImprimir(pedido)}>Imprimir canhoto</Botao>
+          <ImprimirPedido {...impressaoDoPedido(pedido.id)} documentoInicial="cozinha" />
           {proximo && (
             <Botao variante="primario" disabled={movendo} onClick={() => aoAvancar(pedido.id, proximo.status)}>
               {movendo ? 'Enviando…' : proximo.toque}
