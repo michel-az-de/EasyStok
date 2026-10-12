@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Lookup;
@@ -167,7 +167,11 @@ public sealed class CalcularFreteUseCase(
             ValorFormatado: FormatarValor(r.ValorCentavos / 100m),
             EtaLabel: FormatarEta(minutos),
             ZonaLabel: r.Gratis ? "Frete grátis" : "Entrega por raio",
-            TempoEstimadoMinutos: minutos);
+            TempoEstimadoMinutos: minutos,
+            GeocodeConfiavel: true,
+            DistanciaMetros: r.DistanciaRotaMetros,
+            FaixaId: r.FaixaId,
+            Gratis: r.Gratis);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Frete;
 using EasyStock.Domain.Storefront.Frete;
+using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
 namespace EasyStock.Application.UseCases.Storefront.Entrega;
 
@@ -13,16 +14,24 @@ public sealed record FreteRaioFaixaInput(int AteMetros, int ValorCentavos);
 
 /// <summary>
 /// Frete por raio da loja. A cozinha vem como endereço (CEP e número): a coordenada é sempre resolvida
-/// no servidor (ADR-0017), nunca aceita do cliente.
+/// no servidor (ADR-0017), nunca aceita do cliente. Sem CEP e sem número, vale a cozinha já gravada.
 /// </summary>
 public sealed record FreteRaioInput(
-    string Cep, string Numero, int RaioMaxMetros, int FaixaGratisMetros, double FatorRota,
+    string? Cep, string? Numero, int RaioMaxMetros, int FaixaGratisMetros, double FatorRota,
     IReadOnlyList<FreteRaioFaixaInput> Faixas);
 
 public sealed record FreteRaioFaixaResult(string Id, int AteMetros, int ValorCentavos);
 
 public sealed record FreteRaioResult(
     int RaioMaxMetros, int FaixaGratisMetros, double FatorRota, IReadOnlyList<FreteRaioFaixaResult> Faixas);
+
+/// <summary>
+/// O que está gravado, para a tela reexibir (I2.2). O endereço da cozinha não é guardado, só a
+/// coordenada: <c>Configurado</c> diz se ela existe.
+/// </summary>
+public sealed record FreteRaioConfigResult(
+    bool Configurado, int? RaioMaxMetros, int? FaixaGratisMetros, double? FatorRota,
+    IReadOnlyList<FreteRaioFaixaResult> Faixas);
 
 public sealed record TestarFreteRaioInput(string Cep, string Numero);
 
@@ -69,7 +78,8 @@ internal static class EnderecoParaGeocode
 
 /// <summary>
 /// I2.1: grava cozinha, raio e faixas do frete por distância. Só grava com geocodificação confiável do
-/// endereço da cozinha; qualquer recusa deixa a configuração anterior intacta.
+/// endereço da cozinha; qualquer recusa deixa a configuração anterior intacta. I2.2: relê o gravado e,
+/// sem endereço no pedido, mantém a cozinha que já está lá.
 /// </summary>
 public sealed class ConfigurarFreteRaioUseCase(
     IStorefrontRepository lojas, ICepLookupClient ceps, IGeocodingClient geocoding, IUnitOfWork unitOfWork)
@@ -77,29 +87,51 @@ public sealed class ConfigurarFreteRaioUseCase(
     private const int MaximoDeFaixas = 20;
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
 
+    public async Task<FreteRaioConfigResult> ObterAsync(Guid empresaId, CancellationToken ct = default)
+    {
+        var loja = await LojaDoTenant.ObterAsync(lojas, empresaId, ct);
+        var config = FreteRaioConfigFactory.TentarCriar(loja);
+        return config is null
+            ? new FreteRaioConfigResult(false, null, null, null, [])
+            : new FreteRaioConfigResult(
+                true, config.RaioMaxMetros, config.FaixaGratisMetros, config.FatorRota,
+                config.Faixas.Select(f => new FreteRaioFaixaResult(f.Id, f.AteMetros, f.ValorCentavos)).ToList());
+    }
+
     public async Task<FreteRaioResult> ExecuteAsync(Guid empresaId, FreteRaioInput input, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(input);
 
         var loja = await LojaDoTenant.ObterAsync(lojas, empresaId, ct);
         var faixas = ValidarFaixas(input);
+        var (lat, lng) = await CozinhaAsync(loja, input, ct);
+
+        loja.ConfigurarFreteRaio(
+            lat, lng, input.FatorRota, input.FaixaGratisMetros, input.RaioMaxMetros,
+            JsonSerializer.Serialize(faixas, JsonOpts));
+        await lojas.UpdateAsync(loja, ct);
+        await unitOfWork.CommitAsync();
+
+        return new FreteRaioResult(input.RaioMaxMetros, input.FaixaGratisMetros, input.FatorRota, faixas);
+    }
+
+    /// <summary>Endereço novo é geocodificado; sem endereço, vale a coordenada que a loja já tem.</summary>
+    private async Task<(double Lat, double Lng)> CozinhaAsync(StorefrontEntity loja, FreteRaioInput input, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(input.Cep) && string.IsNullOrWhiteSpace(input.Numero))
+            return loja is { CozinhaLat: { } lat, CozinhaLng: { } lng }
+                ? (lat, lng)
+                : throw new UseCaseValidationException("Informe o CEP e o número da cozinha.");
 
         if (!geocoding.Disponivel)
             throw new GeocodificadorIndisponivelException();
 
         var cozinha = await geocoding.GeocodificarAsync(
             await EnderecoParaGeocode.MontarAsync(ceps, input.Cep, input.Numero, ct), ct);
-        if (cozinha is null || !cozinha.Confiavel)
-            throw new UseCaseValidationException(
+        return cozinha is { Confiavel: true }
+            ? (cozinha.Lat, cozinha.Lng)
+            : throw new UseCaseValidationException(
                 "Não conseguimos localizar o endereço da cozinha com precisão. Confira o CEP e o número.");
-
-        loja.ConfigurarFreteRaio(
-            cozinha.Lat, cozinha.Lng, input.FatorRota, input.FaixaGratisMetros, input.RaioMaxMetros,
-            JsonSerializer.Serialize(faixas, JsonOpts));
-        await lojas.UpdateAsync(loja, ct);
-        await unitOfWork.CommitAsync();
-
-        return new FreteRaioResult(input.RaioMaxMetros, input.FaixaGratisMetros, input.FatorRota, faixas);
     }
 
     /// <summary>

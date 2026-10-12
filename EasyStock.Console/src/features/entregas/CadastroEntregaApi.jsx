@@ -7,6 +7,7 @@ import { faixaDeHorarios } from '../../dominio/entrega'
 import { DIAS_DA_SEMANA, corpoBloqueio, corpoZona } from '../../dominio/entregasApi'
 import { dataCurtaComSemana, faixaDeCep, moeda } from '../../dominio/formato'
 import { JanelasDaLoja } from './JanelasDaLoja'
+import { FreteRaioDaLoja } from './FreteRaioDaLoja'
 import css from './entregasApi.module.css'
 import layout from './cadastroEntrega.module.css'
 
@@ -25,7 +26,7 @@ function useFormulario(inicial, ocupado) {
 }
 
 export function CadastroEntregaApi() {
-  const { janelas, zonas, bloqueios, erro, enviando, acoes, recarregar, limparErro } = useCadastroEntregaApi()
+  const { janelas, zonas, bloqueios, freteRaio, erro, enviando, acoes, recarregar, limparErro } = useCadastroEntregaApi()
   const z = useFormulario(ZONA_VAZIA, enviando)
   const b = useFormulario(BLOQUEIO_VAZIO, enviando)
   // #1584: remover o bloqueio reabre a data para pedidos; confirma em linha, como "Excluir janela".
@@ -84,6 +85,7 @@ export function CadastroEntregaApi() {
       </div>
 
       <section id={`${id}-painel-zonas`} className={css.secao} role="tabpanel" aria-labelledby={`${id}-zonas`} hidden={aba !== 'zonas'} tabIndex={0}>
+        {freteRaio !== undefined && <FreteRaioDaLoja config={freteRaio} acoes={acoes} ocupado={enviando} />}
         <div className={layout.cabecalho}>
           <div><h2>Zonas de frete</h2><p className={css.apoio}>Valor e prazo por bairro ou faixa de CEP.</p></div>
           <Botao ref={zonaRef} variante="primario" icone="plus" disabled={enviando} aria-expanded={criandoZona} aria-controls={`${id}-zona-nova`} onClick={() => setCriandoZona(true)}>Nova zona</Botao>

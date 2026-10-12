@@ -54,3 +54,7 @@ export const definirZonaAtiva = (id, ativa) => chamarApi(`${E}/zonas/${id}/ativa
 export const listarBloqueios = (de, ate) => chamarApi(`${E}/bloqueios?de=${de}&ate=${ate}`)
 export const criarBloqueio = (corpo) => chamarApi(`${E}/bloqueios`, { metodo: 'POST', corpo })
 export const removerBloqueio = (id) => chamarApi(`${E}/bloqueios/${id}`, { metodo: 'DELETE' })
+// I2.2 (#1651): frete por distância (cozinha, raio e faixas) e o "testar um endereço".
+export const obterFreteRaio = () => chamarApi(`${E}/raio`)
+export const salvarFreteRaio = (corpo) => chamarApi(`${E}/raio`, { metodo: 'PUT', corpo })
+export const testarFreteRaio = (corpo) => chamarApi(`${E}/raio/testar`, { metodo: 'POST', corpo })
