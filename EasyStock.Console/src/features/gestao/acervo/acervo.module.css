@@ -13,7 +13,16 @@
 .detalhe .linha { padding: 12px 0; border-bottom: 1px solid var(--linha); }
 .formulario { display: grid; gap: 16px; }
 .formulario label, .campo { display: grid; gap: 6px; }
-.formulario input, .formulario select, .formulario textarea, .campo input { width: 100%; box-sizing: border-box; padding: 10px 12px; background: var(--papel); color: var(--tinta); border: 1px solid var(--linha-media); border-radius: 8px; font: inherit; }
+.formulario input, .formulario select, .formulario textarea, .campo input, .campo select { width: 100%; box-sizing: border-box; padding: 10px 12px; background: var(--papel); color: var(--tinta); border: 1px solid var(--linha-media); border-radius: 8px; font: inherit; }
+.formulario input[type="checkbox"] { width: auto; }
+.formulario fieldset { min-width: 0; overflow-wrap: anywhere; border: 1px solid var(--linha); border-radius: 8px; }
+.formulario fieldset label { display: flex; align-items: center; }
+.formulario fieldset.campos { display: grid; gap: 16px; padding: 0; border: 0; }
+.formulario fieldset.campos > label { display: grid; }
+.producao { border: 1px solid var(--linha); border-radius: 14px; padding: 16px; min-width: 0; }
+.filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 12px; margin-bottom: 16px; }
+.cobertura { padding: 14px; background: var(--papel); border: 1px solid var(--linha); border-radius: 12px; overflow-wrap: anywhere; }
+.cobertura h4 { margin-top: 0; }
 .formulario textarea { min-height: 100px; resize: vertical; }
 .erro { color: var(--erro); }
 .texto { white-space: pre-wrap; overflow-wrap: anywhere; }
