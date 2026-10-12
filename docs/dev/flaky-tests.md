@@ -10,6 +10,24 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## ✅ CORRIGIDO (#1680) — teste do canário de telemetria dependia do timeout de produção
+
+Visto em `TelemetriaGeocodingTests.Sem_a_protecao_o_canario_vaza_no_span_e_no_log` (os três testes da
+classe tinham a mesma exposição).
+
+- **Por que era flaky:** o teste (I8.2, #1661) usa os clientes reais de CEP e de geocodificação contra
+  um servidor local, e eles vinham com o timeout de produção (1 s no ViaCEP, 2 s no Nominatim). No run
+  38318901505 (master `8831b2a9`) a primeira chamada, fria, passou de 1 s; o cliente do ViaCEP devolveu
+  nulo, como manda o contrato dele, e o teste caiu em `NullReferenceException` na linha 93, com duração
+  de 1 s. Já tinha falhado uma vez na máquina de dev antes do merge e foi mal diagnosticado como
+  contagem de spans.
+- **Como foi confirmado:** com o servidor local respondendo em 1,5 s, os três testes falhavam em 3 de 3.
+- **Fix (#1680):** `PrazoLargoSoNoTeste` sobrepõe o timeout dos `HttpClient` só dentro do teste, e o
+  servidor local passou a demorar 1,2 s de propósito. Assim o teste é determinístico nos dois sentidos:
+  quem tirar o prazo largo vê a falha sempre, não de vez em quando.
+- **Se voltar a falhar:** não é mais prazo. Olhar o que foi para span ou log.
+
+---
 ## ✅ CORRIGIDO (#1117) — gate de worktrees paralelos compartilhava a pasta de build
 
 Visto em `MigrationDesignerHygieneTests` (qualquer arch-test pode ser a vitima).
