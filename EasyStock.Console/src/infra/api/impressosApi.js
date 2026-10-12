@@ -11,9 +11,9 @@ export const obterHtmlDoImpresso = (pedidoId, opcoes) =>
 export const prepararImpresso = (pedidoId, corpo, sinal) =>
   chamarApi(`/api/pedidos/${pedidoId}/impressoes`, { metodo: 'POST', corpo, sinal })
 export const obterOriginalImpresso = (pedidoId, id, sinal) =>
-  chamarApi(`/api/pedidos/${pedidoId}/impressoes/${id}/html`, { texto: true, sinal })
+  chamarApi(`/api/pedidos/${pedidoId}/impressoes/${id}/html`, { texto: true, sinal, prazoComCancelamento: true })
 export const historicoDoPedido = (pedidoId, pagina, sinal) =>
-  chamarApi(`/api/pedidos/${pedidoId}/impressoes?pagina=${pagina}`, { sinal })
+  chamarApi(`/api/pedidos/${pedidoId}/impressoes?pagina=${pagina}`, { sinal, prazoComCancelamento: true })
 export const confirmarDocumentoImpresso = (id, canhotoId = null) =>
   chamarApi(`/api/impressao/${id}/confirmar-documento`, { metodo: 'POST', corpo: { canhotoId } })
 

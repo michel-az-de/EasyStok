@@ -76,7 +76,7 @@ export function CartaoKds({
           <Botao variante="texto" icone="nota" onClick={() => aoAbrir(pedido.id)}>Ver comanda</Botao>
           <Botao variante="texto" icone="printer" onClick={() => aoImprimir(pedido)}>Canhoto</Botao>
           {/* #1632: impressos da API, com escolha de documento e papel. */}
-          <ImprimirPedido {...impressaoDoPedido(pedido.id)} documentoInicial="cozinha" variante="texto" />
+          <ImprimirPedido {...impressaoDoPedido(pedido.id, null, nomeNaComanda(pedido))} documentoInicial="cozinha" variante="texto" />
         </div>
       )}
     </li>

@@ -40,7 +40,7 @@ export function ComandaKds({
           </Botao>
           {/* #1632: "Imprimir" escolhe documento e papel (impressos da API); o canhoto em PDF segue ao lado. */}
           <Botao icone="printer" onClick={() => aoImprimir(pedido)}>Imprimir canhoto</Botao>
-          <ImprimirPedido {...impressaoDoPedido(pedido.id)} documentoInicial="cozinha" />
+          <ImprimirPedido {...impressaoDoPedido(pedido.id, null, nomeNaComanda(pedido))} documentoInicial="cozinha" />
           {proximo && (
             <Botao variante="primario" disabled={movendo} onClick={() => aoAvancar(pedido.id, proximo.status)}>
               {movendo ? 'Enviando…' : proximo.toque}

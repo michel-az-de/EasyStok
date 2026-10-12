@@ -66,7 +66,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
 .im .painel .qr{padding:1.5mm;width:calc(var(--qr) + 3mm);height:calc(var(--qr) + 3mm);border-radius:1.5mm}
 /* entrega: via do entregador */
 .im .via{display:flex;flex-direction:column;gap:var(--s2)}
-.im .duo{display:grid;grid-template-columns:1fr 1fr;gap:var(--s2) var(--s3)}
+.im .duo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s2) var(--s3)}
 .im .duo b{display:block;line-height:1.25}
 .im .corte{border-top:var(--fio) dashed var(--tinta);padding-top:var(--s1);text-align:center;font:700 var(--f0)/1.2 var(--nunito);letter-spacing:.12em;text-transform:uppercase}
 /* canhoto de cozinha */
@@ -98,8 +98,8 @@ html, body { margin: 0; padding: 0; background: #fff; }
 .im.s-a4.d-cozinha{--u:13.2pt}
 .im.s-1015.v1{justify-content:space-between}
 .im b{font-weight:700}
-.im .duo b{white-space:nowrap}
-.im.s-1015.v1 .duo{grid-template-columns:1fr 1fr;gap:var(--s2)}
+.im .duo b{white-space:normal;overflow-wrap:anywhere}
+.im.s-1015.v1 .duo{grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s2)}
 .im.s-1015.v1 .duo b{font-size:1em}
 .im.s-1015.v2{--u:8.4pt}
 .im.s-58 .selo{display:table;margin-bottom:.3em}
