@@ -163,6 +163,65 @@ public class AutenticarUsuarioUseCaseTests
     }
 
     [Fact]
+    public async Task LoginSenha_SuperAdminComEmpresaPedidaRecebeEssaEmpresa()
+    {
+        // #1342: superadmin por senha que informa a empresa entra nela (rotas da loja exigem empresa).
+        var usuario = SuperAdmin();
+        usuario.SenhaHash = FakePasswordHasher.MakeHash("senha123");
+        var repo = Substitute.For<IUsuarioRepository>();
+        repo.GetByEmailAsync(usuario.Email).Returns(usuario);
+        var empresa = Guid.NewGuid();
+
+        var result = await CriarUseCase(repo).ExecuteAsync(new AutenticarUsuarioCommand(usuario.Email, "senha123", empresa));
+
+        Assert.Equal(NivelAcesso.SuperAdmin, result.Nivel);
+        Assert.Equal(empresa, result.EmpresaId);
+    }
+
+    [Fact]
+    public async Task LoginGoogle_SuperAdminEntraNaEmpresaPadrao()
+    {
+        // #1326: o console recusa token sem empresa; pelo Google o superadmin recebe a empresa padrão.
+        var usuario = SuperAdmin();
+        var empresaPadrao = Guid.NewGuid();
+
+        var result = await CriarUseCase(Substitute.For<IUsuarioRepository>())
+            .ConcluirLoginGoogleAsync(usuario, null, empresaPadrao);
+
+        Assert.Equal(NivelAcesso.SuperAdmin, result.Nivel);
+        Assert.Equal(empresaPadrao, result.EmpresaId);
+    }
+
+    [Fact]
+    public async Task LoginGoogle_SuperAdminSemEmpresaPadraoContinuaSemEmpresa()
+    {
+        var result = await CriarUseCase(Substitute.For<IUsuarioRepository>())
+            .ConcluirLoginGoogleAsync(SuperAdmin(), null, null);
+
+        Assert.Equal(NivelAcesso.SuperAdmin, result.Nivel);
+        Assert.Null(result.EmpresaId);
+    }
+
+    private static Usuario SuperAdmin()
+    {
+        var usuarioId = Guid.NewGuid();
+        var perfilId = Guid.NewGuid();
+        return new Usuario
+        {
+            Id = usuarioId, Nome = "Felipe", Email = "felipe.azevedoit@gmail.com", SenhaHash = "x", Ativo = true,
+            CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow, Empresas = new List<UsuarioEmpresa>(),
+            Perfis = new List<UsuarioPerfil>
+            {
+                new UsuarioPerfil
+                {
+                    Id = Guid.NewGuid(), UsuarioId = usuarioId, EmpresaId = Guid.Empty, PerfilId = perfilId, AtribuidoEm = DateTime.UtcNow,
+                    Perfil = new Perfil { Id = perfilId, Nome = "SuperAdmin", EmpresaId = null, Nivel = NivelAcesso.SuperAdmin, Permissoes = new List<PerfilPermissao>() }
+                }
+            }
+        };
+    }
+
+    [Fact]
     public async Task Autenticar_DeveRetornarSuperAdmin_QuandoUsuarioTemPerfilGlobal()
     {
         // Regressao: o login do SuperAdmin (admin@easystok.com no painel admin)
@@ -243,5 +302,89 @@ public class AutenticarUsuarioUseCaseTests
         var command = new AutenticarUsuarioCommand("ana@empresa.com", "senha123", empresaIdNaoVinculada);
 
         await Assert.ThrowsAsync<CredenciaisInvalidasException>(() => useCase.ExecuteAsync(command));
+    }
+
+    // #1540: desativar zera o vínculo, não o usuário. Sem empresa pedida o login seguia e emitia token sem empresa.
+    [Fact]
+    public async Task Autenticar_DeveLancarCredenciaisInvalidas_QuandoNaoHaVinculoAtivo()
+    {
+        var usuarioId = Guid.NewGuid();
+        var usuario = new Usuario
+        {
+            Id = usuarioId,
+            Nome = "Ana",
+            Email = "ana@empresa.com",
+            SenhaHash = FakePasswordHasher.MakeHash("senha123"),
+            Ativo = true,
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow,
+            Empresas = new List<UsuarioEmpresa>
+            {
+                new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = usuarioId, EmpresaId = Guid.NewGuid(), Ativo = false, CriadoEm = DateTime.UtcNow }
+            }
+        };
+
+        var usuarioRepository = Substitute.For<IUsuarioRepository>();
+        usuarioRepository.GetByEmailAsync("ana@empresa.com").Returns(usuario);
+
+        var useCase = CriarUseCase(usuarioRepository);
+        var command = new AutenticarUsuarioCommand("ana@empresa.com", "senha123", null);
+
+        await Assert.ThrowsAsync<CredenciaisInvalidasException>(() => useCase.ExecuteAsync(command));
+    }
+
+    // ── #1352 (N7): o contador é um só para o passo 1 (lista-empresas) e o login completo ──────
+
+    [Fact]
+    public async Task FalhasDosDoisPassosSomam()
+    {
+        var usuario = new Usuario
+        {
+            Id = Guid.NewGuid(), Nome = "Carlos", Email = "carlos@empresa.com", Ativo = true,
+            SenhaHash = FakePasswordHasher.MakeHash("senhaCorreta"),
+            CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow,
+        };
+        var repo = Substitute.For<IUsuarioRepository>();
+        repo.GetByEmailAsync(usuario.Email).Returns(usuario);
+        var passo1 = new ListarEmpresasParaLoginUseCase(
+            repo, new FakeUnitOfWork(), new FakePasswordHasher(), Substitute.For<ILogger<ListarEmpresasParaLoginUseCase>>());
+        var login = CriarUseCase(repo);
+
+        for (var falha = 1; falha <= 3; falha++)
+        {
+            await Assert.ThrowsAsync<CredenciaisInvalidasException>(
+                () => passo1.ExecuteAsync(new ListarEmpresasParaLoginCommand(usuario.Email, "senhaErrada")));
+        }
+        for (var falha = 1; falha <= 2; falha++)
+        {
+            await Assert.ThrowsAsync<CredenciaisInvalidasException>(
+                () => login.ExecuteAsync(new AutenticarUsuarioCommand(usuario.Email, "senhaErrada", null)));
+        }
+
+        usuario.FailedLoginAttempts.Should().Be(5, "3 no passo 1 e 2 no login somam");
+        usuario.EstaBloqueado().Should().BeTrue();
+        var recusa = await Assert.ThrowsAsync<CredenciaisInvalidasException>(
+            () => login.ExecuteAsync(new AutenticarUsuarioCommand(usuario.Email, "senhaCorreta", null)));
+        recusa.Message.Should().Be("Conta bloqueada temporariamente.");
+    }
+
+    [Fact]
+    public async Task LoginComBloqueioVencidoRecomecaAContagem()
+    {
+        var usuario = new Usuario
+        {
+            Id = Guid.NewGuid(), Nome = "Carlos", Email = "carlos@empresa.com", Ativo = true,
+            SenhaHash = FakePasswordHasher.MakeHash("senhaCorreta"),
+            FailedLoginAttempts = 5, LockoutEnd = DateTime.UtcNow.AddMinutes(-1),
+            CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow,
+        };
+        var repo = Substitute.For<IUsuarioRepository>();
+        repo.GetByEmailAsync(usuario.Email).Returns(usuario);
+
+        await Assert.ThrowsAsync<CredenciaisInvalidasException>(
+            () => CriarUseCase(repo).ExecuteAsync(new AutenticarUsuarioCommand(usuario.Email, "senhaErrada", null)));
+
+        usuario.FailedLoginAttempts.Should().Be(1, "a falha herdada de uma janela vencida não conta");
+        usuario.EstaBloqueado().Should().BeFalse();
     }
 }

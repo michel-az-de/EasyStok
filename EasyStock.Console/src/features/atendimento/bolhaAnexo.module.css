@@ -1,0 +1,39 @@
+/* Bolhas da frente Anexos (rodada 7): arquivo, áudio, peça da galeria.
+   Larguras e raios seguem `.figura img` de atendimento.module.css (max
+   280px, var(--r-1)) para as três bolhas terem a mesma régua visual. */
+
+.arquivo {
+  display: flex; align-items: center; gap: var(--e-2);
+  max-width: 280px; padding: var(--e-1) 0;
+}
+.arquivoIcone {
+  display: grid; place-items: center; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: var(--r-1);
+  background: var(--elevado); color: var(--tinta-2);
+}
+.arquivoTexto { display: grid; gap: 2px; min-width: 0; }
+.arquivoTexto strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arquivoTexto span { font-size: var(--t-apoio); color: var(--tinta-3); }
+
+.peca { margin: 0; display: grid; gap: var(--e-1); max-width: 280px; }
+.peca img { width: 100%; max-width: 280px; aspect-ratio: 16 / 10; object-fit: cover; border-radius: var(--r-1); display: block; }
+.peca figcaption { display: grid; gap: 2px; }
+.peca figcaption span { font-size: var(--t-apoio); color: var(--tinta-3); }
+
+.audio { display: flex; align-items: center; gap: var(--e-2); min-width: 220px; }
+.audioBotao {
+  flex-shrink: 0; display: grid; place-items: center;
+  width: var(--toque); height: var(--toque); border-radius: 999px;
+  border: 0; background: var(--elevado); color: var(--tinta); cursor: pointer;
+  transition: background 180ms ease;
+}
+.audioBotao:hover { background: var(--linha); }
+.audioOnda { display: flex; align-items: center; gap: 2px; height: 22px; flex: 1 1 auto; }
+.audioOnda span {
+  width: 3px; border-radius: 2px; background: var(--linha-forte);
+  transition: background 180ms ease, height 180ms ease;
+}
+.ondaFutura { height: 40%; }
+.ondaPassada { height: 100%; background: var(--tinta); }
+.audioTempo { flex-shrink: 0; font-family: var(--f-dado); font-size: var(--t-apoio); color: var(--tinta-3); }
+.audio audio { display: none; }

@@ -1,5 +1,8 @@
-﻿using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Campanhas;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidadeCardapioItemAdmin;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
@@ -11,7 +14,8 @@ public class ToggleVisibilidadeUseCaseTests
     private readonly ICardapioItemRepository _repo = Substitute.For<ICardapioItemRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private ToggleVisibilidadeCardapioItemAdminUseCase Sut() => new(_repo, _uow);
+    private ToggleVisibilidadeCardapioItemAdminUseCase Sut() => new(_repo, _uow, new AvisoItemComInteresse(
+        Substitute.For<IStorefrontRepository>(), Substitute.For<IInteresseItemRepository>(), Substitute.For<IOperacaoEventPublisher>()));
 
     private static CardapioItem ItemFake(Guid storefrontId, bool visivel = false)
     {

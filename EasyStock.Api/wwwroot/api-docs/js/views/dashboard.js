@@ -30,8 +30,8 @@ export function renderDashboard(root, state) {
                             <li>
                                 <span class="es-qs-num">01</span>
                                 <span class="es-qs-body">
-                                    <strong>Registre empresa e usuário</strong>
-                                    <code>POST /api/empresas/registrar</code>
+                                    <strong>Peça ao suporte a criação da empresa</strong>
+                                    <code>POST /api/admin/tenants</code>
                                 </span>
                             </li>
                             <li>

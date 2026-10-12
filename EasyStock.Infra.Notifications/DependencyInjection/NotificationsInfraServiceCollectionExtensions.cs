@@ -46,9 +46,14 @@ public static class NotificationsInfraServiceCollectionExtensions
             "sms:active",
             (sp, _) => sp.GetRequiredKeyedService<IProvedorSms>($"sms:{smsProvider}"));
 
+        // S37 (ADR-0051): SMS e e-mail na porta de canal do atendimento, escolhidos pelo ResolvedorCanal.
+        services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.ICanalMensageria, EasyStock.Infra.Notifications.Atendimento.CanalSms>();
+        services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.ICanalMensageria, EasyStock.Infra.Notifications.Atendimento.CanalEmail>();
+
         // WhatsApp providers
         services.Configure<TwilioWhatsAppOptions>(configuration.GetSection("Notifications:WhatsApp:Twilio"));
         services.Configure<MetaCloudWhatsAppOptions>(configuration.GetSection("Notifications:WhatsApp:Meta"));
+        services.Configure<WhatsAppPlataformaOptions>(configuration.GetSection("Notifications:WhatsApp:Plataforma"));
 
         services.AddKeyedScoped<IProvedorWhatsApp, StubWhatsAppProvider>("whatsapp:stub");
         services.AddKeyedScoped<IProvedorWhatsApp, TwilioWhatsAppProvider>("whatsapp:twilio");
@@ -57,13 +62,20 @@ public static class NotificationsInfraServiceCollectionExtensions
         services.AddScoped<MetaCloudWhatsAppProvider>();
         services.AddKeyedScoped<IProvedorWhatsApp>("whatsapp:meta", (sp, _) => sp.GetRequiredService<MetaCloudWhatsAppProvider>());
 
+        // N6: remetente de plataforma (2º número da WABA). Chave própria, nunca o provider da loja: com Provider diferente
+        // de "meta" vira stub (as mensagens passam a Simulado), e o WhatsAppCanal nunca cai no número da loja.
+        if (string.Equals(configuration["Notifications:WhatsApp:Plataforma:Provider"]?.Trim(), "meta", StringComparison.OrdinalIgnoreCase))
+            services.AddKeyedScoped<IProvedorWhatsApp, EasyStock.Infra.Notifications.WhatsApp.Plataforma.MetaCloudWhatsAppPlataformaProvider>("whatsapp:plataforma");
+        else
+            services.AddKeyedScoped<IProvedorWhatsApp, StubWhatsAppProvider>("whatsapp:plataforma");
+
         var waProvider = configuration["Notifications:WhatsApp:Provider"] ?? "stub";
         services.AddKeyedScoped<IProvedorWhatsApp>(
             "whatsapp:active",
             (sp, _) => sp.GetRequiredKeyedService<IProvedorWhatsApp>($"whatsapp:{waProvider}"));
 
         // #449: default nao-keyed. Consumidores que injetam IProvedorWhatsApp sem
-        // [FromKeyedServices] (ex.: EnviarLinkAvaliacaoWhatsAppHandler do storefront)
+        // [FromKeyedServices]
         // resolvem o provider ativo. Sem isto, o boot falha em Development (ValidateOnBuild)
         // e o handler nao resolveria em runtime (prod inclusive).
         services.AddScoped<IProvedorWhatsApp>(
@@ -74,6 +86,7 @@ public static class NotificationsInfraServiceCollectionExtensions
         services.AddHttpClient("ZenviaSms");
         services.AddHttpClient("TwilioWhatsApp");
         services.AddHttpClient("MetaWhatsApp");
+        services.AddHttpClient(WebPushCanal.NomeHttpClient);
 
         return services;
     }

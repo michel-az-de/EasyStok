@@ -239,7 +239,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToListAsync();
 
         public async Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<ItemEstoque>>> GetByProdutosAsync(
-            Guid empresaId, IEnumerable<Guid> produtoIds, Guid? lojaId, CancellationToken ct = default)
+            Guid empresaId, IEnumerable<Guid> produtoIds, Guid? lojaId, CancellationToken ct = default,
+            bool apenasComSaldoOuDescoberto = false)
         {
             var ids = produtoIds.Distinct().ToList();
             if (ids.Count == 0)
@@ -252,6 +253,10 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (lojaId.HasValue)
                 query = query.Where(i => i.LojaId == lojaId.Value);
 
+            // #1575: lote zerado e sem descoberto soma zero no saldo e no descoberto; fica no banco.
+            if (apenasComSaldoOuDescoberto)
+                query = query.Where(i => (decimal)i.QuantidadeAtual > 0 || (decimal)i.QuantidadeDescoberta != 0);
+
             var todos = await query
                 .OrderByDescending(i => i.EntradaEm)
                 .ToListAsync(ct);
@@ -261,6 +266,31 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToDictionary(
                     g => g.Key,
                     g => (IReadOnlyCollection<ItemEstoque>)g.ToList());
+        }
+
+        public async Task<IReadOnlyDictionary<Guid, decimal>> GetSaldoDisponivelPorProdutosAsync(
+            Guid empresaId, IReadOnlyCollection<Guid> produtoIds, CancellationToken ct = default)
+        {
+            var ids = produtoIds.Distinct().ToList();
+            if (ids.Count == 0)
+                return new Dictionary<Guid, decimal>();
+
+            // #1171: caller anonimo (cardapio publico) nao tem tenant no contexto; o filtro
+            // global zeraria tudo. Isolamento pelo EmpresaId explicito, vindo do storefront.
+            // Vencido fica fora pelo mesmo corte de data civil do FEFO (#983).
+            var hoje = HorarioBrasil.HojeInstanteUtc();
+            var saldos = await dbContext.ItensEstoque
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId
+                    && ids.Contains(i.ProdutoId)
+                    && (decimal)i.QuantidadeAtual > 0
+                    && (i.ValidadeEm == null || (DateTime?)i.ValidadeEm >= hoje))
+                .GroupBy(i => i.ProdutoId)
+                .Select(g => new { ProdutoId = g.Key, Saldo = g.Sum(i => (decimal)i.QuantidadeAtual) })
+                .ToListAsync(ct);
+
+            return saldos.ToDictionary(s => s.ProdutoId, s => s.Saldo);
         }
 
         public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true, bool incluirVencidos = false)
@@ -373,6 +403,17 @@ namespace EasyStock.Infra.Postgre.Repositories
             return Task.CompletedTask;
         }
 
+        public async Task<IReadOnlyList<ItemEstoque>> GetLotesParaAjusteAsync(
+            Guid empresaId, Guid produtoId, Guid? lojaId, CancellationToken ct = default) =>
+            await dbContext.ItensEstoque
+                .Where(i => i.EmpresaId == empresaId
+                    && i.ProdutoId == produtoId
+                    && i.Status != StatusItemEstoque.Descartado
+                    && (lojaId == null || i.LojaId == lojaId))
+                .OrderBy(i => i.EntradaEm)
+                .ThenBy(i => i.CriadoEm)
+                .ToListAsync(ct);
+
         public Task UpdateRangeAsync(IEnumerable<ItemEstoque> itensEstoque)
         {
             dbContext.ItensEstoque.UpdateRange(itensEstoque);
@@ -420,5 +461,14 @@ namespace EasyStock.Infra.Postgre.Repositories
                 _ => null
             };
         }
+
+        public async Task<IReadOnlyList<ItemEstoque>> GetComSaldoEValidadeAteAsync(Guid empresaId, DateTime validadeAteUtc, CancellationToken ct = default) =>
+            await dbContext.ItensEstoque
+                .AsNoTracking()
+                .Include(i => i.Produto)
+                .Where(i => i.EmpresaId == empresaId && (decimal)i.QuantidadeAtual > 0
+                    && i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= validadeAteUtc)
+                .OrderBy(i => (DateTime?)i.ValidadeEm)
+                .ToListAsync(ct);
     }
 }

@@ -57,6 +57,10 @@ entrevista disse que pedido pelo Instagram é improvável e o site já direciona
 - O número sai do aplicativo WhatsApp Business do celular ao entrar na Cloud API. A Meta anunciou
   coexistência entre o app e a API; a disponibilidade no Brasil deve ser verificada antes de
   prometer isso à Tatiana.
+  **Nota de 06/10/2026 (#1417):** a coexistência foi adotada. O número da loja é conectado pelo
+  Embedded Signup v4 e continua no app WhatsApp Business do celular; o que a loja responde por lá
+  chega pelo webhook `smb_message_echoes` como mensagem de saída. Passo a passo em
+  `docs/dev/whatsapp-coexistencia.md`.
 - Fora da janela de 24 h, cada aviso custa uma mensagem de template (utilidade é barato,
   marketing é o mais caro). Atendimento iniciado pelo cliente não é cobrado.
 - Se um dia o canal mudar, o que troca é `IWhatsAppCloudClient` e o webhook; conversa, mensagem,

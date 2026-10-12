@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums.Financeiro;
 
@@ -40,9 +41,9 @@ public class EstornarPagamentoParcelaPagarUseCase(
                 var mov = await caixaRepo.GetMovimentoAsync(cmd.EmpresaId, pag.MovimentoCaixaId.Value);
                 if (mov is not null && mov.EstornadoEm is null)
                 {
-                    var movDay = DateOnly.FromDateTime(mov.DataMovimento);
-                    var diaFechado = await caixaRepo.GetFechamentoDoDiaAsync(cmd.EmpresaId, movDay, mov.LojaId) is not null;
-                    if (!diaFechado)
+                    // Só o movimento que o fechamento retratou fica intocado; o lançado depois de fechar é estornado.
+                    var retratado = await CaixaFechadoGuard.RetratadoAsync(caixaRepo, cmd.EmpresaId, mov.DataMovimento, mov.LojaId);
+                    if (!retratado)
                     {
                         mov.Estornar(cmd.UserId, cmd.UserNome,
                             cmd.Motivo ?? $"Estorno pagamento parcela {parcela.Numero}");
@@ -111,9 +112,9 @@ public class EstornarPagamentoParcelaReceberUseCase(
                 var mov = await caixaRepo.GetMovimentoAsync(cmd.EmpresaId, pag.MovimentoCaixaId.Value);
                 if (mov is not null && mov.EstornadoEm is null)
                 {
-                    var movDay = DateOnly.FromDateTime(mov.DataMovimento);
-                    var diaFechado = await caixaRepo.GetFechamentoDoDiaAsync(cmd.EmpresaId, movDay, mov.LojaId) is not null;
-                    if (!diaFechado)
+                    // Só o movimento que o fechamento retratou fica intocado; o lançado depois de fechar é estornado.
+                    var retratado = await CaixaFechadoGuard.RetratadoAsync(caixaRepo, cmd.EmpresaId, mov.DataMovimento, mov.LojaId);
+                    if (!retratado)
                     {
                         mov.Estornar(cmd.UserId, cmd.UserNome,
                             cmd.Motivo ?? $"Estorno recebimento parcela {parcela.Numero}");

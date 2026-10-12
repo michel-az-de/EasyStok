@@ -1,0 +1,23 @@
+# Transcrição de áudio do WhatsApp (ADR-0058): faster-whisper compatível com OpenAI audio/transcriptions.
+# Stack própria em /opt/stacks/whisper, na rede "edge" do ez-api, sem porta publicada e sem chave.
+# A API chama http://ez-whisper:8000/v1/audio/transcriptions (Transcricao:BaseUrl).
+name: whisper
+services:
+  whisper:
+    image: fedirz/faster-whisper-server:latest-cpu
+    container_name: ez-whisper
+    restart: unless-stopped
+    environment:
+      WHISPER__MODEL: Systran/faster-whisper-small
+      WHISPER__INFERENCE_DEVICE: cpu
+      WHISPER__COMPUTE_TYPE: int8
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+    cpus: "3"
+    mem_limit: 3g
+    networks: [edge]
+volumes:
+  hf-cache:
+networks:
+  edge:
+    external: true

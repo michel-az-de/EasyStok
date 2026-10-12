@@ -59,4 +59,10 @@ public enum StatusPedido
     /// Notificação ao cliente via WhatsApp enfileirada no outbox.
     /// </summary>
     AprovadoBaba = 8,
+
+    /// <summary>
+    /// Saiu para entrega (S12, US-040): passo real entre <see cref="Pronto"/> e
+    /// <see cref="Entregue"/>. Estoque já baixado (entrou em <see cref="Pronto"/>).
+    /// </summary>
+    SaiuParaEntrega = 9,
 }

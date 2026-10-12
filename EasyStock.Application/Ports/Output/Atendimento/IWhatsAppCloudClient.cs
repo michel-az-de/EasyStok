@@ -15,16 +15,28 @@ public interface IWhatsAppCloudClient
     Task<EnvioWhatsAppResult> EnviarImagemAsync(
         string waId, string urlPublica, string? legenda = null, CancellationToken ct = default);
 
+    /// <summary>
+    /// Áudio pelo link HTTPS público (#1444). <paramref name="notaDeVoz"/> manda <c>voice: true</c>, que a Meta só
+    /// aceita para Ogg/Opus mono; os outros formatos (MP4, MPEG, AAC, AMR) saem como áudio comum.
+    /// </summary>
+    Task<EnvioWhatsAppResult> EnviarAudioAsync(
+        string waId, string urlPublica, bool notaDeVoz, CancellationToken ct = default);
+
     /// <summary>No máximo 3 botões; título até 20 caracteres; id até 256. Lança <see cref="ArgumentException"/> antes de chamar a rede quando violado.</summary>
     Task<EnvioWhatsAppResult> EnviarBotoesAsync(
         string waId, string corpo, IReadOnlyList<(string Id, string Titulo)> botoes, CancellationToken ct = default);
 
+    /// <summary>
+    /// <paramref name="imagemCabecalho"/>: URL HTTPS pública do cabeçalho <c>IMAGE</c> do template (#1226). Só
+    /// para template aprovado com esse cabeçalho: a Meta recusa o parâmetro sobrando e também a falta dele.
+    /// </summary>
     Task<EnvioWhatsAppResult> EnviarTemplateAsync(
         string waId,
         string nomeTemplate,
         string idioma,
         IReadOnlyList<string> parametrosCorpo,
         IReadOnlyList<(string Id, string Titulo)>? botoesQuickReply = null,
+        string? imagemCabecalho = null,
         CancellationToken ct = default);
 
     Task MarcarComoLidaAsync(string wamid, CancellationToken ct = default);
@@ -38,7 +50,7 @@ public sealed record EnvioWhatsAppResult(string Wamid);
 /// Erro tipado da Cloud API, com o código numérico da Meta (ex.: 131047 = fora da janela de 24h).
 /// <see cref="EhPermanente"/> = true nunca deve ser reenviado automaticamente.
 /// </summary>
-public sealed class WhatsAppCloudException(int codigo, string mensagem, bool ehPermanente)
+public sealed class WhatsAppCloudException(int codigo, string mensagem, bool ehPermanente, int? statusHttp = null)
     : Exception(mensagem)
 {
     /// <summary>Mensagem livre fora da janela de 24 h (só template passa).</summary>
@@ -46,4 +58,11 @@ public sealed class WhatsAppCloudException(int codigo, string mensagem, bool ehP
 
     public int Codigo { get; } = codigo;
     public bool EhPermanente { get; } = ehPermanente;
+
+    /// <summary>
+    /// Status HTTP da resposta da Meta, quando houve resposta (N2). O 5xx deixa a mensagem
+    /// <c>Indeterminado</c>, porque a Meta pode ter aceitado; o 4xx é recusa e nada saiu. Nulo nos erros que o cliente
+    /// levanta antes de chamar a rede.
+    /// </summary>
+    public int? StatusHttp { get; } = statusHttp;
 }

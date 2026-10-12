@@ -1,289 +1,101 @@
-using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Services.Notifications;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Api.Controllers;
 
+/// <summary>Corpo do disparo de teste. O destinatário não existe aqui de propósito: é sempre o superadmin que chamou.</summary>
+public sealed record DispararTesteRequest(string? Tipo, string? Motivo);
+
+/// <summary>
+/// Operação de plataforma das notificações (N13): disparo de teste por tipo do catálogo e consulta do desfecho. Só
+/// superadmin (policy <c>SuperAdmin</c> que já existe); a mensagem vai ao e-mail do próprio superadmin.
+/// </summary>
 [ApiController]
 [Route("api/admin/notificacoes")]
 [Authorize(Policy = "SuperAdmin")]
-public sealed class AdminNotificacoesController(
-    ITemplateRepository templateRepo,
-    IRotinaRepository rotinaRepo,
-    IConfiguracaoCanalRepository canalRepo,
-    IBloqueioNotificacaoRepository bloqueioRepo,
-    IConsentimentoRepository consentimentoRepo,
-    IVariavelTemplateCatalogoRepository variaveisRepo,
+public class AdminNotificacoesController(
+    DispararTesteNotificacaoUseCase dispararTeste,
+    LimitadorDisparoTeste limitador,
     ICurrentUserAccessor currentUser,
-    CriarTemplateUseCase criarTemplate,
-    AtualizarTemplateUseCase atualizarTemplate,
-    AprovarTemplateUseCase aprovarTemplate,
-    PreviewTemplateUseCase previewTemplate,
-    PreviewDraftTemplateUseCase previewDraftTemplate,
-    CriarRotinaUseCase criarRotina,
-    AtualizarRotinaUseCase atualizarRotina,
-    AtivarRotinaUseCase ativarRotina,
-    DesativarRotinaUseCase desativarRotina,
-    AtivarKillSwitchUseCase ativarKillSwitch,
-    RemoverKillSwitchUseCase removerKillSwitch,
-    ListarLogsEnvioUseCase listarLogs,
-    EnviarNotificacaoManualUseCase broadcast) : EasyStockControllerBase
+    AdminAuditService audit) : EasyStockControllerBase
 {
-    private string Admin => currentUser.UsuarioId.ToString();
-
-    // ── Templates ──────────────────────────────────────────────────────────────
-
-    [HttpGet("templates")]
-    public async Task<IActionResult> ListarTemplates(
-        [FromQuery] Guid? empresaId,
-        [FromQuery] string? tipoEvento,
-        [FromQuery] string? canal,
-        [FromQuery] bool? ativo,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
-    {
-        (page, pageSize) = NormalisePage(page, pageSize);
-
-        TipoEventoNotificacao? tipo = tipoEvento is not null
-            && Enum.TryParse<TipoEventoNotificacao>(tipoEvento, out var t) ? t : null;
-        CanalNotificacao? canalEnum = canal is not null
-            && Enum.TryParse<CanalNotificacao>(canal, out var c) ? c : null;
-
-        var (items, total) = await templateRepo.ListarAsync(empresaId, tipo, canalEnum, ativo, page, pageSize);
-        return DataPaged(items, total, page, pageSize);
-    }
-
-    [HttpGet("templates/{id:guid}")]
-    public async Task<IActionResult> GetTemplate(Guid id)
-    {
-        var t = await templateRepo.GetByIdAsync(id);
-        return t is null ? DataNotFound("Template não encontrado.") : DataOk(t);
-    }
-
-    [HttpPost("templates")]
-    public async Task<IActionResult> CriarTemplate([FromBody] CriarTemplateRequest req)
-    {
-        var result = await criarTemplate.ExecuteAsync(new CriarTemplateCommand(
-            req.Codigo, req.Nome, req.Canal, req.TipoEvento,
-            req.AssuntoTemplate, req.CorpoTemplate,
-            req.Idioma ?? "pt-BR", Admin, req.EmpresaId));
-        return DataOk(result);
-    }
-
-    [HttpPut("templates/{id:guid}")]
-    public async Task<IActionResult> AtualizarTemplate(Guid id, [FromBody] AtualizarTemplateRequest req)
-    {
-        var result = await atualizarTemplate.ExecuteAsync(
-            new AtualizarTemplateCommand(id, req.NovoAssunto, req.NovoCorpo, Admin));
-        return DataOk(result);
-    }
-
-    [HttpPost("templates/{id:guid}/aprovar")]
-    public async Task<IActionResult> AprovarTemplate(Guid id)
-    {
-        var result = await aprovarTemplate.ExecuteAsync(new AprovarTemplateCommand(id, Admin));
-        return DataOk(result);
-    }
-
-    [HttpPost("templates/preview")]
-    public async Task<IActionResult> PreviewTemplate([FromBody] PreviewTemplateRequest req)
-    {
-        var result = await previewTemplate.ExecuteAsync(
-            new PreviewTemplateCommand(req.TemplateId, req.Variaveis ?? new Dictionary<string, object?>()));
-        return DataOk(result);
-    }
-
     /// <summary>
-    /// Renderiza um template em modo "draft" -- assunto/corpo fornecidos no body
-    /// sem precisar salvar antes. Usado pelo editor da Admin para preview ao vivo
-    /// enquanto o usuario digita.
+    /// Publica o exemplo do tipo com <c>teste: true</c> e responde 202 com o <c>eventoId</c>. Motivo (10 caracteres ou mais)
+    /// obrigatório e auditado, tipo fora do catálogo é 400 com a lista dos válidos, e o 11º disparo na hora é 429.
     /// </summary>
-    [HttpPost("templates/preview-draft")]
-    public async Task<IActionResult> PreviewDraftTemplate([FromBody] PreviewDraftRequest req)
+    [HttpPost("disparo-teste")]
+    public async Task<IActionResult> DispararTeste([FromBody] DispararTesteRequest? req, CancellationToken ct)
     {
-        var result = await previewDraftTemplate.ExecuteAsync(
-            new PreviewDraftTemplateCommand(
-                req.AssuntoTemplate ?? string.Empty,
-                req.CorpoTemplate ?? string.Empty,
-                req.Variaveis ?? new Dictionary<string, object?>()));
-        return DataOk(result);
+        if (!RequestGuards.TryValidarMotivo(req?.Motivo, out var motivo, out var erroMotivo)) return DataBadRequest(erroMotivo!);
+
+        if (!TentarLerTipo(req!.Tipo, out var tipo))
+            return TipoForaDoCatalogo(req.Tipo);
+
+        if (!limitador.TentarAdquirir(currentUser.UsuarioId, out var esperar))
+        {
+            var segundos = (int)Math.Ceiling(esperar.TotalSeconds);
+            Response.Headers.Append("Retry-After", segundos.ToString());
+            return StatusCode(StatusCodes.Status429TooManyRequests, new ApiErrorResponse(new ApiError(
+                "TOO_MANY_REQUESTS",
+                $"No máximo {LimitadorDisparoTeste.LimitePorJanela} disparos de teste por hora. Tente de novo em {segundos} s.",
+                null, null)));
+        }
+
+        Guid eventoId;
+        try
+        {
+            eventoId = await dispararTeste.ExecuteAsync(tipo, ct);
+        }
+        catch (UseCaseValidationException ex)
+        {
+            return BadRequest(new ApiErrorResponse(new ApiError(ex.Code ?? "BAD_REQUEST", ex.Message, null, null) { Details = ex.Details }));
+        }
+
+        // Sem endereço no registro: o destinatário é o próprio superadmin e a auditoria já guarda quem chamou.
+        await audit.LogAsync(
+            "AdminDisparouTesteNotificacao",
+            $"Tipo={tipo}, EventoId={eventoId}",
+            motivo: motivo,
+            entidadeAfetadaId: eventoId);
+
+        return Accepted(
+            $"/api/admin/notificacoes/disparo-teste/{eventoId}",
+            new ApiResponse<object>(new { eventoId, tipo = tipo.ToString() }, new { }));
     }
 
-    [HttpGet("variaveis-catalogo")]
-    public async Task<IActionResult> ListarVariaveis([FromQuery] string tipoEvento)
+    /// <summary>Desfecho do disparo: por mensagem do outbox, canal, status, provider, tentativas e erro curto. Sem corpo nem destinatário.</summary>
+    [HttpGet("disparo-teste/{eventoId:guid}")]
+    public async Task<IActionResult> ConsultarDisparoTeste(Guid eventoId, CancellationToken ct)
     {
-        if (!Enum.TryParse<TipoEventoNotificacao>(tipoEvento, out var tipo))
-            return DataBadRequest("tipoEvento inválido.");
-        var items = await variaveisRepo.ListarPorTipoEventoAsync(tipo);
-        return DataOk(items);
+        if (!TryEnsureNotEmpty(eventoId, "Evento", out var erro)) return erro!;
+
+        try
+        {
+            var consulta = await dispararTeste.ConsultarAsync(eventoId, ct);
+            return consulta is null ? DataNotFound("Disparo de teste não encontrado.") : DataOk(consulta);
+        }
+        catch (UseCaseValidationException ex)
+        {
+            return BadRequest(new ApiErrorResponse(new ApiError(ex.Code ?? "BAD_REQUEST", ex.Message, null, null) { Details = ex.Details }));
+        }
     }
 
-
-    // ── Rotinas ────────────────────────────────────────────────────────────────
-
-    [HttpGet("rotinas")]
-    public async Task<IActionResult> ListarRotinas(
-        [FromQuery] Guid? empresaId,
-        [FromQuery] bool? ativa,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+    /// <summary>Só o nome do tipo vale (número é recusado) e só se estiver no catálogo, isto é, se tiver exemplo.</summary>
+    private static bool TentarLerTipo(string? bruto, out TipoEventoNotificacao tipo)
     {
-        (page, pageSize) = NormalisePage(page, pageSize);
-        var (items, total) = await rotinaRepo.ListarAsync(empresaId, ativa, page, pageSize);
-        return DataPaged(items, total, page, pageSize);
+        tipo = default;
+        return !string.IsNullOrWhiteSpace(bruto)
+               && !int.TryParse(bruto, out _)
+               && Enum.TryParse(bruto.Trim(), ignoreCase: true, out tipo)
+               && ExemplosDeEvento.Tipos.Contains(tipo);
     }
 
-    [HttpGet("rotinas/{id:guid}")]
-    public async Task<IActionResult> GetRotina(Guid id)
-    {
-        var r = await rotinaRepo.GetByIdAsync(id);
-        return r is null ? DataNotFound("Rotina não encontrada.") : DataOk(r);
-    }
-
-    [HttpPost("rotinas")]
-    public async Task<IActionResult> CriarRotina([FromBody] CriarRotinaRequest req)
-    {
-        var result = await criarRotina.ExecuteAsync(new CriarRotinaCommand(
-            req.Codigo, req.Nome, req.TipoEvento, req.TriggerTipo,
-            req.TemplateCodigo, req.Categoria,
-            req.CronExpression, req.ParametrosJson, req.EmpresaId));
-        return DataOk(result);
-    }
-
-    [HttpPatch("rotinas/{id:guid}")]
-    public async Task<IActionResult> AtualizarRotina(Guid id, [FromBody] AtualizarRotinaRequest req)
-    {
-        var result = await atualizarRotina.ExecuteAsync(
-            new AtualizarRotinaCommand(id, req.CronExpression, req.ParametrosJson, Admin));
-        return DataOk(result);
-    }
-
-    [HttpPatch("rotinas/{id:guid}/ativar")]
-    public async Task<IActionResult> AtivarRotina(Guid id)
-    {
-        var result = await ativarRotina.ExecuteAsync(new AtivarRotinaCommand(id, Admin));
-        return DataOk(result);
-    }
-
-    [HttpPatch("rotinas/{id:guid}/desativar")]
-    public async Task<IActionResult> DesativarRotina(Guid id)
-    {
-        var result = await desativarRotina.ExecuteAsync(new DesativarRotinaCommand(id, Admin));
-        return DataOk(result);
-    }
-
-    // ── Canais / Kill-switch ────────────────────────────────────────────────────
-
-    [HttpGet("canais")]
-    public async Task<IActionResult> ListarCanais([FromQuery] Guid? empresaId = null)
-    {
-        var configs = await canalRepo.ListarAsync(empresaId);
-        var bloqueios = await bloqueioRepo.ListarAtivosAsync(null, null);
-        return DataOk(new { configs, bloqueios });
-    }
-
-    [HttpPost("canais/kill-switch")]
-    public async Task<IActionResult> AtivarKillSwitch([FromBody] KillSwitchRequest req)
-    {
-        CanalNotificacao? canal = req.Canal is not null
-            && Enum.TryParse<CanalNotificacao>(req.Canal, out var c) ? c : null;
-
-        var result = await ativarKillSwitch.ExecuteAsync(new AtivarKillSwitchCommand(
-            req.Motivo, Admin, req.EmpresaId, canal, req.ExpiraEm));
-        return DataOk(result);
-    }
-
-    [HttpDelete("canais/kill-switch/{id:guid}")]
-    public async Task<IActionResult> RemoverKillSwitch(Guid id)
-    {
-        var result = await removerKillSwitch.ExecuteAsync(new RemoverKillSwitchCommand(id, Admin));
-        return DataOk(result);
-    }
-
-    // ── Logs de envio ──────────────────────────────────────────────────────────
-
-    [HttpGet("envios")]
-    public async Task<IActionResult> ListarEnvios(
-        [FromQuery] Guid? empresaId,
-        [FromQuery] string? status,
-        [FromQuery] string? canal,
-        [FromQuery] DateTime? de,
-        [FromQuery] DateTime? ate,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
-    {
-        (page, pageSize) = NormalisePage(page, pageSize);
-
-        StatusOutbox? statusEnum = status is not null
-            && Enum.TryParse<StatusOutbox>(status, out var s) ? s : null;
-        CanalNotificacao? canalEnum = canal is not null
-            && Enum.TryParse<CanalNotificacao>(canal, out var c) ? c : null;
-
-        var result = await listarLogs.ExecuteAsync(new ListarLogsEnvioQuery(
-            empresaId, statusEnum, canalEnum, de, ate, page, pageSize));
-
-        return DataPaged(result.Items, result.TotalCount, result.Page, result.PageSize);
-    }
-
-    // ── Consentimentos ─────────────────────────────────────────────────────────
-
-    [HttpGet("consentimentos")]
-    public async Task<IActionResult> ListarConsentimentos([FromQuery] Guid usuarioId)
-    {
-        var items = await consentimentoRepo.ListarPorUsuarioAsync(usuarioId);
-        return DataOk(items);
-    }
-
-    // ── Broadcast ─────────────────────────────────────────────────────────────
-
-    [HttpPost("broadcast")]
-    public async Task<IActionResult> EnviarBroadcast([FromBody] BroadcastRequest req)
-    {
-        var result = await broadcast.ExecuteAsync(new EnviarNotificacaoManualCommand(
-            req.EmpresaId, req.UsuariosDestinoIds,
-            req.Titulo, req.Mensagem, Admin));
-        return DataOk(new { enviado = true, totalEnfileirado = result.TotalEnfileirado });
-    }
-
-    // ── Request DTOs ──────────────────────────────────────────────────────────
-
-    public record CriarTemplateRequest(
-        string Codigo, string Nome,
-        CanalNotificacao Canal, TipoEventoNotificacao TipoEvento,
-        string AssuntoTemplate, string CorpoTemplate,
-        string? Idioma = null, Guid? EmpresaId = null);
-
-    public record AtualizarTemplateRequest(string NovoAssunto, string NovoCorpo);
-
-    public record PreviewTemplateRequest(
-        Guid TemplateId,
-        IDictionary<string, object?>? Variaveis = null);
-
-    public record PreviewDraftRequest(
-        string? AssuntoTemplate,
-        string? CorpoTemplate,
-        IDictionary<string, object?>? Variaveis = null);
-
-    public record CriarRotinaRequest(
-        string Codigo, string Nome,
-        TipoEventoNotificacao TipoEvento, TriggerTipoRotina TriggerTipo,
-        string TemplateCodigo, CategoriaConteudoNotificacao Categoria,
-        string? CronExpression = null, string? ParametrosJson = null,
-        Guid? EmpresaId = null);
-
-    public record AtualizarRotinaRequest(
-        string? CronExpression = null,
-        string? ParametrosJson = null);
-
-    public record KillSwitchRequest(
-        string Motivo,
-        Guid? EmpresaId = null,
-        string? Canal = null,
-        DateTime? ExpiraEm = null);
-
-    public record BroadcastRequest(
-        Guid EmpresaId,
-        List<Guid> UsuariosDestinoIds,
-        string Titulo,
-        string Mensagem);
+    private IActionResult TipoForaDoCatalogo(string? informado) =>
+        BadRequest(new ApiErrorResponse(new ApiError(
+            "TIPO_FORA_DO_CATALOGO",
+            $"Tipo '{informado}' fora do catálogo. Válidos: {string.Join(", ", DispararTesteNotificacaoUseCase.TiposValidos)}.",
+            null, null)
+        { Details = DispararTesteNotificacaoUseCase.TiposValidos }));
 }

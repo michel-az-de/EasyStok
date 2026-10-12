@@ -1,3 +1,4 @@
+using EasyStock.Domain.Enums.Storefront;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.AdicionarCardapioItemAdmin;
@@ -51,7 +52,7 @@ public class TenantVitrineCardapioController(
         if (currentUser.EmpresaId == Guid.Empty)
             context.Result = DataBadRequest(
                 "Sua sessão não está vinculada a uma empresa. Selecione uma empresa para gerenciar a vitrine " +
-                "(SuperAdmin: use o painel admin em /api/admin/storefronts).");
+                "(SuperAdmin: selecione a empresa antes; o cardápio só é editado no contexto dela).");
     }
 
     void IActionFilter.OnActionExecuted(ActionExecutedContext context) { }
@@ -77,7 +78,11 @@ public class TenantVitrineCardapioController(
         string? PesoExibicao,
         string? FiltrosJson,
         List<CardapioItemVariacaoInput>? Opcoes,   // ADR-0035 (#652)
-        Guid? SecaoId);
+        Guid? SecaoId,
+        // S15: linha e preparo numérico (opcionais; null = não mexe).
+        LinhaProduto? Linha = null,
+        int? TempoPreparoMinutos = null,
+        string? InstrucaoFinalizacao = null);
 
     public sealed record EditarItemRequest(
         string? NomePublico,
@@ -93,7 +98,11 @@ public class TenantVitrineCardapioController(
         string? PesoExibicao,
         string? FiltrosJson,
         List<CardapioItemVariacaoInput>? Opcoes,   // ADR-0035 (#652)
-        Guid? SecaoId);
+        Guid? SecaoId,
+        // S15: linha e preparo numérico (opcionais; null = não mexe).
+        LinhaProduto? Linha = null,
+        int? TempoPreparoMinutos = null,
+        string? InstrucaoFinalizacao = null);
 
     public sealed record ReordenarRequest(double NovaOrdem);
 
@@ -190,7 +199,10 @@ public class TenantVitrineCardapioController(
                 req.FiltrosJson,
                 EmpresaId,
                 req.Opcoes,
-                req.SecaoId));
+                req.SecaoId,
+                Linha: req.Linha,
+                TempoPreparoMinutos: req.TempoPreparoMinutos,
+                InstrucaoFinalizacao: req.InstrucaoFinalizacao));
 
             return DataCreated($"/api/minha-vitrine/cardapio/{result.ItemId}", result);
         }
@@ -230,7 +242,10 @@ public class TenantVitrineCardapioController(
                 req.FiltrosJson,
                 EmpresaId,
                 req.Opcoes,
-                req.SecaoId));
+                req.SecaoId,
+                Linha: req.Linha,
+                TempoPreparoMinutos: req.TempoPreparoMinutos,
+                InstrucaoFinalizacao: req.InstrucaoFinalizacao));
 
             return DataOk(result);
         }

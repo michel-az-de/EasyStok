@@ -76,6 +76,11 @@ e o parser e o use case do webhook da PR #1053.
 
 ### S35 · Instagram Direct e Messenger
 
+> **Entregue na #1103.** Conferido na documentação da Meta em 29/09/2026: `HUMAN_AGENT` vale no
+> Messenger e no Instagram, 7 dias, só humano, e pede a permissão `Human Agent` no painel da app
+> (acrescentar à Onda 0.10). Assinatura inválida devolve 403, como no webhook do WhatsApp, e não 401. O
+> agente não responde nestes canais (envia pelo WhatsApp). A mídia recebida entra só com o tipo e um aviso.
+
 **Problema.** O protótipo atende o Instagram (`catalogo.js:15-61`: janela de 24 h, sem modelo, foto e
 áudio). O Felipe incluiu Facebook, ou seja, Messenger (ADR-0051, item 2).
 **Abordagem.** O webhook da Meta já assina com o `AppSecret`. O parser passa a aceitar
@@ -112,6 +117,11 @@ e remover os adaptadores.
 
 ### S36 · Chat do site
 
+> **Entregue na #1097.** O stream lê do banco (o broker SSE que existe é em memória e só serve uma
+> instância). O token vai no header, não na URL, então o widget usa `fetch` e não `EventSource`. A
+> conversa do site vai para a fila humana: o agente envia direto pelo WhatsApp e só responde no site
+> quando passar a enviar pela porta de canal. Vincular o cliente logado ficou para depois.
+
 **Problema.** O protótipo tem o canal "Chat do site", sem janela e só com texto. O casadababa.com
 hoje manda o cliente para o WhatsApp.
 **Abordagem.** Canal próprio do EasyStok.
@@ -136,6 +146,10 @@ casadababa.com fica em outro repositório, e aqui entra só o contrato documenta
 
 ### S37 · E-mail e SMS como canais de saída
 
+> **Entregue na #1080, com escopo reduzido.** Os adaptadores ficam em `Infra.Notifications/Atendimento/`,
+> ao lado dos provedores. O remetente por empresa e a validação no startup ficaram fora: os provedores
+> já leem `Notifications:Sms:*` e `Email:*`, e com uma empresa só o remetente global basta.
+
 **Problema.** A mensagem programada e as campanhas precisam de e-mail e SMS (ADR-0051, item 4). Hoje
 `SmtpEmailCanal` e `TwilioSmsProvider` existem, mas estão inertes: o Stub é o único usado em
 produção (#783).
@@ -157,6 +171,10 @@ startup com a chave nomeada, igual ao S01.
 ---
 
 ### S38 · Consentimento do cliente final por canal
+
+> **Entregue na #1078.** O `ConsentiuMarketing` não recebeu `[Obsolete]` (o build trata aviso como
+> erro). Ele fica documentado como legado até a poda. Opt-out por palavra: SAIR, PARAR ou STOP,
+> sozinhas na mensagem. "quero sair do grupo" vai para o atendimento normal.
 
 **Problema.** `Cliente.ConsentiuMarketing` (`Cliente.cs:87`) é um booleano único. A LGPD e as
 políticas da Meta e da Twilio pedem opt-in por canal e por finalidade, além de opt-out simples.
@@ -181,6 +199,11 @@ antigo fica marcado `[Obsolete]` e só é removido na poda.
 ---
 
 ### S39 · Mensagem programada ao cliente (multicanal)
+
+> **Entregue na #1082, com duas decisões.**
+> 1. A tag `HUMAN_AGENT` não vale para envio agendado: fora da janela, Instagram e Messenger recusam.
+> 2. Uma mensagem presa em `Enviando` por queda do processo **não é reenviada sozinha**, para não
+>    sair duas vezes. Ela fica para revisão, e a reentrega automática entra junto com os lembretes (S43).
 
 **Problema.** Decisão 3 do ADR-0051. O protótipo teve "Programar envio" (`prototipo-casa-da-baba.html`,
 build de 22/09) e ficaram restos no código atual: `PROGRAMAR_ENVIO`, `CANCELAR_PROGRAMADO` e
@@ -241,6 +264,10 @@ evento `expediente.alterado` no SSE (S18) e a leitura de `EstaAberta` no `Inicia
 ---
 
 ### S41 · Atendentes e atribuição de conversa
+
+> **Entregue na #1085.** Sem perfil padrão `Atendente` semeado: nenhum perfil tem permissões
+> explícitas hoje e a criação de usuário escolhe o perfil padrão pelo nível, então um segundo padrão
+> Operador a tornaria ambígua. A permissão vem pelo nível (Operador para cima).
 
 **Problema.** O protótipo fixa uma atendente (`reducer.js:48`) e muda o responsável ao escrever ou
 assumir (RN-04). No EasyStok existe `Conversa.AssumidaPorUsuarioId` (`Conversa.cs:55`), mas falta
@@ -346,6 +373,9 @@ integração vai preencher.
 ---
 
 ### S45 · Cadastros operacionais completos
+
+> **Parte 1 entregue na #1095** (janelas, zonas e bloqueios; medido: não havia CRUD em controller
+> nenhum). A parte 2, `CanalEmpresa`, espera S37–S39 entrarem, porque mexe no `ResolvedorCanal`.
 
 **Problema.** No protótipo, canais, janelas com capacidade e zona por prefixo de CEP são só semente
 (`catalogo.js:15,82,267`). No EasyStok, `JanelaEntrega`, `BloqueioEntrega` e `FreteZona` existem, mas

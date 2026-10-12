@@ -44,7 +44,13 @@ public sealed class ProductLinker(
             {
                 var mobileP = await db.Set<Product>()
                     .FirstOrDefaultAsync(p => p.Id == pid && p.EmpresaId == empresaId);
-                if (mobileP == null || mobileP.ErpProductId.HasValue) { idempotentSkip++; continue; }
+                if (mobileP == null) { idempotentSkip++; continue; }
+                if (mobileP.ErpProductId.HasValue)
+                {
+                    cachedSysUserId = await EspelharCustoEMinimoAsync(mobileP, empresaId.Value, cachedSysUserId);
+                    idempotentSkip++;
+                    continue;
+                }
 
                 // PROD-002 (#612): o nome vem do push do PWA/app sem validacao de tags. Sanitiza
                 // antes de matchear/criar o Produto ERP para nao persistir markup (XSS armazenado
@@ -92,6 +98,8 @@ public sealed class ProductLinker(
                     Tipo = TipoProduto.Alimento,
                     Status = StatusProduto.Ativo,
                     PrecoReferencia = mobileP.Price is { } pr && pr > 0 ? Dinheiro.FromDecimal(pr) : null,
+                    CustoReferencia = mobileP.Cost is { } cu && cu > 0 ? Dinheiro.FromDecimal(cu) : null,
+                    QuantidadeMinima = mobileP.MinStock,
                     CodigoBarras = mobileP.Sku,
                     ControlaValidade = mobileP.DefaultValidityDays.HasValue,
                     CriadoEm = DateTime.UtcNow,
@@ -131,6 +139,54 @@ public sealed class ProductLinker(
             "AutoLink Produto summary empresaId={EmpresaId} total={Total} matched={Matched} created={Created} idempotent={Idempotent} errors={Errors}",
             empresaId, idsList.Count, matched, created, idempotentSkip, errorSkip);
     }
+
+    /// <summary>
+    /// #1467: produto ja vinculado. Custo e estoque minimo editados no PWA vao para o Produto ERP.
+    /// So valores informados viajam: PWA sem custo nao apaga o custo do ERP.
+    /// </summary>
+    private async Task<Guid?> EspelharCustoEMinimoAsync(Product mobileP, Guid empresaId, Guid? cachedSysUserId)
+    {
+        if (mobileP.Cost is not > 0 && mobileP.MinStock is null) return cachedSysUserId;
+
+        var produto = await db.Set<Produto>().IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.Id == mobileP.ErpProductId && p.EmpresaId == empresaId);
+        if (produto == null) return cachedSysUserId;
+
+        var mudancas = new List<string>();
+        if (mobileP.Cost is { } custo && custo > 0 && produto.CustoReferencia?.Valor != custo)
+        {
+            mudancas.Add($"{{\"campo\":\"custo\",\"de\":{Json(produto.CustoReferencia?.Valor)},\"para\":{Json(custo)}}}");
+            produto.CustoReferencia = Dinheiro.FromDecimal(custo);
+        }
+        if (mobileP.MinStock is { } minimo && produto.QuantidadeMinima != minimo)
+        {
+            mudancas.Add($"{{\"campo\":\"quantidade_minima\",\"de\":{Json(produto.QuantidadeMinima)},\"para\":{minimo}}}");
+            produto.QuantidadeMinima = minimo;
+        }
+        if (mudancas.Count == 0) return cachedSysUserId;
+
+        produto.AlteradoEm = DateTime.UtcNow;
+        cachedSysUserId ??= await systemUserResolver.GetOrCreateAsync(empresaId);
+        db.Add(new ProdutoAlteracao
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            ProdutoId = produto.Id,
+            UsuarioId = cachedSysUserId.Value,
+            Acao = "atualizado",
+            AlteracoesJson = "[" + string.Join(",", mudancas) + "]",
+            Motivo = "Sync mobile",
+            Observacao = $"Custo/minimo editados no mobile_product {mobileP.Id}",
+            AlteradoEm = DateTime.UtcNow
+        });
+        log.LogInformation("Produto ERP {ErpId} recebeu custo/minimo do mobile {MobileId}", produto.Id, mobileP.Id);
+        return cachedSysUserId;
+    }
+
+    private static string Json(decimal? v) =>
+        v.HasValue ? v.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "null";
+
+    private static string Json(int? v) => v.HasValue ? v.Value.ToString() : "null";
 }
 
 /// <summary>

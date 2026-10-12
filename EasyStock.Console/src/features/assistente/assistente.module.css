@@ -1,0 +1,135 @@
+/* Balão flutuante do assistente (rodada 7, seção D da pesquisa). Só tokens
+   que já existem em src/estilos/tokens.css: nenhuma cor, raio ou sombra nova
+   aqui, e claro/escuro vem de graça porque os tokens já resolvem os dois
+   (light-dark) por conta própria. */
+
+.gatilho {
+  position: fixed; right: var(--e-4); bottom: var(--e-4); z-index: 30;
+  width: 56px; height: 56px; padding: 0; border-radius: var(--r-pilula);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--sombra-alta);
+  transition: transform 180ms ease;
+}
+.gatilho:hover { transform: scale(1.05); }
+.gatilhoNoCabecalho {
+  position: relative; width: 48px; height: 48px; padding: 0; border-radius: var(--r-pilula);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+
+.pontoAtencao {
+  position: absolute; top: 4px; right: 4px;
+  width: calc(var(--ponto) + 2px); height: calc(var(--ponto) + 2px);
+  border-radius: var(--r-pilula); background: var(--erro);
+  border: var(--b-2) solid var(--papel);
+}
+
+.painel {
+  position: fixed; right: var(--e-4); z-index: 32;
+  bottom: calc(56px + var(--e-4) + var(--e-2));
+  width: min(432px, calc(100vw - 2 * var(--e-4)));
+  max-height: min(720px, calc(100dvh - 140px));
+  background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+  box-shadow: var(--sombra-alta);
+  display: flex; flex-direction: column; overflow: hidden;
+  animation: assistenteSubir 180ms ease;
+}
+@keyframes assistenteSubir {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.cabecalho {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
+  padding: var(--e-3);
+  border-bottom: var(--b-1) solid var(--linha); flex-shrink: 0;
+}
+.cabecalho h2 {
+  display: flex; align-items: center; gap: var(--e-1);
+  font-size: var(--t-apoio); font-weight: 700; margin: 0; color: var(--tinta);
+}
+.contexto { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-corpo); overflow-wrap: anywhere; }
+.identidade { min-width: 0; }
+.clienteDoPainel { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2); overflow-wrap: anywhere; line-height: var(--lh-compacto); }
+.cabecalho > button { flex-shrink: 0; }
+
+.corpo { overflow-y: auto; padding: var(--e-3); display: flex; flex-direction: column; gap: var(--e-3); flex: 1; min-height: 0; }
+
+.cartoes { display: flex; flex-direction: column; }
+
+.cartao {
+  border-bottom: var(--b-1) solid var(--linha); padding: var(--e-2) 0;
+}
+.cartao.perigo .cartaoTopo h3 { color: var(--erro); }
+.cartao.ok .cartaoTopo h3 { color: var(--sucesso); }
+
+.cartaoTopo { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-2); }
+.cartaoTopo h3 {
+  display: flex; align-items: center; gap: var(--e-1); flex-wrap: wrap;
+  font-size: var(--t-apoio); font-weight: 700; margin: 0; color: var(--tinta);
+}
+.dispensar { padding: var(--e-1); min-width: 0; flex-shrink: 0; }
+.cartaoCorpo { font-size: var(--t-apoio); color: var(--tinta-2); margin-top: var(--e-1); line-height: var(--lh-corpo); }
+.cartaoCorpo p { margin: 0 0 var(--e-1); }
+.cartaoCorpo ul { margin: var(--e-1) 0; padding-left: var(--e-3); }
+
+.tagsCliente { display: flex; flex-wrap: wrap; gap: var(--e-1); margin: var(--e-1) 0; }
+.numeros { display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-3); font-family: var(--f-dado); font-size: var(--t-apoio); color: var(--tinta); margin-top: var(--e-1); }
+.numeros b { font-weight: 700; }
+
+.acaoCartao { margin-top: var(--e-2); }
+
+.vazio { padding: var(--e-2) 0; }
+
+.perguntas { border-top: var(--b-1) solid var(--linha); padding-top: var(--e-2); display: flex; flex-direction: column; gap: var(--e-2); }
+.tituloPerguntas { font-size: var(--t-apoio); font-weight: 700; color: var(--tinta); margin: 0; }
+.trocas { display: flex; flex-direction: column; gap: var(--e-2); }
+.troca { display: flex; flex-direction: column; gap: var(--e-1); }
+.perguntaDaThatiane, .respostaDoAssistente {
+  font-size: var(--t-apoio); border-radius: var(--r-2); padding: var(--e-1) var(--e-2);
+  max-width: 92%; overflow-wrap: anywhere; line-height: var(--lh-corpo);
+}
+.perguntaDaThatiane { align-self: flex-end; background: var(--marca-claro); color: var(--marca-forte); white-space: pre-wrap; }
+.respostaDoAssistente { align-self: stretch; padding: var(--e-2) 0; max-width: 100%; color: var(--tinta); }
+.perguntaDaThatiane p, .respostaDoAssistente p { margin: var(--e-1) 0 0; white-space: pre-wrap; }
+.autor { display: block; font-size: var(--t-apoio); font-weight: 700; }
+.tituloAcoes { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2); font-weight: 700; }
+.respostaErro { align-self: flex-start; background: var(--erro-pastel); color: var(--erro); }
+.falhaConsulta { display: flex; flex-direction: column; align-items: flex-start; gap: var(--e-1); }
+.falhaConsulta .respostaErro { margin: 0; padding: var(--e-2); border-radius: var(--r-1); font-size: var(--t-apoio); line-height: var(--lh-corpo); }
+.respostaPensando { align-self: flex-start; color: var(--tinta-3); font-style: italic; }
+
+/* #1445: ações propostas pelo assistente. Linha simples sob a resposta, sem cartão
+   dentro de cartão; separador fino entre elas. Só tokens existentes. */
+.acoesPropostas { list-style: none; margin: 0; padding: 0; align-self: stretch; display: flex; flex-direction: column; }
+.acaoProposta {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
+  padding: var(--e-2) 0; border-top: var(--b-1) solid var(--linha);
+}
+.acaoProposta:last-child { border-bottom: var(--b-1) solid var(--linha); }
+.acaoTexto { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: var(--t-apoio); }
+.acaoTitulo { display: flex; align-items: center; gap: var(--e-1); font-weight: 700; color: var(--tinta); overflow-wrap: anywhere; }
+.acaoDetalhe { color: var(--tinta-2); line-height: var(--lh-corpo); overflow-wrap: anywhere; }
+.acaoErro { display: flex; align-items: center; gap: var(--e-1); color: var(--erro); }
+.acaoBotao { flex-shrink: 0; }
+.acaoFeita { display: flex; align-items: center; gap: var(--e-1); flex-shrink: 0; font-size: var(--t-apoio); color: var(--sucesso); }
+
+.formPergunta { display: flex; align-items: flex-start; gap: var(--e-2); padding: var(--e-3); border-top: var(--b-1) solid var(--linha); flex-shrink: 0; }
+.formPergunta > div { flex: 1; min-width: 0; }
+.campoPergunta { min-height: 64px; max-height: 160px; resize: vertical; }
+.botaoEnviar { flex-shrink: 0; }
+
+/* Integração do visual: no celular o gatilho de canto sobe para cima da barra
+   de abas (54 px), em vez de cobrir a aba Ficha. */
+@media (max-width: 759px) {
+  .gatilho { bottom: calc(54px + var(--e-3) + env(safe-area-inset-bottom, 0px)); right: var(--e-3); width: 52px; height: 52px; }
+  .painel { right: var(--e-2); bottom: calc(54px + var(--e-2) + env(safe-area-inset-bottom, 0px)); width: calc(100vw - 2 * var(--e-2)); max-height: calc(100dvh - 144px); }
+  .acaoProposta { align-items: flex-start; flex-wrap: wrap; }
+  .acaoTexto { flex: 1 1 180px; }
+  .acaoBotao { min-height: 44px; }
+  .dispensar { min-width: 44px; min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gatilho { transition: none; }
+  .gatilho:hover { transform: none; }
+  .painel { animation: none; }
+}

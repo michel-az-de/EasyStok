@@ -17,6 +17,14 @@ public sealed class JanelaEntregaRepository(EasyStockDbContext db) : IJanelaEntr
             .ThenBy(j => j.HoraInicio)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<JanelaEntrega>> GetTodasDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default) =>
+        await db.JanelasEntrega
+            .AsNoTracking()
+            .Where(j => j.StorefrontId == storefrontId)
+            .OrderBy(j => j.DiaDaSemana)
+            .ThenBy(j => j.HoraInicio)
+            .ToListAsync(ct);
+
     public Task AddAsync(JanelaEntrega janela, CancellationToken ct = default)
     {
         db.JanelasEntrega.Add(janela);
@@ -26,6 +34,16 @@ public sealed class JanelaEntregaRepository(EasyStockDbContext db) : IJanelaEntr
     public Task UpdateAsync(JanelaEntrega janela, CancellationToken ct = default)
     {
         db.JanelasEntrega.Update(janela);
+        return Task.CompletedTask;
+    }
+
+    public async Task<bool> TemUsoAsync(Guid janelaId, CancellationToken ct = default) =>
+        await db.VagasOcupadas.AnyAsync(v => v.JanelaEntregaId == janelaId, ct)
+        || await db.BloqueiosEntrega.AnyAsync(b => b.JanelaEspecificaId == janelaId, ct);
+
+    public Task RemoveAsync(JanelaEntrega janela, CancellationToken ct = default)
+    {
+        db.JanelasEntrega.Remove(janela);
         return Task.CompletedTask;
     }
 }

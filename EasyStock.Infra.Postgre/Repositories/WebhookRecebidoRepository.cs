@@ -40,6 +40,10 @@ public sealed class WebhookRecebidoRepository(EasyStockDbContext db) : IWebhookR
 
     public async Task MarcarProcessadoAsync(Guid id, bool sucesso, string? erro = null, CancellationToken ct = default)
     {
+        // Falhou: o que o processamento deixou rastreado pertence a uma transação revertida. Sem descartar, o
+        // SaveChanges abaixo gravaria esse resto junto com a marca de falha (#1562).
+        if (!sucesso) db.DescartarAlteracoesPendentes();
+
         var existing = await db.WebhookRecebidos.FirstOrDefaultAsync(w => w.Id == id, ct);
         if (existing is null) return;
         existing.MarcarProcessado(sucesso, erro);

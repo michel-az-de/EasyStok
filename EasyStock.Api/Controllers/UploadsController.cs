@@ -14,10 +14,12 @@ public class UploadsController(
     GerenciarUploadsUseCase gerenciarUploadsUseCase,
     ICurrentUserAccessor currentUserAccessor) : EasyStockControllerBase
 {
-    [SwaggerOperation(Summary = "Upload product photo")]
+    [SwaggerOperation(Summary = "Upload product photo (Gerente only)")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    // #1508: mesma autorização do POST /api/produtos/{id}/fotos (Gerente + módulo Cardápio, ver ModulosConvention).
+    [Authorize(Policy = "Gerente")]
     [HttpPost("produto/{id}/foto")]
     public async Task<IActionResult> UploadFotoProduto(Guid id, [FromQuery] Guid empresaId, IFormFile file, CancellationToken cancellationToken)
     {
@@ -63,7 +65,8 @@ public class UploadsController(
         return DataOk(result);
     }
 
-    [SwaggerOperation(Summary = "Upload cardapio item photo (Admin only)")]
+    [SwaggerOperation(Summary = "Upload cardapio item photo (Admin only)",
+        Description = "galeria=true adiciona um ângulo (até 5); a primeira foto vira capa. O padrão substitui apenas a capa.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -71,7 +74,8 @@ public class UploadsController(
     [RequestSizeLimit(6 * 1024 * 1024)]
     [RequestFormLimits(MultipartBodyLengthLimit = 6 * 1024 * 1024)]
     [HttpPost("cardapio-item/{itemId:guid}/foto")]
-    public async Task<IActionResult> UploadFotoCardapioItem(Guid itemId, IFormFile file, CancellationToken cancellationToken)
+    public async Task<IActionResult> UploadFotoCardapioItem(Guid itemId, IFormFile file, CancellationToken cancellationToken,
+        [FromQuery] bool galeria = false)
     {
         // Teto checado ANTES de bufferizar (o [RequestSizeLimit] barra no Kestrel; aqui é o 2o gate).
         if (file is null || file.Length == 0)
@@ -88,7 +92,8 @@ public class UploadsController(
                 payload.FileName,
                 payload.ContentType,
                 payload.Content,
-                cancellationToken);
+                cancellationToken,
+                galeria);
 
             return DataOk(result);
         }
@@ -97,6 +102,26 @@ public class UploadsController(
         {
             return DataNotFound("Item de cardápio não encontrado.");
         }
+    }
+
+    [SwaggerOperation(Summary = "Upload campaign art (S28)", Description = "Devolve a URL pública; ela vai em imagemUrl da campanha.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize(Policy = "Gerente")]
+    [RequestSizeLimit(6 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 6 * 1024 * 1024)]
+    [HttpPost("campanha/arte")]
+    public async Task<IActionResult> UploadArteCampanha(IFormFile file, CancellationToken cancellationToken)
+    {
+        var payload = await LerArquivoAsync(file, cancellationToken);
+        var result = await gerenciarUploadsUseCase.UploadArteCampanhaAsync(
+            currentUserAccessor.EmpresaId,
+            payload.FileName,
+            payload.ContentType,
+            payload.Content,
+            cancellationToken);
+
+        return DataOk(result);
     }
 
     internal async Task<UploadedFileResult> UploadProdutoAsync(Guid empresaId, Guid produtoId, IFormFile file, CancellationToken cancellationToken)

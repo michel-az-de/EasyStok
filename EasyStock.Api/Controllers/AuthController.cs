@@ -1,9 +1,9 @@
+using EasyStock.Application.Ports.Output.Auth;
 using EasyStock.Application.UseCases.AlterarSenha;
 using Microsoft.AspNetCore.RateLimiting;
 using EasyStock.Application.UseCases.AnonimizarMeusDados;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
-using EasyStock.Application.UseCases.CadastrarUsuario;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.ConfirmEmail;
 using EasyStock.Application.UseCases.EsqueciSenha;
@@ -11,6 +11,7 @@ using EasyStock.Application.UseCases.ExportarMeusDados;
 using EasyStock.Application.UseCases.Logout;
 using EasyStock.Application.UseCases.ObterUsuarioAtual;
 using EasyStock.Application.UseCases.RefreshToken;
+using EasyStock.Application.Services.Auth;
 using EasyStock.Application.UseCases.ResetarSenha;
 using AuditLogEntity = EasyStock.Domain.Entities.AuditLog;
 using RefreshTokenEntity = EasyStock.Domain.Entities.RefreshToken;
@@ -18,6 +19,8 @@ using Swashbuckle.AspNetCore.Annotations;
 using IJwtTokenService = EasyStock.Api.Services.IJwtTokenService;
 
 namespace EasyStock.Api.Controllers;
+
+public sealed record LoginGoogleRequest(string? IdToken, Guid? EmpresaId);
 
 public sealed record LoginRequest(
     [Required, EmailAddress] string Email,
@@ -28,6 +31,18 @@ public sealed record LoginRequest(
 public sealed record ListarEmpresasParaLoginRequest(
     [Required, EmailAddress] string Email,
     [Required] string Senha);
+/// <summary>Pedido de redefinição (N8). Só o e-mail: a base do link vem da configuração, nunca do corpo (#765); um <c>baseUrl</c> enviado é ignorado.</summary>
+public sealed record EsqueciSenhaRequest([Required] string Email);
+
+/// <summary>Reset pelo link do e-mail (N8). IP e agente saem da conexão, não do corpo.</summary>
+public sealed record ResetarSenhaRequest([Required] string Token, [Required] string NovaSenha);
+
+/// <summary>Aceite do convite de primeiro acesso (N9). IP e agente saem da conexão, não do corpo.</summary>
+public sealed record AceitarConviteRequest([Required] string Token, [Required] string NovaSenha);
+
+/// <summary>Reset pelo código de 6 dígitos do WhatsApp (N8).</summary>
+public sealed record ResetarSenhaPorCodigoRequest([Required] string Email, [Required] string Codigo, [Required] string NovaSenha);
+
 public sealed record LoginUsuarioInfo(Guid id, string nome, string email, string nivel);
 public sealed record LoginResponse(string token, string refreshToken, int expiresIn, LoginUsuarioInfo usuario);
 
@@ -41,11 +56,11 @@ public class AuthController(
     IRefreshTokenRepository refreshTokenRepository,
     IAuditLogRepository auditLogRepository,
     IUnitOfWork unitOfWork,
-    CadastrarUsuarioUseCase cadastrarUsuarioUseCase,
     RefreshTokenUseCase refreshTokenUseCase,
     LogoutUseCase logoutUseCase,
     EsqueciSenhaUseCase esqueciSenhaUseCase,
     ResetarSenhaUseCase resetarSenhaUseCase,
+    ResetarSenhaPorCodigoUseCase resetarSenhaPorCodigoUseCase,
     ConfirmEmailUseCase confirmEmailUseCase,
     ObterUsuarioAtualUseCase obterUsuarioAtualUseCase,
     AtualizarUsuarioAtualUseCase atualizarUsuarioAtualUseCase,
@@ -62,6 +77,49 @@ public class AuthController(
         var resultado = await autenticarUseCase.ExecuteAsync(
             new AutenticarUsuarioCommand(request.Email, request.Senha, request.EmpresaId));
 
+        return await EmitirSessaoAsync(resultado, "login");
+    }
+
+    [SwaggerOperation(Summary = "Google sign-in settings", Description = "ClientId público do Google; 404 com o login Google desligado (#1324).")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpGet("google/config")]
+    [AllowAnonymous]
+    public IActionResult ConfigGoogle([FromServices] IGoogleIdTokenValidator google) =>
+        google.ClientId is { } clientId ? DataOk(new { clientId }) : DataNotFound("Login com Google desligado.");
+
+    [SwaggerOperation(Summary = "Sign in with a Google ID token",
+        Description = "Só usuário que já existe (e-mail do Google, ou alias do Gmail com uma conta só). Sem empresaId, entra na empresa ativa do usuário (#1324).")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [EnableRateLimiting("auth")]
+    [HttpPost("google/login")]
+    [AllowAnonymous]
+    public async Task<IActionResult> LoginGoogle(
+        [FromBody] LoginGoogleRequest request,
+        [FromServices] IGoogleIdTokenValidator google,
+        [FromServices] IdentificarUsuarioGoogleUseCase identificar,
+        [FromServices] IEmpresaPadraoResolver empresaPadraoResolver,
+        CancellationToken ct)
+    {
+        if (google.ClientId is null) return DataNotFound("Login com Google desligado.");
+        try
+        {
+            var usuario = await identificar.ExecuteAsync(request.IdToken ?? string.Empty, ct);
+            var empresaPadrao = await empresaPadraoResolver.ResolverAsync(ct);
+            var resultado = await autenticarUseCase.ConcluirLoginGoogleAsync(usuario, request.EmpresaId, empresaPadrao);
+            return await EmitirSessaoAsync(resultado, "login_google");
+        }
+        catch (CredenciaisInvalidasException ex)
+        {
+            return Unauthorized(new { error = new { code = "INVALID_CREDENTIALS", message = ex.Message } });
+        }
+    }
+
+    /// <summary>Revoga as sessões anteriores, emite JWT + refresh token e audita. Credencial já conferida.</summary>
+    private async Task<IActionResult> EmitirSessaoAsync(AutenticarUsuarioResult resultado, string acao)
+    {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
         var userAgent = HttpContext.Request.Headers.UserAgent.ToString();
 
@@ -86,7 +144,7 @@ public class AuthController(
 
         var auditLog = AuditLogEntity.Criar(
             resultado.UsuarioId,
-            "login",
+            acao,
             true,
             "Login realizado com sucesso",
             ip,
@@ -140,14 +198,6 @@ public class AuthController(
         }
     }
 
-    [SwaggerOperation(Summary = "Register new user account")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [EnableRateLimiting("auth")]
-    [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] CadastrarUsuarioCommand command)
-        => DataOk(await cadastrarUsuarioUseCase.ExecuteAsync(command));
-
     [SwaggerOperation(Summary = "Refresh JWT token", Description = "Exchange a valid refresh token for a new JWT access token.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -162,19 +212,105 @@ public class AuthController(
     public async Task<IActionResult> Logout([FromBody] LogoutCommand command)
         => DataOk(await logoutUseCase.ExecuteAsync(command));
 
-    [SwaggerOperation(Summary = "Request password reset email")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [SwaggerOperation(
+        Summary = "Request password reset (link by e-mail, code by WhatsApp when eligible)",
+        Description = "Sempre 202 com o mesmo corpo, exista a conta ou nao (N8). Nao faz rede: enfileira um evento ResetSenha no motor. " +
+                      "Limites: 5 pedidos por IP em 15 min (429) e, por conta, 3 por hora, 6 por dia e 60 s entre pedidos (202 sem envio).")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     [EnableRateLimiting("auth")]
     [HttpPost("forgot-password")]
-    public async Task<IActionResult> ForgotPassword([FromBody] EsqueciSenhaCommand command)
-        => DataOk(await esqueciSenhaUseCase.ExecuteAsync(command));
+    public async Task<IActionResult> ForgotPassword([FromBody] EsqueciSenhaRequest request)
+    {
+        try
+        {
+            var resultado = await esqueciSenhaUseCase.ExecuteAsync(
+                new EsqueciSenhaCommand(request.Email, ClientIp(), ClientUserAgent()));
+            return StatusCode(StatusCodes.Status202Accepted, new ApiResponse<EsqueciSenhaResult>(resultado, new { }));
+        }
+        catch (LimitePedidosAcessoExcedidoException ex)
+        {
+            return TooManyRequests(ex);
+        }
+    }
 
     [SwaggerOperation(Summary = "Reset password using token from email")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     [EnableRateLimiting("auth")]
     [HttpPost("reset-password")]
-    public async Task<IActionResult> ResetPassword([FromBody] ResetarSenhaCommand command)
-        => DataOk(await resetarSenhaUseCase.ExecuteAsync(command));
+    public async Task<IActionResult> ResetPassword([FromBody] ResetarSenhaRequest request)
+    {
+        try
+        {
+            return DataOk(await resetarSenhaUseCase.ExecuteAsync(
+                new ResetarSenhaCommand(request.Token, request.NovaSenha, ClientIp(), ClientUserAgent())));
+        }
+        catch (LimitePedidosAcessoExcedidoException ex)
+        {
+            return TooManyRequests(ex);
+        }
+    }
+
+    [SwaggerOperation(
+        Summary = "Reset password using the 6-digit code sent by WhatsApp",
+        Description = "Codigo de 10 min, 5 tentativas, uso unico. Superadmin nunca redefine por codigo (mesma recusa generica).")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [EnableRateLimiting("auth")]
+    [HttpPost("reset-password-code")]
+    public async Task<IActionResult> ResetPasswordCode([FromBody] ResetarSenhaPorCodigoRequest request)
+    {
+        try
+        {
+            return DataOk(await resetarSenhaPorCodigoUseCase.ExecuteAsync(
+                new ResetarSenhaPorCodigoCommand(request.Email, request.Codigo, request.NovaSenha, ClientIp(), ClientUserAgent())));
+        }
+        catch (LimitePedidosAcessoExcedidoException ex)
+        {
+            return TooManyRequests(ex);
+        }
+    }
+
+    [SwaggerOperation(
+        Summary = "Accept an access invite (set the password and verify the channel)",
+        Description = "Anonimo (N9). Quem consome e este POST: abrir o link nunca consome. Define a senha pela politica existente, " +
+                      "verifica o canal do token (e-mail ou WhatsApp) e revoga os outros convites. Revogado, usado, vencido ou de " +
+                      "superadmin: sempre a mesma mensagem. Nao emite sessao: a pessoa volta ao login. Limite por IP da N8 (429).")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [EnableRateLimiting("auth")]
+    [HttpPost("aceitar-convite")]
+    public async Task<IActionResult> AceitarConvite(
+        [FromBody] AceitarConviteRequest request, [FromServices] EasyStock.Application.UseCases.AceitarConvite.AceitarConviteUseCase aceitarConvite)
+    {
+        try
+        {
+            return DataOk(await aceitarConvite.ExecuteAsync(
+                new EasyStock.Application.UseCases.AceitarConvite.AceitarConviteCommand(
+                    request.Token, request.NovaSenha, ClientIp(), ClientUserAgent())));
+        }
+        catch (LimitePedidosAcessoExcedidoException ex)
+        {
+            return TooManyRequests(ex);
+        }
+    }
+
+    // IP e agente vem da conexao, nunca do corpo. Fora de uma requisicao HTTP (testes) sao nulos.
+    private string? ClientIp() => HttpContext?.Connection.RemoteIpAddress?.ToString();
+
+    private string? ClientUserAgent()
+    {
+        var agente = HttpContext?.Request.Headers.UserAgent.ToString();
+        return string.IsNullOrWhiteSpace(agente) ? null : agente;
+    }
+
+    private IActionResult TooManyRequests(LimitePedidosAcessoExcedidoException ex)
+    {
+        Response.Headers.Append("Retry-After", ex.RetryAfterSeconds.ToString());
+        return StatusCode(StatusCodes.Status429TooManyRequests, new ApiErrorResponse(new ApiError(
+            "TOO_MANY_REQUESTS", ex.Message, null, null)));
+    }
 
     [Authorize]
     [SwaggerOperation(Summary = "Get current authenticated user profile")]
@@ -185,9 +321,53 @@ public class AuthController(
         => DataOk(await obterUsuarioAtualUseCase.ExecuteAsync(new ObterUsuarioAtualCommand()));
 
     [Authorize]
-    [SwaggerOperation(Summary = "Update current user profile")]
+    [HttpGet("me/modulos")]
+    public IActionResult GetModulos([FromServices] ICurrentUserAccessor usuario)
+    {
+        var modulos = Enum.GetValues<Modulo>().Select(m => new
+        {
+            id = Domain.Services.AcessoModulos.IdDe(m),
+            liberado = usuario.EmpresaId != Guid.Empty && usuario.TemPermissao(Domain.Services.AcessoModulos.PermissaoDe(m))
+        }).ToArray();
+        var inicial = User.FindFirst("moduloInicial")?.Value;
+        var gerente = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin or NivelAcesso.Gerente;
+        var financeiroLiberado = modulos.Any(m => m.id == "financeiro" && m.liberado);
+        return DataOk(new
+        {
+            modulos,
+            portaDeEntrada = modulos.Any(m => m.id == inicial && m.liberado) ? inicial : null,
+            acoes = new
+            {
+                editarCardapio = gerente && modulos.Any(m => m.id == "cardapio" && m.liberado),
+                editarProducao = gerente && modulos.Any(m => m.id == "producao" && m.liberado),
+                gerenciarCaixa = gerente && modulos.Any(m => m.id == "financeiro" && m.liberado),
+                visualizarContasPagar = financeiroLiberado && usuario.TemPermissao(Permissao.VisualizarContasAPagar),
+                visualizarContasReceber = financeiroLiberado && usuario.TemPermissao(Permissao.VisualizarContasAReceber),
+                gerenciarContasPagar = financeiroLiberado && usuario.TemPermissao(Permissao.GerenciarContasAPagar),
+                gerenciarContasReceber = financeiroLiberado && usuario.TemPermissao(Permissao.GerenciarContasAReceber),
+                gerenciarCategoriasFinanceiras = financeiroLiberado && usuario.TemPermissao(Permissao.GerenciarCategoriasFinanceiras),
+                gerenciarCentrosCusto = financeiroLiberado && usuario.TemPermissao(Permissao.GerenciarCentrosCusto),
+                editarAtendimento = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin
+                    && modulos.Any(m => m.id == "atendimento" && m.liberado),
+                controlarLoja = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
+                cancelarPedidoPago = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
+                devolverPagamentoManual = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
+                estornarPagamentoOnline = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
+                gerenciarOcorrencias = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
+                reabrirConversa = usuario.TemPermissao(Permissao.AtenderConversas)
+                    && modulos.Any(m => m.id == "atendimento" && m.liberado)
+            }
+        });
+    }
+
+    [Authorize]
+    [EnableRateLimiting("auth")]
+    [SwaggerOperation(
+        Summary = "Update current user profile",
+        Description = "Trocar o e-mail exige senhaAtual (ausente ou errada: 403, e a errada conta como falha de login) e so grava o endereco como pendente: o e-mail da conta troca no clique do link enviado ao endereco novo.")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [HttpPatch("me")]
     public async Task<IActionResult> UpdateMe([FromBody] AtualizarUsuarioAtualCommand command)
         => DataOk(await atualizarUsuarioAtualUseCase.ExecuteAsync(command));

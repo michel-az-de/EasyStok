@@ -2,6 +2,7 @@ using EasyStock.Api.Authorization;
 using EasyStock.Api.Observability;
 using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Application.Ports.Output.Storage;
+using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Infra.Async.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -73,25 +74,18 @@ public static class ApiServiceCollectionExtensions
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
+        services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, ModuloAuthorizationHandler>();
+        services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, PermissaoAuthorizationHandler>();
         services.AddScoped<AdminAuditService>();
-        services.AddScoped<EasyStock.Api.Services.Helpdesk.SlaResolver>();
-        services.AddScoped<EasyStock.Application.Ports.Output.Helpdesk.ISlaResolver>(sp =>
-            sp.GetRequiredService<EasyStock.Api.Services.Helpdesk.SlaResolver>());
-        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskTicketService>();
-        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskAnexoService>();
-        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskBugFixService>();
-        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskClienteService>();
-        services.AddScoped<EasyStock.Api.Services.Helpdesk.SlaConfiguracaoService>();
-        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskDashboardService>();
-        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskRelatorioService>();
-        services.AddScoped<EasyStock.Api.Services.Faturacao.FaturaSaasFactory>();
-        // F14 — auto-ticket categoria=Financeiro apos N falhas de pagamento.
-        services.AddScoped<EasyStock.Application.Ports.Output.IFalhaPagamentoNotifier,
-            EasyStock.Api.Services.Faturacao.AutoTicketFalhaPagamento>();
         services.AddScoped<GeradorNotificacoesAutomaticas>();
+        services.AddSingleton<EasyStock.Api.Services.Impressao.PedidoImpressoHtml>(); // S49: impresso do pedido
+        services.AddSingleton<EasyStock.Api.Services.Impressao.ComandaHtml>(); // S52: comanda de cozinha
         services.AddScoped<EasyStock.Api.Services.IJwtTokenService, JwtTokenService>();
         services.AddScoped<EasyStock.Application.Ports.Output.IJwtTokenService>(sp =>
             sp.GetRequiredService<EasyStock.Api.Services.IJwtTokenService>());
+
+        // #1352: sessão revogável. O validador roda no OnTokenValidated do JwtBearer e no laço do SSE.
+        services.AddScoped<EasyStock.Api.Authentication.ValidadorSessaoUsuario>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
@@ -113,8 +107,17 @@ public static class ApiServiceCollectionExtensions
                     NameClaimType            = "sub",
                     RoleClaimType            = "nivel"
                 };
+
+                // #1352: o JWT passa a ser revogável. Token emitido antes do corte de sessão do usuário, ou de
+                // conta inativa, falha aqui com 401; Auth:SessoesRevogaveis=false desliga a checagem.
+                options.Events = new JwtBearerEvents
+                {
+                    OnTokenValidated = EasyStock.Api.Authentication.SessaoRevogavel.AoValidarTokenAsync,
+                };
             })
             .AddInternalCronJobScheme(configuration)
+            // S20: bridge de impressão (X-Impressao-Api-Key), só nas rotas da policy ImpressaoFila.
+            .AddImpressaoApiKeyScheme(configuration)
             // Sessões server-side do storefront (ADR-0012) — cookie __Host-cdb_session
             .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions,
                 EasyStock.Api.Authentication.ClienteSessionAuthenticationHandler>(
@@ -126,7 +129,11 @@ public static class ApiServiceCollectionExtensions
             opts.AddPolicy("Admin",    p => p.RequireClaim("nivel", "SuperAdmin", "Admin"));
             opts.AddPolicy("Gerente",  p => p.RequireClaim("nivel", "SuperAdmin", "Admin", "Gerente"));
             opts.AddPolicy("Operador", p => p.RequireClaim("nivel", "SuperAdmin", "Admin", "Gerente", "Operador"));
+            // #1508: permissão fina pelo perfil (explícito ou fallback do nível), não só o nível.
+            opts.AddPolicy(PoliticasPermissao.VisualizarRelatorios, p => p.RequireAuthenticatedUser()
+                .AddRequirements(new PermissaoRequirement(Permissao.VisualizarRelatorios)));
             opts.AddInternalCronJobPolicy();
+            opts.AddImpressaoFilaPolicy();
         });
 
         return services;
@@ -182,26 +189,6 @@ public static class ApiServiceCollectionExtensions
                 limiter.QueueLimit = 20;
             });
 
-            // Modulo Fiscal (F3) — particionado por tenant para nao deixar um cliente
-            // saturar a quota global. 10/min e suficiente para PDV varejista normal;
-            // emissoes em rajada (batch) devem ir por outro canal (futuro).
-            options.AddPolicy("nfe-emitir", context =>
-            {
-                var partitionKey = context.User.FindFirst("empresaId")?.Value
-                    ?? context.User.FindFirst("EmpresaId")?.Value
-                    ?? context.Connection.RemoteIpAddress?.ToString()
-                    ?? "anon";
-                return RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey,
-                    _ => new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit = 10,
-                        Window = TimeSpan.FromMinutes(1),
-                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                        QueueLimit = 0,
-                    });
-            });
-
             // Onda 7 — Rate limit pra endpoints mobile anônimos.
             // Cobre: GET /api/mobile/version, POST /api/mobile/devices/pair,
             // POST /api/mobile/diagnostics/errors. Particionado por IP pra
@@ -222,7 +209,7 @@ public static class ApiServiceCollectionExtensions
                     });
             });
 
-            // Rate limit para endpoints sensíveis de autenticação (login, register,
+            // Rate limit para endpoints sensíveis de autenticação (login,
             // forgot/reset password). Particionado por IP do cliente para dificultar
             // brute-force e spam de contas. O IP real volta a ser confiavel apos o fix do
             // ForwardedHeaders (Program.cs) + repasse de X-Forwarded-For pelos BFFs Web/Admin;
@@ -259,39 +246,6 @@ public static class ApiServiceCollectionExtensions
                     });
             });
 
-            // Rate limit para criação/resposta de tickets de suporte. Particionado
-            // por IP para impedir cliente abusivo abrir centenas de tickets.
-            // Limite generoso o suficiente pra suporte legítimo (10/min/IP).
-            options.AddPolicy("tickets-post", context =>
-            {
-                var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
-                return RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey,
-                    _ => new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit = 10,
-                        Window = TimeSpan.FromMinutes(1),
-                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                        QueueLimit = 0
-                    });
-            });
-
-            // FAQ publico — leitura anonima (busca, listar categorias, obter item).
-            // Generoso para nao quebrar SEO/scrapers legitimos.
-            options.AddPolicy("public-read", context =>
-            {
-                var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
-                return RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey,
-                    _ => new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit = 60,
-                        Window = TimeSpan.FromMinutes(1),
-                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                        QueueLimit = 10
-                    });
-            });
-
             // FAQ publico — feedback POST. Limite mais apertado.
             options.AddPolicy("public-post", context =>
             {
@@ -301,6 +255,44 @@ public static class ApiServiceCollectionExtensions
                     _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0
+                    });
+            });
+
+            // Leitura, autosave e SSE usam a credencial individual; clientes no mesmo IP não dividem a cota.
+            options.AddPolicy("comanda-leitura", context =>
+            {
+                var token = context.Request.RouteValues["token"]?.ToString()?.Trim();
+                var formatoGerado = token is { Length: 43 } && token.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
+                var chave = formatoGerado ? "comanda:" + AcessoChatSite.HashDoToken(token!)
+                    : "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "anon");
+                return RateLimitPartition.GetFixedWindowLimiter(chave,
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 });
+            });
+            options.AddPolicy("comanda-rascunho", context => RateLimitPartition.GetFixedWindowLimiter(
+                context.Request.RouteValues["token"]?.ToString() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy("comanda-envio", context => RateLimitPartition.GetFixedWindowLimiter(
+                context.Request.RouteValues["token"]?.ToString() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy("comanda-stream", context => RateLimitPartition.GetConcurrencyLimiter(
+                context.Request.RouteValues["token"]?.ToString() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                _ => new ConcurrencyLimiterOptions { PermitLimit = 3, QueueLimit = 0 }));
+
+            // Webhooks da Meta (WhatsApp, Instagram, Messenger). A Meta entrega em rajada a
+            // partir de poucos IPs; 429 faz ela reenviar e, insistindo, desativar a assinatura.
+            // O endpoint ja exige HMAC (X-Hub-Signature-256), entao aqui e so teto contra flood
+            // nao autenticado. Particionado por IP, generoso (issue 1105).
+            options.AddPolicy("webhook-meta", context =>
+            {
+                var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 600,
                         Window = TimeSpan.FromMinutes(1),
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                         QueueLimit = 0
@@ -340,8 +332,24 @@ public static class ApiServiceCollectionExtensions
                     });
             });
 
-            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            options.OnRejected = async (context, cancellationToken) =>
+            // Chat do site (S36), público e anônimo. Abrir sessão: por IP, apertado (cada sessão é
+            // uma linha no banco). Mandar mensagem: por sessão (hash do token), para um visitante não
+            // gastar a cota do outro atrás do mesmo NAT; sem token, cai no IP. Ler: por IP, folgado
+            // (o widget lê ao reconectar o stream).
+            options.AddPolicy(ChatSiteRateLimit.AbrirSessao, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy(ChatSiteRateLimit.Mensagem, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    ChatSiteRateLimit.ChaveMensagem(context),
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = ChatSiteRateLimit.MensagensPorMinuto, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy(ChatSiteRateLimit.Leitura, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;            options.OnRejected = async (context, cancellationToken) =>
             {
                 context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
 

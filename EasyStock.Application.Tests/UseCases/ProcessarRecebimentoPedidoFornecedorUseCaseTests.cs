@@ -35,7 +35,7 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
             Substitute.For<IMovimentacaoEstoqueRepository>(),
             _unitOfWork,
             Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>(),
-            null, null, null, null, null, null);
+            null, null, null, null, null);
         _movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         _logger = Substitute.For<ILogger<ProcessarRecebimentoPedidoFornecedorUseCase>>();
         _publicador = Substitute.For<IPublicadorEventos>();

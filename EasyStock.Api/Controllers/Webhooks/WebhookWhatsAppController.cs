@@ -1,6 +1,6 @@
-using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Application.UseCases.Atendimento.Webhook;
+using EasyStock.Application.UseCases.Notifications.Plataforma;
 using EasyStock.Infra.Notifications.Options;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
@@ -18,6 +18,7 @@ namespace EasyStock.Api.Controllers.Webhooks;
 [IgnoreAntiforgeryToken] // Webhook servidor-a-servidor autenticado por HMAC (X-Hub-Signature-256), sem cookie/sessão — CSRF não se aplica.
 public class WebhookWhatsAppController(
     ProcessarEventoWhatsAppUseCase processarUseCase,
+    ProcessarCategoriaTemplateWhatsAppUseCase categoriaTemplateUseCase,
     IOptions<MetaCloudWhatsAppOptions> metaOptions,
     ILogger<WebhookWhatsAppController> logger) : ControllerBase
 {
@@ -41,7 +42,7 @@ public class WebhookWhatsAppController(
     }
 
     [HttpPost]
-    [EnableRateLimiting("public-post")]
+    [EnableRateLimiting("webhook-meta")]
     public async Task<IActionResult> Receber(CancellationToken ct)
     {
         Request.EnableBuffering();
@@ -56,37 +57,30 @@ public class WebhookWhatsAppController(
             return Forbid();
         }
 
-        var completo = await processarUseCase.ExecuteAsync(rawBody, ct);
+        // N6: o callback do app recebe também template_category_update (a Meta não deixa sobrescrever esse webhook).
+        // Cada field vai ao seu dono; field desconhecido devolve 200 sem passar pelo atendimento.
+        var campos = CamposWebhookMeta.Separar(rawBody);
+        var completo = true;
+        if (campos.CategoriaTemplate is not null)
+            completo &= await categoriaTemplateUseCase.ExecuteAsync(campos.CategoriaTemplate, ct);
+        if (campos.Mensagens is not null)
+            completo &= await processarUseCase.ExecuteAsync(campos.Mensagens, ct);
+        // #1417: coexistência. Histórico e estado do app são aceitos e só registrados; a importação fica para depois.
+        if (campos.Historico > 0 || campos.EstadoApp > 0)
+            logger.LogInformation("Webhook WhatsApp: coexistência recebeu {Historico} lote(s) de history e {EstadoApp} de smb_app_state_sync (não importados).",
+                campos.Historico, campos.EstadoApp);
+        if (campos.Ignoradas > 0)
+            logger.LogInformation("Webhook WhatsApp: {Ignoradas} mudança(s) de outro field descartada(s) de propósito.", campos.Ignoradas);
 
         // Não-200 faz a Meta reenviar o payload inteiro; o reprocessamento é seguro porque o use
         // case pula pelo wamid o que já gravou. Só pede reenvio quando algo pode passar na próxima.
         return completo ? Ok() : StatusCode(StatusCodes.Status503ServiceUnavailable);
     }
 
-    private bool AssinaturaValida(string rawBody, string appSecret)
-    {
-        if (!Request.Headers.TryGetValue("X-Hub-Signature-256", out var header))
-            return false;
+    private bool AssinaturaValida(string rawBody, string appSecret) =>
+        AssinaturaWebhookMeta.Valida(Request.Headers[AssinaturaWebhookMeta.Header].ToString(), rawBody, appSecret);
 
-        var recebida = header.ToString();
-        const string prefixo = "sha256=";
-        if (!recebida.StartsWith(prefixo, StringComparison.OrdinalIgnoreCase))
-            return false;
-        recebida = recebida[prefixo.Length..];
-
-        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(appSecret));
-        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(rawBody));
-        var esperada = Convert.ToHexString(hash).ToLowerInvariant();
-
-        return FixedTimeEquals(esperada, recebida.ToLowerInvariant());
-    }
-
-    private static bool FixedTimeEquals(string a, string b)
-    {
-        var ba = Encoding.UTF8.GetBytes(a);
-        var bb = Encoding.UTF8.GetBytes(b);
-        return ba.Length == bb.Length && CryptographicOperations.FixedTimeEquals(ba, bb);
-    }
+    private static bool FixedTimeEquals(string a, string b) => AssinaturaWebhookMeta.IguaisEmTempoConstante(a, b);
 
     /// <summary>Remove quebra de linha/retorno de carro de valor vindo da requisição antes de logar — evita log forging (entradas fabricadas no arquivo de log).</summary>
     private static string SanitizarParaLog(string? valor) =>

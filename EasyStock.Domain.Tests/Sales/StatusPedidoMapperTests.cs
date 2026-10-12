@@ -1,4 +1,4 @@
-using EasyStock.Domain.Sales;
+﻿using EasyStock.Domain.Sales;
 using FluentAssertions;
 
 namespace EasyStock.Domain.Tests.Sales;
@@ -15,6 +15,7 @@ public class StatusPedidoMapperTests
     [InlineData(StatusPedido.AguardandoPagamento, "aguardando_pagamento")]
     [InlineData(StatusPedido.AguardandoAprovacaoBaba, "aguardando_aprovacao_baba")]
     [InlineData(StatusPedido.AprovadoBaba, "aprovado_baba")]
+    [InlineData(StatusPedido.SaiuParaEntrega, "saiu_para_entrega")]
     public void Format_retorna_string_canonica_lowercase(StatusPedido status, string esperado)
     {
         StatusPedidoMapper.Format(status).Should().Be(esperado);
@@ -38,6 +39,7 @@ public class StatusPedidoMapperTests
     [InlineData("aguardando_pagamento", StatusPedido.AguardandoPagamento)]
     [InlineData("aguardando_aprovacao_baba", StatusPedido.AguardandoAprovacaoBaba)]
     [InlineData("aprovado_baba", StatusPedido.AprovadoBaba)]
+    [InlineData("saiu_para_entrega", StatusPedido.SaiuParaEntrega)]
     public void Parse_string_canonica_retorna_enum_correto(string raw, StatusPedido esperado)
     {
         StatusPedidoMapper.Parse(raw).Should().Be(esperado);

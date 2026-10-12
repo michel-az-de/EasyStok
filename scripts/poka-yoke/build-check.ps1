@@ -21,7 +21,8 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $slnf     = Join-Path $repoRoot 'EasyStok.CI.slnf'
-$outDir   = Join-Path $env:TEMP 'easystok-build-check'
+. (Join-Path $PSScriptRoot 'build-out-dir.ps1')
+$outDir   = Get-BuildOutDir $repoRoot   # unica por worktree (issue 1117)
 
 if (-not (Test-Path $slnf)) {
     Write-Host "[build-check] NAO achei $slnf -- rode a partir do repo." -ForegroundColor Red

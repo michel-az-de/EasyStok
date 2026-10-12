@@ -2,16 +2,19 @@
 // Registra UseCases relacionados a: login, logout, tokens, recuperação de senha
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using EasyStock.Application.UseCases.AutenticarUsuario;
-using EasyStock.Application.UseCases.CadastrarUsuario;
 using EasyStock.Application.UseCases.RefreshToken;
 using EasyStock.Application.UseCases.Logout;
 using EasyStock.Application.UseCases.EsqueciSenha;
 using EasyStock.Application.UseCases.ResetarSenha;
+using EasyStock.Application.UseCases.AceitarConvite;
+using EasyStock.Application.UseCases.ReenviarConvite;
 using EasyStock.Application.UseCases.ConfirmEmail;
 using EasyStock.Application.UseCases.ObterUsuarioAtual;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
 using EasyStock.Application.UseCases.AlterarSenha;
+using EasyStock.Application.Services.Auth;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -29,13 +32,29 @@ public static partial class ServiceCollectionExtensions
         // Fluxos de login e sessão
         services.AddScoped<AutenticarUsuarioUseCase>();
         services.AddScoped<ListarEmpresasParaLoginUseCase>(); // step-1 do login 2-etapas (ADR-0031)
-        services.AddScoped<CadastrarUsuarioUseCase>();
+        services.AddScoped<IdentificarUsuarioGoogleUseCase>(); // login com Google (#1324)
         services.AddScoped<RefreshTokenUseCase>();
         services.AddScoped<LogoutUseCase>();
+
+        // Revogação de sessão na hora (#1352): reset, troca de senha, desativação e troca de perfil (e N8/N9).
+        // Depende de ICacheService (Infra.Async) e do relógio; o grupo registra o relógio como os de Core e Storefront.
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<RevogadorSessoes>();
+        services.AddScoped<TrocaDeContatoService>(); // troca de contato com senha atual em duas etapas (N4)
+        services.AddScoped<EasyStock.Application.UseCases.ContatoUsuario.DefinirMeuTelefoneUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.ContatoUsuario.VerificarTelefoneUsuarioUseCase>();
 
         // Recuperação e reset de senha
         services.AddScoped<EsqueciSenhaUseCase>();
         services.AddScoped<ResetarSenhaUseCase>();
+        services.AddScoped<ResetarSenhaPorCodigoUseCase>(); // código de 6 dígitos do WhatsApp (N8)
+        services.AddScoped<ConcluidorDeReset>();            // efeitos do reset: senha, sessões, demais segredos, aviso (N8)
+        services.AddScoped<EmpresaDoEventoAnonimo>();       // empresa do evento do pedido anônimo (N8)
+        services.AddScoped<LimitePedidosAcesso>();          // teto por IP, no ICacheService (N8)
+        services.AddScoped<LimpezaTokensAcesso>();          // limpeza dos reset_tokens expirados (N8)
+        services.AddScoped<AceitarConviteUseCase>();        // aceite do convite de primeiro acesso (N9)
+        services.AddScoped<ReenviarConviteUseCase>();       // reenvio do convite pela dona (N9)
+        services.AddScoped<ConvitesDeAcesso>();             // emissao e revogacao do convite de primeiro acesso (N9)
         services.AddScoped<ConfirmEmailUseCase>();
 
         // Perfil do usuário autenticado
@@ -48,11 +67,12 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase>();
 
         // LGPD operacional (admin dispara em nome do cliente)
-        services.AddScoped<EasyStock.Application.UseCases.Admin.AnonimizarUsuarioPorAdmin.AnonimizarUsuarioPorAdminUseCase>();
 
         // Cadastro manual via back-office (operador SuperAdmin)
         services.AddScoped<EasyStock.Application.UseCases.Admin.CriarTenantPorAdmin.CriarTenantPorAdminUseCase>();
-        services.AddScoped<EasyStock.Application.UseCases.Admin.CriarUsuarioTenantPorAdmin.CriarUsuarioTenantPorAdminUseCase>();
+
+        // Vinculo do numero da Meta a empresa (#1102)
+        services.AddScoped<EasyStock.Application.UseCases.Admin.VincularWhatsAppTenant.VincularWhatsAppDoTenantUseCase>();
 
         return services;
     }

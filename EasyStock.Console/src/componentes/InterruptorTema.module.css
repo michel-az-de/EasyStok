@@ -1,0 +1,17 @@
+.tema {
+  display: inline-flex; flex: none; gap: 2px; padding: 3px;
+  background: var(--preenchimento); border-radius: calc(var(--r-1) + 3px);
+}
+.tema > button {
+  min-height: var(--toque); padding: 0 var(--e-2);
+  background: transparent; border-color: transparent; box-shadow: none; color: var(--tinta-2);
+}
+.tema > button:hover { background: var(--elevado); color: var(--tinta); }
+.tema > button[aria-checked='true'] {
+  background: var(--papel); color: var(--marca-forte); border-color: var(--linha); box-shadow: var(--sombra);
+}
+.vertical { display: flex; flex-direction: column; margin-top: var(--e-2); }
+.vertical > button {
+  flex-direction: column; gap: 2px; width: 56px; min-height: 52px; padding: 0;
+  font-size: var(--t-minimo); line-height: 1.1;
+}

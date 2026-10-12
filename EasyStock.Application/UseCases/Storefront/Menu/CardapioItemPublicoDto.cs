@@ -16,6 +16,8 @@
 /// visual ("esgotado" via <see cref="Disponivel"/>).
 /// Null para itens avulsos (sem vínculo com ERP); frontend usa <see cref="Disponivel"/>
 /// como sinal canônico (esgotado = disponivel === false).
+/// Vinculado (#1171): saldo dos lotes do produto com saldo e não vencidos. É informativo:
+/// saldo 0 não muda <see cref="Disponivel"/>, que segue a flag manual.
 /// </para>
 /// </summary>
 public sealed record CardapioItemPublicoDto(
@@ -29,4 +31,10 @@ public sealed record CardapioItemPublicoDto(
     double Ordem,
     bool Disponivel,
     string? Tag,
-    string? PesoExibicao);   // unidade/porção exibida junto ao preço (ex: "por kg", "300g / 800g")
+    string? PesoExibicao,    // unidade/porção exibida junto ao preço (ex: "por kg", "300g / 800g")
+    string Linha,            // S15: "paraServir" | "prepararEmCasa"
+    int? TempoPreparoMinutos, // S15: null = usa o preparo padrão da loja
+    IReadOnlyList<string>? Fotos = null,
+    // M1.2 (#1482): novidade até a data (inclusive) e item novo ainda não confirmado pela dona.
+    DateOnly? NovidadeAte = null,
+    bool EmValidacao = false);

@@ -30,6 +30,13 @@
             builder.Property(c => c.Cpf).HasMaxLength(11);
             builder.Property(c => c.ConsentiuMarketing).HasDefaultValue(false);
 
+            // ── CRM leve (S24) ─────────────────────────────────────────
+            builder.Property(c => c.Bloqueado).HasDefaultValue(false);
+            builder.Property(c => c.MotivoBloqueio).HasMaxLength(Cliente.MotivoBloqueioTamanhoMaximo);
+            // Default true no banco para as linhas existentes. Sentinela true: sem ela o EF omitiria o
+            // false (valor CLR padrão) no INSERT e o banco gravaria true.
+            builder.Property(c => c.AvisosStatusAtivos).HasDefaultValue(true).HasSentinel(true);
+
             // ── Pessoa jurídica (ADR-0048, #1018) ──────────────────────
             // O default no BANCO (não só no C#) é o que mantém as linhas existentes como
             // pessoa física quando a coluna é criada, sem UPDATE de migração.

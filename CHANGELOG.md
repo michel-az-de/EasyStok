@@ -5,7 +5,160 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+- **Painel `EasyStock.Admin` e controllers `Admin*`** (poda P01): saem o projeto Admin e seus testes,
+  19 controllers `Api/Controllers/Admin*` e o `FaturasPdfController` (77 endpoints; 89 com os 12 que
+  saem do `AdminTenantsController`), com os use cases, portas, repositórios e relatórios que só eles usavam (faturas do admin, MRR/inadimplência,
+  dashboard, busca global, frota, status, configurações do sistema, cupons, planos, APK, seed de
+  cenários, helpdesk do cliente). Na Web sai o `POST /auth/impersonate` (handoff que só o Admin
+  chamava). Deploy: sem serviço `admin` no compose Azure, Caddy, Render, Fly e na matriz do
+  `build-images.yml`; `vm-deploy.sh` e scripts de verificação sem o container `easystok-admin`.
+  Ficam as rotas de plataforma sem substituto: `AdminTenantsController` enxuto (criar empresa,
+  consultar, módulos, vínculo do número da Meta), `AdminStorefrontController` e
+  `AdminNotificacoesController`. Tabelas ficam para a P06. (#1169)
+
+### Fixed
+- Criar usuário em cliente pelo SuperAdmin (`POST api/admin/usuarios-tenant` e "Novo usuário" do
+  Admin) respondia 500: o RLS recusava o `Perfil` da empresa alvo porque o token do SuperAdmin não
+  tem empresa. O caso de uso agora define o tenant da empresa alvo antes de gravar. (#1159)
+
 ### Added
+- **Alerta de desacerto e ajuste rápido de saldo** (S22): `GET api/estoque/desacertos` lista os
+  produtos com `QuantidadeDescoberta > 0` com texto legível citando os pedidos (sem tabela nova).
+  `POST api/estoque/desacertos/{produtoId}/ajustar` recebe a contagem e o motivo, reusa
+  `ItemEstoque.AplicarAjusteContagem` numa contagem de um produto já aplicada, grava `AjusteInventario`
+  e movimentação de ajuste por lote, zera o descoberto e publica `estoque.desacerto_resolvido`.
+  Exige `GerenciarEstoque`. (#1181)
+- **Avisos de status do pedido ao cliente pelo WhatsApp** (S13, #1142): pagamento confirmado,
+  `preparando` (com a previsão da janela), `saiu_para_entrega` e `entregue` (agradecimento com o
+  Instagram da loja) viram mensagem no outbox de notificações, canal WhatsApp, categoria transacional.
+  Saem com a conversa assumida; só a revogação do transacional no WhatsApp bloqueia. Idempotente por
+  pedido + status. O outbox passa a persistir os metadados do envio (template da Meta e parâmetros),
+  fechando a pendência da S09; `Storefront.InstagramUrl` novo. Pedido pago com `RequerAprovacao` (S12)
+  vai para `AguardandoAprovacaoBaba`. Migration `AddAvisosStatusPedido` (3 colunas nulas).
+- **Webhook do Mercado Pago de ponta a ponta** (S32): `POST /api/webhooks/mercadopago` ganha o
+  `MercadoPagoWebhookProcessor` (antes respondia 500). Só o tópico `payment`; o `data.id` do corpo
+  dispara `GET v1/payments/{id}` e só o que a fonte devolve vale. `approved` confirma o pedido pela S11
+  (`AguardandoPagamento → Aguardando`, `PedidoPagamento`, `pedido.pago`); valor menor e recusa só gravam
+  o motivo (recusa avisa a conversa uma vez); `refunded`/`charged_back` marcam a cobrança `Estornada`.
+  Idempotência pelo id da notificação (numérico) no `WebhookRecebido`. Client: preferência em
+  `POST checkout/preferences`, consulta, `payments/search` por `external_reference` (o job de cobrança
+  confirma webhook perdido antes de expirar), estorno com `X-Idempotency-Key` e `PUT checkout/preferences/{id}`
+  para expirar o link antigo na troca de forma. Corrige o DI que entregava a porta com `HttpClient` sem
+  `BaseAddress`. Sem credencial ainda (onda 0.9). (#1136)
+- **Canhoto e fila de impressão** (S20): o pedido pago entra em `impressoes_pendentes` na mesma
+  transação do `ConfirmarPagamentoPedidoUseCase` e sai `impressao.pendente` no SSE depois do commit.
+  `GET api/pedidos/{id}/canhoto?formato=html|texto` (html de 80 mm com o CSS do recibo; texto de 42
+  colunas sem acentos para ESC/POS), agrupado por linha com porção, molho e observação por item.
+  Consumidor agnóstico por polling: `GET api/impressao/pendentes`, `POST api/impressao/{id}/impressa`
+  (idempotente) e `POST .../falhou`, com JWT de operador ou header `X-Impressao-Api-Key`
+  (`Impressao:ApiKey` + `Impressao:EmpresaId`). `POST api/pedidos/{id}/reimprimir` só para operador.
+  `ImpressaoPendenteAlertaJob` publica `impressao.atrasada` para pendente há mais de 3 min
+  (`BackgroundJobs:EnableImpressaoPendenteAlerta`). Migration `AddImpressaoPendente` com RLS. (#1156)
+- **Início previsto e atraso** (S21): `Pedido.InicioPrevistoEm` = início da janela da vaga ativa (hora
+  de Brasília) ou `AgendadoParaEm`, menos o prazo mínimo dos itens do cardápio (S15); gravado em
+  `ConfirmarPagamentoPedidoUseCase` e recalculado em `AlterarAgendamentoPedidoUseCase`, que também zera
+  `AtrasoNotificadoEm`. O KDS devolve `inicioPrevistoEm` e deriva `atrasado` (aguardando e início vencido;
+  sem início previsto, vale a regra da S19). `PedidoAtrasoJob` (60 s, `BackgroundJobs:EnablePedidoAtraso`)
+  publica `pedido.atrasado {pedidoId, numero, cliente, inicioPrevistoEm}` uma vez por pedido. Migration
+  `AddInicioPrevistoPedido`. (#1165)
+- **Dossiê do cliente ao lado da conversa** (S25): `GET api/clientes/{id}/dossie` e `GET
+  api/atendimento/conversas/{id}/dossie` devolvem a mesma projeção (cadastro, endereços, tags, notas
+  internas, 10 últimos pedidos com itens, item favorito, última compra, bloqueio, preferências,
+  conversas recentes e pedido em andamento). Conversa de lead devolve o dossiê mínimo (nome do perfil e
+  telefone). Sinal de mesmo domicílio por `cep+numero+complemento` normalizado, só com id e nome do
+  outro cadastro (D10). O agente recebe um resumo com as notas marcadas `[interno]`. (#1161)
+- **CRM leve do cliente** (S24): tags normalizadas e únicas por cliente (`GET|POST|DELETE
+  api/clientes/{id}/tags`, repetida → 409, com sugeridas), notas internas datadas (`GET|POST
+  api/clientes/{id}/notas`, pedido de outro cliente → 400), bloqueio em todos os canais (`POST
+  bloquear|desbloquear`: sem saudação nem agente, conversa vai para a dona, `criar_pedido` recusa com
+  `cliente_bloqueado`) e preferências (`PUT preferencias`: `AvisosStatusAtivos`, `ConsentiuMarketing`).
+  Ferramentas do agente `registrar_restricao` e `registrar_nota`. Migration
+  `AddClienteTagNotaBloqueioPreferencias` com RLS. O filtro de avisos de status por
+  `AvisosStatusAtivos` fica para depois da S13. (#1148)
+- **SSE de operação do console** (S18): `GET api/operacao/eventos` com JWT no header `Authorization`
+  (sem token, 401; token sem empresa, 403), eventos nomeados só da empresa da claim e heartbeat a cada
+  25 s. `ConfirmarPagamentoPedidoUseCase` publica `pedido.pago {pedidoId, numero, cliente, total, janela}`
+  e `AtualizarStatusPedidoUseCase` publica `pedido.mudou_status`, sempre depois do commit. O broker
+  in-memory do mobile virou `Api/Services/Operacao/OperacaoEventBroker` e atende os dois canais; o SSE
+  mobile não muda. `IOperacaoEventPublisher` deixa de ser no-op na Api (Worker segue no-op). (#1146)
+- **Instagram Direct e Messenger** (S35, ADR-0051): webhook `api/webhooks/meta/mensageria` (objetos
+  `instagram` e `page`, mesmo HMAC do App Secret), roteado por `Empresa.InstagramAccountId` e
+  `Empresa.FacebookPageId`, idempotente pelo `mid`. Adaptadores `CanalInstagram` e `CanalMessenger` na
+  porta de canal (Send API v25.0, page token em `Atendimento:MetaMensageria`, stub sem provider `meta`).
+  Fora da janela o console responde com `HUMAN_AGENT` até 7 dias; depois, 409. A conversa entra na
+  fila humana e o agente não responde fora do WhatsApp. Flags `atendimento.canal.instagram` e
+  `atendimento.canal.messenger`. (#1103)
+- **Cadastro de entrega pela loja** (S45, parte 1): `api/minha-vitrine/entrega` com janelas (listar,
+  criar, editar, ativar e desativar), zonas de frete por faixa de CEP ou por bairros (inclusive trocar
+  a cobertura) e bloqueios de dia ou de janela (listar por período, criar, remover). A loja é sempre a
+  da empresa do token e id de outra loja devolve 404. Canais por empresa ficam para a parte 2. (#1095)
+- **Chat do site** (S36, ADR-0051): canal `ChatSite` público por loja em `api/public/chat/{slug}`.
+  `POST sessoes` devolve um token (só o hash fica no banco, vale 24 h renovadas no uso), `POST|GET
+  mensagens` com header `X-Chat-Token` e `GET stream` (SSE que lê do banco a cada 1 s, funciona
+  com várias instâncias). A conversa entra na fila humana sem responsável; o agente ainda não responde
+  no site. Flag `atendimento.canal.chatsite`, rate limit por IP e por sessão, tabela
+  `sessoes_chat_site` com RLS e limpeza das vencidas de hora em hora. (#1097)
+
+### Security
+- CSRF do storefront: POST/PUT/PATCH/DELETE com cookie `__Host-cdb_*` só da mesma origem
+  (`Sec-Fetch-Site` `same-origin`/`none`, ou `Origin` igual ao `Host`); outro site recebe 403.
+  O front é same-origin e não muda; chamadas bearer do Web e do Admin seguem livres (ADR-0053). (#1088)
+- CodeQL: `cs/web/missing-token-validation` filtrada na Api bearer (CSRF não se aplica a JWT) e
+  mantida nos 4 controllers do storefront que usam cookie; `CodeQlCsrfFilterTests` amarra a lista
+  do `codeql.yml` ao código. Web e Admin seguem com a regra inteira (ADR-0052). (#1089)
+
+### Added
+- **Núcleo do checkout compartilhado** (S10): `CheckoutCoreService` concentra as fases 1 e 2 do
+  checkout (validação de CEP, janela, bloqueio e cardápio, frete por zona, pedido em `Rascunho`,
+  vaga ocupada, `AguardandoPagamento`, rollback para `Cancelado` com janela lotada).
+  `IniciarCheckoutUseCase` e `IniciarCheckoutGuestUseCase` passam a delegar; o site não muda de
+  comportamento. Novo `CriarPedidoAtendimentoUseCase` cria o pedido da conversa pelo mesmo caminho
+  (`Origem = "whatsapp"`, observação por item, `Conversa.PedidoEmAndamentoId`); a cobrança é da S11. (#1101)
+- **Cobrança do pedido pelo Mercado Pago** (S11): `CobrancaPedido` (migration `AddCobrancaPedido`,
+  RLS) guarda a preferência com `external_reference = PedidoId`, link e expiração de 30 min; site e
+  conversa passam pelo mesmo `GerarCobrancaPedidoUseCase`. `ConfirmarPagamentoPedidoUseCase` (ponto de
+  entrada do webhook da S32) leva o pedido de `AguardandoPagamento` a `Aguardando`, registra o
+  pagamento e publica `pedido.pago`; repetido é no-op e valor menor não confirma. `CobrancaPedidoJob`
+  (60 s, `BackgroundJobs:EnableCobrancaPedido`) reemite uma vez para pedido da conversa e cancela o
+  resto liberando a vaga. Operadora: `POST api/pedidos/{id}/cobranca`, `.../cobranca/forma`
+  (`online` ou `na_entrega`) e `.../pagamento-manual/desfazer`. A ferramenta `criar_pedido` do agente
+  fecha o pedido e devolve resumo, total e link. (#1115)
+- **Mensagem programada ao cliente em todos os canais** (S39, ADR-0051): `MensagemProgramada`
+  (texto ou modelo aprovado, agendada, enviando, enviada, cancelada ou falhou). Ao agendar e de
+  novo no disparo: horário no passado é recusado; fora da janela no horário do envio, o WhatsApp
+  exige modelo e Instagram e Messenger recusam; marketing sem consentimento no canal é recusado
+  (S38). O destino vem da conversa aberta ou do cadastro (telefone para WhatsApp e SMS, e-mail
+  para e-mail). Disparador no processo da API (`MensagensProgramadasBackgroundService`, desliga
+  com `BackgroundJobs:EnableMensagensProgramadas=false`), com reserva `FOR UPDATE SKIP LOCKED` que
+  não duplica entre processos. A saída entra no histórico com `Mensagem.Programada`.
+  `POST|GET|DELETE api/atendimento/mensagens-programadas` (Operador). (#1082)
+- **WhatsApp por empresa** (#1102): a resposta sai pelo `phone_number_id` da empresa do tenant
+  (`IRemetenteWhatsApp`), com fallback para `Notifications:WhatsApp:Meta:PhoneNumberId` e erro
+  permanente, sem chamar a Meta, quando não há nenhum. Chave nova `Atendimento__WhatsApp__Cliente=meta`
+  liga o cliente real da Cloud API sem trocar o provider de notificações (que segue `stub`);
+  `Provider=meta` continua ligando o cliente real. O `StartupHardening` exige AccessToken, AppSecret
+  e VerifyToken com qualquer uma das duas em `meta`. `PUT api/admin/tenants/{id}/whatsapp`
+  (`{ phoneNumberId }`, `null` desvincula, 409 se outra empresa já usa) e card "WhatsApp" na aba
+  Features do detalhe do tenant no Admin.
+- **Consentimento do cliente final por canal e finalidade** (S38, ADR-0051): `ConsentimentoContato`
+  (transacional ou marketing, concedido ou revogado, com origem), `PoliticaConsentimento` (marketing
+  só com opt-in no canal; transacional passa salvo revogação) e `PoliticaEnvioCliente` para a
+  mensagem programada e as campanhas. "SAIR", "PARAR" ou "STOP" sozinhos no WhatsApp revogam o
+  marketing daquele canal, confirmam ao cliente e não acionam o agente.
+  `GET|PUT api/atendimento/clientes/{id}/consentimentos` (Admin). Tabela `consentimentos_contato`
+  com RLS e backfill de `ConsentiuMarketing=true` para WhatsApp e e-mail. (#1078)
+- **E-mail e SMS na porta de canal do atendimento** (S37, ADR-0051): `CanalSms` (texto pelo
+  `IProvedorSms` ativo, Twilio em produção, com `+` no número) e `CanalEmail` (texto, ou imagem por
+  link em HTML escapado, pelo `IEmailService`). O `ResolvedorCanal` passa a achar `Sms` e `Email`.
+  Falha do provedor vira `EnvioCanalFalhouException`; operação que o canal não suporta lança
+  `NotSupportedException`. (#1080)
+- **Atendentes e atribuição de conversa** (S41, ADR-0051): permissão `AtenderConversas` (Operador,
+  Gerente e Admin pelo nível; perfil com permissões explícitas só se a tiver). Assumir, responder,
+  transferir, liberar e encerrar devolvem 403 sem ela. `POST api/atendimento/conversas/{id}/transferir`
+  (422 se o destino não atende na empresa), `GET api/atendimento/atendentes` e filtro
+  `?responsavel=eu|ninguem|{id}` na inbox. Mensagem do console grava `EnviadaPorUsuarioId`. A regra
+  de permissão efetiva foi para o domínio (`PoliticaPermissao`). (#1085)
 - **Expediente da loja** (S40, ADR-0051): `ExpedienteLoja` por empresa com horário por dia (virada
   da meia-noite), controle manual que vence o relógio e não volta sozinho, e mensagens de "fora do
   horário" (`{abre}` vira "amanhã às 08:00") e "loja fechada". `GET|PUT api/atendimento/expediente`
@@ -139,6 +292,9 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tracing, sink Serilog OTLP e sampler ParentBased (preserva trace distribuido). (#1002)
 
 ### Fixed
+- `SeedSchemaBootstrap` rodava `ALTER TABLE "Empresas"` (a tabela e `empresas`) e falhava com 42P01
+  a cada startup, quebrando todo seed pelo painel admin no passo 1. O `ALTER` sai: `IsSeedData` foi
+  dropada pela migration `20260507011959` e e `[NotMapped]` no dominio. (#1092)
 - `ToString` de `Quantidade`, `Dinheiro` e `Dimensoes` dependia da cultura do host (`1,5` no
   Windows pt-BR, `1.5` no CI Linux) e passa a ser invariante, como a Api ja produzia no container.
   O teste de wiring de metricas coleta so o proprio reader InMemory: o `ForceFlush` do provider

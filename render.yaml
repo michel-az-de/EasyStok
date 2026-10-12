@@ -1,6 +1,6 @@
 # EasyStok — Render Blueprint
 #
-# Cobre os 4 serviços de produção (api / web / admin / worker) + Preview Envs
+# Cobre os 4 serviços de produção (api / web / worker) + Preview Envs
 # por PR. Render é canal único; Azure foi descomissionado.
 #
 # Como aplicar:
@@ -77,30 +77,6 @@ services:
             name: easystok-api
             type: web
             property: hostport
-
-  # ── Admin ────────────────────────────────────────────────────────────────
-  - type: web
-    name: easystok-admin
-    runtime: docker
-    region: oregon
-    plan: standard
-    branch: master
-    autoDeploy: true
-    dockerfilePath: ./Dockerfile.cloudrun.admin
-    dockerContext: .
-    healthCheckPath: /health
-    envVars:
-      - fromGroup: easystok-secrets
-      - key: ASPNETCORE_ENVIRONMENT
-        value: Production
-      - key: ASPNETCORE_URLS
-        value: http://+:8080
-    previews:
-      generation: automatic
-      envVars:
-        - fromGroup: easystok-secrets-preview
-        - key: ASPNETCORE_ENVIRONMENT
-          value: Preview
 
   # ── Worker (background jobs) ─────────────────────────────────────────────
   - type: worker

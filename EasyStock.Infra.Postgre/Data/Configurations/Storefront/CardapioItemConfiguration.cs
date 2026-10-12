@@ -1,3 +1,4 @@
+using EasyStock.Domain.Enums.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
@@ -27,6 +28,11 @@ public class CardapioItemConfiguration : IEntityTypeConfiguration<CardapioItem>
         builder.Property(c => c.Disponivel)
             .IsRequired()
             .HasDefaultValue(true);
+        // M1.2 (#1482): tirar arquiva (≠ ocultar do site); item novo em validação; novidade com prazo.
+        builder.Property(c => c.ArquivadoEm);
+        builder.Property(c => c.EmValidacao).IsRequired().HasDefaultValue(false);
+        builder.Property(c => c.NovidadeAte);
+        builder.Ignore(c => c.EstaArquivado);
 
         builder.Property(c => c.OrdemExibicao)
             .IsRequired()
@@ -37,7 +43,12 @@ public class CardapioItemConfiguration : IEntityTypeConfiguration<CardapioItem>
         builder.Property(c => c.Alergenos).HasMaxLength(200);
         builder.Property(c => c.SugestaoMolho).HasMaxLength(200);
         builder.Property(c => c.TempoPreparo).HasMaxLength(50);
+        // S15: linha (enum int, default ParaServir=1), preparo numérico e instrução de finalização.
+        builder.Property(c => c.Linha).HasConversion<int>().IsRequired().HasDefaultValue(LinhaProduto.ParaServir).HasSentinel((LinhaProduto)0);
+        builder.Property(c => c.TempoPreparoMinutos);
+        builder.Property(c => c.InstrucaoFinalizacao).HasMaxLength(500);
         builder.Property(c => c.FotoUrl).HasMaxLength(500);
+        builder.Property(c => c.FotosJson).IsRequired().HasColumnType("jsonb").HasDefaultValue("[]");
         builder.Property(c => c.PesoExibicao).HasMaxLength(50);
 
         builder.Property(c => c.PrecoStorefront)

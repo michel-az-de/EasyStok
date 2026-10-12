@@ -1,6 +1,8 @@
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Enums.Pagamentos;
 
 namespace EasyStock.Infra.Postgre.Repositories
 {
@@ -26,14 +28,15 @@ namespace EasyStock.Infra.Postgre.Repositories
             var total = await query.CountAsync();
             var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
 
-            query = sort?.ToLowerInvariant() switch
+            var ordenada = sort?.ToLowerInvariant() switch
             {
                 "valor" => desc ? query.OrderByDescending(m => m.Valor) : query.OrderBy(m => m.Valor),
                 "tipo"  => desc ? query.OrderByDescending(m => m.Tipo)  : query.OrderBy(m => m.Tipo),
                 _       => desc ? query.OrderByDescending(m => m.DataMovimento) : query.OrderBy(m => m.DataMovimento),
             };
 
-            var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            var items = await ordenada.ThenByDescending(m => m.Id)
+                .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
             return (items, total);
         }
 
@@ -97,6 +100,19 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToList();
         }
 
+        public async Task MarcarNotificadoEsquecidoAsync(Guid movimentoId, DateTime em, CancellationToken ct = default) =>
+            await db.MovimentosCaixa.IgnoreQueryFilters()
+                .Where(m => m.Id == movimentoId)
+                .ExecuteUpdateAsync(s => s.SetProperty(m => m.NotificadoEsquecidoEm, em), ct);
+
+        // Multi-tenant via UsuarioEmpresa; cross-tenant, então IgnoreQueryFilters (o job roda sob bypass de RLS).
+        public async Task<Guid?> ResolverResponsavelPadraoAsync(Guid empresaId, CancellationToken ct = default) =>
+            await db.Set<UsuarioEmpresa>().IgnoreQueryFilters()
+                .Where(ue => ue.EmpresaId == empresaId && ue.Ativo)
+                .OrderBy(ue => ue.CriadoEm)
+                .Select(ue => (Guid?)ue.UsuarioId)
+                .FirstOrDefaultAsync(ct);
+
         public Task AddMovimentoAsync(MovimentoCaixa m) { db.MovimentosCaixa.Add(m); return Task.CompletedTask; }
         public Task UpdateMovimentoAsync(MovimentoCaixa m) { db.MovimentosCaixa.Update(m); return Task.CompletedTask; }
 
@@ -134,6 +150,15 @@ namespace EasyStock.Infra.Postgre.Repositories
             return false;
         }
 
+        public Task TravarSaidasAsync(Guid empresaId, Guid? lojaId, CancellationToken ct = default)
+        {
+            // O lock é da transação: fora dela soltaria na hora, em silêncio.
+            if (db.Database.CurrentTransaction is null)
+                throw new InvalidOperationException("TravarSaidasAsync exige transação aberta.");
+            var chave = $"caixa-saida:{empresaId:N}:{lojaId:N}";
+            return db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({chave}))", ct);
+        }
+
         public Task<FechamentoCaixa?> GetFechamentoDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null) =>
             db.FechamentosCaixa.FirstOrDefaultAsync(f =>
                 f.EmpresaId == empresaId && f.Data == data && f.LojaId == lojaId);
@@ -161,15 +186,30 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<decimal> GetTotalVendasNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
         {
+            // So Natureza=Venda e receita: Perda/Doacao/Ajuste com preco nao entram no caixa.
             var q = db.Vendas.AsNoTracking()
-                .Where(v => v.EmpresaId == empresaId && v.DataVenda >= iniUtc && v.DataVenda < fimUtc);
+                .Where(v => v.EmpresaId == empresaId && v.Natureza == NaturezaMovimentacaoEstoque.Venda
+                            && v.DataVenda >= iniUtc && v.DataVenda < fimUtc);
             if (lojaId.HasValue) q = q.Where(v => v.LojaId == lojaId);
 
             // Projeta so a coluna ValorTotal (VO Dinheiro via HasConversion — o EF nao
             // traduz Sum() sobre VO-com-converter, entao a soma fica em memoria, mas o
             // SELECT deixa de trazer a entidade Venda inteira). Antes: SELECT * + materializa Venda.
             var valores = await q.Select(v => v.ValorTotal).ToListAsync();
-            return valores.Sum(v => v == null ? 0m : v.Valor);
+            var bruto = valores.Sum(v => v == null ? 0m : v.Valor);
+
+            // Estorno de saida devolve o dinheiro no dia do estorno (fluxo de caixa): abate das vendas
+            // estornadas dentro da janela, independentemente do dia em que a venda foi feita.
+            var qe = db.MovimentacoesEstoque.AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId && m.VendaId != null
+                            && m.Tipo == TipoMovimentacaoEstoque.Saida && m.Natureza == NaturezaMovimentacaoEstoque.Venda
+                            && m.EstornadaEm != null && m.EstornadaEm >= iniUtc && m.EstornadaEm < fimUtc);
+            if (lojaId.HasValue)
+                qe = qe.Where(m => db.Vendas.Any(v => v.Id == m.VendaId && v.LojaId == lojaId));
+            var estornados = await qe.Select(m => m.ValorTotal).ToListAsync();
+            var estornado = estornados.Sum(v => v == null ? 0m : v.Valor);
+
+            return bruto - estornado;
         }
 
         public Task<decimal> GetTotalPagamentosPedidosDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
@@ -189,7 +229,13 @@ namespace EasyStock.Infra.Postgre.Repositories
                       p => p.Id,
                       (pg, p) => new { pg, p })
                 .Where(x => x.p.EmpresaId == empresaId
-                         && x.p.Status != "cancelado"
+                         // Cancelar a operação não devolve dinheiro. Só sai do saldo quando
+                         // o legado já retirou o recebimento. Estorno com ledger mantém receita e saída.
+                         && !db.Set<CobrancaPedido>().Any(c => c.EmpresaId == empresaId
+                             && c.PedidoId == x.p.Id && c.Status == StatusCobrancaPedido.Estornada
+                             && x.pg.Referencia != null && c.PagamentoExternoId == x.pg.Referencia
+                             && !db.Set<PedidoEstornoOnline>().Any(e => e.EmpresaId == empresaId
+                                 && e.PagamentoId == x.pg.Id && e.Situacao == PedidoEstornoOnline.Confirmado))
                          // So pedidos SEM Venda consolidada (balcao/web tem so PedidoPagamento).
                          // Pedido mobile entregue gera Venda (VendaId setado) e ja e contado por
                          // GetTotalVendas — sem este filtro o mesmo dinheiro somava 2x no caixa (#926).
@@ -205,7 +251,8 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<IReadOnlyList<Venda>> GetVendasNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
         {
             var q = db.Vendas.AsNoTracking()
-                .Where(v => v.EmpresaId == empresaId && v.DataVenda >= iniUtc && v.DataVenda < fimUtc);
+                .Where(v => v.EmpresaId == empresaId && v.Natureza == NaturezaMovimentacaoEstoque.Venda
+                            && v.DataVenda >= iniUtc && v.DataVenda < fimUtc);
             if (lojaId.HasValue) q = q.Where(v => v.LojaId == lojaId);
             return await q.OrderBy(v => v.DataVenda).ToListAsync();
         }
@@ -219,7 +266,11 @@ namespace EasyStock.Infra.Postgre.Repositories
                       p => p.Id,
                       (pg, p) => new { pg, p })
                 .Where(x => x.p.EmpresaId == empresaId
-                         && x.p.Status != "cancelado"
+                         && !db.Set<CobrancaPedido>().Any(c => c.EmpresaId == empresaId
+                             && c.PedidoId == x.p.Id && c.Status == StatusCobrancaPedido.Estornada
+                             && x.pg.Referencia != null && c.PagamentoExternoId == x.pg.Referencia
+                             && !db.Set<PedidoEstornoOnline>().Any(e => e.EmpresaId == empresaId
+                                 && e.PagamentoId == x.pg.Id && e.Situacao == PedidoEstornoOnline.Confirmado))
                          // Mesmo filtro do total (#926): exclui pagamentos de pedidos com Venda
                          // consolidada, para a soma das linhas exibidas casar com o SaldoEsperado.
                          && x.p.VendaId == null

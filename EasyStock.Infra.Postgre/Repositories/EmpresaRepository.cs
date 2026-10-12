@@ -21,6 +21,16 @@ namespace EasyStock.Infra.Postgre.Repositories
                 : dbContext.Empresas.AsNoTracking()
                     .FirstOrDefaultAsync(e => e.WhatsAppPhoneNumberId == phoneNumberId, ct);
 
+        public Task<Empresa?> GetByFacebookPageIdAsync(string pageId, CancellationToken ct = default) =>
+            string.IsNullOrWhiteSpace(pageId)
+                ? Task.FromResult<Empresa?>(null)
+                : dbContext.Empresas.AsNoTracking().FirstOrDefaultAsync(e => e.FacebookPageId == pageId, ct);
+
+        public Task<Empresa?> GetByInstagramAccountIdAsync(string instagramAccountId, CancellationToken ct = default) =>
+            string.IsNullOrWhiteSpace(instagramAccountId)
+                ? Task.FromResult<Empresa?>(null)
+                : dbContext.Empresas.AsNoTracking().FirstOrDefaultAsync(e => e.InstagramAccountId == instagramAccountId, ct);
+
         public async Task<IEnumerable<Empresa>> GetAllAsync() =>
             await dbContext.Empresas.AsNoTracking().ToListAsync();
 

@@ -8,11 +8,15 @@ public sealed record EntradaWhatsApp(
     string RawJson,
     IReadOnlyList<ContatoWhatsApp> Contatos,
     IReadOnlyList<MensagemRecebidaWhatsApp> Mensagens,
-    IReadOnlyList<StatusRecebidoWhatsApp> Statuses);
+    IReadOnlyList<StatusRecebidoWhatsApp> Statuses,
+    IReadOnlyList<EcoWhatsApp> Ecos);
 
 public sealed record ContatoWhatsApp(string WaId, string? Nome);
 
-/// <summary><see cref="Tipo"/> é o <c>type</c> bruto da Meta (text, image, audio, document, sticker, location, interactive, button, reaction, unsupported).</summary>
+/// <summary>
+/// <see cref="Tipo"/> é o <c>type</c> bruto da Meta (text, image, audio, document, sticker, video, location, interactive,
+/// button, reaction, unsupported, system). <see cref="TextoCorpo"/> é o texto, a legenda da mídia ou a localização.
+/// </summary>
 public sealed record MensagemRecebidaWhatsApp(
     string De,
     string Wamid,
@@ -29,4 +33,18 @@ public sealed record StatusRecebidoWhatsApp(
     string Wamid,
     string Status,
     string? RecipientId,
-    string? ErroMensagem);
+    string? ErroMensagem,
+    int? ErroCodigo = null);
+
+/// <summary>
+/// Mensagem que a loja mandou pelo app WhatsApp Business do celular (coexistência, #1417, field
+/// <c>smb_message_echoes</c>). <see cref="Para"/> é o <c>wa_id</c> do cliente; o resto segue <see cref="MensagemRecebidaWhatsApp"/>.
+/// </summary>
+public sealed record EcoWhatsApp(
+    string Para,
+    string Wamid,
+    DateTimeOffset Timestamp,
+    string Tipo,
+    string? TextoCorpo,
+    string? MidiaId,
+    string? MidiaMime);

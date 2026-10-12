@@ -14,9 +14,12 @@
 /// <param name="ValorFormatado">Mesmo valor já formatado em pt-BR para UI ("R$ 15,00").</param>
 /// <param name="EtaLabel">Texto legível do tempo estimado ("30 min", "1h30").</param>
 /// <param name="ZonaLabel">Nome humano da zona ("Centro", "Butantã proximidade").</param>
+/// <param name="TempoEstimadoMinutos">Minutos numéricos do <paramref name="EtaLabel"/>, para uso interno
+/// (S14, agente de atendimento). Fora do JSON público: o contrato do storefront não muda.</param>
 public sealed record FreteCalculadoDto(
     Guid ZonaId,
     int Valor,
     string ValorFormatado,
     string EtaLabel,
-    string ZonaLabel);
+    string ZonaLabel,
+    [property: System.Text.Json.Serialization.JsonIgnore] int? TempoEstimadoMinutos = null);

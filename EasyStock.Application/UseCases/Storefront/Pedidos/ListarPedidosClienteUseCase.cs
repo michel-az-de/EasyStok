@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
@@ -151,7 +151,8 @@ public sealed class ListarPedidosClienteUseCase(
         {
             avaliacaoDto = new PedidoStorefrontAvaliacaoDto(
                 Estrelas: avaliacao.Estrelas,
-                Comentario: avaliacao.Comentario);
+                Comentario: avaliacao.Comentario,
+                Resultado: avaliacao.Resultado?.ToString().ToLowerInvariant());
         }
 
         // Motivo de cancelamento: prioriza mensagem ao cliente (texto humano),

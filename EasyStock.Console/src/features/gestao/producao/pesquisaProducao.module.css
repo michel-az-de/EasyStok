@@ -1,0 +1,4 @@
+.nome { min-width: 0; }
+.fontes, .ingredientes { margin: 8px 0; padding-left: 20px; display: grid; gap: 8px; }
+.fontes { font-size: 13px; color: var(--tinta-2); }
+.fontes a { color: var(--tinta); text-decoration: underline; overflow-wrap: anywhere; }

@@ -69,7 +69,7 @@ public class Fatura
     public string? Observacoes { get; set; }
     public string? MetadataJson { get; set; }
 
-    /// <summary>FK opcional a um <see cref="AdminTicket"/> primario (helpdesk financeiro).</summary>
+    /// <summary>Id do ticket de helpdesk vinculado (legado; a tabela de tickets saiu na P06, sem FK).</summary>
     public Guid? TicketRelacionadoId { get; set; }
 
     /// <summary>RowVersion para optimistic concurrency (mapeada como xmin no PG).</summary>
@@ -84,7 +84,6 @@ public class Fatura
     // Navegacao
     public Empresa? Empresa { get; set; }
     public Cliente? Cliente { get; set; }
-    public AdminTicket? TicketRelacionado { get; set; }
     public ICollection<FaturaItem> Itens { get; set; } = new List<FaturaItem>();
     public ICollection<FaturaPagamento> Pagamentos { get; set; } = new List<FaturaPagamento>();
     public ICollection<FaturaEvento> Eventos { get; set; } = new List<FaturaEvento>();

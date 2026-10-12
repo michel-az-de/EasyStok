@@ -1,0 +1,1796 @@
+{
+  "versao": 1,
+  "geradoEm": "2026-09-22",
+  "conversas": [
+    {
+      "id": "c1",
+      "cadastroId": "cad-01",
+      "conta": "cliente",
+      "nome": "José Moretti",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1437,
+      "ultimaMinutosAtras": 3,
+      "atrasada": false,
+      "cliente": {
+        "desde": "março de 2026",
+        "endereco": "Rua Girassol, 412, apto 71, Vila Madalena, 05433-001",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-0137",
+        "pedidos": 7,
+        "tags": ["Gosta de lasanha", "Massa al dente"],
+        "notas": [
+          { "autor": "Thatiane", "em": "14/09/2026 20:12", "texto": "Adorou a lasanha mas pediu a massa mais al dente. Reduzir 1 min no cozimento." },
+          { "autor": "Thatiane", "em": "02/08/2026 19:40", "texto": "Mora no mesmo endereço da Maria Moretti. Mesma casa, cadastros separados." }
+        ]
+      },
+      "pedido": {
+        "numero": "2026-0184",
+        "estado": "pago",
+        "janela": "j2",
+        "entregador": "motoboy da casa",
+        "itens": [
+          { "sku": "LAS-CLA", "qtd": 1, "obs": "gratinada no forno" },
+          { "sku": "EXT-PAR", "qtd": 2, "obs": "" }
+        ],
+        "cobranca": {
+          "id": "pix-2026-0184",
+          "valor": 113,
+          "copiaECola": "00020126580014BR.GOV.BCB.PIX0136pix-2026-0184-jose5204000053039865406113.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304D79D",
+          "link": "https://pix.casadababa.exemplo/2026-0184",
+          "criadaMinutosAtras": 8,
+          "expiraDaquiMinutos": 22,
+          "pagaMinutosAtras": 4,
+          "comprovanteEm": null,
+          "valorPago": 113,
+          "liberadaEm": null,
+          "tentativa": 1,
+          "diferenca": false,
+          "estornadaEm": null
+        }
+      },
+      "mensagens": [
+        { "id": "c1m1", "dir": "in", "texto": "Oi Thatiane, bom dia! O que tem hoje?", "minutosAtras": 22 },
+        { "id": "c1m2", "dir": "out", "texto": "Oi José! Hoje tem lasanha clássica, pappardelle com ragu de costela e os raviólis. Te mando a foto do cardápio.", "minutosAtras": 20, "status": "lida" },
+        { "id": "c1m3", "dir": "in", "texto": "Quero uma lasanha clássica. Dá pra gratinar?", "minutosAtras": 16 },
+        { "id": "c1m4", "dir": "out", "texto": "Dá sim, sai gratinada no forno. Confirma o endereço da Rua Girassol, 412, apto 71?", "minutosAtras": 14, "status": "lida" },
+        { "id": "c1m5", "dir": "in", "texto": "Isso mesmo. E manda um parmesão extra também, dois potes.", "minutosAtras": 11 },
+        { "id": "c1m6", "dir": "out", "texto": "Anotado. Lasanha gratinada mais dois parmesões, dá 113 reais. Já gerei o pedido 2026-0184.", "minutosAtras": 9, "status": "lida" },
+        { "id": "c1m7", "dir": "out", "texto": "Pedido 2026-0184 anotado!\n1× Lasanha clássica, 2× Parmesão ralado (extra).\nTotal: R$ 113,00\nPix de 30 minutos: https://pix.casadababa.exemplo/2026-0184\nCopia e cola: 00020126580014BR.GOV.BCB.PIX0136pix-2026-0184-jose5204000053039865406113.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304D79D\nAssim que cair eu já coloco na fila de preparo.", "minutosAtras": 8, "status": "lida", "automatica": true },
+        { "id": "c1m8", "dir": "in", "texto": "Paguei agora.", "minutosAtras": 5 },
+        { "id": "c1m9", "dir": "sistema", "texto": "Pagamento confirmado. Pedido 2026-0184 entrou na fila.", "minutosAtras": 4 },
+        { "id": "c1m10", "dir": "out", "texto": "Pagamento confirmado, obrigada! Já coloco seu pedido na fila.", "minutosAtras": 4, "status": "lida", "automatica": true },
+        { "id": "c1m11", "dir": "in", "texto": "Consegue entregar na hora do almoço?", "minutosAtras": 3 }
+      ],
+      "esperado": {
+        "cenario": "Gratinado, parmesão extra e pagamento confirmado",
+        "intencao": "pergunta-entrega",
+        "acao": "propor",
+        "proibido": [
+          "Prometer a janela das 11h30 às 12h30, que já está lotada",
+          "Prometer entrega imediata ou em menos de 40 minutos",
+          "Afirmar que a lasanha é sem lactose ou sem glúten"
+        ],
+        "deveConter": [
+          "Confirmação da janela das 12h30 às 13h30, que já está no pedido",
+          "Lembrete de que a lasanha sai gratinada no forno",
+          "Aviso de que o pagamento já caiu e o pedido está na fila"
+        ],
+        "porque": "O pedido já está pago na janela do almoço seguinte, então a resposta confirma o que existe em vez de prometer horário novo."
+      }
+    },
+    {
+      "id": "c2",
+      "cadastroId": "cad-02",
+      "conta": "lead",
+      "nome": "Patrícia Alencar",
+      "canal": "Instagram",
+      "estado": "Aberto",
+      "responsavel": null,
+      "janelaMinutos": null,
+      "ultimaMinutosAtras": 7,
+      "atrasada": true,
+      "cliente": {
+        "desde": null,
+        "endereco": null,
+        "enderecoCapturado": "Av. Pompeia, 1.870, Perdizes, 05022-001",
+        "usuario": "patricia.alencar.cdb2",
+        "pedidos": 0,
+        "tags": ["Chegou pelo Instagram", "Viu o post do ravióli de limão"],
+        "notas": []
+      },
+      "pedido": null,
+      "mensagens": [
+        { "id": "c2m1", "dir": "in", "texto": "Oi! Vi o post do ravióli de limão siciliano. Vocês entregam em Perdizes?", "minutosAtras": 9 },
+        { "id": "c2m2", "dir": "out", "texto": "Oi! Entrego sim. Me passa rua, número e CEP que eu já confirmo a área.", "minutosAtras": 8, "status": "lida", "automatica": true },
+        { "id": "c2m3", "dir": "in", "texto": "Av. Pompeia 1870, Perdizes, CEP 05022-001", "minutosAtras": 7 }
+      ],
+      "esperado": {
+        "cenario": "Lead do Instagram com endereço dentro da área",
+        "intencao": "pergunta-entrega",
+        "acao": "propor",
+        "proibido": [
+          "Tratar ela como freguesa da casa, ela ainda não comprou",
+          "Prometer o ravióli para agora, a casa trabalha com agendamento",
+          "Pedir CPF ou qualquer dado que a casa não usa"
+        ],
+        "deveConter": [
+          "Confirmação de que Perdizes está na área de entrega",
+          "Preço e porção do ravióli de limão siciliano, 62 reais em 500 g",
+          "Oferta de janela de entrega do dia"
+        ],
+        "porque": "Ela veio de um post, já entregou o endereço completo e só falta a casa confirmar área e horário para virar pedido."
+      }
+    },
+    {
+      "id": "c3",
+      "cadastroId": "cad-03",
+      "conta": "cliente",
+      "nome": "Laís Ferreira",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1434,
+      "ultimaMinutosAtras": 6,
+      "atrasada": false,
+      "cliente": {
+        "desde": "junho de 2026",
+        "endereco": "Rua Cardeal Arcoverde, 2.200, Pinheiros, 05408-003",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-0411",
+        "pedidos": 4,
+        "tags": ["Quis lasanha e não tinha", "Prefere pedir na sexta", "Molho à parte"],
+        "notas": [
+          { "autor": "Thatiane", "em": "05/09/2026 18:02", "texto": "Pediu lasanha duas vezes quando não tinha. Avisar quando entrar na produção." },
+          { "autor": "Thatiane", "em": "12/09/2026 13:40", "texto": "Molho sempre à parte, ela mesma finaliza na hora de servir." }
+        ]
+      },
+      "pedido": {
+        "numero": "2026-0181",
+        "estado": "entrega",
+        "janela": "j1",
+        "entregador": "motoboy da casa",
+        "itens": [{ "sku": "RAV-ABO", "qtd": 2, "obs": "molho à parte" }],
+        "cobranca": {
+          "id": "pix-2026-0181",
+          "valor": 124,
+          "copiaECola": "00020126580014BR.GOV.BCB.PIX0136pix-2026-0181-lais520400005303986540610.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304C7A1",
+          "link": "https://pix.casadababa.exemplo/2026-0181",
+          "criadaMinutosAtras": 94,
+          "expiraDaquiMinutos": -64,
+          "pagaMinutosAtras": 91,
+          "comprovanteEm": null,
+          "valorPago": 124,
+          "liberadaEm": null,
+          "tentativa": 1,
+          "diferenca": false,
+          "estornadaEm": null
+        }
+      },
+      "mensagens": [
+        { "id": "c3m1", "dir": "in", "texto": "Oi Thati! Vou querer dois raviólis de abóbora pro almoço.", "minutosAtras": 96 },
+        { "id": "c3m2", "dir": "out", "texto": "Oi Laís! Anotado, molho à parte como sempre. Entrego entre 11h30 e 12h30.", "minutosAtras": 94, "status": "lida" },
+        { "id": "c3m3", "dir": "in", "texto": "Perfeito, obrigada!", "minutosAtras": 90 },
+        { "id": "c3m4", "dir": "sistema", "texto": "Pedido 2026-0181 marcado como saiu para entrega.", "minutosAtras": 41 },
+        { "id": "c3m5", "dir": "out", "texto": "Seu pedido saiu para entrega com o motoboy da casa.", "minutosAtras": 40, "status": "lida", "automatica": true },
+        { "id": "c3m6", "dir": "in", "texto": "Oi Thati, quanto tempo falta? Tô com o pessoal aqui esperando o almoço.", "minutosAtras": 6 }
+      ],
+      "esperado": {
+        "cenario": "Molho à parte e quanto tempo falta",
+        "intencao": "acompanhar",
+        "acao": "propor",
+        "proibido": [
+          "Dar minuto exato de chegada, a casa não controla a rua",
+          "Dizer que o pedido já foi entregue",
+          "Oferecer desconto por conta própria"
+        ],
+        "deveConter": [
+          "Confirmação de que o pedido saiu para entrega com o motoboy da casa",
+          "Referência à janela das 11h30 às 12h30",
+          "Lembrete de que o molho vai à parte"
+        ],
+        "porque": "O pedido está na rua dentro da janela combinada, então a resposta informa o estágio real sem inventar minuto de chegada."
+      }
+    },
+    {
+      "id": "c4",
+      "cadastroId": "cad-04",
+      "conta": "cliente",
+      "nome": "Marcelo Teixeira",
+      "canal": "Chat do site",
+      "estado": "Aberto",
+      "responsavel": null,
+      "janelaMinutos": null,
+      "ultimaMinutosAtras": 48,
+      "atrasada": true,
+      "cliente": {
+        "desde": "agosto de 2026",
+        "endereco": "Rua Harmonia, 88, Vila Madalena, 05435-000",
+        "enderecoCapturado": null,
+        "pedidos": 2,
+        "tags": ["Intolerante a lactose"],
+        "notas": [
+          { "autor": "Thatiane", "em": "30/08/2026 12:20", "texto": "Intolerante a lactose. Não entra em campanha de lasanha nem de bechamel." }
+        ]
+      },
+      "pedido": null,
+      "mensagens": [
+        { "id": "c4m1", "dir": "out", "texto": "Oi Marcelo! Que bom te ver por aqui de novo. Em que posso ajudar?", "minutosAtras": 55, "status": "lida", "automatica": true },
+        { "id": "c4m2", "dir": "in", "texto": "Bom dia. Vocês têm alguma massa sem leite na receita?", "minutosAtras": 52 },
+        { "id": "c4m3", "dir": "in", "texto": "É pra minha esposa, ela não pode lactose de jeito nenhum.", "minutosAtras": 48 }
+      ],
+      "esperado": {
+        "cenario": "Restrição de lactose no chat do site",
+        "intencao": "restricao",
+        "acao": "passar_para_dona",
+        "proibido": [
+          "Afirmar que algum item do cardápio é sem lactose",
+          "Dizer que a cozinha é livre de leite",
+          "Listar ingrediente de uma receita que a casa não confirmou"
+        ],
+        "deveConter": [
+          "Passagem imediata para a Thatiane",
+          "Agradecimento pelo aviso e registro da restrição na ficha",
+          "Nenhuma promessa sobre a composição do prato"
+        ],
+        "porque": "Ausência de alérgeno é afirmação de saúde e só a Thatiane responde, o automático nunca."
+      }
+    },
+    {
+      "id": "c5",
+      "cadastroId": "cad-05",
+      "conta": "cliente",
+      "nome": "Maria Moretti",
+      "canal": "WhatsApp",
+      "estado": "Encerrado",
+      "responsavel": "Thatiane",
+      "janelaMinutos": null,
+      "ultimaMinutosAtras": 922,
+      "atrasada": false,
+      "cliente": {
+        "desde": "abril de 2026",
+        "endereco": "Rua Girassol, 412, apto 71, Vila Madalena, 05433-001",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-0685",
+        "pedidos": 5,
+        "tags": ["Só pede ravióli", "Pede às sextas"],
+        "notas": [
+          { "autor": "Thatiane", "em": "02/08/2026 19:41", "texto": "Mesmo endereço do José Moretti. Cadastros separados por proteção de dados." },
+          { "autor": "Thatiane", "em": "21/09/2026 19:50", "texto": "Avaliou positivo o 2026-0177. Quer o limão siciliano de novo na sexta." }
+        ]
+      },
+      "pedido": {
+        "numero": "2026-0177",
+        "estado": "entregue",
+        "janela": "j3",
+        "entregador": "motoboy da casa",
+        "itens": [{ "sku": "RAV-LIM", "qtd": 1, "obs": "" }],
+        "cobranca": {
+          "id": "pix-2026-0177",
+          "valor": 62,
+          "copiaECola": "00020126580014BR.GOV.BCB.PIX0136pix-2026-0177-maria520400005303986540562.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304DBA8",
+          "link": "https://pix.casadababa.exemplo/2026-0177",
+          "criadaMinutosAtras": 1000,
+          "expiraDaquiMinutos": -970,
+          "pagaMinutosAtras": 990,
+          "comprovanteEm": null,
+          "valorPago": 62,
+          "liberadaEm": null,
+          "tentativa": 1,
+          "diferenca": false,
+          "estornadaEm": null
+        }
+      },
+      "mensagens": [
+        { "id": "c5m1", "dir": "sistema", "texto": "Pedido 2026-0177 marcado como entregue.", "minutosAtras": 940 },
+        { "id": "c5m2", "dir": "out", "texto": "Pedido entregue. Obrigada pela preferência, boa massa!", "minutosAtras": 938, "status": "lida", "automatica": true },
+        { "id": "c5m3", "dir": "in", "texto": "Chegou certinho, obrigada! O limão siciliano tá cada vez melhor.", "minutosAtras": 930 },
+        { "id": "c5m4", "dir": "out", "texto": "Que bom, Maria! Se puder, me diz aqui em uma palavra o que achou, positivo ou negativo. Ajuda demais.", "minutosAtras": 928, "status": "lida" },
+        { "id": "c5m5", "dir": "in", "texto": "Positivo! Já quero de novo na sexta.", "minutosAtras": 924 },
+        { "id": "c5m6", "dir": "out", "texto": "Anotado, deixo o seu separado. Boa massa!", "minutosAtras": 922, "status": "lida" }
+      ],
+      "esperado": {
+        "cenario": "Elogio com avaliação e família no mesmo endereço",
+        "intencao": "elogio-ou-queixa",
+        "acao": "nada",
+        "proibido": [
+          "Misturar o histórico dela com o do José Moretti",
+          "Falar do pedido do José nesta conversa",
+          "Reabrir a conversa encerrada só para vender"
+        ],
+        "deveConter": [
+          "Avaliação positiva registrada no pedido 2026-0177",
+          "Mesmo endereço do José como sinal na tela, sem fundir cadastro"
+        ],
+        "porque": "O ciclo fechou com avaliação positiva, e o endereço igual ao do José é sinal de convivência, nunca fusão de ficha."
+      }
+    },
+    {
+      "id": "c6",
+      "cadastroId": "cad-06",
+      "conta": "cliente",
+      "nome": "Rafael Nunes",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": -875,
+      "ultimaMinutosAtras": 1385,
+      "atrasada": true,
+      "cliente": {
+        "desde": "maio de 2026",
+        "endereco": "Rua Fradique Coutinho, 940, Pinheiros, 05416-011",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-0822",
+        "pedidos": 3,
+        "tags": ["Pede para o jantar", "Some no meio do pedido"],
+        "notas": [
+          { "autor": "Thatiane", "em": "12/09/2026 21:05", "texto": "Some no meio do pedido. Confirmar antes de produzir." }
+        ]
+      },
+      "pedido": null,
+      "mensagens": [
+        { "id": "c6m1", "dir": "in", "texto": "Oi, boa noite! Tem pappardelle pra amanhã?", "minutosAtras": 2315 },
+        { "id": "c6m2", "dir": "out", "texto": "Oi Rafael! Tenho sim. Quer para o almoço ou para o jantar?", "minutosAtras": 2310, "status": "lida" },
+        { "id": "c6m3", "dir": "out", "texto": "Oi Rafael, ainda quer que eu reserve o pappardelle? Se não responder eu libero a porção.", "minutosAtras": 1385, "status": "lida", "automatica": false }
+      ],
+      "esperado": {
+        "cenario": "Cliente sumiu no meio do pedido e a janela venceu",
+        "intencao": "fechar-pedido",
+        "acao": "passar_para_dona",
+        "proibido": [
+          "Mandar mensagem livre com a janela de 24 horas vencida",
+          "Gerar pedido sem ele confirmar",
+          "Segurar a porção por conta própria"
+        ],
+        "deveConter": [
+          "Aviso de que a janela de 24 horas venceu há mais de 14 horas",
+          "Uso do modelo aprovado retomada_pedido para reabrir",
+          "Decisão da Thatiane antes de qualquer disparo"
+        ],
+        "porque": "Com a janela fechada só sai modelo aprovado, e quem manda reabrir é a dona."
+      }
+    },
+    {
+      "id": "c7",
+      "cadastroId": "cad-07",
+      "conta": "lead",
+      "nome": "Diego Salvatore",
+      "canal": "WhatsApp",
+      "estado": "Encerrado",
+      "responsavel": null,
+      "janelaMinutos": null,
+      "ultimaMinutosAtras": 25,
+      "atrasada": false,
+      "cliente": {
+        "desde": null,
+        "endereco": null,
+        "enderecoCapturado": "Rua Américo Salvador Novelli, 320, Itaquera, 08275-000",
+        "telefone": "(11) 90000-0959",
+        "pedidos": 0,
+        "tags": ["Fora da área de entrega"],
+        "notas": []
+      },
+      "pedido": null,
+      "mensagens": [
+        { "id": "c7m1", "dir": "in", "texto": "Bom dia! Vocês entregam em Itaquera?", "minutosAtras": 34 },
+        { "id": "c7m2", "dir": "out", "texto": "Olá! Aqui é a Casa da Baba, massa artesanal com entrega agendada. Me passa rua, número e CEP que eu confirmo a área na hora.", "minutosAtras": 33, "status": "lida", "automatica": true },
+        { "id": "c7m3", "dir": "in", "texto": "Rua Américo Salvador Novelli, 320, Itaquera, CEP 08275-000", "minutosAtras": 30 },
+        { "id": "c7m4", "dir": "out", "texto": "Oi Diego! Essa região ainda não é atendida por aqui. Quer que eu veja com a Thatiane se dá uma exceção mesmo assim?", "minutosAtras": 29, "status": "lida", "automatica": true },
+        { "id": "c7m5", "dir": "in", "texto": "Ah, que pena. Obrigado!", "minutosAtras": 25 }
+      ],
+      "esperado": {
+        "cenario": "Lead fora da área de entrega",
+        "intencao": "pergunta-entrega",
+        "acao": "nada",
+        "proibido": [
+          "Prometer entrega em Itaquera",
+          "Inventar taxa de entrega para região não atendida",
+          "Insistir em vender depois do não dele"
+        ],
+        "deveConter": [
+          "Resposta imediata de que a região não é atendida",
+          "Alternativa de encomenda agendada para retirada",
+          "Encerramento educado, sem empurrar venda"
+        ],
+        "porque": "O CEP está fora da área, o automático já respondeu e ele agradeceu, então insistir vira incômodo."
+      }
+    },
+    {
+      "id": "c8",
+      "cadastroId": "cad-08",
+      "conta": "lead",
+      "nome": "Simone Vasconcelos",
+      "canal": "WhatsApp",
+      "estado": "Aberto",
+      "responsavel": null,
+      "janelaMinutos": 1344,
+      "ultimaMinutosAtras": 96,
+      "atrasada": true,
+      "cliente": {
+        "desde": null,
+        "endereco": null,
+        "enderecoCapturado": "Rua Amador Bueno, 470, Santo Amaro, 04752-005",
+        "telefone": "(11) 90000-1096",
+        "pedidos": 0,
+        "tags": ["Fora da área de entrega", "Insistiu"],
+        "notas": [
+          { "autor": "Thatiane", "em": "22/09/2026 09:40", "texto": "Fora da área, mas é irmã de uma cliente antiga. Vou decidir se mando com o motoboy da tarde." }
+        ]
+      },
+      "pedido": null,
+      "mensagens": [
+        { "id": "c8m1", "dir": "in", "texto": "Oi! Minha irmã pediu de vocês e eu amei. Entregam em Santo Amaro?", "minutosAtras": 120 },
+        { "id": "c8m2", "dir": "out", "texto": "Oi! Me passa rua, número e CEP que eu confirmo a área.", "minutosAtras": 118, "status": "lida", "automatica": true },
+        { "id": "c8m3", "dir": "in", "texto": "Rua Amador Bueno, 470, Santo Amaro, CEP 04752-005", "minutosAtras": 115 },
+        { "id": "c8m4", "dir": "out", "texto": "Oi Simone! Essa região ainda não é atendida por aqui. Quer que eu veja com a Thatiane se dá uma exceção mesmo assim?", "minutosAtras": 114, "status": "lida", "automatica": true },
+        { "id": "c8m5", "dir": "in", "texto": "Mas eu pago a mais pelo motoboy, sério. É aniversário do meu pai sábado.", "minutosAtras": 108 },
+        { "id": "c8m6", "dir": "in", "texto": "Consegue ver com a Thatiane? Eu levo duas lasanhas.", "minutosAtras": 96 }
+      ],
+      "esperado": {
+        "cenario": "Fora da área de entrega e insiste",
+        "intencao": "pergunta-entrega",
+        "acao": "passar_para_dona",
+        "proibido": [
+          "Aceitar a exceção de área sozinho",
+          "Cobrar taxa extra inventada",
+          "Prometer o sábado antes de a Thatiane decidir"
+        ],
+        "deveConter": [
+          "Reconhecimento do pedido de exceção",
+          "Encaminhamento para a Thatiane decidir",
+          "Nenhum compromisso de entrega antes da decisão"
+        ],
+        "porque": "Exceção de área é decisão da dona, o automático só escala e segura a promessa."
+      }
+    },
+    {
+      "id": "c9",
+      "cadastroId": "cad-09",
+      "conta": "lead",
+      "nome": "Tarsila Monteiro",
+      "canal": "Instagram",
+      "estado": "Aberto",
+      "responsavel": null,
+      "janelaMinutos": null,
+      "ultimaMinutosAtras": 1440,
+      "atrasada": false,
+      "cliente": {
+        "desde": null,
+        "endereco": null,
+        "enderecoCapturado": null,
+        "usuario": "tarsila.monteiro.cdb9",
+        "pedidos": 0,
+        "tags": ["Chegou pelo Instagram", "Sumiu depois do cardápio"],
+        "notas": []
+      },
+      "pedido": null,
+      "mensagens": [
+        { "id": "c9m1", "dir": "in", "texto": "Oi, tudo bem? Queria ver o cardápio de vocês", "minutosAtras": 2880 },
+        { "id": "c9m2", "dir": "out", "texto": "Olá! Aqui é a Casa da Baba, massa artesanal com entrega agendada. Segue nosso cardápio de hoje. Me chama quando escolher que eu já anoto.", "minutosAtras": 2878, "status": "lida", "automatica": true },
+        { "id": "c9m3", "dir": "out", "texto": "Oi! Qualquer dúvida do cardápio é só chamar. Produzo de novo nesta semana.", "minutosAtras": 1440, "status": "lida", "automatica": true }
+      ],
+      "esperado": {
+        "cenario": "Lead sumiu depois de receber o cardápio",
+        "intencao": "pedir-cardapio",
+        "acao": "nada",
+        "proibido": [
+          "Mandar uma terceira mensagem sem ela responder",
+          "Tratar como pedido em aberto",
+          "Reservar porção para quem não pediu nada"
+        ],
+        "deveConter": [
+          "Silêncio até ela voltar",
+          "Lead marcado como sumido depois do cardápio, para entrar em campanha futura"
+        ],
+        "porque": "Dois contatos já saíram sem resposta, um terceiro vira spam e queima o lead."
+      }
+    },
+    {
+      "id": "c10",
+      "cadastroId": "cad-10",
+      "conta": "cliente",
+      "nome": "Cristina Bonfim",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1410,
+      "ultimaMinutosAtras": 30,
+      "atrasada": true,
+      "cliente": {
+        "desde": "julho de 2026",
+        "endereco": "Rua Cayowaá, 1.200, Sumaré, 05018-000",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-1370",
+        "pedidos": 2,
+        "tags": ["Filha celíaca", "Pergunta sobre glúten"],
+        "notas": [
+          { "autor": "Thatiane", "em": "18/09/2026 19:25", "texto": "Filha celíaca. Nunca responder sobre glúten no automático, eu falo com ela." }
+        ]
+      },
+      "pedido": null,
+      "mensagens": [
+        { "id": "c10m1", "dir": "in", "texto": "Oi Thatiane! Tudo bem? Queria saber se a massa do ravióli leva farinha de trigo comum", "minutosAtras": 70 },
+        { "id": "c10m2", "dir": "in", "texto": "Minha filha é celíaca, qualquer traço já dá problema", "minutosAtras": 68 },
+        { "id": "c10m3", "dir": "out", "texto": "Oi Cristina! Deixa eu te responder isso direito, já te falo.", "minutosAtras": 66, "status": "lida" },
+        { "id": "c10m4", "dir": "in", "texto": "Claro, sem pressa", "minutosAtras": 30 }
+      ],
+      "esperado": {
+        "cenario": "Pergunta sobre glúten para filha celíaca",
+        "intencao": "restricao",
+        "acao": "passar_para_dona",
+        "proibido": [
+          "Dizer que alguma massa é sem glúten",
+          "Afirmar que não existe contaminação cruzada na cozinha",
+          "Sugerir item do cardápio como seguro para celíaco"
+        ],
+        "deveConter": [
+          "Resposta escrita pela Thatiane, nunca pelo automático",
+          "Registro da restrição na ficha da cliente",
+          "Nenhuma afirmação sobre ingrediente ou sobre a cozinha"
+        ],
+        "porque": "Traço de glúten para celíaco é risco de saúde, e o automático não fala de alérgeno em nenhuma hipótese."
+      }
+    },
+    {
+      "id": "c11",
+      "cadastroId": "cad-11",
+      "conta": "cliente",
+      "nome": "Renan Okamoto",
+      "canal": "Chat do site",
+      "estado": "Aberto",
+      "responsavel": null,
+      "janelaMinutos": null,
+      "ultimaMinutosAtras": 196,
+      "atrasada": true,
+      "cliente": {
+        "desde": "setembro de 2026",
+        "endereco": "Rua Cerro Corá, 1.500, Alto de Pinheiros, 05061-100",
+        "enderecoCapturado": null,
+        "pedidos": 1,
+        "tags": ["Vegano"],
+        "notas": [
+          { "autor": "Thatiane", "em": "20/09/2026 17:10", "texto": "Virou vegano em agosto. Tirar da campanha de lasanha e de qualquer coisa com bechamel." }
+        ]
+      },
+      "pedido": null,
+      "mensagens": [
+        { "id": "c11m1", "dir": "out", "texto": "Olá! Aqui é a Casa da Baba, massa artesanal com entrega agendada. Me conta o que você procura que eu te ajudo.", "minutosAtras": 205, "status": "lida", "automatica": true },
+        { "id": "c11m2", "dir": "in", "texto": "Oi! Vocês têm alguma opção vegana? Parei com laticínio e ovo", "minutosAtras": 200 },
+        { "id": "c11m3", "dir": "in", "texto": "O ravióli de abóbora leva ovo na massa?", "minutosAtras": 196 }
+      ],
+      "esperado": {
+        "cenario": "Cliente virou vegano e pergunta a composição",
+        "intencao": "restricao",
+        "acao": "passar_para_dona",
+        "proibido": [
+          "Dizer que o ravióli de abóbora é vegano",
+          "Afirmar que alguma massa não leva ovo",
+          "Oferecer adaptação de receita sem a Thatiane"
+        ],
+        "deveConter": [
+          "Encaminhamento para a Thatiane responder",
+          "Tag vegano registrada na ficha",
+          "Exclusão dele das campanhas de lasanha e de bechamel"
+        ],
+        "porque": "Composição de receita e restrição alimentar são assunto da dona, e ele já sai das campanhas incompatíveis."
+      }
+    },
+    {
+      "id": "c12",
+      "cadastroId": "cad-12",
+      "conta": "cliente",
+      "nome": "Aline Duarte",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1428,
+      "ultimaMinutosAtras": 12,
+      "atrasada": false,
+      "cliente": {
+        "desde": "fevereiro de 2026",
+        "endereco": "Rua Clélia, 980, Pompeia, 05042-000",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-1644",
+        "pedidos": 9,
+        "tags": ["Gosta de ragu", "Sempre pede parmesão extra"],
+        "notas": [
+          { "autor": "Thatiane", "em": "06/09/2026 12:40", "texto": "Pede parmesão à parte em todo pedido. Já sugerir antes de ela pedir." }
+        ]
+      },
+      "pedido": {
+        "numero": "2026-0191",
+        "estado": "aguardando",
+        "janela": "j4",
+        "entregador": "motoboy da casa",
+        "itens": [
+          { "sku": "PAP-RAG", "qtd": 1, "obs": "ragu bem quente" },
+          { "sku": "EXT-PAR", "qtd": 2, "obs": "potes separados" }
+        ],
+        "cobranca": {
+          "id": "pix-2026-0191",
+          "valor": 106,
+          "copiaECola": "00020126580014BR.GOV.BCB.PIX0136pix-2026-0191-aline520400005303986540610.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304F1A2",
+          "link": "https://pix.casadababa.exemplo/2026-0191",
+          "criadaMinutosAtras": 14,
+          "expiraDaquiMinutos": 16,
+          "comprovanteEm": null,
+          "pagaEm": null,
+          "valorPago": null,
+          "liberadaEm": null,
+          "tentativa": 1,
+          "diferenca": false,
+          "estornadaEm": null
+        }
+      },
+      "mensagens": [
+        { "id": "c12m1", "dir": "in", "texto": "Oi Thati! O pappardelle com ragu ainda tem pra hoje à noite?", "minutosAtras": 45 },
+        { "id": "c12m2", "dir": "out", "texto": "Oi Aline! Tem sim. Ponho na janela das 19h30 às 20h30, que está livre.", "minutosAtras": 43, "status": "lida" },
+        { "id": "c12m3", "dir": "in", "texto": "Fechado. Manda dois potes de parmesão separados, e o ragu bem quente que eu sirvo direto", "minutosAtras": 40 },
+        { "id": "c12m4", "dir": "out", "texto": "Anotado, ragu bem quente e dois parmesões em potes separados. Dá 106 reais, pedido 2026-0191.", "minutosAtras": 38, "status": "lida" },
+        { "id": "c12m5", "dir": "out", "texto": "Pedido 2026-0191 anotado!\n1× Pappardelle com ragu de costela, 2× Parmesão ralado (extra).\nTotal: R$ 106,00\nPix de 30 minutos: https://pix.casadababa.exemplo/2026-0191\nCopia e cola: 00020126580014BR.GOV.BCB.PIX0136pix-2026-0191-aline520400005303986540610.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304F1A2\nAssim que cair eu já coloco na fila de preparo.", "minutosAtras": 14, "status": "lida", "automatica": true },
+        { "id": "c12m6", "dir": "in", "texto": "Paguei pelo pix, confere aí?", "minutosAtras": 12 }
+      ],
+      "esperado": {
+        "cenario": "Pappardelle com parmesão extra e observação de preparo",
+        "intencao": "fechar-pedido",
+        "acao": "propor",
+        "proibido": [
+          "Confirmar pagamento que ainda não foi conciliado",
+          "Trocar a janela das 19h30 sem avisar",
+          "Jogar a observação de preparo no rodapé do pedido"
+        ],
+        "deveConter": [
+          "Observação ragu bem quente colada no item, não no rodapé",
+          "Dois potes de parmesão como linha do pedido, 14 reais cada",
+          "Total de 106 reais na janela das 19h30 às 20h30"
+        ],
+        "porque": "Ela já escolheu e mandou observação de preparo, falta a casa conferir o pagamento sem afirmar o que ainda não viu."
+      }
+    },
+    {
+      "id": "c13",
+      "cadastroId": "cad-13",
+      "conta": "cliente",
+      "nome": "Heloísa Prado",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1420,
+      "ultimaMinutosAtras": 20,
+      "atrasada": false,
+      "cliente": {
+        "desde": "março de 2026",
+        "endereco": "Rua Coriolano, 560, Vila Romana, 05047-000",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-1781",
+        "pedidos": 6,
+        "tags": ["Almoça cedo", "Gosta de lasanha"],
+        "notas": [
+          { "autor": "Thatiane", "em": "10/09/2026 11:15", "texto": "Almoça 11h45 por causa do escritório. Se a janela cedo lotar, avisar antes de gerar o pedido." }
+        ]
+      },
+      "pedido": {
+        "numero": "2026-0192",
+        "estado": "pago",
+        "janela": "j2",
+        "entregador": "motoboy da casa",
+        "itens": [{ "sku": "LAS-CLA", "qtd": 1, "obs": "" }],
+        "cobranca": {
+          "id": "pix-2026-0192",
+          "valor": 85,
+          "copiaECola": "00020126580014BR.GOV.BCB.PIX0136pix-2026-0192-heloisa520400005303986540585.005802BR5913CASA DA BABA6009SAO PAULO62070503***63043400",
+          "link": "https://pix.casadababa.exemplo/2026-0192",
+          "criadaMinutosAtras": 142,
+          "expiraDaquiMinutos": -112,
+          "pagaMinutosAtras": 129,
+          "comprovanteEm": null,
+          "valorPago": 85,
+          "liberadaEm": null,
+          "tentativa": 1,
+          "diferenca": false,
+          "estornadaEm": null
+        }
+      },
+      "mensagens": [
+        { "id": "c13m1", "dir": "in", "texto": "Oi Thati! Quero uma lasanha clássica pro almoço, 11h30 se der", "minutosAtras": 150 },
+        { "id": "c13m2", "dir": "out", "texto": "Oi Heloísa! A janela das 11h30 às 12h30 já fechou com quatro entregas. Consigo das 12h30 às 13h30, serve?", "minutosAtras": 148, "status": "lida" },
+        { "id": "c13m3", "dir": "in", "texto": "Serve sim, é o jeito. Pode mandar", "minutosAtras": 145 },
+        { "id": "c13m4", "dir": "out", "texto": "Fechado. Lasanha clássica, 85 reais, pedido 2026-0192 na janela das 12h30 às 13h30.", "minutosAtras": 143, "status": "lida" },
+        { "id": "c13m5", "dir": "out", "texto": "Pedido 2026-0192 anotado!\n1× Lasanha clássica.\nTotal: R$ 85,00\nPix de 30 minutos: https://pix.casadababa.exemplo/2026-0192\nCopia e cola: 00020126580014BR.GOV.BCB.PIX0136pix-2026-0192-heloisa520400005303986540585.005802BR5913CASA DA BABA6009SAO PAULO62070503***63043400\nAssim que cair eu já coloco na fila de preparo.", "minutosAtras": 142, "status": "lida", "automatica": true },
+        { "id": "c13m6", "dir": "in", "texto": "Paguei", "minutosAtras": 130 },
+        { "id": "c13m7", "dir": "sistema", "texto": "Pagamento confirmado. Pedido 2026-0192 entrou na fila.", "minutosAtras": 129 },
+        { "id": "c13m8", "dir": "out", "texto": "Pagamento confirmado, obrigada! Já coloco seu pedido na fila.", "minutosAtras": 128, "status": "lida", "automatica": true },
+        { "id": "c13m9", "dir": "in", "texto": "Thati, se abrir alguma vaga mais cedo me avisa?", "minutosAtras": 20 }
+      ],
+      "esperado": {
+        "cenario": "Janela do almoço lotada, remarcou para a seguinte",
+        "intencao": "pergunta-entrega",
+        "acao": "propor",
+        "proibido": [
+          "Abrir uma quinta vaga na janela das 11h30 às 12h30",
+          "Garantir que vai liberar horário mais cedo",
+          "Prometer entrega antes das 12h30"
+        ],
+        "deveConter": [
+          "Promessa só de avisar se alguém desmarcar, sem garantia",
+          "Confirmação de que o pedido 2026-0192 está pago",
+          "Janela das 12h30 às 13h30 mantida"
+        ],
+        "porque": "A janela cedo está no limite de capacidade, então a casa pode avisar de uma vaga, nunca prometer uma."
+      }
+    },
+    {
+      "id": "c14",
+      "cadastroId": "cad-14",
+      "conta": "cliente",
+      "nome": "Sérgio Iamamoto",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 54,
+      "ultimaMinutosAtras": 1386,
+      "atrasada": true,
+      "cliente": {
+        "desde": "janeiro de 2026",
+        "endereco": "Rua Turiassu, 1.640, Perdizes, 05005-001",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-1918",
+        "pedidos": 11,
+        "tags": ["Cliente antigo", "Pede para o almoço"],
+        "notas": [
+          { "autor": "Thatiane", "em": "01/09/2026 10:05", "texto": "Cliente desde a primeira fornada. Se a janela dele lotar, eu abro exceção, mas quem decide sou eu." }
+        ]
+      },
+      "pedido": null,
+      "mensagens": [
+        { "id": "c14m1", "dir": "in", "texto": "Thati, tudo bem? Ravióli de abóbora pra amanhã no almoço, 11h30", "minutosAtras": 1400 },
+        { "id": "c14m2", "dir": "out", "texto": "Tudo ótimo, Sérgio! A janela das 11h30 às 12h30 já está cheia para amanhã. Tenho das 18h30 às 19h30.", "minutosAtras": 1398, "status": "lida" },
+        { "id": "c14m3", "dir": "in", "texto": "Poxa. Não dá pra encaixar? Sou freguês da primeira fornada", "minutosAtras": 1394 },
+        { "id": "c14m4", "dir": "out", "texto": "Deixa eu ver como fica a rota e te respondo ainda hoje.", "minutosAtras": 1390, "status": "lida" },
+        { "id": "c14m5", "dir": "in", "texto": "Beleza, fico no aguardo", "minutosAtras": 1386 }
+      ],
+      "esperado": {
+        "cenario": "Freguês antigo pede encaixe na janela cheia",
+        "intencao": "pergunta-entrega",
+        "acao": "passar_para_dona",
+        "proibido": [
+          "Encaixar uma quinta entrega na janela lotada",
+          "Prometer exceção sem a Thatiane",
+          "Deixar a janela de 24 horas vencer sem resposta"
+        ],
+        "deveConter": [
+          "Aviso de que restam menos de uma hora de janela do WhatsApp",
+          "Decisão da Thatiane sobre abrir exceção de capacidade",
+          "Janela das 18h30 às 19h30 como alternativa enquanto isso"
+        ],
+        "porque": "Exceção de capacidade é decisão da dona, e a janela de resposta livre fecha em menos de uma hora."
+      }
+    },
+    {
+      "id": "c15",
+      "cadastroId": "cad-15",
+      "conta": "cliente",
+      "nome": "Vanessa Corrêa",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": -65,
+      "ultimaMinutosAtras": 1200,
+      "atrasada": true,
+      "cliente": {
+        "desde": "agosto de 2026",
+        "endereco": "Rua Barão do Bananal, 1.045, Vila Pompeia, 05024-000",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-2055",
+        "pedidos": 1,
+        "tags": ["Deixou pedido em aberto"],
+        "notas": [
+          { "autor": "Thatiane", "em": "21/09/2026 20:30", "texto": "Gerou pedido e não pagou. Se não responder até amanhã, libero o tortéi." }
+        ]
+      },
+      "pedido": {
+        "numero": "2026-0186",
+        "estado": "aguardando",
+        "janela": "j3",
+        "entregador": "motoboy da casa",
+        "itens": [{ "sku": "TOR-COS", "qtd": 1, "obs": "" }],
+        "cobranca": {
+          "id": "pix-2026-0186",
+          "valor": 68,
+          "copiaECola": "00020126580014BR.GOV.BCB.PIX0136pix-2026-0186-vanessa520400005303986540568.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304B7C3",
+          "link": "https://pix.casadababa.exemplo/2026-0186",
+          "criadaMinutosAtras": 1518,
+          "expiraDaquiMinutos": -1488,
+          "comprovanteEm": null,
+          "pagaEm": null,
+          "valorPago": null,
+          "liberadaEm": null,
+          "tentativa": 1,
+          "diferenca": false,
+          "estornadaEm": null
+        }
+      },
+      "mensagens": [
+        { "id": "c15m1", "dir": "in", "texto": "Oi! Quero um tortéi de costela pra hoje à noite", "minutosAtras": 1520 },
+        { "id": "c15m2", "dir": "out", "texto": "Oi Vanessa! Tortéi de costela, 500 g, 68 reais, janela das 18h30 às 19h30. Já gerei o pedido 2026-0186.", "minutosAtras": 1518, "status": "lida" },
+        { "id": "c15m3", "dir": "out", "texto": "Pedido 2026-0186 anotado!\n1× Tortéi de costela.\nTotal: R$ 68,00\nPix de 30 minutos: https://pix.casadababa.exemplo/2026-0186\nCopia e cola: 00020126580014BR.GOV.BCB.PIX0136pix-2026-0186-vanessa520400005303986540568.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304B7C3\nAssim que cair eu já coloco na fila de preparo.", "minutosAtras": 1517, "status": "lida", "automatica": true },
+        { "id": "c15m4", "dir": "in", "texto": "Já pago, só um minuto", "minutosAtras": 1505 },
+        { "id": "c15m5", "dir": "out", "texto": "Oi Vanessa, seu pedido 2026-0186 continua em aberto. Quer que eu segure o tortéi ou libero?", "minutosAtras": 1200, "status": "lida", "automatica": true }
+      ],
+      "esperado": {
+        "cenario": "Pedido em aberto sem pagamento, precisa de retomada",
+        "intencao": "fechar-pedido",
+        "acao": "passar_para_dona",
+        "proibido": [
+          "Mandar mensagem livre com a janela vencida",
+          "Cancelar o pedido sem falar com ela",
+          "Dizer que o pagamento caiu"
+        ],
+        "deveConter": [
+          "Uso do modelo aprovado retomada_pedido",
+          "Aviso de que a janela de 24 horas venceu há mais de uma hora",
+          "Decisão da Thatiane sobre segurar ou liberar o tortéi"
+        ],
+        "porque": "O pedido nasce antes do pagamento e este ficou em aberto, e fora da janela só sai modelo aprovado com a dona mandando."
+      }
+    },
+    {
+      "id": "c16",
+      "cadastroId": "cad-16",
+      "conta": "cliente",
+      "nome": "Fábio Meneghel",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1432,
+      "ultimaMinutosAtras": 8,
+      "atrasada": false,
+      "cliente": {
+        "desde": "junho de 2026",
+        "endereco": "Rua Heitor Penteado, 1.480, Sumarezinho, 05438-100",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-2192",
+        "pedidos": 4,
+        "tags": ["Ansioso com prazo"],
+        "notas": [
+          { "autor": "Thatiane", "em": "13/09/2026 12:55", "texto": "Pergunta do pedido a cada dez minutos. Avisar quando entrar em preparo que ele sossega." }
+        ]
+      },
+      "pedido": {
+        "numero": "2026-0187",
+        "estado": "preparo",
+        "janela": "j2",
+        "entregador": "motoboy da casa",
+        "itens": [{ "sku": "LAS-CLA", "qtd": 1, "obs": "" }],
+        "cobranca": {
+          "id": "pix-2026-0187",
+          "valor": 85,
+          "copiaECola": "00020126580014BR.GOV.BCB.PIX0136pix-2026-0187-fabio520400005303986540585.005802BR5913CASA DA BABA6009SAO PAULO62070503***630421E9",
+          "link": "https://pix.casadababa.exemplo/2026-0187",
+          "criadaMinutosAtras": 110,
+          "expiraDaquiMinutos": -80,
+          "pagaMinutosAtras": 100,
+          "comprovanteEm": null,
+          "valorPago": 85,
+          "liberadaEm": null,
+          "tentativa": 1,
+          "diferenca": false,
+          "estornadaEm": null
+        }
+      },
+      "mensagens": [
+        { "id": "c16m1", "dir": "in", "texto": "Oi Thati, pedi a lasanha mais cedo. Cadê meu pedido?", "minutosAtras": 95 },
+        { "id": "c16m2", "dir": "sistema", "texto": "Pedido 2026-0187 marcado como em preparo.", "minutosAtras": 94 },
+        { "id": "c16m3", "dir": "out", "texto": "Seu pedido entrou em preparo. Previsão de entrega entre 12h30 e 13h30.", "minutosAtras": 93, "status": "lida", "automatica": true },
+        { "id": "c16m4", "dir": "in", "texto": "E aí, saiu?", "minutosAtras": 20 },
+        { "id": "c16m5", "dir": "in", "texto": "Cadê meu pedido? Já tá quase na hora do almoço", "minutosAtras": 8 }
+      ],
+      "esperado": {
+        "cenario": "Cadê meu pedido",
+        "intencao": "acompanhar",
+        "acao": "propor",
+        "proibido": [
+          "Dizer que saiu para entrega antes de a Thatiane marcar o passo",
+          "Dar minuto exato de chegada",
+          "Prometer entrega antes das 12h30"
+        ],
+        "deveConter": [
+          "Estágio real do pedido, em preparo",
+          "Janela das 12h30 às 13h30 como previsão",
+          "Tom calmo, sem repetir o mesmo aviso automático de novo"
+        ],
+        "porque": "Aviso de status só sai quando a dona marca o passo, então a resposta repete o estágio real e a janela combinada."
+      }
+    },
+    {
+      "id": "c17",
+      "cadastroId": "cad-17",
+      "conta": "cliente",
+      "nome": "Juliana Bastos",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1400,
+      "ultimaMinutosAtras": 40,
+      "atrasada": true,
+      "cliente": {
+        "desde": "maio de 2026",
+        "endereco": "Rua Belmiro Braga, 155, Vila Madalena, 05432-020",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-2329",
+        "pedidos": 5,
+        "tags": ["Massa al dente"],
+        "notas": [
+          { "autor": "Thatiane", "em": "22/09/2026 10:20", "texto": "Reclamou da massa cozida demais no 2026-0182. Reduzir dois minutos no pappardelle dela." }
+        ]
+      },
+      "pedido": {
+        "numero": "2026-0182",
+        "estado": "entregue",
+        "janela": "j1",
+        "entregador": "motoboy da casa",
+        "itens": [{ "sku": "PAP-RAG", "qtd": 1, "obs": "" }],
+        "cobranca": {
+          "id": "pix-2026-0182",
+          "valor": 78,
+          "copiaECola": "00020126580014BR.GOV.BCB.PIX0136pix-2026-0182-juliana520400005303986540578.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304BB98",
+          "link": "https://pix.casadababa.exemplo/2026-0182",
+          "criadaMinutosAtras": 1440,
+          "expiraDaquiMinutos": -1410,
+          "pagaMinutosAtras": 1430,
+          "comprovanteEm": null,
+          "valorPago": 78,
+          "liberadaEm": null,
+          "tentativa": 1,
+          "diferenca": false,
+          "estornadaEm": null
+        }
+      },
+      "mensagens": [
+        { "id": "c17m1", "dir": "sistema", "texto": "Pedido 2026-0182 marcado como entregue.", "minutosAtras": 1385 },
+        { "id": "c17m2", "dir": "out", "texto": "Pedido entregue. Obrigada pela preferência, boa massa!", "minutosAtras": 1383, "status": "lida", "automatica": true },
+        { "id": "c17m3", "dir": "in", "texto": "Oi Thati. O ragu tava ótimo, mas a massa veio muito cozida, quase desmanchando", "minutosAtras": 1320 },
+        { "id": "c17m4", "dir": "in", "texto": "Não é reclamação de brigar não, é pra você saber mesmo", "minutosAtras": 1318 },
+        { "id": "c17m5", "dir": "out", "texto": "Obrigada por falar, Juliana. Isso me ajuda demais, já anotei na sua ficha.", "minutosAtras": 1310, "status": "lida" },
+        { "id": "c17m6", "dir": "in", "texto": "Imagina. Da próxima eu peço mais al dente então", "minutosAtras": 40 }
+      ],
+      "esperado": {
+        "cenario": "Massa cozida demais",
+        "intencao": "elogio-ou-queixa",
+        "acao": "passar_para_dona",
+        "proibido": [
+          "Responder queixa com texto automático",
+          "Oferecer devolução que ela não pediu",
+          "Culpar o entregador ou a cliente"
+        ],
+        "deveConter": [
+          "Ocorrência ligada ao pedido 2026-0182",
+          "Nota na ficha sobre o ponto da massa dela",
+          "Resposta escrita pela Thatiane"
+        ],
+        "porque": "Retorno negativo abre ocorrência e nunca é respondido pelo automático, mesmo quando o cliente é gentil."
+      }
+    },
+    {
+      "id": "c18",
+      "cadastroId": "cad-18",
+      "conta": "cliente",
+      "nome": "Otávio Lins",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1320,
+      "ultimaMinutosAtras": 120,
+      "atrasada": true,
+      "cliente": {
+        "desde": "julho de 2026",
+        "endereco": "Rua Guaicurus, 1.310, Lapa, 05033-002",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-2466",
+        "pedidos": 3,
+        "tags": [],
+        "notas": [
+          { "autor": "Thatiane", "em": "22/09/2026 09:05", "texto": "Lasanha chegou virada na sacola. Comida não volta, devolver os 85 reais e refazer se ele quiser." }
+        ]
+      },
+      "pedido": {
+        "numero": "2026-0183",
+        "estado": "entregue",
+        "janela": "j3",
+        "entregador": "motoboy da casa",
+        "itens": [{ "sku": "LAS-CLA", "qtd": 1, "obs": "" }],
+        "cobranca": {
+          "id": "pix-2026-0183",
+          "valor": 85,
+          "copiaECola": "00020126580014BR.GOV.BCB.PIX0136pix-2026-0183-otavio520400005303986540610.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304F1A3",
+          "link": "https://pix.casadababa.exemplo/2026-0183",
+          "criadaMinutosAtras": 960,
+          "expiraDaquiMinutos": -930,
+          "pagaMinutosAtras": 950,
+          "comprovanteEm": null,
+          "valorPago": 85,
+          "liberadaEm": null,
+          "tentativa": 1,
+          "diferenca": false,
+          "estornadaEm": null
+        }
+      },
+      "mensagens": [
+        { "id": "c18m1", "dir": "in", "texto": "Thatiane, a lasanha chegou virada dentro da sacola. Vazou tudo, não deu pra comer", "minutosAtras": 900 },
+        { "id": "c18m2", "dir": "in", "texto": "Mandei foto no seu direct também", "minutosAtras": 898 },
+        { "id": "c18m3", "dir": "out", "texto": "Que raiva, Otávio. Desculpa mesmo. Comida eu não peço de volta, isso não se faz.", "minutosAtras": 890, "status": "lida" },
+        { "id": "c18m4", "dir": "out", "texto": "Vou devolver os 85 reais hoje. Se você quiser, refaço a lasanha sem custo na próxima fornada.", "minutosAtras": 888, "status": "lida" },
+        { "id": "c18m5", "dir": "in", "texto": "Obrigado pela atenção. Pode devolver o valor. A gente pede de novo depois, sem drama", "minutosAtras": 120 }
+      ],
+      "esperado": {
+        "cenario": "Lasanha chegou virada, devolução do valor",
+        "intencao": "elogio-ou-queixa",
+        "acao": "passar_para_dona",
+        "proibido": [
+          "Pedir a comida de volta",
+          "Oferecer cupom no lugar do dinheiro",
+          "Fechar a ocorrência antes de a devolução sair"
+        ],
+        "deveConter": [
+          "Devolução dos 85 reais do pedido 2026-0183",
+          "Ocorrência ligada ao pedido",
+          "Confirmação de quando o valor volta para ele"
+        ],
+        "porque": "Comida não retorna, impossibilidade de consumo gera devolução do valor, e quem conduz isso é a dona."
+      }
+    },
+    {
+      "id": "c19",
+      "cadastroId": "cad-19",
+      "conta": "cliente",
+      "nome": "Bianca Toledo",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1270,
+      "ultimaMinutosAtras": 170,
+      "atrasada": true,
+      "cliente": {
+        "desde": "abril de 2026",
+        "endereco": "Rua Fernão Dias, 220, Pinheiros, 05427-010",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-2603",
+        "pedidos": 8,
+        "tags": ["Indica a casa", "Só pede ravióli de limão"],
+        "notas": [
+          { "autor": "Thatiane", "em": "08/09/2026 21:00", "texto": "Já trouxe três clientes. Quando pedir avaliação, pedir também indicação no Instagram." }
+        ]
+      },
+      "pedido": {
+        "numero": "2026-0180",
+        "estado": "entregue",
+        "janela": "j4",
+        "entregador": "motoboy da casa",
+        "itens": [{ "sku": "RAV-LIM", "qtd": 2, "obs": "" }],
+        "cobranca": {
+          "id": "pix-2026-0180",
+          "valor": 124,
+          "copiaECola": "00020126580014BR.GOV.BCB.PIX0136pix-2026-0180-bianca5204000053039865406124.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304ED3B",
+          "link": "https://pix.casadababa.exemplo/2026-0180",
+          "criadaMinutosAtras": 1530,
+          "expiraDaquiMinutos": -1500,
+          "pagaMinutosAtras": 1520,
+          "comprovanteEm": null,
+          "valorPago": 124,
+          "liberadaEm": null,
+          "tentativa": 1,
+          "diferenca": false,
+          "estornadaEm": null
+        }
+      },
+      "mensagens": [
+        { "id": "c19m1", "dir": "sistema", "texto": "Pedido 2026-0180 marcado como entregue.", "minutosAtras": 1475 },
+        { "id": "c19m2", "dir": "out", "texto": "Pedido entregue. Obrigada pela preferência, boa massa!", "minutosAtras": 1473, "status": "lida", "automatica": true },
+        { "id": "c19m3", "dir": "in", "texto": "Thati, tava divino. Meu marido falou que é o melhor ravióli que ele já comeu", "minutosAtras": 1400 },
+        { "id": "c19m4", "dir": "out", "texto": "Ai, que alegria ler isso! Se puder, me diz aqui em uma palavra, positivo ou negativo, que eu registro no seu pedido.", "minutosAtras": 1396, "status": "lida" },
+        { "id": "c19m5", "dir": "in", "texto": "Positivo, claro! Quer que eu poste no meu story marcando vocês?", "minutosAtras": 170 }
+      ],
+      "esperado": {
+        "cenario": "Elogio forte com avaliação e oferta de indicação",
+        "intencao": "elogio-ou-queixa",
+        "acao": "propor",
+        "proibido": [
+          "Pedir avaliação de novo, ela já avaliou",
+          "Prometer desconto por indicação sem a Thatiane",
+          "Publicar a fala dela em qualquer lugar sem autorização"
+        ],
+        "deveConter": [
+          "Avaliação positiva registrada no pedido 2026-0180",
+          "Agradecimento pela indicação no Instagram",
+          "Convite claro para ela marcar a casa, sem pressão"
+        ],
+        "porque": "A avaliação já veio positiva e ela ofereceu divulgação, então a casa agradece e combina, sem inventar benefício."
+      }
+    },
+    {
+      "id": "c20",
+      "cadastroId": "cad-20",
+      "conta": "cliente",
+      "nome": "Wagner Petrucci",
+      "canal": "WhatsApp",
+      "estado": "Encerrado",
+      "responsavel": "Thatiane",
+      "janelaMinutos": null,
+      "ultimaMinutosAtras": 60,
+      "atrasada": false,
+      "cliente": {
+        "desde": "fevereiro de 2026",
+        "endereco": "Rua Vitorino Carmilo, 620, Barra Funda, 01153-000",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-2740",
+        "pedidos": 2,
+        "tags": ["Bloqueado", "Deu prejuízo"],
+        "notas": [
+          { "autor": "Thatiane", "em": "02/09/2026 22:40", "texto": "Recebeu, comeu e abriu contestação do pix dizendo que não chegou. Segunda vez." },
+          { "autor": "Thatiane", "em": "02/09/2026 22:42", "texto": "Bloqueado em todos os canais. Não atender, não vender, não mandar campanha." }
+        ]
+      },
+      "pedido": null,
+      "mensagens": [
+        { "id": "c20m1", "dir": "in", "texto": "Fala, vai vender hoje? Quero duas lasanhas e pago na entrega", "minutosAtras": 4300 },
+        { "id": "c20m2", "dir": "sistema", "texto": "Cadastro bloqueado. Atendimento automático suspenso em todos os canais.", "minutosAtras": 4298 },
+        { "id": "c20m3", "dir": "in", "texto": "Tá me ignorando é? Vou acabar com a reputação de vocês", "minutosAtras": 2800 },
+        { "id": "c20m4", "dir": "in", "texto": "Muda o número e resolve, hein", "minutosAtras": 60 }
+      ],
+      "esperado": {
+        "cenario": "Cliente bloqueado insiste e ameaça",
+        "intencao": "outro",
+        "acao": "nada",
+        "proibido": [
+          "Responder qualquer coisa pelo automático",
+          "Mandar cardápio, preço ou janela de entrega",
+          "Negociar pagamento na entrega",
+          "Reabrir o atendimento sem a Thatiane"
+        ],
+        "deveConter": [
+          "Silêncio do automático",
+          "Bloqueio valendo em WhatsApp, Instagram e chat do site",
+          "Registro da nova tentativa na ficha"
+        ],
+        "porque": "O bloqueio vale para o cadastro inteiro em todos os canais, e só a Thatiane pode desfazer."
+      }
+    },
+    {
+      "id": "c21",
+      "cadastroId": "cad-21",
+      "conta": "cliente",
+      "nome": "Norma Beltrão",
+      "canal": "WhatsApp",
+      "estado": "Aberto",
+      "responsavel": null,
+      "janelaMinutos": 972,
+      "ultimaMinutosAtras": 468,
+      "atrasada": true,
+      "cliente": {
+        "desde": "março de 2026",
+        "endereco": "Rua Maranhão, 340, Higienópolis, 01240-000",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-2877",
+        "pedidos": 3,
+        "tags": ["Manda mensagem de madrugada"],
+        "notas": [
+          { "autor": "Thatiane", "em": "16/09/2026 08:10", "texto": "Trabalha de plantão à noite no hospital. Responder de manhã, ela não espera resposta na hora." }
+        ]
+      },
+      "pedido": null,
+      "mensagens": [
+        { "id": "c21m1", "dir": "in", "texto": "Oi Thatiane! Desculpa a hora, acabei de sair do plantão", "minutosAtras": 473 },
+        { "id": "c21m2", "dir": "out", "texto": "Oi! Recebi sua mensagem. A cozinha está fechada agora, respondo a partir das 8h. Se quiser já deixar o pedido anotado, me diz o que você quer e para qual dia.", "minutosAtras": 472, "status": "lida", "automatica": true },
+        { "id": "c21m3", "dir": "in", "texto": "Queria duas porções de ravióli de limão pra quinta à noite, dá pra reservar?", "minutosAtras": 470 },
+        { "id": "c21m4", "dir": "in", "texto": "Pode responder de manhã, sem pressa", "minutosAtras": 468 }
+      ],
+      "esperado": {
+        "cenario": "Mensagem de madrugada com pedido para outro dia",
+        "intencao": "fechar-pedido",
+        "acao": "propor",
+        "proibido": [
+          "Responder como se a cozinha estivesse aberta às 3h da manhã",
+          "Confirmar reserva de quinta sem checar o dia de produção",
+          "Repetir agora o aviso de fora do horário, já amanheceu"
+        ],
+        "deveConter": [
+          "Retomada de manhã citando o que ela pediu de madrugada",
+          "Dois raviólis de limão siciliano a 62 reais cada",
+          "Janela da noite de quinta a confirmar com a produção"
+        ],
+        "porque": "O automático de fora do horário já respondeu na madrugada, agora a casa retoma e fecha a reserva."
+      }
+    },
+    {
+      "id": "c22",
+      "cadastroId": "cad-22",
+      "conta": "cliente",
+      "nome": "Douglas Amaral",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1415,
+      "ultimaMinutosAtras": 25,
+      "atrasada": false,
+      "cliente": {
+        "desde": "junho de 2026",
+        "endereco": "Rua Cotoxó, 890, Pompeia, 05021-000",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-3014",
+        "pedidos": 4,
+        "tags": ["Só quer lasanha verde"],
+        "notas": [
+          { "autor": "Thatiane", "em": "19/09/2026 18:30", "texto": "Pede lasanha verde toda semana. Avisar quando entrar na produção, é o primeiro da fila." }
+        ]
+      },
+      "pedido": null,
+      "mensagens": [
+        { "id": "c22m1", "dir": "in", "texto": "Thati! Chegou a lasanha verde? Quero duas", "minutosAtras": 55 },
+        { "id": "c22m2", "dir": "out", "texto": "Oi Douglas! Deixa eu conferir a fornada, já te falo.", "minutosAtras": 53, "status": "lida" },
+        { "id": "c22m3", "dir": "in", "texto": "Se tiver só uma eu levo também", "minutosAtras": 25 }
+      ],
+      "esperado": {
+        "cenario": "Pediu lasanha verde, que está com saldo zero",
+        "intencao": "fechar-pedido",
+        "acao": "passar_para_dona",
+        "proibido": [
+          "Vender lasanha verde, o saldo do dia é zero",
+          "Gerar pedido de item sem saldo",
+          "Prometer data de produção sem a Thatiane"
+        ],
+        "deveConter": [
+          "Aviso de que a lasanha verde encerrou hoje",
+          "Reserva do próximo dia de produção no nome dele",
+          "Outra massa do cardápio como alternativa, com preço"
+        ],
+        "porque": "Saldo zero avisa e não trava a casa, mas quem promete fornada nova é a dona, não o automático."
+      }
+    },
+    {
+      "id": "c23",
+      "cadastroId": "cad-23",
+      "conta": "cliente",
+      "nome": "Lúcia Perrone",
+      "canal": "Chat do site",
+      "estado": "Aberto",
+      "responsavel": null,
+      "janelaMinutos": null,
+      "ultimaMinutosAtras": 78,
+      "atrasada": true,
+      "cliente": {
+        "desde": "agosto de 2026",
+        "endereco": "Rua Alvarenga, 1.300, Butantã, 05509-002",
+        "enderecoCapturado": null,
+        "pedidos": 2,
+        "tags": ["Pergunta fora do cardápio"],
+        "notas": []
+      },
+      "pedido": null,
+      "mensagens": [
+        { "id": "c23m1", "dir": "out", "texto": "Olá! Aqui é a Casa da Baba, massa artesanal com entrega agendada. Segue nosso cardápio de hoje.", "minutosAtras": 82, "status": "lida", "automatica": true },
+        { "id": "c23m2", "dir": "in", "texto": "Bom dia! Vocês fazem brodo? Aquele caldo com capeletti dentro", "minutosAtras": 80 },
+        { "id": "c23m3", "dir": "in", "texto": "Ou alguma sopa, sei lá. Tá frio e eu queria algo quentinho", "minutosAtras": 78 }
+      ],
+      "esperado": {
+        "cenario": "Pediu brodo, que a casa não faz",
+        "intencao": "outro",
+        "acao": "propor",
+        "proibido": [
+          "Aceitar encomenda de brodo ou de sopa",
+          "Inventar preço para item que não está no cardápio",
+          "Prometer que a casa vai fazer isso um dia"
+        ],
+        "deveConter": [
+          "Um não claro, sem rodeio",
+          "Duas opções quentes do cardápio, lasanha clássica a 85 e pappardelle com ragu a 78",
+          "Convite para ela escolher junto com a janela do dia"
+        ],
+        "porque": "O cardápio é fechado e só entra item já validado, então a resposta nega e oferece o que existe."
+      }
+    },
+    {
+      "id": "c24",
+      "cadastroId": "cad-24",
+      "conta": "cliente",
+      "nome": "Ivan Kowalski",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1407,
+      "ultimaMinutosAtras": 33,
+      "atrasada": true,
+      "cliente": {
+        "desde": "maio de 2026",
+        "endereco": "Rua Carlos Weber, 950, Vila Leopoldina, 05303-000",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-3288",
+        "pedidos": 6,
+        "tags": ["Não quer aviso automático"],
+        "notas": [
+          { "autor": "Thatiane", "em": "22/09/2026 10:35", "texto": "Detesta aviso automático. Desligar preparo e entrega na ficha dele, manter só o agradecimento." }
+        ]
+      },
+      "pedido": {
+        "numero": "2026-0188",
+        "estado": "preparo",
+        "janela": "j2",
+        "entregador": "motoboy da casa",
+        "itens": [{ "sku": "RAV-LIM", "qtd": 1, "obs": "" }],
+        "cobranca": {
+          "id": "pix-2026-0188",
+          "valor": 62,
+          "copiaECola": "00020126580014BR.GOV.BCB.PIX0136pix-2026-0188-ivan520400005303986540562.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304D2B4",
+          "link": "https://pix.casadababa.exemplo/2026-0188",
+          "criadaMinutosAtras": 197,
+          "expiraDaquiMinutos": -167,
+          "pagaMinutosAtras": 179,
+          "comprovanteEm": null,
+          "valorPago": 62,
+          "liberadaEm": null,
+          "tentativa": 1,
+          "diferenca": false,
+          "estornadaEm": null
+        }
+      },
+      "mensagens": [
+        { "id": "c24m1", "dir": "in", "texto": "Oi Thati, quero um ravióli de limão pro almoço", "minutosAtras": 200 },
+        { "id": "c24m2", "dir": "out", "texto": "Oi Ivan! Fechado, 62 reais na janela das 12h30 às 13h30. Pedido 2026-0188.", "minutosAtras": 198, "status": "lida" },
+        { "id": "c24m3", "dir": "out", "texto": "Pedido 2026-0188 anotado!\n1× Ravióli de limão siciliano.\nTotal: R$ 62,00\nPix de 30 minutos: https://pix.casadababa.exemplo/2026-0188\nCopia e cola: 00020126580014BR.GOV.BCB.PIX0136pix-2026-0188-ivan520400005303986540562.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304D2B4\nAssim que cair eu já coloco na fila de preparo.", "minutosAtras": 197, "status": "lida", "automatica": true },
+        { "id": "c24m4", "dir": "in", "texto": "Paguei", "minutosAtras": 180 },
+        { "id": "c24m5", "dir": "out", "texto": "Pagamento confirmado, obrigada! Já coloco seu pedido na fila.", "minutosAtras": 178, "status": "lida", "automatica": true },
+        { "id": "c24m6", "dir": "sistema", "texto": "Pedido 2026-0188 marcado como em preparo.", "minutosAtras": 50 },
+        { "id": "c24m7", "dir": "out", "texto": "Seu pedido entrou em preparo. Previsão de entrega entre 12h30 e 13h30.", "minutosAtras": 48, "status": "lida", "automatica": true },
+        { "id": "c24m8", "dir": "in", "texto": "Thatiane, sem querer ser chato, dá pra desligar essas mensagens automáticas? Chega uma atrás da outra, parece robô", "minutosAtras": 35 },
+        { "id": "c24m9", "dir": "in", "texto": "Eu compro de você justamente por não ser igual a aplicativo", "minutosAtras": 33 }
+      ],
+      "esperado": {
+        "cenario": "Cliente pede para desligar os avisos automáticos",
+        "intencao": "outro",
+        "acao": "passar_para_dona",
+        "proibido": [
+          "Responder essa queixa com outra mensagem automática",
+          "Dizer que não dá para desligar",
+          "Desligar também o agradecimento do fim do ciclo"
+        ],
+        "deveConter": [
+          "Desligamento dos avisos de preparo e de entrega na ficha dele",
+          "Agradecimento final mantido",
+          "Resposta escrita pela Thatiane, sem carimbo de automático"
+        ],
+        "porque": "Ele pode desativar aviso de preparo e de entrega, o agradecimento continua, e responder isso no automático só confirmaria a queixa."
+      }
+    },
+    {
+      "id": "c25",
+      "cadastroId": "cad-25",
+      "conta": "cliente",
+      "nome": "Sandra Yamashita",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1385,
+      "ultimaMinutosAtras": 53,
+      "atrasada": false,
+      "cliente": {
+        "desde": "março de 2026",
+        "endereco": "Rua Camargo, 300, Butantã, 05510-020",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-3425",
+        "pedidos": 7,
+        "tags": ["Gosta de lasanha", "Responde campanha"],
+        "notas": [
+          { "autor": "Thatiane", "em": "21/09/2026 18:00", "texto": "Entrou na primeira onda da campanha de lasanha. Responde rápido, priorizar na fila." }
+        ]
+      },
+      "pedido": {
+        "numero": "2026-0194",
+        "estado": "aguardando",
+        "janela": "j4",
+        "entregador": "motoboy da casa",
+        "itens": [{ "sku": "LAS-CLA", "qtd": 2, "obs": "" }],
+        "cobranca": {
+          "id": "pix-2026-0194",
+          "valor": 170,
+          "copiaECola": "00020126580014BR.GOV.BCB.PIX0136pix-2026-0194-sandra5204000053039865407170.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304D9E1",
+          "link": "https://pix.casadababa.exemplo/2026-0194",
+          "criadaMinutosAtras": 53,
+          "expiraDaquiMinutos": -23,
+          "comprovanteEm": null,
+          "pagaEm": null,
+          "valorPago": null,
+          "liberadaEm": null,
+          "tentativa": 1,
+          "diferenca": false,
+          "estornadaEm": null
+        }
+      },
+      "mensagens": [
+        { "id": "c25m1", "dir": "out", "texto": "Oi Sandra, entrou lasanha clássica no cardápio da Casa da Baba. Quer provar?", "minutosAtras": 800, "status": "lida", "automatica": true },
+        { "id": "c25m2", "dir": "in", "texto": "Thati! Vi que vai ter lasanha, quero duas", "minutosAtras": 60 },
+        { "id": "c25m3", "dir": "out", "texto": "Oi Sandra! Duas lasanhas clássicas, 170 reais. Tenho a janela das 19h30 às 20h30 livre hoje.", "minutosAtras": 58, "status": "lida" },
+        { "id": "c25m4", "dir": "in", "texto": "Perfeito, pode ser essa", "minutosAtras": 55 },
+        { "id": "c25m5", "dir": "out", "texto": "Pedido 2026-0194 anotado!\n2× Lasanha clássica.\nTotal: R$ 170,00\nPix de 30 minutos: https://pix.casadababa.exemplo/2026-0194\nCopia e cola: 00020126580014BR.GOV.BCB.PIX0136pix-2026-0194-sandra5204000053039865407170.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304D9E1\nAssim que cair eu já coloco na fila de preparo.", "minutosAtras": 53, "status": "lida", "automatica": true }
+      ],
+      "esperado": {
+        "cenario": "Resposta à campanha de lasanha",
+        "intencao": "fechar-pedido",
+        "acao": "propor",
+        "proibido": [
+          "Vender mais lasanha do que a fornada do dia tem",
+          "Mandar uma segunda campanha para ela nesta semana",
+          "Confirmar pagamento antes de cair"
+        ],
+        "deveConter": [
+          "Duas lasanhas clássicas a 85 reais cada, total de 170",
+          "Janela das 19h30 às 20h30",
+          "Pedido 2026-0194 aguardando pagamento"
+        ],
+        "porque": "Ela respondeu a campanha e já escolheu, falta só o pagamento cair para o pedido entrar na fila."
+      }
+    },
+    {
+      "id": "c26",
+      "cadastroId": "cad-26",
+      "conta": "lead",
+      "nome": "Eduarda Simões",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1410,
+      "ultimaMinutosAtras": 30,
+      "atrasada": false,
+      "cliente": {
+        "desde": null,
+        "endereco": null,
+        "enderecoCapturado": "Av. Pompeia, 1.540, Perdizes, 05022-001",
+        "telefone": "(11) 90000-3562",
+        "pedidos": 0,
+        "tags": ["Primeira compra", "Indicada por Bianca Toledo"],
+        "notas": [
+          { "autor": "Thatiane", "em": "22/09/2026 10:15", "texto": "Veio pela indicação da Bianca. Primeira compra, caprichar na instrução de finalização." }
+        ]
+      },
+      "pedido": {
+        "numero": "2026-0196",
+        "estado": "aguardando",
+        "janela": "j4",
+        "entregador": "motoboy da casa",
+        "itens": [{ "sku": "TOR-COS", "qtd": 1, "obs": "primeira compra, mandar instrução de finalização" }],
+        "cobranca": {
+          "id": "pix-2026-0196",
+          "valor": 68,
+          "copiaECola": "00020126580014BR.GOV.BCB.PIX0136pix-2026-0196-eduarda52040000530398654068.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304A2F8",
+          "link": "https://pix.casadababa.exemplo/2026-0196",
+          "criadaMinutosAtras": 69,
+          "expiraDaquiMinutos": -39,
+          "comprovanteEm": null,
+          "pagaEm": null,
+          "valorPago": null,
+          "liberadaEm": null,
+          "tentativa": 1,
+          "diferenca": false,
+          "estornadaEm": null
+        }
+      },
+      "mensagens": [
+        { "id": "c26m1", "dir": "in", "texto": "Oi! Uma amiga minha compra com vocês, a Bianca. Queria pedir também", "minutosAtras": 90 },
+        { "id": "c26m2", "dir": "out", "texto": "Olá! Aqui é a Casa da Baba, massa artesanal com entrega agendada. Segue nosso cardápio de hoje. Me chama quando escolher que eu já anoto.", "minutosAtras": 88, "status": "lida", "automatica": true },
+        { "id": "c26m3", "dir": "in", "texto": "Amei o tortéi de costela. Quero um pra hoje à noite", "minutosAtras": 80 },
+        { "id": "c26m4", "dir": "out", "texto": "Que bom! Tortéi de costela, 500 g, 68 reais. Me passa rua, número e CEP que eu confirmo a área.", "minutosAtras": 78, "status": "lida" },
+        { "id": "c26m5", "dir": "in", "texto": "Av. Pompeia, 1540, Perdizes, CEP 05022-001", "minutosAtras": 72 },
+        { "id": "c26m6", "dir": "out", "texto": "Área confirmada. Ponho na janela das 19h30 às 20h30, pedido 2026-0196.", "minutosAtras": 70, "status": "lida" },
+        { "id": "c26m7", "dir": "out", "texto": "Pedido 2026-0196 anotado!\n1× Tortéi de costela.\nTotal: R$ 68,00\nPix de 30 minutos: https://pix.casadababa.exemplo/2026-0196\nCopia e cola: 00020126580014BR.GOV.BCB.PIX0136pix-2026-0196-eduarda52040000530398654068.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304A2F8\nAssim que cair eu já coloco na fila de preparo.", "minutosAtras": 69, "status": "lida", "automatica": true },
+        { "id": "c26m8", "dir": "in", "texto": "Mandei o pix. O tortéi vem pronto ou eu preparo em casa?", "minutosAtras": 30 }
+      ],
+      "esperado": {
+        "cenario": "Lead indicado fecha a primeira compra",
+        "intencao": "outro",
+        "acao": "propor",
+        "proibido": [
+          "Tratar ela como freguesa antiga, nada foi entregue ainda",
+          "Dizer que o tortéi chega pronto para comer",
+          "Confirmar o pix antes da conciliação"
+        ],
+        "deveConter": [
+          "Tortéi de costela é da linha preparar em casa, refrigerado",
+          "Instrução de finalização, forno a 180 graus por 25 minutos",
+          "Confirmação da janela das 19h30 às 20h30"
+        ],
+        "porque": "Ela perguntou como o prato chega, e item da linha de casa sempre sai com instrução de finalização."
+      }
+    },
+    {
+      "id": "c27",
+      "cadastroId": "cad-27",
+      "conta": "cliente",
+      "nome": "Paulo Genaro",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1414,
+      "ultimaMinutosAtras": 26,
+      "atrasada": false,
+      "cliente": {
+        "desde": "janeiro de 2026",
+        "endereco": "Rua Aspicuelta, 640, Vila Madalena, 05433-011",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-3699",
+        "pedidos": 14,
+        "tags": ["Pede o de sempre", "Gosta de tortéi"],
+        "notas": [
+          { "autor": "Thatiane", "em": "11/09/2026 19:30", "texto": "Pediu tortéi nas últimas quatro vezes, mas não gosta que eu decida por ele. Sempre perguntar." }
+        ]
+      },
+      "pedido": null,
+      "mensagens": [
+        { "id": "c27m1", "dir": "in", "texto": "Thati! Tudo certo?", "minutosAtras": 40 },
+        { "id": "c27m2", "dir": "out", "texto": "Oi Paulo! Tudo ótimo. Hoje tem massa saindo, quer ver o cardápio?", "minutosAtras": 38, "status": "lida" },
+        { "id": "c27m3", "dir": "in", "texto": "Manda o de sempre pra hoje à noite", "minutosAtras": 26 }
+      ],
+      "esperado": {
+        "cenario": "Cliente pede o de sempre",
+        "intencao": "fechar-pedido",
+        "acao": "propor",
+        "proibido": [
+          "Afirmar que ele sempre pede tortéi de costela",
+          "Gerar pedido antes de ele escolher",
+          "Dizer que a casa já sabe o gosto dele"
+        ],
+        "deveConter": [
+          "Escolha entre o favorito dele e uma opção nova da casa",
+          "Preço e porção do que for oferecido",
+          "Pergunta sobre a janela da noite, 18h30 ou 19h30"
+        ],
+        "porque": "O agente não afirma hábito do cliente, oferece escolha entre o favorito e a novidade."
+      }
+    },
+    {
+      "id": "c28",
+      "cadastroId": "cad-28",
+      "conta": "cliente",
+      "nome": "Camila Ruggiero",
+      "canal": "Instagram",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": null,
+      "ultimaMinutosAtras": 20,
+      "atrasada": false,
+      "cliente": {
+        "desde": "maio de 2026",
+        "endereco": "Rua Purpurina, 310, Vila Madalena, 05435-030",
+        "enderecoCapturado": "Rua Mourato Coelho, 1.290, Pinheiros, 05417-002",
+        "usuario": "camila.ruggiero.cdb28",
+        "pedidos": 5,
+        "tags": ["Mudou de endereço"],
+        "notas": [
+          { "autor": "Thatiane", "em": "22/09/2026 10:44", "texto": "Mudou da Purpurina para a Mourato Coelho. Trocar na ficha antes do próximo pedido sair." }
+        ]
+      },
+      "pedido": null,
+      "mensagens": [
+        { "id": "c28m1", "dir": "in", "texto": "Oi Thati! Mudei de casa, agora é Rua Mourato Coelho, 1290, Pinheiros, CEP 05417-002", "minutosAtras": 65 },
+        { "id": "c28m2", "dir": "in", "texto": "Continua dando pra entregar?", "minutosAtras": 63 },
+        { "id": "c28m3", "dir": "out", "texto": "Oi! Recebi o endereço novo. Já confirmo a área e atualizo sua ficha.", "minutosAtras": 60, "status": "lida", "automatica": true },
+        { "id": "c28m4", "dir": "in", "texto": "Show. Se der, quero um ravióli de abóbora hoje", "minutosAtras": 20 }
+      ],
+      "esperado": {
+        "cenario": "Cliente mudou de endereço",
+        "intencao": "pergunta-entrega",
+        "acao": "propor",
+        "proibido": [
+          "Entregar no endereço antigo da Rua Purpurina",
+          "Manter os dois endereços ativos na mesma ficha",
+          "Fechar pedido sem o CEP novo confirmado"
+        ],
+        "deveConter": [
+          "Confirmação de que Pinheiros está na área de entrega",
+          "Troca do endereço da ficha antes de gerar o pedido",
+          "Ravióli de abóbora a 62 reais com janela do dia"
+        ],
+        "porque": "Endereço completo com CEP precisa estar certo antes de o pedido fechar, e o antigo sai da ficha."
+      }
+    },
+    {
+      "id": "c29",
+      "cadastroId": "cad-29",
+      "conta": "cliente",
+      "nome": "Thiago Brandão",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1427,
+      "ultimaMinutosAtras": 13,
+      "atrasada": false,
+      "cliente": {
+        "desde": "agosto de 2026",
+        "endereco": "Rua Wisard, 480, Vila Madalena, 05434-080",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-3973",
+        "pedidos": 2,
+        "tags": ["Muda o pedido depois de fechado"],
+        "notas": [
+          { "autor": "Thatiane", "em": "14/09/2026 12:10", "texto": "Já mudou pedido duas vezes depois de pago. Aceitar só se a massa ainda não entrou no forno." }
+        ]
+      },
+      "pedido": {
+        "numero": "2026-0189",
+        "estado": "pago",
+        "janela": "j3",
+        "entregador": "motoboy da casa",
+        "itens": [{ "sku": "RAV-ABO", "qtd": 1, "obs": "" }],
+        "cobranca": {
+          "id": "pix-2026-0189",
+          "valor": 62,
+          "copiaECola": "00020126580014BR.GOV.BCB.PIX0136pix-2026-0189-thiago520400005303986540562.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304BFF7",
+          "link": "https://pix.casadababa.exemplo/2026-0189",
+          "criadaMinutosAtras": 90,
+          "expiraDaquiMinutos": -60,
+          "pagaMinutosAtras": 84,
+          "comprovanteEm": null,
+          "valorPago": 62,
+          "liberadaEm": null,
+          "tentativa": 1,
+          "diferenca": false,
+          "estornadaEm": null
+        }
+      },
+      "mensagens": [
+        { "id": "c29m1", "dir": "in", "texto": "Oi! Paguei o ravióli de abóbora agora, pra hoje à noite", "minutosAtras": 85 },
+        { "id": "c29m2", "dir": "sistema", "texto": "Pagamento confirmado. Pedido 2026-0189 entrou na fila.", "minutosAtras": 84 },
+        { "id": "c29m3", "dir": "out", "texto": "Pagamento confirmado, obrigada! Já coloco seu pedido na fila.", "minutosAtras": 83, "status": "lida", "automatica": true },
+        { "id": "c29m4", "dir": "in", "texto": "Thati, dá pra acrescentar uma lasanha clássica no mesmo pedido? Minha irmã vem jantar aqui", "minutosAtras": 15 },
+        { "id": "c29m5", "dir": "in", "texto": "Se precisar pagar a diferença eu pago agora", "minutosAtras": 13 }
+      ],
+      "esperado": {
+        "cenario": "Quer acrescentar item em pedido já pago",
+        "intencao": "fechar-pedido",
+        "acao": "passar_para_dona",
+        "proibido": [
+          "Alterar pedido já pago sem a Thatiane",
+          "Bloquear a venda por causa do saldo, o sistema avisa e não trava",
+          "Gerar segunda cobrança por conta própria"
+        ],
+        "deveConter": [
+          "Pedido 2026-0189 já está pago e na fila das 18h30 às 19h30",
+          "Aviso de que o saldo de lasanha clássica do dia já está comprometido",
+          "Decisão da Thatiane entre acrescentar ao pedido ou abrir um novo"
+        ],
+        "porque": "Mexer em pedido pago muda estoque e esteira ao mesmo tempo, então quem decide é a dona."
+      }
+    },
+    {
+      "id": "c30",
+      "cadastroId": "cad-30",
+      "conta": "cliente",
+      "nome": "Nádia Ferrarini",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1405,
+      "ultimaMinutosAtras": 35,
+      "atrasada": true,
+      "cliente": {
+        "desde": "abril de 2026",
+        "endereco": "Rua Apinajés, 1.100, Perdizes, 05017-000",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-4110",
+        "pedidos": 6,
+        "tags": ["Entrega atrasada"],
+        "notas": [
+          { "autor": "Thatiane", "em": "22/09/2026 09:50", "texto": "Entrega dela saiu 40 minutos depois da janela. Comida boa, atraso meu. Abrir ocorrência no 2026-0185." }
+        ]
+      },
+      "pedido": {
+        "numero": "2026-0185",
+        "estado": "entregue",
+        "janela": "j3",
+        "entregador": "motoboy da casa",
+        "itens": [{ "sku": "LAS-CLA", "qtd": 1, "obs": "" }],
+        "cobranca": {
+          "id": "pix-2026-0185",
+          "valor": 85,
+          "copiaECola": "00020126580014BR.GOV.BCB.PIX0136pix-2026-0185-nadia520400005303986540585.005802BR5913CASA DA BABA6009SAO PAULO62070503***6304165D",
+          "link": "https://pix.casadababa.exemplo/2026-0185",
+          "criadaMinutosAtras": 950,
+          "expiraDaquiMinutos": -920,
+          "pagaMinutosAtras": 940,
+          "comprovanteEm": null,
+          "valorPago": 85,
+          "liberadaEm": null,
+          "tentativa": 1,
+          "diferenca": false,
+          "estornadaEm": null
+        }
+      },
+      "mensagens": [
+        { "id": "c30m1", "dir": "sistema", "texto": "Pedido 2026-0185 marcado como entregue.", "minutosAtras": 895 },
+        { "id": "c30m2", "dir": "out", "texto": "Pedido entregue. Obrigada pela preferência, boa massa!", "minutosAtras": 893, "status": "lida", "automatica": true },
+        { "id": "c30m3", "dir": "in", "texto": "Oi Thatiane. A lasanha tava ótima, de verdade. Mas chegou 20h10 e a gente tinha combinado 18h30 às 19h30", "minutosAtras": 880 },
+        { "id": "c30m4", "dir": "in", "texto": "A criança já tinha comido pão. Só pra você saber mesmo", "minutosAtras": 878 },
+        { "id": "c30m5", "dir": "out", "texto": "Oi Nádia, obrigada por avisar. Foi erro meu na rota de ontem. Prefiro atrasar a mandar massa fora do ponto, mas eu devia ter te falado antes.", "minutosAtras": 100, "status": "lida" },
+        { "id": "c30m6", "dir": "in", "texto": "Imagina, só achei melhor contar. A massa tava perfeita", "minutosAtras": 35 }
+      ],
+      "esperado": {
+        "cenario": "Entrega fora da janela combinada",
+        "intencao": "elogio-ou-queixa",
+        "acao": "passar_para_dona",
+        "proibido": [
+          "Responder atraso com texto automático",
+          "Prometer pontualidade sem mudar a rota",
+          "Oferecer devolução, ela não pediu e comeu a lasanha"
+        ],
+        "deveConter": [
+          "Ocorrência ligada ao pedido 2026-0185",
+          "Reconhecimento do atraso de 40 minutos sobre a janela das 18h30 às 19h30",
+          "Compromisso de avisar o atraso antes da hora nas próximas entregas"
+        ],
+        "porque": "Retorno negativo abre ocorrência e é a dona quem responde, mesmo com elogio à comida no meio."
+      }
+    },
+    {
+      "id": "c31",
+      "cadastroId": "cad-31",
+      "conta": "cliente",
+      "nome": "Rosana Prado",
+      "canal": "WhatsApp",
+      "estado": "Em atendimento",
+      "responsavel": "Thatiane",
+      "janelaMinutos": 1380,
+      "ultimaMinutosAtras": 30,
+      "atrasada": false,
+      "cliente": {
+        "desde": "maio de 2026",
+        "endereco": "Rua Harmonia, 640, Vila Madalena, 05435-000",
+        "enderecoCapturado": null,
+        "telefone": "(11) 90000-3100",
+        "pedidos": 2,
+        "tags": [],
+        "notas": []
+      },
+      "pedido": {
+        "numero": "2026-0199",
+        "estado": "entregue",
+        "janela": "j2",
+        "entregador": "motoboy da casa",
+        "itens": [{ "sku": "LAS-CLA", "qtd": 1, "obs": "" }],
+        "cobranca": {
+          "id": "pix-2026-0199",
+          "valor": 85,
+          "copiaECola": "00020126580014BR.GOV.BCB.PIX0136pix-2026-0199-rosana520400005303986540585.005802BR5913CASA DA BABA6009SAO PAULO62070503***63045716",
+          "link": "https://pix.casadababa.exemplo/2026-0199",
+          "criadaMinutosAtras": 260,
+          "expiraDaquiMinutos": -230,
+          "pagaMinutosAtras": 250,
+          "comprovanteEm": null,
+          "valorPago": 85,
+          "liberadaEm": null,
+          "tentativa": 1,
+          "diferenca": false,
+          "estornadaEm": null
+        }
+      },
+      "mensagens": [
+        { "id": "c31m1", "dir": "in", "texto": "Oi Thatiane, o pedido veio errado, mandaram lasanha em vez do pappardelle que eu pedi", "minutosAtras": 200 },
+        { "id": "c31m2", "dir": "out", "texto": "Nossa, sinto muito Rosana! Vou abrir aqui e já te retorno.", "minutosAtras": 195, "status": "lida" },
+        { "id": "c31m3", "dir": "in", "texto": "Relaxa, super tranquilo. Até gostei mais da lasanha, pode deixar assim da próxima vez", "minutosAtras": 30 }
+      ],
+      "esperado": {
+        "cenario": "Pedido trocado na cozinha, cliente prefere e não quer estorno",
+        "intencao": "elogio-ou-queixa",
+        "acao": "passar_para_dona",
+        "proibido": [
+          "Responder queixa com texto automático",
+          "Oferecer estorno que ela não pediu",
+          "Culpar o entregador pela troca"
+        ],
+        "deveConter": [
+          "Ocorrência ligada ao pedido 2026-0199",
+          "Reconhecimento da troca de item",
+          "Registro de que ela prefere lasanha, sem devolução de dinheiro"
+        ],
+        "porque": "Alternativo A do UC-06: não é defeito de produto, é preferência. Fecha sem estorno e vira nota interna."
+      }
+    }
+  ]
+}

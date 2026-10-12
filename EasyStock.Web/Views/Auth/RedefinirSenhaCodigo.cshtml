@@ -1,0 +1,86 @@
+@model ResetPasswordCodeViewModel
+@{
+    Layout = null;
+    ViewBag.Title = "Redefinir senha com código";
+}
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Redefinir senha com código · EasyStok</title>
+    <script>
+        (function () {
+            const stored = localStorage.getItem('easystock-theme');
+            const theme = stored === 'dark' || stored === 'light' ? stored : 'light';
+            document.documentElement.dataset.theme = theme;
+            document.documentElement.classList.toggle('theme-dark', theme === 'dark');
+        })();
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/components.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/auth-premium.css" asp-append-version="true" />
+</head>
+<body class="font-[Inter] antialiased">
+    <div class="auth-prem-shell">
+        <div class="auth-prem-layout auth-prem-enter">
+            <section class="auth-prem-panel">
+                <div class="auth-prem-card auth-prem-enter-2">
+                    <p class="auth-prem-card-eyebrow">Código do WhatsApp</p>
+                    <h1 class="auth-prem-card-title">Redefinir com o código</h1>
+                    <p class="auth-prem-card-subtitle">O código tem 6 dígitos, vale por 10 minutos e erra no máximo 5 vezes.</p>
+
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="auth-prem-alert auth-prem-alert--error" role="alert" aria-live="assertive">
+                            <div>@Html.ValidationSummary(false, "", new { @class = "" })</div>
+                        </div>
+                    }
+
+                    <form asp-action="RedefinirSenhaCodigo" asp-controller="Auth" method="post">
+                        @Html.AntiForgeryToken()
+
+                        <div class="auth-prem-field">
+                            <label asp-for="Email" class="auth-prem-field-label">E-mail da conta</label>
+                            <input asp-for="Email" type="email" required autocomplete="username" class="auth-prem-input" />
+                            <span asp-validation-for="Email" class="auth-prem-field-error"></span>
+                        </div>
+
+                        <div class="auth-prem-field">
+                            <label asp-for="Codigo" class="auth-prem-field-label">Código de 6 dígitos</label>
+                            <input asp-for="Codigo" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required
+                                   autocomplete="one-time-code" class="auth-prem-input" />
+                            <span asp-validation-for="Codigo" class="auth-prem-field-error"></span>
+                        </div>
+
+                        <div class="auth-prem-field">
+                            <label asp-for="NovaSenha" class="auth-prem-field-label">Nova senha</label>
+                            <input asp-for="NovaSenha" type="password" minlength="8" required autocomplete="new-password" class="auth-prem-input" />
+                            <span asp-validation-for="NovaSenha" class="auth-prem-field-error"></span>
+                        </div>
+
+                        <div class="auth-prem-field">
+                            <label asp-for="ConfirmarSenha" class="auth-prem-field-label">Confirmar nova senha</label>
+                            <input asp-for="ConfirmarSenha" type="password" minlength="8" required autocomplete="new-password" class="auth-prem-input" />
+                            <span asp-validation-for="ConfirmarSenha" class="auth-prem-field-error"></span>
+                        </div>
+
+                        <button type="submit" class="auth-prem-launch" style="margin-top: 8px;">
+                            <span>Salvar nova senha</span>
+                        </button>
+                    </form>
+
+                    <p class="auth-prem-footer" style="margin-top: 22px;">
+                        <a href="/auth/esqueci-senha" class="auth-prem-link">Pedir um novo código</a> ·
+                        <a href="/auth/login" class="auth-prem-link">Voltar ao login</a>
+                    </p>
+                </div>
+            </section>
+        </div>
+    </div>
+</body>
+</html>

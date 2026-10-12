@@ -39,7 +39,7 @@
 
         if (code && byCode[code]) return byCode[code];
         if (code && /^LIMITE_PLANO/.test(code)) {
-            return 'Você atingiu o limite do seu plano. Veja opções em Configurações › Plano.';
+            return 'Você atingiu o limite do seu plano.';
         }
 
         if (status === 401) return byCode.AUTH_TOKEN_EXPIRED;

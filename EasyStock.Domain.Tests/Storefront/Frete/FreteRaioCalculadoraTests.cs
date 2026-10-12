@@ -96,4 +96,36 @@ public class FreteRaioCalculadoraTests
         Assert.True(r.ForaDeCobertura);
         Assert.Null(r.FaixaId);
     }
+
+    // ── Distância de rota medida (Routes API, issue #1274) ────────────────
+
+    [Fact]
+    public void Rota_medida_substitui_haversine_vezes_fator_na_faixa()
+    {
+        // Haversine × 1.4 daria ~3892 m (ate-5km); a rota medida de 1800 m cai em ate-2km.
+        var r = FreteRaioCalculadora.Calcular(new Coordenada(0, 0.025), Config(), distanciaRotaMedidaMetros: 1800);
+
+        Assert.Equal(1800, r.DistanciaRotaMetros);
+        Assert.Equal("ate-2km", r.FaixaId);
+        Assert.Equal(1500, r.ValorCentavos);
+    }
+
+    [Fact]
+    public void Rota_medida_acima_do_raio_fica_fora_de_cobertura()
+    {
+        // Linha reta curta, mas a rota real dá a volta e passa do raio.
+        var r = FreteRaioCalculadora.Calcular(new Coordenada(0, 0.01), Config(), distanciaRotaMedidaMetros: 6200);
+
+        Assert.True(r.ForaDeCobertura);
+    }
+
+    [Fact]
+    public void Sem_rota_medida_mantem_haversine_vezes_fator()
+    {
+        var semMedida = FreteRaioCalculadora.Calcular(new Coordenada(0, 0.025), Config());
+        var medidaNula = FreteRaioCalculadora.Calcular(new Coordenada(0, 0.025), Config(), distanciaRotaMedidaMetros: null);
+
+        Assert.Equal(semMedida, medidaNula);
+        Assert.Equal("ate-5km", medidaNula.FaixaId);
+    }
 }

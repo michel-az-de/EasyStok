@@ -9,7 +9,7 @@ namespace EasyStock.Web.Controllers;
 /// na Api (o Caddy do app host nao roteia <c>/api/*</c> e o Web tem rotas proprias sob
 /// <c>/api/</c>). Aqui o Web chama a Api com a sessao (Bearer server-side) e devolve o envelope
 /// <c>{ data }</c> que o frontend espera. Sem este proxy, <c>/api/audit/*</c> dava 404 no app
-/// host (QA v1.10 BUG-PED-001 / #551). Espelha <see cref="AssinaturaController"/>.
+/// host (QA v1.10 BUG-PED-001 / #551).
 /// </summary>
 public class AuditController(AuditService svc, SessionService session) : BaseController(session)
 {

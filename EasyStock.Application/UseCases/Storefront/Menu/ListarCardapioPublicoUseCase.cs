@@ -1,4 +1,7 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Storefront;
+using EasyStock.Domain.Entities.Storefront;
+using EasyStock.Domain.Enums.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 
 namespace EasyStock.Application.UseCases.Storefront.Menu;
@@ -33,12 +36,22 @@ namespace EasyStock.Application.UseCases.Storefront.Menu;
 public sealed class ListarCardapioPublicoUseCase(
     IStorefrontRepository storefrontRepository,
     ICardapioItemRepository cardapioItemRepository,
+    IItemEstoqueRepository itemEstoqueRepository,
     ILogger<ListarCardapioPublicoUseCase> logger)
 {
     /// <summary>Sentinela para empurrar items sem categoria para o fim da ordenação.</summary>
     private const string SemCategoriaSentinela = "￿";
 
     public async Task<ListarCardapioPublicoResult> ExecuteAsync(
+        ListarCardapioPublicoInput input,
+        CancellationToken ct = default) =>
+        (await ExecuteComItensAsync(input, ct)).Menu;
+
+    /// <summary>
+    /// #1575: o mesmo menu e os itens que ele leu, para a comanda montar as porções sem carregar o
+    /// cardápio de novo na mesma requisição.
+    /// </summary>
+    internal async Task<(ListarCardapioPublicoResult Menu, IReadOnlyList<CardapioItem> Itens)> ExecuteComItensAsync(
         ListarCardapioPublicoInput input,
         CancellationToken ct = default)
     {
@@ -55,12 +68,18 @@ public sealed class ListarCardapioPublicoUseCase(
         }
 
         var itens = await cardapioItemRepository.GetVisiveisDoStorefrontAsync(storefront.Id, ct);
+        var saldos = await ObterSaldosAsync(storefront.EmpresaId, itens, ct);
 
         var dtos = itens
+            // M1.3 (#1483): categoria escondida esconde os pratos dela (sem apagar nem soltar).
+            .Where(i => i.Secao is null || i.Secao.Visivel)
+            // M1.3: pratos com seção vêm primeiro, na ordem das seções que a dona definiu.
+            .OrderBy(i => i.Secao is null ? 1 : 0)
+            .ThenBy(i => i.Secao?.OrdemExibicao ?? 0)
             // CategoriaTexto ?? Produto.Categoria.Nome: avulsos usam CategoriaTexto;
             // vinculados usam Produto.Categoria.Nome como fallback.
             // Sentinela empurra itens sem categoria para o fim.
-            .OrderBy(i => i.CategoriaEfetiva() ?? SemCategoriaSentinela, StringComparer.Ordinal)
+            .ThenBy(i => i.CategoriaEfetiva() ?? SemCategoriaSentinela, StringComparer.Ordinal)
             .ThenBy(i => i.OrdemExibicao)
             // Desempate determinístico (CriadoEm → Id): itens nascem OrdemExibicao=0 (factory),
             // então um menu nunca-reordenado é todo-empate; sem desempate a ordem do array varia
@@ -72,63 +91,52 @@ public sealed class ListarCardapioPublicoUseCase(
                 Id: i.Id,
                 // Avulsos têm NomePublico/CategoriaTexto em minúsculo (factory). Capitaliza pra
                 // exibição na vitrine (title-case pt-BR); nomes de Produto (vinculado, já
-                // capitalizados) são preservados pelo guard de FormatarExibicao.
-                Nome: FormatarExibicao(i.NomeEfetivo()) ?? string.Empty,
+                // capitalizados) são preservados pelo guard de NomeCardapio.Exibicao.
+                Nome: NomeCardapio.Exibicao(i.NomeEfetivo()) ?? string.Empty,
                 Descricao: i.DescricaoPublica,
                 PrecoCentavos: (long)Math.Round(i.PrecoEfetivo() * 100m, MidpointRounding.AwayFromZero),
                 ImagemUrl: i.FotoUrl,
                 // Avulso: null (frontend usa disponivel; estoqueAtual não se aplica).
-                // Vinculado: 0 por ora — snapshot eventual fora deste escopo (TASK-EZ-MENU-001).
-                EstoqueAtual: i.ProdutoId.HasValue ? 0 : null,
-                Categoria: FormatarExibicao(i.CategoriaEfetiva()),
+                // Vinculado (#1171): saldo produzido, somado dos lotes com saldo e não vencidos.
+                EstoqueAtual: i.ProdutoId.HasValue ? SaldoInteiro(saldos, i.ProdutoId.Value) : null,
+                Categoria: NomeCardapio.Exibicao(i.CategoriaEfetiva()),
                 Ordem: i.OrdemExibicao,
+                // #1171: segue flag manual. Saldo 0 NÃO esgota o item: o checkout recusa
+                // !Disponivel (#1158) e falta de estoque avisa, não trava o pedido (S17).
                 Disponivel: i.Disponivel,
                 Tag: i.Tag,
-                PesoExibicao: i.PesoExibicao))
+                PesoExibicao: i.PesoExibicao,
+                Linha: i.Linha.ParaContrato(),
+                TempoPreparoMinutos: i.TempoPreparoMinutos,
+                Fotos: i.ObterFotosGaleria(),
+                NovidadeAte: i.NovidadeAte,
+                EmValidacao: i.EmValidacao))
             .ToList();
 
-        return new ListarCardapioPublicoResult(dtos, storefront.TituloPublico, storefront.Slug);
+        return (new ListarCardapioPublicoResult(dtos, storefront.TituloPublico, storefront.Slug), itens);
     }
-
-    /// <summary>Preposições/conjunções que ficam minúsculas no meio do título (pt-BR).</summary>
-    private static readonly HashSet<string> PalavrasMinusculas = new(StringComparer.Ordinal)
-    {
-        "de", "da", "do", "das", "dos", "e", "com", "a", "o", "ao", "aos",
-        "à", "às", "em", "no", "na", "nos", "nas", "para", "sem", "por", "ou",
-    };
 
     /// <summary>
-    /// Title-case pt-BR para exibição na vitrine. <c>NomePublico</c>/<c>CategoriaTexto</c> de
-    /// itens avulsos são armazenados em minúsculo (factory). Capitaliza a 1ª letra de cada
-    /// palavra (e após hífen), deixando preposições do meio minúsculas. <strong>Guard:</strong>
-    /// só transforma se o valor vier TODO minúsculo — preserva nomes de Produto (itens
-    /// vinculados) que já vêm capitalizados.
+    /// Uma consulta de saldos para todos os itens vinculados (sem N+1). Sem item vinculado,
+    /// não vai ao banco. <paramref name="empresaId"/> vem do storefront resolvido pelo slug.
     /// </summary>
-    private static string? FormatarExibicao(string? s)
+    private async Task<IReadOnlyDictionary<Guid, decimal>> ObterSaldosAsync(
+        Guid empresaId, IReadOnlyList<CardapioItem> itens, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(s)) return s;
-        if (s != s.ToLowerInvariant()) return s; // já tem maiúscula → preserva (ex: nome de Produto)
+        var produtoIds = itens
+            .Where(i => i.ProdutoId.HasValue)
+            .Select(i => i.ProdutoId!.Value)
+            .Distinct()
+            .ToList();
+        if (produtoIds.Count == 0)
+            return new Dictionary<Guid, decimal>();
 
-        var palavras = s.Split(' ');
-        for (var i = 0; i < palavras.Length; i++)
-        {
-            var p = palavras[i];
-            if (p.Length == 0) continue;
-            if (i > 0 && PalavrasMinusculas.Contains(p)) continue;
-
-            var arr = p.ToCharArray();
-            var capitalizar = true;
-            for (var j = 0; j < arr.Length; j++)
-            {
-                if (arr[j] == '-') { capitalizar = true; continue; }
-                if (capitalizar && char.IsLetter(arr[j]))
-                {
-                    arr[j] = char.ToUpperInvariant(arr[j]);
-                    capitalizar = false;
-                }
-            }
-            palavras[i] = new string(arr);
-        }
-        return string.Join(' ', palavras);
+        return await itemEstoqueRepository.GetSaldoDisponivelPorProdutosAsync(empresaId, produtoIds, ct);
     }
+
+    /// <summary>Contrato expõe inteiro: arredonda para baixo (não promete fração que não existe inteira).</summary>
+    private static int SaldoInteiro(IReadOnlyDictionary<Guid, decimal> saldos, Guid produtoId) =>
+        saldos.TryGetValue(produtoId, out var saldo) && saldo > 0
+            ? (int)Math.Floor(Math.Min(saldo, int.MaxValue))
+            : 0;
 }

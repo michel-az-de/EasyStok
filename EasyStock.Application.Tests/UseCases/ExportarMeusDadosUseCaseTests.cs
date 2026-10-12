@@ -1,5 +1,9 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Entities.Notifications;
+using EasyStock.Domain.Enums.Notifications;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Application.UseCases.ExportarMeusDados;
 using Microsoft.Extensions.Logging;
 
@@ -10,11 +14,13 @@ public class ExportarMeusDadosUseCaseTests
     private readonly IUsuarioRepository _usuarioRepository = Substitute.For<IUsuarioRepository>();
     private readonly IUsuarioEmpresaRepository _usuarioEmpresaRepository = Substitute.For<IUsuarioEmpresaRepository>();
     private readonly IRefreshTokenRepository _refreshTokenRepository = Substitute.For<IRefreshTokenRepository>();
+    private readonly IConsentimentoRepository _consentimentos = Substitute.For<IConsentimentoRepository>();
+    private readonly IPreferenciaNotificacaoRepository _preferencias = Substitute.For<IPreferenciaNotificacaoRepository>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly ILogger<ExportarMeusDadosUseCase> _logger = Substitute.For<ILogger<ExportarMeusDadosUseCase>>();
 
     private ExportarMeusDadosUseCase CriarUseCase() =>
-        new(_usuarioRepository, _usuarioEmpresaRepository, _refreshTokenRepository, _currentUser, _logger);
+        new(_usuarioRepository, _usuarioEmpresaRepository, _refreshTokenRepository, _consentimentos, _preferencias, _currentUser, _logger);
 
     private static Usuario CriarUsuario() =>
         new()
@@ -113,5 +119,39 @@ public class ExportarMeusDadosUseCaseTests
         var result = await useCase.ExecuteAsync();
 
         result.RefreshTokensAtivos.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task ExportaTelefoneVerificacaoEConsentimentos()
+    {
+        var usuario = CriarUsuario();
+        usuario.DefinirTelefone(TelefoneE164.From("11997573992"));
+        var verificadoEm = new DateTime(2026, 10, 2, 15, 0, 0, DateTimeKind.Utc);
+        usuario.MarcarTelefoneVerificado(verificadoEm);
+        usuario.SolicitarTrocaDeEmail("nova@empresa.com");
+        var empresaId = Guid.NewGuid();
+        _currentUser.UsuarioId.Returns(usuario.Id);
+        _usuarioRepository.GetByIdAsync(usuario.Id).Returns(usuario);
+        _usuarioEmpresaRepository.GetByUsuarioIdAsync(usuario.Id).Returns(Array.Empty<UsuarioEmpresa>());
+        _refreshTokenRepository.GetByUsuarioIdAsync(usuario.Id).Returns(Array.Empty<RefreshToken>());
+        _consentimentos.ListarPorUsuarioAsync(usuario.Id).Returns(
+        [
+            ConsentimentoNotificacao.Registrar(
+                usuario.Id, CanalNotificacao.WhatsApp, CategoriaConteudoNotificacao.Seguranca, true, "superadmin:x", "10.0.0.1")
+        ]);
+        _preferencias.ListarPorUsuarioAsync(usuario.Id).Returns(
+        [
+            PreferenciaNotificacaoUsuario.Criar(usuario.Id, empresaId, "prazo_estourado_global", habilitada: false)
+        ]);
+
+        var result = await CriarUseCase().ExecuteAsync();
+
+        result.Usuario.Telefone.Should().Be("+5511997573992");
+        result.Usuario.TelefoneVerificadoEm.Should().Be(verificadoEm);
+        result.Usuario.EmailPendente.Should().Be("nova@empresa.com");
+        result.Consentimentos.Should().ContainSingle().Which.Should().Match<ConsentimentoExport>(c =>
+            c.Canal == "WhatsApp" && c.Categoria == "Seguranca" && c.OptIn && c.IpOrigem == "10.0.0.1");
+        result.Preferencias.Should().ContainSingle().Which.Should().Match<PreferenciaExport>(p =>
+            p.EmpresaId == empresaId && p.RotinaCodigo == "prazo_estourado_global" && !p.Habilitada);
     }
 }

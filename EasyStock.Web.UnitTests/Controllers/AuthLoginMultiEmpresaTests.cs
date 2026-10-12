@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -63,8 +62,7 @@ public class AuthLoginMultiEmpresaTests
         var env = Substitute.For<IWebHostEnvironment>();
         env.EnvironmentName.Returns("Development");
 
-        var ctrl = new AuthController(api, session, env, jwt, Substitute.For<IConfiguration>(),
-            NullLogger<AuthController>.Instance)
+        var ctrl = new AuthController(api, session, env, jwt)
         {
             ControllerContext = new ControllerContext { HttpContext = httpCtx },
             TempData = new TempDataDictionary(httpCtx, Substitute.For<ITempDataProvider>()),

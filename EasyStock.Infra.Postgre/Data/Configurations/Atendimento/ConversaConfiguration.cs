@@ -8,10 +8,13 @@ public class ConversaConfiguration : IEntityTypeConfiguration<Conversa>
     {
         builder.ToTable("atendimento_conversas");
         builder.HasKey(c => c.Id);
+        builder.Property(c => c.NumeroComanda).UseIdentityAlwaysColumn();
+        builder.HasIndex(c => c.NumeroComanda).IsUnique();
 
         builder.Property(c => c.EmpresaId).IsRequired();
         builder.Property(c => c.ContatoIdExterno).IsRequired().HasMaxLength(Conversa.ContatoIdExternoTamanhoMaximo);
         builder.Property(c => c.ContatoNome).HasMaxLength(Conversa.ContatoNomeTamanhoMaximo);
+        builder.Property(c => c.MotivoEscalada).HasMaxLength(Conversa.MotivoEscaladaTamanhoMaximo);
         builder.Property(c => c.Canal).HasConversion<int>().IsRequired();
         builder.Property(c => c.Situacao).HasConversion<int>().IsRequired();
         builder.Property(c => c.ContextoJson).HasColumnType("jsonb").IsRequired();

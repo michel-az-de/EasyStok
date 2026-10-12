@@ -1,7 +1,7 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    Sobe o ambiente local automatico do EasyStok: API (+PWA), Web e Admin via
+    Sobe o ambiente local automatico do EasyStok: API (+PWA) e Web via
     `dotnet watch` (hot reload). O Postgres e REUSADO do WSL (container que voce
     ja mantem de pe) — o script nao gerencia Docker.
 
@@ -14,7 +14,7 @@
     vive no WSL2. O Postgres e o container pg-easystok (db easystok_demo), exposto
     em localhost:5432. O script so detecta a 5432 — quem sobe/para o Postgres e voce.
 
-    Portas (https): API 7039, Web 7010, Admin 7002.
+    Portas (https): API 7039, Web 7010.
 
     Uso manual (o hook .husky/pre-push nao chama mais este script — issue #738):
     sem -Ensure aguarda a API responder e imprime um resumo com URLs e
@@ -73,14 +73,6 @@ $Services = @(
     [pscustomobject]@{
         Name = 'web'; Project = 'EasyStock.Web'; Https = 7010; Http = 5128
         Env = @{}   # ApiSettings:BaseUrl ja vem do appsettings.Development.json (7039)
-    }
-    [pscustomobject]@{
-        Name = 'admin'; Project = 'EasyStock.Admin'; Https = 7002; Http = 5002
-        Env = @{
-            # Corrige o appsettings do Admin que aponta para 7000/7001 inexistentes.
-            'ApiBaseUrl'      = 'https://localhost:7039'
-            'EasyStockWebUrl' = 'https://localhost:7010'
-        }
     }
 )
 
@@ -150,7 +142,6 @@ Write-Host ''
 Write-Host 'Ambiente local EasyStok' -ForegroundColor Magenta
 Write-Host '  API + PWA : https://localhost:7039  (Swagger /swagger | PWA /pwa/ | health /health)'
 Write-Host '  Web (MVC) : https://localhost:7010  (login em /auth/login)'
-Write-Host '  Admin     : https://localhost:7002  (/ -> /Auth/Login)'
 Write-Host '  Postgres  : localhost:5432  (pg-easystok @ WSL | db easystok_demo | easystok/easystok)'
 Write-Host ''
 Write-Host '  Credenciais de dev: definidas em EasyStock.Api/Data/SuperAdminSeed.cs' -ForegroundColor DarkGray

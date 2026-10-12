@@ -2,6 +2,9 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Services.Notifications;
+using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.Extensions.Caching.Distributed;
 
@@ -15,6 +18,7 @@ public sealed class HealthSnapshotService(
 {
     private readonly ConcurrentQueue<HealthSnapshot> _snapshots = new();
     private const int MaxSnapshots = 120; // 2h at 60s intervals
+    private readonly AvaliadorSaudeSnapshot _avaliador = new();
     private const string RedisHistoryKey = "healthsnap:history";
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(60);
 
@@ -57,6 +61,7 @@ public sealed class HealthSnapshotService(
                     _snapshots.TryDequeue(out _);
 
                 await PersistSnapshotsToRedisAsync(stoppingToken);
+                await AvisarTransicoesAsync(snapshot, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -68,6 +73,32 @@ public sealed class HealthSnapshotService(
             }
 
             await Task.Delay(Interval, stoppingToken);
+        }
+    }
+
+    /// <summary>
+    /// N10: avisa os superadmins na transicao para e de <c>critical</c> (banco) e de <c>degraded</c> por Redis. Falha ao
+    /// avisar (banco fora, sem empresa padrao) nunca derruba o loop de snapshots.
+    /// </summary>
+    private async Task AvisarTransicoesAsync(HealthSnapshot snapshot, CancellationToken ct)
+    {
+        var transicoes = _avaliador.Avaliar(snapshot.OverallStatus, snapshot.RedisStatus, snapshot.Timestamp.UtcDateTime);
+        if (transicoes.Count == 0) return;
+
+        foreach (var t in transicoes)
+        {
+            try
+            {
+                using var scope = scopeFactory.CreateScope();
+                var publicador = scope.ServiceProvider.GetRequiredService<IPublicadorIncidenteSistema>();
+                var estado = t.Decisao == DecisaoIncidente.Resolver ? EstadoIncidente.Normalizado : EstadoIncidente.ComProblema;
+                await publicador.PublicarAsync(
+                    t.Componente, estado, t.Severidade, t.DesdeUtc ?? snapshot.Timestamp.UtcDateTime, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Nao foi possivel avisar o incidente {Componente} ({Decisao}).", t.Componente, t.Decisao);
+            }
         }
     }
 

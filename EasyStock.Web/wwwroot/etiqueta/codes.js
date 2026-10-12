@@ -72,8 +72,9 @@ let _libsLoaded = false;
 async function ensureLibs() {
   if (_libsLoaded) return;
   await Promise.all([
-    loadScript('/etiqueta/vendor/qrcode.min.js'),
-    loadScript('/etiqueta/vendor/jsbarcode.min.js'),
+    // #1509: relativo ao modulo; o caminho absoluto /etiqueta/ dava 404 com o PWA servido em /pwa/.
+    loadScript(new URL('./vendor/qrcode.min.js', import.meta.url).href),
+    loadScript(new URL('./vendor/jsbarcode.min.js', import.meta.url).href),
   ]);
   _libsLoaded = true;
 }

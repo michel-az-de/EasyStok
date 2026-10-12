@@ -4,7 +4,8 @@ using EasyStock.Application.Ports.Output.Atendimento;
 namespace EasyStock.Infra.Integrations.WhatsApp;
 
 /// <summary>
-/// Registrado quando <c>Notifications:WhatsApp:Provider=stub</c>. Não bate na rede; grava cada
+/// Registrado quando nem <c>Atendimento:WhatsApp:Cliente</c> nem <c>Notifications:WhatsApp:Provider</c>
+/// são <c>meta</c>. Não bate na rede; grava cada
 /// chamada em memória para os testes de integração inspecionarem o que foi "enviado".
 /// </summary>
 public sealed class StubWhatsAppCloudClient : IWhatsAppCloudClient
@@ -21,6 +22,10 @@ public sealed class StubWhatsAppCloudClient : IWhatsAppCloudClient
         string waId, string urlPublica, string? legenda = null, CancellationToken ct = default)
         => Registrar("imagem", waId, urlPublica);
 
+    public Task<EnvioWhatsAppResult> EnviarAudioAsync(
+        string waId, string urlPublica, bool notaDeVoz, CancellationToken ct = default)
+        => Registrar("audio", waId, urlPublica);
+
     public Task<EnvioWhatsAppResult> EnviarBotoesAsync(
         string waId, string corpo, IReadOnlyList<(string Id, string Titulo)> botoes, CancellationToken ct = default)
         => Registrar("botoes", waId, corpo);
@@ -31,6 +36,7 @@ public sealed class StubWhatsAppCloudClient : IWhatsAppCloudClient
         string idioma,
         IReadOnlyList<string> parametrosCorpo,
         IReadOnlyList<(string Id, string Titulo)>? botoesQuickReply = null,
+        string? imagemCabecalho = null,
         CancellationToken ct = default)
         => Registrar("template", waId, nomeTemplate);
 

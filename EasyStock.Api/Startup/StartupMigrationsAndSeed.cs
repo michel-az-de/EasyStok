@@ -158,7 +158,7 @@ public static class StartupMigrationsAndSeed
             }
 
             // Schema bootstrap defensivo: roda DEPOIS de migrations e antes de qualquer
-            // seed pra garantir que IsSeedData + SeedRunLogs existam, mesmo se uma
+            // seed pra garantir que SeedRunLogs exista, mesmo se uma
             // migration foi aplicada vazia ou deploy parcial deixou o banco inconsistente.
             // SQL idempotente — no-op se schema já está correto.
             try
@@ -202,7 +202,7 @@ public static class StartupMigrationsAndSeed
                 app.Logger.LogWarning(ex, "[Migrations] Drift check falhou (nao-fatal).");
             }
 
-            // SuperAdmin global ANTES do seed de tenants — o painel /EasyStock.Admin
+            // SuperAdmin global ANTES do seed de tenants — as rotas api/admin/*
             // depende dele e nenhum dos seeds de tenant cria SuperAdmin (apenas Admin
             // de empresa). Idempotente: no-op se ja existe.
             // R6: em Production, exception aqui DERRUBA o startup. Painel admin inacessivel
@@ -262,6 +262,17 @@ public static class StartupMigrationsAndSeed
             catch (Exception ex)
             {
                 app.Logger.LogError(ex, "Erro durante seed de notificações globais. Continuando.");
+            }
+
+            using (var perfisScope = app.Services.CreateScope())
+            {
+                var perfisDb = perfisScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                using var bypass = perfisDb.UseRowLevelSecurityBypass();
+                var empresa = await perfisScope.ServiceProvider.GetRequiredService<IEmpresaPadraoResolver>().ResolverAsync();
+                if (empresa is { } empresaId)
+                    await PerfisCasaDaBabaSeed.ExecutarAsync(perfisDb, empresaId);
+                else
+                    app.Logger.LogWarning("[PerfisCasaDaBaba] Seed não executado: configure Auth:Google:EmpresaPadrao com a empresa da loja.");
             }
 
             // Schema do módulo Casa da Baba Mobile (SQL raw, idempotente, fora do EF migrations).

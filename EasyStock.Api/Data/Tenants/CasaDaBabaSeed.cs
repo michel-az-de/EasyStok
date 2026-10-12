@@ -268,10 +268,6 @@ internal static partial class CasaDaBabaSeed
             usuarioAdmin, usuarioGerente, usuarioOperadorCentro, usuarioOperadorMercadao,
             produtos, itens, fornFarinha, fornCarnes, fornLaticinios, fornHortifruti, agora, logger);
 
-        // Configuracao fiscal mock para suportar fluxo de NFC-e end-to-end no admin demo —
-        // implementado em CasaDaBabaSeed.Fiscal.cs. Idempotente.
-        await EnsureFiscalAsync(context, empresa, logger);
-
         logger.LogInformation("Seed tenant '{Empresa}' concluído.", EmpresaNome);
     }
 }

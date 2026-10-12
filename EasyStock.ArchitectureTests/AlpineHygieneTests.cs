@@ -108,7 +108,6 @@ public class AlpineHygieneTests
         // Alpine como `cardapioVitrine({ titulo: `, quebrando o card "Crie sua vitrine online" em
         // TODA loja nova (o bloco so renderiza quando !Model.TemVitrine).
         // Sem Html.Raw o Razor emite &quot; e o browser decodifica de volta ao ler o atributo.
-        // Par Web do guard homonimo de AdminAlpineHygieneTests (que varre EasyStock.Admin/Pages).
         var views = ArchTestPaths.AppDirectory("EasyStock.Web", "Views");
         var ofensores = new List<string>();
 

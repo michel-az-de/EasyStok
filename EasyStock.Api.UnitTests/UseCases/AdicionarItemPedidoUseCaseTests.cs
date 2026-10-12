@@ -112,6 +112,7 @@ public sealed class AdicionarItemPedidoUseCaseTests : IDisposable
     private static PedidoEstoqueIntegrationService EstoqueSvc() => new(
         Substitute.For<IItemEstoqueRepository>(),
         Substitute.For<IMovimentacaoEstoqueRepository>(),
+        Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(),
         Microsoft.Extensions.Options.Options.Create(new PedidoEstoqueOptions()),
         NullLogger<PedidoEstoqueIntegrationService>.Instance);
 

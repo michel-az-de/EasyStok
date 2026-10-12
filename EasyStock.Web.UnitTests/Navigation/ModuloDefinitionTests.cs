@@ -90,7 +90,6 @@ public class ModuloDefinitionTests
     [InlineData("/operacao")]
     [InlineData("/preferencias")]
     [InlineData("/lojas")]
-    [InlineData("/assinatura")]
     public void Rota_que_so_casa_por_alias_legado_nao_define_modulo(string path)
     {
         // Os aliases de ActiveMenuItem servem para DESTACAR um item parecido, nao para

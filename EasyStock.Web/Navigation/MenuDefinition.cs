@@ -35,8 +35,7 @@ public sealed record MenuGroup(
 /// <summary>
 /// Estrutura canonica (estatica, imutavel) do menu lateral na nova IA por fluxo
 /// (ADR-0032). Fonte unica da verdade: renomear/reordenar item = editar aqui.
-/// Nenhuma rota muda em relacao ao menu antigo (Config Fiscal saiu para aba de
-/// Configuracoes, fatia 8). Icones sao nomes do conjunto <c>es-icon</c>; a
+/// Nenhuma rota muda em relacao ao menu antigo. Icones sao nomes do conjunto <c>es-icon</c>; a
 /// correcao visual dos nomes e validada na fatia de render.
 /// </summary>
 public static class MenuDefinition
@@ -110,8 +109,6 @@ public static class MenuDefinition
                 new[] { "ContasAReceber" }),
             new MenuItem("contas-pagar", "Contas a pagar", "credit-card", "/contas-a-pagar",
                 new[] { "ContasAPagar" }),
-            new MenuItem("notas-fiscais", "Notas fiscais", "receipt", "/notas-fiscais",
-                new[] { "NotasFiscais" }),
         }),
         new MenuGroup("crescimento", "Crescimento", "trending-up", new[]
         {
@@ -119,20 +116,16 @@ public static class MenuDefinition
                 new[] { "Analytics", "Movimentacoes", "Inteligencia", "InteligenciaLojas" }),
             new MenuItem("relatorios", "Relatórios", "file-text", "/relatorios",
                 new[] { "Relatorios" }),
-            new MenuItem("anuncios", "Anúncios", "megaphone", "/anuncios",
-                new[] { "Anuncios" }),
         }),
     };
 
-    /// <summary>Rodape fixo (com borda superior). ConfiguracaoFiscal mapeia aqui (vira aba).</summary>
+    /// <summary>Rodape fixo (com borda superior).</summary>
     public static readonly IReadOnlyList<MenuItem> Footer = new[]
     {
-        new MenuItem("dispositivos", "Dispositivos", "monitor", "/dispositivos",
-            new[] { "Dispositivos", "Operacao" }),
         new MenuItem("usuarios", "Usuários", "user-cog", "/usuarios",
             new[] { "Usuarios" }),
         new MenuItem("configuracoes", "Configurações", "settings", "/configuracoes",
-            new[] { "Configuracoes", "Lojas", "Assinatura", "Notificacoes", "Preferencias", "ConfiguracaoFiscal" }),
+            new[] { "Configuracoes", "Lojas", "Notificacoes", "Preferencias" }),
     };
 
     /// <summary>Dashboard + itens de grupo + rodape, na ordem de declaracao (sem filtro de flag).</summary>

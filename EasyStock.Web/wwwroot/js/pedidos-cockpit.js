@@ -14,18 +14,18 @@
   // Espelha StatusPedidoMapper (domínio) — manter em sincronia com StatusHelper.cs e
   // statusDisplayLabel (SSR em Pedidos/Index.cshtml). Issue #719 / QA v1.10 BUG-003/014.
   var STATUS_LABEL = {
-    aguardando: 'Aguardando', preparando: 'Em preparo', pronto: 'Pronto', entregue: 'Entregue', cancelado: 'Cancelado',
+    aguardando: 'Aguardando', preparando: 'Em preparo', pronto: 'Pronto', saiu_para_entrega: 'Saiu para entrega', entregue: 'Entregue', cancelado: 'Cancelado',
     rascunho: 'Rascunho', aguardando_pagamento: 'Aguardando pagamento', aguardando_aprovacao_baba: 'Aguardando aprovação', aprovado_baba: 'Aprovado'
   };
   // Avanco operacional (forward-only). aprovado_baba entra na fila ERP em 'preparando'.
   // A aprovacao em si (aguardando_aprovacao_baba -> aprovado_baba) NAO vem por aqui: e a
   // acao dedicada `approve`, com lock/outbox/notificacao no backend (#862).
-  var NEXT = { aguardando: 'preparando', preparando: 'pronto', pronto: 'entregue', aprovado_baba: 'preparando' };
-  var NEXT_LABEL = { aguardando: 'Iniciar preparo', preparando: 'Marcar pronto', pronto: 'Confirmar entrega', aprovado_baba: 'Iniciar preparo' };
+  var NEXT = { aguardando: 'preparando', preparando: 'pronto', pronto: 'entregue', saiu_para_entrega: 'entregue', aprovado_baba: 'preparando' };
+  var NEXT_LABEL = { aguardando: 'Iniciar preparo', preparando: 'Marcar pronto', pronto: 'Confirmar entrega', saiu_para_entrega: 'Confirmar entrega', aprovado_baba: 'Iniciar preparo' };
   // "Em aberto" = não-terminais operacionais. Inclui os pós-pagamento do storefront
   // (aprovacao_baba/aprovado_baba). rascunho/aguardando_pagamento são pré-operacionais
   // e ficam fora. Incluir aprovacao_baba corrige a subcontagem do BUG-009 (issue #719).
-  var OPEN = ['aguardando', 'preparando', 'pronto', 'aguardando_aprovacao_baba', 'aprovado_baba'];
+  var OPEN = ['aguardando', 'preparando', 'pronto', 'saiu_para_entrega', 'aguardando_aprovacao_baba', 'aprovado_baba'];
   // Pre-operacionais: pedido ainda nao entrou na fila de trabalho. Enquanto aqui a acao
   // NAO e receber pagamento (o cardapio guest nem cobra online) — e aprovar/recusar. Por
   // isso o botao "Receber" e o KPI "A receber" ficam suprimidos ate o pedido virar

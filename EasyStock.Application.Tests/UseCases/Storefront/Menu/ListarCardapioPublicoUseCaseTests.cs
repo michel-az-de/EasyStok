@@ -1,4 +1,5 @@
-﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+﻿using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Menu;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
@@ -32,6 +33,7 @@ public class ListarCardapioPublicoUseCaseTests
     private sealed record Fakes(
         IStorefrontRepository StorefrontRepository,
         ICardapioItemRepository CardapioItemRepository,
+        IItemEstoqueRepository ItemEstoqueRepository,
         ILogger<ListarCardapioPublicoUseCase> Logger,
         Guid EmpresaId,
         StorefrontEntity Storefront);
@@ -54,13 +56,19 @@ public class ListarCardapioPublicoUseCaseTests
         cardapioRepo.GetVisiveisDoStorefrontAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<CardapioItem>());
 
+        // #1171: por padrão nenhum produto tem saldo (dicionário vazio = saldo 0).
+        var itemEstoqueRepo = Substitute.For<IItemEstoqueRepository>();
+        itemEstoqueRepo.GetSaldoDisponivelPorProdutosAsync(
+                Arg.Any<Guid>(), Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, decimal>());
+
         var logger = Substitute.For<ILogger<ListarCardapioPublicoUseCase>>();
 
-        return new Fakes(storefrontRepo, cardapioRepo, logger, empresaId, storefront);
+        return new Fakes(storefrontRepo, cardapioRepo, itemEstoqueRepo, logger, empresaId, storefront);
     }
 
     private static ListarCardapioPublicoUseCase BuildUseCase(Fakes f) =>
-        new(f.StorefrontRepository, f.CardapioItemRepository, f.Logger);
+        new(f.StorefrontRepository, f.CardapioItemRepository, f.ItemEstoqueRepository, f.Logger);
 
     private static CardapioItem CriarItem(
         Guid storefrontId,
@@ -155,7 +163,7 @@ public class ListarCardapioPublicoUseCaseTests
         dto.Ordem.Should().Be(1.0);
         dto.Tag.Should().Be("vegetariano");
         dto.Disponivel.Should().BeTrue();
-        dto.EstoqueAtual.Should().Be(0, "vinculado com ProdutoId retorna 0 (snapshot eventual); avulsos retornariam null");
+        dto.EstoqueAtual.Should().Be(0, "vinculado sem lote com saldo retorna 0; avulsos retornariam null");
     }
 
     // ── Storefront inexistente / inativo ───────────────────────────────
@@ -361,6 +369,24 @@ public class ListarCardapioPublicoUseCaseTests
         dto.Categoria.Should().Be("Acompanhamentos", "CategoriaTexto avulso lowercase recebe title-case na vitrine");
     }
 
+    [Theory]
+    [InlineData("molho pomodoro 500 ml", "Molho Pomodoro 500 ml")]
+    [InlineData("capeletti de carne 1 kg", "Capeletti de Carne 1 kg")]
+    [InlineData("nhoque artesanal 500 g", "Nhoque Artesanal 500 g")]
+    [InlineData("suco de uva 1 l", "Suco de Uva 1 l")]
+    public async Task ExecuteAsync_AvulsoComUnidade_MantemUnidadeMinuscula(string armazenado, string esperado)
+    {
+        // #1334: o cardápio real tem um item por tamanho; "500 G" e "250 Ml" chegavam ao cliente e ao agente.
+        var f = BuildFakes();
+        var avulso = CriarItemAvulso(f.Storefront.Id, armazenado, 18.00m);
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { avulso });
+
+        var dto = (await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido))).Itens.Single();
+
+        dto.Nome.Should().Be(esperado);
+    }
+
     [Fact]
     public async Task ExecuteAsync_MixAvulsoVinculado_OrdenaSemExcecao()
     {
@@ -377,5 +403,154 @@ public class ListarCardapioPublicoUseCaseTests
         var result = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
 
         result.Itens.Should().HaveCount(2, "mix avulso+vinculado não lança e mantém ambos");
+    }
+
+    // ── S15: linha e tempo de preparo no contrato público ─────────────
+
+    [Fact]
+    public async Task EmiteLinhaETempo()
+    {
+        var f = BuildFakes();
+        var item = CriarItemAvulso(f.Storefront.Id, "nhoque congelado", 30m);
+        item.DefinirPreparo(EasyStock.Domain.Enums.Storefront.LinhaProduto.PrepararEmCasa, 45, null);
+        var semLinha = CriarItemAvulso(f.Storefront.Id, "lasanha", 35m, ordem: 1);
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { item, semLinha });
+
+        var result = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        result.Itens[0].Linha.Should().Be("prepararEmCasa");
+        result.Itens[0].TempoPreparoMinutos.Should().Be(45);
+        result.Itens[1].Linha.Should().Be("paraServir");
+        result.Itens[1].TempoPreparoMinutos.Should().BeNull();
+    }
+    // ── #1171: saldo produzido projetado no cardápio ───────────────────
+
+    [Fact]
+    public async Task ExecuteAsync_VinculadoComSaldo_ProjetaSaldoDoEstoque()
+    {
+        var f = BuildFakes();
+        var item = CriarItem(f.Storefront.Id, f.EmpresaId, "Lasanha", 42m);
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { item });
+        f.ItemEstoqueRepository.GetSaldoDisponivelPorProdutosAsync(
+                f.EmpresaId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, decimal> { [item.ProdutoId!.Value] = 12m });
+
+        var result = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        result.Itens[0].EstoqueAtual.Should().Be(12, "saldo produzido pelo POST api/producao aparece no cardápio");
+        result.Itens[0].Disponivel.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_VinculadoSemSaldo_EstoqueZeroMasDisponivelSegueFlagManual()
+    {
+        // Decisão #1171: Disponivel continua flag manual. Saldo 0 não esgota o item, porque o
+        // checkout recusa item !Disponivel (#1158) e falta de estoque avisa, não trava (S17).
+        var f = BuildFakes();
+        var item = CriarItem(f.Storefront.Id, f.EmpresaId, "Nhoque", 30m);
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { item });
+
+        var result = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        result.Itens[0].EstoqueAtual.Should().Be(0);
+        result.Itens[0].Disponivel.Should().BeTrue("saldo zero não derruba a disponibilidade manual");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_VinculadoEsgotadoManualComSaldo_MantemIndisponivel()
+    {
+        var f = BuildFakes();
+        var item = CriarItem(f.Storefront.Id, f.EmpresaId, "Torta", 50m, disponivel: false);
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { item });
+        f.ItemEstoqueRepository.GetSaldoDisponivelPorProdutosAsync(
+                f.EmpresaId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, decimal> { [item.ProdutoId!.Value] = 3m });
+
+        var result = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        result.Itens[0].EstoqueAtual.Should().Be(3);
+        result.Itens[0].Disponivel.Should().BeFalse("o esgotado manual prevalece sobre o saldo");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SaldoFracionado_ArredondaParaBaixo()
+    {
+        var f = BuildFakes();
+        var item = CriarItem(f.Storefront.Id, f.EmpresaId, "Queijo", 20m);
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { item });
+        f.ItemEstoqueRepository.GetSaldoDisponivelPorProdutosAsync(
+                f.EmpresaId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, decimal> { [item.ProdutoId!.Value] = 2.75m });
+
+        var result = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        result.Itens[0].EstoqueAtual.Should().Be(2, "o cardápio não promete fração que não existe inteira");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ConsultaSaldosUmaVezComEmpresaDoStorefrontESoVinculados()
+    {
+        var f = BuildFakes();
+        var a = CriarItem(f.Storefront.Id, f.EmpresaId, "Lasanha", 42m);
+        var b = CriarItem(f.Storefront.Id, f.EmpresaId, "Nhoque", 30m, ordem: 1);
+        var avulso = CriarItemAvulso(f.Storefront.Id, "bolo", 20m, ordem: 2);
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { a, b, avulso });
+
+        await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        await f.ItemEstoqueRepository.Received(1).GetSaldoDisponivelPorProdutosAsync(
+            f.EmpresaId,
+            Arg.Is<IReadOnlyCollection<Guid>>(ids =>
+                ids.Count == 2 && ids.Contains(a.ProdutoId!.Value) && ids.Contains(b.ProdutoId!.Value)),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SemItemVinculado_NaoConsultaEstoque()
+    {
+        var f = BuildFakes();
+        var avulso = CriarItemAvulso(f.Storefront.Id, "bolo", 20m);
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { avulso });
+
+        var result = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        result.Itens[0].EstoqueAtual.Should().BeNull();
+        await f.ItemEstoqueRepository.DidNotReceiveWithAnyArgs().GetSaldoDisponivelPorProdutosAsync(
+            default, default!, default);
+    }
+
+    // M1.3 (#1483): a ordem das categorias é a das seções que a dona definiu, não a alfabética;
+    // categoria escondida esconde os pratos dela.
+    [Fact]
+    public async Task OrdemDasSecoes_VemAntesDoAlfabeto_ESecaoOcultaSome()
+    {
+        var f = BuildFakes();
+        var sobremesas = CardapioSecao.CriarRaiz(f.Storefront.Id, "Sobremesas", 1);
+        var massas = CardapioSecao.CriarRaiz(f.Storefront.Id, "Massas", 2);
+        var bebidas = CardapioSecao.CriarRaiz(f.Storefront.Id, "Bebidas", 3);
+        bebidas.AlterarVisibilidade(false);
+        CardapioItem NaSecao(string nome, CardapioSecao secao)
+        {
+            var i = CardapioItem.CriarAvulso(f.Storefront.Id, nome, 10m);
+            i.TornarVisivel();
+            i.DefinirSecao(secao.Id);
+            i.Secao = secao;
+            return i;
+        }
+        var semSecao = CardapioItem.CriarAvulso(f.Storefront.Id, "Avulso", 10m, "Aaa");
+        semSecao.TornarVisivel();
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new List<CardapioItem> { semSecao, NaSecao("Lasanha", massas), NaSecao("Pudim", sobremesas), NaSecao("Suco", bebidas) });
+
+        var r = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        r.Itens.Select(i => i.Categoria).Should().Equal("Sobremesas", "Massas", "Aaa");
     }
 }

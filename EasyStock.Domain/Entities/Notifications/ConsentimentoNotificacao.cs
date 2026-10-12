@@ -16,6 +16,9 @@ public class ConsentimentoNotificacao
 
     public Usuario? Usuario { get; set; }
 
+    /// <summary>Motivo gravado em <see cref="MotivoOptOut"/> quando a anonimização (LGPD) revoga o consentimento.</summary>
+    public const string MotivoAnonimizacao = "anonimizacao";
+
     public static ConsentimentoNotificacao Registrar(
         Guid usuarioId,
         CanalNotificacao canal,

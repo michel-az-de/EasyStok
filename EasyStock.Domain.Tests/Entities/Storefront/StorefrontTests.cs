@@ -392,4 +392,28 @@ public class StorefrontTests
         s.DesabilitarNfeAutomatica();
         s.NfeAutomaticaHabilitada.Should().BeFalse();
     }
+
+    // ===== S13: Instagram no agradecimento de pedido entregue =====
+
+    [Fact]
+    public void DefinirInstagramUrl_normaliza_e_limpa()
+    {
+        var s = NovoStorefrontValido();
+
+        s.DefinirInstagramUrl("  https://instagram.com/casadababa  ");
+        s.InstagramUrl.Should().Be("https://instagram.com/casadababa");
+
+        s.DefinirInstagramUrl(" ");
+        s.InstagramUrl.Should().BeNull();
+    }
+
+    [Fact]
+    public void DefinirInstagramUrl_acima_de_500_caracteres_viola_regra()
+    {
+        var s = NovoStorefrontValido();
+
+        var act = () => s.DefinirInstagramUrl("https://instagram.com/" + new string('a', 500));
+
+        act.Should().Throw<RegraDeDominioVioladaException>();
+    }
 }

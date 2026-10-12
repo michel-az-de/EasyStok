@@ -26,7 +26,7 @@ primary_region = "iad"
 
 [env]
   # URL publica absoluta da API para compor os links dos arquivos (estrategia B): a
-  # imagem e exibida na Web/Admin (outra origem) e precisa apontar pra API, nao pro
+  # imagem e exibida na Web (outra origem) e precisa apontar pra API, nao pro
   # proprio host. Equivalente ao FileStorage__PublicBaseUrl da VM (docker-compose).
   FileStorage__PublicBaseUrl = "https://easystok.fly.dev/files"
 

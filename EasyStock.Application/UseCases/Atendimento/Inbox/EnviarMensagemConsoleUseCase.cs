@@ -4,6 +4,7 @@ using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
@@ -12,6 +13,9 @@ public sealed record EnviarTextoConsoleCommand(Guid EmpresaId, Guid UsuarioId, G
 public sealed record EnviarImagemConsoleCommand(
     Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string FileName, string ContentType, byte[] Conteudo, string? Legenda);
 
+/// <summary>Áudio gravado no console (#1444): os bytes como vieram do navegador; o formato sai dos bytes.</summary>
+public sealed record EnviarAudioConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, byte[] Conteudo);
+
 /// <summary>
 /// A dona responde pelo console (S07, RN-04, D4): envia pela porta do canal da conversa (S34), grava
 /// <c>Mensagem(Saida, Dona)</c> com o id externo e marca a conversa <see cref="SituacaoConversa.Assumida"/>,
@@ -19,8 +23,8 @@ public sealed record EnviarImagemConsoleCommand(
 ///
 /// <para>
 /// Fora da janela de atendimento (domínio recusa, ou a Meta devolve 131047) nada é gravado como enviado e a
-/// conversa não muda: <see cref="ForaDaJanelaAtendimentoException"/>. Qualquer outra falha do canal também
-/// não grava nada (<see cref="FalhaEnvioCanalException"/>): a dona tenta de novo.
+/// conversa não muda: <see cref="ForaDaJanelaAtendimentoException"/>. Qualquer outra falha do canal grava a
+/// mensagem como falhou (#1396) e devolve o id em <see cref="FalhaEnvioCanalException.Mensagem"/>: a dona reenvia.
 /// </para>
 /// </summary>
 public sealed class EnviarMensagemConsoleUseCase(
@@ -41,14 +45,21 @@ public sealed class EnviarMensagemConsoleUseCase(
             throw new UseCaseValidationException($"Texto excede {Mensagem.TextoTamanhoMaximo} caracteres.");
 
         var agora = DateTime.UtcNow;
-        var conversa = await ObterParaEnvioAsync(command.EmpresaId, command.ConversaId, agora, ct);
+        var conversa = await ObterAbertaAsync(command.EmpresaId, command.ConversaId, ct);
         var canal = resolvedorCanal.Obter(conversa.Canal);
 
-        var externoId = await EnviarAsync(() => canal.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct));
+        // Fora da janela, Instagram e Messenger aceitam resposta humana com HUMAN_AGENT (S35). O console
+        // é humano; o domínio confere se a tag vale e se ainda está no prazo dela.
+        var tag = TagHumanaForaDaJanela(conversa, canal, agora);
+        GarantirJanela(conversa, agora, tag);
 
-        var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
-            TipoConteudoMensagem.Texto, texto, externoId);
-        return await RegistrarAsync(conversa, mensagem, command.UsuarioId, agora, ct);
+        return await EnviarERegistrarAsync(conversa, command.UsuarioId, agora,
+            () => tag is not null && canal is ICanalComTagHumana comTag
+                ? comTag.EnviarTextoComTagAsync(conversa.ContatoIdExterno, texto, tag, ct)
+                : canal.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct),
+            externoId => Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
+                TipoConteudoMensagem.Texto, texto, externoId),
+            ct);
     }
 
     public async Task<MensagemAtendimentoResult> EnviarImagemAsync(EnviarImagemConsoleCommand command, CancellationToken ct = default)
@@ -66,52 +77,110 @@ public sealed class EnviarMensagemConsoleUseCase(
         var imagem = await uploads.UploadImagemAtendimentoAsync(
             command.EmpresaId, conversa.Id, command.FileName, command.ContentType, command.Conteudo, ct);
 
-        var externoId = await EnviarAsync(() => canal.EnviarImagemAsync(conversa.ContatoIdExterno, imagem.Url, legenda, ct));
+        return await EnviarERegistrarAsync(conversa, command.UsuarioId, agora,
+            () => canal.EnviarImagemAsync(conversa.ContatoIdExterno, imagem.Url, legenda, ct),
+            externoId =>
+            {
+                var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
+                    TipoConteudoMensagem.Imagem, legenda, externoId);
+                mensagem.AnexarMidia(imagem.StorageKey, imagem.ContentType);
+                return mensagem;
+            },
+            ct);
+    }
 
-        var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
-            TipoConteudoMensagem.Imagem, legenda, externoId);
-        mensagem.AnexarMidia(imagem.StorageKey, imagem.ContentType);
-        return await RegistrarAsync(conversa, mensagem, command.UsuarioId, agora, ct);
+    /// <summary>
+    /// Áudio gravado pela dona (#1444). Só em canal que aceita áudio (domínio) e cujo adaptador já envia
+    /// (<see cref="ICanalComAudio"/>); a conversão e a validação do formato vêm antes de qualquer envio.
+    /// </summary>
+    public async Task<MensagemAtendimentoResult> EnviarAudioAsync(EnviarAudioConsoleCommand command, CancellationToken ct = default)
+    {
+        var agora = DateTime.UtcNow;
+        var conversa = await ObterParaEnvioAsync(command.EmpresaId, command.ConversaId, agora, ct);
+        if (!conversa.Capacidades.AceitaAudio || resolvedorCanal.Obter(conversa.Canal) is not ICanalComAudio canal)
+            throw new UseCaseValidationException($"O canal {conversa.Canal} ainda não envia áudio pelo EasyStok.");
+
+        var audio = await uploads.UploadAudioAtendimentoAsync(command.EmpresaId, conversa.Id, command.Conteudo, ct);
+
+        return await EnviarERegistrarAsync(conversa, command.UsuarioId, agora,
+            () => canal.EnviarAudioAsync(conversa.ContatoIdExterno, audio.Url, audio.NotaDeVoz, ct),
+            externoId =>
+            {
+                var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
+                    TipoConteudoMensagem.Audio, null, externoId);
+                mensagem.AnexarMidia(audio.StorageKey, audio.ContentType);
+                return mensagem;
+            },
+            ct);
     }
 
     private async Task<Conversa> ObterParaEnvioAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct)
+    {
+        var conversa = await ObterAbertaAsync(empresaId, conversaId, ct);
+        GarantirJanela(conversa, agora, tag: null);
+        return conversa;
+    }
+
+    private async Task<Conversa> ObterAbertaAsync(Guid empresaId, Guid conversaId, CancellationToken ct)
     {
         var conversa = await conversaRepository.ObterPorIdAsync(empresaId, conversaId, ct)
             ?? throw new ConversaNaoEncontradaException(conversaId);
         if (!conversa.EstaAberta)
             throw new RegraDeDominioVioladaException("Conversa encerrada: a próxima mensagem do cliente abre outra.");
+        return conversa;
+    }
 
+    private static void GarantirJanela(Conversa conversa, DateTime agora, string? tag)
+    {
         try
         {
-            conversa.GarantirPodeEnviarTextoLivre(agora);
+            conversa.GarantirPodeEnviarTextoLivre(agora, tag);
         }
         catch (RegraDeDominioVioladaException ex)
         {
             throw new ForaDaJanelaAtendimentoException(ex.Message, ex);
         }
-
-        return conversa;
     }
 
-    private static async Task<string> EnviarAsync(Func<Task<string>> envio)
+    private static string? TagHumanaForaDaJanela(Conversa conversa, ICanalMensageria canal, DateTime agora) =>
+        !conversa.DentroDaJanela(agora)
+        && canal is ICanalComTagHumana
+        && conversa.Capacidades.TagsForaDaJanela.Contains(CapacidadesCanal.TagAgenteHumano, StringComparer.Ordinal)
+            ? CapacidadesCanal.TagAgenteHumano
+            : null;
+
+    /// <summary>
+    /// Envia e grava. Na falha do canal (#1396) grava a mensagem <see cref="StatusMensagem.Falhou"/> com o erro
+    /// (temporária agenda o reenvio, S57) e devolve o id real na exceção, para o botão Reenviar do console.
+    /// </summary>
+    private async Task<MensagemAtendimentoResult> EnviarERegistrarAsync(
+        Conversa conversa, Guid usuarioId, DateTime agora, Func<Task<string>> envio,
+        Func<string?, Mensagem> criarMensagem, CancellationToken ct)
     {
+        string externoId;
         try
         {
-            return await envio();
+            externoId = await envio();
         }
         catch (WhatsAppCloudException ex) when (ex.Codigo == CodigoMetaForaDaJanela)
         {
             throw new ForaDaJanelaAtendimentoException("A Meta recusou: fora da janela de 24 h.", ex);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            throw new FalhaEnvioCanalException($"Falha ao enviar pelo canal: {ex.Message}", ex);
+            var falhou = criarMensagem(null);
+            falhou.RegistrarFalhaEnvio(ex.Message, ClassificadorFalhaEnvio.Classificar(ex), agora);
+            var gravada = await RegistrarAsync(conversa, falhou, usuarioId, agora, ct);
+            throw new FalhaEnvioCanalException($"Falha ao enviar pelo canal: {ex.Message}", ex, gravada);
         }
+
+        return await RegistrarAsync(conversa, criarMensagem(externoId), usuarioId, agora, ct);
     }
 
     private async Task<MensagemAtendimentoResult> RegistrarAsync(
         Conversa conversa, Mensagem mensagem, Guid usuarioId, DateTime agora, CancellationToken ct)
     {
+        mensagem.RegistrarEnviadaPor(usuarioId);
         conversa.Assumir(agora, usuarioId);
         conversa.RegistrarSaida(agora);
         await conversaRepository.AddMensagemAsync(mensagem, ct);

@@ -11,6 +11,9 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task<Cliente?> GetByIdAsync(Guid empresaId, Guid id) =>
             db.Clientes.FirstOrDefaultAsync(c => c.EmpresaId == empresaId && c.Id == id);
 
+        public async Task<IReadOnlyList<Cliente>> ListarPorIdsAsync(Guid empresaId, IReadOnlyCollection<Guid> ids, CancellationToken ct = default) =>
+            await db.Clientes.AsNoTracking().Where(c => c.EmpresaId == empresaId && ids.Contains(c.Id)).ToListAsync(ct);
+
         public Task<Cliente?> GetByIdWithDetailsAsync(Guid empresaId, Guid id) =>
             db.Clientes
                 .Include(c => c.Enderecos)
@@ -46,7 +49,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var total = await query.CountAsync();
             var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
 
-            query = sort?.ToLowerInvariant() switch
+            var ordenada = sort?.ToLowerInvariant() switch
             {
                 "criadoem"    => desc ? query.OrderByDescending(c => c.CriadoEm)    : query.OrderBy(c => c.CriadoEm),
                 "lastorderat" => desc ? query.OrderByDescending(c => c.LastOrderAt) : query.OrderBy(c => c.LastOrderAt),
@@ -54,7 +57,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 _             => desc ? query.OrderByDescending(c => c.Nome)        : query.OrderBy(c => c.Nome),
             };
 
-            var clientes = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            var clientes = await ordenada.ThenByDescending(c => c.Id)
+                .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
             return (clientes, total);
         }
 
@@ -78,8 +82,13 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task<Cliente?> FindByDocumentoAsync(Guid empresaId, string documento) =>
             db.Clientes.FirstOrDefaultAsync(c => c.EmpresaId == empresaId && c.Documento == documento);
 
+        // #1290: o número pode estar só na lista de telefones do cadastro (ex.: WhatsApp como segundo número).
         public Task<Cliente?> FindByTelefoneAsync(Guid empresaId, string telefone) =>
-            db.Clientes.FirstOrDefaultAsync(c => c.EmpresaId == empresaId && c.Telefone == telefone);
+            db.Clientes
+                .Where(c => c.EmpresaId == empresaId
+                            && (c.Telefone == telefone || c.Telefones.Any(t => t.Numero == telefone)))
+                .OrderBy(c => c.Telefone == telefone ? 0 : 1) // o telefone principal vence a lista
+                .FirstOrDefaultAsync();
 
         public Task AddAsync(Cliente cliente) { db.Clientes.Add(cliente); return Task.CompletedTask; }
         public Task UpdateAsync(Cliente cliente) { db.Clientes.Update(cliente); return Task.CompletedTask; }

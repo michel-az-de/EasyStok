@@ -1,3 +1,4 @@
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Pedidos;
 using ClienteEntity = EasyStock.Domain.Entities.Cliente;
 using PedidoEntity = EasyStock.Domain.Entities.Pedido;
@@ -42,7 +43,9 @@ public class CriarPedidoUseCase(
     IClienteRepository clienteRepo,
     IProdutoRepository produtoRepo,
     IUnitOfWork uow,
-    ILogger<CriarPedidoUseCase> logger)
+    ILogger<CriarPedidoUseCase> logger,
+    CalculadoraInicioPrevistoPedido inicioPrevisto,
+    EnderecoEntregaPedido enderecoEntrega)
 {
     public async Task<PedidoResult> ExecuteAsync(CriarPedidoCommand cmd)
     {
@@ -82,7 +85,7 @@ public class CriarPedidoUseCase(
         if (cmd.ClienteId.HasValue && cmd.ClienteId.Value != Guid.Empty)
         {
             cliente = await clienteRepo.GetByIdAsync(cmd.EmpresaId, cmd.ClienteId.Value);
-            if (cliente == null)
+            if (cliente is null || cliente.EmpresaId != cmd.EmpresaId)
                 throw new UseCaseValidationException("Cliente não encontrado nesta empresa.");
         }
 
@@ -97,6 +100,8 @@ public class CriarPedidoUseCase(
         pedido.Observacoes = cmd.Observacoes;
         pedido.MobileOrderId = cmd.MobileOrderId;
         pedido.AgendadoParaEm = agendadoParaEm;
+        if (cliente is not null && pedido.Origem != "balcao")
+            await enderecoEntrega.RegistrarAsync(pedido, DadosEnderecoEntrega.De(cliente));
 
         // Adiciona itens.
         if (cmd.Itens != null)
@@ -174,6 +179,18 @@ public class CriarPedidoUseCase(
         }
 
         await uow.CommitAsync();
+
+        // #1230: o pedido nasce na fila (Aguardando). Com agendamento, ganha início previsto; a leitura da
+        // janela e dos itens vai ao banco, por isso depois do commit. O agregado segue rastreado desde o
+        // AddAsync, então o segundo commit grava só a coluna nova. Sem agendamento (balcão, para já) e recém-
+        // criado (sem vaga), não há janela: pula a consulta.
+        if (pedido.AgendadoParaEm is not null)
+        {
+            var antes = pedido.InicioPrevistoEm;
+            await inicioPrevisto.AplicarNaFilaAsync(pedido);
+            if (pedido.InicioPrevistoEm != antes)
+                await uow.CommitAsync();
+        }
 
         logger.LogInformation("Pedido {Id} criado (cliente={ClienteId}, total={Total}, origem={Origem}).",
             pedido.Id, pedido.ClienteId, pedido.Total, pedido.Origem);

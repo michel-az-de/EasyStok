@@ -1,0 +1,34 @@
+/* Comanda de cozinha (S52), sobre impressos.css. Layout aprovado: docs/plan/atendimento-whatsapp/impressos/comanda-aprovada.html
+   Térmica: só preto. Alergia em faixa preta; observação do item só com contorno. */
+.cm .cm-alerta { background: #000; color: #fff; display: flex; align-items: center; gap: 2mm; padding: var(--pad);
+  font: 900 var(--fal) var(--nunito); letter-spacing: .04em; border-bottom: var(--bh) solid #000; }
+.cm .cm-alerta small { display: block; font: 800 calc(var(--fal) * .62) var(--nunito); letter-spacing: .08em; text-transform: uppercase; margin-top: .3mm; }
+.cm .cm-alerta b { display: grid; place-items: center; width: var(--fbang); height: var(--fbang); border: .6mm solid #fff;
+  border-radius: 50%; font: 900 calc(var(--fbang) * .7)/1 var(--nunito); flex: none; }
+.cm .cm-num { font: 700 var(--fnum)/.9 var(--lora); }
+.cm .cm-hash { font: 800 var(--fl) var(--nunito); letter-spacing: .1em; margin-top: .8mm; }
+.cm .cm-prazo .grande { font-size: var(--fprazo); }
+.cm .cm-ent { display: block; font: 800 var(--fi)/1.25 var(--nunito); }
+.cm .cm-grupo { background: #000; color: #fff; display: flex; justify-content: space-between; align-items: center;
+  padding: var(--pad); font: 900 var(--fl) var(--nunito); letter-spacing: .14em; text-transform: uppercase; }
+.cm .cm-item { display: flex; border-bottom: var(--bt) solid #000; }
+.cm .cm-item:last-child { border-bottom: 0; }
+.cm .cm-item > * { padding: var(--padi); }
+.cm .cm-item > * + * { border-left: var(--bh) solid #000; }
+.cm .cm-q { width: 12mm; flex: none; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+.cm .cm-n { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: .4mm; }
+.cm .cm-nome { font-weight: 800; font-size: var(--fnm); line-height: 1.15; }
+.cm .cm-porcao { font-weight: 900; }
+.cm .cm-molho { font: 900 var(--fmo) var(--nunito); letter-spacing: .03em; text-transform: uppercase; }
+.cm .cm-obs { align-self: flex-start; border: .5mm solid #000; font-weight: 900; padding: .2mm 1.4mm; }
+.cm .cm-ok { width: 9mm; flex: none; display: grid; place-items: center; }
+.cm .cm-ok span { width: 5.4mm; height: 5.4mm; border: .55mm solid #000; display: block; }
+.cm .cm-assin { display: flex; padding: 0; }
+.cm .cm-assin > div { flex: 1; padding: var(--pad); }
+.cm .cm-assin > div + div { border-left: var(--bh) solid #000; }
+.cm .cm-assin i { display: block; border-bottom: .3mm solid #000; height: 5mm; }
+.p1015.cm { --padi: .55mm 1.6mm; --hb: 7.5mm; --fnm: 13px; --fmo: 10px; --fal: 13px; --fbang: 6.5mm; --fnum: 40px; --fprazo: 30px; }
+.p58.cm { --fnm: 11px; --fmo: 8.6px; --fal: 10.5px; --fbang: 5mm; --fnum: 34px; --fprazo: 24px; }
+.p58.cm .cm-q { width: 9mm; }
+.p58.cm .cm-ok { width: 7mm; }
+.p58.cm .cm-ok span { width: 4.4mm; height: 4.4mm; }

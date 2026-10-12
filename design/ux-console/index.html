@@ -1581,6 +1581,29 @@ body{letter-spacing:-.006em}
 .k-who{font-size:13px;font-weight:600;color:#E8DEC9;margin-top:2px}
 .kds-card .k-top{display:flex;align-items:center;gap:8px}
 .kds-card .k-timer{margin-left:auto}
+
+/* ═══ v22 RASTREABILIDADE ═══ */
+.trail{margin-top:6px;position:relative;padding-left:16px}
+.trail::before{content:"";position:absolute;left:5px;top:5px;bottom:5px;width:1px;background:var(--hairline-2)}
+.trail-ev{position:relative;font-size:12px;color:var(--text-3);padding:4px 0;line-height:1.45}
+.trail-ev::before{content:"";position:absolute;left:-14px;top:9px;width:5px;height:5px;border-radius:50%;background:var(--hairline-2)}
+.trail-ev b{color:var(--text);font-weight:600}
+.trail-ev .t-when{color:var(--text-4);font-family:var(--font-mono);font-size:10.5px;margin-left:6px}
+.trail-more{font-size:12px;font-weight:600;color:var(--accent-text);margin-top:4px;display:inline-block}
+.hcard{position:fixed;z-index:680;width:242px;background:var(--card);border-radius:var(--r-m);box-shadow:var(--shadow-pop);
+  border:1px solid var(--hairline);padding:13px 14px;opacity:0;pointer-events:none;transform:translateY(4px);
+  transition:opacity .18s cubic-bezier(.22,1,.36,1),transform .18s cubic-bezier(.22,1,.36,1)}
+.hcard.show{opacity:1;transform:none;pointer-events:auto}
+.hcard .hc-top{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.hcard .hc-name{font-size:13px;font-weight:700}
+.hcard .hc-sub{font-size:11px;color:var(--text-4)}
+.hcard .hc-row{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-3);padding:3px 0}
+.hcard .hc-row b{color:var(--text);font-family:var(--font-mono);font-weight:600}
+.hcard .hc-alert{margin-top:8px;background:var(--crit-soft);color:var(--crit);font-size:11px;font-weight:700;
+  padding:6px 9px;border-radius:8px;line-height:1.4}
+.hcard .hc-foot{margin-top:9px;padding-top:8px;border-top:1px solid var(--hairline);font-size:11px;color:var(--text-4)}
+.crit-note{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--crit);
+  background:var(--crit-soft);padding:3px 9px;border-radius:var(--r-pill)}
 /* ═══ v21 dataGrid ═══ */
 .dg-foot{display:flex;align-items:center;gap:10px;padding:10px 2px;font-size:12px;color:var(--text-3)}
 .dg-foot .dg-pages{display:flex;gap:4px;margin-left:auto}
@@ -4748,4 +4771,123 @@ tMovimentos = function(){
     </div>
     ${dataGrid('mov', [{ l:'Tipo' }, { l:'Item' }, { l:'Qtd', r:1 }, { l:'Motivo' }, { l:'Autor' }, { l:'Quando' }, { l:'Perda', r:1 }], rows, 6)}`;
 };
+</script>
+<script>
+/* ═══ v22.1 — AUDITORIA RICA: objeto linkável + tempo real ═══ */
+function audit(acao, obj){
+  S.audit.unshift({ at:'agora', quem:'Felipe', acao, obj:obj || null });
+  if(S.audit.length > 60) S.audit.length = 60;
+}
+/* trilha sutil embutida em qualquer objeto */
+function trailSection(objType, objId, domainEvents = []){
+  const evs = [
+    ...domainEvents,
+    ...S.audit.filter(a => a.obj && a.obj.type === objType && a.obj.id === objId).map(a => ({ t:`<b>${a.quem}</b> ${esc(a.acao)}`, when:a.at })),
+  ];
+  if(!evs.length) return '';
+  return `<div class="d-section"><span class="eyebrow">Histórico</span>
+    <div class="trail">
+      ${evs.slice(0, 5).map(e => `<div class="trail-ev">${e.t}<span class="t-when">${e.when}</span></div>`).join('')}
+      ${evs.length > 5 ? `<a class="trail-more" href="#" onclick="openModule('gestao','atividade');return false">ver as ${evs.length - 5} anteriores →</a>` : ''}
+    </div></div>`;
+}
+
+/* ═══ v22.2 — ATIVIDADE GLOBAL (Gestão > Atividade) ═══ */
+MODULES.find(m => m.id === 'gestao').tabs.splice(1, 0, ['atividade','Atividade']);
+TABS['atividade'] = () => tAtividade();
+function tAtividade(){
+  const F = S.actFilter || 'todos';
+  const tipos = [['todos','Tudo'],['pedido','Pedidos'],['estoque','Estoque'],['cliente','Clientes'],['caixa','Caixa'],['equipe','Equipe']];
+  const rows = S.audit.filter(a => {
+    if(F === 'todos') return true;
+    if(F === 'equipe') return a.acao.includes('Thati') || a.quem === 'Thati';
+    return a.obj && a.obj.type === F;
+  });
+  return `<div class="chips-row" style="margin-bottom:12px">
+      ${tipos.map(([k, l]) => `<button class="chip ${F === k ? 'on' : ''}" onclick="S.actFilter='${k}';rerender()">${l}</button>`).join('')}
+      <span style="margin-left:auto;font-size:12px;color:var(--text-4)">tempo real · ${rows.length} registros</span>
+    </div>
+    <div class="rows" style="border-top:1px solid var(--hairline)">
+      ${rows.slice(0, 18).map(a => `<div class="row" style="grid-template-columns:auto 1fr auto">
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-4);white-space:nowrap">${a.at}</span>
+        <span style="font-size:13px"><b style="font-weight:600">${a.quem}</b> <span style="color:var(--text-2)">${esc(a.acao)}</span></span>
+        ${a.obj ? `<button class="btn btn-secondary btn-sm" onclick="peek('${a.obj.type}','${a.obj.id}')">ver</button>` : '<span></span>'}
+      </div>`).join('')}
+    </div>`;
+}
+
+/* ═══ v22.3 — HOVER CARDS (tooltip sofisticado) ═══ */
+let hcEl = null, hcTimer = null;
+function hoverCardBind(){
+  if(document.__hcBound) return;
+  document.__hcBound = true;
+  document.addEventListener('mouseover', e => {
+    const t = e.target.closest('[data-hc]');
+    clearTimeout(hcTimer);
+    if(!t){ hideHcard(); return; }
+    hcTimer = setTimeout(() => showHcard(t), 320);
+  });
+  document.addEventListener('mouseout', e => {
+    if(e.target.closest('[data-hc]')){ clearTimeout(hcTimer); hcTimer = setTimeout(hideHcard, 140); }
+  });
+}
+function hideHcard(){ if(hcEl){ hcEl.classList.remove('show'); } }
+function showHcard(t){
+  const [kind, id] = (t.dataset.hc || '').split(':');
+  const content = hcardContent(kind, id);
+  if(!content) return;
+  if(!hcEl){
+    hcEl = document.createElement('div');
+    hcEl.className = 'hcard';
+    document.body.appendChild(hcEl);
+    hcEl.addEventListener('mouseenter', () => clearTimeout(hcTimer));
+    hcEl.addEventListener('mouseleave', hideHcard);
+  }
+  hcEl.innerHTML = content;
+  const r = t.getBoundingClientRect();
+  const w = 242;
+  hcEl.style.left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8) + 'px';
+  const above = r.top > 260;
+  hcEl.style.top = above ? (r.top - hcEl.offsetHeight - 10) + 'px' : (r.bottom + 8) + 'px';
+  hcEl.classList.add('show');
+}
+function hcardContent(kind, id){
+  if(kind === 'cliente'){
+    const c = S.clientes.find(x => x.id === id || x.nome === id);
+    if(!c) return null;
+    const nota = (S.notas[c.id] || []).find(n => n.critica) || (S.notas[c.id] || [])[0];
+    return `<div class="hc-top">${avatarFor(c.nome)}
+      <div><div class="hc-name">${esc(c.nome)}</div><div class="hc-sub">${c.pedidos >= 20 ? 'fiel' : c.pedidos >= 5 ? 'recorrente' : 'novo'} · desde mar/26</div></div></div>
+      <div class="hc-row"><span>pedidos</span><b>${c.pedidos}</b></div>
+      <div class="hc-row"><span>ticket médio</span><b>${fmt$(27)}</b></div>
+      <div class="hc-row"><span>costuma pedir</span><b style="font-family:var(--font-sans)">${esc(c.fav)}</b></div>
+      ${nota ? `<div class="hc-alert">⚠ ${esc(nota.texto)}</div>` : ''}
+      <div class="hc-foot">clique pra abrir o perfil</div>`;
+  }
+  if(kind === 'insumo'){
+    const s = S.stock.find(x => x.id === id);
+    if(!s) return null;
+    const low = s.qty < s.min;
+    const hist = S.stockMoves.filter(m => m.item === s.nome).slice(0, 2);
+    return `<div class="hc-top"><div><div class="hc-name">${esc(s.nome)}</div><div class="hc-sub">${s.cat}</div></div></div>
+      <div class="hc-row"><span>em estoque</span><b style="${low ? 'color:var(--crit)' : ''}">${String(s.qty).replace('.', ',')} ${s.un}</b></div>
+      <div class="hc-row"><span>mínimo</span><b>${s.min} ${s.un}</b></div>
+      <div class="hc-row"><span>cobertura</span><b>${low ? 'repor hoje' : 'ok'}</b></div>
+      ${hist.length ? `<div class="hc-foot">${hist.map(h => `${h.h} · ${h.qty}`).join('<br>')}</div>` : ''}`;
+  }
+  if(kind === 'status'){
+    const map = {
+      aguardando:['Aguardando','entrou na fila, ninguém começou ainda','Preparar é o próximo passo'],
+      preparando:['Preparando','na bancada sendo feito','Marcar pronto quando sair'],
+      pronto:['Pronto','feito, esperando entrega/retirada','Entregar fecha o ciclo e lança no caixa'],
+      entregue:['Entregue','ciclo fechado','o valor já está no caixa'],
+    };
+    const m = map[id];
+    if(!m) return null;
+    return `<div class="hc-top"><div><div class="hc-name">${m[0]}</div><div class="hc-sub">${m[1]}</div></div></div>
+      <div class="hc-foot">💡 ${m[2]}</div>`;
+  }
+  return null;
+}
+hoverCardBind();
 </script>

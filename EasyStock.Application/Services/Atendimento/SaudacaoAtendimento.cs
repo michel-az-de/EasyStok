@@ -12,7 +12,7 @@ namespace EasyStock.Application.Services.Atendimento;
 /// </summary>
 public sealed class SaudacaoAtendimento(IStorefrontRepository storefrontRepository, IConfiguration configuration)
 {
-    /// <summary>Mesmo padrão de <c>EnviarLinkAvaliacaoWhatsAppHandler</c>: <c>App:BaseUrl</c> é a vitrine pública.</summary>
+    /// <summary><c>App:BaseUrl</c> é a vitrine pública.</summary>
     public const string BaseUrlPadrao = "https://casadababa.com";
 
     public const string CaminhoCardapio = "/cardapio";

@@ -1,0 +1,58 @@
+/* Consulta e edição do cadastro S45, sem alterar os painéis de despacho. */
+.cadastro { gap: var(--e-4); }
+:global(main):has(.cadastro) :global(h1) { margin-bottom: var(--e-3); }
+.cadastro [hidden] { display: none; }
+.cadastro [role='tabpanel'] { min-width: 0; }
+.cadastro [role='tabpanel']:focus-visible { outline: var(--b-2) solid var(--marca); outline-offset: var(--e-1); }
+.abas { display: flex; gap: var(--e-4); border-bottom: var(--b-1) solid var(--linha); }
+.abas > button {
+  gap: var(--e-2); padding: var(--e-2) 0; border: 0; border-radius: 0;
+  border-bottom: var(--b-2) solid transparent; color: var(--tinta-2);
+  background: transparent; box-shadow: none;
+}
+.abas > button[aria-selected='true'] { color: var(--marca); border-bottom-color: var(--marca); font-weight: 700; }
+.contagem { color: var(--tinta-2); font-size: var(--t-micro); font-variant-numeric: tabular-nums; }
+.cabecalho { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
+.cabecalho h2 { margin: 0; font-family: var(--f-corpo); font-size: var(--t-forte); font-weight: 700; }
+.cabecalho p, .cadastro section > p { margin: 0; }
+.cadastro li {
+  padding: var(--e-3) 0; border: 0; border-bottom: var(--b-1) solid var(--linha);
+  border-radius: 0; background: transparent;
+}
+.cadastro ul { gap: 0; }
+.cadastro .dia { margin: var(--e-4) 0 0; color: var(--tinta-2); font-size: var(--t-micro); font-weight: 700; }
+.cadastro .janela { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--e-3) var(--e-4); align-items: center; }
+.identidade { display: grid; gap: var(--e-1); min-width: 0; overflow-wrap: anywhere; }
+.horario { font-size: var(--t-forte); font-variant-numeric: tabular-nums; line-height: var(--lh-compacto); }
+.capacidade, .valor { display: grid; justify-items: end; gap: var(--e-1); font-variant-numeric: tabular-nums; }
+.acoes { flex-wrap: nowrap; gap: var(--e-1); }
+.acoes button { padding-inline: var(--e-2); }
+.confirmacao { grid-column: 1 / -1; }
+.cadastro .registro { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--e-3) var(--e-4); align-items: center; }
+.cadastro .registro > div:last-child:not(.identidade):not(.valor) { grid-column: 1 / -1; }
+.edicao { padding: var(--e-4); background: var(--preenchimento); border-radius: var(--r-1); }
+.cadastro .formularioJanela { grid-template-columns: 8rem 8rem 9rem minmax(0, 1fr); }
+.cadastro .formularioZona, .cadastro .formularioBloqueio {
+  padding: var(--e-4); background: var(--preenchimento); border-radius: var(--r-1);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.formularioZona > :first-child, .formularioZona > :nth-child(6) { grid-column: span 2; }
+.formularioBloqueio > :nth-child(3) { grid-column: span 2; }
+.acoesFormulario { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--e-2); }
+.cobertura { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3); }
+.cobertura > :only-child { grid-column: 1 / -1; }
+.vazio { margin: 0; padding: var(--e-5) 0; color: var(--tinta-2); }
+@media (max-width: 900px) {
+  .cadastro .janela { grid-template-columns: minmax(0, 1fr) auto; gap: var(--e-2) var(--e-3); }
+  .acoes { grid-column: 1 / -1; }
+  .cadastro .formularioJanela { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .abas { gap: var(--e-3); }
+  .cadastro .registro { grid-template-columns: minmax(0, 1fr) auto; }
+  .registro > button { grid-column: 1 / -1; justify-self: start; }
+  .cadastro .formularioZona, .cadastro .formularioBloqueio { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: var(--e-3); }
+  .formularioBloqueio > :nth-child(2), .formularioZona > :nth-child(5) { grid-column: span 2; }
+  .edicao { padding: var(--e-3); }
+  .cadastro .dia { margin-top: var(--e-3); }
+}

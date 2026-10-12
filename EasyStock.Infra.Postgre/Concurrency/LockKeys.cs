@@ -49,4 +49,35 @@ public static class LockKeys
     /// Serializa entre réplicas pra não notificar 2x. "CaixEsq" em hex ASCII.
     /// </summary>
     public const long CaixaEsquecidoMonitor = 0x4361_6978_4573_7100L;
+
+    /// <summary>
+    /// Avaliador dos lembretes da dona (S43), a cada minuto. Serializa entre réplicas para não
+    /// avaliar e avisar em dobro. "Lembret" em hex ASCII.
+    /// </summary>
+    public const long AvaliadorLembretes = 0x4C65_6D62_7265_7400L;
+
+    /// <summary>
+    /// Job das campanhas (S30), a cada minuto. Serializa entre réplicas para não disparar onda nem
+    /// lembrete em dobro. "Campanh" em hex ASCII.
+    /// </summary>
+    public const long CampanhaJob = 0x4361_6D70_616E_6800L;
+
+    /// <summary>
+    /// Retenção de <c>entity_alteracoes</c> (EntityAlteracaoRetentionService), 1x/dia. API e Worker registram
+    /// o serviço (#1575): uma rodada por vez. "AudRete" em hex ASCII.
+    /// </summary>
+    public const long RetencaoAuditoria = 0x4175_6452_6574_6500L;
+
+    /// <summary>
+    /// Alerta de aparelho sem sinal (MobileAlertService), a cada 30 min. API e Worker registram o serviço
+    /// (#1575): uma rodada por vez. "MobAler" em hex ASCII.
+    /// </summary>
+    public const long MobileAlerta = 0x4D6F_6241_6C65_7200L;
+
+    /// <summary>
+    /// Cancelamento de pedido abandonado (CancelarPedidosAbandonadosBackgroundService), a cada 5 min. API e
+    /// Worker registram o serviço (#1575): uma rodada por vez, para não cancelar o mesmo pedido em dobro.
+    /// "PedAban" em hex ASCII.
+    /// </summary>
+    public const long PedidosAbandonados = 0x5065_6441_6261_6E00L;
 }

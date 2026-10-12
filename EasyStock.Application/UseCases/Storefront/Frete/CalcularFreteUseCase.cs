@@ -37,6 +37,7 @@ public sealed class CalcularFreteUseCase(
     IFreteZonaRepository freteZonaRepository,
     ICepLookupClient cepLookupClient,
     IGeocodingClient geocodingClient,
+    IRotaClient rotaClient,
     ILogger<CalcularFreteUseCase> logger)
 {
     private static readonly Regex CepDigitosRegex = new(@"^\d{8}$", RegexOptions.Compiled);
@@ -103,7 +104,8 @@ public sealed class CalcularFreteUseCase(
             Valor: valorCentavos,
             ValorFormatado: FormatarValor(zona.Valor),
             EtaLabel: FormatarEta(zona.TempoEstimadoMinutos),
-            ZonaLabel: zona.Label);
+            ZonaLabel: zona.Label,
+            TempoEstimadoMinutos: zona.TempoEstimadoMinutos);
     }
 
     /// <summary>
@@ -142,7 +144,12 @@ public sealed class CalcularFreteUseCase(
             return null;
         }
 
-        var r = FreteRaioCalculadora.Calcular(new Coordenada(geo.Lat, geo.Lng), config);
+        // Rota real (issue #1274) quando disponível; null mantém haversine × fator.
+        var rota = await rotaClient.MedirAsync(
+            new RotaQuery(config.Origem.Lat, config.Origem.Lng, geo.Lat, geo.Lng), ct);
+
+        var r = FreteRaioCalculadora.Calcular(
+            new Coordenada(geo.Lat, geo.Lng), config, rota?.DistanciaMetros);
 
         if (r.ForaDeCobertura)
         {
@@ -152,15 +159,19 @@ public sealed class CalcularFreteUseCase(
             throw new CepSemCoberturaException();
         }
 
-        // ETA estimada a partir da distância de rota (não há roteamento real no MVP).
-        var minutos = 20 + (int)Math.Round(r.DistanciaRotaMetros / 1000.0 * 4, MidpointRounding.AwayFromZero);
+        // ETA = 20 min de preparo + deslocamento: duração medida da rota, ou 4 min/km estimados.
+        var deslocamento = rota is not null
+            ? rota.DuracaoSegundos / 60.0
+            : r.DistanciaRotaMetros / 1000.0 * 4;
+        var minutos = 20 + (int)Math.Round(deslocamento, MidpointRounding.AwayFromZero);
 
         return new FreteCalculadoDto(
             ZonaId: Guid.Empty,
             Valor: r.ValorCentavos,
             ValorFormatado: FormatarValor(r.ValorCentavos / 100m),
             EtaLabel: FormatarEta(minutos),
-            ZonaLabel: r.Gratis ? "Frete grátis" : "Entrega por raio");
+            ZonaLabel: r.Gratis ? "Frete grátis" : "Entrega por raio",
+            TempoEstimadoMinutos: minutos);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────

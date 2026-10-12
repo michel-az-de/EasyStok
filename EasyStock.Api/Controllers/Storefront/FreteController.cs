@@ -23,6 +23,7 @@ namespace EasyStock.Api.Controllers.Storefront;
 [ApiController]
 [Route("api/storefront/{slug}/frete")]
 [AllowAnonymous]
+[TenantDoStorefront]
 public sealed class FreteController(
     CalcularFreteUseCase calcularFreteUseCase) : EasyStockControllerBase
 {

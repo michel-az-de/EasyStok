@@ -64,7 +64,7 @@ export const MODULES = [
         name: 'Sistema',
         icon: 'gear',
         accent: 'ink-dim',
-        tags: ['Configuracoes', 'Loja', 'Plano', 'Notificacao', 'Notificacoes', 'NotificacoesJobs', 'Uploads', 'Tickets', 'Consentimentos', 'AssinaturaCliente', 'Outros'],
+        tags: ['Configuracoes', 'Loja', 'Notificacao', 'Notificacoes', 'NotificacoesJobs', 'Uploads', 'Tickets', 'Consentimentos', 'Outros'],
         catchAll: true,
         desc: 'Configurações, planos, notificações e suporte.'
     }

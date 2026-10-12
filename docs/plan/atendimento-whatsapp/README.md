@@ -2,7 +2,8 @@
 
 Issues: #1040 (plano original) e #1042 (revisão para Meta direto) · Decisão: ADR-0050 (supersede ADR-0049) · Origem: docs 01-04 em `C:\Users\felip\Downloads\`
 Escopo: **somente backend** (`EasyStock.Api`, `Application`, `Domain`, `Infra.*`, `Worker`). O front do
-operador é outra tecnologia e outro repositório. O site casadababa.com continua consumindo a API.
+operador é o console React em `EasyStock.Console/` (ADR-0054), ligado à API módulo a módulo pela
+[matriz de paridade](10-console.md); as specs S não tocam essa pasta. O site casadababa.com continua consumindo a API.
 
 > Este plano foi escrito para ser executado **uma spec por sessão** por um modelo mais barato.
 > Cada spec traz tudo o que a sessão precisa: arquivos a ler, arquivos a criar, testes a escrever
@@ -21,6 +22,12 @@ operador é outra tecnologia e outro repositório. O site casadababa.com continu
 | 7 | [07-poda.md](07-poda.md) | P01–P06 | Remoção do que é SaaS, fiscal, MAUI e alvos de deploy extras |
 | MP | [08-mercado-pago.md](08-mercado-pago.md) | S32–S33 | Cadastro da integração com o Mercado Pago (checklist externo, chaves exatas), processor do webhook que hoje não existe, estorno; opção A adotada: gateway único |
 | 8 | [09-sistema-completo.md](09-sistema-completo.md) | S34–S47 | ADR-0051: canal como porta, Instagram, Messenger, chat do site, e-mail e SMS, consentimento por canal, mensagem programada, expediente da loja, atendentes, respostas prontas e automações, lembretes, entregadores e viagens, cadastros, lote de papel, assistente |
+| Console | [10-console.md](10-console.md) | F01–F05 | ADR-0054: o protótipo vira o console do operador neste repositório; matriz de paridade e ordem de ligação à API |
+| 9 | [12-impressos.md](12-impressos.md) | S49–S53 | Impressos da Casa da Baba: motor de modelos por papel (etiqueta 10×15, cupom 58 mm, A4 econômico), o Pedido e a Comanda (número do dia, alergia do cadastro, congelado à parte); backlog dos demais documentos |
+| Homologação | [13-homologacao-organica.md](13-homologacao-organica.md) | H00–H16 | Aderência medida do atendimento (61 %), 14 achados Altos e spec de correção revisada por banca de 5 lentes |
+| 10 | [14-caderno-da-loja.md](14-caderno-da-loja.md) | S54–S56 | Caderno da loja em trechos para o agente: núcleo e índice no prompt, texto sob demanda por `consultar_caderno`; depois pré-busca e busca semântica |
+| 11 | [15-reenvio-mensagens.md](15-reenvio-mensagens.md) | S57 | Reenvio de mensagens que falharam: automático em 1/5/15/60 min para falha temporária, nunca para permanente ou incerta; botão "Reenviar" no console |
+| 12 | [16-retomada-nao-entregues-sms.md](16-retomada-nao-entregues-sms.md) | S58–S60 | Janela vencida: modelo de retomada e reenvio quando o cliente responde; painel "Não entregues"; reserva por SMS pronta e desligada |
 
 Ordem: 1 → 2 → 3 → 4 → 5 → 6. S32 (Mercado Pago, doc 08) entra logo após S11. A onda 7 pode correr em paralelo a partir da onda 4 (P05 depende de S18/S19).
 **Onda 8 (ADR-0051, go-live com tudo):** S34 entra **entre S03 e S05**, porque muda a chave da identidade do cliente. As demais fatias da onda 8 correm em paralelo às ondas 2 e 3, conforme o diagrama de ordem em [09-sistema-completo.md](09-sistema-completo.md).
@@ -38,7 +45,7 @@ Ordem: 1 → 2 → 3 → 4 → 5 → 6. S32 (Mercado Pago, doc 08) entra logo ap
 | 0.7 | Ligar `ENABLE_VIACEP_LOOKUP` e `ENABLE_NOMINATIM_GEOCODING` no ambiente | S14 |
 | 0.8 | Storage S3 compatível configurado (`FileStorage:S3:*`, já existe) para a mídia recebida, e `PublicBaseUrl` para a imagem do cardápio | S02, S06 |
 | 0.9 | Mercado Pago: conta, aplicação Checkout Pro, credenciais de teste e produção, webhook com assinatura secreta, usuários de teste (roteiro completo em [08-mercado-pago.md](08-mercado-pago.md); fecha casa-da-baba #10) | S32, S33 e o checkout do site |
-| 0.10 | Página do Facebook e conta profissional do Instagram vinculadas ao mesmo Business da 0.1. Na mesma app: produtos Messenger e Instagram, permissões `pages_messaging`, `instagram_manage_messages` e `pages_manage_metadata` (é provável que o acesso avançado exija App Review; confirmar), page access token de longa duração e webhook assinado nos objetos `page` e `instagram` | S35 em produção |
+| 0.10 | Página do Facebook e conta profissional do Instagram vinculadas ao mesmo Business da 0.1. Na mesma app: produtos Messenger e Instagram, permissões `pages_messaging`, `instagram_manage_messages` e `pages_manage_metadata` (é provável que o acesso avançado exija App Review; confirmar), page access token de longa duração (`Atendimento:MetaMensageria:PageAccessToken`, `Provider=meta`), permissão `Human Agent` pedida em Permissões e recursos (resposta humana até 7 dias fora da janela), webhook `api/webhooks/meta/mensageria` assinado nos objetos `page` e `instagram`, e `FacebookPageId`/`InstagramAccountId` gravados na empresa | S35 em produção |
 | 0.11 | Conta Twilio com número remetente de SMS no Brasil (`Notifications:Sms:Twilio:*`) | S37 (SMS) |
 | 0.12 | Domínio de e-mail com SPF, DKIM e DMARC e credenciais SMTP | S37 (e-mail) |
 
@@ -47,12 +54,13 @@ Ordem: 1 → 2 → 3 → 4 → 5 → 6. S32 (Mercado Pago, doc 08) entra logo ap
 1. **Fluxo por spec:** `gh issue create` (título = título da spec; body = Problema, Abordagem, Escopo, Aceite, Rollback copiados da spec; labels da spec) → worktree `C:\rep\.worktrees\EasyStok\<slug>` com branch `feat/<slug>-<N>` a partir de `origin/master` → Red → Green → gate → commit → push → PR `closes #N`.
 2. **Gate:** `powershell -File scripts/poka-yoke/gate.ps1` verde antes de cada commit (é o mesmo do pre-commit).
 3. **Commits:** `tipo(escopo): descrição imperativa` + corpo `refs #N`. Stage arquivo por arquivo. Nunca `git add .`.
-4. **Tier:** `feat`, `refactor`, migration, auth = **alto** (PR fica aberta até a label `aprovado`). `docs`, `test`, `chore`, `fix` trivial = baixo (auto-merge no verde).
+4. **Tier (ADR-0055):** spec deste plano = **baixo** (merge no verde), exceto se tocar migration, RLS, auth ou policy, que continua **alto** (PR aberta até a label `aprovado`). CHANGELOG: crie `changelog.d/<issue>.md`, nunca edite o topo do `CHANGELOG.md`.
 5. **Código:** nomes de negócio em PT-BR com sufixos técnicos em inglês (ADR-0011); use case implementa `IUseCase<TIn,TOut>` com `CancellationToken` (ADR-0013); controller devolve `ActionResult<T>` (ADR-0019); evento vai para o outbox **antes** do único `CommitAsync` (ADR-0030); `EmpresaId` no `WHERE` de toda query nova além do RLS (ADR-0010); migration gerada com `dotnet ef migrations add` e `.Designer.cs` (ADR-0024); migration aplicada em produção **antes** de ligar configuração que dependa dela.
 6. **Testes:** Red primeiro, com o nome listado na spec. Projetos: `EasyStock.Domain.Tests`, `EasyStock.Application.Tests`, `EasyStock.Api.UnitTests`, `EasyStock.Api.IntegrationTests` (Postgres via Testcontainers, fora do `CI.slnf`: rodar local), `EasyStock.ArchitectureTests` (roda no gate).
 7. **Não faça:** refatorar fora do Escopo; ler além da Leitura mínima; abrir o `graphify`; tocar `EasyStok.Mobile`, `EasyStock.Admin` ou `EasyStock.Web` salvo quando a spec mandar (R8: assinatura pública estendida = todos os call-sites no mesmo commit).
 8. **Stack real:** .NET 10 (`global.json` 10.0.201), EF Core, Postgres. O `CLAUDE.md` diz .NET 8 e o `README.md` diz 9: estão errados, corrigidos em P06.
 9. **Segredos:** nunca em código, issue, log ou teste. Nomes de configuração, sim.
+10. **Registro de serviços (#1178):** use case (`*UseCase` em `UseCases/Atendimento`), ferramenta do agente (`IFerramentaAgente`) e tratador de botão (`IAcaoBotaoHandler`) entram sozinhos por convenção. **Não edite** `ServiceCollectionExtensions.Atendimento.cs` para eles; só para interface própria ou outro ciclo de vida.
 
 ## Prompt de execução (copiar para a sessão do modelo executor)
 

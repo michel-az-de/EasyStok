@@ -62,7 +62,19 @@ public static class WebhookWhatsAppParser
                 statuses.Add(ParseStatus(s));
         }
 
-        return new EntradaWhatsApp(phoneNumberId, value.GetRawText(), contatos, mensagens, statuses);
+        // #1417: coexistência. O que a loja mandou pelo app do celular chega em message_echoes ("to" é o cliente).
+        var ecos = new List<EcoWhatsApp>();
+        if (value.TryGetProperty("message_echoes", out var ecosArr) && ecosArr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var e in ecosArr.EnumerateArray())
+            {
+                var conteudo = ParseMensagem(e);
+                ecos.Add(new EcoWhatsApp(GetString(e, "to") ?? "", conteudo.Wamid, conteudo.Timestamp, conteudo.Tipo,
+                    conteudo.TextoCorpo, conteudo.MidiaId, conteudo.MidiaMime));
+            }
+        }
+
+        return new EntradaWhatsApp(phoneNumberId, value.GetRawText(), contatos, mensagens, statuses, ecos);
     }
 
     private static MensagemRecebidaWhatsApp ParseMensagem(JsonElement m)
@@ -82,12 +94,18 @@ public static class WebhookWhatsAppParser
             case "text":
                 if (m.TryGetProperty("text", out var t)) texto = GetString(t, "body");
                 break;
-            case "image" or "audio" or "document" or "sticker":
+            case "image" or "audio" or "document" or "sticker" or "video":
                 if (m.TryGetProperty(tipo, out var media))
                 {
                     midiaId = GetString(media, "id");
                     midiaMime = GetString(media, "mime_type");
+                    // Legenda de imagem, documento e vídeo: o agente e o console leem junto do marcador.
+                    texto = GetString(media, "caption");
                 }
+                break;
+            case "location":
+                if (m.TryGetProperty("location", out var local))
+                    texto = TextoDaLocalizacao(local);
                 break;
             case "interactive":
                 if (m.TryGetProperty("interactive", out var interactive)
@@ -112,14 +130,35 @@ public static class WebhookWhatsAppParser
         var recipientId = GetString(s, "recipient_id");
 
         string? erro = null;
+        int? codigo = null;
         if (s.TryGetProperty("errors", out var errorsArr) && errorsArr.ValueKind == JsonValueKind.Array && errorsArr.GetArrayLength() > 0)
         {
             var primeiro = errorsArr[0];
             erro = GetString(primeiro, "title") ?? GetString(primeiro, "message");
+            if (primeiro.TryGetProperty("code", out var c) && c.ValueKind == JsonValueKind.Number && c.TryGetInt32(out var n))
+                codigo = n;
         }
 
-        return new StatusRecebidoWhatsApp(wamid, status, recipientId, erro);
+        return new StatusRecebidoWhatsApp(wamid, status, recipientId, erro, codigo);
     }
+
+    /// <summary>"Nome; endereço; lat,long", só com as partes presentes. Coordenadas no texto bruto da Meta.</summary>
+    private static string? TextoDaLocalizacao(JsonElement local)
+    {
+        var latitude = Numero(local, "latitude");
+        var longitude = Numero(local, "longitude");
+        var partes = new[]
+        {
+            GetString(local, "name"),
+            GetString(local, "address"),
+            latitude is not null && longitude is not null ? $"{latitude},{longitude}" : null,
+        }.Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
+
+        return partes.Count == 0 ? null : string.Join("; ", partes);
+    }
+
+    private static string? Numero(JsonElement element, string propriedade) =>
+        element.TryGetProperty(propriedade, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetRawText() : null;
 
     private static string? GetString(JsonElement element, string propriedade) =>
         element.TryGetProperty(propriedade, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;

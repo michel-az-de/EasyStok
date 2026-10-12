@@ -21,6 +21,42 @@
   const DEVICE_ID_KEY = 'cdb-device-id';
   const QUEUE_KEY = 'cdb-sync-queue';
   const LAST_FULL_SYNC_KEY = 'cdb-last-sync';
+  // #1474: cursor do pull separado do carimbo do flush. Antes o pull usava
+  // cdb-last-sync (Date.now() do aparelho no fim de cada flush) como `since`:
+  // aparelho recem-pareado fazia flush e o primeiro pull saia com since=agora,
+  // entao o catalogo que ja existia no ERP nunca chegava (produto duplicado ao
+  // produzir pelo catalogo local). Agora o cursor so avanca com o serverTime da
+  // resposta do proprio pull. Pareamento e troca de loja gravam '0' (pull
+  // completo: o catalogo do ERP precisa chegar inteiro).
+  const PULL_CURSOR_KEY = 'cdb-pull-cursor';
+  // W1: cursor AUSENTE = aparelho que ja estava pareado antes desta versao.
+  // since=0 ali traria o historico inteiro (batches com BatchPhoto em data
+  // URL, cashEntries, fechamentos), ressuscitaria pedidos purgados
+  // (purgeOldData, >30 dias) e podia estourar a cota do localStorage. O
+  // cursor nasce de cdb-last-sync (relogio do aparelho) menos uma margem que
+  // cobre a diferenca de relogio; sem cdb-last-sync = sem historico = since=0.
+  const PULL_SEED_MARGIN_MS = 10 * 60 * 1000;
+  // Pull completo demora mais que o incremental; com o abort de 15 s ele
+  // nunca terminava. O prazo maior não autoriza pular dados que não chegaram.
+  const PULL_TIMEOUT_MS = 15000;
+  const FULL_PULL_TIMEOUT_MS = 90000;
+  const FULL_PULL_TIMEOUTS_KEY = 'cdb-pull-full-fails';
+  function resetPullCursor() {
+    try {
+      localStorage.setItem(PULL_CURSOR_KEY, '0');
+      localStorage.removeItem(FULL_PULL_TIMEOUTS_KEY);
+    } catch (_) {}
+  }
+  function readPullCursor() {
+    let cursor = null;
+    try { cursor = localStorage.getItem(PULL_CURSOR_KEY); } catch (_) {}
+    if (cursor) return cursor;
+    let lastSync = 0;
+    try { lastSync = parseInt(localStorage.getItem(LAST_FULL_SYNC_KEY) || '0', 10) || 0; } catch (_) {}
+    const seed = lastSync > 0 ? String(Math.max(0, lastSync - PULL_SEED_MARGIN_MS)) : '0';
+    try { localStorage.setItem(PULL_CURSOR_KEY, seed); } catch (_) {}
+    return seed;
+  }
   // B4: versao do formato de mutations enfileiradas. Independente de
   // PWA_REQUIRED_API_VERSION (que aponta pro schema do server). Quando este
   // valor bumpar, mutations enfileiradas em formato anterior devem passar
@@ -77,6 +113,7 @@
       'hasPairingCode: ' + (!!cfg.forcedPairingCode),
       'paired: ' + (!!pair),
       'lastSync: ' + (localStorage.getItem(LAST_FULL_SYNC_KEY) || '(none)'),
+      'pullCursor: ' + (localStorage.getItem(PULL_CURSOR_KEY) || '(none)'),
       'queueLen: ' + (function () { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]').length; } catch (_) { return -1; } })(),
       'userAgent: ' + (navigator.userAgent || '').slice(0, 200),
       ''
@@ -162,6 +199,20 @@
     // legado (request anonimo). App segue offline-first.
     _pairingInvalid = false;
   }
+  // #1474: troca o "Minha empresa" do topo pelo nome que o pareamento devolveu.
+  // Nao sobrescreve nome que o operador ja personalizou em Ajustes.
+  const DEFAULT_EMPRESA_NAME = 'Minha empresa';
+  function applyEmpresaNomeDoPareamento(nome) {
+    const n = String(nome || '').trim();
+    if (!n) return false;
+    try {
+      const atual = (localStorage.getItem('cdb-empresa-name') || '').trim();
+      if (atual && atual !== DEFAULT_EMPRESA_NAME) return false;
+      localStorage.setItem('cdb-empresa-name', n);
+    } catch (_) { return false; }
+    try { if (typeof window.renderBrandName === 'function') window.renderBrandName(); } catch (_) {}
+    return true;
+  }
   function getApiKey() {
     const p = loadPairing();
     return (p && p.apiKey) || null;
@@ -236,11 +287,14 @@
   let _queueStoreReady = false;
 
   async function _initQueueStore() {
+    // #1509: le a copia sincrona ANTES do init (que apaga o localStorage 7 dias apos a migracao).
+    const filaLS = _loadQueueLS();
     try {
       if (typeof window.cdbQueueStore !== 'undefined') {
         const result = await window.cdbQueueStore.init();
         _queueStoreReady = true;
         _queueCache = await window.cdbQueueStore.loadAll();
+        _unirFilaDoLocalStorage(filaLS);
         _trace('boot', 'queue-store inicializado', { storage: result.storage, items: _queueCache.length, degraded: result.degraded });
         return result;
       }
@@ -249,8 +303,26 @@
     }
     // Fallback: carregar de localStorage
     _queueCache = _loadQueueLS();
+    _unirFilaDoLocalStorage(filaLS);
     _queueStoreReady = true;
     return { storage: 'localStorage', degraded: true };
+  }
+
+  // #1509: o IDB e gravado em segundo plano e o localStorage na hora. Venda feita logo antes
+  // de o app fechar podia estar so no localStorage, e o primeiro save depois do boot o
+  // sobrescrevia com a fila do IDB. Une as duas por id (reenvio de aceita e inofensivo: o
+  // servidor deduplica por MutationId) e ordena por ts, ja que o IDB devolve por id.
+  function _unirFilaDoLocalStorage(filaLS) {
+    const fila = Array.isArray(_queueCache) ? _queueCache : [];
+    const ids = new Set(fila.map(m => m && m.id));
+    const faltando = (Array.isArray(filaLS) ? filaLS : []).filter(m => m && m.id && !ids.has(m.id));
+    const unida = fila.concat(faltando).sort((a, b) => ((a && a.ts) || 0) - ((b && b.ts) || 0));
+    if (faltando.length > 0) {
+      _trace('boot', 'fila: recuperadas do localStorage', { items: faltando.length });
+      saveQueue(unida);
+    } else {
+      _queueCache = unida;
+    }
   }
 
   function _loadQueueLS() {
@@ -288,6 +360,10 @@
 
   // Snapshot do estado anterior pra calcular delta
   let lastSnapshot = null;
+  // #1520 (ADR-0060): saldo dos produtos gravado quando o sync.js carrega. E a base do
+  // primeiro "stock.delta" enquanto o lastSnapshot ainda nao existe (primeiros 500 ms).
+  let _produtosNoBoot = [];
+  try { _produtosNoBoot = JSON.parse(localStorage.getItem('cdb-products') || '[]') || []; } catch (_) { _produtosNoBoot = []; }
 
   // ---- A6: strip de bytes pesados antes de enqueue ----
   // Batches carregam fotos do lote (batchPhoto) e fotos por item (items[].photo).
@@ -386,7 +462,17 @@
       });
     }
 
-    diffCollection(curr.products.map(({count, photo, ...r}) => r), prev && prev.products, 'product');
+    const produtos = curr.products.map(({count, photo, ...r}) => r);
+    diffCollection(produtos, prev && prev.products, 'product');
+    // #1520 (ADR-0060): o saldo do cadastro vai so de informacao (stockByDelta). Quem conta
+    // no servidor e o movimento abaixo, uma vez por MutationId e em qualquer ordem.
+    muts.forEach(m => { m.payload = Object.assign({}, m.payload, { stockByDelta: true }); });
+    const saldoAntes = new Map(((prev && prev.products) || _produtosNoBoot).map(x => [x.id, Number(x.stock) || 0]));
+    produtos.forEach(p => {
+      const qty = (Number(p.stock) || 0) - (saldoAntes.get(p.id) || 0);
+      // id proprio: a fila deduplica por (type, payload.id) e nao pode fundir dois movimentos.
+      if (qty !== 0) muts.push({ type: 'stock.delta', payload: { id: 'sd_' + generateMutationUuid(), productId: p.id, qty } });
+    });
     diffCollection(curr.clients, prev && prev.clients, 'client', c => c.lastOrder);
     diffCollection(curr.orders, prev && prev.orders, 'order', o => o.updatedAt);
     diffCollection(curr.cashEntries, prev && prev.cashEntries, 'cashEntry');
@@ -435,8 +521,13 @@
     if (!mutations.length) return;
     // F10-C-5: bloqueia enqueues nao-criticas durante OTA.
     if (_mutationsBlocked) {
+      // #1520: o cadastro que acompanha um movimento de estoque passa junto; sem ele o
+      // movimento de produto que o servidor ainda nao conhece seria recusado.
+      const comMovimento = new Set(mutations.filter(function (m) { return m.type === 'stock.delta'; })
+        .map(function (m) { return m.payload.productId; }));
       mutations = mutations.filter(function (m) {
-        return CRITICAL_MUTATION_TYPES[m.type] === true;
+        return CRITICAL_MUTATION_TYPES[m.type] === true
+          || (m.type === 'product.upsert' && comMovimento.has(m.payload.id));
       });
       if (!mutations.length) return;
     }
@@ -448,8 +539,12 @@
       // -> pronto) gasta payload/bateria sem ganho. Mutations sem payload.id
       // (caso degenerado) passam direto, mantendo comportamento anterior.
       if (m.payload && m.payload.id) {
+        // #1520: cadastro que vai por movimento (stockByDelta) nao tira da fila o saldo
+        // absoluto pendente ("Sincronizar tudo" ou versao antiga): ele ainda define o saldo.
+        const guardaAbsoluto = m.type === 'product.upsert' && m.payload.stockByDelta === true;
         queue = queue.filter(q =>
-          !(q.type === m.type && q.payload && q.payload.id === m.payload.id));
+          !(q.type === m.type && q.payload && q.payload.id === m.payload.id
+            && !(guardaAbsoluto && q.payload.stockByDelta !== true)));
       }
       queue.push({
         // F10-C-1: UUID v4 via crypto.randomUUID (Chrome 92+, garantido no
@@ -478,6 +573,43 @@
   function updatePendingCount() {
     const q = loadQueue();
     if (window.cdbApp) window.cdbApp.setPendingSync(q.length);
+  }
+
+  // ---- #1520 (ADR-0060): exclusao de lancamento de caixa ----
+  // E mutation explicita ("cashEntry.delete"), nascida da acao do operador. Nunca por
+  // ausencia: purgeOldData e clearTestData tiram lancamentos do aparelho e isso nao pode
+  // virar exclusao no servidor. A pendencia fica gravada enquanto o "Desfazer" esta na tela;
+  // se o app fechar nesse intervalo, o boot confirma (o "Desfazer" ja nao existe).
+  const CASH_EXCLUSOES_KEY = 'cdb-cash-exclusoes-pendentes';
+  function _exclusoesPendentes() {
+    try { return JSON.parse(localStorage.getItem(CASH_EXCLUSOES_KEY) || '{}') || {}; } catch (_) { return {}; }
+  }
+  function _salvarExclusoesPendentes(p) {
+    try { localStorage.setItem(CASH_EXCLUSOES_KEY, JSON.stringify(p)); } catch (_) {}
+  }
+  function agendarExclusaoLancamento(entry) {
+    if (!entry || !entry.id) return;
+    const p = _exclusoesPendentes();
+    p[entry.id] = entry;
+    _salvarExclusoesPendentes(p);
+  }
+  function cancelarExclusaoLancamento(id) {
+    const p = _exclusoesPendentes();
+    if (!(id in p)) return;
+    delete p[id];
+    _salvarExclusoesPendentes(p);
+  }
+  function confirmarExclusaoLancamento(id) {
+    const p = _exclusoesPendentes();
+    if (!p[id]) return;
+    // Vai o lancamento inteiro: um servidor antigo trata como upsert e nao quebra o lote.
+    enqueue([{ type: 'cashEntry.delete', payload: p[id] }]);
+    delete p[id];
+    _salvarExclusoesPendentes(p);
+    flush();
+  }
+  function confirmarExclusoesPendentes() {
+    Object.keys(_exclusoesPendentes()).forEach(confirmarExclusaoLancamento);
   }
 
   // ---- B4: schema migration de mutations ----
@@ -658,6 +790,8 @@
           // Remove os conflitados da fila (não vão ser aceitos mesmo).
           // Server retorna { mutationId, reason } — usar mutationId, não id.
           const conflictIds = new Set(conflicts.map(c => c.mutationId));
+          // #1509: guarda copia na fila de conflitos antes de tirar da fila (sumia sem rastro).
+          _guardarConflitos(loadQueue().filter(m => conflictIds.has(m.id)), conflicts);
           const remaining = loadQueue().filter(m => !conflictIds.has(m.id));
           saveQueue(remaining);
           // C3: server pode incluir winningPayload com a versao server vencedora;
@@ -676,6 +810,14 @@
         const toMigrate = result.rejected.filter(r => r.reason && r.reason.startsWith('migrate:'));
         if (toMigrate.length > 0) {
           applyMutationMigrationsAndRequeue(toMigrate);
+        }
+
+        // #1509: as demais recusas (validacao etc.) ficavam na fila para sempre. O servidor ja
+        // gravou a recusa pelo MutationId e responde igual a cada reenvio.
+        const recusadas = result.rejected.filter(r => r && r.mutationId && r.reason
+          && !r.reason.startsWith('conflict:') && !r.reason.startsWith('migrate:'));
+        if (recusadas.length > 0) {
+          _moverRecusadasParaDeadletter(recusadas);
         }
       }
       localStorage.setItem(LAST_FULL_SYNC_KEY, String(Date.now()));
@@ -704,6 +846,44 @@
     // F10-C-1: o reset do flushPromise mora no `.finally(...)` do wrapper flush().
   }
 
+  function _guardarConflitos(itens, conflicts) {
+    const qs = window.cdbQueueStore;
+    if (!qs || typeof qs.addConflict !== 'function') return;
+    const porId = new Map((conflicts || []).map(c => [c.mutationId, c]));
+    itens.forEach(m => {
+      const c = porId.get(m.id) || {};
+      const copia = Object.assign({}, m, { conflictReason: c.reason || null, winningPayload: c.winningPayload || null });
+      try {
+        Promise.resolve(qs.addConflict(copia)).catch(e => console.warn('[sync] addConflict falhou:', e && e.message));
+      } catch (e) { console.warn('[sync] addConflict falhou:', e && e.message); }
+    });
+  }
+
+  function _moverRecusadasParaDeadletter(recusadas) {
+    const motivos = new Map(recusadas.map(r => [r.mutationId, r.reason]));
+    const fila = loadQueue();
+    const itens = fila.filter(m => motivos.has(m.id));
+    if (itens.length === 0) return;
+    saveQueue(fila.filter(m => !motivos.has(m.id)));
+    const qs = window.cdbQueueStore;
+    itens.forEach(m => {
+      try {
+        if (qs && typeof qs.moveToDeadletter === 'function') {
+          Promise.resolve(qs.moveToDeadletter([m], motivos.get(m.id)))
+            .catch(e => console.warn('[sync] moveToDeadletter falhou:', e && e.message));
+        }
+      } catch (e) { console.warn('[sync] moveToDeadletter falhou:', e && e.message); }
+    });
+    _trace('flush', 'recusadas -> dead-letter', { items: itens.length });
+    try {
+      if (window.cdbApp && typeof window.cdbApp.showToast === 'function') {
+        window.cdbApp.showToast(itens.length === 1
+          ? '1 alteração não foi aceita pelo servidor. Veja em Ajustes > Diagnóstico.'
+          : itens.length + ' alterações não foram aceitas pelo servidor. Veja em Ajustes > Diagnóstico.');
+      }
+    } catch (_) {}
+  }
+
   // ---- Pull: traz mudanças do servidor (outros devices) ----
   // OFFLINE-FIRST: silencioso quando offline ou pairing invalido.
   // F7: contador de falhas consecutivas — abre ticket auto apos 5.
@@ -711,11 +891,12 @@
   async function pull() {
     if (!navigator.onLine) return;
     if (_pairingInvalid) return;
+    let since = null;
     try {
-      const since = localStorage.getItem(LAST_FULL_SYNC_KEY) || '0';
+      since = readPullCursor();
       const url = API_BASE_URL + API_PREFIX + '/sync/pull?' + new URLSearchParams({ since, deviceId });
       const ctrl = new AbortController();
-      const timeoutId = setTimeout(() => ctrl.abort(), 15000);
+      const timeoutId = setTimeout(() => ctrl.abort(), since === '0' ? FULL_PULL_TIMEOUT_MS : PULL_TIMEOUT_MS);
       let resp;
       try {
         resp = await fetch(url, { headers: baseHeaders(), signal: ctrl.signal });
@@ -736,9 +917,15 @@
         return;
       }
       const data = await resp.json();
-      if (data && data.mutations && Array.isArray(data.mutations)) {
-        applyServerMutations(data.mutations);
-      }
+      // Só confirma o cursor depois de persistir todas as mutações. Se faltar
+      // espaço no aparelho, a próxima tentativa precisa receber os mesmos dados.
+      const serverTime = data && Number(data.serverTime);
+      if (!Number.isFinite(serverTime) || serverTime <= 0 || !Array.isArray(data.mutations))
+        throw new Error('Resposta de sincronização inválida.');
+      if (!applyServerMutations(data.mutations))
+        throw new Error('Não foi possível gravar todos os dados recebidos. A sincronização será repetida.');
+      localStorage.setItem(PULL_CURSOR_KEY, String(serverTime));
+      localStorage.removeItem(FULL_PULL_TIMEOUTS_KEY);
       _consecutivePullFailures = 0;
     } catch (e) {
       _consecutivePullFailures++;
@@ -769,10 +956,12 @@
     // F7-C: fechamento de caixa snapshot. Mobile mantem em cashClosings[].
     closing:   { stateKey: 'cashClosings', storage: 'cdb-cash-closings' }
   };
+  const _MARCAS_DE_LOTE = ['deleted', 'deletedAt', 'deletedBy', 'discarded', 'discardedAt', 'discardedBy', 'discardReason'];
   let _consecutiveApplyFailures = 0;
 
   function applyServerMutations(mutations) {
-    if (!mutations.length || !window.cdbApp) return;
+    if (!mutations.length) return true;
+    if (!window.cdbApp) return false;
     const state = window.cdbApp.getState();
     let changed = false;
     let errorsThisBatch = 0;
@@ -782,7 +971,7 @@
         const map = _SERVER_MUTATION_MAP[type];
         if (!map) return; // tipo desconhecido — ignora silenciosamente
         const coll = state[map.stateKey];
-        if (!coll) return;
+        if (!coll) throw new Error('Coleção local indisponível: ' + map.stateKey);
         const idx = coll.findIndex(x => x.id === m.payload.id);
 
         // F7-B: cashEntry com estornado=true → mobile esconde do operador
@@ -790,7 +979,21 @@
         // pull pos-restauracao, server reenvia. Soft-delete visual.
         if (type === 'cashEntry' && m.payload && m.payload.estornado === true) {
           if (idx >= 0) { coll.splice(idx, 1); changed = true; }
-          try { localStorage.setItem(map.storage, JSON.stringify(coll)); } catch (_) {}
+          localStorage.setItem(map.storage, JSON.stringify(coll));
+          return;
+        }
+
+        // #1520: lote que o aparelho ja tem recebe so as marcas de exclusao e descarte, como
+        // o servidor faz (itens sao imutaveis). Trocar o lote inteiro apagava a foto e o status
+        // locais, que o servidor nao guarda. O saldo vem pelo produto, nao daqui.
+        if (type === 'batch' && op === 'upsert' && idx >= 0) {
+          _MARCAS_DE_LOTE.forEach(k => {
+            const novo = m.payload[k] == null ? undefined : m.payload[k];
+            if (coll[idx][k] == novo || (!coll[idx][k] && !novo)) return;
+            if (novo === undefined) delete coll[idx][k]; else coll[idx][k] = novo;
+            changed = true;
+          });
+          localStorage.setItem(map.storage, JSON.stringify(coll));
           return;
         }
 
@@ -798,10 +1001,18 @@
           if (idx >= 0) coll[idx] = m.payload;
           else coll.push(m.payload);
           changed = true;
+          // #1520: saldo que veio do servidor nao e movimento deste aparelho. Sem isto, um
+          // save antes do reload devolvia a diferenca ao servidor como "stock.delta".
+          if (type === 'product') {
+            const base = lastSnapshot ? lastSnapshot.products : _produtosNoBoot;
+            const i = base.findIndex(x => x.id === m.payload.id);
+            const copia = JSON.parse(JSON.stringify(m.payload));
+            if (i >= 0) base[i] = copia; else base.push(copia);
+          }
         } else if (op === 'delete') {
           if (idx >= 0) { coll.splice(idx, 1); changed = true; }
         }
-        try { localStorage.setItem(map.storage, JSON.stringify(coll)); } catch (_) {}
+        localStorage.setItem(map.storage, JSON.stringify(coll));
       } catch (e) {
         errorsThisBatch++;
         try {
@@ -829,13 +1040,14 @@
       _consecutiveApplyFailures = 0;
     }
 
-    if (changed) {
+    if (changed && errorsThisBatch === 0) {
       console.log('Mudanças do servidor aplicadas, recarregando...');
       (async () => {
         try { await flush(); } catch (e) { console.warn('flush before reload falhou', e); }
         setTimeout(() => location.reload(), 100);
       })();
     }
+    return errorsThisBatch === 0;
   }
 
   // ---- Hook de persistência: chamado pelo app a cada save ----
@@ -965,6 +1177,8 @@
       }));
     }
     updatePendingCount();
+    // #1520: exclusao de lancamento que ficou no "Desfazer" quando o app fechou.
+    confirmarExclusoesPendentes();
     // A5: detecta reinstalacao + oferece restore via backup local. Roda em
     // paralelo com o resto do boot — emite evento cdb-restore-prompt que o
     // index.html escuta. Falha silenciosa nao bloqueia o app.
@@ -1413,7 +1627,7 @@
     if (resp.status === 401) { _pairingInvalid = true; throw new Error('pareamento invalidado'); }
     if (!resp.ok) {
       let msg = 'falha ao trocar loja';
-      try { const e = await resp.json(); if (e && e.error) msg = e.error; } catch (_) {}
+      try { const e = await resp.json(); const m = motivoDoErro(e); if (m) msg = m; } catch (_) {}
       throw new Error(msg);
     }
     const data = await resp.json();
@@ -1425,6 +1639,8 @@
         p.label = p.label; // preserva
         savePairing(p);
       }
+      // #1474: loja nova = pull completo, nao a partir do cursor da antiga.
+      resetPullCursor();
       // Drena fila atual + pega dados da loja nova
       try { await flush(); } catch (_) {}
       try { await pull(); } catch (_) {}
@@ -1751,9 +1967,11 @@
   let _mutationsBlocked = false;
   const CRITICAL_MUTATION_TYPES = {
     'order.upsert': true, 'order.update': true,
-    'cashEntry.upsert': true, 'cashEntry.update': true,
+    'cashEntry.upsert': true, 'cashEntry.update': true, 'cashEntry.delete': true,
     'batch.upsert': true, 'batch.update': true,
-    'cashClosing.upsert': true
+    'cashClosing.upsert': true,
+    // #1520: movimento de estoque descartado nao tem como ser refeito depois.
+    'stock.delta': true
   };
   // Schema minimo do servidor que esta versao do PWA requer. Bate com
   // MobileVersionController.mobileSchemaVersion. Bump quando o PWA passar a
@@ -2060,8 +2278,14 @@
       label: data.label,
       defaultOperatorName: data.defaultOperatorName,
       pairedAt: data.pairedAt,
-      deviceId: data.deviceId
+      deviceId: data.deviceId,
+      empresaNome: data.empresaNome || null,
+      lojaNome: data.lojaNome || null
     });
+    // #1474: pareamento novo (ou re-pareamento em outra empresa/loja) parte
+    // de pull completo — o catalogo do ERP precisa chegar inteiro.
+    resetPullCursor();
+    applyEmpresaNomeDoPareamento(data.empresaNome);
     _pairingInvalid = false;
     try { await pingVersion(); } catch (_) {}
     // Marca a UI pra mostrar modal de relatorio apos o pull inicial.
@@ -2087,6 +2311,14 @@
   // Troca codigo de 6 digitos por apiKey + contexto (empresa/loja).
   // Ao pareamento bem-sucedido, persiste em cdb-pairing e proximas chamadas
   // ja saem com X-Mobile-Api-Key automaticamente.
+  // #1474: a API responde {error:"texto"} nos endpoints mobile antigos e
+  // {error:{message, detail}} no GlobalExceptionHandler; o operador lê o motivo.
+  function motivoDoErro(e) {
+    if (!e || !e.error) return null;
+    if (typeof e.error === 'string') return e.error;
+    return e.error.detail || e.error.message || null;
+  }
+
   async function pairWithCode(code, label) {
     if (!navigator.onLine) throw new Error('sem rede');
     const url = API_BASE_URL + API_PREFIX + '/devices/pair';
@@ -2111,7 +2343,7 @@
     }
     if (!resp.ok) {
       let msg = 'codigo invalido';
-      try { const e = await resp.json(); if (e && e.error) msg = e.error; } catch (_) {}
+      try { const e = await resp.json(); const m = motivoDoErro(e); if (m) msg = m; } catch (_) {}
       throw new Error(msg);
     }
     const data = await resp.json();
@@ -2122,8 +2354,14 @@
       label: data.label,
       defaultOperatorName: data.defaultOperatorName,
       pairedAt: data.pairedAt,
-      deviceId: data.deviceId
+      deviceId: data.deviceId,
+      empresaNome: data.empresaNome || null,
+      lojaNome: data.lojaNome || null
     });
+    // #1474: pareamento novo (ou re-pareamento em outra empresa/loja) parte
+    // de pull completo — o catalogo do ERP precisa chegar inteiro.
+    resetPullCursor();
+    applyEmpresaNomeDoPareamento(data.empresaNome);
     // Pareou com sucesso — destrava flush/pull caso estavam bloqueados
     // por pairing invalidado em sessao anterior.
     _pairingInvalid = false;
@@ -2203,6 +2441,9 @@
     (s.batches || []).forEach(b => { if (b && b.id) muts.push({ type: 'batch.upsert', payload: stripBatchPhotoBytes(b) }); });
     (s.cashEntries || []).forEach(c => { if (c && c.id) muts.push({ type: 'cashEntry.upsert', payload: c }); });
     if (muts.length === 0) return { enqueued: 0, queueSize: loadQueue().length };
+    // #1520: aqui o cadastro vai sem stockByDelta, entao o servidor grava o saldo deste
+    // aparelho. Os movimentos pendentes ja estao dentro desse saldo; mandar os dois contava em dobro.
+    saveQueue(loadQueue().filter(q => q.type !== 'stock.delta'));
     enqueue(muts);
     return { enqueued: muts.length, queueSize: loadQueue().length };
   }
@@ -2441,7 +2682,10 @@
       getLastSeenServerTs: () => _lastSeenServerTs,       // B3
       mutationMigrators: mutationMigrators,               // B4 (mutable: register migrators)
       mutationSchemaVersion: PWA_MUTATION_SCHEMA_VERSION, // B4
-      swSupported: () => _swSupported                     // D2
+      swSupported: () => _swSupported,                    // D2
+      initQueueStore: _initQueueStore,                    // #1509
+      bloquearMutations: (v) => { _mutationsBlocked = !!v; }, // #1520 (teste do bloqueio de OTA)
+      confirmarExclusoesPendentes: confirmarExclusoesPendentes // #1520
     },
     hasPublicBackupPlugin: () => !!_getPublicBackupPlugin(),
     lastLocalBackupAt: () => parseInt(localStorage.getItem(LAST_LOCAL_BACKUP_KEY) || '0', 10) || 0,
@@ -2458,6 +2702,8 @@
       return { queueCount: q.length, deadletterCount: 0, conflictCount: 0, storage: 'localStorage', degraded: true };
     },
     pushAll, pushAllAndFlush,
+    // #1520: exclusao de lancamento de caixa (index.html > deleteCashEntry).
+    agendarExclusaoLancamento, cancelarExclusaoLancamento, confirmarExclusaoLancamento,
     // Onda 9 — OTA do PWA: ver maybeApplyPwaUpdate() no fluxo de pingVersion().
     forceUpdate: (opts) => triggerPwaUpdate(Object.assign({ reason: 'manual', force: true }, opts || {})),
     installedPwaVersion: getInstalledPwaVersion,

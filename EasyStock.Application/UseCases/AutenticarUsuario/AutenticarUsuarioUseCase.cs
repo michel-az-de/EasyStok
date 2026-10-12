@@ -13,7 +13,10 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
         string Nome,
         string Email,
         NivelAcesso Nivel,
-        IReadOnlyCollection<Permissao> Permissoes);
+        IReadOnlyCollection<Permissao> Permissoes,
+        string? ModuloInicial = null,
+        bool PermissoesExplicitas = false,
+        bool SessaoPersistente = false);
 
     public class AutenticarUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
@@ -24,7 +27,7 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
         public async Task<AutenticarUsuarioResult> ExecuteAsync(AutenticarUsuarioCommand command)
         {
             var swTotal = Stopwatch.StartNew();
-            logger.LogDebug("Tentativa de autenticacao para o email: {Email}", command.Email);
+            logger.LogDebug("Tentativa de autenticacao iniciada");
 
             // --- etapa 1: query do usuário
             var swDb = Stopwatch.StartNew();
@@ -37,20 +40,13 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
 
             if (usuario.EstaBloqueado())
             {
-                logger.LogWarning("Tentativa de login para usuario bloqueado: {Email}", command.Email);
+                logger.LogWarning("Tentativa de login para usuario bloqueado: {UsuarioId}", usuario.Id);
                 throw new CredenciaisInvalidasException("Conta bloqueada temporariamente.");
             }
 
             if (!usuario.EmailConfirmado)
             {
-                logger.LogWarning("Tentativa de login com email não confirmado: {Email}", command.Email);
-            }
-
-            // Se a janela de lockout expirou, zera o contador de falhas para não
-            // bloquear o usuário na próxima falha "herdada" da sessão anterior.
-            if (usuario.LockoutEnd.HasValue && usuario.LockoutEnd.Value <= DateTime.UtcNow)
-            {
-                usuario.ResetarTentativasFalha();
+                logger.LogWarning("Tentativa de login com email não confirmado: {UsuarioId}", usuario.Id);
             }
 
             // --- etapa 2: verificação do hash (CPU-bound ~200-800ms dependendo do work factor)
@@ -61,12 +57,10 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
 
             if (!senhaOk)
             {
-                usuario.IncrementarTentativasFalha();
-                if (usuario.FailedLoginAttempts >= 5)
-                {
-                    usuario.BloquearPorTentativas(15);
-                    logger.LogWarning("Usuario bloqueado apos 5 tentativas falhidas: {Email}", command.Email);
-                }
+                // #1352: regra única (contagem, bloqueio na 5ª e janela vencida) em Usuario, a mesma do passo 1.
+                usuario.RegistrarFalhaDeSenha();
+                if (usuario.EstaBloqueado())
+                    logger.LogWarning("Usuario {UsuarioId} bloqueado apos {Limite} tentativas falhas", usuario.Id, Domain.Entities.Usuario.FalhasParaBloquear);
                 await usuarioRepository.UpdateAsync(usuario);
                 await unitOfWork.CommitAsync();
                 throw new CredenciaisInvalidasException();
@@ -74,6 +68,28 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
 
             usuario.ResetarTentativasFalha();
 
+            // #1342: superadmin que informa a empresa entra nela; sem empresaId, segue sem (painel admin).
+            var resultado = await ConcluirAsync(usuario, command.EmpresaId ?? ResolveEmpresaIdPadrao(usuario), empresaDoSuperAdmin: command.EmpresaId);
+
+            swTotal.Stop();
+            logger.LogInformation(
+                "Autenticacao bem-sucedida. UsuarioId={UsuarioId} | total={TotalMs}ms (db={DbMs}ms bcrypt={BcryptMs}ms)",
+                usuario.Id, swTotal.ElapsedMilliseconds, swDb.ElapsedMilliseconds, swHash.ElapsedMilliseconds);
+            return resultado;
+        }
+
+        /// <summary>
+        /// #1324: final do login sem senha (Google), com a identidade já validada. Sem empresa pedida, entra
+        /// na empresa ativa do usuário; com mais de uma, na primeira por nome (escolha de empresa fica para depois).
+        /// </summary>
+        /// <param name="empresaPadrao">#1326: empresa do superadmin no console (que recusa token sem empresa).</param>
+        public Task<AutenticarUsuarioResult> ConcluirLoginGoogleAsync(Domain.Entities.Usuario usuario, Guid? empresaId, Guid? empresaPadrao = null) =>
+            ConcluirAsync(usuario, empresaId ?? ResolveEmpresaIdPadrao(usuario) ?? PrimeiraEmpresaAtiva(usuario),
+                empresaDoSuperAdmin: empresaId ?? empresaPadrao);
+
+        /// <summary>SuperAdmin, empresa, nível e permissões, e o último acesso. Credencial já conferida.</summary>
+        private async Task<AutenticarUsuarioResult> ConcluirAsync(Domain.Entities.Usuario usuario, Guid? empresaId, Guid? empresaDoSuperAdmin = null)
+        {
             // SuperAdmin: perfil global com Perfil.EmpresaId=null. Nao tem vinculo
             // em UsuarioEmpresa, entao o fluxo padrao (que exige empresaId resolvido)
             // deixava nivel=Visualizador como default e a tela /Auth/Login do
@@ -93,21 +109,16 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 await usuarioRepository.UpdateAsync(usuario);
                 await unitOfWork.CommitAsync();
 
-                swTotal.Stop();
-                logger.LogInformation(
-                    "Autenticacao SuperAdmin bem-sucedida. UsuarioId={UsuarioId} | total={TotalMs}ms (db={DbMs}ms bcrypt={BcryptMs}ms)",
-                    usuario.Id, swTotal.ElapsedMilliseconds, swDb.ElapsedMilliseconds, swHash.ElapsedMilliseconds);
-
                 return new AutenticarUsuarioResult(
                     UsuarioId: usuario.Id,
-                    EmpresaId: null,
+                    EmpresaId: empresaDoSuperAdmin,
                     Nome: usuario.Nome,
                     Email: usuario.Email,
                     Nivel: NivelAcesso.SuperAdmin,
-                    Permissoes: permissoesSuper);
+                    Permissoes: permissoesSuper,
+                    ModuloInicial: perfilSuperAdmin.ModuloInicial,
+                    PermissoesExplicitas: perfilSuperAdmin.PermissoesExplicitas);
             }
-
-            var empresaId = command.EmpresaId ?? ResolveEmpresaIdPadrao(usuario);
 
             if (empresaId.HasValue)
             {
@@ -117,9 +128,15 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 if (linkEmpresa is null)
                     throw new CredenciaisInvalidasException();
             }
+            // Desativar zera o vínculo, não o usuário: sem vínculo ativo não há sessão a abrir.
+            else if (usuario.Empresas?.Any(e => e.Ativo) != true)
+                throw new CredenciaisInvalidasException();
 
             var nivel = NivelAcesso.Visualizador;
             IReadOnlyCollection<Permissao> permissoes = [];
+            string? moduloInicial = null;
+            var permissoesExplicitas = false;
+            var sessaoPersistente = false;
 
             if (empresaId.HasValue && usuario.Perfis is not null)
             {
@@ -131,6 +148,10 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 if (perfilDaEmpresa?.Perfil is not null)
                 {
                     nivel = perfilDaEmpresa.Perfil.Nivel;
+                    moduloInicial = perfilDaEmpresa.Perfil.ModuloInicial;
+                    permissoesExplicitas = perfilDaEmpresa.Perfil.PermissoesExplicitas;
+                    sessaoPersistente = ResolveEmpresaIdPadrao(usuario) == empresaId
+                        && Domain.Services.PerfisCasaDaBaba.PermiteSessaoPersistente(perfilDaEmpresa.Perfil, empresaId.Value);
                     permissoes = perfilDaEmpresa.Perfil.Permissoes?
                         .Select(p => p.Permissao)
                         .Distinct()
@@ -138,18 +159,9 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 }
             }
 
-            // --- etapa 3: atualizar último acesso
-            var swUpdate = Stopwatch.StartNew();
             usuario.AtualizarUltimoAcesso();
             await usuarioRepository.UpdateAsync(usuario);
             await unitOfWork.CommitAsync();
-            swUpdate.Stop();
-
-            swTotal.Stop();
-            logger.LogInformation(
-                "Autenticacao bem-sucedida. UsuarioId={UsuarioId} | total={TotalMs}ms (db={DbMs}ms bcrypt={BcryptMs}ms update={UpdateMs}ms)",
-                usuario.Id, swTotal.ElapsedMilliseconds, swDb.ElapsedMilliseconds,
-                swHash.ElapsedMilliseconds, swUpdate.ElapsedMilliseconds);
 
             return new AutenticarUsuarioResult(
                 UsuarioId: usuario.Id,
@@ -157,8 +169,18 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 Nome: usuario.Nome,
                 Email: usuario.Email,
                 Nivel: nivel,
-                Permissoes: permissoes);
+                Permissoes: permissoes,
+                ModuloInicial: moduloInicial,
+                PermissoesExplicitas: permissoesExplicitas,
+                SessaoPersistente: sessaoPersistente);
         }
+
+        private static Guid? PrimeiraEmpresaAtiva(Domain.Entities.Usuario usuario) =>
+            usuario.Empresas?
+                .Where(e => e.Ativo)
+                .OrderBy(e => e.Empresa?.Nome)
+                .Select(e => (Guid?)e.EmpresaId)
+                .FirstOrDefault();
 
         private static Guid? ResolveEmpresaIdPadrao(Domain.Entities.Usuario usuario)
         {

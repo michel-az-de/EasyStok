@@ -27,7 +27,7 @@ public sealed class ListarAvaliacoesPublicoUseCase(
             storefront.EmpresaId, limit, ct);
 
         var items = avaliacoes.Select(a => new AvaliacaoPublicaDto(
-            Nota: a.Estrelas,
+            Nota: a.Estrelas ?? 0,
             Comentario: a.Comentario,
             PrimeiroNomeCliente: ExtrairPrimeiroNome(a.Id),
             CriadaEm: a.RespondidoEm)).ToList();

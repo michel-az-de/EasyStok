@@ -550,4 +550,84 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
         var comVencido = await repository.GetLotesDisponiveisParaSaidaAsync(empresaId, produtoId, null, incluirVencidos: true);
         comVencido.Should().HaveCount(2, "incluirVencidos=true e usado pelas naturezas de baixa/descarte (#983)");
     }
+    [SkippableFact]
+    public async Task GetSaldoDisponivelPorProdutosAsync_soma_lotes_validos_do_tenant_numa_consulta()
+    {
+        // #1171: cardapio publico projeta o saldo produzido. Soma so lote com saldo e nao
+        // vencido, do tenant informado, e ignora o filtro global (caller anonimo).
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+
+        await using var context = fixture.CreateDbContext();
+        var empresaId = Guid.NewGuid();
+        var outraEmpresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var outraCategoriaId = Guid.NewGuid();
+        var lasanhaId = Guid.NewGuid();
+        var nhoqueId = Guid.NewGuid();
+        var semSaldoId = Guid.NewGuid();
+        var produtoOutraEmpresaId = Guid.NewGuid();
+        context.SetMobileTenantContext(empresaId);
+
+        context.Empresas.AddRange(
+            new Empresa { Id = empresaId, Nome = "Empresa Saldo", Documento = "222", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow },
+            new Empresa { Id = outraEmpresaId, Nome = "Outra", Documento = "333", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        context.Categorias.AddRange(
+            new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Pratos", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow },
+            new Categoria { Id = outraCategoriaId, EmpresaId = outraEmpresaId, Nome = "Pratos", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        context.Produtos.AddRange(
+            NovoProduto(lasanhaId, empresaId, categoriaId, "Lasanha"),
+            NovoProduto(nhoqueId, empresaId, categoriaId, "Nhoque"),
+            NovoProduto(semSaldoId, empresaId, categoriaId, "Torta"),
+            NovoProduto(produtoOutraEmpresaId, outraEmpresaId, outraCategoriaId, "Lasanha alheia"));
+        context.ItensEstoque.AddRange(
+            NovoLote(empresaId, lasanhaId, 5m, validadeEmDias: 3),
+            NovoLote(empresaId, lasanhaId, 7m, validadeEmDias: null),
+            NovoLote(empresaId, lasanhaId, 4m, validadeEmDias: -2),   // vencido: fora
+            NovoLote(empresaId, nhoqueId, 2.5m, validadeEmDias: 10),
+            NovoLote(empresaId, semSaldoId, 0m, validadeEmDias: 10),  // zerado: fora
+            NovoLote(outraEmpresaId, produtoOutraEmpresaId, 9m, validadeEmDias: 10));
+
+        await context.SaveChangesAsync();
+
+        // Contexto novo sem tenant (como a request anonima do cardapio publico).
+        await using var anonimo = fixture.CreateDbContext();
+        var repository = new ItemEstoqueRepository(anonimo);
+
+        var saldos = await repository.GetSaldoDisponivelPorProdutosAsync(
+            empresaId, new[] { lasanhaId, nhoqueId, semSaldoId, produtoOutraEmpresaId });
+
+        saldos.Should().HaveCount(2);
+        saldos[lasanhaId].Should().Be(12m, "5 + 7; o lote vencido nao entra");
+        saldos[nhoqueId].Should().Be(2.5m);
+        saldos.Should().NotContainKey(semSaldoId);
+        saldos.Should().NotContainKey(produtoOutraEmpresaId, "EmpresaId no WHERE isola o tenant");
+    }
+
+    private static Produto NovoProduto(Guid id, Guid empresaId, Guid categoriaId, string nome) => new()
+    {
+        Id = id,
+        EmpresaId = empresaId,
+        CategoriaId = categoriaId,
+        Nome = nome,
+        Tipo = TipoProduto.Alimento,
+        Status = StatusProduto.Ativo,
+        CriadoEm = DateTime.UtcNow,
+        AlteradoEm = DateTime.UtcNow
+    };
+
+    private static ItemEstoque NovoLote(Guid empresaId, Guid produtoId, decimal quantidade, int? validadeEmDias) => new()
+    {
+        Id = Guid.NewGuid(),
+        EmpresaId = empresaId,
+        ProdutoId = produtoId,
+        QuantidadeInicial = Quantidade.From(Math.Max(quantidade, 1m)),
+        QuantidadeAtual = Quantidade.From(quantidade),
+        CustoUnitario = Dinheiro.FromDecimal(10m),
+        ValidadeEm = validadeEmDias is null ? null : Validade.From(DateTime.UtcNow.AddDays(validadeEmDias.Value)),
+        Status = StatusItemEstoque.Ok,
+        EntradaEm = DateTime.UtcNow.AddDays(-1),
+        CriadoEm = DateTime.UtcNow,
+        AlteradoEm = DateTime.UtcNow
+    };
 }

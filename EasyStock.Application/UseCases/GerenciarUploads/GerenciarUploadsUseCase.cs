@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Ports.Output.Storage;
+using EasyStock.Application.Services.Atendimento.Audio;
 using EasyStock.Application.UseCases.GerenciarProduto;
 using EasyStock.Domain.Exceptions.Storefront;
 
@@ -21,6 +22,11 @@ public sealed record BannerImagemUploadResult(string StorageKey, string Url, str
 
 /// <summary>Imagem do console de atendimento (S07): a chave vai para a mensagem, a URL pública para a Meta.</summary>
 public sealed record ImagemAtendimentoUploadResult(string StorageKey, string Url, string ContentType);
+
+/// <summary>Áudio do console (#1444): chave e MIME para a mensagem, URL pública e nota de voz para a Meta.</summary>
+public sealed record AudioAtendimentoUploadResult(string StorageKey, string Url, string ContentType, bool NotaDeVoz);
+
+public sealed record ArteCampanhaUploadResult(string StorageKey, string Url, string ContentType);
 
 public sealed class GerenciarUploadsUseCase(
     IFileStorage fileStorage,
@@ -168,14 +174,14 @@ public sealed class GerenciarUploadsUseCase(
     }
 
     /// <summary>
-    /// Foto de um item de cardápio da vitrine (ADR-0031). 1 foto por item: grava a nova
-    /// com nome novo e remove a anterior best-effort (igual avatar/logo) — sem órfão no replace.
+    /// Foto de um item de cardápio da vitrine (ADR-0031). Substitui a capa ou acrescenta à
+    /// galeria. A troca da capa preserva arquivos ainda referenciados pela galeria.
     /// Escopo de tenant fechado por construção: resolve o storefront pela empresa do token e
     /// busca o item via <c>GetByIdAndScopeAsync</c> (item de outra empresa → 404, não vaza).
     /// </summary>
     public async Task<UploadedFileResult> UploadFotoCardapioItemAsync(
         Guid empresaId, Guid itemId, string fileName, string contentType, byte[] content,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, bool galeria = false, bool sincronizarCapaGaleria = false)
     {
         ValidarImagem(fileName, contentType, content, 6 * 1024 * 1024); // ate 6MB antes de otimizar
 
@@ -184,6 +190,12 @@ public sealed class GerenciarUploadsUseCase(
 
         var item = await cardapioItemRepository.GetByIdAndScopeAsync(storefront.Id, itemId, empresaId, cancellationToken)
             ?? throw new CardapioItemNaoEncontradoException(storefront.Id, itemId);
+
+        if (galeria && item.ObterFotosGaleria().Count >= 5)
+            throw new UseCaseValidationException("O item já possui o limite de 5 fotos.");
+        // #1550: recusa antes do upload, como acima, para não deixar arquivo órfão no storage.
+        if (!galeria && sincronizarCapaGaleria && item.GaleriaSemVagaParaNovaCapa)
+            throw new UseCaseValidationException(EasyStock.Domain.Entities.Storefront.CardapioItem.MensagemLimiteFotos);
 
         var (optimized, optContentType, optExt) = await Task.Run(
             () => imageProcessor.Optimize(content, contentType, maxSide: 1920, quality: 85),
@@ -198,13 +210,18 @@ public sealed class GerenciarUploadsUseCase(
             cancellationToken);
 
         var fotoAntiga = item.FotoUrl;
-        item.AtualizarMetadata(fotoUrl: stored.Url);
+        if (galeria) item.AdicionarFotoGaleria(stored.Url, preservarCapa: sincronizarCapaGaleria);
+        else if (sincronizarCapaGaleria) item.SubstituirCapaGaleria(stored.Url);
+        else item.AtualizarMetadata(fotoUrl: stored.Url);
 
         await cardapioItemRepository.UpdateAsync(item, cancellationToken);
         await unitOfWork.CommitAsync();
 
         // Best-effort: remove a foto anterior só depois de persistir a nova.
-        await TryDeletePreviousAsync(fotoAntiga, cancellationToken);
+        // Adicionar ângulos preserva a capa anterior; substituir a capa também preserva
+        // qualquer arquivo que continue referenciado pela galeria.
+        if (!galeria && !item.ObterFotosGaleria().Contains(fotoAntiga))
+            await TryDeletePreviousAsync(fotoAntiga, cancellationToken);
 
         return new UploadedFileResult(stored.Url, fileName, optContentType, stored.Size);
     }
@@ -247,8 +264,12 @@ public sealed class GerenciarUploadsUseCase(
         ValidarImagem(fileName, contentType, content, 6 * 1024 * 1024); // ate 6MB antes de otimizar
 
         var (optimized, optContentType, optExt) = await Task.Run(
-            () => imageProcessor.Optimize(content, contentType, maxSide: 1920, quality: 85),
+            () => imageProcessor.Optimize(content, contentType, maxSide: 1920, quality: 85, jpeg: true),
             cancellationToken);
+
+        // A Meta aceita JPEG/PNG como imagem, com até 5 MB. Não envia WebP se a conversão falhar.
+        if (optContentType is not ("image/jpeg" or "image/png") || optimized.Length > 5 * 1024 * 1024)
+            throw new UseCaseValidationException("Não foi possível preparar a imagem para o WhatsApp (JPEG/PNG de até 5 MB).");
 
         var stored = await fileStorage.UploadAsync(
             new FileUploadRequest(
@@ -259,6 +280,51 @@ public sealed class GerenciarUploadsUseCase(
             cancellationToken);
 
         return new ImagemAtendimentoUploadResult(stored.StorageKey, stored.Url, optContentType);
+    }
+
+    /// <summary>
+    /// Áudio que a dona grava no console (#1444). <see cref="AudioParaWhatsApp"/> confere o formato pelos bytes e
+    /// reempacota o WebM do Chrome em Ogg/Opus; fica público porque a Meta busca o áudio pela URL.
+    /// Não persiste nada: quem chama grava a mensagem com a chave.
+    /// </summary>
+    public async Task<AudioAtendimentoUploadResult> UploadAudioAtendimentoAsync(
+        Guid empresaId, Guid conversaId, byte[] content, CancellationToken cancellationToken = default)
+    {
+        var audio = AudioParaWhatsApp.Preparar(content);
+
+        var stored = await fileStorage.UploadAsync(
+            new FileUploadRequest(
+                $"atendimento/{empresaId}/{conversaId}",
+                $"{Guid.NewGuid()}{audio.Extensao}",
+                audio.ContentType,
+                audio.Conteudo),
+            cancellationToken);
+
+        return new AudioAtendimentoUploadResult(stored.StorageKey, stored.Url, audio.ContentType, audio.NotaDeVoz);
+    }
+
+    /// <summary>
+    /// Arte da campanha (S28). Mesma validação e otimização das demais; pública porque a Meta busca
+    /// a imagem pela URL. Não persiste nada: a URL vai em <c>imagemUrl</c> da campanha.
+    /// </summary>
+    public async Task<ArteCampanhaUploadResult> UploadArteCampanhaAsync(
+        Guid empresaId, string fileName, string contentType, byte[] content, CancellationToken cancellationToken = default)
+    {
+        ValidarImagem(fileName, contentType, content, 6 * 1024 * 1024); // ate 6MB antes de otimizar
+
+        var (optimized, optContentType, optExt) = await Task.Run(
+            () => imageProcessor.Optimize(content, contentType, maxSide: 1920, quality: 85),
+            cancellationToken);
+
+        var stored = await fileStorage.UploadAsync(
+            new FileUploadRequest(
+                $"campanhas/{empresaId}",
+                $"{Guid.NewGuid()}{optExt}",
+                optContentType,
+                optimized),
+            cancellationToken);
+
+        return new ArteCampanhaUploadResult(stored.StorageKey, stored.Url, optContentType);
     }
 
     /// <summary>
@@ -296,7 +362,8 @@ public sealed class GerenciarUploadsUseCase(
 
         // Confere a assinatura de bytes contra o tipo declarado (anti arquivo renomeado).
         // SkiaSharp decodifica depois como segundo gate para imagens.
-        UploadSecurityValidator.EnsureContentMatchesDeclaredType(content, contentType);
+        try { UploadSecurityValidator.EnsureContentMatchesDeclaredType(content, contentType); }
+        catch (InvalidOperationException ex) { throw new UseCaseValidationException(ex.Message); }
 
         var extension = Path.GetExtension(fileName);
         if (string.IsNullOrWhiteSpace(extension))

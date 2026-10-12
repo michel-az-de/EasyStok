@@ -1,4 +1,3 @@
-using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
@@ -42,7 +41,6 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new MovimentacaoEstoqueRepository(context),
                 context,
                 NullLogger<RegistrarEntradaEstoqueUseCase>.Instance,
-                new GeradorDescricaoFake("Descricao gerada por IA"),
                 publicadorEventos: PublicadorNoOp);
 
             var result = await useCase.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
@@ -63,12 +61,12 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 "Fornecedor XPTO",
                 null,
                 "Primeira entrada",
-                null,
+                "Descricao informada",
                 "DOC-01",
                 new DimensoesInput(0.3m, 10.5m, 5.2m, 8.1m),
                 "Mercado Livre"));
 
-            result.DescricaoAnuncio.Should().Be("Descricao gerada por IA");
+            result.DescricaoAnuncio.Should().Be("Descricao informada");
         }
 
         await using (var assertContext = fixture.CreateDbContext())
@@ -83,7 +81,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
             item.CustoUnitario.Valor.Should().Be(250m);
             item.PrecoVendaSugerido!.Valor.Should().Be(399.90m);
             item.ChavePesquisa.Should().Contain("CAP3426");
-            item.DescricaoAnuncio.Should().Be("Descricao gerada por IA");
+            item.DescricaoAnuncio.Should().Be("Descricao informada");
 
             movimentacao.Tipo.Should().Be(TipoMovimentacaoEstoque.Entrada);
             movimentacao.Natureza.Should().Be(NaturezaMovimentacaoEstoque.Compra);
@@ -799,12 +797,6 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
         });
 
         await context.SaveChangesAsync();
-    }
-
-    private sealed class GeradorDescricaoFake(string descricao) : IGeradorDescricaoAnuncio
-    {
-        public Task<string> GerarAsync(Produto produto, ProdutoVariacao? variacao, ItemEstoque? itemEstoque, string? instrucoesComplementares = null) =>
-            Task.FromResult(descricao);
     }
 
     [SkippableFact]

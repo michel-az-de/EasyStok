@@ -36,6 +36,7 @@ namespace EasyStock.Api.Controllers.Storefront;
 [ApiController]
 [Route("api/storefront/{slug}/menu")]
 [AllowAnonymous]
+[TenantDoStorefront]
 public sealed class MenuController(
     ListarCardapioPublicoUseCase listarCardapioUseCase,
     ILogger<MenuController> logger) : EasyStockControllerBase

@@ -2,6 +2,7 @@
 // Registra UseCases relacionados a: Pedidos, Caixa, Lotes, Produtos, Estoque, Listas de Compras
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
@@ -47,27 +48,6 @@ using EasyStock.Application.UseCases.PreviewSugestaoCompra;
 using EasyStock.Application.UseCases.CriarSugestaoCompra;
 using EasyStock.Application.UseCases.GerenciarComposicao;
 using EasyStock.Application.UseCases.AdicionarItemPedidoFornecedor;
-using EasyStock.Application.UseCases.AnuncioIa;
-using EasyStock.Application.UseCases.GerarSugestaoDescricaoAnuncio;
-using EasyStock.Application.UseCases.ListarPlanos;
-using EasyStock.Application.UseCases.ListarFaturas;
-using EasyStock.Application.UseCases.CancelarAssinatura;
-using EasyStock.Application.UseCases.AlterarPlano;
-using EasyStock.Application.UseCases.Faturas.EmitirFatura;
-using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
-using EasyStock.Application.UseCases.Faturas.CancelarFatura;
-using EasyStock.Application.UseCases.Faturas.ListarFaturasCliente;
-using EasyStock.Application.UseCases.Faturas.ListarFaturasAdmin;
-using EasyStock.Application.UseCases.Faturas.ObterFaturaDetalhe;
-using EasyStock.Application.UseCases.Faturas.GerarPdfFatura;
-using EasyStock.Application.UseCases.Faturas.ExportarFaturasCsv;
-using EasyStock.Application.UseCases.Faturas.MetricasFinanceiras;
-using EasyStock.Application.UseCases.Fiscal.EmitirNfce;
-using EasyStock.Application.UseCases.Fiscal.CancelarNfe;
-using EasyStock.Application.UseCases.Fiscal.InutilizarNumeracao;
-using EasyStock.Application.UseCases.Fiscal.ConsultarNfe;
-using EasyStock.Application.UseCases.Fiscal.ProcessarWebhookFocusNFe;
-using EasyStock.Application.UseCases.Fiscal.ReprocessarContingencia;
 using EasyStock.Application.UseCases.Financeiro.BaixarLancamento;
 
 namespace EasyStock.Application.DependencyInjection;
@@ -87,16 +67,30 @@ public static partial class ServiceCollectionExtensions
         services.AddOptions<PedidoEstoqueOptions>();
         services.AddScoped<PedidoEstoqueIntegrationService>();
         services.AddScoped<CriarPedidoUseCase>();
+            services.AddScoped<EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido>();
         services.AddScoped<AtualizarStatusPedidoUseCase>();
+        // S19: KDS do console sobre Pedido
+        services.AddScoped<EasyStock.Application.UseCases.Operacao.Kds.ListarPedidosKdsUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Operacao.Kds.AtualizarStatusPedidosEmLoteUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Esteira.LancarLotePapelUseCase>();
+        // S21: início previsto do preparo e aviso de atraso (PedidoAtrasoJob)
+        services.AddScoped<EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido>();
+        services.AddScoped<EasyStock.Application.UseCases.Operacao.Atraso.NotificarAtrasoPedidoUseCase>();
+        // N11: miolo do CaixaEsquecidoJob (sino + PrazoEstourado).
+        services.AddScoped<EasyStock.Application.UseCases.Caixa.AvisarCaixasEsquecidasUseCase>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>();
         services.AddScoped<CancelarPedidoUseCase>();
         services.AddScoped<ObterPedidoDetalhesUseCase>();
         services.AddScoped<AdicionarItemPedidoUseCase>();
         services.AddScoped<RemoverItemPedidoUseCase>();
+        services.AddScoped<EasyStock.Application.Services.Pedidos.QuitacaoPedido>();
         services.AddScoped<RegistrarPagamentoPedidoUseCase>();
         services.AddScoped<RemoverPagamentoPedidoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.FinalizarVendaBalcao.FinalizarVendaBalcaoUseCase>();
         services.AddScoped<ListarPedidosUseCase>();
         services.AddScoped<AlterarAgendamentoPedidoUseCase>();
+        services.AddScoped<TrocarJanelaPedidoUseCase>();
 
         // Onda P3 — Caixa
         // Fonte ÚNICA do saldo esperado (consumida por /caixa e pelo Dashboard/Admin via
@@ -115,6 +109,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AdicionarItemLoteUseCase>();
         services.AddScoped<RemoverItemLoteUseCase>();
         services.AddScoped<FinalizarLoteUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Producao.RegistrarProducaoUseCase>(); // S23 (#1137)
+        services.AddScoped<EasyStock.Application.UseCases.Producao.BaixaDeInsumosDaProducao>(); // D-M2-01 (#1499)
         services.AddScoped<AtualizarPesoLoteItemUseCase>(); // C2 backfill (R3 bloqueio)
         services.AddScoped<ListarLotesUseCase>();
         services.AddScoped<ObterLoteDetalhesUseCase>();
@@ -179,43 +175,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Inventario.IniciarContagemUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Inventario.RegistrarItemContagemUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Inventario.FinalizarContagemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Inventario.Desacertos.ListarDesacertosEstoqueUseCase>(); // S22
+        services.AddScoped<EasyStock.Application.UseCases.Inventario.Desacertos.AjustarSaldoRapidoUseCase>(); // S22
         services.AddScoped<EasyStock.Application.UseCases.Inventario.CancelarContagemUseCase>();
-
-        // IA para Anúncios
-        services.AddScoped<GerarSugestaoDescricaoAnuncioUseCase>();
-        services.AddScoped<GerarAnuncioStreamingUseCase>();
-        services.AddScoped<SalvarRascunhoAnuncioUseCase>();
-        services.AddScoped<ListarAnunciosUseCase>();
-        services.AddScoped<ExcluirAnuncioUseCase>();
-        services.AddScoped<ObterUsoIaUseCase>();
-
-        // Planos e Assinaturas
-        services.AddScoped<ListarPlanosUseCase>();
-        services.AddScoped<ListarFaturasUseCase>();
-        services.AddScoped<CancelarAssinaturaUseCase>();
-        services.AddScoped<AlterarPlanoUseCase>();
-        services.AddScoped<EasyStock.Application.UseCases.PagarAgora.PagarAgoraUseCase>();
-
-        // Modulo Financeiro (F1+) — Faturas
-        services.AddScoped<EmitirFaturaUseCase>();
-        services.AddScoped<RegistrarPagamentoFaturaUseCase>();
-        services.AddScoped<CancelarFaturaUseCase>();
-        services.AddScoped<ListarFaturasClienteUseCase>();
-        services.AddScoped<ListarFaturasAdminUseCase>();
-        services.AddScoped<ObterFaturaDetalheUseCase>();
-        services.AddScoped<GerarPdfFaturaUseCase>();
-        services.AddScoped<ExportarFaturasCsvUseCase>();
-        services.AddScoped<MetricasFinanceirasUseCase>();
-        services.AddScoped<EasyStock.Application.UseCases.Admin.ExportarTenantsCsv.ExportarTenantsCsvUseCase>();
-        services.AddScoped<EasyStock.Application.UseCases.Admin.ExportarTicketsCsv.ExportarTicketsCsvUseCase>();
-
-        // Modulo Fiscal NFC-e (F1) — 6 use cases sobre Nfe*
-        services.AddScoped<EmitirNfceUseCase>();
-        services.AddScoped<CancelarNfeUseCase>();
-        services.AddScoped<InutilizarNumeracaoUseCase>();
-        services.AddScoped<ConsultarNfeUseCase>();
-        services.AddScoped<ProcessarWebhookFocusNFeUseCase>();
-        services.AddScoped<ReprocessarContingenciaUseCase>();
 
         // Modulo Financeiro AR/AP — Lancamentos
         services.AddScoped<BaixarLancamentoUseCase>();

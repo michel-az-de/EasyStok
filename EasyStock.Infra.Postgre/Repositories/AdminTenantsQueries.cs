@@ -187,7 +187,7 @@ public sealed class AdminTenantsQueries(EasyStockDbContext db) : IAdminTenantsQu
                 assinatura.Plano.LimiteProdutos));
 
         return new TenantDetail(
-            new TenantEmpresaInfo(empresa.Id, empresa.Nome, empresa.Documento, empresa.CriadoEm),
+            new TenantEmpresaInfo(empresa.Id, empresa.Nome, empresa.Documento, empresa.CriadoEm, empresa.WhatsAppPhoneNumberId),
             assinaturaInfo,
             lojas,
             usuarios,

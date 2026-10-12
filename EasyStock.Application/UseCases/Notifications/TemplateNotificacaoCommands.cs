@@ -47,7 +47,8 @@ public sealed record AtualizarTemplateCommand(
     Guid TemplateId,
     string NovoAssunto,
     string NovoCorpo,
-    string AtualizadoPor) : ICommand;
+    string AtualizadoPor,
+    Guid EmpresaId) : ICommand;
 
 public sealed class AtualizarTemplateUseCase(
     ITemplateRepository templateRepository,
@@ -57,8 +58,7 @@ public sealed class AtualizarTemplateUseCase(
 {
     public async Task<TemplateResult> ExecuteAsync(AtualizarTemplateCommand command)
     {
-        var original = await templateRepository.GetByIdAsync(command.TemplateId)
-            ?? throw new InvalidOperationException($"Template {command.TemplateId} não encontrado.");
+        var original = await templateRepository.ObterDaEmpresaAsync(command.TemplateId, command.EmpresaId);
 
         // Cria nova versão incrementando a versão do original
         var novaVersao = TemplateNotificacao.Criar(
@@ -82,7 +82,7 @@ public sealed class AtualizarTemplateUseCase(
 
 // ── Aprovar ──────────────────────────────────────────────────────────────────
 
-public sealed record AprovarTemplateCommand(Guid TemplateId, string AprovadoPor) : ICommand;
+public sealed record AprovarTemplateCommand(Guid TemplateId, string AprovadoPor, Guid EmpresaId) : ICommand;
 public sealed record AprovarTemplateResult(bool Aprovado);
 
 public sealed class AprovarTemplateUseCase(
@@ -92,8 +92,7 @@ public sealed class AprovarTemplateUseCase(
 {
     public async Task<AprovarTemplateResult> ExecuteAsync(AprovarTemplateCommand command)
     {
-        var template = await templateRepository.GetByIdAsync(command.TemplateId)
-            ?? throw new InvalidOperationException($"Template {command.TemplateId} não encontrado.");
+        var template = await templateRepository.ObterDaEmpresaAsync(command.TemplateId, command.EmpresaId);
 
         template.Aprovar(command.AprovadoPor);
         await templateRepository.UpdateAsync(template);
@@ -107,7 +106,8 @@ public sealed class AprovarTemplateUseCase(
 
 public sealed record PreviewTemplateCommand(
     Guid TemplateId,
-    IDictionary<string, object?> Variaveis) : ICommand;
+    IDictionary<string, object?> Variaveis,
+    Guid EmpresaId) : ICommand;
 
 public sealed record PreviewTemplateResult(string AssuntoRenderizado, string CorpoRenderizado);
 
@@ -118,8 +118,7 @@ public sealed class PreviewTemplateUseCase(
 {
     public async Task<PreviewTemplateResult> ExecuteAsync(PreviewTemplateCommand command)
     {
-        var template = await templateRepository.GetByIdAsync(command.TemplateId)
-            ?? throw new InvalidOperationException($"Template {command.TemplateId} não encontrado.");
+        var template = await templateRepository.ObterDaEmpresaAsync(command.TemplateId, command.EmpresaId);
 
         var assunto = await renderer.RenderizarAsync(template.AssuntoTemplate, command.Variaveis);
         var corpo = await renderer.RenderizarAsync(template.CorpoTemplate, command.Variaveis);

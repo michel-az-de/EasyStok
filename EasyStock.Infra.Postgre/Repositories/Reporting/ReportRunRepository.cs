@@ -11,8 +11,6 @@ namespace EasyStock.Infra.Postgre.Repositories.Reporting;
 /// </summary>
 public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepository
 {
-    private static readonly TimeSpan DefaultLeaseDuration = TimeSpan.FromMinutes(5);
-
     // ── Leitura ───────────────────────────────────────────────────────────────
 
     public Task<ReportRun?> GetByIdAsync(Guid id, CancellationToken ct) =>
@@ -55,7 +53,7 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
             .OrderByDescending(r => r.EnqueuedAt)
             .FirstOrDefaultAsync(ct);
 
-    public Task<IReadOnlyList<ReportRun>> ListMineAsync(
+    public async Task<IReadOnlyList<ReportRun>> ListMineAsync(
         Guid?             empresaId,
         Guid              usuarioId,
         ReportListFilter  filter,
@@ -76,12 +74,11 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
         if (filter.Ate.HasValue)
             q = q.Where(r => r.EnqueuedAt <= filter.Ate.Value);
 
-        return q
+        return await q
             .OrderByDescending(r => r.EnqueuedAt)
             .Skip(skip)
             .Take(take)
-            .ToListAsync(ct)
-            .ContinueWith(t => (IReadOnlyList<ReportRun>)t.Result, ct);
+            .ToListAsync(ct);
     }
 
     public Task<int> CountRunningForOwnerAsync(

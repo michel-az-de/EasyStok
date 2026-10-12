@@ -1,5 +1,5 @@
 #!/usr/bin/env pwsh
-# Smoke HTTP estrutural dos 3 fly apps EasyStok pos-deploy.
+# Smoke HTTP estrutural dos fly apps EasyStok (api e web) pos-deploy.
 # Uso: pwsh scripts/smoke-fly-3apps.ps1
 # Sem auth (so endpoints publicos / health / login pages).
 
@@ -41,16 +41,13 @@ function Test-Endpoint {
     }
 }
 
-Write-Output "=== Smoke HTTP — 3 fly apps EasyStok ==="
+Write-Output "=== Smoke HTTP — fly apps EasyStok (api, web) ==="
 Write-Output ""
 
 $results += Test-Endpoint 'api-health-live' 'https://easystok.fly.dev/health/live' @(200)
 $results += Test-Endpoint 'api-health' 'https://easystok.fly.dev/health' @(200)
 $results += Test-Endpoint 'api-swagger' 'https://easystok.fly.dev/swagger/index.html' @(200, 401, 404)
 $results += Test-Endpoint 'api-root' 'https://easystok.fly.dev/' @(200, 302, 404)
-
-$results += Test-Endpoint 'admin-root' 'https://easystok-admin.fly.dev/' @(200, 302)
-$results += Test-Endpoint 'admin-login' 'https://easystok-admin.fly.dev/Login' @(200, 302)
 
 $results += Test-Endpoint 'web-root' 'https://easystok-web.fly.dev/' @(200, 302)
 $results += Test-Endpoint 'web-login' 'https://easystok-web.fly.dev/Login' @(200, 302)

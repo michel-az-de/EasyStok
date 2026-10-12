@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using EasyStock.Application.Ports.Output.Messaging;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
@@ -76,6 +76,8 @@ public sealed class SolicitarOtpUseCase(
                 input.Slug, telefoneMascarado, input.IpOrigem, input.IdempotencyKey);
             throw new StorefrontNaoEncontradoException(input.Slug);
         }
+
+        await whatsAppOtpSender.ValidarDisponibilidadeAsync();
 
         var empresaId = storefront.EmpresaId;
         var telefoneHash = ClienteOtp.CalcularTelefoneHash(telefoneE164);

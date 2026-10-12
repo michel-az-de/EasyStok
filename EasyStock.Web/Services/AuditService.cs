@@ -5,8 +5,8 @@ namespace EasyStock.Web.Services;
 /// <summary>
 /// Proxy BFF para a trilha de auditoria (entity_alteracoes) exposta pela Api em
 /// <c>/api/audit/*</c>. O Web reexpoe os mesmos paths para o browser porque o app host
-/// nao roteia <c>/api/*</c> direto pra Api e o Web ja tem rotas proprias sob <c>/api/</c>
-/// (ex.: <c>/api/assinatura</c>). Espelha <see cref="AssinaturaService"/>; auth via sessao
+/// nao roteia <c>/api/*</c> direto pra Api e o Web ja tem rotas proprias sob <c>/api/</c>.
+/// Auth via sessao
 /// server-side (Bearer injetado no <see cref="ApiClient"/>).
 /// </summary>
 public class AuditService(ApiClient api)

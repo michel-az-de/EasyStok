@@ -67,4 +67,17 @@ public class TemplateNotificacaoTests
 
         a.ChecksumSha256.Should().NotBe(b.ChecksumSha256);
     }
+
+    [Fact]
+    public void DefinirMetadados_guarda_o_json_e_vazio_vira_nulo()
+    {
+        var t = TemplateNotificacao.Criar("pedido_em_preparo_whatsapp_v1", "Em preparo", CanalNotificacao.WhatsApp,
+            TipoEventoNotificacao.FaturaVencida, "", "corpo");
+
+        t.DefinirMetadados("""{"template":"pedido_em_preparo"}""");
+        t.MetadadosJson.Should().Be("""{"template":"pedido_em_preparo"}""");
+
+        t.DefinirMetadados("  ");
+        t.MetadadosJson.Should().BeNull();
+    }
 }

@@ -21,15 +21,17 @@ public class LauncherRotasTests : IClassFixture<WebApplicationFactory<WebTestEnt
         _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
     [Fact]
-    public async Task Raiz_anonima_serve_a_landing_sem_rota_ambigua()
+    public async Task Raiz_anonima_leva_ao_login_sem_rota_ambigua()
     {
         var req = new HttpRequestMessage(HttpMethod.Get, "/");
         req.Headers.Accept.ParseAdd("text/html");
 
         var res = await Client().SendAsync(req);
 
-        // 500 aqui = colisao de rota de volta. 302 = a landing virou area logada.
-        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        // 500 aqui = colisao de rota de volta. A landing de venda saiu na poda P02:
+        // a raiz anonima vai direto ao login.
+        res.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        res.Headers.Location!.ToString().Should().Contain("/auth/login");
     }
 
     [Fact]

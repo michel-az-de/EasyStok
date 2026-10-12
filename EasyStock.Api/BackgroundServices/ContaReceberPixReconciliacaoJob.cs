@@ -88,6 +88,7 @@ public sealed class ContaReceberPixReconciliacaoJob(
         using var scope = serviceProvider.CreateScope();
         var contaRepo = scope.ServiceProvider.GetRequiredService<IContaReceberRepository>();
         var reconciliarUseCase = scope.ServiceProvider.GetRequiredService<ReconciliarPixParcelaReceberUseCase>();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
         var hoje = DateTime.UtcNow;
         var parcelas = await contaRepo.ListarParcelasComPixAtivoAsync(hoje, ct);
@@ -112,6 +113,8 @@ public sealed class ContaReceberPixReconciliacaoJob(
             catch (Exception ex)
             {
                 falhas++;
+                // #1598: o resto da parcela que falhou não pode sair no commit da seguinte (mesmo escopo).
+                unitOfWork.DescartarAlteracoesPendentes();
                 logger.LogWarning(ex, "Falha ao reconciliar parcela {ParcelaId} txid={Txid}",
                     parcela.Id, parcela.EfiTxid);
                 // Circuit breaker simples: 3 falhas seguidas para a rodada

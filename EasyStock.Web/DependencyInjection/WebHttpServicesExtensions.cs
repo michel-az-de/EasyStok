@@ -9,7 +9,7 @@ namespace EasyStock.Web.DependencyInjection;
 /// Consolida em uma só extension TODOS os ~37 registros DI que viviam soltos no Program.cs
 /// do <c>EasyStock.Web</c>: Session (Redis ou InMemory), HttpContextAccessor,
 /// SessionService + JwtClaimsReader + LucideIconResolver, 2 HttpClient&lt;T&gt; com
-/// TokenRefreshHandler, 30+ domain Services (Scoped), Marketing options, Leads/Faq/Tickets
+/// TokenRefreshHandler, 30+ domain Services (Scoped), Marketing options
 /// API services, ResponseCompression (Brotli/Gzip).
 ///
 /// Lifetime de cada serviço preservado exatamente como estava no Program.cs original —
@@ -83,23 +83,18 @@ public static class WebHttpServicesExtensions
         services.AddScoped<ListasComprasService>();
         services.AddScoped<AnalyticsService>();
         services.AddScoped<InteligenciaService>();
+        services.AddScoped<AutoPreenchimentoService>();
         services.AddScoped<NotificacoesService>();
         services.AddScoped<UsuariosService>();
-        services.AddScoped<AssinaturaService>();
         services.AddScoped<AuditService>();
         services.AddScoped<ConfiguracoesService>();
-        services.AddScoped<AnunciosService>();
         services.AddScoped<CategoriasService>();
         services.AddScoped<LojasService>();
         services.AddScoped<CardapioService>();
         services.AddScoped<BuscaUnificadaService>();
         services.AddScoped<InteligenciaLojasService>();
-        services.AddScoped<MobileDevicesService>();
         services.AddScoped<MobileProductsService>();
-        services.AddScoped<OperacaoMobileService>();
         services.AddScoped<RelatoriosService>();
-        services.AddScoped<NotasFiscaisService>();
-        services.AddScoped<ConfiguracaoFiscalService>();
 
         // 6d. Menu lateral (ADR-0032, fatia 2): badges agregados com cache curto (60s)
         // por empresa+loja. AddMemoryCache registra IMemoryCache (distinto do distributed
@@ -115,13 +110,8 @@ public static class WebHttpServicesExtensions
         services.AddScoped<ITenantFeaturesFonte, TenantFeaturesFonte>();
         services.AddScoped<TenantFeaturesService>();
 
-        // 6b. Marketing options + Leads API service (landing publica)
+        // 6b. Marketing options (landing publica)
         services.Configure<MarketingOptions>(config.GetSection("Marketing"));
-        // Feature flags (issue #770): modulo fiscal default-off ate homologacao FocusNFe.
-        services.Configure<FeaturesOptions>(config.GetSection("Features"));
-        services.AddScoped<LeadsApiService>();
-        services.AddScoped<FaqApiService>();
-        services.AddScoped<TicketsApiService>();
 
         // 6c. Response compression — Brotli/Gzip pra Razor HTML, JSON do AJAX e estaticos.
         // CPU overhead marginal vs ganho de bandwidth (Render cobra acima do free tier).

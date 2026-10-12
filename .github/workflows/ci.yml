@@ -32,7 +32,7 @@ jobs:
     # restore-test-rotulos.yml.
     services:
       postgres:
-        image: postgres:16
+        image: public.ecr.aws/docker/library/postgres:16 # espelho da imagem oficial: o Docker Hub anonimo estoura o limite de pull (#1514)
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: easystock_ci
@@ -66,6 +66,20 @@ jobs:
       - name: Build
         run: dotnet build EasyStok.CI.slnf -c Release --no-restore -warnaserror
 
+      # #1514: as imagens dos fixtures Testcontainers vem de espelhos e recebem a tag do Docker Hub;
+      # com a imagem local o Testcontainers nao puxa nada (limite anonimo do Hub). Puxadas em serie,
+      # com nova tentativa, porque o espelho da AWS tambem limita pulls simultaneos.
+      - name: Imagens dos testes por espelho
+        run: |
+          set -euo pipefail
+          puxar() { for i in 1 2 3 4 5; do docker pull -q "$1" && return 0; sleep $((i * 5)); done; return 1; }
+          for img in postgres:16-alpine postgres:17-alpine; do
+            puxar "public.ecr.aws/docker/library/$img"
+            docker tag "public.ecr.aws/docker/library/$img" "$img"
+          done
+          puxar ghcr.io/axllent/mailpit:v1.31.3
+          docker tag ghcr.io/axllent/mailpit:v1.31.3 axllent/mailpit:v1.31.3
+
       - name: Test
         env:
           # Conn string do service postgres (superuser). SSL Mode=Disable: o container
@@ -76,6 +90,9 @@ jobs:
           # estoura 500ms na primeira renderizacao de template -- flaky de timing (issue #910,
           # flaky-tests.md). NAO relaxa a guarda de producao, so o piso do runner lento.
           EASYSTOK_SCRIBAN_TIMEOUT_MS: '2000'
+          # #1514: o Ryuk (testcontainers/ryuk) viria do Docker Hub, que estoura o limite anonimo; o
+          # runner e descartado ao fim do job, entao a limpeza dele nao faz falta.
+          TESTCONTAINERS_RYUK_DISABLED: 'true'
         run: >-
           dotnet test EasyStok.CI.slnf
           -c Release --no-build --no-restore
@@ -91,32 +108,3 @@ jobs:
           name: test-results
           path: ./TestResults/**/*.trx
           retention-days: 14
-
-      - name: Open helpdesk ticket on failure
-        if: failure() && env.CI_TICKETS_API_URL != ''
-        env:
-          CI_TICKETS_API_URL: ${{ secrets.CI_TICKETS_API_URL }}
-          CI_AUTO_TICKET_KEY: ${{ secrets.CI_AUTO_TICKET_KEY }}
-        run: |
-          # Auto-ticket em falha de CI. Signature deterministico (run_id + ref)
-          # garante idempotencia diaria — re-trigger do mesmo workflow nao
-          # multiplica tickets. /api/ci/tickets coalesca como comentario.
-          SIG=$(echo -n "ci-${GITHUB_RUN_ID}-${GITHUB_REF}" | sha256sum | awk '{print $1}')
-          # Anexa ultimas 80 linhas do test results (best-effort)
-          CONTEXTO=$(find ./TestResults -name '*.trx' -print0 \
-            | xargs -0 grep -h '<Message>' 2>/dev/null \
-            | tail -n 80 \
-            | sed 's/"/\\"/g' \
-            | tr -d '\r' \
-            | awk '{printf "%s\\n", $0}' \
-            || echo "(sem trx)")
-          curl -sS -X POST "${CI_TICKETS_API_URL}/api/ci/tickets" \
-            -H "Content-Type: application/json" \
-            -H "X-Ci-Key: ${CI_AUTO_TICKET_KEY}" \
-            -d "{
-              \"origin\": \"ci\",
-              \"signature\": \"${SIG}\",
-              \"titulo\": \"CI falhou em ${GITHUB_REF_NAME} (${GITHUB_RUN_ID})\",
-              \"descricao\": \"Run ${GITHUB_RUN_ID} falhou no commit ${GITHUB_SHA}\",
-              \"contexto\": \"${CONTEXTO}\"
-            }" || echo "(auto-ticket falhou — checar manualmente)"
