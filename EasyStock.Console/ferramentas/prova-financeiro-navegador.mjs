@@ -1,10 +1,17 @@
 // UI real do Console com API controlada. Não usa nem altera dados da loja.
 // PLAYWRIGHT_MODULE aponta uma instalação existente; CONSOLE_URL aponta o Vite em modo API.
 import assert from 'node:assert/strict'
-import { createRequire } from 'node:module'
+import { createRequire, registerHooks } from 'node:module'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 const require = createRequire(import.meta.url)
+registerHooks({ resolve(spec, contexto, proximo) {
+  if (spec.startsWith('.') && !/\.[a-z]+$/i.test(spec)) {
+    try { return proximo(spec + '.js', contexto) } catch { /* resolução normal */ }
+  }
+  return proximo(spec, contexto)
+} })
+const { MODULOS, hashDoModulo, telasDoMenu } = await import('../src/dominio/modulos.js')
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const origem = process.env.CONSOLE_URL ?? 'http://127.0.0.1:5186'
 const evidencias = process.env.EVIDENCIAS_UX ?? 'builds/prova-financeiro'
@@ -25,11 +32,26 @@ const acoes = Object.fromEntries(['visualizarContasPagar', 'visualizarContasRece
 const escritas = []
 const erros = []
 let falhaDeGravacao = false
+let shaDoDocumento, versaoPublicada, respostaInvalida = false
 const browser = await chromium.launch({ headless: true })
 let paginaProva
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 960 }, reducedMotion: 'reduce' })
   await context.addInitScript(({ empresaId }) => sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'teste-ui-controlado', expiraEm: Date.now() + 3600000, empresa: { id: empresaId, nome: 'Empresa de teste' }, usuario: { id: '22222222-2222-4222-8222-222222222222', nome: 'Dona de teste' } })), { empresaId })
+  // Emula somente a troca de versão, mantendo o JS/CSS reais do pacote servido.
+  await context.route(origem + '/**', async route => {
+    const request = route.request(), caminho = new URL(request.url()).pathname
+    if (caminho === '/versao.json') return route.fulfill(respostaInvalida ? { contentType: 'application/json', body: 'indisponível' } : { json: { sha: versaoPublicada } })
+    if (request.resourceType() !== 'document') return route.continue()
+    const resposta = await route.fetch()
+    let html = await resposta.text()
+    shaDoDocumento ??= html.match(/easystok-console-sha" content="([a-f0-9]{40})"/)?.[1] ?? 'a'.repeat(40)
+    versaoPublicada ??= shaDoDocumento
+    html = html.includes('<meta name="easystok-console-sha"')
+      ? html.replace(/(easystok-console-sha" content=")[a-f0-9]{40}/, '$1' + shaDoDocumento)
+      : html.replace('<head>', `<head><meta name="easystok-console-sha" content="${shaDoDocumento}">`)
+    return route.fulfill({ response: resposta, body: html })
+  })
   await context.route('**/api/**', async (route) => {
     const request = route.request(), url = new URL(request.url()), caminho = url.pathname, metodo = request.method()
     if (!caminho.startsWith('/api/')) return route.continue()
@@ -65,6 +87,7 @@ try {
     if (caminho === '/api/caixa/movimentos') return ok([{ id: '88888888-8888-4888-8888-888888888888', tipo: 'saida', descricao: 'Despesa avulsa', valor: 30, dataMovimento: instante, metodo: 'dinheiro' }], { total: 1, page: 1, limit: 100 })
     if (caminho === '/api/caixa/dia') return ok({ data: url.searchParams.get('data') ?? hoje, aberto: true, fechado: false, saldoInicial: 100, saldoEsperado: 100, movimentos: [], linhasExtras: [] })
     if (caminho === '/api/atendimento/configuracao') return ok({})
+    if (caminho === '/api/atendimento/agenda') return ok({ lojaDisponivel: false, dias: [] })
     if (caminho === '/api/atendimento/producao/insumos') return ok([{ produtoId: 'insumo', nome: 'Molho sugo', unidade: 'G', saldo: 1000, minimo: 500, custo: 0.02, receitas: 1 }])
     if (caminho === '/api/atendimento/producao/perdas') return ok({ de: hoje, ate: hoje, valor: 0, porMotivo: [], porProduto: [], lancamentos: [] })
     if (caminho === '/api/atendimento/comanda/cardapio/secoes') return ok([{ secaoId: 'secao', nome: 'Massas', ordem: 1, visivel: true, itens: 0 }])
@@ -77,6 +100,32 @@ try {
   page.on('console', (mensagem) => {
     if (mensagem.type() === 'error' && !/Failed to load resource: the server responded with a status of 400/.test(mensagem.text())) erros.push(mensagem.text())
   })
+  let telasVerificadas = 0
+  for (const modulo of MODULOS) {
+    const telas = telasDoMenu(modulo, { fonteApi: true })
+    for (const telaId of [undefined, ...telas.map(tela => tela.id)]) {
+      await page.goto(origem + '/' + hashDoModulo(modulo.id, telaId))
+      // O Balcão é a referência aprovada e conserva seu próprio painel lateral.
+      if (modulo.id === 'atendimento' && (telaId === undefined || telaId === 'balcao')) {
+        await page.getByRole('navigation', { name: 'Navegação', exact: true }).waitFor()
+        telasVerificadas++
+        continue
+      }
+      const navegacao = page.getByRole('navigation', { name: `Telas de ${modulo.nome}`, exact: true })
+      await navegacao.waitFor()
+      await navegacao.locator(`a[href="${hashDoModulo(modulo.id, telaId ?? telas[0].id)}"][aria-current="page"]`).waitFor()
+      assert.equal(await navegacao.getByRole('link').count(), telas.length, `${modulo.id}/${telaId ?? '(entrada)'}`)
+      const ativa = navegacao.locator('[aria-current="page"]')
+      assert.equal(await ativa.getAttribute('href'), hashDoModulo(modulo.id, telaId ?? telas[0].id))
+      assert.equal(await page.getByRole('navigation', { name: 'Módulos da loja', exact: true }).getByRole('link').count(), MODULOS.length + 1)
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+      telasVerificadas++
+    }
+    await page.goto(origem + '/' + hashDoModulo(modulo.id))
+    if (modulo.id === 'atendimento') await page.getByRole('navigation', { name: 'Navegação', exact: true }).waitFor()
+    else await page.getByRole('navigation', { name: `Telas de ${modulo.nome}`, exact: true }).waitFor()
+    await page.screenshot({ path: join(evidencias, `navegacao-${modulo.id}.png`) })
+  }
   await page.goto(origem + '/#/m/financeiro/pagar')
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).waitFor()
   assert.equal(await page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true }).getByRole('link').count(), 8)
@@ -210,10 +259,44 @@ try {
   acoes.visualizarContasPagar = false
   await page.reload()
   await page.getByText('Seu perfil não pode consultar estas contas', { exact: true }).waitFor()
+  acoes.visualizarContasPagar = true
+  acoes.gerenciarContasPagar = true
+  await page.reload()
+  await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Atualizar sistema', exact: true }).count(), 0)
+  await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).click()
+  modal = page.getByRole('dialog', { name: 'Nova conta a pagar', exact: true })
+  await modal.getByLabel('Descrição', { exact: true }).fill('Rascunho preservado durante publicação')
+  const consultarVersao = async () => {
+    await page.waitForTimeout(5100)
+    const consulta = page.waitForResponse(resposta => new URL(resposta.url()).pathname === '/versao.json')
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await consulta
+  }
+  respostaInvalida = true
+  await consultarVersao()
+  assert.equal(await page.getByRole('button', { name: 'Atualizar sistema', exact: true }).count(), 0)
+  respostaInvalida = false
+  versaoPublicada = shaDoDocumento === 'b'.repeat(40) ? 'c'.repeat(40) : 'b'.repeat(40)
+  await consultarVersao()
+  await page.getByRole('button', { name: 'Atualizar sistema', exact: true }).waitFor({ state: 'attached' })
+  assert.equal(await modal.getByLabel('Descrição', { exact: true }).inputValue(), 'Rascunho preservado durante publicação')
+  assert.equal(new URL(page.url()).searchParams.has('versao'), false)
+  await page.keyboard.press('Escape')
+  await page.setViewportSize({ width: 390, height: 844 })
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+  await page.screenshot({ path: join(evidencias, 'aviso-atualizacao-celular.png') })
+  shaDoDocumento = versaoPublicada
+  await page.getByRole('button', { name: 'Atualizar sistema', exact: true }).click()
+  await page.waitForURL(url => url.searchParams.get('versao') === versaoPublicada)
+  await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).waitFor()
+  assert.equal(new URL(page.url()).hash, '#/m/financeiro/pagar')
+  assert.equal(await page.getByRole('button', { name: 'Atualizar sistema', exact: true }).count(), 0)
+  assert.equal(await page.evaluate(() => JSON.parse(sessionStorage.getItem('easystok.sessao')).token), 'teste-ui-controlado')
   assert.deepEqual(erros, [])
-  console.log(`OK: navegação lateral, criação, pagamento, recebimento, estornos, foco, modais aninhadas, erro preservando formulário, extrato, relatório, CSV, cadastros de Produção/Cardápio, permissões, tema escuro e celular; ${escritas.length} escritas controladas; sem erros de página ou console.`)
+  console.log(`OK: ${telasVerificadas} rotas dos oito módulos, navegação lateral, operações financeiras, modais, permissões, atualização por clique sem perder rascunho, manifesto inválido, sessão/rota preservadas e celular; ${escritas.length} escritas controladas; sem erros de página ou console.`)
 } catch (erro) {
-  console.error('Erros de página:', erros)
+  console.error('Erros de página:', erros.filter(erro => !erro.startsWith('Failed to send error')).map(erro => erro.split('\n')[0]))
   if (paginaProva) {
     console.error((await paginaProva.locator('body').innerText()).slice(0, 1500))
     await paginaProva.screenshot({ path: join(evidencias, 'falha.png') })
