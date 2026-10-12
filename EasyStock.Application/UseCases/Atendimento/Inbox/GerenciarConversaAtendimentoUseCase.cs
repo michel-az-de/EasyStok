@@ -2,6 +2,7 @@ using EasyStock.Application.Events.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.Webhook;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 
@@ -20,7 +21,8 @@ public sealed record AcaoConversaCommand(Guid EmpresaId, Guid UsuarioId, Guid Co
 /// Encerrar enfileira <see cref="ConversaEncerradaEvent"/> no outbox do mesmo commit (S42, ADR-0030).
 /// </summary>
 public sealed class GerenciarConversaAtendimentoUseCase(
-    IConversaRepository conversaRepository, IUnitOfWork unitOfWork, IPublicadorEventoIntegracao? publicador = null)
+    IConversaRepository conversaRepository, IUnitOfWork unitOfWork, IPublicadorEventoIntegracao? publicador = null,
+    IQueueService? fila = null)
 {
     public const string PrefixoLiberacao = "atendimento automático retomado por ";
 
@@ -32,15 +34,23 @@ public sealed class GerenciarConversaAtendimentoUseCase(
         }, ct);
 
     /// <summary>Volta a <see cref="SituacaoConversa.Automatica"/> e deixa nota interna com quem liberou.</summary>
-    public Task<ConversaSituacaoResult> LiberarAutomaticoAsync(AcaoConversaCommand command, CancellationToken ct = default) =>
-        ExecutarAsync(command, (conversa, agora) =>
+    public async Task<ConversaSituacaoResult> LiberarAutomaticoAsync(AcaoConversaCommand command, CancellationToken ct = default)
+    {
+        var retomou = false;
+        var resultado = await ExecutarAsync(command, (conversa, agora) =>
         {
+            retomou = conversa.Situacao != SituacaoConversa.Automatica;
             conversa.LiberarAutomatico();
             return conversaRepository.AddMensagemAsync(
                 Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora,
                     TipoConteudoMensagem.Texto, PrefixoLiberacao + command.QuemAgiu),
                 ct);
         }, ct);
+        // A entrada pendente já pode estar na conversa quando a atendente devolve à IA.
+        if (retomou && fila is not null)
+            await fila.EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, new ProcessarTurnoAgenteJob(command.EmpresaId, command.ConversaId));
+        return resultado;
+    }
 
     public const string PrefixoLiberacaoForaDeArea = "entrega fora da área liberada por ";
 

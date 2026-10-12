@@ -8,6 +8,7 @@ import { primeiroNome } from './mensagem.js'
 import { textoConviteCardapio } from './cardapioLink.js'
 
 export const ACOES_DO_ASSISTENTE = {
+  RETOMAR_AUTOMATICO: 'retomar_automatico',
   ENVIAR_CARDAPIO: 'enviar_cardapio',
   NOTA_INTERNA: 'nota_interna',
   RASCUNHO: 'rascunho',
@@ -52,6 +53,8 @@ export function respostaDoAssistente(resposta) {
 export function descreverAcaoDoAssistente(acao, nomeCliente) {
   const nome = nomeCliente ? primeiroNome(nomeCliente) : 'o cliente'
   switch (acao.tipo) {
+    case ACOES_DO_ASSISTENTE.RETOMAR_AUTOMATICO:
+      return { titulo: 'IA no atendimento', detalhe: `Continuar a conversa com ${nome} no modo automático.`, botao: 'IA assumir atendimento', feito: 'Atendimento automático retomado', saiParaCliente: false }
     case ACOES_DO_ASSISTENTE.ENVIAR_CARDAPIO:
       return { titulo: 'Mandar o cardápio', detalhe: `Link do cardápio para ${nome}.`, botao: 'Enviar ao cliente', feito: 'Cardápio enviado', saiParaCliente: true }
     case ACOES_DO_ASSISTENTE.NOTA_INTERNA:
@@ -72,10 +75,12 @@ export function descreverAcaoDoAssistente(acao, nomeCliente) {
 // O cardápio sai com o mesmo convite e o mesmo link do botão do compositor (#1353).
 export async function executarAcaoDoAssistente(acao, conversa, portas) {
   switch (acao.tipo) {
+    case ACOES_DO_ASSISTENTE.RETOMAR_AUTOMATICO:
+      return portas.devolverAutomatico(conversa.id)
     case ACOES_DO_ASSISTENTE.ENVIAR_CARDAPIO: {
       const link = await portas.obterLinkCardapio(conversa.id)
       if (!link?.url) throw new Error('Não consegui gerar o link do cardápio.')
-      if (await portas.enviar(conversa.id, textoConviteCardapio(conversa.nome, link.url)) === false) {
+      if (await portas.enviar(conversa.id, textoConviteCardapio(conversa.nome, link.url, link.numeroComanda || conversa.numeroComanda)) === false) {
         throw new Error('Sem confirmação do envio. Confira a conversa antes de tentar de novo.')
       }
       return

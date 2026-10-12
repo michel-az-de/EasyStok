@@ -61,7 +61,8 @@ public sealed partial class PedidoConversaConcorrenciaTests
         using var client = factory.CreateClient();
         var cenario = await SemearAsync(factory, "casa-da-baba");
         await PrepararAvisos(factory, cenario.ConversaId);
-        string token;
+        string token, leadToken;
+        Guid leadConversaId;
         using (var scope = factory.Services.CreateScope())
         {
             scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(EmpresaId);
@@ -77,11 +78,18 @@ public sealed partial class PedidoConversaConcorrenciaTests
             var link = await scope.ServiceProvider.GetRequiredService<LinkCardapioConversaService>()
                 .GerarAsync(EmpresaId, cenario.ConversaId, DateTime.UtcNow);
             token = link.Token;
+            var lead = Conversa.Abrir(EmpresaId, "5511912345678", agora, "Cliente da sprint");
+            db.AtendimentoConversas.Add(lead);
+            await db.SaveChangesAsync();
+            leadConversaId = lead.Id;
+            leadToken = (await scope.ServiceProvider.GetRequiredService<LinkCardapioConversaService>()
+                .GerarAsync(EmpresaId, lead.Id, agora)).Token;
         }
         var estado = await Estado(client, token);
         var dados = new { api = client.BaseAddress!.ToString().TrimEnd('/'), empresaId = EmpresaId, usuarioId = UsuarioId,
             conversaId = cenario.ConversaId, clienteId = cenario.ClienteId, token, numeroComanda = estado.NumeroComanda,
-            cardapioItemId = cenario.CardapioItemId, janelaId = cenario.JanelaId, dataEntrega = cenario.DataEntrega };
+            cardapioItemId = cenario.CardapioItemId, janelaId = cenario.JanelaId, dataEntrega = cenario.DataEntrega,
+            leadToken, leadConversaId };
         await File.WriteAllTextAsync(arquivo!, JsonSerializer.Serialize(dados, ComandaClienteUseCase.Json));
         using var limite = new CancellationTokenSource(TimeSpan.FromMinutes(30));
         while (!File.Exists(arquivo + ".stop")) await Task.Delay(500, limite.Token);

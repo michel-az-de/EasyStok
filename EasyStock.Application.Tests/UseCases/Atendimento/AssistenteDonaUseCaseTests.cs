@@ -11,6 +11,15 @@ namespace EasyStock.Application.Tests.UseCases.Atendimento;
 /// <summary>Assistente da dona (S47, #1445). O LLM é um fake: nenhuma chamada de rede.</summary>
 public class AssistenteDonaUseCaseTests
 {
+    [Fact]
+    public async Task PedidoParaIAAssumir_PropoeAcaoExecutavelSemPrometerExecucao()
+    {
+        _llm.Disponivel.Returns(true);
+        Responder(new RespostaLlm(RespostaLlm.StopToolUse,
+            [Uso(PropostasAssistenteDona.RetomarAutomatico, "{}")], 100, 20));
+        var resposta = await Criar().ExecuteAsync(new(_empresaId, "assuma o atendimento deste cliente", _conversa.Id));
+        resposta.Acoes.Should().ContainSingle().Which.Tipo.Should().Be(AcaoPropostaAssistente.RetomarAutomatico);
+    }
     private static readonly DateTime Agora = new(2026, 9, 29, 15, 0, 0, DateTimeKind.Utc);
 
     private readonly Guid _empresaId = Guid.NewGuid();
@@ -70,7 +79,7 @@ public class AssistenteDonaUseCaseTests
 
         // #1445: só propostas; nenhuma ferramenta do agente do WhatsApp (criar pedido, escalar, enviar).
         _requisicoes[0].Ferramentas.Select(f => f.Nome).Should().BeEquivalentTo(
-            "propor_envio_cardapio", "propor_nota_interna", "propor_rascunho", "abrir_tela");
+            "propor_envio_cardapio", "propor_nota_interna", "propor_rascunho", "abrir_tela", "propor_retomada_automatico");
     }
 
     [Fact]

@@ -36,6 +36,17 @@ public sealed class AtendimentoComandasClienteController(ILinkCardapioConversaRe
         catch (UnauthorizedAccessException e) { return Problem(e.Message, statusCode: 403); }
     }
 
+    [HttpPost("{linkId:guid}/combinar-frete")]
+    public async Task<IActionResult> CombinarFrete(Guid conversaId, Guid linkId, [FromBody] CombinarFreteComandaBody body, CancellationToken ct)
+    {
+        if (!usuario.TemPermissao(Permissao.AtenderConversas)) return Forbid();
+        try { return Ok(new { data = await comanda.CombinarFreteAsync(usuario.EmpresaId, conversaId, linkId, body.Revisao,
+            body.Valor, User.Identity?.Name ?? "a equipe", ct) }); }
+        catch (LinkCardapioConversaIndisponivelException e) { return Problem(e.Message, statusCode: 410); }
+        catch (ComandaClienteConflitoException e) { return Problem(e.Message, statusCode: 409); }
+        catch (UseCaseValidationException e) { return Problem(e.Message, statusCode: 400); }
+    }
+
     [HttpPut("{linkId:guid}/rascunho")]
     public async Task<IActionResult> Salvar(Guid conversaId, Guid linkId,
         [FromBody] EasyStock.Api.Controllers.Storefront.SalvarComandaClienteBody body, CancellationToken ct)
@@ -49,3 +60,4 @@ public sealed class AtendimentoComandasClienteController(ILinkCardapioConversaRe
     }
 }
 public sealed record ConfirmarAlteracaoClienteBody(bool Aceitar);
+public sealed record CombinarFreteComandaBody(int Revisao, decimal Valor);

@@ -16,6 +16,7 @@ public static class PropostasAssistenteDona
     public const string NotaInterna = "propor_nota_interna";
     public const string Rascunho = "propor_rascunho";
     public const string AbrirTela = "abrir_tela";
+    public const string RetomarAutomatico = "propor_retomada_automatico";
 
     public const int TamanhoMaximoRascunho = 1000;
 
@@ -23,6 +24,10 @@ public static class PropostasAssistenteDona
 
     public static readonly IReadOnlyList<FerramentaLlm> Ferramentas =
     [
+        new(RetomarAutomatico,
+            "Use quando a atendente pedir para a IA assumir, continuar ou conduzir esta conversa. " +
+            "Propõe retomar o atendimento automático; a atendente confirma na tela. Nunca apenas responda que assumiu.",
+            """{"type":"object","properties":{},"additionalProperties":false}"""),
         new(EnviarCardapio,
             "Propõe mandar ao cliente desta conversa o link do cardápio da loja. Use quando a dona pedir para " +
             "mandar ou enviar o cardápio. Não envia nada: a atendente confirma na tela.",
@@ -51,6 +56,7 @@ public static class PropostasAssistenteDona
         {
             var acao = uso.Nome switch
             {
+                RetomarAutomatico => new AcaoPropostaAssistente(AcaoPropostaAssistente.RetomarAutomatico, null, null),
                 EnviarCardapio => new AcaoPropostaAssistente(AcaoPropostaAssistente.EnviarCardapio, null, null),
                 NotaInterna => Texto(uso.Entrada, ClienteNota.TextoTamanhoMaximo) is { } nota
                     ? new AcaoPropostaAssistente(AcaoPropostaAssistente.NotaInterna, nota, null)

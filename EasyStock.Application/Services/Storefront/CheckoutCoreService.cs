@@ -35,7 +35,7 @@ public sealed record CheckoutCoreInput(
     string? Observacoes = null,
     PrazoPreparoCheckout? Prazo = null,
     string? Numero = null,
-    DadosEnderecoEntrega? EnderecoEntrega = null);
+    DadosEnderecoEntrega? EnderecoEntrega = null, decimal? FreteCombinado = null);
 
 /// <summary>
 /// Parâmetros do prazo mínimo (S16, RN-21): com eles o núcleo recusa a janela cujo início seja antes de
@@ -148,7 +148,12 @@ public sealed class CheckoutCoreService(
 
         // ── Cobertura e valor do frete: a mesma cotação do site (#1291) ───
         // Fora da área (zona ou raio), o CalcularFrete lança CepSemCoberturaException.
-        var frete = await calcularFrete.ExecuteAsync(new CalcularFreteInput(storefront.Slug, cep, input.Numero), ct);
+        if (input.FreteCombinado is < 0 or > 100000 || input.FreteCombinado is { } combinado && decimal.Round(combinado, 2) != combinado)
+            throw new UseCaseValidationException("Informe um frete válido em reais e centavos.");
+        var frete = input.FreteCombinado is { } valorCombinado
+            ? new FreteCalculadoDto(Guid.Empty, checked((int)(valorCombinado * 100)), valorCombinado.ToString("C", Cultura.PtBr),
+                "Entrega combinada com a Casa", "Frete combinado pela equipe")
+            : await calcularFrete.ExecuteAsync(new CalcularFreteInput(storefront.Slug, cep, input.Numero), ct);
         var valorFrete = frete.Valor / 100m;
 
         // ── Validar janela ────────────────────────────────────────────────

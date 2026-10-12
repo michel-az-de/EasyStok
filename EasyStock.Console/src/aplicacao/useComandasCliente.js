@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { listarComandasCliente, confirmarComandaCliente, salvarComandaCliente } from '../infra/api/comandasClienteApi'
+import { listarComandasCliente, confirmarComandaCliente, salvarComandaCliente, combinarFreteComanda } from '../infra/api/comandasClienteApi'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
 
 export function useComandasCliente(conversaId, ativo) {
@@ -43,6 +43,7 @@ export function useComandasCliente(conversaId, ativo) {
     finally { trava.current = false; setOcupado(false) }
   }
   return { dados, erro: erro || erroLeitura, ocupado,
+    combinarFrete: (comanda, valor) => executar(() => combinarFreteComanda(conversaId, comanda.linkId, comanda.revisao, valor)),
     confirmar: (linkId, aceitar) => executar(() => confirmarComandaCliente(conversaId, linkId, aceitar)),
     salvar: (comanda, rascunho) => executar(() => salvarComandaCliente(conversaId, comanda.linkId, comanda.revisao, rascunho)) }
 }

@@ -19,7 +19,7 @@ public sealed record CriarPedidoAtendimentoInput(
     Guid JanelaId,
     DateOnly DataEntrega,
     Guid EnderecoId,
-    string? Observacoes = null);
+    string? Observacoes = null, decimal? FreteCombinado = null);
 
 /// <summary>
 /// Cria o pedido da conversa pelo mesmo núcleo do site (<see cref="CheckoutCoreService"/>): itens com
@@ -113,7 +113,7 @@ public sealed class CriarPedidoAtendimentoUseCase(
                 Observacoes: input.Observacoes,
                 Prazo: new PrazoPreparoCheckout(configuracao.TempoPreparoPadraoMinutos, configuracao.RespiroMinutos),
                 Numero: endereco.Numero,
-                EnderecoEntrega: EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega.De(endereco)),
+                EnderecoEntrega: EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega.De(endereco), FreteCombinado: input.FreteCombinado),
             ct);
 
         // Retrato do cliente, como o Pedido.Criar e o checkout guest gravam: sem ele o KDS e as Entregas

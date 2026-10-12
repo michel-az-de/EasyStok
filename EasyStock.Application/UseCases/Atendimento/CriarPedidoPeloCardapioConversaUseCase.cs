@@ -65,7 +65,7 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
         "Não identificamos o cliente desta conversa. Conclua o pedido pela conversa.";
 
     public async Task<PedidoPeloCardapioConversaResult> ExecuteAsync(
-        CriarPedidoPeloCardapioConversaInput input, CancellationToken ct = default)
+        CriarPedidoPeloCardapioConversaInput input, CancellationToken ct = default, decimal? freteCombinado = null)
     {
         ArgumentNullException.ThrowIfNull(input);
         var forma = string.IsNullOrWhiteSpace(input.Forma)
@@ -102,7 +102,7 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
                     ?? throw new RegraDeDominioVioladaException("Não foi possível confirmar o endereço de entrega.");
             reservado = await criarPedido.ExecuteAsync(new CriarPedidoAtendimentoInput(
                 link.EmpresaId, conversa.Id, clienteId, input.Itens, input.JanelaId, input.DataEntrega, enderecoId!.Value,
-                endereco?.Snapshot(input.Observacoes) ?? input.Observacoes), ct);
+                endereco?.Snapshot(input.Observacoes) ?? input.Observacoes, FreteCombinado: freteCombinado), ct);
         }
         catch
         {
