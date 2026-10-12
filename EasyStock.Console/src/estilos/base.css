@@ -118,6 +118,9 @@ p { text-wrap: pretty; }
 [data-imprimir] { display: none; }
 @media print {
   :root { color-scheme: light; }
+  /* #1627: na tela o corpo tem a altura da janela e não rola. No papel isso cortava a folha na
+     primeira página: 40 etiquetas de um lote saíam em 1 página em vez de 5 (medido no Edge). */
+  html, body { height: auto; overflow: visible; }
   #root { display: none; }
   [data-imprimir] { display: block; }
 }
