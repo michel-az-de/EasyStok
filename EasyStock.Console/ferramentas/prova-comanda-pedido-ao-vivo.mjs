@@ -31,7 +31,7 @@ const respirar = async () => { for (let i = 0; i < 12; i += 1) await new Promise
 let passou = 0
 const falhas = []
 
-async function montar({ selecionada = null } = {}) {
+async function montar({ selecionada = null, memoria = criarMemoriaDoLaco(), alocadoInicial = 15 } = {}) {
   const ambiente = globalThis.provaPedidoAoVivo = { efeitos: [], conexoes: [] }
   let agora = 0
   let seguinte = 0
@@ -40,7 +40,7 @@ async function montar({ selecionada = null } = {}) {
   globalThis.clearTimeout = id => tempos.delete(id)
   const pedido = (id, alocado) => ({ pedidoId: id, status: 'aguardando', itens: [], total: 25, alocado, frete: 5 })
   const s = {
-    pedidos: { a: pedido('pedido-a', 15), b: pedido('pedido-b', 25) }, chamadas: [], falha: false,
+    pedidos: { a: pedido('pedido-a', alocadoInicial), b: pedido('pedido-b', 25) }, chamadas: [], falha: false,
     emVoo: 0, pico: 0, retida: null,
     conversas: ['a', 'b'].map(id => ({ id, canal: 'WhatsApp', contatoNome: id, situacao: 'Aberta',
       ultimaMensagemEm: '2026-10-12T04:00:00Z', pedidoEmAndamentoId: `pedido-${id}`, pedidoStatus: 'aguardando' })),
@@ -61,7 +61,6 @@ async function montar({ selecionada = null } = {}) {
       return Response.json({ data: dados })
     } finally { s.emVoo -= 1 }
   }
-  const memoria = criarMemoriaDoLaco()
   let estado = estadoInicial({ conversas: [], catalogo: { janelas: [] }, regras: [] })
   const acoes = []
   useSincronizacaoApi({ ativo: true, usuario: { id: 'atendente' }, selecionadaId: selecionada, memoria,
@@ -187,6 +186,19 @@ await confere('desmontagem fecha SSE e cancela releitura agendada', async m => {
   m.evento(); m.fechar(); await m.avancar(10000)
   assert.equal(m.s.chamadas.length, 0)
   assert.equal(globalThis.provaPedidoAoVivo.conexoes.every(c => c.fechada), true)
+})
+
+await confere('GET do hook desmontado não sobrescreve o cache compartilhado da montagem nova', async m => {
+  const { retida, liberar } = m.reter('a')
+  m.evento(); await m.avancar(300); assert.equal(retida.entrou, true)
+  m.fechar()
+  const nova = await montar({ memoria: m.memoria, alocadoInicial: 25 })
+  try {
+    assert.equal(nova.memoria.pedidos.get('a').dados.alocado, 25)
+    liberar(); await respirar()
+    assert.equal(nova.memoria.pedidos.get('a').dados.alocado, 25, 'resposta da montagem encerrada substituiu o cache mais recente')
+    assert.equal(nova.pedido('a').alocadoApi, 25)
+  } finally { liberar(); nova.fechar() }
 })
 
 Object.assign(globalThis, antigos)

@@ -67,7 +67,7 @@ export function criarCicloDeSincronizacao({
     try {
       const dados = await obterPedido(resumo.id)
       // Um evento que chegou durante o GET exige outra leitura: a resposta anterior não o consome.
-      if (pedidosInvalidos.get(resumo.id) !== invalidacao) return guardado?.dados ?? null
+      if (!estaVivo() || pedidosInvalidos.get(resumo.id) !== invalidacao) return guardado?.dados ?? null
       memoria.pedidos.set(resumo.id, {
         pedidoId: resumo.pedidoEmAndamentoId, ultima: resumo.ultimaMensagemEm, statusDoResumo: resumo.pedidoStatus ?? null, dados,
       })
