@@ -62,6 +62,42 @@ public sealed class TrocarJanelaPedidoTests(PostgreSqlDatabaseFixture fixture)
         await _eventos.Received(1).PublicarAsync(EventosOperacao.PedidoReagendado, c.Empresa, Arg.Any<object>(), Arg.Any<CancellationToken>());
     }
 
+    // S53 (#1283): o número do dia é do dia de produção. Trocar a janela para outro dia troca o número de quem
+    // já tinha (o 007 do dia antigo vira o próximo número do dia novo); antes a troca pelo console deixava o
+    // pedido com o número e a data do dia de onde ele saiu.
+    [SkippableFact]
+    public async Task Troca_para_outro_dia_da_ao_pedido_o_proximo_numero_do_dia_novo()
+    {
+        var c = await PrepararAsync();
+        await using var provider = Provider();
+        await NumerarAsync(c, c.Pedidos[0], c.DataAntiga, 7);
+        await GastarNumerosAsync(provider, c.Empresa, c.DataNova, 3);
+
+        (await Executar(provider, new(c.Empresa, c.Pedidos[0], c.Nova.Id, c.DataNova)))!.Alterado.Should().BeTrue();
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(c.Empresa);
+        var pedido = await db.Pedidos.SingleAsync(p => p.Id == c.Pedidos[0]);
+        pedido.DataNumero.Should().Be(c.DataNova, "o dia de produção mudou com a janela");
+        pedido.NumeroDoDia.Should().Be(4, "o dia novo já tinha dado três números");
+    }
+
+    [SkippableFact]
+    public async Task Troca_de_janela_nao_numera_pedido_que_ainda_nao_tinha_numero()
+    {
+        var c = await PrepararAsync();
+        await using var provider = Provider();
+
+        (await Executar(provider, new(c.Empresa, c.Pedidos[0], c.Nova.Id, c.DataNova)))!.Alterado.Should().BeTrue();
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(c.Empresa);
+        var pedido = await db.Pedidos.SingleAsync(p => p.Id == c.Pedidos[0]);
+        pedido.NumeroDoDia.Should().BeNull();
+        pedido.DataNumero.Should().BeNull();
+        (await db.SequenciasPedidoDia.CountAsync(s => s.EmpresaId == c.Empresa)).Should().Be(0, "não gasta número do dia");
+    }
+
     [SkippableFact]
     public async Task Janela_cheia_preserva_vaga_horario_e_auditoria()
     {
@@ -272,6 +308,22 @@ public sealed class TrocarJanelaPedidoTests(PostgreSqlDatabaseFixture fixture)
         await using var scope = provider.CreateAsyncScope();
         scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().SetMobileTenantContext(cmd.EmpresaId);
         return await scope.ServiceProvider.GetRequiredService<TrocarJanelaPedidoUseCase>().ExecuteAsync(cmd);
+    }
+
+    private async Task NumerarAsync(Cenario c, Guid pedidoId, DateOnly dia, int numero)
+    {
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(c.Empresa);
+        (await db.Pedidos.SingleAsync(p => p.Id == pedidoId)).DefinirNumeroDoDia(dia, numero);
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task GastarNumerosAsync(ServiceProvider provider, Guid empresa, DateOnly dia, int quantos)
+    {
+        await using var scope = provider.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().SetMobileTenantContext(empresa);
+        var sequencia = scope.ServiceProvider.GetRequiredService<ISequenciaDiariaPedido>();
+        for (var i = 0; i < quantos; i++) await sequencia.ProximoAsync(empresa, dia);
     }
 
     private sealed record Cenario(Guid Empresa, JanelaEntrega Antiga, JanelaEntrega Nova, DateOnly DataAntiga, DateOnly DataNova, Guid[] Pedidos);
