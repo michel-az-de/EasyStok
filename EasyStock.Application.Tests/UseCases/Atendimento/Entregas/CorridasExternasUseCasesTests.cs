@@ -169,6 +169,19 @@ public class CorridasExternasUseCasesTests
     }
 
     [Fact]
+    public async Task Corrida_de_viagem_desfeita_depois_ainda_pode_ser_zerada()
+    {
+        var viagem = ViagemEm(SituacaoViagem.Montando);
+        var registrada = await Registrar().ExecuteAsync(Input(viagem.Id));
+        viagem.Desfazer();
+
+        var r = await Corrigir().ExecuteAsync(new CorrigirCorridaExternaInput(_empresaId, _gerente, viagem.Id, registrada.Id, 0, null));
+
+        r.CustoCentavos.Should().Be(0);
+        r.CorrigidoPorUsuarioId.Should().Be(_gerente);
+    }
+
+    [Fact]
     public async Task Corrigir_corrida_de_outra_viagem_nao_encontra()
     {
         var viagem = ViagemEm(SituacaoViagem.EmRota);

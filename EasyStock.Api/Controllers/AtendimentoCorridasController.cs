@@ -60,7 +60,7 @@ public class AtendimentoRelatorioCustoDeEntregaController(
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "Ride cost against delivery fee charged, per trip",
-        Description = "Viagens criadas em [de, ate), no máximo 93 dias. Viagem desfeita fica fora. Saldo negativo é entrega que custou mais do que rendeu.")]
+        Description = "Viagens criadas em [de, ate), no máximo 93 dias. Viagem desfeita só entra se tiver corrida registrada. Saldo negativo é entrega que custou mais do que rendeu.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [HttpGet("custo-de-entrega")]

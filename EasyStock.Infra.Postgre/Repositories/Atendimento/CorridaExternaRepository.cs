@@ -23,7 +23,7 @@ public sealed class CorridaExternaRepository(EasyStockDbContext db) : ICorridaEx
 
 /// <summary>
 /// I9.1: custo das corridas contra o frete cobrado, por viagem. O frete cobrado é a linha de frete do
-/// pedido de cada parada (<c>PedidoItem.EhLinhaDeFrete</c>); viagem desfeita fica fora.
+/// pedido de cada parada (<c>PedidoItem.EhLinhaDeFrete</c>); viagem desfeita só entra se tiver corrida.
 /// </summary>
 public sealed class CustoDeEntregaQuery(EasyStockDbContext db) : ICustoDeEntregaQuery
 {
@@ -33,8 +33,10 @@ public sealed class CustoDeEntregaQuery(EasyStockDbContext db) : ICustoDeEntrega
         var fim = Utc(ate);
 
         var viagens = await db.Viagens.AsNoTracking()
-            .Where(v => v.EmpresaId == empresaId && v.Situacao != SituacaoViagem.Desfeita
-                        && v.CriadaEm >= inicio && v.CriadaEm < fim)
+            // Viagem desfeita só entra se já tinha corrida registrada: o custo pode ter sido pago.
+            .Where(v => v.EmpresaId == empresaId && v.CriadaEm >= inicio && v.CriadaEm < fim
+                        && (v.Situacao != SituacaoViagem.Desfeita
+                            || db.CorridasExternas.Any(c => c.EmpresaId == empresaId && c.ViagemId == v.Id)))
             .Select(v => new { v.Id, v.CriadaEm })
             .ToListAsync(ct);
         if (viagens.Count == 0) return [];

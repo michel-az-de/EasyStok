@@ -54,12 +54,14 @@ public class CorridaExterna
         };
     }
 
-    /// <summary>Corrige custo e motorista e guarda quem corrigiu. Quem registrou não muda.</summary>
+    /// <summary>
+    /// Corrige custo e motorista e guarda quem corrigiu. Quem registrou não muda. Vale também com a viagem
+    /// desfeita depois do registro: é assim que se zera a corrida cancelada ou se acerta a que foi paga.
+    /// </summary>
     public void Corrigir(Viagem viagem, int custoCentavos, string? motorista, Guid usuarioId, DateTime agora)
     {
         ArgumentNullException.ThrowIfNull(viagem);
         if (viagem.Id != ViagemId) throw new RegraDeDominioVioladaException("Corrida de outra viagem.");
-        GarantirViagemComCorrida(viagem);
         if (usuarioId == Guid.Empty) throw new RegraDeDominioVioladaException("Quem corrigiu a corrida é obrigatório.");
 
         var custo = CustoValido(custoCentavos);

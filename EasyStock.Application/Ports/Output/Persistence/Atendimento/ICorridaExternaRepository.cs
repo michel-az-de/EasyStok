@@ -13,7 +13,7 @@ public interface ICorridaExternaRepository
 /// <summary>Uma viagem no relatório de custo de entrega: o que foi cobrado de frete e o que a corrida custou.</summary>
 public sealed record CustoDeEntregaLinha(Guid ViagemId, DateTime CriadaEm, int Paradas, int FreteCobradoCentavos, int CustoCentavos);
 
-/// <summary>Leitura do relatório de custo contra frete (I9.1). Viagem desfeita fica fora.</summary>
+/// <summary>Leitura do relatório de custo contra frete (I9.1). Viagem desfeita só entra se tiver corrida registrada.</summary>
 public interface ICustoDeEntregaQuery
 {
     Task<IReadOnlyList<CustoDeEntregaLinha>> ListarAsync(Guid empresaId, DateTime de, DateTime ate, CancellationToken ct = default);

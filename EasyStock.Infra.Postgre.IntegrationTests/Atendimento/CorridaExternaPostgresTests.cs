@@ -57,13 +57,39 @@ public sealed class CorridaExternaPostgresTests(PostgreSqlDatabaseFixture fixtur
         var relatorio = await new CustoDeEntregaUseCase(new CustoDeEntregaQuery(leitura))
             .ExecuteAsync(empresaId, Agora.AddDays(-1), Agora.AddDays(1));
 
-        var linha = relatorio.Viagens.Should().ContainSingle("viagem desfeita e viagem de outra loja ficam fora").Subject;
+        var linha = relatorio.Viagens.Should().ContainSingle("viagem desfeita sem corrida e viagem de outra loja ficam fora").Subject;
         linha.ViagemId.Should().Be(viagem.Id);
         linha.Paradas.Should().Be(1);
         linha.FreteCobradoCentavos.Should().Be(1200);
         linha.CustoCentavos.Should().Be(2450);
         linha.SaldoCentavos.Should().Be(-1250);
         desfeita.Situacao.Should().Be(SituacaoViagem.Desfeita);
+    }
+
+    [SkippableFact]
+    public async Task Viagem_desfeita_com_corrida_registrada_continua_no_relatorio()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = Guid.NewGuid();
+        var viagem = await SemearViagemComFreteAsync(empresaId, freteReais: 12m);
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresaId);
+            var rastreada = await db.Viagens.Include(v => v.Paradas).SingleAsync(v => v.Id == viagem.Id);
+            db.CorridasExternas.Add(CorridaExterna.RegistrarManual(rastreada, EmpresaEntregador.NoveNove, 1890, null, Operadora, Agora));
+            rastreada.Desfazer();
+            await db.SaveChangesAsync();
+        }
+
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(empresaId);
+        var relatorio = await new CustoDeEntregaUseCase(new CustoDeEntregaQuery(leitura))
+            .ExecuteAsync(empresaId, Agora.AddDays(-1), Agora.AddDays(1));
+
+        var linha = relatorio.Viagens.Should().ContainSingle().Subject;
+        linha.CustoCentavos.Should().Be(1890);
+        linha.Paradas.Should().Be(0, "desfazer devolve os pedidos para a esteira");
+        linha.FreteCobradoCentavos.Should().Be(0);
     }
 
     [SkippableFact]
