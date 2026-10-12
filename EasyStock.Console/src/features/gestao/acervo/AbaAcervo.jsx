@@ -19,7 +19,10 @@ export function AbaAcervo() {
   const a = useAcervo()
   const [busca, setBusca] = useState('')
   const [selecionada, setSelecionada] = useState(null)
-  const [dialogo, setDialogo] = useState(null)
+  const selecionadaAtual = useRef(null)
+  const [dialogo, definirDialogo] = useState(null)
+  const fluxoAtual = useRef(0)
+  const setDialogo = (novo) => { fluxoAtual.current++; definirDialogo(novo) }
   const [historico, setHistorico] = useState([])
   const [publicacao, setPublicacao] = useState(null)
   const [aviso, setAviso] = useState('')
@@ -39,9 +42,11 @@ export function AbaAcervo() {
     return resultado
   }
   async function prepararPublicacao(itemId, galeria) {
+    const imagemId = imagem.id
+    const fluxo = fluxoAtual.current
     const item = await a.fazer(() => a.obterItem(itemId))
-    if (item !== false) {
-      setPublicacao({ itemId, galeria, capaEsperada: item.fotoUrl, nome: item.nome, operacaoId: crypto.randomUUID() })
+    if (item !== false && selecionadaAtual.current === imagemId && fluxoAtual.current === fluxo) {
+      setPublicacao({ imagemId, itemId, galeria, capaEsperada: item.fotoUrl, nome: item.nome, operacaoId: crypto.randomUUID() })
       setDialogo('publicar')
     }
   }
@@ -65,7 +70,7 @@ export function AbaAcervo() {
     <label className={css.campo}>Buscar nesta página<input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Prato, origem ou formato" /></label>
     {a.carregando ? <p role="status">Carregando acervo…</p> : <div className={css.grade}>
       {a.imagens.filter((i) => `${i.titulo} ${i.origem} ${i.formato}`.toLocaleLowerCase('pt-BR').includes(busca.toLocaleLowerCase('pt-BR'))).map((i) =>
-        <button type="button" key={i.id} className={`${css.cartao} ${selecionada === i.id ? css.ativo : ''}`} onClick={() => { setSelecionada(i.id); setHistorico([]) }}>
+        <button type="button" key={i.id} className={`${css.cartao} ${selecionada === i.id ? css.ativo : ''}`} onClick={() => { selecionadaAtual.current = i.id; setSelecionada(i.id); setHistorico([]); setDialogo(null); setPublicacao(null) }}>
           <Foto imagem={i} /><strong>{i.titulo}</strong><span>{i.origem} · {i.formato} · {i.aprovadoEm ? 'Aprovada' : 'Em revisão'}</span>
         </button>)}
       {!a.imagens.length && <p>Adicione o primeiro original para começar o acervo.</p>}
@@ -84,7 +89,7 @@ export function AbaAcervo() {
       {ids(imagem).map((id) => <div className={css.linha} key={id}><span>{a.itens.find((i) => i.cardapioItemId === id)?.nome || 'Item vinculado'}</span>
         <div className={css.acoes}><Botao disabled={!imagem.aprovadoEm || !previa.url || a.ocupado} onClick={() => prepararPublicacao(id, false)}>Prévia como capa</Botao><Botao disabled={!imagem.aprovadoEm || !previa.url || a.ocupado} onClick={() => prepararPublicacao(id, true)}>Adicionar à galeria</Botao></div></div>)}
       {!ids(imagem).length && <p>Imagem de uso geral, sem item de cardápio vinculado.</p>}
-      <Botao onClick={async () => { const h = await a.fazer(() => a.api.historicoImagem(imagem.id)); if (h !== false) setHistorico(h) }}>Consultar publicações</Botao>
+      <Botao disabled={a.ocupado} onClick={async () => { const fluxo = fluxoAtual.current; const h = await a.fazer(() => a.api.historicoImagem(imagem.id)); if (h !== false && selecionadaAtual.current === imagem.id && fluxoAtual.current === fluxo) setHistorico(h) }}>Consultar publicações</Botao>
       {historico.map((h) => <p key={h.id}>{new Date(h.criadoEm).toLocaleString('pt-BR')} · {h.galeria ? 'Galeria' : 'Capa'} · <a href={a.fotoUrl(h.url)} target="_blank" rel="noopener noreferrer">Ver arquivo publicado</a></p>)}
       </div><div><VisualFoto imagem={imagem} previa={previa} />{previa.erro && <Botao onClick={previa.tentar}>Tentar prévia novamente</Botao>}</div>
     </section>}
@@ -105,7 +110,7 @@ export function AbaAcervo() {
       </form>}
       {dialogo === 'canva' && <form className={css.formulario} onSubmit={(e) => { e.preventDefault(); const url = new FormData(e.currentTarget).get('url'); executar(() => a.api.vincularCanva(imagem.id, url), 'Design vinculado.') }}><label>Link do design Canva<input name="url" type="url" required defaultValue={imagem.canvaUrl || ''} /></label><Botao tipo="submit" disabled={a.ocupado}>Salvar vínculo</Botao></form>}
       {dialogo === 'aprovar' && <div className={css.formulario}><VisualFoto imagem={imagem} previa={previa} /><p>Confira a apresentação do prato, os ingredientes visíveis e a adequação da imagem aos itens vinculados. A aprovação vale para esta versão.</p><Botao variante="primario" disabled={!previa.url || a.ocupado} onClick={() => executar(() => a.api.aprovarImagem(imagem.id), 'Versão aprovada para uso.')}>Aprovar esta versão</Botao></div>}
-      {dialogo === 'publicar' && <div className={css.formulario}><h3>{publicacao.nome}</h3><VisualFoto imagem={imagem} previa={previa} /><p>{publicacao.galeria ? 'Acrescentar esta imagem à galeria.' : 'Usar esta versão como capa do prato no site.'}</p>{publicacao.capaEsperada && <details><summary>Ver capa atual</summary><img className={css.foto} src={a.fotoUrl(publicacao.capaEsperada)} alt="Capa atual do prato" /></details>}<Botao variante="primario" disabled={!previa.url || a.ocupado} onClick={() => executar(() => a.api.publicarImagem(imagem.id, publicacao), 'Publicação registrada. A nova imagem já está no cardápio.')}>Confirmar publicação</Botao></div>}
+      {dialogo === 'publicar' && <div className={css.formulario}><h3>{publicacao.nome}</h3><VisualFoto imagem={imagem} previa={previa} /><p>{publicacao.galeria ? 'Acrescentar esta imagem à galeria.' : 'Usar esta versão como capa do prato no site.'}</p>{publicacao.capaEsperada && <details><summary>Ver capa atual</summary><img className={css.foto} src={a.fotoUrl(publicacao.capaEsperada)} alt="Capa atual do prato" /></details>}<Botao variante="primario" disabled={!previa.url || a.ocupado} onClick={() => executar(() => a.api.publicarImagem(publicacao.imagemId, publicacao), 'Publicação registrada. A nova imagem já está no cardápio.')}>Confirmar publicação</Botao></div>}
       {dialogo === 'solicitar' && <form className={css.formulario} onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); executar(() => a.api.solicitarImagem({ operacaoId: solicitacaoId, itemId: f.get('itemId'), formato: f.get('formato'), brief: f.get('brief'), referencias: imagem ? [imagem.id] : [] }), 'Solicitação registrada na fila.') }}>
         <label>Item<select name="itemId" required>{a.itens.map((i) => <option key={i.cardapioItemId} value={i.cardapioItemId}>{i.nome}</option>)}</select></label>
         <label>Formato<select name="formato">{formatos.map((f) => <option key={f}>{f}</option>)}</select></label><label>Descreva o que precisa<textarea name="brief" required maxLength={12000} /></label>

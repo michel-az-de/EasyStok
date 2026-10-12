@@ -23,6 +23,8 @@ public sealed class AcervoRepository(EasyStockDbContext db) : IAcervoRepository
     }
     public Task<AcervoPublicacao?> PublicacaoAsync(Guid empresaId, Guid id, CancellationToken ct) =>
         db.Set<AcervoPublicacao>().FirstOrDefaultAsync(x => x.EmpresaId == empresaId && x.Id == id, ct);
+    public async Task BloquearSolicitacaoAsync(Guid empresaId, Guid id, CancellationToken ct) =>
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({empresaId.ToString() + ":solicitacao:" + id.ToString()}, 0))", ct);
     public async Task<IReadOnlyList<AcervoPublicacao>> HistoricoAsync(Guid empresaId, Guid imagemId, CancellationToken ct) =>
         await db.Set<AcervoPublicacao>().Where(x => x.EmpresaId == empresaId && x.ImagemId == imagemId).OrderByDescending(x => x.CriadoEm).Take(100).ToListAsync(ct);
     public async Task<IReadOnlyList<AcervoSolicitacao>> SolicitacoesAsync(Guid empresaId, CancellationToken ct) =>

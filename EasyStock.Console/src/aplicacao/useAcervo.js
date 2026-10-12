@@ -20,7 +20,7 @@ export function useAcervo() {
     setCarregando(true)
     try {
       const [lista, cardapio, pedidos] = await Promise.all([api.listarImagens(pagina), listarGestao(), api.listarSolicitacoes()])
-      if (atual === requisicao.current) { setImagens(lista); setItens(cardapio); setSolicitacoes(pedidos); setAviso('') }
+      if (atual === requisicao.current) { setImagens(lista); setItens(cardapio); setSolicitacoes(pedidos); setAviso(''); setErro('') }
     } finally { if (atual === requisicao.current) setCarregando(false) }
   }, [pagina])
   useEffect(() => {
@@ -60,9 +60,17 @@ export function useMiniaturaAcervo(id) {
     let ativo = true; let objectUrl
     setResultado(null)
     if (!id) return undefined
-    api.miniaturaImagem(id).then((blob) => {
-      if (ativo) { objectUrl = URL.createObjectURL(blob); setResultado({ id, url: objectUrl, erro: false }) }
-    }).catch(() => { if (ativo) setResultado({ id, url: null, erro: true }) })
+    api.miniaturaImagem(id).then(async (blob) => {
+      if (!ativo) return
+      objectUrl = URL.createObjectURL(blob)
+      const imagem = new Image()
+      imagem.src = objectUrl
+      await imagem.decode()
+      if (ativo) setResultado({ id, url: objectUrl, erro: false })
+    }).catch(() => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+      if (ativo) setResultado({ id, url: null, erro: true })
+    })
     return () => { ativo = false; if (objectUrl) URL.revokeObjectURL(objectUrl) }
   }, [id, tentativa])
   return { url: resultado && resultado.id === id ? resultado.url : null, erro: Boolean(resultado && resultado.id === id && resultado.erro),

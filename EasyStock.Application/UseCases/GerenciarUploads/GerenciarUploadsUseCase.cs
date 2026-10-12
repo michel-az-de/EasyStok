@@ -338,6 +338,9 @@ public sealed class GerenciarUploadsUseCase(
     {
         var storageKey = StorageKeyExtractor.Extract(urlAntigo);
         if (storageKey is null) return;
+        // Derivados do acervo são versões imutáveis referenciadas pelo histórico de publicação.
+        if (storageKey.StartsWith("cardapios/", StringComparison.Ordinal) &&
+            Path.GetFileName(storageKey).StartsWith("acervo-", StringComparison.Ordinal)) return;
 
         try
         {

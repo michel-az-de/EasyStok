@@ -43,8 +43,9 @@ public sealed class AcervoController(AcervoUseCase acervo, ICurrentUserAccessor 
         if (codec is null || codec.Info.Width <= 0 || codec.Info.Height <= 0 ||
             codec.Info.Width > 8192 || codec.Info.Height > 8192 || (long)codec.Info.Width * codec.Info.Height > 32000000)
             return BadRequest("Imagem inválida. Use até 8.192 pixels por lado e 32 megapixels.");
-        using var bitmap = SkiaSharp.SKBitmap.Decode(bytes);
-        if (bitmap is null) return BadRequest("Não foi possível decodificar a imagem.");
+        using var bitmap = new SkiaSharp.SKBitmap(codec.Info);
+        if (codec.GetPixels(bitmap.Info, bitmap.GetPixels()) != SkiaSharp.SKCodecResult.Success)
+            return BadRequest("Não foi possível decodificar a imagem completa.");
         return DataOk(await acervo.AdicionarAsync(usuario.EmpresaId, usuario.UsuarioId, entrada, file.ContentType, bytes, ct));
     }
     [HttpPost("imagens/{id:guid}/aprovar")]

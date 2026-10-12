@@ -36,35 +36,60 @@ public sealed class AcervoUseCase(IAcervoRepository repo, IFileStorage storage, 
         var extensao = contentType switch { "image/png" => ".png", "image/jpeg" => ".jpg", "image/webp" => ".webp", _ => throw new UseCaseValidationException("Use PNG, JPEG ou WebP.") };
         try { UploadSecurityValidator.EnsureContentMatchesDeclaredType(bytes, contentType); }
         catch (InvalidOperationException e) { throw new UseCaseValidationException(e.Message); }
-        await ValidarDadosAsync(empresa, dados, ct);
         var hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
-        var existente = await repo.PorHashAsync(empresa, hash, ct);
-        if (existente is not null) return ConferirRepeticao(existente, dados);
-        var imagem = new AcervoImagem { EmpresaId = empresa, CriadoPorId = autor, Titulo = dados.Titulo.Trim(),
-            Origem = dados.Origem, Formato = dados.Formato, Sha256 = hash, ContentType = contentType, Tamanho = bytes.Length,
-            Prompt = dados.Prompt, Referencias = dados.Referencias, ItensJson = JsonSerializer.Serialize(dados.Itens.Distinct()),
-            OriginalId = dados.OriginalId, SolicitacaoId = dados.SolicitacaoId, CanvaUrl = ValidarCanva(dados.CanvaUrl), CanvaAssetId = dados.CanvaAssetId };
-        var arquivo = await storage.UploadAsync(new FileUploadRequest($"acervo/{empresa}/{imagem.Id}", "original" + extensao, contentType, bytes, IsPublic: false), ct);
-        imagem.StorageKey = arquivo.StorageKey;
-        repo.Adicionar(imagem);
-        if (dados.SolicitacaoId is { } pedidoId)
+        StoredFileResult? arquivo = null;
+        string? chaveTentativa = null;
+        try
         {
-            var pedido = await repo.SolicitacaoAsync(empresa, pedidoId, ct) ?? throw new UseCaseValidationException("Solicitação não encontrada.");
-            pedido.ConcluidoEm = DateTime.UtcNow;
+            return await uow.ExecuteInTransactionSemRetryAsync(async token =>
+            {
+                if (dados.SolicitacaoId is { } solicitacaoId)
+                    await repo.BloquearSolicitacaoAsync(empresa, solicitacaoId, token);
+                await ValidarDadosAsync(empresa, dados, token);
+                var existente = await repo.PorHashAsync(empresa, hash, token);
+                if (existente is not null) return ConferirRepeticao(existente, dados);
+                var pedido = dados.SolicitacaoId is { } pedidoId ? await repo.SolicitacaoAsync(empresa, pedidoId, token) : null;
+                if (pedido?.ConcluidoEm is not null)
+                    throw new UseCaseValidationException("Esta solicitação já foi concluída. Abra outra para gerar uma nova versão.");
+                var imagem = new AcervoImagem { EmpresaId = empresa, CriadoPorId = autor, Titulo = dados.Titulo.Trim(),
+                    Origem = dados.Origem, Formato = dados.Formato, Sha256 = hash, ContentType = contentType, Tamanho = bytes.Length,
+                    Prompt = dados.Prompt, Referencias = dados.Referencias, ItensJson = JsonSerializer.Serialize(dados.Itens.Distinct()),
+                    OriginalId = dados.OriginalId, SolicitacaoId = dados.SolicitacaoId, CanvaUrl = ValidarCanva(dados.CanvaUrl), CanvaAssetId = dados.CanvaAssetId };
+                var pasta = $"acervo/{empresa}/{imagem.Id}";
+                var nome = "original" + extensao;
+                chaveTentativa = $"{pasta}/{nome}";
+                arquivo = await storage.UploadAsync(new FileUploadRequest(pasta, nome, contentType, bytes, IsPublic: false), token);
+                imagem.StorageKey = arquivo.StorageKey;
+                repo.Adicionar(imagem);
+                if (pedido is not null) pedido.ConcluidoEm = DateTime.UtcNow;
+                await uow.CommitAsync();
+                return imagem;
+            }, ct);
         }
-        try { await uow.CommitAsync(); }
-        catch (Exception ex) when (uow.EhViolacaoDeUnicidade(ex))
+        catch (Exception ex)
         {
+            var chave = arquivo?.StorageKey ?? chaveTentativa;
+            if (chave is null) throw;
             uow.DescartarAlteracoesPendentes();
-            await storage.DeleteAsync(arquivo.StorageKey, ct);
-            var repetida = await repo.PorHashAsync(empresa, hash, ct) ?? throw new UseCaseValidationException("Não foi possível registrar a imagem. Tente novamente.");
-            return ConferirRepeticao(repetida, dados);
+            AcervoImagem? persistida = null;
+            try
+            {
+                // Após rollback, só remover a chave que comprovadamente não venceu.
+                // A confirmação do commit pode ter se perdido após a gravação real.
+                persistida = await repo.PorHashAsync(empresa, hash, CancellationToken.None);
+                if (persistida?.StorageKey != chave)
+                    await storage.DeleteAsync(chave, CancellationToken.None);
+            }
+            catch { /* Na dúvida sobre banco ou storage, preservar o arquivo e o erro original. */ }
+            if (uow.EhViolacaoDeUnicidade(ex) && persistida is not null)
+                return ConferirRepeticao(persistida, dados);
+            throw;
         }
-        return imagem;
     }
 
     public async Task<AcervoImagem> VincularCanvaAsync(Guid empresa, Guid id, string url, string? assetId, CancellationToken ct)
     {
+        ValidarTextos(url, assetId);
         var imagem = await ObterAsync(empresa, id, ct);
         imagem.CanvaUrl = ValidarCanva(url) ?? throw new UseCaseValidationException("Informe o link do design.");
         if (assetId?.Length > 100) throw new UseCaseValidationException("Identificador do Canva inválido.");
@@ -123,6 +148,7 @@ public sealed class AcervoUseCase(IAcervoRepository repo, IFileStorage storage, 
     public async Task<AcervoSolicitacao> SolicitarAsync(Guid empresa, Guid autor, SolicitarImagem dados, CancellationToken ct)
     {
         Empresa(empresa);
+        ValidarTextos(dados.Brief);
         if (dados.OperacaoId == Guid.Empty) throw new UseCaseValidationException("Operação não identificada.");
         if (await repo.ItemAsync(empresa, dados.ItemId, ct) is null) throw new UseCaseValidationException("Item não encontrado.");
         Formato(dados.Formato);
@@ -146,6 +172,7 @@ public sealed class AcervoUseCase(IAcervoRepository repo, IFileStorage storage, 
 
     private async Task ValidarDadosAsync(Guid empresa, DadosImagem d, CancellationToken ct)
     {
+        ValidarTextos(d.Titulo, d.Prompt, d.Referencias, d.CanvaUrl, d.CanvaAssetId);
         if (string.IsNullOrWhiteSpace(d.Titulo) || d.Titulo.Length > 160) throw new UseCaseValidationException("Informe um título de até 160 caracteres.");
         if (d.Origem is not ("IA" or "Fotografia" or "Canva")) throw new UseCaseValidationException("Origem inválida.");
         Formato(d.Formato);
@@ -163,6 +190,12 @@ public sealed class AcervoUseCase(IAcervoRepository repo, IFileStorage storage, 
                 throw new UseCaseValidationException("A imagem precisa atender ao item e ao formato da solicitação.");
         }
         if (d.CanvaAssetId?.Length > 100) throw new UseCaseValidationException("Identificador do Canva inválido.");
+    }
+
+    private static void ValidarTextos(params string?[] textos)
+    {
+        if (textos.Any(texto => texto?.Contains('\0') == true))
+            throw new UseCaseValidationException("O texto contém um caractere inválido.");
     }
 
     private static AcervoImagem ConferirRepeticao(AcervoImagem imagem, DadosImagem d)
