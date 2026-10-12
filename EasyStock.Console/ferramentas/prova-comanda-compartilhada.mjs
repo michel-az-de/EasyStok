@@ -7,6 +7,8 @@ const arquivo = new URL('../src/features/ficha-cliente/ComandaDoCliente.jsx', im
 const compilado = (await transformWithOxc(readFileSync(arquivo, 'utf8'), arquivo.pathname, { jsx: { runtime: 'automatic' } })).code
 const modalArquivo = new URL('../src/features/atendimento/ModalEnviarCardapio.jsx', import.meta.url)
 const modalCompilado = (await transformWithOxc(readFileSync(modalArquivo, 'utf8'), modalArquivo.pathname, { jsx: { runtime: 'automatic' } })).code
+const compartilharArquivo = new URL('../src/features/atendimento/CompartilharComanda.jsx', import.meta.url)
+const compartilharCompilado = (await transformWithOxc(readFileSync(compartilharArquivo, 'utf8'), compartilharArquivo.pathname, { jsx: { runtime: 'automatic' } })).code
 const contexto = { dados: [], erro: '', ocupado: false, estados: [], cursor: 0, acoes: { estornarPagamentoOnline: true },
   salvar: async (...args) => { contexto.salvo = args; return contexto.sucesso !== false },
   confirmar: (...args) => { contexto.confirmado = args } }
@@ -18,7 +20,8 @@ registerHooks({
     if (spec === 'react/jsx-runtime') return { url: codigo('export const Fragment="fragment"; export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx'), shortCircuit: true }
     if (spec.endsWith('.css')) return { url: codigo('export default {}'), shortCircuit: true }
     if (spec.endsWith('useComandasCliente')) return { url: codigo('export const useComandasCliente=()=>globalThis.__comandaCompartilhada'), shortCircuit: true }
-    if (spec.endsWith('/contextos')) return { url: codigo('export const useCatalogo=()=>({cardapio:globalThis.__comandaCompartilhada.cardapio})'), shortCircuit: true }
+    if (spec.endsWith('/contextos')) return { url: codigo('export const useCatalogo=()=>({cardapio:globalThis.__comandaCompartilhada.cardapio,canais:[]});export const useAcoes=()=>globalThis.__comandaCompartilhada;export const useAtendimento=()=>({agora:Date.now()})'), shortCircuit: true }
+    if (spec.endsWith('/ModalEnviarCardapio')) return { url: modalArquivo.href, shortCircuit: true }
     if (spec.endsWith('/acessoModulos')) return { url: codigo('export const useAcessoModulos=()=>globalThis.__comandaCompartilhada'), shortCircuit: true }
     if (spec.endsWith('/Botao')) return { url: codigo('export function Botao(){}'), shortCircuit: true }
     if (spec.endsWith('/Modal')) return { url: codigo('export function Modal(){}'), shortCircuit: true }
@@ -27,6 +30,7 @@ registerHooks({
   },
   load(url, ctx, proximo) {
     if (url === arquivo.href || url === modalArquivo.href) return { format: 'module', source: url === arquivo.href ? compilado : modalCompilado, shortCircuit: true }
+    if (url === compartilharArquivo.href) return { format: 'module', source: compartilharCompilado, shortCircuit: true }
     return proximo(url, ctx)
   },
 })
@@ -144,6 +148,52 @@ concluirEnvio(false); await primeiroEnvio
 assert.equal(fechamentos, 0, 'falha mantém link e modal acessíveis')
 assert.ok(renderModal().some(e => e.props.role === 'alert'))
 const novaTentativa = renderModal().find(e => e.props.children === 'Enviar pelo WhatsApp').props.onClick()
+await Promise.resolve()
 concluirEnvio(true); await novaTentativa
 assert.equal(fechamentos, 1)
 console.log('Compartilhamento: espera servidor, bloqueia envio repetido, mantém modal na falha e fecha somente com sucesso.')
+
+const { CompartilharComanda } = await import(compartilharArquivo.href)
+contexto.estados = []
+let geracoes = 0
+contexto.obterLinkCardapio = async () => { geracoes++; return { url: link, numeroComanda: 72, daLoja: true } }
+function renderCompartilhar() {
+  contexto.cursor = 0
+  return CompartilharComanda({ conversa: { id: 'conversa', nome: 'Maria', numeroComanda: 72, mensagens: [] } }).props.children
+}
+renderCompartilhar()[0].props.onClick()
+let modal = renderCompartilhar()[1]
+assert.equal(geracoes, 0, 'abrir compartilhar não substitui o link ativo do cliente')
+modal.props.aoFechar()
+assert.equal(renderCompartilhar()[1], false)
+assert.equal(geracoes, 0, 'cancelar não gera edição nem invalida o link ativo')
+renderCompartilhar()[0].props.onClick()
+modal = renderCompartilhar()[1]
+const gerado = await modal.props.aoGerar()
+assert.equal(gerado.link, link)
+assert.ok(gerado.texto.includes(link), 'convite usa somente o endereço retornado pela API')
+
+contexto.estados = []
+geracoes = 0; fechamentos = 0
+let liberarGeracao, mensagemEnviada
+Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { clipboard: {
+  writeText: async () => { throw new Error('Permissão negada') },
+} } })
+const propsNovo = { nomeCliente: 'Maria', canalNome: 'WhatsApp', numeroComanda: 72,
+  aoGerar: () => { geracoes++; return new Promise(resolve => { liberarGeracao = resolve }) },
+  aoEnviar: async mensagem => { mensagemEnviada = mensagem; return true }, aoFechar: () => { fechamentos++ } }
+function renderNovo() { contexto.cursor = 0; return elementos(ModalEnviarCardapio(propsNovo)) }
+assert.ok(!renderNovo().some(e => e.type === 'a'), 'prévia não inventa URL antes da geração')
+const copia = renderNovo().find(e => e.props.children === 'Gerar e copiar link').props.onClick()
+await renderNovo().find(e => e.props.children === 'Gerar e enviar pelo WhatsApp').props.onClick()
+renderNovo().find(e => e.type.name === 'Modal').props.aoFechar()
+assert.equal(geracoes, 1, 'cópia e envio concorrentes compartilham a trava de geração')
+assert.equal(fechamentos, 0, 'não fecha no meio da geração')
+liberarGeracao(gerado); await copia
+assert.ok(renderNovo().some(e => e.props.role === 'alert'))
+assert.equal(renderNovo().find(e => e.type === 'a').props.href, link, 'falha de clipboard mantém a URL real para cópia manual')
+await renderNovo().find(e => e.props.children === 'Enviar pelo WhatsApp').props.onClick()
+assert.equal(geracoes, 1, 'envio reutiliza o link já gerado, mesmo após falha na cópia')
+assert.equal(mensagemEnviada, gerado.texto)
+assert.equal(fechamentos, 1)
+console.log('Compartilhamento: abrir/cancelar sem geração, uma ação explícita, convite real e reutilização após falha de cópia aprovados.')
