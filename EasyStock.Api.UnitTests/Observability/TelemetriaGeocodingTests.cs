@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Trace;
@@ -35,10 +36,17 @@ public sealed class TelemetriaGeocodingTests : IAsyncLifetime
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Logging.ClearProviders();
         _provedor = builder.Build();
-        _provedor.MapGet("/viacep/ws/{cep}/json/", () => Results.Json(new
+        // #1680: o servidor demora mais que o timeout de produção do cliente de CEP (1 s) de propósito.
+        // O teste não pode depender desse prazo (ver PrazoLargoSoNoTeste): no CI a primeira chamada,
+        // fria, passou de 1 s, o cliente devolveu nulo e o teste falhou de vez em quando.
+        _provedor.MapGet("/viacep/ws/{cep}/json/", async () =>
         {
-            logradouro = "Rua " + RuaCanario, bairro = "Centro", localidade = "São Paulo", uf = "SP",
-        }));
+            await Task.Delay(AtrasoDoProvedor);
+            return Results.Json(new
+            {
+                logradouro = "Rua " + RuaCanario, bairro = "Centro", localidade = "São Paulo", uf = "SP",
+            });
+        });
         _provedor.MapGet("/nominatim/search", () => Results.Json(new[]
         {
             new { lat = "-23.5615", lon = "-46.6560", addresstype = "house", address = new { house_number = NumeroCanario } },
@@ -60,6 +68,16 @@ public sealed class TelemetriaGeocodingTests : IAsyncLifetime
         public void Dispose() { }
     }
 
+    private static readonly TimeSpan AtrasoDoProvedor = TimeSpan.FromMilliseconds(1200);
+
+    /// <summary>
+    /// Os adapters registram timeout de produção (1 s no CEP, 2 s na geocodificação). Aqui o que se mede é
+    /// o que vai para span e log, não o prazo: registrada por último, esta ação vale sobre a do adapter.
+    /// </summary>
+    private static void PrazoLargoSoNoTeste(IServiceCollection services) =>
+        services.ConfigureAll<HttpClientFactoryOptions>(o =>
+            o.HttpClientActions.Add(client => client.Timeout = TimeSpan.FromSeconds(30)));
+
     /// <summary>Roda um CEP e uma geocodificação e devolve tudo o que foi para span e para log.</summary>
     private async Task<(List<string> Spans, List<string> Logs)> ExercitarAsync(bool protegido)
     {
@@ -77,6 +95,7 @@ public sealed class TelemetriaGeocodingTests : IAsyncLifetime
         services.AddEasyStockCepLookup(configuration);
         services.AddEasyStockGeocoding(configuration);
         if (protegido) services.AddEnderecoForaDoLogHttp();
+        PrazoLargoSoNoTeste(services);
 
         var spans = new List<Activity>();
         using (var tracer = Sdk.CreateTracerProviderBuilder()
