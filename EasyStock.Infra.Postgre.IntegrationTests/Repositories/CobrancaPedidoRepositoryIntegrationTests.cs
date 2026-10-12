@@ -140,6 +140,54 @@ public class CobrancaPedidoRepositoryIntegrationTests(PostgreSqlDatabaseFixture 
     }
 
     [SkippableFact]
+    public async Task VarreduraDeAbandonados_SemTenant_AchaGuestEConversaECancelaNoTenantDoPedido()
+    {
+        // #1291: o job roda sem tenant. Sem bypass de RLS a varredura voltava vazia, e só olhava "storefront":
+        // o guest do site e o pedido da conversa sem cobrança ficavam com a vaga presa.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = Guid.NewGuid();
+        Guid guestId, conversaId;
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresa);
+            var guest = await CriarPedidoAsync(db, empresa);
+            var conversa = Pedido.Criar(empresa, origem: "whatsapp");
+            db.Pedidos.Add(conversa);
+            guest.Origem = "storefront-guest";
+            foreach (var p in new[] { guest, conversa })
+            {
+                p.Status = EasyStock.Domain.Sales.StatusPedidoMapper.AguardandoPagamento;
+                p.CriadoEm = Agora.AddHours(-2);
+            }
+            await db.SaveChangesAsync();
+            (guestId, conversaId) = (guest.Id, conversa.Id);
+        }
+
+        await using var job = fixture.CreateDbContext();
+        var repo = new EasyStock.Infra.Postgre.Repositories.Storefront.PedidoStorefrontRepository(job);
+        var expirados = await repo.GetAguardandoPagamentoExpiradosAsync(Agora.AddHours(-1), 500);
+
+        expirados.Select(p => p.Id).Should().Contain(new[] { guestId, conversaId });
+
+        // Escrita do job: escopo novo no tenant do pedido e releitura rastreada (xmin), como o
+        // CancelarPedidosAbandonadosBackgroundService faz.
+        var alvo = expirados.Single(p => p.Id == guestId);
+        await using (var escrita = fixture.CreateDbContext())
+        {
+            escrita.SetMobileTenantContext(alvo.EmpresaId);
+            var repoEscrita = new EasyStock.Infra.Postgre.Repositories.Storefront.PedidoStorefrontRepository(escrita);
+            var pedido = await repoEscrita.GetByIdAsync(alvo.Id);
+            pedido!.Status = EasyStock.Domain.Sales.StatusPedidoMapper.Cancelado;
+            await repoEscrita.UpdateAsync(pedido);
+        }
+
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(empresa);
+        (await leitura.Pedidos.AsNoTracking().SingleAsync(p => p.Id == guestId)).Status
+            .Should().Be(EasyStock.Domain.Sales.StatusPedidoMapper.Cancelado);
+    }
+
+    [SkippableFact]
     public async Task Migration_SobeEDesceLimpaComRls()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");

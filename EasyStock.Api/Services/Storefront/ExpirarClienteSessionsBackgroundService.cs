@@ -50,9 +50,13 @@ public class ExpirarClienteSessionsBackgroundService(
 
         var limite = timeProvider.GetUtcNow().UtcDateTime - ClienteSession.SlidingWindow;
 
+        // Job cross-tenant sem JWT: sem o bypass, o filtro global e a RLS zeram a consulta e a
+        // tabela crescia sem limite, guardando IP e user-agent além do prazo (#1259).
+        using var _ = db.UseRowLevelSecurityBypass();
         var expiradas = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
             .ToListAsync(
-                db.Set<ClienteSession>().Where(s => s.Revogada || s.UltimoUsoEm < limite),
+                Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.IgnoreQueryFilters(
+                    db.Set<ClienteSession>()).Where(s => s.Revogada || s.UltimoUsoEm < limite),
                 ct);
 
         if (expiradas.Count == 0)

@@ -31,6 +31,13 @@ public class AbrirCaixaUseCase(
         if (fechamento != null)
             throw new UseCaseValidationException("Caixa do dia já foi fechado. Não é possível reabrir.");
 
+        // #1506: caixa de um dia anterior esquecido aberto precisa ser fechado antes. Abrir o de hoje
+        // por cima fazia a sessao antiga deixar de ser a "pendente" e o dia dela nunca mais fechava.
+        var pendente = await repo.GetAberturaPendenteAsync(cmd.EmpresaId, cmd.LojaId);
+        if (pendente != null && HorarioBrasil.DataOperacional(pendente.DataMovimento) is var diaPendente && diaPendente < data)
+            throw new UseCaseValidationException(
+                $"O caixa de {diaPendente:dd/MM} ficou aberto. Feche-o antes de abrir o caixa de hoje.");
+
         var mov = MovimentoCaixa.Criar(cmd.EmpresaId, "abertura", cmd.SaldoInicial, dataMov, cmd.LojaId);
         mov.Descricao = cmd.Observacoes;
         mov.RegistradoPorUserId = cmd.RegistradoPorUserId;

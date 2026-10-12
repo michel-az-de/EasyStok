@@ -2,7 +2,7 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
-using ClienteEntity = EasyStock.Domain.Entities.Cliente;
+using EasyStock.Application.UseCases.Atendimento;
 
 namespace EasyStock.Application.UseCases.Storefront.Auth;
 
@@ -40,6 +40,7 @@ public sealed class ValidarOtpUseCase(
     IClienteOtpRepository clienteOtpRepository,
     IClienteStorefrontRepository clienteRepository,
     IClienteSessionRepository clienteSessionRepository,
+    IdentificarClientePorTelefoneUseCase identificarCliente,
     IPasswordHasher passwordHasher,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider,
@@ -132,19 +133,23 @@ public sealed class ValidarOtpUseCase(
 
         // ── 7. Criar ou atualizar Cliente ──────────────────────────────
         var cliente = await clienteRepository.GetByTelefoneHashAsync(empresaId, telefoneHash, ct);
+        var clienteNovo = false;
         if (cliente is null)
         {
-            cliente = ClienteEntity.CriarParaStorefront(empresaId, telefoneHash, timeProvider);
-            await clienteRepository.AddAsync(cliente, ct);
+            // Só após comprovar posse pelo OTP pode reutilizar o cadastro do WhatsApp/ERP.
+            var identificacao = await identificarCliente.ExecuteAsync(
+                new IdentificarClientePorTelefoneInput(empresaId, telefoneE164.TrimStart('+'), null), ct);
+            cliente = identificacao.Cliente;
+            clienteNovo = identificacao.EhNovo;
             logger.LogInformation(
                 "Novo cliente storefront criado: empresaId={EmpresaId} clienteId={ClienteId} telefone={Telefone}",
                 empresaId, cliente.Id, telefoneMascarado);
         }
-        else
-        {
-            cliente.RegistrarAcessoStorefront(timeProvider);
+        if (cliente.EmpresaId != empresaId)
+            throw new OtpInvalidoException();
+        cliente.RegistrarAcessoStorefront(timeProvider);
+        if (!clienteNovo)
             await clienteRepository.UpdateAsync(cliente, ct);
-        }
 
         // ── 8. Criar ClienteSession com fingerprint ────────────────────
         var fingerprint = ClienteFingerprintCalculator.Calcular(input.UserAgent, input.AcceptLanguage);
@@ -160,13 +165,13 @@ public sealed class ValidarOtpUseCase(
         await unitOfWork.CommitAsync();
 
         logger.LogInformation(
-            "Sessão storefront criada: empresaId={EmpresaId} clienteId={ClienteId} sessionId={SessionId} telefone={Telefone}",
-            empresaId, cliente.Id, session.Id, telefoneMascarado);
+            "Sessão storefront criada: empresaId={EmpresaId} clienteId={ClienteId} telefone={Telefone}",
+            empresaId, cliente.Id, telefoneMascarado);
 
         return new ValidarOtpResult(
             SessionId: session.Id,
             TelefoneOfuscado: telefoneMascarado,
-            PrimeiroNome: string.IsNullOrWhiteSpace(cliente.Nome) ? "Olá" : cliente.Nome.Split(' ')[0],
+            PrimeiroNome: (string.IsNullOrWhiteSpace(cliente.Nome) || cliente.Nome == IdentificarClientePorTelefoneUseCase.NomePadraoLead) ? "Olá" : cliente.Nome.Split(' ')[0],
             MaxAgeSecs: MaxAgeSecs);
     }
 

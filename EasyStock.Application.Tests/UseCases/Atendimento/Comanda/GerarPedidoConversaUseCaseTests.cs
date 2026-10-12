@@ -8,7 +8,6 @@ using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.Tests.Services.Storefront;
-using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -72,24 +71,26 @@ public class GerarPedidoConversaUseCaseTests
                 .Returns(new PreferenceCriadaResult("pref-1", "https://mp.test/pref-1"));
 
             // Troca de forma (na entrega) trava o pedido recém-criado numa transação.
-            Uow.SetupExecuteInTransactionSemRetry<(CobrancaPedidoResult, Guid?, string?)>();
+            Uow.SetupExecuteInTransactionSemRetry<(CobrancaPedidoResult, Guid?, string?, PedidoMudouStatusOperacao?, ImpressaoPendenteOperacao?)>();
             Checkout.PedidoRepo.GetForUpdateAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
                 .Returns(ci => Checkout.PedidosAdicionados.FirstOrDefault(p => p.Id == ci.Arg<Guid>()));
 
             var aviso = new AvisoCobrancaConversa(ConversaRepo, new ResolvedorCanal([Canal]), Uow,
                 NullLogger<AvisoCobrancaConversa>.Instance);
-            var gerar = new GerarCobrancaPedidoUseCase(Pedidos, Checkout.StorefrontRepo, cobrancaRepo, Mp, Uow,
+            var gerar = new GerarCobrancaPedidoUseCase(Pedidos, Checkout.StorefrontRepo, cobrancaRepo, Mp, Checkout.Servico(), Uow,
                 TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
             var trocar = new TrocarFormaPagamentoPedidoUseCase(Checkout.PedidoRepo, cobrancaRepo, gerar, aviso,
                 Substitute.For<IPublicadorEventoIntegracao>(), Mp, Uow, TimeProvider.System,
-                NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
+                NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()), Substitute.For<IOperacaoEventPublisher>(), QuitacaoPedidoTeste.Criar(Substitute.For<IPedidoRepository>()));
+
+            // O núcleo lê o pedido em andamento do banco com a conversa travada (#1238).
+            ConversaRepo.TravarParaPedidoAsync(EmpresaId, Conversa.Id, Arg.Any<CancellationToken>())
+                .Returns(_ => Conversa.PedidoEmAndamentoId);
 
             UseCase = new GerarPedidoConversaUseCase(
-                ConversaRepo, clienteRepo, Pedidos,
-                new CriarPedidoAtendimentoUseCase(Checkout.Servico(), ConversaRepo, clienteRepo,
-                    Checkout.ConfiguracaoAtendimentoRepo, Uow, Checkout.Atribuicao()),
-                gerar, trocar, aviso, TimeProvider.System,
-                NullLogger<GerarPedidoConversaUseCase>.Instance);
+                ConversaRepo, clienteRepo,
+                Checkout.CriarPedidoAtendimento(ConversaRepo, clienteRepo, Uow, Pedidos),
+                gerar, trocar, aviso, TimeProvider.System);
         }
 
         public GerarPedidoConversaInput Input(Guid? empresaId = null, string? forma = null) => new(
@@ -185,18 +186,22 @@ public class GerarPedidoConversaUseCaseTests
     }
 
     [Fact]
-    public async Task MercadoPagoFora_PedidoFicaEResumoAvisaQueOLinkVemDepois()
+    public async Task MercadoPagoFora_DesfazPedidoEVagaSemAvisarOCliente()
     {
+        // #1301: antes o pedido ficava sem cobrança e a vaga presa, prometendo um link que nenhum job reemitia.
         var c = new Cenario();
         c.Mp.CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new HttpRequestException("fora"));
 
-        var resultado = await c.UseCase.ExecuteAsync(c.Input());
+        var act = () => c.UseCase.ExecuteAsync(c.Input());
 
-        resultado.Cobranca.Should().BeNull();
-        c.Conversa.PedidoEmAndamentoId.Should().Be(resultado.PedidoId);
-        await c.Canal.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(t => t.Contains("link de pagamento chega")),
-            Arg.Any<CancellationToken>());
+        await act.Should().ThrowAsync<EasyStock.Domain.Exceptions.Storefront.MercadoPagoIndisponivelException>(
+            "a operadora recebe 503 e tenta de novo");
+        var pedido = c.Checkout.PedidosAdicionados.Should().ContainSingle().Subject;
+        pedido.Status.Should().Be(StatusPedidoMapper.Cancelado);
+        await c.Checkout.VagaRepo.Received(1).LiberarPorPedidoAsync(
+            pedido.Id, Arg.Is<string>(m => m.Contains("mercado_pago_indisponivel")), Arg.Any<CancellationToken>());
+        await c.Canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
     }
 
     [Fact]

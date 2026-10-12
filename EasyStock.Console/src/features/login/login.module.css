@@ -1,51 +1,53 @@
 .tela {
-  min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  padding: 16px;
+  height: 100%; overflow-y: auto;
+  display: flex; flex-direction: column; align-items: center;
+  padding: var(--e-4);
   background: var(--fundo);
 }
 
 .cartao {
-  width: min(100%, 400px);
+  width: min(100%, 440px); flex: none; margin-block: auto;
   display: grid;
-  gap: 20px;
-  padding: 32px 24px;
+  gap: var(--e-4);
+  padding: var(--e-5) var(--e-24);
   background: var(--papel);
   border: 1px solid var(--linha);
-  border-radius: 16px;
-  box-shadow: var(--sombra);
+  border-radius: var(--r-3);
+  box-shadow: var(--sombra-media);
 }
 
 .titulo {
   margin: 0;
-  font-size: var(--t-20);
-  color: var(--ragu);
+  font-family: var(--f-titulo-marca); font-weight: 600;
+  font-size: var(--t-valor); line-height: var(--lh-compacto);
+  color: var(--tinta);
 }
+.apoio { margin: var(--e-2) 0 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+.preferencia { display: flex; justify-content: center; padding-top: var(--e-3); border-top: var(--b-1) solid var(--linha); }
 
-.subtitulo {
-  margin: -12px 0 0;
-  color: var(--tinta-2);
-  font-size: var(--t-15);
-}
-
-.formulario,
-.empresas {
+.formulario {
   display: grid;
   gap: 16px;
-}
-
-.pergunta {
-  margin: 0;
-  font-weight: 600;
-  color: var(--tinta);
 }
 
 .erro {
   margin: 0;
   padding: 12px;
   border-radius: 8px;
-  background: var(--perigo-fundo);
-  color: var(--perigo);
-  font-size: var(--t-15);
+  background: var(--erro-pastel);
+  color: var(--erro);
+  font-size: var(--t-apoio);
+  overflow-wrap: anywhere;
+}
+.aviso { margin: 0; padding: var(--e-3); border-radius: var(--r-1); background: var(--preenchimento); color: var(--tinta-2); font-size: var(--t-apoio); }
+
+.google {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+@media (max-width: 480px) {
+  .tela { padding: var(--e-3); }
+  .cartao { padding: var(--e-4); }
 }

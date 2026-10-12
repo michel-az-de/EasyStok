@@ -23,6 +23,9 @@ const STATIC_ASSETS = [
   './index.html',
   './manifest.json',
   './qrcode.min.js',
+  './queue-store.js',
+  './photo-store.js',
+  './upload-photos.js',
   './sync.js',
   './icons/favicon.png',
   './icons/icon-192.png',
@@ -99,7 +102,11 @@ function staleWhileRevalidate(req, url) {
       }
       return resp;
     }).catch(() => undefined);
-    return cached || network;
+    if (cached) return cached;
+    // #1509: a pagina pede `sync.js?v=...` e o pre-cache guarda './sync.js'. Offline, sem copia
+    // exata, cai na mesma URL sem a query. Online a versao nova vem da rede (OTA intacto).
+    return network.then((resp) => resp
+      || (url.origin === self.location.origin ? caches.match(req, { ignoreSearch: true }) : undefined));
   });
 }
 

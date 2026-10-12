@@ -1,11 +1,10 @@
-using EasyStock.Application.Events.Storefront.Handlers;
 using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Domain.Entities.Pagamentos;
-using EasyStock.Domain.Events.Storefront;
 using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -36,7 +35,7 @@ public enum ResultadoExpiracaoCobranca
 ///   <item>Pedido fora de <c>AguardandoPagamento</c> (pago, na fila na entrega, cancelado): só expira a cobrança.</item>
 ///   <item>Tentativa 1 e pedido da conversa: gera a tentativa 2 e envia o link na conversa.</item>
 ///   <item>Tentativa 2, ou pedido do site (sem conversa): <see cref="CancelarPedidoUseCase"/> com motivo
-///     <c>pagamento_expirado</c>, libera a vaga (<see cref="LiberarVagaOnPedidoCanceladoHandler"/>) e avisa
+///     <c>pagamento_expirado</c>, libera a vaga (pelo próprio <see cref="CancelarPedidoUseCase"/>, #1506) e avisa
 ///     na conversa quando houver. Aviso ao cliente do site: S13.</item>
 /// </list>
 ///
@@ -51,14 +50,14 @@ public sealed class ProcessarCobrancaVencidaUseCase(
     ICobrancaPedidoRepository cobrancaRepository,
     GerarCobrancaPedidoUseCase gerarCobranca,
     CancelarPedidoUseCase cancelarPedido,
-    LiberarVagaOnPedidoCanceladoHandler liberarVaga,
     AvisoCobrancaConversa aviso,
     IMercadoPagoClient mercadoPagoClient,
     ConfirmarPagamentoPedidoUseCase confirmarPagamento,
     ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
-    ILogger<ProcessarCobrancaVencidaUseCase> logger)
+    ILogger<ProcessarCobrancaVencidaUseCase> logger,
+    IOperacaoEventPublisher operacaoEventos)
 {
     public const string MotivoCancelamento = "pagamento_expirado";
 
@@ -76,6 +75,10 @@ public sealed class ProcessarCobrancaVencidaUseCase(
 
         var (resultado, conversaId, link) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
             async token => await ProcessarNoLockAsync(item, token), ct);
+
+        if (resultado == ResultadoExpiracaoCobranca.PedidoCancelado)
+            await operacaoEventos.PublicarAsync(EventosOperacao.PedidoMudouStatus, item.EmpresaId,
+                new PedidoMudouStatusOperacao(item.PedidoId, StatusPedidoMapper.AguardandoPagamento, StatusPedidoMapper.Cancelado), ct);
 
         var agora = relogio.GetUtcNow().UtcDateTime;
         if (conversaId is { } conversa)
@@ -134,8 +137,8 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         }
 
         await cancelarPedido.ExecuteAsync(new CancelarPedidoCommand(
-            item.EmpresaId, item.PedidoId, UsuarioNome: "Sistema", Motivo: MotivoCancelamento, Origem: "sistema"));
-        await liberarVaga.HandleAsync(new PedidoCanceladoEvent(item.PedidoId, Guid.Empty, MotivoCancelamento), ct);
+            item.EmpresaId, item.PedidoId, UsuarioNome: "Sistema", Motivo: MotivoCancelamento, Origem: "sistema"),
+            publicarOperacao: false); // O evento de UI espera o commit da transação externa.
         return (ResultadoExpiracaoCobranca.PedidoCancelado, cobranca.ConversaId, null);
     }
 }

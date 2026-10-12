@@ -1,5 +1,7 @@
+using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Infra.Postgre.Repositories;
@@ -24,13 +26,15 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
         var (_, fimUtc) = HorarioBrasil.JanelaDiaUtc(dataFinal);
 
         // Dia de produção: vaga ativa manda (pedido do storefront); sem vaga, agendamento; sem ele, criação.
+        // Aguardando aprovação não tem corte (#1238): a dona aprova hoje o pedido de daqui a 3 dias.
         var pedidos = await db.Pedidos
             .AsNoTracking()
             .Include(p => p.Itens)
             .Include(p => p.Pagamentos)
             .Where(p => p.EmpresaId == empresaId && statusLista.Contains(p.Status))
             .Where(p =>
-                db.VagasOcupadas.Any(v => v.PedidoId == p.Id && v.LiberadoEm == null
+                p.Status == StatusPedidoMapper.AguardandoAprovacaoBaba
+                || db.VagasOcupadas.Any(v => v.PedidoId == p.Id && v.LiberadoEm == null
                                           && v.DataEntrega >= dataInicial && v.DataEntrega <= dataFinal)
                 || (!db.VagasOcupadas.Any(v => v.PedidoId == p.Id && v.LiberadoEm == null)
                     && (p.AgendadoParaEm ?? p.CriadoEm) >= iniUtc
@@ -52,16 +56,17 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
             .GroupBy(x => x.PedidoId)
             .ToDictionary(g => g.Key, g => g.First());
 
-        // Endereço do cadastro do cliente (S14), com EmpresaId no WHERE como o resto da leitura.
+        // Endereço do cadastro do cliente (S14), com EmpresaId no WHERE como o resto da leitura. O nome do
+        // cadastro cobre o pedido que nasceu sem o retrato do cliente (#1474).
         var clienteIds = pedidos.Where(p => p.ClienteId != null).Select(p => p.ClienteId!.Value).Distinct().ToList();
-        var enderecos = clienteIds.Count == 0
-            ? new Dictionary<Guid, string?>()
+        var clientes = clienteIds.Count == 0
+            ? new Dictionary<Guid, ClienteDoPedido>()
             : (await db.Clientes
                 .AsNoTracking()
                 .Where(c => c.EmpresaId == empresaId && clienteIds.Contains(c.Id))
-                .Select(c => new { c.Id, c.Endereco, c.Bairro, c.Cidade })
+                .Select(c => new { c.Id, c.Nome, c.Endereco, c.Bairro, c.Cidade })
                 .ToListAsync(ct))
-                .ToDictionary(c => c.Id, c => EnderecoEmTexto(c.Endereco, c.Bairro, c.Cidade));
+                .ToDictionary(c => c.Id, c => new ClienteDoPedido(c.Nome, EnderecoEmTexto(c.Endereco, c.Bairro, c.Cidade)));
 
         var cardapioIds = pedidos
             .SelectMany(p => p.Itens)
@@ -79,10 +84,11 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
         return pedidos.Select(p =>
         {
             var janela = janelas.GetValueOrDefault(p.Id);
+            var cliente = p.ClienteId is { } cid ? clientes.GetValueOrDefault(cid) : null;
             return new KdsPedidoLeitura(
                 Id: p.Id,
                 Status: p.Status,
-                ClienteNome: p.ClienteNome,
+                ClienteNome: string.IsNullOrWhiteSpace(p.ClienteNome) ? cliente?.Nome : p.ClienteNome,
                 ClienteApt: p.ClienteApt,
                 Observacoes: p.Observacoes,
                 AgendadoParaEm: p.AgendadoParaEm,
@@ -92,20 +98,23 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
                 InicioPrevistoEm: p.InicioPrevistoEm,
                 Janela: janela is null ? null : new KdsJanelaLeitura(janela.Label, janela.DataEntrega, janela.HoraInicio, janela.HoraFim),
                 Itens: p.Itens
+                    .Where(i => !i.EhLinhaDeFrete)
                     .OrderBy(i => i.CriadoEm)
                     .Select(i => new KdsItemLeitura(
-                        Nome: i.Nome,
+                        Nome: NomeCardapio.Exibicao(i.Nome) ?? i.Nome,
                         Variacao: i.VariacaoRotuloSnapshot,
                         Quantidade: i.Quantidade,
                         Observacao: i.Observacao,
                         Linha: i.LinhaSnapshot,
                         Molho: i.CardapioItemId is { } c ? molhos.GetValueOrDefault(c) : null))
                     .ToList(),
-                Endereco: p.ClienteId is { } cid ? enderecos.GetValueOrDefault(cid) : null,
+                Endereco: p.EnderecoEntrega ?? cliente?.Endereco,
                 RequerAprovacao: p.RequerAprovacao,
                 MotivoRequerAprovacao: p.MotivoRequerAprovacao);
         }).ToList();
     }
+
+    private sealed record ClienteDoPedido(string? Nome, string? Endereco);
 
     /// <summary>Mesmo formato do despacho da viagem (S44): sem logradouro, sem endereço.</summary>
     private static string? EnderecoEmTexto(string? endereco, string? bairro, string? cidade)

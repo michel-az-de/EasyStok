@@ -36,7 +36,7 @@ public sealed class S3CompatibleFileStorage : IFileStorage
     {
         // Fail-fast: valida filename (path traversal) e MIME antes de qualquer chamada S3.
         var safeFileName = UploadSecurityValidator.SanitizeFileName(request.FileName);
-        UploadSecurityValidator.EnsureValidMime(request.ContentType);
+        UploadSecurityValidator.EnsureValidMime(request);
 
         var client = GetClient();
         var key = $"{request.BucketPath.Trim('/')}/{safeFileName}".Trim('/');

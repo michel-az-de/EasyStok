@@ -87,6 +87,10 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableMensagensProgramadas)
             services.AddHostedService<MensagensProgramadasBackgroundService>();
 
+        // S57: reenvio das mensagens que falharam por motivo temporário (canal fora, rede).
+        if (options.EnableReenvioMensagens)
+            services.AddHostedService<ReenvioMensagensBackgroundService>();
+
         // S43: lembretes internos da dona (pagamento sem baixa, cliente sem resposta, manuais vencidos).
         if (options.EnableAvaliadorLembretes)
             services.AddHostedService<AvaliadorLembretesBackgroundService>();

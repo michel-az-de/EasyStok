@@ -1,18 +1,18 @@
 /* Aba Atendimento da Gestão (F02): três blocos na mesma casca de papel que
    Mensagens automáticas usa para o horário e o som. */
-.aba { display: grid; gap: var(--e-4); }
+.aba { display: grid; gap: var(--e-5); }
 
 .secao {
   display: grid; gap: var(--e-3);
-  border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
-  padding: var(--e-3); background: var(--papel);
+  border-top: var(--b-1) solid var(--linha);
+  padding: var(--e-4) 0; background: transparent;
 }
-.secao h3 { margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); }
+.secao h3 { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
 
 .topo { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .topo .chave { margin-left: auto; }
 
-.descricao { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+.descricao { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); max-width: 72ch; }
 
 .acoes { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .toque { min-height: var(--toque); }
@@ -23,7 +23,9 @@
   display: inline-flex; align-items: center; gap: var(--e-2);
   min-height: var(--toque); font-size: var(--t-apoio); color: var(--tinta);
 }
-.chave input { width: 20px; height: 20px; accent-color: var(--ragu); }
+.chave input { width: 20px; height: 20px; accent-color: var(--marca); }
 
 .retorno { font-size: var(--t-apoio); color: var(--tinta-2); }
-.erro { color: var(--perigo); font-size: var(--t-apoio); margin: 0; }
+.erro { color: var(--erro); font-size: var(--t-apoio); margin: 0; }
+
+.campos { border: 0; padding: 0; margin: 0; min-width: 0; display: contents; }

@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
@@ -6,6 +7,8 @@ using EasyStock.Application.Ports.Output.Persistence.Campanhas;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.Tests.Helpers;
+using EasyStock.Application.UseCases.Storefront.Frete;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Domain.Entities.Campanhas;
@@ -47,6 +50,7 @@ public class IniciarCheckoutGuestUseCaseTests
         public IJanelaEntregaRepository JanelaRepo { get; } = Substitute.For<IJanelaEntregaRepository>();
         public IBloqueioEntregaRepository BloqueioRepo { get; } = Substitute.For<IBloqueioEntregaRepository>();
         public IFreteZonaRepository FreteZonaRepo { get; } = Substitute.For<IFreteZonaRepository>();
+        public IGeocodingClient Geocoding { get; } = Substitute.For<IGeocodingClient>();
         public IVagaOcupadaRepository VagaRepo { get; } = Substitute.For<IVagaOcupadaRepository>();
         public IPedidoStorefrontRepository PedidoRepo { get; } = Substitute.For<IPedidoStorefrontRepository>();
         public IExpedienteLojaRepository ExpedienteRepo { get; } = Substitute.For<IExpedienteLojaRepository>();
@@ -89,6 +93,7 @@ public class IniciarCheckoutGuestUseCaseTests
                 tempoEstimadoMinutos: 60, cepInicio: "01000000", cepFim: "01999999");
             FreteZonaRepo.GetAtivasDoStorefrontOrdenadasAsync(Storefront.Id, Arg.Any<CancellationToken>())
                 .Returns(new List<FreteZona> { zona });
+            FreteZonaRepo.BuscarZonaPelasAtivas();
 
             VagaRepo.OcuparAsync(JanelaId, DataEntrega, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
                 .Returns(ci => VagaOcupada.Ocupar(JanelaId, DataEntrega, ci.ArgAt<Guid>(2)));
@@ -118,14 +123,17 @@ public class IniciarCheckoutGuestUseCaseTests
                     ["Acompanhamento:JwtSecret"] = new string('s', 40),
                 })
                 .Build();
-            var core = new CheckoutCoreService(StorefrontRepo, CardapioRepo, JanelaRepo, BloqueioRepo, FreteZonaRepo,
-                VagaRepo, PedidoRepo, ExpedienteRepo, NullLogger<CheckoutCoreService>.Instance, TimeProvider.System);
+            var frete = new CalcularFreteUseCase(StorefrontRepo, FreteZonaRepo, Substitute.For<ICepLookupClient>(),
+                Geocoding, Substitute.For<IRotaClient>(), NullLogger<CalcularFreteUseCase>.Instance);
+            var core = new CheckoutCoreService(StorefrontRepo, CardapioRepo, JanelaRepo, BloqueioRepo, frete,
+                VagaRepo, PedidoRepo, ExpedienteRepo, NullLogger<CheckoutCoreService>.Instance,
+                new EasyStock.TestHelpers.FakeTimeProvider(new DateTimeOffset(2026, 6, 1, 15, 0, 0, TimeSpan.Zero)) /* #1506: antes das entregas de 02/06 */, EnderecoEntregaPedidoTeste.Criar());
             var cobranca = new GerarCobrancaPedidoUseCase(Substitute.For<IPedidoRepository>(), StorefrontRepo, CobrancaRepo,
-                MpClient, Uow, TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
+                MpClient, core, Uow, TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
             return new IniciarCheckoutGuestUseCase(StorefrontRepo, core, cobranca, ClienteRepo, PedidoRepo, Uow,
                 new AcompanhamentoTokenService(config, TimeProvider.System),
                 new AtribuicaoPedidoCampanha(CampanhaRepo, TimeProvider.System), Tenant, TimeProvider.System,
-                NullLogger<IniciarCheckoutGuestUseCase>.Instance);
+                NullLogger<IniciarCheckoutGuestUseCase>.Instance, EnderecoEntregaPedidoTeste.Criar());
         }
     }
 
@@ -177,6 +185,24 @@ public class IniciarCheckoutGuestUseCaseTests
     }
 
     [Fact]
+    public async Task MercadoPagoFora_CancelaPedidoELiberaVaga()
+    {
+        // #1301: o guest recebe 503 e não vê o pedido; sem desfazer, a vaga ficava presa.
+        var f = new Fixture();
+        f.MpClient.CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("500"));
+
+        var act = () => f.UseCase().ExecuteAsync(Input());
+
+        await act.Should().ThrowAsync<MercadoPagoIndisponivelException>();
+        var pedido = f.Pedidos.Should().ContainSingle().Subject;
+        pedido.Status.Should().Be(StatusPedidoMapper.Cancelado);
+        await f.VagaRepo.Received(1).LiberarPorPedidoAsync(
+            pedido.Id, Arg.Is<string>(m => m.Contains("mercado_pago_indisponivel")), Arg.Any<CancellationToken>());
+        f.Cobrancas.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task SemVagaLancaJanelaSemVagasSemCobrar()
     {
         var f = new Fixture();
@@ -214,7 +240,7 @@ public class IniciarCheckoutGuestUseCaseTests
     }
 
     [Fact]
-    public async Task PedidoGuestDeQuemRecebeuCampanhaMarcaPediu()
+    public async Task TelefoneAlegadoNaoAssociaPedidoACadastroOuCampanhaSemOtp()
     {
         var f = new Fixture();
         var empresaId = f.Storefront.EmpresaId;
@@ -235,8 +261,10 @@ public class IniciarCheckoutGuestUseCaseTests
 
         var resultado = await f.UseCase().ExecuteAsync(Input());
 
-        destinatario.Status.Should().Be(StatusCampanhaDestinatario.Pediu);
-        destinatario.PedidoId.Should().Be(resultado.PedidoId);
+        destinatario.Status.Should().Be(StatusCampanhaDestinatario.Enviado);
+        destinatario.PedidoId.Should().BeNull();
+        f.Pedidos.Single().ClienteId.Should().NotBe(cliente.Id);
+        await f.ClienteRepo.DidNotReceive().UpdateAsync(cliente, Arg.Any<CancellationToken>());
         f.Tenant.Received().SetCurrentTenant(empresaId);
     }
 
@@ -251,5 +279,98 @@ public class IniciarCheckoutGuestUseCaseTests
         resultado.PedidoId.Should().NotBeEmpty();
         f.Pedidos.Should().ContainSingle(p => p.Id == resultado.PedidoId);
         f.Cobrancas.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task ClienteBloqueadoNaoFechaPedidoNemOcupaVaga()
+    {
+        // #1291: o bloqueio vale em todos os canais (spec 05-crm-e-pos-venda); antes só a conversa conferia.
+        var f = new Fixture();
+        var bloqueado = DomainCliente.CriarParaStorefront(f.Storefront.EmpresaId, "hash", TimeProvider.System);
+        bloqueado.Bloquear("calote", DateTime.UtcNow);
+        f.ClienteRepo.GetByTelefoneHashAsync(f.Storefront.EmpresaId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(bloqueado);
+
+        var act = () => f.UseCase().ExecuteAsync(Input());
+
+        await act.Should().ThrowAsync<EasyStock.Domain.Exceptions.ClienteBloqueadoException>();
+        f.Pedidos.Should().BeEmpty();
+        await f.VagaRepo.DidNotReceiveWithAnyArgs().OcuparAsync(default, default, default, default);
+        await f.MpClient.DidNotReceiveWithAnyArgs().CriarPreferenceAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task NumeroDoEnderecoVaiParaOGeocodeDoFretePorRaio()
+    {
+        // #1291: o checkout cota o frete como o POST /frete/calcular, com o número no geocode.
+        var f = new Fixture();
+        f.Storefront.ConfigurarFreteRaio(0, 0, 1.4, 500, 5000,
+            """[{"id":"ate-5km","ateMetros":5000,"valorCentavos":2500}]""");
+        f.Geocoding.GeocodificarAsync(Arg.Any<GeocodeQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new GeocodeResultado(0, 0.025, Confiavel: true));
+
+        var r = await f.UseCase().ExecuteAsync(Input());
+
+        await f.Geocoding.Received().GeocodificarAsync(
+            Arg.Is<GeocodeQuery>(q => q.Numero == "120" && q.Cep == CepValido), Arg.Any<CancellationToken>());
+        r.FreteEstimado.Should().Be(25m);
+    }
+
+    // ── Ponte #1306: o site ainda não manda janela; sem ela, o guest segue o modo antigo ──
+
+    [Fact]
+    public async Task SemJanela_ModoAntigoVaiParaAprovacaoSemVagaNemCobranca()
+    {
+        var f = new Fixture();
+
+        var r = await f.UseCase().ExecuteAsync(Input() with { JanelaId = null, DataEntrega = null });
+
+        var pedido = f.Pedidos.Should().ContainSingle().Subject;
+        pedido.Id.Should().Be(r.PedidoId);
+        pedido.Status.Should().Be(StatusPedidoMapper.AguardandoAprovacaoBaba);
+        pedido.Origem.Should().Be("storefront-guest");
+        pedido.ClienteNome.Should().Be("Maria Silva");
+        pedido.ClienteTelefone.Should().Be("+5511987654321");
+        pedido.Observacoes.Should().Contain("[Guest] CEP 01310-100, numero 120");
+        r.LinkPagamento.Should().BeNull();
+        r.ExpiresIn.Should().Be(0);
+        r.AcompanhamentoToken.Should().NotBeNullOrWhiteSpace();
+        await f.VagaRepo.DidNotReceiveWithAnyArgs().OcuparAsync(default, default, default, default);
+        await f.MpClient.DidNotReceiveWithAnyArgs().CriarPreferenceAsync(default!, default);
+        f.Cobrancas.Should().BeEmpty();
+        await f.Uow.Received().CommitAsync();
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task SoJanelaOuSoDataRecusa(bool comJanela, bool comData)
+    {
+        var f = new Fixture();
+        var input = Input() with
+        {
+            JanelaId = comJanela ? JanelaId : null,
+            DataEntrega = comData ? DataEntrega : null,
+        };
+
+        var act = () => f.UseCase().ExecuteAsync(input);
+
+        await act.Should().ThrowAsync<RegraDeDominioVioladaException>().WithMessage("*janela*data*");
+        f.Pedidos.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SemJanela_ClienteBloqueadoRecusa()
+    {
+        var f = new Fixture();
+        var bloqueado = DomainCliente.CriarParaStorefront(f.Storefront.EmpresaId, "hash", TimeProvider.System);
+        bloqueado.Bloquear("calote", DateTime.UtcNow);
+        f.ClienteRepo.GetByTelefoneHashAsync(f.Storefront.EmpresaId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(bloqueado);
+
+        var act = () => f.UseCase().ExecuteAsync(Input() with { JanelaId = null, DataEntrega = null });
+
+        await act.Should().ThrowAsync<EasyStock.Domain.Exceptions.ClienteBloqueadoException>();
+        f.Pedidos.Should().BeEmpty();
     }
 }

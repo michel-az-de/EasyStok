@@ -1,0 +1,393 @@
+{
+  "fonte": "Cardápio impresso da Casa da Baba, recebido em 2026-10-01 (#1334)",
+  "observacao": "Um item por sabor e tamanho: o agente lê um preço por item. Alérgenos em branco porque o cardápio não informa; a dona preenche.",
+  "itens": [
+    {
+      "ordem": 1,
+      "nome": "Ravioli de limão siciliano e mussarela 500 g",
+      "categoria": "Massas recheadas",
+      "preco": 42.0,
+      "porcao": "500 g",
+      "descricao": "Ravioli recheado de limão siciliano e mussarela.",
+      "ingredientes": "Massa fresca; recheio de limão siciliano e mussarela"
+    },
+    {
+      "ordem": 2,
+      "nome": "Ravioli de limão siciliano e mussarela 1 kg",
+      "categoria": "Massas recheadas",
+      "preco": 78.0,
+      "porcao": "1 kg",
+      "descricao": "Ravioli recheado de limão siciliano e mussarela.",
+      "ingredientes": "Massa fresca; recheio de limão siciliano e mussarela"
+    },
+    {
+      "ordem": 3,
+      "nome": "Ravioli de ricota e espinafre 500 g",
+      "categoria": "Massas recheadas",
+      "preco": 39.0,
+      "porcao": "500 g",
+      "descricao": "Ravioli de massa verde recheado de ricota e espinafre.",
+      "ingredientes": "Massa fresca; recheio de ricota e espinafre"
+    },
+    {
+      "ordem": 4,
+      "nome": "Ravioli de ricota e espinafre 1 kg",
+      "categoria": "Massas recheadas",
+      "preco": 72.0,
+      "porcao": "1 kg",
+      "descricao": "Ravioli de massa verde recheado de ricota e espinafre.",
+      "ingredientes": "Massa fresca; recheio de ricota e espinafre"
+    },
+    {
+      "ordem": 5,
+      "nome": "Ravioli de abóbora e alho-poró 500 g",
+      "categoria": "Massas recheadas",
+      "preco": 39.0,
+      "porcao": "500 g",
+      "descricao": "Ravioli recheado de abóbora e alho-poró.",
+      "ingredientes": "Massa fresca; recheio de abóbora e alho-poró"
+    },
+    {
+      "ordem": 6,
+      "nome": "Ravioli de abóbora e alho-poró 1 kg",
+      "categoria": "Massas recheadas",
+      "preco": 72.0,
+      "porcao": "1 kg",
+      "descricao": "Ravioli recheado de abóbora e alho-poró.",
+      "ingredientes": "Massa fresca; recheio de abóbora e alho-poró"
+    },
+    {
+      "ordem": 7,
+      "nome": "Ravioli tricolore de peito de peru defumado 500 g",
+      "categoria": "Massas recheadas",
+      "preco": 42.0,
+      "porcao": "500 g",
+      "descricao": "Massa de cenoura, beterraba e espinafre, recheio de peito de peru defumado.",
+      "ingredientes": "Massa de cenoura, beterraba e espinafre; recheio de peito de peru defumado"
+    },
+    {
+      "ordem": 8,
+      "nome": "Ravioli tricolore de peito de peru defumado 1 kg",
+      "categoria": "Massas recheadas",
+      "preco": 78.0,
+      "porcao": "1 kg",
+      "descricao": "Massa de cenoura, beterraba e espinafre, recheio de peito de peru defumado.",
+      "ingredientes": "Massa de cenoura, beterraba e espinafre; recheio de peito de peru defumado"
+    },
+    {
+      "ordem": 9,
+      "nome": "Ravioli tricolore de alho-poró cremoso 500 g",
+      "categoria": "Massas recheadas",
+      "preco": 42.0,
+      "porcao": "500 g",
+      "descricao": "Massa de cenoura, beterraba e espinafre, recheio de alho-poró cremoso.",
+      "ingredientes": "Massa de cenoura, beterraba e espinafre; recheio de alho-poró cremoso"
+    },
+    {
+      "ordem": 10,
+      "nome": "Ravioli tricolore de alho-poró cremoso 1 kg",
+      "categoria": "Massas recheadas",
+      "preco": 78.0,
+      "porcao": "1 kg",
+      "descricao": "Massa de cenoura, beterraba e espinafre, recheio de alho-poró cremoso.",
+      "ingredientes": "Massa de cenoura, beterraba e espinafre; recheio de alho-poró cremoso"
+    },
+    {
+      "ordem": 11,
+      "nome": "Tortellini de costela 500 g",
+      "categoria": "Massas recheadas",
+      "preco": 45.0,
+      "porcao": "500 g",
+      "descricao": "Tortellini recheado de costela.",
+      "ingredientes": "Massa fresca; recheio de costela"
+    },
+    {
+      "ordem": 12,
+      "nome": "Tortellini de costela 1 kg",
+      "categoria": "Massas recheadas",
+      "preco": 82.0,
+      "porcao": "1 kg",
+      "descricao": "Tortellini recheado de costela.",
+      "ingredientes": "Massa fresca; recheio de costela"
+    },
+    {
+      "ordem": 13,
+      "nome": "Sorrentino de ricota e espinafre 500 g",
+      "categoria": "Massas recheadas",
+      "preco": 42.0,
+      "porcao": "500 g",
+      "descricao": "Sorrentino recheado de ricota e espinafre.",
+      "ingredientes": "Massa fresca; recheio de ricota e espinafre"
+    },
+    {
+      "ordem": 14,
+      "nome": "Sorrentino de ricota e espinafre 1 kg",
+      "categoria": "Massas recheadas",
+      "preco": 76.0,
+      "porcao": "1 kg",
+      "descricao": "Sorrentino recheado de ricota e espinafre.",
+      "ingredientes": "Massa fresca; recheio de ricota e espinafre"
+    },
+    {
+      "ordem": 15,
+      "nome": "Capeletti de carne 500 g",
+      "categoria": "Massas recheadas",
+      "preco": 38.0,
+      "porcao": "500 g",
+      "descricao": "Capeletti recheado de carne.",
+      "ingredientes": "Massa fresca; recheio de carne"
+    },
+    {
+      "ordem": 16,
+      "nome": "Capeletti de carne 1 kg",
+      "categoria": "Massas recheadas",
+      "preco": 72.0,
+      "porcao": "1 kg",
+      "descricao": "Capeletti recheado de carne.",
+      "ingredientes": "Massa fresca; recheio de carne"
+    },
+    {
+      "ordem": 17,
+      "nome": "Capeletti de frango 500 g",
+      "categoria": "Massas recheadas",
+      "preco": 38.0,
+      "porcao": "500 g",
+      "descricao": "Capeletti recheado de frango.",
+      "ingredientes": "Massa fresca; recheio de frango"
+    },
+    {
+      "ordem": 18,
+      "nome": "Capeletti de frango 1 kg",
+      "categoria": "Massas recheadas",
+      "preco": 72.0,
+      "porcao": "1 kg",
+      "descricao": "Capeletti recheado de frango.",
+      "ingredientes": "Massa fresca; recheio de frango"
+    },
+    {
+      "ordem": 20,
+      "nome": "Talharim 500 g",
+      "categoria": "Massas frescas",
+      "preco": 19.0,
+      "porcao": "500 g",
+      "descricao": "Massa fresca simples.",
+      "ingredientes": null
+    },
+    {
+      "ordem": 21,
+      "nome": "Fettuccine 500 g",
+      "categoria": "Massas frescas",
+      "preco": 19.0,
+      "porcao": "500 g",
+      "descricao": "Massa fresca simples.",
+      "ingredientes": null
+    },
+    {
+      "ordem": 22,
+      "nome": "Espaguete 500 g",
+      "categoria": "Massas frescas",
+      "preco": 19.0,
+      "porcao": "500 g",
+      "descricao": "Massa fresca simples.",
+      "ingredientes": null
+    },
+    {
+      "ordem": 23,
+      "nome": "Linguini 500 g",
+      "categoria": "Massas frescas",
+      "preco": 19.0,
+      "porcao": "500 g",
+      "descricao": "Massa fresca simples.",
+      "ingredientes": null
+    },
+    {
+      "ordem": 30,
+      "nome": "Nhoque artesanal 500 g",
+      "categoria": "Nhoque",
+      "preco": 38.0,
+      "porcao": "500 g",
+      "descricao": "Macio, leve, feito à mão.",
+      "ingredientes": null
+    },
+    {
+      "ordem": 40,
+      "nome": "Panqueca de carne 400 g",
+      "categoria": "Panquecas artesanais",
+      "preco": 34.0,
+      "porcao": "400 g",
+      "descricao": "Carne ao pomodoro e queijo. Massa tradicional ou de espinafre.",
+      "ingredientes": "Carne, molho pomodoro, queijo"
+    },
+    {
+      "ordem": 41,
+      "nome": "Panqueca de frango 400 g",
+      "categoria": "Panquecas artesanais",
+      "preco": 36.0,
+      "porcao": "400 g",
+      "descricao": "Frango com creme de milho, pomodoro e queijo. Massa tradicional ou de espinafre.",
+      "ingredientes": "Frango, creme de milho, molho pomodoro, queijo"
+    },
+    {
+      "ordem": 50,
+      "nome": "Lasanha bolonhesa clássica 600 g",
+      "categoria": "Lasanhas artesanais",
+      "preco": 38.0,
+      "porcao": "600 g",
+      "descricao": "Lasanha à bolonhesa.",
+      "ingredientes": null
+    },
+    {
+      "ordem": 51,
+      "nome": "Lasanha bolonhesa clássica 800 g",
+      "categoria": "Lasanhas artesanais",
+      "preco": 45.0,
+      "porcao": "800 g",
+      "descricao": "Lasanha à bolonhesa.",
+      "ingredientes": null
+    },
+    {
+      "ordem": 52,
+      "nome": "Lasanha bolonhesa clássica 1 kg",
+      "categoria": "Lasanhas artesanais",
+      "preco": 68.0,
+      "porcao": "1 kg",
+      "descricao": "Lasanha à bolonhesa.",
+      "ingredientes": null
+    },
+    {
+      "ordem": 53,
+      "nome": "Lasanha verde com bolonhesa 600 g",
+      "categoria": "Lasanhas artesanais",
+      "preco": 38.0,
+      "porcao": "600 g",
+      "descricao": "Lasanha de massa verde com molho bolonhesa.",
+      "ingredientes": null
+    },
+    {
+      "ordem": 54,
+      "nome": "Lasanha verde com bolonhesa 800 g",
+      "categoria": "Lasanhas artesanais",
+      "preco": 45.0,
+      "porcao": "800 g",
+      "descricao": "Lasanha de massa verde com molho bolonhesa.",
+      "ingredientes": null
+    },
+    {
+      "ordem": 55,
+      "nome": "Lasanha verde com bolonhesa 1 kg",
+      "categoria": "Lasanhas artesanais",
+      "preco": 68.0,
+      "porcao": "1 kg",
+      "descricao": "Lasanha de massa verde com molho bolonhesa.",
+      "ingredientes": null
+    },
+    {
+      "ordem": 60,
+      "nome": "Molho pomodoro 250 ml",
+      "categoria": "Molhos artesanais",
+      "preco": 15.0,
+      "porcao": "250 ml",
+      "descricao": null,
+      "ingredientes": null
+    },
+    {
+      "ordem": 61,
+      "nome": "Molho pomodoro 500 ml",
+      "categoria": "Molhos artesanais",
+      "preco": 18.0,
+      "porcao": "500 ml",
+      "descricao": null,
+      "ingredientes": null
+    },
+    {
+      "ordem": 62,
+      "nome": "Molho bolonhesa 250 ml",
+      "categoria": "Molhos artesanais",
+      "preco": 20.0,
+      "porcao": "250 ml",
+      "descricao": null,
+      "ingredientes": null
+    },
+    {
+      "ordem": 63,
+      "nome": "Molho bolonhesa 500 ml",
+      "categoria": "Molhos artesanais",
+      "preco": 25.0,
+      "porcao": "500 ml",
+      "descricao": null,
+      "ingredientes": null
+    },
+    {
+      "ordem": 64,
+      "nome": "Molho bechamel 250 ml",
+      "categoria": "Molhos artesanais",
+      "preco": 15.0,
+      "porcao": "250 ml",
+      "descricao": null,
+      "ingredientes": null
+    },
+    {
+      "ordem": 65,
+      "nome": "Molho bechamel 500 ml",
+      "categoria": "Molhos artesanais",
+      "preco": 18.0,
+      "porcao": "500 ml",
+      "descricao": null,
+      "ingredientes": null
+    },
+    {
+      "ordem": 66,
+      "nome": "Pesto de manjericão 250 ml",
+      "categoria": "Molhos artesanais",
+      "preco": 30.0,
+      "porcao": "250 ml",
+      "descricao": null,
+      "ingredientes": null
+    },
+    {
+      "ordem": 67,
+      "nome": "Pesto de manjericão 500 ml",
+      "categoria": "Molhos artesanais",
+      "preco": 50.0,
+      "porcao": "500 ml",
+      "descricao": null,
+      "ingredientes": null
+    },
+    {
+      "ordem": 68,
+      "nome": "Manteiga de sálvia 250 ml",
+      "categoria": "Molhos artesanais",
+      "preco": 20.0,
+      "porcao": "250 ml",
+      "descricao": null,
+      "ingredientes": null
+    },
+    {
+      "ordem": 69,
+      "nome": "Manteiga de sálvia 500 ml",
+      "categoria": "Molhos artesanais",
+      "preco": 35.0,
+      "porcao": "500 ml",
+      "descricao": null,
+      "ingredientes": null
+    },
+    {
+      "ordem": 70,
+      "nome": "Fonduta de parmesão 250 ml",
+      "categoria": "Molhos artesanais",
+      "preco": 22.0,
+      "porcao": "250 ml",
+      "descricao": null,
+      "ingredientes": null
+    },
+    {
+      "ordem": 71,
+      "nome": "Fonduta de parmesão 500 ml",
+      "categoria": "Molhos artesanais",
+      "preco": 28.0,
+      "porcao": "500 ml",
+      "descricao": null,
+      "ingredientes": null
+    }
+  ]
+}

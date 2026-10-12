@@ -5,9 +5,11 @@ using EasyStock.Application.Events.Atendimento;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Atendimento;
 
 namespace EasyStock.Application.UseCases.Atendimento.Webhook;
@@ -34,10 +36,16 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     RoteadorAcoesBotao roteadorAcoes,
     OptOutPorPalavra optOut,
     IEscaladorConversa escalador,
+    IExpedienteLojaRepository expedientes,
+    TimeProvider relogio,
     ILogger<ProcessarEventoWhatsAppUseCase> logger,
-    IPublicadorEventoIntegracao? publicadorEventos = null)
+    IPublicadorEventoIntegracao? publicadorEventos = null,
+    Ports.Output.Ai.ITranscritorAudio? transcritor = null)
 {
     private const string Provedor = "meta_whatsapp";
+
+    /// <summary>Tipos gravados para a dona ver, mas que não pedem resposta: o agente não responde a um emoji.</summary>
+    private static readonly HashSet<string> TiposSemTurnoDoAgente = new(StringComparer.Ordinal) { "reaction", "unsupported", "system" };
 
     /// <returns>
     /// <c>false</c> quando alguma mensagem falhou por motivo que um reenvio pode resolver (ex.: dois
@@ -92,7 +100,95 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         foreach (var status in entrada.Statuses)
             await ProcessarStatusAsync(empresa.Id, status, ct);
 
+        foreach (var eco in entrada.Ecos)
+            completo &= await ProcessarEcoAsync(empresa.Id, entrada, eco, ct);
+
         return completo;
+    }
+
+    /// <summary>
+    /// #1417 (coexistência): a loja respondeu pelo app WhatsApp Business do celular. Vira <c>Mensagem(Saida, Dona)</c> na
+    /// conversa do cliente e a conversa fica assumida, como quando a dona escreve pelo console (RN-04): o agente não
+    /// responde por cima. Nada automático sai daqui: sem saudação, sem marcar como lida, sem turno do agente e sem job de
+    /// mídia (que enfileira o agente depois da transcrição). Idempotente pelo wamid, inclusive para o eco de mensagem
+    /// que o próprio EasyStok enviou.
+    /// </summary>
+    private async Task<bool> ProcessarEcoAsync(Guid empresaId, EntradaWhatsApp entrada, EcoWhatsApp eco, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(eco.Wamid) || string.IsNullOrWhiteSpace(eco.Para))
+        {
+            logger.LogWarning("Webhook WhatsApp: eco do app sem wamid ou sem destino, ignorado.");
+            return true;
+        }
+
+        if (await conversaRepository.ObterMensagemPorExternoIdAsync(empresaId, eco.Wamid, ct) is not null)
+            return true;
+
+        var enviadaEm = eco.Timestamp.UtcDateTime;
+        Conversa conversa;
+        Mensagem mensagem;
+        try
+        {
+            var existente = await conversaRepository.ObterAbertaPorContatoAsync(empresaId, CanalConversa.WhatsApp, eco.Para, ct);
+            conversa = existente ?? Conversa.Abrir(empresaId, eco.Para, enviadaEm,
+                entrada.Contatos.FirstOrDefault(c => c.WaId == eco.Para)?.Nome);
+            if (existente is null)
+            {
+                // A loja puxou a conversa pelo celular: identifica (ou cria o lead) como na 1ª mensagem do cliente.
+                var identificacao = await identificarCliente.ExecuteAsync(
+                    new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoIdExterno, conversa.ContatoNome), ct);
+                conversa.VincularCliente(identificacao.Cliente.Id);
+                await conversaRepository.AddAsync(conversa, ct);
+            }
+
+            conversa.Assumir(enviadaEm);
+            conversa.RegistrarSaida(enviadaEm);
+            mensagem = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Dona, enviadaEm,
+                MapearTipoConteudo(eco.Tipo), TextoDoEco(eco), eco.Wamid);
+            await conversaRepository.AddMensagemAsync(mensagem, ct);
+            await unitOfWork.CommitAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Webhook WhatsApp: falha gravando o eco do app wamid={Wamid}.", eco.Wamid);
+            unitOfWork.DescartarAlteracoesPendentes();
+            // Mesmo critério das mensagens: regra de domínio não passa num reenvio; concorrência e banco passam.
+            return ex is RegraDeDominioVioladaException;
+        }
+
+        try
+        {
+            // O console atualiza a conversa por este evento, venha a mensagem de qual lado vier.
+            await eventPublisher.PublicarAsync("conversa.mensagem_recebida", empresaId,
+                new { conversaId = conversa.Id, mensagemId = mensagem.Id }, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Webhook WhatsApp: eco {Wamid} gravado, aviso ao console falhou.", eco.Wamid);
+        }
+
+        return true;
+    }
+
+    /// <summary>Mídia do eco não é baixada (#1417): fica o tipo e um aviso, como no Instagram e no Messenger.</summary>
+    private static string? TextoDoEco(EcoWhatsApp eco) =>
+        !string.IsNullOrWhiteSpace(eco.TextoCorpo) ? CortarNoLimite(eco.TextoCorpo)
+        : eco.Tipo == "text" ? null
+        : $"[{eco.Tipo} enviado pelo app do celular; abra no app para ver]";
+
+    /// <summary>
+    /// #1615: o WhatsApp entrega texto maior que o limite da mensagem. Sem o corte a regra do domínio
+    /// estourava, o webhook respondia 200 e a mensagem do cliente sumia sem aviso.
+    /// </summary>
+    private static string? CortarNoLimite(string? texto)
+    {
+        var limpo = texto?.Trim();
+        if (limpo is not { Length: > Mensagem.TextoTamanhoMaximo }) return limpo;
+
+        // Não corta um emoji ao meio: a metade solta de um par não grava no banco.
+        var corte = Mensagem.TextoTamanhoMaximo - 1;
+        if (char.IsHighSurrogate(limpo[corte - 1])) corte--;
+        return limpo[..corte] + "…";
     }
 
     private async Task<bool> ProcessarMensagemAsync(Guid empresaId, EntradaWhatsApp entrada, MensagemRecebidaWhatsApp msg, CancellationToken ct)
@@ -136,6 +232,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             var existenteConversa = await conversaRepository.ObterAbertaPorContatoAsync(empresaId, CanalConversa.WhatsApp, msg.De, ct);
             var nomePerfil = entrada.Contatos.FirstOrDefault(c => c.WaId == msg.De)?.Nome;
             conversa = existenteConversa ?? Conversa.Abrir(empresaId, msg.De, enviadaEm, nomePerfil);
+            // #1332: responder no wa_id que escreveu, não na grafia antiga com/sem o nono dígito.
+            existenteConversa?.AtualizarContatoWhatsApp(msg.De);
 
             if (existenteConversa is null)
             {
@@ -150,9 +248,15 @@ public sealed class ProcessarEventoWhatsAppUseCase(
                 await conversaRepository.AddAsync(conversa, ct);
 
             var botaoId = msg.BotaoRespostaId ?? msg.BotaoPayload;
-            var texto = msg.Tipo is "interactive" or "button" ? null : msg.TextoCorpo;
+            var texto = msg.Tipo is "interactive" or "button" ? null : CortarNoLimite(msg.TextoCorpo);
+            // Resposta de lista ou de fluxo não traz o id do botão: fica o registro, sem o tipo Botao.
+            var tipoConteudo = MapearTipoConteudo(msg.Tipo);
+            if (tipoConteudo == TipoConteudoMensagem.Botao && string.IsNullOrWhiteSpace(botaoId))
+                tipoConteudo = TipoConteudoMensagem.Outro;
 
-            mensagemEntidade = Mensagem.Entrada(empresaId, conversa.Id, enviadaEm, MapearTipoConteudo(msg.Tipo), texto, msg.Wamid, botaoId);
+            mensagemEntidade = Mensagem.Entrada(empresaId, conversa.Id, enviadaEm, tipoConteudo, texto, msg.Wamid, botaoId);
+            if (msg.MidiaId is not null)
+                mensagemEntidade.AguardarMidia(msg.MidiaId, DateTime.UtcNow); // #1397: pendência durável
             await conversaRepository.AddMensagemAsync(mensagemEntidade, ct);
 
             // S24: cliente bloqueado não é saudado nem atendido pelo agente; a conversa nasce com a
@@ -161,8 +265,10 @@ public sealed class ProcessarEventoWhatsAppUseCase(
                 await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoClienteBloqueado(identificacao.Cliente), DateTime.UtcNow, ct);
 
             // S42: conversa nova dispara a automática de entrada (primeiro contato, fora do horário ou loja
-            // fechada) pelo outbox deste mesmo commit. Cliente bloqueado não recebe nada automático (S24).
-            if (existenteConversa is null && identificacao?.Cliente.Bloqueado != true && publicadorEventos is not null)
+            // fechada) pelo outbox deste mesmo commit. Cliente bloqueado não recebe nada automático (S24),
+            // nem entrada que o agente não vai responder (botão "acao:", reação; issue 1285).
+            if (existenteConversa is null && identificacao?.Cliente.Bloqueado != true
+                && !SemRespostaAutomatica(msg.Tipo, botaoId) && publicadorEventos is not null)
                 await publicadorEventos.PublicarAsync(empresaId, ConversaAbertaEvent.TipoEvento, "Conversa", conversa.Id,
                     new ConversaAbertaEvent(conversa.Id, conversa.ClienteId), ct: ct);
 
@@ -216,14 +322,24 @@ public sealed class ProcessarEventoWhatsAppUseCase(
                 return;
             }
 
-            // RN-01: a saudação sai antes do agente, sem LLM, para caber nos 5 s.
-            if (identificacao is not null)
+            // RN-01: a saudação sai antes do agente, sem LLM, para caber nos 5 s. Sem agente para cumprir
+            // o "já te respondo" (botão "acao:", reação), não há saudação (issue 1285).
+            if (identificacao is not null && !SemRespostaAutomatica(msg.Tipo, mensagem.BotaoId))
                 await EnviarSaudacaoAsync(empresaId, conversa, configuracao, identificacao, ct);
 
-            if (mensagem.BotaoId is { } botaoId && botaoId.StartsWith("acao:", StringComparison.Ordinal))
+            if (EhAcaoDeBotao(mensagem.BotaoId))
             {
                 // S06: "acao:<nome>:<payload>" é resolvido sem LLM; o turno do agente não é enfileirado.
-                await ExecutarAcaoDeBotaoAsync(empresaId, conversa, botaoId!, ct);
+                await ExecutarAcaoDeBotaoAsync(empresaId, conversa, mensagem.BotaoId!, ct);
+            }
+            else if (TiposSemTurnoDoAgente.Contains(msg.Tipo))
+            {
+                // Reação, mensagem sem suporte ou de sistema: fica gravada para a dona; o agente não responde.
+            }
+            else if (!string.IsNullOrWhiteSpace(msg.MidiaId)
+                && ProcessarMidiaWhatsAppJobUseCase.AguardaTranscricao(mensagem.TipoConteudo, transcritor?.Disponivel == true))
+            {
+                // #1406: o turno sai do job de mídia depois da transcrição; daqui o agente leria "[áudio recebido]".
             }
             else if (await optOut.TentarAsync(empresaId, conversa, mensagem.Texto, DateTime.UtcNow, ct))
             {
@@ -275,7 +391,11 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         var novoStatus = MapearStatus(status.Status);
         if (novoStatus is null) return;
 
-        mensagem.AtualizarStatusEntrega(novoStatus.Value, novoStatus == StatusMensagem.Falhou ? status.ErroMensagem : null);
+        // #1396: falha temporária da Meta agenda o reenvio automático (S57); permanente ou sem código, não.
+        if (novoStatus == StatusMensagem.Falhou)
+            mensagem.RegistrarFalhaEnvio(status.ErroMensagem, ClassificadorFalhaEnvio.ClassificarCodigoMeta(status.ErroCodigo), DateTime.UtcNow);
+        else
+            mensagem.AtualizarStatusEntrega(novoStatus.Value);
         await unitOfWork.CommitAsync();
     }
 
@@ -296,7 +416,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     {
         try
         {
-            var texto = await saudacao.MontarAsync(empresaId, configuracao, identificacao, ct);
+            var texto = await MontarPrimeiraRespostaAsync(empresaId, configuracao, identificacao, ct);
 
             Mensagem saida;
             try
@@ -310,7 +430,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
                 logger.LogWarning(ex, "Webhook WhatsApp: falha ao enviar a saudação da conversa {ConversaId}.", conversa.Id);
                 saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, DateTime.UtcNow,
                     TipoConteudoMensagem.Texto, texto);
-                saida.AtualizarStatusEntrega(StatusMensagem.Falhou, ex.Message);
+                saida.RegistrarFalhaEnvio(ex.Message, ClassificadorFalhaEnvio.Classificar(ex), saida.EnviadaEm);
             }
 
             conversa.RegistrarSaida(saida.EnviadaEm);
@@ -323,6 +443,18 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             // Não deixa o insert pendente contaminar o commit da próxima mensagem do lote.
             unitOfWork.DescartarAlteracoesPendentes();
         }
+    }
+
+    /// <summary>
+    /// #1474: com a loja fora do horário ou fechada na mão, o aviso do expediente vai no lugar da saudação, cuja
+    /// frase de espera ("já te ajudo") prometeria uma resposta que não vem. Sem registro, vale o expediente padrão.
+    /// </summary>
+    private async Task<string> MontarPrimeiraRespostaAsync(
+        Guid empresaId, ConfiguracaoAtendimento configuracao, IdentificacaoCliente identificacao, CancellationToken ct)
+    {
+        var expediente = await expedientes.GetByEmpresaIdAsync(empresaId, ct) ?? ExpedienteLoja.CriarPadrao(empresaId);
+        return expediente.MensagemParaCliente(relogio.GetUtcNow().UtcDateTime)
+            ?? await saudacao.MontarAsync(empresaId, configuracao, identificacao, ct);
     }
 
     private async Task<ConfiguracaoAtendimento> AtualizarUltimaMensagemRecebidaAsync(Guid empresaId, DateTime agora)
@@ -339,6 +471,12 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
         return configuracao;
     }
+
+    private static bool EhAcaoDeBotao(string? botaoId) =>
+        botaoId is not null && botaoId.StartsWith("acao:", StringComparison.Ordinal);
+
+    private static bool SemRespostaAutomatica(string tipo, string? botaoId) =>
+        EhAcaoDeBotao(botaoId) || TiposSemTurnoDoAgente.Contains(tipo);
 
     private static TipoConteudoMensagem MapearTipoConteudo(string tipo) => tipo switch
     {

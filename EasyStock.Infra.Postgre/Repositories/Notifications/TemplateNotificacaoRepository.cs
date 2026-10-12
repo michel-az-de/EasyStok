@@ -25,20 +25,36 @@ public sealed class TemplateNotificacaoRepository(EasyStockDbContext db) : ITemp
     }
 
     /// <summary>
-    /// Template global (<c>EmpresaId</c> nulo). No escopo de uma empresa, o filtro do EF e a policy
-    /// <c>tenant_isolation</c> (<c>EmpresaId = app.empresa_id</c>) o escondem, e o fallback para o
-    /// global nunca o achava (S30, provado em <c>DisparoCampanhaIntegrationTests</c>). A leitura
-    /// abre conexão própria com o bypass de RLS e o WHERE só alcança linhas globais. Com a conexão
-    /// já aberta por quem chama, o bypass não se aplica e vale o comportamento anterior.
+    /// Template global (<c>EmpresaId</c> nulo). O filtro do EF o esconde de quem está no escopo de uma empresa e o
+    /// fallback para o global nunca o achava (S30). Desde a N1 a policy <c>catalogo_global_leitura</c> o expõe ao
+    /// tenant (só SELECT), então a leitura ignora o filtro do EF e o WHERE só alcança linhas globais, sem bypass de
+    /// RLS: o repositório não liga mais a flag.
     /// </summary>
     private async Task<TemplateNotificacao?> GetGlobalAtivoAsync(string codigo, CanalNotificacao canal, CancellationToken ct)
     {
-        using var _ = db.UseRowLevelSecurityBypass();
         return await db.NotifTemplates
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(t => t.Codigo == codigo && t.Canal == canal && t.Ativo && t.Aprovado && t.EmpresaId == null)
             .OrderByDescending(t => t.Versao)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    /// <summary>
+    /// Por tipo e canal (N5), com a mesma leitura do catálogo global da N1: o filtro do EF é ignorado e o predicado
+    /// <c>EmpresaId == empresa ou nulo</c> delimita o que entra; a policy <c>catalogo_global_leitura</c> expõe os
+    /// globais ao tenant (só SELECT), sem bypass de RLS. A empresa vem antes do global, depois a maior versão.
+    /// </summary>
+    public async Task<TemplateNotificacao?> GetAtivoPorTipoAsync(
+        TipoEventoNotificacao tipo, CanalNotificacao canal, Guid? empresaId, CancellationToken ct = default)
+    {
+        return await db.NotifTemplates
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(t => t.TipoEvento == tipo && t.Canal == canal && t.Ativo && t.Aprovado
+                        && (t.EmpresaId == null || t.EmpresaId == empresaId))
+            .OrderBy(t => t.EmpresaId == null)
+            .ThenByDescending(t => t.Versao)
             .FirstOrDefaultAsync(ct);
     }
 

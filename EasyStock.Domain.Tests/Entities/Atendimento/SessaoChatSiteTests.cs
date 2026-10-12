@@ -74,4 +74,23 @@ public class SessaoChatSiteTests
         sessao.ConversaId.Should().Be(conversa);
         ((Action)(() => sessao.VincularConversa(Guid.Empty))).Should().Throw<RegraDeDominioVioladaException>();
     }
+    [Fact]
+    public void Encerrar_TrocaHashEImpedeNovoUso()
+    {
+        var sessao = SessaoChatSite.Abrir(Empresa, Loja, Hash, Agora);
+        sessao.Encerrar(Agora.AddMinutes(1));
+        sessao.TokenHash.Should().HaveLength(64).And.NotBe(Hash);
+        sessao.EstaValida(Agora.AddMinutes(1)).Should().BeFalse();
+        ((Action)(() => sessao.RegistrarUso(Agora.AddMinutes(2)))).Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Fact]
+    public void Encerrar_VencidaTambemInvalidaHash()
+    {
+        var sessao = SessaoChatSite.Abrir(Empresa, Loja, Hash, Agora);
+        sessao.Encerrar(Agora.AddDays(2));
+        sessao.TokenHash.Should().NotBe(Hash);
+        sessao.EstaValida(Agora.AddDays(2)).Should().BeFalse();
+    }
+
 }

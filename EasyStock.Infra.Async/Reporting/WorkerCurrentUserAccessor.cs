@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Reporting;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.Services;
 using Microsoft.AspNetCore.Http;
 
 namespace EasyStock.Infra.Async.Reporting;
@@ -102,7 +103,14 @@ public sealed class WorkerCurrentUserAccessor(
 
     public bool TemPermissao(Permissao permissao)
     {
-        if (Nivel == NivelAcesso.SuperAdmin) return true;
-        return permissao != Permissao.ConfigurarSla;
+        var usuario = httpContextAccessor?.HttpContext?.User;
+        if (usuario?.Identity?.IsAuthenticated != true)
+            return PoliticaPermissao.Tem(Nivel, [], permissao);
+
+        var claims = usuario.FindAll("permissao").ToArray();
+        var permissoes = claims.Select(c => Enum.TryParse<Permissao>(c.Value, true, out var p) && Enum.IsDefined(p)
+            ? (Permissao?)p : null).Where(p => p.HasValue).Select(p => p!.Value).ToArray();
+        return PoliticaPermissao.Tem(Nivel, permissoes, permissao,
+            claims.Length > 0 || usuario.HasClaim("permissoesExplicitas", "true"));
     }
 }

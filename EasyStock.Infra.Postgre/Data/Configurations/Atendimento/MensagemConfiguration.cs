@@ -16,13 +16,47 @@ public class MensagemConfiguration : IEntityTypeConfiguration<Mensagem>
         builder.Property(m => m.Autor).HasConversion<int>().IsRequired();
         builder.Property(m => m.TipoConteudo).HasConversion<int>().IsRequired();
         builder.Property(m => m.Texto).HasMaxLength(Mensagem.TextoTamanhoMaximo);
+        builder.Property(m => m.ModeloJson).HasColumnType("jsonb");
+        builder.Ignore(m => m.Modelo);
         builder.Property(m => m.BotaoId).HasMaxLength(Mensagem.BotaoIdTamanhoMaximo);
         builder.Property(m => m.Programada).HasDefaultValue(false);
         builder.Property(m => m.MidiaChave).HasMaxLength(Mensagem.MidiaChaveTamanhoMaximo);
         builder.Property(m => m.MidiaMime).HasMaxLength(Mensagem.MidiaMimeTamanhoMaximo);
+        builder.Property(m => m.Transcricao).HasMaxLength(Mensagem.TextoTamanhoMaximo);
         builder.Property(m => m.Status).HasConversion<int>().IsRequired();
         builder.Property(m => m.Erro).HasMaxLength(Mensagem.ErroTamanhoMaximo);
         builder.Property(m => m.EnviadaEm).IsRequired();
+        builder.Property(m => m.TentativasEnvio).HasDefaultValue(0);
+        builder.Property(m => m.UltimaFalhaEnvio).HasConversion<int?>();
+        builder.Property(m => m.MidiaIdExterno).HasMaxLength(Mensagem.MidiaIdExternoTamanhoMaximo);
+        builder.Property(m => m.ErroMidia).HasMaxLength(Mensagem.ErroMidiaTamanhoMaximo);
+        builder.Property(m => m.TentativasMidia).HasDefaultValue(0);
+        builder.Ignore(m => m.MidiaFalhou);
+
+        // #1397: a varredura de anexos só procura mensagens com tentativa agendada.
+        builder.HasIndex(m => m.ProximaTentativaMidiaEm)
+            .HasFilter("\"ProximaTentativaMidiaEm\" IS NOT NULL")
+            .HasDatabaseName("ix_atendimento_mensagens_proxima_tentativa_midia");
+
+        // S58: o serviço de reenvio procura quem espera o cliente responder ao modelo de retomada.
+        builder.HasIndex(m => m.AguardaClienteDesde)
+            .HasFilter("\"AguardaClienteDesde\" IS NOT NULL")
+            .HasDatabaseName("ix_atendimento_mensagens_aguarda_cliente");
+
+        // S59: painel "Não entregues" (saída que falhou, por empresa, mais recente primeiro).
+        builder.HasIndex(m => new { m.EmpresaId, m.EnviadaEm })
+            .HasFilter("\"Status\" = 5 AND \"Direcao\" = 2")
+            .HasDatabaseName("ix_atendimento_mensagens_nao_entregues");
+
+        // S57: o serviço de reenvio só procura mensagens com reenvio agendado.
+        builder.HasIndex(m => m.ProximoReenvioEm)
+            .HasFilter("\"ProximoReenvioEm\" IS NOT NULL")
+            .HasDatabaseName("ix_atendimento_mensagens_proximo_reenvio");
+
+        // #1599: a varredura de intenção de modelo presa só procura modelo ainda pendente (StatusMensagem.Pendente = 1).
+        builder.HasIndex(m => m.EnviadaEm)
+            .HasFilter("\"ModeloJson\" IS NOT NULL AND \"Status\" = 1")
+            .HasDatabaseName("ix_atendimento_mensagens_modelo_pendente");
 
         // Idempotencia do webhook: o mesmo wamid nao entra duas vezes na mesma empresa.
         builder.HasIndex(m => new { m.EmpresaId, m.ExternoId })

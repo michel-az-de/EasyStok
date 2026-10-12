@@ -32,12 +32,18 @@ public interface IFileStorage
     Task<bool> ExistsAsync(string storageKey, CancellationToken ct);
 }
 
+/// <param name="PrivateAllowedMimeTypes">
+/// Allowlist própria de um upload privado (ex.: mídia recebida no atendimento, que inclui áudio e
+/// vídeo). Ignorada quando <paramref name="IsPublic"/>: o público sempre usa a whitelist conservadora
+/// de <c>UploadSecurityValidator.AllowedMimeTypes</c>.
+/// </param>
 public sealed record FileUploadRequest(
     string BucketPath,
     string FileName,
     string ContentType,
     byte[] Content,
-    bool IsPublic = true);
+    bool IsPublic = true,
+    IReadOnlySet<string>? PrivateAllowedMimeTypes = null);
 
 public sealed record StoredFileResult(
     string StorageKey,

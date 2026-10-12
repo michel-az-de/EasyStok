@@ -54,6 +54,26 @@ public class MercadoPagoWebhookProcessorTests
     }
 
     [Fact]
+    public async Task SegundoPagamentoAprovado_EstornaEResponde200()
+    {
+        // #1289: outro pagamento aprovado para o pedido já pago. Antes, MarcarPaga lançava e o webhook dava 500 em loop.
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 25m);
+        f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 25m, id: "20359979");
+        f.Estorno.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(EstornoPedidoResult.Ok("estorno-1"));
+        var processor = f.Processor();
+        await processor.ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+
+        var r = await processor.ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(dataId: "20359979"), SemHeaders);
+
+        r.Sucesso.Should().BeTrue();
+        await f.Estorno.Received(1).EstornarAsync("20359979", 25m, "estorno-duplicado-20359979", Arg.Any<CancellationToken>());
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.Referencia.Should().Be(MercadoPagoWebhookFixture.PagamentoId);
+        f.Cobranca.PagamentoExternoId.Should().Be(MercadoPagoWebhookFixture.PagamentoId);
+    }
+
+    [Fact]
     public async Task ValorMenorNaoConfirma()
     {
         var f = new MercadoPagoWebhookFixture();
@@ -83,6 +103,24 @@ public class MercadoPagoWebhookProcessorTests
         f.Pedido.Pagamentos.Should().BeEmpty();
         f.Cobranca.Status.Should().Be(StatusCobrancaPedido.Pendente);
         f.Cobranca.Motivo.Should().Be($"pagamento_recusado: pagamento {MercadoPagoWebhookFixture.PagamentoId} ({status})");
+    }
+
+    [Theory]
+    [InlineData("approved")]
+    [InlineData("refunded")]
+    public async Task Devolucao_consultada_na_fonte_usa_ledger_sem_exclusao_legada(string status)
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 25m);
+        var processor = f.Processor();
+        await processor.ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+        f.Pagamentos[MercadoPagoWebhookFixture.PagamentoId] = f.Pagamentos[MercadoPagoWebhookFixture.PagamentoId]
+            with { Status = status, TransactionAmountRefunded = 10 };
+        f.EstornosOnline.SincronizarPagamentoAsync(Arg.Any<PagamentoMercadoPago>(), Arg.Any<CancellationToken>()).Returns(true);
+        await processor.ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+        await f.EstornosOnline.Received(1).SincronizarPagamentoAsync(
+            Arg.Is<PagamentoMercadoPago>(p => p.TransactionAmountRefunded == 10 && p.ExternalReference == f.Pedido.Id.ToString()), Arg.Any<CancellationToken>());
+        f.Cobranca.Status.Should().Be(StatusCobrancaPedido.Paga, "o ledger confirma a cobrança somente quando o total foi devolvido");
     }
 
     [Fact]

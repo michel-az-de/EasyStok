@@ -7,6 +7,11 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario;
 /// o seletor de Empresa na tela de login.
 ///
 /// <para>
+/// Senha errada conta como falha de login (#1352): mesmo contador e mesmo bloqueio do login completo.
+/// Senha certa não grava nada.
+/// </para>
+///
+/// <para>
 /// Fluxo de uso:
 /// 1. Cliente chama este use case com email + senha.
 /// 2. Se IsSuperAdmin=true → cliente chama AutenticarUsuarioUseCase diretamente.
@@ -24,6 +29,7 @@ public sealed record ListarEmpresasParaLoginResult(
 
 public class ListarEmpresasParaLoginUseCase(
     IUsuarioRepository usuarioRepository,
+    IUnitOfWork unitOfWork,
     IPasswordHasher passwordHasher,
     ILogger<ListarEmpresasParaLoginUseCase> logger)
 {
@@ -40,7 +46,16 @@ public class ListarEmpresasParaLoginUseCase(
 
         var senhaOk = passwordHasher.Verify(command.Senha, usuario.SenhaHash);
         if (!senhaOk)
+        {
+            // #1352: a senha errada do passo 1 conta como a do login completo (mesmo contador, mesmo bloqueio).
+            // Senha certa não zera nada: quem zera é o login completo.
+            usuario.RegistrarFalhaDeSenha();
+            if (usuario.EstaBloqueado())
+                logger.LogWarning("ListarEmpresasParaLogin: usuario {UsuarioId} bloqueado apos {Limite} tentativas falhas", usuario.Id, Domain.Entities.Usuario.FalhasParaBloquear);
+            await usuarioRepository.UpdateAsync(usuario);
+            await unitOfWork.CommitAsync();
             throw new CredenciaisInvalidasException();
+        }
 
         logger.LogDebug("ListarEmpresasParaLogin: credenciais válidas para {Domain}", MaskEmail(command.Email));
 

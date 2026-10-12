@@ -26,8 +26,9 @@ F14 caixa ─► F15 fidelidade (desconto entra no pedido) ───────
 F13 deploy e validações do Felipe (último) ◄────────────────────────────────────────────────────┘
 ```
 
-**Go-live mínimo = F06 + F07 + F08 + F16 + F13.** A F16 entra no mínimo porque sem ela uma chave
-vencida do Mercado Pago ou da Meta para a esteira sem ninguém ver. F09 a F12, F14, F15 e F17 fecham a
+**Go-live mínimo = F06 + F07 + F08 + F16 + F18 + F13.** A F16 entra no mínimo porque sem ela uma chave
+vencida do Mercado Pago ou da Meta para a esteira sem ninguém ver. A F18 entra porque, sem ela, nenhuma
+conversa fora do WhatsApp vira pedido (decisão do Felipe, 2026-10-01). F09 a F12, F14, F15 e F17 fecham a
 paridade com o protótipo.
 
 Toda fatia segue as convenções do [README](README.md#convenções-do-executor-vinculantes-resumo-do-claudemd-v40):
@@ -426,6 +427,31 @@ saldo na carteira para produção; a assinatura do webhook (PDF v1.3) confirmada
 Routes API habilitada na chave do Google.
 
 **Fora.** 99 (depende de contato comercial, F9 do #1205); taxa de prioridade; troca de motorista.
+
+---
+
+## F18 · Cadastro do cliente pela conversa (go-live) · #1276
+
+Achado da verificação lado a lado de 2026-10-01 (API local do master `10b3528d`, banco conferido).
+
+**Problema.** `GerarPedidoConversaUseCase` exige cliente vinculado e endereço padrão, mas só o webhook do
+WhatsApp vincula cliente. Chat do site, Instagram, Messenger, e-mail e SMS recebiam 409 "Cadastre o
+cliente desta conversa" sem caminho para cadastrar: "Salvar cadastro", "Cadastrar endereço" e a edição
+do cliente avisavam "ainda não ligado", e a sincronização de 5 s reescrevia o cliente vazio.
+
+**Abordagem.** Uma rota nova que compõe o que já existe:
+`POST api/atendimento/conversas/{id}/cliente` (`CadastrarClienteDaConversaUseCase`) =
+`IdentificarClientePorTelefoneUseCase` (acha ou cria pelo telefone, sem trocar o nome de quem já existe)
++ `Conversa.VincularCliente` + `ValidarEnderecoUseCase` + `ConfirmarEnderecoClienteUseCase` (endereço de
+entrega padrão; fora da área grava e devolve `dentroDaArea=false`). O console liga as três ações, relê o
+dossiê (`GET .../dossie`, S25) depois de salvar e ao abrir conversa com cliente, e mantém o cliente lido
+da API na sincronização. Nome do lead sem cadastro é rascunho; no chat do site o cadastro exige o nome
+escrito pela dona (o do contato é "Visitante do site").
+
+**Pré-condições do pedido que continuam valendo:** CEP dentro de uma zona `cep_range` (bairro só conta
+com ViaCEP ligado) e loja aberta. As duas aparecem como aviso honesto no console.
+
+**Fora.** Avisos do cliente (segue "ainda não ligado"); busca de cliente por e-mail, IGSID ou PSID.
 
 ---
 

@@ -123,4 +123,61 @@ public class ProcessarEventoMensageriaMetaUseCaseTests
 
         _uow.Received(1).DescartarAlteracoesPendentes();
     }
+
+    [Fact]
+    public async Task RegraDeDominioViolada_NaoPedeReenvio()
+    {
+        // Regra de domínio não passa num reenvio: pedir retry faria a Meta reenviar para sempre (issue 1285).
+        _uow.CommitAsync().Returns<int>(_ => throw new RegraDeDominioVioladaException("texto inválido"));
+
+        (await _useCase.ExecuteAsync(Dm("page", "PAGE-1", "PSID-3", "m_5"))).Should().BeTrue();
+
+        _uow.Received(1).DescartarAlteracoesPendentes();
+    }
+
+    [Fact]
+    public async Task MidLongoDoInstagram_GravaComIdDeterministico()
+    {
+        var mid = new string('a', 160);
+
+        (await _useCase.ExecuteAsync(Dm("instagram", "1784", "IGSID-9", mid))).Should().BeTrue();
+
+        await _conversas.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.ExternoId == IdHash(mid)), Arg.Any<CancellationToken>());
+        await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task MidLongoJaGravado_ReentregaIgnorada()
+    {
+        var mid = new string('b', 160);
+        _conversas.ObterMensagemPorExternoIdAsync(_empresa.Id, IdHash(mid), Arg.Any<CancellationToken>())
+            .Returns(Mensagem.Entrada(_empresa.Id, Guid.NewGuid(), DateTime.UtcNow, TipoConteudoMensagem.Texto, "oi", IdHash(mid)));
+
+        (await _useCase.ExecuteAsync(Dm("instagram", "1784", "IGSID-9", mid))).Should().BeTrue();
+
+        await _conversas.DidNotReceiveWithAnyArgs().AddMensagemAsync(default!, default);
+    }
+
+    [Theory]
+    [InlineData("is_deleted")]
+    [InlineData("is_unsupported")]
+    public async Task MensagemSemTextoNemAnexo_GravaComoOutroSemPedirReenvio(string marcador)
+    {
+        var corpo = $$$"""
+            {"object":"instagram","entry":[{"id":"1784","messaging":[
+              {"sender":{"id":"IGSID-9"},"recipient":{"id":"1784"},"timestamp":1790000000000,
+               "message":{"mid":"ig-sem-texto","{{{marcador}}}":true}}]}]}
+            """;
+
+        (await _useCase.ExecuteAsync(corpo)).Should().BeTrue();
+
+        await _conversas.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.TipoConteudo == TipoConteudoMensagem.Outro && !string.IsNullOrWhiteSpace(m.Texto)),
+            Arg.Any<CancellationToken>());
+        _uow.DidNotReceive().DescartarAlteracoesPendentes();
+    }
+
+    private static string IdHash(string mid) => "h:" + Convert.ToHexString(
+        System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(mid))).ToLowerInvariant();
 }

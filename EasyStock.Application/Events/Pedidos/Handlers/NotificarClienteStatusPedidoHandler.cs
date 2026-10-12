@@ -12,6 +12,7 @@ namespace EasyStock.Application.Events.Pedidos.Handlers;
 /// <see cref="TipoEventoNotificacao.PedidoEmPreparo"/> (com a previsão da janela), <c>saiu_para_entrega</c> →
 /// <see cref="TipoEventoNotificacao.PedidoSaiuParaEntrega"/> e <c>entregue</c> →
 /// <see cref="TipoEventoNotificacao.PedidoEntregue"/> (agradecimento, RN-37). Demais status não avisam.
+/// Preparo e saída respeitam os avisos desligados pelo cliente (S24); o agradecimento sai sempre.
 /// Roda ao lado do <see cref="PedidoMudouStatusLogHandler"/>; idempotente por pedido + status novo.
 /// </summary>
 public sealed class NotificarClienteStatusPedidoHandler(AvisoStatusPedidoCliente aviso) : IIntegrationEventHandler
@@ -25,7 +26,8 @@ public sealed class NotificarClienteStatusPedidoHandler(AvisoStatusPedidoCliente
         var mudanca = JsonSerializer.Deserialize<PedidoMudouStatusEvent>(evento.PayloadJson, Camel);
         if (mudanca is null || TipoDoAviso(mudanca.StatusNovo) is not { } tipo) return;
 
-        await aviso.EnfileirarAsync(tipo, evento.EmpresaId, mudanca.PedidoId, mudanca.StatusNovo, ct);
+        await aviso.EnfileirarAsync(tipo, evento.EmpresaId, mudanca.PedidoId, mudanca.StatusNovo, ct,
+            respeitaPreferenciaAvisos: tipo != TipoEventoNotificacao.PedidoEntregue);
 
         // S26: pedido de avaliação em dois botões 30 min após a entrega. É pós-venda: respeita os avisos
         // desligados pelo cliente (o agradecimento acima é incondicional).

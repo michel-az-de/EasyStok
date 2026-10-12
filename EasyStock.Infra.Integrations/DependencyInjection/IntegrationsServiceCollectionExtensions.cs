@@ -23,6 +23,11 @@ namespace EasyStock.Infra.Integrations.DependencyInjection;
 /// circuit breaker abre por 60s após 50% de falhas em janela de 30s
 /// (mín 8 chamadas), timeout total 30s.
 /// </para>
+///
+/// <para>
+/// Exceção: <see cref="IntegrationCategories.WhatsAppEnvio"/> tem só circuit breaker e timeout. Envio
+/// que não é idempotente não pode ser repetido às cegas (#1292).
+/// </para>
 /// </summary>
 public static class IntegrationsServiceCollectionExtensions
 {
@@ -39,21 +44,28 @@ public static class IntegrationsServiceCollectionExtensions
                         BackoffType = DelayBackoffType.Exponential,
                         UseJitter = true,
                         Delay = TimeSpan.FromMilliseconds(200),
-                    })
-                    .AddCircuitBreaker(new CircuitBreakerStrategyOptions
-                    {
-                        FailureRatio = 0.5,
-                        MinimumThroughput = 8,
-                        SamplingDuration = TimeSpan.FromSeconds(30),
-                        BreakDuration = TimeSpan.FromSeconds(60),
-                    })
-                    .AddTimeout(new TimeoutStrategyOptions
-                    {
-                        Timeout = TimeSpan.FromSeconds(30),
                     });
+                AdicionarDisjuntorETimeout(builder);
             });
         }
 
+        // #1292: envio não idempotente (POST /messages da Meta) não repete; falha volta para quem chamou.
+        services.AddResiliencePipeline(IntegrationCategories.WhatsAppEnvio, AdicionarDisjuntorETimeout);
+
         return services;
     }
+
+    private static void AdicionarDisjuntorETimeout(ResiliencePipelineBuilder builder) =>
+        builder
+            .AddCircuitBreaker(new CircuitBreakerStrategyOptions
+            {
+                FailureRatio = 0.5,
+                MinimumThroughput = 8,
+                SamplingDuration = TimeSpan.FromSeconds(30),
+                BreakDuration = TimeSpan.FromSeconds(60),
+            })
+            .AddTimeout(new TimeoutStrategyOptions
+            {
+                Timeout = TimeSpan.FromSeconds(30),
+            });
 }

@@ -39,7 +39,7 @@ public class CardapioConversaControllerTests
             linkService, Substitute.For<ITenantContextAccessor>(), Substitute.For<IConversaRepository>(),
             Substitute.For<IClienteRepository>(), null!, null!, null!, Substitute.For<IOperacaoEventPublisher>(),
             Substitute.For<IUnitOfWork>(), TimeProvider.System,
-            NullLogger<CriarPedidoPeloCardapioConversaUseCase>.Instance);
+            NullLogger<CriarPedidoPeloCardapioConversaUseCase>.Instance, null!);
         _controller = new CardapioConversaController(useCase)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },

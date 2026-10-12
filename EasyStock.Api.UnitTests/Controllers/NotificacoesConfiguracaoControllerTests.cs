@@ -93,6 +93,23 @@ public class NotificacoesConfiguracaoControllerTests
             TriggerTipoRotina.Evento, "pedido_pronto", CategoriaConteudoNotificacao.Transacional,
             empresaId: empresaId);
 
+    // ── Rotinas agendadas (N12) ─────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(TriggerTipoRotina.Cron, "0 20 * * *", null)]
+    [InlineData(TriggerTipoRotina.Evento, null, """{"agenda":{"horario":"8h"}}""")]
+    public async Task CriarRotina_com_cron_ou_horario_fora_do_formato_devolve_400(
+        TriggerTipoRotina trigger, string? cron, string? parametros)
+    {
+        var req = new NotificacoesConfiguracaoController.CriarRotinaRequest(
+            "resumo", "Resumo", TipoEventoNotificacao.ResumoDiario, trigger, "resumo_diario_email_v1",
+            CategoriaConteudoNotificacao.Operacional, cron, parametros);
+
+        (await _controller.CriarRotina(req)).Should().BeOfType<BadRequestObjectResult>();
+
+        await _rotinas.DidNotReceiveWithAnyArgs().AddAsync(default!);
+    }
+
     // ── Templates ───────────────────────────────────────────────────────────
 
     [Fact]

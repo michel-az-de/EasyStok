@@ -1,24 +1,36 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { AlcaLargura } from '../../componentes/AlcaLargura'
-import { CampoMascarado } from '../../componentes/CampoMascarado'
 import { Icone } from '../../componentes/Icone'
-import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
 import { Botao } from '../../componentes/Botao'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useEscape } from '../../hooks/useEscape'
+import { abrirSecao } from '../../hooks/useRecolhido'
 import {
-  adicionaisDoItem, alternativasPara, catalogoDeAdicionais, contarDisponiveis, ehNovidade,
-  estaEmValidacao, itensAtivos, itensRemovidos, situacaoDoItem,
+  adicionaisDoItem, alternativasPara, contarDisponiveis, ehNovidade,
+  estaEmValidacao, itensAtivos, itensRemovidos, porcaoDoToque, produtoDaPorcao, situacaoDoItem,
 } from '../../dominio/cardapio'
 import { cartaDoItem } from '../../dominio/arteCardapio'
-import { lerMoeda, mascaraMoeda, moeda, moedaAltaDemais } from '../../dominio/formato'
+import { aceitaFormato, canalDaConversa, motivoDeFormato } from '../../dominio/canal'
+import { permissaoDeEscrita } from '../../dominio/janela'
 import {
-  agruparPorLinha, itensDetalhados, numeroCurto, totalDoPedido,
+  SEM_CATEGORIA, agruparPorCategoria, filtrarCardapio, fotoDoItem, mensagemDaFotoDoItem,
+} from '../../dominio/vitrineCardapio'
+import { moeda } from '../../dominio/formato'
+import {
+  agruparPorLinha, comandaTravada, itensDetalhados, numeroDaComanda, totalDoPedido,
 } from '../../dominio/pedido'
 import { diferencaAposPagamento } from '../../dominio/pagamento'
+import { FOTO_NAO_ENVIADA } from '../../dominio/anexos'
+import { primeiroNome } from '../../dominio/mensagem'
+import { LINHA_COMANDA_TRAVADA } from '../../dominio/resumoPedido'
+import { EditorItemCardapio } from './EditorItemCardapio'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { lerFichaDoPrato } from '../../aplicacao/edicaoCardapio'
+import { MarcaIcone } from '../../componentes/MarcaIcone'
 import css from './cardapio.module.css'
 
 // Dois papéis na mesma janela, porque são a mesma conversa com o cardápio: ela
@@ -29,19 +41,55 @@ import css from './cardapio.module.css'
 // de marca: o número já está no contador de Gerir o dia.
 const PEDE_ACAO = new Set(['esgotado', 'fora-do-dia', 'pouco'])
 
+// #1474: largura em que nome, porção, preço e o botão de foto cabem sem espremer o nome.
+const LARGURA_MINIMA = 440
+
 const PAPEIS = [
   { id: 'escolher', rotulo: 'Anotar na comanda' },
   { id: 'gerir', rotulo: 'Gerir o dia' },
 ]
 
-function FichaDoItem({ item, adicionais, linhas }) {
+// Foto real do item (#1448), a mesma da vitrine. Sem foto, ou se ela não carregar, a carta
+// desenhada: honesta, parece arte de cardápio e não finge ser fotografia.
+function FotoDoItem({ item, className, alt = '' }) {
+  const foto = fotoDoItem(item)
+  const [falhou, setFalhou] = useState(null)
+  const usarFoto = foto && falhou !== foto
+  return (
+    <img
+      className={className}
+      src={usarFoto ? foto : cartaDoItem(item)}
+      alt={alt}
+      onError={usarFoto ? () => setFalhou(foto) : undefined}
+    />
+  )
+}
+
+function FichaDoItem({ item, adicionais, linhas, aoEditar }) {
+  const { fonteApi } = useAtendimento()
+  const [detalhe, setDetalhe] = useState(null)
+  const [erro, setErro] = useState(null)
+  const [tentativa, setTentativa] = useState(0)
+  useEffect(() => {
+    if (!fonteApi) return undefined
+    let vivo = true
+    lerFichaDoPrato(item.sku).then((d) => { if (vivo) { setDetalhe(d); setErro(null) } })
+      .catch((e) => { if (vivo) setErro(e.message) })
+    return () => { vivo = false }
+  }, [fonteApi, item, tentativa])
   return (
     <div className={css.ficha}>
-      <img className={css.carta} src={cartaDoItem(item)} alt={'Carta do cardápio de ' + item.nome} />
+      {(detalhe?.descricao || item.descricao) && <p className={css.descricaoPrato}>{detalhe?.descricao || item.descricao}</p>}
+      {fonteApi && !detalhe && !erro && <output>Consultando informações do prato…</output>}
+      {erro && <p role="alert">{erro} <Botao variante="texto" onClick={() => setTentativa((v) => v + 1)}>Tentar novamente</Botao></p>}
       <dl className={css.dados}>
-        <div><dt>Porção</dt><dd>{item.porcao}</dd></div>
-        <div><dt>Linha</dt><dd>{linhas[item.linha]?.rotulo}</dd></div>
         <div><dt>Como sai</dt><dd>{linhas[item.linha]?.dica}</dd></div>
+        {detalhe && <>
+          <div><dt>Ingredientes</dt><dd>{detalhe.ingredientes || 'Ainda não informados'}</dd></div>
+          <div><dt>Alérgenos</dt><dd>{detalhe.alergenos || 'Não informados. Confirme com a cozinha.'}</dd></div>
+          <div><dt>Preparo</dt><dd>{detalhe.tempoPreparoMinutos ? `${detalhe.tempoPreparoMinutos} minutos` : 'Tempo padrão da loja'}</dd></div>
+          {item.linha === 'casa' && <div><dt>Em casa</dt><dd>{detalhe.instrucaoFinalizacao || 'Instruções ainda não cadastradas'}</dd></div>}
+        </>}
         <div>
           <dt>Adicionais</dt>
           <dd>
@@ -51,6 +99,7 @@ function FichaDoItem({ item, adicionais, linhas }) {
           </dd>
         </div>
       </dl>
+      {aoEditar && <Botao variante="texto" icone="lapis" onClick={() => aoEditar(item)}>Editar prato e fotos</Botao>}
     </div>
   )
 }
@@ -60,7 +109,7 @@ function FichaDoItem({ item, adicionais, linhas }) {
 export function CartaoArrasto({ item }) {
   return (
     <div className={css.cartaoArrasto}>
-      <img src={cartaDoItem(item)} alt="" />
+      <FotoDoItem item={item} />
       <span>{item.nome}</span>
     </div>
   )
@@ -69,16 +118,23 @@ export function CartaoArrasto({ item }) {
 // Um item por instância do hook: useDraggable precisa de um componente por
 // linha, senão a lista muda de tamanho e a ordem dos hooks quebra.
 function ItemEscolher({
-  item, situacao, quantos, alternativas, linhas, adicionais, cardapio, novidade, aoEscolher, aoAjustar,
+  item, situacao, quantos, alternativas, linhas, adicionais, cardapio, novidade, aoEscolher, aoAjustar, envioDeFoto,
+  podeGerir = true, naComanda = () => 0, aoEditar, travada = false,
 }) {
+  const [detalheAberto, setDetalheAberto] = useState(false)
+  // M1.4b (#1531): prato com porções. O toque (e o arrasto) soma a porção padrão; cada porção tem
+  // o seu botão, com o preço dela, e a esgotada não entra.
+  const porcoes = item.porcoes ?? []
+  const padrao = porcaoDoToque(item)
+  const doToque = porcoes.length > 0 ? (padrao ? produtoDaPorcao(item, padrao) : null) : item
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: 'prato-' + item.sku,
-    data: { type: 'prato', item },
-    disabled: !situacao.vendavel,
+    data: { type: 'prato', item: doToque ?? item },
+    disabled: !situacao.vendavel || !doToque || travada,
   })
 
   return (
-    <li className={situacao.vendavel ? '' : css.apagado}>
+    <li className={`${css.itemVenda} ${situacao.vendavel ? '' : css.apagado}`}>
       {/* `.linhaComAjuste` só existe pra por o "−" ao LADO do <button> da
           linha, nunca dentro dele: HTML não aceita botão dentro de botão (o
           navegador reparenta e quebra o clique). Os dois são irmãos que
@@ -88,27 +144,31 @@ function ItemEscolher({
           type="button"
           ref={setNodeRef}
           className={css.linha}
-          disabled={!situacao.vendavel}
+          disabled={!situacao.vendavel || !doToque || travada}
+          title={travada ? LINHA_COMANDA_TRAVADA : undefined}
           style={isDragging ? { opacity: 0.5 } : undefined}
-          onClick={() => aoEscolher(item)}
+          onClick={() => aoEscolher(doToque)}
           {...listeners}
           {...attributes}
         >
+          <FotoDoItem item={item} className={css.foto} />
           {/* Sete itens viravam sete manchas de cor. O estado do item é
               texto na segunda linha, e só aparece quando muda a venda. */}
           <span className={css.nome}>
             {item.nome}
-            {novidade && <Pilula tom="ragu" fina>Novidade da casa</Pilula>}
+            {novidade && <Pilula tom="marca" fina>Novidade da casa</Pilula>}
             <small>
-              {linhas[item.linha]?.rotulo} · {item.porcao}
+              {[linhas[item.linha]?.rotulo, item.porcao].filter(Boolean).join(' · ')}
               {PEDE_ACAO.has(situacao.chave) && (
                 <b className={css[situacao.tom]}> · {situacao.rotulo}</b>
               )}
             </small>
           </span>
           <span className={css.preco}>{moeda(item.preco)}</span>
-          {quantos === 0 && (
-            <Icone nome="mais" rotulo={'Somar ' + item.nome + ' na comanda, ou arrastar até a comanda'} />
+          {!travada && (
+            <span className={css.somar}>
+              <Icone nome="mais" rotulo={'Somar ' + item.nome + ' na comanda, ou arrastar até a comanda'} />
+            </span>
           )}
         </button>
 
@@ -116,39 +176,93 @@ function ItemEscolher({
             sem sair do cardápio. Fora do botão da linha (largura própria,
             nunca por cima dele), então nunca disputa espaço com nome/preço
             nem depende de posição absoluta pra não se sobrepor. */}
-        {quantos > 0 && (
+        {quantos > 0 && porcoes.length === 0 && (
           <div className={css.ajusteNaLinha}>
             <span className={css.contagem}>{quantos} na comanda</span>
-            <button
-              type="button"
-              className={css.botaoMenosCardapio}
-              onClick={() => aoAjustar(item.sku, -1)}
-            >
-              <Icone nome="menos" rotulo={'Tirar uma unidade de ' + item.nome} />
-            </button>
+            {!travada && (
+              <button
+                type="button"
+                className={css.botaoMenosCardapio}
+                onClick={() => aoAjustar(item.sku, -1)}
+              >
+                <Icone nome="menos" rotulo={'Tirar uma unidade de ' + item.nome} />
+              </button>
+            )}
           </div>
         )}
+
       </div>
+
+      {porcoes.length > 0 && (
+        <ul className={css.porcoesVenda} aria-label={'Porções de ' + item.nome}>
+          {porcoes.map((p) => {
+            const produto = produtoDaPorcao(item, p)
+            const qtd = naComanda(produto.sku)
+            return (
+              <li key={p.id} className={css.linhaPorcao}>
+                <button
+                  type="button"
+                  className={css.botaoPorcao}
+                  disabled={!situacao.vendavel || !p.disponivel || travada}
+                  title={travada ? LINHA_COMANDA_TRAVADA : undefined}
+                  onClick={() => aoEscolher(produto)}
+                >
+                  <span className={css.nome}>
+                    {p.rotulo}
+                    <small>{p.disponivel ? (p.padrao ? 'padrão' : '') : 'esgotada'}</small>
+                  </span>
+                  <span className={css.preco}>{moeda(p.preco)}</span>
+                  {qtd === 0 && p.disponivel && !travada && <Icone nome="mais" rotulo={`Somar ${item.nome} ${p.rotulo} na comanda`} />}
+                </button>
+                {qtd > 0 && (
+                  <div className={css.ajusteNaLinha}>
+                    <span className={css.contagem}>{qtd} na comanda</span>
+                    {!travada && (
+                      <button type="button" className={css.botaoMenosCardapio} onClick={() => aoAjustar(produto.sku, -1)}>
+                        <Icone nome="menos" rotulo={`Tirar uma unidade de ${item.nome} ${p.rotulo}`} />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
 
       {/* O erro caro não é o item acabar, é a conversa morrer em "não tem".
           A alternativa nasce junto com a má notícia. */}
       {alternativas.length > 0 && (
         <p className={css.alternativa}>
           {situacao.chave === 'fora-do-dia'
-            ? 'Você tirou do dia. Ligue de volta em Gerir o dia, ou ofereça: '
+            ? (podeGerir ? 'Você tirou do dia. Ligue de volta em Gerir o dia, ou ofereça: ' : 'Fora do dia. Ofereça: ')
             : 'Sem saldo, mas ainda vende. No lugar dele: '}
           {alternativas.map((a) => a.nome).join(' ou ')}.
         </p>
       )}
 
-      <details className={css.detalhe}>
-        <summary>Porção, linha e adicionais</summary>
-        <FichaDoItem
+      <div className={css.acoesConsulta}>
+        <button type="button" className={css.consultar} aria-expanded={detalheAberto} onClick={() => setDetalheAberto((aberto) => !aberto)}>
+          <MarcaIcone nome="informacao" tamanho={20} /> Ingredientes e detalhes
+        </button>
+        {envioDeFoto && fotoDoItem(item) && (
+          <button type="button" className={css.enviarFoto}
+            disabled={!envioDeFoto.pode || envioDeFoto.enviando !== null}
+            title={envioDeFoto.motivo ?? 'Enviar a foto ao cliente'}
+            aria-label={rotuloDoEnvio(envioDeFoto, item)} onClick={() => envioDeFoto.enviar(item)}>
+            <Icone nome={envioDeFoto.enviado === item.sku ? 'check' : 'imagem'} />
+            {envioDeFoto.enviando === item.sku ? 'Enviando…' : envioDeFoto.enviado === item.sku ? 'Foto enviada' : 'Enviar foto'}
+          </button>
+        )}
+        {/* #1587: a falha fica escrita junto do botão; antes ele só voltava a "Enviar foto". */}
+        {envioDeFoto?.falhou === item.sku && <p className={css.falhaFoto} role="alert">{FOTO_NAO_ENVIADA}</p>}
+      </div>
+      {detalheAberto && <FichaDoItem
           item={item}
           linhas={linhas}
+          aoEditar={aoEditar}
           adicionais={adicionaisDoItem(cardapio, adicionais, item.sku)}
-        />
-      </details>
+        />}
     </li>
   )
 }
@@ -157,33 +271,67 @@ function ItemEscolher({
 // esgotado continua vendendo (D7 e RN-48), item fora do dia não: quem desligou
 // foi ela, de propósito. O prato também se arrasta até a comanda (seção 9);
 // o toque continua somando, e é o caminho mais rápido.
-function Escolher({ cardapio, linhas, adicionais, pedido, agora, aoEscolher, aoAjustar }) {
+function rotuloDoEnvio(envioDeFoto, item) {
+  if (envioDeFoto.enviando === item.sku) return 'Enviando a foto de ' + item.nome
+  if (envioDeFoto.enviado === item.sku) return 'Foto de ' + item.nome + ' enviada'
+  return 'Enviar a foto de ' + item.nome + ' ao cliente'
+}
+
+// Grupos pela categoria da vitrine (#1448): 43 itens em lista corrida não se
+// leem. O título do grupo é texto, sem caixa: a hierarquia vem da tipografia.
+// Cardápio sem categoria nenhuma (a massa de demonstração) é uma lista só, sem título "Outros".
+function PorCategoria({ itens, children }) {
+  const grupos = agruparPorCategoria(itens)
+  if (grupos.length === 1 && grupos[0].categoria === SEM_CATEGORIA) return children(grupos[0].itens)
+  return grupos.map((grupo) => (
+    <section key={grupo.categoria} className={css.grupo} aria-label={grupo.categoria}>
+      <h3 className={css.categoria}>
+        {grupo.categoria} <span>{grupo.itens.length}</span>
+      </h3>
+      {children(grupo.itens)}
+    </section>
+  ))
+}
+
+function Escolher({
+  cardapio, visiveis, linhas, adicionais, pedido, agora, aoEscolher, aoAjustar, envioDeFoto, podeGerir, aoEditar, travada,
+}) {
   const naComanda = (sku) => pedido?.itens.find((l) => l.sku === sku)?.qtd ?? 0
 
   return (
-    <ul className={css.lista}>
-      {cardapio.map((item) => {
-        const situacao = situacaoDoItem(item)
-        const alternativas = situacao.chave === 'esgotado' || situacao.chave === 'fora-do-dia'
-          ? alternativasPara(cardapio, item.sku)
-          : []
-        return (
-          <ItemEscolher
-            key={item.sku}
-            item={item}
-            situacao={situacao}
-            quantos={naComanda(item.sku)}
-            alternativas={alternativas}
-            linhas={linhas}
-            adicionais={adicionais}
-            cardapio={cardapio}
-            novidade={ehNovidade(item, agora)}
-            aoEscolher={aoEscolher}
-            aoAjustar={aoAjustar}
-          />
-        )
-      })}
-    </ul>
+    <PorCategoria itens={visiveis}>
+      {(itens) => (
+        <ul className={css.lista}>
+          {itens.map((item) => {
+            const situacao = situacaoDoItem(item)
+            // A alternativa olha o cardápio inteiro, não só o que a busca deixou à vista.
+            const alternativas = situacao.chave === 'esgotado' || situacao.chave === 'fora-do-dia'
+              ? alternativasPara(cardapio, item.sku)
+              : []
+            return (
+              <ItemEscolher
+                key={item.sku}
+                item={item}
+                situacao={situacao}
+                quantos={naComanda(item.sku)}
+                alternativas={alternativas}
+                linhas={linhas}
+                adicionais={adicionais}
+                cardapio={cardapio}
+                novidade={ehNovidade(item, agora)}
+                aoEscolher={aoEscolher}
+                aoAjustar={aoAjustar}
+                envioDeFoto={envioDeFoto}
+                podeGerir={podeGerir}
+                naComanda={naComanda}
+                aoEditar={aoEditar}
+                travada={travada}
+              />
+            )
+          })}
+        </ul>
+      )}
+    </PorCategoria>
   )
 }
 
@@ -196,90 +344,95 @@ function Escolher({ cardapio, linhas, adicionais, pedido, agora, aoEscolher, aoA
 function Gerir({
   cardapio, removidos, linhas, adicionais, agora, aoAlternar, aoAjustar,
   aoAbrirNovo, aoAbrirEditar, aoTirar, aoRepor, aoConfirmarValidacao,
+  podeEditar,
 }) {
   return (
     <div className={css.gerir}>
-      <Botao variante="secundario" icone="mais" className={css.botaoNovoItem} onClick={aoAbrirNovo}>
+      {podeEditar && <Botao variante="secundario" icone="mais" className={css.botaoNovoItem} onClick={aoAbrirNovo}>
         Incluir item novo
-      </Botao>
+      </Botao>}
 
-      <ul className={css.gestao}>
-        {cardapio.map((item) => {
-          const situacao = situacaoDoItem(item)
-          const novidade = ehNovidade(item, agora)
-          return (
-            <li key={item.sku} className={`${css.cartaoItem} ${situacao.vendavel ? '' : css.apagado}`}>
-              <img className={css.miniatura} src={cartaDoItem(item)} alt="" />
+      <PorCategoria itens={cardapio}>
+        {(itens) => (
+          <ul className={css.gestao}>
+            {itens.map((item) => {
+              const situacao = situacaoDoItem(item)
+              const novidade = ehNovidade(item, agora)
+              return (
+                <li key={item.sku} className={`${css.cartaoItem} ${situacao.vendavel ? '' : css.apagado}`}>
+                  <FotoDoItem item={item} className={css.miniatura} />
 
-              <div className={css.corpoItem}>
-                <strong>
-                  {item.nome}
-                  {novidade && <Pilula tom="ragu" fina>Novidade</Pilula>}
-                  {estaEmValidacao(item) && <Pilula tom="aviso" fina>Em validação</Pilula>}
-                </strong>
-                <small>
-                  {linhas[item.linha]?.rotulo} · {item.porcao} · {moeda(item.preco)}
-                  {PEDE_ACAO.has(situacao.chave) && (
-                    <b className={css[situacao.tom]}> · {situacao.rotulo}</b>
-                  )}
-                </small>
-                <small className={css.extras}>
-                  {adicionaisDoItem(cardapio, adicionais, item.sku).map((a) => a.nome).join(' · ')
-                    || 'Sem adicional'}
-                </small>
-                {estaEmValidacao(item) && (
-                  <p className={css.avisoValidacao}>
-                    Vendeu menos de duas vezes. Confirme se ele fica no cardápio ou tire.
-                    <button type="button" className={css.linkValidacao} onClick={() => aoConfirmarValidacao(item.sku)}>
-                      Confirmar no cardápio
-                    </button>
-                  </p>
-                )}
-              </div>
+                  <div className={css.corpoItem}>
+                    <strong>
+                      {item.nome}
+                      {novidade && <Pilula tom="marca" fina>Novidade</Pilula>}
+                      {estaEmValidacao(item) && <Pilula tom="aviso" fina>Em validação</Pilula>}
+                    </strong>
+                    <small>
+                      {linhas[item.linha]?.rotulo} · {item.porcao} · {moeda(item.preco)}
+                      {PEDE_ACAO.has(situacao.chave) && (
+                        <b className={css[situacao.tom]}> · {situacao.rotulo}</b>
+                      )}
+                    </small>
+                    <small className={css.extras}>
+                      {adicionaisDoItem(cardapio, adicionais, item.sku).map((a) => a.nome).join(' · ')
+                        || 'Sem adicional'}
+                    </small>
+                    {podeEditar && estaEmValidacao(item) && (
+                      <p className={css.avisoValidacao}>
+                        Vendeu menos de duas vezes. Confirme se ele fica no cardápio ou tire.
+                        <button type="button" className={css.linkValidacao} onClick={() => aoConfirmarValidacao(item.sku)}>
+                          Confirmar no cardápio
+                        </button>
+                      </p>
+                    )}
+                  </div>
 
-              <div className={css.controles}>
-                <label className={css.chave}>
-                  <input
-                    type="checkbox"
-                    checked={situacao.chave !== 'fora-do-dia'}
-                    onChange={() => aoAlternar(item.sku)}
-                  />
-                  Hoje
-                </label>
-                <span className={css.saldo}>
-                  <button
-                    type="button"
-                    onClick={() => aoAjustar(item.sku, -1)}
-                    disabled={item.estoque === 0}
-                  >
-                    <Icone nome="menos" rotulo={'Tirar uma porção de ' + item.nome} />
-                  </button>
-                  <b>{item.estoque}</b>
-                  <button type="button" onClick={() => aoAjustar(item.sku, 1)}>
-                    <Icone nome="mais" rotulo={'Somar uma porção de ' + item.nome} />
-                  </button>
-                </span>
-                <span className={css.acoesItem}>
-                  <button type="button" onClick={() => aoAbrirEditar(item)}>
-                    <Icone nome="lapis" rotulo={'Editar ' + item.nome} />
-                  </button>
-                  <button type="button" onClick={() => aoTirar(item.sku)}>
-                    <Icone nome="x" rotulo={'Tirar ' + item.nome + ' do cardápio'} />
-                  </button>
-                </span>
-              </div>
-            </li>
-          )
-        })}
-      </ul>
+                  <div className={css.controles}>
+                    <label className={css.chave}>
+                      <input
+                        type="checkbox"
+                        checked={situacao.chave !== 'fora-do-dia'}
+                        onChange={() => aoAlternar(item.sku)}
+                      />
+                      Hoje
+                    </label>
+                    {item.estoque != null ? <span className={css.saldo}>
+                      <button
+                        type="button"
+                        onClick={() => aoAjustar(item.sku, -1)}
+                        disabled={item.estoque === 0}
+                      >
+                        <Icone nome="menos" rotulo={'Tirar uma porção de ' + item.nome} />
+                      </button>
+                      <b>{item.estoque}</b>
+                      <button type="button" onClick={() => aoAjustar(item.sku, 1)}>
+                        <Icone nome="mais" rotulo={'Somar uma porção de ' + item.nome} />
+                      </button>
+                    </span> : <span className={css.semSaldo}>Sem controle de saldo</span>}
+                    {podeEditar && <span className={css.acoesItem}>
+                      <button type="button" onClick={() => aoAbrirEditar(item)}>
+                        <Icone nome="lapis" rotulo={'Editar ' + item.nome} />
+                      </button>
+                      <button type="button" onClick={() => aoTirar(item.sku)}>
+                        <Icone nome="x" rotulo={'Tirar ' + item.nome + ' do cardápio'} />
+                      </button>
+                    </span>}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </PorCategoria>
 
-      {removidos.length > 0 && (
+      {podeEditar && removidos.length > 0 && (
         <details className={css.foraDoCardapio}>
           <summary>Fora do cardápio · {removidos.length}</summary>
           <ul className={css.gestao}>
             {removidos.map((item) => (
               <li key={item.sku} className={`${css.cartaoItem} ${css.apagado}`}>
-                <img className={css.miniatura} src={cartaDoItem(item)} alt="" />
+                <FotoDoItem item={item} className={css.miniatura} />
                 <div className={css.corpoItem}>
                   <strong>{item.nome}</strong>
                   <small>{linhas[item.linha]?.rotulo} · {item.porcao} · {moeda(item.preco)}</small>
@@ -305,7 +458,8 @@ function Gerir({
 // conferir a comanda inteira sem fechar o cardápio. `aria-live` fala o nome
 // do último prato somado porque quem está de olho na tela do cardápio,
 // não na comanda, precisa ouvir a confirmação, não só ver o número mudar.
-function RodapeComanda({ pedido, cardapio, linhas }) {
+function RodapeComanda({ pedido, cardapio, linhas, nomeCliente }) {
+  const { fonteApi } = useAtendimento()
   const [aberto, setAberto] = useState(false)
   const [eco, setEco] = useState('')
   const totalAnteriorRef = useRef(null)
@@ -336,6 +490,7 @@ function RodapeComanda({ pedido, cardapio, linhas }) {
   }, [qtdItens])
 
   if (qtdItens === 0) return null
+  const numero = numeroDaComanda(pedido, { fonteApi })
 
   return (
     <div className={css.rodapeComanda}>
@@ -346,7 +501,8 @@ function RodapeComanda({ pedido, cardapio, linhas }) {
         onClick={() => setAberto((v) => !v)}
       >
         <span className={css.rodapeTitulo}>
-          Comanda {numeroCurto(pedido.numero)} · {qtdItens} {qtdItens === 1 ? 'item' : 'itens'}
+          {/* #1587: de quem é a comanda, sempre à vista (o painel não fecha ao trocar de conversa). */}
+          Comanda{nomeCliente ? ` de ${nomeCliente}` : ''} · {numero ? `Nº ${numero}` : 'rascunho'} · {qtdItens} {qtdItens === 1 ? 'item' : 'itens'}
         </span>
         <span className={`${css.rodapeTotal} ${somaEmDestaque ? css.rodapeTotalSomando : ''}`}>
           {somaEmDestaque != null && <b className={css.rodapeSoma}>+ {moeda(somaEmDestaque)}</b>}
@@ -385,179 +541,106 @@ function RodapeComanda({ pedido, cardapio, linhas }) {
   )
 }
 
-const isoFimDoDia = (dataISO) => (dataISO ? `${dataISO}T23:59:59-03:00` : null)
-const dataDoIso = (iso) => (iso ? iso.slice(0, 10) : '')
-
-// Incluir e editar item na mesma modal (seção 8, US-020): os campos são os
-// mesmos, só muda o rótulo do botão e o que acontece ao confirmar.
-// `adicionaisMap` é o mapa cru (sku do prato → skus de adicional), a mesma
-// forma que `PainelCardapio` já recebe de `useCatalogo()`.
-function FormularioItemCardapio({
-  item, cardapio, adicionaisMap, linhas, aoFechar, aoIncluir, aoEditar,
-}) {
-  const [nome, setNome] = useState(item?.nome ?? '')
-  const [linha, setLinha] = useState(item?.linha ?? Object.keys(linhas)[0])
-  const [porcao, setPorcao] = useState(item?.porcao ?? '')
-  const [centavos, setCentavos] = useState(() => Math.round((item?.preco ?? 0) * 100))
-  const [selecionados, setSelecionados] = useState(() => adicionaisMap?.[item?.sku] ?? [])
-  const [comNovidade, setComNovidade] = useState(Boolean(item?.novidadeAte))
-  const [prazo, setPrazo] = useState(dataDoIso(item?.novidadeAte))
-  const [erro, setErro] = useState(null)
-
-  const candidatosAdicionais = catalogoDeAdicionais(cardapio, adicionaisMap, item?.sku ?? null)
-  const excedeu = moedaAltaDemais(centavos)
-
-  function alternarAdicional(sku) {
-    setSelecionados((atual) => (atual.includes(sku) ? atual.filter((s) => s !== sku) : [...atual, sku]))
-  }
-
-  function confirmar() {
-    if (!nome.trim()) { setErro('Dê um nome ao item.'); return }
-    if (!porcao.trim()) { setErro('Diga a porção.'); return }
-    if (centavos <= 0 || excedeu) { setErro('Preço inválido.'); return }
-    if (comNovidade && !prazo) { setErro('Dê um prazo para a novidade.'); return }
-    const dados = {
-      nome: nome.trim(),
-      linha,
-      porcao: porcao.trim(),
-      preco: centavos / 100,
-      novidadeAte: comNovidade ? isoFimDoDia(prazo) : null,
-      adicionaisSelecionados: selecionados,
-    }
-    if (item) aoEditar(item.sku, dados)
-    else aoIncluir(dados)
-  }
-
-  return (
-    <Modal
-      titulo={item ? `Editar ${item.nome}` : 'Incluir item novo'}
-      aoFechar={aoFechar}
-      rodape={(
-        <>
-          <Botao onClick={aoFechar}>Cancelar</Botao>
-          <Botao variante="primario" onClick={confirmar}>
-            {item ? 'Salvar' : 'Incluir no cardápio'}
-          </Botao>
-        </>
-      )}
-    >
-      <div className={css.formularioItem}>
-        <label className={css.campoFormulario}>
-          Nome
-          <input value={nome} onChange={(e) => setNome(e.target.value)} />
-        </label>
-
-        <label className={css.campoFormulario}>
-          Linha de produto
-          <select value={linha} onChange={(e) => setLinha(e.target.value)}>
-            {Object.entries(linhas).map(([chave, l]) => (
-              <option key={chave} value={chave}>{l.rotulo}</option>
-            ))}
-          </select>
-        </label>
-
-        <label className={css.campoFormulario}>
-          Porção
-          <input value={porcao} onChange={(e) => setPorcao(e.target.value)} placeholder="Ex.: 800 g" />
-        </label>
-
-        <CampoMascarado
-          tipo="moeda"
-          rotulo="Preço"
-          valor={mascaraMoeda(centavos)}
-          erro={excedeu ? 'Valor alto demais' : null}
-          aoMudarDigitos={(digitos) => setCentavos(Number(digitos || '0'))}
-          aoColarTexto={(texto) => setCentavos(lerMoeda(texto))}
-        />
-
-        {candidatosAdicionais.length > 0 && (
-          <fieldset className={css.camposAdicionais}>
-            <legend>Adicionais</legend>
-            {candidatosAdicionais.map((a) => (
-              <label key={a.sku} className={css.opcaoAdicional}>
-                <input
-                  type="checkbox"
-                  checked={selecionados.includes(a.sku)}
-                  onChange={() => alternarAdicional(a.sku)}
-                />
-                {a.nome} · {moeda(a.preco)}
-              </label>
-            ))}
-          </fieldset>
-        )}
-
-        <label className={css.opcaoAdicional}>
-          <input type="checkbox" checked={comNovidade} onChange={(e) => setComNovidade(e.target.checked)} />
-          Novidade da casa
-        </label>
-        {comNovidade && (
-          <label className={css.campoFormulario}>
-            Novidade até
-            <input type="date" value={prazo} onChange={(e) => setPrazo(e.target.value)} />
-          </label>
-        )}
-
-        {erro && <p className={css.erroFormulario} role="alert">{erro}</p>}
-
-        {!item && (
-          <p className={css.avisoValidacao}>
-            RN-15: item novo entra em validação até vender de novo. Confirme ou
-            tire depois, em "Gerir o dia".
-          </p>
-        )}
-      </div>
-    </Modal>
-  )
-}
-
 // Cardápio como painel lateral, ancorado à Ficha (seção 9: "o 'janela' da fala
 // do dono"). Deixa de tampar a tela porque ela consulta o cardápio enquanto lê
 // a conversa: sem cortina, sem <dialog>, o resto da tela continua clicável.
 export function PainelCardapio({
-  pedido, aoEscolher, aoAjustar, aoFechar, largura, deslocamentoDireita = 0, aoRedimensionar,
+  pedido, aoEscolher, aoAjustar, aoFechar, largura: larguraGuardada, deslocamentoDireita = 0, aoRedimensionar,
 }) {
-  const { cardapio, linhas, adicionais } = useCatalogo()
-  const { agora } = useAtendimento()
+  // #1474: largura guardada de antes (320 a 400) espremia o nome do prato; o mínimo agora é 440.
+  const largura = Math.max(larguraGuardada ?? LARGURA_MINIMA, LARGURA_MINIMA)
+  const { cardapio, linhas, adicionais, canais } = useCatalogo()
+  const { agora, selecionada, fonteApi } = useAtendimento()
   const {
-    alternarDisponibilidade, ajustarSaldo, incluirItemCardapio, editarItemCardapio,
-    alternarRemocaoItemCardapio, confirmarValidacaoItem,
+    alternarDisponibilidade, ajustarSaldo,
+    alternarRemocaoItemCardapio, confirmarValidacaoItem, enviarMidia,
   } = useAcoes()
   const [papel, setPapel] = useState('escolher')
+  // #1474 (R2): a aba "Gerir o dia" só aparece quando a ação está ligada (#1241 ligou no modo API);
+  // ação não ligada some em vez de só avisar.
+  const podeGerir = useAcaoDisponivel()('alternarDisponibilidade')
+  const acesso = useAcessoModulos()
+  const podeEditar = !fonteApi || acesso.acoes.editarCardapio === true
+  const papeis = podeGerir ? PAPEIS : PAPEIS.filter((p) => p.id !== 'gerir')
   const [modal, setModal] = useState(null)
+  const [busca, setBusca] = useState('')
+  const [enviandoSku, setEnviandoSku] = useState(null)
+  const [enviadoSku, setEnviadoSku] = useState(null)
+  // Falha do envio de foto (#1587), com a conversa em que aconteceu: não segue para a próxima.
+  const [falhaFoto, setFalhaFoto] = useState(null)
+  // #1587: o painel não é modal e o "+" soma na conversa selecionada NAQUELE instante. O nome
+  // do cliente fica no cabeçalho e no rodapé, para a troca de conversa não passar em silêncio.
+  const nomeCliente = selecionada?.nome ? primeiroNome(selecionada.nome) : ''
+  const travada = comandaTravada(pedido, { fonteApi })
   const fecharRef = useRef(null)
   const focoAnterior = useRef(null)
 
-  useEscape(true, aoFechar)
+  useEscape(!modal, aoFechar)
 
   useEffect(() => {
     focoAnterior.current = document.activeElement
     fecharRef.current?.focus()
+    return () => {
+      if (focoAnterior.current?.isConnected) focoAnterior.current.focus()
+      else {
+        const comanda = document.getElementById('comanda-pedido')
+        comanda?.focus({ preventScroll: true })
+        comanda?.scrollIntoView({ block: 'start' })
+      }
+    }
+  }, [])
+
+  const temPedido = Boolean(pedido)
+  useEffect(() => {
+    if (!temPedido) return
     // Seção 3.1: abrir o cardápio rola a Ficha até a comanda, pra ela ficar
     // ao lado do painel em vez de escondida acima da dobra. `id` compartilhado
     // por atributo (não por import) porque cardápio e ficha-cliente são
     // features separadas — a fronteira de camadas não deixa uma importar a
     // outra, então o encontro é só no DOM, como o resto do arrasto já faz.
+    // #1442: a comanda pode estar recolhida na Ficha; abre e rola depois que
+    // ela volta ao layout.
+    abrirSecao('comanda')
     const reduzMovimento = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    document.getElementById('comanda-pedido')
-      ?.scrollIntoView({ behavior: reduzMovimento ? 'auto' : 'smooth', block: 'nearest' })
+    const rolar = setTimeout(() => document.getElementById('comanda-pedido')
+      ?.scrollIntoView({ behavior: reduzMovimento ? 'auto' : 'smooth', block: 'nearest' }))
     return () => {
-      if (focoAnterior.current?.isConnected) focoAnterior.current.focus()
+      clearTimeout(rolar)
     }
-  }, [])
+  }, [temPedido])
 
   const ativos = itensAtivos(cardapio)
   const removidos = itensRemovidos(cardapio)
   const noDia = contarDisponiveis(ativos)
+  const visiveis = filtrarCardapio(ativos, busca)
 
-  function incluir(dados) {
-    incluirItemCardapio(dados)
-    setModal(null)
+  // Mesma regra da galeria (PainelGaleria.jsx): canal que aceita foto, janela aberta e, no modo
+  // API, só o WhatsApp tem envio de foto. O motivo vai no title do botão desabilitado.
+  const canal = canalDaConversa(canais, selecionada)
+  const escrita = permissaoDeEscrita(selecionada, agora, canal)
+  let motivoFoto = null
+  if (!escrita.pode) motivoFoto = escrita.motivo?.detalhe ?? 'Conversa sem envio agora.'
+  else if (!aceitaFormato(canal, 'foto')) motivoFoto = motivoDeFormato(canal, 'foto')
+  else if (fonteApi && selecionada?.canal !== 'WhatsApp') motivoFoto = `${selecionada?.canal} ainda não recebe foto pelo EasyStok.`
+
+  async function enviarFoto(item) {
+    const mensagem = mensagemDaFotoDoItem(item)
+    if (!mensagem || !selecionada) return
+    setEnviandoSku(item.sku)
+    setFalhaFoto(null)
+    const enviado = await enviarMidia(selecionada.id, mensagem)
+    setEnviandoSku(null)
+    if (enviado === false) { setFalhaFoto({ sku: item.sku, conversaId: selecionada.id }); return }
+    setEnviadoSku(item.sku)
+    setTimeout(() => setEnviadoSku((atual) => (atual === item.sku ? null : atual)), 1400)
   }
 
-  function editar(sku, dados) {
-    editarItemCardapio(sku, dados)
-    setModal(null)
-  }
+  const envioDeFoto = selecionada
+    ? {
+      pode: !motivoFoto, motivo: motivoFoto, enviando: enviandoSku, enviado: enviadoSku, enviar: enviarFoto,
+      falhou: falhaFoto?.conversaId === selecionada.id ? falhaFoto.sku : null,
+    }
+    : null
 
   return (
     <aside
@@ -568,9 +651,9 @@ export function PainelCardapio({
       <AlcaLargura
         rotulo="Redimensionar painel do cardápio"
         valor={largura}
-        min={320}
-        max={560}
-        padrao={400}
+        min={LARGURA_MINIMA}
+        max={600}
+        padrao={460}
         invertida
         aoMudar={aoRedimensionar}
       />
@@ -579,6 +662,7 @@ export function PainelCardapio({
         <header className={css.cabecalhoPainel}>
           <div>
             <h2>Cardápio de hoje</h2>
+            {nomeCliente && <p className={css.donoDaComanda} aria-live="polite">Comanda de <b>{nomeCliente}</b></p>}
             <p className={css.subPainel}>{noDia} de {ativos.length} itens no dia.</p>
           </div>
           <button type="button" ref={fecharRef} className={css.fechar} onClick={aoFechar}>
@@ -589,26 +673,45 @@ export function PainelCardapio({
         {/* Botão de alternância em vez do padrão ARIA de aba: aba promete
             navegação por seta, e prometer teclado que não existe é pior que
             não prometer. */}
-        <fieldset className={css.papeis}>
-          <legend className="sr">O que fazer no cardápio</legend>
-          {PAPEIS.map((p) => (
-            <button
-              type="button"
-              key={p.id}
-              aria-pressed={papel === p.id}
-              className={`${css.papel} ${papel === p.id ? css.papelAtivo : ''}`}
-              onClick={() => setPapel(p.id)}
-            >
-              {p.rotulo}
-            </button>
-          ))}
-        </fieldset>
+        {papeis.length > 1 && (
+          <fieldset className={css.papeis}>
+            <legend className="sr">O que fazer no cardápio</legend>
+            {papeis.map((p) => (
+              <button
+                type="button"
+                key={p.id}
+                aria-pressed={papel === p.id}
+                className={`${css.papel} ${papel === p.id ? css.papelAtivo : ''}`}
+                onClick={() => setPapel(p.id)}
+              >
+                {p.rotulo}
+              </button>
+            ))}
+          </fieldset>
+        )}
+
+        {ativos.length > 0 && (
+          <label className={css.busca}>
+            <Icone nome="lupa" />
+            <span className="sr">Buscar no cardápio</span>
+            <input
+              type="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar prato, categoria ou porção"
+            />
+          </label>
+        )}
 
         <div className={css.rolavelPainel}>
+          {ativos.length > 0 && visiveis.length === 0 && (
+            <p className={css.semResultado}>Nada com &ldquo;{busca.trim()}&rdquo; no cardápio de hoje.</p>
+          )}
+
           {ativos.length === 0 && (
             <Vazio
               titulo="Cardápio sem itens"
-              acao={<Botao variante="primario" onClick={() => setModal({ modo: 'novo' })}>Incluir item novo</Botao>}
+              acao={podeEditar && <Botao variante="primario" onClick={() => setModal({ modo: 'novo' })}>Incluir item novo</Botao>}
             >
               Nenhum item no cardápio de hoje. Sem cardápio não dá para anotar comanda
               nem dizer o que a casa vende hoje.
@@ -618,18 +721,24 @@ export function PainelCardapio({
           {ativos.length > 0 && papel === 'escolher' && (
             <Escolher
               cardapio={ativos}
+              visiveis={visiveis}
               linhas={linhas}
               adicionais={adicionais}
               pedido={pedido}
               agora={agora}
               aoEscolher={aoEscolher}
               aoAjustar={aoAjustar}
+              envioDeFoto={envioDeFoto}
+              podeGerir={podeGerir}
+              aoEditar={podeEditar ? (item) => setModal({ modo: 'editar', item }) : undefined}
+              travada={travada}
             />
           )}
 
-          {papel === 'gerir' && (
+          {papel === 'gerir' && podeGerir && (
             <Gerir
-              cardapio={ativos}
+              podeEditar={podeEditar}
+              cardapio={visiveis}
               removidos={removidos}
               linhas={linhas}
               adicionais={adicionais}
@@ -648,18 +757,15 @@ export function PainelCardapio({
         {/* `cardapio` cheio (não só `ativos`) de propósito: um item já anotado
             na comanda continua precificando certo mesmo depois de tirado do
             cardápio (RN de não apagar histórico). */}
-        {papel === 'escolher' && pedido && <RodapeComanda pedido={pedido} cardapio={cardapio} linhas={linhas} />}
+        {/* #1587: pedido já criado não soma nem tira por aqui; o motivo fica escrito acima do total. */}
+        {papel === 'escolher' && travada && <output className={css.comandaTravada}>{LINHA_COMANDA_TRAVADA}</output>}
+        {papel === 'escolher' && pedido && <RodapeComanda pedido={pedido} cardapio={cardapio} linhas={linhas} nomeCliente={nomeCliente} />}
       </div>
 
       {modal && (
-        <FormularioItemCardapio
+        <EditorItemCardapio
           item={modal.modo === 'editar' ? modal.item : null}
-          cardapio={cardapio}
-          adicionaisMap={adicionais}
-          linhas={linhas}
           aoFechar={() => setModal(null)}
-          aoIncluir={incluir}
-          aoEditar={editar}
         />
       )}
     </aside>

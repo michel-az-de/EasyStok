@@ -24,6 +24,8 @@ public class RegistrarMovimentoCaixaUseCase(
     ObterCaixaDiaUseCase obterCaixaDia,
     ILogger<RegistrarMovimentoCaixaUseCase> logger)
 {
+    private static readonly TimeSpan ToleranciaDeRelogio = TimeSpan.FromMinutes(5);
+
     public async Task<MovimentoCaixaResult> ExecuteAsync(RegistrarMovimentoCaixaCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
@@ -37,16 +39,20 @@ public class RegistrarMovimentoCaixaUseCase(
 
         var dataMov = cmd.DataMovimento ?? DateTime.UtcNow;   // timestamp do movimento (UTC, armazenado)
         var data = HorarioBrasil.DataOperacional(dataMov);    // dia operacional em Brasilia (alinha com o card; BUG-09)
+        var origem = (cmd.Origem ?? "web").Trim().ToLowerInvariant();
+
+        // #1615: lançamento retroativo é uso legítimo; no futuro ele some do caixa de hoje e cai num
+        // dia que ainda não abriu. O mobile fica de fora: a hora vem do relógio do aparelho.
+        if (origem != "mobile" && dataMov > DateTime.UtcNow.Add(ToleranciaDeRelogio))
+            throw new UseCaseValidationException("Data do lançamento não pode estar no futuro.");
 
         // Bloquear lançamento em dia já fechado (preserva integridade do snapshot).
-        var fechamento = await repo.GetFechamentoDoDiaAsync(cmd.EmpresaId, data, cmd.LojaId);
-        if (fechamento != null)
-            throw new UseCaseValidationException("Caixa do dia já foi fechado. Lance em outra data ou faça estorno.");
+        await CaixaFechadoGuard.ExigirDiaAbertoAsync(repo, cmd.EmpresaId, dataMov, cmd.LojaId,
+            "Caixa do dia já foi fechado. Lance em outra data ou faça estorno.");
 
         // FIN-003: saída interativa (não-mobile) exige rastro de auditoria e não pode estourar o
         // saldo do dia — caixa físico não fica negativo. O mobile promove fatos já registrados no
         // device (sync); não passa por estas guardas pra não bloquear lançamento legítimo.
-        var origem = (cmd.Origem ?? "web").Trim().ToLowerInvariant();
         if (tipo == "saida" && origem != "mobile")
         {
             if (string.IsNullOrWhiteSpace(cmd.Metodo))
@@ -54,16 +60,45 @@ public class RegistrarMovimentoCaixaUseCase(
             if (string.IsNullOrWhiteSpace(cmd.Descricao))
                 throw new UseCaseValidationException("Saída exige descrição (justificativa para auditoria).");
 
-            var saldoAtual = await CalcularSaldoDoDiaAsync(cmd.EmpresaId, data, cmd.LojaId);
-            if (cmd.Valor > saldoAtual)
+            // #1547: duas saídas simultâneas liam o mesmo saldo e as duas passavam do teto. A conferência
+            // e a gravação ficam na mesma transação, atrás da trava do caixa da loja: a segunda só lê o
+            // saldo depois que a primeira gravou.
+            return await uow.ExecuteInTransactionSemRetryAsync(async ct =>
             {
-                var ptBr = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
-                throw new UseCaseValidationException(
-                    $"Saída de {cmd.Valor.ToString("C", ptBr)} é maior que o saldo disponível em caixa " +
-                    $"({saldoAtual.ToString("C", ptBr)}). O caixa não pode ficar negativo.");
-            }
+                await repo.TravarSaidasAsync(cmd.EmpresaId, cmd.LojaId, ct);
+                await ConferirSaldoParaSaidaAsync(cmd, data);
+                return await GravarAsync(cmd, tipo, origem, dataMov);
+            });
         }
 
+        return await GravarAsync(cmd, tipo, origem, dataMov);
+    }
+
+    private async Task ConferirSaldoParaSaidaAsync(RegistrarMovimentoCaixaCommand cmd, DateOnly data)
+    {
+        var dia = await ObterCaixaDoDiaAsync(cmd.EmpresaId, data, cmd.LojaId);
+        var ptBr = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+        // #1521: saída em dinheiro (sangria, despesa paga da gaveta) sai da gaveta, e nela só há
+        // dinheiro. O saldo esperado soma Pix e cartão: com R$100 na gaveta e R$400 em Pix,
+        // uma sangria de R$450 passava e a gaveta "ficava negativa".
+        if (GavetaCaixa.EhDinheiro(cmd.Metodo))
+        {
+            var teto = GavetaCaixa.TetoSaidaEmDinheiro(dia);
+            if (cmd.Valor > teto)
+                throw new UseCaseValidationException(
+                    $"Saída de {cmd.Valor.ToString("C", ptBr)} em dinheiro é maior que o dinheiro na gaveta " +
+                    $"({teto.ToString("C", ptBr)}). Pix e cartão não estão na gaveta.");
+        }
+        else if (cmd.Valor > dia.SaldoEsperado)
+        {
+            throw new UseCaseValidationException(
+                $"Saída de {cmd.Valor.ToString("C", ptBr)} é maior que o saldo disponível em caixa " +
+                $"({dia.SaldoEsperado.ToString("C", ptBr)}). O caixa não pode ficar negativo.");
+        }
+    }
+
+    private async Task<MovimentoCaixaResult> GravarAsync(RegistrarMovimentoCaixaCommand cmd, string tipo, string origem, DateTime dataMov)
+    {
         var mov = MovimentoCaixa.Criar(cmd.EmpresaId, tipo, cmd.Valor, dataMov, cmd.LojaId);
         mov.Descricao = cmd.Descricao;
         mov.Metodo = cmd.Metodo;
@@ -85,9 +120,6 @@ public class RegistrarMovimentoCaixaUseCase(
     // sessao aberta em dia anterior (#596). Reusa o ObterCaixaDiaUseCase como FONTE UNICA em
     // vez de recalcular. Antes este metodo agregava so a janela civil de hoje e divergia (card
     // R$4.514 vs validacao R$0), bloqueando saidas legitimas em sessao que atravessa a meia-noite.
-    private async Task<decimal> CalcularSaldoDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId)
-    {
-        var dia = await obterCaixaDia.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, data, lojaId));
-        return dia.SaldoEsperado;
-    }
+    private Task<CaixaDiaResult> ObterCaixaDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId) =>
+        obterCaixaDia.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, data, lojaId));
 }

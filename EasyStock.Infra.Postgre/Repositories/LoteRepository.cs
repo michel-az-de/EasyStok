@@ -57,13 +57,20 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<int> GetNextSequencialDoDiaAsync(Guid empresaId, DateOnly data)
         {
-            // S23 (#1137): Npgsql so aceita Kind=Utc em timestamptz; Unspecified lancava ArgumentException.
-            var inicio = data.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-            var fim    = data.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-            return await db.Lotes.AsNoTracking()
-                .Where(l => l.EmpresaId == empresaId
-                         && l.DataProducao >= inicio && l.DataProducao < fim)
-                .CountAsync() + 1;
+            // #1506: o proximo numero vem dos codigos ja emitidos para o dia (LOT-yyMMdd-NNN), nao da
+            // contagem de lotes por janela de DataProducao. A contagem colidia com o indice unico
+            // (EmpresaId, Codigo) quando a janela do dia mudava (dia UTC -> dia de Brasilia) ou um
+            // lote saia da janela.
+            var prefixo = $"LOT-{data:yyMMdd}-";
+            var codigos = await db.Lotes.AsNoTracking()
+                .Where(l => l.EmpresaId == empresaId && l.Codigo.StartsWith(prefixo))
+                .Select(l => l.Codigo)
+                .ToListAsync();
+            var maior = codigos
+                .Select(c => int.TryParse(c.AsSpan(prefixo.Length), out var n) ? n : 0)
+                .DefaultIfEmpty(0)
+                .Max();
+            return maior + 1;
         }
 
         public Task AddAsync(Lote lote) { db.Lotes.Add(lote); return Task.CompletedTask; }

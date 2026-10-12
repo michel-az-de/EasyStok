@@ -1,0 +1,26 @@
+.painel { margin-bottom: var(--e-6); padding-bottom: var(--e-6); border-bottom: var(--b-1) solid var(--linha); }
+.legenda { margin: 0 0 var(--e-3); font-size: var(--t-minimo); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--marca-forte); }
+.filas { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--e-4); }
+
+.fila { display: flex; flex-direction: column; gap: var(--e-3); min-width: 0; padding: var(--e-4); background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); }
+.cabeca { display: flex; align-items: center; gap: var(--e-3); }
+.numero { flex: none; min-width: 2ch; font-family: var(--f-titulo-marca); font-size: clamp(2rem, 2.5vw, 2.75rem); font-weight: 500; line-height: 1; color: var(--tinta); text-align: center; }
+.numero[data-vazio="true"] { color: var(--tinta-2); }
+.titulo { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
+.apoio { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+.emDia { display: flex; align-items: center; gap: var(--e-2); margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+
+.itens { display: grid; gap: var(--e-2); margin: 0; padding: 0; list-style: none; }
+.item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--e-1) var(--e-2); align-items: baseline; width: 100%; min-height: var(--toque); padding: var(--e-2) var(--e-3); background: var(--marca-claro); color: var(--tinta); border: var(--b-1) solid transparent; border-radius: var(--r-1); font: inherit; text-align: left; }
+button.item { cursor: pointer; }
+button.item:hover { border-color: var(--marca); }
+button.item:focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
+.item[data-tom="perigo"] { background: var(--erro-pastel); }
+.item[data-tom="perigo"] .selo { color: var(--erro); }
+.quem { min-width: 0; font-size: var(--t-corpo); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.selo { font-size: var(--t-apoio); font-weight: 700; color: var(--marca-forte); white-space: nowrap; }
+.detalhe { grid-column: 1 / -1; font-size: var(--t-apoio); color: var(--tinta-2); }
+
+.abrir { display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--toque); margin-top: auto; color: var(--marca-forte); font-size: var(--t-apoio); font-weight: 700; text-decoration: none; }
+.abrir:hover { text-decoration: underline; }
+.abrir:focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }

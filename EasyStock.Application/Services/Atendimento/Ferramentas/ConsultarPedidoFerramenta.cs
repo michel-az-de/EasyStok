@@ -1,5 +1,9 @@
 using System.Text.Json;
 using EasyStock.Application.UseCases.ObterPedidoDetalhes;
+using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.Comanda;
+using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 
@@ -11,7 +15,9 @@ namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 public sealed class ConsultarPedidoFerramenta(
     IPedidoRepository pedidoRepository,
     ObterPedidoDetalhesUseCase obterPedidoDetalhes,
-    IConfiguracaoAtendimentoRepository configuracaoRepository) : IFerramentaAgente
+    IConfiguracaoAtendimentoRepository configuracaoRepository, SaldoFinanceiroPedido saldos,
+    ICreditoClienteComandaRepository creditos, ComandaClienteUseCase? comanda = null,
+    ILinkCardapioConversaRepository? links = null) : IFerramentaAgente
 {
     public string Nome => "consultar_pedido";
 
@@ -46,13 +52,60 @@ public sealed class ConsultarPedidoFerramenta(
 
         var configuracao = await configuracaoRepository.GetByEmpresaIdAsync(contexto.EmpresaId);
         var p = detalhe.Pedido;
+        var pedido = await pedidoRepository.GetByIdWithDetailsAsync(contexto.EmpresaId, p.Id);
+        if (pedido is null || pedido.EmpresaId != contexto.EmpresaId || pedido.ClienteId != clienteId)
+            return FerramentaJson.Serializar(new { erro = "pedido_nao_encontrado" });
+        var financeiro = await saldos.ConsultarAsync(pedido, ct);
+        ComandaClienteResult? estado = null;
+        if (links is not null && comanda is not null)
+        {
+            var ultimo = (await links.ListarDaConversaAsync(contexto.EmpresaId, conversa.Id, contexto.Agora.AddDays(-1), ct))
+                .FirstOrDefault(l => l.PedidoRegistradoId == pedido.Id);
+            if (ultimo is not null) estado = await comanda.EstadoAsync(ultimo, ct);
+        }
+
+        var cupons = await creditos.ListarAsync(contexto.EmpresaId, clienteId, ct);
+        var titulo = conversa.NumeroComanda > 0 && conversa.PedidoEmAndamentoId == p.Id
+            ? $"Comanda #{conversa.NumeroComanda}" : $"Pedido registrado em {Brasilia(p.CriadoEm)}";
+        var resposta = new List<string>
+        {
+            $"{titulo}. Situação registrada: {StatusPedidoVocabulario.RotuloLojista(StatusPedidoMapper.Parse(pedido.Status))}.",
+            $"Total: {FerramentaJson.FormatarReais(p.Total)}. Cobertura atual: {FerramentaJson.FormatarReais(financeiro.Alocado)}. Falta pagar: {FerramentaJson.FormatarReais(Math.Max(0, p.Total - financeiro.Alocado))}.",
+            $"Dinheiro recebido registrado: {FerramentaJson.FormatarReais(financeiro.Recebido)}. Devoluções registradas: {FerramentaJson.FormatarReais(financeiro.Devolvido)}. Reservado para devolução: {FerramentaJson.FormatarReais(financeiro.Reservado)}.",
+            $"Crédito emitido em cupom: {FerramentaJson.FormatarReais(financeiro.ConvertidoEmCupom)}. Crédito aplicado ao pedido: {FerramentaJson.FormatarReais(financeiro.CupomAplicado)}.",
+            estado?.Pedido?.Janela is { } janela
+                ? $"Entrega agendada para {janela.Data:dd/MM/yyyy}, das {janela.HoraInicio:HH:mm} às {janela.HoraFim:HH:mm}."
+                : p.AgendadoParaEm is { } agendado
+                    ? $"Data de entrega registrada: {HorarioBrasil.ConverterParaBrasilia(agendado):dd/MM/yyyy}. A equipe pode conferir a janela com você."
+                    : "Sem previsão de entrega registrada."
+        };
+        if (estado?.Acerto is { Tipo: "estorno" } acerto)
+            foreach (var devolucao in acerto.Devolucoes)
+                resposta.Add($"Solicitação de devolução desta alteração: {FerramentaJson.FormatarReais(devolucao.Valor)}, " +
+                    (devolucao.Situacao switch { "confirmado" => "registrada", "recusado" => "recusada, não confirmada pelo provedor", _ => "pendente" }) + ".");
+        if (estado?.Acerto is { Tipo: "cupom", CodigoCupom: not null, SaldoCupom: { } saldo } cupom)
+            resposta.Add($"Cupom {cupom.CodigoCupom}. Saldo atual: {FerramentaJson.FormatarReais(saldo)}.");
+        if (estado?.Envio?.CupomAplicado is { } aplicado)
+            resposta.Add($"Cupom {aplicado.Codigo}: crédito aplicado de {FerramentaJson.FormatarReais(aplicado.Valor)}. Saldo atual: {FerramentaJson.FormatarReais(aplicado.SaldoCupom)}.");
+        foreach (var cupomDisponivel in cupons)
+            resposta.Add($"Cupom disponível {cupomDisponivel.Codigo}: {FerramentaJson.FormatarReais(cupomDisponivel.Saldo)}.");
+        if (financeiro.Devolvido > 0 || financeiro.Reservado > 0 || estado?.Acerto?.Tipo == "estorno")
+            resposta.Add("O registro de devolução no sistema não comprova o crédito na sua conta. A equipe pode conferir isso com você.");
+        contexto.RegistrarRespostaVerificada(string.Join("\n", resposta));
 
         return FerramentaJson.Serializar(new
         {
             pedidoId = p.Id,
+            numeroComanda = conversa.NumeroComanda,
             status = p.Status,
             total = FerramentaJson.FormatarReais(p.Total),
-            pago = FerramentaJson.FormatarReais(p.TotalPago),
+            pago = FerramentaJson.FormatarReais(financeiro.Alocado),
+            recebido = FerramentaJson.FormatarReais(financeiro.Recebido),
+            faltaPagar = FerramentaJson.FormatarReais(Math.Max(0, p.Total - financeiro.Alocado)),
+            financeiro,
+            acerto = estado?.Acerto,
+            cupomAplicado = estado?.Envio?.CupomAplicado,
+            cupons = cupons.Select(c => new { codigo = c.Codigo, saldo = c.Saldo }),
             criadoEm = Brasilia(p.CriadoEm),
             agendadoPara = p.AgendadoParaEm is { } a ? Brasilia(a) : null,
             entregueEm = p.EntreguEm is { } e ? Brasilia(e) : null,

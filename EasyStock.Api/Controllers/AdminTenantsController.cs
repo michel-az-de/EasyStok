@@ -176,6 +176,8 @@ public class AdminTenantsController(
                 return DataNotFound("Tenant não encontrado.");
             case StatusVinculoWhatsApp.NumeroEmUsoPorOutraEmpresa:
                 return DataConflict("Este phone_number_id já está vinculado a outra empresa.");
+            case StatusVinculoWhatsApp.NumeroReservadoDaPlataforma:
+                return DataConflict("Este phone_number_id é o número de plataforma do EasyStok e não pode ser vinculado a uma empresa.");
         }
 
         await audit.LogAsync(

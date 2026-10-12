@@ -30,6 +30,8 @@ public class EnviarCardapioImagemFerramentaTests
             StorefrontRepo.GetByEmpresaAsync(Storefront.EmpresaId, Arg.Any<CancellationToken>()).Returns(Storefront);
             Cloud.EnviarImagemAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
                 .Returns(new EnvioWhatsAppResult("wamid.1"));
+            Cloud.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                .Returns(new EnvioWhatsAppResult("wamid.texto"));
             Conversa = Conversa.Abrir(Storefront.EmpresaId, "5511999998888", Agora, "Maria", Guid.NewGuid());
 
             var saudacao = new SaudacaoAtendimento(StorefrontRepo, new ConfigurationBuilder().Build());
@@ -53,21 +55,26 @@ public class EnviarCardapioImagemFerramentaTests
         var json = await c.ExecutarAsync();
 
         var link = json.GetProperty("link").GetString()!;
-        link.Should().StartWith($"{SaudacaoAtendimento.BaseUrlPadrao}{SaudacaoAtendimento.CaminhoCardapio}?c=");
-        await c.Cloud.Received(1).EnviarImagemAsync(c.Conversa.ContatoIdExterno, "https://cdn.test/cardapio.png", link,
+        link.Should().StartWith($"{SaudacaoAtendimento.BaseUrlPadrao}/comanda.html?c=");
+        await c.Cloud.Received(1).EnviarImagemAsync(c.Conversa.ContatoIdExterno, "https://cdn.test/cardapio.png",
+            Arg.Is<string>(texto => texto.Contains(link) && texto.Contains("comanda pessoal")),
             Arg.Any<CancellationToken>());
         c.Links.Links.Should().ContainSingle().Which.ConversaId.Should().Be(c.Conversa.Id);
     }
 
     [Fact]
-    public async Task SemImagem_DevolveOLinkComTokenParaOAgente()
+    public async Task SemImagem_EnviaComandaEmTextoERegistraMensagem()
     {
         var c = new Cenario(null);
 
         var json = await c.ExecutarAsync();
 
-        json.GetProperty("enviado").GetBoolean().Should().BeFalse();
+        json.GetProperty("enviado").GetBoolean().Should().BeTrue();
         json.GetProperty("link").GetString().Should().Contain("?c=");
+        await c.Cloud.Received(1).EnviarTextoAsync(c.Conversa.ContatoIdExterno,
+            Arg.Is<string>(texto => texto.Contains("comanda pessoal") && texto.Contains("/comanda.html?c=")),
+            null, Arg.Any<CancellationToken>());
+        await c.Cloud.DidNotReceiveWithAnyArgs().EnviarImagemAsync(default!, default!, default, default);
         c.Links.Links.Should().ContainSingle();
     }
 }

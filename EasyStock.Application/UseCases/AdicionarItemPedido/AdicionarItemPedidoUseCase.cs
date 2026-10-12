@@ -103,7 +103,7 @@ public class AdicionarItemPedidoUseCase(
         // por item, então os itens já descontados são pulados; só o novo é baixado. Tudo no
         // mesmo CommitAsync (atômico) — se faltar estoque, lança e nada é persistido.
         if (PedidoStateMachine.DescontaEstoque(pedido.StatusEnum))
-            await estoqueIntegration.DescontarAsync(pedido);
+            await estoqueIntegration.DescontarAsync(pedido, itemNovo: item);
 
         await repo.UpdateAsync(pedido);
         await uow.CommitAsync();

@@ -49,20 +49,21 @@ public sealed class CategoriaFinanceiraRepository(EasyStockDbContext db) : ICate
         return q.AnyAsync(ct);
     }
 
-    public Task<bool> ExisteContaAbertaAsync(Guid empresaId, Guid categoriaId, CancellationToken ct = default)
+    public async Task<bool> ExisteContaAbertaAsync(Guid empresaId, Guid categoriaId, CancellationToken ct = default)
     {
-        var pagar = db.ContasPagar.AsNoTracking()
+        // Sequencial: DbContext nao e thread-safe (duas queries paralelas lancam InvalidOperationException).
+        if (await db.ContasPagar.AsNoTracking()
+            .AnyAsync(c =>
+                c.EmpresaId == empresaId &&
+                c.CategoriaFinanceiraId == categoriaId &&
+                c.Status != StatusContaFinanceira.Cancelada &&
+                c.Status != StatusContaFinanceira.Paga, ct))
+            return true;
+        return await db.ContasReceber.AsNoTracking()
             .AnyAsync(c =>
                 c.EmpresaId == empresaId &&
                 c.CategoriaFinanceiraId == categoriaId &&
                 c.Status != StatusContaFinanceira.Cancelada &&
                 c.Status != StatusContaFinanceira.Paga, ct);
-        var receber = db.ContasReceber.AsNoTracking()
-            .AnyAsync(c =>
-                c.EmpresaId == empresaId &&
-                c.CategoriaFinanceiraId == categoriaId &&
-                c.Status != StatusContaFinanceira.Cancelada &&
-                c.Status != StatusContaFinanceira.Paga, ct);
-        return Task.WhenAll(pagar, receber).ContinueWith(_ => pagar.Result || receber.Result, ct);
     }
 }

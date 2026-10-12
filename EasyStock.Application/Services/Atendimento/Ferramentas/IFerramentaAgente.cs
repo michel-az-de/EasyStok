@@ -27,4 +27,17 @@ public sealed class ContextoTurnoAgente(Guid empresaId, Conversa conversa, DateT
     public Guid EmpresaId { get; } = empresaId;
     public Conversa Conversa { get; } = conversa;
     public DateTime Agora { get; } = agora;
+    public string? RespostaVerificada { get; private set; }
+    public bool EnvioVerificado { get; private set; }
+    public bool HouveEnvio { get; private set; }
+
+    public void RegistrarRespostaVerificada(string texto) => RespostaVerificada = texto;
+
+    public void RegistrarEnvioVerificado() => EnvioVerificado = HouveEnvio = true;
+
+    public void LimparRespostaVerificada()
+    {
+        RespostaVerificada = null;
+        EnvioVerificado = false;
+    }
 }

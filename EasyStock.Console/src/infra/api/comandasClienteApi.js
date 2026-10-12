@@ -1,0 +1,6 @@
+import { chamarApi } from './cliente'
+
+const rota = id => `/api/atendimento/conversas/${id}/comandas-cliente`
+export const listarComandasCliente = id => chamarApi(rota(id))
+export const confirmarComandaCliente = (id, linkId, aceitar) => chamarApi(`${rota(id)}/${linkId}/confirmar`, { metodo: 'POST', corpo: { aceitar } })
+export const salvarComandaCliente = (id, linkId, revisao, rascunho) => chamarApi(`${rota(id)}/${linkId}/rascunho`, { metodo: 'PUT', corpo: { revisao, rascunho } })

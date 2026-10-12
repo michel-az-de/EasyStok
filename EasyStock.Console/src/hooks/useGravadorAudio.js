@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 // Grava áudio do microfone (MediaRecorder). Puro wrapper de API de navegador,
 // sem domínio: quem chama decide o que fazer com { dataUrl, duracaoMs } que
@@ -6,7 +6,10 @@ import { useCallback, useRef, useState } from 'react'
 // "gravar com o microfone... cancelar ou enviar").
 //
 // estado: 'ocioso' | 'pedindo' | 'gravando' | 'erro'.
-export function useGravadorAudio() {
+//
+// `escolherTipo` (#1444): recebe MediaRecorder.isTypeSupported e devolve o tipo preferido (ou
+// null para o padrão do navegador). Vem de quem chama porque hook não conhece domínio.
+export function useGravadorAudio({ escolherTipo } = {}) {
   const [estado, setEstado] = useState('ocioso')
   const [duracaoMs, setDuracaoMs] = useState(0)
   const [erro, setErro] = useState(null)
@@ -16,6 +19,7 @@ export function useGravadorAudio() {
   const pedacosRef = useRef([])
   const inicioRef = useRef(0)
   const timerRef = useRef(null)
+  const montadoRef = useRef(false)
 
   const pararTrilhas = () => {
     streamRef.current?.getTracks().forEach((trilha) => trilha.stop())
@@ -27,13 +31,35 @@ export function useGravadorAudio() {
     timerRef.current = null
   }
 
+  // #1510: ao desmontar (trocar de conversa, sair da tela) o microfone e o relógio param
+  // junto; antes seguiam vivos e o indicador de gravação do navegador ficava aceso.
+  useEffect(() => {
+    montadoRef.current = true
+    return () => {
+      montadoRef.current = false
+      if (timerRef.current) clearInterval(timerRef.current)
+      timerRef.current = null
+      const gravador = gravadorRef.current
+      if (gravador && gravador.state !== 'inactive') gravador.stop()
+      streamRef.current?.getTracks().forEach((trilha) => trilha.stop())
+      streamRef.current = null
+      pedacosRef.current = []
+    }
+  }, [])
+
   const iniciar = useCallback(async () => {
     setErro(null)
     setEstado('pedindo')
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // Mono: a Meta só toca nota de voz Ogg/Opus de um canal (#1444). Pedido, não exigência.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+      })
+      // Permissão concedida depois de desmontar: devolve o microfone em vez de gravar no vazio.
+      if (!montadoRef.current) { stream.getTracks().forEach((trilha) => trilha.stop()); return }
       streamRef.current = stream
-      const gravador = new MediaRecorder(stream)
+      const tipo = escolherTipo?.((t) => MediaRecorder.isTypeSupported(t)) ?? null
+      const gravador = tipo ? new MediaRecorder(stream, { mimeType: tipo }) : new MediaRecorder(stream)
       pedacosRef.current = []
       gravador.ondataavailable = (evento) => {
         if (evento.data.size > 0) pedacosRef.current.push(evento.data)
@@ -49,7 +75,7 @@ export function useGravadorAudio() {
       setErro('Não consegui acessar o microfone. Verifique a permissão do navegador.')
       setEstado('erro')
     }
-  }, [])
+  }, [escolherTipo])
 
   const cancelar = useCallback(() => {
     limparTimer()

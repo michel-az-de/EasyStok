@@ -83,6 +83,13 @@ public class TemplateNotificacao
         AtualizadoEm = DateTime.UtcNow;
     }
 
+    /// <summary>Versão da entrada do catálogo (N13): o seed cria a linha nova quando a do catálogo passa da gravada.</summary>
+    public void DefinirVersao(int versao)
+    {
+        if (versao < 1) throw new ArgumentOutOfRangeException(nameof(versao));
+        Versao = versao;
+    }
+
     public void Aprovar(string adminEmail)
     {
         Aprovado = true;

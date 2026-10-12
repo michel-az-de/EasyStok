@@ -86,16 +86,22 @@ export function FilaCanhotos() {
     setFila((atual) => atual.slice(1))
   }
 
-  // Fixa no canto de baixo, a gaveta cobria o botão principal da esteira e o
-  // "Abrir cardápio" da ficha. No arranjo de três colunas ela mora na linha
-  // de título da Ficha, que só tem a palavra "Ficha"; sem essa linha (ficha
-  // em gaveta, celular), volta para o canto.
-  const tituloDaFicha = typeof document === 'undefined'
-    ? null
-    : document.querySelector('section[aria-label="Ficha"] > header')
+  // Lugar reservado em cada arranjo, sem cobrir a navegação nem a Cobrança.
+  // Redimensionar troca esse nó; a fila global continua montada e conserva os canhotos.
+  const [peDaFicha, setPeDaFicha] = useState(null)
+  useEffect(() => {
+    const atualizar = () => {
+      const destino = document.querySelector('[data-fila-canhotos]')
+      setPeDaFicha((atual) => (atual === destino ? atual : destino))
+    }
+    const observador = new MutationObserver(atualizar)
+    observador.observe(document.body, { childList: true, subtree: true })
+    atualizar()
+    return () => observador.disconnect()
+  }, [])
 
   const gaveta = fila.length > 0 && (
-    <output className={tituloDaFicha ? css.gavetaNoTitulo : css.gavetaCanhoto} aria-live="polite">
+    <output className={peDaFicha ? css.gavetaNoPe : css.gavetaCanhoto} aria-live="polite">
       <span className={css.gavetaTexto}>
         <Icone nome="printer" tamanho={20} />
         <span className={css.gavetaLabel}>
@@ -110,7 +116,7 @@ export function FilaCanhotos() {
 
   return (
     <>
-      {gaveta && tituloDaFicha ? createPortal(gaveta, tituloDaFicha) : gaveta}
+      {gaveta && peDaFicha ? createPortal(gaveta, peDaFicha) : gaveta}
 
       {/* Portal de impressão do topo da fila, sempre montado enquanto ela
           existir: é o que deixa o botão "Imprimir" da gaveta sair sem abrir

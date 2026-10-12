@@ -43,6 +43,20 @@ public class CanaisEmailSmsTests
     }
 
     [Fact]
+    public async Task Sms_ProvedorSimuladoContaComoSucessoForaDoMotor()
+    {
+        // N2: o stub devolve Simulado, e quem está fora do motor só olha Sucesso (o atendimento em
+        // desenvolvimento não pode virar erro). Só o dispatcher grava StatusOutbox.Simulado; registrado na #783.
+        var provedor = Substitute.For<IProvedorSms>();
+        provedor.EnviarAsync(Arg.Any<MensagemPronta>(), Arg.Any<CancellationToken>())
+            .Returns(ResultadoEnvio.Simulado("stub"));
+
+        var id = await new CanalSms(provedor).EnviarTextoAsync("5511988887777", "Oi");
+
+        id.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
     public async Task Sms_BotaoNaoESuportado()
     {
         var act = () => new CanalSms(Substitute.For<IProvedorSms>())

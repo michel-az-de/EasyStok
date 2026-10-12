@@ -1,6 +1,8 @@
 // Domínio da Frente 2 · Ficha do lead e do cliente (rodada 5, seção 2).
 // Funções puras: conversas, catálogo e relógio chegam por parâmetro, nada
 // aqui importa infra nem React (regra de ferramentas/verificar-camadas.mjs).
+// Extensão .js: `dominio/assistente.js` chega aqui pelo Node puro.
+import { diasDeCalendarioEntre } from './formato.js'
 
 // Restrição decide campanha (RN-39) e o que o agente não responde sozinho
 // (RN-52): vem sempre primeiro entre as tags. Substring sem caixa porque a
@@ -30,11 +32,8 @@ export function mesmoDomicilio(conversa, conversas) {
 
 // "Chegou hoje pelo Instagram" (situação do lead). Sem hora: a dona lê o
 // dia, o minuto cru não ajuda nela a entender o caso.
-export function diasEntre(iso, agora) {
-  const inicio = new Date(iso); inicio.setHours(0, 0, 0, 0)
-  const hoje = new Date(agora); hoje.setHours(0, 0, 0, 0)
-  return Math.round((hoje - inicio) / 86400000)
-}
+// #1600: dias de calendário da loja, não do aparelho.
+export const diasEntre = (iso, agora) => diasDeCalendarioEntre(iso, agora)
 
 // "hoje" / "ontem" / "há N dias": mesmo texto usado na situação do lead
 // (Bloco Cliente) e na faixa de números da modal Histórico.
@@ -95,9 +94,28 @@ function gostosConhecidos(conversas, cadastroIdAtual, restricoes) {
   return [...usados].sort()
 }
 
+// #1474: o EasyStok grava a tag normalizada ("Lactose" vira "lactose", "cliente vip" vira
+// "cliente_vip"). A tela mostra com espaço e compara sem acento, caixa nem "_", senão a
+// sugestão já escolhida continuava na lista.
+// #1474 (R9): a área de entrega da demonstração vem de prefixos de CEP inventados; no modo API
+// quem diz se o CEP é atendido é o EasyStok, ao salvar o cadastro. A dica some lá.
+export const dicaDoCep = (foraDaArea, { fonteApi = false } = {}) =>
+  (foraDaArea && !fonteApi ? 'Fora da área de entrega' : undefined)
+
+// #1586: no modo API o bloqueio é do cadastro no EasyStok. Lead sem cadastro salvo não tem o
+// que bloquear: o menu diz o motivo em vez de recusar depois das duas etapas do modal.
+export const MOTIVO_BLOQUEIO_SEM_CADASTRO = 'Salve o cadastro do cliente antes de bloquear.'
+export const motivoParaNaoBloquear = (conversa, { fonteApi = false } = {}) =>
+  (fonteApi && !conversa?.clienteId ? MOTIVO_BLOQUEIO_SEM_CADASTRO : null)
+
+export const rotuloDaTag = (tag) => String(tag ?? '').replace(/_/g, ' ')
+export const chaveDaTag = (tag) => rotuloDaTag(tag).normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .toLowerCase().replace(/\s+/g, ' ').trim()
+
 export function sugestoesDeTag(texto, { conversas, cadastroIdAtual, tagsAtuais, restricoes }) {
-  const termo = texto.trim().toLowerCase()
-  const bate = (t) => !tagsAtuais.includes(t) && (termo === '' || t.toLowerCase().includes(termo))
+  const termo = chaveDaTag(texto)
+  const atuais = new Set(tagsAtuais.map(chaveDaTag))
+  const bate = (t) => !atuais.has(chaveDaTag(t)) && (termo === '' || chaveDaTag(t).includes(termo))
   return {
     restricao: restricoes.filter(bate),
     gosto: gostosConhecidos(conversas, cadastroIdAtual, restricoes).filter(bate),

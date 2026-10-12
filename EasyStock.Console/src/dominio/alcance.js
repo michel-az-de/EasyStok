@@ -6,7 +6,7 @@
 // vivo de hoje. Bairro sai do endereço do cadastro, pela mesma leitura que o
 // cartão de entrega já usa (`formato.js: partesDoEndereco`).
 import { historicoComPedidoVivo } from './cliente'
-import { partesDoEndereco } from './formato'
+import { inicioDoDiaNoFuso, instanteNoFuso, partesDoEndereco } from './formato'
 import { totalDoPedido } from './pedido'
 
 export const SEM_BAIRRO = 'Sem bairro'
@@ -43,15 +43,18 @@ export const PERIODOS_DE_ALCANCE = [
 
 const DIA_MS = 24 * 60 * 60 * 1000
 
-const inicioDoDia = (ms) => {
-  const dia = new Date(ms)
-  dia.setHours(0, 0, 0, 0)
-  return dia.getTime()
-}
+// #1600: "hoje" e os períodos são dias da loja, não do aparelho.
+const inicioDoDia = inicioDoDiaNoFuso
 
-// "2026-09-22" é dia sem hora: meio-dia local, para fuso nenhum empurrar o
-// pedido para o dia vizinho.
-const emMs = (em) => (typeof em === 'string' && em.length === 10 ? Date.parse(em + 'T12:00:00') : Date.parse(em))
+// "2026-09-22" é dia sem hora: meio-dia DA LOJA desse dia, para fuso nenhum
+// empurrar o pedido para o dia vizinho.
+function emMs(em) {
+  if (typeof em !== 'string' || em.length !== 10) return Date.parse(em)
+  const [ano, mes, dia] = em.split('-').map(Number)
+  // Fora de AAAA-MM-DD fica de fora da conta, como antes; `instanteNoFuso` lançaria no render.
+  if (![ano, mes, dia].every(Number.isFinite)) return NaN
+  return instanteNoFuso({ ano, mes, dia, horas: 12 })
+}
 
 // Uma linha por pedido que conta como venda (cancelado não conta), com o
 // bairro de quem comprou. Pedido vivo que já é espelho da última linha do

@@ -14,10 +14,25 @@
 #   7. se falhar: volta as imagens para vps-prev-<ts> e sobe de novo.
 #      O banco NAO e revertido: o dump do passo 4 fica para restauracao manual.
 #
+# Guarda (issue #1336, incidente 2026-10-01): antes do git archive faz git fetch
+# e RECUSA o SHA que nao for o origin/master atual nem descendente dele, porque
+# publicar um commit antigo desfaz em producao tudo o que entrou depois. Voltar
+# de proposito a uma versao anterior so com --rollback, que exige motivo e
+# confirmacao. Tambem recusa rodar a partir de uma copia deste script diferente
+# da do origin/master (worktree antigo). Cada execucao grava uma linha em
+# $BUILD_ROOT/deploy-history.log na VPS: data, modo, sha, rc, quem, motivo.
+#
 # Uso:
 #   scripts/deploy/vps-deploy.sh                 # origin/master
-#   scripts/deploy/vps-deploy.sh <sha>           # um commit especifico
-#   scripts/deploy/vps-deploy.sh --dry-run [sha] # plano + checagem de sintaxe, sem SSH
+#   scripts/deploy/vps-deploy.sh <sha>           # origin/master ou descendente dele
+#   scripts/deploy/vps-deploy.sh --rollback <sha> --motivo "<por que>"
+#                                                # commit anterior do master; pede
+#                                                # para digitar o sha (ou ROLLBACK_CONFIRMA=<sha8>)
+#   scripts/deploy/vps-deploy.sh --dry-run [...] # guarda + plano + sintaxe, sem SSH
+#
+# Saidas: 0 ok | 2 uso invalido | 3 outro deploy em andamento | 4 build falhou
+# | 5 dump vazio | 6 nao ficou healthy (imagem revertida) | 7 SHA recusado pela
+# guarda | 8 rollback sem motivo ou sem confirmacao.
 #
 # Variaveis: VPS_HOST (hostinger), STACK_DIR (/opt/stacks/easystok),
 # BUILD_ROOT (/home/felipe/build), BACKUP_DIR (/home/felipe/backups; /opt/backups e do root), DB_CONTAINER
@@ -34,13 +49,31 @@ DB_NAME="${DB_NAME:-easystock}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-180}"
 SERVICES="api worker web"
 
-DRY_RUN=0
-if [ "${1:-}" = "--dry-run" ]; then DRY_RUN=1; shift; fi
-REF="${1:-origin/master}"
+uso() { echo "ERRO: $*" >&2; sed -n '/^# Uso:/,/^# Saidas:/p' "$0" | sed '$d; s/^# \{0,1\}//' >&2; exit 2; }
+
+DRY_RUN=0 ROLLBACK=0 MOTIVO="" REF=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1 ;;
+    --rollback) [ -n "${2:-}" ] || uso "--rollback exige um sha"; ROLLBACK=1; REF="$2"; shift ;;
+    --motivo) [ -n "${2:-}" ] || uso "--motivo exige um texto"; MOTIVO="$2"; shift ;;
+    -*) uso "opcao desconhecida: $1" ;;
+    *) [ -z "$REF" ] || uso "mais de um sha informado"; REF="$1" ;;
+  esac
+  shift
+done
+REF="${REF:-origin/master}"
+[ "$ROLLBACK" = 1 ] || [ -z "$MOTIVO" ] || uso "--motivo so vale com --rollback"
 
 # Script executado na VPS. Heredoc literal: nada aqui e expandido localmente.
 read -r -d '' REMOTE <<'REMOTE_EOF' || true
 set -euo pipefail
+registra() {
+  local rc=$?
+  printf '%s\t%s\t%s\trc=%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$MODO" "$SHA" "$rc" "$QUEM" "$MOTIVO" \
+    >>"$BUILD_ROOT/deploy-history.log" 2>/dev/null || true
+}
+trap registra EXIT
 exec 9>/tmp/easystok-deploy.lock
 flock -n 9 || { echo "ERRO: outro deploy em andamento (trava /tmp/easystok-deploy.lock)" >&2; exit 3; }
 
@@ -124,13 +157,63 @@ fi
 exit 6
 REMOTE_EOF
 
-git fetch -q origin
-SHA_FULL="$(git rev-parse --verify "$REF^{commit}")"
+recusa() { echo "RECUSADO: $1" >&2; shift; [ $# = 0 ] || printf '%s\n' "$@" >&2; exit 7; }
+
+# --- guarda (#1336): o SHA tem de ser o origin/master atual ou descendente dele
+git fetch -q origin || recusa "git fetch origin falhou; sem o origin/master atual nao da para conferir o SHA."
+MASTER="$(git rev-parse --verify 'origin/master^{commit}')"
+SHA_FULL="$(git rev-parse --verify -q "$REF^{commit}")" || recusa "'$REF' nao e um commit conhecido (rode git fetch?)."
 SHA="${SHA_FULL:0:8}"
+ATRAS="$(git rev-list --count "$SHA_FULL..$MASTER")"
+
+if [ "$ROLLBACK" = 0 ]; then
+  if ! git merge-base --is-ancestor "$MASTER" "$SHA_FULL"; then
+    if git merge-base --is-ancestor "$SHA_FULL" "$MASTER"; then
+      onde="esta $ATRAS commit(s) atras do origin/master (${MASTER:0:8}); publicar desfaz em producao:"
+    else
+      onde="nao descende do origin/master (${MASTER:0:8}); ficariam de fora $ATRAS commit(s) do master, entre eles:"
+    fi
+    recusa "$SHA $onde" \
+      "$(git log --format='  %h %s' -10 "$SHA_FULL..$MASTER")" \
+      "Para publicar o master atual: scripts/deploy/vps-deploy.sh" \
+      "Para voltar de proposito a uma versao anterior: --rollback <sha> --motivo \"<por que>\""
+  fi
+  MODO=deploy
+  FRENTE="$(git rev-list --count "$MASTER..$SHA_FULL")"
+  guarda="$SHA e o origin/master atual"
+  [ "$FRENTE" = 0 ] || guarda="$SHA descende do origin/master (${MASTER:0:8}), $FRENTE commit(s) a frente"
+else
+  [ -n "$MOTIVO" ] || { echo "ERRO: --rollback exige --motivo \"<por que>\"" >&2; exit 8; }
+  git merge-base --is-ancestor "$SHA_FULL" "$MASTER" \
+    || recusa "rollback so para commit que ja esteve no origin/master; $SHA nao esta na historia dele."
+  MODO=rollback
+  guarda="ROLLBACK para $SHA, $ATRAS commit(s) atras do origin/master (${MASTER:0:8}). Motivo: $MOTIVO"
+fi
+
+# Copia antiga deste script (worktree parado) nao tem as guardas novas: so roda a do master.
+ESPERADO="$(git rev-parse -q --verify 'origin/master:scripts/deploy/vps-deploy.sh' || true)"
+if [ -n "$ESPERADO" ] && [ "$(git hash-object --path=scripts/deploy/vps-deploy.sh "$0")" != "$ESPERADO" ]; then
+  msg="esta copia do vps-deploy.sh ($0) difere da do origin/master: script desatualizado ou alterado. Rode o do master atualizado."
+  if [ "$DRY_RUN" = 1 ]; then echo "AVISO: $msg" >&2; else recusa "$msg"; fi
+fi
+
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
+QUEM="$(git config user.name || true) <$(git config user.email || true)> em ${USER:-${USERNAME:-?}}@$(hostname 2>/dev/null || echo '?')"
+QUEM="${QUEM//[$'\t\n\r']/ }"
+MOTIVO="${MOTIVO//[$'\t\n\r']/ }"
 
 echo "==> Deploy de $SHA ($(git log -1 --format=%s "$SHA_FULL" | cut -c1-70)) em $VPS_HOST"
+echo "    guarda: OK, $guarda"
 echo "    servicos: $SERVICES | dump: $BACKUP_DIR/$DB_NAME-predeploy-$TS.dump | rollback: vps-prev-$TS"
+echo "    historico: $BUILD_ROOT/deploy-history.log ($MODO, $QUEM)"
+
+if [ "$ROLLBACK" = 1 ] && [ "$DRY_RUN" = 0 ]; then
+  git log --format='    desfaz %h %s' -10 "$SHA_FULL..$MASTER"
+  if [ -n "${ROLLBACK_CONFIRMA:-}" ]; then resp="$ROLLBACK_CONFIRMA"
+  elif [ -t 0 ]; then read -r -p "Digite $SHA para confirmar o rollback: " resp
+  else resp=""; fi
+  [ "$resp" = "$SHA" ] || { echo "ERRO: rollback nao confirmado; digite exatamente $SHA (ou ROLLBACK_CONFIRMA=$SHA)." >&2; exit 8; }
+fi
 
 if [ "$DRY_RUN" = 1 ]; then
   bash -n <<<"$REMOTE" && echo "==> script remoto: sintaxe OK"
@@ -141,6 +224,7 @@ fi
 ENVS="SHA=$SHA SHA_FULL=$SHA_FULL TS=$TS STACK_DIR=$STACK_DIR BUILD_ROOT=$BUILD_ROOT"
 ENVS="$ENVS BACKUP_DIR=$BACKUP_DIR DB_CONTAINER=$DB_CONTAINER DB_NAME=$DB_NAME"
 ENVS="$ENVS HEALTH_TIMEOUT=$HEALTH_TIMEOUT SERVICES='$SERVICES'"
+ENVS="$ENVS MODO=$MODO QUEM=$(printf '%q' "$QUEM") MOTIVO=$(printf '%q' "$MOTIVO")"
 
 # stdin do ssh = fonte (tar); o script remoto vai como argumento de bash -c.
 git archive --format=tar "$SHA_FULL" \

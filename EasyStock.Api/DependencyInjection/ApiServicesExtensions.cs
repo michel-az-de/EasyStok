@@ -32,6 +32,7 @@ public static class ApiServicesExtensions
 
         // ── Mobile module services (Onda 2 parte 2: stock reconciliation) ────────
         services.AddScoped<MobileStockReconciler>();
+        services.AddScoped<LoteMobileEstadoReconciler>();
         // Onda 3: vendas mobile -> Venda ERP (Order entregue cria Venda + ItemVenda).
         services.AddScoped<MobileSaleSyncService>();
         // F9-E: resolve Usuario "Sistema Mobile Sync" pra auditoria de produto/movimentacao
@@ -44,6 +45,8 @@ public static class ApiServicesExtensions
         // S18: a mesma instância alimenta o SSE do console (api/operacao/eventos); troca o no-op da Application.
         services.Replace(ServiceDescriptor.Singleton<
             EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher, OperacaoEventPublisher>());
+        // S60: reserva por SMS do reenvio; desligada sem chave ou com o provedor stub (ReservaSmsConfiguracao).
+        services.Replace(ServiceDescriptor.Singleton(EasyStock.Api.Configuration.ReservaSmsConfiguracao.Ler(configuration)));
         // SyncController decomposition: mutation dispatch, auto-link pipeline, reverse pull.
         services.AddScoped<SyncMutationDispatcher>();
         services.AddScoped<SyncAutoLinker>();

@@ -1,3 +1,4 @@
+using EasyStock.Application.Services.Storefront;
 using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
@@ -18,6 +19,18 @@ public class SyncReversePullService(
     private readonly IConfiguration _config = config;
     private readonly ILogger<SyncReversePullService> _log = log;
 
+    /// <summary>
+    /// #1469: o grid de producao do PWA so desenha massa/molho/extra. Traduz a Categoria ERP
+    /// pelo nome; o que nao casar vai para extra, para nunca sumir da tela.
+    /// </summary>
+    internal static string CategoriaDoPwa(string? nomeCategoriaErp)
+    {
+        var nome = (nomeCategoriaErp ?? string.Empty).Trim().ToLowerInvariant();
+        if (nome.Contains("massa")) return "massa";
+        if (nome.Contains("molho")) return "molho";
+        return "extra";
+    }
+
     public async Task AppendAsync(List<MutationDto> mutations, DateTime sinceDate, Guid empresaId, Guid? lojaId)
     {
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -27,6 +40,7 @@ public class SyncReversePullService(
             .Where(p => p.EmpresaId == empresaId && p.ErpProductId != null)
             .Select(p => p.ErpProductId!.Value).ToListAsync();
         var produtosQ = _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
+            .Include(p => p.Categoria)
             .Where(p => p.EmpresaId == empresaId && p.AlteradoEm > sinceDate
                 && p.Status == StatusProduto.Ativo
                 && !mobileLinkedProdutos.Contains(p.Id));
@@ -37,14 +51,16 @@ public class SyncReversePullService(
                 Id: p.Id.ToString(),
                 Name: p.Nome,
                 Emoji: null,
-                Category: "Geral",
+                Category: CategoriaDoPwa(p.Categoria?.Nome),
                 Unit: null,
                 Price: p.PrecoReferencia?.Valor ?? 0m,
                 Stock: 0,
                 Custom: false,
                 Sku: p.CodigoBarras,
                 DefaultWeightG: null,
-                DefaultValidityDays: null);
+                DefaultValidityDays: null,
+                Cost: p.CustoReferencia?.Valor,
+                MinStock: p.QuantidadeMinima);
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
                 "product.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(p.AlteradoEm).ToUnixTimeMilliseconds()));
         }
@@ -80,9 +96,10 @@ public class SyncReversePullService(
         var pedidos = await pedidosQ.ToListAsync();
         foreach (var p in pedidos)
         {
-            var items = p.Itens.Select(i => new OrderItemDto(
+            // #1474: a linha de frete não é produto a preparar; o nome segue o da vitrine.
+            var items = p.Itens.Where(i => !i.EhLinhaDeFrete).Select(i => new OrderItemDto(
                 ProductId: i.ProdutoId?.ToString() ?? "",
-                Name: i.Nome ?? "",
+                Name: NomeCardapio.Exibicao(i.Nome) ?? "",
                 Emoji: i.Emoji,
                 Unit: i.Unidade,
                 Qty: (int)i.Quantidade,

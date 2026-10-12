@@ -10,7 +10,16 @@ public sealed record RegistrarProducaoItemInput(
     int Porcoes,
     int? PesoPorPorcaoG,
     int ValidadeDias,
-    decimal? CustoUnitario);
+    decimal? CustoUnitario,
+    // M2.2 (#1491, RN-45): peso real produzido; a sobra é o que passa das porções.
+    int? PesoRealG = null,
+    // M1.4c (#1537, D-M1-03): a porção produzida. A entrada vai para o saldo dela.
+    Guid? ProdutoVariacaoId = null,
+    [property: MaxLength(60)] string? Porcao = null,
+    // #1542: o prato tem mais de um tamanho de porção; a baixa de insumo avisa onde a receita não acompanha.
+    bool VariosTamanhos = false,
+    // M1.4e (#1552): a embalagem da porção produzida; desce uma por porção, no lugar da embalagem da receita.
+    Guid? EmbalagemDaPorcaoId = null);
 
 public sealed record RegistrarProducaoCommand(
     [property: Required] Guid EmpresaId,
@@ -21,13 +30,16 @@ public sealed record RegistrarProducaoCommand(
     Guid? OperadorUserId = null,
     [property: MaxLength(120)] string? OperadorNome = null);
 
-public sealed record RegistrarProducaoItemResult(Guid ProdutoId, Guid ItemEstoqueId, Guid MovimentacaoId, int Porcoes, DateTime ValidadeEm);
+public sealed record RegistrarProducaoItemResult(
+    Guid ProdutoId, Guid ItemEstoqueId, Guid MovimentacaoId, int Porcoes, DateTime ValidadeEm, int? SobraG = null);
 
 public sealed record RegistrarProducaoResult(
     Guid LoteId,
     string CodigoLote,
     int TotalEtiquetas,
-    IReadOnlyList<RegistrarProducaoItemResult> Itens);
+    IReadOnlyList<RegistrarProducaoItemResult> Itens,
+    // D-M2-01 (#1499): falta de insumo na baixa automatica avisa, nao trava.
+    IReadOnlyList<string>? Avisos = null);
 
 /// <summary>
 /// S23 (#1137): registra uma producao em porcoes numa TRANSACAO UNICA:
@@ -48,7 +60,8 @@ public class RegistrarProducaoUseCase(
     RegistrarEntradaEstoqueUseCase registrarEntradaUC,
     IProdutoRepository produtoRepository,
     IUnitOfWork uow,
-    ILogger<RegistrarProducaoUseCase> logger)
+    ILogger<RegistrarProducaoUseCase> logger,
+    BaixaDeInsumosDaProducao? baixaDeInsumos = null)
 {
     public async Task<RegistrarProducaoResult> ExecuteAsync(RegistrarProducaoCommand cmd, CancellationToken ct = default)
     {
@@ -68,6 +81,11 @@ public class RegistrarProducaoUseCase(
                 throw new UseCaseValidationException("Peso por porcao deve ser maior que zero.");
             if (it.CustoUnitario is < 0)
                 throw new UseCaseValidationException("Custo unitario nao pode ser negativo.");
+            if (it.PesoRealG is <= 0)
+                throw new UseCaseValidationException("Peso real deve ser maior que zero.");
+            if (Sobra(it) is < 0)
+                throw new UseCaseValidationException(
+                    "O peso real nao fecha as porcoes: confira o peso ou o numero de porcoes.");
         }
 
         // Antecipa a regra RDC 727 do FinalizarLote: Embalado sem peso e rejeitado antes de gravar.
@@ -106,12 +124,13 @@ public class RegistrarProducaoUseCase(
             Observacoes: cmd.Observacao,
             Origem: "producao",
             Itens: itens.Select(i => new CriarLoteItemInput(
-                Nome: Truncar(produtos[i.ProdutoId].Nome, 150),
+                Nome: Truncar(produtos[i.ProdutoId].Nome + (string.IsNullOrWhiteSpace(i.Porcao) ? "" : $" {i.Porcao.Trim()}"), 150),
                 Quantidade: i.Porcoes,
                 ProdutoId: i.ProdutoId,
                 Unidade: "porcao",
                 PesoG: i.PesoPorPorcaoG,
-                ValidadeDias: i.ValidadeDias)).ToList()));
+                ValidadeDias: i.ValidadeDias,
+                PesoRealG: i.PesoRealG)).ToList()));
 
         var finalizado = await finalizarLoteUC.ExecuteAsync(new FinalizarLoteCommand(cmd.EmpresaId, lote.Id))
             ?? throw new InvalidOperationException($"Lote {lote.Id} nao encontrado dentro da transacao.");
@@ -121,13 +140,16 @@ public class RegistrarProducaoUseCase(
         {
             ct.ThrowIfCancellationRequested();
             var produto = produtos[it.ProdutoId];
-            var validadeEm = dataProducao.AddDays(it.ValidadeDias);
+            // #1506: validade conta a partir do dia de Brasilia da producao (data civil como
+            // meia-noite UTC). Somar dias ao instante UTC dava +1 dia nas producoes apos as 21h.
+            var validadeEm = HorarioBrasil.CivilComoInstanteUtc(
+                HorarioBrasil.DataOperacional(dataProducao).AddDays(it.ValidadeDias));
             var custo = it.CustoUnitario ?? (decimal?)produto.CustoReferencia ?? 0m;
 
             var entrada = await registrarEntradaUC.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
                 EmpresaId: cmd.EmpresaId,
                 ProdutoId: it.ProdutoId,
-                ProdutoVariacaoId: null,
+                ProdutoVariacaoId: it.ProdutoVariacaoId,
                 Quantidade: it.Porcoes,
                 CustoUnitario: custo,
                 PrecoVendaSugerido: null,
@@ -149,14 +171,25 @@ public class RegistrarProducaoUseCase(
                 LojaId: cmd.LojaId));
 
             resultados.Add(new RegistrarProducaoItemResult(
-                it.ProdutoId, entrada.ItemEstoqueId, entrada.MovimentacaoId, it.Porcoes, validadeEm));
+                it.ProdutoId, entrada.ItemEstoqueId, entrada.MovimentacaoId, it.Porcoes, validadeEm, Sobra(it)));
         }
 
-        logger.LogInformation("Producao registrada: lote {Codigo} com {Itens} item(ns) e {Etiquetas} etiqueta(s).",
-            finalizado.Codigo, resultados.Count, finalizado.TotalUnidades);
+        // D-M2-01 (#1499): baixa dos insumos na MESMA transacao (a saida reusa a transacao aberta).
+        var avisos = baixaDeInsumos is null
+            ? []
+            : await baixaDeInsumos.BaixarAsync(cmd.EmpresaId,
+                itens.Select(i => PratoParaBaixa.Da(produtos[i.ProdutoId], i)).ToList(),
+                finalizado.Codigo, dataProducao, ct);
 
-        return new RegistrarProducaoResult(finalizado.Id, finalizado.Codigo, finalizado.TotalUnidades, resultados);
+        logger.LogInformation("Producao registrada: lote {Codigo} com {Itens} item(ns), {Etiquetas} etiqueta(s) e {Avisos} aviso(s) de insumo.",
+            finalizado.Codigo, resultados.Count, finalizado.TotalUnidades, avisos.Count);
+
+        return new RegistrarProducaoResult(finalizado.Id, finalizado.Codigo, finalizado.TotalUnidades, resultados, avisos);
     }
 
     private static string Truncar(string s, int max) => s.Length > max ? s[..max] : s;
+
+    // US-061: 1.000 g em 2 porções de 500 g sobra 0; 1.144 g sobra 144 g. Sem os dois pesos, null.
+    private static int? Sobra(RegistrarProducaoItemInput it) =>
+        it.PesoRealG is { } real && it.PesoPorPorcaoG is { } porcao ? real - it.Porcoes * porcao : null;
 }

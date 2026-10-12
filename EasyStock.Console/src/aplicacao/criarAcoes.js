@@ -24,6 +24,9 @@ import { criarAcoesProducao } from './acoes/producao'
 import { criarAcoesCaixa } from './acoes/caixa'
 import { criarAcoesIntegracoes } from './acoes/integracoes'
 import { criarAcoesFidelidade } from './acoes/fidelidade'
+import { linkDoCardapio } from '../dominio/cardapioLink'
+
+const PROGRAMADA_SO_NA_API = 'Mensagem programada só sai pelo EasyStok: na demonstração não há disparo.'
 
 const mesPorExtenso = (ms) =>
   new Date(ms).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
@@ -34,6 +37,7 @@ const mesPorExtenso = (ms) =>
 // `pendentes` guarda os timers da entrega simulada, para o Provider limpar ao desmontar.
 export function criarAcoes({
   despachar, agoraRef, estadoRef, pendentes, consultarAgente, perguntarAssistente, pedirNotificacaoDoNavegador,
+  guardarRascunhoJa,
 }) {
   const enviar = (id, texto, opcoes = {}) => {
     const mensagemId = proximoId('msg')
@@ -49,6 +53,20 @@ export function criarAcoes({
 
   return {
     enviar,
+    // "Enviar cardápio" (#1353): na demonstração o link é a tela do próprio console
+    // (useEspelhoCardapioLink.js); no modo API vem da loja (acoesApi.js).
+    obterLinkCardapio: async (id) => ({
+      url: linkDoCardapio(window.location.origin + window.location.pathname, id), daLoja: false,
+    }),
+    // Mensagem programada (#1424): quem agenda e dispara é o EasyStok (acoesApi.js). Na
+    // demonstração não há disparo, então não finge: a modal mostra este motivo.
+    programarMensagem: async () => { throw new Error(PROGRAMADA_SO_NA_API) },
+    listarProgramadas: async () => { throw new Error(PROGRAMADA_SO_NA_API) },
+    cancelarProgramada: async () => { throw new Error(PROGRAMADA_SO_NA_API) },
+    listarModelos: async () => { throw new Error('Modelos aprovados exigem a conexão real com o EasyStok.') },
+    enviarModelo: async () => { throw new Error('Modelos aprovados exigem a conexão real com o EasyStok.') },
+    prepararOutroModelo: () => {},
+    listarAtendentes: async () => [{ nome: ATENDENTE }],
     consultarAgente,
     perguntarAssistente,
     selecionar: (id) => despachar({ tipo: acao.SELECIONAR_CONVERSA, id }),
@@ -70,6 +88,12 @@ export function criarAcoes({
     ajustarObservacao: (id, sku, texto) => despachar({ tipo: acao.AJUSTAR_OBSERVACAO, id, sku, texto }),
     mudarFiltro: (chave, valor) => despachar({ tipo: acao.MUDAR_FILTRO, chave, valor }),
     definirRascunho: (id, texto) => despachar({ tipo: acao.DEFINIR_RASCUNHO, id, texto }),
+    // #1577: texto do campo de escrever, que chega na pausa da digitação. `ja` é a tela saindo (401, Hall,
+    // aba oculta): o despacho pode não render mais, então o Provider também grava direto.
+    descarregarRascunho: (despacho, { ja = false, desmontando = false } = {}) => {
+      despachar({ tipo: acao.DEFINIR_RASCUNHO, ...despacho, doCampo: true, adotar: desmontando })
+      if (ja) guardarRascunhoJa?.(despacho)
+    },
     reabrir: (id) => despachar({ tipo: acao.REABRIR_CONVERSA, id }),
     trocarJanela: (id, janela) => despachar({ tipo: acao.TROCAR_JANELA, id, janela }),
     removerItem: (id, sku) => despachar({ tipo: acao.REMOVER_ITEM, id, sku }),

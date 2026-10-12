@@ -2,6 +2,7 @@ using EasyStock.Api.Authorization;
 using EasyStock.Api.Observability;
 using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Application.Ports.Output.Storage;
+using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Infra.Async.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -73,6 +74,8 @@ public static class ApiServiceCollectionExtensions
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
+        services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, ModuloAuthorizationHandler>();
+        services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, PermissaoAuthorizationHandler>();
         services.AddScoped<AdminAuditService>();
         services.AddScoped<GeradorNotificacoesAutomaticas>();
         services.AddSingleton<EasyStock.Api.Services.Impressao.PedidoImpressoHtml>(); // S49: impresso do pedido
@@ -80,6 +83,9 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<EasyStock.Api.Services.IJwtTokenService, JwtTokenService>();
         services.AddScoped<EasyStock.Application.Ports.Output.IJwtTokenService>(sp =>
             sp.GetRequiredService<EasyStock.Api.Services.IJwtTokenService>());
+
+        // #1352: sessão revogável. O validador roda no OnTokenValidated do JwtBearer e no laço do SSE.
+        services.AddScoped<EasyStock.Api.Authentication.ValidadorSessaoUsuario>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
@@ -101,6 +107,13 @@ public static class ApiServiceCollectionExtensions
                     NameClaimType            = "sub",
                     RoleClaimType            = "nivel"
                 };
+
+                // #1352: o JWT passa a ser revogável. Token emitido antes do corte de sessão do usuário, ou de
+                // conta inativa, falha aqui com 401; Auth:SessoesRevogaveis=false desliga a checagem.
+                options.Events = new JwtBearerEvents
+                {
+                    OnTokenValidated = EasyStock.Api.Authentication.SessaoRevogavel.AoValidarTokenAsync,
+                };
             })
             .AddInternalCronJobScheme(configuration)
             // S20: bridge de impressão (X-Impressao-Api-Key), só nas rotas da policy ImpressaoFila.
@@ -116,6 +129,9 @@ public static class ApiServiceCollectionExtensions
             opts.AddPolicy("Admin",    p => p.RequireClaim("nivel", "SuperAdmin", "Admin"));
             opts.AddPolicy("Gerente",  p => p.RequireClaim("nivel", "SuperAdmin", "Admin", "Gerente"));
             opts.AddPolicy("Operador", p => p.RequireClaim("nivel", "SuperAdmin", "Admin", "Gerente", "Operador"));
+            // #1508: permissão fina pelo perfil (explícito ou fallback do nível), não só o nível.
+            opts.AddPolicy(PoliticasPermissao.VisualizarRelatorios, p => p.RequireAuthenticatedUser()
+                .AddRequirements(new PermissaoRequirement(Permissao.VisualizarRelatorios)));
             opts.AddInternalCronJobPolicy();
             opts.AddImpressaoFilaPolicy();
         });
@@ -193,7 +209,7 @@ public static class ApiServiceCollectionExtensions
                     });
             });
 
-            // Rate limit para endpoints sensíveis de autenticação (login, register,
+            // Rate limit para endpoints sensíveis de autenticação (login,
             // forgot/reset password). Particionado por IP do cliente para dificultar
             // brute-force e spam de contas. O IP real volta a ser confiavel apos o fix do
             // ForwardedHeaders (Program.cs) + repasse de X-Forwarded-For pelos BFFs Web/Admin;
@@ -244,6 +260,26 @@ public static class ApiServiceCollectionExtensions
                         QueueLimit = 0
                     });
             });
+
+            // Leitura, autosave e SSE usam a credencial individual; clientes no mesmo IP não dividem a cota.
+            options.AddPolicy("comanda-leitura", context =>
+            {
+                var token = context.Request.RouteValues["token"]?.ToString()?.Trim();
+                var formatoGerado = token is { Length: 43 } && token.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
+                var chave = formatoGerado ? "comanda:" + AcessoChatSite.HashDoToken(token!)
+                    : "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "anon");
+                return RateLimitPartition.GetFixedWindowLimiter(chave,
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 });
+            });
+            options.AddPolicy("comanda-rascunho", context => RateLimitPartition.GetFixedWindowLimiter(
+                context.Request.RouteValues["token"]?.ToString() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy("comanda-envio", context => RateLimitPartition.GetFixedWindowLimiter(
+                context.Request.RouteValues["token"]?.ToString() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy("comanda-stream", context => RateLimitPartition.GetConcurrencyLimiter(
+                context.Request.RouteValues["token"]?.ToString() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                _ => new ConcurrencyLimiterOptions { PermitLimit = 3, QueueLimit = 0 }));
 
             // Webhooks da Meta (WhatsApp, Instagram, Messenger). A Meta entrega em rajada a
             // partir de poucos IPs; 429 faz ela reenviar e, insistindo, desativar a assinatura.

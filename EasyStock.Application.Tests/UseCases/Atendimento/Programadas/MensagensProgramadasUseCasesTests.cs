@@ -59,6 +59,39 @@ public class MensagensProgramadasUseCasesTests
         new(_empresaId, Guid.NewGuid(), _cliente.Id, null, canal, finalidade, texto, modelo, para);
 
     [Fact]
+    public async Task Agendar_ClienteBloqueado_RecusaSemGravar()
+    {
+        _cliente.Bloquear("Teste", Agora);
+
+        var act = () => Agendar().ExecuteAsync(Comando(CanalConversa.Sms, Agora.AddHours(1)));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*bloqueado*");
+        await _repo.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+        _uow.CommitCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Disparar_ClienteBloqueadoAposAgendar_RecusaTextoEModelo()
+    {
+        foreach (var modelo in new ModeloMensagem?[] { null, new("aviso", "pt_BR", []) })
+        {
+            var mensagem = MensagemProgramada.Agendar(_empresaId, _cliente.Id, null, CanalConversa.WhatsApp,
+                FinalidadeContato.Transacional, modelo is null ? "Oi" : null, modelo,
+                Agora.AddMinutes(1), Guid.NewGuid(), Agora.AddMinutes(-10));
+            mensagem.Reservar(Agora);
+            _repo.ObterAsync(_empresaId, mensagem.Id, Arg.Any<CancellationToken>()).Returns(mensagem);
+            _cliente.Bloquear("Teste", Agora);
+
+            await Disparar().ExecuteAsync(_empresaId, mensagem.Id);
+
+            mensagem.Situacao.Should().Be(SituacaoMensagemProgramada.Falhou);
+            mensagem.Erro.Should().Contain("bloqueado");
+        }
+        await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+        await _whats.DidNotReceiveWithAnyArgs().EnviarModeloAsync(default!, default!, default!, default!, default);
+    }
+
+    [Fact]
     public async Task Agendar_WhatsAppTextoComJanelaVencidaNoEnvio_Recusa()
     {
         ConversaAberta(Agora.AddHours(-2));
@@ -93,6 +126,62 @@ public class MensagensProgramadasUseCasesTests
         resultado.Situacao.Should().Be(SituacaoMensagemProgramada.Agendada);
         await _repo.Received(1).AddAsync(Arg.Is<MensagemProgramada>(m => m.Canal == CanalConversa.Sms), Arg.Any<CancellationToken>());
         _uow.CommitCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Agendar_TelefoneDoCadastroComDdiSemMais_ProcuraAConversaAberta()
+    {
+        // #1290: o VO Telefone grava "55..." sem '+'; antes o destino recusava e o agendamento dizia
+        // que o cliente não tinha telefone.
+        _cliente.Telefone = "5511988887777";
+        ConversaAberta(Agora.AddHours(-1));
+
+        var resultado = await Agendar().ExecuteAsync(Comando(CanalConversa.WhatsApp, Agora.AddHours(1)));
+
+        resultado.ConversaId.Should().NotBeNull();
+        await _conversas.Received(1).ObterAbertaPorContatoAsync(
+            _empresaId, CanalConversa.WhatsApp, "+5511988887777", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Disparar_ConversaDoAgendamentoEncerrada_UsaAConversaAbertaAtualDoContato()
+    {
+        // #1290: a conversa do agendamento foi encerrada e o cliente voltou a falar numa nova.
+        var antiga = Conversa.Abrir(_empresaId, "5511988887777", Agora.AddDays(-3));
+        antiga.VincularCliente(_cliente.Id);
+        antiga.Encerrar(Agora.AddDays(-2));
+        var atual = ConversaAberta(Agora.AddHours(-1));
+        var mensagem = MensagemProgramada.Agendar(_empresaId, _cliente.Id, antiga.Id, CanalConversa.WhatsApp,
+            FinalidadeContato.Transacional, "Chegou o bolo", null, Agora.AddMinutes(1), Guid.NewGuid(), Agora.AddDays(-3));
+        mensagem.Reservar(Agora);
+        _repo.ObterAsync(_empresaId, mensagem.Id, Arg.Any<CancellationToken>()).Returns(mensagem);
+        _conversas.ObterPorIdAsync(_empresaId, antiga.Id, Arg.Any<CancellationToken>()).Returns(antiga);
+        _whats.EnviarTextoAsync("5511988887777", "Chegou o bolo", Arg.Any<CancellationToken>()).Returns("wamid.atual");
+
+        await Disparar().ExecuteAsync(_empresaId, mensagem.Id);
+
+        mensagem.Situacao.Should().Be(SituacaoMensagemProgramada.Enviada);
+        await _conversas.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.ConversaId == atual.Id && m.ExternoId == "wamid.atual"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Disparar_ConversaEncerradaEAAbertaEDeOutroCliente_NaoUsaAConversaAlheia()
+    {
+        var antiga = Conversa.Abrir(_empresaId, "5511988887777", Agora.AddDays(-3));
+        antiga.VincularCliente(_cliente.Id);
+        antiga.Encerrar(Agora.AddDays(-2));
+        var alheia = ConversaAberta(Agora.AddHours(-1));
+        alheia.VincularCliente(Guid.NewGuid());
+        var mensagem = MensagemProgramada.Agendar(_empresaId, _cliente.Id, antiga.Id, CanalConversa.WhatsApp,
+            FinalidadeContato.Transacional, "Chegou o bolo", null, Agora.AddMinutes(1), Guid.NewGuid(), Agora.AddDays(-3));
+        mensagem.Reservar(Agora);
+        _repo.ObterAsync(_empresaId, mensagem.Id, Arg.Any<CancellationToken>()).Returns(mensagem);
+        _conversas.ObterPorIdAsync(_empresaId, antiga.Id, Arg.Any<CancellationToken>()).Returns(antiga);
+
+        await Disparar().ExecuteAsync(_empresaId, mensagem.Id);
+
+        await _conversas.DidNotReceiveWithAnyArgs().AddMensagemAsync(default!, default);
     }
 
     [Fact]

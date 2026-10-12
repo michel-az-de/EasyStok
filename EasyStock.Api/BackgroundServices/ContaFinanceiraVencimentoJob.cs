@@ -1,5 +1,7 @@
 using System.Text.Json;
+using EasyStock.Api.Configuration;
 using EasyStock.Application.Ports.Output.Notifications;
+using Microsoft.Extensions.Options;
 using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums.Financeiro;
 using EasyStock.Domain.Enums.Notifications;
@@ -24,8 +26,12 @@ namespace EasyStock.Api.BackgroundServices;
 /// </summary>
 public sealed class ContaFinanceiraVencimentoJob(
     IServiceProvider serviceProvider,
-    ILogger<ContaFinanceiraVencimentoJob> logger) : BackgroundService
+    ILogger<ContaFinanceiraVencimentoJob> logger,
+    IOptions<BackgroundJobOptions>? opcoes = null) : BackgroundService
 {
+    /// <summary>N12: os avisos de vencimento só saem com <c>BackgroundJobs:EnableContaFinanceiraNotificacoes=true</c> (padrão desligado).</summary>
+    private readonly bool _notificar = opcoes?.Value.EnableContaFinanceiraNotificacoes ?? false;
+
     private const long LockKeyJob = 0x4361704361725665L; // "CapCarVe"
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -94,7 +100,8 @@ public sealed class ContaFinanceiraVencimentoJob(
         finally { await db.Database.CloseConnectionAsync(); }
     }
 
-    private async Task ProcessarAsync(CancellationToken ct)
+    /// <summary>Uma rodada do job (sem o advisory lock). Pública para os testes de integração; o loop diário a chama.</summary>
+    public async Task ProcessarAsync(CancellationToken ct)
     {
         using var scope = serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
@@ -103,7 +110,7 @@ public sealed class ContaFinanceiraVencimentoJob(
         // cobre a camada do banco. Scope fresco → liga ANTES da 1a query (interceptor lê a flag
         // em ConnectionOpened). Espelha FaturaReconciliacaoJob (issue 644).
         using var _rls = db.UseRowLevelSecurityBypass();
-        var notificador = scope.ServiceProvider.GetService<INotificadorService>();
+        var notificador = _notificar ? scope.ServiceProvider.GetService<INotificadorService>() : null;
         var hoje = DateTime.UtcNow.Date;
 
         // Cohorts D-3 e D-1 (parcelas vencendo)
@@ -117,74 +124,78 @@ public sealed class ContaFinanceiraVencimentoJob(
         var processadasVencidas = 0;
         var contasAtualizadas = new HashSet<(Guid contaId, TipoLadoFinanceiro lado)>();
 
-        // ── ContaPagar — D-3 ─────────────────────────────────────────────
-        var parcelasD3Pagar = await db.ParcelasPagar
-            .IgnoreQueryFilters()
-            .Include(p => p.ContaPagar)
-            .Where(p =>
-                p.ContaPagar!.Status != StatusContaFinanceira.Rascunho &&
-                (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
-                p.DataVencimento.Date >= d3Inicio && p.DataVencimento.Date < d3Fim &&
-                p.NotificadaD3Em == null)
-            .Take(500)
-            .ToListAsync(ct);
-        foreach (var p in parcelasD3Pagar)
+        // N12: D-3 e D-1 só existem para avisar; com os avisos desligados as coortes nem são lidas.
+        if (_notificar)
         {
-            await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaPagarVencendo, p, "d3", ct);
-            p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaD3, DateTime.UtcNow);
-            processadasD3++;
-        }
+            // ── ContaPagar — D-3 ─────────────────────────────────────────────
+            var parcelasD3Pagar = await db.ParcelasPagar
+                .IgnoreQueryFilters()
+                .Include(p => p.ContaPagar)
+                .Where(p =>
+                    p.ContaPagar!.Status != StatusContaFinanceira.Rascunho &&
+                    (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
+                    p.DataVencimento.Date >= d3Inicio && p.DataVencimento.Date < d3Fim &&
+                    p.NotificadaD3Em == null)
+                .Take(500)
+                .ToListAsync(ct);
+            foreach (var p in parcelasD3Pagar)
+            {
+                if (!await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaPagarVencendo, p, "d3", ct)) continue; // falhou: sem carimbo, tenta amanhã
+                p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaD3, DateTime.UtcNow);
+                processadasD3++;
+            }
 
-        // ── ContaReceber — D-3 ───────────────────────────────────────────
-        var parcelasD3Receber = await db.ParcelasReceber
-            .IgnoreQueryFilters()
-            .Include(p => p.ContaReceber)
-            .Where(p =>
-                p.ContaReceber!.Status != StatusContaFinanceira.Rascunho &&
-                (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
-                p.DataVencimento.Date >= d3Inicio && p.DataVencimento.Date < d3Fim &&
-                p.NotificadaD3Em == null)
-            .Take(500)
-            .ToListAsync(ct);
-        foreach (var p in parcelasD3Receber)
-        {
-            await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaReceberVencendo, p, "d3", ct);
-            p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaD3, DateTime.UtcNow);
-            processadasD3++;
-        }
+            // ── ContaReceber — D-3 ───────────────────────────────────────────
+            var parcelasD3Receber = await db.ParcelasReceber
+                .IgnoreQueryFilters()
+                .Include(p => p.ContaReceber)
+                .Where(p =>
+                    p.ContaReceber!.Status != StatusContaFinanceira.Rascunho &&
+                    (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
+                    p.DataVencimento.Date >= d3Inicio && p.DataVencimento.Date < d3Fim &&
+                    p.NotificadaD3Em == null)
+                .Take(500)
+                .ToListAsync(ct);
+            foreach (var p in parcelasD3Receber)
+            {
+                if (!await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaReceberVencendo, p, "d3", ct)) continue; // falhou: sem carimbo, tenta amanhã
+                p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaD3, DateTime.UtcNow);
+                processadasD3++;
+            }
 
-        // ── D-1 ─────────────────────────────────────────────────────────
-        var parcelasD1Pagar = await db.ParcelasPagar
-            .IgnoreQueryFilters()
-            .Include(p => p.ContaPagar)
-            .Where(p =>
-                p.ContaPagar!.Status != StatusContaFinanceira.Rascunho &&
-                (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
-                p.DataVencimento.Date >= d1Inicio && p.DataVencimento.Date < d1Fim &&
-                p.NotificadaD1Em == null)
-            .Take(500)
-            .ToListAsync(ct);
-        foreach (var p in parcelasD1Pagar)
-        {
-            await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaPagarVencendo, p, "d1", ct);
-            p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaD1, DateTime.UtcNow);
-            processadasD1++;
-        }
-        var parcelasD1Receber = await db.ParcelasReceber
-            .IgnoreQueryFilters()
-            .Include(p => p.ContaReceber)
-            .Where(p =>
-                p.ContaReceber!.Status != StatusContaFinanceira.Rascunho &&
-                (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
-                p.DataVencimento.Date >= d1Inicio && p.DataVencimento.Date < d1Fim &&
-                p.NotificadaD1Em == null)
-            .Take(500)
-            .ToListAsync(ct);
-        foreach (var p in parcelasD1Receber)
-        {
-            await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaReceberVencendo, p, "d1", ct);
-            p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaD1, DateTime.UtcNow);
-            processadasD1++;
+            // ── D-1 ─────────────────────────────────────────────────────────
+            var parcelasD1Pagar = await db.ParcelasPagar
+                .IgnoreQueryFilters()
+                .Include(p => p.ContaPagar)
+                .Where(p =>
+                    p.ContaPagar!.Status != StatusContaFinanceira.Rascunho &&
+                    (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
+                    p.DataVencimento.Date >= d1Inicio && p.DataVencimento.Date < d1Fim &&
+                    p.NotificadaD1Em == null)
+                .Take(500)
+                .ToListAsync(ct);
+            foreach (var p in parcelasD1Pagar)
+            {
+                if (!await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaPagarVencendo, p, "d1", ct)) continue; // falhou: sem carimbo, tenta amanhã
+                p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaD1, DateTime.UtcNow);
+                processadasD1++;
+            }
+            var parcelasD1Receber = await db.ParcelasReceber
+                .IgnoreQueryFilters()
+                .Include(p => p.ContaReceber)
+                .Where(p =>
+                    p.ContaReceber!.Status != StatusContaFinanceira.Rascunho &&
+                    (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
+                    p.DataVencimento.Date >= d1Inicio && p.DataVencimento.Date < d1Fim &&
+                    p.NotificadaD1Em == null)
+                .Take(500)
+                .ToListAsync(ct);
+            foreach (var p in parcelasD1Receber)
+            {
+                if (!await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaReceberVencendo, p, "d1", ct)) continue; // falhou: sem carimbo, tenta amanhã
+                p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaD1, DateTime.UtcNow);
+                processadasD1++;
+            }
         }
 
         // ── D+0 (vencidas) — marcar status e notificar ─────────────────
@@ -200,9 +211,9 @@ public sealed class ContaFinanceiraVencimentoJob(
         foreach (var p in parcelasPagar)
         {
             p.MarcarVencidaSeAplicavel(hoje);
-            if (p.NotificadaVencidaEm is null)
+            if (_notificar && p.NotificadaVencidaEm is null
+                && await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaPagarVencida, p, "vencida", ct))
             {
-                await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaPagarVencida, p, "vencida", ct);
                 p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaVencida, DateTime.UtcNow);
                 processadasVencidas++;
             }
@@ -220,9 +231,9 @@ public sealed class ContaFinanceiraVencimentoJob(
         foreach (var p in parcelasReceber)
         {
             p.MarcarVencidaSeAplicavel(hoje);
-            if (p.NotificadaVencidaEm is null)
+            if (_notificar && p.NotificadaVencidaEm is null
+                && await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaReceberVencida, p, "vencida", ct))
             {
-                await PublicarNotificacaoAsync(notificador, TipoEventoNotificacao.ContaReceberVencida, p, "vencida", ct);
                 p.CarimbarNotificacao(TipoEventoContaFinanceira.NotificadaVencida, DateTime.UtcNow);
                 processadasVencidas++;
             }
@@ -253,14 +264,18 @@ public sealed class ContaFinanceiraVencimentoJob(
             processadasD3, processadasD1, processadasVencidas, contasAtualizadas.Count);
     }
 
-    private async Task PublicarNotificacaoAsync(
+    /// <summary>
+    /// Publica o evento. Devolve se deu certo: o chamador só carimba o dedup (<c>Notificada*Em</c>) quando sim (N1);
+    /// falha ou ausência do notificador deixam a parcela sem carimbo e a rodada seguinte tenta de novo.
+    /// </summary>
+    private async Task<bool> PublicarNotificacaoAsync(
         INotificadorService? notificador,
         TipoEventoNotificacao tipo,
         ParcelaPagar parcela,
         string variante,
         CancellationToken ct)
     {
-        if (notificador is null) return;
+        if (notificador is null) return false;
         try
         {
             await notificador.PublicarEventoAsync(
@@ -275,21 +290,27 @@ public sealed class ContaFinanceiraVencimentoJob(
                     descricao = parcela.ContaPagar?.Descricao,
                     variante
                 }), ct: ct);
+            return true;
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Falha ao publicar evento {Tipo} pra parcela {ParcelaId}", tipo, parcela.Id);
+            return false;
         }
     }
 
-    private async Task PublicarNotificacaoAsync(
+    /// <summary>
+    /// Publica o evento. Devolve se deu certo: o chamador só carimba o dedup (<c>Notificada*Em</c>) quando sim (N1);
+    /// falha ou ausência do notificador deixam a parcela sem carimbo e a rodada seguinte tenta de novo.
+    /// </summary>
+    private async Task<bool> PublicarNotificacaoAsync(
         INotificadorService? notificador,
         TipoEventoNotificacao tipo,
         ParcelaReceber parcela,
         string variante,
         CancellationToken ct)
     {
-        if (notificador is null) return;
+        if (notificador is null) return false;
         try
         {
             await notificador.PublicarEventoAsync(
@@ -304,10 +325,12 @@ public sealed class ContaFinanceiraVencimentoJob(
                     descricao = parcela.ContaReceber?.Descricao,
                     variante
                 }), ct: ct);
+            return true;
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Falha ao publicar evento {Tipo} pra parcela {ParcelaId}", tipo, parcela.Id);
+            return false;
         }
     }
 }

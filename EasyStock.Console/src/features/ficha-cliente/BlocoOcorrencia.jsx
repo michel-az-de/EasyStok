@@ -182,7 +182,7 @@ export function BlocoOcorrencia({
             <Botao
               variante="primario"
               onClick={() => {
-                bloquearCliente(nomeCliente, `Reclamação indevida reincidente. ${relatoOriginal}`.trim())
+                bloquearCliente(nomeCliente, `Reclamação indevida reincidente. ${relatoOriginal}`.trim(), conversaId)
                 fechar()
               }}
             >

@@ -1,4 +1,5 @@
 using EasyStock.Domain.Entities.Notifications;
+using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Infra.Postgre.Data.Configurations.Notifications;
 
@@ -24,7 +25,10 @@ public class OutboxMensagemNotificacaoConfiguration : IEntityTypeConfiguration<O
         b.Property(x => x.ProximaTentativaEm).IsRequired();
         b.Property(x => x.EnviadoEm);
         b.Property(x => x.ProviderUsado).HasMaxLength(40);
+        b.Property(x => x.ProviderMensagemId).HasMaxLength(128);
         b.Property(x => x.ErroUltimaTentativa).HasColumnType("text");
+        // N6: de quem a mensagem sai. O default cobre as linhas que já existem, todas da loja.
+        b.Property(x => x.Remetente).HasConversion<string>().HasMaxLength(20).HasDefaultValue(OrigemRemetente.Loja).IsRequired();
         b.Property(x => x.IdempotencyKey).HasMaxLength(64).IsRequired();
         b.Property(x => x.TenantTimezone).HasMaxLength(64).IsRequired();
         b.Property(x => x.CanaisFallbackRestantesJson).HasColumnType("jsonb").IsRequired();
@@ -37,6 +41,10 @@ public class OutboxMensagemNotificacaoConfiguration : IEntityTypeConfiguration<O
         b.HasIndex(x => new { x.Status, x.ProximaTentativaEm });
         b.HasIndex(x => new { x.ShardKey, x.Status, x.ProximaTentativaEm });
         b.HasIndex(x => new { x.EmpresaId, x.CriadoEm });
+        // N1: o webhook de status da N6 acha a mensagem pelo id do provider; só as linhas que o têm entram no índice.
+        b.HasIndex(x => x.ProviderMensagemId)
+            .HasDatabaseName("ix_notif_outbox_provider_mensagem_id")
+            .HasFilter("\"ProviderMensagemId\" IS NOT NULL");
 
         b.HasOne(x => x.Evento)
             .WithMany()

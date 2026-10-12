@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Admin.VincularWhatsAppTenant;
+using Microsoft.Extensions.Configuration;
 
 namespace EasyStock.Application.Tests.UseCases.Admin;
 
@@ -19,7 +20,17 @@ public class VincularWhatsAppDoTenantUseCaseTests
         _empresas.GetByIdAsync(_empresa.Id).Returns(_empresa);
     }
 
-    private VincularWhatsAppDoTenantUseCase Sut() => new(_empresas, _unitOfWork);
+    private const string NumeroDaPlataforma = "7770009999";
+
+    private static IConfiguration Config(string? plataforma = NumeroDaPlataforma) =>
+        new ConfigurationBuilder().AddInMemoryCollection(
+            plataforma is null
+                ? []
+                : new Dictionary<string, string?> { ["Notifications:WhatsApp:Plataforma:PhoneNumberId"] = plataforma })
+            .Build();
+
+    private VincularWhatsAppDoTenantUseCase Sut(string? plataforma = NumeroDaPlataforma) =>
+        new(_empresas, _unitOfWork, Config(plataforma));
 
     [Fact]
     public async Task Vincula_numero_valido_e_persiste()
@@ -91,6 +102,26 @@ public class VincularWhatsAppDoTenantUseCaseTests
         _empresas.GetByWhatsAppPhoneNumberIdAsync("5550001111", Arg.Any<CancellationToken>()).Returns(_empresa);
 
         var r = await Sut().ExecuteAsync(new VincularWhatsAppDoTenantCommand(_empresa.Id, "5550001111"));
+
+        r.Status.Should().Be(StatusVinculoWhatsApp.Vinculado);
+    }
+
+    [Fact]
+    public async Task NumeroDaPlataformaNaoVinculaAEmpresa()
+    {
+        // N6: o número de plataforma nunca tem dono; senão o webhook do atendimento criaria Conversa para ele.
+        var r = await Sut().ExecuteAsync(new VincularWhatsAppDoTenantCommand(_empresa.Id, $" {NumeroDaPlataforma} "));
+
+        r.Status.Should().Be(StatusVinculoWhatsApp.NumeroReservadoDaPlataforma);
+        _empresa.WhatsAppPhoneNumberId.Should().BeNull();
+        await _empresas.DidNotReceive().UpdateAsync(Arg.Any<Empresa>());
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task SemNumeroDePlataformaConfiguradoOVinculoSegueIgual()
+    {
+        var r = await Sut(plataforma: null).ExecuteAsync(new VincularWhatsAppDoTenantCommand(_empresa.Id, NumeroDaPlataforma));
 
         r.Status.Should().Be(StatusVinculoWhatsApp.Vinculado);
     }

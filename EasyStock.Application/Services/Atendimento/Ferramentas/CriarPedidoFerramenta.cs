@@ -125,6 +125,8 @@ public sealed class CriarPedidoFerramenta(
         try
         {
             var cobranca = await gerarCobranca.ExecuteAsync(reservado, conversa.Id, ct);
+            contexto.RegistrarRespostaVerificada($"Pedido registrado. Total: {resumo.total}. Entrega agendada para {resumo.entrega}. " +
+                $"Aguardando pagamento. Pague por este link: {cobranca.LinkPagamento}");
             return FerramentaJson.Serializar(new
             {
                 resumo.pedidoId,
@@ -141,13 +143,12 @@ public sealed class CriarPedidoFerramenta(
         }
         catch (MercadoPagoIndisponivelException)
         {
-            // Pedido criado e vaga reservada; o link sai pela reemissão (dona ou job).
+            // #1301: a cobrança desfez o pedido e liberou a vaga; nada fica preso esperando reemissão.
             return FerramentaJson.Serializar(new
             {
                 erro = "pagamento_indisponivel",
-                resumo.pedidoId,
                 resumo.total,
-                orientacao = "Pedido anotado, mas o link de pagamento não saiu agora. Avise que a equipe envia o link em instantes e use escalar_para_dona.",
+                orientacao = "O link de pagamento não saiu e o pedido não foi fechado. Peça um instante ao cliente e chame criar_pedido de novo; se falhar outra vez, use escalar_para_dona.",
             });
         }
     }

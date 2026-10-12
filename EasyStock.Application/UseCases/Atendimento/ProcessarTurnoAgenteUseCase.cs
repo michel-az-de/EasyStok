@@ -23,7 +23,7 @@ public sealed class ProcessarTurnoAgenteUseCase(
         {
             return await agente.ProcessarTurnoAsync(job.EmpresaId, job.ConversaId, DateTime.UtcNow, ct);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogError(ex, "Turno do agente falhou na conversa {ConversaId}.", job.ConversaId);
             return ResultadoTurnoAgente.Ignorado;

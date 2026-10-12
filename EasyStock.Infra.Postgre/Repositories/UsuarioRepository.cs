@@ -31,6 +31,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                     .Include(u => u.Empresas)
                     .Include(u => u.Perfis!)
                     .ThenInclude(up => up.Perfil)
+                        .ThenInclude(p => p!.Permissoes)
                     .FirstOrDefaultAsync(u => u.Id == id);
             }
         }
@@ -51,17 +52,34 @@ namespace EasyStock.Infra.Postgre.Repositories
             // de login a visibilidade global que ela precisa antes do JWT existir.
             using (dbContext.UseRowLevelSecurityBypass())
             {
-                return await dbContext.Usuarios
-                    .AsNoTracking()
-                    .IgnoreQueryFilters()
-                    .Include(u => u.Empresas)
-                        .ThenInclude(ue => ue.Empresa) // carrega Nome da Empresa para ListarEmpresasParaLogin
-                    .Include(u => u.Perfis!)
-                        .ThenInclude(up => up.Perfil)
-                            .ThenInclude(p => p!.Permissoes)
-                    .FirstOrDefaultAsync(u => u.Email == email);
+                return await QueryDeLogin().FirstOrDefaultAsync(u => u.Email == email);
             }
         }
+
+        public async Task<IReadOnlyList<Usuario>> ListarPorAliasGmailAsync(string parteLocal)
+        {
+            var prefixo = parteLocal.Trim().ToLowerInvariant() + "+";
+            // Mesmo bypass do GetByEmailAsync: roda antes de existir tenant (#1324).
+            using (dbContext.UseRowLevelSecurityBypass())
+            {
+                return await QueryDeLogin()
+                    .Where(u => u.Email.ToLower().StartsWith(prefixo)
+                        && (u.Email.ToLower().EndsWith("@gmail.com") || u.Email.ToLower().EndsWith("@googlemail.com")))
+                    .Take(5)
+                    .ToListAsync();
+            }
+        }
+
+        /// <summary>Usuário com empresas (e nome delas) e perfis com permissões, sem filtro de tenant.</summary>
+        private IQueryable<Usuario> QueryDeLogin() =>
+            dbContext.Usuarios
+                .AsNoTracking()
+                .IgnoreQueryFilters()
+                .Include(u => u.Empresas)
+                    .ThenInclude(ue => ue.Empresa) // carrega Nome da Empresa para ListarEmpresasParaLogin
+                .Include(u => u.Perfis!)
+                    .ThenInclude(up => up.Perfil)
+                        .ThenInclude(p => p!.Permissoes);
 
         public async Task<(IEnumerable<Usuario> Usuarios, int Total)> GetByEmpresaAsync(Guid empresaId, int page, int pageSize)
         {
@@ -94,9 +112,26 @@ namespace EasyStock.Infra.Postgre.Repositories
             // (UsuarioEmpresa, UsuarioPerfil) as Modified too — those tables have RLS,
             // so their UPDATEs return 0 rows when called without the bypass scope,
             // causing DbUpdateConcurrencyException on login and other pre-auth flows.
+            // #1352: a linha inteira vai, menos SessoesValidasDesde: o modelo (UsuarioConfiguration) manda o EF
+            // ignorar a coluna em UPDATE, e o corte só muda por AtualizarSessoesValidasDesdeAsync.
             dbContext.Entry(usuario).State = EntityState.Modified;
             return Task.CompletedTask;
         }
+
+        public Task<SessaoDoUsuario?> ObterSessaoAsync(Guid usuarioId) =>
+            // Sem IgnoreQueryFilters e sem bypass de RLS: usuarios não tem EmpresaId (#1352).
+            dbContext.Usuarios
+                .AsNoTracking()
+                .Where(u => u.Id == usuarioId)
+                .Select(u => new SessaoDoUsuario(u.Ativo, u.SessoesValidasDesde))
+                .FirstOrDefaultAsync();
+
+        public Task<int> AtualizarSessoesValidasDesdeAsync(Guid usuarioId, DateTime desde) =>
+            // UPDATE atômico e monotônico: só avança. Revogações concorrentes e relógios diferentes entre
+            // réplicas nunca fazem o corte recuar.
+            dbContext.Usuarios
+                .Where(u => u.Id == usuarioId && (u.SessoesValidasDesde == null || u.SessoesValidasDesde < desde))
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.SessoesValidasDesde, desde));
 
         public async Task<IEnumerable<Usuario>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
         {

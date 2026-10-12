@@ -12,5 +12,8 @@ public enum TipoLembrete
     PagamentoSemBaixa = 2,
 
     /// <summary>Conversa assumida com o cliente esperando resposta há 10 min ou mais.</summary>
-    ClienteSemResposta = 3
+    ClienteSemResposta = 3,
+
+    /// <summary>Véspera ou início previsto do preparo de uma encomenda.</summary>
+    PedidoAgendado = 4
 }

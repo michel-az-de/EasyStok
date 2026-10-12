@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { EVENTOS, tocarAviso } from '../infra/som'
 import { motivoVisivel, precisaDeVoce } from '../dominio/automatico'
 import { notificarPrecisaDeVoce } from '../infra/notificacaoNavegador'
+import { mudancasDoRetrato } from '../dominio/avisoSonoro'
 
 // Quando o som toca (D6, US-010, RN-25). O COMO mora em infra/som.js.
 //
@@ -26,7 +27,7 @@ import { notificarPrecisaDeVoce } from '../infra/notificacaoNavegador'
 const DURACAO_DESTAQUE_MS = 1500
 
 export function useAvisoSonoro({
-  conversas, som, agora, aberta = true, janelas = [], aoTocar,
+  conversas, som, agora, aberta = true, janelas = [], expediente = null, aoTocar,
 }) {
   const anterior = useRef(null)
   const [destacados, setDestacados] = useState(() => new Set())
@@ -47,27 +48,14 @@ export function useAvisoSonoro({
       const ultimaDoCliente = (c.mensagens ?? []).filter((m) => m.dir === 'in').at(-1)
       return [c.id, {
         pago: c.pedido?.estado === 'pago',
-        precisa: precisaDeVoce(c, agora, true, aberta, janelas),
+        precisa: precisaDeVoce(c, agora, true, aberta, janelas, expediente),
         ultimaMensagemClienteId: ultimaDoCliente?.id ?? null,
       }]
     }))
     const antes = anterior.current
     anterior.current = retrato
-    // Primeira volta é só retrato: o balcão inteiro não vira trinta avisos.
-    if (!antes) return
-
-    for (const [id, atual] of retrato) {
-      const velho = antes.get(id)
-      // Conversa nova na lista só conta como "mensagem nova" se já chegou
-      // com fala do cliente (evita som em conversa criada vazia); pago e
-      // precisa nunca disparam na primeira aparição, para não confundir o
-      // estado de nascença com uma mudança de agora.
-      const mensagemNova = velho
-        ? Boolean(atual.ultimaMensagemClienteId) && atual.ultimaMensagemClienteId !== velho.ultimaMensagemClienteId
-        : Boolean(atual.ultimaMensagemClienteId)
-      const pagouAgora = Boolean(velho) && atual.pago && !velho.pago
-      const passouAgora = Boolean(velho) && atual.precisa && !velho.precisa
-
+    // Primeira volta (ou lista ainda vazia, modo API) é só retrato: `dominio/avisoSonoro.js`.
+    for (const { id, mensagemNova, pagouAgora, passouAgora } of mudancasDoRetrato(antes, retrato)) {
       // Achado 6 (rodada 10): quando a mesma mensagem faz "passou para você"
       // E conta como "novo atendimento" no mesmo retrato, só o mais
       // importante toca (precisa de ação > chegou mensagem), nunca os dois
@@ -78,7 +66,7 @@ export function useAvisoSonoro({
         destacarPorInstante(id)
         const conversa = conversas.find((c) => c.id === id)
         notificarPrecisaDeVoce(
-          id, 'Precisa de você', motivoVisivel(conversa, agora, true, aberta, janelas) ?? conversa?.nome ?? '',
+          id, 'Precisa de você', motivoVisivel(conversa, agora, true, aberta, janelas, expediente) ?? conversa?.nome ?? '',
         )
       } else if (mensagemNova) {
         tocarAviso(EVENTOS.NOVO_ATENDIMENTO, som)
@@ -91,7 +79,7 @@ export function useAvisoSonoro({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversas, som, agora, aberta, janelas])
+  }, [conversas, som, agora, aberta, janelas, expediente])
 
   return destacados
 }

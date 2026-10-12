@@ -1,3 +1,5 @@
+using EasyStock.Application.Ports.Output.Storage;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.GerenciarUploads;
 
 namespace EasyStock.Application.Tests.UseCases;
@@ -121,6 +123,44 @@ public class UploadSecurityValidatorTests
     public void EnsureValidMime_rejeita_vazio(string? contentType)
     {
         var act = () => UploadSecurityValidator.EnsureValidMime(contentType);
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    // ── EnsureValidMime(FileUploadRequest) — allowlist própria do upload privado (issue 1285) ──
+
+    private static FileUploadRequest Upload(string mime, bool publico, IReadOnlySet<string>? allowlist) =>
+        new("atendimento/x", "a.bin", mime, [1, 2, 3], publico, allowlist);
+
+    [Theory]
+    [InlineData("audio/ogg; codecs=opus")]
+    [InlineData("video/mp4")]
+    [InlineData("text/plain")]
+    public void EnsureValidMime_privado_com_allowlist_do_atendimento_aceita_midia(string mime)
+    {
+        var act = () => UploadSecurityValidator.EnsureValidMime(Upload(mime, publico: false, ArmazenadorMidiaWhatsApp.MimesPermitidos));
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureValidMime_publico_ignora_allowlist_privada()
+    {
+        var act = () => UploadSecurityValidator.EnsureValidMime(Upload("audio/ogg", publico: true, ArmazenadorMidiaWhatsApp.MimesPermitidos));
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Theory]
+    [InlineData("audio/ogg")]
+    [InlineData("text/html")]
+    public void EnsureValidMime_privado_sem_allowlist_usa_whitelist_publica(string mime)
+    {
+        var act = () => UploadSecurityValidator.EnsureValidMime(Upload(mime, publico: false, null));
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void EnsureValidMime_privado_com_allowlist_recusa_html()
+    {
+        var act = () => UploadSecurityValidator.EnsureValidMime(Upload("text/html", publico: false, ArmazenadorMidiaWhatsApp.MimesPermitidos));
         act.Should().Throw<InvalidOperationException>();
     }
 

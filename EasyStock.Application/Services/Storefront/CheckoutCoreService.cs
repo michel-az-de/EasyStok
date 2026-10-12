@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.UseCases.Storefront.Frete;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
@@ -14,11 +15,13 @@ using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 namespace EasyStock.Application.Services.Storefront;
 
 /// <summary>Item pedido no checkout: cardápio, quantidade e observação do item (RN-20).</summary>
-public sealed record ItemPedidoCheckout(Guid CardapioItemId, int Qtd, string? Observacao = null);
+/// <param name="VariacaoId">M1.4b (#1531): a porção pedida. Null em prato com porções = a padrão.</param>
+public sealed record ItemPedidoCheckout(Guid CardapioItemId, int Qtd, string? Observacao = null, Guid? VariacaoId = null);
 
 /// <summary>
 /// Entrada do núcleo do checkout (S10). A loja vem do <see cref="Slug"/> (site) ou da
-/// <see cref="EmpresaId"/> (atendimento); um dos dois é obrigatório.
+/// <see cref="EmpresaId"/> (atendimento); um dos dois é obrigatório. <see cref="Numero"/> do endereço
+/// melhora o geocode do frete por raio (opcional, como na cotação).
 /// </summary>
 public sealed record CheckoutCoreInput(
     Guid ClienteId,
@@ -30,7 +33,9 @@ public sealed record CheckoutCoreInput(
     string? Slug = null,
     Guid? EmpresaId = null,
     string? Observacoes = null,
-    PrazoPreparoCheckout? Prazo = null);
+    PrazoPreparoCheckout? Prazo = null,
+    string? Numero = null,
+    DadosEnderecoEntrega? EnderecoEntrega = null);
 
 /// <summary>
 /// Parâmetros do prazo mínimo (S16, RN-21): com eles o núcleo recusa a janela cujo início seja antes de
@@ -41,14 +46,16 @@ public sealed record PrazoPreparoCheckout(int TempoPreparoPadraoMinutos, int Res
 /// <summary>
 /// Pedido em <c>AguardandoPagamento</c> com a vaga ocupada. <see cref="Itens"/> são os itens do
 /// cardápio na ordem da entrada; o frete vem à parte em <see cref="ItemFrete"/>. <see cref="Total"/> é
-/// o somatório sem arredondamento, o mesmo que a cobrança usa.
+/// o somatório sem arredondamento, o mesmo que a cobrança usa. <see cref="Janela"/> é a janela reservada,
+/// para o resumo ao cliente mostrar o horário (#1474).
 /// </summary>
 public sealed record PedidoReservado(
     DomainPedido Pedido,
     StorefrontEntity Storefront,
     IReadOnlyList<DomainPedidoItem> Itens,
     DomainPedidoItem ItemFrete,
-    decimal Total);
+    decimal Total,
+    JanelaEntrega? Janela = null);
 
 /// <summary>
 /// Núcleo do checkout compartilhado (S10): fases 1 e 2 do ADR-0014, as mesmas para o site
@@ -56,7 +63,8 @@ public sealed record PedidoReservado(
 ///
 /// <para>
 /// <strong>Fase 1:</strong> cria o <c>Pedido(Rascunho)</c> com itens (snapshot do cardápio e
-/// observação por item) e o item de frete da zona do CEP.
+/// observação por item) e o item de frete. O frete é o do <see cref="CalcularFreteUseCase"/>, a mesma
+/// cotação que o cliente viu (raio quando a loja tem config, senão zona; #1291).
 /// </para>
 ///
 /// <para>
@@ -67,7 +75,8 @@ public sealed record PedidoReservado(
 ///
 /// <para>
 /// A cobrança (fase 3) fica com quem chama. A idempotência do site também: o que ela guarda é a
-/// resposta da fase 3 (pedido e link de pagamento).
+/// resposta da fase 3 (pedido e link de pagamento). Cobrança que não sai volta por
+/// <see cref="DesfazerReservaAsync"/>.
 /// </para>
 /// </summary>
 public sealed class CheckoutCoreService(
@@ -75,17 +84,24 @@ public sealed class CheckoutCoreService(
     ICardapioItemRepository cardapioItemRepository,
     IJanelaEntregaRepository janelaEntregaRepository,
     IBloqueioEntregaRepository bloqueioEntregaRepository,
-    IFreteZonaRepository freteZonaRepository,
+    CalcularFreteUseCase calcularFrete,
     IVagaOcupadaRepository vagaOcupadaRepository,
     IPedidoStorefrontRepository pedidoRepository,
     IExpedienteLojaRepository expedienteLojaRepository,
     ILogger<CheckoutCoreService> logger,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    EnderecoEntregaPedido enderecoEntrega)
 {
     private static readonly Regex CepDigitosRegex = new(@"^\d{8}$", RegexOptions.Compiled);
 
+    // #1474: as recusas chegam à dona pelo detail do erro; datas no formato dela e sem GUID.
+    private static readonly System.Globalization.CultureInfo PtBr = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+
     /// <summary>Motivo da recusa quando a janela começa antes de agora + prazo mínimo (S16).</summary>
     public const string JanelaAbaixoDoPrazo = "janela_abaixo_do_prazo";
+
+    /// <summary>Motivo do cancelamento quando a primeira cobrança do pedido não sai (#1301).</summary>
+    public const string MotivoMercadoPagoIndisponivel = "mercado_pago_indisponivel";
 
     /// <summary>
     /// Valida CEP e carrinho antes de qualquer consulta. Devolve o CEP só com dígitos.
@@ -103,7 +119,7 @@ public sealed class CheckoutCoreService(
         {
             if (qtd <= 0)
                 throw new RegraDeDominioVioladaException(
-                    $"Quantidade inválida para item {cardapioItemId}: deve ser > 0.");
+                    "A quantidade de cada item precisa ser maior que zero.");
         }
 
         return cepNormalizado;
@@ -118,6 +134,7 @@ public sealed class CheckoutCoreService(
         var sw = Stopwatch.StartNew();
 
         var cep = ValidarEntrada(input.Cep, input.Itens?.Select(i => (i.CardapioItemId, i.Qtd)).ToList());
+        HorizonteAgendamento.Validar(input.DataEntrega, HorarioBrasil.DataOperacional(timeProvider.GetUtcNow().UtcDateTime));
 
         // ── Resolver storefront ───────────────────────────────────────────
         var storefront = await ResolverStorefrontAsync(input, ct);
@@ -129,21 +146,20 @@ public sealed class CheckoutCoreService(
         if (expediente?.ControleManual == Domain.Enums.Storefront.ControleManualLoja.ForcarFechada)
             throw new LojaFechadaException(expediente.MensagemLojaFechada);
 
-        // ── Validar cobertura de CEP ──────────────────────────────────────
-        var zonas = await freteZonaRepository.GetAtivasDoStorefrontOrdenadasAsync(storefront.Id, ct);
-        var zonaMatch = zonas.FirstOrDefault(z => z.CobreCep(cep));
-        if (zonaMatch is null)
-            throw new CepSemCoberturaException();
+        // ── Cobertura e valor do frete: a mesma cotação do site (#1291) ───
+        // Fora da área (zona ou raio), o CalcularFrete lança CepSemCoberturaException.
+        var frete = await calcularFrete.ExecuteAsync(new CalcularFreteInput(storefront.Slug, cep, input.Numero), ct);
+        var valorFrete = frete.Valor / 100m;
 
         // ── Validar janela ────────────────────────────────────────────────
         var janela = await janelaEntregaRepository.GetByIdAsync(input.JanelaId, ct);
         if (janela is null || !janela.Ativa || janela.StorefrontId != storefront.Id)
             throw new RegraDeDominioVioladaException(
-                $"Janela de entrega {input.JanelaId} inválida ou inativa.");
+                "A janela de entrega escolhida não está mais disponível. Escolha outro horário.");
 
         if (janela.DiaDaSemana != (int)input.DataEntrega.DayOfWeek)
             throw new RegraDeDominioVioladaException(
-                $"Janela {input.JanelaId} não atende o dia {input.DataEntrega:ddd}.");
+                $"A janela {janela.Label} não atende o dia {input.DataEntrega.ToString("dd/MM/yyyy", PtBr)}. Escolha outro horário.");
 
         var bloqueios = await bloqueioEntregaRepository.GetByStorefrontPeriodoAsync(
             storefront.Id, input.DataEntrega, input.DataEntrega, ct);
@@ -153,11 +169,18 @@ public sealed class CheckoutCoreService(
 
         if (diaBloqueado || janelaEspecificaBloqueada)
             throw new RegraDeDominioVioladaException(
-                $"Data {input.DataEntrega:yyyy-MM-dd} bloqueada para entrega.");
+                $"Não há entrega no dia {input.DataEntrega.ToString("dd/MM/yyyy", PtBr)}. Escolha outra data.");
 
         // ── Validar e carregar itens do cardápio ──────────────────────────
         var cardapioItens = await CarregarItensCardapioAsync(
             storefront.Id, input.Itens!.Select(i => i.CardapioItemId), ct);
+        // M1.4b (#1531): porção de outro prato ou esgotada recusa antes de criar o pedido e ocupar a vaga.
+        ValidarItens(input.Itens!, cardapioItens);
+
+        // #1506: janela já encerrada (ou data passada) nunca vale, com ou sem prazo mínimo.
+        if (CalculadoraPrazoPedido.JanelaJaPassou(input.DataEntrega, janela.HoraFim, timeProvider.GetUtcNow().UtcDateTime))
+            throw new RegraDeDominioVioladaException(
+                $"A janela {janela.Label} de {input.DataEntrega.ToString("dd/MM/yyyy", PtBr)} já passou. Escolha outro horário.");
 
         // ── Prazo mínimo (S16, RN-21) ─────────────────────────────────────
         // Revalida o corte da listagem: a janela pode ter ficado curta entre listar e criar.
@@ -190,18 +213,21 @@ public sealed class CheckoutCoreService(
         pedido.ClienteId = input.ClienteId;
         pedido.Status = StatusPedidoMapper.Rascunho;
         pedido.Observacoes = input.Observacoes;
+        pedido.AgendadoParaEm = HorarioBrasil.InstanteUtc(input.DataEntrega, janela.HoraInicio);
+        await enderecoEntrega.RegistrarAsync(pedido,
+            input.EnderecoEntrega ?? new DadosEnderecoEntrega(null, input.Numero, null, null, null, null, cep), ct);
 
         await pedidoRepository.AddAsync(pedido, ct);
 
         var itens = await AdicionarItensAsync(pedido, input.Itens!, cardapioItens, ct);
-        var itemFrete = await AdicionarItemFreteAsync(pedido, zonaMatch, ct);
+        var itemFrete = await AdicionarItemFreteAsync(pedido, frete.ZonaLabel, valorFrete, ct);
 
         // Total agregado (itens + frete) — persistir no Pedido. Os itens são inseridos
         // via AddItemAsync (DbSet) e NÃO em pedido.Itens, então RecalcularTotal() computaria
         // 0 (coleção vazia); por isso atribuímos o Total diretamente. É o mesmo somatório
         // cobrado no MercadoPago (Fase 3), reutilizado aqui.
-        decimal total = input.Itens!.Sum(i => cardapioItens[i.CardapioItemId].PrecoEfetivo() * i.Qtd)
-                        + zonaMatch.Valor;
+        // M1.4b (#1531): soma o que foi gravado em cada linha (preço da porção quando há).
+        decimal total = itens.Sum(i => i.Subtotal) + valorFrete;
         pedido.Total = Dinheiro.FromDecimal(total);
         pedido.AlteradoEm = DateTime.UtcNow;
         await pedidoRepository.UpdateAsync(pedido, ct);
@@ -241,8 +267,10 @@ public sealed class CheckoutCoreService(
                 input.JanelaId, input.DataEntrega, pedido.Id);
 
             throw new JanelaSemVagasException(
-                $"Janela {input.JanelaId} esgotada para {input.DataEntrega:yyyy-MM-dd}. " +
-                $"Alternativas: [{string.Join(", ", alternativas)}]");
+                $"A janela {janela.Label} esgotou para {input.DataEntrega.ToString("dd/MM/yyyy", PtBr)}. " +
+                (alternativas.Count > 0
+                    ? $"Ainda tem vaga em: {string.Join(", ", alternativas)}."
+                    : "Escolha outro horário."));
         }
 
         pedido.Status = StatusPedidoMapper.AguardandoPagamento;
@@ -253,7 +281,39 @@ public sealed class CheckoutCoreService(
             "Checkout fase-2 ok pedidoId={PedidoId} janelaId={JanelaId} data={Data} elapsed={Ms}ms",
             pedido.Id, input.JanelaId, input.DataEntrega, swFase2.ElapsedMilliseconds);
 
-        return new PedidoReservado(pedido, storefront, itens, itemFrete, total);
+        return new PedidoReservado(pedido, storefront, itens, itemFrete, total, janela);
+    }
+
+    /// <summary>
+    /// Desfaz a reserva de <see cref="CriarPedidoComReservaAsync"/> quando a cobrança não sai (#1301): libera a
+    /// vaga, cancela o pedido e grava o motivo no histórico. Sem isso o pedido ficava em
+    /// <c>AguardandoPagamento</c> sem <c>CobrancaPedido</c>, fora do alcance do <c>CobrancaPedidoJob</c>, e a vaga
+    /// da janela presa.
+    /// </summary>
+    public async Task DesfazerReservaAsync(PedidoReservado reservado, string motivo, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(reservado);
+        var pedido = reservado.Pedido;
+        var statusAntigo = pedido.Status;
+
+        // A liberação só marca a vaga; o SaveChanges do UpdateAsync grava vaga e pedido juntos.
+        await vagaOcupadaRepository.LiberarPorPedidoAsync(pedido.Id, $"Pedido cancelado: {motivo}", ct);
+        pedido.Cancelar();
+        await pedidoRepository.UpdateAsync(pedido, ct);
+        await pedidoRepository.AddEventoAsync(new PedidoEvento
+        {
+            Id = Guid.NewGuid(),
+            PedidoId = pedido.Id,
+            Tipo = "cancelado",
+            StatusAntigo = statusAntigo,
+            StatusNovo = pedido.Status,
+            Detalhes = motivo,
+            UsuarioNome = "Sistema",
+            Origem = "sistema",
+            OcorridoEm = timeProvider.GetUtcNow().UtcDateTime,
+        }, ct);
+
+        logger.LogWarning("Checkout reserva desfeita pedidoId={PedidoId} motivo={Motivo}", pedido.Id, motivo);
     }
 
     /// <summary>
@@ -269,13 +329,39 @@ public sealed class CheckoutCoreService(
         foreach (var itemId in cardapioItemIds.Distinct())
         {
             var ci = await cardapioItemRepository.GetByIdAsync(storefrontId, itemId, ct);
-            if (ci is null || !ci.Visivel || !ci.Disponivel)
-                throw new RegraDeDominioVioladaException(
-                    $"Item de cardápio {itemId} não encontrado ou indisponível.");
+            // M1.2 (#1482): item arquivado não se vende, nem por link antigo.
+            if (ci is null || !ci.Visivel || !ci.Disponivel || ci.EstaArquivado)
+                throw new RegraDeDominioVioladaException(ci?.NomeEfetivo() is { Length: > 0 } nome
+                    ? $"{nome} está indisponível no cardápio agora."
+                    : "Um item do pedido não está mais no cardápio.");
             cardapioItens[itemId] = ci;
         }
 
         return cardapioItens;
+    }
+
+    /// <summary>
+    /// Recusa, antes de criar o pedido e ocupar a vaga, porção de outro prato ou esgotada (M1.4b, #1531)
+    /// e item sem preço (#1615).
+    /// </summary>
+    public static void ValidarItens(IEnumerable<ItemPedidoCheckout> itens, IReadOnlyDictionary<Guid, CardapioItem> cardapioItens)
+    {
+        foreach (var i in itens)
+            PorcaoEPreco(cardapioItens[i.CardapioItemId], i.VariacaoId);
+    }
+
+    /// <summary>
+    /// M1.4b (#1531): com porção, o preço é o dela (absoluto, ADR-0035). PED-01 (#656): item a R$ 0 não
+    /// vira pedido; a guarda existia só no pedido digitado e no balcão.
+    /// </summary>
+    private static (CardapioItemVariacao? Porcao, decimal Preco) PorcaoEPreco(CardapioItem ci, Guid? variacaoId)
+    {
+        var porcao = ci.PorcaoParaVenda(variacaoId);
+        var preco = porcao?.PrecoStorefront ?? ci.PrecoEfetivo();
+        if (preco <= 0m)
+            throw new RegraDeDominioVioladaException(
+                $"{(ci.NomeEfetivo() is { Length: > 0 } nome ? nome : "Um item")} está sem preço no cardápio.");
+        return (porcao, preco);
     }
 
     /// <summary>
@@ -292,16 +378,20 @@ public sealed class CheckoutCoreService(
         foreach (var inputItem in itens)
         {
             var ci = cardapioItens[inputItem.CardapioItemId];
-            var precoUnit = ci.PrecoEfetivo();
+            var (porcao, precoUnit) = PorcaoEPreco(ci, inputItem.VariacaoId);
             var item = new DomainPedidoItem
             {
                 Id = Guid.NewGuid(),
                 PedidoId = pedido.Id,
                 ProdutoId = ci.ProdutoId,
                 CardapioItemId = ci.Id,
+                CardapioItemVariacaoId = porcao?.Id,
+                ProdutoVariacaoId = porcao?.ProdutoVariacaoId,
+                VariacaoRotuloSnapshot = porcao?.Rotulo,
+                SkuSnapshot = porcao?.Sku?.Value,
                 LinhaSnapshot = ci.Linha.ParaContrato(),
                 ConservacaoSnapshot = ci.Conservacao.ParaContrato(),
-                Nome = ci.Produto?.Nome ?? $"Item {ci.ProdutoId}",
+                Nome = ci.NomeEfetivo() ?? $"Item {ci.ProdutoId}",
                 Quantidade = inputItem.Qtd,
                 PrecoUnitario = precoUnit,
                 Subtotal = inputItem.Qtd * precoUnit,
@@ -315,10 +405,11 @@ public sealed class CheckoutCoreService(
         return criados;
     }
 
-    /// <summary>Grava o item de frete da zona (<c>Entrega — rótulo</c>, quantidade 1).</summary>
+    /// <summary>Grava o item de frete cotado (<c>Entrega — rótulo</c>, quantidade 1).</summary>
     public async Task<DomainPedidoItem> AdicionarItemFreteAsync(
         DomainPedido pedido,
-        FreteZona zona,
+        string rotulo,
+        decimal valor,
         CancellationToken ct = default)
     {
         var itemFrete = new DomainPedidoItem
@@ -326,10 +417,10 @@ public sealed class CheckoutCoreService(
             Id = Guid.NewGuid(),
             PedidoId = pedido.Id,
             ProdutoId = null,
-            Nome = $"Entrega — {zona.Label}",
+            Nome = $"Entrega — {rotulo}",
             Quantidade = 1,
-            PrecoUnitario = zona.Valor,
-            Subtotal = zona.Valor,
+            PrecoUnitario = valor,
+            Subtotal = valor,
             CriadoEm = DateTime.UtcNow,
         };
         await pedidoRepository.AddItemAsync(itemFrete, ct);

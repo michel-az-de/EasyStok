@@ -23,7 +23,7 @@ public class EstornarPagamentoParcelaReceberUseCaseTests
         PagamentoParcela Pag,
         MovimentoCaixa? Mov);
 
-    private static Cenario Montar(bool comMovimentoCaixa = true)
+    private static Cenario Montar(bool comMovimentoCaixa = true, Guid? lojaDoMovimento = null)
     {
         var conta = ContaReceber.Criar(Empresa, clienteId: null, Categoria, "Cliente", DateTime.UtcNow);
         conta.AdicionarParcela(1, 100m, DateTime.UtcNow.AddDays(30));
@@ -38,7 +38,7 @@ public class EstornarPagamentoParcelaReceberUseCaseTests
         MovimentoCaixa? mov = null;
         if (comMovimentoCaixa)
         {
-            mov = MovimentoCaixa.Criar(Empresa, "entrada", 100m, DateTime.UtcNow, lojaId: null);
+            mov = MovimentoCaixa.Criar(Empresa, "entrada", 100m, DateTime.UtcNow, lojaId: lojaDoMovimento);
             pag.AssociarMovimentoCaixa(mov.Id);
         }
 
@@ -87,6 +87,38 @@ public class EstornarPagamentoParcelaReceberUseCaseTests
         c.Parcela.ValorPago.Should().Be(0m);
         c.Mov!.EstornadoEm.Should().BeNull();                       // periodo congelado: caixa intocado
         await c.CaixaRepo.DidNotReceive().UpdateMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    // #1598: o fechamento sem loja é o da empresa e soma os movimentos de todas as lojas.
+    [Fact]
+    public async Task Dia_fechado_pela_empresa_NAO_toca_o_movimento_que_tem_loja()
+    {
+        var loja = Guid.NewGuid();
+        var c = Montar(lojaDoMovimento: loja);
+        c.CaixaRepo.GetFechamentoDoDiaAsync(Empresa, Arg.Any<DateOnly>(), null)
+            .Returns(FechamentoCaixa.Criar(Empresa, DateOnly.FromDateTime(DateTime.UtcNow), 0m, 0m, 0m, 0m, 0m, null));
+
+        var ok = await c.Uc.ExecuteAsync(Cmd(c));
+
+        ok.Should().BeTrue();
+        c.Pag.Status.Should().Be(StatusPagamentoParcela.Estornado); // razao revertido
+        c.Mov!.EstornadoEm.Should().BeNull();                       // retrato da empresa intocado
+        await c.CaixaRepo.DidNotReceive().UpdateMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    // #1598, direção inversa: o fechamento de uma loja não retrata o movimento sem loja.
+    [Fact]
+    public async Task Dia_fechado_so_por_uma_loja_soft_marca_o_movimento_sem_loja()
+    {
+        var loja = Guid.NewGuid();
+        var c = Montar();
+        c.CaixaRepo.GetFechamentoDoDiaAsync(Empresa, Arg.Any<DateOnly>(), loja)
+            .Returns(FechamentoCaixa.Criar(Empresa, DateOnly.FromDateTime(DateTime.UtcNow), 0m, 0m, 0m, 0m, 0m, loja));
+
+        var ok = await c.Uc.ExecuteAsync(Cmd(c));
+
+        ok.Should().BeTrue();
+        c.Mov!.EstornadoEm.Should().NotBeNull();
     }
 
     [Fact]

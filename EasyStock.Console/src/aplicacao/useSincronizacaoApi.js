@@ -1,89 +1,124 @@
 import { useEffect, useRef } from 'react'
 import * as acao from './acoes'
-import { listarTodasConversas, listarMensagens } from '../infra/api/conversasApi'
-import { conversaDaApi } from '../infra/api/traducaoConversas'
-import { listarCardapio, obterPedido, pedidoDaApi } from '../infra/api/comandaApi'
-import { deveRelerMensagens, deveRelerPedido } from './planoDeSincronizacao'
+import { lerAlertasDeEstoque, lerCardapio } from './api/cardapio'
+import { avisoDoCardapio } from './planoDeSincronizacao'
+import { criarCicloDeSincronizacao, criarMemoriaDoLaco } from './cicloDeSincronizacao'
+import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
 
-// Polling da inbox (F01): não existe SSE de conversas ainda (S18). A lista vem a
-// cada ciclo, paginada (F07); o que mais se relê está em `planoDeSincronizacao.js`:
-// a conversa aberta sempre, as outras só quando mudaram.
+// Polling da inbox (F01), com releitura dirigida pelos eventos de pedido (S18).
+// A volta está em `cicloDeSincronizacao.js` e o que ela relê em
+// `planoDeSincronizacao.js`: a conversa aberta sempre, as outras só quando mudaram.
+// #1576: a inbox inteira (F07) vem ao entrar e a cada minuto; as outras voltas leem a página 1.
 //
 // F03: o pedido da conversa (`pedidoEmAndamentoId`) vem junto. O cardápio da vitrine
 // vem ao entrar e a cada minuto (saldo).
 const INTERVALO_MS = 5000
 const CICLOS_POR_MINUTO = 12
+const AGRUPAR_EVENTOS_MS = 300
 
-export function useSincronizacaoApi({ ativo, usuario, despachar, selecionadaId = null }) {
+// `memoria` (#1576): os caches do laço, criados acima do Balcão para a volta do Hall, da Cozinha ou
+// das Entregas não reler tudo. Sem ela (demonstração, provas) o laço usa a sua, que morre com ele.
+export function useSincronizacaoApi({ ativo, comConversas = true, usuario, despachar, selecionadaId = null, memoria = null }) {
   // A seleção muda a cada clique; num ref, o laço não recomeça por causa dela.
   const selecionadaRef = useRef(selecionadaId)
   useEffect(() => { selecionadaRef.current = selecionadaId }, [selecionadaId])
+  // O refresh do token recria o objeto do usuário, mesma pessoa. Num ref o laço não recomeça: recomeçar
+  // refaz a varredura da inbox e relê o pedido aberto de toda conversa.
+  const usuarioRef = useRef(usuario)
+  useEffect(() => { usuarioRef.current = usuario }, [usuario])
+  const usuarioId = usuario?.id ?? null
 
   useEffect(() => {
     if (!ativo) return undefined
     let vivo = true
     let proximo = null
     let ciclos = 0
-    const cache = new Map()
-    const pedidos = new Map()
+    let lendo = false
+    let pedidosPendentes = false
+    let voltaPendente = false
+    let esperaPedidos = null
+    let reconexao = null
+    let fecharEventos = () => {}
+    const sincronizar = criarCicloDeSincronizacao({
+      despachar, comConversas, memoria: memoria ?? criarMemoriaDoLaco(), dono: usuarioId,
+      lerSelecionada: () => selecionadaRef.current, lerUsuario: () => usuarioRef.current, estaVivo: () => vivo,
+    })
 
-    async function mensagensDe(resumo) {
-      const guardado = cache.get(resumo.id)
-      if (!deveRelerMensagens(resumo, guardado, selecionadaRef.current)) return guardado.mensagens
-      try {
-        const mensagens = await listarMensagens(resumo.id)
-        cache.set(resumo.id, { ultima: resumo.ultimaMensagemEm, mensagens })
-        return mensagens
-      } catch {
-        return guardado?.mensagens ?? []
-      }
-    }
-
-    async function pedidoDe(resumo, cicloLento) {
-      if (!resumo.pedidoEmAndamentoId) return null
-      const guardado = pedidos.get(resumo.id)
-      if (!deveRelerPedido(resumo, guardado, { selecionadaId: selecionadaRef.current, cicloLento })) {
-        return guardado.dados
-      }
-      try {
-        const dados = await obterPedido(resumo.id)
-        pedidos.set(resumo.id, { pedidoId: resumo.pedidoEmAndamentoId, ultima: resumo.ultimaMensagemEm, dados })
-        return dados
-      } catch {
-        return guardado?.dados ?? null
-      }
-    }
-
+    // #1241: com os itens tirados (Repor) e os alertas de produto vendido sem saldo.
+    // #1474: o aviso do cardápio (loja online desligada) é estado de configuração, não de ação:
+    // vai como persistente (trocar de tela não o apaga) e sai sozinho quando o cardápio volta.
+    let avisouCardapio = false
     async function cardapio() {
       try {
-        const itens = await listarCardapio()
-        if (vivo) despachar({ tipo: acao.SINCRONIZAR_CARDAPIO, cardapio: itens })
+        const itens = await lerCardapio({ incluirFora: comConversas })
+        if (!vivo) return
+        despachar({ tipo: acao.SINCRONIZAR_CARDAPIO, cardapio: itens })
+        if (avisouCardapio) {
+          avisouCardapio = false
+          despachar({ tipo: acao.AVISO_API, mensagem: null, persistente: true })
+        }
       } catch (erro) {
-        if (vivo) despachar({ tipo: acao.AVISO_API, mensagem: `Cardápio: ${erro.message}` })
+        if (!vivo) return
+        avisouCardapio = true
+        despachar({ tipo: acao.AVISO_API, mensagem: avisoDoCardapio(erro), persistente: true })
+      }
+      const alertas = await lerAlertasDeEstoque()
+      if (vivo) despachar({ tipo: acao.ALERTAS_DE_ESTOQUE_DA_API, alertas })
+    }
+
+    async function ciclo(somentePedidos = false) {
+      if (!vivo) return
+      if (lendo) {
+        if (somentePedidos) pedidosPendentes = true
+        else voltaPendente = true
+        return
+      }
+      if (!somentePedidos) clearTimeout(proximo)
+      clearTimeout(esperaPedidos)
+      lendo = true
+      const cicloLento = !somentePedidos && ciclos % CICLOS_POR_MINUTO === 0
+      if (!somentePedidos) {
+        if (cicloLento) await cardapio()
+        ciclos += 1
+      }
+      await sincronizar({ cicloLento, somentePedidos })
+      lendo = false
+      if (!vivo) return
+      if (!somentePedidos) proximo = setTimeout(ciclo, INTERVALO_MS)
+      if (voltaPendente) {
+        voltaPendente = false
+        pedidosPendentes = false
+        clearTimeout(proximo)
+        proximo = setTimeout(ciclo, 0)
+      } else if (pedidosPendentes) {
+        pedidosPendentes = false
+        esperaPedidos = setTimeout(() => ciclo(true), AGRUPAR_EVENTOS_MS)
       }
     }
 
-    async function ciclo() {
-      const cicloLento = ciclos % CICLOS_POR_MINUTO === 0
-      if (cicloLento) await cardapio()
-      ciclos += 1
-      try {
-        const lista = await listarTodasConversas()
-        const conversas = await Promise.all(lista.map(async (resumo) => {
-          const [mensagens, pedido] = await Promise.all([mensagensDe(resumo), pedidoDe(resumo, cicloLento)])
-          return { ...conversaDaApi(resumo, mensagens, usuario), pedido: pedidoDaApi(pedido) }
-        }))
-        if (vivo) despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas })
-      } catch (erro) {
-        if (vivo) despachar({ tipo: acao.SINCRONIZACAO_FALHOU, mensagem: erro.message })
-      }
-      if (vivo) proximo = setTimeout(ciclo, INTERVALO_MS)
+    function conectar() {
+      fecharEventos = conectarEventosOperacao({
+        aoEvento: ({ evento, dados }) => {
+          const pedido = evento?.startsWith('pedido.') && dados?.pedidoId
+          const comanda = evento === 'conversa.comanda_atualizada' && dados?.conversaId
+          if (!vivo || (evento !== 'ready' && !pedido && !comanda)) return
+          if (!sincronizar.invalidarPedidos(pedido || null, comanda || null)) return
+          if (lendo) { pedidosPendentes = true; return }
+          clearTimeout(esperaPedidos)
+          esperaPedidos = setTimeout(() => ciclo(true), AGRUPAR_EVENTOS_MS)
+        },
+        aoCair: () => { if (vivo) reconexao = setTimeout(conectar, INTERVALO_MS) },
+      })
     }
 
     ciclo()
+    if (comConversas) conectar()
     return () => {
       vivo = false
       clearTimeout(proximo)
+      clearTimeout(esperaPedidos)
+      clearTimeout(reconexao)
+      fecharEventos()
     }
-  }, [ativo, usuario, despachar])
+  }, [ativo, comConversas, usuarioId, despachar, memoria])
 }

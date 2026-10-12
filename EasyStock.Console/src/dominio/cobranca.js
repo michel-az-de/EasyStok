@@ -50,6 +50,11 @@ export const MINUTOS_PARA_EXPIRAR = 30
 // compromisso da casa (mesmo motivo de `textoDaCobranca` existir aqui).
 export const NOME_DO_MEIO = {
   pix: 'Pix',
+  dinheiro: 'dinheiro',
+  credito: 'cartão de crédito',
+  debito: 'cartão de débito',
+  transferencia: 'transferência',
+  outro: 'outro meio',
   'cartao-link': 'link de cartão',
   maquininha: 'maquininha',
   'vale-refeicao': 'vale',
@@ -169,7 +174,7 @@ export function situacaoDaCobranca(cobranca, agora) {
     return { chave: 'cancelada', tom: 'neutro', rotulo: 'Pedido cancelado', restamMs: 0 }
   }
   if (cobranca.pagaEm) {
-    if (cobranca.valorPago == null) {
+    if (cobranca.manual || cobranca.valorPago == null) {
       return { chave: 'paga', tom: 'ok', rotulo: 'Pago, marcado à mão', restamMs: 0 }
     }
     if (cobranca.valorPago === cobranca.valor) {
@@ -320,6 +325,7 @@ export function travaDaEsteira(pedido, agora) {
 export function podeAlterarMeio(pedido) {
   const cobranca = pedido?.cobranca
   if (!cobranca || pedido.estado === 'cancelado' || pedido.estado === 'entregue') return false
+  if ((pedido.totalPagoApi ?? 0) > 0 || (pedido.sinalNaReserva && (pedido.totalApi ?? 0) > cobranca.valor)) return false
   return !cobranca.pagaEm && !cobranca.canceladaEm && !cobranca.estornadaEm
 }
 
@@ -343,6 +349,10 @@ export function estadoDepoisDaTroca(pedido, anterior, novaTemLink) {
 // ("Recebi") se desfazem em qualquer passo, porque a esteira deles nunca
 // dependeu do pagamento.
 export function podeDesfazerPagamento(pedido) {
+  if (pedido?.pagamentosApi) {
+    return pedido.pagamentosApi.length > 0 && !pedido.cobranca?.link
+      && ['aguardando', 'aprovado_baba'].includes(pedido.statusApi)
+  }
   const cobranca = pedido?.cobranca
   if (!cobranca?.pagaEm || cobranca.estornadaEm || cobranca.canceladaEm) return false
   if (pedido.estado === 'cancelado') return false
@@ -367,3 +377,42 @@ export function desfazerPagamento(cobranca, agora, motivo) {
 // Pix e cartão voltam a esperar; maquininha e vale seguem na esteira.
 export const estadoDepoisDeDesfazer = (pedido) =>
   (pedido.cobranca?.link && pedido.estado === 'pago' ? 'aguardando' : pedido.estado)
+
+// --- Baixa à mão com link online pendente (#1474) ---------------------------
+// O EasyStok recusa pagamento manual em pedido que ainda espera o Mercado Pago
+// ("pré-operacional"). O caminho é virar a forma para "na entrega" (cancela o
+// link e põe o pedido na fila) e só então registrar o recebido. A tela avisa
+// antes de confirmar, porque o link que o cliente tem deixa de valer.
+export const AVISO_BAIXA_COM_LINK = 'O link do Mercado Pago será cancelado e o pagamento fica registrado como recebido por fora.'
+
+// #1474 (R8): pedido que exige aprovação (fora da área liberado) só aceita baixa à mão depois
+// de aprovado; antes disso o EasyStok recusa ("ainda não foi confirmado/aprovado").
+export const MOTIVO_BAIXA_SEM_APROVACAO = 'Aprove o pedido antes de registrar o pagamento.'
+export const aguardaAprovacao = (pedido) => Boolean(pedido?.pedidoId) && pedido.statusApi === 'aguardando_aprovacao_baba'
+// Com o link ainda pendente o status não mostra a aprovação que falta; o pedido traz `requerAprovacao`.
+export const baixaEsperaAprovacao = (pedido) => aguardaAprovacao(pedido)
+  || (Boolean(pedido?.pedidoId) && pedido.requerAprovacao === true)
+
+export const baixaCancelaCobrancaOnline = (pedido) => Boolean(
+  pedido?.pedidoId && pedido.cobranca?.link && !pedido.cobranca.pagaEm && !pedido.cobranca.canceladaEm,
+)
+  && pedido.statusApi === 'aguardando_pagamento'
+  && !pedido.cobranca?.manual
+  && !pedido.cobranca?.pagaEm
+
+// --- Link vencido no modo API (#1586) ----------------------------------------
+// Quem trata é o job de expiração do EasyStok (`CobrancaPedidoJob`, a cada 60 s): na primeira
+// vez gera a segunda cobrança e manda o link novo na conversa; na segunda cancela o pedido,
+// libera a vaga e avisa o cliente. A Ficha não reenvia nada, então diz o que vai acontecer.
+const ULTIMA_TENTATIVA_DE_COBRANCA = 2
+export const avisoDeLinkVencidoApi = (cobranca) => ((cobranca?.tentativa ?? 1) < ULTIMA_TENTATIVA_DE_COBRANCA
+  ? 'O EasyStok manda um link novo ao cliente sozinho. Se esse também vencer, o pedido é cancelado e o cliente é avisado.'
+  : 'Segundo link vencido: o EasyStok cancela o pedido sozinho e avisa o cliente.')
+
+// "Como recebeu" já preenchido com o meio da cobrança quando ele é um dos métodos
+// da baixa; link de cartão não diz se foi crédito ou débito, então fica em branco.
+const METODOS_DA_BAIXA = new Set(['pix', 'dinheiro', 'credito', 'debito', 'transferencia'])
+export function metodoDaCobranca(cobranca) {
+  if (METODOS_DA_BAIXA.has(cobranca?.metodoRecebido)) return cobranca.metodoRecebido
+  return METODOS_DA_BAIXA.has(cobranca?.meio) ? cobranca.meio : ''
+}

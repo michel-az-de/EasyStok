@@ -33,8 +33,10 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// Usado pela calculadora de producao pra evitar N round trips em receitas com varios insumos.
         /// Filtra por loja se <paramref name="lojaId"/> informado.
         /// Retorna dicionario produtoId -> lotes; produto sem estoque nao aparece (consumer usa TryGetValue + default vazio).
+        /// <paramref name="apenasComSaldoOuDescoberto"/> (#1575) deixa no banco o lote zerado e sem descoberto: so
+        /// para quem soma saldo e descoberto. Quem precisa saber que o lote existe fica no padrao.
         /// </summary>
-        Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<ItemEstoque>>> GetByProdutosAsync(Guid empresaId, IEnumerable<Guid> produtoIds, Guid? lojaId, CancellationToken ct = default);
+        Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<ItemEstoque>>> GetByProdutosAsync(Guid empresaId, IEnumerable<Guid> produtoIds, Guid? lojaId, CancellationToken ct = default, bool apenasComSaldoOuDescoberto = false);
         /// <summary>
         /// Batch (#1171): saldo disponível somado por produto numa única query
         /// (<c>WHERE EmpresaId = @e AND ProdutoId IN (...)</c>). Conta só lote com
@@ -69,5 +71,11 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// itens como Modified e evitar round-trips individuais.
         /// </summary>
         Task UpdateRangeAsync(IEnumerable<ItemEstoque> itensEstoque);
+
+        /// <summary>
+        /// M2.6 (#1511): lotes com saldo e validade até <paramref name="validadeAteUtc"/>, com o produto.
+        /// O chamador confere o vencimento no dia operacional (a validade é data civil).
+        /// </summary>
+        Task<IReadOnlyList<ItemEstoque>> GetComSaldoEValidadeAteAsync(Guid empresaId, DateTime validadeAteUtc, CancellationToken ct = default);
     }
 }

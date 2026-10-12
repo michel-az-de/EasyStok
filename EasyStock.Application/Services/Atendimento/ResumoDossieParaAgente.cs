@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 
 namespace EasyStock.Application.Services.Atendimento;
@@ -7,12 +8,16 @@ namespace EasyStock.Application.Services.Atendimento;
 /// <summary>
 /// Versão curta do <see cref="DossieClienteDto"/> para o contexto do LLM (S25, S06). Toda nota interna
 /// sai numa linha só, prefixada por <see cref="PromptAtendimento.MarcadorInterno"/> (RN-08): quebra de
-/// linha dentro da nota não pode gerar linha sem marcador. O sinal de mesmo domicílio fica de fora
-/// (D10): o agente não recebe nome nem dado de outro cadastro.
+/// linha dentro da nota não pode gerar linha sem marcador. Nota que o próprio agente registrou sai com
+/// <see cref="RotuloNotaDoAgente"/>: não pode voltar nos turnos seguintes como fato da equipe (#1292). O
+/// sinal de mesmo domicílio fica de fora (D10): o agente não recebe nome nem dado de outro cadastro.
 /// </summary>
 public static class ResumoDossieParaAgente
 {
     public const int PedidosNoResumo = 3;
+
+    /// <summary>Rótulo da nota que o próprio agente registrou (<c>registrar_nota</c>): não é fato da equipe.</summary>
+    public const string RotuloNotaDoAgente = "nota do agente (não confirmada pela equipe)";
 
     private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
 
@@ -42,7 +47,9 @@ public static class ResumoDossieParaAgente
         {
             sb.AppendLine("Notas internas do cadastro:");
             foreach (var nota in dossie.Notas)
-                sb.AppendLine($"- {interno} {Data(nota.CriadoEm)}: {UmaLinha(nota.Texto)}");
+                sb.AppendLine(nota.Autor == RegistrarNotaFerramenta.Autor
+                    ? $"- {interno} {Data(nota.CriadoEm)}, {RotuloNotaDoAgente}: {UmaLinha(nota.Texto)}"
+                    : $"- {interno} {Data(nota.CriadoEm)}: {UmaLinha(nota.Texto)}");
         }
 
         return sb.ToString().TrimEnd();

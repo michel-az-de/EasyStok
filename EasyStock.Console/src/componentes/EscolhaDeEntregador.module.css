@@ -10,5 +10,5 @@
 }
 .campos :global(input), .campos :global(select) { width: 100%; }
 .rodape { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
-.motivo { margin: 0; color: var(--perigo); font-weight: 600; }
-.aviso { margin: 0; color: var(--tinta-2); font-size: var(--t-15); }
+.motivo { margin: 0; color: var(--erro); font-weight: 600; }
+.aviso { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }

@@ -20,8 +20,15 @@ public static partial class ServiceCollectionExtensions
         services.TryAddSingleton<IOperacaoEventPublisher, NoOpOperacaoEventPublisher>();
         // S48: link do cardápio com token da conversa e o pedido que volta do site por ele.
         services.AddScoped<LinkCardapioConversaService>();
+        services.AddScoped<EasyStock.Application.Services.Pedidos.SaldoFinanceiroPedido>();
         services.AddScoped<ArmazenadorMidiaWhatsApp>();
+        // #1398: transcrição de áudio, nula por padrão; a Infra troca pela Fireworks quando há chave.
+        services.TryAddSingleton<EasyStock.Application.Ports.Output.Ai.ITranscritorAudio, TranscritorAudioNulo>();
+        services.AddScoped<TranscricaoAudioWhatsApp>();
         services.AddScoped<ResolvedorCanal>();
+        // S60: reserva por SMS, desligada por padrão; a Api liga só com chave e provedor real.
+        services.TryAddSingleton(ReservaSmsOpcoes.Desligada);
+        services.AddScoped<ReservaSmsAtendimento>();
 
         // S38: consentimento do cliente final por canal e opt-out por palavra.
         services.AddScoped<PoliticaEnvioCliente>();
@@ -33,6 +40,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<VariaveisAtendimento>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Automacoes.RespostasProntasUseCases>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Automacoes.AutomacoesUseCases>();
+
+        // S54: caderno da loja para o agente.
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Caderno.CadernoUseCases>();
 
         // S06: agente de atendimento (LLM com ferramentas) e roteador de botões sem LLM.
         services.AddScoped<AgenteAtendimentoService>();

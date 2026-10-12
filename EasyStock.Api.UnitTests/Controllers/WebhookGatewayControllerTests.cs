@@ -90,7 +90,8 @@ public class WebhookGatewayControllerTests
         {
             ["MercadoPago:WebhookSecret"] = SegredoMp,
         }).Build();
-        var validator = new MercadoPagoSignatureValidator(config, NullLogger<MercadoPagoSignatureValidator>.Instance);
+        var validator = new MercadoPagoSignatureValidator(config, NullLogger<MercadoPagoSignatureValidator>.Instance,
+            Substitute.For<Microsoft.Extensions.Hosting.IHostEnvironment>());
         var controller = new WebhookGatewayController(
             new IGatewayWebhookProcessor[] { f.Processor() }, new IWebhookSignatureValidator[] { validator }, repo,
             NullLogger<WebhookGatewayController>.Instance);

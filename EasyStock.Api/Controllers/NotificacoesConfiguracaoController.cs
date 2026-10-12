@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -54,6 +55,8 @@ public sealed class NotificacoesConfiguracaoController(
         try { return await acao(); }
         catch (ConfiguracaoNotificacaoNaoEncontradaException ex) { return DataNotFound(ex.Message); }
         catch (ArgumentException ex) { return DataBadRequest(ex.Message); }
+        // N12: cron e horário fora do formato (e a audiência da N4) são erro do pedido, 400 e não o 409 do handler global.
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
     }
 
     private static T? Enumerado<T>(string? valor) where T : struct, Enum =>
@@ -155,7 +158,7 @@ public sealed class NotificacoesConfiguracaoController(
         DataOk(await criarRotina.ExecuteAsync(new CriarRotinaCommand(
             req.Codigo, req.Nome, req.TipoEvento, req.TriggerTipo,
             req.TemplateCodigo, req.Categoria,
-            req.CronExpression, req.ParametrosJson, Empresa))));
+            req.CronExpression, req.ParametrosJson, Empresa, req.Canais))));
 
     [SwaggerOperation(Summary = "Update schedule or parameters of a company routine")]
     [HttpPatch("rotinas/{id:guid}")]
@@ -237,7 +240,8 @@ public sealed class NotificacoesConfiguracaoController(
         string Codigo, string Nome,
         TipoEventoNotificacao TipoEvento, TriggerTipoRotina TriggerTipo,
         string TemplateCodigo, CategoriaConteudoNotificacao Categoria,
-        string? CronExpression = null, string? ParametrosJson = null);
+        string? CronExpression = null, string? ParametrosJson = null,
+        IReadOnlyList<CanalNotificacao>? Canais = null);
 
     public sealed record AtualizarRotinaRequest(
         string? CronExpression = null,

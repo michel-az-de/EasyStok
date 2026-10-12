@@ -96,6 +96,15 @@ public static class StartupHardening
         ValidateWhatsAppMetaCore(accessToken, appSecret, verifyToken);
     }
 
+    /// <summary>
+    /// WhatsApp de plataforma (N6): com <c>Notifications:WhatsApp:Plataforma:Provider=meta</c> exige o número, o verify
+    /// token próprio, o token e o <c>AppSecret</c>. A regra é compartilhada com o Worker.
+    /// </summary>
+    public static void ValidateWhatsAppPlataforma(
+        string? provider, string? phoneNumberId, string? verifyToken, string? accessToken, string? appSecret)
+        => EasyStock.Infra.Notifications.Hosting.WhatsAppPlataformaStartup.Validar(
+            provider, phoneNumberId, verifyToken, accessToken, appSecret);
+
     /// <summary>Atalho sem a chave do atendimento (so o provider de notificacoes).</summary>
     public static void ValidateWhatsAppMeta(string? provider, string? accessToken, string? appSecret, string? verifyToken)
         => ValidateWhatsAppMeta(clienteAtendimento: null, provider, accessToken, appSecret, verifyToken);

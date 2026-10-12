@@ -23,6 +23,9 @@ export function criarAcoesCaixa(despachar) {
 
     fecharCaixa: (agora, contado) => despachar({ tipo: acao.FECHAR_CAIXA, agora, contado }),
 
+    // #1443: o gesto da loja só é pedido no modo API; fechar o modal é só da tela.
+    fecharGestoLoja: () => despachar({ tipo: acao.FECHAR_GESTO_LOJA }),
+
     // UC-11: itens = [{ sku, qtd }].
     lancarVendaAvulsa: (agora, { nome, itens, meio }) => despachar({
       tipo: acao.LANCAR_VENDA_AVULSA, agora, nome, itens, meio,

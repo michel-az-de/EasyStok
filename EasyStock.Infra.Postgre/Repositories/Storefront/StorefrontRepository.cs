@@ -9,11 +9,20 @@ public sealed class StorefrontRepository(EasyStockDbContext db) : IStorefrontRep
     public Task<StorefrontEntity?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
         db.Storefronts.FirstOrDefaultAsync(s => s.Id == id, ct);
 
-    public Task<StorefrontEntity?> GetBySlugAsync(string slug, CancellationToken ct = default) =>
-        db.Storefronts.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(s => s.Slug == slug, ct);
+    // #1345: chave de entrada pública, sem tenant ainda. IgnoreQueryFilters não basta: a policy RLS
+    // tenant_isolation esconde a linha sem app.empresa_id (só não esconde para superusuário, como no
+    // Postgres local). Mesmo padrão de UsuarioRepository.GetByEmailAsync.
+    public async Task<StorefrontEntity?> GetBySlugAsync(string slug, CancellationToken ct = default)
+    {
+        using (db.UseRowLevelSecurityBypass())
+            return await db.Storefronts.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(s => s.Slug == slug, ct);
+    }
 
-    public Task<StorefrontEntity?> GetByDominioCustomAsync(string dominioCustom, CancellationToken ct = default) =>
-        db.Storefronts.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(s => s.DominioCustom == dominioCustom, ct);
+    public async Task<StorefrontEntity?> GetByDominioCustomAsync(string dominioCustom, CancellationToken ct = default)
+    {
+        using (db.UseRowLevelSecurityBypass())
+            return await db.Storefronts.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(s => s.DominioCustom == dominioCustom, ct);
+    }
 
     public Task<StorefrontEntity?> GetByEmpresaAsync(Guid empresaId, CancellationToken ct = default) =>
         db.Storefronts.FirstOrDefaultAsync(s => s.EmpresaId == empresaId, ct);

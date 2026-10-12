@@ -14,6 +14,8 @@ public class LinkCardapioConversaConfiguration : IEntityTypeConfiguration<LinkCa
         builder.Property(l => l.TokenHash).HasMaxLength(LinkCardapioConversa.TokenHashTamanho).IsRequired();
         builder.Property(l => l.CriadoEm).IsRequired();
         builder.Property(l => l.ExpiraEm).IsRequired();
+        builder.Property(l => l.RascunhoJson).HasColumnType("jsonb").IsRequired();
+        builder.Property(l => l.ResultadoJson).HasColumnType("jsonb");
 
         // O site chama a API só com o token: a busca é pelo hash.
         builder.HasIndex(l => l.TokenHash).IsUnique().HasDatabaseName("uq_links_cardapio_conversa_token_hash");

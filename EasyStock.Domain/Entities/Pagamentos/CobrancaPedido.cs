@@ -32,6 +32,8 @@ public class CobrancaPedido
     public Guid Id { get; private set; }
     public Guid EmpresaId { get; private set; }
     public Guid PedidoId { get; private set; }
+    public bool Complementar { get; private set; }
+    public void MarcarComplementar() => Complementar = true;
 
     /// <summary>Conversa de atendimento onde o link foi enviado; null para pedido do site.</summary>
     public Guid? ConversaId { get; private set; }
@@ -158,6 +160,18 @@ public class CobrancaPedido
         MetodoPagamento = metodo;
         PagaEm = Utc(pagaEm);
         AtualizadaEm = PagaEm;
+    }
+
+    public void ReabrirPagamentoManual(DateTime agora)
+    {
+        if (EhOnline || Status != StatusCobrancaPedido.Paga)
+            throw new RegraDeDominioVioladaException("Só cobrança manual paga pode ser reaberta.");
+        Status = StatusCobrancaPedido.Pendente;
+        PagamentoExternoId = null;
+        ValorPago = null;
+        PagaEm = null;
+        MetodoPagamento = null;
+        AtualizadaEm = Utc(agora);
     }
 
     public void Expirar(DateTime agora)

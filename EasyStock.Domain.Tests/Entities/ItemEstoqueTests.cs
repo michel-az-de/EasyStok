@@ -123,6 +123,18 @@ public class ItemEstoqueTests
     }
 
     [Fact]
+    public void Estorno_de_saida_com_descoberto_abate_o_descoberto_antes_de_voltar_ao_saldo()
+    {
+        var item = CriarItem(status: StatusItemEstoque.Ok, quantidadeAtual: 2);
+        item.RegistrarSaidaPermitindoDescoberto(Quantidade.From(5), new DateTime(2026, 4, 3, 0, 0, 0, DateTimeKind.Utc), DateTime.UtcNow);
+
+        item.RestaurarSaidaEstornada(Quantidade.From(5), DateTime.UtcNow);
+
+        item.QuantidadeAtual.Value.Should().Be(2);      // so o que existia de fato
+        item.QuantidadeDescoberta.Value.Should().Be(0);
+    }
+
+    [Fact]
     public void Saidas_sucessivas_com_descoberto_acumulam_a_falta()
     {
         var item = CriarItem(status: StatusItemEstoque.Ok, quantidadeAtual: 2);

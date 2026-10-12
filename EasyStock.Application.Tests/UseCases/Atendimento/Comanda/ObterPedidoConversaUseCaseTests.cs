@@ -23,7 +23,8 @@ public class ObterPedidoConversaUseCaseTests
 
     public ObterPedidoConversaUseCaseTests()
     {
-        _useCase = new ObterPedidoConversaUseCase(_conversas, _pedidos, _cobrancas);
+        _useCase = new ObterPedidoConversaUseCase(_conversas, _pedidos, _cobrancas,
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>());
     }
 
     private Conversa NovaConversa()
@@ -47,6 +48,20 @@ public class ObterPedidoConversaUseCaseTests
         conversa.DefinirPedidoEmAndamento(pedido.Id);
         _pedidos.GetByIdWithDetailsAsync(_empresaId, pedido.Id).Returns(pedido);
         return pedido;
+    }
+
+    [Fact]
+    public async Task PedidoQueRequerAprovacao_AvisaOConsoleAntesDaBaixa()
+    {
+        // #1474: a baixa manual com link pendente troca a forma e registra o pagamento; com pedido
+        // que requer aprovação o registro falha depois da troca. O console precisa saber antes.
+        var conversa = NovaConversa();
+        var pedido = NovoPedido(conversa);
+        pedido.MarcarRequerAprovacao("fora da área");
+
+        var resultado = await _useCase.ExecuteAsync(_empresaId, conversa.Id);
+
+        resultado!.RequerAprovacao.Should().BeTrue();
     }
 
     [Fact]

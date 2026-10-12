@@ -48,7 +48,7 @@ public class AutomacoesHandlerTests
     }
 
     private DispararAutomacaoUseCase UseCase() =>
-        new(_regras, _conversas, _expedientes, new VariaveisAtendimento(_clientes, _pedidos),
+        new(_regras, _conversas, _clientes, _expedientes, new VariaveisAtendimento(_clientes, _pedidos),
             new PoliticaEnvioCliente(_consentimentos), new ResolvedorCanal([_whats]), _uow, _relogio,
             NullLogger<DispararAutomacaoUseCase>.Instance);
 
@@ -118,6 +118,23 @@ public class AutomacoesHandlerTests
         _uow.CommitCount.Should().Be(0);
     }
 
+    [Theory]
+    [InlineData(GatilhoAutomacao.Encerramento)]
+    [InlineData(GatilhoAutomacao.PagamentoConfirmado)]
+    [InlineData(GatilhoAutomacao.PosEntrega)]
+    public async Task ClienteBloqueadoNaoRecebeAutomatica(GatilhoAutomacao gatilho)
+    {
+        // #1292: bloqueio vale em todos os canais e mensagens (S24), não só na primeira entrada.
+        Regra(gatilho, "Mensagem automática.");
+        _cliente.Bloquear("calote", Agora);
+
+        var resultado = await UseCase().ExecuteAsync(new DisparoAutomacao(_empresaId, gatilho, _conversa.Id, null, null));
+
+        resultado.Should().Be(ResultadoAutomacao.ClienteBloqueado);
+        await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+        _uow.CommitCount.Should().Be(0);
+    }
+
     [Fact]
     public async Task SemRegraNaoDispara()
     {
@@ -180,6 +197,23 @@ public class AutomacoesHandlerTests
 
         (await UseCase().ExecuteAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PosEntrega, _conversa.Id, null, null)))
             .Should().Be(ResultadoAutomacao.Falhou);
+        _uow.CommitCount.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EncerramentoPendenteNaoEnviaDespedidaAposReabertura(bool jaAssumida)
+    {
+        Regra(GatilhoAutomacao.Encerramento, "Obrigada, {nome}!");
+        _conversa.Encerrar(Agora.AddSeconds(-1));
+        _conversa.Reabrir(Agora);
+        if (jaAssumida) _conversa.Assumir(Agora, Guid.NewGuid());
+
+        (await UseCase().ExecuteAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.Encerramento, _conversa.Id, null, null)))
+            .Should().Be(ResultadoAutomacao.ConversaReaberta);
+
+        await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
         _uow.CommitCount.Should().Be(0);
     }
 }

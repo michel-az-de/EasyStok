@@ -3,12 +3,17 @@
 // O que a API ainda não entrega (pedido, notas, tags, endereço) nasce vazio: cada módulo
 // ganha o dado de verdade quando for ligado (matriz 10-console.md).
 
-import { pausaDaSituacao } from '../../dominio/automatico'
+import { pausaDaSituacao, respostaAtrasada } from '../../dominio/automatico'
+import { ACOES } from '../../dominio/agente'
 
 const NOME_DO_CANAL = {
   WhatsApp: 'WhatsApp', Instagram: 'Instagram', Messenger: 'Messenger',
   ChatSite: 'Chat do site', Email: 'E-mail', Sms: 'SMS',
 }
+
+// Caminho de volta (#1424): o nome do canal na tela vira o enum da API (`CanalConversa`, string).
+const CANAL_DO_NOME = Object.fromEntries(Object.entries(NOME_DO_CANAL).map(([api, nome]) => [nome, api]))
+export const canalParaApi = (nome) => CANAL_DO_NOME[nome] ?? nome
 
 const ESTADO_DA_SITUACAO = { Automatica: 'Aberto', Assumida: 'Em atendimento', Encerrada: 'Encerrado' }
 
@@ -29,16 +34,45 @@ export const instante = (valor) => {
   return /[zZ]|[+-]\d{2}:\d{2}$/.test(valor) ? valor : `${valor}Z`
 }
 
-export function mensagemDaApi(m) {
+// #1600: a nota de reabertura é a "última palavra" da conversa, como na lista da API (#1570,
+// `UltimaPalavraConversa`). O DTO não tem tipo de nota: vale o critério de lá, nota de sistema com
+// autor humano e o prefixo de `ReabrirConversaUseCase.PrefixoNotaReabertura`.
+const PREFIXO_NOTA_REABERTURA = 'Conversa reaberta por '
+const ehNotaDeReabertura = (m) => Boolean(m.enviadaPorUsuarioId) && (m.texto ?? '').startsWith(PREFIXO_NOTA_REABERTURA)
+
+// `conversaId` vem da listagem: com ele, a mensagem com arquivo leva o endereço para o balão
+// buscar a mídia no endpoint autenticado (#1287). Sem ele (confirmação de envio), só o rótulo.
+export function mensagemDaApi(m, conversaId = null) {
   const saida = m.direcao === 'Saida'
+  // #1474: nota interna do sistema (ex.: escalada para a dona) nunca vai ao canal: sem id externo
+  // e Pendente para sempre. Vira evento na conversa, não balão "automática · enviando".
+  if (saida && m.autor === 'Sistema' && !m.externoId && m.status === 'Pendente') {
+    return {
+      id: m.id, dir: 'sistema', texto: m.texto || '', em: instante(m.enviadaEm),
+      ...(ehNotaDeReabertura(m) ? { reabertura: true } : {}),
+    }
+  }
   return {
     id: m.id,
     dir: saida ? 'out' : 'in',
     texto: m.texto || ROTULO_DO_CONTEUDO[m.tipoConteudo] || '',
     em: instante(m.enviadaEm),
     ...(saida ? { status: STATUS_DA_MENSAGEM[m.status] ?? 'enviada' } : {}),
-    ...(saida && m.autor === 'Agente' ? { automatica: true } : {}),
+    ...(saida && m.autor === 'Agente' ? { automatica: true, origemAutomatica: 'agente' } : {}),
+    // #1441: automáticas por gatilho (S42) e avisos do sistema também saem sem a dona.
+    ...(saida && m.autor === 'Sistema' ? { automatica: true, origemAutomatica: 'sistema' } : {}),
+    // #1424: saiu pelo disparo da mensagem programada; o balão mostra o selo.
+    ...(saida && m.programada ? { programada: true } : {}),
+    ...(m.modelo ? { modelo: true, modeloNome: m.modelo.nome } : {}),
     ...(m.erro ? { erro: m.erro } : {}),
+    // S58/S60 (#1391): espera o cliente responder ao modelo de retomada; ou saiu pela reserva por SMS.
+    ...(m.aguardaClienteDesde ? { aguardaCliente: true } : {}),
+    ...(m.reservaSmsEm ? { porSms: true } : {}),
+    // #1398: texto do áudio transcrito, mostrado abaixo do player.
+    ...(m.transcricao ? { transcricao: m.transcricao } : {}),
+    ...(m.midiaChave && conversaId ? { midia: { conversaId, mensagemId: m.id, mime: m.midiaMime ?? null } } : {}),
+    // #1397: o EasyStok desistiu de baixar o anexo depois das tentativas; o balão avisa em vez de ficar parado.
+    ...(!m.midiaChave && m.midiaFalhou ? { midia: { falhou: true, erro: m.erroMidia ?? null } } : {}),
   }
 }
 
@@ -59,32 +93,97 @@ function janelaExpiraEm(resumo, mensagens) {
 // opcional (F08); sem ele, o motivo padrão. A API não dá a hora da escalada.
 function passagemDaApi(resumo) {
   if (resumo.situacao !== 'Assumida' || resumo.assumidaPorUsuarioId) return null
-  return { motivo: resumo.motivoEscalada || null, em: null, assumida: false }
+  return {
+    motivo: resumo.motivoEscalada || null, em: null, assumida: false,
+    ...(resumo.motivoEscalada === 'Conversa reaberta para atendimento.' ? { origem: 'reabertura' } : {}),
+  }
 }
 
-export function conversaDaApi(resumo, mensagensDaApi, usuario) {
-  const mensagens = (mensagensDaApi ?? []).map(mensagemDaApi).sort(cronologica)
+export function situacaoConversaDaApi(resumo, usuario) {
   const minha = resumo.assumidaPorUsuarioId && resumo.assumidaPorUsuarioId === usuario?.id
   return {
+    estado: ESTADO_DA_SITUACAO[resumo.situacao] ?? 'Aberto',
+    situacaoApi: resumo.situacao,
+    assumidaPorUsuarioId: resumo.assumidaPorUsuarioId ?? null,
+    responsavel: resumo.assumidaPorUsuarioId ? (resumo.assumidaPorNome?.trim() || (minha ? usuario.nome : 'Outro atendente')) : null,
+    pausaApi: pausaDaSituacao(resumo, usuario?.id ?? null),
+    passagem: passagemDaApi(resumo),
+    naoLidas: resumo.naoLidas,
+  }
+}
+
+// `agora` só pesa em `atrasada` (#1427): retrato do SLA na sincronização (a
+// cada 5 s), no relógio inteiro. O cartão recalcula a cada tique com o
+// expediente da loja (`respostaAtrasada`, dominio/automatico.js).
+export function conversaDaApi(resumo, mensagensDaApi, usuario, agora = Date.now()) {
+  const mensagens = (mensagensDaApi ?? []).map((m) => mensagemDaApi(m, resumo.id)).sort(cronologica)
+  const conversa = {
     id: resumo.id,
+    numeroComanda: resumo.numeroComanda || null,
     conta: resumo.clienteId ? 'cliente' : 'lead',
     // Chave do cadastro na API: consentimento (S38) e o que mais for por cliente.
     clienteId: resumo.clienteId ?? null,
     nome: resumo.contatoNome || resumo.contatoIdExterno,
     contato: resumo.contatoIdExterno,
     canal: NOME_DO_CANAL[resumo.canal] ?? resumo.canal,
-    estado: ESTADO_DA_SITUACAO[resumo.situacao] ?? 'Aberto',
-    situacaoApi: resumo.situacao,
-    responsavel: resumo.assumidaPorUsuarioId ? (minha ? usuario.nome : 'Outro atendente') : null,
     // F07, item 3: quem pausou o automático (você, outro atendente ou a escalada) e a passagem.
-    pausaApi: pausaDaSituacao(resumo, usuario?.id ?? null),
-    passagem: passagemDaApi(resumo),
+    ...situacaoConversaDaApi(resumo, usuario),
     janelaExpiraEm: janelaExpiraEm(resumo, mensagens),
     ultimaEm: instante(resumo.ultimaMensagemEm),
-    naoLidas: resumo.naoLidas,
-    atrasada: false,
+    // Prévia do cartão quando as mensagens não foram carregadas (encerrada, #1287).
+    ultimaMensagemTexto: resumo.ultimaMensagemTexto ?? null,
+    // #1427: SLA de primeira resposta da loja e de onde ele conta.
+    slaMinutos: resumo.slaRespostaMinutos ?? null,
+    aguardaResposta: resumo.aguardaResposta ?? false,
+    ultimaEntradaEm: resumo.ultimaMensagemEntradaEm ? instante(resumo.ultimaMensagemEntradaEm) : null,
     cliente: { desde: null, endereco: null, enderecoCapturado: null, pedidos: 0, tags: [], notas: [] },
     pedido: null,
     mensagens,
   }
+  return { ...conversa, atrasada: respostaAtrasada(conversa, agora, Boolean(conversa.pausaApi)) }
 }
+
+// Linha do painel "Não entregues" (S59): quem devia receber e a mensagem no formato do balão.
+export const naoEntregueDaApi = (l) => ({
+  conversaId: l.conversaId,
+  contato: l.contatoNome || l.contatoIdExterno,
+  canal: l.canal,
+  aberta: l.conversaAberta,
+  mensagem: mensagemDaApi(l.mensagem, l.conversaId),
+})
+
+// Mensagem programada (#1424, `MensagemProgramadaResult`) no formato da lista do console.
+// `situacao` segue o enum da API (Agendada, Enviando, Enviada, Cancelada, Falhou).
+export const programadaDaApi = (r) => ({
+  id: r.id,
+  clienteId: r.clienteId,
+  conversaId: r.conversaId ?? null,
+  canal: NOME_DO_CANAL[r.canal] ?? r.canal,
+  finalidade: r.finalidade,
+  texto: r.texto ?? null,
+  modelo: r.modelo ?? null,
+  agendadaPara: instante(r.agendadaPara),
+  situacao: r.situacao,
+  tentativas: r.tentativas ?? 0,
+  erro: r.erro ?? null,
+  enviadaEm: instante(r.enviadaEm),
+})
+
+// Sugestão do agente (#1420) no formato que o painel do agente lê. O agente do EasyStok escreve a
+// mensagem; quem decide se passa para a dona é ele no automático, então aqui a ação é sempre propor.
+export const sugestaoDaApi = (r, recebidoEm = Date.now()) => ({
+  modo: 'api',
+  modelo: 'agente do EasyStok',
+  intencao: { chave: 'sugestao', rotulo: 'Sugestão do agente' },
+  confianca: null,
+  acao: ACOES.PROPOR,
+  texto: r?.texto ?? '',
+  estruturada: true,
+  prompt: '',
+  recebidoEm,
+  latenciaMs: r?.latenciaMs ?? null,
+  tokensEstimados: null,
+  tokensMedidos: r?.tokens ?? null,
+  custoUsd: null,
+  transporte: 'easystok',
+})

@@ -37,6 +37,7 @@ function CartaoProvedor({ provedor, config, padrao, acoes }) {
         <strong className={css.nomeProvedor}>{provedor.rotulo}</strong>
         <Chip
           papel="filtro" ativo={ativo} className={css.chipLigar}
+          aria-label={`${provedor.rotulo}: ${ativo ? 'ligado' : 'desligado'}`}
           onClick={() => acoes.alternarProvedorLogistica(provedor.chave)}
         >
           {ativo ? 'Ligado' : 'Desligado'}
@@ -50,30 +51,29 @@ function CartaoProvedor({ provedor, config, padrao, acoes }) {
             {salva ? 'Credencial salva' : 'Sem credencial'}
           </Pilula>
           {!mostrarCampo && (
-            <Botao variante="texto" onClick={() => setMostrarCampo(true)}>
+            <Botao variante="texto" icone="lapis" onClick={() => setMostrarCampo(true)}>
               {salva ? 'Trocar credencial' : 'Cadastrar credencial'}
             </Botao>
           )}
           {mostrarCampo && (
-            <div className={css.formularioCredencial}>
+            <form className={css.formularioCredencial} onSubmit={(e) => { e.preventDefault(); salvarCredencial() }}>
               <CampoTexto
                 rotulo={`Credencial da ${provedor.rotulo} (simulada)`}
-                rotuloOculto
                 tipo="password"
                 autoComplete="off"
-                placeholder="Cole a chave de API simulada"
+                placeholder="Cole a credencial simulada"
                 value={credencial}
                 onChange={(e) => setCredencial(e.target.value)}
               />
               <div className={css.botoesCredencial}>
-                <Botao variante="primario" onClick={salvarCredencial} disabled={!credencial.trim()}>
-                  Salvar
+                <Botao tipo="submit" variante="primario" icone="check" disabled={!credencial.trim()}>
+                  Salvar credencial simulada
                 </Botao>
                 <Botao variante="texto" onClick={() => { setCredencial(''); setMostrarCampo(false) }}>
                   Cancelar
                 </Botao>
               </div>
-            </div>
+            </form>
           )}
         </div>
       )}
@@ -99,7 +99,7 @@ export function AbaIntegracoes() {
   if (!integracoesLogistica) {
     return (
       <div className={css.aba}>
-        <p>Carregando integrações…</p>
+        <output>Carregando integrações…</output>
       </div>
     )
   }
@@ -121,8 +121,7 @@ export function AbaIntegracoes() {
         ))}
       </ul>
       <p className={css.rodape}>
-        Contrato do adapter (cotar, chamar, cancelar, consultar status e webhook) documentado para o
-        backend em <code>src/infra/provedoresDeEntrega.js</code> e no registro da rodada 13.
+        Só provedores ligados podem ser usados como padrão do despacho.
       </p>
     </div>
   )

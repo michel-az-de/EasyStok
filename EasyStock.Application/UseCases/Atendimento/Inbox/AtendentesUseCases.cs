@@ -7,7 +7,7 @@ namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
 public sealed record AtendenteResult(Guid UsuarioId, string Nome, string Email);
 
-public sealed record TransferirConversaCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, Guid ParaUsuarioId);
+public sealed record TransferirConversaCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, Guid ParaUsuarioId, string? UsuarioNome = null);
 
 /// <summary>Destino da transferência não é usuário ativo da empresa com permissão de atender: 422.</summary>
 public sealed class DestinoNaoAtendenteException(Guid usuarioId)
@@ -26,7 +26,8 @@ internal static class RegraAtendente
     public static bool Atende(UsuarioDaEmpresa usuario)
     {
         var perfil = usuario.Perfis.OrderBy(p => (int)p.Nivel).FirstOrDefault();
-        return perfil is not null && PoliticaPermissao.Tem(perfil.Nivel, perfil.Permissoes, Permissao.AtenderConversas);
+        return perfil is not null && PoliticaPermissao.Tem(perfil.Nivel, perfil.Permissoes, Permissao.AtenderConversas,
+            perfil.PermissoesExplicitas);
     }
 }
 
@@ -50,7 +51,7 @@ public sealed class TransferirConversaUseCase(
     IAtendenteRepository atendenteRepository,
     IUnitOfWork unitOfWork)
 {
-    public const string PrefixoTransferencia = "conversa transferida pelo usuário ";
+    public const string PrefixoTransferencia = "conversa transferida por ";
 
     public async Task<ConversaSituacaoResult> ExecuteAsync(TransferirConversaCommand command, CancellationToken ct = default)
     {
@@ -65,7 +66,7 @@ public sealed class TransferirConversaUseCase(
         conversa.Transferir(destino.UsuarioId, agora);
         await conversaRepository.AddMensagemAsync(
             Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
-                $"{PrefixoTransferencia}{command.UsuarioId} para {destino.UsuarioId}"),
+                $"{PrefixoTransferencia}{(string.IsNullOrWhiteSpace(command.UsuarioNome) ? "a equipe" : command.UsuarioNome.Trim())} para {destino.Nome}"),
             ct);
         await unitOfWork.CommitAsync();
         return ConversaSituacaoResult.De(conversa);

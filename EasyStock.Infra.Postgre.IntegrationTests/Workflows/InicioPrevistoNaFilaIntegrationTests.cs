@@ -121,6 +121,9 @@ public sealed class InicioPrevistoNaFilaIntegrationTests(PostgreSqlDatabaseFixtu
         services.AddSingleton(Substitute.For<ICacheService>());
         services.AddEasyStockPostgreInfrastructure(fixture.ConnectionString, config);
         services.AddEasyStockApplication();
+        // #1560: criar pedido registra o endereco de entrega; CEP e geocoding sao registrados pela API, nao por este provedor.
+        services.AddSingleton(Substitute.For<EasyStock.Application.Ports.Output.Lookup.ICepLookupClient>());
+        services.AddSingleton(Substitute.For<EasyStock.Application.Ports.Output.Lookup.IGeocodingClient>());
         return services.BuildServiceProvider();
     }
 }

@@ -21,6 +21,8 @@ public class OcorrenciaConfiguration : IEntityTypeConfiguration<Ocorrencia>
         b.Property(o => o.ReembolsoValor).HasPrecision(18, 2);
         b.Property(o => o.ReembolsoIdSolicitacao).HasMaxLength(Ocorrencia.ReembolsoIdTamanhoMaximo);
         b.Property(o => o.CriadaEm).IsRequired();
+        b.Property(o => o.ApuradaPorNome).HasMaxLength(120);
+        b.Property(o => o.ResolvidaPorNome).HasMaxLength(120);
 
         // Lista do console: por status, mais recentes primeiro.
         b.HasIndex(o => new { o.EmpresaId, o.Status, o.CriadaEm })

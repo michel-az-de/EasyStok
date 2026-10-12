@@ -258,6 +258,8 @@ public class GlobalExceptionHandler(
     {
         "ix_movimentos_caixa_abertura_unica" =>
             "O caixa deste dia/loja já foi aberto por outra operação. Recarregue a tela antes de tentar de novo.",
+        "ux_viagem_paradas_pedido_ativo" =>
+            "Pedido já está em outra viagem. Recarregue as viagens antes de tentar de novo.",
         _ => "Já existe um registro com esses dados (SKU, email, documento ou outro campo único).",
     };
 

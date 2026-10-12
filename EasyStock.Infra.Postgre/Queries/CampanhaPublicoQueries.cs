@@ -36,10 +36,19 @@ public sealed class CampanhaPublicoQueries(EasyStockDbContext db) : ICampanhaPub
                         .Where(p => p.EmpresaId == empresaId && p.ClienteId == c.Id && p.Status == entregue
                             && p.Itens.Any(i => i.CardapioItemId == comprouItemId || i.ProdutoId == comprouItemId))
                         .Max(p => (DateTime?)(p.EntreguEm ?? p.CriadoEm)),
+                // RN-40: quem está na fila de outra campanha (Enfileirado, ainda sem EnviadoEm) também conta,
+                // senão duas campanhas no mesmo tick do job atingem o mesmo cliente (#1292). A data é a da
+                // mensagem no outbox, que existe enquanto ela está na fila.
                 UltimaCampanhaRecebidaEm = db.CampanhaDestinatarios
                     .Where(d => d.EmpresaId == empresaId && d.ClienteId == c.Id && d.CampanhaId != campanhaId
-                        && (d.Status == StatusCampanhaDestinatario.Enviado || d.Status == StatusCampanhaDestinatario.Pediu))
-                    .Max(d => d.EnviadoEm),
+                        && (d.Status == StatusCampanhaDestinatario.Enviado || d.Status == StatusCampanhaDestinatario.Pediu
+                            || d.Status == StatusCampanhaDestinatario.Enfileirado))
+                    .Max(d => d.Status == StatusCampanhaDestinatario.Enfileirado
+                        ? db.NotifOutboxMensagens
+                            .Where(m => m.EmpresaId == empresaId && m.Id == d.OutboxMensagemId)
+                            .Select(m => (DateTime?)m.CriadoEm)
+                            .FirstOrDefault()
+                        : d.EnviadoEm),
             })
             .ToListAsync(ct);
 

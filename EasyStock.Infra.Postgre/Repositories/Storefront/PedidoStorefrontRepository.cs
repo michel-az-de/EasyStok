@@ -1,4 +1,5 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
 
@@ -40,10 +41,13 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
         // SISTEMA nao vem no SELECT * — sem ela o EF falha com "column e.xmin does not
         // exist" e TODO aprovar/recusar de pedido storefront morre (pego via #822).
         const string sql = "SELECT *, xmin FROM pedidos WHERE \"Id\" = {0} FOR UPDATE";
-        return await db.Pedidos
+        var pedido = await db.Pedidos
             .FromSqlRaw(sql, pedidoId)
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(ct);
+        if (pedido is not null)
+            await db.Entry(pedido).Collection(p => p.Pagamentos).LoadAsync(ct);
+        return pedido;
     }
 
     public async Task AddAsync(Pedido pedido, CancellationToken ct = default)
@@ -70,38 +74,32 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
         await db.SaveChangesAsync(ct);
     }
 
-    public Task<IReadOnlyList<Pedido>> GetAguardandoPagamentoExpiradosAsync(
+    /// <summary>
+    /// Origens que passam pelo checkout em 3 fases (núcleo S10) e podem ficar em <c>AguardandoPagamento</c>
+    /// sem cobrança quando o Mercado Pago cai na fase 3 (#1291): site logado, site sem login e conversa.
+    /// </summary>
+    private static readonly string[] OrigensDoCheckout =
+        [OrigemPedido.Storefront, OrigemPedido.StorefrontGuest, OrigemPedido.WhatsApp];
+
+    public async Task<IReadOnlyList<Pedido>> GetAguardandoPagamentoExpiradosAsync(
         DateTime criadoAntesDe,
         int maxBatch = 50,
-        CancellationToken ct = default) =>
-        db.Pedidos
+        CancellationToken ct = default)
+    {
+        // Varredura do job: cross-tenant por natureza, bypass de RLS em escopo curto (#1291).
+        using var _ = db.UseRowLevelSecurityBypass();
+        return await db.Pedidos
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(p => p.Status == StatusPedidoMapper.AguardandoPagamento
-                     && p.Origem == "storefront"
+                     && OrigensDoCheckout.Contains(p.Origem)
                      && p.CriadoEm < criadoAntesDe
                      // S11: pedido com CobrancaPedido é do CobrancaPedidoJob (expira pelo link, não pela criação).
                      && !db.CobrancasPedido.IgnoreQueryFilters().Any(c => c.PedidoId == p.Id))
             .OrderBy(p => p.CriadoEm)
             .Take(maxBatch)
-            .ToListAsync(ct)
-            .ContinueWith<IReadOnlyList<Pedido>>(t => t.Result, ct, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
-
-    public Task<IReadOnlyList<Pedido>> GetEntreguesElegiveisPraAvaliacaoAsync(
-        DateTime entregueAntesDe,
-        int maxBatch = 50,
-        CancellationToken ct = default) =>
-        db.Pedidos
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(p => p.Status == StatusPedidoMapper.Entregue
-                     && p.Origem == "storefront"
-                     && p.EntreguEm <= entregueAntesDe
-                     && p.AvaliacaoSolicitadaEm == null)
-            .OrderBy(p => p.EntreguEm)
-            .Take(maxBatch)
-            .ToListAsync(ct)
-            .ContinueWith<IReadOnlyList<Pedido>>(t => t.Result, ct, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            .ToListAsync(ct);
+    }
 
     public async Task<IReadOnlyList<Pedido>> ListarPorClienteAsync(
         Guid empresaId,

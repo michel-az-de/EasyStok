@@ -19,7 +19,7 @@ namespace EasyStock.Domain.Entities.Storefront;
 ///   </item>
 ///   <item>
 ///     Mesma <c>Key</c> + <c>ContentHash</c> diferente ⇒ cliente alterou o cart
-///     entre cliques: tratamos como checkout novo (cria Fatura nova).
+///     entre cliques: recusa a reutilização; uma nova tentativa exige outra chave.
 ///   </item>
 /// </list>
 /// </para>
@@ -76,10 +76,16 @@ public class CheckoutIdempotency
     }
 
     /// <summary>
-    /// Vincula este registro à Fatura criada e InitPoint do MercadoPago.
-    /// Idempotente para a mesma fatura (proteção contra retry); rejeita
-    /// segunda vinculação para fatura diferente.
+    /// Persiste o pedido antes da cobrança. O nome legado FaturaId é mantido no schema.
     /// </summary>
+    public void VincularPedidoEmProcessamento(Guid pedidoId)
+    {
+        if (pedidoId == Guid.Empty || (FaturaId.HasValue && FaturaId != pedidoId))
+            throw new RegraDeDominioVioladaException("Registro de checkout já vinculado a outro pedido.");
+        FaturaId = pedidoId;
+    }
+
+    /// <summary>Completa a resposta do mesmo pedido; uma resposta concluída não pode ser alterada.</summary>
     public void VincularFatura(Guid faturaId, string initPoint)
     {
         if (faturaId == Guid.Empty)
@@ -92,7 +98,7 @@ public class CheckoutIdempotency
             if (FaturaId.Value != faturaId)
                 throw new RegraDeDominioVioladaException(
                     $"FaturaId já vinculada ({FaturaId.Value}); não é possível vincular outra ({faturaId}).");
-            return; // idempotente para mesma fatura
+            if (InitPoint is not null) return; // resposta concluída é imutável
         }
 
         FaturaId = faturaId;

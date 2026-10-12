@@ -1,5 +1,8 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.UseCases.AlterarAgendamentoPedido;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Pagamentos;
@@ -16,14 +19,27 @@ public sealed record PedidoConversaResult(
     DateTime CriadoEm,
     DateTime? AgendadoParaEm,
     IReadOnlyList<ItemPedidoConversaResult> Itens,
-    CobrancaPedidoConversaResult? Cobranca);
+    CobrancaPedidoConversaResult? Cobranca,
+    decimal TotalPago = 0,
+    IReadOnlyList<PagamentoPedidoConversaResult>? Pagamentos = null,
+    bool RequerAprovacao = false,
+    JanelaPedidoResult? Janela = null,
+    bool SinalNaReserva = false,
+    decimal? Alocado = null,
+    long NumeroComanda = 0,
+    string? Observacoes = null);
 
+public sealed record PagamentoPedidoConversaResult(Guid Id, decimal Valor, string Metodo, DateTime PagoEm);
+
+/// <param name="VariacaoId">M1.4b (#1531): a porção vendida (null em prato sem porções).</param>
 public sealed record ItemPedidoConversaResult(
     Guid? CardapioItemId,
     string Nome,
     decimal Quantidade,
     decimal PrecoUnitario,
-    string? Observacao);
+    string? Observacao,
+    Guid? VariacaoId = null,
+    string? Porcao = null);
 
 /// <param name="Status">Nome do <see cref="StatusCobrancaPedido"/> (Pendente, Paga, Expirada, Cancelada, Estornada).</param>
 public sealed record CobrancaPedidoConversaResult(
@@ -52,20 +68,24 @@ public sealed record CobrancaPedidoConversaResult(
 public sealed class ObterPedidoConversaUseCase(
     IConversaRepository conversaRepository,
     IPedidoRepository pedidoRepository,
-    ICobrancaPedidoRepository cobrancaRepository)
+    ICobrancaPedidoRepository cobrancaRepository,
+    IVagaOcupadaRepository vagas,
+    SaldoFinanceiroPedido? saldos = null)
 {
-    public async Task<PedidoConversaResult?> ExecuteAsync(Guid empresaId, Guid conversaId, CancellationToken ct = default)
+    public async Task<PedidoConversaResult?> ExecuteAsync(Guid empresaId, Guid conversaId, CancellationToken ct = default, Guid? pedidoEscolhido = null)
     {
         UseCaseGuards.EnsureEmpresaId(empresaId);
         var conversa = await conversaRepository.ObterPorIdAsync(empresaId, conversaId, ct)
             ?? throw new ConversaNaoEncontradaException(conversaId);
-        if (conversa.PedidoEmAndamentoId is not { } pedidoId) return null;
+        if ((pedidoEscolhido ?? conversa.PedidoEmAndamentoId) is not { } pedidoId) return null;
 
         var pedido = await pedidoRepository.GetByIdWithDetailsAsync(empresaId, pedidoId);
-        if (pedido is null) return null;
+        if (pedido is null || pedido.EmpresaId != empresaId) return null;
+        var janela = (await vagas.GetByPedidoIdsAsync([pedido.Id], ct)).GetValueOrDefault(pedido.Id);
 
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(empresaId, pedido.Id, ct);
-        var vigente = cobrancas.FirstOrDefault(c => c.Status == StatusCobrancaPedido.Paga)
+        var vigente = cobrancas.FirstOrDefault(c => c.EstaPendente)
+            ?? cobrancas.FirstOrDefault(c => c.Status == StatusCobrancaPedido.Paga)
             ?? cobrancas.OrderByDescending(c => c.CriadaEm).FirstOrDefault();
 
         // O frete é a linha sem item de cardápio nem produto (CheckoutCoreService.AdicionarItemFreteAsync).
@@ -74,7 +94,14 @@ public sealed class ObterPedidoConversaUseCase(
 
         return new PedidoConversaResult(
             pedido.Id, pedido.Status, pedido.Total.Valor, frete, pedido.CriadoEm, pedido.AgendadoParaEm,
-            itens.Select(i => new ItemPedidoConversaResult(i.CardapioItemId, i.Nome, i.Quantidade, i.PrecoUnitario, i.Observacao)).ToList(),
-            vigente is null ? null : CobrancaPedidoConversaResult.De(vigente));
+            itens.Select(i => new ItemPedidoConversaResult(i.CardapioItemId, i.Nome, i.Quantidade, i.PrecoUnitario, i.Observacao,
+                i.CardapioItemVariacaoId, i.VariacaoRotuloSnapshot)).ToList(),
+            vigente is null ? null : CobrancaPedidoConversaResult.De(vigente), pedido.TotalPago,
+            pedido.Pagamentos.Select(p => new PagamentoPedidoConversaResult(p.Id, p.Valor, p.Metodo, p.PagoEm)).ToList(),
+            // #1474: o console barra a baixa manual antes de cancelar o link quando falta aprovar.
+            pedido.RequerAprovacao && pedido.AprovadoEm is null,
+            janela.Vaga is { LiberadoEm: null } ? JanelaPedidoResult.De(janela.Vaga, janela.Janela) : null,
+            PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm),
+            saldos is null ? null : (await saldos.ConsultarAsync(pedido, ct)).Alocado, conversa.NumeroComanda, pedido.Observacoes);
     }
 }

@@ -9,7 +9,8 @@ public sealed record LinhaLotePapel(Guid PedidoId, string Passo, DateTime Ocorre
 public sealed record LancarLotePapelCommand(
     Guid EmpresaId,
     IReadOnlyList<LinhaLotePapel> Linhas,
-    Guid? UsuarioId = null) : ICommand;
+    Guid? UsuarioId = null,
+    NivelAcesso NivelSolicitante = NivelAcesso.Operador) : ICommand;
 
 /// <param name="Linha">Posição da linha no lote enviado (base 1), para a tela apontar o erro.</param>
 public sealed record ResultadoLinhaLotePapel(int Linha, Guid PedidoId, string Passo, DateTime OcorreuEm,
@@ -43,7 +44,7 @@ public class LancarLotePapelUseCase(AtualizarStatusPedidosEmLoteUseCase lote)
             cmd.EmpresaId,
             ordenadas.Select(x => new KdsStatusLoteItem(x.Item.PedidoId, x.Item.Passo, x.Item.OcorreuEm)).ToList(),
             cmd.UsuarioId,
-            OrigemLotePapel), ct);
+            OrigemLotePapel, cmd.NivelSolicitante), ct);
 
         var linhas = ordenadas.Zip(resultados, (o, r) => new ResultadoLinhaLotePapel(
                 o.Linha, o.Item.PedidoId, o.Item.Passo, o.Item.OcorreuEm, r.Sucesso, r.Status, r.Erro))

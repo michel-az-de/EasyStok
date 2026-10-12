@@ -42,6 +42,13 @@ public class CardapioItemVariacao
     /// <summary>FK opcional para <see cref="ProdutoVariacao"/> do ERP (rastreabilidade).</summary>
     public Guid? ProdutoVariacaoId { get; private set; }
 
+    /// <summary>
+    /// M1.4e (#1552): a embalagem desta porção (bandeja de 300 g), um <see cref="Produto"/> marcado como
+    /// embalagem. A produção baixa uma por porção produzida e deixa de usar a embalagem da receita.
+    /// Null = sem embalagem própria (vale a da receita, D-M2-03).
+    /// </summary>
+    public Guid? EmbalagemProdutoId { get; private set; }
+
     /// <summary>Peso/porção para exibição da opção (ex.: "300g"). Texto livre, max 50.</summary>
     public string? PesoExibicao { get; private set; }
 
@@ -59,6 +66,7 @@ public class CardapioItemVariacao
 
     public CardapioItem? CardapioItem { get; set; }
     public ProdutoVariacao? ProdutoVariacao { get; set; }
+    public Produto? Embalagem { get; set; }
 
     // EF Core ctor sem parâmetros
     private CardapioItemVariacao() { }
@@ -142,6 +150,26 @@ public class CardapioItemVariacao
         PesoExibicao = NormalizarPeso(pesoExibicao);
         Sku = sku;
         ProdutoVariacaoId = produtoVariacaoId;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    /// <summary>D-M1-03 (#1529): liga a porção à variação do estoque, que dá o saldo próprio dela.</summary>
+    public void VincularProdutoVariacao(Guid produtoVariacaoId)
+    {
+        if (produtoVariacaoId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("Variação do estoque inválida.");
+        if (ProdutoVariacaoId == produtoVariacaoId) return;
+        ProdutoVariacaoId = produtoVariacaoId;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    /// <summary>M1.4e (#1552): escolhe ou tira (null) a embalagem da porção. Que o produto é embalagem da empresa, a Application valida.</summary>
+    public void DefinirEmbalagem(Guid? embalagemProdutoId)
+    {
+        if (embalagemProdutoId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("Embalagem inválida.");
+        if (EmbalagemProdutoId == embalagemProdutoId) return;
+        EmbalagemProdutoId = embalagemProdutoId;
         AlteradoEm = DateTime.UtcNow;
     }
 

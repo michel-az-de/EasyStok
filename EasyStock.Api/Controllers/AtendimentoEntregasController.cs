@@ -222,6 +222,25 @@ public class AtendimentoRelatoriosEntregaController(
     }
 }
 
+[SwaggerTag("Agenda de entregas")]
+[ApiController]
+[Route("api/atendimento/agenda")]
+[Authorize(Policy = "Operador")]
+public sealed class AtendimentoAgendaController(
+    ListarAgendaEntregasUseCase listarUseCase,
+    ICurrentUserAccessor currentUser) : EasyStockControllerBase
+{
+    [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Listar([FromQuery] DateOnly? de, [FromQuery] DateOnly? ate, CancellationToken ct)
+    {
+        if (de is null || ate is null) return DataBadRequest("Informe 'de' e 'ate'.");
+        try { return DataOk(await listarUseCase.ExecuteAsync(currentUser.EmpresaId, de.Value, ate.Value, ct)); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+    }
+}
+
 public sealed record EntregadorBody(
     string Nome, TipoEntregador Tipo, EmpresaEntregador Empresa, string? Telefone, string? Veiculo, string? Placa);
 

@@ -1,0 +1,6 @@
+.erro {
+  margin: var(--e-3) 0 0;
+  color: var(--erro);
+  font-size: var(--t-apoio);
+  line-height: 1.5;
+}

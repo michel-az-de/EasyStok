@@ -14,6 +14,33 @@ namespace EasyStock.Application.Tests.UseCases.Pedidos.Cobranca;
 public class GerarCobrancaPedidoUseCaseTests
 {
     [Fact]
+    public async Task EncomendaFutura_CobraSinalArredondadoEReutilizaLink()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddDays(2);
+        f.Pedido.Total = CobrancaPedidoFixture.Reais(25.01m);
+
+        var uc = f.Gerar();
+        var input = new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id);
+        var primeira = await uc.ExecuteAsync(input);
+        var segunda = await uc.ExecuteAsync(input);
+
+        primeira.Valor.Should().Be(12.51m);
+        segunda.CobrancaId.Should().Be(primeira.CobrancaId);
+        segunda.Reutilizada.Should().BeTrue();
+        var preferencia = f.Preferencias.Should().ContainSingle().Subject;
+        preferencia.ValorTotal.Should().Be(12.51m);
+        preferencia.Items.Should().ContainSingle().Which.Should().BeEquivalentTo(
+            new PreferenceItemCommand("Sinal da encomenda (50%)", 1, 12.51m));
+
+        f.Relogio.Agora = CobrancaPedidoFixture.Agora.AddMinutes(31);
+        var reemitida = await uc.ExecuteAsync(input);
+        reemitida.Valor.Should().Be(12.51m);
+        reemitida.CobrancaId.Should().NotBe(primeira.CobrancaId);
+        f.Preferencias.Should().HaveCount(2);
+    }
+
+    [Fact]
     public async Task PreferenciaComExternalReferenceEExpiracao()
     {
         var f = new CobrancaPedidoFixture();
@@ -85,6 +112,20 @@ public class GerarCobrancaPedidoUseCaseTests
         (await act.Should().ThrowAsync<CobrancaPedidoConflitoException>()).Which.Codigo.Should().Be("pedido_ja_pago");
     }
 
+    // #1540: depois do estorno total a cobrança fica Estornada e o pagamento permanece. A confirmação
+    // (#1289) trata o próximo pagamento como duplicado e devolve sozinha, então o link não pode sair.
+    [Fact]
+    public async Task PagamentosJaCobremOTotal_SemCobrancaPaga_Recusa()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarPagamento(referencia: null);
+
+        var act = () => f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id));
+
+        (await act.Should().ThrowAsync<CobrancaPedidoConflitoException>()).Which.Codigo.Should().Be("pedido_ja_pago");
+        f.Preferencias.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task MercadoPagoFora_LancaIndisponivelSemGravar()
     {
@@ -96,5 +137,56 @@ public class GerarCobrancaPedidoUseCaseTests
 
         await act.Should().ThrowAsync<MercadoPagoIndisponivelException>();
         f.Cobrancas.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task QuantidadeFracionaria_VaiComoUmComOSubtotalESomaFechaComOTotal()
+    {
+        // #1291: (int)1,5 cobrava 1 kg e 0,5 virava 0, que o Mercado Pago recusa.
+        var f = new CobrancaPedidoFixture();
+        AdicionarItem(f, "Queijo meia cura (kg)", 1.5m, 30m);
+        AdicionarItem(f, "Doce de leite (kg)", 0.5m, 12m);
+
+        await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id));
+
+        var pref = f.Preferencias.Should().ContainSingle().Subject;
+        pref.Items.Should().ContainEquivalentOf(new PreferenceItemCommand("Queijo meia cura (kg)", 1, 45m));
+        pref.Items.Should().ContainEquivalentOf(new PreferenceItemCommand("Doce de leite (kg)", 1, 6m));
+        pref.Items.Should().ContainEquivalentOf(new PreferenceItemCommand("Brigadeiro", 2, 10m), "item inteiro não muda");
+        pref.Items.Sum(i => i.Quantidade * i.PrecoUnitario).Should().Be(f.Pedido.Total.Valor);
+        pref.ValorTotal.Should().Be(76m);
+    }
+
+    [Fact]
+    public async Task PendenteComValorDiferenteDoTotal_CancelaEGeraOutra()
+    {
+        // #1291: item editado em AguardandoPagamento; o link antigo cobraria o valor velho.
+        var f = new CobrancaPedidoFixture();
+        var antiga = f.AdicionarOnline();
+        AdicionarItem(f, "Bolo de fubá", 1m, 6m);
+
+        var r = await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id));
+
+        antiga.Status.Should().Be(StatusCobrancaPedido.Cancelada);
+        r.Reutilizada.Should().BeFalse();
+        r.Valor.Should().Be(31m);
+        var nova = f.Cobrancas.Should().ContainSingle(c => c.Status == StatusCobrancaPedido.Pendente).Subject;
+        nova.Valor.Should().Be(31m);
+        f.Preferencias.Should().ContainSingle().Which.IdempotencyKey.Should().EndWith("-2");
+    }
+
+    private static void AdicionarItem(CobrancaPedidoFixture f, string nome, decimal qtd, decimal preco)
+    {
+        var item = new PedidoItem
+        {
+            Id = Guid.NewGuid(),
+            PedidoId = f.Pedido.Id,
+            Nome = nome,
+            Quantidade = qtd,
+            PrecoUnitario = preco,
+        };
+        item.RecalcularSubtotal();
+        f.Pedido.Itens.Add(item);
+        f.Pedido.RecalcularTotal();
     }
 }

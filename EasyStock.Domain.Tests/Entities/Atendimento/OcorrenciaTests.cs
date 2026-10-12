@@ -8,6 +8,22 @@ namespace EasyStock.Domain.Tests.Entities.Atendimento;
 /// <summary>S27 (#1186): regras da ocorrência.</summary>
 public class OcorrenciaTests
 {
+    [Fact]
+    public void Apurar_preserva_primeiro_responsavel_e_nao_reabre_encerrada()
+    {
+        var o = Nova();
+        var usuario = Guid.NewGuid();
+        o.Apurar(usuario, "Gerente", Agora).Should().BeTrue();
+        o.Apurar(Guid.NewGuid(), "Outra", Agora.AddMinutes(1)).Should().BeFalse();
+        o.ApuradaPorUsuarioId.Should().Be(usuario);
+        o.ApuradaPorNome.Should().Be("Gerente");
+        o.ApuradaEm.Should().Be(Agora);
+        o.Resolver("Concluída", usuario, Agora, "Gerente");
+        o.Apurar(Guid.NewGuid(), "Outra", Agora.AddMinutes(2)).Should().BeFalse();
+        o.EstaAberta.Should().BeFalse();
+        o.ResolvidaPorNome.Should().Be("Gerente");
+    }
+
     private static readonly DateTime Agora = new(2026, 9, 30, 15, 0, 0, DateTimeKind.Utc);
 
     private static Ocorrencia Nova() => Ocorrencia.Abrir(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null,

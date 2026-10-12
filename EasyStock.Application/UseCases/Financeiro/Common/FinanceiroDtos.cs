@@ -111,7 +111,7 @@ public sealed record ContaPagarResult(
         c.Id, c.EmpresaId, c.LojaId, c.FornecedorId, c.CategoriaFinanceiraId, c.CentroCustoId,
         c.Descricao, c.Observacoes,
         c.ValorTotal, c.TotalPago, c.Pendente,
-        c.StatusEfetivo(DateTime.UtcNow).ToString(),
+        c.StatusEfetivo(HorarioBrasil.HojeInstanteUtc()).ToString(), // #1506: dia de Brasilia, nao UTC
         c.DataEmissao, c.DataCompetencia,
         c.Origem.ToString(), c.OrigemRefId, c.DocumentoReferencia,
         c.CanceladaEm, c.MotivoCancelamento,
@@ -148,7 +148,7 @@ public sealed record ContaReceberResult(
         c.Id, c.EmpresaId, c.LojaId, c.ClienteId, c.CategoriaFinanceiraId, c.CentroCustoId,
         c.FaturaId, c.Descricao, c.Observacoes,
         c.ValorTotal, c.TotalRecebido, c.Pendente,
-        c.StatusEfetivo(DateTime.UtcNow).ToString(),
+        c.StatusEfetivo(HorarioBrasil.HojeInstanteUtc()).ToString(), // #1506: dia de Brasilia, nao UTC
         c.DataEmissao, c.DataCompetencia,
         c.Origem.ToString(), c.OrigemRefId, c.DocumentoReferencia,
         c.CanceladaEm, c.MotivoCancelamento,

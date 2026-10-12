@@ -5,20 +5,18 @@ namespace EasyStock.Infra.Postgre.Repositories;
 
 public sealed class EtiquetaTemplateRepository(EasyStockDbContext db) : IEtiquetaTemplateRepository
 {
-    public Task<IEnumerable<EtiquetaTemplateSistema>> ListSistemaAsync() =>
-        Task.FromResult<IEnumerable<EtiquetaTemplateSistema>>(
-            db.EtiquetaTemplatesSistema.AsNoTracking().OrderBy(t => t.Ordem).ToList());
+    public async Task<IEnumerable<EtiquetaTemplateSistema>> ListSistemaAsync() =>
+        await db.EtiquetaTemplatesSistema.AsNoTracking().OrderBy(t => t.Ordem).ToListAsync();
 
     public Task<EtiquetaTemplateSistema?> GetSistemaByIdAsync(Guid id) =>
         db.EtiquetaTemplatesSistema.FirstOrDefaultAsync(t => t.Id == id);
 
-    public Task<IEnumerable<EtiquetaTemplate>> ListEmpresaAsync(Guid empresaId) =>
-        Task.FromResult<IEnumerable<EtiquetaTemplate>>(
-            db.EtiquetaTemplates.AsNoTracking()
-                .Where(t => t.EmpresaId == empresaId)
-                .OrderByDescending(t => t.IsDefault)
-                .ThenBy(t => t.Nome)
-                .ToList());
+    public async Task<IEnumerable<EtiquetaTemplate>> ListEmpresaAsync(Guid empresaId) =>
+        await db.EtiquetaTemplates.AsNoTracking()
+            .Where(t => t.EmpresaId == empresaId)
+            .OrderByDescending(t => t.IsDefault)
+            .ThenBy(t => t.Nome)
+            .ToListAsync();
 
     public Task<EtiquetaTemplate?> GetEmpresaByIdAsync(Guid empresaId, Guid id) =>
         db.EtiquetaTemplates.FirstOrDefaultAsync(t => t.EmpresaId == empresaId && t.Id == id);

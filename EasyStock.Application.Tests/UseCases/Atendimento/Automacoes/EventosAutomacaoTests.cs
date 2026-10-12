@@ -34,6 +34,24 @@ public class EventosAutomacaoTests
     }
 
     [Fact]
+    public async Task EncerrarConversaJaEncerradaNaoPublicaDeNovo()
+    {
+        // #1292: Encerrar é idempotente; o evento também precisa ser, senão a automática de encerramento sai 2x.
+        var conversas = Substitute.For<IConversaRepository>();
+        var publicador = Substitute.For<IPublicadorEventoIntegracao>();
+        var conversa = Conversa.Abrir(_empresaId, "5511988887777", DateTime.UtcNow);
+        conversa.Encerrar(DateTime.UtcNow);
+        conversas.ObterPorIdAsync(_empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        await new GerenciarConversaAtendimentoUseCase(conversas, new FakeUnitOfWork(), publicador)
+            .EncerrarAsync(new AcaoConversaCommand(_empresaId, Guid.NewGuid(), conversa.Id));
+
+        await publicador.DidNotReceive().PublicarAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<Guid>(), Arg.Any<ConversaEncerradaEvent>(), Arg.Any<int>(), Arg.Any<string?>(),
+            Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task PedidoEntregueIgnoraOutrosStatus()
     {
         var pedidos = Substitute.For<IPedidoRepository>();

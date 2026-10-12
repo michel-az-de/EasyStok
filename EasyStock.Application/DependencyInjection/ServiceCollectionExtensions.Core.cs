@@ -67,6 +67,7 @@ public static partial class ServiceCollectionExtensions
         services.AddOptions<PedidoEstoqueOptions>();
         services.AddScoped<PedidoEstoqueIntegrationService>();
         services.AddScoped<CriarPedidoUseCase>();
+            services.AddScoped<EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido>();
         services.AddScoped<AtualizarStatusPedidoUseCase>();
         // S19: KDS do console sobre Pedido
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Kds.ListarPedidosKdsUseCase>();
@@ -76,16 +77,21 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.Services.Pedidos.NumeradorPedidoDoDia>(); // S53: número do dia
         services.AddScoped<EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido>();
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Atraso.NotificarAtrasoPedidoUseCase>();
+        // N11: miolo do CaixaEsquecidoJob (sino + PrazoEstourado).
+        services.AddScoped<EasyStock.Application.UseCases.Caixa.AvisarCaixasEsquecidasUseCase>();
         services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>();
         services.AddScoped<CancelarPedidoUseCase>();
         services.AddScoped<ObterPedidoDetalhesUseCase>();
         services.AddScoped<AdicionarItemPedidoUseCase>();
         services.AddScoped<RemoverItemPedidoUseCase>();
+        services.AddScoped<EasyStock.Application.Services.Pedidos.QuitacaoPedido>();
         services.AddScoped<RegistrarPagamentoPedidoUseCase>();
         services.AddScoped<RemoverPagamentoPedidoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.FinalizarVendaBalcao.FinalizarVendaBalcaoUseCase>();
         services.AddScoped<ListarPedidosUseCase>();
         services.AddScoped<AlterarAgendamentoPedidoUseCase>();
+        services.AddScoped<TrocarJanelaPedidoUseCase>();
 
         // Onda P3 — Caixa
         // Fonte ÚNICA do saldo esperado (consumida por /caixa e pelo Dashboard/Admin via
@@ -105,6 +111,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<RemoverItemLoteUseCase>();
         services.AddScoped<FinalizarLoteUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Producao.RegistrarProducaoUseCase>(); // S23 (#1137)
+        services.AddScoped<EasyStock.Application.UseCases.Producao.BaixaDeInsumosDaProducao>(); // D-M2-01 (#1499)
         services.AddScoped<AtualizarPesoLoteItemUseCase>(); // C2 backfill (R3 bloqueio)
         services.AddScoped<ListarLotesUseCase>();
         services.AddScoped<ObterLoteDetalhesUseCase>();

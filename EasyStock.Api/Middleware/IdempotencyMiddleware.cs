@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -22,15 +23,22 @@ namespace EasyStock.Api.Middleware;
 /// (whitelist explicita) — nao queremos cachear por header em endpoints
 /// idempotentes por natureza (GET/PUT) ou onde duplicidade e' aceitavel.
 ///
-/// TTL: 24h. Cleanup periodico via <see cref="IIdempotencyKeyRepository.CleanupExpiredAsync"/>.
+/// TTL: 24h. Limpeza (#1578): a propria requisicao idempotente apaga as chaves expiradas da empresa dela, no maximo
+/// uma vez por hora por empresa, via <see cref="IIdempotencyKeyRepository.CleanupExpiredAsync"/>. Roda com o tenant
+/// da requisicao: a tabela tem RLS e um job sem tenant nao apagaria nada.
 /// </summary>
-public sealed class IdempotencyMiddleware(RequestDelegate next, IdempotencyOptions options, ILogger<IdempotencyMiddleware> logger)
+public sealed class IdempotencyMiddleware(
+    RequestDelegate next, IdempotencyOptions options, ILogger<IdempotencyMiddleware> logger, TimeProvider? relogio = null)
 {
     private const string HeaderName = "Idempotency-Key";
     private const int MaxBufferBytes = 1 * 1024 * 1024; // 1MB hard cap por request — evita OOM em response excepcionalmente grande.
     private const int CacheMaxBytes = 64 * 1024;        // 64KB cacheado em DB.
     private const int MaxPayloadHashBytes = 256 * 1024; // acima disso nao calcula hash (custo), so nao dedup fino.
     private static readonly TimeSpan Ttl = TimeSpan.FromHours(24);
+    private static readonly TimeSpan IntervaloDeLimpeza = TimeSpan.FromHours(1);
+
+    private readonly TimeProvider _relogio = relogio ?? TimeProvider.System;
+    private readonly ConcurrentDictionary<Guid, DateTime> _ultimaLimpeza = new();
 
     public async Task InvokeAsync(HttpContext context)
     {
@@ -195,6 +203,43 @@ public sealed class IdempotencyMiddleware(RequestDelegate next, IdempotencyOptio
         else
         {
             await MarcarFalhouSemQuebrarAsync(repo, idParaFinalizar, context.RequestAborted);
+        }
+
+        await LimparExpiradasDaEmpresaAsync(repo, empresaId, context.RequestAborted);
+    }
+
+    /// <summary>
+    /// #1578: apaga as chaves expiradas da empresa desta requisicao (o tenant ja esta fixado na conexao). A resposta
+    /// ja saiu pelo stream; falha aqui so adia a limpeza para a proxima hora.
+    /// </summary>
+    private async Task LimparExpiradasDaEmpresaAsync(IIdempotencyKeyRepository repo, Guid empresaId, CancellationToken ct)
+    {
+        var agora = _relogio.GetUtcNow().UtcDateTime;
+        if (!ChegouAHoraDeLimpar(empresaId, agora)) return;
+        try
+        {
+            var removidas = await repo.CleanupExpiredAsync(agora, ct);
+            if (removidas > 0)
+                logger.LogInformation("Idempotencia: {Removidas} chaves expiradas apagadas da empresa {EmpresaId}.", removidas, empresaId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Idempotencia: falha ao apagar chaves expiradas da empresa {EmpresaId}. Nova tentativa em {Intervalo}.", empresaId, IntervaloDeLimpeza);
+        }
+    }
+
+    // Uma requisicao por empresa ganha a vez a cada intervalo; as concorrentes seguem sem limpar.
+    private bool ChegouAHoraDeLimpar(Guid empresaId, DateTime agora)
+    {
+        while (true)
+        {
+            if (!_ultimaLimpeza.TryGetValue(empresaId, out var ultima))
+            {
+                if (_ultimaLimpeza.TryAdd(empresaId, agora)) return true;
+                continue;
+            }
+            if (agora - ultima < IntervaloDeLimpeza) return false;
+            if (_ultimaLimpeza.TryUpdate(empresaId, agora, ultima)) return true;
         }
     }
 

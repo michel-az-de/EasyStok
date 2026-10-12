@@ -1,13 +1,18 @@
+import { memo } from 'react'
 import { Icone } from '../../componentes/Icone'
+import { mesmasProps } from '../../aplicacao/igualdade'
 import { horaCurta } from '../../dominio/formato'
 import { partesComLinkDoCardapio } from '../../dominio/cardapioLink'
 import { BolhaArquivo, BolhaAudio, BolhaPeca } from './BolhaAnexo'
 import { BolhaAvaliacaoPedido, BolhaAvaliacaoResposta } from './BolhaAvaliacao'
+import { BolhaMidiaApi } from './BolhaMidiaApi'
 import css from './atendimento.module.css'
 
 const CLASSE = { in: css.entrada, out: css.saida }
 
 function Corpo({ mensagem }) {
+  // Modo API: arquivo do canal servido pelo endpoint autenticado (#1287).
+  if (mensagem.midia) return <BolhaMidiaApi mensagem={mensagem} />
   if (mensagem.formato === 'figurinha') {
     return <img className={css.figurinha} src={mensagem.arte} alt={mensagem.texto} />
   }
@@ -32,7 +37,8 @@ function Corpo({ mensagem }) {
   if (mensagem.formato === 'avaliacaoResposta') return <BolhaAvaliacaoResposta mensagem={mensagem} />
   return (
     <p className={mensagem.regra === 'resumo' ? css.resumo : undefined}>
-      {partesComLinkDoCardapio(mensagem.texto).map((parte, i) => (parte.tipo === 'link'
+      {/* #1510: mensagem que chega do cliente nunca vira link; a nossa, só da própria origem. */}
+      {partesComLinkDoCardapio(mensagem.texto, mensagem.dir === 'in' ? null : window.location.origin).map((parte, i) => (parte.tipo === 'link'
         ? <LinkDoCardapio key={i} url={parte.texto} />
         : parte.texto))}
     </p>
@@ -45,16 +51,18 @@ function Corpo({ mensagem }) {
 function LinkDoCardapio({ url }) {
   const abrir = (evento) => {
     evento.preventDefault()
-    window.open(url, 'cdb-cardapio-cliente', 'width=420,height=860')
+    window.open(url, 'cdb-cardapio-cliente', 'width=420,height=860,noopener')
   }
   return (
-    <a className={css.linkCardapio} href={url} target="_blank" rel="noreferrer" title="Abrir como o cliente vê" onClick={abrir}>
+    <a className={css.linkCardapio} href={url} target="_blank" rel="noopener noreferrer" title="Abrir como o cliente vê" onClick={abrir}>
       {url}
     </a>
   )
 }
 
-export function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica }) {
+// #1577: em `memo`. Mensagem nova na conversa não re-renderiza os balões antigos (até 100, cada um com a
+// regex de link). A mensagem compara por conteúdo: a leitura da API a devolve como objeto novo sem ter mudado.
+export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReenviar }) {
   if (mensagem.dir === 'sistema') {
     return (
       <p className={`${css.balao} ${css.sistema} ${trocaDeVoz ? css.trocaDeVoz : ''}`}>
@@ -75,24 +83,35 @@ export function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica }) {
           <button
             type="button"
             className={`${css.selo} ${css.seloBotao}`}
+            title={mensagem.origemAutomatica === 'agente' ? 'Escrita pelo agente do EasyStok' : 'Mensagem automática do sistema'}
             onClick={() => aoAbrirDefinicaoAutomatica?.(mensagem.regra)}
           >
             <Icone nome="raio" /> automática
           </button>
         )}
-        {mensagem.modelo && <span className={css.selo}><Icone nome="modelo" /> modelo</span>}
+        {mensagem.modelo && <span className={css.selo} title={mensagem.modeloNome}><Icone nome="modelo" /> modelo</span>}
         {mensagem.programada && <span className={css.selo}><Icone nome="relogio" /> programada</span>}
         <time dateTime={mensagem.em}>{horaCurta(mensagem.em)}</time>
         {mensagem.status === 'falhou' && (
-          <span className={css.falhou} role="alert">⚠ {mensagem.erro ?? 'Não enviada.'}</span>
+          <span className={css.falhou} role="alert"><Icone nome="alerta" tamanho={14} /> {mensagem.erro ?? 'Não enviada.'}</span>
         )}
-        {mensagem.dir === 'out' && mensagem.status !== 'falhou' && (
+        {/* S57: texto que falhou volta a sair pelo mesmo canal. Só com a ação ligada (modo API). */}
+        {mensagem.porSms && <span className={css.selo}><Icone nome="check" /> saiu por SMS</span>}
+        {mensagem.status === 'falhou' && mensagem.dir === 'out' && aoReenviar && !mensagem.modelo && !mensagem.semIdServidor && !mensagem.midia && !mensagem.aguardaCliente && (
+          <button type="button" className={`${css.selo} ${css.seloBotao}`} onClick={() => aoReenviar(mensagem.id)}>
+            <Icone nome="raio" /> Reenviar
+          </button>
+        )}
+        {mensagem.dir === 'out' && mensagem.status === 'enviando' && (
+          <span className={css.enviando}>{mensagem.modelo ? 'envio sem confirmação' : 'enviando'}</span>
+        )}
+        {mensagem.dir === 'out' && mensagem.status !== 'falhou' && mensagem.status !== 'enviando' && (
           <span>
             <span aria-hidden="true">{entregue ? '✓✓' : '✓'}</span>
-            <span className="sr">{entregue ? 'entregue' : 'enviando'}</span>
+            <span className="sr">{entregue ? 'entregue' : 'enviada'}</span>
           </span>
         )}
       </span>
     </div>
   )
-}
+}, (antes, depois) => mesmasProps(antes, depois, ['mensagem']))
