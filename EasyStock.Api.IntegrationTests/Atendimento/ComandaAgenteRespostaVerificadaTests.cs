@@ -23,12 +23,19 @@ public sealed partial class PedidoConversaConcorrenciaTests
 {
     [SkippableTheory]
     [InlineData("escalar")]
-    [InlineData("encerrar")]
     [InlineData("outro_cliente")]
     [InlineData("sem_pedido")]
     [InlineData("criar")]
     [InlineData("criar_falha")]
-    public async Task Comanda_AgentePreservaAcoesReaisENuncaPromoveTextoLivre(string caso)
+    public Task Comanda_AgentePreservaAcoesReaisENuncaPromoveTextoLivre(string caso) => ExercitarAcaoVerificada(caso);
+
+    [SkippableFact]
+    public Task Comanda_EncerrarComPedidoVinculadoEncaminhaSemAlterarFinanceiro() => ExercitarAcaoVerificada("encerrar_com_pedido");
+
+    [SkippableFact]
+    public Task Comanda_EncerrarSemPedidoEnviaDespedidaUmaVezESuspendeLote() => ExercitarAcaoVerificada("encerrar_sem_pedido");
+
+    private async Task ExercitarAcaoVerificada(string caso)
     {
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
         var llm = Substitute.For<IAgenteLlmClient>(); llm.Disponivel.Returns(true);
@@ -43,7 +50,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
             b.ConfigureTestServices(s => { s.AddSingleton(llm); s.AddSingleton(cloud); }));
         using var client = factory.CreateClient(); var cenario = await SemearAsync(factory);
         var token = await Link(factory, cenario.ConversaId); var pedidoId = Guid.Empty;
-        if (caso is "escalar" or "encerrar" or "outro_cliente")
+        if (caso is "escalar" or "encerrar_com_pedido" or "outro_cliente")
         {
             var estado = await Estado(client, token);
             await Salvar(client, token, estado, estado.Rascunho with
@@ -68,7 +75,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         var consultar = new BlocoUsoFerramentaLlm("consulta", "consultar_pedido", JsonSerializer.SerializeToElement(new { pedido_id = pedidoId }));
         BlocoLlm[] ferramentas = caso switch
         {
-            "escalar" or "encerrar" => [consultar, new BlocoUsoFerramentaLlm("acao", caso == "escalar" ? "escalar_para_dona" : "encerrar_conversa",
+            "escalar" or "encerrar_com_pedido" or "encerrar_sem_pedido" => [consultar, new BlocoUsoFerramentaLlm("acao", caso == "escalar" ? "escalar_para_dona" : "encerrar_conversa",
                 JsonSerializer.SerializeToElement(new { motivo = "Conferência solicitada" })),
                 new BlocoUsoFerramentaLlm("proibida_apos_acao", "criar_pedido", JsonSerializer.SerializeToElement(new { }))],
             "criar" or "criar_falha" => [new BlocoUsoFerramentaLlm("criar", "criar_pedido", JsonSerializer.SerializeToElement(new
@@ -81,37 +88,48 @@ public sealed partial class PedidoConversaConcorrenciaTests
         llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
             new RespostaLlm(RespostaLlm.StopToolUse, ferramentas, 1, 1),
             new RespostaLlm("end_turn", [new BlocoTextoLlm("Seu estorno já caiu na conta.")], 1, 1));
+        var antes = caso == "encerrar_com_pedido" ? await Estado(client, token) : null;
         var agente = scope.ServiceProvider.GetRequiredService<AgenteAtendimentoService>();
         var resultado = await agente.ProcessarTurnoAsync(EmpresaId, conversa.Id, DateTime.UtcNow);
         var texto = mensagens.Should().ContainSingle().Subject;
+        if (Environment.GetEnvironmentVariable("EASYSTOK_GUARD_EVIDENCIAS") is { Length: > 0 } arquivo)
+            await File.WriteAllTextAsync($"{arquivo}.{caso}.json", JsonSerializer.Serialize(new
+            {
+                caso, resultado, texto, conversa.Situacao, antes,
+                pedidos = await db.Pedidos.Select(p => new { p.Id, p.ClienteId, p.Status }).ToArrayAsync(),
+                cobrancas = await db.CobrancasPedido.Select(c => c.Id).ToArrayAsync()
+            }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
         texto.Should().NotContain("caiu na conta").And.NotContain("{").And.NotContain("Nota livre");
         resultado.Respondeu.Should().BeTrue();
-        resultado.Escalou.Should().Be(caso is not ("criar" or "encerrar"));
+        resultado.Escalou.Should().Be(caso is not ("criar" or "encerrar_sem_pedido"));
         if (caso == "criar")
         {
             texto.Should().Contain("Pedido registrado").And.Contain("Aguardando pagamento").And.Contain("R$ 15,00").And.Contain("https://");
             (await db.CobrancasPedido.CountAsync()).Should().Be(1);
         }
-        else if (caso == "encerrar")
+        else if (caso == "encerrar_sem_pedido")
         {
             conversa.Situacao.Should().Be(SituacaoConversa.Encerrada);
             texto.Should().StartWith("Conversa encerrada.");
         }
         else texto.Should().Contain("equipe").And.NotContain("Pedido registrado");
-        if (caso is "escalar" or "encerrar")
+        if (caso is "escalar" or "encerrar_sem_pedido")
         {
-            (await db.Pedidos.CountAsync()).Should().Be(1, "nenhuma ferramenta do lote pode executar após transferência ou encerramento");
+            (await db.Pedidos.CountAsync()).Should().Be(caso == "escalar" ? 1 : 0, "nenhuma ferramenta do lote pode executar após transferência ou encerramento");
             await llm.Received(1).EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
+        }
+        if (caso == "encerrar_com_pedido")
+        {
+            conversa.Situacao.Should().Be(SituacaoConversa.Assumida, "pedido vinculado deve ir para a equipe e conserva a conversa aberta");
+            var depois = await Estado(client, token);
+            depois.Pedido.Should().BeEquivalentTo(antes!.Pedido);
+            depois.Financeiro.Should().BeEquivalentTo(antes.Financeiro);
+            depois.Envio.Should().BeEquivalentTo(antes.Envio);
+            (await db.Pedidos.CountAsync()).Should().Be(1);
+            (await db.CobrancasPedido.CountAsync()).Should().Be(1);
         }
         if (caso == "criar_falha") (await db.CobrancasPedido.CountAsync()).Should().Be(0);
         (await agente.ProcessarTurnoAsync(EmpresaId, conversa.Id, DateTime.UtcNow)).ChamouLlm.Should().BeFalse();
-        if (Environment.GetEnvironmentVariable("EASYSTOK_GUARD_EVIDENCIAS") is { Length: > 0 } arquivo)
-            await File.WriteAllTextAsync($"{arquivo}.{caso}.json", JsonSerializer.Serialize(new
-            {
-                caso, resultado, texto, conversa.Situacao,
-                pedidos = await db.Pedidos.Select(p => new { p.Id, p.ClienteId, p.Status }).ToArrayAsync(),
-                cobrancas = await db.CobrancasPedido.Select(c => c.Id).ToArrayAsync()
-            }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
     }
 
     [SkippableTheory]

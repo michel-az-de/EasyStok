@@ -226,6 +226,31 @@ public class AgenteAtendimentoServiceTests
         _requisicoes.Should().ContainSingle();
     }
 
+    [Fact]
+    public async Task EncerramentoComPedidoVinculadoEncaminhaParaEquipeSemDespedidaOuRespostaLivre()
+    {
+        _situacaoNoBanco = SituacaoConversa.Automatica;
+        _escalador.When(e => e.EscalarAsync(_empresaId, _conversa, Arg.Any<string>(), Agora, Arg.Any<CancellationToken>()))
+            .Do(_ => _conversa.Escalar(Agora, "pedido vinculado"));
+        var pedidoId = Guid.NewGuid();
+        _conversa.DefinirPedidoEmAndamento(pedidoId);
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
+            UsoFerramenta("encerrar_conversa"),
+            new RespostaLlm("end_turn", [new BlocoTextoLlm("Pedido concluído e conversa encerrada.")], 1, 1));
+        var servico = CriarServico(new EncerrarConversaFerramenta());
+
+        var resultado = await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Respondeu.Should().BeTrue();
+        resultado.Escalou.Should().BeTrue();
+        _conversa.Situacao.Should().NotBe(SituacaoConversa.Encerrada);
+        _conversa.PedidoEmAndamentoId.Should().Be(pedidoId);
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId,
+            "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.",
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        (await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora)).ChamouLlm.Should().BeFalse();
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
