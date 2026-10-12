@@ -91,6 +91,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
             (await client.PostAsJsonAsync($"{Rota(token)}/confirmar", new { final.Revisao })).StatusCode.Should().Be(HttpStatusCode.OK);
             (await banco.AtendimentoMensagens.CountAsync(x => x.ConversaId == conversaId)).Should().Be(notasAntes);
             var rotaFrete = $"/api/atendimento/conversas/{conversaId}/comandas-cliente/{final.LinkId}/combinar-frete";
+            (await client.PostAsJsonAsync(rotaFrete, new { final.Revisao })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
             (await client.PostAsJsonAsync(rotaFrete, new { final.Revisao, Valor = -1m })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
             (await client.PostAsJsonAsync($"/api/atendimento/conversas/{c.ConversaId}/comandas-cliente/{final.LinkId}/combinar-frete",
                 new { final.Revisao, Valor = 13.5m })).StatusCode.Should().Be(HttpStatusCode.Gone);

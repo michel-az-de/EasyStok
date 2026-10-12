@@ -40,8 +40,9 @@ public sealed class AtendimentoComandasClienteController(ILinkCardapioConversaRe
     public async Task<IActionResult> CombinarFrete(Guid conversaId, Guid linkId, [FromBody] CombinarFreteComandaBody body, CancellationToken ct)
     {
         if (!usuario.TemPermissao(Permissao.AtenderConversas)) return Forbid();
+        if (body.Valor is not { } valor) return Problem("Informe o valor do frete combinado.", statusCode: 400);
         try { return Ok(new { data = await comanda.CombinarFreteAsync(usuario.EmpresaId, conversaId, linkId, body.Revisao,
-            body.Valor, User.Identity?.Name ?? "a equipe", ct) }); }
+            valor, User.Identity?.Name ?? "a equipe", ct) }); }
         catch (LinkCardapioConversaIndisponivelException e) { return Problem(e.Message, statusCode: 410); }
         catch (ComandaClienteConflitoException e) { return Problem(e.Message, statusCode: 409); }
         catch (UseCaseValidationException e) { return Problem(e.Message, statusCode: 400); }
@@ -60,4 +61,4 @@ public sealed class AtendimentoComandasClienteController(ILinkCardapioConversaRe
     }
 }
 public sealed record ConfirmarAlteracaoClienteBody(bool Aceitar);
-public sealed record CombinarFreteComandaBody(int Revisao, decimal Valor);
+public sealed record CombinarFreteComandaBody(int Revisao, decimal? Valor);
