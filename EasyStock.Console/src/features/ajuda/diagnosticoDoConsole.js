@@ -5,7 +5,7 @@ const GUIAS = {
   atendimento: [
     'Escolha a conversa no Balcão. Atendimento reúne as mensagens; a Ficha guarda os dados do cliente e a comanda.',
     'Use Respostas para inserir um texto pronto. Confira o destinatário e o texto antes de enviar.',
-    'No Assistente, peça uma sugestão ou faça uma pergunta sobre a conversa. Revise cada proposta antes de usar ou enviar ao cliente.',
+    'Peça sugestões ao Assistente. Revise cada proposta antes de usar ou enviar ao cliente.',
   ],
   cardapio: [
     'Abra a foto ou o nome do prato para editar fotos, informações e porções, conforme seu acesso.',
@@ -28,11 +28,11 @@ const GUIAS = {
     'As ações disponíveis dependem do seu perfil. Se faltar uma ação necessária, peça à dona para revisar seu acesso.',
   ],
   campanhas: [
-    'Consulte o estado mostrado na tela. Um recurso indicado como ainda não ligado não está gravando alterações no EasyStok.',
+    'Uma função marcada como Em preparação ainda não está disponível.',
   ],
   configuracoes: [
     'Canais reúne a situação do WhatsApp. Confira os avisos antes de alterar a configuração.',
-    'Um recurso indicado como ainda não ligado não está gravando alterações no EasyStok.',
+    'Uma função marcada como Em preparação ainda não está disponível.',
   ],
 }
 
@@ -58,8 +58,8 @@ export function contextoDaAjuda(rota, fonteApi) {
   const producaoNaoLigada = fonteApi && modulo?.id === 'cozinha' && tela?.id === 'producao'
   return {
     titulo: tela ? `${modulo.nome} · ${tela.rotulo}` : modulo?.nome ?? 'Módulos',
-    passos: producaoNaoLigada ? ['Esta tela antiga da Cozinha ainda não está ligada à API.', 'Para registrar o preparo, abra Produção e escolha Produção do dia.'] : TELAS[`${modulo?.id}/${tela?.id}`] ?? GUIAS[modulo?.id] ?? [
-      'Busque pelo nome do módulo ou da tela. A busca considera só o catálogo de navegação.',
+    passos: producaoNaoLigada ? ['Esta tela ainda não está disponível.', 'Para registrar o preparo, abra Produção e escolha Produção do dia.'] : TELAS[`${modulo?.id}/${tela?.id}`] ?? GUIAS[modulo?.id] ?? [
+      'Busque um módulo ou uma função pelo nome.',
       'Os módulos disponíveis seguem seu perfil. Para voltar ao atendimento, abra Atendimento e escolha Balcão.',
     ],
     atalho: producaoNaoLigada ? { modulo: 'producao', tela: 'producao', rotulo: 'Ir para Produção do dia' } : null,

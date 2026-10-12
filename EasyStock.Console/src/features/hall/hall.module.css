@@ -32,7 +32,6 @@
 .conteudo { width: min(1384px, 100%); margin: 0 auto; padding: var(--e-4) var(--e-5); }
 
 .cabeca { min-width: 0; }
-.legenda { margin: 0 0 var(--e-3); font-size: var(--t-minimo); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--marca-forte); }
 .titulo {
   margin: 0; font-family: var(--f-titulo-marca); font-weight: 500;
   font-size: clamp(2rem, 2.5vw, 2.75rem); line-height: 1.15; color: var(--tinta);
@@ -56,9 +55,6 @@
 .cartao:not(.emBreve):hover { border-color: var(--marca); background: var(--preenchimento); }
 .cartao:has(.abrir:focus-visible) { outline: 3px solid var(--marca); outline-offset: 2px; }
 
-.numero {
-  font-size: var(--t-minimo); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--tinta-3);
-}
 .icone { grid-column: 1; grid-row: 1 / span 2; display: grid; place-items: start center; padding-top: var(--e-1); width: 44px; color: var(--marca); }
 .icone > svg { width: 30px; height: 30px; }
 .nome { grid-column: 2; font-family: var(--f-corpo); font-size: var(--t-titulo); line-height: var(--lh-compacto); font-weight: 700; color: var(--tinta); }
@@ -114,7 +110,6 @@
 .rotina { padding: 0 0 var(--e-5); margin-bottom: var(--e-5); border-bottom: 1px solid var(--linha); animation: aparecerRotina var(--dur-curta) var(--ease-saida); }
 .cabecaRotina { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--e-1) var(--e-2); margin-bottom: var(--e-2); }
 .rotinaTitulo { font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); }
-.rotinaApoio { font-size: var(--t-apoio); color: var(--tinta-2); }
 .linksRotina { display: flex; flex-wrap: wrap; gap: var(--e-2); margin: 0; padding: 0; list-style: none; }
 .linksRotina > li { min-width: 0; }
 .linkRotina { display: flex; align-items: center; gap: var(--e-2); min-height: var(--toque); padding: var(--e-2) var(--e-3); background: var(--papel); color: var(--marca-forte); border: var(--b-1) solid var(--linha); border-radius: var(--r-1); font-size: var(--t-apoio); font-weight: 700; text-decoration: none; }
@@ -171,7 +166,6 @@
 .destaque { display: flex; align-items: center; gap: var(--e-3); padding: var(--e-3) var(--e-4); margin-bottom: var(--e-4); border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--comanda); }
 .ilustracao { display: grid; place-items: center; flex: 0 0 48px; color: var(--marca-forte); }
 .textoDestaque { flex: 1; min-width: 0; }
-.textoDestaque .legenda { margin-bottom: var(--e-2); }
 .textoDestaque h2 { font: 500 var(--t-valor)/1.2 var(--f-titulo-marca); margin: 0; }
 .acaoDestaque { display: flex; justify-content: center; align-items: center; gap: var(--e-3); flex: none; min-height: 48px; padding: var(--e-3) var(--e-4); border-radius: var(--r-2); background: var(--acao); color: var(--sobre-acao); text-decoration: none; font-weight: 700; }
 .acaoDestaque:hover { background: var(--acao-forte); }
@@ -212,7 +206,6 @@
 }
 @media (max-width: 640px) {
   .abertura { gap: var(--e-2); margin-bottom: var(--e-3); padding-bottom: var(--e-3); }
-  .cabeca .legenda { margin-bottom: var(--e-1); }
   .destaque { padding: var(--e-3); margin-bottom: var(--e-3); }
   .textoDestaque h2 { font-size: 1.4rem; }
   .textoDestaque { flex-basis: calc(100% - 64px); }

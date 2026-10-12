@@ -23,7 +23,7 @@ export function CompartilharComanda({ conversa }) {
   }
   if (conversaEncerrada(conversa) || estaBloqueada(conversa)) return null
   return <>
-    <Botao icone="cardapio" variante="primario" aria-haspopup="dialog"
+    <Botao icone="cardapio" variante="secundario" aria-haspopup="dialog"
       onClick={() => setAberto(true)}>Link de compra</Botao>
     {aberto && <ModalEnviarCardapio nomeCliente={conversa.nome} canalNome={canal.nome}
       numeroComanda={conversa.numeroComanda} aoGerar={gerar}

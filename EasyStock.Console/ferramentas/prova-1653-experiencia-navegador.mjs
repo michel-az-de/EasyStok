@@ -142,7 +142,7 @@ try {
   await conferir('falha ao salvar conserva mensagem, reenvio confirmado limpa pendência', async () => {
     estado.falhar = true
     await page.getByRole('button', { name: 'Salvar mensagens', exact: true }).click()
-    await page.getByRole('alert').filter({ hasText: 'Falha ao salvar' }).waitFor()
+    await page.getByRole('alert').filter({ hasText: 'Não foi possível confirmar o salvamento' }).waitFor()
     assert.equal(await fora.inputValue(), 'Rascunho para um dia difícil.')
     estado.falhar = false
     await page.getByRole('button', { name: 'Salvar mensagens', exact: true }).click()
