@@ -123,8 +123,21 @@ try {
     }
     await page.goto(origem + '/' + hashDoModulo(modulo.id))
     if (modulo.id === 'atendimento') await page.getByRole('navigation', { name: 'Navegação', exact: true }).waitFor()
-    else await page.getByRole('navigation', { name: `Telas de ${modulo.nome}`, exact: true }).waitFor()
+    else await page.getByRole('navigation', { name: `Telas de ${modulo.nome}`, exact: true }).locator(`a[href="${hashDoModulo(modulo.id, telas[0].id)}"][aria-current="page"]`).waitFor()
+    if (modulo.id === 'cardapio') await page.getByRole('button', { name: 'Novo prato', exact: true }).first().waitFor()
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
     await page.screenshot({ path: join(evidencias, `navegacao-${modulo.id}.png`) })
+    if (modulo.id === 'cardapio') {
+      await page.getByRole('button', { name: 'Novo prato', exact: true }).first().waitFor()
+      const botoes = await page.getByRole('button', { name: 'Novo prato', exact: true }).evaluateAll(nos => nos.map(no => {
+        const r = no.getBoundingClientRect()
+        const faixa = document.createRange()
+        faixa.selectNodeContents(no)
+        const conteudo = faixa.getBoundingClientRect()
+        return { esquerda: r.left, direita: r.right, conteudoDireita: conteudo.right, viewport: innerWidth }
+      }))
+      assert.ok(botoes.length > 0 && botoes.every(b => b.esquerda >= 0 && b.direita <= b.viewport && b.conteudoDireita <= b.direita), JSON.stringify(botoes))
+    }
   }
   await page.goto(origem + '/#/m/financeiro/pagar')
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).waitFor()
