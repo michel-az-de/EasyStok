@@ -7,6 +7,8 @@ let quadroAnterior = null
 const MS_ATE_LIBERAR = 60000
 // Fonte que não chega (rede ruim) não segura o papel: imprime com a fonte que tiver.
 const MS_ESPERA_FONTES = 4000
+// O `load` espera as imagens; logo que não responde não pode deixar o botão preso em "Preparando".
+const MS_ESPERA_CARGA = 8000
 
 const esperar = (ms) => new Promise((ok) => { setTimeout(ok, ms) })
 
@@ -37,7 +39,17 @@ export function imprimirHtml(html) {
     // A página é só papel, sem script. `allow-modals` é o que deixa o `print()` abrir.
     quadro.setAttribute('sandbox', 'allow-same-origin allow-modals')
     quadro.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden'
+    let decidido = false
+    const prazo = setTimeout(() => {
+      if (decidido) return
+      decidido = true
+      removerQuadro(quadro)
+      planoB()
+    }, MS_ESPERA_CARGA)
     quadro.addEventListener('load', async () => {
+      if (decidido) return
+      decidido = true
+      clearTimeout(prazo)
       try {
         // `load` já esperou as imagens (logo, QR); as fontes da página têm promessa própria.
         await Promise.race([quadro.contentDocument?.fonts?.ready, esperar(MS_ESPERA_FONTES)])

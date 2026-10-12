@@ -95,10 +95,12 @@ public sealed class PedidoImpressoHtml(IRendererTemplate renderer, IConfiguratio
             ["alergias"] = opcoes.Alergias is { Count: > 0 } a ? T(string.Join(", ", a).ToLower(PtBr)) : null,
             ["total"] = Moeda(p.Cobranca.Total),
             ["pago"] = p.Cobranca.Pago,
+            ["saldo"] = Moeda(p.Cobranca.Saldo),
             ["forma"] = T(forma),
             ["cobranca_frase"] = T(p.Cobranca.Pago
                 ? "Tudo pago" + (forma is null ? string.Empty : " no " + forma) + ". Obrigada!"
-                : "A acertar na entrega" + (forma is null ? string.Empty : " · " + forma) + "."),
+                : (p.Cobranca.Recebido > 0 ? "Falta " + Moeda(p.Cobranca.Saldo) + ", a acertar na entrega" : "A acertar na entrega")
+                  + (forma is null ? string.Empty : " · " + forma) + "."),
             ["qr"] = link is null ? null : QrSvg.Gerar(link),
         };
     }

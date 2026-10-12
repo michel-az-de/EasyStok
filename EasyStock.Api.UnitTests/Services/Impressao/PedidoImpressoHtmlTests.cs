@@ -35,7 +35,7 @@ public class PedidoImpressoHtmlTests
 
     internal static PedidoImpressoDto Exemplo(
         bool agendado = true, bool pago = false, string? clienteNome = "Mariana Souza", string? logo = Logo,
-        string? whatsApp = "5511900000000", IReadOnlyList<PedidoImpressoItemDto>? itens = null) => new(
+        string? whatsApp = "5511900000000", IReadOnlyList<PedidoImpressoItemDto>? itens = null, decimal recebido = 0m) => new(
         new PedidoImpressoCasaDto("Casa da Baba", "12345678000190", "https://casadababa.com.br/", whatsApp, logo),
         "A7F3C21B",
         agendado
@@ -52,7 +52,7 @@ public class PedidoImpressoHtmlTests
         ],
         "Deixar na portaria, bloco B",
         "Embalar os pães separados",
-        new PedidoImpressoCobrancaDto(173.30m, pago, "pix"),
+        new PedidoImpressoCobrancaDto(173.30m, pago, "pix", recebido),
         7,
         agendado ? new DateTime(2026, 9, 30, 14, 32, 0) : new DateTime(2026, 10, 2, 14, 32, 0),
         new DateTime(2026, 10, 1, 9, 12, 0),
@@ -162,6 +162,28 @@ public class PedidoImpressoHtmlTests
 
         aCobrar.Should().ContainAll("<div class=\"alerta\">RECEBER R$ 173,30<small>PIX</small></div>", "Motoboy · João").And.NotContain("Já está pago");
         paga.Should().Contain("Nada. Já está pago.").And.NotContain("RECEBER");
+    }
+
+    [Fact]
+    public async Task ComSinalOEntregadorCobraSoOSaldo()
+    {
+        var dto = Exemplo(recebido: 50m);
+
+        var entrega = SnapshotImpresso.Corpo(await Renderizar(dto, PedidoImpressoHtml.Entrega, ImpressoHtml.Cupom80));
+        var pedido = SnapshotImpresso.Corpo(await Renderizar(dto, PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom80));
+
+        entrega.Should().Contain("RECEBER R$ 123,30<small>PIX</small>").And.NotContain("RECEBER R$ 173,30");
+        pedido.Should().ContainAll("R$ 173,30", "Falta R$ 123,30, a acertar na entrega · PIX.");
+    }
+
+    [Theory]
+    [MemberData(nameof(DocumentosEPapeis))]
+    public async Task ClienteSemNomeNaoDeixaFraseQuebrada(string documento, string modelo)
+    {
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(Exemplo(clienteNome: null), documento, modelo));
+
+        corpo.Should().NotContainAny("<h1>, ", "<h1>Para </h1>", ">Para <");
+        corpo.Should().ContainAny("<h1>Vamos à mesa?</h1>", "<h1>Combinado: ", "<h1>Seu pedido chegou</h1>");
     }
 
     [Theory]

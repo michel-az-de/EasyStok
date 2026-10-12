@@ -212,7 +212,7 @@ export function TelaCozinhaApi({ linhas }) {
                     <Botao variante="primario" icone="printer" onClick={imprimirDaFila}>Imprimir</Botao>
                     <ImprimirPedido
                       key={topoDaFila.id} {...impressaoDoPedido(topoDaFila.pedidoId)} documentoInicial="cozinha"
-                      rotulo="Escolher papel" aoImprimir={() => confirmarImpressao(topoDaFila.id)}
+                      rotulo="Escolher papel" aoImprimir={(documento) => { if (documento === 'cozinha') confirmarImpressao(topoDaFila.id) }}
                     />
                   </output>
                 )}

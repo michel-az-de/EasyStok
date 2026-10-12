@@ -11,7 +11,6 @@ export const obterHtmlDoImpresso = (pedidoId, opcoes) =>
 const urlDoLogo = (url) => (typeof url === 'string' && url ? (url.startsWith('/') ? API_BASE + url : url) : null)
 
 // A loja que recebe o logo: a primeira ativa da empresa logada (tenant único, uma loja).
-// `logoUrl` ainda não vem nesta leitura; quando a API passar a mandar, a tela já mostra.
 export async function obterLojaDaEmpresa() {
   const empresaId = lerSessao()?.empresa?.id
   if (!empresaId) throw new Error('Entre novamente na empresa para continuar.')

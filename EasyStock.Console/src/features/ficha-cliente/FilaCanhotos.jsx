@@ -122,7 +122,7 @@ export function FilaCanhotos() {
       {pedidoIdApi && (
         <ImprimirPedido
           key={pedidoIdApi} {...impressaoDoPedido(pedidoIdApi)} documentoInicial="pedido"
-          rotulo="Escolher papel" aoImprimir={concluir}
+          rotulo="Escolher papel" aoImprimir={(documento) => { if (documento === 'pedido' || documento === 'cozinha') concluir() }}
         />
       )}
     </output>

@@ -83,7 +83,7 @@ export function ModalCanhoto({
             {pedidoIdApi ? (
               <>
                 <AcoesPdf gerar={gerar} aoImprimir={aoImprimir} planoB={() => window.print()} varianteImprimir="secundario" rotuloImprimir="Imprimir PDF" />
-                <ImprimirPedido {...impressaoDoPedido(pedidoIdApi)} documentoInicial="pedido" variante="primario" aoImprimir={aoImprimir} />
+                <ImprimirPedido {...impressaoDoPedido(pedidoIdApi)} documentoInicial="pedido" variante="primario" aoImprimir={(documento) => { if (documento === 'pedido' || documento === 'cozinha') aoImprimir?.() }} />
               </>
             ) : <AcoesPdf gerar={gerar} aoImprimir={aoImprimir} planoB={() => window.print()} />}
           </>
