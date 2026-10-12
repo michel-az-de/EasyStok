@@ -36,6 +36,7 @@ const hooks = {
     return atual.valores[i].valor
   },
   useCallback: (fn, deps) => hooks.useMemo(() => fn, deps),
+  useRef(valor) { return host.valores[host.i++] ??= { current: valor } },
   useEffect(fn, deps) {
     const atual = host, i = atual.i++, antes = atual.valores[i]
     if (antes && deps && !deps.some((d, j) => !Object.is(d, antes.deps[j]))) return
@@ -48,7 +49,7 @@ const inline = (source) => ({ format: 'module', shortCircuit: true, source })
 
 registerHooks({
   resolve(especificador, contexto, proximo) {
-    if (especificador === 'react') return { url: 'data:text/javascript,export const {useState,useMemo,useCallback,useEffect}=globalThis.__prova1585.hooks', shortCircuit: true }
+    if (especificador === 'react') return { url: 'data:text/javascript,export const {useState,useMemo,useCallback,useEffect,useRef}=globalThis.__prova1585.hooks', shortCircuit: true }
     if (especificador === 'react/jsx-runtime') return { url: 'data:text/javascript,export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx;export const Fragment="fragment"', shortCircuit: true }
     if (especificador.startsWith('.') && !/\.[a-z]+$/i.test(especificador)) {
       for (const ext of ['.js', '.jsx']) { try { return proximo(especificador + ext, contexto) } catch { /* próxima extensão */ } }
@@ -399,7 +400,7 @@ await confere('Produção do dia: cada lote imprime as próprias etiquetas, o er
   assert.equal(impressoes, 2)
   assert.equal(chamadas.filter((c) => c.url.includes('/etiquetas/')).length, 3)
   // Dispensar o lote 1 leva a folha dele; o lote 2 continua.
-  botoes(t.arvore, 'Dispensar')[1].props.onClick()
+  botoes(t.arvore, 'Fechar aviso')[1].props.onClick()
   assert.equal(folha(t).length, 0)
   assert.deepEqual(avisosDeLote(t.arvore).map((o) => texto(o).match(/LOT-[\d-]+/)[0]), ['LOT-261011-002'])
   assert.deepEqual(lotesLancados().map((l) => l.loteId), ['l-2'])

@@ -48,13 +48,31 @@ function erroDasLinhas(linhas) {
 // a mesma chave com outro corpo. Separado do componente para a prova rodar sem React.
 export function criarProducaoDoDia({ gerarChave, agora } = {}) {
   const envio = criarChaveDeEnvio(gerarChave, agora)
+  // #1627: o envio em voo é daqui, não da tela. A tela desmonta a cada troca de rota; se o "está
+  // enviando" morasse nela, quem voltasse durante o envio acharia tudo liberado, mudaria uma porção
+  // e confirmaria de novo: corpo diferente ganha chave nova e o lote gravava em dobro.
+  let emEnvio = false
+  const ouvintesDoEnvio = new Set()
+  const marcarEnvio = (valor) => {
+    emEnvio = valor
+    ouvintesDoEnvio.forEach((ouvinte) => ouvinte(valor))
+  }
 
   return {
+    enviando: () => emEnvio,
+    // Quem se inscreve recebe o estado de agora: a tela que monta no meio do envio já nasce travada.
+    aoMudarEnvio: (ouvinte) => {
+      ouvintesDoEnvio.add(ouvinte)
+      ouvinte(emEnvio)
+      return () => ouvintesDoEnvio.delete(ouvinte)
+    },
     produzir: async (linhas) => {
       const erro = erroDasLinhas(linhas)
       if (erro) return { ok: false, erro }
+      if (emEnvio) return { ok: false, erro: 'A produção anterior ainda está sendo gravada. Espere um instante.' }
       const chave = envio.para(corpoDaProducao(linhas))
       let lote
+      marcarEnvio(true)
       try {
         const r = await registrarProducao(linhas, chave)
         envio.confirmar(chave)
@@ -68,12 +86,14 @@ export function criarProducaoDoDia({ gerarChave, agora } = {}) {
           avisos: r.avisos ?? [],
         }
       } catch (e) {
+        marcarEnvio(false)
         return { ok: false, erro: e.message }
       }
       // #1585: gravou, o rascunho sai e o lote entra na lista, mesmo com a tela já desmontada.
       rascunho = null
       lancados = [lote, ...lancados.filter((l) => l.loteId !== lote.loteId)]
       ouvintes.forEach((ouvinte) => ouvinte(lote))
+      marcarEnvio(false)
       return lote
     },
     etiquetas: async (loteId) => etiquetasDaApi(await obterEtiquetasDoLote(loteId)),

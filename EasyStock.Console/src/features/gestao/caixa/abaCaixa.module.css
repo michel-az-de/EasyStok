@@ -140,6 +140,29 @@
 .fluxo tbody tr:nth-child(even) { background: var(--preenchimento); }
 .fluxo tfoot th, .fluxo tfoot td { border-top: var(--b-1) solid var(--linha-media); font-weight: 750; }
 .fluxo td.valorSaida { color: var(--erro); }
+.fluxo caption { caption-side: bottom; padding: var(--e-2) var(--e-3) 0; text-align: left; color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-corpo); }
+/* #1627: a situação e o rodapé podem quebrar linha; com tudo em `nowrap` a tabela pedia 650 px. */
+.fluxo td:last-child { white-space: normal; }
+.fluxo td:last-child .dicaItem { margin-top: var(--e-1); }
+
+/* Tela estreita: cada dia vira um cartão com os três valores lado a lado e o rótulo em cima. */
+@container (max-width: 560px) {
+  .fluxo, .fluxo tbody, .fluxo tfoot, .fluxo caption { display: block; }
+  .fluxo thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .fluxo tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e-1) var(--e-3); padding: var(--e-3); }
+  .fluxo th, .fluxo td { padding: 0; text-align: left; white-space: normal; border: 0; }
+  .fluxo tr > th { grid-column: 1 / -1; }
+  .fluxo tr > td:last-child { grid-column: 1 / -1; }
+  .fluxo td::before { content: attr(data-rotulo); display: block; color: var(--tinta-2); font-size: var(--t-micro); font-weight: 400; }
+  .fluxo td:last-child::before { content: none; }
+  .fluxo tfoot tr { border-top: var(--b-1) solid var(--linha-media); }
+  .fluxo tfoot th, .fluxo tfoot td { border-top: 0; }
+}
+
+/* Resumo com número de itens diferente de sete: quatro colunas, para o total não ficar sozinho. */
+@container (min-width: 1040px) {
+  .caixaApi > .resumoLista.resumoEmQuatro { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 
 @container (min-width: 601px) {
   .caixaApi > .resumoLista dt { min-height: calc(2em * var(--lh-corpo)); }

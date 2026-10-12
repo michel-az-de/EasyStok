@@ -50,10 +50,13 @@ export function ModalFecharCaixa({ resumo, gaveta = null, aoFechar, aoConfirmar,
           <div className={css.resumoForte}><dt>Saldo esperado</dt><dd>{moeda(resumo.saldoEsperado)}</dd></div>
         )}
         <div><dt>Saldo inicial</dt><dd>{moeda(resumo.saldoInicial)}</dd></div>
+        {Boolean(resumo.totalVendas) && <div><dt>Vendas</dt><dd>{moeda(resumo.totalVendas)}</dd></div>}
         <div><dt>Outras entradas</dt><dd>{moeda(resumo.totalEntradasExtras)}</dd></div>
         <div><dt>Outras saídas</dt><dd>{moeda(resumo.totalSaidasExtras)}</dd></div>
         <div><dt>Pagamentos de pedidos</dt><dd>{moeda(resumo.totalPagamentosPedidos)}</dd></div>
         {gaveta && <div><dt>Pix e cartão (fora da gaveta)</dt><dd>{moeda(gaveta.pixECartao)}</dd></div>}
+        {/* #1627: pode ser dinheiro que já está na gaveta (venda do pedido entregue pelo PWA, #1630). */}
+        {Boolean(gaveta?.semForma) && <div><dt>Sem forma de pagamento (confira se é dinheiro)</dt><dd>{moeda(gaveta.semForma)}</dd></div>}
       </dl>
 
       <CampoMascarado

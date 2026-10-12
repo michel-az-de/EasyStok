@@ -8,6 +8,10 @@
 //   - dia sem abertura mostra o que entrou e saiu, junto do abrir o caixa;
 //   - o resumo tem a linha de vendas e as linhas somam o total;
 //   - fluxo dos últimos 7 dias lido de `api/caixa/dia?data=`.
+//   Banca de revisão (#1627): envio em voo que sobrevive à troca de tela, ordem do lote pelo
+//   cardápio, linha do Planejamento sem porção, campo só com dígitos, limpar com confirmação,
+//   impressão depois de sair da tela; no caixa, venda sem forma de pagamento fora do "Pix e cartão",
+//   suprimento e sangria fora do fluxo, dia fechado que mudou depois, fluxo que não recarrega à toa.
 //   Telas reais compiladas, com hooks de mentira (como a prova-1585). Pixel e toque pedem navegador.
 //
 //   node ferramentas/prova-1624-producao-toque-caixa-do-dia.mjs
@@ -47,7 +51,9 @@ const hooks = {
   },
 }
 const AGORA = Date.parse('2026-10-11T15:00:00-03:00')
-const g = globalThis.__prova1624 = { hooks, catalogo: { cardapio: [] }, caixa: null, acoes: {}, acesso: { acoes: {}, permite: () => true }, agora: AGORA }
+const gerente = () => ({ acoes: { gerenciarCaixa: true }, permite: () => true })
+const acoesDoCaixa = () => ({ abrirCaixa() {}, fecharCaixa() {}, lancarMovimentoCaixa() {}, estornarMovimentoCaixa() {} })
+const g = globalThis.__prova1624 = { hooks, catalogo: { cardapio: [] }, caixa: null, acoes: acoesDoCaixa(), acesso: gerente(), agora: AGORA }
 const DE_FORA = 'globalThis.__prova1624'
 const inline = (source) => ({ format: 'module', shortCircuit: true, source })
 
@@ -79,6 +85,10 @@ registerHooks({
 
 let passou = 0
 const falhas = []
+// Cada cenário começa limpo: as telas montadas no anterior são desmontadas (a limpeza dos efeitos
+// tira os ouvintes do módulo, como a troca de rota) e o acesso volta ao de gerente. Sem isso uma
+// tela esquecida continuava relendo o estoque e inflava a contagem do cenário seguinte.
+const telasAbertas = []
 const confere = async (descricao, fn) => {
   try {
     await fn()
@@ -87,6 +97,10 @@ const confere = async (descricao, fn) => {
   } catch (erro) {
     falhas.push(descricao)
     console.log(`FALHA ${descricao}\n      ${String(erro.message).split('\n').filter(Boolean).slice(0, 3).join(' ')}`)
+  } finally {
+    for (const tela of telasAbertas.splice(0)) tela.desmontar()
+    g.acesso = gerente()
+    g.acoes = acoesDoCaixa()
   }
 }
 
@@ -132,9 +146,16 @@ function montar(componente, props = {}) {
       for (let i = 0; i < 6; i += 1) { t.renderizar(); await new Promise((r) => setTimeout(r, 5)) }
       return t.renderizar()
     },
+    // Trocar de rota desmonta a tela: a limpeza de cada efeito roda e o estado some.
+    desmontar() {
+      for (const h of hosts.values()) for (const v of h.valores) if (typeof v?.limpar === 'function') v.limpar()
+      hosts.clear()
+    },
   }
+  telasAbertas.push(t)
   return t
 }
+const esperar = (ms) => new Promise((r) => setTimeout(r, ms))
 const andar = (no, fn, achados = []) => {
   if (no == null || typeof no !== 'object') return achados
   if (Array.isArray(no)) { for (const filho of no) andar(filho, fn, achados); return achados }
@@ -161,11 +182,17 @@ const ESTOQUE = { pratos: [
   { cardapioItemId: 'i-1', nome: 'Talharim', saldo: 4, descoberto: 0, fisico: 4, lotes: [], porcoes: [] },
   { cardapioItemId: 'i-2', nome: 'Lasanha', saldo: 2, descoberto: 0, fisico: 2, lotes: [], porcoes: [{ variacaoId: 'v-6', rotulo: '600 g', saldo: 2 }] },
 ], alertas: [] }
+// O nome da sugestão vem do estoque, em minúsculas; a tela mostra o do cardápio. O último prato saiu
+// do cardápio e continua na sugestão: não pode derrubar a tela nem virar chip.
 const SUGESTAO = { ate: '2026-10-12', pratos: [
-  { cardapioItemId: 'i-1', produtoId: 'p-1', nome: 'Talharim', minimo: 6, saldo: 4, agendados: 4, descoberto: 0, sugestao: 6 },
-  { cardapioItemId: 'i-2', produtoId: 'p-2', nome: 'Lasanha', minimo: 0, saldo: 2, agendados: 5, descoberto: 0, sugestao: 3 },
-  { cardapioItemId: 'i-3', produtoId: 'p-3', nome: 'Molho sugo', minimo: 0, saldo: 9, agendados: 0, descoberto: 0, sugestao: 0 },
+  { cardapioItemId: 'i-1', produtoId: 'p-1', nome: 'talharim', minimo: 6, saldo: 4, agendados: 4, descoberto: 0, sugestao: 6 },
+  { cardapioItemId: 'i-2', produtoId: 'p-2', nome: 'lasanha', minimo: 0, saldo: 2, agendados: 5, descoberto: 0, sugestao: 3 },
+  { cardapioItemId: 'i-3', produtoId: 'p-3', nome: 'molho sugo', minimo: 0, saldo: 9, agendados: 0, descoberto: 0, sugestao: 0 },
+  { cardapioItemId: 'i-404', produtoId: 'p-404', nome: 'prato que saiu', minimo: 0, saldo: 0, agendados: 9, descoberto: 0, sugestao: 9 },
 ] }
+// A tela recebe também um prato tirado do cardápio: ele não pode aparecer na grade.
+g.catalogo = { cardapio: [...CARDAPIO, { sku: 'i-9', nome: 'Prato antigo', porcao: '1 kg', categoria: 'Massas', porcoes: [], removidoEm: '2026-10-01T00:00:00Z' }] }
+const lidas = (chamadas, rota) => chamadas.filter((c) => rota(c.metodo, c.url)).length
 const LER_ESTOQUE = (m, u) => m === 'GET' && u.endsWith('/producao/estoque-do-dia')
 const LER_SUGESTAO = (m, u) => m === 'GET' && u.includes('/producao/sugestao')
 const PRODUZIR = (m, u) => m === 'POST' && u.endsWith('/api/atendimento/producao')
@@ -231,11 +258,16 @@ const tocar = (t, nome) => { comRotulo(t.renderizar(), `Somar 1 porção de ${no
 
 await confere('Produção do dia: a tela abre com a grade e o saldo; nada no lote e nada para confirmar', async () => {
   zerarProducao()
-  g.catalogo = { cardapio: CARDAPIO }
-  montarFetch(rotasDaProducao())
+  const chamadas = montarFetch(rotasDaProducao())
   const t = montar(AbaProducaoDoDiaApi)
   await t.assentar()
-  assert.equal(cartoesDaTela(t.arvore).length, 4)
+  assert.deepEqual([lidas(chamadas, LER_ESTOQUE), lidas(chamadas, LER_SUGESTAO)], [1, 1], 'uma leitura de cada ao abrir, por mais que a tela redesenhe')
+  assert.equal(cartoesDaTela(t.arvore).length, 4, 'o prato tirado do cardápio não entra na grade')
+  // O Confirmar da barra fica fora do formulário: só funciona se apontar para ele.
+  const formulario = doTipo(t.arvore, 'form')[0]
+  const daBarra = doTipo(andar(t.arvore, (n) => String(n.props?.className).includes('barraDoLote'))[0], 'Botao').find((b) => b.props.tipo === 'submit')
+  assert.equal(formulario.props.id, 'lote-da-producao')
+  assert.equal(daBarra.props.form, formulario.props.id)
   assert.match(texto(cartoesDaTela(t.arvore)[0]), /Talharim.*500 g.*4 no estoque/)
   assert.match(texto(cartoesDaTela(t.arvore)[2]), /Lasanha.*Família.*0 no estoque/)
   assert.doesNotMatch(texto(cartoesDaTela(t.arvore)[3]), /no estoque/, 'prato sem estoque ligado não mostra saldo inventado')
@@ -276,6 +308,10 @@ await confere('Produção do dia: "Falta produzir" põe a quantidade no lote; pr
   assert.deepEqual(doTipo(falta(), 'Chip').map(texto), ['6× Talharim', '3× Lasanha'])
   doTipo(falta(), 'Chip')[0].props.onClick()
   assert.equal(campos(t.renderizar(), 'Porções')[0].props.value, '6')
+  tocar(t, 'Talharim 500 g')
+  tocar(t, 'Talharim 500 g')
+  doTipo(falta(), 'Chip')[0].props.onClick()
+  assert.equal(campos(t.renderizar(), 'Porções')[0].props.value, '8', 'com 8 no lote, tocar no "6×" não rebaixa')
   doTipo(falta(), 'Chip')[1].props.onClick()
   assert.equal(itensDoLote(t.renderizar()).length, 1, 'a Lasanha não entra sem ela dizer o tamanho')
   assert.deepEqual(cartoesDaTela(t.arvore).map((c) => c.props['data-prato']).length, 2, 'a grade mostra só os tamanhos da Lasanha')
@@ -284,7 +320,12 @@ await confere('Produção do dia: "Falta produzir" põe a quantidade no lote; pr
 
 await confere('Produção do dia: validade em um toque; confirmar manda o corpo de sempre, mostra o lote e relê o saldo', async () => {
   zerarProducao()
-  const chamadas = montarFetch(rotasDaProducao())
+  // A segunda leitura do estoque já traz o lote somado: 4 + 8.
+  let leiturasDoEstoque = 0
+  const depoisDoLote = { ...ESTOQUE, pratos: [{ ...ESTOQUE.pratos[0], saldo: 12, fisico: 12 }, ESTOQUE.pratos[1]] }
+  const chamadas = montarFetch([
+    [LER_ESTOQUE, () => ({ data: (leiturasDoEstoque += 1) === 1 ? ESTOQUE : depoisDoLote })], [LER_SUGESTAO, { data: SUGESTAO }], [PRODUZIR, LOTE],
+  ])
   const t = montar(AbaProducaoDoDiaApi)
   await t.assentar()
   for (let i = 0; i < 8; i += 1) tocar(t, 'Talharim 500 g')
@@ -293,7 +334,7 @@ await confere('Produção do dia: validade em um toque; confirmar manda o corpo 
   assert.deepEqual(validade().map((c) => c.props.ativo), [false, true, false, false, false])
   validade()[2].props.onClick()
   assert.equal(campos(t.renderizar(), 'Validade (dias)')[0].props.value, '7')
-  const leiturasAntes = chamadas.filter((c) => c.metodo === 'GET').length
+  assert.deepEqual([lidas(chamadas, LER_ESTOQUE), lidas(chamadas, LER_SUGESTAO)], [1, 1])
   await doTipo(t.arvore, 'form')[0].props.onSubmit(evento)
   await t.assentar()
   const envios = chamadas.filter((c) => c.metodo === 'POST')
@@ -301,19 +342,250 @@ await confere('Produção do dia: validade em um toque; confirmar manda o corpo 
   assert.ok(envios[0].chave, 'o envio leva a chave de idempotência')
   assert.match(texto(doTipo(t.arvore, 'output')[0]), /Lote LOT-261011-001 lançado: 8× Talharim\./)
   assert.equal(itensDoLote(t.arvore).length, 0)
-  assert.ok(chamadas.filter((c) => c.metodo === 'GET').length >= leiturasAntes + 2, 'saldo e falta produzir são relidos depois do lote')
+  assert.deepEqual([lidas(chamadas, LER_ESTOQUE), lidas(chamadas, LER_SUGESTAO)], [2, 2], 'saldo e falta produzir são relidos uma vez cada depois do lote')
+  assert.match(texto(cartoesDaTela(t.arvore)[0]), /12 no estoque/, 'o cartão mostra o saldo novo')
+})
+
+await confere('Produção do dia: prato com porções vai com a porção tocada no corpo e o nome dela no lote', async () => {
+  zerarProducao()
+  const chamadas = montarFetch(rotasDaProducao())
+  const t = montar(AbaProducaoDoDiaApi)
+  await t.assentar()
+  tocar(t, 'Lasanha 600 g')
+  tocar(t, 'Lasanha Família')
+  assert.deepEqual(itensDoLote(t.arvore).map((item) => texto(doTipo(item, 'h4')[0])), ['Lasanha 600 g', 'Lasanha Família'])
+  await doTipo(t.arvore, 'form')[0].props.onSubmit(evento)
+  assert.deepEqual(chamadas.filter((c) => c.metodo === 'POST').map((c) => c.corpo), [{ pratos: [
+    { cardapioItemId: 'i-2', variacaoId: 'v-6', porcoes: 1, pesoPorPorcaoG: 600, pesoRealG: null, validadeDias: 5 },
+    { cardapioItemId: 'i-2', variacaoId: 'v-8', porcoes: 1, pesoPorPorcaoG: null, pesoRealG: null, validadeDias: 5 },
+  ] }])
+})
+
+await confere('Produção do dia: o filtro por categoria muda a grade; a linha do Planejamento escolhe a porção no lote', async () => {
+  zerarProducao()
+  const { levarParaProducao } = await import('../src/aplicacao/planejamento.js')
+  assert.equal(levarParaProducao([{ sku: 'i-2', porcoes: '6' }]), 1)
+  montarFetch(rotasDaProducao())
+  const t = montar(AbaProducaoDoDiaApi)
+  await t.assentar()
+  const filtro = (rotulo) => doTipo(t.renderizar(), 'Chip').find((c) => c.props.papel === 'filtro' && texto(c) === rotulo)
+  filtro('Molhos').props.onClick()
+  assert.deepEqual(cartoesDaTela(t.renderizar()).map((c) => texto(doTipo(c, 'button')[0])), ['Molho sugo300 g'])
+  filtro('Todos').props.onClick()
+  assert.equal(cartoesDaTela(t.renderizar()).length, 4)
+  const item = () => itensDoLote(t.renderizar())[0]
+  assert.match(texto(doTipo(item(), 'summary')[0]), /Lasanha.*escolha a porção.*6 porções/)
+  doTipo(item(), 'CampoSelecao').find((c) => c.props.rotulo === 'Porção').props.onChange(digitar('v-8'))
+  assert.match(texto(doTipo(item(), 'summary')[0]), /Lasanha Família/)
+  assert.doesNotMatch(texto(doTipo(item(), 'summary')[0]), /escolha a porção/)
+  assert.equal(itensDoLote(t.arvore).length, 1)
 })
 
 await confere('Produção do dia: sem saldo nem sugestão (API fora) a grade continua servindo', async () => {
   zerarProducao()
-  montarFetch([[LER_ESTOQUE, { status: 500, error: { message: 'fora' } }], [LER_SUGESTAO, { status: 403, error: { message: 'sem acesso' } }]])
+  let estoqueFora = true
+  const chamadas = montarFetch([[LER_ESTOQUE, () => (estoqueFora ? { status: 500, error: { message: 'fora' } } : { data: ESTOQUE })], [LER_SUGESTAO, { status: 403, error: { message: 'sem acesso' } }]])
   const t = montar(AbaProducaoDoDiaApi)
   await t.assentar()
   assert.equal(cartoesDaTela(t.arvore).length, 4)
   assert.equal(andar(t.arvore, (n) => n.props?.['aria-label'] === 'Falta produzir').length, 0)
-  assert.match(texto(t.arvore), /Não consegui ler o saldo dos pratos agora\./, 'a falha do saldo é dita, com o tentar de novo')
+  assert.match(texto(t.arvore), /Não consegui ler o saldo dos pratos agora\./, 'a falha do saldo é dita')
+  estoqueFora = false
+  await doTipo(t.arvore, 'Botao').find((b) => texto(b) === 'Tentar de novo').props.onClick()
+  await t.assentar()
+  assert.equal(lidas(chamadas, LER_ESTOQUE), 2, 'o tentar de novo relê o estoque')
+  assert.match(texto(cartoesDaTela(t.arvore)[0]), /4 no estoque/)
+  assert.doesNotMatch(texto(t.arvore), /Não consegui ler o saldo/)
   tocar(t, 'Molho sugo 300 g')
   assert.equal(campos(t.arvore, 'Porções')[0].props.value, '1')
+})
+
+// --- Banca #1627: produção ---------------------------------------------------------------
+const novaLinhaDeProva = () => { let n = 0; return () => ({ id: `n-${n += 1}`, sku: '', variacaoId: '', porcoes: '', pesoPorPorcaoG: '', pesoRealG: '', validadeDias: '5' }) }
+
+await confere('lote: a ordem é a do cardápio, não a dos toques (o corpo enviado não muda com a ordem)', async () => {
+  const { cartoesDaGrade, somarNoLote } = await import('../src/dominio/gradeDeProducao.js')
+  const apoio = { pratos: CARDAPIO, novaLinha: novaLinhaDeProva() }
+  const [talharim, lasanha600, , molho] = cartoesDaGrade(CARDAPIO, [])
+  const umaOrdem = somarNoLote(somarNoLote(somarNoLote([], molho, 1, apoio), lasanha600, 1, apoio), talharim, 1, apoio)
+  const outraOrdem = somarNoLote(somarNoLote(somarNoLote([], talharim, 1, apoio), molho, 1, apoio), lasanha600, 1, apoio)
+  assert.deepEqual(umaOrdem.map((l) => [l.sku, l.variacaoId]), [['i-1', ''], ['i-2', 'v-6'], ['i-3', '']])
+  assert.deepEqual(outraOrdem.map((l) => [l.sku, l.variacaoId]), umaOrdem.map((l) => [l.sku, l.variacaoId]))
+})
+
+await confere('lote: a linha do Planejamento ganha o peso do prato e, sem porção, vira a porção do primeiro toque', async () => {
+  const { cartoesDaGrade, linhasIniciais, somarNoLote } = await import('../src/dominio/gradeDeProducao.js')
+  const apoio = { pratos: CARDAPIO, novaLinha: novaLinhaDeProva() }
+  const [, lasanha600, lasanhaFamilia] = cartoesDaGrade(CARDAPIO, [])
+  let linhas = linhasIniciais([{ sku: 'i-2', porcoes: '6' }, { sku: 'i-1', porcoes: '4' }], apoio)
+  assert.deepEqual(linhas.map((l) => [l.sku, l.variacaoId, l.porcoes, l.pesoPorPorcaoG, l.validadeDias]),
+    [['i-1', '', '4', '500', '5'], ['i-2', '', '6', '', '5']], 'ordem do cardápio; o Talharim planejado já traz 500 g')
+  linhas = somarNoLote(linhas, lasanha600, 1, apoio)
+  assert.deepEqual(linhas.map((l) => [l.sku, l.variacaoId, l.porcoes, l.pesoPorPorcaoG]), [['i-1', '', '4', '500'], ['i-2', 'v-6', '6', '600']],
+    'as 6 planejadas são da porção tocada; não nasce outra linha')
+  linhas = somarNoLote(linhas, lasanha600, 1, apoio)
+  assert.equal(linhas[1].porcoes, '7')
+  linhas = somarNoLote(linhas, lasanhaFamilia, 1, apoio)
+  assert.deepEqual(linhas.map((l) => [l.variacaoId, l.porcoes]), [['', '4'], ['v-6', '7'], ['v-8', '1']])
+  // Rascunho que ela já digitou não é mexido: peso vazio digitado fica vazio.
+  assert.equal(linhasIniciais([{ id: 'a', sku: 'i-1', variacaoId: '', porcoes: '2', pesoPorPorcaoG: '', pesoRealG: '', validadeDias: '7' }], apoio)[0].pesoPorPorcaoG, '')
+})
+
+await confere('campo: porções e validade só guardam dígitos, até 4', async () => {
+  const { soDigitos } = await import('../src/dominio/gradeDeProducao.js')
+  assert.deepEqual(['12a', '-3', 'abc', '0x10', '1e2', ' 7 ', '123456'].map((t) => soDigitos(t)), ['12', '3', '', '010', '12', '7', '1234'])
+})
+
+const enviarDaTela = (t) => doTipo(t.arvore, 'Botao').filter((b) => b.props.tipo === 'submit')
+const respostaJson = (data, status = 200) => new Response(JSON.stringify({ data }), { status })
+// Só o POST da produção fica em voo; as leituras respondem na hora.
+function fetchComEnvioEmVoo() {
+  const controle = { responder: null }
+  globalThis.fetch = (url, { method = 'GET' } = {}) => {
+    if (method === 'POST') return new Promise((resolver) => { controle.responder = () => resolver(respostaJson(LOTE.data, 201)) })
+    if (LER_ESTOQUE(method, url)) return Promise.resolve(respostaJson(ESTOQUE))
+    if (LER_SUGESTAO(method, url)) return Promise.resolve(respostaJson(SUGESTAO))
+    return Promise.resolve(respostaJson(null))
+  }
+  return controle
+}
+
+await confere('produção: com um envio em voo, o segundo é recusado sem ir para a API', async () => {
+  zerarProducao()
+  const { criarProducaoDoDia } = await import('../src/aplicacao/producaoDoDia.js')
+  let responder = null
+  let envios = 0
+  globalThis.fetch = () => { envios += 1; return new Promise((resolver) => { responder = () => resolver(respostaJson(LOTE.data, 201)) }) }
+  const producao = criarProducaoDoDia()
+  const vistos = []
+  const sair = producao.aoMudarEnvio((valor) => vistos.push(valor))
+  const linha = (porcoes) => ({ sku: 'i-1', nome: 'Talharim', porcoes, pesoPorPorcaoG: 500, pesoRealG: null, validadeDias: 5 })
+  const primeiro = producao.produzir([linha(3)])
+  for (let i = 0; i < 50 && !responder; i += 1) await esperar(0)
+  assert.equal(producao.enviando(), true)
+  // Corpo diferente ganharia chave nova e gravaria outro lote: não sai nem da máquina.
+  assert.deepEqual(await producao.produzir([linha(4)]), { ok: false, erro: 'A produção anterior ainda está sendo gravada. Espere um instante.' })
+  assert.equal(envios, 1)
+  responder()
+  assert.equal((await primeiro).ok, true)
+  assert.equal(producao.enviando(), false)
+  assert.deepEqual(vistos, [false, true, false], 'quem se inscreve recebe o estado de agora e cada mudança')
+  sair()
+  zerarProducao()
+})
+
+await confere('Produção do dia: com o envio em voo, a tela que volta fica travada até a resposta', async () => {
+  zerarProducao()
+  const controle = fetchComEnvioEmVoo()
+  const antes = montar(AbaProducaoDoDiaApi)
+  await antes.assentar()
+  tocar(antes, 'Talharim 500 g')
+  const envio = doTipo(antes.arvore, 'form')[0].props.onSubmit(evento)
+  for (let i = 0; i < 50 && !controle.responder; i += 1) await esperar(0)
+  antes.desmontar()
+  const depois = montar(AbaProducaoDoDiaApi)
+  await depois.assentar()
+  assert.equal(itensDoLote(depois.arvore).length, 1, 'o lote que está indo continua na tela')
+  assert.ok(enviarDaTela(depois).length > 0 && enviarDaTela(depois).every((b) => b.props.disabled === true), 'não dá para confirmar de novo')
+  assert.equal(comRotulo(depois.arvore, 'Somar 1 porção de Talharim 500 g')[0].props.disabled, true, 'nem mexer no lote que já foi')
+  controle.responder()
+  await envio
+  await depois.assentar()
+  assert.equal(itensDoLote(depois.arvore).length, 0)
+  assert.equal(comRotulo(depois.arvore, 'Somar 1 porção de Talharim 500 g')[0].props.disabled, false)
+  assert.match(texto(doTipo(depois.arvore, 'output')[0]), /Lote LOT-261011-001 lançado/)
+})
+
+await confere('Produção do dia: o aviso de erro some quando ela mexe no lote', async () => {
+  zerarProducao()
+  guardarRascunho([{ id: 'a', sku: 'i-1', variacaoId: '', porcoes: '', pesoPorPorcaoG: '500', pesoRealG: '', validadeDias: '5' }])
+  const chamadas = montarFetch(rotasDaProducao())
+  const t = montar(AbaProducaoDoDiaApi)
+  await t.assentar()
+  await doTipo(t.arvore, 'form')[0].props.onSubmit(evento)
+  const alertas = () => andar(t.renderizar(), (n) => n.props?.role === 'alert')
+  assert.match(texto(alertas()[0]), /Prato 01 \(Talharim\): Quantas porções saíram\?/)
+  assert.equal(chamadas.filter((c) => c.metodo === 'POST').length, 0)
+  tocar(t, 'Talharim 500 g')
+  assert.equal(alertas().length, 0, 'ela corrigiu: o aviso antigo não fica na tela')
+})
+
+await confere('Produção do dia: o campo de porções ignora o que não é dígito e o toque soma em cima do digitado', async () => {
+  zerarProducao()
+  montarFetch(rotasDaProducao())
+  const t = montar(AbaProducaoDoDiaApi)
+  await t.assentar()
+  tocar(t, 'Talharim 500 g')
+  campos(t.arvore, 'Porções')[0].props.onChange(digitar('12a'))
+  assert.equal(campos(t.renderizar(), 'Porções')[0].props.value, '12')
+  tocar(t, 'Talharim 500 g')
+  assert.equal(campos(t.arvore, 'Porções')[0].props.value, '13', 'somou em cima do 12, não trocou por 1')
+  campos(t.arvore, 'Validade (dias)')[0].props.onChange(digitar('7 dias'))
+  assert.equal(campos(t.renderizar(), 'Validade (dias)')[0].props.value, '7')
+})
+
+await confere('Produção do dia: Limpar pede confirmação antes de apagar o lote', async () => {
+  zerarProducao()
+  montarFetch(rotasDaProducao())
+  const t = montar(AbaProducaoDoDiaApi)
+  await t.assentar()
+  tocar(t, 'Talharim 500 g')
+  tocar(t, 'Molho sugo 300 g')
+  const botao = (rotulo) => doTipo(t.renderizar(), 'Botao').find((b) => texto(b) === rotulo)
+  botao('Limpar').props.onClick()
+  assert.equal(itensDoLote(t.renderizar()).length, 2, 'um toque só não apaga')
+  assert.match(texto(andar(t.arvore, (n) => String(n.props?.className).includes('barraDoLote'))[0]), /Tirar os 2 pratos do lote\?/)
+  botao('Manter o lote').props.onClick()
+  assert.equal(itensDoLote(t.renderizar()).length, 2)
+  botao('Limpar').props.onClick()
+  botao('Sim, limpar').props.onClick()
+  assert.equal(itensDoLote(t.renderizar()).length, 0)
+})
+
+await confere('Produção do dia: o lote mostra porções, validade e peso de cada prato numa linha, e os campos dizem de qual prato são', async () => {
+  zerarProducao()
+  montarFetch(rotasDaProducao())
+  const t = montar(AbaProducaoDoDiaApi)
+  await t.assentar()
+  tocar(t, 'Talharim 500 g')
+  tocar(t, 'Talharim 500 g')
+  const item = itensDoLote(t.arvore)[0]
+  assert.match(texto(doTipo(item, 'summary')[0]), /Talharim 500 g.*2 porções.*validade 5 dias.*500 g cada/)
+  assert.equal(campos(item, 'Porções')[0].props['aria-label'], 'Porções de Talharim 500 g')
+  assert.equal(campos(item, 'Validade (dias)')[0].props['aria-label'], 'Validade em dias de Talharim 500 g')
+  // Em tela estreita o lote fica abaixo da grade: a barra leva até ele e o Confirmar fica no fim do lote.
+  assert.ok(doTipo(t.arvore, 'Botao').some((b) => texto(b) === 'Conferir lote' && b.props.tipo !== 'submit'), 'a barra leva até o lote')
+  assert.equal(enviarDaTela(t).length, 2, 'um Confirmar na barra (tela larga) e um no fim do lote (tela estreita)')
+})
+
+await confere('Produção do dia: etiqueta que chega depois de ela sair da tela não abre a impressão', async () => {
+  zerarProducao()
+  montarFetch(rotasDaProducao())
+  const t = montar(AbaProducaoDoDiaApi)
+  await t.assentar()
+  tocar(t, 'Talharim 500 g')
+  await doTipo(t.arvore, 'form')[0].props.onSubmit(evento)
+  await t.assentar()
+  let impressoes = 0
+  globalThis.window = { print: () => { impressoes += 1 } }
+  let entregar = null
+  globalThis.fetch = () => new Promise((resolver) => { entregar = () => resolver(respostaJson({ etiquetas: [{ id: 'e-1', sequencial: 1, codigo: 'C1', produto: { nome: 'Talharim', pesoG: 500, fichaAlergenos: [] }, loteCodigo: 'LOT-261011-001', loteValidadeEm: null, loteCriadoEm: '2026-10-11T12:00:00' }] })) })
+  const imprimindo = doTipo(t.arvore, 'Botao').find((b) => /^Imprimir/.test(texto(b))).props.onClick()
+  for (let i = 0; i < 50 && !entregar; i += 1) await esperar(0)
+  t.desmontar()
+  entregar()
+  await imprimindo
+  await esperar(80)
+  assert.equal(impressoes, 0)
+  zerarProducao()
+})
+
+await confere('impressão: a folha não fica presa à altura da janela (lote grande sai em várias páginas)', () => {
+  const css = readFileSync(new URL('../src/estilos/base.css', import.meta.url), 'utf8')
+  const impressao = css.slice(css.lastIndexOf('@media print'))
+  assert.match(css, /html, body \{ height: 100dvh; overflow: hidden; \}/, 'na tela o corpo continua do tamanho da janela')
+  assert.match(impressao, /html, body \{ height: auto; overflow: visible; \}/, 'no papel não: senão só a primeira página imprime')
+  assert.ok(impressao.indexOf('[data-imprimir] { display: block; }') > 0)
 })
 
 // === Caixa do dia =======================================================================
@@ -328,11 +600,19 @@ const DIA_DA_API = (m, u) => m === 'GET' && u.includes('/api/caixa/dia')
 
 await confere('fluxo: entrou soma vendas, pagamentos e entradas; saiu são as saídas; o saldo é a diferença', async () => {
   const { linhaDoFluxo, linhasDoFluxo, totaisDoFluxo } = await import('../src/dominio/caixa.js')
-  const linha = linhaDoFluxo(dia({ data: '2026-10-09', fechado: true, saldoInicial: 100, totalVendas: 80, totalPagamentosPedidos: 310.5, totalEntradasExtras: 20, totalSaidasExtras: 45 }))
-  assert.deepEqual(linha, { data: '2026-10-09', entrou: 410.5, saiu: 45, saldo: 365.5, situacao: 'fechado' })
+  // A API manda `aberto: true` também no dia que fechou (ele teve abertura): fechado vem primeiro.
+  const linha = linhaDoFluxo(dia({ data: '2026-10-09', fechado: true, aberto: true, saldoInicial: 100, totalVendas: 80, totalPagamentosPedidos: 310.5, totalEntradasExtras: 20, totalSaidasExtras: 45 }))
+  assert.deepEqual(linha, { data: '2026-10-09', entrou: 410.5, saiu: 45, saldo: 365.5, situacao: 'fechado', depoisDoFechamento: 0 })
   assert.equal(linhaDoFluxo(dia({ aberto: true, totalEntradasExtras: 10 })).situacao, 'aberto')
   assert.equal(linhaDoFluxo(dia({ totalPagamentosPedidos: 59.9 })).situacao, 'sem-abertura')
+  assert.equal(linhaDoFluxo(dia({ totalSaidasExtras: 12 })).situacao, 'sem-abertura', 'dia só com saída também tem movimento')
   assert.equal(linhaDoFluxo(dia()).situacao, 'sem-movimento')
+  const { temMovimentoNoDia } = await import('../src/dominio/caixa.js')
+  assert.equal(temMovimentoNoDia(dia()), false)
+  assert.equal(temMovimentoNoDia(dia({ movimentos: [{ id: 'a', tipo: 'abertura', valor: 50 }] })), false, 'abrir o caixa não é movimento')
+  assert.equal(temMovimentoNoDia(dia({ movimentos: [{ id: 'm', tipo: 'saida', valor: 5 }] })), true)
+  assert.equal(temMovimentoNoDia(dia({ linhasExtras: [{ valor: 10, meio: 'pix' }] })), true)
+  assert.equal(temMovimentoNoDia(dia({ totalVendas: 10 })), true)
   assert.deepEqual(totaisDoFluxo([linha, linhaDoFluxo(dia({ totalPagamentosPedidos: 59.9, totalSaidasExtras: 9.9 }))]), { entrou: 470.4, saiu: 54.9, saldo: 415.5 })
   // Caixa esquecido aberto desde 09/10: hoje já soma a sessão inteira, então 09 e 10 não repetem na tabela.
   const anteriores = ['2026-10-10', '2026-10-09', '2026-10-08'].map((data) => dia({ data, totalVendas: 10 }))
@@ -344,9 +624,7 @@ await confere('fluxo: entrou soma vendas, pagamentos e entradas; saiu são as sa
 const { AbaCaixaApi } = await import('../src/features/gestao/caixa/AbaCaixaApi.jsx')
 
 await confere('Caixa do dia: dia sem abertura mostra o que entrou, com o lançamento, junto do abrir o caixa', async () => {
-  montarFetch([[DIA_DA_API, { data: dia() }]])
-  g.acesso = { acoes: { gerenciarCaixa: true }, permite: () => true }
-  g.acoes = { abrirCaixa() {}, fecharCaixa() {}, lancarMovimentoCaixa() {}, estornarMovimentoCaixa() {} }
+  montarFetch([[DIA_DA_API, (url) => ({ data: dia({ data: new URL(url, 'http://x').searchParams.get('data') }) })]])
   g.caixa = caixaCom(dia({
     totalEntradasExtras: 120.5, totalPagamentosPedidos: 59.9, saldoEsperado: 180.4,
     movimentos: [{ id: 'm-1', tipo: 'entrada', valor: 120.5, categoria: 'Venda no balcão', meio: 'pix', descricao: '', em: '2026-10-11T16:00:00Z' }],
@@ -361,6 +639,10 @@ await confere('Caixa do dia: dia sem abertura mostra o que entrou, com o lançam
   assert.match(tela, new RegExp(`Pagamentos de pedidos${moedaDe(59.9).replace('$', '\\$')}`))
   assert.match(tela, /Venda no balcão/)
   assert.match(tela, /Pagamento de pedido/)
+  // É o caso da dona (o PWA não abre caixa): os 7 dias também aparecem aqui.
+  const fluxo = andar(t.arvore, (n) => n.props?.['aria-label'] === 'Fluxo de caixa dos últimos 7 dias')[0]
+  assert.equal(doTipo(fluxo, 'tr').length, 9)
+  assert.match(limpo(doTipo(fluxo, 'tr')[1]), /Hoje, 11\/10.*Sem abertura/)
 })
 
 await confere('Caixa do dia: dia sem abertura e sem movimento diz que nada entrou, sem resumo zerado', async () => {
@@ -386,7 +668,7 @@ await confere('Caixa do dia: o resumo tem a linha de vendas e as linhas somam o 
 
 await confere('Caixa do dia: fluxo dos últimos 7 dias lê os 6 dias anteriores e soma com o de hoje', async () => {
   const porDia = {
-    '2026-10-10': dia({ data: '2026-10-10', fechado: true, totalPagamentosPedidos: 300, totalSaidasExtras: 50 }),
+    '2026-10-10': dia({ data: '2026-10-10', fechado: true, aberto: true, totalPagamentosPedidos: 300, totalSaidasExtras: 50 }),
     '2026-10-08': dia({ data: '2026-10-08', totalVendas: 99.9 }),
   }
   const chamadas = montarFetch([[DIA_DA_API, (url) => { const data = new URL(url, 'http://x').searchParams.get('data'); return { data: porDia[data] ?? dia({ data }) } }]])
@@ -407,13 +689,145 @@ await confere('Caixa do dia: fluxo dos últimos 7 dias lê os 6 dias anteriores 
 })
 
 await confere('Caixa do dia: fluxo que não carrega avisa e deixa tentar de novo, sem derrubar o caixa de hoje', async () => {
-  montarFetch([[DIA_DA_API, { status: 500, error: { message: 'Sem conexão com o EasyStok.' } }]])
+  let fora = true
+  const chamadas = montarFetch([[DIA_DA_API, (url) => (fora
+    ? { status: 500, error: { message: 'Sem conexão com o EasyStok.' } }
+    : { data: dia({ data: new URL(url, 'http://x').searchParams.get('data'), totalVendas: 10 }) })]])
   g.caixa = caixaCom(dia({ aberto: true, totalEntradasExtras: 10, saldoEsperado: 10 }))
   const t = montar(AbaCaixaApi)
   await t.assentar()
+  const fluxo = () => andar(t.arvore, (n) => n.props?.['aria-label'] === 'Fluxo de caixa dos últimos 7 dias')[0]
   assert.match(limpo(t.arvore), /Na gaveta \(dinheiro\)/)
   assert.match(limpo(t.arvore), /Os dias anteriores não carregaram\./)
-  assert.ok(doTipo(t.arvore, 'Botao').some((b) => /Tentar de novo/.test(texto(b))))
+  assert.equal(doTipo(fluxo(), 'tfoot').length, 0, 'sem os dias anteriores não há total de 7 dias')
+  assert.equal(doTipo(fluxo(), 'tr').length, 2, 'só o cabeçalho e hoje')
+  fora = false
+  doTipo(fluxo(), 'Botao').find((b) => /Tentar de novo/.test(texto(b))).props.onClick()
+  await t.assentar()
+  assert.equal(chamadas.length, 12, 'seis leituras que falharam e seis da nova tentativa')
+  assert.equal(doTipo(fluxo(), 'tr').length, 9)
+  assert.doesNotMatch(limpo(t.arvore), /Os dias anteriores não carregaram/)
+})
+
+await confere('Caixa do dia: quem não é gerente não vê fechar nem estornar; caixa fechado não lança', async () => {
+  montarFetch([[DIA_DA_API, { data: dia() }]])
+  const movimentos = [{ id: 'm-1', tipo: 'entrada', valor: 20, categoria: 'Troco devolvido', meio: 'dinheiro', descricao: '', em: '2026-10-11T16:00:00Z' }]
+  g.acesso = { acoes: {}, permite: () => true }
+  g.caixa = caixaCom(dia({ aberto: true, saldoInicial: 100, totalEntradasExtras: 20, saldoEsperado: 120, movimentos }))
+  const operador = montar(AbaCaixaApi)
+  await operador.assentar()
+  const botoes = (t) => doTipo(t.arvore, 'Botao').map(texto)
+  assert.ok(botoes(operador).includes('Lançamento'))
+  assert.ok(!botoes(operador).some((b) => /Fechar o caixa|Estornar/.test(b)), 'fechar e estornar são da dona ou gerente')
+  assert.match(limpo(operador.arvore), /ficam com a dona ou gerente/)
+  operador.desmontar()
+  g.acesso = gerente()
+  g.caixa = caixaCom(dia({ aberto: true, fechado: true, saldoInicial: 100, totalEntradasExtras: 20, saldoEsperado: 120, movimentos,
+    fechamento: { id: 'f', data: '2026-10-11', saldoInicial: 100, totalVendas: 0, totalPagamentosPedidos: 0, totalEntradasExtras: 20, totalSaidasExtras: 0, saldoFinal: 120, fechadoEm: '2026-10-11T23:00:00Z', fechadoPorNome: 'Thati', observacoes: null } }))
+  const fechado = montar(AbaCaixaApi)
+  await fechado.assentar()
+  assert.ok(doTipo(fechado.arvore, 'Pilula').some((pilula) => texto(pilula) === 'Fechado'))
+  assert.ok(!botoes(fechado).some((b) => /Lançamento|Fechar o caixa|Estornar/.test(b)), 'dia fechado não lança, não fecha de novo e não estorna')
+  assert.match(limpo(fechado.arvore), /Total do dia/)
+  assert.doesNotMatch(limpo(fechado.arvore), /Total esperado do dia/)
+})
+
+// --- Banca #1627: caixa -------------------------------------------------------------------
+await confere('gaveta: venda ou pagamento sem forma de pagamento fica à parte, não vira "Pix e cartão"', async () => {
+  const { gavetaDoDia } = await import('../src/dominio/caixa.js')
+  const g = gavetaDoDia(dia({ saldoInicial: 100, linhasExtras: [
+    { valor: 250, meio: null, origem: 'Venda' }, { valor: 40, meio: 'pix', origem: 'Pedido' }, { valor: 30, meio: 'dinheiro', origem: 'Pedido' },
+  ] }))
+  assert.deepEqual(g, { naGaveta: 130, pixECartao: 40, semForma: 250 })
+  assert.equal(gavetaDoDia(dia({ saldoInicial: 100 })).semForma, 0)
+})
+
+await confere('fluxo: suprimento e sangria só trocam o dinheiro de lugar e não entram em entrou nem em saiu', async () => {
+  const { linhaDoFluxo } = await import('../src/dominio/caixa.js')
+  const linha = linhaDoFluxo(dia({ aberto: true, totalVendas: 300, totalEntradasExtras: 120, totalSaidasExtras: 395, movimentos: [
+    { id: 'a', tipo: 'entrada', categoria: 'Suprimento', valor: 100 }, { id: 'b', tipo: 'entrada', categoria: 'Troco devolvido', valor: 20 },
+    { id: 'c', tipo: 'saida', categoria: ' sangria ', valor: 350 }, { id: 'd', tipo: 'saida', categoria: 'Despesa', valor: 45 },
+  ] }))
+  assert.deepEqual([linha.entrou, linha.saiu, linha.saldo], [320, 45, 275])
+})
+
+await confere('fluxo: dia fechado que recebeu dinheiro depois do fechamento diz quanto mudou', async () => {
+  const { linhaDoFluxo } = await import('../src/dominio/caixa.js')
+  const retrato = { saldoInicial: 100, totalVendas: 0, totalPagamentosPedidos: 400, totalEntradasExtras: 0, totalSaidasExtras: 0, saldoFinal: 500 }
+  assert.equal(linhaDoFluxo(dia({ fechado: true, saldoInicial: 100, totalPagamentosPedidos: 480, fechamento: retrato })).depoisDoFechamento, 80)
+  assert.equal(linhaDoFluxo(dia({ fechado: true, saldoInicial: 100, totalPagamentosPedidos: 400, fechamento: retrato })).depoisDoFechamento, 0)
+  assert.equal(linhaDoFluxo(dia({ aberto: true, totalPagamentosPedidos: 480 })).depoisDoFechamento, 0)
+})
+
+await confere('Caixa do dia: sem abertura o resumo não inventa gaveta nem saldo inicial, e a venda sem forma aparece com o nome certo', async () => {
+  montarFetch([[DIA_DA_API, { data: dia() }]])
+  g.acesso = { acoes: { gerenciarCaixa: true }, permite: () => true }
+  g.caixa = caixaCom(dia({
+    totalVendas: 250, totalPagamentosPedidos: 70, saldoEsperado: 320,
+    linhasExtras: [
+      { em: '2026-10-11T15:00:00Z', tipo: 'venda', valor: 250, descricao: 'Mobile', meio: null, origem: 'Venda' },
+      { em: '2026-10-11T16:00:00Z', tipo: 'pagamento', valor: 40, descricao: '', meio: 'pix', origem: 'Pedido' },
+      { em: '2026-10-11T17:00:00Z', tipo: 'pagamento', valor: 30, descricao: '', meio: 'dinheiro', origem: 'Pedido' },
+    ],
+  }))
+  const t = montar(AbaCaixaApi)
+  await t.assentar()
+  const resumo = andar(t.arvore, (n) => n.type === 'dl' && String(n.props.className).includes('resumoLista'))[0]
+  const linhas = Object.fromEntries(doTipo(resumo, 'div').map((d) => [texto(doTipo(d, 'dt')[0]), limpo(doTipo(d, 'dd')[0])]))
+  assert.equal(linhas['Na gaveta (dinheiro)'], undefined, 'sem abrir o caixa ninguém disse quanto há na gaveta')
+  assert.equal(linhas['Saldo inicial'], undefined)
+  assert.deepEqual([linhas['Em dinheiro'], linhas['Pix e cartão'], linhas['Sem forma de pagamento'], linhas['Total do dia até agora']],
+    [moedaDe(30), moedaDe(40), moedaDe(250), moedaDe(320)])
+})
+
+await confere('Caixa do dia: abrir o caixa não relê os dias anteriores; fechar o caixa esquecido relê', async () => {
+  const chamadas = montarFetch([[DIA_DA_API, (url) => ({ data: dia({ data: new URL(url, 'http://x').searchParams.get('data') }) })]])
+  g.caixa = caixaCom(dia({ totalEntradasExtras: 10, saldoEsperado: 10 }))
+  const t = montar(AbaCaixaApi)
+  await t.assentar()
+  assert.equal(chamadas.length, 6)
+  g.caixa = caixaCom(dia({ aberto: true, saldoInicial: 50, totalEntradasExtras: 10, saldoEsperado: 60 }))
+  await t.assentar()
+  assert.equal(chamadas.length, 6, 'a tabela dos 7 dias continuou montada')
+  assert.match(limpo(t.arvore), /Na gaveta \(dinheiro\)/)
+  g.caixa = caixaCom(dia({ aberto: true, esquecidoAberto: true, abertoDesde: '2026-10-09', saldoInicial: 50, saldoEsperado: 60 }))
+  await t.assentar()
+  assert.equal(chamadas.length, 12, 'a sessão mudou: os dias anteriores são relidos')
+  const fluxo = andar(t.arvore, (n) => n.props?.['aria-label'] === 'Fluxo de caixa dos últimos 7 dias')[0]
+  assert.match(limpo(fluxo), /Desde 09\/10/)
+  assert.match(limpo(fluxo), /O caixa está aberto desde 09\/10/)
+  assert.doesNotMatch(limpo(doTipo(fluxo, 'tfoot')[0]), /7 dias/, 'o total não diz 7 dias quando soma uma sessão mais longa')
+})
+
+await confere('Caixa do dia: erro ao estornar fica junto dos lançamentos, não no bloco de abrir o caixa', async () => {
+  montarFetch([[DIA_DA_API, { data: dia() }]])
+  g.acoes = { abrirCaixa() {}, fecharCaixa() {}, lancarMovimentoCaixa() {}, estornarMovimentoCaixa: async () => { throw new Error('Movimento de outro dia.') } }
+  g.caixa = caixaCom(dia({
+    totalEntradasExtras: 120.5, saldoEsperado: 120.5,
+    movimentos: [{ id: 'm-1', tipo: 'entrada', valor: 120.5, categoria: 'Venda no balcão', meio: 'pix', descricao: '', em: '2026-10-11T16:00:00Z' }],
+  }))
+  const t = montar(AbaCaixaApi)
+  await t.assentar()
+  doTipo(t.arvore, 'Botao').find((b) => texto(b) === 'Estornar').props.onClick()
+  await doTipo(t.renderizar(), 'PromptEstorno')[0].props.aoConfirmar('lancei errado')
+  t.renderizar()
+  const movimentacao = andar(t.arvore, (n) => n.props?.['aria-label'] === 'Movimentação do caixa')[0]
+  assert.match(texto(andar(movimentacao, (n) => n.props?.role === 'alert')[0]), /Movimento de outro dia\./)
+  assert.equal(andar(t.arvore, (n) => n.props?.role === 'alert').length, 1, 'o erro aparece uma vez só')
+  assert.ok(doTipo(t.arvore, 'Botao').some((b) => texto(b) === 'Abrir o caixa'), 'o botão de abrir não diz que está abrindo')
+})
+
+await confere('Caixa do dia: a tabela dos 7 dias tem legenda, rótulo por célula para tela estreita e avisa dia fechado que mudou', async () => {
+  const retrato = { id: 'f', data: '2026-10-10', saldoInicial: 0, totalVendas: 0, totalPagamentosPedidos: 300, totalEntradasExtras: 0, totalSaidasExtras: 0, saldoFinal: 300, fechadoEm: '2026-10-10T23:00:00Z' }
+  montarFetch([[DIA_DA_API, (url) => { const data = new URL(url, 'http://x').searchParams.get('data'); return { data: data === '2026-10-10' ? dia({ data, fechado: true, totalPagamentosPedidos: 380, fechamento: retrato }) : dia({ data }) } }]])
+  g.caixa = caixaCom(dia({ aberto: true, totalEntradasExtras: 10, saldoEsperado: 10 }))
+  const t = montar(AbaCaixaApi)
+  await t.assentar()
+  const fluxo = andar(t.arvore, (n) => n.props?.['aria-label'] === 'Fluxo de caixa dos últimos 7 dias')[0]
+  assert.match(texto(doTipo(fluxo, 'caption')[0]), /suprimento e sangria/)
+  const ontem = doTipo(fluxo, 'tr')[2]
+  assert.deepEqual(doTipo(ontem, 'td').map((td) => td.props['data-rotulo']), ['Entrou', 'Saiu', 'Saldo do dia', 'Caixa'])
+  assert.match(limpo(ontem), /Fechado.*R\$ 80,00 depois de fechar/)
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

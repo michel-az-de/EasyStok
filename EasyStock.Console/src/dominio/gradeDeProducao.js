@@ -43,6 +43,39 @@ const porcoesDaLinha = (linha) => {
   return Number.isInteger(n) && n > 0 ? n : 0
 }
 
+// Campo de quantidade (porções, dias de validade): só dígitos, até 4. O toque no cartão soma em
+// cima do que está no campo; texto como "12a" contava zero e o toque seguinte trocava por 1.
+export const soDigitos = (texto, maximo = 4) => String(texto ?? '').replace(/\D/g, '').slice(0, maximo)
+
+// O lote segue a ordem do cardápio, não a dos toques: ela acha o prato onde ele está na grade, e
+// o corpo enviado é o mesmo para o mesmo lote. Com a ordem dos toques, refazer o lote depois de
+// uma resposta perdida mudava o corpo, a chave de idempotência e gravava em dobro.
+export function ordenarPeloCardapio(linhas, pratos) {
+  const posicao = (linha) => {
+    const indice = pratos.findIndex((p) => p.sku === linha.sku)
+    if (indice < 0) return [pratos.length, 0]
+    return [indice, (pratos[indice].porcoes ?? []).findIndex((v) => v.id === linha.variacaoId) + 1]
+  }
+  return linhas
+    .map((linha, ordem) => ({ linha, ordem, chave: posicao(linha) }))
+    .sort((a, b) => a.chave[0] - b.chave[0] || a.chave[1] - b.chave[1] || a.ordem - b.ordem)
+    .map((item) => item.linha)
+}
+
+// As linhas com que a tela abre: o rascunho como ela deixou e, vindo do Planejamento, a linha só
+// com prato e porções. Essa ganha o resto da linha nova e o peso que o cardápio diz, igual à linha
+// criada pelo toque. `pesoPorPorcaoG` presente é sinal de linha já digitada: não se mexe.
+export function linhasIniciais(guardadas, { pratos, novaLinha }) {
+  const linhas = (guardadas ?? []).map((guardada) => {
+    if (guardada.pesoPorPorcaoG !== undefined) return { ...novaLinha(), ...guardada }
+    const peso = (pratos.find((p) => p.sku === guardada.sku)?.porcoes ?? []).length === 0
+      ? pesoDeReferenciaDoPrato(pratos.find((p) => p.sku === guardada.sku))
+      : null
+    return { ...novaLinha(), ...guardada, pesoPorPorcaoG: peso == null ? '' : String(peso) }
+  })
+  return ordenarPeloCardapio(linhas, pratos)
+}
+
 export const porcoesNoLote = (linhas, cartao) =>
   linhas.filter((l) => ehDoCartao(l, cartao)).reduce((soma, l) => soma + porcoesDaLinha(l), 0)
 
@@ -63,11 +96,21 @@ export function definirNoLote(linhas, cartao, quantidade, { pratos, novaLinha })
   const linha = cartao.variacaoId
     ? linhaComPorcao(comPrato, pratos, cartao.variacaoId)
     : { ...comPrato, pesoPorPorcaoG: peso == null ? '' : String(peso) }
-  return [...linhas, { ...linha, porcoes: String(alvo) }]
+  return ordenarPeloCardapio([...linhas, { ...linha, porcoes: String(alvo) }], pratos)
 }
 
-export const somarNoLote = (linhas, cartao, delta, apoio) =>
-  definirNoLote(linhas, cartao, porcoesNoLote(linhas, cartao) + delta, apoio)
+// Linha do Planejamento de prato com porções chega sem a porção (o plano é por prato). O primeiro
+// toque num tamanho diz de qual porção são as planejadas: a linha vira daquela porção, com as
+// porções que já tinha, em vez de nascer outra ao lado.
+export function somarNoLote(linhas, cartao, delta, apoio) {
+  const semPorcao = delta > 0 && cartao.variacaoId && !linhas.some((l) => ehDoCartao(l, cartao))
+    ? linhas.find((l) => l.sku === cartao.sku && !l.variacaoId)
+    : null
+  if (semPorcao) {
+    return ordenarPeloCardapio(linhas.map((l) => (l === semPorcao ? linhaComPorcao(l, apoio.pratos, cartao.variacaoId) : l)), apoio.pratos)
+  }
+  return definirNoLote(linhas, cartao, porcoesNoLote(linhas, cartao) + delta, apoio)
+}
 
 export function resumoDoLote(linhas) {
   const comPrato = linhas.filter((l) => l.sku)
