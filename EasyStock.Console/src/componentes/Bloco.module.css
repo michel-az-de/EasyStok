@@ -18,7 +18,7 @@
 /* #1442: seção recolhível. O título vira o gatilho, linha inteira, com a seta
    no fim; recolhida, o resumo aparece entre os dois. */
 .gatilho {
-  display: flex; align-items: center; gap: var(--e-2); width: 100%; min-height: 28px;
+  display: flex; align-items: center; gap: var(--e-2); width: 100%; min-height: var(--toque);
   padding: 0; border: 0; background: none; color: inherit; cursor: pointer;
   font: inherit; text-align: left;
 }

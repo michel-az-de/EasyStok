@@ -11,6 +11,8 @@
 .nomeMenu { display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-forte); margin: 0 0 var(--e-3); padding: var(--e-2); }
 .item { display: flex; align-items: center; gap: var(--e-2); min-height: var(--toque); padding: var(--e-2); border-radius: var(--r-1); text-decoration: none; color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 600; }
 .item:hover { background: var(--preenchimento); color: var(--tinta); }
+.item > span { min-width: 0; overflow-wrap: anywhere; }
+.preparacao { display: block; font-size: var(--t-minimo); font-weight: 400; color: var(--tinta-2); margin-top: var(--e-1); }
 .itemAtivo, .itemAtivo:hover { background: var(--preenchimento-forte); color: var(--tinta); }
 .item:focus-visible, .itemTrilho:focus-visible, .inicioTrilho:focus-visible, .voltar:focus-visible, .link:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
 .barra { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); padding: var(--e-2) var(--e-3); flex: none; }
@@ -28,6 +30,7 @@
 .conteudo { min-width: 0; }
 .link { font-weight: 700; color: var(--marca); }
 .abrirMenu { display: none; }
+.nomeNoMenu { display: none; }
 .menuModal { display: flex; min-height: 0; }
 .menuModal .menu { flex: 1; width: auto; margin: 0; box-shadow: none; border: 0; }
 .menuModal .trilho { max-height: 60dvh; }
@@ -39,6 +42,9 @@
   .lateral { display: none; }
   .barra { gap: var(--e-1); padding: var(--e-2); }
   .modulo, .contexto > a { display: none; }
+  .abrirMenu { min-width: 0; max-width: 100%; text-align: left; }
+  .abrirMenu > span { min-width: 0; overflow-wrap: anywhere; }
+  .nomeNoMenu { display: block; font-size: var(--t-minimo); font-weight: 400; }
   .acoes { gap: var(--e-1); }
   .acoes > :global([data-ajuda-console]) { font-size: 0; gap: 0; width: 44px; padding: 0; }
   .ajuste { padding: 0 var(--e-2) var(--e-2); }

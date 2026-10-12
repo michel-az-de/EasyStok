@@ -363,5 +363,39 @@ await confere('E o seletor repassa o aviso no clique e no Enter, e o composer fo
   assert.match(composer, /<div ref=\{campoRef\}>\s*<CampoArea/, 'o campo de texto mora dentro de campoRef')
 })
 
+await confere('E composição IME e seleção de texto não inserem respostas, fecham a lista ou mudam o destaque', () => {
+  const m = montarSeletor('/')
+  for (const key of ['Enter', 'ArrowDown', 'ArrowUp', 'Escape']) {
+    for (const extra of [{ isComposing: true }, { nativeEvent: { isComposing: true } }, { keyCode: 229 },
+      { altKey: true }, { ctrlKey: true }, { metaKey: true }, { shiftKey: true }]) {
+      const evento = { ...tecla(key), ...extra, preventDefault() { assert.fail('a edição nativa não pode ser capturada') } }
+      assert.equal(m.desenhar().aoTeclar(evento), false)
+      assert.equal(m.desenhar().destaque, 0)
+      assert.equal(m.desenhar().aberto, true)
+      assert.equal(m.estado.rascunho, '/')
+    }
+  }
+  assert.deepEqual(m.estado.ordem, [])
+  m.desenhar().aoTeclar(tecla('ArrowDown'))
+  assert.equal(m.desenhar().destaque, 1)
+  m.desenhar().aoTeclar(tecla('Enter'))
+  assert.equal(m.estado.rascunho, 'Abrimos às 11h.')
+})
+
+await confere('E texto multilinha mantém semântica nativa e aponta para a opção da lista no portal', () => {
+  const seletor = fonte('features/atendimento/SeletorRespostas.jsx')
+  const campo = composer.slice(composer.indexOf('<CampoArea'), composer.indexOf('/>', composer.indexOf('<CampoArea')))
+  assert.doesNotMatch(campo, /role=/, 'textarea continua sendo caixa de texto multilinha')
+  assert.match(campo, /aria-controls=\{sugestoesNoCampo \? idListaRespostas : undefined\}/)
+  assert.match(campo, /aria-activedescendant=\{sugestoesNoCampo && barra\.itens\[barra\.destaque\]/)
+  assert.match(campo, /if \(e\.isComposing \|\| e\.nativeEvent\?\.isComposing \|\| e\.keyCode === 229/)
+  assert.match(composer, /idLista=\{idListaRespostas\}/)
+  assert.match(seletor, /const idLista = idInformado \?\? idGerado/)
+  assert.match(seletor, /id=\{idLista\} role="listbox"/)
+  assert.match(seletor, /id=\{idDe\(i\)\}/)
+  assert.match(seletor, /role="combobox"/)
+  assert.match(seletor, /aria-expanded=\{itens.length > 0\}/)
+})
+
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)
 if (falhas.length) process.exit(1)

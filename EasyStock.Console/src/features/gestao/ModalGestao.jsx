@@ -49,7 +49,7 @@ function navegarAbas(evento, itens, indice, escolher, botoes, vertical = false) 
 
 // A janela e as rotas usam o mesmo catálogo, as mesmas permissões e o mesmo
 // PainelDeAjuste. Trocar uma aba aqui mantém a conversa e o pedido montados.
-export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, focoInicial = null, janelasApi = null, avisosApi = null, renderizarEditorCardapio }) {
+export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, focoInicial = null, janelasApi = null, avisosApi = null, renderizarEditorCardapio, horariosAtendimento }) {
   const { fonteApi } = useAtendimento()
   const { permite } = useAcessoModulos()
   const areas = useMemo(() => MODULOS
@@ -166,7 +166,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
                       onClick={() => escolherTela(item)}
                       onKeyDown={(evento) => navegarAbas(evento, area.telas, indice, escolherTela, botoesTela, true)}
                     >
-                      <IconeDoModulo modulo={area} telaId={item.id} />{item.rotulo}
+                      <IconeDoModulo modulo={area} telaId={item.id} />{item.rotulo}{fonteApi && item.indisponivelNaApi ? ' · Em preparação' : ''}
                     </button>
                   ))}
                 </div>
@@ -181,7 +181,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
               className={css.painelGestao}
               onClickCapture={seguirLink}
             >
-              <PainelDeAjuste aba={tela.aba} focoInicial={focoInicial} janelasApi={janelasApi} aoAbrirAba={abrirAba} renderizarEditorCardapio={renderizarEditorCardapio} />
+              <PainelDeAjuste aba={tela.aba} focoInicial={focoInicial} janelasApi={janelasApi} aoAbrirAba={abrirAba} renderizarEditorCardapio={renderizarEditorCardapio} horariosAtendimento={horariosAtendimento} />
             </div>
           </section>
         </div>
@@ -231,10 +231,10 @@ function AbaNaoLigada({ texto, saida = null, children }) {
 // Uma tela por aba: o objeto só decide qual elemento entra na árvore.
 // `janelasApi` (#1440): no modo API o App entrega aqui o cadastro de janelas, zonas e bloqueios
 // da S45 (o mesmo de Entregas › Janelas e frete), no lugar da aba de demonstração.
-export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoAbrirAba = null, renderizarEditorCardapio }) {
+export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoAbrirAba = null, renderizarEditorCardapio, horariosAtendimento }) {
   const { fonteApi } = useAtendimento()
   const painelDaAba = useMemo(() => ({
-    atendimento: <AbaAtendimento />,
+    atendimento: <AbaAtendimento horariosAtendimento={horariosAtendimento} />,
     // #1441: respostas prontas e automáticas, fora do caminho do atendimento.
     respostas: <AbaRespostas focoInicial={focoInicial} />,
     producao: <AbaProducao />,
@@ -264,7 +264,7 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
     planejamento: <AbaPlanejamentoApi aoAbrirAba={aoAbrirAba} />,
     // M2.6 (#1511): controle de perdas (só modo API).
     perdas: <AbaPerdasApi />,
-  }), [fonteApi, focoInicial, janelasApi, aoAbrirAba, renderizarEditorCardapio])
+  }), [fonteApi, focoInicial, janelasApi, aoAbrirAba, renderizarEditorCardapio, horariosAtendimento])
   if (fonteApi && aba?.startsWith('financeiro-')) return <PainelFinanceiro key={aba} tela={aba.slice('financeiro-'.length)} />
   const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada {...AINDA_NAO_LIGADO[aba]}>{painel}</AbaNaoLigada>

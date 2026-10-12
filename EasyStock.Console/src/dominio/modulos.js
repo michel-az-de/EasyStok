@@ -64,7 +64,7 @@ export const MODULOS = [
     resumo: 'Fila de preparo e produção do dia',
     telas: [
       { id: 'fila', rotulo: 'Fila de preparo', tipo: TELA_OPERACAO },
-      { id: 'producao', rotulo: 'Produção e cardápio do dia', tipo: TELA_AJUSTE, aba: 'producao' },
+      { id: 'producao', rotulo: 'Produção e cardápio do dia', tipo: TELA_AJUSTE, aba: 'producao', indisponivelNaApi: true },
     ],
   },
   {
@@ -85,15 +85,15 @@ export const MODULOS = [
     numero: 6, id: 'campanhas', nome: 'Campanhas', icone: 'presente',
     resumo: 'Fidelidade, cupons e promoções',
     telas: [
-      { id: 'fidelidade', rotulo: 'Fidelidade e cupons', tipo: TELA_AJUSTE, aba: 'fidelidade' },
+      { id: 'fidelidade', rotulo: 'Fidelidade e cupons', tipo: TELA_AJUSTE, aba: 'fidelidade', indisponivelNaApi: true },
     ],
   },
   {
     numero: 7, id: 'configuracoes', nome: 'Configurações', icone: 'automacao',
-    resumo: 'Canais, integrações e usuários',
+    resumo: 'Canais e integrações da loja',
     telas: [
       { id: 'canais', rotulo: 'Canais', tipo: TELA_AJUSTE, aba: 'canais', soApi: true },
-      { id: 'integracoes', rotulo: 'Integrações de entrega', tipo: TELA_AJUSTE, aba: 'integracoes' },
+      { id: 'integracoes', rotulo: 'Integrações de entrega', tipo: TELA_AJUSTE, aba: 'integracoes', indisponivelNaApi: true },
       // #1632: logo da loja e papel padrão dos impressos em HTML da API (só modo API).
       { id: 'impressao', rotulo: 'Impressão', tipo: TELA_AJUSTE, aba: 'impressao', soApi: true },
     ],
@@ -138,6 +138,21 @@ export function filtrarModulos(modulos, busca) {
   return modulos.filter((modulo) => {
     const texto = textoDeBusca([modulo.nome, modulo.resumo, ...modulo.telas.map((t) => t.rotulo)].join(' '))
     return termos.every((termo) => texto.includes(termo))
+  })
+}
+
+// Quem chama entrega apenas os módulos e as telas liberados no modo atual.
+export function buscarDestinosDoConsole(modulos, busca) {
+  const termos = textoDeBusca(busca).split(/\s+/).filter(Boolean)
+  if (!termos.length) return []
+  return filtrarModulos(modulos, busca).flatMap((modulo) => {
+    const correspondentes = modulo.telas.filter((tela) => {
+      const texto = textoDeBusca(`${modulo.nome} ${tela.rotulo}`)
+      return termos.every((termo) => texto.includes(termo))
+    })
+    // Uma busca pelo resumo continua útil, oferecendo as telas daquela área.
+    return (correspondentes.length ? correspondentes : modulo.telas)
+      .map((tela) => ({ modulo, tela, href: hashDoModulo(modulo.id, tela.id) }))
   })
 }
 
