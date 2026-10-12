@@ -471,7 +471,7 @@ export function BlocoCobranca({
         <Pilula tom="neutro" fina>{nome}</Pilula>
         {cobranca.tentativa > 1 && <span className={css.tentativa}>{cobranca.tentativa}ª cobrança</span>}
       </div>
-      {fonteApi && pedido.sinalNaReserva && pedido.totalApi > cobranca.valor && !cobranca.pagaEm && (
+      {fonteApi && pedido.sinalNaReserva && !cobranca.diferenca && pedido.totalApi > cobranca.valor && !cobranca.pagaEm && (
         <p className={css.corpoBloco}>Sinal agora: {moeda(cobranca.valor)}. Restante na entrega: {moeda(pedido.totalApi - cobranca.valor)}.</p>
       )}
 

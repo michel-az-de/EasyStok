@@ -2,6 +2,7 @@ using EasyStock.Api.Authorization;
 using EasyStock.Api.Observability;
 using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Application.Ports.Output.Storage;
+using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Infra.Async.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -260,7 +261,16 @@ public static class ApiServiceCollectionExtensions
                     });
             });
 
-            // Autosave e SSE usam a credencial individual; clientes no mesmo IP não dividem a cota.
+            // Leitura, autosave e SSE usam a credencial individual; clientes no mesmo IP não dividem a cota.
+            options.AddPolicy("comanda-leitura", context =>
+            {
+                var token = context.Request.RouteValues["token"]?.ToString()?.Trim();
+                var formatoGerado = token is { Length: 43 } && token.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
+                var chave = formatoGerado ? "comanda:" + AcessoChatSite.HashDoToken(token!)
+                    : "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "anon");
+                return RateLimitPartition.GetFixedWindowLimiter(chave,
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 });
+            });
             options.AddPolicy("comanda-rascunho", context => RateLimitPartition.GetFixedWindowLimiter(
                 context.Request.RouteValues["token"]?.ToString() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anon",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));

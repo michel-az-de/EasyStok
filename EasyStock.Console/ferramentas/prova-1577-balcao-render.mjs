@@ -787,5 +787,16 @@ await confere('B. props de memo: iguais por identidade ou, na chave pedida, por 
   assert.equal(igualdade.mesmasProps(antes, { mensagem: antes.mensagem, trocaDeVoz: false }, ['mensagem']), false, 'prop que sumiu é mudança')
 })
 
+const { CartaoConversa } = await import('../src/features/caixa-de-entrada/CartaoConversa.jsx')
+for (const [descricao, saldo, cobranca, sinalNaReserva, esperado] of [
+  ['complemento pendente mostra o saldo devido', 35, { valor: 10, pagaEm: null, diferenca: true }, true, 'Falta R$ 10,00'],
+  ['complemento quitado mantém o rótulo pago', 45, { valor: 10, pagaEm: AGORA }, true, 'Pago'],
+  ['sinal quitado com saldo futuro comunica sinal pago', 22.5, { valor: 22.5, pagaEm: AGORA }, true, 'Sinal pago'],
+  ['devolução reduz cobertura sem chamar o pedido de pago', 25, { valor: 35, pagaEm: AGORA }, true, 'Falta R$ 20,00'],
+]) await confere(`B. rótulo financeiro: ${descricao}`, naTela(() => {
+  const conversa = carregarConversas().find(c => c.pedido)
+  return [h(CartaoConversa, { key: descricao, conversa: { ...conversa, pedido: { ...conversa.pedido, estado: 'pago', totalApi: 45, alocadoApi: saldo, sinalNaReserva, cobranca } }, selecionada: false, agora: AGORA, aoAbrir: () => {} })]
+}, async (t) => { assert.ok(t.recipiente.textContent.includes(esperado), `rótulo esperado: ${esperado}; tela: ${t.recipiente.textContent}`) }))
+
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)
 if (falhas.length) process.exit(1)

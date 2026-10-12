@@ -87,22 +87,60 @@ public sealed partial class PedidoConversaConcorrenciaTests
         while (!File.Exists(arquivo + ".stop")) await Task.Delay(500, limite.Token);
     }
 
-    private sealed record PagamentoBrowser(Guid PedidoId, decimal Valor);
+    private sealed record PagamentoBrowser(Guid PedidoId, decimal Valor, string? PagamentoExternoId = null);
     private sealed record AgenteBrowser(Guid ConversaId);
-    private sealed record TurnoBrowser(Guid ConversaId, string Texto);
+    private sealed record TurnoBrowser(Guid ConversaId, string Texto, string? RespostaControlada = null, bool RepetirUltimoTurno = false);
     private sealed record EstornoBrowser(Guid PedidoId, string Situacao);
 
     private sealed class ComandaBrowserBridge(EasyStock.Application.Ports.Output.Pagamentos.IMercadoPagoClient mp,
-        ConcurrentQueue<string> mensagens, EstornosBrowserControlados estornos, LlmBrowserControlado llm) : IStartupFilter
+        ConcurrentQueue<string> mensagens, EstornosBrowserControlados estornos, LlmBrowserControlado llm,
+        ConcurrentQueue<MensagemCanalGoLive>? detalhes = null) : IStartupFilter
     {
         private int _pagamentoId = 800000;
+        private readonly ConcurrentDictionary<string, EasyStock.Application.Ports.Output.Pagamentos.PagamentoMercadoPago> _pagamentos = new();
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
         {
             app.Use(async (context, continuar) =>
             {
                 if (!context.Request.Path.StartsWithSegments("/__comanda-teste")) { await continuar(); return; }
                 // Este middleware existe exclusivamente na fixture, escuta localhost e nunca entra na API publicada.
+                if (context.Connection.RemoteIpAddress is not { } ip || !System.Net.IPAddress.IsLoopback(ip))
+                { context.Response.StatusCode = 403; return; }
                 context.RequestServices.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(EmpresaId);
+                if (context.Request.Method == "GET" && context.Request.Path == "/__comanda-teste/evidencias")
+                {
+                    ComandaClienteResult? estado = null;
+                    if (!string.IsNullOrWhiteSpace(context.Request.Query["token"]))
+                    {
+                        var comanda = context.RequestServices.GetRequiredService<ComandaClienteUseCase>();
+                        var acesso = await comanda.AcessoAsync(context.Request.Query["token"].ToString(), CancellationToken.None);
+                        if (acesso.EmpresaId != EmpresaId) { context.Response.StatusCode = 404; return; }
+                        estado = await comanda.EstadoAsync(acesso, CancellationToken.None);
+                    }
+                    if (!Guid.TryParse(context.Request.Query["pedidoId"], out var pedidoId))
+                    {
+                        if (estado is null) { context.Response.StatusCode = 400; return; }
+                        await context.Response.WriteAsJsonAsync(new { estado }); return;
+                    }
+                    if (estado is not null && estado.Pedido?.PedidoId != pedidoId) { context.Response.StatusCode = 404; return; }
+                    var banco = context.RequestServices.GetRequiredService<EasyStockDbContext>();
+                    var pedido = await banco.Pedidos.AsNoTracking().Include(p => p.Pagamentos)
+                        .SingleOrDefaultAsync(p => p.EmpresaId == EmpresaId && p.Id == pedidoId);
+                    if (pedido is null) { context.Response.StatusCode = 404; return; }
+                    var financeiro = await context.RequestServices.GetRequiredService<EasyStock.Application.Services.Pedidos.SaldoFinanceiroPedido>().ConsultarAsync(pedido, CancellationToken.None);
+                    await context.Response.WriteAsJsonAsync(new { pedidoId, pedido.ClienteId, total = pedido.Total.Valor, financeiro, estado,
+                        pagamentos = pedido.Pagamentos.Select(p => new { p.Id, p.Valor }),
+                        cobrancas = await banco.CobrancasPedido.AsNoTracking().Where(c => c.EmpresaId == EmpresaId && c.PedidoId == pedidoId)
+                            .Select(c => new { c.Id, c.Valor, c.Status, c.PagamentoExternoId }).ToListAsync(),
+                        estornos = await banco.Set<PedidoEstornoOnline>().AsNoTracking().Where(e => e.EmpresaId == EmpresaId && e.PedidoId == pedidoId).ToListAsync(),
+                        creditos = await banco.Set<CreditoClienteComanda>().AsNoTracking().Where(c => c.EmpresaId == EmpresaId && c.ClienteId == pedido.ClienteId)
+                            .Select(c => new { c.Id, c.PedidoOrigemId, c.OperacaoId, c.Codigo, c.Valor, c.Saldo }).ToListAsync(),
+                        usosCupom = await banco.Set<UsoCreditoClienteComanda>().AsNoTracking().Where(u => u.EmpresaId == EmpresaId && u.PedidoId == pedidoId).ToListAsync(),
+                        movimentosCaixaDoTenant = await banco.MovimentosCaixa.AsNoTracking().Where(m => m.EmpresaId == EmpresaId)
+                            .Select(m => new { m.Id, m.Tipo, m.Valor, m.Referencia, m.Categoria }).ToListAsync() }); return;
+                }
+                if (context.Request.Path == "/__comanda-teste/mensagens-detalhadas")
+                { await context.Response.WriteAsJsonAsync(detalhes?.ToArray() ?? []); return; }
                 if (context.Request.Path == "/__comanda-teste/mensagens")
                 {
                     await context.Response.WriteAsJsonAsync(mensagens.ToArray()); return;
@@ -114,12 +152,22 @@ public sealed partial class PedidoConversaConcorrenciaTests
                     await context.RequestServices.GetRequiredService<INotificacoesDispatcherOrchestrator>().ExecutarRodadaAsync(1, 100);
                     var db = context.RequestServices.GetRequiredService<EasyStockDbContext>();
                     await context.Response.WriteAsJsonAsync(await db.NotifOutboxMensagens.AsNoTracking().Select(o => new
-                        { o.Id, o.IdempotencyKey, o.CorpoRenderizado, o.Status, o.EnviadoEm, o.ProviderMensagemId, o.ErroUltimaTentativa }).ToListAsync()); return;
+                        { o.Id, o.IdempotencyKey, o.Destinatario, o.CorpoRenderizado, o.Status, o.EnviadoEm, o.ProviderMensagemId, o.ErroUltimaTentativa }).ToListAsync()); return;
                 }
                 if (context.Request.Method == "POST" && context.Request.Path == "/__comanda-teste/estorno-modo")
                 {
                     var dados = (await context.Request.ReadFromJsonAsync<EstornoBrowser>())!;
-                    estornos.DefinirModo(dados.Situacao); await context.Response.WriteAsJsonAsync(new { configurado = true }); return;
+                    if (dados.PedidoId == Guid.Empty) estornos.DefinirModo(dados.Situacao);
+                    else
+                    {
+                        var banco = context.RequestServices.GetRequiredService<EasyStockDbContext>();
+                        if (!await banco.Pedidos.AnyAsync(p => p.EmpresaId == EmpresaId && p.Id == dados.PedidoId))
+                        { context.Response.StatusCode = 404; return; }
+                        var ids = await banco.CobrancasPedido.Where(p => p.EmpresaId == EmpresaId && p.PedidoId == dados.PedidoId
+                            && p.PagamentoExternoId != null).Select(p => p.PagamentoExternoId!).ToListAsync();
+                        estornos.DefinirModo(dados.Situacao, ids);
+                    }
+                    await context.Response.WriteAsJsonAsync(new { configurado = true }); return;
                 }
                 if (context.Request.Method == "POST" && context.Request.Path == "/__comanda-teste/conciliar-estorno")
                 {
@@ -138,25 +186,37 @@ public sealed partial class PedidoConversaConcorrenciaTests
                 if (context.Request.Method == "POST" && context.Request.Path == "/__comanda-teste/atendimento-automatico")
                 {
                     var dados = (await context.Request.ReadFromJsonAsync<TurnoBrowser>())!;
+                    var resultados = llm.IniciarTurno(dados.RespostaControlada);
                     var db = context.RequestServices.GetRequiredService<EasyStockDbContext>();
                     var conversa = await db.AtendimentoConversas.SingleAsync(c => c.EmpresaId == EmpresaId && c.Id == dados.ConversaId);
-                    conversa.LiberarAutomatico(); conversa.RegistrarEntrada(DateTime.UtcNow);
-                    db.AtendimentoMensagens.Add(Mensagem.Entrada(EmpresaId, conversa.Id, DateTime.UtcNow,
-                        TipoConteudoMensagem.Texto, dados.Texto, $"wamid.fixture.in.{Guid.NewGuid():N}"));
+                    if (!dados.RepetirUltimoTurno)
+                    {
+                        conversa.LiberarAutomatico(); conversa.RegistrarEntrada(DateTime.UtcNow);
+                        db.AtendimentoMensagens.Add(Mensagem.Entrada(EmpresaId, conversa.Id, DateTime.UtcNow,
+                            TipoConteudoMensagem.Texto, dados.Texto, $"wamid.fixture.in.{Guid.NewGuid():N}"));
+                    }
                     await db.SaveChangesAsync();
                     var resultado = await context.RequestServices.GetRequiredService<AgenteAtendimentoService>()
                         .ProcessarTurnoAsync(EmpresaId, conversa.Id, DateTime.UtcNow);
-                    await context.Response.WriteAsJsonAsync(new { resultado, ferramentas = llm.Resultados.ToArray() }); return;
+                    await context.Response.WriteAsJsonAsync(new { resultado, ferramentas = resultados.ToArray() }); return;
                 }
                 if (context.Request.Method == "POST" && context.Request.Path == "/__comanda-teste/pagamento")
                 {
                     var dados = (await context.Request.ReadFromJsonAsync<PagamentoBrowser>())!;
-                    var id = Interlocked.Increment(ref _pagamentoId).ToString();
-                    mp.ConsultarPagamentoAsync(id, Arg.Any<CancellationToken>()).Returns(new EasyStock.Application.Ports.Output.Pagamentos.PagamentoMercadoPago(
+                    var db = context.RequestServices.GetRequiredService<EasyStockDbContext>();
+                    if (!await db.Pedidos.AnyAsync(p => p.EmpresaId == EmpresaId && p.Id == dados.PedidoId))
+                    { context.Response.StatusCode = 404; return; }
+                    var id = dados.PagamentoExternoId ?? Interlocked.Increment(ref _pagamentoId).ToString();
+                    if (!long.TryParse(id, out var numero) || numero <= 0) { context.Response.StatusCode = 400; return; }
+                    var pagamento = _pagamentos.GetOrAdd(id, _ => new EasyStock.Application.Ports.Output.Pagamentos.PagamentoMercadoPago(
                         id, "approved", null, dados.PedidoId.ToString(), dados.Valor, DateTime.UtcNow, "pix", "bank_transfer"));
+                    if (pagamento.ExternalReference != dados.PedidoId.ToString() || pagamento.TransactionAmount != dados.Valor)
+                    { context.Response.StatusCode = 409; return; }
+                    mp.ConsultarPagamentoAsync(id, Arg.Any<CancellationToken>()).Returns(pagamento);
                     var resultado = await context.RequestServices.GetRequiredService<ConfirmarPagamentoPedidoUseCase>()
                         .ExecuteAsync(new(dados.PedidoId, id, "approved", dados.Valor, "pix"));
-                    await context.Response.WriteAsJsonAsync(resultado); return;
+                    await context.Response.WriteAsJsonAsync(new { resultado.Situacao, resultado.CobrancaId, resultado.StatusPedido,
+                        resultado.Confirmado, pagamentoExternoId = id }); return;
                 }
                 if (context.Request.Method == "POST" && context.Request.Path == "/__comanda-teste/compartilhar-agente")
                 {

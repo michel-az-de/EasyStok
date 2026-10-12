@@ -152,3 +152,54 @@ confere('cardápio da vitrine substitui o da massa', () => {
 })
 
 console.log(`\n${passou} verificações passaram.`)
+
+const { faltaPagar: saldoPendenteApi, complementoAReceber } = await import('../src/dominio/pagamento.js')
+const complementoReal = (extra = {}) => ({ ...doServidor('aguardando', cobrancaMp('Pendente', { valor: 10 })), total: 45, totalPago: 35, alocado: 35, pagamentos: [{ id: 'recebimento-original', valor: 35, metodo: 'pix', pagoEm: '2026-09-30T14:55:00' }], ...extra })
+confere('saldo45 menos cobertura35 oferece baixa manual somente do complemento10', () => {
+  const pedido = pedidoDaApi(complementoReal())
+  assert.equal(pedido.cobranca.diferenca, true)
+  assert.equal(complementoAReceber(pedido), 10)
+  assert.equal(saldoPendenteApi(pedido), 10)
+  assert.equal(pedido.estado, 'pago', 'a etapa operacional continua preservada')
+})
+confere('complemento quitado não oferece receber novamente', () => {
+  const pedido = pedidoDaApi(complementoReal({ alocado: 45, totalPago: 45, cobranca: cobrancaMp('Paga', { valor: 10, valorPago: 10, pagaEm: '2026-09-30T14:59:00' }) }))
+  assert.equal(pedido.cobranca.diferenca, false)
+  assert.equal(complementoAReceber(pedido), 0)
+  assert.equal(saldoPendenteApi(pedido), 0)
+})
+confere('sinal de reserva conserva suas regras sem virar complemento', () => {
+  const pedido = pedidoDaApi(complementoReal({ sinalNaReserva: true, alocado: 0, totalPago: 0, pagamentos: [], cobranca: cobrancaMp('Pendente', { valor: 22.5 }) }))
+  assert.equal(pedido.cobranca.diferenca, false)
+})
+confere('pedido agendado com sinal habilitado identifica cobrança de todo o saldo restante', () => {
+  const pedido = pedidoDaApi(complementoReal({ sinalNaReserva: true }))
+  assert.equal(pedido.cobranca.diferenca, true)
+  assert.equal(complementoAReceber(pedido), 10)
+})
+confere('leitura legada sem alocado conserva recebimentos e saldo do complemento', () => {
+  const pedido = pedidoDaApi(complementoReal({ alocado: undefined }))
+  assert.equal(pedido.cobranca.diferenca, true)
+  assert.equal(saldoPendenteApi(pedido), 10)
+})
+confere('devolução não confunde dinheiro recebido com cobertura atual', () => {
+  const pedido = pedidoDaApi(complementoReal({ total: 35, totalPago: 45, alocado: 25, pagamentos: [{ id: 'recebido', valor: 45, metodo: 'pix', pagoEm: '2026-09-30T14:55:00' }] }))
+  assert.equal(pedido.cobranca.diferenca, true)
+  assert.equal(saldoPendenteApi(pedido), 10)
+})
+confere('saldo fracionado usa centavos na tradução do complemento', () => {
+  const pedido = pedidoDaApi(complementoReal({ total: 35.05, totalPago: 30.01, alocado: 30.01, cobranca: cobrancaMp('Pendente', { valor: 5.04 }) }))
+  assert.equal(pedido.cobranca.diferenca, true)
+})
+for (const status of ['Cancelada', 'Estornada']) confere(`cobrança ${status.toLowerCase()} não oferece baixa de complemento`, () => {
+  const pedido = pedidoDaApi(complementoReal({ cobranca: cobrancaMp(status, { valor: 10 }) }))
+  assert.equal(pedido.cobranca.diferenca, false)
+  assert.equal(complementoAReceber(pedido), 0)
+})
+confere('complemento expirado preserva a situação vencida e a baixa humana existente', () => {
+  const pedido = pedidoDaApi(complementoReal({ cobranca: cobrancaMp('Expirada', { valor: 10, expiraEm: '2026-09-30T14:40:00' }) }))
+  assert.equal(pedido.cobranca.diferenca, true)
+  assert.equal(situacaoDaCobranca(pedido.cobranca, AGORA).chave, 'expirada')
+  assert.equal(complementoAReceber(pedido), 10)
+})
+console.log(`Resumo final: ${passou} verificações F03 aprovadas.`)

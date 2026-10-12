@@ -101,7 +101,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             var endereco = cliente.Enderecos.FirstOrDefault(e => e.Id == CriarPedidoAtendimentoUseCase.EnderecoPadrao(cliente));
             dados = new(pedido?.Itens.Where(i => i.CardapioItemId is not null).Select(i =>
                 new ItemPedidoCheckout(i.CardapioItemId!.Value, (int)i.Quantidade, i.Observacao, i.CardapioItemVariacaoId)).ToList() ?? [],
-                PedidoId: pedido?.Id, PedidoAtualizadoEm: pedido?.AlteradoEm,
+                Observacoes: pedido?.Observacoes, PedidoId: pedido?.Id, PedidoAtualizadoEm: pedido?.AlteradoEm,
                 Endereco: endereco is null ? null : new(endereco.Cep ?? "", endereco.Logradouro ?? "", endereco.Numero ?? "",
                     endereco.Bairro ?? "", endereco.Cidade ?? "", endereco.Estado ?? "", endereco.Complemento));
         }

@@ -103,6 +103,7 @@ public sealed partial class PedidoConversaConcorrenciaTests : IAsyncLifetime
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         var agora = DateTime.UtcNow;
+        db.SetMobileTenantContext(EmpresaId);
 
         db.Empresas.Add(new Empresa
         {

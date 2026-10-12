@@ -71,7 +71,8 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
             var devolucao = Math.Max(0, saldoAnterior.Alocado - novoTotal);
             if (devolucao > 0 && input.Nivel is not (NivelAcesso.Gerente or NivelAcesso.Admin or NivelAcesso.SuperAdmin))
                 throw new UnauthorizedAccessException("Só a dona ou um gerente pode confirmar uma devolução ou cupom.");
-            if (input.Automatico && (devolucao > 0 || !SomenteAcrescimos(antigos, selecao)))
+            if (input.Automatico && (devolucao > 0 || (dados.Observacoes ?? "") != (pedido.Observacoes ?? "")
+                || !SomenteAcrescimos(antigos, selecao)))
                 throw new ComandaClienteConflitoException("Esta alteração precisa ser conferida pelo atendimento.");
             var agora = relogio.GetUtcNow().UtcDateTime;
             var historico = JsonSerializer.Serialize(antigos.Select(i => new { i.Nome, i.Quantidade, i.PrecoUnitario, i.Observacao }), ComandaClienteUseCase.Json);

@@ -16,16 +16,16 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
     OperacaoEventBroker broker, TimeProvider relogio, IServiceScopeFactory escopos) : ControllerBase
 {
     [HttpGet("comanda")]
-    [EnableRateLimiting("disponibilidade")]
+    [EnableRateLimiting("comanda-leitura")]
     public Task<IActionResult> Obter(string token, CancellationToken ct) => Tratar(async () => await comanda.ObterAsync(token, ct));
 
     [HttpGet("cardapio")]
-    [EnableRateLimiting("disponibilidade")]
+    [EnableRateLimiting("comanda-leitura")]
     public Task<IActionResult> Cardapio(string token, CancellationToken ct) => Tratar(async () =>
         await cardapio.ExecuteAsync((await comanda.AcessoAsync(token, ct)).EmpresaId, ct));
 
     [HttpGet("janelas")]
-    [EnableRateLimiting("disponibilidade")]
+    [EnableRateLimiting("comanda-leitura")]
     public Task<IActionResult> Janelas(string token, [FromQuery] Guid[]? itens, CancellationToken ct) => Tratar(async () =>
         await janelas.ExecuteAsync(new((await comanda.AcessoAsync(token, ct)).EmpresaId, null, null, itens ?? []), ct));
 
@@ -44,6 +44,7 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
             var estado = await comanda.ObterAsync(token, ct);
             // Só acréscimos preservando pratos e observações passam direto. Trocas têm conferência humana.
             if (estado.Pedido is { } pedido && resultado.Total >= pedido.Total
+                && (estado.Rascunho.Observacoes ?? "") == (pedido.Observacoes ?? "")
                 && pedido.Itens.GroupBy(a => (a.CardapioItemId, a.VariacaoId)).All(g => estado.Selecao.Any(n => n.CardapioItemId == g.Key.CardapioItemId
                     && n.VariacaoId == g.Key.VariacaoId && n.Qtd >= g.Sum(a => a.Quantidade) && g.All(a => (n.Observacao ?? "") == (a.Observacao ?? "")))))
             {
