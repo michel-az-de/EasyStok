@@ -159,12 +159,12 @@ provar('Desfazer persiste snapshot anterior sem perder os atalhos', () => {
   gravarPreferenciasHall(chave, antes, disco)
   assert.deepEqual(lerPreferenciasHall(chave, disco), antes)
 })
-provar('somente versão e IDs de módulos são gravados, sem nomes, token ou clientes', () => {
+provar('somente preferências de apresentação são gravadas, sem nomes, token ou clientes', () => {
   const disco = storage()
   const chave = chaveDasPreferenciasHall(sessao('empresa-a', 'usuario-a'))
   gravarPreferenciasHall(chave, { ...inicial, favoritos: ['atendimento'], nome: 'Nome privado', token: 'token-privado', cliente: { documento: 'documento-privado' } }, disco)
   const gravado = disco.dados.get(chave)
-  assert.deepEqual(Object.keys(JSON.parse(gravado)).sort(), ['favoritos', 'ordem', 'versao'])
+  assert.deepEqual(Object.keys(JSON.parse(gravado)).sort(), ['compacto', 'favoritos', 'foco', 'movimentos', 'ordem', 'paineis', 'ritmo', 'versao'])
   assert.doesNotMatch(chave + gravado, /Nome privado|token-privado|documento-privado|cliente/)
 })
 provar('JSON corrompido volta ao catálogo sem quebrar a tela', () => {
