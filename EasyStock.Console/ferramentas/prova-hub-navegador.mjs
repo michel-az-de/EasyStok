@@ -101,7 +101,10 @@ try {
   await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await page.mouse.down()
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 16 }); await page.mouse.up()
   await page.waitForFunction((primeiro) => document.querySelector('[data-modulo]')?.dataset.modulo !== primeiro, antes[0])
+  // O sensor de ponteiro do dnd-kit suprime clicks por 50 ms após soltar.
+  await page.clock.runFor(60)
   await page.getByRole('button', { name: 'Desfazer', exact: true }).click()
+  await page.waitForFunction((esperado) => JSON.stringify([...document.querySelectorAll('[data-modulo]')].map((el) => el.dataset.modulo)) === JSON.stringify(esperado), antes)
   assert.deepEqual(await ordem(page), antes)
   await page.setViewportSize({ width: 390, height: 844 })
   const alca = page.locator('[data-alca-modulo]').first()
@@ -132,6 +135,7 @@ try {
   for (let passo = 1; passo <= 12; passo++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: pontoA.x + (pontoB.x - pontoA.x) * passo / 12, y: pontoA.y + (pontoB.y - pontoA.y) * passo / 12 }] })
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
   await page.waitForFunction((primeiro) => document.querySelector('[data-modulo]')?.dataset.modulo !== primeiro, teclado[0])
+  await page.clock.runFor(60)
   await cdp.detach()
   await page.getByRole('button', { name: 'Concluir organização' }).click()
   await page.evaluate(() => document.querySelector('main').scrollIntoView())
