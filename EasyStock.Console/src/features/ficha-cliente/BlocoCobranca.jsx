@@ -513,7 +513,7 @@ export function BlocoCobranca({
       />
 
       <ListaDados itens={[
-        { rotulo: 'Recebido', valor: cobranca.valorPago != null ? moeda(cobranca.valorPago) : null },
+        { rotulo: pedido.pedidoId ? 'Recebido nesta cobrança' : 'Recebido', valor: cobranca.valorPago != null ? moeda(cobranca.valorPago) : null },
         {
           rotulo: 'Comprovante',
           valor: cobranca.comprovanteEm ? horaCurta(new Date(cobranca.comprovanteEm).toISOString()) : null,
