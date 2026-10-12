@@ -78,6 +78,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Storefront.Entrega.CadastroJanelasEntregaUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Storefront.Entrega.CadastroZonasFreteUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Storefront.Entrega.CadastroBloqueiosEntregaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Storefront.Entrega.ConfigurarFreteRaioUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Storefront.Entrega.TestarFreteRaioUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Storefront.Expediente.AtualizarExpedienteLojaUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Storefront.Expediente.DefinirControleExpedienteUseCase>();
         services.AddScoped<LiberarVagaOnPedidoCanceladoHandler>();
