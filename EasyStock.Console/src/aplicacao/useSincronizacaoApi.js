@@ -99,8 +99,10 @@ export function useSincronizacaoApi({ ativo, comConversas = true, usuario, despa
     function conectar() {
       fecharEventos = conectarEventosOperacao({
         aoEvento: ({ evento, dados }) => {
-          if (!vivo || (evento !== 'ready' && !(evento?.startsWith('pedido.') && dados?.pedidoId))) return
-          if (!sincronizar.invalidarPedidos(evento === 'ready' ? null : dados.pedidoId)) return
+          const pedido = evento?.startsWith('pedido.') && dados?.pedidoId
+          const comanda = evento === 'conversa.comanda_atualizada' && dados?.conversaId
+          if (!vivo || (evento !== 'ready' && !pedido && !comanda)) return
+          if (!sincronizar.invalidarPedidos(pedido || null, comanda || null)) return
           if (lendo) { pedidosPendentes = true; return }
           clearTimeout(esperaPedidos)
           esperaPedidos = setTimeout(() => ciclo(true), AGRUPAR_EVENTOS_MS)

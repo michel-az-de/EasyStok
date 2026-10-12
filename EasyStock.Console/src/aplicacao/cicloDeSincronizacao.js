@@ -125,10 +125,11 @@ export function criarCicloDeSincronizacao({
       }
     }
   }
-  volta.invalidarPedidos = pedidoId => {
+  volta.invalidarPedidos = (pedidoId, conversaId = null) => {
     let afetou = false
     for (const resumo of memoria.resumos.values()) {
-      if (resumo.pedidoEmAndamentoId && (!pedidoId || resumo.pedidoEmAndamentoId === pedidoId)) {
+      if (resumo.pedidoEmAndamentoId && (!pedidoId || resumo.pedidoEmAndamentoId === pedidoId)
+        && (!conversaId || resumo.id === conversaId)) {
         pedidosInvalidos.set(resumo.id, {})
         afetou = true
       }

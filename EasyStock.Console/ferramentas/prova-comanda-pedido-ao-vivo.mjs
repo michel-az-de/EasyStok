@@ -25,6 +25,7 @@ registerHooks({
 const { useSincronizacaoApi } = await import('../src/aplicacao/useSincronizacaoApi.js')
 const { reducer, estadoInicial } = await import('../src/aplicacao/reducer.js')
 const { criarMemoriaDoLaco } = await import('../src/aplicacao/cicloDeSincronizacao.js')
+const { faltaPagar } = await import('../src/dominio/pagamento.js')
 const antigos = { fetch: globalThis.fetch, setTimeout, clearTimeout }
 const respirar = async () => { for (let i = 0; i < 12; i += 1) await new Promise(setImmediate) }
 let passou = 0
@@ -71,6 +72,7 @@ async function montar({ selecionada = null } = {}) {
     s, memoria, acoes,
     pedido: id => estado.conversas.find(c => c.id === id)?.pedido,
     evento: (pedidoId = 'pedido-a') => ambiente.conexoes.at(-1)?.aoEvento({ evento: 'pedido.pagamento_atualizado', dados: { pedidoId } }),
+    eventoComanda: (conversaId = 'a') => ambiente.conexoes.at(-1)?.aoEvento({ evento: 'conversa.comanda_atualizada', dados: { conversaId } }),
     ready: () => ambiente.conexoes.at(-1)?.aoEvento({ evento: 'ready', dados: {} }),
     cair: () => ambiente.conexoes.at(-1)?.aoCair(),
     conexoes: () => ambiente.conexoes.length,
@@ -110,6 +112,26 @@ await confere('SSE atualiza financeiro de pedido não selecionado sem mudar stat
   assert.equal(m.pedido('a').statusApi, 'aguardando')
   assert.deepEqual(m.s.chamadas, ['/api/atendimento/conversas/a/pedido'])
   assert.equal(m.memoria.pedidos.get('b').dados.alocado, 25)
+})
+
+await confere('evento real de alteração da comanda atualiza total/saldo antes do próximo pagamento', async m => {
+  m.eventoComanda('fora-da-inbox'); m.eventoComanda(null); await m.avancar(300)
+  assert.equal(m.s.chamadas.length, 0, 'conversa desconhecida não pode invalidar todos os pedidos')
+  m.s.pedidos.a.alocado = 25; m.evento(); await m.avancar(300); m.s.chamadas.length = 0
+  m.s.pedidos.a.total = 35
+  for (let i = 0; i < 8; i += 1) m.eventoComanda()
+  await m.avancar(300)
+  assert.equal(m.pedido('a').totalApi, 35, 'o indicador conservou o total anterior à alteração da comanda')
+  assert.equal(faltaPagar(m.pedido('a'), []), 10)
+  assert.equal(m.pedido('a').statusApi, 'aguardando')
+  assert.deepEqual(m.s.chamadas, ['/api/atendimento/conversas/a/pedido'])
+  m.s.chamadas.length = 0
+  const { retida, liberar } = m.reter('a')
+  m.eventoComanda(); await m.avancar(300); assert.equal(retida.entrou, true)
+  m.s.pedidos.a.total = 45; m.eventoComanda(); liberar(); await respirar(); await m.avancar(300)
+  assert.equal(m.pedido('a').totalApi, 45, 'evento da conversa em voo se perdeu no cache antigo')
+  assert.equal(m.s.chamadas.length, 2)
+  assert.equal(m.s.pico, 1)
 })
 
 await confere('rajada do mesmo pedido agrupa uma única leitura e ignora pedido desconhecido', async m => {
