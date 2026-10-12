@@ -34,6 +34,7 @@ export function Popover({
   const origemRef = useRef(null)
   const [retangulo, setRetangulo] = useState(null)
   useEscape(true, (evento) => {
+    if (evento.isComposing || evento.keyCode === 229) return
     // Uma janela aberta sobre este menu recebe seu próprio Escape nativo.
     const janelaDoMenu = caixaRef.current?.closest('dialog[open]') ?? null
     const janelaDoFoco = document.activeElement?.closest('dialog[open]') ?? null
@@ -49,36 +50,64 @@ export function Popover({
     if (!portal) return
     const ancora = marcadorRef.current?.parentElement
     if (!ancora) return
-    const medida = ancora.getBoundingClientRect()
-    const dialogo = ancora.closest('dialog[open]')
-    const referencia = dialogo?.getBoundingClientRect()
-    const escalaX = dialogo ? referencia.width / dialogo.offsetWidth : 1
-    const escalaY = dialogo ? referencia.height / dialogo.offsetHeight : 1
-    setRetangulo({
-      left: dialogo ? (medida.left - referencia.left) / escalaX + dialogo.scrollLeft - dialogo.clientLeft : medida.left,
-      top: dialogo ? (medida.top - referencia.top) / escalaY + dialogo.scrollTop - dialogo.clientTop : medida.top,
-      width: medida.width / escalaX, height: medida.height / escalaY,
-      destino: dialogo ?? document.body, emDialogo: !!dialogo,
-    })
+    let quadro = null
+    const medir = () => {
+      quadro = null
+      const medida = ancora.getBoundingClientRect()
+      const dialogo = ancora.closest('dialog[open]')
+      const referencia = dialogo?.getBoundingClientRect()
+      const escalaX = dialogo ? referencia.width / dialogo.offsetWidth : 1
+      const escalaY = dialogo ? referencia.height / dialogo.offsetHeight : 1
+      const proximo = {
+        left: dialogo ? (medida.left - referencia.left) / escalaX + dialogo.scrollLeft - dialogo.clientLeft : medida.left,
+        top: dialogo ? (medida.top - referencia.top) / escalaY + dialogo.scrollTop - dialogo.clientTop : medida.top,
+        width: medida.width / escalaX, height: medida.height / escalaY,
+        destino: dialogo ?? document.body, emDialogo: !!dialogo,
+        larguraLimite: dialogo?.clientWidth ?? window.visualViewport?.width ?? window.innerWidth,
+        alturaLimite: dialogo?.clientHeight ?? window.visualViewport?.height ?? window.innerHeight,
+        inicioX: dialogo ? 0 : window.visualViewport?.offsetLeft ?? 0,
+        inicioY: dialogo ? 0 : window.visualViewport?.offsetTop ?? 0,
+      }
+      setRetangulo((atual) => atual && Object.keys(proximo).every((chave) => atual[chave] === proximo[chave]) ? atual : proximo)
+    }
+    const agendar = (evento) => {
+      if (evento?.type === 'scroll' && evento.target?.nodeType && caixaRef.current?.contains(evento.target)) return
+      if (quadro === null) quadro = window.requestAnimationFrame(medir)
+    }
+    const viewport = window.visualViewport
+    medir()
+    window.addEventListener('scroll', agendar, true)
+    window.addEventListener('resize', agendar)
+    viewport?.addEventListener('scroll', agendar)
+    viewport?.addEventListener('resize', agendar)
+    return () => {
+      window.removeEventListener('scroll', agendar, true)
+      window.removeEventListener('resize', agendar)
+      viewport?.removeEventListener('scroll', agendar)
+      viewport?.removeEventListener('resize', agendar)
+      if (quadro !== null) window.cancelAnimationFrame(quadro)
+    }
   }, [portal])
 
   useLayoutEffect(() => {
-    if (!retangulo?.emDialogo || posicao !== 'abaixo') return
+    if (!retangulo || posicao !== 'abaixo') return
     const caixa = caixaRef.current
-    const dialogo = retangulo.destino
+    // Ao mudar de desktop para celular, devolve ao CSS a folha fixa no rodapé.
+    for (const propriedade of ['position', 'width', 'left', 'right', 'top', 'bottom', 'maxHeight', 'transformOrigin']) caixa.style[propriedade] = ''
     const estilo = getComputedStyle(caixa)
+    if (!retangulo.emDialogo && estilo.position === 'fixed') return
     const margem = parseFloat(estilo.getPropertyValue('--e-4'))
     const espaco = parseFloat(estilo.getPropertyValue('--e-2'))
-    const largura = Math.min(360, dialogo.clientWidth - 2 * margem)
-    const esquerda = Math.max(margem, Math.min(retangulo.left + retangulo.width - largura, dialogo.clientWidth - largura - margem))
-    // O dialog animado é um containing block. Mantém o menu dentro dele,
-    // sem o foco provocar rolagem horizontal ou esconder o último item.
+    const { larguraLimite, alturaLimite, inicioX, inicioY } = retangulo
+    const largura = Math.max(1, Math.min(360, larguraLimite - 2 * margem))
+    const esquerda = Math.max(inicioX + margem, Math.min(retangulo.left + retangulo.width - largura, inicioX + larguraLimite - largura - margem))
+    // O limite é o dialog ou a viewport. Menus do rodapé também precisam abrir para cima.
     Object.assign(caixa.style, {
       position: 'absolute', width: `${largura}px`, left: `${esquerda - retangulo.left}px`, right: 'auto',
-      maxHeight: `${dialogo.clientHeight - 2 * margem}px`,
+      maxHeight: `${Math.max(1, alturaLimite - 2 * margem)}px`,
     })
-    const abaixo = dialogo.clientHeight - retangulo.top - retangulo.height - espaco - margem
-    const acima = retangulo.top - espaco - margem
+    const abaixo = inicioY + alturaLimite - retangulo.top - retangulo.height - espaco - margem
+    const acima = retangulo.top - inicioY - espaco - margem
     const inverter = caixa.offsetHeight > abaixo && acima > abaixo
     Object.assign(caixa.style, {
       top: inverter ? 'auto' : `${retangulo.height + espaco}px`,
@@ -98,7 +127,7 @@ export function Popover({
     if (papel === 'menu') itens.forEach((item) => { item.tabIndex = -1 })
     const destino = papel === 'menu' ? itens[0] : caixaRef.current?.querySelector('button, input, select, textarea')
     destino?.focus()
-  }, [semAutoFoco, retangulo, papel])
+  }, [semAutoFoco, retangulo?.destino, papel])
 
   useEffect(() => {
     const aoClicarFora = (evento) => {

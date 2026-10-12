@@ -19,6 +19,15 @@
 .busca > div { width: 100%; }
 .resultado { display: block; color: var(--tinta-2); font-size: var(--t-apoio); }
 .resultado:not(:empty) { margin-bottom: var(--e-4); }
+.destinos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: var(--e-2); list-style: none; padding: 0; margin: 0; }
+.destino { display: flex; align-items: center; gap: var(--e-3); min-height: 72px; height: 100%; padding: var(--e-3); border: 1px solid var(--linha); border-radius: var(--r-2); color: var(--tinta); background: var(--papel); text-decoration: none; }
+.destino:hover { border-color: var(--marca); background: var(--preenchimento); }
+.destino:focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
+.destino > svg { flex: none; color: var(--marca-forte); }
+.textoDestino { display: flex; flex-direction: column; flex: 1; gap: var(--e-1); min-width: 0; overflow-wrap: anywhere; }
+.textoDestino strong { font-size: var(--t-forte); }
+.textoDestino > span, .estadoTela { font-size: var(--t-micro); color: var(--tinta-2); }
+.estadoTela { display: inline-flex; align-items: center; padding: var(--e-1) var(--e-2); border: 1px solid var(--linha); border-radius: var(--r-1); background: var(--fundo); line-height: var(--lh-compacto); font-weight: 500; }
 
 .conteudo { width: min(1384px, 100%); margin: 0 auto; padding: var(--e-4) var(--e-5); }
 
@@ -66,7 +75,7 @@
   margin: 0; padding: 0; list-style: none;
 }
 .atalho {
-  display: flex; align-items: center; min-height: var(--toque); padding-inline: 0;
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-1) var(--e-2); min-height: var(--toque); padding-inline: 0;
   border-radius: var(--r-1); font-size: var(--t-micro); font-weight: 600; color: var(--marca-forte); text-decoration: none;
 }
 .atalho:hover { background: var(--marca-claro); text-decoration: underline; }

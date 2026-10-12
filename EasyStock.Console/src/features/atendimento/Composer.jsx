@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
@@ -42,6 +42,8 @@ export function Composer({
   // do próprio componente agora; aqui só sobra a ref.
   const campoRef = useRef(null)
   const respostasRef = useRef(null)
+  const idListaRespostas = useId()
+  const sugestoesNoCampo = barra.aberto && barra.pelaBarra && barra.itens.length > 0
 
   // Frente Anexos (rodada 7, pedido do dono 24/09/2026 04h12): anexo de
   // arquivo em espera (prévia antes de enviar) e o gravador de áudio.
@@ -160,6 +162,9 @@ export function Composer({
                 rotuloOculto
                 value={rascunho}
                 disabled={!podeEscrever}
+                aria-autocomplete={barra.pelaBarra ? 'list' : undefined}
+                aria-controls={sugestoesNoCampo ? idListaRespostas : undefined}
+                aria-activedescendant={sugestoesNoCampo && barra.itens[barra.destaque] ? `${idListaRespostas}-${barra.destaque}` : undefined}
                 placeholder={!podeEscrever
                   ? (podeEnviarModelo ? 'Use Modelos aprovados para continuar' : 'Mensagem indisponível nesta conversa')
                   : anexo
@@ -171,6 +176,7 @@ export function Composer({
                 onChange={(e) => digitar(e.target.value)}
                 onBlur={() => descarregar()}
                 onKeyDown={(e) => {
+                  if (e.isComposing || e.nativeEvent?.isComposing || e.keyCode === 229 || e.altKey || e.ctrlKey || e.metaKey) return
                   if (barra.aoTeclar(e)) return
                   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarComposer() }
                 }}
@@ -179,7 +185,7 @@ export function Composer({
                   do próprio Popover) e planta o conteúdo em document.body,
                   fora do recorte de `.composer`. Visual idêntico ao de antes,
                   só que agora fora do overflow. */}
-              {barra.aberto && <SeletorRespostas seletor={barra} aoInserido={() => campoRef.current?.querySelector('textarea')?.focus()} aoGerenciar={() => {
+              {barra.aberto && <SeletorRespostas seletor={barra} aoInserido={() => campoRef.current?.querySelector('textarea')?.focus()} idLista={idListaRespostas} aoGerenciar={() => {
                 if (!barra.pelaBarra) respostasRef.current?.focus()
                 aoAbrirBiblioteca?.()
               }} />}
@@ -197,6 +203,7 @@ export function Composer({
                 disabled={!podeEscrever}
                 aria-haspopup="listbox"
                 aria-expanded={barra.aberto}
+                aria-controls={barra.aberto && barra.itens.length > 0 ? idListaRespostas : undefined}
                 title="Respostas prontas (atalho: / no campo)"
                 className={css.botaoRespostas}
                 onClick={barra.abrir}

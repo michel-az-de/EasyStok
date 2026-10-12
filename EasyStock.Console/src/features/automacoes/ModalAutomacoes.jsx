@@ -150,7 +150,7 @@ function Regra({
 // Achado 8 (banca capricho R10): as sete linhas competiam em pé de igualdade,
 // sem nada que dissesse qual vale hoje. `hoje` já vem calculado do relógio da
 // tela (ModalAutomacoes), esta função só decora a linha.
-function DiaDeFuncionamento({ dia, valor, aoEditar, hoje }) {
+export function DiaDeFuncionamento({ dia, valor, aoEditar, hoje, obrigatorio = false }) {
   return (
     <li className={`${css.diaFuncionamento} ${hoje ? css.diaFuncionamentoHoje : ''}`}>
       <strong>{dia.rotulo}</strong>
@@ -174,6 +174,7 @@ function DiaDeFuncionamento({ dia, valor, aoEditar, hoje }) {
             rotulo={`Abre, ${dia.rotulo}`}
             rotuloOculto
             tipo="time"
+            required={obrigatorio}
             value={valor.abre ?? ''}
             onChange={(e) => aoEditar({ abre: e.target.value })}
           />
@@ -181,6 +182,7 @@ function DiaDeFuncionamento({ dia, valor, aoEditar, hoje }) {
             rotulo={`Fecha, ${dia.rotulo}`}
             rotuloOculto
             tipo="time"
+            required={obrigatorio}
             value={valor.fecha ?? ''}
             onChange={(e) => aoEditar({ fecha: e.target.value })}
           />
@@ -190,7 +192,7 @@ function DiaDeFuncionamento({ dia, valor, aoEditar, hoje }) {
   )
 }
 
-export function ModalAutomacoes({ regras, aoAlternar, aoFechar }) {
+export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
   const {
     selecionada, agora, som, audioBloqueado, funcionamento, aberta, lojaAberta, permissaoNotificacao,
     fonteApi, sincronizacao,
@@ -253,7 +255,7 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar }) {
             <Botao className={css.toque} onClick={voltarAoHorario}>Voltar a seguir o horário</Botao>
           )}
         </div>
-        <ul className={css.diasFuncionamento}>
+        {fonteApi ? horariosApi : <ul className={css.diasFuncionamento}>
           {DIAS_DA_SEMANA.map((dia) => (
             <DiaDeFuncionamento
               key={dia.chave}
@@ -263,7 +265,7 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar }) {
               hoje={dia.chave === chaveDeHoje}
             />
           ))}
-        </ul>
+        </ul>}
       </div>
 
       {/* Som da cozinha: liga e desliga aqui, porque é aqui que mora o que a

@@ -1,5 +1,5 @@
 import { API_BASE } from '../fonteDados'
-import { atualizarTokens, empresaDoToken, gravarSessao, lerSessao, limparSessao } from './sessao'
+import { atualizarTokens, empresaDoToken, gravarSessao, identidadeDaSessao, lerSessao, limparSessao } from './sessao'
 
 // Erro de chamada à API com o que a tela precisa para falar com a dona:
 // status HTTP, código da API (`error.code` ou `erro`), mensagem legível e o detalhe
@@ -104,9 +104,13 @@ const PRAZO_DE_LEITURA_MS = 20000
 const semResposta = () => new ErroApi(0, 'SEM_RESPOSTA', 'O EasyStok demorou a responder.')
 
 export async function chamarApi(caminho, {
-  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null, sinal, envelope = false, prazoComCancelamento = false,
+  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null, sinal, envelope = false, prazoComCancelamento = false, identidadeEsperada = null,
 } = {}) {
   const sessao = autenticado ? await garantirSessao() : null
+  // Uma operação em etapas pertence à conta que a iniciou, mesmo durante a renovação do token.
+  if (identidadeEsperada !== null && (identidadeDaSessao(sessao) !== identidadeEsperada || identidadeDaSessao(lerSessao()) !== identidadeEsperada)) {
+    throw new ErroApi(401, 'SESSAO_ALTERADA', 'A sessão foi encerrada ou trocada.')
+  }
   // Conta a partir daqui: a renovação da sessão não gasta o prazo da leitura.
   const prazo = (!sinal || prazoComCancelamento) && metodo === 'GET' && !arquivo ? AbortSignal.timeout(PRAZO_DE_LEITURA_MS) : null
   const cabecalhos = { Accept: arquivo ? '*/*' : 'application/json' }

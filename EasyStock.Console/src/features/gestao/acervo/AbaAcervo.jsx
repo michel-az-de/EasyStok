@@ -33,7 +33,8 @@ export function AbaAcervo() {
   useEffect(() => {
     if (selecionada && detalhe.current) {
       detalhe.current.focus({ preventScroll: true })
-      detalhe.current.scrollIntoView({ block: 'start', behavior: 'smooth' })
+      const reduzirMovimento = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      detalhe.current.scrollIntoView({ block: 'start', behavior: reduzirMovimento ? 'auto' : 'smooth' })
     }
   }, [selecionada])
   const executar = async (acao, mensagem) => {

@@ -19,7 +19,7 @@ export function MenuDosModulos({ moduloId, telaId, fonteApi, aoNavegar }) {
     <nav className={css.menu} aria-label={`Telas de ${modulo.nome}`}>
       <h2 className={css.nomeMenu}><IconeDoModulo modulo={modulo} />{modulo.nome}</h2>
       {telasDoMenu(modulo, { fonteApi }).map((item) => <a key={item.id} href={hashDoModulo(modulo.id, item.id)} onClick={aoNavegar} className={`${css.item} ${item.id === telaId ? css.itemAtivo : ''}`} aria-current={item.id === telaId ? 'page' : undefined}>
-        <IconeDoModulo modulo={modulo} telaId={item.id} /><span>{item.rotulo}</span>
+        <IconeDoModulo modulo={modulo} telaId={item.id} /><span>{item.rotulo}{fonteApi && item.indisponivelNaApi && <small className={css.preparacao}>Em preparação</small>}</span>
       </a>)}
     </nav>
   </>

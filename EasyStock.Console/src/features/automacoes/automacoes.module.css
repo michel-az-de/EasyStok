@@ -38,6 +38,7 @@
 }
 .horariosDoDia { display: flex; gap: var(--e-2); flex-wrap: wrap; margin-left: auto; }
 .horariosDoDia input { min-height: var(--toque); }
+.camposHorarios { min-width: 0; margin: 0; padding: 0; border: 0; }
 /* #1474: dia desligado diz "Fechado" no lugar dos horários. */
 .diaFechado { margin-left: auto; color: var(--tinta-3); font-weight: 600; }
 .acoesLoja { display: flex; gap: var(--e-2); flex-wrap: wrap; }

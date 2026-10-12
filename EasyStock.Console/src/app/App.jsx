@@ -4,6 +4,7 @@ import {
 } from '@dnd-kit/core'
 import { AtendimentoProvider } from '../aplicacao/AtendimentoProvider'
 import { criarMemoriaDoLaco } from '../aplicacao/cicloDeSincronizacao'
+import { ContextoRascunhosDosAjustes, useGravacoesDosAjustes } from '../aplicacao/rascunhosDosAjustes'
 import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
 import { useReacaoClienteSimulado } from '../aplicacao/useReacaoClienteSimulado'
 import { useDigitacaoAutomatica } from '../aplicacao/useDigitacaoAutomatica'
@@ -38,6 +39,7 @@ import { CartaoArrasto, PainelCardapio } from '../features/cardapio/PainelCardap
 import { ModalNota } from '../features/notas/ModalNota'
 import { PainelGaleria } from '../features/anexos/PainelGaleria'
 import { ModalAutomacoes } from '../features/automacoes/ModalAutomacoes'
+import { ModalHorariosDaSemana } from '../features/automacoes/ModalHorariosDaSemana'
 import { ModalGestao, PainelDeAjuste } from '../features/gestao/ModalGestao'
 import { HallDeModulos } from '../features/hall/HallDeModulos'
 import { PainelAgora } from '../features/agora/PainelAgora'
@@ -225,7 +227,7 @@ function Composicao({ rota, aoSair }) {
       )}
 
       {modal === 'automacoes' && (
-        <ModalAutomacoes regras={regras} aoAlternar={alternarRegra} aoFechar={fechar} />
+        <ModalAutomacoes regras={regras} aoAlternar={alternarRegra} aoFechar={fechar} horariosApi={<AjustarHorariosAtendimento />} />
       )}
 
       {modal === 'ajuda' && <AjudaDoConsole rota={rota} fonteApi={FONTE_API} aoFechar={fechar} />}
@@ -233,6 +235,7 @@ function Composicao({ rota, aoSair }) {
       {modal === 'gestao' && (
         <ModalGestao
           renderizarEditorCardapio={(props) => <EditorItemCardapio {...props} />}
+          horariosAtendimento={<AjustarHorariosAtendimento />}
           abaInicial={abaGestao}
           aoTrocarAba={setAbaGestao}
           janelasApi={FONTE_API ? <CadastroEntregaApi /> : null}
@@ -325,7 +328,7 @@ function TelaDaRota({ rota, aoSair }) {
             {/* #1440: no modo API, Entregas › Janelas de entrega é o cadastro da S45 (o mesmo de
                 Entregas › Janelas e frete). Feature não importa feature; quem compõe é o App. */}
             {rota.aba && (
-              <PainelDeAjuste renderizarEditorCardapio={(props) => <EditorItemCardapio {...props} />} key={rota.aba} aba={rota.aba} janelasApi={FONTE_API ? <CadastroEntregaApi /> : null} />
+              <PainelDeAjuste renderizarEditorCardapio={(props) => <EditorItemCardapio {...props} />} horariosAtendimento={<AjustarHorariosAtendimento />} key={rota.aba} aba={rota.aba} janelasApi={FONTE_API ? <CadastroEntregaApi /> : null} />
             )}
           </MolduraDoModulo>
         )}
@@ -401,6 +404,16 @@ function ControleAjuda({ rota }) {
     {aberta && <AjudaDoConsole rota={rota} fonteApi={FONTE_API} aoFechar={() => setAberta(false)} />}</>
 }
 
+function AjustarHorariosAtendimento() {
+  const [aberto, setAberto] = useState(false)
+  const { acoes } = useAcessoModulos()
+  if (acoes.editarAtendimento !== true) return null
+  return <>
+    <Botao icone="relogio" aria-haspopup="dialog" onClick={() => setAberto(true)}>Ajustar horários da semana</Botao>
+    {aberto && <ModalHorariosDaSemana aoFechar={() => setAberto(false)} />}
+  </>
+}
+
 // Cozinha no modo API (F05): a fila vem do KDS, não do espelho do Balcão. Sem
 // sessão nesta aba, pede o login como a janela principal.
 function CozinhaApi({ rota, sessao }) {
@@ -430,6 +443,31 @@ export function App() {
 function AppComAcesso({ rota, sessao, aoSair }) {
   const ultimaConversa = useRef(null)
   const comandasDaVisita = useRef({})
+  const [rascunhosDosAjustes, setRascunhosDosAjustes] = useState({})
+  const gravacoesDosAjustes = useGravacoesDosAjustes()
+  const [confirmandoSaida, setConfirmandoSaida] = useState(false)
+  const temRascunhos = Object.keys(rascunhosDosAjustes).length > 0 || Object.keys(gravacoesDosAjustes.gravando).length > 0
+  const definirRascunho = useCallback((chave, valorOuFuncao) => {
+    setRascunhosDosAjustes((atuais) => {
+      const valor = typeof valorOuFuncao === 'function' ? valorOuFuncao(atuais[chave] ?? null) : valorOuFuncao
+      if (valor === (atuais[chave] ?? null)) return atuais
+      const proximos = { ...atuais }
+      if (valor === null) delete proximos[chave]
+      else proximos[chave] = valor
+      return proximos
+    })
+  }, [])
+  useEffect(() => {
+    if (!temRascunhos) return
+    const antesDeSair = (evento) => { evento.preventDefault(); evento.returnValue = '' }
+    window.addEventListener('beforeunload', antesDeSair)
+    return () => window.removeEventListener('beforeunload', antesDeSair)
+  }, [temRascunhos])
+  const sair = () => temRascunhos ? setConfirmandoSaida(true) : aoSair()
+  const confirmacaoSaida = confirmandoSaida && <Modal titulo="Sair sem salvar os ajustes?"
+    descricao="Há ajustes não concluídos em Horários e mensagens. Você pode continuar trabalhando e voltar a eles. Sair descarta os rascunhos; uma gravação já enviada pode ser concluída. Confira os valores ao entrar novamente."
+    aoFechar={() => setConfirmandoSaida(false)}
+    rodape={<><Botao onClick={() => setConfirmandoSaida(false)}>Continuar trabalhando</Botao><Botao variante="texto" onClick={aoSair}>Sair e descartar ajustes</Botao></>} />
   // #1576: mensagens e pedidos já lidos ficam aqui enquanto a dona está no Hall, na Cozinha ou nas
   // Entregas; a `key` da sessão no AppComAcesso recria tudo quando troca o usuário ou a empresa.
   const [memoriaDoLaco] = useState(criarMemoriaDoLaco)
@@ -441,19 +479,19 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: true })
   const { dados, erro, tentarNovamente } = useModulosDaSessao(sessao)
   if (!dados) return (
-    <main className={css.estadoAcesso} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label={erro ? 'Falha ao carregar acesso' : 'Carregando módulos'} aria-busy={!erro}>
+    <><main className={css.estadoAcesso} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label={erro ? 'Falha ao carregar acesso' : 'Carregando módulos'} aria-busy={!erro}>
     <Vazio titulo={erro ? 'Não foi possível carregar seu acesso' : 'Carregando seus módulos'}
-      acao={<>{erro && <><Botao onClick={tentarNovamente}>Tentar novamente</Botao><ControleAjuda rota={rota} /></>}<Botao variante="texto" onClick={aoSair}>Sair</Botao></>}>
+      acao={<>{erro && <><Botao onClick={tentarNovamente}>Tentar novamente</Botao><ControleAjuda rota={rota} /></>}<Botao variante="texto" onClick={sair}>Sair</Botao></>}>
       {erro ?? 'Aguarde um instante.'}
     </Vazio>
-    </main>
+    </main>{confirmacaoSaida}</>
   )
-  const acesso = { permite: (id) => permiteModulo(dados, id), acoes: dados.acoes ?? {}, aoSair, sessaoPersistente: sessao.persistente,
+  const acesso = { permite: (id) => permiteModulo(dados, id), acoes: dados.acoes ?? {}, aoSair: sair, sessaoPersistente: sessao.persistente,
     notificacoes: <SinoDaSessao avisos={avisos} aparelho={avisosNoAparelho} /> }
   let tela
   if (!permiteRota(dados, rota)) tela = (
     <main className={css.estadoAcesso} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Módulo sem acesso">
-    <Vazio titulo="Seu perfil não tem acesso a este módulo" acao={<><a href={HASH_HALL}>Voltar aos módulos</a><ControleAjuda rota={rota} /><Botao variante="texto" onClick={aoSair}>Sair</Botao></>}>
+    <Vazio titulo="Seu perfil não tem acesso a este módulo" acao={<><a href={HASH_HALL}>Voltar aos módulos</a><ControleAjuda rota={rota} /><Botao variante="texto" onClick={sair}>Sair</Botao></>}>
       Peça à dona para revisar seu acesso, se precisar trabalhar aqui.
     </Vazio>
     </main>
@@ -462,6 +500,10 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   else if (rota.tipo === ROTA_COZINHA) tela = <CozinhaApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_ENTREGAS) tela = <EntregasApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_CARDAPIO_LINK) tela = <AvisoCardapioDoSite />
-  else tela = <AppPrincipal rota={rota} sessao={sessao} aoSair={aoSair} ultimaConversa={ultimaConversa} aoLembrarConversa={lembrarConversa} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={guardarComandas} memoriaDoLaco={memoriaDoLaco} />
-  return <ContextoAcessoModulos.Provider value={acesso}>{tela}</ContextoAcessoModulos.Provider>
+  else tela = <AppPrincipal rota={rota} sessao={sessao} aoSair={sair} ultimaConversa={ultimaConversa} aoLembrarConversa={lembrarConversa} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={guardarComandas} memoriaDoLaco={memoriaDoLaco} />
+  return <ContextoAcessoModulos.Provider value={acesso}>
+    <ContextoRascunhosDosAjustes.Provider value={{ rascunhos: rascunhosDosAjustes, definir: definirRascunho, ...gravacoesDosAjustes }}>
+      {tela}{confirmacaoSaida}
+    </ContextoRascunhosDosAjustes.Provider>
+  </ContextoAcessoModulos.Provider>
 }

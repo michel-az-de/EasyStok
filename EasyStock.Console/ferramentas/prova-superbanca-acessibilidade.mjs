@@ -8,11 +8,14 @@ import { transformWithOxc } from 'vite'
 
 const fontes = new Map()
 const base = process.argv.includes('--base') ? process.argv[process.argv.indexOf('--base') + 1] : null
-for (const nome of ['AlcaLargura', 'Popover', 'Modal', 'Chip', 'Icone', 'Campo', 'Botao', 'BarraDeAbas', 'EscolhaDeEntregador', 'EscolhaDeProvedorEntrega']) {
+for (const nome of ['AlcaLargura', 'Popover', 'Modal', 'Chip', 'Icone', 'Campo', 'Botao', 'BarraDeAbas', 'EscolhaDeEntregador', 'EscolhaDeProvedorEntrega', 'InterruptorTema']) {
   const url = new URL(`../src/componentes/${nome}.jsx`, import.meta.url)
   const fonte = base ? execFileSync('git', ['show', `${base}:EasyStock.Console/src/componentes/${nome}.jsx`], { encoding: 'utf8' }) : readFileSync(url, 'utf8')
   fontes.set(url.href, (await transformWithOxc(fonte, url.pathname, { jsx: { runtime: 'automatic' } })).code)
 }
+const urlSeletor = new URL('../src/features/atendimento/SeletorRespostas.jsx', import.meta.url)
+const fonteSeletor = base ? execFileSync('git', ['show', `${base}:EasyStock.Console/src/features/atendimento/SeletorRespostas.jsx`], { encoding: 'utf8' }) : readFileSync(urlSeletor, 'utf8')
+fontes.set(urlSeletor.href, (await transformWithOxc(fonteSeletor, urlSeletor.pathname, { jsx: { runtime: 'automatic' } })).code)
 let host
 const hookRef = valor => host.valores[host.indice++] ??= { current: valor }
 const hooks = {
@@ -32,6 +35,7 @@ registerHooks({
     if (spec === 'react') return { url: dados('const h=globalThis.__provaSuperbancaAcessibilidade.hooks; export const useRef=h.useRef,useId=h.useId,useState=h.useState,useEffect=h.useEffect,useLayoutEffect=h.useLayoutEffect,forwardRef=h.forwardRef;'), shortCircuit: true }
     if (spec === 'react/jsx-runtime') return { url: dados('export const jsx=(type,props)=>({type,props}),jsxs=jsx,Fragment="fragment";'), shortCircuit: true }
     if (spec === 'react-dom') return { url: dados('export const createPortal=(elemento)=>elemento;'), shortCircuit: true }
+    if (spec === '../hooks/useTema') return { url: dados('export const useTema=()=>["light", globalThis.__provaSuperbancaAcessibilidade.trocarTema];'), shortCircuit: true }
     if (spec.endsWith('.css')) return { url: dados('export default new Proxy({}, {get:(_,k)=>k});'), shortCircuit: true }
     if (spec.startsWith('.') && !/\.[a-z]+$/i.test(spec)) {
       for (const extensao of ['.js', '.jsx']) { try { return proximo(spec + extensao, contexto) } catch { /* próxima extensão */ } }
@@ -47,6 +51,8 @@ const { Chip } = await import('../src/componentes/Chip.jsx')
 const { BarraDeAbas } = await import('../src/componentes/BarraDeAbas.jsx')
 const { EscolhaDeEntregador } = await import('../src/componentes/EscolhaDeEntregador.jsx')
 const { EscolhaDeProvedorEntrega } = await import('../src/componentes/EscolhaDeProvedorEntrega.jsx')
+const { InterruptorTema } = await import('../src/componentes/InterruptorTema.jsx')
+const { SeletorRespostas } = await import('../src/features/atendimento/SeletorRespostas.jsx')
 const ouvintes = new Map()
 globalThis.window = {
   addEventListener(tipo, fn) { if (!ouvintes.has(tipo)) ouvintes.set(tipo, new Set()); ouvintes.get(tipo).add(fn) },
@@ -331,6 +337,84 @@ provar('Abas: consumidores normais mantem foco circular, Home/End e ativacao man
   assert.equal(document.activeElement, itens[3])
   focadas[3].props.onClick()
   assert.deepEqual(escolhas, ['automaticas'])
+})
+
+provar('Tema: atalhos modificados conservam comportamento do navegador sem trocar aparência', () => {
+  const escolhas = []
+  globalThis.__provaSuperbancaAcessibilidade.trocarTema = tema => escolhas.push(tema)
+  const m = montar(InterruptorTema, {})
+  const currentTarget = { querySelector: () => origem }
+  for (const modificador of ['altKey', 'ctrlKey', 'metaKey']) {
+    for (const key of ['ArrowLeft', 'ArrowRight', 'Home', 'End']) {
+      const evento = tecla(key, origem, { currentTarget, [modificador]: true })
+      m.elemento.props.onKeyDown(evento)
+      assert.equal(evento.prevenido, false)
+    }
+  }
+  assert.deepEqual(escolhas, [])
+  const evento = tecla('ArrowRight', origem, { currentTarget })
+  m.elemento.props.onKeyDown(evento)
+  assert.equal(evento.prevenido, true)
+  assert.deepEqual(escolhas, ['dark'])
+})
+
+provar('Popover portal: acompanha rolagem e resize medindo uma vez por quadro; desmontagem limpa tudo', () => {
+  const quadros = new Map()
+  let proximoQuadro = 0, medicoes = 0, esquerda = 100, topo = 300, largura = 240
+  window.requestAnimationFrame = fn => { const id = ++proximoQuadro; quadros.set(id, fn); return id }
+  window.cancelAnimationFrame = id => quadros.delete(id)
+  const passarQuadro = () => { const tarefas = [...quadros.values()]; quadros.clear(); tarefas.forEach(fn => fn()) }
+  document.body = { corpo: true }
+  const ancora = {
+    getBoundingClientRect() { medicoes++; return { left: esquerda, top: topo, width: largura, height: 44 } },
+    closest: () => null,
+  }
+  const m = montar(Popover, { rotulo: 'Respostas', grupos: [], aoFechar() {}, portal: true, semAutoFoco: true })
+  andar(m.elemento, elemento => elemento.type === 'span')[0].props.ref.current = { parentElement: ancora }
+  try {
+    m.efeitos()
+    const camada = () => andar(m.renderizar(), elemento => elemento.props.style?.position === 'fixed')[0]
+    assert.equal(camada().props.style.top, 300)
+    const leiturasIniciais = medicoes
+    topo = 180
+    for (let i = 0; i < 8; i++) emitir('scroll', { target: ancora })
+    assert.equal(medicoes, leiturasIniciais, 'a rajada espera um quadro antes de medir')
+    passarQuadro()
+    assert.equal(camada().props.style.top, 180, 'a âncora rolou 120 px; o portal precisa acompanhá-la')
+    assert.equal(medicoes, leiturasIniciais + 1)
+    esquerda = 72; largura = 320
+    emitir('resize'); passarQuadro()
+    assert.equal(camada().props.style.left, 72)
+    assert.equal(camada().props.style.width, 320)
+    emitir('scroll', { target: ancora })
+    assert.equal(quadros.size, 1)
+    m.desmontar()
+    assert.equal(quadros.size, 0)
+    assert.equal([...ouvintes.values()].reduce((n, itens) => n + itens.size, 0), 0)
+  } finally {
+    m.desmontar()
+    delete window.requestAnimationFrame; delete window.cancelAnimationFrame
+    delete document.body
+  }
+})
+
+provar('Respostas: opção ativa e busca compartilham IDs e só a lista rola para revelar o destaque', () => {
+  const itens = [{ id: 'r1', titulo: 'Primeira', texto: 'Oi' }, { id: 'r2', titulo: 'Segunda', texto: 'Olá' }]
+  for (const [top, bottom, esperado] of [[80, 120, 30], [260, 320, 70], [180, 220, 50]]) {
+    const m = montar(SeletorRespostas, { idLista: 'respostas', seletor: { itens, destaque: 1, busca: '', pelaBarra: false } })
+    const opcao = andar(m.elemento, elemento => elemento.props.role === 'option' && elemento.props['aria-selected'])[0]
+    const caixa = { scrollTop: 50, getBoundingClientRect: () => ({ top: 100, bottom: 300 }) }
+    opcao.props.ref.current = { closest: () => caixa, getBoundingClientRect: () => ({ top, bottom }) }
+    const campo = andar(m.elemento, elemento => elemento.type === 'input')[0]
+    assert.equal(campo.props.role, 'combobox')
+    assert.equal(campo.props['aria-controls'], 'respostas')
+    assert.equal(campo.props['aria-activedescendant'], opcao.props.id)
+    document.activeElement = origem
+    m.efeitos()
+    assert.equal(caixa.scrollTop, esperado)
+    assert.equal(document.activeElement, origem, 'revelar opção não transfere foco do campo')
+    m.desmontar()
+  }
 })
 
 console.log(JSON.stringify({ aprovados, falhas: falhas.length }))

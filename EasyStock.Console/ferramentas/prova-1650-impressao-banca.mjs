@@ -36,7 +36,7 @@ registerHooks({
   load(url, contexto, proximo) {
     if (url === componente.href) return { format: 'module', shortCircuit: true, source: compilado }
     if (url.endsWith('/infra/fonteDados.js')) return { format: 'module', shortCircuit: true, source: 'export const API_BASE=""' }
-    if (url.endsWith('/api/sessao.js')) return { format: 'module', shortCircuit: true, source: 'export const lerSessao=()=>null;export function atualizarTokens(){};export function empresaDoToken(){};export function gravarSessao(){};export function limparSessao(){}' }
+    if (url.endsWith('/api/sessao.js')) return { format: 'module', shortCircuit: true, source: 'export const lerSessao=()=>null;export const identidadeDaSessao=()=>"-:-";export function atualizarTokens(){};export function empresaDoToken(){};export function gravarSessao(){};export function limparSessao(){}' }
     return proximo(url, contexto)
   },
 })
