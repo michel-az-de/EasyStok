@@ -8,6 +8,9 @@ public sealed class AcervoImagem
     public string Titulo { get; set; } = "";
     public string Origem { get; set; } = "";
     public string Formato { get; set; } = "";
+    public string Natureza { get; set; } = "NaoClassificada";
+    public int Largura { get; set; }
+    public int Altura { get; set; }
     public string Sha256 { get; set; } = "";
     public string StorageKey { get; set; } = "";
     public string ContentType { get; set; } = "";
@@ -47,6 +50,37 @@ public sealed class AcervoSolicitacao
     public string Formato { get; set; } = "";
     public string Brief { get; set; } = "";
     public string ReferenciasJson { get; set; } = "[]";
+    public Guid? BriefingId { get; set; }
     public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
     public DateTime? ConcluidoEm { get; set; }
+}
+
+public sealed class AcervoBriefing
+{
+    public Guid Id { get; set; }
+    public Guid EmpresaId { get; set; }
+    public Guid UsuarioId { get; set; }
+    public Guid ItemId { get; set; }
+    public Guid RaizId { get; set; }
+    public Guid? AnteriorId { get; set; }
+    public int Versao { get; set; }
+    public string Canal { get; set; } = "";
+    public string Finalidade { get; set; } = "";
+    public string Formato { get; set; } = "";
+    public string ReferenciasJson { get; set; } = "[]";
+    public string Restricoes { get; set; } = "";
+    public string Prompt { get; set; } = "";
+    public string ConteudoHash { get; set; } = "";
+    public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
+}
+
+public sealed class AcervoUso
+{
+    public Guid EmpresaId { get; set; }
+    public Guid ImagemId { get; set; }
+    public string Canal { get; set; } = "";
+    public decimal? LarguraMm { get; set; }
+    public decimal? AlturaMm { get; set; }
+    public Guid UsuarioId { get; set; }
+    public DateTime ConfirmadoEm { get; set; } = DateTime.UtcNow;
 }

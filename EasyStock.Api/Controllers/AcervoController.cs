@@ -9,8 +9,38 @@ namespace EasyStock.Api.Controllers;
 public sealed class AcervoController(AcervoUseCase acervo, ICurrentUserAccessor usuario, EasyStock.Application.Ports.Output.Storage.IImageProcessor processor) : EasyStockControllerBase
 {
     [HttpGet("imagens")]
-    public async Task<IActionResult> Listar([FromQuery] int pagina = 0, CancellationToken ct = default) =>
-        DataOk(await acervo.ListarAsync(usuario.EmpresaId, pagina, ct));
+    public async Task<IActionResult> Listar([FromQuery] int pagina = 0, [FromQuery] string busca = "", [FromQuery] string origem = "",
+        [FromQuery] string formato = "", [FromQuery] string natureza = "", [FromQuery] Guid? itemId = null, [FromQuery] string canal = "", CancellationToken ct = default) =>
+        DataOk(await acervo.BuscarAsync(usuario.EmpresaId, pagina, busca, origem, formato, natureza, itemId, canal, ct));
+    [HttpGet("cobertura")]
+    public async Task<IActionResult> Cobertura(CancellationToken ct) => DataOk(await acervo.CoberturaAsync(usuario.EmpresaId, ct));
+    [HttpGet("briefings")]
+    public async Task<IActionResult> Briefings(CancellationToken ct) => DataOk(await acervo.BriefingsAsync(usuario.EmpresaId, ct));
+    [HttpPost("briefings")]
+    public async Task<IActionResult> Briefing([FromBody] DadosBriefing req, CancellationToken ct) =>
+        DataOk(await acervo.SalvarBriefingAsync(usuario.EmpresaId, usuario.UsuarioId, req, ct));
+    [HttpPost("briefings/{id:guid}/solicitacoes")]
+    public async Task<IActionResult> Enfileirar(Guid id, [FromBody] OperacaoBriefing req, CancellationToken ct) =>
+        DataOk(await acervo.EnfileirarBriefingAsync(usuario.EmpresaId, usuario.UsuarioId, id, req.OperacaoId, ct));
+    [HttpGet("usos")]
+    public async Task<IActionResult> Usos(CancellationToken ct) => DataOk(await acervo.UsosAsync(usuario.EmpresaId, ct));
+    [HttpPut("imagens/{id:guid}/natureza")]
+    public async Task<IActionResult> Natureza(Guid id, [FromBody] ClassificacaoImagem req, CancellationToken ct) =>
+        DataOk(await acervo.ClassificarAsync(usuario.EmpresaId, id, req.Natureza, req.NaturezaEsperada, ct));
+    [HttpPut("imagens/{id:guid}/uso")]
+    public async Task<IActionResult> Uso(Guid id, [FromBody] DadosUso req, CancellationToken ct)
+    {
+        var (imagem, bytes) = await acervo.ArquivoAsync(usuario.EmpresaId, id, ct);
+        if (Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes)) != imagem.Sha256)
+            return BadRequest("O original não passou na verificação de integridade.");
+        using var data = SkiaSharp.SKData.CreateCopy(bytes);
+        using var codec = SkiaSharp.SKCodec.Create(data);
+        if (codec is null) return BadRequest("Não foi possível conferir as dimensões do original.");
+        using var bitmap = new SkiaSharp.SKBitmap(codec.Info);
+        if (codec.GetPixels(bitmap.Info, bitmap.GetPixels()) != SkiaSharp.SKCodecResult.Success)
+            return BadRequest("Não foi possível decodificar a imagem completa.");
+        return DataOk(await acervo.ConfirmarUsoAsync(usuario.EmpresaId, usuario.UsuarioId, id, req, codec.Info.Width, codec.Info.Height, ct));
+    }
     [HttpGet("imagens/{id:guid}/arquivo")]
     public async Task<IActionResult> Arquivo(Guid id, CancellationToken ct)
     {
@@ -46,7 +76,8 @@ public sealed class AcervoController(AcervoUseCase acervo, ICurrentUserAccessor 
         using var bitmap = new SkiaSharp.SKBitmap(codec.Info);
         if (codec.GetPixels(bitmap.Info, bitmap.GetPixels()) != SkiaSharp.SKCodecResult.Success)
             return BadRequest("Não foi possível decodificar a imagem completa.");
-        return DataOk(await acervo.AdicionarAsync(usuario.EmpresaId, usuario.UsuarioId, entrada, file.ContentType, bytes, ct));
+        return DataOk(await acervo.AdicionarAsync(usuario.EmpresaId, usuario.UsuarioId,
+            entrada with { Largura = codec.Info.Width, Altura = codec.Info.Height }, file.ContentType, bytes, ct));
     }
     [HttpPost("imagens/{id:guid}/aprovar")]
     public async Task<IActionResult> Aprovar(Guid id, CancellationToken ct) => DataOk(await acervo.AprovarAsync(usuario.EmpresaId, usuario.UsuarioId, id, ct));
@@ -57,8 +88,11 @@ public sealed class AcervoController(AcervoUseCase acervo, ICurrentUserAccessor 
     [HttpGet("imagens/{id:guid}/historico")]
     public async Task<IActionResult> Historico(Guid id, CancellationToken ct) => DataOk(await acervo.HistoricoAsync(usuario.EmpresaId, id, ct));
     [HttpGet("solicitacoes")]
-    public async Task<IActionResult> Solicitacoes(CancellationToken ct) => DataOk(await acervo.SolicitacoesAsync(usuario.EmpresaId, ct));
+    public async Task<IActionResult> Solicitacoes(CancellationToken ct, [FromQuery] bool incluirConcluidas = false) =>
+        DataOk(incluirConcluidas ? await acervo.HistoricoFilaAsync(usuario.EmpresaId, ct) : await acervo.SolicitacoesAsync(usuario.EmpresaId, ct));
     [HttpPost("solicitacoes")]
     public async Task<IActionResult> Solicitar([FromBody] SolicitarImagem req, CancellationToken ct) => DataOk(await acervo.SolicitarAsync(usuario.EmpresaId, usuario.UsuarioId, req, ct));
     public sealed record VinculoCanva(string Url, string? AssetId);
+    public sealed record OperacaoBriefing(Guid OperacaoId);
+    public sealed record ClassificacaoImagem(string Natureza, string NaturezaEsperada);
 }

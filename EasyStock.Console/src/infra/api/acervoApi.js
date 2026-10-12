@@ -1,8 +1,15 @@
 import { chamarApi } from './cliente'
 
 const BASE = '/api/acervo'
-export const listarImagens = (pagina = 0) => chamarApi(`${BASE}/imagens?pagina=${pagina}`)
-export const listarSolicitacoes = () => chamarApi(`${BASE}/solicitacoes`)
+export const listarImagens = (pagina = 0, filtros = {}) => chamarApi(`${BASE}/imagens?${new URLSearchParams({ pagina, ...filtros })}`)
+export const listarSolicitacoes = () => chamarApi(`${BASE}/solicitacoes?incluirConcluidas=true`)
+export const listarCobertura = () => chamarApi(`${BASE}/cobertura`)
+export const listarBriefings = () => chamarApi(`${BASE}/briefings`)
+export const listarUsos = () => chamarApi(`${BASE}/usos`)
+export const salvarBriefing = (dados) => chamarApi(`${BASE}/briefings`, { metodo: 'POST', corpo: dados })
+export const enfileirarBriefing = (id, operacaoId) => chamarApi(`${BASE}/briefings/${id}/solicitacoes`, { metodo: 'POST', corpo: { operacaoId } })
+export const confirmarUso = (id, dados) => chamarApi(`${BASE}/imagens/${id}/uso`, { metodo: 'PUT', corpo: dados })
+export const classificarImagem = (id, natureza, naturezaEsperada) => chamarApi(`${BASE}/imagens/${id}/natureza`, { metodo: 'PUT', corpo: { natureza, naturezaEsperada } })
 export const solicitarImagem = (dados) => chamarApi(`${BASE}/solicitacoes`, { metodo: 'POST', corpo: dados })
 export const aprovarImagem = (id) => chamarApi(`${BASE}/imagens/${id}/aprovar`, { metodo: 'POST' })
 export const vincularCanva = (id, url) => chamarApi(`${BASE}/imagens/${id}/canva`, { metodo: 'PUT', corpo: { url } })

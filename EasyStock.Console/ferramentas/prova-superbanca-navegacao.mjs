@@ -108,7 +108,7 @@ await provar('hash/histórico usam rotas existentes; origem inválida volta ao c
 await provar('produção antiga da Cozinha orienta para cadastro real sem fingir escrita', () => {
   const caminho = rotaDaHash('#/m/cozinha/producao', { fonteApi: true })
   const api = contextoDaAjuda(caminho, true)
-  assert.match(api.passos[0], /ainda não está ligada/)
+  assert.match(api.passos[0], /ainda não está disponível/)
   assert.equal(hashDoModulo(api.atalho.modulo, api.atalho.tela), '#/m/producao/producao')
   assert.equal(contextoDaAjuda(caminho, false).atalho, null)
 })

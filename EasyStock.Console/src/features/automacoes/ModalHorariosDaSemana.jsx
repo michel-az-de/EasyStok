@@ -76,7 +76,7 @@ export function ModalHorariosDaSemana({ aoFechar }) {
     setSituacao({ estado: 'salvando' })
     try {
       const confirmado = await salvarHorariosExpediente(enviado)
-      if (!confirmado?.funcionamento) throw new Error('O EasyStok não confirmou os horários. Sua edição continua guardada.')
+      if (!confirmado?.funcionamento) throw new Error('O EasyStok não confirmou os horários. Tente novamente.')
       if (atual === consulta.current) {
         setGravado(confirmado.funcionamento)
         setSituacao({ estado: 'salvo' })
@@ -93,7 +93,7 @@ export function ModalHorariosDaSemana({ aoFechar }) {
   const fechar = () => { if (!ocupado.current && !gravando) aoFechar() }
   const hoje = DIAS_DA_SEMANA[partesNoFuso(agora).diaDaSemana].chave
   return <Modal titulo="Horários da semana" largura="min(760px, calc(100vw - 24px))"
-    descricao="As mudanças só valem depois de salvar. Ao fechar, sua edição fica guardada nesta sessão."
+    descricao="As mudanças valem após salvar. Fechar mantém o rascunho nesta sessão."
     aoFechar={salvando || gravando ? undefined : fechar}
     rodape={<>
       <Botao variante="primario" tipo="submit" form={formularioId} disabled={!pendente || gravando || salvando || carga.estado !== 'ok'}>{salvando ? 'Salvando…' : 'Salvar horários'}</Botao>
@@ -103,7 +103,7 @@ export function ModalHorariosDaSemana({ aoFechar }) {
     <form id={formularioId} onSubmit={salvar}>
       <p className={css.descricao}>{lojaAberta == null
         ? 'A loja segue os horários da semana.'
-        : `A loja está ${lojaAberta ? 'aberta' : 'fechada'} manualmente. Salvar a semana não muda esse controle.`}</p>
+        : `Loja ${lojaAberta ? 'aberta' : 'fechada'} manualmente. Salvar horários mantém essa escolha.`}</p>
       {carga.estado === 'carregando' && <output>Conferindo os horários salvos…</output>}
       {carga.estado === 'erro' && <div className={css.alerta} role="alert"><p>{carga.mensagem}</p><Botao onClick={() => { setCarga({ estado: 'carregando' }); carregar() }}>Tentar novamente</Botao></div>}
       {valor && <fieldset className={css.camposHorarios} disabled={salvando || carga.estado !== 'ok'}>
@@ -112,12 +112,12 @@ export function ModalHorariosDaSemana({ aoFechar }) {
           valor={valor[dia.chave]} obrigatorio hoje={dia.chave === hoje} aoEditar={(campos) => editar(dia.chave, campos)} />)}</ul>
       </fieldset>}
       <output className={css.editando}>{salvando
-        ? 'Salvando os horários. Uma gravação já enviada não pode ser desfeita ao sair.'
-        : gravando ? 'Uma gravação anterior está em andamento. Você pode editar; aguarde para salvar. A gravação enviada não pode ser desfeita ao sair.'
+        ? 'Salvando horários. Sair não cancela o que já foi enviado.'
+        : gravando ? 'Outro ajuste está sendo salvo. Você pode editar; aguarde para salvar. Sair não cancela o que já foi enviado.'
           : situacao.estado === 'salvo' ? 'Horários salvos no EasyStok.'
-          : situacao.estado === 'desfeito' ? 'Edição desfeita. Os últimos horários confirmados continuam valendo.'
-            : pendente ? 'Alterações não salvas. Rascunho mantido nesta sessão; salve antes de sair.' : ''}</output>
-      {situacao.estado === 'erro' && <p className={css.alerta} role="alert">Não foi possível confirmar a gravação. {situacao.mensagem} Sua edição continua aqui.</p>}
+          : situacao.estado === 'desfeito' ? 'Edição desfeita. Os horários salvos continuam valendo.'
+            : pendente ? 'Alterações não salvas. Salve antes de sair do EasyStok.' : ''}</output>
+      {situacao.estado === 'erro' && <p className={css.alerta} role="alert">Não foi possível confirmar o salvamento. {situacao.mensagem} Sua edição foi mantida.</p>}
     </form>
   </Modal>
 }

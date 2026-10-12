@@ -37,6 +37,7 @@ public sealed record ComandaClienteResult(Guid LinkId, string Nome, DateOnly Dia
     long NumeroComanda = 0, Guid ConversaId = default, SaldoFinanceiroComanda? Financeiro = null, AcertoComandaCliente? Acerto = null,
     bool PrecisaCadastro = false, bool EntregaACombinar = false, decimal? FreteCombinado = null);
 public sealed record FreteCombinadoComanda(Guid LinkId, int Revisao, decimal Valor);
+public sealed record EntregaACombinarComanda(Guid LinkId, int Revisao);
 public sealed class ComandaClienteConflitoException(string mensagem) : Exception(mensagem);
 
 public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links, IConversaRepository conversas,
@@ -162,7 +163,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             HorarioBrasil.DataOperacional(link.CriadoEm), link.ExpiraEm, link.Revisao, pode, dados, selecao, detalhe,
             envio, cliente is null ? [] : (await creditos.ListarAsync(link.EmpresaId, cliente.Id, ct)).Select(c => new CupomComandaCliente(c.Codigo, c.Saldo, c.Valor, c.CriadoEm)).ToList(),
             selecao.Sum(i => i.Qtd * i.Preco) + (detalhe?.Frete ?? valorCombinado ?? 0m), conversa.NumeroComanda, conversa.Id, financeiro, acerto,
-            cliente is null, valorCombinado is null && ContextoConversaJson.Ler<int?>(conversa, RevisaoEntregaACombinar) == link.Revisao, valorCombinado);
+            cliente is null, valorCombinado is null && ContextoConversaJson.Ler<EntregaACombinarComanda>(conversa, RevisaoEntregaACombinar) == new EntregaACombinarComanda(link.Id, link.Revisao), valorCombinado);
     }
 
     private async Task<AcertoComandaCliente?> AcertoAsync(LinkCardapioConversa link, PedidoEntity pedido, CancellationToken ct)
@@ -352,10 +353,10 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 new(endereco.Cep, endereco.Logradouro, endereco.Numero, endereco.Complemento, endereco.Bairro, endereco.Cidade, endereco.Uf)), t);
             var conversa = await conversas.ObterPorIdAsync(acesso.EmpresaId, acesso.ConversaId, t)
                 ?? throw new LinkCardapioConversaIndisponivelException();
-            if (ContextoConversaJson.Ler<int?>(conversa, RevisaoEntregaACombinar) == revisao) return true;
+            if (ContextoConversaJson.Ler<EntregaACombinarComanda>(conversa, RevisaoEntregaACombinar) == new EntregaACombinarComanda(link.Id, revisao)) return true;
             var agora = relogio.GetUtcNow().UtcDateTime;
             conversa.Escalar(agora, "Entrega e frete a combinar. Confira o endereço e a seleção da comanda.");
-            ContextoConversaJson.Gravar(conversa, RevisaoEntregaACombinar, revisao);
+            ContextoConversaJson.Gravar(conversa, RevisaoEntregaACombinar, new EntregaACombinarComanda(link.Id, revisao));
             await conversas.AddMensagemAsync(Mensagem.Saida(acesso.EmpresaId, acesso.ConversaId, AutorMensagem.Sistema,
                 agora, TipoConteudoMensagem.Texto, "Cliente enviou a comanda para combinar entrega fora da área automática. " +
                 "Seleção e endereço preservados. Frete pendente de decisão humana; não cobrar nem prometer entrega ainda."), t);
