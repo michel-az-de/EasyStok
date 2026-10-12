@@ -38,6 +38,8 @@ Todo cliente pode iniciar e continuar o atendimento. Cobertura automática deter
 9. **Agente tratava fora da área como recusa.** Atualizar orientação para acolher, confirmar e preservar o endereço, encaminhando entrega e frete à equipe.
 
 10. **Falha da retomada podia aparecer como sucesso.** A camada do Console ocultava o erro HTTP. Devolver confirmação explícita da API e manter a ação em falha quando a retomada não for confirmada; prova com erro HTTP real na camada do Console.
+11. **Resposta pública ainda recusava o CEP.** A checagem de produção encontrou “Não entregamos neste CEP.” no detalhe HTTP 422. Substituir pela orientação de combinar entrega e frete; preservar o status e o contrato de cotação, que não confirma uma tarifa automática inexistente.
+12. **Frete automático sem configuração em produção.** Consulta somente leitura em 12/10/2026 confirmou cozinha sem coordenadas, fator de rota, distância grátis, raio máximo e faixas nulos. Existe apenas a zona ativa “TESTE SANDBOX (temporaria)”, CEPs 05500000–05500999, R$ 8. Os CEPs 01310100 e 20040002 retornam 422. A tarifa real e a origem dependem dos dados da operação, solicitados ao Felipe; não foram inventados nem alterados. Fora do limite automático, manter o fluxo humano já publicado.
 
 ## Copy por situação
 
@@ -61,6 +63,7 @@ Não confundir ferramentas controladas com entrega real por WhatsApp, pagamento 
 Evidências locais:
 - Aplicação: 721 testes aprovados em Atendimento e CheckoutCoreService.
 - Gate: build e 40 testes de arquitetura aprovados.
+- Integração com o master antes do merge: build e 42 testes de arquitetura aprovados; árvore local idêntica à árvore do squash publicado.
 - Site: 683 testes unitários, lint e build aprovados; comanda em desktop, Pixel 7 e iPhone SE aprovada com mocks.
 - Navegador com API/PostgreSQL reais locais: lead fora da área, cadastro e endereço, combinação humana do frete, confirmação R$ 33,50; jornada existente de automático, pagamento, acréscimo, cupom, estorno e mesma comanda aprovadas. Provedores externos controlados.
 - Console: qualidade, prova de ações do assistente, comanda compartilhada e 25 cenários de UX aprovados.
@@ -69,3 +72,11 @@ Evidências locais:
 - Suíte ampla PostgreSQL: 31 testes de comanda aprovados, incluindo quatro clientes/dois atendentes, isolamento por empresa, concorrência, replay e respostas verificadas; 1 fixture opt-in ignorada.
 - CI do site b376794: 683 testes unitários e 168 testes de navegador aprovados; 6 fixtures opt-in ignoradas. As duas jornadas com API real local foram executadas separadamente.
 - Endpoint de frete: campo omitido retorna 400; valor negativo retorna 400; revisão antiga retorna 409. Reteste HTTP após tornar o valor obrigatório: 2 cenários aprovados.
+
+### Recibo de publicação da correção principal
+
+Publicação em 12/10/2026, após a PR #1679: API e Console servindo `fa307f987bc2dbbb046319136a9078c5874073c7`; site servindo `b37679442d30b1e46646040665c6e596f4b14669`. Conferidos externamente em `/health/version`, meta `easystok-console-sha` e `/version.txt`. Os três scripts canônicos concluíram com código zero.
+
+Backup PostgreSQL anterior ao deploy: `/home/felipe/backups/easystock-predeploy-20261012T231456Z.dump`, 722.679 bytes, tamanho confirmado na VPS. Backup do Console: `/opt/stacks/shared/docs/easystok-console/index.html.antes-20261012T232144Z`. Site com rollback `casadababa-storefront:vps-prev-20261012T232135Z`.
+
+O código de atendimento e frete combinado está publicado. A configuração operacional do frete automático permanece pendente dos dados da cozinha e das tarifas. Testes de provedores controlados não atestam envio real de WhatsApp ou pagamento real em produção.
