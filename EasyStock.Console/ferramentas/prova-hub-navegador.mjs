@@ -14,7 +14,7 @@ const usuario = '22222222-2222-4222-8222-222222222222'
 const chave = `easystok.hall.v1:${empresa}:${usuario}`
 const browser = await chromium.launch({ headless: true })
 let ultimaPagina
-async function preparar({ permitidos = catalogo, modo = 'normal', demora = 0, bloqueiaStorage = false } = {}) {
+async function preparar({ permitidos = catalogo, modo = 'normal', demora = 0, bloqueiaStorage = false, saldoEsperado = 300.03 } = {}) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce', hasTouch: true })
   const controle = { modo, demora, chamadas: [] }
   await context.addInitScript(({ empresa, usuario, bloqueiaStorage }) => {
@@ -48,7 +48,7 @@ async function preparar({ permitidos = catalogo, modo = 'normal', demora = 0, bl
     if (path === '/api/kds/pedidos') return ok(controle.modo === 'parcial'
       ? Array.from({ length: 200 }, (_, i) => ({ id: String(i), status: 'pronto' }))
       : [{ id: 'a', status: 'aguardando' }, { id: 'b', status: 'preparando' }, { id: 'c', status: 'pronto' }])
-    if (path === '/api/caixa/dia') return ok({ saldoEsperado: 300.03, aberto: true, fechado: false })
+    if (path === '/api/caixa/dia') return ok({ saldoEsperado, aberto: true, fechado: false })
     if (path === '/api/atendimento/configuracao') return ok({})
     return ok([])
   })
@@ -62,6 +62,15 @@ async function preparar({ permitidos = catalogo, modo = 'normal', demora = 0, bl
   return { context, page, controle, erros }
 }
 const ordem = (page) => page.locator('[data-modulo]').evaluateAll((itens) => itens.map((item) => item.dataset.modulo))
+const ordemIndicadores = (page) => page.locator('[data-indicador]').evaluateAll((itens) => itens.map((item) => item.dataset.indicador))
+async function conferirDobra(page) {
+  await page.evaluate(() => { document.querySelector('main').parentElement.scrollTop = 0 })
+  const primeiraAcao = await page.locator('[data-indicador] a').first().boundingBox()
+  assert.ok(primeiraAcao.y >= 0 && primeiraAcao.y + primeiraAcao.height <= page.viewportSize().height, 'A primeira ação deve caber sem rolagem')
+  assert.ok(primeiraAcao.height >= 44, 'A ação deve preservar o alvo de toque')
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+  assert.ok(await page.locator('[data-indicador]').evaluateAll((itens) => itens.every((el) => el.scrollWidth <= el.clientWidth)), 'Os cartões não podem ocultar conteúdo lateralmente')
+}
 async function foto(page, nome) {
   await page.evaluate(async () => { await document.fonts.ready; await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))) })
   await page.screenshot({ path: join(evidencias, nome + '.png'), fullPage: true })
@@ -76,20 +85,36 @@ try {
   assert.equal(await page.locator('[data-indicador="cozinha"] strong').innerText(), '2')
   assert.equal(await page.locator('[data-indicador="entregas"] strong').innerText(), '1')
   assert.match(await page.locator('[data-indicador="financeiro"]').innerText(), /300,03[\s\S]*incluindo Pix e cartão/)
+  assert.deepEqual(await ordemIndicadores(page), ['atendimento', 'entregas', 'cozinha', 'financeiro'])
+  assert.equal(await page.getByRole('progressbar').count(), 0)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await conferirDobra(page)
+  await foto(page, 'hub-cliente-celular')
+  await page.setViewportSize({ width: 1440, height: 1000 })
   await foto(page, 'hub-cliente-desktop')
   const personalizar = page.getByRole('button', { name: 'Personalizar painel', exact: true })
   await personalizar.click(); await page.getByRole('dialog').waitFor()
   await page.keyboard.press('Escape')
   assert.equal(await personalizar.evaluate((el) => el === document.activeElement), true)
   await personalizar.click()
+  await page.getByLabel('Gestão da casa', { exact: true }).check()
+  await page.getByRole('status').filter({ hasText: 'Ordem dos indicadores: Financeiro → Atendimento → Entregas → Cozinha.' }).waitFor()
+  await page.getByRole('button', { name: 'Aplicar personalização' }).click()
+  assert.deepEqual(await ordemIndicadores(page), ['financeiro', 'atendimento', 'entregas', 'cozinha'])
+  await page.getByRole('button', { name: 'Desfazer', exact: true }).click()
+  assert.deepEqual(await ordemIndicadores(page), ['atendimento', 'entregas', 'cozinha', 'financeiro'])
+  await personalizar.click()
   await page.getByLabel('Produção e entregas', { exact: true }).check()
+  await page.getByRole('status').filter({ hasText: 'Ordem dos indicadores: Cozinha → Entregas → Atendimento → Financeiro.' }).waitFor()
   await page.getByLabel('Módulos compactos, com telas recolhidas').check()
   await page.getByLabel('Movimentos suaves').uncheck()
   await foto(page, 'hub-personalizacao')
   await page.getByRole('button', { name: 'Aplicar personalização' }).click()
   assert.equal((await ordem(page))[0], 'producao')
+  assert.deepEqual(await ordemIndicadores(page), ['cozinha', 'entregas', 'atendimento', 'financeiro'])
   await page.reload(); await page.getByRole('button', { name: 'Personalizar painel' }).waitFor()
   assert.equal((await ordem(page))[0], 'producao')
+  assert.deepEqual(await ordemIndicadores(page), ['cozinha', 'entregas', 'atendimento', 'financeiro'])
   assert.equal(await page.locator('[data-modulo="producao"] details').getAttribute('open'), null)
   await page.locator('[data-modulo="producao"] summary').click()
   await page.getByRole('link', { name: 'Calculadora', exact: true }).waitFor({ state: 'visible' })
@@ -143,6 +168,10 @@ try {
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
   await page.getByRole('radio', { name: 'Escuro', exact: true }).click()
   await foto(page, 'hub-celular-escuro')
+  await conferirDobra(page)
+  await page.setViewportSize({ width: 320, height: 844 })
+  await conferirDobra(page)
+  await page.setViewportSize({ width: 390, height: 844 })
   await personalizar.click(); await foto(page, 'hub-modal-celular')
   assert.equal(await page.getByRole('dialog').evaluate((el) => el.scrollWidth <= innerWidth), true)
   await page.getByLabel('Movimentos suaves').focus()
@@ -172,12 +201,19 @@ try {
   controle.modo = 'vazio'; await page.getByRole('button', { name: 'Atualizar números' }).click()
   await atendimento.getByText(/Conferido às/).waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '0')
-  assert.equal(await page.getByRole('progressbar').getAttribute('value'), '1')
+  assert.equal(await page.getByRole('progressbar').count(), 0)
+  controle.demora = 900
+  await page.getByRole('button', { name: 'Atualizar números' }).click()
+  await atendimento.getByText(/Atualizando · última leitura/).waitFor()
+  assert.equal(await atendimento.locator('strong').innerText(), '0')
+  assert.equal(await page.getByRole('progressbar').count(), 0)
+  await atendimento.getByText(/Conferido às/).waitFor()
+  controle.demora = 0
   controle.modo = 'parcial'; await page.getByRole('button', { name: 'Atualizar números' }).click()
   await atendimento.getByText(/Leitura parcial/).waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '1000+')
   assert.equal(await page.locator('[data-indicador="entregas"] strong').innerText(), '200+')
-  assert.equal(await page.getByRole('progressbar').getAttribute('value'), '0')
+  assert.equal(await page.getByRole('progressbar').count(), 0)
   // Troca de pessoa e de empresa remonta a leitura e não herda a personalização.
   controle.demora = 900; controle.modo = 'normal'
   await page.evaluate(({ empresa, usuario }) => {
@@ -206,6 +242,19 @@ try {
   await falha.page.getByText(/personalização vale só nesta visita/).waitFor()
   assert.ok(!falha.controle.chamadas.some((item) => ['/api/kds/pedidos', '/api/caixa/dia'].includes(item.path)))
   await falha.context.close()
+  const ampliado = await preparar({ permitidos: ['financeiro'], saldoEsperado: 123456.78 })
+  await ampliado.page.locator('[data-indicador="financeiro"]').getByText(/Conferido às/).waitFor()
+  await ampliado.page.setViewportSize({ width: 320, height: 844 })
+  await conferirDobra(ampliado.page)
+  await ampliado.page.evaluate(() => { document.documentElement.style.fontSize = '200%' })
+  const geometria = await ampliado.page.locator('[data-indicador="financeiro"]').evaluate((el) => {
+    const titulo = el.querySelector('h3').getBoundingClientRect(), valor = el.querySelector('strong').getBoundingClientRect()
+    return { cabe: el.scrollWidth <= el.clientWidth, separados: titulo.bottom <= valor.top || valor.bottom <= titulo.top || titulo.right <= valor.left || valor.right <= titulo.left }
+  })
+  assert.deepEqual(geometria, { cabe: true, separados: true }, 'Moeda longa e texto 200% devem caber sem sobreposição')
+  await ampliado.page.locator('[data-indicador="financeiro"]').scrollIntoViewIfNeeded()
+  await foto(ampliado.page, 'hub-financeiro-texto-200')
+  await ampliado.context.close()
   console.log('Hub UI: números, erro/zero/parcial, modelos, persistência por pessoa/empresa, drag com mouse/toque, teclado/Esc, polling visível, celular/escuro, modal/foco e permissões aprovados. Nenhuma escrita operacional.')
 } catch (erro) {
   if (ultimaPagina && !ultimaPagina.isClosed()) console.error('Diagnóstico:', await ultimaPagina.evaluate(() => ({ foco: document.activeElement?.outerHTML.slice(0, 350), anuncios: [...document.querySelectorAll('[aria-live], [role="status"]')].map((el) => el.textContent.slice(0, 180)), ordem: [...document.querySelectorAll('[data-modulo]')].map((el) => el.dataset.modulo) })))

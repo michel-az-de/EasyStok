@@ -13,7 +13,7 @@ import { Vazio } from '../../componentes/Vazio'
 import { filtrarModulos, hashDoModulo, modulosDoHall, saudacaoDoHall } from '../../dominio/modulos'
 import {
   alternarFavoritoDoHall, favoritosDoHall, favoritosPrimeiroNoHall, moverModuloDoHall,
-  ordenarModulosDoHall, restaurarOrdemDoHall, FOCOS_DO_HALL,
+  ordenarModulosDoHall, ordenarPaineisDoHall, restaurarOrdemDoHall, FOCOS_DO_HALL,
 } from '../../dominio/preferenciasHall'
 import { IconeDoModulo } from './IconeDoModulo'
 import { colisoesDoHall } from './colisoesDoHall'
@@ -107,7 +107,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   const buscando = Boolean(busca.trim())
   const foco = FOCOS_DO_HALL.find((item) => item.id === preferencia.foco)
   const destaque = foco.ordem.map((id) => modulosPermitidos.find((modulo) => modulo.id === id && modulo.disponivel)).find(Boolean) ?? todos.find((modulo) => modulo.disponivel)
-  const idsDoPulso = preferencia.paineis.filter((id) => modulosPermitidos.some((modulo) => modulo.id === id))
+  const idsDoPulso = ordenarPaineisDoHall(preferencia, modulosPermitidos.map((modulo) => modulo.id))
   const podeOrganizar = organizar && !buscando
   const sensores = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -153,7 +153,6 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
           <div className={css.cabeca}>
             <p className={css.legenda}>Seu painel da casa</p>
             <h1 className={css.titulo} tabIndex={-1} data-inicio-tela id="conteudo-principal">{saudacaoDoHall(agora, sessao?.usuario?.nome)}</h1>
-            <p className={css.apoio}>Veja o que precisa de você e siga direto para a ação.</p>
             {sessao?.persistente && <p className={css.apoio}>A Cozinha permanece conectada neste aparelho. Use Sair ao trocar de pessoa.</p>}
             {modulos.length === 0 && !busca && <output>Seu perfil ainda não tem módulos liberados. Peça à dona para revisar seu acesso.</output>}
           </div>
@@ -165,12 +164,12 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
             <Botao variante="texto" onClick={() => setPersonalizando(true)}><MarcaIcone nome="configuracoes" tamanho={20} />Personalizar painel</Botao>
           </div>
         </div>
+        {!buscando && fonteApi && <PulsoDoHall key={idsDoPulso.join(':')} ids={idsDoPulso} foco={foco.nome} />}
         {!buscando && destaque && <section className={css.destaque} aria-labelledby="destaque-hall">
-          <div className={css.ilustracao} aria-hidden="true"><IconeDoModulo modulo={destaque} tamanho={88} /><span><MarcaIcone nome="proximo" tamanho={28} /></span></div>
-          <div className={css.textoDestaque}><p className={css.legenda}>{foco.nome}</p><h2 id="destaque-hall">{destaque.id === 'atendimento' ? 'O cliente vem primeiro.' : destaque.nome + ' em foco.'}</h2><p>{destaque.resumo}. Comece por aqui e organize o restante do seu dia.</p></div>
+          <div className={css.ilustracao} aria-hidden="true"><IconeDoModulo modulo={destaque} tamanho={40} /></div>
+          <div className={css.textoDestaque}><p className={css.legenda}>Seu atalho · {foco.nome}</p><h2 id="destaque-hall">{destaque.nome}</h2></div>
           <a className={css.acaoDestaque} href={destaque.href}>Abrir {destaque.nome}<MarcaIcone nome="proximo" tamanho={22} /></a>
         </section>}
-        {!buscando && fonteApi && <PulsoDoHall key={idsDoPulso.join(':')} ids={idsDoPulso} ritmo={preferencia.ritmo} />}
         {/* #1608: o que fazer agora vem antes da lista de módulos. Quem compõe é o App. */}
         {!buscando && painel}
         {!buscando && favoritos.length > 0 && <nav className={css.rotina} aria-label="Favoritos da sua rotina">
