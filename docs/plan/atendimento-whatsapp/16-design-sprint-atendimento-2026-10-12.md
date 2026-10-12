@@ -37,6 +37,8 @@ Todo cliente pode iniciar e continuar o atendimento. Cobertura automática deter
 8. **Convite recomeçava a conversa.** Remover saudação no envio durante o atendimento; manter variante de abertura explicitamente separada.
 9. **Agente tratava fora da área como recusa.** Atualizar orientação para acolher, confirmar e preservar o endereço, encaminhando entrega e frete à equipe.
 
+10. **Falha da retomada podia aparecer como sucesso.** A camada do Console ocultava o erro HTTP. Devolver confirmação explícita da API e manter a ação em falha quando a retomada não for confirmada; prova com erro HTTP real na camada do Console.
+
 ## Copy por situação
 
 | Situação | Texto/direção |

@@ -76,7 +76,8 @@ export function descreverAcaoDoAssistente(acao, nomeCliente) {
 export async function executarAcaoDoAssistente(acao, conversa, portas) {
   switch (acao.tipo) {
     case ACOES_DO_ASSISTENTE.RETOMAR_AUTOMATICO:
-      return portas.devolverAutomatico(conversa.id)
+      if (await portas.devolverAutomatico(conversa.id) === false) throw new Error('Sem confirmação da retomada. Confira a conversa antes de tentar de novo.')
+      return
     case ACOES_DO_ASSISTENTE.ENVIAR_CARDAPIO: {
       const link = await portas.obterLinkCardapio(conversa.id)
       if (!link?.url) throw new Error('Não consegui gerar o link do cardápio.')
