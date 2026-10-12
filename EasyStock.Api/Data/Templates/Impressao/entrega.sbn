@@ -1,0 +1,14 @@
+{{ capture via }}<div class="via"><div class="id"><span class="chip">Pedido {{ m.numero }}</span><span class="quando">via do entregador</span></div>
+<h1 class="forte">{{ if m.cliente.endereco }}{{ m.cliente.endereco }}{{ else }}Endereço a confirmar{{ end }}</h1>
+{{ if m.observacao }}<p class="barra">{{ m.observacao }}</p>{{ end }}{{ if m.nota }}<p class="barra">{{ m.nota }}</p>{{ end }}
+<div class="duo"><div><span class="rot">Quando</span><b>{{ m.prazo.data_longa }} · {{ m.prazo.hora_curta }}</b></div>{{ if m.pago }}<div><span class="rot">Receber</span><b>Nada. Já está pago.</b></div>{{ else }}<div><span class="rot">Entregador</span><b>{{ m.entrega }}</b></div>{{ end }}<div><span class="rot">Cliente</span><b>{{ m.cliente.nome }}</b></div>{{ if m.cliente.telefone }}<div><span class="rot">Telefone</span><b>{{ m.cliente.telefone }}</b></div>{{ end }}</div>{{ if !m.pago }}<div class="alerta">RECEBER {{ m.total }}<small>{{ if m.forma }}{{ m.forma }}{{ else }}combinar a forma com a cliente{{ end }}</small></div>{{ end }}</div>{{ end -}}
+{{ capture conteudo }}<div class="sec"><h2>Neste pedido</h2><div class="its">{{ for i in m.itens }}<div class="it"><span class="q">{{ i.quantidade }}</span><span class="n">{{ i.nome }}{{ if i.observacao }}<small>{{ i.observacao }}</small>{{ end }}</span></div>{{ end }}</div></div>{{ end -}}
+{{ capture qr }}{{ if m.qr }}<div class="qrl"><div><h3>Chegou diferente?</h3><p>Aponte a câmera e fale direto com a Casa.</p></div>{{ m.qr }}</div>{{ end }}{{ end -}}
+{{ capture fecho }}<div class="fecho">{{ m.orn }}<p class="frase">Da nossa casa para a sua mesa.</p><p class="ass">{{ m.assinatura }}</p></div>{{ end -}}
+{{ capture cab }}<header class="cab">{{ if m.logo }}<img class="logo" src="{{ m.logo }}" alt="{{ m.casa.nome }}">{{ else }}<div class="wm">{{ m.casa.nome }}</div>{{ end }}</header>{{ end -}}
+{{ capture pe }}<footer class="pe">{{ for c in m.casa.contatos }}<span>{{ c }}</span>{{ if !for.last }} · {{ end }}{{ end }}<br><span>#{{ m.numero }} · impresso {{ m.impresso }}</span></footer>{{ end -}}
+{{ capture para }}<h1>{{ if m.cliente.primeiro }}Para {{ m.cliente.primeiro }}{{ else }}Seu pedido chegou{{ end }}</h1>{{ end -}}
+{{ if m.papel.largo }}<article class="im {{ m.papel.classes }}">{{ via }}<div class="corte">dobre ou corte aqui</div>{{ cab }}<div class="cols"><div class="folha">{{ para }}{{ conteudo }}{{ fecho }}</div><aside class="painel"><div class="id"><span class="chip">Pedido {{ m.numero }}</span></div>{{ qr }}</aside></div>{{ pe }}</article>
+{{ else }}<article class="im {{ m.papel.classes }} v1">{{ via }}<footer class="pe"><span>#{{ m.numero }} · impresso {{ m.impresso }}</span></footer></article>
+<article class="im {{ m.papel.classes }} v2">{{ cab }}<div class="id"><span class="chip">Pedido {{ m.numero }}</span></div>{{ para }}{{ conteudo }}{{ if m.qr }}<div class="f">{{ qr }}</div>{{ end }}{{ fecho }}{{ pe }}</article>
+{{ end }}

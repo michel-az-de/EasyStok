@@ -5,49 +5,66 @@ using static EasyStock.Api.Services.Impressao.ImpressoHtml;
 
 namespace EasyStock.Api.Services.Impressao;
 
-/// <summary>
-/// Impresso do pedido em HTML (S49): um modelo Scriban por papel sobre as peças de <see cref="ImpressoHtml"/>.
-/// Layout aprovado em <c>docs/plan/atendimento-whatsapp/impressos/pedido-aprovado.html</c>.
-/// </summary>
-public sealed class PedidoImpressoHtml(IRendererTemplate renderer)
-{
-    public const string Etiqueta10x15 = ImpressoHtml.Etiqueta10x15;
-    public const string Cupom58 = ImpressoHtml.Cupom58;
-    public const string A4 = ImpressoHtml.A4;
-    public const string CaminhoFontes = ImpressoHtml.CaminhoFontes;
+/// <summary>O que varia por aparelho ou por pedido na hora de imprimir.</summary>
+/// <param name="LogoNaTermica">Sai o logo também na térmica (10×15, 80 mm, 58 mm). Padrão: nome da casa em texto.</param>
+/// <param name="Alergias">Alergias do cadastro da cliente, para a confirmação de agendamento.</param>
+public sealed record ImpressoOpcoes(bool LogoNaTermica = false, IReadOnlyList<string>? Alergias = null);
 
-    public static readonly IReadOnlyList<string> Modelos = [Etiqueta10x15, Cupom58, A4];
+/// <summary>
+/// Impressos do pedido voltados à cliente e ao entregador (#1632): pedido, agendamento e entrega, um modelo
+/// Scriban por documento sobre as peças de <see cref="ImpressoHtml"/>, em qualquer papel de
+/// <see cref="ImpressoHtml.Papeis"/>. Layout aprovado em
+/// <c>docs/plan/atendimento-whatsapp/impressos/impressos-v4-proposta.html</c>.
+/// </summary>
+public sealed class PedidoImpressoHtml(IRendererTemplate renderer, IConfiguration? configuracao = null)
+{
+    public const string Pedido = "pedido";
+    public const string Agendamento = "agendamento";
+    public const string Entrega = "entrega";
+
+    /// <summary>Chave de configuração com quem assina o fecho (ex.: o nome da dona). Sem ela, assina a casa.</summary>
+    public const string ChaveAssinatura = "Impressao:Assinatura";
+
+    public static readonly IReadOnlyList<string> Documentos = [Pedido, Agendamento, Entrega];
+    public static readonly IReadOnlyList<string> Modelos = Papeis;
 
     private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
 
     /// <param name="baseUrl">Origem da Api (ex.: <c>https://api.casadababa.com.br</c>), para as fontes.</param>
-    public async Task<string> RenderizarAsync(PedidoImpressoDto pedido, string modelo, string baseUrl, CancellationToken ct = default)
+    public async Task<string> RenderizarAsync(
+        PedidoImpressoDto pedido, string documento, string modelo, string baseUrl, ImpressoOpcoes? opcoes = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(pedido);
+        if (!Documentos.Contains(documento))
+            throw new ArgumentException($"Documento desconhecido: {documento}.", nameof(documento));
         if (!Modelos.Contains(modelo))
             throw new ArgumentException($"Modelo desconhecido: {modelo}.", nameof(modelo));
 
         var corpo = await renderer.RenderizarAsync(
-            Recurso($"pedido.{modelo}.sbn"),
-            new Dictionary<string, object?> { ["m"] = Modelo(pedido) },
+            Recurso($"{documento}.sbn"),
+            new Dictionary<string, object?> { ["m"] = Modelo(pedido, documento, modelo, opcoes ?? new ImpressoOpcoes()) },
             htmlEscape: false,
             ct);
-        return Pagina("Pedido #" + pedido.Numero, modelo, baseUrl, corpo);
+        return Pagina(Titulo(documento) + " #" + pedido.Numero, modelo, baseUrl, corpo);
     }
 
-    private static Dictionary<string, object?> Modelo(PedidoImpressoDto p)
+    private Dictionary<string, object?> Modelo(PedidoImpressoDto p, string documento, string modelo, ImpressoOpcoes opcoes)
     {
         var hoje = DateOnly.FromDateTime(p.ImpressoEm);
+        var link = LinkWhatsApp(p.Casa.WhatsApp, p.Numero);
+        var forma = p.Cobranca.Forma is { } f ? Forma(f) : null;
         return new Dictionary<string, object?>
         {
+            ["papel"] = Papel(modelo, documento),
             ["numero"] = T(p.Numero),
+            ["logo"] = Logo(p.Casa.LogoUrl, modelo, opcoes.LogoNaTermica),
+            ["orn"] = Ornamento,
+            ["assinatura"] = T(Assinatura(p.Casa.Nome)),
             ["casa"] = new Dictionary<string, object?>
             {
                 ["nome"] = T(p.Casa.Nome),
-                ["logo_url"] = T(p.Casa.LogoUrl),
                 ["contatos"] = new[]
                     {
-                        p.Casa.Documento is { } d ? Documento(d) : null,
                         p.Casa.Site is { } s ? Site(s) : null,
                         p.Casa.WhatsApp is { } w ? "WhatsApp " + Telefone(w) : null,
                     }
@@ -56,41 +73,45 @@ public sealed class PedidoImpressoHtml(IRendererTemplate renderer)
                     .ToList(),
             },
             ["prazo"] = Prazo(p.Prazo, hoje),
-            ["solicitado"] = T(DataCurta(p.SolicitadoEm, hoje) + " " + Hora(p.SolicitadoEm)),
-            ["solicitado_longo"] = T(DataLonga(p.SolicitadoEm, hoje) + " " + Hora(p.SolicitadoEm)),
-            ["entrega"] = T(Entrega(p.Entrega)),
+            ["solicitado"] = T(Curta(p.SolicitadoEm)),
+            ["impresso"] = Curta(p.ImpressoEm),
+            ["entrega"] = T(ImpressoHtml.Entrega(p.Entrega)),
             ["cliente"] = new Dictionary<string, object?>
             {
-                ["id"] = T(p.Cliente.IdCurto),
                 ["nome"] = T(p.Cliente.Nome ?? "Cliente sem nome"),
+                ["primeiro"] = T(PrimeiroNome(p.Cliente.Nome)),
                 ["telefone"] = p.Cliente.Telefone is { } tel ? T(Telefone(tel)) : null,
                 ["endereco"] = T(p.Cliente.Endereco),
             },
             ["itens"] = p.Itens.Select(i => new Dictionary<string, object?>
             {
-                ["quantidade"] = Quantidade(i.Quantidade),
-                ["unidade"] = T(i.Unidade),
+                ["quantidade"] = T(QuantidadeComUnidade(i.Quantidade, i.Unidade)),
                 ["nome"] = T(i.Nome),
                 ["observacao"] = T(i.Observacao),
-                ["unitario"] = Moeda(i.Unitario),
-                ["subtotal"] = Moeda(i.Subtotal),
+                ["valor"] = Valor(i.Subtotal),
             }).ToList(),
-            ["quantidade_total"] = p.QuantidadeItens + (p.QuantidadeItens == 1 ? " item" : " itens"),
             ["observacao"] = T(p.Observacao),
             ["nota"] = T(p.Nota),
-            ["cobranca"] = new Dictionary<string, object?>
-            {
-                ["total"] = Moeda(p.Cobranca.Total),
-                ["rotulo"] = T((p.Cobranca.Pago ? "Pago" : "Cobrar na entrega")
-                               + (p.Cobranca.Forma is { } f ? " · " + Forma(f) : string.Empty)),
-            },
-            ["barras"] = Code128Svg.Gerar(p.Numero),
-            ["alterado"] = Curta(p.AlteradoEm),
-            ["impresso"] = Curta(p.ImpressoEm),
-            ["alterado_longo"] = T(DataLonga(p.AlteradoEm, null) + " " + Hora(p.AlteradoEm)),
-            ["impresso_longo"] = T(DataLonga(p.ImpressoEm, null) + " " + Hora(p.ImpressoEm)),
+            ["alergias"] = opcoes.Alergias is { Count: > 0 } a ? T(string.Join(", ", a).ToLower(PtBr)) : null,
+            ["total"] = Moeda(p.Cobranca.Total),
+            ["pago"] = p.Cobranca.Pago,
+            ["forma"] = T(forma),
+            ["cobranca_frase"] = T(p.Cobranca.Pago
+                ? "Tudo pago" + (forma is null ? string.Empty : " no " + forma) + ". Obrigada!"
+                : "A acertar na entrega" + (forma is null ? string.Empty : " · " + forma) + "."),
+            ["qr"] = link is null ? null : QrSvg.Gerar(link),
         };
     }
+
+    private string Assinatura(string casa) =>
+        configuracao?[ChaveAssinatura] is { Length: > 0 } quem ? $"{quem.Trim()} · {casa}" : casa;
+
+    private static string Titulo(string documento) => documento switch
+    {
+        Agendamento => "Agendamento",
+        Entrega => "Entrega",
+        _ => "Pedido",
+    };
 
     /// <summary>Mantido para quem já chamava pelo Pedido; a regra mora em <see cref="ImpressoHtml.Telefone"/>.</summary>
     public static string Telefone(string telefone) => ImpressoHtml.Telefone(telefone);
@@ -98,23 +119,12 @@ public sealed class PedidoImpressoHtml(IRendererTemplate renderer)
     private static string Forma(string forma) => forma.Trim().ToLowerInvariant() switch
     {
         "pix" => "PIX",
-        "cartao" or "cartão" => "Cartão",
-        "credito" or "crédito" or "cartao_credito" => "Crédito",
-        "debito" or "débito" or "cartao_debito" => "Débito",
-        "dinheiro" => "Dinheiro",
-        var outra => char.ToUpper(outra[0], PtBr) + outra[1..],
+        "cartao" or "cartão" => "cartão",
+        "credito" or "crédito" or "cartao_credito" => "crédito",
+        "debito" or "débito" or "cartao_debito" => "débito",
+        "dinheiro" => "dinheiro",
+        var outra => outra,
     };
-
-    private static string Documento(string documento)
-    {
-        var d = new string(documento.Where(char.IsDigit).ToArray());
-        return d.Length switch
-        {
-            14 => $"CNPJ {d[..2]}.{d[2..5]}.{d[5..8]}/{d[8..12]}-{d[12..]}",
-            11 => $"CPF {d[..3]}.{d[3..6]}.{d[6..9]}-{d[9..]}",
-            _ => documento.Trim(),
-        };
-    }
 
     private static string Site(string site) =>
         site.Trim().Replace("https://", string.Empty, StringComparison.OrdinalIgnoreCase)

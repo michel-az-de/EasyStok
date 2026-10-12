@@ -24,7 +24,7 @@ public class FontesImpressaoTests
     [Fact]
     public void FonteDoImpressoLiberadaParaQualquerOrigem()
     {
-        Responder(PedidoImpressoHtml.CaminhoFontes + "/Lora.ttf")
+        Responder(ImpressoHtml.CaminhoFontes + "/Lora.ttf")
             .Response.Headers.AccessControlAllowOrigin.ToString().Should().Be("*");
     }
 
