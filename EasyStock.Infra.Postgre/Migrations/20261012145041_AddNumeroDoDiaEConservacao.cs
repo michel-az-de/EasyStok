@@ -63,6 +63,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                 filter: "numero_do_dia IS NOT NULL");
 
             // RLS (ADR-0010, defesa em profundidade): mesmo padrão de toda tabela nova com EmpresaId.
+            // SQL manual: o scaffold do EF não gera este bloco; quem regenerar a migração porta à mão.
             migrationBuilder.Sql("""
 ALTER TABLE sequencias_pedido_dia ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sequencias_pedido_dia FORCE ROW LEVEL SECURITY;
@@ -82,6 +83,13 @@ CREATE POLICY tenant_isolation ON sequencias_pedido_dia
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // Inverso do bloco de RLS do Up, antes do DROP TABLE (que derrubaria a policy de qualquer forma).
+            migrationBuilder.Sql("""
+DROP POLICY IF EXISTS tenant_isolation ON sequencias_pedido_dia;
+ALTER TABLE sequencias_pedido_dia NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE sequencias_pedido_dia DISABLE ROW LEVEL SECURITY;
+""");
+
             migrationBuilder.DropTable(
                 name: "sequencias_pedido_dia");
 
