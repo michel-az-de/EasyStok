@@ -60,10 +60,12 @@ public class CriarPedidoFerramentaTests
                 gerar, clienteRepo, Checkout.StorefrontRepo, Checkout.JanelaRepo);
         }
 
-        public Task<string> ExecutarAsync(object entrada) =>
-            Ferramenta.ExecutarAsync(
-                new ContextoTurnoAgente(Checkout.Storefront.EmpresaId, Conversa, Agora),
-                JsonSerializer.SerializeToElement(entrada));
+        public ContextoTurnoAgente? Contexto { get; private set; }
+        public Task<string> ExecutarAsync(object entrada)
+        {
+            Contexto = new ContextoTurnoAgente(Checkout.Storefront.EmpresaId, Conversa, Agora);
+            return Ferramenta.ExecutarAsync(Contexto, JsonSerializer.SerializeToElement(entrada));
+        }
     }
 
     [Fact]
@@ -85,6 +87,8 @@ public class CriarPedidoFerramentaTests
         json.RootElement.GetProperty("itens")[0].GetProperty("observacao").GetString().Should().Be("sem granulado");
         c.Conversa.PedidoEmAndamentoId.Should().NotBeNull();
         c.Cobrancas.Should().ContainSingle().Which.ConversaId.Should().Be(c.Conversa.Id);
+        c.Contexto!.RespostaVerificada.Should().Contain("Pedido registrado").And.Contain("Aguardando pagamento")
+            .And.Contain("https://mp.test/pref-1").And.NotContain("sem granulado");
     }
 
     [Fact]
@@ -140,6 +144,7 @@ public class CriarPedidoFerramentaTests
         json.RootElement.GetProperty("orientacao").GetString().Should().Contain("criar_pedido");
         var pedido = c.Checkout.PedidosAdicionados.Should().ContainSingle().Subject;
         pedido.Status.Should().Be(StatusPedidoMapper.Cancelado);
+        c.Contexto!.RespostaVerificada.Should().BeNull("a falha do provedor desfez o pedido");
         await c.Checkout.VagaRepo.Received(1).LiberarPorPedidoAsync(
             pedido.Id, Arg.Is<string>(m => m.Contains("mercado_pago_indisponivel")), Arg.Any<CancellationToken>());
     }

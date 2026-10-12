@@ -26,7 +26,8 @@ public sealed record PedidoConversaResult(
     JanelaPedidoResult? Janela = null,
     bool SinalNaReserva = false,
     decimal? Alocado = null,
-    long NumeroComanda = 0);
+    long NumeroComanda = 0,
+    string? Observacoes = null);
 
 public sealed record PagamentoPedidoConversaResult(Guid Id, decimal Valor, string Metodo, DateTime PagoEm);
 
@@ -101,6 +102,6 @@ public sealed class ObterPedidoConversaUseCase(
             pedido.RequerAprovacao && pedido.AprovadoEm is null,
             janela.Vaga is { LiberadoEm: null } ? JanelaPedidoResult.De(janela.Vaga, janela.Janela) : null,
             PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm),
-            saldos is null ? null : (await saldos.ConsultarAsync(pedido, ct)).Alocado, conversa.NumeroComanda);
+            saldos is null ? null : (await saldos.ConsultarAsync(pedido, ct)).Alocado, conversa.NumeroComanda, pedido.Observacoes);
     }
 }

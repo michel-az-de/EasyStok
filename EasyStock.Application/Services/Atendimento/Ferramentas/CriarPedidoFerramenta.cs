@@ -125,6 +125,8 @@ public sealed class CriarPedidoFerramenta(
         try
         {
             var cobranca = await gerarCobranca.ExecuteAsync(reservado, conversa.Id, ct);
+            contexto.RegistrarRespostaVerificada($"Pedido registrado. Total: {resumo.total}. Entrega agendada para {resumo.entrega}. " +
+                $"Aguardando pagamento. Pague por este link: {cobranca.LinkPagamento}");
             return FerramentaJson.Serializar(new
             {
                 resumo.pedidoId,

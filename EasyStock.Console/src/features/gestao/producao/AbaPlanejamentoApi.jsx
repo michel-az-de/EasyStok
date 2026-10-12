@@ -35,6 +35,24 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
   const [ocupado, setOcupado] = useState(false)
   // #1585: a última lista gerada, com as porções e a data que a pediram.
   const [compras, setCompras] = useState(comprasGuardadas)
+  const atualizando = carga.estado === 'atualizando'
+  const bloqueado = ocupado || carga.estado !== 'ok'
+
+  const consultar = (data) => {
+    if (ocupado || atualizando) return
+    setAte(data)
+    setConsulta(data)
+    setTentativa((t) => t + 1)
+    setPlano(null)
+    setAviso(null)
+    setCarga({ estado: 'atualizando', erro: null })
+  }
+
+  const tentarNovamente = () => {
+    setPlano(null)
+    setCarga({ estado: linhas.length ? 'atualizando' : 'carregando', erro: null })
+    setTentativa((t) => t + 1)
+  }
 
   useEffect(() => {
     let vivo = true
@@ -52,12 +70,13 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
 
   // #1510: porção mudada invalida o cálculo; a lista de compras não sai com faltas antigas.
   const mudar = (sku) => (e) => {
+    if (bloqueado) return
     setLinhas((atual) => atual.map((l) => (l.sku === sku ? { ...l, porcoes: e.target.value } : l)))
     setPlano(null)
   }
 
   async function calcular() {
-    if (ocupado) return
+    if (bloqueado) return
     const erro = erroDasPorcoes(linhas)
     if (erro) { setAviso(erro); return }
     setOcupado(true)
@@ -72,7 +91,7 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
   }
 
   async function comprar() {
-    if (ocupado) return
+    if (bloqueado) return
     setOcupado(true)
     const cadastrados = await lerInsumos().catch(() => [])
     const itens = itensDeCompra(plano?.insumos ?? [], cadastrados)
@@ -83,16 +102,17 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
   }
 
   function lancar() {
+    if (bloqueado) return
     if (levarParaProducao(linhas) === 0) { setAviso('Diga quantas porções de ao menos um prato.'); return }
     if (aoAbrirAba) aoAbrirAba('producao-do-dia')
     else window.location.hash = hashDoModulo('producao', 'producao')
   }
 
   if (carga.estado === 'carregando') return <output className={css.descricao}>Calculando a sugestão…</output>
-  if (carga.estado === 'erro') return (
+  if (carga.estado === 'erro' && linhas.length === 0) return (
     <div className={css.aba} role="alert">
       <p className={css.aviso}>Não consegui ler a sugestão: {carga.erro}</p>
-      <Botao icone="refresh-cw" onClick={() => { setCarga({ estado: 'carregando', erro: null }); setTentativa((t) => t + 1) }}>Tentar novamente</Botao>
+      <Botao icone="refresh-cw" onClick={tentarNovamente}>Tentar novamente</Botao>
     </div>
   )
 
@@ -107,8 +127,13 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
       </p>
       <label className={css.dataPlanejamento}>
         <span className={css.nome}>Pedidos até</span>
-        <input className={css.busca} type="date" aria-label="Pedidos até" disabled={ocupado} value={ate} onChange={(e) => { setAte(e.target.value); setConsulta(e.target.value) }} />
+        <input className={css.busca} type="date" aria-label="Pedidos até" disabled={ocupado || atualizando} value={ate} onChange={(e) => consultar(e.target.value)} />
       </label>
+      {atualizando && <output className={css.descricao}>Atualizando a sugestão para a data escolhida…</output>}
+      {carga.estado === 'erro' && <p className={css.aviso} role="alert">
+        Não consegui atualizar a sugestão. As porções abaixo são da consulta anterior. {carga.erro}
+        {' '}<Botao icone="refresh-cw" onClick={tentarNovamente}>Tentar novamente</Botao>
+      </p>}
       {aviso && <p className={css.aviso} role="alert">{aviso} <Botao variante="texto" onClick={() => setAviso(null)}>Fechar</Botao></p>}
 
       {linhas.length === 0 ? (
@@ -125,7 +150,7 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
                 {l.sugestao > 0 && <Pilula tom="ok" fina>sugestão {qtd(l.sugestao)}</Pilula>}
               </div>
               <div className={css.campoQuantidade}>
-                <CampoTexto disabled={ocupado} rotulo="Porções" inputMode="numeric" aria-label={`Porções de ${l.nome}`} value={l.porcoes} onChange={mudar(l.sku)} />
+                <CampoTexto disabled={bloqueado} rotulo="Porções" inputMode="numeric" aria-label={`Porções de ${l.nome}`} value={l.porcoes} onChange={mudar(l.sku)} />
               </div>
             </li>
           ))}
@@ -133,8 +158,8 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
       )}
 
       <div className={css.topo}>
-        <Botao variante="primario" icone="nota" onClick={calcular} disabled={ocupado || linhas.length === 0}>Calcular insumos</Botao>
-        <Botao icone="cooking-pot" onClick={lancar} disabled={ocupado || linhas.length === 0}>Revisar na produção</Botao>
+        <Botao variante="primario" icone="nota" onClick={calcular} disabled={bloqueado || linhas.length === 0}>Calcular insumos</Botao>
+        <Botao icone="cooking-pot" onClick={lancar} disabled={bloqueado || linhas.length === 0}>Revisar na produção</Botao>
       </div>
 
       {plano && (
@@ -162,7 +187,7 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
           {motivosDosPendentes(plano.pendentes, linhas).map((texto) => <p key={texto} className={css.descricao}>{texto}</p>)}
           <div className={css.topo}>
             {plano.custoTotal != null && <span className={css.detalhe}>Custo estimado {moeda(plano.custoTotal)}</span>}
-            <Botao icone="shopping-cart" onClick={comprar} disabled={ocupado || listaGerada !== null}>{listaGerada ? 'Lista de compras gerada' : 'Gerar lista de compras'}</Botao>
+            <Botao icone="shopping-cart" onClick={comprar} disabled={bloqueado || listaGerada !== null}>{listaGerada ? 'Lista de compras gerada' : 'Gerar lista de compras'}</Botao>
           </div>
           {listaGerada && (
             <section className={css.secao} aria-label="Lista de compras gerada">

@@ -77,6 +77,7 @@
 }
 /* Mensagem esperando: a hora ganha a cor da marca, como o contador. */
 .topo time.horaNova { color: var(--marca); font-weight: 600; }
+.cartao[aria-current='true'] .topo time.horaNova { color: var(--tinta); }
 
 /* Linha 2: prévia em largura cheia e o número de mensagens sem resposta. */
 .linhaPrevia { display: flex; align-items: center; gap: 6px; min-width: 0; }

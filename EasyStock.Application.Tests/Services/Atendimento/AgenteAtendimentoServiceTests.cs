@@ -66,9 +66,9 @@ public class AgenteAtendimentoServiceTests
             .Returns("""{"status":"EmPreparo","previsao":"15:40"}""");
     }
 
-    private AgenteAtendimentoService CriarServico() => new(
+    private AgenteAtendimentoService CriarServico(params IFerramentaAgente[] adicionais) => new(
         _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
-        [_consultarPedido], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
+        [_consultarPedido, .. adicionais], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
         _caderno, NullLogger<AgenteAtendimentoService>.Instance);
 
@@ -83,6 +83,7 @@ public class AgenteAtendimentoServiceTests
     [Fact]
     public async Task ExecutaFerramentaEResponde()
     {
+        VerificarConsulta("Seu pedido fica pronto por volta das 15h40.");
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
             .Returns(UsoFerramenta("consultar_pedido"), Texto("Seu pedido fica pronto por volta das 15h40."));
 
@@ -134,8 +135,9 @@ public class AgenteAtendimentoServiceTests
     public async Task RespostaDoAgenteSaiSemTravessao()
     {
         // #1330: travessão vira pontuação simples antes de ir ao WhatsApp e ao histórico.
+        VerificarConsulta("Temos ravioli de carne — R$ 22,50.");
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
-            .Returns(Texto("Temos ravioli de carne — R$ 22,50."));
+            .Returns(UsoFerramenta("consultar_pedido"), Texto("Texto livre ignorado."));
 
         await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
@@ -144,6 +146,126 @@ public class AgenteAtendimentoServiceTests
         await _conversaRepository.Received(1).AddMensagemAsync(
             Arg.Is<Mensagem>(m => m.Autor == AutorMensagem.Agente && m.Texto == "Temos ravioli de carne, R$ 22,50."),
             Arg.Any<CancellationToken>());
+    }
+
+    private void VerificarConsulta(string texto) =>
+        _consultarPedido.When(f => f.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>()))
+            .Do(c => c.Arg<ContextoTurnoAgente>().RegistrarRespostaVerificada(texto));
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TextoLivreOuJsonDeFerramentaSemRespostaVerificadaEncaminhaParaEquipe(bool consultar)
+    {
+        var falso = Texto("Seu estorno já caiu na conta.");
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(consultar ? UsoFerramenta("consultar_pedido") : falso, falso);
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+        resultado.Escalou.Should().BeTrue();
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.",
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FerramentaPosteriorSemResultadoLimpaRespostaAnterior(bool lanca)
+    {
+        var chamada = 0;
+        _consultarPedido.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>()).Returns(c =>
+        {
+            if (++chamada == 1) c.Arg<ContextoTurnoAgente>().RegistrarRespostaVerificada("Resposta anterior.");
+            else if (lanca) throw new InvalidOperationException("falha controlada");
+            return "{\"erro\":\"pedido_nao_encontrado\"}";
+        });
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
+            UsoFerramenta("consultar_pedido"), UsoFerramenta("consultar_pedido", "toolu_2"), Texto("Seu estorno já caiu na conta."));
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+        resultado.Escalou.Should().BeTrue();
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId,
+            Arg.Is<string>(s => s.Contains("equipe") && !s.Contains("anterior") && !s.Contains("caiu")),
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ConsultaDepoisEscaladaNoMesmoLoteAvisaClienteESuspendeFerramentasRestantes()
+    {
+        VerificarConsulta("Resposta anterior.");
+        _situacaoNoBanco = SituacaoConversa.Automatica;
+        _escalador.When(e => e.EscalarAsync(_empresaId, _conversa, Arg.Any<string>(), Agora, Arg.Any<CancellationToken>()))
+            .Do(_ => _conversa.Escalar(Agora, "conferência"));
+        var entrada = JsonSerializer.SerializeToElement(new { motivo = "conferência" });
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(new RespostaLlm(RespostaLlm.StopToolUse,
+        [
+            new BlocoUsoFerramentaLlm("consulta", "consultar_pedido", entrada),
+            new BlocoUsoFerramentaLlm("escala", "escalar_para_dona", entrada),
+            new BlocoUsoFerramentaLlm("nao_executar", "consultar_pedido", entrada)
+        ], 1, 1));
+        var resultado = await CriarServico(new EscalarParaDonaFerramenta(_escalador)).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+        resultado.Escalou.Should().BeTrue(); resultado.Respondeu.Should().BeTrue();
+        _requisicoes.Should().ContainSingle();
+        await _consultarPedido.Received(1).ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>());
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.",
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EncerramentoPelaFerramentaEnviaDespedidaFixaENaoExecutaRestanteDoLoteOuReplay()
+    {
+        _situacaoNoBanco = SituacaoConversa.Automatica;
+        var entrada = JsonSerializer.SerializeToElement(new { });
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(new RespostaLlm(RespostaLlm.StopToolUse,
+        [new BlocoUsoFerramentaLlm("fechar", "encerrar_conversa", entrada), new BlocoUsoFerramentaLlm("ignorar", "consultar_pedido", entrada)], 1, 1));
+        var servico = CriarServico(new EncerrarConversaFerramenta());
+        var resultado = await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+        resultado.Respondeu.Should().BeTrue(); resultado.Escalou.Should().BeFalse();
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Conversa encerrada. Quando precisar, mande uma nova mensagem por aqui.",
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _consultarPedido.DidNotReceiveWithAnyArgs().ExecutarAsync(default!, default, default);
+        (await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora)).ChamouLlm.Should().BeFalse();
+        _requisicoes.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task EncerramentoComPedidoVinculadoEncaminhaParaEquipeSemDespedidaOuRespostaLivre()
+    {
+        _situacaoNoBanco = SituacaoConversa.Automatica;
+        _escalador.When(e => e.EscalarAsync(_empresaId, _conversa, Arg.Any<string>(), Agora, Arg.Any<CancellationToken>()))
+            .Do(_ => _conversa.Escalar(Agora, "pedido vinculado"));
+        var pedidoId = Guid.NewGuid();
+        _conversa.DefinirPedidoEmAndamento(pedidoId);
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
+            UsoFerramenta("encerrar_conversa"),
+            new RespostaLlm("end_turn", [new BlocoTextoLlm("Pedido concluído e conversa encerrada.")], 1, 1));
+        var servico = CriarServico(new EncerrarConversaFerramenta());
+
+        var resultado = await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Respondeu.Should().BeTrue();
+        resultado.Escalou.Should().BeTrue();
+        _conversa.Situacao.Should().NotBe(SituacaoConversa.Encerrada);
+        _conversa.PedidoEmAndamentoId.Should().Be(pedidoId);
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId,
+            "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.",
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        (await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora)).ChamouLlm.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EnvioEfetivoNaoDuplicaRespostaENaoPerdeHistoricoQuandoFerramentaPosteriorFalha(bool falhaPosterior)
+    {
+        _consultarPedido.When(f => f.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>()))
+            .Do(c => c.Arg<ContextoTurnoAgente>().RegistrarEnvioVerificado());
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(UsoFerramenta("consultar_pedido"),
+            falhaPosterior ? UsoFerramenta("inexistente", "toolu_2") : Texto("Texto livre ignorado."), Texto("Texto livre ignorado."));
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+        resultado.Respondeu.Should().BeTrue(); resultado.Escalou.Should().Be(falhaPosterior);
+        if (falhaPosterior)
+            await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("equipe")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        else
+            await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
     }
 
     [Fact]
@@ -429,7 +551,7 @@ public class AgenteAtendimentoServiceTests
 
         resultado.Escalou.Should().BeTrue();
         _requisicoes.Should().HaveCount(AgenteAtendimentoService.MaximoIteracoes);
-        var espera = ConfiguracaoAtendimento.CriarPadrao(_empresaId).FraseEspera;
+        var espera = "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.";
         await _cloudClient.Received(1).EnviarTextoAsync(WaId, espera, Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await _escalador.Received(1).EscalarAsync(_empresaId, _conversa, Arg.Any<string>(), Agora, Arg.Any<CancellationToken>());
     }

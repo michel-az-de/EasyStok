@@ -101,6 +101,90 @@ public sealed partial class PedidoConversaConcorrenciaTests
         }
     }
 
+    [SkippableTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Comanda_ReciboAntigoRecuperaEdicaoAposFilhoConsumidoOuSubstituido(bool consumirFilho)
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var factory = CriarFactory(Provedor(new()));
+        using var client = factory.CreateClient();
+        var c = await SemearAsync(factory);
+        var tokenPai = await Link(factory, c.ConversaId);
+        var pai = await Estado(client, tokenPai);
+        await Salvar(client, tokenPai, pai, pai.Rascunho with { Itens = [new(c.CardapioItemId, 1)],
+            JanelaId = c.JanelaId, DataEntrega = c.DataEntrega });
+        pai = await Estado(client, tokenPai);
+        var pedidoId = (await Enviar(client, tokenPai, pai.Revisao)).PedidoId;
+        await ConfirmarPagamento(factory, pedidoId, "830001", 15);
+        using var primeiraResposta = await client.PostAsync($"{Rota(tokenPai)}/nova-edicao", null);
+        primeiraResposta.StatusCode.Should().Be(HttpStatusCode.OK);
+        var filho = (await primeiraResposta.Content.ReadFromJsonAsync<EasyStock.Application.Services.Atendimento.LinkCardapioConversaGerado>())!;
+        var estadoFilho = await Estado(client, filho.Token);
+        await Salvar(client, filho.Token, estadoFilho, estadoFilho.Rascunho with { Itens = [new(c.CardapioItemId, 2)] });
+        if (consumirFilho)
+        {
+            estadoFilho = await Estado(client, filho.Token);
+            (await Enviar(client, filho.Token, estadoFilho.Revisao)).PedidoId.Should().Be(pedidoId);
+            await ConfirmarPagamento(factory, pedidoId, "830002", 10);
+        }
+        using var compartilhamento = await client.PostAsync($"/api/atendimento/conversas/{c.ConversaId}/link-cardapio", null);
+        compartilhamento.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await compartilhamento.Content.ReadAsStringAsync());
+        var vigente = json.RootElement.GetProperty("data").Deserialize<EasyStock.Application.Services.Atendimento.LinkCardapioConversaGerado>(ComandaClienteUseCase.Json)!;
+        var selecao = await Estado(client, vigente.Token);
+        await Salvar(client, vigente.Token, selecao, selecao.Rascunho with { Itens = [new(c.CardapioItemId, 3)], Observacoes = "Seleção vigente preservada" });
+        (await client.GetAsync($"{Rota(tokenPai)}/comanda")).StatusCode.Should().Be(HttpStatusCode.OK);
+        var antes = await Contar();
+        using var resposta = await client.PostAsync($"{Rota(tokenPai)}/nova-edicao", null);
+        var corpo = await resposta.Content.ReadAsStringAsync();
+        var depois = await Contar();
+        var evidencia = new { linkPai = pai.LinkId, linkFilho = estadoFilho.LinkId, consumirFilho,
+            linksAntes = antes.Links, linksDepois = depois.Links, pedidosAntes = antes.Pedidos, pedidosDepois = depois.Pedidos,
+            cobrancasAntes = antes.Cobrancas, cobrancasDepois = depois.Cobrancas,
+            pagamentosAntes = antes.Pagamentos, pagamentosDepois = depois.Pagamentos,
+            financeiroAntes = selecao.Financeiro, financeiroDepois = (await Estado(client, tokenPai)).Financeiro };
+        resposta.StatusCode.Should().Be(HttpStatusCode.OK,
+            $"o recibo continua acessível após seu filho; HTTP={(int)resposta.StatusCode}; corpo={corpo}; evidencia={JsonSerializer.Serialize(evidencia)}");
+        var nova = (await resposta.Content.ReadFromJsonAsync<EasyStock.Application.Services.Atendimento.LinkCardapioConversaGerado>())!;
+        var repeticoes = await Task.WhenAll(Enumerable.Range(0, 4).Select(i => client.PostAsync(
+            $"{Rota(consumirFilho && i % 2 == 1 ? filho.Token : tokenPai)}/nova-edicao", null)));
+        foreach (var repeticao in repeticoes)
+        {
+            repeticao.StatusCode.Should().Be(HttpStatusCode.OK, await repeticao.Content.ReadAsStringAsync());
+            (await repeticao.Content.ReadFromJsonAsync<EasyStock.Application.Services.Atendimento.LinkCardapioConversaGerado>())!.Token.Should().Be(nova.Token);
+        }
+        var recuperada = await Estado(client, nova.Token);
+        recuperada.PodeEditar.Should().BeTrue();
+        recuperada.Pedido!.PedidoId.Should().Be(pedidoId); recuperada.NumeroComanda.Should().Be(pai.NumeroComanda);
+        recuperada.Rascunho.Observacoes.Should().Be("Seleção vigente preservada");
+        recuperada.Rascunho.Itens.Should().ContainSingle().Which.Qtd.Should().Be(3);
+        recuperada.Financeiro!.Recebido.Should().Be(consumirFilho ? 25 : 15);
+        recuperada.Financeiro.Alocado.Should().Be(consumirFilho ? 25 : 15);
+        (await client.GetAsync($"{Rota(vigente.Token)}/comanda")).StatusCode.Should().Be(HttpStatusCode.Gone);
+        var final = await Contar();
+        final.Links.Should().Be(antes.Links + 1); final.Editaveis.Should().Be(1);
+        final.Pedidos.Should().Be(1); final.Cobrancas.Should().Be(antes.Cobrancas); final.Pagamentos.Should().Be(antes.Pagamentos);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>(); db.SetMobileTenantContext(EmpresaId);
+            var expirado = await db.LinksCardapioConversa.SingleAsync(l => l.Id == pai.LinkId);
+            expirado.Expirar(DateTime.UtcNow.AddMinutes(-1)); await db.SaveChangesAsync();
+        }
+        (await client.PostAsync($"{Rota(tokenPai)}/nova-edicao", null)).StatusCode.Should().Be(HttpStatusCode.Gone);
+        (await Contar()).Links.Should().Be(final.Links);
+
+        async Task<(int Links, int Editaveis, int Pedidos, int Cobrancas, int Pagamentos)> Contar()
+        {
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>(); db.SetMobileTenantContext(EmpresaId);
+            return (await db.LinksCardapioConversa.CountAsync(),
+                await db.LinksCardapioConversa.CountAsync(l => l.UsadoEm == null && l.ExpiraEm > DateTime.UtcNow),
+                await db.Pedidos.CountAsync(), await db.CobrancasPedido.CountAsync(),
+                await db.Pedidos.SelectMany(p => p.Pagamentos).CountAsync());
+        }
+    }
+
     private static IMercadoPagoClient Provedor(ConcurrentDictionary<string, CriarPreferenceCommand> preferencias)
     {
         var mp = Substitute.For<IMercadoPagoClient>();

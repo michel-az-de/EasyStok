@@ -111,7 +111,8 @@ public class CalcularCestaProducaoUseCase(
             Itens: itensResultado,
             Consolidado: consolidado,
             TudoDisponivel: tudoDisponivel,
-            CustoEstimadoTotal: algumCustoConhecido ? custoTotal : null);
+            CustoEstimadoTotal: algumCustoConhecido && itensResultado.All(i => i.Status == ItemCestaStatus.Ok && i.Resultado?.CustoEstimadoTotal.HasValue == true)
+                ? custoTotal : null);
     }
 
     /// <summary>

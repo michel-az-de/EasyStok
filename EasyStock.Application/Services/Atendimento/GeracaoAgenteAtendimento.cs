@@ -18,7 +18,7 @@ public sealed record GeracaoAgente(string? Texto, int Tokens, bool Concluiu, str
 /// <summary>
 /// Geração do agente de atendimento, sem efeito colateral próprio: monta o contexto (prompt fixo, caderno,
 /// dossiê, histórico) e roda o laço LLM + ferramentas. Quem chama decide o que fazer com o texto: o turno
-/// (<see cref="AgenteAtendimentoService"/>) envia ao cliente; a sugestão da dona (#1420) só devolve.
+/// (<see cref="AgenteAtendimentoService"/>) usa apenas resposta verificada das ferramentas; a sugestão da dona (#1420) só devolve.
 /// </summary>
 public static class GeracaoAgenteAtendimento
 {
@@ -69,6 +69,7 @@ public static class GeracaoAgenteAtendimento
             .Select(f => new FerramentaLlm(f.Nome, f.Descricao, f.SchemaJson))
             .ToList();
         var tokens = 0;
+        var situacaoInicial = contexto.Conversa.Situacao;
 
         for (var iteracao = 0; iteracao < maximoIteracoes; iteracao++)
         {
@@ -79,6 +80,7 @@ public static class GeracaoAgenteAtendimento
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
+                contexto.LimparRespostaVerificada();
                 logger.LogError(ex, "Agente de atendimento: falha chamando o LLM na conversa {ConversaId}.", contexto.Conversa.Id);
                 return new GeracaoAgente(null, tokens, false, "o agente não conseguiu responder (falha ao chamar o LLM)");
             }
@@ -89,13 +91,22 @@ public static class GeracaoAgenteAtendimento
             {
                 var texto = string.Join("\n", resposta.Conteudo.OfType<BlocoTextoLlm>().Select(b => b.Texto)).Trim();
                 return new GeracaoAgente(texto, tokens, true,
-                    texto.Length == 0 ? $"o agente não produziu resposta (stop_reason={resposta.StopReason})" : null);
+                    texto.Length == 0 && !(situacaoInicial == SituacaoConversa.Automatica
+                        && (contexto.EnvioVerificado || contexto.RespostaVerificada is { Length: > 0 }))
+                        ? $"o agente não produziu resposta (stop_reason={resposta.StopReason})" : null);
             }
 
             mensagens.Add(new MensagemLlm(MensagemLlm.Assistente, resposta.Conteudo));
             var resultados = new List<BlocoLlm>();
             foreach (var uso in resposta.Conteudo.OfType<BlocoUsoFerramentaLlm>())
+            {
                 resultados.Add(await ExecutarFerramentaAsync(ferramentas, contexto, uso, logger, ct));
+                if (situacaoInicial == SituacaoConversa.Automatica && contexto.Conversa.Situacao != SituacaoConversa.Automatica)
+                {
+                    if (contexto.Conversa.Situacao != SituacaoConversa.Encerrada) contexto.LimparRespostaVerificada();
+                    return new GeracaoAgente(null, tokens, true, null);
+                }
+            }
             mensagens.Add(new MensagemLlm(MensagemLlm.Usuario, resultados));
         }
 
@@ -106,6 +117,7 @@ public static class GeracaoAgenteAtendimento
         IReadOnlyDictionary<string, IFerramentaAgente> ferramentas, ContextoTurnoAgente contexto,
         BlocoUsoFerramentaLlm uso, ILogger logger, CancellationToken ct)
     {
+        contexto.LimparRespostaVerificada();
         if (!ferramentas.TryGetValue(uso.Nome, out var ferramenta))
             return new BlocoResultadoFerramentaLlm(uso.Id, $"Ferramenta desconhecida: {uso.Nome}.", EhErro: true);
 
@@ -115,6 +127,7 @@ public static class GeracaoAgenteAtendimento
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
+            contexto.LimparRespostaVerificada();
             logger.LogError(ex, "Agente de atendimento: ferramenta {Ferramenta} falhou na conversa {ConversaId}.",
                 ferramenta.Nome, contexto.Conversa.Id);
             return new BlocoResultadoFerramentaLlm(uso.Id, "A ferramenta falhou; não invente o resultado.", EhErro: true);

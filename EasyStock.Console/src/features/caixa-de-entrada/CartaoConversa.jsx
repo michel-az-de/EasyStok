@@ -3,6 +3,7 @@ import { Avatar } from '../../componentes/Avatar'
 import { Icone } from '../../componentes/Icone'
 import { useCatalogo } from '../../aplicacao/contextos'
 import { sinalVerde } from '../../dominio/cobranca'
+import { faltaPagar } from '../../dominio/pagamento'
 import { ehLead, previaDaConversa, tagCorrespondida } from '../../dominio/conversa'
 import { motivoDePrecisar, respostaAtrasada } from '../../dominio/automatico'
 import { contextoDaLinha, estadoDaLinha, pendentesDaLinha } from '../../dominio/linhaDoBalcao'
@@ -11,7 +12,7 @@ import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { estadoDaJanela } from '../../dominio/janela'
 import { passoPorId } from '../../dominio/esteira'
 import { inicioDoPedidoAtivo } from '../../dominio/entrega'
-import { duracao, horaMono } from '../../dominio/formato'
+import { duracao, horaMono, moeda } from '../../dominio/formato'
 import css from './caixa.module.css'
 import { classesDoCartao } from './classesDoCartao'
 
@@ -40,9 +41,15 @@ const ICONE_DO_PASSO = {
 
 // Passo do pedido no contexto da linha (com o sinal verde do pagamento, RN-25,
 // dez minutos só) ou "Lead" quando ainda não há pedido nem cadastro.
-function marcaDoPedido(conversa) {
+function marcaDoPedido(conversa, cardapio) {
   const passo = conversa.pedido ? passoPorId(conversa.pedido.estado) : null
   if (passo) {
+    const saldo = faltaPagar(conversa.pedido, cardapio)
+    if (saldo > 0 && conversa.pedido.sinalNaReserva && conversa.pedido.cobranca?.pagaEm
+      && Math.round(conversa.pedido.cobranca.valor * 100) === Math.round((conversa.pedido.totalApi - saldo) * 100)) {
+      return { texto: 'Sinal pago', icone: 'circle-check', tom: 'ok' }
+    }
+    if (saldo > 0) return { texto: `Falta ${moeda(saldo)}`, icone: 'dollar-sign', tom: 'neutro' }
     if (sinalVerde(conversa.pedido)) return { texto: 'Pago', icone: 'circle-check', tom: 'ok' }
     return { texto: passo.rotulo, icone: ICONE_DO_PASSO[passo.id], tom: 'neutro' }
   }
@@ -75,7 +82,7 @@ export const CartaoConversa = memo(function CartaoConversa({
   conversa, selecionada, agora, pausado = false, pagamentoNaoVisto = false, aberta = true, expediente = null,
   grupo, busca, aoAbrir,
 }) {
-  const { canais, janelas } = useCatalogo()
+  const { canais, janelas, cardapio } = useCatalogo()
   const canal = canalDaConversa(canais, conversa)
   const motivo = grupo ? null : motivoDaLinha(motivoDePrecisar(conversa, agora, pausado, aberta, janelas, expediente))
   const slaEstourado = !grupo && respostaAtrasada(conversa, agora, pausado, expediente)
@@ -95,7 +102,7 @@ export const CartaoConversa = memo(function CartaoConversa({
   const tagAchada = busca?.trim() && !nomeCombinaBusca ? tagCorrespondida(conversa, busca) : null
   const contexto = contextoDaLinha({
     origem: origem?.curto ?? null,
-    pedido: grupo ? null : marcaDoPedido(conversa),
+    pedido: grupo ? null : marcaDoPedido(conversa, cardapio),
     entregaAte: inicioPedido != null ? horaMono(inicioPedido) : null,
     janelaFechada,
     tagAchada,

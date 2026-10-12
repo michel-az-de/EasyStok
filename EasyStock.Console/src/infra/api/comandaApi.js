@@ -127,6 +127,10 @@ function cobrancaDaApi(c, meioAnterior) {
 export function pedidoDaApi(p, anterior = null) {
   if (!p) return null
   const cobranca = cobrancaDaApi(p.cobranca, anterior?.meio)
+  const cobertura = p.alocado ?? p.totalPago ?? 0
+  if (cobranca) cobranca.diferenca = cobertura > 0
+    && ['Pendente', 'Expirada'].includes(cobranca.statusApi)
+    && Math.round(cobranca.valor * 100) === Math.round((p.total - cobertura) * 100)
   return {
     pedidoId: p.pedidoId,
     // Mesmo código curto do backend (VariaveisAtendimento.CodigoCurto): o que o cliente lê.

@@ -33,6 +33,7 @@ export function criarCicloDeSincronizacao({
   // `ultimaMensagemEm`: fora da página 1, o resumo guardado desfaria na tela o que ela acabou de fazer.
   // Por isso a volta rápida lê até a página de quem está ou esteve aberta há pouco (id -> voltas que faltam).
   const frescas = new Map()
+  const pedidosInvalidos = new Map()
   function conversasFrescas() {
     for (const [id, voltas] of frescas) {
       if (voltas > 1) frescas.set(id, voltas - 1)
@@ -59,14 +60,18 @@ export function criarCicloDeSincronizacao({
   async function pedidoDe(resumo, cicloLento) {
     if (!resumo.pedidoEmAndamentoId) return null
     const guardado = memoria.pedidos.get(resumo.id)
-    if (!deveRelerPedido(resumo, guardado, { selecionadaId: lerSelecionada(), cicloLento })) {
+    const invalidacao = pedidosInvalidos.get(resumo.id)
+    if (!invalidacao && !deveRelerPedido(resumo, guardado, { selecionadaId: lerSelecionada(), cicloLento })) {
       return guardado.dados
     }
     try {
       const dados = await obterPedido(resumo.id)
+      // Um evento que chegou durante o GET exige outra leitura: a resposta anterior não o consome.
+      if (!estaVivo() || pedidosInvalidos.get(resumo.id) !== invalidacao) return guardado?.dados ?? null
       memoria.pedidos.set(resumo.id, {
         pedidoId: resumo.pedidoEmAndamentoId, ultima: resumo.ultimaMensagemEm, statusDoResumo: resumo.pedidoStatus ?? null, dados,
       })
+      pedidosInvalidos.delete(resumo.id)
       return dados
     } catch {
       return guardado?.dados ?? null
@@ -78,13 +83,21 @@ export function criarCicloDeSincronizacao({
     if (!completa) return
     devendoVarredura = false
     // Conversa que saiu da inbox sai dos caches: a memória agora dura o dia inteiro.
-    for (const guardados of [memoria.mensagens, memoria.pedidos]) {
+    for (const guardados of [memoria.mensagens, memoria.pedidos, pedidosInvalidos]) {
       for (const id of guardados.keys()) if (!memoria.resumos.has(id)) guardados.delete(id)
     }
   }
 
-  return async function volta({ cicloLento = false } = {}) {
+  async function volta({ cicloLento = false, somentePedidos = false } = {}) {
     try {
+      if (somentePedidos) {
+        const afetados = [...memoria.resumos.values()].filter(r => pedidosInvalidos.has(r.id))
+        await emFila(afetados, CONVERSAS_POR_VEZ, async resumo => {
+          const pedido = await pedidoDe(resumo, false)
+          if (estaVivo()) despachar({ tipo: acao.SINCRONIZAR_PEDIDO, id: resumo.id, pedido: pedidoDaApi(pedido) })
+        })
+        return
+      }
       const inbox = comConversas
         ? await listarInbox({ completa: devendoVarredura || cicloLento, ate: conversasFrescas() })
         : { itens: [], completa: true }
@@ -112,4 +125,16 @@ export function criarCicloDeSincronizacao({
       }
     }
   }
+  volta.invalidarPedidos = (pedidoId, conversaId = null) => {
+    let afetou = false
+    for (const resumo of memoria.resumos.values()) {
+      if (resumo.pedidoEmAndamentoId && (!pedidoId || resumo.pedidoEmAndamentoId === pedidoId)
+        && (!conversaId || resumo.id === conversaId)) {
+        pedidosInvalidos.set(resumo.id, {})
+        afetou = true
+      }
+    }
+    return afetou
+  }
+  return volta
 }

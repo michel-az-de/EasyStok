@@ -7,7 +7,7 @@ const MODULOS = {
 }
 const TELAS = {
   itens: 'produto', categorias: 'grade', estoque: 'estoque', producao: 'producao',
-  insumos: 'ingredientes', receitas: 'receita', planejamento: 'horarios', perdas: 'atencao',
+  insumos: 'ingredientes', receitas: 'receita', calculadora: 'financeiro', planejamento: 'horarios', perdas: 'atencao',
   balcao: 'mensagem', horarios: 'horarios', respostas: 'mensagem', fila: 'pedido-em-preparo',
   caixa: 'caixa', fidelidade: 'cupom', canais: 'mensagem', integracoes: 'link',
   painel: 'entrega', janelas: 'horarios',

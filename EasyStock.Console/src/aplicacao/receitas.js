@@ -1,4 +1,5 @@
 import { detalheDaReceitaDaApi, marcarBaixaAutomatica, obterReceita, receitaDaApi, listarReceitas, salvarReceita } from '../infra/api/producaoApi'
+import { numeroDaReceita } from './calculosReceita'
 
 // Receitas no modo API (M2.4a, #1498). A receita é gravada inteira (o EasyStok substitui as linhas
 // numa transação e guarda o diff). Valida antes o que a API recusaria, para avisar em português.
@@ -44,12 +45,14 @@ export const lerReceitas = async () => ((await listarReceitas()) ?? []).map(rece
 export const lerReceita = async (produtoId) => detalheDaReceitaDaApi(await obterReceita(produtoId))
 
 // O teclado decimal em pt-BR só tem vírgula: "1,2" é um vírgula dois.
-const numero = (texto) => (String(texto ?? '').trim() === '' ? NaN : Number(String(texto).replace(',', '.')))
+const numero = numeroDaReceita
 
-export function erroDaReceita({ rendimento, linhas }) {
+export function erroDaReceita({ rendimento, unidadeRendimento, linhas }) {
   if (!(numero(rendimento) > 0)) return 'Diga quanto a receita rende (maior que zero).'
+  if (unidadeRendimento != null && !UNIDADES_RECEITA.includes(unidadeRendimento)) return 'Confira a unidade do rendimento da receita.'
   if (linhas.some((l) => !l.insumoId)) return 'Escolha o insumo de cada linha.'
   if (linhas.some((l) => !(numero(l.quantidade) > 0))) return 'Quantidade de cada insumo maior que zero.'
+  if (linhas.some((l) => !UNIDADES_RECEITA.includes(l.unidade))) return 'Confira a unidade de cada insumo.'
   const ids = linhas.map((l) => l.insumoId)
   if (new Set(ids).size !== ids.length) return 'O mesmo insumo apareceu duas vezes: some numa linha só.'
   return null

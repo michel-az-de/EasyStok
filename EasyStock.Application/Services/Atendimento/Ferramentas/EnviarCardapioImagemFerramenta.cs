@@ -38,6 +38,7 @@ public sealed class EnviarCardapioImagemFerramenta(
         var envio = temImagem
             ? await cloudClient.EnviarImagemAsync(conversa.ContatoIdExterno, storefront!.CardapioImagemUrl!, texto, ct)
             : await cloudClient.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct: ct);
+        contexto.RegistrarEnvioVerificado();
 
         if (conversa.EstaAberta) conversa.RegistrarSaida(contexto.Agora);
         await conversaRepository.AddMensagemAsync(
