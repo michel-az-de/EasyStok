@@ -776,7 +776,7 @@ await confere('Caixa do dia: sem abertura o resumo não inventa gaveta nem saldo
   const linhas = Object.fromEntries(doTipo(resumo, 'div').map((d) => [texto(doTipo(d, 'dt')[0]), limpo(doTipo(d, 'dd')[0])]))
   assert.equal(linhas['Na gaveta (dinheiro)'], undefined, 'sem abrir o caixa ninguém disse quanto há na gaveta')
   assert.equal(linhas['Saldo inicial'], undefined)
-  assert.deepEqual([linhas['Em dinheiro'], linhas['Pix e cartão'], linhas['Sem forma de pagamento'], linhas['Total do dia até agora']],
+  assert.deepEqual([linhas['Em dinheiro'], linhas['Pix, cartão e outros'], linhas['Sem forma de pagamento'], linhas['Total do dia até agora']],
     [moedaDe(30), moedaDe(40), moedaDe(250), moedaDe(320)])
 })
 

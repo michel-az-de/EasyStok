@@ -24,7 +24,12 @@ export const TIPOS_MOVIMENTO = {
 // categoria, estas são só atalho de um toque. #1474: suprimento é reforço de
 // troco, dinheiro que ENTRA na gaveta; como saída ele subtraía da conta dela.
 export const CATEGORIAS_SAIDA_SUGERIDAS = ['Sangria', 'Despesa']
-export const CATEGORIAS_ENTRADA_SUGERIDAS = ['Suprimento']
+// #1683: a venda de balcão recebida na hora não tinha atalho; a única entrada sugerida era o troco.
+export const CATEGORIAS_ENTRADA_SUGERIDAS = ['Venda no balcão', 'Suprimento']
+
+// #1683: fechar o caixa também decide a loja. O caixa do dia não reabre e a loja só abre com ele
+// aberto (`aberturaDaLoja.js`, situação `fechadoHoje`).
+export const AVISO_AO_FECHAR_CAIXA = 'Depois de fechado, o caixa de hoje não reabre, a loja só abre com o caixa aberto e os lançamentos não podem mais ser estornados.'
 
 // #1584: a sugestão é do tipo. Trocar Entrada/Saída com "Sangria" marcada gravava uma entrada
 // rotulada Sangria. A sugerida do outro tipo sai; a que a dona digitou fica.
@@ -313,6 +318,10 @@ const sinalDoMovimento = (tipo) => (tipo === TIPOS_MOVIMENTO.ENTRADA ? 1 : tipo 
 // #1627: o que veio sem forma de pagamento fica à parte (`semForma`). A venda do pedido entregue
 // pelo PWA nasce sem forma no EasyStok (#1630); somada em "Pix e cartão", a tela afirmava que
 // dinheiro vivo estava fora da gaveta e a conferência do fechamento dava sobra.
+// #1683: `pixECartao` soma tudo o que não é dinheiro (transferência, outro e vale também); o
+// rótulo passou a dizer isso. A conta não mudou.
+export const ROTULO_FORA_DA_GAVETA = 'Fora da gaveta (Pix, cartão e outros)'
+export const ROTULO_FORA_DO_DINHEIRO = 'Pix, cartão e outros'
 export function gavetaDoDia(dia) {
   let gaveta = centavos(dia?.saldoInicial)
   let fora = 0

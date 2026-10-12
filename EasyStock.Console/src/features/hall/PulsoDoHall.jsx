@@ -7,7 +7,7 @@ import css from './hall.module.css'
 
 const frentes = {
   atendimento: { nome: 'Atendimento pendente', icone: 'mensagem', acao: 'Abrir Atendimento', tela: 'balcao' },
-  cozinha: { nome: 'Em preparo ou aguardando', icone: 'producao', acao: 'Ver fila de preparo', tela: 'fila' },
+  cozinha: { nome: 'Em preparo ou na fila', icone: 'producao', acao: 'Ver fila de preparo', tela: 'fila' },
   entregas: { nome: 'Prontos para sair', icone: 'entrega', acao: 'Organizar entregas', tela: 'painel' },
   financeiro: { nome: 'Saldo esperado no caixa', icone: 'caixa', acao: 'Conferir caixa', tela: 'caixa' },
 }

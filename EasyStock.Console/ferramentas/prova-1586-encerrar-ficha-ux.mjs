@@ -264,8 +264,9 @@ await confere('E  bloquear sem cadastro: motivo escrito só no modo API e só pa
   assert.match(fonte, /\{motivoSemBloqueio && <p id=\{idMotivoBloqueio\}[^>]*>\{motivoSemBloqueio\}<\/p>\}/)
 })
 await confere('F  link vencido: o texto diz o que o job do EasyStok faz em cada tentativa', () => {
-  assert.match(cobrancaDom.avisoDeLinkVencidoApi({ tentativa: 1 }), /manda um link novo ao cliente sozinho/)
-  assert.match(cobrancaDom.avisoDeLinkVencidoApi({ tentativa: 2 }), /cancela o pedido sozinho e avisa o cliente/)
+  // #1683: o job só reemite e cancela com o pedido esperando o pagamento; o status entra na pergunta.
+  assert.match(cobrancaDom.avisoDeLinkVencidoApi({ tentativa: 1 }, 'aguardando_pagamento'), /manda um link novo ao cliente sozinho/)
+  assert.match(cobrancaDom.avisoDeLinkVencidoApi({ tentativa: 2 }, 'aguardando_pagamento'), /cancela o pedido sozinho e avisa o cliente/)
   // A regra é do backend: se a tentativa máxima mudar lá, este texto precisa mudar junto.
   const dominio = readFileSync(new URL('../../EasyStock.Domain/Entities/Pagamentos/CobrancaPedido.cs', src), 'utf8')
   assert.match(dominio, /public const int TentativaMaxima = 2;/)
@@ -360,7 +361,29 @@ await confere('A  modal: promessa rejeitada também vira erro dentro dele e solt
   assert.equal(botao(tela, 'Encerrar').props.disabled, false)
   tela.encerrar()
 })
-await confere('A  modal: pedido sem pagamento é cancelado antes, e o resultado segue para a ação', async () => {
+// #1683: o cancelamento do pedido sem pagamento é escolha da atendente, numa caixa que nasce desmarcada.
+const caixaDeCancelar = (tela) => nos(tela.arvore).find((n) => n.type === 'label' && texto(n).includes('Cancelar também o pedido'))
+  ?.props.children.find?.((f) => f?.type === 'input')
+const marcarCancelar = (tela) => { caixaDeCancelar(tela).props.onChange({ target: { checked: true } }); tela.renderizar() }
+await confere('A  modal: a caixa de cancelar o pedido sem pagamento nasce desmarcada, e desmarcada não cancela', async () => {
+  const comPedido = conversaBase({ pedido: { pedidoId: 'p1', estado: 'aguardando', numero: 'P1ABCDEF', itens: [], cobranca: null } })
+  comoApi([comPedido])
+  const ordem = []
+  ctx.acoes = acoesDoModal({
+    cancelarPedido: async () => { ordem.push('cancelar'); return { ok: true } },
+    encerrarComResumo: async (_id, _agora, opcoes) => { ordem.push('encerrar'); assert.equal(opcoes.pedidoCancelado, false) },
+  })
+  const tela = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
+  const caixa = nos(tela.arvore).find((n) => n.type === 'label' && texto(n).includes('Cancelar também o pedido'))
+  assert.ok(caixa, 'falta a caixa de cancelar o pedido')
+  assert.equal(texto(caixa), 'Cancelar também o pedido Nº P1ABCDEF, que ainda não foi pago')
+  assert.equal(caixaDeCancelar(tela).props.checked, false)
+  assert.ok(!/será cancelado/.test(texto(tela.arvore)), 'a tela ainda promete cancelar sem perguntar')
+  await botao(tela, 'Encerrar').props.onClick()
+  assert.deepEqual(ordem, ['encerrar'])
+  tela.encerrar()
+})
+await confere('A  modal: com a caixa marcada o pedido é cancelado antes, e o resultado segue para a ação', async () => {
   const comPedido = conversaBase({ pedido: { pedidoId: 'p1', estado: 'aguardando', numero: 'P1ABCDEF', itens: [], cobranca: null } })
   comoApi([comPedido])
   const ordem = []
@@ -369,8 +392,49 @@ await confere('A  modal: pedido sem pagamento é cancelado antes, e o resultado 
     encerrarComResumo: async (_id, _agora, opcoes) => { ordem.push('encerrar'); assert.equal(opcoes.pedidoCancelado, true) },
   })
   const tela = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
+  marcarCancelar(tela)
   await botao(tela, 'Encerrar').props.onClick()
   assert.deepEqual(ordem, ['cancelar', 'encerrar'])
+  tela.encerrar()
+})
+await confere('A  modal: cancelamento que falha não encerra, e o erro aparece dentro dele', async () => {
+  const comPedido = conversaBase({ pedido: { pedidoId: 'p1', estado: 'aguardando', numero: 'P1ABCDEF', itens: [], cobranca: null } })
+  comoApi([comPedido])
+  const ordem = []
+  let devolver = { erro: 'Sem conexão com o EasyStok.' }
+  ctx.acoes = acoesDoModal({
+    cancelarPedido: async () => { ordem.push('cancelar'); return devolver },
+    encerrarComResumo: async (_id, _agora, opcoes) => { ordem.push('encerrar'); assert.equal(opcoes.pedidoCancelado, true) },
+  })
+  const tela = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
+  marcarCancelar(tela)
+  await botao(tela, 'Encerrar').props.onClick()
+  tela.renderizar()
+  assert.deepEqual(ordem, ['cancelar'], 'encerrou mesmo com o cancelamento recusado')
+  assert.deepEqual(alertas(tela), ['O pedido Nº P1ABCDEF não foi cancelado: Sem conexão com o EasyStok. O atendimento não foi encerrado. Tente de novo ou desmarque o cancelamento.'])
+  assert.equal(botao(tela, 'Encerrar').props.disabled, false, 'o botão volta para a nova tentativa')
+  devolver = { ok: true }
+  await botao(tela, 'Encerrar').props.onClick()
+  tela.renderizar()
+  assert.deepEqual(ordem, ['cancelar', 'cancelar', 'encerrar'])
+  assert.deepEqual(alertas(tela), [])
+  tela.encerrar()
+})
+await confere('A  modal: pedido já cancelado não é cancelado de novo quando só o encerramento falhou', async () => {
+  const comPedido = conversaBase({ pedido: { pedidoId: 'p1', estado: 'aguardando', numero: 'P1ABCDEF', itens: [], cobranca: null } })
+  comoApi([comPedido])
+  const ordem = []
+  let devolver = { erro: 'Atendimento não encerrado: Sem conexão com o EasyStok.' }
+  ctx.acoes = acoesDoModal({
+    cancelarPedido: async () => { ordem.push('cancelar'); return { ok: true } },
+    encerrarComResumo: async (_id, _agora, opcoes) => { ordem.push('encerrar'); assert.equal(opcoes.pedidoCancelado, true); return devolver },
+  })
+  const tela = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
+  marcarCancelar(tela)
+  await botao(tela, 'Encerrar').props.onClick()
+  devolver = undefined
+  await botao(tela, 'Encerrar').props.onClick()
+  assert.deepEqual(ordem, ['cancelar', 'encerrar', 'encerrar'])
   tela.encerrar()
 })
 await confere('A  modal: conversa da API encerrada por fora não derruba a tela', () => {
@@ -423,6 +487,7 @@ await confere('A  modal na demonstração: ações síncronas seguem valendo, se
   const ordem = []
   ctx.acoes = acoesDoModal({ cancelarPedido: () => { ordem.push('cancelar') }, encerrarComResumo: () => { ordem.push('encerrar') } })
   const tela = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
+  marcarCancelar(tela)
   await botao(tela, 'Encerrar').props.onClick()
   tela.renderizar()
   assert.deepEqual(ordem, ['cancelar', 'encerrar'])
@@ -532,13 +597,16 @@ await confere('D  formulário da baixa mostra a recusa e guarda valor e método'
   let devolver = { erro: 'Pagamento não registrado: Falha ao gravar' }
   const idas = []
   const tela = new Tela(BaixaAMao, { valorCobrado: 50, pedido: pedidoComLink(), aoCancelar: nada, aoConfirmar: async (...args) => { idas.push(args); return devolver } })
-  await botao(tela, 'Confirmar').props.onClick()
+  // #1683: a baixa é formulário (Enter registra); o botão é o envio dele.
+  const enviar = () => nos(tela.arvore).find((n) => n.type === 'form').props.onSubmit({ preventDefault: nada })
+  assert.equal(botao(tela, 'Marcar pago').props.tipo, 'submit')
+  await enviar()
   tela.renderizar()
   assert.deepEqual(alertas(tela), ['Pagamento não registrado: Falha ao gravar'])
   assert.equal(doTipo(tela, 'CampoSelecao')[0].props.value, 'pix')
-  assert.equal(botao(tela, 'Confirmar').props.disabled, false)
+  assert.equal(botao(tela, 'Marcar pago').props.disabled, false)
   devolver = undefined
-  await botao(tela, 'Confirmar').props.onClick()
+  await enviar()
   tela.renderizar()
   assert.deepEqual(idas, [[50, 'pix'], [50, 'pix']])
   assert.deepEqual(alertas(tela), [])
@@ -561,15 +629,17 @@ await confere('D  "Desfazer pagamento" espera, trava o segundo toque e só fecha
   const campo = () => doTipo(tela, 'CampoArea').find((n) => n.props.rotulo === 'Motivo')
   campo().props.onChange({ target: { value: 'Lançamento errado' } })
   tela.renderizar()
-  const ida = botao(tela, 'Desfazer pagamento').props.onClick()
-  botao(tela, 'Desfazer pagamento').props.onClick()
+  const enviar = () => nos(tela.arvore).find((n) => n.type === 'form').props.onSubmit({ preventDefault: nada })
+  assert.equal(botao(tela, 'Desfazer pagamento').props.tipo, 'submit')
+  const ida = enviar()
+  enviar()
   tela.renderizar()
   assert.deepEqual(idas, ['Lançamento errado'])
   assert.equal(botao(tela, 'Desfazendo…').props.disabled, true)
   espera.resolver({ erro: 'Pagamento não desfeito: Falha ao gravar' }); await ida; tela.renderizar()
   assert.deepEqual(alertas(tela), ['Pagamento não desfeito: Falha ao gravar'])
   assert.equal(campo().props.value, 'Lançamento errado', 'o motivo digitado se perdeu')
-  await botao(tela, 'Desfazer pagamento').props.onClick()
+  await enviar()
   tela.renderizar()
   assert.equal(campo(), undefined, 'a confirmação continua aberta depois do sucesso')
   tela.encerrar()
@@ -580,7 +650,8 @@ await confere('F  link vencido: no modo API o texto substitui "Reenviar cobranç
   const api = new Tela(BarraProximoPasso, propsDaBarra(vencido, { aoReenviarPix: nada }))
   assert.equal(botao(api, 'Reenviar cobrança'), undefined)
   assert.ok(texto(api.arvore).includes('Cobrança venceu'))
-  assert.ok(texto(api.arvore).includes(cobrancaDom.avisoDeLinkVencidoApi(vencido.cobranca)))
+  assert.ok(texto(api.arvore).includes(cobrancaDom.avisoDeLinkVencidoApi(vencido.cobranca, vencido.statusApi)))
+  assert.ok(botao(api, 'Marcar pago'), '#1683: com o link vencido a baixa à mão continua na barra')
   api.encerrar()
   comoDemonstracao()
   const demo = new Tela(BarraProximoPasso, propsDaBarra({ ...vencido, pedidoId: null, statusApi: undefined }, { aoReenviarPix: nada }))

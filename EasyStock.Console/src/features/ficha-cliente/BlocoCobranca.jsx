@@ -11,7 +11,7 @@ import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import {
   AVISO_BAIXA_COM_LINK, MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, baixaEsperaAprovacao, baixaCancelaCobrancaOnline, metodoDaCobranca,
-  nomeDoMeio, podeAlterarMeio, situacaoDaCobranca,
+  nomeDoMeio, podeAlterarMeio, situacaoDaCobranca, trocaDeFormaNoEasyStok,
 } from '../../dominio/cobranca'
 import { rotuloDoTotal } from '../../dominio/resumoPedido'
 import {
@@ -96,7 +96,7 @@ function useEmissao(aoEmitir) {
   return { emitindo, emitir }
 }
 
-function CopiaECola({ codigo }) {
+function CopiaECola({ codigo, rotulo = 'Copiar código' }) {
   const [status, setStatus] = useState(null) // null | 'copiado' | 'falhou'
   const pendente = useRef(null)
   const codigoRef = useRef(null)
@@ -126,7 +126,7 @@ function CopiaECola({ codigo }) {
     pendente.current = setTimeout(() => setStatus(null), 2000)
   }
 
-  const rotuloBotao = { copiado: 'Copiado', falhou: 'Selecione e copie' }[status] ?? 'Copiar código'
+  const rotuloBotao = { copiado: 'Copiado', falhou: 'Selecione e copie' }[status] ?? rotulo
 
   return (
     <div className={css.copiaECola}>
@@ -181,8 +181,26 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
     )
   }
 
+  const registrar = async () => {
+    setEnviando(true)
+    setRecusa(null)
+    try {
+      const resultado = await aoConfirmar(centavos / 100, metodo)
+      if (resultado?.erro) setRecusa(resultado.erro)
+    } catch (erro) {
+      setRecusa(erro.message || 'Não foi possível registrar o pagamento. Tente de novo.')
+    } finally { setEnviando(false) }
+  }
+  // #1683: Enter registra (envio nativo do formulário) e Esc volta, como nas outras confirmações.
+  const teclaDaBaixa = (evento) => {
+    if (evento.key === 'Escape' && !enviando) { evento.preventDefault(); evento.stopPropagation(); aoCancelar() }
+  }
+
   return (
-    <div className={css.baixaDivergente}>
+    <form className={css.baixaDivergente} onKeyDown={teclaDaBaixa} onSubmit={(evento) => {
+      evento.preventDefault()
+      return valido && !enviando ? registrar() : undefined
+    }}>
       {baixaCancelaCobrancaOnline(pedido) && (
         <div className={css.avisoDiferenca} role="note">
           <p className={css.corpoBloco}><Icone nome="alerta" /> {AVISO_BAIXA_COM_LINK}</p>
@@ -206,20 +224,11 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
       {recusa && <p className={css.motivoDesabilitado} role="alert">{recusa}</p>}
       <div className={css.acoesCobranca}>
         <Botao largo disabled={enviando} onClick={aoCancelar}>Voltar</Botao>
-        <Botao largo variante="primario" disabled={!valido || enviando} onClick={async () => {
-          setEnviando(true)
-          setRecusa(null)
-          try {
-            const resultado = await aoConfirmar(centavos / 100, metodo)
-            if (resultado?.erro) setRecusa(resultado.erro)
-          } catch (erro) {
-            setRecusa(erro.message || 'Não foi possível registrar o pagamento. Tente de novo.')
-          } finally { setEnviando(false) }
-        }}>
-          {enviando ? 'Registrando…' : 'Confirmar'}
+        <Botao largo tipo="submit" variante="primario" disabled={!valido || enviando}>
+          {enviando ? 'Registrando…' : 'Marcar pago'}
         </Botao>
       </div>
-    </div>
+    </form>
   )
 }
 
@@ -228,9 +237,14 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
 // a esteira já tinha andado e o bloco caía em "Pago fora da cobrança", sem
 // chips, até o pedido vencer. Agora escolhe a forma nova, confirma em linha e
 // sai tudo numa ação: a pendente é cancelada e a nova vai ao cliente.
-function AlterarForma({ cobranca, nomeCliente, aoAlterar }) {
+//
+// #1683: no modo API o EasyStok só troca entre link e na entrega (Pix e cartão são o mesmo
+// link). A tela não pergunta um meio que ele ignora e diz o que acontece de fato.
+function AlterarForma({ cobranca, nomeCliente, fonteApi = false, aoAlterar }) {
   const [aberto, setAberto] = useState(false)
-  const [novo, setNovo] = useState(null)
+  const [escolhido, setNovo] = useState(null)
+  const trocaApi = fonteApi ? trocaDeFormaNoEasyStok(cobranca, nomeCliente) : null
+  const novo = trocaApi?.meio ?? escolhido
   const atual = nomeDoMeio(cobranca.meio)
   const fechar = () => { setAberto(false); setNovo(null) }
   if (!aberto) {
@@ -242,12 +256,16 @@ function AlterarForma({ cobranca, nomeCliente, aoAlterar }) {
   }
   return (
     <div className={css.confirmarTroca}>
-      <EscolhaDeMeio escolhido={novo} excluir={cobranca.meio ?? 'pix'} aoEscolher={setNovo} pergunta={`Hoje: ${atual}. Mudar para:`} />
-      {novo && (
-        <p>
-          A cobrança por {atual} é cancelada e {nomeCliente} recebe uma nova por {nomeDoMeio(novo)}.
-          O pedido continua o mesmo.
-        </p>
+      {trocaApi ? <p>{trocaApi.texto}</p> : (
+        <>
+          <EscolhaDeMeio escolhido={novo} excluir={cobranca.meio ?? 'pix'} aoEscolher={setNovo} pergunta={`Hoje: ${atual}. Mudar para:`} />
+          {novo && (
+            <p>
+              A cobrança por {atual} é cancelada e {nomeCliente} recebe uma nova por {nomeDoMeio(novo)}.
+              O pedido continua o mesmo.
+            </p>
+          )}
+        </>
       )}
       <div className={css.acoesCobranca}>
         <Botao largo onClick={fechar}>Voltar</Botao>
@@ -296,7 +314,7 @@ export function BlocoCobranca({
   const reenvio = useEmissao(aoReenviar)
   const troca = useEmissao(aoAlterarMeio)
   const alterar = editavel && podeAlterarMeio(pedido) && (
-    <AlterarForma cobranca={cobranca} nomeCliente={nomeCliente} aoAlterar={troca.emitir} />
+    <AlterarForma cobranca={cobranca} nomeCliente={nomeCliente} fonteApi={fonteApi} aoAlterar={troca.emitir} />
   )
 
   if (geracao.emitindo || reenvio.emitindo || troca.emitindo) {
@@ -419,7 +437,7 @@ export function BlocoCobranca({
             aoAprovar={aprovarPedido ? () => aprovarPedido(conversaId) : null}
             aoCancelar={() => setRecebendo(false)}
             aoConfirmar={async (valor, metodo) => {
-              // #1586: "Recebi" só fecha no sucesso; a recusa volta para o formulário.
+              // #1586: a baixa só fecha no sucesso; a recusa volta para o formulário.
               const resultado = await confirmarPagamento(conversaId, valor, metodo)
               if (!resultado?.erro) setRecebendo(false)
               return resultado
@@ -427,13 +445,14 @@ export function BlocoCobranca({
         )}
         {editavel && !recebendo && (
           <div className={css.acoesCobranca}>
+            {/* #1683: mesmo rótulo e mesmo formulário do "Marcar pago" da barra; o primário é o dela. */}
             <Botao
               largo
-              variante="primario"
+              variante="secundario"
               icone="circle-check"
               onClick={() => pedido.pedidoId ? setRecebendo(true) : marcarRecebidoEntrega(conversaId, true, agora)}
             >
-              Recebi
+              Marcar pago
             </Botao>
             {disponivel('marcarRecebidoEntrega') && (
               <Botao
@@ -505,6 +524,7 @@ export function BlocoCobranca({
         editavel={editavel}
         numeroPedido={pedido.numero}
         nomeCliente={nomeCliente}
+        statusApi={pedido.statusApi}
         aoReenviar={() => reenvio.emitir()}
         aoCancelarPedido={aoCancelarPedido}
         aoEncerrarAtendimento={aoEncerrarAtendimento}
@@ -521,6 +541,9 @@ export function BlocoCobranca({
       ]} />
 
       {emAberto && cobranca.copiaECola && <CopiaECola codigo={cobranca.copiaECola} />}
+      {/* #1683: no modo API não há copia e cola; o link fica à mão para ela mandar pela conversa
+          quando o resumo não saiu. */}
+      {situacao.chave === 'aguardando' && !cobranca.copiaECola && cobranca.link && <CopiaECola codigo={cobranca.link} rotulo="Copiar link" />}
 
       {situacao.chave === 'aguardando' && !cobranca.comprovanteEm && editavel && disponivel('marcarComprovante') && (
         <Botao largo variante="secundario" icone="imagem" onClick={aoMarcarComprovante}>

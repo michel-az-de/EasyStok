@@ -160,7 +160,7 @@ confere('urgência: atrasado, agora, logo ou nada; só enquanto aguarda', () => 
 })
 
 // --- Etapas e fila de impressão --------------------------------------------------------
-confere('etapas: a trilha da comanda vai de Aguardando a Entregue', () => {
+confere('etapas: a trilha da comanda vai de Na fila a Entregue', () => {
   assert.deepEqual(ETAPAS_KDS.map((e) => e.status), ['aguardando', 'preparando', 'pronto', 'saiu_para_entrega', 'entregue'])
 })
 

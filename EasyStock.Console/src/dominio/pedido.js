@@ -1,14 +1,26 @@
 import { itemPorSku } from './cardapio.js'
+import { passoPorId } from './esteira.js'
+
+// #1683: prato que saiu do cardápio visível depois do pedido não some da Ficha. A linha da API
+// traz o retrato (nome, preço unitário, porção) e ele vira o produto quando o cardápio não tem.
+const produtoDoRetrato = (linha) => (linha.nome
+  ? { sku: linha.sku, nome: linha.nome, preco: linha.precoUnitario ?? 0, porcao: linha.porcao ?? '', estoque: null, foraDoCardapio: true }
+  : null)
 
 export function itensDetalhados(pedido, cardapio) {
   if (!pedido) return []
-  return pedido.itens.map((linha) => ({ ...linha, produto: itemPorSku(cardapio, linha.sku) }))
+  return pedido.itens.map((linha) => ({ ...linha, produto: itemPorSku(cardapio, linha.sku) ?? produtoDoRetrato(linha) }))
 }
 
+// Segue só pelo cardápio: o retrato existe em pedido do EasyStok, e nele o total é o do servidor.
 export function totalDoPedido(pedido, cardapio) {
-  return itensDetalhados(pedido, cardapio)
-    .reduce((soma, linha) => soma + (linha.produto?.preco ?? 0) * linha.qtd, 0)
+  if (!pedido) return 0
+  return pedido.itens
+    .reduce((soma, linha) => soma + (itemPorSku(cardapio, linha.sku)?.preco ?? 0) * linha.qtd, 0)
 }
+
+// Preço da linha na Ficha: o que o pedido gravou; sem retrato (rascunho local), o do cardápio.
+export const precoDaLinha = (linha) => (linha.precoUnitario ?? linha.produto?.preco ?? 0) * linha.qtd
 
 // `diferencaAposPagamento` mudou para `dominio/pagamento.js` na integração:
 // "quanto já foi pago" tem uma fonte só (registro 38).
@@ -88,11 +100,53 @@ export function numeroDaComanda(pedido, { fonteApi = false } = {}) {
 export const ORDEM_DAS_LINHAS = ['servir', 'casa']
 
 export function agruparPorLinha(itens, linhas) {
-  return ORDEM_DAS_LINHAS
-    .map((chave) => ({
+  return [
+    ...ORDEM_DAS_LINHAS.map((chave) => ({
       chave,
       rotulo: linhas[chave]?.rotulo ?? chave,
       itens: itens.filter((l) => l.produto?.linha === chave),
-    }))
-    .filter((grupo) => grupo.itens.length > 0)
+    })),
+    // #1683: linha que só tem o retrato do pedido não sabe a linha de produção; fica por último.
+    { chave: 'fora', rotulo: 'Fora do cardápio', itens: itens.filter((l) => l.produto?.foraDoCardapio) },
+  ].filter((grupo) => grupo.itens.length > 0)
+}
+
+// #1683: "Manter minha edição" depois de um conflito. O cliente pode ter trocado endereço, janela
+// e cupom no site; da atendente ficam só os itens e a observação que ela editou.
+export const rascunhoMantendoEdicao = (doServidor, daAtendente) => ({
+  ...doServidor, itens: daAtendente.itens, observacoes: daAtendente.observacoes,
+})
+
+// #1683: o cliente montando a escolha pelo link, sem pedido ainda. A comanda de baixo não soma
+// item por conta própria, senão a Ficha mostra duas listas e dois totais da mesma comanda.
+// Item que a atendente já pôs no rascunho local segue editável para ela poder tirar.
+export const clienteEscolhendoPeloLink = (comandas, pedido) => !pedido?.pedidoId && !pedido?.itens?.length
+  && (comandas ?? []).some((c) => c.podeEditar && !c.pedido && c.rascunho?.itens?.length > 0)
+
+export const LINHA_CLIENTE_ESCOLHENDO =
+  'O cliente está escolhendo pelo link. Os itens aparecem acima e viram pedido quando ele confirmar.'
+
+// #1683: sem pedido e sem frete combinado o EasyStok soma só os itens; o cliente já vê o frete.
+export function rotuloDoTotalDaSelecao(comanda, emEdicao = false) {
+  const semFrete = !comanda.pedido && comanda.freteCombinado == null
+  if (emEdicao) return 'Total da seleção salva' + (semFrete ? ', sem frete' : '')
+  return semFrete ? 'Total dos itens, sem frete' : 'Total previsto'
+}
+
+// #1683: o histórico traz o estado da esteira (demonstração) ou o status do EasyStok em
+// minúsculas e com espaço (`traducaoCliente.js`). Nenhum dos dois vai cru para a tela.
+const ROTULO_FORA_DA_ESTEIRA = {
+  cancelado: 'Cancelado',
+  rascunho: 'Rascunho',
+  'aguardando pagamento': 'Aguardando pagamento',
+  'aguardando aprovacao baba': 'Aguardando aprovação',
+  'aprovado baba': 'Pago',
+  preparando: 'Em preparo',
+  pronto: 'Embalado',
+  'saiu para entrega': 'Em entrega',
+}
+
+export function rotuloDoEstado(estado) {
+  const texto = String(estado ?? '')
+  return passoPorId(texto)?.rotulo ?? ROTULO_FORA_DA_ESTEIRA[texto] ?? texto.charAt(0).toUpperCase() + texto.slice(1)
 }
