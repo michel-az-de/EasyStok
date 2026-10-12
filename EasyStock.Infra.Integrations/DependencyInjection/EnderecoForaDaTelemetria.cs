@@ -49,10 +49,14 @@ public static class EnderecoForaDaTelemetria
         var hosts = Hosts(configuration);
         return (activity, request) =>
         {
-            if (request.RequestUri is { } url && hosts.Contains(url.Host))
+            if (request.RequestUri is { } url && EhHostDeEndereco(hosts, url.Host))
                 activity.SetTag("url.full", $"{url.Scheme}://{url.Authority}/");
         };
     }
+
+    /// <summary>O host do provedor ou um subdomínio dele (redirecionamento para <c>www.</c>, por exemplo).</summary>
+    internal static bool EhHostDeEndereco(HashSet<string> hosts, string host) =>
+        hosts.Contains(host) || hosts.Any(h => host.EndsWith("." + h, StringComparison.OrdinalIgnoreCase));
 
     internal static HashSet<string> Hosts(IConfiguration configuration)
     {

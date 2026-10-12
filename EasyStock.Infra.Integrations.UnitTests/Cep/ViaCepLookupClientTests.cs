@@ -1,7 +1,7 @@
 using System.Net;
 using EasyStock.Infra.Integrations.Cep;
 using EasyStock.TestHelpers.Http;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Integrations.UnitTests.Cep;
 
@@ -16,11 +16,38 @@ public class ViaCepLookupClientTests
 
     private readonly HttpFalso _http = new();
 
+    private readonly LogEmMemoria _log = new();
+
+    private sealed class LogEmMemoria : ILogger<ViaCepLookupClient>
+    {
+        public List<string> Linhas { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Linhas.Add($"{formatter(state, exception)} {exception}");
+    }
+
     private ViaCepLookupClient Cliente(TimeSpan? timeout = null)
     {
         var client = _http.CriarClient("https://viacep.test/");
         if (timeout is { } t) client.Timeout = t;
-        return new ViaCepLookupClient(client, NullLogger<ViaCepLookupClient>.Instance);
+        return new ViaCepLookupClient(client, _log);
+    }
+
+    [Fact]
+    public async Task Falha_nao_escreve_o_cep_no_log()
+    {
+        _http.Quando(HttpMethod.Get, Rota)
+            .Responde(HttpStatusCode.InternalServerError)
+            .Lanca(new HttpRequestException("sem rota"))
+            .Responde(HttpStatusCode.OK, "<html>fora do ar</html>")
+            .Demora(TimeSpan.FromSeconds(10));
+
+        for (var i = 0; i < 3; i++) await Cliente().LookupAsync(Cep);
+        await Cliente(TimeSpan.FromMilliseconds(50)).LookupAsync(Cep);
+
+        Assert.Equal(4, _log.Linhas.Count);
+        Assert.DoesNotContain(_log.Linhas, l => l.Contains(Cep));
     }
 
     [Fact]

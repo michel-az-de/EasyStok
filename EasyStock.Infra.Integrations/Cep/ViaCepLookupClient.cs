@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Json;
+using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using EasyStock.Application.Ports.Output.Lookup;
 using Microsoft.Extensions.Logging;
@@ -50,9 +50,8 @@ public sealed class ViaCepLookupClient : ICepLookupClient
             using var resp = await _http.GetAsync(url, ct);
             if (!resp.IsSuccessStatusCode)
             {
-                _logger.LogDebug(
-                    "ViaCEP retornou {Status} para cep={Cep}",
-                    (int)resp.StatusCode, cep);
+                // O CEP não vai para o log (I8.2, #1661): basta o status para diagnosticar.
+                _logger.LogDebug("ViaCEP retornou {Status}", (int)resp.StatusCode);
                 return null;
             }
 
@@ -70,17 +69,17 @@ public sealed class ViaCepLookupClient : ICepLookupClient
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             // Timeout do HttpClient → OperationCanceledException sem ct cancelado.
-            _logger.LogDebug("ViaCEP timeout para cep={Cep}", cep);
+            _logger.LogDebug("ViaCEP timeout");
             return null;
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogDebug(ex, "ViaCEP HTTP falhou para cep={Cep}", cep);
+            _logger.LogDebug("ViaCEP HTTP falhou: {Status}", ex.StatusCode);
             return null;
         }
         catch (Exception ex) when (ex is System.Text.Json.JsonException or InvalidOperationException)
         {
-            _logger.LogDebug(ex, "ViaCEP JSON inválido para cep={Cep}", cep);
+            _logger.LogDebug("ViaCEP JSON inválido: {Excecao}", ex.GetType().Name);
             return null;
         }
     }
