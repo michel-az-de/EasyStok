@@ -16,6 +16,9 @@ public interface ICardapioItemRepository
 
     Task<IReadOnlyList<CardapioItem>> GetVisiveisDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default);
     Task<IReadOnlyList<CardapioItem>> GetTodosDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default);
+
+    /// <summary>Só os itens tirados do cardápio (arquivados), com a mesma carga de <see cref="GetTodosDoStorefrontAsync"/> (#1575).</summary>
+    Task<IReadOnlyList<CardapioItem>> GetArquivadosDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default);
     Task AddAsync(CardapioItem item, CancellationToken ct = default);
     Task UpdateAsync(CardapioItem item, CancellationToken ct = default);
 

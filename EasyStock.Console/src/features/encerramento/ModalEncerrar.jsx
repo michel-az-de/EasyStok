@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { Modal } from '../../componentes/Modal'
 import { FolhaImpressao } from '../../componentes/FolhaImpressao'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { canalDaConversa } from '../../dominio/canal'
 import { conversaEncerrada } from '../../dominio/conversa'
 import { pedidoEncerrado } from '../../dominio/pedido'
@@ -58,9 +59,20 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   const resumo = useMemo(() => {
     if (!conversa) return null
     if (leitura) return (conversa.atendimentos ?? []).find((a) => a.numero === numeroAtendimento) ?? null
-    if (encerrada) return conversa.atendimentos.at(-1) ?? null
+    // #1586: conversa da API não guarda `atendimentos`; encerrada por fora, não há resumo a ler.
+    if (encerrada) return conversa.atendimentos?.at(-1) ?? null
     return montarResumoAtendimento(conversa, cardapio, agora, rascunho)
   }, [conversa, leitura, numeroAtendimento, encerrada, cardapio, agora, rascunho])
+
+  // #1586: no modo API avaliação e anotação não gravam (só avisariam na faixa): não aparecem.
+  const disponivel = useAcaoDisponivel()
+  const guardaAvaliacaoEAnotacao = ['salvarAvaliacaoCliente', 'salvarAutoavaliacao', 'salvarAnotacaoFechamento'].every(disponivel)
+  // #1586: Encerrar trava no primeiro toque e espera a resposta; o erro aparece aqui dentro,
+  // porque a faixa do rodapé fica atrás da cortina.
+  const emVoo = useRef(false)
+  const despedidaJaSaiu = useRef(false)
+  const [encerrandoAgora, setEncerrandoAgora] = useState(false)
+  const [erroAoEncerrar, setErroAoEncerrar] = useState(null)
 
   if (!conversaId || !conversa || !resumo) return null
 
@@ -77,16 +89,35 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   const avisoEmailLigado = Boolean(conversa.cliente?.avisos?.email)
   const avisoSmsLigado = Boolean(conversa.cliente?.avisos?.sms)
 
-  const clicarEncerrar = () => {
-    if (aguardandoPagamento) {
-      cancelarPedido(conversa.id, `Cancelei o pedido ${pedido.numero}. Qualquer coisa, é só chamar.`)
+  const clicarEncerrar = async () => {
+    if (emVoo.current) return
+    emVoo.current = true
+    setEncerrandoAgora(true)
+    setErroAoEncerrar(null)
+    try {
+      // Na demonstração as duas ações são síncronas e não devolvem nada: segue como sucesso.
+      const cancelamento = aguardandoPagamento
+        ? await cancelarPedido(conversa.id, `Cancelei o pedido ${pedido.numero}. Qualquer coisa, é só chamar.`)
+        : null
+      const resultado = await encerrarComResumo(conversa.id, agora, {
+        enviarMensagem: enviarMensagem && !despedidaJaSaiu.current,
+        textoMensagem,
+        avisoEmail: avisoEmailLigado,
+        avisoSms: avisoSmsLigado,
+        pedidoCancelado: cancelamento?.ok === true,
+      })
+      if (resultado?.despedidaSaiu) despedidaJaSaiu.current = true
+      if (resultado?.erro) {
+        setErroAoEncerrar(despedidaJaSaiu.current
+          ? `${resultado.erro} A despedida já foi enviada: tentar de novo não manda outra.`
+          : resultado.erro)
+      }
+    } catch (erro) {
+      setErroAoEncerrar(erro.message || 'Não foi possível encerrar. Tente de novo.')
+    } finally {
+      emVoo.current = false
+      setEncerrandoAgora(false)
     }
-    encerrarComResumo(conversa.id, agora, {
-      enviarMensagem,
-      textoMensagem,
-      avisoEmail: avisoEmailLigado,
-      avisoSms: avisoSmsLigado,
-    })
   }
 
   const propsDaFolha = {
@@ -103,12 +134,15 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
         aoFechar={aoFechar}
         rodape={(
           <>
+            {erroAoEncerrar && <p className={css.erroAoEncerrar} role="alert">{erroAoEncerrar}</p>}
             <Botao variante="texto" onClick={aoFechar}>Voltar</Botao>
             <Botao variante="secundario" icone="printer" onClick={() => window.print()}>
               Exportar PDF
             </Botao>
             {!encerrada && (
-              <Botao variante="primario" icone="log-out" onClick={clicarEncerrar}>Encerrar</Botao>
+              <Botao variante="primario" icone="log-out" disabled={encerrandoAgora} onClick={clicarEncerrar}>
+                {encerrandoAgora ? 'Encerrando…' : 'Encerrar'}
+              </Botao>
             )}
           </>
         )}
@@ -151,6 +185,7 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
             <FolhaResumo
               {...propsDaFolha}
               editavel={!encerrada}
+              comAvaliacaoEAnotacao={guardaAvaliacaoEAnotacao}
               aoMarcarAvaliacaoCliente={(valor) => salvarAvaliacaoCliente(conversa.id, valor)}
               aoMarcarAutoavaliacao={(valor) => salvarAutoavaliacao(conversa.id, valor)}
               aoMudarAnotacao={(texto) => salvarAnotacaoFechamento(conversa.id, { texto })}
@@ -160,7 +195,7 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
         </div>
       </Modal>
       <FolhaImpressao>
-        <FolhaResumo {...propsDaFolha} editavel={false} impresso />
+        <FolhaResumo {...propsDaFolha} editavel={false} impresso comAvaliacaoEAnotacao={guardaAvaliacaoEAnotacao} />
       </FolhaImpressao>
     </>
   )

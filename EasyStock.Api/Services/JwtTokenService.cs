@@ -34,6 +34,15 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
         foreach (var permissao in resultado.Permissoes.Distinct())
             claims.Add(new Claim("permissao", permissao.ToString()));
 
+        if (resultado.PermissoesExplicitas)
+            claims.Add(new Claim("permissoesExplicitas", "true"));
+
+        if (resultado.SessaoPersistente)
+            claims.Add(new Claim("sessaoPersistente", "true"));
+
+        if (!string.IsNullOrWhiteSpace(resultado.ModuloInicial))
+            claims.Add(new Claim("moduloInicial", resultado.ModuloInicial));
+
         var agora = DateTime.UtcNow;
         var tokenDescriptor = new SecurityTokenDescriptor
         {

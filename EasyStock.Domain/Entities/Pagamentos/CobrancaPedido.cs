@@ -32,6 +32,8 @@ public class CobrancaPedido
     public Guid Id { get; private set; }
     public Guid EmpresaId { get; private set; }
     public Guid PedidoId { get; private set; }
+    public bool Complementar { get; private set; }
+    public void MarcarComplementar() => Complementar = true;
 
     /// <summary>Conversa de atendimento onde o link foi enviado; null para pedido do site.</summary>
     public Guid? ConversaId { get; private set; }

@@ -36,7 +36,8 @@ public class MobileE2EFixture : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_mobile_e2e")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                // O StartupHardening recusa a dupla postgres/postgres; container descartavel.
+                .WithPassword("senha-de-teste-descartavel")
                 .Build();
             await _pg.StartAsync();
             IsAvailable = true;
@@ -50,6 +51,12 @@ public class MobileE2EFixture : IAsyncLifetime
         Factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(b =>
             {
+                // UseSetting entra antes do Program ler a configuracao; o ConfigureAppConfiguration
+                // chega tarde demais para o DatabaseProviderResolver do startup e a API nem subia
+                // ("PostgreSQL configurado mas indisponivel"). Mesmo padrao do
+                // PedidoConversaConcorrenciaTests.
+                b.UseSetting("Database:Provider", "PostgreSql");
+                b.UseSetting("ConnectionStrings:DefaultConnection", _pg!.GetConnectionString());
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>

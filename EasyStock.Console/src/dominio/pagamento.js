@@ -34,13 +34,16 @@ export const pagamentosDoPedido = (pedido) => pedido?.pagamentosApi ?? [
   ...(pedido?.cobranca?.pagaEm ? [registroDaCobranca(pedido.cobranca)] : []),
 ]
 
+// O pagamento que "Desfazer o último" mostra e manda: a tela e a chamada leem daqui.
+export const ultimoPagamentoApi = (pedido) => pedido?.pagamentosApi?.toSorted((a, b) => b.em - a.em)[0] ?? null
+
 // Dinheiro que entrou no pedido.
 export const totalPago = (pedido) =>
   pagamentosDoPedido(pedido).reduce((soma, p) => soma + p.valor, 0)
 
 // Parte da comanda já quitada por cobrança paga.
 const totalCoberto = (pedido) =>
-  pagamentosDoPedido(pedido).reduce((soma, p) => soma + p.coberto, 0)
+  pedido?.alocadoApi ?? pagamentosDoPedido(pedido).reduce((soma, p) => soma + p.coberto, 0)
 
 // Falta pagar do PEDIDO inteiro (comanda menos o que as cobranças pagas
 // quitaram), diferente do `faltaPagar` de dominio/cobranca.js, que é só a
@@ -54,7 +57,7 @@ const totalCoberto = (pedido) =>
 // um valor que o cliente não deve (achado ao validar na tela, registro 107).
 export function faltaPagar(pedido, cardapio) {
   if (!pedido) return 0
-  const totalLiquido = totalDoPedido(pedido, cardapio) - (pedido.valorDesconto ?? 0)
+  const totalLiquido = (pedido.totalApi ?? totalDoPedido(pedido, cardapio)) - (pedido.valorDesconto ?? 0)
   return Math.max(totalLiquido - totalCoberto(pedido), 0)
 }
 

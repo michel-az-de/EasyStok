@@ -29,7 +29,7 @@ import css from './cozinha.module.css'
 export function CartaoCozinha({
   conversa, janelas, cardapio, linhas, agora, linhaFiltro, acoes, destacado = false,
   recusa = null, assentando = false, aCaminho = false, pedindoEntregador = false, aoPedirEntregador,
-  opcoesDespacho,
+  opcoesDespacho, retomarFoco = false, aoConsumirFoco,
 }) {
   const { pedido } = conversa
   const proximo = proximoPasso(pedido.estado)
@@ -56,8 +56,11 @@ export function CartaoCozinha({
   // arrasta pelo teclado seguir de onde parou.
   const alcaRef = useRef(null)
   useEffect(() => {
-    if (assentando) alcaRef.current?.focus({ preventScroll: true })
-  }, [assentando])
+    if (retomarFoco && document.activeElement === document.body && !document.querySelector('dialog[open]')) {
+      alcaRef.current?.focus({ preventScroll: true })
+    }
+    if (retomarFoco) aoConsumirFoco?.()
+  }, [retomarFoco, aoConsumirFoco])
 
   const classes = [
     css.cartao, css['cor-' + situacaoDoCartao(pedido, janelas, agora).chave],

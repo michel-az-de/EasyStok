@@ -9,6 +9,7 @@ public class NotificadorServiceRemetenteTests
     [InlineData(TipoEventoNotificacao.IncidenteSistema, OrigemRemetente.Plataforma)]
     [InlineData(TipoEventoNotificacao.FaturaVencida, OrigemRemetente.Plataforma)]
     [InlineData(TipoEventoNotificacao.PedidoEntregue, OrigemRemetente.Loja)]
+    [InlineData(TipoEventoNotificacao.PedidoReagendado, OrigemRemetente.Loja)]
     public async Task OutboxNasceComORemetenteDoTipo(TipoEventoNotificacao tipo, OrigemRemetente esperado)
     {
         var f = new NotificadorServiceFixture(CanalNotificacao.Email);

@@ -1,4 +1,5 @@
 using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos;
 using EasyStock.Domain.Sales;
@@ -32,7 +33,8 @@ public class RegistrarPagamentoPedidoUseCase(
     ILogger<RegistrarPagamentoPedidoUseCase> logger,
     CalculadoraInicioPrevistoPedido inicioPrevisto,
     QuitacaoPedido quitacao,
-    ICaixaRepository? caixaRepo = null)
+    ICaixaRepository? caixaRepo = null,
+    SaldoFinanceiroPedido? saldos = null)
 {
     private static readonly HashSet<string> MetodosValidos = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -45,6 +47,8 @@ public class RegistrarPagamentoPedidoUseCase(
         UseCaseGuards.EnsureNotEmpty(cmd.PedidoId, "PedidoId");
         if (cmd.Valor <= 0)
             throw new UseCaseValidationException("Valor do pagamento deve ser maior que zero.");
+        if (cmd.Valor != decimal.Round(cmd.Valor, 2))
+            throw new UseCaseValidationException("Valor do pagamento deve ter até duas casas decimais.");
         // Teto de sanidade anti-fat-finger (espelha LimitesProduto.ValorMaximo). NAO bloqueia
         // overpay (pagar acima do pendente e cenario real: gorjeta/arredondamento) -- o aviso
         // de overpay e so no frontend (Detail.cshtml). QA v1.10 r3 BUG-004 (issue 607).
@@ -71,8 +75,9 @@ public class RegistrarPagamentoPedidoUseCase(
                 && StatusPedidoMapper.TryParse(pedido.Status, out var statusPedido)
                 && !PedidoStateMachine.AceitaPagamento(statusPedido))
             {
-                throw new UseCaseValidationException(
-                    "Não é possível registrar pagamento: o pedido ainda não foi confirmado/aprovado.");
+                throw new UseCaseValidationException(statusPedido == StatusPedido.Cancelado
+                    ? "Não é possível registrar pagamento: o pedido está cancelado."
+                    : "Não é possível registrar pagamento: o pedido ainda não foi confirmado/aprovado.");
             }
 
             // issue 962 (BUG-002 do QA): o guard client-side do cockpit e' sobre dado carregado —
@@ -80,7 +85,8 @@ public class RegistrarPagamentoPedidoUseCase(
             // superpagamento acidental, e o servidor aceitava por design (#607) sem distinguir
             // deliberado de acidental. Overpay so passa com PermitirExcedente=true, enviado
             // SOMENTE pelo Detail.cshtml (onde o aviso de gorjeta/arredondamento ja existe).
-            var pendente = Math.Max(0m, pedido.Total.Valor - pedido.TotalPago);
+            var alocado = saldos is null ? pedido.TotalPago : (await saldos.ConsultarAsync(pedido, token)).Alocado;
+            var pendente = Math.Max(0m, pedido.Total.Valor - alocado);
             if (cmd.Valor > pendente && !cmd.PermitirExcedente)
             {
                 throw new UseCaseValidationException(
@@ -168,8 +174,8 @@ public class RegistrarPagamentoPedidoUseCase(
             // Não reabre caixa fechado (replica regra de AbrirCaixaUseCase). Pagamentos
             // retroativos em dia fechado ficam apenas como PedidoPagamento; aparecem
             // na agregação do dia via GetTotalPagamentosPedidosDoDiaAsync.
-            var fechamento = await caixaRepo.GetFechamentoDoDiaAsync(cmd.EmpresaId, data, pedido.LojaId);
-            if (fechamento != null)
+            // #1598: vale o fechamento da loja do pedido ou o da empresa (CaixaFechadoGuard).
+            if (await CaixaFechadoGuard.DiaFechadoAsync(caixaRepo, cmd.EmpresaId, pagoEm, pedido.LojaId))
             {
                 logger.LogInformation("Caixa de {Data} já fechado; pagamento {PedidoId} não dispara abertura automática.", data, pedido.Id);
                 return;
@@ -177,6 +183,16 @@ public class RegistrarPagamentoPedidoUseCase(
 
             var movimentos = await caixaRepo.GetMovimentosDoDiaAsync(cmd.EmpresaId, data, pedido.LojaId);
             if (movimentos.Any(m => m.Tipo == "abertura")) return;
+
+            // #1506: sessao de dia anterior ainda aberta: nao abre o dia por cima (a antiga ficaria
+            // orfa, sem fechamento). O pagamento ja esta gravado e entra no caixa do dia dele.
+            var pendente = await caixaRepo.GetAberturaPendenteAsync(cmd.EmpresaId, pedido.LojaId);
+            if (pendente != null && HorarioBrasil.DataOperacional(pendente.DataMovimento) < data)
+            {
+                logger.LogInformation("Caixa de {Pendente} ainda aberto; pagamento {PedidoId} não abre o caixa de {Data}.",
+                    HorarioBrasil.DataOperacional(pendente.DataMovimento), pedido.Id, data);
+                return;
+            }
 
             var abertura = MovimentoCaixa.Criar(cmd.EmpresaId, "abertura", 0m, pagoEm, pedido.LojaId);
             abertura.Descricao = "Abertura automática no primeiro pagamento de pedido do dia.";

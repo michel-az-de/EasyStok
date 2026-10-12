@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import { Bloco } from '../../componentes/Bloco'
 import { Botao } from '../../componentes/Botao'
 import { partesDoEndereco } from '../../dominio/formato'
@@ -22,6 +23,28 @@ export function BlocoEnderecoCapturado({
   const rotuloDistancia = faixasDeDistancia == null ? null
     : faixasDeDistancia > LONGE_DEMAIS_PARA_CONTAR ? 'bem longe da área atendida'
       : `a ${faixasDeDistancia} ${faixasDeDistancia === 1 ? 'faixa de CEP' : 'faixas de CEP'} da área`
+
+  // #1586: "Confirmar e cadastrar" espera a resposta e trava o segundo toque. A recusa fica
+  // aqui, presa ao endereço que a recebeu (o bloco não remonta ao trocar de conversa). Na
+  // demonstração a ação é síncrona e o `await` segue como sucesso.
+  const [confirmando, setConfirmando] = useState(false)
+  const [recusa, setRecusa] = useState(null)
+  const emVoo = useRef(false)
+  const confirmar = async () => {
+    if (emVoo.current) return
+    emVoo.current = true
+    setConfirmando(true)
+    setRecusa(null)
+    try {
+      const resultado = await aoConfirmar()
+      if (resultado?.erro) setRecusa({ endereco, texto: resultado.erro })
+    } catch (falha) {
+      setRecusa({ endereco, texto: falha.message || 'Não foi possível cadastrar. Tente de novo.' })
+    } finally {
+      emVoo.current = false
+      setConfirmando(false)
+    }
+  }
 
   return (
     <Bloco titulo="Endereço capturado" destaque>
@@ -51,8 +74,9 @@ export function BlocoEnderecoCapturado({
           <p className={css.rodapeBloco} style={{ marginTop: 0 }}>
             Confira antes de confirmar. Depois vira o endereço de entrega.
           </p>
-          <Botao largo variante="primario" onClick={aoConfirmar}>
-            Confirmar e cadastrar
+          {recusa?.endereco === endereco && <p className={css.recusaEndereco} role="alert">{recusa.texto}</p>}
+          <Botao largo variante="primario" disabled={confirmando} onClick={confirmar}>
+            {confirmando ? 'Cadastrando…' : 'Confirmar e cadastrar'}
           </Botao>
         </>
       )}

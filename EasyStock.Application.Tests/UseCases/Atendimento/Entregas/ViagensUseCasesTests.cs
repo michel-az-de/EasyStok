@@ -11,6 +11,81 @@ namespace EasyStock.Application.Tests.UseCases.Atendimento.Entregas;
 /// <summary>S44: montar a viagem, bloqueio de cliente, retrato e rota no Maps.</summary>
 public class ViagensUseCasesTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Viagem_usa_endereco_do_pedido_com_fallback_apenas_para_legado(bool legado)
+    {
+        var pedido = Pedido.Criar(_empresaId);
+        pedido.ClienteId = Guid.NewGuid();
+        pedido.EnderecoEntrega = legado ? null : "Rua da encomenda, 42";
+        _pedidos.ListarPorIdsAsync(_empresaId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([pedido]);
+        _clientes.ListarPorIdsAsync(_empresaId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns([new Cliente { Id = pedido.ClienteId.Value, Endereco = "Rua do cadastro, 99" }]);
+        var viagem = Viagem.Criar(_empresaId, Agora);
+        viagem.IncluirParada(pedido.Id, false);
+        _viagens.ObterAsync(_empresaId, viagem.Id, Arg.Any<CancellationToken>()).Returns(viagem);
+        var dto = await new ObterViagemUseCase(_viagens, _pedidos, _clientes).ExecuteAsync(_empresaId, viagem.Id);
+        dto.Paradas.Single().Endereco.Should().Be(legado ? "Rua do cadastro, 99" : "Rua da encomenda, 42");
+        dto.RotaUrl.Should().Contain(Uri.EscapeDataString(legado ? "Rua do cadastro, 99" : "Rua da encomenda, 42"));
+    }
+
+    // #1564: a lista monta todas as paradas com uma consulta de pedidos e uma de clientes, e não uma por parada.
+    [Fact]
+    public async Task Lista_carrega_pedidos_e_clientes_em_lote()
+    {
+        var fulana = Cliente.Criar(_empresaId, "Fulana");
+        fulana.Endereco = "Rua do cadastro, 99";
+        var comEndereco = Pedido.Criar(_empresaId, fulana);
+        comEndereco.EnderecoEntrega = "Rua da encomenda, 42";
+        var legado = Pedido.Criar(_empresaId, fulana);
+        var semCliente = Pedido.Criar(_empresaId);
+        semCliente.ClienteNome = "Balcão";
+        var sumido = Guid.NewGuid();
+        var primeira = Viagem.Criar(_empresaId, Agora);
+        primeira.IncluirParada(comEndereco.Id, false);
+        primeira.IncluirParada(legado.Id, false);
+        var segunda = Viagem.Criar(_empresaId, Agora);
+        segunda.IncluirParada(semCliente.Id, false);
+        segunda.IncluirParada(sumido, false);
+        var vazia = Viagem.Criar(_empresaId, Agora);
+        _viagens.ListarAsync(_empresaId, null, ListarViagensUseCase.LimitePadrao, Arg.Any<CancellationToken>())
+            .Returns([primeira, segunda, vazia]);
+        IReadOnlyCollection<Guid>? pedidosPedidos = null, clientesPedidos = null;
+        _pedidos.ListarPorIdsAsync(_empresaId, Arg.Do<IReadOnlyCollection<Guid>>(ids => pedidosPedidos = ids), Arg.Any<CancellationToken>())
+            .Returns([comEndereco, legado, semCliente]);
+        _clientes.ListarPorIdsAsync(_empresaId, Arg.Do<IReadOnlyCollection<Guid>>(ids => clientesPedidos = ids), Arg.Any<CancellationToken>())
+            .Returns([fulana]);
+
+        var lista = await new ListarViagensUseCase(_viagens, new ObterViagemUseCase(_viagens, _pedidos, _clientes))
+            .ExecuteAsync(_empresaId, null);
+
+        lista.Select(v => v.Id).Should().Equal(primeira.Id, segunda.Id, vazia.Id);
+        lista[0].Paradas.Select(p => (p.PedidoId, p.ClienteNome, p.Endereco)).Should().Equal(
+            (comEndereco.Id, "Fulana", "Rua da encomenda, 42"), (legado.Id, "Fulana", "Rua do cadastro, 99"));
+        lista[1].Paradas.Select(p => (p.PedidoId, p.ClienteNome, p.Endereco)).Should().Equal(
+            (semCliente.Id, "Balcão", (string?)null), (sumido, (string?)null, (string?)null));
+        lista[2].Paradas.Should().BeEmpty();
+        pedidosPedidos.Should().BeEquivalentTo([comEndereco.Id, legado.Id, semCliente.Id, sumido]);
+        clientesPedidos.Should().Equal(fulana.Id);
+        await _pedidos.Received(1).ListarPorIdsAsync(_empresaId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>());
+        await _clientes.Received(1).ListarPorIdsAsync(_empresaId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>());
+        await _pedidos.DidNotReceive().GetByIdAsync(Arg.Any<Guid>(), Arg.Any<Guid>());
+        await _clientes.DidNotReceive().GetByIdAsync(Arg.Any<Guid>(), Arg.Any<Guid>());
+    }
+
+    [Fact]
+    public async Task Viagem_sem_parada_nao_consulta_pedido_nem_cliente()
+    {
+        var viagem = Viagem.Criar(_empresaId, Agora);
+        _viagens.ObterAsync(_empresaId, viagem.Id, Arg.Any<CancellationToken>()).Returns(viagem);
+
+        (await new ObterViagemUseCase(_viagens, _pedidos, _clientes).ExecuteAsync(_empresaId, viagem.Id)).Paradas.Should().BeEmpty();
+
+        _pedidos.ReceivedCalls().Should().BeEmpty();
+        _clientes.ReceivedCalls().Should().BeEmpty();
+    }
+
     private static readonly DateTime Agora = new(2026, 9, 30, 18, 0, 0, DateTimeKind.Utc);
 
     private readonly Guid _empresaId = Guid.NewGuid();

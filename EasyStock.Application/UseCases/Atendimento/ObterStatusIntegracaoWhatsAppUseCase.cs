@@ -5,8 +5,8 @@ namespace EasyStock.Application.UseCases.Atendimento;
 public sealed record ObterStatusIntegracaoWhatsAppQuery(Guid EmpresaId);
 
 /// <summary>
-/// WebhookVerificadoEm e UltimaMensagemRecebidaEm ainda nao tem onde ser gravados (S03): sempre
-/// nulos ate la, como a spec de S01 prevê.
+/// WebhookVerificadoEm e UltimaMensagemRecebidaEm vêm de <c>ConfiguracaoAtendimento</c>; a última mensagem é
+/// gravada pelo webhook a cada entrada (#1474). Nulos enquanto a empresa não tem configuração gravada.
 /// </summary>
 public sealed record StatusIntegracaoWhatsAppDto(
     string? PhoneNumberId,
@@ -19,7 +19,8 @@ public sealed record StatusIntegracaoWhatsAppDto(
 /// </summary>
 public sealed class ObterStatusIntegracaoWhatsAppUseCase(
     ITenantFeatureFlagRepository featureFlagRepository,
-    IEmpresaRepository empresaRepository)
+    IEmpresaRepository empresaRepository,
+    IConfiguracaoAtendimentoRepository configuracaoRepository)
 {
     public async Task<StatusIntegracaoWhatsAppDto?> ExecuteAsync(
         ObterStatusIntegracaoWhatsAppQuery query, CancellationToken ct = default)
@@ -29,9 +30,10 @@ public sealed class ObterStatusIntegracaoWhatsAppUseCase(
             return null;
 
         var empresa = await empresaRepository.GetByIdAsync(query.EmpresaId);
+        var configuracao = await configuracaoRepository.GetByEmpresaIdAsync(query.EmpresaId);
         return new StatusIntegracaoWhatsAppDto(
             PhoneNumberId: empresa?.WhatsAppPhoneNumberId,
-            WebhookVerificadoEm: null,
-            UltimaMensagemRecebidaEm: null);
+            WebhookVerificadoEm: configuracao?.WebhookVerificadoEm,
+            UltimaMensagemRecebidaEm: configuracao?.UltimaMensagemRecebidaEm);
     }
 }

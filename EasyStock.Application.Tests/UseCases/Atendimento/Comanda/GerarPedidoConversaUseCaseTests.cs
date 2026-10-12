@@ -90,8 +90,7 @@ public class GerarPedidoConversaUseCaseTests
             UseCase = new GerarPedidoConversaUseCase(
                 ConversaRepo, clienteRepo,
                 Checkout.CriarPedidoAtendimento(ConversaRepo, clienteRepo, Uow, Pedidos),
-                gerar, trocar, aviso, TimeProvider.System,
-                NullLogger<GerarPedidoConversaUseCase>.Instance);
+                gerar, trocar, aviso, TimeProvider.System);
         }
 
         public GerarPedidoConversaInput Input(Guid? empresaId = null, string? forma = null) => new(

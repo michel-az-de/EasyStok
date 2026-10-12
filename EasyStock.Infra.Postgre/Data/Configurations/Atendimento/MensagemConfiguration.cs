@@ -17,6 +17,8 @@ public class MensagemConfiguration : IEntityTypeConfiguration<Mensagem>
         builder.Property(m => m.TipoConteudo).HasConversion<int>().IsRequired();
         builder.Property(m => m.Texto).HasMaxLength(Mensagem.TextoTamanhoMaximo);
         builder.Property(m => m.Assunto).HasMaxLength(Mensagem.AssuntoTamanhoMaximo); // #1432
+        builder.Property(m => m.ModeloJson).HasColumnType("jsonb");
+        builder.Ignore(m => m.Modelo);
         builder.Property(m => m.BotaoId).HasMaxLength(Mensagem.BotaoIdTamanhoMaximo);
         builder.Property(m => m.Programada).HasDefaultValue(false);
         builder.Property(m => m.MidiaChave).HasMaxLength(Mensagem.MidiaChaveTamanhoMaximo);
@@ -51,6 +53,11 @@ public class MensagemConfiguration : IEntityTypeConfiguration<Mensagem>
         builder.HasIndex(m => m.ProximoReenvioEm)
             .HasFilter("\"ProximoReenvioEm\" IS NOT NULL")
             .HasDatabaseName("ix_atendimento_mensagens_proximo_reenvio");
+
+        // #1599: a varredura de intenção de modelo presa só procura modelo ainda pendente (StatusMensagem.Pendente = 1).
+        builder.HasIndex(m => m.EnviadaEm)
+            .HasFilter("\"ModeloJson\" IS NOT NULL AND \"Status\" = 1")
+            .HasDatabaseName("ix_atendimento_mensagens_modelo_pendente");
 
         // Idempotencia do webhook: o mesmo wamid nao entra duas vezes na mesma empresa.
         builder.HasIndex(m => new { m.EmpresaId, m.ExternoId })

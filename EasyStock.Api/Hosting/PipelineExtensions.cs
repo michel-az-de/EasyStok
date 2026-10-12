@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Middleware;
+using EasyStock.Api.Observability;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Infra.Async.Storage;
@@ -53,12 +54,11 @@ public static class PipelineExtensions
         // Correlation ID propagation
         app.Use(async (context, next) =>
         {
-            var correlationId = context.Request.Headers["X-Correlation-Id"].FirstOrDefault();
-            if (string.IsNullOrEmpty(correlationId))
-                correlationId = Guid.NewGuid().ToString();
+            var correlationId = CorrelationIdHeader.Resolver(
+                context.Request.Headers[CorrelationIdHeader.Nome].FirstOrDefault());
 
             context.Items["CorrelationId"] = correlationId;
-            context.Response.Headers["X-Correlation-Id"] = correlationId;
+            context.Response.Headers[CorrelationIdHeader.Nome] = correlationId;
 
             using (LogContext.PushProperty("CorrelationId", correlationId))
             {
@@ -417,6 +417,12 @@ public static class PipelineExtensions
         .Add("/api/pedidos")
         // S23 (#1137): producao em porcoes cria lote + entrada; retry nao pode duplicar.
         .Add("/api/producao")
+        // M2.2 (#1491): producao do dia pelo console (lote + entrada); retry nao pode duplicar.
+        .Add("/api/atendimento/producao")
+        .Add("/api/atendimento/mensagens-programadas")
+        .Add("/api/atendimento/lembretes")
+        // #1540: sangria ou suprimento repetido depois de resposta perdida virava dois lançamentos.
+        .Add("/api/caixa/movimentos")
         // S20: retorno do consumidor da fila de impressão (impressa/falhou); opt-in por header.
         .Add("/api/impressao");
 }

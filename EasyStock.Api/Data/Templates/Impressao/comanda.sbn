@@ -1,0 +1,12 @@
+{{ capture lista }}<div class="klista">{{ for g in m.grupos }}<div class="grp"><span class="rot">{{ g.titulo }}</span><span class="rot">{{ g.contagem }}</span></div>{{ for i in g.itens }}<div class="kit"><span class="q">{{ i.quantidade }}</span><span class="n">{{ i.nome }}{{ if i.porcao }} <span class="un">· {{ i.porcao }}</span>{{ end }}{{ if i.molho }}<small>MOLHO: {{ i.molho }}</small>{{ end }}{{ if i.observacao }}<small class="barra">OBS: {{ i.observacao }}</small>{{ end }}</span><i class="chk"></i></div>{{ end }}{{ end }}</div>{{ end -}}
+{{ capture obs }}{{ if m.observacao }}<div class="sec"><span class="rot">Observação do pedido</span><p class="dado">{{ m.observacao }}</p></div>{{ end }}{{ end -}}
+{{ capture ass }}<div class="ass2"><div><span class="rot">Feito por</span><i></i></div><div><span class="rot">Embalado por</span><i></i></div></div>{{ end -}}
+{{ capture qr }}<div class="qrl"><div><h3>Código do pedido</h3><p>#{{ m.numero }}</p></div>{{ m.qr }}</div>{{ end -}}
+<article class="im {{ m.papel.classes }}">
+{{ if m.alergias }}<div class="alerta"><b>ALERGIA: {{ m.alergias }}</b><small>cadastro da cliente · confira todos os itens</small></div>{{ end }}
+<div class="kh"><div><span class="rot">Pedido</span>{{ if m.numero_dia }}<b>{{ m.numero_dia }}</b>{{ else }}<b class="cod">{{ m.numero }}</b>{{ end }}</div><div class="dir"><span class="rot">Pronto até · {{ m.prazo.data_longa }}</span><b>{{ m.prazo.pronto_ate }}</b></div></div>
+<p class="dado"><span class="selo">{{ m.prazo.selo }}</span> <b>{{ m.cliente }}</b> · entrega {{ m.prazo.hora_curta }} · {{ m.entrega }} · {{ m.total_linhas }}</p>
+{{ if m.papel.largo }}<div class="cols"><div class="folha">{{ lista }}</div><aside class="painel">{{ obs }}{{ ass }}{{ qr }}</aside></div>
+{{ else }}{{ lista }}{{ if m.observacao }}<div class="f">{{ obs }}</div>{{ end }}{{ ass }}<div class="f">{{ qr }}</div>
+{{ end }}<footer class="pe"><span>Solicitado {{ m.solicitado }}</span> · <span>#{{ m.numero }}</span> · <span>impresso {{ m.impresso }}</span></footer>
+</article>

@@ -35,6 +35,17 @@ public class ConfiguracaoAtendimento
 
     public int TempoPreparoPadraoMinutos { get; set; } = 60;
 
+    public const int SlaRespostaPadraoMinutos = 5;
+    public const int SlaRespostaMinimoMinutos = 1;
+    public const int SlaRespostaMaximoMinutos = 240;
+
+    /// <summary>
+    /// Prazo de primeira resposta da loja (#1427): minutos que o cliente pode esperar depois de falar por
+    /// último. Um só por loja, não por canal. Estourado, o cartão pisca no console e nasce o lembrete
+    /// <c>ClienteSemResposta</c>. Console e avaliador pausam a contagem fora do expediente.
+    /// </summary>
+    public int SlaRespostaMinutos { get; set; } = SlaRespostaPadraoMinutos;
+
     /// <summary>Carimbo do status de integração (S01/S03) — nulo até o webhook confirmar.</summary>
     public DateTime? WebhookVerificadoEm { get; set; }
     public DateTime? UltimaMensagemRecebidaEm { get; set; }
@@ -77,12 +88,16 @@ public class ConfiguracaoAtendimento
         string? mensagemForaArea,
         int? respiroMinutos,
         int? tempoPreparoPadraoMinutos,
-        bool? ativo)
+        bool? ativo,
+        int? slaRespostaMinutos = null)
     {
         if (respiroMinutos is < 0)
             throw new ArgumentOutOfRangeException(nameof(respiroMinutos), "RespiroMinutos não pode ser negativo.");
         if (tempoPreparoPadraoMinutos is <= 0)
             throw new ArgumentOutOfRangeException(nameof(tempoPreparoPadraoMinutos), "TempoPreparoPadraoMinutos deve ser maior que zero.");
+        if (slaRespostaMinutos is < SlaRespostaMinimoMinutos or > SlaRespostaMaximoMinutos)
+            throw new ArgumentOutOfRangeException(nameof(slaRespostaMinutos),
+                $"SlaRespostaMinutos deve ficar entre {SlaRespostaMinimoMinutos} e {SlaRespostaMaximoMinutos}.");
 
         if (!string.IsNullOrWhiteSpace(tom)) Tom = tom.Trim();
         if (nivelSugestao.HasValue) NivelSugestao = nivelSugestao.Value;
@@ -93,6 +108,7 @@ public class ConfiguracaoAtendimento
         if (respiroMinutos.HasValue) RespiroMinutos = respiroMinutos.Value;
         if (tempoPreparoPadraoMinutos.HasValue) TempoPreparoPadraoMinutos = tempoPreparoPadraoMinutos.Value;
         if (ativo.HasValue) Ativo = ativo.Value;
+        if (slaRespostaMinutos.HasValue) SlaRespostaMinutos = slaRespostaMinutos.Value;
         AlteradoEm = DateTime.UtcNow;
     }
 

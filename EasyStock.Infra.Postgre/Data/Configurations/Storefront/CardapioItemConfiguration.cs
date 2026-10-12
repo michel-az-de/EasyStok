@@ -28,6 +28,11 @@ public class CardapioItemConfiguration : IEntityTypeConfiguration<CardapioItem>
         builder.Property(c => c.Disponivel)
             .IsRequired()
             .HasDefaultValue(true);
+        // M1.2 (#1482): tirar arquiva (≠ ocultar do site); item novo em validação; novidade com prazo.
+        builder.Property(c => c.ArquivadoEm);
+        builder.Property(c => c.EmValidacao).IsRequired().HasDefaultValue(false);
+        builder.Property(c => c.NovidadeAte);
+        builder.Ignore(c => c.EstaArquivado);
 
         builder.Property(c => c.OrdemExibicao)
             .IsRequired()

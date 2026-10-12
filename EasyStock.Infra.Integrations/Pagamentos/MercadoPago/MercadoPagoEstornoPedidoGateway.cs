@@ -20,7 +20,7 @@ public sealed class MercadoPagoEstornoPedidoGateway(
         try
         {
             var r = await mercadoPago.EstornarAsync(pagamentoExternoId, valor, chaveIdempotencia, ct);
-            if (r.Status is "rejected" or "cancelled")
+            if (r.Status != "approved" || string.IsNullOrWhiteSpace(r.EstornoId) || r.Valor != valor)
             {
                 logger.LogWarning("MP recusou o estorno {Chave}: status {Status}.", chaveIdempotencia, r.Status);
                 return EstornoPedidoResult.Falha(CodigoRecusado);

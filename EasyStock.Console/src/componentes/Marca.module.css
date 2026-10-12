@@ -1,0 +1,4 @@
+.marca { display: inline-flex; align-items: center; gap: var(--e-2); flex: none; }
+.marca img { display: block; width: 120px; height: 80px; object-fit: contain; background: var(--branco); }
+.produto { font-family: var(--f-corpo); font-size: var(--t-micro); font-weight: 700; color: var(--tinta-2); }
+.compacta img { width: 66px; height: 44px; }

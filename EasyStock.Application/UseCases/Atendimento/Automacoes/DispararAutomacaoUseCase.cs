@@ -25,7 +25,8 @@ public enum ResultadoAutomacao
     SemConsentimento = 6,
     VariavelSemValor = 7,
     Falhou = 8,
-    ClienteBloqueado = 9
+    ClienteBloqueado = 9,
+    ConversaReaberta = 10
 }
 
 /// <summary>
@@ -80,6 +81,10 @@ public sealed class DispararAutomacaoUseCase(
         var clienteId = disparo.ClienteId ?? conversa.ClienteId;
         if (clienteId is { } bloqueavel && (await clientes.GetByIdAsync(disparo.EmpresaId, bloqueavel))?.Bloqueado == true)
             return Registrar(disparo, ResultadoAutomacao.ClienteBloqueado);
+
+        // O encerramento pode estar no outbox quando o operador reabre. Não despedir de uma conversa retomada.
+        if (disparo.Gatilho == GatilhoAutomacao.Encerramento && conversa.EstaAberta)
+            return Registrar(disparo, ResultadoAutomacao.ConversaReaberta);
 
         if (clienteId is { } c
             && !await politica.PodeEnviarAsync(disparo.EmpresaId, c, conversa.Canal, FinalidadeContato.Transacional, ct))

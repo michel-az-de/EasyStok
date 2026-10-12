@@ -1,168 +1,270 @@
-// Casca da Gestão (rodada 13, issue das 5 frentes paralelas): o lugar comum
-// para Produção e cardápio, Caixa, Janelas de entrega, Fidelidade e cupons e
-// Entregas e integrações. Cada aba mora no próprio arquivo (uma por frente);
-// este componente só monta o tablist e lembra qual aba estava aberta.
-//
-// Mesmo molde de ModalAutomacoes: `Modal` de sempre, auto-suficiente (só
-// `aoFechar`), estado do modal em `app/App.jsx`.
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
+import { Icone } from '../../componentes/Icone'
+import { IconeDoModulo } from '../../componentes/IconeDoModulo'
 import { Modal } from '../../componentes/Modal'
+import { Vazio } from '../../componentes/Vazio'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { MODULOS, TELA_AJUSTE, hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
+import { HASH_HALL, ROTA_PRINCIPAL, rotaDaHash } from '../../dominio/rota'
 import { AbaProducao } from './producao/AbaProducao'
 import { AbaCaixa } from './caixa/AbaCaixa'
+import { AbaCaixaApi } from './caixa/AbaCaixaApi'
+import { PainelFinanceiro } from './financeiro/PainelFinanceiro'
 import { AbaJanelas } from './janelas/AbaJanelas'
 import { AbaFidelidade } from './fidelidade/AbaFidelidade'
 import { AbaIntegracoes } from './integracoes/AbaIntegracoes'
-import { SecaoWhatsApp } from './integracoes/SecaoWhatsApp'
-import { SecaoEmail } from './integracoes/SecaoEmail'
 import { AbaAtendimento } from './atendimento/AbaAtendimento'
+import { AbaImpressao } from './impressao/AbaImpressao'
+import { AbaRespostas } from './respostas/AbaRespostas'
+import { TelaCanais } from './canais/TelaCanais'
+import { AbaCardapioApi } from './cardapio/AbaCardapioApi'
+import { AbaCategoriasApi } from './cardapio/AbaCategoriasApi'
+import { AbaEstoqueDoDiaApi } from './producao/AbaEstoqueDoDiaApi'
+import { AbaProducaoDoDiaApi } from './producao/AbaProducaoDoDiaApi'
+import { AbaInsumosApi } from './producao/AbaInsumosApi'
+import { AbaReceitasApi } from './producao/AbaReceitasApi'
+import { AbaCalculadoraApi } from './producao/AbaCalculadoraApi'
+import { AbaPlanejamentoApi } from './producao/AbaPlanejamentoApi'
+import { AbaPerdasApi } from './producao/AbaPerdasApi'
 import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
 
-const ABAS_DEMONSTRACAO = [
-  { id: 'producao', rotulo: 'Produção e cardápio' },
-  { id: 'caixa', rotulo: 'Caixa' },
-  { id: 'janelas', rotulo: 'Janelas de entrega' },
-  { id: 'fidelidade', rotulo: 'Fidelidade e cupons' },
-  { id: 'integracoes', rotulo: 'Entregas e integrações' },
-]
+function navegarAbas(evento, itens, indice, escolher, botoes, vertical = false) {
+  const anterior = vertical ? 'ArrowUp' : 'ArrowLeft'
+  const proxima = vertical ? 'ArrowDown' : 'ArrowRight'
+  let destino
+  if (evento.key === anterior) destino = (indice - 1 + itens.length) % itens.length
+  else if (evento.key === proxima) destino = (indice + 1) % itens.length
+  else if (evento.key === 'Home') destino = 0
+  else if (evento.key === 'End') destino = itens.length - 1
+  else return
+  evento.preventDefault()
+  const item = itens[destino]
+  escolher(item)
+  botoes.current[item.id]?.focus({ preventScroll: true })
+  botoes.current[item.id]?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+}
 
-// Modo API (F02): a aba Atendimento é a única que já grava no EasyStok, por isso vem
-// primeiro. No modo demonstração ela não aparece (não há expediente nem configuração).
-const ABAS_API = [{ id: 'atendimento', rotulo: 'Atendimento' }, ...ABAS_DEMONSTRACAO]
+// A janela e as rotas usam o mesmo catálogo, as mesmas permissões e o mesmo
+// PainelDeAjuste. Trocar uma aba aqui mantém a conversa e o pedido montados.
+export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, focoInicial = null, janelasApi = null, avisosApi = null, renderizarEditorCardapio }) {
+  const { fonteApi } = useAtendimento()
+  const { permite } = useAcessoModulos()
+  const areas = useMemo(() => MODULOS
+    .filter((modulo) => permite(modulo.id))
+    .map((modulo) => ({ ...modulo, telas: telasDoMenu(modulo, { fonteApi }).filter((tela) => tela.tipo === TELA_AJUSTE) }))
+    .filter((modulo) => modulo.telas.length > 0), [fonteApi, permite])
+  const [abaAtiva, setAbaAtiva] = useState(abaInicial)
+  const area = areas.find((modulo) => modulo.telas.some((tela) => tela.aba === abaAtiva)) ?? areas[0]
+  const tela = area?.telas.find((item) => item.aba === abaAtiva) ?? area?.telas[0]
+  const id = useId()
+  const botoesArea = useRef({})
+  const botoesTela = useRef({})
+  const painelRef = useRef(null)
+  function escolherTela(item) {
+    setAbaAtiva(item.aba)
+    aoTrocarAba?.(item.aba)
+  }
+  const escolherArea = (modulo) => escolherTela(modulo.telas[0])
+
+  function abrirAba(aba) {
+    if (!areas.some((modulo) => modulo.telas.some((item) => item.aba === aba))) return
+    escolherTela({ aba })
+    painelRef.current?.focus()
+  }
+
+  function seguirLink(evento) {
+    if (evento.defaultPrevented || evento.button !== 0 || evento.metaKey || evento.ctrlKey || evento.shiftKey || evento.altKey) return
+    const link = evento.target.closest?.('a[href]')
+    if (!link || link.target || link.hasAttribute('download')) return
+    const href = link.getAttribute('href')
+    if (!href?.startsWith('#/m/')) return
+    const destino = rotaDaHash(href, { fonteApi })
+    // #1582: esta janela só abre por cima do Balcão; link para o Balcão é fechar a janela.
+    if (destino.tipo === ROTA_PRINCIPAL) {
+      evento.preventDefault()
+      aoFechar()
+      return
+    }
+    const permitido = areas.some((modulo) => modulo.id === destino.modulo && modulo.telas.some((item) => item.aba === destino.aba))
+    if (!permitido || ![hashDoModulo(destino.modulo), hashDoModulo(destino.modulo, destino.tela)].includes(href)) return
+    evento.preventDefault()
+    abrirAba(destino.aba)
+  }
+
+  return (
+    <Modal
+      titulo="Gestão da loja"
+      aoFechar={aoFechar}
+      largura="min(1180px, calc(100vw - 24px))"
+      rodape={(
+        <div className={css.rodapeGestao}>
+          {avisosApi && <div className={css.avisosGestao}>{avisosApi}</div>}
+          <div className={css.acoesGestao}>
+            <a className={css.verModulos} href={HASH_HALL} onClick={aoFechar}>
+              <Icone nome="painel" tamanho={18} /> Ver módulos
+            </a>
+            <Botao onClick={aoFechar}>Fechar</Botao>
+          </div>
+        </div>
+      )}
+    >
+      {area ? (
+        <div className={css.janelaGestao}>
+          <div className={css.areasGestao}>
+            <p className={css.rotuloAreas}>Áreas da loja</p>
+            <div role="tablist" aria-label="Áreas da loja" aria-orientation="vertical" className={css.listaAreas}>
+              {areas.map((modulo, indice) => (
+                <button
+                  key={modulo.id}
+                  ref={(no) => { botoesArea.current[modulo.id] = no }}
+                  type="button"
+                  role="tab"
+                  id={`${id}-area-${modulo.id}`}
+                  aria-selected={modulo.id === area.id}
+                  aria-controls={`${id}-area`}
+                  tabIndex={modulo.id === area.id ? 0 : -1}
+                  className={css.areaGestao}
+                  onClick={() => escolherArea(modulo)}
+                  onKeyDown={(evento) => navegarAbas(evento, areas, indice, escolherArea, botoesArea, true)}
+                >
+                  <IconeDoModulo modulo={modulo} />
+                  <span>{modulo.nome}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className={css.areaCompacta}>
+            <label htmlFor={`${id}-escolher-area`}>Área da loja</label>
+            <div className={css.seletorArea}>
+              <IconeDoModulo modulo={area} />
+              <select id={`${id}-escolher-area`} value={area.id} onChange={(evento) => escolherArea(areas.find((modulo) => modulo.id === evento.target.value))}>
+                {areas.map((modulo) => <option key={modulo.id} value={modulo.id}>{modulo.nome}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <section id={`${id}-area`} role="tabpanel" aria-label={area.nome} className={css.corpoGestao}>
+            <header className={css.cabecalhoArea}>
+              <h3 className={css.tituloArea}><IconeDoModulo modulo={area} />{area.nome}</h3>
+              {area.telas.length > 1 ? (
+                <div className={css.subtelasGestao} role="tablist" aria-label={`Telas de ${area.nome}`} aria-orientation="vertical">
+                  {area.telas.map((item, indice) => (
+                    <button
+                      key={item.id}
+                      ref={(no) => { botoesTela.current[item.id] = no }}
+                      type="button"
+                      role="tab"
+                      id={`${id}-tela-${item.id}`}
+                      aria-selected={item.id === tela.id}
+                      aria-controls={`${id}-tela`}
+                      tabIndex={item.id === tela.id ? 0 : -1}
+                      className={css.subtelaGestao}
+                      onClick={() => escolherTela(item)}
+                      onKeyDown={(evento) => navegarAbas(evento, area.telas, indice, escolherTela, botoesTela, true)}
+                    >
+                      <IconeDoModulo modulo={area} telaId={item.id} />{item.rotulo}
+                    </button>
+                  ))}
+                </div>
+              ) : <p className={css.nomeTela}>{tela.rotulo}</p>}
+            </header>
+            <div
+              id={`${id}-tela`}
+              role={area.telas.length > 1 ? 'tabpanel' : undefined}
+              aria-labelledby={area.telas.length > 1 ? `${id}-tela-${tela.id}` : undefined}
+              tabIndex={0}
+              ref={painelRef}
+              className={css.painelGestao}
+              onClickCapture={seguirLink}
+            >
+              <PainelDeAjuste aba={tela.aba} focoInicial={focoInicial} janelasApi={janelasApi} aoAbrirAba={abrirAba} renderizarEditorCardapio={renderizarEditorCardapio} />
+            </div>
+          </section>
+        </div>
+      ) : (
+        <Vazio titulo="Nenhum ajuste disponível">Consulte as telas disponíveis em Ver módulos.</Vazio>
+      )}
+    </Modal>
+  )
+}
 
 // Modo API (F06, decisão do Felipe em 30/09): as abas sem backend não somem. Abrem com a
 // faixa e os controles desabilitados até a fatia de cada uma entrar. Nada é gravado: as
 // ações delas também avisam (`aplicacao/api/naoLigadas.js`), e Integrações nunca guarda chave.
+// #1582: `saida` aponta as telas que já fazem o trabalho da aba, quando existem.
 const AINDA_NAO_LIGADO = {
-  producao: 'Produção e cardápio ainda não estão ligados ao EasyStok nesta versão (F11). Nada aqui é gravado.',
-  caixa: 'O caixa ainda não está ligado ao EasyStok nesta versão (F14). Nada aqui é gravado.',
-  janelas: 'Esta aba ainda não está ligada. As janelas de verdade estão em Entregas › Janelas e frete.',
-  fidelidade: 'Fidelidade e cupons ainda não estão ligados ao EasyStok nesta versão (F15). Nada aqui é gravado.',
-  integracoes: 'As integrações ainda não estão ligadas nesta versão (F16). Nenhuma chave é guardada no navegador.',
+  producao: {
+    texto: 'Produção e cardápio ainda não funcionam por esta tela. Nada aqui é gravado.',
+    saida: { modulo: 'producao', telas: ['producao', 'estoque'] },
+  },
+  fidelidade: { texto: 'Fidelidade e cupons ainda não funcionam por esta tela. Nada aqui é gravado.' },
+  integracoes: { texto: 'As integrações ainda não funcionam por esta tela. Nenhuma chave é guardada no navegador.' },
 }
 
-function AbaNaoLigada({ texto, children }) {
+function AbaNaoLigada({ texto, saida = null, children }) {
+  const { permite } = useAcessoModulos()
+  const modulo = saida && permite(saida.modulo) ? moduloPorId(saida.modulo) : null
+  const telas = modulo ? saida.telas.map((id) => modulo.telas.find((tela) => tela.id === id)).filter(Boolean) : []
   return (
     <>
-      <p className={css.naoLigado} role="note">{texto}</p>
+      <p className={css.naoLigado} role="note">
+        {texto}
+        {telas.length > 0 && (
+          <>
+            {' Use '}
+            {telas.map((tela, indice) => (
+              <span key={tela.id}>{indice > 0 && ' ou '}<a href={hashDoModulo(modulo.id, tela.id)}>{tela.rotulo}</a></span>
+            ))}
+            {`, em ${modulo.nome}.`}
+          </>
+        )}
+      </p>
       <fieldset disabled className={css.desligado}>{children}</fieldset>
     </>
   )
 }
 
-// "A aba ativa é lembrada durante a sessão": sessionStorage (não
-// localStorage, que sobrevive à sessão) no mesmo molde de `app/Moldura.jsx`
-// (CHAVE_TEMA, CHAVE_SIMULAR_ESCONDIDO).
-const CHAVE_ABA = 'casa-da-baba:gestao-aba'
-
-function lerAbaSalva(abas) {
-  try {
-    const salva = window.sessionStorage.getItem(CHAVE_ABA)
-    if (abas.some((aba) => aba.id === salva)) return salva
-  } catch {
-    // sem sessionStorage, a gaveta sempre abre na primeira aba
-  }
-  return abas[0].id
-}
-
-function gravarAba(id) {
-  try {
-    window.sessionStorage.setItem(CHAVE_ABA, id)
-  } catch {
-    // sem persistência, a aba lembrada vale só para esta renderização
-  }
-}
-
-export function ModalGestao({ aoFechar }) {
+// Uma tela por aba: o objeto só decide qual elemento entra na árvore.
+// `janelasApi` (#1440): no modo API o App entrega aqui o cadastro de janelas, zonas e bloqueios
+// da S45 (o mesmo de Entregas › Janelas e frete), no lugar da aba de demonstração.
+export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoAbrirAba = null, renderizarEditorCardapio }) {
   const { fonteApi } = useAtendimento()
-  const ABAS = fonteApi ? ABAS_API : ABAS_DEMONSTRACAO
-  const [ativa, setAtiva] = useState(() => lerAbaSalva(ABAS))
-  const referenciasDasAbas = useRef([])
-
-  const escolher = useCallback((id) => {
-    setAtiva(id)
-    gravarAba(id)
-  }, [])
-
-  // Setas do teclado (padrão APG de tabs, ativação automática): a seta já
-  // move o foco E troca a aba, sem precisar de Enter/Espaço depois. Home e
-  // End vão direto para a primeira e a última, sem passar pelas do meio.
-  const aoTeclar = useCallback((evento) => {
-    const indiceAtual = ABAS.findIndex((aba) => aba.id === ativa)
-    let proximo = null
-    if (evento.key === 'ArrowRight') proximo = (indiceAtual + 1) % ABAS.length
-    else if (evento.key === 'ArrowLeft') proximo = (indiceAtual - 1 + ABAS.length) % ABAS.length
-    else if (evento.key === 'Home') proximo = 0
-    else if (evento.key === 'End') proximo = ABAS.length - 1
-    if (proximo == null) return
-    evento.preventDefault()
-    escolher(ABAS[proximo].id)
-    referenciasDasAbas.current[proximo]?.focus()
-  }, [ativa, escolher, ABAS])
-
-  // Um por frente, arquivo próprio (US da issue): o objeto só decide qual
-  // elemento entra na árvore, os outros quatro nunca chegam a renderizar.
   const painelDaAba = useMemo(() => ({
     atendimento: <AbaAtendimento />,
+    // #1441: respostas prontas e automáticas, fora do caminho do atendimento.
+    respostas: <AbaRespostas focoInicial={focoInicial} />,
     producao: <AbaProducao />,
-    caixa: <AbaCaixa />,
-    janelas: <AbaJanelas />,
+    // #1443: no modo API o caixa é o do EasyStok; a demonstração segue com a massa local.
+    caixa: fonteApi ? <AbaCaixaApi /> : <AbaCaixa />,
+    janelas: fonteApi && janelasApi ? janelasApi : <AbaJanelas />,
     fidelidade: <AbaFidelidade />,
     integracoes: <AbaIntegracoes />,
-  }), [])
-
-  return (
-    <Modal
-      titulo="Gestão"
-      descricao="Produção, caixa, janelas de entrega, fidelidade e integrações num só lugar."
-      aoFechar={aoFechar}
-      largura="min(880px, calc(100vw - 32px))"
-      rodape={<Botao className={css.toque} onClick={aoFechar}>Fechar</Botao>}
-    >
-      {/* Rolagem horizontal no celular (390 px): a barra vira largura total
-          da tela e as abas correm por baixo do dedo, sem quebrar linha. */}
-      <div className={css.tablistRolavel}>
-        <div
-          role="tablist"
-          aria-label="Áreas de gestão"
-          tabIndex={-1}
-          className={css.tablist}
-          onKeyDown={aoTeclar}
-        >
-          {ABAS.map((aba, indice) => (
-            <button
-              key={aba.id}
-              ref={(el) => { referenciasDasAbas.current[indice] = el }}
-              type="button"
-              role="tab"
-              id={`gestao-aba-${aba.id}`}
-              aria-selected={aba.id === ativa}
-              aria-controls={`gestao-painel-${aba.id}`}
-              tabIndex={aba.id === ativa ? 0 : -1}
-              className={`${css.aba} ${aba.id === ativa ? css.abaAtiva : ''}`}
-              onClick={() => escolher(aba.id)}
-            >
-              {aba.rotulo}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div
-        role="tabpanel"
-        id={`gestao-painel-${ativa}`}
-        aria-labelledby={`gestao-aba-${ativa}`}
-        tabIndex={0}
-        className={css.painel}
-      >
-        {/* #1417: a seção do WhatsApp já grava no EasyStok; fica fora do bloco desligado. */}
-        {fonteApi && ativa === 'integracoes' && <SecaoWhatsApp />}
-        {/* #1432: caixa de suporte do atendimento por e-mail, também gravada no EasyStok. */}
-        {fonteApi && ativa === 'integracoes' && <SecaoEmail />}
-        {fonteApi && AINDA_NAO_LIGADO[ativa]
-          ? <AbaNaoLigada texto={AINDA_NAO_LIGADO[ativa]}>{painelDaAba[ativa]}</AbaNaoLigada>
-          : painelDaAba[ativa]}
-      </div>
-    </Modal>
-  )
+    canais: <TelaCanais />,
+    // #1632: logo da loja e papel padrão dos impressos (só modo API).
+    impressao: <AbaImpressao />,
+    // M1.1 (#1481): gestão do cardápio (só modo API).
+    cardapio: <AbaCardapioApi renderizarEditor={renderizarEditorCardapio} />,
+    // M1.3 (#1483): categorias do cardápio (só modo API).
+    categorias: <AbaCategoriasApi />,
+    // M2.1 (#1490): estoque do dia em porções (só modo API).
+    'estoque-do-dia': <AbaEstoqueDoDiaApi />,
+    // M2.2 (#1491): produção do dia por prato (só modo API).
+    'producao-do-dia': <AbaProducaoDoDiaApi />,
+    // M2.3 (#1496): insumos (só modo API).
+    insumos: <AbaInsumosApi />,
+    // M2.4a (#1498): receitas (só modo API).
+    receitas: <AbaReceitasApi />,
+    'calculadora-producao': <AbaCalculadoraApi />,
+    // M2.5 (#1502): planejamento da produção (só modo API).
+    planejamento: <AbaPlanejamentoApi aoAbrirAba={aoAbrirAba} />,
+    // M2.6 (#1511): controle de perdas (só modo API).
+    perdas: <AbaPerdasApi />,
+  }), [fonteApi, focoInicial, janelasApi, aoAbrirAba, renderizarEditorCardapio])
+  if (fonteApi && aba?.startsWith('financeiro-')) return <PainelFinanceiro key={aba} tela={aba.slice('financeiro-'.length)} />
+  const painel = painelDaAba[aba] ?? null
+  if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada {...AINDA_NAO_LIGADO[aba]}>{painel}</AbaNaoLigada>
+  return painel
 }

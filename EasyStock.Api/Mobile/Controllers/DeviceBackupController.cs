@@ -114,7 +114,7 @@ public class DeviceBackupController(
 
     /// <summary>Web: lista backups de um device (sem o JSON pra economizar bandwidth).</summary>
     [HttpGet("devices/{id}/backups")]
-    [Authorize]
+    [Authorize(Policy = "Gerente")] // o snapshot traz clientes, pedidos e caixa do aparelho
     public async Task<ActionResult<DeviceBackupSummary[]>> List(string id, CancellationToken ct)
     {
         if (!await DeviceBelongsToCurrentTenantAsync(id, ct)) return Forbid();
@@ -131,7 +131,7 @@ public class DeviceBackupController(
 
     /// <summary>Web: baixa o JSON inteiro pra restaurar manualmente.</summary>
     [HttpGet("devices/{id}/backups/{backupId}")]
-    [Authorize]
+    [Authorize(Policy = "Gerente")]
     public async Task<IActionResult> Download(string id, Guid backupId, CancellationToken ct)
     {
         if (!await DeviceBelongsToCurrentTenantAsync(id, ct)) return Forbid();

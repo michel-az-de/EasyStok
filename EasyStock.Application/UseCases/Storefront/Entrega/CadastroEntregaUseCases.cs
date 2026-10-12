@@ -80,6 +80,20 @@ public sealed class CadastroJanelasEntregaUseCase(
     public Task<JanelaEntregaResult> DefinirAtivaAsync(Guid empresaId, Guid id, bool ativa, CancellationToken ct = default) =>
         AlterarAsync(empresaId, id, j => { if (ativa) j.Ativar(); else j.Desativar(); }, ct);
 
+    /// <summary>
+    /// #1440: apaga a janela criada por engano. Com vaga (mesmo liberada) ou bloqueio apontando para ela,
+    /// recusa: o histórico não some e as FKs são RESTRICT. Nesse caso o caminho é pausar.
+    /// </summary>
+    public async Task ExcluirAsync(Guid empresaId, Guid id, CancellationToken ct = default)
+    {
+        var loja = await LojaDoTenant.ObterAsync(lojas, empresaId, ct);
+        var janela = await ObterDaLojaAsync(janelas, loja.Id, id, ct);
+        if (await janelas.TemUsoAsync(janela.Id, ct))
+            throw new UseCaseValidationException("Esta janela já tem pedido ou bloqueio marcado. Pause em vez de excluir.");
+        await janelas.RemoveAsync(janela, ct);
+        await unitOfWork.CommitAsync();
+    }
+
     private async Task<JanelaEntregaResult> AlterarAsync(Guid empresaId, Guid id, Action<JanelaEntrega> alteracao, CancellationToken ct)
     {
         var loja = await LojaDoTenant.ObterAsync(lojas, empresaId, ct);

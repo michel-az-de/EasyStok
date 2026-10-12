@@ -1,5 +1,7 @@
 import * as acao from '../acoes'
 import { estaAberta } from '../../dominio/funcionamento'
+import { fecharLojaPedeJustificativa } from '../../dominio/aberturaDaLoja'
+import { abrirCaixa } from '../../infra/api/caixaApi'
 import {
   CONTROLE, atualizarExpediente, definirControleExpediente, expedienteDaApi, horariosParaApi, obterExpediente,
 } from '../../infra/api/expedienteApi'
@@ -8,7 +10,7 @@ import {
 // dígito, e uma semana inteira editada não precisa virar vinte chamadas.
 const ESPERA_HORARIO_MS = 800
 
-const SO_ADMINISTRADOR = 'Só o administrador da loja abre, fecha ou muda o horário da loja.'
+const SO_ADMINISTRADOR = 'Só gerente ou dona abre e fecha a loja; o horário é só da dona.'
 
 // Expediente no modo API (F02, S40). O despacho local vem antes (a tela responde na hora);
 // a resposta da API substitui o estado local, porque ela é a verdade. Erro vai para a FaixaApi
@@ -56,11 +58,30 @@ export function criarAcoesExpedienteApi({ despachar, estadoRef }) {
       esperaHorario = null
     },
 
+    // #1443: abrir a loja é abrir o caixa, e fechar dentro do horário pede justificativa. Os dois
+    // casos viram um gesto com conferência (`features/loja`); só fechar fora do horário segue direto.
     alternarLoja: (agora) => {
       const { funcionamento, lojaAberta } = estadoRef.current
       const abrir = !estaAberta(agora, { funcionamento, lojaAberta })
+      if (abrir || fecharLojaPedeJustificativa(agora, funcionamento)) {
+        despachar({ tipo: acao.PEDIR_GESTO_LOJA, gesto: abrir ? 'abrir' : 'fechar' })
+        return
+      }
       despachar({ tipo: acao.ALTERNAR_LOJA, agora })
-      definirControle(abrir ? CONTROLE.ABRIR : CONTROLE.FECHAR, () => despachar({ tipo: acao.ALTERNAR_LOJA, agora }))
+      definirControle(CONTROLE.FECHAR, () => despachar({ tipo: acao.ALTERNAR_LOJA, agora }))
+    },
+
+    // O caixa abre primeiro; se a API recusar, a loja não abre. Devolve a promessa: o modal mostra
+    // o erro junto do botão e só fecha quando as duas pontas gravaram.
+    abrirLojaComCaixa: async ({ saldoInicial = 0, observacoes, caixaJaAberto = false } = {}) => {
+      if (!caixaJaAberto) await abrirCaixa({ saldoInicial, observacoes })
+      sincronizar(await definirControleExpediente(CONTROLE.ABRIR))
+      despachar({ tipo: acao.FECHAR_GESTO_LOJA })
+    },
+
+    fecharLojaComJustificativa: async (justificativa) => {
+      sincronizar(await definirControleExpediente(CONTROLE.FECHAR, (justificativa ?? '').trim()))
+      despachar({ tipo: acao.FECHAR_GESTO_LOJA })
     },
 
     // Só a dona devolve a loja ao relógio (S40); o botão mora na aba Atendimento da Gestão.

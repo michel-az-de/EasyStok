@@ -1,0 +1,2 @@
+.aviso { position: fixed; bottom: var(--e-4); right: var(--e-4); z-index: 80; max-width: min(28rem, calc(100vw - 2 * var(--e-4))); padding: var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--papel); color: var(--tinta); box-shadow: var(--sombra-media); }
+.aviso p { margin: 0 0 var(--e-3); }

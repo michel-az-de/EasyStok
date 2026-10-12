@@ -43,11 +43,11 @@ export function EscolhaDeEntregador({
     <div className={css.escolha}>
       <p className={css.pergunta}>{pergunta}</p>
       <div className={css.opcoes}>
-        <Chip papel="escolha" onClick={() => aoEscolher({ tipo: 'propria' })}>
+        <Chip papel="acao" onClick={() => aoEscolher({ tipo: 'propria' })}>
           Eu mesma levo
         </Chip>
         {conhecidos.map((c) => (
-          <Chip key={c.chave} papel="escolha" onClick={() => aoEscolher(c.entregador)}>
+          <Chip key={c.chave} papel="acao" onClick={() => aoEscolher(c.entregador)}>
             {c.rotulo}
           </Chip>
         ))}

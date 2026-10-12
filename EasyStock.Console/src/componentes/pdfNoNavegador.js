@@ -5,6 +5,8 @@
 // Um só quadro de impressão vivo por vez: o da impressão anterior sai quando a
 // próxima começa (tirar antes disso cancelaria o diálogo ainda aberto).
 let quadroAnterior = null
+// O navegador precisa do endereço vivo até o download, ou a aba nova, começar a ler o arquivo.
+const MS_ATE_LIBERAR = 60000
 
 function urlDoPdf(bytes) {
   return URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
@@ -18,8 +20,7 @@ export function baixarPdf({ bytes, nomeArquivo }) {
   document.body.appendChild(link)
   link.click()
   link.remove()
-  // O navegador precisa da URL viva até o download começar.
-  setTimeout(() => URL.revokeObjectURL(url), 60000)
+  setTimeout(() => URL.revokeObjectURL(url), MS_ATE_LIBERAR)
 }
 
 // Imprime o PRÓPRIO PDF, não a tela: o diálogo recebe a página com o tamanho
@@ -35,6 +36,9 @@ export function imprimirPdf({ bytes }, { planoB } = {}) {
     // Sem 'noopener': com ele o `open` devolve sempre null e não dá para
     // saber se o navegador bloqueou a aba.
     if (!window.open(url, '_blank')) window.location.assign(url)
+    // #1577: sem plano B (canhoto da Cozinha no tablet) o endereço nunca era liberado, e cada
+    // canhoto impresso deixava um PDF na memória da aba, que fica aberta o dia inteiro.
+    setTimeout(() => URL.revokeObjectURL(url), MS_ATE_LIBERAR)
   }
   if (!navigator.pdfViewerEnabled) { semVisualizador(); return }
 

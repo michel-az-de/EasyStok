@@ -19,6 +19,9 @@ public interface IProdutoComposicaoRepository
     /// <summary>Receitas que usam este produto como insumo. Util pra alerta de impacto antes de editar.</summary>
     Task<IReadOnlyCollection<ProdutoComposicao>> GetOndeInsumoAsync(Guid empresaId, Guid insumoId, CancellationToken ct = default);
 
+    /// <summary>M2.3 (#1496): em quantas receitas (produtos finais distintos) cada insumo entra. Sem uso, não aparece.</summary>
+    Task<IReadOnlyDictionary<Guid, int>> ContarReceitasPorInsumoAsync(Guid empresaId, CancellationToken ct = default);
+
     /// <summary>Detecta se adicionar a linha (produtoFinal, insumoCandidato) criaria ciclo no grafo da empresa.</summary>
     Task<bool> ExisteCicloAsync(Guid empresaId, Guid produtoFinalId, Guid insumoCandidatoId, CancellationToken ct = default);
 

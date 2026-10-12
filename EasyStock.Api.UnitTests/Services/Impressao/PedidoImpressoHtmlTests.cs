@@ -1,26 +1,42 @@
-using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using EasyStock.Api.Services.Impressao;
 using EasyStock.Application.UseCases.Operacao.Impressao;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Infra.Notifications.Templating;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EasyStock.Api.UnitTests.Services.Impressao;
 
 /// <summary>
-/// S49 (#1269): o impresso sai igual ao layout aprovado (docs/plan/atendimento-whatsapp/impressos/pedido-aprovado.html).
-/// Snapshots em <c>Snapshots/</c>; para regravar depois de uma mudança aprovada, rodar com
-/// <c>IMPRESSAO_ATUALIZAR_SNAPSHOT=1</c> e revisar o diff.
+/// #1632: pedido, agendamento e entrega saem no layout "bilhete da casa"
+/// (docs/plan/atendimento-whatsapp/impressos/impressos-v4-proposta.html), em qualquer papel.
+/// Snapshots em <c>Snapshots/</c>; regravar com <c>IMPRESSAO_ATUALIZAR_SNAPSHOT=1</c> e revisar o diff.
 /// </summary>
 public class PedidoImpressoHtmlTests
 {
     private const string BaseUrl = "https://api.test";
+    private const string Logo = "https://cdn.test/lojas/logo.png";
+
+    public static TheoryData<string> Papeis => new(ImpressoHtml.Papeis);
+
+    public static TheoryData<string, string> DocumentosEPapeis
+    {
+        get
+        {
+            var dados = new TheoryData<string, string>();
+            foreach (var d in PedidoImpressoHtml.Documentos)
+                foreach (var p in ImpressoHtml.Papeis)
+                    dados.Add(d, p);
+            return dados;
+        }
+    }
 
     internal static PedidoImpressoDto Exemplo(
-        bool agendado = true, string clienteNome = "Mariana Souza", IReadOnlyList<PedidoImpressoItemDto>? itens = null, int quantidadeItens = 7) => new(
-        new PedidoImpressoCasaDto("Casa da Baba", "12345678000190", "https://casadababa.com.br/", "5511900000000", null),
+        bool agendado = true, bool pago = false, string? clienteNome = "Mariana Souza", string? logo = Logo,
+        string? whatsApp = "5511900000000", IReadOnlyList<PedidoImpressoItemDto>? itens = null, decimal recebido = 0m) => new(
+        new PedidoImpressoCasaDto("Casa da Baba", "12345678000190", "https://casadababa.com.br/", whatsApp, logo),
         "A7F3C21B",
         agendado
             ? new PedidoImpressoPrazoDto(true, new DateTime(2026, 10, 2, 10, 0, 0), new DateTime(2026, 10, 2, 11, 0, 0), new DateTime(2026, 10, 2, 9, 30, 0))
@@ -31,127 +47,273 @@ public class PedidoImpressoHtmlTests
         [
             new PedidoImpressoItemDto(2, "un", "Pão de queijo recheado 500 g", null, 24.90m, 49.80m),
             new PedidoImpressoItemDto(1, "un", "Bolo de cenoura com cobertura de chocolate", "sem granulado", 42m, 42m),
-            new PedidoImpressoItemDto(3, "un", "Coxinha de frango congelada", null, 8.50m, 25.50m),
+            new PedidoImpressoItemDto(1.5m, "kg", "Massa fresca de espinafre", null, 17m, 25.50m),
             new PedidoImpressoItemDto(1, "un", "Torta de palmito média", null, 56m, 56m),
         ],
         "Deixar na portaria, bloco B",
         "Embalar os pães separados",
-        new PedidoImpressoCobrancaDto(173.30m, false, "pix"),
-        quantidadeItens,
+        new PedidoImpressoCobrancaDto(173.30m, pago, "pix", recebido),
+        7,
         agendado ? new DateTime(2026, 9, 30, 14, 32, 0) : new DateTime(2026, 10, 2, 14, 32, 0),
         new DateTime(2026, 10, 1, 9, 12, 0),
         new DateTime(2026, 10, 2, 7, 40, 0));
 
-    private static Task<string> Renderizar(PedidoImpressoDto dto, string modelo) =>
-        new PedidoImpressoHtml(new ScribanRenderer(NullLogger<ScribanRenderer>.Instance)).RenderizarAsync(dto, modelo, BaseUrl);
-
-    private static string Corpo(string html) =>
-        html[(html.IndexOf("<body>", StringComparison.Ordinal) + 6)..html.IndexOf("</body>", StringComparison.Ordinal)];
+    private static Task<string> Renderizar(
+        PedidoImpressoDto dto, string documento, string modelo, ImpressoOpcoes? opcoes = null, IConfiguration? configuracao = null) =>
+        new PedidoImpressoHtml(new ScribanRenderer(NullLogger<ScribanRenderer>.Instance), configuracao)
+            .RenderizarAsync(dto, documento, modelo, BaseUrl, opcoes);
 
     [Theory]
-    [InlineData(PedidoImpressoHtml.Etiqueta10x15, true)]
-    [InlineData(PedidoImpressoHtml.Etiqueta10x15, false)]
-    [InlineData(PedidoImpressoHtml.Cupom58, true)]
-    [InlineData(PedidoImpressoHtml.A4, true)]
-    public async Task Snapshot(string modelo, bool agendado)
+    [InlineData(PedidoImpressoHtml.Pedido, ImpressoHtml.A5)]
+    [InlineData(PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom80)]
+    [InlineData(PedidoImpressoHtml.Agendamento, ImpressoHtml.A5)]
+    [InlineData(PedidoImpressoHtml.Agendamento, ImpressoHtml.Cupom58)]
+    [InlineData(PedidoImpressoHtml.Entrega, ImpressoHtml.Etiqueta10x15)]
+    [InlineData(PedidoImpressoHtml.Entrega, ImpressoHtml.A4)]
+    public async Task Snapshot(string documento, string modelo)
     {
-        var html = await Renderizar(Exemplo(agendado), modelo);
-        ConferirSnapshot($"pedido.{modelo}.{(agendado ? "agendado" : "imediato")}.html", html);
-    }
-
-    [Fact]
-    public async Task AgendadoMostraJanelaEProntoAte()
-    {
-        var corpo = Corpo(await Renderizar(Exemplo(), PedidoImpressoHtml.Etiqueta10x15));
-
-        corpo.Should().ContainAll("AGENDADO", "Entrega", "02/10", "Janela", "10–11h", "Pronto até", "09:30", "Solicitado", "30/09 14:32");
-        corpo.Should().ContainAll("CNPJ 12.345.678/0001-90", "casadababa.com.br", "WhatsApp (11) 90000-0000");
-        corpo.Should().ContainAll("(11) 98765-4412", "ID #0412AB", "Motoboy · João", "Cobrar na entrega · PIX · 7 itens", "R$ 173,30");
-        corpo.Should().ContainAll("Alterado 01/10 09:12", "Impresso 02/10 07:40");
-    }
-
-    [Fact]
-    public async Task ImediatoMostraPrevisao()
-    {
-        var corpo = Corpo(await Renderizar(Exemplo(agendado: false), PedidoImpressoHtml.Etiqueta10x15));
-
-        corpo.Should().ContainAll("IMEDIATO", "Previsão", "hoje", "Sai às", "~15:10", "14:40", "hoje 14:32");
-        corpo.Should().NotContain("AGENDADO");
-    }
-
-    [Fact]
-    public async Task A4MostraUnitarioEDataLonga()
-    {
-        var corpo = Corpo(await Renderizar(Exemplo(), PedidoImpressoHtml.A4));
-
-        corpo.Should().ContainAll("Unitário", "R$ 24,90", "sex 02/10", "10:00–11:00", "qua 30/09 14:32", "Casa da Baba");
+        var html = await Renderizar(Exemplo(), documento, modelo, new ImpressoOpcoes(Alergias: ["CASTANHA"]));
+        SnapshotImpresso.Conferir($"{documento}.{modelo}.html", html);
     }
 
     [Theory]
-    [InlineData(PedidoImpressoHtml.Etiqueta10x15, "<span class=\"qn\">0,5</span><span class=\"qx\">kg</span>")]
-    [InlineData(PedidoImpressoHtml.Cupom58, "<span class=\"qn\">0,5</span><span class=\"qx\">kg</span>")]
-    [InlineData(PedidoImpressoHtml.A4, "0,5<span class=\"eun\">kg</span>")]
-    public async Task UnidadeDoItemEContagem(string modelo, string esperado)
+    [MemberData(nameof(DocumentosEPapeis))]
+    public async Task TodoDocumentoSaiEmTodoPapelComONumeroEOQr(string documento, string modelo)
     {
-        var dto = Exemplo(quantidadeItens: 1, itens: [new PedidoImpressoItemDto(0.5m, "kg", "Massa fresca", null, 60m, 30m)]);
-        var corpo = Corpo(await Renderizar(dto, modelo));
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(Exemplo(), documento, modelo));
 
-        corpo.Should().Contain(esperado);
-        if (modelo != PedidoImpressoHtml.Cupom58) corpo.Should().Contain("· 1 item<");
+        corpo.Should().ContainAll("Pedido A7F3C21B", "#A7F3C21B", "<svg class=\"qr\"", "Casa da Baba");
+        corpo.Should().Contain($"d-{documento}");
     }
 
     [Theory]
-    [InlineData(PedidoImpressoHtml.Etiqueta10x15)]
-    [InlineData(PedidoImpressoHtml.Cupom58)]
-    [InlineData(PedidoImpressoHtml.A4)]
-    public async Task EscapaTextoDoCliente(string modelo)
+    [MemberData(nameof(Papeis))]
+    public async Task PedidoFalaComAClienteEDizOQueFaltaAcertar(string modelo)
     {
-        var corpo = Corpo(await Renderizar(Exemplo(clienteNome: "<script>alert(1)</script>"), modelo));
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, modelo));
 
-        corpo.Should().NotContain("<script>");
-        corpo.Should().Contain("&lt;script&gt;");
-    }
-
-    [Theory]
-    [InlineData(PedidoImpressoHtml.Etiqueta10x15)]
-    [InlineData(PedidoImpressoHtml.Cupom58)]
-    public async Task TermicoSoPreto(string modelo)
-    {
-        var corpo = Corpo(await Renderizar(Exemplo(), modelo));
-
-        corpo.Should().StartWith("<div class=\"t ");
-        // Cor só em atributo ou CSS (fill="#000", color:#...); "#0412AB" no texto é o ID do cliente.
-        Regex.Matches(corpo, "[:=]\\s*\"?(#[0-9A-Fa-f]{3,6})\\b").Select(m => m.Groups[1].Value.ToLowerInvariant())
-            .Should().OnlyContain(c => c == "#000", "a térmica só imprime preto");
-        corpo.Should().NotContain("var(--");
+        corpo.Should().ContainAll("Mariana, vamos à mesa?", "Seu pedido", "Pão de queijo recheado 500 g", "sem granulado", "49,80");
+        corpo.Should().ContainAll("1,5 kg", "R$ 173,30", "A acertar na entrega · PIX.", "Faltou algo? Quer repetir?");
+        corpo.Should().ContainAll("Feito com cuidado, acompanhado de perto.", "casadababa.com.br", "WhatsApp (11) 90000-0000", "impresso 02/10 07:40");
+        corpo.Should().NotContainAny("Falta pagar", "CNPJ", "ID #");
     }
 
     [Fact]
-    public async Task JatoDeTintaSemFundoPreenchido()
+    public async Task PedidoPagoAgradeceEmVezDeCobrar()
     {
-        var html = await Renderizar(Exemplo(), PedidoImpressoHtml.A4);
-        var css = html[html.IndexOf("/* ===== Jato de tinta", StringComparison.Ordinal)..html.IndexOf("</style>", StringComparison.Ordinal)];
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(Exemplo(pago: true), PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom80));
 
-        Regex.Matches(css, "background[^;}]*").Select(m => m.Value.Trim())
-            .Should().OnlyContain(b => b == "background: #fff", "cor só em linha, contorno e texto");
-        Corpo(html).Should().NotContain("background");
+        corpo.Should().Contain("Tudo pago no PIX. Obrigada!").And.NotContain("A acertar");
+    }
+
+    [Fact]
+    public async Task AgendamentoTemOCombinadoNoTituloEAAlergiaAnotada()
+    {
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(
+            Exemplo(), PedidoImpressoHtml.Agendamento, ImpressoHtml.A5, new ImpressoOpcoes(Alergias: ["CASTANHA", "GLÚTEN"])));
+
+        corpo.Should().ContainAll("Encomenda confirmada", "Mariana, combinado: sexta, 02/10, entre 10h e 11h.");
+        corpo.Should().ContainAll("Anotado: alergia a castanha, glúten.", "pedido feito em 30/09 14:32", "Mudou o plano?");
+    }
+
+    [Fact]
+    public async Task AgendamentoSemAlergiaNaoInventaAviso()
+    {
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(Exemplo(), PedidoImpressoHtml.Agendamento, ImpressoHtml.Cupom80));
+
+        corpo.Should().NotContain("Anotado");
+    }
+
+    [Theory]
+    [InlineData(ImpressoHtml.Etiqueta10x15)]
+    [InlineData(ImpressoHtml.Cupom80)]
+    [InlineData(ImpressoHtml.Cupom58)]
+    public async Task EntregaNaTermicaSaiEmDuasViasParaAGuilhotinaCortar(string modelo)
+    {
+        var html = await Renderizar(Exemplo(), PedidoImpressoHtml.Entrega, modelo);
+        var corpo = SnapshotImpresso.Corpo(html);
+
+        Regex.Matches(corpo, "<article ").Should().HaveCount(2);
+        html.Should().Contain(".im.v1{break-after:page}");
+        var viaDoEntregador = corpo[..corpo.IndexOf("</article>", StringComparison.Ordinal)];
+        var viaDoPacote = corpo[corpo.IndexOf("</article>", StringComparison.Ordinal)..];
+
+        viaDoEntregador.Should().ContainAll(" v1\"", "via do entregador", "Rua das Laranjeiras, 214", "(11) 98765-4412", "Deixar na portaria, bloco B");
+        viaDoPacote.Should().ContainAll(" v2\"", "Para Mariana", "Neste pedido", "Chegou diferente?", "Da nossa casa para a sua mesa.");
+        viaDoPacote.Should().NotContainAny("98765-4412", "RECEBER", "R$", "Rua das Laranjeiras");
+    }
+
+    [Theory]
+    [InlineData(ImpressoHtml.A4)]
+    [InlineData(ImpressoHtml.A5)]
+    public async Task EntregaNoJatoDeTintaEUmaFolhaComLinhaDeDobra(string modelo)
+    {
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(Exemplo(), PedidoImpressoHtml.Entrega, modelo));
+
+        Regex.Matches(corpo, "<article ").Should().HaveCount(1);
+        corpo.Should().ContainAll("dobre ou corte aqui", "via do entregador", "Para Mariana");
+    }
+
+    [Fact]
+    public async Task EntregaACobrarGritaOValorEAPagaDizQueNaoRecebeNada()
+    {
+        var aCobrar = SnapshotImpresso.Corpo(await Renderizar(Exemplo(), PedidoImpressoHtml.Entrega, ImpressoHtml.Cupom80));
+        var paga = SnapshotImpresso.Corpo(await Renderizar(Exemplo(pago: true), PedidoImpressoHtml.Entrega, ImpressoHtml.Cupom80));
+
+        aCobrar.Should().ContainAll("<div class=\"alerta\">RECEBER R$ 173,30<small>PIX</small></div>", "Motoboy · João").And.NotContain("Já está pago");
+        paga.Should().Contain("Nada. Já está pago.").And.NotContain("RECEBER");
+    }
+
+    [Fact]
+    public async Task ComSinalOEntregadorCobraSoOSaldo()
+    {
+        var dto = Exemplo(recebido: 50m);
+
+        var entrega = SnapshotImpresso.Corpo(await Renderizar(dto, PedidoImpressoHtml.Entrega, ImpressoHtml.Cupom80));
+        var pedido = SnapshotImpresso.Corpo(await Renderizar(dto, PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom80));
+
+        entrega.Should().Contain("RECEBER R$ 123,30<small>PIX</small>").And.NotContain("RECEBER R$ 173,30");
+        pedido.Should().ContainAll("R$ 173,30", "Falta R$ 123,30, a acertar na entrega · PIX.");
+    }
+
+    [Theory]
+    [MemberData(nameof(DocumentosEPapeis))]
+    public async Task ClienteSemNomeNaoDeixaFraseQuebrada(string documento, string modelo)
+    {
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(Exemplo(clienteNome: null), documento, modelo));
+
+        corpo.Should().NotContainAny("<h1>, ", "<h1>Para </h1>", ">Para <");
+        corpo.Should().ContainAny("<h1>Vamos à mesa?</h1>", "<h1>Combinado: ", "<h1>Seu pedido chegou</h1>");
+    }
+
+    [Theory]
+    [InlineData(ImpressoHtml.A4, false, true)]
+    [InlineData(ImpressoHtml.A5, false, true)]
+    [InlineData(ImpressoHtml.Cupom80, false, false)]
+    [InlineData(ImpressoHtml.Cupom58, true, true)]
+    [InlineData(ImpressoHtml.Etiqueta10x15, true, true)]
+    public async Task LogoDaLojaSaiNoJatoDeTintaENaTermicaSoQuandoPedido(string modelo, bool logoNaTermica, bool esperaLogo)
+    {
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(
+            Exemplo(), PedidoImpressoHtml.Pedido, modelo, new ImpressoOpcoes(LogoNaTermica: logoNaTermica)));
+
+        if (esperaLogo)
+            corpo.Should().Contain($"<img class=\"logo\" src=\"{Logo}\" alt=\"Casa da Baba\">").And.NotContain("class=\"wm\"");
+        else
+            corpo.Should().Contain("<div class=\"wm\">Casa da Baba</div>").And.NotContain("<img");
+    }
+
+    [Fact]
+    public async Task SemLogoCadastradoSaiONomeDaCasaEmTexto()
+    {
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(Exemplo(logo: null), PedidoImpressoHtml.Pedido, ImpressoHtml.A4));
+
+        corpo.Should().Contain("<div class=\"wm\">Casa da Baba</div>").And.NotContain("<img");
+    }
+
+    [Fact]
+    public async Task LogoDeCaminhoRelativoViraEnderecoDaApi()
+    {
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(Exemplo(logo: "/uploads/lojas/logo.png"), PedidoImpressoHtml.Pedido, ImpressoHtml.A4));
+
+        corpo.Should().Contain("<img class=\"logo\" src=\"https://api.test/uploads/lojas/logo.png\"");
+    }
+
+    [Fact]
+    public async Task SemWhatsAppDaCasaNaoHaQrNemConvite()
+    {
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(Exemplo(whatsApp: null), PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom80));
+
+        corpo.Should().NotContain("<svg class=\"qr\"").And.NotContain("Faltou algo?");
+    }
+
+    [Fact]
+    public async Task AssinaturaVemDaConfiguracaoESemElaAssinaACasa()
+    {
+        var comDona = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [PedidoImpressoHtml.ChaveAssinatura] = "Thati" })
+            .Build();
+
+        (await Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom80, configuracao: comDona))
+            .Should().Contain("<p class=\"ass\">Thati · Casa da Baba</p>");
+        (await Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom80))
+            .Should().Contain("<p class=\"ass\">Casa da Baba</p>");
+    }
+
+    [Fact]
+    public async Task ImediatoDizHojeEPorVoltaDe()
+    {
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(Exemplo(agendado: false), PedidoImpressoHtml.Pedido, ImpressoHtml.A4));
+
+        corpo.Should().ContainAll("hoje · ~15:10", "hoje, por volta das 15:10");
+    }
+
+    [Theory]
+    [MemberData(nameof(DocumentosEPapeis))]
+    public async Task EscapaTextoDoCliente(string documento, string modelo)
+    {
+        var dto = Exemplo(clienteNome: "<script>alert(1)</script>", itens: [new PedidoImpressoItemDto(1, "un", "<b>Bolo</b>", "<i>obs</i>", 10m, 10m)]);
+
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(dto, documento, modelo));
+
+        corpo.Should().NotContain("<script>").And.NotContain("<b>Bolo").And.NotContain("<i>obs");
+        corpo.Should().Contain("&lt;b&gt;Bolo&lt;/b&gt;");
+    }
+
+    [Theory]
+    [InlineData(PedidoImpressoHtml.Pedido)]
+    [InlineData(PedidoImpressoHtml.Agendamento)]
+    [InlineData(PedidoImpressoHtml.Entrega)]
+    public async Task TermicaSoPretoSemCorNoCorpo(string documento)
+    {
+        foreach (var modelo in new[] { ImpressoHtml.Etiqueta10x15, ImpressoHtml.Cupom80, ImpressoHtml.Cupom58 })
+        {
+            var html = await Renderizar(Exemplo(), documento, modelo);
+            SnapshotImpresso.CoresDoCorpo(html).Should().OnlyContain(c => c == "#000", "a térmica só imprime preto");
+            SnapshotImpresso.Corpo(html).Should().Contain(" termica ").And.NotContain(" tinta ");
+        }
+    }
+
+    [Fact]
+    public async Task TermicaNoCssEPretoPuroEJatoDeTintaNaoTemFundoEscuro()
+    {
+        var html = await Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, ImpressoHtml.A4);
+
+        html.Should().Contain(".im.termica{--tinta:#000;--apoio:#000;--acento:#000;--marca:#000;--linha:#000;");
+        html.Should().Contain(".im.tinta .alerta{background:#fff;");
+        html.Should().NotContain("#FBF5EC", "papel branco: sem creme na impressão");
     }
 
     [Fact]
     public async Task FontesDaApiEPaginaDoTamanhoDoPapel()
     {
-        (await Renderizar(Exemplo(), PedidoImpressoHtml.Etiqueta10x15)).Should()
+        (await Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, ImpressoHtml.Etiqueta10x15)).Should()
             .Contain("@page{size:100mm 150mm;margin:0}")
             .And.Contain("url(\"https://api.test/impressao/fontes/Lora.ttf\")");
-        (await Renderizar(Exemplo(), PedidoImpressoHtml.Cupom58)).Should().Contain("@page{size:58mm auto;margin:0}");
-        (await Renderizar(Exemplo(), PedidoImpressoHtml.A4)).Should().Contain("@page{size:A4;margin:0}");
+        (await Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom80)).Should().Contain("@page{size:80mm auto;margin:0}");
+        (await Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom58)).Should().Contain("@page{size:58mm auto;margin:0}");
+        (await Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, ImpressoHtml.A4)).Should().Contain("@page{size:A4;margin:0}");
+        (await Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, ImpressoHtml.A5)).Should().Contain("@page{size:A5;margin:0}");
     }
 
     [Fact]
-    public async Task ModeloDesconhecidoLanca()
+    public async Task ModeloOuDocumentoDesconhecidoLanca()
     {
-        var act = () => Renderizar(Exemplo(), "bobina-80");
-        await act.Should().ThrowAsync<ArgumentException>();
+        var modelo = () => Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, "carta");
+        var documento = () => Renderizar(Exemplo(), "recibo", ImpressoHtml.A4);
+
+        await modelo.Should().ThrowAsync<ArgumentException>();
+        await documento.Should().ThrowAsync<ArgumentException>();
+    }
+
+    [Theory]
+    [InlineData("5511900000000", "https://wa.me/5511900000000?text=Pedido%20A7F3C21B")]
+    [InlineData("(11) 90000-0000", "https://wa.me/5511900000000?text=Pedido%20A7F3C21B")]
+    [InlineData("ramal 12", null)]
+    [InlineData(null, null)]
+    public void LinkDoWhatsAppLevaOPedidoNoTexto(string? whatsApp, string? esperado)
+    {
+        ImpressoHtml.LinkWhatsApp(whatsApp, "A7F3C21B").Should().Be(esperado);
     }
 
     [Theory]
@@ -161,18 +323,5 @@ public class PedidoImpressoHtmlTests
     public void FormataTelefone(string entrada, string esperado)
     {
         PedidoImpressoHtml.Telefone(entrada).Should().Be(esperado);
-    }
-
-    private static void ConferirSnapshot(string nome, string atual, [CallerFilePath] string arquivoTeste = "")
-    {
-        var caminho = Path.Combine(Path.GetDirectoryName(arquivoTeste)!, "Snapshots", nome);
-        if (Environment.GetEnvironmentVariable("IMPRESSAO_ATUALIZAR_SNAPSHOT") == "1")
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(caminho)!);
-            File.WriteAllText(caminho, atual);
-            return;
-        }
-        File.Exists(caminho).Should().BeTrue($"snapshot {nome} existe (gere com IMPRESSAO_ATUALIZAR_SNAPSHOT=1)");
-        atual.ReplaceLineEndings().Should().Be(File.ReadAllText(caminho).ReplaceLineEndings());
     }
 }

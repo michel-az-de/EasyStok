@@ -59,6 +59,39 @@ public class MensagensProgramadasUseCasesTests
         new(_empresaId, Guid.NewGuid(), _cliente.Id, null, canal, finalidade, texto, modelo, para);
 
     [Fact]
+    public async Task Agendar_ClienteBloqueado_RecusaSemGravar()
+    {
+        _cliente.Bloquear("Teste", Agora);
+
+        var act = () => Agendar().ExecuteAsync(Comando(CanalConversa.Sms, Agora.AddHours(1)));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*bloqueado*");
+        await _repo.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+        _uow.CommitCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Disparar_ClienteBloqueadoAposAgendar_RecusaTextoEModelo()
+    {
+        foreach (var modelo in new ModeloMensagem?[] { null, new("aviso", "pt_BR", []) })
+        {
+            var mensagem = MensagemProgramada.Agendar(_empresaId, _cliente.Id, null, CanalConversa.WhatsApp,
+                FinalidadeContato.Transacional, modelo is null ? "Oi" : null, modelo,
+                Agora.AddMinutes(1), Guid.NewGuid(), Agora.AddMinutes(-10));
+            mensagem.Reservar(Agora);
+            _repo.ObterAsync(_empresaId, mensagem.Id, Arg.Any<CancellationToken>()).Returns(mensagem);
+            _cliente.Bloquear("Teste", Agora);
+
+            await Disparar().ExecuteAsync(_empresaId, mensagem.Id);
+
+            mensagem.Situacao.Should().Be(SituacaoMensagemProgramada.Falhou);
+            mensagem.Erro.Should().Contain("bloqueado");
+        }
+        await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+        await _whats.DidNotReceiveWithAnyArgs().EnviarModeloAsync(default!, default!, default!, default!, default);
+    }
+
+    [Fact]
     public async Task Agendar_WhatsAppTextoComJanelaVencidaNoEnvio_Recusa()
     {
         ConversaAberta(Agora.AddHours(-2));

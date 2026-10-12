@@ -199,4 +199,21 @@ public class AutomacoesHandlerTests
             .Should().Be(ResultadoAutomacao.Falhou);
         _uow.CommitCount.Should().Be(0);
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EncerramentoPendenteNaoEnviaDespedidaAposReabertura(bool jaAssumida)
+    {
+        Regra(GatilhoAutomacao.Encerramento, "Obrigada, {nome}!");
+        _conversa.Encerrar(Agora.AddSeconds(-1));
+        _conversa.Reabrir(Agora);
+        if (jaAssumida) _conversa.Assumir(Agora, Guid.NewGuid());
+
+        (await UseCase().ExecuteAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.Encerramento, _conversa.Id, null, null)))
+            .Should().Be(ResultadoAutomacao.ConversaReaberta);
+
+        await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+        _uow.CommitCount.Should().Be(0);
+    }
 }

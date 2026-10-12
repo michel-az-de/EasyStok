@@ -1,5 +1,7 @@
 # Plano — ERP da Casa da Baba (front único, sala de módulos)
 
+> **Levantamento atualizado em 09/10/2026:** [inventário, evidências e plano de continuidade em ondas](11-levantamento-e-ondas-2026-10-09.md). Use esse levantamento para priorizar a execução. As especificações M0–M8 abaixo continuam como referência, com as correções do ADR-0059. Os estados históricos desta página não comprovam merge, publicação ou homologação atuais.
+
 Issue: #1316 · Decisão: [ADR-0056](../../adr/0056-erp-da-casa-da-baba-front-unico.md) · Data: 2026-10-01
 Base medida: master `0a70eb56` (estudo da #1316). Plano irmão: [atendimento-whatsapp](../atendimento-whatsapp/README.md)
 (dono de S01–S53 e F01–F18; este plano referencia aquelas fatias e não as reescreve).
@@ -39,6 +41,12 @@ Base medida: master `0a70eb56` (estudo da #1316). Plano irmão: [atendimento-wha
 Fica no `EasyStock.Web` (bastidor, ADR-0056 item 7): gestão e histórico de estoque e lotes, compras e
 fornecedores, financeiro (contas a pagar e a receber), etiquetas de lote, relatórios gerenciais. A operação
 do dia (saldo, lote em porções, desacerto, produção, perda) vai para o console no M2.
+
+> **Emendado em 08/10 pelo [ADR-0059](../../adr/0059-web-sai-pwa-continua-e-merge-de-conflitos.md).**
+> O `EasyStock.Web` sai inteiro: todas as áreas acima vão para o console, e as telas antigas servem só
+> de referência de regra. A PWA de produção e cadastro continua junto ao console como backup offline, e
+> conflito entre os dois vai para um módulo de merge decidido pela dona. DM7-1, D-M5-02, D-M5-07 e a
+> Fase B precisam ser revistas à luz disso.
 
 ## 2. Princípios (vinculantes para toda fatia)
 
@@ -102,14 +110,14 @@ as marcadas com ⚑ (todas respondidas em 01/10, ✅); as demais só travam a fa
 | D-M1-08 | Item novo em validação (RN-15) | sim | [02](02-m1-cardapio.md) |
 | D-M2-01 | Produção baixa insumo pela receita | só produto marcado; avisa, não trava | [03](03-m2-producao.md) |
 | D-M2-02 | Perda exige motivo | lista; texto só em "Outro" | [03](03-m2-producao.md) |
-| D-M2-03 | Onde a embalagem desce | na produção, pela receita | [03](03-m2-producao.md) |
+| D-M2-03 | Onde a embalagem desce | na produção: pela porção quando ela tem embalagem própria (#1552), senão pela receita | [03](03-m2-producao.md) |
 | D-M2-04 | Destino da porção no lote | vem da linha do item (RN-17) | [03](03-m2-producao.md) |
 | D-M2-05 | Sugestão de produção | mínimo − saldo + agendados + descoberto | [03](03-m2-producao.md) |
 | D-M2-06 | Quem lança produção e perda | perfis do M2; perda grande pede Gerente | [03](03-m2-producao.md) |
 | D3-01 | Configuração do atendimento | abrir/fechar loja no M3, resto no M7 | [04](04-m3-atendimento.md) |
 | D3-02 | iFood | fora até ter conta e volume | [04](04-m3-atendimento.md) |
 | D3-03 | Atendentes múltiplos | só filtro Minhas/Sem dono e nome no selo | [04](04-m3-atendimento.md) |
-| D3-04 | Quem cancela pedido pago | só Gerente | [04](04-m3-atendimento.md) |
+| ✅ D3-04 | Quem cancela pedido pago | **DECIDIDO em 09/10:** Atendimento sem pagamento; com qualquer valor recebido, só Dona/gerente | [04](04-m3-atendimento.md) |
 | D4-01 | Prioridade da fila | derivada do prazo, sem campo | [05](05-m4-cozinha.md) |
 | D4-02 | Rastreio por item | soma por item; status por pedido | [05](05-m4-cozinha.md) |
 | D4-03 | Encomendas na cozinha | Hoje/Amanhã/dia; futuro só leitura | [05](05-m4-cozinha.md) |
@@ -167,3 +175,4 @@ Atualizado por cada PR. Legenda: ⬜ sem issue · 🟡 em PR · ✅ mergeada. 78
 | Fatia | Título | Estado | Issue/PR |
 |---|---|---|---|
 | — | ADR-0056 e este plano | 🟡 | #1316 |
+| M0.2 (parcial) | Hall de módulos, menu do módulo pela rota (`#/m/<modulo>/<tela>`) e abas da Gestão no módulo dono; sem login de um passo nem permissão por perfil (dependem da M0.3) | 🟡 | #1447 |

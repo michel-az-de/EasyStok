@@ -22,6 +22,99 @@ namespace EasyStock.Domain.Tests.Entities.Storefront;
 /// </summary>
 public class CardapioItemTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(5)]
+    public void TrocarCapaGaleria_SubstituiSomenteAPrimeira_EConservaPrecoEProduto(int quantidade)
+    {
+        var item = NovoItemValido();
+        var produtoId = item.ProdutoId;
+        var preco = item.PrecoEfetivo();
+        var fotos = Enumerable.Range(1, quantidade).Select(n => $"https://exemplo.test/{n}.webp").ToList();
+        foreach (var foto in fotos) item.AdicionarFotoGaleria(foto);
+
+        item.SubstituirCapaGaleria("https://exemplo.test/nova.webp");
+        item.SubstituirCapaGaleria("https://exemplo.test/nova.webp");
+
+        item.FotoUrl.Should().Be("https://exemplo.test/nova.webp");
+        item.ObterFotosGaleria().Should().Equal(fotos.Skip(1).Prepend(item.FotoUrl));
+        item.ProdutoId.Should().Be(produtoId);
+        item.PrecoEfetivo().Should().Be(preco);
+    }
+
+    // #1550: estado legado, capa gravada fora da galeria. A primeira foto não é a capa e não pode sumir.
+    [Fact]
+    public void TrocarCapaGaleria_CapaLegadaForaDaGaleria_NaoDescartaOPrimeiroAngulo()
+    {
+        var item = NovoItemValido();
+        item.AdicionarFotoGaleria("https://exemplo.test/a.webp");
+        item.AdicionarFotoGaleria("https://exemplo.test/b.webp");
+        item.AtualizarMetadata(fotoUrl: "https://exemplo.test/capa-legada.webp");
+
+        item.SubstituirCapaGaleria("https://exemplo.test/nova.webp");
+
+        item.FotoUrl.Should().Be("https://exemplo.test/nova.webp");
+        item.ObterFotosGaleria().Should().Equal(
+            "https://exemplo.test/nova.webp", "https://exemplo.test/a.webp", "https://exemplo.test/b.webp");
+    }
+
+    [Fact]
+    public void TrocarCapaGaleria_CapaLegadaComGaleriaCheia_RecusaSemPerderFoto()
+    {
+        var item = NovoItemValido();
+        var fotos = Enumerable.Range(1, 5).Select(n => $"https://exemplo.test/{n}.webp").ToList();
+        foreach (var foto in fotos) item.AdicionarFotoGaleria(foto);
+        item.AtualizarMetadata(fotoUrl: "https://exemplo.test/capa-legada.webp");
+        item.GaleriaSemVagaParaNovaCapa.Should().BeTrue();
+
+        var trocar = () => item.SubstituirCapaGaleria("https://exemplo.test/nova.webp");
+
+        trocar.Should().Throw<RegraDeDominioVioladaException>().WithMessage("*limite de 5 fotos*");
+        item.FotoUrl.Should().Be("https://exemplo.test/capa-legada.webp");
+        item.ObterFotosGaleria().Should().Equal(fotos);
+        // Promover a capa uma foto que já está na galeria não aumenta a contagem.
+        item.SubstituirCapaGaleria(fotos[2]);
+        item.ObterFotosGaleria().Should().BeEquivalentTo(fotos).And.StartWith(fotos[2]);
+    }
+
+    [Theory]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("file:///etc/passwd")]
+    [InlineData("")]
+    public void TrocarCapaGaleria_EnderecoInvalido_NaoPerdeCapaOuAngulos(string url)
+    {
+        var item = NovoItemValido();
+        item.AdicionarFotoGaleria("https://exemplo.test/capa.webp");
+        item.AdicionarFotoGaleria("https://exemplo.test/angulo.webp");
+
+        var trocar = () => item.SubstituirCapaGaleria(url);
+
+        trocar.Should().Throw<RegraDeDominioVioladaException>();
+        item.FotoUrl.Should().Be("https://exemplo.test/capa.webp");
+        item.ObterFotosGaleria().Should().Equal("https://exemplo.test/capa.webp", "https://exemplo.test/angulo.webp");
+    }
+
+    [Fact]
+    public void AdicionarAnguloPreservandoCapaLegada_ContaACapaNoLimite_ERecusaSemEscritaParcial()
+    {
+        var item = NovoItemValido();
+        const string capa = "https://exemplo.test/capa-legada.webp";
+        item.AtualizarMetadata(fotoUrl: capa);
+        var invalido = () => item.AdicionarFotoGaleria("javascript:alert(1)", preservarCapa: true);
+        invalido.Should().Throw<RegraDeDominioVioladaException>();
+        item.ObterFotosGaleria().Should().BeEmpty();
+        item.FotoUrl.Should().Be(capa);
+
+        var angulos = Enumerable.Range(1, 4).Select(n => $"https://exemplo.test/{n}.webp").ToList();
+        foreach (var angulo in angulos) item.AdicionarFotoGaleria(angulo, preservarCapa: true);
+        var excedente = () => item.AdicionarFotoGaleria("https://exemplo.test/excedente.webp", preservarCapa: true);
+
+        excedente.Should().Throw<RegraDeDominioVioladaException>();
+        item.FotoUrl.Should().Be(capa);
+        item.ObterFotosGaleria().Should().Equal(angulos.Prepend(capa));
+    }
+
     [Fact]
     public void Galeria_preserva_angulos_e_define_apenas_a_primeira_como_capa()
     {
@@ -565,5 +658,34 @@ public class CardapioItemTests
         var act = () => item.DefinirPreparo(null, 0, null);
 
         act.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    // M1.2 (#1482, US-029): a novidade some sozinha depois do prazo (relógio fixo).
+    [Fact]
+    public void Novidade_ValeAteODiaInclusive_ESomeDepois()
+    {
+        var item = CardapioItem.CriarAvulso(Guid.NewGuid(), "Torta", 60m);
+        item.DefinirNovidade(new DateOnly(2026, 10, 20));
+
+        item.EhNovidade(new DateOnly(2026, 10, 20)).Should().BeTrue();
+        item.EhNovidade(new DateOnly(2026, 10, 21)).Should().BeFalse();
+        item.DefinirNovidade(null);
+        item.EhNovidade(new DateOnly(2026, 10, 1)).Should().BeFalse();
+    }
+
+    // M1.2 (#1482, D-M1-07): arquivar não mexe no site nem no dia, e repor volta.
+    [Fact]
+    public void Arquivar_NaoMexeNoSiteNemNoDia_ERepoeVolta()
+    {
+        var item = CardapioItem.CriarAvulso(Guid.NewGuid(), "Torta", 60m);
+        item.TornarVisivel();
+
+        item.Arquivar(new DateTime(2026, 10, 8, 12, 0, 0, DateTimeKind.Utc));
+        item.EstaArquivado.Should().BeTrue();
+        item.Visivel.Should().BeTrue();
+        item.Disponivel.Should().BeTrue();
+
+        item.Repor();
+        item.EstaArquivado.Should().BeFalse();
     }
 }

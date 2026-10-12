@@ -4,7 +4,9 @@ import { CampoArea, CampoTexto } from '../../componentes/Campo'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
-import { VARIAVEIS, contextoDePrevia, textoDaRegra } from '../../dominio/automacao'
+import {
+  VARIAVEIS, VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, contextoDePrevia, textoDaRegra, variaveisForaDaApi,
+} from '../../dominio/automacao'
 import { ROTULO_DO_SOM, listaDeEventosDeSom } from '../../dominio/automatico'
 import { canalDaConversa } from '../../dominio/canal'
 import { DIAS_DA_SEMANA, descreverProximaAbertura } from '../../dominio/funcionamento'
@@ -14,20 +16,46 @@ import css from './automacoes.module.css'
 
 const AVISOS_DE_SOM = listaDeEventosDeSom().map((e) => ROTULO_DO_SOM[e]).join(', ')
 
+// #1474, modo API: o EasyStok só preenche {nome}, {pedido} e {faixa}; a prévia não inventa o
+// resto ({abre}, {linkCardapio} saem escritos assim para o cliente) e a tela avisa.
+const CHAVES_DA_API = new Set(VARIAVEIS_DA_API.map((v) => v.chave))
+const soDaApi = (contexto) => Object.fromEntries(Object.entries(contexto).filter(([chave]) => CHAVES_DA_API.has(chave)))
+
 function Regra({
-  regra, contexto, aoAlternar, aoEditar, nomeConversa, podeEnviar, aoEnviar,
+  regra, contexto, aoAlternar, aoEditar, nomeConversa, podeEnviar, aoEnviar, fonteApi, avisoApi,
 }) {
   const [rascunho, setRascunho] = useState(null)
+  // ocioso | salvando | salvo | erro: o resultado aparece aqui dentro, não atrás do modal.
+  const [gravacao, setGravacao] = useState('ocioso')
 
   const valor = rascunho ?? { texto: regra.texto }
   const editando = valor.texto !== regra.texto
-  const previa = textoDaRegra({ ...regra, texto: valor.texto }, contexto)
+  const previa = textoDaRegra({ ...regra, texto: valor.texto }, fonteApi ? soDaApi(contexto) : contexto)
+  const variaveis = fonteApi ? VARIAVEIS_DA_API : VARIAVEIS
+  const foraDaApi = fonteApi ? variaveisForaDaApi(valor.texto) : []
+  const avisoEntrada = fonteApi ? avisoDaAutomaticaDeEntrada(regra) : null
 
-  const mudar = (campo, novo) => setRascunho({ ...valor, [campo]: novo })
+  const mudar = (campo, novo) => {
+    setGravacao('ocioso')
+    setRascunho({ ...valor, [campo]: novo })
+  }
 
-  const salvar = () => {
-    aoEditar(regra.id, { texto: valor.texto.trim() })
+  // Espera a API: só limpa o rascunho quando gravou. A ação do modo API devolve `false` quando
+  // recusou (o motivo vai para o aviso da faixa); a da demonstração não devolve nada.
+  const salvar = async () => {
+    setGravacao('salvando')
+    let ok
+    try {
+      ok = await aoEditar(regra.id, { texto: valor.texto.trim() })
+    } catch {
+      ok = false
+    }
+    if (ok === false) {
+      setGravacao('erro')
+      return
+    }
     setRascunho(null)
+    setGravacao('salvo')
   }
 
   return (
@@ -55,39 +83,57 @@ function Regra({
       />
       <p className={css.variaveis}>
         <span>Variáveis:</span>
-        {VARIAVEIS.map((v) => <span key={v.chave} className={css.tokenVariavel}>{`{${v.chave}}`}</span>)}
+        {variaveis.map((v) => <span key={v.chave} className={css.tokenVariavel}>{`{${v.chave}}`}</span>)}
       </p>
+      {foraDaApi.length > 0 && (
+        <p className={css.alerta} role="alert">
+          {foraDaApi.map((v) => `{${v}}`).join(', ')} não é preenchida pelo EasyStok e sai escrita assim para o cliente.
+        </p>
+      )}
+      {avisoEntrada && <p className={css.alerta}>{avisoEntrada}</p>}
 
       {/* Prévia em bolha: é o que o cliente lê agora, com os dados desta conversa. */}
       <p className={css.rotuloPrevia}>O cliente recebe assim agora:</p>
       <p className={css.bolha}>{previa}</p>
 
-      {editando && (
+      {editando && gravacao !== 'erro' && (
         <p className={css.editando}>
           <Pilula tom="aviso" fina>editando, não salvo</Pilula>
         </p>
       )}
+      {gravacao === 'erro' && (
+        <p className={css.alerta} role="alert">
+          Não salvou. {avisoApi ?? 'Tente de novo.'} O texto continua aqui.
+        </p>
+      )}
+      {gravacao === 'salvo' && !editando && (
+        <output className={css.editando}><Pilula tom="ok" fina>Salvo</Pilula></output>
+      )}
 
       <div className={css.acoes}>
-        <Botao variante="primario" className={css.toque} disabled={!editando} onClick={salvar}>
-          Salvar texto
+        <Botao variante="primario" className={css.toque} disabled={!editando || gravacao === 'salvando'} onClick={salvar}>
+          {gravacao === 'salvando' ? 'Salvando…' : 'Salvar texto'}
         </Botao>
-        <Botao className={css.toque} disabled={!editando} onClick={() => setRascunho(null)}>
+        <Botao className={css.toque} disabled={!editando || gravacao === 'salvando'} onClick={() => { setRascunho(null); setGravacao('ocioso') }}>
           Desfazer
         </Botao>
         {/* Achado 1, P0 (banca 10): a tela que o dono já achou (trilho,
             rótulo por extenso) não deixava enviar; quem enviava de fato era
             outro ícone, escondido dentro da conversa. Mesma ação `enviar` de
-            useAcoes() que features/respostas/ModalBiblioteca.jsx já usa. */}
-        <Botao
-          icone="enviar"
-          className={css.toque}
-          disabled={!podeEnviar}
-          title={!podeEnviar ? 'Abra uma conversa (com janela aberta para texto livre) para enviar.' : undefined}
-          onClick={() => aoEnviar(regra, previa)}
-        >
-          {nomeConversa ? `Enviar para ${nomeConversa.split(' ')[0]}` : 'Enviar'}
-        </Botao>
+            useAcoes() que features/respostas/ModalBiblioteca.jsx já usa.
+            #1474: no modo API este envio não está ligado (ENVIOS_NAO_LIGADOS.automatica)
+            e o modal fechava como se tivesse enviado; some até ligar. */}
+        {!fonteApi && (
+          <Botao
+            icone="enviar"
+            className={css.toque}
+            disabled={!podeEnviar}
+            title={!podeEnviar ? 'Abra uma conversa (com janela aberta para texto livre) para enviar.' : undefined}
+            onClick={() => aoEnviar(regra, previa)}
+          >
+            {nomeConversa ? `Enviar para ${nomeConversa.split(' ')[0]}` : 'Enviar'}
+          </Botao>
+        )}
       </div>
     </li>
   )
@@ -96,6 +142,10 @@ function Regra({
 // Uma linha por dia da semana (pedido do dono, 24/09/2026): fechado o dia
 // todo tira os dois campos de hora, sem apagar o que estava neles (ela pode
 // desmarcar e achar o horário de antes do jeito que deixou).
+//
+// #1474: a chave era "Fechado o dia todo" (desligada = aberto), dupla negação: com a
+// semana toda aberta a tela parecia toda fechada. Agora é "Abre neste dia" (ligada =
+// abre); o dado gravado continua `fechado`, só a leitura da chave inverteu.
 //
 // Achado 8 (banca capricho R10): as sete linhas competiam em pé de igualdade,
 // sem nada que dissesse qual vale hoje. `hoje` já vem calculado do relógio da
@@ -108,15 +158,16 @@ function DiaDeFuncionamento({ dia, valor, aoEditar, hoje }) {
       <label className={css.chave}>
         <input
           type="checkbox"
-          aria-label={`${dia.rotulo}, fechado o dia todo`}
-          checked={valor.fechado}
+          aria-label={`${dia.rotulo}, abre neste dia`}
+          checked={!valor.fechado}
           onChange={(e) => aoEditar({
-            fechado: e.target.checked,
-            ...(!e.target.checked && !valor.abre ? { abre: '08:00', fecha: '18:00' } : {}),
+            fechado: !e.target.checked,
+            ...(e.target.checked && !valor.abre ? { abre: '08:00', fecha: '18:00' } : {}),
           })}
         />
-        Fechado o dia todo
+        Abre neste dia
       </label>
+      {valor.fechado && <span className={css.diaFechado}>Fechado</span>}
       {!valor.fechado && (
         <span className={css.horariosDoDia}>
           <CampoTexto
@@ -142,10 +193,11 @@ function DiaDeFuncionamento({ dia, valor, aoEditar, hoje }) {
 export function ModalAutomacoes({ regras, aoAlternar, aoFechar }) {
   const {
     selecionada, agora, som, audioBloqueado, funcionamento, aberta, lojaAberta, permissaoNotificacao,
+    fonteApi, sincronizacao,
   } = useAtendimento()
   const {
     editarRegra, alternarSom, ouvirAmostraDeSom, editarFuncionamento, alternarLoja, pedirNotificacaoDoNavegador,
-    enviar,
+    enviar, voltarAoHorario,
   } = useAcoes()
   const { janelas, canais } = useCatalogo()
 
@@ -192,9 +244,15 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar }) {
             ? 'Segue o horário configurado abaixo.'
             : `Forçada ${lojaAberta ? 'aberta' : 'fechada'} na mão, por cima do horário.`}
         </p>
-        <Botao className={css.toque} onClick={() => alternarLoja(agora)}>
-          {aberta ? 'Fechar loja agora' : 'Abrir loja agora'}
-        </Botao>
+        <div className={css.acoesLoja}>
+          <Botao className={css.toque} onClick={() => alternarLoja(agora)}>
+            {aberta ? 'Fechar loja agora' : 'Abrir loja agora'}
+          </Botao>
+          {/* #1474: o mesmo "Voltar a seguir o horário" de Horários e mensagens (só no modo API). */}
+          {voltarAoHorario && lojaAberta != null && (
+            <Botao className={css.toque} onClick={voltarAoHorario}>Voltar a seguir o horário</Botao>
+          )}
+        </div>
         <ul className={css.diasFuncionamento}>
           {DIAS_DA_SEMANA.map((dia) => (
             <DiaDeFuncionamento
@@ -282,6 +340,8 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar }) {
             nomeConversa={selecionada?.nome}
             podeEnviar={podeEnviar}
             aoEnviar={enviarRegra}
+            fonteApi={fonteApi}
+            avisoApi={sincronizacao?.aviso ?? null}
           />
         ))}
       </ul>

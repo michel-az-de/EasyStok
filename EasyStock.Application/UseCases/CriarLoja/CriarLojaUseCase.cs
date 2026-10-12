@@ -41,6 +41,6 @@ public class CriarLojaUseCase(
 
         logger.LogInformation("Loja {LojaId} criada para empresa {EmpresaId}.", loja.Id, loja.EmpresaId);
 
-        return new LojaResult(loja.Id, loja.EmpresaId, loja.Nome, loja.Ativa);
+        return new LojaResult(loja.Id, loja.EmpresaId, loja.Nome, loja.Ativa, loja.LogoUrl);
     }
 }

@@ -15,7 +15,7 @@ public sealed class AvisoItemComInteresse(
     IInteresseItemRepository interesses,
     IOperacaoEventPublisher publisher)
 {
-    public static bool Ofertado(CardapioItem item) => item.Visivel && item.Disponivel;
+    public static bool Ofertado(CardapioItem item) => item.Visivel && item.Disponivel && !item.EstaArquivado;
 
     /// <param name="ofertadoAntes">Se o item já estava visível e disponível antes da alteração.</param>
     /// <param name="empresaId">Escopo do chamador; nulo (SuperAdmin) resolve pela loja do item.</param>

@@ -22,7 +22,7 @@ public sealed class EnviarCardapioImagemFerramenta(
     public string Nome => "enviar_cardapio_imagem";
 
     public string Descricao =>
-        "Envia ao cliente a imagem do cardápio com o link do site na legenda; pelo link ele marca os itens e o pedido volta pronto para esta conversa. " +
+        "Compartilha a comanda pessoal: imagem com legenda, ou texto quando não houver imagem; pelo link cliente e atendimento acompanham seleção, envio e pagamento. " +
         "Não precisa repetir o link depois.";
 
     public string SchemaJson => """{"type":"object","properties":{},"additionalProperties":false}""";
@@ -31,16 +31,19 @@ public sealed class EnviarCardapioImagemFerramenta(
     {
         var link = (await linkCardapio.GerarAsync(contexto.EmpresaId, contexto.Conversa.Id, contexto.Agora, ct)).Url;
         var storefront = await storefrontRepository.GetByEmpresaAsync(contexto.EmpresaId, ct);
-        if (string.IsNullOrWhiteSpace(storefront?.CardapioImagemUrl))
-            return FerramentaJson.Serializar(new { enviado = false, motivo = "sem_imagem_configurada", link });
-
         var conversa = contexto.Conversa;
-        var envio = await cloudClient.EnviarImagemAsync(conversa.ContatoIdExterno, storefront.CardapioImagemUrl, link, ct);
+        var titulo = conversa.NumeroComanda > 0 ? $"Comanda #{conversa.NumeroComanda}" : "Sua comanda pessoal";
+        var texto = $"{titulo}. Escolha os itens e acompanhe seu pedido e pagamento por aqui: {link}";
+        var temImagem = !string.IsNullOrWhiteSpace(storefront?.CardapioImagemUrl);
+        var envio = temImagem
+            ? await cloudClient.EnviarImagemAsync(conversa.ContatoIdExterno, storefront!.CardapioImagemUrl!, texto, ct)
+            : await cloudClient.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct: ct);
+        contexto.RegistrarEnvioVerificado();
 
         if (conversa.EstaAberta) conversa.RegistrarSaida(contexto.Agora);
         await conversaRepository.AddMensagemAsync(
             Mensagem.Saida(contexto.EmpresaId, conversa.Id, AutorMensagem.Agente, contexto.Agora,
-                TipoConteudoMensagem.Imagem, link, envio.Wamid),
+                temImagem ? TipoConteudoMensagem.Imagem : TipoConteudoMensagem.Texto, texto, envio.Wamid),
             ct);
 
         return FerramentaJson.Serializar(new { enviado = true, link });

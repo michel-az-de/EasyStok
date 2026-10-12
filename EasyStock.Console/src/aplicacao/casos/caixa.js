@@ -25,6 +25,10 @@ const ATENDENTE = 'Thatiane'
 const comCaixa = (estado, movimentos) => ({ ...estado, caixa: { ...estado.caixa, movimentos } })
 
 export const casosCaixa = {
+  // #1443: qual gesto da loja está aberto ('abrir' | 'fechar'), ou nenhum.
+  [acao.PEDIR_GESTO_LOJA]: (estado, { gesto }) => ({ ...estado, ui: { ...estado.ui, gestoLoja: gesto } }),
+  [acao.FECHAR_GESTO_LOJA]: (estado) => ({ ...estado, ui: { ...estado.ui, gestoLoja: null } }),
+
   [acao.ABRIR_CAIXA]: (estado, { agora, saldoInicial }) => {
     const movimentos = estado.caixa?.movimentos ?? []
     if (!podeAbrirCaixa(movimentos, agora)) return estado

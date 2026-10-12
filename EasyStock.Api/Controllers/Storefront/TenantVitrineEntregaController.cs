@@ -53,6 +53,15 @@ public class TenantVitrineEntregaController(
     public Task<IActionResult> DefinirJanelaAtiva(Guid id, [FromBody] AtivaBody body, CancellationToken ct) =>
         Tratar(async () => DataOk(await janelas.DefinirAtivaAsync(Empresa, id, body.Ativa, ct)));
 
+    [SwaggerOperation(Summary = "Delete an unused delivery window", Description = "Com pedido ou bloqueio na janela, recusa: pause em vez de excluir.")]
+    [HttpDelete("janelas/{id:guid}")]
+    public Task<IActionResult> ExcluirJanela(Guid id, CancellationToken ct) =>
+        Tratar(async () =>
+        {
+            await janelas.ExcluirAsync(Empresa, id, ct);
+            return NoContent();
+        });
+
     // ── Zonas ──────────────────────────────────────────────────────────
 
     [SwaggerOperation(Summary = "List shipping zones (including inactive)")]

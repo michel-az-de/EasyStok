@@ -42,8 +42,8 @@ export function pedidoAtrasado(pedido, janelas, agora) {
 // vai sempre junto). UC-04 E2: o card só muda para o estado de atraso quando
 // o horário de início calculado passa — antes disso "pago" é espera normal,
 // não alarme. 'esperando' fica em tom neutro (--info, mesma aposentadoria
-// que os outros neutros da tela); só 'atraso' usa a cor de perigo (--parado,
-// apelidada --perigo em tokens.css). Entregue mantém o azul próprio (nota em
+// que os outros neutros da tela); só 'atraso' usa a cor de perigo (--erro,
+// apelidada --erro em tokens.css). Entregue mantém o azul próprio (nota em
 // tokens.css: "ela quer azul aqui, não neutro").
 export function situacaoDoCartao(pedido, janelas, agora) {
   if (pedidoAtrasado(pedido, janelas, agora)) return { chave: 'atraso', rotulo: 'Atrasado' }

@@ -91,13 +91,26 @@ public class PedidoAvaliacao
             Estrelas = estrelas,
             Comentario = comentarioNormalizado,
             RecomendariaParaAmigos = recomendariaParaAmigos,
-            FotoUrl = fotoUrl?.Trim(),
+            FotoUrl = NormalizarFotoUrl(fotoUrl),
             SolicitadoEm = DateTime.SpecifyKind(solicitadoEm, DateTimeKind.Utc),
             RespondidoEm = DateTime.UtcNow,
             OcultadoEm = null,
             RespostaDaBaba = null,
             RespondidaEmPorBaba = null,
         };
+    }
+
+    public const int FotoUrlMax = 500;
+
+    // #1547: a rota é pública e gravava qualquer texto (javascript:, data:; acima de 500 estourava a coluna).
+    private static string? NormalizarFotoUrl(string? fotoUrl)
+    {
+        var url = fotoUrl?.Trim();
+        if (string.IsNullOrEmpty(url)) return null;
+        if (url.Length > FotoUrlMax || !Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
+            throw new RegraDeDominioVioladaException("URL da foto inválida.");
+        return url;
     }
 
     /// <summary>

@@ -18,7 +18,7 @@ public static class CoreMvcExtensions
 {
     public static IServiceCollection AddEasyStockCoreMvc(this IServiceCollection services)
     {
-        services.AddControllersWithViews()
+        services.AddControllersWithViews(options => options.Conventions.Add(new Authorization.ModulosConvention()))
             .AddJsonOptions(opts =>
             {
                 opts.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;

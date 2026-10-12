@@ -22,8 +22,9 @@ public sealed record ResultadoTurnoAgente(bool ChamouLlm, bool Respondeu, bool E
 /// como <c>Mensagem(Saida, Agente)</c>, envia pela Cloud API e registra o consumo em <c>UsoIa</c>.
 ///
 /// <para>Guardas: conversa que não está <see cref="SituacaoConversa.Automatica"/> (RN-04), fora da janela
-/// de 24 h, ou sem entrada pendente do cliente (job repetido) → não chama o LLM nem envia nada. LLM
-/// indisponível (<c>Anthropic:Enabled=false</c> ou sem chave) ou canal sem agente → escala para a dona.
+/// de 24 h, ou sem entrada pendente do cliente (job repetido) → não chama o LLM nem envia nada. Atendimento
+/// automático desligado na configuração (#1475), LLM indisponível (<c>Anthropic:Enabled=false</c> ou sem
+/// chave) ou canal sem agente → escala para a dona.
 /// Se a dona assumir durante a chamada ao LLM, a resposta é descartada (#1288).</para>
 /// </summary>
 public sealed class AgenteAtendimentoService(
@@ -47,6 +48,7 @@ public sealed class AgenteAtendimentoService(
         ferramentas.ToDictionary(f => f.Nome, StringComparer.Ordinal);
 
     public const string MotivoAgenteDesligado = "agente desligado (LLM indisponível)";
+    public const string MotivoAtendimentoAutomaticoDesligado = "atendimento automático desligado na configuração";
 
     public async Task<ResultadoTurnoAgente> ProcessarTurnoAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default)
     {
@@ -61,10 +63,15 @@ public sealed class AgenteAtendimentoService(
         if (pendentes.Count == 0)
             return ResultadoTurnoAgente.Ignorado;
 
-        // Ninguém responderia: LLM desligado (Anthropic:Enabled=false ou sem chave) ou canal sem agente (o
-        // agente envia pelo cliente do WhatsApp; em outro canal sairia pelo canal errado). Passa de fato
-        // para a dona, senão a conversa fica Automatica sem ninguém e fora do lembrete (#1288).
-        var motivoSemAgente = !llm.Disponivel ? MotivoAgenteDesligado
+        var configuracao = await configuracaoRepository.GetByEmpresaIdAsync(empresaId)
+            ?? ConfiguracaoAtendimento.CriarPadrao(empresaId);
+
+        // Ninguém responderia: a dona desligou o atendimento automático no console (#1475), LLM desligado
+        // (Anthropic:Enabled=false ou sem chave) ou canal sem agente (o agente envia pelo cliente do WhatsApp;
+        // em outro canal sairia pelo canal errado). Passa de fato para a dona, senão a conversa fica
+        // Automatica sem ninguém e fora do lembrete (#1288).
+        var motivoSemAgente = !configuracao.Ativo ? MotivoAtendimentoAutomaticoDesligado
+            : !llm.Disponivel ? MotivoAgenteDesligado
             : !conversa.TemAgente ? $"o canal {conversa.Canal} não tem agente"
             : null;
         if (motivoSemAgente is not null)
@@ -79,8 +86,6 @@ public sealed class AgenteAtendimentoService(
         if (mensagens.Count == 0 || mensagens[^1].Papel != MensagemLlm.Usuario)
             return ResultadoTurnoAgente.Ignorado;
 
-        var configuracao = await configuracaoRepository.GetByEmpresaIdAsync(empresaId)
-            ?? ConfiguracaoAtendimento.CriarPadrao(empresaId);
         var cliente = conversa.ClienteId is { } clienteId
             ? await clienteRepository.GetByIdAsync(empresaId, clienteId)
             : null;
@@ -100,7 +105,6 @@ public sealed class AgenteAtendimentoService(
         var geracao = await GeracaoAgenteAtendimento.GerarAsync(
             llm, system, mensagens, _ferramentas, contexto, MaximoIteracoes, logger, ct);
         var tokens = geracao.Tokens;
-        var textoFinal = geracao.Texto;
         var motivoEscalada = geracao.MotivoFalha;
         var concluiu = geracao.Concluiu;
 
@@ -116,22 +120,31 @@ public sealed class AgenteAtendimentoService(
             if (tokens > 0)
                 await RegistrarUsoAsync(empresaId, tokens, agora);
             await unitOfWork.CommitAsync();
-            return new ResultadoTurnoAgente(ChamouLlm: true, Respondeu: false, Escalou: false);
+            return new ResultadoTurnoAgente(ChamouLlm: true, Respondeu: contexto.HouveEnvio,
+                Escalou: conversa.Situacao == SituacaoConversa.Assumida);
         }
 
-        var respondeu = false;
-        if (!concluiu && motivoEscalada is null)
+        var respondeu = contexto.HouveEnvio;
+        const string encaminhamento = "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.";
+        if (conversa.Situacao == SituacaoConversa.Assumida)
         {
-            // Limite de iterações: avisa o cliente e passa para a dona.
-            respondeu = await EnviarRespostaAsync(empresaId, conversa, configuracao.FraseEspera, agora, ct);
-            motivoEscalada = $"o agente atingiu o limite de {MaximoIteracoes} iterações sem concluir a resposta";
+            respondeu = await EnviarRespostaAsync(empresaId, conversa, encaminhamento, agora, ct) || respondeu;
         }
-        else if (!string.IsNullOrWhiteSpace(textoFinal))
+        else if (conversa.Situacao == SituacaoConversa.Encerrada && contexto.RespostaVerificada is { Length: > 0 } despedida)
+            respondeu = await EnviarRespostaAsync(empresaId, conversa, despedida, agora, ct) || respondeu;
+        else if (conversa.Situacao == SituacaoConversa.Automatica)
         {
-            respondeu = await EnviarRespostaAsync(empresaId, conversa, textoFinal, agora, ct);
+            if (concluiu && motivoEscalada is null && contexto.RespostaVerificada is { Length: > 0 } verificada)
+                respondeu = await EnviarRespostaAsync(empresaId, conversa, verificada, agora, ct) || respondeu;
+            else if (!contexto.EnvioVerificado || motivoEscalada is not null || !concluiu)
+            {
+                respondeu = await EnviarRespostaAsync(empresaId, conversa, encaminhamento, agora, ct) || respondeu;
+                motivoEscalada ??= concluiu ? "resposta sem resultado verificado; precisa de conferência humana"
+                    : $"o agente atingiu o limite de {MaximoIteracoes} iterações sem concluir a resposta";
+            }
         }
 
-        if (motivoEscalada is not null)
+        if (motivoEscalada is not null && conversa.Situacao == SituacaoConversa.Automatica)
             await escalador.EscalarAsync(empresaId, conversa, motivoEscalada, agora, ct);
 
         if (tokens > 0)

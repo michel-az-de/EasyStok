@@ -1,16 +1,17 @@
 /* Popover (rodada 6): material de vidro sobre o que está atrás, raio de
    cartão, sombra alta e entrada curta a partir do gatilho. */
 .popover {
+  pointer-events: auto;
   position: absolute; bottom: calc(100% + var(--e-2)); left: var(--e-3); right: var(--e-3);
   max-height: min(340px, 50dvh); overflow-y: auto;
   background: var(--vidro); -webkit-backdrop-filter: var(--desfoque); backdrop-filter: var(--desfoque);
   border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
   box-shadow: var(--sombra-alta), var(--brilho); padding: var(--e-2); z-index: 20;
   transform-origin: bottom center;
-  animation: abrir var(--dur-media) var(--ease-mola) both;
+  animation: abrir var(--dur-curta) var(--ease-saida) both;
 }
 @keyframes abrir {
-  from { opacity: 0; transform: translateY(6px) scale(.97); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: none; }
 }
 .grupo { margin-bottom: var(--e-1); }
@@ -23,7 +24,8 @@
   display: block; width: 100%; text-align: left; background: none; border: 0;
   border-radius: var(--r-1); padding: var(--e-2) var(--e-3); min-height: var(--toque);
 }
-.item:hover { background: var(--preenchimento-forte); }
+.item:hover:not(.informativo) { background: var(--preenchimento-forte); }
+.informativo { cursor: default; }
 .item strong { display: block; font-size: var(--t-corpo); font-weight: 600; }
 .item span { display: block; font-size: var(--t-apoio); color: var(--tinta-2); margin-top: var(--e-0); }
 /* Popover que abre para baixo, para gatilho que mora no topo da tela. Largura

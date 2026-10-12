@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
-import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
+import { useChamadaEstavel } from '../../hooks/useChamadaEstavel'
 import { CartaoConversa } from './CartaoConversa'
 import { BarraBalcao } from './BarraBalcao'
 import { NaoEntregues } from './NaoEntregues'
@@ -12,7 +11,7 @@ import css from './caixa.module.css'
 // um com sua própria lista e sua própria memória de aberto/fechado — abrir um
 // não deve fechar o outro.
 function GrupoRecolhido({
-  titulo, conversas, aberto, aoAlternar, agora, automaticoPausado, aoAbrir, chave, busca,
+  titulo, conversas, aberto, aoAlternar, agora, automaticoPausado, pagamentosNaoVistos, aoAbrir, chave, busca,
 }) {
   if (conversas.length === 0) return null
   return (
@@ -32,7 +31,8 @@ function GrupoRecolhido({
           conversa={conversa}
           selecionada={false}
           agora={agora}
-          automaticoPausado={automaticoPausado}
+          pausado={automaticoPausado?.[conversa.id] ?? false}
+          pagamentoNaoVisto={pagamentosNaoVistos?.has(conversa.id) ?? false}
           grupo={chave}
           busca={busca}
           aoAbrir={aoAbrir}
@@ -42,10 +42,20 @@ function GrupoRecolhido({
   )
 }
 
+// Lista vazia em uma linha de texto e um link (#1442).
+function VazioEmLinha({ texto, acao, aoAgir }) {
+  return (
+    <p className={css.vazioLinha}>
+      {texto}
+      {acao && <button type="button" className={css.linkVazio} onClick={aoAgir}>{acao}</button>}
+    </p>
+  )
+}
+
 export function PainelConversas({ aoAbrir }) {
   const {
     visiveis, encerradasDoBalcao, bloqueadasDoBalcao, selecionadaId, filtros, agora,
-    automaticoPausado, aberta,
+    automaticoPausado, aberta, horarioDaLoja, pagamentosNaoVistos,
   } = useAtendimento()
   const { mudarFiltro, selecionar } = useAcoes()
   const [gruposAbertos, setGruposAbertos] = useState({ encerradas: false, bloqueados: false })
@@ -60,10 +70,11 @@ export function PainelConversas({ aoAbrir }) {
     setGruposAbertos({ encerradas: abrir, bloqueados: abrir })
   }
 
-  function abrir(id) {
+  // #1577: identidade fixa, senão o `memo` do cartão não segura.
+  const abrir = useChamadaEstavel((id) => {
     selecionar(id)
     aoAbrir?.(id)
-  }
+  })
 
   function alternarGrupo(chave) {
     setGruposAbertos((atual) => ({ ...atual, [chave]: !atual[chave] }))
@@ -114,33 +125,27 @@ export function PainelConversas({ aoAbrir }) {
         onFocusCapture={travar}
         onBlurCapture={destravarComAtraso}
       >
+        {/* #1442: vazio em uma linha, com o atalho certo. O bloco grande
+            "Ninguém esperando você" ocupava a coluna e escondia o resto. */}
         {lista.length === 0 && !semBusca
           && (filtros.aba === 'precisa' || encerradasDoBalcao.length + bloqueadasDoBalcao.length === 0) && (
-          <Vazio
-            titulo={`Nada com "${filtros.busca.trim()}"`}
-            acao={<Botao variante="secundario" onClick={() => mudarFiltro('busca', '')}>Limpar busca</Botao>}
-          >
-            Nenhuma conversa tem esse nome, telefone, mensagem ou tag.
-          </Vazio>
+          <VazioEmLinha texto={`Nada com "${filtros.busca.trim()}".`} acao="Limpar busca" aoAgir={() => mudarFiltro('busca', '')} />
         )}
         {lista.length === 0 && semBusca && !semCanal && (
-          <Vazio
-            titulo={`Nada no ${filtros.canais.join(', ')}`}
-            acao={<Botao variante="texto" onClick={() => mudarFiltro('canais', [])}>Ver todos os canais</Botao>}
-          >
-            Nenhuma conversa deste canal está aqui agora.
-          </Vazio>
+          <VazioEmLinha
+            texto={`${filtros.aba === 'precisa' ? 'Ninguém esperando você' : 'Nada aberto'} no ${filtros.canais.join(', ')}.`}
+            acao="Ver todos os canais"
+            aoAgir={() => mudarFiltro('canais', [])}
+          />
         )}
         {lista.length === 0 && semBusca && semCanal && filtros.aba === 'precisa' && (
-          <Vazio
-            titulo="Ninguém esperando você"
-            acao={<Botao variante="texto" onClick={() => mudarFiltro('aba', 'todas')}>Ver todas</Botao>}
-          >
-            Toda conversa em aberto está com o automático ou já foi respondida.
-          </Vazio>
+          <VazioEmLinha texto="Ninguém esperando você." acao="Ver todas" aoAgir={() => mudarFiltro('aba', 'todas')} />
         )}
-        {lista.length === 0 && semBusca && semCanal && filtros.aba !== 'precisa' && (
-          <Vazio titulo="Nada por aqui">Nenhuma conversa neste canal e nesta busca.</Vazio>
+        {lista.length === 0 && semBusca && semCanal && filtros.aba !== 'precisa' && filtros.responsavel && filtros.responsavel !== 'todas' && (
+          <VazioEmLinha texto={filtros.responsavel === 'minhas' ? 'Nenhuma conversa sua aberta agora.' : 'Nenhuma conversa sem dono aberta agora.'} acao="Ver todas" aoAgir={() => mudarFiltro('responsavel', 'todas')} />
+        )}
+        {lista.length === 0 && semBusca && semCanal && filtros.aba !== 'precisa' && (!filtros.responsavel || filtros.responsavel === 'todas') && (
+          <VazioEmLinha texto="Nenhuma conversa aberta agora." />
         )}
         {lista.map((conversa) => (
           <CartaoConversa
@@ -148,8 +153,10 @@ export function PainelConversas({ aoAbrir }) {
             conversa={conversa}
             selecionada={conversa.id === selecionadaId}
             agora={agora}
-            automaticoPausado={automaticoPausado}
+            pausado={automaticoPausado?.[conversa.id] ?? false}
+            pagamentoNaoVisto={pagamentosNaoVistos?.has(conversa.id) ?? false}
             aberta={aberta}
+            expediente={horarioDaLoja}
             busca={filtros.busca}
             aoAbrir={abrir}
           />
@@ -164,6 +171,7 @@ export function PainelConversas({ aoAbrir }) {
               aoAlternar={() => alternarGrupo('encerradas')}
               agora={agora}
               automaticoPausado={automaticoPausado}
+              pagamentosNaoVistos={pagamentosNaoVistos}
               busca={filtros.busca}
               aoAbrir={abrir}
             />
@@ -175,6 +183,7 @@ export function PainelConversas({ aoAbrir }) {
               aoAlternar={() => alternarGrupo('bloqueados')}
               agora={agora}
               automaticoPausado={automaticoPausado}
+              pagamentosNaoVistos={pagamentosNaoVistos}
               busca={filtros.busca}
               aoAbrir={abrir}
             />

@@ -94,8 +94,12 @@ export function textoDoEntregador(entregador) {
 // ela, sai da comanda por uma conta que não repete: multiplicar por 7919
 // (primo, não divide 9000) é uma troca um a um dentro dos 9000 números de
 // quatro dígitos.
+//
+// #1474 (R6): pedido do EasyStok já tem o número que a Cozinha, as Entregas e o cliente leem
+// (8 letras do id); inventar outro fazia o entregador conferir um número que não existe.
 export function numeroParaEntregador(pedido) {
   if (pedido?.numeroEntrega) return '#' + pedido.numeroEntrega
+  if (pedido?.pedidoId) return pedido.numero
   const curto = numeroCurto(pedido?.numero ?? '')
   let base = Number.parseInt(curto, 10)
   if (Number.isNaN(base)) base = [...String(curto)].reduce((soma, letra) => (soma * 31 + letra.charCodeAt(0)) % 9000, 7)

@@ -26,15 +26,27 @@ public sealed class WebPushCanal(
     IWebPushSubscriptionRepository repo,
     IOptions<WebPushOptions> options,
     ILogger<WebPushCanal> logger,
-    WebPushClient? client = null) : ICanalNotificacao
+    WebPushClient? client = null,
+    IHttpClientFactory? httpClientFactory = null) : ICanalNotificacao, IDisposable
 {
+    /// <summary>Nome do HttpClient registrado com <c>AddHttpClient</c> para o push service.</summary>
+    public const string NomeHttpClient = "WebPush";
+
     public CanalNotificacao Canal => CanalNotificacao.Push;
 
     private readonly WebPushOptions _opts = options.Value;
 
-    // O cliente HTTP do Web Push e injetavel so para teste (HttpClient com handler falso). Em runtime o container
-    // nao registra WebPushClient e o valor padrao (nulo) cai no cliente proprio.
-    private readonly WebPushClient _client = client ?? new();
+    // O WebPushClient e injetavel so para teste (HttpClient com handler falso); o container nao o registra. Em runtime
+    // o HttpClient vem da fabrica (#1507): o canal e scoped e um WebPushClient() proprio criava um HttpClient por escopo
+    // que nunca era descartado. Sem fabrica, o cliente proprio e descartado junto com o escopo (Dispose).
+    private readonly WebPushClient _client = client
+        ?? (httpClientFactory is not null ? new WebPushClient(httpClientFactory.CreateClient(NomeHttpClient)) : new());
+
+    public void Dispose()
+    {
+        // So descarta o que o canal criou; o HttpClient da fabrica nao e do WebPushClient e nao e fechado aqui.
+        if (client is null) _client.Dispose();
+    }
 
     public async Task<ResultadoEnvio> EnviarAsync(MensagemPronta mensagem, CancellationToken ct = default)
     {
@@ -47,7 +59,8 @@ public sealed class WebPushCanal(
                 DuracaoMs: sw.ElapsedMilliseconds, FalhaPermanente: true);
         }
 
-        var subs = await ResolverSubscriptionsAsync(mensagem, ct);
+        var subs = (await ResolverSubscriptionsAsync(mensagem, ct))
+            .Where(s => s.EmpresaId == mensagem.EmpresaId && s.Ativo).ToList();
         if (subs.Count == 0)
         {
             sw.Stop();
@@ -70,6 +83,16 @@ public sealed class WebPushCanal(
         var permanentes = 0;
         foreach (var sub in subs)
         {
+            // #1508: inscricao gravada antes da allowlist nao pode virar SSRF. Desativa e conta como permanente.
+            if (!EndpointPushPermitido.Valido(sub.Endpoint))
+            {
+                logger.LogWarning("Subscription Web Push {SubscriptionId} com endpoint fora da allowlist desativada.", sub.Id);
+                await repo.DesativarAsync(sub.Endpoint, ct);
+                falhas++;
+                permanentes++;
+                continue;
+            }
+
             try
             {
                 var psub = new PushSubscription(sub.Endpoint, sub.P256dh, sub.Auth);
@@ -118,9 +141,9 @@ public sealed class WebPushCanal(
     {
         var dest = msg.Destinatario.Trim();
         if (dest.StartsWith("usuario:", StringComparison.OrdinalIgnoreCase) && Guid.TryParse(dest[8..], out var usuarioId))
-            return await repo.GetByUsuarioAsync(usuarioId, ct);
+            return (await repo.GetByUsuarioAsync(usuarioId, ct)).Where(s => s.UsuarioId == usuarioId).ToList();
         if (dest.StartsWith("empresa:", StringComparison.OrdinalIgnoreCase) && Guid.TryParse(dest[8..], out var empId))
-            return await repo.GetByEmpresaAsync(empId, ct);
+            return empId == msg.EmpresaId ? await repo.GetByEmpresaAsync(empId, ct) : [];
         // Fallback: empresa da mensagem.
         return await repo.GetByEmpresaAsync(msg.EmpresaId, ct);
     }

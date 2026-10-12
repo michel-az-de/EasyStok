@@ -6,6 +6,7 @@ namespace EasyStock.Api.Controllers;
 
 [SwaggerTag("Store Intelligence / Inteligência por Loja")]
 [Authorize]
+[Authorize(Policy = EasyStock.Api.Authorization.PoliticasPermissao.VisualizarRelatorios)]
 [ValidateEmpresaId]
 [ApiController]
 [Route("api/inteligencia-lojas")]

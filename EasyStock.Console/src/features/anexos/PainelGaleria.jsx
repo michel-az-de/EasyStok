@@ -14,7 +14,7 @@ import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
-import { tipoDeArquivo, validarArquivo, validarPeca, mensagemDePeca } from '../../dominio/anexos'
+import { FOTO_NAO_ENVIADA, tipoDeArquivo, validarArquivo, validarPeca, mensagemDePeca } from '../../dominio/anexos'
 import { aceitaFormato, canalDaConversa, motivoDeFormato } from '../../dominio/canal'
 import { permissaoDeEscrita } from '../../dominio/janela'
 import { useArquivoComoDataUrl } from '../../hooks/useArquivoComoDataUrl'
@@ -135,6 +135,8 @@ export function PainelGaleria({ aoFechar }) {
   const [confirmandoTirar, setConfirmandoTirar] = useState(null)
   const [enviadoId, setEnviadoId] = useState(null)
   const [enviandoId, setEnviandoId] = useState(null)
+  // #1587: a falha fica escrita no cartão; antes o botão só voltava a "Enviar", sem dizer nada.
+  const [falhouId, setFalhouId] = useState(null)
 
   const canal = canalDaConversa(canais, selecionada)
   const { pode, motivo } = permissaoDeEscrita(selecionada, agora, canal)
@@ -143,9 +145,10 @@ export function PainelGaleria({ aoFechar }) {
 
   async function aoCliqueEnviar(peca) {
     setEnviandoId(peca.id)
+    setFalhouId(null)
     const enviado = await enviarMidia(selecionada.id, mensagemDePeca(peca))
     setEnviandoId(null)
-    if (enviado === false) return
+    if (enviado === false) { setFalhouId(peca.id); return }
     setEnviadoId(peca.id)
     setTimeout(() => setEnviadoId((atual) => (atual === peca.id ? null : atual)), 1400)
   }
@@ -162,7 +165,9 @@ export function PainelGaleria({ aoFechar }) {
   return (
     <Modal
       titulo="Fotos e peças"
-      descricao="Fotos prontas para enviar na conversa: prato, horário de funcionamento, ou o que você cadastrar."
+      descricao={fonteApi
+        ? 'Fotos dos pratos do cardápio, prontas para enviar na conversa.'
+        : 'Fotos prontas para enviar na conversa: prato, horário de funcionamento, ou o que você cadastrar.'}
       largura="720px"
       aoFechar={aoFechar}
       rodape={<Botao onClick={aoFechar}>Fechar</Botao>}
@@ -171,16 +176,20 @@ export function PainelGaleria({ aoFechar }) {
 
       {galeria.length === 0 ? (
         <Vazio
-          titulo="Nenhuma peça cadastrada"
+          titulo={fonteApi ? 'Nenhum prato com foto' : 'Nenhuma peça cadastrada'}
           acao={!fonteApi && <Botao variante="primario" onClick={() => setModal({ modo: 'novo' })}>Nova peça</Botao>}
         >
-          Cadastre uma foto com nome e descrição para mandar na conversa em um toque.
+          {/* #1474: no modo API não há cadastro de peça aqui; prometer isso era um beco sem saída. */}
+          {fonteApi
+            ? 'As fotos vêm dos pratos do cardápio. Nenhum prato tem foto ainda.'
+            : 'Cadastre uma foto com nome e descrição para mandar na conversa em um toque.'}
         </Vazio>
       ) : (
         <ul className={css.grade}>
           {galeria.map((peca) => (
             <li key={peca.id} className={css.cartao}>
-              <img src={peca.foto} alt={peca.nome} loading="lazy" />
+              {/* Sem loading="lazy": dentro do <dialog> a miniatura ficava branca (#1437). */}
+              <img src={peca.foto} alt={peca.nome} />
               <div className={css.cartaoTexto}>
                 <strong>{peca.nome}</strong>
                 <p>{peca.descricao}</p>
@@ -216,6 +225,7 @@ export function PainelGaleria({ aoFechar }) {
                   {enviandoId === peca.id ? 'Enviando…' : enviadoId === peca.id ? <><Icone nome="check" /> Enviado</> : 'Enviar'}
                 </Botao>
               </div>
+              {falhouId === peca.id && <p className={css.cartaoFalha} role="alert">{FOTO_NAO_ENVIADA}</p>}
             </li>
           ))}
           {!fonteApi && <li className={css.cartaoNovo}>

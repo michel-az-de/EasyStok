@@ -27,7 +27,7 @@ import { mudancasDoRetrato } from '../dominio/avisoSonoro'
 const DURACAO_DESTAQUE_MS = 1500
 
 export function useAvisoSonoro({
-  conversas, som, agora, aberta = true, janelas = [], aoTocar,
+  conversas, som, agora, aberta = true, janelas = [], expediente = null, aoTocar,
 }) {
   const anterior = useRef(null)
   const [destacados, setDestacados] = useState(() => new Set())
@@ -48,7 +48,7 @@ export function useAvisoSonoro({
       const ultimaDoCliente = (c.mensagens ?? []).filter((m) => m.dir === 'in').at(-1)
       return [c.id, {
         pago: c.pedido?.estado === 'pago',
-        precisa: precisaDeVoce(c, agora, true, aberta, janelas),
+        precisa: precisaDeVoce(c, agora, true, aberta, janelas, expediente),
         ultimaMensagemClienteId: ultimaDoCliente?.id ?? null,
       }]
     }))
@@ -66,7 +66,7 @@ export function useAvisoSonoro({
         destacarPorInstante(id)
         const conversa = conversas.find((c) => c.id === id)
         notificarPrecisaDeVoce(
-          id, 'Precisa de você', motivoVisivel(conversa, agora, true, aberta, janelas) ?? conversa?.nome ?? '',
+          id, 'Precisa de você', motivoVisivel(conversa, agora, true, aberta, janelas, expediente) ?? conversa?.nome ?? '',
         )
       } else if (mensagemNova) {
         tocarAviso(EVENTOS.NOVO_ATENDIMENTO, som)
@@ -79,7 +79,7 @@ export function useAvisoSonoro({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversas, som, agora, aberta, janelas])
+  }, [conversas, som, agora, aberta, janelas, expediente])
 
   return destacados
 }

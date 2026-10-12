@@ -100,8 +100,10 @@ public sealed class NotificacoesDispatcherOrchestrator(
     }
 
     /// <summary>
-    /// Passo 1 (cross-tenant): o bypass entra pela porta antes de qualquer conexão e tudo roda numa transação curta,
-    /// sem retentativa (o bloco não é idempotente): (a) expira o outbox <c>Pendente</c> além do prazo do tipo, para o
+    /// Passo 1 (cross-tenant): o bypass entra pela porta antes de qualquer conexão. Sem mensagem aberta no outbox
+    /// (<see cref="IOutboxNotificacaoRepository.ExisteMensagemAbertaAsync"/>) devolve vazio sem abrir transação (#1566).
+    /// Havendo, tudo roda numa transação curta, sem retentativa (o bloco não é idempotente):
+    /// (a) expira o outbox <c>Pendente</c> além do prazo do tipo, para o
     /// backlog velho nunca ficar elegível; (b) reclama o <c>EmEnvio</c> com lease vencido (e-mail volta a <c>Pendente</c>,
     /// WhatsApp e SMS viram <c>Indeterminado</c>); (c) reserva as elegíveis. Devolve só ids: as linhas são relidas no
     /// escopo da empresa.
@@ -114,6 +116,10 @@ public sealed class NotificacoesDispatcherOrchestrator(
         var outboxRepo = sp.GetRequiredService<IOutboxNotificacaoRepository>();
         var unitOfWork = sp.GetRequiredService<IUnitOfWork>();
         var politica = sp.GetRequiredService<PoliticaValidadeNotificacao>();
+
+        // #1566: o loop acorda a cada 10 s. Sem nenhuma Pendente ou EmEnvio os três passos abaixo não têm o que fazer
+        // (expiração e reserva só leem Pendente; a reclamação de lease, só EmEnvio): uma consulta e o wakeup acaba.
+        if (!await outboxRepo.ExisteMensagemAbertaAsync(ct)) return [];
 
         return await unitOfWork.ExecuteInTransactionSemRetryAsync<IReadOnlyList<MensagemReservada>>(async token =>
         {

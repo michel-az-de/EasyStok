@@ -38,6 +38,7 @@ public sealed class AtendenteRepository(EasyStockDbContext db) : IAtendenteRepos
             {
                 up.UsuarioId,
                 up.Perfil!.Nivel,
+                up.Perfil.PermissoesExplicitas,
                 Permissoes = up.Perfil.Permissoes.Select(p => p.Permissao).ToList(),
             })
             .ToListAsync(ct);
@@ -45,7 +46,7 @@ public sealed class AtendenteRepository(EasyStockDbContext db) : IAtendenteRepos
         return usuarios
             .Select(u => new UsuarioDaEmpresa(u.Id, u.Nome, u.Email, perfis
                 .Where(p => p.UsuarioId == u.Id)
-                .Select(p => new PerfilNaEmpresa(p.Nivel, p.Permissoes.Distinct().ToList()))
+                .Select(p => new PerfilNaEmpresa(p.Nivel, p.Permissoes.Distinct().ToList(), p.PermissoesExplicitas))
                 .ToList()))
             .ToList();
     }

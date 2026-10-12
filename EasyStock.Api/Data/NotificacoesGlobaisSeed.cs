@@ -543,6 +543,24 @@ public static class NotificacoesGlobaisSeed
             assuntoTemplate: "Lembrete",
             corpoTemplate: "{{ texto }}");
 
+        // ===== Loja fechada no horario (#1443): aviso aos donos (audiencia "admins") de quem fechou e por que.
+        // Interno: nada sai para o cliente. =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "loja_fechada_no_horario_push_v1",
+            nome: "Loja Fechada no Horário — Push",
+            canal: CanalNotificacao.Push,
+            tipoEvento: TipoEventoNotificacao.LojaFechadaNoHorario,
+            assuntoTemplate: "Loja fechada no horário",
+            corpoTemplate: "Loja fechada às {{ hora }}, dentro do horário. Motivo: {{ justificativa }}");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "loja_fechada_no_horario_inapp_v1",
+            nome: "Loja Fechada no Horário — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.LojaFechadaNoHorario,
+            assuntoTemplate: "Loja fechada no horário",
+            corpoTemplate: "A loja foi fechada na mão às {{ hora }}, dentro do horário de funcionamento. Justificativa: {{ justificativa }}");
+
         // ===== Campanhas (S30): carregam a mensagem da onda e o lembrete do encerramento pelo WhatsApp. Sem
         // rotina: o EnfileiradorMensagensCampanha escreve direto no outbox (categoria Marketing) e monta os
         // metadados da Meta (campanha_generica / campanha_lembrete ou o template da propria campanha). =====
@@ -571,7 +589,7 @@ public static class NotificacoesGlobaisSeed
             tipoEvento: TipoEventoNotificacao.PedidoPagoConfirmado,
             assuntoTemplate: "",
             corpoTemplate: "Oi, {{ nome }}! Recebemos seu pagamento. Pedido nº {{ numero }} confirmado, previsão de entrega: {{ previsao }}. Obrigada pela preferência!"),
-            """{"template":"pedido_pago","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ numero }}","param3":"{{ previsao }}"}""");
+            """{"template":"pedido_pago","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ numero }}","param3":"{{ previsao }}","clienteId":"{{ clienteId }}"}""").ComVersao(2);
 
         yield return ComMetadados(TemplateNotificacao.Criar(
             codigo: "pedido_em_preparo_whatsapp_v1",
@@ -581,6 +599,25 @@ public static class NotificacoesGlobaisSeed
             assuntoTemplate: "",
             corpoTemplate: "{{ nome }}, seu pedido nº {{ numero }} já está em preparo na nossa cozinha. Previsão de entrega: {{ previsao }}."),
             """{"template":"pedido_em_preparo","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ numero }}","param3":"{{ previsao }}"}""");
+
+        // Texto livre; fora da janela de 24 h depende de configurar um template aprovado na Meta.
+        var comandaAtualizada = TemplateNotificacao.Criar(
+            codigo: "comanda_atualizada_whatsapp_v1",
+            nome: "Comanda Atualizada",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.ComandaAtualizada,
+            assuntoTemplate: "",
+            corpoTemplate: "{{ nome }}, comanda nº {{ numero }}. {{ mensagem }}");
+        comandaAtualizada.DefinirMetadados("""{"clienteId":"{{ clienteId }}"}""");
+        yield return comandaAtualizada;
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "pedido_reagendado_whatsapp_v1",
+            nome: "Pedido Reagendado",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.PedidoReagendado,
+            assuntoTemplate: "",
+            corpoTemplate: "{{ nome }}, seu pedido nº {{ numero }} foi reagendado. Nova previsão de entrega: {{ previsao }}.");
 
         yield return ComMetadados(TemplateNotificacao.Criar(
             codigo: "pedido_saiu_whatsapp_v1",
@@ -970,6 +1007,11 @@ public static class NotificacoesGlobaisSeed
             TipoEventoNotificacao.LembreteVencido, "lembrete_vencido_push_v1",
             CategoriaConteudoNotificacao.Operacional, "[\"Push\"]");
 
+        // ===== Loja fechada no horario (#1443): so os donos (audiencia admins), Push e In-App. Rollback: Ativa=false. =====
+        yield return MakeRotina("loja_fechada_no_horario_global", "Loja Fechada no Horário",
+            TipoEventoNotificacao.LojaFechadaNoHorario, "loja_fechada_no_horario_push_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"Push\",\"InApp\"]", ModoTodos("admins"));
+
         // ===== Avisos de status do pedido ao cliente (S13): transacionais, so WhatsApp, sem janela de horario
         // (aviso de status nao espera). Rollback: desativar a rotina (Ativa=false). =====
         yield return MakeRotina("pedido_pago_confirmado_global", "Pedido Pago — Aviso ao Cliente",
@@ -977,6 +1019,13 @@ public static class NotificacoesGlobaisSeed
             CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
         yield return MakeRotina("pedido_em_preparo_global", "Pedido Em Preparo — Aviso ao Cliente",
             TipoEventoNotificacao.PedidoEmPreparo, "pedido_em_preparo_whatsapp_v1",
+            CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
+        yield return MakeRotina("pedido_reagendado_global", "Pedido Reagendado",
+            TipoEventoNotificacao.PedidoReagendado, "pedido_reagendado_whatsapp_v1",
+            CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
+
+        yield return MakeRotina("comanda_atualizada_global", "Comanda Atualizada — Aviso ao Cliente",
+            TipoEventoNotificacao.ComandaAtualizada, "comanda_atualizada_whatsapp_v1",
             CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
         yield return MakeRotina("pedido_saiu_para_entrega_global", "Pedido Saiu Para Entrega — Aviso ao Cliente",
             TipoEventoNotificacao.PedidoSaiuParaEntrega, "pedido_saiu_whatsapp_v1",

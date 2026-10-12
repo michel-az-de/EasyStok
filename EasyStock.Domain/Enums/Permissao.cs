@@ -2,13 +2,14 @@ namespace EasyStock.Domain.Enums
 {
     public enum Permissao
     {
-        GerenciarLojas,
-        GerenciarUsuarios,
-        GerenciarProdutos,
-        GerenciarEstoque,
-        GerenciarFornecedores,
-        VisualizarRelatorios,
-        GerarRelatorioVendas,
+        // Compatibilidade de leitura dos perfis de outras empresas; a Casa da Baba arquiva o legado.
+        GerenciarLojas = 0,
+        GerenciarUsuarios = 1,
+        GerenciarProdutos = 2,
+        GerenciarEstoque = 3,
+        GerenciarFornecedores = 4,
+        VisualizarRelatorios = 5,
+        GerarRelatorioVendas = 6,
         AcessarInteligencia,
         VisualizarTickets,
         ResponderTickets,
@@ -24,12 +25,20 @@ namespace EasyStock.Domain.Enums
         CancelarFatura,
         GerenciarFaq,
         VisualizarMetricasHelpdesk,
-        VisualizarContasAPagar,
+        VisualizarContasAPagar = 22,
         GerenciarContasAPagar,
         VisualizarContasAReceber,
         GerenciarContasAReceber,
         GerenciarCategoriasFinanceiras,
         GerenciarCentrosCusto,
-        AtenderConversas
+        AtenderConversas,
+        AcessarModuloCardapio,
+        AcessarModuloProducao,
+        AcessarModuloAtendimento,
+        AcessarModuloCozinha,
+        AcessarModuloCaixa,
+        AcessarModuloCampanhas,
+        AcessarModuloConfiguracoes,
+        AcessarModuloEntregas
     }
 }

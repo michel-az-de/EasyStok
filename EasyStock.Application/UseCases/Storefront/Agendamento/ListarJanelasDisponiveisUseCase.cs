@@ -41,7 +41,6 @@ public sealed class ListarJanelasDisponiveisUseCase(
     TimeProvider timeProvider)
 {
     private const int MaxDiasPeriodo = 60;
-    private const int DefaultDiasPeriodo = 14;
     private static readonly Regex CepDigitosRegex = new(@"^\d{8}$", RegexOptions.Compiled);
 
     public async Task<IReadOnlyList<JanelaDisponivelDto>> ExecuteAsync(
@@ -63,12 +62,16 @@ public sealed class ListarJanelasDisponiveisUseCase(
         var agoraUtc = timeProvider.GetUtcNow().UtcDateTime;
         var hoje = HorarioBrasil.DataOperacional(agoraUtc);
         var inicio = input.DataInicio ?? hoje;
-        var fim = input.DataFim ?? hoje.AddDays(DefaultDiasPeriodo);
+        var fim = input.DataFim ?? hoje.AddDays(HorizonteAgendamento.Dias);
+
+        if (fim < inicio)
+            throw new UseCaseValidationException("A data final não pode ser anterior à data inicial.");
 
         // 3. Anti-DoS: período máximo 60 dias
         if (fim.DayNumber - inicio.DayNumber > MaxDiasPeriodo)
             throw new RegraDeDominioVioladaException(
                 $"Período máximo permitido é {MaxDiasPeriodo} dias.");
+        HorizonteAgendamento.Validar(fim, hoje);
 
         // 4. Resolver storefront
         var storefront = await storefrontRepository.GetBySlugAsync(input.Slug, ct);
@@ -120,6 +123,9 @@ public sealed class ListarJanelasDisponiveisUseCase(
                     continue;
 
                 if (bloqueioEspecifico[(data, janela.Id)].Any())
+                    continue;
+
+                if (CalculadoraPrazoPedido.JanelaJaPassou(data, janela.HoraFim, agoraUtc))
                     continue;
 
                 if (input.PrazoMinimoMinutos is { } prazo

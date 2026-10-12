@@ -1,10 +1,13 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { AssuntoEmail } from '../../componentes/AssuntoEmail'
 import { Icone } from '../../componentes/Icone'
 import { marcarMudancasDeAssunto } from '../../dominio/email'
 import { Pilula } from '../../componentes/Pilula'
-import { rotuloDoDia } from '../../dominio/formato'
+import { inicioDoDiaNoFuso, rotuloDoDia } from '../../dominio/formato'
+import { intercalarNotas } from '../../dominio/notas'
+import { useChamadaEstavel } from '../../hooks/useChamadaEstavel'
 import { Balao } from './Balao'
+import { useRolagemDoFio } from './useRolagemDoFio'
 import css from './atendimento.module.css'
 
 // Divisória entre atendimentos (decisão 46, "Encerrar" v2): encerrado nunca
@@ -47,19 +50,28 @@ function Digitando() {
   )
 }
 
-const diaDe = (iso) => {
-  const d = new Date(iso)
-  return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate()
+// Nota interna como post-it (#1441): entra no fio pela hora em que foi escrita, do
+// lado de quem atende, e nunca vai ao cliente. A nota é do cadastro, então uma nota
+// de outra conversa do mesmo cliente também aparece aqui, na hora dela.
+function PostIt({ nota }) {
+  return (
+    <aside className={css.postIt} aria-label="Nota interna">
+      <span className={css.postItQuem}><Icone nome="nota" /> Nota interna · {nota.autor} · {nota.em}</span>
+      <p>{nota.texto}</p>
+    </aside>
+  )
 }
 
 export function Thread({
-  mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, digitando = false,
+  mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, digitando = false, notas = [],
 }) {
   const fim = useRef(null)
+  // #1577: o pai recria os dois handlers a cada render; com identidade fixa o `memo` do balão segura.
+  const abrirDefinicaoAutomatica = useChamadaEstavel(aoAbrirDefinicaoAutomatica)
+  const reenviar = useChamadaEstavel(aoReenviar)
 
-  useEffect(() => {
-    fim.current?.scrollIntoView({ block: 'end' })
-  }, [mensagens.length, chaveRolagem, digitando])
+  // #1587: não rola mais a cada mensagem; a regra está no hook.
+  useRolagemDoFio(fim, { mensagens, chaveRolagem, digitando, totalDeNotas: notas.length })
 
   // Intercala as divisórias na posição certa: por ÍNDICE (`aposIndice`), não
   // por horário — o relógio simulado anda em passos e duas mensagens de
@@ -70,33 +82,47 @@ export function Thread({
   const linhas = []
   // #1432: assunto acima do e-mail recebido, só quando muda.
   const assuntos = marcarMudancasDeAssunto(mensagens)
-  mensagens.forEach((m, i) => {
+  let i = -1
+  let diaAnterior = null
+  for (const item of intercalarNotas(mensagens, notas)) {
+    if (item.tipo === 'nota') {
+      linhas.push({ tipo: 'nota', chave: `nota-${item.nota.id}`, nota: item.nota })
+      continue
+    }
+    i += 1
+    const m = item.mensagem
     while (proxima < fronteiras.length && i > fronteiras[proxima].aposIndice) {
       linhas.push({ tipo: 'divisoria', chave: `divisoria-${fronteiras[proxima].numero}`, numero: fronteiras[proxima].numero })
       proxima += 1
     }
-    if (i === 0 || diaDe(m.em) !== diaDe(mensagens[i - 1].em)) {
+    // #1600: quebra no dia da loja, o mesmo critério de `rotuloDoDia`. O dia da mensagem anterior
+    // fica guardado: cada conta de fuso custa caro num fio longo.
+    const diaDaMensagem = inicioDoDiaNoFuso(m.em)
+    if (i === 0 || diaDaMensagem !== diaAnterior) {
       linhas.push({ tipo: 'dia', chave: `dia-${m.id}`, rotulo: rotuloDoDia(m.em, agora) })
     }
+    diaAnterior = diaDaMensagem
     if (assuntos[i]) linhas.push({ tipo: 'assunto', chave: `assunto-${m.id}`, assunto: assuntos[i] })
     linhas.push({
       tipo: 'mensagem', chave: m.id, mensagem: m, trocaDeVoz: i > 0 && mensagens[i - 1].dir !== m.dir,
     })
-  })
+  }
 
   return (
     <div className={css.thread} role="log" aria-live="polite" aria-label="Mensagens da conversa">
       {linhas.map((l) => {
         if (l.tipo === 'divisoria') return <Divisoria key={l.chave} numero={l.numero} />
         if (l.tipo === 'dia') return <SeparadorDeDia key={l.chave} rotulo={l.rotulo} />
+        if (l.tipo === 'nota') return <PostIt key={l.chave} nota={l.nota} />
         if (l.tipo === 'assunto') return <AssuntoEmail key={l.chave} assunto={l.assunto} noFio />
         return (
           <Balao
             key={l.chave}
             mensagem={l.mensagem}
             trocaDeVoz={l.trocaDeVoz}
-            aoAbrirDefinicaoAutomatica={aoAbrirDefinicaoAutomatica}
-            aoReenviar={aoReenviar}
+            aoAbrirDefinicaoAutomatica={abrirDefinicaoAutomatica}
+            // Sem a ação (demonstração) o balão não mostra o Reenviar.
+            aoReenviar={aoReenviar ? reenviar : undefined}
           />
         )
       })}

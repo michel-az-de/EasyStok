@@ -333,6 +333,7 @@ public class RevogacaoDeSessaoTests
     {
         // Logar em outro aparelho revoga só o refresh dos outros (AuthController); o JWT deles segue valendo,
         // então o carimbo não pode mudar no login.
+        VincularA(Guid.NewGuid()); // sem vínculo ativo o login é recusado (#1540)
         _usuarios.GetByEmailAsync(_usuario.Email).Returns(_usuario);
         var login = new AutenticarUsuarioUseCase(
             _usuarios, _unitOfWork, new FakePasswordHasher(), Substitute.For<ILogger<AutenticarUsuarioUseCase>>());

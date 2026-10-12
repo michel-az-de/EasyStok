@@ -9,6 +9,8 @@
 // nome do EasyStok (ItemEstoque): venda acima do saldo não bloqueia nem fica
 // negativa, fica "descoberta" até a contagem física repor (RN-48, D7).
 
+import { plural } from './formato.js'
+
 // Peso sempre em grama nesta rodada (UnidadeMedida do EasyStok tem Mg/G/Kg/
 // Ml/L/Un/Dz/Cx; produção de prato pronto usa G). Registrado como limite.
 export const UNIDADE_PESO = 'G'
@@ -27,6 +29,10 @@ export const rotuloDestino = (destino) =>
   DESTINOS_PORCAO.find((d) => d.valor === destino)?.rotulo ?? destino
 
 export const PADRAO_DIAS_AVISO_VENCIMENTO = 1 // RN-51: proposta de prazo para a Thati, ajustável.
+
+// Saldo da tabela "Saldo por item" (#1474): item sem controle de saldo (API devolve nulo)
+// mostra "—", não "null porções".
+export const rotuloDoSaldo = (estoque) => (estoque == null ? '—' : plural(estoque, 'porção', 'porções'))
 
 // ---------------------------------------------------------------------------
 // Lote de produção (UC-08). `porcoes` já chega em porção de venda (RN-46),
@@ -181,4 +187,26 @@ export function fecharDescoberto(descobertos, sku) {
 // sem produção lançada."
 export function textoDescoberto(nome, porcao, quantidade) {
   return `Vendeu ${quantidade} ${nome}${porcao ? ' ' + porcao : ''} sem produção lançada.`
+}
+
+// M2.2 (#1491): uma linha da produção do dia lançada no EasyStok. A sobra é o peso real menos as
+// porções (US-061: 1.144 g em 2 de 500 g sobram 144 g); sem os dois pesos, não há sobra a mostrar.
+export function sobraDaLinha({ porcoes, pesoPorPorcaoG, pesoRealG }) {
+  if (!pesoRealG || !pesoPorPorcaoG || !porcoes) return null
+  return pesoRealG - porcoes * pesoPorPorcaoG
+}
+
+// O que impede lançar a linha, em português, ou null. Mesmas regras da API, para avisar antes.
+export function erroDaLinha(linha) {
+  if (!linha.sku) return 'Escolha o prato.'
+  // M1.4c (#1537): prato com porções produz uma porção; o saldo é dela.
+  if (linha.exigePorcao && !linha.variacaoId) return 'Escolha a porção produzida.'
+  if (!Number.isInteger(linha.porcoes) || linha.porcoes <= 0) return 'Quantas porções saíram?'
+  if (!Number.isInteger(linha.validadeDias) || linha.validadeDias <= 0) return 'Validade em dias inteiros.'
+  // "350g" ou "350,5" viram NaN, que não é <= 0: o lote nascia sem peso e a etiqueta sem gramas.
+  if (linha.pesoPorPorcaoG != null && !(Number.isInteger(linha.pesoPorPorcaoG) && linha.pesoPorPorcaoG > 0)) return 'Peso da porção em gramas inteiros.'
+  if (linha.pesoRealG != null && !(Number.isInteger(linha.pesoRealG) && linha.pesoRealG > 0)) return 'Peso real em gramas inteiros.'
+  const sobra = sobraDaLinha(linha)
+  if (sobra != null && sobra < 0) return 'O peso real não fecha as porções.'
+  return null
 }

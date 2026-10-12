@@ -525,4 +525,32 @@ public class ListarCardapioPublicoUseCaseTests
         await f.ItemEstoqueRepository.DidNotReceiveWithAnyArgs().GetSaldoDisponivelPorProdutosAsync(
             default, default!, default);
     }
+
+    // M1.3 (#1483): a ordem das categorias é a das seções que a dona definiu, não a alfabética;
+    // categoria escondida esconde os pratos dela.
+    [Fact]
+    public async Task OrdemDasSecoes_VemAntesDoAlfabeto_ESecaoOcultaSome()
+    {
+        var f = BuildFakes();
+        var sobremesas = CardapioSecao.CriarRaiz(f.Storefront.Id, "Sobremesas", 1);
+        var massas = CardapioSecao.CriarRaiz(f.Storefront.Id, "Massas", 2);
+        var bebidas = CardapioSecao.CriarRaiz(f.Storefront.Id, "Bebidas", 3);
+        bebidas.AlterarVisibilidade(false);
+        CardapioItem NaSecao(string nome, CardapioSecao secao)
+        {
+            var i = CardapioItem.CriarAvulso(f.Storefront.Id, nome, 10m);
+            i.TornarVisivel();
+            i.DefinirSecao(secao.Id);
+            i.Secao = secao;
+            return i;
+        }
+        var semSecao = CardapioItem.CriarAvulso(f.Storefront.Id, "Avulso", 10m, "Aaa");
+        semSecao.TornarVisivel();
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new List<CardapioItem> { semSecao, NaSecao("Lasanha", massas), NaSecao("Pudim", sobremesas), NaSecao("Suco", bebidas) });
+
+        var r = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        r.Itens.Select(i => i.Categoria).Should().Equal("Sobremesas", "Massas", "Aaa");
+    }
 }

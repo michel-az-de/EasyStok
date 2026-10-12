@@ -214,7 +214,7 @@ public class IniciarCheckoutUseCaseTests
             f.PedidoRepo,
             f.ExpedienteRepo,
             NullLogger<CheckoutCoreService>.Instance,
-            TimeProvider.System);
+            new EasyStock.TestHelpers.FakeTimeProvider(new DateTimeOffset(2026, 6, 1, 15, 0, 0, TimeSpan.Zero)) /* #1506: antes das entregas de 02/06 */, EnderecoEntregaPedidoTeste.Criar());
         return new(
             core,
             f.StorefrontRepo,
@@ -286,6 +286,9 @@ public class IniciarCheckoutUseCaseTests
         result.ExpiresIn.Should().Be(1800);
 
         await f.VagaRepo.Received(1).OcuparAsync(JanelaId, DataEntrega, result.PedidoId, Arg.Any<CancellationToken>());
+        await f.PedidoRepo.Received().AddAsync(
+            Arg.Is<Pedido>(p => p.AgendadoParaEm == EasyStock.Application.Common.HorarioBrasil.InstanteUtc(DataEntrega, f.Janela.HoraInicio)),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -368,7 +371,7 @@ public class IniciarCheckoutUseCaseTests
 
         await uc.Invoking(u => u.ExecuteAsync(InputValido()))
             .Should().ThrowAsync<RegraDeDominioVioladaException>()
-            .WithMessage("*não encontrado*");
+            .WithMessage("*não está mais no cardápio*");
     }
 
     [Fact]
@@ -420,7 +423,7 @@ public class IniciarCheckoutUseCaseTests
 
         await uc.Invoking(u => u.ExecuteAsync(InputValido()))
             .Should().ThrowAsync<RegraDeDominioVioladaException>()
-            .WithMessage("*inválida*");
+            .WithMessage("*não está mais disponível*");
     }
 
     [Fact]

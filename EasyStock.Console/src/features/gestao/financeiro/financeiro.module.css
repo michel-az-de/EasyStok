@@ -1,0 +1,47 @@
+.painel, .formulario, .campos { display: grid; align-content: start; gap: var(--e-4); min-width: 0; }
+.campos { border: 0; padding: 0; margin: 0; }
+.barra, .acoes { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
+.barra { justify-content: space-between; }
+.acoes { justify-content: flex-end; }
+.grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3); }
+.indicadores { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--e-3); }
+.indicador { display: grid; gap: var(--e-2); padding: var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--preenchimento); }
+.indicador > span { color: var(--tinta-2); font-size: var(--t-apoio); }
+.indicador > strong { font-family: var(--f-dado); font-size: var(--t-titulo); }
+.indicador > small { color: var(--tinta-2); }
+.atalhos { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--e-3); }
+.atalho { display: flex; align-items: center; gap: var(--e-3); padding: var(--e-4); border-radius: var(--r-2); background: var(--preenchimento); color: var(--tinta); font-weight: 600; text-decoration: none; }
+.atalho:hover { background: var(--preenchimento-forte); }
+.filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); align-items: end; gap: var(--e-3); }
+.comContexto { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: var(--e-4); }
+.contexto { display: grid; align-content: start; gap: var(--e-3); padding: var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--preenchimento); }
+.contexto h2 { font-size: var(--t-forte); margin: 0; }
+.contexto p { margin: 0; color: var(--tinta-2); }
+.lista { display: grid; align-content: start; gap: var(--e-2); padding: 0; margin: 0; list-style: none; }
+.linha { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--e-3); padding: var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); min-width: 0; }
+.linhaSelecionada { border-color: var(--marca); background: var(--preenchimento); }
+.selecionar { display: grid; gap: var(--e-1); flex: 1; min-width: 130px; text-align: left; background: none; border: 0; padding: var(--e-2); color: var(--tinta); }
+.selecionar small, .apoio { color: var(--tinta-2); font-size: var(--t-apoio); }
+.selecionar:focus-visible, .atalho:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.valor { font-family: var(--f-dado); font-weight: 700; white-space: nowrap; }
+.detalhes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3); margin: 0; }
+.detalhes > div { min-width: 0; }
+.detalhes dt { color: var(--tinta-2); font-size: var(--t-apoio); }
+.detalhes dd { margin: var(--e-1) 0 0; overflow-wrap: anywhere; }
+.parcela { border: var(--b-1) solid var(--linha); border-radius: var(--r-2); padding: var(--e-3); display: grid; gap: var(--e-3); }
+.parcela h3 { margin: 0; font-size: var(--t-forte); }
+.parcela p { margin: 0; }
+.historico { padding-left: var(--e-4); display: grid; gap: var(--e-2); }
+.paginacao { display: flex; align-items: center; justify-content: center; gap: var(--e-3); }
+.erro { color: var(--erro); background: var(--erro-pastel); border-radius: var(--r-1); padding: var(--e-3); margin: 0; }
+.aviso { color: var(--tinta-2); font-size: var(--t-apoio); margin: 0; }
+.escolha { display: flex; align-items: center; gap: var(--e-2); min-height: var(--toque); }
+.parcelas { margin: 0; padding-left: var(--e-5); max-height: 180px; overflow-y: auto; }
+.tabelaRolavel { min-width: 0; overflow-x: auto; }
+.tabela { width: 100%; border-collapse: collapse; font-size: var(--t-apoio); }
+.tabela th, .tabela td { padding: var(--e-3); text-align: left; border-bottom: var(--b-1) solid var(--linha); }
+.tabela th { color: var(--tinta-2); }
+.tabela td { white-space: nowrap; }
+.tabela td:first-child { white-space: normal; }
+@media (max-width: 1199px) { .comContexto { grid-template-columns: minmax(0, 1fr); } .contexto { grid-template-columns: repeat(2, minmax(0, 1fr)); } .contexto .acoes { justify-content: start; } }
+@media (max-width: 759px) { .grade, .detalhes, .contexto { grid-template-columns: minmax(0, 1fr); } .linha { gap: var(--e-2); } .filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

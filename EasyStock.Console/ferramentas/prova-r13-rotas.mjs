@@ -29,17 +29,19 @@ registerHooks({
 })
 
 const {
-  ROTA_PRINCIPAL, ROTA_ENTREGAS, ROTA_COZINHA, ROTA_CARDAPIO_LINK, HASH_ENTREGAS, HASH_COZINHA, rotaDaHash,
+  ROTA_HALL, ROTA_PRINCIPAL, ROTA_ENTREGAS, ROTA_COZINHA, ROTA_CARDAPIO_LINK, HASH_ENTREGAS, HASH_COZINHA, rotaDaHash,
 } = await import('../src/dominio/rota.js')
 const { PREFIXO_ROTA } = await import('../src/dominio/cardapioLink.js')
 
 let passou = 0
 const confere = (descricao, fn) => { fn(); passou += 1; console.log('ok  ' + descricao) }
 
-confere('sem hash (carga normal) é a tela principal (Balcão)', () => {
-  assert.equal(rotaDaHash('').tipo, ROTA_PRINCIPAL)
-  assert.equal(rotaDaHash(undefined).tipo, ROTA_PRINCIPAL)
-  assert.equal(rotaDaHash(null).tipo, ROTA_PRINCIPAL)
+// #1447 (homologação de 07/10): sem hash o console abre no hall de módulos; o
+// Balcão passou a ser `#/m/atendimento` (prova-1447-hall-modulos.mjs).
+confere('sem hash (carga normal) é o hall de módulos', () => {
+  assert.equal(rotaDaHash('').tipo, ROTA_HALL)
+  assert.equal(rotaDaHash(undefined).tipo, ROTA_HALL)
+  assert.equal(rotaDaHash(null).tipo, ROTA_HALL)
 })
 
 confere('hash de Entregas dá a rota de Entregas', () => {
@@ -57,8 +59,8 @@ confere('hash do cardápio por link dá a rota do cliente, nunca a do Balcão', 
   assert.equal(rota.conversaId, 'c1')
 })
 
-confere('hash desconhecida cai na tela principal, não trava nem finge outra tela', () => {
-  assert.equal(rotaDaHash('#/nada-a-ver').tipo, ROTA_PRINCIPAL)
+confere('hash desconhecida cai no hall, não trava nem finge outra tela', () => {
+  assert.equal(rotaDaHash('#/nada-a-ver').tipo, ROTA_HALL)
 })
 
 confere('mesma hash, chamadas diferentes: a rota é sempre recalculada (nada de cache preso na primeira leitura)', () => {

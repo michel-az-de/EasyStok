@@ -20,6 +20,7 @@ public static partial class ServiceCollectionExtensions
         services.TryAddSingleton<IOperacaoEventPublisher, NoOpOperacaoEventPublisher>();
         // S48: link do cardápio com token da conversa e o pedido que volta do site por ele.
         services.AddScoped<LinkCardapioConversaService>();
+        services.AddScoped<EasyStock.Application.Services.Pedidos.SaldoFinanceiroPedido>();
         services.AddScoped<ArmazenadorMidiaWhatsApp>();
         // #1398: transcrição de áudio, nula por padrão; a Infra troca pela Fireworks quando há chave.
         services.TryAddSingleton<EasyStock.Application.Ports.Output.Ai.ITranscritorAudio, TranscritorAudioNulo>();

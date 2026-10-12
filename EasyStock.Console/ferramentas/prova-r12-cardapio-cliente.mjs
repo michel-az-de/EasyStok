@@ -120,7 +120,7 @@ confere('foto do prato: imagem própria por prato, sem texto dentro', () => {
 })
 confere('link do convite vira trecho clicável na bolha; texto sem link fica inteiro', () => {
   const url = link.linkDoCardapio('http://127.0.0.1:5173/', 'c7')
-  const partes = link.partesComLinkDoCardapio(link.textoConviteCardapio('Norma Lima', url))
+  const partes = link.partesComLinkDoCardapio(link.textoConviteCardapio('Norma Lima', url), 'http://127.0.0.1:5173')
   assert.equal(partes.length, 2)
   assert.equal(partes[1].tipo, 'link')
   assert.equal(partes[1].texto, url)

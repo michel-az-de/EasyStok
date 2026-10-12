@@ -5,9 +5,11 @@ using EasyStock.Application.Events.Atendimento;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Atendimento;
 
 namespace EasyStock.Application.UseCases.Atendimento.Webhook;
@@ -34,6 +36,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     RoteadorAcoesBotao roteadorAcoes,
     OptOutPorPalavra optOut,
     IEscaladorConversa escalador,
+    IExpedienteLojaRepository expedientes,
+    TimeProvider relogio,
     ILogger<ProcessarEventoWhatsAppUseCase> logger,
     IPublicadorEventoIntegracao? publicadorEventos = null,
     Ports.Output.Ai.ITranscritorAudio? transcritor = null)
@@ -168,9 +172,24 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
     /// <summary>Mídia do eco não é baixada (#1417): fica o tipo e um aviso, como no Instagram e no Messenger.</summary>
     private static string? TextoDoEco(EcoWhatsApp eco) =>
-        !string.IsNullOrWhiteSpace(eco.TextoCorpo) ? eco.TextoCorpo
+        !string.IsNullOrWhiteSpace(eco.TextoCorpo) ? CortarNoLimite(eco.TextoCorpo)
         : eco.Tipo == "text" ? null
         : $"[{eco.Tipo} enviado pelo app do celular; abra no app para ver]";
+
+    /// <summary>
+    /// #1615: o WhatsApp entrega texto maior que o limite da mensagem. Sem o corte a regra do domínio
+    /// estourava, o webhook respondia 200 e a mensagem do cliente sumia sem aviso.
+    /// </summary>
+    private static string? CortarNoLimite(string? texto)
+    {
+        var limpo = texto?.Trim();
+        if (limpo is not { Length: > Mensagem.TextoTamanhoMaximo }) return limpo;
+
+        // Não corta um emoji ao meio: a metade solta de um par não grava no banco.
+        var corte = Mensagem.TextoTamanhoMaximo - 1;
+        if (char.IsHighSurrogate(limpo[corte - 1])) corte--;
+        return limpo[..corte] + "…";
+    }
 
     private async Task<bool> ProcessarMensagemAsync(Guid empresaId, EntradaWhatsApp entrada, MensagemRecebidaWhatsApp msg, CancellationToken ct)
     {
@@ -229,9 +248,13 @@ public sealed class ProcessarEventoWhatsAppUseCase(
                 await conversaRepository.AddAsync(conversa, ct);
 
             var botaoId = msg.BotaoRespostaId ?? msg.BotaoPayload;
-            var texto = msg.Tipo is "interactive" or "button" ? null : msg.TextoCorpo;
+            var texto = msg.Tipo is "interactive" or "button" ? null : CortarNoLimite(msg.TextoCorpo);
+            // Resposta de lista ou de fluxo não traz o id do botão: fica o registro, sem o tipo Botao.
+            var tipoConteudo = MapearTipoConteudo(msg.Tipo);
+            if (tipoConteudo == TipoConteudoMensagem.Botao && string.IsNullOrWhiteSpace(botaoId))
+                tipoConteudo = TipoConteudoMensagem.Outro;
 
-            mensagemEntidade = Mensagem.Entrada(empresaId, conversa.Id, enviadaEm, MapearTipoConteudo(msg.Tipo), texto, msg.Wamid, botaoId);
+            mensagemEntidade = Mensagem.Entrada(empresaId, conversa.Id, enviadaEm, tipoConteudo, texto, msg.Wamid, botaoId);
             if (msg.MidiaId is not null)
                 mensagemEntidade.AguardarMidia(msg.MidiaId, DateTime.UtcNow); // #1397: pendência durável
             await conversaRepository.AddMensagemAsync(mensagemEntidade, ct);
@@ -393,7 +416,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     {
         try
         {
-            var texto = await saudacao.MontarAsync(empresaId, configuracao, identificacao, ct);
+            var texto = await MontarPrimeiraRespostaAsync(empresaId, configuracao, identificacao, ct);
 
             Mensagem saida;
             try
@@ -420,6 +443,18 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             // Não deixa o insert pendente contaminar o commit da próxima mensagem do lote.
             unitOfWork.DescartarAlteracoesPendentes();
         }
+    }
+
+    /// <summary>
+    /// #1474: com a loja fora do horário ou fechada na mão, o aviso do expediente vai no lugar da saudação, cuja
+    /// frase de espera ("já te ajudo") prometeria uma resposta que não vem. Sem registro, vale o expediente padrão.
+    /// </summary>
+    private async Task<string> MontarPrimeiraRespostaAsync(
+        Guid empresaId, ConfiguracaoAtendimento configuracao, IdentificacaoCliente identificacao, CancellationToken ct)
+    {
+        var expediente = await expedientes.GetByEmpresaIdAsync(empresaId, ct) ?? ExpedienteLoja.CriarPadrao(empresaId);
+        return expediente.MensagemParaCliente(relogio.GetUtcNow().UtcDateTime)
+            ?? await saudacao.MontarAsync(empresaId, configuracao, identificacao, ct);
     }
 
     private async Task<ConfiguracaoAtendimento> AtualizarUltimaMensagemRecebidaAsync(Guid empresaId, DateTime agora)

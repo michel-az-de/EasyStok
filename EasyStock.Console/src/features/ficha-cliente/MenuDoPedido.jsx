@@ -38,7 +38,7 @@ export function MenuDoPedido({
         <Icone nome="ellipsis" tamanho={24} />
       </Botao>
       {aberto && (
-        <Popover rotulo="Mais ações do pedido" posicao="abaixo" aoFechar={fechar}>
+        <Popover rotulo="Mais ações do pedido" posicao="abaixo" aoFechar={fechar} portal>
           <div className={css.menuAcoes}>
             {podeCancelar && (
               <button type="button" role="menuitem" className={css.itemMenu} onClick={() => escolher('cancelar')}>

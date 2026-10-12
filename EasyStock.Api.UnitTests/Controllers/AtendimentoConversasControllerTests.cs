@@ -36,18 +36,23 @@ namespace EasyStock.Api.UnitTests.Controllers;
 /// Handoff pelo console (S07). Use cases reais sobre um repositório em memória; o canal é substituto
 /// (nenhuma chamada à Meta).
 /// </summary>
-public class AtendimentoConversasControllerTests
+public partial class AtendimentoConversasControllerTests
 {
     private const string WaId = "5511999998888";
 
     private readonly Guid _empresaId = Guid.NewGuid();
     private readonly Guid _usuarioId = Guid.NewGuid();
     private readonly ConversaRepositoryEmMemoria _repositorio = new();
-    private readonly ICanalMensageria _canal = Substitute.For<ICanalMensageria>();
+    private readonly ICanalMensageria _canal = Substitute.For<ICanalMensageria, ICanalComAudio>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly IAtendenteRepository _atendentes = Substitute.For<IAtendenteRepository>();
     private readonly ILinkCardapioConversaRepository _links = Substitute.For<ILinkCardapioConversaRepository>();
+    private readonly IFileStorage _fileStorage = Substitute.For<IFileStorage>();
+    private readonly IImageProcessor _imageProcessor = Substitute.For<IImageProcessor>();
+    private readonly IStorefrontRepository _storefronts = Substitute.For<IStorefrontRepository>();
+    private readonly ICardapioItemRepository _cardapioItens = Substitute.For<ICardapioItemRepository>();
+    private readonly EnviarMensagemConsoleUseCase _enviarUseCase;
     private readonly AtendimentoConversasController _controller;
 
     internal static LinkCardapioConversaService LinkCardapio(ILinkCardapioConversaRepository links) =>
@@ -64,14 +69,15 @@ public class AtendimentoConversasControllerTests
 
         var resolvedor = new ResolvedorCanal([_canal]);
         var uploads = new GerenciarUploadsUseCase(
-            Substitute.For<IFileStorage>(), Substitute.For<IImageProcessor>(), Substitute.For<IProdutoRepository>(),
-            Substitute.For<IUsuarioRepository>(), Substitute.For<ILojaRepository>(), Substitute.For<IStorefrontRepository>(),
-            Substitute.For<ICardapioItemRepository>(), _unitOfWork);
+            _fileStorage, _imageProcessor, Substitute.For<IProdutoRepository>(),
+            Substitute.For<IUsuarioRepository>(), Substitute.For<ILojaRepository>(), _storefronts,
+            _cardapioItens, _unitOfWork);
+        _enviarUseCase = new EnviarMensagemConsoleUseCase(_repositorio, resolvedor, uploads, _unitOfWork);
 
         _controller = new AtendimentoConversasController(
-            new ListarConversasAtendimentoUseCase(_repositorio),
+            new ListarConversasAtendimentoUseCase(_repositorio, ConfiguracoesPadrao(), Microsoft.Extensions.Options.Options.Create(new EasyStock.Application.Services.Notifications.PrazosOptions())),
             new ListarMensagensConversaUseCase(_repositorio),
-            new EnviarMensagemConsoleUseCase(_repositorio, resolvedor, uploads, _unitOfWork),
+            _enviarUseCase,
             new ReenviarMensagemUseCase(_repositorio, ConfiguracoesPadrao(), resolvedor,
                 new ReservaSmsAtendimento(resolvedor, ReservaSmsOpcoes.Desligada, NullLogger<ReservaSmsAtendimento>.Instance),
                 _unitOfWork, TimeProvider.System),
@@ -99,6 +105,7 @@ public class AtendimentoConversasControllerTests
     {
         var configuracoes = Substitute.For<IConfiguracaoAtendimentoRepository>();
         configuracoes.GetOrDefaultAsync(Arg.Any<Guid>()).Returns(c => ConfiguracaoAtendimento.CriarPadrao(c.Arg<Guid>()));
+        configuracoes.GetByEmpresaIdAsync(Arg.Any<Guid>()).Returns(c => ConfiguracaoAtendimento.CriarPadrao(c.Arg<Guid>()));
         return configuracoes;
     }
 
@@ -153,6 +160,23 @@ public class AtendimentoConversasControllerTests
         await _canal.Received(1).EnviarTextoAsync(WaId, "Temos ravioli!", Arg.Any<CancellationToken>());
         falhou.Status.Should().Be(StatusMensagem.Enviada);
         falhou.ExternoId.Should().Be("wamid.dona1");
+    }
+
+    // #1424: o balão do console mostra o selo "programada" da mensagem que o disparo mandou.
+    [Fact]
+    public async Task ListarMensagensExpoeProgramada()
+    {
+        var conversa = ConversaComClienteAgora();
+        var programada = Mensagem.Saida(_empresaId, conversa.Id, AutorMensagem.Dona, DateTime.UtcNow, TipoConteudoMensagem.Texto, "Bom dia!");
+        programada.MarcarComoProgramada();
+        _repositorio.Mensagens.Add(programada);
+
+        var result = await _controller.ListarMensagens(conversa.Id, null, 20, default);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var dados = (IReadOnlyList<MensagemAtendimentoResult>)ok.Value!.GetType().GetProperty("Data")!.GetValue(ok.Value)!;
+        dados.Should().ContainSingle(m => m.Id == programada.Id).Which.Programada.Should().BeTrue();
+        dados.Should().ContainSingle(m => m.Texto == "oi").Which.Programada.Should().BeFalse();
     }
 
     [Fact]
@@ -242,14 +266,16 @@ public class AtendimentoConversasControllerTests
     {
         var conversa = ConversaComClienteAgora();
         conversa.Assumir(DateTime.UtcNow, _usuarioId);
+        LogadoComo("Thati");
 
         var result = await _controller.LiberarAutomatico(conversa.Id, default);
 
         result.Should().BeOfType<OkObjectResult>();
         conversa.Situacao.Should().Be(SituacaoConversa.Automatica);
         conversa.AssumidaPorUsuarioId.Should().BeNull();
+        // #1474: a nota é lida pela dona no fio; leva o nome de quem liberou, nunca o id.
         _repositorio.Mensagens.Should().ContainSingle(m => m.Autor == AutorMensagem.Sistema
-            && m.ExternoId == null && m.Texto!.Contains(_usuarioId.ToString()));
+            && m.ExternoId == null && m.Texto!.Contains("Thati") && !m.Texto.Contains(_usuarioId.ToString()));
         await _unitOfWork.Received(1).CommitAsync();
     }
 
@@ -342,6 +368,19 @@ public class AtendimentoConversasControllerTests
         data.Should().ContainSingle(c => c.Id == conversa.Id && c.UltimaMensagemTexto == "oi" && c.NaoLidas == 1);
     }
 
+    [Fact]
+    public async Task ListarDizSeOClienteAguardaRespostaEOSlaDaLoja()
+    {
+        var conversa = ConversaComClienteAgora();
+
+        var data = Dados<IReadOnlyList<ConversaResumoResult>>(await _controller.Listar(null, "mar", null, 1, 20, default));
+
+        var resumo = data.Should().ContainSingle(c => c.Id == conversa.Id).Subject;
+        resumo.AguardaResposta.Should().BeTrue("o cliente falou por último");
+        resumo.UltimaMensagemEntradaEm.Should().Be(conversa.UltimaMensagemEntradaEm);
+        resumo.SlaRespostaMinutos.Should().Be(ConfiguracaoAtendimento.SlaRespostaPadraoMinutos);
+    }
+
     // ── S41: atendentes e atribuição ──────────────────────────────────
 
     [Fact]
@@ -373,7 +412,7 @@ public class AtendimentoConversasControllerTests
         var link = Dados<LinkCardapioConversaGerado>(await _controller.LinkCardapio(conversa.Id, default));
 
         // #1353: o mesmo link que o agente manda (S48), não a tela do console.
-        link.Url.Should().StartWith($"{SaudacaoAtendimento.BaseUrlPadrao}{SaudacaoAtendimento.CaminhoCardapio}?c=");
+        link.Url.Should().StartWith($"{SaudacaoAtendimento.BaseUrlPadrao}/comanda.html?c=");
         await _links.Received(1).AddAsync(Arg.Is<LinkCardapioConversa>(l => l.ConversaId == conversa.Id), Arg.Any<CancellationToken>());
         await _unitOfWork.Received(1).CommitAsync();
     }
@@ -392,6 +431,16 @@ public class AtendimentoConversasControllerTests
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         return (T)ok.Value!.GetType().GetProperty("Data")!.GetValue(ok.Value)!;
     }
+
+    private void LogadoComo(string nome) =>
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+                    [new System.Security.Claims.Claim("sub", _usuarioId.ToString()), new System.Security.Claims.Claim("nome", nome)], "teste")),
+            },
+        };
 
     private void Atendente(Guid usuarioId, NivelAcesso nivel = NivelAcesso.Operador, params Permissao[] explicitas) =>
         _atendentes.ObterUsuarioAtivoAsync(_empresaId, usuarioId, Arg.Any<CancellationToken>())
@@ -433,13 +482,15 @@ public class AtendimentoConversasControllerTests
         conversa.Assumir(DateTime.UtcNow, _usuarioId);
         var bia = Guid.NewGuid();
         Atendente(bia);
+        LogadoComo("Thati");
 
         var result = await _controller.Transferir(conversa.Id, new TransferirConversaBody(bia), default);
 
         Dados<ConversaSituacaoResult>(result).AssumidaPorUsuarioId.Should().Be(bia);
         conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
         _repositorio.Mensagens.Should().ContainSingle(m => m.Autor == AutorMensagem.Sistema
-            && m.Texto!.Contains(_usuarioId.ToString()) && m.Texto.Contains(bia.ToString()));
+            && m.Texto!.Contains("Thati") && m.Texto.Contains("Bia")
+            && !m.Texto.Contains(_usuarioId.ToString()) && !m.Texto.Contains(bia.ToString()));
         await _unitOfWork.Received(1).CommitAsync();
     }
 
@@ -453,8 +504,12 @@ public class AtendimentoConversasControllerTests
         var restrito = Guid.NewGuid();
         Atendente(restrito, NivelAcesso.Admin, Permissao.GerenciarProdutos);
         var desconhecido = Guid.NewGuid();
+        var semPermissoes = Guid.NewGuid();
+        _atendentes.ObterUsuarioAtivoAsync(_empresaId, semPermissoes, Arg.Any<CancellationToken>())
+            .Returns(new UsuarioDaEmpresa(semPermissoes, "Restrito", "restrito@local",
+                [new PerfilNaEmpresa(NivelAcesso.Admin, [], PermissoesExplicitas: true)]));
 
-        foreach (var destino in new[] { visualizador, restrito, desconhecido })
+        foreach (var destino in new[] { visualizador, restrito, desconhecido, semPermissoes })
         {
             var result = await _controller.Transferir(conversa.Id, new TransferirConversaBody(destino), default);
             result.Should().BeOfType<UnprocessableEntityObjectResult>();
@@ -494,7 +549,9 @@ public class AtendimentoConversasControllerTests
         // Com dois perfis vale o de maior nível (menor valor), como no login.
         var dupla = new UsuarioDaEmpresa(Guid.NewGuid(), "Duda", "duda@x.com",
             [new PerfilNaEmpresa(NivelAcesso.Visualizador, []), new PerfilNaEmpresa(NivelAcesso.Gerente, [])]);
-        _atendentes.ListarUsuariosAtivosAsync(_empresaId, Arg.Any<CancellationToken>()).Returns([ana, leitor, semPerfil, dupla]);
+        var restrito = new UsuarioDaEmpresa(Guid.NewGuid(), "Restrito", "restrito@local",
+            [new PerfilNaEmpresa(NivelAcesso.Admin, [], PermissoesExplicitas: true)]);
+        _atendentes.ListarUsuariosAtivosAsync(_empresaId, Arg.Any<CancellationToken>()).Returns([ana, leitor, semPerfil, dupla, restrito]);
         var controller = new AtendimentoAtendentesController(new ListarAtendentesUseCase(_atendentes), _currentUser);
 
         var lista = Dados<IReadOnlyList<AtendenteResult>>(await controller.Listar(default));
@@ -710,6 +767,136 @@ public class AtendimentoConversasControllerTests
         await llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
     }
 
+    // ── Foto da galeria do cardápio pelo id do item (#1437) ─────────────────────────────────
+
+    /// <summary>Host antigo gravado na produção: o navegador não alcança, o backend lê pela chave.</summary>
+    private const string HostAntigo = "https://ez-api.92.113.33.60.sslip.io/files/";
+
+    private static readonly byte[] WebpDaGaleria =
+        [0x52, 0x49, 0x46, 0x46, 0x10, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x20];
+
+    private static readonly byte[] JpegConvertido = [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3];
+
+    private EnviarImagemCardapioConsoleUseCase ImagemCardapio() =>
+        new(_storefronts, _cardapioItens, _fileStorage, _enviarUseCase);
+
+    private EasyStock.Domain.Entities.Storefront.CardapioItem ItemComGaleria(params string[] chaves)
+    {
+        var storefront = EasyStock.Domain.Entities.Storefront.Storefront.Criar(_empresaId, "casa-da-baba", "Casa da Baba", 0m);
+        _storefronts.GetByEmpresaAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(storefront);
+        var item = EasyStock.Domain.Entities.Storefront.CardapioItem.CriarAvulso(storefront.Id, "Lasanha", 50m);
+        foreach (var chave in chaves) item.AdicionarFotoGaleria(HostAntigo + chave);
+        _cardapioItens.GetByIdAndScopeAsync(storefront.Id, item.Id, _empresaId, Arg.Any<CancellationToken>()).Returns(item);
+        return item;
+    }
+
+    [Fact]
+    public async Task ImagemCardapioEnviaAFotoDaGaleriaConvertidaSemONavegadorBaixar()
+    {
+        var conversa = ConversaComClienteAgora();
+        var item = ItemComGaleria("cardapios/e/s/i/capa.webp", "cardapios/e/s/i/angulo.webp");
+        _fileStorage.ExistsAsync("cardapios/e/s/i/angulo.webp", Arg.Any<CancellationToken>()).Returns(true);
+        _fileStorage.DownloadAsync("cardapios/e/s/i/angulo.webp", Arg.Any<CancellationToken>()).Returns(WebpDaGaleria);
+        _imageProcessor.Optimize(WebpDaGaleria, "image/webp", 1920, 85, true).Returns((JpegConvertido, "image/jpeg", ".jpg"));
+        _fileStorage.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new StoredFileResult("atendimento/x/foto.jpg", "https://app.easystok.online/files/atendimento/x/foto.jpg", "image/jpeg", 7));
+        _canal.EnviarImagemAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns("wamid.foto1");
+
+        var result = await _controller.EnviarImagemCardapio(
+            conversa.Id, new EnviarImagemCardapioBody(item.Id, 1, "Lasanha\n600 g"), ImagemCardapio(), default);
+
+        Dados<MensagemAtendimentoResult>(result).Should().NotBeNull();
+        await _fileStorage.Received(1).UploadAsync(
+            Arg.Is<FileUploadRequest>(r => r.Content == JpegConvertido && r.ContentType == "image/jpeg"
+                && r.BucketPath == $"atendimento/{_empresaId}/{conversa.Id}"),
+            Arg.Any<CancellationToken>());
+        await _canal.Received(1).EnviarImagemAsync(
+            WaId, "https://app.easystok.online/files/atendimento/x/foto.jpg", "Lasanha\n600 g", Arg.Any<CancellationToken>());
+        _repositorio.Mensagens.Should().ContainSingle(m => m.Direcao == DirecaoMensagem.Saida
+            && m.Autor == AutorMensagem.Dona && m.TipoConteudo == TipoConteudoMensagem.Imagem
+            && m.MidiaChave == "atendimento/x/foto.jpg" && m.ExternoId == "wamid.foto1" && m.Texto == "Lasanha\n600 g");
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+    }
+
+    [Fact]
+    public async Task ImagemCardapioSemGaleriaUsaACapaNoIndiceZero()
+    {
+        var conversa = ConversaComClienteAgora();
+        var item = ItemComGaleria();
+        item.AtualizarMetadata(fotoUrl: HostAntigo + "cardapios/e/s/i/capa.webp");
+        _fileStorage.ExistsAsync("cardapios/e/s/i/capa.webp", Arg.Any<CancellationToken>()).Returns(true);
+        _fileStorage.DownloadAsync("cardapios/e/s/i/capa.webp", Arg.Any<CancellationToken>()).Returns(WebpDaGaleria);
+        _imageProcessor.Optimize(WebpDaGaleria, "image/webp", 1920, 85, true).Returns((JpegConvertido, "image/jpeg", ".jpg"));
+        _fileStorage.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new StoredFileResult("atendimento/x/capa.jpg", "https://app.easystok.online/files/atendimento/x/capa.jpg", "image/jpeg", 7));
+        _canal.EnviarImagemAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns("wamid.capa");
+
+        var result = await _controller.EnviarImagemCardapio(
+            conversa.Id, new EnviarImagemCardapioBody(item.Id, 0, null), ImagemCardapio(), default);
+
+        result.Should().BeOfType<OkObjectResult>();
+        await _canal.Received(1).EnviarImagemAsync(
+            WaId, "https://app.easystok.online/files/atendimento/x/capa.jpg", null, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ImagemCardapioDeItemInexistenteOuDeOutraEmpresa404()
+    {
+        var conversa = ConversaComClienteAgora();
+        ItemComGaleria("cardapios/e/s/i/capa.webp");
+
+        var result = await _controller.EnviarImagemCardapio(
+            conversa.Id, new EnviarImagemCardapioBody(Guid.NewGuid(), 0, null), ImagemCardapio(), default);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+        await _canal.DidNotReceiveWithAnyArgs().EnviarImagemAsync(default!, default!, default, default);
+        _repositorio.Mensagens.Should().NotContain(m => m.Direcao == DirecaoMensagem.Saida);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(-1)]
+    public async Task ImagemCardapioComIndiceForaDaGaleria400(int indice)
+    {
+        var conversa = ConversaComClienteAgora();
+        var item = ItemComGaleria("cardapios/e/s/i/capa.webp");
+
+        var result = await _controller.EnviarImagemCardapio(
+            conversa.Id, new EnviarImagemCardapioBody(item.Id, indice, null), ImagemCardapio(), default);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        await _fileStorage.DidNotReceiveWithAnyArgs().DownloadAsync(default!, default);
+        await _canal.DidNotReceiveWithAnyArgs().EnviarImagemAsync(default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task ImagemCardapioComArquivoFaltandoNoStorage404()
+    {
+        var conversa = ConversaComClienteAgora();
+        var item = ItemComGaleria("cardapios/e/s/i/sumiu.webp");
+        _fileStorage.ExistsAsync("cardapios/e/s/i/sumiu.webp", Arg.Any<CancellationToken>()).Returns(false);
+
+        var result = await _controller.EnviarImagemCardapio(
+            conversa.Id, new EnviarImagemCardapioBody(item.Id, 0, null), ImagemCardapio(), default);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+        await _canal.DidNotReceiveWithAnyArgs().EnviarImagemAsync(default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task ImagemCardapioSemPermissaoDeAtender403()
+    {
+        _currentUser.TemPermissao(Permissao.AtenderConversas).Returns(false);
+        var conversa = ConversaComClienteAgora();
+        var item = ItemComGaleria("cardapios/e/s/i/capa.webp");
+
+        var result = await _controller.EnviarImagemCardapio(
+            conversa.Id, new EnviarImagemCardapioBody(item.Id, 0, null), ImagemCardapio(), default);
+
+        result.Should().BeOfType<ForbidResult>();
+        await _fileStorage.DidNotReceiveWithAnyArgs().DownloadAsync(default!, default);
+    }
+
     /// <summary>Repositório em memória: basta para os use cases e para o turno do agente.</summary>
     private sealed class ConversaRepositoryEmMemoria : IConversaRepository
     {
@@ -726,6 +913,9 @@ public class AtendimentoConversasControllerTests
 
         public Task<Conversa?> ObterPorIdAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
             Task.FromResult(Conversas.FirstOrDefault(c => c.EmpresaId == empresaId && c.Id == id));
+
+        public Task<Conversa?> ObterPorIdComLockAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
+            ObterPorIdAsync(empresaId, id, ct);
 
         public Task<Guid?> TravarParaPedidoAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
             Task.FromResult(Conversas.FirstOrDefault(c => c.EmpresaId == empresaId && c.Id == id)?.PedidoEmAndamentoId);
@@ -757,7 +947,7 @@ public class AtendimentoConversasControllerTests
                 .Where(c => c.EmpresaId == empresaId && (situacao is null || c.Situacao == situacao))
                 .Where(c => responsavel is null || c.AssumidaPorUsuarioId == responsavel.UsuarioId)
                 .Where(c => busca is null || (c.ContatoNome ?? "").Contains(busca, StringComparison.OrdinalIgnoreCase) || c.ContatoIdExterno.Contains(busca))
-                .Select(c => new ConversaInboxItem(c, Mensagens.Where(m => m.ConversaId == c.Id).OrderBy(m => m.EnviadaEm).LastOrDefault()?.Texto))
+                .Select(c => ConversaInboxItem.De(c, Mensagens.Where(m => m.ConversaId == c.Id).OrderBy(m => m.EnviadaEm).LastOrDefault()?.Texto))
                 .ToList());
 
         public Task<IReadOnlyList<Mensagem>> ListarMensagensAsync(
@@ -784,8 +974,15 @@ public class AtendimentoConversasControllerTests
         public Task<Mensagem?> ObterMensagemParaAlterarAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
             ObterMensagemAsync(empresaId, conversaId, mensagemId, ct);
 
+        public Task<Mensagem?> ObterMensagemComLockAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
+            ObterMensagemAsync(empresaId, conversaId, mensagemId, ct);
+
         public Task<IReadOnlyList<Mensagem>> ListarReenviosVencidosComLockAsync(DateTime agora, int limite, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<Mensagem>>(Mensagens.Where(m => m.ProximoReenvioEm <= agora).Take(limite).ToList());
+
+        public Task<IReadOnlyList<Mensagem>> ListarIntencoesModeloSemDesfechoComLockAsync(DateTime gravadaAntesDe, int limite, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<Mensagem>>(Mensagens
+                .Where(m => m.Status == StatusMensagem.Pendente && m.ModeloJson != null && m.EnviadaEm < gravadaAntesDe).Take(limite).ToList());
 
         public Task<IReadOnlyList<Mensagem>> ListarMidiasPendentesComLockAsync(DateTime agora, int limite, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<Mensagem>>(Mensagens.Where(m => m.ProximaTentativaMidiaEm <= agora && m.MidiaChave == null).Take(limite).ToList());

@@ -16,9 +16,10 @@ import { GATILHOS, contextoDePrevia, regraDoGatilho, textoDaRegra } from '../dom
 import { PAUSA_POR_ASSUMIR } from '../dominio/automatico'
 import { canalDaConversa } from '../dominio/canal'
 import { envioBloqueado } from '../dominio/janela'
-import { ORIGENS } from '../dominio/lembrete'
+import { FONTES, ORIGENS, chaveLembrete } from '../dominio/lembrete'
 import { dataHora, mesPorExtenso, moeda } from '../dominio/formato'
 import { faixaParaCliente, janelaPorId } from '../dominio/entrega'
+import { legendaDoItem } from '../dominio/vitrineCardapio'
 import {
   TEXTO_DE_CONFERENCIA, aceitarDivergencia, aplicarPagamento, cancelarCobranca, criarCobranca,
   estornarCobranca, liberaEsteira, marcarComprovante, reemitirCobranca, textoDaCobranca,
@@ -52,6 +53,8 @@ import { casosFidelidade } from './casos/fidelidade'
 import { FUNCIONAMENTO_PADRAO } from '../dominio/funcionamento'
 import { REGRA_FIDELIDADE_PADRAO, pontosGanhosNoPedido } from '../dominio/fidelidade'
 import { FIDELIDADE_SEMENTE } from '../infra/fidelidadeSemente'
+import { mesmoConteudo } from './igualdade'
+import { comRascunhoDeFora, comRascunhoDoCampo } from './rascunhoLocal'
 
 export const ATENDENTE = 'Thatiane'
 
@@ -72,9 +75,12 @@ export function estadoInicial({
     selecionadaId: conversas[0]?.id ?? null,
     // Balcão (seção 1, rodada 5): duas abas, canais que ligam mais de um ao
     // mesmo tempo e uma ordem só. `MUDAR_FILTRO` é genérico (chave/valor), a
-    // forma nova só muda o que mora em cada chave.
-    filtros: { busca: '', aba: 'precisa', canais: [], ordenacao: 'urgencia' },
+    // forma nova só muda o que mora em cada chave. #1442: abre em "Todas";
+    // "Precisa de você" virou filtro com contador.
+    filtros: { busca: '', aba: 'todas', canais: [], ordenacao: 'urgencia', responsavel: 'todas' },
     rascunhos: {},
+    // #1577: quantas vezes cada rascunho foi escrito de fora do campo (ver rascunhoLocal.js).
+    escritasDeFora: {},
     automaticoPausado: {},
     // Lista, não campo único: dois desacertos de saldo antes dela clicar
     // "Entendi" no primeiro não podem apagar um ao outro (QA2-16).
@@ -198,66 +204,102 @@ function comMensagem(conversa, mensagem, { id, agora }) {
 // porque a leitura em voo pode ter saído antes de o servidor gravá-la.
 const mensagemSoLocal = (m) => m.status === 'enviando' || m.status === 'falhou' || Boolean(m.aguardandoSync)
 
+// #1565: o pedido relido igual fica o mesmo objeto na tela, com a `leitura` de quando entrou. A ordem da
+// releitura mais nova que o confirmou fica aqui, para a regra da #1548 continuar valendo.
+const confirmadoNaLeitura = new WeakMap()
+const leituraDe = (pedido) => (pedido ? Math.max(pedido.leitura ?? -Infinity, confirmadoNaLeitura.get(pedido) ?? -Infinity) : undefined)
+
 // F03: sem pedido no servidor, a comanda que a dona monta (rascunho) fica. Com pedido, o do
-// servidor manda; a janela e o meio escolhidos na tela vêm junto (a API não os devolve).
+// servidor manda, inclusive a vaga de entrega; o meio escolhido na tela vem junto.
 // Pedido anterior já entregue ou cancelado não apaga a comanda nova que ela está montando.
 function pedidoMesclado(local, doServidor) {
   if (!doServidor) return local ?? null
+  // #1548: leitura que saiu antes da que já está na tela chegou atrasada e não desfaz a mais nova.
+  if (leituraDe(local) > doServidor.leitura) return local
   const rascunho = Boolean(local) && !local.pedidoId
   if (rascunho && pedidoEncerrado(doServidor)) return local
   if (!local || (!rascunho && local.pedidoId !== doServidor.pedidoId)) return doServidor
   return {
     ...doServidor,
-    janela: local.janela ?? doServidor.janela,
     meio: doServidor.cobranca?.meio ?? local.meio ?? doServidor.meio,
   }
 }
+
+const mesmaLista = (a, b) => a.length === b.length && a.every((item, i) => item === b[i])
 
 // O resumo da inbox não traz o cadastro; o cliente lido do EasyStok (#1276) fica enquanto
 // a conversa seguir com o mesmo cliente.
 const clienteDaApiMantido = (local, doServidor) =>
   local.cliente?.daApi && local.clienteId && local.clienteId === doServidor.clienteId
 
-function mesclarDoServidor(local, doServidor) {
-  if (!local) return doServidor
+// #1565: `leitura` é só a ordem em que a consulta saiu; o mesmo pedido relido não é mudança.
+const mesmoPedido = (a, b) => Boolean(a) && Boolean(b) && mesmoConteudo({ ...a, leitura: null }, { ...b, leitura: null })
+
+// #1565: a polling relê a cada 5 s. Leitura igual à que já está na tela devolve a MESMA conversa, para a
+// tela parada não re-renderizar inteira.
+// #1576: `semMensagens` é a conversa cujas mensagens o laço não conseguiu ler e não tinha em cache. Não é
+// conversa vazia: ficam as mensagens da tela e o que se calcula delas (janela de 24 h, atraso).
+function mesclarDoServidor(local, lida, semMensagens = false) {
+  if (!local) return lida
+  const doServidor = semMensagens
+    ? { ...lida, mensagens: local.mensagens, janelaExpiraEm: local.janelaExpiraEm, atrasada: local.atrasada }
+    : lida
   const doServidorIds = new Set(doServidor.mensagens.map((m) => m.id))
   const soLocais = local.mensagens.filter((m) => mensagemSoLocal(m) && !doServidorIds.has(m.id))
   const mantido = clienteDaApiMantido(local, doServidor)
   const rascunhoDoNome = local.nomeDaDona && !doServidor.clienteId
-  return {
+  const lido = pedidoMesclado(local.pedido, doServidor.pedido)
+  const pedido = mesmoPedido(local.pedido, lido) ? local.pedido : lido
+  if (pedido !== lido && lido.leitura > leituraDe(pedido)) confirmadoNaLeitura.set(pedido, lido.leitura)
+  const mesclada = {
     ...local,
     ...doServidor,
     ...(mantido ? { nome: local.nome, cliente: local.cliente } : {}),
     ...(rascunhoDoNome ? { nome: local.nome, nomeDaDona: true } : {}),
-    pedido: pedidoMesclado(local.pedido, doServidor.pedido),
+    pedido,
     mensagens: [...doServidor.mensagens, ...soLocais],
   }
+  return mesmoConteudo(local, mesclada) ? local : mesclada
 }
 
 const CASOS_API = {
-  [acao.SINCRONIZAR_CONVERSAS]: (estado, { conversas }) => {
+  [acao.CONFIRMAR_RESPONSAVEL_API]: (estado, { id, situacao }) => ({
+    ...mapear(estado, id, (c) => ({ ...c, ...situacao })),
+    automaticoPausado: { ...estado.automaticoPausado, [id]: situacao.pausaApi ?? false },
+  }),
+  [acao.CONFIRMAR_REABERTURA_API]: (estado, { id, situacao }) => ({
+    ...mapear(estado, id, (c) => ({ ...c, ...situacao })),
+    automaticoPausado: { ...estado.automaticoPausado, [id]: situacao.pausaApi ?? false },
+  }),
+  [acao.SINCRONIZAR_CONVERSAS]: (estado, { conversas, semMensagens }) => {
     const locais = new Map(estado.conversas.map((c) => [c.id, c]))
-    const mescladas = conversas.map((c) => mesclarDoServidor(locais.get(c.id), c))
+    const lidas = conversas.map((c) => mesclarDoServidor(locais.get(c.id), c, semMensagens?.includes(c.id)))
+    const mescladas = mesmaLista(estado.conversas, lidas) ? estado.conversas : lidas
     const aindaExiste = mescladas.some((c) => c.id === estado.selecionadaId)
-    return {
-      ...estado,
-      conversas: mescladas,
-      selecionadaId: aindaExiste ? estado.selecionadaId : (mescladas[0]?.id ?? null),
-      automaticoPausado: Object.fromEntries(
-        mescladas.map((c) => [c.id, c.pausaApi ?? false]),
-      ),
-      // O aviso de ação recusada fica até a dona fechar (F06): o ciclo de 5 s não o apaga.
-      sincronizacao: { estado: 'ok', mensagem: null, em: Date.now(), aviso: estado.sincronizacao?.aviso ?? null },
+    const selecionadaId = aindaExiste ? estado.selecionadaId : (mescladas[0]?.id ?? null)
+    const pausas = Object.fromEntries(mescladas.map((c) => [c.id, c.pausaApi ?? false]))
+    const automaticoPausado = mesmoConteudo(estado.automaticoPausado, pausas) ? estado.automaticoPausado : pausas
+    // O aviso de ação recusada fica até a dona fechar (F06): o ciclo de 5 s não o apaga.
+    const emDia = estado.sincronizacao?.estado === 'ok' && estado.sincronizacao.mensagem == null
+    const sincronizacao = emDia ? estado.sincronizacao : {
+      estado: 'ok', mensagem: null,
+      aviso: estado.sincronizacao?.aviso ?? null, avisoFixo: estado.sincronizacao?.avisoFixo ?? null,
     }
+    // #1565: volta sem novidade devolve o mesmo estado; o Provider não recalcula nem a tela re-renderiza.
+    if (mescladas === estado.conversas && selecionadaId === estado.selecionadaId
+      && automaticoPausado === estado.automaticoPausado && sincronizacao === estado.sincronizacao) return estado
+    return { ...estado, conversas: mescladas, selecionadaId, automaticoPausado, sincronizacao }
   },
 
   // #1276: cliente da conversa como o EasyStok tem (cadastro pelo console ou dossiê ao abrir).
-  [acao.CLIENTE_DA_API]: (estado, { id, clienteId, nome, cliente }) =>
+  [acao.CLIENTE_DA_API]: (estado, { id, clienteId, nome, cliente, bloqueio }) =>
     mapear(estado, id, (c) => ({
       ...c,
       clienteId,
       conta: 'cliente',
       nome: nome || c.nome,
+      // #1474: o bloqueio do cadastro vem do dossiê; sem o campo, fica o que estava.
+      bloqueio: bloqueio === undefined ? c.bloqueio : bloqueio,
       cliente: { ...c.cliente, ...cliente, enderecoCapturado: null, daApi: true },
     })),
 
@@ -281,6 +323,10 @@ const CASOS_API = {
       }
     }),
 
+  [acao.RECEBER_MODELO_API]: (estado, { id, mensagem }) => mapear(estado, id, c => ({
+    ...c, mensagens: [...c.mensagens.filter(m => m.id !== mensagem.id), { ...mensagem, aguardandoSync: true }],
+  })),
+
   // #1396: com a mensagem gravada pelo EasyStok, o balão local vira ela (id do servidor, que o Reenviar
   // usa); sem ela, fica marcado `semIdServidor` e não oferece Reenviar.
   [acao.FALHAR_ENVIO_API]: (estado, { id, mensagemId, erro, mensagem, semIdServidor }) =>
@@ -293,22 +339,30 @@ const CASOS_API = {
       }),
     })),
 
-  [acao.AVISO_API]: (estado, { mensagem }) => ({
-    ...estado, sincronizacao: { ...estado.sincronizacao, aviso: mensagem },
+  // #1474: aviso de configuração (loja online desligada) é `persistente` e mora em `avisoFixo`:
+  // só sai quando a dona fecha (`fixo: true`). A limpeza automática (trocar de tela, ação que
+  // deu certo) apaga só o aviso de ação, que é o `aviso`.
+  [acao.AVISO_API]: (estado, { mensagem, persistente }) => ({
+    ...estado,
+    sincronizacao: { ...estado.sincronizacao, ...(persistente ? { avisoFixo: mensagem } : { aviso: mensagem }) },
   }),
 
-  [acao.FECHAR_AVISO_API]: (estado) => ({
+  [acao.FECHAR_AVISO_API]: (estado, { fixo } = {}) => (fixo ? {
+    ...estado, sincronizacao: { ...estado.sincronizacao, aviso: null, avisoFixo: null },
+  } : {
     ...estado, sincronizacao: { ...estado.sincronizacao, aviso: null },
   }),
 
   // F03: o cardápio da vitrine substitui o da massa. Adicional da massa não existe na API.
+  // A peça guarda o id do item e o índice da foto: o envio vai pelo id (#1437), não pela URL.
   [acao.SINCRONIZAR_CARDAPIO]: (estado, { cardapio }) => ({
     ...estado,
     catalogo: {
       ...estado.catalogo, cardapio, adicionais: {},
       galeria: cardapio.flatMap((item) => (item.fotos ?? []).map((foto, indice) => ({
         id: `${item.sku}-foto-${indice}`, nome: item.nome,
-        descricao: `${item.porcao} · Foto ${indice + 1}`, foto, doCardapio: true,
+        descricao: `${item.porcao} · Foto ${indice + 1}`, legenda: legendaDoItem(item), foto, doCardapio: true,
+        cardapioItemId: item.sku, indice,
       }))),
     },
   }),
@@ -339,9 +393,9 @@ const CASOS = {
 
   // O rascunho vive no estado da conversa, não dentro do componente. Assim o
   // agente e as respostas rápidas escrevem nele sem truque de remontagem.
-  [acao.DEFINIR_RASCUNHO]: (estado, { id, texto }) => ({
-    ...estado, rascunhos: { ...estado.rascunhos, [id]: texto },
-  }),
+  // #1577: o campo de escrever manda o texto na pausa da digitação (`doCampo`); o resto é escrita de fora.
+  [acao.DEFINIR_RASCUNHO]: (estado, { id, texto, doCampo = false, escritaVista, adotar = false }) =>
+    (doCampo ? comRascunhoDoCampo(estado, { id, texto, escritaVista, adotar }) : comRascunhoDeFora(estado, id, texto)),
 
   [acao.ENVIAR_MENSAGEM]: (estado, { id, texto, agora, mensagemId, modelo = false, automatica = false, regra = null }) => {
     if (recusaEnvio(estado, id, agora)) return estado
@@ -353,7 +407,7 @@ const CASOS = {
       estado: c.estado === 'Aberto' ? 'Em atendimento' : c.estado,
       responsavel: c.responsavel ?? ATENDENTE,
     }))
-    const comRascunhoLimpo = { ...base, rascunhos: { ...base.rascunhos, [id]: '' } }
+    const comRascunhoLimpo = comRascunhoDeFora(base, id, '')
     if (automatica) return comRascunhoLimpo
     return {
       ...comRascunhoLimpo,
@@ -646,7 +700,8 @@ const CASOS = {
       ...c,
       cliente: {
         ...c.cliente,
-        notas: [{ id: notaId, autor: ATENDENTE, em: dataHora(agora), texto }, ...c.cliente.notas],
+        // `criadoEm` (#1441): a nota entra no fio da conversa como post-it pela hora.
+        notas: [{ id: notaId, autor: ATENDENTE, em: dataHora(agora), criadoEm: new Date(agora).toISOString(), texto }, ...c.cliente.notas],
       },
     })),
 
@@ -667,9 +722,24 @@ const CASOS = {
     }, { id: mensagemId, agora }))
   },
 
+  // #1241: o "Entendi" de um alerta do EasyStok vale até recarregar a página; sem isso a
+  // releitura do minuto seguinte traria o mesmo cartão de volta.
   [acao.FECHAR_ALERTA]: (estado, { alertaId }) => ({
-    ...estado, alertasEstoque: estado.alertasEstoque.filter((a) => a.id !== alertaId),
+    ...estado,
+    alertasEstoque: estado.alertasEstoque.filter((a) => a.id !== alertaId),
+    alertasFechados: [...(estado.alertasFechados ?? []), alertaId],
   }),
+
+  [acao.ALERTAS_DE_ESTOQUE_DA_API]: (estado, { alertas }) => {
+    const fechados = new Set(estado.alertasFechados ?? [])
+    return {
+      ...estado,
+      alertasEstoque: [
+        ...estado.alertasEstoque.filter((a) => !a.daApi),
+        ...alertas.filter((a) => !fechados.has(a.id)),
+      ],
+    }
+  },
 
   [acao.ALTERNAR_REGRA]: (estado, { regraId }) => ({
     ...estado,
@@ -978,7 +1048,9 @@ const CASOS = {
   }),
 
   [acao.CRIAR_LEMBRETE]: (estado, { lembrete }) => ({
-    ...estado, lembretes: [...estado.lembretes, lembrete],
+    ...estado,
+    revisaoLembretes: (estado.revisaoLembretes ?? 0) + 1,
+    lembretes: [...estado.lembretes.filter((l) => l.id !== lembrete.id), lembrete],
   }),
 
   // Concluído sai da lista e fica no histórico da conversa como mensagem de
@@ -986,6 +1058,7 @@ const CASOS = {
   [acao.CONCLUIR_LEMBRETE]: (estado, { lembreteId, titulo, conversaId, agora, mensagemId }) => {
     const semEle = {
       ...estado,
+      revisaoLembretes: (estado.revisaoLembretes ?? 0) + 1,
       lembretes: estado.lembretes.filter((l) => l.id !== lembreteId),
       lembretesConcluidos: { ...estado.lembretesConcluidos, [lembreteId]: true },
     }
@@ -998,8 +1071,10 @@ const CASOS = {
   // Os lembretes automáticos são retrato do estado das conversas: o que não
   // vale mais sai sozinho, o que foi adiado mantém a hora nova, e o que ela
   // concluiu não volta.
+  // O que veio do EasyStok (`fonte`, modo API) também fica: quem troca isso é a
+  // SINCRONIZAR_LEMBRETES_API.
   [acao.SINCRONIZAR_LEMBRETES]: (estado, { automaticos }) => {
-    const manuais = estado.lembretes.filter((l) => l.origem === ORIGENS.MANUAL)
+    const manuais = estado.lembretes.filter((l) => l.origem === ORIGENS.MANUAL || l.fonte)
     const antigos = new Map(estado.lembretes.map((l) => [l.id, l]))
     const vivos = automaticos
       .filter((l) => !estado.lembretesConcluidos[l.id])
@@ -1010,13 +1085,31 @@ const CASOS = {
     return igual ? estado : { ...estado, lembretes: proximos }
   },
 
+  // Uma consulta iniciada antes de salvar não pode apagar o lembrete recém-criado.
+  [acao.SINCRONIZAR_LEMBRETES_API]: (estado, { lembretes, revisao }) => {
+    if (!Array.isArray(lembretes) || (revisao !== undefined && revisao !== (estado.revisaoLembretes ?? 0))) return estado
+    const antigos = new Map(estado.lembretes.map((l) => [l.id, l]))
+    const mesmo = (a, b) => a && a.quando === b.quando && a.titulo === b.titulo
+      && a.detalhe === b.detalhe && a.conversaId === b.conversaId && a.visto === b.visto
+    const chegaram = lembretes
+      .filter((l) => !estado.lembretesConcluidos[l.id])
+      .map((l) => (mesmo(antigos.get(l.id), l) ? antigos.get(l.id) : l))
+    const proximos = [...estado.lembretes.filter((l) => l.fonte !== FONTES.LEMBRETE), ...chegaram]
+    const vistos = { ...estado.vistos }
+    for (const l of chegaram) if (l.visto) vistos[chaveLembrete(l)] = true
+    const atuais = new Set(estado.lembretes)
+    const igual = proximos.length === estado.lembretes.length && proximos.every((l) => atuais.has(l))
+      && Object.keys(vistos).length === Object.keys(estado.vistos).length
+    return igual ? estado : { ...estado, lembretes: proximos, vistos }
+  },
+
   // Visto estilo Instagram (seção 8): a Frente B manda as chaves `id+quando`
   // dos itens de "Novos" quando o painel fecha, e elas somam ao conjunto.
   [acao.MARCAR_LEMBRETES_VISTOS]: (estado, { chaves }) => {
     if (!chaves?.length) return estado
     const vistos = { ...estado.vistos }
     for (const chave of chaves) vistos[chave] = true
-    return { ...estado, vistos }
+    return { ...estado, vistos, revisaoLembretes: (estado.revisaoLembretes ?? 0) + 1 }
   },
 
   // RN-14: bloquear é do cadastro, não da conversa. Toda conversa do mesmo

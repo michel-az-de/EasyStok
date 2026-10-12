@@ -58,7 +58,8 @@ public class AtendimentoConfiguracaoController(
                 body.MensagemForaArea,
                 body.RespiroMinutos,
                 body.TempoPreparoPadraoMinutos,
-                body.Ativo));
+                body.Ativo,
+                body.SlaRespostaMinutos));
 
             return DataOk(resultado);
         }
@@ -78,6 +79,7 @@ public sealed record AtualizarConfiguracaoAtendimentoBody(
     string? MensagemForaArea,
     int? RespiroMinutos,
     int? TempoPreparoPadraoMinutos,
-    bool? Ativo);
+    bool? Ativo,
+    int? SlaRespostaMinutos = null);
 
 public sealed record ModeloRetomadaBody(string? Nome, string? Idioma);

@@ -59,7 +59,8 @@ public sealed record PedidoImpressoClienteLeitura(
     string? Bairro,
     string? Cidade,
     string? Cep,
-    IReadOnlyList<string>? Alergias = null);
+    IReadOnlyList<string>? Alergias = null,
+    string? EnderecoEntrega = null);
 
 public sealed record PedidoImpressoPagamentoLeitura(decimal Valor, DateTime PagoEm, string Metodo);
 

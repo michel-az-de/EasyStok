@@ -1,5 +1,7 @@
 import * as acao from '../acoes'
-import { encerrar, enviarImagem, enviarTexto } from '../../infra/api/conversasApi'
+import {
+  encerrar, enviarAudio, enviarImagem, enviarImagemCardapio, enviarTexto,
+} from '../../infra/api/conversasApi'
 import { mensagemDaApi } from '../../infra/api/traducaoConversas'
 import { proximoId } from '../../infra/repositorioConversas'
 
@@ -7,11 +9,14 @@ import { proximoId } from '../../infra/repositorioConversas'
 //
 // Encerrar: a despedida marcada sai pelo envio de texto real (S07) e a conversa fecha no
 // EasyStok (`POST .../encerrar`). O resumo, a avaliação, a anotação e os avisos por e-mail
-// e SMS do modo demonstração não têm endpoint: não viram registro local, só avisam.
+// e SMS do modo demonstração não têm endpoint: não viram registro local, e a tela nem mostra
+// avaliação e anotação (#1586).
 //
-// Mídia: só foto no WhatsApp tem endpoint (S02, multipart). Áudio, arquivo, figurinha,
-// peça da galeria e foto em outro canal avisam e não aparecem como enviados.
+// Mídia: foto e áudio no WhatsApp têm endpoint. A foto do computador vai em multipart (S02); a peça
+// da galeria do cardápio, pelo id do item (#1437); o áudio gravado, em multipart (#1444). Arquivo,
+// figurinha e foto ou áudio em outro canal avisam e não aparecem como enviados.
 const CANAL_COM_FOTO = 'WhatsApp'
+const CANAL_COM_AUDIO = 'WhatsApp'
 
 const ROTULO_DA_MIDIA = {
   audio: 'Áudio', arquivo: 'Arquivo', figurinha: 'Figurinha', peca: 'Peça da galeria',
@@ -34,31 +39,75 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
     }
   }
 
+  // Áudio (#1444): o balão nasce "enviando" e a ação devolve só depois da resposta, para o gravador
+  // mostrar o envio. Confirmado, o balão segue tocando o que foi gravado; o arquivo convertido do
+  // EasyStok chega na sincronização.
+  async function enviarAudioGravado(id, { arte, texto, ...extra }) {
+    const canal = conversaDe(id)?.canal
+    if (canal !== CANAL_COM_AUDIO) {
+      avisar(`Áudio: ainda não ligado para ${canal ?? 'este canal'} nesta versão. Pelo EasyStok sai só no WhatsApp.`)
+      return false
+    }
+    const mensagemId = proximoId('mid')
+    despachar({
+      tipo: acao.ENVIAR_MIDIA, id, formato: 'audio', arte, texto, ...extra, status: 'enviando', agora: agoraRef.current, mensagemId,
+    })
+    try {
+      const mensagem = mensagemDaApi(await enviarAudio(id, { dataUrl: arte }))
+      despachar({
+        tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: { ...mensagem, formato: 'audio', arte, duracaoMs: extra.duracaoMs },
+      })
+      return mensagem.status !== 'falhou'
+    } catch (erro) {
+      despachar(falhaDoEnvio(id, mensagemId, erro))
+      return false
+    }
+  }
+
+  // #1586: o erro volta para o modal (a faixa fica atrás da cortina), com a notícia de que a
+  // despedida já saiu, para a nova tentativa não mandar outra. `pedidoCancelado` vem do modal,
+  // que cancela o pedido sem pagamento antes de encerrar.
+  async function encerrarPeloModal(id, {
+    enviarMensagem = false, textoMensagem = '', avisoEmail = false, avisoSms = false, pedidoCancelado = false,
+  } = {}) {
+    const texto = textoMensagem.trim()
+    const despedidaSaiu = enviarMensagem && texto ? await despedir(id, texto) : null
+    try {
+      await encerrar(id)
+    } catch (erro) {
+      const mensagem = `Atendimento não encerrado: ${erro.message}`
+      avisar(mensagem)
+      return { erro: mensagem, despedidaSaiu: despedidaSaiu === true }
+    }
+    const pedido = conversaDe(id)?.pedido
+    despachar({ tipo: acao.ENCERRAR_ATENDIMENTO, id })
+    despachar({ tipo: acao.FECHAR_ENCERRAMENTO })
+    // Só ressalva acende a faixa: encerrar que deu certo não sai em tom de alerta.
+    const ressalvas = []
+    if (despedidaSaiu === false) ressalvas.push('A despedida não saiu (veja a mensagem na conversa).')
+    if (!pedidoCancelado && pedido?.pedidoId && pedido.estado === 'aguardando') ressalvas.push('O pedido sem pagamento segue aberto no EasyStok.')
+    if (avisoEmail || avisoSms) ressalvas.push('O aviso por e-mail e SMS ainda não sai nesta versão.')
+    if (ressalvas.length > 0) avisar(['Atendimento encerrado no EasyStok.', ...ressalvas].join(' '))
+    else despachar({ tipo: acao.FECHAR_AVISO_API })
+    return undefined
+  }
+
+  // #1586: um encerramento por conversa. O envio de texto não tem chave de idempotência: o
+  // segundo toque com o primeiro em voo recebe a mesma promessa, sem outra despedida.
+  const encerrando = new Map()
+
   return {
-    encerrarComResumo: async (id, _agora, { enviarMensagem = false, textoMensagem = '', avisoEmail = false, avisoSms = false } = {}) => {
-      const pedido = conversaDe(id)?.pedido
-      const texto = textoMensagem.trim()
-      const despedidaSaiu = enviarMensagem && texto ? await despedir(id, texto) : null
-      try {
-        await encerrar(id)
-      } catch (erro) {
-        avisar(`Atendimento não encerrado: ${erro.message}`)
-        return
+    encerrarComResumo: (id, _agora, opcoes) => {
+      if (!encerrando.has(id)) {
+        encerrando.set(id, encerrarPeloModal(id, opcoes).finally(() => encerrando.delete(id)))
       }
-      despachar({ tipo: acao.ENCERRAR_ATENDIMENTO, id })
-      despachar({ tipo: acao.FECHAR_ENCERRAMENTO })
-      const partes = ['Atendimento encerrado no EasyStok.']
-      if (despedidaSaiu === false) partes.push('A despedida não saiu (veja a mensagem na conversa).')
-      // O modal cancela o pedido sem pagamento, mas cancelar ainda não está ligado (F03).
-      if (pedido?.pedidoId && pedido.estado === 'aguardando') partes.push('O pedido sem pagamento segue aberto no EasyStok.')
-      partes.push('Resumo, avaliação e anotação ainda não são guardados nesta versão.')
-      if (avisoEmail || avisoSms) partes.push('Aviso por e-mail e SMS também não sai ainda.')
-      avisar(partes.join(' '))
+      return encerrando.get(id)
     },
 
     enviarMidia: async (id, { formato, arte, texto, ...extra }) => {
+      if (formato === 'audio') return enviarAudioGravado(id, { arte, texto, ...extra })
       if (formato !== 'imagem' && formato !== 'peca') {
-        avisar(`${ROTULO_DA_MIDIA[formato] ?? 'Mídia'}: ainda não ligado nesta versão. Pelo EasyStok sai só foto no WhatsApp.`)
+        avisar(`${ROTULO_DA_MIDIA[formato] ?? 'Mídia'}: ainda não ligado nesta versão. Pelo EasyStok saem só foto e áudio no WhatsApp.`)
         return false
       }
       const canal = conversaDe(id)?.canal
@@ -71,11 +120,12 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
       despachar({
         tipo: acao.ENVIAR_MIDIA, id, formato: 'imagem', arte, texto, ...extra, status: 'enviando', agora: agoraRef.current, mensagemId,
       })
+      const legenda = extra.legenda ?? (formato === 'peca' ? [texto, extra.descricao].filter(Boolean).join('\n') : undefined)
       try {
-        const m = await enviarImagem(id, {
-          dataUrl: arte, nomeArquivo: extra.nomeArquivo,
-          legenda: extra.legenda ?? (formato === 'peca' ? [texto, extra.descricao].filter(Boolean).join('\n') : undefined),
-        })
+        // Peça do cardápio vai pelo id do item (#1437); foto do computador, em multipart.
+        const m = extra.cardapioItemId && Number.isInteger(extra.indice)
+          ? await enviarImagemCardapio(id, { cardapioItemId: extra.cardapioItemId, indice: extra.indice, legenda })
+          : await enviarImagem(id, { dataUrl: arte, nomeArquivo: extra.nomeArquivo, legenda })
         const mensagem = mensagemDaApi(m)
         despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem })
         return mensagem.status !== 'falhou'

@@ -8,6 +8,7 @@ import css from './agente.module.css'
 // O que a linha fechada diz. Número e palavra: recolhido não pode virar silêncio.
 function resumoFechado(estado, temSugestao) {
   if (estado === 'pensando') return 'lendo a conversa'
+  if (estado === 'erro') return 'consulta não concluída'
   if (temSugestao) return 'sugestão pronta'
   return 'nada pendente'
 }
@@ -30,7 +31,7 @@ export function PainelAgente({
     ? esperado.acao === sugestao.acao
     : null
 
-  const chamaAtencao = Boolean(sugestao) || passouParaVoce
+  const chamaAtencao = Boolean(sugestao) || passouParaVoce || estado === 'pensando' || estado === 'erro'
   // Ajuste de estado durante a renderização, não em efeito: sugestão nova ou
   // devolução chegando abre a gaveta, e Descartar fecha de novo. A chave da
   // conversa remonta o painel, então a escolha não vaza para a conversa seguinte.
@@ -66,7 +67,7 @@ export function PainelAgente({
   return (
     <section className={css.painel} aria-label="Agente de atendimento">
       <div className={css.cabeca}>
-        <h3><Icone nome="agente" /> Agente da casa</h3>
+        <h3><Icone nome="agente" /> Sugestão de resposta</h3>
         {!aberto && (
           <span className={`${css.resumoFechado} ${chamaAtencao ? css.pendente : ''}`}>
             {pendencias}
@@ -74,13 +75,13 @@ export function PainelAgente({
         )}
         <div className={css.direita}>
           <Botao onClick={aoConsultar} disabled={estado === 'pensando'}>
-            {estado === 'pensando' ? 'Lendo' : 'Sugerir'}
+            {estado === 'pensando' ? 'Consultando…' : estado === 'erro' ? 'Tentar novamente' : 'Sugerir resposta'}
           </Botao>
         </div>
       </div>
 
       {aberto && (
-        <div className={css.corpo} id="corpo-do-agente">
+        <div className={css.corpo}>
           {estado === 'ocioso' && (
             <p className={css.tranquilo}>
               <Icone nome="check" /> Nada pendente nesta conversa.
@@ -88,25 +89,28 @@ export function PainelAgente({
           )}
 
           {estado === 'pensando' && (
-            <p className={css.pensando}>
+            <output className={css.pensando}>
               {modo === 'simulado'
-                ? 'Lendo a conversa, a ficha e o cardápio do dia…'
-                : `Perguntando ao Claude (${conexao.rotulo.toLowerCase()})…`}
-            </p>
+                ? 'Preparando uma sugestão de demonstração…'
+                : 'Consultando a IA sobre esta conversa…'}
+            </output>
           )}
 
           {estado === 'erro' && (
             <p className={css.erro} role="alert">
-              <Icone nome="alerta" /> {erro ?? 'O agente não respondeu.'}
+              <Icone nome="alerta" /> {erro?.includes('Anthropic:')
+                ? 'A conexão com a IA está indisponível. Peça ao responsável pelo sistema para verificar.'
+                : erro || 'Não foi possível gerar uma sugestão. Tente novamente.'}
             </p>
           )}
 
           {estado === 'pronto' && sugestao && (
             <div ref={sugestaoRef} className={passarParaDona ? css.sugestaoDona : css.sugestao}>
               <p className={css.rotuloSugestao}>
-                {passarParaDona ? 'Passar para você decidir:' : 'Você pediu:'}
+                {passarParaDona ? 'Ponto para você decidir:' : 'Texto para revisar:'}
               </p>
               <p>{sugestao.texto}</p>
+              <p className={css.pensando}>Ainda não foi enviado. Revise antes de usar no rascunho.</p>
               {/* Uma pílula por linha. Quem está cozinhando não lê sete de
                   enfiada, e latência, token e dólar não decidem nada para ela:
                   foram para a bancada de teste, no fim do painel. */}
@@ -123,7 +127,7 @@ export function PainelAgente({
               </div>
               {bloqueada && (
                 <p className={css.pensando}>
-                  Cadastro bloqueado: nada sai desta conversa. Desbloqueie na ficha primeiro.
+                  Envio indisponível nesta conversa. Confira o aviso no campo de mensagem.
                 </p>
               )}
             </div>

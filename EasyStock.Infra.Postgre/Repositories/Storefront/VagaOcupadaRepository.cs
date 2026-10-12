@@ -187,6 +187,8 @@ public sealed class VagaOcupadaRepository(EasyStockDbContext db) : IVagaOcupadaR
             .AsNoTracking()
             .IgnoreQueryFilters()
             .Where(v => ids.Contains(v.PedidoId))
+            .OrderBy(v => v.LiberadoEm != null)
+            .ThenByDescending(v => v.OcupadoEm)
             .ToListAsync(ct);
 
         if (vagas.Count == 0)
@@ -202,9 +204,7 @@ public sealed class VagaOcupadaRepository(EasyStockDbContext db) : IVagaOcupadaR
         var resultado = new Dictionary<Guid, (VagaOcupada, JanelaEntrega)>(vagas.Count);
         foreach (var vaga in vagas)
         {
-            // Convenção: 1 pedido ↔ 1 vaga (ativa OU liberada — pegamos a "principal").
-            // Se houver duplicidade por concorrência histórica, mantemos a primeira
-            // encontrada (DESC por OcupadoEm seria mais "verdadeira" mas é overhead pro caso raro).
+            // Reagendamento mantém histórico: a ativa vence; sem ativa, a mais recente.
             if (resultado.ContainsKey(vaga.PedidoId)) continue;
             if (janelas.TryGetValue(vaga.JanelaEntregaId, out var janela))
             {

@@ -49,9 +49,8 @@ internal sealed class GeradorAutoPreenchimentoClaude(
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
             using var reader = new StreamReader(stream, Encoding.UTF8);
 
-            while (!reader.EndOfStream && !ct.IsCancellationRequested)
+            while (await reader.ReadLineAsync(ct) is { } line)
             {
-                var line = await reader.ReadLineAsync(ct);
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 if (!line.StartsWith("data:")) continue;
 
@@ -61,7 +60,7 @@ internal sealed class GeradorAutoPreenchimentoClaude(
                 string? text = null;
                 try
                 {
-                    var json = JsonDocument.Parse(data);
+                    using var json = JsonDocument.Parse(data);
                     var type = json.RootElement.GetProperty("type").GetString();
                     if (type == "content_block_delta")
                     {
@@ -106,16 +105,19 @@ internal sealed class GeradorAutoPreenchimentoClaude(
 
             if (!response.IsSuccessStatusCode)
             {
-                var errorBody = await response.Content.ReadAsStringAsync(ct);
-                var logLevel = (int)response.StatusCode >= 500 ? Microsoft.Extensions.Logging.LogLevel.Error : Microsoft.Extensions.Logging.LogLevel.Warning;
-                logger.Log(logLevel, "Anthropic API retornou {StatusCode} para auto-preenchimento de '{Nome}': {ErrorBody}",
-                    (int)response.StatusCode, nomeProduto, errorBody);
-                return null;
+                using (response)
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync(ct);
+                    var logLevel = (int)response.StatusCode >= 500 ? LogLevel.Error : LogLevel.Warning;
+                    logger.Log(logLevel, "Anthropic API retornou {StatusCode} para auto-preenchimento de '{Nome}': {ErrorBody}",
+                        (int)response.StatusCode, nomeProduto, errorBody);
+                    return null;
+                }
             }
 
             return response;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogError(ex, "Erro ao iniciar stream Anthropic para auto-preenchimento: {Nome}", nomeProduto);
             return null;

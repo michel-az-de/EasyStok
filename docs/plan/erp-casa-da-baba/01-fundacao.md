@@ -22,6 +22,8 @@ para não decidir permissão no front (princípio 2 do README).
 
 ## M0.1 · Tema da marca no console
 
+> Execução de 09/10/2026: tema global, tipografia, logo derivada, contraste automatizado e ajuste de largura implementados. Capturas e limites da homologação na [seção 13 do levantamento](11-levantamento-e-ondas-2026-10-09.md#13-continuação-autorizada-identidade-e-navegação-09102026). A M0.2 avançou com busca, login único e guarda compartilhado; M0.3/perfis continua pendente. Este registro não declara deploy.
+
 **Fato medido.** O console define tudo em tokens (`src/estilos/tokens.css:1`, "nenhum componente
 escreve cor... literal"), com `light-dark()` em 44 declarações e tema claro/escuro escolhido pelo
 usuário (`tokens.css:18,226-227`; interruptor em `src/app/Moldura.jsx:135-160`). A identidade é o
@@ -252,6 +254,8 @@ só de URL bonita. `rotaDaHash` continua pura em `dominio/` e cresce com testes.
 
 ## M0.3 · Perfis × módulos na API
 
+> Execução de 09/10/2026: matriz, seed, porta por perfil e proteção da API/Console validados. A seção 15 do [levantamento](11-levantamento-e-ondas-2026-10-09.md) registra a limpeza das 18 permissões da lista ativa somente da empresa configurada, com arquivo recuperável e sem ativar fallback indevido. O enum mantém 37 membros para compatibilidade com perfis globais e de outras empresas. A poda global para 19 membros permanece pendente; M0.3 não está integralmente encerrada. Não houve deploy. As medições e proposta abaixo são a especificação anterior a essas entregas.
+
 **Fato medido.**
 
 | Peça | Estado | Onde |
@@ -326,12 +330,12 @@ o Atendimento abre, lança e vê; fecha quem é Dona.
 
 **Aceite.**
 - [ ] Enum com 19 membros; `git grep -nE "Tickets|Sla|Fatura|Faq|Helpdesk" -- EasyStock.Domain/Enums/Permissao.cs` = 0.
-- [ ] Migration de dados apaga as linhas das 18 permissões removidas; teste de integração: perfil com permissão antiga autentica depois da migration.
-- [ ] Teste de domínio do fallback de módulo por nível (5 níveis × 8 módulos).
-- [ ] Teste de arquitetura: todo controller da Api está no mapa de módulo, na lista transversal ou na lista do bastidor (controller novo sem classificação quebra o build).
-- [ ] Teste de integração por módulo: Operador "Cozinha" recebe 403 em `GET api/caixa/dia` e 200 em `GET api/kds/...`.
-- [ ] `GET api/auth/me/modulos` devolve a matriz de cada perfil semeado e a porta de entrada.
-- [ ] Seed de perfis idempotente: rodar duas vezes não duplica perfil nem permissão.
+- [x] Arquivar e retirar as 18 permissões da lista ativa apenas da empresa configurada, sem ampliar acesso; teste em PostgreSQL comprova login legado e refresh. Escopo adaptado na seção 15 do levantamento; migration é aditiva.
+- [x] Teste de domínio do fallback de módulo por nível (5 níveis × 8 módulos).
+- [x] Teste de arquitetura: todo controller da Api está no mapa de módulo, na lista transversal ou na lista do bastidor (controller novo sem classificação quebra o build).
+- [x] Teste de integração por módulo: Operador "Cozinha" recebe 403 em `GET api/caixa/dia` e 200 em `GET api/kds/...`.
+- [x] `GET api/auth/me/modulos` devolve a matriz de cada perfil semeado e a porta de entrada.
+- [x] Seed de perfis idempotente: rodar duas vezes não duplica perfil nem permissão.
 - [ ] Usuários atuais sem permissão explícita continuam entrando no Web e no console como hoje.
 
 **Fora.** CRUD de perfil e editor da matriz na tela (`08-m7-configuracoes.md`); permissão por loja (`UsuarioPerfil.LojaId` fica como está); união de vários perfis por usuário (um perfil por usuário, como o login já faz).

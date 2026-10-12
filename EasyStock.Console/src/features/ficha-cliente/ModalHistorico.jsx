@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { BarraDeAbas } from '../../componentes/BarraDeAbas'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
@@ -6,8 +6,9 @@ import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
-import { useAcoes } from '../../aplicacao/contextos'
+import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { ehLead } from '../../dominio/conversa'
+import { enviosAutomaticos } from '../../dominio/automacao'
 import { diasEntre, quandoRelativo, resumoFinanceiro } from '../../dominio/cliente'
 import { moeda } from '../../dominio/formato'
 import { numeroParaEntregador, textoDoEntregador } from '../../dominio/despacho'
@@ -120,15 +121,33 @@ function AbaAtendimentos({ conversaId, atendimentos }) {
   )
 }
 
-function AbaNotas({ conversa }) {
+function AbaNotas({ conversa, ocupado, aoOcupar }) {
   const { salvarNota } = useAcoes()
   const [texto, setTexto] = useState('')
+  const [aviso, setAviso] = useState(null)
+  const salvando = useRef(false)
+  const campo = useRef(null)
   const notas = conversa.cliente.notas
 
-  function salvar() {
-    if (!texto.trim()) return
-    salvarNota(conversa.id, texto.trim())
-    setTexto('')
+  async function salvar() {
+    if (!texto.trim() || salvando.current) return
+    salvando.current = true
+    campo.current?.focus()
+    aoOcupar(true)
+    setAviso(null)
+    try {
+      if (await salvarNota(conversa.id, texto.trim()) === false) {
+        setAviso({ erro: true, texto: 'Sem confirmação da nota. Seu texto continua aqui. Confira a ficha antes de tentar de novo.' })
+      } else {
+        setTexto('')
+        setAviso({ erro: false, texto: 'Nota salva.' })
+      }
+    } catch (erro) {
+      setAviso({ erro: true, texto: erro.message || 'Não foi possível salvar a nota. Seu texto continua aqui.' })
+    } finally {
+      salvando.current = false
+      aoOcupar(false)
+    }
   }
 
   return (
@@ -138,11 +157,15 @@ function AbaNotas({ conversa }) {
           rotulo="Nova nota"
           rows={2}
           value={texto}
+          ref={campo}
+          readOnly={ocupado}
+          aria-busy={ocupado}
           onChange={(e) => setTexto(e.target.value)}
           placeholder="Nunca chega ao cliente."
         />
-        <Botao variante="primario" disabled={!texto.trim()} onClick={salvar}>Salvar nota</Botao>
+        <Botao variante="primario" disabled={!texto.trim() || ocupado} onClick={salvar}>{ocupado ? 'Salvando…' : 'Salvar nota'}</Botao>
       </div>
+      {aviso && <p className={aviso.erro ? css.avisoErro : css.corpoBloco} role={aviso.erro ? 'alert' : 'status'}>{aviso.texto}</p>}
       {notas.length === 0
         ? <p className={css.corpoBloco}>Nenhuma nota.</p>
         : (
@@ -159,18 +182,46 @@ function AbaNotas({ conversa }) {
   )
 }
 
+// #1441: o que a casa mandou sozinha nesta conversa (automáticas do EasyStok, avisos do
+// pedido e o agente). A API grava cada envio como mensagem; o gatilho de cada uma e os
+// disparos que não saíram (fora da janela, desligada) ainda não ficam registrados.
+const ROTULO_ORIGEM = { agente: 'Agente', sistema: 'Automática' }
+const horaCompleta = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+
+function AbaAutomaticas({ envios }) {
+  if (envios.length === 0) return <p className={css.corpoBloco}>Nada automático nesta conversa.</p>
+  return (
+    <ul className={css.listaNotas}>
+      {envios.map((m) => (
+        <li key={m.id} className={css.linhaNota}>
+          <span className={css.quemNota}>
+            {ROTULO_ORIGEM[m.origemAutomatica] ?? 'Automática'} · {horaCompleta(m.em)}{m.status === 'falhou' ? ' · não entregue' : ''}
+          </span>
+          {m.texto}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
+  const id = useId()
   const [aba, setAba] = useState('pedidos')
+  const [salvandoNota, setSalvandoNota] = useState(false)
+  // #1586: o resumo de cada encerramento só existe na demonstração; no modo API o EasyStok não
+  // guarda, e a aba ficaria sempre vazia.
+  const { fonteApi } = useAtendimento()
   const { cliente } = conversa
   const lead = ehLead(conversa)
   const financeiro = resumoFinanceiro(historico)
+  const automaticas = enviosAutomaticos(conversa.mensagens)
 
   return (
     <Modal
       titulo={`Histórico · ${conversa.nome}`}
-      aoFechar={aoFechar}
+      aoFechar={salvandoNota ? undefined : aoFechar}
       largura="min(880px, calc(100vw - 32px))"
-      rodape={<Botao onClick={aoFechar}>Fechar</Botao>}
+      rodape={<Botao disabled={salvandoNota} onClick={aoFechar}>Fechar</Botao>}
     >
       {lead ? (
         <p className={css.faixaLead}>
@@ -178,29 +229,36 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
         </p>
       ) : (
         <div className={css.faixaNumeros}>
-          <div><b>{cliente.desde}</b><span>Cliente desde</span></div>
+          {cliente.desde && <div><b>{cliente.desde}</b><span>Cliente desde</span></div>}
           <div><b>{cliente.pedidos}</b><span>{cliente.pedidos === 1 ? 'pedido' : 'pedidos'}</span></div>
-          <div><b>{moeda(financeiro.total)}</b><span>gastos</span></div>
+          <div><b>{moeda(financeiro.total)}</b><span>total comprado</span></div>
           <div><b>{moeda(financeiro.ticketMedio)}</b><span>Ticket médio</span></div>
         </div>
       )}
 
       <BarraDeAbas
+        desabilitada={salvandoNota}
+        idPainel={`${id}-painel`}
+        prefixoId={`${id}-aba`}
         abas={[
           { id: 'pedidos', rotulo: 'Pedidos', contador: cliente.pedidos },
-          { id: 'atendimentos', rotulo: 'Atendimentos', contador: (conversa.atendimentos ?? []).length },
+          ...(fonteApi ? [] : [{ id: 'atendimentos', rotulo: 'Atendimentos', contador: (conversa.atendimentos ?? []).length }]),
           { id: 'notas', rotulo: 'Notas', contador: cliente.notas.length },
+          { id: 'automaticas', rotulo: 'Automáticas', contador: automaticas.length },
         ]}
         ativa={aba}
-        aoTrocar={setAba}
+        aoTrocar={(novaAba) => { if (!salvandoNota) setAba(novaAba) }}
       />
 
-      <div role="tabpanel" id="painel-da-aba" className={css.painelAba}>
+      <div role="tabpanel" id={`${id}-painel`} aria-labelledby={`${id}-aba-${aba}`} tabIndex={0} className={css.painelAba}>
         {aba === 'pedidos' && <AbaPedidos historico={historico} pedidosAnteriores={cliente.pedidos} />}
         {aba === 'atendimentos' && (
           <AbaAtendimentos conversaId={conversa.id} atendimentos={conversa.atendimentos ?? []} />
         )}
-        {aba === 'notas' && <AbaNotas conversa={conversa} />}
+        <div hidden={aba !== 'notas'}>
+          <AbaNotas conversa={conversa} ocupado={salvandoNota} aoOcupar={setSalvandoNota} />
+        </div>
+        {aba === 'automaticas' && <AbaAutomaticas envios={automaticas} />}
       </div>
     </Modal>
   )

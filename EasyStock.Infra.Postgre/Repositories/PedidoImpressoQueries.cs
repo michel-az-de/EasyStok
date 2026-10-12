@@ -42,6 +42,14 @@ public sealed class PedidoImpressoQueries(EasyStockDbContext db) : IPedidoImpres
             .Select(s => new { s.TituloPublico, s.DominioCustom, s.WhatsappPedidos, s.LogoUrl })
             .FirstOrDefaultAsync(ct);
 
+        // #1632: o logo dos impressos é o da loja (Configurações > Impressão); o da vitrine é só reserva.
+        var logoDaLoja = await db.Lojas
+            .AsNoTracking()
+            .Where(l => l.EmpresaId == empresaId && l.LogoUrl != null && l.LogoUrl != "")
+            .OrderByDescending(l => l.Id == p.LojaId)
+            .Select(l => l.LogoUrl)
+            .FirstOrDefaultAsync(ct);
+
         var cliente = p.ClienteId is { } clienteId
             ? await db.Clientes
                 .AsNoTracking()
@@ -109,7 +117,7 @@ public sealed class PedidoImpressoQueries(EasyStockDbContext db) : IPedidoImpres
             AlteradoEm: p.AlteradoEm,
             AgendadoParaEm: p.AgendadoParaEm,
             Janela: janela is null ? null : new PedidoImpressoJanelaLeitura(janela.DataEntrega, janela.HoraInicio, janela.HoraFim),
-            Casa: new PedidoImpressoCasaLeitura(nomeCasa, empresa?.Documento, vitrine?.DominioCustom, vitrine?.WhatsappPedidos, vitrine?.LogoUrl),
+            Casa: new PedidoImpressoCasaLeitura(nomeCasa, empresa?.Documento, vitrine?.DominioCustom, vitrine?.WhatsappPedidos, logoDaLoja ?? vitrine?.LogoUrl),
             Cliente: new PedidoImpressoClienteLeitura(
                 p.ClienteId,
                 string.IsNullOrWhiteSpace(p.ClienteNome) ? cliente?.Nome : p.ClienteNome,
@@ -120,7 +128,7 @@ public sealed class PedidoImpressoQueries(EasyStockDbContext db) : IPedidoImpres
                 cliente?.Bairro,
                 cliente?.Cidade,
                 cliente?.Cep,
-                alergias),
+                alergias, p.EnderecoEntrega),
             Observacoes: p.Observacoes,
             Total: p.Total.Valor,
             Pagamentos: p.Pagamentos.Select(g => new PedidoImpressoPagamentoLeitura(g.Valor, g.PagoEm, g.Metodo)).ToList(),

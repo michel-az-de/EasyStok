@@ -4,6 +4,8 @@ import { imprimirPdf } from '../../componentes/pdfNoNavegador'
 import { Botao } from '../../componentes/Botao'
 import { FolhaImpressao } from '../../componentes/FolhaImpressao'
 import { Icone } from '../../componentes/Icone'
+import { ImprimirPedido } from '../../componentes/ImprimirPedido'
+import { impressaoDoPedido } from '../../aplicacao/impressos'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { faixaDaJanela } from '../../dominio/entrega'
 import { pdfDoCanhoto } from '../../dominio/impressao'
@@ -47,7 +49,7 @@ function pedidosRecemPagos(conversas, vistosRef, primeiraRodadaRef) {
 // sem nenhuma modal aberta). Modal bloqueante só nasce do "Ver canhoto"
 // manual, em `BlocoPedido.jsx` — este arquivo nunca abre uma.
 export function FilaCanhotos() {
-  const { conversas } = useAtendimento()
+  const { conversas, fonteApi } = useAtendimento()
   const { marcarCanhotoImpresso } = useAcoes()
   const { cardapio, linhas, janelas } = useCatalogo()
   const [fila, setFila] = useState([])
@@ -79,23 +81,35 @@ export function FilaCanhotos() {
     endereco: conversaAtual.cliente?.endereco ?? null,
     faixa: faixaDaJanela(janelas, conversaAtual.pedido.janela),
   }
-  const imprimir = () => {
-    if (!numeroAtual) return
-    if (dadosDoPapel) imprimirPdf(pdfDoCanhoto(dadosDoPapel), { planoB: () => window.print() })
+  const concluir = () => {
     marcarCanhotoImpresso(numeroAtual)
     setFila((atual) => atual.slice(1))
   }
+  const imprimir = () => {
+    if (!numeroAtual) return
+    if (dadosDoPapel) imprimirPdf(pdfDoCanhoto(dadosDoPapel), { planoB: () => window.print() })
+    concluir()
+  }
+  // #1632: no modo API, com o pedido já no EasyStok, o topo da fila também sai pelo impresso
+  // em HTML da API (documento e papel à escolha). O PDF de 80 mm segue no botão de sempre.
+  const pedidoIdApi = fonteApi ? conversaAtual?.pedido?.pedidoId ?? null : null
 
-  // Fixa no canto de baixo, a gaveta cobria o botão principal da esteira e o
-  // "Abrir cardápio" da ficha. No arranjo de três colunas ela mora na linha
-  // de título da Ficha, que só tem a palavra "Ficha"; sem essa linha (ficha
-  // em gaveta, celular), volta para o canto.
-  const tituloDaFicha = typeof document === 'undefined'
-    ? null
-    : document.querySelector('section[aria-label="Ficha"] > header')
+  // Lugar reservado em cada arranjo, sem cobrir a navegação nem a Cobrança.
+  // Redimensionar troca esse nó; a fila global continua montada e conserva os canhotos.
+  const [peDaFicha, setPeDaFicha] = useState(null)
+  useEffect(() => {
+    const atualizar = () => {
+      const destino = document.querySelector('[data-fila-canhotos]')
+      setPeDaFicha((atual) => (atual === destino ? atual : destino))
+    }
+    const observador = new MutationObserver(atualizar)
+    observador.observe(document.body, { childList: true, subtree: true })
+    atualizar()
+    return () => observador.disconnect()
+  }, [])
 
   const gaveta = fila.length > 0 && (
-    <output className={tituloDaFicha ? css.gavetaNoTitulo : css.gavetaCanhoto} aria-live="polite">
+    <output className={peDaFicha ? css.gavetaNoPe : css.gavetaCanhoto} aria-live="polite">
       <span className={css.gavetaTexto}>
         <Icone nome="printer" tamanho={20} />
         <span className={css.gavetaLabel}>
@@ -105,12 +119,18 @@ export function FilaCanhotos() {
       <Botao variante="primario" icone="printer" className={css.botaoImprimir} onClick={imprimir}>
         Imprimir
       </Botao>
+      {pedidoIdApi && (
+        <ImprimirPedido
+          key={pedidoIdApi} {...impressaoDoPedido(pedidoIdApi)} documentoInicial="pedido"
+          rotulo="Escolher papel" aoImprimir={(documento) => { if (documento === 'pedido' || documento === 'cozinha') concluir() }}
+        />
+      )}
     </output>
   )
 
   return (
     <>
-      {gaveta && tituloDaFicha ? createPortal(gaveta, tituloDaFicha) : gaveta}
+      {gaveta && peDaFicha ? createPortal(gaveta, peDaFicha) : gaveta}
 
       {/* Portal de impressão do topo da fila, sempre montado enquanto ela
           existir: é o que deixa o botão "Imprimir" da gaveta sair sem abrir

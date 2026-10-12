@@ -51,6 +51,7 @@ git -C "$REPO" archive "$SHA" EasyStock.Console | tar -x -C "$TMP"
 )
 DIST="$TMP/EasyStock.Console/dist"
 sed -i "0,/<head>/s##<head><meta name=\"easystok-console-sha\" content=\"$SHA\">#" "$DIST/index.html"
+printf '{"sha":"%s"}\n' "$SHA" > "$DIST/versao.json"
 
 for marca in 'easystok-console-sha' 'google/config' 'api/atendimento/conversas'; do
   grep -q "$marca" "$DIST/index.html" || { echo "ERRO: o console montado nao tem '$marca'" >&2; exit 1; }
@@ -63,12 +64,33 @@ if [ "$SO_MONTAR" = 1 ]; then
 fi
 
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
-ssh -o BatchMode=yes "$VPS_HOST" "cp $DESTINO/index.html $DESTINO/index.html.antes-$TS"
-scp -q "$DIST"/* "$VPS_HOST:$DESTINO/"
+VPS_HOST="$VPS_HOST" bash "$REPO/scripts/deploy/console-cache.sh"
+ssh -o BatchMode=yes "$VPS_HOST" "set -e; cp $DESTINO/index.html $DESTINO/index.html.antes-$TS; if [ -f $DESTINO/versao.json ]; then cp $DESTINO/versao.json $DESTINO/versao.json.antes-$TS; fi"
+# O manifesto muda por último: uma aba só anuncia uma versão já publicada.
+ARQUIVOS=()
+for arquivo in "$DIST"/*; do
+  case "$arquivo" in */index.html|*/versao.json) ;; *) ARQUIVOS+=("$arquivo");; esac
+done
+scp -q "${ARQUIVOS[@]}" "$VPS_HOST:$DESTINO/"
+scp -q "$DIST/index.html" "$VPS_HOST:$DESTINO/index.html.novo-$SHA"
+scp -q "$DIST/versao.json" "$VPS_HOST:$DESTINO/versao.json.novo-$SHA"
+ssh -o BatchMode=yes "$VPS_HOST" bash -s -- "$DESTINO" "$SHA" "$TS" <<'REMOTE'
+set -euo pipefail
+destino="$1"; sha="$2"; ts="$3"
+if ! { mv "$destino/index.html.novo-$sha" "$destino/index.html" && mv "$destino/versao.json.novo-$sha" "$destino/versao.json"; }; then
+  cp "$destino/index.html.antes-$ts" "$destino/index.html"
+  if [ -f "$destino/versao.json.antes-$ts" ]; then cp "$destino/versao.json.antes-$ts" "$destino/versao.json"; fi
+  echo 'ERRO: troca incompleta; versão anterior restaurada.' >&2
+  exit 1
+fi
+REMOTE
 
 NO_AR="$(curl -s -m 15 "$URL_CONSOLE/" | sed -n 's/.*easystok-console-sha" content="\([0-9a-f]*\)".*/\1/p' | head -1)"
 if [ "$NO_AR" != "$SHA" ]; then
   echo "ERRO: servido '${NO_AR:0:8}', esperado '${SHA:0:8}'. Backup: $DESTINO/index.html.antes-$TS" >&2
   exit 9
 fi
+VERSAO_NO_AR="$(curl -fsS -m 15 "$URL_CONSOLE/versao.json" | sed -n 's/.*"sha":"\([0-9a-f]*\)".*/\1/p')"
+[ "$VERSAO_NO_AR" = "$SHA" ] || { echo "ERRO: manifesto de versao divergente." >&2; exit 9; }
+curl -fsSI -m 15 "$URL_CONSOLE/" | grep -iq '^cache-control:.*no-store' || { echo "ERRO: HTML sem a politica no-store no Caddy." >&2; exit 9; }
 echo "==> OK: console ${SHA:0:8} no ar. Backup do anterior: $DESTINO/index.html.antes-$TS"

@@ -7,6 +7,7 @@ namespace EasyStock.Api.BackgroundServices;
 /// Reenvio automático das mensagens que falharam por motivo temporário (S57, #1355). A cada rodada: reserva
 /// as vencidas num escopo com bypass de RLS (cross-tenant, <c>FOR UPDATE SKIP LOCKED</c>) e reenvia cada uma
 /// num escopo próprio com o tenant dela. Vários processos da API podem rodar juntos: a reserva não duplica.
+/// No fim da rodada, a intenção de modelo que ficou sem desfecho vira falha incerta, sem reenvio (#1562).
 /// </summary>
 public sealed class ReenvioMensagensBackgroundService(
     IServiceProvider serviceProvider,
@@ -66,6 +67,15 @@ public sealed class ReenvioMensagensBackgroundService(
             {
                 logger.LogWarning(ex, "Reenvio da mensagem {MensagemId} não rodou.", reservado.MensagemId);
             }
+        }
+
+        using (var scope = serviceProvider.CreateScope())
+        {
+            using var _ = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().UseRowLevelSecurityBypass();
+            var encerradas = await scope.ServiceProvider.GetRequiredService<EncerrarIntencoesModeloSemDesfechoUseCase>()
+                .ExecuteAsync(LotePorRodada, ct);
+            if (encerradas > 0)
+                logger.LogWarning("Intenções de modelo sem desfecho marcadas como envio incerto: {Quantidade}.", encerradas);
         }
     }
 }

@@ -24,6 +24,63 @@ public class ConversaTests
     private static Conversa Nova(DateTime? agora = null) =>
         Conversa.Abrir(Empresa, WaId, agora ?? Agora, contatoNome: "Tatiana");
 
+    [Fact]
+    public void ReabrirEncerrada_PreservaJanelaPedidoContextoENaoLidas()
+    {
+        var conversa = Nova();
+        var pedido = Guid.NewGuid();
+        conversa.DefinirPedidoEmAndamento(pedido);
+        conversa.DefinirContexto("{\"observacao\":\"sem cebola\"}");
+        conversa.RegistrarEntrada(Agora);
+        conversa.Assumir(Agora.AddMinutes(1), Guid.NewGuid());
+        conversa.Encerrar(Agora.AddMinutes(2));
+
+        conversa.Reabrir(Agora.AddDays(2)).Should().BeTrue();
+
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+        conversa.EncerradaEm.Should().BeNull();
+        conversa.AssumidaPorUsuarioId.Should().BeNull();
+        conversa.MotivoEscalada.Should().Contain("reaberta");
+        conversa.IniciadaEm.Should().Be(Agora);
+        conversa.UltimaMensagemEntradaEm.Should().Be(Agora);
+        conversa.NaoLidas.Should().Be(1);
+        conversa.PedidoEmAndamentoId.Should().Be(pedido);
+        conversa.ContextoJson.Should().Be("{\"observacao\":\"sem cebola\"}");
+        conversa.DentroDaJanela(Agora.AddDays(2)).Should().BeFalse();
+        var enviar = () => conversa.GarantirPodeEnviarTextoLivre(Agora.AddDays(2));
+        enviar.Should().Throw<RegraDeDominioVioladaException>();
+        conversa.RegistrarEntrada(Agora.AddDays(2).AddMinutes(1));
+        conversa.DentroDaJanela(Agora.AddDays(2).AddMinutes(2)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void ReabrirRepetido_NaoTomaConversaAssumidaNemRenovaDatas()
+    {
+        var conversa = Nova();
+        conversa.Encerrar(Agora);
+        conversa.Reabrir(Agora.AddMinutes(1));
+        var atendente = Guid.NewGuid();
+        conversa.Assumir(Agora.AddMinutes(2), atendente);
+
+        conversa.Reabrir(Agora.AddDays(1)).Should().BeFalse();
+
+        conversa.AssumidaPorUsuarioId.Should().Be(atendente);
+        conversa.UltimaMensagemEm.Should().Be(Agora.AddMinutes(2));
+        conversa.MotivoEscalada.Should().BeNull();
+    }
+
+    [Fact]
+    public void Reabrir_ConservaJanelaVigenteENaoRetrocedeUltimaMensagem()
+    {
+        var conversa = Nova();
+        conversa.RegistrarEntrada(Agora);
+        conversa.Encerrar(Agora);
+        conversa.Reabrir(Agora.AddMinutes(-1));
+
+        conversa.UltimaMensagemEm.Should().Be(Agora);
+        conversa.DentroDaJanela(Agora.AddHours(23)).Should().BeTrue();
+    }
+
     // ── Abrir ──────────────────────────────────────────────────────────
 
     [Fact]
@@ -435,5 +492,43 @@ public class ConversaTests
         conversa.AtualizarContatoWhatsApp("+55 11 98225-4398");
 
         conversa.ContatoIdExterno.Should().Be("5511982254398");
+    }
+
+    // ── Aguarda resposta (SLA de primeira resposta, #1427) ─────────────
+
+    [Fact]
+    public void AguardaResposta_ConversaNovaSemEntrada_Falso()
+    {
+        Nova().AguardaResposta.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AguardaResposta_ClienteFalouPorUltimo_Verdadeiro()
+    {
+        var conversa = Nova();
+        conversa.RegistrarSaida(Agora.AddMinutes(1));
+        conversa.RegistrarEntrada(Agora.AddMinutes(2));
+
+        conversa.AguardaResposta.Should().BeTrue();
+    }
+
+    [Fact]
+    public void AguardaResposta_DepoisDaResposta_Falso()
+    {
+        var conversa = Nova();
+        conversa.RegistrarEntrada(Agora.AddMinutes(1));
+        conversa.RegistrarSaida(Agora.AddMinutes(3));
+
+        conversa.AguardaResposta.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AguardaResposta_ConversaEncerrada_Falso()
+    {
+        var conversa = Nova();
+        conversa.RegistrarEntrada(Agora.AddMinutes(1));
+        conversa.Encerrar(Agora.AddMinutes(2));
+
+        conversa.AguardaResposta.Should().BeFalse();
     }
 }

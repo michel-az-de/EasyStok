@@ -88,7 +88,6 @@ public sealed class EndpointHealthMonitorService(
 
             var threshold = Math.Max(1, configuration.GetValue<int>("EndpointHealth:FailureThreshold", 3));
             var limiares = LimiaresIncidente.Endpoint with { FalhasParaAbrir = threshold };
-            var publicador = sp.GetRequiredService<IPublicadorIncidenteSistema>();
 
             var http = httpClientFactory.CreateClient("endpoint-health");
             http.BaseAddress = new Uri(baseUrl);
@@ -96,15 +95,14 @@ public sealed class EndpointHealthMonitorService(
 
             foreach (var (name, path) in Endpoints)
             {
-                await CheckEndpointAsync(name, path, http, db, publicador, limiares, ct);
+                await CheckEndpointAsync(name, path, http, db, limiares, ct);
             }
         }, ct);
     }
 
     private async Task CheckEndpointAsync(
         string name, string path, HttpClient http, EasyStockDbContext db,
-        IPublicadorIncidenteSistema publicador, LimiaresIncidente limiares,
-        CancellationToken ct)
+        LimiaresIncidente limiares, CancellationToken ct)
     {
         var state = await db.EndpointHealthStates
             .FirstOrDefaultAsync(s => s.EndpointName == name, ct);
@@ -144,12 +142,12 @@ public sealed class EndpointHealthMonitorService(
                     AlertCounter.Add(1, new KeyValuePair<string, object?>("endpoint", name));
                 logger.LogWarning("Endpoint {Name} com problema ({Decisao}, {Falhas} falhas seguidas)",
                     name, avaliacao.Decisao, state.ConsecutiveFailures);
-                await publicador.PublicarAsync(ComponenteIncidente.Api, EstadoIncidente.ComProblema,
+                await PublicarIncidenteAsync(EstadoIncidente.ComProblema,
                     SeveridadeIncidente.Alta, avaliacao.DesdeUtc ?? agora, ct);
                 break;
             case DecisaoIncidente.Resolver:
                 logger.LogInformation("Endpoint {Name} normalizado", name);
-                await publicador.PublicarAsync(ComponenteIncidente.Api, EstadoIncidente.Normalizado,
+                await PublicarIncidenteAsync(EstadoIncidente.Normalizado,
                     SeveridadeIncidente.Media, avaliacao.DesdeUtc ?? agora, ct);
                 break;
             default:
@@ -158,8 +156,22 @@ public sealed class EndpointHealthMonitorService(
                 break;
         }
 
-        // O publicador commita a mesma unidade de trabalho (estado e evento juntos); sem publicacao (interruptor
-        // desligado, sem empresa padrao) ou sem decisao, o estado ainda precisa ser gravado.
+        // O estado so e gravado depois do aviso: se a publicacao falhar, a excecao aborta o tick sem gravar e a
+        // proxima verificacao decide de novo (a chave de dedupe do outbox segura o aviso em dobro).
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Publica num escopo de DI novo. A conexao do escopo do tick foi aberta pelo advisory lock antes de haver tenant;
+    /// publicar nela fazia o INSERT em <c>notif_eventos</c> (RLS FORCE) violar o WITH CHECK (42501). O escopo novo abre a
+    /// propria conexao ja com o tenant da empresa padrao (mesmo padrao do HealthSnapshotService e do N1 do
+    /// LembretesPedidoAgendadoTick).
+    /// </summary>
+    private async Task PublicarIncidenteAsync(
+        EstadoIncidente estado, SeveridadeIncidente severidade, DateTime desdeUtc, CancellationToken ct)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var publicador = scope.ServiceProvider.GetRequiredService<IPublicadorIncidenteSistema>();
+        await publicador.PublicarAsync(ComponenteIncidente.Api, estado, severidade, desdeUtc, ct);
     }
 }

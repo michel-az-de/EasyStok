@@ -1,6 +1,7 @@
 using EasyStock.Api.Controllers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.ObterCaixaDia;
@@ -72,5 +73,35 @@ public class CaixaControllerOrigemTests
 
         persistido.Should().NotBeNull();
         persistido!.Origem.Should().Be("web");
+    }
+
+    [Fact]
+    public async Task Abrir_IgnoraDataMovimentoDoBody()
+    {
+        // #1615: uma abertura com data futura virava para sempre o "ultimo evento" do caixa e
+        // nenhum dia fechava mais. A abertura e sempre de agora.
+        MovimentoCaixa? persistido = null;
+        await _repo.AddMovimentoAsync(Arg.Do<MovimentoCaixa>(m => persistido = m));
+        CriarController();
+        var abrir = new AbrirCaixaUseCase(_repo, _uow, Substitute.For<ILogger<AbrirCaixaUseCase>>());
+        var controller = new CaixaController(abrir, null!, null!, null!, null!, null!, null!, _currentUser);
+
+        await controller.Abrir(new AbrirCaixaCommand(_empresaId, 0m, DataMovimento: DateTime.UtcNow.AddYears(50)));
+
+        persistido.Should().NotBeNull();
+        persistido!.DataMovimento.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_ComDataNoFuturo_Recusa()
+    {
+        var controller = CriarController();
+        var command = new RegistrarMovimentoCaixaCommand(
+            _empresaId, "entrada", 50m, DataMovimento: DateTime.UtcNow.AddDays(2));
+
+        var act = () => controller.RegistrarMovimento(command);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*futuro*");
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
     }
 }

@@ -42,6 +42,8 @@ public sealed class PoliticaValidadeNotificacao
 
             [TipoEventoNotificacao.PedidoPagoConfirmado] = TimeSpan.FromHours(2),
             [TipoEventoNotificacao.PedidoEmPreparo] = TimeSpan.FromHours(2),
+            [TipoEventoNotificacao.PedidoReagendado] = TimeSpan.FromHours(2),
+            [TipoEventoNotificacao.ComandaAtualizada] = TimeSpan.FromHours(2),
             [TipoEventoNotificacao.PedidoSaiuParaEntrega] = TimeSpan.FromHours(2),
             [TipoEventoNotificacao.PedidoEntregue] = TimeSpan.FromHours(2),
             [TipoEventoNotificacao.AvaliacaoSolicitada] = TimeSpan.FromHours(2),
@@ -52,6 +54,7 @@ public sealed class PoliticaValidadeNotificacao
 
             [TipoEventoNotificacao.ConversaEscalada] = TimeSpan.FromHours(1),
             [TipoEventoNotificacao.LembreteVencido] = TimeSpan.FromHours(1),
+            [TipoEventoNotificacao.LojaFechadaNoHorario] = TimeSpan.FromHours(2),
 
             // Catalogo de plataforma (N13). ConviteAcesso fica no padrao de 24 h, como a N9 espera.
             [TipoEventoNotificacao.IncidenteSistema] = TimeSpan.FromHours(2),

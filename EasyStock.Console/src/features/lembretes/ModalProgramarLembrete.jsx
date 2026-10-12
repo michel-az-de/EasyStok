@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea, CampoTexto } from '../../componentes/Campo'
 import { Modal } from '../../componentes/Modal'
@@ -16,6 +16,10 @@ export function ModalProgramarLembrete({ conversa, faixa, agora, aoProgramar, ao
   const [horarioManual, setHorarioManual] = useState('')
   const [vinculada, setVinculada] = useState(Boolean(conversa))
   const [erro, setErro] = useState(null)
+  const [salvando, setSalvando] = useState(false)
+  const ocupado = useRef(false)
+  const tentativa = useRef(null)
+  const fechar = () => { if (!ocupado.current) aoFechar() }
 
   const sugestoes = sugestoesParaDona(conversa, faixa)
   const usaOutro = opcaoId === OPCAO_OUTRO_HORARIO
@@ -23,11 +27,22 @@ export function ModalProgramarLembrete({ conversa, faixa, agora, aoProgramar, ao
     ? (horarioManual ? quandoDoHorario(horarioManual, agora) : null)
     : quandoDaOpcao(opcaoId, agora)
 
-  const programar = () => {
+  const programar = async () => {
+    if (ocupado.current) return
     const limpo = texto.trim()
     if (!limpo) { setErro('Escreva o lembrete.'); return }
-    if (quando == null) { setErro('Escolha um horário.'); return }
-    aoProgramar({ texto: limpo, quando, conversaId: vinculada && conversa ? conversa.id : null })
+    if (limpo.length > 500) { setErro('Use até 500 caracteres.'); return }
+    if (!Number.isFinite(quando)) { setErro('Escolha um horário.'); return }
+    const conversaId = vinculada && conversa ? conversa.id : null
+    const assinatura = JSON.stringify([limpo, opcaoId, horarioManual, conversaId])
+    // O relógio continua andando; retentar "daqui a 5 min" mantém o instante da primeira tentativa.
+    if (tentativa.current?.assinatura !== assinatura) tentativa.current = { assinatura, dados: { texto: limpo, quando, conversaId } }
+    ocupado.current = true
+    setSalvando(true)
+    setErro(null)
+    try { await aoProgramar(tentativa.current.dados) }
+    catch (e) { setErro(e.message) }
+    finally { ocupado.current = false; setSalvando(false) }
   }
 
   const aoTeclarNoTexto = (evento) => {
@@ -40,11 +55,12 @@ export function ModalProgramarLembrete({ conversa, faixa, agora, aoProgramar, ao
   return (
     <Modal
       titulo="Programar lembrete"
-      aoFechar={aoFechar}
+      descricao="Lembrete interno da equipe de atendimento. Ninguém envia esta mensagem ao cliente."
+      aoFechar={fechar}
       rodape={(
         <>
-          <Botao variante="texto" onClick={aoFechar}>Cancelar</Botao>
-          <Botao variante="primario" icone="bell-plus" onClick={programar}>Programar</Botao>
+          <Botao variante="texto" onClick={fechar} disabled={salvando}>Cancelar</Botao>
+          <Botao variante="primario" icone="bell-plus" disabled={salvando} onClick={programar}>{salvando ? 'Salvando…' : 'Programar'}</Botao>
         </>
       )}
     >
@@ -52,6 +68,7 @@ export function ModalProgramarLembrete({ conversa, faixa, agora, aoProgramar, ao
         <CampoArea
           rotulo="O que lembrar"
           value={texto}
+          disabled={salvando}
           onChange={(e) => { setTexto(e.target.value); setErro(null) }}
           onKeyDown={aoTeclarNoTexto}
           placeholder="Ex.: ligar para o José"
@@ -68,6 +85,7 @@ export function ModalProgramarLembrete({ conversa, faixa, agora, aoProgramar, ao
                 key={s}
                 variante="secundario"
                 className={css.pilula}
+                disabled={salvando}
                 onClick={() => { setTexto(s); setErro(null) }}
               >
                 {s}
@@ -76,7 +94,7 @@ export function ModalProgramarLembrete({ conversa, faixa, agora, aoProgramar, ao
           </div>
         )}
 
-        <fieldset className={css.grupoPilulas}>
+        <fieldset className={css.grupoPilulas} disabled={salvando}>
           <legend className={css.rotuloCampo}>Quando</legend>
           <div className={css.pilulas}>
             {OPCOES_QUANDO.map((opcao) => (
@@ -113,7 +131,7 @@ export function ModalProgramarLembrete({ conversa, faixa, agora, aoProgramar, ao
         </fieldset>
 
         {conversa && vinculada && (
-          <fieldset className={css.grupoPilulas}>
+          <fieldset className={css.grupoPilulas} disabled={salvando}>
             <legend className={css.rotuloCampo}>Conversa</legend>
             <div className={css.pilulas}>
               <Botao variante="secundario" className={css.pilula} onClick={() => setVinculada(false)}>

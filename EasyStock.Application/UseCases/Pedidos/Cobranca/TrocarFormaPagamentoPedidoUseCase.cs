@@ -106,10 +106,11 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         if (PedidoStateMachine.EstaFinalizado(pedido.StatusEnum))
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoFinalizado,
                 "Pedido cancelado ou entregue não troca a forma de pagamento.");
-
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(input.EmpresaId, pedido.Id, ct);
         if (cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga))
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
+        if (forma == FormaNaEntrega && PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, agora))
+            throw new UseCaseValidationException("Encomenda futura exige sinal de 50% por link antes da entrega.");
 
         var pendente = cobrancas.FirstOrDefault(c => c.EstaPendente);
         var provedorPedido = forma == FormaOnline ? CobrancaPedido.ProvedorMercadoPago : CobrancaPedido.ProvedorNaEntrega;

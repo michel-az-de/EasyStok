@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Notifications;
 using Microsoft.Extensions.Options;
@@ -37,8 +38,16 @@ public sealed class AvaliarLembretesUseCase(
     IOptions<PrazosOptions> prazos)
 {
     public static readonly TimeSpan PagamentoSemBaixaApos = TimeSpan.FromMinutes(15);
-    /// <summary>Padrão do limite de cliente sem resposta; a fonte é <see cref="PrazosOptions.ClienteSemRespostaMin"/> (N11).</summary>
+    /// <summary>
+    /// Padrão do limite de cliente sem resposta quando a loja não gravou configuração; a fonte é
+    /// <see cref="PrazosOptions.ClienteSemRespostaMin"/> (N11). Com configuração, vale o SLA da loja (#1427).
+    /// </summary>
     public static readonly TimeSpan SemRespostaApos = TimeSpan.FromMinutes(10);
+    /// <summary>
+    /// Por quanto tempo o início previsto do preparo ainda é notícia (#1550). Depois disso o marco sai de
+    /// vigência: pedido antigo com início no passado não gera aviso quando o avaliador liga.
+    /// </summary>
+    public static readonly TimeSpan InicioPrevistoValePor = TimeSpan.FromHours(24);
     public const string EventoSse = "lembrete.vencido";
     public const int AvisosPorRodada = 100;
 
@@ -48,11 +57,50 @@ public sealed class AvaliarLembretesUseCase(
         var vigentes = new HashSet<(Guid EmpresaId, TipoLembrete Tipo, string Referencia)>();
         var criados = 0;
 
-        foreach (var pedido in await candidatos.ListarPedidosSemBaixaAsync(agora - PagamentoSemBaixaApos, ct))
+        // #1564: cada bloco junta os fatos que já venceram e pergunta ao banco uma vez só quais já têm lembrete.
+        var agendados = new List<(PedidoAgendadoLembrete Pedido, string Referencia, string Texto)>();
+        foreach (var pedido in await candidatos.ListarPedidosAgendadosAsync(ct))
+        {
+            var expediente = pedido.Expediente ?? ExpedienteLoja.CriarPadrao(pedido.EmpresaId);
+            if (expediente.EmpresaId != pedido.EmpresaId) continue;
+            var diaEntrega = HorarioBrasil.DataOperacional(pedido.EntregaEm);
+            var vespera = diaEntrega.AddDays(-1);
+            var turno = expediente.Horarios.FirstOrDefault(h => h.DiaDaSemana == (int)vespera.DayOfWeek);
+            var quem = string.IsNullOrWhiteSpace(pedido.ClienteNome) ? "Pedido agendado" : $"Pedido de {pedido.ClienteNome.Trim()}";
+            // #1550: passada a véspera, "entrega amanhã" é falso. O marco sai de vigência e o aviso aberto
+            // fecha sozinho; não renasce porque só nasce na própria véspera e a referência já existe.
+            var hoje = HorarioBrasil.DataOperacional(agora);
+            if (turno is not null && hoje <= vespera)
+                MarcarAgendado(pedido, $"vespera:{diaEntrega:yyyyMMdd}",
+                    $"{quem}: entrega amanhã, {HorarioBrasil.ConverterParaBrasilia(pedido.EntregaEm):dd/MM 'às' HH:mm}.",
+                    agora >= HorarioBrasil.InstanteUtc(vespera, turno.Abre) && hoje == vespera,
+                    vigentes, agendados);
+            // #1550: o início previsto é aviso para quem ainda não começou. Com o preparo iniciado, ou com o
+            // início velho demais para ser notícia, o marco sai de vigência e o aviso aberto fecha sozinho.
+            if (pedido.InicioPrevistoEm is { } inicio && !pedido.PreparoIniciado && agora - inicio <= InicioPrevistoValePor)
+                MarcarAgendado(pedido, $"inicio:{inicio:yyyyMMddHHmmss}",
+                    $"{quem}: início previsto do preparo em {HorarioBrasil.ConverterParaBrasilia(inicio):dd/MM 'às' HH:mm}.",
+                    agora >= inicio, vigentes, agendados);
+        }
+        var agendadosExistentes = await ExistentesAsync(
+            TipoLembrete.PedidoAgendado, agendados.Select(a => (a.Pedido.EmpresaId, a.Referencia)), ct);
+        foreach (var (pedido, referencia, texto) in agendados)
+        {
+            if (!agendadosExistentes.Add((pedido.EmpresaId, referencia))) continue;
+            await repository.AddAsync(Lembrete.Automatico(pedido.EmpresaId, TipoLembrete.PedidoAgendado, referencia,
+                texto.Length > Lembrete.TextoTamanhoMaximo ? texto[..Lembrete.TextoTamanhoMaximo] : texto,
+                agora, conversaId: pedido.ConversaId, pedidoId: pedido.PedidoId), ct);
+            criados++;
+        }
+
+        var semBaixa = await candidatos.ListarPedidosSemBaixaAsync(agora - PagamentoSemBaixaApos, ct);
+        var semBaixaExistentes = await ExistentesAsync(
+            TipoLembrete.PagamentoSemBaixa, semBaixa.Select(p => (p.EmpresaId, p.PedidoId.ToString())), ct);
+        foreach (var pedido in semBaixa)
         {
             var referencia = pedido.PedidoId.ToString();
             vigentes.Add((pedido.EmpresaId, TipoLembrete.PagamentoSemBaixa, referencia));
-            if (await repository.ExisteAutomaticoAsync(pedido.EmpresaId, TipoLembrete.PagamentoSemBaixa, referencia, ct)) continue;
+            if (!semBaixaExistentes.Add((pedido.EmpresaId, referencia))) continue;
 
             var quem = string.IsNullOrWhiteSpace(pedido.ClienteNome) ? "Um pedido" : $"O pedido de {pedido.ClienteNome.Trim()}";
             await repository.AddAsync(Lembrete.Automatico(pedido.EmpresaId, TipoLembrete.PagamentoSemBaixa, referencia,
@@ -61,12 +109,33 @@ public sealed class AvaliarLembretesUseCase(
             criados++;
         }
 
-        var semRespostaApos = prazos.Value.ClienteSemResposta;
-        foreach (var conversa in await candidatos.ListarConversasSemRespostaAsync(agora - semRespostaApos, ct))
+        // #1427: o prazo é da loja. A consulta traz desde o menor SLA possível e o corte fino é aqui, por loja.
+        var padrao = prazos.Value.ClienteSemResposta;
+        var slaPorEmpresa = new Dictionary<Guid, TimeSpan>();
+        var aguardandoPrazo = new HashSet<Guid>();
+        var menorPrazo = TimeSpan.FromMinutes(Math.Min(ConfiguracaoAtendimento.SlaRespostaMinimoMinutos, padrao.TotalMinutes));
+        var semResposta = new List<(ConversaSemResposta Conversa, string Referencia, TimeSpan Sla)>();
+        foreach (var conversa in await candidatos.ListarConversasSemRespostaAsync(agora - menorPrazo, ct))
         {
+            var semRespostaApos = SlaDa(conversa, padrao);
+            var expediente = conversa.Expediente ?? ExpedienteLoja.CriarPadrao(conversa.EmpresaId);
+            if (expediente.EmpresaId != conversa.EmpresaId) continue;
             var referencia = conversa.MensagemEntradaId.ToString();
             vigentes.Add((conversa.EmpresaId, TipoLembrete.ClienteSemResposta, referencia));
-            if (await repository.ExisteAutomaticoAsync(conversa.EmpresaId, TipoLembrete.ClienteSemResposta, referencia, ct)) continue;
+            if (conversa.EntradaEm is { } entrada &&
+                expediente.MinutosAbertosEntre(entrada, agora, semRespostaApos.TotalMinutes) <= semRespostaApos.TotalMinutes)
+            {
+                aguardandoPrazo.Add(conversa.ConversaId);
+                continue;
+            }
+            slaPorEmpresa[conversa.EmpresaId] = semRespostaApos;
+            semResposta.Add((conversa, referencia, semRespostaApos));
+        }
+        var semRespostaExistentes = await ExistentesAsync(
+            TipoLembrete.ClienteSemResposta, semResposta.Select(s => (s.Conversa.EmpresaId, s.Referencia)), ct);
+        foreach (var (conversa, referencia, semRespostaApos) in semResposta)
+        {
+            if (!semRespostaExistentes.Add((conversa.EmpresaId, referencia))) continue;
 
             var quem = string.IsNullOrWhiteSpace(conversa.ContatoNome) ? "Um cliente" : conversa.ContatoNome.Trim();
             await repository.AddAsync(Lembrete.Automatico(conversa.EmpresaId, TipoLembrete.ClienteSemResposta, referencia,
@@ -86,13 +155,41 @@ public sealed class AvaliarLembretesUseCase(
         if (criados + resolvidos > 0)
             await unitOfWork.CommitAsync();
 
-        var avisados = await AvisarVencidosAsync(agora, ct);
+        var avisados = await AvisarVencidosAsync(agora, slaPorEmpresa, aguardandoPrazo, ct);
         return new ResultadoAvaliacaoLembretes(criados, resolvidos, avisados);
     }
 
-    private async Task<int> AvisarVencidosAsync(DateTime agora, CancellationToken ct)
+    private static TimeSpan SlaDa(ConversaSemResposta conversa, TimeSpan padrao) =>
+        conversa.SlaRespostaMinutos is { } minutos and > 0 ? TimeSpan.FromMinutes(minutos) : padrao;
+
+    private static void MarcarAgendado(PedidoAgendadoLembrete pedido, string marco, string texto, bool venceu,
+        HashSet<(Guid EmpresaId, TipoLembrete Tipo, string Referencia)> vigentes,
+        List<(PedidoAgendadoLembrete Pedido, string Referencia, string Texto)> vencidos)
     {
-        var vencidos = await repository.ListarVencidosSemAvisoAsync(agora, AvisosPorRodada, ct);
+        // O instante faz parte do marco: reagendar encerra o aviso anterior e permite lembrar a nova data.
+        var referencia = $"{pedido.PedidoId}:{marco}";
+        vigentes.Add((pedido.EmpresaId, TipoLembrete.PedidoAgendado, referencia));
+        if (venceu) vencidos.Add((pedido, referencia, texto));
+    }
+
+    /// <summary>
+    /// Os fatos que já têm lembrete, em uma consulta. Quem chama acrescenta o que cria, e o mesmo fato
+    /// repetido na rodada não nasce duas vezes.
+    /// </summary>
+    private async Task<HashSet<(Guid EmpresaId, string Referencia)>> ExistentesAsync(
+        TipoLembrete tipo, IEnumerable<(Guid EmpresaId, string Referencia)> fatos, CancellationToken ct)
+    {
+        var distintos = fatos.Distinct().ToList();
+        return distintos.Count == 0 ? [] : [.. await repository.ListarAutomaticosExistentesAsync(tipo, distintos, ct)];
+    }
+
+    // `slaPorEmpresa`: o SLA aplicado nesta rodada, para o PrazoEstourado dizer o mesmo prazo que criou o lembrete.
+    private async Task<int> AvisarVencidosAsync(DateTime agora, IReadOnlyDictionary<Guid, TimeSpan> slaPorEmpresa,
+        IReadOnlySet<Guid> aguardandoPrazo, CancellationToken ct)
+    {
+        var vencidos = (await repository.ListarVencidosSemAvisoAsync(agora, AvisosPorRodada, ct))
+            .Where(l => l.Tipo != TipoLembrete.ClienteSemResposta || l.ConversaId is not { } c || !aguardandoPrazo.Contains(c))
+            .ToList();
         if (vencidos.Count == 0) return 0;
 
         foreach (var lembrete in vencidos)
@@ -105,10 +202,12 @@ public sealed class AvaliarLembretesUseCase(
             // N11: o cliente sem resposta também chega por e-mail e WhatsApp. Pagamento sem baixa e lembrete manual
             // ficam só no Push. Sem atendente, o destino é a audiência da rotina (gestores).
             if (lembrete is { Tipo: TipoLembrete.ClienteSemResposta, CriadoPorUsuarioId: null })
+            {
+                var sla = slaPorEmpresa.GetValueOrDefault(lembrete.EmpresaId, prazos.Value.ClienteSemResposta);
                 await PrazoEstouradoEvento.EnfileirarAsync(notificador, prazos.Value, TipoPrazo.ClienteSemResposta,
                     lembrete.EmpresaId, lembrete.Id, PrazoEstouradoEvento.Referencia(lembrete.ConversaId ?? lembrete.Id),
-                    PrazoEstouradoEvento.Duracao(prazos.Value.ClienteSemResposta),
-                    PrazoEstouradoEvento.Duracao(prazos.Value.ClienteSemResposta), lembrete.ParaUsuarioId, ct);
+                    PrazoEstouradoEvento.Duracao(sla), PrazoEstouradoEvento.Duracao(sla), lembrete.ParaUsuarioId, ct);
+            }
             lembrete.MarcarAvisado(agora);
         }
 
