@@ -9,7 +9,6 @@ using EasyStock.Infra.Async.Storage;
 using EasyStock.Infra.Notifications.Hosting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.FileProviders;
 using Serilog;
 using Serilog.Context;
 
@@ -217,7 +216,7 @@ public static class PipelineExtensions
 
                 app.UseStaticFiles(new StaticFileOptions
                 {
-                    FileProvider = new PhysicalFileProvider(rootPath),
+                    FileProvider = new PublicUploadFileProvider(rootPath),
                     RequestPath = servePath
                 });
             }

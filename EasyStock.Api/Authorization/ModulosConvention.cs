@@ -76,7 +76,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         {
             foreach (var controller in controllers) mapa.Add(controller, [modulo]);
         }
-        Associar(Modulo.Cardapio, "Produto", "Categoria", "IaAutoPreenchimento", "AtendimentoItensCardapio",
+        Associar(Modulo.Cardapio, "Acervo", "Produto", "Categoria", "IaAutoPreenchimento", "AtendimentoItensCardapio",
             "AtendimentoSecoesCardapio", "Storefront.TenantVitrineCardapio");
         Associar(Modulo.Producao, "Producao", "ProdutoComposicao", "Lotes", "ItemEstoque", "Movimentacao",
             "EstoqueDesacertos", "ListasCompras", "EtiquetaTemplates", "AtendimentoProducao", "AtendimentoProducaoPesquisa");

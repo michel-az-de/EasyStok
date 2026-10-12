@@ -27,6 +27,7 @@ export const MODULOS = [
       { id: 'itens', rotulo: 'Itens do cardápio', tipo: TELA_AJUSTE, aba: 'cardapio', soApi: true },
       // M1.3 (#1483): as categorias (seções) que o cliente vê.
       { id: 'categorias', rotulo: 'Categorias', tipo: TELA_AJUSTE, aba: 'categorias', soApi: true },
+      { id: 'imagens', rotulo: 'Banco de imagens', tipo: TELA_AJUSTE, aba: 'acervo', soApi: true },
     ],
   },
   {

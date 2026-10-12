@@ -18,6 +18,7 @@ import { AbaAtendimento } from './atendimento/AbaAtendimento'
 import { AbaImpressao } from './impressao/AbaImpressao'
 import { AbaRespostas } from './respostas/AbaRespostas'
 import { TelaCanais } from './canais/TelaCanais'
+import { AbaAcervo } from './acervo/AbaAcervo'
 import { AbaCardapioApi } from './cardapio/AbaCardapioApi'
 import { AbaCategoriasApi } from './cardapio/AbaCategoriasApi'
 import { AbaEstoqueDoDiaApi } from './producao/AbaEstoqueDoDiaApi'
@@ -246,6 +247,7 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
     // #1632: logo da loja e papel padrão dos impressos (só modo API).
     impressao: <AbaImpressao />,
     // M1.1 (#1481): gestão do cardápio (só modo API).
+    acervo: <AbaAcervo />,
     cardapio: <AbaCardapioApi renderizarEditor={renderizarEditorCardapio} />,
     // M1.3 (#1483): categorias do cardápio (só modo API).
     categorias: <AbaCategoriasApi />,

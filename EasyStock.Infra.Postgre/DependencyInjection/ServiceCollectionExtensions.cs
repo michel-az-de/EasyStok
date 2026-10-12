@@ -59,6 +59,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                     sp.GetRequiredService<EstoqueSaldoCacheInvalidationInterceptor>()));
 
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EasyStockDbContext>());
+            services.AddScoped<IAcervoRepository, Repositories.AcervoRepository>();
             services.AddScoped<ICategoriaRepository, CategoriaRepository>();
             services.AddScoped<IEmpresaRepository, EmpresaRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.ITenantContextAccessor, EasyStock.Infra.Postgre.TenantContextAccessor>();
