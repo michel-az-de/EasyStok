@@ -65,7 +65,8 @@ function SelecaoCompartilhada({ comanda: c, ocupado, salvar, confirmar, cardapio
     : (c.podeEditar || pendente ? c.totalPrevisto ?? 0 : c.pedido?.total ?? c.totalPrevisto ?? 0) - (c.pedido?.alocado ?? c.pedido?.totalPago ?? 0)
   const exigeGerente = saldo < 0 || c.envio?.situacao === 'estorno_pendente'
   return <div>
-    <p>{c.podeEditar ? 'Cliente e atendimento acompanham esta seleção. Só vira pedido após a confirmação do cliente.'
+    <p>{c.podeEditar ? c.pedido ? 'O pedido atual continua registrado. Esta seleção propõe um ajuste, aplicado após a confirmação do cliente e a conferência necessária da Casa.'
+      : 'Cliente e atendimento acompanham esta seleção. Só vira pedido após a confirmação do cliente.'
       : c.envio?.situacao === 'estorno_pendente' ? 'Devolução em acompanhamento.'
         : pendente ? 'Confira a alteração solicitada antes de aplicar ao pedido.' : 'Envio registrado. Compartilhe uma nova edição para ajustar.'}</p>
     {conflito && <p role="alert">A seleção mudou enquanto você editava. Sua edição foi preservada. Confira a seleção atual abaixo antes de continuar.</p>}
