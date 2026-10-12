@@ -1,60 +1,140 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { listarPedidosKds, mudarStatusKds, obterCanhotoHtml, reimprimirCanhoto } from '../infra/api/kdsApi'
+import {
+  confirmarImpressao, listarImpressoesPendentes, listarPedidosKds, mudarStatusKds, reimprimirCanhoto,
+} from '../infra/api/kdsApi'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
+import { transicaoDaFila } from '../dominio/kds'
+import { criarRecargaDeAcao } from './recargaDeAcao'
 
 // Cozinha no modo API (F05). A fila vem do KDS sobre Pedido (S19) e recarrega a
 // cada evento de pedido do SSE de operação (S18). Com o SSE caído, a tela não
 // para: busca a fila a cada 15 s e tenta reconectar a cada 10 s.
-const ESPERA_RECARGA_MS = 300
+//
+// Issue #1446: a cada leitura, compara com a anterior (`transicaoDaFila`) e marca
+// quem entrou, quem mudou de coluna e quem saiu, para a tela animar; e lê a fila de
+// impressão da API (S20), que a aba da Cozinha consome como a gaveta do protótipo.
+// O canhoto em si é o PDF de 80 mm do protótipo, montado na tela (`features/cozinha`).
 const POLLING_SEM_SSE_MS = 15000
 const RECONECTAR_MS = 10000
-const RECARREGA_COM = (evento) => evento === 'ready' || evento.startsWith('pedido.')
+const RECARREGA_COM = (evento) => evento === 'ready' || evento.startsWith('pedido.') || evento.startsWith('impressao.')
 
-// O Blob URL fica vivo o bastante para a janela carregar e imprimir.
-const REVOGAR_CANHOTO_MS = 60000
-const IMPRIMIR_AO_ABRIR = '<script>addEventListener("load", () => print())</script>'
-const comImpressaoAoAbrir = (html) => (/<\/body>/i.test(html)
-  ? html.replace(/<\/body>/i, `${IMPRIMIR_AO_ABRIR}</body>`)
-  : html + IMPRIMIR_AO_ABRIR)
+// Quanto o destaque de "chegou" e "mudou de coluna" fica no cartão, e quanto o cartão que
+// saiu da fila (entregue, cancelado) fica na tela para a animação de saída.
+const MS_DESTAQUE = 1800
+const MS_SAIDA = 520
 
-export function useCozinhaApi() {
+const comId = (conjunto, id, liga) => {
+  const novo = new Set(conjunto)
+  if (liga) novo.add(id)
+  else novo.delete(id)
+  return novo
+}
+
+// Geração da leitura (#1474): cada troca de dia abre uma geração nova; a resposta que chega de
+// uma geração velha (Hoje respondendo depois de Amanhã) é descartada em vez de sobrescrever.
+export function criarGeracao() {
+  let atual = 0
+  return {
+    nova: () => { atual += 1; return atual },
+    agora: () => atual,
+    vale: (geracao) => geracao === atual,
+  }
+}
+
+// `data` (YYYY-MM-DD ou null para hoje, #1474): o dia da fila. Trocar o dia relê e não anima
+// a troca como se os pedidos tivessem entrado ou saído.
+export function useCozinhaApi({ data = null } = {}) {
+  const [geracao] = useState(criarGeracao)
   const [pedidos, setPedidos] = useState(null)
   const [erro, setErro] = useState(null)
   const [aoVivo, setAoVivo] = useState(false)
   const [movendo, setMovendo] = useState(() => new Set())
+  const [novos, setNovos] = useState(() => new Set())
+  const [mudaram, setMudaram] = useState(() => new Set())
+  const [saindo, setSaindo] = useState([])
+  const [impressoes, setImpressoes] = useState([])
   const vivoRef = useRef(true)
+  const anteriorRef = useRef(null)
+  const timersRef = useRef(new Set())
+  const recargaRef = useRef(null)
 
-  const recarregar = useCallback(() => listarPedidosKds()
-    .then((lista) => {
-      if (!vivoRef.current) return
-      setPedidos(lista ?? [])
-      setErro(null)
-    })
-    .catch((e) => { if (vivoRef.current) setErro(`A fila não carregou: ${e.message}`) }), [])
+  const depois = useCallback((ms, fazer) => {
+    const t = setTimeout(() => {
+      timersRef.current.delete(t)
+      if (vivoRef.current) fazer()
+    }, ms)
+    timersRef.current.add(t)
+  }, [])
+
+  const animar = useCallback(({ novos: entraram, mudaram: andaram, sairam }) => {
+    if (entraram.length > 0) {
+      setNovos((s) => new Set([...s, ...entraram]))
+      depois(MS_DESTAQUE, () => setNovos((s) => new Set([...s].filter((id) => !entraram.includes(id)))))
+    }
+    if (andaram.length > 0) {
+      setMudaram((s) => new Set([...s, ...andaram]))
+      depois(MS_DESTAQUE, () => setMudaram((s) => new Set([...s].filter((id) => !andaram.includes(id)))))
+    }
+    if (sairam.length > 0) {
+      const ids = sairam.map((p) => p.id)
+      setSaindo((atual) => [...atual.filter((p) => !ids.includes(p.id)), ...sairam])
+      depois(MS_SAIDA, () => setSaindo((atual) => atual.filter((p) => !ids.includes(p.id))))
+    }
+  }, [depois])
+
+  const recarregarImpressoes = useCallback(() => listarImpressoesPendentes()
+    .then((lista) => { if (vivoRef.current) setImpressoes(lista ?? []) })
+    // A fila de impressão é extra: sem ela (perfil sem acesso, API fora) a cozinha segue.
+    .catch(() => {}), [])
+
+  const recarregar = useCallback(() => {
+    recarregarImpressoes()
+    const minha = geracao.agora()
+    const vale = () => vivoRef.current && geracao.vale(minha)
+    return listarPedidosKds(data)
+      .then((lista) => {
+        if (!vale()) return
+        const atual = lista ?? []
+        animar(transicaoDaFila(anteriorRef.current, atual))
+        anteriorRef.current = atual
+        setPedidos(atual)
+        setErro(null)
+      })
+      .catch((e) => { if (vale()) setErro(`A fila não carregou: ${e.message}`) })
+  }, [animar, recarregarImpressoes, data, geracao])
 
   useEffect(() => {
     vivoRef.current = true
+    geracao.nova()
+    anteriorRef.current = null
+    setPedidos(null)
+    setErro(null)
+    setSaindo([])
+    setNovos(new Set())
+    setMudaram(new Set())
+    const timers = timersRef.current
     let fechar = () => {}
-    let espera = null
     let reconexao = null
     let polling = null
+    let noAr = false
+    // #1577: o evento da própria ação já relê a fila; a ação não relê de novo na resposta.
+    const recarga = criarRecargaDeAcao({ recarregar: () => recarregar(), aoVivo: () => noAr })
+    recargaRef.current = recarga
 
-    const agendarRecarga = () => {
-      clearTimeout(espera)
-      espera = setTimeout(recarregar, ESPERA_RECARGA_MS)
-    }
     const conectar = () => {
       fechar = conectarEventosOperacao({
         aoEvento: ({ evento }) => {
           if (evento === 'ready') {
+            noAr = true
             setAoVivo(true)
             clearInterval(polling)
             polling = null
           }
-          if (RECARREGA_COM(evento)) agendarRecarga()
+          if (RECARREGA_COM(evento)) recarga.aoEvento()
         },
         aoCair: () => {
           if (!vivoRef.current) return
+          noAr = false
           setAoVivo(false)
           if (!polling) polling = setInterval(recarregar, POLLING_SEM_SSE_MS)
           reconexao = setTimeout(conectar, RECONECTAR_MS)
@@ -67,45 +147,42 @@ export function useCozinhaApi() {
     return () => {
       vivoRef.current = false
       fechar()
-      clearTimeout(espera)
+      recarga.desligar()
       clearTimeout(reconexao)
       clearInterval(polling)
+      timers.forEach(clearTimeout)
+      timers.clear()
     }
-  }, [recarregar])
+  }, [recarregar, geracao])
 
-  // Um toque: a chamada vai, o cartão fica "movendo" até a API responder; a
-  // lista nova chega pela resposta e pelo `pedido.mudou_status` do SSE.
+  // Um toque (ou um soltar): a chamada vai e o cartão fica "movendo" até a fila nova chegar, pelo
+  // `pedido.mudou_status` do SSE; sem ele (caído, ou mudo por 2 s), pela releitura da própria ação.
   const avancar = useCallback((id, status) => {
-    setMovendo((s) => new Set(s).add(id))
-    mudarStatusKds(id, status)
-      .then(() => recarregar())
+    setMovendo((s) => comId(s, id, true))
+    const recarga = recargaRef.current
+    const marca = recarga.marcar()
+    return mudarStatusKds(id, status)
+      .then(() => recarga.depoisDaAcao(marca))
       .catch((e) => setErro(`O pedido não mudou: ${e.message}`))
-      .finally(() => setMovendo((s) => { const n = new Set(s); n.delete(id); return n }))
-  }, [recarregar])
-
-  // S20: abre o canhoto HTML numa janela e chama a impressão do navegador.
-  // F07, item 10: a janela abre no clique (senão o bloqueador de pop-up segura), perde o
-  // `opener` na hora e recebe o canhoto por Blob URL, sem `document.write`.
-  const imprimirCanhoto = useCallback((id) => {
-    const janela = window.open('', '_blank')
-    if (janela) janela.opener = null
-    obterCanhotoHtml(id)
-      .then((html) => {
-        if (!janela) return setErro('O navegador bloqueou a janela do canhoto.')
-        const endereco = URL.createObjectURL(new Blob([comImpressaoAoAbrir(html)], { type: 'text/html' }))
-        janela.location.replace(endereco)
-        setTimeout(() => URL.revokeObjectURL(endereco), REVOGAR_CANHOTO_MS)
-        return undefined
-      })
-      .catch((e) => {
-        janela?.close()
-        setErro(`O canhoto não abriu: ${e.message}`)
-      })
+      .finally(() => setMovendo((s) => comId(s, id, false)))
   }, [])
 
-  const reimprimir = useCallback((id) => {
-    reimprimirCanhoto(id).catch((e) => setErro(`Não voltou para a fila de impressão: ${e.message}`))
-  }, [])
+  const reimprimir = useCallback((id) => reimprimirCanhoto(id)
+    .then(() => recarregarImpressoes())
+    .catch((e) => setErro(`Não voltou para a fila de impressão: ${e.message}`)), [recarregarImpressoes])
 
-  return { pedidos, erro, aoVivo, movendo, avancar, imprimirCanhoto, reimprimir, limparErro: () => setErro(null) }
+  // O canhoto saiu pela aba: tira da gaveta na hora e confirma na API (idempotente).
+  const confirmar = useCallback((impressaoId) => {
+    setImpressoes((lista) => lista.filter((i) => i.id !== impressaoId))
+    return confirmarImpressao(impressaoId)
+      .catch((e) => setErro(`O canhoto saiu, mas a fila não soube: ${e.message}`))
+      .finally(() => recarregarImpressoes())
+  }, [recarregarImpressoes])
+
+  const limparErro = useCallback(() => setErro(null), [])
+
+  return {
+    pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes,
+    avancar, recarregar, reimprimir, confirmarImpressao: confirmar, avisar: setErro, limparErro,
+  }
 }

@@ -4,6 +4,9 @@ using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Infra.Postgre.Repositories.Atendimento;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using EasyStock.Application.UseCases.Atendimento.Programadas;
+using EasyStock.Application.UseCases.Common;
+using Npgsql;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 
@@ -14,6 +17,76 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 public class MensagemProgramadaIntegrationTests(PostgreSqlDatabaseFixture fixture)
     : IClassFixture<PostgreSqlDatabaseFixture>
 {
+    [SkippableFact]
+    public async Task CancelamentoPreservaTenantETiraMensagemDaFila()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var agora = DateTime.UtcNow;
+        var empresa = Empresa.Criar("Programadas canceladas", null);
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Teste" };
+        var mensagem = MensagemProgramada.Agendar(empresa.Id, cliente.Id, null, CanalConversa.Email,
+            FinalidadeContato.Transacional, "Aviso cancelado", null, agora.AddSeconds(1), Guid.NewGuid(), agora);
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresa.Id);
+        using var bypass = db.UseRowLevelSecurityBypass();
+        db.Empresas.Add(empresa);
+        db.Clientes.Add(cliente);
+        db.MensagensProgramadas.Add(mensagem);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var repo = new MensagemProgramadaRepository(db);
+        var cancelar = new CancelarMensagemProgramadaUseCase(repo, db, TimeProvider.System);
+        var alheio = () => cancelar.ExecuteAsync(Guid.NewGuid(), mensagem.Id);
+        await alheio.Should().ThrowAsync<MensagemProgramadaNaoEncontradaException>();
+        (await cancelar.ExecuteAsync(empresa.Id, mensagem.Id)).Situacao.Should().Be(SituacaoMensagemProgramada.Cancelada);
+        await using var tx = await db.Database.BeginTransactionAsync();
+        (await repo.ListarVencidasComLockAsync(agora.AddSeconds(2), 100)).Should().NotContain(m => m.Id == mensagem.Id);
+    }
+
+    [SkippableFact]
+    public async Task CancelamentoConcorrenteNaoSobrescreveReservaDoDisparador()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var agora = DateTime.UtcNow;
+        var empresa = Empresa.Criar("Programadas concorrentes", null);
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Teste" };
+        var mensagem = MensagemProgramada.Agendar(empresa.Id, cliente.Id, null, CanalConversa.Email,
+            FinalidadeContato.Transacional, "Aviso", null, agora.AddSeconds(1), Guid.NewGuid(), agora);
+        await using var reservaDb = fixture.CreateDbContext();
+        reservaDb.SetMobileTenantContext(empresa.Id);
+        using var bypass = reservaDb.UseRowLevelSecurityBypass();
+        reservaDb.Empresas.Add(empresa);
+        reservaDb.Clientes.Add(cliente);
+        reservaDb.MensagensProgramadas.Add(mensagem);
+        await reservaDb.SaveChangesAsync();
+
+        await using var tx = await reservaDb.Database.BeginTransactionAsync();
+        mensagem.Reservar(agora.AddSeconds(2));
+        await reservaDb.SaveChangesAsync();
+
+        await using var cancelarDb = fixture.CreateDbContext();
+        cancelarDb.SetMobileTenantContext(empresa.Id);
+        using var bypassCancelar = cancelarDb.UseRowLevelSecurityBypass();
+        await cancelarDb.Database.OpenConnectionAsync();
+        var pid = ((NpgsqlConnection)cancelarDb.Database.GetDbConnection()).ProcessID;
+        var cancelar = new CancelarMensagemProgramadaUseCase(new MensagemProgramadaRepository(cancelarDb), cancelarDb, TimeProvider.System);
+        var tentativa = cancelar.ExecuteAsync(empresa.Id, mensagem.Id);
+        var esperando = false;
+        var limite = DateTime.UtcNow.AddSeconds(10);
+        while (!esperando && !tentativa.IsCompleted && DateTime.UtcNow < limite)
+        {
+            esperando = await reservaDb.Database.SqlQuery<bool>($"SELECT cardinality(pg_blocking_pids({pid})) > 0 AS \"Value\"").SingleAsync();
+            if (!esperando) await Task.Delay(20);
+        }
+        esperando.Should().BeTrue("o cancelamento deve concorrer com a reserva ainda sem commit");
+        await tx.CommitAsync();
+
+        Func<Task> finalizar = async () => await tentativa.WaitAsync(TimeSpan.FromSeconds(10));
+        await finalizar.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Enviando*");
+        await reservaDb.Entry(mensagem).ReloadAsync();
+        mensagem.Situacao.Should().Be(SituacaoMensagemProgramada.Enviando);
+    }
+
     [SkippableFact]
     public async Task DoisDisparadoresConcorrentesNaoPegamAMesmaMensagem()
     {

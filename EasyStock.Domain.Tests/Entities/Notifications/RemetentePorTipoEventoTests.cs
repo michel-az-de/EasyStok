@@ -31,6 +31,7 @@ public class RemetentePorTipoEventoTests
     [InlineData(TipoEventoNotificacao.PedidoEmPreparo)]
     [InlineData(TipoEventoNotificacao.PedidoSaiuParaEntrega)]
     [InlineData(TipoEventoNotificacao.PedidoEntregue)]
+    [InlineData(TipoEventoNotificacao.PedidoReagendado)]
     [InlineData(TipoEventoNotificacao.AvaliacaoSolicitada)]
     [InlineData(TipoEventoNotificacao.ReembolsoEfetuado)]
     [InlineData(TipoEventoNotificacao.CampanhaMarketing)]

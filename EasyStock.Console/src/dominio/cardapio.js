@@ -1,6 +1,43 @@
 // Domínio puro: não importa infraestrutura. O catálogo chega por parâmetro.
 
-export const itemPorSku = (cardapio, sku) => cardapio.find((i) => i.sku === sku) ?? null
+// M1.4b (#1531): a porção vendida é um sku composto "prato~porção". A comanda inteira é indexada
+// por sku (preço, quantidade, anotação), então a porção entra como um produto próprio, que herda o
+// prato e leva o nome, o preço e o "tem" dela. Só a ida e a volta com a API separam as duas partes.
+const SEPARADOR_PORCAO = '~'
+export const skuDaPorcao = (itemSku, variacaoId) => `${itemSku}${SEPARADOR_PORCAO}${variacaoId}`
+export function partesDoSku(sku) {
+  const [itemSku, variacaoId = null] = String(sku ?? '').split(SEPARADOR_PORCAO)
+  return { itemSku, variacaoId: variacaoId || null }
+}
+
+export const produtoDaPorcao = (item, porcao) => ({
+  ...item,
+  sku: skuDaPorcao(item.sku, porcao.id),
+  itemSku: item.sku,
+  variacaoId: porcao.id,
+  nome: `${item.nome} · ${porcao.rotulo}`,
+  porcao: porcao.peso || porcao.rotulo,
+  preco: porcao.preco,
+  disponivelHoje: item.disponivelHoje !== false && porcao.disponivel !== false,
+  porcoes: [],
+})
+
+// A porção que um toque no prato soma: a padrão se tem hoje, senão a primeira que tem.
+export function porcaoDoToque(item) {
+  const tem = (item?.porcoes ?? []).filter((p) => p.disponivel !== false)
+  return tem.find((p) => p.padrao) ?? tem[0] ?? null
+}
+
+export function itemPorSku(cardapio, sku) {
+  const direto = cardapio.find((i) => i.sku === sku)
+  if (direto) return direto
+  const { itemSku, variacaoId } = partesDoSku(sku)
+  if (!variacaoId) return null
+  const prato = cardapio.find((i) => i.sku === itemSku) ?? null
+  const porcao = prato?.porcoes?.find((p) => p.id === variacaoId)
+  // Porção que saiu do cardápio depois do pedido: a linha ainda mostra o prato.
+  return porcao ? produtoDaPorcao(prato, porcao) : prato
+}
 
 // Item sem controle de saldo (cardápio da API sem estoque ligado, F03): nulo, nunca zero.
 export const semControleDeSaldo = (item) => item?.estoque == null
@@ -213,4 +250,11 @@ export function alternarRemocaoItem(cardapio, sku, agoraIso) {
 export function catalogoDeAdicionais(cardapio, mapa, skuDoItem = null) {
   const skusUnicos = [...new Set(Object.values(mapa ?? {}).flat())]
   return skusUnicos.filter((sku) => sku !== skuDoItem).map((sku) => itemPorSku(cardapio, sku)).filter(Boolean)
+}
+
+// M1.1 (#1481, #1486): subir ou descer um item na lista de gestão. Quem renumera é o EasyStok (os
+// itens nascem com ordem 0 e a ordem não aceita negativo). Aqui só se sabe se há para onde ir.
+export function podeMover(lista, indice, direcao) {
+  const alvo = indice + (direcao === 'subir' ? -1 : 1)
+  return indice >= 0 && indice < lista.length && alvo >= 0 && alvo < lista.length
 }

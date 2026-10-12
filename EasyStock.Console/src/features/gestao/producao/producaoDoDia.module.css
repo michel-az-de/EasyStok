@@ -1,0 +1,124 @@
+/* Produção do dia por toque (#1624): a grade de pratos, o lote ao lado e a barra que confirma.
+   O resto da tela usa as classes de `../cardapio/abaCardapio.module.css`, como as outras abas.
+
+   #1627: a moldura dos módulos ganhou menu lateral e a largura útil caiu uns 300 px. O lote vai
+   para o lado a partir de 700 px de contêiner (tablet deitado), e cada prato do lote é uma linha
+   que abre em "Ajustar", para caber sem rolar por dentro. */
+
+.chips { display: flex; gap: var(--e-2); flex-wrap: wrap; min-width: 0; }
+
+.falta {
+  display: grid; gap: var(--e-3); padding: var(--e-3) var(--e-4);
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--elevado);
+}
+
+/* Bloco comum (não grid): a barra é filha direta dele e gruda no rodapé enquanto a grade rola. */
+.palco { display: block; min-width: 0; }
+.bancada { display: grid; gap: var(--e-5); grid-template-columns: minmax(0, 1fr); align-items: start; }
+.cardapio, .colunaDoLote { display: grid; gap: var(--e-3); min-width: 0; }
+.filtros { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
+.busca { flex: 0 1 260px; min-width: 0; }
+
+/* O foco do teclado não pode parar atrás da barra fixa: quem recebe foco rola com folga embaixo. */
+.bancada :is(button, input, select, summary, a) { scroll-margin-block-end: 200px; }
+
+.grade {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
+}
+/* O cartão não muda de tamanho nem de largura de texto quando entra no lote: a faixa do "−" e da
+   contagem já tem lugar reservado embaixo. Antes ela entrava ao lado, o nome quebrava em mais
+   linhas e o cartão de baixo saía de onde o dedo ia tocar. */
+.cartao {
+  position: relative; display: grid; min-width: 0; min-height: 116px;
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--papel); overflow: clip;
+}
+.noLote { border-color: var(--marca); background: var(--marca-claro); }
+.tocar {
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: var(--e-1);
+  min-width: 0; width: 100%; padding: var(--e-3); padding-bottom: calc(var(--toque) + var(--e-3));
+  border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.tocar:hover:not(:disabled) { background: var(--preenchimento); }
+.tocar:focus-visible, .menos:focus-visible { outline: var(--b-2) solid var(--marca); outline-offset: -2px; }
+.tocar:disabled, .menos:disabled { cursor: default; opacity: .6; }
+.nomeDoPrato { color: var(--tinta); font-size: var(--t-corpo); font-weight: 700; line-height: var(--lh-compacto); overflow-wrap: anywhere; }
+.tamanho { color: var(--tinta-2); font-size: var(--t-apoio); line-height: var(--lh-compacto); }
+.saldo { color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-corpo); font-variant-numeric: tabular-nums; }
+.saldo strong { color: var(--tinta); font-weight: 700; }
+
+/* A faixa fica por cima do pé do cartão. Só o "−" recebe toque; o resto da faixa continua sendo
+   o cartão (somar). */
+.passo {
+  position: absolute; inset: auto var(--e-2) var(--e-2) var(--e-2);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); pointer-events: none;
+}
+.contagem {
+  min-width: 2.25em; padding: var(--e-1) var(--e-2); border-radius: var(--r-pilula); background: var(--acao); color: var(--sobre-acao);
+  font-size: var(--t-forte); font-weight: 750; line-height: var(--lh-compacto); text-align: center; font-variant-numeric: tabular-nums;
+}
+.menos {
+  display: grid; place-items: center; min-width: var(--toque); min-height: var(--toque); pointer-events: auto;
+  border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1); background: var(--papel); color: var(--tinta); cursor: pointer;
+}
+.menos:hover:not(:disabled) { background: var(--preenchimento); }
+
+/* Aviso que a tela rola até ele (erro, lote lançado): a margem deixa lugar para a barra fixa do
+   rodapé, que senão fica por cima do aviso. */
+.aparecer { scroll-margin-block: var(--e-4) 200px; }
+
+/* O aviso do lote lançado: o texto em cima, os botões numa linha só deles. */
+.acoesDoAviso { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; margin-top: var(--e-2); }
+
+.lote { display: grid; gap: var(--e-3); min-width: 0; padding: var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--papel); }
+.itens { list-style: none; margin: 0; padding: 0; display: grid; }
+.itemDoLote { min-width: 0; border-top: var(--b-1) solid var(--linha); }
+.resumoDoItem {
+  display: flex; align-items: center; gap: var(--e-3); min-width: 0; min-height: var(--toque);
+  padding-block: var(--e-3); cursor: pointer; list-style: none;
+}
+.resumoDoItem::-webkit-details-marker { display: none; }
+.resumoDoItem:focus-visible { outline: var(--b-2) solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
+.textoDoItem { flex: 1 1 0; min-width: 0; display: grid; gap: var(--e-1); }
+.nomeDoItem { margin: 0; color: var(--tinta); font-size: var(--t-corpo); font-weight: 700; line-height: var(--lh-compacto); overflow-wrap: anywhere; }
+.ajustar { flex: none; color: var(--marca); font-size: var(--t-apoio); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.editorDoItem { display: grid; gap: var(--e-3); min-width: 0; padding-bottom: var(--e-4); }
+.camposDoItem { display: grid; gap: var(--e-3); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; }
+
+.barraDoLote {
+  position: sticky; bottom: 0; z-index: 2; margin-top: var(--e-4);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap;
+  padding: var(--e-3) var(--e-4); border: var(--b-1) solid var(--linha-media); border-radius: var(--r-2);
+  background: var(--elevado); box-shadow: var(--sombra-media);
+}
+.resumoDoLote { margin: 0; color: var(--tinta); font-size: var(--t-forte); font-weight: 750; line-height: var(--lh-compacto); font-variant-numeric: tabular-nums; }
+.acoesDoLote { display: flex; align-items: center; gap: var(--e-4); flex-wrap: wrap; }
+
+/* Lote abaixo da grade (tela estreita): a barra leva até o lote e o Confirmar fica no fim dele,
+   depois da validade e do peso, como o "Finalizar" do PWA. Lote ao lado: o Confirmar é o da barra. */
+.barraDoLote .confirmarNaBarra { display: none; }
+
+@container (min-width: 700px) {
+  .bancada { grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); }
+  /* Ao lado, o lote acompanha a rolagem da grade (como a comanda ao lado da conversa no Balcão).
+     A altura deixa lugar para o cabeçalho do módulo e para a barra; lote comprido rola por dentro. */
+  .colunaDoLote { position: sticky; top: 0; max-height: calc(100dvh - 200px); overflow-y: auto; overscroll-behavior: contain; }
+  .barraDoLote .confirmarNaBarra { display: inline-flex; }
+  .barraDoLote .atalhoDoLote, .lote .confirmarNoLote { display: none; }
+}
+
+@container (min-width: 1000px) {
+  .bancada { grid-template-columns: minmax(0, 1fr) minmax(340px, 400px); }
+}
+
+@container (max-width: 480px) {
+  .grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .busca { flex-basis: 100%; }
+  .barraDoLote { padding: var(--e-3); gap: var(--e-2); }
+  .resumoDoLote { flex: 1 1 100%; font-size: var(--t-corpo); }
+  .acoesDoLote { flex: 1 1 100%; justify-content: space-between; gap: var(--e-2); flex-wrap: nowrap; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cartao { transition: border-color var(--dur-curta) var(--ease-padrao), background var(--dur-curta) var(--ease-padrao); }
+}

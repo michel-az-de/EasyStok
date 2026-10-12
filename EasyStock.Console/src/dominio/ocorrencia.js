@@ -16,6 +16,7 @@
 // aconteceu". Puro, sem rede: quem decide `agora` e persiste é a aplicação.
 
 import { faixaDaJanela } from './entrega.js'
+import { noDiaDaLojaAs } from './formato.js'
 
 // Mesmo cálculo de `dominio/viagem.js: fimDaFaixa`, copiado em vez de
 // importado: `viagem.js` puxa `esteira.js`/`entrega.js` sem extensão, o que
@@ -26,9 +27,7 @@ import { faixaDaJanela } from './entrega.js'
 function fimDaFaixaSimples(faixa, agora) {
   const casado = /às\s*(\d{1,2})h(\d{2})?/.exec(faixa ?? '')
   if (!casado) return null
-  const dia = new Date(agora)
-  dia.setHours(Number(casado[1]), Number(casado[2] ?? 0), 0, 0)
-  return dia.getTime()
+  return noDiaDaLojaAs(agora, Number(casado[1]), Number(casado[2] ?? 0))
 }
 
 export const ESTADOS_OCORRENCIA = {

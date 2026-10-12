@@ -253,6 +253,25 @@ public class WhatsAppCloudClientTests
         ex.Which.Codigo.Should().Be(2);
     }
 
+    // #1550: o envio de modelo pelo Balcão separa "nada saiu" de "pode ter saído" pelo status. A recusa antes
+    // da rede não tem status; a resposta 2xx sem message id carrega o dela.
+    [Fact]
+    public async Task DoisXxSemMessageIdCarregaOStatusERecusaAntesDaRedeNao()
+    {
+        var respondeu = CreateClient(HttpStatusCode.OK, """{"messaging_product":"whatsapp","messages":[]}""", out _);
+        var semId = await ((Func<Task>)(() => respondeu.EnviarTextoAsync("5511999998888", "Oi!")))
+            .Should().ThrowAsync<WhatsAppCloudException>();
+        semId.Which.StatusHttp.Should().Be(200);
+        semId.Which.EhPermanente.Should().BeTrue();
+
+        var handler = new SequenceHandler();
+        var semNumero = BuildClient(handler, phoneNumberIdDoTenant: null, haTenant: true);
+        var antesDaRede = await ((Func<Task>)(() => semNumero.EnviarTextoAsync("5511999998888", "Oi!")))
+            .Should().ThrowAsync<WhatsAppCloudException>();
+        antesDaRede.Which.StatusHttp.Should().BeNull();
+        antesDaRede.Which.EhPermanente.Should().BeTrue();
+    }
+
     [Fact]
     public async Task ErroSemCorpoDaMetaTambemCarregaOStatusHttp()
     {
@@ -372,6 +391,41 @@ public class WhatsAppCloudClientTests
         await client.EnviarTextoPlataformaAsync("5511999998888", "Oi!");
 
         handler.Tokens.Should().Equal("token-teste");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AudioSaiComoTipoAudioPeloLinkEMarcaNotaDeVoz(bool notaDeVoz)
+    {
+        // #1444: a Meta busca o áudio pela URL; "voice" só vale para Ogg/Opus mono.
+        var client = CreateClient(HttpStatusCode.OK, RespostaEnvioOk, out var handler);
+
+        var envio = await client.EnviarAudioAsync("5511999998888", "https://cdn.test/a.ogg", notaDeVoz);
+
+        envio.Wamid.Should().Be("wamid.X");
+        using var json = System.Text.Json.JsonDocument.Parse(handler.UltimoCorpo!);
+        json.RootElement.GetProperty("type").GetString().Should().Be("audio");
+        var audio = json.RootElement.GetProperty("audio");
+        audio.GetProperty("link").GetString().Should().Be("https://cdn.test/a.ogg");
+        audio.GetProperty("voice").GetBoolean().Should().Be(notaDeVoz);
+    }
+
+    [Theory]
+    [InlineData("/files/empresa/foto.jpg")]
+    [InlineData("files/foto.jpg")]
+    [InlineData("ftp://cdn.test/foto.jpg")]
+    public async Task MidiaComUrlNaoAbsolutaFalhaAntesDeIrAMeta(string url)
+    {
+        // #1474 B2: a Meta só busca mídia por URL absoluta http(s); "/files/..." vem de FileStorage__PublicBaseUrl vazio.
+        var client = CreateClient(HttpStatusCode.OK, RespostaEnvioOk, out var handler);
+
+        var imagem = async () => await client.EnviarImagemAsync("5511999998888", url);
+        var audio = async () => await client.EnviarAudioAsync("5511999998888", url, notaDeVoz: false);
+
+        (await imagem.Should().ThrowAsync<ArgumentException>()).Which.Message.Should().Contain("FileStorage__PublicBaseUrl");
+        (await audio.Should().ThrowAsync<ArgumentException>()).Which.Message.Should().Contain("FileStorage__PublicBaseUrl");
+        handler.Chamadas.Should().Be(0);
     }
 
     private sealed class SequenceHandler : HttpMessageHandler

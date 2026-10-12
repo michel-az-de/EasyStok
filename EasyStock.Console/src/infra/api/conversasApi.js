@@ -1,4 +1,5 @@
 import { chamarApi } from './cliente'
+import { nomeDoArquivoDeAudio } from '../../dominio/audio'
 
 // Inbox do console (S07): `api/atendimento/conversas`. Devolve o formato da API;
 // a tradução para o formato do console mora em traducaoConversas.js.
@@ -11,16 +12,21 @@ const PAGINAS_NO_MAXIMO = 10
 export const listarConversas = ({ limite = POR_PAGINA, pagina = 1 } = {}) =>
   chamarApi(`${BASE}?limite=${limite}&pagina=${pagina}`)
 
-// Inbox inteira (F07, item 7): segue as páginas até uma vir incompleta. Conversa que
-// subiu de página entre uma chamada e outra aparece uma vez só.
-export async function listarTodasConversas() {
+export const listarAtendentes = () => chamarApi('/api/atendimento/atendentes')
+
+// Leitura da polling. Inbox inteira (F07, item 7): segue as páginas até uma vir incompleta;
+// conversa que subiu de página entre uma chamada e outra aparece uma vez só.
+// #1576: sem `completa`, para na página 1, que traz quem recebeu mensagem por último, ou segue até
+// achar as conversas de `ate` (ids). `completa` na resposta diz se o que veio é a inbox inteira.
+export async function listarInbox({ completa = false, ate = [] } = {}) {
   const vistas = new Map()
   for (let pagina = 1; pagina <= PAGINAS_NO_MAXIMO; pagina += 1) {
     const itens = (await listarConversas({ pagina })) ?? []
     for (const item of itens) if (!vistas.has(item.id)) vistas.set(item.id, item)
-    if (itens.length < POR_PAGINA) break
+    if (itens.length < POR_PAGINA) return { itens: [...vistas.values()], completa: true }
+    if (!completa && ate.every((id) => vistas.has(id))) break
   }
-  return [...vistas.values()]
+  return { itens: [...vistas.values()], completa }
 }
 
 export const listarMensagens = (id, { limite = 100 } = {}) =>
@@ -43,6 +49,7 @@ export const listarNaoEntregues = ({ limite = 50 } = {}) => chamarApi(`${BASE}/n
 export const assumir = (id) => chamarApi(`${BASE}/${id}/assumir`, { metodo: 'POST' })
 export const liberarAutomatico = (id) => chamarApi(`${BASE}/${id}/liberar-automatico`, { metodo: 'POST' })
 export const encerrar = (id) => chamarApi(`${BASE}/${id}/encerrar`, { metodo: 'POST' })
+export const reabrir = (id) => chamarApi(`${BASE}/${id}/reabrir`, { metodo: 'POST' })
 export const marcarLida = (id) => chamarApi(`${BASE}/${id}/marcar-lida`, { metodo: 'POST' })
 
 // Sugestão do agente para a dona (#1420): `{ texto, tokens, latenciaMs }`. Nada sai ao cliente.
@@ -56,6 +63,14 @@ export const gerarLinkCardapio = (id) => chamarApi(`${BASE}/${id}/link-cardapio`
 // que a Ficha relê depois. Conversa sem cliente devolve o dossiê mínimo.
 export const cadastrarClienteDaConversa = (id, corpo) => chamarApi(`${BASE}/${id}/cliente`, { metodo: 'POST', corpo })
 export const obterDossie = (id) => chamarApi(`${BASE}/${id}/dossie`)
+// #1436: nota interna no cadastro do cliente (o cliente nunca vê).
+export const adicionarNotaCliente = (clienteId, texto) =>
+  chamarApi(`/api/clientes/${clienteId}/notas`, { metodo: 'POST', corpo: { texto } })
+// #1474 (R2): bloqueio do cadastro em todos os canais (policy Gerente na API).
+export const bloquearClienteApi = (clienteId, motivo) =>
+  chamarApi(`/api/clientes/${clienteId}/bloquear`, { metodo: 'POST', corpo: { motivo } })
+export const desbloquearClienteApi = (clienteId) =>
+  chamarApi(`/api/clientes/${clienteId}/desbloquear`, { metodo: 'POST' })
 
 // Foto da dona (S02): multipart com `file` e `legenda`. A imagem chega como data URL
 // (o Composer já leu o arquivo para a prévia) e volta a ser binário aqui.
@@ -69,21 +84,28 @@ function arquivoDoDataUrl(dataUrl, nomeArquivo) {
 }
 
 export async function enviarImagem(id, { dataUrl, nomeArquivo, legenda }) {
-  let arquivo
-  if (dataUrl.startsWith('data:')) arquivo = arquivoDoDataUrl(dataUrl, nomeArquivo)
-  else {
-    const url = new URL(dataUrl)
-    if (url.protocol !== 'https:') throw new Error('Endereço da foto inválido.')
-    const resposta = await fetch(url, { credentials: 'omit' })
-    if (!resposta.ok) throw new Error('Não foi possível carregar a foto do cardápio.')
-    const blob = await resposta.blob()
-    if (!blob.type.startsWith('image/') || blob.size > 6 * 1024 * 1024)
-      throw new Error('Foto inválida ou maior que 6 MB.')
-    arquivo = { blob, nome: nomeArquivo || `cardapio.${blob.type.split('/')[1]}` }
-  }
-  const { blob, nome } = arquivo
+  // Só arquivo lido no navegador. Foto por endereço (cardápio) vai pelo id: enviarImagemCardapio.
+  if (!dataUrl?.startsWith('data:')) throw new Error('Foto sem arquivo: anexe do computador.')
+  const { blob, nome } = arquivoDoDataUrl(dataUrl, nomeArquivo)
   const formulario = new FormData()
   formulario.append('file', blob, nome)
   if (legenda?.trim()) formulario.append('legenda', legenda.trim())
   return chamarApi(`${BASE}/${id}/mensagens/imagem`, { metodo: 'POST', formulario })
 }
+
+// Áudio gravado no console (#1444). Vai como veio do navegador; o EasyStok converte o WebM do
+// Chrome em Ogg/Opus, que é o que a Meta aceita como nota de voz.
+export async function enviarAudio(id, { dataUrl }) {
+  if (!dataUrl?.startsWith('data:')) throw new Error('Áudio sem gravação: grave de novo.')
+  const { blob } = arquivoDoDataUrl(dataUrl)
+  const formulario = new FormData()
+  formulario.append('file', blob, nomeDoArquivoDeAudio(blob.type))
+  return chamarApi(`${BASE}/${id}/mensagens/audio`, { metodo: 'POST', formulario })
+}
+
+// Foto da galeria do cardápio (#1437): o EasyStok lê a foto do storage pelo id do item e o índice;
+// o navegador não baixa a URL (cross-origin, host gravado pode estar fora do ar).
+export const enviarImagemCardapio = (id, { cardapioItemId, indice, legenda }) =>
+  chamarApi(`${BASE}/${id}/mensagens/imagem-cardapio`, {
+    metodo: 'POST', corpo: { cardapioItemId, indice, legenda: legenda?.trim() || null },
+  })

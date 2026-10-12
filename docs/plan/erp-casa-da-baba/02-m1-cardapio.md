@@ -191,6 +191,65 @@ busca só por produto (`PedidoEstoqueIntegrationService.cs:78-80`).
 **Console.** Comanda: item com porções abre a escolha da porção (como o site). M1 › Itens: editor de porções
 (rótulo, peso, preço, padrão, disponível).
 
+> **Como fica a entrega (09/10):** três fatias, com o console primeiro.
+> - **M1.4a (#1529):** editor de porções no console, cada porção ligada à sua `ProdutoVariacao`.
+> - **M1.4b:** vender por porção (pedido e comanda).
+> - **M1.4c:** saldo por porção (produção e baixa).
+>
+> O menu público com `opcoes` (lacuna 1, Fase 2) fica para depois da confirmação do site.
+>
+> **Entregue (10/10):** M1.4a (#1529), M1.4b (#1531) e M1.4c (#1537). No caminho apareceu um bug: o pedido do site e da
+> comanda nasce sem loja e não baixava estoque. Foi corrigido na #1534: sem loja, a baixa sai do estoque da empresa.
+> Na M1.4c, a linha de porção sem nenhum lote daquela porção baixa do lote sem porção do prato (estoque antigo ou PWA).
+>
+> **M1.4d (#1542, 10/10): contagem e perda por porção.** A M1.4c deixou o ajuste e a perda olhando o prato inteiro.
+> - **Perda** (#1540): recebe a porção e o FEFO fica nos lotes dela; sem a porção, a API pede.
+> - **Ajuste de contagem:** em prato com porções o formulário pede a porção (abre na que tem venda sem saldo) e a
+>   contagem só mexe nos lotes dela. O alerta do prato fecha quando nenhuma porção tem venda sem saldo. A rota aceita
+>   `variacaoId` ou `semPorcao`; sem nenhum dos dois segue contando o prato inteiro, que é o que uma aba antiga manda.
+>   Só entra na escolha a porção que já tem lote, e "o prato inteiro" fica sempre como última opção: é a saída para
+>   lote de porção que saiu do cardápio e para quando nenhuma porção tem lote.
+> - **Botões − e + do cardápio do dia (não mudaram):** seguem contando o prato inteiro. Em produção (10/10) os
+>   usuários estão em perfis antigos, e o Operador antigo acerta saldo pelo balcão sem ter o módulo de Produção;
+>   bloquear os botões tiraria o único caminho dele. Para contar por porção ali, o cardápio da comanda precisa trazer
+>   o saldo de cada porção.
+> - **O que a contagem cobre (decidido):** tudo o que está guardado, vencido incluído, que é como a API reparte entre os
+>   lotes. O saldo da tela não conta vencido, então o formulário começa pelo guardado e diz quantas são vencidas; para
+>   tirá-las, Perdas.
+> - **Receita por tamanho de porção:** a receita é do prato. Na #1542 a produção de prato com mais de um tamanho passou
+>   a avisar onde a conta não acompanha o tamanho; a conta em si ficou para a M1.4e.
+>
+> **M1.4e (#1552, 11/10): receita e embalagem por tamanho de porção.** Decidido na sessão de 11/10, com a autorização do
+> Felipe para decidir sem gerar regressão. As duas recomendações da issue valem.
+> - **Embalagem (decisão 1):** é da porção. Cada porção do cardápio escolhe a sua embalagem (um insumo marcado como
+>   embalagem e contado por unidade), e a produção baixa **uma por porção produzida**, em qualquer prato, com ou sem
+>   receita e com ou sem a baixa automática (segue a D-M2-03). Porção com embalagem própria **não usa a embalagem da
+>   receita**. Porção sem escolha segue como antes: vale a embalagem da receita. Coluna nova
+>   `cardapio_item_variacao."EmbalagemProdutoId"`, opcional, com `ON DELETE SET NULL`.
+> - **Comida (decisão 2):** prato com mais de um tamanho usa receita que **rende em peso**. A baixa já escala pelo
+>   peso produzido; faltava o console deixar escolher a unidade do rendimento (ele só gravava "porções"). O editor da
+>   receita ganhou "Rende em" (porções, kg, g) e orienta quando o prato tem mais de um tamanho. Na produção, escolher a
+>   porção já traz o peso dela ("300 g" → 300), que é o que a receita em peso usa.
+> - **Aviso da #1542:** some quando a receita rende em peso e a porção tem embalagem própria. Onde ainda não está
+>   montado, o aviso continua e diz o que fazer (rendimento em peso; embalagem da porção no cardápio).
+> - **Planejamento:** ele conta porções por prato, e a receita em peso pede peso. O console manda junto o peso de uma
+>   porção (o da padrão, lido do cardápio) e o EasyStok planeja pelo peso quando a receita rende em peso. Sem peso
+>   escrito na porção, o prato fica de fora da conta e a tela diz qual e o que fazer. Em prato com mais de um tamanho
+>   a conta é uma aproximação pela porção padrão: o planejamento ainda não separa por tamanho.
+> - **Guardas:** o console anterior não manda a embalagem, e o EasyStok então não mexe nela (`mexerEmbalagem`). Se a
+>   embalagem escolhida for tirada do estoque (o que só a inativa), desmarcada ou trocar de unidade, a produção avisa
+>   e baixa a da receita; a escolha que a porção já tinha não trava a edição do prato. O peso só é lido do texto da
+>   porção quando o texto começa por ele ("300 g", "1,2 kg"); "2x300 g" ou "1/2 kg" ficam para ela digitar.
+> - **Limites conhecidos:** uma embalagem por porção. Quem usa bandeja e selo na mesma porção escolhe a bandeja na
+>   porção; o selo que estiver na receita deixa de descer para ela, e o editor da receita avisa. A produção lançada
+>   sem porção (aplicativo do celular) só conhece a receita: por isso o editor não manda tirar a embalagem de lá.
+> - **Revisão independente do diff (11/10):** sem regressão no caminho sem embalagem na porção; 4 defeitos em volta,
+>   corrigidos antes do PR (peso da porção que ficava ao trocar de prato, receita em peso tirando o prato do
+>   planejamento, embalagem inativada que deixava de descer, e o aviso que mandava tirar a embalagem da receita).
+> - **Aba Insumos:** a embalagem escolhida numa porção aparece como "embalagem de N porções" (antes diria "não entra
+>   em receita"), e o rótulo dela passa a "Embalagem de porção, uma por porção produzida".
+> - **Fora desta fatia:** o custo por porção com a embalagem dela (o custo da receita segue sem a embalagem da porção).
+
 **Decisão já tomada.** Preço da variação é absoluto, não delta (ADR-0035). Tier **alto** (pedido e contrato
 público; coordenar com o repositório do site antes da fase 2 do ADR-0035).
 
@@ -298,6 +357,22 @@ gravam na mesma API.
 5. O "ficha técnica" do `api/produtos/{id}/ficha-tecnica` (`ProdutoController.cs:339`) é **nutricional**, não receita: nome colide com M2.2.
 
 ## 6. Decisões pendentes do Felipe
+
+> **Decididas em 08/10/2026 (Felipe, múltipla escolha):**
+> - **D-M1-01 = a:** o cardápio é dono do preço (item/porção) e da categoria (seção).
+> - **D-M1-05 = a:** o item fora do cardápio de hoje só volta quando ela religa.
+> - **D-M1-07 = a:** tirar arquiva e é diferente de ocultar do site; apagar só item nunca vendido.
+> - **D-M1-08 = a:** o item novo nasce em validação, e o agente não oferece até ela confirmar.
+>
+> Permissão no console (#1241): o Operador mexe no dia e no saldo; o Gerente inclui, edita e tira.
+> **Decididas em 09/10/2026 (Felipe, múltipla escolha):**
+> - **D-M1-02 = a:** o combo tem preço e componentes fixos, e cada componente baixa o próprio estoque.
+> - **D-M1-03 = a:** a porção tem saldo próprio pela `ProdutoVariacao`; a produção e a baixa passam a usar a porção.
+> - **D-M1-04 = a:** o adicional é item do próprio cardápio e entra como linha própria ligada ao prato, com saldo e preço.
+> - **D-M1-06 = a:** os alérgenos são uma lista fechada no item, mais um texto "outros".
+> - **ADR-0035, Fase 2:** as porções entram primeiro no console. O menu público só emite `opcoes` depois de o Felipe confirmar que o site lê o schema v2.
+>
+> Todas as decisões do M1 estão tomadas.
 
 **D-M1-01 · Quem é dono do preço e da categoria que o cliente vê?**
 - a) O cardápio: preço no item ou na porção, categoria na seção; `PrecoReferencia` vira sugestão do bastidor **(Recomendado)**

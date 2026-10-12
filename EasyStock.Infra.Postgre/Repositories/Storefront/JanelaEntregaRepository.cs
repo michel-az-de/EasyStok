@@ -36,4 +36,14 @@ public sealed class JanelaEntregaRepository(EasyStockDbContext db) : IJanelaEntr
         db.JanelasEntrega.Update(janela);
         return Task.CompletedTask;
     }
+
+    public async Task<bool> TemUsoAsync(Guid janelaId, CancellationToken ct = default) =>
+        await db.VagasOcupadas.AnyAsync(v => v.JanelaEntregaId == janelaId, ct)
+        || await db.BloqueiosEntrega.AnyAsync(b => b.JanelaEspecificaId == janelaId, ct);
+
+    public Task RemoveAsync(JanelaEntrega janela, CancellationToken ct = default)
+    {
+        db.JanelasEntrega.Remove(janela);
+        return Task.CompletedTask;
+    }
 }

@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.Ports.Output.Integration;
@@ -7,6 +8,7 @@ using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Lookup;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
@@ -19,6 +21,7 @@ using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
+using EasyStock.Infra.Notifications.Templating;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -53,7 +56,7 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
                 }
                 avisos.Add(call.Arg<string>());
             });
-        await using var provider = CriarProvider(eventos);
+        await using var provider = CriarProvider(cenario, eventos);
         var input = new GerarPedidoConversaInput(cenario.EmpresaId, cenario.ConversaId,
             [new ItemPedidoCheckout(cenario.ItemId, 2, "Sem molho")], cenario.JanelaId, cenario.Data, Forma: forma);
         Guid pedidoId;
@@ -71,8 +74,8 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
             await using var scope = provider.CreateAsyncScope();
             DefinirEmpresa(scope, cenario.EmpresaId);
             var confirmar = scope.ServiceProvider.GetRequiredService<ConfirmarPagamentoPedidoUseCase>();
-            var pagamento = new ConfirmarPagamentoPedidoInput(pedidoId, "pagamento-jornada", "approved", 25m,
-                "pix", ReferenciaExterna: "preferencia-jornada");
+            var pagamento = new ConfirmarPagamentoPedidoInput(pedidoId, $"pagamento-jornada-{pedidoId:N}", "approved", 25m,
+                "pix", ReferenciaExterna: $"preferencia-jornada-{pedidoId:N}");
             (await confirmar.ExecuteAsync(pagamento)).Confirmado.Should().BeTrue();
             (await confirmar.ExecuteAsync(pagamento)).Situacao.Should().Be(SituacaoConfirmacaoPagamento.JaConfirmado);
             avisos.Count(e => e == EventosOperacao.PedidoPago).Should().Be(1);
@@ -92,7 +95,8 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         card.Id.Should().Be(pedidoId);
         card.Status.Should().Be("aguardando");
         card.InicioPrevistoEm.Should().NotBeNull();
-        card.Itens.Should().Contain(i => i.Nome == "brigadeiro" && i.Qtd == 2 && i.Observacao == "Sem molho");
+        // #1474: a cozinha mostra o nome como no cardápio (o avulso é gravado minúsculo).
+        card.Itens.Should().Contain(i => i.Nome == "Brigadeiro" && i.Qtd == 2 && i.Observacao == "Sem molho");
         (await LerFilaAsync(provider, cenario with { EmpresaId = Guid.NewGuid() })).Should().BeEmpty();
 
         // Uma nova requisição não pode criar um segundo pedido ou uma segunda vaga na mesma conversa.
@@ -135,7 +139,7 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var cenario = await SemearAsync();
         var eventos = Substitute.For<IOperacaoEventPublisher>();
-        await using var provider = CriarProvider(eventos);
+        await using var provider = CriarProvider(cenario, eventos);
         Guid pedidoId;
         await using (var scope = provider.CreateAsyncScope())
         {
@@ -177,7 +181,7 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var cenario = await SemearAsync();
         var eventos = Substitute.For<IOperacaoEventPublisher>();
-        await using var provider = CriarProvider(eventos);
+        await using var provider = CriarProvider(cenario, eventos);
         var pedidoId = await CriarNaEntregaAsync(provider, cenario);
         async Task<bool> Receber()
         {
@@ -213,7 +217,7 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         publicador.PublicarAsync(cenario.EmpresaId, PedidoPagoEvent.TipoEvento, "pedido", Arg.Any<Guid>(),
             Arg.Any<PedidoPagoEvent>(), 1, Arg.Any<string>(), null, Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new InvalidOperationException("Falha de persistência simulada")));
-        await using var provider = CriarProvider(eventos, publicador);
+        await using var provider = CriarProvider(cenario, eventos, publicador);
         var pedidoId = await CriarNaEntregaAsync(provider, cenario);
         await using (var scope = provider.CreateAsyncScope())
         {
@@ -263,7 +267,7 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         var loja = StorefrontEntity.Criar(empresaId, $"jornada-{empresaId:N}"[..20], "Jornada cozinha", 0m);
         loja.Ativar();
         db.Storefronts.Add(loja);
-        var data = DateOnly.FromDateTime(agora).AddDays(7);
+        var data = HorarioBrasil.DataOperacional(agora);
         var janela = JanelaEntrega.Criar(loja.Id, (int)data.DayOfWeek, new TimeOnly(9, 0), new TimeOnly(12, 0), 10, "Manhã");
         db.JanelasEntrega.Add(janela);
         db.FreteZonas.Add(FreteZona.CriarPorCep(loja.Id, "Centro", "01000000", "01999999", 5m, 60));
@@ -279,7 +283,7 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         return new Cenario(empresaId, conversa.Id, item.Id, janela.Id, data);
     }
 
-    private ServiceProvider CriarProvider(IOperacaoEventPublisher eventos, IPublicadorEventoIntegracao? publicador = null)
+    private ServiceProvider CriarProvider(Cenario cenario, IOperacaoEventPublisher eventos, IPublicadorEventoIntegracao? publicador = null)
     {
         var config = new ConfigurationBuilder().Build();
         var services = new ServiceCollection();
@@ -291,7 +295,10 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         services.AddSingleton(Substitute.For<ICacheService>());
         services.AddEasyStockPostgreInfrastructure(fixture.ConnectionString, config);
         services.AddEasyStockApplication();
-        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IRendererTemplate, ScribanRenderer>();
+        var relogio = Substitute.For<TimeProvider>();
+        relogio.GetUtcNow().Returns(new DateTimeOffset(HorarioBrasil.InstanteUtc(cenario.Data, new TimeOnly(6, 0))));
+        services.AddSingleton(relogio);
         services.AddSingleton(eventos);
         if (publicador is not null) services.AddSingleton(publicador);
         services.AddSingleton(Substitute.For<ICepLookupClient>());
@@ -300,7 +307,8 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         services.AddSingleton(Substitute.For<IEstornoPedidoGateway>());
         var mp = Substitute.For<IMercadoPagoClient>();
         mp.CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>())
-            .Returns(new PreferenceCriadaResult("preferencia-jornada", "https://mp.test/jornada"));
+            .Returns(call => new PreferenceCriadaResult(
+                $"preferencia-jornada-{call.Arg<CriarPreferenceCommand>().PedidoId:N}", "https://mp.test/jornada"));
         services.AddSingleton(mp);
         return services.BuildServiceProvider();
     }

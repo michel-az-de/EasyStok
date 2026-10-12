@@ -4,7 +4,8 @@ namespace EasyStock.Worker.BackgroundServices;
 
 /// <summary>
 /// Limpeza agendada dos segredos de acesso (N8, #301): a cada 6 h apaga em lote os <c>reset_tokens</c> expirados há mais de
-/// 24 h, usados ou não (o <c>DeleteExpiredAsync</c> antigo não tinha chamador e carregava tudo em memória). A regra está em
+/// 24 h, usados ou não (o <c>DeleteExpiredAsync</c> antigo não tinha chamador e carregava tudo em memória) e, desde a
+/// #1566, os <c>refresh_tokens</c> e <c>email_confirmation_tokens</c> na mesma condição. A regra está em
 /// <see cref="LimpezaTokensAcesso"/>; aqui só o ritmo e o escopo de DI por rodada. Falha numa rodada não derruba o host.
 /// <c>Auth:LimpezaTokens:Habilitada=false</c> desliga sem deploy; <c>IntervaloHoras</c> muda o ritmo.
 /// </summary>

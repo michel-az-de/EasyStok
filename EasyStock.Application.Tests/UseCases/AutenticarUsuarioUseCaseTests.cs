@@ -304,6 +304,35 @@ public class AutenticarUsuarioUseCaseTests
         await Assert.ThrowsAsync<CredenciaisInvalidasException>(() => useCase.ExecuteAsync(command));
     }
 
+    // #1540: desativar zera o vínculo, não o usuário. Sem empresa pedida o login seguia e emitia token sem empresa.
+    [Fact]
+    public async Task Autenticar_DeveLancarCredenciaisInvalidas_QuandoNaoHaVinculoAtivo()
+    {
+        var usuarioId = Guid.NewGuid();
+        var usuario = new Usuario
+        {
+            Id = usuarioId,
+            Nome = "Ana",
+            Email = "ana@empresa.com",
+            SenhaHash = FakePasswordHasher.MakeHash("senha123"),
+            Ativo = true,
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow,
+            Empresas = new List<UsuarioEmpresa>
+            {
+                new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = usuarioId, EmpresaId = Guid.NewGuid(), Ativo = false, CriadoEm = DateTime.UtcNow }
+            }
+        };
+
+        var usuarioRepository = Substitute.For<IUsuarioRepository>();
+        usuarioRepository.GetByEmailAsync("ana@empresa.com").Returns(usuario);
+
+        var useCase = CriarUseCase(usuarioRepository);
+        var command = new AutenticarUsuarioCommand("ana@empresa.com", "senha123", null);
+
+        await Assert.ThrowsAsync<CredenciaisInvalidasException>(() => useCase.ExecuteAsync(command));
+    }
+
     // ── #1352 (N7): o contador é um só para o passo 1 (lista-empresas) e o login completo ──────
 
     [Fact]

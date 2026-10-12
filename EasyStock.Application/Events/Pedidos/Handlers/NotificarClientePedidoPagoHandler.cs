@@ -9,7 +9,7 @@ namespace EasyStock.Application.Events.Pedidos.Handlers;
 /// <summary>
 /// Pagamento online confirmado (S11, <see cref="PedidoPagoEvent"/>) vira
 /// <see cref="TipoEventoNotificacao.PedidoPagoConfirmado"/> ao cliente pelo WhatsApp (S13): "recebemos seu
-/// pagamento, pedido nº …, previsão …". Idempotente por pedido (marco <c>pago</c>).
+/// pagamento, pedido nº …, previsão …". Idempotente por cobrança e pagamento externo.
 /// </summary>
 public sealed class NotificarClientePedidoPagoHandler(AvisoStatusPedidoCliente aviso) : IIntegrationEventHandler
 {
@@ -24,6 +24,7 @@ public sealed class NotificarClientePedidoPagoHandler(AvisoStatusPedidoCliente a
         var pago = JsonSerializer.Deserialize<PedidoPagoEvent>(evento.PayloadJson, Camel);
         if (pago is null) return;
 
-        await aviso.EnfileirarAsync(TipoEventoNotificacao.PedidoPagoConfirmado, evento.EmpresaId, pago.PedidoId, MarcoPago, ct);
+        var marco = pago.CobrancaPedidoId == Guid.Empty ? MarcoPago : $"pagamento:{pago.CobrancaPedidoId:N}:{pago.PagamentoExternoId}";
+        await aviso.EnfileirarAsync(TipoEventoNotificacao.PedidoPagoConfirmado, evento.EmpresaId, pago.PedidoId, marco, ct);
     }
 }

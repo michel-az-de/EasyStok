@@ -9,6 +9,8 @@ public class ConversaConfiguration : IEntityTypeConfiguration<Conversa>
     {
         builder.ToTable("atendimento_conversas");
         builder.HasKey(c => c.Id);
+        builder.Property(c => c.NumeroComanda).UseIdentityAlwaysColumn();
+        builder.HasIndex(c => c.NumeroComanda).IsUnique();
 
         builder.Property(c => c.EmpresaId).IsRequired();
         builder.Property(c => c.ContatoIdExterno).IsRequired().HasMaxLength(Conversa.ContatoIdExternoTamanhoMaximo);

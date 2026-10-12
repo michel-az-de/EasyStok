@@ -4,13 +4,13 @@
   border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--elevado); transition: background var(--dur-curta) var(--ease-padrao);
 }
 .linha:hover { background: var(--papel); }
-.nome { flex: 1; min-width: 120px; font-size: var(--t-corpo); }
-.nome small { display: block; color: var(--tinta-3); font-size: var(--t-apoio); }
+.nome { flex: 1; min-width: 0; font-size: var(--t-corpo); font-weight: 600; overflow-wrap: anywhere; }
+.nome small { display: block; color: var(--tinta-3); font-size: var(--t-apoio); font-weight: 400; }
 .preco { font-family: var(--f-dado); font-size: var(--t-apoio); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .lista { list-style: none; margin: 0; padding: 0; }
 .contagem {
-  font-size: var(--t-apoio); color: var(--ragu); background: var(--ragu-claro);
+  font-size: var(--t-apoio); color: var(--marca); background: var(--marca-claro);
   padding: 2px var(--e-2); border-radius: var(--r-pilula); white-space: nowrap;
 }
 
@@ -21,7 +21,7 @@
 /* Dois papéis, um alvo de 44 px cada, sempre visíveis. */
 .papeis {
   display: flex; gap: var(--e-1); margin: 0 0 var(--e-4); border: 0;
-  padding: var(--e-1); background: var(--semola-2); border-radius: var(--r-1);
+  padding: var(--e-1); background: var(--elevado); border-radius: var(--r-1);
 }
 .papel {
   flex: 1; min-height: var(--toque); padding: var(--e-2) var(--e-3);
@@ -41,10 +41,11 @@
 
 .detalhe { margin: 0 0 var(--e-3); padding: 0 var(--e-3); font-size: var(--t-apoio); }
 .detalhe summary {
-  min-height: var(--toque); display: flex; align-items: center;
+  min-height: var(--toque); display: flex; align-items: center; gap: var(--e-1);
   color: var(--tinta-3); font-size: var(--t-apoio);
 }
 .detalhe summary:hover { color: var(--tinta); }
+
 
 .ficha { display: flex; gap: var(--e-3); flex-wrap: wrap; padding-bottom: var(--e-2); }
 .carta { width: 160px; border-radius: var(--r-1); flex-shrink: 0; }
@@ -58,7 +59,7 @@
 .cartaoItem {
   display: flex; gap: var(--e-3); align-items: flex-start; flex-wrap: wrap;
   padding: var(--e-3); border: var(--b-1) solid var(--linha);
-  border-radius: var(--r-1); background: var(--semola);
+  border-radius: var(--r-1); background: var(--fundo);
 }
 .miniatura { width: 96px; border-radius: var(--r-1); flex-shrink: 0; }
 .corpoItem { flex: 1; min-width: 140px; display: grid; gap: var(--e-1); justify-items: start; }
@@ -71,7 +72,7 @@
   display: inline-flex; align-items: center; gap: var(--e-2);
   min-height: var(--toque); font-size: var(--t-apoio); font-weight: 600;
 }
-.chave input { width: 20px; height: 20px; accent-color: var(--ragu); }
+.chave input { width: 20px; height: 20px; accent-color: var(--marca); }
 /* Integração 72: a mesma cápsula das Automáticas (banca da rodada 6, item 9).
    Continua sendo o mesmo checkbox, só com o desenho de interruptor. */
 .chave input[type='checkbox'] {
@@ -81,12 +82,12 @@
 }
 .chave input[type='checkbox']::after {
   content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%;
-  background: #FFFFFF; box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+  background: var(--branco); box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
   transition: transform var(--dur-media) var(--ease-mola);
 }
-.chave input[type='checkbox']:checked { background: var(--ok); }
+.chave input[type='checkbox']:checked { background: var(--sucesso); }
 .chave input[type='checkbox']:checked::after { transform: translateX(18px); }
-.chave input[type='checkbox']:focus-visible { outline: var(--b-3) solid var(--ragu); outline-offset: 2px; }
+.chave input[type='checkbox']:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
 
 .saldo {
   display: inline-flex; align-items: center; gap: var(--e-1);
@@ -97,7 +98,7 @@
   background: none; border: 0; color: var(--tinta-2); border-radius: var(--r-pilula);
   min-width: var(--toque); min-height: var(--toque); display: grid; place-items: center;
 }
-.saldo button:hover:not(:disabled) { background: var(--semola-2); color: var(--tinta); }
+.saldo button:hover:not(:disabled) { background: var(--elevado); color: var(--tinta); }
 .saldo button:disabled { opacity: .4; cursor: not-allowed; }
 .saldo b { font-family: var(--f-dado); min-width: 24px; text-align: center; }
 
@@ -106,9 +107,9 @@
 }
 
 /* Estado do item em texto, no lugar de uma pílula pintada por linha. */
-.perigo { color: var(--parado); font-weight: 700; }
-.aviso { color: var(--atencao); font-weight: 700; }
-.ok { color: var(--ok); font-weight: 700; }
+.perigo { color: var(--erro); font-weight: 700; }
+.aviso { color: var(--alerta); font-weight: 700; }
+.ok { color: var(--sucesso); font-weight: 700; }
 .neutro { color: var(--tinta-2); font-weight: 700; }
 
 /* ---------------------------------------------------------------------------
@@ -116,7 +117,7 @@
    ancorado à Ficha, sem cortina, com a própria alça de largura à esquerda.
    --------------------------------------------------------------------------- */
 .painel {
-  position: fixed; top: 0; bottom: 0; z-index: 45;
+  position: absolute; top: 0; bottom: 0; z-index: 45;
   display: flex; align-items: stretch;
   background: var(--papel); box-shadow: var(--sombra-alta);
   border-left: var(--b-1) solid var(--linha);
@@ -129,6 +130,8 @@
 }
 .cabecalhoPainel h2 { margin: 0; font-size: var(--t-titulo); font-weight: 700; }
 .subPainel { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+/* #1587: de quem é a comanda que o "+" soma. Corpo de texto, para ser lido de relance. */
+.donoDaComanda { margin: var(--e-1) 0 0; font-size: var(--t-corpo); color: var(--tinta); overflow-wrap: anywhere; }
 .fechar {
   flex-shrink: 0; width: var(--toque); height: var(--toque);
   display: grid; place-items: center; background: none; border: 0;
@@ -149,15 +152,13 @@
    errado sem sair do cardápio. `.ajusteNaLinha` é IRMÃO do <button> da linha
    (ver PainelCardapio.jsx: botão dentro de botão não existe em HTML), com
    largura própria ao lado dele — nunca por cima, nunca disputando espaço com
-   nome/preço por posição absoluta. `flex-wrap` deixa o grupo cair pra uma
-   segunda linha sozinho se o painel estiver estreito, em vez de espremer ou
-   cortar texto. */
-.linhaComAjuste { display: flex; flex-wrap: wrap; gap: var(--e-2); margin-bottom: var(--e-2); }
-.linhaComAjuste .linha { flex: 1; min-width: 220px; margin-bottom: 0; }
+   nome/preço por posição absoluta. O grid mantém o ajuste em uma segunda
+   linha, sem espremer ou cortar o texto do prato. */
+.linhaComAjuste { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--e-1); margin-bottom: var(--e-2); }
+.linhaComAjuste .linha { grid-column: 1 / -1; min-width: 0; margin-bottom: 0; }
 .ajusteNaLinha {
-  flex-shrink: 0; display: flex; align-items: center; gap: var(--e-2);
-  padding: var(--e-2); border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
-  background: var(--semola);
+  display: flex; align-items: center; gap: var(--e-2); justify-self: start;
+  padding: var(--e-1) var(--e-2);
 }
 .botaoMenosCardapio {
   width: var(--toque); height: var(--toque); flex-shrink: 0;
@@ -180,25 +181,31 @@
 }
 .rodapeTitulo {
   flex: 1; min-width: 0; font-size: var(--t-corpo); font-weight: 600;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .rodapeTotal {
-  display: flex; align-items: baseline; gap: var(--e-2);
+  display: flex; flex-direction: column; align-items: flex-end; gap: 0; white-space: nowrap;
   font-family: var(--f-dado); font-size: var(--t-valor); font-weight: 600;
   padding: 2px var(--e-2); border-radius: var(--r-1);
   transition: background-color var(--dur-longa) var(--ease-padrao);
 }
-/* Ao somar: fundo `--ok-pastel` pisca junto com o "+ R$" por 600 ms (seção
+/* Ao somar: fundo `--sucesso-pastel` pisca junto com o "+ R$" por 600 ms (seção
    3.1). O global de prefers-reduced-motion (base.css) já esmaga a duração da
    transição a quase zero, então quem pediu menos movimento só troca o
    número, sem piscar de verdade. */
-.rodapeTotalSomando { background: var(--ok-pastel); }
-.rodapeSoma { color: var(--ok); font-family: var(--f-dado); font-size: var(--t-corpo); font-weight: 700; }
+.rodapeTotalSomando { background: var(--sucesso-pastel); }
+.rodapeSoma { color: var(--sucesso); font-family: var(--f-dado); font-size: var(--t-micro); font-weight: 700; }
 
 .rodapeAcrescimo {
   display: flex; gap: var(--e-2); align-items: center; margin: 0;
-  padding: var(--e-2) var(--e-4); background: var(--atencao-pastel); color: var(--atencao);
+  padding: var(--e-2) var(--e-4); background: var(--alerta-pastel); color: var(--alerta);
   border-top: var(--b-1) solid var(--linha-forte); font-size: var(--t-apoio); font-weight: 600;
+}
+
+/* #1587: pedido já criado no EasyStok. Fora da lista rolável, logo acima do total da comanda. */
+.comandaTravada {
+  display: block; flex-shrink: 0; padding: var(--e-2) var(--e-4);
+  background: var(--info-pastel); color: var(--tinta-2); font-size: var(--t-apoio);
 }
 
 .rodapeItens {
@@ -212,7 +219,7 @@
 }
 .rodapeObs {
   flex-basis: 100%; color: var(--tinta-2);
-  border-left: var(--trilho) solid var(--atencao); padding-left: var(--e-2);
+  border-left: var(--trilho) solid var(--alerta); padding-left: var(--e-2);
 }
 
 /* Cartãozinho de 64 px que segue o dedo no arrasto do prato até a comanda
@@ -243,11 +250,11 @@
 .acoesItem button:hover { background: var(--elevado); color: var(--tinta); }
 
 .avisoValidacao {
-  margin: 0; font-size: var(--t-apoio); color: var(--atencao);
+  margin: 0; font-size: var(--t-apoio); color: var(--alerta);
   display: flex; gap: var(--e-2); flex-wrap: wrap; align-items: baseline;
 }
 .linkValidacao {
-  background: none; border: 0; padding: 0; color: var(--ragu);
+  background: none; border: 0; padding: 0; color: var(--marca);
   font-size: var(--t-apoio); font-weight: 600; text-decoration: underline;
 }
 
@@ -276,5 +283,85 @@
 .opcaoAdicional {
   display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-apoio); min-height: var(--toque);
 }
-.opcaoAdicional input { width: 20px; height: 20px; accent-color: var(--ragu); }
-.erroFormulario { margin: 0; color: var(--parado); font-size: var(--t-apoio); font-weight: 600; }
+.opcaoAdicional input { width: 20px; height: 20px; accent-color: var(--marca); }
+.erroFormulario { margin: 0; color: var(--erro); font-size: var(--t-apoio); font-weight: 600; }
+
+/* ---------------------------------------------------------------------------
+   #1448 · homologação de 07/10: "não estou vendo foto [...] de maneira mais
+   organizada". Foto real da vitrine em cada item, grupos por categoria com
+   título em texto (sem caixa), busca fixa acima da lista. Os itens deixam de
+   ser caixas empilhadas: uma linha com divisória, a foto dá o ritmo.
+   --------------------------------------------------------------------------- */
+.busca {
+  display: flex; align-items: center; gap: var(--e-2); flex-shrink: 0;
+  margin: var(--e-3) var(--e-4) 0; padding: 0 var(--e-3); min-height: var(--toque);
+  border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-1);
+  background: var(--papel); color: var(--tinta-3);
+}
+.busca:focus-within { border-color: var(--marca); color: var(--tinta-2); }
+.busca input {
+  flex: 1; min-width: 0; min-height: var(--toque); border: 0; outline: 0;
+  background: transparent; color: var(--tinta); font-size: var(--t-corpo);
+}
+.semResultado { margin: var(--e-4) 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+
+.grupo + .grupo { margin-top: var(--e-4); }
+.categoria {
+  display: flex; align-items: baseline; gap: var(--e-2);
+  margin: 0 0 var(--e-2); padding-bottom: var(--e-1);
+  border-bottom: var(--b-1) solid var(--linha);
+  font-size: var(--t-apoio); font-weight: 700; letter-spacing: .02em; color: var(--tinta);
+}
+.categoria span { font-family: var(--f-dado); font-weight: 400; color: var(--tinta-3); }
+
+/* A quantidade ocupa uma faixa própria, sem estreitar nome, foto ou preço. */
+.lista .linha {
+  display: grid; grid-template-columns: 72px minmax(0, 1fr) 36px;
+  column-gap: var(--e-3); row-gap: var(--e-1); align-items: center;
+  margin-bottom: 0; padding: var(--e-3); background: var(--papel);
+  border: 0; border-radius: 8px;
+}
+.lista .linha:hover:not(:disabled) { background: var(--elevado); }
+.lista .linha .foto { grid-row: 1 / 3; }
+.lista .linha .nome { grid-column: 2; grid-row: 1; }
+.lista .linha .preco { grid-column: 2; grid-row: 2; white-space: nowrap; }
+.somar {
+  grid-column: 3; grid-row: 1 / 3; width: 32px; height: 32px;
+  display: grid; place-items: center; border-radius: var(--r-pilula);
+  background: var(--marca-claro); color: var(--marca-forte);
+}
+.lista .linhaComAjuste { margin-bottom: 0; padding: var(--e-1) 0; }
+.foto {
+  width: 72px; height: 72px; flex-shrink: 0; object-fit: cover;
+  border-radius: var(--r-1); background: var(--elevado);
+}
+.carta, .miniatura { aspect-ratio: 16 / 10; object-fit: cover; background: var(--elevado); }
+
+.acoesConsulta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; }
+.enviarFoto, .consultar { display: inline-flex; align-items: center; gap: 8px; min-height: var(--toque); padding: 4px 0; background: none; border: 0; border-radius: var(--r-1); color: var(--tinta-2); font-size: .8125rem; }
+.consultar:hover { color: var(--marca); }
+.enviarFoto:hover:not(:disabled) { background: var(--elevado); color: var(--marca); }
+.enviarFoto:disabled { opacity: .4; cursor: not-allowed; }
+/* #1587: foto que não saiu, escrita na linha de baixo do próprio botão. */
+.falhaFoto { flex-basis: 100%; margin: 0; color: var(--erro); font-size: .8125rem; text-align: right; }
+
+/* A foto identifica o prato; porções e detalhes são secundários ao gesto de anotar. */
+.itemVenda { padding: 12px 0; border-bottom: 1px solid var(--linha); }
+.itemVenda .linha { padding: 8px 0; }
+.itemVenda .nome { font-size: 1rem; font-weight: 700; line-height: 1.35; }
+.itemVenda .nome small { font-size: .875rem; font-weight: 400; margin-top: 4px; }
+.itemVenda .preco { font-size: 1rem; }
+.itemVenda .detalhe { margin: 0; padding: 0; }
+.itemVenda .detalhe summary { font-size: .8125rem; gap: 8px; }
+.itemVenda .ficha { display: grid; padding: 12px; background: var(--elevado); border-radius: 8px; }
+.descricaoPrato { margin: 0; font-size: .9375rem; }
+.dados dt, .dados dd { font-size: .875rem; }
+.porcoesVenda { list-style: none; padding: 0; margin: 8px 0 0 84px; display: grid; gap: 4px; }
+.linhaPorcao { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.botaoPorcao { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 12px; min-height: 44px; border: 1px solid var(--linha); border-radius: 8px; background: var(--papel); text-align: left; }
+.botaoPorcao:hover:not(:disabled) { background: var(--elevado); }
+.botaoPorcao:disabled { opacity: .55; cursor: not-allowed; }
+.botaoPorcao .nome { font-size: .875rem; }
+.botaoPorcao .nome small { display: inline; margin-left: 6px; font-size: .75rem; }
+.semSaldo { color: var(--tinta-3); font-size: .8125rem; }
+@media (max-width: 420px) { .porcoesVenda { margin-left: 0; } }

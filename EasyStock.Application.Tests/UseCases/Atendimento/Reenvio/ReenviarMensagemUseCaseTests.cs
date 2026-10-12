@@ -156,6 +156,51 @@ public class ReservarReenviosUseCaseTests
     }
 }
 
+/// <summary>#1562: a intenção de modelo que ficou pendente vira falha incerta e nunca é reenviada.</summary>
+public class EncerrarIntencoesModeloSemDesfechoUseCaseTests
+{
+    private static readonly DateTime Agora = new(2026, 10, 11, 15, 0, 0, DateTimeKind.Utc);
+
+    [Fact]
+    public async Task MarcaComoIncertaSemAgendarReenvio()
+    {
+        var gravadaEm = Agora.AddMinutes(-11);
+        var intencao = Mensagem.SaidaModelo(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), gravadaEm,
+            new ModeloMensagem("retomar", "pt_BR", ["Ana"]), "Olá Ana");
+        var repo = Substitute.For<IConversaRepository>();
+        repo.ListarIntencoesModeloSemDesfechoComLockAsync(
+                Agora - EncerrarIntencoesModeloSemDesfechoUseCase.PrazoSemDesfecho, 20, Arg.Any<CancellationToken>())
+            .Returns([intencao]);
+        var uow = new FakeUnitOfWork();
+
+        var encerradas = await new EncerrarIntencoesModeloSemDesfechoUseCase(repo, uow, new FakeTimeProvider(new DateTimeOffset(Agora)))
+            .ExecuteAsync(20);
+
+        encerradas.Should().Be(1);
+        intencao.Status.Should().Be(StatusMensagem.Falhou);
+        intencao.UltimaFalhaEnvio.Should().Be(TipoFalhaEnvio.Incerta);
+        intencao.Erro.Should().Contain(EnviarModeloConversaUseCase.AvisoEnvioIncerto);
+        intencao.ProximoReenvioEm.Should().BeNull("envio incerto nunca volta para a fila de reenvio");
+        intencao.PodeReenviar.Should().BeFalse();
+        intencao.ExternoId.Should().BeNull();
+        uow.CommitCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task SemIntencaoPresaNaoGrava()
+    {
+        var repo = Substitute.For<IConversaRepository>();
+        repo.ListarIntencoesModeloSemDesfechoComLockAsync(Arg.Any<DateTime>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        var uow = new FakeUnitOfWork();
+
+        (await new EncerrarIntencoesModeloSemDesfechoUseCase(repo, uow, new FakeTimeProvider(new DateTimeOffset(Agora))).ExecuteAsync(20))
+            .Should().Be(0);
+
+        uow.CommitCount.Should().Be(0);
+    }
+}
+
 /// <summary>S58 (#1391): fora da janela, o modelo de retomada reabre a conversa; S60: reserva por SMS.</summary>
 public class ReenviarMensagemRetomadaTests
 {

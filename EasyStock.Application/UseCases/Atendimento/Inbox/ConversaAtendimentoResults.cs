@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 
@@ -5,6 +6,11 @@ namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
 /// <summary>Linha da inbox do console (S07).</summary>
 /// <param name="MotivoEscalada">Por que o agente passou para humano (#1238); nulo depois que alguém assume.</param>
+/// <param name="UltimaMensagemEntradaEm">Última fala do cliente (#1427): de onde o SLA de primeira resposta conta.</param>
+/// <param name="AguardaResposta">O cliente falou por último e a conversa segue aberta (#1427).</param>
+/// <param name="SlaRespostaMinutos">SLA de primeira resposta da loja (#1427), o mesmo em toda linha: a rota é de
+/// Operador e a configuração é de Admin, então é por aqui que todo atendente lê o prazo.</param>
+/// <param name="PedidoStatus">Status canônico do pedido em andamento (#1575), o mesmo texto da rota do pedido; nulo sem pedido.</param>
 public sealed record ConversaResumoResult(
     Guid Id,
     CanalConversa Canal,
@@ -18,12 +24,19 @@ public sealed record ConversaResumoResult(
     Guid? PedidoEmAndamentoId,
     Guid? AssumidaPorUsuarioId,
     bool DentroDaJanela,
-    string? MotivoEscalada = null)
+    string? MotivoEscalada = null,
+    DateTime? UltimaMensagemEntradaEm = null,
+    bool AguardaResposta = false,
+    int SlaRespostaMinutos = ConfiguracaoAtendimento.SlaRespostaPadraoMinutos,
+    string? AssumidaPorNome = null,
+    string? PedidoStatus = null,
+    long NumeroComanda = 0)
 {
-    internal static ConversaResumoResult De(Conversa c, string? ultimaMensagemTexto, DateTime agora) => new(
-        c.Id, c.Canal, c.ContatoIdExterno, c.ContatoNome, c.ClienteId, c.Situacao, c.NaoLidas,
-        c.UltimaMensagemEm, ultimaMensagemTexto, c.PedidoEmAndamentoId, c.AssumidaPorUsuarioId, c.DentroDaJanela(agora),
-        c.MotivoEscalada);
+    internal static ConversaResumoResult De(ConversaInboxItem i, DateTime agora, int slaRespostaMinutos) => new(
+        i.Id, i.Canal, i.ContatoIdExterno, i.ContatoNome, i.ClienteId, i.Situacao, i.NaoLidas,
+        i.UltimaMensagemEm, i.UltimaMensagemTexto, i.PedidoEmAndamentoId, i.AssumidaPorUsuarioId,
+        Conversa.DentroDaJanela(i.Canal, i.UltimaMensagemEntradaEm, agora),
+        i.MotivoEscalada, i.UltimaMensagemEntradaEm, i.AguardaResposta, slaRespostaMinutos, i.AssumidaPorNome, i.PedidoStatus, i.NumeroComanda);
 }
 
 /// <summary>Mensagem como o console mostra. <c>MidiaChave</c> é interna: o arquivo é servido por endpoint autenticado.</summary>
@@ -45,18 +58,21 @@ public sealed record MensagemAtendimentoResult(
     DateTime? ReservaSmsEm = null,
     string? ErroMidia = null,
     bool MidiaFalhou = false,
-    string? Transcricao = null)
+    string? Transcricao = null,
+    bool Programada = false,
+    ModeloMensagem? Modelo = null)
 {
     internal static MensagemAtendimentoResult De(Mensagem m) => new(
         m.Id, m.Direcao, m.Autor, m.TipoConteudo, m.Texto, m.BotaoId, m.MidiaChave, m.MidiaMime,
         m.Status, m.Erro, m.ExternoId, m.EnviadaEm, m.EnviadaPorUsuarioId, m.AguardaClienteDesde, m.ReservaSmsEm,
-        m.ErroMidia, m.MidiaFalhou, m.Transcricao);
+        m.ErroMidia, m.MidiaFalhou, m.Transcricao, m.Programada, m.Modelo);
 }
 
 /// <summary>Estado da conversa depois de uma ação do console.</summary>
-public sealed record ConversaSituacaoResult(Guid Id, SituacaoConversa Situacao, Guid? AssumidaPorUsuarioId, int NaoLidas)
+public sealed record ConversaSituacaoResult(Guid Id, SituacaoConversa Situacao, Guid? AssumidaPorUsuarioId, int NaoLidas,
+    string? MotivoEscalada = null)
 {
-    internal static ConversaSituacaoResult De(Conversa c) => new(c.Id, c.Situacao, c.AssumidaPorUsuarioId, c.NaoLidas);
+    internal static ConversaSituacaoResult De(Conversa c) => new(c.Id, c.Situacao, c.AssumidaPorUsuarioId, c.NaoLidas, c.MotivoEscalada);
 }
 
 /// <summary>Conversa inexistente ou de outra empresa: 404, sem vazar existência.</summary>

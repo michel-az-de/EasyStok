@@ -206,4 +206,38 @@ public class ProdutoRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture
         (await repository.ExistsNomeAsync(empresa.Id, "  Vassoura  ")).Should().BeTrue("dedup deve ignorar espacos");
         (await repository.ExistsNomeAsync(empresa.Id, "Rodo")).Should().BeFalse("nome distinto nao colide");
     }
+
+    [SkippableFact] // #1566: a sugestao de producao buscava um produto por prato.
+    public async Task GetByIdsAsync_traz_so_os_produtos_da_empresa_numa_consulta()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+
+        await using var context = fixture.CreateDbContext();
+        var empresaA = new Empresa { Id = Guid.NewGuid(), Nome = "Empresa A", Documento = "111", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        var empresaB = new Empresa { Id = Guid.NewGuid(), Nome = "Empresa B", Documento = "222", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        var categoriaA = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresaA.Id, Nome = "Massas", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        var categoriaB = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresaB.Id, Nome = "Massas", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        Produto Novo(Empresa empresa, Categoria categoria, string nome) => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresa.Id, CategoriaId = categoria.Id,
+            Nome = nome, Tipo = TipoProduto.Fisico, Status = StatusProduto.Ativo,
+            CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+        };
+        var lasanha = Novo(empresaA, categoriaA, "Lasanha");
+        var nhoque = Novo(empresaA, categoriaA, "Nhoque");
+        var foraDaLista = Novo(empresaA, categoriaA, "Canelone");
+        var deOutraEmpresa = Novo(empresaB, categoriaB, "Lasanha");
+        context.Empresas.AddRange(empresaA, empresaB);
+        context.Categorias.AddRange(categoriaA, categoriaB);
+        context.Produtos.AddRange(lasanha, nhoque, foraDaLista, deOutraEmpresa);
+        await context.SaveChangesAsync();
+        context.SetMobileTenantContext(empresaA.Id);
+        var repository = new ProdutoRepository(context);
+
+        var achados = await repository.GetByIdsAsync(empresaA.Id, [lasanha.Id, nhoque.Id, lasanha.Id, deOutraEmpresa.Id, Guid.NewGuid()]);
+
+        achados.Select(p => p.Id).Should().BeEquivalentTo([lasanha.Id, nhoque.Id]);
+        (await repository.GetByIdsAsync(empresaA.Id, [])).Should().BeEmpty();
+    }
 }

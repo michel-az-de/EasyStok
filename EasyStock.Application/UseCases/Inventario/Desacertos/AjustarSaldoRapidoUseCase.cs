@@ -3,13 +3,18 @@ using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Inventario.Desacertos;
 
+/// <param name="Porcao">M1.4d (#1542): a contagem é só dessa porção. Null = o produto inteiro.</param>
 public sealed record AjustarSaldoRapidoInput(
     Guid EmpresaId,
     Guid UsuarioId,
     Guid ProdutoId,
     Guid? LojaId,
     decimal QuantidadeContada,
-    string Motivo);
+    string Motivo,
+    PorcaoDoAjuste? Porcao = null);
+
+/// <param name="ProdutoVariacaoId">A porção contada. Null = os lotes sem porção (estoque antigo, lote do PWA).</param>
+public sealed record PorcaoDoAjuste(Guid? ProdutoVariacaoId);
 
 public sealed record AjustarSaldoRapidoResult(
     Guid ProdutoId,
@@ -24,6 +29,10 @@ public sealed record AjustarSaldoRapidoResult(
 /// cada lote passa por <see cref="ItemEstoque.AplicarAjusteContagem"/> (zera o descoberto e pisa em 0, #772)
 /// e grava <see cref="AjusteInventario"/> + <see cref="MovimentacaoEstoque"/> de ajuste por lote alterado.
 /// O alerta de desacerto fecha por construção; publica <c>estoque.desacerto_resolvido</c> depois do commit.
+/// <para>
+/// O saldo de prato com porções é de cada porção (D-M1-03): com <see cref="AjustarSaldoRapidoInput.Porcao"/>
+/// a contagem só mexe nos lotes dela, e o alerta do produto fecha quando nenhuma porção tem descoberto.
+/// </para>
 /// </summary>
 public sealed class AjustarSaldoRapidoUseCase(
     IItemEstoqueRepository itens,
@@ -50,13 +59,18 @@ public sealed class AjustarSaldoRapidoUseCase(
             throw new UseCaseValidationException($"O motivo aceita até {MotivoMaximo} caracteres.");
         UseCaseGuards.EnsureSemTagsHtml(motivo, "Motivo");
 
-        var lotes = (await itens.GetLotesParaAjusteAsync(input.EmpresaId, input.ProdutoId, input.LojaId, ct))
+        var doProduto = (await itens.GetLotesParaAjusteAsync(input.EmpresaId, input.ProdutoId, input.LojaId, ct))
             .OrderBy(l => l.EntradaEm).ThenBy(l => l.CriadoEm).ToList();
+        var lotes = input.Porcao is { } porcao
+            ? doProduto.Where(l => l.ProdutoVariacaoId == porcao.ProdutoVariacaoId).ToList()
+            : doProduto;
         if (lotes.Count == 0)
-            throw new UseCaseValidationException("Produto sem lote de estoque: registre uma entrada em vez de ajustar.");
+            throw new UseCaseValidationException(input.Porcao is null
+                ? "Produto sem lote de estoque: registre uma entrada em vez de ajustar."
+                : "Esta porção ainda não tem lote de estoque: lance a produção em vez de ajustar.");
 
         var agora = relogio.GetUtcNow().UtcDateTime;
-        var tinhaDescoberto = lotes.Any(l => l.QuantidadeDescoberta.Value > 0);
+        var tinhaDescoberto = doProduto.Any(l => l.QuantidadeDescoberta.Value > 0);
         var alvos = DistribuirContagem(lotes, input.QuantidadeContada);
         var descricao = $"Ajuste rápido: {motivo}";
 
@@ -112,8 +126,9 @@ public sealed class AjustarSaldoRapidoUseCase(
             await movimentacoes.InsertRangeAsync(movs);
         await unitOfWork.CommitAsync();
 
-        var atual = lotes.Sum(l => l.QuantidadeAtual.Value);
-        var descoberto = lotes.Sum(l => l.QuantidadeDescoberta.Value);
+        // O resultado e o alerta são do produto inteiro, mesmo quando a contagem foi de uma porção.
+        var atual = doProduto.Sum(l => l.QuantidadeAtual.Value);
+        var descoberto = doProduto.Sum(l => l.QuantidadeDescoberta.Value);
         if (tinhaDescoberto && descoberto == 0m)
             await operacaoEventos.PublicarAsync(EventosOperacao.EstoqueDesacertoResolvido, input.EmpresaId,
                 new EstoqueDesacertoResolvidoOperacao(input.ProdutoId, atual), ct);

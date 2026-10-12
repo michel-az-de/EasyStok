@@ -6,7 +6,7 @@
 // que é uma parada, e este arquivo é quem sabe juntar isso de volta.
 import { indiceDoPasso } from './esteira'
 import { inicioDaFaixa, janelaPorId } from './entrega'
-import { partesDoEndereco } from './formato'
+import { noDiaDaLojaAs, partesDoEndereco } from './formato'
 
 // Quem leva, a partir do que a viagem já capturou (US-040). Viagem "eu
 // levo" (`modo: 'propria'`) não precisa de nome; viagem "entregador" só
@@ -48,9 +48,7 @@ export const entregadorResolvido = (pedido) => {
 export function fimDaFaixa(faixa, agora) {
   const casado = /às\s*(\d{1,2})h(\d{2})?/.exec(faixa ?? '')
   if (!casado) return null
-  const dia = new Date(agora)
-  dia.setHours(Number(casado[1]), Number(casado[2] ?? 0), 0, 0)
-  return dia.getTime()
+  return noDiaDaLojaAs(agora, Number(casado[1]), Number(casado[2] ?? 0))
 }
 
 // Marcos de uma viagem (seção 6, "Supervisão: os marcos calculados de trás

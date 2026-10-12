@@ -17,6 +17,31 @@ public class MensagemTests
     private static readonly Guid Conversa = Guid.NewGuid();
     private static readonly DateTime Em = new(2026, 9, 22, 12, 0, 0, DateTimeKind.Utc);
 
+    [Fact]
+    public void NotaInterna_GuardaAutoriaSemMarcarComoEnviada()
+    {
+        var nota = Mensagem.Saida(Empresa, Conversa, AutorMensagem.Sistema, Em, TipoConteudoMensagem.Texto, "Reaberta");
+        var usuario = Guid.NewGuid();
+        nota.RegistrarAutorNotaInterna(usuario);
+        nota.EnviadaPorUsuarioId.Should().Be(usuario);
+        nota.Status.Should().Be(StatusMensagem.Pendente);
+        nota.ExternoId.Should().BeNull();
+    }
+
+    [Fact]
+    public void NotaInterna_NaoAtribuiMensagemExternaAutomaticaOuSemUsuario()
+    {
+        var nota = Mensagem.Saida(Empresa, Conversa, AutorMensagem.Sistema, Em, TipoConteudoMensagem.Texto, "Reaberta");
+        var semUsuario = () => nota.RegistrarAutorNotaInterna(Guid.Empty);
+        semUsuario.Should().Throw<RegraDeDominioVioladaException>();
+        nota.ConfirmarEnvio("wamid.automatica");
+        var externa = () => nota.RegistrarAutorNotaInterna(Guid.NewGuid());
+        externa.Should().Throw<RegraDeDominioVioladaException>();
+        var entrada = Mensagem.Entrada(Empresa, Conversa, Em, TipoConteudoMensagem.Texto, "Oi");
+        var cliente = () => entrada.RegistrarAutorNotaInterna(Guid.NewGuid());
+        cliente.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
     // #1397: o anexo pendente fica no banco; falha registra o erro e reagenda até o limite.
     [Fact]
     public void AguardarMidia_GuardaMediaIdEAgendaVarredura()

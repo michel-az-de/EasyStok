@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EasyStock.Domain.Enums.Atendimento;
 
 namespace EasyStock.Domain.Entities.Atendimento;
@@ -34,6 +35,9 @@ public class Mensagem
     public TipoConteudoMensagem TipoConteudo { get; private set; }
     public string? Texto { get; private set; }
 
+    public string? ModeloJson { get; private set; }
+    public ModeloMensagem? Modelo => ModeloJson is null ? null : JsonSerializer.Deserialize<ModeloMensagem>(ModeloJson);
+
     /// <summary>Id do botao interativo respondido (ex.: <c>acao:avaliacao:positiva:{pedidoId}</c>).</summary>
     public string? BotaoId { get; private set; }
 
@@ -52,7 +56,7 @@ public class Mensagem
     public bool Programada { get; private set; }
     public DateTime? ProcessadaEm { get; private set; }
 
-    /// <summary>Usuario do console que enviou a mensagem (S41). So em saida humana (<see cref="AutorMensagem.Dona"/>).</summary>
+    /// <summary>Usuário do console que enviou a mensagem (S41) ou praticou a ação registrada em nota interna.</summary>
     public Guid? EnviadaPorUsuarioId { get; private set; }
 
     /// <summary>S57 (#1355): esperas do reenvio automático depois de cada falha temporária.</summary>
@@ -120,7 +124,7 @@ public class Mensagem
     /// <summary>Texto que falhou e pode ser reenviado (automático ou pelo console).</summary>
     public bool PodeReenviar =>
         Direcao == DirecaoMensagem.Saida && Status == StatusMensagem.Falhou
-        && TipoConteudo == TipoConteudoMensagem.Texto && !string.IsNullOrWhiteSpace(Texto);
+        && ModeloJson is null && TipoConteudo == TipoConteudoMensagem.Texto && !string.IsNullOrWhiteSpace(Texto);
 
     // EF Core ctor sem parametros
     private Mensagem() { }
@@ -158,6 +162,20 @@ public class Mensagem
         return msg;
     }
 
+    // A intenção tem o id da tentativa do console e nasce persistida antes da chamada externa.
+    public static Mensagem SaidaModelo(Guid id, Guid empresaId, Guid conversaId, Guid usuarioId,
+        DateTime em, ModeloMensagem modelo, string texto)
+    {
+        if (id == Guid.Empty || usuarioId == Guid.Empty || string.IsNullOrWhiteSpace(modelo.Nome)
+            || string.IsNullOrWhiteSpace(modelo.Idioma))
+            throw new RegraDeDominioVioladaException("Tentativa, usuário, nome e idioma do modelo são obrigatórios.");
+        var mensagem = Saida(empresaId, conversaId, AutorMensagem.Dona, em, TipoConteudoMensagem.Modelo, texto);
+        mensagem.Id = id;
+        mensagem.ModeloJson = JsonSerializer.Serialize(modelo);
+        mensagem.RegistrarEnviadaPor(usuarioId);
+        return mensagem;
+    }
+
     /// <summary>A Meta aceitou a mensagem e devolveu o <c>wamid</c>.</summary>
     public void ConfirmarEnvio(string externoId)
     {
@@ -167,6 +185,22 @@ public class Mensagem
             ?? throw new RegraDeDominioVioladaException("ExternoId e obrigatorio para confirmar o envio.");
         if (Status == StatusMensagem.Pendente)
             Status = StatusMensagem.Enviada;
+    }
+
+    /// <summary>
+    /// #1599: o canal confirmou depois de a varredura de intenção presa marcar falha incerta. A entrega vence:
+    /// sai de <see cref="StatusMensagem.Falhou"/> e desfaz o que aquela falha gravou.
+    /// </summary>
+    public void ConfirmarEnvioAposFalhaIncerta(string externoId)
+    {
+        if (Status != StatusMensagem.Falhou || UltimaFalhaEnvio != TipoFalhaEnvio.Incerta || ExternoId is not null)
+            throw new RegraDeDominioVioladaException("Só falha incerta sem confirmação anterior pode ser desfeita pelo canal.");
+        ConfirmarEnvio(externoId);
+        Status = StatusMensagem.Enviada;
+        Erro = null;
+        UltimaFalhaEnvio = null;
+        ProximoReenvioEm = null;
+        TentativasEnvio = Math.Max(0, TentativasEnvio - 1);
     }
 
     /// <summary>Callback de status da Meta. Nunca regride; <see cref="StatusMensagem.Falhou"/> e terminal.</summary>
@@ -207,7 +241,7 @@ public class Mensagem
     /// <summary>S57: tira do agendamento antes de enviar, para outro processo não pegar a mesma mensagem.</summary>
     public void ReservarReenvio() => ProximoReenvioEm = null;
 
-    /// <summary>S57: o reenvio saiu. Única saída de <see cref="StatusMensagem.Falhou"/>.</summary>
+    /// <summary>S57: o reenvio saiu. Saída de <see cref="StatusMensagem.Falhou"/> para texto reenviável.</summary>
     public void RegistrarReenviada(string externoId)
     {
         if (!PodeReenviar)
@@ -303,6 +337,15 @@ public class Mensagem
             throw new RegraDeDominioVioladaException("So mensagem enviada por humano da empresa guarda quem enviou.");
         if (usuarioId == Guid.Empty)
             throw new RegraDeDominioVioladaException("Usuario que enviou e obrigatorio.");
+        EnviadaPorUsuarioId = usuarioId;
+    }
+
+    /// <summary>Autoria de ação humana registrada como nota interna, sem envio ao canal.</summary>
+    public void RegistrarAutorNotaInterna(Guid usuarioId)
+    {
+        if (Autor != AutorMensagem.Sistema || Direcao != DirecaoMensagem.Saida
+            || Status != StatusMensagem.Pendente || ExternoId is not null || usuarioId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("Nota interna exige usuário e mensagem do sistema sem envio ao canal.");
         EnviadaPorUsuarioId = usuarioId;
     }
 

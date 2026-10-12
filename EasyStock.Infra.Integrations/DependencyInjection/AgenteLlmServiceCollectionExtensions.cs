@@ -16,6 +16,12 @@ public static class AgenteLlmServiceCollectionExtensions
     public static IServiceCollection AddEasyStockAgenteLlm(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<AnthropicAgenteOptions>(configuration.GetSection(AnthropicAgenteOptions.Secao));
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Producao.SugerirReceitaUseCase>();
+        services.AddHttpClient<IPesquisaProducaoWeb, PesquisaProducaoWeb>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(12);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("EasyStok/1.0 (+https://easystok.online)");
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
         services.AddHttpClient<IAgenteLlmClient, AnthropicMessagesClient>((sp, client) =>
         {

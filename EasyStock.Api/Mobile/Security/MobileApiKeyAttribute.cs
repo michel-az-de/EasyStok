@@ -30,7 +30,8 @@ public static class MobileAuth
 /// </list>
 ///
 /// Ao resolver um device válido, atualiza <c>last_seen_at</c> e
-/// <c>last_seen_ip</c> de forma assíncrona (fire-and-forget) e expõe o
+/// <c>last_seen_ip</c> de forma assíncrona (fire-and-forget), no máximo uma
+/// vez por minuto enquanto o IP não muda, e expõe o
 /// device em <c>HttpContext.Items["mobile-device"]</c> pro controller.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
@@ -45,6 +46,9 @@ internal sealed class MobileApiKeyFilter(
     IConfiguration configuration,
     ILogger<MobileApiKeyFilter> logger) : IAsyncActionFilter
 {
+    /// <summary>Intervalo minimo entre gravacoes de <c>last_seen_at</c> do mesmo device com o mesmo IP.</summary>
+    private static readonly TimeSpan IntervaloMinimoLastSeen = TimeSpan.FromMinutes(1);
+
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
         var requireApiKey = configuration.GetValue<bool>("Mobile:RequireApiKey", false);
@@ -107,6 +111,17 @@ internal sealed class MobileApiKeyFilter(
         // Agora abre novo scope com novo DbContext, sem interferencia.
         var deviceId = device.Id;
         var remoteIp = http.Connection.RemoteIpAddress?.ToString() ?? "";
+
+        // #1566: o PWA faz polling a cada 30 s. Sem este corte cada request virava um UPDATE;
+        // o painel de saude le last_seen_at em faixas de 30 min, 2 h e 24 h.
+        if (device.LastSeenAt is { } vistoEm
+            && DateTime.UtcNow - vistoEm < IntervaloMinimoLastSeen
+            && device.LastSeenIp == remoteIp)
+        {
+            await next();
+            return;
+        }
+
         _ = Task.Run(async () =>
         {
             try

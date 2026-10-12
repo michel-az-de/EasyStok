@@ -20,9 +20,9 @@ Método: 3 revisões somente leitura (Api/auth, Application/Domain, Infra/Worker
 
 | # | Sev. | Local | Problema |
 |---|---|---|---|
-| P1 | Alta | `EstornarSaidaUseCase`, `CaixaRepository:175` | Estornar saída não desfaz a Venda; caixa continua somando (e Perda/Doação com preço entram como receita) |
-| P2 | Alta | `ItemEstoque.RestaurarQuantidade`, `PedidoEstoqueIntegrationService` | Estorno de saída com descoberto cria estoque fantasma |
-| P3 | Alta | `PedidoEstoqueIntegrationService.DescontarAsync` | Desconto de pedido escolhe lote vazio/vencido/bloqueado; usar FEFO de `RegistrarSaidaEstoqueUseCase` |
+| ~~P1~~ (corrigido, #1399) | Alta | `EstornarSaidaUseCase`, `CaixaRepository:175` | Estornar saída não desfaz a Venda; caixa continua somando (e Perda/Doação com preço entram como receita) |
+| ~~P2~~ (corrigido, #1399) | Alta | `ItemEstoque.RestaurarQuantidade`, `PedidoEstoqueIntegrationService` | Estorno de saída com descoberto cria estoque fantasma |
+| ~~P3~~ (corrigido, #1399) | Alta | `PedidoEstoqueIntegrationService.DescontarAsync` | Desconto de pedido escolhe lote vazio/vencido/bloqueado; usar FEFO de `RegistrarSaidaEstoqueUseCase` |
 | P4 | Média | `ValidarOtpUseCase` | Contador de tentativas do OTP não atômico (brute force paralelo) |
 | P5 | Média | `RefreshTokenUseCase` | Sem atomicidade nem detecção de reuso; perde empresa/nível; token fraco, 7 vs 30 dias |
 | P6 | Média | `CurrentUserAccessor` | IP do primeiro `X-Forwarded-For` (forjável) vai para auditoria e LGPD |

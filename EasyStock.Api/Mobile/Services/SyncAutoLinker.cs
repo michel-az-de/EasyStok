@@ -49,8 +49,10 @@ public class SyncAutoLinker(
         // F1/F2/F3 â€” promove orders/batches/cash DEPOIS de products/clients pra que
         // FKs (ErpProductId, ErpClienteId) jÃ¡ estejam preenchidas.
         if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
-        if (autoLinkOrder  && orderIds.Count   > 0) await _orderLinker.ExecuteAsync(orderIds, empresaId);
+        // #1543: lote antes de pedido. O pedido que chega no mesmo envio do lote so acha estoque para
+        // baixar depois que a entrada do lote existe no ERP.
         if (autoLinkBatch  && batchIds.Count   > 0) await _batchLinker.ExecuteAsync(batchIds, empresaId);
+        if (autoLinkOrder  && orderIds.Count   > 0) await _orderLinker.ExecuteAsync(orderIds, empresaId);
         if (autoLinkCash   && cashIds.Count    > 0) await _cashEntryLinker.ExecuteAsync(cashIds, empresaId);
     }
 
@@ -83,8 +85,8 @@ public class SyncAutoLinker(
         await _productLinker.ExecuteAsync(productIds, empresaId);
         await _clientLinker.ExecuteAsync(clientIds, empresaId);
         if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync(ct);
-        await _orderLinker.ExecuteAsync(orderIds, empresaId);
         await _batchLinker.ExecuteAsync(batchIds, empresaId);
+        await _orderLinker.ExecuteAsync(orderIds, empresaId);
         await _cashEntryLinker.ExecuteAsync(cashIds, empresaId);
 
         return new BackfillCounts(productIds.Count, clientIds.Count, orderIds.Count, batchIds.Count, cashIds.Count);

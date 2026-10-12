@@ -112,6 +112,24 @@ public class CardapioVariacaoAuthoringTests
         item.Variacoes.Single(v => v.Id == gId).EhPadrao.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task Editar_preserva_o_vinculo_da_porcao_com_a_variacao_do_estoque()
+    {
+        // #1529: a reconciliação chamava Atualizar sem o vínculo e o padrão null o apagava.
+        var item = CardapioItem.CriarAvulso(Guid.NewGuid(), "Ravioli", 30m, "massas");
+        var variacaoEstoque = Guid.NewGuid();
+        var p = CardapioItemVariacao.Criar(item.Id, "300 g", 28m, ordemExibicao: 1, produtoVariacaoId: variacaoEstoque);
+        item.AdicionarVariacao(p);
+        _cardapioRepo.GetByIdAndScopeAsync(item.StorefrontId, item.Id, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
+            .Returns(item);
+
+        await new EditarCardapioItemAdminUseCase(_cardapioRepo, _uow).ExecuteAsync(
+            NewEdit(item, [new(Id: p.Id, Rotulo: "300 g", PrecoStorefront: 32m)]));
+
+        item.Variacoes.Single().Should().Match<CardapioItemVariacao>(v =>
+            v.PrecoStorefront == 32m && v.ProdutoVariacaoId == variacaoEstoque);
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     private static CardapioItem ItemComOpcoes(out Guid pId, out Guid gId)

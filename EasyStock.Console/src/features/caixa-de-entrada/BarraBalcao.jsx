@@ -1,15 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { Popover } from '../../componentes/Popover'
-import { useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { precisaDeVoce } from '../../dominio/automatico'
-import { combinaBusca, combinaCanal, contarPorCanal } from '../../dominio/conversa'
+import { combinaBusca, combinaCanal, combinaResponsavel, contarPorCanal } from '../../dominio/conversa'
 import css from './caixa.module.css'
-
-// "Site" é o rótulo curto de "Chat do site" só no contador (seção 1): no cartão e
-// na ficha o nome continua inteiro.
-const ROTULO_CURTO_DO_CANAL = { 'Chat do site': 'Site' }
 
 const OPCOES_DE_ORDEM = [
   { chave: 'urgencia', titulo: 'Urgência', detalhe: 'Precisa de você primeiro; dentro, quem espera há mais tempo' },
@@ -31,56 +27,48 @@ function useSubidas(valor) {
   return subidas
 }
 
-// Contador de um canal (issue #2): número grande das abertas no Balcão e,
-// embaixo, quantas delas precisam de você. É o próprio filtro de canal da
-// linha C: tocar liga, tocar de novo desliga.
-function ContadorCanal({ canal, rotulo, abertas, precisam, ligado, aoTrocar }) {
-  const subidasAbertas = useSubidas(abertas)
-  const subidasPrecisam = useSubidas(precisam)
-  const pulso = (subidas) => (subidas > 0 ? css.pulso : '')
+// Filtro de canal (issue #2) em chip compacto (#1442): ícone e número das
+// abertas, o nome e quantas precisam de você no rótulo acessível e no title.
+// Tocar liga, tocar de novo desliga. O ponto âmbar avisa que alguém daquele
+// canal espera ação dela, sem o cartão grande de antes.
+function ChipCanal({ canal, rotulo, abertas, precisam, ligado, aoTrocar }) {
+  const subidas = useSubidas(abertas)
+  const descricao = `${rotulo}: ${abertas} ${abertas === 1 ? 'aberta' : 'abertas'}, ${precisam} ${precisam === 1 ? 'precisa' : 'precisam'} de você`
   return (
     <button
       type="button"
-      className={`${css.contadorCanal} ${ligado ? css.contadorLigado : ''}`}
+      className={`${css.chipFiltro} ${css.chipCanal} ${ligado ? css.chipLigado : ''}`}
       aria-pressed={ligado}
-      aria-label={`${rotulo}: ${abertas} ${abertas === 1 ? 'aberta' : 'abertas'}, ${precisam} ${precisam === 1 ? 'precisa' : 'precisam'} de você`}
+      aria-label={descricao}
+      title={descricao}
       onClick={aoTrocar}
     >
-      <span className={css.topoContador}>
-        <Icone nome={canal.icone} tamanho={20} className={css['canal_' + canal.icone]} />
-        <span className={css.rotuloContador}>{rotulo}</span>
-      </span>
-      <span className={css.numerosContador}>
-        <span key={subidasAbertas} className={`${css.numeroContador} ${pulso(subidasAbertas)}`}>{abertas}</span>
-        <span
-          key={`p${subidasPrecisam}`}
-          className={`${css.precisamContador} ${precisam > 0 ? css.precisamAtivo : ''} ${pulso(subidasPrecisam)}`}
-        >
-          {precisam} {precisam === 1 ? 'precisa' : 'precisam'}
-        </span>
-      </span>
+      <Icone nome={canal.icone} tamanho={16} className={css['canal_' + canal.icone]} />
+      <span key={subidas} className={`${css.numeroChip} ${subidas > 0 ? css.pulso : ''}`}>{abertas}</span>
+      {precisam > 0 && <span className={css.pontoPrecisa} aria-hidden="true" />}
     </button>
   )
 }
 
-// Linha A (busca e ordenar), linha B (abas) e linha C (contadores de canal) da
-// seção 1: substitui os dez controles empilhados do Balcão antigo (achado #1
-// da onda seguinte, 31-gp-onda-seguinte.md).
+// Linha A (busca e ordenar) e linha B (filtros) da seção 1. #1442
+// (homologação de 07/10): o Balcão abre em "Todas"; "Precisa de você" virou
+// filtro com contador e os três cartões de canal viraram chips na mesma linha.
 export function BarraBalcao({ filtros, aoMudar }) {
   const [ordenarAberto, setOrdenarAberto] = useState(false)
   const { canais, janelas } = useCatalogo()
-  const { conversas, agora, automaticoPausado, aberta } = useAtendimento()
+  const { conversas, agora, automaticoPausado, aberta, horarioDaLoja, sessao } = useAtendimento()
+  const doResponsavel = conversas.filter((c) => combinaResponsavel(c, filtros.responsavel, sessao?.usuario))
 
   // As duas contagens das abas já respeitam o canal ligado na linha C e a
   // busca da linha A (seção 1): trocar canal ou digitar não pode deixar o
   // número da aba discordando da lista embaixo.
-  const doUniverso = conversas.filter((c) => combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca))
+  const doUniverso = doResponsavel.filter((c) => combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca))
   const quantasPrecisam = doUniverso
-    .filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas)).length
+    .filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas, horarioDaLoja)).length
 
   // Tempo real: derivado de `conversas` a cada render, sem contador guardado
   // que possa divergir. Conversa nova da simulação (F2) já sobe o número.
-  const contagemPorCanal = contarPorCanal(conversas, canais, agora, automaticoPausado, aberta, janelas)
+  const contagemPorCanal = contarPorCanal(doResponsavel, canais, agora, automaticoPausado, aberta, janelas, horarioDaLoja)
 
   function trocarCanal(nome) {
     const ligados = filtros.canais.includes(nome)
@@ -99,12 +87,12 @@ export function BarraBalcao({ filtros, aoMudar }) {
       <div className={css.linhaA}>
         <span className={css.campoBusca}>
           <Icone nome="search" tamanho={20} />
-          <label className="sr" htmlFor="balcao-busca">Buscar nome, telefone, mensagem ou tag</label>
+          <label className="sr" htmlFor="balcao-busca">Buscar comanda, nome, telefone, mensagem ou tag</label>
           <input
             id="balcao-busca"
             type="search"
             className={css.entradaBusca}
-            placeholder="Buscar, ou uma tag"
+            placeholder="Nome, comanda ou tag"
             value={filtros.busca}
             onChange={(e) => {
               // Integração: buscar um nome estando em "Precisa de você" dava
@@ -141,7 +129,7 @@ export function BarraBalcao({ filtros, aoMudar }) {
           </Botao>
           {ordenarAberto && (
             <Popover rotulo="Ordenar" posicao="abaixo" aoFechar={() => setOrdenarAberto(false)}>
-              <div className={css.menuOrdem} role="menu" aria-label="Ordenar">
+              <div className={css.menuOrdem}>
                 {OPCOES_DE_ORDEM.map((opcao) => (
                   <button
                     key={opcao.chave}
@@ -164,34 +152,30 @@ export function BarraBalcao({ filtros, aoMudar }) {
         </span>
       </div>
 
-      <div className={css.abas} role="tablist" aria-label="Conversas do Balcão">
+      <fieldset className={css.filtros}>
+        <legend className="sr">Filtros do Balcão</legend>
         <button
           type="button"
-          role="tab"
-          aria-selected={filtros.aba === 'precisa'}
-          className={`${css.aba} ${filtros.aba === 'precisa' ? css.abaAtiva : ''}`}
-          onClick={() => aoMudar('aba', 'precisa')}
-        >
-          Precisa de você <span className={css.contadorAba}>{quantasPrecisam}</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={filtros.aba === 'todas'}
-          className={`${css.aba} ${filtros.aba === 'todas' ? css.abaAtiva : ''}`}
+          aria-pressed={filtros.aba !== 'precisa'}
+          className={`${css.chipFiltro} ${filtros.aba !== 'precisa' ? css.chipLigado : ''}`}
           onClick={() => aoMudar('aba', 'todas')}
         >
-          Todas <span className={css.contadorAba}>{doUniverso.length}</span>
+          Todas <span className={css.numeroChip}>{doUniverso.length}</span>
         </button>
-      </div>
-
-      <fieldset className={css.contadoresCanal}>
-        <legend className="sr">Canal</legend>
+        <button
+          type="button"
+          aria-pressed={filtros.aba === 'precisa'}
+          className={`${css.chipFiltro} ${filtros.aba === 'precisa' ? css.chipLigado : ''} ${quantasPrecisam > 0 ? css.chipAtencao : ''}`}
+          onClick={() => aoMudar('aba', filtros.aba === 'precisa' ? 'todas' : 'precisa')}
+        >
+          Precisa de você <span className={css.numeroChip}>{quantasPrecisam}</span>
+        </button>
+        <span className={css.divisorFiltros} aria-hidden="true" />
         {canais.map((c, i) => (
-          <ContadorCanal
+          <ChipCanal
             key={c.nome}
             canal={c}
-            rotulo={ROTULO_CURTO_DO_CANAL[c.nome] ?? c.nome}
+            rotulo={c.nome}
             abertas={contagemPorCanal[i].abertas}
             precisam={contagemPorCanal[i].precisam}
             ligado={filtros.canais.includes(c.nome)}
@@ -199,6 +183,38 @@ export function BarraBalcao({ filtros, aoMudar }) {
           />
         ))}
       </fieldset>
+      <FiltroResponsavel valor={filtros.responsavel ?? 'todas'} aoMudar={(valor) => aoMudar('responsavel', valor)} />
     </div>
+  )
+}
+
+function FiltroResponsavel({ valor, aoMudar }) {
+  const { listarAtendentes } = useAcoes()
+  const [consulta, setConsulta] = useState({ estado: 'carregando', itens: [] })
+  const [tentativa, setTentativa] = useState(0)
+  useEffect(() => {
+    let vivo = true
+    listarAtendentes().then(
+      (itens) => { if (vivo) setConsulta({ estado: 'ok', itens }) },
+      () => { if (vivo) setConsulta({ estado: 'erro', itens: [] }) },
+    )
+    return () => { vivo = false }
+  }, [listarAtendentes, tentativa])
+  if (consulta.estado === 'erro') return (
+    <output className={css.vazioLinha}>
+      Não foi possível consultar os atendentes.
+      <button type="button" className={css.linkVazio} onClick={() => { setConsulta({ estado: 'carregando', itens: [] }); setTentativa((n) => n + 1) }}>Tentar novamente</button>
+    </output>
+  )
+  if (consulta.itens.length <= 1 && valor === 'todas') return null
+  return (
+    <label className={css.filtroResponsavel}>
+      Responsável
+      <select aria-label="Responsável pelas conversas" value={valor} onChange={(e) => aoMudar(e.target.value)}>
+        <option value="todas">Todas</option>
+        <option value="minhas">Minhas</option>
+        <option value="sem-dono">Sem dono</option>
+      </select>
+    </label>
   )
 }

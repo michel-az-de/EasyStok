@@ -8,5 +8,6 @@ public enum TipoConteudoMensagem
     Documento = 4,
     Botao = 5,
     Localizacao = 6,
-    Outro = 7
+    Outro = 7,
+    Modelo = 8
 }

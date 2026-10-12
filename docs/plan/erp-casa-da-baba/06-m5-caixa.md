@@ -1,5 +1,7 @@
 # M5 Caixa: abertura, pagamentos, sangrias, movimentações, relatórios
 
+> **Atualização de execução, 09/10/2026:** a devolução manual pela Ficha (D3-05) grava uma saída com origem `devolucao_pedido`, ligada ao recebimento e à confirmação de Dona/gerente. O total recebido permanece no dia original; a saída entra no dia do registro, inclusive para pedido cancelado ou consolidado em Venda, sem duplicar a receita. A devolução usa o meio informado pela gerente e exige Caixa do dia sem fechamento. Não pode ser apagada pelo estorno genérico de lançamentos. Evidência e limites na seção 25 do plano de ondas. Estorno online, reconciliação com o provedor, reabertura e correção de devoluções continuam pendentes.
+
 Issue: #1316 · [ADR-0056](../../adr/0056-erp-da-casa-da-baba-front-unico.md) · 2026-10-01 · Base: master `b713263a` e branch `feat/console-caixa-1244` (`a7c4c3af`, F14).
 **Pré-requisito: F14 (#1244)**, em [11-console-fechamento.md §F14](../atendimento-whatsapp/11-console-fechamento.md#f14--caixa-na-api-real--1244). Este doc **não reescreve a F14**: as fatias M5.x começam onde ela termina.
 Legenda: **fato** = lido no `path:linha` citado; **inferência** = dedução não reproduzida, marcada; **medir** = depende de dado de produção.

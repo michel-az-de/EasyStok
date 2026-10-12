@@ -1,5 +1,4 @@
 using EasyStock.Application.Ports.Output.Notifications;
-using EasyStock.Application.Events.Storefront.Handlers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
@@ -62,6 +61,7 @@ internal sealed class CobrancaPedidoFixture
     public IConversaRepository ConversaRepo { get; } = Substitute.For<IConversaRepository>();
     public IVagaOcupadaRepository VagaRepo { get; } = Substitute.For<IVagaOcupadaRepository>();
     public IUnitOfWork Uow { get; } = Substitute.For<IUnitOfWork>();
+    public ICaixaRepository CaixaRepo { get; } = Substitute.For<ICaixaRepository>();
     public INotificadorService Notificador { get; } = Substitute.For<INotificadorService>();
     public EasyStock.Application.Services.Notifications.PrazosOptions Prazos { get; } = new();
     public IImpressaoPendenteRepository ImpressaoRepo { get; } = Substitute.For<IImpressaoPendenteRepository>();
@@ -179,7 +179,7 @@ internal sealed class CobrancaPedidoFixture
             new CalcularFreteUseCase(StorefrontRepo, Substitute.For<IFreteZonaRepository>(), Substitute.For<ICepLookupClient>(),
                 Substitute.For<IGeocodingClient>(), Substitute.For<IRotaClient>(), NullLogger<CalcularFreteUseCase>.Instance),
             VagaRepo, PedidoStorefrontRepo, Substitute.For<IExpedienteLojaRepository>(),
-            NullLogger<CheckoutCoreService>.Instance, Relogio);
+            NullLogger<CheckoutCoreService>.Instance, Relogio, EnderecoEntregaPedidoTeste.Criar());
 
     private QuitacaoPedido Quitacao() => QuitacaoPedidoTeste.Criar(PedidoRepo, CobrancaRepo, ConversaRepo, ImpressaoRepo, Publicador, OperacaoEventos);
 
@@ -203,7 +203,7 @@ internal sealed class CobrancaPedidoFixture
             NullLogger<AtualizarCobrancaPorPagamentoUseCase>.Instance);
 
     public DesfazerPagamentoManualUseCase Desfazer() =>
-        new(PedidoStorefrontRepo, PedidoRepo, CobrancaRepo, Publicador, Uow, Relogio, Quitacao());
+        new(PedidoStorefrontRepo, PedidoRepo, CobrancaRepo, Publicador, Uow, Relogio, Quitacao(), CaixaRepo);
 
     public ProcessarCobrancaVencidaUseCase ProcessarVencida()
     {
@@ -213,11 +213,13 @@ internal sealed class CobrancaPedidoFixture
             Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(),
             Options.Create(new PedidoEstoqueOptions()),
             NullLogger<PedidoEstoqueIntegrationService>.Instance);
-        var cancelar = new CancelarPedidoUseCase(PedidoRepo, estoque, Substitute.For<IContaReceberRepository>(), Uow,
-            NullLogger<CancelarPedidoUseCase>.Instance);
-        var liberarVaga = new LiberarVagaOnPedidoCanceladoHandler(VagaRepo, NullLogger<LiberarVagaOnPedidoCanceladoHandler>.Instance);
-        return new ProcessarCobrancaVencidaUseCase(PedidoStorefrontRepo, CobrancaRepo, Gerar(), cancelar, liberarVaga,
-            Aviso(), MpClient, Confirmar(), Tenant, Uow, Relogio, NullLogger<ProcessarCobrancaVencidaUseCase>.Instance);
+        Uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>()(ci.Arg<CancellationToken>()));
+        var cancelar = new CancelarPedidoUseCase(PedidoRepo, estoque,
+            new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(Substitute.For<IContaReceberRepository>(), VagaRepo, NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance), Uow,
+            NullLogger<CancelarPedidoUseCase>.Instance, CobrancaRepo, Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(), Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>());
+        return new ProcessarCobrancaVencidaUseCase(PedidoStorefrontRepo, CobrancaRepo, Gerar(), cancelar,
+            Aviso(), MpClient, Confirmar(), Tenant, Uow, Relogio, NullLogger<ProcessarCobrancaVencidaUseCase>.Instance, OperacaoEventos);
     }
 
     public void AdicionarPagamento(string? referencia, decimal valor = 25m)

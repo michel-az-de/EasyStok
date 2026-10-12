@@ -21,7 +21,8 @@ public sealed record CriarPedidoPeloCardapioConversaInput(
     Guid? EnderecoId = null,
     string? Forma = null,
     string? Observacoes = null,
-    EnderecoCheckout? Endereco = null);
+    EnderecoCheckout? Endereco = null,
+    bool SemCobranca = false);
 
 /// <param name="LinkPagamento">Nulo na entrega. Mercado Pago fora: <see cref="MercadoPagoIndisponivelException"/> com o pedido desfeito e o link do cardápio devolvido (#1301).</param>
 public sealed record PedidoPeloCardapioConversaResult(
@@ -112,10 +113,13 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
         conversa.RegistrarSaida(agora);
         var resumo = Mensagem.Saida(link.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
             ResumoPedidoConversa.Texto(reservado, input.DataEntrega, forma,
-                "Pedido montado pelo cliente no cardápio do site:"));
+                "Pedido montado pelo cliente no cardápio do site:", cobrarTotal: input.SemCobranca));
         await conversaRepository.AddMensagemAsync(resumo, ct);
         await unitOfWork.CommitAsync();
-        await AvisarConsoleAsync(reservado, resumo, ct);
+        if (!input.SemCobranca) await AvisarConsoleAsync(reservado, resumo, ct);
+
+        if (input.SemCobranca)
+            return new PedidoPeloCardapioConversaResult(reservado.Pedido.Id, reservado.Total, forma, null, null);
 
         CobrancaPedidoResult? cobranca;
         try
@@ -154,7 +158,9 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
     private async Task<CobrancaPedidoResult?> CobrarAsync(
         PedidoReservado reservado, Guid conversaId, string forma, CancellationToken ct)
     {
-        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega)
+        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
+            && !EasyStock.Application.Services.Pedidos.PlanoPagamentoEncomenda.TemSinal(
+                reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
             return (await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(
                 reservado.Pedido.EmpresaId, reservado.Pedido.Id, forma, UsuarioNome: "cardápio da conversa"), ct)).Cobranca;
         return await gerarCobranca.ExecuteAsync(reservado, conversaId, ct);

@@ -6,6 +6,20 @@ namespace EasyStock.Infra.Postgre.Repositories
 {
     public sealed class PedidoRepository(EasyStockDbContext db) : IPedidoRepository
     {
+        public Task<bool> TemEstornoOnlineAsync(Guid empresaId, Guid pagamentoId, CancellationToken ct = default) =>
+            db.Set<PedidoEstornoOnline>().AnyAsync(e => e.EmpresaId == empresaId && e.PagamentoId == pagamentoId, ct);
+
+        public async Task<IReadOnlyList<PedidoEstornoManual>> ListarEstornosManuaisAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default) =>
+            await db.Set<PedidoEstornoManual>().AsNoTracking()
+                .Where(e => e.EmpresaId == empresaId && e.PedidoId == pedidoId)
+                .OrderBy(e => e.RegistradoEm).ThenBy(e => e.Id).ToListAsync(ct);
+
+        public Task AdicionarEstornoManualAsync(PedidoEstornoManual estorno)
+        {
+            db.Set<PedidoEstornoManual>().Add(estorno);
+            return Task.CompletedTask;
+        }
+
         public async Task TravarAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default)
         {
             if (db.Database.CurrentTransaction is null)
@@ -20,6 +34,9 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public Task<Pedido?> GetByIdAsync(Guid empresaId, Guid id) =>
             db.Pedidos.FirstOrDefaultAsync(p => p.EmpresaId == empresaId && p.Id == id);
+
+        public async Task<IReadOnlyList<Pedido>> ListarPorIdsAsync(Guid empresaId, IReadOnlyCollection<Guid> ids, CancellationToken ct = default) =>
+            await db.Pedidos.AsNoTracking().Where(p => p.EmpresaId == empresaId && ids.Contains(p.Id)).ToListAsync(ct);
 
         public Task<Pedido?> GetByIdWithDetailsAsync(Guid empresaId, Guid id) =>
             db.Pedidos
@@ -69,7 +86,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
             var agora = DateTime.UtcNow;
 
-            query = sort?.ToLowerInvariant() switch
+            var ordenada = sort?.ToLowerInvariant() switch
             {
                 // Cockpit (#591): abertos antes de terminais → o cap de pagina nunca
                 // descarta pedido ativo; refino atrasado/agendado/recencia por cima.
@@ -80,7 +97,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 _         => desc ? query.OrderByDescending(p => p.CriadoEm)  : query.OrderBy(p => p.CriadoEm),
             };
 
-            var pedidos = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            var pedidos = await ordenada.ThenByDescending(p => p.Id)
+                .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
             return (pedidos, total);
         }
 
@@ -123,6 +141,23 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(p => p.EmpresaId == empresaId && StatusAbertos.Contains(p.Status))
                 .SelectMany(p => p.Itens)
                 .AnyAsync(i => i.ProdutoId == produtoId);
+        }
+
+        private static readonly string[] StatusDemanda = PedidoStateMachine.DemandaAConsumir
+            .Select(StatusPedidoMapper.Format)
+            .ToArray();
+
+        public async Task<IReadOnlyList<DemandaDePedido>> GetDemandaAgendadaAsync(Guid empresaId, DateTime antesDeUtc, CancellationToken ct = default)
+        {
+            var linhas = await db.Pedidos.AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && StatusDemanda.Contains(p.Status)
+                    && p.AgendadoParaEm != null && p.AgendadoParaEm < antesDeUtc)
+                .SelectMany(p => p.Itens)
+                .Where(i => i.CardapioItemId != null || i.ProdutoId != null)
+                .GroupBy(i => new { i.CardapioItemId, i.ProdutoId })
+                .Select(g => new { g.Key.CardapioItemId, g.Key.ProdutoId, Quantidade = g.Sum(i => i.Quantidade) })
+                .ToListAsync(ct);
+            return linhas.Select(l => new DemandaDePedido(l.CardapioItemId, l.ProdutoId, l.Quantidade)).ToList();
         }
     }
 }

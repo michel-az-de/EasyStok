@@ -1,3 +1,4 @@
+using EasyStock.Api.Authentication;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Application.UseCases.ClienteCrm;
 using Swashbuckle.AspNetCore.Annotations;
@@ -153,10 +154,12 @@ public class ClientesCrmController(
         }
     }
 
+    // Identity.Name é o "sub" (id); o nome legível vem da claim "nome" (#1474).
     private string Autor() =>
-        !string.IsNullOrWhiteSpace(User.Identity?.Name)
+        User.NomeExibicao()
+        ?? (!string.IsNullOrWhiteSpace(User.Identity?.Name)
             ? User.Identity!.Name!
-            : $"console:{currentUser.UsuarioId:N}";
+            : $"console:{currentUser.UsuarioId:N}");
 }
 
 public sealed record AdicionarTagBody(string? Tag);

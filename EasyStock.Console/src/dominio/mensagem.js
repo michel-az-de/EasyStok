@@ -33,7 +33,7 @@ const ehAvisoDeEsteira = (mensagem) => Boolean(mensagem?.automatica) && (mensage
 // Resposta que conversa de verdade com o cliente: a dona escrevendo, ou o
 // automático respondendo alguma coisa que não seja aviso de esteira (FAQ,
 // captura de lead, agradecimento pós-entrega...). Nota de sistema não conta.
-export const respondeAoCliente = (mensagem) => mensagem.dir === 'out' && !ehAvisoDeEsteira(mensagem)
+export const respondeAoCliente = (mensagem) => mensagem.dir === 'out' && !['falhou', 'enviando'].includes(mensagem.status) && !ehAvisoDeEsteira(mensagem)
 
 // Mensagens do cliente ainda sem essa resposta, na ordem em que chegaram.
 // Anda de trás para frente: aviso de esteira e nota de sistema são
@@ -48,7 +48,9 @@ export function mensagensSemRespostaReal(conversa) {
   const pendentes = []
   for (let i = mensagens.length - 1; i >= 0; i -= 1) {
     const mensagem = mensagens[i]
-    if (respondeAoCliente(mensagem)) break
+    // #1600: conversa reaberta recomeça na nota de reabertura (mesma regra da lista da API): a
+    // entrada de antes do encerramento não volta como cliente esperando há dias.
+    if (respondeAoCliente(mensagem) || mensagem.reabertura) break
     if (mensagem.dir === 'in') pendentes.unshift(mensagem)
   }
   return pendentes

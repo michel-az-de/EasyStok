@@ -1,21 +1,25 @@
 import * as acao from '../acoes'
-import { cadastrarClienteDaConversa, obterDossie } from '../../infra/api/conversasApi'
+import {
+  adicionarNotaCliente, bloquearClienteApi, cadastrarClienteDaConversa, desbloquearClienteApi, obterDossie,
+} from '../../infra/api/conversasApi'
 import { clienteDoDossie, contatoInformadoDoDossie, enderecoParaApi } from '../../infra/api/traducaoCliente'
+import { deveCarregarDossie } from '../planoDeSincronizacao'
 import { textoNaoLigado } from './naoLigadas'
 
 // Cadastro do cliente da conversa no modo API (#1276). Sem cliente vinculado o EasyStok não
 // gera pedido; aqui a dona cadastra nome, telefone e endereço pela Ficha. Nada muda na tela
 // antes da resposta: o que aparece depois é o dossiê relido, a mesma fonte de quem abre a
 // conversa em outra aba.
-// Ao abrir a conversa: cliente ainda não lido do EasyStok (#1276) ou lead do chat do site, cujo
-// contato informado pelo visitante só vem no dossiê (#1430).
-export const precisaLerFicha = (c) => Boolean(c) && (c.clienteId
-  ? !c.cliente?.daApi
-  : c.canal === 'Chat do site' && !c.contatoInformado)
+// Ao abrir a conversa: cliente ainda não lido do EasyStok (#1276, regra única em
+// `deveCarregarDossie`) ou lead do chat do site, cujo contato informado pelo visitante só vem
+// no dossiê (#1430).
+export const precisaLerFicha = (c) => deveCarregarDossie(c)
+  || Boolean(c && !c.clienteId && c.canal === 'Chat do site' && !c.contatoInformado)
 
 export function criarAcoesClienteApi({ despachar, estadoRef }) {
   const avisar = (mensagem) => despachar({ tipo: acao.AVISO_API, mensagem })
   const conversaDe = (id) => estadoRef.current.conversas.find((c) => c.id === id) ?? null
+  const lendoDossie = new Map()
 
   async function carregar(id) {
     const dossie = await obterDossie(id)
@@ -25,12 +29,27 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
     if (contato) despachar({ tipo: acao.CONTATO_INFORMADO_API, id, contato })
   }
 
+  // #1474 (R2): bloquear e desbloquear vão ao cadastro no EasyStok (todos os canais); a Ficha
+  // relê o dossiê, que traz o bloqueio e o motivo. A tela ainda chama pelo nome (`BlocoCliente`).
+  function mudarBloqueio(conversaId, fazer, rotulo) {
+    const c = conversaDe(conversaId)
+    if (!c?.clienteId) {
+      avisar(`Salve o cadastro do cliente antes de ${rotulo}.`)
+      return undefined
+    }
+    return fazer(c.clienteId)
+      .then(() => carregar(c.id))
+      .catch((erro) => avisar(`Bloqueio do cliente: ${erro.message}`))
+  }
+
+  // #1586: a recusa volta como `{ erro }` para a Ficha mostrar no campo ou ao lado do botão; a
+  // tela só diz "Salvo" depois desta resposta.
   // E-mail só vai quando há (#1430): o corpo das outras edições continua o mesmo.
   function cadastrar(id, { nome = null, telefone = null, endereco = null, email = null }) {
     const corpo = { nome: nome?.trim() || null, telefone: telefone || null, endereco: endereco ? enderecoParaApi(endereco) : null }
     if (email?.trim()) corpo.email = email.trim()
     return cadastrarClienteDaConversa(id, corpo)
-      .then((salvo) => {
+      .then(async (salvo) => {
         // O telefone já era de outro cadastro: a conversa foi ligada a ele, com o nome dele.
         if (salvo && salvo.novo === false && corpo.nome && salvo.nome !== corpo.nome) {
           avisar(`Este telefone já é de ${salvo.nome}: a conversa foi ligada a esse cadastro.`)
@@ -38,19 +57,28 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
         if (salvo?.dentroDaArea === false) {
           avisar(`Cadastro salvo, mas o endereço está fora da área de entrega. ${salvo.mensagemForaArea ?? ''}`.trim())
         }
-        return carregar(id)
+        // O cadastro já foi gravado: falha na leitura não é recusa (mesma regra da nota, abaixo).
+        try { await carregar(id) }
+        catch (erro) { avisar(`Cadastro salvo, mas a ficha não atualizou: ${erro.message}`) }
+        return undefined
+      }, (erro) => {
+        avisar(`Cadastro do cliente: ${erro.message}`)
+        return { erro: erro.message }
       })
-      .catch((erro) => avisar(`Cadastro do cliente: ${erro.message}`))
   }
 
   return {
+    bloquearCliente: (_nome, motivo, conversaId) => mudarBloqueio(conversaId, (clienteId) => bloquearClienteApi(clienteId, motivo?.trim() || null), 'bloquear'),
+    desbloquearCliente: (_nome, conversaId) => mudarBloqueio(conversaId, desbloquearClienteApi, 'desbloquear'),
+
     // O nome que vale é o que a dona escreveu no lápis (rascunho do lead). No chat do site sem
     // o formulário (#1430) o nome do contato é genérico ("Visitante do site"): sem o dela, não cadastra.
     salvarCadastroRapido: (id, dados) => {
       const c = conversaDe(id)
       if (c?.canal === 'Chat do site' && !c.nomeDaDona && !c.contatoInformado) {
-        avisar('Escreva o nome do cliente (lápis ao lado do nome) antes de salvar o cadastro.')
-        return undefined
+        const mensagem = 'Escreva o nome do cliente (lápis ao lado do nome) antes de salvar o cadastro.'
+        avisar(mensagem)
+        return { erro: mensagem }
       }
       return cadastrar(id, { ...dados, nome: c?.nomeDaDona ? c.nome : dados?.nome })
     },
@@ -78,7 +106,33 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
       return cadastrar(id, { [campo]: valor })
     },
 
-    carregarClienteDaConversa: (id) => carregar(id).catch(() => {}),
+    // #1436: nota interna vai ao cadastro do cliente; a Ficha relê o dossiê. Lead não tem cadastro.
+    salvarNota: (id, texto) => {
+      const clienteId = conversaDe(id)?.clienteId
+      if (!clienteId) {
+        avisar('Cadastre o cliente (Salvar cadastro na Ficha) antes de anotar.')
+        return false
+      }
+      return adicionarNotaCliente(clienteId, texto.trim())
+        .then(async () => {
+          // A nota já foi gravada: falha na leitura não deve incentivar outro POST.
+          try { await carregar(id) }
+          catch (erro) { avisar(`Nota salva, mas a ficha não atualizou: ${erro.message}`) }
+          return true
+        })
+        .catch((erro) => {
+          avisar(`Nota do cliente: ${erro.message}`)
+          return false
+        })
+    },
 
+    // #1474: o clique em `selecionar` e o efeito da conversa restaurada podem pedir o mesmo
+    // dossiê juntos; com um em voo, o segundo recebe a mesma promessa.
+    carregarClienteDaConversa: (id) => {
+      if (!lendoDossie.has(id)) {
+        lendoDossie.set(id, carregar(id).catch(() => {}).finally(() => lendoDossie.delete(id)))
+      }
+      return lendoDossie.get(id)
+    },
   }
 }

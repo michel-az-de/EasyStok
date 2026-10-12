@@ -153,4 +153,15 @@ public class SugerirRespostaAgenteUseCaseTests
             .Which.Message.Should().Contain("não conseguiu sugerir");
         await _conversaRepository.DidNotReceive().AddMensagemAsync(Arg.Any<Mensagem>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public void InstrucaoSugestao_CurtaEObjetiva()
+    {
+        // #1445 (homologação 07/10): a sugestão saía prolixa. WhatsApp pede de 1 a 3 frases, sem floreio.
+        SugerirRespostaAgenteUseCase.InstrucaoSugestao.Should()
+            .Contain("de 1 a 3 frases curtas")
+            .And.Contain("sem floreio")
+            .And.Contain("sem repetir o que o cliente disse")
+            .And.NotContain("—").And.NotContain("–");
+    }
 }

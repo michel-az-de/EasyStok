@@ -13,7 +13,8 @@ namespace EasyStock.Infra.Postgre.Repositories.Atendimento;
 public sealed class ConversaRepository(EasyStockDbContext db) : IConversaRepository
 {
     public Task<Guid?> ObterIdPorPedidoAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default) =>
-        db.AtendimentoConversas.Where(c => c.EmpresaId == empresaId && c.PedidoEmAndamentoId == pedidoId)
+        db.AtendimentoConversas.Where(c => c.EmpresaId == empresaId && (c.PedidoEmAndamentoId == pedidoId
+            || db.LinksCardapioConversa.Any(l => l.EmpresaId == empresaId && l.ConversaId == c.Id && l.PedidoRegistradoId == pedidoId)))
             .Select(c => (Guid?)c.Id).FirstOrDefaultAsync(ct);
 
     public Task<Conversa?> ObterAbertaPorClienteNoCanalAsync(Guid empresaId, Guid clienteId, CanalConversa canal, CancellationToken ct = default) =>
@@ -32,6 +33,16 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
 
     public Task<Conversa?> ObterPorIdAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
         db.AtendimentoConversas.FirstOrDefaultAsync(c => c.EmpresaId == empresaId && c.Id == id, ct);
+
+    public async Task<Conversa?> ObterPorIdComLockAsync(Guid empresaId, Guid id, CancellationToken ct = default)
+    {
+        var conversa = await db.AtendimentoConversas.FromSqlInterpolated($"""
+            SELECT * FROM atendimento_conversas WHERE "EmpresaId" = {empresaId} AND "Id" = {id} FOR UPDATE
+            """).SingleOrDefaultAsync(ct);
+        // A primeira leitura serve para travar o contato. Outra requisição pode ter reaberto enquanto esperávamos.
+        if (conversa is not null) await db.Entry(conversa).ReloadAsync(ct);
+        return conversa;
+    }
 
     public async Task<Guid?> TravarParaPedidoAsync(Guid empresaId, Guid id, CancellationToken ct = default)
     {
@@ -143,23 +154,40 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
                                      || EF.Functions.ILike(c.ContatoIdExterno, padrao));
         }
 
+        // #1575: só as colunas do resumo. O ContextoJson (jsonb do carrinho) fica no banco: a inbox faz polling.
         var linhas = await query
             .OrderByDescending(c => c.UltimaMensagemEm)
             .Skip((paginaEfetiva - 1) * tamanho)
             .Take(tamanho)
             .Select(c => new
             {
-                Conversa = c,
+                c.Id, c.NumeroComanda, c.EmpresaId, c.Canal, c.ContatoIdExterno, c.ContatoNome, c.ClienteId, c.Situacao, c.NaoLidas,
+                c.UltimaMensagemEm, c.UltimaMensagemEntradaEm, c.PedidoEmAndamentoId, c.AssumidaPorUsuarioId, c.MotivoEscalada,
+                AssumidaPorNome = db.UsuariosEmpresas
+                    .Where(ue => ue.EmpresaId == empresaId && ue.UsuarioId == c.AssumidaPorUsuarioId)
+                    .Select(ue => ue.Usuario!.Nome).FirstOrDefault(),
+                AguardaResposta = c.Situacao != SituacaoConversa.Encerrada && db.AtendimentoMensagens
+                    .Where(m => m.EmpresaId == empresaId && m.ConversaId == c.Id)
+                    .Where(UltimaPalavraConversa.Conta)
+                    .OrderByDescending(m => m.EnviadaEm).ThenByDescending(m => m.Id)
+                    .Select(m => (DirecaoMensagem?)m.Direcao).FirstOrDefault() == DirecaoMensagem.Entrada,
                 UltimoTexto = db.AtendimentoMensagens
                     .Where(m => m.EmpresaId == empresaId && m.ConversaId == c.Id)
                     .OrderByDescending(m => m.EnviadaEm)
                     .ThenByDescending(m => m.Id)
                     .Select(m => m.Texto)
                     .FirstOrDefault(),
+                // O mesmo texto que a rota do pedido da conversa devolve em "status" (Pedido.Status, sem conversão).
+                PedidoStatus = db.Pedidos
+                    .Where(p => p.EmpresaId == empresaId && p.Id == c.PedidoEmAndamentoId)
+                    .Select(p => p.Status).FirstOrDefault(),
             })
             .ToListAsync(ct);
 
-        return linhas.Select(l => new ConversaInboxItem(l.Conversa, l.UltimoTexto)).ToList();
+        return linhas.Select(l => new ConversaInboxItem(
+            l.Id, l.EmpresaId, l.Canal, l.ContatoIdExterno, l.ContatoNome, l.ClienteId, l.Situacao, l.NaoLidas,
+            l.UltimaMensagemEm, l.UltimaMensagemEntradaEm, l.PedidoEmAndamentoId, l.AssumidaPorUsuarioId, l.MotivoEscalada,
+            l.UltimoTexto, l.AguardaResposta, l.AssumidaPorNome, l.PedidoStatus, l.NumeroComanda)).ToList();
     }
 
     public async Task<IReadOnlyList<Mensagem>> ListarMensagensAsync(
@@ -226,6 +254,17 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
         db.AtendimentoMensagens.FirstOrDefaultAsync(
             m => m.EmpresaId == empresaId && m.ConversaId == conversaId && m.Id == mensagemId, ct);
 
+    public async Task<Mensagem?> ObterMensagemComLockAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default)
+    {
+        var mensagem = await db.AtendimentoMensagens.FromSqlInterpolated($"""
+            SELECT * FROM atendimento_mensagens
+            WHERE "EmpresaId" = {empresaId} AND "ConversaId" = {conversaId} AND "Id" = {mensagemId} FOR UPDATE
+            """).SingleOrDefaultAsync(ct);
+        // A leitura serve para travar. A instância já rastreada não é relida pelo EF: a varredura pode tê-la mudado (#1599).
+        if (mensagem is not null) await db.Entry(mensagem).ReloadAsync(ct);
+        return mensagem;
+    }
+
     // SQL cru de propósito: FOR UPDATE SKIP LOCKED não sai do LINQ. IgnoreQueryFilters mantém o SQL sem
     // composição; o serviço de reenvio é cross-tenant e roda com bypass de RLS ligado pelo host (S57).
     public async Task<IReadOnlyList<Mensagem>> ListarReenviosVencidosComLockAsync(DateTime agora, int limite, CancellationToken ct = default) =>
@@ -234,6 +273,20 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
                 SELECT * FROM atendimento_mensagens
                 WHERE "Status" = {(int)StatusMensagem.Falhou} AND "ProximoReenvioEm" <= {agora}
                 ORDER BY "ProximoReenvioEm"
+                LIMIT {limite}
+                FOR UPDATE SKIP LOCKED
+                """)
+            .IgnoreQueryFilters()
+            .ToListAsync(ct);
+
+    // SQL cru: FOR UPDATE SKIP LOCKED não sai do LINQ. Cross-tenant, com bypass de RLS ligado pelo host (#1562).
+    // Só a intenção de modelo tem ModeloJson: nota interna e texto também ficam pendentes e não entram.
+    public async Task<IReadOnlyList<Mensagem>> ListarIntencoesModeloSemDesfechoComLockAsync(DateTime gravadaAntesDe, int limite, CancellationToken ct = default) =>
+        await db.AtendimentoMensagens
+            .FromSqlInterpolated($"""
+                SELECT * FROM atendimento_mensagens
+                WHERE "Status" = {(int)StatusMensagem.Pendente} AND "ModeloJson" IS NOT NULL AND "EnviadaEm" < {gravadaAntesDe}
+                ORDER BY "EnviadaEm"
                 LIMIT {limite}
                 FOR UPDATE SKIP LOCKED
                 """)

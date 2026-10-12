@@ -180,6 +180,10 @@ PWA (`EasyStock.Api/wwwroot/pwa/index.html:17385,17501,17625,17663,17958`). Pedi
 api/producao/planejamento` reaproveita `CalcularCestaProducaoUseCase` e devolve insumos necessários e faltas.
 O botão "Gerar lista de compras" usa o `criar-compra` existente e abre a lista no Web.
 
+> **Como ficou (#1502):** as rotas são `GET api/atendimento/producao/sugestao?ate=` e `POST .../planejamento`. A conta
+> é `max(mínimo + agendados + descoberto − saldo, 0)`: com saldo acima do mínimo, o saldo cobre os pedidos. A
+> lista de compras é gravada pelo `POST api/listas-compras/gerar` (faltas mais o que repõe o mínimo), sem o Web.
+
 **Console.** M2 › **Planejamento**: sugestão editável (ela muda as quantidades), insumos e faltas, "Lançar como
 produção" leva as quantidades para o M2.2.
 
@@ -212,6 +216,10 @@ sugestão de "Lançar perda por vencimento" (não lança sozinho, D8).
 - [ ] Ajuste de contagem (M2.1) **não** entra como perda (o card atual mistura os dois).
 - [ ] Lote vencido aparece como sugestão, sem lançamento automático.
 
+> **Como ficou (#1511):** as rotas são `POST`/`GET api/atendimento/producao/perdas` e `GET .../perdas/vencidos`. A
+> perda sai por FEFO, ou do lote vencido sugerido, e não cria descoberto. O resumo não conta ajuste nem a baixa de
+> insumo da produção (M2.4b), que também é Uso interno. Desfazer é o `POST api/estoque/estorno/{id}`.
+
 **Fora.** Meta de perda; perda de pedido entregue (é ocorrência/estorno, M3).
 
 ### M2.7 · Embalagens
@@ -229,6 +237,10 @@ manual do M2.1 cobre.
 **Aceite.**
 - [ ] Produzir 6 porções com receita que pede 1 bandeja por porção baixa 6 bandejas.
 - [ ] Bandeja abaixo do mínimo aparece em "Comprar" (M2.3).
+
+> **Como ficou (#1523):** a marca é `Produto.EhEmbalagem`, na categoria de estoque "Embalagens", com contagem em Un.
+> Ela se liga no cadastro rápido ou na lista de M2 › Insumos. No prato sem a marca, `BaixaDeInsumosDaProducao` baixa só as
+> linhas de embalagem da receita.
 
 **Fora.** Embalagem por canal de entrega (sacola do Lalamove).
 
@@ -254,6 +266,21 @@ das decisões abaixo.
 6. **FIFO**: RN-50 fala em "lote mais antigo"; o backend ordena por validade (`PedidoEstoqueIntegrationService.cs:80`).
 
 ## 6. Decisões pendentes do Felipe
+
+> **Decididas em 09/10/2026 (Felipe, múltipla escolha):**
+> - **D-M2-01 = a:** a baixa de insumo é só para produto com receita marcada "baixa automática"; falta de insumo avisa, não trava. Entra com a M2.4.
+> - **D-M2-04 = a:** o destino da porção vem da linha do prato (servir × preparar em casa). Nada novo no lote.
+> - **D-M2-06 = a:** o Operador lança a produção e ajusta o saldo; ver e mexer no estoque ainda exige a permissão de estoque. Perda acima de um valor pede Gerente (M2.6).
+>
+> - **D-M2-05 = a** (09/10, M2.5, #1502): a sugestão é `max(mínimo + agendados + descoberto − saldo, 0)` por prato. Agendados são os pedidos antes de "pronto", que é quando o pedido baixa o estoque. A lista de compras fica no console, pelo `POST api/listas-compras/gerar`, e não abre no Web, que saiu (ADR-0059).
+>
+> - **D-M2-02 = a** (09/10, M2.6, #1511): o motivo vem da lista e vira a natureza da saída (Vencido → Vencimento, Perda no preparo → Perda, Doação → Doação, Degustação → Uso interno, Outro → Prejuízo). Texto obrigatório só em "Outro".
+> - **D-M2-06, o limite** (09/10, #1511): perda acima de R$ 50, pelo custo dos lotes, só o Gerente lança. Desfazer é o estorno de saída (Gerente), pelo botão no console, porque o Web saiu.
+>
+> - **D-M2-03 = a** (09/10, M2.7, #1523): a embalagem desce na produção, pela receita. A embalagem (`Produto.EhEmbalagem`) desce em **toda** produção, mesmo em prato sem a marca de baixa automática; os outros insumos seguem a D-M2-01.
+>   **Ajuste de 11/10 (M1.4e, #1552):** em prato com porções, a embalagem é da porção (escolhida no cardápio) e desce uma por porção produzida; a da receita só vale para porção sem embalagem própria. Detalhe em [02](02-m1-cardapio.md).
+>
+> Todas as decisões do M2 estão tomadas.
 
 **D-M2-01 · A produção baixa insumo pela receita?**
 - a) Sim, só para produto com receita marcada "baixa automática"; falta de insumo avisa, não trava **(Recomendado)**

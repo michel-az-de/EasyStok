@@ -2,7 +2,8 @@ namespace EasyStock.Domain.Entities.Mobile;
 
 /// <summary>
 /// Lote de produção. Cada turno de produção vira um Batch com os itens produzidos.
-/// Criação é imutável: não há update após a criação (re-envio é ignorado).
+/// Itens e quantidades são imutáveis após a criação. O re-envio só atualiza as
+/// marcas de exclusão e descarte (#1464), que o ERP reflete no estoque do lote.
 /// Ao criar, incrementa o Stock dos produtos.
 /// </summary>
 [Table("mobile_batches")]
@@ -22,6 +23,14 @@ public class Batch
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// #1520 (ADR-0060) — carimbo do relógio do SERVIDOR, gravado em toda inserção e alteração
+    /// pelo <c>AuditTimestampsInterceptor</c>. Nunca vem do aparelho. É o filtro e o cursor do
+    /// pull e a base da detecção de conflito; <see cref="CreatedAt"/> traz a hora do aparelho.
+    /// </summary>
+    [Column("server_updated_at")]
+    public DateTime ServerUpdatedAt { get; set; } = DateTime.UtcNow;
 
     [Column("last_device_id"), MaxLength(64)]
     public string? LastDeviceId { get; set; }
@@ -47,6 +56,26 @@ public class Batch
     /// </summary>
     [Column("erp_lote_id")]
     public Guid? ErpLoteId { get; set; }
+
+    /// <summary>Exclusão (lote registrado por engano). Recuperável no PWA (#1464).</summary>
+    [Column("deleted_at")]
+    public DateTime? DeletedAt { get; set; }
+
+    [Column("deleted_by"), MaxLength(64)]
+    public string? DeletedBy { get; set; }
+
+    /// <summary>Descarte (perda do saldo restante do lote). Reversível no PWA (#1464).</summary>
+    [Column("discarded_at")]
+    public DateTime? DiscardedAt { get; set; }
+
+    [Column("discarded_by"), MaxLength(64)]
+    public string? DiscardedBy { get; set; }
+
+    [Column("discard_reason"), MaxLength(200)]
+    public string? DiscardReason { get; set; }
+
+    public bool Excluido => DeletedAt.HasValue;
+    public bool Descartado => DiscardedAt.HasValue;
 
     public List<BatchItem> Items { get; set; } = new();
 }

@@ -43,7 +43,10 @@ function FormCupom({ aoSalvar, aoCancelar }) {
   const valido = form.codigo.trim().length >= 3 && Number(form.valor) > 0
 
   return (
-    <div className={css.formLinha}>
+    <form className={css.formLinha} noValidate onSubmit={(e) => {
+      e.preventDefault()
+      if (valido) aoSalvar({ ...form, validade: form.validade || null, limiteUsos: form.limiteUsos === '' ? null : form.limiteUsos })
+    }}>
       <CampoTexto rotulo="Código" placeholder="Ex.: BEMVINDA10" value={form.codigo}
         onChange={(e) => setForm((f) => ({ ...f, codigo: e.target.value }))} />
       <CampoSelecao
@@ -52,9 +55,9 @@ function FormCupom({ aoSalvar, aoCancelar }) {
         value={form.tipoDesconto}
         onChange={(e) => setForm((f) => ({ ...f, tipoDesconto: e.target.value }))}
       />
-      <CampoTexto rotulo="Valor" tipo="number" value={form.valor}
+      <CampoTexto rotulo={form.tipoDesconto === 'percentual' ? 'Desconto (%)' : 'Desconto (R$)'} tipo="number" value={form.valor}
         onChange={(e) => setForm((f) => ({ ...f, valor: e.target.value }))} />
-      <CampoTexto rotulo="Validade" tipo="date" value={form.validade}
+      <CampoTexto rotulo="Validade (opcional)" tipo="date" value={form.validade}
         onChange={(e) => setForm((f) => ({ ...f, validade: e.target.value }))} />
       <CampoTexto rotulo="Limite de usos" tipo="number" placeholder="Sem limite" value={form.limiteUsos}
         onChange={(e) => setForm((f) => ({ ...f, limiteUsos: e.target.value }))} />
@@ -64,17 +67,13 @@ function FormCupom({ aoSalvar, aoCancelar }) {
         <Botao onClick={aoCancelar}>Cancelar</Botao>
         <Botao
           variante="primario"
+          tipo="submit"
           disabled={!valido}
-          onClick={() => aoSalvar({
-            ...form,
-            validade: form.validade || null,
-            limiteUsos: form.limiteUsos === '' ? null : form.limiteUsos,
-          })}
         >
           Salvar cupom
         </Botao>
       </div>
-    </div>
+    </form>
   )
 }
 
@@ -83,7 +82,7 @@ function ListaCupons({ cupons, aoAlternarAtivo }) {
   return (
     <ul className={css.lista}>
       {cupons.map((cupom) => (
-        <li key={cupom.id} className={css.linha}>
+        <li key={cupom.id} className={`${css.linha} ${css.cupom}`}>
           <span className={css.codigoCupom}>{cupom.codigo}</span>
           <span className={css.detalheLinha}>
             {cupom.tipoDesconto === 'percentual' ? `${cupom.valor}%` : moeda(cupom.valor)}
@@ -110,7 +109,7 @@ function RegraFidelidade({ config, aoSalvar }) {
   const mudou = JSON.stringify(rascunho) !== JSON.stringify(config)
 
   return (
-    <div className={css.formLinha}>
+    <form className={css.formLinha} noValidate onSubmit={(e) => { e.preventDefault(); if (mudou) aoSalvar(rascunho) }}>
       <CampoSelecao
         rotulo="Como pontua"
         opcoes={[
@@ -136,13 +135,13 @@ function RegraFidelidade({ config, aoSalvar }) {
         </>
       )}
       <div className={css.acoesForm}>
-        <Botao variante="primario" disabled={!mudou} onClick={() => aoSalvar(rascunho)}>Salvar regra</Botao>
+        <Botao variante="primario" tipo="submit" disabled={!mudou}>Salvar regra</Botao>
       </div>
       <p className={css.notaProposta}>
         <Icone nome="dica" /> Só conta pedido com pagamento confirmado.
         Os números acima são um ponto de partida: ajuste quando quiser.
       </p>
-    </div>
+    </form>
   )
 }
 
@@ -159,7 +158,7 @@ function FormRecompensa({ cardapio, sorteios, aoSalvar, aoCancelar }) {
     && (!precisaSorteio || form.sorteioId)
 
   return (
-    <div className={css.formLinha}>
+    <form className={css.formLinha} noValidate onSubmit={(e) => { e.preventDefault(); if (valido) aoSalvar(form) }}>
       <CampoSelecao rotulo="Tipo" opcoes={TIPOS_RECOMPENSA.map((t) => ({ valor: t.valor, rotulo: t.rotulo }))}
         value={form.tipo} onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))} />
       <CampoTexto rotulo="Nome da recompensa" value={form.rotulo}
@@ -184,9 +183,9 @@ function FormRecompensa({ cardapio, sorteios, aoSalvar, aoCancelar }) {
       )}
       <div className={css.acoesForm}>
         <Botao onClick={aoCancelar}>Cancelar</Botao>
-        <Botao variante="primario" disabled={!valido} onClick={() => aoSalvar(form)}>Salvar recompensa</Botao>
+        <Botao variante="primario" tipo="submit" disabled={!valido}>Salvar recompensa</Botao>
       </div>
-    </div>
+    </form>
   )
 }
 
@@ -217,18 +216,21 @@ function ListaRecompensas({ recompensas, aoAlternarAtivo }) {
 function FormSorteio({ aoSalvar, aoCancelar }) {
   const [form, setForm] = useState({ nome: '', dataSorteio: '' })
   return (
-    <div className={css.formLinha}>
+    <form className={css.formLinha} noValidate onSubmit={(e) => {
+      e.preventDefault()
+      if (form.nome.trim()) aoSalvar({ ...form, dataSorteio: form.dataSorteio || null })
+    }}>
       <CampoTexto rotulo="Nome do sorteio" value={form.nome}
         onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} />
-      <CampoTexto rotulo="Data do sorteio" tipo="date" value={form.dataSorteio}
+      <CampoTexto rotulo="Data do sorteio (opcional)" tipo="date" value={form.dataSorteio}
         onChange={(e) => setForm((f) => ({ ...f, dataSorteio: e.target.value }))} />
       <div className={css.acoesForm}>
         <Botao onClick={aoCancelar}>Cancelar</Botao>
-        <Botao variante="primario" disabled={!form.nome.trim()} onClick={() => aoSalvar({ ...form, dataSorteio: form.dataSorteio || null })}>
+        <Botao variante="primario" tipo="submit" disabled={!form.nome.trim()}>
           Salvar sorteio
         </Botao>
       </div>
-    </div>
+    </form>
   )
 }
 
@@ -239,12 +241,12 @@ function ListaSorteios({ sorteios }) {
     <ul className={css.lista}>
       {sorteios.map((s) => (
         <li key={s.id} className={css.linhaSorteio}>
-          <button type="button" className={css.linha} onClick={() => setAberto(aberto === s.id ? null : s.id)}>
+          <button type="button" className={css.linha} aria-expanded={aberto === s.id} onClick={() => setAberto(aberto === s.id ? null : s.id)}>
             <Icone nome={aberto === s.id ? 'chevron-up' : 'chevron-right'} />
             <span className={css.detalheLinha}>
               {s.nome}{s.dataSorteio && ` · ${s.dataSorteio.split('-').reverse().join('/')}`}
             </span>
-            <Pilula tom="neutro" fina>{s.participantes.length} participantes</Pilula>
+            <Pilula tom="neutro" fina>{s.participantes.length} {s.participantes.length === 1 ? 'participante' : 'participantes'}</Pilula>
           </button>
           {aberto === s.id && (
             s.participantes.length === 0 ? (

@@ -47,5 +47,33 @@ namespace EasyStock.Application.Ports.Output.Persistence
             string referenciaDocumento,
             NaturezaMovimentacaoEstoque natureza,
             CancellationToken ct = default);
+
+        /// <summary>
+        /// As movimentações que <see cref="ExisteReferenciaAsync"/> enxerga (#1564): mesmo produto, documento e
+        /// natureza, da mais nova para a mais antiga. Somente leitura, sem o lote.
+        /// </summary>
+        Task<IReadOnlyList<MovimentacaoEstoque>> GetPorReferenciaAsync(
+            Guid empresaId,
+            Guid produtoId,
+            string referenciaDocumento,
+            NaturezaMovimentacaoEstoque natureza,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// M2.6 (#1511): saídas das naturezas pedidas no período [de, ate), com o produto e o lote
+        /// (para o relatório de perdas). Inclui as estornadas, que o relatório mostra como desfeitas.
+        /// <paramref name="excetoDescricaoComPrefixo"/> (#1564) deixa no banco as saídas cuja descrição começa
+        /// pelo prefixo; descrição nula não é excluída.
+        /// </summary>
+        Task<IReadOnlyList<MovimentacaoEstoque>> GetSaidasPorNaturezaAsync(
+            Guid empresaId, IReadOnlyCollection<NaturezaMovimentacaoEstoque> naturezas, DateTime deUtc, DateTime ateUtc,
+            string? excetoDescricaoComPrefixo = null, CancellationToken ct = default);
+
+        /// <summary>
+        /// Saídas da natureza pedida com este documento que ainda valem (não estornadas), de qualquer
+        /// produto (#1571: o que o PWA baixou por um pedido, com o id do pedido de lá). Somente leitura.
+        /// </summary>
+        Task<IReadOnlyList<MovimentacaoEstoque>> GetSaidasAbertasPorDocumentoAsync(
+            Guid empresaId, string documento, NaturezaMovimentacaoEstoque natureza, CancellationToken ct = default);
     }
 }

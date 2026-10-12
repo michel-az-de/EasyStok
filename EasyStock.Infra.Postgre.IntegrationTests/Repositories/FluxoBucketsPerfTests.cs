@@ -108,8 +108,7 @@ public sealed class FluxoBucketsPerfTests(ITestOutputHelper output)
 
         // ── Regressão de performance: queries FIXAS, não 4 por bucket ─────────
         // Antes: ~96 (4 x 24). Depois da otimização: um punhado, independente do nº de buckets.
-        cmdCount.Should().BeLessThanOrEqualTo(8,
-            $"FluxoBucketsAsync deve agregar por bucket no SQL, não emitir 4 queries por bucket (emitiu {cmdCount})");
+        cmdCount.Should().Be(4, "uma consulta por série, independente da quantidade de buckets");
     }
 
     private static EasyStockDbContext NewContext(string conn, out DbContextOptions<EasyStockDbContext> options, Action<string>? log = null)

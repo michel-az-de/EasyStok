@@ -17,7 +17,8 @@ public sealed record ConfiguracaoAtendimentoResult(
     DateTime? UltimaMensagemRecebidaEm,
     bool Ativo,
     string? ModeloRetomadaNome = null,
-    string ModeloRetomadaIdioma = ConfiguracaoAtendimento.IdiomaModeloPadrao);
+    string ModeloRetomadaIdioma = ConfiguracaoAtendimento.IdiomaModeloPadrao,
+    int SlaRespostaMinutos = ConfiguracaoAtendimento.SlaRespostaPadraoMinutos);
 
 public sealed record ObterConfiguracaoAtendimentoQuery(Guid EmpresaId);
 
@@ -26,13 +27,21 @@ public sealed class ObterConfiguracaoAtendimentoUseCase(IConfiguracaoAtendimento
     public async Task<ConfiguracaoAtendimentoResult> ExecuteAsync(ObterConfiguracaoAtendimentoQuery query)
     {
         var config = await repository.GetOrDefaultAsync(query.EmpresaId);
+        ValidarEmpresa(config, query.EmpresaId);
         return ToResult(config);
+    }
+
+    internal static void ValidarEmpresa(ConfiguracaoAtendimento? config, Guid empresaId)
+    {
+        if (empresaId == Guid.Empty || config is not null && config.EmpresaId != empresaId)
+            throw new UseCaseValidationException("Configuração de atendimento inválida para a empresa.");
     }
 
     internal static ConfiguracaoAtendimentoResult ToResult(ConfiguracaoAtendimento c) => new(
         c.EmpresaId, c.Tom, c.NivelSugestao, c.SaudacaoPrimeiroContato, c.SaudacaoRetorno,
         c.FraseEspera, c.MensagemForaArea, c.RespiroMinutos, c.TempoPreparoPadraoMinutos,
-        c.WebhookVerificadoEm, c.UltimaMensagemRecebidaEm, c.Ativo, c.ModeloRetomadaNome, c.ModeloRetomadaIdioma);
+        c.WebhookVerificadoEm, c.UltimaMensagemRecebidaEm, c.Ativo, c.ModeloRetomadaNome, c.ModeloRetomadaIdioma,
+        c.SlaRespostaMinutos);
 }
 
 public sealed record AtualizarConfiguracaoAtendimentoCommand(
@@ -45,14 +54,17 @@ public sealed record AtualizarConfiguracaoAtendimentoCommand(
     string? MensagemForaArea,
     int? RespiroMinutos,
     int? TempoPreparoPadraoMinutos,
-    bool? Ativo);
+    bool? Ativo,
+    int? SlaRespostaMinutos = null);
 
 public sealed class AtualizarConfiguracaoAtendimentoUseCase(
-    IConfiguracaoAtendimentoRepository repository, IUnitOfWork unitOfWork)
+    IConfiguracaoAtendimentoRepository repository, IUnitOfWork unitOfWork, ICacheService? cacheService = null,
+    ILogger<AtualizarConfiguracaoAtendimentoUseCase>? logger = null)
 {
     public async Task<ConfiguracaoAtendimentoResult> ExecuteAsync(AtualizarConfiguracaoAtendimentoCommand command)
     {
         var configuracao = await repository.GetByEmpresaIdAsync(command.EmpresaId);
+        ObterConfiguracaoAtendimentoUseCase.ValidarEmpresa(configuracao, command.EmpresaId);
         var nova = configuracao is null;
         configuracao ??= ConfiguracaoAtendimento.CriarPadrao(command.EmpresaId);
 
@@ -67,7 +79,8 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
                 command.MensagemForaArea,
                 command.RespiroMinutos,
                 command.TempoPreparoPadraoMinutos,
-                command.Ativo);
+                command.Ativo,
+                command.SlaRespostaMinutos);
         }
         catch (ArgumentOutOfRangeException ex)
         {
@@ -78,6 +91,17 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
         else await repository.UpdateAsync(configuracao);
 
         await unitOfWork.CommitAsync();
+
+        // #1566: a inbox guarda o SLA em cache; sem isto o prazo novo só apareceria depois do TTL. Melhor esforço: a
+        // configuração já foi persistida, então a falha do cache vira aviso e o TTL cobre.
+        if (cacheService is not null)
+        {
+            try { await cacheService.RemoveAsync(CacheKeys.AtendimentoSlaResposta(command.EmpresaId)); }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger?.LogWarning(ex, "Configuracao do atendimento salva, mas o cache do SLA nao foi invalidado (empresa {EmpresaId})", command.EmpresaId);
+            }
+        }
 
         return ObterConfiguracaoAtendimentoUseCase.ToResult(configuracao);
     }
@@ -92,6 +116,7 @@ public sealed class DefinirModeloRetomadaUseCase(IConfiguracaoAtendimentoReposit
     public async Task<ConfiguracaoAtendimentoResult> ExecuteAsync(Guid empresaId, string? nome, string? idioma)
     {
         var configuracao = await repository.GetByEmpresaIdAsync(empresaId);
+        ObterConfiguracaoAtendimentoUseCase.ValidarEmpresa(configuracao, empresaId);
         var nova = configuracao is null;
         configuracao ??= ConfiguracaoAtendimento.CriarPadrao(empresaId);
 

@@ -77,6 +77,31 @@ public class ConstrutorMensagemOutboxTests
         r.Mensagem.LerMetadados()!["param1"].Should().Be("Maria");
     }
 
+    [Theory]
+    [InlineData(CanalNotificacao.WhatsApp, TipoEventoNotificacao.PedidoPagoConfirmado, "ab7c9c95-dc97-4c38-b468-3f7620fcf677", true)]
+    [InlineData(CanalNotificacao.WhatsApp, TipoEventoNotificacao.FaturaVencida, "ab7c9c95-dc97-4c38-b468-3f7620fcf677", false)]
+    [InlineData(CanalNotificacao.Email, TipoEventoNotificacao.PedidoPagoConfirmado, "ab7c9c95-dc97-4c38-b468-3f7620fcf677", false)]
+    [InlineData(CanalNotificacao.WhatsApp, TipoEventoNotificacao.PedidoPagoConfirmado, "invalido", false)]
+    [InlineData(CanalNotificacao.WhatsApp, TipoEventoNotificacao.PedidoPagoConfirmado, "00000000-0000-0000-0000-000000000000", false)]
+    public async Task IdentidadeDoClienteDaLojaIndependeDoTemplateHumanoPreservandoMetadados(
+        CanalNotificacao canal, TipoEventoNotificacao tipo, string clienteId, bool deveIncluir)
+    {
+        var template = TemplateNotificacao.Criar("humano", "Humano", canal, tipo, "", "{{ nome }}", criadoPor: "operadora");
+        template.DefinirMetadados("""{"template":"pedido_editado","param1":"{{ nome }}"}""");
+        _templates.GetAtivoAsync("humano", canal, Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(template);
+        var rotina = RotinaNotificacao.Criar("humano", "Humano", tipo, TriggerTipoRotina.Evento, "humano", CategoriaConteudoNotificacao.Transacional);
+        var evento = EventoNotificacao.Criar(tipo, _empresaId,
+            System.Text.Json.JsonSerializer.Serialize(new { nome = "Maria", telefone = "+5511999990001", email = "a@x.com", clienteId }));
+
+        var resultado = await _sut.ConstruirAsync(evento, rotina, canal, Para(evento), [], Agora);
+
+        var metadados = resultado.Mensagem!.LerMetadados()!;
+        metadados["template"].Should().Be("pedido_editado");
+        metadados["param1"].Should().Be("Maria");
+        metadados.ContainsKey("clienteId").Should().Be(deveIncluir);
+        if (deveIncluir) metadados["clienteId"].Should().Be(clienteId);
+    }
+
     [Fact]
     public async Task AchaTemplatePorTipoECanalQuandoOCodigoNaoTemOCanal()
     {

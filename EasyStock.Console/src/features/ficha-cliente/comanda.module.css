@@ -12,8 +12,18 @@
   padding: var(--e-4);
   margin-bottom: 8px;
   color: var(--tinta);
-  font-family: var(--f-papel);
+  font-family: var(--f-corpo);
 }
+
+.clienteCompartilhado { border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-1); padding: var(--e-3); margin-bottom: var(--e-3); }
+.clienteCompartilhado p { margin: var(--e-2) 0; }
+.clienteCompartilhado ul { list-style: none; padding: 0; }
+.clienteCompartilhado li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2); padding: var(--e-2) 0; }
+.clienteCompartilhado small { width: 100%; }
+.adicionarCompartilhado { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2); }
+.observacaoCompartilhada { display: grid; width: 100%; gap: var(--e-1); margin-block: var(--e-2); }
+.clienteCompartilhado input, .clienteCompartilhado textarea, .clienteCompartilhado select { max-width: 100%; min-width: 0; width: 100%; min-height: 44px; padding: var(--e-2); border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-1); color: var(--tinta); background: var(--papel); font: inherit; }
+.comparativo { padding: var(--e-2); border-left: 3px solid var(--linha-forte); }
 
 /* O único gesto "de papel": dois triângulos diagonais por dente de 8×5 px,
    pintados na cor da comanda. Onde não há tinta, o fundo por trás aparece,
@@ -29,13 +39,13 @@
   background-repeat: repeat-x;
 }
 
-/* Soltar aqui (seção 9): borda tracejada --ragu quando um prato arrastado do
+/* Soltar aqui (seção 9): borda tracejada --marca quando um prato arrastado do
    cardápio está sobre a comanda. */
-.alvoArrasto { border-style: dashed; border-width: var(--b-2); border-color: var(--ragu); }
+.alvoArrasto { border-style: dashed; border-width: var(--b-2); border-color: var(--marca); }
 .soltarAqui {
   margin: 0 0 var(--e-3); padding: var(--e-2); text-align: center;
-  border: var(--b-1) dashed var(--ragu); border-radius: var(--r-1);
-  background: var(--ragu-claro); color: var(--ragu); font-weight: 700;
+  border: var(--b-1) dashed var(--marca); border-radius: var(--r-1);
+  background: var(--marca-claro); color: var(--marca); font-weight: 700;
 }
 
 .cabecalho { margin: 0 0 var(--e-3); text-align: center; }
@@ -43,7 +53,9 @@
 .linhaCabecalho h2 {
   margin: 0; font-size: var(--t-titulo); font-weight: 700; line-height: var(--lh-compacto);
 }
-.numero { font-family: var(--f-papel); font-size: var(--t-titulo); }
+.numero { font-family: var(--f-corpo); font-size: var(--t-titulo); }
+/* #1474 (R3): a janela ainda falta; em tom de aviso, com a palavra (a cor nunca informa sozinha). */
+.semJanela { color: var(--alerta); font-weight: 600; }
 .subCabecalho { margin: var(--e-1) 0 0; font-size: var(--t-corpo); color: var(--tinta-2); border-top: repeating-linear-gradient(to right, var(--linha-forte) 0 6px, transparent 6px 10px); padding-top: var(--e-2); }
 
 /* Tracejado de 2 px, traço de 6 px e vão de 4 px, entre cabeçalho, grupos e
@@ -62,6 +74,8 @@
 .itens { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--e-3); }
 .item { display: flex; flex-direction: column; gap: var(--e-1); }
 .linhaItem { display: flex; gap: var(--e-2); align-items: baseline; }
+.linhaItem:has(.controlesItem) { display: grid; grid-template-columns: 3ch minmax(0, 1fr); align-items: start; }
+.linhaItem .controlesItem { grid-column: 2; justify-self: end; }
 
 /* "2×" fixo em 3ch para o nome do prato começar sempre na mesma coluna,
    dígito com dígito (RN de leitura de relance da cozinha). */
@@ -84,11 +98,11 @@
 .corpoAnotar:hover, .corpoAnotar[aria-pressed='true'] { background: var(--papel); }
 .corpoAnotar svg { color: var(--tinta-3); }
 
-/* Observação: trilho de --atencao à esquerda, texto reto (não itálico). É o
+/* Observação: trilho de --alerta à esquerda, texto reto (não itálico). É o
    que o cozinheiro não pode perder, então não compete com o resto em ênfase. */
 .obs {
   display: block; margin-top: var(--e-1);
-  border-left: var(--trilho) solid var(--atencao); padding-left: var(--e-2);
+  border-left: var(--trilho) solid var(--alerta); padding-left: var(--e-2);
   font-size: var(--t-apoio); color: var(--tinta);
 }
 .obsCampo { min-height: var(--toque); margin-top: var(--e-1); resize: none; }
@@ -110,19 +124,22 @@
 .vazio { margin: 0; font-size: var(--t-corpo); color: var(--tinta-2); }
 
 .total {
-  display: flex; align-items: baseline; justify-content: space-between;
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--e-2);
   margin: 0; font-size: var(--t-corpo); font-weight: 700;
   padding-top: var(--e-3); border-top: 2px double var(--linha-forte);
 }
-.total b { font-family: var(--f-papel); font-weight: 700; font-size: var(--t-valor); font-variant-numeric: tabular-nums; }
+.total b { font-family: var(--f-corpo); font-weight: 700; font-size: var(--t-valor); font-variant-numeric: tabular-nums; }
+.total > span { flex: 1 1 140px; }
+.total b { white-space: nowrap; }
+.notaTotal { margin: var(--e-2) 0 0; font-family: var(--f-corpo); font-size: var(--t-apoio); color: var(--tinta-2); }
 
 /* Defeito b: pedido pago que ganhou item novo não pode ficar calado sobre o
    quanto falta cobrar. Mesmo desenho de alerta do composer bloqueado. */
 .diferencaPaga {
   display: flex; gap: var(--e-2); align-items: baseline; flex-wrap: wrap;
   margin: var(--e-2) 0 0; padding: var(--e-2) var(--e-3);
-  background: var(--atencao-pastel); color: var(--atencao);
-  border-left: var(--trilho) solid var(--atencao);
+  background: var(--alerta-pastel); color: var(--alerta);
+  border-left: var(--trilho) solid var(--alerta);
   border-radius: var(--r-1); font-size: var(--t-apoio);
 }
 
@@ -135,9 +152,9 @@
 .situacaoEnvio {
   display: flex; gap: var(--e-2); align-items: center; margin: 0;
   padding: var(--e-2) var(--e-3); border-radius: var(--r-1);
-  background: var(--info-fundo); color: var(--tinta-2); font-size: var(--t-apoio);
+  background: var(--info-pastel); color: var(--tinta-2); font-size: var(--t-apoio);
 }
-.envioFeito { background: var(--ok-fundo); color: var(--ok); }
+.envioFeito { background: var(--sucesso-pastel); color: var(--sucesso); }
 
 /* Aviso passageiro do envio: some sozinho em 6 s, fala pelo leitor de tela. */
 .avisoEnvio {
@@ -145,7 +162,7 @@
   z-index: 60; display: flex; gap: var(--e-2); align-items: center;
   max-width: min(560px, calc(100vw - 32px)); padding: var(--e-3) var(--e-4);
   border-radius: var(--r-2); background: var(--tinta); color: var(--papel);
-  box-shadow: var(--sombra-alta); font-size: var(--t-15); font-weight: 600;
+  box-shadow: var(--sombra-alta); font-size: var(--t-apoio); font-weight: 600;
 }
 
 /* Canhoto (RN-27, RN-28, RN-29, RN-33): mesma folha da comanda, sem os
@@ -174,9 +191,12 @@
   padding: var(--e-2) var(--e-2) var(--e-2) var(--e-3); border-radius: var(--r-pilula);
   background: var(--tinta); color: var(--papel); box-shadow: var(--sombra-alta);
 }
-.gavetaNoTitulo {
-  margin-left: auto; min-width: 0; display: flex; align-items: center; gap: var(--e-3);
-  padding: 2px 2px 2px var(--e-3); border-radius: var(--r-pilula);
+/* #1474: no pé da Ficha, faixa no fluxo da coluna (antes ficava na linha do título e
+   cobria o "Ficha"). Largura toda, texto à esquerda e "Imprimir" à direita. */
+.gavetaNoPe {
+  min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--e-3);
+  padding: var(--e-2) var(--e-2) var(--e-2) var(--e-4);
+  border-top: var(--b-1) solid var(--linha);
   background: var(--tinta); color: var(--papel);
 }
 .gavetaTexto { display: flex; align-items: center; gap: var(--e-2); min-width: 0; font-weight: 700; white-space: nowrap; }

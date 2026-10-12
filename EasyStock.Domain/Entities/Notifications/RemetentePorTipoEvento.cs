@@ -16,6 +16,8 @@ public static class RemetentePorTipoEvento
             or TipoEventoNotificacao.PedidoEmPreparo
             or TipoEventoNotificacao.PedidoSaiuParaEntrega
             or TipoEventoNotificacao.PedidoEntregue
+            or TipoEventoNotificacao.PedidoReagendado
+            or TipoEventoNotificacao.ComandaAtualizada
             or TipoEventoNotificacao.AvaliacaoSolicitada
             or TipoEventoNotificacao.ReembolsoEfetuado
             or TipoEventoNotificacao.CampanhaMarketing
@@ -61,6 +63,7 @@ public static class RemetentePorTipoEvento
             or TipoEventoNotificacao.CaixaAbertoEsquecido
             or TipoEventoNotificacao.ConversaEscalada
             or TipoEventoNotificacao.LembreteVencido
+            or TipoEventoNotificacao.LojaFechadaNoHorario
             or TipoEventoNotificacao.ConviteAcesso
             or TipoEventoNotificacao.IncidenteSistema
             or TipoEventoNotificacao.PrazoEstourado

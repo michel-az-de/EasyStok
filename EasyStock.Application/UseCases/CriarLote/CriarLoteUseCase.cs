@@ -11,7 +11,8 @@ public sealed record CriarLoteItemInput(
     [property: MaxLength(32)] string? Unidade = null,
     int? PesoG = null,
     int? ValidadeDias = null,
-    string? FotoUrl = null);
+    string? FotoUrl = null,
+    int? PesoRealG = null);
 
 public sealed record CriarLoteCommand(
     [property: Required] Guid EmpresaId,
@@ -41,7 +42,9 @@ public class CriarLoteUseCase(
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
 
         var dataProd = cmd.DataProducao ?? DateTime.UtcNow;
-        var data = DateOnly.FromDateTime(dataProd);
+        // #1506: o dia do codigo e o dia de Brasilia; DateOnly.FromDateTime(UtcNow) pulava para o
+        // dia seguinte nas producoes depois das 21h.
+        var data = HorarioBrasil.DataOperacional(dataProd);
 
         string codigo;
         if (!string.IsNullOrWhiteSpace(cmd.CodigoCustom))
@@ -114,6 +117,7 @@ public class CriarLoteUseCase(
                     Unidade = input.Unidade,
                     Quantidade = input.Quantidade,
                     PesoG = input.PesoG,
+                    PesoRealG = input.PesoRealG,
                     ValidadeDias = input.ValidadeDias,
                     ExpiraEm = expira,
                     FotoUrl = input.FotoUrl,

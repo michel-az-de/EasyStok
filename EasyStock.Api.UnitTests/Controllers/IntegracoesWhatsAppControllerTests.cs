@@ -22,7 +22,8 @@ public class IntegracoesWhatsAppControllerTests
 
     public IntegracoesWhatsAppControllerTests()
     {
-        var useCase = new ObterStatusIntegracaoWhatsAppUseCase(_featureFlagRepository, _empresaRepository);
+        var useCase = new ObterStatusIntegracaoWhatsAppUseCase(
+            _featureFlagRepository, _empresaRepository, Substitute.For<IConfiguracaoAtendimentoRepository>());
         var metaOptions = Options.Create(new MetaCloudWhatsAppOptions { ApiVersion = "v19.0" });
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Notifications:WhatsApp:Provider"] = "meta" })

@@ -19,6 +19,7 @@ public sealed class BacklogNotificacoesQuery(EasyStockDbContext db, IRowLevelSec
         var agora = DateTime.UtcNow;
         var haUmaHora = agora.AddHours(-1);
         var ha24Horas = agora.AddHours(-24);
+        var ha48Horas = agora.AddHours(-48);
 
         var outbox = db.NotifOutboxMensagens.IgnoreQueryFilters().AsNoTracking();
         var eventos = db.NotifEventos.IgnoreQueryFilters().AsNoTracking();
@@ -42,8 +43,11 @@ public sealed class BacklogNotificacoesQuery(EasyStockDbContext db, IRowLevelSec
             .ToListAsync(ct);
         int Total(StatusOutbox status) => terminadasNaHora.FirstOrDefault(t => t.Status == status)?.Total ?? 0;
 
+        // #1566: o corte por OcorridoEm usa o índice (Status, OcorridoEm) e poupa a varredura do histórico. Evento além
+        // do prazo do tipo (24 h no máximo, por padrão) expira sem ser processado, então quem foi processado nas últimas
+        // 24 h ocorreu nas últimas 48 h.
         var processadosSemOutbox = await eventos
-            .Where(e => e.Status == StatusEventoNotificacao.Processado && e.ProcessadoEm >= ha24Horas)
+            .Where(e => e.Status == StatusEventoNotificacao.Processado && e.OcorridoEm >= ha48Horas && e.ProcessadoEm >= ha24Horas)
             .CountAsync(e => !db.NotifOutboxMensagens.IgnoreQueryFilters().Any(m => m.EventoId == e.Id), ct);
 
         return new BacklogNotificacoes(

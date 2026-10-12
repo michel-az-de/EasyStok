@@ -44,6 +44,7 @@ internal sealed class MercadoPagoWebhookFixture
     public List<PedidoEvento> Eventos { get; } = new();
     public Dictionary<string, PagamentoMercadoPago> Pagamentos { get; } = new();
 
+    public IEstornosOnlineService EstornosOnline { get; } = Substitute.For<IEstornosOnlineService>();
     public IMercadoPagoClient MpClient { get; } = Substitute.For<IMercadoPagoClient>();
     public IEstornoPedidoGateway Estorno { get; } = Substitute.For<IEstornoPedidoGateway>();
     public IPedidoRepository PedidoRepo { get; } = Substitute.For<IPedidoRepository>();
@@ -105,6 +106,6 @@ internal sealed class MercadoPagoWebhookFixture
             new CalculadoraInicioPrevistoPedido(Substitute.For<IPrazoPreparoPedidoQueries>()), Estorno, aviso, PedidoRepo);
         var atualizar = new AtualizarCobrancaPorPagamentoUseCase(CobrancaRepo, PedidoStorefrontRepo, aviso, tenant, Uow,
             relogio, NullLogger<AtualizarCobrancaPorPagamentoUseCase>.Instance);
-        return new MercadoPagoWebhookProcessor(MpClient, confirmar, atualizar, NullLogger<MercadoPagoWebhookProcessor>.Instance);
+        return new MercadoPagoWebhookProcessor(MpClient, confirmar, atualizar, NullLogger<MercadoPagoWebhookProcessor>.Instance, EstornosOnline);
     }
 }

@@ -1,8 +1,9 @@
 .vazio {
   padding: var(--e-6) var(--e-4); margin: 0; text-align: center;
   display: grid; justify-items: center; gap: var(--e-3);
-  animation: surgirVazio var(--dur-longa) var(--ease-saida) both;
+  animation: surgirVazio var(--dur-media) var(--ease-saida) both;
 }
+.icone { display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--r-2); color: var(--marca); background: var(--preenchimento); }
 /* Título em 21 px, não em cinza pequeno: o estado vazio é a primeira coisa que
    ela lê quando a tela está parada. */
 .titulo {

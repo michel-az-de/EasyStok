@@ -20,8 +20,8 @@ public class ResultadoEnvioTests
     [Fact]
     public void Simulado_conta_como_Sucesso_para_quem_esta_fora_do_motor()
     {
-        // CanalSms (atendimento) e EnviarLinkAvaliacaoWhatsAppHandler só olham Sucesso: no desenvolvimento
-        // o stub não pode virar erro para eles. Só o dispatcher grava o status Simulado.
+        // CanalSms (atendimento) só olha Sucesso: no desenvolvimento
+        // o stub não pode virar erro para ele. Só o dispatcher grava o status Simulado.
         var resultado = ResultadoEnvio.Simulado("stub", duracaoMs: 7);
 
         resultado.Desfecho.Should().Be(DesfechoEnvio.Simulado);

@@ -170,4 +170,44 @@ public class PedidoStateMachineTests
     {
         PedidoStateMachine.DescontaEstoque(status).Should().Be(esperado);
     }
+
+    // #1543: o aparelho manda só o último status; o caminho até ele passa pela linha da cozinha.
+    [Theory]
+    [InlineData(StatusPedido.Aguardando, StatusPedido.Preparando, new[] { StatusPedido.Preparando })]
+    [InlineData(StatusPedido.Aguardando, StatusPedido.Pronto, new[] { StatusPedido.Preparando, StatusPedido.Pronto })]
+    [InlineData(StatusPedido.Aguardando, StatusPedido.Entregue, new[] { StatusPedido.Preparando, StatusPedido.Pronto, StatusPedido.Entregue })]
+    [InlineData(StatusPedido.Preparando, StatusPedido.Entregue, new[] { StatusPedido.Pronto, StatusPedido.Entregue })]
+    [InlineData(StatusPedido.AprovadoBaba, StatusPedido.Pronto, new[] { StatusPedido.Preparando, StatusPedido.Pronto })]
+    [InlineData(StatusPedido.SaiuParaEntrega, StatusPedido.Entregue, new[] { StatusPedido.Entregue })]
+    [InlineData(StatusPedido.Entregue, StatusPedido.Cancelado, new[] { StatusPedido.Cancelado })]
+    [InlineData(StatusPedido.AguardandoPagamento, StatusPedido.Cancelado, new[] { StatusPedido.Cancelado })]
+    [InlineData(StatusPedido.Pronto, StatusPedido.Pronto, new StatusPedido[0])]
+    public void CaminhoPelaCozinha_percorre_passo_a_passo(StatusPedido de, StatusPedido para, StatusPedido[] esperado)
+    {
+        var caminho = PedidoStateMachine.CaminhoPelaCozinha(de, para);
+
+        caminho.Should().Equal(esperado);
+        var atual = de;
+        foreach (var passo in caminho!)
+        {
+            PedidoStateMachine.PodeTransicionar(atual, passo).Should().BeTrue($"{atual} → {passo} tem de ser transição válida");
+            atual = passo;
+        }
+    }
+
+    [Theory]
+    [InlineData(StatusPedido.AguardandoPagamento, StatusPedido.Preparando)] // não pula o pagamento
+    [InlineData(StatusPedido.AguardandoAprovacaoBaba, StatusPedido.Pronto)] // não pula a aprovação
+    [InlineData(StatusPedido.Rascunho, StatusPedido.Entregue)]
+    // Transições válidas na máquina, mas que não são da cozinha: dar o pagamento ou a aprovação por feitos.
+    [InlineData(StatusPedido.AguardandoPagamento, StatusPedido.Aguardando)]
+    [InlineData(StatusPedido.AguardandoAprovacaoBaba, StatusPedido.AprovadoBaba)]
+    [InlineData(StatusPedido.Rascunho, StatusPedido.AguardandoPagamento)]
+    [InlineData(StatusPedido.Pronto, StatusPedido.Preparando)]              // não volta atrás
+    [InlineData(StatusPedido.Entregue, StatusPedido.Pronto)]
+    [InlineData(StatusPedido.Cancelado, StatusPedido.Preparando)]
+    public void CaminhoPelaCozinha_sem_caminho_devolve_null(StatusPedido de, StatusPedido para)
+    {
+        PedidoStateMachine.CaminhoPelaCozinha(de, para).Should().BeNull();
+    }
 }

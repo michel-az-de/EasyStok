@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
-import { ehRestricao, ordenarTags, sugestoesDeTag } from '../../dominio/cliente'
+import {
+  chaveDaTag, ehRestricao, ordenarTags, rotuloDaTag, sugestoesDeTag,
+} from '../../dominio/cliente'
 import { SEGUNDOS_PARA_DESFAZER } from '../../dominio/esteira'
 import css from './cliente.module.css'
 
 // Tags como chips (seção 2 da direção visual, US-016). Restrição sempre
-// primeiro (RN-39/RN-52): ícone de alerta e borda `--atencao`. Remover usa o
+// primeiro (RN-39/RN-52): ícone de alerta e borda `--alerta`. Remover usa o
 // mesmo padrão de desfazer da esteira (`SEGUNDOS_PARA_DESFAZER`), sem criar
 // ação nova: `Desfazer` só chama `adicionarTag` de volta.
 export function TagsDoCliente({ conversa }) {
@@ -47,12 +49,12 @@ export function TagsDoCliente({ conversa }) {
 
   function abrirEdicao(tag) {
     setEditando(tag)
-    setRascunho(tag)
+    setRascunho(rotuloDaTag(tag))
   }
 
   function confirmarEdicao() {
     const novo = rascunho.trim()
-    if (novo && novo !== editando) editarTag(conversa.id, editando, novo)
+    if (novo && chaveDaTag(novo) !== chaveDaTag(editando)) editarTag(conversa.id, editando, novo)
     setEditando(null)
   }
 
@@ -92,12 +94,12 @@ export function TagsDoCliente({ conversa }) {
               <span className={[css.chip, ehRestricao(tag, restricoes) ? css.chipRestricao : ''].filter(Boolean).join(' ')}>
                 {ehRestricao(tag, restricoes) && <Icone nome="alerta" tamanho={20} />}
                 <button type="button" className={css.chipTexto} onClick={() => abrirEdicao(tag)}>
-                  {tag}
+                  {rotuloDaTag(tag)}
                 </button>
                 <button
                   type="button"
                   className={css.chipRemover}
-                  aria-label={`Tirar tag ${tag}`}
+                  aria-label={`Tirar tag ${rotuloDaTag(tag)}`}
                   onClick={() => remover(tag)}
                 >
                   <Icone nome="x" tamanho={20} />

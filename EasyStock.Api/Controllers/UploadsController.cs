@@ -14,10 +14,12 @@ public class UploadsController(
     GerenciarUploadsUseCase gerenciarUploadsUseCase,
     ICurrentUserAccessor currentUserAccessor) : EasyStockControllerBase
 {
-    [SwaggerOperation(Summary = "Upload product photo")]
+    [SwaggerOperation(Summary = "Upload product photo (Gerente only)")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    // #1508: mesma autorização do POST /api/produtos/{id}/fotos (Gerente + módulo Cardápio, ver ModulosConvention).
+    [Authorize(Policy = "Gerente")]
     [HttpPost("produto/{id}/foto")]
     public async Task<IActionResult> UploadFotoProduto(Guid id, [FromQuery] Guid empresaId, IFormFile file, CancellationToken cancellationToken)
     {

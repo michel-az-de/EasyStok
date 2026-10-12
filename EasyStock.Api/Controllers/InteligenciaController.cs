@@ -13,6 +13,7 @@ namespace EasyStock.Api.Controllers;
 
 [SwaggerTag("Intelligence / Inteligência")]
 [Authorize]
+[Authorize(Policy = EasyStock.Api.Authorization.PoliticasPermissao.VisualizarRelatorios)]
 [ValidateEmpresaId]
 [ApiController]
 [Route("api/inteligencia")]

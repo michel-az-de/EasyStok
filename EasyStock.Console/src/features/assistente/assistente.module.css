@@ -19,15 +19,15 @@
 .pontoAtencao {
   position: absolute; top: 4px; right: 4px;
   width: calc(var(--ponto) + 2px); height: calc(var(--ponto) + 2px);
-  border-radius: var(--r-pilula); background: var(--parado);
+  border-radius: var(--r-pilula); background: var(--erro);
   border: var(--b-2) solid var(--papel);
 }
 
 .painel {
   position: fixed; right: var(--e-4); z-index: 32;
   bottom: calc(56px + var(--e-4) + var(--e-2));
-  width: min(384px, calc(100vw - 2 * var(--e-4)));
-  max-height: min(640px, calc(100vh - 140px));
+  width: min(432px, calc(100vw - 2 * var(--e-4)));
+  max-height: min(720px, calc(100dvh - 140px));
   background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
   box-shadow: var(--sombra-alta);
   display: flex; flex-direction: column; overflow: hidden;
@@ -40,24 +40,27 @@
 
 .cabecalho {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
-  padding: var(--e-3) var(--e-2) var(--e-3) var(--e-3);
+  padding: var(--e-3);
   border-bottom: var(--b-1) solid var(--linha); flex-shrink: 0;
 }
 .cabecalho h2 {
   display: flex; align-items: center; gap: var(--e-1);
   font-size: var(--t-apoio); font-weight: 700; margin: 0; color: var(--tinta);
 }
+.contexto { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-corpo); overflow-wrap: anywhere; }
+.identidade { min-width: 0; }
+.clienteDoPainel { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2); overflow-wrap: anywhere; line-height: var(--lh-compacto); }
+.cabecalho > button { flex-shrink: 0; }
 
 .corpo { overflow-y: auto; padding: var(--e-3); display: flex; flex-direction: column; gap: var(--e-3); flex: 1; min-height: 0; }
 
-.cartoes { display: flex; flex-direction: column; gap: var(--e-2); }
+.cartoes { display: flex; flex-direction: column; }
 
 .cartao {
-  border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
-  background: var(--elevado); padding: var(--e-2) var(--e-3);
+  border-bottom: var(--b-1) solid var(--linha); padding: var(--e-2) 0;
 }
-.cartao.perigo { border-color: var(--parado); }
-.cartao.ok { border-color: var(--ok); }
+.cartao.perigo .cartaoTopo h3 { color: var(--erro); }
+.cartao.ok .cartaoTopo h3 { color: var(--sucesso); }
 
 .cartaoTopo { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-2); }
 .cartaoTopo h3 {
@@ -85,17 +88,48 @@
   font-size: var(--t-apoio); border-radius: var(--r-2); padding: var(--e-1) var(--e-2);
   max-width: 92%; overflow-wrap: anywhere; line-height: var(--lh-corpo);
 }
-.perguntaDaThatiane { align-self: flex-end; background: var(--ragu-claro); color: var(--ragu-forte); }
-.respostaDoAssistente { align-self: flex-start; background: var(--elevado); color: var(--tinta); }
-.respostaErro { align-self: flex-start; background: var(--perigo-fundo); color: var(--perigo); }
+.perguntaDaThatiane { align-self: flex-end; background: var(--marca-claro); color: var(--marca-forte); white-space: pre-wrap; }
+.respostaDoAssistente { align-self: stretch; padding: var(--e-2) 0; max-width: 100%; color: var(--tinta); }
+.perguntaDaThatiane p, .respostaDoAssistente p { margin: var(--e-1) 0 0; white-space: pre-wrap; }
+.autor { display: block; font-size: var(--t-apoio); font-weight: 700; }
+.tituloAcoes { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2); font-weight: 700; }
+.respostaErro { align-self: flex-start; background: var(--erro-pastel); color: var(--erro); }
+.falhaConsulta { display: flex; flex-direction: column; align-items: flex-start; gap: var(--e-1); }
+.falhaConsulta .respostaErro { margin: 0; padding: var(--e-2); border-radius: var(--r-1); font-size: var(--t-apoio); line-height: var(--lh-corpo); }
 .respostaPensando { align-self: flex-start; color: var(--tinta-3); font-style: italic; }
 
-.formPergunta { display: flex; align-items: flex-end; gap: var(--e-1); }
-.campoPergunta { flex: 1; }
+/* #1445: ações propostas pelo assistente. Linha simples sob a resposta, sem cartão
+   dentro de cartão; separador fino entre elas. Só tokens existentes. */
+.acoesPropostas { list-style: none; margin: 0; padding: 0; align-self: stretch; display: flex; flex-direction: column; }
+.acaoProposta {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
+  padding: var(--e-2) 0; border-top: var(--b-1) solid var(--linha);
+}
+.acaoProposta:last-child { border-bottom: var(--b-1) solid var(--linha); }
+.acaoTexto { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: var(--t-apoio); }
+.acaoTitulo { display: flex; align-items: center; gap: var(--e-1); font-weight: 700; color: var(--tinta); overflow-wrap: anywhere; }
+.acaoDetalhe { color: var(--tinta-2); line-height: var(--lh-corpo); overflow-wrap: anywhere; }
+.acaoErro { display: flex; align-items: center; gap: var(--e-1); color: var(--erro); }
+.acaoBotao { flex-shrink: 0; }
+.acaoFeita { display: flex; align-items: center; gap: var(--e-1); flex-shrink: 0; font-size: var(--t-apoio); color: var(--sucesso); }
+
+.formPergunta { display: flex; align-items: flex-start; gap: var(--e-2); padding: var(--e-3); border-top: var(--b-1) solid var(--linha); flex-shrink: 0; }
+.formPergunta > div { flex: 1; min-width: 0; }
+.campoPergunta { min-height: 64px; max-height: 160px; resize: vertical; }
 .botaoEnviar { flex-shrink: 0; }
 
 /* Integração do visual: no celular o gatilho de canto sobe para cima da barra
    de abas (54 px), em vez de cobrir a aba Ficha. */
 @media (max-width: 759px) {
   .gatilho { bottom: calc(54px + var(--e-3) + env(safe-area-inset-bottom, 0px)); right: var(--e-3); width: 52px; height: 52px; }
+  .painel { right: var(--e-2); bottom: calc(54px + var(--e-2) + env(safe-area-inset-bottom, 0px)); width: calc(100vw - 2 * var(--e-2)); max-height: calc(100dvh - 144px); }
+  .acaoProposta { align-items: flex-start; flex-wrap: wrap; }
+  .acaoTexto { flex: 1 1 180px; }
+  .acaoBotao { min-height: 44px; }
+  .dispensar { min-width: 44px; min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gatilho { transition: none; }
+  .gatilho:hover { transform: none; }
+  .painel { animation: none; }
 }

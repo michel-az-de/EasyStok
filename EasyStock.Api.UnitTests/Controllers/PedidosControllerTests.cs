@@ -48,7 +48,11 @@ public class PedidosControllerTests
 
         var criar = new CriarPedidoUseCase(
             _pedidoRepo, _clienteRepo, _produtoRepo, _uow,
-            NullLogger<CriarPedidoUseCase>.Instance, new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
+            NullLogger<CriarPedidoUseCase>.Instance, new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()),
+            new EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido(
+                Substitute.For<EasyStock.Application.Ports.Output.Lookup.ICepLookupClient>(),
+                Substitute.For<EasyStock.Application.Ports.Output.Lookup.IGeocodingClient>(), TimeProvider.System,
+                NullLogger<EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido>.Instance));
 
         var estoqueIntegration = new PedidoEstoqueIntegrationService(
             Substitute.For<IItemEstoqueRepository>(),
@@ -71,6 +75,8 @@ public class PedidosControllerTests
             criarContaReceber,
             NullLogger<GerarContaReceberDePedidoUseCase>.Instance);
 
+        _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>()(ci.Arg<CancellationToken>()));
         var status = new AtualizarStatusPedidoUseCase(
             _pedidoRepo,
             estoqueIntegration,
@@ -80,16 +86,18 @@ public class PedidosControllerTests
             Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>(),
             _uow,
             NullLogger<AtualizarStatusPedidoUseCase>.Instance,
-            new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
+            new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()),
+            new EasyStock.Application.UseCases.CancelarPedido.CancelarPedidoUseCase(_pedidoRepo, estoqueIntegration, new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(Substitute.For<IContaReceberRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>(), NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance), _uow, Microsoft.Extensions.Logging.Abstractions.NullLogger<EasyStock.Application.UseCases.CancelarPedido.CancelarPedidoUseCase>.Instance, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(), Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>()));
 
         var cancelar = new CancelarPedidoUseCase(
-            _pedidoRepo, estoqueIntegration, Substitute.For<IContaReceberRepository>(),
-            _uow, NullLogger<CancelarPedidoUseCase>.Instance);
+            _pedidoRepo, estoqueIntegration, new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(Substitute.For<IContaReceberRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>(), NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance),
+            _uow, NullLogger<CancelarPedidoUseCase>.Instance, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(), Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>());
 
         var agendamento = new AlterarAgendamentoPedidoUseCase(
             _pedidoRepo, _uow, NullLogger<AlterarAgendamentoPedidoUseCase>.Instance,
             new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(
-                Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
+                Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()),
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>());
 
         var listar = new ListarPedidosUseCase(_pedidoRepo);
 
@@ -106,7 +114,9 @@ public class PedidosControllerTests
             new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()), QuitacaoPedidoTeste.Criar(_pedidoRepo));
 
         var removePag = new RemoverPagamentoPedidoUseCase(
-            _pedidoRepo, _uow, NullLogger<RemoverPagamentoPedidoUseCase>.Instance, QuitacaoPedidoTeste.Criar(_pedidoRepo));
+            _pedidoRepo, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>(), _uow,
+            NullLogger<RemoverPagamentoPedidoUseCase>.Instance, QuitacaoPedidoTeste.Criar(_pedidoRepo),
+            Substitute.For<ICaixaRepository>());
 
         var criarCliente = new CriarClienteUseCase(
             _clienteRepo, _uow, NullLogger<CriarClienteUseCase>.Instance);
@@ -201,6 +211,61 @@ public class PedidosControllerTests
         await _pedidoRepo.DidNotReceive().AddPagamentoAsync(Arg.Any<PedidoPagamento>());
     }
 
+    [Fact]
+    public async Task AddPagamento_AutorVemDaSessao_NaoDoCorpo()
+    {
+        _uow.SetupExecuteInTransactionSemRetry<EasyStock.Application.UseCases.Pedidos.PedidoResult?>();
+        var pedido = MakePedido(_empresaId);
+        _pedidoRepo.GetByIdWithDetailsAsync(_empresaId, pedido.Id).Returns(pedido);
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
+            {
+                User = new System.Security.Claims.ClaimsPrincipal(
+                    new System.Security.Claims.ClaimsIdentity([new System.Security.Claims.Claim("nome", "Ana")], "test"))
+            }
+        };
+
+        await _controller.AddPagamento(pedido.Id,
+            new RegistrarPagamentoPedidoCommand(_empresaId, pedido.Id, "pix", 100m, RegistradoPorNome: "Mercado Pago"));
+
+        await _pedidoRepo.Received(1).AddPagamentoAsync(Arg.Is<PedidoPagamento>(p => p.RegistradoPorNome == "Ana"));
+    }
+
+    // #1547: a venda de balcão levava criadoPorNome do corpo para o autor do pagamento.
+    [Theory]
+    [InlineData("Ana", "Ana")]
+    [InlineData(null, "Nome do corpo")]
+    public async Task CreateBalcao_AutorDoPagamentoVemDaSessao_ECorpoSoValeSemSessao(string? nomeDaSessao, string esperado)
+    {
+        _uow.SetupExecuteInTransactionSemRetry<EasyStock.Application.UseCases.Pedidos.PedidoResult?>();
+        _uow.SetupExecuteInTransactionSemRetry<FinalizarVendaBalcaoResult>();
+        _clienteRepo.SearchAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<int>())
+            .Returns(Task.FromResult<IEnumerable<Cliente>>([]));
+        var produtoId = Guid.NewGuid();
+        _produtoRepo.GetByIdAsync(_empresaId, produtoId)
+            .Returns(new Produto { Id = produtoId, EmpresaId = _empresaId, Nome = "Marmita", Status = StatusProduto.Ativo });
+        Pedido? criado = null;
+        await _pedidoRepo.AddAsync(Arg.Do<Pedido>(x => criado = x));
+        _pedidoRepo.GetByIdWithDetailsAsync(_empresaId, Arg.Any<Guid>()).Returns(_ => criado);
+        _pedidoRepo.GetByIdAsync(_empresaId, Arg.Any<Guid>()).Returns(_ => criado);
+        var claims = nomeDaSessao is null ? [] : new[] { new System.Security.Claims.Claim("nome", nomeDaSessao) };
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
+            {
+                User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(claims, "test"))
+            }
+        };
+
+        await _controller.CreateBalcao(new FinalizarVendaBalcaoCommand(_empresaId,
+            ClienteNomeAdHoc: "Cliente do balcão",
+            Itens: [new FinalizarVendaBalcaoItemInput("Marmita", 1, 30m, ProdutoId: produtoId)],
+            Pagou: true, FormaPagamento: "pix", CriadoPorNome: "Nome do corpo"));
+
+        await _pedidoRepo.Received(1).AddPagamentoAsync(Arg.Is<PedidoPagamento>(x => x.RegistradoPorNome == esperado));
+    }
+
     // ── GetById ───────────────────────────────────────────────────────────────
 
     [Fact]
@@ -231,6 +296,28 @@ public class PedidosControllerTests
     }
 
     // ── Cancelar ──────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Operador_nao_cancela_pago_mesmo_forjando_nivel_no_body(bool viaStatus)
+    {
+        _currentUser.Nivel.Returns(NivelAcesso.Operador);
+        _currentUser.EmpresaId.Returns(_empresaId);
+        var pedido = Pedido.Criar(_empresaId);
+        pedido.Pagamentos.Add(new PedidoPagamento { Valor = 10m, Metodo = "dinheiro" });
+        _pedidoRepo.GetByIdWithDetailsAsync(_empresaId, pedido.Id).Returns(pedido);
+
+        Func<Task> acao = viaStatus
+            ? () => _controller.UpdateStatus(pedido.Id, new AtualizarStatusPedidoCommand(
+                _empresaId, pedido.Id, "cancelado", NivelSolicitante: NivelAcesso.Admin))
+            : () => _controller.Cancelar(pedido.Id, new CancelarPedidoCommand(
+                _empresaId, pedido.Id, Motivo: "desistiu", NivelSolicitante: NivelAcesso.Admin));
+
+        await acao.Should().ThrowAsync<UnauthorizedAccessException>();
+        pedido.Status.Should().Be("aguardando");
+        await _uow.DidNotReceive().CommitAsync();
+    }
 
     [Fact]
     public async Task Cancelar_DeveRetornarOk_QuandoPedidoCancelado()

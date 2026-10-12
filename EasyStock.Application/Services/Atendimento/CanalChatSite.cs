@@ -17,8 +17,14 @@ public sealed class CanalChatSite : ICanalMensageria
     public Task<string> EnviarTextoAsync(string contatoIdExterno, string texto, CancellationToken ct = default) =>
         Task.FromResult(PrefixoIdExterno + Guid.NewGuid().ToString("N"));
 
+    /// <summary>
+    /// #1448: como o texto, a foto é a mensagem gravada; o visitante busca o arquivo pela sessão
+    /// (<c>GET api/public/chat/{slug}/mensagens/{id}/midia</c>). Quem segura o envio hoje é
+    /// <see cref="Domain.ValueObjects.CapacidadesCanal"/> (<c>AceitaImagem</c> desligado até o widget do
+    /// site desenhar imagem).
+    /// </summary>
     public Task<string> EnviarImagemAsync(string contatoIdExterno, string urlPublica, string? legenda = null, CancellationToken ct = default) =>
-        throw new NotSupportedException("O chat do site só aceita texto.");
+        Task.FromResult(PrefixoIdExterno + Guid.NewGuid().ToString("N"));
 
     public Task<string> EnviarBotoesAsync(
         string contatoIdExterno, string corpo, IReadOnlyList<(string Id, string Titulo)> botoes, CancellationToken ct = default) =>

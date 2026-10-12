@@ -105,6 +105,24 @@ public class MercadoPagoWebhookProcessorTests
         f.Cobranca.Motivo.Should().Be($"pagamento_recusado: pagamento {MercadoPagoWebhookFixture.PagamentoId} ({status})");
     }
 
+    [Theory]
+    [InlineData("approved")]
+    [InlineData("refunded")]
+    public async Task Devolucao_consultada_na_fonte_usa_ledger_sem_exclusao_legada(string status)
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 25m);
+        var processor = f.Processor();
+        await processor.ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+        f.Pagamentos[MercadoPagoWebhookFixture.PagamentoId] = f.Pagamentos[MercadoPagoWebhookFixture.PagamentoId]
+            with { Status = status, TransactionAmountRefunded = 10 };
+        f.EstornosOnline.SincronizarPagamentoAsync(Arg.Any<PagamentoMercadoPago>(), Arg.Any<CancellationToken>()).Returns(true);
+        await processor.ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+        await f.EstornosOnline.Received(1).SincronizarPagamentoAsync(
+            Arg.Is<PagamentoMercadoPago>(p => p.TransactionAmountRefunded == 10 && p.ExternalReference == f.Pedido.Id.ToString()), Arg.Any<CancellationToken>());
+        f.Cobranca.Status.Should().Be(StatusCobrancaPedido.Paga, "o ledger confirma a cobrança somente quando o total foi devolvido");
+    }
+
     [Fact]
     public async Task RefundedMarcaEstornoNaCobranca()
     {

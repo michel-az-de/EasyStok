@@ -42,11 +42,13 @@ public sealed class SugerirRespostaAgenteUseCase(
         "consultar_cardapio", "consultar_caderno", "consultar_pedido", "listar_endereco_salvo",
     };
 
-    internal const string InstrucaoSugestao =
+    public const string InstrucaoSugestao =
         "MODO SUGESTÃO: a dona assumiu esta conversa e pediu uma sugestão. Escreva só o texto da próxima " +
         "mensagem da loja para o cliente, pronto para ela revisar e enviar; nada do que você escrever sai sozinho. " +
         "Você só tem ferramentas de consulta: não crie pedido, não encerre nem escale. Se a resposta depender de " +
-        "algo que só a dona decide, escreva a mensagem mesmo assim e deixe esse ponto entre colchetes.";
+        "algo que só a dona decide, escreva a mensagem mesmo assim e deixe esse ponto entre colchetes. " +
+        "Escreva de 1 a 3 frases curtas de WhatsApp, direto ao ponto: sem floreio, sem repetir o que o cliente disse, " +
+        "sem nova saudação e sem fechar com oferta genérica de ajuda.";
 
     internal const string PedidoDaDona = "[pedido interno da dona] Sugira a próxima mensagem da loja para o cliente.";
 

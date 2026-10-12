@@ -24,6 +24,7 @@ namespace EasyStock.Api.UnitTests.Notifications;
 /// </summary>
 public class ClassificacaoDeFalhaTests
 {
+    private static readonly Guid EmpresaPush = Guid.NewGuid();
     private const string Telefone = "+5511999990001";
     private const string Email = "maria.souza@example.com";
 
@@ -149,6 +150,61 @@ public class ClassificacaoDeFalhaTests
         await act.Should().ThrowAsync<OperationCanceledException>();
     }
 
+    [Fact]
+    public async Task Twilio_conexao_que_nem_abriu_segue_transitoria()
+    {
+        // #1507: DNS, recusa e TLS falham antes de o pedido sair. Nada saiu, então o outbox pode repetir.
+        var http = new FabricaHttpContada(_ => throw new HttpRequestException(HttpRequestError.ConnectionError, "recusada"));
+
+        var resultado = await TwilioSms(http).EnviarAsync(Mensagem(CanalNotificacao.Sms, Telefone));
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaTransitoria);
+    }
+
+    // ----- Zenvia (SMS sai no máximo uma vez, como o Twilio) -----
+
+    private static ZenviaSmsProvider ZenviaSms(FabricaHttpContada http) =>
+        new(http, Options.Create(new ZenviaSmsOptions()), NullLogger<ZenviaSmsProvider>.Instance);
+
+    [Theory]
+    [InlineData(HttpStatusCode.OK, DesfechoEnvio.Enviado)]
+    [InlineData(HttpStatusCode.BadRequest, DesfechoEnvio.FalhaPermanente)]
+    [InlineData(HttpStatusCode.TooManyRequests, DesfechoEnvio.FalhaTransitoria)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, DesfechoEnvio.Indeterminado)]
+    public async Task Zenvia_classifica_pelo_status_http_sem_retentativa(HttpStatusCode status, DesfechoEnvio esperado)
+    {
+        var http = new FabricaHttpContada(status);
+
+        var resultado = await ZenviaSms(http).EnviarAsync(Mensagem(CanalNotificacao.Sms, Telefone));
+
+        resultado.Desfecho.Should().Be(esperado);
+        resultado.ProviderUsado.Should().Be("zenvia");
+        http.Chamadas.Should().Be(1, "o POST do SMS não é idempotente: repetir pode entregar duas vezes");
+    }
+
+    [Fact]
+    public async Task Zenvia_queda_de_conexao_vira_Indeterminado_sem_retentativa()
+    {
+        var http = new FabricaHttpContada(_ => throw new HttpRequestException("conexão encerrada"));
+
+        var resultado = await ZenviaSms(http).EnviarAsync(Mensagem(CanalNotificacao.Sms, Telefone));
+
+        resultado.Desfecho.Should().Be(DesfechoEnvio.Indeterminado);
+        http.Chamadas.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Zenvia_com_cancelamento_do_chamador_propaga_em_vez_de_virar_falha()
+    {
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        var http = new FabricaHttpContada(ct => Task.FromCanceled<HttpResponseMessage>(ct));
+
+        var act = () => ZenviaSms(http).EnviarAsync(Mensagem(CanalNotificacao.Sms, Telefone), cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
     // ----- Web Push -----
 
     private static WebPushOptions OpcoesVapid()
@@ -157,7 +213,7 @@ public class ClassificacaoDeFalhaTests
         return new WebPushOptions { Subject = "mailto:teste@example.com", PublicKey = chaves.PublicKey, PrivateKey = chaves.PrivateKey };
     }
 
-    private static WebPushSubscription Inscricao(Guid usuarioId, string endpoint = "https://push.example.test/send/abc")
+    private static WebPushSubscription Inscricao(Guid usuarioId, string endpoint = "https://fcm.googleapis.com/fcm/send/abc")
     {
         // Chave pública P-256 (65 bytes, formato não comprimido) e segredo de 16 bytes: o que o navegador envia.
         using var ecdh = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
@@ -169,11 +225,27 @@ public class ClassificacaoDeFalhaTests
         return WebPushSubscription.Criar(endpoint,
             System.Buffers.Text.Base64Url.EncodeToString(p256dh),
             System.Buffers.Text.Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(16)),
-            usuarioId: usuarioId);
+            empresaId: EmpresaPush, usuarioId: usuarioId);
     }
 
     private static MensagemPronta MensagemPush(Guid usuarioId) =>
-        Mensagem(CanalNotificacao.Push, $"usuario:{usuarioId}");
+        Mensagem(CanalNotificacao.Push, $"usuario:{usuarioId}") with { EmpresaId = EmpresaPush };
+
+    [Fact]
+    public async Task WebPush_NaoEntregaEmOutraEmpresaOuOutroDestinatario()
+    {
+        var usuarioId = Guid.NewGuid();
+        var outraEmpresa = Inscricao(usuarioId);
+        outraEmpresa.EmpresaId = Guid.NewGuid();
+        var outroUsuario = Inscricao(Guid.NewGuid());
+        var (canal, _, handler) = CanalWebPush(usuarioId, _ => new HttpResponseMessage(HttpStatusCode.Created),
+            outraEmpresa, outroUsuario);
+
+        var resultado = await canal.EnviarAsync(MensagemPush(usuarioId));
+
+        resultado.ErroDetalhado.Should().Be("NENHUMA_SUBSCRIPTION_ATIVA");
+        handler.Chamadas.Should().Be(0);
+    }
 
     private sealed class HandlerWebPush(Func<HttpRequestMessage, HttpResponseMessage> responder) : HttpMessageHandler
     {
@@ -212,6 +284,30 @@ public class ClassificacaoDeFalhaTests
         using var scope = provider.CreateScope();
 
         scope.ServiceProvider.GetRequiredService<ICanalNotificacao>().Should().BeOfType<WebPushCanal>();
+    }
+
+    [Fact]
+    public async Task WebPush_no_container_envia_pelo_HttpClient_da_fabrica()
+    {
+        // #1507: o canal é scoped; um WebPushClient próprio por escopo criava um HttpClient que nunca era descartado.
+        var usuarioId = Guid.NewGuid();
+        var handler = new HandlerWebPush(_ => new HttpResponseMessage(HttpStatusCode.Created));
+        var repo = Substitute.For<IWebPushSubscriptionRepository>();
+        repo.GetByUsuarioAsync(usuarioId, Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<WebPushSubscription>)[Inscricao(usuarioId)]);
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(repo);
+        services.AddSingleton(Options.Create(OpcoesVapid()));
+        services.AddHttpClient(WebPushCanal.NomeHttpClient).ConfigurePrimaryHttpMessageHandler(() => handler);
+        services.AddScoped<ICanalNotificacao, WebPushCanal>();
+
+        using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+        using var scope = provider.CreateScope();
+        var resultado = await scope.ServiceProvider.GetRequiredService<ICanalNotificacao>().EnviarAsync(MensagemPush(usuarioId));
+
+        resultado.Sucesso.Should().BeTrue();
+        handler.Chamadas.Should().Be(1);
     }
 
     [Fact]
@@ -287,13 +383,28 @@ public class ClassificacaoDeFalhaTests
             r => new HttpResponseMessage(r.RequestUri!.AbsolutePath.EndsWith("/boa", StringComparison.Ordinal)
                 ? HttpStatusCode.Created
                 : HttpStatusCode.BadRequest),
-            Inscricao(usuarioId, "https://push.example.test/send/boa"),
-            Inscricao(usuarioId, "https://push.example.test/send/ruim"));
+            Inscricao(usuarioId, "https://fcm.googleapis.com/fcm/send/boa"),
+            Inscricao(usuarioId, "https://fcm.googleapis.com/fcm/send/ruim"));
 
         var resultado = await canal.EnviarAsync(MensagemPush(usuarioId));
 
         resultado.Desfecho.Should().Be(DesfechoEnvio.Enviado);
         handler.Chamadas.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task WebPush_endpoint_fora_da_allowlist_nao_e_chamado_e_e_desativado()
+    {
+        // #1508: inscricao gravada antes da validacao nao pode virar SSRF a partir do worker.
+        var usuarioId = Guid.NewGuid();
+        var (canal, repo, handler) = CanalWebPush(usuarioId, _ => new HttpResponseMessage(HttpStatusCode.Created),
+            Inscricao(usuarioId, "http://169.254.169.254/latest/meta-data"));
+
+        var resultado = await canal.EnviarAsync(MensagemPush(usuarioId));
+
+        handler.Chamadas.Should().Be(0);
+        resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaPermanente);
+        await repo.Received(1).DesativarAsync("http://169.254.169.254/latest/meta-data", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -305,8 +416,8 @@ public class ClassificacaoDeFalhaTests
             r => new HttpResponseMessage(r.RequestUri!.AbsolutePath.EndsWith("/ruim", StringComparison.Ordinal)
                 ? HttpStatusCode.BadRequest
                 : HttpStatusCode.ServiceUnavailable),
-            Inscricao(usuarioId, "https://push.example.test/send/ruim"),
-            Inscricao(usuarioId, "https://push.example.test/send/fora"));
+            Inscricao(usuarioId, "https://fcm.googleapis.com/fcm/send/ruim"),
+            Inscricao(usuarioId, "https://fcm.googleapis.com/fcm/send/fora"));
 
         var resultado = await canal.EnviarAsync(MensagemPush(usuarioId));
 

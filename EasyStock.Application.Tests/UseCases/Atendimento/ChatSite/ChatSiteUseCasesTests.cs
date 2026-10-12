@@ -162,14 +162,41 @@ public class ChatSiteUseCasesTests
     }
 
     [Fact]
-    public async Task CanalChatSite_DevolveIdExternoESoTexto()
+    public async Task CanalChatSite_DevolveIdExternoParaTextoEFoto()
     {
         var canal = new CanalChatSite();
 
         (await canal.EnviarTextoAsync("sessao", "olá")).Should().StartWith(CanalChatSite.PrefixoIdExterno);
         canal.Canal.Should().Be(CanalConversa.ChatSite);
-        var imagem = () => canal.EnviarImagemAsync("sessao", "https://x/y.png");
-        await imagem.Should().ThrowAsync<NotSupportedException>();
+        // #1448: a foto da loja é a mensagem gravada (o visitante busca a mídia pela sessão). O que ainda
+        // segura o envio é a capacidade do canal, desligada até o widget do site desenhar imagem.
+        (await canal.EnviarImagemAsync("sessao", "https://x/y.png")).Should().StartWith(CanalChatSite.PrefixoIdExterno);
+        var botoes = () => canal.EnviarBotoesAsync("sessao", "x", [("a", "A")]);
+        await botoes.Should().ThrowAsync<NotSupportedException>();
+    }
+
+    [Fact]
+    public async Task MensagemDoChat_DizOTipoESeTemMidia()
+    {
+        var (sessao, token) = SessaoValida();
+        var conversaId = Guid.NewGuid();
+        sessao.VincularConversa(conversaId);
+        var foto = Mensagem.Saida(_loja.EmpresaId, conversaId, AutorMensagem.Dona, DateTime.UtcNow, TipoConteudoMensagem.Imagem, null, "chatsite:1");
+        foto.AnexarMidia("atendimento/e/c/f.jpg", "image/jpeg");
+        var texto = Mensagem.Saida(_loja.EmpresaId, conversaId, AutorMensagem.Dona, DateTime.UtcNow, TipoConteudoMensagem.Texto, "oi", "chatsite:2");
+        _conversas.ListarMensagensDepoisAsync(_loja.EmpresaId, conversaId, null, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([foto, texto]);
+
+        var lista = await new ListarMensagensChatSiteUseCase(_acesso, _sessoes, _conversas).ExecuteAsync(Slug, token, null);
+
+        lista.Select(m => (m.Tipo, m.TemMidia)).Should().Equal(("imagem", true), ("texto", false));
+    }
+
+    [Fact]
+    public void ChatSite_SegueSemAceitarFotoAteOWidgetDesenhar()
+    {
+        // #1448: dependência do widget (repo casa-da-baba). Ligar só quando ele desenhar `tipo: imagem`.
+        EasyStock.Domain.ValueObjects.CapacidadesCanal.Para(CanalConversa.ChatSite).AceitaImagem.Should().BeFalse();
     }
     [Fact]
     public async Task Stream_UsaSnapshotAtualENaoSessaoRastreadaAntesDoLogout()

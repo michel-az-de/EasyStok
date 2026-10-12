@@ -55,7 +55,7 @@ public class GerenciarComposicaoUseCase(
             throw new UseCaseValidationException("INVALID_RENDIMENTO", "Rendimento deve ser maior que zero.");
 
         // Valida produto-final pertence a empresa
-        var produto = await produtoRepository.GetByIdAsync(command.EmpresaId, command.ProdutoFinalId)
+        var produto = await produtoRepository.GetByIdParaAtualizarAsync(command.EmpresaId, command.ProdutoFinalId)
             ?? throw new UseCaseValidationException("PRODUTO_NOT_FOUND", "Produto-final nao encontrado.");
 
         if (produto.EmpresaId != command.EmpresaId)
@@ -135,7 +135,7 @@ public class GerenciarComposicaoUseCase(
                 }, innerCt);
             }
 
-            // Atualiza rendimento + unidade no Produto (carrega novamente pra ter xmin atual)
+            // A leitura rastreada conserva o xmin original e detecta alteração concorrente.
             produto.RendimentoBase = command.RendimentoBase;
             produto.RendimentoUnidade = command.RendimentoUnidade;
             produto.UnidadeMedidaBase = command.UnidadeMedidaBaseProdutoFinal;

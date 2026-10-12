@@ -56,6 +56,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var salesByLoja = await dbContext.MovimentacoesEstoque.AsNoTracking()
                 .Where(m => m.EmpresaId == empresaId &&
                     m.Tipo == EasyStock.Domain.Enums.TipoMovimentacaoEstoque.Saida &&
+                    m.Natureza == NaturezaMovimentacaoEstoque.Venda &&
                     m.DataMovimentacao >= de && m.DataMovimentacao <= ate &&
                     m.ItemEstoque != null && m.ItemEstoque.LojaId != null)
                 .GroupBy(m => m.ItemEstoque!.LojaId!.Value)
@@ -69,7 +70,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             // Company-wide average daily sales for velocity scoring
             var totalEmpresaSaidas = salesByLoja.Values.Sum(s => s.TotalSaidas);
-            var mediaEmpresaDiaria = lojas.Count > 0 ? (decimal)totalEmpresaSaidas / dias / lojas.Count : 0m;
+            var mediaEmpresaDiaria = (decimal)totalEmpresaSaidas / dias / lojas.Count;
 
             var result = lojas.Select(loja =>
             {
@@ -143,7 +144,6 @@ namespace EasyStock.Infra.Postgre.Repositories
                 {
                     IsCritical = (int)i.QuantidadeAtual <= 2,
                     IsBelowMin = (int)i.QuantidadeAtual < i.QuantidadeMinima,
-                    IsExpiring = i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade,
                     IsIdle = i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoffParado,
                     ValorVencendo = i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade
                         ? (decimal)i.CustoUnitario * (int)i.QuantidadeAtual : 0m
@@ -160,6 +160,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var empresaSaidas = await dbContext.MovimentacoesEstoque.AsNoTracking()
                 .Where(m => m.EmpresaId == empresaId &&
                     m.Tipo == EasyStock.Domain.Enums.TipoMovimentacaoEstoque.Saida &&
+                    m.Natureza == NaturezaMovimentacaoEstoque.Venda &&
                     m.DataMovimentacao >= de && m.DataMovimentacao <= ate)
                 .SumAsync(m => (int)m.Quantidade);
             var lojasCount = await dbContext.Lojas.AsNoTracking()
@@ -207,6 +208,8 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<IReadOnlyList<ProdutoTurnover>> GetTopProdutosPorLojaAsync(
             Guid empresaId, Guid lojaId, int periodoDias = 30, int top = 10, bool ascending = false)
         {
+            if (top <= 0) return [];
+
             var cacheKey = $"analytics:turnover:{empresaId}:{lojaId}:{periodoDias}:{top}:{ascending}";
             var cached = await GetCachedAsync<List<ProdutoTurnover>>(cacheKey);
             if (cached is not null) return cached;
@@ -215,9 +218,10 @@ namespace EasyStock.Infra.Postgre.Repositories
             var ate = DateTime.UtcNow;
             var dias = Math.Max(1, periodoDias);
 
-            var raw = await dbContext.MovimentacoesEstoque.AsNoTracking()
+            var grouped = dbContext.MovimentacoesEstoque.AsNoTracking()
                 .Where(m => m.EmpresaId == empresaId &&
                     m.Tipo == EasyStock.Domain.Enums.TipoMovimentacaoEstoque.Saida &&
+                    m.Natureza == NaturezaMovimentacaoEstoque.Venda &&
                     m.DataMovimentacao >= de && m.DataMovimentacao <= ate &&
                     m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId)
                 .Join(dbContext.Produtos.AsNoTracking(), m => m.ProdutoId, p => p.Id, (m, p) => new
@@ -227,21 +231,28 @@ namespace EasyStock.Infra.Postgre.Repositories
                     Quantidade = (int)m.Quantidade,
                     Valor = (decimal?)m.ValorTotal ?? 0m
                 })
-                .ToListAsync();
-
-            var grouped = raw
                 .GroupBy(x => new { x.ProdutoId, x.NomeProduto })
-                .Select(g => new ProdutoTurnover(
-                    ProdutoId: g.Key.ProdutoId,
-                    NomeProduto: g.Key.NomeProduto,
-                    QuantidadeVendida: g.Sum(x => x.Quantidade),
-                    ReceitaGerada: Math.Round(g.Sum(x => x.Valor), 2),
-                    TaxaSaidaDiaria: Math.Round((decimal)g.Sum(x => x.Quantidade) / dias, 2)));
+                .Select(g => new
+                {
+                    g.Key.ProdutoId,
+                    g.Key.NomeProduto,
+                    QuantidadeVendida = g.Sum(x => x.Quantidade),
+                    ReceitaGerada = g.Sum(x => x.Valor)
+                });
 
-            var result = (ascending
+            var linhas = await (ascending
                 ? grouped.OrderBy(x => x.QuantidadeVendida)
                 : grouped.OrderByDescending(x => x.QuantidadeVendida))
+                .ThenBy(x => x.ProdutoId)
                 .Take(top)
+                .ToListAsync();
+
+            var result = linhas.Select(l => new ProdutoTurnover(
+                    ProdutoId: l.ProdutoId,
+                    NomeProduto: l.NomeProduto,
+                    QuantidadeVendida: l.QuantidadeVendida,
+                    ReceitaGerada: Math.Round(l.ReceitaGerada, 2),
+                    TaxaSaidaDiaria: Math.Round((decimal)l.QuantidadeVendida / dias, 2)))
                 .ToList();
 
             await SetCachedAsync(cacheKey, result, ComparacaoTtl);

@@ -49,7 +49,7 @@ public class ConsoleTagHumanaTests
         var resolvedor = new ResolvedorCanal([_whatsApp, new CanalMessenger(_meta), new CanalInstagram(_meta)]);
 
         _controller = new AtendimentoConversasController(
-            new ListarConversasAtendimentoUseCase(_conversas),
+            new ListarConversasAtendimentoUseCase(_conversas, ConfiguracoesPadrao(), Microsoft.Extensions.Options.Options.Create(new EasyStock.Application.Services.Notifications.PrazosOptions())),
             new ListarMensagensConversaUseCase(_conversas),
             new EnviarMensagemConsoleUseCase(_conversas, resolvedor, uploads, _uow),
             new ReenviarMensagemUseCase(_conversas, ConfiguracoesPadrao(), resolvedor,
@@ -94,6 +94,7 @@ public class ConsoleTagHumanaTests
     {
         var configuracoes = Substitute.For<IConfiguracaoAtendimentoRepository>();
         configuracoes.GetOrDefaultAsync(Arg.Any<Guid>()).Returns(c => ConfiguracaoAtendimento.CriarPadrao(c.Arg<Guid>()));
+        configuracoes.GetByEmpresaIdAsync(Arg.Any<Guid>()).Returns(c => ConfiguracaoAtendimento.CriarPadrao(c.Arg<Guid>()));
         return configuracoes;
     }
 

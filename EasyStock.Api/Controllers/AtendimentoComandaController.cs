@@ -69,7 +69,7 @@ public class AtendimentoComandaController(
 
         return Tratar(async () => DataOk(await gerarPedidoUseCase.ExecuteAsync(new GerarPedidoConversaInput(
             currentUser.EmpresaId, id,
-            body.Itens.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd, i.Observacao)).ToList(),
+            body.Itens.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd, i.Observacao, i.VariacaoId)).ToList(),
             body.JanelaId, body.DataEntrega, body.EnderecoId, body.Forma, body.Observacoes), ct)));
     }
 
@@ -118,4 +118,5 @@ public sealed record GerarPedidoConversaBody(
     string? Forma = null,
     string? Observacoes = null);
 
-public sealed record ItemComandaBody(Guid CardapioItemId, int Qtd, string? Observacao = null);
+/// <param name="VariacaoId">M1.4b (#1531): a porção escolhida; null em prato com porções usa a padrão.</param>
+public sealed record ItemComandaBody(Guid CardapioItemId, int Qtd, string? Observacao = null, Guid? VariacaoId = null);

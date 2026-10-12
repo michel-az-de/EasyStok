@@ -1,5 +1,6 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using Microsoft.Extensions.Logging;
 
@@ -24,6 +25,7 @@ namespace EasyStock.Infra.Async.Pagamentos.Webhooks;
 /// </summary>
 public sealed class EfiPixWebhookProcessor(
     ReconciliarPixParcelaReceberUseCase reconciliarPixParcelaReceberUseCase,
+    IUnitOfWork unitOfWork,
     ILogger<EfiPixWebhookProcessor> logger) : IGatewayWebhookProcessor
 {
     public const string ErroTxidDesconhecido = "txid_desconhecido";
@@ -85,6 +87,9 @@ public sealed class EfiPixWebhookProcessor(
             catch (Exception ex)
             {
                 logger.LogError(ex, "EfiPixWebhookProcessor: falha ao processar txid {Txid}", txid);
+                // #1598: a baixa que ficou pela metade no contexto sairia no commit do próximo txid.
+                // O que os txid anteriores já gravaram não está pendente e não é afetado.
+                unitOfWork.DescartarAlteracoesPendentes();
                 if (ex is OperationCanceledException) throw;
                 falha ??= ex;
             }

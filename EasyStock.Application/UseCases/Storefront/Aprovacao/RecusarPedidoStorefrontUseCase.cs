@@ -6,6 +6,7 @@ using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.Storefront.Aprovacao.Exceptions;
 using EasyStock.Domain.Entities.Pagamentos;
@@ -133,7 +134,7 @@ public sealed class RecusarPedidoStorefrontUseCase(
 
             // 4. #1289: devolve o dinheiro antes de mudar qualquer coisa.
             var agora = DateTime.UtcNow;
-            var estornadas = await EstornarCobrancasPagasAsync(pedido, motivoCanonical, agora, innerCt);
+            var estornadas = await EstornarCobrancasPagasAsync(pedido, motivoCanonical, agora, input.NivelSolicitante, innerCt);
             conversaAviso = estornadas.Select(c => c.ConversaId).FirstOrDefault(c => c is not null);
 
             // 5. Aplicar transição + audit trail.
@@ -199,9 +200,11 @@ public sealed class RecusarPedidoStorefrontUseCase(
     /// uma falha) não devolve duas vezes.
     /// </summary>
     private async Task<IReadOnlyList<CobrancaPedido>> EstornarCobrancasPagasAsync(
-        PedidoEntity pedido, string motivoCanonical, DateTime agora, CancellationToken ct)
+        PedidoEntity pedido, string motivoCanonical, DateTime agora, NivelAcesso nivel, CancellationToken ct)
     {
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(pedido.EmpresaId, pedido.Id, ct);
+        EfeitosCancelamentoPedido.ExigirPermissao(
+            pedido.TotalPago > 0 || cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga), nivel);
         var pagas = cobrancas
             .Where(c => c.Status == StatusCobrancaPedido.Paga && c.EhOnline && !string.IsNullOrWhiteSpace(c.PagamentoExternoId))
             .ToList();

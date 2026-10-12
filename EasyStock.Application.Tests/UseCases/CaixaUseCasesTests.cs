@@ -1,3 +1,5 @@
+using EasyStock.Application.Tests.Helpers;
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.Caixa;
@@ -19,6 +21,9 @@ public class CaixaUseCasesTests
 {
     private readonly ICaixaRepository _repo = Substitute.For<ICaixaRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+
+    // #1547: a saída interativa roda dentro de ExecuteInTransactionSemRetryAsync.
+    public CaixaUseCasesTests() => _uow.SetupExecuteInTransactionSemRetry<MovimentoCaixaResult>();
 
     // ════════════════════════════════════════════════════════════════════
     // AbrirCaixa
@@ -64,6 +69,23 @@ public class CaixaUseCasesTests
 
         await act.Should().ThrowAsync<UseCaseValidationException>()
             .WithMessage("*já foi fechado*");
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task AbrirCaixa_DeveLancarValidation_QuandoCaixaDeDiaAnteriorFicouAberto()
+    {
+        // #1506: abrir hoje por cima de uma sessao de ontem deixava ontem sem fechamento.
+        var empresaId = Guid.NewGuid();
+        _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
+        _repo.GetAberturaPendenteAsync(empresaId, null)
+            .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 80m, DateTime.UtcNow.AddDays(-1), null));
+
+        var useCase = new AbrirCaixaUseCase(_repo, _uow, Substitute.For<ILogger<AbrirCaixaUseCase>>());
+
+        var act = () => useCase.ExecuteAsync(new AbrirCaixaCommand(empresaId, 100m));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*ficou aberto*");
         await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
     }
 
@@ -283,6 +305,50 @@ public class CaixaUseCasesTests
         await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
     }
 
+    // 15h UTC = meio-dia em Brasília: o dia operacional não depende do fuso de quem roda o teste.
+    private static readonly DateTime InstanteFixo = new(2026, 10, 5, 15, 0, 0, DateTimeKind.Utc);
+    private static readonly DateOnly DiaFixo = HorarioBrasil.DataOperacional(InstanteFixo);
+
+    // #1598: o fechamento sem loja é o da empresa e soma os movimentos de todas as lojas.
+    [Fact]
+    public async Task RegistrarMovimento_de_loja_e_recusado_quando_a_empresa_ja_fechou_o_dia()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        _repo.GetFechamentoDoDiaAsync(empresaId, DiaFixo, null)
+            .Returns(FechamentoCaixa.Criar(empresaId, DiaFixo, 0, 0, 0, 0, 0));
+
+        var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
+
+        var act = () => useCase.ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "entrada", 50m, LojaId: lojaId, DataMovimento: InstanteFixo));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*já foi fechado*");
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    // #1598, direção inversa: o fechamento de uma loja só soma o que é dela.
+    [Fact]
+    public async Task RegistrarMovimento_sem_loja_segue_livre_quando_so_uma_loja_fechou_o_dia()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        _repo.GetFechamentoDoDiaAsync(empresaId, DiaFixo, lojaId)
+            .Returns(FechamentoCaixa.Criar(empresaId, DiaFixo, 0, 0, 0, 0, 0, lojaId));
+
+        var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
+
+        await useCase.ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "entrada", 50m, DataMovimento: InstanteFixo));
+
+        await _repo.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m => m.LojaId == null));
+    }
+
     [Fact]
     public async Task RegistrarMovimento_DeveCommitarMovimento_QuandoEntradaValida()
     {
@@ -327,8 +393,124 @@ public class CaixaUseCasesTests
                 Descricao: "Sangria", Metodo: "dinheiro"));
 
         await act.Should().ThrowAsync<UseCaseValidationException>()
-            .WithMessage("*saldo*");
+            .WithMessage("*gaveta*");
         await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_DeveBloquearSaidaPorPix_QuandoMaiorQueSaldoDoDia()
+    {
+        var empresaId = Guid.NewGuid();
+        _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m) });
+
+        var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
+
+        var act = () => useCase.ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "saida", 500m, Descricao: "Fornecedor", Metodo: "pix"));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*saldo*");
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    // #1547: a saída interativa confere o saldo e grava atrás da trava do caixa, na mesma transação.
+    // A corrida em si é provada contra Postgres em SangriaSimultaneaIntegrationTests.
+    [Fact]
+    public async Task RegistrarMovimento_SaidaInterativa_TravaOCaixaAntesDeLerOSaldo_EMobileNaoTrava()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), lojaId).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), lojaId)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m, null, lojaId) });
+        var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
+
+        await useCase.ExecuteAsync(new RegistrarMovimentoCaixaCommand(empresaId, "saida", 80m,
+            Descricao: "Sangria", LojaId: lojaId, Metodo: "dinheiro"));
+
+        Received.InOrder(() =>
+        {
+            _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<MovimentoCaixaResult>>>(), Arg.Any<CancellationToken>());
+            _repo.TravarSaidasAsync(empresaId, lojaId, Arg.Any<CancellationToken>());
+            _repo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), lojaId);
+            _repo.AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m => m.Tipo == "saida" && m.Valor == 80m));
+        });
+
+        _repo.ClearReceivedCalls();
+        await useCase.ExecuteAsync(new RegistrarMovimentoCaixaCommand(empresaId, "saida", 80m, LojaId: lojaId, Origem: "mobile"));
+        await _repo.DidNotReceive().TravarSaidasAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+        await _repo.Received(1).AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    // ─── #1521: saída em dinheiro respeita a gaveta, não o saldo com Pix e cartão ───
+
+    private RegistrarMovimentoCaixaUseCase UcComGavetaDe100EPixDe400(Guid empresaId)
+    {
+        _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m) });
+        _repo.GetTotalVendasDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns(0m);
+        _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns(400m);
+        _repo.GetPagamentosPedidosListaNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null)
+            .Returns(new[] { new PedidoPagamento { Id = Guid.NewGuid(), Metodo = "pix", Valor = 400m, PagoEm = DateTime.UtcNow } });
+        return new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_DeveBloquearSangriaEmDinheiro_AcimaDoDinheiroNaGaveta()
+    {
+        // Gaveta: R$100 de abertura. Os R$400 recebidos em Pix não estão na gaveta, então uma
+        // sangria de R$450 em dinheiro não existe fisicamente (antes passava: teto = R$500).
+        var empresaId = Guid.NewGuid();
+        var act = () => UcComGavetaDe100EPixDe400(empresaId).ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "saida", 450m, Descricao: "Sangria", Metodo: "dinheiro"));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*gaveta*");
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_DevePermitirSangriaEmDinheiro_DentroDaGaveta()
+    {
+        var empresaId = Guid.NewGuid();
+        await UcComGavetaDe100EPixDe400(empresaId).ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "saida", 80m, Descricao: "Sangria", Metodo: "Dinheiro"));
+
+        await _repo.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m => m.Tipo == "saida" && m.Valor == 80m));
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_VendaSemMetodoContaComoPossivelDinheiro_NoTetoDaSangria()
+    {
+        // Venda sem forma de pagamento (legado, PWA antigo) pode ser dinheiro: não trava a sangria.
+        var empresaId = Guid.NewGuid();
+        var useCase = UcComGavetaDe100EPixDe400(empresaId);
+        _repo.GetVendasNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null)
+            .Returns(new[] { new Venda { Id = Guid.NewGuid(), EmpresaId = empresaId, DataVenda = DateTime.UtcNow,
+                ValorTotal = Dinheiro.FromDecimal(300m), FormaPagamentoPrincipal = null } });
+
+        await useCase.ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "saida", 350m, Descricao: "Sangria", Metodo: "dinheiro"));
+
+        await _repo.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m => m.Valor == 350m));
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_SaidaPorPix_ContinuaLimitadaPeloSaldoDoDia()
+    {
+        // Saída que não sai da gaveta (Pix) segue a regra do #686: teto = saldo esperado do dia.
+        var empresaId = Guid.NewGuid();
+        await UcComGavetaDe100EPixDe400(empresaId).ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "saida", 450m, Descricao: "Pagamento fornecedor", Metodo: "pix"));
+
+        await _repo.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m => m.Valor == 450m));
     }
 
     [Fact]
@@ -407,6 +589,10 @@ public class CaixaUseCasesTests
             .Returns(new[] { aberturaOntem });
         _repo.GetTotalVendasNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null).Returns(4414m);
         _repo.GetTotalPagamentosPedidosNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null).Returns(0m);
+        // #1521: as vendas da sessão foram em dinheiro, então estão na gaveta.
+        _repo.GetVendasNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null)
+            .Returns(new[] { new Venda { Id = Guid.NewGuid(), EmpresaId = empresaId, DataVenda = DateTime.UtcNow,
+                ValorTotal = Dinheiro.FromDecimal(4414m), FormaPagamentoPrincipal = "dinheiro" } });
 
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
             new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
@@ -486,7 +672,8 @@ public class CaixaUseCasesTests
     {
         var empresaId = Guid.NewGuid();
         var mov = MovimentoCaixa.Criar(empresaId, "entrada", 100m);
-        var data = DateOnly.FromDateTime(mov.DataMovimento);
+        // #1478: mesma data do use case (operacional do Brasil); em UTC falhava entre 00h e 03h.
+        var data = HorarioBrasil.DataOperacional(mov.DataMovimento);
         _repo.GetMovimentoAsync(empresaId, mov.Id).Returns(mov);
         _repo.GetFechamentoDoDiaAsync(empresaId, data, mov.LojaId)
             .Returns(FechamentoCaixa.Criar(empresaId, data, 0, 0, 0, 0, 0));
@@ -503,12 +690,51 @@ public class CaixaUseCasesTests
     }
 
     [Fact]
+    public async Task EstornarMovimento_de_loja_e_recusado_quando_a_empresa_ja_fechou_o_dia()
+    {
+        var empresaId = Guid.NewGuid();
+        var mov = MovimentoCaixa.Criar(empresaId, "entrada", 100m, InstanteFixo, Guid.NewGuid());
+        _repo.GetMovimentoAsync(empresaId, mov.Id).Returns(mov);
+        _repo.GetFechamentoDoDiaAsync(empresaId, DiaFixo, null)
+            .Returns(FechamentoCaixa.Criar(empresaId, DiaFixo, 0, 0, 0, 0, 0));
+
+        var useCase = new EstornarMovimentoCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<EstornarMovimentoCaixaUseCase>>());
+
+        var act = () => useCase.ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, mov.Id));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*dia já fechado*");
+        mov.EstornadoEm.Should().BeNull();
+        await _repo.DidNotReceive().UpdateMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task EstornarMovimento_sem_loja_segue_livre_quando_so_uma_loja_fechou_o_dia()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var mov = MovimentoCaixa.Criar(empresaId, "entrada", 100m, InstanteFixo);
+        _repo.GetMovimentoAsync(empresaId, mov.Id).Returns(mov);
+        _repo.GetFechamentoDoDiaAsync(empresaId, DiaFixo, lojaId)
+            .Returns(FechamentoCaixa.Criar(empresaId, DiaFixo, 0, 0, 0, 0, 0, lojaId));
+
+        var useCase = new EstornarMovimentoCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<EstornarMovimentoCaixaUseCase>>());
+
+        var result = await useCase.ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, mov.Id));
+
+        result!.EstornadoEm.Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task EstornarMovimento_DeveEstornarERegistrarMotivo_QuandoSucesso()
     {
         var empresaId = Guid.NewGuid();
         var operadorId = Guid.NewGuid();
         var mov = MovimentoCaixa.Criar(empresaId, "saida", 30m);
-        var data = DateOnly.FromDateTime(mov.DataMovimento);
+        // #1478: mesma data do use case (operacional do Brasil); em UTC falhava entre 00h e 03h.
+        var data = HorarioBrasil.DataOperacional(mov.DataMovimento);
         _repo.GetMovimentoAsync(empresaId, mov.Id).Returns(mov);
         _repo.GetFechamentoDoDiaAsync(empresaId, data, mov.LojaId).Returns((FechamentoCaixa?)null);
 

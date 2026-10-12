@@ -90,6 +90,10 @@ public sealed class DesfazerReservaIntegrationTests(PostgreSqlDatabaseFixture fi
                 Substitute.For<Application.Ports.Output.Lookup.IGeocodingClient>(),
                 Substitute.For<Application.Ports.Output.Lookup.IRotaClient>(), NullLogger<CalcularFreteUseCase>.Instance),
             new VagaOcupadaRepository(db), new PedidoStorefrontRepository(db), Substitute.For<IExpedienteLojaRepository>(),
-            NullLogger<CheckoutCoreService>.Instance, TimeProvider.System);
+            NullLogger<CheckoutCoreService>.Instance, TimeProvider.System,
+            new EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido(
+                Substitute.For<Application.Ports.Output.Lookup.ICepLookupClient>(),
+                Substitute.For<Application.Ports.Output.Lookup.IGeocodingClient>(), TimeProvider.System,
+                NullLogger<EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido>.Instance));
     }
 }

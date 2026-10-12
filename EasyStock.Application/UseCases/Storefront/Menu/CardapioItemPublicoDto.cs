@@ -34,4 +34,7 @@ public sealed record CardapioItemPublicoDto(
     string? PesoExibicao,    // unidade/porção exibida junto ao preço (ex: "por kg", "300g / 800g")
     string Linha,            // S15: "paraServir" | "prepararEmCasa"
     int? TempoPreparoMinutos, // S15: null = usa o preparo padrão da loja
-    IReadOnlyList<string>? Fotos = null);
+    IReadOnlyList<string>? Fotos = null,
+    // M1.2 (#1482): novidade até a data (inclusive) e item novo ainda não confirmado pela dona.
+    DateOnly? NovidadeAte = null,
+    bool EmValidacao = false);

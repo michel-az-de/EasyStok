@@ -28,7 +28,7 @@ namespace EasyStock.Api.IntegrationTests.Atendimento;
 /// F08 item 1 (#1238): clique duplo no "Gerar pedido" do console (ou console + ferramenta do agente)
 /// não pode criar dois pedidos na mesma conversa. Postgres real, requisições HTTP em paralelo.
 /// </summary>
-public sealed class PedidoConversaConcorrenciaTests : IAsyncLifetime
+public sealed partial class PedidoConversaConcorrenciaTests : IAsyncLifetime
 {
     private const int Paralelas = 4;
     private static readonly Guid EmpresaId = Guid.NewGuid();
@@ -98,11 +98,12 @@ public sealed class PedidoConversaConcorrenciaTests : IAsyncLifetime
 
     private sealed record Cenario(Guid ConversaId, Guid ClienteId, Guid CardapioItemId, Guid JanelaId, DateOnly DataEntrega);
 
-    private static async Task<Cenario> SemearAsync(WebApplicationFactory<Program> factory)
+    private static async Task<Cenario> SemearAsync(WebApplicationFactory<Program> factory, string? slug = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         var agora = DateTime.UtcNow;
+        db.SetMobileTenantContext(EmpresaId);
 
         db.Empresas.Add(new Empresa
         {
@@ -113,7 +114,7 @@ public sealed class PedidoConversaConcorrenciaTests : IAsyncLifetime
             AlteradoEm = agora,
         });
 
-        var storefront = StorefrontEntity.Criar(EmpresaId, $"sf-conv-{Guid.NewGuid():N}"[..20], "SF Conversa", 0m);
+        var storefront = StorefrontEntity.Criar(EmpresaId, slug ?? $"sf-conv-{Guid.NewGuid():N}"[..20], "SF Conversa", 0m);
         storefront.Ativar();
         db.Storefronts.Add(storefront);
 
@@ -136,6 +137,9 @@ public sealed class PedidoConversaConcorrenciaTests : IAsyncLifetime
             Logradouro = "Rua A",
             Numero = "10",
             Cep = "01310100",
+            Bairro = "Centro",
+            Cidade = "São Paulo",
+            Estado = "SP",
             Padrao = true,
             CriadoEm = agora,
             AlteradoEm = agora,
@@ -149,7 +153,7 @@ public sealed class PedidoConversaConcorrenciaTests : IAsyncLifetime
         return new Cenario(conversa.Id, cliente.Id, item.Id, janela.Id, dataEntrega);
     }
 
-    private WebApplicationFactory<Program> CriarFactory()
+    private WebApplicationFactory<Program> CriarFactory(EasyStock.Application.Ports.Output.Pagamentos.IMercadoPagoClient? mp = null, NivelAcesso nivel = NivelAcesso.Operador)
     {
         if (_pg is null) throw new InvalidOperationException("Postgres test container indisponível.");
 
@@ -181,7 +185,8 @@ public sealed class PedidoConversaConcorrenciaTests : IAsyncLifetime
                 {
                     var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(ICurrentUserAccessor));
                     if (descriptor is not null) services.Remove(descriptor);
-                    services.AddSingleton<ICurrentUserAccessor>(new OperadoraStub());
+                    services.AddSingleton<ICurrentUserAccessor>(new OperadoraStub(nivel));
+                    if (mp is not null) services.AddSingleton(mp);
 
                     services
                         .AddAuthentication(opts =>
@@ -194,19 +199,20 @@ public sealed class PedidoConversaConcorrenciaTests : IAsyncLifetime
             });
     }
 
-    private sealed class OperadoraStub : ICurrentUserAccessor
+    private sealed class OperadoraStub(NivelAcesso nivel) : ICurrentUserAccessor
     {
         public Guid EmpresaId => PedidoConversaConcorrenciaTests.EmpresaId;
         public bool IsAuthenticated => true;
         public Guid UsuarioId => PedidoConversaConcorrenciaTests.UsuarioId;
-        public NivelAcesso Nivel => NivelAcesso.Operador;
+        public NivelAcesso Nivel => nivel;
         public bool TemPermissao(Permissao permissao) => true;
     }
 
     private sealed class TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
-        UrlEncoder encoder)
+        UrlEncoder encoder,
+        ICurrentUserAccessor currentUser)
         : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
     {
         public const string SchemeName = "TestAuth";
@@ -219,7 +225,7 @@ public sealed class PedidoConversaConcorrenciaTests : IAsyncLifetime
                 new Claim(ClaimTypes.Name, "Operadora"),
                 new Claim("sub", UsuarioId.ToString()),
                 new Claim("empresaId", EmpresaId.ToString()),
-                new Claim("nivel", NivelAcesso.Operador.ToString()),
+                new Claim("nivel", currentUser.Nivel.ToString()),
             };
             var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemeName));
             return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, SchemeName)));

@@ -98,25 +98,55 @@ public class CardapioItem
     public string? FotoUrl { get; private set; }
     public string FotosJson { get; private set; } = "[]";
 
+    public const int LimiteFotosGaleria = 5;
+    public const string MensagemLimiteFotos = "O item já possui o limite de 5 fotos.";
+
     public IReadOnlyList<string> ObterFotosGaleria() =>
         JsonSerializer.Deserialize<string[]>(FotosJson) ?? [];
 
-    public void AdicionarFotoGaleria(string url)
+    /// <summary>
+    /// Legado: capa gravada fora da galeria. Trocar a capa por uma foto nova não tem quem substituir e
+    /// precisa de uma vaga; com a galeria cheia, a troca é recusada em vez de descartar um ângulo.
+    /// </summary>
+    public bool GaleriaSemVagaParaNovaCapa =>
+        ObterFotosGaleria() is { Count: >= LimiteFotosGaleria } fotos && fotos[0] != FotoUrl;
+
+    public void AdicionarFotoGaleria(string url, bool preservarCapa = false)
+    {
+        ValidarUrlFoto(url);
+        var fotos = ObterFotosGaleria().ToList();
+        if (preservarCapa && fotos.Count == 0 && !string.IsNullOrWhiteSpace(FotoUrl))
+            fotos.Add(FotoUrl);
+        if (fotos.Contains(url)) return;
+        if (fotos.Count >= LimiteFotosGaleria)
+            throw new RegraDeDominioVioladaException(MensagemLimiteFotos);
+        fotos.Add(url);
+        FotosJson = JsonSerializer.Serialize(fotos);
+        if (fotos.Count == 1) FotoUrl = url;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    public void SubstituirCapaGaleria(string url)
+    {
+        ValidarUrlFoto(url);
+        // A primeira foto só é a capa antiga quando coincide com FotoUrl. No legado (capa fora da galeria)
+        // ela é um ângulo e fica: a capa nova entra na frente, respeitando o limite.
+        var atuais = ObterFotosGaleria();
+        var fotos = atuais.Skip(atuais.Count > 0 && atuais[0] == FotoUrl ? 1 : 0).Where(f => f != url).Prepend(url).ToList();
+        if (fotos.Count > LimiteFotosGaleria)
+            throw new RegraDeDominioVioladaException(MensagemLimiteFotos);
+        FotosJson = JsonSerializer.Serialize(fotos);
+        FotoUrl = url;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    private static void ValidarUrlFoto(string url)
     {
         ValidarTamanho(url, max: 500, nome: "URL da foto");
         if (!url.StartsWith("/files/", StringComparison.Ordinal) &&
             (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
              (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp)))
             throw new RegraDeDominioVioladaException("URL da foto inválida.");
-
-        var fotos = ObterFotosGaleria().ToList();
-        if (fotos.Contains(url)) return;
-        if (fotos.Count >= 5)
-            throw new RegraDeDominioVioladaException("O item já possui o limite de 5 fotos.");
-        fotos.Add(url);
-        FotosJson = JsonSerializer.Serialize(fotos);
-        if (fotos.Count == 1) FotoUrl = url;
-        AlteradoEm = DateTime.UtcNow;
     }
 
     /// <summary>Override do preço do <see cref="Produto"/>. Null = usa <c>Produto.PrecoReferencia</c>.</summary>
@@ -124,6 +154,72 @@ public class CardapioItem
 
     /// <summary>Tag (assinatura, novo, vegetariano). Null = sem tag.</summary>
     public string? Tag { get; private set; }
+
+    /// <summary>
+    /// Tirado do cardápio (M1.2, D-M1-07). Diferente de <see cref="Visivel"/> (só o site): arquivado
+    /// sai do site, da comanda e do agente, mas continua achável por pedido antigo e pode voltar.
+    /// </summary>
+    public DateTime? ArquivadoEm { get; private set; }
+
+    /// <summary>Item novo ainda não confirmado pela dona (M1.2, RN-15, D-M1-08): o agente não oferece.</summary>
+    public bool EmValidacao { get; private set; }
+
+    /// <summary>Novidade até esta data, inclusive (M1.2, US-029). Depois some sozinha.</summary>
+    public DateOnly? NovidadeAte { get; private set; }
+
+    public bool EstaArquivado => ArquivadoEm.HasValue;
+
+    /// <summary>
+    /// Liga o prato avulso a um produto do estoque (M2.2, D-M1-01: o que a casa produz é vinculado).
+    /// O nome e o preço do cardápio continuam os do item. Prato já vinculado não troca de produto.
+    /// </summary>
+    public void VincularProduto(Guid produtoId)
+    {
+        if (produtoId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("Produto deve ter Id válido.");
+        if (ProdutoId == produtoId) return;
+        if (ProdutoId.HasValue)
+            throw new RegraDeDominioVioladaException("O prato já está ligado a outro produto do estoque.");
+        ProdutoId = produtoId;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    public bool EhNovidade(DateOnly hoje) => NovidadeAte is { } ate && ate >= hoje;
+
+    public void Arquivar(DateTime agora)
+    {
+        if (EstaArquivado) return;
+        ArquivadoEm = agora;
+        AlteradoEm = agora;
+    }
+
+    public void Repor()
+    {
+        if (!EstaArquivado) return;
+        ArquivadoEm = null;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    public void MarcarEmValidacao()
+    {
+        if (EmValidacao) return;
+        EmValidacao = true;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    public void ConfirmarValidacao()
+    {
+        if (!EmValidacao) return;
+        EmValidacao = false;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    public void DefinirNovidade(DateOnly? ate)
+    {
+        if (NovidadeAte == ate) return;
+        NovidadeAte = ate;
+        AlteradoEm = DateTime.UtcNow;
+    }
 
     /// <summary>JSON array de strings, ex: <c>["sem-gluten","vegano"]</c>. Default <c>"[]"</c>.</summary>
     public string FiltrosJson { get; private set; } = "[]";
@@ -479,6 +575,25 @@ public class CardapioItem
     /// senão <see cref="PrecoEfetivo"/> (item de preço único — comportamento legado).
     /// </summary>
     public decimal PrecoAPartirDe() => VariacaoPadrao()?.PrecoStorefront ?? PrecoEfetivo();
+
+    /// <summary>
+    /// M1.4b (#1531): a porção que o pedido vai cobrar. Prato sem porções devolve null (vale o preço do
+    /// item). Com porções, vale a pedida ou, sem nenhuma informada, a <see cref="VariacaoPadrao"/>
+    /// (site e agente ainda não escolhem porção). Porção de outro prato ou esgotada recusa.
+    /// </summary>
+    public CardapioItemVariacao? PorcaoParaVenda(Guid? variacaoId)
+    {
+        var nome = NomeEfetivo() is { Length: > 0 } n ? n : "O item";
+        if (!TemVariacoes())
+            return variacaoId is null ? null : throw new RegraDeDominioVioladaException($"{nome} não tem essa porção.");
+
+        var porcao = variacaoId is { } id ? Variacoes.FirstOrDefault(v => v.Id == id) : VariacaoPadrao();
+        if (porcao is null)
+            throw new RegraDeDominioVioladaException($"{nome} não tem essa porção.");
+        if (!porcao.Disponivel)
+            throw new RegraDeDominioVioladaException($"{nome} {porcao.Rotulo} está esgotado agora.");
+        return porcao;
+    }
 
     /// <summary>
     /// Há disponibilidade para venda: item sem opções segue <see cref="Disponivel"/>;

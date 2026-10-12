@@ -35,11 +35,27 @@ public class PromptAtendimentoTests
         for (var i = 1; i <= 8; i++)
             prompt.Should().Contain($"RN-0{i}");
         prompt.Should().Contain("D3").And.Contain(configuracao.Tom).And.Contain("[interno]");
-        prompt.Should().Contain("Para fechar um pedido use criar_pedido"); // S11: pedido e link pela conversa
+        prompt.Should().Contain("Para montar um pedido compartilhe a comanda pessoal")
+            .And.Contain("nunca use criar_pedido para repetir esse envio")
+            .And.Contain("Use criar_pedido somente quando o cliente pedir explicitamente");
 
         // Snapshot: mudança no system prompt é deliberada e revisada no diff deste arquivo.
         var snapshot = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Services", "Atendimento", "PromptAtendimento.snapshot.txt"));
         Normalizar(prompt).Should().Be(Normalizar(snapshot));
+    }
+
+    [Fact]
+    public void DinheiroPedidoEAmeaca_VaoParaADona_SemPrometerNada()
+    {
+        var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));
+
+        // #1613: o agente não decide cancelamento, reembolso, desconto nem responde ameaça.
+        prompt.Should().Contain("Dinheiro, pedido e ameaça são da dona")
+            .And.Contain("cancelar ou mudar um pedido")
+            .And.Contain("dinheiro de volta")
+            .And.Contain("desconto ou frete grátis")
+            .And.Contain("Procon")
+            .And.Contain("sem prometer nada");
     }
 
     [Fact]
@@ -62,6 +78,8 @@ public class PromptAtendimentoTests
         // #1330: o modelo imitava o travessão do próprio prompt e escrevia textos longos.
         prompt.Should().NotContain("—").And.NotContain("–");
         prompt.Should().Contain("no máximo 3 frases curtas").And.Contain("nunca use travessão");
+        // #1445 (homologação 07/10): "está sendo muito prolixo".
+        prompt.Should().Contain("Vá direto ao ponto, sem floreio");
     }
 
     [Fact]

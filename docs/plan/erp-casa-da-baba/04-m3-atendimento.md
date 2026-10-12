@@ -1,5 +1,7 @@
 # M3 Atendimento · balcão, pedidos, clientes, canais, status e histórico
 
+> **Atualização de 10/10/2026:** reabertura de conversa ligada à API, com histórico, janela do canal e fila humana preservados; homologação local no computador e celular (seção 28). Modelos textuais aprovados do M3.6 e filtros por atendente do M3.7 implementados e homologados localmente (seções 29 e 30); entrega real na Meta segue pendente. Ocorrências por pedido ligadas à Ficha: Dona/gerente inicia apuração e encerra com resolução; Atendimento consulta histórico. Autoria, repetição idempotente, concorrência e retomada de reembolso pendente homologadas localmente (seção 27 do plano de ondas). Devolução manual confirmada e estorno pelo Mercado Pago também implementados na Ficha (seções 25 e 26); o provedor online foi validado com transporte HTTP controlado, sem transferência real. Cancelamento conserva D3-04: Atendimento sem pagamento; com qualquer valor recebido, só Dona/gerente. Cancelar não devolve dinheiro nem avisa automaticamente o cliente. M3.3 e os aceites externos continuam parciais.
+
 Issue: #1316 · Decisão: [ADR-0056](../../adr/0056-erp-da-casa-da-baba-front-unico.md) · Data: 2026-10-01
 Base medida: master `b713263a`. Plano irmão (dono de S01–S53 e F01–F18):
 [10-console.md](../atendimento-whatsapp/10-console.md), [11-console-fechamento.md](../atendimento-whatsapp/11-console-fechamento.md).
@@ -104,7 +106,7 @@ canal", `Downloads/01-TRANSCRICAO.md:153`). **Inferência:** a casa não opera i
 | Avançar esteira, voltar etapa, pago à mão, comprovante, desfazer pagamento, estorno, cancelar | `PedidosController.cs:97,113,178,194`; `KdsController.cs:41` | avisam "Use o EasyStok" (`aplicacao/api/comanda.js:19-33`) | ❌ | **M3.3** |
 | Recebido na entrega, refazer cobrança | `PedidosController.cs:178`; S11 | avisam (`naoLigadas.js:39-40`) | ❌ | **M3.3** (o lado caixa é da F14) |
 | Aprovar ou recusar fora de área pela ficha | S12 (`api/storefront/pedidos/{id}/aprovar`) | ligado só na tela Entregas (F04); na ficha avisa (`naoLigadas.js:51`) | ❌ | **M3.3** |
-| Trocar janela do pedido criado | `AlterarAgendamentoPedidoUseCase.cs:41-42` troca só `AgendadoParaEm`, **não move a `VagaOcupada`** | avisa (`naoLigadas.js:30,44`) | ❌ | **M3.4** |
+| Trocar janela do pedido criado | `TrocarJanelaPedidoUseCase`: transação com liberação, ocupação, prazo e auditoria | Ficha e Entregas usam a vaga persistida | ✅ local | **M3.4**, seção 24 do plano de ondas |
 | Endereço do pedido diferente do cadastro | `Pedido` não tem endereço próprio (KDS lê o do cliente, `KdsPedidoQueries.cs:58-67`) | avisa (`naoLigadas.js:37`) | ❌ | **M8.3** |
 | Pedido pelo link do cardápio | S48, #1234 | F11 #1241 | ⬜ | nenhuma |
 | Aviso de status ao cliente | S13 | automático | ✅ | nenhuma |
@@ -194,14 +196,16 @@ tela Entregas) e nenhuma F seguinte as cita: a lacuna está órfã.
 **Aceite.**
 - [ ] Avançar a esteira pela ficha muda o cartão na Cozinha (F05) sem recarregar.
 - [ ] Pago à mão grava `PedidoPagamento` e aparece em "Pagamentos de pedidos hoje" (F14).
-- [ ] Cancelar pedido pago obedece D3-04 (403 com texto para quem não pode).
-- [ ] `prova-f06-honestidade.mjs` continua verde com as ações movidas para "ligada".
+- [x] Cancelar pedido pago obedece D3-04 (403 com texto para quem não pode), homologado localmente em 09/10.
+- [x] `prova-f06-honestidade.mjs` continua verde com o cancelamento ligado; estorno e volta de etapa permanecem indisponíveis no modo API.
 **Fora.** Trocar janela (M3.4) e endereço do pedido (M8.3).
 **Depende de.** F14 para o lado do caixa. **Tamanho.** M · **Tier.** baixo (sem migração) · **Rollback.** revert; as ações voltam a avisar.
 
 ### M3.4 · Trocar a janela de um pedido criado
 
-**Problema.** Reagendar pela API hoje só troca `AgendadoParaEm` (`AlterarAgendamentoPedidoUseCase.cs:41-42`).
+**Executado em 09/10/2026:** troca atômica implementada e homologada localmente na Ficha e em Entregas. A leitura da Ficha passa a devolver a vaga persistida, inclusive após recarga. A rota antiga de agendamento recusa pedidos com vaga. O aviso opcional entra no outbox da S13, respeita preferências e usa a faixa validada pelo prazo de preparo; envio externo continua pendente. Evidências na [seção 24 do plano de ondas](11-levantamento-e-ondas-2026-10-09.md#24-continuação-reagendamento-com-troca-de-vaga-09102026).
+
+**Problema inicial.** Reagendar pela API trocava só `AgendadoParaEm`.
 Pedido com vaga continua preso à vaga antiga, porque o KDS manda pela vaga ativa
 (`KdsPedidoQueries.cs:34-40`): a cozinha vê o horário velho e a janela velha continua ocupada.
 **Abordagem.**
@@ -209,11 +213,11 @@ Pedido com vaga continua preso à vaga antiga, porque o KDS manda pela vaga ativ
 - `avisarCliente` usa o aviso de status (S13) com a faixa nova (RN-22, respiro).
 - Console: o seletor de janelas da comanda (`features/ficha-cliente/SeletorJanelaApi.jsx`) passa a funcionar com pedido criado; "Alterar agendamento" da gaveta (`features/entregas/ModalAlterarAgendamento.jsx`) usa a mesma ação.
 **Aceite.**
-- [ ] Janela cheia recusa com 409 e a vaga antiga continua ocupada.
-- [ ] Duas trocas simultâneas para a última vaga: só uma passa (teste com duas chamadas paralelas).
-- [ ] KDS mostra a janela nova; atraso (S21) recalculado.
-**Testes (Red).** `TrocarJanelaPedidoUseCaseTests.LiberaAntigaOcupaNova`, `...JanelaCheiaNaoMexe`, `...Concorrencia`.
-**Depende de.** nada. **Tamanho.** M · **Tier.** baixo (sem migração) · **Rollback.** revert; volta a avisar.
+- [x] Janela cheia recusa com 409 e a vaga antiga continua ocupada.
+- [x] Duas trocas simultâneas para a última vaga: só uma passa (duas transações PostgreSQL aguardando o mesmo lock de capacidade).
+- [x] KDS mostra a janela nova; atraso (S21) recalculado.
+**Testes executados.** `EasyStock.Infra.Postgre.IntegrationTests/Storefront/TrocarJanelaPedidoTests.cs`: 15 casos com PostgreSQL real, incluindo rollback após inserir a nova vaga, tenant, prazo, bloqueio, status final, idempotência e aviso persistido. Console: `prova-onda2-reagendamento.mjs` e Chromium com API local.
+**Depende de.** nada. **Tamanho.** M · **Tier.** baixo (sem migração) · **Rollback.** retirar a ação da interface preservando vagas e histórico; manter a proteção que impede a troca simples de data em pedido com vaga.
 
 ### M3.5 · Clientes fora da conversa
 
@@ -233,24 +237,29 @@ quem não escreveu hoje nem começa contato.
 
 ### M3.6 · Modelo aprovado e reabrir conversa
 
+**Execução de 10/10/2026.** Reabertura entregue e homologada localmente (seção 28 do plano de ondas): `POST conversas/{id}/reabrir`, capacidade da sessão, fila humana, histórico com autoria, bloqueio de cliente e conflito de contato, repetição e concorrência. Modelos textuais aprovados ligados ao Composer e homologados com provedor HTTP local (seção 29): catálogo da conta, idioma, parâmetros, prévia, consentimento e intenção persistida antes do envio. Repetição e resposta perdida não duplicam o POST ao canal. A janela do canal é preservada. Recebimento no WhatsApp real continua sem aceite; modelos com mídia, botões ou parâmetros nomeados aparecem com motivo de indisponibilidade.
+
 **Problema.** Fora da janela de 24 h só modelo aprovado chega ao cliente, e o console não tem como mandar
 um (#1287 deixou avisando); conversa encerrada não reabre.
 **Fato medido.** A porta de canal já envia modelo (`ICanalMensageria.cs:22-33`; campanhas e S26 usam).
 As rotas de mensagem são só texto e imagem (`AtendimentoConversasController.cs:99,112`).
 `Conversa.RegistrarEntrada` exige conversa aberta (`Conversa.cs:225-228`).
 **Abordagem.**
-- `GET api/atendimento/modelos` (aprovados na Meta, cache curto) e `POST conversas/{id}/mensagens/modelo {nome, parametros}` com `AtenderConversas`.
+- `GET api/atendimento/modelos` (aprovados na Meta, cache de um minuto por empresa) e `POST conversas/{id}/mensagens/modelo {tentativaId, nome, idioma, parametros}` com `AtenderConversas`. Envio consulta a aprovação novamente. A conta e o token vêm da conexão por coexistência já existente.
 - `POST conversas/{id}/reabrir`: `Conversa.Reabrir` no domínio (volta a `Assumida`, limpa `EncerradaEm`, guarda evento).
 - Console: liga `ENVIOS_NAO_LIGADOS.modelo` e `reabrir`.
 **Aceite.**
 - [ ] Modelo enviado fora da janela chega ao WhatsApp (validação do Felipe) e aparece na thread.
-- [ ] Texto livre fora da janela continua recusado (regra da S09 intacta).
-- [ ] Reabrir põe a conversa em "Precisa de você" e a mensagem seguinte do cliente cai nela.
+- [x] Modelo textual enviado fora da janela usa o contrato HTTP real com provedor controlado e aparece na thread no computador e celular; validação local, não entrega externa.
+- [x] Texto livre fora da janela continua recusado após reabertura (regra da S09 intacta; API local retorna 409).
+- [x] Reabrir põe a conversa em "Precisa de você" e a mensagem seguinte do cliente cai nela (ChatSite, API e navegador locais; canais externos ainda sem aceite).
 **Testes (Red).** `ConversaTests.ReabrirEncerrada`, `EnviarModeloConversaUseCaseTests.SoComAceitaModelo`.
 **Fora.** Criar modelo na Meta pelo console (fica no Gerenciador da Meta).
 **Tamanho.** M · **Tier.** baixo · **Rollback.** revert; volta a avisar.
 
 ### M3.7 · Atendentes: minhas, sem dono, todas
+
+**Executado em 10/10/2026:** filtro por responsável no Balcão, padrão Todas e nome de quem assumiu a conversa. Minhas usa o ID da sessão, inclusive entre homônimos; Sem dono respeita a atribuição persistida. Busca, canais, contagens e históricos recolhidos usam o mesmo filtro. Com um atendente ativo, o controle adicional fica oculto. Assumir e devolver aguardam a confirmação da API; transferência entre dois usuários atualiza as listas pela sincronização existente. Homologação local e evidências na seção 30 do plano de ondas.
 
 **Problema.** A S41 permite atribuir e transferir, mas o balcão não separa o que é de quem.
 **Fato medido.** Atendente = usuário com `AtenderConversas` (`AtendentesUseCases.cs:24-31`). O console
@@ -260,24 +269,26 @@ No modo massa a atendente é fixa "Thatiane" (`Moldura.jsx:425`, `aplicacao/caso
 **Abordagem.** Aditivo no resumo da conversa: `assumidaPorNome`. Filtro do balcão: Minhas, Sem dono, Todas
 (padrão Todas, para a casa de uma pessoa só não mudar nada). Selo com o nome. Transferir é da F09.
 **Aceite.**
-- [ ] Com dois usuários, cada um vê "Minhas" com as suas e o nome do outro no selo.
-- [ ] Com um usuário só, nada muda na tela (captura igual).
+- [x] Com dois usuários, cada um vê "Minhas" com as suas e o nome do outro no selo (API, PostgreSQL e Chromium locais).
+- [x] Com um atendente ativo no banco local, o controle adicional fica oculto e a lista padrão permanece Todas; captura 1440 px conferida.
 **Fora.** Distribuição automática; metas por atendente.
 **Depende de.** F09; D3-03. **Tamanho.** P · **Tier.** baixo · **Rollback.** revert.
 
 ### M3.8 · Lembrete de pedido agendado sobre `Pedido`
 
+**Executado e homologado localmente em 10/10/2026.** Evidências na seção 31 do plano de ondas. Encomenda pela comanda ganhou seleção de dia; a agenda completa do M8.2 continua pendente.
+
 **Problema.** O lembrete de agendado só enxerga `mobile_orders` (§3.5); encomenda do site ou do WhatsApp
 para outro dia não lembra ninguém.
 **Abordagem.**
-- Job novo no Worker sobre `Pedido` com vaga ativa ou `AgendadoParaEm`, status não final: na véspera (início do expediente do dia anterior) e no início previsto (S21) cria `Lembrete` (S43) do tipo novo `PedidoAgendado`, com `PedidoId` e `Referencia` = `{pedidoId}:{marco}` como trava (sem coluna nova).
-- Mesmo `PostgresAdvisoryLock`. O job antigo continua até a PWA sair (P05) e é removido junto.
+- O avaliador existente na API consulta `Pedido` com vaga ativa ou `AgendadoParaEm`, status não final: na véspera (abertura do expediente do dia anterior) e no início previsto (S21) cria `Lembrete` (S43) do tipo `PedidoAgendado`, com `PedidoId` e `Referencia` = `{pedidoId}:{marco}:{dataOuInstante}` como trava. Reagendamento conclui o aviso do marco antigo; cancelamento e conclusão retiram o pedido da avaliação.
+- Reuso do `PostgresAdvisoryLock`, outbox e SSE existentes, sem outro disparador. O job antigo de `mobile_orders` continua até a PWA sair (P05). `TipoLembrete` é persistido como inteiro; valor novo 4, sem coluna nem migração.
 **Aceite.**
-- [ ] Encomenda para depois de amanhã gera um lembrete na véspera e só um (rodar o job duas vezes).
-- [ ] Pedido cancelado não lembra.
-- [ ] Lembrete aparece na lista da F10 e no SSE.
-**Testes (Red).** `LembretePedidoAgendadoJobTests.VesperaUmaVez`, `...CanceladoNaoLembra` (relógio falso).
-**Depende de.** F10 para a tela; M8.2 para existir encomenda pelo console. **Tamanho.** P · **Tier.** baixo (enum, sem migração; conferir se `TipoLembrete` é gravado como texto ou inteiro antes de fechar o tier) · **Rollback.** revert.
+- [x] Encomenda para depois de amanhã gera um lembrete na véspera e só um (rodar o avaliador duas vezes, relógio falso).
+- [x] Pedido cancelado não lembra; avisos anteriores são concluídos.
+- [x] Lembrete aparece na lista da F10 e no SSE, com navegador e API locais.
+**Testes.** `AvaliadorLembretesTests` (relógio falso); `LembretesPedidoAgendadoIntegrationTests.VesperaUmaVezInicioPrevistoListaSseECancelamentoComRlsReal` e `VagaAtivaPrevaleceHistoricoLiberadoEJanelaOuConversaDeOutraEmpresaNaoEntram` (PostgreSQL real); `prova-m38-lembretes-agendados.mjs`.
+**Depende de.** F10 para a tela; seleção de dia do M8.2 entregue nesta fatia. **Tamanho.** P · **Tier.** baixo (enum inteiro, sem migração) · **Rollback.** revert.
 
 ### M3.9 · iFood como canal de pedido (condicional a D3-02)
 
@@ -310,16 +321,21 @@ F10 ─► M3.8 lembrete agendado (junto com M8.2)            M3.9 só depois de
 - B) Só o pedido do iFood entra (Cozinha e lista de pedidos), sem chat.
 - C) Pedido e chat do iFood como canal do balcão (D5 inteiro).
 
-**D3-03 · Atendentes múltiplos agora?**
-- A) (Recomendado) Só filtro Minhas/Sem dono e nome no selo (M3.7, pequeno).
-- B) Adiar até existir a segunda pessoa no atendimento.
-- C) Distribuição automática das conversas entre atendentes.
+**D3-03 · Escopo executado no M3.7 em 10/10/2026.**
+- Filtro Minhas/Sem dono/Todas e nome no selo, conforme a continuidade solicitada para esta fatia.
+- Distribuição automática e metas por atendente continuam fora do escopo.
 
-**D3-04 · Quem cancela pedido já pago pela ficha (dispara estorno)?**
-- A) (Recomendado) Operador cancela pedido não pago; pago só Gerente.
-- B) Qualquer Operador.
-- C) Só pelo EasyStok Web, nunca pelo console.
+**D3-04 · Quem cancela pedido já pago pela ficha? Decidido por Felipe em 09/10/2026.**
+- Atendimento cancela sem pagamento. Com qualquer valor recebido, inclusive parcial, só Dona/gerente.
+- A API aplica a regra também à troca de status, KDS, lotes e recusa do site. O nível vem da sessão autenticada.
+- A entrega da seção 23 é o cancelamento operacional com motivo. Estorno externo e comunicação ao cliente continuam com aceites próprios; a tela informa que a devolução é separada. A recusa do site conserva seu fluxo de estorno já existente, agora protegido pela mesma autorização.
 
 **Já decidido (01/10), registrado para não reabrir:** pedido do checkout do site entra no balcão pela
 conversa `ChatSite` do cliente, com o pedido na Ficha, igual ao WhatsApp. Fatia dona: SI.6
 ([10-site-e-impressos.md](10-site-e-impressos.md)).
+
+**D3-05 · Devolução de dinheiro, Pix direto ou maquininha fora do Mercado Pago. Decidido por Felipe em 09/10/2026.**
+- Dona/gerente confirma que já devolveu o valor e informa motivo e comprovante/referência. O sistema registra a saída no Caixa.
+- A Ficha permite selecionar o recebimento e registrar valor parcial ou total, além do meio efetivamente usado na devolução. Atendimento consulta o histórico, sem confirmar devoluções.
+- Registro manual não transfere dinheiro nem aciona o provedor. Recebimentos do Mercado Pago são recusados neste caminho. Estorno online e devolução manual têm execuções separadas.
+- A saída tem a data do registro, exige Caixa do dia sem fechamento e não apaga o pagamento original. Correção de devolução e reabertura de Caixa permanecem fora desta fatia.

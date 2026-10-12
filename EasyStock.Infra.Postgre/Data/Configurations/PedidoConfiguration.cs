@@ -17,6 +17,9 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(p => p.ClienteNome).HasMaxLength(150);
             b.Property(p => p.ClienteApt).HasMaxLength(32);
             b.Property(p => p.ClienteTelefone).HasMaxLength(32);
+            b.Property(p => p.EnderecoEntrega).HasColumnType("text");
+            b.Property(p => p.BairroEntrega).HasMaxLength(150);
+            b.Property(p => p.CepEntrega).HasMaxLength(8);
             // Status: 32 chars cobrem todos os enum values (maior atual = "aguardando_aprovacao_baba" = 25).
             // Aumento de 20 → 32 acompanha migration aditiva de TASK-EZ-APROVAR-001.
             b.Property(p => p.Status).IsRequired().HasMaxLength(32);

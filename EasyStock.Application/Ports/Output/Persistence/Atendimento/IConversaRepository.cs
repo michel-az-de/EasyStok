@@ -6,8 +6,37 @@ namespace EasyStock.Application.Ports.Output.Persistence.Atendimento;
 /// <summary>Conversa com as ultimas N mensagens em ordem cronologica (a mais nova por ultimo).</summary>
 public sealed record ConversaComMensagens(Conversa Conversa, IReadOnlyList<Mensagem> Mensagens);
 
-/// <summary>Linha da inbox do console (S07): a conversa e o texto da ultima mensagem, quando houver.</summary>
-public sealed record ConversaInboxItem(Conversa Conversa, string? UltimaMensagemTexto);
+/// <summary>
+/// Linha da inbox do console (S07): as colunas da conversa que o resumo mostra, o texto da ultima mensagem,
+/// quando houver, e o status do pedido em andamento. Sem o <c>ContextoJson</c> de proposito (#1575): a
+/// inbox faz polling e nao mostra o contexto.
+/// </summary>
+public sealed record ConversaInboxItem(
+    Guid Id,
+    Guid EmpresaId,
+    CanalConversa Canal,
+    string ContatoIdExterno,
+    string? ContatoNome,
+    Guid? ClienteId,
+    SituacaoConversa Situacao,
+    int NaoLidas,
+    DateTime UltimaMensagemEm,
+    DateTime? UltimaMensagemEntradaEm,
+    Guid? PedidoEmAndamentoId,
+    Guid? AssumidaPorUsuarioId,
+    string? MotivoEscalada,
+    string? UltimaMensagemTexto,
+    bool AguardaResposta,
+    string? AssumidaPorNome = null,
+    string? PedidoStatus = null,
+    long NumeroComanda = 0)
+{
+    /// <summary>Linha a partir da entidade carregada. Sem <paramref name="aguardaResposta"/> vale a regra do dominio.</summary>
+    public static ConversaInboxItem De(Conversa c, string? ultimaMensagemTexto, bool? aguardaResposta = null, string? assumidaPorNome = null, string? pedidoStatus = null) => new(
+        c.Id, c.EmpresaId, c.Canal, c.ContatoIdExterno, c.ContatoNome, c.ClienteId, c.Situacao, c.NaoLidas,
+        c.UltimaMensagemEm, c.UltimaMensagemEntradaEm, c.PedidoEmAndamentoId, c.AssumidaPorUsuarioId, c.MotivoEscalada,
+        ultimaMensagemTexto, aguardaResposta ?? c.AguardaResposta, assumidaPorNome, pedidoStatus, c.NumeroComanda);
+}
 
 /// <summary>Mensagem que não chegou ao cliente, com a conversa dela (S59).</summary>
 public sealed record MensagemNaoEntregue(Conversa Conversa, Mensagem Mensagem);
@@ -32,6 +61,9 @@ public interface IConversaRepository
     Task TravarContatoAsync(Guid empresaId, string contato, CancellationToken ct = default);
 
     Task<Conversa?> ObterPorIdAsync(Guid empresaId, Guid id, CancellationToken ct = default);
+
+    /// <summary>Trava a linha e relê o estado atual para reabertura, antes de qualquer alteração. Exige transação explícita.</summary>
+    Task<Conversa?> ObterPorIdComLockAsync(Guid empresaId, Guid id, CancellationToken ct = default);
 
     /// <summary>
     /// Trava a linha da conversa (<c>SELECT ... FOR UPDATE</c>) e devolve o <c>PedidoEmAndamentoId</c>
@@ -104,10 +136,23 @@ public interface IConversaRepository
     Task<Mensagem?> ObterMensagemParaAlterarAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default);
 
     /// <summary>
+    /// #1599: trava a linha da mensagem (<c>FOR UPDATE</c>) e devolve o estado gravado agora, mesmo que a instância
+    /// já esteja rastreada no escopo. Exige transação explícita.
+    /// </summary>
+    Task<Mensagem?> ObterMensagemComLockAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default);
+
+    /// <summary>
     /// S57: trava (<c>FOR UPDATE SKIP LOCKED</c>) até <paramref name="limite"/> mensagens com reenvio vencido, de
     /// todas as empresas. Exige bypass de RLS e transação explícita.
     /// </summary>
     Task<IReadOnlyList<Mensagem>> ListarReenviosVencidosComLockAsync(DateTime agora, int limite, CancellationToken ct = default);
+
+    /// <summary>
+    /// #1562: trava (<c>FOR UPDATE SKIP LOCKED</c>) até <paramref name="limite"/> intenções de modelo aprovado que
+    /// seguem pendentes e foram gravadas antes de <paramref name="gravadaAntesDe"/>, de todas as empresas. Exige
+    /// bypass de RLS e transação explícita.
+    /// </summary>
+    Task<IReadOnlyList<Mensagem>> ListarIntencoesModeloSemDesfechoComLockAsync(DateTime gravadaAntesDe, int limite, CancellationToken ct = default);
 
     /// <summary>
     /// #1397: trava (<c>FOR UPDATE SKIP LOCKED</c>) até <paramref name="limite"/> mensagens com anexo ainda não

@@ -105,4 +105,88 @@ public class AjustarSaldoRapidoUseCaseTests
         Func<Task> act = () => Criar().ExecuteAsync(Input(5m, " "));
         await act.Should().ThrowAsync<UseCaseValidationException>();
     }
+
+    // ── #1542 (M1.4d): o saldo de prato com porções é de cada porção ──────────────────────────
+
+    private ItemEstoque LoteDaPorcao(Guid? porcao, decimal atual, decimal descoberto = 0m, int diasAtras = 1)
+    {
+        var lote = Lote(atual, descoberto, diasAtras);
+        lote.ProdutoVariacaoId = porcao;
+        return lote;
+    }
+
+    private void LotesDoProduto(params ItemEstoque[] lotes) =>
+        _itens.GetLotesParaAjusteAsync(_empresaId, _produtoId, null, Arg.Any<CancellationToken>()).Returns(lotes);
+
+    [Fact]
+    public async Task ContagemDaPorcao_SoMexeNosLotesDela()
+    {
+        var p300 = Guid.NewGuid();
+        var p800 = Guid.NewGuid();
+        var lote300 = LoteDaPorcao(p300, atual: 4m, diasAtras: 5);
+        var lote800 = LoteDaPorcao(p800, atual: 3m, diasAtras: 1);
+        LotesDoProduto(lote300, lote800);
+
+        var r = await Criar().ExecuteAsync(Input(6m) with { Porcao = new PorcaoDoAjuste(p300) });
+
+        lote300.QuantidadeAtual.Value.Should().Be(6m, "ela contou 6 de 300 g");
+        lote800.QuantidadeAtual.Value.Should().Be(3m, "a porção de 800 g não foi contada");
+        r.QuantidadeAtual.Should().Be(9m, "o resultado é o saldo do prato inteiro");
+        await _itens.Received(1).UpdateRangeAsync(Arg.Is<IEnumerable<ItemEstoque>>(ls => ls.Single() == lote300));
+    }
+
+    [Fact]
+    public async Task ContagemSemPorcao_SoMexeNosLotesSemPorcao()
+    {
+        var antigo = LoteDaPorcao(null, atual: 2m, diasAtras: 9);
+        var lote300 = LoteDaPorcao(Guid.NewGuid(), atual: 4m);
+        LotesDoProduto(antigo, lote300);
+
+        await Criar().ExecuteAsync(Input(0m) with { Porcao = new PorcaoDoAjuste(null) });
+
+        antigo.QuantidadeAtual.Value.Should().Be(0m);
+        lote300.QuantidadeAtual.Value.Should().Be(4m);
+    }
+
+    [Fact]
+    public async Task PorcaoSemLote_PedeProducaoEmVezDeAjustar()
+    {
+        LotesDoProduto(LoteDaPorcao(Guid.NewGuid(), atual: 4m));
+
+        Func<Task> act = () => Criar().ExecuteAsync(Input(2m) with { Porcao = new PorcaoDoAjuste(Guid.NewGuid()) });
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*porção*produção*");
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task DescobertoEmOutraPorcao_MantemOAlertaDoPrato()
+    {
+        var p300 = Guid.NewGuid();
+        var lote300 = LoteDaPorcao(p300, atual: 0m, descoberto: 2m);
+        var lote800 = LoteDaPorcao(Guid.NewGuid(), atual: 0m, descoberto: 1m);
+        LotesDoProduto(lote300, lote800);
+
+        var r = await Criar().ExecuteAsync(Input(5m) with { Porcao = new PorcaoDoAjuste(p300) });
+
+        lote300.QuantidadeDescoberta.Value.Should().Be(0m);
+        r.QuantidadeDescoberta.Should().Be(1m, "a 800 g ainda tem venda sem saldo");
+        await _eventos.DidNotReceive().PublicarAsync(EventosOperacao.EstoqueDesacertoResolvido, Arg.Any<Guid>(),
+            Arg.Any<object>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UltimaPorcaoComDescoberto_FechaOAlertaDoPrato()
+    {
+        var p800 = Guid.NewGuid();
+        var lote300 = LoteDaPorcao(Guid.NewGuid(), atual: 4m);
+        var lote800 = LoteDaPorcao(p800, atual: 0m, descoberto: 1m);
+        LotesDoProduto(lote300, lote800);
+
+        var r = await Criar().ExecuteAsync(Input(2m) with { Porcao = new PorcaoDoAjuste(p800) });
+
+        r.QuantidadeDescoberta.Should().Be(0m);
+        await _eventos.Received(1).PublicarAsync(EventosOperacao.EstoqueDesacertoResolvido, _empresaId,
+            Arg.Any<object>(), Arg.Any<CancellationToken>());
+    }
 }

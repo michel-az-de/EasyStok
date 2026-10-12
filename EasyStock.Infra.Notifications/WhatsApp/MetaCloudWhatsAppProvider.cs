@@ -21,7 +21,7 @@ namespace EasyStock.Infra.Notifications.WhatsApp;
 /// e, com <c>Metadados["imagem"]</c> (arte da campanha, #1226), a imagem no cabeçalho;</item>
 /// <item>dentro da janela com <c>Metadados["imagem"]</c>: imagem com o texto como legenda;</item>
 /// <item>conversa aberta fora da janela sem template: falha permanente, sem chamar a Meta;</item>
-/// <item>sem conversa e sem template: tenta o texto; se a Meta recusar com 131047, falha permanente.</item>
+/// <item>sem conversa e sem template: falha permanente; não existe janela comprovada.</item>
 /// </list>
 /// Com conversa aberta, a saída é copiada para o histórico como <c>Mensagem(Saida, Sistema)</c> com o <c>wamid</c>.
 /// <para>
@@ -36,7 +36,8 @@ public sealed class MetaCloudWhatsAppProvider(
     IConversaRepository conversaRepository,
     ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
-    ILogger<MetaCloudWhatsAppProvider> logger) : IProvedorWhatsApp
+    ILogger<MetaCloudWhatsAppProvider> logger, IClienteRepository? clientes = null,
+    PoliticaEnvioCliente? politica = null) : IProvedorWhatsApp
 {
     public const string ErroForaDaJanelaSemTemplate = "fora_da_janela_24h_sem_template";
 
@@ -61,9 +62,21 @@ public sealed class MetaCloudWhatsAppProvider(
             var agora = DateTime.UtcNow;
             var contato = Conversa.NormalizarContato(CanalConversa.WhatsApp, mensagem.Destinatario);
             var conversa = await ObterConversaAbertaAsync(mensagem.EmpresaId, contato, ct);
+            var clienteAtualId = conversa?.ClienteId;
+            if (clienteAtualId is null && mensagem.Metadados is { } metadata && metadata.TryGetValue("clienteId", out var id)
+                && Guid.TryParse(id, out var clienteEnfileiradoId)) clienteAtualId = clienteEnfileiradoId;
+            if (clienteAtualId is { } clienteId && clientes is not null)
+            {
+                var cliente = await clientes.GetByIdAsync(mensagem.EmpresaId, clienteId);
+                if (cliente is null || cliente.EmpresaId != mensagem.EmpresaId || cliente.Bloqueado)
+                    return Falha("cliente_bloqueado_ou_indisponivel", permanente: true, sw);
+                if (politica is not null && mensagem.Categoria == Domain.Enums.Notifications.CategoriaConteudoNotificacao.Transacional
+                    && !await politica.PodeEnviarAsync(mensagem.EmpresaId, clienteId, CanalConversa.WhatsApp, FinalidadeContato.Transacional, ct))
+                    return Falha("contato_transacional_revogado", permanente: true, sw);
+            }
             var dentroDaJanela = conversa?.DentroDaJanela(agora) == true;
 
-            if (conversa is not null && !dentroDaJanela && template is null)
+            if (!dentroDaJanela && template is null)
                 return Falha(ErroForaDaJanelaSemTemplate, permanente: true, sw);
 
             var canal = resolvedorCanal.Obter(CanalConversa.WhatsApp);
@@ -90,6 +103,13 @@ public sealed class MetaCloudWhatsAppProvider(
             {
                 IdExterno = wamid
             };
+        }
+        catch (TextoAposImagemFalhouException ex)
+        {
+            // #1507: a imagem já saiu. Repetir reenviaria a imagem, então a falha do texto não pode ser transitória.
+            logger.LogError(ex.InnerException, "Meta WhatsApp: imagem enviada, texto falhou: entrega indeterminada (outbox {OutboxId}).",
+                mensagem.OutboxId);
+            return Indeterminado(ex.Message, (ex.InnerException as WhatsAppCloudException)?.StatusHttp, sw);
         }
         catch (WhatsAppCloudException ex) when (ex.Codigo == WhatsAppCloudException.CodigoForaDaJanela && template is null)
         {
@@ -194,6 +214,7 @@ public sealed class MetaCloudWhatsAppProvider(
     /// <summary>
     /// Imagem com o texto como legenda (#1226: arte da campanha dentro da janela). Legenda acima do limite
     /// da Meta sai em duas mensagens: a imagem sem legenda e depois o texto, cujo id fica no histórico.
+    /// Falha do texto depois de a imagem sair sobe como <see cref="TextoAposImagemFalhouException"/> (Indeterminado).
     /// </summary>
     private static async Task<string> EnviarImagemComTextoAsync(
         ICanalMensageria canal, string contato, string imagem, string texto, CancellationToken ct)
@@ -202,8 +223,18 @@ public sealed class MetaCloudWhatsAppProvider(
             return await canal.EnviarImagemAsync(contato, imagem, texto, ct);
 
         await canal.EnviarImagemAsync(contato, imagem, null, ct);
-        return await canal.EnviarTextoAsync(contato, texto, ct);
+        try
+        {
+            return await canal.EnviarTextoAsync(contato, texto, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            throw new TextoAposImagemFalhouException(ex);
+        }
     }
+
+    /// <summary>A imagem saiu e o texto que a segue falhou: o envio já é parcial.</summary>
+    private sealed class TextoAposImagemFalhouException(Exception inner) : Exception(inner.Message, inner);
 
     /// <summary><c>imagem</c>: URL HTTPS pública (cabeçalho do template ou imagem com legenda na janela).</summary>
     private static string? LerImagem(IReadOnlyDictionary<string, string>? metadados) =>

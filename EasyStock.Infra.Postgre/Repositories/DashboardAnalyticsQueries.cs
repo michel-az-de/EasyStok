@@ -57,23 +57,24 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         if (lojaId.HasValue)
             estoqueQuery = estoqueQuery.Where(i => i.LojaId == lojaId.Value);
 
-        var estoqueData = await estoqueQuery.Select(i => new
-        {
-            Quantidade = (int)i.QuantidadeAtual,
-            ValorCusto = (decimal)i.CustoUnitario * (int)i.QuantidadeAtual,
-            ValorVenda = ((decimal?)i.PrecoVendaSugerido ?? (decimal)i.CustoUnitario * OperacionalDefaults.FallbackMargemPrecoSugerido) * (int)i.QuantidadeAtual,
-            i.Status
-        }).ToListAsync();
-
-        var totalSkus = await estoqueQuery.Select(i => i.ProdutoId).Distinct().CountAsync();
-        var totalQtd = estoqueData.Sum(e => e.Quantidade);
-        var valorCusto = estoqueData.Sum(e => e.ValorCusto);
-        var valorVenda = estoqueData.Sum(e => e.ValorVenda);
         // BUG-05 (QA v1.10 #674): "estoque critico" = precisa repor = Critical + Esgotado (qty 0).
         // Antes contava qty<minima (incluia "Atencao"/Warn), divergindo do filtro /estoque?status=critico
         // (Critical-only, 4 itens) enquanto somava os Esgotados (6 no dashboard). Agora a contagem casa
         // com o filtro, que passa a incluir Esgotado (ver ItemEstoqueRepository.GetItensEstoquePaginadosAsync).
-        var alertasBaixo = estoqueData.Count(e => e.Status == StatusItemEstoque.Critical || e.Status == StatusItemEstoque.Esgotado);
+        var estoqueData = await estoqueQuery.GroupBy(_ => 1).Select(g => new
+        {
+            TotalSkus = g.Select(i => i.ProdutoId).Distinct().Count(),
+            Quantidade = g.Sum(i => (int)i.QuantidadeAtual),
+            ValorCusto = g.Sum(i => (decimal)i.CustoUnitario * (int)i.QuantidadeAtual),
+            ValorVenda = g.Sum(i => ((decimal?)i.PrecoVendaSugerido ?? (decimal)i.CustoUnitario * OperacionalDefaults.FallbackMargemPrecoSugerido) * (int)i.QuantidadeAtual),
+            AlertasBaixo = g.Count(i => i.Status == StatusItemEstoque.Critical || i.Status == StatusItemEstoque.Esgotado)
+        }).FirstOrDefaultAsync();
+
+        var totalSkus = estoqueData?.TotalSkus ?? 0;
+        var totalQtd = estoqueData?.Quantidade ?? 0;
+        var valorCusto = estoqueData?.ValorCusto ?? 0m;
+        var valorVenda = estoqueData?.ValorVenda ?? 0m;
+        var alertasBaixo = estoqueData?.AlertasBaixo ?? 0;
 
         // Alertas de validade — janela canonica DiasVencimentoProximo (7d), a mesma do
         // filtro "Vencendo" do Estoque (ItemEstoqueRepository.AplicarFiltroVencendo) e do
@@ -121,12 +122,16 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         if (lojaId.HasValue)
             movQuery = movQuery.Where(m => m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId.Value);
 
-        var movData = await movQuery
-            .Select(m => new { Quantidade = (int)m.Quantidade, ValorTotal = (decimal?)m.ValorTotal ?? 0m })
-            .ToListAsync();
+        var movData = await movQuery.GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Quantidade = g.Sum(m => (int)m.Quantidade),
+                ValorTotal = g.Sum(m => (decimal?)m.ValorTotal ?? 0m)
+            })
+            .FirstOrDefaultAsync();
 
-        var totalSaidasQtd = movData.Sum(m => m.Quantidade);
-        var receitaEstimada = movData.Sum(m => m.ValorTotal);
+        var totalSaidasQtd = movData?.Quantidade ?? 0;
+        var receitaEstimada = movData?.ValorTotal ?? 0m;
         var dias = Math.Max(1, periodoDias);
         var mediaVendasDiaria = (decimal)totalSaidasQtd / dias;
 

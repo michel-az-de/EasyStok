@@ -25,11 +25,41 @@ export function partesNoFuso(ms) {
   }
 }
 
+// Inverso de `partesNoFuso` (#1563): relógio de parede da loja -> instante em ms. Hora digitada
+// na tela é hora da loja; `new Date('2026-10-08T09:30')` e `setHours` leem no fuso do aparelho.
+// Dia, hora e minuto fora da faixa transbordam (dia 32 vira o dia 1 do mês seguinte).
+export function instanteNoFuso({ ano, mes, dia, horas = 0, minutos = 0 }) {
+  const parede = Date.UTC(ano, mes - 1, dia, horas, minutos)
+  let ms = parede
+  // Duas passadas: a segunda acerta a virada de um eventual horário de verão.
+  for (let i = 0; i < 2; i += 1) {
+    const p = partesNoFuso(ms)
+    ms -= Date.UTC(p.ano, p.mes - 1, p.dia, p.horas, p.minutos) - parede
+  }
+  return ms
+}
+
+// #1600: o dia e a hora de parede que o domínio calcula são os DA LOJA. `setHours` no lugar disto
+// lê o fuso do aparelho: depois das 21 h de Brasília o UTC já é amanhã, e em Tóquio é amanhã desde
+// o meio-dia. `ms` aceita instante em ms ou ISO; data inválida dá NaN, como o `setHours` dava
+// (`partesNoFuso` lançaria e derrubaria a tela por um registro sem data).
+export const noDiaDaLojaAs = (ms, horas = 0, minutos = 0) => {
+  if (Number.isNaN(new Date(ms).getTime())) return NaN
+  const { ano, mes, dia } = partesNoFuso(ms)
+  return instanteNoFuso({ ano, mes, dia, horas, minutos })
+}
+export const inicioDoDiaNoFuso = (ms) => noDiaDaLojaAs(ms)
+// Dias de calendário da loja entre dois instantes (0 = mesmo dia, 1 = ontem).
+export const diasDeCalendarioEntre = (de, ate) => Math.round((inicioDoDiaNoFuso(ate) - inicioDoDiaNoFuso(de)) / 86400000)
+
 // "2026-09-30" do dia da loja, não do UTC (depois das 21 h o UTC já é amanhã).
 export const dataIsoNoFuso = (ms) => {
   const { ano, mes, dia } = partesNoFuso(ms)
   return `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
 }
+
+export const somarDiasIso = (data, quantidade) =>
+  new Date(new Date(`${data}T12:00:00Z`).getTime() + quantidade * 86400000).toISOString().slice(0, 10)
 
 // Hora em mono sem dois-pontos ("12h30"), para o contexto do cartão do Balcão
 // (seção 1, rodada 5) e o sininho. Mesma conta de `horaComH` em dominio/lembrete.js,
@@ -96,18 +126,25 @@ export function duracao(ms) {
 export const mascaraMoeda = (centavos) => moeda((centavos ?? 0) / 100)
 
 // Acima disto o campo de moeda avisa em vez de aceitar (seção 4):
-// "Valor alto demais" em --parado, no lugar do valor.
+// "Valor alto demais" em --erro, no lugar do valor.
 export const LIMITE_MOEDA_CENTAVOS = 9999999
 export const moedaAltaDemais = (centavos) => (centavos ?? 0) > LIMITE_MOEDA_CENTAVOS
 
 // Cola de "68,5", "68.50" ou "R$ 68,50": o último separador (vírgula ou
-// ponto) é sempre o decimal, o resto é parte inteira. Sem separador nenhum, o
+// ponto) é o decimal, o resto é parte inteira. Sem separador nenhum, o
 // texto inteiro é reais cheios ("68" vira R$ 68,00).
+// #1510: um só tipo de separador seguido de exatamente 3 dígitos é milhar
+// ("R$ 1.500" é mil e quinhentos, não R$ 1,50), salvo parte inteira zero.
 export function lerMoeda(texto) {
   const semSimbolo = String(texto ?? '').replace(/[^\d.,]/g, '')
   if (!semSimbolo) return 0
   const posSeparador = Math.max(semSimbolo.lastIndexOf(','), semSimbolo.lastIndexOf('.'))
   if (posSeparador === -1) return Math.round(Number(semSimbolo) * 100)
+  const outroSeparador = semSimbolo[posSeparador] === ',' ? '.' : ','
+  const ehMilhar = !semSimbolo.includes(outroSeparador)
+    && /^\d{3}$/.test(semSimbolo.slice(posSeparador + 1))
+    && /[1-9]/.test(semSimbolo.slice(0, posSeparador))
+  if (ehMilhar) return Number(semSimbolo.replace(/[.,]/g, '')) * 100
   const inteiro = semSimbolo.slice(0, posSeparador).replace(/[.,]/g, '')
   const decimal = (semSimbolo.slice(posSeparador + 1).replace(/[.,]/g, '') + '00').slice(0, 2)
   return Number(inteiro || '0') * 100 + Number(decimal || '0')
@@ -135,6 +172,9 @@ export function mascaraCep(valor) {
   return digitos.length <= 5 ? digitos : `${digitos.slice(0, 5)}-${digitos.slice(5)}`
 }
 
+// Faixa de CEP da zona de frete (#1474): "05500-000 a 05599-999", não os oito dígitos crus.
+export const faixaDeCep = (inicio, fim) => `${mascaraCep(inicio)} a ${mascaraCep(fim)}`
+
 // Endereço em string só, formato da massa: "Rua X, 412, apto 71, Bairro,
 // CEP" (seção 2). `partesDoEndereco` separa para o cadastro rápido editar
 // campo a campo; `enderecoDasPartes` junta de volta na mesma ordem.
@@ -153,15 +193,20 @@ export const enderecoDasPartes = ({ rua, numero, complemento, bairro, cep }) =>
 
 // Rótulo do dia para o separador do fio da conversa (achado 8, pendência 18
 // da banca 64): "Hoje", "Ontem" ou a data por extenso, sempre contra o dia de
-// `agora` (o relógio simulado da tela), nunca o dia real da máquina.
-const inicioDoDiaMs = (ms) => {
-  const d = new Date(ms)
-  d.setHours(0, 0, 0, 0)
-  return d.getTime()
-}
+// `agora` (o relógio simulado da tela), nunca o dia real da máquina. #1600: dia da loja.
 export function rotuloDoDia(iso, agora) {
-  const diffDias = Math.round((inicioDoDiaMs(agora) - inicioDoDiaMs(new Date(iso).getTime())) / 86400000)
+  const diffDias = diasDeCalendarioEntre(iso, agora)
   if (diffDias === 0) return 'Hoje'
   if (diffDias === 1) return 'Ontem'
-  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', timeZone: FUSO })
+}
+
+// Data de calendário "2026-10-12" -> "seg, 12/10" (#1474). Só a data, sem hora nem fuso: o dia
+// da semana sai da própria data em UTC, então nunca escorrega para o dia anterior.
+const DIA_DA_SEMANA_CURTO = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
+export function dataCurtaComSemana(iso) {
+  const [ano, mes, dia] = String(iso ?? '').slice(0, 10).split('-').map(Number)
+  if (!ano || !mes || !dia) return iso ?? ''
+  const semana = DIA_DA_SEMANA_CURTO[new Date(Date.UTC(ano, mes - 1, dia)).getUTCDay()]
+  return `${semana}, ${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`
 }

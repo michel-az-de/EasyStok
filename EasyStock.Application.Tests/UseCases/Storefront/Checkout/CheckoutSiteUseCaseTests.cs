@@ -97,7 +97,7 @@ public class CheckoutSiteUseCaseTests
                 { ["Acompanhamento:JwtSecret"] = new string('s', 40) }).Build();
             var acompanhar = new AcompanhamentoTokenService(config, TimeProvider.System);
             var guest = new IniciarCheckoutGuestUseCase(Core.StorefrontRepo, Core.Servico(), cobrar, Clientes, Core.PedidoRepo,
-                Uow, acompanhar, Core.Atribuicao(), tenant, TimeProvider.System, NullLogger<IniciarCheckoutGuestUseCase>.Instance);
+                Uow, acompanhar, Core.Atribuicao(), tenant, TimeProvider.System, NullLogger<IniciarCheckoutGuestUseCase>.Instance, EnderecoEntregaPedidoTeste.Criar());
             var logado = new IniciarCheckoutUseCase(Core.Servico(), Core.StorefrontRepo, Clientes, idempotencia, cobrar,
                 Core.Atribuicao(), tenant, Uow, NullLogger<IniciarCheckoutUseCase>.Instance);
             UseCase = new CheckoutSiteUseCase(Acesso, new AbrirSessaoChatSiteUseCase(Acesso, Sessoes, Uow),

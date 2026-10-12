@@ -12,11 +12,17 @@ namespace EasyStock.Application.UseCases.Atendimento.ChatSite;
 
 public sealed record SessaoChatSiteAberta(Guid SessaoId, string Token, DateTime ExpiraEm);
 
-/// <summary>Mensagem como o visitante vê: a dele ou a da loja. Notas internas não aparecem.</summary>
-public sealed record MensagemChatSiteResult(Guid Id, bool DoVisitante, string? Texto, DateTime EnviadaEm)
+/// <summary>
+/// Mensagem como o visitante vê: a dele ou a da loja. Notas internas não aparecem. <c>Tipo</c>
+/// (<c>texto</c>, <c>imagem</c>...) e <c>TemMidia</c> (#1448): com mídia, o widget busca o arquivo em
+/// <c>GET mensagens/{id}/midia</c> com o mesmo <c>X-Chat-Token</c>; foto pode vir sem texto.
+/// </summary>
+public sealed record MensagemChatSiteResult(
+    Guid Id, bool DoVisitante, string? Texto, DateTime EnviadaEm, string Tipo = "texto", bool TemMidia = false)
 {
     internal static MensagemChatSiteResult De(Mensagem m) =>
-        new(m.Id, m.Direcao == DirecaoMensagem.Entrada, m.Texto, m.EnviadaEm);
+        new(m.Id, m.Direcao == DirecaoMensagem.Entrada, m.Texto, m.EnviadaEm,
+            m.TipoConteudo.ToString().ToLowerInvariant(), m.MidiaChave is not null);
 }
 
 /// <summary>Loja inexistente, inativa ou sem o chat ligado: 404, sem dizer qual dos três.</summary>

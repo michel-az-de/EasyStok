@@ -47,6 +47,18 @@ namespace EasyStock.Domain.Entities
         /// <summary>Unidade em que ItemEstoque.QuantidadeAtual deste produto e mantido. Default Un — operador atualiza via Admin Web quando necessario.</summary>
         public UnidadeMedida UnidadeMedidaBase { get; set; } = UnidadeMedida.Un;
 
+        /// <summary>
+        /// D-M2-01 (#1499): produzir este prato baixa os insumos da receita (UsoInterno). Desligado por
+        /// padrao: so o que a Thati marca na tela de receita entra na baixa.
+        /// </summary>
+        public bool BaixaInsumoAutomatica { get; set; }
+
+        /// <summary>
+        /// D-M2-03 (#1523): insumo que é embalagem (bandeja, selo, pote). Desce em TODA produção pela
+        /// receita, mesmo sem <see cref="BaixaInsumoAutomatica"/> no prato.
+        /// </summary>
+        public bool EhEmbalagem { get; set; }
+
         public StatusProduto Status { get; set; }
         public DateTime CriadoEm { get; set; }
         public DateTime AlteradoEm { get; set; }

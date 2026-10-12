@@ -36,6 +36,9 @@ public interface IMercadoPagoClient
     Task<EstornoMercadoPagoResult> EstornarAsync(
         string pagamentoId, decimal? valor = null, string? idempotencyKey = null, CancellationToken ct = default);
 
+    Task<EstornoMercadoPagoResult?> ConsultarEstornoAsync(string pagamentoId, string estornoId, CancellationToken ct = default);
+    Task<IReadOnlyList<EstornoMercadoPagoResult>> ListarEstornosAsync(string pagamentoId, CancellationToken ct = default);
+
     /// <summary>
     /// Encerra a validade de uma preferência (<c>PUT checkout/preferences/{id}</c> com
     /// <c>expiration_date_to</c>, S32): usado na troca de forma de pagamento para o link antigo parar de aceitar.

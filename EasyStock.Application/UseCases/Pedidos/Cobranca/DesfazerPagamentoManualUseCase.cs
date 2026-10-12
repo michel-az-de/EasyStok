@@ -1,4 +1,5 @@
 using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
@@ -33,7 +34,8 @@ public sealed class DesfazerPagamentoManualUseCase(
     IPublicadorEventoIntegracao publicador,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
-    QuitacaoPedido quitacao)
+    QuitacaoPedido quitacao,
+    ICaixaRepository caixa)
 {
     public Task<DesfazerPagamentoManualResult> ExecuteAsync(DesfazerPagamentoManualInput input, CancellationToken ct = default)
     {
@@ -63,6 +65,9 @@ public sealed class DesfazerPagamentoManualUseCase(
         if (pagamento is null)
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.SemPagamento, "Pedido sem pagamento para desfazer.");
 
+        if ((await pedidoRepository.ListarEstornosManuaisAsync(input.EmpresaId, pedido.Id, ct)).Any(e => e.PagamentoId == pagamento.Id))
+            throw new CobrancaPedidoConflitoException("pagamento_com_devolucao", "O recebimento possui devolução confirmada e deve permanecer no histórico.");
+
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(input.EmpresaId, pedido.Id, ct);
         if (!string.IsNullOrEmpty(pagamento.Referencia)
             && cobrancas.Any(c => c.EhOnline && c.PagamentoExternoId == pagamento.Referencia))
@@ -72,6 +77,9 @@ public sealed class DesfazerPagamentoManualUseCase(
         if (!PedidoStateMachine.PodeDesfazerPagamento(pedido.StatusEnum))
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PreparoIniciado,
                 "O preparo já começou (ou o pedido não está na fila): o pagamento não se desfaz por aqui.");
+
+        // #1547: o recebimento já entrou no retrato de um dia fechado. Mesma guarda da devolução.
+        await CaixaFechadoGuard.ExigirRecebimentoForaDoRetratoAsync(caixa, input.EmpresaId, pagamento.PagoEm, pedido.LojaId);
 
         // Remoção rastreada (mesmo padrão de RemoverPagamentoPedidoUseCase, #768): o DELETE entra no commit.
         pedido.Pagamentos.Remove(pagamento);

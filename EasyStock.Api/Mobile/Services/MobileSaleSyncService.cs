@@ -209,6 +209,8 @@ public class MobileSaleSyncService(
             var venda = await _db.Set<Venda>().IgnoreQueryFilters()
                 .FirstOrDefaultAsync(v => v.Id == order.ErpVendaId, ct);
             if (venda == null) return false;
+            // #1543: o vinculo chama de novo a cada reenvio do pedido cancelado; a marca entra uma vez.
+            if (venda.Observacoes?.StartsWith("[CANCELADO no mobile", StringComparison.Ordinal) == true) return false;
 
             var prefix = "[CANCELADO no mobile em " + DateTime.UtcNow.ToString("dd/MM HH:mm") + "] ";
             venda.Observacoes = prefix + (venda.Observacoes ?? "");

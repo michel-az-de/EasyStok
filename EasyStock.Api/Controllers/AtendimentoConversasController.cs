@@ -1,4 +1,8 @@
+using EasyStock.Api.Authentication;
+using EasyStock.Application.Ports.Output.Atendimento;
+using Microsoft.Extensions.Caching.Memory;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Services.Atendimento.Audio;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.ClienteDaConversa;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
@@ -32,6 +36,9 @@ public class AtendimentoConversasController(
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     private const int TamanhoMaximoImagem = 6 * 1024 * 1024;
+
+    /// <summary>Limite de áudio da Cloud API (#1444) mais folga para o envelope do multipart.</summary>
+    private const int TamanhoMaximoAudio = AudioParaWhatsApp.TamanhoMaximo + 64 * 1024;
 
     [SwaggerOperation(Summary = "List conversations (inbox)",
         Description = "responsavel: eu | ninguem | {usuarioId}. Sem o parâmetro, todas.")]
@@ -106,6 +113,30 @@ public class AtendimentoConversasController(
         => Atendendo(async () => DataOk(await enviarUseCase.EnviarTextoAsync(
             new EnviarTextoConsoleCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.Texto ?? string.Empty), ct)));
 
+    [HttpGet("~/api/atendimento/modelos")]
+    [ValidateEmpresaId]
+    public Task<IActionResult> ListarModelos(
+        [FromServices] ListarModelosAtendimentoUseCase useCase, [FromServices] IMemoryCache cache,
+        [FromQuery] bool atualizar = false, CancellationToken ct = default)
+        => Atendendo(async () =>
+        {
+            var chave = $"atendimento:modelos:{currentUser.EmpresaId}";
+            if (atualizar) cache.Remove(chave);
+            var modelos = await cache.GetOrCreateAsync(chave, async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1);
+                return await useCase.ExecuteAsync(currentUser.EmpresaId, ct);
+            });
+            return DataOk(modelos);
+        });
+
+    [HttpPost("{id:guid}/mensagens/modelo")]
+    [ValidateEmpresaId]
+    public Task<IActionResult> EnviarModelo(Guid id, [FromBody] EnviarModeloConversaBody body,
+        [FromServices] EnviarModeloConversaUseCase useCase, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await useCase.ExecuteAsync(new EnviarModeloConversaCommand(
+            currentUser.EmpresaId, currentUser.UsuarioId, id, body.TentativaId, body.Nome, body.Idioma, body.Parametros), ct)));
+
     [SwaggerOperation(Summary = "Messages that did not reach the customer (S59)",
         Description = "Saída que falhou, mais recente primeiro: inclui a que espera o cliente responder ao modelo de retomada e a que saiu por SMS.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -145,6 +176,59 @@ public class AtendimentoConversasController(
                 currentUser.EmpresaId, currentUser.UsuarioId, id, file.FileName, file.ContentType, memoria.ToArray(), legenda), ct));
         });
 
+    [SwaggerOperation(Summary = "Send a recorded audio as the owner (multipart; takes over the conversation)",
+        Description = "#1444: WebM/Opus do Chrome vira Ogg/Opus sem recodificar (a Meta não aceita WebM) e sai como nota de " +
+                      "voz; Ogg/Opus, MP4, MP3, AAC e AMR passam como vieram. O formato vem dos bytes. Até 16 MB.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status502BadGateway)]
+    [RequestSizeLimit(TamanhoMaximoAudio)]
+    [RequestFormLimits(MultipartBodyLengthLimit = TamanhoMaximoAudio)]
+    [HttpPost("{id:guid}/mensagens/audio")]
+    public Task<IActionResult> EnviarAudio(Guid id, IFormFile file, CancellationToken ct = default)
+        => Atendendo(async () =>
+        {
+            if (file is null || file.Length == 0)
+                return DataBadRequest("Áudio não informado ou vazio.");
+            if (file.Length > AudioParaWhatsApp.TamanhoMaximo)
+                return DataBadRequest("O áudio passa de 16 MB, o limite do WhatsApp.");
+
+            await using var memoria = new MemoryStream();
+            await file.CopyToAsync(memoria, ct);
+            return DataOk(await enviarUseCase.EnviarAudioAsync(new EnviarAudioConsoleCommand(
+                currentUser.EmpresaId, currentUser.UsuarioId, id, memoria.ToArray()), ct));
+        });
+
+    /// <remarks>Use case por <c>[FromServices]</c>: o construtor fica como está para os testes que o montam.</remarks>
+    [SwaggerOperation(Summary = "Send a menu gallery photo by item id (takes over the conversation)",
+        Description = "#1437: o backend lê a foto do storage pela chave (independe do host gravado na URL), converte para " +
+                      "JPEG e envia como a rota /imagem. indice segue a galeria do item; sem galeria, 0 é a capa. " +
+                      "Item de outra empresa ou arquivo fora do storage: 404. Índice inválido: 400.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status502BadGateway)]
+    [HttpPost("{id:guid}/mensagens/imagem-cardapio")]
+    public Task<IActionResult> EnviarImagemCardapio(
+        Guid id, [FromBody] EnviarImagemCardapioBody body,
+        [FromServices] EnviarImagemCardapioConsoleUseCase imagemCardapioUseCase, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await imagemCardapioUseCase.ExecuteAsync(new EnviarImagemCardapioConsoleCommand(
+            currentUser.EmpresaId, currentUser.UsuarioId, id, body?.CardapioItemId ?? Guid.Empty, body?.Indice ?? 0, body?.Legenda), ct)));
+
+    [SwaggerOperation(Summary = "Reopen a closed conversation in the human queue without renewing the channel window")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [HttpPost("{id:guid}/reabrir")]
+    public Task<IActionResult> Reabrir(Guid id, [FromServices] ReabrirConversaUseCase reabrirUseCase, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await reabrirUseCase.ExecuteAsync(Acao(id), ct)));
+
     [SwaggerOperation(Summary = "Take over the conversation without sending")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -163,7 +247,7 @@ public class AtendimentoConversasController(
     [HttpPost("{id:guid}/transferir")]
     public Task<IActionResult> Transferir(Guid id, [FromBody] TransferirConversaBody body, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await transferirUseCase.ExecuteAsync(
-            new TransferirConversaCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.ParaUsuarioId ?? Guid.Empty), ct)));
+            new TransferirConversaCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.ParaUsuarioId ?? Guid.Empty, User.NomeExibicao()), ct)));
 
     [SwaggerOperation(Summary = "Give the conversation back to the agent")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -235,7 +319,7 @@ public class AtendimentoConversasController(
         => Atendendo(async () => DataOk(await sugestaoUseCase.ExecuteAsync(
             new SugerirRespostaAgenteCommand(currentUser.EmpresaId, id), ct)));
 
-    private AcaoConversaCommand Acao(Guid id) => new(currentUser.EmpresaId, currentUser.UsuarioId, id);
+    private AcaoConversaCommand Acao(Guid id) => new(currentUser.EmpresaId, currentUser.UsuarioId, id, User.NomeExibicao());
 
     /// <summary>Ação que mexe na conversa: só quem atende (S41). Sem a permissão, 403 antes de tocar em nada.</summary>
     private Task<IActionResult> Atendendo(Func<Task<IActionResult>> acao)
@@ -255,6 +339,10 @@ public class AtendimentoConversasController(
         catch (MensagemNaoEncontradaException)
         {
             return DataNotFound("Mensagem não encontrada.");
+        }
+        catch (FotoCardapioNaoEncontradaException ex)
+        {
+            return DataNotFound(ex.Message);
         }
         catch (DestinoNaoAtendenteException ex)
         {
@@ -282,10 +370,19 @@ public class AtendimentoConversasController(
             return StatusCode(StatusCodes.Status502BadGateway,
                 new ApiErrorResponse(new ApiError("CANAL_FALHOU", "Falha ao enviar pelo canal.", ex.Message, null) { Details = ex.Mensagem }));
         }
+        catch (CatalogoModelosException ex)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway,
+                new ApiErrorResponse(new ApiError("MODELOS_INDISPONIVEIS", ex.Message, null, null)));
+        }
     }
 }
 
 public sealed record EnviarMensagemConsoleBody(string Texto);
+
+public sealed record EnviarModeloConversaBody(Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros, Guid? EmpresaId = null);
+
+public sealed record EnviarImagemCardapioBody(Guid CardapioItemId, int Indice, string? Legenda);
 
 public sealed record TransferirConversaBody(Guid ParaUsuarioId);
 

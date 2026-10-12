@@ -12,6 +12,7 @@ using EasyStock.Application.UseCases.ObterUsuarioAtual;
 using EasyStock.Application.UseCases.RefreshToken;
 using EasyStock.Application.UseCases.ResetarSenha;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
@@ -171,6 +172,8 @@ public class AuthControllerTests
         // #1352: logar em outro aparelho revoga só o refresh dos outros; o JWT deles segue valendo, então o
         // carimbo de sessão não pode mudar no login (logar o tablet derrubaria o balcão).
         var usuario = Usuario.Criar("Ana", "ana@casadababa.com", "hash");
+        // Sem vínculo ativo o login é recusado (#1541).
+        usuario.Empresas.Add(new UsuarioEmpresa { UsuarioId = usuario.Id, EmpresaId = Guid.NewGuid(), Ativo = true });
         _usuarioRepository.GetByEmailAsync(usuario.Email).Returns(usuario);
         _passwordHasher.Verify("Senha@12345", "hash").Returns(true);
         _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() };
@@ -182,7 +185,97 @@ public class AuthControllerTests
         usuario.SessoesValidasDesde.Should().BeNull();
     }
 
+    [Theory]
+    [InlineData(NivelAcesso.Admin, Modulo.Producao, true, true, false, false)]
+    [InlineData(NivelAcesso.Gerente, Modulo.Producao, true, true, false, false)]
+    [InlineData(NivelAcesso.SuperAdmin, Modulo.Producao, true, true, false, false)]
+    [InlineData(NivelAcesso.Operador, Modulo.Producao, true, false, false, false)]
+    [InlineData(NivelAcesso.Visualizador, Modulo.Producao, true, false, false, false)]
+    [InlineData(NivelAcesso.Admin, Modulo.Producao, false, false, false, false)]
+    [InlineData(NivelAcesso.Gerente, Modulo.Caixa, true, false, true, false)]
+    [InlineData(NivelAcesso.Operador, Modulo.Caixa, true, false, false, false)]
+    [InlineData(NivelAcesso.Gerente, Modulo.Cardapio, true, false, false, true)]
+    [InlineData(NivelAcesso.Operador, Modulo.Cardapio, true, false, false, false)]
+    [InlineData(NivelAcesso.Admin, Modulo.Atendimento, true, false, false, false)]
+    [InlineData(NivelAcesso.SuperAdmin, Modulo.Atendimento, true, false, false, false)]
+    [InlineData(NivelAcesso.Gerente, Modulo.Atendimento, true, false, false, false)]
+    [InlineData(NivelAcesso.Operador, Modulo.Atendimento, true, false, false, false)]
+    [InlineData(NivelAcesso.Admin, Modulo.Atendimento, false, false, false, false)]
+    public void CapacidadesDeEdicaoExigemNivelEmpresaEModulo(
+        NivelAcesso nivel, Modulo modulo, bool comEmpresa, bool producao, bool caixa, bool cardapio)
+    {
+        UsarContextoHttp();
+        _controller.HttpContext.User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+        [
+            new("nivel", nivel.ToString()),
+            new("empresaId", (comEmpresa ? Guid.NewGuid() : Guid.Empty).ToString()),
+            new("permissao", EasyStock.Domain.Services.AcessoModulos.PermissaoDe(modulo).ToString()),
+            new("permissoesExplicitas", "true")
+        ], "test"));
+        var usuario = new EasyStock.Api.Services.CurrentUserAccessor(
+            new Microsoft.AspNetCore.Http.HttpContextAccessor { HttpContext = _controller.HttpContext });
+
+        var resposta = (Microsoft.AspNetCore.Mvc.OkObjectResult)_controller.GetModulos(usuario);
+        var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
+
+        acoes.GetProperty("editarProducao").GetBoolean().Should().Be(producao);
+        acoes.GetProperty("gerenciarCaixa").GetBoolean().Should().Be(caixa);
+        acoes.GetProperty("editarCardapio").GetBoolean().Should().Be(cardapio);
+        acoes.GetProperty("editarAtendimento").GetBoolean().Should().Be(
+            comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin);
+        acoes.GetProperty("controlarLoja").GetBoolean().Should().Be(
+            comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin or NivelAcesso.Gerente);
+        acoes.GetProperty("cancelarPedidoPago").GetBoolean().Should().Be(
+            comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin or NivelAcesso.Gerente);
+        acoes.GetProperty("devolverPagamentoManual").GetBoolean().Should().Be(
+            comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin or NivelAcesso.Gerente);
+    }
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    public void ReabrirExigeModuloEPermissaoDeAtender(bool modulo, bool atender, bool esperado)
+    {
+        UsarContextoHttp();
+        var usuario = NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.ICurrentUserAccessor>();
+        usuario.EmpresaId.Returns(Guid.NewGuid());
+        usuario.TemPermissao(EasyStock.Domain.Services.AcessoModulos.PermissaoDe(Modulo.Atendimento)).Returns(modulo);
+        usuario.TemPermissao(Permissao.AtenderConversas).Returns(atender);
+        var resposta = (Microsoft.AspNetCore.Mvc.OkObjectResult)_controller.GetModulos(usuario);
+        var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
+        acoes.GetProperty("reabrirConversa").GetBoolean().Should().Be(esperado);
+    }
+
     // ── N8: esqueci a senha ───────────────────────────────────────────────────────────────────
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    public void FinanceiroExigeModuloECapacidadeEspecifica(bool modulo, bool capacidade, bool esperado)
+    {
+        UsarContextoHttp();
+        var usuario = NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.ICurrentUserAccessor>();
+        usuario.EmpresaId.Returns(Guid.NewGuid());
+        usuario.TemPermissao(EasyStock.Domain.Services.AcessoModulos.PermissaoDe(Modulo.Caixa)).Returns(modulo);
+        var capacidades = new Dictionary<string, Permissao>
+        {
+            ["visualizarContasPagar"] = Permissao.VisualizarContasAPagar,
+            ["visualizarContasReceber"] = Permissao.VisualizarContasAReceber,
+            ["gerenciarContasPagar"] = Permissao.GerenciarContasAPagar,
+            ["gerenciarContasReceber"] = Permissao.GerenciarContasAReceber,
+            ["gerenciarCategoriasFinanceiras"] = Permissao.GerenciarCategoriasFinanceiras,
+            ["gerenciarCentrosCusto"] = Permissao.GerenciarCentrosCusto
+        };
+        foreach (var permissao in capacidades.Values) usuario.TemPermissao(permissao).Returns(capacidade);
+        var resposta = (Microsoft.AspNetCore.Mvc.OkObjectResult)_controller.GetModulos(usuario);
+        var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
+        foreach (var nome in capacidades.Keys) acoes.GetProperty(nome).GetBoolean().Should().Be(esperado);
+    }
+
 
     private void UsarContextoHttp(string ip = "203.0.113.7")
     {
