@@ -69,17 +69,34 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
 
     public async Task<LinkCardapioConversaGerado> NovaEdicaoAsync(string token, CancellationToken ct)
     {
-        var link = await AcessoAsync(token, ct);
-        var estado = await EstadoAsync(link, ct);
-        if (link.UsadoEm is null || estado.Pedido is null || estado.Envio?.Situacao is "alteracao_aguardando_confirmacao" or "estorno_pendente")
-            throw new ComandaClienteConflitoException("Aguarde a confirmação deste envio antes de abrir outra edição.");
-        var pedido = await pedidos.GetByIdWithDetailsAsync(link.EmpresaId, estado.Pedido.PedidoId);
-        if (pedido is null || !PodeAlterar(pedido)) throw new LinkCardapioConversaIndisponivelException();
-        // Repetir a solicitação após perder a resposta recupera a mesma credencial, sem armazenar token cru.
-        var novoToken = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes($"nova-edicao:{link.Id:N}:{token.Trim()}")))
-            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        var novo = await gerarLink.GerarAsync(link.EmpresaId, link.ConversaId, relogio.GetUtcNow().UtcDateTime, ct, novoToken);
-        await AvisarAsync(link.EmpresaId, link.ConversaId, ct);
+        var acesso = await AcessoAsync(token, ct);
+        var novo = await uow.ExecuteInTransactionSemRetryAsync(async t =>
+        {
+            await conversas.TravarParaPedidoAsync(acesso.EmpresaId, acesso.ConversaId, t);
+            var link = await AcessoAsync(token, t);
+            var estado = await EstadoAsync(link, t);
+            if (link.UsadoEm is null || estado.Pedido is null || estado.Envio?.Situacao is "alteracao_aguardando_confirmacao" or "estorno_pendente")
+                throw new ComandaClienteConflitoException("Aguarde a confirmação deste envio antes de abrir outra edição.");
+            var pedido = await pedidos.GetByIdWithDetailsAsync(link.EmpresaId, estado.Pedido.PedidoId);
+            if (pedido is null || !PodeAlterar(pedido)) throw new LinkCardapioConversaIndisponivelException();
+            var anterior = link;
+            var tokenAnterior = token.Trim();
+            var agora = relogio.GetUtcNow().UtcDateTime;
+            while (true)
+            {
+                // Recibos anteriores convergem à próxima edição, mesmo após o consumo de seus filhos.
+                var novoToken = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes($"nova-edicao:{anterior.Id:N}:{tokenAnterior}")))
+                    .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+                var filho = await links.ObterPorTokenHashAsync(AcessoChatSite.HashDoToken(novoToken), t);
+                if (filho is not null && (filho.EmpresaId != link.EmpresaId || filho.ConversaId != link.ConversaId))
+                    throw new LinkCardapioConversaIndisponivelException();
+                if (filho is null || filho.EstaValido(agora))
+                    return await gerarLink.GerarAsync(link.EmpresaId, link.ConversaId, agora, t, novoToken);
+                anterior = filho;
+                tokenAnterior = novoToken;
+            }
+        }, ct);
+        await AvisarAsync(acesso.EmpresaId, acesso.ConversaId, ct);
         return novo;
     }
 
