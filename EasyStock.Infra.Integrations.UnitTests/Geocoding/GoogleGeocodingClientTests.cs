@@ -1,23 +1,24 @@
 using System.Net;
-using System.Text;
 using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Infra.Integrations.Geocoding;
+using EasyStock.TestHelpers.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EasyStock.Infra.Integrations.UnitTests.Geocoding;
 
 /// <summary>
 /// Testes do adapter Google Geocoding (módulo de entregas, issue #1217).
-/// HTTP é stubado por um <see cref="StubHandler"/> — nenhuma chamada de rede real.
+/// HTTP é stubado por um <see cref="HttpFalso"/> — nenhuma chamada de rede real.
 /// </summary>
 public class GoogleGeocodingClientTests
 {
     private const string Chave = "chave-de-teste";
 
-    private static GoogleGeocodingClient Client(HttpStatusCode status, string body, out StubHandler handler)
+    private static GoogleGeocodingClient Client(HttpStatusCode status, string body, out HttpFalso handler)
     {
-        handler = new StubHandler(status, body);
-        var http = new HttpClient(handler) { BaseAddress = new Uri("https://maps.test/") };
+        handler = new HttpFalso();
+        handler.QuandoQualquer().Responde(status, body);
+        var http = handler.CriarClient("https://maps.test/");
         return new GoogleGeocodingClient(http, Chave, NullLogger<GoogleGeocodingClient>.Instance);
     }
 
@@ -109,7 +110,7 @@ public class GoogleGeocodingClientTests
         var r = await client.GeocodificarAsync(new GeocodeQuery(null, null, null, null, null, null));
 
         Assert.Null(r);
-        Assert.Equal(0, handler.Chamadas);
+        Assert.Empty(handler.Chamadas);
     }
 
     [Fact]
@@ -119,35 +120,10 @@ public class GoogleGeocodingClientTests
 
         await client.GeocodificarAsync(QueryCompleta());
 
-        var url = handler.UltimaUrl!;
+        var url = handler.UltimaChamada!.Uri.AbsoluteUri;
         Assert.Contains("geocode/json?", url);
         Assert.Contains("components=country%3ABR", url);
         Assert.Contains($"key={Chave}", url);
         Assert.Contains("Avenida%20Paulista", url);
-    }
-
-    private sealed class StubHandler : HttpMessageHandler
-    {
-        private readonly HttpStatusCode _status;
-        private readonly string _body;
-
-        public int Chamadas { get; private set; }
-        public string? UltimaUrl { get; private set; }
-
-        public StubHandler(HttpStatusCode status, string body)
-        {
-            _status = status;
-            _body = body;
-        }
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            Chamadas++;
-            UltimaUrl = request.RequestUri?.AbsoluteUri;
-            return Task.FromResult(new HttpResponseMessage(_status)
-            {
-                Content = new StringContent(_body, Encoding.UTF8, "application/json"),
-            });
-        }
     }
 }
