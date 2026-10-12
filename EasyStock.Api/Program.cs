@@ -6,6 +6,7 @@ using EasyStock.Application.DependencyInjection;
 using EasyStock.Infra.Integrations.DependencyInjection;
 using EasyStock.Infra.Integrations.Pagamentos.MercadoPago;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Integration;
 using EasyStock.Infra.Async.DependencyInjection;
 using Serilog;
 
@@ -24,6 +25,9 @@ TaskScheduler.UnobservedTaskException += (_, e) =>
 };
 
 var builder = WebApplication.CreateBuilder(args);
+
+// I4.1 (#1674): a chave-mestra do cofre chega por EZ_CRYPTO_* nos dois hosts (API e Worker).
+builder.Configuration.AdicionarChaveMestraDoAmbiente();
 
 // Garantir que diretório de logs existe antes do Serilog iniciar
 {
@@ -149,6 +153,9 @@ builder.Services.AddSingleton<EasyStock.Api.Observability.DiagnosticoModeService
 
 // ── Build ─────────────────────────────────────────────────────────────────────
 var app = builder.Build();
+
+// I4.1: sem chave-mestra a API sobe e avisa (o fail-fast é da I4.2).
+ChaveMestraConfiguracao.AvisarSeFaltar(app.Configuration, app.Logger, "API");
 
 // ── Modo migrate-only (release_command do deploy) ─────────────────────────────
 // Aplica migrations pendentes e ENCERRA, sem subir o servidor. O deploy (Fly
