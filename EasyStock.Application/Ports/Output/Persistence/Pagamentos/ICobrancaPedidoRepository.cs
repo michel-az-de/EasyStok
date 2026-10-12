@@ -27,4 +27,10 @@ public interface ICobrancaPedidoRepository
     /// das que venceram antes primeiro.
     /// </summary>
     Task<IReadOnlyList<CobrancaPedidoVencida>> ListarPendentesVencidasAsync(DateTime limite, int maximo, CancellationToken ct = default);
+
+    /// <summary>
+    /// Há alguma cobrança online pendente, em qualquer loja (I3.1)? O webhook que não consegue reconsultar o
+    /// pagamento usa isto para decidir entre pedir reenvio e ignorar. Só devolve sim ou não.
+    /// </summary>
+    Task<bool> ExistePendenteOnlineAsync(CancellationToken ct = default);
 }

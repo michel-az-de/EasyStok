@@ -131,15 +131,16 @@ public sealed partial class MercadoPagoClient(
     }
 
     public async Task<EstornoMercadoPagoResult> EstornarAsync(
-        string pagamentoId, decimal? valor = null, string? idempotencyKey = null, CancellationToken ct = default)
+        string pagamentoId, decimal? valor, string idempotencyKey, CancellationToken ct = default)
     {
         var id = ValidarPagamentoId(pagamentoId);
         if (valor is <= 0m)
             throw new ArgumentOutOfRangeException(nameof(valor), "Valor do estorno deve ser maior que zero.");
 
-        var chave = string.IsNullOrWhiteSpace(idempotencyKey)
-            ? $"estorno-{id}-{(valor.HasValue ? valor.Value.ToString("F2", CultureInfo.InvariantCulture) : "total")}"
-            : idempotencyKey.Trim();
+        // I3.1: a chave vem de quem chama. Derivá-la do valor fazia dois parciais iguais virarem um só.
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+            throw new ArgumentException("Chave de idempotência do estorno é obrigatória.", nameof(idempotencyKey));
+        var chave = idempotencyKey.Trim();
 
         using var request = Requisicao(HttpMethod.Post, $"v1/payments/{id}/refunds");
         request.Headers.Add("X-Idempotency-Key", chave);
