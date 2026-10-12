@@ -75,6 +75,7 @@ jobs:
       - run: node ferramentas/prova-1552-receita-por-porcao.mjs
       - run: node ferramentas/prova-1551-delta-console.mjs
       - run: node ferramentas/prova-1565-console-ocioso.mjs
+      - run: node ferramentas/prova-1650-impressao-banca.mjs
       - run: node ferramentas/prova-1577-telas-console.mjs
       - run: node ferramentas/prova-1576-laco-sincronizacao.mjs
       - run: node ferramentas/prova-1577-balcao-render.mjs

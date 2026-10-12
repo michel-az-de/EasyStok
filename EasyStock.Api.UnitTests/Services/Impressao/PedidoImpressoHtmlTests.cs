@@ -26,10 +26,22 @@ public class PedidoImpressoHtmlTests
         var renderer = new PedidoImpressoHtml(new ScribanRenderer(NullLogger<ScribanRenderer>.Instance));
         var html = await renderer.RenderizarAsync(Exemplo(logo: null), documento, papel, BaseUrl, new ImpressoOpcoes(Codigo: "barras"));
         html.Should().Contain("class=\"barras\"").And.Contain("Código de barras A7F3C21B").And.NotContain("Aponte a câmera");
-        if (papel == "a4" && Environment.GetEnvironmentVariable("IMPRESSAO_ARTEFATOS") is { Length: > 0 } pasta)
+        if (Environment.GetEnvironmentVariable("IMPRESSAO_ARTEFATOS") is { Length: > 0 } pasta)
         {
             Directory.CreateDirectory(pasta);
-            await File.WriteAllTextAsync(Path.Combine(pasta, documento + "-a4-barras.html"), html);
+            await File.WriteAllTextAsync(Path.Combine(pasta, documento + "-" + papel + "-barras.html"), html);
+            if (documento == PedidoImpressoHtml.Entrega)
+            {
+                var longo = Exemplo(logo: null, clienteNome: "Maria Aparecida de Albuquerque e Vasconcelos",
+                    itens: Enumerable.Range(1, 12).Select(n => new PedidoImpressoItemDto(2, "un",
+                        $"Item {n}: pão de queijo recheado com queijo e ervas", "embalar separadamente", 24.90m, 49.80m)).ToArray());
+                longo = longo with {
+                    Cliente = longo.Cliente with { Endereco = "Rua das Laranjeiras, 214, apartamento 320, bloco Girassol, Vila Mariana, São Paulo, acesso pela portaria da avenida" },
+                    Entrega = longo.Entrega! with { Responsavel = "Carlos Eduardo de Oliveira e Albuquerque" }
+                };
+                var htmlLongo = await renderer.RenderizarAsync(longo, documento, papel, BaseUrl);
+                await File.WriteAllTextAsync(Path.Combine(pasta, "entrega-" + papel + "-longa.html"), htmlLongo);
+            }
         }
     }
 

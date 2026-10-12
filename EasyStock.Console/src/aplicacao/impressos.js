@@ -8,7 +8,9 @@ import { gravarPreferenciasImpressao, lerPreferenciasImpressao } from '../infra/
 export { enviarLogoDaLoja, gravarPreferenciasImpressao, lerPreferenciasImpressao, obterLojaDaEmpresa }
 
 // Propriedades de `componentes/ImprimirPedido` para um pedido que existe no EasyStok.
-export const impressaoDoPedido = (pedidoId, canhotoId = null) => ({
+export const impressaoDoPedido = (pedidoId, canhotoId = null, clienteNome = null) => ({
+  contexto: pedidoId ? `#${pedidoId.replaceAll('-', '').slice(0, 8).toUpperCase()}` : null,
+  clienteNome,
   documentos: DOCUMENTOS,
   papeis: PAPEIS,
   papelPadrao: (documento) => lerPreferenciasImpressao().papeis[documento],
