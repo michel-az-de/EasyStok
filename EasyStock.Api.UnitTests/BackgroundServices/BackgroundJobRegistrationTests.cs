@@ -84,13 +84,14 @@ public class BackgroundJobRegistrationTests
     }
 
     [Fact]
-    public void AddEasyStockBackgroundJobs_RegistraCaixaDeEmail_EDesligaPorFlag()
+    public void AddEasyStockBackgroundJobs_CaixaDeEmailNasceDesligada_ELigaPorFlag()
     {
-        var ligado = new ServiceCollection().AddLogging();
-        ligado.AddEasyStockBackgroundJobs(new ConfigurationBuilder().Build());
+        // #1642: sem data de corte, ligar com a caixa real importa todo o acumulado. O padrão é desligado.
         var desligado = new ServiceCollection().AddLogging();
-        desligado.AddEasyStockBackgroundJobs(new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { [$"{BackgroundJobOptions.SectionName}:EnableAtendimentoCaixaEmail"] = "false" })
+        desligado.AddEasyStockBackgroundJobs(new ConfigurationBuilder().Build());
+        var ligado = new ServiceCollection().AddLogging();
+        ligado.AddEasyStockBackgroundJobs(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [$"{BackgroundJobOptions.SectionName}:EnableAtendimentoCaixaEmail"] = "true" })
             .Build());
 
         ligado.Where(d => d.ServiceType == typeof(IHostedService)).Select(d => d.ImplementationType)
