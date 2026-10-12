@@ -23,7 +23,7 @@ export function useCadastroEntregaApi() {
     const ate = new Date(hoje.getTime() + DIAS_BLOQUEIO * 86400000)
     return Promise.all([api.listarJanelas(), api.listarZonas(), api.listarBloqueios(dataIso(hoje), dataIso(ate)),
       // #1651: console e API publicam em separado; API sem a rota não derruba janelas, zonas e bloqueios.
-      api.obterFreteRaio().catch(() => undefined)])
+      api.obterFreteRaio().catch((e) => { if (e.status === 404) return undefined; throw e })])
       .then(([j, z, b, raio]) => {
         setFreteRaio(raio)
         setJanelas(j ?? [])
