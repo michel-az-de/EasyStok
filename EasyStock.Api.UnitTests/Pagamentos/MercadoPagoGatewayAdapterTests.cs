@@ -56,7 +56,7 @@ public class MercadoPagoGatewayAdapterTests
     [Fact]
     public async Task EstornarComFalhaDevolveInsucesso()
     {
-        _client.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _client.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal?>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns<Task<EstornoMercadoPagoResult>>(_ => throw new HttpRequestException("mp fora"));
 
         var r = await Adapter().EstornarAsync("123", 10m);
