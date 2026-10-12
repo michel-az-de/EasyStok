@@ -1,14 +1,14 @@
 using System.Net;
-using System.Text;
 using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Infra.Integrations.Rotas;
+using EasyStock.TestHelpers.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EasyStock.Infra.Integrations.UnitTests.Rotas;
 
 /// <summary>
 /// Testes do adapter Google Routes API (issue #1274).
-/// HTTP é stubado por um <see cref="StubHandler"/> — nenhuma chamada de rede real.
+/// HTTP é stubado por um <see cref="HttpFalso"/> — nenhuma chamada de rede real.
 /// </summary>
 public class GoogleRotasClientTests
 {
@@ -17,10 +17,11 @@ public class GoogleRotasClientTests
     private static readonly RotaQuery Query = new(
         OrigemLat: -23.5614, OrigemLng: -46.6562, DestinoLat: -23.5874, DestinoLng: -46.6576);
 
-    private static GoogleRotasClient Client(HttpStatusCode status, string body, out StubHandler handler)
+    private static GoogleRotasClient Client(HttpStatusCode status, string body, out HttpFalso handler)
     {
-        handler = new StubHandler(status, body);
-        var http = new HttpClient(handler) { BaseAddress = new Uri("https://routes.test/") };
+        handler = new HttpFalso();
+        handler.QuandoQualquer().Responde(status, body);
+        var http = handler.CriarClient("https://routes.test/");
         return new GoogleRotasClient(http, Chave, NullLogger<GoogleRotasClient>.Instance);
     }
 
@@ -67,42 +68,13 @@ public class GoogleRotasClientTests
 
         await client.MedirAsync(Query);
 
-        Assert.Equal(HttpMethod.Post, handler.Metodo);
-        Assert.EndsWith("directions/v2:computeRoutes", handler.Url);
-        Assert.DoesNotContain(Chave, handler.Url);
-        Assert.Equal(Chave, handler.Header("X-Goog-Api-Key"));
-        Assert.Equal("routes.distanceMeters,routes.duration", handler.Header("X-Goog-FieldMask"));
-        Assert.Contains("\"travelMode\":\"DRIVE\"", handler.Corpo);
-        Assert.Contains("-23.5874", handler.Corpo);
-    }
-
-    private sealed class StubHandler : HttpMessageHandler
-    {
-        private readonly HttpStatusCode _status;
-        private readonly string _body;
-        private HttpRequestMessage? _ultima;
-
-        public HttpMethod? Metodo => _ultima?.Method;
-        public string Url => _ultima?.RequestUri?.AbsoluteUri ?? "";
-        public string Corpo { get; private set; } = "";
-
-        public StubHandler(HttpStatusCode status, string body)
-        {
-            _status = status;
-            _body = body;
-        }
-
-        public string? Header(string nome) =>
-            _ultima is not null && _ultima.Headers.TryGetValues(nome, out var v) ? v.Single() : null;
-
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            _ultima = request;
-            Corpo = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
-            return new HttpResponseMessage(_status)
-            {
-                Content = new StringContent(_body, Encoding.UTF8, "application/json"),
-            };
-        }
+        var chamada = handler.UltimaChamada!;
+        Assert.Equal(HttpMethod.Post, chamada.Metodo);
+        Assert.EndsWith("directions/v2:computeRoutes", chamada.Uri.AbsoluteUri);
+        Assert.DoesNotContain(Chave, chamada.Uri.AbsoluteUri);
+        Assert.Equal(Chave, chamada.Cabecalho("X-Goog-Api-Key"));
+        Assert.Equal("routes.distanceMeters,routes.duration", chamada.Cabecalho("X-Goog-FieldMask"));
+        Assert.Contains("\"travelMode\":\"DRIVE\"", chamada.Corpo);
+        Assert.Contains("-23.5874", chamada.Corpo);
     }
 }

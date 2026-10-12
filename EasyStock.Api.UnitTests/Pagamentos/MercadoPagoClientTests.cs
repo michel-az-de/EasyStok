@@ -1,8 +1,8 @@
 using System.Net;
-using System.Text;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Infra.Integrations.Pagamentos.MercadoPago;
+using EasyStock.TestHelpers.Http;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,26 +16,19 @@ namespace EasyStock.Api.UnitTests.Pagamentos;
 /// S11: a preferência do pedido leva expiração (<c>expires</c> + <c>expiration_date_to</c>) e o header
 /// <c>X-Idempotency-Key</c>. S32: endpoint do Checkout Pro (<c>checkout/preferences</c>), consulta do
 /// pagamento na fonte, busca por <c>external_reference</c>, estorno idempotente e expiração da preferência.
-/// Handler HTTP falso com payloads no formato da documentação oficial: nenhuma chamada à API real
+/// <see cref="HttpFalso"/> com payloads no formato da documentação oficial: nenhuma chamada à API real
 /// (onda 0.9 ainda sem credencial).
 /// </summary>
 public class MercadoPagoClientTests
 {
-    internal sealed class HandlerFalso(HttpStatusCode status = HttpStatusCode.Created, string? resposta = null) : HttpMessageHandler
-    {
-        public HttpRequestMessage? Requisicao { get; private set; }
-        public string? Corpo { get; private set; }
+    private const string PreferenciaCriadaJson = """{"id":"pref-1","init_point":"https://mp.test/pref-1"}""";
 
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
-        {
-            Requisicao = request;
-            Corpo = request.Content is null ? null : await request.Content.ReadAsStringAsync(ct);
-            return new HttpResponseMessage(status)
-            {
-                Content = new StringContent(
-                    resposta ?? """{"id":"pref-1","init_point":"https://mp.test/pref-1"}""", Encoding.UTF8, "application/json"),
-            };
-        }
+    /// <summary>Responde o mesmo status e corpo a qualquer rota: cada teste confere a rota pela chamada gravada.</summary>
+    private static HttpFalso Falso(HttpStatusCode status, string? resposta)
+    {
+        var handler = new HttpFalso();
+        handler.QuandoQualquer().Responde(status, resposta ?? PreferenciaCriadaJson);
+        return handler;
     }
 
     /// <summary>Pagamento aprovado, recortado do exemplo de <c>GET /v1/payments/{id}</c> da documentação.</summary>
@@ -54,10 +47,10 @@ public class MercadoPagoClientTests
         }
         """;
 
-    private static (MercadoPagoClient, HandlerFalso) Criar(HttpStatusCode status = HttpStatusCode.Created, string? resposta = null)
+    private static (MercadoPagoClient, HttpFalso) Criar(HttpStatusCode status = HttpStatusCode.Created, string? resposta = null)
     {
-        var handler = new HandlerFalso(status, resposta);
-        var http = new HttpClient(handler) { BaseAddress = new Uri("https://api.mp.test/") };
+        var handler = Falso(status, resposta);
+        var http = handler.CriarClient("https://api.mp.test/");
         var opcoes = Options.Create(new MercadoPagoOptions { AccessToken = "fake" });
         return (new MercadoPagoClient(http, opcoes, NullLogger<MercadoPagoClient>.Instance), handler);
     }
@@ -75,8 +68,8 @@ public class MercadoPagoClientTests
             ExpiraEm: expira, IdempotencyKey: $"{pedidoId:N}-1"));
 
         r.InitPointUrl.Should().Be("https://mp.test/pref-1");
-        handler.Requisicao!.Headers.GetValues("X-Idempotency-Key").Should().ContainSingle($"{pedidoId:N}-1");
-        using var json = JsonDocument.Parse(handler.Corpo!);
+        handler.UltimaChamada!.Cabecalhos["X-Idempotency-Key"].Should().ContainSingle($"{pedidoId:N}-1");
+        using var json = JsonDocument.Parse(handler.UltimaChamada!.Corpo!);
         json.RootElement.GetProperty("external_reference").GetString().Should().Be(pedidoId.ToString());
         json.RootElement.GetProperty("expires").GetBoolean().Should().BeTrue();
         json.RootElement.GetProperty("expiration_date_to").GetString().Should().Be("2026-09-29T15:30:00.000+00:00");
@@ -91,8 +84,8 @@ public class MercadoPagoClientTests
         await client.CriarPreferenceAsync(new CriarPreferenceCommand(
             Guid.NewGuid(), Guid.NewGuid(), "Loja", 10m, [new PreferenceItemCommand("Item", 1, 10m)]));
 
-        handler.Requisicao!.Headers.Contains("X-Idempotency-Key").Should().BeFalse();
-        using var json = JsonDocument.Parse(handler.Corpo!);
+        handler.UltimaChamada!.Cabecalhos.ContainsKey("X-Idempotency-Key").Should().BeFalse();
+        using var json = JsonDocument.Parse(handler.UltimaChamada!.Corpo!);
         json.RootElement.GetProperty("expires").GetBoolean().Should().BeFalse();
         json.RootElement.TryGetProperty("expiration_date_to", out _).Should().BeFalse();
         json.RootElement.TryGetProperty("date_of_expiration", out _).Should().BeFalse();
@@ -110,7 +103,7 @@ public class MercadoPagoClientTests
             Guid.NewGuid(), Guid.NewGuid(), "Casa da Babá", 10m, [new PreferenceItemCommand("Item", 1, 10m)],
             ExpiraEm: expira));
 
-        using var json = JsonDocument.Parse(handler.Corpo!);
+        using var json = JsonDocument.Parse(handler.UltimaChamada!.Corpo!);
         json.RootElement.GetProperty("date_of_expiration").GetString().Should().Be("2026-09-29T15:30:00.000+00:00");
         json.RootElement.GetProperty("expiration_date_to").GetString().Should().Be("2026-09-29T15:30:00.000+00:00");
     }
@@ -127,7 +120,7 @@ public class MercadoPagoClientTests
             Guid.NewGuid(), Guid.NewGuid(), "Casa da Babá", 10m, [new PreferenceItemCommand("Entrega — Butantã", 1, 10m)],
             ExpiraEm: new DateTime(2026, 9, 29, 15, 30, 0, DateTimeKind.Utc)));
 
-        handler.Corpo.Should().Contain("\"expiration_date_to\":\"2026-09-29T15:30:00.000+00:00\"")
+        handler.UltimaChamada!.Corpo.Should().Contain("\"expiration_date_to\":\"2026-09-29T15:30:00.000+00:00\"")
             .And.Contain("\"date_of_expiration\":\"2026-09-29T15:30:00.000+00:00\"")
             .And.NotContain("\\u002B");
     }
@@ -139,7 +132,7 @@ public class MercadoPagoClientTests
 
         await client.ExpirarPreferenciaAsync("pref-1", new DateTime(2026, 9, 29, 15, 0, 0, DateTimeKind.Utc));
 
-        handler.Corpo.Should().Contain("2026-09-29T15:00:00.000+00:00").And.NotContain("\\u002B");
+        handler.UltimaChamada!.Corpo.Should().Contain("2026-09-29T15:00:00.000+00:00").And.NotContain("\\u002B");
     }
 
     [Fact]
@@ -164,9 +157,9 @@ public class MercadoPagoClientTests
         await client.CriarPreferenceAsync(new CriarPreferenceCommand(
             Guid.NewGuid(), Guid.NewGuid(), "Loja", 10m, [new PreferenceItemCommand("Item", 1, 10m)]));
 
-        handler.Requisicao!.Method.Should().Be(HttpMethod.Post);
-        handler.Requisicao.RequestUri!.AbsoluteUri.Should().Be("https://api.mp.test/checkout/preferences");
-        handler.Requisicao.Headers.Authorization!.ToString().Should().Be("Bearer fake");
+        handler.UltimaChamada!.Metodo.Should().Be(HttpMethod.Post);
+        handler.UltimaChamada.Uri.AbsoluteUri.Should().Be("https://api.mp.test/checkout/preferences");
+        handler.UltimaChamada.Cabecalho("Authorization").Should().Be("Bearer fake");
     }
 
     [Fact]
@@ -177,10 +170,10 @@ public class MercadoPagoClientTests
 
         var r = await client.EstornarAsync("20359978", 10.5m, "estorno-chave-1");
 
-        handler.Requisicao!.Method.Should().Be(HttpMethod.Post);
-        handler.Requisicao.RequestUri!.AbsoluteUri.Should().Be("https://api.mp.test/v1/payments/20359978/refunds");
-        handler.Requisicao.Headers.GetValues("X-Idempotency-Key").Should().ContainSingle("estorno-chave-1");
-        using var json = JsonDocument.Parse(handler.Corpo!);
+        handler.UltimaChamada!.Metodo.Should().Be(HttpMethod.Post);
+        handler.UltimaChamada.Uri.AbsoluteUri.Should().Be("https://api.mp.test/v1/payments/20359978/refunds");
+        handler.UltimaChamada.Cabecalhos["X-Idempotency-Key"].Should().ContainSingle("estorno-chave-1");
+        using var json = JsonDocument.Parse(handler.UltimaChamada!.Corpo!);
         json.RootElement.GetProperty("amount").GetDecimal().Should().Be(10.5m);
         r.EstornoId.Should().Be("1009042015");
         r.Valor.Should().Be(10.5m);
@@ -195,8 +188,8 @@ public class MercadoPagoClientTests
 
         await client.EstornarAsync("20359978");
 
-        handler.Requisicao!.Headers.GetValues("X-Idempotency-Key").Should().ContainSingle("estorno-20359978-total");
-        handler.Corpo.Should().BeNullOrEmpty("estorno total vai sem amount");
+        handler.UltimaChamada!.Cabecalhos["X-Idempotency-Key"].Should().ContainSingle("estorno-20359978-total");
+        handler.UltimaChamada!.Corpo.Should().BeNullOrEmpty("estorno total vai sem amount");
     }
 
     [Fact]
@@ -206,8 +199,8 @@ public class MercadoPagoClientTests
 
         var p = await client.ConsultarPagamentoAsync("20359978");
 
-        handler.Requisicao!.Method.Should().Be(HttpMethod.Get);
-        handler.Requisicao.RequestUri!.AbsoluteUri.Should().Be("https://api.mp.test/v1/payments/20359978");
+        handler.UltimaChamada!.Metodo.Should().Be(HttpMethod.Get);
+        handler.UltimaChamada.Uri.AbsoluteUri.Should().Be("https://api.mp.test/v1/payments/20359978");
         p.Should().NotBeNull();
         p!.Id.Should().Be("20359978");
         p.Aprovado.Should().BeTrue();
@@ -248,8 +241,8 @@ public class MercadoPagoClientTests
 
         var r = await client.BuscarPagamentosPorReferenciaAsync("3f2b8f0e-8a47-4f55-9c3a-5d1f0c1e2a10");
 
-        handler.Requisicao!.Method.Should().Be(HttpMethod.Get);
-        handler.Requisicao.RequestUri!.AbsoluteUri.Should().Be(
+        handler.UltimaChamada!.Metodo.Should().Be(HttpMethod.Get);
+        handler.UltimaChamada.Uri.AbsoluteUri.Should().Be(
             "https://api.mp.test/v1/payments/search?external_reference=3f2b8f0e-8a47-4f55-9c3a-5d1f0c1e2a10&sort=date_created&criteria=desc");
         r.Should().ContainSingle().Which.Id.Should().Be("20359978");
     }
@@ -261,9 +254,9 @@ public class MercadoPagoClientTests
 
         await client.ExpirarPreferenciaAsync("pref-1", new DateTime(2026, 9, 29, 15, 0, 0, DateTimeKind.Utc));
 
-        handler.Requisicao!.Method.Should().Be(HttpMethod.Put);
-        handler.Requisicao.RequestUri!.AbsoluteUri.Should().Be("https://api.mp.test/checkout/preferences/pref-1");
-        using var json = JsonDocument.Parse(handler.Corpo!);
+        handler.UltimaChamada!.Metodo.Should().Be(HttpMethod.Put);
+        handler.UltimaChamada.Uri.AbsoluteUri.Should().Be("https://api.mp.test/checkout/preferences/pref-1");
+        using var json = JsonDocument.Parse(handler.UltimaChamada!.Corpo!);
         json.RootElement.GetProperty("expires").GetBoolean().Should().BeTrue();
         json.RootElement.GetProperty("expiration_date_to").GetString().Should().Be("2026-09-29T15:00:00.000+00:00");
     }
@@ -279,7 +272,7 @@ public class MercadoPagoClientTests
         var act = () => client.ConsultarPagamentoAsync(id);
 
         await act.Should().ThrowAsync<ArgumentException>();
-        handler.Requisicao.Should().BeNull();
+        handler.UltimaChamada.Should().BeNull();
     }
 
     /// <summary>
@@ -289,7 +282,7 @@ public class MercadoPagoClientTests
     [Fact]
     public async Task ClientRegistradoNoDiUsaBaseUrlConfigurada()
     {
-        var handler = new HandlerFalso(HttpStatusCode.OK, PagamentoAprovadoJson);
+        var handler = Falso(HttpStatusCode.OK, PagamentoAprovadoJson);
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["MercadoPago:UseStub"] = "false",
@@ -307,6 +300,6 @@ public class MercadoPagoClientTests
         var client = scope.ServiceProvider.GetRequiredService<IMercadoPagoClient>();
         await client.ConsultarPagamentoAsync("20359978");
 
-        handler.Requisicao!.RequestUri!.AbsoluteUri.Should().Be("https://api.mp.test/v1/payments/20359978");
+        handler.UltimaChamada!.Uri.AbsoluteUri.Should().Be("https://api.mp.test/v1/payments/20359978");
     }
 }
