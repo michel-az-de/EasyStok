@@ -15,14 +15,14 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido }) {
   return (
     <Popover rotulo="Respostas rápidas" papel="group" aoFechar={seletor.fechar} semAutoFoco portal>
       <div className={css.seletor}>
-        <p className={css.dica}>A resposta entra no rascunho. Confira o texto antes de enviar.</p>
+        <p className={css.orientacao}>A resposta entra no rascunho. Confira o texto antes de enviar.</p>
         {!seletor.pelaBarra && (
           <input
             autoFocus
             className={css.busca}
             type="search"
             aria-label="Buscar resposta pronta"
-            aria-controls={idLista}
+            aria-controls={itens.length ? idLista : undefined}
             aria-activedescendant={itens[destaque] ? idDe(destaque) : undefined}
             placeholder="Buscar por título, atalho ou texto"
             value={seletor.busca}
