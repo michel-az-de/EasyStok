@@ -106,9 +106,10 @@
     "validacao": {
       "gate": "Build e 40 testes de arquitetura aprovados",
       "migracao": "Scripts EF Up e Down executados em PostgreSQL17 isolado; registro legado preservado, RLS ENABLE/FORCE nas duas tabelas e três índices únicos verificados",
-      "integracao": "Em execução; resultados finais devem substituir este campo",
-      "bancas": "Duas rodadas independentes solicitadas de experiência, funcionamento e segurança; correções em validação",
-      "producao": "Deploy e fluxos autenticados ainda pendentes"
+      "integracao": "42 casos distintos aprovados com API real e PostgreSQL. Rodada 1: 39 aprovados e uma falha de fixture corrigida. Rodada 2: 4 aprovados, incluindo correção RLS e novos casos; nenhum caso final com falha ou ignorado",
+      "bancas": "Duas rodadas independentes de experiência, funcionamento e segurança concluídas; achados corrigidos e retestados. Produção ainda depende do deploy e sessão autenticada",
+      "producao": "PR #1675; CI remoto em execução. Deploy e validação autenticada pendentes",
+      "console": "Lint, camadas, 264 pares de contraste e build aprovados após a última correção. 18 cenários no browser; desktop 1440 e celulares 390/320"
     },
     "piloto": {
       "produtos": [
