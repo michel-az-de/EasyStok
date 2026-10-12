@@ -10,6 +10,20 @@ public class ImpressaoPendenteTests
     private static readonly DateTime Agora = new(2026, 9, 30, 15, 0, 0, DateTimeKind.Utc);
 
     [Fact]
+    public void Documento_preparado_nao_entra_na_fila_e_so_confirma_com_retorno_explicito()
+    {
+        var usuario = Guid.NewGuid();
+        var i = ImpressaoPendente.PrepararDocumento(Guid.NewGuid(), null, Guid.NewGuid(), Guid.NewGuid(), usuario,
+            "pedido", "a4", "qr", "HP", "1", "html original", "hash", "intencao", Agora);
+        i.Status.Should().Be(StatusImpressao.Preparada);
+        i.ImpressaEm.Should().BeNull();
+        i.MarcarImpressa(Agora.AddMinutes(1), usuario).Should().BeTrue();
+        i.MarcarImpressa(Agora.AddMinutes(2), Guid.NewGuid()).Should().BeFalse();
+        i.ConfirmadaPor.Should().Be(usuario);
+        i.Html.Should().Be("html original");
+    }
+
+    [Fact]
     public void CriarCanhoto_NasceNaFila()
     {
         var empresa = Guid.NewGuid();

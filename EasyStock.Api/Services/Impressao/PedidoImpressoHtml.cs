@@ -8,7 +8,7 @@ namespace EasyStock.Api.Services.Impressao;
 /// <summary>O que varia por aparelho ou por pedido na hora de imprimir.</summary>
 /// <param name="LogoNaTermica">Sai o logo também na térmica (10×15, 80 mm, 58 mm). Padrão: nome da casa em texto.</param>
 /// <param name="Alergias">Alergias do cadastro da cliente, para a confirmação de agendamento.</param>
-public sealed record ImpressoOpcoes(bool LogoNaTermica = false, IReadOnlyList<string>? Alergias = null);
+public sealed record ImpressoOpcoes(bool LogoNaTermica = false, IReadOnlyList<string>? Alergias = null, string Codigo = "qr");
 
 /// <summary>
 /// Impressos do pedido voltados à cliente e ao entregador (#1632): pedido, agendamento e entrega, um modelo
@@ -45,7 +45,7 @@ public sealed class PedidoImpressoHtml(IRendererTemplate renderer, IConfiguratio
             new Dictionary<string, object?> { ["m"] = Modelo(pedido, documento, modelo, baseUrl, opcoes ?? new ImpressoOpcoes()) },
             htmlEscape: false,
             ct);
-        return Pagina(Titulo(documento) + " #" + pedido.Numero, modelo, baseUrl, corpo);
+        return CodigoImpresso.AjustarPagina(Pagina(Titulo(documento) + " #" + pedido.Numero, modelo, baseUrl, corpo), opcoes?.Codigo ?? "qr");
     }
 
     private Dictionary<string, object?> Modelo(PedidoImpressoDto p, string documento, string modelo, string baseUrl, ImpressoOpcoes opcoes)
@@ -101,7 +101,8 @@ public sealed class PedidoImpressoHtml(IRendererTemplate renderer, IConfiguratio
                 ? "Tudo pago" + (forma is null ? string.Empty : " no " + forma) + ". Obrigada!"
                 : (p.Cobranca.Recebido > 0 ? "Falta " + Moeda(p.Cobranca.Saldo) + ", a acertar na entrega" : "A acertar na entrega")
                   + (forma is null ? string.Empty : " · " + forma) + "."),
-            ["qr"] = link is null ? null : QrSvg.Gerar(link),
+            ["qr"] = CodigoImpresso.Gerar(opcoes.Codigo, p.Numero, link),
+            ["codigo_barras"] = opcoes.Codigo == "barras",
         };
     }
 

@@ -66,6 +66,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.MontarComandaUseCase>(); // S52: comanda de cozinha
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.ListarImpressoesPendentesUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.RegistrarRetornoImpressaoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.PrepararDocumentoImpressoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.ReimprimirCanhotoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.AlertarImpressoesAtrasadasUseCase>();
         // N11: aviso externo (e-mail e WhatsApp) da impressão travada, um escopo por impressão.

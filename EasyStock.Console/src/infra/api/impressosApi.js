@@ -8,6 +8,15 @@ import { lerSessao } from './sessao'
 export const obterHtmlDoImpresso = (pedidoId, opcoes) =>
   chamarApi(caminhoDoImpresso(pedidoId, opcoes), { texto: true })
 
+export const prepararImpresso = (pedidoId, corpo, sinal) =>
+  chamarApi(`/api/pedidos/${pedidoId}/impressoes`, { metodo: 'POST', corpo, sinal })
+export const obterOriginalImpresso = (pedidoId, id, sinal) =>
+  chamarApi(`/api/pedidos/${pedidoId}/impressoes/${id}/html`, { texto: true, sinal })
+export const historicoDoPedido = (pedidoId, pagina, sinal) =>
+  chamarApi(`/api/pedidos/${pedidoId}/impressoes?pagina=${pagina}`, { sinal })
+export const confirmarDocumentoImpresso = (id, canhotoId = null) =>
+  chamarApi(`/api/impressao/${id}/confirmar-documento`, { metodo: 'POST', corpo: { canhotoId } })
+
 const urlDoLogo = (url) => (typeof url === 'string' && url ? (url.startsWith('/') ? API_BASE + url : url) : null)
 
 // A loja que recebe o logo: a primeira ativa da empresa logada (tenant único, uma loja).

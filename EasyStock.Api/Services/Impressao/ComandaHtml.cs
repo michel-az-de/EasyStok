@@ -15,7 +15,7 @@ public sealed class ComandaHtml(IRendererTemplate renderer)
 
     public static readonly IReadOnlyList<string> Modelos = Papeis;
 
-    public async Task<string> RenderizarAsync(ComandaDto comanda, string modelo, string baseUrl, CancellationToken ct = default)
+    public async Task<string> RenderizarAsync(ComandaDto comanda, string modelo, string baseUrl, CancellationToken ct = default, string codigo = "qr")
     {
         ArgumentNullException.ThrowIfNull(comanda);
         if (!Modelos.Contains(modelo))
@@ -23,13 +23,13 @@ public sealed class ComandaHtml(IRendererTemplate renderer)
 
         var corpo = await renderer.RenderizarAsync(
             Recurso("comanda.sbn"),
-            new Dictionary<string, object?> { ["m"] = Modelo(comanda, modelo) },
+            new Dictionary<string, object?> { ["m"] = Modelo(comanda, modelo, codigo) },
             htmlEscape: false,
             ct);
-        return Pagina("Comanda #" + comanda.Numero, modelo, baseUrl, corpo);
+        return CodigoImpresso.AjustarPagina(Pagina("Comanda #" + comanda.Numero, modelo, baseUrl, corpo), codigo);
     }
 
-    private static Dictionary<string, object?> Modelo(ComandaDto c, string modelo)
+    private static Dictionary<string, object?> Modelo(ComandaDto c, string modelo, string codigo)
     {
         var hoje = DateOnly.FromDateTime(c.ImpressoEm);
         return new Dictionary<string, object?>
@@ -56,7 +56,7 @@ public sealed class ComandaHtml(IRendererTemplate renderer)
             }).ToList(),
             ["total_linhas"] = Linhas(c.TotalLinhas),
             ["observacao"] = T(c.Observacao),
-            ["qr"] = QrSvg.Gerar(c.Numero),
+            ["qr"] = CodigoImpresso.Gerar(codigo, c.Numero, c.Numero),
             ["solicitado"] = T(DataCurta(c.SolicitadoEm, hoje) + " " + Hora(c.SolicitadoEm)),
             ["impresso"] = Curta(c.ImpressoEm),
         };

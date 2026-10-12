@@ -4,6 +4,7 @@ using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Repositories.Operacao;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
@@ -19,6 +20,207 @@ public class ImpressaoPendenteRepositoryIntegrationTests(PostgreSqlDatabaseFixtu
 {
     private const string MigrationAnterior = "20260930132753_AddClienteTagNotaBloqueioPreferencias";
     private static readonly DateTime Agora = new(2026, 9, 30, 15, 0, 0, DateTimeKind.Utc);
+
+    [SkippableFact]
+    public async Task Falha_no_commit_reverte_documento_e_fila_e_permite_confirmar_em_nova_requisicao()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker indisponível");
+        var empresa = Guid.NewGuid();
+        Guid documentoId, filaId;
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresa);
+            var pedido = await CriarPedidoAsync(seed, empresa);
+            var documento = ImpressaoPendente.PrepararDocumento(empresa, null, pedido.Id, Guid.NewGuid(), null,
+                "cozinha", "a4", "qr", "HP", "1", "html", "hash", "intencao", Agora);
+            var fila = ImpressaoPendente.CriarCanhoto(empresa, null, pedido.Id, Agora);
+            seed.ImpressoesPendentes.AddRange(documento, fila);
+            await seed.SaveChangesAsync();
+            (documentoId, filaId) = (documento.Id, fila.Id);
+        }
+        var falha = new FalharCommit();
+        var options = new DbContextOptionsBuilder<EasyStockDbContext>()
+            .UseNpgsql(fixture.ConnectionString, o => o.EnableRetryOnFailure())
+            .AddInterceptors(falha).Options;
+        var ator = Guid.NewGuid();
+        await using (var db = new EasyStockDbContext(options))
+        {
+            db.SetMobileTenantContext(empresa);
+            var caso = new EasyStock.Application.UseCases.Operacao.Impressao.RegistrarRetornoImpressaoUseCase(
+                new ImpressaoPendenteRepository(db), db, TimeProvider.System,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<EasyStock.Application.UseCases.Operacao.Impressao.RegistrarRetornoImpressaoUseCase>.Instance);
+            Func<Task> confirmar = async () => await caso.ExecuteAsync(new(empresa, documentoId, true,
+                UsuarioId: ator, CanhotoId: filaId));
+            await confirmar.Should().ThrowAsync<Npgsql.NpgsqlException>().WithMessage("falha simulada no commit");
+        }
+        falha.Chamadas.Should().Be(1);
+        await using var conferir = fixture.CreateDbContext();
+        conferir.SetMobileTenantContext(empresa);
+        var pendentes = await conferir.ImpressoesPendentes.AsNoTracking()
+            .Where(i => i.Id == documentoId || i.Id == filaId).ToListAsync();
+        pendentes.Single(i => i.Id == documentoId).Status.Should().Be(EasyStock.Domain.Enums.Operacao.StatusImpressao.Preparada);
+        pendentes.Single(i => i.Id == filaId).Status.Should().Be(EasyStock.Domain.Enums.Operacao.StatusImpressao.Pendente);
+        pendentes.Should().OnlyContain(i => i.ImpressaEm == null && i.ConfirmadaPor == null);
+        var retomada = new EasyStock.Application.UseCases.Operacao.Impressao.RegistrarRetornoImpressaoUseCase(
+            new ImpressaoPendenteRepository(conferir), conferir, TimeProvider.System,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<EasyStock.Application.UseCases.Operacao.Impressao.RegistrarRetornoImpressaoUseCase>.Instance);
+        (await retomada.ExecuteAsync(new(empresa, documentoId, true, UsuarioId: ator, CanhotoId: filaId))).Should().NotBeNull();
+        var confirmadas = await conferir.ImpressoesPendentes.AsNoTracking()
+            .Where(i => i.Id == documentoId || i.Id == filaId).ToListAsync();
+        confirmadas.Should().OnlyContain(i => i.Status == EasyStock.Domain.Enums.Operacao.StatusImpressao.Impressa
+            && i.ConfirmadaPor == ator && i.Tentativas == 1);
+    }
+
+    private sealed class FalharCommit : DbTransactionInterceptor
+    {
+        public int Chamadas { get; private set; }
+
+        public override ValueTask<InterceptionResult> TransactionCommittingAsync(
+            System.Data.Common.DbTransaction transaction, TransactionEventData eventData,
+            InterceptionResult result, CancellationToken cancellationToken = default)
+        {
+            Chamadas++;
+            throw new Npgsql.NpgsqlException("falha simulada no commit", new TimeoutException());
+        }
+    }
+
+    [SkippableFact]
+    public async Task Confirmacao_atomica_e_concorrente_preserva_saida_e_ator_da_primeira_confirmacao()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker indisponível");
+        var empresa = Guid.NewGuid();
+        Guid documentoId, filaId, falhaId;
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresa);
+            var pedido = await CriarPedidoAsync(seed, empresa);
+            var doc = ImpressaoPendente.PrepararDocumento(empresa, null, pedido.Id, Guid.NewGuid(), null,
+                "cozinha", "a4", "qr", "HP", "1", "html", "hash", "intencao", Agora);
+            var fila = ImpressaoPendente.CriarCanhoto(empresa, null, pedido.Id, Agora);
+            var falha = ImpressaoPendente.PrepararDocumento(empresa, null, pedido.Id, Guid.NewGuid(), null,
+                "pedido", "a4", "qr", "HP", "1", "html", "hash", "intencao", Agora);
+            seed.ImpressoesPendentes.AddRange(doc, fila, falha);
+            await seed.SaveChangesAsync();
+            (documentoId, filaId, falhaId) = (doc.Id, fila.Id, falha.Id);
+        }
+        async Task Responder(Guid id, bool impressa, Guid ator, Guid? fila = null)
+        {
+            await using var db = fixture.CreateDbContext();
+            db.SetMobileTenantContext(empresa);
+            var caso = new EasyStock.Application.UseCases.Operacao.Impressao.RegistrarRetornoImpressaoUseCase(
+                new ImpressaoPendenteRepository(db), db, TimeProvider.System,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<EasyStock.Application.UseCases.Operacao.Impressao.RegistrarRetornoImpressaoUseCase>.Instance);
+            (await caso.ExecuteAsync(new(empresa, id, impressa, "erro", ator, fila))).Should().NotBeNull();
+        }
+        await Task.WhenAll(Responder(documentoId, true, Guid.NewGuid(), filaId), Responder(documentoId, true, Guid.NewGuid(), filaId));
+        await using var conferir = fixture.CreateDbContext();
+        conferir.SetMobileTenantContext(empresa);
+        var documento = await conferir.ImpressoesPendentes.AsNoTracking().SingleAsync(i => i.Id == documentoId);
+        var filaConfirmada = await conferir.ImpressoesPendentes.AsNoTracking().SingleAsync(i => i.Id == filaId);
+        documento.ImpressaEm.Should().Be(filaConfirmada.ImpressaEm);
+        documento.ConfirmadaPor.Should().Be(filaConfirmada.ConfirmadaPor);
+        documento.Tentativas.Should().Be(1);
+        filaConfirmada.Tentativas.Should().Be(1);
+        await Responder(documentoId, false, Guid.NewGuid());
+        var intacto = await conferir.ImpressoesPendentes.AsNoTracking().SingleAsync(i => i.Id == documentoId);
+        intacto.ImpressaEm.Should().Be(documento.ImpressaEm);
+        intacto.ConfirmadaPor.Should().Be(documento.ConfirmadaPor);
+        var operador = Guid.NewGuid();
+        await Task.WhenAll(Responder(falhaId, true, operador), Responder(falhaId, false, Guid.NewGuid()));
+        var final = await conferir.ImpressoesPendentes.AsNoTracking().SingleAsync(i => i.Id == falhaId);
+        final.Status.Should().Be(EasyStock.Domain.Enums.Operacao.StatusImpressao.Impressa);
+        final.ConfirmadaPor.Should().Be(operador);
+    }
+
+    [SkippableFact]
+    public async Task Snapshot_com_login_sem_bypass_obedece_RLS_mesmo_sem_filtro_global()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker indisponível");
+        // O teste de downgrade desta classe recria a tabela e seus grants.
+        await fixture.ResetDatabaseAsync();
+        var empresa = Guid.NewGuid();
+        Guid id;
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresa);
+            var pedido = await CriarPedidoAsync(seed, empresa);
+            var i = ImpressaoPendente.PrepararDocumento(empresa, null, pedido.Id, Guid.NewGuid(), null,
+                "pedido", "a4", "qr", "HP", "1", "snapshot privado", "hash", "intencao", Agora);
+            seed.ImpressoesPendentes.Add(i);
+            await seed.SaveChangesAsync();
+            id = i.Id;
+        }
+        await using var db = fixture.CreateRlsClientDbContext();
+        await db.Database.OpenConnectionAsync();
+        var outra = Guid.NewGuid().ToString();
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT set_config('app.empresa_id', {outra}, false)");
+        (await db.ImpressoesPendentes.IgnoreQueryFilters().CountAsync(i => i.Id == id)).Should().Be(0);
+        var correta = empresa.ToString();
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT set_config('app.empresa_id', {correta}, false)");
+        (await db.ImpressoesPendentes.IgnoreQueryFilters().SingleAsync(i => i.Id == id)).Html.Should().Be("snapshot privado");
+    }
+
+    [SkippableFact]
+    public async Task Documento_preparado_preserva_snapshot_sem_bloquear_canhoto_e_historico_e_paginado()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker indisponível");
+        var empresa = Guid.NewGuid();
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresa);
+        var pedido = await CriarPedidoAsync(db, empresa);
+        var repo = new ImpressaoPendenteRepository(db);
+        var primeiro = ImpressaoPendente.PrepararDocumento(empresa, null, pedido.Id, Guid.NewGuid(), null,
+            "pedido", "a4", "barras", "HP", "1", "<html>conteúdo original</html>", "hash", "intencao", Agora);
+        await repo.AddAsync(primeiro);
+        await db.SaveChangesAsync();
+        (await repo.ExisteCanhotoAsync(empresa, pedido.Id)).Should().BeFalse();
+        (await repo.ListarPendentesAsync(empresa, 20)).Should().BeEmpty();
+        for (var n = 1; n < 25; n++) await repo.AddAsync(ImpressaoPendente.PrepararDocumento(empresa, null,
+            pedido.Id, Guid.NewGuid(), null, "pedido", "a4", "qr", "HP", "1", "html", "hash", "intencao", Agora.AddMinutes(n)));
+        await db.SaveChangesAsync();
+        (await repo.HistoricoAsync(empresa, pedido.Id, 1)).Should().HaveCount(20);
+        (await repo.HistoricoAsync(empresa, pedido.Id, 2)).Should().HaveCount(5);
+        db.ChangeTracker.Clear();
+        (await repo.GetByIdAsync(empresa, primeiro.Id))!.Html.Should().Be("<html>conteúdo original</html>");
+        await repo.AddAsync(ImpressaoPendente.CriarCanhoto(empresa, null, pedido.Id, Agora));
+        await db.SaveChangesAsync();
+        (await repo.ExisteCanhotoAsync(empresa, pedido.Id)).Should().BeTrue();
+    }
+
+    [SkippableFact]
+    public async Task Solicitacoes_concorrentes_devolvem_um_documento_e_guids_sao_isolados_por_empresa()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker indisponível");
+        var empresa = Guid.NewGuid();
+        Guid pedidoId;
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresa);
+            pedidoId = (await CriarPedidoAsync(seed, empresa)).Id;
+        }
+        var solicitacao = Guid.NewGuid();
+        async Task<Guid> Preparar(Guid emp, Guid pid)
+        {
+            await using var db = fixture.CreateDbContext();
+            db.SetMobileTenantContext(emp);
+            var pedidos = NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPedidoRepository>();
+            var pedido = await db.Pedidos.SingleAsync(p => p.EmpresaId == emp && p.Id == pid);
+            NSubstitute.SubstituteExtensions.Returns(pedidos.GetByIdAsync(emp, pid), pedido);
+            var caso = new EasyStock.Application.UseCases.Operacao.Impressao.PrepararDocumentoImpressoUseCase(
+                new ImpressaoPendenteRepository(db), pedidos, db, TimeProvider.System);
+            return (await caso.ExecuteAsync(new(emp, pid, solicitacao, null, "pedido", "a4", "qr", "HP", false, "html", "1")))!.Id;
+        }
+        var ids = await Task.WhenAll(Preparar(empresa, pedidoId), Preparar(empresa, pedidoId));
+        ids.Distinct().Should().HaveCount(1);
+        await using var outro = fixture.CreateDbContext();
+        var empresaB = Guid.NewGuid();
+        outro.SetMobileTenantContext(empresaB);
+        var pedidoB = await CriarPedidoAsync(outro, empresaB);
+        (await Preparar(empresaB, pedidoB.Id)).Should().NotBe(ids[0]);
+        var repoB = new ImpressaoPendenteRepository(outro);
+        (await repoB.GetByIdAsync(empresaB, ids[0])).Should().BeNull();
+        (await repoB.HistoricoAsync(empresaB, pedidoId, 1)).Should().BeEmpty();
+    }
 
     private static async Task<Pedido> CriarPedidoAsync(EasyStockDbContext db, Guid empresaId)
     {

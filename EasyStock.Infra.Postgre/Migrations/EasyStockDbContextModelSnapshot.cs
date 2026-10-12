@@ -6317,8 +6317,19 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Codigo")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid?>("ConfirmadaPor")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CriadaEm")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Documento")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
 
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid");
@@ -6327,13 +6338,38 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("Hash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Html")
+                        .HasColumnType("text");
+
                     b.Property<DateTime?>("ImpressaEm")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Intencao")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<Guid?>("LojaId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Modelo")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<Guid?>("OriginalId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("PedidoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Perfil")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid?>("SolicitacaoId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("Status")
@@ -6345,9 +6381,20 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<int>("Tipo")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Versao")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("PedidoId");
+
+                    b.HasIndex("EmpresaId", "SolicitacaoId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_impressoes_empresa_solicitacao");
 
                     b.HasIndex("EmpresaId", "Status", "CriadaEm")
                         .HasDatabaseName("ix_impressoes_pendentes_empresa_status_criada");

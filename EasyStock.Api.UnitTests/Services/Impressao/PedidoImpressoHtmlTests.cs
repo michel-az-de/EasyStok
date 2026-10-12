@@ -19,6 +19,20 @@ public class PedidoImpressoHtmlTests
     private const string BaseUrl = "https://api.test";
     private const string Logo = "https://cdn.test/lojas/logo.png";
 
+    [Theory]
+    [MemberData(nameof(DocumentosEPapeis))]
+    public async Task Barras_identificam_o_pedido_sem_instruir_camera_whatsapp(string documento, string papel)
+    {
+        var renderer = new PedidoImpressoHtml(new ScribanRenderer(NullLogger<ScribanRenderer>.Instance));
+        var html = await renderer.RenderizarAsync(Exemplo(logo: null), documento, papel, BaseUrl, new ImpressoOpcoes(Codigo: "barras"));
+        html.Should().Contain("class=\"barras\"").And.Contain("Código de barras A7F3C21B").And.NotContain("Aponte a câmera");
+        if (papel == "a4" && Environment.GetEnvironmentVariable("IMPRESSAO_ARTEFATOS") is { Length: > 0 } pasta)
+        {
+            Directory.CreateDirectory(pasta);
+            await File.WriteAllTextAsync(Path.Combine(pasta, documento + "-a4-barras.html"), html);
+        }
+    }
+
     public static TheoryData<string> Papeis => new(ImpressoHtml.Papeis);
 
     public static TheoryData<string, string> DocumentosEPapeis
