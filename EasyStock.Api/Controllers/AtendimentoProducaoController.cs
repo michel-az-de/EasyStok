@@ -1,4 +1,5 @@
 using EasyStock.Application.UseCases.Atendimento.Producao;
+using EasyStock.Application.UseCases.CalcularProducao;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Exceptions.Storefront;
 using Swashbuckle.AspNetCore.Annotations;
@@ -8,6 +9,7 @@ namespace EasyStock.Api.Controllers;
 public sealed record BaixaAutomaticaRequest(bool Ligada);
 
 public sealed record PlanejamentoRequest(IReadOnlyList<PratoPlanejado>? Pratos);
+public sealed record CalculoReceitaRequest(Guid ProdutoId, decimal Quantidade, UnidadeMedida Unidade);
 
 /// <param name="ItemEstoqueId">Lote escolhido; null = FEFO.</param>
 /// <param name="ProdutoVariacaoId">Porção perdida, quando o prato tem porções (vem do estoque do dia).</param>
@@ -38,6 +40,16 @@ public class AtendimentoProducaoController(
     PerdasDaProducaoUseCase perdas,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
+    [HttpPost("calcular")]
+    public async Task<IActionResult> Calcular([FromBody] CalculoReceitaRequest request, [FromServices] CalcularProducaoUseCase calculo, CancellationToken ct)
+    {
+        if (!currentUser.TemPermissao(Permissao.GerenciarEstoque)) return Forbid();
+        if (request.Quantidade is <= 0 or > 1000000 || !Enum.IsDefined(request.Unidade))
+            return DataBadRequest("Informe uma quantidade maior que zero e até 1.000.000, com unidade válida.");
+        try { return DataOk(await calculo.ExecuteAsync(new(currentUser.EmpresaId, request.ProdutoId, request.Quantidade, request.Unidade, null), ct)); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+    }
+
     [SwaggerOperation(Summary = "Losses of the period by reason and product, in quantity and R$, with each entry (M2.6)",
         Description = "de/ate em dia operacional (padrão: os últimos 7 dias). Não conta ajuste de contagem nem a baixa de insumo da produção.")]
     [ProducesResponseType(StatusCodes.Status200OK)]

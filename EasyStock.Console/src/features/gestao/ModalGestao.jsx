@@ -23,6 +23,7 @@ import { AbaEstoqueDoDiaApi } from './producao/AbaEstoqueDoDiaApi'
 import { AbaProducaoDoDiaApi } from './producao/AbaProducaoDoDiaApi'
 import { AbaInsumosApi } from './producao/AbaInsumosApi'
 import { AbaReceitasApi } from './producao/AbaReceitasApi'
+import { AbaCalculadoraApi } from './producao/AbaCalculadoraApi'
 import { AbaPlanejamentoApi } from './producao/AbaPlanejamentoApi'
 import { AbaPerdasApi } from './producao/AbaPerdasApi'
 import { useAtendimento } from '../../aplicacao/contextos'
@@ -253,6 +254,7 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
     insumos: <AbaInsumosApi />,
     // M2.4a (#1498): receitas (só modo API).
     receitas: <AbaReceitasApi />,
+    'calculadora-producao': <AbaCalculadoraApi />,
     // M2.5 (#1502): planejamento da produção (só modo API).
     planejamento: <AbaPlanejamentoApi aoAbrirAba={aoAbrirAba} />,
     // M2.6 (#1511): controle de perdas (só modo API).

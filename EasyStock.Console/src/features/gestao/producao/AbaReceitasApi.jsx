@@ -8,6 +8,8 @@ import { useReceitasApi } from '../../../aplicacao/useReceitasApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { lerReceita, orientacoesDaReceita, rotuloDoRendimento, UNIDADES_RECEITA, UNIDADES_RENDIMENTO } from '../../../aplicacao/receitas'
 import { lerInsumos } from '../../../aplicacao/insumos'
+import { custoDoRascunho, rascunhoDaSugestao } from '../../../aplicacao/calculosReceita'
+import { PesquisaReceitaIa } from './PesquisaProducao'
 import { moeda } from '../../../dominio/formato'
 import { hashDoModulo } from '../../../dominio/modulos'
 import css from '../cardapio/abaCardapio.module.css'
@@ -81,10 +83,19 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
   // A receita que já rende em litro ou mililitro mantém a unidade dela na lista.
   const unidadesDoRendimento = UNIDADES_RENDIMENTO.some((u) => u.valor === unidade)
     ? UNIDADES_RENDIMENTO
-    : [...UNIDADES_RENDIMENTO, { valor: unidade, rotulo: unidade }]
+    : [...UNIDADES_RENDIMENTO, { valor: unidade, rotulo: unidade || 'Conferir unidade do rendimento' }]
   const orientacoes = orientacoesDaReceita({ prato, unidadeRendimento: unidade, linhas, insumos })
+  const referencias = detalhe.linhas.filter((l) => !insumos.some((s) => s.id === l.insumoId))
+    .map((l) => ({ id: l.insumoId, unidade: l.unidadeDoInsumo, custo: l.custoReferencia }))
+  const custos = custoDoRascunho({ linhas, rendimento, unidadeRendimento: unidade }, [...insumos, ...referencias])
+  const aplicarSugestao = (sugestao) => {
+    const rascunho = rascunhoDaSugestao(sugestao, insumos)
+    setRendimento(rascunho.rendimento); setUnidade(rascunho.unidadeRendimento); setLinhas(rascunho.linhas)
+    aoFecharAviso()
+  }
 
   return (
+    <><PesquisaReceitaIa nome={prato.nome} aoAplicar={aplicarSugestao} disabled={salvando} />
     <form className={`${css.aba} ${css.editorReceita}`} onSubmit={salvar} aria-label={`Receita de ${prato.nome}`}>
       <div className={`${css.campos} ${css.rendimentoDaReceita}`}>
         <CampoTexto rotulo="Rendimento" dica={`Quanto a receita rende, em ${rotuloDoRendimento(unidade)}`}
@@ -94,17 +105,21 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
           opcoes={unidadesDoRendimento} />
       </div>
       {orientacoes.map((texto) => <p key={texto} className={css.aviso}>{texto}</p>)}
+      <section aria-label="Custo estimado do rascunho">
+        <p className={css.descricao}>{custos.total == null ? 'Custo incompleto: escolha os insumos e confira as quantidades, unidades e custos cadastrados.' : `Custo estimado da receita: ${moeda(custos.total)}`}
+          {custos.porRendimento != null && ` · ${moeda(custos.porRendimento)} por ${rotuloDoRendimento(unidade)}`}</p>
+      </section>
       <ul className={css.listaFormularios}>
         {linhas.map((l, i) => (
           <li key={`${l.insumoId}-${i}`} className={`${css.campos} ${css.formulario} ${css.linhaReceita}`}>
-            <CampoSelecao disabled={salvando} rotulo="Insumo" value={l.insumoId} onChange={mudar(i, 'insumoId')}
+            <CampoSelecao disabled={salvando} rotulo={l.insumo && !l.insumoId ? `Insumo para ${l.insumo}` : 'Insumo'} value={l.insumoId} onChange={mudar(i, 'insumoId')}
               opcoes={[{ valor: '', rotulo: 'Escolha o insumo' }, ...insumos.map((s) => ({ valor: s.id, rotulo: s.nome })),
                 ...(l.insumoId && !insumos.some((s) => s.id === l.insumoId) ? [{ valor: l.insumoId, rotulo: l.insumo }] : [])]} />
             <CampoTexto disabled={salvando} rotulo="Quantidade" inputMode="decimal" value={l.quantidade} onChange={mudar(i, 'quantidade')} />
             <CampoSelecao disabled={salvando} rotulo="Unidade" value={l.unidade} onChange={mudar(i, 'unidade')}
-              opcoes={UNIDADES_RECEITA.map((u) => ({ valor: u, rotulo: u }))} />
+              opcoes={[{ valor: '', rotulo: 'Conferir unidade' }, ...UNIDADES_RECEITA.map((u) => ({ valor: u, rotulo: u }))]} />
             <div className={css.rodapeForm}>
-              <span className={css.detalhe}>{l.custo != null ? `Custo: ${moeda(l.custo)}` : ''}</span>
+              <span className={css.detalhe}>{custos.custos[i] == null ? 'Custo não conhecido' : `Custo estimado: ${moeda(custos.custos[i])}`}</span>
               <Botao variante="texto" icone="lixeira" disabled={salvando} aria-label={`Remover insumo ${i + 1} da receita`} onClick={() => setLinhas((atual) => atual.filter((_, j) => j !== i))}>Remover insumo</Botao>
             </div>
           </li>
@@ -120,7 +135,7 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
         <Botao tipo="submit" variante="primario" icone="check" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar receita'}</Botao>
       </div>
       {insumos.length === 0 && <p className={css.descricao}>Para montar a receita, cadastre os insumos em <a className={css.link} href={hashDoModulo('producao', 'insumos')}>Insumos</a>.</p>}
-    </form>
+    </form></>
   )
 }
 

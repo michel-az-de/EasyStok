@@ -75,7 +75,7 @@ await confere('detalhe traz as linhas com o custo de cada insumo', async () => {
     custoTotal: 36, custoPorRendimento: 6,
   } }]])
   const d = await lerReceita('p-1')
-  assert.deepEqual(d.linhas[0], { insumoId: 's-1', insumo: 'Molho', quantidade: 1.2, unidade: 'Kg', custo: 36 })
+  assert.deepEqual(d.linhas[0], { insumoId: 's-1', insumo: 'Molho', quantidade: 1.2, unidade: 'Kg', unidadeDoInsumo: 'G', custo: 36 })
 })
 
 await confere('validação: rendimento, insumo, quantidade e insumo repetido', () => {

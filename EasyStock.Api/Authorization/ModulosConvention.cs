@@ -79,7 +79,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         Associar(Modulo.Cardapio, "Produto", "Categoria", "IaAutoPreenchimento", "AtendimentoItensCardapio",
             "AtendimentoSecoesCardapio", "Storefront.TenantVitrineCardapio");
         Associar(Modulo.Producao, "Producao", "ProdutoComposicao", "Lotes", "ItemEstoque", "Movimentacao",
-            "EstoqueDesacertos", "ListasCompras", "EtiquetaTemplates", "AtendimentoProducao");
+            "EstoqueDesacertos", "ListasCompras", "EtiquetaTemplates", "AtendimentoProducao", "AtendimentoProducaoPesquisa");
         Associar(Modulo.Atendimento, "AtendimentoAtendentes", "AtendimentoCaderno", "AtendimentoAssistente",
             "AtendimentoComanda", "AtendimentoComandasCliente", "AtendimentoConfiguracao", "AtendimentoConsentimentos", "AtendimentoConversas",
             "AtendimentoAutomacoes", "AtendimentoEsteira", "AtendimentoExpediente", "AtendimentoMensagensProgramadas",

@@ -138,7 +138,9 @@ export const detalheDaReceitaDaApi = (d) => ({
   rendimento: d.rendimentoBase,
   unidadeRendimento: d.rendimentoUnidade,
   unidadeMedidaBase: d.unidadeMedidaBase,
-  linhas: (d.linhas ?? []).map((l) => ({ insumoId: l.insumoId, insumo: l.insumo, quantidade: l.quantidade, unidade: l.unidade, custo: l.custo ?? null })),
+  linhas: (d.linhas ?? []).map((l) => ({ insumoId: l.insumoId, insumo: l.insumo, quantidade: l.quantidade, unidade: l.unidade, custo: l.custo ?? null,
+    ...(l.unidadeDoInsumo !== undefined ? { unidadeDoInsumo: l.unidadeDoInsumo } : {}), ...(l.custoReferencia !== undefined ? { custoReferencia: l.custoReferencia } : {}),
+  })),
   custoTotal: d.custoTotal ?? null,
   custoPorRendimento: d.custoPorRendimento ?? null,
 })
@@ -146,7 +148,15 @@ export const detalheDaReceitaDaApi = (d) => ({
 // M2.5 (#1502): sugestão de produção (mínimo + agendados + descoberto − saldo) e planejamento dos
 // insumos pela mesma cesta da calculadora mobile. Ler exige a permissão de estoque.
 export const obterSugestao = (ate) => chamarApi(`${PRODUCAO}/sugestao${ate ? `?ate=${ate}` : ''}`)
-export const planejarProducao = (pratos) => chamarApi(`${PRODUCAO}/planejamento`, { metodo: 'POST', corpo: { pratos } })
+export const planejarProducao = async (pratos) => {
+  const prazo = AbortSignal.timeout(20000)
+  try {
+    return await chamarApi(`${PRODUCAO}/planejamento`, { metodo: 'POST', corpo: { pratos }, sinal: prazo })
+  } catch (e) {
+    if (prazo.aborted) throw new Error('O cálculo demorou a responder. Tente novamente.')
+    throw e
+  }
+}
 
 export const sugestaoDaApi = (s) => ({
   sku: s.cardapioItemId,

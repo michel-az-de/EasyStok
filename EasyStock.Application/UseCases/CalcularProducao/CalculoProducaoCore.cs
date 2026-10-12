@@ -1,9 +1,10 @@
+using EasyStock.Domain.Specifications;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.CalcularProducao;
 
 /// <summary>
-/// Algoritmo puro de calculo de producao 1 nivel. Usado pelo
+/// Algoritmo de calculo de producao 1 nivel. Usado pelo
 /// <see cref="CalcularProducaoUseCase"/> (single product) e pelo
 /// <see cref="CalcularCestaProducaoUseCase"/> (cesta in-context).
 /// Sem dependencia de repositorio: caller resolve produto + composicoes + saldos
@@ -58,6 +59,7 @@ internal static class CalculoProducaoCore
         decimal custoTotal = 0m;
         var algumCustoConhecido = false;
         var tudoDisponivel = true;
+        var disponivelParaSaida = new ItemEstoqueDisponivelParaSaidaSpecification(DateTime.UtcNow);
 
         foreach (var comp in composicoes)
         {
@@ -67,7 +69,10 @@ internal static class CalculoProducaoCore
             decimal saldoNaUnidadeBase = 0m;
             IReadOnlyCollection<ItemEstoque>? lotes = null;
             if (saldosPorInsumo.TryGetValue(comp.InsumoId, out lotes))
+            {
+                lotes = lotes.Where(disponivelParaSaida.EhSatisfeitaPor).ToArray();
                 saldoNaUnidadeBase = lotes.Sum(l => l.QuantidadeAtual.Value);
+            }
 
             var (saldoConvertido, erroConversao) = UnidadeMedidaConverter.Converter(
                 saldoNaUnidadeBase, insumo.UnidadeMedidaBase, comp.Unidade);
@@ -124,6 +129,6 @@ internal static class CalculoProducaoCore
             FatorMultiplicador: fator,
             Insumos: linhas,
             TudoDisponivel: tudoDisponivel,
-            CustoEstimadoTotal: algumCustoConhecido ? custoTotal : null);
+            CustoEstimadoTotal: algumCustoConhecido && linhas.All(l => l.CustoEstimadoLinha.HasValue) ? custoTotal : null);
     }
 }

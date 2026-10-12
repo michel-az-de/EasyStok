@@ -14,8 +14,10 @@ public sealed record ReceitaDoPrato(
     int Porcoes = 0, int PorcoesComEmbalagem = 0);
 
 /// <param name="Custo">Custo da linha na unidade do insumo. Null = insumo sem custo ou unidades incompatíveis.</param>
+/// <param name="CustoReferencia">Custo por unidade-base do insumo, sem derivar do custo da linha.</param>
 public sealed record LinhaDaReceita(
-    Guid InsumoId, string Insumo, decimal Quantidade, UnidadeMedida Unidade, UnidadeMedida UnidadeDoInsumo, decimal? Custo);
+    Guid InsumoId, string Insumo, decimal Quantidade, UnidadeMedida Unidade, UnidadeMedida UnidadeDoInsumo, decimal? Custo,
+    decimal? CustoReferencia = null);
 
 public sealed record DetalheDaReceita(
     Guid ProdutoId, string Nome, decimal RendimentoBase, UnidadeMedida RendimentoUnidade, UnidadeMedida UnidadeMedidaBase,
@@ -92,14 +94,15 @@ public sealed class ReceitasDaProducaoUseCase(
         decimal? custo = insumo.CustoReferencia is { } custoRef
             ? CalculoProducaoCore.CustoNaUnidadeDoInsumo(c.Quantidade, c.Unidade, insumo.UnidadeMedidaBase, custoRef.Valor)
             : null;
-        return new LinhaDaReceita(c.InsumoId, insumo.Nome, c.Quantidade, c.Unidade, insumo.UnidadeMedidaBase, custo);
+        return new LinhaDaReceita(c.InsumoId, insumo.Nome, c.Quantidade, c.Unidade, insumo.UnidadeMedidaBase, custo, insumo.CustoReferencia?.Valor);
     }
 
     // Custo só fecha se TODA linha tem custo: total parcial pareceria barato demais.
     private static (decimal? Total, decimal? PorRendimento) Custos(IReadOnlyList<LinhaDaReceita> linhas, decimal rendimento)
     {
         if (linhas.Count == 0 || linhas.Any(l => l.Custo is null)) return (null, null);
-        var total = Math.Round(linhas.Sum(l => l.Custo!.Value), 2, MidpointRounding.AwayFromZero);
-        return (total, rendimento > 0 ? Math.Round(total / rendimento, 2, MidpointRounding.AwayFromZero) : null);
+        var total = linhas.Sum(l => l.Custo!.Value);
+        return (Math.Round(total, 2, MidpointRounding.AwayFromZero),
+            rendimento > 0 ? Math.Round(total / rendimento, 2, MidpointRounding.AwayFromZero) : null);
     }
 }

@@ -453,7 +453,7 @@ await confere('Insumos: o aviso sai no formulário que o causou; sem formulário
   botoes(t.arvore, 'Cadastrar insumo')[0].props.onClick()
   t.renderizar()
   // Cadastro com mínimo inválido: o aviso fica dentro do formulário, antes do botão, e nada é enviado.
-  campos(cadastro(), 'CampoTexto', 'Nome do insumo')[0].props.onChange(digitar('Massa'))
+  andar(cadastro(), (n) => n.type === 'NomeInsumoPesquisado')[0].props.onChange(digitar('Massa'))
   t.renderizar()
   campos(cadastro(), 'CampoTexto', 'Mínimo (opcional)')[0].props.onChange(digitar('1,5'))
   t.renderizar()
@@ -542,6 +542,88 @@ await confere('os textos de Estoque do dia, Receitas e Planejamento têm link pa
   await t.assentar()
   botoes(t.arvore, 'Ajustar')[0].props.onClick()
   assert.deepEqual(links(t.renderizar()), [[hashDoModulo('producao', 'perdas'), 'Perdas']])
+})
+
+await confere('Planejamento: consulta de outra data preserva o formulário, bloqueia ações e invalida o cálculo antigo', async () => {
+  const sugestao = { ate: '2026-10-12', pratos: [{ cardapioItemId: 'i-1', produtoId: 'p-1', nome: 'Ravióli', minimo: 0, saldo: 0, agendados: 0, descoberto: 0, sugestao: 6 }] }
+  const responder = (data) => new Response(JSON.stringify({ data }), { status: 200 })
+  let liberarSugestao, calculos = 0
+  globalThis.fetch = async (url) => {
+    if (url.includes('/producao/sugestao')) {
+      if (url.includes('?ate=')) return new Promise((r) => { liberarSugestao = r })
+      return responder(sugestao)
+    }
+    if (url.endsWith('/producao/planejamento')) {
+      calculos += 1
+      return responder({ itens: [], consolidado: [], custoEstimadoTotal: 8 })
+    }
+    return responder(null)
+  }
+  const t = montar(await tela('AbaPlanejamentoApi'))
+  await t.assentar()
+  const porcoes = () => campos(t.arvore, 'CampoTexto', 'Porções')[0]
+  const calcular = () => botoes(t.arvore, 'Calcular insumos')[0]
+  porcoes().props.onChange(digitar('99'))
+  t.renderizar()
+  await calcular().props.onClick()
+  t.renderizar()
+  assert.ok(texto(t.arvore).includes('Custo estimado'))
+  andar(t.arvore, (n) => n.type === 'input' && n.props.type === 'date')[0].props.onChange(digitar('2026-10-13'))
+  await t.assentar()
+  assert.equal(porcoes().props.value, '99', 'a consulta não desmonta nem apaga o formulário')
+  assert.equal(porcoes().props.disabled, true)
+  assert.equal(calcular().props.disabled, true)
+  assert.equal(texto(t.arvore).includes('Custo estimado'), false)
+  assert.ok(texto(t.arvore).includes('Atualizando a sugestão'))
+  await calcular().props.onClick()
+  assert.equal(calculos, 1, 'não calcula as porções antigas enquanto a nova data é consultada')
+  porcoes().props.onChange(digitar('111'))
+  t.renderizar()
+  assert.equal(porcoes().props.value, '99', 'evento atrasado não edita o campo bloqueado')
+  liberarSugestao(responder({ ...sugestao, ate: '2026-10-13', pratos: [{ ...sugestao.pratos[0], sugestao: 8 }] }))
+  await t.assentar()
+  assert.equal(porcoes().props.value, '8')
+  assert.equal(calcular().props.disabled, false)
+  assert.equal(texto(t.arvore).includes('Custo estimado'), false)
+})
+
+await confere('Planejamento: falha da nova data conserva as porções e permite repetir; limpar a data inicial também consulta', async () => {
+  let consultas = 0
+  montarFetch([[(m, u) => m === 'GET' && u.includes('/producao/sugestao'), () => {
+    consultas += 1
+    return consultas === 2
+      ? { status: 503, error: { message: 'Sugestão indisponível' } }
+      : { data: { ate: '2026-10-12', pratos: [{ cardapioItemId: 'i-1', produtoId: 'p-1', nome: 'Ravióli', sugestao: consultas === 1 ? 6 : 12 }] } }
+  }]])
+  const t = montar(await tela('AbaPlanejamentoApi'))
+  await t.assentar()
+  campos(t.arvore, 'CampoTexto', 'Porções')[0].props.onChange(digitar('99'))
+  t.renderizar()
+  andar(t.arvore, (n) => n.type === 'input' && n.props.type === 'date')[0].props.onChange(digitar(''))
+  await t.assentar()
+  assert.equal(consultas, 2, 'consulta vazia igual à inicial ainda inicia nova leitura')
+  assert.equal(campos(t.arvore, 'CampoTexto', 'Porções')[0].props.value, '99')
+  assert.equal(botoes(t.arvore, 'Calcular insumos')[0].props.disabled, true)
+  assert.ok(texto(t.arvore).includes('As porções abaixo são da consulta anterior'))
+  botoes(t.arvore, 'Tentar novamente')[0].props.onClick()
+  await t.assentar()
+  assert.equal(consultas, 3)
+  assert.equal(campos(t.arvore, 'CampoTexto', 'Porções')[0].props.value, '12')
+  assert.equal(botoes(t.arvore, 'Calcular insumos')[0].props.disabled, false)
+})
+
+await confere('Planejamento: o cálculo tem prazo e avisa como tentar novamente', async () => {
+  const original = AbortSignal.timeout
+  let duracao
+  AbortSignal.timeout = (ms) => { duracao = ms; return AbortSignal.abort() }
+  globalThis.fetch = async (_, opcoes) => { assert.equal(opcoes.signal.aborted, true); throw new Error('aborted') }
+  try {
+    const { planejarProducao } = await import('../src/infra/api/producaoApi.js')
+    await assert.rejects(planejarProducao([]), /O cálculo demorou a responder. Tente novamente./)
+    assert.equal(duracao, 20000)
+  } finally {
+    AbortSignal.timeout = original
+  }
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

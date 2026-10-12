@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.CalcularProducao;
 using EasyStock.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
@@ -210,6 +211,95 @@ public class CalcularProducaoUseCaseTests
         // Garante que batch query foi chamado EXATAMENTE 1 vez (nao N vezes por insumo)
         await _itemEstoqueRepo.Received(1).GetByProdutosAsync(
             empresaId, Arg.Any<IEnumerable<Guid>>(), null, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Custo_total_desconhecido_quando_um_insumo_nao_tem_custo()
+    {
+        var empresaId = Guid.NewGuid();
+        var produto = BuildProduto(empresaId, rendimento: 1m);
+        var farinha = new Produto { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Farinha", UnidadeMedidaBase = UnidadeMedida.Kg, CustoReferencia = Dinheiro.FromDecimal(5m) };
+        var ovo = new Produto { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Ovo", UnidadeMedidaBase = UnidadeMedida.Un };
+        var linhas = new[]
+        {
+            new ProdutoComposicao { InsumoId = farinha.Id, Insumo = farinha, Quantidade = 0.2m, Unidade = UnidadeMedida.Kg },
+            new ProdutoComposicao { InsumoId = ovo.Id, Insumo = ovo, Quantidade = 1m, Unidade = UnidadeMedida.Un }
+        };
+        _produtoRepo.GetByIdAsync(empresaId, produto.Id).Returns(produto);
+        _composicaoRepo.GetByProdutoFinalAsync(empresaId, produto.Id, null, Arg.Any<CancellationToken>()).Returns(linhas);
+        _itemEstoqueRepo.GetByProdutosAsync(empresaId, Arg.Any<IEnumerable<Guid>>(), null, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, IReadOnlyCollection<ItemEstoque>>());
+
+        var resultado = await Build().ExecuteAsync(new CalcularProducaoCommand(empresaId, produto.Id, 1m, UnidadeMedida.Un, null));
+
+        resultado.Insumos[0].CustoEstimadoLinha.Should().Be(1m);
+        resultado.Insumos[1].CustoEstimadoLinha.Should().BeNull();
+        resultado.CustoEstimadoTotal.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(StatusItemEstoque.Ok, 1, -5, false)]
+    [InlineData(StatusItemEstoque.Descartado, 1, 5, false)]
+    [InlineData(StatusItemEstoque.Bloqueado, 1, 5, false)]
+    [InlineData(StatusItemEstoque.Ok, 0, 5, false)]
+    [InlineData(StatusItemEstoque.Ok, 1, 5, true)]
+    public async Task Saldo_e_custo_contam_so_lotes_utilizaveis(StatusItemEstoque status, decimal saldo, int diasValidade, bool disponivel)
+    {
+        var resultado = await CalcularFarinhaAsync(null, Lote(saldo, 5m, status, diasValidade));
+
+        resultado.TudoDisponivel.Should().Be(disponivel);
+        resultado.Insumos[0].SaldoAtual.Should().Be(disponivel ? saldo : 0m);
+        resultado.Insumos[0].Falta.Should().Be(disponivel ? null : 0.2m);
+        resultado.CustoEstimadoTotal.Should().Be(disponivel ? 1m : null);
+    }
+
+    [Theory]
+    [InlineData(StatusItemEstoque.Ok, 0, 5)]
+    [InlineData(StatusItemEstoque.Ok, 1, -5)]
+    [InlineData(StatusItemEstoque.Descartado, 1, 5)]
+    [InlineData(StatusItemEstoque.Bloqueado, 1, 5)]
+    public async Task Custo_ignora_primeiro_lote_sem_saldo_utilizavel(StatusItemEstoque status, decimal saldo, int diasValidade)
+    {
+        var resultado = await CalcularFarinhaAsync(null, Lote(saldo, 99m, status, diasValidade), Lote(1m, 5m));
+
+        resultado.Insumos[0].SaldoAtual.Should().Be(1m);
+        resultado.Insumos[0].CustoUnitarioReferencia.Should().Be(5m);
+        resultado.CustoEstimadoTotal.Should().Be(1m);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(7)]
+    public async Task Sem_lote_utilizavel_usa_custo_de_referencia_inclusive_zero(decimal custoReferencia)
+    {
+        var resultado = await CalcularFarinhaAsync(custoReferencia, Lote(0m, 99m));
+
+        resultado.Insumos[0].CustoUnitarioReferencia.Should().Be(custoReferencia);
+        resultado.CustoEstimadoTotal.Should().Be(0.2m * custoReferencia);
+    }
+
+    private static ItemEstoque Lote(decimal saldo, decimal custo, StatusItemEstoque status = StatusItemEstoque.Ok, int diasValidade = 5) => new()
+    {
+        Id = Guid.NewGuid(), QuantidadeAtual = Quantidade.From(saldo), CustoUnitario = Dinheiro.FromDecimal(custo),
+        Status = status, ValidadeEm = Validade.From(HorarioBrasil.HojeInstanteUtc().AddDays(diasValidade))
+    };
+
+    private async Task<CalcularProducaoResult> CalcularFarinhaAsync(decimal? custoReferencia, params ItemEstoque[] lotes)
+    {
+        var empresaId = Guid.NewGuid();
+        var produto = BuildProduto(empresaId, rendimento: 1m);
+        var farinha = new Produto
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Farinha", UnidadeMedidaBase = UnidadeMedida.Kg,
+            CustoReferencia = custoReferencia.HasValue ? Dinheiro.FromDecimal(custoReferencia.Value) : null
+        };
+        foreach (var lote in lotes) { lote.EmpresaId = empresaId; lote.ProdutoId = farinha.Id; }
+        var linha = new ProdutoComposicao { InsumoId = farinha.Id, Insumo = farinha, Quantidade = 0.2m, Unidade = UnidadeMedida.Kg };
+        _produtoRepo.GetByIdAsync(empresaId, produto.Id).Returns(produto);
+        _composicaoRepo.GetByProdutoFinalAsync(empresaId, produto.Id, null, Arg.Any<CancellationToken>()).Returns([linha]);
+        _itemEstoqueRepo.GetByProdutosAsync(empresaId, Arg.Any<IEnumerable<Guid>>(), null, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, IReadOnlyCollection<ItemEstoque>> { [farinha.Id] = lotes });
+        return await Build().ExecuteAsync(new CalcularProducaoCommand(empresaId, produto.Id, 1m, UnidadeMedida.Un, null));
     }
 
     // #1498: o custo do insumo é por unidade-base dele; a receita pode estar em outra unidade.
