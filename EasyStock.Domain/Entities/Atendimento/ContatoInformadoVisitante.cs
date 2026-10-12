@@ -1,3 +1,4 @@
+using System.Net.Mail;
 using System.Text.RegularExpressions;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.ValueObjects;
@@ -67,16 +68,24 @@ public sealed record ContatoInformadoVisitante
             ? new ContatoInformadoVisitante(nome ?? string.Empty, telefone, email, Utc(em))
             : null;
 
-    /// <summary>E-mail opcional: vazio vira nulo; preenchido precisa ser válido.</summary>
+    /// <summary>
+    /// E-mail opcional: vazio vira nulo; preenchido precisa ser válido e ser só o endereço. O parser também aceita
+    /// nome de exibição (<c>Maria &lt;a@b.com&gt;</c>), comentário (<c>a@b.com (texto)</c>) e lista
+    /// (<c>a@b.com, c@d.com</c>); nenhum deles é um endereço para gravar no cadastro.
+    /// </summary>
     public static string? EmailNormalizado(string? email)
     {
         if (string.IsNullOrWhiteSpace(email))
             return null;
-        var valido = EmailAddress.TryFrom(email);
-        if (valido is null || valido.Value.Length > EmailTamanhoMaximo)
+        var texto = email.Trim();
+        var valido = EmailAddress.TryFrom(texto);
+        if (valido is null || valido.Value.Length > EmailTamanhoMaximo || !EhSoOEndereco(texto))
             throw new RegraDeDominioVioladaException("E-mail inválido.");
         return valido.Value;
     }
+
+    private static bool EhSoOEndereco(string texto) =>
+        MailAddress.TryCreate(texto, out var endereco) && string.Equals(endereco.Address, texto, StringComparison.Ordinal);
 
     private static DateTime Utc(DateTime d) => d.Kind switch
     {

@@ -45,6 +45,25 @@ public class ContatoInformadoVisitanteTests
         acao.Should().Throw<RegraDeDominioVioladaException>().WithMessage(mensagem);
     }
 
+    // O parser de e-mail aceita nome de exibição, comentário e lista; o formulário só aceita o endereço puro,
+    // senão o texto inteiro iria para a Ficha e para o cadastro como se fosse o e-mail.
+    [Theory]
+    [InlineData("Maria Souza <maria@exemplo.com>")]
+    [InlineData("maria@exemplo.com (texto)")]
+    [InlineData("maria@exemplo.com, outra@exemplo.com")]
+    public void EmailNormalizado_RecusaOQueNaoForSoOEndereco(string email)
+    {
+        var acao = () => ContatoInformadoVisitante.EmailNormalizado(email);
+
+        acao.Should().Throw<RegraDeDominioVioladaException>().WithMessage("*E-mail*");
+    }
+
+    [Fact]
+    public void EmailNormalizado_AceitaOEnderecoPuroEGravaSoEle()
+    {
+        ContatoInformadoVisitante.EmailNormalizado("  Maria.Souza+loja@Exemplo.com.br ").Should().Be("maria.souza+loja@exemplo.com.br");
+    }
+
     [Fact]
     public void Criar_RecusaNomeMaiorQueOContatoDaConversa()
     {
