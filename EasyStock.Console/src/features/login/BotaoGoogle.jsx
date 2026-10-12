@@ -45,7 +45,7 @@ export function BotaoGoogle({ buscarClientId, aoReceberToken, aoFalhar }) {
         // #1354: o renderButton acrescenta; limpar antes garante um botão só.
         alvo.current.replaceChildren()
         window.google.accounts.id.renderButton(alvo.current, {
-          theme: 'outline', size: 'large', text: 'signin_with', locale: 'pt-BR', width: 280,
+          theme: 'outline', size: 'large', text: 'signin_with', locale: 'pt-BR',
         })
       })
       .catch((erro) => { if (vivo) aoFalharAtual.current(erro.message) })

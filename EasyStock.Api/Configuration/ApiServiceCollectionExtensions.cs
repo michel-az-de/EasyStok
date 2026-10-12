@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
+using EasyStock.Infra.Integrations.DependencyInjection;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -391,6 +392,7 @@ public static class ApiServiceCollectionExtensions
         services.AddSingleton<IOperationalMetrics>(sp => sp.GetRequiredService<MetricsService>());
         services.AddProblemDetails();
         services.AddExceptionHandler<GlobalExceptionHandler>();
+        services.AddEnderecoForaDoLogHttp();
 
         // string.IsNullOrWhiteSpace (nao `??`): o compose da VM injeta a env como string
         // vazia quando OTEL_COLLECTOR_ENDPOINT nao esta no .env, e new Uri("") lanca
@@ -404,7 +406,9 @@ public static class ApiServiceCollectionExtensions
             {
                 tracing
                     .AddAspNetCoreInstrumentation()
-                    .AddHttpClientInstrumentation()
+                    // I8.2 (#1661): CEP e endereço do cliente não vão para o span dos provedores de mapa.
+                    .AddHttpClientInstrumentation(http =>
+                        http.EnrichWithHttpRequestMessage = EnderecoForaDaTelemetria.OcultarUrlNoSpan(configuration))
                     .AddNpgsql()
                     .AddOtlpExporter(options => options.Endpoint = otlpEndpoint);
 

@@ -30,7 +30,7 @@ Todo cliente pode iniciar e continuar o atendimento. Cobertura automática deter
 1. **Cadastro bloqueava a abertura.** `EstadoAsync` recusava conversa sem ClienteId. Permitir leitura e seleção do lead; validar nome, telefone e endereço na confirmação; criar o cadastro do lead sem vincular uma identidade anterior apenas pelo telefone informado em link público.
 2. **Rascunho com itens não recebia endereço.** O preenchimento ocorria apenas quando não havia rascunho. Completar endereço ausente com o padrão do cadastro, preservando seleção e endereço digitado.
 3. **CEP sem cobertura bloqueava a compra.** A página exigia cotação coberta e o núcleo lançava `CepSemCoberturaException`. A confirmação passa a preservar a comanda e encaminhar à equipe, sem pedido financeiro ou cobrança prematuros.
-4. **Não havia como combinar frete na comanda.** Acrescentar campo no Atendimento e ação autenticada. Guardar valor ligado ao link e à revisão; o cliente precisa confirmar o total. Repetir a mesma ação não duplica nota; outra revisão invalida o valor.
+4. **Não havia como combinar frete na comanda.** Acrescentar campo no Atendimento e ação autenticada. Exigir valor explícito, inclusive para frete zero. Guardar valor ligado ao link e à revisão; o cliente precisa confirmar o total. Repetir a mesma ação não duplica nota; outra revisão invalida o valor.
 5. **Endereço manual perdia cidade/UF.** O cadastro da conversa não transportava esses campos ao validador. Preservar os campos fornecidos quando o serviço de CEP estiver indisponível.
 6. **IA interna não tinha ação de assumir.** Acrescentar ferramenta de proposta e botão “IA assumir atendimento”, executando a retomada na conversa selecionada. Não anunciar ação executada antes da confirmação.
 7. **Retomar automático não processava entrada já recebida.** Enfileirar o turno após persistir a transição. A regra existente de entradas pendentes continua evitando respostas repetidas.
@@ -64,3 +64,6 @@ Evidências locais:
 - Console: qualidade, prova de ações do assistente, comanda compartilhada e 25 cenários de UX aprovados.
 - Ajustes na regressão de navegador: abrir observação recolhida antes de digitar; aguardar o ciclo real de atualização do painel (até 20 segundos, polling de 15 segundos).
 - Alterar a seleção invalida a prévia do frete combinado no site e a autorização da revisão na API.
+- Suíte ampla PostgreSQL: 31 testes de comanda aprovados, incluindo quatro clientes/dois atendentes, isolamento por empresa, concorrência, replay e respostas verificadas; 1 fixture opt-in ignorada.
+- CI do site b376794: 683 testes unitários e 168 testes de navegador aprovados; 6 fixtures opt-in ignoradas. As duas jornadas com API real local foram executadas separadamente.
+- Endpoint de frete: campo omitido retorna 400; valor negativo retorna 400; revisão antiga retorna 409. Reteste HTTP após tornar o valor obrigatório: 2 cenários aprovados.
