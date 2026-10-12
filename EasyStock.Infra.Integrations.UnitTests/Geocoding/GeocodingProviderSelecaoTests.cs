@@ -116,6 +116,54 @@ public class GeocodingProviderSelecaoTests
         Assert.IsType<EasyStock.Infra.Integrations.TomTom.TomTomRotasClient>(ResolverRota(config));
     }
 
+    // ── Cadeia (I8.1, #1658): provedor com chave, depois Nominatim, depois NoOp ──
+
+    [Fact]
+    public void Sem_chave_e_NoOp()
+    {
+        var client = Resolver(new());
+
+        Assert.IsType<NoOpGeocodingClient>(client);
+        Assert.False(client.Disponivel);
+        Assert.IsType<EasyStock.Infra.Integrations.Rotas.NoOpRotaClient>(ResolverRota(new()));
+    }
+
+    [Theory]
+    [InlineData("tomtom", GeocodingServiceCollectionExtensions.TomTomApiKeyKey)]
+    [InlineData("google", GeocodingServiceCollectionExtensions.GoogleApiKeyKey)]
+    public void Provedor_com_chave_e_nominatim_ligado_formam_a_cadeia(string provider, string chave)
+    {
+        var client = Resolver(new()
+        {
+            [GeocodingServiceCollectionExtensions.ProviderKey] = provider,
+            [chave] = "k",
+            [GeocodingServiceCollectionExtensions.FeatureFlagKey] = "true",
+        });
+
+        Assert.IsType<CadeiaGeocodingClient>(client);
+        Assert.True(client.Disponivel);
+    }
+
+    [Fact]
+    public void Nominatim_ligado_sozinho_segue_sendo_o_proprio_adapter()
+    {
+        var client = Resolver(new() { [GeocodingServiceCollectionExtensions.FeatureFlagKey] = "true" });
+
+        Assert.IsType<NominatimGeocodingClient>(client);
+    }
+
+    [Fact]
+    public void Provedor_sem_chave_com_nominatim_ligado_cai_no_nominatim()
+    {
+        var client = Resolver(new()
+        {
+            [GeocodingServiceCollectionExtensions.ProviderKey] = "tomtom",
+            [GeocodingServiceCollectionExtensions.FeatureFlagKey] = "true",
+        });
+
+        Assert.IsType<NominatimGeocodingClient>(client);
+    }
+
     [Fact]
     public void TomTom_sem_chave_cai_em_noop()
     {
