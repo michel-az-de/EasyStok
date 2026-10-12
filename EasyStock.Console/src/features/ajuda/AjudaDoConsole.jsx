@@ -23,16 +23,16 @@ export function AjudaDoConsole({ rota, fonteApi, aoFechar }) {
     })
     setDiagnostico(texto)
     const copiado = await copiarDiagnostico(texto, navigator.clipboard)
-    setAviso(copiado ? 'Diagnóstico copiado. Envie pelo canal que você já usa com a equipe.' : 'Não foi possível copiar. Selecione os dados abaixo para copiar manualmente.')
+    setAviso(copiado ? 'Diagnóstico copiado. Envie à equipe junto com sua dúvida.' : 'Não foi possível copiar. Copie os dados selecionados abaixo.')
     if (!copiado) requestAnimationFrame(() => { dadosRef.current?.focus(); dadosRef.current?.select() })
   }
 
   return (
-    <Modal titulo="Ajuda e diagnóstico" descricao={contexto.titulo} aoFechar={aoFechar} largura="min(620px, calc(100vw - 24px))"
+    <Modal titulo="Ajuda" descricao={contexto.titulo} aoFechar={aoFechar} largura="min(620px, calc(100vw - 24px))"
       rodape={<Botao onClick={aoFechar}>Voltar ao trabalho</Botao>}>
       <div className={css.corpo}>
         <section aria-labelledby="ajuda-por-aqui">
-          <h3 id="ajuda-por-aqui" className={css.titulo}><MarcaIcone nome="informacao" /> Por aqui</h3>
+          <h3 id="ajuda-por-aqui" className={css.titulo}><MarcaIcone nome="informacao" /> Como usar esta tela</h3>
           <ol className={css.passos}>{contexto.passos.map(passo => <li key={passo}>{passo}</li>)}</ol>
           <div className={css.caminhos}>
             <a href={HASH_HALL} onClick={aoFechar}><MarcaIcone nome="grade" tamanho={20} />Ver módulos</a>
@@ -45,14 +45,14 @@ export function AjudaDoConsole({ rota, fonteApi, aoFechar }) {
           <p><kbd>Tab</kbd> e <kbd>Shift</kbd> + <kbd>Tab</kbd> percorrem os controles. <kbd>Enter</kbd> abre links; <kbd>Enter</kbd> ou <kbd>Espaço</kbd> aciona botões. <kbd>Esc</kbd> fecha a janela ou menu aberto.</p>
           {rota.tipo === 'principal' && <><p>No campo da mensagem, <kbd>/</kbd> busca respostas prontas. Nas abas do celular, as setas movem o foco; <kbd>Enter</kbd> ou <kbd>Espaço</kbd> escolhe a aba.</p><p>No Assistente, <kbd>Enter</kbd> cria uma nova linha; <kbd>Ctrl</kbd> + <kbd>Enter</kbd> faz a pergunta.</p></>}
         </details>
-        <section aria-labelledby="ajuda-problema" className={css.suporte}>
-          <h3 id="ajuda-problema" className={css.titulo}>Algo não funcionou?</h3>
-          <p>Confira o aviso na tela e a confirmação da ação antes de repetir. Para pedir ajuda à equipe, descreva o que tentou fazer e copie o diagnóstico.</p>
+        <details className={`${css.detalhes} ${css.suporte}`}>
+          <summary>Pedir ajuda à equipe</summary>
+          <p>Antes de repetir uma ação, confira se ela foi concluída. Se precisar de ajuda, descreva o que tentou fazer e envie o diagnóstico à equipe.</p>
           <Botao icone="copy" onClick={copiar}>Copiar diagnóstico</Botao>
-          <p className={css.apoio}>Inclui apenas a tela, versão, origem dos dados e indicação de rede. Nenhuma mensagem é enviada por este painel.</p>
+          <p className={css.apoio}>Só inclui tela, versão, origem dos dados e estado da conexão. Nada é enviado automaticamente.</p>
           <output className={css.aviso} aria-live="polite">{aviso}</output>
           {diagnostico && <label className={css.dados}>Dados para a equipe<textarea ref={dadosRef} readOnly value={diagnostico} rows={6} /></label>}
-        </section>
+        </details>
       </div>
     </Modal>
   )

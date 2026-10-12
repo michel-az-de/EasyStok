@@ -27,7 +27,7 @@ export const SO_DA_TELA = [
 
 const grupo = (rotulo, nomes) => Object.fromEntries(nomes.map((nome) => [nome, rotulo]))
 
-// Nome da ação -> rótulo que abre o aviso ("<rótulo>: ainda não ligado nesta versão.").
+// Nome da ação -> rótulo que abre o aviso de indisponibilidade.
 export const NAO_LIGADAS = {
   trocarJanela: 'Trocar a janela do pedido',
   mudarEnderecoDoPedido: 'Endereço do pedido',
@@ -60,7 +60,7 @@ export const NAO_LIGADAS = {
   ...grupo('Cupom e recompensa no pedido', ['aplicarCupom', 'removerCupomDoPedido', 'resgatarRecompensa']),
 }
 
-export const textoNaoLigado = (rotulo) => `${rotulo}: ainda não ligado nesta versão.`
+export const textoNaoLigado = (rotulo) => `${rotulo}: indisponível nesta versão.`
 
 // Ações da comanda que só o EasyStok faz (`api/comanda.js`): no modo API elas avisam e não
 // mexem no pedido. A esteira anda pelo PATCH do KDS; cancelar usa a rota com motivo e

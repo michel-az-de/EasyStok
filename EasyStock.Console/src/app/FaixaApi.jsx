@@ -53,7 +53,7 @@ export function FaixaApi({ aoSair }) {
       ? `Conversas sem atualização: ${sincronizacao.mensagem || 'a consulta não foi concluída.'} A próxima tentativa é automática.`
       : aviso ?? 'Conversas ao vivo do EasyStok'
   return (
-    <output className={`${css.faixa} ${falhou || aviso ? css.alerta : ''}`}>
+    <output className={`${css.faixa} ${falhou ? css.falha : aviso ? css.aviso : ''}`}>
       <span className={css.texto}>
         {texto}
         {aviso && (

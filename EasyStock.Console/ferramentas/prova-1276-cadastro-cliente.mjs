@@ -147,7 +147,7 @@ await confere('Editar telefone manda só o telefone; editar avisos ainda avisa s
   acoes.editarDadoCliente('conv-1', 'avisos', 'alergia a camarão', 0)
   await esperar()
   assert.equal(chamadas.length, 0, 'avisos chamou a API')
-  assert.ok(despachados.some((a) => a.tipo === acao.AVISO_API && /ainda não ligado/.test(a.mensagem)), 'avisos não avisou')
+  assert.ok(despachados.some((a) => a.tipo === acao.AVISO_API && /indisponível nesta versão/.test(a.mensagem)), 'avisos não avisou')
 })
 
 await confere('Abrir conversa com cliente e Ficha vazia carrega pelo dossiê', async () => {

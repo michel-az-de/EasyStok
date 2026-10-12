@@ -152,7 +152,6 @@ export function AbaInsumosApi() {
 
       {podeEditar ? <><Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => { avisarEm(CADASTRO); setCadastroAberto(true) }}>Cadastrar insumo</Botao>
       {cadastroAberto && <Modal titulo="Cadastrar insumo" aoFechar={criando ? undefined : () => { avisarEm(null); setCadastroAberto(false) }} largura="min(720px, calc(100vw - 24px))"><form className={`${css.campos} ${css.formulario} ${css.cadastroInsumo}`} onSubmit={cadastrar} aria-label="Cadastrar insumo">
-        <h3 className={`${css.tituloFormulario} ${css.linhaCompleta}`}>Cadastrar insumo</h3>
         <NomeInsumoPesquisado disabled={criando} value={novo.nome} onChange={mudarNovo('nome')} />
         <CampoSelecao disabled={criando} rotulo="Unidade" value={novo.unidade} onChange={mudarNovo('unidade')} opcoes={UNIDADES_INSUMO.map((u) => ({ valor: u, rotulo: u }))} />
         <CampoTexto disabled={criando} inputMode="numeric" rotulo="Mínimo (opcional)" value={novo.minimo} onChange={mudarNovo('minimo')} />
