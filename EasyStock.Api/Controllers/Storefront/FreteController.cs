@@ -35,7 +35,7 @@ public sealed class FreteController(
     /// </summary>
     [SwaggerOperation(
         Summary = "Calcular frete por CEP",
-        Description = "Retorna valor (centavos) + ETA textual quando o CEP esta coberto. 422 quando nao entregamos no CEP. Cache de 24h em 200.")]
+        Description = "Retorna valor (centavos) + ETA textual quando ha cotacao automatica. 422 quando entrega e frete precisam ser combinados com a equipe. Cache de 24h em 200.")]
     [ProducesResponseType(typeof(FreteCalculadoDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
