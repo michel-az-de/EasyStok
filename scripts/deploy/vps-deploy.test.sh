@@ -121,6 +121,7 @@ echo "current=$(cat $BUILD_ROOT/easystok-current 2>/dev/null)"
 echo "dump=$(ls $BACKUP_DIR | wc -l)"
 echo "up=$(grep -c 'compose up' $STATE/calls 2>/dev/null)"
 echo "hist=$(cat $BUILD_ROOT/deploy-history.log 2>/dev/null)"
+echo "log_worker=$(grep -c 'logs --tail 40 ez-worker' $STATE/calls 2>/dev/null)"
 EOF
 
 run() { docker run --rm -e "$1" -v "$(pwd -W):/t" bash:5 sh -c 'apk add -q util-linux >/dev/null 2>&1; bash /t/.caso.sh'; }
@@ -133,6 +134,7 @@ r=$(run X=0);                confere "sucesso: exit 0"                  "rc=0" "
 r=$(run FAKE_WORKER_RESTARTS=3); confere "worker em laco de restart: exit 6"     "rc=6" "$r"
                               confere "worker em laco: volta a imagem"   "imagem=easystok-api:vps-antiga" "$r"
                               confere "worker em laco: nao marca current" "current=$" "$r"
+                              confere "worker em laco: mostra o log do worker" "log_worker=1" "$r"
 r=$(run FAKE_BAD=1);         confere "falha de health: exit 6"          "rc=6" "$r"
                               confere "falha de health: volta a imagem"  "imagem=easystok-api:vps-antiga" "$r"
                               confere "falha de health: sobe 2 vezes"    "up=2" "$r"

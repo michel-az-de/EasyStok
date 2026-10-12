@@ -148,8 +148,10 @@ if healthy && [ "$(sha_no_ar)" = "$SHA_FULL" ]; then
   exit 0
 fi
 
-echo "ERRO: $SHA nao ficou healthy em ${HEALTH_TIMEOUT}s; voltando para vps-prev-$TS" >&2
+echo "ERRO: $SHA nao passou na verificacao (api e web healthy, worker rodando sem reiniciar) em ${HEALTH_TIMEOUT}s; voltando para vps-prev-$TS" >&2
 docker logs --tail 40 ez-api >&2 || true
+# I4.1 (#1674): a falha pode ser so do Worker; sem o log dele o motivo fica na VPS.
+docker logs --tail 40 ez-worker >&2 || true
 for s in $SERVICES; do
   if docker image inspect "easystok-$s:vps-prev-$TS" >/dev/null 2>&1; then
     docker tag "easystok-$s:vps-prev-$TS" "easystok-$s:vps"
