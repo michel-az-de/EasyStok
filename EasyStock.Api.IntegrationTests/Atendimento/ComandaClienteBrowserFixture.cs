@@ -89,7 +89,8 @@ public sealed partial class PedidoConversaConcorrenciaTests
 
     private sealed record PagamentoBrowser(Guid PedidoId, decimal Valor, string? PagamentoExternoId = null);
     private sealed record AgenteBrowser(Guid ConversaId);
-    private sealed record TurnoBrowser(Guid ConversaId, string Texto, string? RespostaControlada = null, bool RepetirUltimoTurno = false);
+    private sealed record TurnoBrowser(Guid ConversaId, string Texto, string? RespostaControlada = null, bool RepetirUltimoTurno = false,
+        bool ConsultarAntesDaRespostaControlada = false);
     private sealed record EstornoBrowser(Guid PedidoId, string Situacao);
 
     private sealed class ComandaBrowserBridge(EasyStock.Application.Ports.Output.Pagamentos.IMercadoPagoClient mp,
@@ -186,7 +187,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
                 if (context.Request.Method == "POST" && context.Request.Path == "/__comanda-teste/atendimento-automatico")
                 {
                     var dados = (await context.Request.ReadFromJsonAsync<TurnoBrowser>())!;
-                    var resultados = llm.IniciarTurno(dados.RespostaControlada);
+                    var resultados = llm.IniciarTurno(dados.RespostaControlada, dados.ConsultarAntesDaRespostaControlada);
                     var db = context.RequestServices.GetRequiredService<EasyStockDbContext>();
                     var conversa = await db.AtendimentoConversas.SingleAsync(c => c.EmpresaId == EmpresaId && c.Id == dados.ConversaId);
                     if (!dados.RepetirUltimoTurno)

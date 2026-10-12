@@ -45,26 +45,28 @@ public sealed partial class PedidoConversaConcorrenciaTests
         public ConcurrentQueue<string> Resultados { get; } = new();
         private readonly AsyncLocal<ConcurrentQueue<string>?> _turno = new();
         private readonly AsyncLocal<string?> _resposta = new();
-        public ConcurrentQueue<string> IniciarTurno(string? respostaControlada = null)
+        private readonly AsyncLocal<bool> _consultarAntesDaResposta = new();
+        public ConcurrentQueue<string> IniciarTurno(string? respostaControlada = null, bool consultarAntesDaResposta = false)
         {
             var resultados = new ConcurrentQueue<string>();
             _turno.Value = resultados; _resposta.Value = respostaControlada;
+            _consultarAntesDaResposta.Value = consultarAntesDaResposta;
             return resultados;
         }
         public Task<RespostaLlm> EnviarAsync(RequisicaoLlm requisicao, CancellationToken ct = default)
         {
-            if (_resposta.Value is { } resposta)
+            if (_resposta.Value is { } resposta && !_consultarAntesDaResposta.Value)
                 return Task.FromResult(new RespostaLlm("end_turn", [new BlocoTextoLlm(resposta)], 1, 1));
             var resultado = requisicao.Mensagens.Last().Conteudo.OfType<BlocoResultadoFerramentaLlm>().FirstOrDefault();
             if (resultado is not null)
             {
                 Resultados.Enqueue(resultado.Conteudo);
                 _turno.Value?.Enqueue(resultado.Conteudo);
-                return Task.FromResult(new RespostaLlm("end_turn", [new BlocoTextoLlm("Confira os dados atuais da sua comanda: " + resultado.Conteudo)], 1, 1));
+                return Task.FromResult(new RespostaLlm("end_turn", [new BlocoTextoLlm(_resposta.Value ?? "Confira os dados atuais da sua comanda: " + resultado.Conteudo)], 1, 1));
             }
             var texto = string.Join(" ", requisicao.Mensagens.Last().Conteudo.OfType<BlocoTextoLlm>().Select(b => b.Texto));
-            var ferramenta = texto.Contains("adicionar", StringComparison.OrdinalIgnoreCase) || texto.Contains("cardápio", StringComparison.OrdinalIgnoreCase)
-                || texto.Contains("montar", StringComparison.OrdinalIgnoreCase) ? "enviar_cardapio_imagem" : "consultar_pedido";
+            var ferramenta = !_consultarAntesDaResposta.Value && (texto.Contains("adicionar", StringComparison.OrdinalIgnoreCase) || texto.Contains("cardápio", StringComparison.OrdinalIgnoreCase)
+                || texto.Contains("montar", StringComparison.OrdinalIgnoreCase)) ? "enviar_cardapio_imagem" : "consultar_pedido";
             return Task.FromResult(new RespostaLlm(RespostaLlm.StopToolUse,
                 [new BlocoUsoFerramentaLlm("toolu.controlado", ferramenta, JsonSerializer.SerializeToElement(new { }))], 1, 1));
         }

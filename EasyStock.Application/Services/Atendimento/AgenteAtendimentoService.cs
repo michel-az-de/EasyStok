@@ -105,7 +105,6 @@ public sealed class AgenteAtendimentoService(
         var geracao = await GeracaoAgenteAtendimento.GerarAsync(
             llm, system, mensagens, _ferramentas, contexto, MaximoIteracoes, logger, ct);
         var tokens = geracao.Tokens;
-        var textoFinal = geracao.Texto;
         var motivoEscalada = geracao.MotivoFalha;
         var concluiu = geracao.Concluiu;
 
@@ -121,22 +120,31 @@ public sealed class AgenteAtendimentoService(
             if (tokens > 0)
                 await RegistrarUsoAsync(empresaId, tokens, agora);
             await unitOfWork.CommitAsync();
-            return new ResultadoTurnoAgente(ChamouLlm: true, Respondeu: false, Escalou: false);
+            return new ResultadoTurnoAgente(ChamouLlm: true, Respondeu: contexto.HouveEnvio,
+                Escalou: conversa.Situacao == SituacaoConversa.Assumida);
         }
 
-        var respondeu = false;
-        if (!concluiu && motivoEscalada is null)
+        var respondeu = contexto.HouveEnvio;
+        const string encaminhamento = "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.";
+        if (conversa.Situacao == SituacaoConversa.Assumida)
         {
-            // Limite de iterações: avisa o cliente e passa para a dona.
-            respondeu = await EnviarRespostaAsync(empresaId, conversa, configuracao.FraseEspera, agora, ct);
-            motivoEscalada = $"o agente atingiu o limite de {MaximoIteracoes} iterações sem concluir a resposta";
+            respondeu = await EnviarRespostaAsync(empresaId, conversa, encaminhamento, agora, ct) || respondeu;
         }
-        else if (!string.IsNullOrWhiteSpace(textoFinal))
+        else if (conversa.Situacao == SituacaoConversa.Encerrada && contexto.RespostaVerificada is { Length: > 0 } despedida)
+            respondeu = await EnviarRespostaAsync(empresaId, conversa, despedida, agora, ct) || respondeu;
+        else if (conversa.Situacao == SituacaoConversa.Automatica)
         {
-            respondeu = await EnviarRespostaAsync(empresaId, conversa, textoFinal, agora, ct);
+            if (concluiu && motivoEscalada is null && contexto.RespostaVerificada is { Length: > 0 } verificada)
+                respondeu = await EnviarRespostaAsync(empresaId, conversa, verificada, agora, ct) || respondeu;
+            else if (!contexto.EnvioVerificado || motivoEscalada is not null || !concluiu)
+            {
+                respondeu = await EnviarRespostaAsync(empresaId, conversa, encaminhamento, agora, ct) || respondeu;
+                motivoEscalada ??= concluiu ? "resposta sem resultado verificado; precisa de conferência humana"
+                    : $"o agente atingiu o limite de {MaximoIteracoes} iterações sem concluir a resposta";
+            }
         }
 
-        if (motivoEscalada is not null)
+        if (motivoEscalada is not null && conversa.Situacao == SituacaoConversa.Automatica)
             await escalador.EscalarAsync(empresaId, conversa, motivoEscalada, agora, ct);
 
         if (tokens > 0)
