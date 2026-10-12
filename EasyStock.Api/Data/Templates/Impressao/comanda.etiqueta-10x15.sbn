@@ -1,6 +1,6 @@
 <div class="t p1015 cm"><div class="box">
 {{ if m.alergias }}<div class="cm-alerta"><b>!</b><span>ALERGIA: {{ m.alergias }}<small>cadastro da cliente · confira todos os itens</small></span></div>{{ end }}
-<div class="r"><div class="inv" style="width:34mm;flex:none">{{ if m.numero_dia }}<span class="l">Comanda nº</span><span class="cm-num">{{ m.numero_dia }}</span><span class="cm-hash">#{{ m.numero }}</span>{{ else }}<span class="l">Comanda</span><span class="codigo">#{{ m.numero }}</span>{{ end }}<span class="selo">{{ m.prazo.selo }}</span></div>
+<div class="r"><div class="inv" style="width:34mm;flex:none">{{ if m.numero_dia }}<span class="l">Pedido nº</span><span class="cm-num">{{ m.numero_dia }}</span><span class="cm-hash">#{{ m.numero }}</span>{{ else }}<span class="l">Comanda</span><span class="codigo">#{{ m.numero }}</span>{{ end }}<span class="selo">{{ m.prazo.selo }}</span></div>
 <div class="g contorno cm-prazo col"><span class="l">Pronto até</span><span class="grande">{{ m.prazo.pronto_ate }}</span><span style="font-weight:800">{{ m.prazo.data_longa }}</span></div></div>
 <div class="r"><div class="g"><span class="l">Cliente</span><div class="nome">{{ m.cliente }}</div></div><div style="flex:none;width:38mm"><span class="l">Entrega</span><span class="cm-ent">{{ m.prazo.hora_curta }} · {{ m.entrega }}</span></div></div>
 <div class="r itens">

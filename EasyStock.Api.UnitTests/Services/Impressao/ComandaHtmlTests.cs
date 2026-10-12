@@ -63,10 +63,23 @@ public class ComandaHtmlTests
     {
         var corpo = Corpo(await Renderizar(Exemplo(), modelo));
 
-        corpo.Should().ContainAll("ALERGIA: CASTANHA", "Comanda nº", "042", "#A7F3C21B", "AGENDADO", "Pronto até", "09:30",
+        corpo.Should().ContainAll("ALERGIA: CASTANHA", "Pedido nº", "042", "#A7F3C21B", "AGENDADO", "Pronto até", "09:30",
             "sex 02/10", "10–11h", "Motoboy", "Mariana Souza", "Preparar em casa", "3 itens", "Para servir", "2 itens",
             "Nhoque de batata", "· 800 g", "molho: sugo", "OBS: cortar em 6 pedaços", "0,5", "kg", "Feito por", "Embalado por",
             "Embalar os pães separados", "5 itens", "Solicitado 30/09 14:32", "Impresso 02/10 07:40");
+    }
+
+    [Theory]
+    [InlineData(ImpressoHtml.Etiqueta10x15)]
+    [InlineData(ImpressoHtml.Cupom58)]
+    public async Task NumeroDoDiaSaiComoPedidoENaoComoComanda(string modelo)
+    {
+        // "Comanda nº N" já é o número da conversa (Conversa.NumeroComanda) no console, na IA e no aviso ao
+        // cliente; no papel o número do dia é do pedido, como na proposta de impressos (#1628).
+        var corpo = Corpo(await Renderizar(Exemplo(), modelo));
+
+        corpo.Should().Contain("<span class=\"l\">Pedido nº</span><span class=\"cm-num\">042</span>");
+        corpo.Should().NotContain("Comanda nº");
     }
 
     [Theory]
@@ -84,7 +97,7 @@ public class ComandaHtmlTests
     {
         var corpo = Corpo(await Renderizar(Exemplo(numeroDoDia: null, alergias: [], observacao: null), ImpressoHtml.Etiqueta10x15));
 
-        corpo.Should().NotContain("cm-alerta").And.NotContain("Comanda nº");
+        corpo.Should().NotContain("cm-alerta").And.NotContain("Pedido nº").And.NotContain("cm-num");
         corpo.Should().Contain("<span class=\"codigo\">#A7F3C21B</span>");
         corpo.Should().Contain("Observação do pedido</span>—");
     }
