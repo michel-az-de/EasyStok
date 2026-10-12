@@ -28,7 +28,7 @@ export function AjudaDoConsole({ rota, fonteApi, aoFechar }) {
   }
 
   return (
-    <Modal titulo="Ajuda" descricao={contexto.titulo} aoFechar={aoFechar} largura="min(620px, calc(100vw - 24px))"
+    <Modal titulo="Ajuda" descricao={contexto.titulo} aoFechar={aoFechar} largura="620px"
       rodape={<Botao onClick={aoFechar}>Voltar ao trabalho</Botao>}>
       <div className={css.corpo}>
         <section aria-labelledby="ajuda-por-aqui">
