@@ -1,5 +1,5 @@
 import { itensDetalhados, totalDoPedido } from './pedido'
-import { horaCurta, moeda } from './formato'
+import { dataIsoNoFuso, horaCurta, moeda } from './formato'
 import { faixaDepoisDeEntre } from './entrega'
 import { nomeDoMeio } from './cobranca'
 
@@ -34,6 +34,15 @@ export const LINHA_COMANDA_VAI_JUNTO = 'A comanda vai ao cliente junto com a cob
 // #1587: pedido já criado (`comandaTravada`). O console não troca item de pedido criado; a frase
 // diz só isso, sem prometer caminho que não existe.
 export const LINHA_COMANDA_TRAVADA = 'O pedido já está no EasyStok: os itens não mudam mais por aqui.'
+
+export function avisoDeSinalAntesDeGerar(pedido, { fonteApi = false, agora = Date.now(), meio = pedido?.meio } = {}) {
+  if (!fonteApi || pedido?.pedidoId || pedido?.cobranca || pedido?.estado !== 'aguardando'
+    || !pedido.itens?.length || (meio && meio !== 'maquininha')) return null
+  const [janelaId, data] = String(pedido.janela ?? '').split('|')
+  if (!janelaId || !/^\d{4}-\d{2}-\d{2}$/.test(data) || !Number.isFinite(Date.parse(data + 'T12:00:00Z'))
+    || data <= dataIsoNoFuso(agora)) return null
+  return 'Encomenda para outro dia: sinal de 50% antes da produção. Restante na entrega.'
+}
 
 // #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que a dona resolve, para o
 // botão nascer desabilitado com o motivo à vista em vez de falhar depois do clique. Cadastro,
