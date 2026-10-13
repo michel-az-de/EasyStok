@@ -153,13 +153,14 @@ public class MercadoPagoClientTests
     public async Task RecusaDoMercadoPagoNaoLevaSegredoParaOErro()
     {
         // I4.5 (#1698): a mensagem da exceção vai para o log e para WebhookRecebido.Erro.
-        var (client, _) = Criar(HttpStatusCode.Unauthorized,
-            """{"message":"invalid_token","status":401,"access_token":"CANARIO-9f3a7c21d4"}""");
+const string canario = "CANARIO-de-teste";
+                var (client, _) = Criar(HttpStatusCode.Unauthorized,
+            "{\"message\":\"invalid_token\",\"status\":401,\"access_token\":\"" + canario + "\"}");
 
         var act = () => client.ConsultarPagamentoAsync("20359978");
 
         (await act.Should().ThrowAsync<HttpRequestException>())
-            .Which.Message.Should().Contain("401").And.Contain("invalid_token").And.NotContain("CANARIO");
+            .Which.Message.Should().Contain("401").And.Contain("invalid_token").And.NotContain(canario);
     }
 
     [Fact]
