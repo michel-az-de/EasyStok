@@ -24,21 +24,33 @@ public sealed partial class PedidoConversaConcorrenciaTests
         });
         if (!string.IsNullOrWhiteSpace(fixture)) factory.UseKestrel(0);
         using var client = factory.CreateClient();
-        await SemearAsync(factory);
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
             db.SetMobileTenantContext(EmpresaId);
-            var empresa = await db.Empresas.SingleAsync(e => e.Id == EmpresaId);
-            empresa.Nome = "Demonstração de entregas";
+            db.Empresas.Add(new Empresa { Id = EmpresaId, Nome = "Demonstração de entregas",
+                Documento = EmpresaId.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
             db.Usuarios.Add(new Usuario { Id = UsuarioId, Nome = "Gerente da demonstração", Email = "logistica@fixture.test", SenhaHash = "sem-login-externo", Ativo = true, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
             await db.SaveChangesAsync();
+            (await db.Lojas.AnyAsync(l => l.EmpresaId == EmpresaId)).Should().BeFalse();
+            (await db.Storefronts.AnyAsync(s => s.EmpresaId == EmpresaId)).Should().BeFalse();
         }
         var dia = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1).ToString("yyyy-MM-dd");
         var seed = await LogisticaOk(client.PostAsJsonAsync("/api/atendimento/logistica/demonstracao", new { dia }));
         seed.GetProperty("criados").GetInt32().Should().Be(10);
         var repetirSeed = await LogisticaOk(client.PostAsJsonAsync("/api/atendimento/logistica/demonstracao", new { dia }));
         repetirSeed.GetProperty("criados").GetInt32().Should().Be(0);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(EmpresaId);
+            var vitrine = await db.Storefronts.SingleAsync(s => s.EmpresaId == EmpresaId);
+            vitrine.Ativo.Should().BeFalse();
+            vitrine.Slug.Should().Be($"demo-{EmpresaId:N}");
+            vitrine.Slug.Length.Should().BeLessThanOrEqualTo(40);
+            (await db.Lojas.CountAsync(l => l.EmpresaId == EmpresaId)).Should().Be(1);
+            (await db.Pedidos.CountAsync(p => p.EmpresaId == EmpresaId)).Should().Be(10);
+        }
         var contexto = await LogisticaOk(client.GetAsync($"/api/atendimento/logistica/contexto?dia={dia}"));
         contexto.GetProperty("demonstracao").GetBoolean().Should().BeTrue();
         contexto.GetProperty("pedidos").GetArrayLength().Should().Be(10);

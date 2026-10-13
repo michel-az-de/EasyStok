@@ -46,7 +46,7 @@ public sealed class LogisticaDemoSeeder(EasyStockDbContext db, IConfiguration co
         var vitrine = await db.Storefronts.SingleOrDefaultAsync(s => s.EmpresaId == empresaId, ct);
         if (vitrine is null)
         {
-            vitrine = StorefrontEntity.Criar(empresaId, $"demo-entregas-{empresaId:N}", "Demonstração de entregas", 0);
+            vitrine = StorefrontEntity.Criar(empresaId, $"demo-{empresaId:N}", "Demonstração de entregas", 0);
             vitrine.ConfigurarFreteRaio(-23.55, -46.63, null, null, null, null);
             db.Storefronts.Add(vitrine);
         }
