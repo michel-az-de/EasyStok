@@ -143,6 +143,17 @@ export function faltaPagar(cobranca) {
   return Math.max(cobranca.valor - cobranca.valorPago, 0)
 }
 
+export function aguardaSinalManual(pedido) {
+  return Boolean(pedido?.sinalNaReserva && pedido.statusApi === 'aguardando_pagamento'
+    && pedido.cobranca && !pedido.cobranca.link && !pedido.cobranca.pagaEm && !pedido.cobranca.canceladaEm)
+}
+
+export function valorSugeridoParaBaixa(pedido) {
+  const total = pedido.totalApi ?? pedido.cobranca?.valor ?? 0
+  const alvo = aguardaSinalManual(pedido) ? Math.ceil(Math.round(total * 100) / 2) / 100 : total
+  return Math.max(0, Math.round((alvo - (pedido.alocadoApi ?? pedido.totalPagoApi ?? 0)) * 100) / 100)
+}
+
 // Cancelamento do pedido (24/09/2026, bug do dono: cancelar com a cobrança
 // vencida não fazia o relógio sumir). Fecha só a cobrança que AINDA NÃO foi
 // paga: dinheiro que já entrou não sai daqui, sai por estorno explícito, com
