@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Botao } from './Botao'
 import { CampoSelecao, CampoTexto } from './Campo'
 import { Modal } from './Modal'
@@ -28,6 +28,8 @@ export function ModalFrete({ controlador: c }) {
 }
 
 function Conteudo({ controlador: c }) {
+  const cotacoesRef = useRef(null)
+  useEffect(() => { if (c.cotacoes) cotacoesRef.current?.focus() }, [c.cotacoes])
   const todos = c.contexto.pedidos ?? []
   const idsDaEntrada = new Set(c.entrada.pedidos.map((p) => p.id))
   const despachos = (c.contexto.despachos ?? []).filter((d) => idsDaEntrada.size === 0 || d.pedidoIds.some((id) => idsDaEntrada.has(id) || c.selecionados.includes(id)))
@@ -37,8 +39,8 @@ function Conteudo({ controlador: c }) {
   const menor = disponiveis.length ? Math.min(...disponiveis.map((q) => q.valorCentavos)) : null
   const pedidos = [...todos].sort((a, b) => Number(idsDaEntrada.has(b.id)) - Number(idsDaEntrada.has(a.id)))
   return <>
-    <details className={css.politica} open={!c.cotacoes && despachos.length === 0}>
-      <summary>1. Pedidos para transportar · {c.selecionados.length} selecionados</summary>
+    <details key={c.cotacoes ? 'cotado' : 'selecionar'} className={css.politica} open={!c.cotacoes && despachos.length === 0}>
+      <summary>1. Pedidos para transportar · {c.selecionados.length} {c.selecionados.length === 1 ? 'selecionado' : 'selecionados'}</summary>
       <section className={css.secao} aria-label="Pedidos para transportar">
       <p className={css.apoio}>Agrupe antes de contratar. Uma entrega já contratada não recebe novos pedidos aqui.</p>
       {pedidos.length === 0 && <p>Nenhum pedido disponível neste dia.</p>}
@@ -60,7 +62,7 @@ function Conteudo({ controlador: c }) {
         {!elegiveis && <span className={css.apoio}>Selecione pedidos sem transporte contratado.</span>}</div>
       </section>
     </details>
-    {c.cotacoes && <section className={css.secao} aria-label="Cotações de transporte">
+    {c.cotacoes && <section ref={cotacoesRef} tabIndex={-1} className={css.secao} aria-label="Cotações de transporte">
       <h3>2. Compare custo e prazo</h3>
       <p className={css.apoio}>Este é o custo do transportador. O frete cobrado do cliente permanece separado.</p>
       {c.cotacoes.length === 0 && <p>Nenhuma cotação disponível. Tente novamente ou combine uma entrega manual.</p>}
@@ -78,7 +80,7 @@ function Conteudo({ controlador: c }) {
     </section>}
     {c.escolhida && <section className={css.confirmacao} aria-label="Confirmar contratação">
       <h3>Confirmar {nome(c.escolhida.provedor)}</h3>
-      <p>{c.escolhida.pedidoIds.length} pedido(s) · <strong>{moeda(c.escolhida.valorCentavos)}</strong></p>
+      <p>{c.escolhida.pedidoIds.length} {c.escolhida.pedidoIds.length === 1 ? 'pedido' : 'pedidos'} · <strong>{moeda(c.escolhida.valorCentavos)}</strong></p>
       <ol className={css.historico} aria-label="Ordem das entregas">{c.escolhida.pedidoIds.map((id) => {
         const p = todos.find((pedido) => pedido.id === id)
         return <li key={id}>{p ? `${p.numero} · ${p.cliente} · ${p.endereco}` : 'Pedido selecionado'}</li>
@@ -113,7 +115,7 @@ function Despacho({ despacho: d, controlador: c }) {
   return <article className={css.viagem} data-despacho-id={d.id}>
     <div className={css.linha}><strong className={css.cresce}>{nome(d.provedor)} · {SITUACOES[d.status] ?? d.status}</strong><strong>{moeda(d.valorCentavos)}</strong></div>
     <div className={css.trilha} aria-hidden="true"><span style={{ width: d.status === 'entregue' ? '100%' : d.status === 'a_caminho' ? '60%' : '15%' }} /></div>
-    <p className={css.apoio}>{d.pedidoIds.length} pedido(s) · {d.pago ? 'Pagamento registrado no caixa' : 'Pagamento ainda não registrado'}{d.simulado ? ' · Serviço simulado' : ''}</p>
+    <p className={css.apoio}>{d.pedidoIds.length} {d.pedidoIds.length === 1 ? 'pedido' : 'pedidos'} · {d.pago ? 'Pagamento registrado no caixa' : 'Pagamento ainda não registrado'}{d.simulado ? ' · Serviço simulado' : ''}</p>
     {d.status === 'entregue' && <p className={css.sucesso}>Entrega concluída.</p>}
     {rastreioSeguro && <a href={d.rastreioUrl} target="_blank" rel="noreferrer">{c.contexto.demonstracao ? 'Rastreio de demonstração' : 'Abrir rastreio do transportador'}</a>}
     <div className={css.linha}>

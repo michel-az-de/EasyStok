@@ -20,6 +20,7 @@
 .formulario { display: grid; gap: var(--e-3); grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); align-items: end; }
 .confirmacao { padding: var(--e-4); background: var(--elevado); border: 1px solid var(--linha); border-radius: var(--r-2); display: grid; gap: var(--e-3); }
 .viagem { border: 1px solid var(--linha); border-radius: var(--r-2); padding: var(--e-4); display: grid; gap: var(--e-3); }
+.viagem a { color: var(--marca); text-underline-offset: .2em; }
 .historico { padding-left: var(--e-4); display: grid; gap: var(--e-2); color: var(--tinta-2); }
 .trilha { height: 4px; border-radius: 4px; background: var(--preenchimento-forte); overflow: hidden; }
 .trilha span { display: block; height: 100%; background: var(--marca); transition: width .3s ease-out; }

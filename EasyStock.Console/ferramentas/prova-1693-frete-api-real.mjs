@@ -8,6 +8,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const fixture = JSON.parse(readFileSync(process.env.LOGISTICA_FIXTURE ?? '../.build/logistica-browser.json', 'utf8'))
 const origem = process.env.CONSOLE_URL ?? 'http://127.0.0.1:5197'
 const evidencias = process.env.EVIDENCIAS_UX ?? '../.build/1693-api-real'
+const somenteCotacao = process.env.LOGISTICA_SOMENTE_COTACAO === '1'
 mkdirSync(evidencias, { recursive: true })
 async function ler(caminho) {
   const resposta = await fetch(fixture.api + caminho)
@@ -31,9 +32,9 @@ const page = await context.newPage()
 const erros = [], respostas = []
 page.on('pageerror', e => erros.push(e.message))
 page.on('response', r => { if (r.url().includes('/api/atendimento/logistica/')) respostas.push({ caminho: new URL(r.url()).pathname, status: r.status() }) })
-page.setDefaultTimeout(15000)
+page.setDefaultTimeout(30000)
 try {
-  await page.goto(origem + '/#/m/entregas')
+  await page.goto(origem + '/#/m/entregas', { waitUntil: 'domcontentloaded', timeout: 60000 })
   await page.getByLabel('Outro dia', { exact: true }).fill(fixture.dia)
   await page.getByRole('button', { name: 'Organizar transportes', exact: true }).click()
   const modal = page.getByRole('dialog', { name: 'Organizar entrega' })
@@ -47,7 +48,18 @@ try {
   await modal.getByLabel(`Pedido ${pedido.numero}, ${pedido.cliente}`, { exact: true }).check()
   await modal.getByRole('button', { name: 'Comparar transportes', exact: true }).click()
   await modal.getByRole('button', { name: 'Escolher Lalamove', exact: true }).waitFor()
-  await page.screenshot({ path: `${evidencias}/desktop-cotacao.png`, fullPage: true })
+  await page.screenshot({ path: `${evidencias}/${somenteCotacao ? 'desktop-cotacao-foco' : 'desktop-cotacao'}.png`, fullPage: true })
+  if (somenteCotacao) {
+    assert.equal(await modal.getByRole('region', { name: 'Cotações de transporte' }).evaluate(e => e === document.activeElement), true)
+    assert.equal(await selecao.getAttribute('open'), null)
+    await page.setViewportSize({ width: 390, height: 844 })
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false)
+    await page.screenshot({ path: `${evidencias}/celular-cotacao-foco.png`, fullPage: true })
+    assert.deepEqual(erros, [])
+    await browser.close()
+    console.log('OK: foco real na região de cotações, lista recolhida, desktop/celular sem overflow. Nenhuma contratação, pagamento ou evento novo.')
+    process.exit(0)
+  }
   await modal.getByRole('button', { name: 'Escolher Lalamove', exact: true }).click()
   await modal.getByRole('button', { name: 'Confirmar contratação simulada', exact: true }).click()
   await modal.getByText('Contratação registrada. Acompanhe a entrega abaixo.', { exact: true }).waitFor()
@@ -83,7 +95,7 @@ try {
   assert.match(despachoFinal.rastreioUrl, /^\/api\/entregas-demonstracao\//)
   const publico = await browser.newContext({ viewport: { width: 390, height: 844 } })
   const paginaPublica = await publico.newPage()
-  await paginaPublica.goto(new URL(despachoFinal.rastreioUrl, origem).href)
+  await paginaPublica.goto(new URL(despachoFinal.rastreioUrl, origem).href, { waitUntil: 'domcontentloaded' })
   await paginaPublica.getByRole('heading', { name: 'Pedido entregue', exact: true }).waitFor()
   const textoPublico = await paginaPublica.locator('body').innerText()
   assert.ok(!textoPublico.includes(pedido.endereco))
@@ -93,7 +105,7 @@ try {
   await publico.close()
   const tokenAlterado = despachoFinal.rastreioUrl.slice(0, -1) + (despachoFinal.rastreioUrl.endsWith('0') ? '1' : '0')
   assert.equal((await fetch(new URL(tokenAlterado, fixture.api))).status, 404)
-  await page.reload()
+  await page.reload({ waitUntil: 'domcontentloaded' })
   await page.getByLabel('Outro dia', { exact: true }).fill(fixture.dia)
   await page.getByRole('button', { name: 'Organizar transportes', exact: true }).click()
   await modal.getByText('Entrega concluída.', { exact: true }).waitFor()

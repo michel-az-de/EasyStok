@@ -326,6 +326,13 @@ Estados usados: `agendado`, `a_caminho`, `entregue`, `falha`, `devolvendo`, `dev
 Pagamento significa **valor já pago**, informado com meio e referência; registrar não cobra cartão.
 Cancelar ou devolver transporte não estorna automaticamente o pagamento do cliente nem o do entregador.
 
+O acompanhamento público próprio da demonstração usa link HMAC com validade de sete dias. Não exige
+sessão, não expõe nome, endereço, telefone ou valores e recusa assinatura adulterada. A interface o chama
+de “Rastreio de demonstração”; não é link do transportador e não comprova notificações por WhatsApp.
+O despacho é vinculado à viagem canônica; ações tradicionais de edição dessa viagem são bloqueadas
+para preservar os pedidos e a ordem da cotação contratada. A Ficha consulta colegas do dia após validar
+o pedido/empresa, permitindo selecionar outros pedidos antes de contratar.
+
 ### 7.5 Evidências e sala de guerra
 
 | Camada | Evidência disponível nesta atualização |
@@ -333,13 +340,24 @@ Cancelar ou devolver transporte não estorna automaticamente o pagamento do clie
 | Console | Build Vite, lint focado sem avisos/erros, fronteiras entre camadas e 264 pares de contraste aprovados. |
 | Navegador com HTTP controlado | `ferramentas/prova-1693-frete-navegador.mjs`: dez pedidos, cotação, custo manual em centavos, negativo bloqueado, repetição da mesma chave após resposta perdida, pagamento, saída/falha/retorno, celular, Escape/foco e restrições de atendente. |
 | Inspeção visual | Capturas desktop e celular em `.build/1693-ux/`, revisadas; sem transbordamento horizontal no celular. |
-| Navegador com API/PostgreSQL reais | Script `ferramentas/prova-1693-frete-api-real.mjs` preparado, sem interceptação HTTP. Execução e resultado ainda devem ser registrados. |
+| Navegador com API/PostgreSQL reais | `ferramentas/prova-1693-frete-api-real.mjs` executado sem interceptação HTTP: Diego/P04 cotado, contratado, pago e entregue. API confirmou saída única no Caixa, status no pedido/despacho e persistência após recarregar. |
+| Dez cenários HTTP reais | `ferramentas/prova-1693-dez-cenarios-api-real.mjs` passou com PostgreSQL real: grupo de três, P04 pelo navegador, P05 endereço400, P06 preparo bloqueado e KDS pronto, P07 manual R$18, P08 mãos a zero sem gasto, P09 falha/retorno/pedido pronto e P10 automático desligado/ligado dentro do teto. Pagamentos repetidos concorrentemente geraram uma saída por frete. |
+| Rastreio público próprio | Página aberta em navegador sem sessão; status entregue, ausência de nome/endereço/valores e token adulterado404 conferidos. Captura em `.build/1693-api-real/rastreio-publico.png`. |
+| Refinamento após inspeção real | Lista recolhe e foco passa às cotações mesmo quando foi expandida manualmente. Prova somente de cotação reexecutada, sem nova contratação/pagamento/evento; desktop/celular sem overflow. |
 | Publicação e aceite | Não comprovados por estas evidências locais. Exigem CI/PR, SHA servido, verificação da empresa demo e aceite humano explícito. |
 
 O script com HTTP controlado verifica UX e integração do Console com o contrato; não substitui testes da
 API, transações PostgreSQL, isolamento de empresa ou serviços externos. A prova com API real usa
 autenticação de teste e simuladores exclusivamente nas integrações externas; também não equivale ao login
 e à operação de produção.
+
+Evidências dessa execução: `.build/1693-api-real/resultado.json`, `dez-cenarios.json`,
+`desktop-cotacao-foco.png`, `celular-cotacao-foco.png`, `celular-entregue.png` e `rastreio-publico.png`.
+Dia sintético ensaiado: **14/10/2026**. No fluxo de navegador, despacho
+`7b92dd18-112a-4cbb-b276-f051af15d44c`, valor R$16,00, associado ao movimento
+`1a447b3c-1f1c-4477-8529-4042ffdd305b`. São IDs da fixture local descartável, não registros de produção.
+O primeiro ensaio do navegador terminou no prazo de carregamento do Vite sob build concorrente, antes
+de qualquer mutação; a navegação foi ajustada para DOMContentLoaded e reexecutada com sucesso.
 
 Bloqueadores da banca técnica: contratação/caixa duplicados, vazamento entre empresas, automático fora da
 política, pagamento sem autorização ou estado de entrega fabricado. Cenários negativos: cotação vencida,
