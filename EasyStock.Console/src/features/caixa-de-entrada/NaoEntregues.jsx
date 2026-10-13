@@ -5,7 +5,7 @@ import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
 import { horaCurta } from '../../dominio/formato'
-import { textoDaFalhaDeEnvio } from '../../dominio/falhaDeEnvio'
+import { falhaDeEnvio, textoDaFalhaDeEnvio, TIPOS_DE_FALHA } from '../../dominio/falhaDeEnvio'
 import { useAcoes } from '../../aplicacao/contextos'
 import css from './caixa.module.css'
 
@@ -33,7 +33,7 @@ function Item({ item, aoReenviar, aoAbrir, ocupado, reenviando }) {
       {/* #1761: o erro cru do canal (em inglês) vira a frase do mapa do domínio. */}
       {mensagem.erro && <p className={css.erroNaoEntregue}>{textoDaFalhaDeEnvio(mensagem.erro)}</p>}
       <div className={css.acoesNaoEntregue}>
-        {!mensagem.aguardaCliente && (
+        {!mensagem.aguardaCliente && falhaDeEnvio(mensagem.erro).tipo !== TIPOS_DE_FALHA.FORA_DA_JANELA && (
           <Botao variante="secundario" disabled={ocupado} onClick={() => aoReenviar(item)} aria-label={`Reenviar mensagem para ${item.contato}`}>{reenviando ? 'Reenviando…' : 'Reenviar'}</Botao>
         )}
         <Botao variante="texto" onClick={() => aoAbrir(item)}>Abrir conversa</Botao>

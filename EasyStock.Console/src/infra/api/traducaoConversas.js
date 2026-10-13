@@ -135,7 +135,7 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario, agora = Date.now(
     janelaExpiraEm: janelaExpiraEm(resumo, mensagens),
     ultimaEm: instante(resumo.ultimaMensagemEm),
     // Prévia do cartão quando as mensagens não foram carregadas (encerrada, #1287).
-    ultimaMensagemTexto: resumo.ultimaMensagemTexto ?? null,
+    ultimaMensagemTexto: resumo.ultimaMensagemTexto ? notaDeSistema(resumo.ultimaMensagemTexto) : null,
     // #1427: SLA de primeira resposta da loja e de onde ele conta.
     slaMinutos: resumo.slaRespostaMinutos ?? null,
     aguardaResposta: resumo.aguardaResposta ?? false,

@@ -31,8 +31,10 @@ export function BarraModo({
   // acabou de ser devolvida. Devolver só onde o automático está parado.
   const podeAssumir = resumo.chave === MODOS.LIGADO || resumo.chave === MODOS.COM_VOCE
   // #1761 (L6): com o automático desligado na loja não há para quem devolver.
-  const podeDevolver = (resumo.chave === MODOS.PAUSADO || resumo.chave === MODOS.COM_VOCE)
-    && !automaticoDesligadoNaConversa(conversa)
+  const semAutomatico = automaticoDesligadoNaConversa(conversa)
+  const podeDevolver = (resumo.chave === MODOS.PAUSADO || resumo.chave === MODOS.COM_VOCE) && !semAutomatico
+  // Automático desligado não está "pausado" nem "volta": a faixa diz só o que é verdade.
+  const linha = semAutomatico && !encerrada && resumo.chave !== MODOS.LIGADO ? 'O atendimento automático está desligado.' : resumo.linha
   const sugereEncerrar = resumo.sugereEncerrar && Boolean(aoEncerrar)
   const nome = primeiroNome(conversa.nome)
 
@@ -45,7 +47,7 @@ export function BarraModo({
     <section className={`${css.modo} ${css['modo_' + resumo.chave]}`} aria-label="Quem responde esta conversa">
       <div className={css.modoLinha}>
         <Pilula tom={resumo.tom} fina>{resumo.rotulo}</Pilula>
-        <p className={css.modoTexto} title={resumo.detalhe}>{resumo.linha}</p>
+        <p className={css.modoTexto} title={linha === resumo.linha ? resumo.detalhe : undefined}>{linha}</p>
         {!encerrada && !bloqueada && (
           <span className={css.modoAcoes}>
             {podeAssumir && (

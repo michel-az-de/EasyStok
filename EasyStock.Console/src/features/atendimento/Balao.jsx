@@ -3,7 +3,7 @@ import { Icone } from '../../componentes/Icone'
 import { mesmasProps } from '../../aplicacao/igualdade'
 import { horaCurta } from '../../dominio/formato'
 import { partesComLinkDoCardapio } from '../../dominio/cardapioLink'
-import { falhaDeEnvio, TIPOS_DE_FALHA } from '../../dominio/falhaDeEnvio'
+import { falhaDeEnvio, fraseDoReenvio, TIPOS_DE_FALHA } from '../../dominio/falhaDeEnvio'
 import { tiqueDaMensagem } from '../../dominio/mensagem'
 import { BolhaArquivo, BolhaAudio, BolhaPeca } from './BolhaAnexo'
 import { BolhaAvaliacaoPedido, BolhaAvaliacaoResposta } from './BolhaAvaliacao'
@@ -137,7 +137,7 @@ export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinica
           </button>
         )}
         {mensagem.status === 'falhou' && reenvio === 'falhou' && (
-          <output ref={resultadoDoReenvio} className={css.falhou}>Tentei de novo e não saiu.</output>
+          <output ref={resultadoDoReenvio} className={css.falhou}>{fraseDoReenvio(mensagem.erro)}</output>
         )}
         {mensagem.dir === 'out' && mensagem.status === 'enviando' && (
           <span className={css.enviando}>{mensagem.modelo ? 'envio sem confirmação' : 'enviando'}</span>

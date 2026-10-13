@@ -24,10 +24,10 @@ const NOTA_DE_ESCALADA = /^escalado para a dona:\s*/i
 
 // #1761 (L6): com o automático desligado na loja, "Devolver ao automático" promete o que não
 // acontece. O Console não lê essa chave da loja no EasyStok; o sinal que ele tem é o motivo da
-// passagem, que some quando alguém assume, e a nota que o EasyStok deixou na conversa. Vale a
-// nota de passagem mais recente.
+// passagem, que some quando alguém assume ou troca quando a conversa é reaberta, e a nota que o
+// EasyStok deixou na conversa. Vale a nota de passagem mais recente.
 export function automaticoDesligadoNaConversa(conversa) {
-  if (conversa?.passagem?.motivo) return conversa.passagem.motivo === AUTOMATICO_DESLIGADO
+  if (conversa?.passagem?.motivo === AUTOMATICO_DESLIGADO) return true
   const nota = (conversa?.mensagens ?? []).findLast((m) => m.dir === 'sistema' && m.texto?.startsWith('Passou para você'))
   return nota?.texto === `Passou para você: ${AUTOMATICO_DESLIGADO}`
 }

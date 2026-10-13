@@ -213,10 +213,11 @@
    reticência (inteira no `title`); em coluna estreita as ações descem. */
 /* #1761 (L6): a barra fica em uma linha e o texto não corta com reticência: se faltar largura,
    quem quebra é a frase, ao lado da pílula e dos botões. */
-.modoLinha { display: flex; align-items: center; gap: var(--e-2) var(--e-3); }
+/* Com dois botões a frase não cabe ao lado: ela desce inteira para a linha de baixo, nunca é esmagada. */
+.modoLinha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-3); }
 .modoLinha > :first-child { flex-shrink: 0; }
 .modoTexto {
-  flex: 1 1 8rem; min-width: 0; margin: 0;
+  flex: 1 1 14rem; min-width: 0; margin: 0;
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto);
 }
 .modoAcoes { margin-left: auto; display: flex; gap: var(--e-2); flex-shrink: 0; }

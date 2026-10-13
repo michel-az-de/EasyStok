@@ -51,7 +51,7 @@ const { AUTOMATICO_DESLIGADO, motivoDeEscalada, notaDeSistema } = await import('
 const { origemDaPassagem } = await import('../src/dominio/passagem.js')
 const { resumoDoModo } = await import('../src/dominio/resumoDoModo.js')
 const { PAUSA_POR_ASSUMIR, modoDoAtendimento, proximoPassoDepoisDeResponder } = await import('../src/dominio/automatico.js')
-const { FRASE_DA_FALHA, TIPOS_DE_FALHA, falhaDeEnvio, pedeModeloAprovado, textoDaFalhaDeEnvio } = await import('../src/dominio/falhaDeEnvio.js')
+const { FRASE_DA_FALHA, TIPOS_DE_FALHA, falhaDeEnvio, fraseDoReenvio, pedeModeloAprovado, textoDaFalhaDeEnvio } = await import('../src/dominio/falhaDeEnvio.js')
 const { FORMATO_DO_ENDERECO, recusaDoEndereco } = await import('../src/dominio/cliente.js')
 const { encaixeNaJanela, tempoDoItem } = await import('../src/dominio/lembrete.js')
 const { podeVerAvisosDoCliente, podeVerItensFora } = await import('../src/dominio/acessoModulos.js')
@@ -366,6 +366,22 @@ await confere('J  o cardápio fecha quando o pedido nasce na conversa aberta, e 
   assert.equal(pedidoAcabouDeNascer({ conversaId: 'c1', pedidoId: 'p1' }, { conversaId: 'c1', pedidoId: 'p1' }), false)
   assert.equal(pedidoAcabouDeNascer({ conversaId: 'c1', pedidoId: null }, { conversaId: 'c2', pedidoId: 'p9' }), false, 'trocar para conversa com pedido não fecha')
   assert.equal(pedidoAcabouDeNascer({ conversaId: 'c1', pedidoId: null }, { conversaId: 'c1', pedidoId: null }), false)
+})
+
+await confere('K  automático desligado continua valendo depois de reabrir a conversa', () => {
+  const nota = { dir: 'sistema', texto: 'Passou para você: o atendimento automático está desligado' }
+  assert.equal(automaticoDesligadoNaConversa({ passagem: { motivo: 'Conversa reaberta para atendimento.' }, mensagens: [nota] }), true)
+  assert.equal(automaticoDesligadoNaConversa({ passagem: { motivo: 'cliente pediu atendente' }, mensagens: [] }), false)
+})
+
+await confere('K  reenvio que demora de novo não afirma que não saiu', () => {
+  assert.match(fraseDoReenvio("The operation didn't complete within the allowed timeout of '00:00:30'."), /Pode ter chegado/)
+  assert.equal(fraseDoReenvio('Message undeliverable'), 'Tentei de novo e não saiu.')
+})
+
+await confere('K  a prévia do cartão passa pelo tradutor da nota', () => {
+  assert.equal(notaDeSistema('escalado para a dona: agente desligado (LLM indisponível)'),
+    'Passou para você: o atendimento automático está desligado')
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

@@ -47,5 +47,10 @@ export function falhaDeEnvio(erro) {
 
 export const textoDaFalhaDeEnvio = (erro) => falhaDeEnvio(erro).texto
 
+// Depois de tentar de novo: tempo esgotado não é recusa, a mensagem pode ter chegado.
+export const fraseDoReenvio = (erro) => (falhaDeEnvio(erro).tipo === TIPOS_DE_FALHA.TEMPO_ESGOTADO
+  ? 'Tentei de novo e o WhatsApp demorou outra vez. Pode ter chegado: confira com o cliente.'
+  : 'Tentei de novo e não saiu.')
+
 // Fora da janela o texto livre não sai: o caminho é o modelo aprovado.
 export const pedeModeloAprovado = (erro) => falhaDeEnvio(erro).tipo === TIPOS_DE_FALHA.FORA_DA_JANELA
