@@ -15,6 +15,7 @@ import { DESKTOP, useTamanhoTela } from '../hooks/useTamanhoTela'
 import { INSTANTE_INICIAL, LINHAS_PRODUTO } from '../infra/catalogo'
 import { FONTE_API } from '../infra/fonteDados'
 import { identidadeDaSessao } from '../infra/api/sessao'
+import { gravarVisita, lerVisita } from '../infra/api/visitaDaSessao'
 import { useSessaoApi } from '../aplicacao/useSessaoApi'
 import { useNotificacoesDaSessao } from '../aplicacao/useNotificacoesDaSessao'
 import { useAvisosNoAparelho } from '../aplicacao/useAvisosNoAparelho'
@@ -337,7 +338,7 @@ function TelaDaRota({ rota, aoSair }) {
       {/* #1582: Horários e mensagens também abre e fecha a loja; sem isto o gesto só aparecia
           depois, sozinho, ao voltar para o Balcão. */}
       {FONTE_API && <GestoLoja />}
-      <FaixaApi aoSair={aoSair} />
+      <FaixaApi aoSair={aoSair} somenteAvisos />
     </>
   )
 }
@@ -443,8 +444,9 @@ export function App() {
 }
 
 function AppComAcesso({ rota, sessao, aoSair }) {
-  const ultimaConversa = useRef(null)
-  const comandasDaVisita = useRef({})
+  const [visitaInicial] = useState(() => lerVisita(sessao))
+  const ultimaConversa = useRef(visitaInicial.ultimaConversa)
+  const comandasDaVisita = useRef(visitaInicial.comandas)
   const [rascunhosDosAjustes, setRascunhosDosAjustes] = useState({})
   const gravacoesDosAjustes = useGravacoesDosAjustes()
   const [confirmandoSaida, setConfirmandoSaida] = useState(false)
@@ -474,8 +476,14 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   // Entregas; a `key` da sessão no AppComAcesso recria tudo quando troca o usuário ou a empresa.
   const [memoriaDoLaco] = useState(criarMemoriaDoLaco)
   const lerComandasDaVisita = useCallback(() => comandasDaVisita.current, [])
-  const guardarComandas = useCallback((comandas) => { comandasDaVisita.current = comandas }, [])
-  const lembrarConversa = useCallback((id) => { ultimaConversa.current = id }, [])
+  const guardarComandas = useCallback((comandas) => {
+    comandasDaVisita.current = comandas
+    gravarVisita(sessao, { comandas, ultimaConversa: ultimaConversa.current })
+  }, [sessao])
+  const lembrarConversa = useCallback((id) => {
+    ultimaConversa.current = id
+    gravarVisita(sessao, { comandas: comandasDaVisita.current, ultimaConversa: id })
+  }, [sessao])
   const avisos = useNotificacoesDaSessao()
   const avisosNoAparelho = useAvisosNoAparelho({ sessao })
   const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: true })

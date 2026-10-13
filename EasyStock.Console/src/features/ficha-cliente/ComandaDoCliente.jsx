@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import { Botao } from '../../componentes/Botao'
+import { Modal } from '../../componentes/Modal'
 import { moeda } from '../../dominio/formato'
 import { partesDoSku, produtoDaPorcao } from '../../dominio/cardapio'
 import { itensDoDia } from '../../dominio/cardapioLink'
 import { clienteEscolhendoPeloLink, rascunhoMantendoEdicao, rotuloDoTotalDaSelecao } from '../../dominio/pedido'
 import { useCatalogo } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
-import { useComandasCliente } from '../../aplicacao/useComandasCliente'
+import { useComandasCliente, idDaJanela, janelaDoId } from '../../aplicacao/useComandasCliente'
 import { useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
+import { ConsultaTransporte } from './BlocoFreteApi'
+import { SeletorJanelaApi } from './SeletorJanelaApi'
 import css from './comanda.module.css'
 
 function AcertoDaComanda({ comanda: c }) {
@@ -41,15 +44,34 @@ function AcertoDaComanda({ comanda: c }) {
   </section>
 }
 
-function SelecaoCompartilhada({ comanda: c, ocupado, salvar, confirmar, combinarFrete, cardapio, podeDevolver }) {
+export function ConfirmacaoPedidoCompartilhado({ comanda: c, janela, ocupado, erro, desatualizado, aoFechar, aoConfirmar }) {
+  const endereco = c.rascunho.endereco
+  return <Modal titulo="Confirmar pedido com o cliente" aoFechar={ocupado ? undefined : aoFechar}
+    rodape={<><Botao disabled={ocupado} onClick={aoFechar}>Voltar à seleção</Botao>
+      <Botao variante="primario" disabled={ocupado || desatualizado} onClick={aoConfirmar}>Criar pedido</Botao></>}>
+    <p>Confira com o cliente. O pedido será criado com estes itens e entrega; a cobrança será feita depois pelo atendimento.</p>
+    <ul>{c.selecao.map(i => <li key={i.cardapioItemId + ':' + i.variacaoId}>{i.qtd}× {i.nome} · {moeda(i.qtd * i.preco)}{i.observacao && ' · ' + i.observacao}</li>)}</ul>
+    {c.rascunho.observacoes && <p>Observação: {c.rascunho.observacoes}</p>}
+    <p>Entrega: {endereco.logradouro}, {endereco.numero}{endereco.complemento && ' · ' + endereco.complemento} · {endereco.bairro} · {endereco.cidade}/{endereco.uf} · CEP {endereco.cep}</p>
+    <p>Janela de entrega: <strong>{janela}</strong></p>
+    <p>Frete combinado: <strong>{moeda(c.freteCombinado)}</strong></p>
+    <p>Total com frete: <strong>{moeda(c.totalPrevisto)}</strong></p>
+    {desatualizado && <p role="alert">A seleção mudou. Volte para conferir os dados atuais antes de criar o pedido.</p>}
+    {erro && <p role="alert">{erro}</p>}
+  </Modal>
+}
+
+export function SelecaoCompartilhada({ comanda: c, ocupado, erro, salvar, confirmar, combinarFrete, encaminharEntrega, confirmarPedido, cardapio, podeDevolver }) {
   const [edicao, setEdicao] = useRascunhoDoAjuste('comanda-cliente:' + c.linkId)
   const [prato, setPrato] = useState('')
   const [frete, setFrete] = useState('')
+  const [janelas, setJanelas] = useState([])
+  const [confirmacao, setConfirmacao] = useState(null)
   const rascunho = c.podeEditar && edicao ? edicao.rascunho : c.rascunho
   const conflito = c.podeEditar && edicao && (edicao.revisao !== c.revisao
     || edicao.rascunho.pedidoAtualizadoEm !== c.rascunho.pedidoAtualizadoEm || edicao.rascunho.pedidoId !== c.rascunho.pedidoId)
   const catalogo = cardapio.flatMap(p => p.porcoes?.length ? p.porcoes.map(v => produtoDaPorcao(p, v)) : [p])
-  function editar(novo) { setEdicao({ revisao: edicao?.revisao ?? c.revisao, rascunho: novo }) }
+  function editar(novo) { setEdicao({ revisao: edicao?.revisao ?? c.revisao, base: edicao?.base ?? c.rascunho, rascunho: novo }) }
   function mudarItem(indice, campos) {
     editar({ ...rascunho, itens: rascunho.itens.map((i, n) => n === indice ? { ...i, ...campos } : i).filter(i => i.qtd > 0) })
   }
@@ -68,25 +90,28 @@ function SelecaoCompartilhada({ comanda: c, ocupado, salvar, confirmar, combinar
   const saldo = c.envio?.situacao === 'estorno_pendente' ? c.envio.saldo
     : (c.podeEditar || pendente ? c.totalPrevisto ?? 0 : c.pedido?.total ?? c.totalPrevisto ?? 0) - (c.pedido?.alocado ?? c.pedido?.totalPago ?? 0)
   const exigeGerente = saldo < 0 || c.envio?.situacao === 'estorno_pendente'
+  const janela = rascunho.janelaId && rascunho.dataEntrega ? idDaJanela(rascunho.janelaId, rascunho.dataEntrega) : null
+  const rotuloJanela = janelas.find(j => j.id === janela)?.rotulo
+  const faltaConfirmar = edicao ? 'Salve os ajustes da seleção antes de confirmar o pedido.'
+    : !rascunho.itens.length ? 'Adicione e salve os pratos antes de confirmar.'
+      : !rascunho.endereco ? 'Peça ao cliente que informe o endereço na comanda.'
+        : !janela || !rotuloJanela ? 'Escolha uma janela de entrega disponível e salve a seleção.'
+          : c.freteCombinado == null ? 'Abra “Combinar entrega” e confirme o frete antes de criar o pedido, inclusive se for R$ 0,00.' : null
   return <div>
-    {c.rascunho.endereco && <details className={css.enderecoCompartilhado} open={c.entregaACombinar}>
+    {c.ajudaSolicitada && <output className={css.ajudaCompartilhada}>
+      <strong>Pedido de ajuda registrado</strong>
+    </output>}
+    {c.rascunho.endereco && <details className={css.enderecoCompartilhado}>
       <summary>Entrega · {c.rascunho.endereco.logradouro}, {c.rascunho.endereco.numero}</summary>
       <p>{c.rascunho.endereco.logradouro}, {c.rascunho.endereco.numero}
       {c.rascunho.endereco.complemento && ' · ' + c.rascunho.endereco.complemento} · {c.rascunho.endereco.bairro}
       {' · ' + c.rascunho.endereco.cidade + '/' + c.rascunho.endereco.uf + ' · CEP ' + c.rascunho.endereco.cep}</p>
     </details>}
-    {c.entregaACombinar && <form onSubmit={e => { e.preventDefault(); combinarFrete(c, Number(frete)) }}>
-      <p>O cliente quer combinar a entrega. Confira o endereço e o transporte antes de informar o frete.</p>
-      <label>Frete combinado (R$) <input type="number" min="0" max="100000" step="0.01" required value={frete}
-        disabled={ocupado} onChange={e => setFrete(e.target.value)} /></label>
-      <Botao tipo="submit" disabled={ocupado || frete === ''} variante="primario">Confirmar frete combinado</Botao>
-      <p>O cliente confere o total na comanda antes de confirmar e pagar.</p>
-    </form>}
-    {c.freteCombinado != null && !c.pedido && <p>Frete combinado: {moeda(c.freteCombinado)}. Aguarde a confirmação do cliente.</p>}
-    <p className={css.estadoCompartilhado}>{c.podeEditar ? c.pedido ? 'O pedido confirmado continua valendo até a aprovação deste ajuste.'
-      : 'Em montagem · aguardando confirmação do cliente.'
+    {c.podeEditar && !c.pedido && <ConsultaTransporte semPedido />}
+    {c.freteCombinado != null && !c.pedido && <p>Frete combinado: {moeda(c.freteCombinado)}. Confira o total com o cliente e confirme o pedido aqui ou pelo link.</p>}
+    {(c.pedido || !c.podeEditar) && <p className={css.estadoCompartilhado}>{c.podeEditar ? 'O pedido confirmado continua valendo até a aprovação deste ajuste.'
       : c.envio?.situacao === 'estorno_pendente' ? 'Devolução em acompanhamento.'
-        : pendente ? 'Confira a alteração solicitada antes de aplicar ao pedido.' : 'Envio registrado. Compartilhe uma nova edição para ajustar.'}</p>
+        : pendente ? 'Confira a alteração solicitada antes de aplicar ao pedido.' : 'Envio registrado. Compartilhe uma nova edição para ajustar.'}</p>}
     {conflito && <p role="alert">A seleção mudou enquanto você editava. Sua edição foi preservada. Confira a seleção atual abaixo antes de continuar.</p>}
     {pendente && <div className={css.comparativo}>
       <b>Pedido atual · {moeda(c.pedido?.total ?? 0)}</b>
@@ -135,13 +160,38 @@ function SelecaoCompartilhada({ comanda: c, ocupado, salvar, confirmar, combinar
           onChange={e => editar({ ...rascunho, observacoes: e.target.value })} />
       </label>
       </details>
+      {!c.pedido && <SeletorJanelaApi key={c.revisao} editavel={!ocupado}
+        pedido={{ itens: rascunho.itens.map(i => ({ sku: i.cardapioItemId })), janela }}
+        dataInicial={c.rascunho.dataEntrega ?? ''} aoLerJanelas={setJanelas}
+        aoEscolher={valor => { const escolhida = janelaDoId(valor); editar({ ...rascunho, janelaId: escolhida?.janelaId ?? null, dataEntrega: escolhida?.data ?? null }) }} />}
       {edicao && <div className={css.salvarCompartilhado}>
         <Botao disabled={ocupado} onClick={() => setEdicao(null)}>{conflito ? 'Usar seleção atual' : 'Descartar minha edição'}</Botao>
-        {conflito ? <Botao disabled={ocupado || rascunho.pedidoId !== c.rascunho.pedidoId} onClick={() => setEdicao({ revisao: c.revisao,
-          rascunho: rascunhoMantendoEdicao(c.rascunho, rascunho) })}>Manter minha edição para conferir</Botao>
+        {conflito ? <Botao disabled={ocupado || rascunho.pedidoId !== c.rascunho.pedidoId} onClick={() => setEdicao({ revisao: c.revisao, base: c.rascunho,
+          rascunho: rascunhoMantendoEdicao(c.rascunho, rascunho, edicao.base) })}>Manter minha edição para conferir</Botao>
           : <Botao variante="primario" disabled={ocupado} onClick={persistir}>Salvar seleção</Botao>}
       </div>}
       {edicao && <p>Alterações locais. Salve para o cliente ver; os valores finais serão conferidos pelo sistema.</p>}
+      {!c.pedido && <details className={css.transporteCompartilhado} open={c.entregaACombinar}>
+        <summary>Combinar entrega · consultar Lalamove</summary>
+        {!c.entregaACombinar && c.freteCombinado == null && <>
+          <Botao disabled={ocupado || Boolean(edicao) || !c.rascunho.endereco || !c.rascunho.itens.length}
+            onClick={() => encaminharEntrega(c)}>Combinar entrega desta seleção</Botao>
+          {!c.rascunho.endereco ? <p>Peça ao cliente que informe o endereço na comanda.</p>
+            : !c.rascunho.itens.length && <p>Adicione e salve os pratos antes de combinar a entrega.</p>}
+        </>}
+        {c.entregaACombinar && <form className={css.freteCompartilhado} onSubmit={e => { e.preventDefault(); combinarFrete(c, Number(frete)) }}>
+          <p>Confira o transporte e combine o frete com o cliente.</p>
+          <label>Frete combinado (R$) <input type="number" min="0" max="100000" step="0.01" required value={frete}
+            disabled={ocupado} onChange={e => setFrete(e.target.value)} /></label>
+          <Botao tipo="submit" disabled={ocupado || Boolean(edicao) || frete === ''} variante="primario">Confirmar frete combinado</Botao>
+        </form>}
+        {edicao && <p>Salve os ajustes da seleção antes de combinar a entrega.</p>}
+      </details>}
+      {!c.pedido && <div className={css.confirmarCompartilhado}>
+        <Botao variante="primario" disabled={ocupado || Boolean(faltaConfirmar)}
+          onClick={() => setConfirmacao({ comanda: c, janela: rotuloJanela })}>Confirmar pedido com o cliente</Botao>
+        {faltaConfirmar && <p>{faltaConfirmar}</p>}
+      </div>}
     </> : c.rascunho.observacoes && <p>Observação: {c.rascunho.observacoes}</p>}
     {c.pedido && <p>{saldo < 0 ? 'A devolver: ' + moeda(-saldo) + ' em ' + (c.rascunho.acerto === 'cupom' ? 'cupom' : 'estorno') + '.' : saldo > 0 ? 'Mais a pagar: ' + moeda(saldo) + '.' : 'Sem diferença de pagamento.'}</p>}
     <AcertoDaComanda comanda={c} />
@@ -151,11 +201,14 @@ function SelecaoCompartilhada({ comanda: c, ocupado, salvar, confirmar, combinar
       <Botao variante="primario" disabled={ocupado || exigeGerente && !podeDevolver} onClick={() => confirmar(c.linkId, true)}>Confirmar alteração</Botao>
     </div>}
     {c.envio?.situacao === 'estorno_pendente' && <Botao disabled={ocupado || !podeDevolver} onClick={() => confirmar(c.linkId, true)}>Conferir devolução</Botao>}
+    {confirmacao && <ConfirmacaoPedidoCompartilhado {...confirmacao} ocupado={ocupado} erro={erro}
+      desatualizado={confirmacao.comanda.revisao !== c.revisao || !c.podeEditar || Boolean(c.pedido)}
+      aoFechar={() => setConfirmacao(null)} aoConfirmar={async () => { if (await confirmarPedido(confirmacao.comanda)) setConfirmacao(null) }} />}
   </div>
 }
 
 export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompartilhar, pedido = null, aoMudarEscolha }) {
-  const { dados, erro, ocupado, confirmar, salvar, combinarFrete } = useComandasCliente(conversaId, ativo)
+  const { dados, erro, ocupado, confirmar, salvar, combinarFrete, encaminharEntrega, confirmarPedido } = useComandasCliente(conversaId, ativo)
   const { cardapio } = useCatalogo()
   const { acoes } = useAcessoModulos()
   if (!ativo) return null
@@ -173,8 +226,8 @@ export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompart
     {!visiveis.length && !erro && !pedido?.pedidoId && <p>Compartilhe com o cliente para escolherem juntos. A seleção chega aqui antes da confirmação.</p>}
     {visiveis.map(c => {
       const pendente = ['alteracao_aguardando_confirmacao', 'estorno_pendente', 'estorno_recusado'].includes(c.envio?.situacao)
-      const selecao = <SelecaoCompartilhada key={c.linkId} comanda={c} ocupado={ocupado} salvar={salvar} confirmar={confirmar}
-        combinarFrete={combinarFrete} cardapio={cardapio} podeDevolver={acoes.estornarPagamentoOnline === true} />
+      const selecao = <SelecaoCompartilhada key={c.linkId} comanda={c} ocupado={ocupado} erro={erro} salvar={salvar} confirmar={confirmar}
+        combinarFrete={combinarFrete} encaminharEntrega={encaminharEntrega} confirmarPedido={confirmarPedido} cardapio={cardapio} podeDevolver={acoes.estornarPagamentoOnline === true} />
       return c.pedido ? <details key={c.linkId} className={css.historicoCompartilhado} open={c.podeEditar || pendente}>
         <summary>{pendente ? 'Ajuste para conferir' : c.podeEditar ? 'Seleção em edição' : 'Histórico do link'}</summary>
         {selecao}

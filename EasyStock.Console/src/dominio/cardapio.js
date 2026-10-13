@@ -106,7 +106,7 @@ export function situacaoDoItem(item) {
   }
   if (item.estoque <= 2) {
     return {
-      chave: 'pouco', tom: 'aviso', rotulo: item.estoque + ' porções',
+      chave: 'pouco', tom: 'aviso', rotulo: item.estoque + (item.estoque === 1 ? ' porção' : ' porções'),
       vendavel: true, alerta: false,
     }
   }

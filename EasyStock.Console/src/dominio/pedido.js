@@ -111,17 +111,20 @@ export function agruparPorLinha(itens, linhas) {
   ].filter((grupo) => grupo.itens.length > 0)
 }
 
-// #1683: "Manter minha edição" depois de um conflito. O cliente pode ter trocado endereço, janela
-// e cupom no site; da atendente ficam só os itens e a observação que ela editou.
-export const rascunhoMantendoEdicao = (doServidor, daAtendente) => ({
+// #1683/#1712: no conflito, conserva os dados atuais do cliente e reaplica itens e observações.
+// O horário local só prevalece quando difere da base da edição.
+export const rascunhoMantendoEdicao = (doServidor, daAtendente, baseDaEdicao = daAtendente) => ({
   ...doServidor, itens: daAtendente.itens, observacoes: daAtendente.observacoes,
+  ...((daAtendente.janelaId ?? null) !== (baseDaEdicao.janelaId ?? null)
+    || (daAtendente.dataEntrega ?? null) !== (baseDaEdicao.dataEntrega ?? null)
+    ? { janelaId: daAtendente.janelaId, dataEntrega: daAtendente.dataEntrega } : {}),
 })
 
 // #1683: o cliente montando a escolha pelo link, sem pedido ainda. A comanda de baixo não soma
 // item por conta própria, senão a Ficha mostra duas listas e dois totais da mesma comanda.
 // Item que a atendente já pôs no rascunho local segue editável para ela poder tirar.
 export const clienteEscolhendoPeloLink = (comandas, pedido) => !pedido?.pedidoId && !pedido?.itens?.length
-  && (comandas ?? []).some((c) => c.podeEditar && !c.pedido && c.rascunho?.itens?.length > 0)
+  && (comandas ?? []).some((c) => c.podeEditar && !c.pedido && (c.rascunho?.itens?.length > 0 || c.ajudaSolicitada))
 
 export const LINHA_CLIENTE_ESCOLHENDO =
   'O cliente está escolhendo pelo link. Os itens aparecem acima e viram pedido quando ele confirmar.'

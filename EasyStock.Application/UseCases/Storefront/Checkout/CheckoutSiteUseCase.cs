@@ -11,7 +11,6 @@ using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
-using EasyStock.Domain.Exceptions.Storefront;
 
 namespace EasyStock.Application.UseCases.Storefront.Checkout;
 
@@ -122,6 +121,13 @@ public sealed class CheckoutSiteUseCase(
             // Recupera resposta perdida depois do commit da cobrança, sem chamar o gateway novamente.
             var registro = await registros.GetByKeyHashAsync(chave, hash, ct);
             if (registro?.FaturaId is not { } pedidoId) throw;
+            // Tentativa que morreu entre o pedido e a cobrança: quando a varredura cancela o pedido, a chave
+            // volta a valer em vez de responder "em andamento" para sempre (#1719).
+            if ((await pedidos.GetByIdAsync(pedidoId, ct))?.Status == "cancelado")
+            {
+                await registros.RemoverSemRespostaAsync(chave, hash, ct);
+                return await idempotencia.TentarReservarAsync(chave, hash, ct);
+            }
             var cobranca = (await cobrancas.ListarDoPedidoAsync(empresaId, pedidoId, ct))
                 .LastOrDefault(c => c.EmpresaId == empresaId && c.PedidoId == pedidoId && c.EstaPendente
                     && c.ExpiraEm > relogio.GetUtcNow().UtcDateTime && c.LinkPagamento is not null);
@@ -184,15 +190,24 @@ public sealed class CheckoutSiteUseCase(
 
     private async Task LiberarFalhaConfirmadaAsync(Guid chave, string hash)
     {
-        var registro = await registros.GetByKeyHashAsync(chave, hash, CancellationToken.None);
-        if (registro?.FaturaId is { } id)
+        try
         {
-            var pedido = await pedidos.GetByIdAsync(id, CancellationToken.None);
-            if (pedido?.Status != "cancelado") return;
+            var registro = await registros.GetByKeyHashAsync(chave, hash, CancellationToken.None);
+            if (registro?.FaturaId is { } id)
+            {
+                var pedido = await pedidos.GetByIdAsync(id, CancellationToken.None);
+                if (pedido?.Status != "cancelado") return;
+            }
+            await registros.RemoverSemRespostaAsync(chave, hash, CancellationToken.None);
         }
-        await registros.RemoverSemRespostaAsync(chave, hash, CancellationToken.None);
+        catch (Exception ex)
+        {
+            // A falha original é a que o cliente precisa ver; a chave presa fica registrada.
+            logger.LogError(ex, "Checkout chave-nao-liberada chave={Chave}", chave);
+        }
     }
 
-    private static bool FalhaRecuperavel(Exception ex) => ex is CepInvalidoException or CepSemCoberturaException
-        or JanelaSemVagasException or LojaFechadaException or MercadoPagoIndisponivelException or RegraDeDominioVioladaException;
+    // Toda falha tenta soltar a chave (#1719): validação, cancelamento da requisição e erro de banco prendiam a
+    // reserva e a repetição respondia "em andamento" sem fim. Pedido criado e ainda vivo conserva a reserva.
+    private static bool FalhaRecuperavel(Exception ex) => ex is not (IdempotencyMismatchException or CheckoutEmAndamentoException);
 }

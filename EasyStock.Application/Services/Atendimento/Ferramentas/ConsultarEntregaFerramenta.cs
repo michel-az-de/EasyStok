@@ -20,6 +20,8 @@ public sealed class ConsultarEntregaFerramenta(IPedidoRepository pedidos, Logist
         try
         {
             var dados = await logistica.ContextoAsync(contexto.EmpresaId, null, pedidoId, ct);
+            if (dados.Indisponibilidade is not null)
+                return FerramentaJson.Serializar(new { situacao = "acompanhamento_indisponivel", mensagem = "A equipe pode conferir o transporte do seu pedido." });
             var despacho = dados.Despachos.Where(d => d.PedidoIds.Contains(pedidoId))
                 .OrderByDescending(d => d.CriadoEm).FirstOrDefault();
             if (despacho is null)

@@ -19,6 +19,7 @@ export function origemDaPassagem(passagem) {
   if (!passagem) return null
   const motivo = passagem.motivo ?? MOTIVO_PADRAO
   const hora = passagem.em ? horaCurta(passagem.em) : null
+  if (passagem.origem === 'chat-site') return { motivo, hora, curto: 'Chat do site', longo: motivo }
   if (passagem.origem === 'reabertura') return { motivo, hora, curto: motivo, longo: motivo }
   return {
     motivo,

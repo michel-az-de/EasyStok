@@ -8,7 +8,7 @@ import { conversaEncerrada, estaBloqueada } from '../../dominio/conversa'
 import { faltaPagar } from '../../dominio/cobranca'
 import { faixaDaJanela } from '../../dominio/entrega'
 import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
-import { LINHA_CLIENTE_ESCOLHENDO, numeroDaComanda } from '../../dominio/pedido'
+import { numeroDaComanda } from '../../dominio/pedido'
 import { motivoAntesDeCobrar } from '../../dominio/resumoPedido'
 import { chavesDaFicha, fichaRecolhidaDePadrao } from '../../dominio/ficha'
 import { BarraProximoPasso } from './BarraProximoPasso'
@@ -166,6 +166,7 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
             {fonteApi && pedido.pedidoId && <BlocoDevolucoes
               key={chaves.devolucoes}
               pedidoId={pedido.pedidoId}
+              cancelado={pedido.estado === 'cancelado'}
             />}
             {fonteApi && pedido.pedidoId && <BlocoOcorrenciasApi key={chaves.ocorrenciasApi} pedidoId={pedido.pedidoId} conversaId={selecionada.id} />}
             {!fonteApi && pedido.ocorrencia && (
@@ -182,11 +183,12 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
               cliente={selecionada.nome} numero={numero} endereco={cliente.endereco} />}
           </>
         ) : (
-          <Bloco titulo="Montar pelo atendimento" chave="comanda">
+          <Bloco titulo={clienteEscolhendo ? 'Revisar com o cliente' : 'Montar pelo atendimento'} chave="comanda">
             <p className={css.corpoBloco}>
-              Nenhum pedido confirmado ainda. O resumo e a cobrança aparecem após a confirmação.
+              {clienteEscolhendo ? 'Ajuste os itens na seleção acima e salve para o cliente conferir. A entrega também pode ser combinada antes da confirmação.'
+                : 'Nenhum pedido confirmado ainda. Adicione itens para montar pelo atendimento ou compartilhe o link de compra.'}
             </p>
-            {clienteEscolhendo ? <p className={css.corpoBloco}>{LINHA_CLIENTE_ESCOLHENDO}</p> : (
+            {!clienteEscolhendo && (
               <Botao largo disabled={!editavel} onClick={aoAbrirCardapio}>
                 Adicionar itens
               </Botao>

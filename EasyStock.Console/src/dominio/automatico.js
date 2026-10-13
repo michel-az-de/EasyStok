@@ -127,7 +127,9 @@ export function modoDoAtendimento(conversa, pausado = false, bloqueada = false) 
   // Balcão e do lembrete (dominio/passagem.js, rodada 12).
   if (conversa.passagem && !conversa.passagem.assumida) {
     const base = DESCRICOES[MODOS.COM_VOCE]
-    return { chave: MODOS.COM_VOCE, ...base, detalhe: origemDaPassagem(conversa.passagem).longo }
+    return { chave: MODOS.COM_VOCE, ...base,
+      ...(conversa.passagem.origem === 'chat-site' ? { rotulo: 'Aguardando equipe' } : {}),
+      detalhe: origemDaPassagem(conversa.passagem).longo }
   }
   if (pausado) {
     const base = DESCRICAO_DA_PAUSA[pausado] ?? DESCRICOES[MODOS.PAUSADO]

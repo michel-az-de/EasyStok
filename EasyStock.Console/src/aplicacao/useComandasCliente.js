@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { listarComandasCliente, confirmarComandaCliente, salvarComandaCliente, combinarFreteComanda } from '../infra/api/comandasClienteApi'
+import { listarComandasCliente, confirmarComandaCliente, salvarComandaCliente, combinarFreteComanda, encaminharEntregaComanda, confirmarPedidoComanda } from '../infra/api/comandasClienteApi'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
+export { idDaJanela, janelaDoId } from '../infra/api/comandaApi'
 
 export function useComandasCliente(conversaId, ativo) {
   const [dados, setDados] = useState([])
@@ -43,6 +44,8 @@ export function useComandasCliente(conversaId, ativo) {
     finally { trava.current = false; setOcupado(false) }
   }
   return { dados, erro: erro || erroLeitura, ocupado,
+    encaminharEntrega: (comanda) => executar(() => encaminharEntregaComanda(conversaId, comanda.linkId, comanda.revisao)),
+    confirmarPedido: (comanda) => executar(() => confirmarPedidoComanda(conversaId, comanda.linkId, comanda.revisao)),
     combinarFrete: (comanda, valor) => executar(() => combinarFreteComanda(conversaId, comanda.linkId, comanda.revisao, valor)),
     confirmar: (linkId, aceitar) => executar(() => confirmarComandaCliente(conversaId, linkId, aceitar)),
     salvar: (comanda, rascunho) => executar(() => salvarComandaCliente(conversaId, comanda.linkId, comanda.revisao, rascunho)) }

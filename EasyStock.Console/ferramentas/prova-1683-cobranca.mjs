@@ -10,7 +10,7 @@
 //   7  estorno e "Voltar etapa" esperam a resposta e só fecham no sucesso;
 //   8  ação destrutiva usa a variante `perigo` do botão;
 //   9  confirmação em linha é formulário: Enter confirma, Esc volta, foco no motivo;
-//   10 um rótulo só para receber: "Marcar pago".
+//   10 "Marcar pago" no recebimento comum e "Registrar sinal" na entrada manual de encomenda.
 //
 // Regras puras e ações reais (HTTP controlado no `fetch`); a composição que só existe no JSX é
 // conferida por leitura do fonte. Não prova pixels nem foco nativo.
@@ -35,6 +35,7 @@ registerHooks({
 })
 
 const cobranca = await import('../src/dominio/cobranca.js')
+const pagamento = await import('../src/dominio/pagamento.js')
 const { situacaoDoEnvio } = await import('../src/dominio/resumoPedido.js')
 const { pedidoDaApi } = await import('../src/infra/api/comandaApi.js')
 const { criarAcoesComandaApi } = await import('../src/aplicacao/api/comanda.js')
@@ -101,6 +102,13 @@ await confere('1  link vencido no modo API: a barra segue oferecendo "Marcar pag
 // ------------------------------------------------------------------ 2
 
 await confere('2  aviso de link novo e cancelamento só com o pedido em aguardando_pagamento', () => {
+  const cancelado = cobranca.avisoDeLinkVencidoApi({ tentativa: 2 }, 'cancelado')
+  assert.match(cancelado, /Pedido cancelado/)
+  assert.doesNotMatch(cancelado, /continua valendo|Marcar pago|link novo/)
+  const pedido = { estado: 'cancelado', totalApi: 65, alocadoApi: 32.5, cobranca: { pagaEm: 1, valor: 32.5 } }
+  assert.equal(pagamento.diferencaAposPagamento(pedido, []), 0)
+  assert.equal(pagamento.totalPago(pedido), 32.5)
+  assert.equal(pagamento.diferencaAposPagamento({ ...pedido, estado: 'pago' }, []), 32.5)
   assert.match(cobranca.avisoDeLinkVencidoApi({ tentativa: 1 }, 'aguardando_pagamento'), /manda um link novo ao cliente sozinho/)
   assert.match(cobranca.avisoDeLinkVencidoApi({ tentativa: 2 }, 'aguardando_pagamento'), /cancela o pedido sozinho/)
   for (const status of ['aguardando', 'aprovado_baba', 'preparando', 'pronto', 'saiu_para_entrega', undefined]) {
@@ -321,13 +329,13 @@ await confere('9  a baixa à mão também é formulário: Enter registra, Esc vo
 
 // ------------------------------------------------------------------ 10
 
-await confere('10  receber tem um rótulo só: "Marcar pago", secundário no bloco e no fim do formulário', () => {
+await confere('10  receber distingue sinal manual de quitação, com ação secundária no bloco', () => {
   assert.doesNotMatch(bloco, />\s*Recebi\s*</)
   const naEntrega = trecho(bloco, '{editavel && !recebendo && (', "{disponivel('marcarRecebidoEntrega') && (")
-  assert.match(naEntrega, /variante="secundario"[\s\S]*>\s*Marcar pago\s*<\/Botao>/)
+  assert.match(naEntrega, /variante="secundario"[\s\S]*sinalPendente \? 'Registrar sinal' : 'Marcar pago'/)
   assert.doesNotMatch(naEntrega, /variante="primario"/)
   const baixa = trecho(bloco, 'export function BaixaAMao(', '// "Alterar forma de pagamento"')
-  assert.match(baixa, /\{enviando \? 'Registrando…' : 'Marcar pago'\}/)
+  assert.match(baixa, /enviando \? 'Registrando…' : aguardaSinalManual\(pedido\) \? 'Registrar sinal' : 'Marcar pago'/)
   assert.doesNotMatch(baixa, /'Confirmar'/)
 })
 

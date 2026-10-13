@@ -17,7 +17,7 @@ const meios = [
 ]
 const data = (valor) => new Date(valor).toLocaleString('pt-BR')
 
-export function BlocoDevolucoes({ pedidoId }) {
+export function BlocoDevolucoes({ pedidoId, cancelado = false }) {
   const { acoes } = useAcessoModulos()
   const { dados, erro, aviso, pendente, ocupado, atualizar, registrar } = useEstornosManuais(pedidoId)
   const [aberto, setAberto] = useState(false)
@@ -33,6 +33,7 @@ export function BlocoDevolucoes({ pedidoId }) {
   const podeRegistrar = acoes.devolverPagamentoManual === true
   const valido = pagamento && valor > 0 && valor <= pagamento.disponivel && motivo.trim() && referencia.trim() && confirmado
   const totalDevolvido = dados?.estornos.reduce((soma, e) => soma + e.valor, 0) ?? 0
+  const conferirAcerto = cancelado && dados?.pagamentos.some((p) => p.valor > 0)
 
   function escolher(id) {
     setPagamentoId(id)
@@ -51,7 +52,8 @@ export function BlocoDevolucoes({ pedidoId }) {
   }
 
   return (
-    <Bloco titulo="Devoluções" chave="devolucoes" recolhidoDePadrao={!erro} resumo={erro ? RESUMO_COM_ERRO : totalDevolvido ? `${moeda(totalDevolvido)} devolvidos` : 'Recebimentos e estornos'}>
+    <Bloco titulo={conferirAcerto ? 'Conferir acerto' : 'Devoluções'} chave="devolucoes" recolhidoDePadrao={!erro}
+      resumo={erro ? RESUMO_COM_ERRO : totalDevolvido ? `${moeda(totalDevolvido)} devolvidos` : conferirAcerto ? 'Recebimento registrado' : 'Recebimentos e estornos'}>
       <div className={css.acoesPedido}>
         {erro && <p role="alert" className={css.corpoBloco}>{erro}</p>}
         {aviso && <output className={css.corpoBloco}>{aviso}</output>}

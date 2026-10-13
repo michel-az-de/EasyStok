@@ -21,10 +21,41 @@ export function ModalFrete({ controlador: c }) {
       {c.aviso && <output className={css.sucesso}>{c.aviso}</output>}
       {!c.contexto && <div className={css.linha}><p>{c.ocupado ? 'Carregando pedidos e transportes…' : 'Os dados não carregaram.'}</p>
         {!c.ocupado && <Botao onClick={c.atualizar}>Tentar novamente</Botao>}</div>}
-      {c.contexto && <Conteudo controlador={c} />}
+      {c.contexto && (c.contexto.indisponibilidade ? <EntregaExterna controlador={c} /> : <Conteudo controlador={c} />)}
       {c.ocupado && <output className={css.apoio}>Confirmando com o servidor…</output>}
     </div>
   </Modal>
+}
+
+function EntregaExterna({ controlador: c }) {
+  const orientacaoRef = useRef(null)
+  useEffect(() => { orientacaoRef.current?.focus() }, [])
+  return <section ref={orientacaoRef} tabIndex={-1} className={css.secao} aria-label="Combinar transporte com o prestador">
+    <h3>Combine o transporte com o prestador</h3>
+    <p>{c.contexto.indisponibilidade}</p>
+    <a href="https://web.lalamove.com/" target="_blank" rel="noopener noreferrer"
+      aria-label="Consultar Lalamove (site externo, abre em nova aba)">Consultar Lalamove ↗</a>
+    <ol className={css.historico}>
+      <li>Confira endereço, horário e custo antes de contratar.</li>
+      <li>Com o cliente de acordo, use Confirmar pedido com o cliente na Ficha ou peça que confirme pelo link.</li>
+      <li>Em Entregas, abra ou monte a viagem do pedido e use Registrar corrida para anotar o custo e o motorista.</li>
+    </ol>
+    <p className={css.apoio}>O custo do transportador é separado do frete cobrado do cliente.</p>
+    {c.podeAbrirEntregas ? <a href="#/m/entregas" onClick={c.fechar}>Abrir Entregas</a>
+      : <p>Peça a uma pessoa com acesso a Entregas para registrar a corrida na viagem.</p>}
+  </section>
+}
+
+function pendenciasDoPedido(pedido) {
+  const pendencias = []
+  if (pedido.clienteBloqueado) pendencias.push('Cliente bloqueado: confira o cadastro na Ficha.')
+  if (['cancelado', 'entregue'].includes(pedido.status)) pendencias.push('Pedido encerrado: consulte a entrega já registrada.')
+  if (!pedido.janelaInicio || !pedido.janelaFim) pendencias.push('Defina o dia e a janela de entrega em Entregas.')
+  if (!pedido.endereco?.trim()) pendencias.push('Confira o endereço de entrega na Ficha.')
+  if (!Number.isFinite(pedido.latitude) || !Number.isFinite(pedido.longitude) || Math.abs(pedido.latitude) > 90 || Math.abs(pedido.longitude) > 180)
+    pendencias.push('Localização não validada. Confira o endereço; se a localização continuar indisponível, combine o transporte diretamente com o prestador.')
+  if (!pedido.telefone?.trim()) pendencias.push('Informe o telefone do cliente na Ficha.')
+  return pendencias
 }
 
 function Conteudo({ controlador: c }) {
@@ -34,7 +65,8 @@ function Conteudo({ controlador: c }) {
   const idsDaEntrada = new Set(c.entrada.pedidos.map((p) => p.id))
   const despachos = (c.contexto.despachos ?? []).filter((d) => idsDaEntrada.size === 0 || d.pedidoIds.some((id) => idsDaEntrada.has(id) || c.selecionados.includes(id)))
   const ocupados = new Set((c.contexto.despachos ?? []).filter((d) => !['cancelado', 'devolvido'].includes(d.status)).flatMap((d) => d.pedidoIds))
-  const elegiveis = c.selecionados.length > 0 && c.selecionados.every((id) => todos.some((p) => p.id === id) && !ocupados.has(id))
+  const pendencias = new Map(todos.map((p) => [p.id, pendenciasDoPedido(p)]))
+  const elegiveis = c.selecionados.length > 0 && c.selecionados.length <= 15 && c.selecionados.every((id) => pendencias.get(id)?.length === 0 && !ocupados.has(id))
   const disponiveis = (c.cotacoes ?? []).filter((q) => !q.indisponibilidade)
   const menor = disponiveis.length ? Math.min(...disponiveis.map((q) => q.valorCentavos)) : null
   const pedidos = [...todos].sort((a, b) => Number(idsDaEntrada.has(b.id)) - Number(idsDaEntrada.has(a.id)))
@@ -43,14 +75,16 @@ function Conteudo({ controlador: c }) {
       <summary>1. Pedidos para transportar · {c.selecionados.length} {c.selecionados.length === 1 ? 'selecionado' : 'selecionados'}</summary>
       <section className={css.secao} aria-label="Pedidos para transportar">
       <p className={css.apoio}>Agrupe antes de contratar. Uma entrega já contratada não recebe novos pedidos aqui.</p>
-      {pedidos.length === 0 && <p>Nenhum pedido disponível neste dia.</p>}
+      <p className={css.apoio}>A cotação exige pedido confirmado, janela de entrega ativa, endereço com localização validada e telefone. Agrupe até 15 pedidos com horários coincidentes. Pedidos em preparo podem ser cotados; a saída exige todos prontos.</p>
+      {pedidos.length === 0 && <p>Nenhum pedido com janela ativa disponível. Confira a confirmação do pedido e seu agendamento em Entregas.</p>}
       {pedidos.length === 0 && c.contexto.demonstracao && c.entrada.dia && c.podeConfigurar && <Botao disabled={c.ocupado} onClick={c.prepararDia}>Preparar dia de teste com 10 pedidos</Botao>}
       <ul className={css.lista}>{pedidos.map((p) => <li key={p.id}>
-        <label className={css.pedido} aria-label={`Pedido ${p.numero}, ${p.cliente}`}><input type="checkbox" checked={c.selecionados.includes(p.id)} disabled={c.ocupado || (ocupados.has(p.id) && !c.selecionados.includes(p.id))} onChange={() => c.selecionar(p.id)} />
+        <label className={css.pedido}><input type="checkbox" aria-label={`Pedido ${p.numero}, ${p.cliente}`} checked={c.selecionados.includes(p.id)} aria-describedby={pendencias.get(p.id).length ? `frete-${p.id}-pendencias` : undefined} disabled={c.ocupado || ((ocupados.has(p.id) || pendencias.get(p.id).length > 0) && !c.selecionados.includes(p.id))} onChange={() => c.selecionar(p.id)} />
           <span><strong>{p.numero} · {p.cliente}</strong><span className={css.apoio}>{p.endereco || 'Endereço não informado'}</span>
             <span className={css.apoio}>{p.janelaInicio && p.janelaFim ? `Receber entre ${horario(p.janelaInicio)} e ${horario(p.janelaFim)}` : 'Horário não informado'}{ocupados.has(p.id) ? ' · Transporte já contratado' : ''}</span>
           </span>
         </label>
+        {pendencias.get(p.id).length > 0 && <ul id={`frete-${p.id}-pendencias`} className={css.apoio}>{pendencias.get(p.id).map((pendencia) => <li key={pendencia}>{pendencia}</li>)}</ul>}
       </li>)}</ul>
       <label className={css.marcador}><input type="checkbox" checked={c.agrupar} disabled={c.ocupado} onChange={(e) => c.mudarAgrupamento(e.target.checked)} />Buscar uma entrega com várias paradas</label>
       <label className={css.marcador}><input type="checkbox" checked={c.incluirManual} disabled={c.ocupado} onChange={(e) => c.mudarManual(e.target.checked)} />Incluir entregador combinado e entrega em mãos</label>
@@ -59,7 +93,7 @@ function Conteudo({ controlador: c }) {
         onChange={(e) => c.mudarValorManual(e.target.value)} />}
       <div className={css.linha}><Botao variante="primario" disabled={c.ocupado || !elegiveis || (c.incluirManual && c.valorManual !== '' && (!Number.isFinite(Number(c.valorManual)) || Number(c.valorManual) < 0 || Number(c.valorManual) > 1000))} onClick={c.cotar}>Comparar transportes</Botao>
         {c.contexto.politica?.automatico && <Botao disabled={c.ocupado || !elegiveis} onClick={c.automatico}>Escolher e contratar até {moeda(c.contexto.politica.tetoCentavos)}</Botao>}
-        {!elegiveis && <span className={css.apoio}>Selecione pedidos sem transporte contratado.</span>}</div>
+        {!elegiveis && <span className={css.apoio}>Selecione de 1 a 15 pedidos sem transporte contratado e confira os requisitos indicados em cada pedido.</span>}</div>
       </section>
     </details>
     {c.cotacoes && <section ref={cotacoesRef} tabIndex={-1} className={css.secao} aria-label="Cotações de transporte">

@@ -181,7 +181,9 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         if (cobranca.Tentativa < CobrancaPedido.TentativaMaxima && cobranca.ConversaId is { } conversaId)
         {
             var nova = await gerarCobranca.ExecuteAsync(
-                new GerarCobrancaPedidoInput(item.EmpresaId, item.PedidoId, conversaId, cobranca.Tentativa + 1), ct);
+                // Complementar reemite pelo saldo (#1719): como cobrança comum, o cupom já abatido voltava ao link.
+                new GerarCobrancaPedidoInput(item.EmpresaId, item.PedidoId, conversaId, cobranca.Tentativa + 1,
+                    CobrarSaldo: cobranca.Complementar), ct);
             return (ResultadoExpiracaoCobranca.Reemitida, conversaId, nova.LinkPagamento);
         }
 

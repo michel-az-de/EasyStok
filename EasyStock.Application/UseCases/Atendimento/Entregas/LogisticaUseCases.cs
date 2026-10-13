@@ -11,7 +11,9 @@ public sealed class LogisticaUseCases(ILogisticaRepository repository, IUnitOfWo
 {
     public async Task<ContextoLogisticaResult> ContextoAsync(Guid empresaId, DateOnly? dia, Guid? pedidoId, CancellationToken ct = default)
     {
-        ExigirDemonstracao(empresaId);
+        if (empresaId == Guid.Empty || configuracao.EmpresaDemonstracaoId == Guid.Empty || empresaId != configuracao.EmpresaDemonstracaoId)
+            return new(false, Politica(null), [], [],
+                "A contratação de transporte ainda não está conectada nesta empresa. Consulte o prestador e combine o frete com o cliente.");
         var pedidos = await repository.PedidosAsync(empresaId, dia, pedidoId, ct);
         if (pedidoId is not null && pedidos.Count > 0)
         {

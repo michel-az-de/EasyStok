@@ -40,16 +40,38 @@ public sealed class LogisticaUseCasesTests
     }
 
     [Fact]
-    public async Task Empresa_divergente_nao_acessa_nem_consulta_provedor()
+    public async Task Empresa_real_recebe_orientacao_sem_consultar_dados_ou_provedor()
     {
-        await FluentActions.Invoking(() => sut.ContextoAsync(Guid.NewGuid(), null, null)).Should().ThrowAsync<UseCaseValidationException>();
+        var contexto = await sut.ContextoAsync(Guid.NewGuid(), null, null);
+        contexto.Demonstracao.Should().BeFalse();
+        contexto.Indisponibilidade.Should().Contain("Consulte o prestador").And.NotContain("laboratório");
+        contexto.Pedidos.Should().BeEmpty();
+        contexto.Despachos.Should().BeEmpty();
+        contexto.Politica.Automatico.Should().BeFalse();
+        repo.ReceivedCalls().Should().BeEmpty();
         await provider.DidNotReceiveWithAnyArgs().CotarAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Empresa_real_continua_sem_permissao_para_mutacoes_do_laboratorio()
+    {
+        var real = Guid.NewGuid();
+        await FluentActions.Invoking(() => sut.CotarAsync(real, new([pedidos[0].Id], false))).Should().ThrowAsync<UseCaseValidationException>();
+        await FluentActions.Invoking(() => sut.ContratarAsync(real, usuario, new(Guid.NewGuid(), "contratar"))).Should().ThrowAsync<UseCaseValidationException>();
+        await FluentActions.Invoking(() => sut.ContratarAutomaticoAsync(real, usuario, new([pedidos[0].Id], false), "automatico")).Should().ThrowAsync<UseCaseValidationException>();
+        await FluentActions.Invoking(() => sut.ConfirmarPagamentoAsync(real, usuario, Guid.NewGuid(), new("pagar", "pix", "referencia"))).Should().ThrowAsync<UseCaseValidationException>();
+        await FluentActions.Invoking(() => sut.RegistrarEventoAsync(real, Guid.NewGuid(), new("a_caminho", null, "evento"))).Should().ThrowAsync<UseCaseValidationException>();
+        await FluentActions.Invoking(() => sut.ConfigurarPoliticaAsync(real, new(true, 3000, false))).Should().ThrowAsync<UseCaseValidationException>();
+        repo.ReceivedCalls().Should().BeEmpty();
+        await provider.DidNotReceiveWithAnyArgs().CotarAsync(default!, default);
+        await provider.DidNotReceiveWithAnyArgs().ContratarAsync(default!, default!, default);
     }
 
     [Fact]
     public async Task Configuracao_vazia_nao_abre_demo_em_qualquer_empresa()
     {
         var fechado = new LogisticaUseCases(repo, uow, caixa, [provider], new(Guid.Empty, new("", "", "", 0, 0)), tempo);
+        (await fechado.ContextoAsync(empresa, null, null)).Indisponibilidade.Should().NotBeNullOrWhiteSpace();
         await FluentActions.Invoking(() => fechado.CotarAsync(empresa, new([pedidos[0].Id], false))).Should().ThrowAsync<UseCaseValidationException>();
     }
 

@@ -112,3 +112,28 @@ Publicação em 12/10/2026, após a PR #1679: API e Console servindo `fa307f987b
 Backup PostgreSQL anterior ao deploy: `/home/felipe/backups/easystock-predeploy-20261012T231456Z.dump`, 722.679 bytes, tamanho confirmado na VPS. Backup do Console: `/opt/stacks/shared/docs/easystok-console/index.html.antes-20261012T232144Z`. Site com rollback `casadababa-storefront:vps-prev-20261012T232135Z`.
 
 O código de atendimento e frete combinado está publicado. A configuração operacional do frete automático permanece pendente dos dados da cozinha e das tarifas. Testes de provedores controlados não atestam envio real de WhatsApp ou pagamento real em produção.
+
+## Correção funcional após a banca desktop (#1712)
+
+Base conferida no início da rodada: API e Console `c614920b0d759fc5a0e6a1ccf33e87bc97c6d684`; site `fd288ed91873ece914865bab04bbef166a4730e1`. O polimento anterior não comprovava os caminhos sem confirmação. A prova antiga de CEP externo escolhia uma janela válida antes de encaminhar; o teste unitário verificava apenas a cotação e a mensagem.
+
+| Cenário que faltava | Correção e critério de aceite |
+|---|---|
+| Lead pede ajuda sem itens, endereço ou pedido | `POST pedir-ajuda` sem body registra mensagem interna, escala a conversa e atualiza o retrato por SSE. Não salva nem substitui o rascunho. Repetições simultâneas são idempotentes; uma nova solicitação é possível após retomar o automático. |
+| CEP distante sem janela | `POST encaminhar-entrega {revisao}` reaproveita cadastro/endereço e encaminha a seleção, sem criar pedido ou cobrança. O horário é opcional nessa etapa; dados incompletos não impedem pedir ajuda. |
+| Encaminhamento registrado | Cliente vê que aguarda atendimento, pode rever endereço e continuar editando. Alteração efetiva da seleção permite novo envio. |
+| Resumo depois de encaminhar | A inspeção visual revelou rolagem interna retida e apenas 20,9 px para os pratos. O resumo agora reserva espaço útil além do cabeçalho/rodapé e volta ao primeiro item. Teste exige nome integralmente visível e pelo menos 150 px de conteúdo. |
+| Casa escolhe horário e combina frete enquanto cliente mantém página aberta | Site sincroniza o horário, recarrega as opções e limpa a orientação antiga. Frete combinado não se transforma em frete grátis nem permanece como entrega pendente. |
+| Atendente precisa concluir o primeiro pedido | Edita a mesma seleção, escolhe janela, salva e combina frete explícito, inclusive zero. A confirmação assistida exibe itens, endereço, horário, frete e total. API protege revisão, empresa/conversa, consumo do link e repetição. Cobrança fica para ação posterior. |
+| Localizar Lalamove antes de existir pedido | Acesso ao [web app oficial](https://web.lalamove.com/) junto à entrega. Consulta e contratação são externas; depois de criar o pedido e montar a viagem, `Registrar corrida` guarda empresa, custo e motorista. |
+| Empresa real abre comparação de transportes | Contexto informa contratação externa com ação direta e acesso a Entregas, sem terminar em erro de laboratório. Empresas de demonstração continuam explicitamente simuladas; guards de contratação não foram removidos. |
+
+Contratos novos: o retrato da comanda acrescenta `ajudaSolicitada` e `ajudaSolicitadaEm`; atendimento autenticado ganha `/{linkId}/encaminhar-entrega` e `/{linkId}/confirmar-pedido`, ambos com `{revisao}`. Contexto de logística acrescenta `indisponibilidade`. Sem migração, nova dependência ou mudança nas permissões existentes.
+
+Validação local concluída em 13/10/2026: 690 testes do site (46 focados na comanda), seis cenários de navegador de seleção/rolagem, qualidade completa do Console, oito provas de domínio, dez de renderização do painel e gate com build e 42 testes de arquitetura. Testes de integração cobrem empresa, revisão, repetição concorrente, ajuda sem rascunho e confirmação assistida; 19 testes de logística e a prova de navegador verificam o contexto real sem acionar prestadores.
+
+Duas jornadas de navegador passaram com API/PostgreSQL reais descartáveis: lead pede ajuda sem itens, informa CEP distante sem janela, atendente combina horário e frete de R$ 13,50 e confirma o mesmo pedido de R$ 33,50 sem gerar cobrança; a regressão independente cobre automático, pagamento, acréscimo, cupom e estorno. Banca de fluxo, hierarquia e acessibilidade aprovada após corrigir a preservação do horário em conflitos, a duplicidade da seleção vazia e a reativação indevida da ajuda ao reassumir a conversa.
+
+Última conferência visual: ajuda resumida em uma linha, Lalamove visível junto ao endereço e pratos/horário antes do formulário de frete. Removidas instruções repetidas que empurravam os itens para fora da primeira tela.
+
+Pagamento, IA, WhatsApp e prestadores externos foram controlados. Nenhuma corrida ou cobrança real foi contratada, e a jornada autenticada não foi exercitada em produção. Recibo de CI e publicação fica na [issue #1712](https://github.com/michel-az-de/EasyStok/issues/1712).
