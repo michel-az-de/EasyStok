@@ -5,6 +5,7 @@ import { Modal } from '../../componentes/Modal'
 import { FolhaImpressao } from '../../componentes/FolhaImpressao'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
+import { cancelarNasceMarcado, falhaAoCancelarNoEncerramento, pedidoAoEncerrar, rotuloCancelarAoEncerrar } from '../../aplicacao/api/encerramentoEMidia'
 import { canalDaConversa } from '../../dominio/canal'
 import { conversaEncerrada } from '../../dominio/conversa'
 import { pedidoEncerrado } from '../../dominio/pedido'
@@ -26,7 +27,7 @@ const RASCUNHO_PADRAO = { avaliacaoCliente: null, autoavaliacao: null, anotacao:
 // (depois de clicar, lido de `conversa.atendimentos.at(-1)`, já congelado) e a
 // cópia impressa (sempre somente leitura, com só a opção marcada, seção 5).
 export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }) {
-  const { conversas, agora, regras } = useAtendimento()
+  const { conversas, agora, regras, fonteApi } = useAtendimento()
   const { canais, cardapio } = useCatalogo()
   const {
     salvarAvaliacaoCliente, salvarAutoavaliacao, salvarAnotacaoFechamento,
@@ -49,7 +50,13 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   const [textoMensagem, setTextoMensagem] = useState(() => (regraEncerramento
     ? textoDaRegra(regraEncerramento, contextoDePrevia(conversa, null, agora))
     : ''))
+  // #1683: cancelar o pedido sem pagamento é escolha de quem atende. Nasce desmarcada, menos
+  // quando o pedido não tem link em aberto e ficaria sem ninguém para fechá-lo.
+  const [cancelarMarcado, setCancelarMarcado] = useState(() => cancelarNasceMarcado(conversa?.pedido, { fonteApi }))
+  const pedidoJaCancelado = useRef(false)
   useEffect(() => {
+    setCancelarMarcado(cancelarNasceMarcado(conversa?.pedido, { fonteApi }))
+    pedidoJaCancelado.current = false
     setEnviarMensagem(Boolean(regraEncerramento))
     setTextoMensagem(regraEncerramento ? textoDaRegra(regraEncerramento, contextoDePrevia(conversa, null, agora)) : '')
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só reseta ao trocar de conversa, não a cada tecla
@@ -79,11 +86,12 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   const pedido = conversa.pedido
   const pedidoAtivo = Boolean(pedido) && !pedidoEncerrado(pedido)
   const aguardandoPagamento = pedidoAtivo && pedido.estado === 'aguardando'
+  const noPedido = pedidoAoEncerrar(pedidoAtivo ? pedido : null, { fonteApi, cancelarMarcado })
   const canal = canalDaConversa(canais, conversa)
 
-  // Faixa da seção 5: aguardando pagamento cancela e encerra (regra da
-  // rodada 4, reaproveitada); pago e na esteira só fecha a conversa, o pedido
-  // segue em Entregas por conta própria.
+  // Faixa da seção 5: pago e na esteira só fecha a conversa, o pedido segue em
+  // Entregas por conta própria. #1683: aguardando pagamento só é cancelado se a
+  // atendente marcar a caixa (antes a regra da rodada 4 cancelava sem perguntar).
   // Canais de aviso (decisão 46): ligados no cadastro (BlocoCliente.jsx),
   // aqui só leitura — a escolha por atendimento é só a da mensagem.
   const avisoEmailLigado = Boolean(conversa.cliente?.avisos?.email)
@@ -96,15 +104,19 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
     setErroAoEncerrar(null)
     try {
       // Na demonstração as duas ações são síncronas e não devolvem nada: segue como sucesso.
-      const cancelamento = aguardandoPagamento
-        ? await cancelarPedido(conversa.id, `Cancelei o pedido ${pedido.numero}. Qualquer coisa, é só chamar.`)
-        : null
+      // #1683: cancelamento que falha não encerra; o erro fica aqui dentro.
+      if (noPedido.cancelar && !pedidoJaCancelado.current) {
+        const cancelamento = await cancelarPedido(conversa.id, `Cancelei o pedido ${pedido.numero}. Qualquer coisa, é só chamar.`)
+        const falha = falhaAoCancelarNoEncerramento(cancelamento, pedido.numero)
+        if (falha) { setErroAoEncerrar(falha); return }
+        pedidoJaCancelado.current = true
+      }
       const resultado = await encerrarComResumo(conversa.id, agora, {
         enviarMensagem: enviarMensagem && !despedidaJaSaiu.current,
         textoMensagem,
         avisoEmail: avisoEmailLigado,
         avisoSms: avisoSmsLigado,
-        pedidoCancelado: cancelamento?.ok === true,
+        pedidoCancelado: pedidoJaCancelado.current,
       })
       if (resultado?.despedidaSaiu) despedidaJaSaiu.current = true
       if (resultado?.erro) {
@@ -149,15 +161,26 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
       >
         <div className={css.canhotoTela}>
           <div className={css.corpoModal}>
-            {!encerrada && pedidoAtivo && !leitura && (
+            {!encerrada && pedidoAtivo && !leitura && !noPedido.cancelar && (
               <p className={css.faixaAtencao}>
                 {aguardandoPagamento
-                  ? `O pedido ${pedido.numero} sem pagamento será cancelado.`
+                  ? `O pedido Nº ${pedido.numero} ainda não foi pago. Ele continua valendo depois de encerrar.`
                   : `O pedido ${pedido.numero} segue na esteira até a entrega.`}
               </p>
             )}
             {!encerrada && !leitura && (
               <div className={css.confirmacaoEncerrar}>
+                {noPedido.ofereceCancelar && (
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={cancelarMarcado}
+                      disabled={encerrandoAgora}
+                      onChange={(e) => setCancelarMarcado(e.target.checked)}
+                    />
+                    {rotuloCancelarAoEncerrar(pedido.numero)}
+                  </label>
+                )}
                 <label>
                   <input
                     type="checkbox"

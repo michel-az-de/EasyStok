@@ -52,6 +52,14 @@ export const rotuloDoTotal = (pedido, { fonteApi = false } = {}) =>
   (fonteApi && !pedido?.pedidoId ? 'Total dos itens (o frete entra ao gerar a cobrança)' : 'Total')
 
 export function situacaoDoEnvio(pedido, { bloqueado = false } = {}) {
+  // #1683: o EasyStok criou a cobrança mas o resumo não saiu (janela de 24 h, canal fora do ar).
+  if (pedido?.cobranca && pedido.resumoNaoEnviado) {
+    return {
+      chave: 'nao-enviada', pode: false,
+      texto: 'Cobrança criada, mas a mensagem não saiu. '
+        + (pedido.cobranca.link ? 'Copie o link na Cobrança abaixo e envie pela conversa.' : 'Avise o cliente pela conversa.'),
+    }
+  }
   if (pedido?.cobranca) {
     return {
       chave: 'enviada', pode: false,

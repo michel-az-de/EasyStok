@@ -69,7 +69,13 @@ function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, linkVencidoApi, aoA
     case 'expirada':
       // #1586: no modo API quem reemite (ou cancela) é o job do EasyStok; o botão só avisava.
       // No lugar dele, o texto diz o que vai acontecer.
-      if (linkVencidoApi) return { rotuloEstado: 'Cobrança venceu', motivo: linkVencidoApi, botoes: [] }
+      // #1683: quem pagou por fora com o link vencido ainda precisa da baixa à mão.
+      if (linkVencidoApi) {
+        return {
+          rotuloEstado: 'Cobrança venceu', motivo: linkVencidoApi,
+          botoes: [{ rotulo: 'Marcar pago', icone: 'dollar-sign', onClick: aoAbrirBaixa }],
+        }
+      }
       return {
         rotuloEstado: 'Cobrança venceu',
         botoes: [{ rotulo: 'Reenviar cobrança', icone: 'refresh-cw', onClick: aoReenviarPix }],
@@ -139,6 +145,9 @@ export function BarraProximoPasso({
   const [motivoDesfazer, setMotivoDesfazer] = useState('')
   const [erroDesfazer, setErroDesfazer] = useState(null)
   const desfazendo = useRef(false)
+  // #1683: estorno e "Voltar etapa" seguem o mesmo padrão: esperam, mostram a recusa, fecham no sucesso.
+  const [erroCorrecao, setErroCorrecao] = useState(null)
+  const corrigindo = useRef(false)
 
   // O retorno pertence ao pedido e à etapa que iniciaram a ação. A espera só termina
   // com a Promise, inclusive quando o rascunho ganha pedidoId durante a recarga.
@@ -204,7 +213,7 @@ export function BarraProximoPasso({
       prerequisito: prerequisito ?? (pedido.itens.length > 0 ? null : 'A comanda está vazia.'),
       // #1474 (R4): no modo API este é o único botão que cria o pedido (cobra e manda a comanda).
       rotuloGerar: fonteApi && !pedido.pedidoId ? ROTULO_GERAR_E_ENVIAR : 'Gerar cobrança',
-      linkVencidoApi: fonteApi && pedido.pedidoId ? avisoDeLinkVencidoApi(pedido.cobranca) : null,
+      linkVencidoApi: fonteApi && pedido.pedidoId ? avisoDeLinkVencidoApi(pedido.cobranca, pedido.statusApi) : null,
       aoAbrirBaixa: () => setAbrindoBaixa(true),
       aoGerarPix: () => (pedido.meio ? executar(() => aoGerarPix(pedido.meio)) : setPedindoMeio(true)),
       aoReenviarPix: () => executar(() => aoReenviarPix()),
@@ -337,6 +346,9 @@ export function BarraProximoPasso({
   const valorPago = pedido.cobranca?.valorPago ?? pedido.cobranca?.valor ?? 0
   const podeDesfazer = podeDesfazerPagamento(pedido)
   const valorParaDesfazer = ultimoPagamentoApi(pedido)?.valor ?? valorPago
+  const estornoValido = motivoEstorno.trim().length >= 3
+    && centavosEstorno > 0 && !moedaAltaDemais(centavosEstorno)
+    && centavosEstorno <= Math.round(valorPago * 100)
 
   // UC-06 passo 5: o valor nasce pré-preenchido com o que foi pago, editável
   // para um estorno parcial. Motivo some ao fechar, para não vazar de um
@@ -348,6 +360,7 @@ export function BarraProximoPasso({
     }
     if (chave === 'desfazer') { setMotivoDesfazer(''); setErroDesfazer(null) }
     if (chave === 'cancelar') { setMotivoCancelar(''); setErroCancelar(null) }
+    setErroCorrecao(null)
     setConfirmando(chave)
   }
 
@@ -377,6 +390,29 @@ export function BarraProximoPasso({
       else setConfirmando(null)
     } catch (erro) { setErroDesfazer(erro.message || 'Não foi possível desfazer o pagamento. Tente de novo.') }
     finally { desfazendo.current = false; setMarcoEmVoo(null) }
+  }
+
+  const confirmarCorrecao = async (fazer, falha) => {
+    if (corrigindo.current) return
+    corrigindo.current = true
+    setMarcoEmVoo(marco)
+    setErroCorrecao(null)
+    try {
+      const resultado = await fazer()
+      if (resultado?.erro) setErroCorrecao(resultado.erro)
+      else setConfirmando(null)
+    } catch (erro) { setErroCorrecao(erro.message || falha) }
+    finally { corrigindo.current = false; setMarcoEmVoo(null) }
+  }
+
+  // #1683: confirmação em linha pelo teclado. Esc volta; no motivo, Enter quebra a linha e
+  // Ctrl+Enter confirma, para um Enter distraído não cancelar pedido. Em andamento, nada fecha.
+  const teclaDaConfirmacao = (evento) => {
+    if (evento.key === 'Escape' && !emVoo) { evento.preventDefault(); evento.stopPropagation(); setConfirmando(null) }
+    if (evento.key === 'Enter' && (evento.ctrlKey || evento.metaKey) && evento.target.tagName === 'TEXTAREA') {
+      evento.preventDefault()
+      evento.currentTarget.requestSubmit()
+    }
   }
 
   // "Marcar pago": o formulário (`BaixaAMao`) fica aberto até a resposta e mostra a recusa,
@@ -472,27 +508,35 @@ export function BarraProximoPasso({
       )}
 
       {confirmando === 'cancelar' && (
-        <div className={css.confirmarCorrecao}>
+        <form className={css.confirmarCorrecao} onKeyDown={teclaDaConfirmacao} onSubmit={(evento) => {
+          evento.preventDefault()
+          if (!emVoo && !(fonteApi && motivoCancelar.trim().length < 3)) confirmarCancelamento()
+        }}>
           <p className={css.corpoBloco}>
             Cancelar o pedido {pedido.numero}? {fonteApi ? 'Avise o cliente pela conversa após confirmar.' : `${nomeCliente} recebe aviso de cancelamento.`}
           </p>
           {fonteApi && <CampoArea rotulo="Motivo do cancelamento" value={motivoCancelar}
-            onChange={(e) => setMotivoCancelar(e.target.value)} maxLength={500} disabled={emVoo} />}
+            onChange={(e) => setMotivoCancelar(e.target.value)} maxLength={500} disabled={emVoo} autoFocus />}
           {fonteApi && temPagamento && <p className={css.corpoBloco}>
             O cancelamento não devolve o pagamento automaticamente. A devolução deve ser tratada separadamente.
           </p>}
           {erroCancelar && <p className={css.motivoDesabilitado} role="alert">{erroCancelar}</p>}
           <p className={css.confirmarAcoes}>
-            <Botao variante="texto" disabled={emVoo} onClick={() => setConfirmando(null)}>Manter</Botao>
-            <Botao variante="primario" disabled={emVoo || (fonteApi && motivoCancelar.trim().length < 3)} onClick={confirmarCancelamento}>
+            <Botao variante="texto" disabled={emVoo} autoFocus={!fonteApi} onClick={() => setConfirmando(null)}>Manter</Botao>
+            <Botao variante="perigo" tipo="submit" disabled={emVoo || (fonteApi && motivoCancelar.trim().length < 3)}>
               {emVoo ? 'Cancelando…' : 'Cancelar pedido'}
             </Botao>
           </p>
-        </div>
+        </form>
       )}
 
       {confirmando === 'estornar' && (
-        <div className={css.confirmarCorrecao}>
+        <form className={css.confirmarCorrecao} onKeyDown={teclaDaConfirmacao} onSubmit={(evento) => {
+          evento.preventDefault()
+          if (emVoo || !estornoValido) return
+          confirmarCorrecao(() => aoMarcarEstorno(motivoEstorno.trim(), centavosEstorno / 100),
+            'Não foi possível registrar o estorno. Tente de novo.')
+        }}>
           <p className={css.corpoBloco}>
             Devolver para {nomeCliente}. Pago: {moeda(valorPago)}.
           </p>
@@ -513,27 +557,24 @@ export function BarraProximoPasso({
             rows={2}
             value={motivoEstorno}
             onChange={(e) => setMotivoEstorno(e.target.value)}
+            disabled={emVoo}
+            autoFocus
           />
+          {erroCorrecao && <p className={css.motivoDesabilitado} role="alert">{erroCorrecao}</p>}
           <p className={css.confirmarAcoes}>
-            <Botao variante="texto" onClick={() => setConfirmando(null)}>Manter</Botao>
-            <Botao
-              variante="primario"
-              disabled={motivoEstorno.trim().length < 3
-                || centavosEstorno <= 0 || moedaAltaDemais(centavosEstorno)
-                || centavosEstorno > Math.round(valorPago * 100)}
-              onClick={() => {
-                aoMarcarEstorno(motivoEstorno.trim(), centavosEstorno / 100)
-                setConfirmando(null)
-              }}
-            >
-              Marcar estorno
+            <Botao variante="texto" disabled={emVoo} onClick={() => setConfirmando(null)}>Manter</Botao>
+            <Botao variante="perigo" tipo="submit" disabled={emVoo || !estornoValido}>
+              {emVoo ? 'Registrando…' : 'Marcar estorno'}
             </Botao>
           </p>
-        </div>
+        </form>
       )}
 
       {confirmando === 'desfazer' && (
-        <div className={css.confirmarCorrecao}>
+        <form className={css.confirmarCorrecao} onKeyDown={teclaDaConfirmacao} onSubmit={(evento) => {
+          evento.preventDefault()
+          if (!emVoo && motivoDesfazer.trim().length >= 3) confirmarDesfazer()
+        }}>
           <p className={css.corpoBloco}>
             Desfazer o último pagamento de {moeda(valorParaDesfazer)}? A cobrança volta a esperar
             {pedido.cobranca?.link ? ' e o pedido sai da cozinha' : ''}.
@@ -546,34 +587,39 @@ export function BarraProximoPasso({
             value={motivoDesfazer}
             onChange={(e) => setMotivoDesfazer(e.target.value)}
             disabled={emVoo}
+            autoFocus
           />
           {erroDesfazer && <p className={css.motivoDesabilitado} role="alert">{erroDesfazer}</p>}
           <p className={css.confirmarAcoes}>
             <Botao variante="texto" disabled={emVoo} onClick={() => setConfirmando(null)}>Manter</Botao>
             <Botao
-              variante="primario"
+              variante="perigo"
+              tipo="submit"
               disabled={emVoo || motivoDesfazer.trim().length < 3}
-              onClick={confirmarDesfazer}
             >
               {emVoo ? 'Desfazendo…' : 'Desfazer pagamento'}
             </Botao>
           </p>
-        </div>
+        </form>
       )}
 
       {confirmando === 'voltar' && (
-        <div className={css.confirmarCorrecao}>
+        <form className={css.confirmarCorrecao} onKeyDown={teclaDaConfirmacao} onSubmit={(evento) => {
+          evento.preventDefault()
+          if (!emVoo) confirmarCorrecao(() => aoVoltarEtapa(), 'Não foi possível voltar a etapa. Tente de novo.')
+        }}>
           <p className={css.corpoBloco}>
             Voltar para "{rotuloAnterior}"?
             {mensagemJaEnviada ? ' A mensagem já enviada não volta.' : ''}
           </p>
+          {erroCorrecao && <p className={css.motivoDesabilitado} role="alert">{erroCorrecao}</p>}
           <p className={css.confirmarAcoes}>
-            <Botao variante="texto" onClick={() => setConfirmando(null)}>Manter</Botao>
-            <Botao variante="primario" onClick={() => { aoVoltarEtapa(); setConfirmando(null) }}>
-              Voltar
+            <Botao variante="texto" disabled={emVoo} autoFocus onClick={() => setConfirmando(null)}>Manter</Botao>
+            <Botao variante="primario" tipo="submit" disabled={emVoo}>
+              {emVoo ? 'Voltando…' : 'Voltar'}
             </Botao>
           </p>
-        </div>
+        </form>
       )}
 
     </div>

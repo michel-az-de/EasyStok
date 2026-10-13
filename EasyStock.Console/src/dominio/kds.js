@@ -4,12 +4,19 @@ import { agruparPorLinha } from './pedido'
 // KDS sobre Pedido (S19), usado pela cozinha no modo API (F05). Os status são os
 // tokens da API (`StatusPedidoMapper`); a máquina de estados mora na API, aqui só
 // fica o próximo toque de cada coluna, como na cozinha da demonstração.
+// #1683: o pedido pago que espera o preparo está "Na fila"; "Aguardando" é da Ficha, que chama
+// assim o pedido que ainda não foi pago (`esteira.js`).
 export const COLUNAS_KDS = [
-  { status: 'aguardando', rotulo: 'Aguardando', toque: 'Começar preparo' },
+  { status: 'aguardando', rotulo: 'Na fila', toque: 'Começar preparo' },
   { status: 'preparando', rotulo: 'Em preparo', toque: 'Marcar pronto' },
   { status: 'pronto', rotulo: 'Pronto', toque: 'Saiu para entrega' },
   { status: 'saiu_para_entrega', rotulo: 'Saiu para entrega', toque: 'Marcar entregue' },
 ]
+
+// O cartão escreve o rótulo da própria coluna; o da API ("Aguardando") só vale fora delas.
+export function rotuloDoStatusKds(pedido) {
+  return COLUNAS_KDS.find((c) => c.status === pedido.status)?.rotulo ?? pedido.statusRotulo
+}
 
 const PROXIMO = {
   aguardando: 'preparando',
