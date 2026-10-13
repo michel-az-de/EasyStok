@@ -337,7 +337,7 @@ function TelaDaRota({ rota, aoSair }) {
       {/* #1582: Horários e mensagens também abre e fecha a loja; sem isto o gesto só aparecia
           depois, sozinho, ao voltar para o Balcão. */}
       {FONTE_API && <GestoLoja />}
-      <FaixaApi aoSair={aoSair} />
+      <FaixaApi aoSair={aoSair} somenteAvisos />
     </>
   )
 }
