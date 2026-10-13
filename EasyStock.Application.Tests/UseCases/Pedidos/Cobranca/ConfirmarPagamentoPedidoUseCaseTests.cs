@@ -27,8 +27,10 @@ public class ConfirmarPagamentoPedidoUseCaseTests
     public async Task SinalPago_GeraSaldoManualSemQuitar_AQuitacaoSaiAposSaldo()
     {
         var f = new CobrancaPedidoFixture();
+        f.Pedido.CriadoEm = CobrancaPedidoFixture.Agora;
         f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddDays(2);
         var sinal = await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id));
+        sinal.Valor.Should().Be(12.50m);
 
         var confirmado = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, sinal.Valor));
 
