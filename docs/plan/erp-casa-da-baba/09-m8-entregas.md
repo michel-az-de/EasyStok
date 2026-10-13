@@ -344,7 +344,7 @@ o pedido/empresa, permitindo selecionar outros pedidos antes de contratar.
 | Dez cenários HTTP reais | `ferramentas/prova-1693-dez-cenarios-api-real.mjs` passou com PostgreSQL real: grupo de três, P04 pelo navegador, P05 endereço400, P06 preparo bloqueado e KDS pronto, P07 manual R$18, P08 mãos a zero sem gasto, P09 falha/retorno/pedido pronto e P10 automático desligado/ligado dentro do teto. Pagamentos repetidos concorrentemente geraram uma saída por frete. |
 | Rastreio público próprio | Página aberta em navegador sem sessão; status entregue, ausência de nome/endereço/valores e token adulterado404 conferidos. Captura em `.build/1693-api-real/rastreio-publico.png`. |
 | Refinamento após inspeção real | Lista recolhe e foco passa às cotações mesmo quando foi expandida manualmente. Prova somente de cotação reexecutada, sem nova contratação/pagamento/evento; desktop/celular sem overflow. |
-| Publicação e aceite | Não comprovados por estas evidências locais. Exigem CI/PR, SHA servido, verificação da empresa demo e aceite humano explícito. |
+| Publicação | PR #1700 com CI verde, publicado em 13/10/2026 UTC no SHA `1d28b79a` conferido na API e Console. Login real na empresa isolada, dez pedidos do dia 13/10, grupo de três entregue e uma saída de R$24 no Caixa, repetição idempotente e rastreio público sem dados pessoais comprovados. Aceite humano ainda pendente. |
 
 O script com HTTP controlado verifica UX e integração do Console com o contrato; não substitui testes da
 API, transações PostgreSQL, isolamento de empresa ou serviços externos. A prova com API real usa
@@ -364,10 +364,14 @@ política, pagamento sem autorização ou estado de entrega fabricado. Cenários
 endereço ausente/alterado, janela incompatível, pedido em preparo/entregue/cancelado, contratação concorrente,
 mesma chave com outra intenção, saldo insuficiente/caixa fechado, provedor indisponível e transição inválida.
 
+Prova de produção: `.build/1693-producao/resultado-sanitizado.json` e capturas desktop/celular/rastreio.
+Empresa `923f8e8d-406b-4897-8c45-f8fe6f049773`, exclusivamente demonstrativa; vitrine inativa e nenhum envio externo.
+O ensaio identificou slug acima do limite ao preparar empresa nova. A correção preserva a UUID em 37 caracteres;
+o teste de integração passa a começar sem loja nem vitrine, cobrindo criação e repetição sem duplicação.
+
 ### 7.6 Pendências explícitas
 
 - Aceite humano de Thatiane e teste de uma atendente real; a banca simulada não os substitui.
-- Validação e publicação da empresa de demonstração com evidências de CI, SHA e login real.
 - Credenciais, habilitação comercial/regional e homologação externa de cada prestador.
 - Contratação externa com intenção durável e conciliação após timeout/rollback. Ligar produção exige esse
   tratamento, não apenas inserir uma chave na configuração.
