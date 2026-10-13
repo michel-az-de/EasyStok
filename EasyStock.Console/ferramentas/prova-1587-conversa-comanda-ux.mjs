@@ -163,7 +163,7 @@ await confere('A no cardápio, somar e tirar prato ficam desligados com o motivo
 // ── B. De quem é a comanda ───────────────────────────────────────────────────────────────
 await confere('B o painel do cardápio mostra o primeiro nome do cliente no cabeçalho e no rodapé', () => {
   assert.match(painelCardapio, /const nomeCliente = selecionada\?\.nome \? primeiroNome\(selecionada\.nome\) : ''/)
-  assert.match(painelCardapio, /<h2>Cardápio de hoje<\/h2>\s*\{nomeCliente && <p className=\{css\.donoDaComanda\} aria-live="polite">Comanda de <b>\{nomeCliente\}<\/b><\/p>\}/)
+  assert.match(painelCardapio, /<h2>\{travada && papel === 'escolher' \? 'Consulta do cardápio' : 'Cardápio de hoje'\}<\/h2>\s*\{nomeCliente && <p className=\{css\.donoDaComanda\} aria-live="polite">Comanda de <b>\{nomeCliente\}<\/b><\/p>\}/)
   assert.match(painelCardapio, /<RodapeComanda pedido=\{pedido\} cardapio=\{cardapio\} linhas=\{linhas\} nomeCliente=\{nomeCliente\} \/>/)
   assert.match(painelCardapio, /Comanda\{nomeCliente \? ` de \$\{nomeCliente\}` : ''\} · /)
 })
