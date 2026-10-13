@@ -27,7 +27,11 @@ $api = "http://127.0.0.1:$PortaApi"
 
 function Parar-Laboratorio {
     if (Test-Path $pids) {
-        foreach ($id in Get-Content $pids) { Stop-Process -Id ([int]$id) -Force -ErrorAction SilentlyContinue }
+        foreach ($id in Get-Content $pids) {
+            # PID pode ter sido reaproveitado depois de um reinicio: so encerra o que ainda e python ou dotnet.
+            $alvo = Get-Process -Id ([int]$id) -ErrorAction SilentlyContinue
+            if ($alvo -and $alvo.ProcessName -in 'python', 'dotnet') { Stop-Process -Id $alvo.Id -Force -ErrorAction SilentlyContinue }
+        }
         Remove-Item $pids
     }
     if (Test-Path (Join-Path $Pasta 'pgdata\postmaster.pid')) {
@@ -51,7 +55,10 @@ if (-not (Test-Path $dados)) {
     & (Join-Path $PgBin 'initdb.exe') -D $dados -U postgres --pwfile=$arquivoSenha -A scram-sha-256 -E UTF8 --locale=C | Out-Null
     Remove-Item $arquivoSenha
 }
-if (-not (Get-NetTCPConnection -LocalPort $PortaPg -State Listen -ErrorAction SilentlyContinue)) {
+if (Get-NetTCPConnection -LocalPort $PortaPg -State Listen -ErrorAction SilentlyContinue) {
+    # Porta ocupada so vale se for o PostgreSQL deste laboratorio; o de outra sessao nao e nosso para usar.
+    if (-not (Test-Path (Join-Path $dados 'postmaster.pid'))) { throw "Porta $PortaPg em uso por outro servidor. Informe -PortaPg." }
+} else {
     Start-Process -FilePath (Join-Path $PgBin 'pg_ctl.exe') -WindowStyle Hidden -ArgumentList @(
         '-D', "`"$dados`"", '-l', "`"$(Join-Path $Pasta 'pg.log')`"", '-o', "`"-p $PortaPg -c listen_addresses=127.0.0.1`"", 'start')
     Start-Sleep -Seconds 5
@@ -103,14 +110,17 @@ $login = Invoke-RestMethod -Method Post "$api/api/auth/login" -ContentType 'appl
 $arquivoToken = Join-Path $Pasta 'token.txt'
 [IO.File]::WriteAllText($arquivoToken, $login.data.token)
 $cab = @{ Authorization = "Bearer $($login.data.token)" }
-try {
+$vitrines = & $psql -h 127.0.0.1 -p $PortaPg -U postgres -d easystock -tAc "select count(*) from storefront where ""Slug""='casa-da-baba'"
+if ($vitrines -eq '0') {
     Invoke-RestMethod -Method Post "$api/api/minha-vitrine" -Headers $cab -ContentType 'application/json' -Body '{"tituloPublico":"Casa da Baba","slug":"casa-da-baba"}' | Out-Null
     Invoke-RestMethod -Method Post "$api/api/minha-vitrine/configuracao/ativar" -Headers $cab -ContentType 'application/json' -Body '{}' | Out-Null
-    python (Join-Path $raiz 'scripts\cardapio\carregar_cardapio.py') --api $api --token-arquivo $arquivoToken --aplicar | Select-Object -Last 1
-    python (Join-Path $raiz 'scripts\entrega\configurar_janelas.py') --api $api --token-arquivo $arquivoToken --aplicar | Select-Object -Last 1
+    foreach ($carga in 'scripts\cardapio\carregar_cardapio.py', 'scripts\entrega\configurar_janelas.py') {
+        python (Join-Path $raiz $carga) --api $api --token-arquivo $arquivoToken --aplicar | Select-Object -Last 1
+        if ($LASTEXITCODE -ne 0) { throw "$carga falhou." }
+    }
     Invoke-RestMethod -Method Post "$api/api/minha-vitrine/entrega/zonas" -Headers $cab -ContentType 'application/json' `
         -Body '{"label":"Pinheiros e arredores","valor":12,"tempoEstimadoMinutos":60,"ordem":1,"cepInicio":"05400000","cepFim":"05499999","bairros":[]}' | Out-Null
-} catch { Write-Host 'Loja ja preparada em execucao anterior (vitrine existente).' }
+} else { Write-Host 'Loja ja preparada em execucao anterior.' }
 foreach ($flag in 'modulo.atendimento', 'atendimento.canal.chatsite') {
     & $psql -h 127.0.0.1 -p $PortaPg -U postgres -d easystock -tAc "insert into ""TenantFeatureFlags"" (""Id"",""EmpresaId"",""Feature"",""Ativo"",""AlteradoEm"",""AlteradoPor"") select gen_random_uuid(), e.""Id"", '$flag', true, now(), 'laboratorio' from empresas e where not exists (select 1 from ""TenantFeatureFlags"" x where x.""EmpresaId""=e.""Id"" and x.""Feature""='$flag')" | Out-Null
 }

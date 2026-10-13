@@ -30,14 +30,21 @@ public sealed partial class PedidoConversaConcorrenciaTests
             Itens = [new(c.CardapioItemId, 1, null)], JanelaId = c.JanelaId, DataEntrega = c.DataEntrega,
         });
 
-        var resposta = await client.PostAsJsonAsync($"{Rota(token)}/confirmar", new { revisao = 1 });
+        var antes = await ContarPedidos(factory);
+
+        var resposta = await client.PostAsJsonAsync($"{Rota(token)}/confirmar", new { revisao = (await Estado(client, token)).Revisao });
 
         var corpo = await resposta.Content.ReadAsStringAsync();
         resposta.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable, corpo);
         corpo.Should().NotContain("Erro interno");
-        using var scope = factory.Services.CreateScope();
-        (await scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().Pedidos.IgnoreQueryFilters().CountAsync())
-            .Should().Be(0, "pedido sem cobrança não fica para trás");
+        corpo.Should().Contain("combinar o pagamento");
+        (await ContarPedidos(factory)).Should().Be(antes, "pedido sem cobrança não fica para trás");
         (await Estado(client, token)).PodeEditar.Should().BeTrue("o cliente continua com a seleção para tentar de novo");
+    }
+
+    private static async Task<int> ContarPedidos(Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().Pedidos.IgnoreQueryFilters().CountAsync();
     }
 }

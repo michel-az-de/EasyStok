@@ -20,6 +20,7 @@ URL_PUBLICA = os.environ.get("MP_URL_PUBLICA", f"http://127.0.0.1:{PORTA}").rstr
 LOG = os.environ.get("MP_LOG", "mp-chamadas.jsonl")
 CONTA = 900001  # conta recebedora: a mesma em users/me, na preferência e no pagamento, como a API confere (I3.2)
 PREFS, PAGTOS, ESTORNOS, N = {}, {}, {}, [900000]
+TRAVA = threading.Lock()  # o servidor atende em threads: id e saldo devolvido mudam sob trava
 EVENTO = itertools.count(int(time.time()) * 1000)  # id da notificação: único, o da API é a chave de repetição
 
 # Desfechos da página: rótulo, método e status do contrato de v1/payments, e a back_url que o Checkout Pro usaria.
@@ -51,7 +52,8 @@ def vencida(pref):
     if not pref.get("expires") or not pref.get("expiration_date_to"):
         return False
     try:
-        return datetime.fromisoformat(pref["expiration_date_to"]) <= datetime.now(timezone.utc)
+        fim = datetime.fromisoformat(pref["expiration_date_to"])
+        return (fim if fim.tzinfo else fim.replace(tzinfo=timezone.utc)) <= datetime.now(timezone.utc)
     except ValueError:
         return False
 
@@ -80,7 +82,8 @@ def total(pref):
 
 
 def pagamento(ref, valor, metodo, status="approved", detalhe="accredited"):
-    N[0] += 1; pid = N[0]
+    with TRAVA:
+        N[0] += 1; pid = N[0]
     tipo = {"pix": "bank_transfer", "credit_card": "credit_card"}.get(metodo, "credit_card")
     PAGTOS[str(pid)] = {"id": pid, "status": status, "status_detail": detalhe, "external_reference": ref, "transaction_amount": valor,
                         "date_approved": time.strftime("%Y-%m-%dT%H:%M:%S.000-03:00") if status == "approved" else None,
@@ -189,7 +192,10 @@ class H(BaseHTTPRequestHandler):
             threading.Thread(target=webhook, args=(pg["id"],), daemon=True).start()
             return self._json(200, pg)
         if p.startswith("/v1/payments/") and p.endswith("/refunds"):
-            pid = p.split("/")[3]; st, corpo = estornar(pid, d.get("amount")); log(estorno=pid, corpo=d, http=st)
+            pid = p.split("/")[3]
+            with TRAVA:
+                st, corpo = estornar(pid, d.get("amount"))
+            log(estorno=pid, corpo=d, http=st)
             return self._json(st, corpo)
         self._json(404, {})
 
