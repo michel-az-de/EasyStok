@@ -20,6 +20,7 @@ registerHooks({
     if (spec === 'react/jsx-runtime') return { url: codigo('export const Fragment="fragment"; export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx'), shortCircuit: true }
     if (spec.endsWith('.css')) return { url: codigo('export default {}'), shortCircuit: true }
     if (spec.endsWith('useComandasCliente')) return { url: codigo('export const useComandasCliente=()=>globalThis.__comandaCompartilhada'), shortCircuit: true }
+    if (spec.endsWith('rascunhosDosAjustes')) return { url: codigo('import { useState } from "react"; export const useRascunhoDoAjuste=()=>useState(null)'), shortCircuit: true }
     if (spec.endsWith('/contextos')) return { url: codigo('export const useCatalogo=()=>({cardapio:globalThis.__comandaCompartilhada.cardapio,canais:[]});export const useAcoes=()=>globalThis.__comandaCompartilhada;export const useAtendimento=()=>({agora:Date.now()})'), shortCircuit: true }
     if (spec.endsWith('/ModalEnviarCardapio')) return { url: modalArquivo.href, shortCircuit: true }
     if (spec.endsWith('/acessoModulos')) return { url: codigo('export const useAcessoModulos=()=>globalThis.__comandaCompartilhada'), shortCircuit: true }
@@ -52,7 +53,7 @@ contexto.cardapio = [{ sku: 'prato', nome: 'Lasanha', preco: 50 }, { sku: 'novo'
   { sku: 'validacao', nome: 'Em validação', emValidacao: true }, { sku: 'removido', nome: 'Removido', removidoEm: 'hoje' }]
 function render() { contexto.cursor = 0; return elementos(ComandaDoCliente({ conversaId: 'conversa', numeroComanda: 72, ativo: true })) }
 let arvore = render()
-assert.equal(arvore.find(e => e.type === 'span' && Array.isArray(e.props.children) && e.props.children.includes('Lasanha')).props.children.at(-1), 'R$ 40,00', 'preço salvo vence catálogo alterado')
+assert.ok(arvore.some(e => e.type === 'small' && e.props.children === 'R$ 40,00'), 'preço salvo vence catálogo alterado')
 assert.ok(!arvore.some(e => e.type === 'option' && ['validacao', 'removido'].includes(e.props.value)))
 arvore.find(e => e.props['aria-label'] === 'Tirar uma unidade de Lasanha').props.onClick()
 assert.equal(contexto.salvo, undefined, 'edição local só publica ao salvar')

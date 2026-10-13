@@ -27,26 +27,26 @@ O que funciona e ficou como estava: a barra fixa de andamento no pé da Ficha, c
 
 ## Antes e depois, medido
 
-Mesmo pedido, mesmo laboratório.
+Mesmo pedido, mesmo laboratório. A base mudou durante a rodada: a #1701, de outra sessão, entrou no master antes desta PR, renomeou a coluna para "Pedido" e pôs o pedido no topo dela, com o cliente depois. O achado 1 foi resolvido por ela. A tabela compara o master já com a #1701 (`9aeffa86`) com esta PR por cima.
 
-| Tela | Medida | Antes | Depois |
+| Tela | Medida | Master com a #1701 | Com esta PR |
 |---|---|---|---|
 | 1280x720 | Largura da conversa | 380 px | 480 px |
-| 1280x720 | Rolagem da Ficha | 7,1 telas | 4,5 telas |
-| 1280x720 | Comanda abaixo do topo | 1.013 px | 477 px |
-| 1440x900 | Rolagem da Ficha | 5,0 telas | 3,1 telas |
-| 1440x900 | Comanda abaixo do topo | 1.013 px | 446 px |
-| 1440x900 | Cobrança abaixo do topo | 2.130 px | 1.233 px |
-| 1920x1080 | Rolagem da Ficha | 3,8 telas | 2,2 telas |
-| 1920x1080 | Largura da Ficha | 420 px | 520 px |
+| 1280x720 | Rolagem da coluna Pedido | 7,1 telas | 4,5 telas |
+| 1280x720 | Cobrança abaixo do topo | 1.269 px | 925 px |
+| 1440x900 | Rolagem da coluna Pedido | 4,9 telas | 3,0 telas |
+| 1440x900 | Cobrança abaixo do topo | 1.269 px | 877 px |
+| 1920x1080 | Rolagem da coluna Pedido | 3,8 telas | 2,2 telas |
+| 1920x1080 | Cobrança abaixo do topo | 1.269 px | 809 px |
+| 1920x1080 | Largura da coluna Pedido | 420 px | 520 px |
 | 1440, cardápio aberto | Conversa à vista | 104 px, cortada | 452 px, inteira |
 | 1280, cardápio aberto | Conversa à vista | 0 px | 352 px, inteira |
 
-Em 1440x900 e 1920x1080 a comanda passa a aparecer na primeira tela da Ficha.
+O pedido no topo da coluna (20 px) vem da #1701. O que esta PR acrescenta: a troca de janela, as devoluções e as ocorrências recolhidas entre o pedido e o resto, o cadastro recolhido no fim, o cardápio fora de cima da conversa e as larguras por tela.
 
 ## Limites
 
-- Em 1280x720 a comanda ainda começa abaixo da primeira tela (477 px para 415 visíveis): o bloco do cliente e a barra de andamento ocupam o resto.
+- Em 1280x720 a cobrança ainda fica 925 px abaixo do topo, com 415 px visíveis: o pedido e a janela vêm antes.
 - A Ficha em duas colunas na tela larga não foi feita; segue na #1686.
 - Com o cardápio aberto em 1280 a conversa fica com 352 px. Antes ficava com zero.
 - A crítica cobriu o Atendimento. Cozinha, Caixa e Entregas não foram medidos nesta rodada.
