@@ -19,13 +19,16 @@ registerHooks({
     if (spec === 'react') return { url: codigo('export function useState(inicial){const c=globalThis.__comandaCompartilhada;const n=c.cursor++;if(!(n in c.estados))c.estados[n]=inicial;return [c.estados[n],v=>c.estados[n]=v]} export const useRef=inicial=>useState({current:inicial})[0]'), shortCircuit: true }
     if (spec === 'react/jsx-runtime') return { url: codigo('export const Fragment="fragment"; export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx'), shortCircuit: true }
     if (spec.endsWith('.css')) return { url: codigo('export default {}'), shortCircuit: true }
-    if (spec.endsWith('useComandasCliente')) return { url: codigo('export const useComandasCliente=()=>globalThis.__comandaCompartilhada'), shortCircuit: true }
+    if (spec.endsWith('useComandasCliente')) return { url: codigo(`export const useComandasCliente=()=>globalThis.__comandaCompartilhada;export { idDaJanela, janelaDoId } from ${JSON.stringify(new URL('../src/infra/api/comandaApi.js', import.meta.url).href)}`), shortCircuit: true }
+    if (spec.endsWith('/fonteDados')) return { url: codigo('export const API_BASE=""; export const FONTE_API=true'), shortCircuit: true }
     if (spec.endsWith('rascunhosDosAjustes')) return { url: codigo('import { useState } from "react"; export const useRascunhoDoAjuste=()=>useState(null)'), shortCircuit: true }
     if (spec.endsWith('/contextos')) return { url: codigo('export const useCatalogo=()=>({cardapio:globalThis.__comandaCompartilhada.cardapio,canais:[]});export const useAcoes=()=>globalThis.__comandaCompartilhada;export const useAtendimento=()=>({agora:Date.now()})'), shortCircuit: true }
     if (spec.endsWith('/ModalEnviarCardapio')) return { url: modalArquivo.href, shortCircuit: true }
     if (spec.endsWith('/acessoModulos')) return { url: codigo('export const useAcessoModulos=()=>globalThis.__comandaCompartilhada'), shortCircuit: true }
     if (spec.endsWith('/Botao')) return { url: codigo('export function Botao(){}'), shortCircuit: true }
     if (spec.endsWith('/Modal')) return { url: codigo('export function Modal(){}'), shortCircuit: true }
+    if (spec.endsWith('/BlocoFreteApi')) return { url: codigo('export function ConsultaTransporte(){}'), shortCircuit: true }
+    if (spec.endsWith('/SeletorJanelaApi')) return { url: codigo('export function SeletorJanelaApi(){}'), shortCircuit: true }
     if (spec.startsWith('.') && !/\.[a-z]+$/i.test(spec)) return proximo(spec + '.js', ctx)
     return proximo(spec, ctx)
   },

@@ -11,9 +11,9 @@ export function ConsultaTransporte({ semPedido = false }) {
   return <div className={css.consultaTransporte}>
     <a href="https://web.lalamove.com/" target="_blank" rel="noopener noreferrer"
       aria-label="Consultar Lalamove (site externo, abre em nova aba)">Consultar Lalamove ↗</a>
-    <p>Consulte o preço na Lalamove e combine o frete. {semPedido
-      ? 'Com pedido e viagem criados, registre a corrida em Entregas > Registrar corrida.'
-      : 'Depois de contratar, registre a corrida na viagem em Entregas > Registrar corrida.'}</p>
+    <p>{semPedido
+      ? 'Cotação e contratação externas. Após criar o pedido e a viagem, use Entregas > Registrar corrida.'
+      : 'Consulte o preço e combine o frete. Após contratar, registre a corrida na viagem em Entregas > Registrar corrida.'}</p>
     {!semPedido && permite('entregas') && <a href={hashDoModulo('entregas')}>Abrir Entregas</a>}
   </div>
 }

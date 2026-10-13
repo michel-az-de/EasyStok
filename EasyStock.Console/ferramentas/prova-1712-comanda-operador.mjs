@@ -79,6 +79,8 @@ provar('entrega encaminhada abre o frete e não repete a ação de encaminhar', 
   assert.match(html, /class="transporteCompartilhado" open=""/)
   assert.doesNotMatch(html, /class="enderecoCompartilhado" open=""/)
   assert.match(html, /Confirmar frete combinado/)
+  assert.ok(html.indexOf('Quantidade de Lasanha') < html.indexOf('class="transporteCompartilhado"'), 'itens devem aparecer antes do formulário de frete')
+  assert.ok(html.indexOf('type="date"') >= 0 && html.indexOf('type="date"') < html.indexOf('class="transporteCompartilhado"'), 'horário deve aparecer antes do formulário de frete')
   assert.doesNotMatch(html, /Combinar entrega desta seleção/)
 })
 provar('frete confirmado fica visível sem voltar a oferecer encaminhamento', () => {

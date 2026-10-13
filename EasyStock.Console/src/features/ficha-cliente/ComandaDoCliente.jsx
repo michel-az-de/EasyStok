@@ -100,7 +100,6 @@ export function SelecaoCompartilhada({ comanda: c, ocupado, erro, salvar, confir
   return <div>
     {c.ajudaSolicitada && <output className={css.ajudaCompartilhada}>
       <strong>Pedido de ajuda registrado</strong>
-      <span>Revise com o cliente os itens e a entrega desta comanda.</span>
     </output>}
     {c.rascunho.endereco && <details className={css.enderecoCompartilhado}>
       <summary>Entrega · {c.rascunho.endereco.logradouro}, {c.rascunho.endereco.numero}</summary>
@@ -108,30 +107,11 @@ export function SelecaoCompartilhada({ comanda: c, ocupado, erro, salvar, confir
       {c.rascunho.endereco.complemento && ' · ' + c.rascunho.endereco.complemento} · {c.rascunho.endereco.bairro}
       {' · ' + c.rascunho.endereco.cidade + '/' + c.rascunho.endereco.uf + ' · CEP ' + c.rascunho.endereco.cep}</p>
     </details>}
-    {c.podeEditar && !c.pedido && <details className={css.transporteCompartilhado} open={c.entregaACombinar}>
-      <summary>Combinar entrega · consultar Lalamove</summary>
-      <ConsultaTransporte semPedido />
-      {!c.entregaACombinar && c.freteCombinado == null && <>
-        <Botao disabled={ocupado || Boolean(edicao) || !c.rascunho.endereco || !c.rascunho.itens.length}
-          onClick={() => encaminharEntrega(c)}>Combinar entrega desta seleção</Botao>
-        {!c.rascunho.endereco ? <p>Peça ao cliente que informe o endereço na comanda.</p>
-          : !c.rascunho.itens.length && <p>Adicione e salve os pratos antes de combinar a entrega.</p>}
-      </>}
-    {c.entregaACombinar && <form className={css.freteCompartilhado} onSubmit={e => { e.preventDefault(); combinarFrete(c, Number(frete)) }}>
-      <p>Confira o transporte e combine o frete com o cliente.</p>
-      <label>Frete combinado (R$) <input type="number" min="0" max="100000" step="0.01" required value={frete}
-        disabled={ocupado} onChange={e => setFrete(e.target.value)} /></label>
-      <Botao tipo="submit" disabled={ocupado || Boolean(edicao) || frete === ''} variante="primario">Confirmar frete combinado</Botao>
-      <p>Confira o total com o cliente e confirme o pedido aqui ou pelo link.</p>
-    </form>}
-      {edicao && <p>Salve os ajustes da seleção antes de combinar a entrega.</p>}
-      <p>Se alterar itens ou horário, salve e combine o frete novamente.</p>
-    </details>}
+    {c.podeEditar && !c.pedido && <ConsultaTransporte semPedido />}
     {c.freteCombinado != null && !c.pedido && <p>Frete combinado: {moeda(c.freteCombinado)}. Confira o total com o cliente e confirme o pedido aqui ou pelo link.</p>}
-    <p className={css.estadoCompartilhado}>{c.podeEditar ? c.pedido ? 'O pedido confirmado continua valendo até a aprovação deste ajuste.'
-      : 'Revise e ajuste esta seleção com o cliente. Salve para conferir o total e confirmar o pedido aqui ou pelo link.'
+    {(c.pedido || !c.podeEditar) && <p className={css.estadoCompartilhado}>{c.podeEditar ? 'O pedido confirmado continua valendo até a aprovação deste ajuste.'
       : c.envio?.situacao === 'estorno_pendente' ? 'Devolução em acompanhamento.'
-        : pendente ? 'Confira a alteração solicitada antes de aplicar ao pedido.' : 'Envio registrado. Compartilhe uma nova edição para ajustar.'}</p>
+        : pendente ? 'Confira a alteração solicitada antes de aplicar ao pedido.' : 'Envio registrado. Compartilhe uma nova edição para ajustar.'}</p>}
     {conflito && <p role="alert">A seleção mudou enquanto você editava. Sua edição foi preservada. Confira a seleção atual abaixo antes de continuar.</p>}
     {pendente && <div className={css.comparativo}>
       <b>Pedido atual · {moeda(c.pedido?.total ?? 0)}</b>
@@ -191,6 +171,22 @@ export function SelecaoCompartilhada({ comanda: c, ocupado, erro, salvar, confir
           : <Botao variante="primario" disabled={ocupado} onClick={persistir}>Salvar seleção</Botao>}
       </div>}
       {edicao && <p>Alterações locais. Salve para o cliente ver; os valores finais serão conferidos pelo sistema.</p>}
+      {!c.pedido && <details className={css.transporteCompartilhado} open={c.entregaACombinar}>
+        <summary>Combinar entrega · consultar Lalamove</summary>
+        {!c.entregaACombinar && c.freteCombinado == null && <>
+          <Botao disabled={ocupado || Boolean(edicao) || !c.rascunho.endereco || !c.rascunho.itens.length}
+            onClick={() => encaminharEntrega(c)}>Combinar entrega desta seleção</Botao>
+          {!c.rascunho.endereco ? <p>Peça ao cliente que informe o endereço na comanda.</p>
+            : !c.rascunho.itens.length && <p>Adicione e salve os pratos antes de combinar a entrega.</p>}
+        </>}
+        {c.entregaACombinar && <form className={css.freteCompartilhado} onSubmit={e => { e.preventDefault(); combinarFrete(c, Number(frete)) }}>
+          <p>Confira o transporte e combine o frete com o cliente.</p>
+          <label>Frete combinado (R$) <input type="number" min="0" max="100000" step="0.01" required value={frete}
+            disabled={ocupado} onChange={e => setFrete(e.target.value)} /></label>
+          <Botao tipo="submit" disabled={ocupado || Boolean(edicao) || frete === ''} variante="primario">Confirmar frete combinado</Botao>
+        </form>}
+        {edicao && <p>Salve os ajustes da seleção antes de combinar a entrega.</p>}
+      </details>}
       {!c.pedido && <div className={css.confirmarCompartilhado}>
         <Botao variante="primario" disabled={ocupado || Boolean(faltaConfirmar)}
           onClick={() => setConfirmacao({ comanda: c, janela: rotuloJanela })}>Confirmar pedido com o cliente</Botao>
