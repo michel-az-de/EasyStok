@@ -15,6 +15,54 @@ namespace EasyStock.Application.Tests.UseCases.Pedidos.Cobranca;
 
 public class EncomendaSinalManualTests
 {
+    [Theory]
+    [InlineData(0, 120, true)]
+    [InlineData(30, 90, true)]
+    [InlineData(0, 120, false)]
+    [InlineData(30, 90, false)]
+    public async Task EditarTotalManual_RecriaDividaAtualSemAlterarRecebimentos(decimal recebido, decimal saldoEsperado, bool cobrarSaldo)
+    {
+        var f = Futuro();
+        var item = f.Pedido.Itens.Last();
+        item.PrecoUnitario = 80m; item.RecalcularSubtotal(); f.Pedido.RecalcularTotal();
+        var conversaId = Guid.NewGuid();
+        var anterior = CobrancaPedido.CriarNaEntrega(f.EmpresaId, f.Pedido.Id, 100m, CobrancaPedidoFixture.Agora, conversaId);
+        f.Cobrancas.Add(anterior);
+        if (recebido > 0) await Manual(f).ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "pix", recebido));
+        var pagamentos = f.Pedido.Pagamentos.ToArray();
+
+        item.PrecoUnitario = 100m; item.RecalcularSubtotal(); f.Pedido.RecalcularTotal();
+        var resultado = await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id, CobrarSaldo: cobrarSaldo));
+        var repetida = await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id, CobrarSaldo: cobrarSaldo));
+
+        resultado.Valor.Should().Be(saldoEsperado);
+        resultado.CobrancaId.Should().NotBe(anterior.Id);
+        repetida.CobrancaId.Should().Be(resultado.CobrancaId);
+        anterior.EstaPendente.Should().BeFalse();
+        var atual = f.Cobrancas.Single(c => c.EstaPendente);
+        atual.EmpresaId.Should().Be(f.EmpresaId); atual.PedidoId.Should().Be(f.Pedido.Id);
+        atual.ConversaId.Should().Be(conversaId); atual.EhOnline.Should().BeFalse(); atual.ExpiraEm.Should().BeNull();
+        f.Pedido.TotalPago.Should().Be(recebido);
+        f.Pedido.Pagamentos.Should().Equal(pagamentos);
+        await f.MpClient.DidNotReceiveWithAnyArgs().CriarPreferenceAsync(default!, default);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ReemitirManual_ConsideraCupomAlocadoMesmoSemFlagDeSaldo(bool cobrarSaldo)
+    {
+        var f = Futuro();
+        f.AdicionarNaEntrega();
+        f.Creditos.TotaisDoPedidoAsync(f.EmpresaId, f.Pedido.Id, Arg.Any<CancellationToken>()).Returns((0m, 5m));
+
+        var resultado = await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id, CobrarSaldo: cobrarSaldo));
+
+        resultado.Valor.Should().Be(20m);
+        f.Pedido.TotalPago.Should().Be(0m);
+        await f.MpClient.DidNotReceiveWithAnyArgs().CriarPreferenceAsync(default!, default);
+    }
+
     [Fact]
     public async Task SemMercadoPago_NasceComDividaManualSemPrazoENaoDuplicaAoRepetir()
     {

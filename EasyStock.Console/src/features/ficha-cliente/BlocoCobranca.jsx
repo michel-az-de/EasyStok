@@ -420,22 +420,23 @@ export function BlocoCobranca({
   // 19, seção 4: "Linha 'Receber na entrega · maquininha · R$ 68,00'").
   if (!cobranca.link && !cobranca.pagaEm) {
     const sinalPendente = fonteApi && aguardaSinalManual(pedido)
-    const recebido = pedido.alocadoApi ?? pedido.totalPagoApi ?? 0
+    const recebido = pedido.totalPagoApi ?? 0
+    const alocado = pedido.alocadoApi ?? recebido
     const faltaSinal = valorSugeridoParaBaixa(pedido)
     return (
       <Bloco titulo="Cobrança">
         <div className={css.cabecaCobranca}>
           <span className={css.rotuloTotal}>Total</span>
-          <b className={css.valorForte}>{moeda(cobranca.valor)}</b>
+          <b className={css.valorForte}>{moeda(fonteApi ? pedido.totalApi ?? cobranca.valor : cobranca.valor)}</b>
         </div>
         <p className={css.linhaNaEntrega}>
           <Icone nome="credit-card" /> {sinalPendente ? 'Sinal a receber' : 'Receber na entrega'} · {nome} <b>{moeda(faltaSinal)}</b>
         </p>
         {sinalPendente && (
-          <p className={css.corpoBloco}>{recebido > 0 ? `Recebido: ${moeda(recebido)}. ` : ''}O sinal confirma a reserva. Restante na entrega: {moeda(pedido.totalApi - recebido - faltaSinal)}.</p>
+          <p className={css.corpoBloco}>{recebido > 0 ? `Recebido: ${moeda(recebido)}. ` : ''}O sinal confirma a reserva. Restante na entrega: {moeda(pedido.totalApi - alocado - faltaSinal)}.</p>
         )}
-        {!sinalPendente && fonteApi && pedido.sinalNaReserva && pedido.totalPagoApi > 0 && pedido.totalPagoApi < pedido.totalApi && (
-          <p className={css.corpoBloco}>Sinal recebido: {moeda(pedido.totalPagoApi)}. Saldo na entrega: {moeda(pedido.totalApi - pedido.totalPagoApi)}.</p>
+        {!sinalPendente && fonteApi && pedido.sinalNaReserva && alocado > 0 && alocado < pedido.totalApi && (
+          <p className={css.corpoBloco}>Recebido: {moeda(recebido)}. Saldo na entrega: {moeda(pedido.totalApi - alocado)}.</p>
         )}
         {recebendo && (
           <BaixaAMao valorCobrado={valorSugeridoParaBaixa(pedido)}

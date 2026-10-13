@@ -117,7 +117,7 @@ public sealed class GerarCobrancaPedidoUseCase(
                 "Pedido cancelado ou entregue não recebe cobrança.");
         // Mesma conta da confirmação (#1289): com os pagamentos cobrindo o total, o webhook trataria
         // o pagamento deste link como duplicado e o devolveria sozinho.
-        var alocado = input.CobrarSaldo && saldoFinanceiro is not null
+        var alocado = saldoFinanceiro is not null
             ? (await saldoFinanceiro.ConsultarAsync(pedido, ct)).Alocado : pedido.TotalPago;
         if (pedido.Total.Valor > 0m && alocado >= pedido.Total.Valor)
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
@@ -125,7 +125,7 @@ public sealed class GerarCobrancaPedidoUseCase(
         var storefront = await storefrontRepository.GetByEmpresaAsync(input.EmpresaId, ct);
         var dados = new DadosCobranca(
             pedido.EmpresaId, pedido.Id, storefront?.Id ?? Guid.Empty, storefront?.TituloPublico ?? string.Empty,
-            pedido.Total.Valor, pedido.Itens.ToList(), pedido.AgendadoParaEm, pedido.CriadoEm, input.CobrarSaldo ? alocado : 0m, input.CobrarSaldo);
+            pedido.Total.Valor, pedido.Itens.ToList(), pedido.AgendadoParaEm, pedido.CriadoEm, alocado, input.CobrarSaldo);
         return await CobrarAsync(dados, input.ConversaId, input.Tentativa, ct);
     }
 
@@ -144,7 +144,16 @@ public sealed class GerarCobrancaPedidoUseCase(
         if (pendente is not null && !pendente.EhOnline)
         {
             if (PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, dados.CriadoEm))
-                return CobrancaPedidoResult.De(pendente, reutilizada: true);
+            {
+                var saldoManual = dados.Total - dados.Alocado;
+                if (pendente.Valor == saldoManual) return CobrancaPedidoResult.De(pendente, reutilizada: true);
+                pendente.Cancelar(MotivoValorAlterado, agora);
+                var manual = CobrancaPedido.CriarNaEntrega(dados.EmpresaId, dados.PedidoId,
+                    saldoManual, agora, conversaId ?? pendente.ConversaId);
+                await cobrancaRepository.AddAsync(manual, ct);
+                await unitOfWork.CommitAsync();
+                return CobrancaPedidoResult.De(manual);
+            }
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.FormaNaEntrega,
                 "O pedido está combinado para pagar na entrega; troque a forma para gerar link.");
         }
