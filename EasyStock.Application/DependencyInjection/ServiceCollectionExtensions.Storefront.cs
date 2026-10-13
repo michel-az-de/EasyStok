@@ -30,6 +30,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ValidarOtpUseCase>();
         services.AddScoped<EncerrarSessaoUseCase>();
         services.AddScoped<VincularChatAposLoginUseCase>();
+        services.AddScoped<VincularComandaAposOtpUseCase>();
 
         // Frete (EZ-FRETE-001)
         services.AddScoped<CalcularFreteUseCase>();

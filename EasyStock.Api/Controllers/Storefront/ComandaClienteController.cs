@@ -4,6 +4,8 @@ using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Exceptions.Storefront;
+using EasyStock.Application.UseCases.Atendimento;
+using Npgsql;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace EasyStock.Api.Controllers.Storefront;
@@ -147,9 +149,13 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
         try { return Ok(await acao()); }
         catch (LinkCardapioConversaIndisponivelException e) { return Problem(e.Message, statusCode: 410); }
         catch (ComandaClienteConflitoException e) { return Problem(e.Message, statusCode: 409); }
+        catch (TelefoneExigeVerificacaoException e) { return ExigirVerificacao(e.Message); }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: "23505", ConstraintName: "ix_clientes_empresa_telefone_hash" })
+        { return ExigirVerificacao(new TelefoneExigeVerificacaoException().Message); }
         catch (UseCaseValidationException e) { return Problem(e.Message, statusCode: 400); }
         catch (RegraDeDominioVioladaException e) { return Problem(e.Message, statusCode: 422); }
     }
+    private ObjectResult ExigirVerificacao(string mensagem) => StatusCode(409, new { error = new { code = "TELEFONE_EXIGE_VERIFICACAO", message = mensagem } });
 }
 public sealed record SalvarComandaClienteBody(int Revisao, RascunhoComandaCliente Rascunho);
 public sealed record EnviarComandaClienteBody(int Revisao);

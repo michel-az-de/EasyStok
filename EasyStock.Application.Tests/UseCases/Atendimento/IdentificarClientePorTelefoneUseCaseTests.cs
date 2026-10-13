@@ -141,4 +141,32 @@ public class IdentificarClientePorTelefoneUseCaseTests
 
         resultado.Cliente.Nome.Should().Be(IdentificarClientePorTelefoneUseCase.NomePadraoLead);
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Telefone_declarado_existente_exige_posse_sem_modificar_cadastro(bool temHash)
+    {
+        var existente = ClienteEntity.Criar(_empresaId, "Nome preservado");
+        if (temHash)
+        {
+            existente.TelefoneHash = ClienteOtp.CalcularTelefoneHash(TelefoneE164);
+            _clienteStorefrontRepository.GetByTelefoneHashAsync(_empresaId, existente.TelefoneHash, Arg.Any<CancellationToken>()).Returns(existente);
+        }
+        else _clienteRepository.FindByTelefoneAsync(_empresaId, "11997573992").Returns(existente);
+        await _useCase.Invoking(s => s.ExecuteAsync(new(_empresaId, WaId, "Nome alegado", ReutilizarCadastro: false)))
+            .Should().ThrowAsync<TelefoneExigeVerificacaoException>();
+        existente.Nome.Should().Be("Nome preservado");
+        if (!temHash) existente.TelefoneHash.Should().BeNull();
+        await _clienteRepository.DidNotReceiveWithAnyArgs().AddAsync(default!);
+        await _clienteRepository.DidNotReceiveWithAnyArgs().UpdateAsync(default!);
+    }
+
+    [Fact]
+    public async Task Telefone_declarado_novo_continua_criando_cliente()
+    {
+        var resultado = await _useCase.ExecuteAsync(new(_empresaId, WaId, "Nova cliente", ReutilizarCadastro: false));
+        resultado.EhNovo.Should().BeTrue();
+        await _clienteRepository.Received(1).AddAsync(resultado.Cliente);
+    }
 }
