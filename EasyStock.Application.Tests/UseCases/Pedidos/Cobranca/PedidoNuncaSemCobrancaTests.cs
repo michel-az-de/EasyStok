@@ -109,6 +109,6 @@ public class PedidoNuncaSemCobrancaTests
             NullLogger<CancelarPedidoUseCase>.Instance, f.CobrancaRepo, f.Publicador, f.OperacaoEventos);
         return new AtualizarStatusPedidoUseCase(f.PedidoRepo, estoque, config, gerarConta, f.Publicador, f.OperacaoEventos, f.Uow,
             NullLogger<AtualizarStatusPedidoUseCase>.Instance, new CalculadoraInicioPrevistoPedido(f.PrazoQueries), cancelar,
-            f.CobrancaRepo, f.Trocar());
+            f.CobrancaRepo, new Lazy<TrocarFormaPagamentoPedidoUseCase>(f.Trocar));
     }
 }

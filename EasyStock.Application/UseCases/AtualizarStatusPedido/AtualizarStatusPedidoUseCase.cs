@@ -53,7 +53,7 @@ public class AtualizarStatusPedidoUseCase(
     CalculadoraInicioPrevistoPedido inicioPrevisto,
     CancelarPedidoUseCase cancelarPedido,
     ICobrancaPedidoRepository? cobrancas = null,
-    TrocarFormaPagamentoPedidoUseCase? trocarForma = null)
+    Lazy<TrocarFormaPagamentoPedidoUseCase>? trocarForma = null)
 {
     public async Task<PedidoResult?> ExecuteAsync(AtualizarStatusPedidoCommand cmd)
     {
@@ -92,13 +92,14 @@ public class AtualizarStatusPedidoUseCase(
 
         // #1726: liberar sem pagamento um pedido com link pendente é trocar a forma para "na entrega". O link
         // morre, a dívida continua, a trilha guarda quem liberou e o pedido de exceção ainda espera a dona.
+        // Tardio de propósito: só este ramo precisa do provedor de pagamento; os demais hosts e status não.
         if (statusAtual == StatusPedido.AguardandoPagamento && statusNovo == StatusPedido.Aguardando
             && cobrancas is not null && trocarForma is not null
             && (await cobrancas.ListarDoPedidoAsync(cmd.EmpresaId, pedido.Id)).Any(c => c.EstaPendente && c.EhOnline))
         {
             try
             {
-                await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(cmd.EmpresaId, pedido.Id,
+                await trocarForma.Value.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(cmd.EmpresaId, pedido.Id,
                     TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega, cmd.UsuarioId, cmd.UsuarioNome));
             }
             catch (CobrancaPedidoConflitoException ex)
