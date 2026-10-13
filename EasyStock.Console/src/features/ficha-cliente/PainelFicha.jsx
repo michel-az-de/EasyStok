@@ -10,7 +10,7 @@ import { faixaDaJanela } from '../../dominio/entrega'
 import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
 import { numeroDaComanda } from '../../dominio/pedido'
 import { motivoAntesDeCobrar } from '../../dominio/resumoPedido'
-import { fichaRecolhidaDePadrao } from '../../dominio/ficha'
+import { chavesDaFicha, fichaRecolhidaDePadrao } from '../../dominio/ficha'
 import { BarraProximoPasso } from './BarraProximoPasso'
 import { BlocoCobranca } from './BlocoCobranca'
 import { BlocoDevolucoes } from './BlocoDevolucoes'
@@ -81,7 +81,11 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
   // anel zerado abrem a MESMA modal do cabeçalho e do menu ⋯, com o resumo.
   // Quem cancela pedido sem pagamento é a própria modal (faixa da seção 5).
   const aoEncerrarAtendimento = () => abrirEncerramento(selecionada.id)
-  const comandaCompartilhada = <ComandaDoCliente key={selecionada.id} conversaId={selecionada.id}
+  const chaves = chavesDaFicha({
+    conversaId: selecionada.id, pedidoId: pedido?.pedidoId ?? null,
+    pagamentos: (pedido?.pagamentosApi ?? []).map((p) => p.pagamentoId),
+  })
+  const comandaCompartilhada = <ComandaDoCliente key={chaves.comandaCompartilhada} conversaId={selecionada.id}
     numeroComanda={numero} ativo={fonteApi} acaoCompartilhar={acaoCompartilhar}
     pedido={pedido} aoMudarEscolha={setConversaEscolhendo} />
 
@@ -144,7 +148,7 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
             {comandaCompartilhada}
             {/* #1510: formulário "Recebi" e confirmações não atravessam de uma conversa para outra. */}
             <BlocoCobranca
-              key={selecionada.id}
+              key={chaves.cobranca}
               pedido={pedido}
               agora={agora}
               editavel={editavel}
@@ -160,14 +164,14 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
               aoAlterarMeio={(meio) => alterarMeioPagamento(selecionada.id, meio)}
             />
             {fonteApi && pedido.pedidoId && <BlocoDevolucoes
-              key={`${pedido.pedidoId}:${(pedido.pagamentosApi ?? []).map((p) => p.pagamentoId).join(':')}`}
+              key={chaves.devolucoes}
               pedidoId={pedido.pedidoId}
               cancelado={pedido.estado === 'cancelado'}
             />}
-            {fonteApi && pedido.pedidoId && <BlocoOcorrenciasApi key={pedido.pedidoId} pedidoId={pedido.pedidoId} conversaId={selecionada.id} />}
+            {fonteApi && pedido.pedidoId && <BlocoOcorrenciasApi key={chaves.ocorrenciasApi} pedidoId={pedido.pedidoId} conversaId={selecionada.id} />}
             {!fonteApi && pedido.ocorrencia && (
               <BlocoOcorrencia
-                key={selecionada.id}
+                key={chaves.ocorrencia}
                 ocorrencia={pedido.ocorrencia}
                 conversaId={selecionada.id}
                 nomeCliente={selecionada.nome}
@@ -175,7 +179,7 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
               />
             )}
             <BlocoEntrega conversa={selecionada} />
-            {fonteApi && pedido.pedidoId && <BlocoFreteApi key={pedido.pedidoId} pedido={pedido}
+            {fonteApi && pedido.pedidoId && <BlocoFreteApi key={chaves.frete} pedido={pedido}
               cliente={selecionada.nome} numero={numero} endereco={cliente.endereco} />}
           </>
         ) : (
