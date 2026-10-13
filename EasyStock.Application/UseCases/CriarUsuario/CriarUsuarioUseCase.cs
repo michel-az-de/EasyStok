@@ -111,9 +111,10 @@ namespace EasyStock.Application.UseCases.CriarUsuario
             // #1753: o nascimento do acesso deixa rastro com o perfil dado e o nome de quem convidou.
             var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
             var comPerfil = perfil is null ? "sem perfil" : $"com o perfil {perfil.Nome}";
+            var fato = convidar ? "Convite enviado" : "Acesso criado";
             await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(
                 usuario.Id, convidar ? RastroDeUsuarios.Convidado : RastroDeUsuarios.Criado,
-                $"{(convidar ? "Convidado" : "Criado")} {comPerfil} por {autor}", currentUser));
+                $"{fato} {comPerfil} por {autor}", currentUser));
 
             await unitOfWork.CommitAsync();
 

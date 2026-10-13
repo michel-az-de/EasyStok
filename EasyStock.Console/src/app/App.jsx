@@ -26,6 +26,8 @@ import { Vazio } from '../componentes/Vazio'
 import { Botao } from '../componentes/Botao'
 import { Modal } from '../componentes/Modal'
 import { TelaLogin } from '../features/login/TelaLogin'
+import { TelaConvite } from '../features/login/TelaConvite'
+import { ehRotaDeConvite, tokenDoConvite } from '../dominio/usuarios'
 import { AvisoDaAcaoApi, FaixaApi, LimparAvisoAoNavegar } from './FaixaApi'
 import { contarPrecisaDeVoce, precisaDeVoce } from '../dominio/automatico'
 import { useTituloDaAba } from '../aplicacao/useTituloDaAba'
@@ -434,6 +436,8 @@ export function App() {
   const rota = rotaDaHash(hash, { fonteApi: FONTE_API })
   // #1582: cada tela diz o próprio nome na aba. No Balcão quem escreve é a `Composicao`, com a contagem.
   useTituloDaAba(FONTE_API && !sessao ? TITULO_BASE : rota.tipo === ROTA_PRINCIPAL ? null : tituloDaAba(rota))
+  // #1753: o link do convite abre antes do login e vale mesmo com outra pessoa logada neste aparelho.
+  if (FONTE_API && ehRotaDeConvite(hash)) return <TelaConvite key={hash} token={tokenDoConvite(hash)} aoConcluir={() => { window.location.hash = '' }} />
   if (FONTE_API && !sessao) return <TelaLogin entrarNaEmpresa={entrarNaEmpresa} google={google} avisoSaida={avisoSaida} />
   if (FONTE_API) return <><NavegacaoDoConsole hash={hash} /><AppComAcesso key={identidadeDaSessao(sessao)} rota={rota} sessao={sessao} aoSair={encerrarSessao} /></>
   if (!FONTE_API && rota.modulo) return <AppPrincipal rota={rota} sessao={sessao} aoSair={encerrarSessao} />

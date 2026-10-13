@@ -75,7 +75,7 @@ public class CriarUsuarioUseCaseTests
 
         var rastro = _c.Auditorias.Should().ContainSingle(a => a.Acao == "usuario-convidado").Subject;
         rastro.UsuarioId.Should().Be(_adicionados.Single().Id);
-        rastro.Detalhes.Should().Be("Convidado com o perfil Atendimento por Baba");
+        rastro.Detalhes.Should().Be("Convite enviado com o perfil Atendimento por Baba");
         await _perfisDoUsuario.Received(1).AddAsync(Arg.Is<UsuarioPerfil>(p => p.AtribuidoPorId == _donaId));
     }
 

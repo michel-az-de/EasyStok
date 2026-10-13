@@ -18,6 +18,8 @@ import { AbaAtendimento } from './atendimento/AbaAtendimento'
 import { AbaImpressao } from './impressao/AbaImpressao'
 import { AbaRespostas } from './respostas/AbaRespostas'
 import { TelaCanais } from './canais/TelaCanais'
+import { AbaUsuarios } from './usuarios/AbaUsuarios'
+import { AbaAuditoria } from './usuarios/AbaAuditoria'
 import { AbaAcervo } from './acervo/AbaAcervo'
 import { AbaCardapioApi } from './cardapio/AbaCardapioApi'
 import { AbaCategoriasApi } from './cardapio/AbaCategoriasApi'
@@ -233,6 +235,9 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
     fidelidade: <AbaFidelidade />,
     integracoes: <AbaIntegracoes />,
     canais: <TelaCanais />,
+    // #1753 (M7.2): usuários e histórico de acesso (só modo API).
+    usuarios: <AbaUsuarios />,
+    auditoria: <AbaAuditoria />,
     // #1632: logo da loja e papel padrão dos impressos (só modo API).
     impressao: <AbaImpressao />,
     // M1.1 (#1481): gestão do cardápio (só modo API).

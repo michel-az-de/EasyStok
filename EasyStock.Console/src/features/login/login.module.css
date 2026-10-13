@@ -39,6 +39,16 @@
   font-size: var(--t-apoio);
   overflow-wrap: anywhere;
 }
+/* Primeiro acesso (#1753): o que a senha ainda precisa ter, marcado enquanto a pessoa digita. */
+.mostrar { display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--toque); font-size: var(--t-apoio); color: var(--tinta); }
+.mostrar input { width: 20px; height: 20px; accent-color: var(--marca); }
+.regras { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-1); font-size: var(--t-apoio); color: var(--tinta-2); }
+.regras li { display: flex; align-items: center; gap: var(--e-2); }
+.regras li[data-ok] { color: var(--tinta); }
+.regras li[data-ok] svg { color: var(--sucesso); }
+.pendente { width: 16px; height: 16px; flex: none; display: grid; place-items: center; }
+.pendente::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--tinta-3); }
+
 .aviso { margin: 0; padding: var(--e-3); border-radius: var(--r-1); background: var(--preenchimento); color: var(--tinta-2); font-size: var(--t-apoio); }
 
 .google {
