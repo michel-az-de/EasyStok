@@ -54,9 +54,21 @@ public sealed class ConsultarEntregaFerramentaTests
         json.RootElement.GetProperty("simulado").GetBoolean().Should().BeTrue();
         json.RootElement.TryGetProperty("rastreioUrl", out _).Should().BeFalse();
         contexto.RespostaVerificada.Should().Contain("Demonstração").And.Contain("eventos simulados");
+        contexto.RespostaVerificada.Should().Contain("aguardando coleta").And.NotContain("a caminho");
         await fixture.Pedidos.Received(1).GetByIdWithDetailsAsync(fixture.Empresa, fixture.Pedido.Id);
         await fixture.Pedidos.DidNotReceive().GetByIdWithDetailsAsync(Arg.Any<Guid>(), idInjetado);
         fixture.Logistica.ReceivedCalls().Should().OnlyContain(c => new[] { "PedidosAsync", "DespachosAsync", "PoliticaAsync" }.Contains(c.GetMethodInfo().Name));
+    }
+
+    [Fact]
+    public async Task Sem_despacho_proprio_nao_usa_entrega_de_outro_cliente_no_mesmo_dia()
+    {
+        var fixture = new Cenario();
+        fixture.Despachos.RemoveAll(d => d.PedidoIdsJson.Contains(fixture.Pedido.Id.ToString()));
+        var contexto = fixture.Contexto();
+        var resposta = await fixture.Ferramenta.ExecutarAsync(contexto, JsonSerializer.SerializeToElement(new { }));
+        resposta.Should().Contain("sem_transporte_registrado").And.NotContain("outro-cliente").And.NotContain("a_caminho");
+        contexto.RespostaVerificada.Should().BeNull();
     }
 
     [Fact]
@@ -79,6 +91,7 @@ public sealed class ConsultarEntregaFerramentaTests
         public IPedidoRepository Pedidos { get; } = Substitute.For<IPedidoRepository>();
         public ILogisticaRepository Logistica { get; } = Substitute.For<ILogisticaRepository>();
         public ConsultarEntregaFerramenta Ferramenta { get; }
+        public List<DespachoLogistica> Despachos { get; } = [];
 
         public Cenario(bool permitirDemo = true)
         {
@@ -87,11 +100,18 @@ public sealed class ConsultarEntregaFerramentaTests
             Conversa = Conversa.Abrir(Empresa, "5511999998888", DateTime.UtcNow, "Maria", Cliente.Id);
             Conversa.DefinirPedidoEmAndamento(Pedido.Id);
             Pedidos.GetByIdWithDetailsAsync(Empresa, Pedido.Id).Returns(Pedido);
-            Logistica.PedidosAsync(Empresa, null, Pedido.Id, Arg.Any<CancellationToken>()).Returns([
-                new LogisticaPedido(Pedido.Id, "demo", "Maria", "Endereço privado", "Bairro", DateTime.UtcNow, DateTime.UtcNow.AddHours(1), "pronto", 800, "5511999998888", -23.5, -46.6, false)]);
-            Logistica.DespachosAsync(Empresa, Arg.Any<CancellationToken>()).Returns([
-                new DespachoLogistica { EmpresaId = Empresa, ViagemId = Guid.NewGuid(), Simulado = true, Provedor = "lalamove",
-                    CriadoEm = DateTime.UtcNow, PedidoIdsJson = JsonSerializer.Serialize(new[] { Pedido.Id }) }]);
+            var inicio = new DateTime(2026, 10, 13, 13, 0, 0, DateTimeKind.Utc);
+            var pedidoAtual = new LogisticaPedido(Pedido.Id, "demo", "Maria", "Endereço privado", "Bairro", inicio, inicio.AddHours(1), "pronto", 800, "5511999998888", -23.5, -46.6, false);
+            var outroPedido = pedidoAtual with { Id = Guid.NewGuid(), Cliente = "Outro cliente" };
+            Logistica.PedidosAsync(Empresa, null, Pedido.Id, Arg.Any<CancellationToken>()).Returns([pedidoAtual]);
+            Logistica.PedidosAsync(Empresa, new DateOnly(2026, 10, 13), null, Arg.Any<CancellationToken>()).Returns([pedidoAtual, outroPedido]);
+            Despachos.Add(new DespachoLogistica { EmpresaId = Empresa, ViagemId = Guid.NewGuid(), Simulado = true, Provedor = "lalamove",
+                CriadoEm = inicio, PedidoIdsJson = JsonSerializer.Serialize(new[] { Pedido.Id }) });
+            var outroDespacho = new DespachoLogistica { EmpresaId = Empresa, ViagemId = Guid.NewGuid(), Simulado = true, Provedor = "lalamove",
+                CriadoEm = inicio.AddMinutes(30), PedidoIdsJson = JsonSerializer.Serialize(new[] { outroPedido.Id }), RastreioUrl = "https://rastreio.invalid/outro-cliente" };
+            outroDespacho.RegistrarEvento("a_caminho", null);
+            Despachos.Add(outroDespacho);
+            Logistica.DespachosAsync(Empresa, Arg.Any<CancellationToken>()).Returns(_ => Despachos);
             var useCase = new LogisticaUseCases(Logistica, Substitute.For<IUnitOfWork>(), Substitute.For<ICaixaRepository>(), [],
                 new(permitirDemo ? Empresa : Guid.Empty, new("Demo", "Origem", "5500000000000", -23.5, -46.6)), TimeProvider.System);
             Ferramenta = new ConsultarEntregaFerramenta(Pedidos, useCase);
