@@ -12,9 +12,9 @@ import css from './ficha.module.css'
 
 // Rascunho escolhe a janela localmente; pedido criado troca a vaga no servidor (M3.4).
 // Ambos usam vagas da vitrine que respeitam o prazo de preparo (S16).
-export function SeletorJanelaApi({ pedido, editavel, aoEscolher }) {
+export function SeletorJanelaApi({ pedido, editavel, aoEscolher, dataInicial = '', aoLerJanelas }) {
   if (pedido.pedidoId) return <ReagendamentoPedido key={pedido.pedidoId} pedidoId={pedido.pedidoId} aoEscolher={aoEscolher} />
-  return <EscolhaRascunho pedido={pedido} editavel={editavel} aoEscolher={aoEscolher} />
+  return <EscolhaRascunho pedido={pedido} editavel={editavel} aoEscolher={aoEscolher} dataInicial={dataInicial} aoLerJanelas={aoLerJanelas} />
 }
 
 function ReagendamentoPedido({ pedidoId, aoEscolher }) {
@@ -23,11 +23,11 @@ function ReagendamentoPedido({ pedidoId, aoEscolher }) {
   return <Bloco titulo="Janela de entrega" chave="janela-pedido" recolhidoDePadrao={janelaRecolhidaDePadrao(campos)} resumo={resumoDaJanela(campos)}><EscolhaJanelaPedido {...campos} /></Bloco>
 }
 
-function EscolhaRascunho({ pedido, editavel, aoEscolher }) {
+function EscolhaRascunho({ pedido, editavel, aoEscolher, dataInicial, aoLerJanelas }) {
   const { carregarJanelasComanda } = useAcoes()
   const [janelas, setJanelas] = useState(null)
   const [erro, setErro] = useState(null)
-  const [data, setData] = useState('')
+  const [data, setData] = useState(dataInicial)
   const [hoje] = useState(() => dataIsoNoFuso(Date.now()))
   // Recarrega quando muda o que entra no prazo (os itens), não a cada quantidade.
   const skus = [...new Set(pedido.itens.map((l) => l.sku))].sort().join(',')
@@ -36,15 +36,17 @@ function EscolhaRascunho({ pedido, editavel, aoEscolher }) {
     let vivo = true
     setJanelas(null)
     setErro(null)
+    aoLerJanelas?.([])
     carregarJanelasComanda(skus ? skus.split(',') : [], data)
       .then((lidas) => {
         if (!vivo) return
         setJanelas(lidas.janelas)
+        aoLerJanelas?.(lidas.janelas)
         setErro(lidas.lojaDisponivel ? null : 'A empresa não tem vitrine ativa para entrega.')
       })
       .catch((e) => { if (vivo) setErro(`Janelas não carregaram: ${e.message}`) })
     return () => { vivo = false }
-  }, [skus, data, carregarJanelasComanda])
+  }, [skus, data, carregarJanelasComanda, aoLerJanelas])
 
   return (
     <Bloco titulo="Janela de entrega">

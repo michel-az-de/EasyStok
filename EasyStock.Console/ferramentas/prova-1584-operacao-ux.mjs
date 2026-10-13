@@ -68,7 +68,7 @@ registerHooks({
     if (url.endsWith('/aplicacao/usePerdasApi.js')) return inline(`export const usePerdasApi=()=>${DE_FORA}.perdas`)
     if (url.endsWith('/aplicacao/useCadastroEntregaApi.js')) return inline(`export const useCadastroEntregaApi=()=>${DE_FORA}.cadastro`)
     if (url.endsWith('/aplicacao/useCaixaDoDiaApi.js')) return inline(`export const useCaixaDoDiaApi=()=>${DE_FORA}.caixa`)
-    if (url.endsWith('/aplicacao/acessoModulos.jsx')) return inline(`export const useAcessoModulos=()=>${DE_FORA}.acesso`)
+    if (url.endsWith('/aplicacao/acessoModulos.jsx')) return inline(`export const useAcessoModulos=()=>({permite:()=>true,...${DE_FORA}.acesso})`)
     if (url.endsWith('/aplicacao/contextos.js')) return inline(`export const useAcoes=()=>${DE_FORA}.acoes;export const useAtendimento=()=>({agora:${DE_FORA}.agora})`)
     if (url.endsWith('.css')) return inline('export default new Proxy({},{get:(_,p)=>p})')
     if (url.endsWith('.json')) return inline('export default ' + readFileSync(new URL(url), 'utf8'))

@@ -49,7 +49,7 @@ const DA_API = {
 }
 
 // 1. Conflito de edição: a operadora mantém só o que ela editou.
-confere('manter minha edição parte do rascunho do servidor e sobrepõe só itens e observação', () => {
+confere('manter minha edição conserva o servidor e reaplica itens, observação e horário editado', () => {
   const servidor = {
     itens: [{ cardapioItemId: LASANHA, qtd: 3 }], observacoes: 'do cliente', pedidoId: PEDIDO, pedidoAtualizadoEm: 't2',
     endereco: { logradouro: 'Rua Nova', numero: '10' }, janelaId: 'janela-nova', dataEntrega: '2026-10-14', cupom: 'NOVO10',
@@ -62,6 +62,19 @@ confere('manter minha edição parte do rascunho do servidor e sobrepõe só ite
   assert.deepEqual(mantido, { ...servidor, itens: operadora.itens, observacoes: 'Molho à parte' })
   assert.equal(mantido.endereco.logradouro, 'Rua Nova', 'endereço novo do cliente não volta ao antigo')
   assert.equal(mantido.cupom, 'NOVO10')
+  const manter = funcao('rascunhoMantendoEdicao')
+  const horarioLocal = { ...operadora, janelaId: 'janela-operadora', dataEntrega: '2026-10-21' }
+  const comHorario = manter(servidor, horarioLocal, operadora)
+  assert.equal(comHorario.janelaId, 'janela-operadora', 'janela editada localmente deve sobreviver ao conflito')
+  assert.equal(comHorario.dataEntrega, '2026-10-21', 'data editada acompanha a janela local')
+  assert.deepEqual(comHorario.endereco, servidor.endereco, 'preservar horário não reaplica endereço antigo')
+  assert.equal(comHorario.cupom, servidor.cupom)
+  const soItens = manter(servidor, operadora, { ...operadora, itens: [] })
+  assert.equal(soItens.janelaId, servidor.janelaId, 'editar só itens mantém a nova janela do cliente')
+  assert.equal(soItens.dataEntrega, servidor.dataEntrega)
+  assert.equal(manter(servidor, operadora, operadora).janelaId, servidor.janelaId, 'voltar ao horário de origem não reaplica horário antigo')
+  assert.equal(manter(servidor, { ...operadora, dataEntrega: '2026-10-21' }, operadora).dataEntrega, '2026-10-21', 'trocar só o dia também conta como edição')
+  assert.equal(manter(servidor, { ...operadora, janelaId: null, dataEntrega: null }, operadora).janelaId, null, 'limpar horário localmente também é edição')
 })
 
 // 2. Prato fora do cardápio visível continua na Ficha, com o retrato do pedido.
@@ -116,7 +129,7 @@ confere('estado do histórico vira rótulo humano', () => {
 })
 
 // 5. Uma comanda só: enquanto o cliente escolhe pelo link, a de baixo não edita.
-confere('clienteEscolhendoPeloLink só vale com escolha editável, com itens e sem pedido', () => {
+confere('clienteEscolhendoPeloLink inclui seleção editável com itens ou ajuda e sem pedido', () => {
   const escolhendo = funcao('clienteEscolhendoPeloLink')
   const comanda = { podeEditar: true, pedido: null, rascunho: { itens: [{ cardapioItemId: LASANHA, qtd: 1 }] } }
   assert.equal(escolhendo([comanda], null), true)
@@ -128,6 +141,12 @@ confere('clienteEscolhendoPeloLink só vale com escolha editável, com itens e s
   assert.equal(escolhendo([comanda], { itens: [{ sku: LASANHA, qtd: 1 }] }), false, 'item que a atendente já pôs não fica preso')
   assert.equal(escolhendo([], null), false)
   assert.equal(escolhendo(undefined, null), false)
+  const ajudaVazia = { ...comanda, ajudaSolicitada: true, rascunho: { itens: [] } }
+  assert.equal(escolhendo([ajudaVazia], null), true, 'ajuda mantém uma seleção compartilhada antes do primeiro item')
+  assert.equal(escolhendo([ajudaVazia], { itens: [] }), true)
+  assert.equal(escolhendo([ajudaVazia], { itens: [{ sku: LASANHA, qtd: 1 }] }), false, 'não descarta rascunho local já iniciado')
+  assert.equal(escolhendo([{ ...ajudaVazia, podeEditar: false }], null), false)
+  assert.equal(escolhendo([ajudaVazia], { pedidoId: PEDIDO, itens: [] }), false)
   assert.equal(pedido.LINHA_CLIENTE_ESCOLHENDO,
     'O cliente está escolhendo pelo link. Os itens aparecem acima e viram pedido quando ele confirmar.')
 })

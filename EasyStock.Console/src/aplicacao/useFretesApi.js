@@ -4,7 +4,7 @@ import { useAcessoModulos } from './acessoModulos'
 
 // A intenção conserva a chave depois de falhas de rede; repetir não cria outra despesa/corrida.
 export function useFretesApi({ aoAlterado } = {}) {
-  const { acoes: capacidades } = useAcessoModulos()
+  const { acoes: capacidades, permite } = useAcessoModulos()
   const [entrada, setEntrada] = useState(null)
   const [contexto, setContexto] = useState(null)
   const [selecionados, setSelecionados] = useState([])
@@ -76,6 +76,7 @@ export function useFretesApi({ aoAlterado } = {}) {
     entrada, contexto, selecionados, agrupar, incluirManual, valorManual, cotacoes, escolhida, erro, aviso, ocupado,
     podePagar: capacidades.gerenciarCaixa === true,
     podeConfigurar: capacidades.editarAtendimento === true,
+    podeAbrirEntregas: permite('entregas'),
     abrir, fechar, selecionar, mudarAgrupamento, escolher: setEscolhida,
     mudarManual: (valor) => { setIncluirManual(valor); setCotacoes(null); setEscolhida(null) },
     mudarValorManual: (valor) => { setValorManual(valor); setCotacoes(null); setEscolhida(null) },

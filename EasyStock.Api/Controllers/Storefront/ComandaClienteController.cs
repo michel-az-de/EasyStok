@@ -66,6 +66,16 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
     public Task<IActionResult> NovaEdicao(string token, CancellationToken ct) =>
         Tratar(async () => await comanda.NovaEdicaoAsync(token, ct));
 
+    [HttpPost("encaminhar-entrega")]
+    [EnableRateLimiting("comanda-envio")]
+    public Task<IActionResult> EncaminharEntrega(string token, [FromBody] EnviarComandaClienteBody body, CancellationToken ct) =>
+        Tratar(async () => await comanda.EncaminharEntregaAsync(token, body.Revisao, ct));
+
+    [HttpPost("pedir-ajuda")]
+    [EnableRateLimiting("comanda-envio")]
+    public Task<IActionResult> PedirAjuda(string token, CancellationToken ct) =>
+        Tratar(async () => await comanda.PedirAjudaAsync(token, ct));
+
     [HttpGet("eventos")]
     [EnableRateLimiting("comanda-stream")]
     public async Task Eventos(string token, CancellationToken ct)
