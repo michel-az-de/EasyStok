@@ -111,6 +111,16 @@ public class Viagem
         Situacao = SituacaoViagem.Desfeita;
     }
 
+    /// <summary>Retorno confirmado à loja libera as reservas; o despacho conserva pedidos e ocorrências.</summary>
+    public void RegistrarRetorno(DateTime agora)
+    {
+        if (Situacao != SituacaoViagem.EmRota)
+            throw new RegraDeDominioVioladaException("Só uma viagem em rota pode retornar à loja.");
+        _paradas.Clear();
+        Situacao = SituacaoViagem.Desfeita;
+        ConcluidaEm = Datas.Utc(agora);
+    }
+
     private ParadaViagem Parada(Guid pedidoId) =>
         _paradas.FirstOrDefault(p => p.PedidoId == pedidoId)
         ?? throw new RegraDeDominioVioladaException("Pedido não está na viagem.");

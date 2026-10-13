@@ -545,7 +545,7 @@ function RodapeComanda({ pedido, cardapio, linhas, nomeCliente }) {
 // do dono"). Deixa de tampar a tela porque ela consulta o cardápio enquanto lê
 // a conversa: sem cortina, sem <dialog>, o resto da tela continua clicável.
 export function PainelCardapio({
-  pedido, aoEscolher, aoAjustar, aoFechar, largura: larguraGuardada, deslocamentoDireita = 0, aoRedimensionar,
+  pedido, aoEscolher, aoAjustar, aoFechar, largura: larguraGuardada, ladoDoBalcao = false, aoRedimensionar,
 }) {
   // #1474: largura guardada de antes (320 a 400) espremia o nome do prato; o mínimo agora é 440.
   const largura = Math.max(larguraGuardada ?? LARGURA_MINIMA, LARGURA_MINIMA)
@@ -644,9 +644,9 @@ export function PainelCardapio({
 
   return (
     <aside
-      className={css.painel}
+      className={`${css.painel} ${ladoDoBalcao ? css.painelDoBalcao : ''}`}
       aria-label="Cardápio de hoje"
-      style={{ width: `${largura}px`, right: `${deslocamentoDireita}px` }}
+      style={{ width: `${largura}px` }}
     >
       <AlcaLargura
         rotulo="Redimensionar painel do cardápio"
@@ -654,7 +654,7 @@ export function PainelCardapio({
         min={LARGURA_MINIMA}
         max={600}
         padrao={460}
-        invertida
+        invertida={!ladoDoBalcao}
         aoMudar={aoRedimensionar}
       />
 

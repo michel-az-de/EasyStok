@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { useOcorrencias } from '../../aplicacao/useOcorrencias'
 import { Bloco } from '../../componentes/Bloco'
+import { RESUMO_COM_ERRO } from '../../dominio/ficha'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { Pilula } from '../../componentes/Pilula'
@@ -54,7 +55,7 @@ export function BlocoOcorrenciasApi({ pedidoId, conversaId }) {
   const { acoes } = useAcessoModulos()
   const { dados, erro, ocupado, atualizar, ...comandos } = useOcorrencias(pedidoId, conversaId)
   const abertas = dados?.filter((o) => o.status === 'aberta').length ?? 0
-  return <Bloco titulo="Ocorrências" chave="ocorrencias" resumo={dados ? `${abertas} abertas · ${dados.length} no histórico` : 'Consultar ocorrências'}>
+  return <Bloco titulo="Ocorrências" chave="ocorrencias" recolhidoDePadrao={!erro} resumo={erro ? RESUMO_COM_ERRO : dados ? `${abertas} abertas · ${dados.length} no histórico` : 'Consultar ocorrências'}>
     <div className={css.acoesPedido}>
       {erro && <p className={css.corpoBloco} role="alert">{erro}</p>}
       {!dados && !erro && <p className={css.corpoBloco}>Consultando ocorrências…</p>}
