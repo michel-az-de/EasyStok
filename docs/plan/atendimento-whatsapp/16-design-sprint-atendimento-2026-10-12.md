@@ -52,6 +52,27 @@ O retorno do Felipe mostrou o resumo do cliente excedendo a tela e a seleção c
 
 Validação do retorno: seis execuções da regressão com 12 itens (desktop, iPhone SE e Pixel 7, duas vezes cada); navegação por teclado, total e ação visíveis, endereço alcançável e ausência de overflow horizontal. No Atendimento, navegador com quatro pratos de nomes longos comprovou uma rolagem, observações recolhidas e edição preservada entre desktop e celular. Qualidade do Console, prova de comanda compartilhada, 25 cenários de UX, 39 testes unitários da página, lint/build do site e gate com 42 testes de arquitetura aprovados. A prova visual do painel usa seleção controlada; as jornadas com API/PostgreSQL locais são verificadas separadamente.
 
+## Rodada complementar desktop com banca, issue #1705
+
+Solicitada pelo Felipe após o retorno visual. A PR #1702 foi preservada e integrada por outra sessão durante a validação; esta rodada foi atualizada sobre o master que a contém. Não altera larguras das colunas, posição do cardápio, regras de pedido, pagamento, frete ou atendimento. CSS condicionado a largura desktop e ponteiro preciso, com proteção do comportamento mobile.
+
+| Achado | Correção e comprovação |
+|---|---|
+| Observações vazias ocupavam espaço demais | Resumos fechados sem conteúdo passam de 44 para 32 px. Prévia de observação existente e edição continuam disponíveis. Enter abre o campo e Tab chega ao input. |
+| Link duplicado no cabeçalho e no painel | No desktop, permanece a ação do cabeçalho da conversa. A duplicata do painel fica oculta. |
+| Histórico aberto parecia parte do pedido atual | Recuo e borda agrupam os dados sob o título do histórico. |
+| Fila de impressão competia com o pedido e ocultava o contador | Superfície clara e quebra dos comandos quando falta largura. Na coluna de 320 px o rodapé cresce de 57 para 104 px, mantendo contador e ações legíveis. |
+| Bordas dos campos públicos pouco distinguíveis | Borda desktop `#9a856f`, contraste de 3,27:1 e 3,47:1 contra os fundos utilizados. |
+| Foco do resumo cortado pelo contêiner | Contorno de foco voltado para dentro, visível nos quatro lados; rolagem por teclado e acesso à entrega conferidos. |
+
+Banca independente: hierarquia, fluxo e acessibilidade aprovaram o escopo selecionado, sem bloqueadores. Aceite técnico restrito a este polimento, não substitui o aceite humano em uso real. A copy global do histórico e da cobrança foi registrada como oportunidade fora desta rodada desktop. Os possíveis problemas de foco após confirmação e ARIA do redimensionamento não foram reproduzidos e não são declarados corrigidos.
+
+Evidência: componentes reais `ComandaDoCliente`, `FilaCanhotos` e `Botao` em navegador, com seleção controlada de quatro pratos longos e histórico pago, antes/depois em 1280, 1440 e 1920 px (colunas 320, 420 e 520 px). Sem overflow horizontal ou erros de página. Em 1440, o excesso de rolagem da montagem caiu de 129 para 74 px; em 1280, de 299 para 238 px. O caso de 375 px/ponteiro de toque manteve as métricas. As capturas comprovam composição e estilos, não a execução de operações pela API.
+
+Validação: qualidade do Console (lint, camadas, 264 pares de contraste e build), prova de comanda compartilhada, 16 verificações da rodada #1697; site com lint/build, regressão existente de rolagem nos três viewports e prova desktop adicional de borda/foco. Gate e estado de publicação finais ficam no recibo da [issue #1705](https://github.com/michel-az-de/EasyStok/issues/1705).
+
+Evidências locais desta rodada: `C:/rep/casa-da-baba/test-results/banca-desktop/` (capturas e `metricas.json`), `banca-scroll/` e `banca-foco/`. Alterações do site limitadas ao CSS da comanda; WIP prévio de documentação/configuração preservado.
+
 ## Copy por situação
 
 | Situação | Texto/direção |
