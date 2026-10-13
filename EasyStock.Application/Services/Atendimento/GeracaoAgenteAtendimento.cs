@@ -18,7 +18,8 @@ public sealed record GeracaoAgente(string? Texto, int Tokens, bool Concluiu, str
 /// <summary>
 /// Geração do agente de atendimento, sem efeito colateral próprio: monta o contexto (prompt fixo, caderno,
 /// dossiê, histórico) e roda o laço LLM + ferramentas. Quem chama decide o que fazer com o texto: o turno
-/// (<see cref="AgenteAtendimentoService"/>) usa apenas resposta verificada das ferramentas; a sugestão da dona (#1420) só devolve.
+/// (<see cref="AgenteAtendimentoService"/>) envia a resposta verificada das ferramentas ou o texto que passar pela
+/// <see cref="GuardaRespostaAgente"/>; a sugestão da dona (#1420) só devolve.
 /// </summary>
 public static class GeracaoAgenteAtendimento
 {
@@ -119,15 +120,21 @@ public static class GeracaoAgenteAtendimento
     {
         contexto.LimparRespostaVerificada();
         if (!ferramentas.TryGetValue(uso.Nome, out var ferramenta))
+        {
+            contexto.RegistrarFalhaDeFerramenta();
             return new BlocoResultadoFerramentaLlm(uso.Id, $"Ferramenta desconhecida: {uso.Nome}.", EhErro: true);
+        }
 
         try
         {
-            return new BlocoResultadoFerramentaLlm(uso.Id, await ferramenta.ExecutarAsync(contexto, uso.Entrada, ct));
+            var resultado = await ferramenta.ExecutarAsync(contexto, uso.Entrada, ct);
+            contexto.ResultadosDasFerramentas.Add(resultado);
+            return new BlocoResultadoFerramentaLlm(uso.Id, resultado);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             contexto.LimparRespostaVerificada();
+            contexto.RegistrarFalhaDeFerramenta();
             logger.LogError(ex, "Agente de atendimento: ferramenta {Ferramenta} falhou na conversa {ConversaId}.",
                 ferramenta.Nome, contexto.Conversa.Id);
             return new BlocoResultadoFerramentaLlm(uso.Id, "A ferramenta falhou; não invente o resultado.", EhErro: true);

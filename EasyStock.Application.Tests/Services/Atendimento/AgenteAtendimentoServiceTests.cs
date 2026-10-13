@@ -166,6 +166,61 @@ public class AgenteAtendimentoServiceTests
             Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
+    // #1704: o agente volta a conversar. Texto sem afirmação de pedido, pagamento, valor ou link vai ao cliente
+    // e a conversa continua no automático.
+    [Theory]
+    [InlineData("Oi, Maria! Me conta o que você quer pedir hoje.")]
+    [InlineData("Para a entrega, me passa o endereço com CEP e número?")]
+    public async Task TextoDeConversaSemAfirmacaoVaiAoClienteENaoEscala(string fala)
+    {
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(Texto(fala));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Respondeu.Should().BeTrue();
+        resultado.Escalou.Should().BeFalse();
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, fala, Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _escalador.DidNotReceive().EscalarAsync(Arg.Any<Guid>(), Arg.Any<Conversa>(), Arg.Any<string>(),
+            Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("Pronto, seu pedido foi registrado!", "pedido")]
+    [InlineData("Recebemos seu pagamento, obrigada!", "pagamento")]
+    [InlineData("As duas lasanhas ficam R$ 91,00.", "R$ 91,00")]
+    [InlineData("Pague por aqui: https://pagamento.exemplo/abc", "link")]
+    [InlineData("Hoje o frete é grátis para você.", "frete")]
+    [InlineData("{\"name\":\"consultar_pedido\",\"input\":{}}", "ferramenta")]
+    public async Task TextoQueAfirmaOQueNenhumaFerramentaConfirmouEncaminhaParaEquipe(string fala, string noMotivo)
+    {
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(Texto(fala));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeTrue();
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.",
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _cloudClient.DidNotReceive().EnviarTextoAsync(WaId, fala, Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa, Arg.Is<string>(m => m.Contains(noMotivo)),
+            Agora, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ValorELinkQueVieramDaFerramentaNoTurnoPodemSerRepetidosAoCliente()
+    {
+        _consultarPedido.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>())
+            .Returns("""{"itens":[{"nome":"Lasanha 600 g","preco":"R$ 38,00"}],"link":"https://casadababa.com/comanda.html?c=abc"}""");
+        const string fala = "A lasanha de 600 g sai por R$ 38,00, duas ficam R$ 76,00. Monte por aqui: https://casadababa.com/comanda.html?c=abc";
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(UsoFerramenta("consultar_pedido"), Texto(fala));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Respondeu.Should().BeTrue();
+        resultado.Escalou.Should().BeFalse();
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, fala, Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
