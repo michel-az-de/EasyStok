@@ -34,7 +34,6 @@ export function BlocoDevolucoes({ pedidoId, cancelado = false }) {
   const valido = pagamento && valor > 0 && valor <= pagamento.disponivel && motivo.trim() && referencia.trim() && confirmado
   const totalDevolvido = dados?.estornos.reduce((soma, e) => soma + e.valor, 0) ?? 0
   const conferirAcerto = cancelado && dados?.pagamentos.some((p) => p.valor > 0)
-  const resumo = erro ? RESUMO_COM_ERRO : totalDevolvido ? `${moeda(totalDevolvido)} devolvidos` : 'Recebimentos e estornos'
 
   function escolher(id) {
     setPagamentoId(id)
@@ -54,7 +53,7 @@ export function BlocoDevolucoes({ pedidoId, cancelado = false }) {
 
   return (
     <Bloco titulo={conferirAcerto ? 'Conferir acerto' : 'Devoluções'} chave="devolucoes" recolhidoDePadrao={!erro}
-      resumo={conferirAcerto && !erro && !totalDevolvido ? 'Recebimento registrado' : resumo}>
+      resumo={erro ? RESUMO_COM_ERRO : totalDevolvido ? `${moeda(totalDevolvido)} devolvidos` : conferirAcerto ? 'Recebimento registrado' : 'Recebimentos e estornos'}>
       <div className={css.acoesPedido}>
         {erro && <p role="alert" className={css.corpoBloco}>{erro}</p>}
         {aviso && <output className={css.corpoBloco}>{aviso}</output>}
