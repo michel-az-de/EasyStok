@@ -1,12 +1,14 @@
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
+using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Services;
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Application.UseCases.Financeiro.Integracao;
 using EasyStock.Application.UseCases.Pedidos;
+using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.UseCases.AtualizarStatusPedido;
@@ -49,7 +51,9 @@ public class AtualizarStatusPedidoUseCase(
     IUnitOfWork uow,
     ILogger<AtualizarStatusPedidoUseCase> logger,
     CalculadoraInicioPrevistoPedido inicioPrevisto,
-    CancelarPedidoUseCase cancelarPedido)
+    CancelarPedidoUseCase cancelarPedido,
+    ICobrancaPedidoRepository? cobrancas = null,
+    TrocarFormaPagamentoPedidoUseCase? trocarForma = null)
 {
     public async Task<PedidoResult?> ExecuteAsync(AtualizarStatusPedidoCommand cmd)
     {
@@ -84,6 +88,17 @@ public class AtualizarStatusPedidoUseCase(
         catch (TransicaoInvalidaException ex)
         {
             throw new UseCaseValidationException(ex.Message);
+        }
+
+        // #1726: liberar sem pagamento um pedido com link pendente é trocar a forma para "na entrega". O link
+        // morre, a dívida continua, a trilha guarda quem liberou e o pedido de exceção ainda espera a dona.
+        if (statusAtual == StatusPedido.AguardandoPagamento && statusNovo == StatusPedido.Aguardando
+            && cobrancas is not null && trocarForma is not null
+            && (await cobrancas.ListarDoPedidoAsync(cmd.EmpresaId, pedido.Id)).Any(c => c.EstaPendente && c.EhOnline))
+        {
+            await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(cmd.EmpresaId, pedido.Id,
+                TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega, cmd.UsuarioId, cmd.UsuarioNome));
+            return CriarPedidoUseCase.Map(pedido);
         }
 
         var statusAntigoStr = pedido.Status;

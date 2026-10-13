@@ -308,8 +308,11 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 var cupomAplicado = await AplicarCupomAsync(pedido, dados.CodigoCupom, t);
                 var saldo = pedido.Total.Valor - (await saldoFinanceiro.ConsultarAsync(pedido, t)).Alocado;
                 CobrancaPedidoResult? cobranca = null;
-                if (saldo > 0 && (!peloAtendimento || PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm)))
-                    cobranca = await cobrar.ExecuteAsync(new(link.EmpresaId, pedido.Id, link.ConversaId, CobrarSaldo: true), t);
+                // #1726: confirmado pela atendente também nasce com cobrança; sem ela a varredura de abandonados
+                // cancelava o pedido em silêncio 30 minutos depois.
+                if (saldo > 0)
+                    cobranca = await cobrar.ExecuteAsync(new(link.EmpresaId, pedido.Id, link.ConversaId, CobrarSaldo: true,
+                        NaEntregaSemProvedor: peloAtendimento), t);
                 else if (saldo <= 0)
                 {
                     pedido.MudarStatus(pedido.RequerAprovacao ? StatusPedido.AguardandoAprovacaoBaba : StatusPedido.Aguardando);
