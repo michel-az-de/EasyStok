@@ -254,7 +254,9 @@ public sealed partial class MercadoPagoClient(
         PaymentMethodId: Texto(p, "payment_method_id"),
         PaymentTypeId: Texto(p, "payment_type_id"),
         TransactionAmountRefunded: Numero(p, "transaction_amount_refunded") ?? 0,
-        CollectorId: Texto(p, "collector_id"));
+        // collector_id no nível do pagamento; em respostas que só trazem o objeto, collector.id.
+        CollectorId: Texto(p, "collector_id")
+                     ?? (p.TryGetProperty("collector", out var collector) && collector.ValueKind == JsonValueKind.Object ? Texto(collector, "id") : null));
 
     /// <summary>String ou número (o Mercado Pago devolve ids numéricos) como texto; null/ausente = null.</summary>
     private static string? Texto(JsonElement e, string campo)

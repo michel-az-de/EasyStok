@@ -65,13 +65,29 @@ public class CobrancaContaRecebedoraTests
         await f.Estorno.DidNotReceiveWithAnyArgs().EstornarAsync(default!, default, default!, default);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData(" ")]
+    public async Task Pagamento_sem_conta_informada_pela_fonte_confirma_como_antes(string? contaDoPagamento)
+    {
+        // A fonte (reconsulta no Mercado Pago) não disse a conta: não se sabe, então não se recusa dinheiro.
+        var f = new CobrancaPedidoFixture();
+        Online(f, ContaDaLoja);
+
+        (await f.Confirmar().ExecuteAsync(Aprovado(f, contaDoPagamento))).Confirmado.Should().BeTrue();
+    }
+
     [Fact]
-    public async Task Pagamento_sem_conta_informada_nao_confirma_cobranca_que_tem_conta()
+    public async Task Notificacao_reentregue_de_outra_conta_nao_repete_o_evento_no_historico()
     {
         var f = new CobrancaPedidoFixture();
         Online(f, ContaDaLoja);
 
-        (await f.Confirmar().ExecuteAsync(Aprovado(f, null))).Situacao.Should().Be(SituacaoConfirmacaoPagamento.ContaDivergente);
+        await f.Confirmar().ExecuteAsync(Aprovado(f, OutraConta));
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f, OutraConta));
+
+        r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.ContaDivergente);
+        f.Eventos.Count(e => e.Tipo == "pagamento_divergente").Should().Be(1);
     }
 
     [Fact]

@@ -195,11 +195,22 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
 
         // I3.2 (invariante 3): o external_reference diz qual é o pedido, não de quem é o dinheiro. Pagamento
         // de outra conta não confirma, e também não é estornado: a credencial desta loja não alcança a outra.
-        if (alvo.ContaRecebedoraId is { } contaDaCobranca
-            && !string.Equals(contaDaCobranca, input.ContaRecebedoraId?.Trim(), StringComparison.Ordinal))
+        // O pagamento vem sempre da reconsulta na fonte. Se ela não disser a conta, não se sabe: confirma
+        // como antes e avisa no log, em vez de recusar dinheiro que pode ser desta loja.
+        var contaDoPagamento = string.IsNullOrWhiteSpace(input.ContaRecebedoraId) ? null : input.ContaRecebedoraId.Trim();
+        if (alvo.ContaRecebedoraId is { } contaDaCobranca)
         {
-            var motivoConta = $"conta_divergente: pagamento {input.PagamentoExternoId} recebido por outra conta do Mercado Pago";
-            return (await RecusarAsync(pedido, alvo, motivoConta, SituacaoConfirmacaoPagamento.ContaDivergente, agora, ct), null, null, null);
+            if (contaDoPagamento is null)
+                logger.LogWarning("Pagamento sem conta recebedora informada pedidoId={PedidoId} pagamento={Pagamento}; conta nao conferida.",
+                    input.PedidoId, input.PagamentoExternoId);
+            else if (!string.Equals(contaDaCobranca, contaDoPagamento, StringComparison.Ordinal))
+            {
+                var motivoConta = $"conta_divergente: pagamento {input.PagamentoExternoId} recebido por outra conta do Mercado Pago";
+                // A notificação reentregue acha o motivo já gravado e não repete o evento no histórico.
+                if (alvo.Motivo == motivoConta)
+                    return (new(SituacaoConfirmacaoPagamento.ContaDivergente, alvo.Id, pedido.Status), null, null, null);
+                return (await RecusarAsync(pedido, alvo, motivoConta, SituacaoConfirmacaoPagamento.ContaDivergente, agora, ct), null, null, null);
+            }
         }
 
         // Antes do valor: pedido cancelado devolve qualquer quantia recebida, a menor inclusive.

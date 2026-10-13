@@ -213,6 +213,14 @@ public class MercadoPagoClientTests
     }
 
     [Fact]
+    public async Task Pagamento_com_a_conta_so_no_objeto_collector_tambem_e_lido()
+    {
+        var (client, _) = Criar(HttpStatusCode.OK, """{"id":20359978,"status":"approved","transaction_amount":25.5,"collector":{"id":724484980}}""");
+
+        (await client.ConsultarPagamentoAsync("20359978"))!.CollectorId.Should().Be("724484980");
+    }
+
+    [Fact]
     public async Task Conta_da_credencial_vem_de_users_me()
     {
         var (client, handler) = Criar(HttpStatusCode.OK, """{"id":724484980,"nickname":"LOJA"}""");
