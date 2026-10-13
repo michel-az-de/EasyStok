@@ -20,7 +20,9 @@ public sealed partial class SinkQueRedige(ILogEventSink interno) : ILogEventSink
 {
     private static readonly MessageTemplateParser Parser = new();
 
-    [GeneratedRegex("(?i)(password|senha|secret|segredo|token|api[_-]?key|authorization|credencial|kek)")]
+    // Nome que termina no segredo (ClientSecret, RlsClientPassword) ou que é o próprio (Token, AccessToken, Kek).
+    // De propósito não casa contagem nem nome de variável: TokensEntrada, IdDoToken, VarKek, KekId.
+    [GeneratedRegex("(?i)^(.*(password|senha|secret|segredo|api[_-]?key)|(access|refresh|id|bearer)?[_-]?token|authorization|kek)$")]
     private static partial Regex NomeSensivel();
 
     public void Emit(LogEvent logEvent)

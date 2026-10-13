@@ -78,6 +78,17 @@ public class SinkQueRedigeTests
     }
 
     [Fact]
+    public void Contagem_de_tokens_e_nome_de_variavel_nao_sao_segredo()
+    {
+        // Diagnóstico da chave-mestra (I4.1) e consumo de IA: nome parecido, valor que precisa aparecer.
+        var coletor = new Coletor();
+        using (var logger = new LoggerConfiguration().WriteTo.Redigido(w => w.Sink(coletor)).CreateLogger())
+            logger.Information("IA {TokensEntrada}/{TokensSaida}; falta {VarKek} ({KekId})", 1200, 300, "EZ_CRYPTO_KEK", "kek-2026");
+
+        coletor.Eventos.Single().RenderMessage().Should().Be("IA 1200/300; falta \"EZ_CRYPTO_KEK\" (\"kek-2026\")");
+    }
+
+    [Fact]
     public void Configuracao_por_json_redige_o_sink_interno()
     {
         // Mesmo formato do appsettings dos hosts: Redigido envolvendo o sink de verdade.

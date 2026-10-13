@@ -58,6 +58,15 @@ public class CaminhoDoLogTests
         registro.Should().Be(CorpoDeProvedor.Omitido);
     }
 
+    [Theory]
+    [InlineData("/v1/payments/20359978")]
+    [InlineData("/authorized_payments/1")]
+    [InlineData("/v1/card_tokens")]
+    public void Corpo_de_endpoint_comum_continua_registrado(string caminho)
+    {
+        CorpoDeProvedor.ParaRegistro(caminho, "{\"message\":\"not_found\"}").Should().Be("{\"message\":\"not_found\"}");
+    }
+
     [Fact]
     public void Corpo_comum_e_redigido_antes_do_corte()
     {

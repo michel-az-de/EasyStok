@@ -9,11 +9,12 @@ public static class CorpoDeProvedor
 {
     public const string Omitido = "[corpo omitido: endpoint de autenticação]";
 
-    private static readonly string[] MarcasDeAutenticacao = ["oauth", "/token", "/auth", "/login"];
+    // Por segmento do caminho: "/oauth/token" e "/v1/oauth/access_token" casam; "/authorized_payments" não.
+    private static readonly string[] SegmentosDeAutenticacao = ["oauth", "oauth2", "token", "auth", "login"];
 
     public static bool EhDeAutenticacao(string? caminho) =>
         caminho is { Length: > 0 }
-        && MarcasDeAutenticacao.Any(m => caminho.Contains(m, StringComparison.OrdinalIgnoreCase));
+        && caminho.Split('/', '?').Any(s => SegmentosDeAutenticacao.Contains(s, StringComparer.OrdinalIgnoreCase));
 
     public static string ParaRegistro(string? caminho, string? corpo, int limite = 500)
     {
