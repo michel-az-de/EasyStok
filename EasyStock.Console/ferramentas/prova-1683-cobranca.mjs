@@ -35,6 +35,7 @@ registerHooks({
 })
 
 const cobranca = await import('../src/dominio/cobranca.js')
+const pagamento = await import('../src/dominio/pagamento.js')
 const { situacaoDoEnvio } = await import('../src/dominio/resumoPedido.js')
 const { pedidoDaApi } = await import('../src/infra/api/comandaApi.js')
 const { criarAcoesComandaApi } = await import('../src/aplicacao/api/comanda.js')
@@ -101,6 +102,13 @@ await confere('1  link vencido no modo API: a barra segue oferecendo "Marcar pag
 // ------------------------------------------------------------------ 2
 
 await confere('2  aviso de link novo e cancelamento só com o pedido em aguardando_pagamento', () => {
+  const cancelado = cobranca.avisoDeLinkVencidoApi({ tentativa: 2 }, 'cancelado')
+  assert.match(cancelado, /Pedido cancelado/)
+  assert.doesNotMatch(cancelado, /continua valendo|Marcar pago|link novo/)
+  const pedido = { estado: 'cancelado', totalApi: 65, alocadoApi: 32.5, cobranca: { pagaEm: 1, valor: 32.5 } }
+  assert.equal(pagamento.diferencaAposPagamento(pedido, []), 0)
+  assert.equal(pagamento.totalPago(pedido), 32.5)
+  assert.equal(pagamento.diferencaAposPagamento({ ...pedido, estado: 'pago' }, []), 32.5)
   assert.match(cobranca.avisoDeLinkVencidoApi({ tentativa: 1 }, 'aguardando_pagamento'), /manda um link novo ao cliente sozinho/)
   assert.match(cobranca.avisoDeLinkVencidoApi({ tentativa: 2 }, 'aguardando_pagamento'), /cancela o pedido sozinho/)
   for (const status of ['aguardando', 'aprovado_baba', 'preparando', 'pronto', 'saiu_para_entrega', undefined]) {
