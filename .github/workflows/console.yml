@@ -45,6 +45,7 @@ jobs:
       - run: node ferramentas/prova-f11-cardapio-itens.mjs
       - run: node ferramentas/prova-f11-link-na-conversa.mjs
       - run: node ferramentas/prova-1587-conversa-comanda-ux.mjs
+      - run: node ferramentas/prova-1697-ux-desktop.mjs
       - run: node ferramentas/prova-1447-hall-modulos.mjs
       - run: node ferramentas/prova-1608-painel-agora.mjs
       - run: node ferramentas/prova-onda1-shell.mjs
