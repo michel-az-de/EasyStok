@@ -54,7 +54,10 @@ const FEITO = {
     ? `${u.nome} agora tem o perfil ${perfil}. A mudança vale na próxima vez que entrar.`
     : `${u.nome} agora tem o perfil ${perfil}.`),
   desativar: (u) => `O acesso de ${u.nome} foi desativado. Continua no fim desta lista, com o botão Reativar.`,
-  reativar: (u) => `${u.nome} pode entrar de novo.`,
+  // Desativar derruba o convite aberto: quem nunca entrou precisa de um convite novo para voltar.
+  reativar: (u) => (u.convite?.estado === 'pendente'
+    ? `O acesso de ${u.nome} voltou. O convite antigo deixou de valer: use Reenviar convite.`
+    : `${u.nome} pode entrar de novo.`),
 }
 const FALHOU = {
   reenviar: 'O convite não foi reenviado',
@@ -87,6 +90,24 @@ export const REGRAS_DE_SENHA = [
 ]
 export const regrasDaSenha = (senha) => REGRAS_DE_SENHA.map((r) => ({ id: r.id, rotulo: r.rotulo, ok: r.vale(senha) }))
 export const senhaValida = (senha) => REGRAS_DE_SENHA.every((r) => r.vale(senha))
+
+// O que a tela do convite diz quando não há mais o que preencher. Um botão só, "Entrar", em todas.
+export const SAIDAS_DO_CONVITE = {
+  pronto: { titulo: 'Senha criada', texto: 'Agora é só entrar com o seu e-mail e a senha que você escolheu.' },
+  vencido: {
+    titulo: 'Este convite já não vale',
+    texto: 'Se você já criou a sua senha, é só entrar. Se ainda não criou, peça à dona para reenviar o convite.',
+  },
+  // A página foi aberta sem o link (recarregada em outra aba, por exemplo): o convite pode estar valendo.
+  semToken: {
+    titulo: 'Abra o link do convite de novo',
+    texto: 'Use o botão do e-mail que você recebeu. Se já criou a sua senha, é só entrar.',
+  },
+  limitado: {
+    titulo: 'Muitas tentativas seguidas',
+    texto: 'Espere uns minutos e abra o link do e-mail de novo. Se já criou a sua senha, é só entrar.',
+  },
+}
 
 // O token do convite chega no fragmento (`#/convite?t=...`), fora do log de acesso do servidor.
 export function tokenDoConvite(hash) {

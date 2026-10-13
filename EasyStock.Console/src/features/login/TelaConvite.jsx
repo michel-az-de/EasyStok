@@ -6,7 +6,7 @@ import { Botao } from '../../componentes/Botao'
 import { CampoTexto } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
 import { Marca } from '../../componentes/Marca'
-import { regrasDaSenha, senhaValida } from '../../dominio/usuarios'
+import { regrasDaSenha, SAIDAS_DO_CONVITE, senhaValida } from '../../dominio/usuarios'
 import css from './login.module.css'
 
 export function TelaConvite({ token, aoConcluir }) {
@@ -17,7 +17,8 @@ export function TelaConvite({ token, aoConcluir }) {
   const regras = regrasDaSenha(senha)
   const enviando = estado.fase === 'enviando'
   const titulo = useRef(null)
-  const tela = estado.fase === 'pronto' ? 'pronto' : estado.fase === 'semToken' || estado.fase === 'vencido' ? 'vencido' : 'pedindo'
+  const saida = SAIDAS_DO_CONVITE[estado.fase] ?? null
+  const tela = saida ? estado.fase : 'pedindo'
 
   // A tela trocou inteira: o foco vai para o título novo, senão o teclado e o leitor de tela ficam no botão que sumiu.
   const telaAnterior = useRef(tela)
@@ -37,38 +38,21 @@ export function TelaConvite({ token, aoConcluir }) {
     } catch (falha) {
       // Convite usado, vencido ou trocado responde sempre a mesma coisa; a saída é pedir outro.
       const vencido = falha.status === 409 || falha.status === 404
-      // 429: a API travou as tentativas por uns minutos; insistir aqui não adianta.
+      // 429: a API travou as tentativas por uns minutos. Insistir não adianta, então o formulário sai da tela.
       const limitado = falha.status === 429
-      setEstado({
-        fase: vencido ? 'vencido' : 'pedindo', limitado,
-        erro: vencido ? null : limitado ? 'Muitas tentativas seguidas. Espere uns minutos e abra o link do e-mail de novo.' : falha.message,
-      })
+      setEstado({ fase: vencido ? 'vencido' : limitado ? 'limitado' : 'pedindo', erro: vencido || limitado ? null : falha.message })
     }
   }
 
-  if (estado.fase === 'pronto') {
+  // Toda saída tem a mesma forma: o que houve, o que fazer, e um só botão.
+  if (saida) {
     return (
       <main className={css.tela}>
         <section className={css.cartao} aria-labelledby={`${id}-titulo`}>
           <Marca />
           <div>
-            <h1 id={`${id}-titulo`} ref={titulo} tabIndex={-1} className={css.titulo}>Senha criada</h1>
-            <p className={css.apoio}>Agora é só entrar com o seu e-mail e a senha que você escolheu.</p>
-          </div>
-          <Botao variante="primario" largo onClick={aoConcluir}>Entrar</Botao>
-        </section>
-      </main>
-    )
-  }
-
-  if (estado.fase === 'semToken' || estado.fase === 'vencido') {
-    return (
-      <main className={css.tela}>
-        <section className={css.cartao} aria-labelledby={`${id}-titulo`}>
-          <Marca />
-          <div>
-            <h1 id={`${id}-titulo`} ref={titulo} tabIndex={-1} className={css.titulo}>Este convite já não vale</h1>
-            <p className={css.apoio}>Se você já criou a sua senha, é só entrar. Se ainda não criou, peça à dona para reenviar o convite.</p>
+            <h1 id={`${id}-titulo`} ref={titulo} tabIndex={-1} className={css.titulo}>{saida.titulo}</h1>
+            <p className={css.apoio}>{saida.texto}</p>
           </div>
           <Botao variante="primario" largo onClick={aoConcluir}>Entrar</Botao>
         </section>
@@ -107,7 +91,6 @@ export function TelaConvite({ token, aoConcluir }) {
             {enviando ? 'Salvando…' : 'Criar senha'}
           </Botao>
         </form>
-        {estado.limitado && <Botao largo onClick={aoConcluir}>Entrar</Botao>}
       </section>
     </main>
   )

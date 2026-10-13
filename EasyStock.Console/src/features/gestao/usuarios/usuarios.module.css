@@ -45,7 +45,11 @@
 .acoes button { padding-inline: var(--e-2); }
 
 /* Altura reservada para uma linha de aviso: a lista não sai do lugar quando ele aparece ou some. */
-.aviso { min-height: calc(var(--t-apoio) * 1.5 + var(--e-2) * 2); display: flex; align-items: center; }
+/* Gruda no topo da área que rola: a ação feita numa linha lá embaixo ainda mostra o retorno. */
+.aviso {
+  min-height: calc(var(--t-apoio) * 1.5 + var(--e-2) * 2); display: flex; align-items: center;
+  position: sticky; top: 0; z-index: 1; background: var(--papel);
+}
 .retorno { font-size: var(--t-apoio); color: var(--tinta); padding: var(--e-2) var(--e-3); border-radius: var(--r-1); background: var(--sucesso-pastel); }
 /* Vazio continua na página (é a região que o leitor de tela acompanha), só sem a faixa. */
 .retorno:empty { padding: 0; background: none; }

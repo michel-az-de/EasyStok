@@ -9,7 +9,7 @@ import assert from 'node:assert/strict'
 import {
   acoesDoUsuario, agruparPorDia, condensarAuditoria, ehRotaDeConvite, erroDoConvite, fraseDeFalha, fraseDeRetorno,
   instanteDaApi, juntarPaginas, linhaDeAuditoria, opcoesDePessoas, ordenarPerfis, regrasDaSenha, senhaValida,
-  situacaoDoUsuario, tokenDoConvite,
+  SAIDAS_DO_CONVITE, situacaoDoUsuario, tokenDoConvite,
 } from '../src/dominio/usuarios.js'
 
 let passaram = 0
@@ -151,6 +151,19 @@ conferir('entradas de dias diferentes não se juntam', () => {
 conferir('o histórico agrupa por dia na ordem em que chegou', () => {
   const grupos = agruparPorDia([{ quando: 'a1' }, { quando: 'a2' }, { quando: 'b1' }], (q) => q[0])
   assert.deepEqual(grupos.map((g) => [g.dia, g.linhas.length]), [['a', 2], ['b', 1]])
+})
+
+conferir('reativar quem nunca entrou avisa que o convite antigo caiu', () => {
+  assert.match(fraseDeRetorno('reativar', { nome: 'Eva', convite: { estado: 'pendente' } }), /Reenviar convite/)
+  assert.equal(fraseDeRetorno('reativar', { nome: 'Eva', convite: { estado: 'aceito' } }), 'Eva pode entrar de novo.')
+})
+
+conferir('toda saída do convite tem título e o que fazer, e a página sem link não diz que o convite venceu', () => {
+  for (const fase of ['pronto', 'vencido', 'semToken', 'limitado']) {
+    assert.ok(SAIDAS_DO_CONVITE[fase].titulo && SAIDAS_DO_CONVITE[fase].texto, fase)
+  }
+  assert.doesNotMatch(SAIDAS_DO_CONVITE.semToken.titulo + SAIDAS_DO_CONVITE.semToken.texto, /não vale|reenviar/)
+  assert.equal(SAIDAS_DO_CONVITE.pedindo, undefined)
 })
 
 console.log(`\n${passaram} verificações passaram.`)

@@ -109,7 +109,7 @@ export function AbaAuditoria() {
                 <span className={css.fato}>
                   {/* Com a pessoa escolhida no filtro, o nome dela em toda linha só repete. */}
                   {!usuarioId && <><strong>{linha.pessoa}</strong> · </>}{linha.oQue}{linha.falhou && ' (não concluído)'}
-                  {linha.vezes > 1 && <span className={css.detalhe}>A primeira às {hora(linha.primeira)}</span>}
+                  {linha.vezes > 1 && hora(linha.primeira) !== hora(linha.quando) && <span className={css.detalhe}>A primeira às {hora(linha.primeira)}</span>}
                 </span>
               </li>
             ))}

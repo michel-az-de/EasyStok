@@ -207,11 +207,13 @@ export function AbaUsuarios() {
       else if (acao === 'desativar') await desativarUsuario(usuario.usuarioId)
       else await reativarUsuario(usuario.usuarioId)
       const perfil = estado.perfis.find((p) => p.perfilId === valor)?.nome
+      // A lista recarrega antes do aviso: "continua no fim desta lista" só é verdade depois disso.
+      await carregar()
       setRetorno({ tom: 'ok', texto: fraseDeRetorno(acao, usuario, perfil) })
     } catch (falha) {
+      await carregar()
       setRetorno({ tom: 'erro', texto: fraseDeFalha(acao, falha) })
     } finally {
-      await carregar()
       setOcupado(false)
       // Desativar e reativar mudam a linha de lugar: o foco vai para o título da lista.
       setFoco({ usuarioId: acao === 'desativar' || acao === 'reativar' ? null : usuario.usuarioId })
