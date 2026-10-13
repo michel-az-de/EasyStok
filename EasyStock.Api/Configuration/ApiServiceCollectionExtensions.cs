@@ -345,6 +345,10 @@ public static class ApiServiceCollectionExtensions
                 RateLimitPartition.GetFixedWindowLimiter(
                     ChatSiteRateLimit.ChaveMensagem(context),
                     _ => new FixedWindowRateLimiterOptions { PermitLimit = ChatSiteRateLimit.MensagensPorMinuto, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy(ChatSiteRateLimit.Stream, context =>
+                RateLimitPartition.GetConcurrencyLimiter(
+                    ChatSiteRateLimit.ChaveMensagem(context),
+                    _ => new ConcurrencyLimiterOptions { PermitLimit = ChatSiteRateLimit.StreamsPorSessao, QueueLimit = 0 }));
             options.AddPolicy(ChatSiteRateLimit.Leitura, context =>
                 RateLimitPartition.GetFixedWindowLimiter(
                     context.Connection.RemoteIpAddress?.ToString() ?? "anon",
