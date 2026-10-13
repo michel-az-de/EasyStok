@@ -35,7 +35,7 @@ export function CorridasDaViagem({ viagem, entregadores, ocupado }) {
 
   const total = custoDasCorridas(corridas)
   return (
-    <div className={css.secao} aria-label="Corridas desta viagem">
+    <div className={css.secao} role="group" aria-label="Corridas desta viagem">
       {(corridas ?? []).length > 0 && (
         <ul className={css.lista}>
           {corridas.map((corrida) => (

@@ -2,7 +2,7 @@
 // do KDS (S19, com endereço e aprovação da S12/S14) e viagens da S44. Nada de
 // rede aqui; quem busca é `infra/api/entregasApi.js`.
 import { faixaDeHorarios, minutosDoDia } from './entrega'
-import { moeda } from './formato'
+import { dataIsoNoFuso, moeda } from './formato'
 
 // Status que a gaveta pede ao KDS: aprovação manual, pronto e em rota.
 export const STATUS_KDS_ENTREGAS = 'aguardando_aprovacao_baba,pronto,saiu_para_entrega'
@@ -252,6 +252,11 @@ export const formularioDaCorrida = (corrida) => ({
   custo: (corrida.custoCentavos / 100).toFixed(2).replace('.', ','),
   motorista: corrida.motorista ?? '',
 })
+
+// Viagem concluída sai do painel, mas a 99 muitas vezes só fecha o preço no fim: as concluídas do dia
+// escolhido continuam à mão para anotar ou corrigir o custo.
+export const viagensConcluidasNoDia = (viagens, dia) => (viagens ?? [])
+  .filter((v) => v.situacao === 'Concluida' && v.concluidaEm && dataIsoNoFuso(Date.parse(v.concluidaEm)) === dia)
 
 export const custoDasCorridas = (corridas) => (corridas ?? []).reduce((soma, c) => soma + (c.custoCentavos ?? 0), 0)
 

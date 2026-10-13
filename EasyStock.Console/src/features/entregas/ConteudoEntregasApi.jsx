@@ -5,7 +5,7 @@ import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { useEntregasApi } from '../../aplicacao/useEntregasApi'
 import {
   EMPRESAS_ENTREGADOR, TIPOS_ENTREGADOR, confirmacaoDaRecusa, motivoDaAprovacao, motivoDeSaida, paineisDeEntregas,
-  rotuloSituacaoViagem, situacaoDaLista,
+  rotuloSituacaoViagem, situacaoDaLista, viagensConcluidasNoDia,
 } from '../../dominio/entregasApi'
 import { roteiroDoDia } from '../../dominio/roteiroDoDia'
 import { CadastroEntregaApi } from './CadastroEntregaApi'
@@ -85,6 +85,7 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
   const opcoesEntregador = [{ valor: '', rotulo: 'Sem entregador' }, ...entregadores.map((e) => ({ valor: e.id, rotulo: e.nome }))]
   // #1474 (R7): recusar cancela, estorna e avisa o cliente; confirma em linha antes.
   const [recusando, setRecusando] = useState(null)
+  const concluidas = viagensConcluidasNoDia(viagens, dia)
 
   return (
     <div className={css.painelDia}>
@@ -164,6 +165,22 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
           opcoesEntregador={opcoesEntregador} entregadores={entregadores} ocupado={ocupado} acoes={acoes}
         />
       ))}
+
+      {concluidas.length > 0 && (
+        <section className={css.secao} aria-label="Viagens concluídas">
+          <h3>Viagens concluídas</h3>
+          <p className={css.apoio}>O preço da corrida mudou no fim? Anote ou corrija aqui.</p>
+          {concluidas.map((v) => (
+            <div key={v.id} className={css.cartao}>
+              <p className={css.cresce}>
+                {v.paradas.length === 1 ? '1 entrega' : `${v.paradas.length} entregas`}
+                {v.paradas[0]?.entregadorNome ? ` · ${v.paradas[0].entregadorNome}` : ''}
+              </p>
+              <CorridasDaViagem viagem={v} entregadores={entregadores} ocupado={ocupado} />
+            </div>
+          ))}
+        </section>
+      )}
 
       <Chamados chamados={chamados} ocupado={ocupado} acoes={acoes} />
     </div>

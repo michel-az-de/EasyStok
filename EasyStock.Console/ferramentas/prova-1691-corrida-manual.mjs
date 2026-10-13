@@ -122,6 +122,18 @@ await confere('a corrida registrada volta ao formulário para corrigir', () => {
   assert.deepEqual(dominio.formularioDaCorrida(CORRIDAS[0]), { empresa: 'NoveNove', custo: '18,90', motorista: 'João' })
 })
 
+await confere('viagem concluída no dia escolhido continua à mão para corrigir o custo', () => {
+  const viagens = [
+    { id: 'a', situacao: 'Concluida', concluidaEm: '2026-10-12T21:30:00Z' }, // 18h30 em São Paulo
+    { id: 'b', situacao: 'Concluida', concluidaEm: '2026-10-13T02:30:00Z' }, // 23h30 do dia 12 em São Paulo
+    { id: 'c', situacao: 'Concluida', concluidaEm: '2026-10-11T15:00:00Z' },
+    { id: 'd', situacao: 'EmRota', concluidaEm: null },
+    { id: 'e', situacao: 'Desfeita', concluidaEm: null },
+  ]
+  assert.deepEqual(dominio.viagensConcluidasNoDia(viagens, '2026-10-12').map((v) => v.id), ['a', 'b'])
+  assert.deepEqual(dominio.viagensConcluidasNoDia(null, '2026-10-12'), [])
+})
+
 // --- 4. Rotas da API -----------------------------------------------------------------------------
 await confere('a tela lista, registra e corrige nas rotas de corrida da viagem', async () => {
   chamadas.length = 0
