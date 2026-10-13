@@ -27,3 +27,17 @@ export function resumoDaJanela({ leitura, erro }) {
   if (!leitura) return ''
   return leitura.atual?.rotulo ?? 'Sem vaga de entrega'
 }
+
+// #1709: os blocos da Ficha remontam ao trocar de conversa, de pedido ou de pagamento, mas são
+// irmãos: duas chaves iguais lado a lado e o React avisa a cada render e repete seção na tela
+// ("Ocorrências" aparecia duas vezes com o pedido criado). O prefixo separa os irmãos.
+export function chavesDaFicha({ conversaId, pedidoId = null, pagamentos = [] }) {
+  return {
+    comandaCompartilhada: `comanda-compartilhada:${conversaId}`,
+    cobranca: `cobranca:${conversaId}`,
+    ocorrencia: `ocorrencia:${conversaId}`,
+    devolucoes: `devolucoes:${pedidoId}:${pagamentos.join(':')}`,
+    ocorrenciasApi: `ocorrencias-api:${pedidoId}`,
+    frete: `frete:${pedidoId}`,
+  }
+}
