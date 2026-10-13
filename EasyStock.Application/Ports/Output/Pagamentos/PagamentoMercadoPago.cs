@@ -13,7 +13,8 @@ public sealed record PagamentoMercadoPago(
     DateTime? DateApproved,
     string? PaymentMethodId,
     string? PaymentTypeId,
-    decimal TransactionAmountRefunded = 0)
+    decimal TransactionAmountRefunded = 0,
+    string? CollectorId = null)
 {
     public const string Approved = "approved";
     public const string Pending = "pending";

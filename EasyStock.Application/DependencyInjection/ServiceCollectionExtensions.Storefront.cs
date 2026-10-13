@@ -58,6 +58,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.RegistrarEstornoManualUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.IEstornosOnlineService, EasyStock.Application.UseCases.Pedidos.Cobranca.EstornosOnlineService>();
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.ProcessarCobrancaVencidaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.RetomarCobrancasAguardandoCredencialUseCase>(); // I3.2
         services.AddScoped<EasyStock.Application.Services.Atendimento.AvisoCobrancaConversa>();
 
         // S20: canhoto e fila de impressão (o pedido pago entra na fila dentro do ConfirmarPagamento).

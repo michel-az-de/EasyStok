@@ -3,7 +3,7 @@ using EasyStock.Domain.Entities.Pagamentos;
 namespace EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 
 /// <summary>Cobrança pendente cujo link já venceu, na varredura cross-tenant do job (S11).</summary>
-public sealed record CobrancaPedidoVencida(Guid CobrancaId, Guid EmpresaId, Guid PedidoId);
+public sealed record CobrancaPedidoVencida(Guid CobrancaId, Guid EmpresaId, Guid PedidoId, string? ContaRecebedoraId = null);
 
 /// <summary>
 /// Persistência de <see cref="CobrancaPedido"/> (S11). Não faz SaveChanges: o commit é do
@@ -33,4 +33,13 @@ public interface ICobrancaPedidoRepository
     /// pagamento usa isto para decidir entre pedir reenvio e ignorar. Só devolve sim ou não.
     /// </summary>
     Task<bool> ExistePendenteOnlineAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Devolve à varredura as cobranças que aguardavam credencial e são da conta dada, ou não têm conta
+    /// gravada (I3.2). Em todas as lojas; devolve quantas voltaram.
+    /// </summary>
+    Task<int> RetomarAguardandoCredencialAsync(string contaRecebedoraId, CancellationToken ct = default);
+
+    /// <summary>Há cobrança aguardando credencial, em qualquer loja? Evita consultar o provedor à toa a cada rodada.</summary>
+    Task<bool> ExisteAguardandoCredencialAsync(CancellationToken ct = default);
 }
