@@ -1,3 +1,4 @@
+using EasyStock.Api.Authentication;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
@@ -30,7 +31,7 @@ public sealed class AtendimentoComandasClienteController(ILinkCardapioConversaRe
     {
         if (!usuario.TemPermissao(Permissao.AtenderConversas)) return Forbid();
         try { return Ok(new { data = await confirmar.ExecuteAsync(new(usuario.EmpresaId, conversaId, linkId, body.Aceitar,
-            usuario.UsuarioId, User.Identity?.Name, usuario.Nivel), ct) }); }
+            usuario.UsuarioId, User.NomeExibicao(), usuario.Nivel), ct) }); }
         catch (ComandaClienteConflitoException e) { return Problem(e.Message, statusCode: 409); }
         catch (UseCaseValidationException e) { return Problem(e.Message, statusCode: 400); }
         catch (UnauthorizedAccessException e) { return Problem(e.Message, statusCode: 403); }
@@ -42,7 +43,7 @@ public sealed class AtendimentoComandasClienteController(ILinkCardapioConversaRe
         if (!usuario.TemPermissao(Permissao.AtenderConversas)) return Forbid();
         if (body.Valor is not { } valor) return Problem("Informe o valor do frete combinado.", statusCode: 400);
         try { return Ok(new { data = await comanda.CombinarFreteAsync(usuario.EmpresaId, conversaId, linkId, body.Revisao,
-            valor, User.Identity?.Name ?? "a equipe", ct) }); }
+            valor, User.NomeExibicao() ?? "a equipe", ct) }); }
         catch (LinkCardapioConversaIndisponivelException e) { return Problem(e.Message, statusCode: 410); }
         catch (ComandaClienteConflitoException e) { return Problem(e.Message, statusCode: 409); }
         catch (UseCaseValidationException e) { return Problem(e.Message, statusCode: 400); }
