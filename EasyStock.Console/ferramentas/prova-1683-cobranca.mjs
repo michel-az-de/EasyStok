@@ -90,7 +90,7 @@ function montar(pedido, responder) {
   return { acoes, avisos, posts, ultimoPedido, estadoRef }
 }
 const ok = (data) => new Response(JSON.stringify({ data }))
-const falha = (mensagem) => new Response(JSON.stringify({ error: { message: mensagem } }), { status: 500 })
+const falha = (mensagem, status = 500) => new Response(JSON.stringify({ error: { message: mensagem } }), { status })
 
 // ------------------------------------------------------------------ 1
 
@@ -142,7 +142,7 @@ await confere('3  sem janela: "Gerar cobrança e enviar" devolve { erro } e mant
 })
 
 await confere('3  POST recusado: devolve { erro } com o motivo e mantém o aviso', async () => {
-  const t = montar(rascunho(), (url, metodo) => (metodo === 'POST' ? falha('Sem vaga na janela') : ok(null)))
+  const t = montar(rascunho(), (url, metodo) => (metodo === 'POST' ? falha('Sem vaga na janela', 422) : ok(null)))
   const resultado = await t.acoes.gerarCobranca('conversa', null, 'pix')
   assert.equal(resultado?.erro, 'Pedido não criado: Sem vaga na janela')
   assert.deepEqual(t.avisos(), ['Pedido não criado: Sem vaga na janela'])
