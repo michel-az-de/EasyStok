@@ -6889,11 +6889,18 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("AguardandoCredencialDesde")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("AtualizadaEm")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("Complementar")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("ContaRecebedoraId")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<Guid?>("ConversaId")
                         .HasColumnType("uuid");
@@ -6918,6 +6925,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("Motivo")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<string>("OrigemCredencial")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<DateTime?>("PagaEm")
                         .HasColumnType("timestamp with time zone");

@@ -37,6 +37,12 @@ public interface IMercadoPagoClient
     Task<EstornoMercadoPagoResult> EstornarAsync(
         string pagamentoId, decimal? valor, string idempotencyKey, CancellationToken ct = default);
 
+    /// <summary>
+    /// Conta dona da credencial atual (<c>GET users/me</c>, campo <c>id</c>; I3.2). É o <c>collector_id</c> das
+    /// cobranças que esta credencial cria e a única conta cujos pagamentos ela consegue consultar.
+    /// </summary>
+    Task<string> ObterContaRecebedoraAsync(CancellationToken ct = default);
+
     Task<EstornoMercadoPagoResult?> ConsultarEstornoAsync(string pagamentoId, string estornoId, CancellationToken ct = default);
     Task<IReadOnlyList<EstornoMercadoPagoResult>> ListarEstornosAsync(string pagamentoId, CancellationToken ct = default);
 

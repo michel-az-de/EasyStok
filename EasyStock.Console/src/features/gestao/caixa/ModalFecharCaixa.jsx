@@ -3,7 +3,7 @@ import { Botao } from '../../../componentes/Botao'
 import { CampoMascarado } from '../../../componentes/CampoMascarado'
 import { Modal } from '../../../componentes/Modal'
 import { Pilula } from '../../../componentes/Pilula'
-import { conferenciaDaGaveta } from '../../../dominio/caixa'
+import { AVISO_AO_FECHAR_CAIXA, ROTULO_FORA_DA_GAVETA, conferenciaDaGaveta } from '../../../dominio/caixa'
 import {
   lerMoeda, mascaraMoeda, moeda, moedaAltaDemais,
 } from '../../../dominio/formato'
@@ -27,7 +27,7 @@ export function ModalFecharCaixa({ resumo, gaveta = null, aoFechar, aoConfirmar,
   return (
     <Modal
       titulo="Fechar o caixa"
-      descricao="Depois de fechado, os lançamentos de hoje não podem mais ser estornados."
+      descricao={AVISO_AO_FECHAR_CAIXA}
       aoFechar={() => { if (!enviando) aoFechar() }}
       rodape={(
         <>
@@ -54,7 +54,7 @@ export function ModalFecharCaixa({ resumo, gaveta = null, aoFechar, aoConfirmar,
         <div><dt>Outras entradas</dt><dd>{moeda(resumo.totalEntradasExtras)}</dd></div>
         <div><dt>Outras saídas</dt><dd>{moeda(resumo.totalSaidasExtras)}</dd></div>
         <div><dt>Pagamentos de pedidos</dt><dd>{moeda(resumo.totalPagamentosPedidos)}</dd></div>
-        {gaveta && <div><dt>Pix e cartão (fora da gaveta)</dt><dd>{moeda(gaveta.pixECartao)}</dd></div>}
+        {gaveta && <div><dt>{ROTULO_FORA_DA_GAVETA}</dt><dd>{moeda(gaveta.pixECartao)}</dd></div>}
         {/* #1627: pode ser dinheiro que já está na gaveta (venda do pedido entregue pelo PWA, #1630). */}
         {Boolean(gaveta?.semForma) && <div><dt>Sem forma de pagamento (confira se é dinheiro)</dt><dd>{moeda(gaveta.semForma)}</dd></div>}
       </dl>

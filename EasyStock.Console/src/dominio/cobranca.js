@@ -348,9 +348,12 @@ export function estadoDepoisDaTroca(pedido, anterior, novaTemLink) {
 // massa já está no fogo, e o caminho é o estorno. Maquininha e vale recebidos
 // ("Recebi") se desfazem em qualquer passo, porque a esteira deles nunca
 // dependeu do pagamento.
+// #1683: só baixa manual se desfaz; pagamento do Mercado Pago o EasyStok recusa (409, "use o
+// estorno"). A API não diz a origem de cada pagamento: o sinal da reserva é sempre online, então
+// com sinal só há baixa manual a desfazer do segundo pagamento em diante.
 export function podeDesfazerPagamento(pedido) {
   if (pedido?.pagamentosApi) {
-    return pedido.pagamentosApi.length > 0 && !pedido.cobranca?.link
+    return pedido.pagamentosApi.length > (pedido.sinalNaReserva ? 1 : 0) && !pedido.cobranca?.link
       && ['aguardando', 'aprovado_baba'].includes(pedido.statusApi)
   }
   const cobranca = pedido?.cobranca
@@ -404,10 +407,34 @@ export const baixaCancelaCobrancaOnline = (pedido) => Boolean(
 // Quem trata é o job de expiração do EasyStok (`CobrancaPedidoJob`, a cada 60 s): na primeira
 // vez gera a segunda cobrança e manda o link novo na conversa; na segunda cancela o pedido,
 // libera a vaga e avisa o cliente. A Ficha não reenvia nada, então diz o que vai acontecer.
+// #1683: o job só reemite e cancela pedido que ainda espera o pagamento. Com o pedido já na fila
+// (pagamento na entrega, complemento) ele só marca o link como vencido, e o texto diz isso.
 const ULTIMA_TENTATIVA_DE_COBRANCA = 2
-export const avisoDeLinkVencidoApi = (cobranca) => ((cobranca?.tentativa ?? 1) < ULTIMA_TENTATIVA_DE_COBRANCA
-  ? 'O EasyStok manda um link novo ao cliente sozinho. Se esse também vencer, o pedido é cancelado e o cliente é avisado.'
-  : 'Segundo link vencido: o EasyStok cancela o pedido sozinho e avisa o cliente.')
+export const LINK_VENCIDO_PEDIDO_SEGUE = 'O link venceu. O pedido continua valendo e o cliente não recebe outro link. '
+  + 'Se o cliente pagou de outro jeito, clique em Marcar pago.'
+export const avisoDeLinkVencidoApi = (cobranca, statusApi) => {
+  if (statusApi !== 'aguardando_pagamento') return LINK_VENCIDO_PEDIDO_SEGUE
+  return (cobranca?.tentativa ?? 1) < ULTIMA_TENTATIVA_DE_COBRANCA
+    ? 'O EasyStok manda um link novo ao cliente sozinho. Se esse também vencer, o pedido é cancelado e o cliente é avisado.'
+    : 'Segundo link vencido: o EasyStok cancela o pedido sozinho e avisa o cliente.'
+}
+
+// --- "Alterar forma" no modo API (#1683) --------------------------------------
+// O EasyStok só conhece duas formas: link do Mercado Pago (Pix e cartão no mesmo link) e na
+// entrega. Trocar entre Pix e cartão por link não muda nada lá, então a tela oferece só a
+// outra forma e diz o que de fato acontece: o aviso ao cliente só sai quando há link novo.
+export function trocaDeFormaNoEasyStok(cobranca, nomeCliente) {
+  if (cobranca?.link) {
+    return {
+      meio: 'maquininha',
+      texto: `O link de pagamento é cancelado e o pedido passa a receber na entrega. ${nomeCliente} não recebe mensagem: avise pela conversa.`,
+    }
+  }
+  return {
+    meio: 'cartao-link',
+    texto: `O EasyStok gera um link de pagamento (Pix ou cartão) e manda para ${nomeCliente} se a conversa estiver aberta.`,
+  }
+}
 
 // "Como recebeu" já preenchido com o meio da cobrança quando ele é um dos métodos
 // da baixa; link de cartão não diz se foi crédito ou débito, então fica em branco.

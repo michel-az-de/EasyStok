@@ -21,6 +21,9 @@ public sealed class MercadoPagoNaoConfiguradoClient : IMercadoPagoClient
     public Task<EstornoMercadoPagoResult> EstornarAsync(string pagamentoId, decimal? valor, string idempotencyKey, CancellationToken ct = default) =>
         throw new MercadoPagoNaoConfiguradoException();
 
+    public Task<string> ObterContaRecebedoraAsync(CancellationToken ct = default) =>
+        throw new MercadoPagoNaoConfiguradoException();
+
     public Task<EstornoMercadoPagoResult?> ConsultarEstornoAsync(string pagamentoId, string estornoId, CancellationToken ct = default) =>
         throw new MercadoPagoNaoConfiguradoException();
 

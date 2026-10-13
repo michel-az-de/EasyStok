@@ -3,6 +3,7 @@ import { Botao } from '../../componentes/Botao'
 import { moeda } from '../../dominio/formato'
 import { partesDoSku, produtoDaPorcao } from '../../dominio/cardapio'
 import { itensDoDia } from '../../dominio/cardapioLink'
+import { clienteEscolhendoPeloLink, rascunhoMantendoEdicao, rotuloDoTotalDaSelecao } from '../../dominio/pedido'
 import { useCatalogo } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { useComandasCliente } from '../../aplicacao/useComandasCliente'
@@ -123,12 +124,12 @@ function SelecaoCompartilhada({ comanda: c, ocupado, salvar, confirmar, combinar
       {edicao && <div>
         <Botao disabled={ocupado} onClick={() => setEdicao(null)}>{conflito ? 'Usar seleção atual' : 'Descartar minha edição'}</Botao>
         {conflito ? <Botao disabled={ocupado || rascunho.pedidoId !== c.rascunho.pedidoId} onClick={() => setEdicao({ revisao: c.revisao,
-          rascunho: { ...rascunho, pedidoId: c.rascunho.pedidoId, pedidoAtualizadoEm: c.rascunho.pedidoAtualizadoEm } })}>Manter minha edição para conferir</Botao>
+          rascunho: rascunhoMantendoEdicao(c.rascunho, rascunho) })}>Manter minha edição para conferir</Botao>
           : <Botao variante="primario" disabled={ocupado} onClick={persistir}>Salvar seleção</Botao>}
       </div>}
       {edicao && <p>Alterações locais. Salve para o cliente ver; os valores finais serão conferidos pelo sistema.</p>}
     </> : c.rascunho.observacoes && <p>Observação: {c.rascunho.observacoes}</p>}
-    <p>Total {edicao ? 'da seleção salva' : 'previsto'}: <strong>{moeda(c.totalPrevisto ?? 0)}</strong>{c.pedido && <> · Já coberto: {moeda(c.pedido.alocado ?? c.pedido.totalPago)}</>}</p>
+    <p>{rotuloDoTotalDaSelecao(c, Boolean(edicao))}: <strong>{moeda(c.totalPrevisto ?? 0)}</strong>{c.pedido && <> · Já coberto: {moeda(c.pedido.alocado ?? c.pedido.totalPago)}</>}</p>
     {c.pedido && <p>{saldo < 0 ? 'A devolver: ' + moeda(-saldo) + ' em ' + (c.rascunho.acerto === 'cupom' ? 'cupom' : 'estorno') + '.' : saldo > 0 ? 'Mais a pagar: ' + moeda(saldo) + '.' : 'Sem diferença de pagamento.'}</p>}
     <AcertoDaComanda comanda={c} />
     {exigeGerente && !podeDevolver && <p>A dona ou um gerente precisa conferir esta devolução. Avise pelo atendimento.</p>}
@@ -140,15 +141,18 @@ function SelecaoCompartilhada({ comanda: c, ocupado, salvar, confirmar, combinar
   </div>
 }
 
-export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompartilhar }) {
+export function ComandaDoCliente({ conversaId, ativo, acaoCompartilhar, pedido = null, aoMudarEscolha }) {
   const { dados, erro, ocupado, confirmar, salvar, combinarFrete } = useComandasCliente(conversaId, ativo)
   const { cardapio } = useCatalogo()
   const { acoes } = useAcessoModulos()
   if (!ativo) return null
   const visiveis = dados.filter(c => c.podeEditar || ['alteracao_aguardando_confirmacao', 'estorno_pendente', 'estorno_recusado'].includes(c.envio?.situacao)
     || c.linkId === dados[0]?.linkId && c.envio)
-  return <section className={css.clienteCompartilhado} aria-label="Comanda compartilhada com o cliente">
-    <div className={css.adicionarCompartilhado}><b>{numeroComanda ? 'Comanda ' + numeroComanda : 'Comanda do cliente'}</b>{acaoCompartilhar}</div>
+  // #1683: avisa a Ficha, depois de pintar, se o cliente está escolhendo pelo link; a comanda de
+  // baixo deixa de somar item nesse meio tempo. Valor igual não redesenha.
+  const avisarEscolha = no => { if (no) aoMudarEscolha?.(clienteEscolhendoPeloLink(dados, pedido) ? conversaId : null) }
+  return <section ref={avisarEscolha} className={css.clienteCompartilhado} aria-label="Comanda compartilhada com o cliente">
+    <div className={css.adicionarCompartilhado}><b>Escolha do cliente pelo link</b>{acaoCompartilhar}</div>
     {erro && <p role="alert">{erro}</p>}
     {!visiveis.length && !erro && <p>Compartilhe com o cliente para escolherem juntos. A seleção chega aqui antes da confirmação.</p>}
     {visiveis.map(c => <SelecaoCompartilhada key={c.linkId} comanda={c} ocupado={ocupado} salvar={salvar} confirmar={confirmar}

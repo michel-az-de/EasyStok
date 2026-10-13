@@ -26,6 +26,10 @@ export const retirarParada = (id, pedidoId) => chamarApi(`${V}/${id}/paradas/${p
 export const reordenarParada = (id, pedidoId, ordem) =>
   chamarApi(`${V}/${id}/paradas/${pedidoId}/ordem`, { metodo: 'PUT', corpo: { ordem } })
 export const sairParaEntrega = (id) => chamarApi(`${V}/${id}/sair`, { metodo: 'POST' })
+// I9.2 (#1691): corrida externa da viagem, com custo.
+export const listarCorridas = (id) => chamarApi(`${V}/${id}/corridas`)
+export const registrarCorrida = (id, corpo) => chamarApi(`${V}/${id}/corridas`, { metodo: 'POST', corpo })
+export const corrigirCorrida = (id, corridaId, corpo) => chamarApi(`${V}/${id}/corridas/${corridaId}`, { metodo: 'PUT', corpo })
 export const marcarParadaEntregue = (id, pedidoId) => chamarApi(`${V}/${id}/paradas/${pedidoId}/entregue`, { metodo: 'POST' })
 export const desfazerViagem = (id) => chamarApi(`${V}/${id}/desfazer`, { metodo: 'POST' })
 

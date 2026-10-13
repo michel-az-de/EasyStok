@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Bloco } from '../../componentes/Bloco'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
@@ -7,7 +8,7 @@ import { conversaEncerrada, estaBloqueada } from '../../dominio/conversa'
 import { faltaPagar } from '../../dominio/cobranca'
 import { faixaDaJanela } from '../../dominio/entrega'
 import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
-import { numeroDaComanda } from '../../dominio/pedido'
+import { LINHA_CLIENTE_ESCOLHENDO, numeroDaComanda } from '../../dominio/pedido'
 import { motivoAntesDeCobrar } from '../../dominio/resumoPedido'
 import { BarraProximoPasso } from './BarraProximoPasso'
 import { BlocoCobranca } from './BlocoCobranca'
@@ -36,6 +37,8 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
     alterarMeioPagamento, desfazerPagamento, aprovarPedido,
   } = useAcoes()
   const { janelas, prefixosCepAtendidos } = useCatalogo()
+  // #1683: conversa em que o cliente está escolhendo pelo link (quem sabe é a ComandaDoCliente).
+  const [conversaEscolhendo, setConversaEscolhendo] = useState(null)
 
   if (!selecionada) {
     const primeira = visiveis[0]
@@ -58,6 +61,7 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
   const faixa = faixaDaJanela(janelas, pedido?.janela)
   const avancoEm = ultimoAvanco?.conversaId === selecionada.id ? ultimoAvanco.em : null
   const primeiroNome = selecionada.nome.split(' ')[0]
+  const clienteEscolhendo = conversaEscolhendo === selecionada.id
   const numero = selecionada.numeroComanda || (pedido ? numeroDaComanda(pedido, { fonteApi }) : null)
   // #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que se resolve. A barra
   // mostra o motivo e desabilita o botão em vez de deixar o EasyStok recusar depois.
@@ -92,7 +96,8 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
       ))}
 
       <div className={css.conteudo}>
-        <ComandaDoCliente key={selecionada.id} conversaId={selecionada.id} numeroComanda={numero} ativo={fonteApi} acaoCompartilhar={acaoCompartilhar} />
+        <ComandaDoCliente key={selecionada.id} conversaId={selecionada.id} ativo={fonteApi} acaoCompartilhar={acaoCompartilhar}
+          pedido={pedido} aoMudarEscolha={setConversaEscolhendo} />
         {/* Rodada 11 (registro 92): onde o automático está no caminho do
             UC-01, enquanto ele monta o cadastro pela conversa. */}
         {selecionada.captura && selecionada.conta === 'lead' && (
@@ -132,6 +137,7 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
                 bloqueado={estaBloqueada(selecionada)}
                 conversaId={selecionada.id}
                 numeroComanda={numero}
+                clienteEscolhendo={clienteEscolhendo}
               />
             </Bloco>
             {/* #1510: formulário "Recebi" e confirmações não atravessam de uma conversa para outra. */}
@@ -174,9 +180,11 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
             <p className={css.corpoBloco}>
               Nenhum pedido confirmado ainda. O resumo e a cobrança aparecem após a confirmação.
             </p>
-            <Botao largo disabled={!editavel} onClick={aoAbrirCardapio}>
-              Adicionar itens
-            </Botao>
+            {clienteEscolhendo ? <p className={css.corpoBloco}>{LINHA_CLIENTE_ESCOLHENDO}</p> : (
+              <Botao largo disabled={!editavel} onClick={aoAbrirCardapio}>
+                Adicionar itens
+              </Botao>
+            )}
           </Bloco>
         )}
 
