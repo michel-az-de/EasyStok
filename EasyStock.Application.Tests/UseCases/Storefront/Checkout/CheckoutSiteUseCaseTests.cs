@@ -130,6 +130,42 @@ public class CheckoutSiteUseCaseTests
         await c.Mp.Received(1).CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>());
     }
 
+    // #1704: a rua e o complemento digitados no site iam só para a observação; o endereço de entrega do
+    // pedido (rota, etiqueta, parada da viagem) ficava "120 - CEP 01310-100" quando o CEP não resolvia a rua.
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Endereco_informado_no_site_vai_inteiro_para_a_entrega_do_pedido(bool autenticado, bool comChat)
+    {
+        var c = new Cenario();
+        if (!comChat) c.Flags.ListarAtivasAsync(c.Empresa, Arg.Any<CancellationToken>()).Returns([]);
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = c.Empresa };
+        c.Clientes.GetByIdAsync(cliente.Id, Arg.Any<CancellationToken>()).Returns(cliente);
+        var token = comChat ? c.Token : null;
+        if (autenticado) await c.UseCase.LogadoAsync(c.Logado(cliente.Id), Endereco, token, Guid.NewGuid());
+        else await c.UseCase.GuestAsync(c.Guest(), Endereco, token, Guid.NewGuid());
+        var pedido = c.Core.PedidosAdicionados.Single();
+        pedido.EnderecoEntrega.Should().Contain("Avenida Paulista, 120").And.Contain("apto 3").And.Contain("Bela Vista");
+        pedido.BairroEntrega.Should().Be("Bela Vista");
+        pedido.EnderecoConfirmadoEm.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Cadastro_guest_guarda_o_endereco_informado_no_site()
+    {
+        var c = new Cenario();
+        Cliente? criado = null;
+        c.Clientes.When(x => x.AddAsync(Arg.Any<Cliente>(), Arg.Any<CancellationToken>())).Do(ci => criado = ci.Arg<Cliente>());
+        await c.UseCase.GuestAsync(c.Guest(), Endereco, c.Token, Guid.NewGuid());
+        criado.Should().NotBeNull();
+        criado!.Endereco.Should().Be("Avenida Paulista, 120");
+        criado.Complemento.Should().Be("apto 3");
+        criado.Bairro.Should().Be("Bela Vista");
+        criado.Cidade.Should().Be("São Paulo");
+    }
+
     [Fact]
     public async Task Token_presente_nao_permite_fallback_quando_chat_desabilitado()
     {

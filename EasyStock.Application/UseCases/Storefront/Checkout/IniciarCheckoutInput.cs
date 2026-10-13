@@ -12,6 +12,7 @@ public sealed record IniciarCheckoutInput(
     Guid? IdempotencyKey = null,
     string? ContentHash = null,
     string? Numero = null,
-    Guid? ConversaId = null);
+    Guid? ConversaId = null,
+    EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega? EnderecoEntrega = null);
 
 public sealed record CheckoutItemInput(Guid CardapioItemId, int Qtd);

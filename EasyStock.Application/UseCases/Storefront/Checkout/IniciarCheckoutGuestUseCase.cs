@@ -88,7 +88,7 @@ public sealed class IniciarCheckoutGuestUseCase(
             throw new StorefrontNaoEncontradoException(input.Slug);
 
         // ── Cadastro guest isolado; telefone informado não equivale a OTP ──
-        var (cliente, clienteNovo) = await ResolverClienteAsync(storefront.EmpresaId, nome, telefoneE164, cep, ct);
+        var (cliente, clienteNovo) = await ResolverClienteAsync(storefront.EmpresaId, nome, telefoneE164, cep, input.EnderecoEntrega, ct);
 
         // #1291: o bloqueio vale em todos os canais (S24); nada de vaga ocupada nem pedido.
         if (cliente.Bloqueado)
@@ -109,7 +109,8 @@ public sealed class IniciarCheckoutGuestUseCase(
                 Origem: OrigemPedido.StorefrontGuest,
                 Slug: input.Slug,
                 Observacoes: MontarObservacoes(input.Observacoes, cep, input.Numero),
-                Numero: input.Numero),
+                Numero: input.Numero,
+                EnderecoEntrega: input.EnderecoEntrega),
             ct);
 
         var pedido = reservado.Pedido;
@@ -156,7 +157,7 @@ public sealed class IniciarCheckoutGuestUseCase(
 
         var pedido = DomainPedido.Criar(empresaId: empresaId, cliente: cliente, origem: OrigemPedido.StorefrontGuest);
         await enderecoEntrega.RegistrarAsync(pedido,
-            new EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega(null, input.Numero, null, null, null, null, input.Cep), ct);
+            input.EnderecoEntrega ?? new EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega(null, input.Numero, null, null, null, null, input.Cep), ct);
         pedido.ClienteNome = nome;
         pedido.ClienteTelefone = telefoneE164;
         pedido.Status = StatusPedidoMapper.AguardandoAprovacaoBaba;
@@ -183,7 +184,8 @@ public sealed class IniciarCheckoutGuestUseCase(
     }
 
     private async Task<(DomainCliente Cliente, bool Novo)> ResolverClienteAsync(
-        Guid empresaId, string nome, string telefoneE164, string cep, CancellationToken ct)
+        Guid empresaId, string nome, string telefoneE164, string cep,
+        EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega? endereco, CancellationToken ct)
     {
         // O bloqueio comercial continua valendo; consultar não concede identidade nem altera cadastro.
         var declarado = await clienteRepository.GetByTelefoneHashAsync(empresaId, ClienteOtp.CalcularTelefoneHash(telefoneE164), ct);
@@ -194,6 +196,14 @@ public sealed class IniciarCheckoutGuestUseCase(
         cliente.Nome = nome;
         cliente.Telefone = telefoneE164;
         cliente.Cep = cep;
+        // O cadastro guest é só deste pedido: guardar o endereço digitado não toca cadastro alheio (#1704).
+        if (endereco is { Logradouro.Length: > 0 })
+        {
+            cliente.Endereco = string.Join(", ", new[] { endereco.Logradouro, endereco.Numero }.Where(s => !string.IsNullOrWhiteSpace(s)));
+            cliente.Complemento = endereco.Complemento;
+            cliente.Bairro = endereco.Bairro;
+            cliente.Cidade = endereco.Cidade;
+        }
         await clienteRepository.AddAsync(cliente, ct);
         return (cliente, true);
     }
