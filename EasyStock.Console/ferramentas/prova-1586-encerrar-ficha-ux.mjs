@@ -365,8 +365,16 @@ await confere('A  modal: promessa rejeitada também vira erro dentro dele e solt
 const caixaDeCancelar = (tela) => nos(tela.arvore).find((n) => n.type === 'label' && texto(n).includes('Cancelar também o pedido'))
   ?.props.children.find?.((f) => f?.type === 'input')
 const marcarCancelar = (tela) => { caixaDeCancelar(tela).props.onChange({ target: { checked: true } }); tela.renderizar() }
-await confere('A  modal: a caixa de cancelar o pedido sem pagamento nasce desmarcada, e desmarcada não cancela', async () => {
-  const comPedido = conversaBase({ pedido: { pedidoId: 'p1', estado: 'aguardando', numero: 'P1ABCDEF', itens: [], cobranca: null } })
+await confere('A  modal: pedido sem link em aberto nasce com a caixa de cancelar marcada, à vista', () => {
+  // Sem link, nenhum job do EasyStok fecha o pedido depois que a conversa encerra.
+  comoApi([conversaBase({ pedido: { pedidoId: 'p1', estado: 'aguardando', numero: 'P1ABCDEF', itens: [], cobranca: null } })])
+  ctx.acoes = acoesDoModal({})
+  const tela = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
+  assert.equal(caixaDeCancelar(tela).props.checked, true)
+  tela.encerrar()
+})
+await confere('A  modal: com link em aberto a caixa de cancelar nasce desmarcada, e desmarcada não cancela', async () => {
+  const comPedido = conversaBase({ pedido: { pedidoId: 'p1', estado: 'aguardando', numero: 'P1ABCDEF', itens: [], cobranca: { link: 'https://mp/x' } } })
   comoApi([comPedido])
   const ordem = []
   ctx.acoes = acoesDoModal({
@@ -411,7 +419,7 @@ await confere('A  modal: cancelamento que falha não encerra, e o erro aparece d
   await botao(tela, 'Encerrar').props.onClick()
   tela.renderizar()
   assert.deepEqual(ordem, ['cancelar'], 'encerrou mesmo com o cancelamento recusado')
-  assert.deepEqual(alertas(tela), ['O pedido Nº P1ABCDEF não foi cancelado: Sem conexão com o EasyStok. O atendimento não foi encerrado. Tente de novo ou desmarque o cancelamento.'])
+  assert.deepEqual(alertas(tela), ['Não deu para cancelar o pedido Nº P1ABCDEF: Sem conexão com o EasyStok. O atendimento continua aberto. Tente de novo ou desmarque a caixa de cancelar.'])
   assert.equal(botao(tela, 'Encerrar').props.disabled, false, 'o botão volta para a nova tentativa')
   devolver = { ok: true }
   await botao(tela, 'Encerrar').props.onClick()

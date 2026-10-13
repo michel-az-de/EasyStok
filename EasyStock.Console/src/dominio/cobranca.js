@@ -410,8 +410,8 @@ export const baixaCancelaCobrancaOnline = (pedido) => Boolean(
 // #1683: o job só reemite e cancela pedido que ainda espera o pagamento. Com o pedido já na fila
 // (pagamento na entrega, complemento) ele só marca o link como vencido, e o texto diz isso.
 const ULTIMA_TENTATIVA_DE_COBRANCA = 2
-export const LINK_VENCIDO_PEDIDO_SEGUE = 'O link venceu e o pedido segue como está: o EasyStok não manda outro link nem mexe no pedido. '
-  + 'Se o cliente pagar por fora, registre o pagamento.'
+export const LINK_VENCIDO_PEDIDO_SEGUE = 'O link venceu. O pedido continua valendo e o cliente não recebe outro link. '
+  + 'Se o cliente pagou de outro jeito, clique em Marcar pago.'
 export const avisoDeLinkVencidoApi = (cobranca, statusApi) => {
   if (statusApi !== 'aguardando_pagamento') return LINK_VENCIDO_PEDIDO_SEGUE
   return (cobranca?.tentativa ?? 1) < ULTIMA_TENTATIVA_DE_COBRANCA

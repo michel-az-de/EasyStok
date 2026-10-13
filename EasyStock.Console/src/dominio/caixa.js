@@ -29,7 +29,7 @@ export const CATEGORIAS_ENTRADA_SUGERIDAS = ['Venda no balcão', 'Suprimento']
 
 // #1683: fechar o caixa também decide a loja. O caixa do dia não reabre e a loja só abre com ele
 // aberto (`aberturaDaLoja.js`, situação `fechadoHoje`).
-export const AVISO_AO_FECHAR_CAIXA = 'Depois de fechado, o caixa de hoje não reabre, a loja só abre com o caixa aberto e os lançamentos não podem mais ser estornados.'
+export const AVISO_AO_FECHAR_CAIXA = 'Depois de fechar, o caixa de hoje não reabre. Sem caixa aberto, a loja não abre mais hoje. Os lançamentos de hoje não podem mais ser estornados.'
 
 // #1584: a sugestão é do tipo. Trocar Entrada/Saída com "Sangria" marcada gravava uma entrada
 // rotulada Sangria. A sugerida do outro tipo sai; a que a dona digitou fica.

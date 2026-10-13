@@ -28,7 +28,7 @@ const SEM_PEDIDO = 'o pedido ainda não foi criado. Gere a cobrança ou envie ao
 const LINK_CANCELADO_ESPERA_APROVACAO = 'O link foi cancelado e o pedido agora espera aprovação. '
   + 'Use "Aprovar pedido" na Ficha e registre o pagamento de novo.'
 
-const MESMA_FORMA = 'Forma de pagamento: a cobrança já está nessa forma no EasyStok. Nada mudou.'
+const MESMA_FORMA = 'A cobrança já está nessa forma de pagamento. Nada mudou.'
 
 const EDITA_COMANDA = ['adicionarItem', 'removerItem', 'ajustarQuantidade', 'ajustarObservacao', 'forcarEncaixe']
 
@@ -43,11 +43,14 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
 
   // O meio escolhido na tela vai junto: a API devolve a forma, não o meio (F07, item 5).
   // #1683: o POST diz se o resumo saiu ao cliente; a leitura do pedido não diz. A marca fica
-  // aqui e volta ao pedido a cada recarga desta tela.
+  // aqui e volta ao pedido a cada recarga desta tela. A troca de forma
+  // tira a marca: a recarga leva `false` para o reducer não herdar a antiga.
   const semResumo = new Set()
   async function recarregar(id) {
+    const tinhaMarca = Boolean(pedidoDe(id)?.resumoNaoEnviado)
     const lido = pedidoDaApi(await obterPedido(id), pedidoDe(id))
-    const pedido = lido && semResumo.has(lido.pedidoId) ? { ...lido, resumoNaoEnviado: true } : lido
+    const marcado = Boolean(lido) && semResumo.has(lido.pedidoId)
+    const pedido = lido && (marcado || tinhaMarca) ? { ...lido, resumoNaoEnviado: marcado } : lido
     if (pedido) despachar({ tipo: acao.SINCRONIZAR_PEDIDO, id, pedido })
     return pedido
   }

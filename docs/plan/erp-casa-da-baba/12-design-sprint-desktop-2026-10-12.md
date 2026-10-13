@@ -56,10 +56,21 @@ Refutado pela sala: cobrança ou pedido duplicado por clique duplo não acontece
 - Tela do laboratório, 1440 de largura: título "Escolha do cliente pelo link"; "Pedido não criado: Não entregamos neste CEP." ao lado do botão; um único "Marcar pago" e "Copiar link" na cobrança; Esc fecha e Enter registra a baixa; modal de encerrar com "Cancelar também o pedido Nº 1, que ainda não foi pago" desmarcada; coluna "NA FILA" na Cozinha; "Em preparo ou na fila" no hall.
 - A tela reproduziu o item 2 da #1685: baixa do sinal por Pix responde "Encomenda futura exige sinal de 50% por link antes da entrega", depois de avisar que o link seria cancelado.
 
+## Banca final
+
+| Banca | Veredito | O que entrou por causa dela |
+|---|---|---|
+| A sala (dona, psicóloga, designer, direção de arte) | Aprovada com ressalvas, 4 de 4 | Enter no campo de motivo quebra a linha e só Ctrl+Enter confirma, para não cancelar pedido sem querer; cinco textos reescritos sem jargão e com o nome do botão |
+| Revisão de código | Aprova com ressalvas, nenhum achado crítico | A marca de "mensagem não saiu" cai quando a troca de forma manda link novo; pedido sem link em aberto nasce com a caixa de cancelar marcada ao encerrar, porque nada o fecharia depois |
+
+O que a dona ainda sentiria amanhã, segundo a sala: o sinal de encomenda pago por fora (#1685), a segunda compra e a troca de item de pedido criado (#1686), e os limites abaixo.
+
 ## Limites
 
 - Não vistos na tela, só por prova: aviso do modal de fechar caixa, rótulo do grupo fora da gaveta, link vencido, mensagem que não saiu, histórico, item fora do cardápio.
 - As três provas novas ainda não rodam no CI: a linha no workflow é mudança de processo e vai em PR própria.
 - "Desfazer pagamento" usa uma regra aproximada: com sinal na reserva, o primeiro pagamento é o online. A regra exata pede a origem do pagamento na API.
+- A marca de "mensagem não saiu" vive na tela: recarregar a página ou abrir em outro computador volta a "Enviada ao cliente". A correção de verdade é a API devolver esse dado na leitura do pedido.
+- "Adicionar itens" ainda aparece no bloco da cobrança com comanda vazia enquanto o cliente escolhe pelo link.
 - Com item já no rascunho local e o cliente escolhendo pelo link, as duas listas ainda aparecem.
 - Estorno e voltar etapa não estão ligados no modo API; a correção vale para a demonstração e para quando forem ligados.

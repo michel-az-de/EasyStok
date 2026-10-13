@@ -30,6 +30,12 @@ export function pedidoAoEncerrar(pedido, { fonteApi = false, cancelarMarcado = f
   return { ofereceCancelar, cancelar: ofereceCancelar && cancelarMarcado === true }
 }
 
+// Com link de pagamento em aberto, o EasyStok cancela o pedido sozinho quando o link vence. Sem
+// link, nada o fecha depois que a conversa encerra: a caixa nasce marcada, à vista de quem atende.
+export function cancelarNasceMarcado(pedido, { fonteApi = false } = {}) {
+  return fonteApi && pedidoAoEncerrar(pedido, { fonteApi }).ofereceCancelar && !pedido.cobranca?.link
+}
+
 export const rotuloCancelarAoEncerrar = (numero) => `Cancelar também o pedido Nº ${numero}, que ainda não foi pago`
 
 // Cancelamento pedido e não confirmado segura o encerramento: o erro aparece no modal. A
@@ -37,7 +43,7 @@ export const rotuloCancelarAoEncerrar = (numero) => `Cancelar também o pedido N
 export function falhaAoCancelarNoEncerramento(cancelamento, numero) {
   if (cancelamento == null || cancelamento.ok === true) return null
   const motivo = cancelamento.erro ? `: ${String(cancelamento.erro).replace(/\.$/, '')}.` : '.'
-  return `O pedido Nº ${numero} não foi cancelado${motivo} O atendimento não foi encerrado. Tente de novo ou desmarque o cancelamento.`
+  return `Não deu para cancelar o pedido Nº ${numero}${motivo} O atendimento continua aberto. Tente de novo ou desmarque a caixa de cancelar.`
 }
 
 export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio }) {

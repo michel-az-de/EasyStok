@@ -223,7 +223,9 @@ function pedidoMesclado(local, doServidor) {
     ...doServidor,
     meio: doServidor.cobranca?.meio ?? local.meio ?? doServidor.meio,
     // #1683: só a tela sabe que o resumo não saiu; a releitura do mesmo pedido não apaga isso.
-    ...(local.resumoNaoEnviado && local.pedidoId === doServidor.pedidoId ? { resumoNaoEnviado: true } : null),
+    // A recarga da ação que mandou link novo traz `false` e a marca cai.
+    ...(local.resumoNaoEnviado && doServidor.resumoNaoEnviado === undefined && local.pedidoId === doServidor.pedidoId
+      ? { resumoNaoEnviado: true } : null),
   }
 }
 

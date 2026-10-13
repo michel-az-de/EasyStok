@@ -91,9 +91,22 @@ confere('2  encerrar: cancelamento que falha vira erro e o atendimento não é e
   assert.equal(encerramento.falhaAoCancelarNoEncerramento(undefined, 'P1'), null, 'a demonstração é síncrona e não devolve nada')
   assert.equal(
     encerramento.falhaAoCancelarNoEncerramento({ erro: 'Sem conexão com o EasyStok.' }, 'P1'),
-    'O pedido Nº P1 não foi cancelado: Sem conexão com o EasyStok. O atendimento não foi encerrado. Tente de novo ou desmarque o cancelamento.',
+    'Não deu para cancelar o pedido Nº P1: Sem conexão com o EasyStok. O atendimento continua aberto. Tente de novo ou desmarque a caixa de cancelar.',
   )
-  assert.match(encerramento.falhaAoCancelarNoEncerramento({}, 'P1'), /^O pedido Nº P1 não foi cancelado\. O atendimento não foi encerrado\./)
+  assert.match(encerramento.falhaAoCancelarNoEncerramento({}, 'P1'), /^Não deu para cancelar o pedido Nº P1\. O atendimento continua aberto\./)
+})
+
+confere('2  pedido sem link em aberto: nada o fecha sozinho, a caixa de cancelar nasce marcada', () => {
+  const comLink = { ...semPagamento, cobranca: { link: 'https://mp/x' } }
+  assert.equal(encerramento.cancelarNasceMarcado(comLink, { fonteApi: true }), false, 'com link, o EasyStok cancela no vencimento')
+  assert.equal(encerramento.cancelarNasceMarcado(semPagamento, { fonteApi: true }), true)
+  assert.equal(encerramento.cancelarNasceMarcado({ ...semPagamento, cobranca: { link: null } }, { fonteApi: true }), true)
+  assert.equal(encerramento.cancelarNasceMarcado(semPagamento, { fonteApi: false }), false, 'na demonstração segue desmarcada')
+  assert.equal(encerramento.cancelarNasceMarcado({ ...semPagamento, estado: 'pago' }, { fonteApi: true }), false)
+  assert.equal(encerramento.cancelarNasceMarcado(null, { fonteApi: true }), false)
+  const modal = readFileSync(new URL('../src/features/encerramento/ModalEncerrar.jsx', import.meta.url), 'utf8')
+  assert.match(modal, /useState\(\(\) => cancelarNasceMarcado\(conversa\?\.pedido, \{ fonteApi \}\)\)/)
+  assert.match(modal, /setCancelarMarcado\(cancelarNasceMarcado\(conversa\?\.pedido, \{ fonteApi \}\)\)/)
 })
 
 // --- 3. Fechar o caixa -------------------------------------------------------------------------
@@ -101,7 +114,7 @@ confere('2  encerrar: cancelamento que falha vira erro e o atendimento não é e
 confere('3  fechar o caixa: a descrição diz que não reabre e que a loja depende do caixa aberto', () => {
   assert.equal(typeof caixa.AVISO_AO_FECHAR_CAIXA, 'string', 'falta AVISO_AO_FECHAR_CAIXA')
   assert.match(caixa.AVISO_AO_FECHAR_CAIXA, /não reabre/)
-  assert.match(caixa.AVISO_AO_FECHAR_CAIXA, /loja só abre com o caixa aberto/)
+  assert.match(caixa.AVISO_AO_FECHAR_CAIXA, /Sem caixa aberto, a loja não abre/)
   assert.match(caixa.AVISO_AO_FECHAR_CAIXA, /estornados/, 'o aviso do estorno continua')
   assert.doesNotMatch(caixa.AVISO_AO_FECHAR_CAIXA, /—/)
 })

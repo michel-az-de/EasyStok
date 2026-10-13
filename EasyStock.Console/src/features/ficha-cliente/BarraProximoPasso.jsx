@@ -405,11 +405,11 @@ export function BarraProximoPasso({
     finally { corrigindo.current = false; setMarcoEmVoo(null) }
   }
 
-  // #1683: confirmação em linha pelo teclado. Esc volta; Enter no motivo confirma (Shift+Enter
-  // quebra a linha). Com a ação em andamento, nada fecha.
+  // #1683: confirmação em linha pelo teclado. Esc volta; no motivo, Enter quebra a linha e
+  // Ctrl+Enter confirma, para um Enter distraído não cancelar pedido. Em andamento, nada fecha.
   const teclaDaConfirmacao = (evento) => {
     if (evento.key === 'Escape' && !emVoo) { evento.preventDefault(); evento.stopPropagation(); setConfirmando(null) }
-    if (evento.key === 'Enter' && !evento.shiftKey && evento.target.tagName === 'TEXTAREA') {
+    if (evento.key === 'Enter' && (evento.ctrlKey || evento.metaKey) && evento.target.tagName === 'TEXTAREA') {
       evento.preventDefault()
       evento.currentTarget.requestSubmit()
     }

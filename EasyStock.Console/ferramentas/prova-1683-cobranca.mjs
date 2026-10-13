@@ -84,7 +84,7 @@ function montar(pedido, responder) {
   const avisos = () => despachados.filter((d) => d.mensagem).map((d) => d.mensagem)
   const posts = () => chamadas.filter((c) => c.metodo === 'POST')
   const ultimoPedido = () => despachados.filter((d) => d.pedido).at(-1)?.pedido
-  return { acoes, avisos, posts, ultimoPedido }
+  return { acoes, avisos, posts, ultimoPedido, estadoRef }
 }
 const ok = (data) => new Response(JSON.stringify({ data }))
 const falha = (mensagem) => new Response(JSON.stringify({ error: { message: mensagem } }), { status: 500 })
@@ -108,7 +108,8 @@ await confere('2  aviso de link novo e cancelamento só com o pedido em aguardan
       const texto = cobranca.avisoDeLinkVencidoApi({ tentativa }, status)
       assert.doesNotMatch(texto, /link novo|cancela/, `${status}: promete o que o job não faz`)
       assert.match(texto, /venceu/, status)
-      assert.match(texto, /pedido segue/, status)
+      assert.match(texto, /pedido continua valendo/, status)
+      assert.match(texto, /Marcar pago/, `${status}: o texto usa o nome do botão`)
       assert.doesNotMatch(texto, /—/)
     }
   }
@@ -181,6 +182,17 @@ await confere('4  a releitura do mesmo pedido não apaga a marca de que o resumo
   assert.equal(daAcao.conversas[0].pedido.resumoNaoEnviado, true, 'recarga da ação')
   const outro = reducer(base, { tipo: acao.SINCRONIZAR_PEDIDO, id: 'conv-1', pedido: lido('p2', 2) })
   assert.equal(outro.conversas[0].pedido.resumoNaoEnviado, undefined, 'pedido novo não herda a marca')
+  const limpo = reducer(base, { tipo: acao.SINCRONIZAR_PEDIDO, id: 'conv-1', pedido: { ...lido('p1', 2), resumoNaoEnviado: false } })
+  assert.notEqual(limpo.conversas[0].pedido.resumoNaoEnviado, true, 'a ação que mandou link novo apaga a marca')
+})
+
+await confere('4  trocar a forma manda link novo: a marca de que o resumo não saiu se apaga', async () => {
+  const t = montar(rascunho(), (url, metodo) => ok(metodo === 'POST' && /\/pedido$/.test(url) ? { ...doServidor(), enviadoAoCliente: false } : doServidor()))
+  await t.acoes.gerarCobranca('conversa', null, 'pix')
+  assert.equal(t.ultimoPedido().resumoNaoEnviado, true)
+  t.estadoRef.current.conversas[0].pedido = t.ultimoPedido()
+  await t.acoes.alterarMeioPagamento('conversa', 'maquininha')
+  assert.equal(t.ultimoPedido().resumoNaoEnviado, false, 'a recarga depois da troca diz que a marca caiu')
 })
 
 await confere('4  com link em aberto e sem copia e cola, a Cobrança deixa copiar o link', () => {
@@ -211,7 +223,7 @@ await confere('5  trocar entre formas online não vai ao EasyStok nem muda o mei
   const t = montar(pedido, () => ok(doServidor()))
   const resultado = await t.acoes.alterarMeioPagamento('conversa', 'pix')
   assert.equal(t.posts().length, 0, 'foi ao EasyStok para uma troca que ele não executa')
-  assert.equal(resultado?.erro, 'Forma de pagamento: a cobrança já está nessa forma no EasyStok. Nada mudou.')
+  assert.equal(resultado?.erro, 'A cobrança já está nessa forma de pagamento. Nada mudou.')
   assert.deepEqual(t.avisos(), [resultado.erro])
   assert.equal(t.ultimoPedido(), undefined)
 })
@@ -294,7 +306,8 @@ await confere('9  as confirmações em linha são formulário: Enter confirma, E
   const tecla = trecho(barra, 'const teclaDaConfirmacao = ', '\n\n')
   assert.match(tecla, /evento\.key === 'Escape'/)
   assert.match(tecla, /setConfirmando\(null\)/)
-  assert.match(tecla, /evento\.key === 'Enter' && !evento\.shiftKey/)
+  assert.match(tecla, /evento\.key === 'Enter' && \(evento\.ctrlKey \|\| evento\.metaKey\)/, 'Enter sozinho no motivo não confirma ação destrutiva')
+  assert.doesNotMatch(tecla, /!evento\.shiftKey/)
   assert.match(tecla, /requestSubmit\(\)/)
 })
 

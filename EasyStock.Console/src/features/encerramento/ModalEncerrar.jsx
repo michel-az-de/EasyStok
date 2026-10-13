@@ -5,7 +5,7 @@ import { Modal } from '../../componentes/Modal'
 import { FolhaImpressao } from '../../componentes/FolhaImpressao'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
-import { falhaAoCancelarNoEncerramento, pedidoAoEncerrar, rotuloCancelarAoEncerrar } from '../../aplicacao/api/encerramentoEMidia'
+import { cancelarNasceMarcado, falhaAoCancelarNoEncerramento, pedidoAoEncerrar, rotuloCancelarAoEncerrar } from '../../aplicacao/api/encerramentoEMidia'
 import { canalDaConversa } from '../../dominio/canal'
 import { conversaEncerrada } from '../../dominio/conversa'
 import { pedidoEncerrado } from '../../dominio/pedido'
@@ -50,11 +50,12 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   const [textoMensagem, setTextoMensagem] = useState(() => (regraEncerramento
     ? textoDaRegra(regraEncerramento, contextoDePrevia(conversa, null, agora))
     : ''))
-  // #1683: cancelar o pedido sem pagamento é escolha de quem atende; nasce desmarcada.
-  const [cancelarMarcado, setCancelarMarcado] = useState(false)
+  // #1683: cancelar o pedido sem pagamento é escolha de quem atende. Nasce desmarcada, menos
+  // quando o pedido não tem link em aberto e ficaria sem ninguém para fechá-lo.
+  const [cancelarMarcado, setCancelarMarcado] = useState(() => cancelarNasceMarcado(conversa?.pedido, { fonteApi }))
   const pedidoJaCancelado = useRef(false)
   useEffect(() => {
-    setCancelarMarcado(false)
+    setCancelarMarcado(cancelarNasceMarcado(conversa?.pedido, { fonteApi }))
     pedidoJaCancelado.current = false
     setEnviarMensagem(Boolean(regraEncerramento))
     setTextoMensagem(regraEncerramento ? textoDaRegra(regraEncerramento, contextoDePrevia(conversa, null, agora)) : '')
@@ -163,7 +164,7 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
             {!encerrada && pedidoAtivo && !leitura && !noPedido.cancelar && (
               <p className={css.faixaAtencao}>
                 {aguardandoPagamento
-                  ? `O pedido ${pedido.numero} ainda não foi pago e continua aberto depois de encerrar.`
+                  ? `O pedido Nº ${pedido.numero} ainda não foi pago. Ele continua valendo depois de encerrar.`
                   : `O pedido ${pedido.numero} segue na esteira até a entrega.`}
               </p>
             )}
