@@ -203,6 +203,9 @@ app.UseForwardedHeaders(forwardedHeaders);
 // ── Migrations + Seed (PostgreSQL only) ───────────────────────────────────────
 await StartupMigrationsAndSeed.RunAsync(app, infraState, databaseProvider, resolvedProvider);
 
+// I4.2: em Production a API não sobe sem chave-mestra que leia todas as credenciais ativas.
+await ChaveMestraNaSubida.ExigirAsync(app.Services, app.Environment.EnvironmentName, "API");
+
 // Restaura modo de logging verbose salvo no DB (após migrations estarem aplicadas).
 if (resolvedProvider is "postgresql")
 {

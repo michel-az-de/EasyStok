@@ -192,4 +192,7 @@ ChaveMestraConfiguracao.AvisarSeFaltar(
     host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("ChaveMestra"),
     "Worker");
 
+// I4.2: em Production o Worker não sobe sem chave-mestra que leia todas as credenciais ativas.
+await ChaveMestraNaSubida.ExigirAsync(host.Services, builder.Environment.EnvironmentName, "Worker");
+
 host.Run();
