@@ -385,6 +385,7 @@ export function BlocoCobranca({
         )}
         <EscolhaDeMeio
           escolhido={meioEscolhido}
+          pedido={pedido}
           aoEscolher={(meio) => escolherMeioPagamento(conversaId, meio)}
           pergunta="Como o cliente vai pagar?"
         />

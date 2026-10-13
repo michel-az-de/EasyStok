@@ -248,6 +248,8 @@ export function BarraProximoPasso({
           {pedindoMeio && situacaoCob.chave === 'nenhuma' && !pedido.meio && (
             <EscolhaDeMeio
               escolhido={null}
+              pedido={pedido}
+              geraAoEscolher
               aoEscolher={(meio) => { setPedindoMeio(false); executar(() => aoGerarPix(meio)) }}
               pergunta="Como o cliente vai pagar?"
             />
