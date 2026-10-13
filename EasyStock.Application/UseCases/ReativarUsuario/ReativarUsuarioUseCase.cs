@@ -8,6 +8,7 @@ namespace EasyStock.Application.UseCases.ReativarUsuario
     public class ReativarUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
         IUsuarioEmpresaRepository usuarioEmpresaRepository,
+        IAssinaturaEmpresaRepository assinaturaRepository,
         ICurrentUserAccessor currentUser,
         IAuditLogRepository auditLogRepository,
         IUnitOfWork unitOfWork,
@@ -24,6 +25,12 @@ namespace EasyStock.Application.UseCases.ReativarUsuario
                 ?? throw new UseCaseValidationException("Usuario nao encontrado.");
 
             if (linkEmpresa.Ativo) return;
+
+            // Mesmo limite do convite (CriarUsuario): reativar não pode passar do que o plano permite.
+            var assinatura = await assinaturaRepository.GetAtivaAsync(command.EmpresaId);
+            var totalUsuarios = await usuarioRepository.CountByEmpresaAsync(command.EmpresaId);
+            if (assinatura?.Plano is not null && !assinatura.Plano.UsuariosSaoIlimitados && totalUsuarios >= assinatura.Plano.LimiteUsuarios)
+                throw new PlanoLimiteAtingidoException("usuarios");
 
             linkEmpresa.Ativo = true;
             await usuarioEmpresaRepository.UpdateAsync(linkEmpresa);

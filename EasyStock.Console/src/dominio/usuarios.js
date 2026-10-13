@@ -40,10 +40,41 @@ export const resumoDoPerfil = (nome) => RESUMO_DO_PERFIL[chave(nome)] ?? null
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export function erroDoConvite({ nome, email, perfilId }) {
-  if (!nome.trim()) return 'Diga o nome da pessoa.'
-  if (!EMAIL.test(email.trim())) return 'Confira o e-mail: é para ele que o convite vai.'
+  if (!nome.trim()) return 'Escreva o nome da pessoa.'
+  if (!EMAIL.test(email.trim())) return 'Confira o e-mail: o convite vai para ele.'
   if (!perfilId) return 'Escolha o perfil.'
   return null
+}
+
+// O que a dona lê depois de cada ação. Quem nunca entrou não tem sessão para cair, então a frase não fala em entrar de novo.
+const FEITO = {
+  convite: (u) => `Convite enviado para ${u.email}. Chega em até um minuto.`,
+  reenviar: (u) => `Convite reenviado para ${u.email}. O link anterior deixou de valer.`,
+  perfil: (u, perfil) => (u.ultimoAcessoEm
+    ? `${u.nome} agora tem o perfil ${perfil}. A mudança vale na próxima vez que entrar.`
+    : `${u.nome} agora tem o perfil ${perfil}.`),
+  desativar: (u) => `O acesso de ${u.nome} foi desativado. Continua no fim desta lista, com o botão Reativar.`,
+  reativar: (u) => `${u.nome} pode entrar de novo.`,
+}
+const FALHOU = {
+  reenviar: 'O convite não foi reenviado',
+  perfil: 'O perfil não mudou',
+  desativar: 'O acesso continua ativo',
+  reativar: 'O acesso continua desativado',
+}
+export const fraseDeRetorno = (acao, usuario, perfil) => FEITO[acao](usuario, perfil)
+// 429 no reenvio é o limite por pessoa da API (ConvitesDeAcesso.EmissoesPorHora).
+export const fraseDeFalha = (acao, falha) => (acao === 'reenviar' && falha?.status === 429
+  ? 'Limite de 3 envios por hora para a mesma pessoa. Tente de novo mais tarde.'
+  : `${FALHOU[acao]}: ${falha?.message}`)
+
+// Filtro do histórico: duas pessoas com o mesmo nome se distinguem pelo e-mail.
+export function opcoesDePessoas(pessoas) {
+  const vezes = new Map()
+  for (const p of pessoas) vezes.set(chave(p.nome), (vezes.get(chave(p.nome)) ?? 0) + 1)
+  return [...pessoas]
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR') || String(a.email).localeCompare(String(b.email), 'pt-BR'))
+    .map((p) => ({ valor: p.usuarioId, rotulo: vezes.get(chave(p.nome)) > 1 ? `${p.nome} (${p.email})` : p.nome }))
 }
 
 // Política de senha da API (SenhaRules): a tela mostra o que falta antes de enviar.
@@ -73,14 +104,27 @@ const ACOES = {
   logout: 'Saiu',
   'usuario-convidado': 'Convite enviado',
   'usuario-criado': 'Acesso criado',
-  'aceitar-convite': 'Aceitou o convite',
+  'aceitar-convite': 'Aceitou o convite e criou a senha',
   'convite-reenviado': 'Convite reenviado',
   'perfil-trocado': 'Perfil trocado',
   'usuario-desativado': 'Acesso desativado',
   'usuario-reativado': 'Acesso reativado',
+  login_google: 'Entrou com a conta Google',
+  'forgot-password': 'Pediu para criar uma senha nova',
+  'forgot-password-limitado': 'Pediu senha nova muitas vezes seguidas',
+  'forgot-password-convite': 'Pediu senha nova e recebeu o convite de novo',
+  'reset-password': 'Criou uma senha nova pelo link do e-mail',
+  'reset-password-code': 'Criou uma senha nova com o código',
+  'admin-troca-email-solicitada': 'Troca de e-mail pedida',
+  'admin-troca-email-convidado': 'E-mail trocado e convite enviado de novo',
+  'email-alterado': 'E-mail trocado',
+  'email-confirmado': 'E-mail confirmado',
+  'telefone-verificado': 'Telefone confirmado',
+  'loja.fechada_no_horario': 'Fechou a loja no horário de atendimento',
 }
-// Texto de máquina que não acrescenta nada à linha: a ação já diz o que houve.
-const SEM_INFORMACAO = [/^Login realizado com sucesso$/, /^Login detectado em novo dispositivo/]
+// Só as frases novas trazem o nome de quem fez ("... por Baba"); o resto do detalhe é texto de máquina.
+// Estas ações têm " por " no detalhe sem ser frase: "aceito por e-mail", "solicitada por <identificador>".
+const DETALHE_DE_MAQUINA = new Set(['aceitar-convite', 'admin-troca-email-solicitada', 'admin-troca-email-convidado'])
 // Linhas antigas guardaram o nível e o canal em jargão: "(Admin); WhatsApp: nao".
 const limpar = (texto) => texto
   .replace(/\s*\((Admin|SuperAdmin|Gerente|Operador)\)/g, '')
@@ -90,14 +134,14 @@ const limpar = (texto) => texto
 
 export function linhaDeAuditoria(item) {
   const conhecido = ACOES[item.acao]
-  const detalhe = item.detalhes && !SEM_INFORMACAO.some((r) => r.test(item.detalhes)) ? limpar(item.detalhes) : null
+  const detalhe = item.detalhes?.includes(' por ') && !DETALHE_DE_MAQUINA.has(item.acao) ? limpar(item.detalhes) : null
   return {
     id: item.id,
     quando: item.dataHora,
     pessoa: item.usuarioNome,
     usuarioId: item.usuarioId,
     acao: item.acao,
-    // O detalhe já é a frase inteira ("Perfil trocado de Cozinha para Atendimento por Baba"); sem ele, vale a ação.
+    // O detalhe com autor já é a frase inteira ("Perfil trocado de Cozinha para Atendimento por Baba"); sem ele, vale a ação.
     oQue: detalhe ?? conhecido ?? item.acao.replaceAll(/[-_]/g, ' '),
     falhou: item.sucesso === false,
     // Entrar e sair são rotina; o resto muda quem pode o quê.
@@ -135,6 +179,12 @@ export const instanteDaApi = (texto) => {
   if (!texto) return null
   const ms = Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(texto) ? texto : `${texto}Z`)
   return Number.isNaN(ms) ? null : ms
+}
+
+// "Carregar mais antigos" pode trazer de novo uma linha que já está na tela (entrou linha nova entre uma busca e outra).
+export function juntarPaginas(anteriores, novas) {
+  const vistos = new Set(anteriores.map((l) => l.id))
+  return [...anteriores, ...novas.filter((l) => !vistos.has(l.id))]
 }
 
 // Agrupa por dia de calendário já formatado (a formatação no fuso é de quem chama).

@@ -70,7 +70,7 @@ public class UsuarioControllerTests
                 Substitute.For<ILogger<TrocaDeContatoService>>()),
             convites, Substitute.For<IAuditLogRepository>(), atualizarLogger);
         _alterarSenhaUseCase = new AlterarSenhaUsuarioUseCase(_usuarioRepository, new AlterarSenhaUsuarioCommandValidator(), revogadorSessoes, _unitOfWork, passwordHasher, alterarSenhaLogger);
-        _desativarUseCase = new DesativarUsuarioUseCase(_usuarioRepository, _usuarioEmpresaRepository, revogadorSessoes, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork, desativarLogger);
+        _desativarUseCase = new DesativarUsuarioUseCase(_usuarioRepository, _usuarioEmpresaRepository, revogadorSessoes, convites, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork, desativarLogger);
         _listarUseCase = new ListarUsuariosUseCase(_usuarioRepository);
         _atribuirPerfilUseCase = new AtribuirPerfilUsuarioUseCase(_usuarioRepository, _usuarioPerfilRepository, Substitute.For<IPerfilRepository>(), revogadorSessoes, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork, atribuirPerfilLogger);
 
@@ -81,7 +81,7 @@ public class UsuarioControllerTests
         _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
         _controller = new UsuarioController(_criarUseCase, _atualizarUseCase, _alterarSenhaUseCase, _desativarUseCase, _listarUseCase, _atribuirPerfilUseCase, _reenviarConviteUseCase,
             new EasyStock.Application.UseCases.ReativarUsuario.ReativarUsuarioUseCase(
-                _usuarioRepository, _usuarioEmpresaRepository, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork,
+                _usuarioRepository, _usuarioEmpresaRepository, _assinaturaRepository, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork,
                 Substitute.For<ILogger<EasyStock.Application.UseCases.ReativarUsuario.ReativarUsuarioUseCase>>()),
             new ListarPerfisAtribuiveisUseCase(Substitute.For<IPerfilRepository>()),
             new ListarAuditoriaDeAcessoUseCase(Substitute.For<IAuditLogRepository>(), _usuarioRepository),

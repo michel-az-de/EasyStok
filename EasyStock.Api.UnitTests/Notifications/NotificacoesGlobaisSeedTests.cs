@@ -210,12 +210,14 @@ public class NotificacoesGlobaisSeedTests
     }
 
     [Fact]
-    public void ConviteAcessoEmailContinuaEmV1ComOLink()
+    public void ConviteAcessoEmailMantemOCodigoESobeParaAVersao2ComAMarcaDaCasa()
     {
         var template = NotificacoesGlobaisSeed.BuildDefaultTemplates().Single(t => t.Codigo == "convite_acesso_email_v1");
 
-        template.Versao.Should().Be(1);
-        template.CorpoTemplate.Should().Contain("link_convite");
+        template.Versao.Should().Be(2);
+        template.AssuntoTemplate.Should().Be("{{ empresa }}: seu convite para entrar no sistema");
+        template.CorpoTemplate.Should().Contain("link_convite").And.Contain("Seu convite chegou");
+        (template.AssuntoTemplate + template.CorpoTemplate).Should().NotContain("EasyStok").And.NotContain("convidado");
     }
 
     [Fact]

@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Auth;
+using EasyStock.Application.Tests.Services.Auth;
 using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AtribuirPerfilUsuario;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
@@ -165,7 +166,7 @@ public class RevogacaoDeSessaoTests
         vinculos.GetByUsuarioEEmpresaAsync(_usuario.Id, empresaId).Returns(vinculo);
 
         await new DesativarUsuarioUseCase(
-                _usuarios, vinculos, _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
+                _usuarios, vinculos, _revogador, new CenarioDeAcesso().Convites(), Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
                 Substitute.For<ILogger<DesativarUsuarioUseCase>>())
             .ExecuteAsync(new DesativarUsuarioCommand(_usuario.Id, empresaId));
 
@@ -179,7 +180,7 @@ public class RevogacaoDeSessaoTests
         var vinculos = Substitute.For<IUsuarioEmpresaRepository>();
 
         await Assert.ThrowsAsync<UseCaseValidationException>(() => new DesativarUsuarioUseCase(
-                _usuarios, vinculos, _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
+                _usuarios, vinculos, _revogador, new CenarioDeAcesso().Convites(), Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
                 Substitute.For<ILogger<DesativarUsuarioUseCase>>())
             .ExecuteAsync(new DesativarUsuarioCommand(_usuario.Id, Guid.NewGuid())));
 

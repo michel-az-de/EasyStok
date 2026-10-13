@@ -19,6 +19,7 @@ public class GestaoDeUsuariosUseCaseTests
     private readonly IUsuarioEmpresaRepository _vinculos = Substitute.For<IUsuarioEmpresaRepository>();
     private readonly IUsuarioPerfilRepository _usuariosPerfis = Substitute.For<IUsuarioPerfilRepository>();
     private readonly IPerfilRepository _perfis = Substitute.For<IPerfilRepository>();
+    private readonly IAssinaturaEmpresaRepository _assinaturas = Substitute.For<IAssinaturaEmpresaRepository>();
     private readonly List<UsuarioPerfil> _removidos = [];
     private readonly List<UsuarioPerfil> _adicionados = [];
     private readonly Guid _empresaId = Guid.NewGuid();
@@ -59,10 +60,10 @@ public class GestaoDeUsuariosUseCaseTests
     }
 
     private DesativarUsuarioUseCase Desativar() => new(
-        _c.Usuarios, _vinculos, _c.Revogador(), _atual, _c.Auditoria, _c.UnitOfWork, Substitute.For<ILogger<DesativarUsuarioUseCase>>());
+        _c.Usuarios, _vinculos, _c.Revogador(), _c.Convites(), _atual, _c.Auditoria, _c.UnitOfWork, Substitute.For<ILogger<DesativarUsuarioUseCase>>());
 
     private ReativarUsuarioUseCase Reativar() => new(
-        _c.Usuarios, _vinculos, _atual, _c.Auditoria, _c.UnitOfWork, Substitute.For<ILogger<ReativarUsuarioUseCase>>());
+        _c.Usuarios, _vinculos, _assinaturas, _atual, _c.Auditoria, _c.UnitOfWork, Substitute.For<ILogger<ReativarUsuarioUseCase>>());
 
     private AtribuirPerfilUsuarioUseCase Atribuir() => new(
         _c.Usuarios, _usuariosPerfis, _perfis, _c.Revogador(), _atual, _c.Auditoria, _c.UnitOfWork,
@@ -114,6 +115,34 @@ public class GestaoDeUsuariosUseCaseTests
         ana.Empresas.Single().Ativo.Should().BeTrue();
         _c.Auditorias.Should().ContainSingle(a => a.Acao == "usuario-reativado" && a.UsuarioId == ana.Id);
         _c.UnitOfWork.CommitCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task DesativarDerrubaOConviteAberto()
+    {
+        var ana = _c.CriarConvidado(empresaId: _empresaId);
+        _vinculos.GetByUsuarioEEmpresaAsync(ana.Id, _empresaId).Returns(ana.Empresas.Single());
+        await _c.Convites().EmitirAsync(ana, _empresaId, comWhatsApp: false, ip: null, userAgent: null, revogarAbertos: false);
+        _c.Tokens.Linhas.Should().ContainSingle(t => !t.Usado, "o convite nasce aberto");
+
+        await Desativar().ExecuteAsync(new DesativarUsuarioCommand(ana.Id, _empresaId));
+
+        _c.Tokens.Linhas.Should().OnlyContain(t => t.Usado, "quem foi desativada não pode criar a senha pelo link antigo");
+    }
+
+    [Fact]
+    public async Task ReativarRespeitaOLimiteDoPlano()
+    {
+        var ana = Atendente(ativo: false);
+        _assinaturas.GetAtivaAsync(_empresaId).Returns(new AssinaturaEmpresa { Plano = new Plano { Nome = "Starter", LimiteUsuarios = 2 } });
+        _c.Usuarios.CountByEmpresaAsync(_empresaId).Returns(2);
+
+        var acao = () => Reativar().ExecuteAsync(new ReativarUsuarioCommand(ana.Id, _empresaId));
+
+        await acao.Should().ThrowAsync<PlanoLimiteAtingidoException>();
+        ana.Empresas.Single().Ativo.Should().BeFalse();
+        _c.Auditorias.Should().BeEmpty();
+        _c.UnitOfWork.CommitCount.Should().Be(0);
     }
 
     [Fact]

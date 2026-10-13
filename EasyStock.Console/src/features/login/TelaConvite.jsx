@@ -1,6 +1,6 @@
 // Primeiro acesso (#1753, N9): quem recebeu o convite escolhe a senha aqui. Abrir o link não gasta o
 // convite; só o envio gasta. Depois de aceitar, a pessoa entra pelo login, como todo mundo.
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { aceitarConvite } from '../../aplicacao/usuarios'
 import { Botao } from '../../componentes/Botao'
 import { CampoTexto } from '../../componentes/Campo'
@@ -16,6 +16,16 @@ export function TelaConvite({ token, aoConcluir }) {
   const [estado, setEstado] = useState({ fase: token ? 'pedindo' : 'semToken', erro: null })
   const regras = regrasDaSenha(senha)
   const enviando = estado.fase === 'enviando'
+  const titulo = useRef(null)
+  const tela = estado.fase === 'pronto' ? 'pronto' : estado.fase === 'semToken' || estado.fase === 'vencido' ? 'vencido' : 'pedindo'
+
+  // A tela trocou inteira: o foco vai para o título novo, senão o teclado e o leitor de tela ficam no botão que sumiu.
+  const telaAnterior = useRef(tela)
+  useEffect(() => {
+    if (telaAnterior.current === tela) return
+    telaAnterior.current = tela
+    titulo.current?.focus()
+  }, [tela])
 
   async function enviar(evento) {
     evento.preventDefault()
@@ -27,7 +37,12 @@ export function TelaConvite({ token, aoConcluir }) {
     } catch (falha) {
       // Convite usado, vencido ou trocado responde sempre a mesma coisa; a saída é pedir outro.
       const vencido = falha.status === 409 || falha.status === 404
-      setEstado({ fase: vencido ? 'vencido' : 'pedindo', erro: vencido ? null : falha.message })
+      // 429: a API travou as tentativas por uns minutos; insistir aqui não adianta.
+      const limitado = falha.status === 429
+      setEstado({
+        fase: vencido ? 'vencido' : 'pedindo', limitado,
+        erro: vencido ? null : limitado ? 'Muitas tentativas seguidas. Espere uns minutos e abra o link do e-mail de novo.' : falha.message,
+      })
     }
   }
 
@@ -37,7 +52,7 @@ export function TelaConvite({ token, aoConcluir }) {
         <section className={css.cartao} aria-labelledby={`${id}-titulo`}>
           <Marca />
           <div>
-            <h1 id={`${id}-titulo`} className={css.titulo}>Senha criada</h1>
+            <h1 id={`${id}-titulo`} ref={titulo} tabIndex={-1} className={css.titulo}>Senha criada</h1>
             <p className={css.apoio}>Agora é só entrar com o seu e-mail e a senha que você escolheu.</p>
           </div>
           <Botao variante="primario" largo onClick={aoConcluir}>Entrar</Botao>
@@ -52,10 +67,10 @@ export function TelaConvite({ token, aoConcluir }) {
         <section className={css.cartao} aria-labelledby={`${id}-titulo`}>
           <Marca />
           <div>
-            <h1 id={`${id}-titulo`} className={css.titulo}>Este convite não vale mais</h1>
-            <p className={css.apoio}>Ele já foi usado ou passou do prazo. Peça à responsável pela casa para reenviar o convite.</p>
+            <h1 id={`${id}-titulo`} ref={titulo} tabIndex={-1} className={css.titulo}>Este convite já não vale</h1>
+            <p className={css.apoio}>Se você já criou a sua senha, é só entrar. Se ainda não criou, peça à dona para reenviar o convite.</p>
           </div>
-          <Botao largo onClick={aoConcluir}>Ir para o login</Botao>
+          <Botao variante="primario" largo onClick={aoConcluir}>Entrar</Botao>
         </section>
       </main>
     )
@@ -66,7 +81,7 @@ export function TelaConvite({ token, aoConcluir }) {
       <section className={css.cartao} aria-labelledby={`${id}-titulo`}>
         <Marca />
         <div>
-          <h1 id={`${id}-titulo`} className={css.titulo}>Bem-vinda à Casa da Baba</h1>
+          <h1 id={`${id}-titulo`} ref={titulo} tabIndex={-1} className={css.titulo}>Boas-vindas à Casa da Baba</h1>
           <p className={css.apoio}>Escolha a senha que você vai usar para entrar.</p>
         </div>
         {estado.erro && <p className={css.erro} role="alert">{estado.erro}</p>}
@@ -92,6 +107,7 @@ export function TelaConvite({ token, aoConcluir }) {
             {enviando ? 'Salvando…' : 'Criar senha'}
           </Botao>
         </form>
+        {estado.limitado && <Botao largo onClick={aoConcluir}>Entrar</Botao>}
       </section>
     </main>
   )

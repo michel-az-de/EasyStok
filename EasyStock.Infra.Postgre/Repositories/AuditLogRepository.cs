@@ -33,6 +33,8 @@ public class AuditLogRepository(EasyStockDbContext context) : IAuditLogRepositor
         var total = await consulta.CountAsync(ct);
         var itens = await consulta
             .OrderByDescending(al => al.DataHora)
+            // Desempate estável: duas linhas no mesmo instante não trocam de página entre uma busca e outra.
+            .ThenByDescending(al => al.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(al => new AuditoriaDeAcessoLinha(

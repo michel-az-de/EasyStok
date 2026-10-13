@@ -8,10 +8,11 @@ const comEmpresa = (caminho, extra = {}) => {
   return `${caminho}?${consulta}`
 }
 
+// Leituras com `prazoComCancelamento`: sem ele, passar `sinal` desliga o prazo de 20 s e a tela ficava carregando para sempre.
 export const listarUsuarios = (sinal) =>
-  chamarApi(comEmpresa('/api/usuarios', { pageSize: '100' }), { sinal })
+  chamarApi(comEmpresa('/api/usuarios', { pageSize: '100' }), { sinal, prazoComCancelamento: true })
 
-export const listarPerfis = (sinal) => chamarApi(comEmpresa('/api/usuarios/perfis'), { sinal })
+export const listarPerfis = (sinal) => chamarApi(comEmpresa('/api/usuarios/perfis'), { sinal, prazoComCancelamento: true })
 
 // Sem senha: a API cria o convite e manda o link por e-mail (N9).
 export const convidarUsuario = ({ nome, email, perfilId }) =>
@@ -31,7 +32,7 @@ export const reativarUsuario = (usuarioId) => chamarApi(comEmpresa(`/api/usuario
 export const listarAuditoria = ({ usuarioId = null, pagina = 1, tamanho = 50 } = {}, sinal) =>
   chamarApi(comEmpresa('/api/usuarios/auditoria', {
     page: String(pagina), pageSize: String(tamanho), ...(usuarioId ? { usuarioId } : {}),
-  }), { sinal, envelope: true })
+  }), { sinal, envelope: true, prazoComCancelamento: true })
 
 // Anônimo: quem aceita o convite ainda não tem sessão.
 export const aceitarConvite = (token, novaSenha) =>

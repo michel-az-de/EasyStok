@@ -436,8 +436,21 @@ export function App() {
   const rota = rotaDaHash(hash, { fonteApi: FONTE_API })
   // #1582: cada tela diz o próprio nome na aba. No Balcão quem escreve é a `Composicao`, com a contagem.
   useTituloDaAba(FONTE_API && !sessao ? TITULO_BASE : rota.tipo === ROTA_PRINCIPAL ? null : tituloDaAba(rota))
-  // #1753: o link do convite abre antes do login e vale mesmo com outra pessoa logada neste aparelho.
-  if (FONTE_API && ehRotaDeConvite(hash)) return <TelaConvite key={hash} token={tokenDoConvite(hash)} aoConcluir={() => { window.location.hash = '' }} />
+  // #1753: o token sai da barra de endereço assim que é lido, para não ficar no histórico do navegador.
+  const [tokenGuardado, setTokenGuardado] = useState(null)
+  const tokenNaBarra = FONTE_API ? tokenDoConvite(hash) : null
+  useEffect(() => {
+    if (!tokenNaBarra) return
+    setTokenGuardado(tokenNaBarra)
+    window.history.replaceState(window.history.state, '', '#/convite')
+  }, [tokenNaBarra])
+  // O link do convite abre antes do login e vale mesmo com outra pessoa logada neste aparelho. Ao concluir, a sessão
+  // dessa outra pessoa é encerrada: senão quem acabou de criar a senha clicava "Entrar" e caía no Console dela.
+  if (FONTE_API && ehRotaDeConvite(hash)) {
+    const token = tokenNaBarra ?? tokenGuardado
+    const aoConcluir = () => { if (sessao) encerrarSessao(); setTokenGuardado(null); window.location.hash = '' }
+    return <TelaConvite key={token ?? 'sem-token'} token={token} aoConcluir={aoConcluir} />
+  }
   if (FONTE_API && !sessao) return <TelaLogin entrarNaEmpresa={entrarNaEmpresa} google={google} avisoSaida={avisoSaida} />
   if (FONTE_API) return <><NavegacaoDoConsole hash={hash} /><AppComAcesso key={identidadeDaSessao(sessao)} rota={rota} sessao={sessao} aoSair={encerrarSessao} /></>
   if (!FONTE_API && rota.modulo) return <AppPrincipal rota={rota} sessao={sessao} aoSair={encerrarSessao} />
@@ -504,9 +517,9 @@ function AppComAcesso({ rota, sessao, aoSair }) {
     notificacoes: <SinoDaSessao avisos={avisos} aparelho={avisosNoAparelho} /> }
   let tela
   if (!permiteRota(dados, rota)) tela = (
-    <main className={css.estadoAcesso} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Módulo sem acesso">
-    <Vazio titulo="Seu perfil não tem acesso a este módulo" acao={<><a href={HASH_HALL}>Voltar aos módulos</a><ControleAjuda rota={rota} /><Botao variante="texto" onClick={sair}>Sair</Botao></>}>
-      Peça à dona para revisar seu acesso, se precisar trabalhar aqui.
+    <main className={css.estadoAcesso} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Tela só para a dona">
+    <Vazio titulo="Esta tela é só para a dona" acao={<><Botao variante="primario" onClick={() => { window.location.hash = HASH_HALL }}>Voltar ao início</Botao><Botao variante="texto" onClick={sair}>Sair</Botao></>}>
+      Se você precisa trabalhar aqui, peça à dona para mudar o seu perfil.
     </Vazio>
     </main>
   )

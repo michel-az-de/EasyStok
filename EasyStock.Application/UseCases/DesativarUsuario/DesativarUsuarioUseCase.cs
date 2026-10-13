@@ -8,6 +8,7 @@ namespace EasyStock.Application.UseCases.DesativarUsuario
         IUsuarioRepository usuarioRepository,
         IUsuarioEmpresaRepository usuarioEmpresaRepository,
         RevogadorSessoes revogadorSessoes,
+        ConvitesDeAcesso convites,
         ICurrentUserAccessor currentUser,
         IAuditLogRepository auditLogRepository,
         IUnitOfWork unitOfWork,
@@ -39,6 +40,9 @@ namespace EasyStock.Application.UseCases.DesativarUsuario
             // #1352: desativar tira o vínculo de uma empresa, mas o corte é do usuário todo. Quem está em duas
             // empresas entra de novo e fica só com a que continua ativa.
             await revogadorSessoes.RevogarAsync(usuario);
+
+            // #1753: convite aberto cai junto. Sem isso a pessoa desativada ainda criava a senha pelo link e só o login recusava.
+            await convites.RevogarAbertosAsync(usuario.Id);
 
             var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
             await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(
