@@ -65,7 +65,7 @@ export function faltaPagar(pedido, cardapio) {
 // cobrança ativa já foi paga e a comanda cresceu além do que foi quitado.
 // Vale para o segundo, terceiro acréscimo: o que já caiu está no arquivo.
 export function diferencaAposPagamento(pedido, cardapio) {
-  if (!pedido?.cobranca?.pagaEm) return 0
+  if (!pedido?.cobranca?.pagaEm || pedido.estado === 'cancelado') return 0
   return faltaPagar(pedido, cardapio)
 }
 
