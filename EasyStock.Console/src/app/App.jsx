@@ -108,7 +108,7 @@ function Composicao({ rota, aoSair }) {
   // Larguras redimensionáveis por alça (seção 9): um hook só, aqui em cima,
   // porque Moldura e o painel do cardápio leem a mesma chave de localStorage
   // e duas instâncias do hook se pisariam na hora de gravar.
-  const { larguras, definir: aoRedimensionar } = useLarguras()
+  const { larguras, padrao: largurasPadrao, definir: aoRedimensionar } = useLarguras()
 
   // Arrasto de prato (cardápio → comanda) e reordenar item da comanda dividem
   // o mesmo DndContext (seção 9, C3): os dois precisam de um ancestral comum
@@ -194,6 +194,7 @@ function Composicao({ rota, aoSair }) {
         // e desloca o relógio; sem o gatilho, nem o botão nem o F2 aparecem.
         aoAlternarSimulacoes={FONTE_API ? null : () => setSimulando((v) => !v)}
         larguras={larguras}
+        largurasPadrao={largurasPadrao}
         aoRedimensionar={aoRedimensionar}
         cardapioAberto={modal === 'cardapio' && Boolean(selecionada)}
       />

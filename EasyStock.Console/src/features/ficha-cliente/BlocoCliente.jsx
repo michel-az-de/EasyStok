@@ -255,7 +255,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
         )}
       </Bloco>
 
-      <Bloco titulo="Contato e endereço" chave="contato" recolhidoDePadrao={recolhidas.contato} resumo={cliente.telefone ?? ''}>
+      <Bloco titulo="Contato e endereço" chave="contato" recolhidoDePadrao={recolhidas.contato && !avisoEndereco} resumo={cliente.telefone ?? ''}>
         {precisaCadastro ? (
           <div className={css.cadastroRapido}>
             {!cliente.telefone && (

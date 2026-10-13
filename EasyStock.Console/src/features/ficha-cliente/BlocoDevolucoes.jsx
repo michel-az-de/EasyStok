@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { useEstornosManuais } from '../../aplicacao/useEstornosManuais'
 import { Bloco } from '../../componentes/Bloco'
+import { RESUMO_COM_ERRO } from '../../dominio/ficha'
 import { Botao } from '../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { CampoMascarado } from '../../componentes/CampoMascarado'
@@ -50,7 +51,7 @@ export function BlocoDevolucoes({ pedidoId }) {
   }
 
   return (
-    <Bloco titulo="Devoluções" chave="devolucoes" recolhidoDePadrao resumo={totalDevolvido ? `${moeda(totalDevolvido)} devolvidos` : 'Recebimentos e estornos'}>
+    <Bloco titulo="Devoluções" chave="devolucoes" recolhidoDePadrao={!erro} resumo={erro ? RESUMO_COM_ERRO : totalDevolvido ? `${moeda(totalDevolvido)} devolvidos` : 'Recebimentos e estornos'}>
       <div className={css.acoesPedido}>
         {erro && <p role="alert" className={css.corpoBloco}>{erro}</p>}
         {aviso && <output className={css.corpoBloco}>{aviso}</output>}

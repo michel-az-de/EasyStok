@@ -51,4 +51,15 @@ Em 1440x900 e 1920x1080 a comanda passa a aparecer na primeira tela da Ficha.
 - Com o cardápio aberto em 1280 a conversa fica com 352 px. Antes ficava com zero.
 - A crítica cobriu o Atendimento. Cozinha, Caixa e Entregas não foram medidos nesta rodada.
 - Capturas feitas no painel do navegador de desenvolvimento, reduzidas; as medidas vêm do DOM.
-- Tema escuro. O claro não foi conferido.
+
+## Revisão do diff
+
+Revisão independente: nada crítico, aprova com ressalvas. Entraram por causa dela:
+
+- Seção que nasce recolhida não esconde erro: com falha na consulta, Devoluções, Ocorrências e a troca de janela nascem abertas; recolhidas por escolha, o título diz "Não carregou". Pedido sem vaga de entrega também nasce aberto.
+- "Contato e endereço" não recolhe por cima da pergunta "mudar também a entrega do pedido?".
+- Enter na alça de largura restaura o padrão da tela, não o padrão fixo antigo.
+
+Ficaram para a #1686: entre 1180 e 1235 px de largura o cardápio ainda cobre de 31 a 60 px da conversa; na demonstração, a gaveta de simulações fica sob o cardápio. Observado durante a rodada: um erro de renderização num bloco da Ficha deixa a tela inteira em branco, porque não há contenção de erro por região.
+
+Tema claro conferido na Ficha em 1440x900.

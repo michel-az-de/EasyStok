@@ -356,7 +356,7 @@ function BotaoSimular({ ativo, aoAlternar }) {
 // Três arranjos para o mesmo conteúdo. Os painéis não sabem em qual estão.
 export function Moldura({
   tamanho, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca, aoAbrirCardapio, aoAbrirAutomacoes, aoAbrirGestao,
-  aoAbrirEntregas, aoAbrirAjuda, simulando, aoAlternarSimulacoes, larguras, aoRedimensionar, cardapioAberto = false,
+  aoAbrirEntregas, aoAbrirAjuda, simulando, aoAlternarSimulacoes, larguras, largurasPadrao = larguras, aoRedimensionar, cardapioAberto = false,
 }) {
   const {
     visiveis, selecionada, conversas, regras: regrasDaMassa, agora, aberta, fonteApi, sessao,
@@ -461,7 +461,7 @@ export function Moldura({
             valor={larguras.balcao}
             min={300}
             max={480}
-            padrao={360}
+            padrao={largurasPadrao.balcao}
             aoMudar={(valor) => aoRedimensionar('balcao', valor)}
           />
           <section className={`${css.coluna} ${css.centro}`} aria-label="Atendimento">{atendimento}</section>
@@ -470,7 +470,7 @@ export function Moldura({
             valor={larguras.ficha}
             min={320}
             max={520}
-            padrao={420}
+            padrao={largurasPadrao.ficha}
             invertida
             aoMudar={(valor) => aoRedimensionar('ficha', valor)}
           />

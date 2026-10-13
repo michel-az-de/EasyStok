@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { escolhidasDoSalvo, largurasDaTela } from './larguras'
+import { escolhidasDoSalvo, largurasDaTela, padraoPorTela } from './larguras'
 
 // Largura das colunas Balcão e Ficha, e do painel do cardápio (seção 9 da
 // direção visual). Uma chave só no localStorage para as três, lida e escrita
@@ -47,5 +47,5 @@ export function useLarguras() {
     })
   }, [])
 
-  return { larguras: largurasDaTela(escolhidas, tela), definir }
+  return { larguras: largurasDaTela(escolhidas, tela), padrao: padraoPorTela(tela), definir }
 }

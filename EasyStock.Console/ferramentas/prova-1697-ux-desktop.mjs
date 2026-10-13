@@ -79,11 +79,32 @@ confere('2  a Ficha usa a regra, e os blocos vazios do pedido criado nascem reco
   assert.match(fonte('features/ficha-cliente/PainelFicha.jsx'), /<BlocoCliente conversa=\{selecionada\} recolhidas=\{fichaRecolhidaDePadrao\(\{ pedido, cliente \}\)\} \/>/)
   const cliente = fonte('features/ficha-cliente/BlocoCliente.jsx')
   for (const chave of ['contato', 'tags', 'historico']) {
-    assert.match(cliente, new RegExp(`chave="${chave}" recolhidoDePadrao=\\{recolhidas\\.${chave}\\}`), chave)
+    assert.match(cliente, new RegExp(`chave="${chave}" recolhidoDePadrao=\\{recolhidas\\.${chave}`), chave)
   }
-  assert.match(fonte('features/ficha-cliente/BlocoDevolucoes.jsx'), /chave="devolucoes" recolhidoDePadrao/)
-  assert.match(fonte('features/ficha-cliente/BlocoOcorrenciasApi.jsx'), /chave="ocorrencias" recolhidoDePadrao/)
-  assert.match(fonte('features/ficha-cliente/SeletorJanelaApi.jsx'), /chave="janela-pedido" recolhidoDePadrao resumo=\{/)
+  assert.match(fonte('features/ficha-cliente/BlocoDevolucoes.jsx'), /chave="devolucoes" recolhidoDePadrao=\{!erro\}/)
+  assert.match(fonte('features/ficha-cliente/BlocoOcorrenciasApi.jsx'), /chave="ocorrencias" recolhidoDePadrao=\{!erro\}/)
+  assert.match(fonte('features/ficha-cliente/SeletorJanelaApi.jsx'), /chave="janela-pedido" recolhidoDePadrao=\{janelaRecolhidaDePadrao\(campos\)\}/)
+})
+confere('2  erro e o que pede ação não nascem escondidos', () => {
+  // Troca de janela: recolhe com vaga já marcada ou ainda carregando; abre com erro ou sem vaga.
+  assert.equal(ficha.janelaRecolhidaDePadrao({ leitura: { atual: { rotulo: 'ter 13/10' } }, erro: null }), true)
+  assert.equal(ficha.janelaRecolhidaDePadrao({ leitura: null, erro: null }), true)
+  assert.equal(ficha.janelaRecolhidaDePadrao({ leitura: null, erro: 'Janelas não carregaram' }), false)
+  assert.equal(ficha.janelaRecolhidaDePadrao({ leitura: { atual: null }, erro: null }), false)
+  assert.equal(ficha.resumoDaJanela({ leitura: { atual: { rotulo: 'ter 13/10' } }, erro: null }), 'ter 13/10')
+  assert.equal(ficha.resumoDaJanela({ leitura: { atual: null }, erro: null }), 'Sem vaga de entrega')
+  assert.equal(ficha.resumoDaJanela({ leitura: null, erro: 'x' }), ficha.RESUMO_COM_ERRO)
+  // Recolhida por escolha dela, a seção ainda diz no título que não carregou.
+  assert.match(fonte('features/ficha-cliente/BlocoDevolucoes.jsx'), /resumo=\{erro \? RESUMO_COM_ERRO : /)
+  assert.match(fonte('features/ficha-cliente/BlocoOcorrenciasApi.jsx'), /resumo=\{erro \? RESUMO_COM_ERRO : /)
+  // Endereço salvo com pedido em andamento abre uma pergunta dentro do bloco: ele não recolhe por cima dela.
+  assert.match(fonte('features/ficha-cliente/BlocoCliente.jsx'), /chave="contato" recolhidoDePadrao=\{recolhidas\.contato && !avisoEndereco\}/)
+})
+confere('3  Enter na alça restaura o padrão da tela, não o padrão fixo antigo', () => {
+  assert.match(fonte('app/Moldura.jsx'), /padrao=\{largurasPadrao\.balcao\}/)
+  assert.match(fonte('app/Moldura.jsx'), /padrao=\{largurasPadrao\.ficha\}/)
+  assert.match(fonte('app/App.jsx'), /largurasPadrao=\{largurasPadrao\}/)
+  assert.match(fonte('hooks/useLarguras.js'), /padrao: padraoPorTela\(tela\)/)
 })
 confere('2  com pedido criado, o convite do link fica só com o botão, sem o parágrafo de explicação', () => {
   assert.match(fonte('features/ficha-cliente/ComandaDoCliente.jsx'), /\{!visiveis\.length && !erro && !pedido\?\.pedidoId && <p>Compartilhe com o cliente/)

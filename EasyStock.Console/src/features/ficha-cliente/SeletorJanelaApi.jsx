@@ -3,6 +3,7 @@ import { Bloco } from '../../componentes/Bloco'
 import { CampoTexto } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
 import { dataIsoNoFuso, somarDiasIso } from '../../dominio/formato'
+import { janelaRecolhidaDePadrao, resumoDaJanela } from '../../dominio/ficha'
 import { useAcoes } from '../../aplicacao/contextos'
 import { useReagendamentoPedido } from '../../aplicacao/useReagendamentoPedido'
 import { EscolhaJanelaPedido } from '../../componentes/EscolhaJanelaPedido'
@@ -19,9 +20,7 @@ export function SeletorJanelaApi({ pedido, editavel, aoEscolher }) {
 function ReagendamentoPedido({ pedidoId, aoEscolher }) {
   const campos = useReagendamentoPedido(pedidoId, aoEscolher)
   // #1697: pedido criado já tem a vaga; o formulário de troca abre pelo título, que mostra a atual.
-  const { leitura } = campos
-  const resumo = leitura ? (leitura.atual?.rotulo ?? 'Sem vaga de entrega') : ''
-  return <Bloco titulo="Janela de entrega" chave="janela-pedido" recolhidoDePadrao resumo={resumo}><EscolhaJanelaPedido {...campos} /></Bloco>
+  return <Bloco titulo="Janela de entrega" chave="janela-pedido" recolhidoDePadrao={janelaRecolhidaDePadrao(campos)} resumo={resumoDaJanela(campos)}><EscolhaJanelaPedido {...campos} /></Bloco>
 }
 
 function EscolhaRascunho({ pedido, editavel, aoEscolher }) {
