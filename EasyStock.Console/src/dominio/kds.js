@@ -182,5 +182,5 @@ export const TETO_DA_FILA_KDS = 200
 
 export function avisoDeFilaNoTeto(quantidade) {
   if (quantidade < TETO_DA_FILA_KDS) return null
-  return `A fila mostra só os ${TETO_DA_FILA_KDS} pedidos mais antigos: os mais novos ficam fora da tela. Conclua ou cancele os pedidos parados para a fila andar.`
+  return `A fila chegou ao limite de ${TETO_DA_FILA_KDS} pedidos: pedidos mais novos podem estar fora da tela. Conclua ou cancele os pedidos parados para a fila andar.`
 }
