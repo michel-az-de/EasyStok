@@ -41,6 +41,17 @@ Todo cliente pode iniciar e continuar o atendimento. Cobertura automática deter
 11. **Resposta pública ainda recusava o CEP.** A checagem de produção encontrou “Não entregamos neste CEP.” no detalhe HTTP 422. Substituir pela orientação de combinar entrega e frete; preservar o status e o contrato de cotação, que não confirma uma tarifa automática inexistente.
 12. **Frete automático sem configuração em produção.** Consulta somente leitura em 12/10/2026 confirmou cozinha sem coordenadas, fator de rota, distância grátis, raio máximo e faixas nulos. Existe apenas a zona ativa “TESTE SANDBOX (temporaria)”, CEPs 05500000–05500999, R$ 8. Os CEPs 01310100 e 20040002 retornam 422. A tarifa real e a origem dependem dos dados da operação, solicitados ao Felipe; não foram inventados nem alterados. Fora do limite automático, manter o fluxo humano já publicado.
 
+## Retorno visual: rolagem e hierarquia do pedido
+
+O retorno do Felipe mostrou o resumo do cliente excedendo a tela e a seleção compartilhada tomando o lugar do pedido no Atendimento. Pedido confirmado e seleção em montagem passam a ter apresentações distintas:
+
+- A coluna direita volta a se chamar **Pedido**. O pedido confirmado aparece primeiro; o histórico do link fica recolhido. Uma alteração em edição ou aguardando conferência continua aberta.
+- Antes da confirmação, o bloco se chama **Pedido em montagem**, com número da comanda como referência, total antes dos itens, quantidade explícita e observações recolhidas com prévia do texto existente.
+- O painel do Atendimento usa uma única rolagem. A edição local usa a memória da visita autenticada já existente, preservando o rascunho ao trocar de conversa ou de tamanho de tela.
+- No link do cliente, o resumo no computador cabe na área visível, com cabeçalho e total/ação acessíveis enquanto os pratos rolam. No celular e em telas baixas, mantém a rolagem normal da página. “Conferir entrega” leva o foco ao endereço.
+
+Validação do retorno: seis execuções da regressão com 12 itens (desktop, iPhone SE e Pixel 7, duas vezes cada); navegação por teclado, total e ação visíveis, endereço alcançável e ausência de overflow horizontal. No Atendimento, navegador com quatro pratos de nomes longos comprovou uma rolagem, observações recolhidas e edição preservada entre desktop e celular. Qualidade do Console, prova de comanda compartilhada, 25 cenários de UX, 39 testes unitários da página, lint/build do site e gate com 42 testes de arquitetura aprovados. A prova visual do painel usa seleção controlada; as jornadas com API/PostgreSQL locais são verificadas separadamente.
+
 ## Copy por situação
 
 | Situação | Texto/direção |

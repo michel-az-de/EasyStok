@@ -15,11 +15,23 @@
   font-family: var(--f-corpo);
 }
 
-.clienteCompartilhado { border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-1); padding: var(--e-3); margin-bottom: var(--e-3); }
+.clienteCompartilhado { padding: 0 var(--e-4); min-width: 0; }
+.clienteCompartilhado h3 { margin: 0; font-size: var(--t-forte); }
+.clienteCompartilhado h3 small { display: block; margin-top: var(--e-1); color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 400; }
 .clienteCompartilhado p { margin: var(--e-2) 0; }
 .clienteCompartilhado ul { list-style: none; padding: 0; }
-.clienteCompartilhado li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2); padding: var(--e-2) 0; }
+.clienteCompartilhado li { padding: var(--e-2) 0; border-bottom: var(--b-1) solid var(--linha); }
 .clienteCompartilhado small { width: 100%; }
+.linhaCompartilhada { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--e-2); }
+.linhaCompartilhada strong { font-size: var(--t-apoio); font-weight: 600; overflow-wrap: anywhere; }
+.linhaCompartilhada small { display: block; margin-top: var(--e-1); font-size: var(--t-apoio); color: var(--tinta-2); }
+.anotacaoCompartilhada summary, .enderecoCompartilhado summary, .historicoCompartilhado > summary { cursor: pointer; min-height: 44px; align-content: center; font-size: var(--t-apoio); color: var(--tinta-2); }
+.anotacaoCompartilhada summary small { display: block; padding-left: var(--e-3); color: var(--tinta); overflow-wrap: anywhere; }
+.anotacaoCompartilhada[open] summary small { display: none; }
+.anotacaoCompartilhada summary:focus-visible, .enderecoCompartilhado summary:focus-visible, .historicoCompartilhado > summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.clienteCompartilhado .estadoCompartilhado { font-size: var(--t-apoio); color: var(--tinta-2); }
+.clienteCompartilhado .totalCompartilhado { padding-block: var(--e-2); border-block: var(--b-1) solid var(--linha); }
+.salvarCompartilhado { display: flex; flex-wrap: wrap; gap: var(--e-2); position: sticky; bottom: 0; padding: var(--e-2) 0; background: var(--papel); }
 .adicionarCompartilhado { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2); }
 .observacaoCompartilhada { display: grid; width: 100%; gap: var(--e-1); margin-block: var(--e-2); }
 .clienteCompartilhado input, .clienteCompartilhado textarea, .clienteCompartilhado select { max-width: 100%; min-width: 0; width: 100%; min-height: 44px; padding: var(--e-2); border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-1); color: var(--tinta); background: var(--papel); font: inherit; }

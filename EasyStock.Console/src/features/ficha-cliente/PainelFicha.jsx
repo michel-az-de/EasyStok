@@ -79,6 +79,9 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
   // anel zerado abrem a MESMA modal do cabeçalho e do menu ⋯, com o resumo.
   // Quem cancela pedido sem pagamento é a própria modal (faixa da seção 5).
   const aoEncerrarAtendimento = () => abrirEncerramento(selecionada.id)
+  const comandaCompartilhada = <ComandaDoCliente key={selecionada.id} conversaId={selecionada.id}
+    numeroComanda={numero} ativo={fonteApi} acaoCompartilhar={acaoCompartilhar}
+    pedido={pedido} aoMudarEscolha={setConversaEscolhendo} />
 
   return (
     <div className={css.painel}>
@@ -95,8 +98,7 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
       ))}
 
       <div className={css.conteudo}>
-        <ComandaDoCliente key={selecionada.id} conversaId={selecionada.id} ativo={fonteApi} acaoCompartilhar={acaoCompartilhar}
-          pedido={pedido} aoMudarEscolha={setConversaEscolhendo} />
+        {!pedido && comandaCompartilhada}
         {/* Rodada 11 (registro 92): onde o automático está no caminho do
             UC-01, enquanto ele monta o cadastro pela conversa. */}
         {selecionada.captura && selecionada.conta === 'lead' && (
@@ -115,12 +117,10 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
           />
         )}
 
-        <BlocoCliente conversa={selecionada} />
-
         {pedido ? (
           <>
             {/* #1442: a comanda recolhe e lembra, como as seções do cliente. */}
-            <Bloco titulo="Comanda" chave="comanda" resumo={numero ? `Nº ${numero}` : 'Rascunho'}>
+            <Bloco titulo="Pedido" chave="comanda" resumo={numero ? `Comanda ${numero}` : 'Rascunho'}>
               <BlocoPedido
                 pedido={pedido}
                 editavel={editavel}
@@ -139,6 +139,7 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
                 clienteEscolhendo={clienteEscolhendo}
               />
             </Bloco>
+            {comandaCompartilhada}
             {/* #1510: formulário "Recebi" e confirmações não atravessam de uma conversa para outra. */}
             <BlocoCobranca
               key={selecionada.id}
@@ -173,7 +174,7 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
             <BlocoEntrega conversa={selecionada} />
           </>
         ) : (
-          <Bloco titulo="Pedido" chave="comanda">
+          <Bloco titulo="Montar pelo atendimento" chave="comanda">
             <p className={css.corpoBloco}>
               Nenhum pedido confirmado ainda. O resumo e a cobrança aparecem após a confirmação.
             </p>
@@ -184,6 +185,7 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
             )}
           </Bloco>
         )}
+        <BlocoCliente conversa={selecionada} />
 
         {/* Histórico e Notas saíram da coluna no passe de integração (direção 19,
             seção 8): moram na modal Histórico da F2, botão no bloco Cliente. */}
