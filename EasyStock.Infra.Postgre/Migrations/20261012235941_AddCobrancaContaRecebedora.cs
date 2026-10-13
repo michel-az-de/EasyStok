@@ -31,11 +31,18 @@ namespace EasyStock.Infra.Postgre.Migrations
                 nullable: true);
 
             // I3.2: cobrança online criada antes desta migration nasceu da credencial global do .env.
-            // A tabela tem RLS forçado; set_config com is_local = true vale só nesta transação.
+            // A tabela tem RLS forçado: liga o bypass só para este UPDATE e devolve o valor que estava antes,
+            // para não mexer no que outra migration da mesma transação espera.
             migrationBuilder.Sql("""
-SELECT set_config('app.bypass_rls', 'true', true);
-UPDATE cobrancas_pedido SET "OrigemCredencial" = 'global' WHERE "Provedor" = 'mercadopago' AND "OrigemCredencial" IS NULL;
-SELECT set_config('app.bypass_rls', '', true);
+DO $origem$
+DECLARE
+    bypass_anterior text := coalesce(current_setting('app.bypass_rls', true), '');
+BEGIN
+    PERFORM set_config('app.bypass_rls', 'true', true);
+    UPDATE cobrancas_pedido SET "OrigemCredencial" = 'global' WHERE "Provedor" = 'mercadopago' AND "OrigemCredencial" IS NULL;
+    PERFORM set_config('app.bypass_rls', bypass_anterior, true);
+END
+$origem$;
 """);
         }
 
