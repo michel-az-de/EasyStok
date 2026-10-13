@@ -35,7 +35,7 @@ for (const situacao of ['em_processamento','nao_encontrado','aguardando_credenci
   const t=montar(()=>ok({situacao,confirmado:false}))
   assert.deepEqual(await t.api.conferirPagamento('conversa'),{situacao,confirmado:false})
   assert.deepEqual(t.chamadas,[{url:`/api/pedidos/${pedidoId}/cobranca/conferir`,metodo:'POST',corpo:null}])
-  assert.equal(t.atualizacoes.length,0); testes++
+  assert.equal(t.atualizacoes.length,0); assert.equal(t.avisos.length,0,'Erro local sem aviso global duplicado'); testes++
 }
 for (const situacao of ['confirmado','ja_conferido']) {
   const t=montar(url=>url.endsWith('/conferir')?ok({situacao,confirmado:true}):ok(dto))
@@ -54,7 +54,7 @@ for (const situacao of ['confirmado','ja_conferido']) {
 {
   const t=montar(()=>{throw new TypeError('Failed to fetch')})
   assert.match((await t.api.conferirPagamento('conversa')).erro,/Não foi possível conferir/)
-  assert.equal(t.atualizacoes.length,0); testes++
+  assert.equal(t.atualizacoes.length,0); assert.equal(t.avisos.length,0,'Erro local sem aviso global duplicado'); testes++
 }
 {
   const t=montar(url=>url.endsWith('/conferir')?ok({situacao:'confirmado',confirmado:true}):new Response('{}',{status:503}))

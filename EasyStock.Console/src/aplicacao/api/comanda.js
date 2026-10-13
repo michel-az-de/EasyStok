@@ -287,7 +287,6 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
         } catch (erro) {
           const mensagem = erro.status && erro.status < 500 ? erro.message
             : 'Não foi possível conferir o pagamento agora. Tente novamente.'
-          avisar(mensagem)
           return { erro: mensagem }
         }
       })

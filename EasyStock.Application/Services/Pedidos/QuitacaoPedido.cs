@@ -7,6 +7,7 @@ using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Domain.Entities.Operacao;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Pagamentos;
+using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.Services.Pedidos;
 
@@ -21,9 +22,44 @@ public sealed class QuitacaoPedido(
     IImpressaoPendenteRepository impressoes,
     IPublicadorEventoIntegracao publicador,
     IOperacaoEventPublisher eventos,
+    CalculadoraInicioPrevistoPedido inicioPrevisto,
     SaldoFinanceiroPedido? saldos = null)
 {
     public const string Marco = "quitacao_confirmada";
+
+    public async Task ExigirBaixaSemCobrancaOnlineAsync(Pedido pedido, CancellationToken ct)
+    {
+        var lista = await cobrancas.ListarDoPedidoAsync(pedido.EmpresaId, pedido.Id, ct);
+        if (lista.Any(c => c.EmpresaId != pedido.EmpresaId || c.PedidoId != pedido.Id))
+            throw new UseCaseValidationException("Cobrança não pertence ao pedido.");
+        if (lista.Any(c => c.EhOnline && c.EstaPendente))
+            throw new UseCaseValidationException("cobranca_online_pendente",
+                "Há uma cobrança online pendente. Confira o pagamento antes de receber manualmente.");
+    }
+
+    public async Task<bool> PodeReceberSinalManualAsync(Pedido pedido, CancellationToken ct)
+    {
+        if (pedido.StatusEnum != StatusPedido.AguardandoPagamento
+            || !PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm)) return false;
+        var lista = (await cobrancas.ListarDoPedidoAsync(pedido.EmpresaId, pedido.Id, ct))
+            .Where(c => c.EmpresaId == pedido.EmpresaId && c.PedidoId == pedido.Id && c.EstaPendente).ToList();
+        return lista.Any(c => !c.EhOnline) && !lista.Any(c => c.EhOnline);
+    }
+
+    public async Task<PedidoMudouStatusOperacao?> ConfirmarSinalManualAsync(Pedido pedido, PedidoPagamento pagamento, CancellationToken ct)
+    {
+        if (!await PodeReceberSinalManualAsync(pedido, ct)) return null;
+        var alocado = saldos is not null ? (await saldos.ConsultarAsync(pedido, ct)).Alocado : pedido.TotalPago;
+        if (alocado < PlanoPagamentoEncomenda.Sinal(pedido.Total.Valor)) return null;
+        var anterior = pedido.Status;
+        pedido.MudarStatus(pedido.RequerAprovacao ? StatusPedido.AguardandoAprovacaoBaba : StatusPedido.Aguardando);
+        await inicioPrevisto.AplicarNaFilaAsync(pedido, ct);
+        await publicador.PublicarAsync(pedido.EmpresaId, "pedido.mudou_status", "pedido", pedido.Id,
+            new PedidoMudouStatusEvent(pedido.Id, pedido.EmpresaId, pedido.LojaId, anterior, pedido.Status,
+                "manual", pagamento.RegistradoPorUserId, pagamento.RegistradoPorNome, pagamento.PagoEm),
+            correlationId: pedido.Id.ToString(), ct: ct);
+        return new(pedido.Id, anterior, pedido.Status);
+    }
 
     public async Task<EfeitosQuitacao?> ConcluirManualAsync(Pedido pedido, PedidoPagamento pagamento, CancellationToken ct)
     {
@@ -96,8 +132,9 @@ public sealed class QuitacaoPedido(
             c.ReabrirPagamentoManual(agora);
     }
 
-    public async Task PublicarAsync(Guid empresaId, EfeitosQuitacao? efeito, CancellationToken ct)
+    public async Task PublicarAsync(Guid empresaId, EfeitosQuitacao? efeito, CancellationToken ct, PedidoMudouStatusOperacao? mudanca = null)
     {
+        if (mudanca is not null) await eventos.PublicarAsync(EventosOperacao.PedidoMudouStatus, empresaId, mudanca, ct);
         if (efeito?.Pago is { } pago) await eventos.PublicarAsync(EventosOperacao.PedidoPago, empresaId, pago, ct);
         if (efeito?.Impressao is { } impressao) await eventos.PublicarAsync(EventosOperacao.ImpressaoPendente, empresaId, impressao, ct);
     }

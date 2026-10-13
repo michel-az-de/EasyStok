@@ -10,8 +10,8 @@ import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import {
-  AVISO_BAIXA_COM_LINK, MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, baixaEsperaAprovacao, baixaCancelaCobrancaOnline, metodoDaCobranca,
-  nomeDoMeio, podeAlterarMeio, situacaoDaCobranca, trocaDeFormaNoEasyStok,
+  AVISO_BAIXA_COM_LINK, MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, aguardaSinalManual, baixaEsperaAprovacao, baixaCancelaCobrancaOnline, metodoDaCobranca,
+  nomeDoMeio, podeAlterarMeio, situacaoDaCobranca, trocaDeFormaNoEasyStok, valorSugeridoParaBaixa,
 } from '../../dominio/cobranca'
 import { rotuloDoTotal } from '../../dominio/resumoPedido'
 import {
@@ -226,7 +226,7 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
       <div className={css.acoesCobranca}>
         <Botao largo disabled={enviando} onClick={aoCancelar}>Voltar</Botao>
         <Botao largo tipo="submit" variante="primario" disabled={!valido || enviando}>
-          {enviando ? 'Registrando…' : 'Marcar pago'}
+          {enviando ? 'Registrando…' : aguardaSinalManual(pedido) ? 'Registrar sinal' : 'Marcar pago'}
         </Botao>
       </div>
     </form>
@@ -420,20 +420,27 @@ export function BlocoCobranca({
   // Maquininha ou vale (sem link): sem anel, sem prazo, uma linha só (decisão
   // 19, seção 4: "Linha 'Receber na entrega · maquininha · R$ 68,00'").
   if (!cobranca.link && !cobranca.pagaEm) {
+    const sinalPendente = fonteApi && aguardaSinalManual(pedido)
+    const recebido = pedido.totalPagoApi ?? 0
+    const alocado = pedido.alocadoApi ?? recebido
+    const faltaSinal = valorSugeridoParaBaixa(pedido)
     return (
       <Bloco titulo="Cobrança">
         <div className={css.cabecaCobranca}>
           <span className={css.rotuloTotal}>Total</span>
-          <b className={css.valorForte}>{moeda(cobranca.valor)}</b>
+          <b className={css.valorForte}>{moeda(fonteApi ? pedido.totalApi ?? cobranca.valor : cobranca.valor)}</b>
         </div>
         <p className={css.linhaNaEntrega}>
-          <Icone nome="credit-card" /> Receber na entrega · {nome} <b>{moeda(cobranca.valor)}</b>
+          <Icone nome="credit-card" /> {sinalPendente ? 'Sinal a receber' : 'Receber na entrega'} · {nome} <b>{moeda(faltaSinal)}</b>
         </p>
-        {fonteApi && pedido.sinalNaReserva && pedido.totalPagoApi > 0 && pedido.totalPagoApi < pedido.totalApi && (
-          <p className={css.corpoBloco}>Sinal recebido: {moeda(pedido.totalPagoApi)}. Saldo na entrega: {moeda(pedido.totalApi - pedido.totalPagoApi)}.</p>
+        {sinalPendente && (
+          <p className={css.corpoBloco}>{recebido > 0 ? `Recebido: ${moeda(recebido)}. ` : ''}O sinal confirma a reserva. Restante na entrega: {moeda(pedido.totalApi - alocado - faltaSinal)}.</p>
+        )}
+        {!sinalPendente && fonteApi && pedido.estado !== 'cancelado' && pedido.sinalNaReserva && alocado > 0 && alocado < pedido.totalApi && (
+          <p className={css.corpoBloco}>Recebido: {moeda(recebido)}. Saldo na entrega: {moeda(pedido.totalApi - alocado)}.</p>
         )}
         {recebendo && (
-          <BaixaAMao valorCobrado={Math.max(0, (pedido.totalApi ?? cobranca.valor) - (pedido.totalPagoApi ?? 0))}
+          <BaixaAMao valorCobrado={valorSugeridoParaBaixa(pedido)}
             pedido={pedido}
             aoAprovar={aprovarPedido ? () => aprovarPedido(conversaId) : null}
             aoCancelar={() => setRecebendo(false)}
@@ -453,7 +460,7 @@ export function BlocoCobranca({
               icone="circle-check"
               onClick={() => pedido.pedidoId ? setRecebendo(true) : marcarRecebidoEntrega(conversaId, true, agora)}
             >
-              Marcar pago
+              {sinalPendente ? 'Registrar sinal' : 'Marcar pago'}
             </Botao>
             {disponivel('marcarRecebidoEntrega') && (
               <Botao
@@ -491,7 +498,7 @@ export function BlocoCobranca({
         <Pilula tom="neutro" fina>{nome}</Pilula>
         {cobranca.tentativa > 1 && <span className={css.tentativa}>{cobranca.tentativa}ª cobrança</span>}
       </div>
-      {fonteApi && pedido.sinalNaReserva && !cobranca.diferenca && pedido.totalApi > cobranca.valor && !cobranca.pagaEm && (
+      {fonteApi && pedido.estado !== 'cancelado' && pedido.sinalNaReserva && !cobranca.diferenca && pedido.totalApi > cobranca.valor && !cobranca.pagaEm && (
         <p className={css.corpoBloco}>Sinal agora: {moeda(cobranca.valor)}. Restante na entrega: {moeda(pedido.totalApi - cobranca.valor)}.</p>
       )}
 

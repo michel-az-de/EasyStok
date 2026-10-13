@@ -6,7 +6,7 @@ import { CampoMascarado } from '../../componentes/CampoMascarado'
 import { EscolhaDeEntregador } from '../../componentes/EscolhaDeEntregador'
 import { Icone } from '../../componentes/Icone'
 import {
-  aguardaAprovacao, avisoDeLinkVencidoApi, faltaPagar, podeDesfazerPagamento, situacaoDaCobranca,
+  aguardaAprovacao, aguardaSinalManual, avisoDeLinkVencidoApi, faltaPagar, podeDesfazerPagamento, situacaoDaCobranca, valorSugeridoParaBaixa,
 } from '../../dominio/cobranca'
 import { ultimoPagamentoApi } from '../../dominio/pagamento'
 import { ROTULO_GERAR_E_ENVIAR } from '../../dominio/resumoPedido'
@@ -218,7 +218,8 @@ export function BarraProximoPasso({
       aoGerarPix: () => (pedido.meio ? executar(() => aoGerarPix(pedido.meio)) : setPedindoMeio(true)),
       aoReenviarPix: () => executar(() => aoReenviarPix()),
     })
-    rotuloEstado = info.rotuloEstado
+    rotuloEstado = fonteApi && aguardaSinalManual(pedido) ? 'Aguardando sinal' : info.rotuloEstado
+    if (fonteApi && aguardaSinalManual(pedido)) depoisTexto = pedido.requerAprovacao ? 'Próximo: Aprovação da loja' : 'Próximo: Fila de preparo'
 
     if (info.divergente) {
       const falta = faltaPagar(pedido.cobranca)
@@ -241,7 +242,7 @@ export function BarraProximoPasso({
               key={b.rotulo} largo variante="primario" icone={b.icone}
               disabled={b.desabilitado || emVoo} onClick={b.onClick}
             >
-              {b.rotulo}
+              {fonteApi && aguardaSinalManual(pedido) && b.rotulo === 'Marcar pago' ? 'Registrar sinal' : b.rotulo}
             </Botao>
           ))}
           {pedindoMeio && situacaoCob.chave === 'nenhuma' && !pedido.meio && (
@@ -499,7 +500,7 @@ export function BarraProximoPasso({
       )}
       {abrindoBaixa && (
         <BaixaAMao
-          valorCobrado={Math.max(0, (pedido.totalApi ?? pedido.cobranca.valor) - (alocadoApi ?? 0))}
+          valorCobrado={valorSugeridoParaBaixa(pedido)}
           pedido={pedido}
           aoAprovar={aoAprovarPedido}
           aoCancelar={() => setAbrindoBaixa(false)}

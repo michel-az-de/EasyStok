@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -14,9 +15,9 @@ namespace EasyStock.Api.IntegrationTests.Atendimento;
 public sealed partial class PedidoConversaConcorrenciaTests
 {
     [SkippableTheory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task TrocarLinkParaManual_ConsultaPagamentoAprovadoAntesDeCancelarCobrarDeNovo(bool conferirPeloEndpoint)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    public async Task TrocarLinkParaManual_ConsultaPagamentoAprovadoAntesDeCancelarCobrarDeNovo(bool conferirPeloEndpoint, bool receberDireto)
     {
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
         var mp = Provedor(new());
@@ -31,6 +32,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
             db.SetMobileTenantContext(EmpresaId);
             var pedido = Pedido.Criar(EmpresaId, origem: "whatsapp");
             pedido.ClienteId = c.ClienteId;
+            if (receberDireto) pedido.Status = StatusPedidoMapper.Aguardando;
             pedido.Itens.Add(new PedidoItem
             {
                 Id = Guid.NewGuid(), PedidoId = pedido.Id, Nome = "Pedido de conferência",
@@ -50,9 +52,26 @@ public sealed partial class PedidoConversaConcorrenciaTests
 
         using var resposta = conferirPeloEndpoint
             ? await client.PostAsync($"/api/pedidos/{pedidoId}/cobranca/conferir", null)
+            : receberDireto
+            ? await client.PostAsJsonAsync($"/api/pedidos/{pedidoId}/pagamentos", new { EmpresaId, PedidoId = pedidoId, Metodo = "pix", Valor = 10m })
             : await client.PostAsJsonAsync($"/api/pedidos/{pedidoId}/cobranca/forma", new { forma = "na_entrega" });
 
-        resposta.StatusCode.Should().Be(conferirPeloEndpoint ? HttpStatusCode.OK : HttpStatusCode.Conflict, await resposta.Content.ReadAsStringAsync());
+        resposta.StatusCode.Should().Be(conferirPeloEndpoint ? HttpStatusCode.OK
+            : receberDireto ? HttpStatusCode.BadRequest : HttpStatusCode.Conflict, await resposta.Content.ReadAsStringAsync());
+        if (receberDireto)
+        {
+            (await resposta.Content.ReadAsStringAsync()).Should().Contain("Confira o pagamento");
+            await mp.DidNotReceiveWithAnyArgs().BuscarPagamentosPorReferenciaAsync(default!, default);
+            using (var scope = factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                db.SetMobileTenantContext(EmpresaId);
+                (await db.Pedidos.Include(p => p.Pagamentos).SingleAsync(p => p.Id == pedidoId)).TotalPago.Should().Be(0m);
+                (await db.CobrancasPedido.SingleAsync(p => p.PedidoId == pedidoId)).EstaPendente.Should().BeTrue();
+            }
+            using var conferencia = await client.PostAsync($"/api/pedidos/{pedidoId}/cobranca/conferir", null);
+            conferencia.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
         if (conferirPeloEndpoint)
         {
             (await resposta.Content.ReadAsStringAsync()).Should().Contain("\"situacao\":\"confirmado\"");
@@ -72,4 +91,8 @@ public sealed partial class PedidoConversaConcorrenciaTests
         cobranca.EhOnline.Should().BeTrue();
         cobranca.EstaPendente.Should().BeFalse();
     }
+
+    [SkippableFact]
+    public Task BaixaDireta_ComLinkPendenteEmPedidoOperacional_ExigeConferenciaSemReceber() =>
+        TrocarLinkParaManual_ConsultaPagamentoAprovadoAntesDeCancelarCobrarDeNovo(false, true);
 }

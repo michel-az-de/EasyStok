@@ -1,6 +1,10 @@
 using System.Net;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
+using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
+using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.Tests.Helpers;
+using Microsoft.Extensions.Logging.Abstractions;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
@@ -9,6 +13,25 @@ namespace EasyStock.Application.Tests.UseCases.Pedidos.Cobranca;
 
 public class ConferirPagamentoPedidoUseCaseTests
 {
+    [Theory]
+    [InlineData(StatusPedidoMapper.Aguardando)]
+    [InlineData(StatusPedidoMapper.Preparando)]
+    public async Task BaixaManualDireta_LinkPendenteMesmoOperacional_NaoRecebe(string status)
+    {
+        var f = new CobrancaPedidoFixture(status);
+        f.AdicionarOnline();
+        var registrar = new RegistrarPagamentoPedidoUseCase(f.PedidoRepo, f.Uow,
+            NullLogger<RegistrarPagamentoPedidoUseCase>.Instance,
+            new CalculadoraInicioPrevistoPedido(f.PrazoQueries),
+            QuitacaoPedidoTeste.Criar(f.PedidoRepo, f.CobrancaRepo, f.ConversaRepo,
+                f.ImpressaoRepo, f.Publicador, f.OperacaoEventos));
+        var receber = () => registrar.ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "pix", 10m));
+        await receber.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Confira o pagamento*");
+        f.Pedido.Pagamentos.Should().BeEmpty();
+        f.Cobrancas.Should().ContainSingle().Which.Status.Should().Be(StatusCobrancaPedido.Pendente);
+        await f.MpClient.DidNotReceiveWithAnyArgs().BuscarPagamentosPorReferenciaAsync(default!, default);
+    }
+
     [Fact]
     public async Task Aprovado_ConciliaERepeticaoNaoRecebeDeNovo()
     {
@@ -111,6 +134,42 @@ public class ConferirPagamentoPedidoUseCaseTests
         f.Cobrancas.Should().ContainSingle().Which.Status.Should().Be(StatusCobrancaPedido.Pendente);
         if (credencialDivergente)
             await f.MpClient.DidNotReceiveWithAnyArgs().BuscarPagamentosPorReferenciaAsync(default!, default);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SinalJaPago_ComplementoPendente_AprovacaoAntigaNaoConfirmaSaldo(bool saldoAprovado)
+    {
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Aguardando);
+        var sinal = EasyStock.Domain.Entities.Pagamentos.CobrancaPedido.CriarOnline(f.EmpresaId, f.Pedido.Id,
+            12.50m, "pref-sinal", "https://mp.test/sinal", CobrancaPedidoFixture.Agora.AddMinutes(30), 1,
+            CobrancaPedidoFixture.Agora, contaRecebedoraId: "conta-original");
+        sinal.MarcarPaga("pagamento-sinal", 12.50m, "pix", CobrancaPedidoFixture.Agora);
+        f.AdicionarPagamento("pagamento-sinal", 12.50m);
+        var saldo = EasyStock.Domain.Entities.Pagamentos.CobrancaPedido.CriarOnline(f.EmpresaId, f.Pedido.Id,
+            12.50m, "pref-saldo", "https://mp.test/saldo", CobrancaPedidoFixture.Agora.AddMinutes(30), 2,
+            CobrancaPedidoFixture.Agora, contaRecebedoraId: "conta-original");
+        saldo.MarcarComplementar();
+        f.Cobrancas.AddRange([sinal, saldo]);
+        f.MpClient.ObterContaRecebedoraAsync(Arg.Any<CancellationToken>()).Returns("conta-original");
+        f.PagamentosNoMercadoPago.Add(new("pagamento-sinal", "approved", null, f.Pedido.Id.ToString(),
+            12.50m, CobrancaPedidoFixture.Agora, "pix", "bank_transfer", CollectorId: "conta-original"));
+        if (saldoAprovado)
+            f.PagamentosNoMercadoPago.Add(new("pagamento-saldo", "approved", null, f.Pedido.Id.ToString(),
+                12.50m, CobrancaPedidoFixture.Agora, "pix", "bank_transfer", CollectorId: "conta-original"));
+
+        var resultado = await f.Conferir().ExecuteAsync(f.EmpresaId, f.Pedido.Id);
+
+        resultado.Should().Be(saldoAprovado
+            ? new ConferirPagamentoPedidoResult("confirmado", true)
+            : new ConferirPagamentoPedidoResult("nao_conciliado", false));
+        f.Pedido.TotalPago.Should().Be(saldoAprovado ? 25m : 12.50m);
+        f.Pedido.Pagamentos.Should().HaveCount(saldoAprovado ? 2 : 1);
+        saldo.Status.Should().Be(saldoAprovado ? StatusCobrancaPedido.Paga : StatusCobrancaPedido.Pendente);
+        sinal.PagamentoExternoId.Should().Be("pagamento-sinal");
+        await f.MpClient.Received(1).BuscarPagamentosPorReferenciaAsync(f.Pedido.Id.ToString(), Arg.Any<CancellationToken>());
+        await f.MpClient.DidNotReceiveWithAnyArgs().EstornarAsync(default!, default, default!, default);
     }
 
     private static PagamentoMercadoPago Pagamento(CobrancaPedidoFixture f, string status) =>

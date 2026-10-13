@@ -27,7 +27,7 @@ public sealed record TrocarFormaPagamentoPedidoResult(CobrancaPedidoResult Cobra
 /// <list type="bullet">
 ///   <item><c>online</c>: preferência nova com a mesma tentativa da anterior (a troca não consome a
 ///     reemissão do job); com conversa aberta, o link sai na conversa. O status do pedido não muda.</item>
-///   <item><c>na_entrega</c>: cobran�a online pendente � conferida e impede nova cobran�a manual; sem link,
+///   <item><c>na_entrega</c>: cobrança online pendente é conferida e impede nova cobrança manual; sem link,
 ///     pedido em <c>AguardandoPagamento</c> vai para <c>Aguardando</c>
 ///     (entra na fila e paga na entrega), senão o job o cancelaria por falta de pagamento.</item>
 /// </list>
@@ -74,7 +74,7 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
                 if (resultado.Confirmado)
                     throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago,
                         "Pagamento online conferido. Atualize o pedido antes de receber outro valor.");
-                throw new UseCaseValidationException("H� uma cobran�a online pendente. Confira o pagamento antes de receber manualmente.");
+                throw new UseCaseValidationException("Há uma cobrança online pendente. Confira o pagamento antes de receber manualmente.");
             }
         }
 
@@ -125,7 +125,7 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         if (cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga))
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
         if (forma == FormaNaEntrega && cobrancas.Any(c => c.EhOnline && c.EstaPendente))
-            throw new UseCaseValidationException("H� uma cobran�a online pendente. Confira o pagamento antes de receber manualmente.");
+            throw new UseCaseValidationException("Há uma cobrança online pendente. Confira o pagamento antes de receber manualmente.");
 
         var pendente = cobrancas.FirstOrDefault(c => c.EstaPendente);
         var provedorPedido = forma == FormaOnline ? CobrancaPedido.ProvedorMercadoPago : CobrancaPedido.ProvedorNaEntrega;
@@ -174,6 +174,8 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
     private async Task<PedidoMudouStatusOperacao?> ColocarNaFilaAsync(PedidoEntity pedido, TrocarFormaPagamentoPedidoInput input, DateTime agora, CancellationToken ct)
     {
         if (pedido.StatusEnum != StatusPedido.AguardandoPagamento) return null;
+        if (PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm)
+            && pedido.TotalPago < PlanoPagamentoEncomenda.Sinal(pedido.Total.Valor)) return null;
 
         var statusAntigo = pedido.Status;
         // #1291: pedido de exceção (ex.: lead liberado fora de área) espera a dona, como no pago online.
