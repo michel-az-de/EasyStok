@@ -224,7 +224,7 @@ public sealed partial class PedidoConversaConcorrenciaTests : IAsyncLifetime
                 new Claim(ClaimTypes.NameIdentifier, UsuarioId.ToString()),
                 new Claim(ClaimTypes.Name, "Operadora"),
                 new Claim("sub", UsuarioId.ToString()),
-                new Claim("empresaId", EmpresaId.ToString()),
+                new Claim("empresaId", currentUser.EmpresaId.ToString()),
                 new Claim("nivel", currentUser.Nivel.ToString()),
             };
             var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemeName));

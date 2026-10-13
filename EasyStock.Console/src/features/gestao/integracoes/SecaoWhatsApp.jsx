@@ -33,7 +33,7 @@ function Resultado({ resultado }) {
 
 // #1447: a tela Canais monta a seção `embutida` (sem título nem moldura, o cabeçalho é dela)
 // e recarrega o estado do canal quando a conexão termina (`aoConectar`).
-export function SecaoWhatsApp({ embutida = false, aoConectar }) {
+export function SecaoWhatsApp({ embutida = false, aoConectar, canalLigado = false }) {
   const { estado, erro, resultado, conectar } = useConexaoWhatsAppApi()
   useEffect(() => { if (resultado) aoConectar?.() }, [resultado, aoConectar])
   const ocupado = estado in ROTULO_BOTAO
@@ -42,17 +42,18 @@ export function SecaoWhatsApp({ embutida = false, aoConectar }) {
   return (
     <section className={embutida ? css.embutida : css.secao} aria-labelledby={embutida ? undefined : 'secao-whatsapp-titulo'}>
       {!embutida && <h3 id="secao-whatsapp-titulo" className={css.titulo}>WhatsApp</h3>}
-      <p className={css.texto}>
+      {estado !== 'indisponivel' && <p className={css.texto}>
         Conecte o número da loja sem tirá-lo do celular: o app WhatsApp Business continua funcionando, e o
         que a loja responder por ele aparece aqui na conversa.
-      </p>
-      <Botao variante="primario" className={css.botao} onClick={conectar} disabled={desabilitado} aria-busy={ocupado}>
+      </p>}
+      {estado !== 'indisponivel' && <Botao variante="primario" className={css.botao} onClick={conectar} disabled={desabilitado} aria-busy={ocupado}>
         {ROTULO_BOTAO[estado] ?? 'Conectar WhatsApp Business'}
-      </Botao>
+      </Botao>}
       {estado === 'indisponivel' && (
         <p className={css.explicacao} role="note">
-          A conexão do WhatsApp ainda não está habilitada para esta loja. Peça ao responsável pela configuração
-          para concluir a ativação antes de conectar o número.
+          {canalLigado
+            ? 'O canal segue ligado. A conexão de outro número pela Meta ainda não está habilitada.'
+            : 'A conexão pela Meta ainda não está habilitada nesta loja. Peça ao responsável pela configuração para ativá-la.'}
         </p>
       )}
       {estado === 'aguardando' && (
