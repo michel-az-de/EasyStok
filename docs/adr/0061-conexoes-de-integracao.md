@@ -51,13 +51,43 @@ A conexão de uma loja com um provedor (`conexao_integracao`) guarda dois eixos 
 
 Regras que valem para toda família:
 
-- Conexão que já foi real nunca usa simulador. Em Production nenhum simulador é construído.
+- Conexão que já foi real nunca usa simulador. Em Production nenhum simulador é construído para conexões
+  operacionais; a única exceção é o laboratório de tenant dedicado descrito na D2.1.
 - `Desconectado` nunca cai no token global. Desconectar vira `SomenteConsulta` até a última cobrança ou
   corrida aberta; depois revoga e apaga.
 - Credencial ausente, revogada ou ilegível nunca equivale a "sem pagamento": a cobrança vai a
   `AguardandoCredencial` e volta quando a conexão volta.
 - A credencial fica no cofre por loja (RLS, KEK, cifra versionada) e chega ao cliente HTTP por
   `ICredencial<Família>DaLoja`, scoped. Mapas usam credencial de plataforma, sem cartão para a dona.
+
+### D2.1 · Exceção explícita: laboratório de logística #1693
+
+Felipe autorizou em 12/10/2026 a publicação de uma demonstração navegável do sprint de entregas em
+**tenant dedicado**, com backend e persistência reais e simulação limitada às integrações externas.
+O propósito é testar cotação, agrupamento, contratação, acompanhamento, devolução e caixa sem contratar
+motoristas nem usar clientes reais.
+
+- O único tenant elegível é `Logistica:EmpresaDemonstracaoId`, configurado explicitamente. Empresa vazia,
+  configuração ausente ou empresa diferente deve ser recusada no servidor.
+- Em Production os simuladores deste laboratório só atendem esse tenant. Não há fallback de credencial,
+  indisponibilidade ou erro para simulação; **nenhuma conexão real usa simulador**.
+- Os dez pedidos, contatos, destinos e saldo inicial são sintéticos e identificados como demonstração.
+  Não importar clientes reais nem misturar lançamentos com o Caixa de uma loja operacional.
+- Mensagens externas permanecem bloqueadas para esses contatos. O ensaio não envia WhatsApp, não chama
+  entregador real, não cobra cartão e não produz link de rastreio externo fictício como se fosse válido.
+- O indicador de simulação vem da API e é mostrado pelo Console. Registro manual/em mãos é um evento
+  local do tenant de demonstração, não comprovação de serviço prestado fora do laboratório.
+- A entidade de despacho e seu custo neste laboratório não substituem a decisão D5 para integrações
+  operacionais. A ativação comercial continua sujeita ao contrato, credencial, gate e revisão da fatia dona.
+
+QA automatizado, inspeção visual, publicação verificada e aceite humano são evidências separadas.
+Personas encenadas de Thatiane/atendente não contam como aceite humano. Homologar o laboratório não
+homologa Uber, Lalamove, 99, WhatsApp ou cobrança real. O relatório e suas pendências ficam na
+[seção 7 do plano M8](../plan/erp-casa-da-baba/09-m8-entregas.md#7-sprint-de-logística-1693-12102026).
+
+Para retirar a exceção operacionalmente, remover a configuração do tenant demonstrativo e bloquear
+suas rotas; preservar os registros para auditoria. Não transformar a demonstração em conexão real por
+troca de token ou retirada do indicador visual.
 
 ### D3 · Webhook por provedor
 

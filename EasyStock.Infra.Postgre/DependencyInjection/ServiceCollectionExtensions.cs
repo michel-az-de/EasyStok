@@ -26,6 +26,11 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             IConfiguration configuration)
         {
             services.Configure<CacheOptions>(configuration.GetSection("Cache"));
+            // API e Worker compartilham a barreira contra avisos externos da empresa de demonstração.
+            services.TryAddSingleton(new EasyStock.Application.UseCases.Atendimento.Entregas.ConfiguracaoLogistica(
+                Guid.TryParse(configuration["Logistica:EmpresaDemonstracaoId"], out var empresaDemo) ? empresaDemo : Guid.Empty,
+                new EasyStock.Application.Ports.Output.Integrations.FreteEndereco("Cozinha de demonstração",
+                    "Origem sintética de teste, São Paulo", "+5500000000000", -23.55, -46.63)));
 
             // Garante limites de pool sãos quando a connection string vem sem
             // controle (ex: Cloud SQL f1-micro aceita ~25 conexões totais; com
@@ -88,6 +93,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IViagemRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ViagemRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IChamadoEntregadorRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ChamadoEntregadorRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICorridaExternaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.CorridaExternaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ILogisticaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.LogisticaRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICustoDeEntregaQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.CustoDeEntregaQuery>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IEntregasPorBairroQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.EntregasPorBairroQuery>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IAgendaPedidosQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.AgendaPedidosQuery>();
