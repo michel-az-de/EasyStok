@@ -89,6 +89,9 @@ public sealed class CancelarPedidosAbandonadosBackgroundService(
     /// <c>xmin</c> (a lista da varredura é sem rastreio) e uma falha não contamina os seguintes. Pedido que
     /// saiu de <c>AguardandoPagamento</c> no meio do caminho (pago, cobrado) fica como está.
     /// </summary>
+    /// <summary>Detalhe do evento gravado no pedido que a varredura cancela (#1726).</summary>
+    public const string MotivoAbandonado = "abandonado_sem_cobranca";
+
     public async Task CancelarAbandonadoAsync(Guid pedidoId, Guid empresaId, CancellationToken ct = default)
     {
         using var scope = scopeFactory.CreateScope();
@@ -110,6 +113,19 @@ public sealed class CancelarPedidosAbandonadosBackgroundService(
             services.GetRequiredService<IVagaOcupadaRepository>(),
             services.GetRequiredService<ILogger<LiberarVagaOnPedidoCanceladoHandler>>());
         await handler.HandleAsync(new PedidoCanceladoEvent(pedido.Id, Guid.Empty, "Timeout 30 min sem pagamento"), ct);
+        // #1726: o cancelamento automático deixa trilha no pedido. O evento grava junto com o pedido e a vaga.
+        await pedidoRepo.AddEventoAsync(new Domain.Entities.PedidoEvento
+        {
+            Id = Guid.NewGuid(),
+            PedidoId = pedido.Id,
+            Tipo = "cancelado",
+            StatusAntigo = StatusPedidoMapper.AguardandoPagamento,
+            StatusNovo = StatusPedidoMapper.Cancelado,
+            Detalhes = MotivoAbandonado,
+            UsuarioNome = "Sistema",
+            Origem = "sistema",
+            OcorridoEm = pedido.CanceladoEm.Value,
+        }, ct);
         await pedidoRepo.UpdateAsync(pedido, ct);
 
         logger.LogInformation("CancelarPedidosAbandonados cancelado pedidoId={PedidoId}.", pedido.Id);
