@@ -295,7 +295,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 var cupomAplicado = await AplicarCupomAsync(pedido, dados.CodigoCupom, t);
                 var saldo = pedido.Total.Valor - (await saldoFinanceiro.ConsultarAsync(pedido, t)).Alocado;
                 CobrancaPedidoResult? cobranca = null;
-                if (saldo > 0 && !peloAtendimento)
+                if (saldo > 0 && (!peloAtendimento || PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm)))
                     cobranca = await cobrar.ExecuteAsync(new(link.EmpresaId, pedido.Id, link.ConversaId, CobrarSaldo: true), t);
                 else if (saldo <= 0)
                 {
