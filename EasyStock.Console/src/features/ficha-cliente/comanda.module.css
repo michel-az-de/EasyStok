@@ -153,6 +153,8 @@
 }
 .total b { font-family: var(--f-corpo); font-weight: 700; font-size: var(--t-valor); font-variant-numeric: tabular-nums; }
 .total > span { flex: 1 1 140px; }
+.resumoTotal { padding-bottom: var(--e-3); }
+.resumoTotal .total { padding-top: 0; border-top: 0; }
 .total b { white-space: nowrap; }
 .notaTotal { margin: var(--e-2) 0 0; font-family: var(--f-corpo); font-size: var(--t-apoio); color: var(--tinta-2); }
 

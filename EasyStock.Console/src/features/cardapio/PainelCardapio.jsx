@@ -661,7 +661,7 @@ export function PainelCardapio({
       <div className={css.corpoPainel}>
         <header className={css.cabecalhoPainel}>
           <div>
-            <h2>Cardápio de hoje</h2>
+            <h2>{travada && papel === 'escolher' ? 'Consulta do cardápio' : 'Cardápio de hoje'}</h2>
             {nomeCliente && <p className={css.donoDaComanda} aria-live="polite">Comanda de <b>{nomeCliente}</b></p>}
             <p className={css.subPainel}>{noDia} de {ativos.length} itens no dia.</p>
           </div>
@@ -684,7 +684,7 @@ export function PainelCardapio({
                 className={`${css.papel} ${papel === p.id ? css.papelAtivo : ''}`}
                 onClick={() => setPapel(p.id)}
               >
-                {p.rotulo}
+                {p.id === 'escolher' && travada ? 'Consultar pratos' : p.rotulo}
               </button>
             ))}
           </fieldset>

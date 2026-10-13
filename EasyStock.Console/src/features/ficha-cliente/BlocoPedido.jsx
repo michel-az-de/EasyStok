@@ -201,6 +201,16 @@ export function BlocoPedido({
         />
         <hr className={css.separador} />
 
+        {/* O total fica à vista antes de percorrer os itens da montagem. */}
+        <div className={css.resumoTotal}>
+          {pedido.frete > 0 && <p className={css.vazio}>Frete {moeda(pedido.frete)}</p>}
+          <p className={css.total}>
+            <span>{fonteApi && !pedido.pedidoId ? 'Total dos itens' : rotuloDoTotal(pedido, { fonteApi })}</span>
+            <b>{moeda(pedido.totalApi ?? total)}</b>
+          </p>
+          {fonteApi && !pedido.pedidoId && <p className={css.notaTotal}>O frete entra ao gerar a cobrança.</p>}
+        </div>
+
         {alvoDoArrasto && <p className={css.soltarAqui}>Soltar aqui</p>}
 
         {grupos.length === 0 && (
@@ -230,15 +240,6 @@ export function BlocoPedido({
         {pedido.observacoes && <p className={css.notaTotal}>Observação do pedido: {pedido.observacoes}</p>}
 
         <hr className={css.separador} />
-        {/* F03: pedido criado no EasyStok traz o frete da zona; o total é o que foi cobrado. */}
-        {pedido.frete > 0 && (
-          <p className={css.vazio}>Frete {moeda(pedido.frete)}</p>
-        )}
-        <p className={css.total}>
-          <span>{fonteApi && !pedido.pedidoId ? 'Total dos itens' : rotuloDoTotal(pedido, { fonteApi })}</span>
-          <b>{moeda(pedido.totalApi ?? total)}</b>
-        </p>
-        {fonteApi && !pedido.pedidoId && <p className={css.notaTotal}>O frete entra ao gerar a cobrança.</p>}
         {diferencaPosPagamento > 0 && (
           <p className={css.diferencaPaga} role="alert">
             <Icone nome="alerta" />
