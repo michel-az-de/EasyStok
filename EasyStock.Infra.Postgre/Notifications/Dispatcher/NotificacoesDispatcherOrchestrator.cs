@@ -8,6 +8,7 @@ using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
+using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -234,7 +235,14 @@ public sealed class NotificacoesDispatcherOrchestrator(
         var abriuFallback = false;
         var canal = canais.FirstOrDefault(c => c.Canal == mensagem.Canal);
         var bloqueio = await ObterBloqueioAtivoAsync(mensagem, bloqueioRepo, ct);
-        if (bloqueio is not null)
+        var evento = await eventoRepo.ObterAsync(mensagem.EmpresaId, mensagem.EventoId, ct);
+        if (evento is { Tipo: TipoEventoNotificacao.PedidoPagoConfirmado, RefEntidadeId: { } pedidoId }
+            && await db.Pedidos.AnyAsync(p => p.EmpresaId == mensagem.EmpresaId && p.Id == pedidoId
+                && p.Status == StatusPedidoMapper.Cancelado, ct))
+        {
+            mensagem.Suprimir("Pedido cancelado: confirmação de pagamento não enviada.");
+        }
+        else if (bloqueio is not null)
         {
             // Kill switch ativado depois do enfileiramento (campanha enfileirada inteira): segura o que já está no outbox.
             logger.LogWarning(
