@@ -85,8 +85,11 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
     conversaId: selecionada.id, pedidoId: pedido?.pedidoId ?? null,
     pagamentos: (pedido?.pagamentosApi ?? []).map((p) => p.pagamentoId),
   })
+  // #1761 (L10): sem pedido, "Adicionar itens" é o próximo passo e mora no bloco da comanda.
+  const acaoMontar = !pedido && !clienteEscolhendo
+    ? <Botao largo variante="primario" disabled={!editavel} onClick={aoAbrirCardapio}>Adicionar itens</Botao> : null
   const comandaCompartilhada = <ComandaDoCliente key={chaves.comandaCompartilhada} conversaId={selecionada.id}
-    numeroComanda={numero} ativo={fonteApi} acaoCompartilhar={acaoCompartilhar}
+    numeroComanda={numero} ativo={fonteApi} acaoCompartilhar={acaoCompartilhar} acaoMontar={acaoMontar}
     pedido={pedido} aoMudarEscolha={setConversaEscolhendo} />
 
   return (
@@ -182,7 +185,7 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
             {fonteApi && pedido.pedidoId && <BlocoFreteApi key={chaves.frete} pedido={pedido}
               cliente={selecionada.nome} numero={numero} endereco={cliente.endereco} />}
           </>
-        ) : (
+        ) : (clienteEscolhendo || !fonteApi) && (
           <Bloco titulo={clienteEscolhendo ? 'Revisar com o cliente' : 'Montar pelo atendimento'} chave="comanda">
             <p className={css.corpoBloco}>
               {clienteEscolhendo ? 'Ajuste os itens na seleção acima e salve para o cliente conferir. A entrega também pode ser combinada antes da confirmação.'

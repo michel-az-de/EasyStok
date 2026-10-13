@@ -18,6 +18,11 @@ export function fichaRecolhidaDePadrao({ pedido, cliente }) {
 // escolha de quem atende, o título diz que não carregou.
 export const RESUMO_COM_ERRO = 'Não carregou'
 
+// #1761 (L22): linha zerada da Ficha. "Tags · 0 tags" vira o convite da ação que mora ali; o
+// Histórico sem pedido e sem pontos para resgatar não tem o que abrir e sai da coluna.
+export const resumoDasTags = (quantas) => (quantas === 0 ? 'Adicionar tag' : quantas === 1 ? '1 tag' : `${quantas} tags`)
+export const mostraHistorico = ({ pedidos = 0, fonteApi = false, resgataPontos = false } = {}) => !fonteApi || pedidos > 0 || resgataPontos
+
 // Troca de janela de pedido criado: recolhe com a vaga já marcada (ou ainda carregando) e abre
 // quando a consulta falha ou o pedido está sem vaga.
 export const janelaRecolhidaDePadrao = ({ leitura, erro }) => !erro && (!leitura || Boolean(leitura.atual))

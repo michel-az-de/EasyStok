@@ -30,6 +30,7 @@ import { AvisoDaAcaoApi, FaixaApi, LimparAvisoAoNavegar } from './FaixaApi'
 import { contarPrecisaDeVoce, precisaDeVoce } from '../dominio/automatico'
 import { useTituloDaAba } from '../aplicacao/useTituloDaAba'
 import { TITULO_BASE, tituloDaAba } from '../dominio/tituloDaAba'
+import { pedidoAcabouDeNascer } from '../dominio/pedido'
 import { canalDaConversa } from '../dominio/canal'
 import { envioBloqueado } from '../dominio/janela'
 import {
@@ -84,6 +85,15 @@ function Composicao({ rota, aoSair }) {
   // para quem trocou de janela no mesmo computador (US-010, saber sem olhar).
   useTituloDaAba(tituloDaAba(rota, contarPrecisaDeVoce(conversas, agora, automaticoPausado, aberta, janelas, horarioDaLoja)))
   const [modal, setModal] = useState(null)
+  // #1761 (L3): gerada a cobrança, o cardápio virava "Consulta do cardápio" com tudo desligado,
+  // cobrindo a lista e apertando a conversa. Fecha sozinho; "Ver cardápio" na Ficha reabre.
+  const pedidoNaTela = { conversaId: selecionada?.id ?? null, pedidoId: selecionada?.pedido?.pedidoId ?? null }
+  const pedidoVisto = useRef(pedidoNaTela)
+  useEffect(() => {
+    const nasceu = pedidoAcabouDeNascer(pedidoVisto.current, { conversaId: pedidoNaTela.conversaId, pedidoId: pedidoNaTela.pedidoId })
+    pedidoVisto.current = { conversaId: pedidoNaTela.conversaId, pedidoId: pedidoNaTela.pedidoId }
+    if (nasceu) setModal((atual) => (atual === 'cardapio' ? null : atual))
+  }, [pedidoNaTela.conversaId, pedidoNaTela.pedidoId])
   const [focoBiblioteca, setFocoBiblioteca] = useState(null)
   const [abaGestao, setAbaGestao] = useState(null)
   const [pratoArrastando, setPratoArrastando] = useState(null)

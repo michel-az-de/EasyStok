@@ -10,6 +10,7 @@
 // Puro. A hora sai de `passagem.em`, gravada quando o agente devolveu.
 
 import { horaCurta } from './formato'
+import { AUTOMATICO_DESLIGADO } from './motivoDeEscalada'
 
 export const MOTIVO_PADRAO = 'O agente preferiu não responder sozinho'
 
@@ -21,6 +22,15 @@ export function origemDaPassagem(passagem) {
   const hora = passagem.em ? horaCurta(passagem.em) : null
   if (passagem.origem === 'chat-site') return { motivo, hora, curto: 'Chat do site', longo: motivo }
   if (passagem.origem === 'reabertura') return { motivo, hora, curto: motivo, longo: motivo }
+  // #1761: com o automático desligado ninguém "não soube responder": a conversa só veio para a equipe.
+  if (motivo === AUTOMATICO_DESLIGADO) {
+    return {
+      motivo, hora,
+      // O cartão e o lembrete já dizem "Passou para você" na linha de estado: aqui vai só o porquê.
+      curto: `Sem automático${hora ? ` (${hora})` : ''}`,
+      longo: `A conversa passou para você${hora ? ` às ${hora}` : ''} porque ${motivo}.`,
+    }
+  }
   return {
     motivo,
     hora,

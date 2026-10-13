@@ -129,6 +129,29 @@ export const clienteEscolhendoPeloLink = (comandas, pedido) => !pedido?.pedidoId
 export const LINHA_CLIENTE_ESCOLHENDO =
   'O cliente está escolhendo pelo link. Os itens aparecem acima e viram pedido quando ele confirmar.'
 
+// #1761: a Ficha dizia "Pedido em montagem" com o pedido já confirmado e pago. O título segue o
+// pedido: montagem só enquanto ele não existe no EasyStok.
+export function tituloDaComanda(pedido, { temLinkComPedido = false } = {}) {
+  if (temLinkComPedido) return 'Link do cliente'
+  if (!pedido?.pedidoId) return 'Pedido em montagem'
+  if (pedido.estado === 'cancelado') return 'Pedido cancelado'
+  if (pedido.estado === 'aguardando') return 'Pedido aguardando pagamento'
+  return 'Pedido confirmado'
+}
+
+// #1761 (L18): a porção embaixo do nome repetia o que o nome já diz ("...600 g" e "600 g").
+export function porcaoForaDoNome(produto) {
+  const porcao = String(produto?.porcao ?? '').trim()
+  if (!porcao) return ''
+  const semEspaco = (texto) => String(texto ?? '').toLowerCase().replace(/\s+/g, '')
+  return semEspaco(produto.nome).includes(semEspaco(porcao)) ? '' : porcao
+}
+
+// #1761 (L3): o pedido acabou de nascer no EasyStok nesta conversa (a cobrança foi gerada). É a
+// hora de fechar o cardápio: dali em diante ele só consulta e cobria a lista e a conversa.
+export const pedidoAcabouDeNascer = (antes, depois) => Boolean(depois?.pedidoId)
+  && !antes?.pedidoId && antes?.conversaId === depois.conversaId
+
 // #1683: sem pedido e sem frete combinado o EasyStok soma só os itens; o cliente já vê o frete.
 export function rotuloDoTotalDaSelecao(comanda, emEdicao = false) {
   const semFrete = !comanda.pedido && comanda.freteCombinado == null

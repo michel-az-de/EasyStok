@@ -19,11 +19,12 @@ import { indiceDoPasso } from '../../dominio/esteira'
 import { numeroCurto, pedidoEncerrado } from '../../dominio/pedido'
 import { SITUACOES, situacaoDoCep } from '../../dominio/areaEntrega'
 import {
-  chegouQuando, dicaDoCep, mesmoDomicilio, motivoParaNaoBloquear, resumoFinanceiro,
+  chegouQuando, dicaDoCep, mesmoDomicilio, motivoParaNaoBloquear, recusaDoEndereco, resumoFinanceiro,
 } from '../../dominio/cliente'
 import { SELO_CAPTADO, automaticoConduzindo } from '../../dominio/captura'
 import { historicoElegivelParaFidelidade, saldoDePontos } from '../../dominio/fidelidade'
 import { notasRecentes } from '../../dominio/notas'
+import { mostraHistorico, resumoDasTags } from '../../dominio/ficha'
 import { CampoEmLinha } from './CampoEmLinha'
 import { TagsDoCliente } from './TagsDoCliente'
 import { ModalHistorico } from './ModalHistorico'
@@ -189,7 +190,8 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
 
   // #1442: quatro seções que recolhem e lembram (Bloco com `chave`), para a
   // rolagem da ficha não ficar extensa. Recolhida, cada uma deixa um resumo.
-  const resumoTags = cliente.tags.length === 1 ? '1 tag' : `${cliente.tags.length} tags`
+  const resumoTags = resumoDasTags(cliente.tags.length)
+  const resgataPontos = !lead && disponivel('resgatarRecompensa')
   const resumoHistorico = cliente.pedidos === 1 ? '1 pedido' : `${cliente.pedidos} pedidos`
 
   return (
@@ -307,15 +309,17 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
               <CampoEmLinha rotulo="Endereço" valor={cliente.endereco}
                 vazio={enderecoPendente ? 'Aguardando confirmação acima'
                   : automaticoCaptando ? 'O automático está pedindo na conversa' : 'Adicionar endereço'}
+                validar={fonteApi ? recusaDoEndereco : undefined}
                 aoSalvar={aoSalvarEndereco} />
             </div>
-            <div className={css.linhaDado}>
-              <span className={`${css.azulejo} ${css['az_' + canal.icone] ?? css.azCinza}`} aria-hidden="true"><Icone nome={canal.icone} tamanho={15} /></span>
-              <span className={css.rotuloDado}>Canal</span>
-              <span className={css.valorCanal}>
-                {canal.nome}{cliente.usuario ? ` · @${cliente.usuario}` : ''}
-              </span>
-            </div>
+            {/* #1761 (L22): o canal já está no cabeçalho da conversa; aqui só o que ele não diz, o usuário. */}
+            {cliente.usuario && (
+              <div className={css.linhaDado}>
+                <span className={`${css.azulejo} ${css['az_' + canal.icone] ?? css.azCinza}`} aria-hidden="true"><Icone nome={canal.icone} tamanho={15} /></span>
+                <span className={css.rotuloDado}>Canal</span>
+                <span className={css.valorCanal}>{canal.nome} · @{cliente.usuario}</span>
+              </div>
+            )}
             {/* Canais de aviso: e-mail e SMS (AvisosDoCliente.jsx, que no modo API
                 grava o consentimento do cadastro, F02). */}
             <div className={css.linhaDado}>
@@ -370,6 +374,8 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
         )}
       </Bloco>
 
+      {/* #1761 (L22): sem pedido e sem pontos, o Histórico não tem o que abrir. */}
+      {mostraHistorico({ pedidos: cliente.pedidos, fonteApi, resgataPontos }) && (
       <Bloco titulo="Histórico" chave="historico" recolhidoDePadrao={recolhidas.historico} resumo={resumoHistorico}>
         {!lead && cliente.pedidos > 0 && (
           <div className={css.numerosCliente}>
@@ -395,7 +401,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
 
         {/* Selo discreto de fidelidade (pedido do Felipe: "sem sujar a UX
             atual"): só saldo e o botão de resgate, o catálogo mora na Gestão. */}
-        {!lead && disponivel('resgatarRecompensa') && (
+        {resgataPontos && (
           <div className={css.linhaFidelidade}>
             <span className={css.seloPontos}>
               <Icone nome="estrela" tamanho={13} /> {saldoPontos} {saldoPontos === 1 ? 'ponto' : 'pontos'}
@@ -408,6 +414,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
           Histórico · {cliente.pedidos}
         </Botao>
       </Bloco>
+      )}
 
         {modal === 'bloquear' && (
           <ModalBloqueio

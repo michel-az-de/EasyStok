@@ -7,7 +7,7 @@ import { Pilula } from '../../componentes/Pilula'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { moeda } from '../../dominio/formato'
 import {
-  LINHA_CLIENTE_ESCOLHENDO, agruparPorLinha, comandaTravada, itensDetalhados, numeroDaComanda, pedidoEncerrado,
+  LINHA_CLIENTE_ESCOLHENDO, agruparPorLinha, comandaTravada, itensDetalhados, numeroDaComanda, pedidoEncerrado, porcaoForaDoNome,
   precoDaLinha, totalDoPedido,
 } from '../../dominio/pedido'
 import { diferencaAposPagamento, totalPago } from '../../dominio/pagamento'
@@ -42,6 +42,9 @@ function ItemComanda({
   // (`aria-hidden`); quem lê por teclado ou leitor de tela usa o rótulo do
   // próprio botão do nome.
   const podeAnotar = !observacaoTravada
+  // #1761 (L18): sem a porção que o nome já diz; e o "1×" só no item fechado, porque aberto a
+  // quantidade está no seletor, que fica na mesma linha do nome.
+  const porcao = porcaoForaDoNome(linha.produto)
   const corpo = (
     <>
       <span className={css.nomeItem}>
@@ -49,19 +52,19 @@ function ItemComanda({
         <MarcaDoItem produto={linha.produto} />
         {podeAnotar && <Icone nome="lapis" tamanho={16} />}
       </span>
-      <span className={css.porcao}>{linha.produto?.porcao}</span>
+      {porcao && <span className={css.porcao}>{porcao}</span>}
     </>
   )
   return (
     <li className={css.item}>
       <div className={css.linhaItem}>
-        <span className={css.qtd}>{linha.qtd}×</span>
+        {fechado && <span className={css.qtd}>{linha.qtd}×</span>}
         {podeAnotar ? (
           <button
             type="button"
             className={`${css.corpo} ${css.corpoAnotar}`}
             aria-pressed={obsAberta}
-            aria-label={`Anotar na ${linha.produto?.nome}`}
+            aria-label={`Anotação para ${linha.produto?.nome}`}
             onClick={aoAlternarObs}
           >
             {corpo}

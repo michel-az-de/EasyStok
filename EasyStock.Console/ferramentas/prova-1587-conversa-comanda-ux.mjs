@@ -223,7 +223,8 @@ await confere('C o composer recusa ao escolher e não promete PDF no modo API', 
   assert.match(composer, /validarArquivo\(\{ tipo: arquivo\.type, tamanho: arquivo\.size, soImagem: fonteApi \}\)/)
   assert.match(composer, /const bloqueioCanal = motivoDeAnexo\(canal, tipo, \{ fonteApi \}\)/)
   assert.match(composer, /soImagem=\{fonteApi\}/)
-  assert.match(composer, /titulo=\{fonteApi \? 'Anexar foto do computador \(imagem, até 8 MB\)' : /)
+  // #1761: canal que não aceita anexo mostra a restrição no lugar; o resto segue igual.
+  assert.match(composer, /titulo=\{!podeAnexar \? restricao : fonteApi \? 'Anexar foto do computador \(imagem, até 8 MB\)' : /)
   const anexos = fonte('features/atendimento/ComposerAnexos.jsx')
   assert.match(anexos, /accept=\{`image\/jpeg,image\/png,image\/webp,image\/gif\$\{soImagem \? '' : ',application\/pdf'\}`\}/)
 })

@@ -5,6 +5,7 @@ import { Pilula } from '../../componentes/Pilula'
 import { MODOS } from '../../dominio/automatico'
 import { resumoDoModo } from '../../dominio/resumoDoModo'
 import { primeiroNome } from '../../dominio/mensagem'
+import { automaticoDesligadoNaConversa } from '../../dominio/motivoDeEscalada'
 import css from './atendimento.module.css'
 
 // Quem responde esta conversa. Um lugar só, no topo da thread, com os três
@@ -29,7 +30,9 @@ export function BarraModo({
   // Assumir só faz sentido em conversa que ainda está no automático ou que
   // acabou de ser devolvida. Devolver só onde o automático está parado.
   const podeAssumir = resumo.chave === MODOS.LIGADO || resumo.chave === MODOS.COM_VOCE
-  const podeDevolver = resumo.chave === MODOS.PAUSADO || resumo.chave === MODOS.COM_VOCE
+  // #1761 (L6): com o automático desligado na loja não há para quem devolver.
+  const podeDevolver = (resumo.chave === MODOS.PAUSADO || resumo.chave === MODOS.COM_VOCE)
+    && !automaticoDesligadoNaConversa(conversa)
   const sugereEncerrar = resumo.sugereEncerrar && Boolean(aoEncerrar)
   const nome = primeiroNome(conversa.nome)
 
@@ -57,7 +60,8 @@ export function BarraModo({
             )}
             {podeDevolver && (
               <Botao
-                variante={podeAssumir ? 'padrao' : 'primario'}
+                // #1761 (L5): nunca é o próximo passo; o primário da tela é o do pedido.
+                variante="padrao"
                 className={css.acaoModo}
                 title="O atendimento automático volta a responder esta conversa"
                 aria-haspopup="dialog"

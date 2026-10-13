@@ -9,7 +9,9 @@ import { cancelarNasceMarcado, falhaAoCancelarNoEncerramento, pedidoAoEncerrar, 
 import { canalDaConversa } from '../../dominio/canal'
 import { conversaEncerrada } from '../../dominio/conversa'
 import { pedidoEncerrado } from '../../dominio/pedido'
-import { montarResumoAtendimento } from '../../dominio/resumoAtendimento'
+import {
+  PEDE_TEXTO_DA_DESPEDIDA, avisoDoPedidoAoEncerrar, faltaTextoDaDespedida, montarResumoAtendimento,
+} from '../../dominio/resumoAtendimento'
 import { GATILHOS, contextoDePrevia, regraDoGatilho, textoDaRegra } from '../../dominio/automacao'
 import { FolhaResumo } from './FolhaResumo'
 import css from './encerramento.module.css'
@@ -80,12 +82,14 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   const despedidaJaSaiu = useRef(false)
   const [encerrandoAgora, setEncerrandoAgora] = useState(false)
   const [erroAoEncerrar, setErroAoEncerrar] = useState(null)
+  // #1761: só cobra o texto depois do toque em Encerrar; o aviso fica junto do campo.
+  const [cobrouDespedida, setCobrouDespedida] = useState(false)
+  const campoDespedida = useRef(null)
 
   if (!conversaId || !conversa || !resumo) return null
 
   const pedido = conversa.pedido
   const pedidoAtivo = Boolean(pedido) && !pedidoEncerrado(pedido)
-  const aguardandoPagamento = pedidoAtivo && pedido.estado === 'aguardando'
   const noPedido = pedidoAoEncerrar(pedidoAtivo ? pedido : null, { fonteApi, cancelarMarcado })
   const canal = canalDaConversa(canais, conversa)
 
@@ -97,8 +101,15 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   const avisoEmailLigado = Boolean(conversa.cliente?.avisos?.email)
   const avisoSmsLigado = Boolean(conversa.cliente?.avisos?.sms)
 
+  const semDespedida = faltaTextoDaDespedida(enviarMensagem && !despedidaJaSaiu.current, textoMensagem)
+
   const clicarEncerrar = async () => {
     if (emVoo.current) return
+    if (semDespedida) {
+      setCobrouDespedida(true)
+      campoDespedida.current?.querySelector('textarea')?.focus()
+      return
+    }
     emVoo.current = true
     setEncerrandoAgora(true)
     setErroAoEncerrar(null)
@@ -163,9 +174,7 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
           <div className={css.corpoModal}>
             {!encerrada && pedidoAtivo && !leitura && !noPedido.cancelar && (
               <p className={css.faixaAtencao}>
-                {aguardandoPagamento
-                  ? `O pedido Nº ${pedido.numero} ainda não foi pago. Ele continua valendo depois de encerrar.`
-                  : `O pedido ${pedido.numero} segue na esteira até a entrega.`}
+                {avisoDoPedidoAoEncerrar(conversa, { fonteApi })}
               </p>
             )}
             {!encerrada && !leitura && (
@@ -190,12 +199,19 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
                   Mandar mensagem de encerramento ao cliente
                 </label>
                 {enviarMensagem && (
-                  <CampoArea
-                    rotulo="Mensagem de encerramento"
-                    rotuloOculto
-                    value={textoMensagem}
-                    onChange={(e) => setTextoMensagem(e.target.value)}
-                  />
+                  <div ref={campoDespedida}>
+                    <CampoArea
+                      rotulo="Mensagem de encerramento"
+                      rotuloOculto
+                      placeholder="Ex.: Obrigada pela preferência! Qualquer coisa, é só chamar."
+                      aria-invalid={cobrouDespedida && semDespedida ? true : undefined}
+                      value={textoMensagem}
+                      onChange={(e) => setTextoMensagem(e.target.value)}
+                    />
+                    {cobrouDespedida && semDespedida && (
+                      <p className={css.erroAoEncerrar} role="alert">{PEDE_TEXTO_DA_DESPEDIDA}</p>
+                    )}
+                  </div>
                 )}
                 {(avisoEmailLigado || avisoSmsLigado) && (
                   <p className={css.avisosConfigurados}>

@@ -82,13 +82,13 @@ try {
     await page.mouse.move(alvo.x + alvo.width / 2, Math.min(alvo.y + 100, 600), { steps: 18 })
     await page.getByText('Soltar aqui', { exact: true }).waitFor()
     await page.mouse.up()
-    await page.getByRole('button', { name: 'Anotar na Lasanha Bolonhesa Clássica 800 g', exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Anotação para Lasanha Bolonhesa Clássica 800 g', exact: true }).waitFor()
     await page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 1 kg na comanda', exact: true }).click()
     await foto(page, '01b-arrasto-tamanho-1280')
     await page.getByRole('button', { name: 'Tirar uma unidade de Lasanha Bolonhesa Clássica 800 g', exact: true }).click()
-    assert.equal(await page.getByRole('button', { name: 'Anotar na Lasanha Bolonhesa Clássica 800 g', exact: true }).count(), 0)
+    assert.equal(await page.getByRole('button', { name: 'Anotação para Lasanha Bolonhesa Clássica 800 g', exact: true }).count(), 0)
     for (const peso of ['600 g', '1 kg']) {
-      assert.equal(await page.getByRole('button', { name: 'Anotar na Lasanha Bolonhesa Clássica ' + peso, exact: true }).count(), 1,
+      assert.equal(await page.getByRole('button', { name: 'Anotação para Lasanha Bolonhesa Clássica ' + peso, exact: true }).count(), 1,
         'Retirar 800 g preserva ' + peso)
     }
     await foto(page, '01c-retirada-800-preserva-600-1kg-1280')
@@ -147,7 +147,7 @@ try {
     await foto(page, '05-porcao-nativa-390')
     await page.getByRole('button', { name: 'Fechar cardápio', exact: true }).click()
     await page.getByRole('tab', { name: 'Pedido', exact: true }).click()
-    await page.getByRole('button', { name: 'Anotar na Lasanha Bolonhesa Clássica · 300 g', exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Anotação para Lasanha Bolonhesa Clássica · 300 g', exact: true }).waitFor()
     pedidoCriado = true
     await page.reload()
     await page.getByRole('tab', { name: 'Pedido', exact: true }).click()

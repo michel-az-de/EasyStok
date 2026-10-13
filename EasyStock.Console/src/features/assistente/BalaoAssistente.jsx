@@ -138,7 +138,8 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela }) {
   const gatilho = (
     <Botao
       ref={botaoRef}
-      variante="primario"
+      // #1761 (L5): no cabeçalho da conversa é apoio, não o próximo passo: secundário.
+      variante={cabecalhoDoAtendimento ? 'secundario' : 'primario'}
       className={cabecalhoDoAtendimento ? css.gatilhoNoCabecalho : css.gatilho}
       aria-label={aberto ? 'Fechar assistente' : 'Abrir assistente'}
       aria-expanded={aberto}

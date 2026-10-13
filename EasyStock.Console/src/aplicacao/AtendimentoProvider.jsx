@@ -29,6 +29,8 @@ import { audioDestravado, destravarAudio } from '../infra/som'
 import { gravarPreferenciaSom, lerPreferenciaSom } from '../infra/preferenciaSom'
 import { conectarPrincipal } from '../infra/canalEntreJanelas'
 import { FONTE_API } from '../infra/fonteDados'
+import { useAcessoModulos } from './acessoModulos'
+import { podeVerItensFora } from '../dominio/acessoModulos'
 import { comApi } from './acoesApi'
 import { criarAcoes } from './criarAcoes'
 import { useSincronizacaoApi } from './useSincronizacaoApi'
@@ -75,7 +77,11 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
     if (estado.sincronizacao.estado === 'ok' || estado.conversas.length) aoGuardarComandas?.(comandasLocaisDaVisita(estado.conversas))
   }, [aoGuardarComandas, estado.conversas, estado.sincronizacao.estado])
   useEffect(() => { if (FONTE_API) gravarRascunhos(sessao, estado.rascunhos) }, [sessao, estado.rascunhos])
-  useSincronizacaoApi({ ativo: FONTE_API, comConversas: atendimentoAtivo, usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId, memoria: memoriaDoLaco })
+  const { acoes: acoesDoPerfil } = useAcessoModulos()
+  const comItensFora = podeVerItensFora(acoesDoPerfil)
+  const comItensForaRef = useRef(comItensFora)
+  useEffect(() => { comItensForaRef.current = comItensFora }, [comItensFora])
+  useSincronizacaoApi({ ativo: FONTE_API, comConversas: atendimentoAtivo, comItensFora, usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId, memoria: memoriaDoLaco })
 
   // Relógio da tela mais o deslocamento do painel de simulações (seção 7,
   // "+10 min"/"+30 min"/"Agora"): as ações carimbam o mesmo instante que a
@@ -320,7 +326,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   }, [conversasAgora, agoraEfetivo, estado.catalogo.janelas])
 
   const acoesAtivas = useMemo(
-    () => (FONTE_API ? comApi(acoes, { despachar, agoraRef, estadoRef }) : acoes),
+    () => (FONTE_API ? comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef }) : acoes),
     [acoes],
   )
 
