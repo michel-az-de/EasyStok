@@ -37,6 +37,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AlterarSenhaUsuarioUseCase>();
         services.AddScoped<DesativarUsuarioUseCase>();
         services.AddScoped<ListarUsuariosUseCase>();
+        services.AddScoped<ListarPerfisAtribuiveisUseCase>();
+        services.AddScoped<ListarAuditoriaDeAcessoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.ReativarUsuario.ReativarUsuarioUseCase>();
 
         // Perfis e permissões
         services.AddScoped<AtribuirPerfilUsuarioUseCase>();

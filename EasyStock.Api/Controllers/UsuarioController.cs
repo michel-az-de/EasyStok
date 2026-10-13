@@ -4,6 +4,7 @@ using EasyStock.Application.UseCases.AtualizarUsuario;
 using EasyStock.Application.UseCases.CriarUsuario;
 using EasyStock.Application.UseCases.DesativarUsuario;
 using EasyStock.Application.UseCases.ListarUsuarios;
+using EasyStock.Application.UseCases.ReativarUsuario;
 using EasyStock.Application.UseCases.ReenviarConvite;
 using EasyStock.Application.Services.Auth;
 using Swashbuckle.AspNetCore.Annotations;
@@ -24,6 +25,9 @@ public class UsuarioController(
     ListarUsuariosUseCase listarUseCase,
     AtribuirPerfilUsuarioUseCase atribuirPerfilUseCase,
     ReenviarConviteUseCase reenviarConviteUseCase,
+    ReativarUsuarioUseCase reativarUseCase,
+    ListarPerfisAtribuiveisUseCase listarPerfisUseCase,
+    ListarAuditoriaDeAcessoUseCase listarAuditoriaUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List users (Admin only, paginated)")]
@@ -114,6 +118,58 @@ public class UsuarioController(
 
         await desativarUseCase.ExecuteAsync(new DesativarUsuarioCommand(id, empresaId));
         return NoContent();
+    }
+
+    [SwaggerOperation(
+        Summary = "Reactivate user (Admin only)",
+        Description = "Desfaz a desativacao: religa o vinculo com a empresa e grava a auditoria. Repetir nao muda nada.")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpPost("{id}/reativar")]
+    [Authorize(Policy = "Admin")]
+    public async Task<IActionResult> Reativar(Guid id, [FromQuery] Guid empresaId)
+    {
+        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
+            return Forbid();
+
+        await reativarUseCase.ExecuteAsync(new ReativarUsuarioCommand(id, empresaId));
+        return NoContent();
+    }
+
+    [SwaggerOperation(Summary = "List the roles an Admin can assign in the company (Admin only)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("perfis")]
+    [Authorize(Policy = "Admin")]
+    public async Task<IActionResult> Perfis([FromQuery] Guid empresaId)
+    {
+        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
+            return Forbid();
+
+        return DataOk(await listarPerfisUseCase.ExecuteAsync(empresaId));
+    }
+
+    [SwaggerOperation(
+        Summary = "Access audit trail of the company users (Admin only, paginated)",
+        Description = "Login, convite, troca de perfil, desativacao e reativacao, da mais recente para a mais antiga. " +
+                      "usuarioId filtra pela pessoa afetada. IP e agente nao saem.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("auditoria")]
+    [Authorize(Policy = "Admin")]
+    public async Task<IActionResult> Auditoria(
+        [FromQuery] Guid empresaId, [FromQuery] Guid? usuarioId = null,
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default)
+    {
+        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
+            return Forbid();
+
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        var (itens, total) = await listarAuditoriaUseCase.ExecuteAsync(
+            new ListarAuditoriaDeAcessoQuery(empresaId, usuarioId, page, pageSize), ct);
+        return DataPaged(itens, total, page, pageSize);
     }
 
     [SwaggerOperation(Summary = "Change user password")]

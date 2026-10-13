@@ -33,7 +33,7 @@ public class CriarUsuarioUseCaseTests
 
     private CriarUsuarioUseCase UseCase() => new(
         _c.Usuarios, _assinaturas, _vinculos, _perfisDoUsuario, _perfis, _c.Consentimentos, _c.Convites(), _atual,
-        _c.UnitOfWork, _hasher, Substitute.For<ILogger<CriarUsuarioUseCase>>());
+        _c.Auditoria, _c.UnitOfWork, _hasher, Substitute.For<ILogger<CriarUsuarioUseCase>>());
 
     private CriarUsuarioCommand Convite(
         string? telefone = null, bool atesta = false, Guid? perfilId = null, string? senha = null) =>
@@ -61,6 +61,34 @@ public class CriarUsuarioUseCaseTests
         evento.Payload.GetProperty("link_convite").GetString().Should().StartWith("https://app.easystok.com.br/auth/convite?token=");
         evento.Payload.GetProperty("expira_em_dias").GetInt32().Should().Be(3);
         _c.UnitOfWork.CommitCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ConvidarDeixaRastroComOPerfilEQuemConvidou()
+    {
+        var dona = Usuario.Criar("Baba", "baba@casadababa.com", "$2a$11$hash");
+        _c.Usuarios.GetByIdAsync(_donaId).Returns(dona);
+        var perfil = new Perfil { Id = Guid.NewGuid(), Nome = "Atendimento", Nivel = NivelAcesso.Operador, EmpresaId = _empresaId };
+        _perfis.GetByIdAsync(perfil.Id).Returns(perfil);
+
+        await UseCase().ExecuteAsync(Convite(perfilId: perfil.Id));
+
+        var rastro = _c.Auditorias.Should().ContainSingle(a => a.Acao == "usuario-convidado").Subject;
+        rastro.UsuarioId.Should().Be(_adicionados.Single().Id);
+        rastro.Detalhes.Should().Be("Convidado com o perfil Atendimento por Baba");
+        await _perfisDoUsuario.Received(1).AddAsync(Arg.Is<UsuarioPerfil>(p => p.AtribuidoPorId == _donaId));
+    }
+
+    [Fact]
+    public async Task PerfilDeOutraEmpresaNaoEntraNoConvite()
+    {
+        var alheio = new Perfil { Id = Guid.NewGuid(), Nome = "Dona", Nivel = NivelAcesso.Admin, EmpresaId = Guid.NewGuid() };
+        _perfis.GetByIdAsync(alheio.Id).Returns(alheio);
+
+        var acao = () => UseCase().ExecuteAsync(Convite(perfilId: alheio.Id));
+
+        await acao.Should().ThrowAsync<UseCaseValidationException>();
+        _adicionados.Should().BeEmpty();
     }
 
     [Fact]
