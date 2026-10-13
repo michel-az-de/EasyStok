@@ -50,7 +50,7 @@ export function BlocoDevolucoes({ pedidoId }) {
   }
 
   return (
-    <Bloco titulo="Devoluções" chave="devolucoes" resumo={totalDevolvido ? `${moeda(totalDevolvido)} devolvidos` : 'Recebimentos e estornos'}>
+    <Bloco titulo="Devoluções" chave="devolucoes" recolhidoDePadrao resumo={totalDevolvido ? `${moeda(totalDevolvido)} devolvidos` : 'Recebimentos e estornos'}>
       <div className={css.acoesPedido}>
         {erro && <p role="alert" className={css.corpoBloco}>{erro}</p>}
         {aviso && <output className={css.corpoBloco}>{aviso}</output>}

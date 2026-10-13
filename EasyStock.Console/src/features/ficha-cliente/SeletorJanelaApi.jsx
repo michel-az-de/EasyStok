@@ -18,7 +18,10 @@ export function SeletorJanelaApi({ pedido, editavel, aoEscolher }) {
 
 function ReagendamentoPedido({ pedidoId, aoEscolher }) {
   const campos = useReagendamentoPedido(pedidoId, aoEscolher)
-  return <Bloco titulo="Janela de entrega"><EscolhaJanelaPedido {...campos} /></Bloco>
+  // #1697: pedido criado já tem a vaga; o formulário de troca abre pelo título, que mostra a atual.
+  const { leitura } = campos
+  const resumo = leitura ? (leitura.atual?.rotulo ?? 'Sem vaga de entrega') : ''
+  return <Bloco titulo="Janela de entrega" chave="janela-pedido" recolhidoDePadrao resumo={resumo}><EscolhaJanelaPedido {...campos} /></Bloco>
 }
 
 function EscolhaRascunho({ pedido, editavel, aoEscolher }) {

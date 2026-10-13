@@ -154,7 +154,7 @@ export function ComandaDoCliente({ conversaId, ativo, acaoCompartilhar, pedido =
   return <section ref={avisarEscolha} className={css.clienteCompartilhado} aria-label="Comanda compartilhada com o cliente">
     <div className={css.adicionarCompartilhado}><b>Escolha do cliente pelo link</b>{acaoCompartilhar}</div>
     {erro && <p role="alert">{erro}</p>}
-    {!visiveis.length && !erro && <p>Compartilhe com o cliente para escolherem juntos. A seleção chega aqui antes da confirmação.</p>}
+    {!visiveis.length && !erro && !pedido?.pedidoId && <p>Compartilhe com o cliente para escolherem juntos. A seleção chega aqui antes da confirmação.</p>}
     {visiveis.map(c => <SelecaoCompartilhada key={c.linkId} comanda={c} ocupado={ocupado} salvar={salvar} confirmar={confirmar}
       combinarFrete={combinarFrete}
       cardapio={cardapio} podeDevolver={acoes.estornarPagamentoOnline === true} />)}

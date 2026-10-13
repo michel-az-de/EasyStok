@@ -10,6 +10,7 @@ import { faixaDaJanela } from '../../dominio/entrega'
 import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
 import { LINHA_CLIENTE_ESCOLHENDO, numeroDaComanda } from '../../dominio/pedido'
 import { motivoAntesDeCobrar } from '../../dominio/resumoPedido'
+import { fichaRecolhidaDePadrao } from '../../dominio/ficha'
 import { BarraProximoPasso } from './BarraProximoPasso'
 import { BlocoCobranca } from './BlocoCobranca'
 import { BlocoDevolucoes } from './BlocoDevolucoes'
@@ -115,7 +116,7 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
           />
         )}
 
-        <BlocoCliente conversa={selecionada} />
+        <BlocoCliente conversa={selecionada} recolhidas={fichaRecolhidaDePadrao({ pedido, cliente })} />
 
         {pedido ? (
           <>

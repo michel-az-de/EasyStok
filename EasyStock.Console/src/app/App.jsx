@@ -195,6 +195,7 @@ function Composicao({ rota, aoSair }) {
         aoAlternarSimulacoes={FONTE_API ? null : () => setSimulando((v) => !v)}
         larguras={larguras}
         aoRedimensionar={aoRedimensionar}
+        cardapioAberto={modal === 'cardapio' && Boolean(selecionada)}
       />
 
       {modal === 'nota' && selecionada && (
@@ -216,7 +217,7 @@ function Composicao({ rota, aoSair }) {
           // na coluna Ficha quando ela existe (layout de três colunas). Na
           // gaveta e no celular a Ficha não fica fixa na tela, então o painel
           // vai para a borda mesmo.
-          deslocamentoDireita={tamanho === DESKTOP ? larguras.ficha : 0}
+          ladoDoBalcao={tamanho === DESKTOP}
           aoRedimensionar={(valor) => aoRedimensionar('cardapio', valor)}
           aoFechar={fechar}
           aoEscolher={(item) => adicionarItem(selecionada.id, item)}

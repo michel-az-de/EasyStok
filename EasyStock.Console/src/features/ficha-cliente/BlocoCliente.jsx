@@ -64,7 +64,9 @@ function SeloCaptado({ quando }) {
   )
 }
 
-export function BlocoCliente({ conversa }) {
+const NADA_RECOLHIDO = { contato: false, tags: false, historico: false }
+
+export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
   const { cliente } = conversa
   const { conversas, historico, agora, automaticoPausado, fidelidade, fonteApi } = useAtendimento()
   // #1474 (R2): no modo API, mudar a entrega do pedido e os pontos não têm endpoint e somem.
@@ -253,7 +255,7 @@ export function BlocoCliente({ conversa }) {
         )}
       </Bloco>
 
-      <Bloco titulo="Contato e endereço" chave="contato" resumo={cliente.telefone ?? ''}>
+      <Bloco titulo="Contato e endereço" chave="contato" recolhidoDePadrao={recolhidas.contato} resumo={cliente.telefone ?? ''}>
         {precisaCadastro ? (
           <div className={css.cadastroRapido}>
             {!cliente.telefone && (
@@ -352,7 +354,7 @@ export function BlocoCliente({ conversa }) {
         )}
       </Bloco>
 
-      <Bloco titulo="Tags" chave="tags" resumo={resumoTags}>
+      <Bloco titulo="Tags" chave="tags" recolhidoDePadrao={recolhidas.tags} resumo={resumoTags}>
         <TagsDoCliente conversa={conversa} />
 
         {/* #1441: as notas internas mais recentes como post-its, ao lado da conversa. */}
@@ -368,7 +370,7 @@ export function BlocoCliente({ conversa }) {
         )}
       </Bloco>
 
-      <Bloco titulo="Histórico" chave="historico" resumo={resumoHistorico}>
+      <Bloco titulo="Histórico" chave="historico" recolhidoDePadrao={recolhidas.historico} resumo={resumoHistorico}>
         {!lead && cliente.pedidos > 0 && (
           <div className={css.numerosCliente}>
             <span>
