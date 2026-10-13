@@ -103,6 +103,20 @@ public sealed class GerarCobrancaPedidoUseCase(
         }
     }
 
+    /// <summary>
+    /// Reemissão pedida por uma pessoa (console). Trava o pedido antes de olhar as cobranças (#1724): sem a
+    /// trava, cliques simultâneos liam "sem pendente" e cada um criava um link pagável para o mesmo pedido.
+    /// </summary>
+    public Task<CobrancaPedidoResult> ExecuteComTravaAsync(GerarCobrancaPedidoInput input, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        return unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+        {
+            await pedidoRepository.TravarAsync(input.EmpresaId, input.PedidoId, token);
+            return await ExecuteAsync(input, token);
+        }, ct);
+    }
+
     /// <summary>Pedido já gravado: carrega itens e frete do banco.</summary>
     public async Task<CobrancaPedidoResult> ExecuteAsync(GerarCobrancaPedidoInput input, CancellationToken ct = default)
     {
