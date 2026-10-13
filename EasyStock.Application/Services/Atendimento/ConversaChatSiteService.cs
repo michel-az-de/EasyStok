@@ -6,6 +6,7 @@ namespace EasyStock.Application.Services.Atendimento;
 
 public sealed class ConversaChatSiteService(IConversaRepository conversas, IUnitOfWork unitOfWork)
 {
+    public const string MotivoFilaHumana = "Visitante do site aguardando atendimento da equipe.";
     public Task<Conversa> ObterOuCriarAsync(SessaoChatSite sessao, Guid? clienteVerificadoId, DateTime agora,
         CancellationToken ct = default) => unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
     {
@@ -28,7 +29,7 @@ public sealed class ConversaChatSiteService(IConversaRepository conversas, IUnit
         if (conversa is null)
         {
             conversa = Conversa.Abrir(sessao.EmpresaId, contato, agora, "Visitante do site", clienteVerificadoId, CanalConversa.ChatSite);
-            conversa.Assumir(agora);
+            conversa.Escalar(agora, MotivoFilaHumana);
             await conversas.AddAsync(conversa, token);
         }
         if (clienteVerificadoId is { } verificado) conversa.VincularCliente(verificado);

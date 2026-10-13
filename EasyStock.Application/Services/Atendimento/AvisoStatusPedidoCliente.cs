@@ -7,6 +7,7 @@ using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Exceptions.Storefront;
+using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.Services.Atendimento;
 
@@ -62,6 +63,9 @@ public sealed class AvisoStatusPedidoCliente(
             logger.LogWarning("Aviso {Tipo} sem pedido: pedidoId={PedidoId}", tipo, pedidoId);
             return false;
         }
+
+        if (tipo == TipoEventoNotificacao.PedidoPagoConfirmado && pedido.StatusEnum == StatusPedido.Cancelado)
+            return false;
 
         var cliente = pedido.ClienteId is { } clienteId
             ? await clienteRepository.GetByIdAsync(empresaId, clienteId)

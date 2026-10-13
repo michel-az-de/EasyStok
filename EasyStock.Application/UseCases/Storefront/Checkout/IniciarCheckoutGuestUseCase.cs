@@ -55,6 +55,9 @@ public sealed class IniciarCheckoutGuestUseCase(
     /// <summary>Validade do link, em segundos (a mesma do checkout logado).</summary>
     private static readonly int ExpiresInSeconds = (int)GerarCobrancaPedidoUseCase.Validade.TotalSeconds;
 
+    /// <summary>Tamanho de <c>pedidos.ClienteNome</c>; acima disso o banco recusava com erro interno (#1719).</summary>
+    private const int NomeMaximo = 150;
+
     /// <summary>E.164 BR: <c>+55</c> + DDD (2) + numero (8 ou 9 digitos).</summary>
     private static readonly Regex TelefoneE164BrRegex =
         new(@"^\+55[1-9][0-9]\d{8,9}$", RegexOptions.Compiled);
@@ -72,6 +75,8 @@ public sealed class IniciarCheckoutGuestUseCase(
         var nome = (input.Nome ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(nome) || nome.Length < 2)
             throw new RegraDeDominioVioladaException("Nome e obrigatorio (min 2 caracteres).");
+        if (nome.Length > NomeMaximo)
+            throw new RegraDeDominioVioladaException($"O nome vai até {NomeMaximo} caracteres.");
 
         var telefoneE164 = NormalizarTelefone(input.Telefone);
 

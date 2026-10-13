@@ -162,6 +162,7 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
             {fonteApi && pedido.pedidoId && <BlocoDevolucoes
               key={`${pedido.pedidoId}:${(pedido.pagamentosApi ?? []).map((p) => p.pagamentoId).join(':')}`}
               pedidoId={pedido.pedidoId}
+              cancelado={pedido.estado === 'cancelado'}
             />}
             {fonteApi && pedido.pedidoId && <BlocoOcorrenciasApi key={`ocorrencias:${pedido.pedidoId}`} pedidoId={pedido.pedidoId} conversaId={selecionada.id} />}
             {!fonteApi && pedido.ocorrencia && (

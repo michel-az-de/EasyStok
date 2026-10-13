@@ -140,11 +140,11 @@ confere('o login explica quando a sessão venceu sozinha', () => {
 
 // ---------------------------------------------------------------- telas sem saída
 
-confere('a aba de produção que ainda não grava aponta as telas que fazem o trabalho', () => {
+confere('a aba de produção em preparação aponta um próximo passo real conforme o acesso', () => {
   const gestao = fonte('features/gestao/ModalGestao.jsx')
-  assert.match(gestao, /saida: \{ modulo: 'producao', telas: \['producao', 'estoque'\] \}/)
+  assert.match(gestao, /saida: \{ modulo: 'producao', telas: \['producao'\] \}/)
   const producao = MODULOS.find((m) => m.id === 'producao')
-  for (const id of ['producao', 'estoque']) assert.ok(producao.telas.some((tela) => tela.id === id), `tela ${id} existe no catálogo`)
+  assert.ok(producao.telas.some((tela) => tela.id === 'producao'), 'destino Produção do dia existe no catálogo')
   assert.match(gestao, /permite\(saida\.modulo\)/)
 })
 
