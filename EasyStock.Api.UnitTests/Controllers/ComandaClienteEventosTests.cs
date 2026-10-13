@@ -48,6 +48,20 @@ public class ComandaClienteEventosTests
         ComandaClienteController.EsvaziarEventos(s.Slot, Conversa, Pedido).Should().BeTrue();
     }
 
+    /// <summary>Evento que chega depois de o sinal ser drenado fica com o sinal dele: o próximo giro o enxerga.</summary>
+    [Fact]
+    public void Evento_que_chega_depois_da_drenagem_conserva_o_sinal()
+    {
+        using var s = _broker.SubscribeOperacao("e", Empresa);
+        _broker.PublicarOperacao(Empresa, "conversa.mensagem_recebida", new { conversaId = Guid.NewGuid() });
+        ComandaClienteController.EsvaziarEventos(s.Slot, Conversa, Pedido).Should().BeFalse();
+
+        _broker.PublicarOperacao(Empresa, "pedido.pago", new { pedidoId = Pedido });
+
+        s.Slot.Signal.CurrentCount.Should().Be(1);
+        ComandaClienteController.EsvaziarEventos(s.Slot, Conversa, Pedido).Should().BeTrue();
+    }
+
     [Fact]
     public void Evento_de_outro_pedido_nao_pede_releitura()
     {

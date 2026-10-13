@@ -125,7 +125,7 @@ public sealed class CheckoutCoreService(
                     "A quantidade de cada item precisa ser maior que zero.");
             if (qtd > QuantidadeMaximaPorItem)
                 throw new RegraDeDominioVioladaException(
-                    $"A quantidade de cada item vai até {QuantidadeMaximaPorItem}. Para mais, fale com a loja.");
+                    $"A quantidade de cada item vai até {QuantidadeMaximaPorItem}.");
         }
 
         return cepNormalizado;

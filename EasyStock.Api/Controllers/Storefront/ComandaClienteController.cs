@@ -113,9 +113,12 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
             await Response.Body.FlushAsync(ct);
             // Relê quando o evento é desta comanda ou no batimento de 15 s, que cobre o que o evento não diz (#1719).
             var limite = relogio.GetUtcNow().AddSeconds(15);
-            while (limite - relogio.GetUtcNow() is { } resta && resta > TimeSpan.Zero
-                && await s.Slot.Signal.WaitAsync(resta, ct)
-                && !s.Slot.Cancelled && !EsvaziarEventos(s.Slot, acesso.ConversaId, pedidoId)) { }
+            while (true)
+            {
+                var resta = limite - relogio.GetUtcNow();
+                if (resta <= TimeSpan.Zero || !await s.Slot.Signal.WaitAsync(resta, ct)) break;
+                if (s.Slot.Cancelled || EsvaziarEventos(s.Slot, acesso.ConversaId, pedidoId)) break;
+            }
         }
     }
 
@@ -129,10 +132,12 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
         var conversa = conversaId.ToString();
         var pedido = pedidoId?.ToString();
         var relevante = false;
+        // O sinal sai antes da fila: o broker enfileira e depois sinaliza, então evento que chega no meio fica
+        // na fila com o sinal dele sobrando (um giro a mais), nunca na fila sem sinal.
+        while (slot.Signal.CurrentCount > 0 && slot.Signal.Wait(0)) { }
         while (slot.Queue.TryDequeue(out var evento))
             relevante |= evento.Dados.Contains(conversa, StringComparison.OrdinalIgnoreCase)
                 || (pedido is not null && evento.Dados.Contains(pedido, StringComparison.OrdinalIgnoreCase));
-        while (slot.Signal.CurrentCount > 0 && slot.Signal.Wait(0)) { }
         return relevante;
     }
 

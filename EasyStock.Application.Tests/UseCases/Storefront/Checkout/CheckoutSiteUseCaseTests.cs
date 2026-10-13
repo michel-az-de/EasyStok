@@ -243,6 +243,20 @@ public class CheckoutSiteUseCaseTests
         c.Core.PedidosAdicionados.Should().BeEmpty();
     }
 
+    /// <summary>#1719: tentativa que morreu entre o pedido e a cobrança; depois de a varredura cancelar o pedido, a chave volta a valer.</summary>
+    [Fact]
+    public async Task Tentativa_interrompida_com_pedido_cancelado_libera_a_chave()
+    {
+        var c = new Cenario(); var key = Guid.NewGuid();
+        var original = await c.UseCase.GuestAsync(c.Guest(), Endereco, c.Token, key);
+        typeof(CheckoutIdempotency).GetProperty(nameof(CheckoutIdempotency.InitPoint))!.SetValue(c.Registros.Values.Single(), null);
+        c.Cobrancas.Clear();
+        c.Core.PedidosAdicionados.Single().Status = "cancelado";
+        var nova = await c.UseCase.GuestAsync(c.Guest(), Endereco, c.Token, key);
+        nova.PedidoId.Should().NotBe(original.PedidoId);
+        c.Core.PedidosAdicionados.Should().HaveCount(2);
+    }
+
     /// <summary>#1719: nome acima da coluna (150) virava erro interno no banco em vez de recusa.</summary>
     [Fact]
     public async Task Nome_maior_que_o_cadastro_comporta_e_recusado_sem_criar_pedido()

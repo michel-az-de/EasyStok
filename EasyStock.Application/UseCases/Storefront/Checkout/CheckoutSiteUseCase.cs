@@ -121,6 +121,13 @@ public sealed class CheckoutSiteUseCase(
             // Recupera resposta perdida depois do commit da cobrança, sem chamar o gateway novamente.
             var registro = await registros.GetByKeyHashAsync(chave, hash, ct);
             if (registro?.FaturaId is not { } pedidoId) throw;
+            // Tentativa que morreu entre o pedido e a cobrança: quando a varredura cancela o pedido, a chave
+            // volta a valer em vez de responder "em andamento" para sempre (#1719).
+            if ((await pedidos.GetByIdAsync(pedidoId, ct))?.Status == "cancelado")
+            {
+                await registros.RemoverSemRespostaAsync(chave, hash, ct);
+                return await idempotencia.TentarReservarAsync(chave, hash, ct);
+            }
             var cobranca = (await cobrancas.ListarDoPedidoAsync(empresaId, pedidoId, ct))
                 .LastOrDefault(c => c.EmpresaId == empresaId && c.PedidoId == pedidoId && c.EstaPendente
                     && c.ExpiraEm > relogio.GetUtcNow().UtcDateTime && c.LinkPagamento is not null);
