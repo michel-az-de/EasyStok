@@ -48,7 +48,7 @@
 // ---------------------------------------------------------------------------
 import { proximoStatusCorrida } from '../dominio/corrida'
 
-const PREFIXO_CODIGO = { lalamove: 'LM', '99entrega': '99E' }
+const PREFIXO_CODIGO = { lalamove: 'LM' }
 
 // Hash pequeno e estável (sem crypto, sem Math.random): mesmo texto sempre
 // vira o mesmo número, para a cotação e o código não mudarem a cada render.
@@ -92,7 +92,6 @@ export async function cancelar() {
 // vem no formato que `dominio/despacho.js` já entende (nome, veículo, placa).
 const ENTREGADORES_SIMULADOS = {
   lalamove: { nome: 'Rafael Souza', veiculo: 'moto', placa: 'LLM4A12' },
-  '99entrega': { nome: 'Douglas Lima', veiculo: 'moto', placa: 'NVE9B34' },
 }
 
 // Avança o status simulado, com uma chance pequena de falha em quem ainda não
