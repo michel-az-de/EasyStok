@@ -115,6 +115,28 @@ public class ListarPedidosClienteUseCaseTests
         return pedido;
     }
 
+    // ── Uma consulta por vez ────────────────────────────────────────────────
+
+    /// <summary>
+    /// #1725: os dois repositórios dividem o mesmo DbContext, que não aceita duas consultas ao mesmo tempo.
+    /// A segunda só pode começar depois de a primeira terminar.
+    /// </summary>
+    [Fact]
+    public async Task Vagas_so_sao_consultadas_depois_de_as_avaliacoes_terminarem()
+    {
+        var sut = BuildSut(StorefrontAtivo(), [PedidoStub()]);
+        var avaliacoes = new TaskCompletionSource<IReadOnlyDictionary<Guid, PedidoAvaliacao>>();
+        sut.AvaliacaoRepo.GetByPedidoIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(avaliacoes.Task);
+
+        var execucao = sut.UseCase.ExecuteAsync(new ListarPedidosClienteInput(Slug, ClienteId));
+
+        await sut.VagaRepo.DidNotReceive().GetByPedidoIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>());
+        avaliacoes.SetResult(new Dictionary<Guid, PedidoAvaliacao>());
+        (await execucao).Pedidos.Should().ContainSingle();
+        await sut.VagaRepo.Received(1).GetByPedidoIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>());
+    }
+
     // ── Validação de input ──────────────────────────────────────────────────
 
     [Fact]

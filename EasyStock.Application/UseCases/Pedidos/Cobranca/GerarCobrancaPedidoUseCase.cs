@@ -10,7 +10,9 @@ using EasyStock.Domain.Sales;
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 
 /// <summary>Reemissão ou cobrança de um pedido já gravado (job, troca de forma, operadora).</summary>
-public sealed record GerarCobrancaPedidoInput(Guid EmpresaId, Guid PedidoId, Guid? ConversaId = null, int Tentativa = 1, bool CobrarSaldo = false);
+/// <param name="NaEntregaSemProvedor">Pedido confirmado pela atendente (#1726): sem link possível, a dívida fica a receber na entrega em vez de falhar.</param>
+public sealed record GerarCobrancaPedidoInput(Guid EmpresaId, Guid PedidoId, Guid? ConversaId = null, int Tentativa = 1, bool CobrarSaldo = false,
+    bool NaEntregaSemProvedor = false);
 
 public sealed record CobrancaPedidoResult(
     Guid CobrancaId,
@@ -139,7 +141,8 @@ public sealed class GerarCobrancaPedidoUseCase(
         var storefront = await storefrontRepository.GetByEmpresaAsync(input.EmpresaId, ct);
         var dados = new DadosCobranca(
             pedido.EmpresaId, pedido.Id, storefront?.Id ?? Guid.Empty, storefront?.TituloPublico ?? string.Empty,
-            pedido.Total.Valor, pedido.Itens.ToList(), pedido.AgendadoParaEm, pedido.CriadoEm, alocado, input.CobrarSaldo);
+            pedido.Total.Valor, pedido.Itens.ToList(), pedido.AgendadoParaEm, pedido.CriadoEm, alocado, input.CobrarSaldo,
+            input.NaEntregaSemProvedor);
         return await CobrarAsync(dados, input.ConversaId, input.Tentativa, ct);
     }
 
@@ -196,10 +199,12 @@ public sealed class GerarCobrancaPedidoUseCase(
         {
             preferencia = await CriarPreferenciaAsync(command, ct);
         }
-        catch (MercadoPagoIndisponivelException ex) when (ex.InnerException is MercadoPagoNaoConfiguradoException
-            && PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, dados.CriadoEm))
+        catch (MercadoPagoIndisponivelException ex) when (dados.NaEntregaSemProvedor
+            || (ex.InnerException is MercadoPagoNaoConfiguradoException
+                && PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, dados.CriadoEm)))
         {
             // Sem provedor configurado, a encomenda conserva a dívida e aguarda sinal externo, sem prazo de link.
+            // O pedido confirmado pela atendente faz o mesmo com o provedor fora: nunca nasce sem cobrança (#1726).
             var manual = CobrancaPedido.CriarNaEntrega(dados.EmpresaId, dados.PedidoId,
                 dados.Total - dados.Alocado, agora, conversaId);
             await cobrancaRepository.AddAsync(manual, ct);
@@ -263,5 +268,6 @@ public sealed class GerarCobrancaPedidoUseCase(
 
     private sealed record DadosCobranca(
         Guid EmpresaId, Guid PedidoId, Guid StorefrontId, string StorefrontNome, decimal Total,
-        IReadOnlyList<PedidoItem> Itens, DateTime? AgendadoParaEm, DateTime CriadoEm, decimal Alocado = 0m, bool CobrarSaldo = false);
+        IReadOnlyList<PedidoItem> Itens, DateTime? AgendadoParaEm, DateTime CriadoEm, decimal Alocado = 0m, bool CobrarSaldo = false,
+        bool NaEntregaSemProvedor = false);
 }
