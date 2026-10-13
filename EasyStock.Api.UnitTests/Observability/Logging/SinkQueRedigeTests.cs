@@ -115,4 +115,40 @@ public class SinkQueRedigeTests
             File.Delete(arquivo);
         }
     }
+
+    // Se o Serilog não achar "Redigido" (assembly fora do Using, argumento com outro nome), ele só reclama no
+    // SelfLog e o host sobe SEM console: em produção isso é ficar sem log nenhum.
+    [Theory]
+    [InlineData("EasyStock.Api", null)]
+    [InlineData("EasyStock.Api", "Production")]
+    [InlineData("EasyStock.Worker", null)]
+    public void Appsettings_do_host_monta_o_console_redigido(string projeto, string? ambiente)
+    {
+        var raiz = AppContext.BaseDirectory;
+        while (!File.Exists(Path.Combine(raiz, "EasyStok.CI.slnf"))) raiz = Path.GetDirectoryName(raiz)!;
+        var arquivo = Path.Combine(Path.GetTempPath(), $"easystock-host-{Guid.NewGuid():N}.log");
+        var builder = new ConfigurationBuilder().AddJsonFile(Path.Combine(raiz, projeto, "appsettings.json"));
+        if (ambiente is not null) builder.AddJsonFile(Path.Combine(raiz, projeto, $"appsettings.{ambiente}.json"));
+        // O arquivo de log da API não pode cair na pasta do teste.
+        if (builder.Build()["Serilog:WriteTo:1:Name"] is not null)
+            builder.AddInMemoryCollection(new Dictionary<string, string?> { ["Serilog:WriteTo:1:Args:path"] = arquivo });
+        var configuracao = builder.Build();
+        configuracao["Serilog:WriteTo:0:Name"].Should().Be("Redigido");
+        configuracao["Serilog:WriteTo:0:Args:configure:0:Name"].Should().Be("Console");
+
+        var avisos = new List<string>();
+        Serilog.Debugging.SelfLog.Enable(m => { lock (avisos) avisos.Add(m); });
+        try
+        {
+            using var logger = new LoggerConfiguration().ReadFrom.Configuration(configuracao).CreateLogger();
+            logger.Warning("host {Projeto} montou o console redigido", projeto);
+        }
+        finally
+        {
+            Serilog.Debugging.SelfLog.Disable();
+            foreach (var f in Directory.GetFiles(Path.GetTempPath(), Path.GetFileNameWithoutExtension(arquivo) + "*")) File.Delete(f);
+        }
+
+        lock (avisos) avisos.Should().NotContain(m => m.Contains("Redigido") || m.Contains("Unable to find") || m.Contains("Console"));
+    }
 }
