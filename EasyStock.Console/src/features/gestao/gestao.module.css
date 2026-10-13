@@ -1,6 +1,10 @@
-/* Telas de ajuste dos módulos (#1447). Modo API (F06): aba que ainda não tem
-   backend abre para a dona ver o que vem, com a faixa e todos os controles
-   desabilitados pelo próprio <fieldset disabled>. */
+/* Telas de ajuste dos módulos. No modo API, áreas em preparação mostram
+   um próximo passo disponível para o perfil, sem formulários de demonstração. */
+.saidaPreparacao {
+  display: inline-flex; align-items: center; min-height: max(44px, var(--toque)); padding-inline: var(--e-3);
+  color: var(--marca); font-weight: 600; text-decoration: underline; border-radius: var(--r-1);
+}
+.saidaPreparacao:focus-visible { outline: 2px solid var(--marca); outline-offset: 3px; }
 .naoLigado {
   margin: 0 0 var(--e-3); padding: var(--e-3);
   border-radius: var(--r-2); background: var(--alerta-pastel); color: var(--alerta);
