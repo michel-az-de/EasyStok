@@ -106,7 +106,12 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
         catch (ComandaClienteConflitoException e) { return Problem(e.Message, statusCode: 409); }
         catch (UseCaseValidationException e) { return Problem(e.Message, statusCode: 400); }
         catch (RegraDeDominioVioladaException e) { return Problem(e.Message, statusCode: 422); }
+        // #1716: quem lê é o cliente. O motivo técnico (provedor fora ou sem credencial) fica no log do caso de uso.
+        catch (MercadoPagoIndisponivelException) { return Problem(PagamentoOnlineIndisponivel, statusCode: 503); }
     }
+
+    private const string PagamentoOnlineIndisponivel =
+        "O pagamento online está indisponível agora. Sua seleção continua salva: fale com a Casa para combinar o pagamento.";
 }
 public sealed record SalvarComandaClienteBody(int Revisao, RascunhoComandaCliente Rascunho);
 public sealed record EnviarComandaClienteBody(int Revisao);

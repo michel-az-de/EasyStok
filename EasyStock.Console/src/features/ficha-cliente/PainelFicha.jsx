@@ -81,7 +81,7 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
   // anel zerado abrem a MESMA modal do cabeçalho e do menu ⋯, com o resumo.
   // Quem cancela pedido sem pagamento é a própria modal (faixa da seção 5).
   const aoEncerrarAtendimento = () => abrirEncerramento(selecionada.id)
-  const comandaCompartilhada = <ComandaDoCliente key={selecionada.id} conversaId={selecionada.id}
+  const comandaCompartilhada = <ComandaDoCliente key={`comanda:${selecionada.id}`} conversaId={selecionada.id}
     numeroComanda={numero} ativo={fonteApi} acaoCompartilhar={acaoCompartilhar}
     pedido={pedido} aoMudarEscolha={setConversaEscolhendo} />
 
@@ -144,7 +144,7 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
             {comandaCompartilhada}
             {/* #1510: formulário "Recebi" e confirmações não atravessam de uma conversa para outra. */}
             <BlocoCobranca
-              key={selecionada.id}
+              key={`cobranca:${selecionada.id}`}
               pedido={pedido}
               agora={agora}
               editavel={editavel}
@@ -163,10 +163,10 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
               key={`${pedido.pedidoId}:${(pedido.pagamentosApi ?? []).map((p) => p.pagamentoId).join(':')}`}
               pedidoId={pedido.pedidoId}
             />}
-            {fonteApi && pedido.pedidoId && <BlocoOcorrenciasApi key={pedido.pedidoId} pedidoId={pedido.pedidoId} conversaId={selecionada.id} />}
+            {fonteApi && pedido.pedidoId && <BlocoOcorrenciasApi key={`ocorrencias:${pedido.pedidoId}`} pedidoId={pedido.pedidoId} conversaId={selecionada.id} />}
             {!fonteApi && pedido.ocorrencia && (
               <BlocoOcorrencia
-                key={selecionada.id}
+                key={`ocorrencia:${selecionada.id}`}
                 ocorrencia={pedido.ocorrencia}
                 conversaId={selecionada.id}
                 nomeCliente={selecionada.nome}
@@ -174,7 +174,7 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
               />
             )}
             <BlocoEntrega conversa={selecionada} />
-            {fonteApi && pedido.pedidoId && <BlocoFreteApi key={pedido.pedidoId} pedido={pedido}
+            {fonteApi && pedido.pedidoId && <BlocoFreteApi key={`frete:${pedido.pedidoId}`} pedido={pedido}
               cliente={selecionada.nome} numero={numero} endereco={cliente.endereco} />}
           </>
         ) : (
