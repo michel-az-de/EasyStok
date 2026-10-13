@@ -130,6 +130,24 @@ public sealed partial class PedidoConversaConcorrenciaTests
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(EmpresaId);
+            var conversa = await db.AtendimentoConversas.SingleAsync(c => c.Canal == CanalConversa.ChatSite);
+            // O domínio aceita identificador opaco: só a autoria Sistema identifica a confirmação.
+            db.AtendimentoMensagens.Add(Mensagem.Saida(EmpresaId, conversa.Id, AutorMensagem.Dona,
+                DateTime.UtcNow, TipoConteudoMensagem.Texto, "Resposta da equipe preservada", "chatsite:recepcao:resposta-humana"));
+            await db.SaveChangesAsync();
+        }
+        var inboxHumana = await client.GetAsync("/api/atendimento/conversas");
+        inboxHumana.StatusCode.Should().Be(HttpStatusCode.OK);
+        using (var retrato = JsonDocument.Parse(await inboxHumana.Content.ReadAsStringAsync()))
+        {
+            var linha = retrato.RootElement.GetProperty("data").EnumerateArray().Single(c => c.GetProperty("canal").GetString() == "ChatSite");
+            linha.GetProperty("ultimaMensagemTexto").GetString().Should().Be("Resposta da equipe preservada");
+            linha.GetProperty("aguardaResposta").GetBoolean().Should().BeFalse();
+        }
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
             var outroTenant = Guid.NewGuid();
             db.SetMobileTenantContext(outroTenant);
             db.Empresas.Add(new Empresa {Id = outroTenant, Nome = "Outra empresa", Documento = outroTenant.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow});

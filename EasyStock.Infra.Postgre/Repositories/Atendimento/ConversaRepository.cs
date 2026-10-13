@@ -173,7 +173,7 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
                     .Select(m => (DirecaoMensagem?)m.Direcao).FirstOrDefault() == DirecaoMensagem.Entrada,
                 UltimoTexto = db.AtendimentoMensagens
                     .Where(m => m.EmpresaId == empresaId && m.ConversaId == c.Id)
-                    .Where(m => m.ExternoId == null || !m.ExternoId.StartsWith(EasyStock.Application.UseCases.Atendimento.ChatSite.EnviarMensagemVisitanteUseCase.PrefixoConfirmacaoRecebimento))
+                    .Where(m => m.Autor != AutorMensagem.Sistema || m.ExternoId == null || !m.ExternoId.StartsWith(EasyStock.Application.UseCases.Atendimento.ChatSite.EnviarMensagemVisitanteUseCase.PrefixoConfirmacaoRecebimento))
                     .OrderByDescending(m => m.EnviadaEm)
                     .ThenByDescending(m => m.Id)
                     .Select(m => m.Texto)
