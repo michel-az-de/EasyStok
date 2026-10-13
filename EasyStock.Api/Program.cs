@@ -8,6 +8,7 @@ using EasyStock.Infra.Integrations.Pagamentos.MercadoPago;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Integration;
 using EasyStock.Infra.Async.DependencyInjection;
+using EasyStock.Infra.Async.Logging;
 using Serilog;
 
 // Handler global para exceções não tratadas que derrubam o processo
@@ -57,12 +58,13 @@ var loggerConfiguration = new LoggerConfiguration()
 // sem a config (dev local/CI), nenhum sink extra.
 if (builder.Configuration["OpenTelemetry:OtlpEndpoint"] is { Length: > 0 } otlpLogsEndpoint)
 {
-    loggerConfiguration = loggerConfiguration.WriteTo.OpenTelemetry(o =>
+    // I4.5 (#1698): o log sai da maquina por aqui, entao sai redigido.
+    loggerConfiguration = loggerConfiguration.WriteTo.Redigido(sinks => sinks.OpenTelemetry(o =>
     {
         o.Endpoint = otlpLogsEndpoint;
         o.Protocol = Serilog.Sinks.OpenTelemetry.OtlpProtocol.Grpc;
         o.ResourceAttributes = new Dictionary<string, object> { ["service.name"] = "EasyStock.Api" };
-    });
+    }));
 }
 
 Log.Logger = loggerConfiguration.CreateLogger();

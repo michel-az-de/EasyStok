@@ -1,5 +1,6 @@
 using EasyStock.Api.Authorization;
 using EasyStock.Api.Observability;
+using EasyStock.Api.Observability.Logging;
 using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.Atendimento.ChatSite;
@@ -405,7 +406,12 @@ public static class ApiServiceCollectionExtensions
             .WithTracing(tracing =>
             {
                 tracing
-                    .AddAspNetCoreInstrumentation()
+                    // I4.5 (#1698): o span do webhook leva o molde da rota, não o caminho do provedor.
+                    .AddAspNetCoreInstrumentation(aspnet => aspnet.EnrichWithHttpResponse = (atividade, resposta) =>
+                    {
+                        if (CaminhoDoLog.EhWebhook(resposta.HttpContext))
+                            atividade.SetTag("url.path", CaminhoDoLog.De(resposta.HttpContext));
+                    })
                     // I8.2 (#1661): CEP e endereço do cliente não vão para o span dos provedores de mapa.
                     .AddHttpClientInstrumentation(http =>
                         http.EnrichWithHttpRequestMessage = EnderecoForaDaTelemetria.OcultarUrlNoSpan(configuration))

@@ -3,6 +3,7 @@ using System.Reflection;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Middleware;
 using EasyStock.Api.Observability;
+using EasyStock.Api.Observability.Logging;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Infra.Async.Storage;
@@ -69,6 +70,15 @@ public static class PipelineExtensions
         app.UseSerilogRequestLogging(options =>
         {
             options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0} ms ({ResponseSize} bytes)";
+
+            // I4.5 (#1698): em webhook o log leva o molde da rota, não o caminho que o provedor montou.
+            options.GetMessageTemplateProperties = (ctx, _, elapsedMs, statusCode) =>
+            [
+                new Serilog.Events.LogEventProperty("RequestMethod", new Serilog.Events.ScalarValue(ctx.Request.Method)),
+                new Serilog.Events.LogEventProperty("RequestPath", new Serilog.Events.ScalarValue(CaminhoDoLog.De(ctx))),
+                new Serilog.Events.LogEventProperty("StatusCode", new Serilog.Events.ScalarValue(statusCode)),
+                new Serilog.Events.LogEventProperty("Elapsed", new Serilog.Events.ScalarValue(elapsedMs)),
+            ];
 
             options.GetLevel = (ctx, _, ex) =>
             {
