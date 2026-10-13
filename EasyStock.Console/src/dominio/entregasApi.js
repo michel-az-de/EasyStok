@@ -27,6 +27,7 @@ export const EMPRESAS_ENTREGADOR = [
   { valor: 'Propria', rotulo: 'Própria' },
   { valor: 'NoveNove', rotulo: '99' },
   { valor: 'Lalamove', rotulo: 'Lalamove' },
+  { valor: 'Uber', rotulo: 'Uber' },
   { valor: 'Ifood', rotulo: 'iFood Entregas' },
   { valor: 'Outra', rotulo: 'Outra' },
 ]
@@ -216,3 +217,44 @@ export function resumoDoTesteDeFrete(r) {
   if (r.foraDeCobertura) return { tom: 'atencao', titulo: 'Fora do raio de entrega', detalhe: rota }
   return { tom: 'ok', titulo: r.gratis ? 'Frete grátis' : `Frete de ${moeda(r.valorCentavos / 100)}`, detalhe: rota }
 }
+// I9.2 (#1691): corrida pedida por fora (app da 99, da Lalamove, da Uber), anotada na viagem com o
+// custo (`CorridaExternaBody` da API). Entregador próprio não é corrida externa.
+export const EMPRESAS_DE_CORRIDA = EMPRESAS_ENTREGADOR.filter((e) => e.valor !== 'Propria')
+export const CORRIDA_CUSTO_MAXIMO_CENTAVOS = 500000
+
+export const empresaPadraoDaCorrida = (viagem, entregadores) => {
+  const empresa = (entregadores ?? []).find((e) => e.id === viagem?.entregadorId)?.empresa
+  return EMPRESAS_DE_CORRIDA.some((e) => e.valor === empresa) ? empresa : 'NoveNove'
+}
+
+// "18,90", "18.9" e "R$ 18,90" valem o mesmo; o que não é número vira NaN e o formulário avisa.
+const custoEmCentavos = (texto) => {
+  const limpo = String(texto ?? '').replace(/R\$/i, '').trim()
+  return limpo === '' ? NaN : Math.round(numero(limpo) * 100)
+}
+
+export function erroDoFormularioCorrida(f) {
+  const custo = custoEmCentavos(f.custo)
+  if (Number.isNaN(custo)) return 'Informe o custo da corrida.'
+  if (custo < 0) return 'O custo da corrida não pode ser negativo.'
+  if (custo > CORRIDA_CUSTO_MAXIMO_CENTAVOS) return 'Custo acima de R$ 5.000,00. Confira o valor.'
+  return null
+}
+
+export const corpoCorrida = (f) => ({
+  provedor: f.empresa,
+  custoCentavos: custoEmCentavos(f.custo),
+  motorista: String(f.motorista ?? '').trim() || null,
+})
+
+export const formularioDaCorrida = (corrida) => ({
+  empresa: corrida.provedor,
+  custo: (corrida.custoCentavos / 100).toFixed(2).replace('.', ','),
+  motorista: corrida.motorista ?? '',
+})
+
+export const custoDasCorridas = (corridas) => (corridas ?? []).reduce((soma, c) => soma + (c.custoCentavos ?? 0), 0)
+
+export const resumoDaCorrida = (corrida) => [
+  rotuloEmpresaEntregador(corrida.provedor), moeda(corrida.custoCentavos / 100), corrida.motorista, corrida.corrigidoEm ? 'corrigida' : null,
+].filter(Boolean).join(' · ')

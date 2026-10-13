@@ -9,6 +9,7 @@ import {
 } from '../../dominio/entregasApi'
 import { roteiroDoDia } from '../../dominio/roteiroDoDia'
 import { CadastroEntregaApi } from './CadastroEntregaApi'
+import { CorridasDaViagem } from './CorridasDaViagem'
 import { Endereco, EntregasDoDia } from './EntregasDoDia'
 import css from './entregasApi.module.css'
 
@@ -160,7 +161,7 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
       {[...p.montando, ...p.emRota].map((v, i) => (
         <Viagem
           key={v.id} viagem={v} indice={i + 1} pedidoPorId={pedidoPorId}
-          opcoesEntregador={opcoesEntregador} ocupado={ocupado} acoes={acoes}
+          opcoesEntregador={opcoesEntregador} entregadores={entregadores} ocupado={ocupado} acoes={acoes}
         />
       ))}
 
@@ -169,7 +170,7 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
   )
 }
 
-function Viagem({ viagem, indice, opcoesEntregador, ocupado, acoes }) {
+function Viagem({ viagem, indice, opcoesEntregador, entregadores, ocupado, acoes }) {
   const montando = viagem.situacao === 'Montando'
   const motivo = montando ? motivoDeSaida(viagem) : null
   const n = viagem.paradas.length
@@ -216,6 +217,7 @@ function Viagem({ viagem, indice, opcoesEntregador, ocupado, acoes }) {
           </li>
         ))}
       </ul>
+      <CorridasDaViagem viagem={viagem} entregadores={entregadores} ocupado={ocupado} />
       {montando && (
         <div className={css.linha}>
           <Botao variante="primario" icone="moto" disabled={ocupado || !!motivo} onClick={() => acoes.sair(viagem.id)}>
