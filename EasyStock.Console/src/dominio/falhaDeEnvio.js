@@ -22,7 +22,7 @@ export const FRASE_DA_FALHA = {
 const SINAIS = [
   [TIPOS_DE_FALHA.NAO_ENTREGAVEL, /undeliverable|\b131026\b/i],
   [TIPOS_DE_FALHA.FORA_DA_JANELA, /re-?engagement|\b131047\b|fora_da_janela_24h|fora da janela de 24 h/i],
-  [TIPOS_DE_FALHA.TEMPO_ESGOTADO, /timeout|timed out|task was cancell?ed/i],
+  [TIPOS_DE_FALHA.TEMPO_ESGOTADO, /timeout|timed out|task was cancell?ed|operation was cancell?ed|envio incerto/i],
 ]
 
 // Recusa escrita pelo próprio Console ou pelo EasyStok ("Não enviada: Sem conexão com o

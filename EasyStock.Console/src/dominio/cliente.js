@@ -8,7 +8,7 @@ import { diasDeCalendarioEntre, partesDoEndereco } from './formato.js'
 // EasyStok como nulo, voltava 200 e o campo esvaziava sem dizer nada. A recusa diz o formato.
 // Campo em branco não é recusa: é só não informar endereço.
 export const FORMATO_DO_ENDERECO = 'Não salvei: escreva o endereço separado por vírgulas, com o CEP no fim. '
-  + 'Exemplo: Rua das Flores, 120, apto 12, Pinheiros, 05400-000.'
+  + 'Exemplo: Rua das Flores, 120, apto 12, Pinheiros, 05400-000'
 export function recusaDoEndereco(texto) {
   if (!String(texto ?? '').trim()) return null
   return partesDoEndereco(texto).cep ? null : FORMATO_DO_ENDERECO

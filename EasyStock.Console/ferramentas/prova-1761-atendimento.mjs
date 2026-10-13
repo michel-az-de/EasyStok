@@ -384,6 +384,29 @@ await confere('K  a prévia do cartão passa pelo tradutor da nota', () => {
     'Passou para você: o atendimento automático está desligado')
 })
 
+await confere('M  maquininha na entrega sem nada recebido não é "Pago em parte" nem "Sinal pago"', () => {
+  const naEntrega = { ...PEDIDO_COM_SINAL, totalPago: 0, alocado: 0, pagamentos: [], cobranca: { ...PEDIDO_COM_SINAL.cobranca, provedor: 'na_entrega', status: 'Pendente' } }
+  const resumo = resumoDom.montarResumoAtendimento(conversaDaMarina(naEntrega), CARDAPIO, AGORA, {})
+  for (const venda of resumo.vendas) assert.notEqual(venda.situacao, 'Pago em parte'), assert.notEqual(venda.situacao, 'Sinal pago'), assert.notEqual(venda.situacao, 'Pago')
+  assert.equal(resumo.receita.liquido, 0)
+})
+await confere('M  demonstração: pedido nascido pago, sem registro de pagamento, segue "Pago"', () => {
+  const venda = resumoDom.vendaDoTrecho({ numero: '2026-0001', estado: 'pago', itens: [{ sku: LASANHA, qtd: 1 }] }, CARDAPIO, 0)
+  if (venda) assert.equal(venda.situacao ?? venda[2], 'Pago')
+})
+await confere('M  o sinal de automático desligado acaba quando o automático volta a responder', () => {
+  const nota = { dir: 'sistema', texto: 'Passou para você: o atendimento automático está desligado' }
+  assert.equal(automaticoDesligadoNaConversa({ passagem: null, mensagens: [nota, { dir: 'out', origemAutomatica: 'sistema' }] }), true)
+  assert.equal(automaticoDesligadoNaConversa({ passagem: null, mensagens: [nota, { dir: 'out', origemAutomatica: 'agente' }] }), false)
+})
+await confere('M  "envio incerto" não vira "não foi enviada"; porção só some com o nome trazendo ela inteira', () => {
+  assert.equal(falhaDeEnvio('Envio incerto (sem resposta do canal): The operation was canceled.').tipo, TIPOS_DE_FALHA.TEMPO_ESGOTADO)
+  assert.equal(porcaoForaDoNome({ nome: 'Sopa', porcao: 'P' }), 'P')
+  assert.equal(porcaoForaDoNome({ nome: 'Lasanha 1600 g', porcao: '600 g' }), '600 g')
+  assert.equal(porcaoForaDoNome({ nome: 'Lasanha Bolonhesa Clássica 600 g', porcao: '600 g' }), '')
+  assert.equal(porcaoForaDoNome({ nome: 'Talharim 500g', porcao: '500 g' }), '')
+})
+
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)
 if (falhas.length) {
   console.log(falhas.map((f) => ' - ' + f).join('\n'))

@@ -28,8 +28,11 @@ const NOTA_DE_ESCALADA = /^escalado para a dona:\s*/i
 // EasyStok deixou na conversa. Vale a nota de passagem mais recente.
 export function automaticoDesligadoNaConversa(conversa) {
   if (conversa?.passagem?.motivo === AUTOMATICO_DESLIGADO) return true
-  const nota = (conversa?.mensagens ?? []).findLast((m) => m.dir === 'sistema' && m.texto?.startsWith('Passou para você'))
-  return nota?.texto === `Passou para você: ${AUTOMATICO_DESLIGADO}`
+  const mensagens = conversa?.mensagens ?? []
+  const indice = mensagens.findLastIndex((m) => m.dir === 'sistema' && m.texto?.startsWith('Passou para você'))
+  if (indice < 0 || mensagens[indice].texto !== `Passou para você: ${AUTOMATICO_DESLIGADO}`) return false
+  // Se o automático respondeu depois da nota, a loja o religou: o sinal antigo não vale mais.
+  return !mensagens.slice(indice + 1).some((m) => m.origemAutomatica === 'agente')
 }
 
 export function notaDeSistema(texto) {

@@ -143,8 +143,11 @@ export function tituloDaComanda(pedido, { temLinkComPedido = false } = {}) {
 export function porcaoForaDoNome(produto) {
   const porcao = String(produto?.porcao ?? '').trim()
   if (!porcao) return ''
-  const semEspaco = (texto) => String(texto ?? '').toLowerCase().replace(/\s+/g, '')
-  return semEspaco(produto.nome).includes(semEspaco(porcao)) ? '' : porcao
+  // Espaço entre o número e a unidade não conta: "600g" e "600 g" são a mesma porção.
+  const escapada = [...porcao.toLowerCase().replace(/\s+/g, '')]
+    .map((letra) => letra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*')
+  const noNome = new RegExp(`(^|[^\\p{L}\\p{N}])${escapada}($|[^\\p{L}\\p{N}])`, 'u')
+  return noNome.test(String(produto.nome ?? '').toLowerCase()) ? '' : porcao
 }
 
 // #1761 (L3): o pedido acabou de nascer no EasyStok nesta conversa (a cobrança foi gerada). É a

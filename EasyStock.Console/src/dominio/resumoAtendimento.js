@@ -8,7 +8,7 @@
 // inteira. Isso já existia pronta do passo zero, a F5 só consome.
 
 import { nomeDoMeio } from './cobranca'
-import { faltaPagar, pagamentosDoPedido } from './pagamento'
+import { faltaPagar, pagamentosDoPedido, totalPago } from './pagamento'
 import { atendimentoDesde, ehLead, indiceInicioDoAtendimento } from './conversa'
 import { duracao, horaCurta } from './formato'
 import { itensDetalhados, totalDoPedido } from './pedido'
@@ -86,7 +86,11 @@ export function receitaDoTrecho(pedido, cardapio, desde) {
 function situacaoDoPedido(pedido, cardapio) {
   if (pedido.estado === 'cancelado') return { rotulo: 'Cancelado', tom: 'perigo' }
   if (pedido.estado === 'pago' && faltaPagar(pedido, cardapio) > 0) {
-    return { rotulo: pedido.sinalNaReserva ? 'Sinal pago' : 'Pago em parte', tom: 'aviso' }
+    // "Sinal pago" e "Pago em parte" só com dinheiro registrado. Pedido do EasyStok que avançou
+    // sem receber nada (maquininha na entrega) não pagou parte nenhuma. Na demonstração, o pedido
+    // nascido pago não tem registro de pagamento e segue "Pago", como sempre.
+    if (totalPago(pedido) > 0) return { rotulo: pedido.sinalNaReserva ? 'Sinal pago' : 'Pago em parte', tom: 'aviso' }
+    if (Array.isArray(pedido.pagamentosApi)) return { rotulo: 'A receber na entrega', tom: 'aviso' }
   }
   const passo = passoPorId(pedido.estado)
   return passo ? { rotulo: passo.rotulo, tom: passo.tom } : { rotulo: pedido.estado, tom: 'neutro' }

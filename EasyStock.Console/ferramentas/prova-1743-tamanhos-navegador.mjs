@@ -131,7 +131,7 @@ try {
     await page.getByRole('button', { name: 'Fechar cardápio', exact: true }).click()
     await page.getByRole('tab', { name: 'Pedido', exact: true }).click()
     for (const item of itens.filter(i => i.disponivel !== false)) {
-      assert.equal(await page.getByRole('button', { name: 'Anotar na ' + item.nome, exact: true }).count(), 1,
+      assert.equal(await page.getByRole('button', { name: 'Anotação para ' + item.nome, exact: true }).count(), 1,
         'Cada tamanho fica no pedido com seu nome original: ' + item.id)
     }
     assert.equal(chamadas.filter(c => c.metodo !== 'GET').every(c => c.path.endsWith('/marcar-lida')), true)
