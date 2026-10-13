@@ -17,6 +17,7 @@ public interface IEntregadorRepository
 /// <summary>Viagens de entrega (S44), sempre com as paradas.</summary>
 public interface IViagemRepository
 {
+    Task<bool> VinculadaLogisticaAsync(Guid empresaId, Guid viagemId, CancellationToken ct = default);
     Task AddAsync(Viagem viagem, CancellationToken ct = default);
 
     /// <summary>Rastreado, com as paradas.</summary>

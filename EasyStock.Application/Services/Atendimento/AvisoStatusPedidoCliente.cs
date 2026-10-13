@@ -30,7 +30,8 @@ public sealed class AvisoStatusPedidoCliente(
     PoliticaEnvioCliente politicaEnvio,
     INotificadorService notificador,
     ITenantContextAccessor tenantContext,
-    ILogger<AvisoStatusPedidoCliente> logger, IConversaRepository? conversas = null)
+    ILogger<AvisoStatusPedidoCliente> logger, IConversaRepository? conversas = null,
+    EasyStock.Application.UseCases.Atendimento.Entregas.ConfiguracaoLogistica? logistica = null)
 {
     /// <summary>Previsão quando o pedido não tem vaga de entrega (ex.: balcão).</summary>
     public const string PrevisaoSemJanela = "a confirmar";
@@ -51,6 +52,8 @@ public sealed class AvisoStatusPedidoCliente(
         string? mensagem = null)
     {
         // O dispatcher de integração roda sem claim JWT: sem o tenant, o filtro global e a RLS zeram a busca.
+        if (logistica is not null && logistica.EmpresaDemonstracaoId != Guid.Empty && empresaId == logistica.EmpresaDemonstracaoId)
+            return false;
         tenantContext.SetCurrentTenant(empresaId);
 
         var pedido = await pedidoRepository.GetByIdAsync(empresaId, pedidoId);

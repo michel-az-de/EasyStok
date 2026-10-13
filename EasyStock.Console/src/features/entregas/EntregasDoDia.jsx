@@ -11,6 +11,8 @@ import { resumoDoRoteiro, rotuloDaData, textoDeQuemLeva } from '../../dominio/ro
 import { useRelogio } from '../../hooks/useRelogio'
 import css from './entregasApi.module.css'
 import { ModalAlterarAgendamentoApi } from './ModalAlterarAgendamento'
+import { ModalFrete } from '../../componentes/ModalFrete'
+import { useFretesApi } from '../../aplicacao/useFretesApi'
 
 // Entregas do dia por janela (issue #1440): para cada janela, os pedidos com a situação, o
 // endereço, quem leva e o que falta para sair. O roteiro impresso sai do mesmo dado
@@ -86,7 +88,7 @@ function PedidoDoDia({ pedido, montando, ocupado, acoes, aoVerViagens, aoReagend
   )
 }
 
-function JanelaDoDia({ grupo, montando, ocupado, acoes, aoVerViagens, aoReagendar }) {
+function JanelaDoDia({ grupo, montando, ocupado, acoes, aoVerViagens, aoReagendar, aoCotar }) {
   const n = grupo.pedidos.length
   const titulo = grupo.chave === 'sem-janela' || grupo.label === grupo.faixa ? grupo.faixa : `${grupo.faixa} · ${grupo.label}`
   return (
@@ -94,6 +96,7 @@ function JanelaDoDia({ grupo, montando, ocupado, acoes, aoVerViagens, aoReagenda
       <div className={css.linha}>
         <h3 className={css.cresce}>{titulo}</h3>
         <span className={css.numero}>{grupo.capacidade ? `${n} de ${grupo.capacidade} vagas` : plural(n, 'entrega', 'entregas')}</span>
+        {n > 0 && <Botao variante="secundario" disabled={ocupado} onClick={() => aoCotar(grupo)}>Cotar esta janela</Botao>}
       </div>
       {grupo.bloqueio && <p className={css.linha}><Pilula tom="aviso">Bloqueada</Pilula> <span className={css.apoio}>{grupo.bloqueio}</span></p>}
       {n > 0 && (
@@ -109,6 +112,7 @@ function JanelaDoDia({ grupo, montando, ocupado, acoes, aoVerViagens, aoReagenda
 
 // `roteiro`: `roteiroDoDia` já montado por quem chama (nulo enquanto o dia carrega).
 export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes, aoAbrirCadastro, aoVerViagens }) {
+  const fretes = useFretesApi({ aoAlterado: acoes.recarregar })
   const [papel, setPapel] = useState('a4')
   // #1584: o pedido em reagendamento mora aqui, fora da lista. Quando ele muda de janela (ou
   // de dia) o item dele desmonta; o modal ficava dentro do item e sumia com a frase de resultado.
@@ -119,6 +123,7 @@ export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes
     <>
       <section className={css.secao} aria-label="Dia das entregas">
         <EscolhaDoDia dia={dia} mudarDia={mudarDia} />
+        <Botao variante="texto" onClick={() => fretes.abrir({ titulo: 'Transportes do dia', dia, selecionarTodos: false, pedidos: roteiro?.grupos.flatMap((g) => g.pedidos) ?? [] })}>Organizar transportes</Botao>
         {roteiro && (
           <div className={css.cabecalhoDoDia}>
             <div className={css.cresce}>
@@ -145,7 +150,9 @@ export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes
           <Botao variante="secundario" onClick={aoAbrirCadastro}>Cadastrar janelas e frete</Botao>
         </div>
       )}
-      {roteiro?.grupos.map((g) => <JanelaDoDia key={g.chave} grupo={g} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} aoReagendar={aoReagendar} />)}
+      {roteiro?.grupos.map((g) => <JanelaDoDia key={g.chave} grupo={g} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} aoReagendar={aoReagendar}
+        aoCotar={(grupo) => fretes.abrir({ titulo: `Entrega · ${grupo.faixa}`, dia, pedidos: grupo.pedidos })} />)}
+      <ModalFrete controlador={fretes} />
       {reagendando && <ModalAlterarAgendamentoApi pedidoId={reagendando.id} nome={reagendando.nome}
         aoFechar={() => setReagendando(null)} aoAlterado={acoes.recarregar} />}
     </>

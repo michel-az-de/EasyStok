@@ -20,6 +20,7 @@ import { BlocoEnderecoCapturado } from './BlocoEnderecoCapturado'
 import { BlocoOcorrencia } from './BlocoOcorrencia'
 import { BlocoOcorrenciasApi } from './BlocoOcorrenciasApi'
 import { BlocoEntrega } from './BlocoEntrega'
+import { BlocoFreteApi } from './BlocoFreteApi'
 import { BlocoPedido } from './BlocoPedido'
 import { ComandaDoCliente } from './ComandaDoCliente'
 import css from './ficha.module.css'
@@ -173,6 +174,8 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
               />
             )}
             <BlocoEntrega conversa={selecionada} />
+            {fonteApi && pedido.pedidoId && <BlocoFreteApi key={pedido.pedidoId} pedido={pedido}
+              cliente={selecionada.nome} numero={numero} endereco={cliente.endereco} />}
           </>
         ) : (
           <Bloco titulo="Montar pelo atendimento" chave="comanda">
