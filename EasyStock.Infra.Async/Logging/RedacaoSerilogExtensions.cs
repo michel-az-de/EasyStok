@@ -21,6 +21,7 @@ public static class RedacaoSerilogExtensions
     {
         ArgumentNullException.ThrowIfNull(sinks);
         ArgumentNullException.ThrowIfNull(configure);
-        return LoggerSinkConfiguration.Wrap(sinks, interno => new SinkQueRedige(interno), configure, restrictedToMinimumLevel, levelSwitch);
+        var redigido = LoggerSinkConfiguration.Wrap(interno => new SinkQueRedige(interno), configure);
+        return sinks.Sink(redigido, restrictedToMinimumLevel, levelSwitch);
     }
 }
