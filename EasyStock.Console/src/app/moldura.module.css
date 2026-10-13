@@ -78,6 +78,7 @@
 .palcoTres > .ficha { min-width: 320px; flex-shrink: 1; }
 .ficha { width: var(--largura-ficha, var(--coluna)); flex-shrink: 0; border-left: var(--b-1) solid var(--linha); }
 .rolavel { overflow-y: auto; flex: 1; min-height: 0; overscroll-behavior: contain; }
+.painelFicha { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 
 /* Título de coluna: rótulo de seção discreto, no estilo da barra lateral do
    macOS, sem ícone e sem linha pesada. */

@@ -5,10 +5,11 @@ import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { useEntregasApi } from '../../aplicacao/useEntregasApi'
 import {
   EMPRESAS_ENTREGADOR, TIPOS_ENTREGADOR, confirmacaoDaRecusa, motivoDaAprovacao, motivoDeSaida, paineisDeEntregas,
-  rotuloSituacaoViagem, situacaoDaLista,
+  rotuloSituacaoViagem, situacaoDaLista, viagensConcluidasNoDia,
 } from '../../dominio/entregasApi'
 import { roteiroDoDia } from '../../dominio/roteiroDoDia'
 import { CadastroEntregaApi } from './CadastroEntregaApi'
+import { CorridasDaViagem } from './CorridasDaViagem'
 import { Endereco, EntregasDoDia } from './EntregasDoDia'
 import css from './entregasApi.module.css'
 
@@ -84,6 +85,7 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
   const opcoesEntregador = [{ valor: '', rotulo: 'Sem entregador' }, ...entregadores.map((e) => ({ valor: e.id, rotulo: e.nome }))]
   // #1474 (R7): recusar cancela, estorna e avisa o cliente; confirma em linha antes.
   const [recusando, setRecusando] = useState(null)
+  const concluidas = viagensConcluidasNoDia(viagens, dia)
 
   return (
     <div className={css.painelDia}>
@@ -160,16 +162,32 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
       {[...p.montando, ...p.emRota].map((v, i) => (
         <Viagem
           key={v.id} viagem={v} indice={i + 1} pedidoPorId={pedidoPorId}
-          opcoesEntregador={opcoesEntregador} ocupado={ocupado} acoes={acoes}
+          opcoesEntregador={opcoesEntregador} entregadores={entregadores} ocupado={ocupado} acoes={acoes}
         />
       ))}
+
+      {concluidas.length > 0 && (
+        <section className={css.secao} aria-label="Viagens concluídas">
+          <h3>Viagens concluídas</h3>
+          <p className={css.apoio}>O preço da corrida mudou no fim? Anote ou corrija aqui.</p>
+          {concluidas.map((v) => (
+            <div key={v.id} className={css.cartao}>
+              <p className={css.cresce}>
+                {v.paradas.length === 1 ? '1 entrega' : `${v.paradas.length} entregas`}
+                {v.paradas[0]?.entregadorNome ? ` · ${v.paradas[0].entregadorNome}` : ''}
+              </p>
+              <CorridasDaViagem viagem={v} entregadores={entregadores} ocupado={ocupado} />
+            </div>
+          ))}
+        </section>
+      )}
 
       <Chamados chamados={chamados} ocupado={ocupado} acoes={acoes} />
     </div>
   )
 }
 
-function Viagem({ viagem, indice, opcoesEntregador, ocupado, acoes }) {
+function Viagem({ viagem, indice, opcoesEntregador, entregadores, ocupado, acoes }) {
   const montando = viagem.situacao === 'Montando'
   const motivo = montando ? motivoDeSaida(viagem) : null
   const n = viagem.paradas.length
@@ -216,6 +234,7 @@ function Viagem({ viagem, indice, opcoesEntregador, ocupado, acoes }) {
           </li>
         ))}
       </ul>
+      <CorridasDaViagem viagem={viagem} entregadores={entregadores} ocupado={ocupado} />
       {montando && (
         <div className={css.linha}>
           <Botao variante="primario" icone="moto" disabled={ocupado || !!motivo} onClick={() => acoes.sair(viagem.id)}>

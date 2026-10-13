@@ -168,7 +168,7 @@ public sealed class GerarCobrancaPedidoUseCase(
 
         var cobranca = CobrancaPedido.CriarOnline(
             dados.EmpresaId, dados.PedidoId, valorCobrado, preferencia.PreferenceId, preferencia.InitPointUrl,
-            expiraEm, tentativa, agora, conversaId);
+            expiraEm, tentativa, agora, conversaId, preferencia.ContaRecebedoraId);
         if (dados.CobrarSaldo) cobranca.MarcarComplementar();
         await cobrancaRepository.AddAsync(cobranca, ct);
         await unitOfWork.CommitAsync();

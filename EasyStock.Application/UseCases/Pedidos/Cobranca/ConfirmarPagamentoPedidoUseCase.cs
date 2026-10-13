@@ -28,6 +28,7 @@ namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 /// <param name="ReferenciaExterna">Id da preferência paga, quando o processor souber; sem ele, vale a
 /// cobrança online pendente do pedido ou, não havendo, a mais recente.</param>
 /// <param name="Provedor">Provedor da cobrança (<c>mercadopago</c>).</param>
+/// <param name="ContaRecebedoraId"><c>collector_id</c> do pagamento (I3.2): tem de ser a conta da cobrança.</param>
 public sealed record ConfirmarPagamentoPedidoInput(
     Guid PedidoId,
     string PagamentoExternoId,
@@ -37,7 +38,8 @@ public sealed record ConfirmarPagamentoPedidoInput(
     string? TipoPagamentoExterno = null,
     DateTime? PagoEm = null,
     string? ReferenciaExterna = null,
-    string Provedor = CobrancaPedido.ProvedorMercadoPago);
+    string Provedor = CobrancaPedido.ProvedorMercadoPago,
+    string? ContaRecebedoraId = null);
 
 /// <summary>Desfecho da confirmação. Nenhum deles lança: o processor responde 200 ao Mercado Pago.</summary>
 public enum SituacaoConfirmacaoPagamento
@@ -51,6 +53,8 @@ public enum SituacaoConfirmacaoPagamento
     PedidoNaoEncontrado = 7,
     /// <summary>Pedido já pago por outro pagamento: o novo foi estornado na hora (#1289).</summary>
     PagamentoDuplicado = 8,
+    /// <summary>I3.2: o pagamento é de outra conta do Mercado Pago que não a da cobrança. Não confirma nem estorna.</summary>
+    ContaDivergente = 9,
 }
 
 public sealed record ConfirmarPagamentoPedidoResult(
@@ -188,6 +192,26 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         var alvo = EscolherCobranca(cobrancas, input);
         if (alvo is null)
             return (new(SituacaoConfirmacaoPagamento.SemCobranca, null, pedido.Status), null, null, null);
+
+        // I3.2 (invariante 3): o external_reference diz qual é o pedido, não de quem é o dinheiro. Pagamento
+        // de outra conta não confirma, e também não é estornado: a credencial desta loja não alcança a outra.
+        // O pagamento vem sempre da reconsulta na fonte. Se ela não disser a conta, não se sabe: confirma
+        // como antes e avisa no log, em vez de recusar dinheiro que pode ser desta loja.
+        var contaDoPagamento = string.IsNullOrWhiteSpace(input.ContaRecebedoraId) ? null : input.ContaRecebedoraId.Trim();
+        if (alvo.ContaRecebedoraId is { } contaDaCobranca)
+        {
+            if (contaDoPagamento is null)
+                logger.LogWarning("Pagamento sem conta recebedora informada pedidoId={PedidoId} pagamento={Pagamento}; conta nao conferida.",
+                    input.PedidoId, input.PagamentoExternoId);
+            else if (!string.Equals(contaDaCobranca, contaDoPagamento, StringComparison.Ordinal))
+            {
+                var motivoConta = $"conta_divergente: pagamento {input.PagamentoExternoId} recebido por outra conta do Mercado Pago";
+                // A notificação reentregue acha o motivo já gravado e não repete o evento no histórico.
+                if (alvo.Motivo == motivoConta)
+                    return (new(SituacaoConfirmacaoPagamento.ContaDivergente, alvo.Id, pedido.Status), null, null, null);
+                return (await RecusarAsync(pedido, alvo, motivoConta, SituacaoConfirmacaoPagamento.ContaDivergente, agora, ct), null, null, null);
+            }
+        }
 
         // Antes do valor: pedido cancelado devolve qualquer quantia recebida, a menor inclusive.
         if (pedido.StatusEnum == StatusPedido.Cancelado)

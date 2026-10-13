@@ -10,6 +10,10 @@ reescreve S nem F.
 
 ## 1. Veredito
 
+> As seções 1 a 6 conservam o levantamento histórico de 01/10/2026 e decisões datadas posteriores.
+> Para o laboratório de cotação, contratação e caixa da issue #1693, consulte a seção 7.
+> Implementação local, prova com HTTP controlado, integração real e publicação são evidências diferentes.
+
 **O BACKEND DE ENTREGAS ESTÁ COMPLETO PARA O DIA (S12, S14, S16, S44, S45) E A TELA DA DONA ESTÁ LIGADA (F04). FALTAM QUATRO COISAS: ENCOMENDA PARA OUTRO DIA NA TELA, ENDEREÇO DE ENTREGA NO PRÓPRIO PEDIDO, A TELA DO ENTREGADOR E A LALAMOVE (F17).**
 
 | Medida | Valor | Fonte |
@@ -238,3 +242,160 @@ F12 paridade do painel (plano irmão) · M8.5 relatórios (independente)
 - A) (Recomendado) Continua contando pedidos até a M4.4 medir os tempos reais por linha; depois decidir com número.
 - B) Capacidade separada por linha já (para servir × preparar em casa), migration em `JanelaEntrega`.
 - C) Capacidade em minutos de preparo, somando o tempo previsto dos itens.
+
+## 7. Sprint de logística #1693, 12/10/2026
+
+### 7.1 Objetivo, decisão e limite operacional
+
+Thatiane deve escolher o transporte dos pedidos de uma janela, acompanhar a entrega e conferir seu custo
+no Caixa sem sair do contexto de Entregas ou da Ficha do Atendimento. O sprint adotou uma **empresa de
+demonstração isolada**, autorizada por Felipe, com pedidos e movimentos persistidos no backend. O acesso
+ao laboratório exige que a empresa do token corresponda à configuração `Logistica:EmpresaDemonstracaoId`.
+Os adapters externos usam respostas simuladas; a tela só mostra cotação ou serviço simulado quando recebe
+esse estado da API. Não há chamada de motorista externo, cobrança de cartão ou envio de WhatsApp real
+demonstrados por este laboratório.
+
+O backend usa cotação persistida e expiração, contrato de despacho, idempotência, validação da janela e
+endereço, estados de entrega e referência ao movimento de saída no Caixa. O preço do transportador é
+separado do frete cobrado do cliente. Transporte combinado manualmente e entrega em mãos fazem registros
+locais na empresa demonstrativa, sem fingir integração com o prestador.
+
+### 7.2 Sprint e banca simulada
+
+| Etapa | Trabalho e decisão |
+|---|---|
+| Entender | Inspeção de Entregas API, viagens, janelas, Ficha e caixa. A tela existente exigia criar viagem vazia e depois adicionar pedidos. |
+| Esboçar | Entrada por janela e por pedido; comparação de preço/prazo; confirmação explícita; acompanhamento e financeiro no mesmo modal. |
+| Decidir | Reutilizar moldura, componentes, cores e comportamento de Atendimento. Nenhuma dependência de UI adicionada. |
+| Prototipar | `ModalFrete` compartilhado, `useFretesApi`, endpoints de logística e empresa demonstrativa persistida. |
+| Testar | Banca de personas simuladas, cenários negativos, testes de aplicação/integração e navegador em camadas separadas. |
+
+Os papéis de UX, design/direção de arte, front-end, backend, arquitetura, gerência de projeto e QA são
+perspectivas de revisão da simulação. As falas abaixo são **encenadas**, não entrevistas ou aprovação
+humana de Thatiane ou de uma funcionária.
+
+| Dificuldade da persona simulada | Resposta de UX implementada |
+|---|---|
+| “Janela é a hora que sai?” | Texto “Receber entre…” no pedido; estado de coleta separado. |
+| “Onde eu começo?” | “Cotar esta janela”, “Organizar transportes” e “Cotar ou acompanhar entrega” na Ficha. |
+| “Esse valor é o frete que cobrei?” | Explicação junto às cotações: custo do transportador separado do frete do cliente. |
+| “Cliquei e demorou; clico outra vez?” | Botões ocupados, mensagem de confirmação e chave estável para repetir a mesma intenção. |
+| “Cadê o preço depois de escolher dez pedidos?” | Lista de seleção recolhe ao apresentar cotações; também recolhe para mostrar acompanhamento. |
+| “O produto voltou; já devolveu dinheiro?” | Retorno físico separado do reembolso financeiro na Ficha. |
+| “Posso pôr outro pedido nessa entrega?” | Agrupamento antes da contratação; a interface informa que não altera despacho já contratado. |
+| “Posso pagar ou ligar o automático como atendente?” | Pagamento exige capacidade `gerenciarCaixa`; política e seed exigem `editarAtendimento`, além dos guards da API. |
+
+Direção de arte: hierarquia curta, uma ação principal por etapa, cards de comparação, preços em destaque,
+cores semânticas e trilha discreta de andamento. A animação de confirmação respeita redução de movimento.
+Não há mapa fictício, pontuação inventada, economia estimada sem base ou promessa de “melhor rota”.
+
+### 7.3 Dia demonstrativo com dez pedidos
+
+O seeder cria estes pedidos sintéticos, com cinco janelas, endereços e contatos de teste. São dados de
+ensaio, não clientes reais. A ordem abaixo descreve o roteiro de teste; não declara que todos os casos
+tenham recebido aceite humano ou sido executados no serviço externo.
+
+| Pedido | Destino sintético | Recebimento | Situação e ensaio |
+|---|---|---|---|
+| 01 Ana | Centro A | 10h–11h | Pronto; cotar e agrupar com Bruno e Carla. |
+| 02 Bruno | Centro B | 10h–11h | Pronto; mesma contratação agrupada e uma saída de frete. |
+| 03 Carla | Centro C | 10h–11h | Pronto; acompanhar junto aos outros destinos. |
+| 04 Diego | Centro D | 10h–11h | Pedido adicional; pode compor nova cotação antes de contratar, não editar contratação existente. |
+| 05 Elisa | Norte A | 11h30–12h30 | Sem endereço/coordenadas; bloquear cotação com erro acionável. |
+| 06 Fábio | Norte B | 11h30–12h30 | Em preparo; cotação não equivale a autorização para sair. Saída exige pedido pronto. |
+| 07 Gabi | Sul A | 14h–15h | Ensaiar entregador combinado, custo digitado e pagamento confirmado. |
+| 08 Hugo | Sul B | 14h–15h | Ensaiar entrega em mãos, custo zero e ausência de saída financeira fictícia. |
+| 09 Iris | Leste A | 16h–17h | Ensaiar cliente ausente, falha, retorno e confirmação de devolução física. |
+| 10 João | Oeste A | 17h–18h | Ensaiar escolha automática desativada e depois limitada pela política e pelo teto. |
+
+Não agrupar horários incompatíveis. Os pedidos contratados devem continuar visíveis no acompanhamento;
+devolução concluída permite nova contratação, enquanto pedido entregue não volta a ser elegível.
+
+### 7.4 Contrato de operação e automação
+
+Base: `/api/atendimento/logistica`. Contexto aceita dia ou pedido; cotação recebe IDs de pedidos e decisão
+de agrupar; contratação referencia a cotação persistida. Pagamento e eventos recebem chave de idempotência.
+Atualização de política e preparação dos dez pedidos são administrativas.
+
+O modo automático só contrata quando a política está habilitada, respeita o teto e a permissão de agrupar,
+e escolhe a opção elegível de menor custo. Entrega manual/em mãos exige decisão humana. Trata-se de regra
+determinística, não decisão de IA generativa. A ordenação atual usa proximidade entre coordenadas;
+**não consulta trânsito nem prova a rota ótima**, e a duração fornecida pelo simulador não é ETA real.
+
+Estados usados: `agendado`, `a_caminho`, `entregue`, `falha`, `devolvendo`, `devolvido` e `cancelado`.
+Pagamento significa **valor já pago**, informado com meio e referência; registrar não cobra cartão.
+Cancelar ou devolver transporte não estorna automaticamente o pagamento do cliente nem o do entregador.
+
+O acompanhamento público próprio da demonstração usa link HMAC com validade de sete dias. Não exige
+sessão, não expõe nome, endereço, telefone ou valores e recusa assinatura adulterada. A interface o chama
+de “Rastreio de demonstração”; não é link do transportador e não comprova notificações por WhatsApp.
+O despacho é vinculado à viagem canônica; ações tradicionais de edição dessa viagem são bloqueadas
+para preservar os pedidos e a ordem da cotação contratada. A Ficha consulta colegas do dia após validar
+o pedido/empresa, permitindo selecionar outros pedidos antes de contratar.
+
+### 7.5 Evidências e sala de guerra
+
+| Camada | Evidência disponível nesta atualização |
+|---|---|
+| Console | Build Vite, lint focado sem avisos/erros, fronteiras entre camadas e 264 pares de contraste aprovados. |
+| Navegador com HTTP controlado | `ferramentas/prova-1693-frete-navegador.mjs`: dez pedidos, cotação, custo manual em centavos, negativo bloqueado, repetição da mesma chave após resposta perdida, pagamento, saída/falha/retorno, celular, Escape/foco e restrições de atendente. |
+| Inspeção visual | Capturas desktop e celular em `.build/1693-ux/`, revisadas; sem transbordamento horizontal no celular. |
+| Navegador com API/PostgreSQL reais | `ferramentas/prova-1693-frete-api-real.mjs` executado sem interceptação HTTP: Diego/P04 cotado, contratado, pago e entregue. API confirmou saída única no Caixa, status no pedido/despacho e persistência após recarregar. |
+| Dez cenários HTTP reais | `ferramentas/prova-1693-dez-cenarios-api-real.mjs` passou com PostgreSQL real: grupo de três, P04 pelo navegador, P05 endereço400, P06 preparo bloqueado e KDS pronto, P07 manual R$18, P08 mãos a zero sem gasto, P09 falha/retorno/pedido pronto e P10 automático desligado/ligado dentro do teto. Pagamentos repetidos concorrentemente geraram uma saída por frete. |
+| Rastreio público próprio | Página aberta em navegador sem sessão; status entregue, ausência de nome/endereço/valores e token adulterado404 conferidos. Captura em `.build/1693-api-real/rastreio-publico.png`. |
+| Refinamento após inspeção real | Lista recolhe e foco passa às cotações mesmo quando foi expandida manualmente. Prova somente de cotação reexecutada, sem nova contratação/pagamento/evento; desktop/celular sem overflow. |
+| Publicação e aceite | Não comprovados por estas evidências locais. Exigem CI/PR, SHA servido, verificação da empresa demo e aceite humano explícito. |
+
+O script com HTTP controlado verifica UX e integração do Console com o contrato; não substitui testes da
+API, transações PostgreSQL, isolamento de empresa ou serviços externos. A prova com API real usa
+autenticação de teste e simuladores exclusivamente nas integrações externas; também não equivale ao login
+e à operação de produção.
+
+Evidências dessa execução: `.build/1693-api-real/resultado.json`, `dez-cenarios.json`,
+`desktop-cotacao-foco.png`, `celular-cotacao-foco.png`, `celular-entregue.png` e `rastreio-publico.png`.
+Dia sintético ensaiado: **14/10/2026**. No fluxo de navegador, despacho
+`7b92dd18-112a-4cbb-b276-f051af15d44c`, valor R$16,00, associado ao movimento
+`1a447b3c-1f1c-4477-8529-4042ffdd305b`. São IDs da fixture local descartável, não registros de produção.
+O primeiro ensaio do navegador terminou no prazo de carregamento do Vite sob build concorrente, antes
+de qualquer mutação; a navegação foi ajustada para DOMContentLoaded e reexecutada com sucesso.
+
+Bloqueadores da banca técnica: contratação/caixa duplicados, vazamento entre empresas, automático fora da
+política, pagamento sem autorização ou estado de entrega fabricado. Cenários negativos: cotação vencida,
+endereço ausente/alterado, janela incompatível, pedido em preparo/entregue/cancelado, contratação concorrente,
+mesma chave com outra intenção, saldo insuficiente/caixa fechado, provedor indisponível e transição inválida.
+
+### 7.6 Pendências explícitas
+
+- Aceite humano de Thatiane e teste de uma atendente real; a banca simulada não os substitui.
+- Validação e publicação da empresa de demonstração com evidências de CI, SHA e login real.
+- Credenciais, habilitação comercial/regional e homologação externa de cada prestador.
+- Contratação externa com intenção durável e conciliação após timeout/rollback. Ligar produção exige esse
+  tratamento, não apenas inserir uma chave na configuração.
+- Webhooks externos autenticados, rastreio compartilhável real e envio de mensagens/avaliações por WhatsApp.
+- Cancelamento e devolução demonstrativos alteram o ciclo interno. O fluxo operacional ainda precisa
+  acionar cancelamento/retorno do prestador pela porta adequada e conciliar a resposta externa.
+- Pagamento efetivo do prestador via integração e tratamento de cobranças/ressarcimentos externos.
+- Roteirização com trânsito, previsão por parada e restrições de carga/alimento; hoje há heurística e contratos simulados.
+- Inclusão de pedido em corrida contratada depende da capacidade específica do prestador; neste laboratório fica bloqueada.
+- Atendimento de IA que opera sozinho e conversa com cliente está fora da prova deste corte; a regra automática é configurável e limitada.
+- Integração 99 automática sem documentação/acesso comercial confirmado; transporte combinado por fora pode ser registrado manualmente.
+
+### 7.7 Pesquisa rastreável e contratos oficiais
+
+Pesquisa realizada no sprint; documentação comercial/regional deve ser reconferida na sessão que ligar
+credenciais. Código de exemplo e fóruns ajudam a encontrar padrões, mas não autorizam capacidades que
+o contrato oficial não oferece.
+
+| Serviço | Fonte e implicação para a experiência |
+|---|---|
+| Uber Direct | [Início](https://developer.uber.com/docs/deliveries/get-started), [FAQ](https://developer.uber.com/docs/deliveries/faq), [janelas](https://developer.uber.com/docs/deliveries/guides/delivery-window), [simulador oficial](https://developer.uber.com/docs/deliveries/guides/robocourier) e [webhooks](https://developer.uber.com/docs/deliveries/guides/webhooks). Criação documentada tem um destino; batching não prova inclusão de parada por esta API. Cotação tem validade; janelas e `tracking_url` devem ser conservados. Retorno produz identificação própria `ret_`, não mera mudança local do pedido original. |
+| Lalamove | [API oficial](https://developers.lalamove.com/). Até 16 paradas incluindo coleta; `scheduleAt` em UTC, opção `isRouteOptimized` e `shareLink`. Edição documentada tem condições: uma vez, após alocação do motorista e antes da coleta. Wallet/onboarding e capacidades regionais precisam de homologação. Não foi assumido endpoint genérico de devolução. |
+| 99 Entrega | [Portal oficial de integração](https://99entrega.99app.com/b2c-sme/). Cadastro comercial, boleto aprovado e homologação sandbox fazem parte do acesso. O contrato fechado não foi obtido neste sprint; não há endpoint inventado. Registro combinado manualmente permanece alternativa. |
+
+Exemplos oficiais usados como referências de padrões: [Uber Direct SDK samples](https://github.com/uber/uber-direct-sdk-samples)
+e [Lalamove API examples](https://github.com/lalamove/api-examples). Fóruns consultados como relatos de experiência,
+sem valor de contrato: [discussão r/brdev](https://www.reddit.com/r/brdev/comments/w41sy7) e
+[discussão sobre integração 99](https://www.reddit.com/r/brdev/comments/1nopjmd/integra%C3%A7%C3%A3o_com_o_99_food/).
+
+A exceção de simuladores no tenant dedicado foi reconciliada na
+[ADR-0061, D2.1](../../adr/0061-conexoes-de-integracao.md#d21--exceção-explícita-laboratório-de-logística-1693).

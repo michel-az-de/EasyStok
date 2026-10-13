@@ -15,4 +15,10 @@ export function lerRecolhidos(bruto) {
   }
 }
 
-export const alternarRecolhido = (mapa, chave) => ({ ...mapa, [chave]: !mapa[chave] })
+// #1697: a seção pode nascer recolhida (`padrao`). Escolha gravada vence o padrão; alternar
+// parte do que está na tela.
+export const estaRecolhido = (mapa, chave, padrao = false) => (
+  typeof mapa[chave] === 'boolean' ? mapa[chave] : Boolean(padrao)
+)
+
+export const alternarRecolhido = (mapa, chave, padrao = false) => ({ ...mapa, [chave]: !estaRecolhido(mapa, chave, padrao) })
