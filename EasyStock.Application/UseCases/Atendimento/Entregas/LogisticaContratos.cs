@@ -18,4 +18,4 @@ public sealed record DespachoLogisticaResult(Guid Id, string Provedor, string St
     bool Pago, bool Simulado, string? RastreioUrl, IReadOnlyList<Guid> PedidoIds, DateTime CriadoEm,
     IReadOnlyList<LogisticaEvento> Eventos, Guid ViagemId);
 public sealed record ContextoLogisticaResult(bool Demonstracao, PoliticaLogisticaInput Politica,
-    IReadOnlyList<LogisticaPedido> Pedidos, IReadOnlyList<DespachoLogisticaResult> Despachos);
+    IReadOnlyList<LogisticaPedido> Pedidos, IReadOnlyList<DespachoLogisticaResult> Despachos, string? Indisponibilidade = null);

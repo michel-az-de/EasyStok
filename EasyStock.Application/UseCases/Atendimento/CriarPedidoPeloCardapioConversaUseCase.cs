@@ -68,6 +68,16 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
         CriarPedidoPeloCardapioConversaInput input, CancellationToken ct = default, decimal? freteCombinado = null)
     {
         ArgumentNullException.ThrowIfNull(input);
+        var link = await linkService.ValidarAsync(input.Token, relogio.GetUtcNow().UtcDateTime, ct);
+        return await ExecuteComLinkAsync(input, link, ct, freteCombinado);
+    }
+
+    // A comanda autenticada já conferiu empresa, conversa, revisão e bloqueou o link.
+    internal async Task<PedidoPeloCardapioConversaResult> ExecuteComLinkAsync(
+        CriarPedidoPeloCardapioConversaInput input, LinkCardapioConversa link, CancellationToken ct,
+        decimal? freteCombinado = null, bool peloAtendimento = false)
+    {
+        ArgumentNullException.ThrowIfNull(input);
         var forma = string.IsNullOrWhiteSpace(input.Forma)
             ? TrocarFormaPagamentoPedidoUseCase.FormaOnline
             : input.Forma.Trim().ToLowerInvariant();
@@ -75,7 +85,7 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
             throw new UseCaseValidationException("Forma de pagamento deve ser 'online' ou 'na_entrega'.");
 
         var agora = relogio.GetUtcNow().UtcDateTime;
-        var link = await linkService.ValidarAsync(input.Token, agora, ct);
+        if (!link.EstaValido(agora)) throw new LinkCardapioConversaIndisponivelException();
         tenantContext.SetCurrentTenant(link.EmpresaId);
 
         var conversa = await conversaRepository.ObterPorIdAsync(link.EmpresaId, link.ConversaId, ct);
@@ -113,7 +123,8 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
         conversa.RegistrarSaida(agora);
         var resumo = Mensagem.Saida(link.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
             ResumoPedidoConversa.Texto(reservado, input.DataEntrega, forma,
-                "Pedido montado pelo cliente no cardápio do site:", cobrarTotal: input.SemCobranca));
+                peloAtendimento ? "Pedido confirmado pelo atendimento a partir da seleção compartilhada:" : "Pedido montado pelo cliente no cardápio do site:",
+                cobrarTotal: input.SemCobranca));
         await conversaRepository.AddMensagemAsync(resumo, ct);
         await unitOfWork.CommitAsync();
         if (!input.SemCobranca) await AvisarConsoleAsync(reservado, resumo, ct);

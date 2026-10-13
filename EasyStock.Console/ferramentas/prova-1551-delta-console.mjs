@@ -85,9 +85,11 @@ confere('o seletor de janela da API remonta quando a conversa muda', () => {
 confere('a Ficha entrega o id da conversa à comanda', () => {
   assert.ok(tagDe(painelFicha, 'BlocoPedido').includes('conversaId={selecionada.id}'), '<BlocoPedido> sem conversaId')
 })
-confere('o dia escolhido é estado local do seletor do rascunho (é ele que a remontagem zera)', () => {
+confere('o dia escolhido é estado local reiniciado com a data da comanda, vazia por padrão', () => {
   const seletor = semComentarios(ler('features/ficha-cliente/SeletorJanelaApi.jsx'))
-  assert.ok(corpoDe(seletor, 'EscolhaRascunho').includes("const [data, setData] = useState('')"))
+  assert.ok(corpoDe(seletor, 'SeletorJanelaApi').includes("dataInicial = ''"))
+  assert.ok(tagDe(seletor, 'EscolhaRascunho').includes('dataInicial={dataInicial}'))
+  assert.ok(corpoDe(seletor, 'EscolhaRascunho').includes('const [data, setData] = useState(dataInicial)'))
 })
 
 // --- 3. Modelos aprovados só com a API ----------------------------------------------------

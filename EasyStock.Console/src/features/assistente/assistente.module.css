@@ -15,6 +15,11 @@
   position: relative; width: 48px; height: 48px; padding: 0; border-radius: var(--r-pilula);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
+.rotuloGatilho { display: none; }
+@media (min-width: 1180px) and (pointer: fine) {
+  .gatilhoNoCabecalho { width: auto; gap: var(--e-1); padding: 0 var(--e-2); }
+  .rotuloGatilho { display: inline; }
+}
 
 .pontoAtencao {
   position: absolute; top: 4px; right: 4px;
