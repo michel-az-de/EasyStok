@@ -245,7 +245,7 @@ await confere('C  cadastro gravado com a leitura da ficha falhando não vira rec
 })
 await confere('D  baixa e desfazer recusados devolvem { erro }; aceitos, não', async () => {
   const recusado = montarAcoes()
-  atender = (c) => (c.metodo === 'POST' ? resposta('Falha ao gravar', 500) : resposta(PEDIDO_NA_ENTREGA))
+  atender = (c) => (c.metodo === 'POST' ? resposta('Falha ao gravar', 422) : resposta(PEDIDO_NA_ENTREGA))
   assert.equal((await recusado.api.confirmarPagamento('pg', 25, 'dinheiro'))?.erro, 'Pagamento não registrado: Falha ao gravar')
   assert.equal((await recusado.api.desfazerPagamento('pg', 'Lançamento errado'))?.erro, 'Pagamento não desfeito: Falha ao gravar')
   const aceito = montarAcoes()

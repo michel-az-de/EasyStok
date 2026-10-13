@@ -32,7 +32,8 @@ public sealed class IdempotencyMiddleware(
 {
     private const string HeaderName = "Idempotency-Key";
     private const int MaxBufferBytes = 1 * 1024 * 1024; // 1MB hard cap por request — evita OOM em response excepcionalmente grande.
-    private const int CacheMaxBytes = 64 * 1024;        // 64KB cacheado em DB.
+    public const int CacheMaxBytes = 64 * 1024;        // 64KB cacheado em DB.
+    public static readonly object EntradaDaRequisicao = new();
     private const int MaxPayloadHashBytes = 256 * 1024; // acima disso nao calcula hash (custo), so nao dedup fino.
     private static readonly TimeSpan Ttl = TimeSpan.FromHours(24);
     private static readonly TimeSpan IntervaloDeLimpeza = TimeSpan.FromHours(1);
@@ -155,6 +156,8 @@ public sealed class IdempotencyMiddleware(
                     break;
             }
         }
+
+        context.Items[EntradaDaRequisicao] = idParaFinalizar;
 
         // Captura body da resposta para serializar no cache. Usa stream-mirror
         // que escreve no body original imediatamente E espelha em buffer ate

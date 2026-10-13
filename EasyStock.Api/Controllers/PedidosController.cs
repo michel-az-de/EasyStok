@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.AdicionarItemPedido;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
 using EasyStock.Application.UseCases.CancelarPedido;
@@ -9,6 +10,11 @@ using EasyStock.Application.UseCases.ObterPedidoDetalhes;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
 using EasyStock.Application.UseCases.RemoverItemPedido;
 using EasyStock.Application.UseCases.RemoverPagamentoPedido;
+using EasyStock.Application.UseCases.Pedidos;
+using EasyStock.Api.Middleware;
+using Microsoft.Extensions.Options;
+using System.Text;
+using System.Text.Json;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
@@ -30,7 +36,9 @@ public class PedidosController(
     RegistrarPagamentoPedidoUseCase addPagUseCase,
     RemoverPagamentoPedidoUseCase removePagUseCase,
     FinalizarVendaBalcaoUseCase finalizarBalcaoUseCase,
-    ICurrentUserAccessor currentUser) : EasyStockControllerBase
+    ICurrentUserAccessor currentUser,
+    IIdempotencyKeyRepository idempotencia,
+    IOptions<Microsoft.AspNetCore.Mvc.JsonOptions> json) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List orders (paginated, filterable)")]
     [HttpGet]
@@ -184,9 +192,11 @@ public class PedidosController(
     [SwaggerOperation(Summary = "Register payment (parcial ou total)")]
     [HttpPost("{id}/pagamentos")]
     [Authorize(Policy = "Operador")]
-    public async Task<IActionResult> AddPagamento(Guid id, [FromBody] RegistrarPagamentoPedidoCommand command)
+    public async Task<IActionResult> AddPagamento(Guid id, [FromBody] RegistrarPagamentoPedidoCommand command,
+        CancellationToken ct = default)
     {
         if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var emp, out var err)) return err!;
+        var entradaId = HttpContext?.Items[IdempotencyMiddleware.EntradaDaRequisicao] as Guid?;
         var result = await addPagUseCase.ExecuteAsync(command with
         {
             EmpresaId = emp,
@@ -197,8 +207,29 @@ public class PedidosController(
             RegistradoPorNome = NomeDaSessao(),
             Origem = "web",
             ConfirmadoPeloProvedor = false
-        });
+        }, ct, entradaId is null ? null : GuardarReciboAsync,
+            entradaId is null ? null : RecuperarReciboAsync);
         return result == null ? DataNotFound("Pedido não encontrado.") : DataOk(result);
+
+        Task GuardarReciboAsync(PedidoResult resposta, CancellationToken token)
+        {
+            var corpo = JsonSerializer.Serialize(((ObjectResult)DataOk(resposta)).Value, json.Value.JsonSerializerOptions);
+            return idempotencia.MarcarConcluidoAsync(entradaId!.Value, StatusCodes.Status200OK,
+                Encoding.UTF8.GetByteCount(corpo) <= IdempotencyMiddleware.CacheMaxBytes ? corpo : null, token);
+        }
+
+        async Task<PedidoResult?> RecuperarReciboAsync(CancellationToken token)
+        {
+            var recibo = await idempotencia.ObterConcluidoAsync(entradaId!.Value, emp, token);
+            if (recibo is null) return null;
+            if (string.IsNullOrEmpty(recibo.RespostaJson))
+                throw new UseCaseValidationException("Recebimento já registrado. Atualize o pedido antes de tentar novamente.");
+            var resposta = JsonSerializer.Deserialize<ApiResponse<PedidoResult>>(recibo.RespostaJson, json.Value.JsonSerializerOptions)?.Data;
+            if (resposta is null || resposta.EmpresaId != emp || resposta.Id != id)
+                throw new UseCaseValidationException("Recibo de recebimento inválido. Atualize o pedido.");
+            Response.Headers["X-Idempotent-Replay"] = "true";
+            return resposta;
+        }
     }
 
     [SwaggerOperation(Summary = "Remove payment")]

@@ -5,6 +5,10 @@ namespace EasyStock.Infra.Postgre.Repositories;
 
 public sealed class IdempotencyKeyRepository(EasyStockDbContext dbContext) : IIdempotencyKeyRepository
 {
+    public Task<IdempotencyKey?> ObterConcluidoAsync(Guid id, Guid empresaId, CancellationToken ct = default) =>
+        dbContext.IdempotencyKeys.AsNoTracking().FirstOrDefaultAsync(
+            x => x.Id == id && x.EmpresaId == empresaId && x.Status == StatusIdempotencyKey.Concluido, ct);
+
     public async Task<(IdempotencyKey Entry, bool Reservado)> TryBeginAsync(
         string key, Guid empresaId, string metodoRecurso, string? payloadHash, TimeSpan ttl, CancellationToken ct = default)
     {
@@ -66,7 +70,7 @@ public sealed class IdempotencyKeyRepository(EasyStockDbContext dbContext) : IId
 
     public Task MarcarFalhouAsync(Guid id, CancellationToken ct = default) =>
         dbContext.IdempotencyKeys
-            .Where(x => x.Id == id)
+            .Where(x => x.Id == id && x.Status == StatusIdempotencyKey.Pendente)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(x => x.Status, StatusIdempotencyKey.Falhou)
                 .SetProperty(x => x.LockedAtUtc, DateTime.UtcNow), ct);

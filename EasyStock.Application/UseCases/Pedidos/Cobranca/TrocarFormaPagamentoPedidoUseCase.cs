@@ -27,7 +27,8 @@ public sealed record TrocarFormaPagamentoPedidoResult(CobrancaPedidoResult Cobra
 /// <list type="bullet">
 ///   <item><c>online</c>: prefer√™ncia nova com a mesma tentativa da anterior (a troca n√£o consome a
 ///     reemiss√£o do job); com conversa aberta, o link sai na conversa. O status do pedido n√£o muda.</item>
-///   <item><c>na_entrega</c>: sem link; pedido em <c>AguardandoPagamento</c> vai para <c>Aguardando</c>
+///   <item><c>na_entrega</c>: cobranÁa online pendente È conferida e impede nova cobranÁa manual; sem link,
+///     pedido em <c>AguardandoPagamento</c> vai para <c>Aguardando</c>
 ///     (entra na fila e paga na entrega), sen√£o o job o cancelaria por falta de pagamento.</item>
 /// </list>
 ///
@@ -49,7 +50,8 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
     ILogger<TrocarFormaPagamentoPedidoUseCase> logger,
     CalculadoraInicioPrevistoPedido inicioPrevisto,
     IOperacaoEventPublisher operacaoEventos,
-    QuitacaoPedido quitacao)
+    QuitacaoPedido quitacao,
+    IConferenciaPagamentoPedido conferencia)
 {
     public const string FormaOnline = "online";
     public const string FormaNaEntrega = "na_entrega";
@@ -62,6 +64,19 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         var forma = (input.Forma ?? string.Empty).Trim().ToLowerInvariant();
         if (forma is not (FormaOnline or FormaNaEntrega))
             throw new UseCaseValidationException("Forma de pagamento deve ser 'online' ou 'na_entrega'.");
+
+        if (forma == FormaNaEntrega)
+        {
+            var anteriores = await cobrancaRepository.ListarDoPedidoAsync(input.EmpresaId, input.PedidoId, ct);
+            if (anteriores.Any(c => c.EmpresaId == input.EmpresaId && c.PedidoId == input.PedidoId && c.EhOnline && c.EstaPendente))
+            {
+                var resultado = await conferencia.ExecuteAsync(input.EmpresaId, input.PedidoId, ct);
+                if (resultado.Confirmado)
+                    throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago,
+                        "Pagamento online conferido. Atualize o pedido antes de receber outro valor.");
+                throw new UseCaseValidationException("H· uma cobranÁa online pendente. Confira o pagamento antes de receber manualmente.");
+            }
+        }
 
         var (cobranca, conversaId, preferenciaSubstituida, mudanca, impressao) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
             async token => await TrocarNoLockAsync(input, forma, token), ct);
@@ -109,8 +124,8 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(input.EmpresaId, pedido.Id, ct);
         if (cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga))
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido j√° pago.");
-        if (forma == FormaNaEntrega && PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, agora))
-            throw new UseCaseValidationException("Encomenda futura exige sinal de 50% por link antes da entrega.");
+        if (forma == FormaNaEntrega && cobrancas.Any(c => c.EhOnline && c.EstaPendente))
+            throw new UseCaseValidationException("H· uma cobranÁa online pendente. Confira o pagamento antes de receber manualmente.");
 
         var pendente = cobrancas.FirstOrDefault(c => c.EstaPendente);
         var provedorPedido = forma == FormaOnline ? CobrancaPedido.ProvedorMercadoPago : CobrancaPedido.ProvedorNaEntrega;

@@ -36,7 +36,8 @@ public sealed class PedidosCobrancaController(
     ICurrentUserAccessor currentUser,
     ConsultarEstornosManuaisUseCase consultarEstornos,
     RegistrarEstornoManualUseCase registrarEstorno,
-    IEstornosOnlineService estornosOnline) : EasyStockControllerBase
+    IEstornosOnlineService estornosOnline,
+    IConferenciaPagamentoPedido conferencia) : EasyStockControllerBase
 {
     [HttpGet("{id}/estornos-online")]
     [Authorize(Policy = "Operador")]
@@ -83,6 +84,12 @@ public sealed class PedidosCobrancaController(
     public Task<IActionResult> Reemitir(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
         ExecutarAsync(empresaId, async emp =>
             DataOk(await gerarCobranca.ExecuteAsync(new GerarCobrancaPedidoInput(emp, id), ct)));
+
+    [SwaggerOperation(Summary = "Conferir pagamento online pendente no provedor")]
+    [HttpPost("{id}/cobranca/conferir")]
+    [Authorize(Policy = "Operador")]
+    public Task<IActionResult> Conferir(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await conferencia.ExecuteAsync(emp, id, ct)));
 
     [SwaggerOperation(Summary = "Trocar a forma de pagamento do pedido (online | na_entrega)")]
     [HttpPost("{id}/cobranca/forma")]
