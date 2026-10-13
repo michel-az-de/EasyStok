@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
+using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 
@@ -18,7 +19,9 @@ internal static class UltimaPalavraConversa
     /// que a nota e conta normalmente.
     /// </summary>
     public static readonly Expression<Func<Mensagem, bool>> Conta = m =>
-        (m.Status != StatusMensagem.Falhou && m.Status != StatusMensagem.Pendente)
+        (m.Status != StatusMensagem.Falhou && m.Status != StatusMensagem.Pendente
+            && !(m.Autor == AutorMensagem.Sistema && m.ExternoId != null
+                && m.ExternoId.StartsWith(EnviarMensagemVisitanteUseCase.PrefixoConfirmacaoRecebimento)))
         || (m.Autor == AutorMensagem.Sistema && m.EnviadaPorUsuarioId != null
             && m.Texto!.StartsWith(ReabrirConversaUseCase.PrefixoNotaReabertura));
 }

@@ -46,7 +46,8 @@ export function mensagemDaApi(m, conversaId = null) {
   const saida = m.direcao === 'Saida'
   // #1474: nota interna do sistema (ex.: escalada para a dona) nunca vai ao canal: sem id externo
   // e Pendente para sempre. Vira evento na conversa, não balão "automática · enviando".
-  if (saida && m.autor === 'Sistema' && !m.externoId && m.status === 'Pendente') {
+  if (saida && m.autor === 'Sistema' && ((!m.externoId && m.status === 'Pendente')
+      || m.externoId?.startsWith('chatsite:recepcao:'))) {
     return {
       id: m.id, dir: 'sistema', texto: m.texto || '', em: instante(m.enviadaEm),
       ...(ehNotaDeReabertura(m) ? { reabertura: true } : {}),
@@ -96,6 +97,8 @@ function passagemDaApi(resumo) {
   return {
     motivo: resumo.motivoEscalada || null, em: null, assumida: false,
     ...(resumo.motivoEscalada === 'Conversa reaberta para atendimento.' ? { origem: 'reabertura' } : {}),
+    ...(resumo.canal === 'ChatSite' && (!resumo.motivoEscalada || resumo.motivoEscalada === 'Visitante do site aguardando atendimento da equipe.')
+      ? { origem: 'chat-site', motivo: 'Visitante do site aguardando atendimento da equipe.' } : {}),
   }
 }
 
