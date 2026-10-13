@@ -153,8 +153,8 @@ public class MercadoPagoClientTests
     public async Task RecusaDoMercadoPagoNaoLevaSegredoParaOErro()
     {
         // I4.5 (#1698): a mensagem da exceção vai para o log e para WebhookRecebido.Erro.
-const string canario = "CANARIO-de-teste";
-                var (client, _) = Criar(HttpStatusCode.Unauthorized,
+        const string canario = "CANARIO-de-teste";
+        var (client, _) = Criar(HttpStatusCode.Unauthorized,
             "{\"message\":\"invalid_token\",\"status\":401,\"access_token\":\"" + canario + "\"}");
 
         var act = () => client.ConsultarPagamentoAsync("20359978");
