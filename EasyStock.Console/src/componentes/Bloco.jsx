@@ -9,8 +9,9 @@ import css from './Bloco.module.css'
 // extensa"): com `chave`, a seção recolhe pelo título e o navegador lembra a
 // escolha. Recolhida, mostra o `resumo` ao lado do título (um número, um
 // telefone) para ela não precisar abrir só para conferir.
-export function Bloco({ titulo, destaque = false, chave, resumo, children }) {
-  const [recolhido, alternar] = useRecolhido(chave)
+// #1697: `recolhidoDePadrao` faz a seção nascer recolhida enquanto ninguém escolheu.
+export function Bloco({ titulo, destaque = false, chave, resumo, recolhidoDePadrao = false, children }) {
+  const [recolhido, alternar] = useRecolhido(chave, recolhidoDePadrao)
   const idConteudo = useId()
   const classes = `${css.bloco} ${destaque ? css.destaque : ''}`
 

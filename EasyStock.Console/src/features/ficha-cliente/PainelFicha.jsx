@@ -10,6 +10,7 @@ import { faixaDaJanela } from '../../dominio/entrega'
 import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
 import { LINHA_CLIENTE_ESCOLHENDO, numeroDaComanda } from '../../dominio/pedido'
 import { motivoAntesDeCobrar } from '../../dominio/resumoPedido'
+import { fichaRecolhidaDePadrao } from '../../dominio/ficha'
 import { BarraProximoPasso } from './BarraProximoPasso'
 import { BlocoCobranca } from './BlocoCobranca'
 import { BlocoDevolucoes } from './BlocoDevolucoes'
@@ -185,7 +186,7 @@ export function PainelFicha({ aoAbrirCardapio, acaoCompartilhar }) {
             )}
           </Bloco>
         )}
-        <BlocoCliente conversa={selecionada} />
+        <BlocoCliente conversa={selecionada} recolhidas={fichaRecolhidaDePadrao({ pedido, cliente })} />
 
         {/* Histórico e Notas saíram da coluna no passe de integração (direção 19,
             seção 8): moram na modal Histórico da F2, botão no bloco Cliente. */}
