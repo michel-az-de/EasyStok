@@ -47,7 +47,7 @@ export function mensagemDaApi(m, conversaId = null) {
   // #1474: nota interna do sistema (ex.: escalada para a dona) nunca vai ao canal: sem id externo
   // e Pendente para sempre. Vira evento na conversa, não balão "automática · enviando".
   if (saida && m.autor === 'Sistema' && ((!m.externoId && m.status === 'Pendente')
-      || m.externoId?.startsWith('chatsite:recepcao:'))) {
+      || m.externoId?.startsWith('chatsite:recepcao:') || m.externoId?.startsWith('chatsite:comanda:'))) {
     return {
       id: m.id, dir: 'sistema', texto: m.texto || '', em: instante(m.enviadaEm),
       ...(ehNotaDeReabertura(m) ? { reabertura: true } : {}),
@@ -89,16 +89,14 @@ function janelaExpiraEm(resumo, mensagens) {
   return resumo.dentroDaJanela ? new Date(ultima + HORAS_DA_JANELA * MS_POR_HORA).toISOString() : new Date(ultima).toISOString()
 }
 
-// `Assumida` sem responsável: o automático passou a conversa para a fila humana. Vira a
-// mesma `passagem` do protótipo (selo "Precisa de você" com o motivo). `motivoEscalada` é
-// opcional (F08); sem ele, o motivo padrão. A API não dá a hora da escalada.
+// `Assumida` sem responsável representa a fila humana. ChatSite conserva a origem do canal
+// e o motivo real; reabertura mantém sua origem própria. A API não dá a hora da escalada.
 function passagemDaApi(resumo) {
   if (resumo.situacao !== 'Assumida' || resumo.assumidaPorUsuarioId) return null
   return {
     motivo: resumo.motivoEscalada || null, em: null, assumida: false,
-    ...(resumo.motivoEscalada === 'Conversa reaberta para atendimento.' ? { origem: 'reabertura' } : {}),
-    ...(resumo.canal === 'ChatSite' && (!resumo.motivoEscalada || resumo.motivoEscalada === 'Visitante do site aguardando atendimento da equipe.')
-      ? { origem: 'chat-site', motivo: 'Visitante do site aguardando atendimento da equipe.' } : {}),
+    ...(resumo.motivoEscalada === 'Conversa reaberta para atendimento.' ? { origem: 'reabertura' }
+      : resumo.canal === 'ChatSite' ? { origem: 'chat-site', motivo: resumo.motivoEscalada || 'Visitante do site aguardando atendimento da equipe.' } : {}),
   }
 }
 

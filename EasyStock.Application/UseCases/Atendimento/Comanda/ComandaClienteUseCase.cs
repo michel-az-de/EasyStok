@@ -12,7 +12,9 @@ using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Application.UseCases.Atendimento.ClienteDaConversa;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Sales;
 using PedidoEntity = EasyStock.Domain.Entities.Pedido;
 
@@ -53,6 +55,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     private const string FreteCombinadoChave = "comandaFreteCombinado";
     private const string AjudaSolicitadaChave = Conversa.ChaveAjudaComandaSolicitadaEm;
     public const string Evento = "conversa.comanda_atualizada";
+    public const string PrefixoAvisoChatSite = CanalChatSite.PrefixoIdExterno + "comanda:";
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     public static T? Ler<T>(string? json) => json is null ? default : JsonSerializer.Deserialize<T>(json, Json);
     public static bool PodeAlterar(PedidoEntity p) => p.StatusEnum is StatusPedido.AguardandoPagamento or StatusPedido.Aguardando
@@ -316,6 +319,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 }
                 resultado = new(pedido.Id, saldo > 0 ? "aguardando_pagamento" : "pedido_confirmado", pedido.Total.Valor, saldo,
                     cobranca?.LinkPagamento, CupomAplicado: cupomAplicado);
+                await AvisarChatSiteAsync(link, $"pedido:{pedido.Id:N}", TextoPedidoChatSite(pedido, resultado, cobranca, agora), agora, t);
             }
             link.RegistrarResultado(resultado.PedidoId, JsonSerializer.Serialize(resultado, Json));
             await uow.CommitAsync();
@@ -367,6 +371,9 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             await conversas.AddMensagemAsync(Mensagem.Saida(empresaId, conversaId, AutorMensagem.Sistema,
                 relogio.GetUtcNow().UtcDateTime, TipoConteudoMensagem.Texto,
                 $"Frete de {valor.ToString("C", Cultura.PtBr)} combinado por {quem}. O cliente precisa conferir e confirmar o total na comanda."), t);
+            await AvisarChatSiteAsync(acesso, $"frete:{acesso.Id:N}:{revisao}",
+                $"O frete combinado é {valor.ToString("C", Cultura.PtBr)}. Confira e confirme o total na comanda para enviar o pedido.",
+                relogio.GetUtcNow().UtcDateTime, t);
             await uow.CommitAsync();
             return acesso;
         }, ct);
@@ -481,6 +488,37 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             return new ItemSelecionadoComanda(i.CardapioItemId, porcao?.Id, prato.NomeEfetivo() ?? "", i.Qtd,
                 anterior?.PrecoUnitario ?? porcao?.PrecoStorefront ?? prato.PrecoEfetivo(), i.Observacao?.Trim());
         }).ToList();
+    }
+
+    // O ChatSite entrega a saída persistida pelo GET/SSE. O lock da conversa/link e a chave do marco
+    // impedem repetição; gravar antes do commit preserva o aviso e a alteração na mesma transação.
+    private async Task AvisarChatSiteAsync(LinkCardapioConversa link, string marco, string texto, DateTime agora, CancellationToken ct)
+    {
+        var conversa = await conversas.ObterPorIdAsync(link.EmpresaId, link.ConversaId, ct)
+            ?? throw new LinkCardapioConversaIndisponivelException();
+        if (conversa.Canal != CanalConversa.ChatSite) return;
+        var externoId = PrefixoAvisoChatSite + marco;
+        if (await conversas.ObterMensagemPorExternoIdAsync(link.EmpresaId, externoId, ct) is not null) return;
+        conversa.RegistrarSaida(agora);
+        await conversas.AddMensagemAsync(Mensagem.Saida(link.EmpresaId, link.ConversaId, AutorMensagem.Sistema,
+            agora, TipoConteudoMensagem.Texto, texto, externoId), ct);
+    }
+
+    private static string TextoPedidoChatSite(PedidoEntity pedido, EnvioComandaCliente envio, CobrancaPedidoResult? cobranca, DateTime agora)
+    {
+        var texto = $"Recebemos seu pedido. Total: {envio.Total.ToString("C", Cultura.PtBr)}.";
+        if (pedido.RequerAprovacao) texto += " A equipe ainda precisa conferir o pedido.";
+        if (envio.Saldo <= 0) return texto + " Saldo a pagar: R$ 0,00.";
+        if (cobranca is { Status: nameof(StatusCobrancaPedido.Pendente), LinkPagamento: { } link }
+            && (cobranca.ExpiraEm is null || cobranca.ExpiraEm > agora))
+            return texto + $"\n\nPagamento de {cobranca.Valor.ToString("C", Cultura.PtBr)} pelo link: {link}";
+        if (cobranca is { Provedor: CobrancaPedido.ProvedorNaEntrega }
+            && PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm))
+        {
+            var sinal = Math.Min(envio.Saldo, Math.Max(0, PlanoPagamentoEncomenda.Sinal(envio.Total) - (envio.Total - envio.Saldo)));
+            return texto + $"\n\nSinal a receber: {sinal.ToString("C", Cultura.PtBr)} por Pix, dinheiro ou maquininha. Restante na entrega: {(envio.Saldo - sinal).ToString("C", Cultura.PtBr)}. Combine o pagamento com a equipe.";
+        }
+        return texto + $" Saldo a pagar: {envio.Saldo.ToString("C", Cultura.PtBr)}. Combine o pagamento com a equipe.";
     }
 
     public Task AvisarAsync(Guid empresaId, Guid conversaId, CancellationToken ct) =>
