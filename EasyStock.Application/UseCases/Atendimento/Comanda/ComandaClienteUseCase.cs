@@ -35,7 +35,8 @@ public sealed record ComandaClienteResult(Guid LinkId, string Nome, DateOnly Dia
     RascunhoComandaCliente Rascunho, IReadOnlyList<ItemSelecionadoComanda> Selecao, PedidoConversaResult? Pedido,
     EnvioComandaCliente? Envio, IReadOnlyList<CupomComandaCliente> Cupons, decimal? TotalPrevisto = null,
     long NumeroComanda = 0, Guid ConversaId = default, SaldoFinanceiroComanda? Financeiro = null, AcertoComandaCliente? Acerto = null,
-    bool PrecisaCadastro = false, bool EntregaACombinar = false, decimal? FreteCombinado = null);
+    bool PrecisaCadastro = false, bool EntregaACombinar = false, decimal? FreteCombinado = null,
+    bool AjudaSolicitada = false, DateTime? AjudaSolicitadaEm = null);
 public sealed record FreteCombinadoComanda(Guid LinkId, int Revisao, decimal Valor);
 public sealed record EntregaACombinarComanda(Guid LinkId, int Revisao);
 public sealed class ComandaClienteConflitoException(string mensagem) : Exception(mensagem);
@@ -50,6 +51,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
 {
     private const string RevisaoEntregaACombinar = "comandaEntregaACombinarRevisao";
     private const string FreteCombinadoChave = "comandaFreteCombinado";
+    private const string AjudaSolicitadaChave = Conversa.ChaveAjudaComandaSolicitadaEm;
     public const string Evento = "conversa.comanda_atualizada";
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     public static T? Ler<T>(string? json) => json is null ? default : JsonSerializer.Deserialize<T>(json, Json);
@@ -159,11 +161,13 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             && (pedido is null || PodeAlterar(pedido));
         var freteCombinado = ContextoConversaJson.Ler<FreteCombinadoComanda>(conversa, FreteCombinadoChave);
         var valorCombinado = freteCombinado?.LinkId == link.Id && freteCombinado.Revisao == link.Revisao ? freteCombinado.Valor : (decimal?)null;
+        var ajudaEm = ContextoConversaJson.Ler<DateTime?>(conversa, AjudaSolicitadaChave);
         return new(link.Id, (cliente?.Nome ?? conversa.ContatoNome ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "",
             HorarioBrasil.DataOperacional(link.CriadoEm), link.ExpiraEm, link.Revisao, pode, dados, selecao, detalhe,
             envio, cliente is null ? [] : (await creditos.ListarAsync(link.EmpresaId, cliente.Id, ct)).Select(c => new CupomComandaCliente(c.Codigo, c.Saldo, c.Valor, c.CriadoEm)).ToList(),
             selecao.Sum(i => i.Qtd * i.Preco) + (detalhe?.Frete ?? valorCombinado ?? 0m), conversa.NumeroComanda, conversa.Id, financeiro, acerto,
-            cliente is null, valorCombinado is null && ContextoConversaJson.Ler<EntregaACombinarComanda>(conversa, RevisaoEntregaACombinar) == new EntregaACombinarComanda(link.Id, link.Revisao), valorCombinado);
+            cliente is null, valorCombinado is null && ContextoConversaJson.Ler<EntregaACombinarComanda>(conversa, RevisaoEntregaACombinar) == new EntregaACombinarComanda(link.Id, link.Revisao), valorCombinado,
+            ajudaEm is not null && conversa.Situacao == SituacaoConversa.Assumida, ajudaEm);
     }
 
     private async Task<AcertoComandaCliente?> AcertoAsync(LinkCardapioConversa link, PedidoEntity pedido, CancellationToken ct)
@@ -227,6 +231,20 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     public async Task<EnvioComandaCliente> EnviarAsync(string token, int revisao, CancellationToken ct)
     {
         var acesso = await AcessoAsync(token, ct);
+        return await EnviarAsync(acesso, revisao, ct);
+    }
+
+    public async Task<EnvioComandaCliente> ConfirmarPedidoDoAtendimentoAsync(Guid empresaId, Guid conversaId, Guid linkId,
+        int revisao, CancellationToken ct)
+    {
+        var acesso = (await links.ListarDaConversaAsync(empresaId, conversaId, relogio.GetUtcNow().UtcDateTime.AddDays(-1), ct))
+            .SingleOrDefault(l => l.Id == linkId) ?? throw new LinkCardapioConversaIndisponivelException();
+        return await EnviarAsync(acesso, revisao, ct, peloAtendimento: true);
+    }
+
+    private async Task<EnvioComandaCliente> EnviarAsync(LinkCardapioConversa acesso, int revisao, CancellationToken ct,
+        bool peloAtendimento = false)
+    {
         await ConfirmarCadastroAsync(acesso, revisao, ct);
         EfeitosQuitacao? efeitos = null;
         var resposta = await uow.ExecuteInTransactionSemRetryAsync(async t =>
@@ -234,10 +252,14 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             await conversas.TravarParaPedidoAsync(acesso.EmpresaId, acesso.ConversaId, t);
             var link = await links.ObterComLockAsync(acesso.EmpresaId, acesso.Id, t) ?? throw new LinkCardapioConversaIndisponivelException();
             if (link.Revisao != revisao) throw new ComandaClienteConflitoException("A seleção mudou. Confira a comanda antes de enviar.");
+            if (peloAtendimento && Ler<RascunhoComandaCliente>(link.RascunhoJson)?.PedidoId is not null)
+                throw new ComandaClienteConflitoException("Esta seleção já é um ajuste. Confira a alteração no pedido existente.");
             if (link.UsadoEm is not null)
                 return Ler<EnvioComandaCliente>(link.ResultadoJson) ?? throw new ComandaClienteConflitoException("O envio está em confirmação. Atualize em instantes.");
             var estado = await EstadoAsync(link, t);
             if (!estado.PodeEditar) throw new LinkCardapioConversaIndisponivelException();
+            if (peloAtendimento && estado.Pedido is not null)
+                throw new ComandaClienteConflitoException("A conversa já tem um pedido. Atualize antes de continuar.");
             var dados = Ler<RascunhoComandaCliente>(link.RascunhoJson) is { Itens: not null } salvo ? salvo : estado.Rascunho;
             Validar(dados);
             if (dados.Itens.Count == 0) throw new UseCaseValidationException("Escolha ao menos um prato.");
@@ -261,8 +283,11 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             {
                 if (dados.JanelaId is not { } janela || dados.DataEntrega is not { } dia)
                     throw new UseCaseValidationException("Escolha o horário de entrega antes de enviar.");
-                var criado = await criarPedido.ExecuteAsync(new(token, dados.Itens, janela, dia,
-                    Observacoes: dados.Observacoes, Endereco: dados.Endereco, SemCobranca: true), t, freteCombinado: estado.FreteCombinado);
+                if (peloAtendimento && estado.FreteCombinado is null)
+                    throw new UseCaseValidationException("Combine o frete com o cliente antes de confirmar o pedido pelo atendimento.");
+                var criado = await criarPedido.ExecuteComLinkAsync(new(null, dados.Itens, janela, dia,
+                    Observacoes: dados.Observacoes, Endereco: dados.Endereco, SemCobranca: true), link, t,
+                    freteCombinado: estado.FreteCombinado, peloAtendimento: peloAtendimento);
                 // O núcleo consumiu o link por UPDATE; relê para não sobrescrever o uso no flush.
                 link = await links.ObterComLockAsync(acesso.EmpresaId, acesso.Id, t) ?? throw new LinkCardapioConversaIndisponivelException();
                 var pedido = await pedidos.GetByIdWithDetailsAsync(link.EmpresaId, criado.PedidoId)
@@ -270,9 +295,9 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 var cupomAplicado = await AplicarCupomAsync(pedido, dados.CodigoCupom, t);
                 var saldo = pedido.Total.Valor - (await saldoFinanceiro.ConsultarAsync(pedido, t)).Alocado;
                 CobrancaPedidoResult? cobranca = null;
-                if (saldo > 0)
+                if (saldo > 0 && !peloAtendimento)
                     cobranca = await cobrar.ExecuteAsync(new(link.EmpresaId, pedido.Id, link.ConversaId, CobrarSaldo: true), t);
-                else
+                else if (saldo <= 0)
                 {
                     pedido.MudarStatus(pedido.RequerAprovacao ? StatusPedido.AguardandoAprovacaoBaba : StatusPedido.Aguardando);
                     await inicioPrevisto.AplicarNaFilaAsync(pedido, t);
@@ -294,11 +319,12 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     private Task<bool> ConfirmarCadastroAsync(LinkCardapioConversa acesso, int revisao, CancellationToken ct) =>
         uow.ExecuteInTransactionSemRetryAsync(async t =>
         {
-            await conversas.TravarParaPedidoAsync(acesso.EmpresaId, acesso.ConversaId, t);
+            await conversas.ObterPorIdComLockAsync(acesso.EmpresaId, acesso.ConversaId, t);
             var link = await links.ObterComLockAsync(acesso.EmpresaId, acesso.Id, t) ?? throw new LinkCardapioConversaIndisponivelException();
             if (link.Revisao != revisao) throw new ComandaClienteConflitoException("A seleção mudou. Confira antes de enviar.");
             var estado = await EstadoAsync(link, t);
             if (!estado.PrecisaCadastro) return true;
+            if (!estado.PodeEditar) throw new LinkCardapioConversaIndisponivelException();
             var dados = estado.Rascunho;
             Validar(dados);
             if (dados.Itens.Count == 0) throw new UseCaseValidationException("Escolha ao menos um prato.");
@@ -341,18 +367,33 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     public async Task<ComandaClienteResult> EncaminharEntregaAsync(string token, int revisao, CancellationToken ct)
     {
         var acesso = await AcessoAsync(token, ct);
+        return await EncaminharEntregaAsync(acesso, revisao, ct);
+    }
+
+    public async Task<ComandaClienteResult> EncaminharEntregaDoAtendimentoAsync(Guid empresaId, Guid conversaId, Guid linkId,
+        int revisao, CancellationToken ct)
+    {
+        var acesso = (await links.ListarDaConversaAsync(empresaId, conversaId, relogio.GetUtcNow().UtcDateTime.AddDays(-1), ct))
+            .SingleOrDefault(l => l.Id == linkId) ?? throw new LinkCardapioConversaIndisponivelException();
+        return await EncaminharEntregaAsync(acesso, revisao, ct);
+    }
+
+    private async Task<ComandaClienteResult> EncaminharEntregaAsync(LinkCardapioConversa acesso, int revisao, CancellationToken ct)
+    {
+        await ConfirmarCadastroAsync(acesso, revisao, ct);
         await uow.ExecuteInTransactionSemRetryAsync(async t =>
         {
-            await conversas.TravarParaPedidoAsync(acesso.EmpresaId, acesso.ConversaId, t);
+            var conversa = await conversas.ObterPorIdComLockAsync(acesso.EmpresaId, acesso.ConversaId, t)
+                ?? throw new LinkCardapioConversaIndisponivelException();
             var link = await links.ObterComLockAsync(acesso.EmpresaId, acesso.Id, t) ?? throw new LinkCardapioConversaIndisponivelException();
             if (link.Revisao != revisao) throw new ComandaClienteConflitoException("A seleção mudou. Confira antes de enviar.");
             var estado = await EstadoAsync(link, t);
             if (!estado.PodeEditar || estado.Pedido is not null) throw new LinkCardapioConversaIndisponivelException();
+            Validar(estado.Rascunho);
+            if (estado.Rascunho.Itens.Count == 0) throw new UseCaseValidationException("Escolha ao menos um prato.");
             var endereco = estado.Rascunho.Endereco?.Validar() ?? throw new UseCaseValidationException("Informe seu endereço de entrega.");
             await cadastrarCliente.ExecuteAsync(new(acesso.EmpresaId, acesso.ConversaId, null, null,
                 new(endereco.Cep, endereco.Logradouro, endereco.Numero, endereco.Complemento, endereco.Bairro, endereco.Cidade, endereco.Uf)), t);
-            var conversa = await conversas.ObterPorIdAsync(acesso.EmpresaId, acesso.ConversaId, t)
-                ?? throw new LinkCardapioConversaIndisponivelException();
             if (ContextoConversaJson.Ler<EntregaACombinarComanda>(conversa, RevisaoEntregaACombinar) == new EntregaACombinarComanda(link.Id, revisao)) return true;
             var agora = relogio.GetUtcNow().UtcDateTime;
             conversa.Escalar(agora, "Entrega e frete a combinar. Confira o endereço e a seleção da comanda.");
@@ -360,6 +401,29 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             await conversas.AddMensagemAsync(Mensagem.Saida(acesso.EmpresaId, acesso.ConversaId, AutorMensagem.Sistema,
                 agora, TipoConteudoMensagem.Texto, "Cliente enviou a comanda para combinar entrega fora da área automática. " +
                 "Seleção e endereço preservados. Frete pendente de decisão humana; não cobrar nem prometer entrega ainda."), t);
+            await uow.CommitAsync();
+            return true;
+        }, ct);
+        await AvisarAsync(acesso.EmpresaId, acesso.ConversaId, ct);
+        return await EstadoAsync(acesso, ct);
+    }
+
+    public async Task<ComandaClienteResult> PedirAjudaAsync(string token, CancellationToken ct)
+    {
+        var acesso = await AcessoAsync(token, ct);
+        await uow.ExecuteInTransactionSemRetryAsync(async t =>
+        {
+            // Relê após o lock: duas abas podem pedir ajuda sem alterar a revisão do rascunho.
+            var conversa = await conversas.ObterPorIdComLockAsync(acesso.EmpresaId, acesso.ConversaId, t)
+                ?? throw new LinkCardapioConversaIndisponivelException();
+            await AcessoAsync(token, t);
+            if (conversa.Situacao == SituacaoConversa.Assumida
+                && ContextoConversaJson.Ler<DateTime?>(conversa, AjudaSolicitadaChave) is not null) return true;
+            var agora = relogio.GetUtcNow().UtcDateTime;
+            conversa.Escalar(agora, "Cliente pediu ajuda pela comanda. Confira a conversa e a seleção antes de continuar.");
+            ContextoConversaJson.Gravar(conversa, AjudaSolicitadaChave, agora);
+            await conversas.AddMensagemAsync(Mensagem.Saida(acesso.EmpresaId, acesso.ConversaId, AutorMensagem.Sistema,
+                agora, TipoConteudoMensagem.Texto, "Cliente pediu ajuda pela comanda. A solicitação chegou ao atendimento; seleção preservada, sem confirmar pedido ou pagamento."), t);
             await uow.CommitAsync();
             return true;
         }, ct);

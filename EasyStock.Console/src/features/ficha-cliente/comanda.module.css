@@ -38,6 +38,15 @@
 .comparativo { padding: var(--e-2); border-left: 3px solid var(--linha-forte); }
 .historicoFinanceiro summary { display: list-item; min-height: 44px; align-content: center; cursor: pointer; color: var(--tinta); }
 .historicoFinanceiro summary:focus-visible { outline: 2px solid var(--tinta); outline-offset: 2px; }
+.ajudaCompartilhada { display: grid; gap: var(--e-1); margin-block: var(--e-2); padding: var(--e-2) var(--e-3); border-left: var(--trilho) solid var(--alerta); background: var(--alerta-pastel); border-radius: var(--r-1); }
+.transporteCompartilhado { margin-block: var(--e-2); }
+.transporteCompartilhado > summary { min-height: 44px; align-content: center; cursor: pointer; font-weight: 600; }
+.consultaTransporte { font-size: var(--t-apoio); }
+.consultaTransporte p { margin-block: var(--e-2); }
+.consultaTransporte a { display: inline-flex; align-items: center; min-height: 44px; color: var(--marca); text-underline-offset: 3px; }
+.consultaTransporte a:focus-visible, .transporteCompartilhado > summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
+.freteCompartilhado { margin-block: var(--e-3); }
+.confirmarCompartilhado { margin-block: var(--e-3); }
 
 /* O único gesto "de papel": dois triângulos diagonais por dente de 8×5 px,
    pintados na cor da comanda. Onde não há tinta, o fundo por trás aparece,

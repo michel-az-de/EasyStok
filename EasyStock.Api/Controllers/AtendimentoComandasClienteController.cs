@@ -48,6 +48,32 @@ public sealed class AtendimentoComandasClienteController(ILinkCardapioConversaRe
         catch (UseCaseValidationException e) { return Problem(e.Message, statusCode: 400); }
     }
 
+    [HttpPost("{linkId:guid}/encaminhar-entrega")]
+    public async Task<IActionResult> EncaminharEntrega(Guid conversaId, Guid linkId,
+        [FromBody] EasyStock.Api.Controllers.Storefront.EnviarComandaClienteBody body, CancellationToken ct)
+    {
+        if (!usuario.TemPermissao(Permissao.AtenderConversas)) return Forbid();
+        try { return Ok(new { data = await comanda.EncaminharEntregaDoAtendimentoAsync(usuario.EmpresaId, conversaId,
+            linkId, body.Revisao, ct) }); }
+        catch (LinkCardapioConversaIndisponivelException e) { return Problem(e.Message, statusCode: 410); }
+        catch (ComandaClienteConflitoException e) { return Problem(e.Message, statusCode: 409); }
+        catch (UseCaseValidationException e) { return Problem(e.Message, statusCode: 400); }
+        catch (RegraDeDominioVioladaException e) { return Problem(e.Message, statusCode: 422); }
+    }
+
+    [HttpPost("{linkId:guid}/confirmar-pedido")]
+    public async Task<IActionResult> ConfirmarPedido(Guid conversaId, Guid linkId,
+        [FromBody] EasyStock.Api.Controllers.Storefront.EnviarComandaClienteBody body, CancellationToken ct)
+    {
+        if (!usuario.TemPermissao(Permissao.AtenderConversas)) return Forbid();
+        try { return Ok(new { data = await comanda.ConfirmarPedidoDoAtendimentoAsync(usuario.EmpresaId, conversaId,
+            linkId, body.Revisao, ct) }); }
+        catch (LinkCardapioConversaIndisponivelException e) { return Problem(e.Message, statusCode: 410); }
+        catch (ComandaClienteConflitoException e) { return Problem(e.Message, statusCode: 409); }
+        catch (UseCaseValidationException e) { return Problem(e.Message, statusCode: 400); }
+        catch (RegraDeDominioVioladaException e) { return Problem(e.Message, statusCode: 422); }
+    }
+
     [HttpPut("{linkId:guid}/rascunho")]
     public async Task<IActionResult> Salvar(Guid conversaId, Guid linkId,
         [FromBody] EasyStock.Api.Controllers.Storefront.SalvarComandaClienteBody body, CancellationToken ct)
