@@ -96,8 +96,16 @@ public class AtualizarStatusPedidoUseCase(
             && cobrancas is not null && trocarForma is not null
             && (await cobrancas.ListarDoPedidoAsync(cmd.EmpresaId, pedido.Id)).Any(c => c.EstaPendente && c.EhOnline))
         {
-            await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(cmd.EmpresaId, pedido.Id,
-                TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega, cmd.UsuarioId, cmd.UsuarioNome));
+            try
+            {
+                await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(cmd.EmpresaId, pedido.Id,
+                    TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega, cmd.UsuarioId, cmd.UsuarioNome));
+            }
+            catch (CobrancaPedidoConflitoException ex)
+            {
+                // Mesmo contrato das transições inválidas: 400, não erro interno.
+                throw new UseCaseValidationException(ex.Message);
+            }
             return CriarPedidoUseCase.Map(pedido);
         }
 
