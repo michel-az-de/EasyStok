@@ -153,3 +153,14 @@ export function rotuloDoEstado(estado) {
   const texto = String(estado ?? '')
   return passoPorId(texto)?.rotulo ?? ROTULO_FORA_DA_ESTEIRA[texto] ?? texto.charAt(0).toUpperCase() + texto.slice(1)
 }
+
+// #1709: CEP sem cobertura volta do EasyStok com a frase escrita para o cliente
+// (`CepSemCoberturaException`, sem código próprio na resposta). No console quem lê é a equipe:
+// a linha diz o motivo e os dois caminhos que existem hoje.
+const CEP_SEM_COBERTURA = 'Vamos combinar a entrega e o frete com a equipe.'
+const FORA_DA_AREA = 'o endereço do cliente está fora da área de entrega. Mande o Link de compra para combinar o frete com ele, ou cadastre a região em Entregas, Janelas de entrega, Frete.'
+
+export function motivoDoPedidoNaoCriado(erro) {
+  const mensagem = String(erro?.message ?? '').trim()
+  return `Pedido não criado: ${mensagem === CEP_SEM_COBERTURA ? FORA_DA_AREA : mensagem}`
+}
