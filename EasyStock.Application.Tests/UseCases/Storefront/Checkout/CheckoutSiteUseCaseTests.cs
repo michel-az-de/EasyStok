@@ -84,6 +84,8 @@ public class CheckoutSiteUseCaseTests
             {
                 var r = ci.Arg<CheckoutIdempotency>(); var ganhou = Registros.TryAdd(r.Key, r); return (ganhou, Registros[r.Key]);
             });
+            repo.When(x => x.RemoverSemRespostaAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>()))
+                .Do(ci => Registros.TryRemove(ci.Arg<Guid>(), out _));
             var idempotencia = new CheckoutIdempotencyService(repo, NullLogger<CheckoutIdempotencyService>.Instance);
             var cobrancas = Substitute.For<ICobrancaPedidoRepository>();
             cobrancas.ListarDoPedidoAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
@@ -227,6 +229,29 @@ public class CheckoutSiteUseCaseTests
         await c.UseCase.Invoking(x => x.GuestAsync(c.Guest(), Endereco with { Complemento = "apto 9" }, c.Token, key))
             .Should().ThrowAsync<IdempotencyMismatchException>();
         c.Core.PedidosAdicionados.Should().ContainSingle();
+    }
+
+    /// <summary>#1719: a tentativa que falha sem criar pedido prendia a chave; a repetição ficava em "ainda processando".</summary>
+    [Fact]
+    public async Task Falha_de_validacao_libera_a_chave_para_a_proxima_tentativa()
+    {
+        var c = new Cenario(); var key = Guid.NewGuid();
+        var passado = c.Guest() with { DataEntrega = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-3)) };
+        await c.UseCase.Invoking(x => x.GuestAsync(passado, Endereco, c.Token, key)).Should().ThrowAsync<UseCaseValidationException>();
+        c.Registros.Should().BeEmpty("sem pedido criado, a chave volta a valer");
+        await c.UseCase.Invoking(x => x.GuestAsync(passado, Endereco, c.Token, key)).Should().ThrowAsync<UseCaseValidationException>();
+        c.Core.PedidosAdicionados.Should().BeEmpty();
+    }
+
+    /// <summary>#1719: nome acima da coluna (150) virava erro interno no banco em vez de recusa.</summary>
+    [Fact]
+    public async Task Nome_maior_que_o_cadastro_comporta_e_recusado_sem_criar_pedido()
+    {
+        var c = new Cenario();
+        var longo = c.Guest() with { Nome = new string('N', 151) };
+        await c.UseCase.Invoking(x => x.GuestAsync(longo, Endereco, c.Token, Guid.NewGuid()))
+            .Should().ThrowAsync<RegraDeDominioVioladaException>();
+        c.Core.PedidosAdicionados.Should().BeEmpty(); c.Registros.Should().BeEmpty();
     }
 
     [Fact]

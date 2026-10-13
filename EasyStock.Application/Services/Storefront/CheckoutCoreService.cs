@@ -103,6 +103,9 @@ public sealed class CheckoutCoreService(
     /// <summary>Motivo do cancelamento quando a primeira cobrança do pedido não sai (#1301).</summary>
     public const string MotivoMercadoPagoIndisponivel = "mercado_pago_indisponivel";
 
+    /// <summary>Teto por item, o mesmo da comanda do cliente (<c>ComandaClienteUseCase.Validar</c>).</summary>
+    public const int QuantidadeMaximaPorItem = 99;
+
     /// <summary>
     /// Valida CEP e carrinho antes de qualquer consulta. Devolve o CEP só com dígitos.
     /// </summary>
@@ -120,6 +123,9 @@ public sealed class CheckoutCoreService(
             if (qtd <= 0)
                 throw new RegraDeDominioVioladaException(
                     "A quantidade de cada item precisa ser maior que zero.");
+            if (qtd > QuantidadeMaximaPorItem)
+                throw new RegraDeDominioVioladaException(
+                    $"A quantidade de cada item vai até {QuantidadeMaximaPorItem}. Para mais, fale com a loja.");
         }
 
         return cepNormalizado;

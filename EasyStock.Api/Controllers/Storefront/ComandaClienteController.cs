@@ -92,10 +92,18 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
         while (!ct.IsCancellationRequested && relogio.GetUtcNow().UtcDateTime < acesso.ExpiraEm)
         {
             // O stream transmite somente o retrato da comanda autenticada, nunca o payload do broker do tenant.
-            await using var escopo = escopos.CreateAsyncScope();
+            Guid? pedidoId;
             string estado;
-            try { estado = JsonSerializer.Serialize(await escopo.ServiceProvider.GetRequiredService<ComandaClienteUseCase>().ObterAsync(token, ct), ComandaClienteUseCase.Json); }
-            catch (LinkCardapioConversaIndisponivelException) { break; }
+            await using (var escopo = escopos.CreateAsyncScope())
+            {
+                try
+                {
+                    var retrato = await escopo.ServiceProvider.GetRequiredService<ComandaClienteUseCase>().ObterAsync(token, ct);
+                    pedidoId = retrato.Pedido?.PedidoId;
+                    estado = JsonSerializer.Serialize(retrato, ComandaClienteUseCase.Json);
+                }
+                catch (LinkCardapioConversaIndisponivelException) { break; }
+            }
             if (estado != ultimo)
             {
                 await Response.WriteAsync($"event: comanda\ndata: {estado}\n\n", ct);
@@ -103,9 +111,29 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
             }
             else await Response.WriteAsync(": conectado\n\n", ct);
             await Response.Body.FlushAsync(ct);
-            await s.Slot.Signal.WaitAsync(TimeSpan.FromSeconds(15), ct);
-            while (s.Slot.Queue.TryDequeue(out _)) { }
+            // Relê quando o evento é desta comanda ou no batimento de 15 s, que cobre o que o evento não diz (#1719).
+            var limite = relogio.GetUtcNow().AddSeconds(15);
+            while (limite - relogio.GetUtcNow() is { } resta && resta > TimeSpan.Zero
+                && await s.Slot.Signal.WaitAsync(resta, ct)
+                && !s.Slot.Cancelled && !EsvaziarEventos(s.Slot, acesso.ConversaId, pedidoId)) { }
         }
+    }
+
+    /// <summary>
+    /// Esvazia a fila e o sinal do ouvinte e diz se algum evento cita a conversa ou o pedido desta comanda. O
+    /// ouvinte recebe os eventos de conversa e de pedido da loja inteira; reler o retrato a cada um custava dezenas
+    /// de consultas por evento alheio, multiplicadas pelas comandas abertas (#1719).
+    /// </summary>
+    public static bool EsvaziarEventos(OperacaoEventBroker.ListenerSlot slot, Guid conversaId, Guid? pedidoId)
+    {
+        var conversa = conversaId.ToString();
+        var pedido = pedidoId?.ToString();
+        var relevante = false;
+        while (slot.Queue.TryDequeue(out var evento))
+            relevante |= evento.Dados.Contains(conversa, StringComparison.OrdinalIgnoreCase)
+                || (pedido is not null && evento.Dados.Contains(pedido, StringComparison.OrdinalIgnoreCase));
+        while (slot.Signal.CurrentCount > 0 && slot.Signal.Wait(0)) { }
+        return relevante;
     }
 
     private async Task<IActionResult> Tratar(Func<Task<object>> acao)

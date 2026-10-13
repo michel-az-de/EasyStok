@@ -11,7 +11,6 @@ using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
-using EasyStock.Domain.Exceptions.Storefront;
 
 namespace EasyStock.Application.UseCases.Storefront.Checkout;
 
@@ -184,15 +183,24 @@ public sealed class CheckoutSiteUseCase(
 
     private async Task LiberarFalhaConfirmadaAsync(Guid chave, string hash)
     {
-        var registro = await registros.GetByKeyHashAsync(chave, hash, CancellationToken.None);
-        if (registro?.FaturaId is { } id)
+        try
         {
-            var pedido = await pedidos.GetByIdAsync(id, CancellationToken.None);
-            if (pedido?.Status != "cancelado") return;
+            var registro = await registros.GetByKeyHashAsync(chave, hash, CancellationToken.None);
+            if (registro?.FaturaId is { } id)
+            {
+                var pedido = await pedidos.GetByIdAsync(id, CancellationToken.None);
+                if (pedido?.Status != "cancelado") return;
+            }
+            await registros.RemoverSemRespostaAsync(chave, hash, CancellationToken.None);
         }
-        await registros.RemoverSemRespostaAsync(chave, hash, CancellationToken.None);
+        catch (Exception ex)
+        {
+            // A falha original é a que o cliente precisa ver; a chave presa fica registrada.
+            logger.LogError(ex, "Checkout chave-nao-liberada chave={Chave}", chave);
+        }
     }
 
-    private static bool FalhaRecuperavel(Exception ex) => ex is CepInvalidoException or CepSemCoberturaException
-        or JanelaSemVagasException or LojaFechadaException or MercadoPagoIndisponivelException or RegraDeDominioVioladaException;
+    // Toda falha tenta soltar a chave (#1719): validação, cancelamento da requisição e erro de banco prendiam a
+    // reserva e a repetição respondia "em andamento" sem fim. Pedido criado e ainda vivo conserva a reserva.
+    private static bool FalhaRecuperavel(Exception ex) => ex is not (IdempotencyMismatchException or CheckoutEmAndamentoException);
 }
