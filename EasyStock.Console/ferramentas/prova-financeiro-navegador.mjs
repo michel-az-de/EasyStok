@@ -2,7 +2,7 @@
 // PLAYWRIGHT_MODULE aponta uma instalação existente; CONSOLE_URL aponta o Vite em modo API.
 import assert from 'node:assert/strict'
 import { createRequire, registerHooks } from 'node:module'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 const require = createRequire(import.meta.url)
 registerHooks({ resolve(spec, contexto, proximo) {
@@ -16,6 +16,18 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const origem = process.env.CONSOLE_URL ?? 'http://127.0.0.1:5186'
 const evidencias = process.env.EVIDENCIAS_UX ?? 'builds/prova-financeiro'
 mkdirSync(evidencias, { recursive: true })
+const capturas = []
+async function capturarTela(page, modulo, tela, tema) {
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  })
+  const viewport = page.viewportSize()
+  const arquivo = `tela-${modulo.id}-${tela.id}-${viewport.width}-${tema}.png`
+  await page.screenshot({ path: join(evidencias, arquivo), fullPage: true })
+  capturas.push({ modulo: modulo.id, tela: tela.id, rota: hashDoModulo(modulo.id, tela.id), arquivo, viewport, tema, tipoProva: 'HTTP controlado' })
+  writeFileSync(join(evidencias, 'indice-telas.json'), JSON.stringify(capturas, null, 2))
+}
 const empresaId = '11111111-1111-4111-8111-111111111111'
 const categoriaId = '33333333-3333-4333-8333-333333333333'
 const contaId = '44444444-4444-4444-8444-444444444444'
@@ -32,11 +44,13 @@ const acoes = Object.fromEntries(['visualizarContasPagar', 'visualizarContasRece
 const escritas = []
 const erros = []
 let falhaDeGravacao = false
+let falhaDeConversas = false
 let shaDoDocumento, versaoPublicada, respostaInvalida = false
 const browser = await chromium.launch({ headless: true })
 let paginaProva
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 960 }, reducedMotion: 'reduce' })
+  await context.grantPermissions(['local-network-access'], { origin: origem })
   await context.addInitScript(({ empresaId }) => sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'teste-ui-controlado', expiraEm: Date.now() + 3600000, empresa: { id: empresaId, nome: 'Empresa de teste' }, usuario: { id: '22222222-2222-4222-8222-222222222222', nome: 'Dona de teste' } })), { empresaId })
   // Emula somente a troca de versão, mantendo o JS/CSS reais do pacote servido.
   await context.route(origem + '/**', async route => {
@@ -58,6 +72,7 @@ try {
     const ok = (data, meta = {}) => route.fulfill({ json: { data, meta } })
     const aReceber = caminho.startsWith('/api/contas-a-receber')
     const contaAtual = aReceber ? contaReceber : conta
+    if (falhaDeConversas && caminho === '/api/atendimento/conversas') return route.fulfill({ status: 400, json: { error: { message: 'Consulta de conversas indisponível na prova' } } })
     if (metodo !== 'GET') {
       const corpo = request.postDataJSON()
       escritas.push({ caminho, metodo, corpo })
@@ -91,6 +106,7 @@ try {
     if (caminho === '/api/atendimento/producao/insumos') return ok([{ produtoId: 'insumo', nome: 'Molho sugo', unidade: 'G', saldo: 1000, minimo: 500, custo: 0.02, receitas: 1 }])
     if (caminho === '/api/atendimento/producao/perdas') return ok({ de: hoje, ate: hoje, valor: 0, porMotivo: [], porProduto: [], lancamentos: [] })
     if (caminho === '/api/atendimento/comanda/cardapio/secoes') return ok([{ secaoId: 'secao', nome: 'Massas', ordem: 1, visivel: true, itens: 0 }])
+    if (caminho === '/api/notificacoes/badge') return ok({ count: 0 })
     if (/nao-lidas|não-lidas|count/.test(caminho)) return ok({ total: 0 })
     return ok([])
   })
@@ -108,6 +124,7 @@ try {
       // O Balcão é a referência aprovada e conserva seu próprio painel lateral.
       if (modulo.id === 'atendimento' && (telaId === undefined || telaId === 'balcao')) {
         await page.getByRole('navigation', { name: 'Navegação', exact: true }).waitFor()
+        if (telaId) await capturarTela(page, modulo, telas.find(tela => tela.id === telaId), 'light')
         telasVerificadas++
         continue
       }
@@ -119,6 +136,8 @@ try {
       assert.equal(await ativa.getAttribute('href'), hashDoModulo(modulo.id, telaId ?? telas[0].id))
       assert.equal(await page.getByRole('navigation', { name: 'Módulos da loja', exact: true }).getByRole('link').count(), MODULOS.length + 1)
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+      if (modulo.id === MODULOS[0].id && telaId === undefined) await page.getByRole('radio', { name: 'Claro', exact: true }).click()
+      if (telaId) await capturarTela(page, modulo, telas.find(tela => tela.id === telaId), 'light')
       telasVerificadas++
     }
     await page.goto(origem + '/' + hashDoModulo(modulo.id))
@@ -139,8 +158,23 @@ try {
       assert.ok(botoes.length > 0 && botoes.every(b => b.esquerda >= 0 && b.direita <= b.viewport && b.conteudoDireita <= b.direita), JSON.stringify(botoes))
     }
   }
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('radio', { name: 'Escuro', exact: true }).click()
+  for (const modulo of MODULOS) {
+    for (const tela of telasDoMenu(modulo, { fonteApi: true })) {
+      await page.goto(origem + '/' + hashDoModulo(modulo.id, tela.id))
+      await page.locator('[data-inicio-tela]').waitFor()
+      await capturarTela(page, modulo, tela, 'dark')
+    }
+  }
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await page.getByRole('radio', { name: 'Claro', exact: true }).click()
   await page.goto(origem + '/#/m/financeiro/pagar')
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).waitFor()
+  await page.getByRole('main', { name: 'Contas a pagar', exact: true }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Sair', exact: true }).count(), 1)
+  await page.getByText('Conversas ao vivo do EasyStok', { exact: true }).waitFor({ state: 'hidden' })
+  await page.getByText('Dona de teste · Empresa de teste', { exact: true }).waitFor()
   assert.equal(await page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true }).getByRole('link').count(), 8)
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).click()
   let modal = page.getByRole('dialog', { name: 'Nova conta a pagar', exact: true })
@@ -228,6 +262,8 @@ try {
   await modal.getByLabel('Valor total', { exact: true }).fill('10000')
   await modal.getByRole('button', { name: 'Salvar', exact: true }).click()
   await modal.getByRole('alert').filter({ hasText: 'Categoria de teste indisponível' }).waitFor()
+  assert.equal(await modal.getByRole('alert').filter({ hasText: 'Categoria de teste indisponível' }).isVisible(), true)
+  await page.screenshot({ path: join(evidencias, 'financeiro-erro-preservado.png') })
   assert.equal(await modal.getByLabel('Descrição', { exact: true }).inputValue(), 'Conta recusada')
   await page.keyboard.press('Escape')
   falhaDeGravacao = false
@@ -306,6 +342,17 @@ try {
   assert.equal(new URL(page.url()).hash, '#/m/financeiro/pagar')
   assert.equal(await page.getByRole('button', { name: 'Atualizar sistema', exact: true }).count(), 0)
   assert.equal(await page.evaluate(() => JSON.parse(sessionStorage.getItem('easystok.sessao')).token), 'teste-ui-controlado')
+  falhaDeConversas = true
+  await page.reload()
+  await page.getByText(/Conversas sem atualização:.*Consulta de conversas indisponível na prova/).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Sair', exact: true }).count(), 1)
+  await page.getByText('Dona de teste · Empresa de teste', { exact: true }).waitFor()
+  await page.screenshot({ path: join(evidencias, 'financeiro-aviso-global-preservado.png') })
+  falhaDeConversas = false
+  await page.reload()
+  await page.getByText(/Conversas sem atualização:/).waitFor({ state: 'hidden' })
+  await page.getByText('Conversas ao vivo do EasyStok', { exact: true }).waitFor({ state: 'hidden' })
+  await page.getByText('Dona de teste · Empresa de teste', { exact: true }).waitFor()
   assert.deepEqual(erros, [])
   console.log(`OK: ${telasVerificadas} rotas dos oito módulos, navegação lateral, operações financeiras, modais, permissões, atualização por clique sem perder rascunho, manifesto inválido, sessão/rota preservadas e celular; ${escritas.length} escritas controladas; sem erros de página ou console.`)
 } catch (erro) {
