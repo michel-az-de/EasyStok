@@ -13,7 +13,7 @@ import { comandaTravada, numeroDaComanda, pedidoEncerrado, rotuloDoEstado, total
 import { faltaPagar as saldoDoPedido } from '../../dominio/pagamento'
 import { moeda } from '../../dominio/formato'
 import { motivoAntesDeCobrar } from '../../dominio/resumoPedido'
-import { chavesDaFicha } from '../../dominio/ficha'
+import { chavesDaFicha, primeiroPassoAntesDaVenda } from '../../dominio/ficha'
 import { BarraProximoPasso } from './BarraProximoPasso'
 import { BlocoCobranca } from './BlocoCobranca'
 import { BlocoDevolucoes } from './BlocoDevolucoes'
@@ -118,8 +118,16 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
     pagamentos: (pedido?.pagamentosApi ?? []).map((p) => p.pagamentoId),
   })
   // #1761 (L10): sem pedido, "Adicionar itens" é o próximo passo e mora no bloco da comanda.
+  // #1806: lead sem cadastro cadastra primeiro, com o formulário já preenchido pela conversa.
+  const cadastrarPrimeiro = primeiroPassoAntesDaVenda({ conversa: selecionada, pedido, fonteApi }) === 'cadastro'
   const acaoMontar = !pedido && !clienteEscolhendo
-    ? <Botao largo variante="primario" disabled={!editavel} onClick={aoAbrirCardapio}>Adicionar itens</Botao> : null
+    ? (cadastrarPrimeiro
+      ? <>
+        <Botao largo variante="primario" disabled={!editavel} onClick={() => setSecao('cliente')}>Cadastrar cliente</Botao>
+        <Botao largo disabled={!editavel} onClick={aoAbrirCardapio}>Adicionar itens</Botao>
+      </>
+      : <Botao largo variante="primario" disabled={!editavel} onClick={aoAbrirCardapio}>Adicionar itens</Botao>)
+    : null
   const comandaCompartilhada = <ComandaDoCliente key={chaves.comandaCompartilhada} conversaId={selecionada.id} compacta
     nomeCliente={selecionada.nome}
     numeroComanda={numero} ativo={fonteApi} acaoCompartilhar={acaoCompartilhar} acaoMontar={acaoMontar}
@@ -145,7 +153,8 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           <h3>{!editavel ? 'Atendimento encerrado' : pedidoCriado ? `Pedido ${numero ?? ''}`.trim() : pedido ? 'Seleção não confirmada' : 'Vamos atender ' + primeiroNome}</h3>
           <p>{!editavel ? 'O histórico está guardado. Reabra a conversa para retomar o atendimento.'
             : pedido ? `${pedidoCriado ? rotuloDoEstado(pedido.estado) : 'Em montagem'} · ${itens} ${itens === 1 ? 'item' : 'itens'} · ${moeda(total)}`
-              : 'Monte o pedido por aqui ou acompanhe a escolha do cliente pelo link.'}</p>
+              : cadastrarPrimeiro ? 'Primeiro o cadastro: o pedido só nasce para cliente cadastrado. Nome e telefone já vêm da conversa.'
+                : 'Monte o pedido por aqui ou acompanhe a escolha do cliente pelo link.'}</p>
         </section>
 
         {editavel && comandaCompartilhada}
