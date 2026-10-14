@@ -65,6 +65,8 @@ public class CheckoutSiteUseCaseTests
                 .Returns(ci => ListaConversas.FirstOrDefault(c => c.ContatoIdExterno == ci.Arg<string>() && c.EstaAberta));
             Conversas.ObterAbertaPorClienteNoCanalAsync(Empresa, Arg.Any<Guid>(), CanalConversa.ChatSite, Arg.Any<CancellationToken>())
                 .Returns(ci => ListaConversas.FirstOrDefault(c => c.ClienteId == ci.ArgAt<Guid>(1) && c.EstaAberta));
+            Conversas.ObterPorIdComLockAsync(Empresa, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                .Returns(ci => ListaConversas.FirstOrDefault(c => c.Id == ci.ArgAt<Guid>(1)));
             Conversas.TravarParaPedidoAsync(Empresa, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
                 .Returns(ci => ListaConversas.First(c => c.Id == ci.ArgAt<Guid>(1)).PedidoEmAndamentoId);
             Core.PedidoRepo.GetByIdComItensAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(ci =>
@@ -103,7 +105,7 @@ public class CheckoutSiteUseCaseTests
             var logado = new IniciarCheckoutUseCase(Core.Servico(), Core.StorefrontRepo, Clientes, idempotencia, cobrar,
                 Core.Atribuicao(), tenant, Uow, NullLogger<IniciarCheckoutUseCase>.Instance);
             UseCase = new CheckoutSiteUseCase(Acesso, new AbrirSessaoChatSiteUseCase(Acesso, Sessoes, Uow),
-                new ConversaChatSiteService(Conversas, Uow), Conversas, Clientes, Core.PedidoRepo, idempotencia, repo,
+                new ConversaChatSiteService(Conversas, Uow), Clientes, Core.PedidoRepo, idempotencia, repo,
                 logado, guest, acompanhar, Substitute.For<IOperacaoEventPublisher>(), cobrancas, Uow, TimeProvider.System, NullLogger<CheckoutSiteUseCase>.Instance);
         }
 

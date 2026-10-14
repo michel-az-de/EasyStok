@@ -3,6 +3,7 @@ using System.Text;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -126,6 +127,11 @@ public sealed class EnviarMensagemVisitanteUseCase(
         var mensagem = await unitOfWork.ExecuteInTransactionSemRetryAsync(async tokenCt =>
         {
             var conversa = await conversaChat.ObterOuCriarAsync(sessao, null, agora, tokenCt);
+            // #1797: a trava do contato não exclui o console. A linha travada e relida não grava não lidas velhas por cima
+            // do marcar-lida; encerrada enquanto esperava, a mensagem abre outra conversa (nova, ninguém mais a vê).
+            conversa = await conversaRepository.ObterPorIdComLockAsync(sessao.EmpresaId, conversa.Id, tokenCt)
+                ?? throw new ConversaNaoEncontradaException(conversa.Id);
+            if (!conversa.EstaAberta) conversa = await conversaChat.ObterOuCriarAsync(sessao, null, agora, tokenCt);
             var entrada = Mensagem.Entrada(sessao.EmpresaId, conversa.Id, agora, TipoConteudoMensagem.Texto, limpo);
             conversa.RegistrarEntrada(agora);
             await conversaRepository.AddMensagemAsync(entrada, tokenCt);

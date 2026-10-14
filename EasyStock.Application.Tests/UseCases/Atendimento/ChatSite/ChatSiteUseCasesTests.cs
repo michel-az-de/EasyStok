@@ -37,6 +37,12 @@ public class ChatSiteUseCasesTests
         _flags.ListarAtivasAsync(_loja.EmpresaId, Arg.Any<CancellationToken>())
             .Returns([FeatureCatalogo.ModuloAtendimento, FeatureCatalogo.CanalChatSite]);
         _acesso = new AcessoChatSite(_lojas, _flags, _tenant, _sessoes);
+        // #1797: a mensagem relê a conversa travada; no dublê, a já cadastrada ou a recém-criada.
+        var criadas = new List<Conversa>();
+        _conversas.When(x => x.AddAsync(Arg.Any<Conversa>(), Arg.Any<CancellationToken>())).Do(ci => criadas.Add(ci.Arg<Conversa>()));
+        _conversas.ObterPorIdComLockAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(async ci => await _conversas.ObterPorIdAsync(ci.ArgAt<Guid>(0), ci.ArgAt<Guid>(1), ci.ArgAt<CancellationToken>(2))
+                ?? criadas.FirstOrDefault(c => c.Id == ci.ArgAt<Guid>(1)));
         _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<Conversa>>>(), Arg.Any<CancellationToken>())
             .Returns(ci => ci.Arg<Func<CancellationToken, Task<Conversa>>>()(ci.Arg<CancellationToken>()));
         _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<Mensagem>>>(), Arg.Any<CancellationToken>())
