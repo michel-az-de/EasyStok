@@ -1,5 +1,6 @@
 ﻿using EasyStock.Application.UseCases.Storefront.Frete;
 using EasyStock.Domain.Exceptions.Storefront;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -41,6 +42,7 @@ public sealed class FreteController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     [HttpGet]
+    [EnableRateLimiting("frete-publico")]
     public async Task<IActionResult> CalcularFrete(
         [FromRoute] string slug,
         [FromQuery] string? cep,
