@@ -8,6 +8,12 @@ public sealed record SecaoDoCardapio(Guid SecaoId, string Nome, double Ordem, bo
 
 public sealed record MigracaoDeCategoriasResult(int SecoesCriadas, int ItensLigados);
 
+/// <summary>Um texto antigo de categoria: o nome que a seção receberia, quantos pratos ligaria e se a seção já existe.</summary>
+public sealed record CategoriaAntiga(string Nome, int Pratos, bool Existe);
+
+/// <summary>O que <c>MigrarCategoriasAsync</c> faria agora, sem gravar (#1803).</summary>
+public sealed record PreviaMigracaoCategorias(IReadOnlyList<CategoriaAntiga> Categorias, int Pratos);
+
 /// <summary>
 /// Categorias do cardápio pelo console (M1.3, #1483). D-M1-01 (Felipe, 08/10/2026): a categoria que o
 /// cliente vê é a seção do cardápio. v1 de restaurante: seções de um nível (raiz), com nome único
@@ -102,14 +108,12 @@ public sealed class SecoesDoCardapioComandaUseCase(
     {
         var storefrontId = await VitrineAsync(empresaId, ct);
         var secoes = (await secaoRepository.GetDoStorefrontAsync(storefrontId, ct)).ToList();
-        var itens = await cardapioRepository.GetTodosDoStorefrontAsync(storefrontId, ct);
-        var semSecao = itens.Where(i => i.SecaoId is null && !string.IsNullOrWhiteSpace(i.CategoriaTexto)).ToList();
+        var semSecao = SemSecaoComTexto(await cardapioRepository.GetTodosDoStorefrontAsync(storefrontId, ct));
 
         var criadas = 0;
         var proximaOrdem = secoes.Count == 0 ? 1 : secoes.Max(s => s.OrdemExibicao) + 1;
         var porNome = Raizes(secoes).ToDictionary(s => Chave(s.Nome), s => s.Id);
-        foreach (var texto in semSecao.Select(i => i.CategoriaTexto!.Trim())
-                     .DistinctBy(Chave).OrderBy(t => t, StringComparer.Ordinal))
+        foreach (var texto in TextosDistintos(semSecao))
         {
             if (porNome.ContainsKey(Chave(texto))) continue;
             var secao = CardapioSecao.CriarRaiz(storefrontId, Exibicao(texto), proximaOrdem++);
@@ -130,6 +134,28 @@ public sealed class SecoesDoCardapioComandaUseCase(
         if (criadas > 0 || ligados > 0) await unitOfWork.CommitAsync();
         return new MigracaoDeCategoriasResult(criadas, ligados);
     }
+
+    /// <summary>
+    /// Prévia de <see cref="MigrarCategoriasAsync"/> (#1803): os mesmos textos, na mesma ordem, com o
+    /// nome que a seção receberia e quantos pratos seriam ligados. Só lê; a tela explica o efeito antes.
+    /// </summary>
+    public async Task<PreviaMigracaoCategorias> PreviaDaMigracaoAsync(Guid empresaId, CancellationToken ct = default)
+    {
+        var storefrontId = await VitrineAsync(empresaId, ct);
+        var existentes = Raizes(await secaoRepository.GetDoStorefrontAsync(storefrontId, ct)).Select(s => Chave(s.Nome)).ToHashSet();
+        var semSecao = SemSecaoComTexto(await cardapioRepository.GetTodosDoStorefrontAsync(storefrontId, ct));
+        var categorias = TextosDistintos(semSecao)
+            .Select(texto => new CategoriaAntiga(
+                Exibicao(texto), semSecao.Count(i => Chave(i.CategoriaTexto!) == Chave(texto)), existentes.Contains(Chave(texto))))
+            .ToList();
+        return new PreviaMigracaoCategorias(categorias, semSecao.Count);
+    }
+
+    private static List<CardapioItem> SemSecaoComTexto(IEnumerable<CardapioItem> itens) =>
+        itens.Where(i => i.SecaoId is null && !string.IsNullOrWhiteSpace(i.CategoriaTexto)).ToList();
+
+    private static IEnumerable<string> TextosDistintos(IEnumerable<CardapioItem> semSecao) =>
+        semSecao.Select(i => i.CategoriaTexto!.Trim()).DistinctBy(Chave).OrderBy(t => t, StringComparer.Ordinal);
 
     private static IEnumerable<CardapioSecao> Raizes(IEnumerable<CardapioSecao> secoes) =>
         secoes.Where(s => s.SecaoPaiId is null)

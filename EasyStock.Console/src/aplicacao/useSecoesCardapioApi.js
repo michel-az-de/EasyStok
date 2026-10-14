@@ -1,21 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { criarGestaoSecoes, lerSecoes } from './gestaoSecoes'
+import { criarGestaoSecoes, lerPreviaMigracao, lerSecoes } from './gestaoSecoes'
 
 // Categorias do cardápio lidas da API (M1.3, #1483). Lista da tela; nada no reducer.
-export function useSecoesCardapioApi() {
-  const [carga, setCarga] = useState({ estado: 'carregando', secoes: [], erro: null, aviso: null })
+// #1803: quem edita também lê a prévia da conversão; se ela falhar, a tela segue sem o resumo.
+export function useSecoesCardapioApi({ comPrevia = false } = {}) {
+  const [carga, setCarga] = useState({ estado: 'carregando', secoes: [], previa: null, erro: null, aviso: null })
 
-  const recarregar = useCallback(() => lerSecoes()
-    .then((secoes) => setCarga((atual) => ({ ...atual, estado: 'ok', secoes, erro: null })))
-    .catch((erro) => setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message }))), [])
+  const ler = useCallback(() => Promise.all([
+    lerSecoes(),
+    comPrevia ? lerPreviaMigracao().catch(() => null) : Promise.resolve(null),
+  ]), [comPrevia])
+
+  const recarregar = useCallback(() => ler()
+    .then(([secoes, previa]) => setCarga((atual) => ({ ...atual, estado: 'ok', secoes, previa, erro: null })))
+    .catch((erro) => setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message }))), [ler])
 
   useEffect(() => {
     let vivo = true
-    lerSecoes()
-      .then((secoes) => { if (vivo) setCarga((atual) => ({ ...atual, estado: 'ok', secoes, erro: null })) })
+    ler()
+      .then(([secoes, previa]) => { if (vivo) setCarga((atual) => ({ ...atual, estado: 'ok', secoes, previa, erro: null })) })
       .catch((erro) => { if (vivo) setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message })) })
     return () => { vivo = false }
-  }, [])
+  }, [ler])
 
   const { secoes } = carga
   const acoes = useMemo(() => criarGestaoSecoes({
