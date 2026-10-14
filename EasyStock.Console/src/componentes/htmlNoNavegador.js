@@ -1,4 +1,4 @@
-import { prepararGeometriaImpresso } from './geometriaImpresso'
+import { prepararGeometriaImpresso } from './geometriaImpresso.js'
 
 // Manda imprimir uma página HTML pronta (#1632, impressos servidos pela API). A página já traz
 // o `@page` da folha; a bobina recebe aqui o comprimento medido (#1756), então o diálogo abre no
@@ -74,7 +74,8 @@ export function imprimirHtml(html, { sinal } = {}) {
           falhar(erro)
           return
         }
-        paraImprimir = '<!DOCTYPE html>' + quadro.contentDocument.documentElement.outerHTML
+        const raiz = quadro.contentDocument?.documentElement
+        if (raiz) paraImprimir = '<!DOCTYPE html>' + raiz.outerHTML
         quadro.contentWindow.addEventListener('afterprint', () => removerQuadro(quadro), { once: true })
         quadro.contentWindow.focus()
         quadro.contentWindow.print()
