@@ -9,11 +9,14 @@ import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
 // A volta está em `cicloDeSincronizacao.js` e o que ela relê em
 // `planoDeSincronizacao.js`: a conversa aberta enquanto algo nela pode mudar, as outras só quando mudaram.
 // #1576: a inbox inteira (F07) vem ao entrar e a cada minuto; as outras voltas leem a página 1.
-// #1786: com a aba oculta o laço para; ao voltar lê na hora (e varre tudo se ficou oculta 1 min ou mais).
+// #1786: com a aba oculta o laço lê a cada 15 s (o aviso de mensagem nova depende dele); ao voltar lê na hora
+// (e varre tudo se ficou oculta 1 min ou mais).
 //
 // F03: o pedido da conversa (`pedidoEmAndamentoId`) vem junto. O cardápio da vitrine
 // vem ao entrar e a cada minuto (saldo).
 const INTERVALO_MS = 5000
+// #1786: aba oculta lê mais devagar, mas lê: é o que dispara o som e a notificação de mensagem nova.
+const INTERVALO_OCULTA_MS = 15000
 const CICLOS_POR_MINUTO = 12
 const AGRUPAR_EVENTOS_MS = 300
 
@@ -74,11 +77,10 @@ export function useSincronizacaoApi({ ativo, comConversas = true, comItensFora =
 
     async function ciclo(somentePedidos = false) {
       if (!vivo) return
-      // Aba oculta: a volta não lê nem agenda a próxima. O pedido avisado pelos eventos ainda é relido.
-      if (!somentePedidos && !abaVisivel()) {
-        ocultaDesde ??= Date.now()
-        return
-      }
+      // Aba oculta: o laço segue, mais devagar (INTERVALO_OCULTA_MS). O aviso sonoro e a notificação de
+      // mensagem nova (useAvisoSonoro) saem da diferença de estado que esta leitura traz; parar silenciava
+      // justamente o console minimizado.
+      if (!somentePedidos && !abaVisivel()) ocultaDesde ??= Date.now()
       if (lendo) {
         if (somentePedidos) pedidosPendentes = true
         else voltaPendente = true
@@ -95,7 +97,7 @@ export function useSincronizacaoApi({ ativo, comConversas = true, comItensFora =
       await sincronizar({ cicloLento, somentePedidos })
       lendo = false
       if (!vivo) return
-      if (!somentePedidos) proximo = setTimeout(ciclo, INTERVALO_MS)
+      if (!somentePedidos) proximo = setTimeout(ciclo, abaVisivel() ? INTERVALO_MS : INTERVALO_OCULTA_MS)
       if (voltaPendente) {
         voltaPendente = false
         pedidosPendentes = false

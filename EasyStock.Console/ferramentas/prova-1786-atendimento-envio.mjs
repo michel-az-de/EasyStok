@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 // Prova da #1786: envio do atendimento sem mensagem dupla e laço da inbox mais leve.
 //   1. o mesmo envio repetido (resposta perdida) leva a mesma Idempotency-Key; confirmado, o próximo ganha outra;
-//   2. a conversa aberta só relê as mensagens quando algo pode ter mudado; aba oculta não lê.
+//   2. a conversa aberta só relê as mensagens quando algo pode ter mudado; aba oculta lê mais devagar.
 //
 //   node ferramentas/prova-1786-atendimento-envio.mjs
 
@@ -198,7 +198,7 @@ await confere('2. conversas não abertas seguem como antes: só quando mudaram',
   assert.equal(plano.deveRelerMensagens(resumo({ ultimaMensagemEm: '2026-10-14T12:01:00' }), guardado(), 'outra'), true)
 })
 
-await confere('2. aba oculta não lê; sem documento (node, provas) a aba conta como visível', () => {
+await confere('2. visibilidade da aba; sem documento (node, provas) a aba conta como visível', () => {
   assert.equal(plano.abaVisivel({ visibilityState: 'hidden' }), false)
   assert.equal(plano.abaVisivel({ visibilityState: 'visible' }), true)
   assert.equal(plano.abaVisivel(undefined), true)
@@ -211,9 +211,9 @@ await confere('2. aba que ficou oculta 1 min ou mais varre a inbox inteira ao vo
   assert.equal(plano.deveVarrerAoVoltar(null, agora), false)
 })
 
-await confere('2. o laço pausa com a aba oculta e volta quando ela aparece', () => {
+await confere('2. com a aba oculta o laço segue mais devagar (o aviso de mensagem nova depende dele) e volta ao normal quando ela aparece', () => {
   const fonte = readFileSync(new URL('../src/aplicacao/useSincronizacaoApi.js', import.meta.url), 'utf8')
-  assert.match(fonte, /abaVisivel\(\)/)
+  assert.match(fonte, /setTimeout\(ciclo, abaVisivel\(\) \? INTERVALO_MS : INTERVALO_OCULTA_MS\)/)
   assert.match(fonte, /addEventListener\('visibilitychange'/)
   assert.match(fonte, /removeEventListener\('visibilitychange'/)
 })
