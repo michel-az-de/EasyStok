@@ -24,6 +24,17 @@ public sealed record ItemListaComprasResult(
     DateTime CriadoEm, DateTime AlteradoEm
 );
 
+internal static class ListaComprasValidacao
+{
+    // Quantidade é opcional (item de texto livre), mas quando vem precisa ser positiva: zero ou
+    // negativa era gravada e depois sumia do gerar-pedidos sem aviso (contada em ItensIgnorados).
+    public static void ValidarQuantidade(decimal? quantidade, string texto)
+    {
+        if (quantidade is <= 0m)
+            throw new UseCaseValidationException($"Item '{texto.Trim()}': a quantidade precisa ser maior que zero.");
+    }
+}
+
 internal static class ListaComprasMapper
 {
     public static ListaComprasResult Map(ListaComprasEntity l) => new(
@@ -173,6 +184,7 @@ public class AdicionarItemListaComprasUseCase(
         UseCaseGuards.EnsureNotEmpty(cmd.ListaComprasId, "ListaComprasId");
         if (string.IsNullOrWhiteSpace(cmd.Texto))
             throw new UseCaseValidationException("Texto do item é obrigatório.");
+        ListaComprasValidacao.ValidarQuantidade(cmd.Quantidade, cmd.Texto);
 
         var lista = await repo.GetByIdAsync(cmd.EmpresaId, cmd.ListaComprasId);
         if (lista == null) return null;
@@ -301,6 +313,7 @@ public class GerarListaComprasUseCase(
             .ToList();
         if (itensValidos.Count == 0)
             throw new UseCaseValidationException("Selecione ao menos um item para gerar a lista.");
+        foreach (var input in itensValidos) ListaComprasValidacao.ValidarQuantidade(input.Quantidade, input.Texto);
 
         var agora = DateTime.UtcNow;
         var lista = ListaComprasEntity.Criar(cmd.EmpresaId, cmd.Nome, cmd.LojaId, cmd.Origem);

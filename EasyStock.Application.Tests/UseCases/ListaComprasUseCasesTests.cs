@@ -274,4 +274,26 @@ public class ListaComprasUseCasesTests
         await _repo.DidNotReceive().UpdateAsync(Arg.Any<ListaCompras>());
         await _uow.DidNotReceive().CommitAsync();
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public async Task Gerar_RecusaQuantidadeNaoPositiva(int quantidade)
+    {
+        var act = () => Gerar().ExecuteAsync(new GerarListaComprasCommand(
+            _empresaId, "Reposição", new[] { new GerarItemListaComprasInput("Farinha", Quantidade: quantidade) }));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*maior que zero*");
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task Adicionar_RecusaQuantidadeNegativa()
+    {
+        var act = () => Adicionar().ExecuteAsync(
+            new AdicionarItemListaComprasCommand(_empresaId, Guid.NewGuid(), "Farinha", Quantidade: -1m));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*maior que zero*");
+        await _uow.DidNotReceive().CommitAsync();
+    }
 }

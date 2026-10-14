@@ -238,6 +238,35 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_RecusaRecebidoAcimaDoPedido_SemDarEntrada()
+    {
+        var pedidoId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var agora = new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc);
+        var item = new PedidoFornecedorItem
+        {
+            Id = itemId, PedidoFornecedorId = pedidoId, ProdutoId = _produtoId, Nome = "Farinha",
+            Quantidade = 10, QuantidadeRecebida = 0, CustoUnitario = 5m, CriadoEm = agora
+        };
+        var pedido = new PedidoFornecedor
+        {
+            Id = pedidoId, EmpresaId = _empresaId, FornecedorId = _fornecedorId, DataPedido = agora,
+            Status = StatusPedidoFornecedor.Aberto, CriadoEm = agora, AlteradoEm = agora,
+            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "Fornecedor", EmpresaId = _empresaId },
+            Itens = { item }
+        };
+        _pedidoRepository.GetByIdWithItensAsync(pedidoId, Arg.Any<CancellationToken>()).Returns(pedido);
+
+        // Um dígito a mais na tela: 1000 em vez de 10.
+        var acao = () => _useCase.ExecuteAsync(new ProcessarRecebimentoPedidoFornecedorCommand(
+            pedidoId, _empresaId, agora, new Dictionary<Guid, decimal> { { itemId, 1000m } }));
+
+        await acao.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*passa do pedido*");
+        await _entradaUseCase.DidNotReceive().ExecuteAsync(Arg.Any<RegistrarEntradaEstoqueCommand>());
+        item.QuantidadeRecebida.Should().Be(0);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_SkipQuantidadeZero()
     {
         // Arrange

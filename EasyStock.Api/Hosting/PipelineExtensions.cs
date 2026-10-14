@@ -408,6 +408,8 @@ public static class PipelineExtensions
         .Add("/api/estoque/saida")
         .Add("/api/estoque/entrada")
         .Add("/api/mobile/calculadora/criar-compra")
+        // #1780: gerar-pedidos repetido com a mesma chave criava outro pedido e avisava o fornecedor de novo.
+        .Add("/api/listas-compras")
         // issue 917 Fase B: fecha o vetor de duplicata de pagamento (timeout no POST ->
         // toast generico -> operador clica de novo). Prefixo largo (nao so .../pagamentos)
         // porque o id do pedido fica NO MEIO do path e o matcher e' so-prefixo; cobre de

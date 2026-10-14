@@ -93,6 +93,11 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
                 continue;
             }
 
+            // Sem teto, um digito a mais (1000 em vez de 10) virava +1000 no estoque e Recebido.
+            if (novoTotalRecebido > item.Quantidade)
+                throw new UseCaseValidationException(
+                    $"Item {item.Id}: recebido ({novoTotalRecebido}) passa do pedido ({item.Quantidade}).");
+
             var delta = novoTotalRecebido - item.QuantidadeRecebida;
             if (delta <= 0)
             {
