@@ -2,15 +2,16 @@
 .cabecalho { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
 .apresentacao { display: flex; align-items: center; gap: var(--e-3); min-width: 0; }
 .descricao { margin: 0; font-size: var(--t-apoio); line-height: var(--lh-corpo); color: var(--tinta-2); }
-.ferramentas { display: grid; gap: var(--e-2); }
+.ferramentas { display: grid; gap: var(--e-3); padding: var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--elevado); }
 .faixaFiltros { display: grid; gap: var(--e-1); }
 .busca { display: flex; align-items: flex-end; gap: var(--e-2); }
 .busca > :first-child { flex: 1; min-width: 0; }
 .busca > button { flex: none; }
 .filtros { display: flex; gap: var(--e-1); flex-wrap: wrap; min-width: 0; margin: 0; padding: 0; border: 0; }
-.filtro { display: inline-flex; align-items: center; gap: var(--e-1); min-height: var(--toque); padding: var(--e-2); color: var(--tinta-2); background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; font-size: var(--t-micro); transition: background var(--dur-micro) var(--ease-padrao), color var(--dur-micro) var(--ease-padrao); }
+.filtros legend { margin-bottom: var(--e-1); font-size: var(--t-apoio); color: var(--tinta); font-weight: 650; }
+.filtro { display: inline-flex; align-items: center; gap: var(--e-1); min-height: var(--toque); padding: var(--e-2); color: var(--tinta-2); background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-1); font-size: var(--t-micro); transition: background var(--dur-micro) var(--ease-padrao), color var(--dur-micro) var(--ease-padrao); }
 .filtro:hover { background: var(--preenchimento); color: var(--tinta); }
-.filtro[aria-pressed='true'] { border-bottom-color: var(--marca); color: var(--marca-forte); font-weight: 750; }
+.filtro[aria-pressed='true'] { border-color: var(--marca); color: var(--marca-forte); background: var(--marca-claro); font-weight: 750; }
 .contagem { display: inline-grid; place-items: center; min-width: 20px; font-family: var(--f-dado); font-size: var(--t-micro); font-variant-numeric: tabular-nums; }
 .leitura { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
 .ajuda { font-size: var(--t-micro); color: var(--tinta-2); }
@@ -46,9 +47,9 @@ button.abrirFoto:hover:not(:disabled) { box-shadow: 0 0 0 2px var(--marca-claro)
 .hoje input:disabled { cursor: wait; }
 .rodapePrato { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-1) var(--e-3); flex-wrap: wrap; padding-left: calc(64px + var(--e-4)); }
 .acoesCadastro { display: flex; gap: var(--e-1); flex-wrap: wrap; }
-.acoesCadastro > button { padding-inline: var(--e-2); font-size: var(--t-micro); }
+.acoesCadastro > button { min-width: var(--toque); padding-inline: var(--e-2); font-size: var(--t-micro); }
 .outrasAcoes { flex: 1; min-width: min(100%, 180px); text-align: right; }
-.outrasAcoes summary { display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--toque); padding-inline: var(--e-2); color: var(--tinta-2); font-size: var(--t-micro); border-radius: var(--r-1); cursor: pointer; list-style: none; }
+.outrasAcoes summary { display: inline-flex; align-items: center; justify-content: center; gap: var(--e-2); min-width: var(--toque); min-height: var(--toque); padding-inline: var(--e-2); color: var(--tinta-2); font-size: var(--t-micro); border-radius: var(--r-1); cursor: pointer; list-style: none; }
 .outrasAcoes summary::-webkit-details-marker { display: none; }
 .outrasAcoes summary:hover { background: var(--preenchimento); color: var(--tinta); }
 .outrasAcoes[open] summary > svg { transform: rotate(180deg); }

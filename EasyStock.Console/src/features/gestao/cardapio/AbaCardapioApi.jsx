@@ -83,7 +83,7 @@ export function AbaCardapioApi({ renderizarEditor }) {
           {busca && <Botao variante="texto" onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>}
         </div>
         <div className={css.faixaFiltros}><fieldset className={css.filtros}>
-          <legend className="sr">Filtrar pratos</legend>
+          <legend>Filtrar pratos</legend>
           {FILTROS.map((f) => (
             <button type="button" key={f.id} aria-pressed={filtro === f.id} className={css.filtro} onClick={() => setFiltro(f.id)}>
               {f.rotulo}{' '}<span className={css.contagem}>{contagens[f.id]}</span>
@@ -117,6 +117,7 @@ export function AbaCardapioApi({ renderizarEditor }) {
               <div className={css.cabecalhoPrato}>
                 {temEditor ? (
                   <button type="button" className={css.abrirFoto} disabled={ocupado === item.sku}
+                    title={`${item.foto ? 'Alterar' : 'Adicionar'} foto de ${item.nome}`}
                     aria-label={`${item.foto ? 'Alterar' : 'Adicionar'} foto de ${item.nome}`} onClick={() => abrirEditor(item, 'foto')}>
                     <FotoDoPrato item={item} />
                   </button>
@@ -145,11 +146,10 @@ export function AbaCardapioApi({ renderizarEditor }) {
               </div>
               <div className={css.rodapePrato}>
                 {temEditor && <div className={css.acoesCadastro}>
-                  <Botao variante="texto" disabled={ocupado === item.sku} aria-label={`Editar prato ${item.nome}`} onClick={() => abrirEditor(item)}><MarcaIcone nome="editar" tamanho={20} />Editar prato</Botao>
-                  <Botao variante="texto" disabled={ocupado === item.sku} aria-label={`Foto de ${item.nome}`} onClick={() => abrirEditor(item, 'foto')}><Icone nome="imagem" tamanho={18} />Foto</Botao>
+                  <Botao variante="texto" disabled={ocupado === item.sku} title={`Editar prato ${item.nome}`} aria-label={`Editar prato ${item.nome}`} onClick={() => abrirEditor(item)}><MarcaIcone nome="editar" tamanho={20} /></Botao>
                 </div>}
                 <details className={css.outrasAcoes}>
-                  <summary aria-label={`Mais ações para ${item.nome}`}>Mais ações<MarcaIcone nome="abaixo" tamanho={16} /></summary>
+                  <summary title={`Mais ações para ${item.nome}`} aria-label={`Mais ações para ${item.nome}`}><span aria-hidden="true">•••</span></summary>
                   <div className={css.painelAcoes}>
                     <label className={css.chave}>
                       <input type="checkbox" checked={item.noSite} disabled={!podeEditar || ocupado === item.sku}
