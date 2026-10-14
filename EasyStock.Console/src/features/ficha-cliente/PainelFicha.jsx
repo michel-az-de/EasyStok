@@ -88,6 +88,8 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
   const clienteEscolhendo = conversaEscolhendo === selecionada.id
   const numero = selecionada.numeroComanda || (pedido ? numeroDaComanda(pedido, { fonteApi }) : null)
   const posVenda = pedido && pedidoEncerrado(pedido)
+  const pedidoCriado = Boolean(pedido && (fonteApi ? pedido.pedidoId : pedido.cobranca || pedido.estado !== 'aguardando'))
+  const tituloPedido = pedidoCriado ? 'Pedido e entrega' : 'Seleção do atendimento'
   const total = pedido?.totalApi ?? totalDoPedido(pedido, cardapio)
   const saldo = saldoDoPedido(pedido, cardapio)
   const itens = pedido?.itens?.reduce((soma, item) => soma + item.qtd, 0) ?? 0
@@ -139,22 +141,22 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
 
       <div className={css.conteudo}>
         <section ref={receberPrato} className={css.resumoAtual} data-recebendo-prato={recebendoPrato || undefined} aria-label="Resumo do atendimento">
-          <p className={css.fase}>{!editavel ? 'Conversa encerrada' : posVenda ? 'Pós-venda' : pedido ? 'Pedido em andamento' : 'Antes da venda'}</p>
-          <h3>{!editavel ? 'Atendimento encerrado' : pedido ? `Comanda ${numero ?? ''}`.trim() : 'Vamos atender ' + primeiroNome}</h3>
+          <p className={css.fase}>{!editavel ? 'Conversa encerrada' : posVenda ? 'Pós-venda' : pedidoCriado ? 'Pedido criado' : 'Antes da venda'}</p>
+          <h3>{!editavel ? 'Atendimento encerrado' : pedidoCriado ? `Pedido ${numero ?? ''}`.trim() : pedido ? 'Seleção não confirmada' : 'Vamos atender ' + primeiroNome}</h3>
           <p>{!editavel ? 'O histórico está guardado. Reabra a conversa para retomar o atendimento.'
-            : pedido ? `${rotuloDoEstado(pedido.estado)} · ${itens} ${itens === 1 ? 'item' : 'itens'} · ${moeda(total)}`
+            : pedido ? `${pedidoCriado ? rotuloDoEstado(pedido.estado) : 'Em montagem'} · ${itens} ${itens === 1 ? 'item' : 'itens'} · ${moeda(total)}`
               : 'Monte o pedido por aqui ou acompanhe a escolha do cliente pelo link.'}</p>
         </section>
 
         {editavel && comandaCompartilhada}
         {editavel && !pedido && !fonteApi && acaoMontar && <div className={css.acaoMontar}>{acaoMontar}</div>}
         <nav className={css.acessosFicha} aria-label="Detalhes do atendimento">
-          {pedido && <AcessoDaFicha titulo={editavel ? 'Pedido e entrega' : 'Consultar pedido vinculado'}
+          {pedido && <AcessoDaFicha titulo={editavel ? tituloPedido : 'Consultar pedido vinculado'}
             resumo={editavel ? faixa || 'Itens, horário e acompanhamento' : 'Consultar sem alterar o pedido'} aoAbrir={() => setSecao('pedido')} />}
-          {editavel && pedido && <AcessoDaFicha titulo="Pagamento" resumo={resumoPagamento} aoAbrir={() => setSecao('pagamento')} />}
+          {editavel && pedidoCriado && <AcessoDaFicha titulo="Pagamento" resumo={resumoPagamento} aoAbrir={() => setSecao('pagamento')} />}
           <AcessoDaFicha titulo="Cliente e histórico"
             resumo={!cliente.endereco ? 'Conferir cadastro e endereço' : 'Cadastro, endereço e conversas anteriores'} aoAbrir={() => setSecao('cliente')} />
-          {editavel && pedido && (fonteApi || posVenda || pedido.ocorrencia) && <AcessoDaFicha titulo="Pós-venda"
+          {editavel && pedidoCriado && (fonteApi || posVenda || pedido.ocorrencia) && <AcessoDaFicha titulo="Pós-venda"
             resumo={pedido.ocorrencia ? 'Acompanhar problema relatado' : 'Ocorrências e devoluções'} aoAbrir={() => setSecao('pos-venda')} />}
         </nav>
       </div>
@@ -181,7 +183,8 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
         <BlocoCliente key={selecionada.id} conversa={selecionada} />
       </Modal>}
 
-      {secao === 'pedido' && pedido && <Modal titulo={`${editavel ? 'Pedido e entrega' : 'Pedido vinculado'} · ${selecionada.nome}`} largura="760px" aoFechar={() => setSecao(null)}>
+      {secao === 'pedido' && pedido && <Modal titulo={`${editavel ? tituloPedido : 'Pedido vinculado'} · ${selecionada.nome}`} largura="760px" aoFechar={() => setSecao(null)}>
+        {editavel && !pedidoCriado && <p>Estes itens ainda estão em montagem. O pedido será criado ao gerar a cobrança.</p>}
         {!editavel && <p>Consulta do atendimento encerrado. Reabra a conversa para fazer alterações.</p>}
         <BlocoPedido
           pedido={pedido}

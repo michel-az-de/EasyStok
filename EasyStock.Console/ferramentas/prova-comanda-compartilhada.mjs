@@ -139,6 +139,22 @@ assert.equal(partesComLinkDoCardapio(link.replace('casadababa.com', 'malicioso.c
 assert.equal(partesComLinkDoCardapio(link, null)[0].tipo, 'texto')
 assert.equal(combinaBusca({ nome: 'Maria', numeroComanda: 72, mensagens: [] }, 'comanda 72'), true)
 console.log('Comanda: conflito preserva edição, falha API preserva dados, adição de prato, permissão de devolução, saldo líquido, link seguro e busca por número aprovados.')
+for (const [podeEditar, pedido, situacao, estado, acao] of [
+  [true, null, null, 'Não confirmada', 'Revisar seleção'],
+  [true, { total: 60 }, null, 'Pedido atual mantido', 'Revisar alteração'],
+  [false, { total: 60 }, 'alteracao_aguardando_confirmacao', 'Pedido atual mantido', 'Comparar e aprovar'],
+  [false, { total: 60 }, 'aguardando_pagamento', 'Pedido criado', 'Consultar histórico'],
+  [false, { total: 60 }, 'alteracao_recusada', 'Alteração recusada', 'Consultar histórico'],
+  [false, { total: 60 }, 'estorno_pendente', 'Devolução em acompanhamento', 'Consultar histórico'],
+]) {
+  contexto.estados = []; contexto.cursor = 0
+  contexto.dados = [{ ...comanda, podeEditar, pedido, envio: situacao ? { situacao } : null }]
+  const resumo = elementos(ComandaDoCliente({ conversaId: 'conversa', ativo: true, compacta: true, pedido }))
+  assert.ok(resumo.some(e => e.props.children === estado), 'resumo distingue etapa: ' + estado)
+  assert.ok(resumo.some(e => e.type.name === 'Botao' && e.props.children === acao), 'ação corresponde à etapa: ' + acao)
+  assert.ok(!resumo.some(e => e.props.children === 'Seleção enviada'), 'envio não se confunde com criação ou aprovação')
+}
+console.log('Resumo: seleção, edição, aprovação, pedido criado, recusa e devolução têm estados e ações distintos.')
 const { ModalEnviarCardapio } = await import(modalArquivo.href)
 contexto.estados = []
 let concluirEnvio, envios = 0, fechamentos = 0

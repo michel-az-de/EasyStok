@@ -37,7 +37,7 @@ const { ContextoAcessoModulos } = await import('../src/aplicacao/acessoModulos.j
 const { pedidoDaApi } = await import('../src/infra/api/comandaApi.js')
 const { CANAIS, LINHAS_PRODUTO } = await import('../src/infra/catalogo.js')
 const pedido = pedidoDaApi({
-  pedidoId: 'pedido-anterior', numeroComanda: 4321, status: 'aguardando', total: 81, frete: 5,
+  pedidoId: 'pedido-anterior', numeroComanda: 4321, status: 'aguardando_pagamento', total: 81, frete: 5,
   itens: [{ cardapioItemId: 'lasanha', nome: 'Lasanha da compra anterior', quantidade: 2, precoUnitario: 38 }],
   alocado: 38, totalPago: 38, pagamentos: [{ id: 'pg1', valor: 38, metodo: 'pix', pagoEm: '2026-10-14T12:00:00Z' }],
 })
@@ -81,7 +81,8 @@ provar('lead sem compra abre antes da venda e aponta cadastro incompleto', () =>
 })
 provar('pedido com sinal mostra saldo do pedido inteiro incluindo frete', () => {
   const html = renderizar()
-  assert.match(html, /Pedido em andamento/)
+  assert.match(html, /Pedido criado/)
+  assert.match(html, /Aguardando pagamento/)
   assert.match(html, /81,00/)
   assert.match(html, /43,00 a receber/)
   assert.match(html, /Pedido e entrega/)
@@ -92,12 +93,19 @@ for (const estado of ['entregue', 'cancelado']) {
     const html = renderizar({ pedido: { ...pedido, estado } })
     assert.match(html, /Pós-venda/)
     assert.match(html, /Ocorrências e devoluções/)
-    assert.doesNotMatch(html, /Pedido em andamento|Antes da venda/)
+    assert.doesNotMatch(html, /Pedido criado|Antes da venda/)
   })
 }
 provar('cliente seguinte não herda nome, comanda nem saldo do anterior', () => {
   const html = renderizar({ id: 'bruno', nome: 'Bruno Lima', pedido: null })
   assert.match(html, /Vamos atender Bruno/)
   assert.doesNotMatch(html, /Ana|4321|43,00|81,00/)
+})
+for (const fonteApi of [true, false]) provar(`seleção local ${fonteApi ? 'API' : 'demo'} não aparece como pedido criado ou pagamento pendente`, () => {
+  const html = renderizar({ pedido: { numero: 'local', estado: 'aguardando', itens: [{ sku: 'lasanha', qtd: 1 }] } }, fonteApi)
+  assert.match(html, /Antes da venda/)
+  assert.match(html, /Seleção não confirmada/)
+  assert.match(html, /Seleção do atendimento/)
+  assert.doesNotMatch(html, /Pedido criado|Pedido e entrega|Pagamento completo|a receber|Ocorrências e devoluções/)
 })
 console.log(`${total} cenários reais de renderização da ficha aprovados.`)

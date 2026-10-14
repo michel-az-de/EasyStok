@@ -114,7 +114,7 @@ try {
   assert.equal(await modal.getByRole('button', { name: 'Tentar novamente' }).count(), 0)
   assert.equal(await modal.getByRole('button', { name: 'Comparar transportes' }).count(), 0)
   assert.doesNotMatch(await modal.innerText(), /laboratório|demonstração/iu)
-  assert.match(await orientacao.innerText(), /Com o cliente de acordo, use Confirmar pedido com o cliente/)
+  assert.match(await orientacao.innerText(), /Com o cliente de acordo, revise a seleção e use Criar pedido no Atendimento/)
   const consultaLalamove = modal.getByRole('link', { name: 'Consultar Lalamove (site externo, abre em nova aba)', exact: true })
   assert.equal(await consultaLalamove.getAttribute('href'), 'https://web.lalamove.com/')
   assert.equal(await consultaLalamove.getAttribute('target'), '_blank')
