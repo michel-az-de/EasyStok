@@ -3,11 +3,13 @@ using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EasyStock.Application.Tests.Services.Atendimento;
@@ -377,7 +379,8 @@ public class AgenteAtendimentoServiceTests
         _conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
         await _escalador.Received(1).EscalarAsync(_empresaId, _conversa,
             Arg.Is<string>(m => m.Contains("falha ao chamar o LLM")), Agora, Arg.Any<CancellationToken>());
-        await _unitOfWork.Received(1).CommitAsync();
+        // #1791: a resposta é gravada logo depois do envio; o fim do turno faz o segundo commit.
+        await _unitOfWork.Received(2).CommitAsync();
     }
 
     [Fact]
@@ -420,7 +423,8 @@ public class AgenteAtendimentoServiceTests
         await _conversaRepository.Received(1).AddMensagemAsync(
             Arg.Is<Mensagem>(m => m.Autor == AutorMensagem.Agente && m.Status == StatusMensagem.Falhou),
             Arg.Any<CancellationToken>());
-        await _unitOfWork.Received(1).CommitAsync();
+        // #1791: a resposta é gravada logo depois do envio; o fim do turno faz o segundo commit.
+        await _unitOfWork.Received(2).CommitAsync();
     }
 
     [Fact]
@@ -600,5 +604,99 @@ public class AgenteAtendimentoServiceTests
         var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
         resultado.ChamouLlm.Should().BeFalse();
+    }
+
+    // #1791: banco simulado. Só o que passou por um commit bem-sucedido fica visível para o webhook
+    // (status e eco procuram a mensagem pelo wamid); commit que falha não grava nada.
+    private readonly List<Mensagem> _pendentes = [];
+    private readonly List<Mensagem> _gravadas = [];
+    private readonly HashSet<string> _entradasProcessadasGravadas = [];
+    private Func<bool> _commitFalha = () => false;
+
+    private void SimularBanco()
+    {
+        _conversaRepository.When(r => r.AddMensagemAsync(Arg.Any<Mensagem>(), Arg.Any<CancellationToken>()))
+            .Do(c => _pendentes.Add(c.Arg<Mensagem>()));
+        _conversaRepository.ObterMensagemPorExternoIdAsync(_empresaId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(c => _historico.FirstOrDefault(m => m.ExternoId == c.ArgAt<string>(1)));
+        _unitOfWork.CommitAsync().Returns(_ =>
+        {
+            if (_commitFalha()) throw new InvalidOperationException("banco fora do ar");
+            _gravadas.AddRange(_pendentes);
+            _pendentes.Clear();
+            foreach (var entrada in _historico.Where(m => m.Autor == AutorMensagem.Cliente && m.ProcessadaEm is not null))
+                _entradasProcessadasGravadas.Add(entrada.ExternoId!);
+            return 1;
+        });
+    }
+
+    private EnviarCardapioImagemFerramenta CriarFerramentaCardapio()
+    {
+        var storefront = Substitute.For<IStorefrontRepository>();
+        _cloudClient.EnviarTextoAsync(WaId, Arg.Is<string>(t => t.Contains("comanda", StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(new EnvioWhatsAppResult("wamid.cardapio"));
+        var saudacao = new SaudacaoAtendimento(storefront, new ConfigurationBuilder().Build());
+        return new EnviarCardapioImagemFerramenta(storefront,
+            new LinkCardapioConversaService(new LinkCardapioConversaServiceTests.RepositorioEmMemoria(), saudacao),
+            _cloudClient, _conversaRepository);
+    }
+
+    [Fact]
+    public async Task SaidaDaFerramentaFicaGravadaAntesDeOLlmContinuar()
+    {
+        // #1791: o status (sent/failed) e o eco da comanda chegam pelo webhook enquanto o LLM ainda
+        // responde. Se a mensagem só fosse gravada no fim do turno, o status cairia em "wamid
+        // desconhecido" (sem reenvio S57 nem SMS S60) e o eco viraria Mensagem(Dona) assumindo a conversa.
+        SimularBanco();
+        var ferramenta = CriarFerramentaCardapio();
+        string?[] gravadasNaContinuacao = [];
+        var entradaProcessadaNaContinuacao = false;
+        var chamada = 0;
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            if (++chamada == 1) return UsoFerramenta("enviar_cardapio_imagem");
+            gravadasNaContinuacao = _gravadas.Select(m => m.ExternoId).ToArray();
+            entradaProcessadaNaContinuacao = _entradasProcessadasGravadas.Contains("wamid.in1");
+            return Texto("Texto livre ignorado.");
+        });
+
+        var resultado = await CriarServico(ferramenta).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Respondeu.Should().BeTrue();
+        gravadasNaContinuacao.Should().Contain("wamid.cardapio");
+        entradaProcessadaNaContinuacao.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CommitFinalQueFalhaNaoFazOProximoTurnoResponderDeNovo()
+    {
+        // #1791: a comanda já saiu pela Meta; se o commit do fim do turno falhar, as entradas
+        // precisam continuar processadas, senão o próximo job responde de novo ao cliente.
+        SimularBanco();
+        var ferramenta = CriarFerramentaCardapio();
+        var chamadas = 0;
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(_ =>
+            ++chamadas == 1 ? UsoFerramenta("enviar_cardapio_imagem") : Texto("Texto livre ignorado."));
+        // Falha o commit do fim do turno, depois de o LLM concluir.
+        _commitFalha = () => chamadas >= 2;
+        var servico = CriarServico(ferramenta);
+
+        var primeiro = () => servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+        await primeiro.Should().ThrowAsync<InvalidOperationException>();
+
+        // O próximo job relê o banco: só o que foi gravado.
+        var entrada = Mensagem.Entrada(_empresaId, _conversa.Id, Agora.AddMinutes(-1), TipoConteudoMensagem.Texto,
+            "quanto tempo falta?", "wamid.in1");
+        if (_entradasProcessadasGravadas.Contains("wamid.in1")) entrada.MarcarProcessada(Agora);
+        _historico.Clear();
+        _historico.Add(entrada);
+        _historico.AddRange(_gravadas);
+        _requisicoes.Clear();
+        _commitFalha = () => false;
+
+        var segundo = await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora.AddSeconds(5));
+
+        segundo.ChamouLlm.Should().BeFalse();
+        _gravadas.Select(m => m.ExternoId).Should().Contain("wamid.cardapio");
     }
 }
