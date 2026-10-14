@@ -65,6 +65,7 @@ import { useRoteiro } from '../features/simulacoes/useRoteiro'
 import { PainelAgente } from '../features/agente/PainelAgente'
 import { BalaoAssistente } from '../features/assistente/BalaoAssistente'
 import { Moldura } from './Moldura'
+import { PilhaDeAvisos } from './PilhaDeAvisos'
 import { AjudaDoConsole } from '../features/ajuda/AjudaDoConsole'
 import { NavegacaoDoConsole } from './NavegacaoDoConsole'
 import css from './moldura.module.css'
@@ -399,6 +400,7 @@ function AppPrincipal({ rota, sessao, aoSair, ultimaConversa, aoLembrarConversa,
       {ultimaConversa && <RestaurarConversa ultimaConversa={ultimaConversa} aoLembrarConversa={aoLembrarConversa} />}
       <LimparAvisoAoNavegar />
       <TelaDaRota rota={rota} aoSair={aoSair} />
+      {permite('atendimento') && <PilhaDeAvisos />}
     </AtendimentoProvider>
   )
 }

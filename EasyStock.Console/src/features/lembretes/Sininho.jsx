@@ -96,7 +96,7 @@ function ItemProgramado({ lembrete, agora, realcado, aoAbrir }) {
 // ancorado com Novos / Vistos / Programados, e o "+" que abre a modal de
 // programar. Visto é estilo Instagram: some da lista quando o painel fecha,
 // não quando ela olha.
-export function Sininho() {
+export function Sininho({ comRotulo = false }) {
   const {
     lembretes, agora, selecionada, vistos, conversas, eventosSonoros, fonteApi, consultaLembretes,
   } = useAtendimento()
@@ -264,7 +264,10 @@ export function Sininho() {
         onAnimationEnd={() => setBalancar(false)}
         onClick={alternarPainel}
       >
-        <Icone nome="bell" tamanho={24} />
+        {/* #1807: relógio, não sino. O sino é de Avisos; dois sinos colados no trilho faziam
+            quem clicava em "Avisos" abrir Lembretes. */}
+        <Icone nome="relogio" tamanho={24} />
+        {comRotulo && <span>Lembretes</span>}
         {contagem > 0 && <span className={css.badge} aria-hidden="true">{rotuloBadge}</span>}
       </Botao>
 

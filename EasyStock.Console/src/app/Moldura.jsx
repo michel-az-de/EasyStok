@@ -292,8 +292,11 @@ function Trilho({
         <Icone nome="painel" tamanho={22} />
         <span>Gestão</span>
       </Botao>
-      <div className={css.sinoTrilho}><Sininho /></div>
+      {/* #1807: Avisos (sino) e Lembretes (relógio) com ícone e rótulo próprios, cada rótulo
+          dentro do próprio botão. Antes o "Lembretes" vinha de CSS e ficava colado ao sino de
+          Avisos logo abaixo, e quem clicava em Avisos abria Lembretes. */}
       <div className={css.avisosTrilho}>{notificacoes}</div>
+      <div className={css.sinoTrilho}><Sininho comRotulo /></div>
       <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAjuda} aria-haspopup="dialog" title="Ajuda e diagnóstico">
         <MarcaIcone nome="informacao" tamanho={22} /><span>Ajuda</span>
       </Botao>
