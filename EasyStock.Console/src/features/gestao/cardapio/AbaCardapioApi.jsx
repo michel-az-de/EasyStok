@@ -6,18 +6,12 @@ import { Icone } from '../../../componentes/Icone'
 import { MarcaIcone } from '../../../componentes/MarcaIcone'
 import { useGestaoCardapioApi } from '../../../aplicacao/useGestaoCardapioApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
+import { FILTROS_DO_CARDAPIO, contagensDoCardapio, filtrarCardapio, podeReordenar } from '../../../dominio/filtroDoCardapio'
 import { moeda } from '../../../dominio/formato'
 import css from './gestaoCardapio.module.css'
 
 const LINHA = { servir: 'Para servir', casa: 'Preparar em casa' }
-const FILTROS = [
-  { id: 'todos', rotulo: 'Todos', aceita: () => true },
-  { id: 'hoje', rotulo: 'Disponíveis hoje', aceita: (item) => item.hoje && !item.arquivado },
-  { id: 'fora', rotulo: 'Fora de hoje', aceita: (item) => !item.hoje || item.arquivado },
-  { id: 'sem-foto', rotulo: 'Sem foto', aceita: (item) => !item.foto },
-]
 const dataCurta = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
-const normalizar = (texto) => (texto ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 function FotoDoPrato({ item }) {
   const [falhou, setFalhou] = useState(null)
@@ -33,27 +27,24 @@ export function AbaCardapioApi({ renderizarEditor }) {
   const gestao = useGestaoCardapioApi()
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState('todos')
+  // #1808: a categoria combina com a disponibilidade e com a busca; nula é "Todas".
+  const [categoria, setCategoria] = useState(null)
   const buscaRef = useRef(null)
   const [ocupado, setOcupado] = useState(null)
   const [editor, setEditor] = useState(null)
   const temEditor = podeEditar && typeof renderizarEditor === 'function'
 
-  const contagens = useMemo(() => Object.fromEntries(FILTROS.map((f) => [f.id, gestao.itens.filter(f.aceita).length])), [gestao.itens])
-  const itens = useMemo(() => {
-    const termo = normalizar(busca.trim())
-    const aceita = FILTROS.find((f) => f.id === filtro).aceita
-    return gestao.itens.filter((item) => aceita(item)
-      && (!termo || normalizar(`${item.nome} ${item.categoria ?? ''} ${item.porcao ?? ''}`).includes(termo)))
-  }, [gestao.itens, busca, filtro])
+  const recorte = useMemo(() => ({ filtro, categoria, busca }), [filtro, categoria, busca])
+  const contagens = useMemo(() => contagensDoCardapio(gestao.itens, recorte), [gestao.itens, recorte])
+  const itens = useMemo(() => filtrarCardapio(gestao.itens, recorte), [gestao.itens, recorte])
 
   const fazer = (sku, acao) => {
     setOcupado(sku)
     Promise.resolve(acao()).finally(() => setOcupado(null))
   }
   const abrirEditor = (item = null, focoInicial = null) => setEditor({ item, focoInicial })
-  const limpar = () => { setBusca(''); setFiltro('todos'); buscaRef.current?.focus() }
-  // A posição é a lista completa do servidor; ordenar um recorte mudaria vizinhos invisíveis.
-  const ordenando = !busca.trim() && filtro === 'todos'
+  const limpar = () => { setBusca(''); setFiltro('todos'); setCategoria(null); buscaRef.current?.focus() }
+  const ordenando = podeReordenar(recorte)
 
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando o cardápio…</output>
   if (gestao.estado === 'erro' && gestao.itens.length === 0 && !editor) {
@@ -84,12 +75,23 @@ export function AbaCardapioApi({ renderizarEditor }) {
         </div>
         <div className={css.faixaFiltros}><fieldset className={css.filtros}>
           <legend>Filtrar pratos</legend>
-          {FILTROS.map((f) => (
+          {FILTROS_DO_CARDAPIO.map((f) => (
             <button type="button" key={f.id} aria-pressed={filtro === f.id} className={css.filtro} onClick={() => setFiltro(f.id)}>
-              {f.rotulo}{' '}<span className={css.contagem}>{contagens[f.id]}</span>
+              {f.rotulo}{' '}<span className={css.contagem}>{contagens.filtros[f.id]}</span>
             </button>
           ))}
         </fieldset>
+        {contagens.categorias.length > 0 && <fieldset className={css.filtros}>
+          <legend>Categoria</legend>
+          <button type="button" aria-pressed={!categoria} className={css.filtro} onClick={() => setCategoria(null)}>
+            Todas{' '}<span className={css.contagem}>{contagens.todas}</span>
+          </button>
+          {contagens.categorias.map((c) => (
+            <button type="button" key={c.nome} aria-pressed={categoria === c.nome} className={css.filtro} onClick={() => setCategoria(c.nome)}>
+              {c.nome}{' '}<span className={css.contagem}>{c.total}</span>
+            </button>
+          ))}
+        </fieldset>}
       <div className={css.leitura}>
         <output className={css.descricao}>{itens.length} de {gestao.itens.length} {gestao.itens.length === 1 ? 'prato' : 'pratos'}</output>
         <details className={css.ajuda}>
@@ -168,7 +170,7 @@ export function AbaCardapioApi({ renderizarEditor }) {
                         <Botao variante="texto" aria-label={`Subir ${item.nome}`} disabled={indice === 0 || ocupado === item.sku} onClick={() => fazer(item.sku, () => gestao.mover(item.sku, 'subir'))}><MarcaIcone nome="acima" tamanho={18} /></Botao>
                         <Botao variante="texto" aria-label={`Descer ${item.nome}`} disabled={indice === itens.length - 1 || ocupado === item.sku} onClick={() => fazer(item.sku, () => gestao.mover(item.sku, 'descer'))}><MarcaIcone nome="abaixo" tamanho={18} /></Botao>
                       </span>
-                    ) : <span className={css.detalhe}>Veja Todos e limpe a busca para mudar a ordem.</span>)}
+                    ) : <span className={css.detalhe}>Para mudar a ordem, escolha Todos e Todas as categorias e limpe a busca.</span>)}
                   </div>
                 </details>
               </div>
