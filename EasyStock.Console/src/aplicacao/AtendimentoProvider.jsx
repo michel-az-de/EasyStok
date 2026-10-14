@@ -25,6 +25,7 @@ import { entregaPassouDoPrazo, ocorrenciaAberta, ORIGENS_OCORRENCIA } from '../d
 import { pedirPermissaoDeNotificacao, permissaoDeNotificacao } from '../infra/notificacaoNavegador'
 import { lembretesAutomaticos, listaDeLembretes } from '../dominio/lembrete'
 import { useAvisoSonoro } from './useAvisoSonoro'
+import { useFilaDeAvisos } from './useFilaDeAvisos'
 import { audioDestravado, destravarAudio } from '../infra/som'
 import { gravarPreferenciaSom, lerPreferenciaSom } from '../infra/preferenciaSom'
 import { conectarPrincipal } from '../infra/canalEntreJanelas'
@@ -239,9 +240,13 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   // `janelas` liga o motivo "pedido atrasado" (achado 3); `aoTocar` alimenta
   // o registro de sons recentes do Sininho (achado 7, item 7) e a marca de
   // "pagamento não visto" independente do sinal verde (item 2).
+  // #1807: o mesmo aviso que toca também aparece na tela e, com a aba
+  // escondida, no navegador (`useFilaDeAvisos`, montado só aqui).
+  const filaDeAvisos = useFilaDeAvisos()
   useAvisoSonoro({
     conversas: estado.conversas, som: estado.som, agora: agoraEfetivo, aberta, expediente: horarioDaLoja,
     janelas: estado.catalogo.janelas,
+    aoAvisar: filaDeAvisos.avisar,
     aoTocar: (evento, conversaId) => {
       setEventosSonoros((atual) => [
         ...atual, { id: proximoId('som'), evento, conversaId, quando: agoraRef.current },
@@ -416,6 +421,9 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       pagamentosNaoVistos,
       permissaoNotificacao,
       consultaLembretes,
+      // #1807: pilha de avisos da tela (toast) e quem tira um da pilha.
+      avisosNaTela: filaDeAvisos.avisos,
+      dispensarAviso: filaDeAvisos.dispensar,
       // `ui.encerrando` (seção 5): id da conversa com a modal de
       // encerramento aberta, ou `null`.
       encerrando: estado.ui.encerrando,
@@ -439,7 +447,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       cargaDasRegras: estado.cargaDasRegras,
       sessao,
     }
-  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, horarioDaLoja, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao, consultaLembretes])
+  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, horarioDaLoja, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao, consultaLembretes, filaDeAvisos.avisos, filaDeAvisos.dispensar])
 
   return (
     <ContextoCatalogo.Provider value={estado.catalogo}>

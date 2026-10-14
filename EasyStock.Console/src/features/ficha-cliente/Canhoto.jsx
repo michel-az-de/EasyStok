@@ -5,7 +5,7 @@ import { FolhaImpressao } from '../../componentes/FolhaImpressao'
 import { Modal } from '../../componentes/Modal'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
 import { pdfDoCanhoto } from '../../dominio/impressao'
-import { agruparPorLinha, numeroCurto } from '../../dominio/pedido'
+import { agruparPorLinha, numeroCurto, porcaoForaDoNome } from '../../dominio/pedido'
 import { Cabecalho } from './Cabecalho'
 import css from './comanda.module.css'
 
@@ -43,7 +43,7 @@ export function PapelCanhoto({
                   <span className={css.qtd}>{linha.qtd}×</span>
                   <span className={css.corpo}>
                     <span className={css.nomeItem}>{linha.produto?.nome}</span>
-                    <span className={css.porcao}>{linha.produto?.porcao}</span>
+                    <span className={css.porcao}>{porcaoForaDoNome(linha.produto)}</span>
                   </span>
                 </div>
                 {linha.obs && <span className={css.obs}>{linha.obs}</span>}
@@ -82,7 +82,9 @@ export function ModalCanhoto({
             <Botao variante="texto" onClick={aoFechar}>Fechar</Botao>
             {pedidoIdApi ? (
               <>
-                <AcoesPdf gerar={gerar} aoImprimir={aoImprimir} planoB={() => window.print()} varianteImprimir="secundario" rotuloImprimir="Imprimir PDF" />
+                {/* #1802: "Imprimir PDF" mandava a bobina de 80 mm ao diálogo do navegador, que a esticava
+                    em A4. Com o pedido no EasyStok só imprime o impresso da API, pelo perfil do documento. */}
+                <AcoesPdf gerar={gerar} soBaixar />
                 <ImprimirPedido {...impressaoDoPedido(pedidoIdApi)} documentoInicial="pedido" variante="primario" aoImprimir={(documento) => { if (documento === 'pedido' || documento === 'cozinha') aoImprimir?.() }} />
               </>
             ) : <AcoesPdf gerar={gerar} aoImprimir={aoImprimir} planoB={() => window.print()} />}

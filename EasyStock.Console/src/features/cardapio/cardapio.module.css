@@ -146,6 +146,8 @@
   color: var(--tinta-2); border-radius: var(--r-1);
 }
 .fechar:hover { background: var(--elevado); color: var(--tinta); }
+/* #1806: lado e tamanho do painel, no canto do cabeçalho junto do fechar, com o mesmo botão. */
+.ferramentasPainel { display: flex; align-items: center; gap: var(--e-1); flex-shrink: 0; }
 
 .painel .papeis { margin: var(--e-4) var(--e-4) 0; }
 .rolavelPainel { flex: 1; min-height: 0; overflow-y: auto; padding: var(--e-3) var(--e-4) var(--e-4); }
