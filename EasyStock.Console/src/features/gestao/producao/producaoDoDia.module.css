@@ -38,7 +38,7 @@
 .tocar:focus-visible, .menos:focus-visible { outline: var(--b-2) solid var(--marca); outline-offset: -2px; }
 .tocar:disabled, .menos:disabled { cursor: default; opacity: .6; }
 .nomeDoPrato { color: var(--tinta); font-size: var(--t-corpo); font-weight: 700; line-height: var(--lh-compacto); overflow-wrap: anywhere; }
-.tamanho { color: var(--tinta-2); font-size: var(--t-apoio); line-height: var(--lh-compacto); }
+.tamanho { color: var(--tinta-2); font-size: var(--t-apoio); line-height: var(--lh-compacto); white-space: nowrap; }
 .saldo { color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-corpo); font-variant-numeric: tabular-nums; }
 .saldo strong { color: var(--tinta); font-weight: 700; }
 
