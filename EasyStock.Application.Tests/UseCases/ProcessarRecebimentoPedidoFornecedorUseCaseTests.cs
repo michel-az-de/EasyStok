@@ -267,6 +267,37 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ItemLegadoSobreRecebido_NaoTravaOutroItem()
+    {
+        var pedidoId = Guid.NewGuid();
+        var agora = new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc);
+        var legado = new PedidoFornecedorItem
+        {
+            Id = Guid.NewGuid(), PedidoFornecedorId = pedidoId, ProdutoId = _produtoId, Nome = "Antigo",
+            Quantidade = 10, QuantidadeRecebida = 12, CustoUnitario = 5m, CriadoEm = agora
+        };
+        var pendente = new PedidoFornecedorItem
+        {
+            Id = Guid.NewGuid(), PedidoFornecedorId = pedidoId, ProdutoId = _produtoId, Nome = "Novo",
+            Quantidade = 4, QuantidadeRecebida = 0, CustoUnitario = 5m, CriadoEm = agora
+        };
+        var pedido = new PedidoFornecedor
+        {
+            Id = pedidoId, EmpresaId = _empresaId, FornecedorId = _fornecedorId, DataPedido = agora,
+            Status = StatusPedidoFornecedor.RecebidoParcial, CriadoEm = agora, AlteradoEm = agora,
+            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "Fornecedor", EmpresaId = _empresaId },
+            Itens = { legado, pendente }
+        };
+        _pedidoRepository.GetByIdWithItensAsync(pedidoId, Arg.Any<CancellationToken>()).Returns(pedido);
+
+        var resultado = await _useCase.ExecuteAsync(new ProcessarRecebimentoPedidoFornecedorCommand(
+            pedidoId, _empresaId, agora, new Dictionary<Guid, decimal> { { pendente.Id, 4m } }));
+
+        resultado.ItensProcessados.Should().Be(1);
+        pendente.QuantidadeRecebida.Should().Be(4);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_SkipQuantidadeZero()
     {
         // Arrange

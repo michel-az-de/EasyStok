@@ -26,12 +26,12 @@ public sealed record ItemListaComprasResult(
 
 internal static class ListaComprasValidacao
 {
-    // Quantidade é opcional (item de texto livre), mas quando vem precisa ser positiva: zero ou
-    // negativa era gravada e depois sumia do gerar-pedidos sem aviso (contada em ItensIgnorados).
+    // Quantidade é opcional e zero segue valendo como "sem quantidade" (o console manda mínimo - saldo,
+    // que pode dar zero). Negativa não tem leitura possível: era gravada e sumia do gerar-pedidos.
     public static void ValidarQuantidade(decimal? quantidade, string texto)
     {
-        if (quantidade is <= 0m)
-            throw new UseCaseValidationException($"Item '{texto.Trim()}': a quantidade precisa ser maior que zero.");
+        if (quantidade is < 0m)
+            throw new UseCaseValidationException($"Item '{texto.Trim()}': a quantidade não pode ser negativa.");
     }
 }
 

@@ -275,15 +275,13 @@ public class ListaComprasUseCasesTests
         await _uow.DidNotReceive().CommitAsync();
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-5)]
-    public async Task Gerar_RecusaQuantidadeNaoPositiva(int quantidade)
+    [Fact]
+    public async Task Gerar_RecusaQuantidadeNegativa()
     {
         var act = () => Gerar().ExecuteAsync(new GerarListaComprasCommand(
-            _empresaId, "Reposição", new[] { new GerarItemListaComprasInput("Farinha", Quantidade: quantidade) }));
+            _empresaId, "Reposição", new[] { new GerarItemListaComprasInput("Farinha", Quantidade: -5m) }));
 
-        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*maior que zero*");
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*negativa*");
         await _uow.DidNotReceive().CommitAsync();
     }
 
@@ -293,7 +291,17 @@ public class ListaComprasUseCasesTests
         var act = () => Adicionar().ExecuteAsync(
             new AdicionarItemListaComprasCommand(_empresaId, Guid.NewGuid(), "Farinha", Quantidade: -1m));
 
-        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*maior que zero*");
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*negativa*");
         await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task Gerar_AceitaQuantidadeZeroComoSemQuantidade()
+    {
+        // O planejamento do console manda mínimo - saldo, que dá zero quando o saldo bate o mínimo.
+        var result = await Gerar().ExecuteAsync(new GerarListaComprasCommand(
+            _empresaId, "Reposição", new[] { new GerarItemListaComprasInput("Farinha", Quantidade: 0m) }));
+
+        result.TotalItens.Should().Be(1);
     }
 }

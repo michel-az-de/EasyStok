@@ -93,17 +93,18 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
                 continue;
             }
 
-            // Sem teto, um digito a mais (1000 em vez de 10) virava +1000 no estoque e Recebido.
-            if (novoTotalRecebido > item.Quantidade)
-                throw new UseCaseValidationException(
-                    $"Item {item.Id}: recebido ({novoTotalRecebido}) passa do pedido ({item.Quantidade}).");
-
             var delta = novoTotalRecebido - item.QuantidadeRecebida;
             if (delta <= 0)
             {
                 logger.LogDebug("Item {ItemId} sem delta a aplicar, pulando.", item.Id);
                 continue;
             }
+
+            // Sem teto, um digito a mais (1000 em vez de 10) virava +1000 no estoque e Recebido.
+            // So vale para entrada nova: item antigo ja sobre-recebido nao pode travar os outros.
+            if (novoTotalRecebido > item.Quantidade)
+                throw new UseCaseValidationException(
+                    $"Item {item.Id}: recebido ({novoTotalRecebido}) passa do pedido ({item.Quantidade}).");
 
             // Validar produto (obrigatório para criar entrada)
             if (!item.ProdutoId.HasValue)
