@@ -29,11 +29,11 @@ export function SinoDaSessao({ avisos, aparelho }) {
     }
   }, [lendo, recentes])
   return <>
-    <Botao variante="texto" icone="bell" aria-label={`Notificações${erro ? ', sem atualizar' : total === null ? '' : `, ${total} não lidas`}`}
+    <Botao variante="texto" icone="bell" aria-label={`Avisos${erro ? ', sem atualizar' : total === null ? '' : `, ${total} não lidas`}`}
       aria-haspopup="dialog" onClick={() => { setAberto(true); carregar() }}>
       <span>Avisos{erro ? ' !' : total ? ` (${total})` : ''}</span>
     </Botao>
-    {aberto && <Modal titulo="Notificações" largura="min(760px, calc(100vw - 24px))" descricao="Avisos para você e para a equipe. A leitura de um aviso geral vale para toda a equipe."
+    {aberto && <Modal titulo="Avisos" largura="min(760px, calc(100vw - 24px))" descricao="Avisos para você e para a equipe. A leitura de um aviso geral vale para toda a equipe."
       aoFechar={() => setAberto(false)} rodape={<><Botao ref={atualizarRef} onClick={() => carregar()} disabled={carregando || Boolean(lendo)}>Atualizar avisos</Botao><Botao onClick={() => setAberto(false)}>Fechar</Botao></>}>
       {erro && <p role="alert" className={css.erro}>Sem atualizar: {erro}</p>}
       {carregando && <p role="status" className={css.resumo}>Atualizando avisos…</p>}
