@@ -8,6 +8,8 @@ import { proximoId } from '../infra/repositorioConversas'
 import { avisoDeVariaveisNaoResolvidas } from '../dominio/respostas'
 import { FRASE_DA_FALHA, TIPOS_DE_FALHA, textoDaFalhaDeEnvio } from '../dominio/falhaDeEnvio'
 import { deveCarregarDossie } from './planoDeSincronizacao'
+import { envioBloqueado } from '../dominio/janela'
+import { canalDaConversa } from '../dominio/canal'
 import { criarAcoesExpedienteApi } from './api/expediente'
 import { criarAcoesCaixaApi } from './api/caixa'
 import { criarAcoesLembretesApi } from './api/lembretes'
@@ -56,6 +58,15 @@ const falhaDoEnvio = (id, mensagemId, erro) => ({
 // `api/naoLigadas.js`) não mexem na memória do navegador: só avisam na faixa.
 export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef = null }) {
   const avisar = (erro) => despachar({ tipo: acao.AVISO_API, mensagem: erro.message })
+  // #1787: o reducer recusa o envio sem criar balão; sem esta guarda o texto saía pela API e a falha ficava muda.
+  // A mesma regra do reducer (envioBloqueado); conversa que o estado não conhece segue para o EasyStok decidir.
+  const envioRecusado = (id) => {
+    const { conversas = [], catalogo } = estadoRef.current
+    const conversa = conversas.find((c) => c.id === id)
+    if (!conversa || !envioBloqueado(conversa, agoraRef.current, canalDaConversa(catalogo?.canais, conversa))) return false
+    despachar({ tipo: acao.AVISO_API, mensagem: 'Cadastro bloqueado: a mensagem não saiu. Desbloqueie na ficha para escrever.' })
+    return true
+  }
   const clienteApi = criarAcoesClienteApi({ despachar, estadoRef })
   const confirmarResponsavel = (id, chamada) => chamada(id)
     .then((resumo) => { despachar({ tipo: acao.CONFIRMAR_RESPONSAVEL_API, id, situacao: situacaoConversaDaApi(resumo, lerSessao()?.usuario) }); return true })
@@ -65,7 +76,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
     ...acoes,
     listarAtendentes,
     ...criarAvisosNaoLigadas(despachar),
-    ...criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio }),
+    ...criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio, envioRecusado }),
     // #1474: sem `fixo`, fecha só o aviso de ação; o persistente (configuração) só com `fixo: true`.
     fecharAvisoApi: ({ fixo = false } = {}) => despachar({ tipo: acao.FECHAR_AVISO_API, fixo }),
     ...criarAcoesExpedienteApi({ despachar, estadoRef }),
@@ -105,6 +116,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
         despachar({ tipo: acao.AVISO_API, mensagem: variavelSobrando })
         return false
       }
+      if (envioRecusado(id)) return false
       const mensagemId = proximoId('msg')
       despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, agora: agoraRef.current })
       return enviarTexto(id, texto)

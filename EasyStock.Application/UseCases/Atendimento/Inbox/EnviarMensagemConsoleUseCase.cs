@@ -54,12 +54,11 @@ public sealed class EnviarMensagemConsoleUseCase(
         GarantirJanela(conversa, agora, tag);
 
         return await EnviarERegistrarAsync(conversa, command.UsuarioId, agora,
-            () => tag is not null && canal is ICanalComTagHumana comTag
-                ? comTag.EnviarTextoComTagAsync(conversa.ContatoIdExterno, texto, tag, ct)
-                : canal.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct),
+            token => tag is not null && canal is ICanalComTagHumana comTag
+                ? comTag.EnviarTextoComTagAsync(conversa.ContatoIdExterno, texto, tag, token)
+                : canal.EnviarTextoAsync(conversa.ContatoIdExterno, texto, token),
             externoId => Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
-                TipoConteudoMensagem.Texto, texto, externoId),
-            ct);
+                TipoConteudoMensagem.Texto, texto, externoId));
     }
 
     public async Task<MensagemAtendimentoResult> EnviarImagemAsync(EnviarImagemConsoleCommand command, CancellationToken ct = default)
@@ -78,15 +77,14 @@ public sealed class EnviarMensagemConsoleUseCase(
             command.EmpresaId, conversa.Id, command.FileName, command.ContentType, command.Conteudo, ct);
 
         return await EnviarERegistrarAsync(conversa, command.UsuarioId, agora,
-            () => canal.EnviarImagemAsync(conversa.ContatoIdExterno, imagem.Url, legenda, ct),
+            token => canal.EnviarImagemAsync(conversa.ContatoIdExterno, imagem.Url, legenda, token),
             externoId =>
             {
                 var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
                     TipoConteudoMensagem.Imagem, legenda, externoId);
                 mensagem.AnexarMidia(imagem.StorageKey, imagem.ContentType);
                 return mensagem;
-            },
-            ct);
+            });
     }
 
     /// <summary>
@@ -103,15 +101,14 @@ public sealed class EnviarMensagemConsoleUseCase(
         var audio = await uploads.UploadAudioAtendimentoAsync(command.EmpresaId, conversa.Id, command.Conteudo, ct);
 
         return await EnviarERegistrarAsync(conversa, command.UsuarioId, agora,
-            () => canal.EnviarAudioAsync(conversa.ContatoIdExterno, audio.Url, audio.NotaDeVoz, ct),
+            token => canal.EnviarAudioAsync(conversa.ContatoIdExterno, audio.Url, audio.NotaDeVoz, token),
             externoId =>
             {
                 var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
                     TipoConteudoMensagem.Audio, null, externoId);
                 mensagem.AnexarMidia(audio.StorageKey, audio.ContentType);
                 return mensagem;
-            },
-            ct);
+            });
     }
 
     private async Task<Conversa> ObterParaEnvioAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct)
@@ -152,21 +149,24 @@ public sealed class EnviarMensagemConsoleUseCase(
     /// <summary>
     /// Envia e grava. Na falha do canal (#1396) grava a mensagem <see cref="StatusMensagem.Falhou"/> com o erro
     /// (temporária agenda o reenvio, S57) e devolve o id real na exceção, para o botão Reenviar do console.
+    /// #1787: daqui em diante o cancelamento do request não vale. A Meta pode ter entregue mesmo com a aba
+    /// fechada, e sem o registro a conversa não fica Assumida e o agente segue respondendo (RN-04).
     /// </summary>
     private async Task<MensagemAtendimentoResult> EnviarERegistrarAsync(
-        Conversa conversa, Guid usuarioId, DateTime agora, Func<Task<string>> envio,
-        Func<string?, Mensagem> criarMensagem, CancellationToken ct)
+        Conversa conversa, Guid usuarioId, DateTime agora, Func<CancellationToken, Task<string>> envio,
+        Func<string?, Mensagem> criarMensagem)
     {
+        var ct = CancellationToken.None;
         string externoId;
         try
         {
-            externoId = await envio();
+            externoId = await envio(ct);
         }
         catch (WhatsAppCloudException ex) when (ex.Codigo == CodigoMetaForaDaJanela)
         {
             throw new ForaDaJanelaAtendimentoException("A Meta recusou: fora da janela de 24 h.", ex);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        catch (Exception ex)
         {
             var falhou = criarMensagem(null);
             falhou.RegistrarFalhaEnvio(ex.Message, ClassificadorFalhaEnvio.Classificar(ex), agora);
