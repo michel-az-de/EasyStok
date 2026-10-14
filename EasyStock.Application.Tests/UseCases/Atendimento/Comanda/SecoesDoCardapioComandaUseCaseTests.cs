@@ -135,4 +135,39 @@ public class SecoesDoCardapioComandaUseCaseTests
         _secoes.Should().ContainSingle();
         lasanha.SecaoId.Should().Be(massas.Id);
     }
+    [Fact]
+    public async Task PreviaDaMigracao_ListaOQueAConversaoFaria_SemGravar()
+    {
+        Item("Lasanha", "Massas recheadas");
+        Item("Ravioli", "MASSAS RECHEADAS");
+        Item("Nhoque", "nhoque");
+        Item("Torta", null);
+
+        var previa = await Sut().PreviaDaMigracaoAsync(EmpresaId);
+
+        previa.Categorias.Should().Equal(
+            new CategoriaAntiga("Massas recheadas", 2, false),
+            new CategoriaAntiga("Nhoque", 1, false));
+        previa.Pratos.Should().Be(3);
+        _secoes.Should().BeEmpty("a prévia não grava");
+        await _uow.DidNotReceive().CommitAsync();
+
+        var r = await Sut().MigrarCategoriasAsync(EmpresaId);
+        r.Should().Be(new MigracaoDeCategoriasResult(previa.Categorias.Count(c => !c.Existe), previa.Pratos));
+        var depois = await Sut().PreviaDaMigracaoAsync(EmpresaId);
+        depois.Categorias.Should().BeEmpty("rodar de novo não converteria nada");
+        depois.Pratos.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task PreviaDaMigracao_MarcaATextoQueJaTemCategoria()
+    {
+        Secao("Massas", 1);
+        Item("Lasanha", "massas");
+        Item("Sugo", "molhos");
+
+        var previa = await Sut().PreviaDaMigracaoAsync(EmpresaId);
+
+        previa.Categorias.Should().Equal(new CategoriaAntiga("Massas", 1, true), new CategoriaAntiga("Molhos", 1, false));
+    }
 }
