@@ -165,7 +165,7 @@ function comDevolucaoDeProducao(producao, sku, quantidade) {
 // do agente, nem regra automática, nem mensagem programada. Quem decide é a
 // MESMA permissão de escrita que o composer consulta, e não uma segunda conta
 // feita aqui dentro.
-export const recusaEnvio = (estado, id, agora) => {
+const recusaEnvio = (estado, id, agora) => {
   const conversa = estado.conversas.find((c) => c.id === id)
   if (!conversa) return true
   return envioBloqueado(conversa, agora, canalDaConversa(estado.catalogo.canais, conversa))
