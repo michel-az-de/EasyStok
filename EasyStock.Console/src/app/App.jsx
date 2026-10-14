@@ -8,6 +8,8 @@ import { ContextoRascunhosDosAjustes, useGravacoesDosAjustes } from '../aplicaca
 import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
 import { useReacaoClienteSimulado } from '../aplicacao/useReacaoClienteSimulado'
 import { useDigitacaoAutomatica } from '../aplicacao/useDigitacaoAutomatica'
+import { CHAVE_CARDAPIO, usePreferenciaDePainel } from '../aplicacao/preferenciaDosPaineis'
+import { CARDAPIO, larguraDoCardapio, larguraMaxima, normalizarCardapio } from '../dominio/paineis'
 import { useHash } from '../hooks/useHash'
 import { useLarguras } from '../hooks/useLarguras'
 import { useRelogio } from '../hooks/useRelogio'
@@ -120,7 +122,16 @@ function Composicao({ rota, aoSair }) {
   // Larguras redimensionáveis por alça (seção 9): um hook só, aqui em cima,
   // porque Moldura e o painel do cardápio leem a mesma chave de localStorage
   // e duas instâncias do hook se pisariam na hora de gravar.
-  const { larguras, padrao: largurasPadrao, definir: aoRedimensionar } = useLarguras()
+  const { larguras, padrao: largurasPadrao, definir: aoRedimensionar, tela } = useLarguras()
+  // #1806: lado (Balcão ou Resumo) e modo (compacto ou amplo) do cardápio, lembrados por
+  // aparelho. A máxima deixa a conversa com 320 px à vista (`dominio/paineis.js`); amplo usa a
+  // máxima. A largura arrastada continua em `larguras.cardapio`.
+  const [prefCardapio, definirPrefCardapio] = usePreferenciaDePainel(CHAVE_CARDAPIO, normalizarCardapio)
+  const areaDoBalcao = { tela, balcao: larguras.balcao, ficha: larguras.ficha, colunas: tamanho === DESKTOP }
+  const maximaCardapio = larguraMaxima({
+    ...areaDoBalcao, lado: prefCardapio.lado, empurraBalcao: prefCardapio.lado === 'esquerda', faixa: CARDAPIO,
+  })
+  const larguraCardapio = larguraDoCardapio({ modo: prefCardapio.modo, guardada: larguras.cardapio, maxima: maximaCardapio })
 
   // Arrasto de prato (cardápio → comanda) e reordenar item da comanda dividem
   // o mesmo DndContext (seção 9, C3): os dois precisam de um ancestral comum
@@ -205,10 +216,11 @@ function Composicao({ rota, aoSair }) {
         // Modo API (F06): sem Simular. Cenário simulado em conversa de verdade some em 5 s
         // e desloca o relógio; sem o gatilho, nem o botão nem o F2 aparecem.
         aoAlternarSimulacoes={FONTE_API ? null : () => setSimulando((v) => !v)}
-        larguras={larguras}
+        larguras={{ ...larguras, cardapio: larguraCardapio }}
         largurasPadrao={largurasPadrao}
         aoRedimensionar={aoRedimensionar}
-        cardapioAberto={modal === 'cardapio' && Boolean(selecionada)}
+        // #1806: só o cardápio do lado do Balcão alarga a coluna; à direita ele fica sobre o Resumo.
+        cardapioAberto={modal === 'cardapio' && Boolean(selecionada) && prefCardapio.lado === 'esquerda'}
       />
 
       {modal === 'nota' && selecionada && (
@@ -225,13 +237,18 @@ function Composicao({ rota, aoSair }) {
       {modal === 'cardapio' && selecionada && (
         <PainelCardapio
           pedido={selecionada.pedido}
-          largura={larguras.cardapio}
-          // "right: var(--largura-ficha)" da seção 9: só faz sentido encostado
-          // na coluna Ficha quando ela existe (layout de três colunas). Na
-          // gaveta e no celular a Ficha não fica fixa na tela, então o painel
-          // vai para a borda mesmo.
-          ladoDoBalcao={tamanho === DESKTOP}
-          aoRedimensionar={(valor) => aoRedimensionar('cardapio', valor)}
+          largura={larguraCardapio}
+          larguraMaxima={maximaCardapio}
+          // #1697: no computador abre do lado do Balcão. #1806: a pessoa pode mandar para o lado
+          // do Resumo. Na gaveta e no celular não há colunas fixas: o painel vai para a borda.
+          ladoDoBalcao={tamanho === DESKTOP && prefCardapio.lado === 'esquerda'}
+          amplo={prefCardapio.modo === 'amplo'}
+          aoAlternarAmplo={() => definirPrefCardapio({ modo: prefCardapio.modo === 'amplo' ? 'compacto' : 'amplo' })}
+          aoTrocarLado={tamanho === DESKTOP
+            ? () => definirPrefCardapio({ lado: prefCardapio.lado === 'esquerda' ? 'direita' : 'esquerda' })
+            : null}
+          // Arrastar a alça volta ao compacto com a largura nova.
+          aoRedimensionar={(valor) => { aoRedimensionar('cardapio', valor); definirPrefCardapio({ modo: 'compacto' }) }}
           aoFechar={fechar}
           aoEscolher={(item) => adicionarItem(selecionada.id, item)}
           // "−" ao lado do "+" no cartão do prato já na comanda (seção 3.1):
@@ -294,7 +311,7 @@ function Composicao({ rota, aoSair }) {
           voltar. Global pelo mesmo motivo de FilaCanhotos, um degrau acima. */}
       <ModalLoteDePapel />
 
-      <BalaoAssistente sugestaoAgente={sugestaoAgente} aoAbrirTela={abrirTelaDoAssistente} />
+      <BalaoAssistente sugestaoAgente={sugestaoAgente} aoAbrirTela={abrirTelaDoAssistente} areaDoBalcao={areaDoBalcao} />
 
       <DragOverlay>
         {pratoArrastando && <CartaoArrasto item={pratoArrastando} />}

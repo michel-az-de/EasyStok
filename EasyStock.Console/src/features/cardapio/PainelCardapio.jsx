@@ -540,6 +540,7 @@ function RodapeComanda({ pedido, cardapio, linhas, nomeCliente }) {
 // a conversa: sem cortina, sem <dialog>, o resto da tela continua clicável.
 export function PainelCardapio({
   pedido, aoEscolher, aoAjustar, aoFechar, largura: larguraGuardada, ladoDoBalcao = false, aoRedimensionar,
+  larguraMaxima = 600, amplo = false, aoAlternarAmplo, aoTrocarLado,
 }) {
   // #1474: largura guardada de antes (320 a 400) espremia o nome do prato; o mínimo agora é 440.
   const largura = Math.max(larguraGuardada ?? LARGURA_MINIMA, LARGURA_MINIMA)
@@ -648,8 +649,8 @@ export function PainelCardapio({
         rotulo="Redimensionar painel do cardápio"
         valor={largura}
         min={LARGURA_MINIMA}
-        max={600}
-        padrao={460}
+        max={larguraMaxima}
+        padrao={Math.min(460, larguraMaxima)}
         invertida={!ladoDoBalcao}
         aoMudar={aoRedimensionar}
       />
@@ -662,9 +663,35 @@ export function PainelCardapio({
             <p className={css.subPainel}>{noDia} de {ativos.length} itens no dia.</p>
             {papel === 'escolher' && !travada && <p className={css.subPainel}>Busque um prato e escolha a porção para adicionar à comanda.</p>}
           </div>
-          <button type="button" ref={fecharRef} className={css.fechar} onClick={aoFechar}>
-            <Icone nome="fechar" rotulo="Fechar cardápio" />
-          </button>
+          <div className={css.ferramentasPainel}>
+            {/* #1806: lado e tamanho do painel, lembrados por aparelho. Só ícone para caber nos
+                440 px do painel ao lado do título; o nome vai no aria-label e no title. */}
+            {aoTrocarLado && (
+              <button
+                type="button"
+                className={css.fechar}
+                aria-label={`Mover o cardápio para a ${ladoDoBalcao ? 'direita, sobre o Resumo' : 'esquerda, sobre o Balcão'}`}
+                title={ladoDoBalcao ? 'Mover para a direita' : 'Mover para a esquerda'}
+                onClick={aoTrocarLado}
+              >
+                <Icone nome="trocarLado" />
+              </button>
+            )}
+            {aoAlternarAmplo && (
+              <button
+                type="button"
+                className={css.fechar}
+                aria-label={`${amplo ? 'Reduzir' : 'Ampliar'} o cardápio`}
+                title={amplo ? 'Reduzir' : 'Ampliar'}
+                onClick={aoAlternarAmplo}
+              >
+                <Icone nome={amplo ? 'reduzir' : 'ampliar'} />
+              </button>
+            )}
+            <button type="button" ref={fecharRef} className={css.fechar} onClick={aoFechar}>
+              <Icone nome="fechar" rotulo="Fechar cardápio" />
+            </button>
+          </div>
         </header>
 
         {/* Botão de alternância em vez do padrão ARIA de aba: aba promete
