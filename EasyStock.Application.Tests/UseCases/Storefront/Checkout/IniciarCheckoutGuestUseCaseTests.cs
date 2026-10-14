@@ -373,4 +373,20 @@ public class IniciarCheckoutGuestUseCaseTests
         await act.Should().ThrowAsync<EasyStock.Domain.Exceptions.ClienteBloqueadoException>();
         f.Pedidos.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task SemJanela_LojaFechadaNaMaoRecusa()
+    {
+        // #1784: o modo sem janela não passa pelo core e criava pedido com a pausa manual ligada.
+        var f = new Fixture();
+        var expediente = ExpedienteLoja.CriarPadrao(f.Storefront.EmpresaId);
+        expediente.DefinirControle(EasyStock.Domain.Enums.Storefront.ControleManualLoja.ForcarFechada, null, DateTime.UtcNow);
+        f.ExpedienteRepo.GetPublicoAsync(f.Storefront.EmpresaId, Arg.Any<CancellationToken>()).Returns(expediente);
+
+        var act = () => f.UseCase().ExecuteAsync(Input() with { JanelaId = null, DataEntrega = null });
+
+        await act.Should().ThrowAsync<LojaFechadaException>();
+        f.Pedidos.Should().BeEmpty();
+        await f.Uow.DidNotReceive().CommitAsync();
+    }
 }

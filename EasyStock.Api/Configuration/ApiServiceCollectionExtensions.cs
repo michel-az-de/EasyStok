@@ -333,6 +333,19 @@ public static class ApiServiceCollectionExtensions
                     });
             });
 
+            // #1784: frete público consulta ViaCEP, geocode e rota pagos a cada chamada e variar o número
+            // fura o cache HTTP. 30/IP/min cobre o cliente digitando CEP e número no checkout.
+            options.AddPolicy("frete-publico", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0
+                    }));
+
             // Chat do site (S36), público e anônimo. Abrir sessão: por IP, apertado (cada sessão é
             // uma linha no banco). Mandar mensagem: por sessão (hash do token), para um visitante não
             // gastar a cota do outro atrás do mesmo NAT; sem token, cai no IP. Ler: por IP, folgado

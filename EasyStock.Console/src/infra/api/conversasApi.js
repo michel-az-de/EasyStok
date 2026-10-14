@@ -26,7 +26,9 @@ export async function listarInbox({ completa = false, ate = [] } = {}) {
     if (itens.length < POR_PAGINA) return { itens: [...vistas.values()], completa: true }
     if (!completa && ate.every((id) => vistas.has(id))) break
   }
-  return { itens: [...vistas.values()], completa }
+  // #1787: parou antes de uma página incompleta (teto ou `ate` achado): não é a inbox inteira, e quem
+  // funde com `completa` apagaria as conversas que ficaram de fora, inclusive a aberta.
+  return { itens: [...vistas.values()], completa: false }
 }
 
 export const listarMensagens = (id, { limite = 100 } = {}) =>
@@ -36,8 +38,10 @@ export const listarMensagens = (id, { limite = 100 } = {}) =>
 export const baixarMidia = (conversaId, mensagemId) =>
   chamarApi(`${BASE}/${conversaId}/mensagens/${mensagemId}/midia`, { arquivo: true })
 
-export const enviarTexto = (id, texto) =>
-  chamarApi(`${BASE}/${id}/mensagens`, { metodo: 'POST', corpo: { texto } })
+// #1786: `chave` (Idempotency-Key) é a do balão. Repetir o mesmo envio depois de uma resposta perdida devolve a
+// mensagem já gravada em vez de mandar outra ao cliente.
+export const enviarTexto = (id, texto, { chave = null } = {}) =>
+  chamarApi(`${BASE}/${id}/mensagens`, { metodo: 'POST', corpo: { texto }, chave })
 
 // Reenvio de texto que falhou (S57): devolve a mensagem atualizada (enviada, ou com o novo erro).
 export const reenviarMensagem = (conversaId, mensagemId) =>
@@ -83,29 +87,29 @@ function arquivoDoDataUrl(dataUrl, nomeArquivo) {
   return { blob: new Blob([bytes], { type: tipo }), nome: nomeArquivo || 'foto' }
 }
 
-export async function enviarImagem(id, { dataUrl, nomeArquivo, legenda }) {
+export async function enviarImagem(id, { dataUrl, nomeArquivo, legenda }, { chave = null } = {}) {
   // Só arquivo lido no navegador. Foto por endereço (cardápio) vai pelo id: enviarImagemCardapio.
   if (!dataUrl?.startsWith('data:')) throw new Error('Foto sem arquivo: anexe do computador.')
   const { blob, nome } = arquivoDoDataUrl(dataUrl, nomeArquivo)
   const formulario = new FormData()
   formulario.append('file', blob, nome)
   if (legenda?.trim()) formulario.append('legenda', legenda.trim())
-  return chamarApi(`${BASE}/${id}/mensagens/imagem`, { metodo: 'POST', formulario })
+  return chamarApi(`${BASE}/${id}/mensagens/imagem`, { metodo: 'POST', formulario, chave })
 }
 
 // Áudio gravado no console (#1444). Vai como veio do navegador; o EasyStok converte o WebM do
 // Chrome em Ogg/Opus, que é o que a Meta aceita como nota de voz.
-export async function enviarAudio(id, { dataUrl }) {
+export async function enviarAudio(id, { dataUrl }, { chave = null } = {}) {
   if (!dataUrl?.startsWith('data:')) throw new Error('Áudio sem gravação: grave de novo.')
   const { blob } = arquivoDoDataUrl(dataUrl)
   const formulario = new FormData()
   formulario.append('file', blob, nomeDoArquivoDeAudio(blob.type))
-  return chamarApi(`${BASE}/${id}/mensagens/audio`, { metodo: 'POST', formulario })
+  return chamarApi(`${BASE}/${id}/mensagens/audio`, { metodo: 'POST', formulario, chave })
 }
 
 // Foto da galeria do cardápio (#1437): o EasyStok lê a foto do storage pelo id do item e o índice;
 // o navegador não baixa a URL (cross-origin, host gravado pode estar fora do ar).
-export const enviarImagemCardapio = (id, { cardapioItemId, indice, legenda }) =>
+export const enviarImagemCardapio = (id, { cardapioItemId, indice, legenda }, { chave = null } = {}) =>
   chamarApi(`${BASE}/${id}/mensagens/imagem-cardapio`, {
-    metodo: 'POST', corpo: { cardapioItemId, indice, legenda: legenda?.trim() || null },
+    metodo: 'POST', corpo: { cardapioItemId, indice, legenda: legenda?.trim() || null }, chave,
   })

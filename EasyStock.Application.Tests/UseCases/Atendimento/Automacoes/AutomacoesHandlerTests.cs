@@ -179,6 +179,31 @@ public class AutomacoesHandlerTests
     }
 
     [Fact]
+    public async Task SemConversaPeloIdReleAConversaRastreadaParaSubirNaInbox()
+    {
+        // #1787: a lista do cliente vem sem rastreio; sem reler, a saída não atualiza UltimaMensagemEm.
+        Regra(GatilhoAutomacao.PosEntrega, "Chegou, {nome}?");
+        _conversas.ListarPorClienteAsync(_empresaId, _cliente.Id, 1, Arg.Any<CancellationToken>()).Returns(new List<Conversa> { _conversa });
+
+        (await UseCase().ExecuteAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PosEntrega, null, _cliente.Id, null)))
+            .Should().Be(ResultadoAutomacao.Enviada);
+
+        await _conversas.Received(1).ObterPorIdAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TimeoutDoCanalViraFalhaSemRelancar()
+    {
+        // #1787: relançar devolve o evento ao outbox, que tenta de novo e pode duplicar a mensagem.
+        Regra(GatilhoAutomacao.PosEntrega, "Chegou?");
+        _whats.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<Task<string>>(_ => throw new TaskCanceledException("HttpClient.Timeout"));
+
+        (await UseCase().ExecuteAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PosEntrega, _conversa.Id, null, null)))
+            .Should().Be(ResultadoAutomacao.Falhou);
+    }
+
+    [Fact]
     public async Task EncerramentoSaiComAConversaJaEncerrada()
     {
         Regra(GatilhoAutomacao.Encerramento, "Obrigada, {nome}!");
