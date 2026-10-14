@@ -98,7 +98,7 @@ public sealed partial class PedidoConversaConcorrenciaTests : IAsyncLifetime
 
     private sealed record Cenario(Guid ConversaId, Guid ClienteId, Guid CardapioItemId, Guid JanelaId, DateOnly DataEntrega);
 
-    private static async Task<Cenario> SemearAsync(WebApplicationFactory<Program> factory, string? slug = null)
+    private static async Task<Cenario> SemearAsync(WebApplicationFactory<Program> factory, string? slug = null, DateOnly? dataEntrega = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
@@ -118,8 +118,8 @@ public sealed partial class PedidoConversaConcorrenciaTests : IAsyncLifetime
         storefront.Ativar();
         db.Storefronts.Add(storefront);
 
-        var dataEntrega = DateOnly.FromDateTime(agora).AddDays(7);
-        var janela = JanelaEntrega.Criar(storefront.Id, (int)dataEntrega.DayOfWeek,
+        var dia = dataEntrega ?? DateOnly.FromDateTime(agora).AddDays(7);
+        var janela = JanelaEntrega.Criar(storefront.Id, (int)dia.DayOfWeek,
             new TimeOnly(9, 0), new TimeOnly(12, 0), 10, "Manhã");
         db.JanelasEntrega.Add(janela);
 
@@ -150,7 +150,7 @@ public sealed partial class PedidoConversaConcorrenciaTests : IAsyncLifetime
         db.AtendimentoConversas.Add(conversa);
 
         await db.SaveChangesAsync();
-        return new Cenario(conversa.Id, cliente.Id, item.Id, janela.Id, dataEntrega);
+        return new Cenario(conversa.Id, cliente.Id, item.Id, janela.Id, dia);
     }
 
     private WebApplicationFactory<Program> CriarFactory(EasyStock.Application.Ports.Output.Pagamentos.IMercadoPagoClient? mp = null, NivelAcesso nivel = NivelAcesso.Operador)
