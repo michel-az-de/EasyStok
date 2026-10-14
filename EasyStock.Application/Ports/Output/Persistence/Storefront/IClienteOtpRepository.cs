@@ -33,4 +33,11 @@ public interface IClienteOtpRepository
     /// </summary>
     /// <returns><c>false</c> quando as tentativas acabaram (ou o OTP foi consumido): o código não deve ser conferido.</returns>
     Task<bool> ReservarTentativaAsync(Guid otpId, CancellationToken ct = default);
+
+    /// <summary>
+    /// #1781: consome o OTP num UPDATE atômico (<c>Consumido = true</c> só se ainda não consumido). Dois códigos certos
+    /// em paralelo: só um afeta a linha.
+    /// </summary>
+    /// <returns><c>false</c> quando outra requisição já consumiu o OTP: não abra sessão.</returns>
+    Task<bool> ConsumirAsync(Guid otpId, CancellationToken ct = default);
 }

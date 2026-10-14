@@ -124,8 +124,15 @@ public sealed class ValidarOtpUseCase(
         }
 
         // ── 6. Consumir OTP ────────────────────────────────────────────
-        otp.Consumir();
-        await clienteOtpRepository.UpdateAsync(otp, ct);
+        // #1781: consumo atômico no banco. Dois códigos certos em paralelo: só um afeta a linha; o outro
+        // responde como código inválido, sem sessão e sem tentar criar o cliente de novo.
+        if (!await clienteOtpRepository.ConsumirAsync(otp.Id, ct))
+        {
+            logger.LogWarning(
+                "OTP já consumido por outra requisição: empresaId={EmpresaId} otpId={OtpId} telefone={Telefone}",
+                empresaId, otp.Id, telefoneMascarado);
+            throw new OtpInvalidoException();
+        }
 
         // ── 7. Criar ou atualizar Cliente ──────────────────────────────
         var cliente = await clienteRepository.GetByTelefoneHashAsync(empresaId, telefoneHash, ct);

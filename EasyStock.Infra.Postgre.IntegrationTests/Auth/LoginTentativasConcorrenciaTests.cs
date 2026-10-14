@@ -142,6 +142,64 @@ public sealed class LoginTentativasConcorrenciaTests(PostgreSqlDatabaseFixture f
         gravado.Tentativas.Should().Be(ClienteOtp.MaxTentativas, "nenhuma tentativa paralela se perde");
     }
 
+    [SkippableFact]
+    public async Task RajadaDeCodigosCertosConsomeOOtpUmaVezSo()
+    {
+        // #1781: o mesmo código certo em paralelo abria uma sessão por requisição (e, com telefone novo, a
+        // segunda batia no índice único do cliente e devolvia 500). Só uma pode levar o OTP.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        const int paralelas = 4; // abaixo do limite de tentativas: só o consumo decide
+        var empresaId = Guid.NewGuid();
+        var otp = ClienteOtp.Criar(empresaId, ClienteOtp.CalcularTelefoneHash("+5511997573992"),
+            Bcrypt.Hash("123456"), TimeProvider.System);
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.Empresas.Add(new Empresa
+            {
+                Id = empresaId,
+                Nome = "Empresa OTP certo",
+                Documento = empresaId.ToString("N")[..14],
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow,
+            });
+            seed.ClienteOtps.Add(otp);
+            await seed.SaveChangesAsync();
+        }
+        var storefront = Domain.Entities.Storefront.Storefront.Criar(empresaId, "sf-otp-certo", "SF", 0m);
+        storefront.Ativar();
+        var sessoes = Substitute.For<IClienteSessionRepository>();
+
+        var resultados = await Task.WhenAll(Enumerable.Range(0, paralelas).Select(_ => Task.Run(async () =>
+        {
+            await using var db = ContextoDoTenant(empresaId);
+            var storefronts = Substitute.For<IStorefrontRepository>();
+            storefronts.GetBySlugAsync("sf-otp-certo", Arg.Any<CancellationToken>()).Returns(storefront);
+            var clientes = Substitute.For<IClienteStorefrontRepository>();
+            clientes.GetByTelefoneHashAsync(empresaId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+                .Returns(Cliente.Criar(empresaId, "Cliente da loja"));
+            var validar = new ValidarOtpUseCase(
+                storefronts,
+                new ClienteOtpRepository(db),
+                clientes,
+                sessoes,
+                new IdentificarClientePorTelefoneUseCase(Substitute.For<IClienteRepository>(), clientes,
+                    NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
+                Bcrypt,
+                db,
+                TimeProvider.System,
+                NullLogger<ValidarOtpUseCase>.Instance);
+            return await Capturar(() => validar.ExecuteAsync(
+                new ValidarOtpInput("sf-otp-certo", "(11) 99757-3992", "123456", null, null, null)));
+        })));
+
+        resultados.Count(e => e is null).Should().Be(1, "o OTP é de uso único");
+        resultados.Where(e => e is not null).Should().AllBeOfType<OtpInvalidoException>();
+        await sessoes.Received(1).AddAsync(Arg.Any<ClienteSession>(), Arg.Any<CancellationToken>());
+        await using var leitura = fixture.CreateDbContext();
+        (await leitura.ClienteOtps.IgnoreQueryFilters().AsNoTracking().SingleAsync(o => o.Id == otp.Id))
+            .Consumido.Should().BeTrue();
+    }
+
     private async Task<Usuario> SemearUsuarioAsync(Usuario usuario)
     {
         await using var db = fixture.CreateDbContext();
