@@ -1,3 +1,4 @@
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -33,6 +34,7 @@ public class ProcessarEventoMensageriaMetaUseCaseTests
         _flags.ListarAtivasAsync(_empresa.Id, Arg.Any<CancellationToken>()).Returns(
             [FeatureCatalogo.ModuloAtendimento, FeatureCatalogo.CanalInstagram, FeatureCatalogo.CanalMessenger]);
         _conversas.AddAsync(Arg.Do<Conversa>(_criadas.Add), Arg.Any<CancellationToken>());
+        _uow.SetupExecuteInTransactionSemRetry<(Conversa, Mensagem)>();
         _useCase = new ProcessarEventoMensageriaMetaUseCase(_empresas, _flags, _conversas, Substitute.For<IOperacaoEventPublisher>(),
             _tenant, _uow, NullLogger<ProcessarEventoMensageriaMetaUseCase>.Instance);
     }
@@ -76,6 +78,7 @@ public class ProcessarEventoMensageriaMetaUseCaseTests
     {
         var aberta = Conversa.Abrir(_empresa.Id, "PSID-3", DateTime.UtcNow, canal: CanalConversa.Messenger);
         _conversas.ObterAbertaPorContatoAsync(_empresa.Id, CanalConversa.Messenger, "PSID-3", Arg.Any<CancellationToken>()).Returns(aberta);
+        _conversas.DevolverAberta(aberta);
 
         await _useCase.ExecuteAsync(Dm("page", "PAGE-1", "PSID-3", "m_2"));
 

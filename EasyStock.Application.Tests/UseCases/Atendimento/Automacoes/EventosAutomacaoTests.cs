@@ -1,3 +1,4 @@
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.Events.Atendimento;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Integration;
@@ -18,7 +19,7 @@ public class EventosAutomacaoTests
     [Fact]
     public async Task EncerrarPublicaConversaEncerradaNoMesmoCommit()
     {
-        var conversas = Substitute.For<IConversaRepository>();
+        var conversas = Substitute.For<IConversaRepository>().EspelharLeituraComLock();
         var publicador = Substitute.For<IPublicadorEventoIntegracao>();
         var conversa = Conversa.Abrir(_empresaId, "5511988887777", DateTime.UtcNow);
         conversas.ObterPorIdAsync(_empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
@@ -38,7 +39,7 @@ public class EventosAutomacaoTests
     public async Task EncerrarConversaJaEncerradaNaoPublicaDeNovo()
     {
         // #1292: Encerrar é idempotente; o evento também precisa ser, senão a automática de encerramento sai 2x.
-        var conversas = Substitute.For<IConversaRepository>();
+        var conversas = Substitute.For<IConversaRepository>().EspelharLeituraComLock();
         var publicador = Substitute.For<IPublicadorEventoIntegracao>();
         var conversa = Conversa.Abrir(_empresaId, "5511988887777", DateTime.UtcNow);
         conversa.Encerrar(DateTime.UtcNow);

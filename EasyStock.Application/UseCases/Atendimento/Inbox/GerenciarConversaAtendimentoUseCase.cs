@@ -98,14 +98,19 @@ public sealed class GerenciarConversaAtendimentoUseCase(
             return Task.CompletedTask;
         }, ct);
 
-    private async Task<ConversaSituacaoResult> ExecutarAsync(
-        AcaoConversaCommand command, Func<Conversa, DateTime, Task> acao, CancellationToken ct)
-    {
-        var conversa = await conversaRepository.ObterPorIdAsync(command.EmpresaId, command.ConversaId, ct)
-            ?? throw new ConversaNaoEncontradaException(command.ConversaId);
+    /// <summary>
+    /// #1792: a ação parte da linha travada e relida. Sem a trava, uma entrada gravada sobre a leitura velha desfazia o
+    /// marcar como lida, e assumir sobre uma conversa já encerrada em outra aba a reabria.
+    /// </summary>
+    private Task<ConversaSituacaoResult> ExecutarAsync(
+        AcaoConversaCommand command, Func<Conversa, DateTime, Task> acao, CancellationToken ct) =>
+        unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+        {
+            var conversa = await conversaRepository.ObterPorIdComLockAsync(command.EmpresaId, command.ConversaId, token)
+                ?? throw new ConversaNaoEncontradaException(command.ConversaId);
 
-        await acao(conversa, DateTime.UtcNow);
-        await unitOfWork.CommitAsync();
-        return ConversaSituacaoResult.De(conversa);
-    }
+            await acao(conversa, DateTime.UtcNow);
+            await unitOfWork.CommitAsync();
+            return ConversaSituacaoResult.De(conversa);
+        }, ct);
 }

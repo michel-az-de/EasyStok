@@ -177,14 +177,24 @@ public sealed class EnviarMensagemConsoleUseCase(
         return await RegistrarAsync(conversa, criarMensagem(externoId), usuarioId, agora, ct);
     }
 
-    private async Task<MensagemAtendimentoResult> RegistrarAsync(
-        Conversa conversa, Mensagem mensagem, Guid usuarioId, DateTime agora, CancellationToken ct)
-    {
-        mensagem.RegistrarEnviadaPor(usuarioId);
-        conversa.Assumir(agora, usuarioId);
-        conversa.RegistrarSaida(agora);
-        await conversaRepository.AddMensagemAsync(mensagem, ct);
-        await unitOfWork.CommitAsync();
-        return MensagemAtendimentoResult.De(mensagem);
-    }
+    /// <summary>
+    /// #1792: a conversa é relida sob trava depois do envio. Encerrada no meio do envio, a mensagem fica no histórico
+    /// (ela saiu) e a conversa continua encerrada; sem a releitura, assumir gravava <c>Assumida</c> com <c>EncerradaEm</c>.
+    /// </summary>
+    private Task<MensagemAtendimentoResult> RegistrarAsync(
+        Conversa conversa, Mensagem mensagem, Guid usuarioId, DateTime agora, CancellationToken ct) =>
+        unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+        {
+            var atual = await conversaRepository.ObterPorIdComLockAsync(conversa.EmpresaId, conversa.Id, token)
+                ?? throw new ConversaNaoEncontradaException(conversa.Id);
+            mensagem.RegistrarEnviadaPor(usuarioId);
+            if (atual.EstaAberta)
+            {
+                atual.Assumir(agora, usuarioId);
+                atual.RegistrarSaida(agora);
+            }
+            await conversaRepository.AddMensagemAsync(mensagem, token);
+            await unitOfWork.CommitAsync();
+            return MensagemAtendimentoResult.De(mensagem);
+        }, ct);
 }

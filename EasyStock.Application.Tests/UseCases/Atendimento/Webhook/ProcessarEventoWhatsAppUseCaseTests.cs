@@ -1,3 +1,4 @@
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.Tests.Services.Atendimento;
 using EasyStock.Application.Events.Atendimento;
 using EasyStock.Application.Ports.Output.Notifications;
@@ -54,6 +55,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
     {
         // Antes de construir: o ResolvedorCanal indexa os adaptadores pelo Canal no construtor.
         _canalWhatsApp.Canal.Returns(CanalConversa.WhatsApp);
+        _unitOfWork.SetupExecuteInTransactionSemRetry<(Conversa, Mensagem, ConfiguracaoAtendimento, IdentificacaoCliente?)>();
 
         _useCase = CriarUseCase();
         ConfigurarCenario();
@@ -536,6 +538,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
         var aberta = Conversa.Abrir(_empresaId, ContatoWaId, DateTime.UtcNow.AddMinutes(-5), "Fulano");
         _conversaRepository.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, ContatoWaId, Arg.Any<CancellationToken>())
             .Returns(aberta);
+        _conversaRepository.DevolverAberta(aberta);
 
         await _useCase.ExecuteAsync(PayloadTexto("wamid.segunda", "Quero um bolo"));
 
@@ -664,6 +667,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
         aberta.VincularCliente(clienteId);
         _conversaRepository.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, ContatoWaId, Arg.Any<CancellationToken>())
             .Returns(aberta);
+        _conversaRepository.DevolverAberta(aberta);
         _consentimentoRepository.ListarDoClienteAsync(_empresaId, clienteId, Arg.Any<CancellationToken>())
             .Returns(new List<ConsentimentoContato>());
 

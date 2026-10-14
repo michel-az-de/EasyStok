@@ -1,3 +1,4 @@
+using EasyStock.Api.UnitTests.Helpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using EasyStock.Api.Controllers;
 using EasyStock.Application.Ports.Output;
@@ -38,6 +39,10 @@ public class ConsoleTagHumanaTests
     public ConsoleTagHumanaTests()
     {
         _whatsApp.Canal.Returns(CanalConversa.WhatsApp);
+        // #1792: o envio relê a conversa travada numa transação; no dublê, a mesma leitura sem trava.
+        _uow.SetupExecuteInTransactionSemRetry<MensagemAtendimentoResult>();
+        _conversas.ObterPorIdComLockAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(c => _conversas.ObterPorIdAsync(c.ArgAt<Guid>(0), c.ArgAt<Guid>(1), c.ArgAt<CancellationToken>(2)));
         var currentUser = Substitute.For<ICurrentUserAccessor>();
         currentUser.EmpresaId.Returns(_empresaId);
         currentUser.UsuarioId.Returns(Guid.NewGuid());

@@ -255,10 +255,6 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
         db.AtendimentoMensagens.AsNoTracking().FirstOrDefaultAsync(
             m => m.EmpresaId == empresaId && m.ConversaId == conversaId && m.Id == mensagemId, ct);
 
-    public Task<Mensagem?> ObterMensagemParaAlterarAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
-        db.AtendimentoMensagens.FirstOrDefaultAsync(
-            m => m.EmpresaId == empresaId && m.ConversaId == conversaId && m.Id == mensagemId, ct);
-
     public async Task<Mensagem?> ObterMensagemComLockAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default)
     {
         var mensagem = await db.AtendimentoMensagens.FromSqlInterpolated($"""

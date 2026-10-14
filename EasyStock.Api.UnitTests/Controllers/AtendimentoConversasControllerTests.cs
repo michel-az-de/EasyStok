@@ -1,3 +1,4 @@
+using EasyStock.Api.UnitTests.Helpers;
 using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
@@ -44,7 +45,10 @@ public partial class AtendimentoConversasControllerTests
     private readonly Guid _usuarioId = Guid.NewGuid();
     private readonly ConversaRepositoryEmMemoria _repositorio = new();
     private readonly ICanalMensageria _canal = Substitute.For<ICanalMensageria, ICanalComAudio>();
-    private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
+    // #1792: envio, reenvio e ações do console rodam em transação; o dublê executa o bloco.
+    private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>()
+        .SetupExecuteInTransactionSemRetry<MensagemAtendimentoResult>()
+        .SetupExecuteInTransactionSemRetry<ConversaSituacaoResult>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly IAtendenteRepository _atendentes = Substitute.For<IAtendenteRepository>();
     private readonly ILinkCardapioConversaRepository _links = Substitute.For<ILinkCardapioConversaRepository>();
@@ -997,9 +1001,6 @@ public partial class AtendimentoConversasControllerTests
 
         public Task<Mensagem?> ObterMensagemAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
             Task.FromResult(Mensagens.FirstOrDefault(m => m.EmpresaId == empresaId && m.ConversaId == conversaId && m.Id == mensagemId));
-
-        public Task<Mensagem?> ObterMensagemParaAlterarAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
-            ObterMensagemAsync(empresaId, conversaId, mensagemId, ct);
 
         public Task<Mensagem?> ObterMensagemComLockAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
             ObterMensagemAsync(empresaId, conversaId, mensagemId, ct);
