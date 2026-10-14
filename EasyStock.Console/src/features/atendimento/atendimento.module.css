@@ -412,6 +412,10 @@
 /* #1424: programar mensagem ao cliente (formulário e lista das programadas da conversa). */
 .programar { display: grid; gap: var(--e-3); }
 .programarCampos { display: grid; gap: var(--e-3); border: 0; padding: 0; margin: 0; min-width: 0; }
+.programarQuando { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: var(--e-2); }
+.programadasResumo { font-size: var(--t-apoio); }
+.programadasResumo summary { cursor: pointer; padding-block: var(--e-2); color: var(--marca-forte); }
+@media (max-width: 520px) { .programarQuando { grid-template-columns: minmax(0, 1fr); } }
 .programar p { margin: 0; }
 .programarOpcao { display: flex; align-items: flex-start; gap: var(--e-2); font-size: var(--t-apoio); color: var(--tinta-2); }
 .programarOpcao input { margin-top: 3px; }

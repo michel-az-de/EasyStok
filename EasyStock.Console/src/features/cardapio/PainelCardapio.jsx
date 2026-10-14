@@ -567,13 +567,15 @@ export function PainelCardapio({
   const nomeCliente = selecionada?.nome ? primeiroNome(selecionada.nome) : ''
   const travada = comandaTravada(pedido, { fonteApi })
   const fecharRef = useRef(null)
+  const buscaRef = useRef(null)
   const focoAnterior = useRef(null)
 
   useEscape(!modal, aoFechar)
 
   useEffect(() => {
     focoAnterior.current = document.activeElement
-    fecharRef.current?.focus()
+    const focoInicial = buscaRef.current ?? fecharRef.current
+    focoInicial?.focus()
     return () => {
       if (focoAnterior.current?.isConnected) focoAnterior.current.focus()
       else {
@@ -658,6 +660,7 @@ export function PainelCardapio({
             <h2>{travada && papel === 'escolher' ? 'Consulta do cardápio' : 'Cardápio de hoje'}</h2>
             {nomeCliente && <p className={css.donoDaComanda} aria-live="polite">Comanda de <b>{nomeCliente}</b></p>}
             <p className={css.subPainel}>{noDia} de {ativos.length} itens no dia.</p>
+            {papel === 'escolher' && !travada && <p className={css.subPainel}>Busque um prato e escolha a porção para adicionar à comanda.</p>}
           </div>
           <button type="button" ref={fecharRef} className={css.fechar} onClick={aoFechar}>
             <Icone nome="fechar" rotulo="Fechar cardápio" />
@@ -689,6 +692,7 @@ export function PainelCardapio({
             <Icone nome="lupa" />
             <span className="sr">Buscar no cardápio</span>
             <input
+              ref={buscaRef}
               type="search"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
