@@ -66,6 +66,11 @@ public partial class AtendimentoConversasControllerTests
         _currentUser.TemPermissao(Permissao.AtenderConversas).Returns(true);
         _canal.Canal.Returns(CanalConversa.WhatsApp);
         _canal.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns("wamid.dona1");
+        // #1786: reenviar e encerrar rodam numa transação com trava; o corpo precisa executar.
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<MensagemAtendimentoResult>>>(), Arg.Any<CancellationToken>())
+            .Returns(c => c.Arg<Func<CancellationToken, Task<MensagemAtendimentoResult>>>()(c.Arg<CancellationToken>()));
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<ConversaSituacaoResult>>>(), Arg.Any<CancellationToken>())
+            .Returns(c => c.Arg<Func<CancellationToken, Task<ConversaSituacaoResult>>>()(c.Arg<CancellationToken>()));
 
         var resolvedor = new ResolvedorCanal([_canal]);
         var uploads = new GerenciarUploadsUseCase(

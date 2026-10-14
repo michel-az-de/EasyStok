@@ -422,6 +422,9 @@ public static class PipelineExtensions
         .Add("/api/atendimento/producao")
         .Add("/api/atendimento/mensagens-programadas")
         .Add("/api/atendimento/lembretes")
+        // #1786: envio de texto, foto e áudio pelo console. Resposta perdida e o mesmo envio de novo mandavam duas
+        // mensagens ao cliente. O id da conversa fica no meio do path; as outras ações da conversa sem header seguem como sempre.
+        .Add("/api/atendimento/conversas")
         // #1540: sangria ou suprimento repetido depois de resposta perdida virava dois lançamentos.
         .Add("/api/caixa/movimentos")
         // S20: retorno do consumidor da fila de impressão (impressa/falhou); opt-in por header.

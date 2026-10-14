@@ -28,14 +28,22 @@ import { criarAcoesCardapioApi } from './api/cardapio'
 import { criarAcoesMensagensProgramadasApi } from './api/mensagensProgramadas'
 import { criarAcoesModelosApi } from './api/modelos'
 import { criarAvisosNaoLigadas, envioNaoLigado, textoNaoLigado } from './api/naoLigadas'
+import { criarChavesDeMensagem } from './chavesDeMensagem'
 
 const FORA_DA_JANELA = 'fora_da_janela_24h'
 
 const CANAL_FALHOU = 'CANAL_FALHOU'
 
+// #1786: respostas da proteção contra envio repetido. A mensagem não ficou sem sair: já saiu ou está saindo.
+const ENVIO_REPETIDO = {
+  IDEMPOTENCY_PAYLOAD_MISMATCH: 'Esta mensagem já tinha saído. Confira na conversa antes de mandar de novo.',
+  IDEMPOTENCY_IN_FLIGHT: 'Esta mensagem ainda está saindo. Confira na conversa em instantes.',
+}
+
 const motivoDaRecusa = (erro) => {
   // #1761: o detalhe do canal é o erro cru do provedor, em inglês; a frase sai do mapa do domínio.
   if (erro.codigo === FORA_DA_JANELA) return FRASE_DA_FALHA[TIPOS_DE_FALHA.FORA_DA_JANELA]
+  if (ENVIO_REPETIDO[erro.codigo]) return ENVIO_REPETIDO[erro.codigo]
   if (erro.codigo === CANAL_FALHOU && erro.detalhe) return textoDaFalhaDeEnvio(erro.detalhe)
   return `Não enviada: ${erro.message}`
 }
@@ -68,6 +76,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
     return true
   }
   const clienteApi = criarAcoesClienteApi({ despachar, estadoRef })
+  const chaves = criarChavesDeMensagem()
   const confirmarResponsavel = (id, chamada) => chamada(id)
     .then((resumo) => { despachar({ tipo: acao.CONFIRMAR_RESPONSAVEL_API, id, situacao: situacaoConversaDaApi(resumo, lerSessao()?.usuario) }); return true })
     .catch((erro) => { avisar(erro); return false })
@@ -76,7 +85,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
     ...acoes,
     listarAtendentes,
     ...criarAvisosNaoLigadas(despachar),
-    ...criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio, envioRecusado }),
+    ...criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio, envioRecusado, chaves }),
     // #1474: sem `fixo`, fecha só o aviso de ação; o persistente (configuração) só com `fixo: true`.
     fecharAvisoApi: ({ fixo = false } = {}) => despachar({ tipo: acao.FECHAR_AVISO_API, fixo }),
     ...criarAcoesExpedienteApi({ despachar, estadoRef }),
@@ -119,7 +128,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
       if (envioRecusado(id)) return false
       const mensagemId = proximoId('msg')
       despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, agora: agoraRef.current })
-      return enviarTexto(id, texto)
+      return chaves.enviar(id, { texto }, (chave) => enviarTexto(id, texto, { chave }))
         .then((m) => {
           despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m) })
           return true
