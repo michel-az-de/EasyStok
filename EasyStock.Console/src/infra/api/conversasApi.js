@@ -26,7 +26,9 @@ export async function listarInbox({ completa = false, ate = [] } = {}) {
     if (itens.length < POR_PAGINA) return { itens: [...vistas.values()], completa: true }
     if (!completa && ate.every((id) => vistas.has(id))) break
   }
-  return { itens: [...vistas.values()], completa }
+  // #1787: parou antes de uma página incompleta (teto ou `ate` achado): não é a inbox inteira, e quem
+  // funde com `completa` apagaria as conversas que ficaram de fora, inclusive a aberta.
+  return { itens: [...vistas.values()], completa: false }
 }
 
 export const listarMensagens = (id, { limite = 100 } = {}) =>

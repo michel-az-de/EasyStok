@@ -47,11 +47,12 @@ export function falhaAoCancelarNoEncerramento(cancelamento, numero) {
   return `Não deu para cancelar o pedido Nº ${numero}${motivo} O atendimento continua aberto. Tente de novo ou desmarque a caixa de cancelar.`
 }
 
-export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio, chaves = criarChavesDeMensagem() }) {
+export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio, envioRecusado, chaves = criarChavesDeMensagem() }) {
   const avisar = (mensagem) => despachar({ tipo: acao.AVISO_API, mensagem })
   const conversaDe = (id) => estadoRef.current.conversas.find((c) => c.id === id) ?? null
 
   async function despedir(id, texto) {
+    if (envioRecusado(id)) return false
     const mensagemId = proximoId('msg')
     despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, agora: agoraRef.current })
     try {
@@ -157,8 +158,9 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
         const m = await chaves.enviar(id, conteudo, (chave) => (daGaleria
           ? enviarImagemCardapio(id, { cardapioItemId: extra.cardapioItemId, indice: extra.indice, legenda }, { chave })
           : enviarImagem(id, { dataUrl: arte, nomeArquivo: extra.nomeArquivo, legenda }, { chave })))
-        const mensagem = mensagemDaApi(m)
-        despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem })
+        const mensagem = mensagemDaApi(m, id)
+        // #1787: como no áudio, o balão segue com a imagem local até a sincronização trazer a do storage.
+        despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: { ...mensagem, formato: 'imagem', arte } })
         return mensagem.status !== 'falhou'
       } catch (erro) {
         despachar(falhaDoEnvio(id, mensagemId, erro))
