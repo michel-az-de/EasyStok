@@ -26,4 +26,11 @@ public interface IClienteOtpRepository
 
     Task AddAsync(ClienteOtp otp, CancellationToken ct = default);
     Task UpdateAsync(ClienteOtp otp, CancellationToken ct = default);
+
+    /// <summary>
+    /// #1781: reserva uma tentativa do OTP num UPDATE atômico (<c>Tentativas + 1</c> só enquanto abaixo de
+    /// <see cref="ClienteOtp.MaxTentativas"/> e não consumido), antes de conferir o código.
+    /// </summary>
+    /// <returns><c>false</c> quando as tentativas acabaram (ou o OTP foi consumido): o código não deve ser conferido.</returns>
+    Task<bool> ReservarTentativaAsync(Guid otpId, CancellationToken ct = default);
 }

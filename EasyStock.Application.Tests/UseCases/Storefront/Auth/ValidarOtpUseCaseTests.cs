@@ -88,6 +88,8 @@ public class ValidarOtpUseCaseTests
             .GetAtivoPorTelefoneHashAsync(
                 Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
             .Returns(otp);
+        // #1781: o banco aceita a reserva da tentativa (ainda abaixo do limite).
+        clienteOtpRepo.ReservarTentativaAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
 
         var clienteRepo = Substitute.For<IClienteStorefrontRepository>();
         clienteRepo
@@ -222,18 +224,15 @@ public class ValidarOtpUseCaseTests
     public async Task ExecuteAsync_CodigoErrado_LancaOtpInvalidoEIncrementaTentativas()
     {
         var f = BuildFakes();
-        ClienteOtp? otpAtualizado = null;
-        f.ClienteOtpRepository
-            .When(r => r.UpdateAsync(Arg.Any<ClienteOtp>(), Arg.Any<CancellationToken>()))
-            .Do(call => otpAtualizado = call.Arg<ClienteOtp>());
-
         var useCase = BuildUseCase(f);
 
         await useCase.Invoking(u => u.ExecuteAsync(Input(codigo: "000000")))
             .Should().ThrowAsync<OtpInvalidoException>();
 
-        otpAtualizado.Should().NotBeNull();
-        otpAtualizado!.Tentativas.Should().Be(1);
+        // #1781: a tentativa é gravada pela reserva atômica no banco; regravar o OTP lido devolveria o contador
+        // ao valor velho e perderia as tentativas paralelas.
+        await f.ClienteOtpRepository.Received(1).ReservarTentativaAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await f.ClienteOtpRepository.DidNotReceive().UpdateAsync(Arg.Any<ClienteOtp>(), Arg.Any<CancellationToken>());
         await f.ClienteRepository.DidNotReceive().AddAsync(
             Arg.Any<Cliente>(), Arg.Any<CancellationToken>());
     }

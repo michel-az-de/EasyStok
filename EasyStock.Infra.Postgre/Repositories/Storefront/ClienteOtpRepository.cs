@@ -44,4 +44,10 @@ public sealed class ClienteOtpRepository(EasyStockDbContext db) : IClienteOtpRep
         db.ClienteOtps.Update(otp);
         return Task.CompletedTask;
     }
+
+    public async Task<bool> ReservarTentativaAsync(Guid otpId, CancellationToken ct = default) =>
+        // #1781: limite no WHERE de um UPDATE só; paralelas se enfileiram na trava da linha.
+        await db.ClienteOtps
+            .Where(o => o.Id == otpId && !o.Consumido && o.Tentativas < ClienteOtp.MaxTentativas)
+            .ExecuteUpdateAsync(s => s.SetProperty(o => o.Tentativas, o => o.Tentativas + 1), ct) == 1;
 }
