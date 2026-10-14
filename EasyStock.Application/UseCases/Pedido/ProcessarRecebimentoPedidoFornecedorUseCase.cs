@@ -100,6 +100,12 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
                 continue;
             }
 
+            // Sem teto, um digito a mais (1000 em vez de 10) virava +1000 no estoque e Recebido.
+            // So vale para entrada nova: item antigo ja sobre-recebido nao pode travar os outros.
+            if (novoTotalRecebido > item.Quantidade)
+                throw new UseCaseValidationException(
+                    $"Item {item.Id}: recebido ({novoTotalRecebido}) passa do pedido ({item.Quantidade}).");
+
             // Validar produto (obrigatório para criar entrada)
             if (!item.ProdutoId.HasValue)
             {
