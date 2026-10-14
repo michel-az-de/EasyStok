@@ -64,6 +64,12 @@ public sealed class AcervoRepository(EasyStockDbContext db) : IAcervoRepository
         // Serializa publicações deste item, inclusive a retomada da mesma operação.
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({empresaId.ToString() + id.ToString()}, 0))", ct);
     }
+    public async Task BloquearImagemAsync(Guid empresaId, Guid id, CancellationToken ct)
+    {
+        // #1808: publicar em prato novo grava o vínculo na imagem; duas publicações da mesma imagem em
+        // pratos diferentes não podem perder um vínculo. Sempre depois do bloqueio do item (mesma ordem).
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({"imagem:" + empresaId.ToString() + id.ToString()}, 0))", ct);
+    }
     public Task<AcervoPublicacao?> PublicacaoAsync(Guid empresaId, Guid id, CancellationToken ct) =>
         db.Set<AcervoPublicacao>().FirstOrDefaultAsync(x => x.EmpresaId == empresaId && x.Id == id, ct);
     public async Task BloquearSolicitacaoAsync(Guid empresaId, Guid id, CancellationToken ct) =>
