@@ -12,7 +12,7 @@ public class ReceberPedidoCompletoUseCase(
     IPedidoFornecedorItemRepository itemRepository,
     ProcessarRecebimentoPedidoFornecedorUseCase processarUseCase)
 {
-    public async Task<ProcessarRecebimentoPedidoFornecedorResult> ExecuteAsync(
+    public virtual async Task<ProcessarRecebimentoPedidoFornecedorResult> ExecuteAsync(
         ReceberPedidoCompletoCommand cmd, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureNotEmpty(cmd.PedidoId, nameof(cmd.PedidoId));

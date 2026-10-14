@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -74,17 +75,22 @@ public sealed class ProcessarEventoMensageriaMetaUseCase(
         Mensagem mensagem;
         try
         {
-            conversa = await conversaRepository.ObterAbertaPorContatoAsync(empresa.Id, msg.Canal, msg.SenderId, ct)
-                ?? await AbrirAsync(empresa.Id, msg, enviadaEm, ct);
+            // #1792: travada até o commit, para não gravar não lidas velhas por cima de outra entrada ou do marcar-lida.
+            (conversa, mensagem) = await unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+            {
+                var aberta = await conversaRepository.ObterAbertaPorContatoComLockAsync(empresa.Id, msg.Canal, msg.SenderId, token)
+                    ?? await AbrirAsync(empresa.Id, msg, enviadaEm, token);
 
-            var (tipo, texto) = Conteudo(msg);
-            var payload = msg.PostbackPayload is { Length: > Mensagem.BotaoIdTamanhoMaximo } longo
-                ? longo[..Mensagem.BotaoIdTamanhoMaximo]
-                : msg.PostbackPayload;
-            mensagem = Mensagem.Entrada(empresa.Id, conversa.Id, enviadaEm, tipo, texto, externoId, payload);
-            conversa.RegistrarEntrada(enviadaEm);
-            await conversaRepository.AddMensagemAsync(mensagem, ct);
-            await unitOfWork.CommitAsync();
+                var (tipo, texto) = Conteudo(msg);
+                var payload = msg.PostbackPayload is { Length: > Mensagem.BotaoIdTamanhoMaximo } longo
+                    ? longo[..Mensagem.BotaoIdTamanhoMaximo]
+                    : msg.PostbackPayload;
+                var entrada = Mensagem.Entrada(empresa.Id, aberta.Id, enviadaEm, tipo, texto, externoId, payload);
+                aberta.RegistrarEntrada(enviadaEm);
+                await conversaRepository.AddMensagemAsync(entrada, token);
+                await unitOfWork.CommitAsync();
+                return (aberta, entrada);
+            }, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

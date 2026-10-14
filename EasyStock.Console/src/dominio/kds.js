@@ -4,12 +4,19 @@ import { agruparPorLinha } from './pedido'
 // KDS sobre Pedido (S19), usado pela cozinha no modo API (F05). Os status são os
 // tokens da API (`StatusPedidoMapper`); a máquina de estados mora na API, aqui só
 // fica o próximo toque de cada coluna, como na cozinha da demonstração.
+// #1683: o pedido pago que espera o preparo está "Na fila"; "Aguardando" é da Ficha, que chama
+// assim o pedido que ainda não foi pago (`esteira.js`).
 export const COLUNAS_KDS = [
-  { status: 'aguardando', rotulo: 'Aguardando', toque: 'Começar preparo' },
+  { status: 'aguardando', rotulo: 'Na fila', toque: 'Começar preparo' },
   { status: 'preparando', rotulo: 'Em preparo', toque: 'Marcar pronto' },
   { status: 'pronto', rotulo: 'Pronto', toque: 'Saiu para entrega' },
   { status: 'saiu_para_entrega', rotulo: 'Saiu para entrega', toque: 'Marcar entregue' },
 ]
+
+// O cartão escreve o rótulo da própria coluna; o da API ("Aguardando") só vale fora delas.
+export function rotuloDoStatusKds(pedido) {
+  return COLUNAS_KDS.find((c) => c.status === pedido.status)?.rotulo ?? pedido.statusRotulo
+}
 
 const PROXIMO = {
   aguardando: 'preparando',
@@ -167,4 +174,13 @@ const UM_DIA_MS = 86400000
 export function diaDaFilaDaCozinha(amanhaDesde, agora) {
   const amanha = Boolean(amanhaDesde) && amanhaDesde === dataIsoNoFuso(agora)
   return { amanha, data: amanha ? dataIsoNoFuso(agora + UM_DIA_MS) : null }
+}
+
+// #1709: o EasyStok devolve no máximo 200 pedidos por consulta, dos mais antigos para os mais
+// novos (`KdsPedidoQueries.Limite`). Com a fila no teto, o pedido novo fica fora da tela.
+export const TETO_DA_FILA_KDS = 200
+
+export function avisoDeFilaNoTeto(quantidade) {
+  if (quantidade < TETO_DA_FILA_KDS) return null
+  return `A fila chegou ao limite de ${TETO_DA_FILA_KDS} pedidos: pedidos mais novos podem estar fora da tela. Conclua ou cancele os pedidos parados para a fila andar.`
 }

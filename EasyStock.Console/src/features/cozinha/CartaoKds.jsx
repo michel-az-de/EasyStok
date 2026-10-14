@@ -4,7 +4,7 @@ import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
-import { avisoDeInicio, gruposDoKds, nomeNaComanda, proximoStatusKds, tempoAteInicio, urgenciaDoPedido } from '../../dominio/kds'
+import { avisoDeInicio, gruposDoKds, nomeNaComanda, proximoStatusKds, rotuloDoStatusKds, tempoAteInicio, urgenciaDoPedido } from '../../dominio/kds'
 import css from './cozinha.module.css'
 
 // Cartão do KDS no modo API (issue #1446), no desenho do cartão do protótipo
@@ -76,7 +76,7 @@ export function CartaoKds({
           <Botao variante="texto" icone="nota" onClick={() => aoAbrir(pedido.id)}>Ver comanda</Botao>
           <Botao variante="texto" icone="printer" onClick={() => aoImprimir(pedido)}>Canhoto</Botao>
           {/* #1632: impressos da API, com escolha de documento e papel. */}
-          <ImprimirPedido {...impressaoDoPedido(pedido.id)} documentoInicial="cozinha" variante="texto" />
+          <ImprimirPedido {...impressaoDoPedido(pedido.id, null, nomeNaComanda(pedido))} documentoInicial="cozinha" variante="texto" />
         </div>
       )}
     </li>
@@ -108,7 +108,7 @@ function CorpoKds({ pedido, agora, linhas, linhaFiltro, urgencia, alca }) {
         <span className={css.numeroCartao}>{pedido.numeroCurto} · {nomeNaComanda(pedido)}</span>
         {alca}
       </div>
-      <p className={css.rotuloSituacao}>{aviso ? aviso.texto : pedido.statusRotulo}</p>
+      <p className={css.rotuloSituacao}>{aviso ? aviso.texto : rotuloDoStatusKds(pedido)}</p>
       {fracao !== null && (
         <div
           className={`${css.barraTempo} ${urgencia ? css[`barra-${urgencia}`] : ''}`}

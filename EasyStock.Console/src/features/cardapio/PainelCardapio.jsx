@@ -14,6 +14,7 @@ import {
   estaEmValidacao, itensAtivos, itensRemovidos, porcaoDoToque, produtoDaPorcao, situacaoDoItem,
 } from '../../dominio/cardapio'
 import { cartaDoItem } from '../../dominio/arteCardapio'
+import { agruparApresentacoes } from '../../dominio/apresentacoesDoCardapio'
 import { aceitaFormato, canalDaConversa, motivoDeFormato } from '../../dominio/canal'
 import { permissaoDeEscrita } from '../../dominio/janela'
 import {
@@ -119,7 +120,7 @@ export function CartaoArrasto({ item }) {
 // linha, senão a lista muda de tamanho e a ordem dos hooks quebra.
 function ItemEscolher({
   item, situacao, quantos, alternativas, linhas, adicionais, cardapio, novidade, aoEscolher, aoAjustar, envioDeFoto,
-  podeGerir = true, naComanda = () => 0, aoEditar, travada = false,
+  podeGerir = true, naComanda = () => 0, aoEditar, travada = false, compacto = false,
 }) {
   const [detalheAberto, setDetalheAberto] = useState(false)
   // M1.4b (#1531): prato com porções. O toque (e o arrasto) soma a porção padrão; cada porção tem
@@ -134,7 +135,7 @@ function ItemEscolher({
   })
 
   return (
-    <li className={`${css.itemVenda} ${situacao.vendavel ? '' : css.apagado}`}>
+    <li className={`${css.itemVenda} ${compacto ? css.apresentacao : ''} ${compacto && detalheAberto ? css.apresentacaoAberta : ''} ${situacao.vendavel ? '' : css.apagado}`}>
       {/* `.linhaComAjuste` só existe pra por o "−" ao LADO do <button> da
           linha, nunca dentro dele: HTML não aceita botão dentro de botão (o
           navegador reparenta e quebra o clique). Os dois são irmãos que
@@ -144,6 +145,7 @@ function ItemEscolher({
           type="button"
           ref={setNodeRef}
           className={css.linha}
+          aria-label={compacto ? `Somar ${item.nome} na comanda` : undefined}
           disabled={!situacao.vendavel || !doToque || travada}
           title={travada ? LINHA_COMANDA_TRAVADA : undefined}
           style={isDragging ? { opacity: 0.5 } : undefined}
@@ -151,16 +153,16 @@ function ItemEscolher({
           {...listeners}
           {...attributes}
         >
-          <FotoDoItem item={item} className={css.foto} />
+          {!compacto && <FotoDoItem item={item} className={css.foto} />}
           {/* Sete itens viravam sete manchas de cor. O estado do item é
               texto na segunda linha, e só aparece quando muda a venda. */}
           <span className={css.nome}>
-            {item.nome}
+            {compacto ? item.porcao : item.nome}
             {novidade && <Pilula tom="marca" fina>Novidade da casa</Pilula>}
             <small>
-              {[linhas[item.linha]?.rotulo, item.porcao].filter(Boolean).join(' · ')}
+              {[!compacto && linhas[item.linha]?.rotulo, !compacto && item.porcao].filter(Boolean).join(' · ')}
               {PEDE_ACAO.has(situacao.chave) && (
-                <b className={css[situacao.tom]}> · {situacao.rotulo}</b>
+                <b className={css[situacao.tom]}>{compacto ? '' : ' · '}{situacao.rotulo}</b>
               )}
             </small>
           </span>
@@ -242,8 +244,8 @@ function ItemEscolher({
       )}
 
       <div className={css.acoesConsulta}>
-        <button type="button" className={css.consultar} aria-expanded={detalheAberto} onClick={() => setDetalheAberto((aberto) => !aberto)}>
-          <MarcaIcone nome="informacao" tamanho={20} /> Ingredientes e detalhes
+        <button type="button" className={css.consultar} aria-label={compacto ? `Ingredientes e detalhes de ${item.nome}` : undefined} aria-expanded={detalheAberto} onClick={() => setDetalheAberto((aberto) => !aberto)}>
+          <MarcaIcone nome="informacao" tamanho={20} /> <span className={compacto ? 'sr' : undefined}>Ingredientes e detalhes</span>
         </button>
         {envioDeFoto && fotoDoItem(item) && (
           <button type="button" className={css.enviarFoto}
@@ -251,7 +253,7 @@ function ItemEscolher({
             title={envioDeFoto.motivo ?? 'Enviar a foto ao cliente'}
             aria-label={rotuloDoEnvio(envioDeFoto, item)} onClick={() => envioDeFoto.enviar(item)}>
             <Icone nome={envioDeFoto.enviado === item.sku ? 'check' : 'imagem'} />
-            {envioDeFoto.enviando === item.sku ? 'Enviando…' : envioDeFoto.enviado === item.sku ? 'Foto enviada' : 'Enviar foto'}
+            <span className={compacto ? 'sr' : undefined}>{envioDeFoto.enviando === item.sku ? 'Enviando…' : envioDeFoto.enviado === item.sku ? 'Foto enviada' : 'Enviar foto'}</span>
           </button>
         )}
         {/* #1587: a falha fica escrita junto do botão; antes ele só voltava a "Enviar foto". */}
@@ -297,38 +299,30 @@ function Escolher({
   cardapio, visiveis, linhas, adicionais, pedido, agora, aoEscolher, aoAjustar, envioDeFoto, podeGerir, aoEditar, travada,
 }) {
   const naComanda = (sku) => pedido?.itens.find((l) => l.sku === sku)?.qtd ?? 0
+  const mostrar = (item, compacto = false) => {
+    const situacao = situacaoDoItem(item)
+    return <ItemEscolher key={item.sku} item={item} situacao={situacao}
+      quantos={naComanda(item.sku)} compacto={compacto}
+      alternativas={situacao.chave === 'esgotado' || situacao.chave === 'fora-do-dia' ? alternativasPara(cardapio, item.sku) : []}
+      linhas={linhas} adicionais={adicionais} cardapio={cardapio} novidade={ehNovidade(item, agora)}
+      aoEscolher={aoEscolher} aoAjustar={aoAjustar} envioDeFoto={envioDeFoto} podeGerir={podeGerir}
+      naComanda={naComanda} aoEditar={aoEditar} travada={travada} />
+  }
 
   return (
     <PorCategoria itens={visiveis}>
       {(itens) => (
         <ul className={css.lista}>
-          {itens.map((item) => {
-            const situacao = situacaoDoItem(item)
-            // A alternativa olha o cardápio inteiro, não só o que a busca deixou à vista.
-            const alternativas = situacao.chave === 'esgotado' || situacao.chave === 'fora-do-dia'
-              ? alternativasPara(cardapio, item.sku)
-              : []
-            return (
-              <ItemEscolher
-                key={item.sku}
-                item={item}
-                situacao={situacao}
-                quantos={naComanda(item.sku)}
-                alternativas={alternativas}
-                linhas={linhas}
-                adicionais={adicionais}
-                cardapio={cardapio}
-                novidade={ehNovidade(item, agora)}
-                aoEscolher={aoEscolher}
-                aoAjustar={aoAjustar}
-                envioDeFoto={envioDeFoto}
-                podeGerir={podeGerir}
-                naComanda={naComanda}
-                aoEditar={aoEditar}
-                travada={travada}
-              />
-            )
-          })}
+          {agruparApresentacoes(itens).map((grupo) => grupo.itens.length === 1 ? mostrar(grupo.itens[0]) : (
+            <li key={grupo.itens[0].sku} className={css.receita}>
+              <div className={css.cabecalhoReceita}>
+                <h4>{grupo.nome}</h4>
+              </div>
+              <ul className={css.tamanhos} aria-label={`Apresentações de ${grupo.nome}`}>
+                {grupo.itens.map(item => mostrar(item, true))}
+              </ul>
+            </li>
+          ))}
         </ul>
       )}
     </PorCategoria>
@@ -545,7 +539,8 @@ function RodapeComanda({ pedido, cardapio, linhas, nomeCliente }) {
 // do dono"). Deixa de tampar a tela porque ela consulta o cardápio enquanto lê
 // a conversa: sem cortina, sem <dialog>, o resto da tela continua clicável.
 export function PainelCardapio({
-  pedido, aoEscolher, aoAjustar, aoFechar, largura: larguraGuardada, deslocamentoDireita = 0, aoRedimensionar,
+  pedido, aoEscolher, aoAjustar, aoFechar, largura: larguraGuardada, ladoDoBalcao = false, aoRedimensionar,
+  larguraMaxima = 600, amplo = false, aoAlternarAmplo, aoTrocarLado,
 }) {
   // #1474: largura guardada de antes (320 a 400) espremia o nome do prato; o mínimo agora é 440.
   const largura = Math.max(larguraGuardada ?? LARGURA_MINIMA, LARGURA_MINIMA)
@@ -573,13 +568,15 @@ export function PainelCardapio({
   const nomeCliente = selecionada?.nome ? primeiroNome(selecionada.nome) : ''
   const travada = comandaTravada(pedido, { fonteApi })
   const fecharRef = useRef(null)
+  const buscaRef = useRef(null)
   const focoAnterior = useRef(null)
 
   useEscape(!modal, aoFechar)
 
   useEffect(() => {
     focoAnterior.current = document.activeElement
-    fecharRef.current?.focus()
+    const focoInicial = buscaRef.current ?? fecharRef.current
+    focoInicial?.focus()
     return () => {
       if (focoAnterior.current?.isConnected) focoAnterior.current.focus()
       else {
@@ -644,30 +641,57 @@ export function PainelCardapio({
 
   return (
     <aside
-      className={css.painel}
+      className={`${css.painel} ${ladoDoBalcao ? css.painelDoBalcao : ''}`}
       aria-label="Cardápio de hoje"
-      style={{ width: `${largura}px`, right: `${deslocamentoDireita}px` }}
+      style={{ width: `${largura}px` }}
     >
       <AlcaLargura
         rotulo="Redimensionar painel do cardápio"
         valor={largura}
         min={LARGURA_MINIMA}
-        max={600}
-        padrao={460}
-        invertida
+        max={larguraMaxima}
+        padrao={Math.min(460, larguraMaxima)}
+        invertida={!ladoDoBalcao}
         aoMudar={aoRedimensionar}
       />
 
       <div className={css.corpoPainel}>
         <header className={css.cabecalhoPainel}>
           <div>
-            <h2>Cardápio de hoje</h2>
+            <h2>{travada && papel === 'escolher' ? 'Consulta do cardápio' : 'Cardápio de hoje'}</h2>
             {nomeCliente && <p className={css.donoDaComanda} aria-live="polite">Comanda de <b>{nomeCliente}</b></p>}
             <p className={css.subPainel}>{noDia} de {ativos.length} itens no dia.</p>
+            {papel === 'escolher' && !travada && <p className={css.subPainel}>Busque um prato e escolha a porção para adicionar à comanda.</p>}
           </div>
-          <button type="button" ref={fecharRef} className={css.fechar} onClick={aoFechar}>
-            <Icone nome="fechar" rotulo="Fechar cardápio" />
-          </button>
+          <div className={css.ferramentasPainel}>
+            {/* #1806: lado e tamanho do painel, lembrados por aparelho. Só ícone para caber nos
+                440 px do painel ao lado do título; o nome vai no aria-label e no title. */}
+            {aoTrocarLado && (
+              <button
+                type="button"
+                className={css.fechar}
+                aria-label={`Mover o cardápio para a ${ladoDoBalcao ? 'direita, sobre o Resumo' : 'esquerda, sobre o Balcão'}`}
+                title={ladoDoBalcao ? 'Mover para a direita' : 'Mover para a esquerda'}
+                onClick={aoTrocarLado}
+              >
+                <Icone nome="trocarLado" />
+              </button>
+            )}
+            {aoAlternarAmplo && (
+              <button
+                type="button"
+                className={css.fechar}
+                aria-label={`${amplo ? 'Reduzir' : 'Ampliar'} o cardápio`}
+                title={amplo ? 'Reduzir' : 'Ampliar'}
+                onClick={aoAlternarAmplo}
+              >
+                <Icone nome={amplo ? 'reduzir' : 'ampliar'} />
+              </button>
+            )}
+            <button type="button" ref={fecharRef} className={css.fechar} onClick={aoFechar}>
+              <Icone nome="fechar" rotulo="Fechar cardápio" />
+            </button>
+          </div>
         </header>
 
         {/* Botão de alternância em vez do padrão ARIA de aba: aba promete
@@ -684,7 +708,7 @@ export function PainelCardapio({
                 className={`${css.papel} ${papel === p.id ? css.papelAtivo : ''}`}
                 onClick={() => setPapel(p.id)}
               >
-                {p.rotulo}
+                {p.id === 'escolher' && travada ? 'Consultar pratos' : p.rotulo}
               </button>
             ))}
           </fieldset>
@@ -695,6 +719,7 @@ export function PainelCardapio({
             <Icone nome="lupa" />
             <span className="sr">Buscar no cardápio</span>
             <input
+              ref={buscaRef}
               type="search"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}

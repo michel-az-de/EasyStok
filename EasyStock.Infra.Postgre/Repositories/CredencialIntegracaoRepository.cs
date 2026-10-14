@@ -46,6 +46,15 @@ public sealed class CredencialIntegracaoRepository(EasyStockDbContext db) : ICre
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<CredencialIntegracao>> ListarAtivasAsync(CancellationToken ct = default)
+    {
+        return await db.Set<CredencialIntegracao>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(c => c.Ativo)
+            .ToListAsync(ct);
+    }
+
     public Task AddAsync(CredencialIntegracao credencial, CancellationToken ct = default)
     {
         db.Set<CredencialIntegracao>().Add(credencial);

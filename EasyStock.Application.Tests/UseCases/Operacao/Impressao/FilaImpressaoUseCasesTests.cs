@@ -24,6 +24,14 @@ public class FilaImpressaoUseCasesTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly IPedidoRepository _pedidos = Substitute.For<IPedidoRepository>();
 
+    public FilaImpressaoUseCasesTests()
+    {
+        _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<ImpressaoPendenteDto?>>>(), Arg.Any<CancellationToken>())
+            .Returns(c => c.Arg<Func<CancellationToken, Task<ImpressaoPendenteDto?>>>()(c.Arg<CancellationToken>()));
+        _repo.GetByIdComLockAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(c => _repo.GetByIdAsync(c.ArgAt<Guid>(0), c.ArgAt<Guid>(1), c.Arg<CancellationToken>()));
+    }
+
     [Fact]
     public async Task AlertaPublicaImpressaoAtrasadaPorEmpresa()
     {

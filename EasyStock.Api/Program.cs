@@ -6,7 +6,9 @@ using EasyStock.Application.DependencyInjection;
 using EasyStock.Infra.Integrations.DependencyInjection;
 using EasyStock.Infra.Integrations.Pagamentos.MercadoPago;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Integration;
 using EasyStock.Infra.Async.DependencyInjection;
+using EasyStock.Infra.Async.Logging;
 using Serilog;
 
 // Handler global para exceções não tratadas que derrubam o processo
@@ -24,6 +26,9 @@ TaskScheduler.UnobservedTaskException += (_, e) =>
 };
 
 var builder = WebApplication.CreateBuilder(args);
+
+// I4.1 (#1674): a chave-mestra do cofre chega por EZ_CRYPTO_* nos dois hosts (API e Worker).
+builder.Configuration.AdicionarChaveMestraDoAmbiente();
 
 // Garantir que diretório de logs existe antes do Serilog iniciar
 {
@@ -53,12 +58,13 @@ var loggerConfiguration = new LoggerConfiguration()
 // sem a config (dev local/CI), nenhum sink extra.
 if (builder.Configuration["OpenTelemetry:OtlpEndpoint"] is { Length: > 0 } otlpLogsEndpoint)
 {
-    loggerConfiguration = loggerConfiguration.WriteTo.OpenTelemetry(o =>
+    // I4.5 (#1698): o log sai da maquina por aqui, entao sai redigido.
+    loggerConfiguration = loggerConfiguration.WriteTo.Redigido(sinks => sinks.OpenTelemetry(o =>
     {
         o.Endpoint = otlpLogsEndpoint;
         o.Protocol = Serilog.Sinks.OpenTelemetry.OtlpProtocol.Grpc;
         o.ResourceAttributes = new Dictionary<string, object> { ["service.name"] = "EasyStock.Api" };
-    });
+    }));
 }
 
 Log.Logger = loggerConfiguration.CreateLogger();
@@ -99,7 +105,7 @@ builder.Services.AddEasyStockStorefrontUseCases();
 // #449: registra IMercadoPagoClient (StubMercadoPagoClient em Development via
 // MercadoPago:UseStub; cliente real em producao). Sem isto, IniciarCheckoutUseCase
 // nao resolve e o boot da API falha em Development (ValidateOnBuild).
-builder.Services.AddMercadoPagoClient(builder.Configuration);
+builder.Services.AddMercadoPagoClient(builder.Configuration, builder.Environment.EnvironmentName);
 builder.Services.AddReportingApi();
 builder.Services.Configure<EasyStock.Application.Services.PedidoEstoqueOptions>(
     builder.Configuration.GetSection("Pedidos"));
@@ -150,6 +156,9 @@ builder.Services.AddSingleton<EasyStock.Api.Observability.DiagnosticoModeService
 // ── Build ─────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 
+// I4.1: sem chave-mestra a API sobe e avisa (o fail-fast é da I4.2).
+ChaveMestraConfiguracao.AvisarSeFaltar(app.Configuration, app.Logger, "API");
+
 // ── Modo migrate-only (release_command do deploy) ─────────────────────────────
 // Aplica migrations pendentes e ENCERRA, sem subir o servidor. O deploy (Fly
 // release_command) roda este modo numa máquina temporária ANTES de promover a
@@ -195,6 +204,9 @@ app.UseForwardedHeaders(forwardedHeaders);
 
 // ── Migrations + Seed (PostgreSQL only) ───────────────────────────────────────
 await StartupMigrationsAndSeed.RunAsync(app, infraState, databaseProvider, resolvedProvider);
+
+// I4.2: em Production a API não sobe sem chave-mestra que leia todas as credenciais ativas.
+await ChaveMestraNaSubida.ExigirAsync(app.Services, app.Environment.EnvironmentName, "API");
 
 // Restaura modo de logging verbose salvo no DB (após migrations estarem aplicadas).
 if (resolvedProvider is "postgresql")

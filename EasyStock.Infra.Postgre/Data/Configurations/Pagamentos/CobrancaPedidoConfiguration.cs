@@ -24,6 +24,10 @@ public class CobrancaPedidoConfiguration : IEntityTypeConfiguration<CobrancaPedi
         b.Property(c => c.Tentativa).IsRequired();
         b.Property(c => c.CriadaEm).IsRequired();
 
+        b.Property(c => c.ContaRecebedoraId).HasMaxLength(CobrancaPedido.ContaRecebedoraTamanhoMaximo);
+        b.Property(c => c.OrigemCredencial).HasMaxLength(CobrancaPedido.OrigemCredencialTamanhoMaximo);
+
+        b.Ignore(c => c.AguardandoCredencial);
         b.Ignore(c => c.EhOnline);
         b.Ignore(c => c.EstaPendente);
 

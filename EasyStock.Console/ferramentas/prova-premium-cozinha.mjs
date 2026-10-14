@@ -100,12 +100,12 @@ provar('API conserva mouse 6 px, toque longo 250 ms e teclado com rolagem instan
 })
 provar('cancelar e soltar fora da fila não enviam PATCH', () => {
   const t = novoApi(); dnd(t.renderizar()).props.onDragCancel(); assert.match(feedback(t.renderizar()).feedback.texto, /cancelado/)
-  dnd(t.renderizar()).props.onDragEnd({ active, over: null }); assert.match(feedback(t.renderizar()).feedback.texto, /ficou em Aguardando/)
+  dnd(t.renderizar()).props.onDragEnd({ active, over: null }); assert.match(feedback(t.renderizar()).feedback.texto, /ficou em Na fila/)
   assert.equal(chamadas.length, 0)
 })
 provar('pular etapa é recusado pelo domínio e não envia PATCH', () => {
   const t = novoApi(); dnd(t.renderizar()).props.onDragEnd({ active, over: { id: 'pronto' } })
-  assert.equal(chamadas.length, 0); assert.match(feedback(t.renderizar()).feedback.texto, /ficou em Aguardando/)
+  assert.equal(chamadas.length, 0); assert.match(feedback(t.renderizar()).feedback.texto, /ficou em Na fila/)
 })
 provar('pedido pendente não dispara segunda operação', () => {
   const t = novoApi(); api.movendo.add('p1'); dnd(t.renderizar()).props.onDragEnd({ active, over: { id: 'preparando' } })

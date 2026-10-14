@@ -82,7 +82,7 @@ public sealed class PedidosCobrancaController(
     [Authorize(Policy = "Operador")]
     public Task<IActionResult> Reemitir(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
         ExecutarAsync(empresaId, async emp =>
-            DataOk(await gerarCobranca.ExecuteAsync(new GerarCobrancaPedidoInput(emp, id), ct)));
+            DataOk(await gerarCobranca.ExecuteComTravaAsync(new GerarCobrancaPedidoInput(emp, id), ct)));
 
     [SwaggerOperation(Summary = "Trocar a forma de pagamento do pedido (online | na_entrega)")]
     [HttpPost("{id}/cobranca/forma")]

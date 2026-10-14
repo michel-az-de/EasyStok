@@ -2,11 +2,14 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { registerHooks } from 'node:module'
 import { transformWithOxc } from 'vite'
+import './prova-1757-complemento-texto.mjs'
 
 const arquivo = new URL('../src/features/ficha-cliente/ComandaDoCliente.jsx', import.meta.url)
 const compilado = (await transformWithOxc(readFileSync(arquivo, 'utf8'), arquivo.pathname, { jsx: { runtime: 'automatic' } })).code
 const modalArquivo = new URL('../src/features/atendimento/ModalEnviarCardapio.jsx', import.meta.url)
 const modalCompilado = (await transformWithOxc(readFileSync(modalArquivo, 'utf8'), modalArquivo.pathname, { jsx: { runtime: 'automatic' } })).code
+const compartilharArquivo = new URL('../src/features/atendimento/CompartilharComanda.jsx', import.meta.url)
+const compartilharCompilado = (await transformWithOxc(readFileSync(compartilharArquivo, 'utf8'), compartilharArquivo.pathname, { jsx: { runtime: 'automatic' } })).code
 const contexto = { dados: [], erro: '', ocupado: false, estados: [], cursor: 0, acoes: { estornarPagamentoOnline: true },
   salvar: async (...args) => { contexto.salvo = args; return contexto.sucesso !== false },
   confirmar: (...args) => { contexto.confirmado = args } }
@@ -14,19 +17,27 @@ globalThis.__comandaCompartilhada = contexto
 const codigo = fonte => 'data:text/javascript,' + encodeURIComponent(fonte)
 registerHooks({
   resolve(spec, ctx, proximo) {
-    if (spec === 'react') return { url: codigo('export function useState(inicial){const c=globalThis.__comandaCompartilhada;const n=c.cursor++;if(!(n in c.estados))c.estados[n]=inicial;return [c.estados[n],v=>c.estados[n]=v]} export const useRef=inicial=>useState({current:inicial})[0]'), shortCircuit: true }
+    if (spec === 'react') return { url: codigo('export function useState(inicial){const c=globalThis.__comandaCompartilhada;const n=c.cursor++;if(!(n in c.estados))c.estados[n]=inicial;return [c.estados[n],v=>c.estados[n]=v]} export const useRef=inicial=>useState({current:inicial})[0]; export const useEffect=()=>{}'), shortCircuit: true }
     if (spec === 'react/jsx-runtime') return { url: codigo('export const Fragment="fragment"; export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx'), shortCircuit: true }
     if (spec.endsWith('.css')) return { url: codigo('export default {}'), shortCircuit: true }
-    if (spec.endsWith('useComandasCliente')) return { url: codigo('export const useComandasCliente=()=>globalThis.__comandaCompartilhada'), shortCircuit: true }
-    if (spec.endsWith('/contextos')) return { url: codigo('export const useCatalogo=()=>({cardapio:globalThis.__comandaCompartilhada.cardapio})'), shortCircuit: true }
+    if (spec.endsWith('useComandasCliente')) return { url: codigo(`export const useComandasCliente=()=>globalThis.__comandaCompartilhada;export { idDaJanela, janelaDoId } from ${JSON.stringify(new URL('../src/infra/api/comandaApi.js', import.meta.url).href)}`), shortCircuit: true }
+    if (spec.endsWith('/fonteDados')) return { url: codigo('export const API_BASE=""; export const FONTE_API=true'), shortCircuit: true }
+    if (spec.endsWith('rascunhosDosAjustes')) return { url: codigo('import { useState } from "react"; export const useRascunhoDoAjuste=()=>useState(null)'), shortCircuit: true }
+    if (spec.endsWith('/contextos')) return { url: codigo('export const useCatalogo=()=>({cardapio:globalThis.__comandaCompartilhada.cardapio,canais:[]});export const useAcoes=()=>globalThis.__comandaCompartilhada;export const useAtendimento=()=>({agora:Date.now()})'), shortCircuit: true }
+    if (spec.endsWith('/ModalEnviarCardapio')) return { url: modalArquivo.href, shortCircuit: true }
     if (spec.endsWith('/acessoModulos')) return { url: codigo('export const useAcessoModulos=()=>globalThis.__comandaCompartilhada'), shortCircuit: true }
     if (spec.endsWith('/Botao')) return { url: codigo('export function Botao(){}'), shortCircuit: true }
+    if (spec.endsWith('/SugestaoDeTexto')) return { url: codigo('export function SugestaoDeTexto(){}'), shortCircuit: true }
+    if (spec.endsWith('/useComplementoDeTexto')) return { url: codigo('export const useComplementoDeTexto=()=>({})'), shortCircuit: true }
     if (spec.endsWith('/Modal')) return { url: codigo('export function Modal(){}'), shortCircuit: true }
+    if (spec.endsWith('/BlocoFreteApi')) return { url: codigo('export function ConsultaTransporte(){}'), shortCircuit: true }
+    if (spec.endsWith('/SeletorJanelaApi')) return { url: codigo('export function SeletorJanelaApi(){}'), shortCircuit: true }
     if (spec.startsWith('.') && !/\.[a-z]+$/i.test(spec)) return proximo(spec + '.js', ctx)
     return proximo(spec, ctx)
   },
   load(url, ctx, proximo) {
     if (url === arquivo.href || url === modalArquivo.href) return { format: 'module', source: url === arquivo.href ? compilado : modalCompilado, shortCircuit: true }
+    if (url === compartilharArquivo.href) return { format: 'module', source: compartilharCompilado, shortCircuit: true }
     return proximo(url, ctx)
   },
 })
@@ -48,7 +59,7 @@ contexto.cardapio = [{ sku: 'prato', nome: 'Lasanha', preco: 50 }, { sku: 'novo'
   { sku: 'validacao', nome: 'Em validação', emValidacao: true }, { sku: 'removido', nome: 'Removido', removidoEm: 'hoje' }]
 function render() { contexto.cursor = 0; return elementos(ComandaDoCliente({ conversaId: 'conversa', numeroComanda: 72, ativo: true })) }
 let arvore = render()
-assert.equal(arvore.find(e => e.type === 'span' && Array.isArray(e.props.children) && e.props.children.includes('Lasanha')).props.children.at(-1), 'R$ 40,00', 'preço salvo vence catálogo alterado')
+assert.ok(arvore.some(e => e.type === 'small' && e.props.children === 'R$ 40,00'), 'preço salvo vence catálogo alterado')
 assert.ok(!arvore.some(e => e.type === 'option' && ['validacao', 'removido'].includes(e.props.value)))
 arvore.find(e => e.props['aria-label'] === 'Tirar uma unidade de Lasanha').props.onClick()
 assert.equal(contexto.salvo, undefined, 'edição local só publica ao salvar')
@@ -128,13 +139,29 @@ assert.equal(partesComLinkDoCardapio(link.replace('casadababa.com', 'malicioso.c
 assert.equal(partesComLinkDoCardapio(link, null)[0].tipo, 'texto')
 assert.equal(combinaBusca({ nome: 'Maria', numeroComanda: 72, mensagens: [] }, 'comanda 72'), true)
 console.log('Comanda: conflito preserva edição, falha API preserva dados, adição de prato, permissão de devolução, saldo líquido, link seguro e busca por número aprovados.')
+for (const [podeEditar, pedido, situacao, estado, acao] of [
+  [true, null, null, 'Não confirmada', 'Revisar seleção'],
+  [true, { total: 60 }, null, 'Pedido atual mantido', 'Revisar alteração'],
+  [false, { total: 60 }, 'alteracao_aguardando_confirmacao', 'Pedido atual mantido', 'Comparar e aprovar'],
+  [false, { total: 60 }, 'aguardando_pagamento', 'Pedido criado', 'Consultar histórico'],
+  [false, { total: 60 }, 'alteracao_recusada', 'Alteração recusada', 'Consultar histórico'],
+  [false, { total: 60 }, 'estorno_pendente', 'Devolução em acompanhamento', 'Consultar histórico'],
+]) {
+  contexto.estados = []; contexto.cursor = 0
+  contexto.dados = [{ ...comanda, podeEditar, pedido, envio: situacao ? { situacao } : null }]
+  const resumo = elementos(ComandaDoCliente({ conversaId: 'conversa', ativo: true, compacta: true, pedido }))
+  assert.ok(resumo.some(e => e.props.children === estado), 'resumo distingue etapa: ' + estado)
+  assert.ok(resumo.some(e => e.type.name === 'Botao' && e.props.children === acao), 'ação corresponde à etapa: ' + acao)
+  assert.ok(!resumo.some(e => e.props.children === 'Seleção enviada'), 'envio não se confunde com criação ou aprovação')
+}
+console.log('Resumo: seleção, edição, aprovação, pedido criado, recusa e devolução têm estados e ações distintos.')
 const { ModalEnviarCardapio } = await import(modalArquivo.href)
 contexto.estados = []
 let concluirEnvio, envios = 0, fechamentos = 0
 const props = { nomeCliente: 'Maria', canalNome: 'WhatsApp', link, numeroComanda: 72, texto: 'Convite',
   aoEnviar: () => { envios++; return new Promise(resolve => { concluirEnvio = resolve }) }, aoFechar: () => { fechamentos++ } }
 function renderModal() { contexto.cursor = 0; return elementos(ModalEnviarCardapio(props)) }
-const botao = renderModal().find(e => e.props.children === 'Enviar pelo WhatsApp')
+const botao = renderModal().find(e => e.props.children === 'Enviar link')
 const primeiroEnvio = botao.props.onClick()
 await botao.props.onClick()
 assert.equal(envios, 1, 'cliques repetidos não repetem convite')
@@ -143,7 +170,53 @@ assert.equal(renderModal().find(e => e.props.children === 'Enviando…').props.d
 concluirEnvio(false); await primeiroEnvio
 assert.equal(fechamentos, 0, 'falha mantém link e modal acessíveis')
 assert.ok(renderModal().some(e => e.props.role === 'alert'))
-const novaTentativa = renderModal().find(e => e.props.children === 'Enviar pelo WhatsApp').props.onClick()
+const novaTentativa = renderModal().find(e => e.props.children === 'Enviar link').props.onClick()
+await Promise.resolve()
 concluirEnvio(true); await novaTentativa
 assert.equal(fechamentos, 1)
 console.log('Compartilhamento: espera servidor, bloqueia envio repetido, mantém modal na falha e fecha somente com sucesso.')
+
+const { CompartilharComanda } = await import(compartilharArquivo.href)
+contexto.estados = []
+let geracoes = 0
+contexto.obterLinkCardapio = async () => { geracoes++; return { url: link, numeroComanda: 72, daLoja: true } }
+function renderCompartilhar() {
+  contexto.cursor = 0
+  return CompartilharComanda({ conversa: { id: 'conversa', nome: 'Maria', numeroComanda: 72, mensagens: [] } }).props.children
+}
+renderCompartilhar()[0].props.onClick()
+let modal = renderCompartilhar()[1]
+assert.equal(geracoes, 0, 'abrir compartilhar não substitui o link ativo do cliente')
+modal.props.aoFechar()
+assert.equal(renderCompartilhar()[1], false)
+assert.equal(geracoes, 0, 'cancelar não gera edição nem invalida o link ativo')
+renderCompartilhar()[0].props.onClick()
+modal = renderCompartilhar()[1]
+const gerado = await modal.props.aoGerar()
+assert.equal(gerado.link, link)
+assert.ok(gerado.texto.includes(link), 'convite usa somente o endereço retornado pela API')
+
+contexto.estados = []
+geracoes = 0; fechamentos = 0
+let liberarGeracao, mensagemEnviada
+Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { clipboard: {
+  writeText: async () => { throw new Error('Permissão negada') },
+} } })
+const propsNovo = { nomeCliente: 'Maria', canalNome: 'WhatsApp', numeroComanda: 72,
+  aoGerar: () => { geracoes++; return new Promise(resolve => { liberarGeracao = resolve }) },
+  aoEnviar: async mensagem => { mensagemEnviada = mensagem; return true }, aoFechar: () => { fechamentos++ } }
+function renderNovo() { contexto.cursor = 0; return elementos(ModalEnviarCardapio(propsNovo)) }
+assert.ok(!renderNovo().some(e => e.type === 'a'), 'prévia não inventa URL antes da geração')
+const copia = renderNovo().find(e => e.props.children === 'Gerar e copiar').props.onClick()
+await renderNovo().find(e => e.props.children === 'Gerar e enviar').props.onClick()
+renderNovo().find(e => e.type.name === 'Modal').props.aoFechar()
+assert.equal(geracoes, 1, 'cópia e envio concorrentes compartilham a trava de geração')
+assert.equal(fechamentos, 0, 'não fecha no meio da geração')
+liberarGeracao(gerado); await copia
+assert.ok(renderNovo().some(e => e.props.role === 'alert'))
+assert.equal(renderNovo().find(e => e.type === 'a').props.href, link, 'falha de clipboard mantém a URL real para cópia manual')
+await renderNovo().find(e => e.props.children === 'Enviar link').props.onClick()
+assert.equal(geracoes, 1, 'envio reutiliza o link já gerado, mesmo após falha na cópia')
+assert.equal(mensagemEnviada, gerado.texto)
+assert.equal(fechamentos, 1)
+console.log('Compartilhamento: abrir/cancelar sem geração, uma ação explícita, convite real e reutilização após falha de cópia aprovados.')

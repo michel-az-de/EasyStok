@@ -69,11 +69,11 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
             var saldoAnterior = await saldos.ConsultarAsync(pedido, t);
             if (saldoAnterior.Reservado > 0) throw new ComandaClienteConflitoException("Aguarde a devolução em andamento antes de alterar de novo.");
             var devolucao = Math.Max(0, saldoAnterior.Alocado - novoTotal);
-            if (devolucao > 0 && input.Nivel is not (NivelAcesso.Gerente or NivelAcesso.Admin or NivelAcesso.SuperAdmin))
-                throw new UnauthorizedAccessException("Só a dona ou um gerente pode confirmar uma devolução ou cupom.");
             if (input.Automatico && (devolucao > 0 || (dados.Observacoes ?? "") != (pedido.Observacoes ?? "")
                 || !SomenteAcrescimos(antigos, selecao)))
-                throw new ComandaClienteConflitoException("Esta alteração precisa ser conferida pelo atendimento.");
+                return anterior;
+            if (devolucao > 0 && input.Nivel is not (NivelAcesso.Gerente or NivelAcesso.Admin or NivelAcesso.SuperAdmin))
+                throw new UnauthorizedAccessException("Só a dona ou um gerente pode confirmar uma devolução ou cupom.");
             var agora = relogio.GetUtcNow().UtcDateTime;
             var historico = JsonSerializer.Serialize(antigos.Select(i => new { i.Nome, i.Quantidade, i.PrecoUnitario, i.Observacao }), ComandaClienteUseCase.Json);
             // Retorna exclusivamente as saídas das linhas anteriores. Novas linhas recebem novos IDs.
@@ -169,8 +169,8 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
     public static Guid IdEstorno(Guid linkId, Guid pagamentoId) => new(SHA256.HashData(Encoding.UTF8.GetBytes($"comanda:{linkId:N}:{pagamentoId:N}"))[..16]);
     private static string Texto(EnvioComandaCliente r, decimal devolucao = 0) => r.Situacao == "alteracao_recusada"
         ? "A alteração precisa de outro ajuste. Seu pedido original foi mantido; fale com o atendimento."
-        : $"Comanda atualizada. Total {r.Total.ToString("C", Cultura.PtBr)}. " + (r.CodigoCupom is { } cupom
-            ? $"Crédito de {devolucao.ToString("C", Cultura.PtBr)} emitido no cupom {cupom}. Isso é crédito para compras, não devolução em dinheiro."
-            : r.Situacao == "estorno_pendente" ? $"Devolução de {devolucao.ToString("C", Cultura.PtBr)} solicitada ao Mercado Pago. Aguarde a confirmação; ela ainda não foi registrada como devolvida."
-            : r.LinkPagamento is { } link ? $"Saldo a pagar: {Math.Max(0, r.Saldo).ToString("C", Cultura.PtBr)}. Pague apenas a diferença: {link}" : "O valor alocado já cobre esse pedido.");
+        : $"Seu pedido foi atualizado. Total: {r.Total.ToString("C", Cultura.PtBr)}.\n" + (r.CodigoCupom is { } cupom
+            ? $"Você tem {devolucao.ToString("C", Cultura.PtBr)} de crédito para uma próxima compra.\nCódigo do cupom: {cupom}\nEsse crédito não é uma devolução em dinheiro."
+            : r.Situacao == "estorno_pendente" ? $"Solicitamos a devolução de {devolucao.ToString("C", Cultura.PtBr)} pelo Mercado Pago. Aguarde a confirmação."
+            : r.LinkPagamento is { } link ? $"Falta pagar {Math.Max(0, r.Saldo).ToString("C", Cultura.PtBr)}. Pague apenas essa diferença: {link}" : "Não há mais valor a pagar por esse pedido.");
 }

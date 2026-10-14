@@ -1,8 +1,10 @@
 using System.Text.Json;
 using EasyStock.Api.Services.Operacao;
+using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Application.UseCases.Common;
+using EasyStock.Domain.Exceptions.Storefront;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace EasyStock.Api.Controllers.Storefront;
@@ -38,7 +40,9 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
     [EnableRateLimiting("comanda-envio")]
     public Task<IActionResult> Enviar(string token, [FromBody] EnviarComandaClienteBody body, CancellationToken ct) => Tratar(async () =>
     {
-        var resultado = await comanda.EnviarAsync(token, body.Revisao, ct);
+        EnvioComandaCliente resultado;
+        try { resultado = await comanda.EnviarAsync(token, body.Revisao, ct); }
+        catch (CepSemCoberturaException) { return await comanda.EncaminharEntregaAsync(token, body.Revisao, ct); }
         if (resultado.Situacao == "alteracao_aguardando_confirmacao")
         {
             var estado = await comanda.ObterAsync(token, ct);
@@ -63,6 +67,16 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
     public Task<IActionResult> NovaEdicao(string token, CancellationToken ct) =>
         Tratar(async () => await comanda.NovaEdicaoAsync(token, ct));
 
+    [HttpPost("encaminhar-entrega")]
+    [EnableRateLimiting("comanda-envio")]
+    public Task<IActionResult> EncaminharEntrega(string token, [FromBody] EnviarComandaClienteBody body, CancellationToken ct) =>
+        Tratar(async () => await comanda.EncaminharEntregaAsync(token, body.Revisao, ct));
+
+    [HttpPost("pedir-ajuda")]
+    [EnableRateLimiting("comanda-envio")]
+    public Task<IActionResult> PedirAjuda(string token, CancellationToken ct) =>
+        Tratar(async () => await comanda.PedirAjudaAsync(token, ct));
+
     [HttpGet("eventos")]
     [EnableRateLimiting("comanda-stream")]
     public async Task Eventos(string token, CancellationToken ct)
@@ -79,10 +93,18 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
         while (!ct.IsCancellationRequested && relogio.GetUtcNow().UtcDateTime < acesso.ExpiraEm)
         {
             // O stream transmite somente o retrato da comanda autenticada, nunca o payload do broker do tenant.
-            await using var escopo = escopos.CreateAsyncScope();
+            Guid? pedidoId;
             string estado;
-            try { estado = JsonSerializer.Serialize(await escopo.ServiceProvider.GetRequiredService<ComandaClienteUseCase>().ObterAsync(token, ct), ComandaClienteUseCase.Json); }
-            catch (LinkCardapioConversaIndisponivelException) { break; }
+            await using (var escopo = escopos.CreateAsyncScope())
+            {
+                try
+                {
+                    var retrato = await escopo.ServiceProvider.GetRequiredService<ComandaClienteUseCase>().ObterAsync(token, ct);
+                    pedidoId = retrato.Pedido?.PedidoId;
+                    estado = JsonSerializer.Serialize(retrato, ComandaClienteUseCase.Json);
+                }
+                catch (LinkCardapioConversaIndisponivelException) { break; }
+            }
             if (estado != ultimo)
             {
                 await Response.WriteAsync($"event: comanda\ndata: {estado}\n\n", ct);
@@ -90,9 +112,34 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
             }
             else await Response.WriteAsync(": conectado\n\n", ct);
             await Response.Body.FlushAsync(ct);
-            await s.Slot.Signal.WaitAsync(TimeSpan.FromSeconds(15), ct);
-            while (s.Slot.Queue.TryDequeue(out _)) { }
+            // Relê quando o evento é desta comanda ou no batimento de 15 s, que cobre o que o evento não diz (#1719).
+            var limite = relogio.GetUtcNow().AddSeconds(15);
+            while (true)
+            {
+                var resta = limite - relogio.GetUtcNow();
+                if (resta <= TimeSpan.Zero || !await s.Slot.Signal.WaitAsync(resta, ct)) break;
+                if (s.Slot.Cancelled || EsvaziarEventos(s.Slot, acesso.ConversaId, pedidoId)) break;
+            }
         }
+    }
+
+    /// <summary>
+    /// Esvazia a fila e o sinal do ouvinte e diz se algum evento cita a conversa ou o pedido desta comanda. O
+    /// ouvinte recebe os eventos de conversa e de pedido da loja inteira; reler o retrato a cada um custava dezenas
+    /// de consultas por evento alheio, multiplicadas pelas comandas abertas (#1719).
+    /// </summary>
+    public static bool EsvaziarEventos(OperacaoEventBroker.ListenerSlot slot, Guid conversaId, Guid? pedidoId)
+    {
+        var conversa = conversaId.ToString();
+        var pedido = pedidoId?.ToString();
+        var relevante = false;
+        // O sinal sai antes da fila: o broker enfileira e depois sinaliza, então evento que chega no meio fica
+        // na fila com o sinal dele sobrando (um giro a mais), nunca na fila sem sinal.
+        while (slot.Signal.CurrentCount > 0 && slot.Signal.Wait(0)) { }
+        while (slot.Queue.TryDequeue(out var evento))
+            relevante |= evento.Dados.Contains(conversa, StringComparison.OrdinalIgnoreCase)
+                || (pedido is not null && evento.Dados.Contains(pedido, StringComparison.OrdinalIgnoreCase));
+        return relevante;
     }
 
     private async Task<IActionResult> Tratar(Func<Task<object>> acao)
@@ -103,7 +150,17 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
         catch (ComandaClienteConflitoException e) { return Problem(e.Message, statusCode: 409); }
         catch (UseCaseValidationException e) { return Problem(e.Message, statusCode: 400); }
         catch (RegraDeDominioVioladaException e) { return Problem(e.Message, statusCode: 422); }
+        // #1716: quem lê é o cliente. O motivo técnico (provedor fora ou sem credencial) fica no log do caso de uso.
+        catch (MercadoPagoIndisponivelException e)
+        {
+            return Problem(e.InnerException is MercadoPagoNaoConfiguradoException ? PagamentoOnlineSemProvedor : PagamentoOnlineInstavel, statusCode: 503);
+        }
     }
+
+    private const string PagamentoOnlineSemProvedor =
+        "O pagamento online está indisponível agora. Sua seleção continua salva: fale com a Casa para combinar o pagamento.";
+    private const string PagamentoOnlineInstavel =
+        "O pagamento online não respondeu agora. Sua seleção continua salva: tente de novo em instantes.";
 }
 public sealed record SalvarComandaClienteBody(int Revisao, RascunhoComandaCliente Rascunho);
 public sealed record EnviarComandaClienteBody(int Revisao);

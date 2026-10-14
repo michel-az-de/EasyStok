@@ -19,7 +19,6 @@ export function indicadoresDoHall(fontes, ids) {
       detalhe = !dados ? '' : dados.aberturaPendenteCrossDay ? 'Caixa de outro dia ainda aberto. Confira o fechamento.' : dados.aberto ? 'Total do caixa, incluindo Pix e cartão. Confira a gaveta no financeiro.' : dados.fechado ? 'Caixa fechado hoje.' : 'Caixa do dia ainda não aberto.'
     }
     const atual = fonte?.estado === 'ok' && valor !== null
-    return { id, valor, detalhe, atual, parcial: Boolean(dados?.parcial), estado: fonte?.estado ?? 'carregando', em: fonte?.em, erro: fonte?.erro,
-      emDia: atual && !dados?.parcial && id !== 'financeiro' && valor === 0 }
+    return { id, valor, detalhe, atual, parcial: Boolean(dados?.parcial), estado: fonte?.estado ?? 'carregando', em: fonte?.em, erro: fonte?.erro }
   })
 }

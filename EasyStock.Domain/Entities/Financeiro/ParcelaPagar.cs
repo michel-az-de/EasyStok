@@ -136,7 +136,9 @@ public class ParcelaPagar
     public void Cancelar()
     {
         if (Status == StatusParcela.Cancelada) return;
-        if (Pagamentos.Any(p => p.Status == StatusPagamentoParcela.Confirmado))
+        // #1774: o cancelamento da conta le as parcelas SEM os pagamentos; so a lista deixava cancelar parcela
+        // com dinheiro recebido, e o movimento ficava no caixa sem estorno. ValorPago vem sempre carregado.
+        if (ValorPago > 0m || Pagamentos.Any(p => p.Status == StatusPagamentoParcela.Confirmado))
             throw new RegraDeDominioVioladaException("Nao e possivel cancelar parcela com pagamento confirmado — use estorno antes.");
         Status = StatusParcela.Cancelada;
         AlteradoEm = DateTime.UtcNow;

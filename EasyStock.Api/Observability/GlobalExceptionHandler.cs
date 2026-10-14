@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using EasyStock.Api.Observability.Logging;
 using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Infra.Postgre.Data;
@@ -21,7 +22,10 @@ public class GlobalExceptionHandler(
         }
 
         var correlationId = httpContext.Items["CorrelationId"] as string ?? "unknown";
-        var requestPath = httpContext.Request.Path + httpContext.Request.QueryString;
+        // I4.5 (#1698): webhook entra no log pelo molde da rota e sem query.
+        var requestPath = CaminhoDoLog.EhWebhook(httpContext)
+            ? CaminhoDoLog.De(httpContext)
+            : httpContext.Request.Path + httpContext.Request.QueryString;
         var requestMethod = httpContext.Request.Method;
 
         var (statusCode, code, title, detail, logAsError) = MapException(exception);

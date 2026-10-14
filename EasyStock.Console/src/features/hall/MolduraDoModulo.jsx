@@ -60,7 +60,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
       <div className={css.areaTrabalho}>
       <header className={css.barra}>
         <div className={css.contexto}>
-          <Botao className={css.abrirMenu} icone="painel" aria-label={`Menu de ${modulo.nome}`} aria-haspopup="dialog" onClick={() => setMenuAberto(true)}>Menu</Botao>
+          <Botao className={css.abrirMenu} icone="painel" aria-label={`Menu de ${modulo.nome}`} aria-haspopup="dialog" aria-expanded={menuAberto} onClick={() => setMenuAberto(true)}><span>Menu<span className={css.nomeNoMenu}>{modulo.nome}</span></span></Botao>
           {avulsa ? (
             <button type="button" className={`${css.voltar} ${css.voltarBotao}`} onClick={() => voltarAoBalcao(fonteApi)}>
               <MarcaIcone nome="anterior" tamanho={20} /> <span>Voltar ao Balcão</span>
@@ -105,7 +105,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
               ) : (
                 <div className={css.conteudo}>
                   <Vazio titulo={`${modulo.nome}: em breve`} acao={<a className={css.link} href={HASH_HALL}>Voltar aos módulos</a>}>
-                    Este módulo ainda não funciona por esta tela.
+                    Esta área ainda não está disponível.
                   </Vazio>
                 </div>
               )}

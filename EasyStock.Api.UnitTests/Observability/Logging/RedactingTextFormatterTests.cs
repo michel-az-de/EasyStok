@@ -1,3 +1,4 @@
+using EasyStock.Application.Seguranca;
 using EasyStock.Api.Observability.Logging;
 using FluentAssertions;
 using Serilog.Events;

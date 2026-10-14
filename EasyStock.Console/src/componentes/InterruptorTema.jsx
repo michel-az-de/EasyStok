@@ -11,6 +11,7 @@ const OPCOES = [
 export function InterruptorTema({ vertical = false }) {
   const [tema, trocarTema] = useTema()
   const aoTeclar = (evento) => {
+    if (evento.altKey || evento.ctrlKey || evento.metaKey) return
     const proximo = tema === 'light' ? 'dark' : 'light'
     const destino = { ArrowLeft: proximo, ArrowUp: proximo, Home: 'light', ArrowRight: proximo, ArrowDown: proximo, End: 'dark' }[evento.key]
     if (!destino) return

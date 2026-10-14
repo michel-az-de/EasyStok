@@ -25,6 +25,12 @@ public enum ResultadoExpiracaoCobranca
 
     /// <summary>S32: o Mercado Pago tinha um pagamento aprovado (webhook perdido); o pedido foi confirmado.</summary>
     ConfirmadaPelaConsulta = 5,
+
+    /// <summary>
+    /// I3.2: a credencial atual não alcança a conta da cobrança (trocada, ausente ou recusada). Nada expira e
+    /// nada é cancelado; a cobrança sai da varredura até a credencial voltar.
+    /// </summary>
+    AguardandoCredencial = 6,
 }
 
 /// <summary>
@@ -66,6 +72,14 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         ArgumentNullException.ThrowIfNull(item);
         tenantContext.SetCurrentTenant(item.EmpresaId);
 
+        if (await CredencialNaoAlcancaAsync(item, ct))
+        {
+            await MarcarAguardandoCredencialAsync(item, ct);
+            logger.LogWarning("Cobranca vencida aguardando credencial cobrancaId={CobrancaId} pedidoId={PedidoId}",
+                item.CobrancaId, item.PedidoId);
+            return ResultadoExpiracaoCobranca.AguardandoCredencial;
+        }
+
         if (await ConfirmarPagamentoPerdidoAsync(item, ct))
         {
             logger.LogInformation("Cobranca vencida confirmada pela consulta cobrancaId={CobrancaId} pedidoId={PedidoId}",
@@ -94,6 +108,40 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         return resultado;
     }
 
+    /// <summary>
+    /// I3.2 (invariante 4): sem credencial, com credencial recusada ou com credencial de outra conta, a busca
+    /// por pagamento voltaria vazia e o job cancelaria um pedido pago. Instabilidade do provedor (5xx, timeout)
+    /// não entra aqui: propaga e o job tenta na próxima rodada.
+    /// </summary>
+    private async Task<bool> CredencialNaoAlcancaAsync(CobrancaPedidoVencida item, CancellationToken ct)
+    {
+        string contaAtual;
+        try
+        {
+            contaAtual = await mercadoPagoClient.ObterContaRecebedoraAsync(ct);
+        }
+        catch (MercadoPagoNaoConfiguradoException)
+        {
+            return true;
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+        {
+            return true;
+        }
+
+        return item.ContaRecebedoraId is { } contaDaCobranca
+               && !string.Equals(contaDaCobranca, contaAtual, StringComparison.Ordinal);
+    }
+
+    private async Task MarcarAguardandoCredencialAsync(CobrancaPedidoVencida item, CancellationToken ct)
+    {
+        var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(item.EmpresaId, item.PedidoId, ct);
+        var cobranca = cobrancas.FirstOrDefault(c => c.Id == item.CobrancaId);
+        if (cobranca is null || !cobranca.EstaPendente) return;
+        cobranca.AguardarCredencial(relogio.GetUtcNow().UtcDateTime);
+        await unitOfWork.CommitAsync();
+    }
+
     /// <summary>Pagamento aprovado no Mercado Pago que o webhook não entregou, do mais novo para o mais antigo.</summary>
     private async Task<bool> ConfirmarPagamentoPerdidoAsync(CobrancaPedidoVencida item, CancellationToken ct)
     {
@@ -102,7 +150,8 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         {
             var r = await confirmarPagamento.ExecuteAsync(new ConfirmarPagamentoPedidoInput(
                 item.PedidoId, pagamento.Id, pagamento.Status, pagamento.TransactionAmount,
-                pagamento.PaymentMethodId, pagamento.PaymentTypeId, pagamento.DateApproved), ct);
+                pagamento.PaymentMethodId, pagamento.PaymentTypeId, pagamento.DateApproved,
+                ContaRecebedoraId: pagamento.CollectorId), ct);
             if (r.Confirmado) return true;
         }
         return false;
@@ -132,7 +181,9 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         if (cobranca.Tentativa < CobrancaPedido.TentativaMaxima && cobranca.ConversaId is { } conversaId)
         {
             var nova = await gerarCobranca.ExecuteAsync(
-                new GerarCobrancaPedidoInput(item.EmpresaId, item.PedidoId, conversaId, cobranca.Tentativa + 1), ct);
+                // Complementar reemite pelo saldo (#1719): como cobrança comum, o cupom já abatido voltava ao link.
+                new GerarCobrancaPedidoInput(item.EmpresaId, item.PedidoId, conversaId, cobranca.Tentativa + 1,
+                    CobrarSaldo: cobranca.Complementar), ct);
             return (ResultadoExpiracaoCobranca.Reemitida, conversaId, nova.LinkPagamento);
         }
 

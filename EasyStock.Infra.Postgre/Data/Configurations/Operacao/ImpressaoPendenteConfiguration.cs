@@ -17,6 +17,15 @@ public class ImpressaoPendenteConfiguration : IEntityTypeConfiguration<Impressao
         b.Property(i => i.CriadaEm).IsRequired();
         b.Property(i => i.Tentativas).IsRequired();
         b.Property(i => i.Erro).HasMaxLength(ImpressaoPendente.ErroTamanhoMaximo);
+        b.Property(i => i.Documento).HasMaxLength(24);
+        b.Property(i => i.Modelo).HasMaxLength(24);
+        b.Property(i => i.Codigo).HasMaxLength(16);
+        b.Property(i => i.Perfil).HasMaxLength(80);
+        b.Property(i => i.Versao).HasMaxLength(40);
+        b.Property(i => i.Hash).HasMaxLength(64);
+        b.Property(i => i.Intencao).HasMaxLength(64);
+        b.HasIndex(i => new { i.EmpresaId, i.SolicitacaoId }).IsUnique()
+            .HasDatabaseName("ix_impressoes_empresa_solicitacao");
 
         // Polling do consumidor (pendentes da empresa pela ordem de chegada) e varredura do alerta.
         b.HasIndex(i => new { i.EmpresaId, i.Status, i.CriadaEm })

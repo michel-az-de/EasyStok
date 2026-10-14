@@ -284,6 +284,7 @@ const andar = (no, fn, achados = []) => {
   if (no == null || typeof no !== 'object') return achados
   if (Array.isArray(no)) { for (const filho of no) andar(filho, fn, achados); return achados }
   if (fn(no)) achados.push(no)
+  andar(no.props?.rodape, fn, achados)
   return andar(no.props?.children, fn, achados)
 }
 const texto = (no) => (no == null ? '' : typeof no !== 'object' ? String(no) : Array.isArray(no) ? no.map(texto).join('') : texto(no.props?.children))
@@ -305,6 +306,10 @@ const cartoes = (no) => andar(no, (n) => n.type === 'li' && String(n.props.class
 const avisosDeLote = (no) => andar(no, (n) => n.type === 'output')
 const folha = (t) => andar(t.renderizar(), (n) => n.type === 'FolhaImpressao')
 const enviados = (chamadas) => chamadas.filter((c) => c.metodo === 'POST')
+const revisar = (t) => {
+  if (!formulario(t.renderizar())) botoes(t.arvore, 'Conferir produção')[0].props.onClick()
+  return t.renderizar()
+}
 // #1624: o prato entra no lote pelo toque no cartão da grade (não há mais lista de pratos); as
 // porções ela corrige no campo do lote. O prato tocado por último é o último cartão do lote.
 const tocarNoPrato = (t, sku) => {
@@ -314,10 +319,11 @@ const tocarNoPrato = (t, sku) => {
 }
 const preencher = (t, sku, porcoes) => {
   tocarNoPrato(t, sku)
+  revisar(t)
   campos(t.arvore, 'CampoTexto', 'Porções').at(-1).props.onChange(digitar(porcoes))
   return t.renderizar()
 }
-const confirmar = async (t) => { await formulario(t.renderizar()).props.onSubmit(evento); return t.renderizar() }
+const confirmar = async (t) => { revisar(t); await formulario(t.renderizar()).props.onSubmit(evento); return t.renderizar() }
 
 await confere('Produção do dia: sair da tela e voltar não apaga o que ela digitou', () => {
   zerar()
@@ -327,6 +333,7 @@ await confere('Produção do dia: sair da tela e voltar não apaga o que ela dig
   preencher(antes, 'i-1', '12')
   tocarNoPrato(antes, 'i-2')
   const depois = montar(AbaProducaoDoDiaApi)
+  revisar(depois)
   assert.equal(cartoes(depois.renderizar()).length, 2)
   assert.equal(campos(depois.arvore, 'CampoTexto', 'Porções')[0].props.value, '12')
   assert.match(texto(cartoes(depois.arvore)[0]), /Ravióli/)
@@ -418,6 +425,7 @@ await confere('Produção do dia: envio que termina depois de sair e voltar most
   const envio = formulario(antes.arvore).props.onSubmit(evento)
   for (let i = 0; i < 50 && !responder; i += 1) await esperar(0)
   const depois = montar(AbaProducaoDoDiaApi)
+  revisar(depois)
   assert.equal(campos(depois.renderizar(), 'CampoTexto', 'Porções')[0].props.value, '4', 'com o envio em voo, as linhas ainda estão lá')
   responder()
   await envio
@@ -431,6 +439,7 @@ await confere('Produção do dia: as porções vindas do Planejamento entram jun
   preencher(montar(AbaProducaoDoDiaApi), 'i-1', '5')
   assert.equal(levarParaProducao([{ sku: 'i-2', porcoes: '8' }, { sku: 'i-9', porcoes: '0' }]), 1)
   const t = montar(AbaProducaoDoDiaApi)
+  revisar(t)
   assert.deepEqual(cartoes(t.renderizar()).map((c) => texto(andar(c, (n) => n.type === 'h4')[0])), ['Ravióli', 'Lasanha'])
   assert.deepEqual(campos(t.arvore, 'CampoTexto', 'Porções').map((c) => c.props.value), ['5', '8'])
   assert.equal(campos(t.arvore, 'CampoTexto', 'Validade (dias)')[1].props.value, '5', 'a planejada ganha a validade padrão')

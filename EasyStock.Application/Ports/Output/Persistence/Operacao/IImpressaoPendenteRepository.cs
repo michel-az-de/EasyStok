@@ -15,8 +15,13 @@ public interface IImpressaoPendenteRepository
 
     Task AddAsync(ImpressaoPendente impressao, CancellationToken ct = default);
 
+    Task<ImpressaoPendente?> GetBySolicitacaoAsync(Guid empresaId, Guid solicitacaoId, CancellationToken ct = default);
+    Task<IReadOnlyList<EasyStock.Application.UseCases.Operacao.Impressao.DocumentoImpressoDto>> HistoricoAsync(
+        Guid empresaId, Guid pedidoId, int pagina, CancellationToken ct = default);
+
     /// <summary>Carrega com tracking para o use case mudar o status e comitar.</summary>
     Task<ImpressaoPendente?> GetByIdAsync(Guid empresaId, Guid id, CancellationToken ct = default);
+    Task<ImpressaoPendente?> GetByIdComLockAsync(Guid empresaId, Guid id, CancellationToken ct = default);
 
     /// <summary>As pendentes da empresa, mais antigas primeiro (ordem de impressão).</summary>
     Task<IReadOnlyList<ImpressaoPendente>> ListarPendentesAsync(Guid empresaId, int limite, CancellationToken ct = default);

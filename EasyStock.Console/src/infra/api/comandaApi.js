@@ -146,7 +146,10 @@ export function pedidoDaApi(p, anterior = null) {
       // M1.4b (#1531): linha de porção volta com o sku composto, o mesmo que a comanda somou.
       sku: i.variacaoId ? skuDaPorcao(i.cardapioItemId, i.variacaoId) : i.cardapioItemId,
       qtd: i.quantidade, obs: i.observacao ?? '', acrescimo: false, entrouEm: null,
+      // #1683: retrato da linha no pedido; a Ficha usa quando o prato saiu do cardápio visível.
+      nome: i.nome, precoUnitario: i.precoUnitario, porcao: i.porcao ?? '',
     })),
+    observacoes: p.observacoes ?? '',
     agradecimentoEnviado: anterior?.agradecimentoEnviado ?? false,
     pagamentos: [],
     totalPagoApi: p.totalPago ?? 0,

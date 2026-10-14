@@ -36,6 +36,12 @@ public interface ICredencialIntegracaoRepository
         string kekId,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Todas as credenciais ativas, de todas as lojas, só para leitura: verificação da chave-mestra na
+    /// subida (I4.2). Cross-tenant, só pela porta de bypass da RLS.
+    /// </summary>
+    Task<IReadOnlyList<CredencialIntegracao>> ListarAtivasAsync(CancellationToken ct = default);
+
     Task AddAsync(CredencialIntegracao credencial, CancellationToken ct = default);
 
     /// <summary>

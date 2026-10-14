@@ -35,7 +35,7 @@ public class ReenviarMensagemUseCaseTests
         _falhou = Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Agente, Agora.AddMinutes(-5), TipoConteudoMensagem.Texto, "Temos ravioli!");
         _falhou.RegistrarFalhaEnvio("Meta fora", TipoFalhaEnvio.Temporaria, Agora.AddMinutes(-5));
         _conversas.ObterPorIdAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>()).Returns(_conversa);
-        _conversas.ObterMensagemParaAlterarAsync(_empresaId, _conversa.Id, _falhou.Id, Arg.Any<CancellationToken>()).Returns(_falhou);
+        _conversas.ObterMensagemComLockAsync(_empresaId, _conversa.Id, _falhou.Id, Arg.Any<CancellationToken>()).Returns(_falhou);
     }
 
     private ReenviarMensagemUseCase UseCase()
@@ -90,11 +90,42 @@ public class ReenviarMensagemUseCaseTests
     public async Task MensagemQueNaoFalhouNaoReenvia()
     {
         var ok = Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Agente, Agora, TipoConteudoMensagem.Texto, "Oi", "wamid.1");
-        _conversas.ObterMensagemParaAlterarAsync(_empresaId, _conversa.Id, ok.Id, Arg.Any<CancellationToken>()).Returns(ok);
+        _conversas.ObterMensagemComLockAsync(_empresaId, _conversa.Id, ok.Id, Arg.Any<CancellationToken>()).Returns(ok);
 
         var act = () => UseCase().ExecuteAsync(_empresaId, _conversa.Id, ok.Id);
 
         await act.Should().ThrowAsync<UseCaseValidationException>();
+    }
+
+    /// <summary>
+    /// #1786: a outra atendente (ou o serviço de fundo) reenviou e confirmou enquanto esta lia. A leitura sem trava ainda
+    /// via "falhou"; a releitura sob trava vê a mensagem enviada e não manda o texto de novo ao cliente.
+    /// </summary>
+    [Fact]
+    public async Task ReenvioConcorrenteReleSobTravaENaoMandaDeNovo()
+    {
+        var jaReenviada = Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Agente, Agora.AddMinutes(-5),
+            TipoConteudoMensagem.Texto, "Temos ravioli!", "wamid.da-outra");
+        _conversas.ObterMensagemComLockAsync(_empresaId, _conversa.Id, _falhou.Id, Arg.Any<CancellationToken>()).Returns(jaReenviada);
+
+        var act = () => UseCase().ExecuteAsync(_empresaId, _conversa.Id, _falhou.Id);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        await _whatsapp.DidNotReceive().EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        _uow.CommitCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task LeituraComTravaAconteceDentroDaTransacao()
+    {
+        var dentro = false;
+        _conversas.ObterMensagemComLockAsync(_empresaId, _conversa.Id, _falhou.Id, Arg.Any<CancellationToken>())
+            .Returns(_ => { dentro = _uow.EmTransacao; return _falhou; });
+        _whatsapp.EnviarTextoAsync(WaId, "Temos ravioli!", Arg.Any<CancellationToken>()).Returns("wamid.novo");
+
+        await UseCase().ExecuteAsync(_empresaId, _conversa.Id, _falhou.Id);
+
+        dentro.Should().BeTrue();
     }
 
     [Fact]
@@ -231,7 +262,7 @@ public class ReenviarMensagemRetomadaTests
         _falhou = Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Agente, Agora.AddDays(-2), TipoConteudoMensagem.Texto, "Temos ravioli!");
         _falhou.RegistrarFalhaEnvio("Meta fora", TipoFalhaEnvio.Permanente, Agora.AddDays(-2));
         _conversas.ObterPorIdAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>()).Returns(_conversa);
-        _conversas.ObterMensagemParaAlterarAsync(_empresaId, _conversa.Id, _falhou.Id, Arg.Any<CancellationToken>()).Returns(_falhou);
+        _conversas.ObterMensagemComLockAsync(_empresaId, _conversa.Id, _falhou.Id, Arg.Any<CancellationToken>()).Returns(_falhou);
         _whatsapp.EnviarModeloAsync(WaId, Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
             .Returns("wamid.modelo");
     }

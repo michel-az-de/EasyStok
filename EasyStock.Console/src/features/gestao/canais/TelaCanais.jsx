@@ -10,6 +10,7 @@ import { useStatusWhatsAppApi } from '../../../aplicacao/useStatusWhatsAppApi'
 import { resumoDoWhatsApp } from '../../../dominio/canais'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { SecaoWhatsApp } from '../integracoes/SecaoWhatsApp'
+import { TesteEmailDaSessao } from './TesteEmailDaSessao'
 import css from './TelaCanais.module.css'
 
 const LIGADAS = [
@@ -44,12 +45,13 @@ function EstadoDoCanal() {
           </p>
         )}
       </div>
-      <SecaoWhatsApp embutida aoConectar={recarregar} />
+      <SecaoWhatsApp embutida aoConectar={recarregar} canalLigado={!carregando && !erro && resumo?.tom === 'ok'} />
     </>
   )
 }
 
 export function TelaCanais() {
+  const { sessao } = useAtendimento()
   return (
     <div className={css.tela}>
       <section className={css.canal} aria-labelledby="canal-whatsapp">
@@ -57,7 +59,6 @@ export function TelaCanais() {
           <span className={css.selo}><Icone nome="whatsapp" tamanho={28} /></span>
           <div>
             <h2 id="canal-whatsapp" className={css.titulo}>WhatsApp Business</h2>
-            <p className={css.apoio}>O número da loja continua no app do celular e responde também pelo EasyStok.</p>
           </div>
         </header>
         <EstadoDoCanal />
@@ -81,7 +82,7 @@ export function TelaCanais() {
         </ul>
       </nav>
 
-      <p className={css.apoio}>O canal disponível nesta tela é o WhatsApp Business.</p>
+      {sessao?.usuario?.nivel === 'SuperAdmin' && <TesteEmailDaSessao email={sessao.usuario.email} />}
     </div>
   )
 }

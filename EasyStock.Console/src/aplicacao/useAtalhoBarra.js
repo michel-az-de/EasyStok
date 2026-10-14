@@ -50,7 +50,8 @@ export function useAtalhoBarra({ rascunho, conversa, aoInserir }) {
   }
 
   function aoTeclar(evento, aoInserido) {
-    if (!aberto) return false
+    if (!aberto || evento.isComposing || evento.nativeEvent?.isComposing || evento.keyCode === 229
+      || evento.altKey || evento.ctrlKey || evento.metaKey || evento.shiftKey) return false
     if (evento.key === 'ArrowDown' || evento.key === 'ArrowUp') {
       evento.preventDefault()
       setDestaque((i) => moverDestaque(i, evento.key === 'ArrowDown' ? 1 : -1, itens.length))

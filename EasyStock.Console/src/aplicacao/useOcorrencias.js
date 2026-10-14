@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { listarOcorrencias, resolverOcorrencia } from '../infra/api/ocorrenciasApi'
+import { abrirOcorrencia, listarOcorrencias, resolverOcorrencia } from '../infra/api/ocorrenciasApi'
 import { useAcoes } from './contextos'
 
 // O componente é montado por pedido. A limpeza invalida respostas de outra ficha.
@@ -57,6 +57,7 @@ export function useOcorrencias(pedidoId, conversaId) {
 
   return {
     dados, erro, ocupado, atualizar,
+    abrir: (categoria, relato) => alterar(() => abrirOcorrencia({ pedidoId, conversaId, categoria, relato })),
     apurar: (id) => alterar(() => acoes.apurarOcorrencia(conversaId, id)),
     encerrar: (id, resolucao) => alterar(() => acoes.encerrarOcorrenciaSemEstorno(conversaId, resolucao, id)),
     retomar: (o) => alterar(() => resolverOcorrencia(o.id, { resolucao: o.resolucao, reembolsar: true, valor: o.reembolsoValor })),

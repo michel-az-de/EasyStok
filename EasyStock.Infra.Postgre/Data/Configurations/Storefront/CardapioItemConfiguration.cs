@@ -10,6 +10,7 @@ public class CardapioItemConfiguration : IEntityTypeConfiguration<CardapioItem>
     {
         builder.ToTable("cardapio_item");
         builder.HasKey(c => c.Id);
+        builder.Property<uint>("xmin").HasColumnName("xmin").IsRowVersion();
 
         builder.Property(c => c.StorefrontId).IsRequired();
 

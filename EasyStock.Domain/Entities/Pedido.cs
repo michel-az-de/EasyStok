@@ -323,6 +323,15 @@ namespace EasyStock.Domain.Entities
 
         public void MarcarEntregue() => MudarStatus(StatusPedido.Entregue);
 
+        /// <summary>Retorno físico confirmado, sem cancelar venda, estornar pagamento ou devolver estoque.</summary>
+        public void RegistrarRetornoEntrega()
+        {
+            if (StatusEnum != StatusPedido.SaiuParaEntrega)
+                throw new RegraDeDominioVioladaException("Só pedido em entrega pode retornar à fila de entregas.");
+            Status = StatusPedidoMapper.Pronto;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
         public void RetomarPreparoPorAlteracao()
         {
             if (StatusEnum != StatusPedido.Pronto) throw new RegraDeDominioVioladaException("Só pedido pronto pode retomar o preparo por alteração.");

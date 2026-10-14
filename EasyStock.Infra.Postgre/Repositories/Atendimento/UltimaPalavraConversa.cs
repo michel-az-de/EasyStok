@@ -1,5 +1,7 @@
 using System.Linq.Expressions;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
+using EasyStock.Application.UseCases.Atendimento.ChatSite;
+using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 
@@ -16,9 +18,13 @@ internal static class UltimaPalavraConversa
     /// de fora. A exceção é a nota de reabertura: ela conta como a última palavra, senão a entrada de antes do
     /// encerramento voltaria como cliente esperando há dias. Entrada que chega depois da reabertura é mais nova
     /// que a nota e conta normalmente.
+    /// Confirmações automáticas de recebimento, pedido e frete do ChatSite não respondem à entrada.
     /// </summary>
     public static readonly Expression<Func<Mensagem, bool>> Conta = m =>
-        (m.Status != StatusMensagem.Falhou && m.Status != StatusMensagem.Pendente)
+        (m.Status != StatusMensagem.Falhou && m.Status != StatusMensagem.Pendente
+            && !(m.Autor == AutorMensagem.Sistema && m.ExternoId != null
+                && (m.ExternoId.StartsWith(EnviarMensagemVisitanteUseCase.PrefixoConfirmacaoRecebimento)
+                    || m.ExternoId.StartsWith(ComandaClienteUseCase.PrefixoAvisoChatSite))))
         || (m.Autor == AutorMensagem.Sistema && m.EnviadaPorUsuarioId != null
             && m.Texto!.StartsWith(ReabrirConversaUseCase.PrefixoNotaReabertura));
 }

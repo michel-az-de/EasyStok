@@ -2,6 +2,7 @@
 // do KDS (S19, com endereço e aprovação da S12/S14) e viagens da S44. Nada de
 // rede aqui; quem busca é `infra/api/entregasApi.js`.
 import { faixaDeHorarios, minutosDoDia } from './entrega'
+import { dataIsoNoFuso, moeda } from './formato'
 
 // Status que a gaveta pede ao KDS: aprovação manual, pronto e em rota.
 export const STATUS_KDS_ENTREGAS = 'aguardando_aprovacao_baba,pronto,saiu_para_entrega'
@@ -26,6 +27,7 @@ export const EMPRESAS_ENTREGADOR = [
   { valor: 'Propria', rotulo: 'Própria' },
   { valor: 'NoveNove', rotulo: '99' },
   { valor: 'Lalamove', rotulo: 'Lalamove' },
+  { valor: 'Uber', rotulo: 'Uber' },
   { valor: 'Ifood', rotulo: 'iFood Entregas' },
   { valor: 'Outra', rotulo: 'Outra' },
 ]
@@ -141,3 +143,123 @@ export const camposDaJanela = (j) => ({
   capacidadeMaxima: String(j.capacidadeMaxima),
   label: j.label ?? '',
 })
+
+// I2.2 (#1651): frete por distância. A tela fala km e reais; a API (`FreteRaioInput`), metros e
+// centavos. O endereço da cozinha não volta da API (só a coordenada fica gravada): em branco no
+// formulário quer dizer "manter a cozinha atual".
+const FAIXA_VAZIA = { ateKm: '', valor: '' }
+const decimalBr = (n) => String(n).replace('.', ',')
+const emMetros = (km) => Math.round(numero(km) * 1000)
+const emCentavos = (valor) => Math.round(numero(valor) * 100)
+const preenchido = (v) => String(v ?? '').trim() !== ''
+const faixasPreenchidas = (f) => (f.faixas ?? []).filter((x) => preenchido(x.ateKm) || preenchido(x.valor))
+
+export function formularioDoFreteRaio(config) {
+  if (!config?.configurado) return { cep: '', numero: '', raioKm: '', gratisKm: '0', fatorRota: '1,4', faixas: [{ ...FAIXA_VAZIA }] }
+  const faixas = (config.faixas ?? []).map((x) => ({
+    ateKm: decimalBr(x.ateMetros / 1000), valor: (x.valorCentavos / 100).toFixed(2).replace('.', ','),
+  }))
+  return {
+    cep: '', numero: '',
+    raioKm: decimalBr(config.raioMaxMetros / 1000),
+    gratisKm: decimalBr(config.faixaGratisMetros / 1000),
+    fatorRota: decimalBr(config.fatorRota),
+    faixas: faixas.length ? faixas : [{ ...FAIXA_VAZIA }],
+  }
+}
+
+// As mesmas regras do `ConfigurarFreteRaioUseCase`, ditas antes de chamar a API.
+export function erroDoFormularioFreteRaio(f, cozinhaGravada) {
+  const cep = digitos(f.cep)
+  if (!cep && !preenchido(f.numero)) {
+    if (!cozinhaGravada) return 'Informe o CEP e o número da cozinha.'
+  } else {
+    if (cep.length !== 8) return 'CEP da cozinha inválido. Informe os 8 dígitos.'
+    if (!preenchido(f.numero)) return 'Informe o número do endereço da cozinha.'
+  }
+  const raio = emMetros(f.raioKm)
+  if (!(raio > 0)) return 'O raio máximo deve ser maior que zero.'
+  const gratis = emMetros(f.gratisKm)
+  if (!(gratis >= 0 && gratis <= raio)) return 'A distância com frete grátis deve ficar entre zero e o raio máximo.'
+  const fator = numero(f.fatorRota)
+  if (!(fator >= 1 && fator <= 3)) return 'O fator de rota deve ficar entre 1 e 3.'
+
+  let alcance = gratis
+  for (const faixa of faixasPreenchidas(f)) {
+    const ate = emMetros(faixa.ateKm)
+    if (!(ate > 0)) return 'Informe até quantos km vai cada faixa.'
+    if (!preenchido(faixa.valor) || !(emCentavos(faixa.valor) >= 0)) return 'Informe o valor de cada faixa.'
+    if (ate <= gratis) return 'Cada faixa precisa começar depois da distância com frete grátis.'
+    if (ate <= alcance) return 'As faixas devem estar em ordem crescente de distância, sem repetir.'
+    alcance = ate
+  }
+  return alcance < raio ? 'As faixas precisam alcançar o raio máximo de entrega.' : null
+}
+
+export const corpoFreteRaio = (f) => ({
+  cep: digitos(f.cep) || null,
+  numero: String(f.numero ?? '').trim() || null,
+  raioMaxMetros: emMetros(f.raioKm),
+  faixaGratisMetros: emMetros(f.gratisKm),
+  fatorRota: numero(f.fatorRota),
+  faixas: faixasPreenchidas(f).map((x) => ({ ateMetros: emMetros(x.ateKm), valorCentavos: emCentavos(x.valor) })),
+})
+
+export const corpoTesteDeFrete = (f) => ({ cep: digitos(f.cep), numero: String(f.numero ?? '').trim() })
+
+const emKm = (metros) =>
+  `${(metros / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`
+
+// Resultado do "Testar um endereço" (`FreteRaioTesteResult`) em texto de balcão.
+export function resumoDoTesteDeFrete(r) {
+  if (r.modo !== 'raio') return { tom: 'atencao', titulo: 'Vale a tabela de zonas', detalhe: r.motivo ?? '' }
+  const rota = `${emKm(r.distanciaRotaMetros)} de rota${r.distanciaEstimada ? ' (estimada, sem rota medida)' : ''}`
+  if (r.foraDeCobertura) return { tom: 'atencao', titulo: 'Fora do raio de entrega', detalhe: rota }
+  return { tom: 'ok', titulo: r.gratis ? 'Frete grátis' : `Frete de ${moeda(r.valorCentavos / 100)}`, detalhe: rota }
+}
+// I9.2 (#1691): corrida pedida por fora (app da 99, da Lalamove, da Uber), anotada na viagem com o
+// custo (`CorridaExternaBody` da API). Entregador próprio não é corrida externa.
+export const EMPRESAS_DE_CORRIDA = EMPRESAS_ENTREGADOR.filter((e) => e.valor !== 'Propria')
+export const CORRIDA_CUSTO_MAXIMO_CENTAVOS = 500000
+
+export const empresaPadraoDaCorrida = (viagem, entregadores) => {
+  const empresa = (entregadores ?? []).find((e) => e.id === viagem?.entregadorId)?.empresa
+  return EMPRESAS_DE_CORRIDA.some((e) => e.valor === empresa) ? empresa : 'NoveNove'
+}
+
+// "18,90", "18.9" e "R$ 18,90" valem o mesmo; o que não é número vira NaN e o formulário avisa.
+const custoEmCentavos = (texto) => {
+  const limpo = String(texto ?? '').replace(/R\$/i, '').trim()
+  return limpo === '' ? NaN : Math.round(numero(limpo) * 100)
+}
+
+export function erroDoFormularioCorrida(f) {
+  const custo = custoEmCentavos(f.custo)
+  if (Number.isNaN(custo)) return 'Informe o custo da corrida.'
+  if (custo < 0) return 'O custo da corrida não pode ser negativo.'
+  if (custo > CORRIDA_CUSTO_MAXIMO_CENTAVOS) return 'Custo acima de R$ 5.000,00. Confira o valor.'
+  return null
+}
+
+export const corpoCorrida = (f) => ({
+  provedor: f.empresa,
+  custoCentavos: custoEmCentavos(f.custo),
+  motorista: String(f.motorista ?? '').trim() || null,
+})
+
+export const formularioDaCorrida = (corrida) => ({
+  empresa: corrida.provedor,
+  custo: (corrida.custoCentavos / 100).toFixed(2).replace('.', ','),
+  motorista: corrida.motorista ?? '',
+})
+
+// Viagem concluída sai do painel, mas a 99 muitas vezes só fecha o preço no fim: as concluídas do dia
+// escolhido continuam à mão para anotar ou corrigir o custo.
+export const viagensConcluidasNoDia = (viagens, dia) => (viagens ?? [])
+  .filter((v) => v.situacao === 'Concluida' && v.concluidaEm && dataIsoNoFuso(Date.parse(v.concluidaEm)) === dia)
+
+export const custoDasCorridas = (corridas) => (corridas ?? []).reduce((soma, c) => soma + (c.custoCentavos ?? 0), 0)
+
+export const resumoDaCorrida = (corrida) => [
+  rotuloEmpresaEntregador(corrida.provedor), moeda(corrida.custoCentavos / 100), corrida.motorista, corrida.corrigidoEm ? 'corrigida' : null,
+].filter(Boolean).join(' · ')

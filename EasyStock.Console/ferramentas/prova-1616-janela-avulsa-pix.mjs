@@ -85,15 +85,16 @@ confere('a volta traz a janela de origem e só fecha esta se o foco não saiu da
 // ---------------------------------------------------------------- anel do Pix
 
 confere('o texto do link vencido diz o que o EasyStok faz em cada tentativa', () => {
-  assert.match(avisoDeLinkVencidoApi({ tentativa: 1 }), /manda um link novo ao cliente sozinho/)
-  assert.match(avisoDeLinkVencidoApi({}), /manda um link novo ao cliente sozinho/)
-  assert.match(avisoDeLinkVencidoApi({ tentativa: 2 }), /cancela o pedido sozinho/)
+  // #1683: o job só reemite e cancela com o pedido esperando o pagamento; o status entra na pergunta.
+  assert.match(avisoDeLinkVencidoApi({ tentativa: 1 }, 'aguardando_pagamento'), /manda um link novo ao cliente sozinho/)
+  assert.match(avisoDeLinkVencidoApi({}, 'aguardando_pagamento'), /manda um link novo ao cliente sozinho/)
+  assert.match(avisoDeLinkVencidoApi({ tentativa: 2 }, 'aguardando_pagamento'), /cancela o pedido sozinho/)
 })
 
 confere('no modo API o anel vencido mostra esse texto e não o botão "Reenviar cobrança"', () => {
   const relogio = fonte('features/ficha-cliente/RelogioPix.jsx')
   const zerado = relogio.slice(relogio.indexOf('if (zerado) {'), relogio.indexOf('// Contagem normal'))
-  assert.match(zerado, /\{fonteApi && <p className=\{css\.legenda\}>\{avisoDeLinkVencidoApi\(cobranca\)\}<\/p>\}/)
+  assert.match(zerado, /\{fonteApi && <p className=\{css\.legenda\}>\{avisoDeLinkVencidoApi\(cobranca, statusApi\)\}<\/p>\}/)
   assert.match(zerado, /\{!fonteApi && \(\s*<Botao largo variante="primario" icone="refresh-cw" onClick=\{aoReenviar\}>Reenviar cobrança<\/Botao>\s*\)\}/)
   assert.equal(zerado.match(/Reenviar cobrança/g).length, 1)
 })

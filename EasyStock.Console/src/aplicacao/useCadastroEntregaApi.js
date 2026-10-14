@@ -12,6 +12,7 @@ export function useCadastroEntregaApi() {
   const [janelas, setJanelas] = useState(null)
   const [zonas, setZonas] = useState([])
   const [bloqueios, setBloqueios] = useState([])
+  const [freteRaio, setFreteRaio] = useState(null)
   const [erro, setErro] = useState(null)
   // #1510: um envio por vez; toque duplo em "Criar janela" duplicava a janela (overbooking).
   const [enviando, setEnviando] = useState(false)
@@ -20,8 +21,11 @@ export function useCadastroEntregaApi() {
   const recarregar = useCallback(() => {
     const hoje = new Date()
     const ate = new Date(hoje.getTime() + DIAS_BLOQUEIO * 86400000)
-    return Promise.all([api.listarJanelas(), api.listarZonas(), api.listarBloqueios(dataIso(hoje), dataIso(ate))])
-      .then(([j, z, b]) => {
+    return Promise.all([api.listarJanelas(), api.listarZonas(), api.listarBloqueios(dataIso(hoje), dataIso(ate)),
+      // #1651: console e API publicam em separado; API sem a rota não derruba janelas, zonas e bloqueios.
+      api.obterFreteRaio().catch((e) => { if (e.status === 404) return undefined; throw e })])
+      .then(([j, z, b, raio]) => {
+        setFreteRaio(raio)
         setJanelas(j ?? [])
         setZonas(z ?? [])
         setBloqueios(b ?? [])
@@ -66,7 +70,10 @@ export function useCadastroEntregaApi() {
     alternarZona: (z) => executar(() => api.definirZonaAtiva(z.id, !z.ativa), 'A zona não mudou'),
     criarBloqueio: (corpo) => executar(() => api.criarBloqueio(corpo), 'O bloqueio não foi criado'),
     removerBloqueio: (id) => executar(() => api.removerBloqueio(id), 'O bloqueio não foi removido'),
+    salvarFreteRaio: (corpo) => executar(() => api.salvarFreteRaio(corpo), 'O frete por distância não foi gravado'),
+    // #1651: só consulta, não mexe no cadastro; quem chama mostra o resultado ou o motivo.
+    testarFreteRaio: (corpo) => api.testarFreteRaio(corpo),
   }
 
-  return { janelas, zonas, bloqueios, erro, enviando, acoes, recarregar, limparErro: () => setErro(null) }
+  return { janelas, zonas, bloqueios, freteRaio, erro, enviando, acoes, recarregar, limparErro: () => setErro(null) }
 }

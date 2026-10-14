@@ -207,6 +207,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<EasyStock.Domain.Entities.Atendimento.Viagem> Viagens { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.ParadaViagem> ParadasViagem { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.ChamadoEntregador> ChamadosEntregador { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.CorridaExterna> CorridasExternas { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.ExpedienteLoja> ExpedientesLoja { get; set; } = null!;
         public DbSet<PreferenciaMenuUsuario> PreferenciasMenuUsuario { get; set; } = null!;
         public DbSet<UsoIa> UsoIa { get; set; } = null!;

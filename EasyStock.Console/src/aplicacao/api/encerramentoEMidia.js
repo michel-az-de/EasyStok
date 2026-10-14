@@ -4,6 +4,7 @@ import {
 } from '../../infra/api/conversasApi'
 import { mensagemDaApi } from '../../infra/api/traducaoConversas'
 import { proximoId } from '../../infra/repositorioConversas'
+import { criarChavesDeMensagem } from '../chavesDeMensagem'
 
 // Encerrar pelo modal e mandar foto no modo API (F06, #1236).
 //
@@ -22,15 +23,41 @@ const ROTULO_DA_MIDIA = {
   audio: 'Áudio', arquivo: 'Arquivo', figurinha: 'Figurinha', peca: 'Peça da galeria',
 }
 
-export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio }) {
+// #1683: encerrar não cancela pedido calado. O pedido sem pagamento só é cancelado quando a
+// atendente marca a caixa, que nasce desmarcada. No modo API só há o que cancelar quando o pedido
+// já existe no EasyStok (`pedidoId`); a comanda que ainda é rascunho não oferece a caixa.
+export function pedidoAoEncerrar(pedido, { fonteApi = false, cancelarMarcado = false } = {}) {
+  const ofereceCancelar = Boolean(pedido) && pedido.estado === 'aguardando' && (!fonteApi || Boolean(pedido.pedidoId))
+  return { ofereceCancelar, cancelar: ofereceCancelar && cancelarMarcado === true }
+}
+
+// Com link de pagamento em aberto, o EasyStok cancela o pedido sozinho quando o link vence. Sem
+// link, nada o fecha depois que a conversa encerra: a caixa nasce marcada, à vista de quem atende.
+export function cancelarNasceMarcado(pedido, { fonteApi = false } = {}) {
+  return fonteApi && pedidoAoEncerrar(pedido, { fonteApi }).ofereceCancelar && !pedido.cobranca?.link
+}
+
+export const rotuloCancelarAoEncerrar = (numero) => `Cancelar também o pedido Nº ${numero}, que ainda não foi pago`
+
+// Cancelamento pedido e não confirmado segura o encerramento: o erro aparece no modal. A
+// demonstração é síncrona e não devolve nada: segue como sucesso.
+export function falhaAoCancelarNoEncerramento(cancelamento, numero) {
+  if (cancelamento == null || cancelamento.ok === true) return null
+  const motivo = cancelamento.erro ? `: ${String(cancelamento.erro).replace(/\.$/, '')}.` : '.'
+  return `Não deu para cancelar o pedido Nº ${numero}${motivo} O atendimento continua aberto. Tente de novo ou desmarque a caixa de cancelar.`
+}
+
+export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio, envioRecusado, chaves = criarChavesDeMensagem() }) {
   const avisar = (mensagem) => despachar({ tipo: acao.AVISO_API, mensagem })
   const conversaDe = (id) => estadoRef.current.conversas.find((c) => c.id === id) ?? null
 
   async function despedir(id, texto) {
+    if (envioRecusado(id)) return false
     const mensagemId = proximoId('msg')
     despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, agora: agoraRef.current })
     try {
-      const m = await enviarTexto(id, texto)
+      // #1786: a mesma chave do envio pelo Composer: a despedida que saiu e perdeu a resposta não sai de novo.
+      const m = await chaves.enviar(id, { texto }, (chave) => enviarTexto(id, texto, { chave }))
       despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m) })
       return true
     } catch (erro) {
@@ -53,7 +80,7 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
       tipo: acao.ENVIAR_MIDIA, id, formato: 'audio', arte, texto, ...extra, status: 'enviando', agora: agoraRef.current, mensagemId,
     })
     try {
-      const mensagem = mensagemDaApi(await enviarAudio(id, { dataUrl: arte }))
+      const mensagem = mensagemDaApi(await chaves.enviar(id, { formato: 'audio', arte }, (chave) => enviarAudio(id, { dataUrl: arte }, { chave })))
       despachar({
         tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: { ...mensagem, formato: 'audio', arte, duracaoMs: extra.duracaoMs },
       })
@@ -66,7 +93,7 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
 
   // #1586: o erro volta para o modal (a faixa fica atrás da cortina), com a notícia de que a
   // despedida já saiu, para a nova tentativa não mandar outra. `pedidoCancelado` vem do modal,
-  // que cancela o pedido sem pagamento antes de encerrar.
+  // que cancela o pedido sem pagamento antes de encerrar, só quando a atendente marca (#1683).
   async function encerrarPeloModal(id, {
     enviarMensagem = false, textoMensagem = '', avisoEmail = false, avisoSms = false, pedidoCancelado = false,
   } = {}) {
@@ -92,8 +119,8 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
     return undefined
   }
 
-  // #1586: um encerramento por conversa. O envio de texto não tem chave de idempotência: o
-  // segundo toque com o primeiro em voo recebe a mesma promessa, sem outra despedida.
+  // #1586: um encerramento por conversa. O segundo toque com o primeiro em voo recebe a mesma
+  // promessa, sem outra despedida (a chave do envio, #1786, cobre a repetição depois da resposta perdida).
   const encerrando = new Map()
 
   return {
@@ -123,11 +150,17 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
       const legenda = extra.legenda ?? (formato === 'peca' ? [texto, extra.descricao].filter(Boolean).join('\n') : undefined)
       try {
         // Peça do cardápio vai pelo id do item (#1437); foto do computador, em multipart.
-        const m = extra.cardapioItemId && Number.isInteger(extra.indice)
-          ? await enviarImagemCardapio(id, { cardapioItemId: extra.cardapioItemId, indice: extra.indice, legenda })
-          : await enviarImagem(id, { dataUrl: arte, nomeArquivo: extra.nomeArquivo, legenda })
-        const mensagem = mensagemDaApi(m)
-        despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem })
+        // #1786: a mesma foto (ou peça) de novo antes da confirmação leva a mesma chave e não sai duas vezes.
+        const daGaleria = extra.cardapioItemId && Number.isInteger(extra.indice)
+        const conteudo = daGaleria
+          ? { formato: 'peca', cardapioItemId: extra.cardapioItemId, indice: extra.indice, legenda }
+          : { formato: 'imagem', arte, legenda }
+        const m = await chaves.enviar(id, conteudo, (chave) => (daGaleria
+          ? enviarImagemCardapio(id, { cardapioItemId: extra.cardapioItemId, indice: extra.indice, legenda }, { chave })
+          : enviarImagem(id, { dataUrl: arte, nomeArquivo: extra.nomeArquivo, legenda }, { chave })))
+        const mensagem = mensagemDaApi(m, id)
+        // #1787: como no áudio, o balão segue com a imagem local até a sincronização trazer a do storage.
+        despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: { ...mensagem, formato: 'imagem', arte } })
         return mensagem.status !== 'falhou'
       } catch (erro) {
         despachar(falhaDoEnvio(id, mensagemId, erro))

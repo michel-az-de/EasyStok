@@ -154,6 +154,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<GerenciarProdutoUseCase>();
         services.AddScoped<GerenciarVariacaoProdutoUseCase>();
         services.AddScoped<GerenciarUploadsUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Acervo.AcervoUseCase>();
         services.AddScoped<GerenciarCategoriaUseCase>();
 
         // Calculadora de Producao (Ondas 1.3 + 1.4 single; Onda 1 cesta in-context)

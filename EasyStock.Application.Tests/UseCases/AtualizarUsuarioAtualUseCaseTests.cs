@@ -75,9 +75,9 @@ public class AtualizarUsuarioAtualUseCaseTests
 
         _ana.Email.Should().Be("ana@casadababa.com");
         _ana.EmailConfirmado.Should().BeTrue("o login segue possível pelo endereço antigo");
-        _ana.EmailPendente.Should().Be("Nova@CasaDaBaba.com");
+        _ana.EmailPendente.Should().Be("nova@casadababa.com", "#1781: o pendente vira o e-mail da conta, normalizado como o login busca");
         r.Email.Should().Be("ana@casadababa.com");
-        r.EmailPendente.Should().Be("Nova@CasaDaBaba.com");
+        r.EmailPendente.Should().Be("nova@casadababa.com");
         await _f.Usuarios.Received().UpdateAsync(_ana);
     }
 

@@ -43,10 +43,42 @@ public sealed class CobrancaPedidoRepository(EasyStockDbContext db) : ICobrancaP
             .AsNoTracking()
             .Where(c => c.Status == StatusCobrancaPedido.Pendente
                         && c.Provedor == CobrancaPedido.ProvedorMercadoPago
-                        && c.ExpiraEm <= limite)
+                        && c.ExpiraEm <= limite
+                        // I3.2: quem aguarda credencial fica fora, senão as mesmas presas ocupam a rodada.
+                        && c.AguardandoCredencialDesde == null)
             .OrderBy(c => c.ExpiraEm)
             .Take(Math.Clamp(maximo, 1, 500))
-            .Select(c => new CobrancaPedidoVencida(c.Id, c.EmpresaId, c.PedidoId))
+            .Select(c => new CobrancaPedidoVencida(c.Id, c.EmpresaId, c.PedidoId, c.ContaRecebedoraId))
             .ToListAsync(ct);
+    }
+
+    public async Task<bool> ExisteAguardandoCredencialAsync(CancellationToken ct = default)
+    {
+        using var _ = db.UseRowLevelSecurityBypass();
+        return await db.CobrancasPedido
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(c => c.Status == StatusCobrancaPedido.Pendente && c.AguardandoCredencialDesde != null, ct);
+    }
+
+    public async Task<int> RetomarAguardandoCredencialAsync(string contaRecebedoraId, CancellationToken ct = default)
+    {
+        using var _ = db.UseRowLevelSecurityBypass();
+        return await db.CobrancasPedido
+            .IgnoreQueryFilters()
+            .Where(c => c.Status == StatusCobrancaPedido.Pendente
+                        && c.AguardandoCredencialDesde != null
+                        && (c.ContaRecebedoraId == null || c.ContaRecebedoraId == contaRecebedoraId))
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.AguardandoCredencialDesde, (DateTime?)null), ct);
+    }
+
+    public async Task<bool> ExistePendenteOnlineAsync(CancellationToken ct = default)
+    {
+        using var _ = db.UseRowLevelSecurityBypass();
+        return await db.CobrancasPedido
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(c => c.Status == StatusCobrancaPedido.Pendente
+                           && c.Provedor == CobrancaPedido.ProvedorMercadoPago, ct);
     }
 }

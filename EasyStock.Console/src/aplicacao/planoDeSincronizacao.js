@@ -1,9 +1,10 @@
 // O que a polling da inbox relê a cada ciclo (F07, itens 2 e 7). Puro: recebe o
 // resumo da API, o que está no cache e a conversa aberta na tela.
 //
-// Mensagens: a conversa selecionada é relida sempre, porque mudança de status
-// (Falhou, Entregue) não mexe em `ultimaMensagemEm` e a dona precisa ver que a
-// mensagem não saiu. As outras só quando a conversa mudou.
+// Mensagens: mudança de status (Falhou, Entregue) não mexe em `ultimaMensagemEm` e a dona
+// precisa ver que a mensagem não saiu. #1786: por isso a conversa selecionada é relida
+// enquanto alguma mensagem do cache ainda pode mudar sozinha (saída sem entrega, foto do
+// cliente baixando) e no ciclo lento; parada, fica no cache. As outras só quando mudaram.
 //
 // Pedido: relido para a selecionada, para a que mudou e, nas outras, só no ciclo
 // lento (1 min). Pedido entregue ou cancelado fica no cache até o id mudar.
@@ -17,11 +18,26 @@ export const STATUS_FINAIS_DO_PEDIDO = new Set(['entregue', 'cancelado'])
 // Conversa encerrada que nunca foi lida não busca mensagens na carga (#1287): a
 // inbox pode ter centenas, e o cartão mostra `ultimaMensagemTexto` do resumo.
 // Ela é lida ao ser aberta ou quando volta a ter atendimento.
-export function deveRelerMensagens(resumo, guardado, selecionadaId) {
-  if (resumo.id === selecionadaId) return true
-  if (!guardado) return resumo.situacao !== 'Encerrada'
-  return guardado.ultima !== resumo.ultimaMensagemEm
+export function deveRelerMensagens(resumo, guardado, selecionadaId, { cicloLento = false } = {}) {
+  const selecionada = resumo.id === selecionadaId
+  if (!guardado) return selecionada || resumo.situacao !== 'Encerrada'
+  if (guardado.ultima !== resumo.ultimaMensagemEm) return true
+  return selecionada && (cicloLento || (guardado.mensagens ?? []).some(podeMudarSozinha))
 }
+
+// #1786: o que muda no servidor sem mexer em `ultimaMensagemEm`. Saída até ser entregue (o reenvio
+// troca o Falhou); a nota interna do sistema, sem id do canal, fica Pendente para sempre e não conta.
+// Entrada com arquivo que o EasyStok ainda baixa do canal.
+const STATUS_ASSENTADOS = new Set(['Entregue', 'Lida'])
+const ENTRADA_COM_ARQUIVO = new Set(['Imagem', 'Audio', 'Documento'])
+const podeMudarSozinha = (m) => (m.direcao === 'Saida'
+  ? !STATUS_ASSENTADOS.has(m.status) && !(m.autor === 'Sistema' && !m.externoId)
+  : ENTRADA_COM_ARQUIVO.has(m.tipoConteudo) && !m.midiaChave && !m.midiaFalhou)
+
+// #1786: aba oculta não lê a inbox (o laço de 5 s rodava com o tablet na gaveta). Sem documento (node,
+// provas), conta como visível. Oculta por um minuto ou mais, a volta varre a inbox inteira.
+export const abaVisivel = (documento = globalThis.document) => documento?.visibilityState !== 'hidden'
+export const deveVarrerAoVoltar = (ocultaDesde, agora, limiteMs = 60000) => ocultaDesde != null && agora - ocultaDesde >= limiteMs
 
 export function deveRelerPedido(resumo, guardado, { selecionadaId = null, cicloLento = false } = {}) {
   if (!resumo.pedidoEmAndamentoId) return false
