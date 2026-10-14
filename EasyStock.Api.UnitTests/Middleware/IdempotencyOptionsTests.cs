@@ -15,6 +15,13 @@ public class IdempotencyOptionsTests
     }
 
     [Fact]
+    public void Gerar_pedidos_da_lista_de_compras_usa_a_protecao_de_retentativa()
+    {
+        EasyStock.Api.Hosting.PipelineExtensions.ConfigurarRotasIdempotentes(new IdempotencyOptions())
+            .PathMatchesAny($"/api/listas-compras/{Guid.NewGuid()}/gerar-pedidos").Should().BeTrue();
+    }
+
+    [Fact]
     public void Lancamento_de_caixa_usa_a_protecao_de_retentativa()
     {
         EasyStock.Api.Hosting.PipelineExtensions.ConfigurarRotasIdempotentes(new IdempotencyOptions())

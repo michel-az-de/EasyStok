@@ -3,6 +3,8 @@
 // "escalado para a dona: ". A atendente lia "LLM" e "escalado" no cartão, na faixa e na conversa.
 // Puro: recebe o texto gravado, devolve o que a tela mostra.
 
+import { dataHora } from './formato'
+
 export const AUTOMATICO_DESLIGADO = 'o atendimento automático está desligado'
 
 const MOTIVOS_CONHECIDOS = [
@@ -40,4 +42,16 @@ export function notaDeSistema(texto) {
   if (!NOTA_DE_ESCALADA.test(cru)) return cru
   const motivo = motivoDeEscalada(cru.replace(NOTA_DE_ESCALADA, ''))
   return motivo ? `Passou para você: ${motivo}` : 'Passou para você'
+}
+
+// Só a nota interna reconhecida pela tradução usa este formato. O histórico gravado fica intacto.
+export function notaDeReabertura(texto) {
+  const partes = /^(Conversa reaberta por .+\. Encerramento anterior: )(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2}) UTC\.$/.exec(texto)
+  if (!partes) return texto
+  const [, prefixo, dia, mes, ano, hora, minuto, segundo] = partes
+  const iso = `${ano}-${mes}-${dia}T${hora}:${minuto}:${segundo}.000Z`
+  const data = new Date(iso)
+  // Date aceita alguns dias inexistentes por transbordo (31/02). Não reinterpretar esses registros.
+  if (Number.isNaN(data.getTime()) || data.toISOString() !== iso) return texto
+  return `${prefixo}${dataHora(data)} (horário da loja).`
 }
