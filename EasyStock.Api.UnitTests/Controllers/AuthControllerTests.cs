@@ -44,6 +44,8 @@ public class AuthControllerTests
     public AuthControllerTests()
     {
         var passwordHasher = _passwordHasher;
+        // #1781: o banco aceita a reserva da tentativa de senha (a conta não está bloqueada).
+        _usuarioRepository.ReservarTentativaDeSenhaAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(true);
         _autenticarUseCase = new AutenticarUsuarioUseCase(_usuarioRepository, _unitOfWork, passwordHasher, _autenticarLogger);
 
         _mockJwtService.GerarToken(Arg.Any<AutenticarUsuarioResult>()).Returns("mocked-jwt-token");
@@ -127,7 +129,6 @@ public class AuthControllerTests
         var listarEmpresasLogger = Substitute.For<ILogger<ListarEmpresasParaLoginUseCase>>();
         var listarEmpresasUseCase = new ListarEmpresasParaLoginUseCase(
             Substitute.For<IUsuarioRepository>(),
-            unitOfWork2,
             Substitute.For<IPasswordHasher>(),
             listarEmpresasLogger);
 

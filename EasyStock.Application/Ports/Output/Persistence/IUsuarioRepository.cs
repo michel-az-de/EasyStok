@@ -32,5 +32,20 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// </summary>
         /// <returns>Linhas alteradas: 1 quando o corte avançou, 0 quando já havia um igual ou posterior.</returns>
         Task<int> AtualizarSessoesValidasDesdeAsync(Guid usuarioId, DateTime desde);
+
+        /// <summary>
+        /// #1781: reserva uma tentativa de senha num UPDATE atômico, antes de conferir a senha. Conta a falha como
+        /// <see cref="Usuario.RegistrarFalhaDeSenha"/> (bloqueio vencido recomeça em 1; a
+        /// <see cref="Usuario.FalhasParaBloquear"/>ª bloqueia por <see cref="Usuario.MinutosDeBloqueio"/> min) e só
+        /// vale se a conta não estiver bloqueada em <paramref name="agora"/>. Rajada paralela não passa do limite.
+        /// </summary>
+        /// <returns><c>false</c> quando a conta já está bloqueada: a senha não deve ser conferida.</returns>
+        Task<bool> ReservarTentativaDeSenhaAsync(Guid usuarioId, DateTime agora);
+
+        /// <summary>
+        /// #1781: desfaz a reserva de <see cref="ReservarTentativaDeSenhaAsync"/> quando a senha estava certa e o
+        /// fluxo não zera o contador (passo 1 do login, #1352). Tira o bloqueio que essa reserva tenha posto.
+        /// </summary>
+        Task DevolverTentativaDeSenhaAsync(Guid usuarioId);
     }
 }

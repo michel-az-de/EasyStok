@@ -18,9 +18,9 @@ namespace EasyStock.Application.UseCases.Storefront.Auth;
 /// </para>
 ///
 /// <para>
-/// <strong>Anti-brute force</strong>: cada tentativa incorreta incrementa
-/// <c>ClienteOtp.Tentativas</c>. Na 5ª tentativa <see cref="ClienteOtp.RegistrarTentativa"/>
-/// lança <see cref="RegraDeDominioVioladaException"/> que mapeia para
+/// <strong>Anti-brute force</strong>: cada tentativa é reservada em <c>ClienteOtp.Tentativas</c> num
+/// UPDATE atômico, com o limite no WHERE, antes de conferir o código (#1781): rajada paralela não passa de
+/// <see cref="ClienteOtp.MaxTentativas"/>. Sem tentativa a reservar, ou errando a última, responde
 /// <see cref="OtpTentativasExcedidasException"/>.
 /// </para>
 ///
@@ -92,25 +92,21 @@ public sealed class ValidarOtpUseCase(
         }
 
         // ── 5. Verificar código ────────────────────────────────────────
+        // #1781: a tentativa é contada no banco, num UPDATE atômico, antes do BCrypt; rajada paralela não passa
+        // do limite. Recusada: as tentativas acabaram (ou outra requisição consumiu o OTP).
+        if (!await clienteOtpRepository.ReservarTentativaAsync(otp.Id, ct))
+        {
+            logger.LogWarning(
+                "OTP tentativas esgotadas: empresaId={EmpresaId} otpId={OtpId} telefone={Telefone}",
+                empresaId, otp.Id, telefoneMascarado);
+            throw new OtpTentativasExcedidasException();
+        }
+
         if (!otp.ValidarCodigo(input.Codigo, passwordHasher.Verify, timeProvider))
         {
-            // Registra tentativa — lança RegraDeDominioVioladaException se já estava no limite
-            try
-            {
-                otp.RegistrarTentativa();
-            }
-            catch (Domain.Exceptions.RegraDeDominioVioladaException)
-            {
-                await clienteOtpRepository.UpdateAsync(otp, ct);
-                await unitOfWork.CommitAsync();
-                logger.LogWarning(
-                    "OTP tentativas esgotadas: empresaId={EmpresaId} otpId={OtpId} telefone={Telefone}",
-                    empresaId, otp.Id, telefoneMascarado);
-                throw new OtpTentativasExcedidasException();
-            }
-
-            await clienteOtpRepository.UpdateAsync(otp, ct);
-            await unitOfWork.CommitAsync();
+            // #1781: a reserva já gravou a tentativa; a entidade só espelha. Gravar o OTP lido antes da reserva
+            // devolveria o contador ao valor velho e perderia as tentativas paralelas.
+            otp.RegistrarTentativa();
 
             // Após incrementar, verifica se acabou de atingir o limite
             if (otp.Tentativas >= ClienteOtp.MaxTentativas)
@@ -128,8 +124,15 @@ public sealed class ValidarOtpUseCase(
         }
 
         // ── 6. Consumir OTP ────────────────────────────────────────────
-        otp.Consumir();
-        await clienteOtpRepository.UpdateAsync(otp, ct);
+        // #1781: consumo atômico no banco. Dois códigos certos em paralelo: só um afeta a linha; o outro
+        // responde como código inválido, sem sessão e sem tentar criar o cliente de novo.
+        if (!await clienteOtpRepository.ConsumirAsync(otp.Id, ct))
+        {
+            logger.LogWarning(
+                "OTP já consumido por outra requisição: empresaId={EmpresaId} otpId={OtpId} telefone={Telefone}",
+                empresaId, otp.Id, telefoneMascarado);
+            throw new OtpInvalidoException();
+        }
 
         // ── 7. Criar ou atualizar Cliente ──────────────────────────────
         var cliente = await clienteRepository.GetByTelefoneHashAsync(empresaId, telefoneHash, ct);

@@ -234,6 +234,19 @@ public class AtualizarUsuarioUseCaseTests
     }
 
     [Fact]
+    public async Task EditarEmailDeConvidadoGravaOEmailNormalizado()
+    {
+        // #1781: o login busca o e-mail normalizado; gravar com maiúsculas tranca o convidado fora.
+        var empresaA = _f.EmpresaId;
+        var alvo = ConvidadoDaEmpresa(empresaA);
+        ComoAdmin(empresaA);
+
+        await CriarUseCase().ExecuteAsync(new AtualizarUsuarioCommand(alvo.Id, "Alvo", " Novo@Empresa.COM "));
+
+        alvo.Email.Should().Be("novo@empresa.com");
+    }
+
+    [Fact]
     public async Task EditarEmailDeConvidadoParaUmEmailQueJaExisteRecusa()
     {
         var empresaA = _f.EmpresaId;
