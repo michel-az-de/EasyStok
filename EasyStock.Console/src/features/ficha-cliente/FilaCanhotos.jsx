@@ -7,7 +7,7 @@ import { Icone } from '../../componentes/Icone'
 import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
-import { faixaDaJanela } from '../../dominio/entrega'
+import { faixaDoPedido } from '../../dominio/entrega'
 import { pdfDoCanhoto } from '../../dominio/impressao'
 import { itensDetalhados } from '../../dominio/pedido'
 import { PapelCanhoto } from './Canhoto'
@@ -79,7 +79,7 @@ export function FilaCanhotos() {
     linhas,
     nomeCliente: conversaAtual.nome,
     endereco: conversaAtual.cliente?.endereco ?? null,
-    faixa: faixaDaJanela(janelas, conversaAtual.pedido.janela),
+    faixa: faixaDoPedido(janelas, conversaAtual.pedido),
   }
   const concluir = () => {
     marcarCanhotoImpresso(numeroAtual)

@@ -7,7 +7,7 @@ import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { conversaEncerrada, estaBloqueada } from '../../dominio/conversa'
 import { faltaPagar } from '../../dominio/cobranca'
-import { faixaDaJanela } from '../../dominio/entrega'
+import { faixaDoPedido } from '../../dominio/entrega'
 import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
 import { comandaTravada, numeroDaComanda, pedidoEncerrado, rotuloDoEstado, totalDoPedido } from '../../dominio/pedido'
 import { faltaPagar as saldoDoPedido } from '../../dominio/pagamento'
@@ -84,7 +84,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
 
   const { cliente, pedido } = selecionada
   const editavel = !conversaEncerrada(selecionada)
-  const faixa = faixaDaJanela(janelas, pedido?.janela)
+  const faixa = faixaDoPedido(janelas, pedido)
   const avancoEm = ultimoAvanco?.conversaId === selecionada.id ? ultimoAvanco.em : null
   const primeiroNome = selecionada.nome.split(' ')[0]
   const clienteEscolhendo = conversaEscolhendo === selecionada.id
