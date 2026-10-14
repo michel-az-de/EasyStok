@@ -12,14 +12,15 @@ namespace EasyStock.Api.IntegrationTests.Atendimento;
 
 public sealed partial class PedidoConversaConcorrenciaTests
 {
-    // #1716: sem credencial do Mercado Pago o cliente recebia "Erro interno do servidor" (500) ao confirmar.
+    // #1800: falha temporária não é ausência de credencial. A encomenda sem credencial
+    // conserva cobrança manual desde #1736, coberta em EncomendaSinalManualIntegrationTests.
     [SkippableFact]
-    public async Task Comanda_SemPagamentoOnlineConfiguradoRespondeIndisponivelENaoDeixaPedido()
+    public async Task Comanda_ProvedorOnlineIndisponivelPreservaSelecaoENaoDeixaPedido()
     {
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
         var mp = Substitute.For<IMercadoPagoClient>();
         mp.CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>())
-            .ThrowsAsync(new MercadoPagoNaoConfiguradoException());
+            .ThrowsAsync(new HttpRequestException("Provedor temporariamente indisponível"));
         await using var factory = CriarFactory(mp);
         using var client = factory.CreateClient();
         var c = await SemearAsync(factory);
@@ -37,7 +38,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         var corpo = await resposta.Content.ReadAsStringAsync();
         resposta.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable, corpo);
         corpo.Should().NotContain("Erro interno");
-        corpo.Should().Contain("combinar o pagamento");
+        corpo.Should().Contain("tente de novo");
         (await ContarPedidos(factory)).Should().Be(antes, "pedido sem cobrança não fica para trás");
         (await Estado(client, token)).PodeEditar.Should().BeTrue("o cliente continua com a seleção para tentar de novo");
     }
