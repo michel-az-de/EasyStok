@@ -166,7 +166,10 @@ public sealed class ContaReceberRepository(EasyStockDbContext db) : IContaRecebe
         => db.ParcelasReceber
             .IgnoreQueryFilters()
             .Include(p => p.Pagamentos)
-            .Include(p => p.ContaReceber)
+            // #1774: sem as outras parcelas, a conciliacao do Pix via a conta com uma parcela so e a marcava
+            // como Paga com as demais pendentes.
+            .Include(p => p.ContaReceber!).ThenInclude(c => c.Parcelas).ThenInclude(p2 => p2.Pagamentos)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.EfiTxid == txid, ct);
 
     public Task AddEventoAsync(ContaFinanceiraEvento evento, CancellationToken ct = default)

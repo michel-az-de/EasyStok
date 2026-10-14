@@ -157,4 +157,30 @@ public class ParcelaTests
         p.NotificadaD3Em.Should().Be(agora);
         p.NotificadaD1Em.Should().BeNull();
     }
+
+    // #1774: quem cancela a conta le as parcelas sem a lista de pagamentos.
+    [Fact]
+    public void ParcelaPagar_com_valor_pago_nao_cancela_mesmo_sem_a_lista_de_pagamentos()
+    {
+        var p = ParcelaPagar.Criar(Guid.NewGuid(), Empresa, 1, 100m, DateTime.UtcNow.AddDays(10));
+        p.RegistrarPagamento(PagamentoParcela.CriarConfirmado(Empresa, TipoLadoFinanceiro.Pagar, 40m, "pix", DateTime.UtcNow), DateTime.UtcNow);
+        p.Pagamentos.Clear();
+
+        var cancelar = () => p.Cancelar();
+
+        cancelar.Should().Throw<RegraDeDominioVioladaException>();
+        p.Status.Should().Be(StatusParcela.ParcialmentePaga);
+    }
+
+    [Fact]
+    public void ParcelaReceber_com_valor_recebido_nao_cancela_mesmo_sem_a_lista_de_pagamentos()
+    {
+        var p = ParcelaReceber.Criar(Guid.NewGuid(), Empresa, 1, 100m, DateTime.UtcNow.AddDays(10));
+        p.RegistrarPagamento(PagamentoParcela.CriarConfirmado(Empresa, TipoLadoFinanceiro.Receber, 40m, "pix", DateTime.UtcNow), DateTime.UtcNow);
+        p.Pagamentos.Clear();
+
+        var cancelar = () => p.Cancelar();
+
+        cancelar.Should().Throw<RegraDeDominioVioladaException>();
+    }
 }
