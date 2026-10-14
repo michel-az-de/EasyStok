@@ -10,5 +10,7 @@ public enum EmpresaEntregador
     NoveNove = 2,
     Lalamove = 3,
     Ifood = 4,
-    Outra = 5
+    Outra = 5,
+    /// <summary>I9.1: corrida pedida pelo app, registrada à mão com custo.</summary>
+    Uber = 6
 }

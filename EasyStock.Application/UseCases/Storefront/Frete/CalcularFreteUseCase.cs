@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Lookup;
@@ -125,7 +125,8 @@ public sealed class CalcularFreteUseCase(
         var config = FreteRaioConfigFactory.TentarCriar(storefront);
         if (config is null) return null; // raio não configurado → zona
 
-        var geo = await geocodingClient.GeocodificarAsync(
+        var cotacao = await FreteRaioCotador.CotarAsync(
+            config,
             new GeocodeQuery(
                 Logradouro: endereco?.Logradouro,
                 Numero: input.Numero,
@@ -133,10 +134,10 @@ public sealed class CalcularFreteUseCase(
                 Cidade: endereco?.Cidade,
                 Uf: endereco?.Uf,
                 Cep: cepNormalizado),
-            ct);
+            geocodingClient, rotaClient, ct);
 
         // Geocode ausente ou impreciso → não cobra raio chutado; cai pra zona.
-        if (geo is null || !geo.Confiavel)
+        if (cotacao is null)
         {
             logger.LogInformation(
                 "Frete raio: geocode ausente/impreciso, caindo pra zona. cep={Cep} storefrontId={StorefrontId}",
@@ -144,12 +145,7 @@ public sealed class CalcularFreteUseCase(
             return null;
         }
 
-        // Rota real (issue #1274) quando disponível; null mantém haversine × fator.
-        var rota = await rotaClient.MedirAsync(
-            new RotaQuery(config.Origem.Lat, config.Origem.Lng, geo.Lat, geo.Lng), ct);
-
-        var r = FreteRaioCalculadora.Calcular(
-            new Coordenada(geo.Lat, geo.Lng), config, rota?.DistanciaMetros);
+        var (r, rota) = cotacao;
 
         if (r.ForaDeCobertura)
         {
@@ -171,7 +167,11 @@ public sealed class CalcularFreteUseCase(
             ValorFormatado: FormatarValor(r.ValorCentavos / 100m),
             EtaLabel: FormatarEta(minutos),
             ZonaLabel: r.Gratis ? "Frete grátis" : "Entrega por raio",
-            TempoEstimadoMinutos: minutos);
+            TempoEstimadoMinutos: minutos,
+            GeocodeConfiavel: true,
+            DistanciaMetros: r.DistanciaRotaMetros,
+            FaixaId: r.FaixaId,
+            Gratis: r.Gratis);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────

@@ -61,9 +61,10 @@ function marcaDoPedido(conversa, cardapio) {
 // DEN-06: cobrança vencida repete o aviso do pedido e do lembrete de
 // pagamento em outro lugar da tela, então não pede o vermelho de alarme aqui
 // dentro: vira estado neutro, com o rótulo escrito.
-function motivoDaLinha(motivo) {
+function motivoDaLinha(motivo, origem) {
   if (!motivo) return null
-  const apresentacao = APRESENTACAO_DO_MOTIVO[motivo.chave]
+  const apresentacao = motivo.chave === 'passagem' && origem === 'chat-site'
+    ? { texto: 'Aguardando equipe', icone: 'relogio' } : APRESENTACAO_DO_MOTIVO[motivo.chave]
   return {
     ...motivo,
     tom: motivo.chave === 'cobranca' ? 'neutro' : motivo.tom,
@@ -85,7 +86,7 @@ export const CartaoConversa = memo(function CartaoConversa({
 }) {
   const { canais, janelas, cardapio } = useCatalogo()
   const canal = canalDaConversa(canais, conversa)
-  const motivo = grupo ? null : motivoDaLinha(motivoDePrecisar(conversa, agora, pausado, aberta, janelas, expediente))
+  const motivo = grupo ? null : motivoDaLinha(motivoDePrecisar(conversa, agora, pausado, aberta, janelas, expediente), conversa.passagem?.origem)
   const slaEstourado = !grupo && respostaAtrasada(conversa, agora, pausado, expediente)
   const estado = estadoDaLinha(conversa, { pausado, grupo, motivo })
   // Rodada 12 (issue #16): "Passou para você" sem origem obrigava a abrir a

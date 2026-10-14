@@ -31,6 +31,43 @@ public class ImpressaoPendente
     /// <summary>Último erro relatado pelo consumidor.</summary>
     public string? Erro { get; private set; }
 
+    public Guid? SolicitacaoId { get; private set; }
+    public Guid? OriginalId { get; private set; }
+    public Guid? UsuarioId { get; private set; }
+    public Guid? ConfirmadaPor { get; private set; }
+    public string? Documento { get; private set; }
+    public string? Modelo { get; private set; }
+    public string? Codigo { get; private set; }
+    public string? Perfil { get; private set; }
+    public string? Versao { get; private set; }
+    public string? Html { get; private set; }
+    public string? Hash { get; private set; }
+    public string? Intencao { get; private set; }
+
+    // Snapshot só recebe conteúdo renderizado pelo servidor, nunca HTML enviado pelo operador.
+    public static ImpressaoPendente PrepararDocumento(Guid empresaId, Guid? lojaId, Guid pedidoId,
+        Guid solicitacaoId, Guid? usuarioId, string documento, string modelo, string codigo,
+        string perfil, string versao, string html, string hash, string intencao, DateTime agora, Guid? originalId = null)
+    {
+        if (solicitacaoId == Guid.Empty) throw new ArgumentException("Solicitação obrigatória.", nameof(solicitacaoId));
+        ArgumentException.ThrowIfNullOrWhiteSpace(html);
+        var i = CriarCanhoto(empresaId, lojaId, pedidoId, agora);
+        i.Tipo = TipoImpressao.Documento;
+        i.Status = StatusImpressao.Preparada;
+        i.SolicitacaoId = solicitacaoId;
+        i.UsuarioId = usuarioId;
+        i.OriginalId = originalId;
+        i.Documento = documento;
+        i.Modelo = modelo;
+        i.Codigo = codigo;
+        i.Perfil = perfil;
+        i.Versao = versao;
+        i.Html = html;
+        i.Hash = hash;
+        i.Intencao = intencao;
+        return i;
+    }
+
     // EF Core
     private ImpressaoPendente() { }
 
@@ -52,11 +89,12 @@ public class ImpressaoPendente
     }
 
     /// <summary>Confirma a impressão. Devolve <c>false</c> quando já estava impressa (nada muda).</summary>
-    public bool MarcarImpressa(DateTime agora)
+    public bool MarcarImpressa(DateTime agora, Guid? usuarioId = null)
     {
         if (Status == StatusImpressao.Impressa) return false;
         Status = StatusImpressao.Impressa;
         ImpressaEm = agora;
+        ConfirmadaPor = usuarioId;
         Tentativas++;
         return true;
     }

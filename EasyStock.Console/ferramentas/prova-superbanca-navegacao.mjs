@@ -81,7 +81,8 @@ await provar('identidade muda por conta/empresa, sem mudar só por refresh de to
   assert.notEqual(identidadeDaSessao(sessao), identidadeDaSessao({ ...sessao, empresa: { id: 'outra-empresa' } }))
   const app = readFileSync(new URL('../src/app/App.jsx', import.meta.url), 'utf8')
   assert.match(app, /AppComAcesso key=\{identidadeDaSessao\(sessao\)\}/)
-  assert.match(app, /const comandasDaVisita = useRef\(\{\}\)/)
+  assert.match(app, /const \[visitaInicial\] = useState\(\(\) => lerVisita\(sessao\)\)/)
+  assert.match(app, /const comandasDaVisita = useRef\(visitaInicial\.comandas\)/)
 })
 await provar('cada tela real recebe ajuda com título do catálogo e passos', () => {
   assert.ok(telasCatalogadas.length > 0)
@@ -108,7 +109,7 @@ await provar('hash/histórico usam rotas existentes; origem inválida volta ao c
 await provar('produção antiga da Cozinha orienta para cadastro real sem fingir escrita', () => {
   const caminho = rotaDaHash('#/m/cozinha/producao', { fonteApi: true })
   const api = contextoDaAjuda(caminho, true)
-  assert.match(api.passos[0], /ainda não está ligada/)
+  assert.match(api.passos[0], /ainda não está disponível/)
   assert.equal(hashDoModulo(api.atalho.modulo, api.atalho.tela), '#/m/producao/producao')
   assert.equal(contextoDaAjuda(caminho, false).atalho, null)
 })

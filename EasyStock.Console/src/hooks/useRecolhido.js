@@ -1,5 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react'
-import { CHAVE_RECOLHIDOS, alternarRecolhido, lerRecolhidos } from './recolhidos'
+import { CHAVE_RECOLHIDOS, alternarRecolhido, estaRecolhido, lerRecolhidos } from './recolhidos'
 
 // Seção recolhida da Ficha, lembrada neste navegador (#1442). Um armazém só
 // para todas as seções: cada uma chamando o localStorage por conta própria se
@@ -35,19 +35,20 @@ function gravar(novo) {
   ouvintes.forEach((ouvinte) => ouvinte())
 }
 
-function alternar(chave) {
-  gravar(alternarRecolhido(atual(), chave))
+function alternar(chave, padrao) {
+  gravar(alternarRecolhido(atual(), chave, padrao))
 }
 
 // Abre uma seção de fora dela: abrir o cardápio rola a Ficha até a comanda,
 // e comanda recolhida não recebe o item arrastado nem aparece na rolagem.
 export function abrirSecao(chave) {
-  if (atual()[chave]) gravar({ ...atual(), [chave]: false })
+  if (atual()[chave] !== false) gravar({ ...atual(), [chave]: false })
 }
 
-// `chave` vazia: seção que não recolhe, sempre aberta.
-export function useRecolhido(chave) {
+// `chave` vazia: seção que não recolhe, sempre aberta. `padrao` (#1697): como a seção nasce
+// enquanto ninguém escolheu.
+export function useRecolhido(chave, padrao = false) {
   const recolhidos = useSyncExternalStore(assinar, atual, atual)
-  const trocar = useCallback(() => { if (chave) alternar(chave) }, [chave])
-  return [Boolean(chave && recolhidos[chave]), trocar]
+  const trocar = useCallback(() => { if (chave) alternar(chave, padrao) }, [chave, padrao])
+  return [Boolean(chave) && estaRecolhido(recolhidos, chave, padrao), trocar]
 }

@@ -13,7 +13,7 @@ namespace EasyStock.Infra.Postgre.Repositories.Operacao;
 public sealed class ImpressaoPendenteRepository(EasyStockDbContext db) : IImpressaoPendenteRepository
 {
     public Task<bool> ExisteCanhotoAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default) =>
-        db.ImpressoesPendentes.AnyAsync(i => i.EmpresaId == empresaId && i.PedidoId == pedidoId, ct);
+        db.ImpressoesPendentes.AnyAsync(i => i.EmpresaId == empresaId && i.PedidoId == pedidoId && i.Tipo == TipoImpressao.Canhoto, ct);
 
     public async Task AddAsync(ImpressaoPendente impressao, CancellationToken ct = default) =>
         await db.ImpressoesPendentes.AddAsync(impressao, ct);
@@ -21,10 +21,28 @@ public sealed class ImpressaoPendenteRepository(EasyStockDbContext db) : IImpres
     public Task<ImpressaoPendente?> GetByIdAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
         db.ImpressoesPendentes.FirstOrDefaultAsync(i => i.EmpresaId == empresaId && i.Id == id, ct);
 
+    public Task<ImpressaoPendente?> GetByIdComLockAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
+        db.ImpressoesPendentes.FromSqlInterpolated($"SELECT * FROM impressoes_pendentes WHERE \"EmpresaId\" = {empresaId} AND \"Id\" = {id} FOR UPDATE")
+            .FirstOrDefaultAsync(ct);
+
+    public Task<ImpressaoPendente?> GetBySolicitacaoAsync(Guid empresaId, Guid solicitacaoId, CancellationToken ct = default) =>
+        db.ImpressoesPendentes.FirstOrDefaultAsync(i => i.EmpresaId == empresaId && i.SolicitacaoId == solicitacaoId, ct);
+
+    public async Task<IReadOnlyList<EasyStock.Application.UseCases.Operacao.Impressao.DocumentoImpressoDto>> HistoricoAsync(
+        Guid empresaId, Guid pedidoId, int pagina, CancellationToken ct = default) =>
+        await db.ImpressoesPendentes.AsNoTracking()
+            .Where(i => i.EmpresaId == empresaId && i.PedidoId == pedidoId && i.Tipo == TipoImpressao.Documento)
+            .OrderByDescending(i => i.CriadaEm).ThenByDescending(i => i.Id)
+            .Skip((Math.Clamp(pagina, 1, 10000) - 1) * 20).Take(20)
+            .Select(i => new EasyStock.Application.UseCases.Operacao.Impressao.DocumentoImpressoDto(i.Id, i.PedidoId,
+                i.OriginalId, i.Documento, i.Modelo, i.Codigo, i.Perfil, i.Versao, i.Hash, i.UsuarioId,
+                i.Status == StatusImpressao.Impressa ? "impressa" : i.Status == StatusImpressao.Falhou ? "falhou" : "preparada",
+                i.CriadaEm, i.ImpressaEm)).ToListAsync(ct);
+
     public async Task<IReadOnlyList<ImpressaoPendente>> ListarPendentesAsync(Guid empresaId, int limite, CancellationToken ct = default) =>
         await db.ImpressoesPendentes
             .AsNoTracking()
-            .Where(i => i.EmpresaId == empresaId && i.Status == StatusImpressao.Pendente)
+            .Where(i => i.EmpresaId == empresaId && i.Tipo == TipoImpressao.Canhoto && i.Status == StatusImpressao.Pendente)
             .OrderBy(i => i.CriadaEm)
             .ThenBy(i => i.Id)
             .Take(Math.Clamp(limite, 1, 500))

@@ -9,6 +9,8 @@ namespace EasyStock.Api.Controllers;
 /// <summary>
 /// Mensagem programada ao cliente pelo console (S39, ADR-0051): agendar, listar e cancelar. O
 /// disparo roda no processo da API (<c>MensagensProgramadasBackgroundService</c>).
+/// Agendar e cancelar falam com o cliente como enviar na conversa: exigem <see cref="Permissao.AtenderConversas"/>
+/// (#1781); ler basta a policy.
 /// </summary>
 [SwaggerTag("Scheduled messages to customers")]
 [ApiController]
@@ -27,6 +29,7 @@ public class AtendimentoMensagensProgramadasController(
     [HttpPost]
     public async Task<IActionResult> Agendar([FromBody] AgendarMensagemProgramadaBody body, CancellationToken ct)
     {
+        if (!currentUser.TemPermissao(Permissao.AtenderConversas)) return Forbid();
         try
         {
             var modelo = body.Modelo is { } m ? new ModeloMensagem(m.Nome, m.Idioma ?? "pt_BR", m.Parametros ?? []) : null;
@@ -54,6 +57,7 @@ public class AtendimentoMensagensProgramadasController(
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Cancelar(Guid id, CancellationToken ct)
     {
+        if (!currentUser.TemPermissao(Permissao.AtenderConversas)) return Forbid();
         try
         {
             return DataOk(await cancelarUseCase.ExecuteAsync(currentUser.EmpresaId, id, ct));

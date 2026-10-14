@@ -13,7 +13,6 @@ export function normalizarPreferenciasHall(valor) {
     foco: ['atendimento', 'gestao', 'producao'].includes(valor?.foco) ? valor.foco : 'atendimento',
     compacto: valor?.compacto === true,
     movimentos: valor?.movimentos !== false,
-    ritmo: valor?.ritmo !== false,
     paineis: Array.isArray(valor?.paineis)
       ? [...new Set(valor.paineis.filter((id) => ['atendimento', 'cozinha', 'entregas', 'financeiro'].includes(id)))]
       : ['atendimento', 'cozinha', 'entregas', 'financeiro'],
@@ -30,6 +29,12 @@ export function aplicarFocoDoHall(preferencia, foco) {
   const atual = normalizarPreferenciasHall(preferencia)
   const modelo = FOCOS_DO_HALL.find((item) => item.id === foco)
   return modelo ? normalizarPreferenciasHall({ ...atual, foco, ordem: modelo.ordem }) : atual
+}
+
+export function ordenarPaineisDoHall(preferencia, permitidos) {
+  const atual = normalizarPreferenciasHall(preferencia)
+  return FOCOS_DO_HALL.find((item) => item.id === atual.foco).ordem
+    .filter((id) => atual.paineis.includes(id) && permitidos.includes(id))
 }
 
 export function ordenarModulosDoHall(modulos, preferencia) {

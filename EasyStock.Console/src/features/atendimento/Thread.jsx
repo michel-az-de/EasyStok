@@ -63,12 +63,13 @@ function PostIt({ nota }) {
 }
 
 export function Thread({
-  mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, digitando = false, notas = [],
+  mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, digitando = false, notas = [],
 }) {
   const fim = useRef(null)
   // #1577: o pai recria os dois handlers a cada render; com identidade fixa o `memo` do balão segura.
   const abrirDefinicaoAutomatica = useChamadaEstavel(aoAbrirDefinicaoAutomatica)
   const reenviar = useChamadaEstavel(aoReenviar)
+  const abrirModelos = useChamadaEstavel(aoAbrirModelos)
 
   // #1587: não rola mais a cada mensagem; a regra está no hook.
   useRolagemDoFio(fim, { mensagens, chaveRolagem, digitando, totalDeNotas: notas.length })
@@ -123,6 +124,8 @@ export function Thread({
             aoAbrirDefinicaoAutomatica={abrirDefinicaoAutomatica}
             // Sem a ação (demonstração) o balão não mostra o Reenviar.
             aoReenviar={aoReenviar ? reenviar : undefined}
+            // #1761: só onde o compositor já oferece Modelos aprovados.
+            aoAbrirModelos={aoAbrirModelos ? abrirModelos : undefined}
           />
         )
       })}

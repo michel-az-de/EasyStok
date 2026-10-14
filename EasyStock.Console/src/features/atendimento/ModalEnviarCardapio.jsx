@@ -5,24 +5,42 @@ import { primeiroNome } from '../../dominio/mensagem'
 import css from './atendimento.module.css'
 
 export function ModalEnviarCardapio({
-  nomeCliente, canalNome, link, daLoja = false, texto, aoEnviar, aoFechar, numeroComanda, podeEnviar = true,
+  nomeCliente, canalNome, link, daLoja = false, texto, aoGerar, aoEnviar, aoFechar, numeroComanda, podeEnviar = true,
 }) {
+  const [conteudo, setConteudo] = useState(link ? { link, texto, daLoja, numeroComanda } : null)
   const [copiado, setCopiado] = useState(false)
+  const [copiando, setCopiando] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState('')
   const trava = useRef(false)
+  const ocupado = enviando || copiando
+  const numero = conteudo?.numeroComanda || numeroComanda
   const endereco = (() => {
-    try { return new URL(link).host } catch { return link }
+    try { return new URL(conteudo?.link).host } catch { return conteudo?.link }
   })()
 
+  async function preparar() {
+    if (conteudo) return conteudo
+    const resultado = await aoGerar()
+    if (!resultado?.link) throw new Error('Não foi possível obter o link da comanda. Tente novamente.')
+    setConteudo(resultado)
+    return resultado
+  }
+
   const copiar = async () => {
+    if (trava.current) return
+    trava.current = true; setCopiando(true); setErro('')
     try {
-      await navigator.clipboard.writeText(link)
-      setCopiado(true)
-    } catch {
-      setCopiado(false)
-      setErro('Não foi possível copiar. Abra "Como funciona esta comanda" e selecione o endereço para copiá-lo.')
-    }
+      const dados = await preparar()
+      try {
+        await navigator.clipboard.writeText(dados.link)
+        setCopiado(true)
+      } catch {
+        setCopiado(false)
+        setErro('Não foi possível copiar. Abra "Detalhes do link" e selecione o endereço para copiá-lo.')
+      }
+    } catch (e) { setErro(e.message) }
+    finally { trava.current = false; setCopiando(false) }
   }
 
   async function enviar() {
@@ -30,7 +48,8 @@ export function ModalEnviarCardapio({
     trava.current = true
     setEnviando(true); setErro('')
     try {
-      if (await aoEnviar() === false) throw new Error('A comanda não foi enviada. Confira o motivo na conversa. O link continua disponível para copiar ou tentar novamente.')
+      const dados = await preparar()
+      if (await aoEnviar(dados.texto) === false) throw new Error('A comanda não foi enviada. Confira o motivo na conversa. O link continua disponível para copiar ou tentar novamente.')
       aoFechar()
     } catch (e) { setErro(e.message) }
     finally { trava.current = false; setEnviando(false) }
@@ -38,14 +57,14 @@ export function ModalEnviarCardapio({
 
   return (
     <Modal
-      titulo={numeroComanda ? `Compartilhar comanda ${numeroComanda}` : 'Compartilhar comanda'}
-      descricao={`Com ${primeiroNome(nomeCliente)}. A seleção aparece na ficha enquanto ele escolhe.`}
-      aoFechar={() => { if (!enviando) aoFechar() }}
+      titulo="Link de compra"
+      descricao={`${primeiroNome(nomeCliente)}${numero ? ` · Comanda ${numero}` : ''} · ${canalNome}`}
+      aoFechar={() => { if (!trava.current) aoFechar() }}
       rodape={(
         <>
-          <Botao onClick={copiar}>{copiado ? 'Link copiado' : 'Copiar link'}</Botao>
-          <Botao variante="primario" icone="enviar" disabled={enviando || !podeEnviar} onClick={enviar}>
-            {enviando ? 'Enviando…' : `Enviar pelo ${canalNome}`}
+          <Botao disabled={ocupado} onClick={copiar}>{copiando ? 'Copiando…' : copiado ? 'Link copiado' : conteudo ? 'Copiar link' : 'Gerar e copiar'}</Botao>
+          <Botao variante="primario" icone="enviar" disabled={ocupado || !podeEnviar} onClick={enviar}>
+            {enviando ? 'Enviando…' : conteudo ? 'Enviar link' : 'Gerar e enviar'}
           </Botao>
         </>
       )}
@@ -53,15 +72,19 @@ export function ModalEnviarCardapio({
       <div className={css.cardapioEnvio}>
         {erro && <p role="alert">{erro}</p>}
         {!podeEnviar && <p>O canal não permite enviar texto agora. Você pode copiar o link ou usar um modelo aprovado na conversa.</p>}
-        <p className={css.cardapioRotulo}>Mensagem</p>
-        <p className={css.cardapioMensagem}>{texto}</p>
+        {!conteudo && <>
+          <p>O cliente escolhe pelo link. Você acompanha a seleção nesta conversa.</p>
+          <p>Se houver um link ainda não confirmado, ele será substituído ao gerar outro.</p>
+        </>}
+        {conteudo && <><p className={css.cardapioRotulo}>Mensagem</p>
+          <p className={css.cardapioMensagem}>{conteudo.texto}</p></>}
 
-        <p className={css.cardapioLink}>
-          <a href={link} target="_blank" rel="noreferrer">Abrir comanda {numeroComanda}</a>
+        {conteudo && <><p className={css.cardapioLink}>
+          <a href={conteudo.link} target="_blank" rel="noreferrer">Abrir página de compra</a>
         </p>
         <details>
-        <summary>Como funciona esta comanda</summary>
-        {daLoja ? (
+        <summary>Detalhes do link</summary>
+        {conteudo.daLoja ? (
           // #1353: o mesmo link que o agente manda (S48). Vale 24 h e um pedido.
           <p>
             É a comanda pessoal no site da Casa da Baba (<strong>{endereco}</strong>). Cliente e
@@ -77,9 +100,9 @@ export function ModalEnviarCardapio({
           </p>
         )}
         <p className={css.cardapioLink}>
-          <code>{link}</code>
+          <code>{conteudo.link}</code>
         </p>
-        </details>
+        </details></>}
       </div>
     </Modal>
   )

@@ -7,6 +7,7 @@ import { mudarStatusKds } from '../../infra/api/kdsApi'
 import { aprovarPedido as aprovarPedidoApi } from '../../infra/api/entregasApi'
 import { MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, baixaCancelaCobrancaOnline, baixaEsperaAprovacao } from '../../dominio/cobranca'
 import { ultimoPagamentoApi } from '../../dominio/pagamento'
+import { motivoDoPedidoNaoCriado } from '../../dominio/pedido'
 import { criarChaveDeEnvio } from '../chaveDeEnvio'
 import { SO_NO_EASYSTOK } from './naoLigadas'
 
@@ -23,10 +24,12 @@ import { SO_NO_EASYSTOK } from './naoLigadas'
 // Sem pedido criado (#1271) vale o mesmo: só a comanda é rascunho local. Gerar ou reenviar a
 // cobrança cria o pedido (o EasyStok cobra e manda o resumo); pagamento e esteira avisam,
 // porque um rascunho "Pago" ou "Em preparo" nunca chega à cozinha.
-const NAO_LIGADO = 'ainda não está ligado ao EasyStok (F04 em diante). Use o EasyStok para isso.'
-const SEM_PEDIDO = 'o pedido ainda não está no EasyStok. Gere a cobrança ou envie ao cliente primeiro.'
+const NAO_LIGADO = 'esta ação ainda não está disponível nesta tela.'
+const SEM_PEDIDO = 'o pedido ainda não foi criado. Gere a cobrança ou envie ao cliente primeiro.'
 const LINK_CANCELADO_ESPERA_APROVACAO = 'O link foi cancelado e o pedido agora espera aprovação. '
   + 'Use "Aprovar pedido" na Ficha e registre o pagamento de novo.'
+
+const MESMA_FORMA = 'A cobrança já está nessa forma de pagamento. Nada mudou.'
 
 const EDITA_COMANDA = ['adicionarItem', 'removerItem', 'ajustarQuantidade', 'ajustarObservacao', 'forcarEncaixe']
 
@@ -40,8 +43,15 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   const envioDoPagamento = criarChaveDeEnvio()
 
   // O meio escolhido na tela vai junto: a API devolve a forma, não o meio (F07, item 5).
+  // #1683: o POST diz se o resumo saiu ao cliente; a leitura do pedido não diz. A marca fica
+  // aqui e volta ao pedido a cada recarga desta tela. A troca de forma
+  // tira a marca: a recarga leva `false` para o reducer não herdar a antiga.
+  const semResumo = new Set()
   async function recarregar(id) {
-    const pedido = pedidoDaApi(await obterPedido(id), pedidoDe(id))
+    const tinhaMarca = Boolean(pedidoDe(id)?.resumoNaoEnviado)
+    const lido = pedidoDaApi(await obterPedido(id), pedidoDe(id))
+    const marcado = Boolean(lido) && semResumo.has(lido.pedidoId)
+    const pedido = lido && (marcado || tinhaMarca) ? { ...lido, resumoNaoEnviado: marcado } : lido
     if (pedido) despachar({ tipo: acao.SINCRONIZAR_PEDIDO, id, pedido })
     return pedido
   }
@@ -57,7 +67,8 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
     if (atual?.nome === nome) return atual.promessa
     if (atual) { avisar(AGUARDE); return Promise.resolve({ erro: AGUARDE }) }
     const promessa = fazer()
-    if (!promessa) return promessa
+    // Recusa decidida na hora (`{ erro }`) não tem o que esperar: não segura a conversa.
+    if (!promessa?.finally) return promessa
     const final = promessa.finally(() => emVoo.delete(id))
     emVoo.set(id, { nome, promessa: final })
     return final
@@ -78,6 +89,8 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
 
   const trocarForma = (id, meio) => umaPorConversa(id, 'trocarForma', () => {
     const pedidoId = pedidoCriado(id)
+    // Link novo ou forma na entrega: o que valia para o resumo do pedido não vale mais.
+    semResumo.delete(pedidoId)
     despachar({ tipo: acao.ESCOLHER_MEIO_PAGAMENTO, id, meio })
     // Falhou: o meio local já mudou, então volta ao que o EasyStok tem (F07, item 5).
     return trocarFormaPagamento(pedidoId, formaDoMeio(meio))
@@ -94,9 +107,11 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   const criarPedido = (id, meio = null) => umaPorConversa(id, 'criarPedido', () => {
     const pedido = pedidoDe(id)
     if (!pedido || pedidoCriado(id)) return undefined
+    // #1683: o erro volta como `{ erro }` para a barra mostrar ao lado do botão; o aviso fica.
     if (!janelaDoId(pedido.janela)) {
-      avisar('Escolha a janela de entrega antes de enviar ao cliente.')
-      return undefined
+      const erro = 'Escolha a janela de entrega antes de enviar ao cliente.'
+      avisar(erro)
+      return { erro }
     }
     const corpo = corpoDoPedido({ ...pedido, meio: meio ?? pedido.meio })
     return gerarPedido(id, corpo).then(
@@ -107,6 +122,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
           faltas.push('a cobrança não saiu (Mercado Pago fora do ar). Use "Gerar cobrança" para emitir o link')
         }
         if (!gerado?.enviadoAoCliente) {
+          if (gerado?.pedidoId) semResumo.add(gerado.pedidoId)
           faltas.push('o resumo não saiu ao cliente (conversa fora da janela de 24 h ou canal fora do ar)')
         }
         const aviso = faltas.length > 0 ? `Pedido criado no EasyStok, mas ${faltas.join('; e ')}.` : null
@@ -114,7 +130,11 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
         if (aviso) avisar(aviso)
         return recarregar(id).catch(() => avisar(aviso ? `${aviso} Atualizando a tela…` : 'Pedido criado no EasyStok, atualizando a tela…'))
       },
-      (erro) => avisar(`Pedido não criado: ${erro.message}`),
+      (erro) => {
+        const mensagem = motivoDoPedidoNaoCriado(erro)
+        avisar(mensagem)
+        return { erro: mensagem }
+      },
     )
   })
 
@@ -253,7 +273,14 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
     gerarPedido: (id, meio = null) => criarPedido(id, meio),
 
     // Com pedido criado, trocar o meio é a troca de forma da S11: online ↔ na entrega.
-    alterarMeioPagamento: (id, meio) => (pedidoCriado(id) ? trocarForma(id, meio) : acoes.alterarMeioPagamento(id, meio)),
+    // #1683: entre Pix e cartão por link o EasyStok não faz nada (é o mesmo link); a tela não
+    // muda o meio nem diz que reenviou.
+    alterarMeioPagamento: (id, meio) => {
+      if (!pedidoCriado(id)) return acoes.alterarMeioPagamento(id, meio)
+      if (formaDoMeio(meio) !== formaDoMeio(pedidoDe(id)?.meio)) return trocarForma(id, meio)
+      avisar(MESMA_FORMA)
+      return Promise.resolve({ erro: MESMA_FORMA })
+    },
 
     gerarCobranca: (id, pedido, meio = null) => cobrar(id, meio),
     reenviarCobranca: (id, pedido, valorForcado = null, meio = null) => cobrar(id, meio),

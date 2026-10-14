@@ -236,4 +236,23 @@ public class MensagensProgramadasUseCasesTests
         await _sms.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
         _uow.CommitCount.Should().Be(0);
     }
+
+    [Fact]
+    public async Task Disparar_TimeoutDoCanal_MarcaFalhouEmVezDePrenderEmEnviando()
+    {
+        // #1787: o timeout do HttpClient chega como TaskCanceledException sem o token do disparo cancelado.
+        var conversa = ConversaAberta(Agora.AddHours(-1));
+        var mensagem = MensagemProgramada.Agendar(_empresaId, _cliente.Id, conversa.Id, CanalConversa.WhatsApp,
+            FinalidadeContato.Transacional, "Lembrete", null, Agora.AddMinutes(1), Guid.NewGuid(), Agora.AddMinutes(-10));
+        mensagem.Reservar(Agora);
+        _repo.ObterAsync(_empresaId, mensagem.Id, Arg.Any<CancellationToken>()).Returns(mensagem);
+        _conversas.ObterPorIdAsync(_empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        _whats.EnviarTextoAsync("5511988887777", "Lembrete", Arg.Any<CancellationToken>())
+            .Returns<Task<string>>(_ => throw new TaskCanceledException("HttpClient.Timeout"));
+
+        await Disparar().ExecuteAsync(_empresaId, mensagem.Id);
+
+        mensagem.Situacao.Should().Be(SituacaoMensagemProgramada.Falhou);
+        _uow.CommitCount.Should().Be(1);
+    }
 }

@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Infra.Postgre.Repositories
@@ -37,18 +38,40 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Take(pageSize)
                 .ToListAsync();
 
+            await CompletarTitulosLegadosAsync(empresaId, items);
             return (items, totalCount);
         }
 
         public async Task<IEnumerable<Notificacao>> GetRecentesNaoLidasAsync(Guid empresaId, int limit = 5, Guid? usuarioId = null)
         {
-            return await dbContext.Notificacoes
+            var items = await dbContext.Notificacoes
                 .AsNoTracking()
                 .Where(n => n.EmpresaId == empresaId && !n.Lida && (!usuarioId.HasValue || n.UsuarioId == null || n.UsuarioId == usuarioId))
                 .OrderByDescending(n => n.CriadaEm)
                 .ThenBy(n => n.Severidade)
                 .Take(limit)
                 .ToListAsync();
+            await CompletarTitulosLegadosAsync(empresaId, items);
+            return items;
+        }
+
+        // Envios antigos usavam o título do enum de estoque, mesmo para avisos de caixa.
+        // Recupera o assunto do envio apenas nas cópias AsNoTracking, preservando o registro histórico.
+        private async Task CompletarTitulosLegadosAsync(Guid empresaId, List<Notificacao> items)
+        {
+            var legadas = items.Where(n => n.OutboxMensagemId.HasValue
+                && ((n.TipoAlerta == TipoAlertaEstoque.ValidadeProxima && n.Titulo == "Validade Próxima")
+                    || (n.TipoAlerta == TipoAlertaEstoque.PedidoRecebido && n.Titulo == "Pedido Recebido"))).ToList();
+            if (legadas.Count == 0) return;
+
+            var ids = legadas.Select(n => n.OutboxMensagemId!.Value).ToArray();
+            var assuntos = await dbContext.NotifOutboxMensagens.AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId && m.Canal == CanalNotificacao.InApp && ids.Contains(m.Id))
+                .Select(m => new { m.Id, m.AssuntoRenderizado })
+                .ToDictionaryAsync(m => m.Id, m => m.AssuntoRenderizado);
+            foreach (var aviso in legadas)
+                if (assuntos.TryGetValue(aviso.OutboxMensagemId!.Value, out var assunto) && !string.IsNullOrWhiteSpace(assunto))
+                    aviso.Titulo = assunto;
         }
 
         public async Task<NotificacaoResumo> GetResumoAsync(Guid empresaId, Guid? usuarioId = null)

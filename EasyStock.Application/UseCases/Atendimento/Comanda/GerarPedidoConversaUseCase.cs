@@ -6,6 +6,8 @@ using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Exceptions.Storefront;
 
+using EasyStock.Domain.Entities.Pagamentos;
+
 namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 
 /// <param name="EnderecoId">Opcional: sem ele vale o endereço padrão (ou o único) do cliente.</param>
@@ -90,8 +92,7 @@ public sealed class GerarPedidoConversaUseCase(
     private async Task<CobrancaPedidoResult?> CobrarAsync(
         PedidoReservado reservado, Guid conversaId, string forma, string? usuarioNome, CancellationToken ct)
     {
-        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
-            && !PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
+        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega)
             return (await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(
                 reservado.Pedido.EmpresaId, reservado.Pedido.Id, forma, UsuarioNome: usuarioNome ?? "console"), ct)).Cobranca;
         return await gerarCobranca.ExecuteAsync(reservado, conversaId, ct);
@@ -100,6 +101,9 @@ public sealed class GerarPedidoConversaUseCase(
     private static string TextoAoCliente(PedidoReservado reservado, DateOnly dataEntrega, string forma, CobrancaPedidoResult? cobranca)
     {
         var resumo = ResumoPedidoConversa.Texto(reservado, dataEntrega, forma, CabecalhoResumo);
+        if (cobranca is { Provedor: CobrancaPedido.ProvedorNaEntrega }
+            && PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
+            return ResumoPedidoConversa.Limitar($"{resumo}\n\nSinal a receber: {PlanoPagamentoEncomenda.Sinal(reservado.Total).ToString("C", Cultura.PtBr)} por Pix, dinheiro ou maquininha. Restante na entrega.");
         if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
             && !PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm)) return resumo;
         var pagamento = cobranca?.LinkPagamento is { } link

@@ -86,6 +86,7 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
     public async Task EncomendaFutura_NaoPermiteTrocarSinalPorPagamentoNaEntrega()
     {
         var f = new CobrancaPedidoFixture();
+        f.Pedido.CriadoEm = CobrancaPedidoFixture.Agora;
         f.AdicionarOnline();
         f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddDays(2);
 
@@ -93,7 +94,7 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
             new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega"));
 
         await act.Should().ThrowAsync<UseCaseValidationException>()
-            .WithMessage("*exige sinal de 50%*");
+            .WithMessage("*cobrança online pendente*");
         f.Cobrancas.Should().ContainSingle(c => c.EstaPendente && c.EhOnline);
     }
 

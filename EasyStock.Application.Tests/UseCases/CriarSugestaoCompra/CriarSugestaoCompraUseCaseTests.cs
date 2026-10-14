@@ -113,4 +113,21 @@ public class CriarSugestaoCompraUseCaseTests
             Arg.Any<Guid?>(),
             Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task Valor_estimado_sai_arredondado_em_centavos()
+    {
+        var empresaId = Guid.NewGuid();
+        var fornecedor = Fornecedor.Criar(empresaId, "Moinho");
+        _fornecedorRepo.GetByIdAsync(empresaId, fornecedor.Id).Returns(fornecedor);
+
+        // 0,333 x 10,99 = 3,65967: o banco guarda numeric(18,2) e a resposta precisa bater com ele.
+        var result = await Build().ExecuteAsync(new CriarSugestaoCompraCommand(
+            empresaId, null,
+            [new FornecedorGrupoInput(fornecedor.Id,
+                [new ItemFaltanteInput(Guid.NewGuid(), "Fermento", 0.333m, UnidadeMedida.Kg, 10.99m, null)])],
+            "lista-compras", null, "chave-arredonda"));
+
+        result.PedidosCriados.Single().ValorEstimado.Should().Be(3.66m);
+    }
 }

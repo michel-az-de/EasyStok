@@ -34,6 +34,8 @@ public class ReceberEmailAtendimentoUseCaseTests
 
     public ReceberEmailAtendimentoUseCaseTests()
     {
+        _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<(Conversa, Mensagem)>>>(), Arg.Any<CancellationToken>())
+            .Returns(c => c.Arg<Func<CancellationToken, Task<(Conversa, Mensagem)>>>()(c.Arg<CancellationToken>()));
         _conversas.AddMensagemAsync(Arg.Do<Mensagem>(_gravadas.Add), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
         _conversas.AddAsync(Arg.Do<Conversa>(_abertas.Add), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
         _storage.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>())
@@ -104,6 +106,7 @@ public class ReceberEmailAtendimentoUseCaseTests
         existente.DefinirAssunto("Encomenda de bolo");
         _conversas.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.Email, "maria@exemplo.com", Arg.Any<CancellationToken>())
             .Returns(existente);
+        _conversas.ObterPorIdComLockAsync(_empresaId, existente.Id, Arg.Any<CancellationToken>()).Returns(existente);
 
         await Sut().ExecuteAsync(_empresaId, Caixa, Email(assunto: null, messageId: "def@x"));
 

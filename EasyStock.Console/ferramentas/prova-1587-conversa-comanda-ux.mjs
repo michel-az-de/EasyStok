@@ -163,7 +163,7 @@ await confere('A no cardápio, somar e tirar prato ficam desligados com o motivo
 // ── B. De quem é a comanda ───────────────────────────────────────────────────────────────
 await confere('B o painel do cardápio mostra o primeiro nome do cliente no cabeçalho e no rodapé', () => {
   assert.match(painelCardapio, /const nomeCliente = selecionada\?\.nome \? primeiroNome\(selecionada\.nome\) : ''/)
-  assert.match(painelCardapio, /<h2>Cardápio de hoje<\/h2>\s*\{nomeCliente && <p className=\{css\.donoDaComanda\} aria-live="polite">Comanda de <b>\{nomeCliente\}<\/b><\/p>\}/)
+  assert.match(painelCardapio, /<h2>\{travada && papel === 'escolher' \? 'Consulta do cardápio' : 'Cardápio de hoje'\}<\/h2>\s*\{nomeCliente && <p className=\{css\.donoDaComanda\} aria-live="polite">Comanda de <b>\{nomeCliente\}<\/b><\/p>\}/)
   assert.match(painelCardapio, /<RodapeComanda pedido=\{pedido\} cardapio=\{cardapio\} linhas=\{linhas\} nomeCliente=\{nomeCliente\} \/>/)
   assert.match(painelCardapio, /Comanda\{nomeCliente \? ` de \$\{nomeCliente\}` : ''\} · /)
 })
@@ -223,7 +223,8 @@ await confere('C o composer recusa ao escolher e não promete PDF no modo API', 
   assert.match(composer, /validarArquivo\(\{ tipo: arquivo\.type, tamanho: arquivo\.size, soImagem: fonteApi \}\)/)
   assert.match(composer, /const bloqueioCanal = motivoDeAnexo\(canal, tipo, \{ fonteApi \}\)/)
   assert.match(composer, /soImagem=\{fonteApi\}/)
-  assert.match(composer, /titulo=\{fonteApi \? 'Anexar foto do computador \(imagem, até 8 MB\)' : /)
+  // #1761: canal que não aceita anexo mostra a restrição no lugar; o resto segue igual.
+  assert.match(composer, /titulo=\{!podeAnexar \? restricao : fonteApi \? 'Anexar foto do computador \(imagem, até 8 MB\)' : /)
   const anexos = fonte('features/atendimento/ComposerAnexos.jsx')
   assert.match(anexos, /accept=\{`image\/jpeg,image\/png,image\/webp,image\/gif\$\{soImagem \? '' : ',application\/pdf'\}`\}/)
 })
@@ -361,6 +362,40 @@ await confere('E o seletor repassa o aviso no clique e no Enter, e o composer fo
   assert.match(seletor, /onKeyDown=\{\(e\) => \{ seletor\.aoTeclar\(e, aoInserido\) \}\}/)
   assert.match(composer, /<SeletorRespostas seletor=\{barra\} aoInserido=\{\(\) => campoRef\.current\?\.querySelector\('textarea'\)\?\.focus\(\)\}/)
   assert.match(composer, /<div ref=\{campoRef\}>\s*<CampoArea/, 'o campo de texto mora dentro de campoRef')
+})
+
+await confere('E composição IME e seleção de texto não inserem respostas, fecham a lista ou mudam o destaque', () => {
+  const m = montarSeletor('/')
+  for (const key of ['Enter', 'ArrowDown', 'ArrowUp', 'Escape']) {
+    for (const extra of [{ isComposing: true }, { nativeEvent: { isComposing: true } }, { keyCode: 229 },
+      { altKey: true }, { ctrlKey: true }, { metaKey: true }, { shiftKey: true }]) {
+      const evento = { ...tecla(key), ...extra, preventDefault() { assert.fail('a edição nativa não pode ser capturada') } }
+      assert.equal(m.desenhar().aoTeclar(evento), false)
+      assert.equal(m.desenhar().destaque, 0)
+      assert.equal(m.desenhar().aberto, true)
+      assert.equal(m.estado.rascunho, '/')
+    }
+  }
+  assert.deepEqual(m.estado.ordem, [])
+  m.desenhar().aoTeclar(tecla('ArrowDown'))
+  assert.equal(m.desenhar().destaque, 1)
+  m.desenhar().aoTeclar(tecla('Enter'))
+  assert.equal(m.estado.rascunho, 'Abrimos às 11h.')
+})
+
+await confere('E texto multilinha mantém semântica nativa e aponta para a opção da lista no portal', () => {
+  const seletor = fonte('features/atendimento/SeletorRespostas.jsx')
+  const campo = composer.slice(composer.indexOf('<CampoArea'), composer.indexOf('/>', composer.indexOf('<CampoArea')))
+  assert.doesNotMatch(campo, /role=/, 'textarea continua sendo caixa de texto multilinha')
+  assert.match(campo, /aria-controls=\{sugestoesNoCampo \? idListaRespostas : undefined\}/)
+  assert.match(campo, /aria-activedescendant=\{sugestoesNoCampo && barra\.itens\[barra\.destaque\]/)
+  assert.match(campo, /if \(e\.isComposing \|\| e\.nativeEvent\?\.isComposing \|\| e\.keyCode === 229/)
+  assert.match(composer, /idLista=\{idListaRespostas\}/)
+  assert.match(seletor, /const idLista = idInformado \?\? idGerado/)
+  assert.match(seletor, /id=\{idLista\} role="listbox"/)
+  assert.match(seletor, /id=\{idDe\(i\)\}/)
+  assert.match(seletor, /role="combobox"/)
+  assert.match(seletor, /aria-expanded=\{itens.length > 0\}/)
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

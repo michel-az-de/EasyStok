@@ -5,6 +5,7 @@ using EasyStock.Infra.Notifications.DependencyInjection;
 using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.DependencyInjection;
+using EasyStock.Infra.Postgre.Integration;
 using EasyStock.Infra.Postgre.Notifications.Agendamento;
 using EasyStock.Worker;
 using EasyStock.Worker.BackgroundServices;
@@ -26,6 +27,9 @@ TaskScheduler.UnobservedTaskException += (_, e) =>
 };
 
 var builder = Host.CreateApplicationBuilder(args);
+
+// I4.1 (#1674): o Worker decifra o token do WhatsApp; a chave-mestra chega por EZ_CRYPTO_*, como na API.
+builder.Configuration.AdicionarChaveMestraDoAmbiente();
 
 // Serilog
 var loggerConfiguration = new LoggerConfiguration()
@@ -181,4 +185,11 @@ if (args.Contains("--validate-di"))
 }
 
 var host = builder.Build();
+
+// I4.1: sem chave-mestra o Worker sobe e avisa (o fail-fast é da I4.2).
+ChaveMestraConfiguracao.AvisarSeFaltar(
+    host.Services.GetRequiredService<IConfiguration>(),
+    host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("ChaveMestra"),
+    "Worker");
+
 host.Run();

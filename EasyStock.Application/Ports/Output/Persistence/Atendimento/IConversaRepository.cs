@@ -133,9 +133,6 @@ public interface IConversaRepository
     /// <summary>Mensagem da conversa na empresa (mídia do console, #1287); de outra empresa ou conversa, nula.</summary>
     Task<Mensagem?> ObterMensagemAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default);
 
-    /// <summary>Mesma busca de <see cref="ObterMensagemAsync"/>, rastreada para alterar (reenvio, S57).</summary>
-    Task<Mensagem?> ObterMensagemParaAlterarAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default);
-
     /// <summary>
     /// #1599: trava a linha da mensagem (<c>FOR UPDATE</c>) e devolve o estado gravado agora, mesmo que a instância
     /// já esteja rastreada no escopo. Exige transação explícita.

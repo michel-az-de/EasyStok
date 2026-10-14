@@ -31,6 +31,12 @@ public sealed class ListarJanelasAtendimentoUseCase(
 {
     public const int MaximoPadrao = 10;
 
+    /// <summary>Teto de pratos consultados para o prazo: o mesmo número de itens que a comanda aceita.</summary>
+    public const int MaximoItens = 50;
+
+    /// <summary>A lista vem da URL de um endpoint público: sem repetição e sem passar do teto (#1719).</summary>
+    public static IReadOnlyList<Guid> ItensParaPrazo(IReadOnlyCollection<Guid> itens) => itens.Distinct().Take(MaximoItens).ToList();
+
     public async Task<JanelasAtendimentoResult> ExecuteAsync(ListarJanelasAtendimentoInput input, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -52,7 +58,7 @@ public sealed class ListarJanelasAtendimentoUseCase(
         var configuracao = await configuracaoRepository.GetOrDefaultAsync(empresaId);
 
         var tempos = new List<int?>();
-        foreach (var id in itens)
+        foreach (var id in ItensParaPrazo(itens))
         {
             var item = await cardapioItemRepository.GetByIdAsync(storefrontId, id, ct);
             if (item is not null) tempos.Add(item.TempoPreparoMinutos);

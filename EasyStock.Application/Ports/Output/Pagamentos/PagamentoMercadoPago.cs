@@ -13,7 +13,8 @@ public sealed record PagamentoMercadoPago(
     DateTime? DateApproved,
     string? PaymentMethodId,
     string? PaymentTypeId,
-    decimal TransactionAmountRefunded = 0)
+    decimal TransactionAmountRefunded = 0,
+    string? CollectorId = null)
 {
     public const string Approved = "approved";
     public const string Pending = "pending";
@@ -40,4 +41,8 @@ public sealed record PagamentoMercadoPago(
 
 /// <summary>Estorno criado pelo Mercado Pago (<c>POST v1/payments/{id}/refunds</c>).</summary>
 public sealed record EstornoMercadoPagoResult(string EstornoId, decimal? Valor, string? Status,
-    string? PagamentoId = null, DateTime? CriadoEm = null);
+    string? PagamentoId = null, DateTime? CriadoEm = null)
+{
+    /// <summary>Status devolvido pelo simulador (I3.1): nunca <c>approved</c>, para não se passar por estorno real.</summary>
+    public const string Simulado = "simulado";
+}

@@ -12,7 +12,7 @@
 // usar, com base em `ehProvedorIntegrado`.
 import { numeroParaEntregador } from './despacho'
 
-export const ehProvedorIntegrado = (provedor) => provedor === 'lalamove' || provedor === '99entrega'
+export const ehProvedorIntegrado = (provedor) => provedor === 'lalamove'
 
 // Áudios 06 e da homologação (Q3, UC-10): "saber quando entregou" pelo status
 // do provedor, não por adivinhação (RN-32, D8). Quatro passos da corrida mais

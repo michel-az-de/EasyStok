@@ -187,7 +187,7 @@ for (const [rotulo, opcoes] of [['modelo aprovado', { modelo: true }], ['mensage
     api.enviar('conv-1', 'Olá, tudo bem?', opcoes)
     await esperar()
     assert.equal(chamadas.length, 0, `enviou como texto: ${chamadas.join(', ')}`)
-    const aviso = opcoes.modelo ? /Modelos aprovados/ : /ainda não ligado/
+    const aviso = opcoes.modelo ? /Modelos aprovados/ : /indisponível nesta versão/
     assert.ok(despachados.some((a) => a.tipo === acao.AVISO_API && aviso.test(a.mensagem)), 'não avisou')
     assert.ok(!despachados.some((a) => a.tipo === acao.ENVIAR_MENSAGEM), 'pôs balão na tela')
   })

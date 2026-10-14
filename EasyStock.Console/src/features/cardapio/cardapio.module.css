@@ -122,6 +122,14 @@
   background: var(--papel); box-shadow: var(--sombra-alta);
   border-left: var(--b-1) solid var(--linha);
 }
+/* #1697: no computador o painel abre do lado do Balcão (depois do trilho de 84 px) e a conversa
+   fica à vista. Ancorado à Ficha ele cobria a conversa inteira em 1440, medido na tela. A alça de
+   largura passa para a borda de dentro, do lado da conversa. */
+.painel { right: 0; }
+.painelDoBalcao {
+  left: 84px; right: auto; flex-direction: row-reverse;
+  border-left: 0; border-right: var(--b-1) solid var(--linha);
+}
 .corpoPainel { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 
 .cabecalhoPainel {
@@ -143,7 +151,7 @@
 .rolavelPainel { flex: 1; min-height: 0; overflow-y: auto; padding: var(--e-3) var(--e-4) var(--e-4); }
 
 @media (max-width: 759px) {
-  .painel { left: 0; right: 0 !important; width: auto !important; }
+  .painel, .painelDoBalcao { left: 0; right: 0; width: auto !important; flex-direction: row; }
   /* Sem coluna nenhuma para redimensionar contra, a alça de largura some. */
   .painel > :first-child { display: none; }
 }
@@ -365,3 +373,20 @@
 .botaoPorcao .nome small { display: inline; margin-left: 6px; font-size: .75rem; }
 .semSaldo { color: var(--tinta-3); font-size: .8125rem; }
 @media (max-width: 420px) { .porcoesVenda { margin-left: 0; } }
+
+.receita { padding: var(--e-3) 0; border-bottom: 1px solid var(--linha); }
+.cabecalhoReceita { display: flex; align-items: center; gap: var(--e-3); }
+.cabecalhoReceita h4 { margin: 0; font-size: var(--t-corpo); }
+.tamanhos { list-style: none; margin: var(--e-2) 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: var(--e-2); }
+.apresentacao { padding: 0; border: 0; min-width: 0; }
+.apresentacaoAberta { grid-column: 1 / -1; }
+.apresentacao .linha { grid-template-columns: 1fr; padding: var(--e-2); border: 1px solid var(--linha); border-radius: var(--r-1); }
+.apresentacao .linha .nome, .apresentacao .linha .preco { grid-column: 1; }
+.apresentacao .somar { display: none; }
+.apresentacao .linha .nome small:empty { display: none; }
+.apresentacao .linha .nome small { font-size: var(--t-minimo); }
+.apresentacao .linhaComAjuste { display: flex; flex-wrap: wrap; padding: 0; }
+.apresentacao .linhaComAjuste .linha { width: 100%; }
+.apresentacao .acoesConsulta { justify-content: flex-start; gap: var(--e-1); }
+.apresentacao .consultar, .apresentacao .enviarFoto { min-width: var(--toque); padding: 0; justify-content: center; }
+.apresentacao .ajusteNaLinha { flex-wrap: wrap; }

@@ -81,20 +81,25 @@ public sealed class ReceberEmailAtendimentoUseCase(
         Mensagem principal;
         try
         {
-            conversa = await conversaRepository.ObterAbertaPorContatoAsync(empresaId, CanalConversa.Email, contato, ct)
-                ?? await AbrirAsync(empresaId, contato, email.DeNome, recebidoEm, ct);
+            (conversa, principal) = await unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+            {
+                await conversaRepository.TravarContatoAsync(empresaId, contato, token);
+                var atual = await conversaRepository.ObterAbertaPorContatoComLockAsync(empresaId, CanalConversa.Email, contato, token)
+                    ?? await AbrirAsync(empresaId, contato, email.DeNome, recebidoEm, token);
 
-            conversa.DefinirAssunto(AssuntoEmail.SemPrefixos(email.Assunto));
-            principal = Mensagem.Entrada(empresaId, conversa.Id, recebidoEm, TipoConteudoMensagem.Texto, texto, externoId);
-            principal.DefinirAssunto(email.Assunto);
-            conversa.RegistrarEntrada(recebidoEm);
-            await conversaRepository.AddMensagemAsync(principal, ct);
+                atual.DefinirAssunto(AssuntoEmail.SemPrefixos(email.Assunto));
+                var mensagem = Mensagem.Entrada(empresaId, atual.Id, recebidoEm, TipoConteudoMensagem.Texto, texto, externoId);
+                mensagem.DefinirAssunto(email.Assunto);
+                atual.RegistrarEntrada(recebidoEm);
+                await conversaRepository.AddMensagemAsync(mensagem, token);
 
-            for (var i = 0; i < email.Anexos.Count; i++)
-                await conversaRepository.AddMensagemAsync(
-                    await AnexoAsync(empresaId, conversa.Id, recebidoEm, externoId, i + 1, email.Anexos[i], ct), ct);
+                for (var i = 0; i < email.Anexos.Count; i++)
+                    await conversaRepository.AddMensagemAsync(
+                        await AnexoAsync(empresaId, atual.Id, recebidoEm, externoId, i + 1, email.Anexos[i], token), token);
 
-            await unitOfWork.CommitAsync();
+                await unitOfWork.CommitAsync();
+                return (atual, mensagem);
+            }, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

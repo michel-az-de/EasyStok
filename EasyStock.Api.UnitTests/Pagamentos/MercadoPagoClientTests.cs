@@ -181,15 +181,111 @@ public class MercadoPagoClientTests
     }
 
     [Fact]
-    public async Task EstornoTotalSemChave_UsaChaveDeterministicaESemCorpo()
+    public async Task EstornoTotal_VaiSemCorpoEComAChaveDeQuemChamou()
     {
         var (client, handler) = Criar(HttpStatusCode.Created,
             """{"id":77,"payment_id":20359978,"amount":25.5,"status":"approved"}""");
 
-        await client.EstornarAsync("20359978");
+        await client.EstornarAsync("20359978", null, "operacao-9");
 
-        handler.UltimaChamada!.Cabecalhos["X-Idempotency-Key"].Should().ContainSingle("estorno-20359978-total");
+        handler.UltimaChamada!.Cabecalhos["X-Idempotency-Key"].Should().ContainSingle("operacao-9");
         handler.UltimaChamada!.Corpo.Should().BeNullOrEmpty("estorno total vai sem amount");
+    }
+
+    // ── I3.2 (#1688): a conta recebedora ──
+
+    [Fact]
+    public async Task Preferencia_devolve_a_conta_que_vai_receber()
+    {
+        var (client, _) = Criar(HttpStatusCode.Created, """{"id":"pref-1","init_point":"https://mp.test/pref-1","collector_id":724484980}""");
+
+        var r = await client.CriarPreferenceAsync(new CriarPreferenceCommand(Guid.NewGuid(), Guid.NewGuid(), "Loja", 10m, []));
+
+        r.ContaRecebedoraId.Should().Be("724484980");
+    }
+
+    [Fact]
+    public async Task Pagamento_consultado_traz_a_conta_recebedora()
+    {
+        var (client, _) = Criar(HttpStatusCode.OK, """{"id":20359978,"status":"approved","transaction_amount":25.5,"collector_id":724484980}""");
+
+        (await client.ConsultarPagamentoAsync("20359978"))!.CollectorId.Should().Be("724484980");
+    }
+
+    [Fact]
+    public async Task Pagamento_com_a_conta_so_no_objeto_collector_tambem_e_lido()
+    {
+        var (client, _) = Criar(HttpStatusCode.OK, """{"id":20359978,"status":"approved","transaction_amount":25.5,"collector":{"id":724484980}}""");
+
+        (await client.ConsultarPagamentoAsync("20359978"))!.CollectorId.Should().Be("724484980");
+    }
+
+    [Fact]
+    public async Task Conta_da_credencial_vem_de_users_me()
+    {
+        var (client, handler) = Criar(HttpStatusCode.OK, """{"id":724484980,"nickname":"LOJA"}""");
+
+        var conta = await client.ObterContaRecebedoraAsync();
+
+        conta.Should().Be("724484980");
+        handler.UltimaChamada!.Metodo.Should().Be(HttpMethod.Get);
+        handler.UltimaChamada.Uri.AbsoluteUri.Should().Be("https://api.mp.test/users/me");
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public async Task Credencial_recusada_aparece_com_o_status_ao_consultar_a_conta(HttpStatusCode status)
+    {
+        var (client, _) = Criar(status, """{"message":"invalid access token"}""");
+
+        var act = () => client.ObterContaRecebedoraAsync();
+
+        (await act.Should().ThrowAsync<HttpRequestException>()).Which.StatusCode.Should().Be(status);
+    }
+
+    // ── I3.1 (#1667): a chave de idempotência do estorno é de quem chama, nunca derivada do valor ──
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    public async Task Estorno_sem_chave_de_idempotencia_e_recusado_antes_da_rede(string chave)
+    {
+        var (client, handler) = Criar(HttpStatusCode.Created, """{"id":77,"amount":10,"status":"approved"}""");
+
+        var act = () => client.EstornarAsync("20359978", 10m, chave);
+
+        await act.Should().ThrowAsync<ArgumentException>();
+        handler.Chamadas.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Dois_parciais_iguais_geram_2_refunds()
+    {
+        var (client, handler) = Criar(HttpStatusCode.Created,
+            """{"id":77,"payment_id":20359978,"amount":10,"status":"approved"}""");
+
+        await client.EstornarAsync("20359978", 10m, "operacao-1");
+        await client.EstornarAsync("20359978", 10m, "operacao-2");
+
+        handler.Chamadas.Should().HaveCount(2);
+        handler.Chamadas.Select(c => c.Cabecalho("X-Idempotency-Key")).Should().Equal("operacao-1", "operacao-2");
+    }
+
+    [Fact]
+    public async Task Post_com_timeout_chama_1_vez()
+    {
+        var handler = new HttpFalso();
+        handler.QuandoQualquer().Demora(TimeSpan.FromSeconds(10));
+        var http = handler.CriarClient("https://api.mp.test/");
+        http.Timeout = TimeSpan.FromMilliseconds(80);
+        var client = new MercadoPagoClient(http, Options.Create(new MercadoPagoOptions { AccessToken = "fake" }),
+            NullLogger<MercadoPagoClient>.Instance);
+
+        var act = () => client.EstornarAsync("20359978", 10m, "operacao-1");
+
+        await act.Should().ThrowAsync<TaskCanceledException>();
+        handler.Chamadas.Should().ContainSingle("escrita no provedor não repete sozinha");
     }
 
     [Fact]
@@ -291,7 +387,7 @@ public class MercadoPagoClientTests
         }).Build();
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddMercadoPagoClient(config);
+        services.AddMercadoPagoClient(config, "Development");
         services.ConfigureAll<HttpClientFactoryOptions>(o =>
             o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = handler));
         await using var sp = services.BuildServiceProvider();

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
+using EasyStock.Infra.Integrations.DependencyInjection;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -332,6 +333,19 @@ public static class ApiServiceCollectionExtensions
                     });
             });
 
+            // #1784: frete público consulta ViaCEP, geocode e rota pagos a cada chamada e variar o número
+            // fura o cache HTTP. 30/IP/min cobre o cliente digitando CEP e número no checkout.
+            options.AddPolicy("frete-publico", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0
+                    }));
+
             // Chat do site (S36), público e anônimo. Abrir sessão: por IP, apertado (cada sessão é
             // uma linha no banco). Mandar mensagem: por sessão (hash do token), para um visitante não
             // gastar a cota do outro atrás do mesmo NAT; sem token, cai no IP. Ler: por IP, folgado
@@ -344,6 +358,10 @@ public static class ApiServiceCollectionExtensions
                 RateLimitPartition.GetFixedWindowLimiter(
                     ChatSiteRateLimit.ChaveMensagem(context),
                     _ => new FixedWindowRateLimiterOptions { PermitLimit = ChatSiteRateLimit.MensagensPorMinuto, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy(ChatSiteRateLimit.Stream, context =>
+                RateLimitPartition.GetConcurrencyLimiter(
+                    ChatSiteRateLimit.ChaveMensagem(context),
+                    _ => new ConcurrencyLimiterOptions { PermitLimit = ChatSiteRateLimit.StreamsPorSessao, QueueLimit = 0 }));
             options.AddPolicy(ChatSiteRateLimit.Leitura, context =>
                 RateLimitPartition.GetFixedWindowLimiter(
                     context.Connection.RemoteIpAddress?.ToString() ?? "anon",
@@ -391,6 +409,7 @@ public static class ApiServiceCollectionExtensions
         services.AddSingleton<IOperationalMetrics>(sp => sp.GetRequiredService<MetricsService>());
         services.AddProblemDetails();
         services.AddExceptionHandler<GlobalExceptionHandler>();
+        services.AddEnderecoForaDoLogHttp();
 
         // string.IsNullOrWhiteSpace (nao `??`): o compose da VM injeta a env como string
         // vazia quando OTEL_COLLECTOR_ENDPOINT nao esta no .env, e new Uri("") lanca
@@ -404,7 +423,9 @@ public static class ApiServiceCollectionExtensions
             {
                 tracing
                     .AddAspNetCoreInstrumentation()
-                    .AddHttpClientInstrumentation()
+                    // I8.2 (#1661): CEP e endereço do cliente não vão para o span dos provedores de mapa.
+                    .AddHttpClientInstrumentation(http =>
+                        http.EnrichWithHttpRequestMessage = EnderecoForaDaTelemetria.OcultarUrlNoSpan(configuration))
                     .AddNpgsql()
                     .AddOtlpExporter(options => options.Endpoint = otlpEndpoint);
 

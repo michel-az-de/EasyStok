@@ -26,6 +26,7 @@ public class Conversa
     public const int ContatoIdExternoTamanhoMaximo = 256;
     public const int ContatoNomeTamanhoMaximo = 120;
     public const int MotivoEscaladaTamanhoMaximo = 500;
+    public const string ChaveAjudaComandaSolicitadaEm = "comandaAjudaSolicitadaEm";
 
     public Guid Id { get; private set; }
     public long NumeroComanda { get; private set; }
@@ -243,6 +244,9 @@ public class Conversa
         Situacao = SituacaoConversa.Automatica;
         AssumidaPorUsuarioId = null;
         MotivoEscalada = null;
+        // Um novo atendimento humano não reativa a solicitação já encerrada.
+        var contexto = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ContextoJson)!;
+        if (contexto.Remove(ChaveAjudaComandaSolicitadaEm)) ContextoJson = JsonSerializer.Serialize(contexto);
     }
 
     /// <summary>Idempotente: preserva o carimbo até uma reabertura explícita.</summary>

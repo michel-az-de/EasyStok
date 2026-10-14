@@ -110,7 +110,8 @@ export function ModalProgramarMensagem({
   return (
     <Modal
       titulo="Programar mensagem"
-      descricao={`Programe o envio para ${primeiroNome(conversa.nome)} pelo ${canal.nome}. O EasyStok tenta enviar no horário escolhido, mesmo com o console fechado.`}
+      largura="480px"
+      descricao={`Tentaremos enviar para ${primeiroNome(conversa.nome)} pelo ${canal.nome}, mesmo com o console fechado.`}
       aoFechar={fechar}
       rodape={(
         <>
@@ -124,6 +125,7 @@ export function ModalProgramarMensagem({
       <div className={css.programar}>
         {bloqueado && <p className={css.programarErro}>Cliente bloqueado. Desbloqueie na ficha para programar. Você pode consultar e cancelar os agendamentos existentes.</p>}
         <fieldset className={css.programarCampos} disabled={salvando || bloqueado}>
+        <div className={css.programarQuando}>
         <CampoTexto
           rotulo="Quando enviar"
           dica="Horário da loja (Brasília)."
@@ -137,6 +139,7 @@ export function ModalProgramarMensagem({
           value={finalidade}
           onChange={(e) => setFinalidade(e.target.value)}
         />
+        </div>
 
         {canal.aceitaModelo && (
           <label className={css.programarOpcao}>
@@ -163,19 +166,20 @@ export function ModalProgramarMensagem({
             />
           </>
         ) : (
-          <CampoArea rotulo="Mensagem" rows={4} value={texto} onChange={(e) => setTexto(e.target.value)} />
+          <CampoArea rotulo="Mensagem" rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} />
         )}
         </fieldset>
 
         {erro && <p className={css.programarErro} role="alert">{erro}</p>}
         {sucesso && <output>{sucesso}</output>}
 
+        {lista.estado === 'erro' && <p className={css.programarErro} role="alert">{lista.erro}</p>}
+        <details className={css.programadasResumo}>
+        <summary>Programadas desta conversa ({lista.estado === 'carregando' ? 'carregando…' : lista.itens.length})</summary>
         <div className={css.programadaTopo}>
-          <p className={css.cardapioRotulo}>Programadas desta conversa</p>
           <Botao onClick={recarregar} disabled={salvando || lista.estado === 'carregando'}>Atualizar lista</Botao>
         </div>
         {lista.estado === 'carregando' && <p className={css.restricao}>Carregando…</p>}
-        {lista.estado === 'erro' && <p className={css.programarErro} role="alert">{lista.erro}</p>}
         {lista.estado === 'pronto' && lista.itens.length === 0 && (
           <p className={css.restricao}>Nenhuma mensagem programada para esta conversa.</p>
         )}
@@ -201,6 +205,7 @@ export function ModalProgramarMensagem({
             })}
           </ul>
         )}
+        </details>
       </div>
     </Modal>
   )

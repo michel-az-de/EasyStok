@@ -1,4 +1,5 @@
 using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos;
@@ -61,6 +62,7 @@ public class RegistrarPagamentoPedidoUseCase(
             throw new UseCaseValidationException($"Método inválido: {cmd.Metodo}");
 
         EfeitosQuitacao? efeito = null;
+        PedidoMudouStatusOperacao? mudanca = null;
         var resultado = await uow.ExecuteInTransactionSemRetryAsync(async token =>
         {
             if (!cmd.ConfirmadoPeloProvedor) await repo.TravarAsync(cmd.EmpresaId, cmd.PedidoId, token);
@@ -73,7 +75,8 @@ public class RegistrarPagamentoPedidoUseCase(
             // este use case (cockpit, Detail, mobile, API). Espelha PRE_OPERACIONAL do cockpit (issue 862).
             if (!cmd.ConfirmadoPeloProvedor
                 && StatusPedidoMapper.TryParse(pedido.Status, out var statusPedido)
-                && !PedidoStateMachine.AceitaPagamento(statusPedido))
+                && !PedidoStateMachine.AceitaPagamento(statusPedido)
+                && !await quitacao.PodeReceberSinalManualAsync(pedido, token))
             {
                 throw new UseCaseValidationException(statusPedido == StatusPedido.Cancelado
                     ? "Não é possível registrar pagamento: o pedido está cancelado."
@@ -130,7 +133,10 @@ public class RegistrarPagamentoPedidoUseCase(
             // Mercado Pago: grava o início previsto (agregado rastreado, sai no flush abaixo). O pagamento do
             // provedor chega do ConfirmarPagamentoPedidoUseCase, que já gravou antes de chamar este use case.
             if (!cmd.ConfirmadoPeloProvedor)
-                await inicioPrevisto.AplicarNaFilaAsync(pedido, token);
+            {
+                mudanca = await quitacao.ConfirmarSinalManualAsync(pedido, pag, token);
+                if (mudanca is null) await inicioPrevisto.AplicarNaFilaAsync(pedido, token);
+            }
 
             if (!cmd.ConfirmadoPeloProvedor && cmd.Origem != "balcao")
                 efeito = await quitacao.ConcluirManualAsync(pedido, pag, token);
@@ -146,7 +152,7 @@ public class RegistrarPagamentoPedidoUseCase(
                 pedido.Id, pag.Valor, metodo, pedido.TotalPago, pedido.Total);
             return CriarPedidoUseCase.Map(pedido);
         }, ct);
-        await quitacao.PublicarAsync(cmd.EmpresaId, efeito, ct);
+        await quitacao.PublicarAsync(cmd.EmpresaId, efeito, ct, mudanca);
         return resultado;
     }
 

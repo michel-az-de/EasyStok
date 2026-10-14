@@ -1,3 +1,4 @@
+using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Atendimento.Email;
@@ -36,6 +37,8 @@ public class LerCaixaEmailAtendimentoUseCaseTests
 
     public LerCaixaEmailAtendimentoUseCaseTests()
     {
+        _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<(Conversa, Mensagem)>>>(), Arg.Any<CancellationToken>())
+            .Returns(c => c.Arg<Func<CancellationToken, Task<(Conversa, Mensagem)>>>()(c.Arg<CancellationToken>()));
         _flags.ListarAtivasAsync(_empresaId, Arg.Any<CancellationToken>())
             .Returns([FeatureCatalogo.ModuloAtendimento]);
         _credenciais.ObterAsync<CaixaEmailAtendimento>(_empresaId, CaixaEmailAtendimento.ProviderKey,

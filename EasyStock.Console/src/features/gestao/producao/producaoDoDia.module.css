@@ -1,11 +1,19 @@
-/* Produção do dia por toque (#1624): a grade de pratos, o lote ao lado e a barra que confirma.
-   O resto da tela usa as classes de `../cardapio/abaCardapio.module.css`, como as outras abas.
-
-   #1627: a moldura dos módulos ganhou menu lateral e a largura útil caiu uns 300 px. O lote vai
-   para o lado a partir de 700 px de contêiner (tablet deitado), e cada prato do lote é uma linha
-   que abre em "Ajustar", para caber sem rolar por dentro. */
+/* A seleção ocupa a grade; a revisão do lote usa o Modal comum, no computador e no celular. */
 
 .chips { display: flex; gap: var(--e-2); flex-wrap: wrap; min-width: 0; }
+
+/* #1809: os três passos à vista, lado a lado no computador e empilhados na tela estreita. */
+.passos {
+  list-style: none; margin: 0; padding: var(--e-3) var(--e-4); display: grid; gap: var(--e-2) var(--e-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--elevado);
+}
+.passos li { display: flex; align-items: flex-start; gap: var(--e-2); min-width: 0; color: var(--tinta-2); font-size: var(--t-apoio); line-height: var(--lh-corpo); }
+.passos strong { color: var(--tinta); font-weight: 700; }
+.numeroDoPasso {
+  flex: none; display: grid; place-items: center; width: 1.75em; height: 1.75em; border-radius: var(--r-pilula);
+  background: var(--marca-claro); color: var(--marca); font-weight: 750; line-height: 1; font-variant-numeric: tabular-nums;
+}
 
 .falta {
   display: grid; gap: var(--e-3); padding: var(--e-3) var(--e-4);
@@ -40,10 +48,17 @@
   border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
 .tocar:hover:not(:disabled) { background: var(--preenchimento); }
+/* #1809: a foto ocupa a largura do cartão numa proporção fixa. O lugar existe antes de a imagem
+   chegar e continua igual sem foto: nada abaixo dela se mexe. */
+.fotoDoPrato {
+  display: grid; place-items: center; align-self: stretch; aspect-ratio: 4 / 3; margin-bottom: var(--e-1); overflow: hidden;
+  border-radius: var(--r-1); background: var(--preenchimento); color: var(--tinta-2);
+}
+.fotoDoPrato img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .tocar:focus-visible, .menos:focus-visible { outline: var(--b-2) solid var(--marca); outline-offset: -2px; }
 .tocar:disabled, .menos:disabled { cursor: default; opacity: .6; }
 .nomeDoPrato { color: var(--tinta); font-size: var(--t-corpo); font-weight: 700; line-height: var(--lh-compacto); overflow-wrap: anywhere; }
-.tamanho { color: var(--tinta-2); font-size: var(--t-apoio); line-height: var(--lh-compacto); }
+.tamanho { color: var(--tinta-2); font-size: var(--t-apoio); line-height: var(--lh-compacto); white-space: nowrap; }
 .saldo { color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-corpo); font-variant-numeric: tabular-nums; }
 .saldo strong { color: var(--tinta); font-weight: 700; }
 
@@ -70,7 +85,7 @@
 /* O aviso do lote lançado: o texto em cima, os botões numa linha só deles. */
 .acoesDoAviso { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; margin-top: var(--e-2); }
 
-.lote { display: grid; gap: var(--e-3); min-width: 0; padding: var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--papel); }
+.lote { display: grid; gap: var(--e-3); min-width: 0; }
 .itens { list-style: none; margin: 0; padding: 0; display: grid; }
 .itemDoLote { min-width: 0; border-top: var(--b-1) solid var(--linha); }
 .resumoDoItem {
@@ -93,23 +108,6 @@
 }
 .resumoDoLote { margin: 0; color: var(--tinta); font-size: var(--t-forte); font-weight: 750; line-height: var(--lh-compacto); font-variant-numeric: tabular-nums; }
 .acoesDoLote { display: flex; align-items: center; gap: var(--e-4); flex-wrap: wrap; }
-
-/* Lote abaixo da grade (tela estreita): a barra leva até o lote e o Confirmar fica no fim dele,
-   depois da validade e do peso, como o "Finalizar" do PWA. Lote ao lado: o Confirmar é o da barra. */
-.barraDoLote .confirmarNaBarra { display: none; }
-
-@container (min-width: 700px) {
-  .bancada { grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); }
-  /* Ao lado, o lote acompanha a rolagem da grade (como a comanda ao lado da conversa no Balcão).
-     A altura deixa lugar para o cabeçalho do módulo e para a barra; lote comprido rola por dentro. */
-  .colunaDoLote { position: sticky; top: 0; max-height: calc(100dvh - 200px); overflow-y: auto; overscroll-behavior: contain; }
-  .barraDoLote .confirmarNaBarra { display: inline-flex; }
-  .barraDoLote .atalhoDoLote, .lote .confirmarNoLote { display: none; }
-}
-
-@container (min-width: 1000px) {
-  .bancada { grid-template-columns: minmax(0, 1fr) minmax(340px, 400px); }
-}
 
 @container (max-width: 480px) {
   .grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }

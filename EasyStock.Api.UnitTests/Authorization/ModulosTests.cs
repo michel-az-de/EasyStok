@@ -49,6 +49,17 @@ public class ModulosTests
         controllers.Where(t => !ModulosConvention.Classificado(t)).Select(t => t.FullName).Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData("Preparar")]
+    [InlineData("Historico")]
+    [InlineData("Html")]
+    public void Documento_impresso_exige_operador_e_modulo_como_as_demais_impressoes(string acao)
+    {
+        var tipo = typeof(Api.Controllers.DocumentosImpressosController);
+        tipo.GetCustomAttributes<AuthorizeAttribute>().Should().Contain(a => a.Policy == "Operador");
+        ModulosConvention.ModulosDe(tipo, acao)!.Should().Equal(Modulo.Atendimento, Modulo.Cozinha, Modulo.Entregas);
+    }
+
     [Fact]
     public void Troca_de_janela_exige_modulo_atendimento_ou_entregas() =>
         ModulosConvention.ModulosDe(typeof(Api.Controllers.PedidoJanelaController), "Trocar")!

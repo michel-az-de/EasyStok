@@ -116,13 +116,20 @@ done
 up() { (cd "$STACK_DIR" && docker compose up -d --force-recreate $SERVICES); }
 
 healthy() {
-  local fim=$(( $(date +%s) + HEALTH_TIMEOUT )) ok c
+  local fim=$(( $(date +%s) + HEALTH_TIMEOUT )) ok c reinicios
   while [ "$(date +%s)" -lt "$fim" ]; do
     ok=1
     for c in ez-api ez-web; do
       [ "$(docker inspect -f '{{.State.Health.Status}}' "$c" 2>/dev/null)" = healthy ] || ok=0
     done
     [ "$(docker inspect -f '{{.State.Running}}' ez-worker 2>/dev/null)" = true ] || ok=0
+    # I4.1 (#1674): Worker em laco de restart fica "Running" entre uma queda e outra. O container acabou
+    # de ser recriado, entao qualquer restart ja e falha; nao adianta esperar o resto do prazo.
+    reinicios=$(docker inspect -f '{{.RestartCount}}' ez-worker 2>/dev/null || echo 0)
+    if [ "${reinicios:-0}" -gt 0 ] 2>/dev/null; then
+      echo "ERRO: ez-worker reiniciou $reinicios vez(es) depois do deploy (laco de restart)." >&2
+      return 1
+    fi
     [ "$ok" = 1 ] && return 0
     sleep 5
   done
@@ -141,8 +148,10 @@ if healthy && [ "$(sha_no_ar)" = "$SHA_FULL" ]; then
   exit 0
 fi
 
-echo "ERRO: $SHA nao ficou healthy em ${HEALTH_TIMEOUT}s; voltando para vps-prev-$TS" >&2
+echo "ERRO: $SHA nao passou na verificacao (api e web healthy, worker rodando sem reiniciar) em ${HEALTH_TIMEOUT}s; voltando para vps-prev-$TS" >&2
 docker logs --tail 40 ez-api >&2 || true
+# I4.1 (#1674): a falha pode ser so do Worker; sem o log dele o motivo fica na VPS.
+docker logs --tail 40 ez-worker >&2 || true
 for s in $SERVICES; do
   if docker image inspect "easystok-$s:vps-prev-$TS" >/dev/null 2>&1; then
     docker tag "easystok-$s:vps-prev-$TS" "easystok-$s:vps"

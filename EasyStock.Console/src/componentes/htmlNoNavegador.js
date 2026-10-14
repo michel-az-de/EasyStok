@@ -28,10 +28,13 @@ function removerQuadro(quadro) {
 
 // Resolve quando o diálogo de impressão foi chamado (ou a aba do plano B abriu); rejeita com
 // mensagem legível quando nem o plano B deu certo.
-export function imprimirHtml(html) {
+export function imprimirHtml(html, { sinal } = {}) {
   if (typeof html !== 'string' || !html.trim()) return Promise.reject(new Error('O impresso veio vazio.'))
   return new Promise((resolve, reject) => {
-    const planoB = () => { try { abrirEmAba(html); resolve() } catch (erro) { reject(erro) } }
+    const abortado = () => { if (sinal?.aborted) throw new DOMException('Impressão cancelada.', 'AbortError') }
+    const concluir = (destino) => { sinal?.removeEventListener('abort', cancelar); resolve(destino) }
+    const falhar = (erro) => { sinal?.removeEventListener('abort', cancelar); reject(erro) }
+    const planoB = () => { try { abortado(); abrirEmAba(html); concluir('aba') } catch (erro) { falhar(erro) } }
     if (quadroAnterior) removerQuadro(quadroAnterior)
     const quadro = document.createElement('iframe')
     quadro.title = 'Impressão'
@@ -40,6 +43,12 @@ export function imprimirHtml(html) {
     quadro.setAttribute('sandbox', 'allow-same-origin allow-modals')
     quadro.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden'
     let decidido = false
+    const cancelar = () => {
+      decidido = true
+      clearTimeout(prazo)
+      removerQuadro(quadro)
+      falhar(new DOMException('Impressão cancelada.', 'AbortError'))
+    }
     const prazo = setTimeout(() => {
       if (decidido) return
       decidido = true
@@ -53,15 +62,19 @@ export function imprimirHtml(html) {
       try {
         // `load` já esperou as imagens (logo, QR); as fontes da página têm promessa própria.
         await Promise.race([quadro.contentDocument?.fonts?.ready, esperar(MS_ESPERA_FONTES)])
+        abortado()
         quadro.contentWindow.addEventListener('afterprint', () => removerQuadro(quadro), { once: true })
         quadro.contentWindow.focus()
         quadro.contentWindow.print()
-        resolve()
-      } catch {
+        concluir('dialogo')
+      } catch (erro) {
         removerQuadro(quadro)
-        planoB()
+        if (sinal?.aborted) falhar(erro)
+        else planoB()
       }
     }, { once: true })
+    sinal?.addEventListener('abort', cancelar, { once: true })
+    if (sinal?.aborted) { cancelar(); return }
     quadro.srcdoc = html
     document.body.appendChild(quadro)
     quadroAnterior = quadro

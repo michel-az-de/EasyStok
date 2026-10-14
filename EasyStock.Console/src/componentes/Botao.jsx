@@ -6,6 +6,7 @@ import { Icone } from './Icone'
 // A classe de fora SOMA com a do componente, nunca substitui.
 //
 // Três variantes (secao 4 da direção visual): primario, secundario, texto.
+// #1683: `perigo` é o primário de quem confirma ação destrutiva (cancelar, estornar, desfazer).
 // `padrao` e `discreto` são os nomes antigos, mantidos como apelido no CSS
 // para quem ainda chama assim não quebrar antes do quarto passe.
 export const Botao = forwardRef(function Botao(

@@ -10,7 +10,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
     private static readonly Dictionary<string, Modulo[]> Mapa = CriarMapa();
     private static readonly HashSet<string> Transversais =
     [
-        "Auth", "Notificacao", "Uploads", "PreferenciaMenu", "PwaPush", "FeatureFlags",
+        "Auth", "Notificacao", "Uploads", "PreferenciaMenu", "PwaPush", "FeatureFlags", "EntregasDemonstracao",
         "Diagnostico", "DiagnosticoInfra", "DiagnosticoLogs", "Consentimentos", "ContatoUsuario",
         "AdminTenants", "AdminNotificacoes", "WebhookGateway", "WebhookPix",
         "Internal.NotificacoesJobs", "Webhooks.WebhookMensageriaMeta", "Webhooks.WebhookWhatsApp",
@@ -43,6 +43,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         if (chave == "AtendimentoComanda" && acao == "Cardapio")
             return [Modulo.Cardapio, Modulo.Producao, Modulo.Atendimento, Modulo.Cozinha];
         if (chave == "Kds" && acao == "GetPedidos") return [Modulo.Cozinha, Modulo.Entregas];
+        if (chave == "AtendimentoLogistica" && acao == "Pagar") return [Modulo.Caixa];
         // Upload transversal, menos a foto do produto: é edição de cardápio, como /api/produtos/{id}/fotos.
         if (chave == "Uploads" && acao == "UploadFotoProduto") return [Modulo.Cardapio];
         return Mapa.GetValueOrDefault(chave);
@@ -76,7 +77,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         {
             foreach (var controller in controllers) mapa.Add(controller, [modulo]);
         }
-        Associar(Modulo.Cardapio, "Produto", "Categoria", "IaAutoPreenchimento", "AtendimentoItensCardapio",
+        Associar(Modulo.Cardapio, "Acervo", "Produto", "Categoria", "IaAutoPreenchimento", "AtendimentoItensCardapio",
             "AtendimentoSecoesCardapio", "Storefront.TenantVitrineCardapio");
         Associar(Modulo.Producao, "Producao", "ProdutoComposicao", "Lotes", "ItemEstoque", "Movimentacao",
             "EstoqueDesacertos", "ListasCompras", "EtiquetaTemplates", "AtendimentoProducao", "AtendimentoProducaoPesquisa");
@@ -90,14 +91,16 @@ public sealed class ModulosConvention : IApplicationModelConvention
         Associar(Modulo.Campanhas, "Campanhas", "CampanhasSugestoes");
         Associar(Modulo.Configuracoes, "Usuario", "Configuracoes", "Loja", "NotificacoesConfiguracao",
             "IntegracoesWhatsApp", "Storefront.StorefrontConfiguracao");
-        Associar(Modulo.Entregas, "AtendimentoEntregadores", "AtendimentoViagens", "AtendimentoAgenda", "AtendimentoRelatoriosEntrega",
+        Associar(Modulo.Entregas, "AtendimentoEntregadores", "AtendimentoViagens", "AtendimentoAgenda", "AtendimentoRelatoriosEntrega", "AtendimentoCorridas", "AtendimentoRelatorioCustoDeEntrega",
             "Storefront.TenantVitrineEntrega");
         mapa.Add("Storefront.AprovacaoPedido", [Modulo.Atendimento, Modulo.Entregas]);
         mapa.Add("PedidoJanela", [Modulo.Atendimento, Modulo.Entregas]);
+        mapa.Add("AtendimentoLogistica", [Modulo.Atendimento, Modulo.Entregas]);
         mapa.Add("AtendimentoCardapioDoDia", [Modulo.Cardapio, Modulo.Producao, Modulo.Atendimento]);
         mapa.Add("OperacaoEventos", [Modulo.Atendimento, Modulo.Cozinha, Modulo.Entregas]);
         mapa.Add("Impressao", [Modulo.Atendimento, Modulo.Cozinha, Modulo.Entregas]);
         mapa.Add("PedidoImpresso", [Modulo.Atendimento, Modulo.Cozinha, Modulo.Entregas]);
+        mapa.Add("DocumentosImpressos", [Modulo.Atendimento, Modulo.Cozinha, Modulo.Entregas]);
         return mapa;
     }
 }

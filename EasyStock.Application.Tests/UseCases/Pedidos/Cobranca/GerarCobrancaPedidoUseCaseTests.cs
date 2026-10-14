@@ -17,6 +17,7 @@ public class GerarCobrancaPedidoUseCaseTests
     public async Task EncomendaFutura_CobraSinalArredondadoEReutilizaLink()
     {
         var f = new CobrancaPedidoFixture();
+        f.Pedido.CriadoEm = CobrancaPedidoFixture.Agora;
         f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddDays(2);
         f.Pedido.Total = CobrancaPedidoFixture.Reais(25.01m);
 

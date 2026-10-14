@@ -31,7 +31,7 @@ namespace EasyStock.Api.IntegrationTests.Storefront.Uploads;
 /// REAL em disco). Anti-regressão: nenhum teste cobria o caminho ponta-a-ponta antes (o único
 /// existente usava storage fake em memória).
 /// </summary>
-public sealed class CardapioItemFotoUploadE2ETests : IAsyncLifetime
+public sealed partial class CardapioItemFotoUploadE2ETests : IAsyncLifetime
 {
     private PostgreSqlContainer? _pg;
     private bool _isAvailable;

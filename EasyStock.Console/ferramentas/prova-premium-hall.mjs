@@ -164,7 +164,7 @@ provar('somente preferências de apresentação são gravadas, sem nomes, token 
   const chave = chaveDasPreferenciasHall(sessao('empresa-a', 'usuario-a'))
   gravarPreferenciasHall(chave, { ...inicial, favoritos: ['atendimento'], nome: 'Nome privado', token: 'token-privado', cliente: { documento: 'documento-privado' } }, disco)
   const gravado = disco.dados.get(chave)
-  assert.deepEqual(Object.keys(JSON.parse(gravado)).sort(), ['compacto', 'favoritos', 'foco', 'movimentos', 'ordem', 'paineis', 'ritmo', 'versao'])
+  assert.deepEqual(Object.keys(JSON.parse(gravado)).sort(), ['compacto', 'favoritos', 'foco', 'movimentos', 'ordem', 'paineis', 'versao'])
   assert.doesNotMatch(chave + gravado, /Nome privado|token-privado|documento-privado|cliente/)
 })
 provar('JSON corrompido volta ao catálogo sem quebrar a tela', () => {

@@ -1,6 +1,7 @@
 import { chamarApi } from './cliente'
 import { atualizarTokens, empresaDoToken, gravarSessao, identidadeDaSessao, lerSessao, limparSessao } from './sessao'
 import { esquecerRascunhos } from './rascunhosDaSessao'
+import { esquecerVisitas } from './visitaDaSessao'
 import { prepararPushParaSessao } from '../pushNavegador'
 
 // Casa da Baba (M0.2): a API resolve a empresa ativa; nunca escolhemos uma no navegador.
@@ -44,6 +45,7 @@ export function sair() {
   const sessao = lerSessao()
   limparSessao()
   esquecerRascunhos()
+  esquecerVisitas()
   return sessao?.refreshToken
     ? chamarApi('/api/auth/logout', { metodo: 'POST', corpo: { refreshToken: sessao.refreshToken }, autenticado: false, sinal: AbortSignal.timeout(15000) })
     : Promise.resolve()

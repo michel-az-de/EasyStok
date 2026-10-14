@@ -5,7 +5,7 @@ import {
 import { useRelogio } from '../../hooks/useRelogio'
 import { dataIsoNoFuso, horaCurta } from '../../dominio/formato'
 import {
-  COLUNAS_KDS, canhotoDoKds, diaDaFilaDaCozinha, filtrarPorLinha, impressoesDaCozinha, respostaAoSoltarKds, textoDaCozinhaVazia,
+  COLUNAS_KDS, avisoDeFilaNoTeto, canhotoDoKds, diaDaFilaDaCozinha, filtrarPorLinha, impressoesDaCozinha, respostaAoSoltarKds, textoDaCozinhaVazia,
 } from '../../dominio/kds'
 import { ORDEM_DAS_LINHAS } from '../../dominio/pedido'
 import { pdfDoCanhoto } from '../../dominio/impressao'
@@ -67,7 +67,7 @@ export function TelaCozinhaApi({ linhas }) {
   const { amanha, data: dataDaFila } = diaDaFilaDaCozinha(amanhaDesde, agora)
   const {
     pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes,
-    avancar, recarregar, reimprimir, confirmarImpressao, avisar, limparErro,
+    avancar, recarregar, reimprimir, avisar, limparErro,
   } = useCozinhaApi({ data: dataDaFila })
   const [linhaFiltro, setLinhaFiltro] = useState(null)
   const [abertoId, setAbertoId] = useState(null)
@@ -105,11 +105,6 @@ export function TelaCozinhaApi({ linhas }) {
   const filaDeCanhotos = impressoesDaCozinha(impressoes, lista)
   // #1632: o topo da fila também sai pelo impresso da API (papel do aparelho); confirma igual ao PDF.
   const topoDaFila = filaDeCanhotos[0] ?? null
-  const imprimirDaFila = () => {
-    const topo = filaDeCanhotos[0]
-    const pedido = topo && lista.find((p) => p.id === topo.pedidoId)
-    if (pedido && imprimir(pedido)) confirmarImpressao(topo.id)
-  }
 
   const aberto = abertoId ? lista.find((p) => p.id === abertoId) : null
   const arrastado = arrastadoId ? lista.find((p) => p.id === arrastadoId) : null
@@ -179,6 +174,11 @@ export function TelaCozinhaApi({ linhas }) {
           {pedidos !== null && <Botao variante="texto" onClick={limparErro}>Fechar aviso</Botao>}
         </p>
       )}
+      {avisoDeFilaNoTeto(lista.length) && (
+        <p className={css.motivoRecusa} role="alert">
+          <Icone nome="alerta" tamanho={16} /> {avisoDeFilaNoTeto(lista.length)}
+        </p>
+      )}
       {pedidos === null
         ? !erro && <output className={css.aviso}>Carregando a fila da cozinha…</output>
         : (
@@ -209,10 +209,9 @@ export function TelaCozinhaApi({ linhas }) {
                   <output className={css.gavetaCanhotos} aria-live="polite">
                     <Icone nome="printer" tamanho={20} />
                     <span>{filaDeCanhotos.length === 1 ? '1 canhoto na fila' : `${filaDeCanhotos.length} canhotos na fila`}</span>
-                    <Botao variante="primario" icone="printer" onClick={imprimirDaFila}>Imprimir</Botao>
                     <ImprimirPedido
-                      key={topoDaFila.id} {...impressaoDoPedido(topoDaFila.pedidoId)} documentoInicial="cozinha"
-                      rotulo="Escolher papel" aoImprimir={(documento) => { if (documento === 'cozinha') confirmarImpressao(topoDaFila.id) }}
+                      key={topoDaFila.id} {...impressaoDoPedido(topoDaFila.pedidoId, topoDaFila.id)} documentoInicial="cozinha"
+                      rotulo="Imprimir" variante="primario" aoImprimir={() => recarregar()}
                     />
                   </output>
                 )}

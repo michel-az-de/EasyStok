@@ -17,7 +17,7 @@ import {
   diaMes, observacaoDaAbertura, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
 } from '../../../dominio/aberturaDaLoja'
 import {
-  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, TIPOS_MOVIMENTO, categoriaAoTrocarTipo, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
+  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, ROTULO_FORA_DA_GAVETA, ROTULO_FORA_DO_DINHEIRO, TIPOS_MOVIMENTO, categoriaAoTrocarTipo, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
   nomeDoMetodoCaixa, temMovimentoNoDia, totaisDoFluxo,
 } from '../../../dominio/caixa'
 import {
@@ -265,7 +265,7 @@ function ResumoDoDia({ dia, gaveta, semAbertura = false }) {
     { rotulo: 'Outras saídas', valor: dia.totalSaidasExtras },
     { rotulo: 'Pagamentos de pedidos', valor: dia.totalPagamentosPedidos },
     semAbertura && { rotulo: 'Em dinheiro', valor: gaveta.naGaveta },
-    { rotulo: semAbertura ? 'Pix e cartão' : 'Pix e cartão (fora da gaveta)', valor: gaveta.pixECartao },
+    { rotulo: semAbertura ? ROTULO_FORA_DO_DINHEIRO : ROTULO_FORA_DA_GAVETA, valor: gaveta.pixECartao },
     gaveta.semForma !== 0 && { rotulo: 'Sem forma de pagamento', valor: gaveta.semForma },
   ].filter(Boolean)
   const total = semAbertura ? 'Total do dia até agora' : dia.fechado ? 'Total do dia' : 'Total esperado do dia'

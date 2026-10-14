@@ -200,6 +200,34 @@ public class MercadoPagoWebhookProcessorTests
         f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
     }
 
+    // I3.1 (#1667): o Mercado Pago não conhece o pagamento, mas há cobrança online esperando. Responder
+    // 200 faria o provedor parar de reenviar e o pedido pago ficaria sem baixa.
+    [Fact]
+    public async Task Webhook_404_com_pendente_responde_500()
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.CobrancaRepo.ExistePendenteOnlineAsync(Arg.Any<CancellationToken>()).Returns(true);
+
+        var act = () => f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+
+        await act.Should().ThrowAsync<ReconsultaMercadoPagoSemRespostaException>("o controller responde 500 e o Mercado Pago reenvia");
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+    }
+
+    [Theory]
+    [InlineData(System.Net.HttpStatusCode.Unauthorized)]
+    [InlineData(System.Net.HttpStatusCode.Forbidden)]
+    public async Task Webhook_com_credencial_recusada_na_reconsulta_responde_500(System.Net.HttpStatusCode status)
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.MpClient.ConsultarPagamentoAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<Task<PagamentoMercadoPago?>>(_ => throw new HttpRequestException("credencial", null, status));
+
+        var act = () => f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+
+        await act.Should().ThrowAsync<HttpRequestException>();
+    }
+
     [Fact]
     public async Task FalhaNaConsulta_Propaga()
     {

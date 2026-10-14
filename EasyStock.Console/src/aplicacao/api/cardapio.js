@@ -31,7 +31,7 @@ export async function lerAlertasDeEstoque() {
   }
 }
 
-export function criarAcoesCardapioApi({ despachar, estadoRef }) {
+export function criarAcoesCardapioApi({ despachar, estadoRef, comItensForaRef = null }) {
   const avisar = (mensagem) => despachar({ tipo: acao.AVISO_API, mensagem })
   const itemDe = (sku) => itemPorSku(estadoRef.current.catalogo?.cardapio ?? [], sku)
   // #1510: −/+ seguidos do mesmo sku entram em fila; cada toque conta a partir do resultado do
@@ -40,7 +40,7 @@ export function criarAcoesCardapioApi({ despachar, estadoRef }) {
 
   async function recarregarCardapio() {
     try {
-      despachar({ tipo: acao.SINCRONIZAR_CARDAPIO, cardapio: await lerCardapio() })
+      despachar({ tipo: acao.SINCRONIZAR_CARDAPIO, cardapio: await lerCardapio({ incluirFora: comItensForaRef?.current ?? true }) })
     } catch (erro) {
       avisar(`Cardápio: ${erro.message}`)
     }

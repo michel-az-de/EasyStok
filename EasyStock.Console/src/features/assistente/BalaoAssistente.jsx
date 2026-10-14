@@ -29,7 +29,7 @@ import css from './assistente.module.css'
 export function BalaoAssistente({ sugestaoAgente, aoAbrirTela }) {
   const { selecionada, agora, historico, rascunho, fonteApi } = useAtendimento()
   const { canais } = useCatalogo()
-  const { definirRascunho, perguntarAssistente, obterLinkCardapio, enviar, salvarNota } = useAcoes()
+  const { definirRascunho, perguntarAssistente, obterLinkCardapio, enviar, salvarNota, devolverAutomatico } = useAcoes()
 
   const [aberto, setAberto] = useState(false)
   const [dispensados, setDispensados] = useState(() => new Set())
@@ -49,6 +49,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela }) {
       }
       return executarAcaoDoAssistente(proposta, conversa, {
         obterLinkCardapio,
+        devolverAutomatico: (...args) => { conferirContexto(); return devolverAutomatico(...args) },
         enviar: (...args) => { conferirContexto(); return enviar(...args) },
         salvarNota: (...args) => { conferirContexto(); return salvarNota(...args) },
         definirRascunho: (...args) => { conferirContexto(); return definirRascunho(...args) },
@@ -137,7 +138,8 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela }) {
   const gatilho = (
     <Botao
       ref={botaoRef}
-      variante="primario"
+      // #1761 (L5): no cabeçalho da conversa é apoio, não o próximo passo: secundário.
+      variante={cabecalhoDoAtendimento ? 'secundario' : 'primario'}
       className={cabecalhoDoAtendimento ? css.gatilhoNoCabecalho : css.gatilho}
       aria-label={aberto ? 'Fechar assistente' : 'Abrir assistente'}
       aria-expanded={aberto}
@@ -146,6 +148,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela }) {
       onClick={() => aberto ? fechar() : setAberto(true)}
     >
       <Icone nome="agente" tamanho={26} />
+      {cabecalhoDoAtendimento && <span className={css.rotuloGatilho}>Assistente</span>}
       {!aberto && pedeAtencao && <span className={css.pontoAtencao} aria-hidden="true" />}
     </Botao>
   )

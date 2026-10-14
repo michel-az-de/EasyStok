@@ -160,6 +160,7 @@ const andar = (no, fn, achados = []) => {
   if (no == null || typeof no !== 'object') return achados
   if (Array.isArray(no)) { for (const filho of no) andar(filho, fn, achados); return achados }
   if (fn(no)) achados.push(no)
+  andar(no.props?.rodape, fn, achados)
   return andar(no.props?.children, fn, achados)
 }
 const texto = (no) => (no == null ? '' : typeof no !== 'object' ? String(no) : Array.isArray(no) ? no.map(texto).join('') : texto(no.props?.children))
@@ -254,6 +255,10 @@ const { dispensarLote, guardarRascunho, lotesLancados } = await import('../src/a
 const zerarProducao = () => { guardarRascunho(null); for (const l of [...lotesLancados()]) dispensarLote(l.loteId) }
 const cartoesDaTela = (no) => andar(no, (n) => n.type === 'li' && n.props['data-prato'])
 const itensDoLote = (no) => andar(no, (n) => n.type === 'li' && String(n.props.className).includes('itemDoLote'))
+const revisar = (t) => {
+  if (!doTipo(t.renderizar(), 'Modal').length) doTipo(t.arvore, 'Botao').find((b) => texto(b) === 'Conferir produção').props.onClick()
+  return t.renderizar()
+}
 const tocar = (t, nome) => { comRotulo(t.renderizar(), `Somar 1 porção de ${nome}`)[0].props.onClick(); return t.renderizar() }
 
 await confere('Produção do dia: a tela abre com a grade e o saldo; nada no lote e nada para confirmar', async () => {
@@ -263,11 +268,7 @@ await confere('Produção do dia: a tela abre com a grade e o saldo; nada no lot
   await t.assentar()
   assert.deepEqual([lidas(chamadas, LER_ESTOQUE), lidas(chamadas, LER_SUGESTAO)], [1, 1], 'uma leitura de cada ao abrir, por mais que a tela redesenhe')
   assert.equal(cartoesDaTela(t.arvore).length, 4, 'o prato tirado do cardápio não entra na grade')
-  // O Confirmar da barra fica fora do formulário: só funciona se apontar para ele.
-  const formulario = doTipo(t.arvore, 'form')[0]
-  const daBarra = doTipo(andar(t.arvore, (n) => String(n.props?.className).includes('barraDoLote'))[0], 'Botao').find((b) => b.props.tipo === 'submit')
-  assert.equal(formulario.props.id, 'lote-da-producao')
-  assert.equal(daBarra.props.form, formulario.props.id)
+  assert.equal(doTipo(t.arvore, 'form').length, 0, 'o lote só aparece na revisão explícita')
   assert.match(texto(cartoesDaTela(t.arvore)[0]), /Talharim.*500 g.*4 no estoque/)
   assert.match(texto(cartoesDaTela(t.arvore)[2]), /Lasanha.*Família.*0 no estoque/)
   assert.doesNotMatch(texto(cartoesDaTela(t.arvore)[3]), /no estoque/, 'prato sem estoque ligado não mostra saldo inventado')
@@ -277,7 +278,7 @@ await confere('Produção do dia: a tela abre com a grade e o saldo; nada no lot
   assert.equal(botaoDe(3).props['aria-describedby'], undefined)
   assert.equal(itensDoLote(t.arvore).length, 0)
   assert.equal(doTipo(t.arvore, 'CampoSelecao').filter((c) => c.props.rotulo === 'Prato').length, 0, 'não há mais lista suspensa de pratos')
-  assert.equal(doTipo(t.arvore, 'Botao').find((b) => b.props.tipo === 'submit').props.disabled, true)
+  assert.equal(doTipo(t.arvore, 'Botao').find((b) => texto(b) === 'Conferir produção').props.disabled, true)
 })
 
 await confere('Produção do dia: tocar no prato soma 1 porção, mostra o saldo depois e "−" tira até sair do lote', async () => {
@@ -288,6 +289,7 @@ await confere('Produção do dia: tocar no prato soma 1 porção, mostra o saldo
   tocar(t, 'Talharim 500 g')
   tocar(t, 'Talharim 500 g')
   assert.match(texto(cartoesDaTela(t.arvore)[0]), /4 no estoque.*6 depois/)
+  revisar(t)
   assert.equal(itensDoLote(t.arvore).length, 1)
   assert.match(texto(itensDoLote(t.arvore)[0]), /Talharim/)
   assert.equal(campos(t.arvore, 'Porções')[0].props.value, '2')
@@ -307,6 +309,7 @@ await confere('Produção do dia: "Falta produzir" põe a quantidade no lote; pr
   const falta = () => andar(t.renderizar(), (n) => n.props?.['aria-label'] === 'Falta produzir')[0]
   assert.deepEqual(doTipo(falta(), 'Chip').map(texto), ['6× Talharim', '3× Lasanha'])
   doTipo(falta(), 'Chip')[0].props.onClick()
+  revisar(t)
   assert.equal(campos(t.renderizar(), 'Porções')[0].props.value, '6')
   tocar(t, 'Talharim 500 g')
   tocar(t, 'Talharim 500 g')
@@ -329,6 +332,7 @@ await confere('Produção do dia: validade em um toque; confirmar manda o corpo 
   const t = montar(AbaProducaoDoDiaApi)
   await t.assentar()
   for (let i = 0; i < 8; i += 1) tocar(t, 'Talharim 500 g')
+  revisar(t)
   const validade = () => doTipo(itensDoLote(t.renderizar())[0], 'Chip')
   assert.deepEqual(validade().map(texto), ['3 dias', '5 dias', '7 dias', '10 dias', '15 dias'])
   assert.deepEqual(validade().map((c) => c.props.ativo), [false, true, false, false, false])
@@ -353,6 +357,7 @@ await confere('Produção do dia: prato com porções vai com a porção tocada 
   await t.assentar()
   tocar(t, 'Lasanha 600 g')
   tocar(t, 'Lasanha Família')
+  revisar(t)
   assert.deepEqual(itensDoLote(t.arvore).map((item) => texto(doTipo(item, 'h4')[0])), ['Lasanha 600 g', 'Lasanha Família'])
   await doTipo(t.arvore, 'form')[0].props.onSubmit(evento)
   assert.deepEqual(chamadas.filter((c) => c.metodo === 'POST').map((c) => c.corpo), [{ pratos: [
@@ -373,6 +378,7 @@ await confere('Produção do dia: o filtro por categoria muda a grade; a linha d
   assert.deepEqual(cartoesDaTela(t.renderizar()).map((c) => texto(doTipo(c, 'button')[0])), ['Molho sugo300 g'])
   filtro('Todos').props.onClick()
   assert.equal(cartoesDaTela(t.renderizar()).length, 4)
+  revisar(t)
   const item = () => itensDoLote(t.renderizar())[0]
   assert.match(texto(doTipo(item(), 'summary')[0]), /Lasanha.*escolha a porção.*6 porções/)
   doTipo(item(), 'CampoSelecao').find((c) => c.props.rotulo === 'Porção').props.onChange(digitar('v-8'))
@@ -397,6 +403,7 @@ await confere('Produção do dia: sem saldo nem sugestão (API fora) a grade con
   assert.match(texto(cartoesDaTela(t.arvore)[0]), /4 no estoque/)
   assert.doesNotMatch(texto(t.arvore), /Não consegui ler o saldo/)
   tocar(t, 'Molho sugo 300 g')
+  revisar(t)
   assert.equal(campos(t.arvore, 'Porções')[0].props.value, '1')
 })
 
@@ -480,11 +487,13 @@ await confere('Produção do dia: com o envio em voo, a tela que volta fica trav
   const antes = montar(AbaProducaoDoDiaApi)
   await antes.assentar()
   tocar(antes, 'Talharim 500 g')
+  revisar(antes)
   const envio = doTipo(antes.arvore, 'form')[0].props.onSubmit(evento)
   for (let i = 0; i < 50 && !controle.responder; i += 1) await esperar(0)
   antes.desmontar()
   const depois = montar(AbaProducaoDoDiaApi)
   await depois.assentar()
+  revisar(depois)
   assert.equal(itensDoLote(depois.arvore).length, 1, 'o lote que está indo continua na tela')
   assert.ok(enviarDaTela(depois).length > 0 && enviarDaTela(depois).every((b) => b.props.disabled === true), 'não dá para confirmar de novo')
   assert.equal(comRotulo(depois.arvore, 'Somar 1 porção de Talharim 500 g')[0].props.disabled, true, 'nem mexer no lote que já foi')
@@ -502,6 +511,7 @@ await confere('Produção do dia: o aviso de erro some quando ela mexe no lote',
   const chamadas = montarFetch(rotasDaProducao())
   const t = montar(AbaProducaoDoDiaApi)
   await t.assentar()
+  revisar(t)
   await doTipo(t.arvore, 'form')[0].props.onSubmit(evento)
   const alertas = () => andar(t.renderizar(), (n) => n.props?.role === 'alert')
   assert.match(texto(alertas()[0]), /Prato 01 \(Talharim\): Quantas porções saíram\?/)
@@ -516,6 +526,7 @@ await confere('Produção do dia: o campo de porções ignora o que não é díg
   const t = montar(AbaProducaoDoDiaApi)
   await t.assentar()
   tocar(t, 'Talharim 500 g')
+  revisar(t)
   campos(t.arvore, 'Porções')[0].props.onChange(digitar('12a'))
   assert.equal(campos(t.renderizar(), 'Porções')[0].props.value, '12')
   tocar(t, 'Talharim 500 g')
@@ -531,6 +542,7 @@ await confere('Produção do dia: Limpar pede confirmação antes de apagar o lo
   await t.assentar()
   tocar(t, 'Talharim 500 g')
   tocar(t, 'Molho sugo 300 g')
+  revisar(t)
   const botao = (rotulo) => doTipo(t.renderizar(), 'Botao').find((b) => texto(b) === rotulo)
   botao('Limpar').props.onClick()
   assert.equal(itensDoLote(t.renderizar()).length, 2, 'um toque só não apaga')
@@ -549,13 +561,14 @@ await confere('Produção do dia: o lote mostra porções, validade e peso de ca
   await t.assentar()
   tocar(t, 'Talharim 500 g')
   tocar(t, 'Talharim 500 g')
+  revisar(t)
   const item = itensDoLote(t.arvore)[0]
   assert.match(texto(doTipo(item, 'summary')[0]), /Talharim 500 g.*2 porções.*validade 5 dias.*500 g cada/)
   assert.equal(campos(item, 'Porções')[0].props['aria-label'], 'Porções de Talharim 500 g')
   assert.equal(campos(item, 'Validade (dias)')[0].props['aria-label'], 'Validade em dias de Talharim 500 g')
-  // Em tela estreita o lote fica abaixo da grade: a barra leva até ele e o Confirmar fica no fim do lote.
-  assert.ok(doTipo(t.arvore, 'Botao').some((b) => texto(b) === 'Conferir lote' && b.props.tipo !== 'submit'), 'a barra leva até o lote')
-  assert.equal(enviarDaTela(t).length, 2, 'um Confirmar na barra (tela larga) e um no fim do lote (tela estreita)')
+  assert.ok(doTipo(t.arvore, 'Botao').some((b) => texto(b) === 'Conferir produção' && b.props.tipo !== 'submit'), 'a barra só abre a revisão')
+  assert.equal(enviarDaTela(t).length, 1, 'um único Confirmar no rodapé da revisão')
+  assert.equal(enviarDaTela(t)[0].props.form, doTipo(t.arvore, 'form')[0].props.id, 'o rodapé confirma o formulário revisado')
 })
 
 await confere('Produção do dia: etiqueta que chega depois de ela sair da tela não abre a impressão', async () => {
@@ -564,6 +577,7 @@ await confere('Produção do dia: etiqueta que chega depois de ela sair da tela 
   const t = montar(AbaProducaoDoDiaApi)
   await t.assentar()
   tocar(t, 'Talharim 500 g')
+  revisar(t)
   await doTipo(t.arvore, 'form')[0].props.onSubmit(evento)
   await t.assentar()
   let impressoes = 0
@@ -776,7 +790,7 @@ await confere('Caixa do dia: sem abertura o resumo não inventa gaveta nem saldo
   const linhas = Object.fromEntries(doTipo(resumo, 'div').map((d) => [texto(doTipo(d, 'dt')[0]), limpo(doTipo(d, 'dd')[0])]))
   assert.equal(linhas['Na gaveta (dinheiro)'], undefined, 'sem abrir o caixa ninguém disse quanto há na gaveta')
   assert.equal(linhas['Saldo inicial'], undefined)
-  assert.deepEqual([linhas['Em dinheiro'], linhas['Pix e cartão'], linhas['Sem forma de pagamento'], linhas['Total do dia até agora']],
+  assert.deepEqual([linhas['Em dinheiro'], linhas['Pix, cartão e outros'], linhas['Sem forma de pagamento'], linhas['Total do dia até agora']],
     [moedaDe(30), moedaDe(40), moedaDe(250), moedaDe(320)])
 })
 

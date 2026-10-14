@@ -8,8 +8,8 @@ const BASE = '/api/atendimento/expediente'
 export const obterExpediente = () => chamarApi(BASE)
 
 // Horários omitidos mantêm os atuais na API; por isso as mensagens sozinhas não mexem na semana.
-export const atualizarExpediente = ({ horarios, mensagemForaDoHorario, mensagemLojaFechada }) =>
-  chamarApi(BASE, { metodo: 'PUT', corpo: { horarios, mensagemForaDoHorario, mensagemLojaFechada } })
+export const atualizarExpediente = ({ horarios, mensagemForaDoHorario, mensagemLojaFechada }, { identidadeEsperada = null } = {}) =>
+  chamarApi(BASE, { metodo: 'PUT', corpo: { horarios, mensagemForaDoHorario, mensagemLojaFechada }, identidadeEsperada })
 
 // `justificativa` só vale para fechar dentro do horário (#1443); sem ela o corpo é o de sempre.
 export const definirControleExpediente = (controle, justificativa) =>

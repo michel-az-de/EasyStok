@@ -68,6 +68,9 @@ internal sealed class CobrancaPedidoFixture
     public IPrazoPreparoPedidoQueries PrazoQueries { get; } = Substitute.For<IPrazoPreparoPedidoQueries>();
     public List<CriarPreferenceCommand> Preferencias { get; } = new();
 
+    /// <summary>Cupons do pedido, para a cobrança complementar (saldo depois do cupom).</summary>
+    public ICreditoClienteComandaRepository Creditos { get; } = Substitute.For<ICreditoClienteComandaRepository>();
+
     /// <summary>Estorno do pagamento que chega depois do cancelamento; aceita por padrão.</summary>
     public IEstornoPedidoGateway Estorno { get; } = Substitute.For<IEstornoPedidoGateway>();
 
@@ -149,9 +152,9 @@ internal sealed class CobrancaPedidoFixture
         return item;
     }
 
-    public CobrancaPedido AdicionarOnline(int tentativa = 1, DateTime? expiraEm = null, Guid? conversaId = null, string referencia = "pref-antiga")
+    public CobrancaPedido AdicionarOnline(int tentativa = 1, DateTime? expiraEm = null, Guid? conversaId = null, string referencia = "pref-antiga", decimal? valor = null)
     {
-        var c = CobrancaPedido.CriarOnline(EmpresaId, Pedido.Id, Pedido.Total.Valor, referencia,
+        var c = CobrancaPedido.CriarOnline(EmpresaId, Pedido.Id, valor ?? Pedido.Total.Valor, referencia,
             $"https://mp.test/{referencia}", expiraEm ?? Agora.AddMinutes(30), tentativa, Agora.AddMinutes(-1), conversaId);
         Cobrancas.Add(c);
         return c;
@@ -170,7 +173,8 @@ internal sealed class CobrancaPedidoFixture
 
     public GerarCobrancaPedidoUseCase Gerar() =>
         new(PedidoRepo, StorefrontRepo, CobrancaRepo, MpClient, CheckoutCore(), Uow, Relogio,
-            NullLogger<GerarCobrancaPedidoUseCase>.Instance);
+            NullLogger<GerarCobrancaPedidoUseCase>.Instance,
+            new SaldoFinanceiroPedido(PedidoRepo, Substitute.For<IEstornoOnlineRepository>(), Creditos));
 
     /// <summary>Núcleo do checkout sobre a vaga e o pedido da fixture: só a reserva desfeita (#1301) passa por ele aqui.</summary>
     public CheckoutCoreService CheckoutCore() =>
