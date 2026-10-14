@@ -261,6 +261,8 @@ export function AbaProducaoDoDiaApi() {
                 {visiveis.map((cartao) => {
                   const noLote = porcoesNoLote(linhas, cartao)
                   const nome = nomeDoCartao(cartao)
+                  const tamanho = cartao.tamanho?.trim() ?? ''
+                  const nomeVisual = tamanho && !tamanhoNoCartao(cartao) ? cartao.nome.trimEnd().slice(0, -tamanho.length).trimEnd() : cartao.nome
                   // O rótulo do botão diz a ação; saldo e quantidade no lote vêm como descrição, para o leitor de tela também.
                   const idDoSaldo = cartao.saldo == null ? undefined : `saldo-${cartao.chave}`
                   const idDaContagem = noLote > 0 ? `lote-${cartao.chave}` : undefined
@@ -268,8 +270,8 @@ export function AbaProducaoDoDiaApi() {
                     <li key={cartao.chave} data-prato={cartao.chave} className={`${grade.cartao} ${noLote > 0 ? grade.noLote : ''}`}>
                       <button type="button" className={grade.tocar} disabled={enviando} aria-label={`Somar 1 porção de ${nome}`}
                         aria-describedby={[idDoSaldo, idDaContagem].filter(Boolean).join(' ') || undefined} onClick={() => somar(cartao, 1)}>
-                        <span className={grade.nomeDoPrato}>{cartao.nome}</span>
-                        {tamanhoNoCartao(cartao) && <span className={grade.tamanho}>{cartao.tamanho}</span>}
+                        <span className={grade.nomeDoPrato}>{nomeVisual}</span>
+                        {tamanho && <span className={grade.tamanho}>{tamanho}</span>}
                         {cartao.saldo != null && (
                           <span id={idDoSaldo} className={grade.saldo}>
                             {cartao.saldo} no estoque{noLote > 0 && <strong> · {cartao.saldo + noLote} depois</strong>}
