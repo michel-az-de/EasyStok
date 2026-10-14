@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { registerHooks } from 'node:module'
 import { transformWithOxc } from 'vite'
+import './prova-1757-complemento-texto.mjs'
 
 const arquivo = new URL('../src/features/ficha-cliente/ComandaDoCliente.jsx', import.meta.url)
 const compilado = (await transformWithOxc(readFileSync(arquivo, 'utf8'), arquivo.pathname, { jsx: { runtime: 'automatic' } })).code
@@ -26,6 +27,8 @@ registerHooks({
     if (spec.endsWith('/ModalEnviarCardapio')) return { url: modalArquivo.href, shortCircuit: true }
     if (spec.endsWith('/acessoModulos')) return { url: codigo('export const useAcessoModulos=()=>globalThis.__comandaCompartilhada'), shortCircuit: true }
     if (spec.endsWith('/Botao')) return { url: codigo('export function Botao(){}'), shortCircuit: true }
+    if (spec.endsWith('/SugestaoDeTexto')) return { url: codigo('export function SugestaoDeTexto(){}'), shortCircuit: true }
+    if (spec.endsWith('/useComplementoDeTexto')) return { url: codigo('export const useComplementoDeTexto=()=>({})'), shortCircuit: true }
     if (spec.endsWith('/Modal')) return { url: codigo('export function Modal(){}'), shortCircuit: true }
     if (spec.endsWith('/BlocoFreteApi')) return { url: codigo('export function ConsultaTransporte(){}'), shortCircuit: true }
     if (spec.endsWith('/SeletorJanelaApi')) return { url: codigo('export function SeletorJanelaApi(){}'), shortCircuit: true }
