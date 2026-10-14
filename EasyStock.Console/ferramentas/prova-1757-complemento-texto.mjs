@@ -15,6 +15,13 @@ for (const tipo of ['nota_interna', 'abrir_tela', 'enviar_cardapio', 'retomar_au
   assert.equal(complementoDaResposta(texto, { texto: '', acoes: [{ tipo, texto: texto + 'ajudar?' }] }), '')
 assert.equal(complementoDaResposta(texto, { texto: texto + 'ajudar?', acoes: null }), 'ajudar?')
 assert.equal(complementoDaResposta(texto, { texto: '', acoes: {} }), '')
+const prefixoReal = 'Muito obrigado pelo contato e pela'
+const respostaReal = 'Muito obrigado pelo contato e pela sua mensagem. Vou verificar por aqui e te respondo nesta conversa assim que possível.'
+assert.equal(complementoDaResposta(prefixoReal, { texto: '', acoes: [{ tipo: 'rascunho', texto: respostaReal }] }), ' sua mensagem.')
+assert.equal(complementoDeTexto('Conferir os ingredientes', 'Conferir os ingredientes antes de preparar.'), ' antes de preparar.')
+assert.equal(complementoDeTexto('Valor informado: ', 'Valor informado: 12.50 reais. Outra frase.'), '12.50 reais.')
+assert.equal(complementoDeTexto(texto, texto + 'ajudar? Vou confirmar.'), 'ajudar?')
+assert.equal(complementoDeTexto(texto, texto + 'continuar! Obrigado.'), 'continuar!')
 const evento = { key: 'Tab', currentTarget: { selectionStart: texto.length, selectionEnd: texto.length } }
 assert.equal(podeAceitarComplemento(evento, texto, 'ajudar?'), true)
 assert.equal(podeAceitarComplemento(evento, texto, ''), false)

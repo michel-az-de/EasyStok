@@ -34,11 +34,11 @@ async function abrir({ width = 1280, modo = 'normal', query = '' } = {}) {
     const texto = corpo.pergunta.split('\nTRECHO:\n')[1]
     if (modo === 'lento') await new Promise(resolve => { pendente = resolve })
     if (modo === 'erro') return route.fulfill({ status: 503, json: { error: { code: 'IA_OFF', message: 'IA indisponível' } } })
-    const rascunho = { tipo: 'rascunho', texto: texto + 'confirmar os detalhes?' }
+    const rascunho = { tipo: 'rascunho', texto: modo === 'resposta-real' ? 'Muito obrigado pelo contato e pela sua mensagem. Vou verificar por aqui e te respondo nesta conversa assim que possível.' : texto + 'confirmar os detalhes?' }
     const cozinha = corpo.conversaId === null
-    const resposta = modo === 'rascunho-invalido' ? '' : !cozinha && modo === 'rascunho' ? '' : modo === 'explicacao' ? 'Preparei uma sugestão.' : modo === 'invalido' ? 'Claro! ' + texto : texto + 'confirmar os detalhes?'
+    const resposta = modo === 'rascunho-invalido' || modo === 'resposta-real' ? '' : !cozinha && modo === 'rascunho' ? '' : modo === 'explicacao' ? 'Preparei uma sugestão.' : modo === 'invalido' ? 'Claro! ' + texto : texto + 'confirmar os detalhes?'
     const acoes = cozinha ? [] : modo === 'rascunho-invalido' ? [{ tipo: 'rascunho', texto: 'Outro prefixo' }, { tipo: 'nota_interna', texto: rascunho.texto }]
-      : modo === 'rascunho' || modo === 'explicacao' ? [rascunho] : [{ tipo: 'enviar-mensagem', texto: 'NÃO ENVIAR' }]
+      : ['rascunho', 'explicacao', 'resposta-real'].includes(modo) ? [rascunho] : [{ tipo: 'enviar-mensagem', texto: 'NÃO ENVIAR' }]
     return route.fulfill({ json: { success: true, data: { resposta, acoes } } })
   })
   const page = await context.newPage(); page.on('pageerror', e => erros.push(e.message))
@@ -80,6 +80,11 @@ try {
   await foto(proposta.page, 'explicacao-com-rascunho'); await proposta.campo.press('Tab')
   assert.equal(await proposta.campo.inputValue(), texto + 'confirmar os detalhes?')
   assert.deepEqual(await proposta.page.evaluate(() => window.envios), []); await proposta.context.close()
+  const real = await abrir({ modo: 'resposta-real' }); await real.campo.fill('Muito obrigado pelo contato e pela')
+  await real.page.getByRole('button', { name: 'Usar sugestão' }).waitFor()
+  await foto(real.page, 'resposta-real-sem-segunda-frase'); await real.campo.press('Tab')
+  assert.equal(await real.campo.inputValue(), 'Muito obrigado pelo contato e pela sua mensagem.')
+  assert.deepEqual(await real.page.evaluate(() => window.envios), []); await real.context.close()
   const esc = await abrir(); await esc.campo.fill(texto); await esc.page.getByRole('button', { name: 'Usar sugestão' }).waitFor()
   await esc.campo.press('Shift+Tab'); assert.equal(await esc.campo.inputValue(),texto)
   assert.equal(await esc.campo.evaluate(el => el === document.activeElement),false)
