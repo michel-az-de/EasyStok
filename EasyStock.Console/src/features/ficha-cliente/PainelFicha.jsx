@@ -153,7 +153,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           <h3>{!editavel ? 'Atendimento encerrado' : pedidoCriado ? `Pedido ${numero ?? ''}`.trim() : pedido ? 'Seleção não confirmada' : 'Vamos atender ' + primeiroNome}</h3>
           <p>{!editavel ? 'O histórico está guardado. Reabra a conversa para retomar o atendimento.'
             : pedido ? `${pedidoCriado ? rotuloDoEstado(pedido.estado) : 'Em montagem'} · ${itens} ${itens === 1 ? 'item' : 'itens'} · ${moeda(total)}`
-              : cadastrarPrimeiro ? 'Primeiro o cadastro: o pedido só nasce para cliente cadastrado. Nome e telefone já vêm da conversa.'
+              : cadastrarPrimeiro ? 'Primeiro o cadastro: o pedido só nasce para cliente cadastrado. O que a conversa trouxe já vem preenchido.'
                 : 'Monte o pedido por aqui ou acompanhe a escolha do cliente pelo link.'}</p>
         </section>
 
