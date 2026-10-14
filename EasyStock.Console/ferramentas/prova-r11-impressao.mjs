@@ -153,6 +153,14 @@ assert.ok(!daGravacao.some((t) => /não escolhida/.test(t)), 'sem janela, o canh
 assert.equal(daGravacao.filter((t) => /800 g/.test(t)).length, 1, 'porção que o nome já diz sai uma vez só')
 ok('canhoto sem "?" no nome, sem "Janela não escolhida" e sem porção repetida (#1802)')
 
+// #1802: no modo API a janela do pedido vem como "id|data" com o rótulo pronto (`janelaRotulo`);
+// o canhoto buscava no catálogo local e saía sem janela mesmo com a entrega marcada.
+const { faixaDoPedido } = await import('../src/dominio/entrega.js')
+assert.equal(faixaDoPedido(JANELAS, { janela: 'b6f1|2026-10-15', janelaRotulo: 'qui 15/10 · 14:00 às 17:00' }), 'qui 15/10 · 14:00 às 17:00')
+assert.equal(faixaDoPedido(JANELAS, { janela: JANELAS[0].id }), JANELAS[0].faixa, 'demonstração segue pelo catálogo')
+assert.equal(faixaDoPedido(JANELAS, null), null)
+ok('canhoto do modo API usa a janela que o EasyStok devolveu')
+
 // ------------------------------------------------------------------- rota
 const conversaDaParada = (i) => ({
   id: `c${i}`,
