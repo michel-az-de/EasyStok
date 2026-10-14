@@ -114,7 +114,7 @@ namespace EasyStock.Application.UseCases.CriarUsuario
             var fato = convidar ? "Convite enviado" : "Acesso criado";
             await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(
                 usuario.Id, convidar ? RastroDeUsuarios.Convidado : RastroDeUsuarios.Criado,
-                $"{fato} {comPerfil} por {autor}", currentUser));
+                $"{fato} {comPerfil} por {autor}", currentUser, command.EmpresaId));
 
             await unitOfWork.CommitAsync();
 

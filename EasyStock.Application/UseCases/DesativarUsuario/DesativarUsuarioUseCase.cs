@@ -46,7 +46,7 @@ namespace EasyStock.Application.UseCases.DesativarUsuario
 
             var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
             await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(
-                usuario.Id, RastroDeUsuarios.Desativado, $"Acesso desativado por {autor}", currentUser));
+                usuario.Id, RastroDeUsuarios.Desativado, $"Acesso desativado por {autor}", currentUser, command.EmpresaId));
             await unitOfWork.CommitAsync();
         }
     }

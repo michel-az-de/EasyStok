@@ -90,7 +90,7 @@ namespace EasyStock.Application.UseCases.AtualizarUsuario
             var empresaId = await trocaDeContato.ResolverEmpresaDoEventoAsync();
             convites.ExigirBaseDeLink();
 
-            usuario.Email = novoEmail;
+            usuario.Email = Usuario.NormalizarEmail(novoEmail);
             usuario.EmailConfirmado = false;
             usuario.EmailPendente = null;
             usuario.AlteradoEm = DateTime.UtcNow;

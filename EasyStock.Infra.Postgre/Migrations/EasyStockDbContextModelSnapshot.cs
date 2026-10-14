@@ -1736,6 +1736,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<Guid?>("EmpresaId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Ip")
                         .HasMaxLength(45)
                         .HasColumnType("character varying(45)");
@@ -1757,6 +1760,8 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("DataHora");
 
                     b.HasIndex("UsuarioId");
+
+                    b.HasIndex("EmpresaId", "DataHora");
 
                     b.ToTable("audit_logs", (string)null);
                 });

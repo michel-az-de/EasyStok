@@ -1,3 +1,5 @@
 # Falsos positivos (valor de teste, ja trocado por montagem em execucao no commit seguinte da mesma PR #1522).
 8786a4ac0872f77fd7fba9f3a6443a3d5b1114d6:EasyStock.Api.UnitTests/Controllers/ConsentimentosControllerTests.cs:generic-api-key:28
 8786a4ac0872f77fd7fba9f3a6443a3d5b1114d6:EasyStock.Api.UnitTests/Controllers/ConsentimentosControllerTests.cs:generic-api-key:224
+# Falso positivo (canario de teste "CANARIO-...", ja trocado por montagem em execucao em commit seguinte da mesma PR #1703).
+033f2c4558037586c0f60c2bbdd643f9881b26d9:EasyStock.Api.UnitTests/Pagamentos/MercadoPagoClientTests.cs:generic-api-key:157

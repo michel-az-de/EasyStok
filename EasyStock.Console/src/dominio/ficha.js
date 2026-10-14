@@ -14,9 +14,22 @@ export function fichaRecolhidaDePadrao({ pedido, cliente }) {
   }
 }
 
+// #1806 (revisão de 14/10): "não posso vender para um lead que não tem cadastro". Sem comanda, o
+// primeiro passo do lead no modo API é o cadastro, que abre com o que a conversa já trouxe; o
+// cliente cadastrado e a demonstração vão direto aos itens. Com comanda, quem diz é a barra.
+export function primeiroPassoAntesDaVenda({ conversa, pedido, fonteApi = false }) {
+  if (pedido) return null
+  return fonteApi && conversa?.conta === 'lead' && !conversa?.clienteId ? 'cadastro' : 'itens'
+}
+
 // Seção que nasce recolhida não esconde erro nem o que pede ação: com erro, abre; recolhida por
 // escolha de quem atende, o título diz que não carregou.
 export const RESUMO_COM_ERRO = 'Não carregou'
+
+// #1761 (L22): linha zerada da Ficha. "Tags · 0 tags" vira o convite da ação que mora ali; o
+// Histórico sem pedido e sem pontos para resgatar não tem o que abrir e sai da coluna.
+export const resumoDasTags = (quantas) => (quantas === 0 ? 'Adicionar tag' : quantas === 1 ? '1 tag' : `${quantas} tags`)
+export const mostraHistorico = ({ pedidos = 0, fonteApi = false, resgataPontos = false } = {}) => !fonteApi || pedidos > 0 || resgataPontos
 
 // Troca de janela de pedido criado: recolhe com a vaga já marcada (ou ainda carregando) e abre
 // quando a consulta falha ou o pedido está sem vaga.

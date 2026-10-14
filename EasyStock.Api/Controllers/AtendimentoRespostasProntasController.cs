@@ -8,6 +8,7 @@ namespace EasyStock.Api.Controllers;
 /// <summary>
 /// Biblioteca de respostas prontas do console (S42, US-009): cadastro com atalho único e render das
 /// variáveis <c>{nome}</c>, <c>{pedido}</c> e <c>{faixa}</c> no servidor, para uma conversa.
+/// Criar, editar e arquivar exigem <see cref="Permissao.AtenderConversas"/> (#1781); listar e renderizar basta a policy.
 /// </summary>
 [SwaggerTag("Canned replies")]
 [ApiController]
@@ -29,7 +30,7 @@ public class AtendimentoRespostasProntasController(
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [HttpPost]
     public Task<IActionResult> Criar([FromBody] RespostaProntaBody body, CancellationToken ct) =>
-        Executar(async () => DataOk(await useCases.CriarAsync(Comando(body), ct)));
+        Atendendo(async () => DataOk(await useCases.CriarAsync(Comando(body), ct)));
 
     [SwaggerOperation(Summary = "Edit a canned reply", Description = "Atalho de outra resposta devolve 409.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -38,14 +39,14 @@ public class AtendimentoRespostasProntasController(
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [HttpPut("{id:guid}")]
     public Task<IActionResult> Editar(Guid id, [FromBody] RespostaProntaBody body, CancellationToken ct) =>
-        Executar(async () => DataOk(await useCases.EditarAsync(id, Comando(body), ct)));
+        Atendendo(async () => DataOk(await useCases.EditarAsync(id, Comando(body), ct)));
 
     [SwaggerOperation(Summary = "Archive or restore a canned reply")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpPost("{id:guid}/arquivar")]
     public Task<IActionResult> Arquivar(Guid id, [FromQuery] bool arquivada = true, CancellationToken ct = default) =>
-        Executar(async () => DataOk(await useCases.ArquivarAsync(currentUser.EmpresaId, id, arquivada, ct)));
+        Atendendo(async () => DataOk(await useCases.ArquivarAsync(currentUser.EmpresaId, id, arquivada, ct)));
 
     [SwaggerOperation(Summary = "Render a canned reply for a conversation",
         Description = "Variável sem valor na conversa (ex.: {pedido} sem pedido) devolve 400.")]
@@ -58,6 +59,10 @@ public class AtendimentoRespostasProntasController(
 
     private SalvarRespostaProntaCommand Comando(RespostaProntaBody body) =>
         new(currentUser.EmpresaId, body.Titulo ?? string.Empty, body.Atalho ?? string.Empty, body.Texto ?? string.Empty);
+
+    /// <summary>#1781: escrita na biblioteca é ação de atendimento, como no <c>AtendimentoConversasController</c>.</summary>
+    private Task<IActionResult> Atendendo(Func<Task<IActionResult>> acao)
+        => currentUser.TemPermissao(Permissao.AtenderConversas) ? Executar(acao) : Task.FromResult<IActionResult>(Forbid());
 
     private async Task<IActionResult> Executar(Func<Task<IActionResult>> acao)
     {

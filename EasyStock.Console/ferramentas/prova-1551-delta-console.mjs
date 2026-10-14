@@ -97,12 +97,14 @@ const painelAtendimento = semComentarios(ler('features/atendimento/PainelAtendim
 const composer = semComentarios(ler('features/atendimento/Composer.jsx'))
 confere('"Modelos aprovados" exige a fonte API', () => {
   assert.ok(
-    tagDe(painelAtendimento, 'Composer').includes('podeEnviarModelo={fonteApi && podeReabrir && canal.aceitaModelo && !encerrada && !bloqueada}'),
+    // #1761: a conta saiu da tag porque a bolha recusada fora da janela usa a mesma.
+    painelAtendimento.includes('const podeEnviarModelo = fonteApi && podeReabrir && canal.aceitaModelo && !encerrada && !bloqueada')
+      && tagDe(painelAtendimento, 'Composer').includes('podeEnviarModelo={podeEnviarModelo}'),
     'podeEnviarModelo sem exigir fonteApi',
   )
 })
 confere('botão e dica do campo dependem do mesmo sinal: sem o botão, a dica não o promete', () => {
-  assert.match(composer, /\{podeEnviarModelo && <Botao className=\{css\.abrirModelos\}/)
+  assert.match(composer, /\{modelosFixos && podeEnviarModelo && <Botao className=\{css\.abrirModelos\}/)
   assert.match(composer, /podeEnviarModelo \? 'Use Modelos aprovados para continuar' : 'Mensagem indisponível nesta conversa'/)
   assert.equal(vezes(composer, 'Modelos aprovados'), 2)
 })

@@ -164,7 +164,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
           </div>
         </div>
         {!buscando && fonteApi && <PulsoDoHall key={idsDoPulso.join(':')} ids={idsDoPulso} foco={foco.nome} />}
-        {!buscando && destaque && <section className={css.destaque} aria-labelledby="destaque-hall">
+        {!buscando && destaque && (!fonteApi || !idsDoPulso.includes(destaque.id)) && <section className={css.destaque} aria-labelledby="destaque-hall">
           <div className={css.ilustracao} aria-hidden="true"><IconeDoModulo modulo={destaque} tamanho={40} /></div>
           <div className={css.textoDestaque}><h2 id="destaque-hall">{destaque.nome}</h2></div>
           <a className={css.acaoDestaque} href={destaque.href}>Abrir {destaque.nome}<MarcaIcone nome="proximo" tamanho={22} /></a>
@@ -179,7 +179,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
         </nav>}
         {!buscando && todos.length > 0 && <div className={css.organizacao}>
           <div className={css.instrucoes}>
-            <h2 className={css.subtitulo}>Todas as áreas</h2>
+            <h2 className={css.subtitulo}>Áreas</h2>
             {organizar && <p>Arraste pelo botão Mover ou use as setas de cada cartão.</p>}
           </div>
           <div className={css.ferramentas}>

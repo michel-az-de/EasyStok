@@ -37,7 +37,7 @@ namespace EasyStock.Application.UseCases.ReativarUsuario
 
             var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
             await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(
-                usuario.Id, RastroDeUsuarios.Reativado, $"Acesso reativado por {autor}", currentUser));
+                usuario.Id, RastroDeUsuarios.Reativado, $"Acesso reativado por {autor}", currentUser, command.EmpresaId));
             await unitOfWork.CommitAsync();
         }
     }

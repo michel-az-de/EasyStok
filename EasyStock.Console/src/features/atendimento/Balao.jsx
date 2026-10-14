@@ -1,8 +1,10 @@
-import { memo } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { Icone } from '../../componentes/Icone'
 import { mesmasProps } from '../../aplicacao/igualdade'
 import { horaCurta } from '../../dominio/formato'
 import { partesComLinkDoCardapio } from '../../dominio/cardapioLink'
+import { falhaDeEnvio, fraseDoReenvio, TIPOS_DE_FALHA } from '../../dominio/falhaDeEnvio'
+import { tiqueDaMensagem } from '../../dominio/mensagem'
 import { BolhaArquivo, BolhaAudio, BolhaPeca } from './BolhaAnexo'
 import { BolhaAvaliacaoPedido, BolhaAvaliacaoResposta } from './BolhaAvaliacao'
 import { BolhaMidiaApi } from './BolhaMidiaApi'
@@ -62,7 +64,32 @@ function LinkDoCardapio({ url }) {
 
 // #1577: em `memo`. Mensagem nova na conversa não re-renderiza os balões antigos (até 100, cada um com a
 // regex de link). A mensagem compara por conteúdo: a leitura da API a devolve como objeto novo sem ter mudado.
-export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReenviar }) {
+export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos }) {
+  // #1761: o Reenviar não dava retorno nenhum. O botão diz "Reenviando…", trava o segundo toque
+  // e, se o canal recusar de novo, a bolha diz que a nova tentativa também não saiu.
+  const [reenvio, setReenvio] = useState(null)
+  const reenviando = useRef(false)
+  // O resultado nasce abaixo do botão, na última bolha do fio: traz para a vista.
+  const resultadoDoReenvio = useRef(null)
+  useEffect(() => {
+    if (reenvio === 'falhou') resultadoDoReenvio.current?.scrollIntoView({ block: 'nearest' })
+  }, [reenvio])
+  async function reenviar() {
+    if (reenviando.current) return
+    reenviando.current = true
+    setReenvio('indo')
+    let saiu = false
+    try {
+      const resposta = await aoReenviar(mensagem.id)
+      saiu = Boolean(resposta) && resposta.status !== 'falhou'
+    } catch {
+      saiu = false
+    } finally {
+      reenviando.current = false
+    }
+    setReenvio(saiu ? null : 'falhou')
+  }
+
   if (mensagem.dir === 'sistema') {
     return (
       <p className={`${css.balao} ${css.sistema} ${trocaDeVoz ? css.trocaDeVoz : ''}`}>
@@ -70,8 +97,10 @@ export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinica
       </p>
     )
   }
-  // ✓✓ para entregue e lida (F07, item 4): a API distingue as duas; a massa só tem `lida`.
-  const entregue = mensagem.status === 'lida' || mensagem.status === 'entregue'
+  // #1761: entregue e lida deixaram de ser o mesmo "✓✓ entregue" (`tiqueDaMensagem`).
+  const tique = mensagem.dir === 'out' ? tiqueDaMensagem(mensagem.status) : null
+  // #1761: o erro cru do canal vira frase de balcão; fora da janela ganha o caminho do modelo.
+  const falha = mensagem.status === 'falhou' ? falhaDeEnvio(mensagem.erro) : null
   return (
     <div className={`${css.balao} ${CLASSE[mensagem.dir]} ${mensagem.automatica ? css.doAutomatico : ''} ${trocaDeVoz ? css.trocaDeVoz : ''}`}>
       <Corpo mensagem={mensagem} />
@@ -93,22 +122,30 @@ export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinica
         {mensagem.programada && <span className={css.selo}><Icone nome="relogio" /> programada</span>}
         <time dateTime={mensagem.em}>{horaCurta(mensagem.em)}</time>
         {mensagem.status === 'falhou' && (
-          <span className={css.falhou} role="alert"><Icone nome="alerta" tamanho={14} /> {mensagem.erro ?? 'Não enviada.'}</span>
+          <span className={css.falhou} role="alert"><Icone nome="alerta" tamanho={14} /> {falha.texto}</span>
+        )}
+        {falha?.tipo === TIPOS_DE_FALHA.FORA_DA_JANELA && mensagem.dir === 'out' && aoAbrirModelos && (
+          <button type="button" className={`${css.selo} ${css.seloBotao} ${css.acaoDaBolha}`} aria-haspopup="dialog" onClick={aoAbrirModelos}>
+            <Icone nome="modelo" /> Modelos aprovados
+          </button>
         )}
         {/* S57: texto que falhou volta a sair pelo mesmo canal. Só com a ação ligada (modo API). */}
         {mensagem.porSms && <span className={css.selo}><Icone nome="check" /> saiu por SMS</span>}
         {mensagem.status === 'falhou' && mensagem.dir === 'out' && aoReenviar && !mensagem.modelo && !mensagem.semIdServidor && !mensagem.midia && !mensagem.aguardaCliente && (
-          <button type="button" className={`${css.selo} ${css.seloBotao}`} onClick={() => aoReenviar(mensagem.id)}>
-            <Icone nome="raio" /> Reenviar
+          <button type="button" className={`${css.selo} ${css.seloBotao} ${css.acaoDaBolha}`} disabled={reenvio === 'indo'} onClick={reenviar}>
+            <Icone nome="raio" /> {reenvio === 'indo' ? 'Reenviando…' : 'Reenviar'}
           </button>
+        )}
+        {mensagem.status === 'falhou' && reenvio === 'falhou' && (
+          <output ref={resultadoDoReenvio} className={css.falhou}>{fraseDoReenvio(mensagem.erro)}</output>
         )}
         {mensagem.dir === 'out' && mensagem.status === 'enviando' && (
           <span className={css.enviando}>{mensagem.modelo ? 'envio sem confirmação' : 'enviando'}</span>
         )}
-        {mensagem.dir === 'out' && mensagem.status !== 'falhou' && mensagem.status !== 'enviando' && (
-          <span>
-            <span aria-hidden="true">{entregue ? '✓✓' : '✓'}</span>
-            <span className="sr">{entregue ? 'entregue' : 'enviada'}</span>
+        {tique && (
+          <span className={tique.lida ? css.tiqueLida : undefined} title={`Mensagem ${tique.rotulo}`}>
+            <span aria-hidden="true">{tique.marca}</span>
+            <span className={tique.lida ? undefined : 'sr'}> {tique.rotulo}</span>
           </span>
         )}
       </span>

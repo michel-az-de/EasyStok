@@ -84,7 +84,7 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
                 : string.Join(" e ", nomesAnteriores);
             var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
             await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(
-                usuario.Id, RastroDeUsuarios.PerfilTrocado, $"Perfil trocado de {de} para {perfil.Nome} por {autor}", currentUser));
+                usuario.Id, RastroDeUsuarios.PerfilTrocado, $"Perfil trocado de {de} para {perfil.Nome} por {autor}", currentUser, command.EmpresaId));
 
             await unitOfWork.CommitAsync();
         }

@@ -120,6 +120,7 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
 
         return await query
             .OrderByDescending(c => c.UltimaMensagemEm)
+            .ThenByDescending(c => c.Id) // #1787: empate no instante não repete nem pula conversa entre páginas
             .Skip((paginaEfetiva - 1) * tamanho)
             .Take(tamanho)
             .ToListAsync(ct);
@@ -157,6 +158,7 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
         // #1575: só as colunas do resumo. O ContextoJson (jsonb do carrinho) fica no banco: a inbox faz polling.
         var linhas = await query
             .OrderByDescending(c => c.UltimaMensagemEm)
+            .ThenByDescending(c => c.Id) // #1787: empate no instante não repete nem pula conversa entre páginas
             .Skip((paginaEfetiva - 1) * tamanho)
             .Take(tamanho)
             .Select(c => new
@@ -251,10 +253,6 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
 
     public Task<Mensagem?> ObterMensagemAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
         db.AtendimentoMensagens.AsNoTracking().FirstOrDefaultAsync(
-            m => m.EmpresaId == empresaId && m.ConversaId == conversaId && m.Id == mensagemId, ct);
-
-    public Task<Mensagem?> ObterMensagemParaAlterarAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
-        db.AtendimentoMensagens.FirstOrDefaultAsync(
             m => m.EmpresaId == empresaId && m.ConversaId == conversaId && m.Id == mensagemId, ct);
 
     public async Task<Mensagem?> ObterMensagemComLockAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default)

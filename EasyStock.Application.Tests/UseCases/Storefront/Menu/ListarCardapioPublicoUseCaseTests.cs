@@ -326,6 +326,39 @@ public class ListarCardapioPublicoUseCaseTests
     // ── Item avulso (ADR-0031) ─────────────────────────────────────────
 
     [Fact]
+    public async Task ExecuteAsync_ComPorcoes_MostraOPrecoQueOCheckoutCobra()
+    {
+        // #1784: o site mostrava R$ 38 (preço do item) e o link de pagamento cobrava R$ 45 (porção padrão).
+        var f = BuildFakes();
+        var lasanha = CriarItemAvulso(f.Storefront.Id, "Lasanha", 38.00m);
+        lasanha.AdicionarVariacao(CardapioItemVariacao.Criar(lasanha.Id, "1 kg", 45.00m, ehPadrao: true));
+        lasanha.AdicionarVariacao(CardapioItemVariacao.Criar(lasanha.Id, "600 g", 38.00m, ordemExibicao: 1));
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { lasanha });
+
+        var result = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        result.Itens.Single().PrecoCentavos.Should().Be(4500);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_TodasAsPorcoesEsgotadas_ItemIndisponivel()
+    {
+        // O checkout recusa porção esgotada; o site não pode oferecer o prato como disponível.
+        var f = BuildFakes();
+        var lasanha = CriarItemAvulso(f.Storefront.Id, "Lasanha", 38.00m);
+        var unica = CardapioItemVariacao.Criar(lasanha.Id, "1 kg", 45.00m, ehPadrao: true);
+        unica.MarcarEsgotado();
+        lasanha.AdicionarVariacao(unica);
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { lasanha });
+
+        var result = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        result.Itens.Single().Disponivel.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ExecuteAsync_AvulsoPreco35Reais_PrecoCentavos3500()
     {
         var f = BuildFakes();

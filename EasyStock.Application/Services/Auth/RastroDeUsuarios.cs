@@ -19,6 +19,10 @@ public static class RastroDeUsuarios
         return string.IsNullOrWhiteSpace(nome) ? "suporte" : nome.Trim();
     }
 
-    public static AuditLog Linha(Guid afetadoId, string acao, string detalhes, ICurrentUserAccessor atual) =>
-        AuditLog.Criar(afetadoId, acao, true, detalhes, atual.Ip, atual.UserAgent);
+    public static AuditLog Linha(Guid afetadoId, string acao, string detalhes, ICurrentUserAccessor atual, Guid empresaId)
+    {
+        var linha = AuditLog.Criar(afetadoId, acao, true, detalhes, atual.Ip, atual.UserAgent);
+        linha.EmpresaId = empresaId;
+        return linha;
+    }
 }

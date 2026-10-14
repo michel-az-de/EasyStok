@@ -42,6 +42,45 @@ public class RemetenteWhatsAppDoTenantIntegrationTests(PostgreSqlDatabaseFixture
     }
 
     [SkippableFact]
+    public async Task ChaveMestraNaSubida_le_o_cofre_de_todas_as_lojas_sem_tenant()
+    {
+        // I4.2 (#1708): na subida não há tenant; a verificação enxerga as credenciais de todas as lojas pela porta
+        // de bypass, sobe quando a KEK decifra todas e recusa quando a KEK é outra.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        await fixture.ResetDatabaseAsync();
+
+        var lojaA = Empresa.Criar("Loja A", "11111111000191");
+        var lojaB = Empresa.Criar("Loja B", "22222222000191");
+        await SeedAsync(lojaA, lojaB);
+
+        static Dictionary<string, string?> Kek(byte preenchimento) => new()
+        {
+            ["Crypto:CurrentKekId"] = "kek-teste",
+            ["Crypto:Keks:kek-teste"] = Convert.ToBase64String(Enumerable.Repeat(preenchimento, 32).ToArray()),
+        };
+
+        await using (var provider = BuildProvider(Kek(1)))
+        {
+            foreach (var loja in new[] { lojaA, lojaB })
+            {
+                await using var scope = provider.CreateAsyncScope();
+                scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(loja.Id);
+                await scope.ServiceProvider.GetRequiredService<IIntegrationCredentialResolver>().SalvarAsync(
+                    loja.Id, CategoriaIntegracao.Mensageria, CredencialWhatsAppMeta.ProviderKey, AmbienteIntegracao.Production,
+                    new CredencialWhatsAppMeta("token-" + loja.Nome, "1001", "5550001111", DateTime.UtcNow), Guid.NewGuid());
+            }
+
+            await EasyStock.Infra.Postgre.Integration.ChaveMestraNaSubida.ExigirAsync(provider, "Production", "API");
+        }
+
+        await using var comOutraChave = BuildProvider(Kek(2));
+        var act = () => EasyStock.Infra.Postgre.Integration.ChaveMestraNaSubida.ExigirAsync(comOutraChave, "Production", "Worker");
+
+        (await act.Should().ThrowAsync<EasyStock.Infra.Postgre.Integration.ChaveMestraInvalidaException>())
+            .Which.Message.Should().Contain("2 credencial(is)", "sem tenant, a verificação precisa ver as duas lojas");
+    }
+
+    [SkippableFact]
     public async Task DevolveOBusinessTokenDaEmpresaQuandoHaCredencial()
     {
         // #1417: com credencial meta-whatsapp o envio usa o token da empresa; sem ela, null (o cliente cai no global).

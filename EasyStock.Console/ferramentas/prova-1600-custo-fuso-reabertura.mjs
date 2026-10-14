@@ -287,7 +287,7 @@ await confere('o prefixo é o mesmo que a API grava e que a lista usa (#1570)', 
   assert.ok(ler('infra/api/traducaoConversas.js').includes(`'${PREFIXO}'`))
 })
 await confere('a nota de reabertura chega marcada; outra nota de sistema, não', () => {
-  assert.deepEqual(mensagemDaApi(reabertura, 'c1'), { id: 'n1', dir: 'sistema', texto: reabertura.texto, em: '2026-10-10T14:00:00Z', reabertura: true })
+  assert.deepEqual(mensagemDaApi(reabertura, 'c1'), { id: 'n1', dir: 'sistema', texto: 'Conversa reaberta por Thatiane. Encerramento anterior: 08/10/2026, 13:00 (horário da loja).', em: '2026-10-10T14:00:00Z', reabertura: true })
   // Mesmo critério da API: nota de sistema, com autor humano e com o prefixo.
   assert.equal('reabertura' in mensagemDaApi(notaDaApi('n2', '2026-10-10T14:00:00', reabertura.texto, null), 'c1'), false)
   assert.equal('reabertura' in mensagemDaApi(notaDaApi('n3', '2026-10-10T14:00:00', 'Escalado para a dona: pergunta fora do roteiro.'), 'c1'), false)

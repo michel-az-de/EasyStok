@@ -114,4 +114,14 @@ public class FreteControllerTests
         json.GetProperty("gratis").GetBoolean().Should().BeFalse();
         json.GetProperty("foraDeCobertura").GetBoolean().Should().BeFalse();
     }
+
+    [Fact]
+    public void CalcularFrete_tem_limite_por_IP()
+    {
+        // #1784: rota anônima que chama geocode e rota pagos; sem limite, variar o número gerava custo.
+        typeof(FreteController).GetMethod(nameof(FreteController.CalcularFrete))!
+            .GetCustomAttributes(typeof(Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute), false)
+            .Cast<Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute>()
+            .Single().PolicyName.Should().Be("frete-publico");
+    }
 }

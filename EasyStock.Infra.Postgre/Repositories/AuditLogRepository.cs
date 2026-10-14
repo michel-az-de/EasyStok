@@ -22,12 +22,13 @@ public class AuditLogRepository(EasyStockDbContext context) : IAuditLogRepositor
             .Take(pageSize)
             .ToListAsync();
 
-    // audit_logs não tem empresa: o recorte é pelo vínculo de quem foi afetado (usuarios_empresas, sob o filtro do tenant).
+    // Eventos antigos sem empresa não podem ser atribuídos a uma loja pelo vínculo atual do usuário.
     public async Task<(IReadOnlyList<AuditoriaDeAcessoLinha> Itens, int Total)> ListarPorEmpresaAsync(
         Guid empresaId, Guid? usuarioId, int page, int pageSize, CancellationToken ct = default)
     {
         var consulta = _context.AuditLogs.AsNoTracking()
-            .Where(al => _context.UsuariosEmpresas.Any(ue => ue.UsuarioId == al.UsuarioId && ue.EmpresaId == empresaId));
+            .Where(al => al.EmpresaId == empresaId
+                && _context.UsuariosEmpresas.Any(ue => ue.UsuarioId == al.UsuarioId && ue.EmpresaId == empresaId));
         if (usuarioId is { } id) consulta = consulta.Where(al => al.UsuarioId == id);
 
         var total = await consulta.CountAsync(ct);

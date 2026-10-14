@@ -43,6 +43,8 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasForeignKey(al => al.UsuarioId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            builder.Property(al => al.EmpresaId).HasColumnType("uuid");
+            builder.HasIndex(al => new { al.EmpresaId, al.DataHora });
             builder.HasIndex(al => al.UsuarioId);
             builder.HasIndex(al => al.DataHora);
             builder.HasIndex(al => al.Acao);

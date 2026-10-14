@@ -5,6 +5,7 @@
 
 import { pausaDaSituacao, respostaAtrasada } from '../../dominio/automatico'
 import { ACOES } from '../../dominio/agente'
+import { motivoDeEscalada, notaDeReabertura, notaDeSistema } from '../../dominio/motivoDeEscalada'
 
 const NOME_DO_CANAL = {
   WhatsApp: 'WhatsApp', Instagram: 'Instagram', Messenger: 'Messenger',
@@ -22,8 +23,10 @@ const STATUS_DA_MENSAGEM = {
 }
 
 const ROTULO_DO_CONTEUDO = {
-  Imagem: 'Foto', Audio: 'Áudio', Documento: 'Arquivo', Localizacao: 'Localização', Outro: 'Mensagem',
+  Imagem: 'Foto', Audio: 'Áudio', Documento: 'Arquivo', Localizacao: 'Localização', Botao: 'Resposta a um botão',
+  Modelo: 'Mensagem de modelo sem texto',
 }
+const BOTAO_DE_AVALIACAO = /^acao:avaliacao:(positiva|negativa):[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i
 
 const HORAS_DA_JANELA = 24
 const MS_POR_HORA = 3600000
@@ -48,15 +51,20 @@ export function mensagemDaApi(m, conversaId = null) {
   // e Pendente para sempre. Vira evento na conversa, não balão "automática · enviando".
   if (saida && m.autor === 'Sistema' && ((!m.externoId && m.status === 'Pendente')
       || m.externoId?.startsWith('chatsite:recepcao:') || m.externoId?.startsWith('chatsite:comanda:'))) {
+    const reabertura = ehNotaDeReabertura(m)
     return {
-      id: m.id, dir: 'sistema', texto: m.texto || '', em: instante(m.enviadaEm),
-      ...(ehNotaDeReabertura(m) ? { reabertura: true } : {}),
+      // #1761: a nota de escalada sai na fala do balcão, sem "escalado" nem "LLM".
+      id: m.id, dir: 'sistema', texto: reabertura ? notaDeReabertura(m.texto) : notaDeSistema(m.texto || ''), em: instante(m.enviadaEm),
+      ...(reabertura ? { reabertura: true } : {}),
     }
   }
+  // O webhook grava o botão sem texto; só o payload reconhecido identifica a avaliação.
+  const avaliacao = !saida && m.tipoConteudo === 'Botao' ? BOTAO_DE_AVALIACAO.exec(m.botaoId ?? '')?.[1].toLowerCase() : null
   return {
     id: m.id,
     dir: saida ? 'out' : 'in',
-    texto: m.texto || ROTULO_DO_CONTEUDO[m.tipoConteudo] || '',
+    texto: m.texto?.trim() ? m.texto : avaliacao ? `Avaliação ${avaliacao}` : ROTULO_DO_CONTEUDO[m.tipoConteudo] || 'Conteúdo não disponível nesta mensagem.',
+    ...(avaliacao ? { formato: 'avaliacaoResposta', valor: avaliacao } : {}),
     em: instante(m.enviadaEm),
     ...(saida ? { status: STATUS_DA_MENSAGEM[m.status] ?? 'enviada' } : {}),
     ...(saida && m.autor === 'Agente' ? { automatica: true, origemAutomatica: 'agente' } : {}),
@@ -94,7 +102,8 @@ function janelaExpiraEm(resumo, mensagens) {
 function passagemDaApi(resumo) {
   if (resumo.situacao !== 'Assumida' || resumo.assumidaPorUsuarioId) return null
   return {
-    motivo: resumo.motivoEscalada || null, em: null, assumida: false,
+    // #1761: o motivo gravado pelo EasyStok é texto de sistema; cartão, faixa e lembrete leem o traduzido.
+    motivo: motivoDeEscalada(resumo.motivoEscalada), em: null, assumida: false,
     ...(resumo.motivoEscalada === 'Conversa reaberta para atendimento.' ? { origem: 'reabertura' }
       : resumo.canal === 'ChatSite' ? { origem: 'chat-site', motivo: resumo.motivoEscalada || 'Visitante do site aguardando atendimento da equipe.' } : {}),
   }
@@ -132,7 +141,7 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario, agora = Date.now(
     janelaExpiraEm: janelaExpiraEm(resumo, mensagens),
     ultimaEm: instante(resumo.ultimaMensagemEm),
     // Prévia do cartão quando as mensagens não foram carregadas (encerrada, #1287).
-    ultimaMensagemTexto: resumo.ultimaMensagemTexto ?? null,
+    ultimaMensagemTexto: resumo.ultimaMensagemTexto ? notaDeSistema(resumo.ultimaMensagemTexto) : null,
     // #1427: SLA de primeira resposta da loja e de onde ele conta.
     slaMinutos: resumo.slaRespostaMinutos ?? null,
     aguardaResposta: resumo.aguardaResposta ?? false,

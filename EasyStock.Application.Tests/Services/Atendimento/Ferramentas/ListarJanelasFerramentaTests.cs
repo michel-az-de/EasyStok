@@ -42,6 +42,9 @@ public class ListarJanelasFerramentaTests
         public List<Mensagem> Mensagens { get; } = new();
         public List<IReadOnlyList<(string Id, string Titulo)>> BotoesEnviados { get; } = new();
 
+        /// <summary>Wamids das saídas já adicionadas quando a ferramenta pediu a gravação (#1791).</summary>
+        public List<string?> GravadasNaHora { get; } = new();
+
         public Cenario()
         {
             Storefront = StorefrontEntity.Criar(Guid.NewGuid(), "casa-da-baba", "Casa da Babá", 0m);
@@ -96,7 +99,12 @@ public class ListarJanelasFerramentaTests
                 new ListarJanelasAtendimentoUseCase(StorefrontRepo, CardapioRepo, ConfiguracaoRepo, listar),
                 Cloud, ConversaRepo, NullLogger<ListarJanelasFerramenta>.Instance);
             return ferramenta.ExecutarAsync(
-                new ContextoTurnoAgente(Storefront.EmpresaId, Conversa, Agora), JsonSerializer.SerializeToElement(entrada));
+                new ContextoTurnoAgente(Storefront.EmpresaId, Conversa, Agora, _ =>
+                {
+                    GravadasNaHora.AddRange(Mensagens.Select(m => m.ExternoId));
+                    return Task.CompletedTask;
+                }),
+                JsonSerializer.SerializeToElement(entrada));
         }
     }
 
@@ -125,6 +133,8 @@ public class ListarJanelasFerramentaTests
         var saida = c.Mensagens.Should().ContainSingle().Subject;
         saida.Autor.Should().Be(AutorMensagem.Agente);
         saida.ExternoId.Should().Be("wamid.botoes");
+        // #1791: gravada logo depois do envio, antes de o LLM continuar; o status e o eco a encontram.
+        c.GravadasNaHora.Should().Equal("wamid.botoes");
     }
 
     [Fact]

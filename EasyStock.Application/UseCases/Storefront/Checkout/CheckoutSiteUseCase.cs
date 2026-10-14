@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Atendimento;
-using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Services.Atendimento;
@@ -10,13 +9,12 @@ using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
 using EasyStock.Domain.Entities.Atendimento;
-using EasyStock.Domain.Enums.Atendimento;
 
 namespace EasyStock.Application.UseCases.Storefront.Checkout;
 
 public sealed class CheckoutSiteUseCase(
     AcessoChatSite acessoChat, AbrirSessaoChatSiteUseCase abrirSessao,
-    ConversaChatSiteService conversaChat, IConversaRepository conversas,
+    ConversaChatSiteService conversaChat,
     IClienteStorefrontRepository clientes, IPedidoStorefrontRepository pedidos,
     CheckoutIdempotencyService idempotencia, ICheckoutIdempotencyRepository registros,
     IniciarCheckoutUseCase logado, IniciarCheckoutGuestUseCase guest,
@@ -150,24 +148,11 @@ public sealed class CheckoutSiteUseCase(
             ?? throw new InvalidOperationException("Pedido recém-criado não foi encontrado.");
         if (pedido.EmpresaId != sessao.EmpresaId || conversa.EmpresaId != sessao.EmpresaId)
             throw new InvalidOperationException("Pedido e conversa pertencem a lojas diferentes.");
-        await unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
-        {
-            if (await conversas.TravarParaPedidoAsync(sessao.EmpresaId, conversa.Id, token) == pedidoId)
-            {
-                await unitOfWork.CommitAsync();
-                return false;
-            }
-            conversa.DefinirPedidoEmAndamento(pedido.Id);
-            conversa.RegistrarEntrada(relogio.GetUtcNow().UtcDateTime);
-            var linhas = string.Join("; ", pedido.Itens.Select(i => $"{i.Quantidade} × {i.Nome}"));
-            // Nota interna: contém o snapshot informado, mas não concede identidade nem expõe cadastro ao visitante.
-            var resumo = Mensagem.Saida(sessao.EmpresaId, conversa.Id, AutorMensagem.Sistema,
-                relogio.GetUtcNow().UtcDateTime, TipoConteudoMensagem.Texto,
-                $"Pedido do site #{pedido.Id.ToString("N")[..8].ToUpperInvariant()}: {linhas}. Total R$ {pedido.Total}. {pedido.Observacoes}");
-            await conversas.AddMensagemAsync(resumo, token);
-            await unitOfWork.CommitAsync();
-            return true;
-        }, ct);
+        var linhas = string.Join("; ", pedido.Itens.Select(i => $"{i.Quantidade} × {i.Nome}"));
+        // Nota interna: contém o snapshot informado, mas não concede identidade nem expõe cadastro ao visitante.
+        await conversaChat.RegistrarPedidoAsync(sessao.EmpresaId, conversa.Id, pedido.Id,
+            $"Pedido do site #{pedido.Id.ToString("N")[..8].ToUpperInvariant()}: {linhas}. Total R$ {pedido.Total}. {pedido.Observacoes}",
+            relogio.GetUtcNow().UtcDateTime, ct);
         try
         {
             await eventos.PublicarAsync(EventosOperacao.ConversaPedidoPelaPagina, sessao.EmpresaId,

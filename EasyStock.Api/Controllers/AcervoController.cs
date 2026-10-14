@@ -52,10 +52,18 @@ public sealed class AcervoController(AcervoUseCase acervo, ICurrentUserAccessor 
     [HttpGet("imagens/{id:guid}/miniatura")]
     public async Task<IActionResult> Miniatura(Guid id, CancellationToken ct)
     {
+        // O original é imutável (chave por id, deduplicado por hash), então o hash identifica a miniatura.
+        // no-cache + ETag: o navegador revalida a cada exibição (autorização e empresa conferidas aqui) e
+        // o 304 evita baixar até 6 MB do storage e redimensionar de novo cada cartão da página.
+        var meta = await acervo.ObterAsync(usuario.EmpresaId, id, ct);
+        var etag = $"\"m600-{meta.Sha256}\"";
+        Response.Headers.CacheControl = "private, no-cache";
+        Response.Headers.ETag = etag;
+        Response.Headers.XContentTypeOptions = "nosniff";
+        if (Request.Headers.IfNoneMatch.ToString().Contains(etag, StringComparison.Ordinal))
+            return StatusCode(StatusCodes.Status304NotModified);
         var (imagem, bytes) = await acervo.ArquivoAsync(usuario.EmpresaId, id, ct);
         var (conteudo, tipo, _) = processor.Optimize(bytes, imagem.ContentType, maxSide: 600, quality: 75);
-        Response.Headers.CacheControl = "private, no-store";
-        Response.Headers.XContentTypeOptions = "nosniff";
         return File(conteudo, tipo);
     }
     [HttpPost("imagens")]
@@ -68,6 +76,11 @@ public sealed class AcervoController(AcervoUseCase acervo, ICurrentUserAccessor 
         catch (JsonException) { return BadRequest("Dados da imagem inválidos."); }
         await using var stream = new MemoryStream(); await file.CopyToAsync(stream, ct);
         var bytes = stream.ToArray();
+        // Tipo e assinatura antes de decodificar: GIF ou BMP eram decodificados inteiros na memória
+        // só para depois serem recusados, e a recusa dizia "até 8.192 pixels" em vez do tipo aceito.
+        if (file.ContentType is not ("image/png" or "image/jpeg" or "image/webp")) return BadRequest("Use PNG, JPEG ou WebP.");
+        try { EasyStock.Application.UseCases.GerenciarUploads.UploadSecurityValidator.EnsureContentMatchesDeclaredType(bytes, file.ContentType); }
+        catch (InvalidOperationException e) { return BadRequest(e.Message); }
         using var data = SkiaSharp.SKData.CreateCopy(bytes);
         using var codec = SkiaSharp.SKCodec.Create(data);
         if (codec is null || codec.Info.Width <= 0 || codec.Info.Height <= 0 ||

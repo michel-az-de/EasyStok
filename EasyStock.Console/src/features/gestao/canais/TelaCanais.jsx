@@ -10,6 +10,7 @@ import { useStatusWhatsAppApi } from '../../../aplicacao/useStatusWhatsAppApi'
 import { resumoDoWhatsApp } from '../../../dominio/canais'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { SecaoWhatsApp } from '../integracoes/SecaoWhatsApp'
+import { TesteEmailDaSessao } from './TesteEmailDaSessao'
 import css from './TelaCanais.module.css'
 
 const LIGADAS = [
@@ -50,6 +51,7 @@ function EstadoDoCanal() {
 }
 
 export function TelaCanais() {
+  const { sessao } = useAtendimento()
   return (
     <div className={css.tela}>
       <section className={css.canal} aria-labelledby="canal-whatsapp">
@@ -80,6 +82,7 @@ export function TelaCanais() {
         </ul>
       </nav>
 
+      {sessao?.usuario?.nivel === 'SuperAdmin' && <TesteEmailDaSessao email={sessao.usuario.email} />}
     </div>
   )
 }

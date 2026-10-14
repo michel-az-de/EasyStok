@@ -2,6 +2,19 @@ import { useEffect, useRef, useState } from 'react'
 import * as api from '../infra/api/fretesApi'
 import { useAcessoModulos } from './acessoModulos'
 
+// #1761: a comparação integrada de fretes só funciona na empresa de demonstração (no servidor,
+// `LogisticaUseCases.ExigirDemonstracao`). Quem diz se a empresa é a de demonstração é o contexto.
+// Enquanto não responde, ou se falha, vale "não é": a Ficha não oferece o que não existe.
+export function useLogisticaDeDemonstracao(pedidoId) {
+  const [demonstracao, setDemonstracao] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    api.obterContextoFrete({ pedidoId }).then((contexto) => { if (vivo) setDemonstracao(contexto?.demonstracao === true) }, () => {})
+    return () => { vivo = false }
+  }, [pedidoId])
+  return demonstracao
+}
+
 // A intenção conserva a chave depois de falhas de rede; repetir não cria outra despesa/corrida.
 export function useFretesApi({ aoAlterado } = {}) {
   const { acoes: capacidades, permite } = useAcessoModulos()

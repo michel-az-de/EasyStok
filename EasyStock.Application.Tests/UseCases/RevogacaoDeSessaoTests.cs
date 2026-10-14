@@ -342,6 +342,7 @@ public class RevogacaoDeSessaoTests
         // então o carimbo não pode mudar no login.
         VincularA(Guid.NewGuid()); // sem vínculo ativo o login é recusado (#1540)
         _usuarios.GetByEmailAsync(_usuario.Email).Returns(_usuario);
+        _usuarios.ReservarTentativaDeSenhaAsync(_usuario.Id, Arg.Any<DateTime>()).Returns(true);
         var login = new AutenticarUsuarioUseCase(
             _usuarios, _unitOfWork, new FakePasswordHasher(), Substitute.For<ILogger<AutenticarUsuarioUseCase>>());
 
