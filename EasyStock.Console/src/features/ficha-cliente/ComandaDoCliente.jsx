@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { SugestaoDeTexto } from '../../componentes/SugestaoDeTexto'
 import { useComplementoDeTexto } from '../../aplicacao/useComplementoDeTexto'
@@ -69,6 +69,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
   const [frete, setFrete] = useState('')
   const [janelas, setJanelas] = useState([])
   const [confirmacao, setConfirmacao] = useState(null)
+  const selecaoRef = useRef(null)
   const rascunho = c.podeEditar && edicao ? edicao.rascunho : c.rascunho
   const conflito = c.podeEditar && edicao && (edicao.revisao !== c.revisao
     || edicao.rascunho.pedidoAtualizadoEm !== c.rascunho.pedidoAtualizadoEm || edicao.rascunho.pedidoId !== c.rascunho.pedidoId)
@@ -81,9 +82,11 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
   })
   function mudarItem(indice, campos) {
     editar({ ...rascunho, itens: rascunho.itens.map((i, n) => n === indice ? { ...i, ...campos } : i).filter(i => i.qtd > 0) })
+    if (campos.qtd === 0) selecaoRef.current?.focus()
   }
+  function limparEdicao() { setEdicao(null); selecaoRef.current?.focus() }
   async function persistir() {
-    if (await salvar({ ...c, revisao: edicao.revisao }, rascunho)) setEdicao(null)
+    if (await salvar({ ...c, revisao: edicao.revisao }, rascunho)) limparEdicao()
   }
   function adicionar() {
     const { itemSku, variacaoId } = partesDoSku(prato)
@@ -104,7 +107,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
       : !rascunho.endereco ? 'Peça ao cliente que informe o endereço na comanda.'
         : !janela || !rotuloJanela ? 'Escolha uma janela de entrega disponível e salve a seleção.'
           : c.freteCombinado == null ? 'Abra “Combinar entrega” e confirme o frete antes de criar o pedido, inclusive se for R$ 0,00.' : null
-  return <div>
+  return <div ref={selecaoRef} tabIndex={-1} role="group" aria-label="Seleção da comanda">
     {c.ajudaSolicitada && <output className={css.ajudaCompartilhada}>
       <strong>Pedido de ajuda registrado</strong>
     </output>}
@@ -114,7 +117,6 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
       {c.rascunho.endereco.complemento && ' · ' + c.rascunho.endereco.complemento} · {c.rascunho.endereco.bairro}
       {' · ' + c.rascunho.endereco.cidade + '/' + c.rascunho.endereco.uf + ' · CEP ' + c.rascunho.endereco.cep}</p>
     </details>}
-    {c.podeEditar && !c.pedido && <ConsultaTransporte semPedido />}
     {c.freteCombinado != null && !c.pedido && <p>Frete combinado: {moeda(c.freteCombinado)}. Confira o total com o cliente e confirme o pedido aqui ou pelo link.</p>}
     {(c.pedido || !c.podeEditar) && <p className={css.estadoCompartilhado}>{c.podeEditar ? 'O pedido confirmado continua valendo até a aprovação deste ajuste.'
       : c.envio?.situacao === 'estorno_pendente' ? 'Devolução em acompanhamento.'
@@ -174,7 +176,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
         dataInicial={c.rascunho.dataEntrega ?? ''} aoLerJanelas={setJanelas}
         aoEscolher={valor => { const escolhida = janelaDoId(valor); editar({ ...rascunho, janelaId: escolhida?.janelaId ?? null, dataEntrega: escolhida?.data ?? null }) }} />}
       {edicao && <div className={css.salvarCompartilhado}>
-        <Botao disabled={ocupado} onClick={() => setEdicao(null)}>{conflito ? 'Usar seleção atual' : 'Descartar minha edição'}</Botao>
+        <Botao disabled={ocupado} onClick={limparEdicao}>{conflito ? 'Usar seleção atual' : 'Descartar minha edição'}</Botao>
         {conflito ? <Botao disabled={ocupado || rascunho.pedidoId !== c.rascunho.pedidoId} onClick={() => setEdicao({ revisao: c.revisao, base: c.rascunho,
           rascunho: rascunhoMantendoEdicao(c.rascunho, rascunho, edicao.base) })}>Manter minha edição para conferir</Botao>
           : <Botao variante="primario" disabled={ocupado} onClick={persistir}>Salvar seleção</Botao>}
@@ -182,6 +184,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
       {edicao && <p>Alterações locais. Salve para o cliente ver; os valores finais serão conferidos pelo sistema.</p>}
       {!c.pedido && <details className={css.transporteCompartilhado} open={c.entregaACombinar}>
         <summary>Combinar entrega · consultar Lalamove</summary>
+        <ConsultaTransporte semPedido />
         {!c.entregaACombinar && c.freteCombinado == null && <>
           <Botao disabled={ocupado || Boolean(edicao) || !c.rascunho.endereco || !c.rascunho.itens.length}
             onClick={() => encaminharEntrega(c)}>Combinar entrega desta seleção</Botao>
@@ -218,17 +221,53 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
 
 // #1761 (L10): pedido vazio eram três textos em dois blocos. Fica um bloco: o título, "Adicionar
 // itens" no topo (`acaoMontar`, que a Ficha entrega) e uma frase.
-export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompartilhar, acaoMontar = null, pedido = null, aoMudarEscolha }) {
-  const { dados, erro, ocupado, confirmar, salvar, combinarFrete, encaminharEntrega, confirmarPedido } = useComandasCliente(conversaId, ativo)
+function ComandaCompacta({ pedido, visiveis, erro, carregando, dados, acaoCompartilhar, acaoMontar, ocupado, selecaoDe, nomeCliente, atualizar }) {
+  const [linkAberto, setLinkAberto] = useState(null)
+  if (pedido && !visiveis.length && !erro) return null
+  const aberta = visiveis.find(c => c.linkId === linkAberto)
+  return <section className={css.clienteCompartilhado} aria-label="Comanda compartilhada com o cliente">
+    <div className={css.adicionarCompartilhado}><h3>Comanda do cliente</h3>{acaoCompartilhar}</div>
+    {erro && !aberta && <><p role="alert">{erro}</p><Botao onClick={atualizar} disabled={ocupado || carregando}>Atualizar comanda</Botao></>}
+    {carregando && !dados.length ? <p role="status">Consultando a comanda…</p> : <>
+      {acaoMontar}
+      {!visiveis.length && !erro && !pedido && <p>O cliente também pode escolher pelo Link de compra.</p>}
+      {visiveis.map(c => {
+        const ajuste = ['alteracao_aguardando_confirmacao', 'estorno_pendente', 'estorno_recusado'].includes(c.envio?.situacao)
+        const titulo = ajuste ? 'Ajuste para conferir' : c.entregaACombinar ? 'Entrega a combinar'
+          : c.ajudaSolicitada ? 'Cliente pediu ajuda' : c.podeEditar ? (c.pedido ? 'Cliente alterando o pedido' : 'Cliente escolhendo') : 'Seleção enviada'
+        const quantidade = c.selecao.reduce((soma, item) => soma + item.qtd, 0)
+        return <div key={c.linkId} className={css.resumoCompartilhado}>
+          <strong>{titulo}</strong>
+          <p>{quantidade} {quantidade === 1 ? 'item' : 'itens'}{c.totalPrevisto != null && ` · ${moeda(c.totalPrevisto)}`}</p>
+          {!c.pedido && <p>Ainda não é um pedido confirmado.</p>}
+          <Botao largo aria-haspopup="dialog" onClick={() => setLinkAberto(c.linkId)}>
+            {ajuste ? 'Conferir ajuste' : c.podeEditar ? 'Revisar seleção' : 'Consultar seleção'}
+          </Botao>
+        </div>
+      })}
+    </>}
+    {aberta && <Modal titulo={nomeCliente ? `Comanda de ${nomeCliente}` : 'Comanda do cliente'} descricao="Confira a seleção compartilhada. Salve os ajustes para o cliente acompanhar." largura="760px"
+      aoFechar={ocupado ? undefined : () => setLinkAberto(null)}>
+      {erro && <><p role="alert">{erro}</p><Botao onClick={atualizar} disabled={ocupado || carregando}>Atualizar comanda</Botao></>}
+      {selecaoDe(aberta)}
+    </Modal>}
+  </section>
+}
+
+export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompartilhar, acaoMontar = null, pedido = null, aoMudarEscolha, compacta = false, nomeCliente }) {
+  const { dados, erro, ocupado, carregando, confirmar, salvar, combinarFrete, encaminharEntrega, confirmarPedido, atualizar } = useComandasCliente(conversaId, ativo)
   const { cardapio } = useCatalogo()
   const { acoes } = useAcessoModulos()
+  const escolhendo = clienteEscolhendoPeloLink(dados, pedido)
+  useEffect(() => { aoMudarEscolha?.(escolhendo ? conversaId : null) }, [aoMudarEscolha, escolhendo, conversaId])
   if (!ativo) return null
   const visiveis = dados.filter(c => c.podeEditar || ['alteracao_aguardando_confirmacao', 'estorno_pendente', 'estorno_recusado'].includes(c.envio?.situacao)
     || c.linkId === dados[0]?.linkId && c.envio)
-  // #1683: avisa a Ficha, depois de pintar, se o cliente está escolhendo pelo link; a comanda de
-  // baixo deixa de somar item nesse meio tempo. Valor igual não redesenha.
-  const avisarEscolha = no => { if (no) aoMudarEscolha?.(clienteEscolhendoPeloLink(dados, pedido) ? conversaId : null) }
-  return <section ref={avisarEscolha} className={css.clienteCompartilhado} aria-label="Comanda compartilhada com o cliente">
+  const selecaoDe = c => <SelecaoCompartilhada key={c.linkId} conversaId={conversaId} comanda={c} ocupado={ocupado} erro={erro} salvar={salvar} confirmar={confirmar}
+    combinarFrete={combinarFrete} encaminharEntrega={encaminharEntrega} confirmarPedido={confirmarPedido} cardapio={cardapio} podeDevolver={acoes.estornarPagamentoOnline === true} />
+  if (compacta) return <ComandaCompacta pedido={pedido} visiveis={visiveis} erro={erro} carregando={carregando} dados={dados}
+    acaoCompartilhar={acaoCompartilhar} acaoMontar={acaoMontar} ocupado={ocupado} selecaoDe={selecaoDe} nomeCliente={nomeCliente} atualizar={atualizar} />
+  return <section className={css.clienteCompartilhado} aria-label="Comanda compartilhada com o cliente">
     <div className={css.adicionarCompartilhado}>
       <h3>{tituloDaComanda(pedido, { temLinkComPedido: visiveis.some(c => c.pedido) })}<small>{numeroComanda ? 'Comanda ' + numeroComanda : 'Seleção compartilhada'}</small></h3>
       {acaoCompartilhar}
@@ -238,8 +277,7 @@ export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompart
     {!visiveis.length && !erro && !pedido?.pedidoId && <p>Compartilhe com o cliente pelo Link de compra ou adicione os itens por aqui.</p>}
     {visiveis.map(c => {
       const pendente = ['alteracao_aguardando_confirmacao', 'estorno_pendente', 'estorno_recusado'].includes(c.envio?.situacao)
-      const selecao = <SelecaoCompartilhada key={c.linkId} conversaId={conversaId} comanda={c} ocupado={ocupado} erro={erro} salvar={salvar} confirmar={confirmar}
-        combinarFrete={combinarFrete} encaminharEntrega={encaminharEntrega} confirmarPedido={confirmarPedido} cardapio={cardapio} podeDevolver={acoes.estornarPagamentoOnline === true} />
+      const selecao = selecaoDe(c)
       return c.pedido ? <details key={c.linkId} className={css.historicoCompartilhado} open={c.podeEditar || pendente}>
         <summary>{pendente ? 'Ajuste para conferir' : c.podeEditar ? 'Seleção em edição' : 'Histórico do link'}</summary>
         {selecao}

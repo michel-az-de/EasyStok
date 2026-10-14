@@ -66,13 +66,13 @@ export function situacaoDoEnvio(pedido, { bloqueado = false } = {}) {
     return {
       chave: 'nao-enviada', pode: false,
       texto: 'Cobrança criada, mas a mensagem não saiu. '
-        + (pedido.cobranca.link ? 'Copie o link na Cobrança abaixo e envie pela conversa.' : 'Avise o cliente pela conversa.'),
+        + (pedido.cobranca.link ? 'Abra Pagamento no resumo, copie o link e envie pela conversa.' : 'Avise o cliente pela conversa.'),
     }
   }
   if (pedido?.cobranca) {
     return {
       chave: 'enviada', pode: false,
-      texto: `Enviada ao cliente às ${horaCurta(pedido.cobranca.criadaEm)}. Para mudar, use a Cobrança abaixo.`,
+      texto: `Enviada ao cliente às ${horaCurta(pedido.cobranca.criadaEm)}. Para mudar a cobrança, abra Pagamento no resumo.`,
     }
   }
   if (pedido && pedido.estado !== 'aguardando') {

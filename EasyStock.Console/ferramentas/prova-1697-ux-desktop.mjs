@@ -75,8 +75,8 @@ confere('2  sem pedido, ou com pedido encerrado, a Ficha é a do cliente: tudo a
   assert.deepEqual(ficha.fichaRecolhidaDePadrao({ pedido: { estado: 'entregue', itens: [] }, cliente: cadastrado }), aberto)
   assert.deepEqual(ficha.fichaRecolhidaDePadrao({ pedido: { estado: 'cancelado', itens: [] }, cliente: cadastrado }), aberto)
 })
-confere('2  a Ficha usa a regra, e os blocos vazios do pedido criado nascem recolhidos', () => {
-  assert.match(fonte('features/ficha-cliente/PainelFicha.jsx'), /<BlocoCliente conversa=\{selecionada\} recolhidas=\{fichaRecolhidaDePadrao\(\{ pedido, cliente \}\)\} \/>/)
+// #1785: o cliente agora abre em modal; a renderização da ficha é coberta por prova-1785-ficha.
+confere('2  cliente aceita recolhimento e blocos vazios do pós-venda nascem recolhidos', () => {
   const cliente = fonte('features/ficha-cliente/BlocoCliente.jsx')
   for (const chave of ['contato', 'tags', 'historico']) {
     assert.match(cliente, new RegExp(`chave="${chave}" recolhidoDePadrao=\\{recolhidas\\.${chave}`), chave)

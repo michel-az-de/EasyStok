@@ -247,3 +247,6 @@
   .gavetaNoPe .gavetaLabel { overflow: visible; text-overflow: clip; }
   .gavetaNoPe > button { padding-inline: var(--e-2); font-size: var(--t-apoio); }
 }
+.resumoCompartilhado { display: grid; gap: var(--e-2); padding: var(--e-3) 0; }
+.resumoCompartilhado + .resumoCompartilhado { border-top: 1px solid var(--linha); }
+.resumoCompartilhado p { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }

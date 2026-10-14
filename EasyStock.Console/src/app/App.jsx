@@ -142,7 +142,7 @@ function Composicao({ rota, aoSair }) {
   const aoTerminarArrasto = ({ active, over }) => {
     setPratoArrastando(null)
     if (!over || !selecionada) return
-    if (active.data.current?.type === 'prato' && over.id === 'comanda-solta') {
+    if (active.data.current?.type === 'prato' && ['comanda-solta', 'comanda-resumo'].includes(over.id)) {
       adicionarItem(selecionada.id, active.data.current.item)
     }
   }

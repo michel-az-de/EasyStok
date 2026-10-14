@@ -17,7 +17,7 @@ globalThis.__comandaCompartilhada = contexto
 const codigo = fonte => 'data:text/javascript,' + encodeURIComponent(fonte)
 registerHooks({
   resolve(spec, ctx, proximo) {
-    if (spec === 'react') return { url: codigo('export function useState(inicial){const c=globalThis.__comandaCompartilhada;const n=c.cursor++;if(!(n in c.estados))c.estados[n]=inicial;return [c.estados[n],v=>c.estados[n]=v]} export const useRef=inicial=>useState({current:inicial})[0]'), shortCircuit: true }
+    if (spec === 'react') return { url: codigo('export function useState(inicial){const c=globalThis.__comandaCompartilhada;const n=c.cursor++;if(!(n in c.estados))c.estados[n]=inicial;return [c.estados[n],v=>c.estados[n]=v]} export const useRef=inicial=>useState({current:inicial})[0]; export const useEffect=()=>{}'), shortCircuit: true }
     if (spec === 'react/jsx-runtime') return { url: codigo('export const Fragment="fragment"; export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx'), shortCircuit: true }
     if (spec.endsWith('.css')) return { url: codigo('export default {}'), shortCircuit: true }
     if (spec.endsWith('useComandasCliente')) return { url: codigo(`export const useComandasCliente=()=>globalThis.__comandaCompartilhada;export { idDaJanela, janelaDoId } from ${JSON.stringify(new URL('../src/infra/api/comandaApi.js', import.meta.url).href)}`), shortCircuit: true }

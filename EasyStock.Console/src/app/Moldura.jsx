@@ -466,7 +466,7 @@ export function Moldura({
           />
           <section className={`${css.coluna} ${css.centro}`} aria-label="Atendimento">{atendimento}</section>
           <AlcaLargura
-            rotulo="Redimensionar Pedido"
+            rotulo="Redimensionar Resumo"
             valor={larguras.ficha}
             min={320}
             max={520}
@@ -474,7 +474,7 @@ export function Moldura({
             invertida
             aoMudar={(valor) => aoRedimensionar('ficha', valor)}
           />
-          <Coluna variante="ficha" titulo="Pedido">
+          <Coluna variante="ficha" titulo="Resumo">
             <div className={css.painelFicha}><PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} /></div>
             {/* #1474: lugar da fila de canhotos (FilaCanhotos), no pé da Ficha e no fluxo da
                 coluna: a pílula não cobre mais o título nem o topo da coluna. Vazio, não ocupa. */}
@@ -497,7 +497,7 @@ export function Moldura({
           </Coluna>
           <section className={`${css.coluna} ${css.centro}`} aria-label="Atendimento">{atendimento}</section>
           {gavetaAberta && (
-            <Gaveta titulo="Pedido" aoFechar={fecharGaveta}>
+            <Gaveta titulo="Resumo" aoFechar={fecharGaveta}>
               <PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} acaoCompartilhar={acaoCompartilhar} />
             </Gaveta>
           )}
@@ -505,7 +505,7 @@ export function Moldura({
         <div className={css.slotFila} data-fila-canhotos="" />
         <footer className={css.rodape}>
           <Botao ref={botaoFichaRef} onClick={() => setGavetaAberta(true)}>
-            Pedido de {selecionada?.nome.split(' ')[0] ?? 'cliente'}
+            Resumo de {selecionada?.nome.split(' ')[0] ?? 'cliente'}
           </Botao>
         </footer>
         <BotaoSimular ativo={simulando} aoAlternar={aoAlternarSimulacoes} />
@@ -534,7 +534,7 @@ export function Moldura({
         >
           {aba !== 'atendimento' && (
             <header className={`${css.tituloColuna} ${css.tituloCompacto}`}>
-              <span>{aba === 'ficha' ? `Pedido de ${selecionada?.nome.split(' ')[0] ?? 'cliente'}` : 'Balcão'}</span>
+              <span>{aba === 'ficha' ? `Resumo de ${selecionada?.nome.split(' ')[0] ?? 'cliente'}` : 'Balcão'}</span>
               <span className={css.espaco} data-ancora-assistente />
             </header>
           )}
@@ -548,7 +548,7 @@ export function Moldura({
         abas={[
           { id: 'balcao', rotulo: 'Balcão', contador: visiveis.length },
           { id: 'atendimento', rotulo: 'Atendimento' },
-          { id: 'ficha', rotulo: 'Pedido' },
+          { id: 'ficha', rotulo: 'Resumo' },
         ]}
       />
       <BotaoSimular ativo={simulando} aoAlternar={aoAlternarSimulacoes} />

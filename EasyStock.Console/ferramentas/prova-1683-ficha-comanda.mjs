@@ -148,7 +148,7 @@ confere('clienteEscolhendoPeloLink inclui seleção editável com itens ou ajuda
   assert.equal(escolhendo([{ ...ajudaVazia, podeEditar: false }], null), false)
   assert.equal(escolhendo([ajudaVazia], { pedidoId: PEDIDO, itens: [] }), false)
   assert.equal(pedido.LINHA_CLIENTE_ESCOLHENDO,
-    'O cliente está escolhendo pelo link. Os itens aparecem acima e viram pedido quando ele confirmar.')
+    'O cliente está escolhendo pelo link. Abra Revisar seleção para acompanhar os itens antes de confirmar o pedido.')
 })
 
 // 6. Total sem frete avisa que é sem frete.
