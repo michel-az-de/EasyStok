@@ -10,7 +10,7 @@ import { chaveDasPreferenciasHall, gravarPreferenciasHall, lerPreferenciasHall }
 import { Botao } from '../../componentes/Botao'
 import { InterruptorTema } from '../../componentes/InterruptorTema'
 import { Vazio } from '../../componentes/Vazio'
-import { buscarDestinosDoConsole, filtrarModulos, hashDoModulo, modulosDoHall, saudacaoDoHall } from '../../dominio/modulos'
+import { buscarDestinosDoConsole, filtrarModulos, modulosDoHall, saudacaoDoHall } from '../../dominio/modulos'
 import {
   alternarFavoritoDoHall, favoritosDoHall, favoritosPrimeiroNoHall, moverModuloDoHall,
   ordenarModulosDoHall, ordenarPaineisDoHall, restaurarOrdemDoHall, FOCOS_DO_HALL,
@@ -21,7 +21,7 @@ import { PulsoDoHall } from './PulsoDoHall'
 import { PersonalizarHall } from './PersonalizarHall'
 import css from './hall.module.css'
 
-function CartaoModulo({ modulo, fonteApi, favorito, organizar, compacto, movimentos, indice, total, aoFavoritar, aoMover }) {
+function CartaoModulo({ modulo, favorito, organizar, movimentos, indice, total, aoFavoritar, aoMover }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: modulo.id, disabled: !organizar,
     transition: movimentos ? { duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' } : null,
@@ -38,7 +38,7 @@ function CartaoModulo({ modulo, fonteApi, favorito, organizar, compacto, movimen
       <div className={css.cabecaCartao}>
         <span className={css.icone}><IconeDoModulo modulo={modulo} tamanho={32} /></span>
         <div className={css.controlesCartao}>
-          {modulo.disponivel && <button type="button" className={css.favoritar} aria-pressed={favorito}
+          {organizar && modulo.disponivel && <button type="button" className={css.favoritar} aria-pressed={favorito}
             aria-label={`${favorito ? 'Remover' : 'Adicionar'} ${modulo.nome} ${favorito ? 'dos' : 'aos'} favoritos`}
             onClick={() => aoFavoritar(modulo.id)}>
             <MarcaIcone nome={favorito ? 'confirmar' : 'adicionar'} tamanho={16} />
@@ -51,17 +51,7 @@ function CartaoModulo({ modulo, fonteApi, favorito, organizar, compacto, movimen
           <span className={css.nome}>{modulo.nome}</span>
           <MarcaIcone nome="proximo" tamanho={20} />
         </a>
-        <span className={css.resumo}>{modulo.resumo}</span>
-        <details className={css.telasRecolhidas} open={!compacto || undefined} key={compacto ? 'compacto' : 'completo'}>
-          <summary>{modulo.telas.length} telas de {modulo.nome}</summary>
-          <ul className={css.atalhos} aria-label={`Telas de ${modulo.nome}`}>
-          {modulo.telas.map((tela) => <li key={tela.id}>
-            <a className={css.atalho} href={hashDoModulo(modulo.id, tela.id)}><span>{tela.rotulo}</span>
-              {fonteApi && tela.indisponivelNaApi && <span className={css.estadoTela}>Em preparação</span>}
-            </a>
-          </li>)}
-          </ul>
-        </details>
+        {/* #1810: as telas de cada área ficam na busca e no menu do módulo; o cartão só leva à área. */}
       </> : <>
         <span className={css.nome}>{modulo.nome}</span>
         <span className={css.resumo}>{modulo.resumo}</span>
@@ -98,6 +88,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   const [personalizando, setPersonalizando] = useState(false)
   const buscaRef = useRef(null)
   const organizarRef = useRef(null)
+  const ajustarRef = useRef(null)
   const modulosPermitidos = modulosDoHall({ fonteApi }).filter((modulo) => permite(modulo.id))
   const todos = ordenarModulosDoHall(modulosPermitidos, preferencia)
   const modulos = filtrarModulos(todos, busca)
@@ -120,6 +111,12 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
     const persistiu = gravarPreferenciasHall(chavePreferencia, proxima)
     setMensagem(`${texto}${persistiu ? '' : chavePreferencia ? ' A personalização vale só nesta visita.' : ' A personalização vale só nesta tela.'}`)
   }
+  const desfazer = (foco) => {
+    gravar(anterior, 'Personalização anterior restaurada.', false)
+    setAnterior(null)
+    if (foco.current && !foco.current.disabled) foco.current.focus()
+    else buscaRef.current?.focus()
+  }
   const favoritar = (id) => {
     const modulo = modulosPermitidos.find((item) => item.id === id && item.disponivel)
     if (!modulo) return
@@ -138,7 +135,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   }
   const anuncio = (id) => modulos.find((modulo) => modulo.id === id)?.nome ?? 'Módulo'
   return (
-    <div className={[css.hall, preferencia.compacto && css.compacto, !preferencia.movimentos && css.semMovimentos].filter(Boolean).join(' ')}>
+    <div className={[css.hall, !preferencia.movimentos && css.semMovimentos].filter(Boolean).join(' ')}>
       <header className={css.topo}>
         <Marca />
         <div className={css.acoes}>
@@ -160,11 +157,11 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
               placeholder="Ex.: insumos, caixa ou entregas" value={busca}
               onChange={(evento) => setBusca(evento.target.value)} />
             {buscando && <Botao variante="texto" onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>}
-            {!buscando && <Botao variante="texto" onClick={() => setPersonalizando(true)}><MarcaIcone nome="configuracoes" tamanho={20} />Personalizar painel</Botao>}
           </div>
         </div>
         {!buscando && fonteApi && <PulsoDoHall key={idsDoPulso.join(':')} ids={idsDoPulso} foco={foco.nome} />}
-        {!buscando && destaque && (!fonteApi || !idsDoPulso.includes(destaque.id)) && <section className={css.destaque} aria-labelledby="destaque-hall">
+        {/* #1810: no modo API o destaque repetia um cartão de área; ficam só os números e as áreas. */}
+        {!buscando && destaque && !fonteApi && <section className={css.destaque} aria-labelledby="destaque-hall">
           <div className={css.ilustracao} aria-hidden="true"><IconeDoModulo modulo={destaque} tamanho={40} /></div>
           <div className={css.textoDestaque}><h2 id="destaque-hall">{destaque.nome}</h2></div>
           <a className={css.acaoDestaque} href={destaque.href}>Abrir {destaque.nome}<MarcaIcone nome="proximo" tamanho={22} /></a>
@@ -177,18 +174,13 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
             <a className={css.linkRotina} href={modulo.href}><IconeDoModulo modulo={modulo} tamanho={24} /> {modulo.nome}<MarcaIcone nome="proximo" tamanho={16} /></a>
           </li>)}</ul>
         </nav>}
-        {!buscando && todos.length > 0 && <div className={css.organizacao}>
+        {!buscando && organizar && <div className={css.organizacao}>
           <div className={css.instrucoes}>
-            <h2 className={css.subtitulo}>Áreas</h2>
-            {organizar && <p>Arraste pelo botão Mover ou use as setas de cada cartão.</p>}
+            <h2 className={css.subtitulo}>Organizar áreas</h2>
+            <p>Arraste pelo botão Mover ou use as setas de cada cartão. Favorite as áreas da sua rotina.</p>
           </div>
           <div className={css.ferramentas}>
-            {anterior && <Botao variante="texto" onClick={() => {
-              gravar(anterior, 'Personalização anterior restaurada.', false)
-              setAnterior(null)
-              if (organizarRef.current?.disabled) buscaRef.current?.focus()
-              else organizarRef.current?.focus()
-            }}>Desfazer</Botao>}
+            {anterior && <Botao variante="texto" onClick={() => desfazer(organizarRef)}>Desfazer</Botao>}
             <Botao ref={organizarRef} aria-pressed={organizar} variante={organizar ? 'primario' : 'secundario'}
               disabled={!organizar && (buscando || todos.length < 2)} onClick={() => { setOrganizar(!organizar); setMensagem('') }}>
               <MarcaIcone nome={organizar ? 'confirmar' : 'ordenar'} tamanho={20} />{organizar ? 'Concluir organização' : 'Organizar módulos'}
@@ -229,8 +221,8 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
           }} onDragEnd={({ active, over }) => { setArrastando(null); if (over) mover(active.id, over.id) }}>
           <SortableContext items={modulos.map((modulo) => modulo.id)} strategy={rectSortingStrategy}>
             <ul className={css.grade} aria-label="Módulos">
-              {modulos.map((modulo, indice) => <CartaoModulo key={modulo.id} modulo={modulo} fonteApi={fonteApi}
-                favorito={preferencia.favoritos.includes(modulo.id)} organizar={podeOrganizar} compacto={preferencia.compacto} movimentos={preferencia.movimentos}
+              {modulos.map((modulo, indice) => <CartaoModulo key={modulo.id} modulo={modulo}
+                favorito={preferencia.favoritos.includes(modulo.id)} organizar={podeOrganizar} movimentos={preferencia.movimentos}
                 indice={indice} total={modulos.length} aoFavoritar={favoritar} aoMover={moverPorBotao} />)}
             </ul>
           </SortableContext>
@@ -242,8 +234,13 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
             </div>}
           </DragOverlay>
         </DndContext>}
+        {!buscando && !organizar && todos.length > 0 && <div className={css.rodapeHall}>
+          {anterior && <Botao variante="texto" onClick={() => desfazer(ajustarRef)}>Desfazer</Botao>}
+          <Botao ref={ajustarRef} variante="texto" onClick={() => setPersonalizando(true)}><MarcaIcone nome="configuracoes" tamanho={20} />Ajustar tela inicial</Botao>
+        </div>}
       </main>
-      {personalizando && <PersonalizarHall preferencia={preferencia} modulos={modulosPermitidos} aoFechar={() => setPersonalizando(false)} aoSalvar={(proxima) => { gravar(proxima, 'Painel personalizado.'); setPersonalizando(false) }} />}
+      {personalizando && <PersonalizarHall preferencia={preferencia} modulos={modulosPermitidos} aoFechar={() => setPersonalizando(false)}
+        aoOrganizar={todos.length > 0 ? () => { setPersonalizando(false); setOrganizar(true); setMensagem('') } : null} aoSalvar={(proxima) => { gravar(proxima, 'Painel personalizado.'); setPersonalizando(false) }} />}
     </div>
   )
 }
