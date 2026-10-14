@@ -108,4 +108,11 @@ for (const fonteApi of [true, false]) provar(`seleção local ${fonteApi ? 'API'
   assert.match(html, /Seleção do atendimento/)
   assert.doesNotMatch(html, /Pedido criado|Pedido e entrega|Pagamento completo|a receber|Ocorrências e devoluções/)
 })
+const { BlocoOcorrenciasApi } = await import('../src/features/ficha-cliente/BlocoOcorrenciasApi.jsx')
+for (const gerente of [true, false]) provar(`abertura manual de ocorrência ${gerente ? 'disponível à gerente' : 'oculta para operador'}`, () => {
+  const html = renderToStaticMarkup(h(ContextoAcessoModulos.Provider, { value: { acoes: { gerenciarOcorrencias: gerente } } },
+    h(ContextoAcoes.Provider, { value: {} }, h(BlocoOcorrenciasApi, { pedidoId: 'pedido-ana', conversaId: 'ana' }))))
+  assert.equal(html.includes('Registrar ocorrência'), gerente)
+  assert.doesNotMatch(html, /O que aconteceu\?|Salvar ocorrência/)
+})
 console.log(`${total} cenários reais de renderização da ficha aprovados.`)
