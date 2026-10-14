@@ -28,6 +28,25 @@ classe tinham a mesma exposição).
 - **Se voltar a falhar:** não é mais prazo. Olhar o que foi para span ou log.
 
 ---
+## ✅ CORRIGIDO (#1822) — OTP em rajada e trava de outro host nos jobs
+
+Vistos em PRs só de console, em 14/10/2026, e passando no master minutos antes.
+
+- **`LoginTentativasConcorrenciaTests.RajadaDeCodigosCertosConsomeOOtpUmaVezSo`** (run 38642604450, PR #1815):
+  uma das quatro requisições com o código certo recebeu `OtpTentativasExcedidasException`. **Era bug do código**,
+  não do teste: a requisição que leu o OTP antes do consumo da outra tinha a reserva de tentativa recusada pelo
+  `NOT Consumido` do WHERE, e o caso de uso tratava toda reserva recusada como tentativas esgotadas. Fix: reserva
+  recusada com o OTP já consumido (lido sem rastreamento, `ConsumidoAsync`) responde `OtpInvalidoException`.
+  Teste unitário determinístico: `ExecuteAsync_ReservaRecusadaPorqueOutraRequisicaoConsumiu_LancaOtpInvalido`.
+- **`JobsEmDoisHostsIntegrationTests.*_ComATravaDoOutroHost_PulaARodada`** (run 38643283929, PR #1818): a rodada
+  com a trava livre não registrou nada. **Era corrida do teste**: `DeterTravaAsync` soltava a trava fechando a
+  conexão sem pool, e fechar não espera o backend do PostgreSQL sair; o `pg_try_advisory_lock` da rodada seguinte
+  ainda achava a trava presa e pulava. Fix: `pg_advisory_unlock` explícito antes de fechar (`TravaDeOutroHost`).
+- **Medição:** no master, 19 de 19 verdes numa máquina ociosa (a corrida não aparece fora da carga do CI; o OTP foi provado pelo teste unitário). Na branch, 40 de 40 verdes nos quatro testes. No CI a falha do OTP apareceu 3 vezes em 14/10 (#1815, #1818, #1821).
+- **Se voltar a falhar:** no OTP, olhar quem mais recusa a reserva; nos jobs, conferir se outra conexão do
+  mesmo teste segura a chave.
+
+---
 ## ✅ CORRIGIDO (#1117) — gate de worktrees paralelos compartilhava a pasta de build
 
 Visto em `MigrationDesignerHygieneTests` (qualquer arch-test pode ser a vitima).
