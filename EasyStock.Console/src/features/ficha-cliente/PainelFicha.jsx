@@ -13,6 +13,8 @@ import { comandaTravada, numeroDaComanda, pedidoEncerrado, rotuloDoEstado, total
 import { faltaPagar as saldoDoPedido } from '../../dominio/pagamento'
 import { moeda } from '../../dominio/formato'
 import { motivoAntesDeCobrar } from '../../dominio/resumoPedido'
+import { permissaoDeEscrita } from '../../dominio/janela'
+import { canalDaConversa } from '../../dominio/canal'
 import { chavesDaFicha, primeiroPassoAntesDaVenda } from '../../dominio/ficha'
 import { BarraProximoPasso } from './BarraProximoPasso'
 import { BlocoCobranca } from './BlocoCobranca'
@@ -54,7 +56,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
     cancelarPedido, marcarEstorno, abrirEncerramento, decidirAreaEntrega, escolherMeioPagamento,
     alterarMeioPagamento, desfazerPagamento, aprovarPedido,
   } = useAcoes()
-  const { janelas, prefixosCepAtendidos, cardapio } = useCatalogo()
+  const { janelas, prefixosCepAtendidos, cardapio, canais } = useCatalogo()
   const [secao, setSecao] = useState(null)
   // #1683: conversa em que o cliente está escolhendo pelo link (quem sabe é a ComandaDoCliente).
   const [conversaEscolhendo, setConversaEscolhendo] = useState(null)
@@ -98,7 +100,9 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
   // #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que se resolve. A barra
   // mostra o motivo e desabilita o botão em vez de deixar o EasyStok recusar depois.
   const prerequisito = pedido
-    ? motivoAntesDeCobrar({ pedido, clienteId: selecionada.clienteId, endereco: cliente.endereco }, { fonteApi })
+    ? motivoAntesDeCobrar({ pedido, clienteId: selecionada.clienteId, endereco: cliente.endereco }, {
+      fonteApi, escrita: permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)),
+    })
     : null
 
   // Texto pronto que o cliente lê ao cancelar (mesmo padrão de ENVIAR_MIDIA e

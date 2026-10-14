@@ -15,9 +15,9 @@ import { prazoDoPagamento } from './lembrete'
 import { duracao } from './formato'
 import { ehAtrasoDeEntrega, motivoParaAutomatico, ocorrenciaAberta } from './ocorrencia.js'
 import { pedidoAtrasado } from './cozinha.js'
-import { MOTIVO_PADRAO, origemDaPassagem } from './passagem.js'
+import { MOTIVO_PADRAO, origemDaPassagem, passagemPendente } from './passagem.js'
 import { pedidoEncerrado } from './pedido.js'
-import { ehPerguntaSemResposta, mensagensSemRespostaReal } from './mensagem.js'
+import { ehPerguntaSemResposta, mensagensSemRespostaReal, ultimaFala } from './mensagem.js'
 import { minutosAbertos } from './funcionamento.js'
 import { sinalDoCliente } from './agente.js'
 
@@ -125,7 +125,7 @@ export function modoDoAtendimento(conversa, pausado = false, bloqueada = false) 
   // Passou para você e ninguém pegou ainda: é o estado que grita. A linha
   // diz a origem inteira (quem, por quê, que horas), a mesma do cartão do
   // Balcão e do lembrete (dominio/passagem.js, rodada 12).
-  if (conversa.passagem && !conversa.passagem.assumida) {
+  if (passagemPendente(conversa)) {
     const base = DESCRICOES[MODOS.COM_VOCE]
     return { chave: MODOS.COM_VOCE, ...base,
       ...(conversa.passagem.origem === 'chat-site' ? { rotulo: 'Aguardando equipe' } : {}),
@@ -175,9 +175,6 @@ export function motivoDaPassagem(intencaoChave, semSaldo = [], areaForaInsistida
 // última fala da conversa é dela. Nota interna e aviso do sistema não contam
 // como fala. Pedido em andamento nunca sugere encerrar: a conversa ainda vai
 // levar os avisos da esteira até a entrega.
-const ultimaFala = (conversa) =>
-  [...(conversa.mensagens ?? [])].reverse().find((m) => m.dir === 'in' || m.dir === 'out') ?? null
-
 export function proximoPassoDepoisDeResponder(conversa, pausado) {
   if (!conversa || !pausado || conversa.estado === 'Encerrado') return null
   const fala = ultimaFala(conversa)
@@ -408,7 +405,7 @@ function sinalUrgente(conversa, agora) {
 // resposta pausa fora do horário. Default `null` conta o relógio inteiro.
 export function motivoDePrecisar(conversa, agora, pausado = true, aberta = true, janelas = [], expediente = null) {
   if (!conversa) return null
-  if (conversa.passagem && !conversa.passagem.assumida) {
+  if (passagemPendente(conversa)) {
     return {
       chave: 'passagem',
       rotulo: 'Precisa de você',
