@@ -1,3 +1,7 @@
+// Última fala de verdade da conversa: nota interna e aviso do sistema não contam (#1804 reaproveita).
+export const ultimaFala = (conversa) =>
+  [...(conversa?.mensagens ?? [])].reverse().find((m) => m.dir === 'in' || m.dir === 'out') ?? null
+
 // Substituição de variável de modelo aprovado. Sem React e sem catálogo fixo.
 export function preencherModelo(modelo, valores) {
   return modelo.texto.replace(/\{\{(\d+)\}\}/g, (todo, indice) => valores[Number(indice) - 1] ?? todo)

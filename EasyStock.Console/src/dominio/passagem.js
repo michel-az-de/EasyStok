@@ -11,8 +11,21 @@
 
 import { horaCurta } from './formato'
 import { AUTOMATICO_DESLIGADO } from './motivoDeEscalada'
+import { pedidoEncerrado } from './pedido'
+import { ultimaFala } from './mensagem'
 
 export const MOTIVO_PADRAO = 'O agente preferiu não responder sozinho'
+
+// #1804: reabrir a conversa de um pedido já entregue ou cancelado não cria pendência. Ela só
+// volta a "Precisa de você" quando a última fala é do cliente; antes disso, é só encerrar. Sem
+// mensagens carregadas (conversa fora da tela no modo API), vale o número de não lidas.
+export function passagemPendente(conversa) {
+  const passagem = conversa?.passagem
+  if (!passagem || passagem.assumida) return false
+  if (passagem.origem !== 'reabertura' || !pedidoEncerrado(conversa.pedido)) return true
+  if (!conversa.mensagens?.length) return Number(conversa.naoLidas) > 0
+  return ultimaFala(conversa)?.dir === 'in'
+}
 
 const minuscula = (texto) => texto.charAt(0).toLowerCase() + texto.slice(1)
 

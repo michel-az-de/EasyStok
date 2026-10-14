@@ -82,11 +82,13 @@ function motivoForaDaJanela(janela, canal) {
     return {
       titulo: `${janela.rotulo}.`,
       detalhe: 'Só modelo aprovado sai até ele responder.',
+      acao: 'janela',
     }
   }
   return {
     titulo: `${janela.rotulo} no ${canal.nome}.`,
     detalhe: 'Sem modelo aqui. Chame pelo WhatsApp ou espere ele escrever.',
+    acao: 'janela',
   }
 }
 
