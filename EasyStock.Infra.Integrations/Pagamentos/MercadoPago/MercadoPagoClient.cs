@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Seguranca;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -220,9 +221,9 @@ public sealed partial class MercadoPagoClient(
     private async Task GarantirSucessoAsync(HttpResponseMessage response, CancellationToken ct)
     {
         if (response.IsSuccessStatusCode) return;
-        var corpo = await response.Content.ReadAsStringAsync(ct);
-        if (corpo.Length > 500) corpo = corpo[..500];
         var caminho = response.RequestMessage?.RequestUri?.AbsolutePath;
+        // I4.5 (#1698): este texto vai para o log, para a exceção e para WebhookRecebido.Erro.
+        var corpo = CorpoDeProvedor.ParaRegistro(caminho, await response.Content.ReadAsStringAsync(ct));
         logger.LogWarning("MP recusou {Metodo} {Caminho}: {Status} {Corpo}",
             response.RequestMessage?.Method, caminho, (int)response.StatusCode, corpo);
         throw new HttpRequestException(
