@@ -1,6 +1,8 @@
 import { useId, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
+import { SugestaoDeTexto } from '../../componentes/SugestaoDeTexto'
+import { useComplementoDeTexto } from '../../aplicacao/useComplementoDeTexto'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useAtalhoBarra } from '../../aplicacao/useAtalhoBarra'
@@ -96,6 +98,11 @@ export function Composer({
   // envio até o EasyStok responder; o balão na conversa nasce "enviando". Se não sair, o motivo
   // fica no balão e aqui só o aviso curto.
   const [enviandoAudio, setEnviandoAudio] = useState(false)
+  const sugestao = useComplementoDeTexto({
+    texto: rascunho, contexto: 'cliente', conversaId: conversa.id,
+    ativo: fonteApi && podeEscrever && !barra.aberto && !anexo && !gravando && !enviandoAudio,
+    aoCompletar: aoMudarRascunho,
+  })
   async function aoEnviarAudio() {
     setErroAnexo(null)
     setEnviandoAudio(true)
@@ -174,13 +181,16 @@ export function Composer({
                     // quebrava em três linhas no campo (rodada 10, integração).
                     : `Escreva para ${conversa.nome.split(' ')[0]}`}
                 onChange={(e) => digitar(e.target.value)}
-                onBlur={() => descarregar()}
+                onFocus={sugestao.aoFocar}
+                onBlur={() => { sugestao.aoSair(); descarregar() }}
                 onKeyDown={(e) => {
                   if (e.isComposing || e.nativeEvent?.isComposing || e.keyCode === 229 || e.altKey || e.ctrlKey || e.metaKey) return
                   if (barra.aoTeclar(e)) return
+                  if (sugestao.aoTeclar(e)) return
                   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarComposer() }
                 }}
               />
+            <SugestaoDeTexto sugestao={sugestao} />
               {/* `portal`: mede o retângulo deste wrapper (via parentElement
                   do próprio Popover) e planta o conteúdo em document.body,
                   fora do recorte de `.composer`. Visual idêntico ao de antes,

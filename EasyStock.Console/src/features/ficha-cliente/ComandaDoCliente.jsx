@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Botao } from '../../componentes/Botao'
+import { SugestaoDeTexto } from '../../componentes/SugestaoDeTexto'
+import { useComplementoDeTexto } from '../../aplicacao/useComplementoDeTexto'
 import { Modal } from '../../componentes/Modal'
 import { moeda } from '../../dominio/formato'
 import { partesDoSku, produtoDaPorcao } from '../../dominio/cardapio'
@@ -61,7 +63,7 @@ export function ConfirmacaoPedidoCompartilhado({ comanda: c, janela, ocupado, er
   </Modal>
 }
 
-export function SelecaoCompartilhada({ comanda: c, ocupado, erro, salvar, confirmar, combinarFrete, encaminharEntrega, confirmarPedido, cardapio, podeDevolver }) {
+export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, salvar, confirmar, combinarFrete, encaminharEntrega, confirmarPedido, cardapio, podeDevolver }) {
   const [edicao, setEdicao] = useRascunhoDoAjuste('comanda-cliente:' + c.linkId)
   const [prato, setPrato] = useState('')
   const [frete, setFrete] = useState('')
@@ -72,6 +74,11 @@ export function SelecaoCompartilhada({ comanda: c, ocupado, erro, salvar, confir
     || edicao.rascunho.pedidoAtualizadoEm !== c.rascunho.pedidoAtualizadoEm || edicao.rascunho.pedidoId !== c.rascunho.pedidoId)
   const catalogo = cardapio.flatMap(p => p.porcoes?.length ? p.porcoes.map(v => produtoDaPorcao(p, v)) : [p])
   function editar(novo) { setEdicao({ revisao: edicao?.revisao ?? c.revisao, base: edicao?.base ?? c.rascunho, rascunho: novo }) }
+  const sugestao = useComplementoDeTexto({
+    texto: rascunho.observacoes ?? '', contexto: 'cozinha', conversaId,
+    ativo: Boolean(conversaId) && c.podeEditar && !ocupado,
+    aoCompletar: observacoes => editar({ ...rascunho, observacoes }),
+  })
   function mudarItem(indice, campos) {
     editar({ ...rascunho, itens: rascunho.itens.map((i, n) => n === indice ? { ...i, ...campos } : i).filter(i => i.qtd > 0) })
   }
@@ -157,8 +164,10 @@ export function SelecaoCompartilhada({ comanda: c, ocupado, erro, salvar, confir
       <summary>Observação do pedido{rascunho.observacoes && <small>{rascunho.observacoes}</small>}</summary>
       <label className={css.observacaoCompartilhada}>Observação para a cozinha
         <textarea value={rascunho.observacoes ?? ''} maxLength={2000} disabled={ocupado}
-          onChange={e => editar({ ...rascunho, observacoes: e.target.value })} />
+          onChange={e => editar({ ...rascunho, observacoes: e.target.value })}
+          onFocus={sugestao.aoFocar} onBlur={sugestao.aoSair} onKeyDown={sugestao.aoTeclar} />
       </label>
+      <SugestaoDeTexto sugestao={sugestao} />
       </details>
       {!c.pedido && <SeletorJanelaApi key={c.revisao} editavel={!ocupado}
         pedido={{ itens: rascunho.itens.map(i => ({ sku: i.cardapioItemId })), janela }}
@@ -226,7 +235,7 @@ export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompart
     {!visiveis.length && !erro && !pedido?.pedidoId && <p>Compartilhe com o cliente para escolherem juntos. A seleção chega aqui antes da confirmação.</p>}
     {visiveis.map(c => {
       const pendente = ['alteracao_aguardando_confirmacao', 'estorno_pendente', 'estorno_recusado'].includes(c.envio?.situacao)
-      const selecao = <SelecaoCompartilhada key={c.linkId} comanda={c} ocupado={ocupado} erro={erro} salvar={salvar} confirmar={confirmar}
+      const selecao = <SelecaoCompartilhada key={c.linkId} conversaId={conversaId} comanda={c} ocupado={ocupado} erro={erro} salvar={salvar} confirmar={confirmar}
         combinarFrete={combinarFrete} encaminharEntrega={encaminharEntrega} confirmarPedido={confirmarPedido} cardapio={cardapio} podeDevolver={acoes.estornarPagamentoOnline === true} />
       return c.pedido ? <details key={c.linkId} className={css.historicoCompartilhado} open={c.podeEditar || pendente}>
         <summary>{pendente ? 'Ajuste para conferir' : c.podeEditar ? 'Seleção em edição' : 'Histórico do link'}</summary>
