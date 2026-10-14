@@ -137,6 +137,22 @@ assert.ok(comoTexto(canhotoLongo.bytes).includes('(CANHOTO DE PEDIDO, N\\303O \\
 assert.ok(comoTexto(canhotoLongo.bytes).includes('/Encoding /WinAnsiEncoding'), 'fontes com WinAnsiEncoding')
 ok('acentos do português codificados em WinAnsi (Ã = \\303, É = \\311)')
 
+// #1802 (revisão gravada de 14/10): o nome com "∴" saía como "?", a porção que o nome já diz
+// saía de novo embaixo e o pedido sem janela imprimia "Janela não escolhida".
+const pedidoDaGravacao = pedido('2026-0005', [{ sku: 'LAS-CLA', qtd: 1, obs: '' }], null)
+const itemComPorcaoNoNome = { sku: 'LAS-CLA', qtd: 1, obs: '', produto: { nome: 'Lasanha Bolonhesa Clássica 800 g', porcao: '800 g', linha: 'casa' } }
+const canhotoDaGravacao = pdfDoCanhoto({
+  pedido: pedidoDaGravacao, itens: [itemComPorcaoNoNome], linhas: LINHAS,
+  nomeCliente: 'Felipe Azevedo ∴', endereco: null, faixa: null,
+})
+const daGravacao = textos(canhotoDaGravacao)
+const bytesDaGravacao = comoTexto(canhotoDaGravacao.bytes)
+assert.ok(!bytesDaGravacao.includes('Azevedo ?'), 'sinal fora do WinAnsi não vira "?" no nome')
+assert.ok(daGravacao.some((t) => t.startsWith('Felipe Azevedo')), 'nome segue no canhoto')
+assert.ok(!daGravacao.some((t) => /não escolhida/.test(t)), 'sem janela, o canhoto não imprime "Janela não escolhida"')
+assert.equal(daGravacao.filter((t) => /800 g/.test(t)).length, 1, 'porção que o nome já diz sai uma vez só')
+ok('canhoto sem "?" no nome, sem "Janela não escolhida" e sem porção repetida (#1802)')
+
 // ------------------------------------------------------------------- rota
 const conversaDaParada = (i) => ({
   id: `c${i}`,
