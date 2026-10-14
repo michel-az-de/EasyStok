@@ -15,7 +15,28 @@ public sealed class ContaReceberRepository(EasyStockDbContext db) : IContaRecebe
 
     public Task UpdateAsync(ContaReceber conta, CancellationToken ct = default)
     {
-        db.ContasReceber.Update(conta);
+        // #1769: `Update(conta)` marcava como Modified todo filho com chave preenchida, e a chave do pagamento e
+        // da parcela nasce no app. Registrar pagamento e adicionar parcela viravam UPDATE em linha que nao existe:
+        // "dados alterados por outro processo" (409) em toda tentativa. Filho novo entra como INSERT antes de o
+        // EF olhar o pai (mesmo defeito do BUG-01 #512 em Faturas, ADR-0028).
+        // A detecção automática fica desligada durante a conferência: ligada, olhar a primeira parcela já
+        // descobre a parcela nova pela coleção da conta e a marca como Modified antes de chegarmos nela.
+        var detectar = db.ChangeTracker.AutoDetectChangesEnabled;
+        db.ChangeTracker.AutoDetectChangesEnabled = false;
+        try
+        {
+            foreach (var parcela in conta.Parcelas)
+            {
+                foreach (var pagamento in parcela.Pagamentos)
+                    if (db.Entry(pagamento).State == EntityState.Detached) db.Add(pagamento);
+                if (db.Entry(parcela).State == EntityState.Detached) db.ParcelasReceber.Add(parcela);
+            }
+            if (db.Entry(conta).State == EntityState.Detached) db.ContasReceber.Update(conta);
+        }
+        finally
+        {
+            db.ChangeTracker.AutoDetectChangesEnabled = detectar;
+        }
         return Task.CompletedTask;
     }
 
@@ -145,7 +166,10 @@ public sealed class ContaReceberRepository(EasyStockDbContext db) : IContaRecebe
         => db.ParcelasReceber
             .IgnoreQueryFilters()
             .Include(p => p.Pagamentos)
-            .Include(p => p.ContaReceber)
+            // #1774: sem as outras parcelas, a conciliacao do Pix via a conta com uma parcela so e a marcava
+            // como Paga com as demais pendentes.
+            .Include(p => p.ContaReceber!).ThenInclude(c => c.Parcelas).ThenInclude(p2 => p2.Pagamentos)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.EfiTxid == txid, ct);
 
     public Task AddEventoAsync(ContaFinanceiraEvento evento, CancellationToken ct = default)
