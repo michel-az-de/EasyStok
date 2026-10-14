@@ -10,6 +10,7 @@ const tom = { Critica: 'perigo', Alta: 'aviso', Media: 'aviso', Informativa: 'in
 const textoAparelho = {
   desligado: 'Receba avisos desta conta mesmo com o Console fechado.',
   ativando: 'Aguarde a confirmação do navegador…',
+  desativando: 'Desativando avisos neste aparelho…',
   ativo: 'Avisos desta conta ativados neste aparelho.',
   bloqueado: 'Avisos bloqueados nas configurações deste navegador.',
   'sem-chave': 'Os avisos no aparelho ainda não estão configurados neste ambiente.',
@@ -62,7 +63,7 @@ export function SinoDaSessao({ avisos, aparelho }) {
           <p role={aparelho.estado === 'erro' ? 'alert' : 'status'}>{aparelho.mensagem ?? textoAparelho[aparelho.estado]}</p>
         </div>
         {['desligado', 'erro', 'sem-chave', 'ativando'].includes(aparelho.estado) && <Botao onClick={aparelho.ativar} disabled={aparelho.estado === 'ativando'}>Ativar avisos neste aparelho</Botao>}
-        {aparelho.estado === 'ativo' && <Botao onClick={aparelho.desligar}>Desativar avisos neste aparelho</Botao>}
+        {['ativo', 'desativando'].includes(aparelho.estado) && <Botao onClick={aparelho.desligar} disabled={aparelho.estado === 'desativando'}>Desativar avisos neste aparelho</Botao>}
       </section>}
     </Modal>}
   </>
