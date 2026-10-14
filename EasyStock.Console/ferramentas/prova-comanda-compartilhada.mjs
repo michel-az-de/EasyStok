@@ -17,7 +17,7 @@ globalThis.__comandaCompartilhada = contexto
 const codigo = fonte => 'data:text/javascript,' + encodeURIComponent(fonte)
 registerHooks({
   resolve(spec, ctx, proximo) {
-    if (spec === 'react') return { url: codigo('export function useState(inicial){const c=globalThis.__comandaCompartilhada;const n=c.cursor++;if(!(n in c.estados))c.estados[n]=inicial;return [c.estados[n],v=>c.estados[n]=v]} export const useRef=inicial=>useState({current:inicial})[0]'), shortCircuit: true }
+    if (spec === 'react') return { url: codigo('export function useState(inicial){const c=globalThis.__comandaCompartilhada;const n=c.cursor++;if(!(n in c.estados))c.estados[n]=inicial;return [c.estados[n],v=>c.estados[n]=v]} export const useRef=inicial=>useState({current:inicial})[0]; export const useEffect=()=>{}'), shortCircuit: true }
     if (spec === 'react/jsx-runtime') return { url: codigo('export const Fragment="fragment"; export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx'), shortCircuit: true }
     if (spec.endsWith('.css')) return { url: codigo('export default {}'), shortCircuit: true }
     if (spec.endsWith('useComandasCliente')) return { url: codigo(`export const useComandasCliente=()=>globalThis.__comandaCompartilhada;export { idDaJanela, janelaDoId } from ${JSON.stringify(new URL('../src/infra/api/comandaApi.js', import.meta.url).href)}`), shortCircuit: true }
@@ -139,6 +139,22 @@ assert.equal(partesComLinkDoCardapio(link.replace('casadababa.com', 'malicioso.c
 assert.equal(partesComLinkDoCardapio(link, null)[0].tipo, 'texto')
 assert.equal(combinaBusca({ nome: 'Maria', numeroComanda: 72, mensagens: [] }, 'comanda 72'), true)
 console.log('Comanda: conflito preserva edição, falha API preserva dados, adição de prato, permissão de devolução, saldo líquido, link seguro e busca por número aprovados.')
+for (const [podeEditar, pedido, situacao, estado, acao] of [
+  [true, null, null, 'Não confirmada', 'Revisar seleção'],
+  [true, { total: 60 }, null, 'Pedido atual mantido', 'Revisar alteração'],
+  [false, { total: 60 }, 'alteracao_aguardando_confirmacao', 'Pedido atual mantido', 'Comparar e aprovar'],
+  [false, { total: 60 }, 'aguardando_pagamento', 'Pedido criado', 'Consultar histórico'],
+  [false, { total: 60 }, 'alteracao_recusada', 'Alteração recusada', 'Consultar histórico'],
+  [false, { total: 60 }, 'estorno_pendente', 'Devolução em acompanhamento', 'Consultar histórico'],
+]) {
+  contexto.estados = []; contexto.cursor = 0
+  contexto.dados = [{ ...comanda, podeEditar, pedido, envio: situacao ? { situacao } : null }]
+  const resumo = elementos(ComandaDoCliente({ conversaId: 'conversa', ativo: true, compacta: true, pedido }))
+  assert.ok(resumo.some(e => e.props.children === estado), 'resumo distingue etapa: ' + estado)
+  assert.ok(resumo.some(e => e.type.name === 'Botao' && e.props.children === acao), 'ação corresponde à etapa: ' + acao)
+  assert.ok(!resumo.some(e => e.props.children === 'Seleção enviada'), 'envio não se confunde com criação ou aprovação')
+}
+console.log('Resumo: seleção, edição, aprovação, pedido criado, recusa e devolução têm estados e ações distintos.')
 const { ModalEnviarCardapio } = await import(modalArquivo.href)
 contexto.estados = []
 let concluirEnvio, envios = 0, fechamentos = 0

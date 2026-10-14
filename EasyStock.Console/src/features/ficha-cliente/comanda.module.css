@@ -247,3 +247,15 @@
   .gavetaNoPe .gavetaLabel { overflow: visible; text-overflow: clip; }
   .gavetaNoPe > button { padding-inline: var(--e-2); font-size: var(--t-apoio); }
 }
+.resumoCompartilhado { display: grid; gap: var(--e-2); padding: var(--e-3) 0; }
+.resumoCompartilhado + .resumoCompartilhado { border-top: 1px solid var(--linha); }
+.resumoCompartilhado p { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+.estadoDaSelecao { font-size: var(--t-apoio); font-weight: 600; }
+.etapaCompartilhada { padding: var(--e-3); margin-bottom: var(--e-3); border-left: var(--trilho) solid var(--marca); background: var(--elevado); }
+.etapaCompartilhada p { margin-bottom: 0; }
+.pedidoAtualCompartilhado { margin-block: var(--e-3); padding: var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-1); }
+.pedidoAtualCompartilhado summary { min-height: 44px; align-content: center; cursor: pointer; font-weight: 600; }
+.pedidoAtualCompartilhado summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.entregaDaSelecao { margin-block: var(--e-3); border-block: var(--b-1) solid var(--linha); }
+.entregaDaSelecao > summary { min-height: 44px; align-content: center; cursor: pointer; font-weight: 600; }
+.entregaDaSelecao > summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
