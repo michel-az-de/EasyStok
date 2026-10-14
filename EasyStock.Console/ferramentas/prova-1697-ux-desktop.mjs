@@ -31,6 +31,7 @@ const fonte = (caminho) => readFileSync(new URL(`../src/${caminho}`, import.meta
 const recolhidos = await import('../src/hooks/recolhidos.js')
 const larguras = await import('../src/hooks/larguras.js')
 const ficha = await import('../src/dominio/ficha.js')
+const paineis = await import('../src/dominio/paineis.js')
 
 let passou = 0
 const falhas = []
@@ -139,7 +140,9 @@ confere('3  o que a pessoa arrastou vale em qualquer tela; padrão antigo gravad
 // --- 4. Cardápio -------------------------------------------------------------------------------
 
 confere('4  no computador o cardápio abre do lado do Balcão, com a alça do lado da conversa', () => {
-  assert.match(fonte('app/App.jsx'), /ladoDoBalcao=\{tamanho === DESKTOP\}/)
+  // #1806: a pessoa pode mandar o cardápio para o lado do Resumo; o padrão segue o do Balcão.
+  assert.match(fonte('app/App.jsx'), /ladoDoBalcao=\{tamanho === DESKTOP && prefCardapio\.lado === 'esquerda'\}/)
+  assert.equal(paineis.normalizarCardapio(null).lado, 'esquerda')
   const painel = fonte('features/cardapio/PainelCardapio.jsx')
   assert.match(painel, /ladoDoBalcao \? css\.painelDoBalcao : ''/)
   assert.match(painel, /invertida=\{!ladoDoBalcao\}/)
@@ -155,7 +158,7 @@ confere('4  com o cardápio aberto o Balcão abre espaço: o painel não corta o
   }
   assert.equal(larguras.balcaoComCardapio({ balcao: 480, cardapio: 460 }), 480, 'Balcão já largo não encolhe')
   assert.equal(larguras.balcaoComCardapio({ balcao: 360, cardapio: 400 }), 428, 'vale o mínimo de 440 do painel')
-  assert.match(fonte('app/App.jsx'), /cardapioAberto=\{modal === 'cardapio' && Boolean\(selecionada\)\}/)
+  assert.match(fonte('app/App.jsx'), /cardapioAberto=\{modal === 'cardapio' && Boolean\(selecionada\) && prefCardapio\.lado === 'esquerda'\}/)
   assert.match(fonte('app/Moldura.jsx'), /cardapioAberto \? balcaoComCardapio\(larguras\) : larguras\.balcao/)
 })
 confere('1  título de seção recolhida não quebra em duas linhas; quem encurta é o resumo', () => {
