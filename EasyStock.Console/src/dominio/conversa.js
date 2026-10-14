@@ -279,6 +279,10 @@ export function fronteirasDoFio(atendimentos) {
     .map((a) => ({ numero: a.numero, aposIndice: a.ateIndice }))
 }
 
+// #1761 (L15): canal sem conversa aberta não ganha chip no Balcão ("Instagram 0"). Fica o que
+// está ligado como filtro, para dar como desligar.
+export const mostraChipDoCanal = (contagem, ligado = false) => ligado || (contagem?.abertas ?? 0) > 0
+
 export function bloqueioDeSemente(conversa) {
   if (conversa.bloqueio) {
     return novoBloqueio({

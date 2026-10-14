@@ -92,6 +92,11 @@ public sealed class IniciarCheckoutGuestUseCase(
         if (storefront is null || !storefront.Ativo)
             throw new StorefrontNaoEncontradoException(input.Slug);
 
+        // #1784: sem janela o pedido não passa pelo core, que é onde a pausa manual recusa; checar antes
+        // do cadastro guest para não criar cliente nem pedido com a loja fechada na mão.
+        if (input.JanelaId is null)
+            await checkoutCore.GarantirLojaAbertaAsync(storefront.EmpresaId, ct);
+
         // ── Cadastro guest isolado; telefone informado não equivale a OTP ──
         var (cliente, clienteNovo) = await ResolverClienteAsync(storefront.EmpresaId, nome, telefoneE164, cep, ct);
 

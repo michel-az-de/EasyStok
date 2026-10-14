@@ -1,12 +1,12 @@
 using System.Text.RegularExpressions;
 
-namespace EasyStock.Api.Observability.Logging;
+namespace EasyStock.Application.Seguranca;
 
 /// <summary>
 /// Fonte de verdade unica das regex de mascaramento de dados sensiveis em logs.
 ///
 /// Consumida por:
-/// - B3.0b (esta feature) <see cref="RedactingTextFormatter"/> — write-time, intercepta
+/// - B3.0b <c>RedactingTextFormatter</c> e, desde a I4.5 (#1698), <c>SinkQueRedige</c> — write-time, intercepta
 ///   antes de escrever no arquivo. Cobre vetor at-rest/shipping (Datadog/Sentry/backup).
 /// - B3.0a (proxima feature) ISensitivePatternMasker.RegexSensitivePatternMasker — read-time
 ///   no analyzer de logs do endpoint /diagnostico. Cobre vetor de exibicao no SSE.
@@ -52,6 +52,18 @@ public static class SensitivePatterns
         new Regex(
             @"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+",
             RegexOptions.Compiled),
+
+        // I4.5 (#1698): chave sensível em JSON, com aspas: {"access_token":"APP_USR-..."}. O Padrão 1 não
+        // alcança (a aspa fica entre a chave e os dois-pontos, e access_token não tem fronteira antes de "token").
+        new Regex(
+            @"(?i)""(access_token|refresh_token|id_token|client_secret|app_secret|token|password|senha|secret|api_key|apikey|authorization)""\s*:\s*""[^""]*""",
+            RegexOptions.Compiled),
+
+        // I4.5 (#1698): segredo na query de uma URL (?key=... da TomTom e do Google, ?access_token=... da Meta).
+        // Só depois de ? ou &, para não mascarar "monkey=1" nem um "key=" solto num texto qualquer.
+        new Regex(
+            @"(?i)([?&](?:key|access_token|token|api_key|apikey|client_secret|code)=)[^&\s""'<>]+",
+            RegexOptions.Compiled),
     };
 
     /// <summary>
@@ -83,6 +95,10 @@ public static class SensitivePatterns
         result = Patterns[2].Replace(result, RedactedToken);
         // Padrao 4 (Bearer <token>): preserva o "Bearer", substitui o token.
         result = Patterns[3].Replace(result, $"Bearer {RedactedToken}");
+        // Padrao 5 (JSON com aspas): preserva a chave, troca o valor.
+        result = Patterns[4].Replace(result, m => $"\"{m.Groups[1].Value}\":\"{RedactedToken}\"");
+        // Padrao 6 (query de URL): preserva o nome do parametro, troca o valor.
+        result = Patterns[5].Replace(result, m => $"{m.Groups[1].Value}{RedactedToken}");
         return result;
     }
 }

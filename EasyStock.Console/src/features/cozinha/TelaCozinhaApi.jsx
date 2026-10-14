@@ -5,7 +5,7 @@ import {
 import { useRelogio } from '../../hooks/useRelogio'
 import { dataIsoNoFuso, horaCurta } from '../../dominio/formato'
 import {
-  COLUNAS_KDS, canhotoDoKds, diaDaFilaDaCozinha, filtrarPorLinha, impressoesDaCozinha, respostaAoSoltarKds, textoDaCozinhaVazia,
+  COLUNAS_KDS, avisoDeFilaNoTeto, canhotoDoKds, diaDaFilaDaCozinha, filtrarPorLinha, impressoesDaCozinha, respostaAoSoltarKds, textoDaCozinhaVazia,
 } from '../../dominio/kds'
 import { ORDEM_DAS_LINHAS } from '../../dominio/pedido'
 import { pdfDoCanhoto } from '../../dominio/impressao'
@@ -172,6 +172,11 @@ export function TelaCozinhaApi({ linhas }) {
           <Icone nome="circle-x" tamanho={16} /> {erro}
           <Botao variante="secundario" onClick={recarregar}>Atualizar fila</Botao>
           {pedidos !== null && <Botao variante="texto" onClick={limparErro}>Fechar aviso</Botao>}
+        </p>
+      )}
+      {avisoDeFilaNoTeto(lista.length) && (
+        <p className={css.motivoRecusa} role="alert">
+          <Icone nome="alerta" tamanho={16} /> {avisoDeFilaNoTeto(lista.length)}
         </p>
       )}
       {pedidos === null

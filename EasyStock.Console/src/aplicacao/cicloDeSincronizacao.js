@@ -45,9 +45,9 @@ export function criarCicloDeSincronizacao({
   }
 
   // `null` é "não li" (a leitura falhou e não há cache); lista vazia é "a conversa não tem mensagens".
-  async function mensagensDe(resumo) {
+  async function mensagensDe(resumo, cicloLento) {
     const guardado = memoria.mensagens.get(resumo.id)
-    if (!deveRelerMensagens(resumo, guardado, lerSelecionada())) return guardado?.mensagens ?? []
+    if (!deveRelerMensagens(resumo, guardado, lerSelecionada(), { cicloLento })) return guardado?.mensagens ?? []
     try {
       const mensagens = await listarMensagens(resumo.id)
       memoria.mensagens.set(resumo.id, { ultima: resumo.ultimaMensagemEm, mensagens })
@@ -106,7 +106,7 @@ export function criarCicloDeSincronizacao({
       guardarInbox(inbox)
       const semMensagens = []
       const conversas = await emFila([...memoria.resumos.values()], CONVERSAS_POR_VEZ, async (resumo) => {
-        const [mensagens, pedido] = await Promise.all([mensagensDe(resumo), pedidoDe(resumo, cicloLento)])
+        const [mensagens, pedido] = await Promise.all([mensagensDe(resumo, cicloLento), pedidoDe(resumo, cicloLento)])
         if (mensagens === null) semMensagens.push(resumo.id)
         return { ...conversaDaApi(resumo, mensagens, lerUsuario()), pedido: pedidoDaApi(pedido) }
       })

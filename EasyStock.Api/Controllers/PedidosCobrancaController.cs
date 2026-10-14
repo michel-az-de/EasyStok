@@ -83,7 +83,7 @@ public sealed class PedidosCobrancaController(
     [Authorize(Policy = "Operador")]
     public Task<IActionResult> Reemitir(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
         ExecutarAsync(empresaId, async emp =>
-            DataOk(await gerarCobranca.ExecuteAsync(new GerarCobrancaPedidoInput(emp, id), ct)));
+            DataOk(await gerarCobranca.ExecuteComTravaAsync(new GerarCobrancaPedidoInput(emp, id), ct)));
 
     [SwaggerOperation(Summary = "Conferir pagamento online pendente no provedor")]
     [HttpPost("{id}/cobranca/conferir")]

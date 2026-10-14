@@ -16,7 +16,7 @@ namespace EasyStock.Api.IntegrationTests.Atendimento;
 public sealed partial class PedidoConversaConcorrenciaTests
 {
     [SkippableFact]
-    public async Task Comanda1712_OperadorConfirmaPrimeiroPedidoDaMesmaSelecaoSemCobrar()
+    public async Task Comanda1712_OperadorConfirmaPrimeiroPedidoDaMesmaSelecaoJaComCobranca()
     {
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
         await using var factory = CriarFactory(Provedor(new()));
@@ -46,7 +46,8 @@ public sealed partial class PedidoConversaConcorrenciaTests
             resposta.StatusCode.Should().Be(HttpStatusCode.OK, await resposta.Content.ReadAsStringAsync());
             var corpo = await resposta.Content.ReadFromJsonAsync<JsonElement>();
             pedidos.Add(corpo.GetProperty("data").GetProperty("pedidoId").GetGuid());
-            corpo.GetProperty("data").GetProperty("linkPagamento").ValueKind.Should().Be(JsonValueKind.Null);
+            corpo.GetProperty("data").GetProperty("linkPagamento").ValueKind.Should().Be(JsonValueKind.String,
+                "o pedido confirmado pela atendente nasce com cobrança (#1726)");
         }
         pedidos.Distinct().Should().ContainSingle();
         var final = await Estado(client, token);
@@ -62,7 +63,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         (await db.Pedidos.CountAsync()).Should().Be(1);
-        (await db.CobrancasPedido.CountAsync()).Should().Be(0);
+        (await db.CobrancasPedido.CountAsync()).Should().Be(1, "sem cobrança a varredura de abandonados cancelava o pedido em silêncio (#1726)");
         (await db.AtendimentoMensagens.CountAsync(x => x.ConversaId == c.ConversaId && x.Texto!.StartsWith("Pedido confirmado pelo atendimento"))).Should().Be(1);
     }
 

@@ -4,6 +4,22 @@
 .cabecalho p, .detalhe p { color: var(--tinta-2); }
 .acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 16px; }
+.fotosCardapio { display: grid; gap: 16px; }
+.fotosCardapio h3, .fotosCardapio p { margin: 0; }
+.fotosCardapio p { color: var(--tinta-2); }
+.fotosCardapio a { color: var(--tinta); text-decoration: none; }
+.fotosCardapio a:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.grupoFoto { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--linha); border-radius: 14px; }
+.grupoFoto a { border: 0; padding: 0; }
+/* #1808: a foto do prato é um botão que abre a escolha da imagem; "Abrir foto" fica como link. */
+.grupoFoto > button { border: 0; padding: 0; background: transparent; }
+.grupoFoto > button:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.grupoFoto > button:disabled { cursor: default; }
+.grupoFoto > a { color: var(--marca); font-size: .875rem; text-decoration: underline; }
+.tamanhos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+.tamanhos button { min-height: 44px; min-width: 44px; padding: 8px 12px; color: var(--tinta); background: var(--papel); border: 1px solid var(--linha-media); border-radius: 8px; font: inherit; cursor: pointer; }
+.tamanhos button[aria-pressed="true"] { background: var(--marca-claro); border-color: var(--marca); }
+.tamanhos button:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
 .cartao { display: grid; gap: 10px; padding: 12px; text-align: left; color: var(--tinta); background: var(--papel); border: 1px solid var(--linha); border-radius: 14px; cursor: pointer; font: inherit; }
 .cartao span { color: var(--tinta-2); font-size: .875rem; }
 .cartao.ativo { outline: 2px solid var(--marca); outline-offset: 2px; }

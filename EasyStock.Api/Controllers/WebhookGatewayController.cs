@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Seguranca;
 
 namespace EasyStock.Api.Controllers;
 
@@ -40,6 +41,9 @@ public class WebhookGatewayController(
 {
     private readonly IReadOnlyList<IGatewayWebhookProcessor> _processors = processors.ToList();
     private readonly IReadOnlyList<IWebhookSignatureValidator> _validators = validators.ToList();
+
+    // I4.5 (#1698): o erro do provedor fica no banco (WebhookRecebido.Erro) e aparece em tela de suporte.
+    private static string? ErroParaGravar(string? erro) => erro is null ? null : SensitivePatterns.Redact(erro);
 
     [HttpPost("{provedor}")]
     public async Task<IActionResult> Receber(string provedor, CancellationToken ct = default)
@@ -121,13 +125,13 @@ public class WebhookGatewayController(
             var resultado = await processor.ProcessarAsync(rawBody, headers, ct);
             if (!resultado.Sucesso)
                 logger.LogWarning("Webhook {Provedor}: evento nao reconhecido ({Erro}).", validator.Provedor, resultado.Erro);
-            await webhookRepo.MarcarProcessadoAsync(registro.Id, resultado.Sucesso, resultado.Erro, ct);
+            await webhookRepo.MarcarProcessadoAsync(registro.Id, resultado.Sucesso, ErroParaGravar(resultado.Erro), ct);
             return Ok();
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Webhook {Provedor}: falha no processamento.", validator.Provedor);
-            await webhookRepo.MarcarProcessadoAsync(registro.Id, sucesso: false, erro: ex.Message, ct);
+            await webhookRepo.MarcarProcessadoAsync(registro.Id, sucesso: false, erro: ErroParaGravar(ex.Message), ct);
             return StatusCode(500);
         }
     }

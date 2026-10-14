@@ -15,6 +15,25 @@ public class IdempotencyOptionsTests
     }
 
     [Fact]
+    public void Gerar_pedidos_da_lista_de_compras_usa_a_protecao_de_retentativa()
+    {
+        EasyStock.Api.Hosting.PipelineExtensions.ConfigurarRotasIdempotentes(new IdempotencyOptions())
+            .PathMatchesAny($"/api/listas-compras/{Guid.NewGuid()}/gerar-pedidos").Should().BeTrue();
+    }
+
+    // #1786: resposta perdida e o mesmo envio repetido mandavam duas mensagens ao cliente.
+    [Theory]
+    [InlineData("mensagens")]
+    [InlineData("mensagens/imagem")]
+    [InlineData("mensagens/audio")]
+    [InlineData("mensagens/imagem-cardapio")]
+    public void Envio_de_mensagem_do_atendimento_usa_a_protecao_de_retentativa(string sufixo)
+    {
+        EasyStock.Api.Hosting.PipelineExtensions.ConfigurarRotasIdempotentes(new IdempotencyOptions())
+            .PathMatchesAny($"/api/atendimento/conversas/{Guid.NewGuid()}/{sufixo}").Should().BeTrue();
+    }
+
+    [Fact]
     public void Lancamento_de_caixa_usa_a_protecao_de_retentativa()
     {
         EasyStock.Api.Hosting.PipelineExtensions.ConfigurarRotasIdempotentes(new IdempotencyOptions())

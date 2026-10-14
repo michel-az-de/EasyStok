@@ -62,6 +62,13 @@
 }
 .meta time { font-family: var(--f-dado); font-weight: 400; font-variant-numeric: tabular-nums; }
 .falhou { color: var(--erro); font-weight: 600; white-space: normal; text-align: right; }
+/* #1761: o motivo da falha agora é uma frase; ganha a linha inteira em vez de espremer ao lado dos selos. */
+.meta:has(.falhou) { flex-wrap: wrap; }
+/* (L14) o ícone de alerta fica ao lado do texto, não solto na linha de cima; as ações da bolha
+   que falhou têm 32 px de altura para o toque. */
+.meta .falhou { flex-basis: 100%; display: flex; justify-content: flex-end; align-items: flex-start; gap: 4px; }
+.meta .falhou svg { flex-shrink: 0; margin-top: 2px; }
+.acaoDaBolha { min-height: 32px; display: inline-flex; align-items: center; }
 /* #1444: "enviando" escrito, não só o ✓ cinza: a mídia demora e a dona precisa ver que está indo. */
 .enviando { display: inline-flex; align-items: center; gap: 4px; }
 .enviando::before {
@@ -81,6 +88,9 @@
   box-shadow: 0 1px 2px light-dark(rgba(120, 40, 10, .08), rgba(0, 0, 0, .35));
 }
 .saida .meta, .saida .meta * { color: var(--tinta-3); }
+/* #1761: lida se distingue de entregue pela palavra e pela cor. */
+.saida .meta .tiqueLida, .saida .meta .tiqueLida * { color: var(--info); font-weight: 600; }
+.seloBotao:disabled { cursor: progress; text-decoration: none; }
 .sistema {
   align-self: center; max-width: 94%; background: var(--elevado); color: var(--tinta-2);
   font-size: var(--t-apoio); box-shadow: none; text-align: center; padding: var(--e-2) var(--e-3);
@@ -148,6 +158,12 @@
 }
 .acoes .enviar { margin-left: auto; }
 .abrirModelos { align-self: flex-start; }
+/* #1761 (L8): conversa encerrada em uma linha neutra, no lugar do campo. */
+.linhaEncerrada {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap;
+  margin: 0; padding: var(--e-2) var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+  background: var(--papel); color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 600;
+}
 
 /* Aviso janela fechada: raio 12, padding vertical curto, ícone ao topo. */
 .bloqueio {
@@ -195,13 +211,16 @@
 
 /* #1442: uma linha só, rótulo + frase + ações. A frase encolhe com
    reticência (inteira no `title`); em coluna estreita as ações descem. */
-.modoLinha { display: flex; align-items: center; gap: var(--e-2) var(--e-3); flex-wrap: wrap; }
+/* #1761 (L6): a barra fica em uma linha e o texto não corta com reticência: se faltar largura,
+   quem quebra é a frase, ao lado da pílula e dos botões. */
+/* Com dois botões a frase não cabe ao lado: ela desce inteira para a linha de baixo, nunca é esmagada. */
+.modoLinha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-3); }
+.modoLinha > :first-child { flex-shrink: 0; }
 .modoTexto {
-  flex: 1 1 12rem; min-width: 0; margin: 0;
-  font-size: var(--t-apoio); color: var(--tinta-2);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 1 1 14rem; min-width: 0; margin: 0;
+  font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto);
 }
-.modoAcoes { margin-left: auto; display: flex; gap: var(--e-2); flex-wrap: wrap; }
+.modoAcoes { margin-left: auto; display: flex; gap: var(--e-2); flex-shrink: 0; }
 .acaoModo { min-height: 36px; padding-block: 0; }
 .listaEfeito { margin: 0; padding-left: 1.2em; display: grid; gap: var(--e-2); color: var(--tinta-2); }
 
@@ -393,6 +412,10 @@
 /* #1424: programar mensagem ao cliente (formulário e lista das programadas da conversa). */
 .programar { display: grid; gap: var(--e-3); }
 .programarCampos { display: grid; gap: var(--e-3); border: 0; padding: 0; margin: 0; min-width: 0; }
+.programarQuando { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: var(--e-2); }
+.programadasResumo { font-size: var(--t-apoio); }
+.programadasResumo summary { cursor: pointer; padding-block: var(--e-2); color: var(--marca-forte); }
+@media (max-width: 520px) { .programarQuando { grid-template-columns: minmax(0, 1fr); } }
 .programar p { margin: 0; }
 .programarOpcao { display: flex; align-items: flex-start; gap: var(--e-2); font-size: var(--t-apoio); color: var(--tinta-2); }
 .programarOpcao input { margin-top: 3px; }

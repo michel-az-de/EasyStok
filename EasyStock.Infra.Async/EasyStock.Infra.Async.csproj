@@ -28,12 +28,16 @@
          TLS explicito (sem a porta 465) e nao admite dois envios simultaneos. Ultima 4.x estavel; o
          build roda com -warnaserror, entao o audit do NuGet (NU190x) precisa sair limpo. -->
     <PackageReference Include="MailKit" Version="4.18.1" />
+    <!-- MailKit/MimeKit traz Pkcs 10.0.0. O pin da dependência existente aplica a correção
+         GHSA-846f-f764-76mx sem desativar a auditoria ou alterar o cliente de email. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     <!-- File storage (IFileStorage) movido da API para cá: a API e o Worker compartilham
          o mesmo backend de storage. O SDK S3 (R2/MinIO self-hosted) antes só na API, o que
          deixava o motor de relatórios do Worker sem resolver IFileStorage (falha em runtime). -->
     <PackageReference Include="AWSSDK.S3" Version="3.7.415.3" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.7" />
+    <PackageReference Include="Serilog" Version="4.3.0" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.7" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.7" />
     <!--

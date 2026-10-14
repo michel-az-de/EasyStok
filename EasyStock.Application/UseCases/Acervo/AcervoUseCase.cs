@@ -115,6 +115,7 @@ public sealed partial class AcervoUseCase(IAcervoRepository repo, IFileStorage s
         return uow.ExecuteInTransactionSemRetryAsync(async token =>
         {
             await repo.BloquearItemAsync(empresa, dados.ItemId, token);
+            await repo.BloquearImagemAsync(empresa, id, token);
             var anterior = await repo.PublicacaoAsync(empresa, dados.OperacaoId, token);
             if (anterior is not null)
             {
@@ -124,8 +125,7 @@ public sealed partial class AcervoUseCase(IAcervoRepository repo, IFileStorage s
             }
             var imagem = await ObterAsync(empresa, id, token);
             if (imagem.AprovadoEm is null) throw new UseCaseValidationException("Aprove esta versão antes de publicar.");
-            if (!JsonSerializer.Deserialize<Guid[]>(imagem.ItensJson)!.Contains(dados.ItemId))
-                throw new UseCaseValidationException("Esta imagem não está vinculada ao item escolhido.");
+            // #1808: qualquer prato da empresa serve; o item de outra empresa não é encontrado.
             var item = await repo.ItemAsync(empresa, dados.ItemId, token) ?? throw new KeyNotFoundException("Item não encontrado.");
             if (item.FotoUrl != dados.CapaEsperada) throw new UseCaseValidationException("A capa mudou. Atualize a prévia antes de publicar.");
             if (dados.Galeria && item.ObterFotosGaleria().Count >= 5) throw new UseCaseValidationException("A galeria já tem cinco imagens.");
@@ -139,6 +139,8 @@ public sealed partial class AcervoUseCase(IAcervoRepository repo, IFileStorage s
                 ProdutoId = item.ProdutoId, UsuarioId = autor, Galeria = dados.Galeria, Url = arquivo.Url, CapaAnterior = item.FotoUrl };
             if (dados.Galeria) item.AdicionarFotoGaleria(arquivo.Url, preservarCapa: true);
             else item.SubstituirCapaGaleria(arquivo.Url);
+            var vinculos = JsonSerializer.Deserialize<Guid[]>(imagem.ItensJson)!;
+            if (!vinculos.Contains(item.Id)) imagem.ItensJson = JsonSerializer.Serialize(vinculos.Append(item.Id));
             // Originais e arquivos anteriores permanecem para recuperação e rastreabilidade.
             repo.Adicionar(publicacao);
             await uow.CommitAsync();
@@ -216,10 +218,14 @@ public sealed partial class AcervoUseCase(IAcervoRepository repo, IFileStorage s
             (imagem.Natureza != "NaoClassificada" && imagem.Natureza != d.Natureza) ||
             imagem.Prompt != d.Prompt || imagem.Referencias != d.Referencias || imagem.OriginalId != d.OriginalId ||
             imagem.SolicitacaoId != d.SolicitacaoId || imagem.CanvaUrl != ValidarCanva(d.CanvaUrl) || imagem.CanvaAssetId != d.CanvaAssetId ||
-            !JsonSerializer.Deserialize<Guid[]>(imagem.ItensJson)!.ToHashSet().SetEquals(d.Itens))
+            !VinculosConferem(JsonSerializer.Deserialize<Guid[]>(imagem.ItensJson)!.ToHashSet(), d.Itens))
             throw new UseCaseValidationException($"Este arquivo já existe como '{imagem.Titulo}' com outros metadados. Nenhum vínculo foi alterado.");
         return imagem;
     }
+    // Publicar em outro prato acrescenta vínculos (#1808): o reenvio do upload original, com parte dos
+    // pratos de hoje, ainda é o mesmo arquivo. Uso geral (sem prato) só confere com imagem sem vínculo.
+    private static bool VinculosConferem(HashSet<Guid> vinculos, Guid[] itens) =>
+        vinculos.SetEquals(itens) || (itens.Length > 0 && vinculos.IsSupersetOf(itens));
     private static AcervoSolicitacao ConferirSolicitacao(AcervoSolicitacao pedido, SolicitarImagem d)
     {
         if (pedido.ItemId != d.ItemId || pedido.Formato != d.Formato || pedido.Brief != d.Brief.Trim() ||

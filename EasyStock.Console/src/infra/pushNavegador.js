@@ -5,14 +5,14 @@ export const pushSuportado = () => typeof window !== 'undefined'
   && typeof navigator !== 'undefined' && window.isSecureContext !== false
   && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
 export const permissaoPush = () => pushSuportado() ? Notification.permission : 'indisponivel'
-export const pedirPermissaoPush = () => Notification.requestPermission()
+export const pedirPermissaoPush = () => comPrazo(Notification.requestPermission(), 30000)
 
 const dono = () => { try { return JSON.parse(localStorage.getItem(CHAVE_DONO)) } catch { return null } }
 export const associarInscricaoPush = (identidade, endpoint) => localStorage.setItem(CHAVE_DONO, JSON.stringify({ identidade, endpoint }))
-const comPrazo = (promessa) => {
+const comPrazo = (promessa, prazo = 10000) => {
   let timer
   return Promise.race([promessa, new Promise((_, rejeitar) => {
-    timer = setTimeout(() => rejeitar(new Error('O navegador demorou para responder. Tente novamente.')), 10000)
+    timer = setTimeout(() => rejeitar(new Error('O navegador demorou para responder. Tente novamente.')), prazo)
   })]).finally(() => clearTimeout(timer))
 }
 const doConsole = (registro) => (registro?.active ?? registro?.waiting ?? registro?.installing)?.scriptURL === urlDoServiceWorker().href

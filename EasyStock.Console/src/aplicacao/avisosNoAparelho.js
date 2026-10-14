@@ -1,5 +1,5 @@
 export const ESTADOS_AVISO = {
-  INDISPONIVEL: 'indisponivel', DESLIGADO: 'desligado', ATIVANDO: 'ativando',
+  INDISPONIVEL: 'indisponivel', DESLIGADO: 'desligado', ATIVANDO: 'ativando', DESATIVANDO: 'desativando',
   ATIVO: 'ativo', BLOQUEADO: 'bloqueado', SEM_CHAVE: 'sem-chave', ERRO: 'erro',
 }
 const situacao = (estado, mensagem = null) => ({ estado, mensagem })

@@ -34,6 +34,7 @@ jobs:
       - run: npm run qualidade
       - run: node ferramentas/prova-comanda-compartilhada.mjs
       - run: node ferramentas/prova-1683-ficha-comanda.mjs
+      - run: node ferramentas/prova-1785-ficha.mjs
       - run: node ferramentas/prova-1426-notificacoes-console.mjs
       - run: node ferramentas/prova-1255-pagamento-manual-api.mjs
       - run: node ferramentas/prova-1586-encerrar-ficha-ux.mjs

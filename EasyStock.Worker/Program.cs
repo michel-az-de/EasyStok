@@ -11,6 +11,7 @@ using EasyStock.Worker;
 using EasyStock.Worker.BackgroundServices;
 using EasyStock.Worker.DependencyInjection;
 using EasyStock.Infra.Integrations.DependencyInjection;
+using EasyStock.Infra.Async.Logging;
 using Serilog;
 
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -40,12 +41,13 @@ var loggerConfiguration = new LoggerConfiguration()
 // trace_id/span_id com os traces do TelemetrySetup. Opt-in: sem a config, sem sink.
 if (builder.Configuration["OpenTelemetry:OtlpEndpoint"] is { Length: > 0 } otlpLogsEndpoint)
 {
-    loggerConfiguration = loggerConfiguration.WriteTo.OpenTelemetry(o =>
+    // I4.5 (#1698): o log sai da maquina por aqui, entao sai redigido.
+    loggerConfiguration = loggerConfiguration.WriteTo.Redigido(sinks => sinks.OpenTelemetry(o =>
     {
         o.Endpoint = otlpLogsEndpoint;
         o.Protocol = Serilog.Sinks.OpenTelemetry.OtlpProtocol.Grpc;
         o.ResourceAttributes = new Dictionary<string, object> { ["service.name"] = "EasyStock.Worker" };
-    });
+    }));
 }
 
 Log.Logger = loggerConfiguration.CreateLogger();
@@ -191,5 +193,8 @@ ChaveMestraConfiguracao.AvisarSeFaltar(
     host.Services.GetRequiredService<IConfiguration>(),
     host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("ChaveMestra"),
     "Worker");
+
+// I4.2: em Production o Worker não sobe sem chave-mestra que leia todas as credenciais ativas.
+await ChaveMestraNaSubida.ExigirAsync(host.Services, builder.Environment.EnvironmentName, "Worker");
 
 host.Run();

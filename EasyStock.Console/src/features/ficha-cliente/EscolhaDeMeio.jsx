@@ -1,5 +1,6 @@
 import { Chip } from '../../componentes/Chip'
-import { useCatalogo } from '../../aplicacao/contextos'
+import { useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { avisoDeSinalAntesDeGerar } from '../../dominio/resumoPedido'
 import css from './ficha.module.css'
 
 // Os quatro chips de meio (F4, seção 4), num lugar só. Ponta (a) da
@@ -11,11 +12,14 @@ import css from './ficha.module.css'
 // primeira linha; as formas de pagar na entrega numa segunda linha, menores
 // (`destaque` em `infra/catalogo.js`). `excluir` tira a forma atual quando a
 // pergunta é "mudar para qual?".
-export function EscolhaDeMeio({ escolhido, aoEscolher, pergunta = null, excluir = null }) {
+export function EscolhaDeMeio({ escolhido, aoEscolher, pergunta = null, excluir = null, pedido = null, geraAoEscolher = false }) {
   const { meiosDePagamento } = useCatalogo()
+  const { fonteApi, agora } = useAtendimento()
   const meios = meiosDePagamento.filter((meio) => meio.id !== excluir)
   const principais = meios.filter((meio) => meio.destaque)
   const naEntrega = meios.filter((meio) => !meio.destaque)
+  const aviso = (escolhido === 'maquininha' || (geraAoEscolher && !escolhido)) && naEntrega.some(meio => meio.id === 'maquininha')
+    ? avisoDeSinalAntesDeGerar(pedido, { fonteApi, agora, meio: escolhido }) : null
   const chip = (meio, className) => (
     <Chip
       key={meio.id}
@@ -40,6 +44,7 @@ export function EscolhaDeMeio({ escolhido, aoEscolher, pergunta = null, excluir 
             {naEntrega.map((meio) => chip(meio, css.chipSecundario))}
           </div>
         )}
+        {aviso && <p className={css.corpoBloco}>Maquininha na entrega: {aviso}</p>}
       </div>
     </>
   )

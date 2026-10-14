@@ -193,3 +193,32 @@ await esperando
 assert.equal(focos, 1)
 assert.equal(eventos.fetch, undefined)
 console.log('OK #1426: lembretes persistidos, retentativa idempotente, leitura, push por conta e service worker.')
+
+// #1755: uma permissão ignorada não prende a tela nem inscreve depois do prazo.
+const temporizadorOriginal = globalThis.setTimeout
+const limparOriginal = globalThis.clearTimeout
+let permitirDepois, pedidosDePermissao = 0, prazoDePermissao
+globalThis.Notification = { requestPermission: () => {
+  pedidosDePermissao++
+  return new Promise(resolve => { permitirDepois = resolve })
+} }
+globalThis.setTimeout = (executar, prazo) => { prazoDePermissao = prazo; queueMicrotask(executar); return 1 }
+globalThis.clearTimeout = () => {}
+try {
+  const lento = contexto()
+  lento.navegador.pedirPermissao = push.pedirPermissaoPush
+  const tentativa = ativarAvisosNoAparelho(lento)
+  assert.equal(pedidosDePermissao, 1, 'a permissão começa no gesto, antes de qualquer espera')
+  const resultado = await Promise.race([tentativa, new Promise(resolve => setImmediate(() => resolve({ estado: 'preso' })))])
+  assert.equal(resultado.estado, 'erro', 'o navegador sem resposta deve liberar uma nova tentativa')
+  assert.equal(prazoDePermissao, 30000, 'o usuário dispõe de 30 segundos para responder')
+  assert.match(resultado.mensagem, /navegador demorou/)
+  permitirDepois('granted')
+  await Promise.resolve()
+  await Promise.resolve()
+  assert.deepEqual(lento.passos, [], 'permissão tardia não busca chave, inscreve nem grava')
+} finally {
+  globalThis.setTimeout = temporizadorOriginal
+  globalThis.clearTimeout = limparOriginal
+}
+console.log('OK #1755: permissão sem resposta é recuperável e resposta tardia não ativa avisos.')

@@ -1,16 +1,44 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { useOcorrencias } from '../../aplicacao/useOcorrencias'
 import { Bloco } from '../../componentes/Bloco'
 import { RESUMO_COM_ERRO } from '../../dominio/ficha'
 import { Botao } from '../../componentes/Botao'
-import { CampoArea } from '../../componentes/Campo'
+import { CampoArea, CampoSelecao } from '../../componentes/Campo'
 import { Pilula } from '../../componentes/Pilula'
 import { dataHora, moeda } from '../../dominio/formato'
 import css from './ficha.module.css'
 
 const categorias = { produto_improprio: 'Produto impróprio', atraso: 'Atraso', preferencia: 'Preferência', outro: 'Outro' }
 const origens = { dona: 'Loja', avaliacao: 'Avaliação', agente: 'Agente' }
+
+function NovaOcorrencia({ ocupado, abrir }) {
+  const [formulario, setFormulario] = useState(false)
+  const [categoria, setCategoria] = useState('outro')
+  const [relato, setRelato] = useState('')
+  const campo = useRef(null)
+  const botao = useRef(null)
+  useEffect(() => { if (formulario) campo.current?.focus() }, [formulario])
+  function fechar() {
+    setFormulario(false)
+    requestAnimationFrame(() => botao.current?.focus())
+  }
+  async function registrar(e) {
+    e.preventDefault()
+    if (relato.trim() && await abrir(categoria, relato.trim())) {
+      setRelato(''); setCategoria('outro'); fechar()
+    }
+  }
+  return formulario ? <form className={css.acoesPedido} onSubmit={registrar}>
+    <CampoSelecao rotulo="Motivo da ocorrência" value={categoria} onChange={e => setCategoria(e.target.value)} disabled={ocupado}
+      opcoes={Object.entries(categorias).map(([valor, rotulo]) => ({ valor, rotulo }))} />
+    <CampoArea ref={campo} rotulo="O que aconteceu?" value={relato} onChange={e => setRelato(e.target.value)}
+      maxLength={1000} required disabled={ocupado} rows={3} />
+    <p className={css.corpoBloco}>O relato fica no histórico deste pedido. Nenhum valor será devolvido ao registrar.</p>
+    <Botao tipo="submit" variante="primario" disabled={ocupado || !relato.trim()}>Salvar ocorrência</Botao>
+    <Botao disabled={ocupado} onClick={fechar}>Voltar</Botao>
+  </form> : <Botao ref={botao} variante="primario" disabled={ocupado} onClick={() => setFormulario(true)}>Registrar ocorrência</Botao>
+}
 
 function Ocorrencia({ o, podeGerenciar, ocupado, apurar, encerrar, retomar }) {
   const [formulario, setFormulario] = useState(false)
@@ -60,6 +88,7 @@ export function BlocoOcorrenciasApi({ pedidoId, conversaId }) {
       {erro && <p className={css.corpoBloco} role="alert">{erro}</p>}
       {!dados && !erro && <p className={css.corpoBloco}>Consultando ocorrências…</p>}
       {dados?.length === 0 && <p className={css.corpoBloco}>Nenhuma ocorrência neste pedido.</p>}
+      {acoes.gerenciarOcorrencias === true && <NovaOcorrencia ocupado={ocupado} abrir={comandos.abrir} />}
       {dados?.map((o) => <Ocorrencia key={o.id} o={o} podeGerenciar={acoes.gerenciarOcorrencias === true} ocupado={ocupado} {...comandos} />)}
       <Botao disabled={ocupado} onClick={atualizar}>Atualizar ocorrências</Botao>
     </div>

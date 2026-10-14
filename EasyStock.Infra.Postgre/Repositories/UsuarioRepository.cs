@@ -50,9 +50,12 @@ namespace EasyStock.Infra.Postgre.Repositories
             // desligado. UseRowLevelSecurityBypass emite SET app.bypass_rls=true
             // na conexão pelo SetTenantOnConnectionInterceptor, dando à query
             // de login a visibilidade global que ela precisa antes do JWT existir.
+            // #1781: o e-mail é gravado normalizado (Usuario.NormalizarEmail); a busca normaliza o digitado e
+            // segue por igualdade, no índice único de Email.
+            var normalizado = Usuario.NormalizarEmail(email);
             using (dbContext.UseRowLevelSecurityBypass())
             {
-                return await QueryDeLogin().FirstOrDefaultAsync(u => u.Email == email);
+                return await QueryDeLogin().FirstOrDefaultAsync(u => u.Email == normalizado);
             }
         }
 
@@ -132,6 +135,30 @@ namespace EasyStock.Infra.Postgre.Repositories
             dbContext.Usuarios
                 .Where(u => u.Id == usuarioId && (u.SessoesValidasDesde == null || u.SessoesValidasDesde < desde))
                 .ExecuteUpdateAsync(s => s.SetProperty(u => u.SessoesValidasDesde, desde));
+
+        public async Task<bool> ReservarTentativaDeSenhaAsync(Guid usuarioId, DateTime agora)
+        {
+            // #1781: um UPDATE só, com o limite no WHERE: requisições paralelas se enfileiram na trava da linha e
+            // a que chega com a conta já bloqueada altera 0 linhas. LockoutEnd não nulo aqui é bloqueio vencido.
+            var bloqueioAte = agora.AddMinutes(Usuario.MinutosDeBloqueio);
+            var linhas = await dbContext.Usuarios
+                .Where(u => u.Id == usuarioId && (u.LockoutEnd == null || u.LockoutEnd <= agora))
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(u => u.FailedLoginAttempts, u => u.LockoutEnd != null ? 1 : u.FailedLoginAttempts + 1)
+                    .SetProperty(u => u.LockoutEnd, u =>
+                        (u.LockoutEnd != null ? 1 : u.FailedLoginAttempts + 1) >= Usuario.FalhasParaBloquear
+                            ? bloqueioAte
+                            : (DateTime?)null)
+                    .SetProperty(u => u.AlteradoEm, agora));
+            return linhas == 1;
+        }
+
+        public Task DevolverTentativaDeSenhaAsync(Guid usuarioId) =>
+            dbContext.Usuarios
+                .Where(u => u.Id == usuarioId && u.FailedLoginAttempts > 0)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(u => u.FailedLoginAttempts, u => u.FailedLoginAttempts - 1)
+                    .SetProperty(u => u.LockoutEnd, (DateTime?)null));
 
         public async Task<IEnumerable<Usuario>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
         {

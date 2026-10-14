@@ -67,8 +67,10 @@ public sealed class PedidoFornecedorRepository(EasyStockDbContext dbContext) : I
         await dbContext.PedidosFornecedor
             .AsNoTracking()
             .Include(x => x.Fornecedor)
+            // RecebidoParcial ainda espera mercadoria: fora da lista, o pedido sumia sem poder ser concluído.
             .Where(x => x.EmpresaId == empresaId &&
-                        (x.Status == StatusPedidoFornecedor.Aberto || x.Status == StatusPedidoFornecedor.EmTransito))
+                        (x.Status == StatusPedidoFornecedor.Aberto || x.Status == StatusPedidoFornecedor.EmTransito
+                         || x.Status == StatusPedidoFornecedor.RecebidoParcial))
             .OrderByDescending(x => x.DataPedido)
             .ToListAsync();
 

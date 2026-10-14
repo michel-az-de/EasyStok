@@ -161,7 +161,7 @@ await confere('4  mensagem que não saiu: a comanda não diz "Enviada ao cliente
   const s = situacaoDoEnvio(comCobranca({ resumoNaoEnviado: true }))
   assert.equal(s.pode, false)
   assert.equal(s.chave, 'nao-enviada')
-  assert.equal(s.texto, 'Cobrança criada, mas a mensagem não saiu. Copie o link na Cobrança abaixo e envie pela conversa.')
+  assert.equal(s.texto, 'Cobrança criada, mas a mensagem não saiu. Abra Pagamento no resumo, copie o link e envie pela conversa.')
   const semLink = situacaoDoEnvio(comCobranca({ resumoNaoEnviado: true, cobranca: { criadaEm: Date.parse(AGORA), link: null } }))
   assert.equal(semLink.texto, 'Cobrança criada, mas a mensagem não saiu. Avise o cliente pela conversa.')
   assert.match(situacaoDoEnvio(comCobranca()).texto, /^Enviada ao cliente às \d{2}:\d{2}/)

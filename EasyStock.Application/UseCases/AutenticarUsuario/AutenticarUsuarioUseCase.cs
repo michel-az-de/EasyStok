@@ -35,18 +35,28 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
             swDb.Stop();
             logger.LogDebug("Login etapa DB query: {ElapsedMs}ms", swDb.ElapsedMilliseconds);
 
+            // #1781: conta inexistente, inativa ou bloqueada roda o BCrypt contra o hash fictício e responde como
+            // senha errada: nem o tempo nem a mensagem distinguem os casos.
             if (usuario is null || !usuario.Ativo)
-                throw new CredenciaisInvalidasException();
+                throw RecusarSemConferir(command.Senha);
 
             if (usuario.EstaBloqueado())
             {
                 logger.LogWarning("Tentativa de login para usuario bloqueado: {UsuarioId}", usuario.Id);
-                throw new CredenciaisInvalidasException("Conta bloqueada temporariamente.");
+                throw RecusarSemConferir(command.Senha);
             }
 
             if (!usuario.EmailConfirmado)
             {
                 logger.LogWarning("Tentativa de login com email não confirmado: {UsuarioId}", usuario.Id);
+            }
+
+            // #1781: a tentativa é contada no banco, num UPDATE atômico, antes do BCrypt; rajada paralela não passa
+            // do limite. Recusada: outra requisição levou a última tentativa e a conta está bloqueada.
+            if (!await usuarioRepository.ReservarTentativaDeSenhaAsync(usuario.Id, DateTime.UtcNow))
+            {
+                logger.LogWarning("Tentativa de login para usuario bloqueado: {UsuarioId}", usuario.Id);
+                throw RecusarSemConferir(command.Senha);
             }
 
             // --- etapa 2: verificação do hash (CPU-bound ~200-800ms dependendo do work factor)
@@ -58,11 +68,11 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
             if (!senhaOk)
             {
                 // #1352: regra única (contagem, bloqueio na 5ª e janela vencida) em Usuario, a mesma do passo 1.
+                // #1781: a reserva já gravou a falha; a entidade só espelha (log). Gravar a linha lida antes da
+                // reserva devolveria o contador ao valor velho e perderia as falhas paralelas.
                 usuario.RegistrarFalhaDeSenha();
                 if (usuario.EstaBloqueado())
                     logger.LogWarning("Usuario {UsuarioId} bloqueado apos {Limite} tentativas falhas", usuario.Id, Domain.Entities.Usuario.FalhasParaBloquear);
-                await usuarioRepository.UpdateAsync(usuario);
-                await unitOfWork.CommitAsync();
                 throw new CredenciaisInvalidasException();
             }
 
@@ -173,6 +183,13 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 ModuloInicial: moduloInicial,
                 PermissoesExplicitas: permissoesExplicitas,
                 SessaoPersistente: sessaoPersistente);
+        }
+
+        /// <summary>#1781: mesmo custo e mesma resposta da senha errada, sem conferir senha real nenhuma.</summary>
+        private CredenciaisInvalidasException RecusarSemConferir(string senha)
+        {
+            passwordHasher.Verify(senha, SenhaFicticia.Hash);
+            return new CredenciaisInvalidasException();
         }
 
         private static Guid? PrimeiraEmpresaAtiva(Domain.Entities.Usuario usuario) =>
