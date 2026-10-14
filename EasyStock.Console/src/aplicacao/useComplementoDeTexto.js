@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { complementoDeTexto, podeAceitarComplemento, perguntaDeComplemento } from '../dominio/complementoDeTexto'
+import { complementoDaResposta, podeAceitarComplemento, perguntaDeComplemento } from '../dominio/complementoDeTexto'
 import { perguntarAssistente } from '../infra/api/assistenteApi'
 import { EVENTO_SESSAO_ALTERADA, identidadeDaSessao, lerSessao } from '../infra/api/sessao'
 
@@ -42,11 +42,12 @@ export function useComplementoDeTexto({ texto = '', contexto, conversaId, ativo,
       emVoo = controle
       proximaChamada = Date.now() + 8000
       try {
-        const resposta = await perguntarAssistente(perguntaDeComplemento(texto, contexto), conversaId, {
+        // A cozinha pede só redação; sem conversa, a API não oferece ferramentas de ações no cliente.
+        const resposta = await perguntarAssistente(perguntaDeComplemento(texto, contexto), contexto === 'cozinha' ? null : conversaId, {
           sinal: AbortSignal.any([controle.signal, AbortSignal.timeout(15000)]), identidadeEsperada: identidade,
         })
         // Ações da IA nunca são executadas por um complemento de escrita.
-        const complemento = complementoDeTexto(texto, resposta.texto, limite)
+        const complemento = complementoDaResposta(texto, resposta, limite)
         if (!controle.signal.aborted && atual.current === chave && identidadeDaSessao(lerSessao()) === identidade) {
           if (cache.current.size >= 10) cache.current.delete(cache.current.keys().next().value)
           cache.current.set(chave, { complemento, ate: Date.now() + 60000 })

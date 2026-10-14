@@ -1,11 +1,20 @@
 import assert from 'node:assert/strict'
-import { complementoDeTexto, podeAceitarComplemento, perguntaDeComplemento } from '../src/dominio/complementoDeTexto.js'
+import { complementoDaResposta, complementoDeTexto, podeAceitarComplemento, perguntaDeComplemento } from '../src/dominio/complementoDeTexto.js'
 
 const texto = 'Bom dia! Podemos '
 assert.equal(complementoDeTexto(texto, texto + 'ajudar com seu pedido?'), 'ajudar com seu pedido?')
 for (const resposta of [null, '', 'Claro! ' + texto, '"' + texto + 'fim"', texto, texto + ' ', texto + '\nExplicação', texto + '{}', texto + '```', texto + 'x'.repeat(241), texto + 'fim. Explicação: exemplo'])
   assert.equal(complementoDeTexto(texto, resposta), '')
 assert.equal(complementoDeTexto(texto, texto + 'ajudar?', texto.length + 2), '')
+const acoes = [{ tipo: 'rascunho', texto: texto + 'ajudar?' }]
+assert.equal(complementoDaResposta(texto, { texto: '', acoes }), 'ajudar?')
+assert.equal(complementoDaResposta(texto, { texto: 'Preparei uma sugestão.', acoes }), 'ajudar?')
+assert.equal(complementoDaResposta(texto, { texto: '', acoes: [{ tipo: 'rascunho', texto: 'Outro prefixo' }] }), '')
+assert.equal(complementoDaResposta(texto, { texto: '', acoes }, texto.length + 2), '')
+for (const tipo of ['nota_interna', 'abrir_tela', 'enviar_cardapio', 'retomar_automatico'])
+  assert.equal(complementoDaResposta(texto, { texto: '', acoes: [{ tipo, texto: texto + 'ajudar?' }] }), '')
+assert.equal(complementoDaResposta(texto, { texto: texto + 'ajudar?', acoes: null }), 'ajudar?')
+assert.equal(complementoDaResposta(texto, { texto: '', acoes: {} }), '')
 const evento = { key: 'Tab', currentTarget: { selectionStart: texto.length, selectionEnd: texto.length } }
 assert.equal(podeAceitarComplemento(evento, texto, 'ajudar?'), true)
 assert.equal(podeAceitarComplemento(evento, texto, ''), false)

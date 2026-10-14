@@ -34,7 +34,12 @@ async function abrir({ width = 1280, modo = 'normal', query = '' } = {}) {
     const texto = corpo.pergunta.split('\nTRECHO:\n')[1]
     if (modo === 'lento') await new Promise(resolve => { pendente = resolve })
     if (modo === 'erro') return route.fulfill({ status: 503, json: { error: { code: 'IA_OFF', message: 'IA indisponível' } } })
-    return route.fulfill({ json: { success: true, data: { resposta: modo === 'invalido' ? 'Claro! ' + texto : texto + 'confirmar os detalhes?', acoes: [{ tipo: 'enviar-mensagem', texto: 'NÃO ENVIAR' }] } } })
+    const rascunho = { tipo: 'rascunho', texto: texto + 'confirmar os detalhes?' }
+    const cozinha = corpo.conversaId === null
+    const resposta = modo === 'rascunho-invalido' ? '' : !cozinha && modo === 'rascunho' ? '' : modo === 'explicacao' ? 'Preparei uma sugestão.' : modo === 'invalido' ? 'Claro! ' + texto : texto + 'confirmar os detalhes?'
+    const acoes = cozinha ? [] : modo === 'rascunho-invalido' ? [{ tipo: 'rascunho', texto: 'Outro prefixo' }, { tipo: 'nota_interna', texto: rascunho.texto }]
+      : modo === 'rascunho' || modo === 'explicacao' ? [rascunho] : [{ tipo: 'enviar-mensagem', texto: 'NÃO ENVIAR' }]
+    return route.fulfill({ json: { success: true, data: { resposta, acoes } } })
   })
   const page = await context.newPage(); page.on('pageerror', e => erros.push(e.message))
   await page.goto(base + '/.build/sugestao-tab/index.html' + query)
@@ -45,7 +50,7 @@ async function foto(page, nome) { await page.screenshot({ path: join(saida, nome
 const texto = 'Bom dia! Podemos '
 try {
   for (const width of [1280,390]) {
-    const t = await abrir({ width }); await t.campo.fill(texto)
+    const t = await abrir({ width, modo: 'rascunho' }); await t.campo.fill(texto)
     await t.page.getByRole('button', { name: 'Usar sugestão' }).waitFor()
     assert.equal(t.chamadas.length, 1); assert.equal(t.chamadas[0].conversaId, '11111111-1111-4111-8111-111111111111')
     await foto(t.page, 'composer-sugestao-' + width)
@@ -55,6 +60,7 @@ try {
     await t.page.getByText('Observação do pedido', { exact: true }).click()
     const obs = t.page.getByLabel('Observação para a cozinha'); await obs.fill('Para este pedido, ')
     await t.page.getByRole('button', { name: 'Usar sugestão' }).waitFor({ timeout: 12000 })
+    assert.equal(t.chamadas.at(-1).conversaId, null, 'cozinha pede apenas redação, sem ferramentas da conversa')
     const usar = t.page.getByRole('button', { name: 'Usar sugestão' })
     await usar.evaluate(el => el.scrollIntoView({ block: 'center' }))
     assert.equal(await usar.evaluate(el => { const r=el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)) }),true,'o botão precisa estar livre da barra fixa')
@@ -63,12 +69,17 @@ try {
     assert.equal(await obs.inputValue(), 'Para este pedido, confirmar os detalhes?')
     await t.context.close()
   }
-  for (const modo of ['erro','invalido']) {
+  for (const modo of ['erro','invalido','rascunho-invalido']) {
     const t = await abrir({ modo }); await t.campo.fill(texto); await t.page.waitForTimeout(1700)
     assert.equal(t.chamadas.length, 1); assert.equal(await t.page.getByRole('button', { name: 'Usar sugestão' }).count(), 0)
     await t.campo.press('Tab'); assert.equal(await t.campo.evaluate(el => el === document.activeElement), false)
     await foto(t.page, modo); await t.context.close()
   }
+  const proposta = await abrir({ modo: 'explicacao' }); await proposta.campo.fill(texto)
+  await proposta.page.getByRole('button', { name: 'Usar sugestão' }).waitFor()
+  await foto(proposta.page, 'explicacao-com-rascunho'); await proposta.campo.press('Tab')
+  assert.equal(await proposta.campo.inputValue(), texto + 'confirmar os detalhes?')
+  assert.deepEqual(await proposta.page.evaluate(() => window.envios), []); await proposta.context.close()
   const esc = await abrir(); await esc.campo.fill(texto); await esc.page.getByRole('button', { name: 'Usar sugestão' }).waitFor()
   await esc.campo.press('Shift+Tab'); assert.equal(await esc.campo.inputValue(),texto)
   assert.equal(await esc.campo.evaluate(el => el === document.activeElement),false)
