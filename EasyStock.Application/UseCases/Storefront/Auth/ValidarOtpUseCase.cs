@@ -21,7 +21,8 @@ namespace EasyStock.Application.UseCases.Storefront.Auth;
 /// <strong>Anti-brute force</strong>: cada tentativa é reservada em <c>ClienteOtp.Tentativas</c> num
 /// UPDATE atômico, com o limite no WHERE, antes de conferir o código (#1781): rajada paralela não passa de
 /// <see cref="ClienteOtp.MaxTentativas"/>. Sem tentativa a reservar, ou errando a última, responde
-/// <see cref="OtpTentativasExcedidasException"/>.
+/// <see cref="OtpTentativasExcedidasException"/>; reserva recusada porque outra requisição já consumiu o OTP
+/// responde <see cref="OtpInvalidoException"/>.
 /// </para>
 ///
 /// <para>
@@ -96,6 +97,16 @@ public sealed class ValidarOtpUseCase(
         // do limite. Recusada: as tentativas acabaram (ou outra requisição consumiu o OTP).
         if (!await clienteOtpRepository.ReservarTentativaAsync(otp.Id, ct))
         {
+            // Dois códigos certos em paralelo: quem leu o OTP antes do consumo da outra requisição tem a reserva
+            // recusada pelo NOT Consumido. É código já usado, não tentativa esgotada.
+            if (await clienteOtpRepository.ConsumidoAsync(otp.Id, ct))
+            {
+                logger.LogWarning(
+                    "OTP já consumido por outra requisição (na reserva): empresaId={EmpresaId} otpId={OtpId} telefone={Telefone}",
+                    empresaId, otp.Id, telefoneMascarado);
+                throw new OtpInvalidoException();
+            }
+
             logger.LogWarning(
                 "OTP tentativas esgotadas: empresaId={EmpresaId} otpId={OtpId} telefone={Telefone}",
                 empresaId, otp.Id, telefoneMascarado);
