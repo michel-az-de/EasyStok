@@ -32,27 +32,32 @@ public sealed class ReenviarMensagemUseCase(
     /// <summary>Um modelo de retomada por contato a cada janela: outra mensagem que falhar só entra na espera.</summary>
     private static readonly TimeSpan IntervaloEntreModelos = TimeSpan.FromHours(24);
 
-    public async Task<MensagemAtendimentoResult> ExecuteAsync(
-        Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default)
-    {
-        var mensagem = await conversaRepository.ObterMensagemParaAlterarAsync(empresaId, conversaId, mensagemId, ct)
-            ?? throw new MensagemNaoEncontradaException(mensagemId);
-        if (!mensagem.PodeReenviar)
-            throw new UseCaseValidationException("Só texto que falhou pode ser reenviado.");
-        var conversa = await conversaRepository.ObterPorIdAsync(empresaId, conversaId, ct)
-            ?? throw new ConversaNaoEncontradaException(conversaId);
+    /// <summary>
+    /// #1792: a mensagem fica travada do início ao commit. O segundo pedido (clique duplo, ou clique e serviço de fundo)
+    /// espera, relê a mensagem já enviada e é recusado em vez de mandar o texto de novo.
+    /// </summary>
+    public Task<MensagemAtendimentoResult> ExecuteAsync(
+        Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
+        unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+        {
+            var mensagem = await conversaRepository.ObterMensagemComLockAsync(empresaId, conversaId, mensagemId, token)
+                ?? throw new MensagemNaoEncontradaException(mensagemId);
+            if (!mensagem.PodeReenviar)
+                throw new UseCaseValidationException("Só texto que falhou pode ser reenviado.");
+            var conversa = await conversaRepository.ObterPorIdAsync(empresaId, conversaId, token)
+                ?? throw new ConversaNaoEncontradaException(conversaId);
 
-        var agora = relogio.GetUtcNow().UtcDateTime;
-        var destino = await DestinoDentroDaJanelaAsync(empresaId, conversa, agora, ct);
-        if (destino is null)
-            await ForaDaJanelaAsync(empresaId, conversa, mensagem, agora, ct);
-        else
-            await EnviarAsync(empresaId, destino, mensagem, agora, ct);
+            var agora = relogio.GetUtcNow().UtcDateTime;
+            var destino = await DestinoDentroDaJanelaAsync(empresaId, conversa, agora, token);
+            if (destino is null)
+                await ForaDaJanelaAsync(empresaId, conversa, mensagem, agora, token);
+            else
+                await EnviarAsync(empresaId, destino, mensagem, agora, token);
 
-        await reservaSms.TentarAsync(conversa, mensagem, agora, ct);
-        await unitOfWork.CommitAsync();
-        return MensagemAtendimentoResult.De(mensagem);
-    }
+            await reservaSms.TentarAsync(conversa, mensagem, agora, token);
+            await unitOfWork.CommitAsync();
+            return MensagemAtendimentoResult.De(mensagem);
+        }, ct);
 
     private async Task<Conversa?> DestinoDentroDaJanelaAsync(Guid empresaId, Conversa conversa, DateTime agora, CancellationToken ct)
     {
