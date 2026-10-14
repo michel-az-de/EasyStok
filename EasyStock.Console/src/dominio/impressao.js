@@ -4,7 +4,7 @@
 // Sempre preto no branco, independente do tema da tela.
 import { dataHora, horaCurta, listaEmPortugues, plural } from './formato'
 import { A4, LARGURA_BOBINA, larguraDoTexto, mm, montarPdf, quebrarLinhas } from './pdf'
-import { agruparPorLinha, itensDetalhados, numeroCurto, porcaoForaDoNome } from './pedido'
+import { agruparPorLinha, itensDetalhados, numeroCurto, pedidoEncerrado, porcaoForaDoNome } from './pedido'
 import { entregadorDaViagem, marcosDaViagem } from './viagem'
 import { resumoDoRoteiro, rotuloDaData, textoDeQuemLeva } from './roteiroDoDia'
 
@@ -49,8 +49,9 @@ export function documentoDoCanhoto({ pedido, itens, linhas, nomeCliente, enderec
   c.espaco(mm(1.5))
   c.escrever('Comanda', { tamanho: 16, fonte: 'negrito', larguraMax: c.largura - mm(24) })
   c.direita(`Nº ${numeroCurto(pedido.numero)}`, { tamanho: 16, fonte: 'negrito', y: c.estado.y - 16 * 0.3 })
-  // #1802: sem janela, só o nome (o "Janela não escolhida" saía até em pedido já entregue).
-  c.escrever(faixa ? `${nomeCliente} · Janela ${faixa}` : nomeCliente, { tamanho: 10.5, fonte: 'negrito' })
+  // #1802: pedido já entregue ou cancelado sem janela sai só com o nome; na cozinha o aviso segue útil.
+  const janela = faixa ? ` · Janela ${faixa}` : (pedidoEncerrado(pedido) ? '' : ' · Janela não escolhida')
+  c.escrever(`${nomeCliente}${janela}`, { tamanho: 10.5, fonte: 'negrito' })
   if (pedido.cobranca?.criadaEm) c.escrever(`Enviada ${horaCurta(pedido.cobranca.criadaEm)}`, { tamanho: 9.5 })
   if (endereco) c.escrever(endereco, { tamanho: 9.5 })
   c.traco({ tracejada: true })

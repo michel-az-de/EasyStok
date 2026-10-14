@@ -138,8 +138,8 @@ assert.ok(comoTexto(canhotoLongo.bytes).includes('/Encoding /WinAnsiEncoding'), 
 ok('acentos do português codificados em WinAnsi (Ã = \\303, É = \\311)')
 
 // #1802 (revisão gravada de 14/10): o nome com "∴" saía como "?", a porção que o nome já diz
-// saía de novo embaixo e o pedido sem janela imprimia "Janela não escolhida".
-const pedidoDaGravacao = pedido('2026-0005', [{ sku: 'LAS-CLA', qtd: 1, obs: '' }], null)
+// saía de novo embaixo e o pedido entregue sem janela imprimia "Janela não escolhida".
+const pedidoDaGravacao = { ...pedido('2026-0005', [{ sku: 'LAS-CLA', qtd: 1, obs: '' }], null), estado: 'entregue' }
 const itemComPorcaoNoNome = { sku: 'LAS-CLA', qtd: 1, obs: '', produto: { nome: 'Lasanha Bolonhesa Clássica 800 g', porcao: '800 g', linha: 'casa' } }
 const canhotoDaGravacao = pdfDoCanhoto({
   pedido: pedidoDaGravacao, itens: [itemComPorcaoNoNome], linhas: LINHAS,
