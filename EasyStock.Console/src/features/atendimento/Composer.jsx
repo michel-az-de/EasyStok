@@ -159,6 +159,7 @@ export function Composer({
       {modelosFixos && podeEnviarModelo && <Botao className={css.abrirModelos} aria-haspopup="dialog" onClick={aoAbrirModelos}>
         <Icone nome="modelo" /> Modelos aprovados
       </Botao>}
+      {modelosFixos && podeEnviarModelo && <p className={css.restricao}>Mensagens prontas aprovadas pelo WhatsApp para retomar a conversa fora da janela de resposta.</p>}
 
       {/* Gravando substitui o campo de texto e as ações: gravar e escrever ao
           mesmo tempo não é o gesto que o dono pediu ("gravar... cancelar ou

@@ -205,7 +205,7 @@ export function AbaProducaoDoDiaApi() {
   return (
     <div className={css.aba}>
       <p className={css.descricao}>
-        Escolha os pratos que ficaram prontos. Cada toque soma uma porção; depois, confira e registre a produção.
+        Cada toque em um prato seleciona mais 1 porção. Depois, use Conferir produção. O estoque só muda ao confirmar.
       </p>
 
       {falta.length > 0 && (
@@ -269,6 +269,7 @@ export function AbaProducaoDoDiaApi() {
                   return (
                     <li key={cartao.chave} data-prato={cartao.chave} className={`${grade.cartao} ${noLote > 0 ? grade.noLote : ''}`}>
                       <button type="button" className={grade.tocar} disabled={enviando} aria-label={`Somar 1 porção de ${nome}`}
+                        title={`Adicionar 1 porção de ${nome} à seleção. O estoque só muda ao confirmar.`}
                         aria-describedby={[idDoSaldo, idDaContagem].filter(Boolean).join(' ') || undefined} onClick={() => somar(cartao, 1)}>
                         <span className={grade.nomeDoPrato}>{nomeVisual}</span>
                         {tamanho && <span className={grade.tamanho}>{tamanho}</span>}
