@@ -108,6 +108,7 @@ public sealed class ListarJanelasFerramenta(
                 Mensagem.Saida(contexto.EmpresaId, conversa.Id, AutorMensagem.Agente, contexto.Agora,
                     TipoConteudoMensagem.Texto, texto, envio.Wamid),
                 ct);
+            await contexto.GravarSaidaAsync(ct);
             return botoes.Count;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
