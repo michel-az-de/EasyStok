@@ -97,6 +97,37 @@ public class ReenviarMensagemUseCaseTests
         await act.Should().ThrowAsync<UseCaseValidationException>();
     }
 
+    /// <summary>
+    /// #1786: a outra atendente (ou o serviço de fundo) reenviou e confirmou enquanto esta lia. A leitura sem trava ainda
+    /// via "falhou"; a releitura sob trava vê a mensagem enviada e não manda o texto de novo ao cliente.
+    /// </summary>
+    [Fact]
+    public async Task ReenvioConcorrenteReleSobTravaENaoMandaDeNovo()
+    {
+        var jaReenviada = Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Agente, Agora.AddMinutes(-5),
+            TipoConteudoMensagem.Texto, "Temos ravioli!", "wamid.da-outra");
+        _conversas.ObterMensagemComLockAsync(_empresaId, _conversa.Id, _falhou.Id, Arg.Any<CancellationToken>()).Returns(jaReenviada);
+
+        var act = () => UseCase().ExecuteAsync(_empresaId, _conversa.Id, _falhou.Id);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        await _whatsapp.DidNotReceive().EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        _uow.CommitCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task LeituraComTravaAconteceDentroDaTransacao()
+    {
+        var dentro = false;
+        _conversas.ObterMensagemComLockAsync(_empresaId, _conversa.Id, _falhou.Id, Arg.Any<CancellationToken>())
+            .Returns(_ => { dentro = _uow.EmTransacao; return _falhou; });
+        _whatsapp.EnviarTextoAsync(WaId, "Temos ravioli!", Arg.Any<CancellationToken>()).Returns("wamid.novo");
+
+        await UseCase().ExecuteAsync(_empresaId, _conversa.Id, _falhou.Id);
+
+        dentro.Should().BeTrue();
+    }
+
     [Fact]
     public async Task MensagemInexistenteDevolveNaoEncontrada()
     {

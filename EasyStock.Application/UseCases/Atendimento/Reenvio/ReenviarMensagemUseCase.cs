@@ -33,8 +33,8 @@ public sealed class ReenviarMensagemUseCase(
     private static readonly TimeSpan IntervaloEntreModelos = TimeSpan.FromHours(24);
 
     /// <summary>
-    /// #1792: a mensagem fica travada do início ao commit. O segundo pedido (clique duplo, ou clique e serviço de fundo)
-    /// espera, relê a mensagem já enviada e é recusado em vez de mandar o texto de novo.
+    /// #1786: a mensagem é lida sob trava (<c>FOR UPDATE</c>) e a trava dura até o commit. Duas atendentes, ou o botão e o
+    /// serviço de fundo, não mandam o mesmo texto duas vezes: a segunda espera a primeira e encontra a mensagem já enviada.
     /// </summary>
     public Task<MensagemAtendimentoResult> ExecuteAsync(
         Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>

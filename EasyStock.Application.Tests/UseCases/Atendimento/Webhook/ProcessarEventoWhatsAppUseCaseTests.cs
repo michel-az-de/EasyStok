@@ -730,4 +730,39 @@ public class ProcessarEventoWhatsAppUseCaseTests
             _empresaId, ConversaAbertaEvent.TipoEvento, "Conversa", Arg.Any<Guid>(), Arg.Any<ConversaAbertaEvent>(),
             Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task StatusFalhouReentregueNaoGastaOutraTentativa()
+    {
+        // #1787: a Meta reentrega o mesmo "failed"; a segunda cópia não conta tentativa nem reagenda o reenvio.
+        const string wamid = "wamid.falha-dupla";
+        var mensagem = Mensagem.Saida(_empresaId, Guid.NewGuid(), AutorMensagem.Dona, DateTime.UtcNow, TipoConteudoMensagem.Texto, "Oi", wamid);
+        _conversaRepository.ObterMensagemPorExternoIdAsync(_empresaId, wamid, Arg.Any<CancellationToken>()).Returns(mensagem);
+        var payload = """
+            {"entry":[{"changes":[{"value":{
+                "metadata":{"phone_number_id":"__PHONE__"},
+                "statuses":[{"id":"__WAMID__","status":"failed","recipient_id":"__WAID__","errors":[{"code":131000,"title":"Falha da Meta"}]}]
+            }}]}]}
+            """
+            .Replace("__PHONE__", PhoneNumberId).Replace("__WAID__", ContatoWaId).Replace("__WAMID__", wamid);
+
+        await _useCase.ExecuteAsync(payload);
+        var agendado = mensagem.ProximoReenvioEm;
+        await _useCase.ExecuteAsync(payload);
+
+        mensagem.TentativasEnvio.Should().Be(1);
+        mensagem.ProximoReenvioEm.Should().Be(agendado);
+    }
+
+    [Fact]
+    public async Task FalhaNaAcaoDeBotaoDescartaAlteracoesPendentes()
+    {
+        // #1787: a ação pela metade não pode entrar no commit da próxima mensagem do lote.
+        _conversaRepository.AddMensagemAsync(Arg.Is<Mensagem>(m => m.Autor == AutorMensagem.Sistema), Arg.Any<CancellationToken>())
+            .Returns<Task>(_ => throw new InvalidOperationException("banco caiu"));
+
+        await _useCase.ExecuteAsync(PayloadBotaoAcao("wamid.botao-falha", "acao:confirmar_endereco:123"));
+
+        _unitOfWork.Received().DescartarAlteracoesPendentes();
+    }
 }

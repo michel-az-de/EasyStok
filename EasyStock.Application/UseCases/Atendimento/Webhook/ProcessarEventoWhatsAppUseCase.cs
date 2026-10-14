@@ -367,6 +367,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         catch (Exception ex)
         {
             logger.LogError(ex, "Webhook WhatsApp: mensagem {Wamid} gravada, mas falhou ao enfileirar o que vem depois.", msg.Wamid);
+            // #1787: o opt-out pela metade não pode entrar no commit da próxima mensagem do lote.
+            unitOfWork.DescartarAlteracoesPendentes();
         }
     }
 
@@ -384,6 +386,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         catch (Exception ex)
         {
             logger.LogError(ex, "Webhook WhatsApp: falha executando ação de botão na conversa {ConversaId}.", conversa.Id);
+            unitOfWork.DescartarAlteracoesPendentes();
         }
     }
 
@@ -400,6 +403,12 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
         var novoStatus = MapearStatus(status.Status);
         if (novoStatus is null) return;
+
+        // #1787: "failed" reentregue pela Meta não conta outra tentativa nem reagenda o reenvio. A falha incerta
+        // (sem resposta do canal) ainda aceita o veredito da Meta, que pode agendar o reenvio.
+        if (novoStatus == StatusMensagem.Falhou && mensagem.Status == StatusMensagem.Falhou
+            && mensagem.UltimaFalhaEnvio != TipoFalhaEnvio.Incerta)
+            return;
 
         // #1396: falha temporária da Meta agenda o reenvio automático (S57); permanente ou sem código, não.
         if (novoStatus == StatusMensagem.Falhou)

@@ -1,18 +1,22 @@
 import { useEffect, useRef } from 'react'
 import * as acao from './acoes'
 import { lerAlertasDeEstoque, lerCardapio } from './api/cardapio'
-import { avisoDoCardapio } from './planoDeSincronizacao'
+import { abaVisivel, avisoDoCardapio, deveVarrerAoVoltar } from './planoDeSincronizacao'
 import { criarCicloDeSincronizacao, criarMemoriaDoLaco } from './cicloDeSincronizacao'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
 
 // Polling da inbox (F01), com releitura dirigida pelos eventos de pedido (S18).
 // A volta está em `cicloDeSincronizacao.js` e o que ela relê em
-// `planoDeSincronizacao.js`: a conversa aberta sempre, as outras só quando mudaram.
+// `planoDeSincronizacao.js`: a conversa aberta enquanto algo nela pode mudar, as outras só quando mudaram.
 // #1576: a inbox inteira (F07) vem ao entrar e a cada minuto; as outras voltas leem a página 1.
+// #1786: com a aba oculta o laço lê a cada 15 s (o aviso de mensagem nova depende dele); ao voltar lê na hora
+// (e varre tudo se ficou oculta 1 min ou mais).
 //
 // F03: o pedido da conversa (`pedidoEmAndamentoId`) vem junto. O cardápio da vitrine
 // vem ao entrar e a cada minuto (saldo).
 const INTERVALO_MS = 5000
+// #1786: aba oculta lê mais devagar, mas lê: é o que dispara o som e a notificação de mensagem nova.
+const INTERVALO_OCULTA_MS = 15000
 const CICLOS_POR_MINUTO = 12
 const AGRUPAR_EVENTOS_MS = 300
 
@@ -42,6 +46,7 @@ export function useSincronizacaoApi({ ativo, comConversas = true, comItensFora =
     let voltaPendente = false
     let esperaPedidos = null
     let reconexao = null
+    let ocultaDesde = null
     let fecharEventos = () => {}
     const sincronizar = criarCicloDeSincronizacao({
       despachar, comConversas, memoria: memoria ?? criarMemoriaDoLaco(), dono: usuarioId,
@@ -72,6 +77,10 @@ export function useSincronizacaoApi({ ativo, comConversas = true, comItensFora =
 
     async function ciclo(somentePedidos = false) {
       if (!vivo) return
+      // Aba oculta: o laço segue, mais devagar (INTERVALO_OCULTA_MS). O aviso sonoro e a notificação de
+      // mensagem nova (useAvisoSonoro) saem da diferença de estado que esta leitura traz; parar silenciava
+      // justamente o console minimizado.
+      if (!somentePedidos && !abaVisivel()) ocultaDesde ??= Date.now()
       if (lendo) {
         if (somentePedidos) pedidosPendentes = true
         else voltaPendente = true
@@ -88,7 +97,7 @@ export function useSincronizacaoApi({ ativo, comConversas = true, comItensFora =
       await sincronizar({ cicloLento, somentePedidos })
       lendo = false
       if (!vivo) return
-      if (!somentePedidos) proximo = setTimeout(ciclo, INTERVALO_MS)
+      if (!somentePedidos) proximo = setTimeout(ciclo, abaVisivel() ? INTERVALO_MS : INTERVALO_OCULTA_MS)
       if (voltaPendente) {
         voltaPendente = false
         pedidosPendentes = false
@@ -115,10 +124,22 @@ export function useSincronizacaoApi({ ativo, comConversas = true, comItensFora =
       })
     }
 
+    function aoMudarVisibilidade() {
+      if (!abaVisivel()) {
+        ocultaDesde ??= Date.now()
+        return
+      }
+      if (deveVarrerAoVoltar(ocultaDesde, Date.now())) ciclos = 0
+      ocultaDesde = null
+      ciclo()
+    }
+
     ciclo()
     if (comConversas) conectar()
+    globalThis.document?.addEventListener('visibilitychange', aoMudarVisibilidade)
     return () => {
       vivo = false
+      globalThis.document?.removeEventListener('visibilitychange', aoMudarVisibilidade)
       clearTimeout(proximo)
       clearTimeout(esperaPedidos)
       clearTimeout(reconexao)
