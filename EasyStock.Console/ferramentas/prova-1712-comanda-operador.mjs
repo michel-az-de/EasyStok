@@ -89,6 +89,13 @@ provar('frete confirmado fica visível sem voltar a oferecer encaminhamento', ()
   assert.match(html, /Salvar a seleção atualiza os itens no link/)
   assert.doesNotMatch(html, /Combinar entrega desta seleção/)
 })
+provar('entrega completa recolhe campos; horário ou frete pendentes mantêm os campos abertos', () => {
+  const completo = { freteCombinado: 0, rascunho: { ...comanda.rascunho, janelaId: 'j1', dataEntrega: '2026-10-14' } }
+  assert.match(renderizar(completo), /<details class="entregaDaSelecao"><summary>Entrega e horário/)
+  assert.match(renderizar({ ...completo, freteCombinado: null }), /<details class="entregaDaSelecao" open=""/)
+  assert.match(renderizar({ freteCombinado: 0 }), /<details class="entregaDaSelecao" open=""/)
+  assert.match(renderizar({ ...completo, entregaACombinar: true }), /<details class="entregaDaSelecao" open=""/)
+})
 provar('pedido persistido não oferece encaminhamento pré-confirmação', () => {
   const html = renderizar({ podeEditar: false, pedido: { total: 38, alocado: 38 } })
   assert.doesNotMatch(html, /Combinar entrega desta seleção|Confirmar frete combinado/)

@@ -130,6 +130,12 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
       : !rascunho.endereco ? 'Peça ao cliente que informe o endereço na comanda.'
         : !janela || !rotuloJanela ? 'Escolha uma janela de entrega disponível e salve a seleção.'
           : c.freteCombinado == null ? 'Abra “Combinar entrega” e confirme o frete antes de criar o pedido, inclusive se for R$ 0,00.' : null
+  const enderecoCompartilhado = c.rascunho.endereco && <details className={css.enderecoCompartilhado}>
+      <summary>Entrega · {c.rascunho.endereco.logradouro}, {c.rascunho.endereco.numero}</summary>
+      <p>{c.rascunho.endereco.logradouro}, {c.rascunho.endereco.numero}
+      {c.rascunho.endereco.complemento && ' · ' + c.rascunho.endereco.complemento} · {c.rascunho.endereco.bairro}
+      {' · ' + c.rascunho.endereco.cidade + '/' + c.rascunho.endereco.uf + ' · CEP ' + c.rascunho.endereco.cep}</p>
+    </details>
   return <div ref={selecaoRef} tabIndex={-1} role="group" aria-label="Seleção da comanda">
     <div className={css.etapaCompartilhada}>
       <strong>{etapa.estado}</strong><p>{etapa.orientacao}</p>
@@ -137,13 +143,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
     {c.ajudaSolicitada && <output className={css.ajudaCompartilhada}>
       <strong>Pedido de ajuda registrado</strong>
     </output>}
-    {c.rascunho.endereco && <details className={css.enderecoCompartilhado}>
-      <summary>Entrega · {c.rascunho.endereco.logradouro}, {c.rascunho.endereco.numero}</summary>
-      <p>{c.rascunho.endereco.logradouro}, {c.rascunho.endereco.numero}
-      {c.rascunho.endereco.complemento && ' · ' + c.rascunho.endereco.complemento} · {c.rascunho.endereco.bairro}
-      {' · ' + c.rascunho.endereco.cidade + '/' + c.rascunho.endereco.uf + ' · CEP ' + c.rascunho.endereco.cep}</p>
-    </details>}
-    {c.freteCombinado != null && !c.pedido && <p>Frete combinado: {moeda(c.freteCombinado)}.</p>}
+    {c.pedido && enderecoCompartilhado}
     {conflito && <p role="alert">A seleção mudou enquanto você editava. Sua edição foi preservada. Confira a seleção atual abaixo antes de continuar.</p>}
     {c.pedido && <details className={css.pedidoAtualCompartilhado} open={pendente}>
       <summary>Pedido atual · {moeda(c.pedido.total)}</summary>
@@ -195,18 +195,15 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
       </label>
       <SugestaoDeTexto sugestao={sugestao} />
       </details>
-      {!c.pedido && <SeletorJanelaApi key={c.revisao} editavel={!ocupado}
+      {!c.pedido && <details className={css.entregaDaSelecao} open={!janela || c.entregaACombinar || c.freteCombinado == null}>
+      <summary>Entrega e horário{rotuloJanela && ` · ${rotuloJanela}`}</summary>
+      {enderecoCompartilhado}
+      {c.freteCombinado != null && <p>Frete combinado: {moeda(c.freteCombinado)}.</p>}
+      <SeletorJanelaApi key={c.revisao} editavel={!ocupado}
         pedido={{ itens: rascunho.itens.map(i => ({ sku: i.cardapioItemId })), janela }}
         dataInicial={c.rascunho.dataEntrega ?? ''} aoLerJanelas={setJanelas}
-        aoEscolher={valor => { const escolhida = janelaDoId(valor); editar({ ...rascunho, janelaId: escolhida?.janelaId ?? null, dataEntrega: escolhida?.data ?? null }) }} />}
-      {edicao && <div className={css.salvarCompartilhado}>
-        <Botao disabled={ocupado} onClick={limparEdicao}>{conflito ? 'Usar seleção atual' : 'Descartar minha edição'}</Botao>
-        {conflito ? <Botao disabled={ocupado || rascunho.pedidoId !== c.rascunho.pedidoId} onClick={() => setEdicao({ revisao: c.revisao, base: c.rascunho,
-          rascunho: rascunhoMantendoEdicao(c.rascunho, rascunho, edicao.base) })}>Manter minha edição para conferir</Botao>
-          : <Botao variante="primario" disabled={ocupado} onClick={persistir}>Salvar seleção</Botao>}
-      </div>}
-      {edicao && <p role="status">Alterações ainda não salvas. Salvar seleção atualiza o link{c.pedido ? ', sem alterar o pedido atual.' : ', sem criar um pedido.'}</p>}
-      {!c.pedido && <details className={css.transporteCompartilhado} open={c.entregaACombinar}>
+        aoEscolher={valor => { const escolhida = janelaDoId(valor); editar({ ...rascunho, janelaId: escolhida?.janelaId ?? null, dataEntrega: escolhida?.data ?? null }) }} />
+      <details className={css.transporteCompartilhado} open={c.entregaACombinar}>
         <summary>Combinar entrega · consultar Lalamove</summary>
         <ConsultaTransporte semPedido />
         {!c.entregaACombinar && c.freteCombinado == null && <>
@@ -222,7 +219,15 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
           <Botao tipo="submit" disabled={ocupado || Boolean(edicao) || frete === ''} variante="primario">Confirmar frete combinado</Botao>
         </form>}
         {edicao && <p>Salve os ajustes da seleção antes de combinar a entrega.</p>}
+      </details>
       </details>}
+      {edicao && <div className={css.salvarCompartilhado}>
+        <Botao disabled={ocupado} onClick={limparEdicao}>{conflito ? 'Usar seleção atual' : 'Descartar minha edição'}</Botao>
+        {conflito ? <Botao disabled={ocupado || rascunho.pedidoId !== c.rascunho.pedidoId} onClick={() => setEdicao({ revisao: c.revisao, base: c.rascunho,
+          rascunho: rascunhoMantendoEdicao(c.rascunho, rascunho, edicao.base) })}>Manter minha edição para conferir</Botao>
+          : <Botao variante="primario" disabled={ocupado} onClick={persistir}>Salvar seleção</Botao>}
+      </div>}
+      {edicao && <p role="status">Alterações ainda não salvas. Salvar seleção atualiza o link{c.pedido ? ', sem alterar o pedido atual.' : ', sem criar um pedido.'}</p>}
       {!c.pedido && !edicao && <div className={css.confirmarCompartilhado}>
         <Botao variante="primario" disabled={ocupado || Boolean(faltaConfirmar)}
           onClick={() => setConfirmacao({ comanda: c, janela: rotuloJanela })}>Revisar e criar pedido</Botao>
