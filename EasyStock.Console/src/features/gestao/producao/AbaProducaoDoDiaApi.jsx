@@ -4,6 +4,7 @@ import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Chip } from '../../../componentes/Chip'
 import { FolhaImpressao } from '../../../componentes/FolhaImpressao'
 import { Icone } from '../../../componentes/Icone'
+import { Modal } from '../../../componentes/Modal'
 import { useCatalogo } from '../../../aplicacao/contextos'
 import { useEstoqueDoDiaApi } from '../../../aplicacao/useEstoqueDoDiaApi'
 import { aoLancarLote, dispensarLote, guardarRascunho, linhasDoRascunho, lotesLancados, producaoDoDia } from '../../../aplicacao/producaoDoDia'
@@ -15,7 +16,7 @@ import {
   ordenarPeloCardapio, porcoesNoLote, resumoDoLote, soDigitos, somarNoLote, tamanhoNoCartao,
 } from '../../../dominio/gradeDeProducao'
 import { hashDoModulo } from '../../../dominio/modulos'
-import { sobraDaLinha } from '../../../dominio/producao'
+import { erroDaLinha, sobraDaLinha } from '../../../dominio/producao'
 import { linhaComPorcao } from '../../../dominio/porcoes'
 import css from '../cardapio/abaCardapio.module.css'
 import grade from './producaoDoDia.module.css'
@@ -31,6 +32,14 @@ const novaLinha = () => ({ id: crypto.randomUUID(), sku: '', variacaoId: '', por
 const inteiro = (texto) => (String(texto).trim() === '' ? null : Number(texto))
 const dataCurta = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '')
 const diaCurto = (iso) => (iso ? iso.split('-').reverse().slice(0, 2).join('/') : 'amanhã')
+const CAMPO_DO_ERRO = {
+  'Escolha a porção produzida.': 'variacaoId',
+  'Quantas porções saíram?': 'porcoes',
+  'Validade em dias inteiros.': 'validadeDias',
+  'Peso da porção em gramas inteiros.': 'pesoPorPorcaoG',
+  'Peso real em gramas inteiros.': 'pesoRealG',
+  'O peso real não fecha as porções.': 'pesoRealG',
+}
 
 // M1.4c (#1537): prato com porções exige a porção produzida (o saldo é dela).
 function paraEnviar(linha, pratos = []) {
@@ -83,6 +92,7 @@ export function AbaProducaoDoDiaApi() {
   const [categoria, setCategoria] = useState(null)
   const [busca, setBusca] = useState('')
   const [confirmandoLimpar, setConfirmandoLimpar] = useState(false)
+  const [revisando, setRevisando] = useState(false)
   const montada = useRef(true)
 
   useEffect(() => {
@@ -99,14 +109,17 @@ export function AbaProducaoDoDiaApi() {
     setLinhas([])
     setErro(null)
     setImpressao(null)
+    setRevisando(false)
     setLeitura((n) => n + 1)
     recarregarEstoque()
   }), [recarregarEstoque])
-  // O aviso (erro ou lote lançado) tem de aparecer para quem tocou na barra: em tela estreita o lote
-  // fica abaixo da grade e, ao lado, ele rola por dentro. A rolagem vem depois de o aviso existir.
-  // O foco vai para "Imprimir etiquetas": é o passo seguinte, e o leitor de tela anuncia o lote.
+  // O campo inválido ganha foco dentro da revisão; falha da API anuncia o erro sem perder o lote.
   useEffect(() => {
-    if (erro) globalThis.document?.querySelector(`#${ID_DO_LOTE} [role="alert"]`)?.scrollIntoView({ block: 'nearest' })
+    if (!erro) return
+    const campo = globalThis.document?.querySelector(`#${ID_DO_LOTE} [aria-invalid="true"]`)
+      ?? globalThis.document?.querySelector(`#${ID_DO_LOTE} [role="alert"]`)
+    campo?.focus()
+    campo?.scrollIntoView({ block: 'nearest' })
   }, [erro])
   useEffect(() => {
     if (leitura === 0) return
@@ -192,7 +205,7 @@ export function AbaProducaoDoDiaApi() {
   return (
     <div className={css.aba}>
       <p className={css.descricao}>
-        Toque no prato que saiu da cozinha: cada toque soma uma porção. Confirmar cria o lote com as etiquetas e soma no estoque.
+        Escolha os pratos que ficaram prontos. Cada toque soma uma porção; depois, confira e registre a produção.
       </p>
 
       {falta.length > 0 && (
@@ -300,14 +313,16 @@ export function AbaProducaoDoDiaApi() {
               </section>
             )}
 
+            {revisando && <Modal titulo="Conferir produção" largura="680px" aoFechar={enviando ? undefined : () => setRevisando(false)}
+              descricao="Confira as porções, a validade e o peso. Ao confirmar, o lote entra no estoque e as etiquetas ficam prontas."
+              rodape={<>
+                <Botao variante="texto" disabled={enviando} onClick={() => setRevisando(false)}>Voltar aos pratos</Botao>
+                <Botao tipo="submit" form={ID_DO_LOTE} variante="primario" icone="check" disabled={enviando || semLote}>{rotuloDoConfirmar}</Botao>
+              </>}>
             <form id={ID_DO_LOTE} className={grade.lote} aria-label="Lote de hoje" onSubmit={confirmar}>
-              <div>
-                <h3 className={css.tituloSecao}>Lote de hoje</h3>
-                <p className={css.detalhe}>
-                  {semLote ? 'Os pratos que você tocar aparecem aqui.' : 'Confira a validade e o peso antes de confirmar. Toque em Ajustar para mudar.'}
-                </p>
-              </div>
-              {erro && <p className={`${css.aviso} ${grade.aparecer}`} role="alert">{erro}</p>}
+              <p className={grade.resumoDoLote}>{plural(resumo.porcoes, 'porção', 'porções')} · {plural(resumo.pratos, 'prato', 'pratos')}</p>
+              {semLote && <p className={css.descricao}>O lote ficou vazio. Volte aos pratos para escolher o que foi produzido.</p>}
+              {erro && <p id="erro-da-producao" className={`${css.aviso} ${grade.aparecer}`} role="alert" tabIndex={-1}>{erro}</p>}
               {!semLote && (
                 <ol className={grade.itens}>
                   {linhas.map((l, indice) => {
@@ -317,6 +332,8 @@ export function AbaProducaoDoDiaApi() {
                     const nome = nomeDoCartao({ nome: prato?.nome ?? 'Prato fora do cardápio', tamanho: tamanho ?? '' })
                     const faltaPorcao = porcoesDoPrato.length > 0 && !l.variacaoId
                     const sobra = sobraDaLinha(paraEnviar(l))
+                    const campoComErro = erro ? CAMPO_DO_ERRO[erroDaLinha(paraEnviar(l, pratos))] : null
+                    const validacao = (campo) => campoComErro === campo ? { 'aria-invalid': true, 'aria-describedby': 'erro-da-producao' } : {}
                     return (
                       <li key={l.id} className={grade.itemDoLote}>
                         {/* Abre sozinho quando o prato pede decisão dela ou quando o envio foi recusado. */}
@@ -331,12 +348,12 @@ export function AbaProducaoDoDiaApi() {
                           </summary>
                           <div className={grade.editorDoItem}>
                             {porcoesDoPrato.length > 0 && (
-                              <CampoSelecao disabled={enviando} rotulo="Porção" aria-label={`Porção de ${prato.nome}`} value={l.variacaoId} onChange={escolherPorcao(l.id)}
+                              <CampoSelecao disabled={enviando} rotulo="Porção" aria-label={`Porção de ${prato.nome}`} value={l.variacaoId} onChange={escolherPorcao(l.id)} {...validacao('variacaoId')}
                                 opcoes={[{ valor: '', rotulo: 'Escolha a porção' }, ...porcoesDoPrato.map((v) => ({ valor: v.id, rotulo: v.rotulo }))]} />
                             )}
                             <div className={grade.camposDoItem}>
-                              <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Porções" aria-label={`Porções de ${nome}`} value={l.porcoes} onChange={mudarContagem(l.id, 'porcoes')} />
-                              <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Validade (dias)" aria-label={`Validade em dias de ${nome}`} value={l.validadeDias} onChange={mudarContagem(l.id, 'validadeDias')} />
+                              <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Porções" aria-label={`Porções de ${nome}`} value={l.porcoes} onChange={mudarContagem(l.id, 'porcoes')} {...validacao('porcoes')} />
+                              <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Validade (dias)" aria-label={`Validade em dias de ${nome}`} value={l.validadeDias} onChange={mudarContagem(l.id, 'validadeDias')} {...validacao('validadeDias')} />
                             </div>
                             <div className={grade.chips} role="radiogroup" aria-label={`Validade de ${nome}`}>
                               {VALIDADES_RAPIDAS.map((dias) => (
@@ -346,8 +363,8 @@ export function AbaProducaoDoDiaApi() {
                               ))}
                             </div>
                             <div className={grade.camposDoItem}>
-                              <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Peso de cada porção (g)" aria-label={`Peso de cada porção de ${nome}, em gramas`} placeholder="g por porção" value={l.pesoPorPorcaoG} onChange={mudar(l.id, 'pesoPorPorcaoG')} />
-                              <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Peso real total (g)" aria-label={`Peso real total de ${nome}, em gramas`} placeholder="Opcional" value={l.pesoRealG} onChange={mudar(l.id, 'pesoRealG')} />
+                              <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Peso de cada porção (g)" aria-label={`Peso de cada porção de ${nome}, em gramas`} placeholder="g por porção" value={l.pesoPorPorcaoG} onChange={mudar(l.id, 'pesoPorPorcaoG')} {...validacao('pesoPorPorcaoG')} />
+                              <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Peso real total (g)" aria-label={`Peso real total de ${nome}, em gramas`} placeholder="Opcional" value={l.pesoRealG} onChange={mudar(l.id, 'pesoRealG')} {...validacao('pesoRealG')} />
                             </div>
                             {sobra != null && <p className={css.detalhe}>{sobra < 0 ? 'Peso real menor que as porções' : `Sobra ${sobra} g`}</p>}
                             <div>
@@ -360,11 +377,8 @@ export function AbaProducaoDoDiaApi() {
                   })}
                 </ol>
               )}
-              {/* Em tela estreita o lote fica abaixo da grade: confere aqui e confirma aqui (a barra só leva até o lote). */}
-              {!semLote && (
-                <Botao className={grade.confirmarNoLote} tipo="submit" variante="primario" icone="check" largo disabled={enviando}>{rotuloDoConfirmar}</Botao>
-              )}
             </form>
+            </Modal>}
           </div>
         </div>
 
@@ -384,9 +398,8 @@ export function AbaProducaoDoDiaApi() {
               </p>
               <div className={grade.acoesDoLote}>
                 <Botao variante="texto" disabled={enviando || semLote} onClick={() => setConfirmandoLimpar(true)}>Limpar</Botao>
-                <Botao className={grade.atalhoDoLote} variante="primario" icone="check" disabled={semLote}
-                  onClick={() => globalThis.document?.getElementById(ID_DO_LOTE)?.scrollIntoView({ block: 'start' })}>Conferir lote</Botao>
-                <Botao className={grade.confirmarNaBarra} tipo="submit" form={ID_DO_LOTE} variante="primario" icone="check" disabled={enviando || semLote}>{rotuloDoConfirmar}</Botao>
+                <Botao variante="primario" icone="check" disabled={semLote}
+                  onClick={() => setRevisando(true)}>Conferir produção</Botao>
               </div>
             </>
           )}
