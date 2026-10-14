@@ -301,6 +301,12 @@ export function BarraProximoPasso({
     } else if (!proximo) {
       corpoAcao = (
         <div className={css.botoesPrimarios}>
+          {/* #1804: pedido concluído sem nada a cobrar: o atendimento acabou e só falta mandar ao histórico. */}
+          {pedido.estado === 'entregue' && !complementoEmAberto && (
+            <p className={css.motivoDesabilitado}>
+              Pedido concluído, nada pendente. Encerre para a conversa ir ao histórico do cliente.
+            </p>
+          )}
           <Botao largo variante="primario" icone="log-out" onClick={aoEncerrarAtendimento}>
             Encerrar atendimento
           </Botao>
