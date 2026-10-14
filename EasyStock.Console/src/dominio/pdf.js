@@ -81,7 +81,9 @@ export function quebrarLinhas(texto, larguraMax, tamanho, negrito = false) {
 }
 
 // WinAnsiEncoding (cp1252): Latin-1 cai no mesmo byte; os poucos sinais
-// tipográficos fora dele têm posição própria. O resto vira "?", nunca some.
+// tipográficos fora dele têm posição própria. Letra de outro alfabeto latino
+// cai na letra sem acento; sinal sem lugar na fonte sai do papel (#1802: o
+// "∴" do nome imprimia "?").
 // Chave pelo código Unicode (euro, aspas curvas, reticências, marcador e os
 // dois traços longos), para o sinal não precisar aparecer escrito aqui.
 const WIN_ANSI_EXTRA = Object.fromEntries([
@@ -96,7 +98,11 @@ function literal(texto) {
   let saida = ''
   for (const letra of String(texto)) {
     let codigo = letra.charCodeAt(0)
-    if (codigo > 126) codigo = WIN_ANSI_EXTRA[letra] ?? (codigo <= 0xff && codigo >= 0xa0 ? codigo : 63)
+    if (codigo > 126 && !WIN_ANSI_EXTRA[letra] && !(codigo >= 0xa0 && codigo <= 0xff)) {
+      codigo = letra.normalize('NFD').charCodeAt(0)
+      if (codigo > 126) continue
+    }
+    if (WIN_ANSI_EXTRA[letra]) codigo = WIN_ANSI_EXTRA[letra]
     if (codigo < 32) codigo = 32
     if (codigo === 40 || codigo === 41 || codigo === 92) saida += '\\' + String.fromCharCode(codigo)
     else if (codigo > 126) saida += '\\' + codigo.toString(8).padStart(3, '0')

@@ -21,7 +21,7 @@ Implementação:
   > **Por que TextFormatter e não Enricher?** `ILogEventEnricher` permite mexer em `LogEvent.Properties`, mas **não** em `LogEvent.Exception` (set-once, imutável). Como `DbUpdateException` coloca conn string no `.Message` da exception, e o sink File serializa `Exception.ToString()` no placeholder `{Exception}` do template, a única forma de interceptar é no resultado final — daí TextFormatter, não Enricher.
 
 - **`SerilogRedactionExtensions.WriteTo.RedactedFile(...)`** — extension method que registra o sink File com `RedactingTextFormatter`. Drop-in replacement do `WriteTo.File` nativo. Descoberto via reflection: requer `"EasyStock.Api"` no array `Serilog:Using` do `appsettings.json`.
-- **`appsettings.json`** — sink de arquivo trocou de `"Name": "File"` para `"Name": "RedactedFile"`. Console fica sem redaction (dev local; logs de produção vão pelo File sink).
+- **`appsettings.json`** — sink de arquivo trocou de `"Name": "File"` para `"Name": "RedactedFile"`. Desde a I4.5 (#1698) o console também redige (ver seção 6).
 
 ## 3. Vetor 1 — read-time masker (B3.0a, próxima feature)
 
@@ -42,3 +42,22 @@ Tudo em `[Trait("Category", "SecurityRegression")]` — política nova: testes d
 Quando aparecer um padrão novo de segredo no log (audit periódico recomendado: trimestral, lendo amostra de logs recentes em staging), **adicione em `SensitivePatterns.Patterns`** e estenda a tabela de despacho em `SensitivePatterns.Redact`. Os dois vetores (write-time + read-time) ganham proteção automaticamente.
 
 Antes de adicionar: rode um caso "false positive" (e.g. UUID, ID de pedido, timestamp formatado) contra a regex nova para confirmar que não mascara o que não deveria.
+
+## 6. Todos os sinks, nos dois hosts (I4.5, #1698)
+
+O console é o log do contêiner em produção e o OTLP sai da máquina; o Worker nunca teve sink de arquivo. Por isso a redação deixou de ser do arquivo e passou a ser de todo sink.
+
+| Saída | Como redige |
+|---|---|
+| Console (API e Worker) | `"Name": "Redigido"` envolvendo o `Console` no `appsettings.json` |
+| OTLP de logs (API e Worker) | `WriteTo.Redigido(s => s.OpenTelemetry(...))` no `Program.cs` |
+| Arquivo (API) | `RedactedFile`, como antes |
+| `WebhookRecebido.Erro` | `SensitivePatterns.Redact` no `WebhookGatewayController` |
+| Erro do Mercado Pago (log e exceção) | `CorpoDeProvedor.ParaRegistro`: redige e só depois corta; corpo de endpoint de autenticação nunca é registrado |
+| Log de requisição, erro e span de `/api/webhooks/*` | `CaminhoDoLog`: molde da rota (`/api/webhooks/{provedor}`), sem o caminho e sem a query |
+
+`SinkQueRedige` (`EasyStock.Infra.Async/Logging`) redige o texto do template, toda propriedade (também dentro de objeto, lista e dicionário), o valor inteiro de propriedade com nome sensível (`Token`, `Senha`, `ApiKey`) e a exceção. Padrões novos em `SensitivePatterns`: chave sensível em JSON com aspas (`"access_token":"..."`) e segredo na query de URL (`?key=`, `&access_token=`).
+
+**Sink novo.** Sempre dentro de `Redigido`. `TodoSinkRedigeTests` (arquitetura) reprova sink solto em `WriteTo`, no `appsettings` ou no `Program.cs`.
+
+**O que isto não cobre.** Métrica e auditoria não passam pelo Serilog: não recebem corpo de provedor hoje e seguem sem redação automática. Span de cliente HTTP só tem a URL ocultada para os provedores de mapa (I8.2). Redação por regex é a última barreira, não a primeira: o código não deve registrar segredo.

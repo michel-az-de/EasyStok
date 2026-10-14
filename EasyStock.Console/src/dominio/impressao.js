@@ -4,7 +4,7 @@
 // Sempre preto no branco, independente do tema da tela.
 import { dataHora, horaCurta, listaEmPortugues, plural } from './formato'
 import { A4, LARGURA_BOBINA, larguraDoTexto, mm, montarPdf, quebrarLinhas } from './pdf'
-import { agruparPorLinha, itensDetalhados, numeroCurto } from './pedido'
+import { agruparPorLinha, itensDetalhados, numeroCurto, pedidoEncerrado, porcaoForaDoNome } from './pedido'
 import { entregadorDaViagem, marcosDaViagem } from './viagem'
 import { resumoDoRoteiro, rotuloDaData, textoDeQuemLeva } from './roteiroDoDia'
 
@@ -49,7 +49,9 @@ export function documentoDoCanhoto({ pedido, itens, linhas, nomeCliente, enderec
   c.espaco(mm(1.5))
   c.escrever('Comanda', { tamanho: 16, fonte: 'negrito', larguraMax: c.largura - mm(24) })
   c.direita(`Nº ${numeroCurto(pedido.numero)}`, { tamanho: 16, fonte: 'negrito', y: c.estado.y - 16 * 0.3 })
-  c.escrever(`${nomeCliente} · Janela ${faixa ?? 'não escolhida'}`, { tamanho: 10.5, fonte: 'negrito' })
+  // #1802: pedido já entregue ou cancelado sem janela sai só com o nome; na cozinha o aviso segue útil.
+  const janela = faixa ? ` · Janela ${faixa}` : (pedidoEncerrado(pedido) ? '' : ' · Janela não escolhida')
+  c.escrever(`${nomeCliente}${janela}`, { tamanho: 10.5, fonte: 'negrito' })
   if (pedido.cobranca?.criadaEm) c.escrever(`Enviada ${horaCurta(pedido.cobranca.criadaEm)}`, { tamanho: 9.5 })
   if (endereco) c.escrever(endereco, { tamanho: 9.5 })
   c.traco({ tracejada: true })
@@ -62,7 +64,8 @@ export function documentoDoCanhoto({ pedido, itens, linhas, nomeCliente, enderec
       c.escrever(`${linha.qtd}×`, { tamanho: 11, fonte: 'negrito' })
       c.estado.y -= 11 * 1.3
       c.escrever(linha.produto?.nome ?? linha.sku, { tamanho: 11, fonte: 'negrito', x: margem + recuo })
-      if (linha.produto?.porcao) c.escrever(linha.produto.porcao, { tamanho: 9.5, x: margem + recuo })
+      const porcao = porcaoForaDoNome(linha.produto)
+      if (porcao) c.escrever(porcao, { tamanho: 9.5, x: margem + recuo })
       if (linha.obs) c.escrever(linha.obs, { tamanho: 9.5, fonte: 'italico', x: margem + recuo })
       c.espaco(mm(1.2))
     }

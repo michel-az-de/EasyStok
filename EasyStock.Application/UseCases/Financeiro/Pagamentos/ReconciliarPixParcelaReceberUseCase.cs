@@ -100,7 +100,7 @@ public class ReconciliarPixParcelaReceberUseCase(
             mov.Descricao = $"Pix recebido — parcela {parcela.Numero}/{conta.Parcelas.Count} — {conta.Descricao}";
             mov.Metodo = "pix";
             mov.Categoria = "contas-a-receber";
-            mov.Referencia = $"cr:{conta.Id}:parcela:{parcela.Id}:txid:{cmd.Txid}";
+            mov.Referencia = ReferenciaDeParcela.DoPix("cr", conta.Id, parcela.Id, cmd.Txid);
             mov.Origem = "webhook";
 
             await caixaRepo.AddMovimentoAsync(mov);

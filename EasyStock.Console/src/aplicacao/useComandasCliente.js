@@ -8,10 +8,12 @@ export function useComandasCliente(conversaId, ativo) {
   const [erro, setErro] = useState('')
   const [erroLeitura, setErroLeitura] = useState('')
   const [ocupado, setOcupado] = useState(false)
+  const [carregando, setCarregando] = useState(true)
   const [versao, setVersao] = useState(0)
   const trava = useRef(false)
   useEffect(() => {
     if (!ativo || !conversaId) { setDados([]); return undefined }
+    setCarregando(true)
     let vivo = true
     let lendo = false
     let novamente = false
@@ -22,7 +24,7 @@ export function useComandasCliente(conversaId, ativo) {
       lendo = true
       try { const resposta = await listarComandasCliente(conversaId); if (vivo) { setDados(resposta ?? []); setErroLeitura('') } }
       catch (e) { if (vivo) setErroLeitura(e.message) }
-      finally { lendo = false; if (novamente && vivo) { novamente = false; carregar() } }
+      finally { lendo = false; if (vivo) setCarregando(false); if (novamente && vivo) { novamente = false; carregar() } }
     }
     function conectar() {
       fechar = conectarEventosOperacao({ aoEvento: evento => {
@@ -43,7 +45,8 @@ export function useComandasCliente(conversaId, ativo) {
     catch (e) { setErro(e.message); setVersao(v => v + 1); return false }
     finally { trava.current = false; setOcupado(false) }
   }
-  return { dados, erro: erro || erroLeitura, ocupado,
+  return { dados, erro: erro || erroLeitura, ocupado, carregando,
+    atualizar: () => { setErro(''); setVersao(v => v + 1) },
     encaminharEntrega: (comanda) => executar(() => encaminharEntregaComanda(conversaId, comanda.linkId, comanda.revisao)),
     confirmarPedido: (comanda) => executar(() => confirmarPedidoComanda(conversaId, comanda.linkId, comanda.revisao)),
     combinarFrete: (comanda, valor) => executar(() => combinarFreteComanda(conversaId, comanda.linkId, comanda.revisao, valor)),

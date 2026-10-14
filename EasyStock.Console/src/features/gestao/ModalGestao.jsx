@@ -192,39 +192,28 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
   )
 }
 
-// Modo API (F06, decisão do Felipe em 30/09): as abas sem backend não somem. Abrem com a
-// faixa e os controles desabilitados até a fatia de cada uma entrar. Nada é gravado: as
-// ações delas também avisam (`aplicacao/api/naoLigadas.js`), e Integrações nunca guarda chave.
+// Modo API: as abas sem backend conservam o endereço, sem montar dados e formulários
+// de demonstração. Quando existe destino real, a saída respeita o acesso da sessão.
 // #1582: `saida` aponta as telas que já fazem o trabalho da aba, quando existem.
 const AINDA_NAO_LIGADO = {
   producao: {
-    texto: 'Produção e cardápio ainda não funcionam por esta tela. Nada aqui é gravado.',
-    saida: { modulo: 'producao', telas: ['producao', 'estoque'] },
+    texto: 'Esta tela ainda não registra produção nem altera o estoque.',
+    saida: { modulo: 'producao', telas: ['producao'] },
   },
-  fidelidade: { texto: 'Fidelidade e cupons ainda não funcionam por esta tela. Nada aqui é gravado.' },
-  integracoes: { texto: 'As integrações ainda não funcionam por esta tela. Nenhuma chave é guardada no navegador.' },
+  fidelidade: { texto: 'Cupons e fidelidade ainda não estão disponíveis nesta tela.' },
+  integracoes: { texto: 'As integrações de entrega ainda não estão disponíveis nesta tela.' },
 }
 
-function AbaNaoLigada({ texto, saida = null, children }) {
+function AbaNaoLigada({ texto, saida = null }) {
   const { permite } = useAcessoModulos()
   const modulo = saida && permite(saida.modulo) ? moduloPorId(saida.modulo) : null
   const telas = modulo ? saida.telas.map((id) => modulo.telas.find((tela) => tela.id === id)).filter(Boolean) : []
   return (
-    <>
-      <p className={css.naoLigado} role="note">
-        {texto}
-        {telas.length > 0 && (
-          <>
-            {' Use '}
-            {telas.map((tela, indice) => (
-              <span key={tela.id}>{indice > 0 && ' ou '}<a href={hashDoModulo(modulo.id, tela.id)}>{tela.rotulo}</a></span>
-            ))}
-            {`, em ${modulo.nome}.`}
-          </>
-        )}
-      </p>
-      <fieldset disabled className={css.desligado}>{children}</fieldset>
-    </>
+    <Vazio titulo="Em preparação" acao={telas.length > 0
+      ? telas.map(tela => <a className={css.saidaPreparacao} key={tela.id} href={hashDoModulo(modulo.id, tela.id)}>{tela.rotulo}</a>)
+      : <a className={css.saidaPreparacao} href={HASH_HALL}>Ver módulos</a>}>
+      {texto}
+    </Vazio>
   )
 }
 
@@ -267,6 +256,6 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
   }), [fonteApi, focoInicial, janelasApi, aoAbrirAba, renderizarEditorCardapio, horariosAtendimento])
   if (fonteApi && aba?.startsWith('financeiro-')) return <PainelFinanceiro key={aba} tela={aba.slice('financeiro-'.length)} />
   const painel = painelDaAba[aba] ?? null
-  if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada {...AINDA_NAO_LIGADO[aba]}>{painel}</AbaNaoLigada>
+  if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada {...AINDA_NAO_LIGADO[aba]} />
   return painel
 }

@@ -552,6 +552,14 @@ public sealed partial class PedidoConversaConcorrenciaTests
             var operacao = await db.Set<PedidoEstornoOnline>().SingleAsync();
             operacaoId = operacao.Id;
             operacao.Situacao.Should().Be(PedidoEstornoOnline.Pendente);
+            var avisos = await db.NotifEventos.Where(e => e.RefEntidadeId == envio.PedidoId)
+                .Select(e => e.PayloadJson).ToListAsync();
+            var payload = avisos.Single(p => p.Contains($"comanda:{estado.LinkId:N}:estorno_pendente"));
+            using var aviso = JsonDocument.Parse(payload);
+            aviso.RootElement.GetProperty("mensagem").GetString().Should()
+                .Contain("Seu pedido foi atualizado. Total: R$ 15,00.")
+                .And.Contain("Solicitamos a devolução de R$ 20,00 pelo Mercado Pago. Aguarde a confirmação.")
+                .And.NotContain("foi devolvido");
             operacao.EstornoExternoId.Should().BeNull();
             operacao.MovimentoCaixaId.Should().BeNull();
             operacao.Detalhe.Should().Contain("sem confirmação válida");

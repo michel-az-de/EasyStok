@@ -72,8 +72,10 @@ const resumo = (extra = {}) => ({
 })
 const guardado = { ultima: '2026-09-30T11:58:00', mensagens: [] }
 
+// #1786: a selecionada relê com `ultimaMensagemEm` igual enquanto o status de uma saída ainda pode mudar.
 await confere('2. conversa selecionada relê as mensagens mesmo com `ultimaMensagemEm` igual', () => {
-  assert.equal(deveRelerMensagens(resumo(), guardado, 'conv-1'), true)
+  const comEnviada = { ...guardado, mensagens: [{ direcao: 'Saida', autor: 'Atendente', status: 'Enviada', externoId: 'wamid.1' }] }
+  assert.equal(deveRelerMensagens(resumo(), comEnviada, 'conv-1'), true)
 })
 
 await confere('2. conversa não selecionada e sem mudança fica no cache', () => {

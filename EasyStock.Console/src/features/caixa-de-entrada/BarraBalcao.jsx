@@ -4,7 +4,7 @@ import { Icone } from '../../componentes/Icone'
 import { Popover } from '../../componentes/Popover'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { precisaDeVoce } from '../../dominio/automatico'
-import { combinaBusca, combinaCanal, combinaResponsavel, contarPorCanal } from '../../dominio/conversa'
+import { combinaBusca, combinaCanal, combinaResponsavel, contarPorCanal, mostraChipDoCanal } from '../../dominio/conversa'
 import css from './caixa.module.css'
 
 const OPCOES_DE_ORDEM = [
@@ -171,7 +171,8 @@ export function BarraBalcao({ filtros, aoMudar }) {
           Precisa de você <span className={css.numeroChip}>{quantasPrecisam}</span>
         </button>
         <span className={css.divisorFiltros} aria-hidden="true" />
-        {canais.map((c, i) => (
+        {/* #1761 (L15): canal sem conversa aberta não ocupa lugar ("Instagram 0"). */}
+        {canais.map((c, i) => mostraChipDoCanal(contagemPorCanal[i], filtros.canais.includes(c.nome)) && (
           <ChipCanal
             key={c.nome}
             canal={c}

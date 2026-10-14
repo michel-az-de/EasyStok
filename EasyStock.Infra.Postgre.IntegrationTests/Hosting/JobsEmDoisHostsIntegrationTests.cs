@@ -105,17 +105,35 @@ public sealed class JobsEmDoisHostsIntegrationTests(PostgreSqlDatabaseFixture fi
     }
 
     /// <summary>
-    /// Outra sessão segurando a trava, como o outro host no meio da rodada. Sem pool: fechar a conexão
-    /// encerra a sessão e solta a trava (no pool ela ficaria presa na conexão ociosa).
+    /// Outra sessão segurando a trava, como o outro host no meio da rodada. Sem pool, para a trava não ficar
+    /// presa numa conexão ociosa.
     /// </summary>
-    private async Task<NpgsqlConnection> DeterTravaAsync(long chave)
+    private async Task<TravaDeOutroHost> DeterTravaAsync(long chave)
     {
         var conexao = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(fixture.ConnectionString) { Pooling = false }.ConnectionString);
         await conexao.OpenAsync();
         await using var cmd = new NpgsqlCommand("SELECT pg_advisory_lock(@k)", conexao);
         cmd.Parameters.AddWithValue("k", chave);
         await cmd.ExecuteNonQueryAsync();
-        return conexao;
+        return new TravaDeOutroHost(conexao, chave);
+    }
+
+    /// <summary>
+    /// Solta a trava com <c>pg_advisory_unlock</c> antes de fechar. Fechar a conexão não espera o backend do
+    /// PostgreSQL sair: a trava podia seguir presa alguns instantes e a rodada seguinte, com
+    /// <c>pg_try_advisory_lock</c>, pulava sem registrar nada (CI da PR #1818, 14/10/2026).
+    /// </summary>
+    private sealed class TravaDeOutroHost(NpgsqlConnection conexao, long chave) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            await using (var cmd = new NpgsqlCommand("SELECT pg_advisory_unlock(@k)", conexao))
+            {
+                cmd.Parameters.AddWithValue("k", chave);
+                await cmd.ExecuteScalarAsync();
+            }
+            await conexao.DisposeAsync();
+        }
     }
 
     private async Task<string> StatusAsync(Guid empresaId, Guid pedidoId)

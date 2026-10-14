@@ -137,3 +137,39 @@ Duas jornadas de navegador passaram com API/PostgreSQL reais descartáveis: lead
 Última conferência visual: ajuda resumida em uma linha, Lalamove visível junto ao endereço e pratos/horário antes do formulário de frete. Removidas instruções repetidas que empurravam os itens para fora da primeira tela.
 
 Pagamento, IA, WhatsApp e prestadores externos foram controlados. Nenhuma corrida ou cobrança real foi contratada, e a jornada autenticada não foi exercitada em produção. Recibo de CI e publicação fica na [issue #1712](https://github.com/michel-az-de/EasyStok/issues/1712).
+
+## Ficha simples e encerramento do atendimento (#1785, 14/10/2026)
+
+Problema reproduzido no Console demonstrativo: encerrar a conversa mantinha o pedido pago anterior, itens, cobrança e cadastro na coluna lateral. O pedido continua existindo para a operação, mas a ficha não deve apresentá-lo como atendimento atual. A coluna também misturava formulários de assuntos diferentes e obrigava a procurar ações entre várias rolagens.
+
+Pesquisa de referência: [divulgação progressiva de informações](https://www.nngroup.com/articles/progressive-disclosure/), [uso de diálogos modais](https://www.nngroup.com/articles/modal-nonmodal-dialog/) e [padrão de foco para diálogos](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/). A aplicação desses princípios foi avaliada por inspeção e cenários controlados; não houve entrevistas nem teste com participantes nesta rodada.
+
+Decisão: a coluna se chama **Resumo** e mostra a fase, situação, quantidade, total e próxima ação. Pedido e entrega, Pagamento, Cliente e histórico e Pós-venda abrem os componentes existentes em modais com o nome do cliente. O acesso a pós-venda preserva ocorrências e devoluções. O atendimento encerrado mostra somente a conclusão e acessos explícitos ao histórico e à consulta do pedido, sem edição da comanda. O pedido não é apagado nem cancelado pelo fechamento visual da ficha.
+
+A comanda compartilhada mostra estado e total; **Revisar seleção** abre os itens e a edição. Falha ao salvar e conflito de revisão ficam no contexto da edição e preservam o rascunho. O ajuste de transporte fica dentro de Combinar entrega. Trocar cliente, pedido ou encerrar desmonta o contexto anterior, incluindo modais. O cardápio continua adicionando por botão e por arraste para o resumo.
+
+Feedback de Felipe sobre a primeira prévia: **“A comanda ainda confunde”**, especificamente distinguir seleção e pedido confirmado. A revisão passa a nomear **Seleção do cliente / Não confirmada**, **Pedido criado** com número e estado de pagamento separados, e **Alteração em edição / Pedido atual mantido**. O rascunho local do atendimento também fica como seleção, sem acesso prematuro a pagamento ou pós-venda. Salvar explicita que só atualiza o link; **Revisar e criar pedido** abre a confirmação final. Uma alteração enviada abre **Comparar e aprovar**, com itens e total do pedido atual separados da proposta. Recusa vira histórico e conserva o original. A criação não significa pagamento recebido; o texto da confirmação foi alinhado ao contrato atual, que registra cobrança quando há saldo.
+
+| Cenário | Resultado verificado |
+|---|---|
+| Bruna, primeiro contato sem pedido | Antes da venda e ação de adicionar itens, sem comanda anterior |
+| Patrícia, lead com endereço capturado | Cadastro incompleto indicado no resumo; confirmação acessível em Cliente e histórico |
+| Eduarda, pedido e cobrança vencida | Saldo e próxima ação visíveis; itens e cobrança em modais distintos; botão e arraste do cardápio atualizam quantidade e total |
+| José, pagamento completo e conversa encerrada | Nenhum valor ou item do pedido na ficha; consulta explícita sem controle de quantidade; Escape devolve o foco ao acesso |
+| Otávio, pedido entregue | Fase Pós-venda e acesso a ocorrências; histórico preservado |
+| Ana e Bruno, comanda compartilhada controlada | Troca de cliente e encerramento fecham o editor; resposta atrasada de Ana não altera Bruno |
+| Cliente e atendente editam a mesma seleção | Conflito preserva edição; revisão atual pode ser carregada antes de continuar |
+| Falha de gravação e nova tentativa | Erro visível no modal, edição preservada e gravação posterior confirmada |
+| Teclado e telas estreitas | Escape retorna ao acionador; salvar mantém foco após remover o botão; Tab não alcança controles do fundo; modal com uma rolagem vertical e sem excesso horizontal em 320 e 1280 px |
+
+Evidência local: `C:/rep/.worktrees/EasyStok/atendimento-simples-1785/.build/atendimento-1785/` contém capturas e `verificacoes-browser.json` com 23 verificações da banca, incluindo botão e arraste no cardápio. A conferência do cardápio passou em 1440 px, com zero rolagens verticais necessárias no Resumo. A composição do celular também foi inspecionada em 375 px.
+
+Validação após o feedback: 12 cenários de renderização dos componentes reais em `prova-1785-ficha.mjs` (incluídos no CI), provas de comanda compartilhada com seis estados do resumo, 15 do operador, 36 de atendimento, 8 de ficha, 22 de cobrança e 16 de desktop. Qualidade do Console aprovada: lint, fronteiras entre camadas, 264 pares de contraste e build. Gate local aprovado com build e 42 testes de arquitetura.
+
+Revisão visual adicional: salvar mantém a seleção não confirmada; criar pedido troca o resumo para pedido numerado aguardando pagamento; recusar conserva R$ 76,00 do pedido original e identifica o histórico; aprovar atualiza para R$ 38,00 somente após a resposta controlada; nova edição informa que o pedido atual foi mantido. Em 320 px, o modal tem uma rolagem vertical, sem excesso horizontal, e Escape retorna a Revisar seleção. Capturas `selecao-revisao.png`, `pedido-criado-revisao.png`, `alteracao-comparada-revisao.png`, `selecao-320-revisao.png` e `verificacoes-revisao-comanda.json` estão em `C:/Users/felip/.codex/visualizations/2026/10/14/01a13b52-14a5-7c13-ae28-5cd4b903b675/atendimento-1785/`. Entrega, horário e frete preenchidos ficam recolhidos; requisitos pendentes continuam expandidos. A ação Revisar e criar pedido ficou visível em 1280 x 720, e a confirmação foi exercitada em 320 px com retorno de foco. Felipe confirmou que a diferença entre seleção, pedido criado e alteração proposta ficou clara e autorizou pente-fino seguido de publicação. CI e versão servida continuam sendo gates separados.
+
+Publicação da primeira etapa: PR #1790 integrada e commit `a07a5b3b786f9e8084c15329b111da2c24f69368` conferido na API, no HTML público do Console e em `versao.json` em 14/10/2026. Backup anterior à publicação confirmado. CI: 7.337 testes aprovados e um teste de desempenho ignorado; 85 scripts do Console aprovados localmente.
+
+O pente-fino ampliou a banca para Kestrel e PostgreSQL reais, quatro clientes e dois perfis. Foram exercitados seleção sem criação, pedido com frete, pagamento repetido sem duplicação, encerramento com e sem venda, proposta de R$ 15,00 separada do pedido de R$ 25,00, bloqueio de devolução para operador, aprovação pela gerente e devolução de R$ 10,00. O pacote publicado foi baixado e executado contra esse banco para concluir preparo, despacho, entrega e consulta de pós-venda. Acessos de outro tenant e anônimo retornaram 404 e 401. Meta, Mercado Pago e LLM foram substituídos por provedores controlados; a autenticação usou identidades de teste. Isso não homologa provedores externos ou login real.
+
+Complemento #1800: Pós-venda passa a oferecer Registrar ocorrência para a gerente, com motivo e relato dentro do mesmo modal. O relato é preservado após falha; o registro não devolve dinheiro. A prova de indisponibilidade online distingue falha temporária do provedor de encomenda sem credencial, que conserva cobrança manual desde #1736. Implementação e publicação complementar devem ser conferidas na [issue #1800](https://github.com/michel-az-de/EasyStok/issues/1800).

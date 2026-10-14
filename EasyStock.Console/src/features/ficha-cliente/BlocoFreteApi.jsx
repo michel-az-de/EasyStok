@@ -1,7 +1,7 @@
 import { Bloco } from '../../componentes/Bloco'
 import { Botao } from '../../componentes/Botao'
 import { ModalFrete } from '../../componentes/ModalFrete'
-import { useFretesApi } from '../../aplicacao/useFretesApi'
+import { useFretesApi, useLogisticaDeDemonstracao } from '../../aplicacao/useFretesApi'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { hashDoModulo } from '../../dominio/modulos'
 import css from './comanda.module.css'
@@ -21,12 +21,16 @@ export function ConsultaTransporte({ semPedido = false }) {
 // A mesma decisão de frete do módulo Entregas, conservando o pedido da conversa.
 export function BlocoFreteApi({ pedido, cliente, numero, endereco }) {
   const fretes = useFretesApi()
+  // #1761: na loja de verdade a comparação não existe; o aviso e o botão eram ruído na Ficha.
+  const demonstracao = useLogisticaDeDemonstracao(pedido.pedidoId)
   return <Bloco titulo="Transporte e rastreio">
     <ConsultaTransporte />
-    <p>A comparação integrada abaixo é uma demonstração, sem chamada de entregador externo.</p>
-    <Botao onClick={() => fretes.abrir({ titulo: `Entrega de ${cliente}`, pedidoId: pedido.pedidoId, pedidos: [{
-      id: pedido.pedidoId, numero, cliente, endereco,
-    }] })}>Ver comparação demonstrativa</Botao>
-    <ModalFrete controlador={fretes} />
+    {demonstracao && <>
+      <p>A comparação integrada abaixo é uma demonstração, sem chamada de entregador externo.</p>
+      <Botao onClick={() => fretes.abrir({ titulo: `Entrega de ${cliente}`, pedidoId: pedido.pedidoId, pedidos: [{
+        id: pedido.pedidoId, numero, cliente, endereco,
+      }] })}>Ver comparação demonstrativa</Botao>
+      <ModalFrete controlador={fretes} />
+    </>}
   </Bloco>
 }

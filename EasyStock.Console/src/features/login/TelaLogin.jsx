@@ -59,7 +59,7 @@ export function TelaLogin({ entrarNaEmpresa, google, avisoSaida }) {
         </form>
         {google && (
           <div className={css.google}>
-            <BotaoGoogle buscarClientId={google.buscarClientId} aoReceberToken={entrarComGoogle} aoFalhar={falhaDoGoogle} />
+            <BotaoGoogle buscarClientId={google.buscarClientId} aoReceberToken={entrarComGoogle} aoFalhar={falhaDoGoogle} opcoes={google.opcoes} />
           </div>
         )}
 

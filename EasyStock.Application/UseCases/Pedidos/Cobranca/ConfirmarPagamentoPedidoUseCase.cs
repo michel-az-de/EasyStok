@@ -60,7 +60,8 @@ public enum SituacaoConfirmacaoPagamento
 public sealed record ConfirmarPagamentoPedidoResult(
     SituacaoConfirmacaoPagamento Situacao,
     Guid? CobrancaId = null,
-    string? StatusPedido = null)
+    string? StatusPedido = null,
+    string? EstornoFalhou = null)
 {
     public bool Confirmado => Situacao == SituacaoConfirmacaoPagamento.Confirmado;
 }
@@ -132,6 +133,10 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
     private const string Origem = "mercadopago";
     private const string MarcaEstornoAutomatico = "estorno_automatico: pagamento ";
 
+    /// <summary>#1724: estorno automático que o provedor não fez. O dinheiro segue retido até alguém devolver.</summary>
+    public const string MarcaEstornoFalhou = "estorno_automatico_falhou: pagamento ";
+    public const string EventoEstornoFalhou = "estorno_automatico_falhou";
+
     public async Task<ConfirmarPagamentoPedidoResult> ExecuteAsync(ConfirmarPagamentoPedidoInput input, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -157,6 +162,10 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
 
         var (resultado, pago, impressao, conversaEstorno) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
             token => ConfirmarNoLockAsync(input, empresaId.Value, token), ct);
+
+        // A trilha da falha já foi gravada; a exceção sai depois do commit para o provedor reenviar (#1724).
+        if (resultado.EstornoFalhou is { } erroEstorno)
+            throw new EstornoAutomaticoFalhouException(input.PagamentoExternoId, erroEstorno);
 
         // Aviso do estorno automático: só depois do commit; best-effort, não desfaz nada se falhar.
         if (conversaEstorno is { } conversaId)
@@ -326,7 +335,31 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
 
         var r = await estorno.EstornarAsync(input.PagamentoExternoId, input.ValorPago, chaveIdempotencia, ct);
         if (!r.Sucesso)
-            throw new EstornoAutomaticoFalhouException(input.PagamentoExternoId, r.Erro);
+        {
+            // #1724: lançar aqui desfazia a transação e o pedido ficava sem sinal do dinheiro retido. A falha
+            // fica na cobrança e na trilha (uma vez por pagamento) e a exceção sai depois do commit.
+            var falhou = MarcaEstornoFalhou + input.PagamentoExternoId;
+            if (!cobrancas.Any(c => c.Motivo?.StartsWith(falhou, StringComparison.Ordinal) == true))
+            {
+                var detalhe = $"{falhou} de {input.ValorPago.ToString("F2", Cultura.PtBr)} {descricao}; " +
+                    $"o Mercado Pago não devolveu ({r.Erro ?? "sem_detalhe"}). Valor retido: devolver ao cliente.";
+                alvo.RegistrarMotivo(detalhe, agora);
+                await pedidoRepository.AddEventoAsync(new PedidoEvento
+                {
+                    Id = Guid.NewGuid(),
+                    PedidoId = pedido.Id,
+                    Tipo = EventoEstornoFalhou,
+                    Detalhes = detalhe,
+                    UsuarioNome = "Mercado Pago",
+                    Origem = Origem,
+                    OcorridoEm = agora,
+                }, ct);
+                await unitOfWork.CommitAsync();
+                logger.LogError("Estorno automatico falhou pedidoId={PedidoId} pagamento={Pagamento} erro={Erro}",
+                    pedido.Id, input.PagamentoExternoId, r.Erro);
+            }
+            return (new(situacao, alvo.Id, pedido.Status, r.Erro ?? "sem_detalhe"), null, null, null);
+        }
 
         var motivo = $"{marca} de {input.ValorPago.ToString("F2", Cultura.PtBr)} {descricao}; estorno {r.IdSolicitacao}";
         var resultado = await RecusarAsync(pedido, alvo, motivo, situacao, agora, ct);

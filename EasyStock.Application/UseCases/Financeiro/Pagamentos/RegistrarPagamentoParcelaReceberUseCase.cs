@@ -63,7 +63,7 @@ public class RegistrarPagamentoParcelaReceberUseCase(
             mov.Descricao = $"Recb. parcela {parcela.Numero}/{conta.Parcelas.Count} — {conta.Descricao}";
             mov.Metodo = cmd.Metodo.ToLowerInvariant();
             mov.Categoria = "contas-a-receber";
-            mov.Referencia = $"cr:{conta.Id}:parcela:{parcela.Id}:pag:{pagamento.Id}";
+            mov.Referencia = ReferenciaDeParcela.DoPagamento("cr", conta.Id, parcela.Id, pagamento.Id);
             mov.RegistradoPorUserId = cmd.RegistradoPorUserId;
             mov.RegistradoPorNome = cmd.RegistradoPorNome;
             mov.Origem = "api";

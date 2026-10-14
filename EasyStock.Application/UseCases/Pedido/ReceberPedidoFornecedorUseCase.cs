@@ -6,6 +6,8 @@ public sealed record ReceberPedidoFornecedorCommand(Guid PedidoId, Guid EmpresaI
 
 public class ReceberPedidoFornecedorUseCase(
     IPedidoFornecedorRepository pedidoRepository,
+    IPedidoFornecedorItemRepository itemRepository,
+    ReceberPedidoCompletoUseCase receberCompletoUseCase,
     GerarContaPagarDePedidoFornecedorUseCase gerarContaPagarUseCase,
     IUnitOfWork unitOfWork,
     ILogger<ReceberPedidoFornecedorUseCase> logger)
@@ -30,8 +32,22 @@ public class ReceberPedidoFornecedorUseCase(
             throw new RegraDeDominioVioladaException(
                 "Pedido com recebimento parcial — use ProcessarRecebimento com itens para concluir.");
 
-        pedido.Status = StatusPedidoFornecedor.Recebido;
-        pedido.DataRecebimento = command.DataRecebimento ?? DateTime.UtcNow;
+        // Pedido com itens: só mudar o status deixava o estoque de fora e, como já constava
+        // Recebido, o receber-tudo respondia "já recebido" e a entrada nunca acontecia.
+        // Delegar ao recebimento completo dá entrada por item e fecha o status.
+        var temItens = (await itemRepository.GetByPedidoIdAsync(pedido.Id)).Any();
+        if (temItens)
+        {
+            await receberCompletoUseCase.ExecuteAsync(
+                new ReceberPedidoCompletoCommand(pedido.Id, pedido.EmpresaId, command.DataRecebimento));
+            pedido = await pedidoRepository.GetByIdAsync(command.PedidoId) ?? pedido;
+        }
+        else
+        {
+            pedido.Status = StatusPedidoFornecedor.Recebido;
+            pedido.DataRecebimento = command.DataRecebimento ?? DateTime.UtcNow;
+        }
+
         if (!string.IsNullOrWhiteSpace(command.Tracking))
             pedido.Tracking = command.Tracking;
         pedido.AlteradoEm = DateTime.UtcNow;

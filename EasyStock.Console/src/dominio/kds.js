@@ -175,3 +175,12 @@ export function diaDaFilaDaCozinha(amanhaDesde, agora) {
   const amanha = Boolean(amanhaDesde) && amanhaDesde === dataIsoNoFuso(agora)
   return { amanha, data: amanha ? dataIsoNoFuso(agora + UM_DIA_MS) : null }
 }
+
+// #1709: o EasyStok devolve no máximo 200 pedidos por consulta, dos mais antigos para os mais
+// novos (`KdsPedidoQueries.Limite`). Com a fila no teto, o pedido novo fica fora da tela.
+export const TETO_DA_FILA_KDS = 200
+
+export function avisoDeFilaNoTeto(quantidade) {
+  if (quantidade < TETO_DA_FILA_KDS) return null
+  return `A fila chegou ao limite de ${TETO_DA_FILA_KDS} pedidos: pedidos mais novos podem estar fora da tela. Conclua ou cancele os pedidos parados para a fila andar.`
+}

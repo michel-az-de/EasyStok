@@ -12,12 +12,21 @@ registerHooks({ resolve(spec, contexto, proximo) {
   return proximo(spec, contexto)
 } })
 const { MODULOS, hashDoModulo, telasDoMenu } = await import('../src/dominio/modulos.js')
+const { HASH_HALL } = await import('../src/dominio/rota.js')
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const origem = process.env.CONSOLE_URL ?? 'http://127.0.0.1:5186'
 const evidencias = process.env.EVIDENCIAS_UX ?? 'builds/prova-financeiro'
 mkdirSync(evidencias, { recursive: true })
 const capturas = []
 async function capturarTela(page, modulo, tela, tema) {
+  if (tela.indisponivelNaApi) {
+    const principal = page.getByRole('main')
+    await principal.getByText('Em preparação', { exact: true }).waitFor()
+    assert.equal(await principal.locator('input, select, textarea, button').count(), 0, `${modulo.id}/${tela.id}: sem controles de demonstração`)
+    assert.doesNotMatch(await principal.innerText(), /BEMVINDA10|BABA15|Cadastrar credencial|Desativar|Registre a primeira produção pela tabela/)
+    const destino = modulo.id === 'cozinha' ? hashDoModulo('producao', 'producao') : HASH_HALL
+    assert.equal(await principal.locator(`a[href="${destino}"]`).count(), 1)
+  }
   await page.evaluate(async () => {
     await document.fonts.ready
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
@@ -41,6 +50,7 @@ contaReceber.id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 contaReceber.descricao = 'Venda de encomenda'
 contaReceber.parcelas[0].id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 const acoes = Object.fromEntries(['visualizarContasPagar', 'visualizarContasReceber', 'gerenciarContasPagar', 'gerenciarContasReceber', 'gerenciarCategoriasFinanceiras', 'gerenciarCentrosCusto', 'gerenciarCaixa', 'editarProducao', 'editarCardapio', 'editarAtendimento'].map((nome) => [nome, true]))
+let modulosPermitidos = new Set(MODULOS.map(modulo => modulo.id))
 const escritas = []
 const erros = []
 let falhaDeGravacao = false
@@ -92,7 +102,7 @@ try {
       }
       return ok(contaAtual)
     }
-    if (caminho === '/api/auth/me/modulos') return ok({ modulos: ['cardapio', 'producao', 'atendimento', 'cozinha', 'financeiro', 'campanhas', 'configuracoes', 'entregas'].map((id) => ({ id, liberado: true })), acoes })
+    if (caminho === '/api/auth/me/modulos') return ok({ modulos: MODULOS.map(({ id }) => ({ id, liberado: modulosPermitidos.has(id) })), acoes })
     if (caminho === '/api/financeiro/categorias') return ok([{ id: categoriaId, nome: 'Operação', tipo: 'Ambas', ativa: true }])
     if (caminho === '/api/financeiro/centros-custo') return ok([])
     if (caminho === '/api/financeiro/dashboard') return ok({ totalAVencer30dPagar: 100, totalAVencer30dReceber: 100, totalVencidoPagar: 0, totalVencidoReceber: 0, totalPagoMes: 100, totalRecebidoMes: 200, qtdContasPagarAVencer30d: 1, qtdContasReceberAVencer30d: 1 })
@@ -175,6 +185,23 @@ try {
   assert.equal(await page.getByRole('button', { name: 'Sair', exact: true }).count(), 1)
   await page.getByText('Conversas ao vivo do EasyStok', { exact: true }).waitFor({ state: 'hidden' })
   await page.getByText('Dona de teste · Empresa de teste', { exact: true }).waitFor()
+  modulosPermitidos = new Set(['cozinha'])
+  await page.goto(origem + '/#/m/cozinha/producao')
+  await page.reload()
+  const preparacao = page.getByRole('main')
+  await preparacao.getByText('Em preparação', { exact: true }).waitFor()
+  assert.equal(await preparacao.locator('a[href="#/m/producao/producao"]').count(), 0)
+  assert.equal(await preparacao.getByRole('link', { name: 'Ver módulos', exact: true }).count(), 1)
+  const voltarAosModulos = preparacao.getByRole('link', { name: 'Ver módulos', exact: true })
+  assert.ok(await voltarAosModulos.evaluate(no => no.getBoundingClientRect().height >= 44))
+  await page.keyboard.press('Tab')
+  await voltarAosModulos.focus()
+  assert.equal(await voltarAosModulos.evaluate(no => document.activeElement === no && getComputedStyle(no).outlineStyle === 'solid'), true)
+  await page.screenshot({ path: join(evidencias, 'cozinha-preparacao-sem-acesso-producao.png') })
+  modulosPermitidos = new Set(MODULOS.map(modulo => modulo.id))
+  await page.goto(origem + '/#/m/financeiro/pagar')
+  await page.reload()
+  await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).waitFor()
   assert.equal(await page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true }).getByRole('link').count(), 8)
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).click()
   let modal = page.getByRole('dialog', { name: 'Nova conta a pagar', exact: true })
@@ -354,6 +381,27 @@ try {
   await page.getByText('Conversas ao vivo do EasyStok', { exact: true }).waitFor({ state: 'hidden' })
   await page.getByText('Dona de teste · Empresa de teste', { exact: true }).waitFor()
   assert.deepEqual(erros, [])
+  const demonstracao = await browser.newContext({ viewport: { width: 1440, height: 960 }, reducedMotion: 'reduce' })
+  await demonstracao.grantPermissions(['local-network-access'], { origin: origem })
+  // Mesmo Console servido, com a escolha da fonte controlada para conferir o modo demonstração.
+  await demonstracao.route('**/src/infra/fonteDados.js*', route => route.fulfill({ contentType: 'text/javascript', body: "export const FONTE_API = false; export const API_BASE = '';" }))
+  const paginaDemo = await demonstracao.newPage()
+  const errosDemo = []
+  paginaDemo.on('pageerror', erro => errosDemo.push(erro.message))
+  for (const [modulo, tela, texto] of [
+    ['cozinha', 'producao', 'Saldo por item, a partir dos lotes'],
+    ['campanhas', 'fidelidade', 'BEMVINDA10'],
+    ['configuracoes', 'integracoes', 'Entregador próprio'],
+  ]) {
+    await paginaDemo.goto(origem + '/' + hashDoModulo(modulo, tela))
+    await paginaDemo.getByText(texto, { exact: true }).first().waitFor()
+    assert.equal(await paginaDemo.getByRole('main').getByText('Em preparação', { exact: true }).count(), 0)
+    if (modulo === 'campanhas') assert.equal(await paginaDemo.getByRole('button', { name: 'Novo cupom', exact: true }).isEnabled(), true)
+    if (modulo === 'configuracoes') assert.ok(await paginaDemo.getByRole('button', { name: 'Cadastrar credencial', exact: true }).count() > 0)
+    await paginaDemo.screenshot({ path: join(evidencias, `demonstracao-${modulo}-${tela}.png`) })
+  }
+  assert.deepEqual(errosDemo, [])
+  await demonstracao.close()
   console.log(`OK: ${telasVerificadas} rotas dos oito módulos, navegação lateral, operações financeiras, modais, permissões, atualização por clique sem perder rascunho, manifesto inválido, sessão/rota preservadas e celular; ${escritas.length} escritas controladas; sem erros de página ou console.`)
 } catch (erro) {
   console.error('Erros de página:', erros.filter(erro => !erro.startsWith('Failed to send error')).map(erro => erro.split('\n')[0]))

@@ -25,10 +25,13 @@ import { entregaPassouDoPrazo, ocorrenciaAberta, ORIGENS_OCORRENCIA } from '../d
 import { pedirPermissaoDeNotificacao, permissaoDeNotificacao } from '../infra/notificacaoNavegador'
 import { lembretesAutomaticos, listaDeLembretes } from '../dominio/lembrete'
 import { useAvisoSonoro } from './useAvisoSonoro'
+import { useFilaDeAvisos } from './useFilaDeAvisos'
 import { audioDestravado, destravarAudio } from '../infra/som'
 import { gravarPreferenciaSom, lerPreferenciaSom } from '../infra/preferenciaSom'
 import { conectarPrincipal } from '../infra/canalEntreJanelas'
 import { FONTE_API } from '../infra/fonteDados'
+import { useAcessoModulos } from './acessoModulos'
+import { podeVerItensFora } from '../dominio/acessoModulos'
 import { comApi } from './acoesApi'
 import { criarAcoes } from './criarAcoes'
 import { useSincronizacaoApi } from './useSincronizacaoApi'
@@ -75,7 +78,11 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
     if (estado.sincronizacao.estado === 'ok' || estado.conversas.length) aoGuardarComandas?.(comandasLocaisDaVisita(estado.conversas))
   }, [aoGuardarComandas, estado.conversas, estado.sincronizacao.estado])
   useEffect(() => { if (FONTE_API) gravarRascunhos(sessao, estado.rascunhos) }, [sessao, estado.rascunhos])
-  useSincronizacaoApi({ ativo: FONTE_API, comConversas: atendimentoAtivo, usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId, memoria: memoriaDoLaco })
+  const { acoes: acoesDoPerfil } = useAcessoModulos()
+  const comItensFora = podeVerItensFora(acoesDoPerfil)
+  const comItensForaRef = useRef(comItensFora)
+  useEffect(() => { comItensForaRef.current = comItensFora }, [comItensFora])
+  useSincronizacaoApi({ ativo: FONTE_API, comConversas: atendimentoAtivo, comItensFora, usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId, memoria: memoriaDoLaco })
 
   // Relógio da tela mais o deslocamento do painel de simulações (seção 7,
   // "+10 min"/"+30 min"/"Agora"): as ações carimbam o mesmo instante que a
@@ -233,9 +240,13 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   // `janelas` liga o motivo "pedido atrasado" (achado 3); `aoTocar` alimenta
   // o registro de sons recentes do Sininho (achado 7, item 7) e a marca de
   // "pagamento não visto" independente do sinal verde (item 2).
+  // #1807: o mesmo aviso que toca também aparece na tela e, com a aba
+  // escondida, no navegador (`useFilaDeAvisos`, montado só aqui).
+  const filaDeAvisos = useFilaDeAvisos()
   useAvisoSonoro({
     conversas: estado.conversas, som: estado.som, agora: agoraEfetivo, aberta, expediente: horarioDaLoja,
     janelas: estado.catalogo.janelas,
+    aoAvisar: filaDeAvisos.avisar,
     aoTocar: (evento, conversaId) => {
       setEventosSonoros((atual) => [
         ...atual, { id: proximoId('som'), evento, conversaId, quando: agoraRef.current },
@@ -320,7 +331,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   }, [conversasAgora, agoraEfetivo, estado.catalogo.janelas])
 
   const acoesAtivas = useMemo(
-    () => (FONTE_API ? comApi(acoes, { despachar, agoraRef, estadoRef }) : acoes),
+    () => (FONTE_API ? comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef }) : acoes),
     [acoes],
   )
 
@@ -410,6 +421,9 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       pagamentosNaoVistos,
       permissaoNotificacao,
       consultaLembretes,
+      // #1807: pilha de avisos da tela (toast) e quem tira um da pilha.
+      avisosNaTela: filaDeAvisos.avisos,
+      dispensarAviso: filaDeAvisos.dispensar,
       // `ui.encerrando` (seção 5): id da conversa com a modal de
       // encerramento aberta, ou `null`.
       encerrando: estado.ui.encerrando,
@@ -433,7 +447,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       cargaDasRegras: estado.cargaDasRegras,
       sessao,
     }
-  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, horarioDaLoja, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao, consultaLembretes])
+  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, horarioDaLoja, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao, consultaLembretes, filaDeAvisos.avisos, filaDeAvisos.dispensar])
 
   return (
     <ContextoCatalogo.Provider value={estado.catalogo}>

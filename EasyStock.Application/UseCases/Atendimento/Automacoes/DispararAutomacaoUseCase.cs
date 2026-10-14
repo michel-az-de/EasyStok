@@ -107,7 +107,7 @@ public sealed class DispararAutomacaoUseCase(
         {
             idExterno = await canais.Obter(conversa.Canal).EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Automática {Gatilho} falhou no canal da conversa {ConversaId}.", disparo.Gatilho, conversa.Id);
             return ResultadoAutomacao.Falhou;
@@ -132,7 +132,10 @@ public sealed class DispararAutomacaoUseCase(
 
         if (disparo.ClienteId is not { } clienteId) return null;
         var recentes = await conversas.ListarPorClienteAsync(disparo.EmpresaId, clienteId, 1, ct);
-        return recentes.FirstOrDefault();
+        // #1787: a lista vem sem rastreio; relida pelo id, a saída atualiza UltimaMensagemEm e a conversa sobe na inbox.
+        return recentes.FirstOrDefault() is { } recente
+            ? await conversas.ObterPorIdAsync(disparo.EmpresaId, recente.Id, ct)
+            : null;
     }
 
     private ResultadoAutomacao Registrar(DisparoAutomacao disparo, ResultadoAutomacao resultado)

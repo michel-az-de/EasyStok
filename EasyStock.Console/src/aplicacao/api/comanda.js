@@ -7,6 +7,7 @@ import { mudarStatusKds } from '../../infra/api/kdsApi'
 import { aprovarPedido as aprovarPedidoApi } from '../../infra/api/entregasApi'
 import { MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, baixaCancelaCobrancaOnline, baixaEsperaAprovacao } from '../../dominio/cobranca'
 import { ultimoPagamentoApi } from '../../dominio/pagamento'
+import { motivoDoPedidoNaoCriado } from '../../dominio/pedido'
 import { criarChaveDeEnvio } from '../chaveDeEnvio'
 import { SO_NO_EASYSTOK } from './naoLigadas'
 
@@ -130,7 +131,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
         return recarregar(id).catch(() => avisar(aviso ? `${aviso} Atualizando a tela…` : 'Pedido criado no EasyStok, atualizando a tela…'))
       },
       (erro) => {
-        const mensagem = `Pedido não criado: ${erro.message}`
+        const mensagem = motivoDoPedidoNaoCriado(erro)
         avisar(mensagem)
         return { erro: mensagem }
       },

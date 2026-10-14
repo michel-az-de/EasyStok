@@ -100,7 +100,8 @@ public sealed class AgenteAtendimentoService(
 
         var system = await GeracaoAgenteAtendimento.MontarSystemAsync(
             empresaId, configuracao, conversa, cliente, dados.Mensagens, agora, caderno, dossieUseCase, ct);
-        var contexto = new ContextoTurnoAgente(empresaId, conversa, agora);
+        var gravacao = new GravacaoSaidaTurno(conversaRepository, unitOfWork, logger, empresaId, dados.Mensagens, agora);
+        var contexto = new ContextoTurnoAgente(empresaId, conversa, agora, gravacao.GravarAsync);
 
         var geracao = await GeracaoAgenteAtendimento.GerarAsync(
             llm, system, mensagens, _ferramentas, contexto, MaximoIteracoes, logger, ct);
@@ -110,7 +111,7 @@ public sealed class AgenteAtendimentoService(
 
         // As entradas que foram ao LLM ficam processadas: um job repetido não responde de novo e a
         // mensagem que chegar durante o turno continua pendente para o próximo (#1288).
-        await MarcarProcessadasAsync(empresaId, dados.Mensagens, agora, ct);
+        await gravacao.MarcarProcessadasAsync(ct);
 
         // A dona pode ter assumido (ou encerrado) enquanto o LLM respondia: a Situacao carregada no
         // início está velha. Fora do automático o agente não envia nem escala (#1288).
@@ -128,17 +129,17 @@ public sealed class AgenteAtendimentoService(
         const string encaminhamento = "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.";
         if (conversa.Situacao == SituacaoConversa.Assumida)
         {
-            respondeu = await EnviarRespostaAsync(empresaId, conversa, encaminhamento, agora, ct) || respondeu;
+            respondeu = await EnviarRespostaAsync(gravacao, conversa, encaminhamento, ct) || respondeu;
         }
         else if (conversa.Situacao == SituacaoConversa.Encerrada && contexto.RespostaVerificada is { Length: > 0 } despedida)
-            respondeu = await EnviarRespostaAsync(empresaId, conversa, despedida, agora, ct) || respondeu;
+            respondeu = await EnviarRespostaAsync(gravacao, conversa, despedida, ct) || respondeu;
         else if (conversa.Situacao == SituacaoConversa.Automatica)
         {
             if (concluiu && motivoEscalada is null && contexto.RespostaVerificada is { Length: > 0 } verificada)
-                respondeu = await EnviarRespostaAsync(empresaId, conversa, verificada, agora, ct) || respondeu;
+                respondeu = await EnviarRespostaAsync(gravacao, conversa, verificada, ct) || respondeu;
             else if (!contexto.EnvioVerificado || motivoEscalada is not null || !concluiu)
             {
-                respondeu = await EnviarRespostaAsync(empresaId, conversa, encaminhamento, agora, ct) || respondeu;
+                respondeu = await EnviarRespostaAsync(gravacao, conversa, encaminhamento, ct) || respondeu;
                 motivoEscalada ??= concluiu ? "resposta sem resultado verificado; precisa de conferência humana"
                     : $"o agente atingiu o limite de {MaximoIteracoes} iterações sem concluir a resposta";
             }
@@ -155,8 +156,9 @@ public sealed class AgenteAtendimentoService(
             motivoEscalada is not null || conversa.Situacao == SituacaoConversa.Assumida);
     }
 
-    private async Task<bool> EnviarRespostaAsync(Guid empresaId, Conversa conversa, string texto, DateTime agora, CancellationToken ct)
+    private async Task<bool> EnviarRespostaAsync(GravacaoSaidaTurno gravacao, Conversa conversa, string texto, CancellationToken ct)
     {
+        var (empresaId, agora) = (gravacao.EmpresaId, gravacao.Agora);
         if (string.IsNullOrWhiteSpace(texto)) return false;
         texto = TextoWhatsApp.SemTravessao(texto);
         if (texto.Length > Mensagem.TextoTamanhoMaximo) texto = texto[..Mensagem.TextoTamanhoMaximo];
@@ -179,6 +181,7 @@ public sealed class AgenteAtendimentoService(
         // encerrar_conversa pode ter fechado a conversa neste turno: a despedida ainda vai para o histórico.
         if (conversa.EstaAberta) conversa.RegistrarSaida(agora);
         await conversaRepository.AddMensagemAsync(saida, ct);
+        await gravacao.GravarAsync(ct);
         return enviou;
     }
 
@@ -232,16 +235,46 @@ public sealed class AgenteAtendimentoService(
     }
 
     /// <summary>
-    /// Marca no rastreamento as entradas que este turno levou ao LLM. O histórico vem sem tracking:
-    /// a entidade rastreada é buscada pelo <c>wamid</c>.
+    /// Grava cada saída do turno logo depois do envio (#1791), junto com as entradas que o turno levou ao LLM
+    /// marcadas como processadas: o status e o eco da Meta encontram a mensagem pelo wamid, e um commit final que
+    /// falhe não faz o próximo job responder de novo. Falha aqui não derruba o envio: o que ficou rastreado vai no
+    /// commit seguinte.
     /// </summary>
-    private async Task MarcarProcessadasAsync(Guid empresaId, IReadOnlyList<Mensagem> historico, DateTime agora, CancellationToken ct)
+    private sealed class GravacaoSaidaTurno(
+        IConversaRepository conversaRepository, IUnitOfWork unitOfWork, ILogger logger, Guid empresaId, IReadOnlyList<Mensagem> historico, DateTime agora)
     {
-        foreach (var entrada in historico.Where(m => m.Autor == AutorMensagem.Cliente && m.ProcessadaEm is null))
+        private bool _entradasMarcadas;
+
+        public Guid EmpresaId => empresaId;
+        public DateTime Agora => agora;
+
+        public async Task GravarAsync(CancellationToken ct)
         {
-            if (entrada.ExternoId is not { } externoId) continue;
-            var rastreada = await conversaRepository.ObterMensagemPorExternoIdAsync(empresaId, externoId, ct);
-            rastreada?.MarcarProcessada(agora);
+            try
+            {
+                await MarcarProcessadasAsync(ct);
+                await unitOfWork.CommitAsync();
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                logger.LogWarning(ex, "Agente: falha ao gravar a saída já enviada; segue para o commit do fim do turno.");
+            }
+        }
+
+        /// <summary>
+        /// Marca no rastreamento, uma vez por turno, as entradas que foram ao LLM. O histórico vem sem tracking:
+        /// a entidade rastreada é buscada pelo <c>wamid</c>.
+        /// </summary>
+        public async Task MarcarProcessadasAsync(CancellationToken ct)
+        {
+            if (_entradasMarcadas) return;
+            foreach (var entrada in historico.Where(m => m.Autor == AutorMensagem.Cliente && m.ProcessadaEm is null))
+            {
+                if (entrada.ExternoId is not { } externoId) continue;
+                var rastreada = await conversaRepository.ObterMensagemPorExternoIdAsync(empresaId, externoId, ct);
+                rastreada?.MarcarProcessada(agora);
+            }
+            _entradasMarcadas = true;
         }
     }
 }

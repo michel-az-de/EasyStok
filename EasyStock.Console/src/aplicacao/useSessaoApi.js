@@ -3,6 +3,7 @@ import { configGoogle, entrar, entrarComGoogle, sair } from '../infra/api/autent
 import { EVENTO_SESSAO_EXPIRADA, garantirSessao } from '../infra/api/cliente'
 import { EVENTO_FALHA_SAIDA_PUSH, EVENTO_SESSAO_ALTERADA, lerSessao, limparSessao } from '../infra/api/sessao'
 import { AVISO_SESSAO_VENCIDA } from '../dominio/sessao'
+import { liberarEntradaSozinha, opcoesDaEntradaGoogle, travarEntradaSozinha } from '../infra/entradaGoogle'
 
 // Sessão do modo API (F01). Um 401 em qualquer chamada limpa a sessão e dispara
 // EVENTO_SESSAO_EXPIRADA; aqui isso vira "volta para o login".
@@ -51,15 +52,18 @@ export function useSessaoApi() {
   const entrarGoogle = useCallback(async (idToken) => {
     setAvisoSaida(null)
     setSessao(await entrarComGoogle(idToken))
+    liberarEntradaSozinha()
   }, [])
 
   const encerrarSessao = useCallback(() => {
+    // #1810: sair não pode virar entrar de novo pelo One Tap.
+    travarEntradaSozinha()
     sair().catch(() => setAvisoSaida('Você saiu deste aparelho. Não foi possível confirmar o encerramento no servidor.'))
     setSessao(null)
     window.location.hash = '#/'
   }, [])
 
   // #1354: identidade estável; um objeto novo a cada render redesenhava o botão do Google.
-  const google = useMemo(() => ({ buscarClientId: configGoogle, entrar: entrarGoogle }), [entrarGoogle])
+  const google = useMemo(() => ({ buscarClientId: configGoogle, entrar: entrarGoogle, opcoes: opcoesDaEntradaGoogle }), [entrarGoogle])
   return { sessao, entrarNaEmpresa, google, encerrarSessao, avisoSaida }
 }

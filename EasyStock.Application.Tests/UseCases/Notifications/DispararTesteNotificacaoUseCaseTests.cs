@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Notifications;
+using EasyStock.Application.Tests.Services.Notifications;
 using EasyStock.Application.UseCases.Notifications;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
@@ -72,6 +73,33 @@ public class DispararTesteNotificacaoUseCaseTests
         foreach (var chave in ExemplosDeEvento.Obter(TipoEventoNotificacao.IncidenteSistema).Keys)
             payload.TryGetProperty(chave, out _).Should().BeTrue($"o exemplo leva a chave {chave}");
         await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Theory]
+    [InlineData(TipoEventoNotificacao.ContatoAlterado, true)]
+    [InlineData(TipoEventoNotificacao.IncidenteSistema, false)]
+    public async Task TesteDeContatoAlteradoRestringeAoEmailSemAlterarOutrosTipos(TipoEventoNotificacao tipo, bool somenteEmail)
+    {
+        _usuarioAtual.EmpresaId.Returns(Guid.NewGuid());
+
+        await Criar().ExecuteAsync(tipo);
+
+        using var payload = JsonDocument.Parse(PayloadPublicado());
+        payload.RootElement.TryGetProperty(CanaisDaRotina.CanaisPayload, out var canais).Should().Be(somenteEmail);
+        if (somenteEmail)
+        {
+            canais.EnumerateArray().Select(c => c.GetString()).Should().Equal("Email");
+            var f = new NotificadorServiceFixture(CanalNotificacao.Email, CanalNotificacao.WhatsApp);
+            f.UsarRotina(["Email", "WhatsApp"], parametrosJson: """{"modoCanais":"todos"}""", tipo: tipo);
+            f.UsarTemplate(CanalNotificacao.Email, tipo: tipo);
+            f.UsarTemplate(CanalNotificacao.WhatsApp, tipo: tipo);
+            var comTelefone = System.Text.Json.Nodes.JsonNode.Parse(PayloadPublicado())!;
+            comTelefone["telefone"] = "+5511999990001";
+
+            await f.Service.AvaliarEventoAsync(f.NovoEvento(comTelefone.ToJsonString(), tipo));
+
+            f.Gravadas.Should().ContainSingle().Which.Canal.Should().Be(CanalNotificacao.Email);
+        }
     }
 
     [Fact]

@@ -57,6 +57,12 @@ namespace EasyStock.Domain.Entities
         /// <summary>Tem perfil global de SuperAdmin (<c>Perfil.EmpresaId</c> nulo). Exige <see cref="Perfis"/> carregado com o perfil.</summary>
         public bool EhSuperAdmin() => Perfis.Any(up => up.Perfil is { Nivel: NivelAcesso.SuperAdmin });
 
+        /// <summary>
+        /// #1781: forma única do e-mail da conta (trim + minúsculas), a gravada e a buscada no login. Não valida o
+        /// formato: o login normaliza o que vier e responde credencial inválida como sempre.
+        /// </summary>
+        public static string NormalizarEmail(string email) => email.Trim().ToLowerInvariant();
+
         public static Usuario Criar(string nome, string email, string senhaHash)
         {
             var agora = DateTime.UtcNow;
@@ -64,7 +70,7 @@ namespace EasyStock.Domain.Entities
             {
                 Id = Guid.NewGuid(),
                 Nome = nome,
-                Email = email,
+                Email = NormalizarEmail(email),
                 SenhaHash = senhaHash,
                 Ativo = true,
                 EmailConfirmado = false,
@@ -223,7 +229,7 @@ namespace EasyStock.Domain.Entities
         {
             if (string.IsNullOrWhiteSpace(novoEmail))
                 throw new ArgumentException("E-mail novo não pode ser vazio.", nameof(novoEmail));
-            EmailPendente = novoEmail.Trim();
+            EmailPendente = NormalizarEmail(novoEmail);
             AlteradoEm = DateTime.UtcNow;
         }
 
