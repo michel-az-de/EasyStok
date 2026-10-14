@@ -222,6 +222,28 @@ public partial class AtendimentoConversasControllerTests
     }
 
     [Fact]
+    public async Task AbaFechadaDuranteOEnvioAindaGravaAMensagem()
+    {
+        // #1787: o POST à Meta já saiu quando a dona fecha a aba. Sem o registro, o agente seguiria respondendo.
+        var conversa = ConversaComClienteAgora();
+        using var request = new CancellationTokenSource();
+        _canal.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                var ct = ci.ArgAt<CancellationToken>(2);
+                if (!ct.CanBeCanceled) return Task.FromResult("wamid.dona1");
+                request.Cancel();
+                return Task.FromCanceled<string>(ct);
+            });
+
+        await _controller.EnviarMensagem(conversa.Id, new EnviarMensagemConsoleBody("Já sai!"), request.Token);
+
+        _repositorio.Mensagens.Should().ContainSingle(m => m.Direcao == DirecaoMensagem.Saida
+            && m.ExternoId == "wamid.dona1" && m.Status == StatusMensagem.Enviada);
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+    }
+
+    [Fact]
     public async Task ReenviarMensagemInexistente404()
     {
         var conversa = ConversaComClienteAgora();
