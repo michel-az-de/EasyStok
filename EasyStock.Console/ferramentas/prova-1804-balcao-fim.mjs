@@ -47,13 +47,23 @@ assert.equal(motivoDePrecisar(reaberta('entregue', 'in'), AGORA)?.chave, 'passag
   'o cliente escreveu depois: volta a precisar de você')
 ok('se o cliente escreve, a reaberta volta a "Precisa de você"')
 
+// Revisão: no modo API a conversa fora da tela vem sem mensagens; aí vale o `naoLidas`.
+const semMensagens = (naoLidas) => ({ ...reaberta('entregue', 'out'), mensagens: [], naoLidas })
+assert.equal(motivoDePrecisar(semMensagens(1), AGORA)?.chave, 'passagem', 'sem mensagens e com não lida: pendente')
+assert.equal(motivoDePrecisar(semMensagens(0), AGORA)?.chave ?? null, null, 'sem mensagens e sem não lida: nada pendente')
+ok('conversa sem mensagens carregadas decide pelo número de não lidas')
+
 assert.equal(motivoDePrecisar(reaberta('preparo', 'out'), AGORA)?.chave, 'passagem',
   'pedido em andamento segue pendente')
 ok('reaberta com pedido em andamento continua em "Precisa de você"')
 
 const pedidoPronto = { numero: '4', estado: 'aguardando', janela: 'j1|2026-10-15', itens: [{ sku: 'X', qtd: 2 }] }
 const pronto = { pedido: pedidoPronto, clienteId: 'cli', endereco: 'Rua A, 1' }
-const fechada = { pode: false, ofereceModelo: true, motivo: { titulo: 'Janela fechada.', detalhe: 'Só modelo aprovado sai até ele responder.' } }
+const { permissaoDeEscrita } = await import('../src/dominio/janela.js')
+const WHATSAPP = { nome: 'WhatsApp', temJanela: true, horasJanela: 24, aceitaModelo: true }
+const conversaVelha = { estado: 'Em atendimento', canal: 'WhatsApp', mensagens: [{ dir: 'in', em: '2026-10-12T10:00:00Z' }] }
+const fechada = permissaoDeEscrita(conversaVelha, AGORA, WHATSAPP)
+assert.equal(fechada.pode, false, 'pré-condição: janela fechada')
 const motivo = motivoAntesDeCobrar(pronto, { fonteApi: true, escrita: fechada })
 assert.ok(motivo && /Janela fechada/.test(motivo) && /modelo aprovado/.test(motivo), `com a janela fechada a cobrança não sai: ${motivo}`)
 assert.ok(/rascunho/.test(motivo), 'diz para onde vai a comanda anotada')
@@ -64,5 +74,14 @@ assert.equal(motivoAntesDeCobrar({ ...pronto, pedido: { ...pedidoPronto, pedidoI
   'pedido já criado não volta a ser travado pela janela')
 assert.equal(motivoAntesDeCobrar(pronto, { fonteApi: false, escrita: fechada }), null, 'demonstração segue igual')
 ok('janela aberta, pedido já criado e demonstração não mudam')
+
+// Revisão: canal sem regra no catálogo e cliente bloqueado não são janela; a trava não vale.
+const semRegra = permissaoDeEscrita({ ...conversaVelha, canal: 'Messenger' }, AGORA, undefined)
+assert.equal(semRegra.pode, false, 'pré-condição: canal sem regra não escreve')
+assert.equal(motivoAntesDeCobrar(pronto, { fonteApi: true, escrita: semRegra }), null, 'canal sem regra não trava a cobrança')
+const bloqueada = permissaoDeEscrita({ ...conversaVelha, bloqueio: { motivo: 'teste', em: '2026-10-12T10:00:00Z' } }, AGORA, WHATSAPP)
+assert.equal(motivoAntesDeCobrar(pronto, { fonteApi: true, escrita: bloqueada }), null, 'bloqueio tem trava própria, não a da janela')
+assert.ok(/Link de compra/.test(motivo), 'diz a alternativa: copiar o Link de compra')
+ok('só a janela fechada trava a cobrança, e o motivo aponta o Link de compra como alternativa')
 
 console.log(`\n${passos} passos verdes.`)

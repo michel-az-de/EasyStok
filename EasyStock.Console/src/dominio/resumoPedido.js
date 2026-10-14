@@ -48,15 +48,16 @@ export function avisoDeSinalAntesDeGerar(pedido, { fonteApi = false, agora = Dat
 // botão nascer desabilitado com o motivo à vista em vez de falhar depois do clique. Cadastro,
 // endereço e janela são exigências do EasyStok; na demonstração só a comanda vazia trava.
 // #1805: "Gerar cobrança e enviar" manda a comanda pela conversa. Com a janela de 24 h fechada
-// nada sai, então a trava vem primeiro e diz onde fica o que já foi anotado. `escrita` é o
+// nada sai, então a trava vem primeiro e diz onde fica o que já foi anotado e a alternativa. Só a
+// janela trava aqui: bloqueio e canal sem regra têm o motivo próprio. `escrita` é o
 // `permissaoDeEscrita` da conversa (dominio/janela.js).
 export function motivoAntesDeCobrar({ pedido, clienteId, endereco }, { fonteApi = false, escrita = null } = {}) {
   if (!pedido?.itens?.length) return 'A comanda está vazia.'
   if (!fonteApi) return null
-  if (!pedido.pedidoId && escrita && !escrita.pode) {
+  if (!pedido.pedidoId && escrita?.motivo?.acao === 'janela') {
     const saida = escrita.ofereceModelo ? 'mande um modelo aprovado e espere a resposta' : 'espere o cliente escrever'
-    return `${escrita.motivo?.titulo ?? 'A conversa não aceita mensagem agora.'} A cobrança sai pela conversa: ${saida}. `
-      + 'Até lá a comanda fica como rascunho neste atendimento.'
+    return `${escrita.motivo.titulo} A cobrança sai pela conversa: ${saida}, ou copie o Link de compra `
+      + 'e envie por outro meio. Até lá a comanda fica como rascunho neste atendimento.'
   }
   if (!clienteId) return 'Salve o cadastro do cliente (Contato e endereço).'
   if (!endereco) return 'Falta o endereço de entrega (Contato e endereço).'

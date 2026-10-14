@@ -17,7 +17,7 @@ import { ehAtrasoDeEntrega, motivoParaAutomatico, ocorrenciaAberta } from './oco
 import { pedidoAtrasado } from './cozinha.js'
 import { MOTIVO_PADRAO, origemDaPassagem, passagemPendente } from './passagem.js'
 import { pedidoEncerrado } from './pedido.js'
-import { ehPerguntaSemResposta, mensagensSemRespostaReal } from './mensagem.js'
+import { ehPerguntaSemResposta, mensagensSemRespostaReal, ultimaFala } from './mensagem.js'
 import { minutosAbertos } from './funcionamento.js'
 import { sinalDoCliente } from './agente.js'
 
@@ -175,9 +175,6 @@ export function motivoDaPassagem(intencaoChave, semSaldo = [], areaForaInsistida
 // última fala da conversa é dela. Nota interna e aviso do sistema não contam
 // como fala. Pedido em andamento nunca sugere encerrar: a conversa ainda vai
 // levar os avisos da esteira até a entrega.
-const ultimaFala = (conversa) =>
-  [...(conversa.mensagens ?? [])].reverse().find((m) => m.dir === 'in' || m.dir === 'out') ?? null
-
 export function proximoPassoDepoisDeResponder(conversa, pausado) {
   if (!conversa || !pausado || conversa.estado === 'Encerrado') return null
   const fala = ultimaFala(conversa)
