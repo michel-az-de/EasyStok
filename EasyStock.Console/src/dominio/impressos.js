@@ -27,24 +27,60 @@ export const PAPEL_PADRAO = {
   cozinha: 'cupom-80',
 }
 
+// Perfil = a impressora do aparelho (#1756). Cada impressora dedicada só tem um papel; "sistema"
+// deixa a escolha para o diálogo e aceita qualquer papel. O `rotulo` é o que fica no histórico.
+export const PERFIS_IMPRESSAO = [
+  { valor: 'sistema', rotulo: 'Escolher no diálogo do sistema', papeis: PAPEIS.map((p) => p.valor) },
+  { valor: 'hp-a4', rotulo: 'HP · folha A4', papeis: ['a4'] },
+  { valor: 'hp-a5', rotulo: 'HP · folha A5', papeis: ['a5'] },
+  { valor: 'termica-80', rotulo: 'Térmica · bobina 80 mm', papeis: ['cupom-80'] },
+  { valor: 'termica-58', rotulo: 'Térmica · bobina 58 mm', papeis: ['cupom-58'] },
+  { valor: 'etiqueta-10x15', rotulo: 'Térmica · etiqueta 10×15', papeis: ['etiqueta-10x15'] },
+]
+
+export const perfilDeImpressao = (valor) => PERFIS_IMPRESSAO.find((p) => p.valor === valor) ?? PERFIS_IMPRESSAO[0]
+const perfilDedicado = (papel) => PERFIS_IMPRESSAO.find((p) => p.valor !== 'sistema' && p.papeis.includes(papel)).valor
+
+// O que dizer no diálogo para o papel sair na medida: o modelo já traz as margens.
+export function orientacaoDoPapel(papel) {
+  const sem = 'escala 100%, sem margens, cabeçalhos ou rodapés'
+  if (papel === 'cupom-58' || papel === 'cupom-80') {
+    return `Selecione a impressora com bobina de ${papel === 'cupom-58' ? '58' : '80'} mm, ${sem}. O comprimento acompanha o conteúdo; confira o corte.`
+  }
+  if (papel === 'etiqueta-10x15') return `Selecione a etiqueta de 100 × 150 mm em retrato, ${sem}.`
+  return `Selecione papel ${papel === 'a5' ? 'A5 (148 × 210 mm)' : 'A4 (210 × 297 mm)'} em retrato, ${sem}. As margens já fazem parte do modelo.`
+}
+
 const ehDocumento = (valor) => DOCUMENTOS.some((d) => d.valor === valor)
 const ehPapel = (valor) => PAPEIS.some((p) => p.valor === valor)
 
 // O que veio do aparelho pode estar velho ou avariado: papel desconhecido volta ao padrão do
-// documento, e o logo na térmica só liga com `true` de verdade.
+// documento, perfil que não imprime aquele papel vira a impressora dedicada ao papel (a versão 1
+// só guardava o papel), e o logo na térmica só liga com `true` de verdade.
 export function normalizarPreferenciasImpressao(valor) {
   const papeis = {}
+  const perfis = {}
   for (const { valor: documento } of DOCUMENTOS) {
     const salvo = valor?.papeis?.[documento]
     papeis[documento] = ehPapel(salvo) ? salvo : PAPEL_PADRAO[documento]
+    const perfil = PERFIS_IMPRESSAO.find((p) => p.valor === valor?.perfis?.[documento])
+    perfis[documento] = perfil?.papeis.includes(papeis[documento]) ? perfil.valor : perfilDedicado(papeis[documento])
   }
-  return { versao: 1, papeis, logoTermica: valor?.logoTermica === true }
+  return { versao: 2, papeis, perfis, logoTermica: valor?.logoTermica === true }
 }
 
 export function trocarPapelPadrao(preferencias, documento, papel) {
   const atual = normalizarPreferenciasImpressao(preferencias)
   if (!ehDocumento(documento) || !ehPapel(papel)) return atual
-  return { ...atual, papeis: { ...atual.papeis, [documento]: papel } }
+  return normalizarPreferenciasImpressao({ ...atual, papeis: { ...atual.papeis, [documento]: papel } })
+}
+
+export function trocarPerfilPadrao(preferencias, documento, valor) {
+  const atual = normalizarPreferenciasImpressao(preferencias)
+  const perfil = PERFIS_IMPRESSAO.find((p) => p.valor === valor)
+  if (!ehDocumento(documento) || !perfil) return atual
+  const papel = perfil.papeis.includes(atual.papeis[documento]) ? atual.papeis[documento] : perfil.papeis[0]
+  return { ...atual, papeis: { ...atual.papeis, [documento]: papel }, perfis: { ...atual.perfis, [documento]: perfil.valor } }
 }
 
 export function trocarLogoNaTermica(preferencias, ligado) {

@@ -1,5 +1,8 @@
+import { prepararGeometriaImpresso } from './geometriaImpresso'
+
 // Manda imprimir uma página HTML pronta (#1632, impressos servidos pela API). A página já traz
-// o `@page` do papel, então o diálogo abre no tamanho certo. Irmão de `pdfNoNavegador.js`.
+// o `@page` da folha; a bobina recebe aqui o comprimento medido (#1756), então o diálogo abre no
+// tamanho certo. Irmão de `pdfNoNavegador.js`.
 
 // Um só quadro vivo por vez: o da impressão anterior sai quando a próxima começa (tirar antes
 // cancelaria o diálogo ainda aberto, e o `afterprint` não dispara em todo navegador).
@@ -34,7 +37,9 @@ export function imprimirHtml(html, { sinal } = {}) {
     const abortado = () => { if (sinal?.aborted) throw new DOMException('Impressão cancelada.', 'AbortError') }
     const concluir = (destino) => { sinal?.removeEventListener('abort', cancelar); resolve(destino) }
     const falhar = (erro) => { sinal?.removeEventListener('abort', cancelar); reject(erro) }
-    const planoB = () => { try { abortado(); abrirEmAba(html); concluir('aba') } catch (erro) { falhar(erro) } }
+    // A aba do plano B leva a cópia já medida, quando houver.
+    let paraImprimir = html
+    const planoB = () => { try { abortado(); abrirEmAba(paraImprimir); concluir('aba') } catch (erro) { falhar(erro) } }
     if (quadroAnterior) removerQuadro(quadroAnterior)
     const quadro = document.createElement('iframe')
     quadro.title = 'Impressão'
@@ -63,6 +68,13 @@ export function imprimirHtml(html, { sinal } = {}) {
         // `load` já esperou as imagens (logo, QR); as fontes da página têm promessa própria.
         await Promise.race([quadro.contentDocument?.fonts?.ready, esperar(MS_ESPERA_FONTES)])
         abortado()
+        try { prepararGeometriaImpresso(quadro.contentDocument) } catch (erro) {
+          // Papel errado não abre o diálogo: o motivo volta para a tela.
+          removerQuadro(quadro)
+          falhar(erro)
+          return
+        }
+        paraImprimir = '<!DOCTYPE html>' + quadro.contentDocument.documentElement.outerHTML
         quadro.contentWindow.addEventListener('afterprint', () => removerQuadro(quadro), { once: true })
         quadro.contentWindow.focus()
         quadro.contentWindow.print()

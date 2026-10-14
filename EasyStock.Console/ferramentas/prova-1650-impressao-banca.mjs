@@ -103,6 +103,24 @@ await provar('cancelar não confirma e reimprimir não aciona a fila operacional
   assert.equal(confirmadas, 0); await clicar(t, 'Abrir impressão'); await clicar(t, 'Sim, o papel saiu')
   assert.equal(confirmadas, 1); assert.equal(callbacks, 0); t.encerrar()
 })
+await provar('perfil do aparelho por documento escolhe o papel, filtra os papéis e vai ao histórico pelo nome (#1756)', async () => {
+  const chamadas = []
+  const perfis = [{ valor: 'sistema', rotulo: 'Escolher no diálogo do sistema', papeis: ['a4', 'cupom-58'] }, { valor: 'termica-58', rotulo: 'Térmica · bobina 58 mm', papeis: ['cupom-58'] }]
+  const t = new Tela(props({ documentoInicial: 'cozinha', perfis, perfilPadrao: d => d === 'cozinha' ? 'termica-58' : 'sistema', papelPadrao: d => d === 'cozinha' ? 'cupom-58' : 'a4', orientacao: p => `Orientação ${p}`, preparar: async o => { chamadas.push(o); return { ...o, id: 'nova', html: '<h1>x</h1>' } } }))
+  await clicar(t, 'Imprimir')
+  const campo = rotulo => nos(t.arvore).find(n => n.type?.name === 'CampoSelecao' && n.props.rotulo === rotulo)
+  assert.equal(campo('Perfil de impressão').props.value, 'termica-58')
+  assert.deepEqual(campo('Papel').props.opcoes.map(p => p.valor), ['cupom-58'])
+  assert.ok(conteudo(t).includes('Orientação cupom-58'))
+  campo('Documento').props.onChange({ target: { value: 'pedido' } }); await t.estabilizar()
+  assert.deepEqual([campo('Perfil de impressão').props.value, campo('Papel').props.value], ['sistema', 'a4'])
+  assert.deepEqual(campo('Papel').props.opcoes.map(p => p.valor), ['a4', 'cupom-58'])
+  campo('Perfil de impressão').props.onChange({ target: { value: 'termica-58' } }); await t.estabilizar()
+  assert.equal(campo('Papel').props.value, 'cupom-58', 'perfil dedicado puxa o papel dele')
+  await clicar(t, 'Preparar prévia')
+  assert.deepEqual([chamadas[0].documento, chamadas[0].modelo, chamadas[0].perfil], ['pedido', 'cupom-58', 'Térmica · bobina 58 mm'])
+  t.encerrar()
+})
 const { historicoDoPedido, obterOriginalImpresso } = await import('../src/infra/api/impressosApi.js')
 await provar('leituras do histórico e original respeitam 20 segundos mesmo com sinal de fechamento', async () => {
   const timeout = AbortSignal.timeout, fetchOriginal = globalThis.fetch

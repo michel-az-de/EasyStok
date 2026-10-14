@@ -8,7 +8,9 @@ import {
 } from '../../../aplicacao/impressos'
 import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao } from '../../../componentes/Campo'
-import { DOCUMENTOS, PAPEIS, trocarLogoNaTermica, trocarPapelPadrao } from '../../../dominio/impressos'
+import {
+  DOCUMENTOS, PAPEIS, PERFIS_IMPRESSAO, orientacaoDoPapel, perfilDeImpressao, trocarLogoNaTermica, trocarPapelPadrao, trocarPerfilPadrao,
+} from '../../../dominio/impressos'
 import css from './abaImpressao.module.css'
 
 const TIPOS_DE_LOGO = ['image/png', 'image/jpeg']
@@ -91,21 +93,34 @@ function PapeisDoAparelho() {
 
   return (
     <section className={css.secao} aria-labelledby={`${id}-papeis`}>
-      <h3 id={`${id}-papeis`}>Papel padrão neste aparelho</h3>
+      <h3 id={`${id}-papeis`}>Impressora e papel neste aparelho</h3>
       <p className={css.descricao}>
         Cada aparelho guarda o seu: o tablet da cozinha pode sair na bobina e o computador do balcão na A4.
-        Na hora de imprimir ainda dá para trocar.
+        A impressora escolhida já define o papel. Na hora de imprimir ainda dá para trocar.
       </p>
       <div className={css.papeis}>
-        {DOCUMENTOS.map((documento) => (
-          <CampoSelecao
-            key={documento.valor}
-            rotulo={documento.rotulo}
-            opcoes={PAPEIS}
-            value={preferencias.papeis[documento.valor]}
-            onChange={(evento) => aplicar(trocarPapelPadrao(preferencias, documento.valor, evento.target.value))}
-          />
-        ))}
+        {DOCUMENTOS.map((documento) => {
+          const perfil = preferencias.perfis[documento.valor]
+          const papel = preferencias.papeis[documento.valor]
+          return (
+            <fieldset key={documento.valor} className={css.documento}>
+              <legend>{documento.rotulo}</legend>
+              <CampoSelecao
+                rotulo="Impressora"
+                opcoes={PERFIS_IMPRESSAO}
+                value={perfil}
+                onChange={(evento) => aplicar(trocarPerfilPadrao(preferencias, documento.valor, evento.target.value))}
+              />
+              <CampoSelecao
+                rotulo="Papel"
+                opcoes={PAPEIS.filter((p) => perfilDeImpressao(perfil).papeis.includes(p.valor))}
+                value={papel}
+                onChange={(evento) => aplicar(trocarPapelPadrao(preferencias, documento.valor, evento.target.value))}
+              />
+              <p className={css.descricao}>{orientacaoDoPapel(papel)}</p>
+            </fieldset>
+          )
+        })}
       </div>
       <label className={css.chave}>
         <input
