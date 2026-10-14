@@ -6,6 +6,7 @@ import { mensagemDaApi, naoEntregueDaApi, situacaoConversaDaApi } from '../infra
 import { lerSessao } from '../infra/api/sessao'
 import { proximoId } from '../infra/repositorioConversas'
 import { avisoDeVariaveisNaoResolvidas } from '../dominio/respostas'
+import { FRASE_DA_FALHA, TIPOS_DE_FALHA, textoDaFalhaDeEnvio } from '../dominio/falhaDeEnvio'
 import { deveCarregarDossie } from './planoDeSincronizacao'
 import { criarAcoesExpedienteApi } from './api/expediente'
 import { criarAcoesCaixaApi } from './api/caixa'
@@ -31,8 +32,9 @@ const FORA_DA_JANELA = 'fora_da_janela_24h'
 const CANAL_FALHOU = 'CANAL_FALHOU'
 
 const motivoDaRecusa = (erro) => {
-  if (erro.codigo === FORA_DA_JANELA) return 'Não enviada: passou a janela de 24 h. Só modelo aprovado sai até o cliente responder.'
-  if (erro.codigo === CANAL_FALHOU && erro.detalhe) return `Não enviada: ${erro.detalhe}`
+  // #1761: o detalhe do canal é o erro cru do provedor, em inglês; a frase sai do mapa do domínio.
+  if (erro.codigo === FORA_DA_JANELA) return FRASE_DA_FALHA[TIPOS_DE_FALHA.FORA_DA_JANELA]
+  if (erro.codigo === CANAL_FALHOU && erro.detalhe) return textoDaFalhaDeEnvio(erro.detalhe)
   return `Não enviada: ${erro.message}`
 }
 
@@ -52,7 +54,7 @@ const falhaDoEnvio = (id, mensagemId, erro) => ({
 // O despacho local vem antes, para a tela responder na hora; a próxima sincronização
 // traz o estado do servidor. As ações ainda não ligadas (lista única em
 // `api/naoLigadas.js`) não mexem na memória do navegador: só avisam na faixa.
-export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
+export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef = null }) {
   const avisar = (erro) => despachar({ tipo: acao.AVISO_API, mensagem: erro.message })
   const clienteApi = criarAcoesClienteApi({ despachar, estadoRef })
   const confirmarResponsavel = (id, chamada) => chamada(id)
@@ -82,7 +84,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     // #1241: lote de papel no EasyStok.
     ...criarAcoesLoteApi({ despachar, estadoRef }),
     // #1241: cardápio do dia (disponibilidade e saldo) no EasyStok.
-    ...criarAcoesCardapioApi({ despachar, estadoRef }),
+    ...criarAcoesCardapioApi({ despachar, estadoRef, comItensForaRef }),
     ...criarAcoesMensagensProgramadasApi({ estadoRef }),
     ...criarAcoesModelosApi({ despachar }),
     enviar: (id, texto, opcoes = {}) => {

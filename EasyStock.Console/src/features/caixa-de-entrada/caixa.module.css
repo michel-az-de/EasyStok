@@ -26,8 +26,8 @@
 .cartao:active:not(:disabled) { background: var(--preenchimento-forte); }
 /* Selecionada: fundo tinto, pastilha suave. */
 .cartao[aria-current='true'] { background: var(--preenchimento-forte); box-shadow: none; }
-.cartao.precisa[aria-current='true'] { background: var(--alerta-pastel); }
-.cartao.atrasada[aria-current='true'] { background: var(--erro-pastel); }
+/* #1761 (L16): a selecionada tem uma cor só. Antes era amarela ou rosa conforme o motivo, e a
+   seleção se confundia com a urgência, que já tem a pílula. */
 
 /* Avatar com o selo do canal no canto (rodada 6c). */
 .avatarCartao { position: relative; flex-shrink: 0; margin-top: 1px; }
@@ -103,18 +103,18 @@
 /* Linha 3, miúda: quem está com a conversa (ou o motivo de precisar dela)
    e o contexto que existir, separados por ponto. Sem caixa, exceto o que
    espera ação dela, que ganha a pastilha esfumaçada âmbar ou vermelha. */
+/* #1761 (L16): etiqueta de contexto que não cabe inteira some, em vez de cortar em "Automático
+   não s…". A linha quebra e só a primeira fileira aparece; o texto todo segue no `title`. */
 .contextoLinha {
-  display: flex; align-items: center; min-width: 0; overflow: hidden;
-  font-size: var(--t-micro); line-height: 1.35; color: var(--tinta-3); white-space: nowrap;
+  display: flex; flex-wrap: wrap; align-items: center; min-width: 0; overflow: hidden;
+  font-size: var(--t-micro); line-height: 1.35; height: 1.5em; color: var(--tinta-3); white-space: nowrap;
 }
 /* Uma linha só: o estado nunca encolhe; o contexto encolhe com reticência e
    vai inteiro no `title` da linha. */
 .estado, .itemContexto { display: inline-flex; align-items: center; gap: 3px; min-width: 0; }
 .estado { font-weight: 600; flex-shrink: 0; }
-.itemContexto { flex-shrink: 1; }
-/* Falta espaço: encolhe primeiro o que vem depois, o primeiro contexto
-   (origem da passagem ou passo do pedido) é o que mais importa. */
-.itemContexto + .itemContexto { flex-shrink: 8; }
+.estado, .itemContexto { height: 1.5em; }
+.itemContexto { flex-shrink: 0; max-width: 100%; }
 .itemContexto svg { flex-shrink: 0; }
 .textoContexto { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .itemContexto::before { content: '·'; margin: 0 6px 0 3px; color: var(--tinta-3); font-weight: 400; }

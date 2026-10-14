@@ -110,7 +110,18 @@ $login = Invoke-RestMethod -Method Post "$api/api/auth/login" -ContentType 'appl
 $arquivoToken = Join-Path $Pasta 'token.txt'
 [IO.File]::WriteAllText($arquivoToken, $login.data.token)
 $cab = @{ Authorization = "Bearer $($login.data.token)" }
-$vitrines = & $psql -h 127.0.0.1 -p $PortaPg -U postgres -d easystock -tAc "select count(*) from storefront where ""Slug""='casa-da-baba'"
+# Consulta com identificador entre aspas vai por arquivo: o Windows PowerShell 5.1 come as aspas duplas de um
+# argumento de executavel, o psql recebia Slug sem aspas, falhava, e a loja ficava sem preparar (#1761).
+function Sql([string]$consulta) {
+    $arquivo = Join-Path $Pasta 'consulta.sql'
+    [IO.File]::WriteAllText($arquivo, $consulta)
+    $saida = & $psql -h 127.0.0.1 -p $PortaPg -U postgres -d easystock -v ON_ERROR_STOP=1 -tAf $arquivo
+    $codigo = $LASTEXITCODE
+    Remove-Item $arquivo
+    if ($codigo -ne 0) { throw "Consulta ao banco do laboratorio falhou: $consulta" }
+    return $saida
+}
+$vitrines = Sql 'select count(*) from storefront where "Slug"=''casa-da-baba'''
 if ($vitrines -eq '0') {
     Invoke-RestMethod -Method Post "$api/api/minha-vitrine" -Headers $cab -ContentType 'application/json' -Body '{"tituloPublico":"Casa da Baba","slug":"casa-da-baba"}' | Out-Null
     Invoke-RestMethod -Method Post "$api/api/minha-vitrine/configuracao/ativar" -Headers $cab -ContentType 'application/json' -Body '{}' | Out-Null
@@ -122,7 +133,9 @@ if ($vitrines -eq '0') {
         -Body '{"label":"Pinheiros e arredores","valor":12,"tempoEstimadoMinutos":60,"ordem":1,"cepInicio":"05400000","cepFim":"05499999","bairros":[]}' | Out-Null
 } else { Write-Host 'Loja ja preparada em execucao anterior.' }
 foreach ($flag in 'modulo.atendimento', 'atendimento.canal.chatsite') {
-    & $psql -h 127.0.0.1 -p $PortaPg -U postgres -d easystock -tAc "insert into ""TenantFeatureFlags"" (""Id"",""EmpresaId"",""Feature"",""Ativo"",""AlteradoEm"",""AlteradoPor"") select gen_random_uuid(), e.""Id"", '$flag', true, now(), 'laboratorio' from empresas e where not exists (select 1 from ""TenantFeatureFlags"" x where x.""EmpresaId""=e.""Id"" and x.""Feature""='$flag')" | Out-Null
+    Sql ('insert into "TenantFeatureFlags" ("Id","EmpresaId","Feature","Ativo","AlteradoEm","AlteradoPor") ' +
+        "select gen_random_uuid(), e.""Id"", '$flag', true, now(), 'laboratorio' from empresas e " +
+        "where not exists (select 1 from ""TenantFeatureFlags"" x where x.""EmpresaId""=e.""Id"" and x.""Feature""='$flag')") | Out-Null
 }
 
 Write-Host ''

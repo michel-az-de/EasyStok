@@ -116,7 +116,8 @@ export function FilaCanhotos() {
           {fila.length === 1 ? '1 canhoto na fila' : `${fila.length} canhotos na fila`}
         </span>
       </span>
-      <Botao variante="primario" icone="printer" className={css.botaoImprimir} onClick={imprimir}>
+      {/* #1761 (L5): o primário da coluna é o próximo passo do pedido; imprimir é apoio. */}
+      <Botao variante="secundario" icone="printer" className={css.botaoImprimir} onClick={imprimir}>
         Imprimir
       </Botao>
       {pedidoIdApi && (
