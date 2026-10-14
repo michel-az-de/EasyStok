@@ -4,6 +4,7 @@ import { Botao } from '../../../componentes/Botao'
 import { Modal } from '../../../componentes/Modal'
 import css from './acervo.module.css'
 import { ProducaoAcervo, canaisAcervo } from './ProducaoAcervo'
+import { FotosCardapio } from './FotosCardapio'
 
 function Foto({ imagem }) {
   const previa = useMiniaturaAcervo(imagem.id)
@@ -69,14 +70,13 @@ export function AbaAcervo() {
     await executar(() => a.api.adicionarImagem(f.get('file'), dados), 'Imagem guardada. Confira esta versão antes de aprovar.')
   }
   return <section className={css.raiz}>
-    <div className={css.cabecalho}><div><h2>Banco de imagens</h2><p>Originais, peças do Canva e imagens usadas no cardápio.</p></div>
-      <div className={css.acoes}><Botao disabled={a.ocupado} onClick={() => { setSolicitacaoId(crypto.randomUUID()); setDialogo('solicitar') }}>Solicitar imagem</Botao><Botao variante="primario" disabled={a.ocupado} onClick={() => setDialogo('upload')}>Adicionar imagem</Botao></div></div>
+    <div className={css.cabecalho}><p>Fotos, originais e peças do Canva.</p>
+      <div className={css.acoes}><Botao disabled={a.ocupado || a.carregando} onClick={() => a.carregar().catch((e) => a.setErro(e.message))}>Atualizar acervo</Botao><Botao disabled={a.ocupado} onClick={() => { setSolicitacaoId(crypto.randomUUID()); setDialogo('solicitar') }}>Solicitar imagem</Botao><Botao variante="primario" disabled={a.ocupado} onClick={() => setDialogo('upload')}>Adicionar imagem</Botao></div></div>
     {a.erro && <p role="alert" className={css.erro}>{a.erro}</p>}
     {aviso && <p role="status">{aviso}</p>}
     {a.aviso && <p role="status">{a.aviso}</p>}
-    <Botao disabled={a.ocupado || a.carregando} onClick={() => a.carregar().catch((e) => a.setErro(e.message))}>Atualizar acervo</Botao>
-    <ProducaoAcervo acervo={a} />
-    <h3>Consultar imagens</h3>
+    <FotosCardapio acervo={a} />
+    <h3>Originais e versões do acervo</h3>
     <label className={css.campo}>Buscar em todo o acervo<input value={busca} disabled={a.ocupado} onChange={(e) => setBusca(e.target.value)} placeholder="Título da imagem" /></label>
     <div className={css.filtros}>{[
       ['origem', 'Origem da imagem', [['Fotografia', 'Foto real'], ['IA', 'Imagem gerada'], ['Canva', 'Exportação Canva']]],
@@ -114,6 +114,7 @@ export function AbaAcervo() {
       {historico.map((h) => <p key={h.id}>{new Date(h.criadoEm).toLocaleString('pt-BR')} · {h.galeria ? 'Galeria' : 'Capa'} · <a href={a.fotoUrl(h.url)} target="_blank" rel="noopener noreferrer">Ver arquivo publicado</a></p>)}
       </div><div><VisualFoto imagem={imagem} previa={previa} />{previa.erro && <Botao onClick={previa.tentar}>Tentar prévia novamente</Botao>}</div>
     </section>}
+    <ProducaoAcervo acervo={a} />
     <section><h3>Fila de produção</h3><p>Solicitações ficam registradas para execução assistida com as referências do acervo.</p>
       {a.solicitacoes.map((s) => <details key={s.id}><summary>{a.itens.find((i) => i.cardapioItemId === s.itemId)?.nome || 'Item'} · {s.formato} · {s.concluidoEm ? 'Concluída; revisar resultado' : 'Pendente'}</summary><p className={css.texto}>{s.brief}</p><p>Referências: {JSON.parse(s.referenciasJson).map((id) => a.imagens.find((i) => i.id === id)?.titulo || id).join(', ') || 'Nenhuma'}</p><small>Solicitação: {s.id}{s.briefingId && ` · Briefing: ${s.briefingId}`}</small></details>)}
       {!a.solicitacoes.length && <p>Nenhuma solicitação registrada.</p>}
