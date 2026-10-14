@@ -74,16 +74,21 @@ public sealed class GerenciarConversaAtendimentoUseCase(
     /// <summary>
     /// Sem reabertura explícita, a próxima mensagem do contato abre outra conversa Automatica (S05). Idempotente também no
     /// evento: conversa já encerrada não publica de novo (a automática de encerramento sairia 2x, #1292).
+    /// #1786: lida sob trava, como na reabertura. Dois encerramentos ao mesmo tempo publicam o evento uma vez só.
     /// </summary>
     public Task<ConversaSituacaoResult> EncerrarAsync(AcaoConversaCommand command, CancellationToken ct = default) =>
-        ExecutarAsync(command, (conversa, agora) =>
+        unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
         {
-            var estavaAberta = conversa.EstaAberta;
-            conversa.Encerrar(agora);
-            return publicador is null || !estavaAberta
-                ? Task.CompletedTask
-                : publicador.PublicarAsync(command.EmpresaId, ConversaEncerradaEvent.TipoEvento, "Conversa", conversa.Id,
-                    new ConversaEncerradaEvent(conversa.Id, conversa.ClienteId), ct: ct);
+            var conversa = await conversaRepository.ObterPorIdComLockAsync(command.EmpresaId, command.ConversaId, token)
+                ?? throw new ConversaNaoEncontradaException(command.ConversaId);
+            if (!conversa.EstaAberta) return ConversaSituacaoResult.De(conversa);
+
+            conversa.Encerrar(DateTime.UtcNow);
+            if (publicador is not null)
+                await publicador.PublicarAsync(command.EmpresaId, ConversaEncerradaEvent.TipoEvento, "Conversa", conversa.Id,
+                    new ConversaEncerradaEvent(conversa.Id, conversa.ClienteId), ct: token);
+            await unitOfWork.CommitAsync();
+            return ConversaSituacaoResult.De(conversa);
         }, ct);
 
     public Task<ConversaSituacaoResult> MarcarLidaAsync(AcaoConversaCommand command, CancellationToken ct = default) =>
