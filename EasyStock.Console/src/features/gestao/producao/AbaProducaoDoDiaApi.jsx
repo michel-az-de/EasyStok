@@ -5,6 +5,7 @@ import { Chip } from '../../../componentes/Chip'
 import { FolhaImpressao } from '../../../componentes/FolhaImpressao'
 import { Icone } from '../../../componentes/Icone'
 import { Modal } from '../../../componentes/Modal'
+import { Vazio } from '../../../componentes/Vazio'
 import { useCatalogo } from '../../../aplicacao/contextos'
 import { useEstoqueDoDiaApi } from '../../../aplicacao/useEstoqueDoDiaApi'
 import { aoLancarLote, dispensarLote, guardarRascunho, linhasDoRascunho, lotesLancados, producaoDoDia } from '../../../aplicacao/producaoDoDia'
@@ -68,6 +69,19 @@ function resumoDaLinha(linha, faltaPorcao) {
     enviada.validadeDias > 0 ? `validade ${plural(enviada.validadeDias, 'dia', 'dias')}` : 'sem validade',
     enviada.pesoPorPorcaoG > 0 ? `${enviada.pesoPorPorcaoG} g cada` : 'sem peso',
   ].filter(Boolean).join(' · ')
+}
+
+// #1809: a foto do prato no cartão, a mesma do cardápio. Sem foto, ou se ela não carregar, o
+// lugar fica reservado com o desenho de imagem: o cartão não muda de altura e a grade não pula.
+function FotoDoCartao({ foto }) {
+  const [falhou, setFalhou] = useState(null)
+  return (
+    <span className={grade.fotoDoPrato}>
+      {foto && falhou !== foto
+        ? <img src={foto} alt="" loading="lazy" decoding="async" onError={() => setFalhou(foto)} />
+        : <Icone nome="imagem" tamanho={24} />}
+    </span>
+  )
 }
 
 export function AbaProducaoDoDiaApi() {
@@ -204,9 +218,12 @@ export function AbaProducaoDoDiaApi() {
 
   return (
     <div className={css.aba}>
-      <p className={css.descricao}>
-        Cada toque em um prato seleciona mais 1 porção. Depois, use Conferir produção. O estoque só muda ao confirmar.
-      </p>
+      {/* #1809: o caminho em três passos, à vista, para quem abre a tela pela primeira vez. */}
+      <ol className={grade.passos} aria-label="Como registrar a produção">
+        <li><span className={grade.numeroDoPasso} aria-hidden="true">1</span><span><strong>Toque nos pratos que ficaram prontos.</strong> Cada toque soma uma porção; o − tira.</span></li>
+        <li><span className={grade.numeroDoPasso} aria-hidden="true">2</span><span><strong>Confira</strong> porções, validade e peso em Conferir produção.</span></li>
+        <li><span className={grade.numeroDoPasso} aria-hidden="true">3</span><span><strong>Registre a produção</strong> em Confirmar produção. O estoque só muda nessa hora.</span></li>
+      </ol>
 
       {falta.length > 0 && (
         <section className={grade.falta} aria-label="Falta produzir">
@@ -251,10 +268,15 @@ export function AbaProducaoDoDiaApi() {
                 {' '}<Botao variante="texto" icone="refresh-cw" onClick={recarregarEstoque}>Tentar de novo</Botao>
               </p>
             )}
-            {visiveis.length === 0 ? (
+            {cartoes.length === 0 ? (
+              <Vazio icone="cardapio" titulo="Nenhum prato para produzir"
+                acao={<a className={css.link} href={hashDoModulo('cardapio', 'itens')}>Abrir Itens do cardápio</a>}>
+                A grade mostra os pratos do cardápio. Cadastre um prato em Itens do cardápio e ele aparece aqui para você somar as porções.
+              </Vazio>
+            ) : visiveis.length === 0 ? (
               <p className={css.descricao}>
-                {cartoes.length === 0 ? 'O cardápio ainda não tem pratos.' : 'Nenhum prato com esse nome.'}
-                {cartoes.length > 0 && <>{' '}<Botao variante="texto" onClick={() => { setBusca(''); setCategoria(null) }}>Ver todos os pratos</Botao></>}
+                Nenhum prato com esse nome.
+                {' '}<Botao variante="texto" onClick={() => { setBusca(''); setCategoria(null) }}>Ver todos os pratos</Botao>
               </p>
             ) : (
               <ul className={grade.grade}>
@@ -266,11 +288,13 @@ export function AbaProducaoDoDiaApi() {
                   // O rótulo do botão diz a ação; saldo e quantidade no lote vêm como descrição, para o leitor de tela também.
                   const idDoSaldo = cartao.saldo == null ? undefined : `saldo-${cartao.chave}`
                   const idDaContagem = noLote > 0 ? `lote-${cartao.chave}` : undefined
+                  const naSelecao = `${plural(noLote, 'porção', 'porções')} de ${nome} na seleção`
                   return (
                     <li key={cartao.chave} data-prato={cartao.chave} className={`${grade.cartao} ${noLote > 0 ? grade.noLote : ''}`}>
                       <button type="button" className={grade.tocar} disabled={enviando} aria-label={`Somar 1 porção de ${nome}`}
                         title={`Adicionar 1 porção de ${nome} à seleção. O estoque só muda ao confirmar.`}
                         aria-describedby={[idDoSaldo, idDaContagem].filter(Boolean).join(' ') || undefined} onClick={() => somar(cartao, 1)}>
+                        <FotoDoCartao foto={cartao.foto} />
                         <span className={grade.nomeDoPrato}>{nomeVisual}</span>
                         {tamanho && <span className={grade.tamanho}>{tamanho}</span>}
                         {cartao.saldo != null && (
@@ -281,10 +305,10 @@ export function AbaProducaoDoDiaApi() {
                       </button>
                       {noLote > 0 && (
                         <div className={grade.passo}>
-                          <button type="button" className={grade.menos} disabled={enviando} aria-label={`Tirar 1 porção de ${nome}`} onClick={() => somar(cartao, -1)}>
+                          <button type="button" className={grade.menos} disabled={enviando} title={`Tirar 1 porção de ${nome}`} aria-label={`Tirar 1 porção de ${nome}`} onClick={() => somar(cartao, -1)}>
                             <Icone nome="menos" tamanho={20} />
                           </button>
-                          <span id={idDaContagem} className={grade.contagem}>{noLote}<span className="sr"> no lote</span></span>
+                          <span id={idDaContagem} className={grade.contagem} title={naSelecao} aria-label={naSelecao}><span aria-hidden="true">{noLote}</span><span className="sr">{naSelecao}</span></span>
                         </div>
                       )}
                     </li>

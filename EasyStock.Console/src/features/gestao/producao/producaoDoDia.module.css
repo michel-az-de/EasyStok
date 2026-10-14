@@ -2,6 +2,19 @@
 
 .chips { display: flex; gap: var(--e-2); flex-wrap: wrap; min-width: 0; }
 
+/* #1809: os três passos à vista, lado a lado no computador e empilhados na tela estreita. */
+.passos {
+  list-style: none; margin: 0; padding: var(--e-3) var(--e-4); display: grid; gap: var(--e-2) var(--e-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--elevado);
+}
+.passos li { display: flex; align-items: flex-start; gap: var(--e-2); min-width: 0; color: var(--tinta-2); font-size: var(--t-apoio); line-height: var(--lh-corpo); }
+.passos strong { color: var(--tinta); font-weight: 700; }
+.numeroDoPasso {
+  flex: none; display: grid; place-items: center; width: 1.75em; height: 1.75em; border-radius: var(--r-pilula);
+  background: var(--marca-claro); color: var(--marca); font-weight: 750; line-height: 1; font-variant-numeric: tabular-nums;
+}
+
 .falta {
   display: grid; gap: var(--e-3); padding: var(--e-3) var(--e-4);
   border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--elevado);
@@ -35,6 +48,13 @@
   border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
 .tocar:hover:not(:disabled) { background: var(--preenchimento); }
+/* #1809: a foto ocupa a largura do cartão numa proporção fixa. O lugar existe antes de a imagem
+   chegar e continua igual sem foto: nada abaixo dela se mexe. */
+.fotoDoPrato {
+  display: grid; place-items: center; align-self: stretch; aspect-ratio: 4 / 3; margin-bottom: var(--e-1); overflow: hidden;
+  border-radius: var(--r-1); background: var(--preenchimento); color: var(--tinta-2);
+}
+.fotoDoPrato img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .tocar:focus-visible, .menos:focus-visible { outline: var(--b-2) solid var(--marca); outline-offset: -2px; }
 .tocar:disabled, .menos:disabled { cursor: default; opacity: .6; }
 .nomeDoPrato { color: var(--tinta); font-size: var(--t-corpo); font-weight: 700; line-height: var(--lh-compacto); overflow-wrap: anywhere; }
