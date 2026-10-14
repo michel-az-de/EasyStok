@@ -6,7 +6,7 @@ import { Modal } from '../../componentes/Modal'
 import { moeda } from '../../dominio/formato'
 import { partesDoSku, produtoDaPorcao } from '../../dominio/cardapio'
 import { itensDoDia } from '../../dominio/cardapioLink'
-import { clienteEscolhendoPeloLink, rascunhoMantendoEdicao, rotuloDoTotalDaSelecao } from '../../dominio/pedido'
+import { clienteEscolhendoPeloLink, rascunhoMantendoEdicao, rotuloDoTotalDaSelecao, tituloDaComanda } from '../../dominio/pedido'
 import { useCatalogo } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { useComandasCliente, idDaJanela, janelaDoId } from '../../aplicacao/useComandasCliente'
@@ -216,7 +216,9 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
   </div>
 }
 
-export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompartilhar, pedido = null, aoMudarEscolha }) {
+// #1761 (L10): pedido vazio eram três textos em dois blocos. Fica um bloco: o título, "Adicionar
+// itens" no topo (`acaoMontar`, que a Ficha entrega) e uma frase.
+export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompartilhar, acaoMontar = null, pedido = null, aoMudarEscolha }) {
   const { dados, erro, ocupado, confirmar, salvar, combinarFrete, encaminharEntrega, confirmarPedido } = useComandasCliente(conversaId, ativo)
   const { cardapio } = useCatalogo()
   const { acoes } = useAcessoModulos()
@@ -228,11 +230,12 @@ export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompart
   const avisarEscolha = no => { if (no) aoMudarEscolha?.(clienteEscolhendoPeloLink(dados, pedido) ? conversaId : null) }
   return <section ref={avisarEscolha} className={css.clienteCompartilhado} aria-label="Comanda compartilhada com o cliente">
     <div className={css.adicionarCompartilhado}>
-      <h3>{visiveis.some(c => c.pedido) ? 'Link do cliente' : 'Pedido em montagem'}<small>{numeroComanda ? 'Comanda ' + numeroComanda : 'Seleção compartilhada'}</small></h3>
+      <h3>{tituloDaComanda(pedido, { temLinkComPedido: visiveis.some(c => c.pedido) })}<small>{numeroComanda ? 'Comanda ' + numeroComanda : 'Seleção compartilhada'}</small></h3>
       {acaoCompartilhar}
     </div>
     {erro && <p role="alert">{erro}</p>}
-    {!visiveis.length && !erro && !pedido?.pedidoId && <p>Compartilhe com o cliente para escolherem juntos. A seleção chega aqui antes da confirmação.</p>}
+    {acaoMontar}
+    {!visiveis.length && !erro && !pedido?.pedidoId && <p>Compartilhe com o cliente pelo Link de compra ou adicione os itens por aqui.</p>}
     {visiveis.map(c => {
       const pendente = ['alteracao_aguardando_confirmacao', 'estorno_pendente', 'estorno_recusado'].includes(c.envio?.situacao)
       const selecao = <SelecaoCompartilhada key={c.linkId} conversaId={conversaId} comanda={c} ocupado={ocupado} erro={erro} salvar={salvar} confirmar={confirmar}

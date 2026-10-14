@@ -5,6 +5,7 @@
 
 import { pausaDaSituacao, respostaAtrasada } from '../../dominio/automatico'
 import { ACOES } from '../../dominio/agente'
+import { motivoDeEscalada, notaDeSistema } from '../../dominio/motivoDeEscalada'
 
 const NOME_DO_CANAL = {
   WhatsApp: 'WhatsApp', Instagram: 'Instagram', Messenger: 'Messenger',
@@ -49,7 +50,8 @@ export function mensagemDaApi(m, conversaId = null) {
   if (saida && m.autor === 'Sistema' && ((!m.externoId && m.status === 'Pendente')
       || m.externoId?.startsWith('chatsite:recepcao:') || m.externoId?.startsWith('chatsite:comanda:'))) {
     return {
-      id: m.id, dir: 'sistema', texto: m.texto || '', em: instante(m.enviadaEm),
+      // #1761: a nota de escalada sai na fala do balcão, sem "escalado" nem "LLM".
+      id: m.id, dir: 'sistema', texto: notaDeSistema(m.texto || ''), em: instante(m.enviadaEm),
       ...(ehNotaDeReabertura(m) ? { reabertura: true } : {}),
     }
   }
@@ -94,7 +96,8 @@ function janelaExpiraEm(resumo, mensagens) {
 function passagemDaApi(resumo) {
   if (resumo.situacao !== 'Assumida' || resumo.assumidaPorUsuarioId) return null
   return {
-    motivo: resumo.motivoEscalada || null, em: null, assumida: false,
+    // #1761: o motivo gravado pelo EasyStok é texto de sistema; cartão, faixa e lembrete leem o traduzido.
+    motivo: motivoDeEscalada(resumo.motivoEscalada), em: null, assumida: false,
     ...(resumo.motivoEscalada === 'Conversa reaberta para atendimento.' ? { origem: 'reabertura' }
       : resumo.canal === 'ChatSite' ? { origem: 'chat-site', motivo: resumo.motivoEscalada || 'Visitante do site aguardando atendimento da equipe.' } : {}),
   }
@@ -132,7 +135,7 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario, agora = Date.now(
     janelaExpiraEm: janelaExpiraEm(resumo, mensagens),
     ultimaEm: instante(resumo.ultimaMensagemEm),
     // Prévia do cartão quando as mensagens não foram carregadas (encerrada, #1287).
-    ultimaMensagemTexto: resumo.ultimaMensagemTexto ?? null,
+    ultimaMensagemTexto: resumo.ultimaMensagemTexto ? notaDeSistema(resumo.ultimaMensagemTexto) : null,
     // #1427: SLA de primeira resposta da loja e de onde ele conta.
     slaMinutos: resumo.slaRespostaMinutos ?? null,
     aguardaResposta: resumo.aguardaResposta ?? false,

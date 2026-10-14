@@ -74,13 +74,13 @@ const DESCRICOES = {
   [MODOS.PAUSADO]: {
     rotulo: 'Pausado porque você escreveu',
     tom: 'info',
-    detalhe: 'Aviso de esteira continua saindo. O resto espera você devolver.',
+    detalhe: 'Os avisos de preparo e entrega do pedido continuam saindo. O resto espera você devolver.',
   },
   // Mesma pausa, outra porta de entrada: ela apertou Assumir sem escrever nada.
   assumiu: {
     rotulo: 'Pausado porque você assumiu',
     tom: 'info',
-    detalhe: 'Aviso de esteira continua saindo. O resto espera você devolver.',
+    detalhe: 'Os avisos de preparo e entrega do pedido continuam saindo. O resto espera você devolver.',
   },
   // Modo API: a conversa está com outro atendente (F07, item 3).
   outro: {
@@ -181,7 +181,9 @@ const ultimaFala = (conversa) =>
 export function proximoPassoDepoisDeResponder(conversa, pausado) {
   if (!conversa || !pausado || conversa.estado === 'Encerrado') return null
   const fala = ultimaFala(conversa)
-  if (!fala || fala.dir !== 'out') return null
+  // #1761: "Respondido." aparecia sem ninguém ter respondido: a última fala era a automática (o
+  // resumo do pedido) ou uma mensagem que nem saiu. Só vale a que ela escreveu e foi enviada.
+  if (!fala || fala.dir !== 'out' || fala.automatica || ['falhou', 'enviando'].includes(fala.status)) return null
   if (conversa.pedido && !pedidoEncerrado(conversa.pedido)) {
     return {
       chave: 'aguardar',

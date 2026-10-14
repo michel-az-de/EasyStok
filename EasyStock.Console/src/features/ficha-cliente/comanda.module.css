@@ -97,7 +97,8 @@
 .itens { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--e-3); }
 .item { display: flex; flex-direction: column; gap: var(--e-1); }
 .linhaItem { display: flex; gap: var(--e-2); align-items: baseline; }
-.linhaItem:has(.controlesItem) { display: grid; grid-template-columns: 3ch minmax(0, 1fr); align-items: start; }
+/* #1761 (L18): nome e seletor de quantidade na mesma linha. */
+.linhaItem:has(.controlesItem) { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
 .linhaItem .controlesItem { grid-column: 2; justify-self: end; }
 
 /* "2×" fixo em 3ch para o nome do prato começar sempre na mesma coluna,

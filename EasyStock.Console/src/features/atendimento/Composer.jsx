@@ -25,6 +25,7 @@ export function Composer({
   conversa, canal, podeEscrever, motivo, rascunho: rascunhoGlobal, escritaDeFora,
   aoEnviar, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
   aoReabrir, reabrindo = false, podeEnviarModelo = false,
+  modeloAberto = false, aoAbrirModelos, aoFecharModelos, modelosFixos = true,
 }) {
   const { enviarMidia } = useAcoes()
   // #1577: a tecla muda só este campo. O rascunho global recebe o texto na pausa da digitação, ou na hora
@@ -53,7 +54,6 @@ export function Composer({
   const [erroAnexo, setErroAnexo] = useState(null)
   // #1424: modal de programar mensagem, guardada pelo id da conversa (trocar de conversa fecha).
   const [programarEm, setProgramarEm] = useState(null)
-  const [modeloAberto, setModeloAberto] = useState(false)
   const { ler } = useArquivoComoDataUrl()
   const gravador = useGravadorAudio({ escolherTipo: escolherFormatoGravacao })
   const gravando = gravador.estado !== 'ocioso'
@@ -126,6 +126,24 @@ export function Composer({
   // porque só ali dá pra saber qual dos dois ela quis mandar.
   const podeAudio = aceitaFormato(canal, 'audio')
   const restricao = restricoesDoCanal(canal)
+  // #1761: no chat do site "Anexar" e "Fotos" pareciam ativos ao lado do aviso de que o canal não
+  // aceita foto nem arquivo. Desligam de fato, e apontam para a linha que diz o motivo.
+  const podeFoto = aceitaFormato(canal, 'foto')
+  const podeAnexar = podeFoto || aceitaFormato(canal, 'arquivo')
+  const idRestricao = useId()
+
+  // #1761 (L8): conversa encerrada eram três avisos do mesmo estado (botão no cabeçalho, faixa
+  // amarela e o campo apagado com Programar e Nota ativos). Fica uma linha neutra no lugar do campo.
+  if (motivo?.acao === 'reabrir') {
+    return (
+      <div className={css.composer}>
+        <p className={css.linhaEncerrada}>
+          <span>Conversa encerrada</span>
+          {aoReabrir && <Botao disabled={reabrindo} onClick={aoReabrir}>{reabrindo ? 'Reabrindo…' : 'Reabrir conversa'}</Botao>}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className={css.composer}>
@@ -134,13 +152,11 @@ export function Composer({
           <Icone nome={motivo.acao === 'bloqueio' ? 'bloqueio' : 'alerta'} />
           <strong>{motivo.titulo}</strong>
           <span>{motivo.detalhe}</span>
-          {motivo.acao === 'reabrir' && aoReabrir && (
-            <Botao disabled={reabrindo} onClick={aoReabrir}>{reabrindo ? 'Reabrindo…' : 'Reabrir conversa'}</Botao>
-          )}
         </p>
       )}
 
-      {podeEnviarModelo && <Botao className={css.abrirModelos} aria-haspopup="dialog" onClick={() => setModeloAberto(true)}>
+      {/* #1761 (L9): fixo acima do campo só perto do fim da janela de 24 h ou com ela fechada. */}
+      {modelosFixos && podeEnviarModelo && <Botao className={css.abrirModelos} aria-haspopup="dialog" onClick={aoAbrirModelos}>
         <Icone nome="modelo" /> Modelos aprovados
       </Botao>}
 
@@ -190,7 +206,7 @@ export function Composer({
                   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarComposer() }
                 }}
               />
-            <SugestaoDeTexto sugestao={sugestao} />
+              <SugestaoDeTexto sugestao={sugestao} />
               {/* `portal`: mede o retângulo deste wrapper (via parentElement
                   do próprio Popover) e planta o conteúdo em document.body,
                   fora do recorte de `.composer`. Visual idêntico ao de antes,
@@ -226,14 +242,19 @@ export function Composer({
                   Respostas. Em coluna estreita o nome some por container
                   query e fica o title com a explicação inteira. */}
               <BotaoAnexarArquivo
-                disabled={!podeEscrever}
+                disabled={!podeEscrever || !podeAnexar}
+                descritoPor={!podeAnexar && restricao ? idRestricao : undefined}
                 soImagem={fonteApi}
-                titulo={fonteApi ? 'Anexar foto do computador (imagem, até 8 MB)' : 'Anexar arquivo do computador: foto, cardápio em PDF ou comprovante (imagem ou PDF, até 8 MB)'}
+                titulo={!podeAnexar ? restricao : fonteApi ? 'Anexar foto do computador (imagem, até 8 MB)' : 'Anexar arquivo do computador: foto, cardápio em PDF ou comprovante (imagem ou PDF, até 8 MB)'}
                 rotulo="Anexar"
                 classeRotulo={css.rotuloAcao}
                 aoEscolher={aoEscolherArquivo}
               />
-              <Botao title="Fotos dos pratos cadastrados na casa" className={css.acaoComRotulo} disabled={!podeEscrever} onClick={aoAbrirGaleria}>
+              <Botao
+                title={motivoDeFormato(canal, 'foto') ?? 'Fotos dos pratos cadastrados na casa'}
+                aria-describedby={!podeFoto && restricao ? idRestricao : undefined}
+                className={css.acaoComRotulo} disabled={!podeEscrever || !podeFoto} onClick={aoAbrirGaleria}
+              >
                 <Icone nome="imagem" /><span className={css.rotuloAcao}>Fotos</span>
               </Botao>
               {/* #1424: a mensagem programada vai para o cliente cadastrado (a API exige o
@@ -274,11 +295,11 @@ export function Composer({
             </div>
           </div>
 
-          {restricao && <p className={css.restricao}>{restricao}</p>}
+          {restricao && <p id={idRestricao} className={css.restricao}>{restricao}</p>}
         </>
       )}
 
-      {modeloAberto && <ModalEnviarModelo conversa={conversa} aoFechar={() => setModeloAberto(false)} />}
+      {modeloAberto && <ModalEnviarModelo conversa={conversa} aoFechar={aoFecharModelos} />}
 
       {programarEm === conversa.id && (
         <ModalProgramarMensagem

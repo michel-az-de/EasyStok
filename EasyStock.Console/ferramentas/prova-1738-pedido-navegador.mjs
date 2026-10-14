@@ -61,7 +61,7 @@ try {
   await page.getByText('Joana', { exact: true }).first().click()
   await page.getByRole('button', { name: 'Adicionar itens', exact: true }).click()
   for (let i = 1; i <= 5; i++) await page.getByRole('button', { name: new RegExp('^Prato ' + i + '\\b') }).click()
-  await page.getByRole('button', { name: 'Anotar na Prato 1', exact: true }).click()
+  await page.getByRole('button', { name: 'Anotação para Prato 1', exact: true }).click()
   await page.getByRole('textbox', { name: 'Observação de Prato 1', exact: true }).fill('Molho à parte')
   await page.getByRole('textbox', { name: 'Observação de Prato 1', exact: true }).press('Tab')
   assert.equal(await totalVisivel(page), true, 'Total deve ficar visível com cinco itens em 1280x720')
@@ -76,7 +76,7 @@ try {
   await page.setViewportSize({ width: 1280, height: 720 })
   await page.reload()
   await page.getByText('Joana · Sem janela', { exact: true }).waitFor()
-  assert.equal(await page.getByRole('button', { name: /^Anotar na Prato / }).count(), 5, 'F5 conserva os cinco itens na conversa de Joana')
+  assert.equal(await page.getByRole('button', { name: /^Anotação para Prato / }).count(), 5, 'F5 conserva os cinco itens na conversa de Joana')
   await page.getByText('Molho à parte', { exact: true }).waitFor()
   assert.equal(chamadas.filter(c => c.metodo !== 'GET').every(c => c.path.endsWith('/marcar-lida')), true,
     'Montar e recarregar não envia pedido nem inicia conversa na API')

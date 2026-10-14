@@ -18,7 +18,11 @@ const AGRUPAR_EVENTOS_MS = 300
 
 // `memoria` (#1576): os caches do laço, criados acima do Balcão para a volta do Hall, da Cozinha ou
 // das Entregas não reler tudo. Sem ela (demonstração, provas) o laço usa a sua, que morre com ele.
-export function useSincronizacaoApi({ ativo, comConversas = true, usuario, despachar, selecionadaId = null, memoria = null }) {
+export function useSincronizacaoApi({ ativo, comConversas = true, comItensFora = true, usuario, despachar, selecionadaId = null, memoria = null }) {
+  // #1761: quem não é da gerência não pede os itens tirados do cardápio (voltava 403 a cada minuto).
+  // Num ref: a matriz de acesso relida não recomeça o laço.
+  const comItensForaRef = useRef(comItensFora)
+  useEffect(() => { comItensForaRef.current = comItensFora }, [comItensFora])
   // A seleção muda a cada clique; num ref, o laço não recomeça por causa dela.
   const selecionadaRef = useRef(selecionadaId)
   useEffect(() => { selecionadaRef.current = selecionadaId }, [selecionadaId])
@@ -50,7 +54,7 @@ export function useSincronizacaoApi({ ativo, comConversas = true, usuario, despa
     let avisouCardapio = false
     async function cardapio() {
       try {
-        const itens = await lerCardapio({ incluirFora: comConversas })
+        const itens = await lerCardapio({ incluirFora: comConversas && comItensForaRef.current })
         if (!vivo) return
         despachar({ tipo: acao.SINCRONIZAR_CARDAPIO, cardapio: itens })
         if (avisouCardapio) {

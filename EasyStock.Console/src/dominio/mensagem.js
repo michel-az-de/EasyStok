@@ -5,6 +5,19 @@ export function preencherModelo(modelo, valores) {
 
 export const primeiroNome = (nomeCompleto) => nomeCompleto.split(' ')[0]
 
+// Tique da mensagem que saiu (#1761). O EasyStok distingue entregue de lida; a bolha juntava as
+// duas em "✓✓ entregue" e a atendente nunca via que o cliente leu. Lida ganha a palavra na tela:
+// cor sozinha não informa. Enviando e falhou têm aviso próprio e não têm tique.
+const TIQUES = {
+  enviada: { marca: '✓', rotulo: 'enviada', lida: false },
+  entregue: { marca: '✓✓', rotulo: 'entregue', lida: false },
+  lida: { marca: '✓✓', rotulo: 'lida', lida: true },
+}
+export function tiqueDaMensagem(status) {
+  if (status === 'falhou' || status === 'enviando') return null
+  return TIQUES[status] ?? TIQUES.enviada
+}
+
 // --- Pergunta fora do roteiro nunca fica muda -------------------------------
 // Achado P2.6 (rodada 10, `aplicacao/casos/simulacao.js`): "D3 pede
 // interpretar, não ramificar". Quando nem resposta automática nem passagem

@@ -129,6 +129,32 @@ export const clienteEscolhendoPeloLink = (comandas, pedido) => !pedido?.pedidoId
 export const LINHA_CLIENTE_ESCOLHENDO =
   'O cliente está escolhendo pelo link. Os itens aparecem acima e viram pedido quando ele confirmar.'
 
+// #1761: a Ficha dizia "Pedido em montagem" com o pedido já confirmado e pago. O título segue o
+// pedido: montagem só enquanto ele não existe no EasyStok.
+export function tituloDaComanda(pedido, { temLinkComPedido = false } = {}) {
+  if (temLinkComPedido) return 'Link do cliente'
+  if (!pedido?.pedidoId) return 'Pedido em montagem'
+  if (pedido.estado === 'cancelado') return 'Pedido cancelado'
+  if (pedido.estado === 'aguardando') return 'Pedido aguardando pagamento'
+  return 'Pedido confirmado'
+}
+
+// #1761 (L18): a porção embaixo do nome repetia o que o nome já diz ("...600 g" e "600 g").
+export function porcaoForaDoNome(produto) {
+  const porcao = String(produto?.porcao ?? '').trim()
+  if (!porcao) return ''
+  // Espaço entre o número e a unidade não conta: "600g" e "600 g" são a mesma porção.
+  const escapada = [...porcao.toLowerCase().replace(/\s+/g, '')]
+    .map((letra) => letra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*')
+  const noNome = new RegExp(`(^|[^\\p{L}\\p{N}])${escapada}($|[^\\p{L}\\p{N}])`, 'u')
+  return noNome.test(String(produto.nome ?? '').toLowerCase()) ? '' : porcao
+}
+
+// #1761 (L3): o pedido acabou de nascer no EasyStok nesta conversa (a cobrança foi gerada). É a
+// hora de fechar o cardápio: dali em diante ele só consulta e cobria a lista e a conversa.
+export const pedidoAcabouDeNascer = (antes, depois) => Boolean(depois?.pedidoId)
+  && !antes?.pedidoId && antes?.conversaId === depois.conversaId
+
 // #1683: sem pedido e sem frete combinado o EasyStok soma só os itens; o cliente já vê o frete.
 export function rotuloDoTotalDaSelecao(comanda, emEdicao = false) {
   const semFrete = !comanda.pedido && comanda.freteCombinado == null
@@ -152,4 +178,15 @@ const ROTULO_FORA_DA_ESTEIRA = {
 export function rotuloDoEstado(estado) {
   const texto = String(estado ?? '')
   return passoPorId(texto)?.rotulo ?? ROTULO_FORA_DA_ESTEIRA[texto] ?? texto.charAt(0).toUpperCase() + texto.slice(1)
+}
+
+// #1709: CEP sem cobertura volta do EasyStok com a frase escrita para o cliente
+// (`CepSemCoberturaException`, sem código próprio na resposta). No console quem lê é a equipe:
+// a linha diz o motivo e os dois caminhos que existem hoje.
+const CEP_SEM_COBERTURA = 'Vamos combinar a entrega e o frete com a equipe.'
+const FORA_DA_AREA = 'o endereço do cliente está fora da área de entrega. Mande o Link de compra para combinar o frete com ele, ou cadastre a região em Entregas, Janelas de entrega, Frete.'
+
+export function motivoDoPedidoNaoCriado(erro) {
+  const mensagem = String(erro?.message ?? '').trim()
+  return `Pedido não criado: ${mensagem === CEP_SEM_COBERTURA ? FORA_DA_AREA : mensagem}`
 }

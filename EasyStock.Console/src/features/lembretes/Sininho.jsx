@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { useEscape } from '../../hooks/useEscape'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { faixaDaJanela } from '../../dominio/entrega'
 import {
-  ORIGENS, chaveLembrete, descreverAtraso, descreverPrazo, novoLembrete, vencido,
+  ORIGENS, chaveLembrete, descreverPrazo, encaixeNaJanela, novoLembrete, tempoDoItem, vencido,
 } from '../../dominio/lembrete'
 import { primeiroNome } from '../../dominio/mensagem'
 import { EVENTOS_DE_SOM, ROTULO_DO_SOM } from '../../dominio/automatico'
@@ -39,7 +39,7 @@ const JANELA_SONS_RECENTES_MS = 6 * 60 * 60 * 1000
 function subtituloDoItem(lembrete, agora, conversas) {
   if (lembrete.detalhe) return lembrete.detalhe
   const conversa = lembrete.conversaId ? conversas.find((c) => c.id === lembrete.conversaId) : null
-  const tempo = descreverAtraso(lembrete.quando, agora)
+  const tempo = tempoDoItem(lembrete, agora)
   return conversa ? `${primeiroNome(conversa.nome)} · ${tempo}` : tempo
 }
 
@@ -176,6 +176,27 @@ export function Sininho() {
   useEffect(() => {
     if (aberto) painelRef.current?.querySelector('button')?.focus()
   }, [aberto])
+
+  // #1761: mantém o painel dentro da janela (`encaixeNaJanela`). Mede sem o ajuste anterior e sem
+  // a animação de abrir (offsetTop e offsetHeight não enxergam transform); refaz quando a lista
+  // muda de tamanho e quando a janela muda.
+  const tamanhoDaLista = `${lembretes.length}:${vistosExpandido}:${consultaLembretes?.carregando}:${Boolean(erro)}`
+  useLayoutEffect(() => {
+    const painel = painelRef.current
+    if (!aberto || !painel) return undefined
+    const encaixar = () => {
+      painel.style.top = ''
+      painel.style.maxHeight = ''
+      const topoDaAncora = painel.offsetParent?.getBoundingClientRect().top ?? 0
+      const encaixe = encaixeNaJanela({ topo: topoDaAncora + painel.offsetTop, altura: painel.offsetHeight, janela: window.innerHeight })
+      if (!encaixe) return
+      painel.style.top = `${painel.offsetTop - encaixe.sobe}px`
+      painel.style.maxHeight = `${encaixe.alturaMaxima}px`
+    }
+    encaixar()
+    window.addEventListener('resize', encaixar)
+    return () => window.removeEventListener('resize', encaixar)
+  }, [aberto, tamanhoDaLista])
 
   const alternarPainel = () => {
     if (aberto) { fecharPainel(); return }
