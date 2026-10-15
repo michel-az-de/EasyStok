@@ -65,7 +65,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         estado.PodeEditar.Should().BeTrue();
         await Salvar(client, token, estado, new([new(c.CardapioItemId, 2)], JanelaId: c.JanelaId,
             DataEntrega: c.DataEntrega, Endereco: new(cep, "Rua da sprint", "42", "Centro", "São Paulo", "SP", "Casa 2"),
-            Nome: "Cliente da sprint", Telefone: "11999998888"));
+            Nome: "Cliente da sprint", Telefone: "11912345678"));
         estado = await Estado(client, token);
         var enviado = await client.PostAsJsonAsync($"{Rota(token)}/confirmar", new { estado.Revisao });
         enviado.StatusCode.Should().Be(HttpStatusCode.OK, await enviado.Content.ReadAsStringAsync());
