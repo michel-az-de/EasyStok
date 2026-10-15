@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -89,6 +89,14 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   const buscaRef = useRef(null)
   const organizarRef = useRef(null)
   const ajustarRef = useRef(null)
+  // #1810: entrar e sair da organização troca os botões de lugar; o foco segue para o novo.
+  const focoAposOrganizar = useRef(null)
+  useEffect(() => {
+    const alvo = focoAposOrganizar.current
+    focoAposOrganizar.current = null
+    if (alvo === 'ajustar') ajustarRef.current?.focus()
+    else if (alvo === 'organizar') document.querySelector('[data-alca-modulo]')?.focus()
+  }, [organizar])
   const modulosPermitidos = modulosDoHall({ fonteApi }).filter((modulo) => permite(modulo.id))
   const todos = ordenarModulosDoHall(modulosPermitidos, preferencia)
   const modulos = filtrarModulos(todos, busca)
@@ -181,9 +189,8 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
           </div>
           <div className={css.ferramentas}>
             {anterior && <Botao variante="texto" onClick={() => desfazer(organizarRef)}>Desfazer</Botao>}
-            <Botao ref={organizarRef} aria-pressed={organizar} variante={organizar ? 'primario' : 'secundario'}
-              disabled={!organizar && (buscando || todos.length < 2)} onClick={() => { setOrganizar(!organizar); setMensagem('') }}>
-              <MarcaIcone nome={organizar ? 'confirmar' : 'ordenar'} tamanho={20} />{organizar ? 'Concluir organização' : 'Organizar módulos'}
+            <Botao ref={organizarRef} variante="primario" onClick={() => { setOrganizar(false); setMensagem(''); focoAposOrganizar.current = 'ajustar' }}>
+              <MarcaIcone nome="confirmar" tamanho={20} />Concluir organização
             </Botao>
           </div>
         </div>}
@@ -240,7 +247,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
         </div>}
       </main>
       {personalizando && <PersonalizarHall preferencia={preferencia} modulos={modulosPermitidos} aoFechar={() => setPersonalizando(false)}
-        aoOrganizar={todos.length > 0 ? () => { setPersonalizando(false); setOrganizar(true); setMensagem('') } : null} aoSalvar={(proxima) => { gravar(proxima, 'Painel personalizado.'); setPersonalizando(false) }} />}
+        aoOrganizar={todos.length > 0 ? () => { setPersonalizando(false); setOrganizar(true); setMensagem(''); focoAposOrganizar.current = 'organizar' } : null} aoSalvar={(proxima) => { gravar(proxima, 'Painel personalizado.'); setPersonalizando(false) }} />}
     </div>
   )
 }

@@ -24,12 +24,16 @@ export function PulsoDoHall({ ids, foco }) {
     <ul className={css.indicadores}>{indicadores.map((item) => {
       const frente = frentes[item.id]
       const valor = item.valor === null ? '—' : item.id === 'financeiro' ? dinheiro(item.valor) : `${item.valor}${item.parcial ? '+' : ''}`
+      // Só o que pede ação aparece por escrito: leitura que falhou e caixa de outro dia aberto.
+      const aviso = item.estado === 'erro'
+        ? `${item.em ? `Desatualizado · dados das ${hora(item.em)}` : 'Não foi possível atualizar'}${item.erro ? `: ${item.erro}` : ''}`
+        : item.alerta
       return <li key={item.id}>
-        <a data-indicador={item.id} data-estado={item.estado} className={css.indicador} href={hashDoModulo(item.id, frente.tela)} title={item.detalhe || undefined}
-          aria-label={`${frente.nome}: ${valor}. ${frente.acao}`}>
+        <a data-indicador={item.id} data-estado={item.estado} className={css.indicador} href={hashDoModulo(item.id, frente.tela)} title={item.detalhe || undefined}>
           <span className={css.cabecaIndicador}><MarcaIcone nome={frente.icone} tamanho={20} />{frente.nome}</span>
           <strong className={css.valor}>{valor}</strong>
-          {item.estado === 'erro' && <span className={css.frescor}><MarcaIcone nome="atencao" tamanho={16} />{item.em ? `Desatualizado · dados das ${hora(item.em)}` : 'Não foi possível atualizar'}</span>}
+          {aviso && <span className={css.frescor}><MarcaIcone nome="atencao" tamanho={16} />{aviso}</span>}
+          <span className={css.oculto}>{frente.acao}</span>
         </a>
       </li>
     })}</ul>

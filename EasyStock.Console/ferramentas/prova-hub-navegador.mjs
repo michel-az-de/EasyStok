@@ -119,6 +119,7 @@ try {
   assert.deepEqual(await ordemIndicadores(page), ['cozinha', 'entregas', 'atendimento', 'financeiro'])
   assert.equal(await page.locator('[data-modulo] details, [data-modulo] [aria-label^="Telas de"]').count(), 0)
   await personalizar.click(); await page.getByRole('button', { name: 'Organizar áreas e favoritos' }).click()
+  assert.equal(await page.evaluate(() => document.activeElement?.hasAttribute('data-alca-modulo')), true, 'foco na primeira alça ao organizar')
   const antes = await ordem(page)
   const origemDrag = page.locator('[data-alca-modulo]').nth(0), destinoDrag = page.locator('[data-alca-modulo]').nth(1)
   await origemDrag.scrollIntoViewIfNeeded()
@@ -161,6 +162,8 @@ try {
   await page.clock.runFor(60)
   await cdp.detach()
   await page.getByRole('button', { name: 'Concluir organização' }).click()
+  // #1810: o botão some ao concluir; o foco vai para "Ajustar tela inicial", não para o body.
+  assert.equal(await personalizar.evaluate((el) => el === document.activeElement), true)
   await page.evaluate(() => document.querySelector('main').scrollIntoView())
   await foto(page, 'hub-celular-compacto')
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))

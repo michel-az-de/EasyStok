@@ -42,6 +42,10 @@ const fontes = {
   financeiro: { estado: 'ok', dados: { saldoEsperado: 300.03, aberto: true } },
 }
 assert.deepEqual(indicadoresDoHall(fontes, ids).map((item) => item.valor), [2, 2, 1, 300.03])
+// #1810: no hall enxuto só o caixa de outro dia vira alerta escrito; o resto fica no título.
+assert.deepEqual(indicadoresDoHall(fontes, ids).map((item) => item.alerta), [null, null, null, null])
+assert.equal(indicadoresDoHall({ financeiro: { estado: 'ok', dados: { saldoEsperado: 10, aberturaPendenteCrossDay: true } } }, ['financeiro'])[0].alerta,
+  'Caixa de outro dia ainda aberto. Confira o fechamento.')
 fontes.atendimento.estado = 'carregando'
 assert.equal(indicadoresDoHall(fontes, ids)[0].valor, 2)
 assert.equal(indicadoresDoHall(fontes, ids)[0].atual, false)
