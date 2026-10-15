@@ -104,7 +104,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   // "Enviar ao cliente", ou gerar a cobrança antes dele: o EasyStok cria o pedido, cobra e
   // manda o resumo pela conversa. Só o POST decide "não criado" (#1287): a recarga que
   // falha depois dele é só a tela atrasada, a polling traz o pedido.
-  const criarPedido = (id, meio = null) => umaPorConversa(id, 'criarPedido', () => {
+  const criarPedido = (id, meio = null, enviarAoCliente = true) => umaPorConversa(id, 'criarPedido', () => {
     const pedido = pedidoDe(id)
     if (!pedido || pedidoCriado(id)) return undefined
     // #1683: o erro volta como `{ erro }` para a barra mostrar ao lado do botão; o aviso fica.
@@ -113,7 +113,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
       avisar(erro)
       return { erro }
     }
-    const corpo = corpoDoPedido({ ...pedido, meio: meio ?? pedido.meio })
+    const corpo = { ...corpoDoPedido({ ...pedido, meio: meio ?? pedido.meio }), enviarAoCliente }
     return gerarPedido(id, corpo).then(
       (gerado) => {
         // Mercado Pago fora: o pedido nasce sem link e nada o emite sozinho (#1287).
@@ -123,11 +123,14 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
         }
         if (!gerado?.enviadoAoCliente) {
           if (gerado?.pedidoId) semResumo.add(gerado.pedidoId)
-          faltas.push('o resumo não saiu ao cliente (conversa fora da janela de 24 h ou canal fora do ar)')
+          if (enviarAoCliente) faltas.push('o resumo não saiu ao cliente (conversa fora da janela de 24 h ou canal fora do ar)')
         }
         const aviso = faltas.length > 0 ? `Pedido criado no EasyStok, mas ${faltas.join('; e ')}.` : null
         limparAviso()
         if (aviso) avisar(aviso)
+        else if (!enviarAoCliente) avisar(gerado?.cobranca?.linkPagamento
+          ? 'Pedido e cobrança criados sem envio. Abra Pagamento para copiar o link ou usar um modelo aprovado.'
+          : 'Pedido e cobrança criados sem envio. Confira a forma de recebimento em Pagamento.')
         return recarregar(id).catch(() => avisar(aviso ? `${aviso} Atualizando a tela…` : 'Pedido criado no EasyStok, atualizando a tela…'))
       },
       (erro) => {
@@ -146,8 +149,8 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
 
   // Com pedido criado, gerar ou reenviar a cobrança troca a forma (S11) ou, sem cobrança
   // online, emite o link; o link vencido é reemitido e enviado pelo EasyStok (job de expiração).
-  const cobrar = (id, meio) => {
-    if (!pedidoCriado(id)) return criarPedido(id, meio)
+  const cobrar = (id, meio, enviarAoCliente = true) => {
+    if (!pedidoCriado(id)) return criarPedido(id, meio, enviarAoCliente)
     const atual = pedidoDe(id)
     if (meio && formaDoMeio(meio) !== formaDoMeio(atual?.meio)) return trocarForma(id, meio)
     if (!atual?.cobranca && formaDoMeio(atual?.meio) === FORMA_ONLINE) return reemitir(id)
@@ -272,7 +275,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
     // Janelas com vaga no prazo dos itens da comanda (S16). Promessa direta para a tela.
     carregarJanelasComanda: (itens, data = '') => listarJanelas({ itens, dataInicio: data || null, dataFim: data || null }),
 
-    gerarPedido: (id, meio = null) => criarPedido(id, meio),
+    gerarPedido: (id, meio = null, enviarAoCliente = true) => criarPedido(id, meio, enviarAoCliente),
 
     // Com pedido criado, trocar o meio é a troca de forma da S11: online ↔ na entrega.
     // #1683: entre Pix e cartão por link o EasyStok não faz nada (é o mesmo link); a tela não
@@ -284,7 +287,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
       return Promise.resolve({ erro: MESMA_FORMA })
     },
 
-    gerarCobranca: (id, pedido, meio = null) => cobrar(id, meio),
+    gerarCobranca: (id, pedido, meio = null, enviarAoCliente = true) => cobrar(id, meio, enviarAoCliente),
     reenviarCobranca: (id, pedido, valorForcado = null, meio = null) => cobrar(id, meio),
   }
 }

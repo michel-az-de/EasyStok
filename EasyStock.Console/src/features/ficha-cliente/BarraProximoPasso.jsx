@@ -101,7 +101,7 @@ function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, linkVencidoApi, aoA
 // alvo só, fixo no rodapé da coluna Ficha, no lugar de `BlocoEsteira` (que
 // listava os seis passos soltos) e da barra antiga somados.
 export function BarraProximoPasso({
-  pedido, conversaId, nomeCliente, agora, emDesfazer, bloqueado = false, prerequisito = null, aoAvancar, aoDesfazer,
+  pedido, conversaId, nomeCliente, agora, emDesfazer, bloqueado = false, prerequisito = null, gerarSemEnviar = false, aoAvancar, aoDesfazer,
   aoGerarPix, aoReenviarPix, aoConfirmarPagamento, aoAceitarDivergencia, aoCobrarDiferenca,
   aoVoltarEtapa, aoCancelarPedido, aoMarcarEstorno, aoEncerrarAtendimento, aoDesfazerPagamento, aoAprovarPedido,
 }) {
@@ -224,7 +224,7 @@ export function BarraProximoPasso({
     const info = acaoDoPix(situacaoCob, {
       prerequisito: prerequisito ?? (pedido.itens.length > 0 ? null : 'A comanda está vazia.'),
       // #1474 (R4): no modo API este é o único botão que cria o pedido (cobra e manda a comanda).
-      rotuloGerar: fonteApi && !pedido.pedidoId ? ROTULO_GERAR_E_ENVIAR : 'Gerar cobrança',
+      rotuloGerar: fonteApi && !pedido.pedidoId && !gerarSemEnviar ? ROTULO_GERAR_E_ENVIAR : 'Gerar cobrança',
       linkVencidoApi: fonteApi && pedido.pedidoId ? avisoDeLinkVencidoApi(pedido.cobranca, pedido.statusApi) : null,
       aoAbrirBaixa: () => setAbrindoBaixa(true),
       aoGerarPix: () => (pedido.meio ? executar(() => aoGerarPix(pedido.meio), GERANDO_COBRANCA) : setPedindoMeio(true)),
@@ -248,6 +248,7 @@ export function BarraProximoPasso({
     } else {
       corpoAcao = (
         <div className={css.botoesPrimarios}>
+          {gerarSemEnviar && !pedido.pedidoId && <p className={css.motivoDesabilitado}>Janela fechada: gere sem enviar. Depois copie o link em Pagamento ou use um modelo aprovado.</p>}
           {info.motivo && <p className={css.motivoDesabilitado}>{info.motivo}</p>}
           {info.botoes.map((b) => (
             <Botao

@@ -1,8 +1,9 @@
 import { MODULOS } from './modulos'
 
 const idsDoCatalogo = MODULOS.map((modulo) => modulo.id)
-const idsValidos = (valor) => Array.isArray(valor)
-  ? [...new Set(valor.filter((id) => idsDoCatalogo.includes(id)))] : []
+const idsValidos = (valor, catalogo = idsDoCatalogo) => Array.isArray(valor)
+  ? [...new Set(valor.filter((id) => catalogo.includes(id)))] : []
+const PAINEIS = ['atendimento', 'cozinha', 'entregas', 'financeiro']
 
 export function normalizarPreferenciasHall(valor) {
   const ordem = idsValidos(valor?.ordem)
@@ -13,9 +14,11 @@ export function normalizarPreferenciasHall(valor) {
     foco: ['atendimento', 'gestao', 'producao'].includes(valor?.foco) ? valor.foco : 'atendimento',
     compacto: valor?.compacto === true,
     movimentos: valor?.movimentos !== false,
-    paineis: Array.isArray(valor?.paineis)
-      ? [...new Set(valor.paineis.filter((id) => ['atendimento', 'cozinha', 'entregas', 'financeiro'].includes(id)))]
-      : ['atendimento', 'cozinha', 'entregas', 'financeiro'],
+    paineis: Array.isArray(valor?.paineis) ? idsValidos(valor.paineis, PAINEIS) : [...PAINEIS],
+    // #1839 D: ordem livre dos contadores, arrastada no hall. null segue a ordem do foco.
+    ordemPaineis: idsValidos(valor?.ordemPaineis, PAINEIS).length
+      ? [...idsValidos(valor.ordemPaineis, PAINEIS), ...PAINEIS.filter((id) => !valor.ordemPaineis.includes(id))]
+      : null,
   }
 }
 
@@ -28,13 +31,26 @@ export const FOCOS_DO_HALL = [
 export function aplicarFocoDoHall(preferencia, foco) {
   const atual = normalizarPreferenciasHall(preferencia)
   const modelo = FOCOS_DO_HALL.find((item) => item.id === foco)
-  return modelo ? normalizarPreferenciasHall({ ...atual, foco, ordem: modelo.ordem }) : atual
+  return modelo ? normalizarPreferenciasHall({ ...atual, foco, ordem: modelo.ordem, ordemPaineis: null }) : atual
 }
+
+const ordemDosPaineis = (atual) => atual.ordemPaineis
+  ?? FOCOS_DO_HALL.find((item) => item.id === atual.foco).ordem.filter((id) => PAINEIS.includes(id))
 
 export function ordenarPaineisDoHall(preferencia, permitidos) {
   const atual = normalizarPreferenciasHall(preferencia)
-  return FOCOS_DO_HALL.find((item) => item.id === atual.foco).ordem
-    .filter((id) => atual.paineis.includes(id) && permitidos.includes(id))
+  return ordemDosPaineis(atual).filter((id) => atual.paineis.includes(id) && permitidos.includes(id))
+}
+
+export function moverPainelDoHall(preferencia, id, destino) {
+  const atual = normalizarPreferenciasHall(preferencia)
+  const ordem = [...ordemDosPaineis(atual)]
+  const origem = ordem.indexOf(id)
+  const chegada = ordem.indexOf(destino)
+  if (origem < 0 || chegada < 0 || origem === chegada) return atual
+  ordem.splice(origem, 1)
+  ordem.splice(chegada, 0, id)
+  return { ...atual, ordemPaineis: ordem }
 }
 
 export function ordenarModulosDoHall(modulos, preferencia) {

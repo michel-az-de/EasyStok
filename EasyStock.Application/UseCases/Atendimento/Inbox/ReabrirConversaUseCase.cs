@@ -6,7 +6,8 @@ using EasyStock.Domain.Enums.Atendimento;
 namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
 public sealed class ReabrirConversaUseCase(
-    IConversaRepository conversas, IClienteRepository clientes, IUnitOfWork unitOfWork, TimeProvider relogio)
+    IConversaRepository conversas, IClienteRepository clientes, IUnitOfWork unitOfWork, TimeProvider relogio,
+    IPedidoRepository? pedidos = null)
 {
     /// <summary>
     /// Início da nota que registra a reabertura. O avaliador de lembretes a reconhece por ele (#1550): a
@@ -52,6 +53,12 @@ public sealed class ReabrirConversaUseCase(
                 var agora = relogio.GetUtcNow().UtcDateTime;
                 var encerradaEm = conversa.EncerradaEm;
                 conversa.Reabrir(agora);
+                // #1839: atendimento encerrado vira história. Pedido já entregue ou cancelado sai do Resumo e o
+                // novo atendimento começa sem pedido; o antigo segue em Cliente e histórico. Em andamento fica.
+                if (pedidos is not null && conversa.PedidoEmAndamentoId is { } pedidoId
+                    && await pedidos.GetByIdAsync(command.EmpresaId, pedidoId) is { } pedido
+                    && pedido.EmpresaId == command.EmpresaId && pedido.EstaFinalizado)
+                    conversa.DefinirPedidoEmAndamento(null);
                 var nota = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora,
                     TipoConteudoMensagem.Texto, $"{PrefixoNotaReabertura}{command.QuemAgiu}. Encerramento anterior: {encerradaEm:dd/MM/yyyy HH:mm:ss} UTC.");
                 nota.RegistrarAutorNotaInterna(command.UsuarioId);

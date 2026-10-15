@@ -44,10 +44,13 @@
   margin: 0; padding: 0; list-style: none;
 }
 
+/* #1839 D: ilustração da marca à esquerda; nome e linha viva à direita, na mesma altura de antes. */
 .cartao {
   position: relative;
-  display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--e-2);
-  min-width: 0; padding: var(--e-4);
+  display: grid; grid-template-columns: 88px minmax(0, 1fr); align-content: center; gap: var(--e-1) var(--e-3);
+  min-width: 0; padding: var(--e-3) var(--e-4);
+  --il-fundo: var(--marca-claro); --il-tinta: var(--tinta); --il-ouro: var(--trigo);
+  --il-papel: var(--papel); --il-marca: var(--marca); --il-chao: var(--linha);
   border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
   background: var(--papel);
   transition: background var(--dur-curta) var(--ease-padrao), border-color var(--dur-curta) var(--ease-padrao);
@@ -57,11 +60,14 @@
 
 .icone { display: grid; place-items: center; flex: none; width: 44px; height: 44px; color: var(--tinta); }
 .icone > svg { width: 32px; height: 32px; }
-.nome { grid-column: 1; font-family: var(--f-corpo); font-size: var(--t-titulo); line-height: var(--lh-compacto); font-weight: 700; color: var(--tinta); }
-.resumo { grid-column: 1; font-size: var(--t-apoio); color: var(--tinta-2); }
+.ilustracaoCartao { grid-column: 1; grid-row: span 2; align-self: center; display: block; width: 88px; height: auto; }
+.nome { grid-column: 2; font-family: var(--f-corpo); font-size: var(--t-titulo); line-height: var(--lh-compacto); font-weight: 700; color: var(--tinta); }
+.resumo { grid-column: 2; font-size: var(--t-apoio); color: var(--tinta-2); }
+.pendencia { grid-column: 2; align-self: start; font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2); overflow-wrap: anywhere; }
+.pendencia[data-atencao] { color: var(--marca-forte); }
 
 /* O link do nome cobre o cartão inteiro; foco aparece no cartão (regra acima). */
-.abrir { grid-column: 1; display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); min-height: var(--toque); text-decoration: none; color: inherit; outline: none; }
+.abrir { grid-column: 2; display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); min-height: var(--toque); text-decoration: none; color: inherit; outline: none; }
 .abrir > svg { flex: none; color: var(--marca); }
 .abrir::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
 
@@ -70,10 +76,10 @@
 .emBreve { background: var(--papel); }
 .emBreve .icone, .emBreve .nome { color: var(--tinta-2); }
 .selo {
-  grid-column: 1; display: inline-flex; align-items: center; gap: var(--e-1);
+  grid-column: 2; display: inline-flex; align-items: center; gap: var(--e-1);
   font-size: var(--t-micro); font-weight: 600; color: var(--tinta-2);
 }
-.cabecaCartao { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; }
+.cabecaCartao { grid-column: 1 / -1; order: -1; display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; }
 .controlesCartao { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); position: relative; z-index: 1; }
 .favoritar, .alca, .mover {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--e-1);
@@ -93,6 +99,10 @@
 .posicao { margin-left: auto; font-size: var(--t-micro); color: var(--tinta-2); white-space: nowrap; }
 .cartao.organizando:hover { transform: none; }
 .cartao.arrastando { border-color: var(--marca); border-style: dashed; box-shadow: none; background: var(--marca-claro); }
+.indicadores > li { min-width: 0; }
+.indicadores > li.arrastando { position: relative; z-index: 1; }
+.indicadores > li.arrastando .indicador { border-color: var(--marca); border-style: dashed; background: var(--marca-claro); box-shadow: var(--sombra-media); cursor: grabbing; }
+.dicaArrasto { flex-basis: 100%; text-align: center; font-size: var(--t-micro); color: var(--tinta-2); }
 .previaArrasto { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); padding: var(--e-4); border: 1px solid var(--marca); border-radius: var(--r-3); background: var(--papel); color: var(--marca); box-shadow: var(--sombra-media); pointer-events: none; }
 .previaArrasto strong { color: var(--tinta); font-size: var(--t-titulo); }
 .previaArrasto span { flex-basis: 100%; font-size: var(--t-apoio); color: var(--tinta-2); }
@@ -180,8 +190,11 @@
 .configOpcao svg { flex: none; width: 32px; color: var(--marca-forte); }
 .acaoDestaque:focus-visible, .modelo:has(:focus-visible), .configOpcao:has(:focus-visible) { outline: 3px solid var(--marca); outline-offset: 3px; }
 .semMovimentos *, .semMovimentos *::before, .semMovimentos *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
-@media (max-width: 1000px) {
+/* #1852: abaixo da largura desktop, ilustração e nome precisam de duas colunas. */
+@media (max-width: 1279px) {
   .grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 1000px) {
   .destaque { flex-wrap: wrap; gap: var(--e-3); }
   .acaoDestaque { margin-left: auto; }
 }
@@ -200,4 +213,10 @@
   /* Organizando, cada cartão leva Mover e as setas: volta a uma coluna. */
   .grade:has(.organizando) { grid-template-columns: 1fr; }
   .nome { font-size: var(--t-forte); overflow-wrap: anywhere; }
+  /* Duas por linha: a ilustração vai para cima do nome. */
+  .cartao { grid-template-columns: minmax(0, 1fr); align-content: start; }
+  .ilustracaoCartao { grid-row: auto; width: 72px; }
+  .nome, .resumo, .pendencia, .abrir, .selo { grid-column: 1; }
+  /* #1852: a seta junto da ilustração deixa o nome inteiro nos cartões estreitos. */
+  .cartao:not(.organizando) .abrir > svg { position: absolute; top: var(--e-3); right: var(--e-3); }
 }

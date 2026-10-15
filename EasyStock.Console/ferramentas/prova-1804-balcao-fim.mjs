@@ -65,9 +65,8 @@ const conversaVelha = { estado: 'Em atendimento', canal: 'WhatsApp', mensagens: 
 const fechada = permissaoDeEscrita(conversaVelha, AGORA, WHATSAPP)
 assert.equal(fechada.pode, false, 'pré-condição: janela fechada')
 const motivo = motivoAntesDeCobrar(pronto, { fonteApi: true, escrita: fechada })
-assert.ok(motivo && /Janela fechada/.test(motivo) && /modelo aprovado/.test(motivo), `com a janela fechada a cobrança não sai: ${motivo}`)
-assert.ok(/rascunho/.test(motivo), 'diz para onde vai a comanda anotada')
-ok(`janela fechada trava "Gerar cobrança e enviar": "${motivo}"`)
+assert.equal(motivo, null, '#1847: janela fechada permite gerar sem envio')
+ok('janela fechada permite criar a cobrança para copiar, sem alterar a permissão de envio')
 
 assert.equal(motivoAntesDeCobrar(pronto, { fonteApi: true, escrita: { pode: true } }), null, 'janela aberta não trava')
 assert.equal(motivoAntesDeCobrar({ ...pronto, pedido: { ...pedidoPronto, pedidoId: 'p1' } }, { fonteApi: true, escrita: fechada }), null,
@@ -81,7 +80,6 @@ assert.equal(semRegra.pode, false, 'pré-condição: canal sem regra não escrev
 assert.equal(motivoAntesDeCobrar(pronto, { fonteApi: true, escrita: semRegra }), null, 'canal sem regra não trava a cobrança')
 const bloqueada = permissaoDeEscrita({ ...conversaVelha, bloqueio: { motivo: 'teste', em: '2026-10-12T10:00:00Z' } }, AGORA, WHATSAPP)
 assert.equal(motivoAntesDeCobrar(pronto, { fonteApi: true, escrita: bloqueada }), null, 'bloqueio tem trava própria, não a da janela')
-assert.ok(/Link de compra/.test(motivo), 'diz a alternativa: copiar o Link de compra')
-ok('só a janela fechada trava a cobrança, e o motivo aponta o Link de compra como alternativa')
+ok('bloqueio e canal sem regra preservam suas proteções próprias')
 
 console.log(`\n${passos} passos verdes.`)

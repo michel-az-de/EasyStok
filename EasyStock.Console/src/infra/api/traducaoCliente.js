@@ -33,6 +33,9 @@ export function clienteDoDossie(dossie) {
       telefone: dados.telefone || null,
       endereco: endereco || null,
       pedidos: dossie.totalPedidos ?? 0,
+      // #1839: soma e favorito do servidor sobre todas as compras, não só as 10 da lista.
+      totalGasto: dossie.totalGasto ?? null,
+      favorito: dossie.itemFavorito?.nome ?? null,
       notas: (dossie.notas ?? []).map(notaDaApi),
       // #1441: tags do cadastro (S24), já normalizadas pelo EasyStok.
       tags: (dossie.tags ?? []).map((t) => t.tag),

@@ -27,6 +27,8 @@ import { BlocoOcorrenciasApi } from './BlocoOcorrenciasApi'
 import { BlocoEntrega } from './BlocoEntrega'
 import { BlocoFreteApi } from './BlocoFreteApi'
 import { BlocoPedido } from './BlocoPedido'
+import { CartaoDoCliente } from './CartaoDoCliente'
+import { ExtratoDoPedido } from './ExtratoDoPedido'
 import { ComandaDoCliente } from './ComandaDoCliente'
 import css from './ficha.module.css'
 
@@ -99,9 +101,10 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
     : saldo > 0 ? `${moeda(saldo)} a receber` : 'Pagamento completo'
   // #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que se resolve. A barra
   // mostra o motivo e desabilita o botão em vez de deixar o EasyStok recusar depois.
+  const gerarSemEnviar = fonteApi && permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)).motivo?.acao === 'janela'
   const prerequisito = pedido
     ? motivoAntesDeCobrar({ pedido, clienteId: selecionada.clienteId, endereco: cliente.endereco }, {
-      fonteApi, escrita: permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)),
+      fonteApi,
     })
     : null
 
@@ -154,12 +157,15 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
       <div className={css.conteudo}>
         <section ref={receberPrato} className={css.resumoAtual} data-recebendo-prato={recebendoPrato || undefined} aria-label="Resumo do atendimento">
           <p className={css.fase}>{!editavel ? 'Conversa encerrada' : posVenda ? 'Pós-venda' : pedidoCriado ? 'Pedido criado' : 'Antes da venda'}</p>
-          <h3>{!editavel ? 'Atendimento encerrado' : pedidoCriado ? `Pedido ${numero ?? ''}`.trim() : pedido ? 'Seleção não confirmada' : 'Vamos atender ' + primeiroNome}</h3>
+          <h3>{!editavel ? 'Atendimento encerrado' : pedidoCriado ? `${fonteApi ? 'Comanda' : 'Pedido'} ${numero ?? ''}`.trim() : pedido ? 'Seleção não confirmada' : 'Vamos atender ' + primeiroNome}</h3>
           <p>{!editavel ? 'O histórico está guardado. Reabra a conversa para retomar o atendimento.'
             : pedido ? `${pedidoCriado ? rotuloDoEstado(pedido.estado) : 'Em montagem'} · ${itens} ${itens === 1 ? 'item' : 'itens'} · ${moeda(total)}`
               : cadastrarPrimeiro ? 'Primeiro o cadastro: o pedido só nasce para cliente cadastrado. O que a conversa trouxe já vem preenchido.'
                 : 'Monte o pedido por aqui ou acompanhe a escolha do cliente pelo link.'}</p>
         </section>
+
+        {/* #1839: o cliente sempre à vista (resumo da IA, total de pedidos, tags e a última nota). */}
+        <CartaoDoCliente conversa={selecionada} fonteApi={fonteApi} aoAbrir={() => setSecao('cliente')} />
 
         {editavel && comandaCompartilhada}
         {editavel && !pedido && !fonteApi && acaoMontar && <div className={css.acaoMontar}>{acaoMontar}</div>}
@@ -207,7 +213,8 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           aoAbrirCardapio={abrirCardapio}
           aoAjustar={(sku, delta) => ajustarQuantidade(selecionada.id, sku, delta)}
           aoAjustarObservacao={(sku, texto) => ajustarObservacao(selecionada.id, sku, texto)}
-          aoGerarPedido={(meio) => { escolherMeioPagamento(selecionada.id, meio); return gerarPedido(selecionada.id, meio) }}
+          gerarSemEnviar={gerarSemEnviar}
+          aoGerarPedido={(meio) => { escolherMeioPagamento(selecionada.id, meio); return gerarPedido(selecionada.id, meio, !gerarSemEnviar) }}
           nomeCliente={selecionada.nome}
           endereco={cliente.endereco}
           faixa={faixa}
@@ -224,6 +231,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
       </Modal>}
 
       {secao === 'pagamento' && editavel && pedido && <Modal titulo={`Pagamento · ${selecionada.nome}`} largura="680px" aoFechar={() => setSecao(null)}>
+        {fonteApi && <ExtratoDoPedido pedido={pedido} />}
         <BlocoCobranca
           key={chaves.cobranca}
           pedido={pedido}
@@ -273,7 +281,8 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           prerequisito={prerequisito}
           aoAvancar={(passo, entregador, opcoes) => avancarEsteira(selecionada.id, passo, entregador, opcoes)}
           aoDesfazer={() => desfazerEsteira(selecionada.id, ultimoAvanco.mensagemId, ultimoAvanco.posEntregaId)}
-          aoGerarPix={(meio) => { escolherMeioPagamento(selecionada.id, meio); return gerarCobranca(selecionada.id, pedido, meio) }}
+          gerarSemEnviar={gerarSemEnviar}
+          aoGerarPix={(meio) => { escolherMeioPagamento(selecionada.id, meio); return gerarCobranca(selecionada.id, pedido, meio, !gerarSemEnviar) }}
           aoReenviarPix={(valorForcado) => reenviarCobranca(selecionada.id, pedido, valorForcado ?? null)}
           aoAprovarPedido={aprovarPedido ? () => aprovarPedido(selecionada.id) : null}
           aoConfirmarPagamento={(valorPago, metodo) => confirmarPagamento(selecionada.id, valorPago ?? null, metodo)}

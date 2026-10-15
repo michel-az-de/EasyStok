@@ -98,3 +98,26 @@ export function pagamentosDoTrecho(pedido, desde = null) {
   if (desde == null) return pagamentos
   return pagamentos.filter((p) => p.em >= desde)
 }
+
+// #1839: extrato do pedido na modal Pagamento, com o que o EasyStok já devolve (itens, frete,
+// pagamentos e saldo): de onde veio cada real, sem abrir o Financeiro. Nulo fora do modo API.
+export function extratoDoPedido(pedido) {
+  if (!pedido?.pedidoId || typeof pedido.totalApi !== 'number') return null
+  const frete = pedido.frete ?? 0
+  const pagamentos = [...(pedido.pagamentosApi ?? [])].sort((a, b) => (a.em ?? 0) - (b.em ?? 0))
+  const recebido = pedido.totalPagoApi ?? pagamentos.reduce((soma, p) => soma + p.valor, 0)
+  // O alocado do servidor reúne recebimentos, devoluções e créditos; o delta não identifica a origem.
+  // Cancelar encerra a cobrança, mas preserva o histórico e qualquer saldo que ainda precisa de acerto.
+  const pago = pedido.alocadoApi ?? recebido
+  const cancelado = pedido.estado === 'cancelado'
+  return {
+    cancelado,
+    itens: Math.max(pedido.totalApi - frete, 0),
+    frete,
+    total: pedido.totalApi,
+    pagamentos: pagamentos.map((p) => ({ id: p.pagamentoId, em: p.em, meio: p.meio, valor: p.valor })),
+    ajuste: Math.round((pago - recebido) * 100) / 100,
+    pago,
+    saldo: cancelado ? 0 : Math.max(pedido.totalApi - pago, 0),
+  }
+}

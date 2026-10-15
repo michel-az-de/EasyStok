@@ -104,9 +104,12 @@ confere('"Modelos aprovados" exige a fonte API', () => {
   )
 })
 confere('botão e dica do campo dependem do mesmo sinal: sem o botão, a dica não o promete', () => {
-  assert.match(composer, /\{modelosFixos && podeEnviarModelo && <Botao className=\{css\.abrirModelos\}/)
-  assert.match(composer, /podeEnviarModelo \? 'Use Modelos aprovados para continuar' : 'Mensagem indisponível nesta conversa'/)
-  assert.equal(vezes(composer, 'Modelos aprovados'), 2)
+  // #1839: com a janela fechada os modelos moram em Respostas (como no protótipo); o botão à parte fica
+  // só no fim de janela. A dica promete Respostas, e Respostas abre os modelos com o mesmo sinal.
+  assert.match(composer, /\{modelosFixos && podeEnviarModelo && podeEscrever && <Botao className=\{css\.abrirModelos\}/)
+  assert.match(composer, /podeEnviarModelo \? 'Janela fechada: escolha um modelo aprovado em Respostas' : 'Mensagem indisponível nesta conversa'/)
+  assert.match(composer, /disabled=\{!podeEscrever && !podeEnviarModelo\}/)
+  assert.match(composer, /onClick=\{podeEscrever \? barra\.abrir : aoAbrirModelos\}/)
 })
 confere('na demonstração a ação continua recusando, sem fingir envio', () => {
   const acoes = ler('aplicacao/criarAcoes.js')

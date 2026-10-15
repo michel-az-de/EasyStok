@@ -144,7 +144,7 @@ await confere('A na Ficha, contador, anotação, arrasto e "Adicionar itens" seg
   assert.match(blocoPedido, /\{itensTravados && <p className=\{css\.situacaoEnvio\}>\{LINHA_COMANDA_TRAVADA\}<\/p>\}/)
   // O cardápio segue abrindo (ingredientes, foto do prato), só que sem prometer que adiciona.
   assert.match(blocoPedido, /<Botao largo onClick=\{aoAbrirCardapio\}>\{itensTravados \? 'Ver cardápio' : 'Adicionar itens'\}<\/Botao>/)
-  assert.match(blocoPedido, /!itensTravados && <p className=\{css\.situacaoEnvio\}>\{LINHA_COMANDA_VAI_JUNTO\}<\/p>/)
+  assert.match(blocoPedido, /!itensTravados && <p className=\{css\.situacaoEnvio\}>\{gerarSemEnviar \? [^\n]+ : LINHA_COMANDA_VAI_JUNTO\}<\/p>/)
 })
 await confere('A trocar a janela de pedido criado continua de pé (não depende da trava dos itens)', () => {
   assert.match(blocoPedido, /\{!fechado && fonteApi && \(\s*<SeletorJanelaApi /)
