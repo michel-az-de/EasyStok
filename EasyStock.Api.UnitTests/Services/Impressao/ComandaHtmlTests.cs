@@ -98,6 +98,32 @@ public class ComandaHtmlTests
 
     [Theory]
     [MemberData(nameof(Papeis))]
+    public async Task NumeroDoDiaSaiComoPedidoENaoComoComanda(string modelo)
+    {
+        // S53: "Comanda nº N" já é o número da conversa (Conversa.NumeroComanda) no console, na IA e no aviso ao
+        // cliente; no papel o número do dia é do pedido, como na proposta de impressos (#1628).
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(Exemplo(), modelo));
+
+        corpo.Should().Contain("<span class=\"rot\">Pedido</span><b>042</b>");
+        corpo.Should().NotContain("Comanda nº");
+    }
+
+    [Fact]
+    public async Task GrupoCongeladoSaiComOTitulo()
+    {
+        // S53: "Preparar em casa" dividido por conservação; o título vem pronto do use case.
+        var dto = Exemplo() with
+        {
+            Grupos = [new ComandaGrupoDto("prepararEmCasa", "Preparar em casa · congelado",
+                [new ComandaItemDto(2, "un", "Nhoque de batata", "800 g", "sugo", null)], "congelado")],
+        };
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(dto, ImpressoHtml.Etiqueta10x15));
+
+        corpo.Should().Contain("<span class=\"rot\">Preparar em casa · congelado</span><span class=\"rot\">1 item</span>");
+    }
+
+    [Theory]
+    [MemberData(nameof(Papeis))]
     public async Task EscapaTexto(string modelo)
     {
         var corpo = SnapshotImpresso.Corpo(await Renderizar(Exemplo(cliente: "<script>x</script>", observacao: "<B>obs</B>"), modelo));
@@ -108,8 +134,8 @@ public class ComandaHtmlTests
 
     [Theory]
     [InlineData(ImpressoHtml.Etiqueta10x15, "100mm 150mm")]
-    [InlineData(ImpressoHtml.Cupom80, "80mm auto")]
-    [InlineData(ImpressoHtml.Cupom58, "58mm auto")]
+    [InlineData(ImpressoHtml.Cupom80, "auto")]
+    [InlineData(ImpressoHtml.Cupom58, "auto")]
     public async Task TermicaSoPretoENoTamanhoDoPapel(string modelo, string pagina)
     {
         var html = await Renderizar(Exemplo(), modelo);

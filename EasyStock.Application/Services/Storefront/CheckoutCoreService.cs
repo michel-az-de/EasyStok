@@ -410,6 +410,7 @@ public sealed class CheckoutCoreService(
                 VariacaoRotuloSnapshot = porcao?.Rotulo,
                 SkuSnapshot = porcao?.Sku?.Value,
                 LinhaSnapshot = ci.Linha.ParaContrato(),
+                ConservacaoSnapshot = ci.Conservacao.ParaContrato(),
                 Nome = ci.NomeEfetivo() ?? $"Item {ci.ProdutoId}",
                 Quantidade = inputItem.Qtd,
                 PrecoUnitario = precoUnit,

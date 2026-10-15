@@ -9,7 +9,7 @@ public sealed record ConversaComMensagens(Conversa Conversa, IReadOnlyList<Mensa
 /// <summary>
 /// Linha da inbox do console (S07): as colunas da conversa que o resumo mostra, o texto da ultima mensagem,
 /// quando houver, e o status do pedido em andamento. Sem o <c>ContextoJson</c> de proposito (#1575): a
-/// inbox faz polling e nao mostra o contexto.
+/// inbox faz polling e nao mostra o contexto. <c>Assunto</c> (#1432) e o do ultimo e-mail recebido, so no canal E-mail.
 /// </summary>
 public sealed record ConversaInboxItem(
     Guid Id,
@@ -29,13 +29,14 @@ public sealed record ConversaInboxItem(
     bool AguardaResposta,
     string? AssumidaPorNome = null,
     string? PedidoStatus = null,
-    long NumeroComanda = 0)
+    long NumeroComanda = 0,
+    string? Assunto = null)
 {
     /// <summary>Linha a partir da entidade carregada. Sem <paramref name="aguardaResposta"/> vale a regra do dominio.</summary>
     public static ConversaInboxItem De(Conversa c, string? ultimaMensagemTexto, bool? aguardaResposta = null, string? assumidaPorNome = null, string? pedidoStatus = null) => new(
         c.Id, c.EmpresaId, c.Canal, c.ContatoIdExterno, c.ContatoNome, c.ClienteId, c.Situacao, c.NaoLidas,
         c.UltimaMensagemEm, c.UltimaMensagemEntradaEm, c.PedidoEmAndamentoId, c.AssumidaPorUsuarioId, c.MotivoEscalada,
-        ultimaMensagemTexto, aguardaResposta ?? c.AguardaResposta, assumidaPorNome, pedidoStatus, c.NumeroComanda);
+        ultimaMensagemTexto, aguardaResposta ?? c.AguardaResposta, assumidaPorNome, pedidoStatus, c.NumeroComanda, c.Assunto);
 }
 
 /// <summary>Mensagem que não chegou ao cliente, com a conversa dela (S59).</summary>

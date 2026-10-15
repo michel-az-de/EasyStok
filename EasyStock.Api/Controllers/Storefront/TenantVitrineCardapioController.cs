@@ -82,7 +82,8 @@ public class TenantVitrineCardapioController(
         // S15: linha e preparo numérico (opcionais; null = não mexe).
         LinhaProduto? Linha = null,
         int? TempoPreparoMinutos = null,
-        string? InstrucaoFinalizacao = null);
+        string? InstrucaoFinalizacao = null,
+        ConservacaoProduto? Conservacao = null);
 
     public sealed record EditarItemRequest(
         string? NomePublico,
@@ -102,7 +103,8 @@ public class TenantVitrineCardapioController(
         // S15: linha e preparo numérico (opcionais; null = não mexe).
         LinhaProduto? Linha = null,
         int? TempoPreparoMinutos = null,
-        string? InstrucaoFinalizacao = null);
+        string? InstrucaoFinalizacao = null,
+        ConservacaoProduto? Conservacao = null);
 
     public sealed record ReordenarRequest(double NovaOrdem);
 
@@ -202,7 +204,8 @@ public class TenantVitrineCardapioController(
                 req.SecaoId,
                 Linha: req.Linha,
                 TempoPreparoMinutos: req.TempoPreparoMinutos,
-                InstrucaoFinalizacao: req.InstrucaoFinalizacao));
+                InstrucaoFinalizacao: req.InstrucaoFinalizacao,
+                Conservacao: req.Conservacao));
 
             return DataCreated($"/api/minha-vitrine/cardapio/{result.ItemId}", result);
         }
@@ -245,7 +248,8 @@ public class TenantVitrineCardapioController(
                 req.SecaoId,
                 Linha: req.Linha,
                 TempoPreparoMinutos: req.TempoPreparoMinutos,
-                InstrucaoFinalizacao: req.InstrucaoFinalizacao));
+                InstrucaoFinalizacao: req.InstrucaoFinalizacao,
+                Conservacao: req.Conservacao));
 
             return DataOk(result);
         }

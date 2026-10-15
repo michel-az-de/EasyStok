@@ -41,8 +41,10 @@ public static class ImpressoHtml
     private static readonly IReadOnlyDictionary<string, string> TamanhoPagina = new Dictionary<string, string>
     {
         [Etiqueta10x15] = "100mm 150mm",
-        [Cupom80] = "80mm auto",
-        [Cupom58] = "58mm auto",
+        // Bobina não tem altura fixa e "80mm auto" é inválido (o navegador cai no A4, #1756): a largura vem do .im e o
+        // Console mede o comprimento e fixa o @page na cópia que vai ao diálogo.
+        [Cupom80] = "auto",
+        [Cupom58] = "auto",
         [A4] = "A4",
         [A5] = "A5",
     };

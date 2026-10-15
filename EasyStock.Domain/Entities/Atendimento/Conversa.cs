@@ -54,6 +54,8 @@ public class Conversa
     /// <summary>Nulo quando o contato não preencheu o formulário do chat do site.</summary>
     public ContatoInformadoVisitante? ContatoInformado =>
         ContatoInformadoVisitante.Gravado(ContatoNome, ContatoTelefoneInformado, ContatoEmailInformado, ContatoInformadoEm);
+    /// <summary>#1432: assunto do último e-mail recebido, sem "Re:"/"Fwd:". Só no canal E-mail.</summary>
+    public string? Assunto { get; private set; }
 
     public CanalConversa Canal { get; private set; }
     public SituacaoConversa Situacao { get; private set; }
@@ -190,6 +192,16 @@ public class Conversa
         ContatoEmailInformado = contato.Email;
         ContatoInformadoEm = contato.InformadoEm;
         if (ClienteId is null) ContatoNome = NormalizarNome(contato.Nome);
+    }
+
+    /// <summary>
+    /// #1432: guarda o assunto do e-mail (aparado e cortado em <see cref="Mensagem.AssuntoTamanhoMaximo"/>).
+    /// Vazio não apaga o anterior: resposta sem assunto continua o mesmo fio.
+    /// </summary>
+    public void DefinirAssunto(string? assunto)
+    {
+        if (Mensagem.NormalizarAssunto(assunto) is { } limpo)
+            Assunto = limpo;
     }
 
     /// <summary>

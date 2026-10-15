@@ -162,6 +162,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IKdsPedidoQueries, KdsPedidoQueries>(); // S19: KDS do console
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Operacao.IPedidoImpressoQueries, PedidoImpressoQueries>(); // S49: impresso do pedido
             services.AddScoped<IPrazoPreparoPedidoQueries, PrazoPreparoPedidoQueries>(); // S21: início previsto
+            services.AddScoped<ISequenciaDiariaPedido, SequenciaDiariaPedidoRepository>(); // S53: número do dia
 
             services.AddScoped<IAdminTenantsQueries, AdminTenantsQueries>();
             services.AddScoped<ITenantFeatureFlagRepository, TenantFeatureFlagRepository>();
@@ -263,6 +264,11 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             // #1102: número da Meta pelo qual a resposta sai = o da empresa do tenant corrente.
             services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.IRemetenteWhatsApp,
                 Services.Atendimento.RemetenteWhatsAppDoTenant>();
+            // #1432: caixa de suporte da loja (IMAP/SMTP) e o fio do e-mail da conversa.
+            services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.Email.ICaixaEmailDoTenant,
+                Services.Atendimento.CaixaEmailDoTenant>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IEmailAtendimentoQuery,
+                Repositories.Atendimento.EmailAtendimentoQuery>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IStorefrontFaleConoscoRepository,
                 Repositories.Storefront.StorefrontFaleConoscoRepository>();
             // Storefront — autenticação OTP cliente (AUTH-002)

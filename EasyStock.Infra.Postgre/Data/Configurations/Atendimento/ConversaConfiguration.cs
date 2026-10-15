@@ -19,6 +19,7 @@ public class ConversaConfiguration : IEntityTypeConfiguration<Conversa>
         builder.Ignore(c => c.ContatoInformado);
         builder.Property(c => c.ContatoTelefoneInformado).HasMaxLength(TelefoneE164.TamanhoMaximo);
         builder.Property(c => c.ContatoEmailInformado).HasMaxLength(ContatoInformadoVisitante.EmailTamanhoMaximo);
+        builder.Property(c => c.Assunto).HasMaxLength(Mensagem.AssuntoTamanhoMaximo); // #1432
         builder.Property(c => c.MotivoEscalada).HasMaxLength(Conversa.MotivoEscaladaTamanhoMaximo);
         builder.Property(c => c.Canal).HasConversion<int>().IsRequired();
         builder.Property(c => c.Situacao).HasConversion<int>().IsRequired();

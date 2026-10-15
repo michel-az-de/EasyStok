@@ -47,8 +47,13 @@ public sealed class InboxResumoIntegrationTests(PostgreSqlDatabaseFixture fixtur
         var resumos = await Inbox(db).ExecuteAsync(new ListarConversasAtendimentoQuery(cenario.EmpresaId, null, null, 1, 10));
 
         var real = JsonSerializer.SerializeToNode(resumos, Json)!.AsArray();
-        // Campo aditivo do #1575: fica fora desta comparação, que fixa o que já existia.
-        foreach (var linha in real) linha!.AsObject().Remove("pedidoStatus");
+        // Campos aditivos (#1575 `pedidoStatus`, #1432 `assunto`): ficam fora desta comparação, que fixa o que já
+        // existia. Cada um tem a prova dele logo abaixo.
+        foreach (var linha in real)
+        {
+            linha!.AsObject().Remove("pedidoStatus");
+            linha.AsObject().Remove("assunto");
+        }
 
         var esperado = JsonSerializer.SerializeToNode(new object[]
         {
@@ -129,6 +134,35 @@ public sealed class InboxResumoIntegrationTests(PostgreSqlDatabaseFixture fixtur
         depois.Single(r => r.Id == cenario.Escalada.Id).PedidoStatus.Should().BeNull();
         var json = JsonSerializer.SerializeToNode(depois.Single(r => r.Id == cenario.ComPedido.Id), Json)!.AsObject();
         json["pedidoStatus"]!.GetValue<string>().Should().Be("aguardando_pagamento");
+    }
+
+    [SkippableFact]
+    public async Task Resumo_TrazOAssuntoDoEmail_ENuloNosOutrosCanais()
+    {
+        // #1432 sobre o #1583: a inbox é projeção; sem a coluna na consulta o cartão do e-mail fica sem assunto.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var cenario = await SemearAsync();
+        var email = Conversa.Abrir(
+            cenario.EmpresaId, "maria@exemplo.com", cenario.Agora.AddMinutes(-10), "Maria Souza", canal: CanalConversa.Email);
+        email.RegistrarEntrada(cenario.Agora.AddMinutes(-10));
+        email.DefinirAssunto("Encomenda de bolo");
+        await using (var seed = fixture.CreateDbContext())
+        {
+            using var bypass = seed.UseRowLevelSecurityBypass();
+            seed.AtendimentoConversas.Add(email);
+            await seed.SaveChangesAsync();
+        }
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(cenario.EmpresaId);
+        var resumos = await Inbox(db).ExecuteAsync(new ListarConversasAtendimentoQuery(cenario.EmpresaId, null, null, 1, 10));
+
+        var doEmail = resumos.Single(r => r.Id == email.Id);
+        doEmail.Canal.Should().Be(CanalConversa.Email);
+        doEmail.Assunto.Should().Be("Encomenda de bolo");
+        resumos.Where(r => r.Id != email.Id).Should().HaveCount(2).And.OnlyContain(r => r.Assunto == null);
+        // O console lê `assunto` em camelCase (traducaoConversas.js).
+        JsonSerializer.SerializeToNode(doEmail, Json)!["assunto"]!.GetValue<string>().Should().Be("Encomenda de bolo");
     }
 
     [SkippableFact]
