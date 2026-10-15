@@ -44,7 +44,9 @@ public sealed record AdicionarCardapioItemAdminCommand(
     // S15: linha, preparo numérico e instrução de finalização. null = não mexe.
     LinhaProduto? Linha = null,
     int? TempoPreparoMinutos = null,
-    string? InstrucaoFinalizacao = null) : ICommand;
+    string? InstrucaoFinalizacao = null,
+    // S53: conservação até o cliente (congelado, refrigerado, ambiente). null = não mexe.
+    ConservacaoProduto? Conservacao = null) : ICommand;
 
 public sealed record AdicionarCardapioItemAdminResult(Guid ItemId, Guid StorefrontId, Guid? ProdutoId);
 
@@ -179,6 +181,10 @@ public class AdicionarCardapioItemAdminUseCase(
             UseCaseGuards.EnsureSemTagsHtml(command.InstrucaoFinalizacao, "Instrução de finalização");
             item.DefinirPreparo(command.Linha, command.TempoPreparoMinutos, command.InstrucaoFinalizacao);
         }
+
+        // S53: conservação até o cliente.
+        if (command.Conservacao is { } conservacao)
+            item.DefinirConservacao(conservacao);
 
         await cardapioRepository.AddAsync(item);
         await unitOfWork.CommitAsync();

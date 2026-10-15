@@ -49,7 +49,7 @@ public sealed class DocumentosImpressosController(PrepararDocumentoImpressoUseCa
         }
         var resultado = await preparar.ExecuteAsync(new(empresa, id, body.SolicitacaoId,
             usuario.UsuarioId == Guid.Empty ? null : usuario.UsuarioId, body.Documento, body.Modelo,
-            body.Codigo, body.Perfil.Trim(), body.LogoTermica, html, "bilhete-1638-piloto-2", body.OriginalId), ct);
+            body.Codigo, body.Perfil.Trim(), body.LogoTermica, html, "bilhete-1756-3", body.OriginalId), ct);
         return resultado is null ? DataNotFound("Pedido ou impressão original não encontrados.") : DataOk(resultado);
     }
 

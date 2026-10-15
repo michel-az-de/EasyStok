@@ -82,7 +82,9 @@ public sealed class TrocarJanelaPedidoUseCase(
             await vagas.OcuparAsync(janela.JanelaId, janela.Data, pedido.Id, token);
             pedido.AgendadoParaEm = HorarioBrasil.InstanteUtc(janela.Data, janela.HoraInicio);
             pedido.AlteradoEm = DateTime.UtcNow;
-            pedido.DefinirInicioPrevisto(await inicioPrevisto.CalcularAsync(pedido, token));
+            // A vaga nova já está gravada na transação: o recálculo lê a data dela e, se o dia de produção
+            // mudou, troca o número do dia de quem já tinha (S53).
+            await inicioPrevisto.RecalcularAsync(pedido, token);
 
             var eventoId = Guid.NewGuid();
             var faixa = $"{janela.Data:dd/MM/yyyy}, {janela.HoraInicio:HH:mm} às {janela.HoraFim:HH:mm}";

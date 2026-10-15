@@ -120,6 +120,8 @@ const TRACOS = {
   pause: 'M7 4h3v16H7zM14 4h3v16h-3z',
   whatsapp: 'M3 21l1.7-4.9A9 9 0 1 1 8 19.6L3 21ZM9 8.5c0 3.3 3.2 6.5 6.5 6.5l1.5-1.5-2-1.2-1 1a4.5 4.5 0 0 1-2.8-2.8l1-1-1.2-2L9 8.5Z',
   instagram: 'M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4ZM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM17.5 6.5h.01',
+  // #1432: canal E-mail, o "mail" do Lucide (envelope com a aba).
+  email: 'M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM22 7l-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7',
   copy: 'M9 9h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1ZM5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1',
 
   // Rodada 7 · Cardápio por link (US-021): carrinho do site do cliente e

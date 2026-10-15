@@ -1,3 +1,6 @@
+using EasyStock.Application.Ports.Output.Atendimento.Email;
+using EasyStock.Application.Ports.Output.Storage;
+using EasyStock.Application.UseCases.Atendimento.Email;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
@@ -59,6 +62,38 @@ public class CorridasAtendimentoIntegrationTests(PostgreSqlDatabaseFixture fixtu
     {
         await using var db = Contexto(empresa);
         return await db.AtendimentoConversas.AsNoTracking().SingleAsync(c => c.Id == conversaId);
+    }
+
+    [SkippableFact]
+    public async Task DoisEmailsSobreAMesmaLeitura_ContamAsDuasNaoLidas()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason);
+        var empresa = Guid.NewGuid();
+        var agora = DateTime.UtcNow;
+        var conversa = Conversa.Abrir(empresa, "maria@exemplo.com", agora, "Maria", canal: CanalConversa.Email);
+        await using (var seed = Contexto(empresa))
+        {
+            seed.AtendimentoConversas.Add(conversa);
+            await seed.SaveChangesAsync();
+        }
+        await using var dbA = Contexto(empresa);
+        await using var dbB = Contexto(empresa);
+        await dbA.AtendimentoConversas.SingleAsync(c => c.Id == conversa.Id);
+        await dbB.AtendimentoConversas.SingleAsync(c => c.Id == conversa.Id);
+        var caixa = new CaixaEmailAtendimento("contato@exemplo.com", "Loja", "imap.exemplo.com", 993,
+            "smtp.exemplo.com", 465, "contato@exemplo.com", "senha-de-teste", agora);
+        foreach (var (db, id) in new[] { (dbA, "email-a"), (dbB, "email-b") })
+        {
+            var receber = new ReceberEmailAtendimentoUseCase(new ConversaRepository(db),
+                Substitute.For<IEmailAtendimentoQuery>(), Substitute.For<IFileStorage>(),
+                Substitute.For<IOperacaoEventPublisher>(), db, TimeProvider.System,
+                NullLogger<ReceberEmailAtendimentoUseCase>.Instance);
+            var email = new EmailRecebido(id, id, "maria@exemplo.com", "Maria", "Pedido", "Olá", agora, false, []);
+            (await receber.ExecuteAsync(empresa, caixa, email)).Should().Be(DesfechoEmailRecebido.Gravado);
+        }
+        (await LerAsync(empresa, conversa.Id)).NaoLidas.Should().Be(2);
+        await using var conferir = Contexto(empresa);
+        (await conferir.AtendimentoMensagens.CountAsync(m => m.ConversaId == conversa.Id)).Should().Be(2);
     }
 
     // ---------- 1. Não lidas ----------

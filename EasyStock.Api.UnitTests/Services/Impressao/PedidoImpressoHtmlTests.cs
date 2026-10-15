@@ -316,8 +316,11 @@ public class PedidoImpressoHtmlTests
         (await Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, ImpressoHtml.Etiqueta10x15)).Should()
             .Contain("@page{size:100mm 150mm;margin:0}")
             .And.Contain("url(\"https://api.test/impressao/fontes/Lora.ttf\")");
-        (await Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom80)).Should().Contain("@page{size:80mm auto;margin:0}");
-        (await Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom58)).Should().Contain("@page{size:58mm auto;margin:0}");
+        // "80mm auto" é sintaxe inválida e o navegador cai no A4 (#1756): a bobina sai com a largura no .im e o
+        // Console mede o comprimento antes de imprimir.
+        foreach (var bobina in new[] { ImpressoHtml.Cupom80, ImpressoHtml.Cupom58 })
+            (await Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, bobina)).Should().Contain("@page{size:auto;margin:0}")
+                .And.NotContain("mm auto");
         (await Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, ImpressoHtml.A4)).Should().Contain("@page{size:A4;margin:0}");
         (await Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, ImpressoHtml.A5)).Should().Contain("@page{size:A5;margin:0}");
     }

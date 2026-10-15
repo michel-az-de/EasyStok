@@ -90,7 +90,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         Associar(Modulo.Caixa, "Caixa", "Venda");
         Associar(Modulo.Campanhas, "Campanhas", "CampanhasSugestoes");
         Associar(Modulo.Configuracoes, "Usuario", "Configuracoes", "Loja", "NotificacoesConfiguracao",
-            "IntegracoesWhatsApp", "Storefront.StorefrontConfiguracao");
+            "IntegracoesWhatsApp", "IntegracoesEmail", "Storefront.StorefrontConfiguracao");
         Associar(Modulo.Entregas, "AtendimentoEntregadores", "AtendimentoViagens", "AtendimentoAgenda", "AtendimentoRelatoriosEntrega", "AtendimentoCorridas", "AtendimentoRelatorioCustoDeEntrega",
             "Storefront.TenantVitrineEntrega");
         mapa.Add("Storefront.AprovacaoPedido", [Modulo.Atendimento, Modulo.Entregas]);
