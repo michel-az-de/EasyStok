@@ -34,7 +34,7 @@ for (const busca of ['impressão', 'produção', 'fidelidade', 'integrações', 
 }
 assert.equal(JSON.stringify(api), antes, 'a busca não muda o catálogo nem a ordem escolhida')
 assert.deepEqual(api.flatMap((modulo) => modulo.telas.filter((tela) => tela.indisponivelNaApi).map((tela) => `${modulo.id}/${tela.id}`)), [
-  'cozinha/producao', 'campanhas/fidelidade', 'configuracoes/integracoes',
+  'cozinha/producao', 'campanhas/fidelidade',
 ])
 assert.ok(buscarDestinosDoConsole(api, 'fidelidade')[0].href, 'tela em preparação conserva acesso à orientação')
 console.log('Busca #1653: destinos diretos, acentos, contexto, permissões, modo demonstração, rotas e catálogo preservados.')
