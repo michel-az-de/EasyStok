@@ -217,6 +217,31 @@ public sealed partial class PedidoConversaConcorrenciaTests
     }
 
     [SkippableFact]
+    public async Task Comanda1839_ConfirmarComEnderecoParcialSemAtendenteRecusaENaoUsaOEnderecoDoCadastro()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        var cobrancas = new System.Collections.Concurrent.ConcurrentDictionary<string, EasyStock.Application.Ports.Output.Pagamentos.CriarPreferenceCommand>();
+        await using var factory = CriarFactory(Provedor(cobrancas));
+        using var client = factory.CreateClient();
+        var c = await SemearAsync(factory);
+        var token = await Link(factory, c.ConversaId);
+        var estado = await Estado(client, token);
+        await Salvar(client, token, estado, new([new(c.CardapioItemId, 1)], JanelaId: c.JanelaId, DataEntrega: c.DataEntrega,
+            Endereco: new("", "Rua nova sem número", "", "", "", "", "")));
+        estado = await Estado(client, token);
+        estado.Rascunho.Endereco!.Logradouro.Should().Be("Rua nova sem número");
+        var resposta = await client.PostAsJsonAsync($"{Rota(token)}/confirmar", new { estado.Revisao });
+        ((int)resposta.StatusCode).Should().BeInRange(400, 499, "o pedido não pode ir para o endereço do cadastro enquanto a comanda mostra outro");
+        var final = await Estado(client, token);
+        final.Pedido.Should().BeNull();
+        final.PodeEditar.Should().BeTrue();
+        final.Rascunho.Endereco!.Logradouro.Should().Be("Rua nova sem número");
+        cobrancas.Should().BeEmpty();
+        using var scope = factory.Services.CreateScope();
+        (await scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().Pedidos.CountAsync()).Should().Be(0);
+    }
+
+    [SkippableFact]
     public async Task Comanda1712_AjudaSemRascunhoEscalaUmaVezNotificaEPreservaEdicaoConcorrente()
     {
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");

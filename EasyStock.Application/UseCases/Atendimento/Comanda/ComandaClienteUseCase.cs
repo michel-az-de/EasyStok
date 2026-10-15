@@ -280,8 +280,9 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             if (peloAtendimento && estado.Pedido is not null)
                 throw new ComandaClienteConflitoException("A conversa já tem um pedido. Atualize antes de continuar.");
             var dados = Ler<RascunhoComandaCliente>(link.RascunhoJson) is { Itens: not null } salvo ? salvo : estado.Rascunho;
-            // Endereço parcial no rascunho cede ao que o estado mostra (o da Ficha, quando a atendente registrou).
-            if (Valido(dados.Endereco) is null) dados = dados with { Endereco = Valido(estado.Rascunho.Endereco) };
+            // Endereço parcial no rascunho cede só a um substituto válido do estado (o da Ficha, com a atendente);
+            // sem ele, o parcial fica e a validação do pedido recusa, sem cair no endereço do cadastro.
+            if (Valido(dados.Endereco) is null && Valido(estado.Rascunho.Endereco) is { } substituto) dados = dados with { Endereco = substituto };
             Validar(dados);
             if (dados.Itens.Count == 0) throw new UseCaseValidationException("Escolha ao menos um prato.");
             var agora = relogio.GetUtcNow().UtcDateTime;
