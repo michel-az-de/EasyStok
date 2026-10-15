@@ -13,6 +13,11 @@ using System.Net.Http.Json;
 using Testcontainers.PostgreSql;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.ChatSite;
+using EasyStock.Application.UseCases.Atendimento.Comanda;
+using EasyStock.Application.Services.Storefront;
+using EasyStock.Domain.Enums.Atendimento;
+using System.Text.Json;
+using Npgsql;
 
 namespace EasyStock.Api.IntegrationTests.Storefront.Auth;
 
@@ -105,7 +110,7 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
                 });
             });
 
-    private static async Task SeedDadosAsync(IServiceProvider services, string codigoHash)
+    private static async Task<Guid> SeedDadosAsync(IServiceProvider services, string codigoHash)
     {
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
@@ -131,6 +136,7 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
         db.ClienteOtps.Add(otp);
 
         await db.SaveChangesAsync();
+        return empresa.Id;
     }
 
     [SkippableFact]
@@ -322,6 +328,83 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
             using var bypass = db.UseRowLevelSecurityBypass();
             (await db.SessoesChatSite.IgnoreQueryFilters().SingleAsync(s => s.Id == chatId)).TokenHash.Should().NotBe(chatHash);
             if (sessionId is { } id) (await db.ClienteSessions.IgnoreQueryFilters().SingleAsync(s => s.Id == id)).Revogada.Should().BeTrue();
+        }
+    }
+
+    [SkippableTheory]
+    [InlineData("valido")]
+    [InlineData("outro-tenant")]
+    [InlineData("codigo-invalido")]
+    [InlineData("corrida")]
+    public async Task OTP_com_token_comanda_vincula_somente_posse_e_mesmo_tenant(string cenario)
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var factory = CriarFactory();
+        var empresaId = await SeedDadosAsync(factory.Services, BCrypt.Net.BCrypt.HashPassword(CodigoValido));
+        var sucesso = cenario is "valido" or "corrida";
+        if (cenario == "corrida")
+        {
+            async Task<bool> Inserir()
+            {
+                using var scope = factory.Services.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                using var bypass = db.UseRowLevelSecurityBypass();
+                var cliente = Cliente.Criar(empresaId, "Cadastro preservado");
+                cliente.Telefone = TelefoneE164; cliente.TelefoneHash = ClienteOtp.CalcularTelefoneHash(TelefoneE164);
+                db.Clientes.Add(cliente);
+                try { await db.SaveChangesAsync(); return true; }
+                catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: "23505", ConstraintName: "ix_clientes_empresa_telefone_hash" }) { return false; }
+            }
+            (await Task.WhenAll(Inserir(), Inserir())).Should().BeEquivalentTo([true, false]);
+        }
+        var token = AcessoChatSite.NovoToken();
+        Guid conversaId;
+        string rascunho;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            using var bypass = db.UseRowLevelSecurityBypass();
+            var empresaLink = empresaId;
+            if (cenario == "valido")
+            {
+                var cliente = Cliente.Criar(empresaId, "Cadastro preservado");
+                cliente.Telefone = TelefoneE164; db.Clientes.Add(cliente);
+            }
+            if (cenario == "outro-tenant")
+            {
+                var outra = Empresa.Criar("Outra loja", null);
+                db.Empresas.Add(outra); empresaLink = outra.Id;
+            }
+            var conversa = Conversa.Abrir(empresaLink, "visitante-otp", DateTime.UtcNow, canal: CanalConversa.ChatSite);
+            var link = LinkCardapioConversa.Gerar(empresaLink, conversa.Id, AcessoChatSite.HashDoToken(token), DateTime.UtcNow);
+            rascunho = JsonSerializer.Serialize(new RascunhoComandaCliente([new ItemPedidoCheckout(Guid.NewGuid(), 2, "Molho à parte")],
+                Observacoes: "Sem talheres", Nome: "Maria", Telefone: TelefoneE164), ComandaClienteUseCase.Json);
+            link.SalvarRascunho(0, rascunho, DateTime.UtcNow);
+            db.AtendimentoConversas.Add(conversa); db.LinksCardapioConversa.Add(link);
+            await db.SaveChangesAsync(); conversaId = conversa.Id;
+        }
+        using var client = factory.CreateClient();
+        var response = await client.PostAsJsonAsync($"/api/storefront/{SlugTeste}/auth/validar-otp", new
+        {
+            Telefone = TelefoneE164, Codigo = cenario == "codigo-invalido" ? "000000" : CodigoValido, TokenComanda = token,
+        });
+        response.StatusCode.Should().Be(sucesso ? HttpStatusCode.OK : cenario == "outro-tenant" ? HttpStatusCode.Forbidden : HttpStatusCode.Unauthorized);
+        if (!sucesso) response.Headers.Contains("Set-Cookie").Should().BeFalse();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            using var bypass = db.UseRowLevelSecurityBypass();
+            var conversa = await db.AtendimentoConversas.IgnoreQueryFilters().SingleAsync(c => c.Id == conversaId);
+            if (sucesso)
+            {
+                var cliente = await db.Clientes.IgnoreQueryFilters().SingleAsync(c => c.EmpresaId == empresaId);
+                conversa.ClienteId.Should().Be(cliente.Id); cliente.Nome.Should().Be("Cadastro preservado");
+            }
+            else conversa.ClienteId.Should().BeNull();
+            var link = await db.LinksCardapioConversa.IgnoreQueryFilters().SingleAsync(c => c.ConversaId == conversaId);
+            ComandaClienteUseCase.Ler<RascunhoComandaCliente>(link.RascunhoJson).Should().BeEquivalentTo(
+                ComandaClienteUseCase.Ler<RascunhoComandaCliente>(rascunho), o => o.WithStrictOrdering());
+            link.Revisao.Should().Be(1); link.UsadoEm.Should().BeNull();
         }
     }
 

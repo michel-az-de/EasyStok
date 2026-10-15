@@ -5,6 +5,8 @@ using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Exceptions.Storefront;
+using EasyStock.Application.UseCases.Atendimento;
+using Npgsql;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace EasyStock.Api.Controllers.Storefront;
@@ -148,6 +150,9 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
         try { return Ok(await acao()); }
         catch (LinkCardapioConversaIndisponivelException e) { return Problem(e.Message, statusCode: 410); }
         catch (ComandaClienteConflitoException e) { return Problem(e.Message, statusCode: 409); }
+        catch (TelefoneExigeVerificacaoException e) { return ExigirVerificacao(e.Message); }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: "23505", ConstraintName: "ix_clientes_empresa_telefone_hash" })
+        { return ExigirVerificacao(new TelefoneExigeVerificacaoException().Message); }
         catch (UseCaseValidationException e) { return Problem(e.Message, statusCode: 400); }
         catch (RegraDeDominioVioladaException e) { return Problem(e.Message, statusCode: 422); }
         // #1716: quem lê é o cliente. O motivo técnico (provedor fora ou sem credencial) fica no log do caso de uso.
@@ -156,6 +161,7 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
             return Problem(e.InnerException is MercadoPagoNaoConfiguradoException ? PagamentoOnlineSemProvedor : PagamentoOnlineInstavel, statusCode: 503);
         }
     }
+    private ObjectResult ExigirVerificacao(string mensagem) => StatusCode(409, new { error = new { code = "TELEFONE_EXIGE_VERIFICACAO", message = mensagem } });
 
     private const string PagamentoOnlineSemProvedor =
         "O pagamento online está indisponível agora. Sua seleção continua salva: fale com a Casa para combinar o pagamento.";
