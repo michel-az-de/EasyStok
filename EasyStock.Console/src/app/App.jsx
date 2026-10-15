@@ -90,6 +90,8 @@ function Composicao({ rota, aoSair }) {
   // para quem trocou de janela no mesmo computador (US-010, saber sem olhar).
   useTituloDaAba(tituloDaAba(rota, contarPrecisaDeVoce(conversas, agora, automaticoPausado, aberta, janelas, horarioDaLoja)))
   const [modal, setModal] = useState(null)
+  // #1847: o rascunho pertence ao cliente escolhido ao abrir, mesmo ao navegar ou salvar.
+  const [nota, setNota] = useState(null)
   // #1761 (L3): gerada a cobrança, o cardápio virava "Consulta do cardápio" com tudo desligado,
   // cobrindo a lista e apertando a conversa. Fecha sozinho; "Ver cardápio" na Ficha reabre.
   const pedidoNaTela = { conversaId: selecionada?.id ?? null, pedidoId: selecionada?.pedido?.pedidoId ?? null }
@@ -206,7 +208,10 @@ function Composicao({ rota, aoSair }) {
       <div className={css.areaAtendimento} data-conteudo-console>
       <Moldura
         tamanho={tamanho}
-        aoAbrirNota={() => setModal('nota')}
+        aoAbrirNota={() => {
+          if (selecionada) setNota((atual) => atual ?? { id: selecionada.id, nome: selecionada.nome })
+          setModal('nota')
+        }}
         aoAbrirGaleria={() => setModal('galeria')}
         aoAbrirBiblioteca={(foco) => { setFocoBiblioteca(foco ?? null); setModal('respostas') }}
         aoAbrirCardapio={() => setModal('cardapio')}
@@ -225,11 +230,13 @@ function Composicao({ rota, aoSair }) {
         cardapioAberto={modal === 'cardapio' && selecionada ? prefCardapio.lado : null}
       />
 
-      {modal === 'nota' && selecionada && (
+      {nota && (
         <ModalNota
-          nomeCliente={selecionada.nome}
-          aoFechar={fechar}
-          aoSalvar={(texto) => salvarNota(selecionada.id, texto)}
+          visivel={modal === 'nota'}
+          nomeCliente={nota.nome}
+          outraConversa={selecionada?.id !== nota.id}
+          aoFechar={() => { setNota(null); setModal((atual) => atual === 'nota' ? null : atual) }}
+          aoSalvar={(texto) => salvarNota(nota.id, texto)}
         />
       )}
 

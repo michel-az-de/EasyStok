@@ -89,7 +89,8 @@ public sealed class ObterDossieClienteUseCase(
             PreferenciasClienteResult.De(cliente),
             mesmoDomicilio,
             recentes.Select(Resumo).ToList(),
-            pedidoEmAndamentoId is { } pedidoId ? historico.FirstOrDefault(p => p.Id == pedidoId) : null);
+            pedidoEmAndamentoId is { } pedidoId ? historico.FirstOrDefault(p => p.Id == pedidoId) : null,
+            TotalGasto: compras.Where(p => p.Status != StatusPedidoMapper.AguardandoPagamento).Sum(p => p.Total));
     }
 
     /// <summary>Lead sem cadastro: só o que o canal informou.</summary>

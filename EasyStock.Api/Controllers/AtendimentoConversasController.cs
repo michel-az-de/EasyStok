@@ -101,6 +101,17 @@ public class AtendimentoConversasController(
         return dossie is null ? DataNotFound("Conversa não encontrada.") : DataOk(dossie);
     }
 
+    [SwaggerOperation(Summary = "AI summary of the customer for the attendant (#1839)",
+        Description = "Uma ou duas frases sobre o cliente a partir do dossiê. Texto nulo com a IA desligada ou em falha.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpGet("{id:guid}/resumo-cliente")]
+    public async Task<IActionResult> ResumoCliente(Guid id, [FromServices] ResumirClienteUseCase resumir, CancellationToken ct = default)
+    {
+        try { return DataOk(await resumir.ExecuteAsync(currentUser.EmpresaId, id, ct)); }
+        catch (ConversaNaoEncontradaException) { return DataNotFound("Conversa não encontrada."); }
+    }
+
     [SwaggerOperation(Summary = "Send a text message as the owner (takes over the conversation)",
         Description = "Fora da janela de 24 h: 409 { erro: \"fora_da_janela_24h\", sugestao: \"template\" } e nada gravado.")]
     [ProducesResponseType(StatusCodes.Status200OK)]

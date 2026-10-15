@@ -52,7 +52,7 @@ public class AtendimentoComandaController(
         => Tratar(async () => DataOk(await obterPedidoUseCase.ExecuteAsync(currentUser.EmpresaId, id, ct)));
 
     [SwaggerOperation(Summary = "Create the conversation order, charge it and send the summary to the customer",
-        Description = "forma: online (link do Mercado Pago, padrão) ou na_entrega. Sem enderecoId vale o padrão do cliente.")]
+        Description = "forma: online (link do Mercado Pago, padrão) ou na_entrega. Sem enderecoId vale o padrão do cliente. enviarAoCliente: false gera para copiar, sem mensagem; padrão true.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -70,7 +70,8 @@ public class AtendimentoComandaController(
         return Tratar(async () => DataOk(await gerarPedidoUseCase.ExecuteAsync(new GerarPedidoConversaInput(
             currentUser.EmpresaId, id,
             body.Itens.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd, i.Observacao, i.VariacaoId)).ToList(),
-            body.JanelaId, body.DataEntrega, body.EnderecoId, body.Forma, body.Observacoes), ct)));
+            body.JanelaId, body.DataEntrega, body.EnderecoId, body.Forma, body.Observacoes,
+            EnviarAoCliente: body.EnviarAoCliente), ct)));
     }
 
     private async Task<IActionResult> Tratar(Func<Task<IActionResult>> acao)
@@ -116,7 +117,8 @@ public sealed record GerarPedidoConversaBody(
     DateOnly DataEntrega,
     Guid? EnderecoId = null,
     string? Forma = null,
-    string? Observacoes = null);
+    string? Observacoes = null,
+    bool EnviarAoCliente = true);
 
 /// <param name="VariacaoId">M1.4b (#1531): a porção escolhida; null em prato com porções usa a padrão.</param>
 public sealed record ItemComandaBody(Guid CardapioItemId, int Qtd, string? Observacao = null, Guid? VariacaoId = null);

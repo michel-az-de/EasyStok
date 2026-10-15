@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
-import { Modal } from '../../componentes/Modal'
 import css from './ModalNota.module.css'
 
-export function ModalNota({ nomeCliente, aoSalvar, aoFechar }) {
+// #1839: a nota abre como um post-it pequeno logo acima do composer, sem cobrir a conversa. Esc fecha,
+// Ctrl+Enter salva. Salva, ela fica fixa no topo do Resumo, junto das tags e do cadastro.
+export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, outraConversa = false }) {
   const [texto, setTexto] = useState('')
   const [ocupado, setOcupado] = useState(false)
   const [erro, setErro] = useState(null)
@@ -30,31 +31,34 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar }) {
     }
   }
 
+  // Foco só ao abrir: `aoFechar` muda de identidade a cada render do App e não pode refazer o foco.
+  useEffect(() => { if (visivel) campo.current?.focus() }, [visivel])
+  // Esc só fecha quando o foco está no post-it: o Esc de um modal ou da barra "/" não apaga a nota.
+  const aoTeclar = (e) => { if (e.key === 'Escape' && !e.defaultPrevented && !salvando.current) { e.stopPropagation(); aoFechar() } }
+
   return (
-    <Modal
-      titulo="Nota interna"
-      descricao={`Fica na ficha de ${nomeCliente}. O cliente nunca vê.`}
-      aoFechar={ocupado ? undefined : aoFechar}
-      rodape={(
-        <>
-          <Botao disabled={ocupado} onClick={aoFechar}>Cancelar</Botao>
-          <Botao variante="primario" disabled={vazio || ocupado} onClick={salvar}>
-            {ocupado ? 'Salvando…' : 'Salvar nota'}
-          </Botao>
-        </>
-      )}
-    >
+    <dialog open={visivel} className={css.postit} aria-label="Nota interna" onKeyDown={aoTeclar}>
+      <p className={css.titulo}>Nota interna <span>· {nomeCliente} nunca vê</span></p>
+      {outraConversa && <p role="status">Esta nota continua na ficha de {nomeCliente}.</p>}
       <CampoArea
         rotulo="Texto da nota"
         rotuloOculto
+        rows={3}
         value={texto}
         ref={campo}
         readOnly={ocupado}
         aria-busy={ocupado}
         onChange={(e) => setTexto(e.target.value)}
-        placeholder="Ex.: prefere a massa mais al dente, reduzir 1 min de cozimento."
+        onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); salvar() } }}
+        placeholder="Ex.: prefere a massa mais al dente."
       />
       {erro && <p className={css.erro} role="alert">{erro}</p>}
-    </Modal>
+      <div className={css.acoes}>
+        <Botao variante="texto" disabled={ocupado} onClick={aoFechar}>Cancelar</Botao>
+        <Botao variante="primario" disabled={vazio || ocupado} onClick={salvar}>
+          {ocupado ? 'Salvando…' : 'Fixar nota'}
+        </Botao>
+      </div>
+    </dialog>
   )
 }

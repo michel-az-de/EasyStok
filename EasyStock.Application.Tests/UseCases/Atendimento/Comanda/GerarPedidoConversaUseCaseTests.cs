@@ -43,7 +43,7 @@ public class GerarPedidoConversaUseCaseTests
         public GerarPedidoConversaUseCase UseCase { get; }
         public Guid EmpresaId => Checkout.Storefront.EmpresaId;
 
-        public Cenario(bool comEndereco = true)
+        public Cenario(bool comEndereco = true, bool janelaFechada = false)
         {
             Cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = "Maria" };
             if (comEndereco)
@@ -51,7 +51,7 @@ public class GerarPedidoConversaUseCaseTests
             var clienteRepo = Substitute.For<IClienteRepository>();
             clienteRepo.GetByIdWithDetailsAsync(EmpresaId, Cliente.Id).Returns(Cliente);
 
-            var agora = DateTime.UtcNow;
+            var agora = DateTime.UtcNow.AddDays(janelaFechada ? -2 : 0);
             Conversa = Conversa.Abrir(EmpresaId, WaId, agora.AddMinutes(-2), "Maria", Cliente.Id);
             Conversa.RegistrarEntrada(agora.AddMinutes(-1));
             ConversaRepo.ObterPorIdAsync(EmpresaId, Conversa.Id, Arg.Any<CancellationToken>()).Returns(Conversa);
@@ -100,6 +100,22 @@ public class GerarPedidoConversaUseCaseTests
             JanelaId: Checkout.JanelaId,
             DataEntrega: Checkout.DataEntrega,
             Forma: forma);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Geracao_explicita_sem_envio_cria_cobranca_sem_mensagem_nem_falha(bool janelaFechada)
+    {
+        var c = new Cenario(janelaFechada: janelaFechada);
+        var resultado = await c.UseCase.ExecuteAsync(c.Input() with { EnviarAoCliente = false });
+
+        resultado.Cobranca!.LinkPagamento.Should().Be("https://mp.test/pref-1");
+        resultado.EnviadoAoCliente.Should().BeFalse();
+        c.Conversa.PedidoEmAndamentoId.Should().Be(resultado.PedidoId);
+        c.Cobrancas.Should().ContainSingle();
+        c.Mensagens.Should().BeEmpty("gerar para copiar não é uma tentativa de envio");
+        await c.Canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
     }
 
     [Fact]

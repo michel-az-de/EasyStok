@@ -55,7 +55,9 @@ export function RelogioPix({
   const { fonteApi } = useAtendimento()
   // No modo API o cancelamento fica na barra do pedido, com motivo e permissão.
   const disponivel = useAcaoDisponivel()
-  const [recolhido, setRecolhido] = useState(false)
+  // #1839: já pago ao montar (reabrir a modal Pagamento, trocar de conversa) entra recolhido, sem
+  // animação; o selo grande só aparece quando o pagamento chega com a tela aberta.
+  const [recolhido, setRecolhido] = useState(Boolean(cobranca.pagaEm))
 
   // Recolhe a linha "Pago" 3s depois de cair. `cobranca` chega com `key` do
   // pai (BlocoCobranca), então uma cobrança nova remonta o componente e este
