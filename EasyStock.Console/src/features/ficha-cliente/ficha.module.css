@@ -492,3 +492,27 @@
 
 /* F03: erro de carga das janelas da API, ao lado da lista. */
 .avisoErro { display: block; font-size: var(--t-apoio); color: var(--erro); }
+
+/* #1839: cartão do cliente no Resumo, sempre à vista. */
+.cartaoCliente { display: grid; gap: var(--e-2); margin: 0 var(--e-4); padding: var(--e-3); border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--papel); }
+.cartaoClienteAbrir { all: unset; display: grid; gap: var(--e-1); cursor: pointer; border-radius: var(--r-1); }
+.cartaoClienteAbrir:focus-visible { outline: 2px solid var(--tinta); outline-offset: 3px; }
+.resumoIa { margin: 0; color: var(--tinta); line-height: 1.45; }
+.resumoIaCarregando { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+.numerosCliente { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+.tagsCliente { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--e-1); }
+.tagsCliente li { padding: 2px var(--e-2); border-radius: 999px; background: var(--preenchimento); font-size: var(--t-apoio); }
+.postitResumo {
+  margin: 0; padding: var(--e-2) var(--e-3); background: var(--alerta-pastel); color: var(--tinta);
+  border-left: 3px solid var(--alerta); border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.rotuloPostit { display: block; color: var(--alerta); font-weight: 600; font-size: var(--t-apoio); }
+.extrato { margin-bottom: var(--e-4); }
+.extrato h3 { margin: 0 0 var(--e-2); }
+.extrato dl { margin: 0; display: grid; gap: var(--e-1); }
+.extrato dl > div { display: flex; justify-content: space-between; gap: var(--e-3); font-variant-numeric: tabular-nums; }
+.extrato dt { color: var(--tinta-2); }
+.extrato dd { margin: 0; }
+.extratoTotal { border-top: 1px solid var(--linha); padding-top: var(--e-1); font-weight: 700; }
+.extratoTotal dt { color: var(--tinta); }

@@ -1,7 +1,10 @@
 using EasyStock.Application.UseCases.Atendimento.Inbox;
+using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Exceptions;
+using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Repositories;
 using EasyStock.Infra.Postgre.Repositories.Atendimento;
@@ -14,7 +17,7 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 public class ReabrirConversaIntegrationTests(PostgreSqlDatabaseFixture fixture) : IClassFixture<PostgreSqlDatabaseFixture>
 {
     private static ReabrirConversaUseCase UseCase(EasyStockDbContext db) =>
-        new(new ConversaRepository(db), new ClienteRepository(db), db, TimeProvider.System);
+        new(new ConversaRepository(db), new ClienteRepository(db), db, TimeProvider.System, new PedidoRepository(db));
 
     private async Task<Conversa> Preparar(Guid empresa, string contato = "5511999990001")
     {
@@ -31,6 +34,36 @@ public class ReabrirConversaIntegrationTests(PostgreSqlDatabaseFixture fixture) 
             TipoConteudoMensagem.Texto, "mensagem original", $"entrada-{conversa.Id}"));
         await db.SaveChangesAsync();
         return conversa;
+    }
+
+    // #1839: atendimento encerrado vira história; o novo começa sem o pedido já entregue ou cancelado.
+    [SkippableTheory]
+    [InlineData(StatusPedidoMapper.Entregue, true)]
+    [InlineData(StatusPedidoMapper.Cancelado, true)]
+    [InlineData(StatusPedidoMapper.Preparando, false)]
+    public async Task Reabrir_SoltaPedidoFinalizado_EMantemPedidoEmAndamento(string status, bool solta)
+    {
+        var empresa = Guid.NewGuid();
+        var conversa = await Preparar(empresa);
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresa);
+            db.Empresas.Add(new Empresa { Id = empresa, Nome = "Casa", Documento = empresa.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+            db.Pedidos.Add(new Pedido { Id = conversa.PedidoEmAndamentoId!.Value, EmpresaId = empresa, Status = status, Total = Dinheiro.Zero, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresa);
+            await UseCase(db).ExecuteAsync(new(empresa, Guid.NewGuid(), conversa.Id, "Atendente"));
+        }
+
+        await using var conferir = fixture.CreateDbContext();
+        conferir.SetMobileTenantContext(empresa);
+        var salva = await conferir.AtendimentoConversas.SingleAsync(c => c.Id == conversa.Id);
+        salva.EstaAberta.Should().BeTrue();
+        salva.PedidoEmAndamentoId.Should().Be(solta ? null : conversa.PedidoEmAndamentoId);
     }
 
     [SkippableFact]

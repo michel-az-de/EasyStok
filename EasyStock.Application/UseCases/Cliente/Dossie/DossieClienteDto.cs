@@ -7,6 +7,7 @@ namespace EasyStock.Application.UseCases.Cliente.Dossie;
 /// Dossiê do cliente (S25): uma projeção só para o painel lateral da conversa, a lista de clientes do
 /// console e o resumo do agente (<see cref="Services.Atendimento.ResumoDossieParaAgente"/>).
 /// Tem notas internas: é do console autenticado, nunca do storefront.
+/// <c>TotalGasto</c> soma as compras analisadas (sem cancelado e rascunho), a mesma base de <c>TotalPedidos</c> (#1839).
 /// </summary>
 public sealed record DossieClienteDto(
     DossieClienteDados Cliente,
@@ -22,7 +23,8 @@ public sealed record DossieClienteDto(
     IReadOnlyList<ClienteMesmoDomicilio> Domicilio,
     IReadOnlyList<ConversaRecenteDossie> ConversasRecentes,
     PedidoResumoCliente? PedidoEmAndamento,
-    ContatoInformadoDossie? ContatoInformado = null);
+    ContatoInformadoDossie? ContatoInformado = null,
+    decimal TotalGasto = 0m);
 
 /// <summary>
 /// Dados primários. Sem cliente vinculado (conversa de lead), <c>Id</c> é nulo e nome e telefone vêm do

@@ -27,6 +27,8 @@ import { BlocoOcorrenciasApi } from './BlocoOcorrenciasApi'
 import { BlocoEntrega } from './BlocoEntrega'
 import { BlocoFreteApi } from './BlocoFreteApi'
 import { BlocoPedido } from './BlocoPedido'
+import { CartaoDoCliente } from './CartaoDoCliente'
+import { ExtratoDoPedido } from './ExtratoDoPedido'
 import { ComandaDoCliente } from './ComandaDoCliente'
 import css from './ficha.module.css'
 
@@ -154,12 +156,15 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
       <div className={css.conteudo}>
         <section ref={receberPrato} className={css.resumoAtual} data-recebendo-prato={recebendoPrato || undefined} aria-label="Resumo do atendimento">
           <p className={css.fase}>{!editavel ? 'Conversa encerrada' : posVenda ? 'Pós-venda' : pedidoCriado ? 'Pedido criado' : 'Antes da venda'}</p>
-          <h3>{!editavel ? 'Atendimento encerrado' : pedidoCriado ? `Pedido ${numero ?? ''}`.trim() : pedido ? 'Seleção não confirmada' : 'Vamos atender ' + primeiroNome}</h3>
+          <h3>{!editavel ? 'Atendimento encerrado' : pedidoCriado ? `${fonteApi ? 'Comanda' : 'Pedido'} ${numero ?? ''}`.trim() : pedido ? 'Seleção não confirmada' : 'Vamos atender ' + primeiroNome}</h3>
           <p>{!editavel ? 'O histórico está guardado. Reabra a conversa para retomar o atendimento.'
             : pedido ? `${pedidoCriado ? rotuloDoEstado(pedido.estado) : 'Em montagem'} · ${itens} ${itens === 1 ? 'item' : 'itens'} · ${moeda(total)}`
               : cadastrarPrimeiro ? 'Primeiro o cadastro: o pedido só nasce para cliente cadastrado. O que a conversa trouxe já vem preenchido.'
                 : 'Monte o pedido por aqui ou acompanhe a escolha do cliente pelo link.'}</p>
         </section>
+
+        {/* #1839: o cliente sempre à vista (resumo da IA, total de pedidos, tags e a última nota). */}
+        <CartaoDoCliente conversa={selecionada} fonteApi={fonteApi} aoAbrir={() => setSecao('cliente')} />
 
         {editavel && comandaCompartilhada}
         {editavel && !pedido && !fonteApi && acaoMontar && <div className={css.acaoMontar}>{acaoMontar}</div>}
@@ -224,6 +229,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
       </Modal>}
 
       {secao === 'pagamento' && editavel && pedido && <Modal titulo={`Pagamento · ${selecionada.nome}`} largura="680px" aoFechar={() => setSecao(null)}>
+        {fonteApi && <ExtratoDoPedido pedido={pedido} />}
         <BlocoCobranca
           key={chaves.cobranca}
           pedido={pedido}

@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
-import { Modal } from '../../componentes/Modal'
 import css from './ModalNota.module.css'
 
+// #1839: a nota abre como um post-it pequeno logo acima do composer, sem cobrir a conversa. Esc fecha,
+// Ctrl+Enter salva. Salva, ela fica fixa no topo do Resumo, junto das tags e do cadastro.
 export function ModalNota({ nomeCliente, aoSalvar, aoFechar }) {
   const [texto, setTexto] = useState('')
   const [ocupado, setOcupado] = useState(false)
@@ -30,31 +31,35 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar }) {
     }
   }
 
+  useEffect(() => {
+    campo.current?.focus()
+    const aoTeclar = (e) => { if (e.key === 'Escape' && !salvando.current) aoFechar() }
+    document.addEventListener('keydown', aoTeclar)
+    return () => document.removeEventListener('keydown', aoTeclar)
+  }, [aoFechar])
+
   return (
-    <Modal
-      titulo="Nota interna"
-      descricao={`Fica na ficha de ${nomeCliente}. O cliente nunca vê.`}
-      aoFechar={ocupado ? undefined : aoFechar}
-      rodape={(
-        <>
-          <Botao disabled={ocupado} onClick={aoFechar}>Cancelar</Botao>
-          <Botao variante="primario" disabled={vazio || ocupado} onClick={salvar}>
-            {ocupado ? 'Salvando…' : 'Salvar nota'}
-          </Botao>
-        </>
-      )}
-    >
+    <dialog open className={css.postit} aria-label="Nota interna">
+      <p className={css.titulo}>Nota interna <span>· {nomeCliente} nunca vê</span></p>
       <CampoArea
         rotulo="Texto da nota"
         rotuloOculto
+        rows={3}
         value={texto}
         ref={campo}
         readOnly={ocupado}
         aria-busy={ocupado}
         onChange={(e) => setTexto(e.target.value)}
-        placeholder="Ex.: prefere a massa mais al dente, reduzir 1 min de cozimento."
+        onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); salvar() } }}
+        placeholder="Ex.: prefere a massa mais al dente."
       />
       {erro && <p className={css.erro} role="alert">{erro}</p>}
-    </Modal>
+      <div className={css.acoes}>
+        <Botao variante="texto" disabled={ocupado} onClick={aoFechar}>Cancelar</Botao>
+        <Botao variante="primario" disabled={vazio || ocupado} onClick={salvar}>
+          {ocupado ? 'Salvando…' : 'Fixar nota'}
+        </Botao>
+      </div>
+    </dialog>
   )
 }

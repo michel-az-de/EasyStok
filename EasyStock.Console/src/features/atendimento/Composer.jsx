@@ -156,10 +156,12 @@ export function Composer({
       )}
 
       {/* #1761 (L9): fixo acima do campo só perto do fim da janela de 24 h ou com ela fechada. */}
-      {modelosFixos && podeEnviarModelo && <Botao className={css.abrirModelos} aria-haspopup="dialog" onClick={aoAbrirModelos}>
+      {/* #1839: com a janela fechada os modelos moram em Respostas, como no protótipo; o botão à
+          parte fica só no aviso de fim de janela, quando ainda dá para escrever. */}
+      {modelosFixos && podeEnviarModelo && podeEscrever && <Botao className={css.abrirModelos} aria-haspopup="dialog" onClick={aoAbrirModelos}>
         <Icone nome="modelo" /> Modelos aprovados
       </Botao>}
-      {modelosFixos && podeEnviarModelo && <p className={css.restricao}>Mensagens prontas aprovadas pelo WhatsApp para retomar a conversa fora da janela de resposta.</p>}
+      {modelosFixos && podeEnviarModelo && podeEscrever && <p className={css.restricao}>Mensagens prontas aprovadas pelo WhatsApp para retomar a conversa fora da janela de resposta.</p>}
 
       {/* Gravando substitui o campo de texto e as ações: gravar e escrever ao
           mesmo tempo não é o gesto que o dono pediu ("gravar... cancelar ou
@@ -190,7 +192,7 @@ export function Composer({
                 aria-controls={sugestoesNoCampo ? idListaRespostas : undefined}
                 aria-activedescendant={sugestoesNoCampo && barra.itens[barra.destaque] ? `${idListaRespostas}-${barra.destaque}` : undefined}
                 placeholder={!podeEscrever
-                  ? (podeEnviarModelo ? 'Use Modelos aprovados para continuar' : 'Mensagem indisponível nesta conversa')
+                  ? (podeEnviarModelo ? 'Janela fechada: escolha um modelo aprovado em Respostas' : 'Mensagem indisponível nesta conversa')
                   : anexo
                     ? 'Legenda (opcional)'
                     // O atalho / continua valendo, mas a dica não o repete: o botão
@@ -227,13 +229,13 @@ export function Composer({
                   Fotos, Cardápio, Nota, Enviar) continuam ícone só. */}
               <Botao
                 ref={respostasRef}
-                disabled={!podeEscrever}
-                aria-haspopup="listbox"
-                aria-expanded={barra.aberto}
-                aria-controls={barra.aberto && barra.itens.length > 0 ? idListaRespostas : undefined}
-                title="Respostas prontas (atalho: / no campo)"
+                disabled={!podeEscrever && !podeEnviarModelo}
+                aria-haspopup={podeEscrever ? 'listbox' : 'dialog'}
+                aria-expanded={podeEscrever ? barra.aberto : undefined}
+                aria-controls={podeEscrever && barra.aberto && barra.itens.length > 0 ? idListaRespostas : undefined}
+                title={podeEscrever ? 'Respostas prontas (atalho: / no campo)' : 'Janela fechada: só modelos aprovados pelo WhatsApp saem até o cliente responder'}
                 className={css.botaoRespostas}
-                onClick={barra.abrir}
+                onClick={podeEscrever ? barra.abrir : aoAbrirModelos}
               >
                 <Icone nome="respostas" />
                 <span>Respostas</span>
