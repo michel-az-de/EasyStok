@@ -2,11 +2,14 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Middleware;
+using EasyStock.Api.Observability;
+using EasyStock.Api.Observability.Logging;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Infra.Async.Storage;
+using EasyStock.Infra.Notifications.Hosting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Serilog;
 using Serilog.Context;
 
@@ -25,7 +28,7 @@ namespace EasyStock.Api.Hosting;
 ///   <item>HttpsRedirection + StaticFiles (incluindo storage local pra uploaded files)</item>
 ///   <item>Mobile PWA static files</item>
 ///   <item>Cors + RateLimiter + Authentication + Authorization</item>
-///   <item>ClienteSession sliding window + SubscriptionGate + Idempotency</item>
+///   <item>ClienteSession sliding window + Idempotency</item>
 ///   <item>MapControllers + MapGet redirects (/, /console, /api-docs)</item>
 ///   <item>MapHealthChecks (/health, /health/live, /health/ready, /health/api, /health/dispatcher)</item>
 ///   <item>MapGet /health/version (PWA OTA schema gate)</item>
@@ -51,12 +54,11 @@ public static class PipelineExtensions
         // Correlation ID propagation
         app.Use(async (context, next) =>
         {
-            var correlationId = context.Request.Headers["X-Correlation-Id"].FirstOrDefault();
-            if (string.IsNullOrEmpty(correlationId))
-                correlationId = Guid.NewGuid().ToString();
+            var correlationId = CorrelationIdHeader.Resolver(
+                context.Request.Headers[CorrelationIdHeader.Nome].FirstOrDefault());
 
             context.Items["CorrelationId"] = correlationId;
-            context.Response.Headers["X-Correlation-Id"] = correlationId;
+            context.Response.Headers[CorrelationIdHeader.Nome] = correlationId;
 
             using (LogContext.PushProperty("CorrelationId", correlationId))
             {
@@ -68,6 +70,15 @@ public static class PipelineExtensions
         app.UseSerilogRequestLogging(options =>
         {
             options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0} ms ({ResponseSize} bytes)";
+
+            // I4.5 (#1698): em webhook o log leva o molde da rota, não o caminho que o provedor montou.
+            options.GetMessageTemplateProperties = (ctx, _, elapsedMs, statusCode) =>
+            [
+                new Serilog.Events.LogEventProperty("RequestMethod", new Serilog.Events.ScalarValue(ctx.Request.Method)),
+                new Serilog.Events.LogEventProperty("RequestPath", new Serilog.Events.ScalarValue(CaminhoDoLog.De(ctx))),
+                new Serilog.Events.LogEventProperty("StatusCode", new Serilog.Events.ScalarValue(statusCode)),
+                new Serilog.Events.LogEventProperty("Elapsed", new Serilog.Events.ScalarValue(elapsedMs)),
+            ];
 
             options.GetLevel = (ctx, _, ex) =>
             {
@@ -186,7 +197,10 @@ public static class PipelineExtensions
         }
 
         app.UseHttpsRedirection();
-        app.UseStaticFiles();
+        // O console baixa fotos públicas para anexá-las; os arquivos também usam a política de origens da API.
+        app.UseCors();
+        // S49: as fontes do impresso precisam de CORS (o console as carrega de outra origem).
+        app.UseStaticFiles(new StaticFileOptions { OnPrepareResponse = EasyStock.Api.Services.Impressao.FontesImpressao.LiberarCors });
 
         // Serve uploaded files from local storage path (skip for S3 — served directly)
         var fileStorageOptions = app.Configuration
@@ -212,7 +226,7 @@ public static class PipelineExtensions
 
                 app.UseStaticFiles(new StaticFileOptions
                 {
-                    FileProvider = new PhysicalFileProvider(rootPath),
+                    FileProvider = new PublicUploadFileProvider(rootPath),
                     RequestPath = servePath
                 });
             }
@@ -221,23 +235,16 @@ public static class PipelineExtensions
         // Casa da Baba Mobile PWA — static files em /pwa/ com headers de service worker.
         Mobile.MobileModule.UseMobilePwa(app);
 
-        app.UseCors();
+        // CSRF do storefront (#1088, ADR-0053): POST com cookie __Host-cdb_* so da mesma origem.
+        app.UseMiddleware<ProtecaoCsrfCookieMiddleware>();
         app.UseRateLimiter();
         app.UseAuthentication();
         app.UseAuthorization();
         // Sliding window: atualiza UltimoUsoEm da ClienteSession após cada request autenticado (ADR-0012).
         app.UseMiddleware<ClienteSessionMiddleware>();
-        app.UseMiddleware<SubscriptionGateMiddleware>();
         // Idempotencia: aplicado APOS auth para que ICurrentUserAccessor.EmpresaId esteja disponivel.
         // Whitelist de POSTs criticos (R5: dedup retry de mobile/web).
-        IdempotencyMiddlewareExtensions.UseIdempotency(app, opts => opts
-            .Add("/api/itensestoque")
-            .Add("/api/itensestoque/estorno")
-            .Add("/api/vendas")
-            .Add("/api/mobile/vendas")
-            .Add("/api/movimentacoes")
-            .Add("/api/itensestoque/repor")
-            .Add("/api/mobile/calculadora/criar-compra"));
+        IdempotencyMiddlewareExtensions.UseIdempotency(app, opts => ConfigurarRotasIdempotentes(opts));
         app.MapControllers();
 
         app.MapGet("/", () => Results.Redirect("/swagger", permanent: false))
@@ -279,8 +286,24 @@ public static class PipelineExtensions
             ResponseWriter = HealthCheckResponseWriter.WriteJsonAsync
         });
 
+        // /health/notificacoes (N1): backlog do motor (idade do pendente elegivel, EmEnvio alem do lease, Falhado,
+        // Simulado e Indeterminado por hora, provider de teste em Production). O UptimeRobot so ve o status HTTP, entao
+        // Degraded tambem responde 503. Fica de fora de /health e /health/ready: backlog ruim nao tira a API do LB.
+        app.MapHealthChecks("/health/notificacoes", new HealthCheckOptions
+        {
+            Predicate = check => check.Tags.Contains(NotificacoesBacklogHealthCheck.Tag),
+            ResponseWriter = HealthCheckResponseWriter.WriteJsonAsync,
+            ResultStatusCodes =
+            {
+                [HealthStatus.Healthy] = StatusCodes.Status200OK,
+                [HealthStatus.Degraded] = StatusCodes.Status503ServiceUnavailable,
+                [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable,
+            }
+        });
+
         app.MapHealthChecks("/health", new HealthCheckOptions
         {
+            Predicate = check => !check.Tags.Contains(NotificacoesBacklogHealthCheck.Tag),
             ResponseWriter = HealthCheckResponseWriter.WriteJsonAsync
         });
 
@@ -379,4 +402,41 @@ public static class PipelineExtensions
             }
         }
     }
+
+    /// <summary>Whitelist de POSTs criticos cobertos pelo IdempotencyMiddleware (exposta para teste).</summary>
+    public static IdempotencyOptions ConfigurarRotasIdempotentes(IdempotencyOptions opts) => opts
+        .Add("/api/itensestoque")
+        .Add("/api/itensestoque/estorno")
+        .Add("/api/vendas")
+        .Add("/api/mobile/vendas")
+        .Add("/api/movimentacoes")
+        .Add("/api/itensestoque/repor")
+        // #920: saida/entrada de estoque batem na rota REAL /api/estoque/* (ItemEstoqueController
+        // e [Route("api/estoque")]). As entradas /api/itensestoque* acima apontam para rota
+        // inexistente -> o middleware nunca cobria o double-submit desses fluxos, que debitava/
+        // creditava o saldo 2x. A limpeza ampla das rotas mortas fica no epico #917 (Fase A).
+        .Add("/api/estoque/saida")
+        .Add("/api/estoque/entrada")
+        .Add("/api/mobile/calculadora/criar-compra")
+        // #1780: gerar-pedidos repetido com a mesma chave criava outro pedido e avisava o fornecedor de novo.
+        .Add("/api/listas-compras")
+        // issue 917 Fase B: fecha o vetor de duplicata de pagamento (timeout no POST ->
+        // toast generico -> operador clica de novo). Prefixo largo (nao so .../pagamentos)
+        // porque o id do pedido fica NO MEIO do path e o matcher e' so-prefixo; cobre de
+        // quebra outras mutacoes de pedido contra double-submit, o que e' estritamente
+        // seguro (opt-in por header -- sem Idempotency-Key a rota segue como sempre).
+        .Add("/api/pedidos")
+        // S23 (#1137): producao em porcoes cria lote + entrada; retry nao pode duplicar.
+        .Add("/api/producao")
+        // M2.2 (#1491): producao do dia pelo console (lote + entrada); retry nao pode duplicar.
+        .Add("/api/atendimento/producao")
+        .Add("/api/atendimento/mensagens-programadas")
+        .Add("/api/atendimento/lembretes")
+        // #1786: envio de texto, foto e áudio pelo console. Resposta perdida e o mesmo envio de novo mandavam duas
+        // mensagens ao cliente. O id da conversa fica no meio do path; as outras ações da conversa sem header seguem como sempre.
+        .Add("/api/atendimento/conversas")
+        // #1540: sangria ou suprimento repetido depois de resposta perdida virava dois lançamentos.
+        .Add("/api/caixa/movimentos")
+        // S20: retorno do consumidor da fila de impressão (impressa/falhou); opt-in por header.
+        .Add("/api/impressao");
 }

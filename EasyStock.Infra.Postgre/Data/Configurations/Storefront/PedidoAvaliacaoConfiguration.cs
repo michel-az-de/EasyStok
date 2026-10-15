@@ -12,7 +12,9 @@ public class PedidoAvaliacaoConfiguration : IEntityTypeConfiguration<PedidoAvali
         builder.Property(a => a.PedidoId).IsRequired();
         builder.Property(a => a.ClienteId).IsRequired();
         builder.Property(a => a.EmpresaId).IsRequired();
-        builder.Property(a => a.Estrelas).IsRequired();
+        // Estrelas null na avaliacao de um toque (S26); Resultado null nas de estrelas.
+        builder.Property(a => a.Estrelas);
+        builder.Property(a => a.Resultado).HasConversion<int?>();
         builder.Property(a => a.RecomendariaParaAmigos).IsRequired();
 
         builder.Property(a => a.Comentario).HasMaxLength(500);

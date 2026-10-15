@@ -11,4 +11,5 @@ public interface IBloqueioEntregaRepository
         DateOnly fim,
         CancellationToken ct = default);
     Task AddAsync(BloqueioEntrega bloqueio, CancellationToken ct = default);
+    Task RemoveAsync(BloqueioEntrega bloqueio, CancellationToken ct = default);
 }

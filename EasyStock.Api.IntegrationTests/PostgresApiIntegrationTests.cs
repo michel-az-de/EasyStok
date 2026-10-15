@@ -99,23 +99,20 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
     {
         if (_connString is null) throw new InvalidOperationException("PostgreSQL de teste não disponível.");
 
-        // Env vars vencem o appsettings.Development.json (precedencia do host builder); o
-        // ConfigureAppConfiguration in-memory sozinho era sobrescrito pelo appsettings (a
-        // connection string saia null -> AddNpgSql quebrava, #261). Mesmo padrao do
-        // BannerE2ETests. A senha do _connString e nao-default (Testcontainers), entao o
-        // StartupHardening passa. Development: roda migrations + seed demo no startup.
-        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", _connString);
-        Environment.SetEnvironmentVariable("Database__Provider", "PostgreSql");
-        Environment.SetEnvironmentVariable("RunMigrationsOnStartup", "true");
-        Environment.SetEnvironmentVariable("Mobile__ApiKey", "easystock-integration-test-mobile-key-0001");
-        Environment.SetEnvironmentVariable("Jwt__Issuer", JwtIssuer);
-        Environment.SetEnvironmentVariable("Jwt__Audience", JwtAudience);
-        Environment.SetEnvironmentVariable("Jwt__SecretKey", JwtSecret);
-        Environment.SetEnvironmentVariable("Jwt__ExpirationMinutes", "60");
-        Environment.SetEnvironmentVariable("FileStorage__Provider", "Local");
-        Environment.SetEnvironmentVariable("Anthropic__Enabled", "false");
-
-        return new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.UseEnvironment("Development"));
+        return new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
+        {
+            b.UseEnvironment("Development");
+            b.UseSetting("ConnectionStrings:DefaultConnection", _connString);
+            b.UseSetting("Database:Provider", "PostgreSql");
+            b.UseSetting("RunMigrationsOnStartup", "true");
+            b.UseSetting("Mobile:ApiKey", "easystock-integration-test-mobile-key-0001");
+            b.UseSetting("Jwt:Issuer", JwtIssuer);
+            b.UseSetting("Jwt:Audience", JwtAudience);
+            b.UseSetting("Jwt:SecretKey", JwtSecret);
+            b.UseSetting("Jwt:ExpirationMinutes", "60");
+            b.UseSetting("FileStorage:Provider", "Local");
+            b.UseSetting("Anthropic:Enabled", "false");
+        });
     }
 
     private async Task<HttpClient> ClienteAutenticadoAdminAsync(WebApplicationFactory<Program> factory)

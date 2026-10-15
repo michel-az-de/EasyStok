@@ -8,6 +8,11 @@ namespace EasyStock.Web.Navigation;
 /// controller DEVE constar em algum ActiveKeys (garantido por teste). <see cref="BadgeKey"/>
 /// liga o item a uma contagem de <see cref="MenuBadges"/>.
 /// </summary>
+/// <param name="RequerFeature">
+/// Feature de tenant que este item exige (ADR-0048). Null = visível para todo mundo. Quando
+/// preenchida, o item some para quem não tem a flag ativa — inclusive dos favoritos, porque
+/// o filtro acontece antes da resolução de "Meu dia".
+/// </param>
 public sealed record MenuItem(
     string Key,
     string Label,
@@ -17,7 +22,8 @@ public sealed record MenuItem(
     string? BadgeKey = null,
     string? Tag = null,
     bool IsProducaoKds = false,
-    bool IsExternal = false);
+    bool IsExternal = false,
+    string? RequerFeature = null);
 
 /// <summary>Grupo (accordion) do menu, com seus itens na ordem de exibicao.</summary>
 public sealed record MenuGroup(
@@ -29,8 +35,7 @@ public sealed record MenuGroup(
 /// <summary>
 /// Estrutura canonica (estatica, imutavel) do menu lateral na nova IA por fluxo
 /// (ADR-0032). Fonte unica da verdade: renomear/reordenar item = editar aqui.
-/// Nenhuma rota muda em relacao ao menu antigo (Config Fiscal saiu para aba de
-/// Configuracoes, fatia 8). Icones sao nomes do conjunto <c>es-icon</c>; a
+/// Nenhuma rota muda em relacao ao menu antigo. Icones sao nomes do conjunto <c>es-icon</c>; a
 /// correcao visual dos nomes e validada na fatia de render.
 /// </summary>
 public static class MenuDefinition
@@ -70,9 +75,15 @@ public static class MenuDefinition
             // lista lotes de producao (em_producao/finalizado) — clicar o alerta caia em tela
             // vazia ("Nenhum lote"). Mesmo href ja usado no Dashboard (alerta de vencidos).
             // ActiveKeys mantem "Lotes" pra nao orfanizar o alias emitido pelo LotesController.
-            new MenuItem("lotes-validade", "Lotes e validade", "layers", "/estoque?status=vencido",
+            // issue 970: labels curtos porque o orcamento horizontal do label num item de
+            // grupo e ~123px (sidebar 240px menos padding do nav, indentacao, estrela,
+            // padding do item, icone e gap) — e cai para ~99px quando ha badge, que e o
+            // caso destes dois. "Lotes e validade" e "Posicao de estoque" truncavam
+            // sempre ("Lotes e vali...", "Posicao de e..."). O grupo ja se chama
+            // "Producao e estoque", entao o contexto nao se perde.
+            new MenuItem("lotes-validade", "Validade", "layers", "/estoque?status=vencido",
                 new[] { "Lotes", "LotesMobile" }, BadgeKey: BadgeLotesVencidos),
-            new MenuItem("posicao-estoque", "Posição de estoque", "clipboard-list", "/estoque",
+            new MenuItem("posicao-estoque", "Posição", "clipboard-list", "/estoque",
                 new[] { "Estoque" }, BadgeKey: BadgeProdutosCriticos),
             new MenuItem("entradas", "Entradas", "arrow-down-to-line", "/entradas/historico",
                 new[] { "Entradas" }),
@@ -98,8 +109,6 @@ public static class MenuDefinition
                 new[] { "ContasAReceber" }),
             new MenuItem("contas-pagar", "Contas a pagar", "credit-card", "/contas-a-pagar",
                 new[] { "ContasAPagar" }),
-            new MenuItem("notas-fiscais", "Notas fiscais", "receipt", "/notas-fiscais",
-                new[] { "NotasFiscais" }),
         }),
         new MenuGroup("crescimento", "Crescimento", "trending-up", new[]
         {
@@ -107,20 +116,16 @@ public static class MenuDefinition
                 new[] { "Analytics", "Movimentacoes", "Inteligencia", "InteligenciaLojas" }),
             new MenuItem("relatorios", "Relatórios", "file-text", "/relatorios",
                 new[] { "Relatorios" }),
-            new MenuItem("anuncios", "Anúncios", "megaphone", "/anuncios",
-                new[] { "Anuncios" }),
         }),
     };
 
-    /// <summary>Rodape fixo (com borda superior). ConfiguracaoFiscal mapeia aqui (vira aba).</summary>
+    /// <summary>Rodape fixo (com borda superior).</summary>
     public static readonly IReadOnlyList<MenuItem> Footer = new[]
     {
-        new MenuItem("dispositivos", "Dispositivos", "monitor", "/dispositivos",
-            new[] { "Dispositivos", "Operacao" }),
         new MenuItem("usuarios", "Usuários", "user-cog", "/usuarios",
             new[] { "Usuarios" }),
         new MenuItem("configuracoes", "Configurações", "settings", "/configuracoes",
-            new[] { "Configuracoes", "Lojas", "Assinatura", "Notificacoes", "Preferencias", "ConfiguracaoFiscal" }),
+            new[] { "Configuracoes", "Lojas", "Notificacoes", "Preferencias" }),
     };
 
     /// <summary>Dashboard + itens de grupo + rodape, na ordem de declaracao (sem filtro de flag).</summary>

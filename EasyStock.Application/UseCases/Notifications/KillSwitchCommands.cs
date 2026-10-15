@@ -11,7 +11,7 @@ public sealed record AtivarKillSwitchCommand(
     CanalNotificacao? Canal = null,
     DateTime? ExpiraEm = null) : ICommand;
 
-public sealed record RemoverKillSwitchCommand(Guid BloqueioId, string RemovidoPor) : ICommand;
+public sealed record RemoverKillSwitchCommand(Guid BloqueioId, string RemovidoPor, Guid EmpresaId) : ICommand;
 
 public sealed record KillSwitchResult(Guid BloqueioId);
 
@@ -45,8 +45,9 @@ public sealed class RemoverKillSwitchUseCase(
 {
     public async Task<KillSwitchResult> ExecuteAsync(RemoverKillSwitchCommand command)
     {
-        var bloqueio = await bloqueioRepository.GetByIdAsync(command.BloqueioId)
-            ?? throw new InvalidOperationException($"Bloqueio {command.BloqueioId} não encontrado.");
+        var bloqueio = await bloqueioRepository.GetByIdAsync(command.BloqueioId);
+        if (bloqueio is null || bloqueio.EmpresaId != command.EmpresaId)
+            throw new ConfiguracaoNotificacaoNaoEncontradaException("Bloqueio", command.BloqueioId);
 
         bloqueio.Remover(command.RemovidoPor);
         await bloqueioRepository.UpdateAsync(bloqueio);

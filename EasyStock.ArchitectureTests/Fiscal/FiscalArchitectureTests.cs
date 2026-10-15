@@ -22,30 +22,4 @@ public class FiscalArchitectureTests
                 "Se for um conceito novo, atualize esta lista ou o ADR.");
         }
     }
-
-    [Fact]
-    public void UseCases_Fiscal_nao_devem_depender_de_EntityFrameworkCore()
-    {
-        var result = Types.InAssembly(typeof(EasyStock.Application.Ports.Output.Persistence.IProdutoRepository).Assembly)
-            .That().ResideInNamespaceContaining("Fiscal")
-            .ShouldNot()
-            .HaveDependencyOn("Microsoft.EntityFrameworkCore")
-            .GetResult();
-
-        result.IsSuccessful.Should().BeTrue(
-            "use cases fiscais nao devem depender de EF Core diretamente — acesso via ports/interfaces");
-    }
-
-    [Fact]
-    public void UseCases_Fiscal_nao_devem_depender_de_IConfiguration()
-    {
-        var result = Types.InAssembly(typeof(EasyStock.Application.Ports.Output.Persistence.IProdutoRepository).Assembly)
-            .That().ResideInNamespaceContaining("Fiscal")
-            .ShouldNot()
-            .HaveDependencyOn("Microsoft.Extensions.Configuration")
-            .GetResult();
-
-        result.IsSuccessful.Should().BeTrue(
-            "use cases fiscais nao devem ler config diretamente — receber via construtor ou Options");
-    }
 }

@@ -17,6 +17,9 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(p => p.ClienteNome).HasMaxLength(150);
             b.Property(p => p.ClienteApt).HasMaxLength(32);
             b.Property(p => p.ClienteTelefone).HasMaxLength(32);
+            b.Property(p => p.EnderecoEntrega).HasColumnType("text");
+            b.Property(p => p.BairroEntrega).HasMaxLength(150);
+            b.Property(p => p.CepEntrega).HasMaxLength(8);
             // Status: 32 chars cobrem todos os enum values (maior atual = "aguardando_aprovacao_baba" = 25).
             // Aumento de 20 → 32 acompanha migration aditiva de TASK-EZ-APROVAR-001.
             b.Property(p => p.Status).IsRequired().HasMaxLength(32);
@@ -59,6 +62,27 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasColumnName("mensagem_recusa_cliente")
                 .HasMaxLength(280)
                 .IsRequired(false);
+            // S12 (#1119): aprovação manual só na exceção (ex.: fora de área).
+            b.Property(p => p.RequerAprovacao)
+                .HasColumnName("requer_aprovacao")
+                .HasDefaultValue(false)
+                .IsRequired();
+            b.Property(p => p.MotivoRequerAprovacao)
+                .HasColumnName("motivo_requer_aprovacao")
+                .HasMaxLength(Pedido.MotivoRequerAprovacaoMaxLength)
+                .IsRequired(false);
+
+            // S21: início previsto do preparo e trava do aviso de atraso.
+            b.Property(p => p.InicioPrevistoEm)
+                .HasColumnName("inicio_previsto_em")
+                .IsRequired(false);
+            b.Property(p => p.AtrasoNotificadoEm)
+                .HasColumnName("atraso_notificado_em")
+                .IsRequired(false);
+            // Varredura do PedidoAtrasoJob a cada 60 s: só os aguardando ainda não avisados.
+            b.HasIndex(p => p.InicioPrevistoEm)
+                .HasDatabaseName("ix_pedidos_atraso_pendente")
+                .HasFilter("\"Status\" = 'aguardando' AND atraso_notificado_em IS NULL AND inicio_previsto_em IS NOT NULL");
 
             b.HasOne(p => p.Empresa)
                 .WithMany()
@@ -116,6 +140,7 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             // escalares (sem navegação → sem relacionamento EF). Só os snapshots de texto têm tamanho.
             b.Property(x => x.VariacaoRotuloSnapshot).HasMaxLength(60);
             b.Property(x => x.SkuSnapshot).HasMaxLength(100);
+            b.Property(x => x.LinhaSnapshot).HasMaxLength(30);
 
             b.HasOne(x => x.Produto)
                 .WithMany()

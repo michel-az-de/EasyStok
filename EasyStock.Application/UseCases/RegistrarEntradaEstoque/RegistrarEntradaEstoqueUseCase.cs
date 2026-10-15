@@ -1,5 +1,4 @@
 using EasyStock.Domain.Defaults;
-using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Domain.Events;
 using EasyStock.Domain.Services;
@@ -45,7 +44,6 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
         IMovimentacaoEstoqueRepository movimentacaoEstoqueRepository,
         IUnitOfWork unitOfWork,
         ILogger<RegistrarEntradaEstoqueUseCase> logger,
-        IGeradorDescricaoAnuncio? geradorDescricaoAnuncio = null,
         IPublicadorEventos? publicadorEventos = null,
         ILojaRepository? lojaRepository = null,
         IConfiguracaoLojaRepository? configuracaoLojaRepository = null,
@@ -103,7 +101,7 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
             }
 
             var quantidade = Quantidade.From(command.Quantidade);
-            var descricaoAnuncio = await ResolverDescricaoAnuncioAsync(command, produto, variacao);
+            var descricaoAnuncio = ResolverDescricaoAnuncio(command, produto);
             var agora = DateTime.UtcNow;
 
             // P5: o codigo de lote informado (digitado ou auto-gerado no front) vira um Lote real,
@@ -233,23 +231,9 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
             };
         }
 
-        private async Task<string?> ResolverDescricaoAnuncioAsync(RegistrarEntradaEstoqueCommand command, Produto produto, ProdutoVariacao? variacao)
-        {
-            if (!string.IsNullOrWhiteSpace(command.DescricaoAnuncio))
-                return command.DescricaoAnuncio.Trim();
-
-            if (geradorDescricaoAnuncio is null)
-                return produto.SugestaoDescricaoAnuncio;
-
-            try
-            {
-                return await geradorDescricaoAnuncio.GerarAsync(produto, variacao, null, command.InstrucoesGeracaoDescricao);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Falha ao gerar descrição de anúncio via IA para o produto {ProdutoId}. Entrada será salva sem descrição.", produto.Id);
-                return produto.SugestaoDescricaoAnuncio;
-            }
-        }
+        private static string? ResolverDescricaoAnuncio(RegistrarEntradaEstoqueCommand command, Produto produto) =>
+            !string.IsNullOrWhiteSpace(command.DescricaoAnuncio)
+                ? command.DescricaoAnuncio.Trim()
+                : produto.SugestaoDescricaoAnuncio;
     }
 }

@@ -8,7 +8,10 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
 {
     public Task<CardapioItem?> GetByIdAsync(Guid storefrontId, Guid id, CancellationToken ct = default) =>
         db.CardapioItens
+            .AsSplitQuery()
             .Include(c => c.Produto)
+            // M1.4b (#1531): o checkout cobra o preço da porção.
+            .Include(c => c.Variacoes)
             .FirstOrDefaultAsync(c => c.StorefrontId == storefrontId && c.Id == id, ct);
 
     public Task<CardapioItem?> GetByIdAndScopeAsync(Guid storefrontId, Guid itemId, Guid? empresaId, CancellationToken ct = default)
@@ -52,7 +55,8 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
             .Include(c => c.Secao)
                 .ThenInclude(s => s!.SecaoPai)
                     .ThenInclude(s => s!.SecaoPai)
-            .Where(c => c.StorefrontId == storefrontId && c.Visivel)
+            // M1.2 (#1482): arquivado não vai ao site, à comanda nem ao agente.
+            .Where(c => c.StorefrontId == storefrontId && c.Visivel && c.ArquivadoEm == null)
             .OrderBy(c => c.Produto!.Categoria!.Nome)
             .ThenBy(c => c.OrdemExibicao)
             .ToListAsync(ct);
@@ -67,6 +71,18 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
             .Include(c => c.Variacoes)
             .Include(c => c.Secao)
             .Where(c => c.StorefrontId == storefrontId)
+            .OrderBy(c => c.OrdemExibicao)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<CardapioItem>> GetArquivadosDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default) =>
+        // #1575: a tela "tirados do cardápio" filtra no banco. Mesma carga de GetTodosDoStorefrontAsync.
+        await db.CardapioItens
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(c => c.Produto)
+            .Include(c => c.Variacoes)
+            .Include(c => c.Secao)
+            .Where(c => c.StorefrontId == storefrontId && c.ArquivadoEm != null)
             .OrderBy(c => c.OrdemExibicao)
             .ToListAsync(ct);
 

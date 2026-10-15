@@ -1,0 +1,255 @@
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.UseCases.Atendimento.Producao;
+using EasyStock.Application.UseCases.CadastrarProduto;
+using EasyStock.Domain.Entities.Storefront;
+using EasyStock.Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
+using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
+
+namespace EasyStock.Application.Tests.UseCases.Atendimento.Producao;
+
+/// <summary>M2.3 (#1496): insumos com saldo, mínimo, custo e onde são usados; abaixo do mínimo vai para "Comprar".</summary>
+public class InsumosDaProducaoUseCaseTests
+{
+    private static readonly Guid EmpresaId = Guid.NewGuid();
+    private readonly IProdutoRepository _produtos = Substitute.For<IProdutoRepository>();
+    private readonly IProdutoComposicaoRepository _composicao = Substitute.For<IProdutoComposicaoRepository>();
+    private readonly IItemEstoqueRepository _estoque = Substitute.For<IItemEstoqueRepository>();
+    private readonly ICategoriaRepository _categorias = Substitute.For<ICategoriaRepository>();
+    private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly List<Categoria> _categoriasGravadas = [];
+    private readonly Dictionary<Guid, Produto> _gravados = [];
+
+    public InsumosDaProducaoUseCaseTests()
+    {
+        _categorias.GetByEmpresaAsync(EmpresaId).Returns(_ => _categoriasGravadas.ToList());
+        _categorias.When(c => c.AddAsync(Arg.Any<Categoria>())).Do(c => _categoriasGravadas.Add(c.Arg<Categoria>()));
+        _categorias.GetByIdAsync(EmpresaId, Arg.Any<Guid>()).Returns(c => _categoriasGravadas.FirstOrDefault(x => x.Id == c.ArgAt<Guid>(1)));
+        _categorias.GetByIdAsync(Arg.Any<Guid>()).Returns(c => _categoriasGravadas.FirstOrDefault(x => x.Id == c.Arg<Guid>()));
+        _produtos.When(r => r.InsertAsync(Arg.Any<Produto>())).Do(c => _gravados[c.Arg<Produto>().Id] = c.Arg<Produto>());
+        _produtos.GetByIdAsync(EmpresaId, Arg.Any<Guid>()).Returns(c => _gravados.GetValueOrDefault(c.ArgAt<Guid>(1)));
+        _produtos.GetByIdParaAtualizarAsync(EmpresaId, Arg.Any<Guid>()).Returns(c => _gravados.GetValueOrDefault(c.ArgAt<Guid>(1)));
+    }
+
+    private readonly IStorefrontRepository _storefronts = Substitute.For<IStorefrontRepository>();
+    private readonly ICardapioItemRepository _cardapio = Substitute.For<ICardapioItemRepository>();
+
+    private InsumosDaProducaoUseCase Sut() => new(_produtos, _composicao, _estoque, _categorias,
+        new CadastrarProdutoUseCase(_produtos, _categorias, Substitute.For<IProdutoCaracteristicaRepository>(),
+            Substitute.For<IProdutoEmbalagemRepository>(), Substitute.For<IProdutoVariacaoRepository>(), _uow,
+            Substitute.For<ILogger<CadastrarProdutoUseCase>>()),
+        _uow, _storefronts, _cardapio);
+
+    [Fact]
+    public async Task Listar_ContaAsPorcoesQueUsamAEmbalagem_SemContarPratoArquivado()
+    {
+        // M1.4e (#1552): a bandeja escolhida numa porção não entra em receita, mas está em uso.
+        var bandeja = Insumo("Bandeja 300 g", 10, UnidadeMedida.Un);
+        bandeja.EhEmbalagem = true;
+        _produtos.GetInsumosAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns([bandeja]);
+        _estoque.GetSaldoDisponivelPorProdutosAsync(EmpresaId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, decimal>());
+        _composicao.ContarReceitasPorInsumoAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns(new Dictionary<Guid, int>());
+        var vitrine = StorefrontEntity.Criar(EmpresaId, "casa-da-baba", "Casa da Baba", 0m);
+        _storefronts.GetByEmpresaAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns(vitrine);
+        CardapioItem PratoComABandeja(string nome, params string[] porcoes)
+        {
+            var item = CardapioItem.CriarAvulso(vitrine.Id, nome, 30m);
+            foreach (var rotulo in porcoes)
+            {
+                var porcao = CardapioItemVariacao.Criar(item.Id, rotulo, 28m);
+                porcao.DefinirEmbalagem(bandeja.Id);
+                item.AdicionarVariacao(porcao);
+            }
+            return item;
+        }
+        var fora = PratoComABandeja("Nhoque", "300 g");
+        fora.Arquivar(DateTime.UtcNow);
+        _cardapio.GetTodosDoStorefrontAsync(vitrine.Id, Arg.Any<CancellationToken>())
+            .Returns([PratoComABandeja("Lasanha", "300 g", "Individual"), fora]);
+
+        var insumo = (await Sut().ListarAsync(EmpresaId)).Should().ContainSingle().Subject;
+
+        (insumo.Receitas, insumo.Porcoes).Should().Be((0, 2));
+    }
+
+    private static Produto Insumo(string nome, int? minimo, UnidadeMedida unidade = UnidadeMedida.G) => new()
+    {
+        Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = nome, EhInsumo = true, Status = StatusProduto.Ativo,
+        QuantidadeMinima = minimo, UnidadeMedidaBase = unidade,
+    };
+
+    [Fact]
+    public async Task Listar_ComSaldoMinimoEReceitas_EAbaixoDoMinimoMarcado()
+    {
+        var molho = Insumo("Molho sugo", 2000);
+        var bandeja = Insumo("Bandeja 500 ml", 50, UnidadeMedida.Un);
+        _produtos.GetInsumosAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns([molho, bandeja]);
+        _estoque.GetSaldoDisponivelPorProdutosAsync(EmpresaId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, decimal> { [molho.Id] = 1500, [bandeja.Id] = 80 });
+        _composicao.ContarReceitasPorInsumoAsync(EmpresaId, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, int> { [molho.Id] = 3 });
+
+        var lista = await Sut().ListarAsync(EmpresaId);
+
+        lista.Select(i => (i.Nome, i.Saldo, i.Receitas, i.AbaixoDoMinimo)).Should().Equal(
+            ("Molho sugo", 1500m, 3, true), ("Bandeja 500 ml", 80m, 0, false));
+    }
+
+    [Fact]
+    public async Task Criar_MarcaComoInsumo_NaCategoriaInsumos_ComUnidadeEMinimo()
+    {
+        var id = await Sut().CriarAsync(EmpresaId, Guid.NewGuid(), new InsumoInput("Recheio de ricota", UnidadeMedida.G, 1000, 0.05m));
+
+        var p = _gravados[id];
+        p.EhInsumo.Should().BeTrue();
+        p.Status.Should().Be(StatusProduto.Ativo);
+        p.PrecoReferencia.Should().BeNull();
+        p.CustoReferencia!.Valor.Should().Be(0.05m);
+        p.UnidadeMedidaBase.Should().Be(UnidadeMedida.G);
+        p.QuantidadeMinima.Should().Be(1000);
+        _categoriasGravadas.Should().ContainSingle(c => c.Nome == InsumosDaProducaoUseCase.CategoriaInsumos);
+    }
+
+    [Fact]
+    public async Task CriarEmbalagem_NaCategoriaEmbalagens_ComAMarca()
+    {
+        // M2.7 (#1523, D-M2-03): bandeja é insumo marcado como embalagem; desce em toda produção.
+        var id = await Sut().CriarAsync(EmpresaId, Guid.NewGuid(), new InsumoInput("Bandeja 800 g", null, 50, 0.4m, Embalagem: true));
+
+        var p = _gravados[id];
+        (p.EhInsumo, p.EhEmbalagem, p.UnidadeMedidaBase).Should().Be((true, true, UnidadeMedida.Un));
+        _categoriasGravadas.Should().ContainSingle(c => c.Nome == InsumosDaProducaoUseCase.CategoriaEmbalagens);
+    }
+
+    [Fact]
+    public async Task EmbalagemAbaixoDoMinimo_ApareceParaComprar_ComAMarca()
+    {
+        var bandeja = Insumo("Bandeja 800 g", 50, UnidadeMedida.Un);
+        bandeja.EhEmbalagem = true;
+        _produtos.GetInsumosAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns([bandeja]);
+        _estoque.GetSaldoDisponivelPorProdutosAsync(EmpresaId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, decimal> { [bandeja.Id] = 12 });
+        _composicao.ContarReceitasPorInsumoAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns(new Dictionary<Guid, int>());
+
+        var i = (await Sut().ListarAsync(EmpresaId)).Should().ContainSingle().Subject;
+
+        (i.AbaixoDoMinimo, i.Embalagem).Should().Be((true, true));
+    }
+
+    [Fact]
+    public async Task Atualizar_LigaEDesligaAEmbalagem_ENullNaoMexe()
+    {
+        var bandeja = Insumo("Bandeja 800 g", 50, UnidadeMedida.Un);
+        _gravados[bandeja.Id] = bandeja;
+
+        await Sut().AtualizarAsync(EmpresaId, bandeja.Id, new InsumoInput(null, null, null, null, Embalagem: true));
+        bandeja.EhEmbalagem.Should().BeTrue();
+        await Sut().AtualizarAsync(EmpresaId, bandeja.Id, new InsumoInput(null, null, 60, null));
+        (bandeja.EhEmbalagem, bandeja.QuantidadeMinima).Should().Be((true, 60));
+    }
+
+    [Fact]
+    public async Task Atualizar_LimparMinimo_GravaNulo_EVoltaAHerdarDaCategoria()
+    {
+        // #1563: null no mínimo é "não mexe" e zero vence a herança; limpar é explícito.
+        var molho = Insumo("Molho sugo", 2000);
+        _gravados[molho.Id] = molho;
+        var categoria = new Categoria { QuantidadeMinima = 300 };
+
+        await Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, null, null, LimparMinimo: true));
+
+        molho.QuantidadeMinima.Should().BeNull();
+        EasyStock.Domain.Services.LimiarEstoqueResolver.Resolver(molho, categoria, null).QuantidadeMinima.Should().Be(300);
+    }
+
+    [Fact]
+    public async Task Atualizar_SemLimparMinimo_NullNaoMexe_EValorGrava()
+    {
+        var molho = Insumo("Molho sugo", 2000);
+        _gravados[molho.Id] = molho;
+
+        await Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, null, 0.04m));
+        molho.QuantidadeMinima.Should().Be(2000);
+        await Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, 2500, null));
+        molho.QuantidadeMinima.Should().Be(2500);
+    }
+
+    [Fact]
+    public async Task Atualizar_LimparMinimoComValor_400_ENaoMexe()
+    {
+        var molho = Insumo("Molho sugo", 2000);
+        _gravados[molho.Id] = molho;
+
+        var act = () => Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, 10, null, LimparMinimo: true));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        molho.QuantidadeMinima.Should().Be(2000);
+    }
+
+    [Fact]
+    public async Task Atualizar_LimparCusto_GravaNulo_ENaoMexeNoMinimo()
+    {
+        // #1600: null no custo é "não mexe"; limpar é explícito e volta a "sem custo informado".
+        var molho = Insumo("Molho sugo", 2000);
+        molho.CustoReferencia = Dinheiro.FromDecimal(0.04m);
+        _gravados[molho.Id] = molho;
+
+        await Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, null, null, LimparCusto: true));
+
+        molho.CustoReferencia.Should().BeNull();
+        molho.QuantidadeMinima.Should().Be(2000);
+    }
+
+    [Fact]
+    public async Task Atualizar_SemLimparCusto_NullNaoMexe_EValorGrava()
+    {
+        var molho = Insumo("Molho sugo", 2000);
+        molho.CustoReferencia = Dinheiro.FromDecimal(0.04m);
+        _gravados[molho.Id] = molho;
+
+        await Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, 2500, null));
+        molho.CustoReferencia!.Valor.Should().Be(0.04m);
+        await Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, null, 0.05m));
+        molho.CustoReferencia!.Valor.Should().Be(0.05m);
+    }
+
+    [Fact]
+    public async Task Atualizar_LimparCustoComValor_400_ENaoMexe()
+    {
+        var molho = Insumo("Molho sugo", 2000);
+        molho.CustoReferencia = Dinheiro.FromDecimal(0.04m);
+        _gravados[molho.Id] = molho;
+
+        var act = () => Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, null, 0.10m, LimparCusto: true));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        molho.CustoReferencia!.Valor.Should().Be(0.04m);
+    }
+
+    [Fact]
+    public async Task Atualizar_LimparMinimoECusto_Juntos_GravaOsDoisNulos()
+    {
+        var molho = Insumo("Molho sugo", 2000);
+        molho.CustoReferencia = Dinheiro.FromDecimal(0.04m);
+        _gravados[molho.Id] = molho;
+
+        await Sut().AtualizarAsync(EmpresaId, molho.Id, new InsumoInput(null, null, null, null, LimparMinimo: true, LimparCusto: true));
+
+        molho.QuantidadeMinima.Should().BeNull();
+        molho.CustoReferencia.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Atualizar_ProdutoQueNaoEInsumo_400()
+    {
+        var prato = new Produto { Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = "Lasanha", EhInsumo = false };
+        _gravados[prato.Id] = prato;
+
+        var act = () => Sut().AtualizarAsync(EmpresaId, prato.Id, new InsumoInput(null, null, 5, null));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        prato.QuantidadeMinima.Should().BeNull();
+    }
+}

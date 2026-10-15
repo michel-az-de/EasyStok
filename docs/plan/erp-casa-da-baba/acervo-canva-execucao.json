@@ -1,0 +1,133 @@
+{
+  "data": "2026-10-12",
+  "objetivo": "Banco de imagens, Canva e EasyStok com publicação verificada no site",
+  "escopo": [
+    "Originais privados preservados e identificados por SHA256",
+    "Versões do Canva ligadas ao original e ao design editável",
+    "Itens do cardápio validados por empresa",
+    "Aprovação por versão e publicação idempotente de capa/galeria",
+    "Solicitações de geração com referências e conclusão pelo upload",
+    "Interface no módulo Cardápio",
+    "Piloto de seis imagens do acervo existente"
+  ],
+  "decisoes": {
+    "armazenamento": "IFileStorage para bytes; PostgreSQL para metadados, fila e publicações",
+    "permissoes": "Gerente e acesso ao módulo Cardápio; tenant do JWT, filtros explícitos e RLS",
+    "canva": "Percurso assistido por arquivo e design vinculado; OAuth permanente depende de aplicativo e consentimento da conta",
+    "geracao": "Assistida com ferramenta nativa; fila persistida não promete execução autônoma",
+    "publicacao": "Derivado web público; original privado; preservar versões anteriores; registro só com commit da alteração do cardápio"
+  },
+  "aceites": [
+    "Uploads reais e deduplicação por empresa",
+    "Negar item e imagem de outro tenant",
+    "Negar publicação não aprovada e prévia desatualizada",
+    "Retomar operação após resposta perdida sem duplicar",
+    "Download de original autenticado e bloqueio de URL estática",
+    "Console desktop/celular sem erros ou transbordamento",
+    "Revisores independentes de segurança, funcionamento e experiência",
+    "CI e SHA público conferidos; imagem carregada no site"
+  ],
+  "estado": "implementação validada; publicação em andamento",
+  "limites_conhecidos": [
+    "Automação OAuth ainda sem configuração verificada",
+    "Nenhuma mensagem a clientes ou anúncio pago autorizado por este fluxo"
+  ],
+  "fluxo_operacional": [
+    "Selecionar referências existentes e o item do cardápio",
+    "Registrar solicitação: item, formato, brief e referências",
+    "Executar geração assistida e guardar bytes nativos com prompt",
+    "Revisar a versão e aprovar a imagem adequada ao uso",
+    "Enviar original ao Canva e vincular design editável",
+    "Exportar do Canva e guardar nova versão ligada ao original",
+    "Conferir prévia atual e publicar no cardápio",
+    "Consultar histórico e verificar a imagem pública"
+  ],
+  "contratos": {
+    "imagem": "ID único, empresa do JWT, SHA256, origem, título, formato, prompt, referências, itens vinculados e aprovação por versão",
+    "canva": "URL HTTPS validada, asset ID opcional, exportação com OriginalId; sem armazenar credenciais Canva",
+    "publicacao": "OperacaoId estável, item da mesma empresa, versão aprovada, capa esperada, histórico gravado junto da alteração; xmin detecta outros escritores",
+    "solicitacao": "OperacaoId estável, item e formato obrigatórios; conclusão apenas com arquivo correspondente",
+    "recuperacao": "Repetição igual retorna registro existente; metadados divergentes são rejeitados; capa alterada exige nova prévia; erro de atualização da lista não repete gravação"
+  },
+  "manutencao": {
+    "a_cada_entrada": [
+      "Conferir origem, uso e fidelidade do prato",
+      "Preservar original e criar nova versão para edições",
+      "Reaproveitar por hash antes de gerar novamente"
+    ],
+    "rotina_semanal_proposta": [
+      "Revisar fila pendente e lacunas por formato/canal",
+      "Produzir lote pequeno e registrar prompt/referências",
+      "Conferir publicações e retirar de circulação pelo gerenciamento do cardápio quando inadequadas"
+    ],
+    "retencao": "Não remover arquivos anteriores automaticamente; incluir diretório do storage no backup operacional e validar restauração antes de adotar limpeza",
+    "metricas": [
+      "Solicitações pendentes/concluídas",
+      "Versões aprovadas por origem e formato",
+      "Imagens usadas e histórico por item"
+    ],
+    "automacao": "Rotina proposta, sem agendamento criado nesta entrega"
+  },
+  "canva_piloto": {
+    "design_id": "DAHX0REL-As",
+    "asset_id": "MAHX0fYbbzw",
+    "url": "https://www.canva.com/design/DAHX0REL-As/YCr1xD9JarneXQE6CesUew/edit",
+    "exportacao": "PNG 1240x1748; arquivo exportado pelo próprio Canva, proporção livre"
+  },
+  "evolucao_dependente_de_configuracao": [
+    "OAuth: cadastrar app Canva, redirect URI e escopos mínimos; validar conta/plano e consentimento antes de habilitar conexão permanente",
+    "Geração autônoma: escolher provedor, credencial de serviço e teto de gasto; execução assistida disponível agora",
+    "Backup: validar restauração conjunta de PostgreSQL e diretório de originais antes de definir descarte automático"
+  ],
+  "validacao": {
+    "build_arquitetura": "40 testes aprovados no gate",
+    "console": "lint, camadas, 264 pares de contraste e build aprovados",
+    "banca_interface": "7 cenários aprovados com API simulada; desktop 1440 e celulares 390/320; falhas de rede, miniaturas, paginação e foco",
+    "banca_funcional": "6 testes independentes aprovados; correções revisadas",
+    "banca_seguranca": "4 testes independentes aprovados, incluindo RLS NOSUPERUSER NOBYPASSRLS e caminhos HTTP alternativos",
+    "integracao": "21 aprovados, 0 falhas, 0 ignorados; API real, PostgreSQL Testcontainers e armazenamento local"
+  },
+  "incremento_cobertura_1663": {
+    "issue": 1663,
+    "escopo": [
+      "Cobertura de todos os produtos e quatro canais, sem aprovar por proporção apenas",
+      "Origem e natureza separadas; classificação explícita de peças e imagens anteriores",
+      "Busca e filtros no servidor; vínculos de produto em JSONB e uso confirmado por canal",
+      "Briefings imutáveis com referências aprovadas, restrições e prompt; nova versão preserva produto",
+      "Fila existente com repetição idempotente, uma produção por versão, pendências e histórico",
+      "Resultado valida prompt, referências e proporção do snapshot; aprovação permanece explícita"
+    ],
+    "criterios": {
+      "site_whatsapp": "Lado menor de pelo menos 600 pixels e formato permitido",
+      "instagram": "Largura nativa de pelo menos 1080 pixels e formato permitido, critério conservador deste acervo",
+      "impressao": "Medidas físicas positivas até 2000 mm, proporção compatível e pelo menos 300 dpi nos dois eixos; prova física e arte final ainda necessárias",
+      "adequacao": "Versão aprovada, dimensões do arquivo original verificadas e uso do canal explicitamente confirmado"
+    },
+    "validacao": {
+      "gate": "Build e 40 testes de arquitetura aprovados",
+      "migracao": "Scripts EF Up e Down executados em PostgreSQL17 isolado; registro legado preservado, RLS ENABLE/FORCE nas duas tabelas e três índices únicos verificados",
+      "integracao": "42 casos distintos aprovados com API real e PostgreSQL. Rodada 1: 39 aprovados e uma falha de fixture corrigida. Rodada 2: 4 aprovados, incluindo correção RLS e novos casos; nenhum caso final com falha ou ignorado",
+      "bancas": "Duas rodadas independentes de experiência, funcionamento e segurança concluídas; achados corrigidos e retestados. Produção ainda depende do deploy e sessão autenticada",
+      "producao": "PR #1675; CI remoto em execução. Deploy e validação autenticada pendentes",
+      "console": "Lint, camadas, 264 pares de contraste e build aprovados após a última correção. 18 cenários no browser; desktop 1440 e celulares 390/320"
+    },
+    "piloto": {
+      "produtos": [
+        "Lasanha bolonhesa",
+        "Nhoque de batata"
+      ],
+      "objetivo": "Lacuna de imagens 9:16 vinculadas a produto para Instagram",
+      "origem": "image_gen assistido; referências sintéticas aprovadas do lote anterior, inspecionadas antes da geração",
+      "dimensoes": "Dois originais nativos 941x1672, sem ampliação artificial",
+      "fidelidade": "Revisão visual às referências sintéticas, sem comprovação do produto real; aprovação humana pendente",
+      "estado": "Arquivos, hashes, prompts e referências registrados no catálogo local. Abaixo do critério de 1080 pixels; não publicados",
+      "evidencia": "hub-projeto/banco-imagens-2026-10-12/lote-2-registro.json"
+    },
+    "limites": [
+      "Consulta dos últimos 200 briefings e 200 solicitações concluídas; todas as pendentes permanecem visíveis",
+      "Referências novas escolhidas na página atual do acervo; escolhas preservadas quando filtros/respostas mudam",
+      "Não há OAuth, geração autônoma, confirmação automática de uso ou aprovação de novas imagens",
+      "Fotos públicas do cardápio são mapeadas separadamente até a origem e a adequação serem conferidas"
+    ]
+  }
+}

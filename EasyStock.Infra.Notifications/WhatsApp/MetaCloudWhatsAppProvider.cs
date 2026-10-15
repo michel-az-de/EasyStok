@@ -1,137 +1,291 @@
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
+﻿using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Notifications;
-using EasyStock.Infra.Notifications.Options;
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Services.Atendimento;
+using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Enums.Atendimento;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Polly;
-using Polly.Retry;
 
 namespace EasyStock.Infra.Notifications.WhatsApp;
 
+/// <summary>
+/// Provider da Meta no outbox de notificações (S09). Envia pela porta de canal (S34,
+/// <see cref="ResolvedorCanal"/> com <see cref="CanalConversa.WhatsApp"/>) e decide o formato pela
+/// janela de 24 h da conversa aberta do destinatário:
+/// <list type="bullet">
+/// <item>conversa aberta dentro da janela: texto renderizado, ou mensagem interativa quando há
+/// <c>Metadados["botao1..3"]</c> no formato <c>id|título</c> (S26);</item>
+/// <item>sem conversa aberta ou fora da janela, com <c>Metadados["template"]</c>: template com <c>param1..N</c>
+/// e, com <c>Metadados["imagem"]</c> (arte da campanha, #1226), a imagem no cabeçalho;</item>
+/// <item>dentro da janela com <c>Metadados["imagem"]</c>: imagem com o texto como legenda;</item>
+/// <item>conversa aberta fora da janela sem template: falha permanente, sem chamar a Meta;</item>
+/// <item>sem conversa e sem template: falha permanente; não existe janela comprovada.</item>
+/// </list>
+/// Com conversa aberta, a saída é copiada para o histórico como <c>Mensagem(Saida, Sistema)</c> com o <c>wamid</c>.
+/// <para>
+/// Desfecho (N2): o <c>wamid</c> volta em <see cref="ResultadoEnvio.IdExterno"/>. A mensagem sai no máximo uma vez,
+/// então 5xx, timeout e queda de conexão depois de chamar a Meta são <see cref="DesfechoEnvio.Indeterminado"/>:
+/// a Meta pode ter aceitado e reenviar duplicaria. Falha antes de a Meta ser chamada e recusa 4xx que não é
+/// permanente (limite de taxa) seguem transitórias.
+/// </para>
+/// </summary>
 public sealed class MetaCloudWhatsAppProvider(
-    IHttpClientFactory httpClientFactory,
-    IOptions<MetaCloudWhatsAppOptions> options,
-    ILogger<MetaCloudWhatsAppProvider> logger) : IProvedorWhatsApp
+    ResolvedorCanal resolvedorCanal,
+    IConversaRepository conversaRepository,
+    ITenantContextAccessor tenantContext,
+    IUnitOfWork unitOfWork,
+    ILogger<MetaCloudWhatsAppProvider> logger, IClienteRepository? clientes = null,
+    PoliticaEnvioCliente? politica = null) : IProvedorWhatsApp
 {
-    public string Nome => "meta";
+    public const string ErroForaDaJanelaSemTemplate = "fora_da_janela_24h_sem_template";
 
-    private static readonly ResiliencePipeline Pipeline = new ResiliencePipelineBuilder()
-        .AddRetry(new RetryStrategyOptions
-        {
-            MaxRetryAttempts = 3,
-            BackoffType = DelayBackoffType.Exponential,
-            Delay = TimeSpan.FromSeconds(1),
-            ShouldHandle = new PredicateBuilder().Handle<HttpRequestException>()
-        })
-        .Build();
+    /// <summary>Limite da Meta para a legenda de uma imagem.</summary>
+    public const int LegendaImagemTamanhoMaximo = 1024;
+
+    private const string IdiomaPadrao = "pt_BR";
+
+    public string Nome => "meta";
 
     public async Task<ResultadoEnvio> EnviarAsync(MensagemPronta mensagem, CancellationToken ct = default)
     {
-        var opts = options.Value;
         var sw = System.Diagnostics.Stopwatch.StartNew();
+        var template = LerTemplate(mensagem.Metadados);
+        var botoes = LerBotoes(mensagem.Metadados);
+        var imagem = LerImagem(mensagem.Metadados);
+        // Só depois de começar a chamar a Meta um timeout ou queda deixa a entrega indeterminada; antes, nada saiu.
+        var chamouAMeta = false;
 
         try
         {
-            await Pipeline.ExecuteAsync(async pollyToken =>
+            var agora = DateTime.UtcNow;
+            var contato = Conversa.NormalizarContato(CanalConversa.WhatsApp, mensagem.Destinatario);
+            var conversa = await ObterConversaAbertaAsync(mensagem.EmpresaId, contato, ct);
+            var clienteAtualId = conversa?.ClienteId;
+            if (clienteAtualId is null && mensagem.Metadados is { } metadata && metadata.TryGetValue("clienteId", out var id)
+                && Guid.TryParse(id, out var clienteEnfileiradoId)) clienteAtualId = clienteEnfileiradoId;
+            if (clienteAtualId is { } clienteId && clientes is not null)
             {
-                using var client = httpClientFactory.CreateClient("MetaWhatsApp");
-                client.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue("Bearer", opts.AccessToken);
+                var cliente = await clientes.GetByIdAsync(mensagem.EmpresaId, clienteId);
+                if (cliente is null || cliente.EmpresaId != mensagem.EmpresaId || cliente.Bloqueado)
+                    return Falha("cliente_bloqueado_ou_indisponivel", permanente: true, sw);
+                if (politica is not null && mensagem.Categoria == Domain.Enums.Notifications.CategoriaConteudoNotificacao.Transacional
+                    && !await politica.PodeEnviarAsync(mensagem.EmpresaId, clienteId, CanalConversa.WhatsApp, FinalidadeContato.Transacional, ct))
+                    return Falha("contato_transacional_revogado", permanente: true, sw);
+            }
+            var dentroDaJanela = conversa?.DentroDaJanela(agora) == true;
 
-                var url = $"{opts.BaseUrl}/{opts.PhoneNumberId}/messages";
-                var body = JsonSerializer.Serialize(new
-                {
-                    messaging_product = "whatsapp",
-                    to = mensagem.Destinatario,
-                    type = "text",
-                    text = new { body = mensagem.Corpo }
-                });
+            if (!dentroDaJanela && template is null)
+                return Falha(ErroForaDaJanelaSemTemplate, permanente: true, sw);
 
-                var content = new StringContent(body, Encoding.UTF8, "application/json");
-                var response = await client.PostAsync(url, content, pollyToken);
-                response.EnsureSuccessStatusCode();
-            }, ct);
+            var canal = resolvedorCanal.Obter(CanalConversa.WhatsApp);
+            chamouAMeta = true;
+            string wamid;
+            if (template is { } t && !dentroDaJanela)
+                wamid = botoes.Count > 0
+                    ? await canal.EnviarModeloAsync(contato, t.Nome, t.Idioma, t.Parametros, botoes, ct)
+                    : imagem is not null
+                        ? await canal.EnviarModeloComImagemAsync(contato, t.Nome, t.Idioma, t.Parametros, imagem, ct)
+                        : await canal.EnviarModeloAsync(contato, t.Nome, t.Idioma, t.Parametros, ct);
+            else if (botoes.Count > 0 && dentroDaJanela)
+                wamid = await canal.EnviarBotoesAsync(contato, mensagem.Corpo, botoes, ct);
+            else if (imagem is not null)
+                wamid = await EnviarImagemComTextoAsync(canal, contato, imagem, mensagem.Corpo, ct);
+            else
+                wamid = await canal.EnviarTextoAsync(contato, mensagem.Corpo, ct);
+
+            if (conversa is not null)
+                await RegistrarNoHistoricoSemReenvioAsync(conversa, mensagem, wamid, agora, ct);
 
             sw.Stop();
-            return new ResultadoEnvio(Sucesso: true, ProviderUsado: "meta", DuracaoMs: sw.ElapsedMilliseconds);
+            return new ResultadoEnvio(Sucesso: true, ProviderUsado: Nome, DuracaoMs: sw.ElapsedMilliseconds)
+            {
+                IdExterno = wamid
+            };
         }
-        catch (Exception ex)
+        catch (TextoAposImagemFalhouException ex)
         {
-            sw.Stop();
-            logger.LogError(ex, "Falha Meta WhatsApp para {Destinatario}", mensagem.Destinatario);
-            return new ResultadoEnvio(Sucesso: false, ProviderUsado: "meta",
-                ErroDetalhado: ex.Message, DuracaoMs: sw.ElapsedMilliseconds);
+            // #1507: a imagem já saiu. Repetir reenviaria a imagem, então a falha do texto não pode ser transitória.
+            logger.LogError(ex.InnerException, "Meta WhatsApp: imagem enviada, texto falhou: entrega indeterminada (outbox {OutboxId}).",
+                mensagem.OutboxId);
+            return Indeterminado(ex.Message, (ex.InnerException as WhatsAppCloudException)?.StatusHttp, sw);
+        }
+        catch (WhatsAppCloudException ex) when (ex.Codigo == WhatsAppCloudException.CodigoForaDaJanela && template is null)
+        {
+            logger.LogWarning("Meta recusou texto fora da janela de 24 h (outbox {OutboxId}).", mensagem.OutboxId);
+            return Falha(ErroForaDaJanelaSemTemplate, permanente: true, sw);
+        }
+        catch (WhatsAppCloudException ex) when (!ex.EhPermanente && ex.StatusHttp is >= 500)
+        {
+            logger.LogError(ex, "Meta WhatsApp respondeu HTTP {Status}: entrega indeterminada (outbox {OutboxId}).",
+                ex.StatusHttp, mensagem.OutboxId);
+            return Indeterminado(ex.Message, ex.StatusHttp, sw);
+        }
+        catch (WhatsAppCloudException ex)
+        {
+            logger.LogError(ex, "Falha Meta WhatsApp {Codigo} (outbox {OutboxId}).", ex.Codigo, mensagem.OutboxId);
+            return Falha(ex.Message, permanente: ex.EhPermanente, sw);
+        }
+        catch (Exception ex) when (chamouAMeta && !ct.IsCancellationRequested && ClassificadorDeFalha.EhFalhaDeTransporte(ex))
+        {
+            // Timeout (TaskCanceledException do HttpClient ou TimeoutRejectedException da Polly) e queda de conexão: o
+            // cancelamento do chamador, que desliga o host, não entra aqui e sobe como antes.
+            logger.LogError(ex, "Meta WhatsApp sem confirmação: entrega indeterminada (outbox {OutboxId}).", mensagem.OutboxId);
+            return Indeterminado(ex.Message, statusHttp: null, sw);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Falha Meta WhatsApp (outbox {OutboxId}).", mensagem.OutboxId);
+            return Falha(ex.Message, permanente: false, sw);
         }
     }
 
     /// <summary>
-    /// Onda 2.1 — envia mensagem via template aprovado na Meta Business Manager.
-    /// Templates exigem aprovacao previa (24-72h); fora da janela de 24h pos-ultima-resposta-do-cliente,
-    /// SO templates podem ser enviados (utility/marketing/authentication categories).
-    ///
-    /// <para>
-    /// Variaveis sao posicionais ({{1}}, {{2}}, ...) na ordem definida no template aprovado.
-    /// languageCode segue padrao IETF (pt_BR, en_US).
-    /// </para>
+    /// Onda 2.1 — envia template aprovado na Meta, direto (diagnóstico do admin). Variáveis posicionais
+    /// ({{1}}, {{2}}, ...) na ordem do template aprovado; <paramref name="languageCode"/> no padrão da Meta (pt_BR).
     /// </summary>
     public async Task<ResultadoEnvio> EnviarTemplateAsync(
         string destino,
         string templateName,
         IReadOnlyList<string> vars,
-        string languageCode = "pt_BR",
+        string languageCode = IdiomaPadrao,
         CancellationToken ct = default)
     {
-        var opts = options.Value;
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
         try
         {
-            await Pipeline.ExecuteAsync(async pollyToken =>
-            {
-                using var client = httpClientFactory.CreateClient("MetaWhatsApp");
-                client.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue("Bearer", opts.AccessToken);
-
-                var url = $"{opts.BaseUrl}/{opts.PhoneNumberId}/messages";
-                var parameters = vars.Select(v => new { type = "text", text = v }).ToArray();
-                var components = vars.Count > 0
-                    ? new object[] { new { type = "body", parameters } }
-                    : Array.Empty<object>();
-
-                var body = JsonSerializer.Serialize(new
-                {
-                    messaging_product = "whatsapp",
-                    to = destino,
-                    type = "template",
-                    template = new
-                    {
-                        name = templateName,
-                        language = new { code = languageCode },
-                        components
-                    }
-                });
-
-                var content = new StringContent(body, Encoding.UTF8, "application/json");
-                var response = await client.PostAsync(url, content, pollyToken);
-                if (!response.IsSuccessStatusCode)
-                {
-                    var detalhe = await response.Content.ReadAsStringAsync(pollyToken);
-                    throw new InvalidOperationException(
-                        $"Meta WhatsApp retornou HTTP {(int)response.StatusCode}: {detalhe}");
-                }
-            }, ct);
-
+            await resolvedorCanal.Obter(CanalConversa.WhatsApp).EnviarModeloAsync(destino, templateName, languageCode, vars, ct);
             sw.Stop();
             return new ResultadoEnvio(Sucesso: true, ProviderUsado: "meta:template", DuracaoMs: sw.ElapsedMilliseconds);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             sw.Stop();
-            logger.LogError(ex, "Falha Meta WhatsApp template {Template} para {Destinatario}", templateName, destino);
+            // Nome do template pode vir do diagnóstico do admin: sem quebra de linha no log (log forging).
+            logger.LogError(ex, "Falha Meta WhatsApp template {Template}.",
+                templateName.Replace("\r", "", StringComparison.Ordinal).Replace("\n", "", StringComparison.Ordinal));
             return new ResultadoEnvio(Sucesso: false, ProviderUsado: "meta:template",
                 ErroDetalhado: ex.Message, DuracaoMs: sw.ElapsedMilliseconds);
         }
+    }
+
+    private async Task<Conversa?> ObterConversaAbertaAsync(Guid empresaId, string contato, CancellationToken ct)
+    {
+        // Diagnóstico do admin envia sem empresa: não há conversa para consultar.
+        if (empresaId == Guid.Empty) return null;
+
+        // O dispatcher roda sem claim JWT: sem o tenant, o filtro global e a RLS zeram a busca.
+        tenantContext.SetCurrentTenant(empresaId);
+        return await conversaRepository.ObterAbertaPorContatoAsync(empresaId, CanalConversa.WhatsApp, contato, ct);
+    }
+
+    /// <summary>
+    /// #1290: a Meta já entregou. Falha ao gravar a cópia no histórico não pode voltar como falha do envio,
+    /// senão o outbox reenvia a mesma mensagem ao cliente. Loga e descarta o pendente: o dispatcher grava
+    /// o resultado do outbox no mesmo escopo, e o insert inválido derrubaria o commit dele também.
+    /// </summary>
+    private async Task RegistrarNoHistoricoSemReenvioAsync(
+        Conversa conversa, MensagemPronta mensagem, string wamid, DateTime agora, CancellationToken ct)
+    {
+        try
+        {
+            await RegistrarNoHistoricoAsync(conversa, mensagem.Corpo, wamid, agora, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "Meta WhatsApp: enviado (wamid {Wamid}), mas a cópia no histórico da conversa {ConversaId} falhou (outbox {OutboxId}).",
+                wamid, conversa.Id, mensagem.OutboxId);
+            unitOfWork.DescartarAlteracoesPendentes();
+        }
+    }
+
+    private async Task RegistrarNoHistoricoAsync(Conversa conversa, string texto, string wamid, DateTime agora, CancellationToken ct)
+    {
+        var copia = Mensagem.Saida(conversa.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora,
+            TipoConteudoMensagem.Texto, Truncar(texto), wamid);
+        conversa.RegistrarSaida(agora);
+        await conversaRepository.AddMensagemAsync(copia, ct);
+        await unitOfWork.CommitAsync();
+    }
+
+    /// <summary>
+    /// Imagem com o texto como legenda (#1226: arte da campanha dentro da janela). Legenda acima do limite
+    /// da Meta sai em duas mensagens: a imagem sem legenda e depois o texto, cujo id fica no histórico.
+    /// Falha do texto depois de a imagem sair sobe como <see cref="TextoAposImagemFalhouException"/> (Indeterminado).
+    /// </summary>
+    private static async Task<string> EnviarImagemComTextoAsync(
+        ICanalMensageria canal, string contato, string imagem, string texto, CancellationToken ct)
+    {
+        if (texto.Length <= LegendaImagemTamanhoMaximo)
+            return await canal.EnviarImagemAsync(contato, imagem, texto, ct);
+
+        await canal.EnviarImagemAsync(contato, imagem, null, ct);
+        try
+        {
+            return await canal.EnviarTextoAsync(contato, texto, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            throw new TextoAposImagemFalhouException(ex);
+        }
+    }
+
+    /// <summary>A imagem saiu e o texto que a segue falhou: o envio já é parcial.</summary>
+    private sealed class TextoAposImagemFalhouException(Exception inner) : Exception(inner.Message, inner);
+
+    /// <summary><c>imagem</c>: URL HTTPS pública (cabeçalho do template ou imagem com legenda na janela).</summary>
+    private static string? LerImagem(IReadOnlyDictionary<string, string>? metadados) =>
+        metadados is not null && metadados.TryGetValue("imagem", out var url) && !string.IsNullOrWhiteSpace(url)
+            ? url.Trim()
+            : null;
+
+    private static (string Nome, string Idioma, IReadOnlyList<string> Parametros)? LerTemplate(
+        IReadOnlyDictionary<string, string>? metadados)
+    {
+        if (metadados is null || !metadados.TryGetValue("template", out var nome) || string.IsNullOrWhiteSpace(nome))
+            return null;
+
+        var idioma = metadados.TryGetValue("idioma", out var i) && !string.IsNullOrWhiteSpace(i) ? i.Trim() : IdiomaPadrao;
+        var parametros = new List<string>();
+        for (var n = 1; metadados.TryGetValue($"param{n}", out var valor); n++)
+            parametros.Add(valor);
+
+        return (nome.Trim(), idioma, parametros);
+    }
+
+    /// <summary><c>botao1..3</c> no formato <c>id|título</c>; entradas vazias ou sem título são ignoradas.</summary>
+    private static IReadOnlyList<(string Id, string Titulo)> LerBotoes(IReadOnlyDictionary<string, string>? metadados)
+    {
+        var botoes = new List<(string Id, string Titulo)>();
+        if (metadados is null) return botoes;
+
+        for (var n = 1; n <= 3; n++)
+        {
+            if (!metadados.TryGetValue($"botao{n}", out var valor) || string.IsNullOrWhiteSpace(valor)) continue;
+            var separador = valor.LastIndexOf('|');
+            if (separador <= 0 || separador == valor.Length - 1) continue;
+            botoes.Add((valor[..separador].Trim(), valor[(separador + 1)..].Trim()));
+        }
+
+        return botoes;
+    }
+
+    private static string Truncar(string texto) =>
+        texto.Length <= Mensagem.TextoTamanhoMaximo ? texto : texto[..Mensagem.TextoTamanhoMaximo];
+
+    private ResultadoEnvio Falha(string erro, bool permanente, System.Diagnostics.Stopwatch sw)
+    {
+        sw.Stop();
+        return new ResultadoEnvio(Sucesso: false, ProviderUsado: Nome, ErroDetalhado: erro,
+            DuracaoMs: sw.ElapsedMilliseconds, FalhaPermanente: permanente);
+    }
+
+    private ResultadoEnvio Indeterminado(string erro, int? statusHttp, System.Diagnostics.Stopwatch sw)
+    {
+        sw.Stop();
+        return ResultadoEnvio.Indeterminado(Nome, erro, statusHttp, sw.ElapsedMilliseconds);
     }
 }

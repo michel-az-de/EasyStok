@@ -1,4 +1,4 @@
-﻿namespace EasyStock.Domain.Entities.Storefront;
+namespace EasyStock.Domain.Entities.Storefront;
 
 /// <summary>
 /// Template recorrente de janela de entrega por dia da semana (ADR-0011).
@@ -54,20 +54,7 @@ public class JanelaEntrega
         if (storefrontId == Guid.Empty)
             throw new RegraDeDominioVioladaException("StorefrontId é obrigatório.");
 
-        if (diaDaSemana is < 0 or > 6)
-            throw new RegraDeDominioVioladaException(
-                $"Dia da semana inválido (recebido: {diaDaSemana}). Use 0=Domingo a 6=Sábado.");
-
-        if (horaFim <= horaInicio)
-            throw new RegraDeDominioVioladaException(
-                $"HoraFim ({horaFim}) deve ser maior que HoraInicio ({horaInicio}).");
-
-        if (capacidadeMaxima <= 0)
-            throw new RegraDeDominioVioladaException(
-                $"Capacidade máxima deve ser positiva (recebido: {capacidadeMaxima}).");
-
-        if (string.IsNullOrWhiteSpace(label))
-            throw new RegraDeDominioVioladaException("Label é obrigatório.");
+        Validar(diaDaSemana, horaInicio, horaFim, capacidadeMaxima, label);
 
         var agora = DateTime.UtcNow;
         return new JanelaEntrega
@@ -83,6 +70,36 @@ public class JanelaEntrega
             CriadoEm = agora,
             AlteradoEm = agora,
         };
+    }
+
+    /// <summary>Edição pelo cadastro da loja (S45). Mesmas regras da criação; inválido não muda nada.</summary>
+    public void Atualizar(int diaDaSemana, TimeOnly horaInicio, TimeOnly horaFim, int capacidadeMaxima, string label)
+    {
+        Validar(diaDaSemana, horaInicio, horaFim, capacidadeMaxima, label);
+        DiaDaSemana = diaDaSemana;
+        HoraInicio = horaInicio;
+        HoraFim = horaFim;
+        CapacidadeMaxima = capacidadeMaxima;
+        Label = label.Trim();
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    private static void Validar(int diaDaSemana, TimeOnly horaInicio, TimeOnly horaFim, int capacidadeMaxima, string label)
+    {
+        if (diaDaSemana is < 0 or > 6)
+            throw new RegraDeDominioVioladaException(
+                $"Dia da semana inválido (recebido: {diaDaSemana}). Use 0=Domingo a 6=Sábado.");
+
+        if (horaFim <= horaInicio)
+            throw new RegraDeDominioVioladaException(
+                $"HoraFim ({horaFim}) deve ser maior que HoraInicio ({horaInicio}).");
+
+        if (capacidadeMaxima <= 0)
+            throw new RegraDeDominioVioladaException(
+                $"Capacidade máxima deve ser positiva (recebido: {capacidadeMaxima}).");
+
+        if (string.IsNullOrWhiteSpace(label))
+            throw new RegraDeDominioVioladaException("Label é obrigatório.");
     }
 
     public void Ativar()

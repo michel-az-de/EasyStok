@@ -37,7 +37,7 @@ public class CardapioController(
                 return;
             }
             TempData["Toast"] = "warning|Acesso restrito: só administradores gerenciam o cardápio.";
-            context.Result = RedirectToAction("Index", "Dashboard");
+            context.Result = RedirectToAction("Index", "Launcher");
         }
     }
 

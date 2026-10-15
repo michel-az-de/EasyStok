@@ -27,6 +27,15 @@ public interface IOutboxEventoIntegracaoRepository
         CancellationToken ct = default);
 
     /// <summary>
+    /// Próximos N pendentes de todos os shards numa consulta só (#1575), na ordem em que o dispatcher
+    /// percorria os shards: por shard e, dentro dele, FIFO por CriadoEm. Cross-tenant, como o método
+    /// por shard.
+    /// </summary>
+    Task<IReadOnlyList<OutboxEventoIntegracao>> ProximosPendentesDeTodosOsShardsAsync(
+        int max,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Lista eventos da empresa pra painel admin/observabilidade.
     /// Filtros opcionais por status e tipoEvento.
     /// </summary>
@@ -42,4 +51,12 @@ public interface IOutboxEventoIntegracaoRepository
     /// dispatcher. Cross-tenant. Retorna 0 se nada pendente.
     /// </summary>
     Task<TimeSpan> LagDoMaisAntigoPendenteAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Watchdog (#928): reclama até <paramref name="max"/> eventos presos em
+    /// <c>EmEnvio</c> além do lease (<c>ProximaTentativaEm &lt; now</c>) — worker caiu
+    /// ou commit pós-handler falhou — voltando-os a <c>Pendente</c> (ou <c>Falhado</c>
+    /// se esgotaram as tentativas). Cross-tenant. Retorna a quantidade reclamada.
+    /// </summary>
+    Task<int> ReclamarEmEnvioExpiradosAsync(int max, CancellationToken ct = default);
 }

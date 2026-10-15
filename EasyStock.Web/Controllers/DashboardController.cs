@@ -2,11 +2,10 @@ using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Dashboard;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
 
 namespace EasyStock.Web.Controllers;
 
-public class DashboardController(ApiClient api, SessionService session, IOptions<FeaturesOptions> features) : BaseController(session)
+public class DashboardController(ApiClient api, SessionService session) : BaseController(session)
 {
     [HttpGet("/dashboard")]
     public async Task<IActionResult> Index()
@@ -17,11 +16,7 @@ public class DashboardController(ApiClient api, SessionService session, IOptions
         var lojas = await api.GetAsync<List<Loja>>("lojas");
         ViewBag.Lojas = lojas.Success && lojas.Data is not null ? lojas.Data : new List<Loja>();
 
-        var vm = new DashboardViewModel
-        {
-            // issue #770: atalho "Emitir NF-e" so aparece com o modulo fiscal habilitado.
-            TemModuloFiscalHabilitado = features.Value.FiscalHabilitado,
-        };
+        var vm = new DashboardViewModel();
 
         var dashTask = api.GetAsync<DashboardResumoApi>("analytics/dashboard");
         var diaTask = api.GetAsync<ResumoDiaApi>("analytics/dia");
@@ -62,6 +57,8 @@ public class DashboardController(ApiClient api, SessionService session, IOptions
             vm.CaixaAbertaHoje = dia.CaixaAbertaHoje;
             vm.CaixaFechadaHoje = dia.CaixaFechadaHoje;
             vm.SaldoCaixaAtual = dia.SaldoCaixaAtual;
+            vm.CaixaVendas = dia.CaixaVendas;
+            vm.CaixaPagamentosPedidos = dia.CaixaPagamentosPedidos;
             vm.PixRecebidosHoje = dia.PixRecebidosHoje;
             vm.ValorPixHoje = dia.ValorPixHoje;
             vm.OnboardingCompleto = dia.OnboardingCompleto;

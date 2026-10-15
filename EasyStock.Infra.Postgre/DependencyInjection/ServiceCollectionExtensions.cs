@@ -1,13 +1,11 @@
-﻿using EasyStock.Application.Events.Storefront.Handlers;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
-using EasyStock.Application.Ports.Output.Caching;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Storefront.Avaliacao;
-using EasyStock.Infra.Postgre.Caching;
+using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Configuration;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Data.Interceptors;
@@ -28,6 +26,11 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             IConfiguration configuration)
         {
             services.Configure<CacheOptions>(configuration.GetSection("Cache"));
+            // API e Worker compartilham a barreira contra avisos externos da empresa de demonstração.
+            services.TryAddSingleton(new EasyStock.Application.UseCases.Atendimento.Entregas.ConfiguracaoLogistica(
+                Guid.TryParse(configuration["Logistica:EmpresaDemonstracaoId"], out var empresaDemo) ? empresaDemo : Guid.Empty,
+                new EasyStock.Application.Ports.Output.Integrations.FreteEndereco("Cozinha de demonstração",
+                    "Origem sintética de teste, São Paulo", "+5500000000000", -23.55, -46.63)));
 
             // Garante limites de pool sãos quando a connection string vem sem
             // controle (ex: Cloud SQL f1-micro aceita ~25 conexões totais; com
@@ -36,8 +39,6 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
 
             services.AddSingleton<AuditTimestampsInterceptor>();
             services.AddSingleton<SetTenantOnConnectionInterceptor>();
-            services.AddSingleton<ISubscriptionStatusCache, SubscriptionStatusCache>();
-            services.AddSingleton<AssinaturaCacheInvalidationInterceptor>();
             services.AddScoped<EntityChangeInterceptor>();
             // BUG-009 (#517): invalida o cache de saldo (produto-detalhe) em QUALQUER
             // mutacao de ItemEstoque via SaveChanges. Chokepoint — pega os 8 mutadores
@@ -58,14 +59,15 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 .AddInterceptors(
                     sp.GetRequiredService<AuditTimestampsInterceptor>(),
                     sp.GetRequiredService<SetTenantOnConnectionInterceptor>(),
-                    sp.GetRequiredService<AssinaturaCacheInvalidationInterceptor>(),
                     sp.GetRequiredService<EntityChangeInterceptor>(),
                     // BUG-009 (#517): por ULTIMO — captura o estado final da entidade.
                     sp.GetRequiredService<EstoqueSaldoCacheInvalidationInterceptor>()));
 
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EasyStockDbContext>());
+            services.AddScoped<IAcervoRepository, Repositories.AcervoRepository>();
             services.AddScoped<ICategoriaRepository, CategoriaRepository>();
             services.AddScoped<IEmpresaRepository, EmpresaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.ITenantContextAccessor, EasyStock.Infra.Postgre.TenantContextAccessor>();
             services.AddScoped<IProdutoRepository, ProdutoRepository>();
             services.AddScoped<IProdutoVariacaoRepository, ProdutoVariacaoRepository>();
             services.AddScoped<IProdutoCaracteristicaRepository, ProdutoCaracteristicaRepository>();
@@ -78,9 +80,34 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<INotificacaoRepository, NotificacaoRepository>();
             services.AddScoped<ILojaRepository, LojaRepository>();
             services.AddScoped<IConfiguracaoLojaRepository, ConfiguracaoLojaRepository>();
+            services.AddScoped<IConfiguracaoAtendimentoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ConfiguracaoAtendimentoRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConsentimentoContatoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ConsentimentoContatoRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IRespostaProntaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.RespostaProntaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICadernoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.CadernoRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IRegraAutomaticaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.RegraAutomaticaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IMensagemProgramadaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.MensagemProgramadaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Campanhas.IInteresseItemRepository, EasyStock.Infra.Postgre.Repositories.Campanhas.InteresseItemRepository>(); // S31
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ILembreteRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.LembreteRepository>();
+            // S44: entregadores, viagens e chamado.
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IEntregadorRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.EntregadorRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IViagemRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ViagemRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IChamadoEntregadorRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ChamadoEntregadorRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICorridaExternaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.CorridaExternaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ILogisticaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.LogisticaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICustoDeEntregaQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.CustoDeEntregaQuery>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IEntregasPorBairroQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.EntregasPorBairroQuery>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IAgendaPedidosQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.AgendaPedidosQuery>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICandidatosLembreteQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.CandidatosLembreteQuery>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IExpedienteLojaRepository, EasyStock.Infra.Postgre.Repositories.Storefront.ExpedienteLojaRepository>();
             services.AddScoped<IPreferenciaMenuRepository, PreferenciaMenuRepository>();
             services.AddScoped<IFornecedorRepository, FornecedorRepository>();
             services.AddScoped<IClienteRepository, ClienteRepository>();
+            services.AddScoped<IClienteCrmRepository, ClienteCrmRepository>(); // S24
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Campanhas.ICampanhaRepository, EasyStock.Infra.Postgre.Repositories.Campanhas.CampanhaRepository>(); // S28
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Campanhas.ICampanhaPublicoQueries, EasyStock.Infra.Postgre.Queries.CampanhaPublicoQueries>(); // S29
+            services.AddScoped<IHistoricoPedidosClienteQueries, EasyStock.Infra.Postgre.Queries.HistoricoPedidosClienteQueries>(); // S25
+            services.AddScoped<IDesacertosEstoqueQueries, EasyStock.Infra.Postgre.Queries.DesacertosEstoqueQueries>(); // S22
+            services.AddScoped<IDomicilioQueries, EasyStock.Infra.Postgre.Queries.DomicilioQueries>(); // S25
             services.AddScoped<IPedidoRepository, PedidoRepository>();
             services.AddScoped<ICaixaRepository, CaixaRepository>();
             services.AddScoped<ILoteRepository, LoteRepository>();
@@ -92,7 +119,6 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IPerfilRepository, PerfilRepository>();
             services.AddScoped<IPlanoRepository, PlanoRepository>();
             services.AddScoped<IAssinaturaEmpresaRepository, AssinaturaEmpresaRepository>();
-            services.AddScoped<ICupomRepository, CupomRepository>();
             services.AddScoped<IUsuarioEmpresaRepository, UsuarioEmpresaRepository>();
             services.AddScoped<IUsuarioPerfilRepository, UsuarioPerfilRepository>();
             services.AddScoped<IAuditLogRepository, AuditLogRepository>();
@@ -100,14 +126,12 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IResetTokenRepository, ResetTokenRepository>();
             services.AddScoped<IEmailConfirmationTokenRepository, EmailConfirmationTokenRepository>();
             services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
-            services.AddScoped<IAnuncioIaRepository, AnuncioIaRepository>();
             services.AddScoped<IUsoIaRepository, UsoIaRepository>();
             services.AddScoped<IProdutoAlteracaoRepository, ProdutoAlteracaoRepository>();
             services.AddScoped<IProdutoComposicaoRepository, ProdutoComposicaoRepository>();
             services.AddScoped<IProdutoComposicaoAlteracaoRepository, ProdutoComposicaoAlteracaoRepository>();
             services.AddScoped<IMovimentacaoEstoqueAlteracaoRepository, MovimentacaoEstoqueAlteracaoRepository>();
             services.AddScoped<IIdempotencyKeyRepository, IdempotencyKeyRepository>();
-            services.AddScoped<ICobrancaAssinaturaRepository, CobrancaAssinaturaRepository>();
             services.AddScoped<IFaturaRepository, FaturaRepository>();
             services.AddScoped<IFaturaNumeradorService, FaturaNumeradorService>();
             services.AddScoped<ILancamentoRepository, LancamentoRepository>();
@@ -118,6 +142,16 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Repositories.Pagamentos.PaymentAttemptRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Pagamentos.IGatewayRoutingRuleRepository,
                 Repositories.Pagamentos.GatewayRoutingRuleRepository>();
+            // S11: cobrança do pedido
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Pagamentos.IEstornoOnlineRepository, Repositories.Pagamentos.EstornoOnlineRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository,
+                Repositories.Pagamentos.CobrancaPedidoRepository>();
+            // S20: fila de impressão do canhoto
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Operacao.IImpressaoPendenteRepository,
+                Repositories.Operacao.ImpressaoPendenteRepository>();
+            // S27: ocorrência e reembolso
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IOcorrenciaRepository,
+                Repositories.Atendimento.OcorrenciaRepository>();
 
             // Modulo Contas a Pagar / Contas a Receber (CAP/CAR)
             services.AddScoped<IContaPagarRepository, ContaPagarRepository>();
@@ -125,29 +159,13 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<ICategoriaFinanceiraRepository, CategoriaFinanceiraRepository>();
             services.AddScoped<ICentroCustoRepository, CentroCustoRepository>();
             services.AddScoped<IFluxoCaixaQueries, FluxoCaixaQueries>();
+            services.AddScoped<IKdsPedidoQueries, KdsPedidoQueries>(); // S19: KDS do console
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Operacao.IPedidoImpressoQueries, PedidoImpressoQueries>(); // S49: impresso do pedido
+            services.AddScoped<IPrazoPreparoPedidoQueries, PrazoPreparoPedidoQueries>(); // S21: início previsto
 
-            services.AddScoped<IClienteTicketRepository, ClienteTicketRepository>();
-            services.AddScoped<IAdminTicketRepository, AdminTicketRepository>();
-            services.AddScoped<IFaqRepository, FaqRepository>();
-            services.AddScoped<IFaqAdminRepository, FaqAdminRepository>();
-            services.AddScoped<IBannerRepository, BannerRepository>();
-            services.AddScoped<IBannerConfirmacaoRepository, BannerConfirmacaoRepository>();
-            services.AddScoped<IBannerRecebimentoQuery, BannerRecebimentoQuery>();
-            services.AddScoped<ILeadPublicoRepository, LeadPublicoRepository>();
             services.AddScoped<IAdminTenantsQueries, AdminTenantsQueries>();
-            services.AddScoped<IAdminAuditLogQueries, AdminAuditLogQueries>();
-            services.AddScoped<IAdminStatusQueries, AdminStatusQueries>();
-            services.AddScoped<IAdminBuscaGlobalQueries, AdminBuscaGlobalQueries>();
-            services.AddScoped<IApkReleaseRepository, ApkReleaseRepository>();
-            services.AddScoped<IConfiguracaoSistemaRepository, ConfiguracaoSistemaRepository>();
-            services.AddScoped<IPlanoAdminRepository, PlanoAdminRepository>();
-            services.AddScoped<ICupomAdminRepository, CupomAdminRepository>();
-            services.AddScoped<IAdminDashboardQueries, AdminDashboardQueries>();
-            services.AddScoped<IFleetOperationQueries, FleetOperationQueries>();
-            services.AddScoped<IRevenueMetricsQueries, RevenueMetricsQueries>(); // ADR-0037 adendo / #754
-            services.AddScoped<IMetricasFinanceirasQueries, MetricasFinanceirasQueries>(); // #762 — bypass condicional a SuperAdmin
+            services.AddScoped<ITenantFeatureFlagRepository, TenantFeatureFlagRepository>();
             services.AddScoped<IEntityAuditQueries, EntityAuditQueries>();
-            services.AddScoped<ICiAutoTicketRepository, CiAutoTicketRepository>();
             services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
 
             // Modulo Integration (F3) — credenciais cifradas por tenant + resolver AES-256-GCM
@@ -167,27 +185,52 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             // "sem handler"; a Onda 5 (#867) pluga Hiram/marketplace ao lado deste.
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Pedidos.Handlers.PedidoMudouStatusLogHandler>("pedido.mudou_status");
+            // estoque.desacerto (S17): observabilidade até S18/S22 plugarem consumidores reais.
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Estoque.Handlers.EstoqueDesacertadoLogHandler>(
+                EasyStock.Application.Events.Estoque.EstoqueDesacertadoEvent.TipoEventoOutbox);
+            // S11: pedido.pago (S13, S18 e S20 entram ao lado deste).
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Pedidos.Handlers.PedidoPagoLogHandler>(
+                EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+            // S13: avisos de status ao cliente pelo WhatsApp (outbox de notificações).
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Pedidos.Handlers.NotificarClienteStatusPedidoHandler>("pedido.mudou_status");
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Pedidos.Handlers.NotificarClientePedidoPagoHandler>(
+                EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
 
-            // Modulo Fiscal NFC-e (F1) — repositorios + servicos sobre Nfe*
-            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.INfeRepository,
-                Repositories.Fiscal.NfeRepository>();
-            services.AddScoped<EasyStock.Application.Ports.Output.Fiscal.INumeracaoNfeService,
-                Repositories.Fiscal.NumeracaoNfeService>();
-            services.AddScoped<EasyStock.Application.Ports.Output.Fiscal.IGeradorChaveAcesso,
-                Repositories.Fiscal.GeradorChaveAcesso>();
-            services.AddScoped<EasyStock.Application.Ports.Output.Fiscal.ICertificadoA1Repository,
-                Repositories.Fiscal.NfeCertificadoA1Repository>();
-            services.AddScoped<EasyStock.Application.Services.Fiscal.IConfigFiscalResolver,
-                Services.ConfigFiscalResolver>();
+            // #1228: pagamento confirmado fecha os interesses do cliente nos itens comprados (S31).
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Campanhas.FecharInteressesPedidoPagoHandler>(
+                EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+            // S42: mensagens automáticas por gatilho. #1506: a automática envia direto ao cliente, sem
+            // idempotência; fica por ÚLTIMO no tipo para que a falha de um handler seguinte não faça o
+            // outbox repetir o evento e o cliente receber a mesma mensagem de novo.
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.AutomacaoPedidoPagoHandler>(
+                EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.AutomacaoPedidoEntregueHandler>(
+                EasyStock.Application.Events.Atendimento.AutomacaoPedidoEntregueHandler.Tipo);
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.AutomacaoConversaAbertaHandler>(
+                EasyStock.Application.Events.Atendimento.ConversaAbertaEvent.TipoEvento);
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.AutomacaoConversaEncerradaHandler>(
+                EasyStock.Application.Events.Atendimento.ConversaEncerradaEvent.TipoEvento);
+
             services.AddScoped<EasyStock.Application.Ports.Output.Security.IRowLevelSecurityBypass,
                 Security.RowLevelSecurityBypass>();
-            // TODO F2: registrar IGatewayFiscal (FocusNFeAdapter) e INfeCertificadoA1Service em EasyStock.Infra.Integrations.Fiscal
 
             // Storefront — 12 repos para entities novas (ADR-0011, 0012, 0014, 0006)
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IStorefrontRepository,
                 Repositories.Storefront.StorefrontRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.ICardapioItemRepository,
                 Repositories.Storefront.CardapioItemRepository>();
+            // M1.3 (#1483): seções do cardápio.
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.ICardapioSecaoRepository,
+                Repositories.Storefront.CardapioSecaoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IFreteZonaRepository,
                 Repositories.Storefront.FreteZonaRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IJanelaEntregaRepository,
@@ -206,6 +249,20 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Repositories.Storefront.CheckoutIdempotencyRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IPedidoAvaliacaoRepository,
                 Repositories.Storefront.PedidoAvaliacaoRepository>();
+            // Atendimento (S04, ADR-0050)
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConversaRepository,
+                Repositories.Atendimento.ConversaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IAtendenteRepository,
+                Repositories.Atendimento.AtendenteRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ISessaoChatSiteRepository,
+                Repositories.Atendimento.SessaoChatSiteRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ILinkCardapioConversaRepository,
+                Repositories.Atendimento.LinkCardapioConversaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICreditoClienteComandaRepository,
+                Repositories.Atendimento.CreditoClienteComandaRepository>();
+            // #1102: número da Meta pelo qual a resposta sai = o da empresa do tenant corrente.
+            services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.IRemetenteWhatsApp,
+                Services.Atendimento.RemetenteWhatsAppDoTenant>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IStorefrontFaleConoscoRepository,
                 Repositories.Storefront.StorefrontFaleConoscoRepository>();
             // Storefront — autenticação OTP cliente (AUTH-002)
@@ -216,7 +273,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Repositories.Storefront.PedidoStorefrontRepository>();
 
             // Notification repositories (Templates, Rotinas, Outbox, Consentimentos, etc.)
-            services.AddEasyStockNotificationsRepositories();
+            services.AddEasyStockNotificationsRepositories(configuration);
 
             // AI: OpenAI tem prioridade; Anthropic como fallback; stub se nenhum habilitado
             var openAiEnabled = configuration.GetValue<bool>("OpenAI:Enabled");
@@ -225,24 +282,21 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             if (openAiEnabled)
             {
                 services.AddHttpClient("OpenAI");
-                services.AddScoped<IGeradorDescricaoAnuncio, GeradorDescricaoAnuncioOpenAI>();
-                services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioOpenAIStreaming>();
                 services.AddScoped<IGeradorAutoPreenchimento, GeradorAutoPreenchimentoOpenAI>();
             }
             else if (anthropicEnabled)
             {
                 services.AddHttpClient("Anthropic");
-                services.AddScoped<IGeradorDescricaoAnuncio, GeradorDescricaoAnuncioClaude>();
-                services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioClaudeStreaming>();
                 services.AddScoped<IGeradorAutoPreenchimento, GeradorAutoPreenchimentoClaude>();
             }
             else
             {
-                services.AddScoped<IGeradorDescricaoAnuncio, GeradorDescricaoAnuncioStub>();
-                services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioStubStreaming>();
                 services.AddScoped<IGeradorAutoPreenchimento, GeradorAutoPreenchimentoStub>();
             }
 
+            // #1575: API e Worker chamam este método, então os três serviços abaixo sobem nos dois hosts.
+            // Cada rodada pega um advisory lock e quem não pega pula.
+            services.TryAddScoped<PostgresAdvisoryLock>();
             // F10-B: Retention service — limpa entity_alteracoes antigas (1x/dia).
             services.AddHostedService<EntityAlteracaoRetentionService>();
             // F10-D: Mobile alert service — verifica devices offline a cada 30min.
@@ -258,8 +312,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<AbrirPaginaAvaliacaoUseCase>();
             services.AddScoped<CriarAvaliacaoPedidoUseCase>();
             services.AddScoped<ListarAvaliacoesPublicoUseCase>();
-            services.AddScoped<EnviarLinkAvaliacaoWhatsAppHandler>();
-            services.AddHostedService<AgendarSolicitacaoAvaliacaoBackgroundService>();
+            // #1519: o pedido de avaliação sai pelo outbox (S26, AvaliacaoSolicitada 30 min após Entregue, com
+            // botões). O job antigo do link +24h foi aposentado: nunca enviou (a varredura esbarrava na RLS) e,
+            // consertado, mandaria um segundo pedido de avaliação com link para página que o site não tem.
 
             return services;
         }

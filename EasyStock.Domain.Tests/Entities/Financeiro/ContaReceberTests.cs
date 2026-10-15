@@ -48,7 +48,7 @@ public class ContaReceberTests
         c.Emitir();
 
         var pag = PagamentoParcela.CriarConfirmado(Empresa, TipoLadoFinanceiro.Receber, 100m, "pix", DateTime.UtcNow);
-        c.Parcelas.First().RegistrarPagamento(pag);
+        c.Parcelas.First().RegistrarPagamento(pag, DateTime.UtcNow);
         c.AtualizarStatusPorParcelas();
 
         c.Status.Should().Be(StatusContaFinanceira.Paga);
@@ -63,7 +63,7 @@ public class ContaReceberTests
         c.Emitir();
 
         var pagPagar = PagamentoParcela.CriarConfirmado(Empresa, TipoLadoFinanceiro.Pagar, 100m, "pix", DateTime.UtcNow);
-        var act = () => c.Parcelas.First().RegistrarPagamento(pagPagar);
+        var act = () => c.Parcelas.First().RegistrarPagamento(pagPagar, DateTime.UtcNow);
         act.Should().Throw<RegraDeDominioVioladaException>().WithMessage("*Receber*");
     }
 
@@ -76,7 +76,7 @@ public class ContaReceberTests
         c.Emitir();
 
         var pag = PagamentoParcela.CriarConfirmado(Empresa, TipoLadoFinanceiro.Receber, 30m, "pix", DateTime.UtcNow);
-        c.Parcelas.First().RegistrarPagamento(pag);
+        c.Parcelas.First().RegistrarPagamento(pag, DateTime.UtcNow);
 
         c.Pendente.Should().Be(120m); // 150 - 30
     }

@@ -42,6 +42,9 @@ public class SaidasService(ApiClient api, SessionService session) : TenantServic
         // ItemEstoqueId, quando presente, sinaliza saída de lote específico (sem FIFO).
         // Senão, ProdutoId aciona FIFO/FEFO no use case.
         Guid? itemEstoqueId = Guid.TryParse(vm.ItemEstoqueId, out var iid) ? iid : null;
+        // issue 917 Fase B: chave estável gerada no browser (vm.IdempotencyKey) tem
+        // prioridade sobre o fallback por-request de IdempotencyKeyHelper — ver doc
+        // no ViewModel. Sem ela (ex.: cliente antigo/JS desabilitado), cai no fallback.
         return await api.PostAsync<object>("estoque/saida", new
         {
             empresaId,
@@ -70,7 +73,7 @@ public class SaidasService(ApiClient api, SessionService session) : TenantServic
             observacoes = vm.Descricao,
             // #540: QuickSaida envia true — saída não trava, a falta vira descoberto auditável.
             permitirDescoberto = vm.PermitirDescoberto
-        });
+        }, idempotencyKey: vm.IdempotencyKey);
     }
 
     public Task<ApiResult<PagedResult<Movimentacao>>> ExportarAsync(string? periodoInicio = null, string? periodoFim = null)

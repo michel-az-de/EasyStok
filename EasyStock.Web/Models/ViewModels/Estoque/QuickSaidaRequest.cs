@@ -8,4 +8,7 @@ public class QuickSaidaRequest
     public decimal? Valor { get; set; }
     public string? Data { get; set; }
     public string? Motivo { get; set; }
+
+    /// <summary>issue 917 Fase B: gerado no browser ao abrir o modal (crypto.randomUUID()).</summary>
+    public string? IdempotencyKey { get; set; }
 }

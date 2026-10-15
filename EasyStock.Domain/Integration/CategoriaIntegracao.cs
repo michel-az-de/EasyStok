@@ -18,4 +18,10 @@ public enum CategoriaIntegracao
 
     /// <summary>Logística e transportadoras (99Entrega, Correios).</summary>
     Logistics = 4,
+
+    /// <summary>
+    /// Canais de mensagem (business token do WhatsApp da empresa, #1417). A coluna guarda o inteiro e não tem
+    /// check constraint: valor novo não pede migration.
+    /// </summary>
+    Mensageria = 5,
 }

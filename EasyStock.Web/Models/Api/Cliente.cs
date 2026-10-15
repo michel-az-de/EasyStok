@@ -17,6 +17,21 @@ public record Cliente
     public DateTime CriadoEm { get; init; }
     public DateTime AlteradoEm { get; init; }
     public string Status => Ativo ? "ativo" : "inativo";
+
+    // ── Pessoa jurídica (ADR-0048) ─────────────────────────────────────
+    public string TipoPessoa { get; init; } = "fisica";
+    public string? NomeFantasia { get; init; }
+    public string? InscricaoEstadual { get; init; }
+
+    public bool EhPessoaJuridica =>
+        string.Equals(TipoPessoa, "juridica", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Como o cliente aparece nas listagens: o nome fantasia quando existe, senão o Nome
+    /// (que para PJ é a razão social). É por ele que o operador reconhece a empresa.
+    /// </summary>
+    public string NomeExibicao =>
+        string.IsNullOrWhiteSpace(NomeFantasia) ? Nome : NomeFantasia!;
 }
 
 public record ClienteDetalhe

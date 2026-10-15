@@ -6,6 +6,12 @@
     var hojeIso = BrazilTime.Today().ToString("yyyy-MM-dd");
     var em30Iso = BrazilTime.Today().AddDays(30).ToString("yyyy-MM-dd");
 
+    // issue 375/BUG-005 (QA 2026-07-19): antes o card "Vencidas" somava TotalVencidoPagar +
+    // TotalVencidoReceber num numero so, e hrefVencidas apontava so pra /contas-a-pagar — o
+    // drill-in nao batia com o valor exibido. Trocado por "A Receber vencido" (so o lado
+    // receber, que e o que falta cobrar), com href correto. O lado "a pagar" ja esta
+    // corretamente discriminado no painel "Vencido em aberto" abaixo (linhas ~111-114).
+    // totalVencido segue existindo (usado no first-run e como soma bruta) — nao removido.
     var totalVencido = d.TotalVencidoPagar + d.TotalVencidoReceber;
     var saldoMes = d.TotalRecebidoMes - d.TotalPagoMes;
 
@@ -13,7 +19,7 @@
     // como string p/ evitar ambiguidade de '&' no atributo Razor (Razor HTML-encoda o '&').
     var hrefReceber  = $"/contas-a-receber?vencimentoDe={hojeIso}&vencimentoAte={em30Iso}";
     var hrefPagar    = $"/contas-a-pagar?vencimentoDe={hojeIso}&vencimentoAte={em30Iso}";
-    var hrefVencidas = $"/contas-a-pagar?vencimentoAte={hojeIso}";
+    var hrefVencidoReceber = $"/contas-a-receber?vencimentoAte={hojeIso}";
 
     // First-run: dashboard ainda sem nenhum lancamento. Os 4 KPIs continuam visiveis
     // (R$ 0,00 via AsMoney) — mas mostramos um guia da 1a acao em vez de "vazio morto".
@@ -69,6 +75,8 @@
     }
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        @* ADR-0044 (BUG-005 do QA): sao PARCELAS de ContaReceber, nao pedidos — diferente do
+           "A entregar" do Dashboard e do "A receber (nesta lista)" do cockpit de Pedidos. *@
         <es-stat-card label="A Receber 30d"
                       value="@d.TotalAVencer30dReceber.AsMoney()"
                       delta="@deltas.ReceberDelta"
@@ -76,7 +84,7 @@
                       delta-meta="@MetaReceber"
                       sparkline="@deltas.ReceberSerie"
                       href="@hrefReceber"
-                      title="@Aria("A Receber nos próximos 30 dias", d.TotalAVencer30dReceber.AsMoney(), $"{TextHelpers.Plural(d.QtdContasReceberAVencer30d, "conta", "contas")} a vencer no período. Abrir recebíveis do período.")" />
+                      title="@Aria("A Receber nos próximos 30 dias", d.TotalAVencer30dReceber.AsMoney(), $"{TextHelpers.Plural(d.QtdContasReceberAVencer30d, "conta", "contas")} a vencer no período (parcelas de contas a receber, não pedidos). Abrir recebíveis do período.")" />
 
         <es-stat-card label="A Pagar 30d"
                       value="@d.TotalAVencer30dPagar.AsMoney()"
@@ -87,12 +95,13 @@
                       href="@hrefPagar"
                       title="@Aria("A Pagar nos próximos 30 dias", d.TotalAVencer30dPagar.AsMoney(), $"{TextHelpers.Plural(d.QtdContasPagarAVencer30d, "conta", "contas")} a vencer no período. Abrir pagáveis do período.")" />
 
-        @{ var metaVenc = TextHelpers.PluralWord(d.QtdParcelasVencidasHoje, "atrasada", "atrasadas"); }
-        <es-stat-card label="Vencidas"
-                      value="@totalVencido.AsMoney()"
-                      delta-meta="@(d.QtdParcelasVencidasHoje) @metaVenc"
-                      href="@hrefVencidas"
-                      title="@Aria("Total vencido em aberto", totalVencido.AsMoney(), $"{TextHelpers.Plural(d.QtdParcelasVencidasHoje, "parcela", "parcelas")} {(d.QtdParcelasVencidasHoje == 1 ? "atrasada" : "atrasadas")}. Abrir contas vencidas.")" />
+        @* issue 375/BUG-005: sem contagem separada de parcelas vencidas por pagar/receber no
+           ViewModel hoje (QtdParcelasVencidasHoje e' combinado) — nao inventamos um numero
+           desagregado que nao temos; o card fica so com o valor monetario + drill-in certo. *@
+        <es-stat-card label="A Receber vencido"
+                      value="@d.TotalVencidoReceber.AsMoney()"
+                      href="@hrefVencidoReceber"
+                      title="@Aria("A Receber vencido", d.TotalVencidoReceber.AsMoney(), "Abrir contas a receber vencidas.")" />
 
         <es-stat-card label="Saldo do mês"
                       value="@saldoMes.AsMoney()"

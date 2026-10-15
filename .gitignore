@@ -20,10 +20,15 @@ appsettings.*.local.json
 **/C\357\200\272Users*
 **/*claude-projects*tool-results*pr-sizes.json
 
+# Uploads de runtime da Api (banners etc.) — dados locais, nunca versionar
+EasyStock.Api/uploaded-files/
+
 # Node / Tailwind build artifacts (gerados em build, não versionados)
 node_modules/
 **/wwwroot/css/tailwind.dist.css
 package-lock.json
+# Console (ADR-0054) versiona o lock: o CI roda npm ci
+!EasyStock.Console/package-lock.json
 
 # User-specific files
 *.rsuser
@@ -280,6 +285,8 @@ Generated_Code/
 # because we have git ;-)
 _UpgradeReport_Files/
 Backup*/
+# "Backup*/" acima casa com backup-externo no Windows (core.ignorecase). Os scripts sao versionados (#1253).
+!scripts/infra/backup-externo/
 UpgradeLog*.XML
 UpgradeLog*.htm
 ServiceFabricBackup/
@@ -406,6 +413,6 @@ EasyStock.Api/easystock.db*
 # Ver: docs/dev/incidentes/2026-05-16-master-broken-wip-snapshot.md
 /admin/
 
-# Previews locais do design system Deck do Admin (server.js + *.html de showcase).
-# Ferramenta de verificacao no browser (issue 730); nao faz parte do deploy nem do build.
-EasyStock.Admin/wwwroot/dev/
+# Cache NuGet local acidental (nunca deve existir no repo)
+.nuget/
+EasyStock.Console/ferramentas/*.generated.html

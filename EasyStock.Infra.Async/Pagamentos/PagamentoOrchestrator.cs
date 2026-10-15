@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
@@ -102,7 +103,7 @@ public sealed class PagamentoOrchestrator(
 
         try
         {
-            fatura.RegistrarPagamento(pagamento);
+            fatura.RegistrarPagamento(pagamento, HorarioBrasil.HojeInstanteUtc());
         }
         catch (RegraDeDominioVioladaException ex)
         {

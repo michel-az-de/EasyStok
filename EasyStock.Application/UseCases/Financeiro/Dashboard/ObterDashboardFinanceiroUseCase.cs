@@ -7,7 +7,7 @@ public class ObterDashboardFinanceiroUseCase(IFluxoCaixaQueries queries)
     public Task<DashboardFinanceiroDto> ExecuteAsync(ObterDashboardFinanceiroQuery q, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(q.EmpresaId);
-        return queries.KpisDashboardAsync(q.EmpresaId, q.ReferenceDateUtc ?? DateTime.UtcNow, ct);
+        return queries.KpisDashboardAsync(q.EmpresaId, q.ReferenceDateUtc ?? HorarioBrasil.HojeInstanteUtc(), ct);
     }
 }
 

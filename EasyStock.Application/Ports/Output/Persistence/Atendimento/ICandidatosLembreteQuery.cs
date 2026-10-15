@@ -1,0 +1,43 @@
+using EasyStock.Domain.Entities.Storefront;
+
+namespace EasyStock.Application.Ports.Output.Persistence.Atendimento;
+
+/// <summary>Pedido parado em <c>AguardandoPagamento</c> (S43).</summary>
+public sealed record PedidoSemBaixa(Guid EmpresaId, Guid PedidoId, string? ClienteNome, Guid? ConversaId);
+
+/// <param name="PreparoIniciado">
+/// O pedido já está em preparo, pronto ou a caminho (#1550): o marco de início previsto deixou de valer.
+/// </param>
+public sealed record PedidoAgendadoLembrete(
+    Guid EmpresaId, Guid PedidoId, string? ClienteNome, DateTime EntregaEm, DateTime? InicioPrevistoEm,
+    Guid? ConversaId, ExpedienteLoja? Expediente, bool PreparoIniciado = false);
+
+/// <summary>
+/// Conversa assumida cuja última mensagem que conta (nota interna do sistema não conta) é do
+/// cliente (S43). <see cref="MensagemEntradaId"/> é a referência do lembrete: se o cliente escrever de
+/// novo depois de respondido, é outro fato e outro lembrete.
+/// <see cref="EntradaEm"/> é quando o cliente falou; <see cref="SlaRespostaMinutos"/> é o prazo da loja
+/// (<c>ConfiguracaoAtendimento</c>, #1427), nulo quando a loja ainda não gravou configuração.
+/// </summary>
+public sealed record ConversaSemResposta(
+    Guid EmpresaId, Guid ConversaId, Guid MensagemEntradaId, string? ContatoNome, Guid? AssumidaPorUsuarioId,
+    DateTime? EntradaEm = null, int? SlaRespostaMinutos = null, ExpedienteLoja? Expediente = null);
+
+/// <summary>
+/// Consultas cross-tenant que alimentam o avaliador de lembretes (S43). Rodam com bypass de RLS
+/// ligado pelo host. Trazem tudo o que atende à condição, sem página: a resolução sozinha do
+/// avaliador depende de a lista estar completa.
+/// </summary>
+public interface ICandidatosLembreteQuery
+{
+    Task<IReadOnlyList<PedidoAgendadoLembrete>> ListarPedidosAgendadosAsync(CancellationToken ct = default);
+
+    /// <summary>Pedidos em <c>AguardandoPagamento</c> sem alteração desde <paramref name="paradoDesdeAntesDe"/>.</summary>
+    Task<IReadOnlyList<PedidoSemBaixa>> ListarPedidosSemBaixaAsync(DateTime paradoDesdeAntesDe, CancellationToken ct = default);
+
+    /// <summary>
+    /// Conversas assumidas e abertas com o cliente esperando desde antes de <paramref name="entradaAntesDe"/>, com o
+    /// SLA de cada loja. O corte fino por loja é do avaliador.
+    /// </summary>
+    Task<IReadOnlyList<ConversaSemResposta>> ListarConversasSemRespostaAsync(DateTime entradaAntesDe, CancellationToken ct = default);
+}

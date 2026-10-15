@@ -220,7 +220,6 @@
       "baseUrl": "/api/auth",
       "endpoints": [
         { "method": "POST", "path": "/login",           "description": { "pt": "Login do usuário (retorna JWT)",             "en": "User login (returns JWT)" } },
-        { "method": "POST", "path": "/register",        "description": { "pt": "Registro de novo usuário",                   "en": "Register new user" } },
         { "method": "POST", "path": "/refresh",         "description": { "pt": "Renovar token JWT",                          "en": "Refresh JWT token" } },
         { "method": "POST", "path": "/logout",          "description": { "pt": "Logout e invalidar token",                   "en": "Logout & invalidate token" } },
         { "method": "POST", "path": "/forgot-password", "description": { "pt": "Iniciar redefinição de senha",               "en": "Initiate password reset" } },

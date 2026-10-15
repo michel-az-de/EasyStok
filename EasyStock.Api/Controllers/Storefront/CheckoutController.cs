@@ -1,7 +1,11 @@
-﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.UseCases.Atendimento.ChatSite;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Exceptions.Storefront;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -19,9 +23,9 @@ namespace EasyStock.Api.Controllers.Storefront;
 [ApiController]
 [Route("api/storefront/{slug}/checkout")]
 [AllowAnonymous]
+[TenantDoStorefront]
 public sealed class CheckoutController(
-    IniciarCheckoutUseCase iniciarCheckoutUseCase,
-    IniciarCheckoutGuestUseCase iniciarCheckoutGuestUseCase,
+    CheckoutSiteUseCase checkoutSite,
     IClienteSessionRepository clienteSessionRepository,
     TimeProvider timeProvider) : EasyStockControllerBase
 {
@@ -74,18 +78,7 @@ public sealed class CheckoutController(
         {
             idempotencyKey = parsedKey;
 
-            if (!Request.Headers.TryGetValue("X-Content-Hash", out var hashHeader)
-                || string.IsNullOrWhiteSpace(hashHeader.ToString()))
-            {
-                return BadRequest(new ProblemDetails
-                {
-                    Status = StatusCodes.Status400BadRequest,
-                    Title = "Header ausente",
-                    Detail = "X-Content-Hash é obrigatório quando X-Idempotency-Key está presente.",
-                });
-            }
-
-            contentHash = hashHeader.ToString().Trim();
+            contentHash = Request.Headers["X-Content-Hash"].ToString();
         }
 
         // ── Executar use case ─────────────────────────────────────────────
@@ -98,11 +91,11 @@ public sealed class CheckoutController(
             Cep: body.Cep,
             Observacoes: body.Observacoes,
             IdempotencyKey: idempotencyKey,
-            ContentHash: contentHash);
+            ContentHash: contentHash, Numero: body.Endereco?.Numero ?? body.Numero);
 
         try
         {
-            var result = await iniciarCheckoutUseCase.ExecuteAsync(input, ct);
+            var result = await checkoutSite.LogadoAsync(input, body.Endereco, Request.Headers["X-Chat-Token"].ToString(), idempotencyKey, ct);
             Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue { NoStore = true, NoCache = true };
             return StatusCode(StatusCodes.Status201Created, result);
         }
@@ -118,13 +111,42 @@ public sealed class CheckoutController(
                     Type = "https://httpstatuses.com/409",
                 });
         }
+        catch (CheckoutEmAndamentoException ex)
+        {
+            Response.Headers["Retry-After"] = "2";
+            return StatusCode(409, new { error = new { code = "CHECKOUT_EM_ANDAMENTO", message = ex.Message } });
+        }
+        catch (SessaoChatSiteInvalidaException ex)
+        {
+            return StatusCode(403, new { error = new { code = "SESSAO_CHAT_INVALIDA", message = ex.Message } });
+        }
+        catch (ChatSiteIndisponivelException ex)
+        {
+            return DataNotFound(ex.Message);
+        }
         catch (CepInvalidoException ex)
+        {
+            return DataBadRequest(ex.Message);
+        }
+        catch (UseCaseValidationException ex)
         {
             return DataBadRequest(ex.Message);
         }
         catch (StorefrontNaoEncontradoException ex)
         {
             return DataNotFound(ex.Message);
+        }
+        catch (LojaFechadaException ex)
+        {
+            // S40: a dona fechou a loja na mão; a mensagem é a de "loja fechada" configurada.
+            return StatusCode(
+                StatusCodes.Status409Conflict,
+                new ProblemDetails
+                {
+                    Status = StatusCodes.Status409Conflict,
+                    Title = "Loja fechada",
+                    Detail = ex.Message,
+                });
         }
         catch (JanelaSemVagasException ex)
         {
@@ -173,18 +195,22 @@ public sealed class CheckoutController(
     }
 
     /// <summary>
-    /// Inicia checkout GUEST (sem login) — cadastra Pedido em
-    /// <c>aguardando_aprovacao_baba</c>, retorna PedidoId + token de
-    /// acompanhamento. Babá agenda janela manualmente via WhatsApp depois.
+    /// Inicia checkout GUEST (sem login): reserva a vaga da janela, cria o pedido em
+    /// <c>aguardando_pagamento</c> e devolve o link do Mercado Pago, o token de acompanhamento e o
+    /// numero curto (#1254). Mesmos codigos de erro do checkout logado.
     /// </summary>
     [SwaggerOperation(
         Summary = "Iniciar checkout guest (sem login)",
-        Description = "Cadastra Pedido sem cookie de sessao. Cliente identificado " +
-                      "por telefoneHash. Issue #680.")]
+        Description = "Cria Pedido sem cookie de sessao, reserva a janela e retorna URL de pagamento " +
+                      "MercadoPago. Telefone informado não concede identidade nem histórico verificado.")]
     [ProducesResponseType(typeof(IniciarCheckoutGuestResult), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    [EnableRateLimiting("public-post")]
     [HttpPost("guest")]
     public async Task<IActionResult> IniciarCheckoutGuest(
         [FromRoute] string slug,
@@ -208,14 +234,21 @@ public sealed class CheckoutController(
             Items: (body.Items ?? Array.Empty<CheckoutItemRequestBody>())
                 .Select(i => new CheckoutItemInput(i.CardapioItemId, i.Qtd))
                 .ToList(),
+            JanelaId: body.JanelaId,
+            DataEntrega: body.DataEntrega,
             Observacoes: body.Observacoes);
 
         try
         {
-            var result = await iniciarCheckoutGuestUseCase.ExecuteAsync(input, ct);
+            var result = await checkoutSite.GuestAsync(input, body.Endereco, Request.Headers["X-Chat-Token"].ToString(),
+                Guid.TryParse(Request.Headers["X-Idempotency-Key"], out var key) ? key : null, ct);
             Response.GetTypedHeaders().CacheControl =
                 new CacheControlHeaderValue { NoStore = true, NoCache = true };
             return StatusCode(StatusCodes.Status201Created, result);
+        }
+        catch (IdempotencyMismatchException ex)
+        {
+            return StatusCode(409, new { error = new { code = "CARRINHO_ALTERADO", message = ex.Message } });
         }
         catch (TelefoneInvalidoException ex)
         {
@@ -226,13 +259,59 @@ public sealed class CheckoutController(
                 Detail = ex.Message,
             });
         }
+        catch (CheckoutEmAndamentoException ex)
+        {
+            Response.Headers["Retry-After"] = "2";
+            return StatusCode(409, new { error = new { code = "CHECKOUT_EM_ANDAMENTO", message = ex.Message } });
+        }
+        catch (SessaoChatSiteInvalidaException ex)
+        {
+            return StatusCode(403, new { error = new { code = "SESSAO_CHAT_INVALIDA", message = ex.Message } });
+        }
+        catch (ChatSiteIndisponivelException ex)
+        {
+            return DataNotFound(ex.Message);
+        }
         catch (CepInvalidoException ex)
+        {
+            return DataBadRequest(ex.Message);
+        }
+        catch (UseCaseValidationException ex)
         {
             return DataBadRequest(ex.Message);
         }
         catch (StorefrontNaoEncontradoException ex)
         {
             return DataNotFound(ex.Message);
+        }
+        catch (LojaFechadaException ex)
+        {
+            return StatusCode(
+                StatusCodes.Status409Conflict,
+                new ProblemDetails { Status = StatusCodes.Status409Conflict, Title = "Loja fechada", Detail = ex.Message });
+        }
+        catch (JanelaSemVagasException ex)
+        {
+            return StatusCode(
+                StatusCodes.Status409Conflict,
+                new ProblemDetails { Status = StatusCodes.Status409Conflict, Title = "Janela esgotada", Detail = ex.Message });
+        }
+        catch (CepSemCoberturaException ex)
+        {
+            return StatusCode(
+                StatusCodes.Status422UnprocessableEntity,
+                new ProblemDetails { Status = StatusCodes.Status422UnprocessableEntity, Title = "CEP sem cobertura", Detail = ex.Message });
+        }
+        catch (MercadoPagoIndisponivelException ex)
+        {
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new ProblemDetails
+                {
+                    Status = StatusCodes.Status503ServiceUnavailable,
+                    Title = "Gateway de pagamento indisponível",
+                    Detail = ex.Message,
+                });
         }
         catch (RegraDeDominioVioladaException ex)
         {
@@ -255,39 +334,9 @@ public sealed class CheckoutController(
             || string.IsNullOrWhiteSpace(cookieValue))
             return null;
 
-        // Aceita o cookie como Guid direto (testes) ou extrai o "sid" de um JWT simples.
-        if (Guid.TryParse(cookieValue, out var guid))
-            return guid;
-
-        // Parsing minimal de JWT (sem validação de assinatura — middleware dedicado
-        // faz isso em produção quando TASK-EZ-AUTH-002 for integrado).
-        try
-        {
-            var parts = cookieValue.Split('.');
-            if (parts.Length >= 2)
-            {
-                var payloadJson = System.Text.Encoding.UTF8.GetString(
-                    Convert.FromBase64String(PadBase64(parts[1])));
-                using var doc = System.Text.Json.JsonDocument.Parse(payloadJson);
-                if (doc.RootElement.TryGetProperty("sid", out var sidEl)
-                    && Guid.TryParse(sidEl.GetString(), out var sidGuid))
-                    return sidGuid;
-            }
-        }
-        catch { /* JWT malformado — retorna null */ }
-
-        return null;
+        return Guid.TryParse(cookieValue, out var guid) ? guid : null;
     }
 
-    private static string PadBase64(string base64)
-    {
-        return (base64.Length % 4) switch
-        {
-            2 => base64 + "==",
-            3 => base64 + "=",
-            _ => base64,
-        };
-    }
 }
 
 /// <summary>Body do POST /checkout.</summary>
@@ -296,15 +345,20 @@ public sealed record CheckoutRequestBody(
     Guid JanelaId,
     DateOnly DataEntrega,
     string Cep,
-    string? Observacoes = null);
+    string? Observacoes = null,
+    EnderecoCheckout? Endereco = null,
+    string? Numero = null);
 
 public sealed record CheckoutItemRequestBody(Guid CardapioItemId, int Qtd);
 
-/// <summary>Body do POST /checkout/guest (issue #680).</summary>
+/// <summary>Body do POST /checkout/guest (issues #680 e #1254: janela e data obrigatórias).</summary>
 public sealed record CheckoutGuestRequestBody(
     string Nome,
     string Telefone,
     string Cep,
     string? Numero,
     IReadOnlyList<CheckoutItemRequestBody> Items,
-    string? Observacoes = null);
+    Guid? JanelaId = null,
+    DateOnly? DataEntrega = null,
+    string? Observacoes = null,
+    EnderecoCheckout? Endereco = null);

@@ -69,7 +69,7 @@ public class Fatura
     public string? Observacoes { get; set; }
     public string? MetadataJson { get; set; }
 
-    /// <summary>FK opcional a um <see cref="AdminTicket"/> primario (helpdesk financeiro).</summary>
+    /// <summary>Id do ticket de helpdesk vinculado (legado; a tabela de tickets saiu na P06, sem FK).</summary>
     public Guid? TicketRelacionadoId { get; set; }
 
     /// <summary>RowVersion para optimistic concurrency (mapeada como xmin no PG).</summary>
@@ -84,7 +84,6 @@ public class Fatura
     // Navegacao
     public Empresa? Empresa { get; set; }
     public Cliente? Cliente { get; set; }
-    public AdminTicket? TicketRelacionado { get; set; }
     public ICollection<FaturaItem> Itens { get; set; } = new List<FaturaItem>();
     public ICollection<FaturaPagamento> Pagamentos { get; set; } = new List<FaturaPagamento>();
     public ICollection<FaturaEvento> Eventos { get; set; } = new List<FaturaEvento>();
@@ -210,7 +209,7 @@ public class Fatura
     /// Registra pagamento e ajusta status. Se soma de pagamentos confirmados &gt;= Total,
     /// marca como <see cref="StatusFatura.Paga"/>. Senao <see cref="StatusFatura.ParcialmentePaga"/>.
     /// </summary>
-    public void RegistrarPagamento(FaturaPagamento pagamento)
+    public void RegistrarPagamento(FaturaPagamento pagamento, DateTime hojeInstanteUtc)
     {
         if (pagamento is null) throw new ArgumentNullException(nameof(pagamento));
         if (Status == StatusFatura.Cancelada)
@@ -220,12 +219,17 @@ public class Fatura
 
         pagamento.FaturaId = Id;
         Pagamentos.Add(pagamento);
-        AtualizarStatusPorPagamentos();
+        AtualizarStatusPorPagamentos(hojeInstanteUtc);
         AlteradoEm = DateTime.UtcNow;
     }
 
-    /// <summary>Recalcula status a partir dos pagamentos confirmados.</summary>
-    public void AtualizarStatusPorPagamentos()
+    /// <summary>
+    /// Recalcula status a partir dos pagamentos confirmados.
+    /// <paramref name="hojeInstanteUtc"/> e a meia-noite do dia civil de Brasilia como instante UTC
+    /// (<c>HorarioBrasil.HojeInstanteUtc()</c>) — comparar DataVencimento contra ele evita marcar a
+    /// fatura como vencida ~3h cedo, no fim do dia BRT (21h-24h = 00h-03h UTC). Ver #520.
+    /// </summary>
+    public void AtualizarStatusPorPagamentos(DateTime hojeInstanteUtc)
     {
         if (Status == StatusFatura.Cancelada || Status == StatusFatura.Rascunho)
             return;
@@ -243,7 +247,7 @@ public class Fatura
         {
             Status = StatusFatura.ParcialmentePaga;
         }
-        else if (DataVencimento.Date < DateTime.UtcNow.Date)
+        else if (DataVencimento < hojeInstanteUtc)
         {
             Status = StatusFatura.Vencida;
         }
@@ -253,11 +257,15 @@ public class Fatura
         }
     }
 
-    /// <summary>Marca como vencida se passou da data e nao foi paga. Job chama isto.</summary>
-    public void MarcarVencidaSeAplicavel()
+    /// <summary>
+    /// Marca como vencida se passou da data e nao foi paga. Job chama isto.
+    /// <paramref name="hojeInstanteUtc"/>: meia-noite do dia civil de Brasilia como instante UTC
+    /// (<c>HorarioBrasil.HojeInstanteUtc()</c>), para nao vencer 3h cedo no fim do dia BRT (#520).
+    /// </summary>
+    public void MarcarVencidaSeAplicavel(DateTime hojeInstanteUtc)
     {
         if (Status != StatusFatura.Emitida && Status != StatusFatura.ParcialmentePaga) return;
-        if (DataVencimento.Date >= DateTime.UtcNow.Date) return;
+        if (DataVencimento >= hojeInstanteUtc) return;
         Status = StatusFatura.Vencida;
         AlteradoEm = DateTime.UtcNow;
     }

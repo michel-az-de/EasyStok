@@ -152,11 +152,17 @@
                         <span x-show="natureza === 'venda'">Valor unitário (R$) <span class="text-red-500">*</span></span>
                         <span x-show="natureza === 'prejuizo'" x-cloak>Custo perdido por unidade (R$, opcional)</span>
                     </label>
-                    @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
-                    <input type="text" inputmode="decimal" x-model.number="valor"
-                           placeholder="0,00"
+                    @* issue 986: mesmo par display/canonico de Saidas/Nova. Aqui o envio e JSON,
+                       nao FormData, entao o hidden nao existe pelo binder — existe para que os
+                       DOIS campos de saida se comportem igual. Antes divergiam: placeholder sem
+                       R$, classes inline em vez de .ui-field, e nenhuma mascara. *@
+                    <input type="text" inputmode="decimal" id="saida-modal-valor-display"
+                           data-mask="money" data-money-target="saida-modal-valor"
+                           x-effect="window.EasyMasks && window.EasyMasks.setMoney($el, valor)"
+                           placeholder="R$ 0,00"
                            :class="natureza === 'venda' && semPreco ? 'border-amber-400 focus:ring-amber-300' : 'border-slate-300 dark:border-slate-600 focus:ring-indigo-300'"
                            class="w-full px-3 py-2 dark:bg-slate-800 dark:text-slate-100 rounded-lg text-sm focus:outline-none focus:ring-2 border" />
+                    <input type="hidden" id="saida-modal-valor" x-model.number="valor" />
                     <p x-show="natureza === 'venda' && semPreco" x-cloak
                        class="text-xs text-amber-600 mt-1">
                         Produto sem preço cadastrado. Informe o valor de venda para calcular a receita.
@@ -190,18 +196,22 @@
             @Html.AntiForgeryToken()
 
             <!-- Footer -->
-            <div class="modal-footer">
-                <button type="button" @@click="open = false"
-                        class="flex-1 py-2.5 text-sm font-semibold border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors">
-                    Cancelar
-                </button>
-                <button type="button" @@click="confirmarSaida()"
-                        :disabled="loading || !podeEnviar()"
-                        :class="loading || !podeEnviar() ? 'opacity-50 cursor-not-allowed' : ''"
-                        class="flex-1 py-2.5 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
-                    <span x-show="!loading" x-text="ctaLabel"></span>
-                    <span x-show="loading" x-cloak>Salvando…</span>
-                </button>
+            <div class="modal-footer flex-col">
+                <div class="flex gap-2">
+                    <button type="button" @@click="open = false"
+                            class="flex-1 py-2.5 text-sm font-semibold border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="button" @@click="confirmarSaida()"
+                            :disabled="loading || !podeEnviar()"
+                            :aria-describedby="motivoBloqueio ? 'saida-modal-bloqueio' : null"
+                            class="app-primary-btn flex-1 py-2.5 text-white text-sm font-semibold rounded-lg">
+                        <span x-show="!loading" x-text="ctaLabel"></span>
+                        <span x-show="loading" x-cloak>Salvando…</span>
+                    </button>
+                </div>
+                <p id="saida-modal-bloqueio" x-show="motivoBloqueio" x-cloak x-text="motivoBloqueio"
+                   class="text-xs text-slate-500 text-center m-0"></p>
             </div>
         </div>
     </div>
@@ -211,17 +221,27 @@
         @if (Model.Itens.Any())
         {
             <div class="overflow-x-auto">
-            <table class="tbl-full">
+            <table class="tbl-full tbl-full--lg">
                 <thead>
                     <tr>
-                        <th class="sticky left-0 z-10 bg-white">Produto / Variação</th>
+                        <th class="tbl-sticky-start">Produto / Variação</th>
                         <th>SKU</th>
                         <th class="text-center">Qtd</th>
-                        <th class="text-center hidden md:table-cell">Giro</th>
+                        @* issue 982: a escala nao tinha legenda nenhuma. O tooltip abre para BAIXO
+                           (variante da issue 967) porque o wrapper e overflow-x:auto — o overflow-y
+                           computado vira `auto` e um tooltip para cima clipa no topo do scroller.
+                           Para baixo ele entra na area da tabela e aparece inteiro. *@
+                        <th class="text-center hidden md:table-cell">
+                            Giro
+                            <span class="ui-tooltip" tabindex="0" role="tooltip"
+                                  data-tooltip-wide data-tooltip-pos="bottom"
+                                  data-tooltip="Saídas por dia nos últimos 30 dias. Cada barra vale 0,5 un/dia e a escala satura em 5 barras (2,5 un/dia ou mais)."
+                                  aria-label="Saídas por dia nos últimos 30 dias. Cada barra vale 0,5 un/dia e a escala satura em 5 barras.">?</span>
+                        </th>
                         <th class="hidden md:table-cell">Último mov.</th>
                         <th>Validade</th>
                         <th class="text-center">Status</th>
-                        <th></th>
+                        <th class="tbl-sticky-end"><span class="sr-only">Ações</span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -232,7 +252,7 @@
                             : (int?)null;
                         var velInt = (int)Math.Min(Math.Round(item.Vel * 5), 5);
                         <tr id="row-@item.Id">
-                            <td class="sticky left-0 z-10 bg-white">
+                            <td class="tbl-sticky-start">
                                 <div class="font-semibold text-slate-900">@(item.Produto?.Nome ?? item.Sku)</div>
                                 <div class="text-xs text-slate-400">
                                     @(item.Variacao?.Nome ?? "Padrão")
@@ -242,29 +262,31 @@
                                     }
                                 </div>
                             </td>
-                            <td class="font-mono text-xs text-slate-500">@item.Sku</td>
+                            <td class="tbl-cell-code font-mono text-xs text-slate-500" title="@item.Sku">@item.Sku</td>
                             <td class="text-center">
                                 <span class="font-bold text-lg @(item.Qty == 0 ? "text-red-600" : item.Qty < 5 ? "text-amber-600" : "text-slate-900")">
                                     @item.Qty
                                 </span>
                             </td>
                             <td class="text-center hidden md:table-cell">
-                                @if (item.Vel == 0)
-                                {
-                                    <span class="text-xs text-slate-400" title="Sem saídas nos últimos 30 dias">Parado</span>
+                                @* issue 982: representacao UNICA. Antes a mesma metrica saia de dois
+                                   jeitos na mesma coluna — a palavra "Parado" quando Vel == 0, barras
+                                   coloridas caso contrario —, sem ancora visual comum. Agora e sempre
+                                   a barra; sem giro e a barra vazia. O texto vai para leitor de tela.
+                                   "Sem giro" e nao "Parado" porque "Parado" ja e um STATUS na coluna
+                                   ao lado, com outro significado. *@
+                                @{
+                                    var giroDescricao = item.Vel == 0
+                                        ? "Sem giro nos últimos 30 dias"
+                                        : $"{item.Vel.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)} un/dia nos últimos 30 dias";
                                 }
-                                else
-                                {
-                                    <div class="vel-bar justify-center" title="@item.Vel.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) un/dia (últimos 30 dias) — cada barra = 0,5 un/dia">
-                                        @for (int seg = 1; seg <= 5; seg++)
-                                        {
-                                            var segClass = seg <= velInt
-                                                ? (velInt >= 4 ? "g" : velInt >= 2 ? "a" : "r")
-                                                : "";
-                                            <div class="vel-seg @segClass"></div>
-                                        }
-                                    </div>
-                                }
+                                <div class="vel-bar justify-center" title="@giroDescricao">
+                                    <span class="sr-only">@giroDescricao</span>
+                                    @for (int seg = 1; seg <= 5; seg++)
+                                    {
+                                        <div class="vel-seg @(seg <= velInt ? "is-on" : "")"></div>
+                                    }
+                                </div>
                             </td>
                             <td class="text-slate-500 text-xs hidden md:table-cell">
                                 @item.LastMov.AsDate()
@@ -282,14 +304,12 @@
                                 }
                                 else
                                 {
-                                    @if (item.Qty == 0)
-                                    {
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">Sem validade</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="text-slate-400">—</span>
-                                    }
+                                    @* issue 970: ausencia de validade e estado NEUTRO. O badge ambar so
+                                       aparecia quando Qty == 0 — o caso MENOS preocupante dos dois, e ja
+                                       comunicado pela coluna Status ao lado ("Esgotado"). Item COM estoque
+                                       e sem validade renderizava "—". O alerta estava no ramo errado e
+                                       competia com os sinais que importam (vencendo, critico). *@
+                                    <span class="text-slate-400" title="Produto sem data de validade cadastrada">—</span>
                                 }
                             </td>
                             <td class="text-center">
@@ -319,7 +339,7 @@
                                 }
                                 <span class="@sClass px-2 py-0.5 rounded-full text-xs font-semibold">@statusLabel</span>
                             </td>
-                            <td class="min-w-48 whitespace-nowrap">
+                            <td class="tbl-sticky-end min-w-48 whitespace-nowrap">
                                 <div class="flex items-center justify-end gap-2">
                                     <a href="/entradas/reposicao?itemId=@item.Id"
                                        class="grid-action-btn grid-action-btn--ghost"
@@ -418,6 +438,7 @@
 
                 precoSugerido: null,
                 semPreco: false,
+                idempotencyKey: null,
 
                 openModal(id, nome, qty, precoSugerido) {
                     this.estoqueId = id;
@@ -431,6 +452,10 @@
                     this.erroMsg = '';
                     this.natureza = 'venda';
                     this.data = new Date().toLocaleDateString('en-CA');
+                    // issue 917 Fase B: chave nasce aqui, na abertura do modal (a intencao),
+                    // nao no submit -- retry apos timeout/erro reusa a MESMA chave em vez de
+                    // gerar uma nova a cada tentativa.
+                    this.idempotencyKey = crypto.randomUUID();
                     this.open = true;
                 },
 
@@ -456,10 +481,18 @@
                 podeEnviar() {
                     // Excesso vs estoque NAO bloqueia — servidor registra a falta como descoberto
                     // (issue 540), sem entrada-fantasma; a operacao flui (regra do Felipe).
-                    if (!this.qty || this.qty < 1) return false;
-                    if (this.natureza === 'venda' && (!this.valor || this.valor <= 0)) return false;
-                    if ((this.natureza === 'perda' || this.natureza === 'prejuizo') && !this.motivo.trim()) return false;
-                    return true;
+                    return !this.motivoBloqueio;
+                },
+
+                // issue 969: fonte unica do que falta para enviar, exposta como texto
+                // VISIVEL sob o botao. Antes as mesmas 3 condicoes viviam em podeEnviar()
+                // e as mensagens em confirmarSaida() -- que era inalcancavel, porque o
+                // :disabled impedia o proprio clique que geraria a mensagem.
+                get motivoBloqueio() {
+                    if (!this.qty || this.qty < 1) return 'Quantidade deve ser maior ou igual a 1.';
+                    if (this.natureza === 'venda' && (!this.valor || this.valor <= 0)) return 'Informe o valor unitário da venda.';
+                    if ((this.natureza === 'perda' || this.natureza === 'prejuizo') && !this.motivo.trim()) return 'Informe o motivo para registrar essa saída.';
+                    return '';
                 },
 
                 async confirmarSaida() {
@@ -490,7 +523,8 @@
                                 qty: this.qty,
                                 valor: (this.natureza === 'venda' || this.natureza === 'prejuizo') ? this.valor : null,
                                 motivo: (this.natureza === 'perda' || this.natureza === 'prejuizo') ? this.motivo.trim() : null,
-                                data: this.data
+                                data: this.data,
+                                idempotencyKey: this.idempotencyKey
                             })
                         });
                         if (r.ok) {

@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Defaults;
 using EasyStock.Infra.Postgre.Data;
@@ -238,7 +239,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToListAsync();
 
         public async Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<ItemEstoque>>> GetByProdutosAsync(
-            Guid empresaId, IEnumerable<Guid> produtoIds, Guid? lojaId, CancellationToken ct = default)
+            Guid empresaId, IEnumerable<Guid> produtoIds, Guid? lojaId, CancellationToken ct = default,
+            bool apenasComSaldoOuDescoberto = false)
         {
             var ids = produtoIds.Distinct().ToList();
             if (ids.Count == 0)
@@ -251,6 +253,10 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (lojaId.HasValue)
                 query = query.Where(i => i.LojaId == lojaId.Value);
 
+            // #1575: lote zerado e sem descoberto soma zero no saldo e no descoberto; fica no banco.
+            if (apenasComSaldoOuDescoberto)
+                query = query.Where(i => (decimal)i.QuantidadeAtual > 0 || (decimal)i.QuantidadeDescoberta != 0);
+
             var todos = await query
                 .OrderByDescending(i => i.EntradaEm)
                 .ToListAsync(ct);
@@ -262,7 +268,32 @@ namespace EasyStock.Infra.Postgre.Repositories
                     g => (IReadOnlyCollection<ItemEstoque>)g.ToList());
         }
 
-        public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true)
+        public async Task<IReadOnlyDictionary<Guid, decimal>> GetSaldoDisponivelPorProdutosAsync(
+            Guid empresaId, IReadOnlyCollection<Guid> produtoIds, CancellationToken ct = default)
+        {
+            var ids = produtoIds.Distinct().ToList();
+            if (ids.Count == 0)
+                return new Dictionary<Guid, decimal>();
+
+            // #1171: caller anonimo (cardapio publico) nao tem tenant no contexto; o filtro
+            // global zeraria tudo. Isolamento pelo EmpresaId explicito, vindo do storefront.
+            // Vencido fica fora pelo mesmo corte de data civil do FEFO (#983).
+            var hoje = HorarioBrasil.HojeInstanteUtc();
+            var saldos = await dbContext.ItensEstoque
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId
+                    && ids.Contains(i.ProdutoId)
+                    && (decimal)i.QuantidadeAtual > 0
+                    && (i.ValidadeEm == null || (DateTime?)i.ValidadeEm >= hoje))
+                .GroupBy(i => i.ProdutoId)
+                .Select(g => new { ProdutoId = g.Key, Saldo = g.Sum(i => (decimal)i.QuantidadeAtual) })
+                .ToListAsync(ct);
+
+            return saldos.ToDictionary(s => s.ProdutoId, s => s.Saldo);
+        }
+
+        public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true, bool incluirVencidos = false)
         {
             // FOR UPDATE serializa concorrentes — lock adquirido no raw SQL DENTRO da
             // transacao do caller (DbContext.Database.CurrentTransaction). Evita estoque
@@ -284,9 +315,35 @@ namespace EasyStock.Infra.Postgre.Repositories
             // via dbContext.ItensEstoque.Where(...) re-le as mesmas rows JA travadas —
             // outros concorrentes esperam o commit. Semantica de serializacao preservada.
 
-            var variacaoFilter = produtoVariacaoId.HasValue
-                ? "AND \"ProdutoVariacaoId\" = {2}"
-                : "AND \"ProdutoVariacaoId\" IS NULL";
+            // #983 (D1): sem este filtro, um lote vencido com ValidadeEm mais antigo
+            // vinha PRIMEIRO no FEFO e derrubava a transacao inteira ao bater no guard
+            // de ItemEstoque.GarantirOperavelParaSaida — mesmo havendo lote valido
+            // suficiente logo depois. incluirVencidos=true (naturezas de baixa/descarte)
+            // mantem o lote na lista para o caller processar.
+            //
+            // ValidadeEm e coluna de DATA CIVIL (sempre gravada como meia-noite-UTC da
+            // data, via Validade.From(...).Date — ver ItemEstoqueConfiguration): comparar
+            // contra HorarioBrasil.HojeInstanteUtc() (00:00Z do dia operacional de
+            // Brasilia) e sargavel e usa o indice ix_itens_estoque_empresa_validade.
+            var parametros = new List<object> { empresaId, produtoId };
+
+            string variacaoFilter;
+            if (produtoVariacaoId.HasValue)
+            {
+                variacaoFilter = $"AND \"ProdutoVariacaoId\" = {{{parametros.Count}}}";
+                parametros.Add(produtoVariacaoId.Value);
+            }
+            else
+            {
+                variacaoFilter = "AND \"ProdutoVariacaoId\" IS NULL";
+            }
+
+            var filtroVencido = string.Empty;
+            if (!incluirVencidos)
+            {
+                filtroVencido = $"AND (\"ValidadeEm\" IS NULL OR \"ValidadeEm\" >= {{{parametros.Count}}})";
+                parametros.Add(HorarioBrasil.HojeInstanteUtc());
+            }
 
             var orderBy = fefo
                 ? "\"ValidadeEm\" NULLS LAST, \"EntradaEm\", \"CriadoEm\""
@@ -298,12 +355,11 @@ namespace EasyStock.Infra.Postgre.Repositories
                       AND ""ProdutoId"" = {{1}}
                       AND ""QuantidadeAtual"" > 0
                       {variacaoFilter}
+                      {filtroVencido}
                     ORDER BY {orderBy}
                     FOR UPDATE";
 
-            var idsQuery = produtoVariacaoId.HasValue
-                ? dbContext.Database.SqlQueryRaw<Guid>(sqlIds, empresaId, produtoId, produtoVariacaoId.Value)
-                : dbContext.Database.SqlQueryRaw<Guid>(sqlIds, empresaId, produtoId);
+            var idsQuery = dbContext.Database.SqlQueryRaw<Guid>(sqlIds, parametros.ToArray());
 
             var idsOrdenados = await idsQuery.ToListAsync();
             if (idsOrdenados.Count == 0) return Array.Empty<ItemEstoque>();
@@ -346,6 +402,17 @@ namespace EasyStock.Infra.Postgre.Repositories
             dbContext.ItensEstoque.Update(itemEstoque);
             return Task.CompletedTask;
         }
+
+        public async Task<IReadOnlyList<ItemEstoque>> GetLotesParaAjusteAsync(
+            Guid empresaId, Guid produtoId, Guid? lojaId, CancellationToken ct = default) =>
+            await dbContext.ItensEstoque
+                .Where(i => i.EmpresaId == empresaId
+                    && i.ProdutoId == produtoId
+                    && i.Status != StatusItemEstoque.Descartado
+                    && (lojaId == null || i.LojaId == lojaId))
+                .OrderBy(i => i.EntradaEm)
+                .ThenBy(i => i.CriadoEm)
+                .ToListAsync(ct);
 
         public Task UpdateRangeAsync(IEnumerable<ItemEstoque> itensEstoque)
         {
@@ -394,5 +461,14 @@ namespace EasyStock.Infra.Postgre.Repositories
                 _ => null
             };
         }
+
+        public async Task<IReadOnlyList<ItemEstoque>> GetComSaldoEValidadeAteAsync(Guid empresaId, DateTime validadeAteUtc, CancellationToken ct = default) =>
+            await dbContext.ItensEstoque
+                .AsNoTracking()
+                .Include(i => i.Produto)
+                .Where(i => i.EmpresaId == empresaId && (decimal)i.QuantidadeAtual > 0
+                    && i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= validadeAteUtc)
+                .OrderBy(i => (DateTime?)i.ValidadeEm)
+                .ToListAsync(ct);
     }
 }

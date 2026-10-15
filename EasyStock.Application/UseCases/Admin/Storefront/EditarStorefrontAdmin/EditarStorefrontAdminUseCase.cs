@@ -29,6 +29,7 @@ public sealed record EditarStorefrontAdminResult(Guid Id);
 
 public class EditarStorefrontAdminUseCase(
     IStorefrontRepository storefrontRepository,
+    ILojaRepository lojaRepository,
     IUnitOfWork unitOfWork)
     : IUseCase<EditarStorefrontAdminCommand, EditarStorefrontAdminResult>
 {
@@ -36,6 +37,17 @@ public class EditarStorefrontAdminUseCase(
     {
         var s = await storefrontRepository.GetByIdAsync(command.Id)
             ?? throw new StorefrontNaoEncontradoException();
+
+        // P01-B (#1173): quem edita agora é o próprio tenant. A loja padrão e o domínio próprio
+        // apontam para fora da vitrine, então os dois são conferidos antes de qualquer mudança.
+        if (command.LojaPadraoId is { } lojaId && lojaId != Guid.Empty
+            && await lojaRepository.GetByIdAsync(s.EmpresaId, lojaId) is null)
+            throw new UseCaseValidationException("A loja padrão informada não pertence a esta empresa.");
+
+        var dominio = command.DominioCustom?.Trim().ToLowerInvariant();
+        if (!string.IsNullOrEmpty(dominio)
+            && await storefrontRepository.GetByDominioCustomAsync(dominio) is { } dono && dono.Id != s.Id)
+            throw new DominioCustomEmUsoException(dominio);
 
         // Branding — método aceita nulls como "não muda"
         if (command.SubtituloPublico is not null

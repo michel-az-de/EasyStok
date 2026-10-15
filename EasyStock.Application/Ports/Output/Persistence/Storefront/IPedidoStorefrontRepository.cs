@@ -55,17 +55,6 @@ public interface IPedidoStorefrontRepository
         CancellationToken ct = default);
 
     /// <summary>
-    /// Retorna pedidos Storefront com status <c>entregue</c>,
-    /// <c>entregue_em &lt;= entregueAntesDe</c> e <c>avaliacao_solicitada_em IS NULL</c>.
-    /// Inclui dados do cliente (<see cref="Pedido.ClienteNome"/>, <see cref="Pedido.ClienteTelefone"/>)
-    /// para envio do WhatsApp pelo handler de avaliação.
-    /// </summary>
-    Task<IReadOnlyList<Pedido>> GetEntreguesElegiveisPraAvaliacaoAsync(
-        DateTime entregueAntesDe,
-        int maxBatch = 50,
-        CancellationToken ct = default);
-
-    /// <summary>
     /// Lista os pedidos storefront do cliente autenticado dentro do tenant
     /// (<paramref name="empresaId"/>), ordenados por <c>CriadoEm DESC</c>.
     /// Inclui <see cref="Pedido.Itens"/> via eager-load para o use case montar
@@ -104,4 +93,17 @@ public interface IPedidoStorefrontRepository
         Guid clienteId,
         Guid pedidoId,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Varredura do <c>PedidoAtrasoJob</c> (S21), cross-tenant: pedidos <c>aguardando</c> com
+    /// <c>InicioPrevistoEm &lt; agora</c> e atraso ainda não notificado, mais antigos primeiro. Devolve só
+    /// ids para o chamador ligar o tenant antes de tocar no pedido.
+    /// </summary>
+    Task<IReadOnlyList<PedidoAtrasoCandidato>> ListarAtrasoNaoNotificadoAsync(
+        DateTime agoraUtc,
+        int maximo,
+        CancellationToken ct = default);
 }
+
+/// <summary>Pedido que passou do início previsto sem notificação de atraso (S21).</summary>
+public sealed record PedidoAtrasoCandidato(Guid PedidoId, Guid EmpresaId);

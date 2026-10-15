@@ -1,48 +1,62 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
-using EasyStock.Domain.Entities.Storefront;
+using EasyStock.Application.Services.Campanhas;
+using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.UseCases.CriarPedido;
+using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Exceptions.Storefront;
+using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Sales;
 using DomainCliente = EasyStock.Domain.Entities.Cliente;
 using DomainPedido = EasyStock.Domain.Entities.Pedido;
-using DomainPedidoItem = EasyStock.Domain.Entities.PedidoItem;
 
 namespace EasyStock.Application.UseCases.Storefront.Checkout;
 
 /// <summary>
-/// Checkout GUEST do storefront — fluxo simplificado pra cliente nao
-/// autenticado (issue #680).
+/// Checkout GUEST do storefront — cliente nao autenticado (issue #680), cobrado pelo Mercado Pago (#1254).
 ///
 /// <para>
-/// <strong>Diferencas vs <see cref="IniciarCheckoutUseCase"/>:</strong>
-/// (a) sem JanelaId/DataEntrega — pedido nasce em
-/// <c>aguardando_aprovacao_baba</c> e Babá agenda manualmente pelo WhatsApp;
-/// (b) sem reserva de vaga (Fase 2 do ADR-0014); (c) sem MercadoPago
-/// preference (Fase 3); (d) Cliente resolvido por <c>telefoneHash</c> em
-/// vez de cookie de sessao; (e) frete e best-effort estimado (zonas) —
-/// fora de cobertura nao bloqueia o pedido, Babá negocia depois.
+/// Mesmo caminho do <see cref="IniciarCheckoutUseCase"/> e do pedido da conversa: o
+/// <see cref="CheckoutCoreService"/> (S10) valida CEP na area de entrega, janela e bloqueios, cria o
+/// pedido, reserva a vaga e deixa o pedido em <c>AguardandoPagamento</c>; o
+/// <see cref="GerarCobrancaPedidoUseCase"/> (S11) cria a preferencia de 30 min e grava a
+/// <c>CobrancaPedido</c>. O webhook (S32) confirma; o job expira e cancela sem pagamento.
 /// </para>
 ///
 /// <para>
-/// <strong>Codigo duplicado de Fase 1 (~80 LoC do IniciarCheckoutUseCase):</strong>
-/// deliberado pra isolar o caminho guest do caminho logado em arquivos
-/// distintos, evitando colisao com sessao paralela. Refatoracao
-/// extract-method fica pra commit futuro.
+/// O que e so do guest: cadastro guest isolado, sem tratar telefone informado como identidade verificada,
+/// snapshot de nome e telefone no pedido, endereco (CEP e numero) nas observacoes e token de
+/// acompanhamento sem login (#681). CEP fora da area (zona ou raio) e recusado como no logado: sem
+/// frete cotado nao ha o que cobrar. Cliente bloqueado e recusado antes da vaga (#1291).
+/// </para>
+///
+/// <para>
+/// <strong>Ponte (#1306), temporaria:</strong> o site ainda nao manda janela. Sem <c>JanelaId</c> e
+/// <c>DataEntrega</c>, o guest segue o modo antigo (#680): pedido em <c>aguardando_aprovacao_baba</c>, sem
+/// vaga, sem frete e sem cobranca; a dona agenda e cobra pelo WhatsApp. So um dos dois e recusado. Sai
+/// quando o site publicar o passo de janela.
 /// </para>
 /// </summary>
 public sealed class IniciarCheckoutGuestUseCase(
     IStorefrontRepository storefrontRepository,
-    ICardapioItemRepository cardapioItemRepository,
-    IFreteZonaRepository freteZonaRepository,
+    CheckoutCoreService checkoutCore,
+    GerarCobrancaPedidoUseCase gerarCobranca,
     IClienteStorefrontRepository clienteRepository,
     IPedidoStorefrontRepository pedidoRepository,
     IUnitOfWork unitOfWork,
     AcompanhamentoTokenService tokenService,
+    AtribuicaoPedidoCampanha atribuicaoCampanha,
+    ITenantContextAccessor tenantContext,
     TimeProvider timeProvider,
-    ILogger<IniciarCheckoutGuestUseCase> logger)
+    ILogger<IniciarCheckoutGuestUseCase> logger,
+    EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido enderecoEntrega)
 {
-    private static readonly Regex CepDigitosRegex = new(@"^\d{8}$", RegexOptions.Compiled);
+    /// <summary>Validade do link, em segundos (a mesma do checkout logado).</summary>
+    private static readonly int ExpiresInSeconds = (int)GerarCobrancaPedidoUseCase.Validade.TotalSeconds;
+
+    /// <summary>Tamanho de <c>pedidos.ClienteNome</c>; acima disso o banco recusava com erro interno (#1719).</summary>
+    private const int NomeMaximo = 150;
 
     /// <summary>E.164 BR: <c>+55</c> + DDD (2) + numero (8 ou 9 digitos).</summary>
     private static readonly Regex TelefoneE164BrRegex =
@@ -50,7 +64,8 @@ public sealed class IniciarCheckoutGuestUseCase(
 
     public async Task<IniciarCheckoutGuestResult> ExecuteAsync(
         IniciarCheckoutGuestInput input,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Func<Guid, CancellationToken, Task>? pedidoCriado = null)
     {
         ArgumentNullException.ThrowIfNull(input);
 
@@ -60,153 +75,140 @@ public sealed class IniciarCheckoutGuestUseCase(
         var nome = (input.Nome ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(nome) || nome.Length < 2)
             throw new RegraDeDominioVioladaException("Nome e obrigatorio (min 2 caracteres).");
+        if (nome.Length > NomeMaximo)
+            throw new RegraDeDominioVioladaException($"O nome vai até {NomeMaximo} caracteres.");
 
         var telefoneE164 = NormalizarTelefone(input.Telefone);
 
-        var cep = NormalizarCep(input.Cep);
-        if (!CepDigitosRegex.IsMatch(cep))
-            throw new CepInvalidoException();
+        var cep = CheckoutCoreService.ValidarEntrada(
+            input.Cep, input.Items?.Select(i => (i.CardapioItemId, i.Qtd)).ToList());
 
-        if (input.Items is null || input.Items.Count == 0)
-            throw new RegraDeDominioVioladaException("Carrinho vazio — informe ao menos 1 item.");
-
-        foreach (var item in input.Items)
-        {
-            if (item.Qtd <= 0)
-                throw new RegraDeDominioVioladaException(
-                    $"Quantidade invalida para item {item.CardapioItemId}: deve ser > 0.");
-        }
+        if (input.JanelaId.HasValue != input.DataEntrega.HasValue)
+            throw new RegraDeDominioVioladaException(
+                "Informe a janela e a data de entrega juntas, ou nenhuma das duas.");
 
         // ── Resolver storefront ──────────────────────────────────────────
         var storefront = await storefrontRepository.GetBySlugAsync(input.Slug, ct);
         if (storefront is null || !storefront.Ativo)
             throw new StorefrontNaoEncontradoException(input.Slug);
 
-        // ── Resolver/criar Cliente por telefoneHash ──────────────────────
-        var telefoneHash = ClienteOtp.CalcularTelefoneHash(telefoneE164);
-        var cliente = await clienteRepository.GetByTelefoneHashAsync(storefront.EmpresaId, telefoneHash, ct);
-        var clienteNovo = cliente is null;
-        if (clienteNovo)
-        {
-            cliente = DomainCliente.CriarParaStorefront(storefront.EmpresaId, telefoneHash, timeProvider);
-            cliente.Nome = nome;
-            cliente.Telefone = telefoneE164;
-            cliente.Cep = cep;
-            await clienteRepository.AddAsync(cliente, ct);
-        }
-        else
-        {
-            // Idempotente: se cliente recorrente ainda nao tinha nome (telefone-only),
-            // preencher agora. Se ja tem nome diferente, preservar o existente.
-            if (string.IsNullOrWhiteSpace(cliente!.Nome))
-                cliente.Nome = nome;
-            if (string.IsNullOrWhiteSpace(cliente.Telefone))
-                cliente.Telefone = telefoneE164;
-            cliente.RegistrarAcessoStorefront(timeProvider);
-            await clienteRepository.UpdateAsync(cliente, ct);
-        }
+        // #1784: sem janela o pedido não passa pelo core, que é onde a pausa manual recusa; checar antes
+        // do cadastro guest para não criar cliente nem pedido com a loja fechada na mão.
+        if (input.JanelaId is null)
+            await checkoutCore.GarantirLojaAbertaAsync(storefront.EmpresaId, ct);
 
-        // ── Validar items do cardapio ────────────────────────────────────
-        var cardapioItemIds = input.Items.Select(i => i.CardapioItemId).Distinct().ToList();
-        var cardapioItens = new Dictionary<Guid, CardapioItem>();
-        foreach (var itemId in cardapioItemIds)
-        {
-            var ci = await cardapioItemRepository.GetByIdAsync(storefront.Id, itemId, ct);
-            if (ci is null || !ci.Visivel)
-                throw new RegraDeDominioVioladaException(
-                    $"Item de cardapio {itemId} nao encontrado ou indisponivel.");
-            cardapioItens[itemId] = ci;
-        }
+        // ── Cadastro guest isolado; telefone informado não equivale a OTP ──
+        var (cliente, clienteNovo) = await ResolverClienteAsync(storefront.EmpresaId, nome, telefoneE164, cep, ct);
 
-        // ── Frete best-effort (zonas, sem bloqueio) ──────────────────────
-        decimal? freteEstimado = null;
-        FreteZona? zonaMatch = null;
-        try
-        {
-            var zonas = await freteZonaRepository.GetAtivasDoStorefrontOrdenadasAsync(storefront.Id, ct);
-            zonaMatch = zonas.FirstOrDefault(z => z.CobreCep(cep));
-            freteEstimado = zonaMatch?.Valor;
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex,
-                "Frete best-effort falhou; pedido segue sem item de frete. storefrontId={StorefrontId} cep={Cep}",
-                storefront.Id, cep);
-        }
+        // #1291: o bloqueio vale em todos os canais (S24); nada de vaga ocupada nem pedido.
+        if (cliente.Bloqueado)
+            throw new ClienteBloqueadoException(cliente.Id);
 
-        // ── Criar Pedido ─────────────────────────────────────────────────
-        var pedido = DomainPedido.Criar(
-            empresaId: storefront.EmpresaId,
-            cliente: cliente,
-            origem: "storefront-guest");
+        if (input.JanelaId is not { } janelaId || input.DataEntrega is not { } dataEntrega)
+            return await CriarSemJanelaAsync(storefront.Id, storefront.EmpresaId, cliente, clienteNovo, nome, telefoneE164,
+                cep, input, sw, ct, pedidoCriado);
+
+        // ── Fases 1 e 2: pedido, frete cotado e vaga (S10) ───────────────
+        var reservado = await checkoutCore.CriarPedidoComReservaAsync(
+            new CheckoutCoreInput(
+                ClienteId: cliente.Id,
+                Itens: input.Items!.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd)).ToList(),
+                JanelaId: janelaId,
+                DataEntrega: dataEntrega,
+                Cep: cep,
+                Origem: OrigemPedido.StorefrontGuest,
+                Slug: input.Slug,
+                Observacoes: MontarObservacoes(input.Observacoes, cep, input.Numero),
+                Numero: input.Numero),
+            ct);
+
+        var pedido = reservado.Pedido;
         pedido.ClienteNome = nome;          // snapshot do nome fornecido AGORA
+        pedido.ClienteTelefone = telefoneE164;
+        await pedidoRepository.UpdateAsync(pedido, ct);
+
+        // #1226: mesma conversão da campanha que o pedido da conversa (S30); requisição anônima, o tenant
+        // da loja liga o filtro e a RLS. Commit antes da fase 3, que pode falhar com o pedido já criado
+        // (mesma ordem do checkout logado).
+        tenantContext.SetCurrentTenant(storefront.EmpresaId);
+        await atribuicaoCampanha.AtribuirAsync(storefront.EmpresaId, cliente.Id, pedido.Id, ct);
+        await unitOfWork.CommitAsync();
+
+        // ── Fase 3: cobranca do Mercado Pago (S11) ─────────────────────────
+        if (pedidoCriado is not null) await pedidoCriado(pedido.Id, ct);
+        var cobranca = await gerarCobranca.ExecuteAsync(reservado, conversaId: input.ConversaId, ct);
+
+        var token = tokenService.Gerar(pedido.Id);
+        var numeroCurto = pedido.Id.ToString("N")[..8].ToUpperInvariant();
+        var frete = reservado.ItemFrete.PrecoUnitario;
+
+        logger.LogInformation(
+            "Checkout guest ok pedidoId={PedidoId} numeroCurto={Numero} storefrontId={StorefrontId} clienteNovo={Novo} frete={Frete} elapsedMs={Ms}",
+            pedido.Id, numeroCurto, storefront.Id, clienteNovo, frete, sw.ElapsedMilliseconds);
+
+        return new IniciarCheckoutGuestResult(
+            pedido.Id, numeroCurto, token, frete, cobranca.LinkPagamento, ExpiresInSeconds);
+    }
+
+    /// <summary>
+    /// Ponte #1306: modo antigo do guest (#680), sem vaga nem cobranca. O pedido vai para a aprovacao da dona,
+    /// que agenda e cobra pelo WhatsApp; o site monta a mensagem com o numero curto.
+    /// </summary>
+    private async Task<IniciarCheckoutGuestResult> CriarSemJanelaAsync(
+        Guid storefrontId, Guid empresaId, DomainCliente cliente, bool clienteNovo, string nome, string telefoneE164,
+        string cep, IniciarCheckoutGuestInput input, Stopwatch sw, CancellationToken ct,
+        Func<Guid, CancellationToken, Task>? pedidoCriado)
+    {
+        var itensPedidos = input.Items!.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd)).ToList();
+        var cardapioItens = await checkoutCore.CarregarItensCardapioAsync(
+            storefrontId, itensPedidos.Select(i => i.CardapioItemId), ct);
+        CheckoutCoreService.ValidarItens(itensPedidos, cardapioItens);
+
+        var pedido = DomainPedido.Criar(empresaId: empresaId, cliente: cliente, origem: OrigemPedido.StorefrontGuest);
+        await enderecoEntrega.RegistrarAsync(pedido,
+            new EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega(null, input.Numero, null, null, null, null, input.Cep), ct);
+        pedido.ClienteNome = nome;
         pedido.ClienteTelefone = telefoneE164;
         pedido.Status = StatusPedidoMapper.AguardandoAprovacaoBaba;
         pedido.Observacoes = MontarObservacoes(input.Observacoes, cep, input.Numero);
         await pedidoRepository.AddAsync(pedido, ct);
 
-        foreach (var inputItem in input.Items)
-        {
-            var ci = cardapioItens[inputItem.CardapioItemId];
-            var precoUnit = ci.PrecoEfetivo();
-            var item = new DomainPedidoItem
-            {
-                Id = Guid.NewGuid(),
-                PedidoId = pedido.Id,
-                ProdutoId = ci.ProdutoId,
-                CardapioItemId = ci.Id,
-                Nome = ci.Produto?.Nome ?? $"Item {ci.ProdutoId}",
-                Quantidade = inputItem.Qtd,
-                PrecoUnitario = precoUnit,
-                Subtotal = inputItem.Qtd * precoUnit,
-                CriadoEm = DateTime.UtcNow,
-            };
-            await pedidoRepository.AddItemAsync(item, ct);
+        foreach (var item in await checkoutCore.AdicionarItensAsync(pedido, itensPedidos, cardapioItens, ct))
             pedido.Itens.Add(item);
-        }
-
-        if (zonaMatch is not null && zonaMatch.Valor > 0m)
-        {
-            var itemFrete = new DomainPedidoItem
-            {
-                Id = Guid.NewGuid(),
-                PedidoId = pedido.Id,
-                ProdutoId = null,
-                Nome = $"Entrega — {zonaMatch.Label}",
-                Quantidade = 1,
-                PrecoUnitario = zonaMatch.Valor,
-                Subtotal = zonaMatch.Valor,
-                CriadoEm = DateTime.UtcNow,
-            };
-            await pedidoRepository.AddItemAsync(itemFrete, ct);
-            pedido.Itens.Add(itemFrete);
-        }
-
         pedido.RecalcularTotal();
         pedido.AlteradoEm = DateTime.UtcNow;
         await pedidoRepository.UpdateAsync(pedido, ct);
 
+        tenantContext.SetCurrentTenant(empresaId);
+        await atribuicaoCampanha.AtribuirAsync(empresaId, cliente.Id, pedido.Id, ct);
         await unitOfWork.CommitAsync();
 
-        var token = tokenService.Gerar(pedido.Id);
         var numeroCurto = pedido.Id.ToString("N")[..8].ToUpperInvariant();
-
         logger.LogInformation(
-            "Checkout guest ok pedidoId={PedidoId} numeroCurto={Numero} storefrontId={StorefrontId} clienteNovo={Novo} freteEstimado={Frete} elapsedMs={Ms}",
-            pedido.Id, numeroCurto, storefront.Id, clienteNovo, freteEstimado, sw.ElapsedMilliseconds);
+            "Checkout guest sem janela (ponte #1306) pedidoId={PedidoId} numeroCurto={Numero} storefrontId={StorefrontId} clienteNovo={Novo} elapsedMs={Ms}",
+            pedido.Id, numeroCurto, storefrontId, clienteNovo, sw.ElapsedMilliseconds);
 
-        return new IniciarCheckoutGuestResult(pedido.Id, numeroCurto, token, freteEstimado);
+        if (pedidoCriado is not null) await pedidoCriado(pedido.Id, ct);
+        return new IniciarCheckoutGuestResult(pedido.Id, numeroCurto, tokenService.Gerar(pedido.Id), FreteEstimado: null);
+    }
+
+    private async Task<(DomainCliente Cliente, bool Novo)> ResolverClienteAsync(
+        Guid empresaId, string nome, string telefoneE164, string cep, CancellationToken ct)
+    {
+        // O bloqueio comercial continua valendo; consultar não concede identidade nem altera cadastro.
+        var declarado = await clienteRepository.GetByTelefoneHashAsync(empresaId, ClienteOtp.CalcularTelefoneHash(telefoneE164), ct);
+        if (declarado is { Bloqueado: true }) throw new ClienteBloqueadoException(declarado.Id);
+        // O telefone informado não prova posse: o pedido usa um cadastro guest separado.
+        var cliente = DomainCliente.CriarParaStorefront(empresaId,
+            ClienteOtp.CalcularTelefoneHash($"guest:{Guid.NewGuid():N}"), timeProvider);
+        cliente.Nome = nome;
+        cliente.Telefone = telefoneE164;
+        cliente.Cep = cep;
+        await clienteRepository.AddAsync(cliente, ct);
+        return (cliente, true);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────
-
-    private static string NormalizarCep(string? cep)
-    {
-        if (string.IsNullOrWhiteSpace(cep)) return string.Empty;
-        var sb = new System.Text.StringBuilder(cep.Length);
-        foreach (var c in cep) if (char.IsDigit(c)) sb.Append(c);
-        return sb.ToString();
-    }
 
     private static string NormalizarTelefone(string telefone)
     {

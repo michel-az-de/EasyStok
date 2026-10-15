@@ -15,4 +15,9 @@ public record ResumoDiaApi
     public bool OnboardingCompleto { get; init; }
     public int CategoriasCount { get; init; }
     public int EntradasCount { get; init; }
+
+    // issue 988: composicao do SaldoCaixaAtual. Sem isto o card "Caixa" mostrava um numero
+    // que o lojista nao conseguia explicar — o QA viu R$ 126,00 que era o pago de UM pedido.
+    public decimal CaixaVendas { get; init; }
+    public decimal CaixaPagamentosPedidos { get; init; }
 }

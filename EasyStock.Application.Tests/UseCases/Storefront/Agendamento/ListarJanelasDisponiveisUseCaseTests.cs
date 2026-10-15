@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Agendamento;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
+using EasyStock.TestHelpers;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
 namespace EasyStock.Application.Tests.UseCases.Storefront.Agendamento;
@@ -70,12 +71,13 @@ public class ListarJanelasDisponiveisUseCaseTests
         return new Fakes(storefrontRepo, janelaRepo, bloqueioRepo, vagaRepo, freteZonaRepo, storefront);
     }
 
-    private static ListarJanelasDisponiveisUseCase BuildUseCase(Fakes f) => new(
+    private static ListarJanelasDisponiveisUseCase BuildUseCase(Fakes f, TimeProvider? relogio = null) => new(
         f.StorefrontRepo,
         f.JanelaRepo,
         f.BloqueioRepo,
         f.VagaRepo,
-        f.FreteZonaRepo);
+        f.FreteZonaRepo,
+        relogio ?? new FakeTimeProvider(new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero))); // #1506: antes das datas fixas
 
     // ── Helper: cria janela para o dia da semana de uma data específica ──
 
@@ -235,6 +237,24 @@ public class ListarJanelasDisponiveisUseCaseTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_LimiteDe14Dias_AceitaUltimoDiaERecusaSeguinte()
+    {
+        var f = BuildFakes();
+        var hoje = new DateOnly(2026, 6, 1);
+        var ultimoDia = hoje.AddDays(14);
+        var janela = CriarJanela(f.Storefront.Id, ultimoDia);
+        f.JanelaRepo.GetAtivasDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new List<JanelaEntrega> { janela });
+
+        var useCase = BuildUseCase(f);
+        var dentro = await useCase.ExecuteAsync(new(SlugValido, ultimoDia, ultimoDia, null));
+        dentro.Should().ContainSingle(j => j.Data == ultimoDia);
+
+        var fora = () => useCase.ExecuteAsync(new(SlugValido, ultimoDia.AddDays(1), ultimoDia.AddDays(1), null));
+        await fora.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*14 dias*");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_StorefrontInexistente_LancaStorefrontNaoEncontradoException()
     {
         var f = BuildFakes();
@@ -270,6 +290,69 @@ public class ListarJanelasDisponiveisUseCaseTests
         var input = new ListarJanelasDisponiveisInput(SlugValido, data, data, null);
 
         var result = await BuildUseCase(f).ExecuteAsync(input);
+
+        result.Should().BeEmpty();
+    }
+    // ── S16: antecedência mínima ─────────────────────────────────────────
+
+    [Fact]
+    public async Task CortaPorPrazoMinimo()
+    {
+        // Hoje 11:00 em Brasília (14:00Z), terça 02/06/2026; prazo 100 min → nada antes das 12:40.
+        var f = BuildFakes();
+        var hoje = new DateOnly(2026, 6, 2);
+        var amanha = hoje.AddDays(1);
+        var relogio = new FakeTimeProvider(new DateTimeOffset(2026, 6, 2, 14, 0, 0, TimeSpan.Zero));
+
+        JanelaEntrega Janela(DateOnly dia, int hora) => JanelaEntrega.Criar(
+            f.Storefront.Id, (int)dia.DayOfWeek, new TimeOnly(hora, 0), new TimeOnly(hora + 1, 0), 5, $"{hora}h");
+        var hoje12 = Janela(hoje, 12);
+        var hoje13 = Janela(hoje, 13);
+        var amanha12 = Janela(amanha, 12);
+        var amanha13 = Janela(amanha, 13);
+        f.JanelaRepo.GetAtivasDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new List<JanelaEntrega> { hoje12, hoje13, amanha12, amanha13 });
+
+        var input = new ListarJanelasDisponiveisInput(SlugValido, hoje, amanha, null, PrazoMinimoMinutos: 100);
+        var result = await BuildUseCase(f, relogio).ExecuteAsync(input);
+
+        result.Select(r => (r.Data, r.JanelaId)).Should().Equal(
+            (hoje, hoje13.Id),
+            (amanha, amanha12.Id),
+            (amanha, amanha13.Id));
+    }
+
+    [Fact]
+    public async Task SemPrazoMinimo_NaoCorta()
+    {
+        // 11:00 em Brasilia; a janela 12-13h ficaria fora com prazo de 100 min, sem prazo fica.
+        var f = BuildFakes();
+        var hoje = new DateOnly(2026, 6, 2);
+        var relogio = new FakeTimeProvider(new DateTimeOffset(2026, 6, 2, 14, 0, 0, TimeSpan.Zero));
+        var janela = JanelaEntrega.Criar(f.Storefront.Id, (int)hoje.DayOfWeek, new TimeOnly(12, 0), new TimeOnly(13, 0), 5, "12h");
+        f.JanelaRepo.GetAtivasDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new List<JanelaEntrega> { janela });
+
+        var result = await BuildUseCase(f, relogio).ExecuteAsync(new ListarJanelasDisponiveisInput(SlugValido, hoje, hoje, null));
+
+        result.Should().ContainSingle(r => r.JanelaId == janela.Id);
+    }
+
+    [Fact]
+    public async Task JanelaQueJaTerminou_SaiMesmoSemPrazo()
+    {
+        // #1506: 11:00 em Brasilia; a janela 9-10h de hoje acabou e o site a oferecia (cliente pagava
+        // por horario passado). Data passada inteira tambem sai.
+        var f = BuildFakes();
+        var hoje = new DateOnly(2026, 6, 2);
+        var ontem = hoje.AddDays(-1);
+        var relogio = new FakeTimeProvider(new DateTimeOffset(2026, 6, 2, 14, 0, 0, TimeSpan.Zero));
+        var encerrada = JanelaEntrega.Criar(f.Storefront.Id, (int)hoje.DayOfWeek, new TimeOnly(9, 0), new TimeOnly(10, 0), 5, "9h");
+        var deOntem = JanelaEntrega.Criar(f.Storefront.Id, (int)ontem.DayOfWeek, new TimeOnly(15, 0), new TimeOnly(16, 0), 5, "15h");
+        f.JanelaRepo.GetAtivasDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new List<JanelaEntrega> { encerrada, deOntem });
+
+        var result = await BuildUseCase(f, relogio).ExecuteAsync(new ListarJanelasDisponiveisInput(SlugValido, ontem, hoje, null));
 
         result.Should().BeEmpty();
     }

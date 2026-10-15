@@ -8,9 +8,16 @@ public sealed class PedidoFornecedorRepository(EasyStockDbContext dbContext) : I
     public Task<PedidoFornecedor?> GetByIdAsync(Guid id) =>
         dbContext.PedidosFornecedor.FirstOrDefaultAsync(x => x.Id == id);
 
+    public Task<PedidoFornecedor?> GetByIdWithItensAsync(Guid id, CancellationToken ct = default) =>
+        dbContext.PedidosFornecedor
+            .Include(x => x.Itens)
+            .Include(x => x.Fornecedor)
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
+
     public Task AddAsync(PedidoFornecedor pedido) =>
         dbContext.PedidosFornecedor.AddAsync(pedido).AsTask();
 
+    /// <summary>Adiciona um item a um PedidoFornecedor existente (rastreado pelo DbContext).</summary>
     public Task AddItemAsync(PedidoFornecedorItem item)
     {
         dbContext.Set<PedidoFornecedorItem>().Add(item);
@@ -60,8 +67,10 @@ public sealed class PedidoFornecedorRepository(EasyStockDbContext dbContext) : I
         await dbContext.PedidosFornecedor
             .AsNoTracking()
             .Include(x => x.Fornecedor)
+            // RecebidoParcial ainda espera mercadoria: fora da lista, o pedido sumia sem poder ser concluído.
             .Where(x => x.EmpresaId == empresaId &&
-                        (x.Status == StatusPedidoFornecedor.Aberto || x.Status == StatusPedidoFornecedor.EmTransito))
+                        (x.Status == StatusPedidoFornecedor.Aberto || x.Status == StatusPedidoFornecedor.EmTransito
+                         || x.Status == StatusPedidoFornecedor.RecebidoParcial))
             .OrderByDescending(x => x.DataPedido)
             .ToListAsync();
 

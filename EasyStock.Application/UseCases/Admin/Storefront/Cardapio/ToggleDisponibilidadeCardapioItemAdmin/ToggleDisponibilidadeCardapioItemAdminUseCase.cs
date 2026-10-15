@@ -1,4 +1,5 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Campanhas;
 using EasyStock.Domain.Exceptions.Storefront;
 
 namespace EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleDisponibilidadeCardapioItemAdmin;
@@ -13,7 +14,8 @@ public sealed record ToggleDisponibilidadeCardapioItemAdminResult(Guid ItemId, b
 
 public class ToggleDisponibilidadeCardapioItemAdminUseCase(
     ICardapioItemRepository cardapioRepository,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    AvisoItemComInteresse avisoInteresse)
     : IUseCase<ToggleDisponibilidadeCardapioItemAdminCommand, ToggleDisponibilidadeCardapioItemAdminResult>
 {
     public async Task<ToggleDisponibilidadeCardapioItemAdminResult> ExecuteAsync(
@@ -22,11 +24,15 @@ public class ToggleDisponibilidadeCardapioItemAdminUseCase(
         var item = await cardapioRepository.GetByIdAndScopeAsync(command.StorefrontId, command.ItemId, command.EmpresaId)
             ?? throw new CardapioItemNaoEncontradoException(command.StorefrontId, command.ItemId);
 
+        var ofertadoAntes = AvisoItemComInteresse.Ofertado(item);
         if (item.Disponivel) item.MarcarEsgotado();
         else item.MarcarDisponivel();
 
         await cardapioRepository.UpdateAsync(item);
         await unitOfWork.CommitAsync();
+
+        // S31: depois do commit, avisa o console se o item voltou e alguém esperava por ele.
+        await avisoInteresse.AvisarSeVoltouAsync(item, ofertadoAntes, command.EmpresaId);
 
         return new ToggleDisponibilidadeCardapioItemAdminResult(item.Id, item.Disponivel);
     }

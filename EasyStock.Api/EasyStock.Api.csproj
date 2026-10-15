@@ -23,12 +23,14 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.1" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.0" />
+    <PackageReference Include="Npgsql.OpenTelemetry" Version="10.0.3" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
     <PackageReference Include="Serilog.Enrichers.Process" Version="3.0.0" />
     <PackageReference Include="Serilog.Enrichers.Thread" Version="4.0.0" />
     <PackageReference Include="Serilog.Exceptions" Version="8.4.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
     <PackageReference Include="SkiaSharp" Version="3.116.1" />
     <!-- Native assets do SkiaSharp para Linux (container). Sem isto, libSkiaSharp.so
          nao entra no publish linux-x64 e o SkiaImageProcessor cai no catch -> fallback
@@ -73,6 +75,16 @@
          do arquivo sem extensao. -->
     <EmbeddedResource Include="Data\Templates\Email\*.html">
       <LogicalName>EmailTemplates.%(Filename).html</LogicalName>
+    </EmbeddedResource>
+    <!-- S20: CSS do canhoto de 80 mm (copiado de EasyStock.Web/wwwroot/css/recibo.css), lido por
+         Services\Impressao\CanhotoHtml.cs via GetManifestResourceStream("Impressao.canhoto.css"). -->
+    <EmbeddedResource Include="Data\Templates\Impressao\canhoto.css">
+      <LogicalName>Impressao.canhoto.css</LogicalName>
+    </EmbeddedResource>
+    <!-- S49: impressos da Casa da Baba (modelos Scriban por papel e CSS da marca), lidos por
+         Services\Impressao\PedidoImpressoHtml.cs via GetManifestResourceStream("Impressao.<arquivo>"). -->
+    <EmbeddedResource Include="Data\Templates\Impressao\*.sbn;Data\Templates\Impressao\bilhete.css">
+      <LogicalName>Impressao.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
 

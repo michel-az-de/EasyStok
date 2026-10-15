@@ -126,6 +126,18 @@ public static class HorarioBrasil
     }
 
     /// <summary>
+    /// Instante UTC real de uma data e hora de parede em Brasilia (ex.: inicio de janela de entrega
+    /// 30/09 12:00 -> 15:00Z). Mesmo tratamento de gap/ambiguidade de <see cref="InicioRealDoDiaUtc"/>.
+    /// </summary>
+    public static DateTime InstanteUtc(DateOnly dia, TimeOnly hora)
+    {
+        var local = dia.ToDateTime(hora); // Kind=Unspecified, hora "local" de Brasilia
+        if (Tz.IsInvalidTime(local))
+            local = local.AddHours(1);
+        return TimeZoneInfo.ConvertTimeToUtc(local, Tz);
+    }
+
+    /// <summary>
     /// "Hoje" de Brasilia expresso como meia-noite UTC (00:00Z), para comparar com colunas de
     /// DATA CIVIL (gravadas como meia-noite-UTC-da-data-civil via DataUtc.ParaUtc). Ex.:
     /// `WHERE dataVencimento &lt; HojeInstanteUtc()`. NAO confundir com <see cref="JanelaDiaUtc"/>

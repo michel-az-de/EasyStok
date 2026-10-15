@@ -13,10 +13,12 @@ Mecanica:
      quebra o walk-up; rodar de .build\arch-gate (dentro do repo, no .gitignore)
      funciona sem tocar em codigo de teste.
   3. dotnet test na DLL copiada (dotnet test sobre DLL nao compila nada) com
-     --filter Category=Architecture.
+     --filter Category=Architecture. Exige executed > 0 no TRX (issue 1110):
+     zero testes executados e VERMELHO, nao verde.
 
 Uso:   powershell -File scripts/poka-yoke/gate.ps1
-Saida: exit 0 = verde (build + arquitetura); exit != 0 = etapa que falhou.
+Saida: exit 0 = verde (build + arquitetura); exit != 0 = etapa que falhou
+       (4 = nenhum arch-test executou).
 
 Definido em ADR-0040. Registrado em .poka-yoke/registry.yaml (canonical_commands.gate).
 #>
@@ -24,7 +26,8 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $slnf     = Join-Path $repoRoot 'EasyStok.CI.slnf'
-$buildOut = Join-Path $env:TEMP 'easystok-build-check'
+. (Join-Path $PSScriptRoot 'build-out-dir.ps1')
+$buildOut = Get-BuildOutDir $repoRoot   # unica por worktree (issue 1117)
 $gateDir  = Join-Path $repoRoot '.build\arch-gate'
 
 if (-not (Test-Path $slnf)) {
@@ -51,12 +54,30 @@ if ($LASTEXITCODE -ge 8) {   # robocopy: 0-7 = sucesso, >=8 = falha real
 # -- 3. Arch-tests sem rebuild (dotnet test em DLL nao compila nada) ---------
 $dll = Join-Path $gateDir 'EasyStock.ArchitectureTests.dll'
 Write-Host "[gate] 3/3 arch-tests (sem rebuild): $dll"
-dotnet test $dll --filter "Category=Architecture" --nologo --verbosity minimal
+# TRX num diretorio proprio e limpo: o exit 0 do vstest NAO prova que algo rodou.
+# Com a DLL bloqueada (Smart App Control, 0x800711C7) ou filtro sem match ele sai 0
+# com zero testes (issue 1110). O gate so e verde com executed > 0 no TRX desta run.
+$resultsDir = Join-Path $repoRoot '.build\arch-gate-results'
+if (Test-Path $resultsDir) { Remove-Item $resultsDir -Recurse -Force }
+dotnet test $dll --filter "Category=Architecture" --nologo --verbosity minimal `
+    --logger "trx;LogFileName=arch.trx" --results-directory $resultsDir
 $testExit = $LASTEXITCODE
 
-if ($testExit -eq 0) {
-    Write-Host "[gate] VERDE -- build + arquitetura OK." -ForegroundColor Green
-} else {
+if ($testExit -ne 0) {
     Write-Host "[gate] VERMELHO -- arch-tests falharam (exit $testExit)." -ForegroundColor Red
+    exit $testExit
 }
-exit $testExit
+
+$trx = Join-Path $resultsDir 'arch.trx'
+$executed = 0
+if (Test-Path $trx) {
+    $counters = ([xml](Get-Content $trx -Raw)).TestRun.ResultSummary.Counters
+    if ($counters) { $executed = [int]$counters.executed }
+}
+if ($executed -eq 0) {
+    Write-Host "[gate] VERMELHO -- nenhum arch-test executou (TRX: $trx). DLL bloqueada (Smart App Control?) ou filtro sem match; ver docs/dev/flaky-tests.md." -ForegroundColor Red
+    exit 4
+}
+
+Write-Host "[gate] VERDE -- build + arquitetura OK ($executed arch-tests executados)." -ForegroundColor Green
+exit 0

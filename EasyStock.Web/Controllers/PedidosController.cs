@@ -50,6 +50,9 @@ public class RegistrarPagamentoJsonRequest
     public decimal Valor { get; set; }
     public string? Referencia { get; set; }
     public string? Observacao { get; set; }
+
+    /// <summary>issue 917 Fase B: gerado no browser ao abrir o form de pagamento do cockpit.</summary>
+    public string? IdempotencyKey { get; set; }
 }
 public class AprovarJsonRequest { public string? Observacoes { get; set; } }
 public class RecusarJsonRequest { public string? Motivo { get; set; } public string? MensagemCliente { get; set; } }
@@ -58,7 +61,6 @@ public class PedidosController(
     PedidosService svc,
     ClientesService clientesSvc,
     ProdutosService produtosSvc,
-    TicketsApiService ticketsSvc,
     SessionService session) : BaseController(session)
 {
     [HttpGet("/pedidos/novo")]
@@ -76,7 +78,7 @@ public class PedidosController(
         // funciona; o bucket "Novos do cardapio" e client-side (pseudo-filtro, como agendados).
         var statusesValidos = new[]
         {
-            "aguardando", "preparando", "pronto", "entregue", "cancelado",
+            "aguardando", "preparando", "pronto", "saiu_para_entrega", "entregue", "cancelado",
             "rascunho", "aguardando_pagamento", "aguardando_aprovacao_baba", "aprovado_baba",
         };
         var statusFiltro = !string.IsNullOrWhiteSpace(status) && statusesValidos.Contains(status) ? status : null;
@@ -209,7 +211,8 @@ public class PedidosController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddPagamentoJson(string id, [FromBody] RegistrarPagamentoJsonRequest? req) =>
         PedidoJsonContract.From(await svc.RegistrarPagamentoAsync(
-            id, req?.Metodo ?? "", req?.Valor ?? 0m, req?.Referencia, req?.Observacao));
+            id, req?.Metodo ?? "", req?.Valor ?? 0m, req?.Referencia, req?.Observacao,
+            idempotencyKey: req?.IdempotencyKey));
 
     // Aprovação/recusa do pedido do cardápio no cockpit (#862). Reusam os endpoints
     // prontos da API; retornam { success, pedido: { status } } pra UI avançar a linha.
@@ -285,36 +288,6 @@ public class PedidosController(
         return RedirectToAction(nameof(Index));
     }
 
-    /// <summary>
-    /// Onda 1.1 — abre ticket SaaS pra EasyStok reportando problema sobre
-    /// um pedido especifico. Vincula via PedidoId (cross-tenant validado no
-    /// use case). Cliente nao escolhe prioridade; categoria default Solicitacao.
-    /// </summary>
-    [HttpPost("/pedidos/{id:guid}/reportar-problema")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ReportarProblema(Guid id, string motivo, string? descricao, string? categoria)
-    {
-        if (string.IsNullOrWhiteSpace(motivo))
-        {
-            Toast("error", "Informe o motivo da reclamacao.");
-            return RedirectToAction(nameof(Detail), new { id });
-        }
-
-        var titulo = $"Pedido {id.ToString().Substring(0, 8)} — {motivo}";
-        var desc = string.IsNullOrWhiteSpace(descricao) ? motivo : descricao;
-        var cat = string.IsNullOrWhiteSpace(categoria) ? "Solicitacao" : categoria;
-
-        var result = await ticketsSvc.AbrirAsync(titulo, desc, cat, pedidoId: id);
-        if (HasError(result))
-        {
-            Toast("error", $"Falha ao abrir ticket: {result.ErrorMessage}");
-            return RedirectToAction(nameof(Detail), new { id });
-        }
-
-        Toast("success", $"Ticket aberto. Acompanhe em Suporte.");
-        return RedirectToAction(nameof(Detail), new { id });
-    }
-
     [HttpPost("/pedidos/{id}/itens")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddItem(string id, string nome, decimal quantidade, decimal precoUnitario,
@@ -341,9 +314,15 @@ public class PedidosController(
 
     [HttpPost("/pedidos/{id}/pagamentos")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AddPagamento(string id, string metodo, decimal valor, string? referencia, string? observacao)
+    public async Task<IActionResult> AddPagamento(string id, string metodo, decimal valor, string? referencia, string? observacao, string? idempotencyKey)
     {
-        var result = await svc.RegistrarPagamentoAsync(id, metodo, valor, referencia, observacao);
+        // issue 962: o Detail e' a UNICA superficie que mostra o aviso de excedente
+        // (gorjeta/arredondamento, ver Detail.cshtml) antes do submit -- por isso e' a
+        // unica que pode sinalizar permitirExcedente=true. O cockpit (AddPagamentoJson)
+        // continua com o bloqueio duro.
+        // issue 917 Fase B: idempotencyKey vem de hidden field gerado no browser na
+        // abertura do form de pagamento (ver Detail.cshtml) -- estavel entre retries.
+        var result = await svc.RegistrarPagamentoAsync(id, metodo, valor, referencia, observacao, permitirExcedente: true, idempotencyKey: idempotencyKey);
         if (HasError(result))
         {
             Toast("error", result.ErrorMessage ?? "Não foi possível registrar o pagamento. Confira os dados e tente de novo.");

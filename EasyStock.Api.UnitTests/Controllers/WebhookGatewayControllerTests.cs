@@ -1,12 +1,19 @@
+using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Api.Controllers;
+using EasyStock.Api.UnitTests.Pagamentos;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums.Pagamentos;
+using EasyStock.Domain.Sales;
+using EasyStock.Infra.Async.Pagamentos.Webhooks;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace EasyStock.Api.UnitTests.Controllers;
@@ -28,6 +35,8 @@ public class WebhookGatewayControllerTests
         _validator.Provedor.Returns(Provedor);
         _validator.Validar(Arg.Any<string>(), Arg.Any<IDictionary<string, string?>>()).Returns(true);
         _processor.Provedor.Returns(Provedor);
+        _processor.ProcessarAsync(Arg.Any<string>(), Arg.Any<IDictionary<string, string?>>(), Arg.Any<CancellationToken>())
+            .Returns(ResultadoWebhookGateway.Ok);
 
         var controller = new WebhookGatewayController(
             new[] { _processor }, new[] { _validator }, _repo,
@@ -69,5 +78,119 @@ public class WebhookGatewayControllerTests
 
         result.Should().BeOfType<OkResult>();
         await _processor.DidNotReceive().ProcessarAsync(Arg.Any<string>(), Arg.Any<IDictionary<string, string?>>(), Arg.Any<CancellationToken>());
+    }
+
+    // S32: /api/webhooks/mercadopago respondia 500 porque não havia processor registrado.
+    private const string SegredoMp = "segredo-de-teste";
+
+    private static WebhookGatewayController ControllerMercadoPago(
+        MercadoPagoWebhookFixture f, IWebhookRecebidoRepository repo, string corpo, string? assinatura = null)
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["MercadoPago:WebhookSecret"] = SegredoMp,
+        }).Build();
+        var validator = new MercadoPagoSignatureValidator(config, NullLogger<MercadoPagoSignatureValidator>.Instance,
+            Substitute.For<Microsoft.Extensions.Hosting.IHostEnvironment>());
+        var controller = new WebhookGatewayController(
+            new IGatewayWebhookProcessor[] { f.Processor() }, new IWebhookSignatureValidator[] { validator }, repo,
+            NullLogger<WebhookGatewayController>.Instance);
+
+        var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
+        const string requestId = "req-1";
+        var manifesto = $"id:{MercadoPagoWebhookFixture.PagamentoId};request-id:{requestId};ts:{ts};";
+        var v1 = assinatura ?? Convert.ToHexString(
+            HMACSHA256.HashData(Encoding.UTF8.GetBytes(SegredoMp), Encoding.UTF8.GetBytes(manifesto))).ToLowerInvariant();
+
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(corpo));
+        ctx.Request.Headers["x-signature"] = $"ts={ts},v1={v1}";
+        ctx.Request.Headers["x-request-id"] = requestId;
+        controller.ControllerContext = new ControllerContext { HttpContext = ctx };
+        return controller;
+    }
+
+    private static IWebhookRecebidoRepository RepoQueRegistra()
+    {
+        var repo = Substitute.For<IWebhookRecebidoRepository>();
+        repo.TryRegistrarAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ci => WebhookRecebido.Criar(ci.ArgAt<string>(0), ci.ArgAt<string>(1), ci.ArgAt<string>(2)));
+        return repo;
+    }
+
+    [Fact]
+    public async Task MercadoPagoComProcessorRetorna200()
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte("approved", 25m);
+        var repo = RepoQueRegistra();
+
+        var result = await ControllerMercadoPago(f, repo, MercadoPagoWebhookFixture.Notificacao()).Receber("mercadopago");
+
+        result.Should().BeOfType<OkResult>();
+        await repo.Received(1).TryRegistrarAsync("MercadoPago", "MercadoPago:123456789", Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await repo.Received(1).MarcarProcessadoAsync(Arg.Any<Guid>(), true, Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
+        f.Cobranca.Status.Should().Be(StatusCobrancaPedido.Paga);
+    }
+
+    [Fact]
+    public async Task MercadoPagoAssinaturaInvalidaRetorna401ENadaGrava()
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte("approved", 25m);
+        var repo = RepoQueRegistra();
+
+        var result = await ControllerMercadoPago(f, repo, MercadoPagoWebhookFixture.Notificacao(), assinatura: new string('0', 64))
+            .Receber("mercadopago");
+
+        result.Should().BeOfType<UnauthorizedResult>();
+        await repo.DidNotReceiveWithAnyArgs().TryRegistrarAsync(default!, default!, default!, default);
+        await f.MpClient.DidNotReceiveWithAnyArgs().ConsultarPagamentoAsync(default!, default);
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+    }
+
+    [Fact]
+    public async Task Evento_nao_reconhecido_responde_200_e_registra_sem_sucesso()
+    {
+        // Poda P02: txid de cobranca de assinatura antiga nao tem mais dono. O gateway
+        // recebe 200 (para de retentar) e o WebhookRecebido guarda o motivo.
+        var registro = WebhookRecebido.Criar(Provedor, "evt-2", "hash");
+        _repo.TryRegistrarAsync(Provedor, Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(registro);
+        var controller = CriarController();
+        _processor.ProcessarAsync(Arg.Any<string>(), Arg.Any<IDictionary<string, string?>>(), Arg.Any<CancellationToken>())
+            .Returns(ResultadoWebhookGateway.Falha("txid_desconhecido"));
+
+        var result = await controller.Receber(Provedor);
+
+        result.Should().BeOfType<OkResult>();
+        await _repo.Received(1).MarcarProcessadoAsync(registro.Id, false, "txid_desconhecido", Arg.Any<CancellationToken>());
+    }
+
+    // I4.5 (#1698): o texto do erro fica em WebhookRecebido.Erro e aparece em tela de suporte.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Erro_do_provedor_persistido_sem_segredo(bool porExcecao)
+    {
+        const string canario = "CANARIO-9f3a7c21d4";
+        var corpo = "Mercado Pago respondeu 401 em /v1/payments/1: {\"access_token\":\"" + canario + "\"} Bearer " + canario;
+        var registro = WebhookRecebido.Criar(Provedor, "evt-1", "hash");
+        _repo.TryRegistrarAsync(Provedor, Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(registro);
+        var controller = CriarController();
+        if (porExcecao)
+            _processor.ProcessarAsync(Arg.Any<string>(), Arg.Any<IDictionary<string, string?>>(), Arg.Any<CancellationToken>())
+                .Returns<ResultadoWebhookGateway>(_ => throw new HttpRequestException(corpo));
+        else
+            _processor.ProcessarAsync(Arg.Any<string>(), Arg.Any<IDictionary<string, string?>>(), Arg.Any<CancellationToken>())
+                .Returns(ResultadoWebhookGateway.Falha(corpo));
+
+        await controller.Receber(Provedor);
+
+        await _repo.Received(1).MarcarProcessadoAsync(registro.Id, false,
+            Arg.Is<string?>(e => e != null && !e.Contains(canario) && e.Contains("401") && e.Contains("[REDACTED]")),
+            Arg.Any<CancellationToken>());
     }
 }

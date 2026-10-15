@@ -130,7 +130,8 @@
         redirect: '/clientes/{id}',
         requireField: 'nome',
         requireMessage: 'Informe o nome do cliente.',
-        initialForm: { nome: '', apt: '', endereco: '', telefone: '', email: '', documento: '', observacoes: '' }
+        initialForm: { nome: '', apt: '', endereco: '', telefone: '', email: '', documento: '', observacoes: '',
+                       pessoaJuridica: false, nomeFantasia: '', inscricaoEstadual: '' }
      })"
      x-show="open" x-cloak
      x-transition:leave="transition duration-100 ease-in"
@@ -156,25 +157,62 @@
             <div x-show="erroMsg" x-cloak class="fm-error" x-text="erroMsg" role="alert"></div>
             @Html.AntiForgeryToken()
 
+            @* Alternância PF/PJ (ADR-0048): só rótulo, placeholder e campos condicionais mudam.
+               A máscara segue `x-mask:doc`, que decide CPF ou CNPJ pelo comprimento digitado —
+               trocar para `x-mask:cnpj` quebraria CPF e esbarraria na guarda `maskApplied`
+               (o mesmo defeito que a aba Documentos tem hoje, issue #1020). *@
             <fieldset class="fm-section">
                 <legend class="fm-section__legend">Identificação</legend>
+
+                <div class="fm-field" role="radiogroup" aria-label="Tipo de pessoa">
+                    <div class="flex gap-2">
+                        <button type="button" @@click="form.pessoaJuridica = false"
+                                :class="!form.pessoaJuridica ? 'filter-chip active' : 'filter-chip'"
+                                :aria-pressed="!form.pessoaJuridica ? 'true' : 'false'">
+                            Pessoa física
+                        </button>
+                        <button type="button" @@click="form.pessoaJuridica = true"
+                                :class="form.pessoaJuridica ? 'filter-chip active' : 'filter-chip'"
+                                :aria-pressed="form.pessoaJuridica ? 'true' : 'false'">
+                            Pessoa jurídica
+                        </button>
+                    </div>
+                </div>
+
                 <div class="fm-grid">
                     <div class="fm-field fm-col-2">
                         <label class="fm-field__label" for="cli-nome">
-                            Nome completo<span class="fm-field__required" aria-hidden="true">*</span>
+                            <span x-text="form.pessoaJuridica ? 'Razão social' : 'Nome completo'">Nome completo</span><span class="fm-field__required" aria-hidden="true">*</span>
                         </label>
                         <input id="cli-nome" type="text" x-model="form.nome" required
-                               placeholder="Ex: Ana Beatriz Costa"
+                               :placeholder="form.pessoaJuridica ? 'Ex: Distribuidora Sul Ltda' : 'Ex: Ana Beatriz Costa'"
                                @@input="erroMsg = ''"
                                class="ui-field w-full text-sm" />
                     </div>
                     <div class="fm-field fm-col-2">
-                        <label class="fm-field__label" for="cli-doc">CPF ou CNPJ</label>
+                        <label class="fm-field__label" for="cli-doc" x-text="form.pessoaJuridica ? 'CNPJ' : 'CPF ou CNPJ'">CPF ou CNPJ</label>
                         <input id="cli-doc" type="text" x-model="form.documento" x-mask:doc
-                               inputmode="numeric" placeholder="000.000.000-00"
+                               inputmode="numeric"
+                               :placeholder="form.pessoaJuridica ? '00.000.000/0000-00' : '000.000.000-00'"
                                data-validate-doc
                                class="ui-field w-full text-sm" />
                         <span class="fm-field__hint">Necessário para emitir NFC-e/NF-e</span>
+                    </div>
+                </div>
+
+                <div class="fm-grid" x-show="form.pessoaJuridica" x-cloak>
+                    <div class="fm-field fm-col-2">
+                        <label class="fm-field__label" for="cli-fantasia">Nome fantasia</label>
+                        <input id="cli-fantasia" type="text" x-model="form.nomeFantasia"
+                               placeholder="Ex: Sul Bebidas"
+                               class="ui-field w-full text-sm" />
+                        <span class="fm-field__hint">É por ele que a empresa aparece nas listagens</span>
+                    </div>
+                    <div class="fm-field fm-col-2">
+                        <label class="fm-field__label" for="cli-ie">Inscrição estadual</label>
+                        <input id="cli-ie" type="text" x-model="form.inscricaoEstadual"
+                               placeholder="ISENTO ou número"
+                               class="ui-field w-full text-sm" />
                     </div>
                 </div>
             </fieldset>

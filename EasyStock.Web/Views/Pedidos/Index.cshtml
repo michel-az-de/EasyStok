@@ -17,6 +17,7 @@
         "aguardando" => "Aguardando",
         "preparando" => "Em preparo",
         "pronto"     => "Pronto",
+        "saiu_para_entrega" => "Saiu para entrega",
         "entregue"   => "Entregue",
         "cancelado"  => "Cancelado",
         // Fluxo storefront guest (StatusPedidoMapper, issue 719) — espelha StatusHelper.
@@ -35,6 +36,7 @@
         "aguardando"    => "preparando",
         "preparando"    => "pronto",
         "pronto"        => "entregue",
+        "saiu_para_entrega" => "entregue",
         "aprovado_baba" => "preparando",   // pós-aprovação do cardápio entra na fila (issue 862)
         _               => ""
     };
@@ -43,6 +45,7 @@
         "aguardando"    => "Iniciar preparo",
         "preparando"    => "Marcar pronto",
         "pronto"        => "Confirmar entrega",
+        "saiu_para_entrega" => "Confirmar entrega",
         "aprovado_baba" => "Iniciar preparo",
         _               => ""
     };
@@ -115,8 +118,11 @@
         <span class="ped-kpi__eyebrow">Novos do cardápio</span>
         <span class="ped-kpi__val" x-text="kpiCardapio">0</span>
     </div>
-    <div class="ped-kpi ped-kpi--warn">
-        <span class="ped-kpi__eyebrow">A receber</span>
+    @* ADR-0044 (BUG-005 do QA): soma o pendente das linhas CARREGADAS nesta tela (cap de 200,
+       inclui pedidos entregues) — diferente do "Pendentes/A entregar" do Dashboard (bruto, so
+       nao-entregues) e do "A Receber 30d" do Financeiro (parcelas, nao pedidos). *@
+    <div class="ped-kpi ped-kpi--warn" title="Soma do pendente dos pedidos carregados nesta lista (até 200), inclui pedidos já entregues.">
+        <span class="ped-kpi__eyebrow">A receber (nesta lista)</span>
         <span class="ped-kpi__val ped-kpi__val--money" x-text="kpiReceberFmt">R$ 0,00</span>
     </div>
 </div>
@@ -217,7 +223,8 @@
                         <td class="col-num">@p.ItensCount</td>
                         <td class="col-num"><span class="ped-total" x-text="money(p.total)">@p.Total.AsMoney()</span></td>
                         <td>
-                            <span class="stp stp--sm" :class="payClass(p)"><span class="stp-dot"></span><span x-text="payText(p)">@(p.Quitado ? "Quitado" : "Pendente")</span></span>
+                            @* issue 962: fallback SSR (pre-hidratacao) espelha payText(p) do JS -- inclusive o excedente, senao o no-JS diverge do hidratado. *@
+                            <span class="stp stp--sm" :class="payClass(p)"><span class="stp-dot"></span><span x-text="payText(p)">@(p.Quitado && p.TemExcedente ? $"Quitado · +{p.Excedente.AsMoney()}" : p.Quitado ? "Quitado" : "Pendente")</span></span>
                         </td>
                         <td class="ped-data">
                             <div>@p.CriadoEm.ParaBrasilia().AsDateTime()</div>

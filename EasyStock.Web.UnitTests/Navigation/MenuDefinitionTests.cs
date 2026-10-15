@@ -19,10 +19,10 @@ public class MenuDefinitionTests
         "Clientes", "ClientesMobile", "Pedidos", "PedidosMobile", "Caixa",
         "CaixaMobile", "Financeiro", "ContasAReceber", "ContasAPagar", "Lotes",
         "LotesMobile", "ListasCompras", "Categorias", "Entradas", "Saidas",
-        "NotasFiscais", "ConfiguracaoFiscal", "Kds", "Dispositivos", "Operacao",
+        "Kds",
         "Analytics", "Movimentacoes", "Inteligencia", "InteligenciaLojas",
-        "Relatorios", "Anuncios", "Usuarios", "Configuracoes", "Lojas",
-        "Assinatura", "Notificacoes", "Preferencias",
+        "Relatorios", "Usuarios", "Configuracoes", "Lojas",
+        "Notificacoes", "Preferencias",
     };
 
     [Fact]
@@ -33,10 +33,10 @@ public class MenuDefinitionTests
     }
 
     [Fact]
-    public void Rodape_tem_dispositivos_usuarios_configuracoes()
+    public void Rodape_tem_usuarios_configuracoes()
     {
         MenuDefinition.Footer.Select(i => i.Key).Should().Equal(
-            "dispositivos", "usuarios", "configuracoes");
+            "usuarios", "configuracoes");
     }
 
     [Fact]

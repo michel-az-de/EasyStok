@@ -1,0 +1,192 @@
+import { itemPorSku } from './cardapio.js'
+import { passoPorId } from './esteira.js'
+
+// #1683: prato que saiu do cardápio visível depois do pedido não some da Ficha. A linha da API
+// traz o retrato (nome, preço unitário, porção) e ele vira o produto quando o cardápio não tem.
+const produtoDoRetrato = (linha) => (linha.nome
+  ? { sku: linha.sku, nome: linha.nome, preco: linha.precoUnitario ?? 0, porcao: linha.porcao ?? '', estoque: null, foraDoCardapio: true }
+  : null)
+
+export function itensDetalhados(pedido, cardapio) {
+  if (!pedido) return []
+  return pedido.itens.map((linha) => ({ ...linha, produto: itemPorSku(cardapio, linha.sku) ?? produtoDoRetrato(linha) }))
+}
+
+// Segue só pelo cardápio: o retrato existe em pedido do EasyStok, e nele o total é o do servidor.
+export function totalDoPedido(pedido, cardapio) {
+  if (!pedido) return 0
+  return pedido.itens
+    .reduce((soma, linha) => soma + (itemPorSku(cardapio, linha.sku)?.preco ?? 0) * linha.qtd, 0)
+}
+
+// Preço da linha na Ficha: o que o pedido gravou; sem retrato (rascunho local), o do cardápio.
+export const precoDaLinha = (linha) => (linha.precoUnitario ?? linha.produto?.preco ?? 0) * linha.qtd
+
+// `diferencaAposPagamento` mudou para `dominio/pagamento.js` na integração:
+// "quanto já foi pago" tem uma fonte só (registro 38).
+
+// Pedido novo nasce aguardando pagamento, nunca pago. O número vem de fora
+// para o domínio não depender de contador global. `pagamentos` (rodada 5,
+// seção 3.2 e 4) é a soma de tudo que já caiu no pedido: a cobrança original
+// e qualquer complemento, lida por `dominio/pagamento.js`.
+//
+// `entregador` nasce `null`: US-040, ninguém foi escalado ainda, e um texto
+// fixo aqui vira mentira assim que o pedido despachar sem a dona escolher
+// quem leva (`dominio/viagem.js: entregadorResolvido`, `dominio/esteira.js:
+// avisoDoPasso`).
+//
+// `janela` também nasce `null` (#1474): o 'j3' fixo virava "Janela 18h30 às 19h30" na comanda
+// sem ninguém ter escolhido janela nenhuma.
+export const novoPedido = (numero) => ({
+  numero, estado: 'aguardando', janela: null, entregador: null, itens: [],
+  agradecimentoEnviado: false, pagamentos: [],
+})
+
+// Item repetido soma quantidade em vez de virar segunda linha, MAS só quando
+// a anotação é igual e os dois são (ou não são) acréscimo: mesmo prato com
+// anotação diferente vira linha própria (seção 3.3, "Dois tortéis, um sem
+// tempero" é o caso real). `acrescimo`/`entrouEm` marcam item que entrou na
+// comanda depois do pagamento (seção 3.2); item normal nasce com os dois
+// vazios.
+export function comItem(pedido, sku, { obs = '', acrescimo = false, entrouEm = null } = {}) {
+  const existente = pedido.itens.find(
+    (linha) => linha.sku === sku && linha.obs === obs && Boolean(linha.acrescimo) === acrescimo,
+  )
+  if (existente) {
+    return {
+      ...pedido,
+      itens: pedido.itens.map((l) => (l === existente ? { ...l, qtd: l.qtd + 1 } : l)),
+    }
+  }
+  return { ...pedido, itens: [...pedido.itens, { sku, qtd: 1, obs, acrescimo, entrouEm }] }
+}
+
+export function semItem(pedido, sku) {
+  return { ...pedido, itens: pedido.itens.filter((linha) => linha.sku !== sku) }
+}
+
+// Observação mora na linha do item, nunca no rodapé do pedido (RN-20): é o
+// "sem queijo" que a cozinha precisa ler junto do prato, não depois dele.
+export function comObservacao(pedido, sku, texto) {
+  return {
+    ...pedido,
+    itens: pedido.itens.map((linha) => (linha.sku === sku ? { ...linha, obs: texto } : linha)),
+  }
+}
+
+// Cancelado encerra igual a entregue: nenhum dos dois edita comanda nem anda
+// na esteira (secao 5 da direção visual, "Cancelado" fica fora da trilha).
+export const pedidoEncerrado = (pedido) =>
+  pedido?.estado === 'entregue' || pedido?.estado === 'cancelado'
+
+// #1587: no modo API o pedido já criado é do EasyStok e o console não tem como mudar os itens
+// dele (a ação só avisava no rodapé). A tela trava somar, tirar e anotar, e diz o motivo no lugar.
+export const comandaTravada = (pedido, { fonteApi = false } = {}) => fonteApi && Boolean(pedido?.pedidoId)
+
+// Número curto de quatro dígitos, o mesmo formato que a comanda e o canhoto
+// usam de relance (ex.: "2026-0186" vira "0186").
+export const numeroCurto = (numero) => String(numero).split('-').at(-1)
+
+// #1474 (R6): no modo API o número é o do EasyStok (8 letras, o mesmo da Cozinha e das
+// Entregas). Antes de o pedido existir não há número: o "0001" local seria inventado.
+export function numeroDaComanda(pedido, { fonteApi = false } = {}) {
+  if (pedido?.pedidoId) return numeroCurto(pedido.numero)
+  return fonteApi ? null : numeroCurto(pedido?.numero ?? '')
+}
+
+// Ordem fixa da linha de produção na cozinha: quem prepara na hora primeiro,
+// quem é para levar e finalizar em casa depois (QA2-19, conteúdo do canhoto).
+// A comanda em tela e o canhoto impresso agrupam pela mesma ordem.
+export const ORDEM_DAS_LINHAS = ['servir', 'casa']
+
+export function agruparPorLinha(itens, linhas) {
+  return [
+    ...ORDEM_DAS_LINHAS.map((chave) => ({
+      chave,
+      rotulo: linhas[chave]?.rotulo ?? chave,
+      itens: itens.filter((l) => l.produto?.linha === chave),
+    })),
+    // #1683: linha que só tem o retrato do pedido não sabe a linha de produção; fica por último.
+    { chave: 'fora', rotulo: 'Fora do cardápio', itens: itens.filter((l) => l.produto?.foraDoCardapio) },
+  ].filter((grupo) => grupo.itens.length > 0)
+}
+
+// #1683/#1712: no conflito, conserva os dados atuais do cliente e reaplica itens e observações.
+// O horário local só prevalece quando difere da base da edição.
+export const rascunhoMantendoEdicao = (doServidor, daAtendente, baseDaEdicao = daAtendente) => ({
+  ...doServidor, itens: daAtendente.itens, observacoes: daAtendente.observacoes,
+  ...((daAtendente.janelaId ?? null) !== (baseDaEdicao.janelaId ?? null)
+    || (daAtendente.dataEntrega ?? null) !== (baseDaEdicao.dataEntrega ?? null)
+    ? { janelaId: daAtendente.janelaId, dataEntrega: daAtendente.dataEntrega } : {}),
+})
+
+// #1683: o cliente montando a escolha pelo link, sem pedido ainda. A comanda de baixo não soma
+// item por conta própria, senão a Ficha mostra duas listas e dois totais da mesma comanda.
+// Item que a atendente já pôs no rascunho local segue editável para ela poder tirar.
+export const clienteEscolhendoPeloLink = (comandas, pedido) => !pedido?.pedidoId && !pedido?.itens?.length
+  && (comandas ?? []).some((c) => c.podeEditar && !c.pedido && (c.rascunho?.itens?.length > 0 || c.ajudaSolicitada))
+
+export const LINHA_CLIENTE_ESCOLHENDO =
+  'O cliente está escolhendo pelo link. Abra Revisar seleção para acompanhar os itens antes de confirmar o pedido.'
+
+// #1761: a Ficha dizia "Pedido em montagem" com o pedido já confirmado e pago. O título segue o
+// pedido: montagem só enquanto ele não existe no EasyStok.
+export function tituloDaComanda(pedido, { temLinkComPedido = false } = {}) {
+  if (temLinkComPedido) return 'Link do cliente'
+  if (!pedido?.pedidoId) return 'Pedido em montagem'
+  if (pedido.estado === 'cancelado') return 'Pedido cancelado'
+  if (pedido.estado === 'aguardando') return 'Pedido aguardando pagamento'
+  return 'Pedido confirmado'
+}
+
+// #1761 (L18): a porção embaixo do nome repetia o que o nome já diz ("...600 g" e "600 g").
+export function porcaoForaDoNome(produto) {
+  const porcao = String(produto?.porcao ?? '').trim()
+  if (!porcao) return ''
+  // Espaço entre o número e a unidade não conta: "600g" e "600 g" são a mesma porção.
+  const escapada = [...porcao.toLowerCase().replace(/\s+/g, '')]
+    .map((letra) => letra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*')
+  const noNome = new RegExp(`(^|[^\\p{L}\\p{N}])${escapada}($|[^\\p{L}\\p{N}])`, 'u')
+  return noNome.test(String(produto.nome ?? '').toLowerCase()) ? '' : porcao
+}
+
+// #1761 (L3): o pedido acabou de nascer no EasyStok nesta conversa (a cobrança foi gerada). É a
+// hora de fechar o cardápio: dali em diante ele só consulta e cobria a lista e a conversa.
+export const pedidoAcabouDeNascer = (antes, depois) => Boolean(depois?.pedidoId)
+  && !antes?.pedidoId && antes?.conversaId === depois.conversaId
+
+// #1683: sem pedido e sem frete combinado o EasyStok soma só os itens; o cliente já vê o frete.
+export function rotuloDoTotalDaSelecao(comanda, emEdicao = false) {
+  const semFrete = !comanda.pedido && comanda.freteCombinado == null
+  if (emEdicao) return 'Total da seleção salva' + (semFrete ? ', sem frete' : '')
+  return semFrete ? 'Total dos itens, sem frete' : 'Total previsto'
+}
+
+// #1683: o histórico traz o estado da esteira (demonstração) ou o status do EasyStok em
+// minúsculas e com espaço (`traducaoCliente.js`). Nenhum dos dois vai cru para a tela.
+const ROTULO_FORA_DA_ESTEIRA = {
+  cancelado: 'Cancelado',
+  rascunho: 'Rascunho',
+  'aguardando pagamento': 'Aguardando pagamento',
+  'aguardando aprovacao baba': 'Aguardando aprovação',
+  'aprovado baba': 'Pago',
+  preparando: 'Em preparo',
+  pronto: 'Embalado',
+  'saiu para entrega': 'Em entrega',
+}
+
+export function rotuloDoEstado(estado) {
+  const texto = String(estado ?? '')
+  return passoPorId(texto)?.rotulo ?? ROTULO_FORA_DA_ESTEIRA[texto] ?? texto.charAt(0).toUpperCase() + texto.slice(1)
+}
+
+// #1709: CEP sem cobertura volta do EasyStok com a frase escrita para o cliente
+// (`CepSemCoberturaException`, sem código próprio na resposta). No console quem lê é a equipe:
+// a linha diz o motivo e os dois caminhos que existem hoje.
+const CEP_SEM_COBERTURA = 'Vamos combinar a entrega e o frete com a equipe.'
+const FORA_DA_AREA = 'o endereço do cliente está fora da área de entrega. Mande o Link de compra para combinar o frete com ele, ou cadastre a região em Entregas, Janelas de entrega, Frete.'
+
+export function motivoDoPedidoNaoCriado(erro) {
+  const mensagem = String(erro?.message ?? '').trim()
+  return `Pedido não criado: ${mensagem === CEP_SEM_COBERTURA ? FORA_DA_AREA : mensagem}`
+}

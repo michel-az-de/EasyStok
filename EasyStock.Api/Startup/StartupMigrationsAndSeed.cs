@@ -83,7 +83,35 @@ public static class StartupMigrationsAndSeed
                     "20260430210354_RenameAdminAuditLogsTable_AddMissingDbSets"
                 };
 
-                foreach (var migrationId in pendingMigrations)
+                // #1639: migrar PARA uma pendente de carimbo anterior à última aplicada reverteria todas as
+                // posteriores (o Down delas apaga coluna com dado). É o que acontece quando entra uma PR
+                // que ficou parada. Nesse caso as pendentes são aplicadas sem alvo, que é a semântica do
+                // --migrate-only: aplica o que falta e não reverte nada.
+                var foraDeOrdem = MigracoesPendentes.ForaDeOrdem(appliedMigrations, pendingMigrations);
+                if (foraDeOrdem.Count > 0)
+                {
+                    app.Logger.LogWarning(
+                        "[Migrations] Pendente(s) com carimbo anterior à última aplicada: {ForaDeOrdem}. " +
+                        "Aplicando todas as pendentes sem alvo para não reverter as posteriores. Regere a migração na PR de origem.",
+                        string.Join(", ", foraDeOrdem));
+                    try
+                    {
+                        using var foraScope = app.Services.CreateScope();
+                        var foraDb = foraScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                        using var _ = foraDb.UseRowLevelSecurityBypass();
+                        await foraDb.Database.MigrateAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        migrationsHouveErro = true;
+                        infraState.MigrationsApplied = false;
+                        infraState.MigrationError = $"{string.Join(", ", foraDeOrdem)}: {ex.GetType().Name}: {ex.Message}";
+                        app.Logger.LogError(ex, "[Migrations] !!! FALHA aplicando pendentes fora de ordem.");
+                    }
+                }
+
+                // Com pendente fora de ordem, tudo já foi aplicado (ou falhou) no bloco acima.
+                foreach (var migrationId in foraDeOrdem.Count > 0 ? [] : pendingMigrations)
                 {
                     var swMigration = System.Diagnostics.Stopwatch.StartNew();
                     app.Logger.LogInformation("[Migrations] >>> Aplicando {MigrationId}...", migrationId);
@@ -158,7 +186,7 @@ public static class StartupMigrationsAndSeed
             }
 
             // Schema bootstrap defensivo: roda DEPOIS de migrations e antes de qualquer
-            // seed pra garantir que IsSeedData + SeedRunLogs existam, mesmo se uma
+            // seed pra garantir que SeedRunLogs exista, mesmo se uma
             // migration foi aplicada vazia ou deploy parcial deixou o banco inconsistente.
             // SQL idempotente — no-op se schema já está correto.
             try
@@ -202,7 +230,7 @@ public static class StartupMigrationsAndSeed
                 app.Logger.LogWarning(ex, "[Migrations] Drift check falhou (nao-fatal).");
             }
 
-            // SuperAdmin global ANTES do seed de tenants — o painel /EasyStock.Admin
+            // SuperAdmin global ANTES do seed de tenants — as rotas api/admin/*
             // depende dele e nenhum dos seeds de tenant cria SuperAdmin (apenas Admin
             // de empresa). Idempotente: no-op se ja existe.
             // R6: em Production, exception aqui DERRUBA o startup. Painel admin inacessivel
@@ -262,6 +290,17 @@ public static class StartupMigrationsAndSeed
             catch (Exception ex)
             {
                 app.Logger.LogError(ex, "Erro durante seed de notificações globais. Continuando.");
+            }
+
+            using (var perfisScope = app.Services.CreateScope())
+            {
+                var perfisDb = perfisScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                using var bypass = perfisDb.UseRowLevelSecurityBypass();
+                var empresa = await perfisScope.ServiceProvider.GetRequiredService<IEmpresaPadraoResolver>().ResolverAsync();
+                if (empresa is { } empresaId)
+                    await PerfisCasaDaBabaSeed.ExecutarAsync(perfisDb, empresaId);
+                else
+                    app.Logger.LogWarning("[PerfisCasaDaBaba] Seed não executado: configure Auth:Google:EmpresaPadrao com a empresa da loja.");
             }
 
             // Schema do módulo Casa da Baba Mobile (SQL raw, idempotente, fora do EF migrations).

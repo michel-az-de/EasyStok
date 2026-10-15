@@ -39,10 +39,6 @@ public class LojasController(LojasService svc, SessionService sessionSvc) : Base
         }
 
         var result = await svc.CriarAsync(nomeTrim, cidade?.Trim(), telefone?.Trim());
-        // Bloqueio de assinatura ANTES de limite/HasError: sem isso o ramo "sem lojaId"
-        // devolve o usuário a SelecionarLoja e o loop de criar loja reaparece (#619).
-        if (RedirectIfAssinaturaBloqueada(result) is { } bloqueio) return bloqueio;
-        if (RedirectIfLimitReached(result) is { } limitRedirect) return limitRedirect;
         if (HasError(result))
         {
             return string.IsNullOrEmpty(Session.GetLojaId())
@@ -54,7 +50,7 @@ public class LojasController(LojasService svc, SessionService sessionSvc) : Base
 
         // Caso o usuário não tenha loja ativa (fluxo de onboarding após login sem
         // lojas vinculadas), auto-seleciona a loja recém-criada para que o
-        // BaseController não bloqueie o acesso ao Dashboard.
+        // BaseController não bloqueie o acesso ao portal.
         if (string.IsNullOrEmpty(Session.GetLojaId()))
         {
             var listaResult = await svc.ListarAsync();
@@ -63,7 +59,7 @@ public class LojasController(LojasService svc, SessionService sessionSvc) : Base
                 var nova = lojas.FirstOrDefault(l => string.Equals(l.Nome, nomeTrim, StringComparison.OrdinalIgnoreCase))
                     ?? lojas.Last();
                 Session.SetLoja(nova.Id.ToString(), nova.Nome, emoji, nova.EmpresaId ?? "");
-                return RedirectToAction("Index", "Dashboard");
+                return RedirectToAction("Index", "Launcher");
             }
         }
 

@@ -1,4 +1,4 @@
-﻿using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Messaging;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Auth;
@@ -104,6 +104,19 @@ public class SolicitarOtpUseCaseTests
             IdempotencyKey: idempotencyKey,
             IpOrigem: IpOrigem,
             UserAgent: UserAgentTeste);
+
+    [Fact]
+    public async Task Provider_indisponivel_recusa_antes_de_reaproveitar_ou_persistir_otp()
+    {
+        var f = BuildFakes();
+        f.WhatsAppSender.ValidarDisponibilidadeAsync(Arg.Any<CancellationToken>())
+            .ThrowsAsync(new OtpProviderException("Provider não configurado."));
+        await BuildUseCase(f).Invoking(x => x.ExecuteAsync(Input())).Should().ThrowAsync<OtpProviderException>();
+        await f.ClienteOtpRepository.DidNotReceive().GetAtivoPorTelefoneHashAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+        await f.ClienteOtpRepository.DidNotReceive().AddAsync(Arg.Any<ClienteOtp>(), Arg.Any<CancellationToken>());
+        await f.WhatsAppSender.DidNotReceive().EnviarOtpAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
 
     // ── Happy path ─────────────────────────────────────────────────────
 

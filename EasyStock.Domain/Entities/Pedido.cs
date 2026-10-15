@@ -42,6 +42,13 @@ namespace EasyStock.Domain.Entities
         public string? ClienteApt { get; set; }
         public string? ClienteTelefone { get; set; }
 
+        public string? EnderecoEntrega { get; set; }
+        public string? BairroEntrega { get; set; }
+        public string? CepEntrega { get; set; }
+        public double? EntregaLat { get; set; }
+        public double? EntregaLng { get; set; }
+        public DateTime? EnderecoConfirmadoEm { get; set; }
+
         /// <summary>
         /// Status legado em string lowercase: "aguardando" | "preparando" |
         /// "pronto" | "entregue" | "cancelado". Mantido público e mutable
@@ -142,6 +149,77 @@ namespace EasyStock.Domain.Entities
         /// </summary>
         public string? MensagemRecusaCliente { get; set; }
 
+        // ── Aprovação manual só na exceção (S12, #1119) ───────────────
+
+        /// <summary>Tamanho máximo persistido de <see cref="MotivoRequerAprovacao"/>.</summary>
+        public const int MotivoRequerAprovacaoMaxLength = 200;
+
+        /// <summary>
+        /// Pedido que precisa da aprovação da dona antes de entrar na fila (ex.: aceito fora
+        /// de área). Default false: pagamento confirmado vai direto para
+        /// <see cref="StatusPedido.Aguardando"/>.
+        /// </summary>
+        public bool RequerAprovacao { get; private set; }
+
+        /// <summary>Por que o pedido requer aprovação. Preenchido por <see cref="MarcarRequerAprovacao"/>.</summary>
+        public string? MotivoRequerAprovacao { get; private set; }
+
+        /// <summary>
+        /// Marca o pedido como exceção que exige aprovação manual. Motivo obrigatório,
+        /// cortado em <see cref="MotivoRequerAprovacaoMaxLength"/>.
+        /// </summary>
+        public void MarcarRequerAprovacao(string motivo)
+        {
+            if (string.IsNullOrWhiteSpace(motivo))
+                throw new ArgumentException("Motivo obrigatório para exigir aprovação.", nameof(motivo));
+
+            var limpo = motivo.Trim();
+            RequerAprovacao = true;
+            MotivoRequerAprovacao = limpo.Length > MotivoRequerAprovacaoMaxLength
+                ? limpo[..MotivoRequerAprovacaoMaxLength]
+                : limpo;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
+        // ── Início previsto e atraso (S21) ─────────────────────────────
+
+        /// <summary>
+        /// Instante (UTC) em que o preparo precisa começar para cumprir a janela prometida: início da
+        /// janela (ou <see cref="AgendadoParaEm"/>) menos o prazo mínimo dos itens. Nulo = sem janela.
+        /// </summary>
+        public DateTime? InicioPrevistoEm { get; private set; }
+
+        /// <summary>Quando o atraso foi publicado (<c>pedido.atrasado</c>). Nulo = ainda não. Trava de uma vez só.</summary>
+        public DateTime? AtrasoNotificadoEm { get; private set; }
+
+        /// <summary>
+        /// Grava o início previsto e zera a notificação de atraso: prazo novo, aviso novo. Mesmo valor é
+        /// no-op, para um segundo pagamento ou reagendamento para o mesmo horário não repetir o aviso.
+        /// </summary>
+        public void DefinirInicioPrevisto(DateTime? inicioPrevistoEm)
+        {
+            if (InicioPrevistoEm == inicioPrevistoEm) return;
+            InicioPrevistoEm = inicioPrevistoEm;
+            AtrasoNotificadoEm = null;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
+        /// <summary>Atrasado = ainda aguardando e o início previsto já passou (US-037, UC-04 E2).</summary>
+        public bool EstaAtrasado(DateTime agoraUtc) =>
+            StatusEnum == StatusPedido.Aguardando && InicioPrevistoEm is { } inicio && agoraUtc > inicio;
+
+        /// <summary>
+        /// Marca o atraso como notificado. Devolve <c>false</c> (sem mudar nada) se o pedido não está
+        /// atrasado ou já foi notificado desde o último início previsto.
+        /// </summary>
+        public bool MarcarAtrasoNotificado(DateTime agoraUtc)
+        {
+            if (AtrasoNotificadoEm is not null || !EstaAtrasado(agoraUtc)) return false;
+            AtrasoNotificadoEm = agoraUtc;
+            AlteradoEm = DateTime.UtcNow;
+            return true;
+        }
+
         public Empresa? Empresa { get; set; }
         public Loja? Loja { get; set; }
 
@@ -217,7 +295,38 @@ namespace EasyStock.Domain.Entities
 
         public void MarcarEntregue() => MudarStatus(StatusPedido.Entregue);
 
+        /// <summary>Retorno físico confirmado, sem cancelar venda, estornar pagamento ou devolver estoque.</summary>
+        public void RegistrarRetornoEntrega()
+        {
+            if (StatusEnum != StatusPedido.SaiuParaEntrega)
+                throw new RegraDeDominioVioladaException("Só pedido em entrega pode retornar à fila de entregas.");
+            Status = StatusPedidoMapper.Pronto;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
+        public void RetomarPreparoPorAlteracao()
+        {
+            if (StatusEnum != StatusPedido.Pronto) throw new RegraDeDominioVioladaException("Só pedido pronto pode retomar o preparo por alteração.");
+            Status = StatusPedidoMapper.Preparando;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
         public void Cancelar() => MudarStatus(StatusPedido.Cancelado);
+
+        /// <summary>
+        /// Desfaz o "marcar como pago" por engano (S11): o pedido sem preparo iniciado volta a esperar o
+        /// pagamento online. Compensação fora da matriz de transições (<see cref="PedidoStateMachine.PodeDesfazerPagamento"/>).
+        /// </summary>
+        public void VoltarParaAguardandoPagamento()
+        {
+            var atual = StatusEnum;
+            if (atual == StatusPedido.AguardandoPagamento) return;
+            if (!PedidoStateMachine.PodeDesfazerPagamento(atual))
+                throw new TransicaoInvalidaException(atual, StatusPedido.AguardandoPagamento);
+
+            Status = StatusPedidoMapper.AguardandoPagamento;
+            AlteradoEm = DateTime.UtcNow;
+        }
 
         public decimal TotalPago
         {
@@ -233,6 +342,13 @@ namespace EasyStock.Domain.Entities
     /// <summary>Item do pedido. Snapshot de nome/preço pra preservar histórico.</summary>
     public class PedidoItem
     {
+        /// <summary>
+        /// Linha de frete do checkout ("Entrega — Zona"): sem item de cardápio, produto nem linha
+        /// de preparo. Não é prato; cozinha e PWA não a tratam como item (#1474).
+        /// </summary>
+        public bool EhLinhaDeFrete => CardapioItemId is null && ProdutoId is null && LinhaSnapshot is null
+            && Nome.StartsWith("Entrega — ", StringComparison.Ordinal);
+
         public Guid Id { get; set; }
         public Guid PedidoId { get; set; }
 
@@ -264,13 +380,17 @@ namespace EasyStock.Domain.Entities
         public string? VariacaoRotuloSnapshot { get; set; }
         /// <summary>SKU da opção congelado no momento do pedido.</summary>
         public string? SkuSnapshot { get; set; }
+        /// <summary>Linha do item do cardápio congelada no pedido (S15): "paraServir" | "prepararEmCasa". Null = sem cardápio (frete, ad-hoc).</summary>
+        public string? LinhaSnapshot { get; set; }
 
         public Pedido? Pedido { get; set; }
         public Produto? Produto { get; set; }
 
         public void RecalcularSubtotal()
         {
-            Subtotal = Quantidade * PrecoUnitario;
+            // #1506: centavos como a coluna numeric(14,2) grava. Sem arredondar, 0,35 kg x 47,90
+            // (16,765) somava 33,53 no Total em memoria e 33,54 depois de recarregar do banco.
+            Subtotal = Math.Round(Quantidade * PrecoUnitario, 2, MidpointRounding.AwayFromZero);
         }
     }
 

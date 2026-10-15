@@ -17,6 +17,17 @@ public interface ITemplateRepository
         Guid? empresaId,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Template ativo e aprovado do tipo de evento no canal (N5), para quando o código da rotina não existe naquele
+    /// canal. A empresa vem antes do global; dentro de cada um, a maior <c>Versao</c>. Com <paramref name="empresaId"/>
+    /// nulo, só o global.
+    /// </summary>
+    Task<TemplateNotificacao?> GetAtivoPorTipoAsync(
+        TipoEventoNotificacao tipo,
+        CanalNotificacao canal,
+        Guid? empresaId,
+        CancellationToken ct = default);
+
     Task<(IReadOnlyList<TemplateNotificacao> Items, int TotalCount)> ListarAsync(
         Guid? empresaId,
         TipoEventoNotificacao? tipoEvento = null,

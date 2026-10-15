@@ -1,0 +1,245 @@
+using EasyStock.Domain.Entities;
+using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Enums;
+using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
+using EasyStock.Infra.Postgre.Repositories;
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+
+namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
+
+/// <summary>
+/// Regressao #926/#933 — o mesmo dinheiro nao pode contar 2x no caixa.
+///
+/// <para>
+/// O saldo do caixa (CaixaSaldoCalculator) e
+/// <c>saldoInicial + totalVendas + totalPagamentosPedidos + entradas - saidas</c>.
+/// Um pedido mobile entregue vira uma <see cref="Venda"/> (VendaId setado) e o valor
+/// ja entra em <c>GetTotalVendas</c>; se o <see cref="PedidoPagamento"/> desse pedido
+/// tambem entrasse em <c>GetTotalPagamentosPedidos</c>, o mesmo dinheiro somaria duas
+/// vezes. O fix filtra <c>p.VendaId == null</c> nas duas queries (total e lista).
+/// </para>
+///
+/// <para>Estes testes travam o comportamento contra regressao:</para>
+/// <list type="bullet">
+///   <item>o total de pagamentos-pedidos exclui pedidos ja consolidados em Venda (o 2x);</item>
+///   <item>cancelamento preserva recebimentos; só estorno confirmado os retira;</item>
+///   <item>a lista de linhas exibidas casa 1:1 com o total (soma das linhas == total).</item>
+/// </list>
+///
+/// <para>
+/// Nota (verificado ao escrever o teste): <c>GetTotalVendasNoIntervaloAsync</c> NAO filtra
+/// venda cancelada — a entidade <see cref="Venda"/> nao tem campo de status/cancelamento.
+/// Logo o valor de um pedido consolidado aparece SEMPRE exatamente uma vez (via Venda),
+/// nunca some; por isso nao ha caso "dinheiro desaparece no estorno" a cobrir aqui.
+/// </para>
+/// </summary>
+[Collection("PostgreSqlTestCollection")]
+public sealed class CaixaRepositoryPagamentosPedidoIntegrationTests(PostgreSqlDatabaseFixture fixture)
+{
+    [SkippableFact]
+    public async Task Pagamento_de_pedido_consolidado_em_venda_nao_conta_no_total_evitando_2x()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await using var db = fixture.CreateDbContext();
+
+        var empresaId = Guid.NewGuid();
+        db.SetMobileTenantContext(empresaId);
+        db.Empresas.Add(NovaEmpresa(empresaId));
+
+        var agora = DateTime.UtcNow;
+        var ini = agora.AddHours(-1);
+        var fim = agora.AddHours(1);
+
+        // Pedido A — balcao/web: SEM Venda (VendaId null). DEVE contar em pagamentos-pedidos.
+        var pedidoBalcao = NovoPedido(empresaId, status: StatusPedidoMapper.Aguardando, vendaId: null);
+        db.Pedidos.Add(pedidoBalcao);
+        db.Set<PedidoPagamento>().Add(NovoPagamento(pedidoBalcao.Id, 10m, agora));
+
+        // Pedido B — mobile entregue -> consolidado numa Venda (VendaId setado). O ValorTotal
+        // da Venda ja aparece em GetTotalVendas; o PedidoPagamento NAO pode contar de novo.
+        var vendaConsolidada = NovaVenda(empresaId, valor: 25m, dataVenda: agora);
+        db.Vendas.Add(vendaConsolidada);
+        var pedidoMobile = NovoPedido(empresaId, status: StatusPedidoMapper.Entregue, vendaId: vendaConsolidada.Id);
+        db.Pedidos.Add(pedidoMobile);
+        db.Set<PedidoPagamento>().Add(NovoPagamento(pedidoMobile.Id, 25m, agora));
+
+        // Pedido C cancelado sem estorno: o dinheiro recebido continua no caixa.
+        var pedidoCancelado = NovoPedido(empresaId, status: StatusPedidoMapper.Cancelado, vendaId: null);
+        db.Pedidos.Add(pedidoCancelado);
+        db.Set<PedidoPagamento>().Add(NovoPagamento(pedidoCancelado.Id, 99m, agora));
+
+        await db.SaveChangesAsync();
+
+        var repo = new CaixaRepository(db);
+        var totalPagamentosPedidos = await repo.GetTotalPagamentosPedidosNoIntervaloAsync(empresaId, ini, fim);
+        var totalVendas = await repo.GetTotalVendasNoIntervaloAsync(empresaId, ini, fim);
+
+        totalPagamentosPedidos.Should().Be(109m,
+            "cancelamento não é estorno; o mobile já aparece na Venda (#926/#933)");
+        totalVendas.Should().Be(25m,
+            "a Venda consolidada do pedido mobile ja representa esse dinheiro uma vez");
+
+        // Invariante do caixa: o dinheiro do pedido mobile aparece UMA vez (via Venda), nao duas.
+        (totalVendas + totalPagamentosPedidos).Should().Be(134m,
+            "o mesmo dinheiro do pedido mobile nao pode contar 2x no caixa (#926)");
+    }
+
+    [SkippableFact]
+    public async Task Estorno_confirmado_retira_so_o_recebimento_correspondente_do_total_e_da_lista()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await using var db = fixture.CreateDbContext();
+        var empresaId = Guid.NewGuid();
+        db.SetMobileTenantContext(empresaId);
+        db.Empresas.Add(NovaEmpresa(empresaId));
+        var pedido = NovoPedido(empresaId, StatusPedidoMapper.Cancelado, null);
+        db.Pedidos.Add(pedido);
+        var agora = DateTime.UtcNow;
+        var pagamento = NovoPagamento(pedido.Id, 20m, agora);
+        pagamento.Referencia = "pagamento-devolvido";
+        db.Set<PedidoPagamento>().AddRange(pagamento, NovoPagamento(pedido.Id, 5m, agora));
+        var cobranca = CobrancaPedido.CriarOnline(empresaId, pedido.Id, 20m, "pref", "https://mp.test/pref",
+            agora.AddMinutes(30), 1, agora);
+        cobranca.MarcarPaga(pagamento.Referencia, 20m, "pix", agora);
+        db.Set<CobrancaPedido>().Add(cobranca);
+        await db.SaveChangesAsync();
+        var repo = new CaixaRepository(db);
+        (await repo.GetTotalPagamentosPedidosNoIntervaloAsync(empresaId, agora.AddHours(-1), agora.AddHours(1)))
+            .Should().Be(25m);
+
+        cobranca.MarcarEstornada("Confirmado pelo gateway", agora);
+        await db.SaveChangesAsync();
+
+        var total = await repo.GetTotalPagamentosPedidosNoIntervaloAsync(empresaId, agora.AddHours(-1), agora.AddHours(1));
+        var linhas = await repo.GetPagamentosPedidosListaNoIntervaloAsync(empresaId, agora.AddHours(-1), agora.AddHours(1));
+        total.Should().Be(5m);
+        linhas.Should().ContainSingle().Which.Valor.Should().Be(total);
+        (await db.Set<PedidoPagamento>().CountAsync(p => p.PedidoId == pedido.Id)).Should().Be(2);
+    }
+
+    [SkippableFact]
+    public async Task Lista_de_pagamentos_exclui_pedido_consolidado_e_soma_bate_com_o_total()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await using var db = fixture.CreateDbContext();
+
+        var empresaId = Guid.NewGuid();
+        db.SetMobileTenantContext(empresaId);
+        db.Empresas.Add(NovaEmpresa(empresaId));
+
+        var agora = DateTime.UtcNow;
+        var ini = agora.AddHours(-1);
+        var fim = agora.AddHours(1);
+
+        var pedidoBalcao = NovoPedido(empresaId, status: StatusPedidoMapper.Aguardando, vendaId: null);
+        db.Pedidos.Add(pedidoBalcao);
+        db.Set<PedidoPagamento>().Add(NovoPagamento(pedidoBalcao.Id, 40m, agora));
+
+        var venda = NovaVenda(empresaId, valor: 70m, dataVenda: agora);
+        db.Vendas.Add(venda);
+        var pedidoMobile = NovoPedido(empresaId, status: StatusPedidoMapper.Entregue, vendaId: venda.Id);
+        db.Pedidos.Add(pedidoMobile);
+        db.Set<PedidoPagamento>().Add(NovoPagamento(pedidoMobile.Id, 70m, agora));
+
+        await db.SaveChangesAsync();
+
+        var repo = new CaixaRepository(db);
+        var linhas = await repo.GetPagamentosPedidosListaNoIntervaloAsync(empresaId, ini, fim);
+        var total = await repo.GetTotalPagamentosPedidosNoIntervaloAsync(empresaId, ini, fim);
+
+        // A lista exibida nao pode trazer o pagamento do pedido ja consolidado em Venda.
+        linhas.Should().ContainSingle(pg => pg.PedidoId == pedidoBalcao.Id);
+        linhas.Should().NotContain(pg => pg.PedidoId == pedidoMobile.Id);
+
+        // Invariante da tela do caixa: soma das linhas exibidas == total somado ao saldo.
+        linhas.Sum(pg => pg.Valor).Should().Be(total);
+        total.Should().Be(40m);
+    }
+
+    [SkippableTheory]
+    [InlineData(NaturezaMovimentacaoEstoque.Perda)]
+    [InlineData(NaturezaMovimentacaoEstoque.Doacao)]
+    [InlineData(NaturezaMovimentacaoEstoque.Ajuste)]
+    [InlineData(NaturezaMovimentacaoEstoque.UsoInterno)]
+    public async Task Lista_de_vendas_exclui_saidas_sem_receita_e_respeita_empresa_loja_e_intervalo(
+        NaturezaMovimentacaoEstoque natureza)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await using var db = fixture.CreateDbContext();
+        var empresa = NovaEmpresa(Guid.NewGuid());
+        var outraEmpresa = NovaEmpresa(Guid.NewGuid());
+        var loja = Loja.Criar(empresa.Id, "Loja do caixa");
+        var outraLoja = Loja.Criar(empresa.Id, "Outra loja");
+        var inicio = new DateTime(2026, 10, 9, 3, 0, 0, DateTimeKind.Utc);
+        var fim = inicio.AddDays(1);
+        var venda = NovaVenda(empresa.Id, 12.50m, inicio);
+        venda.LojaId = loja.Id;
+        var semReceita = NovaVenda(empresa.Id, 90m, inicio);
+        semReceita.LojaId = loja.Id;
+        semReceita.Natureza = natureza;
+        var deOutraLoja = NovaVenda(empresa.Id, 70m, inicio);
+        deOutraLoja.LojaId = outraLoja.Id;
+        var foraDaJanela = NovaVenda(empresa.Id, 80m, fim);
+        foraDaJanela.LojaId = loja.Id;
+        db.Empresas.AddRange(empresa, outraEmpresa);
+        db.Lojas.AddRange(loja, outraLoja);
+        db.Vendas.AddRange(venda, semReceita, deOutraLoja, foraDaJanela, NovaVenda(outraEmpresa.Id, 100m, inicio));
+        await db.SaveChangesAsync();
+        db.SetMobileTenantContext(empresa.Id);
+        var repo = new CaixaRepository(db);
+
+        var linhas = await repo.GetVendasNoIntervaloAsync(empresa.Id, inicio, fim, loja.Id);
+        var total = await repo.GetTotalVendasNoIntervaloAsync(empresa.Id, inicio, fim, loja.Id);
+        var todasLojas = await repo.GetVendasNoIntervaloAsync(empresa.Id, inicio, fim);
+
+        linhas.Should().ContainSingle().Which.Id.Should().Be(venda.Id);
+        linhas.Sum(v => v.ValorTotal.Valor).Should().Be(total).And.Be(12.50m);
+        todasLojas.Select(v => v.Id).Should().BeEquivalentTo([venda.Id, deOutraLoja.Id]);
+    }
+
+    private static Empresa NovaEmpresa(Guid empresaId) => new()
+    {
+        Id = empresaId,
+        Nome = "Empresa Caixa",
+        Documento = empresaId.ToString("N")[..14],
+        CriadoEm = DateTime.UtcNow,
+        AlteradoEm = DateTime.UtcNow
+    };
+
+    private static Pedido NovoPedido(Guid empresaId, string status, Guid? vendaId)
+    {
+        var agora = DateTime.UtcNow;
+        return new Pedido
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            Status = status,
+            VendaId = vendaId,
+            Total = Dinheiro.Zero,
+            CriadoEm = agora,
+            AlteradoEm = agora
+        };
+    }
+
+    private static Venda NovaVenda(Guid empresaId, decimal valor, DateTime dataVenda) => new()
+    {
+        Id = Guid.NewGuid(),
+        EmpresaId = empresaId,
+        Canal = CanalVenda.LojaPropria,
+        Natureza = NaturezaMovimentacaoEstoque.Venda,
+        DataVenda = dataVenda,
+        ValorTotal = Dinheiro.FromDecimal(valor),
+        CriadoEm = dataVenda
+    };
+
+    private static PedidoPagamento NovoPagamento(Guid pedidoId, decimal valor, DateTime pagoEm) => new()
+    {
+        Id = Guid.NewGuid(),
+        PedidoId = pedidoId,
+        Metodo = "dinheiro",
+        Valor = valor,
+        PagoEm = pagoEm
+    };
+}

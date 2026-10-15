@@ -40,7 +40,8 @@ public class CalcularFreteUseCaseRaioTests
     private static CalcularFreteUseCase Build(
         StorefrontEntity storefront,
         GeocodeResultado? geo,
-        EasyStock.Domain.Entities.Storefront.FreteZona? zona)
+        EasyStock.Domain.Entities.Storefront.FreteZona? zona,
+        RotaResultado? rota = null)
     {
         var storefrontRepo = Substitute.For<IStorefrontRepository>();
         storefrontRepo.GetBySlugAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(storefront);
@@ -57,9 +58,37 @@ public class CalcularFreteUseCaseRaioTests
         var geocoding = Substitute.For<IGeocodingClient>();
         geocoding.GeocodificarAsync(Arg.Any<GeocodeQuery>(), Arg.Any<CancellationToken>()).Returns(geo);
 
+        var rotas = Substitute.For<IRotaClient>();
+        rotas.MedirAsync(Arg.Any<RotaQuery>(), Arg.Any<CancellationToken>()).Returns(rota);
+
         return new CalcularFreteUseCase(
-            storefrontRepo, zonaRepo, cep, geocoding,
+            storefrontRepo, zonaRepo, cep, geocoding, rotas,
             NullLogger<CalcularFreteUseCase>.Instance);
+    }
+
+    [Fact]
+    public async Task Rota_medida_decide_a_faixa_e_o_eta()
+    {
+        // Haversine × fator daria ate-5km; a rota real de 1800 m / 12 min cai em ate-2km.
+        var uc = Build(StorefrontComRaio(), new GeocodeResultado(0, 0.025, Confiavel: true), zona: null,
+            rota: new RotaResultado(DistanciaMetros: 1800, DuracaoSegundos: 720));
+
+        var dto = await uc.ExecuteAsync(new CalcularFreteInput(Slug, Cep, "100"));
+
+        dto.Valor.Should().Be(1500);
+        dto.TempoEstimadoMinutos.Should().Be(32); // 20 min de preparo + 12 min de rota
+        dto.EtaLabel.Should().Be("32 min");
+    }
+
+    [Fact]
+    public async Task Rota_indisponivel_mantem_estimativa_por_haversine()
+    {
+        var uc = Build(StorefrontComRaio(), new GeocodeResultado(0, 0.025, Confiavel: true), zona: null, rota: null);
+
+        var dto = await uc.ExecuteAsync(new CalcularFreteInput(Slug, Cep, "100"));
+
+        dto.Valor.Should().Be(2500);
+        dto.TempoEstimadoMinutos.Should().Be(36); // 20 + 3,892 km × 4
     }
 
     [Fact]

@@ -17,7 +17,7 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
         var hoje = referenceDateUtc.Date;
         var mais30 = hoje.AddDays(30);
         var inicioMes = new DateTime(hoje.Year, hoje.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        var fimMes = inicioMes.AddMonths(1).AddSeconds(-1);
+        var fimMes = inicioMes.AddMonths(1);
 
         // Parcelas "vivas" = nao paga, nao cancelada, E de conta COMMITADA (nao Rascunho).
         // Rascunho tem parcelas mas nao e obrigacao real -> fora das projecoes (BUG-021).
@@ -53,7 +53,7 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
                         p.Lado == TipoLadoFinanceiro.Pagar &&
                         p.Status == StatusPagamentoParcela.Confirmado &&
                         p.DataPagamento >= inicioMes &&
-                        p.DataPagamento <= fimMes)
+                        p.DataPagamento < fimMes)
             .SumAsync(p => (decimal?)p.Valor, ct) ?? 0m;
 
         var recebidoMes = await db.PagamentosParcela.AsNoTracking()
@@ -61,7 +61,7 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
                         p.Lado == TipoLadoFinanceiro.Receber &&
                         p.Status == StatusPagamentoParcela.Confirmado &&
                         p.DataPagamento >= inicioMes &&
-                        p.DataPagamento <= fimMes)
+                        p.DataPagamento < fimMes)
             .SumAsync(p => (decimal?)p.Valor, ct) ?? 0m;
 
         var qtdCpAbertas = await db.ContasPagar.AsNoTracking()
@@ -110,8 +110,6 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
         if (fim <= inicio) throw new ArgumentException("Periodo invalido (fim <= inicio).");
 
         var buckets = GerarBuckets(inicio, fim, periodicidade);
-        if (buckets.Count > 24) buckets = buckets.Take(24).ToList();
-
         // Exclui Rascunho: previsao de fluxo so conta obrigacoes commitadas (BUG-021).
         var pagar = db.ParcelasPagar.AsNoTracking()
             .Where(p => p.EmpresaId == empresaId &&
@@ -135,35 +133,38 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
         var pagamentos = db.PagamentosParcela.AsNoTracking()
             .Where(pg => pg.EmpresaId == empresaId &&
                          pg.Status == StatusPagamentoParcela.Confirmado);
+        if (categoriaId.HasValue)
+            pagamentos = pagamentos.Where(pg =>
+                pg.ParcelaPagar!.ContaPagar!.CategoriaFinanceiraId == categoriaId.Value ||
+                pg.ParcelaReceber!.ContaReceber!.CategoriaFinanceiraId == categoriaId.Value);
+        if (centroCustoId.HasValue)
+            pagamentos = pagamentos.Where(pg =>
+                pg.ParcelaPagar!.ContaPagar!.CentroCustoId == centroCustoId.Value ||
+                pg.ParcelaReceber!.ContaReceber!.CentroCustoId == centroCustoId.Value);
 
-        // Antes: 4 SumAsync POR bucket dentro do loop (ate 24 buckets = 96 SELECTs
-        // sequenciais no PG). Agora: 4 queries no total (uma por serie), projetando
-        // (data, valor) do range inteiro dos buckets; a bucketizacao roda em memoria
-        // com os MESMOS limites de GerarBuckets (preserva a semantica exata de
-        // diario/semanal/mensal e o cap de 24). Medido: 96 -> 4 comandos EF
-        // (FluxoBucketsPerfTests). Parcela/Pagamento.Valor sao decimal simples (nao
-        // value-object com converter), entao a projecao traduz direto pro SQL.
+        // Uma consulta por série evita quatro consultas por bucket. A projeção direta
+        // em tuplas também evita copiar cada lista antes da distribuição pelos buckets.
         var inicioGeral = buckets[0].Inicio;
         var fimGeral = buckets[^1].Fim;
 
-        var prevPagarRows = (await pagar
+        var prevPagarRows = await pagar
             .Where(p => p.DataVencimento >= inicioGeral && p.DataVencimento <= fimGeral)
-            .Select(p => new { D = p.DataVencimento, V = p.Valor })
-            .ToListAsync(ct)).Select(x => (x.D, x.V)).ToList();
-        var prevReceberRows = (await receber
+            .Select(p => new ValueTuple<DateTime, decimal>(p.DataVencimento, p.Valor))
+            .ToListAsync(ct);
+        var prevReceberRows = await receber
             .Where(p => p.DataVencimento >= inicioGeral && p.DataVencimento <= fimGeral)
-            .Select(p => new { D = p.DataVencimento, V = p.Valor })
-            .ToListAsync(ct)).Select(x => (x.D, x.V)).ToList();
-        var realPagarRows = (await pagamentos
+            .Select(p => new ValueTuple<DateTime, decimal>(p.DataVencimento, p.Valor))
+            .ToListAsync(ct);
+        var realPagarRows = await pagamentos
             .Where(pg => pg.Lado == TipoLadoFinanceiro.Pagar &&
                          pg.DataPagamento >= inicioGeral && pg.DataPagamento <= fimGeral)
-            .Select(pg => new { D = pg.DataPagamento, V = pg.Valor })
-            .ToListAsync(ct)).Select(x => (x.D, x.V)).ToList();
-        var realReceberRows = (await pagamentos
+            .Select(pg => new ValueTuple<DateTime, decimal>(pg.DataPagamento, pg.Valor))
+            .ToListAsync(ct);
+        var realReceberRows = await pagamentos
             .Where(pg => pg.Lado == TipoLadoFinanceiro.Receber &&
                          pg.DataPagamento >= inicioGeral && pg.DataPagamento <= fimGeral)
-            .Select(pg => new { D = pg.DataPagamento, V = pg.Valor })
-            .ToListAsync(ct)).Select(x => (x.D, x.V)).ToList();
+            .Select(pg => new ValueTuple<DateTime, decimal>(pg.DataPagamento, pg.Valor))
+            .ToListAsync(ct);
 
         var resultado = new List<FluxoBucketDto>(buckets.Count);
         foreach (var (bIni, bFim, rotulo) in buckets)
@@ -195,23 +196,23 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
     {
         var ret = new List<(DateTime, DateTime, string)>();
         var cursor = inicio.Date;
-        while (cursor <= fim.Date)
+        while (cursor <= fim.Date && ret.Count < 24)
         {
             DateTime bFim;
             string rotulo;
             switch (p)
             {
                 case PeriodicidadeFluxo.Diario:
-                    bFim = cursor.AddDays(1).AddSeconds(-1);
+                    bFim = cursor.AddDays(1).AddTicks(-1);
                     rotulo = cursor.ToString("dd/MM");
                     break;
                 case PeriodicidadeFluxo.Semanal:
-                    bFim = cursor.AddDays(7).AddSeconds(-1);
+                    bFim = cursor.AddDays(7).AddTicks(-1);
                     rotulo = $"{cursor:dd/MM}";
                     break;
                 case PeriodicidadeFluxo.Mensal:
                 default:
-                    bFim = cursor.AddMonths(1).AddSeconds(-1);
+                    bFim = cursor.AddMonths(1).AddTicks(-1);
                     rotulo = cursor.ToString("MM/yyyy");
                     break;
             }

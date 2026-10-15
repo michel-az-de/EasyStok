@@ -34,7 +34,43 @@
         public string? Complemento { get; set; }
         public string? Bairro { get; set; }
         public string? Cidade { get; set; }
+
+        /// <summary>
+        /// ⚠️ Campo SEM uso: nenhum caso de uso, controller, repositório ou DTO lê ou escreve
+        /// esta propriedade. O documento canônico do cliente — inclusive o CPF — é
+        /// <see cref="Documento"/>, que é o campo buscado, normalizado e exposto na Api.
+        /// Não confundir com pessoa física: quem distingue PF de PJ é <see cref="TipoPessoa"/>.
+        /// Remoção avaliada na issue #1019.
+        /// </summary>
         public string? Cpf { get; set; }
+
+        // ── Pessoa jurídica (ADR-0048, issue #1018) ─────────────────────
+        // Seguindo o vocabulário da entidade Empresa (que também é uma PJ): NÃO existe campo
+        // "RazaoSocial" — o Nome É a razão social quando o cliente é PJ, e NomeFantasia é
+        // opcional ao lado. Isso mantém Nome como o campo único que snapshots de pedido,
+        // busca e saudações já usam, sem dois campos disputando quem é o principal.
+
+        /// <summary>
+        /// <c>"fisica"</c> ou <c>"juridica"</c>. String e não enum, seguindo a convenção do
+        /// repo para status (evita migration ao acrescentar valor). Não-nullable com default
+        /// <c>"fisica"</c>: é o que mantém todo cadastro existente — e todo código que não
+        /// conhece o campo — produzindo pessoa física.
+        /// </summary>
+        public string TipoPessoa { get; set; } = TipoPessoaCliente.Fisica;
+
+        /// <summary>Nome fantasia da PJ. Null para pessoa física.</summary>
+        public string? NomeFantasia { get; set; }
+
+        /// <summary>
+        /// Inscrição estadual. Texto livre porque o formato varia por UF e o valor pode ser
+        /// o literal <c>"ISENTO"</c> — mesmo tratamento que <c>EmpresaConfiguracaoFiscal</c>
+        /// já dá à IE do emitente.
+        /// </summary>
+        public string? InscricaoEstadual { get; set; }
+
+        /// <summary>Conveniência de leitura; a fonte da verdade é <see cref="TipoPessoa"/>.</summary>
+        public bool EhPessoaJuridica =>
+            string.Equals(TipoPessoa, TipoPessoaCliente.Juridica, StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
         /// SHA-256 hex (64 chars) do telefone normalizado em E.164.
@@ -53,6 +89,24 @@
         /// <summary>Carimbo do opt-in (LGPD: precisa registrar quando consentimento foi dado).</summary>
         public DateTime? ConsentimentoEm { get; set; }
 
+        // ── CRM leve (S24) ──────────────────────────────────────────────
+        public const int MotivoBloqueioTamanhoMaximo = 255;
+
+        /// <summary>
+        /// Bloqueio que vale em todos os canais: o agente não saúda nem cria pedido; a conversa vai
+        /// direto para a dona. Muda só por <see cref="Bloquear"/> e <see cref="Desbloquear"/>.
+        /// </summary>
+        public bool Bloqueado { get; private set; }
+
+        public DateTime? BloqueadoEm { get; private set; }
+        public string? MotivoBloqueio { get; private set; }
+
+        /// <summary>
+        /// Avisos de andamento do pedido (preparando, saiu para entrega). O agradecimento da entrega sai
+        /// sempre. Default true, também no banco.
+        /// </summary>
+        public bool AvisosStatusAtivos { get; private set; } = true;
+
         // ── Métricas operacionais (mantidas pelo sync) ──────────────────
         public int OrderCount { get; set; }
         public DateTime? LastOrderAt { get; set; }
@@ -68,6 +122,9 @@
         public ICollection<ClienteTelefone> Telefones { get; set; } = new List<ClienteTelefone>();
         public ICollection<ClienteDocumento> Documentos { get; set; } = new List<ClienteDocumento>();
         public ICollection<ClienteAlteracao> Alteracoes { get; set; } = new List<ClienteAlteracao>();
+
+        /// <summary>Tags do cliente (S24). Entram só por <see cref="AdicionarTag"/>.</summary>
+        public ICollection<ClienteTag> Tags { get; private set; } = new List<ClienteTag>();
 
         public static Cliente Criar(Guid empresaId, string nome)
         {
@@ -140,6 +197,37 @@
             AlteradoEm = DateTime.UtcNow;
         }
 
+        /// <summary>
+        /// Dados de pessoa jurídica (ADR-0048). Método separado de propósito:
+        /// <see cref="AtualizarCadastro"/> tem 7 parâmetros posicionais e três call-sites —
+        /// acrescentar parâmetro lá compilaria e trocaria valores em silêncio.
+        ///
+        /// <para>
+        /// Passar <paramref name="ehPessoaJuridica"/> como false limpa os campos de PJ: um
+        /// cadastro corrigido de PJ para PF não deve manter inscrição estadual pendurada.
+        /// </para>
+        /// </summary>
+        public void AtualizarPessoaJuridica(
+            bool ehPessoaJuridica,
+            string? nomeFantasia,
+            string? inscricaoEstadual)
+        {
+            TipoPessoa = ehPessoaJuridica ? TipoPessoaCliente.Juridica : TipoPessoaCliente.Fisica;
+
+            if (!ehPessoaJuridica)
+            {
+                NomeFantasia = null;
+                InscricaoEstadual = null;
+            }
+            else
+            {
+                NomeFantasia = string.IsNullOrWhiteSpace(nomeFantasia) ? null : nomeFantasia.Trim();
+                InscricaoEstadual = string.IsNullOrWhiteSpace(inscricaoEstadual) ? null : inscricaoEstadual.Trim();
+            }
+
+            AlteradoEm = DateTime.UtcNow;
+        }
+
         public void RegistrarPedido(DateTime quandoUtc)
         {
             OrderCount++;
@@ -149,6 +237,80 @@
 
         public void Desativar() { Ativo = false; AlteradoEm = DateTime.UtcNow; }
         public void Reativar() { Ativo = true; AlteradoEm = DateTime.UtcNow; }
+
+        // ── CRM leve (S24). Métodos separados de AtualizarCadastro (R8). ──
+
+        /// <summary>
+        /// Marca a tag normalizada. Devolve a tag criada, ou <c>null</c> quando o cliente já a tinha
+        /// (no-op: a origem e a data da primeira marcação ficam).
+        /// </summary>
+        public ClienteTag? AdicionarTag(string tag, string origem, DateTime em)
+        {
+            var normalizada = ClienteTag.NormalizarValidando(tag);
+            if (Tags.Any(t => t.Tag == normalizada)) return null;
+
+            var nova = ClienteTag.Criar(EmpresaId, Id, normalizada, origem, em);
+            Tags.Add(nova);
+            return nova;
+        }
+
+        /// <summary>Tira a tag (comparada já normalizada). <c>false</c> quando o cliente não a tinha.</summary>
+        public bool RemoverTag(string tag)
+        {
+            var normalizada = ClienteTag.Normalizar(tag);
+            var existente = Tags.FirstOrDefault(t => t.Tag == normalizada);
+            return existente is not null && Tags.Remove(existente);
+        }
+
+        public void Bloquear(string? motivo, DateTime em)
+        {
+            var motivoLimpo = string.IsNullOrWhiteSpace(motivo) ? null : motivo.Trim();
+            if (motivoLimpo?.Length > MotivoBloqueioTamanhoMaximo)
+                throw new RegraDeDominioVioladaException($"Motivo do bloqueio passa de {MotivoBloqueioTamanhoMaximo} caracteres.");
+
+            Bloqueado = true;
+            BloqueadoEm = em;
+            MotivoBloqueio = motivoLimpo;
+            AlteradoEm = em;
+        }
+
+        public void Desbloquear(DateTime em)
+        {
+            Bloqueado = false;
+            BloqueadoEm = null;
+            MotivoBloqueio = null;
+            AlteradoEm = em;
+        }
+
+        public void DefinirAvisosStatus(bool ativos, DateTime em)
+        {
+            AvisosStatusAtivos = ativos;
+            AlteradoEm = em;
+        }
+
+        /// <summary>
+        /// Opt-in de marketing do cadastro, com carimbo (LGPD). O consentimento por canal é o de
+        /// <c>ConsentimentoContato</c> (S38); este booleano segue para compatibilidade.
+        /// </summary>
+        public void DefinirConsentimentoMarketing(bool consentiu, DateTime quando)
+        {
+            ConsentiuMarketing = consentiu;
+            ConsentimentoEm = quando;
+            AlteradoEm = quando;
+        }
+    }
+
+    /// <summary>
+    /// Valores de <see cref="Cliente.TipoPessoa"/>. Constantes em vez de enum para não exigir
+    /// migration a cada valor novo — mesma escolha que o repo faz para status de pedido.
+    /// </summary>
+    public static class TipoPessoaCliente
+    {
+        public const string Fisica = "fisica";
+        public const string Juridica = "juridica";
+
+        public static bool EhValido(string? valor) =>
+            valor is Fisica or Juridica;
     }
 
     /// <summary>
@@ -178,6 +340,22 @@
         public DateTime AlteradoEm { get; set; }
 
         public Cliente? Cliente { get; set; }
+
+        /// <summary>
+        /// Chave do sinal "mesmo domicílio" (S25, RN-13): <c>cep|numero|complemento</c> com a
+        /// normalização de <see cref="Storefront.FreteZona"/> (CEP só dígitos; texto sem acento e
+        /// minúsculo). Sem CEP de 8 dígitos ou sem número não há chave: endereço incompleto não
+        /// aproxima cadastros.
+        /// </summary>
+        public static string? ChaveDomicilio(string? cep, string? numero, string? complemento)
+        {
+            var cepNorm = Storefront.FreteZona.NormalizarCep(cep);
+            if (cepNorm.Length != 8) return null;
+            var numeroNorm = Storefront.FreteZona.NormalizarBairro(numero ?? string.Empty);
+            if (numeroNorm.Length == 0) return null;
+            var complementoNorm = Storefront.FreteZona.NormalizarBairro(complemento ?? string.Empty);
+            return $"{cepNorm}|{numeroNorm}|{complementoNorm}";
+        }
     }
 
     /// <summary>Telefone extra. Cliente pode ter vários. Um Principal.</summary>

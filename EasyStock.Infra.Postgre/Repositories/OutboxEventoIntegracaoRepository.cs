@@ -37,6 +37,22 @@ public sealed class OutboxEventoIntegracaoRepository(EasyStockDbContext db) : IO
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<OutboxEventoIntegracao>> ProximosPendentesDeTodosOsShardsAsync(
+        int max,
+        CancellationToken ct = default)
+    {
+        var agora = DateTime.UtcNow;
+        return await db.Set<OutboxEventoIntegracao>()
+            .IgnoreQueryFilters()
+            .Where(e => e.Status == StatusOutboxIntegracao.Pendente
+                     && e.ProximaTentativaEm <= agora)
+            // Mesma ordem do laço por shard que isto substitui: shard 0 a 3 e, em cada um, FIFO.
+            .OrderBy(e => e.ShardKey)
+            .ThenBy(e => e.CriadoEm)
+            .Take(max)
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<OutboxEventoIntegracao>> ListarPorEmpresaAsync(
         Guid empresaId,
         StatusOutboxIntegracao? status = null,
@@ -56,6 +72,26 @@ public sealed class OutboxEventoIntegracaoRepository(EasyStockDbContext db) : IO
             .OrderByDescending(e => e.CriadoEm)
             .Take(max)
             .ToListAsync(ct);
+    }
+
+    public async Task<int> ReclamarEmEnvioExpiradosAsync(int max, CancellationToken ct = default)
+    {
+        var agora = DateTime.UtcNow;
+        var presos = await db.Set<OutboxEventoIntegracao>()
+            .IgnoreQueryFilters()
+            .Where(e => e.Status == StatusOutboxIntegracao.EmEnvio
+                     && e.ProximaTentativaEm < agora)
+            .OrderBy(e => e.ProximaTentativaEm)
+            .Take(max)
+            .ToListAsync(ct);
+
+        if (presos.Count == 0) return 0;
+
+        foreach (var evt in presos)
+            evt.ReclamarEmEnvioExpirado();
+
+        await db.SaveChangesAsync(ct);
+        return presos.Count;
     }
 
     public async Task<TimeSpan> LagDoMaisAntigoPendenteAsync(CancellationToken ct = default)

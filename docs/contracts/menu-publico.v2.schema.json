@@ -40,7 +40,7 @@
         "imagemUrl": { "type": ["string", "null"] },
         "estoqueAtual": {
           "type": ["integer", "null"],
-          "description": "null para avulso e para item guarda-chuva (estoque e por opcao); snapshot eventual para vinculado simples. Nao usar para decisao de compra."
+          "description": "null para avulso e para item guarda-chuva (estoque e por opcao); vinculado simples: saldo do ItemEstoque do produto (soma dos lotes com saldo e nao vencidos, arredondada para baixo; 0 sem lote), snapshot eventual sob o cache de 5 min (#1171). Informativo: NAO governa disponivel, que segue a flag manual (saldo 0 nao esgota o item; falta de estoque avisa e nao trava, S17). Nao usar para decisao de compra."
         },
         "categoria": { "type": ["string", "null"] },
         "ordem": { "type": "number" },
@@ -63,6 +63,16 @@
           "type": ["array", "null"],
           "description": "Caminho de secao raiz->folha (ex: ['Massas'] ou ['Eletronicos','Celulares','Smartphones']). null = sem categoria. Permite agrupar/breadcrumb sem depender da string plana 'categoria'.",
           "items": { "type": "string" }
+        },
+        "linha": {
+          "type": ["string", "null"],
+          "enum": ["paraServir", "prepararEmCasa", null],
+          "description": "S15 (US-024): linha do item. Opcional (aditivo); ausente = paraServir."
+        },
+        "tempoPreparoMinutos": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "S15 (RN-06): preparo em minutos. null = a loja usa o preparo padrao."
         }
       }
     },

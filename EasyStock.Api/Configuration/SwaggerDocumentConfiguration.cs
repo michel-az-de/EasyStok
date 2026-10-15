@@ -50,10 +50,9 @@ public static class SwaggerConfiguration
             - 📱 **Módulo Mobile** (Casa da Babá PWA — sync delta offline-first)
 
             ### Autenticação
-            1. `POST /api/auth/register` — cadastre um usuário
-            2. `POST /api/empresas/registrar` — registre sua empresa
-            3. `POST /api/auth/login` — obtenha o token JWT
-            4. Clique em **Authorize** e informe `Bearer <seu-token>`
+            1. A empresa e o primeiro usuário são criados pelo suporte (`POST /api/admin/tenants`)
+            2. `POST /api/auth/login` — obtenha o token JWT
+            3. Clique em **Authorize** e informe `Bearer <seu-token>`
 
             ### Envelope de Resposta
             Todas as respostas seguem um envelope padronizado:
@@ -487,7 +486,7 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
         ["Loja"]           = "Configurações e dados da loja vinculada à empresa.",
         ["Plano"]          = "Gerenciamento de planos e assinaturas.",
         ["Uploads"]        = "Upload e gerenciamento de arquivos (fotos de produtos, documentos).",
-        ["IaAnuncio"]      = "Geração de anúncios e descrições de produtos via Inteligência Artificial (Anthropic Claude).",
+        ["IaAutoPreenchimento"] = "Auto-preenchimento de produto novo via Inteligência Artificial (SSE).",
         ["Venda"]          = "Registro e consulta de vendas realizadas.",
         ["Diagnostico"]    = "Diagnóstico operacional da API: status de banco, Redis, SMTP, storage e configurações.",
 
@@ -507,21 +506,17 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
         ["AdminPlanos"]         = "CRUD dos planos da plataforma SaaS (preço, limites, features incluídas).",
         ["AdminReports"]        = "Relatórios consolidados cross-tenant para tomada de decisão.",
         ["AdminSeed"]           = "Disparo manual de seed/reset de dados de demo (apenas Development/Staging).",
-        ["AdminSla"]            = "Configuração e acompanhamento de SLAs de helpdesk por plano.",
         ["AdminStatus"]         = "Página de status pública da plataforma (incidentes, manutenções).",
         ["AdminStorefront"]     = "Gestão dos sites storefront por tenant (slug, domínio, branding).",
         ["AdminStorefrontCardapio"] = "Curadoria do cardápio público (storefront) por tenant.",
         ["AdminTenants"]        = "Operações administrativas em tenants individuais (admin global).",
-        ["AdminTickets"]        = "Visão consolidada dos tickets de helpdesk de todos os tenants.",
         ["AdminUsuariosTenant"] = "Gestão dos usuários de um tenant específico (admin global).",
         ["AdminFaturas"]        = "Gestão de faturas SaaS por tenant (admin global).",
 
         // ── Mobile (Casa da Babá PWA — sync delta offline-first) ─────────────
-        ["ApkDistribution"]     = "Distribuição de APKs assinados para tablets Casa da Babá.",
         ["DeviceBackup"]        = "Backup e restore do estado local do device (PWA).",
         ["DevicePairing"]       = "Pareamento de tablets via código (provisioning + emissão de API key).",
         ["Kds"]                 = "Kitchen Display System — fila de pedidos em produção.",
-        ["MobileAdmin"]         = "Endpoints admin do módulo mobile (estado dos devices, comandos remotos).",
         ["MobileBatches"]       = "Lotes de produção sincronizados do mobile (vinculo opcional com Lote ERP).",
         ["MobileCalculadora"]   = "Calculadora de compras Casa da Babá (precificação + receita).",
         ["MobileCash"]          = "Caixa do tablet: entradas, saídas, fechamento diário.",
@@ -531,7 +526,6 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
         ["MobileEstoque"]       = "Visão de estoque do tablet (read-mostly, sync com ERP).",
         ["MobileOrders"]        = "Pedidos do tablet (Casa da Babá): rascunho, pago, entregue.",
         ["MobileProducts"]      = "Catálogo de produtos do tablet (cardápio + variações).",
-        ["MobilePush"]          = "Notificações push para tablets/PWA (FCM/WebPush).",
         ["MobileQuickReports"]  = "Relatórios resumo offline para o tablet (vendas, fechamento).",
         ["Operation"]           = "Operações cross-device do módulo mobile (comandos remotos, broadcast).",
 
@@ -539,16 +533,12 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
         ["Public"]              = "Endpoints públicos sem autenticação (captura de leads, formulários landing).",
 
         // ── Outros ───────────────────────────────────────────────────────────
-        ["Tickets"]             = "Helpdesk: abertura, resposta e acompanhamento de tickets de suporte por clientes.",
         ["Reports"]             = "Relatórios gerenciais (estoque, vendas, financeiro).",
         ["Consentimentos"]      = "Registro de consentimentos LGPD por usuário/cliente.",
         ["EntityAudit"]         = "Consulta da trilha de auditoria de entidades específicas (quem alterou o quê).",
         ["DiagnosticoInfra"]    = "Diagnóstico de infraestrutura (PostgreSQL, Redis, S3, SMTP) com self-test.",
         ["DiagnosticoLogs"]     = "Live tail de logs estruturados (SSE) para diagnóstico em produção.",
-        ["Faq"]                 = "FAQ público (artigos de ajuda, busca por categoria).",
-        ["FaqAdmin"]            = "Curadoria do FAQ (admin global): criação e edição de artigos.",
         ["PwaPush"]             = "Subscription Web Push para o PWA (storefront e Casa da Babá).",
-        ["WebhookFocusNFe"]     = "Webhook público da Focus NFe (HMAC) para retorno de emissão fiscal.",
         ["WebhookGateway"]      = "Webhook do gateway de pagamento (MercadoPago).",
         ["WebhookPix"]          = "Webhook da Efi (PIX): retorno de cobrança recebida.",
     };

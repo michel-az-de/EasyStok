@@ -52,9 +52,14 @@
     });
   }
 
-  // Linha canonica (a do grupo, que tem estrela) p/ clonar no Meu dia.
+  // Linha canonica (a do grupo, que tem estrela) p/ clonar no Meu dia. Dentro de um modulo
+  // (ADR-0046) so um grupo esta no DOM, entao favorito de outra area nao tem linha de grupo
+  // para clonar: cai na propria linha do Meu dia, que o servidor ja renderizou. Sem isso o
+  // rebuild descartava esses favoritos e o proximo save os apagava do servidor.
   function groupRow(key) {
-    return root.querySelector('.es-group .es-ni-row[data-menu-key="' + cssEsc(key) + '"]');
+    var esc = cssEsc(key);
+    return root.querySelector('.es-group .es-ni-row[data-menu-key="' + esc + '"]')
+        || root.querySelector('[data-meu-dia] .es-ni-row[data-menu-key="' + esc + '"]');
   }
 
   function rebuildMeuDia(keys) {
@@ -82,6 +87,10 @@
       if (!src) return; // chave orfa (ex.: KDS off) — ignora
       var clone = src.cloneNode(true);
       clone.id = 'es-row-' + k + '-fav';
+      // A fonte pode ser uma linha do proprio Meu dia (favorito de outro modulo): remove o
+      // botao ⋮ que ela ja traz, senao o clone acumularia um a cada rebuild.
+      var moreAntigo = clone.querySelector('.es-more');
+      if (moreAntigo) moreAntigo.remove();
       var star = clone.querySelector('.es-star');
       if (star) { star.setAttribute('aria-pressed', 'true'); star.setAttribute('aria-label', 'Remover de Meu dia'); }
       // reorder (fatia 7c): DnD no desktop + botao ⋮ (menu de contexto, a11y/touch)

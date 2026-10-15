@@ -86,6 +86,7 @@ public class CalcularFreteUseCaseTests
             f.FreteZonaRepository,
             f.CepLookupClient,
             geocoding,
+            Substitute.For<IRotaClient>(),
             f.Logger);
     }
 
@@ -184,7 +185,7 @@ public class CalcularFreteUseCaseTests
         var act = () => BuildUseCase(f).ExecuteAsync(Input());
 
         var ex = await act.Should().ThrowAsync<CepSemCoberturaException>();
-        ex.Which.Message.Should().Be("Não entregamos neste CEP.");
+        ex.Which.Message.Should().Be("Vamos combinar a entrega e o frete com a equipe.");
     }
 
     // ── CEP inválido ───────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -51,7 +52,7 @@ public sealed class EntityAlteracaoRetentionService : BackgroundService
         {
             try
             {
-                await CleanupAsync(stoppingToken);
+                await RodadaAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -66,6 +67,13 @@ public sealed class EntityAlteracaoRetentionService : BackgroundService
             await Task.Delay(TimeSpan.FromHours(24), stoppingToken);
         }
     }
+
+    /// <summary>
+    /// Uma rodada com a trava (#1575): API e Worker registram este serviço e quem não pega a trava pula.
+    /// Pública para os testes de integração; o loop diário a chama.
+    /// </summary>
+    public Task RodadaAsync(CancellationToken ct) => PostgresAdvisoryLock.TentarExecutarEmEscopoProprioAsync(
+        _serviceProvider.GetRequiredService<IServiceScopeFactory>(), LockKeys.RetencaoAuditoria, CleanupAsync, ct);
 
     private async Task CleanupAsync(CancellationToken ct)
     {

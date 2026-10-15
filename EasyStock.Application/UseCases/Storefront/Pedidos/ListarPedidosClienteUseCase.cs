@@ -77,12 +77,11 @@ public sealed class ListarPedidosClienteUseCase(
 
         var pedidoIds = pedidos.Select(p => p.Id).ToArray();
 
-        // ── Lookups paralelos: avaliações + vagas+janelas (anti-N+1) ───
-        var avaliacoesTask = avaliacaoRepository.GetByPedidoIdsAsync(pedidoIds, ct);
-        var vagasTask = vagaOcupadaRepository.GetByPedidoIdsAsync(pedidoIds, ct);
-        await Task.WhenAll(avaliacoesTask, vagasTask);
-        var avaliacoes = await avaliacoesTask;
-        var vagas = await vagasTask;
+        // ── Lookups em lote: avaliações + vagas+janelas (anti-N+1) ─────
+        // Um depois do outro (#1725): os dois repositórios dividem o DbContext do escopo, que recusa duas
+        // consultas ao mesmo tempo.
+        var avaliacoes = await avaliacaoRepository.GetByPedidoIdsAsync(pedidoIds, ct);
+        var vagas = await vagaOcupadaRepository.GetByPedidoIdsAsync(pedidoIds, ct);
 
         // ── Montar DTOs ──────────────────────────────────────────────────
         var resultado = new List<PedidoStorefrontDto>(pedidos.Count);
@@ -151,7 +150,8 @@ public sealed class ListarPedidosClienteUseCase(
         {
             avaliacaoDto = new PedidoStorefrontAvaliacaoDto(
                 Estrelas: avaliacao.Estrelas,
-                Comentario: avaliacao.Comentario);
+                Comentario: avaliacao.Comentario,
+                Resultado: avaliacao.Resultado?.ToString().ToLowerInvariant());
         }
 
         // Motivo de cancelamento: prioriza mensagem ao cliente (texto humano),

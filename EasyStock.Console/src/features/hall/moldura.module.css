@@ -1,0 +1,63 @@
+.moldura { display: flex; height: 100%; min-height: 0; background: var(--fundo); }
+.lateral { display: flex; flex: none; min-height: 0; }
+.areaTrabalho { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.trilho { width: 100px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: var(--e-3) 8px; overflow-y: auto; flex: none; }
+.inicioTrilho { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: var(--t-minimo); font-weight: 600; text-decoration: none; color: var(--tinta-2); margin-bottom: var(--e-2); }
+.itemTrilho { display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; gap: 4px; width: 84px; min-height: 58px; padding: 6px 4px; border-radius: 14px; color: var(--tinta-2); font-size: var(--t-minimo); font-weight: 600; text-align: center; text-decoration: none; }
+.itemTrilho > span { max-width: 100%; overflow-wrap: anywhere; hyphens: auto; }
+.itemTrilho:hover { background: var(--preenchimento); color: var(--tinta); }
+.moduloAtivo { background: var(--papel); color: var(--tinta); box-shadow: inset 0 0 0 2px var(--marca); }
+.moduloAtivo::before { content: ''; position: absolute; left: -8px; top: 14px; bottom: 14px; width: 3px; background: var(--tinta); border-radius: 0 3px 3px 0; }
+.menu { width: 216px; display: flex; flex-direction: column; gap: var(--e-1); margin-block: var(--e-3); padding: var(--e-3) var(--e-2); background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); overflow-y: auto; }
+.nomeMenu { display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-forte); margin: 0 0 var(--e-3); padding: var(--e-2); }
+.item { display: flex; align-items: center; gap: var(--e-2); min-height: var(--toque); padding: var(--e-2); border-radius: var(--r-1); text-decoration: none; color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 600; }
+.item:hover { background: var(--preenchimento); color: var(--tinta); }
+.item > span { min-width: 0; overflow-wrap: anywhere; }
+.preparacao { display: block; font-size: var(--t-minimo); font-weight: 400; color: var(--tinta-2); margin-top: var(--e-1); }
+.itemAtivo, .itemAtivo:hover { background: var(--papel); color: var(--tinta); box-shadow: inset 0 0 0 2px var(--marca); }
+.item > svg, .itemTrilho > svg, .modulo > svg, .titulo > svg { flex: none; }
+.item:focus-visible, .itemTrilho:focus-visible, .inicioTrilho:focus-visible, .voltar:focus-visible, .link:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.barra { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); padding: var(--e-2) var(--e-3); flex: none; }
+.contexto, .acoes { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); min-width: 0; }
+.acoes { margin-left: auto; }
+.avisos { display: flex; }
+.voltar { display: inline-flex; align-items: center; gap: var(--e-1); min-height: var(--toque); padding: 0 var(--e-2); border-radius: var(--r-1); color: var(--tinta-2); font-size: var(--t-micro); font-weight: 600; text-decoration: none; }
+.voltarBotao { border: 0; background: transparent; font-family: inherit; cursor: pointer; }
+.voltar:hover { background: var(--preenchimento); }
+.modulo { display: inline-flex; align-items: center; gap: var(--e-2); font-size: var(--t-forte); font-weight: 700; }
+.operacao { flex: 1; min-height: 0; min-width: 0; }
+.ajuste { flex: 1; min-height: 0; min-width: 0; overflow-y: auto; padding: 0 var(--e-3) var(--e-3); }
+.folha { min-height: 100%; padding: var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); box-shadow: var(--sombra); background: var(--papel); }
+.titulo { display: flex; align-items: center; gap: var(--e-2); margin: 0 0 var(--e-4); font-size: var(--t-titulo); font-weight: 700; line-height: var(--lh-compacto); }
+.conteudo { min-width: 0; }
+.link { font-weight: 700; color: var(--marca); }
+.abrirMenu { display: none; }
+.nomeNoMenu { display: none; }
+.menuModal { display: flex; min-height: 0; }
+.menuModal .menu { flex: 1; width: auto; margin: 0; box-shadow: none; border: 0; }
+.menuModal .trilho { max-height: 60dvh; }
+@media (max-width: 1100px) {
+  .lateral > .trilho { display: none; }
+  .abrirMenu { display: inline-flex; }
+}
+@media (max-width: 759px) {
+  .lateral { display: none; }
+  .barra { gap: var(--e-1); padding: var(--e-2); }
+  .modulo, .contexto > a { display: none; }
+  .abrirMenu { min-width: 0; max-width: 100%; text-align: left; }
+  .abrirMenu > span { min-width: 0; overflow-wrap: anywhere; }
+  .nomeNoMenu { display: block; font-size: var(--t-minimo); font-weight: 400; }
+  .acoes { gap: var(--e-1); }
+  .acoes > :global([data-ajuda-console]) { font-size: 0; gap: 0; width: 44px; padding: 0; }
+  .ajuste { padding: 0 var(--e-2) var(--e-2); }
+  .folha { padding: var(--e-3); }
+}
+@media (max-width: 640px) {
+  .barra { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--e-2); }
+  .contexto { grid-row: 1; grid-column: 1; }
+  .acoes { display: contents; }
+  .acoes > [role='radiogroup'] { grid-row: 2; grid-column: 1 / -1; justify-self: start; }
+  .acoes > :global([data-ajuda-console]) { grid-row: 1; grid-column: 2; }
+  .avisos { grid-row: 2; grid-column: 2 / -1; justify-self: end; }
+  .sair { grid-row: 1; grid-column: 3; max-width: 140px; padding-inline: var(--e-2); }
+}

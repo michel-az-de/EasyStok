@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Lookup;
@@ -37,6 +37,7 @@ public sealed class CalcularFreteUseCase(
     IFreteZonaRepository freteZonaRepository,
     ICepLookupClient cepLookupClient,
     IGeocodingClient geocodingClient,
+    IRotaClient rotaClient,
     ILogger<CalcularFreteUseCase> logger)
 {
     private static readonly Regex CepDigitosRegex = new(@"^\d{8}$", RegexOptions.Compiled);
@@ -103,7 +104,8 @@ public sealed class CalcularFreteUseCase(
             Valor: valorCentavos,
             ValorFormatado: FormatarValor(zona.Valor),
             EtaLabel: FormatarEta(zona.TempoEstimadoMinutos),
-            ZonaLabel: zona.Label);
+            ZonaLabel: zona.Label,
+            TempoEstimadoMinutos: zona.TempoEstimadoMinutos);
     }
 
     /// <summary>
@@ -123,7 +125,8 @@ public sealed class CalcularFreteUseCase(
         var config = FreteRaioConfigFactory.TentarCriar(storefront);
         if (config is null) return null; // raio não configurado → zona
 
-        var geo = await geocodingClient.GeocodificarAsync(
+        var cotacao = await FreteRaioCotador.CotarAsync(
+            config,
             new GeocodeQuery(
                 Logradouro: endereco?.Logradouro,
                 Numero: input.Numero,
@@ -131,10 +134,10 @@ public sealed class CalcularFreteUseCase(
                 Cidade: endereco?.Cidade,
                 Uf: endereco?.Uf,
                 Cep: cepNormalizado),
-            ct);
+            geocodingClient, rotaClient, ct);
 
         // Geocode ausente ou impreciso → não cobra raio chutado; cai pra zona.
-        if (geo is null || !geo.Confiavel)
+        if (cotacao is null)
         {
             logger.LogInformation(
                 "Frete raio: geocode ausente/impreciso, caindo pra zona. cep={Cep} storefrontId={StorefrontId}",
@@ -142,7 +145,7 @@ public sealed class CalcularFreteUseCase(
             return null;
         }
 
-        var r = FreteRaioCalculadora.Calcular(new Coordenada(geo.Lat, geo.Lng), config);
+        var (r, rota) = cotacao;
 
         if (r.ForaDeCobertura)
         {
@@ -152,15 +155,23 @@ public sealed class CalcularFreteUseCase(
             throw new CepSemCoberturaException();
         }
 
-        // ETA estimada a partir da distância de rota (não há roteamento real no MVP).
-        var minutos = 20 + (int)Math.Round(r.DistanciaRotaMetros / 1000.0 * 4, MidpointRounding.AwayFromZero);
+        // ETA = 20 min de preparo + deslocamento: duração medida da rota, ou 4 min/km estimados.
+        var deslocamento = rota is not null
+            ? rota.DuracaoSegundos / 60.0
+            : r.DistanciaRotaMetros / 1000.0 * 4;
+        var minutos = 20 + (int)Math.Round(deslocamento, MidpointRounding.AwayFromZero);
 
         return new FreteCalculadoDto(
             ZonaId: Guid.Empty,
             Valor: r.ValorCentavos,
             ValorFormatado: FormatarValor(r.ValorCentavos / 100m),
             EtaLabel: FormatarEta(minutos),
-            ZonaLabel: r.Gratis ? "Frete grátis" : "Entrega por raio");
+            ZonaLabel: r.Gratis ? "Frete grátis" : "Entrega por raio",
+            TempoEstimadoMinutos: minutos,
+            GeocodeConfiavel: true,
+            DistanciaMetros: r.DistanciaRotaMetros,
+            FaixaId: r.FaixaId,
+            Gratis: r.Gratis);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -56,7 +57,7 @@ namespace EasyStock.Domain.ValueObjects
         }
 
         public override string ToString() =>
-            $"P:{Peso:F3} L:{Largura:F2} A:{Altura:F2} C:{Comprimento:F2}";
+            string.Create(CultureInfo.InvariantCulture, $"P:{Peso:F3} L:{Largura:F2} A:{Altura:F2} C:{Comprimento:F2}");
 
         private sealed class DimensoesJsonConverter : JsonConverter<Dimensoes>
         {

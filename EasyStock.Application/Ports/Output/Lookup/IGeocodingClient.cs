@@ -34,6 +34,12 @@ public sealed record GeocodeResultado(
 public interface IGeocodingClient
 {
     /// <summary>
+    /// <see langword="false"/> quando não há provedor ligado (NoOp). Quem precisa GRAVAR uma coordenada
+    /// (cozinha do frete por raio) recusa antes de chamar, em vez de confundir com endereço não encontrado.
+    /// </summary>
+    bool Disponivel => true;
+
+    /// <summary>
     /// Resolve o endereço numa coordenada. <see langword="null"/> quando não
     /// resolve / provider indisponível / timeout.
     /// </summary>

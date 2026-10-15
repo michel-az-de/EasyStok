@@ -31,6 +31,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                     .Include(u => u.Empresas)
                     .Include(u => u.Perfis!)
                     .ThenInclude(up => up.Perfil)
+                        .ThenInclude(p => p!.Permissoes)
                     .FirstOrDefaultAsync(u => u.Id == id);
             }
         }
@@ -49,19 +50,39 @@ namespace EasyStock.Infra.Postgre.Repositories
             // desligado. UseRowLevelSecurityBypass emite SET app.bypass_rls=true
             // na conexão pelo SetTenantOnConnectionInterceptor, dando à query
             // de login a visibilidade global que ela precisa antes do JWT existir.
+            // #1781: o e-mail é gravado normalizado (Usuario.NormalizarEmail); a busca normaliza o digitado e
+            // segue por igualdade, no índice único de Email.
+            var normalizado = Usuario.NormalizarEmail(email);
             using (dbContext.UseRowLevelSecurityBypass())
             {
-                return await dbContext.Usuarios
-                    .AsNoTracking()
-                    .IgnoreQueryFilters()
-                    .Include(u => u.Empresas)
-                        .ThenInclude(ue => ue.Empresa) // carrega Nome da Empresa para ListarEmpresasParaLogin
-                    .Include(u => u.Perfis!)
-                        .ThenInclude(up => up.Perfil)
-                            .ThenInclude(p => p!.Permissoes)
-                    .FirstOrDefaultAsync(u => u.Email == email);
+                return await QueryDeLogin().FirstOrDefaultAsync(u => u.Email == normalizado);
             }
         }
+
+        public async Task<IReadOnlyList<Usuario>> ListarPorAliasGmailAsync(string parteLocal)
+        {
+            var prefixo = parteLocal.Trim().ToLowerInvariant() + "+";
+            // Mesmo bypass do GetByEmailAsync: roda antes de existir tenant (#1324).
+            using (dbContext.UseRowLevelSecurityBypass())
+            {
+                return await QueryDeLogin()
+                    .Where(u => u.Email.ToLower().StartsWith(prefixo)
+                        && (u.Email.ToLower().EndsWith("@gmail.com") || u.Email.ToLower().EndsWith("@googlemail.com")))
+                    .Take(5)
+                    .ToListAsync();
+            }
+        }
+
+        /// <summary>Usuário com empresas (e nome delas) e perfis com permissões, sem filtro de tenant.</summary>
+        private IQueryable<Usuario> QueryDeLogin() =>
+            dbContext.Usuarios
+                .AsNoTracking()
+                .IgnoreQueryFilters()
+                .Include(u => u.Empresas)
+                    .ThenInclude(ue => ue.Empresa) // carrega Nome da Empresa para ListarEmpresasParaLogin
+                .Include(u => u.Perfis!)
+                    .ThenInclude(up => up.Perfil)
+                        .ThenInclude(p => p!.Permissoes);
 
         public async Task<(IEnumerable<Usuario> Usuarios, int Total)> GetByEmpresaAsync(Guid empresaId, int page, int pageSize)
         {
@@ -94,9 +115,50 @@ namespace EasyStock.Infra.Postgre.Repositories
             // (UsuarioEmpresa, UsuarioPerfil) as Modified too — those tables have RLS,
             // so their UPDATEs return 0 rows when called without the bypass scope,
             // causing DbUpdateConcurrencyException on login and other pre-auth flows.
+            // #1352: a linha inteira vai, menos SessoesValidasDesde: o modelo (UsuarioConfiguration) manda o EF
+            // ignorar a coluna em UPDATE, e o corte só muda por AtualizarSessoesValidasDesdeAsync.
             dbContext.Entry(usuario).State = EntityState.Modified;
             return Task.CompletedTask;
         }
+
+        public Task<SessaoDoUsuario?> ObterSessaoAsync(Guid usuarioId) =>
+            // Sem IgnoreQueryFilters e sem bypass de RLS: usuarios não tem EmpresaId (#1352).
+            dbContext.Usuarios
+                .AsNoTracking()
+                .Where(u => u.Id == usuarioId)
+                .Select(u => new SessaoDoUsuario(u.Ativo, u.SessoesValidasDesde))
+                .FirstOrDefaultAsync();
+
+        public Task<int> AtualizarSessoesValidasDesdeAsync(Guid usuarioId, DateTime desde) =>
+            // UPDATE atômico e monotônico: só avança. Revogações concorrentes e relógios diferentes entre
+            // réplicas nunca fazem o corte recuar.
+            dbContext.Usuarios
+                .Where(u => u.Id == usuarioId && (u.SessoesValidasDesde == null || u.SessoesValidasDesde < desde))
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.SessoesValidasDesde, desde));
+
+        public async Task<bool> ReservarTentativaDeSenhaAsync(Guid usuarioId, DateTime agora)
+        {
+            // #1781: um UPDATE só, com o limite no WHERE: requisições paralelas se enfileiram na trava da linha e
+            // a que chega com a conta já bloqueada altera 0 linhas. LockoutEnd não nulo aqui é bloqueio vencido.
+            var bloqueioAte = agora.AddMinutes(Usuario.MinutosDeBloqueio);
+            var linhas = await dbContext.Usuarios
+                .Where(u => u.Id == usuarioId && (u.LockoutEnd == null || u.LockoutEnd <= agora))
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(u => u.FailedLoginAttempts, u => u.LockoutEnd != null ? 1 : u.FailedLoginAttempts + 1)
+                    .SetProperty(u => u.LockoutEnd, u =>
+                        (u.LockoutEnd != null ? 1 : u.FailedLoginAttempts + 1) >= Usuario.FalhasParaBloquear
+                            ? bloqueioAte
+                            : (DateTime?)null)
+                    .SetProperty(u => u.AlteradoEm, agora));
+            return linhas == 1;
+        }
+
+        public Task DevolverTentativaDeSenhaAsync(Guid usuarioId) =>
+            dbContext.Usuarios
+                .Where(u => u.Id == usuarioId && u.FailedLoginAttempts > 0)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(u => u.FailedLoginAttempts, u => u.FailedLoginAttempts - 1)
+                    .SetProperty(u => u.LockoutEnd, (DateTime?)null));
 
         public async Task<IEnumerable<Usuario>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
         {

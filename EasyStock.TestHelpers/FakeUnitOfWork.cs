@@ -24,23 +24,43 @@ public sealed class FakeUnitOfWork : IUnitOfWork
         return Task.FromResult(0);
     }
 
+    public int DescartesCount { get; private set; }
+
+    public void DescartarAlteracoesPendentes() => DescartesCount++;
+
+    /// <summary>Quem testa a violação de unicidade decide: por padrão nenhuma falha é 23505.</summary>
+    public Func<Exception, bool> EhViolacaoDeUnicidadePredicado { get; set; } = _ => false;
+
+    public bool EhViolacaoDeUnicidade(Exception ex) => EhViolacaoDeUnicidadePredicado(ex);
+
     public Task<IDbTransactionScope> BeginTransactionAsync(CancellationToken ct = default)
         => Task.FromResult<IDbTransactionScope>(new FakeTransactionScope());
+
+    /// <summary>Verdadeiro enquanto o corpo de um <c>ExecuteInTransaction*</c> roda: prova que a leitura com trava está dentro da transação.</summary>
+    public bool EmTransacao { get; private set; }
 
     public Task ExecuteInTransactionAsync(
         Func<CancellationToken, Task> action,
         CancellationToken ct = default)
-        => action(ct);
+        => EmTransacaoAsync(async () => { await action(ct); return 0; });
 
     public Task<T> ExecuteInTransactionAsync<T>(
         Func<CancellationToken, Task<T>> action,
         CancellationToken ct = default)
-        => action(ct);
+        => EmTransacaoAsync(() => action(ct));
 
     public Task<T> ExecuteInTransactionSemRetryAsync<T>(
         Func<CancellationToken, Task<T>> action,
         CancellationToken ct = default)
-        => action(ct);
+        => EmTransacaoAsync(() => action(ct));
+
+    private async Task<T> EmTransacaoAsync<T>(Func<Task<T>> action)
+    {
+        var anterior = EmTransacao;
+        EmTransacao = true;
+        try { return await action(); }
+        finally { EmTransacao = anterior; }
+    }
 
     private sealed class FakeTransactionScope : IDbTransactionScope
     {

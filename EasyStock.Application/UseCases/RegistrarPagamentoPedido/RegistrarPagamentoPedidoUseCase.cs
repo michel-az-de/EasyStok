@@ -1,3 +1,6 @@
+using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos;
 using EasyStock.Domain.Sales;
@@ -13,25 +16,40 @@ public sealed record RegistrarPagamentoPedidoCommand(
     string? Observacao = null,
     Guid? RegistradoPorUserId = null,
     [property: MaxLength(120)] string? RegistradoPorNome = null,
-    [property: MaxLength(20)] string? Origem = "web");
+    [property: MaxLength(20)] string? Origem = "web",
+    // issue 962 (BUG-002 do QA): overpay continua permitido por decisao de produto (#607 --
+    // gorjeta/arredondamento), mas so quando o CALLER sinaliza explicitamente que mostrou o
+    // aviso. Hoje so o Detail.cshtml (onde o aviso de excedente ja existe) envia true; o
+    // cockpit NAO envia -- mantem o bloqueio duro la, onde o risco de fat-finger e maior e o
+    // valor costuma vir pre-preenchido de uma listagem que pode estar desatualizada.
+    bool PermitirExcedente = false,
+    // S13: pagamento já confirmado na fonte pelo provedor (ConfirmarPagamentoPedidoUseCase). Dinheiro
+    // recebido é registrado mesmo com o pedido aguardando a aprovação da dona (Pedido.RequerAprovacao,
+    // S12); a guarda de pré-operacional continua valendo para todo registro manual.
+    bool ConfirmadoPeloProvedor = false);
 
 public class RegistrarPagamentoPedidoUseCase(
     IPedidoRepository repo,
     IUnitOfWork uow,
     ILogger<RegistrarPagamentoPedidoUseCase> logger,
-    ICaixaRepository? caixaRepo = null)
+    CalculadoraInicioPrevistoPedido inicioPrevisto,
+    QuitacaoPedido quitacao,
+    ICaixaRepository? caixaRepo = null,
+    SaldoFinanceiroPedido? saldos = null)
 {
     private static readonly HashSet<string> MetodosValidos = new(StringComparer.OrdinalIgnoreCase)
     {
         "pix", "dinheiro", "credito", "debito", "transferencia", "outro"
     };
 
-    public async Task<PedidoResult?> ExecuteAsync(RegistrarPagamentoPedidoCommand cmd)
+    public async Task<PedidoResult?> ExecuteAsync(RegistrarPagamentoPedidoCommand cmd, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         UseCaseGuards.EnsureNotEmpty(cmd.PedidoId, "PedidoId");
         if (cmd.Valor <= 0)
             throw new UseCaseValidationException("Valor do pagamento deve ser maior que zero.");
+        if (cmd.Valor != decimal.Round(cmd.Valor, 2))
+            throw new UseCaseValidationException("Valor do pagamento deve ter até duas casas decimais.");
         // Teto de sanidade anti-fat-finger (espelha LimitesProduto.ValorMaximo). NAO bloqueia
         // overpay (pagar acima do pendente e cenario real: gorjeta/arredondamento) -- o aviso
         // de overpay e so no frontend (Detail.cshtml). QA v1.10 r3 BUG-004 (issue 607).
@@ -43,77 +61,127 @@ public class RegistrarPagamentoPedidoUseCase(
         if (!MetodosValidos.Contains(metodo))
             throw new UseCaseValidationException($"Método inválido: {cmd.Metodo}");
 
-        var pedido = await repo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.PedidoId);
-        if (pedido == null) return null;
-
-        // Pagamento manual so em pedido operacional: pre-operacional (montagem / pagamento
-        // online pendente / aprovacao do cardapio guest) ainda nao e recebivel. Fecha o
-        // pagamento-fantasma em pedido do cardapio nao aprovado, em TODA superficie que chame
-        // este use case (cockpit, Detail, mobile, API). Espelha PRE_OPERACIONAL do cockpit (issue 862).
-        if (StatusPedidoMapper.TryParse(pedido.Status, out var statusPedido)
-            && !PedidoStateMachine.AceitaPagamento(statusPedido))
+        EfeitosQuitacao? efeito = null;
+        PedidoMudouStatusOperacao? mudanca = null;
+        var resultado = await uow.ExecuteInTransactionSemRetryAsync(async token =>
         {
-            throw new UseCaseValidationException(
-                "Não é possível registrar pagamento: o pedido ainda não foi confirmado/aprovado.");
-        }
+            if (!cmd.ConfirmadoPeloProvedor) await repo.TravarAsync(cmd.EmpresaId, cmd.PedidoId, token);
+            var pedido = await repo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.PedidoId);
+            if (pedido == null || pedido.EmpresaId != cmd.EmpresaId) return null;
 
-        var pag = new PedidoPagamento
-        {
-            Id = Guid.NewGuid(),
-            PedidoId = pedido.Id,
-            Metodo = metodo,
-            Valor = cmd.Valor,
-            Referencia = cmd.Referencia,
-            Observacao = cmd.Observacao,
-            PagoEm = DateTime.UtcNow,
-            RegistradoPorUserId = cmd.RegistradoPorUserId,
-            RegistradoPorNome = cmd.RegistradoPorNome
-        };
+            // Pagamento manual so em pedido operacional: pre-operacional (montagem / pagamento
+            // online pendente / aprovacao do cardapio guest) ainda nao e recebivel. Fecha o
+            // pagamento-fantasma em pedido do cardapio nao aprovado, em TODA superficie que chame
+            // este use case (cockpit, Detail, mobile, API). Espelha PRE_OPERACIONAL do cockpit (issue 862).
+            if (!cmd.ConfirmadoPeloProvedor
+                && StatusPedidoMapper.TryParse(pedido.Status, out var statusPedido)
+                && !PedidoStateMachine.AceitaPagamento(statusPedido)
+                && !await quitacao.PodeReceberSinalManualAsync(pedido, token))
+            {
+                throw new UseCaseValidationException(statusPedido == StatusPedido.Cancelado
+                    ? "Não é possível registrar pagamento: o pedido está cancelado."
+                    : "Não é possível registrar pagamento: o pedido ainda não foi confirmado/aprovado.");
+            }
 
-        await repo.AddPagamentoAsync(pag);
-        pedido.Pagamentos.Add(pag);
+            // issue 962 (BUG-002 do QA): o guard client-side do cockpit e' sobre dado carregado —
+            // uma aba stale (lista rec-carregada, pagamento feito em outra tela) repete o
+            // superpagamento acidental, e o servidor aceitava por design (#607) sem distinguir
+            // deliberado de acidental. Overpay so passa com PermitirExcedente=true, enviado
+            // SOMENTE pelo Detail.cshtml (onde o aviso de gorjeta/arredondamento ja existe).
+            var alocado = saldos is null ? pedido.TotalPago : (await saldos.ConsultarAsync(pedido, token)).Alocado;
+            var pendente = Math.Max(0m, pedido.Total.Valor - alocado);
+            if (cmd.Valor > pendente && !cmd.PermitirExcedente)
+            {
+                throw new UseCaseValidationException(
+                    $"Valor do pagamento ({cmd.Valor.ToString("C", Cultura.PtBr)}) excede o pendente ({pendente.ToString("C", Cultura.PtBr)}).");
+            }
 
-        await repo.AddEventoAsync(new PedidoEvento
-        {
-            Id = Guid.NewGuid(),
-            PedidoId = pedido.Id,
-            Tipo = "pagamento",
-            UsuarioId = cmd.RegistradoPorUserId,
-            UsuarioNome = cmd.RegistradoPorNome,
-            Origem = cmd.Origem,
-            OcorridoEm = DateTime.UtcNow,
-            Detalhes = $"+{pag.Valor.ToString("C", Cultura.PtBr)} via {metodo}"
-        });
+            var pag = new PedidoPagamento
+            {
+                Id = Guid.NewGuid(),
+                PedidoId = pedido.Id,
+                Metodo = metodo,
+                Valor = cmd.Valor,
+                Referencia = cmd.Referencia,
+                Observacao = cmd.Observacao,
+                PagoEm = DateTime.UtcNow,
+                RegistradoPorUserId = cmd.RegistradoPorUserId,
+                RegistradoPorNome = cmd.RegistradoPorNome
+            };
 
-        await TentarAbrirCaixaAsync(cmd, pedido, pag.PagoEm);
+            // issue 1029: NAO adicionar pag a pedido.Pagamentos aqui. O agregado e rastreado
+            // (GetByIdWithDetailsAsync nao usa AsNoTracking) e o relationship fixup do EF ja
+            // popula a colecao quando AddPagamentoAsync faz db.Set<PedidoPagamento>().Add(pag).
+            // Um Add explicito entraria DE NOVO na List<> (que nao deduplica por referencia) e
+            // dobraria pedido.TotalPago, que e derivado de Pagamentos -- medido: a resposta
+            // devolvia 160 para um pagamento de 80. Foi por isso que o 4abb7bb5 removeu a linha.
+            await repo.AddPagamentoAsync(pag);
 
-        await uow.CommitAsync();
+            await repo.AddEventoAsync(new PedidoEvento
+            {
+                Id = Guid.NewGuid(),
+                PedidoId = pedido.Id,
+                Tipo = "pagamento",
+                UsuarioId = cmd.RegistradoPorUserId,
+                UsuarioNome = cmd.RegistradoPorNome,
+                Origem = cmd.Origem,
+                OcorridoEm = DateTime.UtcNow,
+                Detalhes = $"+{pag.Valor.ToString("C", Cultura.PtBr)} via {metodo}"
+            });
 
-        logger.LogInformation("Pedido {Id}: pagamento {Valor} {Metodo} (TotalPago={TotalPago}/{Total}).",
-            pedido.Id, pag.Valor, metodo, pedido.TotalPago, pedido.Total);
-        return CriarPedidoUseCase.Map(pedido);
+            // #1230: pagamento manual (Pix, dinheiro, cartão) em pedido da fila vira compromisso como no
+            // Mercado Pago: grava o início previsto (agregado rastreado, sai no flush abaixo). O pagamento do
+            // provedor chega do ConfirmarPagamentoPedidoUseCase, que já gravou antes de chamar este use case.
+            if (!cmd.ConfirmadoPeloProvedor)
+            {
+                mudanca = await quitacao.ConfirmarSinalManualAsync(pedido, pag, token);
+                if (mudanca is null) await inicioPrevisto.AplicarNaFilaAsync(pedido, token);
+            }
+
+            if (!cmd.ConfirmadoPeloProvedor && cmd.Origem != "balcao")
+                efeito = await quitacao.ConcluirManualAsync(pedido, pag, token);
+
+            // Flush do pagamento+evento ANTES da tentativa de abertura (ver comentario acima
+            // sobre savepoint automatico) — e o que garante que a abertura nunca pode derrubar
+            // o pagamento, mesmo que colida com a unique.
+            await uow.CommitAsync();
+
+            await TentarAbrirCaixaAsync(cmd, pedido, pag.PagoEm, token);
+
+            logger.LogInformation("Pedido {Id}: pagamento {Valor} {Metodo} (TotalPago={TotalPago}/{Total}).",
+                pedido.Id, pag.Valor, metodo, pedido.TotalPago, pedido.Total);
+            return CriarPedidoUseCase.Map(pedido);
+        }, ct);
+        await quitacao.PublicarAsync(cmd.EmpresaId, efeito, ct, mudanca);
+        return resultado;
     }
 
-    private async Task TentarAbrirCaixaAsync(RegistrarPagamentoPedidoCommand cmd, EasyStock.Domain.Entities.Pedido pedido, DateTime pagoEm)
+    private async Task TentarAbrirCaixaAsync(RegistrarPagamentoPedidoCommand cmd, EasyStock.Domain.Entities.Pedido pedido, DateTime pagoEm, CancellationToken ct)
     {
         // Caixa segue Pedido: ao receber o primeiro pagamento do dia, abrimos o caixa
         // automaticamente para evitar divergência "pedidos pagos mas caixa zerado".
         //
-        // Best-effort: qualquer falha aqui não pode derrubar o pagamento. Race condition
-        // entre TXs paralelas é mitigada pelo UNIQUE INDEX parcial em movimentos_caixa
-        // (migration 20260516010000_UniqueAberturaCaixaPorDia) — quem perde a corrida
-        // recebe unique_violation, capturado abaixo.
+        // Best-effort de verdade: o pagamento já foi commitado no flush anterior (ver
+        // ExecuteAsync) antes deste método rodar, então NENHUMA falha aqui — esperada
+        // (corrida perdida) ou não — pode derrubá-lo. TryAddMovimentoAsync trata a corrida
+        // como caso normal (retorna false); o catch abaixo é so para falhas inesperadas
+        // (timeout, conexão, etc.) que não devem propagar como 500 pro operador.
         if (caixaRepo is null) return;
 
         try
         {
-            var data = DateOnly.FromDateTime(pagoEm);
+            // issue 951: dia OPERACIONAL de Brasília (não dia civil UTC) — a unique parcial
+            // (ix_movimentos_caixa_abertura_unica) agrupa por caixa_abertura_utc_day (UTC-3).
+            // DateOnly.FromDateTime(pagoEm) divergia do índice exatamente na janela 21h-24h
+            // BRT: o pagamento via dia N+1 (UTC), a abertura existente do dia N (BRT) não
+            // era vista, uma segunda abertura era tentada, e ela colidia com a primeira.
+            var data = HorarioBrasil.DataOperacional(pagoEm);
 
             // Não reabre caixa fechado (replica regra de AbrirCaixaUseCase). Pagamentos
             // retroativos em dia fechado ficam apenas como PedidoPagamento; aparecem
             // na agregação do dia via GetTotalPagamentosPedidosDoDiaAsync.
-            var fechamento = await caixaRepo.GetFechamentoDoDiaAsync(cmd.EmpresaId, data, pedido.LojaId);
-            if (fechamento != null)
+            // #1598: vale o fechamento da loja do pedido ou o da empresa (CaixaFechadoGuard).
+            if (await CaixaFechadoGuard.DiaFechadoAsync(caixaRepo, cmd.EmpresaId, pagoEm, pedido.LojaId))
             {
                 logger.LogInformation("Caixa de {Data} já fechado; pagamento {PedidoId} não dispara abertura automática.", data, pedido.Id);
                 return;
@@ -122,19 +190,36 @@ public class RegistrarPagamentoPedidoUseCase(
             var movimentos = await caixaRepo.GetMovimentosDoDiaAsync(cmd.EmpresaId, data, pedido.LojaId);
             if (movimentos.Any(m => m.Tipo == "abertura")) return;
 
+            // #1506: sessao de dia anterior ainda aberta: nao abre o dia por cima (a antiga ficaria
+            // orfa, sem fechamento). O pagamento ja esta gravado e entra no caixa do dia dele.
+            var pendente = await caixaRepo.GetAberturaPendenteAsync(cmd.EmpresaId, pedido.LojaId);
+            if (pendente != null && HorarioBrasil.DataOperacional(pendente.DataMovimento) < data)
+            {
+                logger.LogInformation("Caixa de {Pendente} ainda aberto; pagamento {PedidoId} não abre o caixa de {Data}.",
+                    HorarioBrasil.DataOperacional(pendente.DataMovimento), pedido.Id, data);
+                return;
+            }
+
             var abertura = MovimentoCaixa.Criar(cmd.EmpresaId, "abertura", 0m, pagoEm, pedido.LojaId);
             abertura.Descricao = "Abertura automática no primeiro pagamento de pedido do dia.";
             abertura.RegistradoPorUserId = cmd.RegistradoPorUserId;
             abertura.RegistradoPorNome = string.IsNullOrWhiteSpace(cmd.RegistradoPorNome) ? "Sistema" : cmd.RegistradoPorNome;
             abertura.Origem = "auto-pagamento";
-            await caixaRepo.AddMovimentoAsync(abertura);
-            logger.LogInformation("Caixa aberto automaticamente em {Data} por pagamento de pedido {PedidoId}.", data, pedido.Id);
+
+            var criada = await caixaRepo.TryAddMovimentoAsync(abertura, ct);
+            if (criada)
+                logger.LogInformation("Caixa aberto automaticamente em {Data} por pagamento de pedido {PedidoId}.", data, pedido.Id);
+            else
+                logger.LogInformation(
+                    "Abertura de caixa em {Data} já existe (corrida perdida contra outra transação); pagamento de pedido {PedidoId} já persistido.",
+                    data, pedido.Id);
         }
         catch (Exception ex)
         {
-            // Não propagar: pagamento já foi adicionado ao UoW. Se a abertura falhar
-            // (race, constraint, timeout), o pagamento deve persistir mesmo assim.
-            logger.LogWarning(ex, "Falha ao abrir caixa automaticamente para pedido {PedidoId}. Pagamento prossegue.", pedido.Id);
+            // Falha inesperada (nao a corrida esperada — essa TryAddMovimentoAsync ja
+            // absorve retornando false). Nao propagar: o pagamento ja foi commitado antes
+            // desta chamada.
+            logger.LogWarning(ex, "Falha inesperada ao abrir caixa automaticamente para pedido {PedidoId}. Pagamento já persistido.", pedido.Id);
         }
     }
 }

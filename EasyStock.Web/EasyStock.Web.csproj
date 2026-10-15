@@ -12,6 +12,10 @@
   <ItemGroup>
     <!-- Authentication.Cookies é implícito no SDK Web do .NET 9 — não referenciar versão antiga -->
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.7" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
   </ItemGroup>
 
   <!-- Tailwind: gera wwwroot/css/tailwind.dist.css antes do build.

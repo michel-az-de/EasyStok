@@ -40,8 +40,43 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// </summary>
         Task<IReadOnlyList<MovimentoCaixa>> GetAberturasEsquecidasAsync(DateTime limiteInferiorUtc, CancellationToken ct = default);
 
+        /// <summary>
+        /// Carimba <c>NotificadoEsquecidoEm</c> da abertura (1 aviso por sessão esquecida). A abertura de
+        /// <see cref="GetAberturasEsquecidasAsync"/> vem sem rastreio, então é um <c>ExecuteUpdate</c> direto, sem
+        /// filtro do EF (cross-tenant, sob o bypass do job). Não passa pela unidade de trabalho.
+        /// </summary>
+        Task MarcarNotificadoEsquecidoAsync(Guid movimentoId, DateTime em, CancellationToken ct = default);
+
+        /// <summary>
+        /// Destinatário de reserva quando quem abriu o caixa não é conhecido: o usuário ativo mais antigo da empresa
+        /// (≈ proprietário). Cross-tenant, sob o bypass do job.
+        /// </summary>
+        Task<Guid?> ResolverResponsavelPadraoAsync(Guid empresaId, CancellationToken ct = default);
+
         Task AddMovimentoAsync(MovimentoCaixa movimento);
         Task UpdateMovimentoAsync(MovimentoCaixa movimento);
+
+        /// <summary>
+        /// Tenta inserir o movimento; se colidir com <c>ix_movimentos_caixa_abertura_unica</c>
+        /// (corrida perdida — outra transação já abriu o caixa do dia/loja), retorna
+        /// <see langword="false"/> sem lançar, e a entidade é destrackeada. Qualquer OUTRA
+        /// falha de persistência propaga normalmente (issue 951: mesmo padrão de
+        /// <c>VagaOcupadaRepository.OcuparDentroDeTxAsync</c> para <c>uq_vaga_ativa_por_pedido</c>
+        /// — uma constraint única simples não precisa de advisory lock, o próprio índice
+        /// serializa; só checagens de threshold/contagem precisam).
+        /// <para>Precisa rodar dentro de uma transação explícita já em andamento: o EF Core
+        /// cria um savepoint automático antes deste <c>SaveChanges</c> quando há uma transação
+        /// ambiente — se este flush falhar, só ele é revertido; mudanças já persistidas antes
+        /// na mesma transação (ex.: o pagamento) permanecem íntegras até o commit final.</para>
+        /// </summary>
+        Task<bool> TryAddMovimentoAsync(MovimentoCaixa movimento, CancellationToken ct = default);
+
+        /// <summary>
+        /// Serializa as saídas interativas do caixa de uma empresa/loja até o fim da transação
+        /// (<c>pg_advisory_xact_lock</c>): conferência de saldo é checagem de limite, e o índice não
+        /// serializa isso sozinho (#1547). Precisa de transação explícita em andamento.
+        /// </summary>
+        Task TravarSaidasAsync(Guid empresaId, Guid? lojaId, CancellationToken ct = default);
 
         // ── Fechamentos ───────────────────────────────────────────
         Task<FechamentoCaixa?> GetFechamentoDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null);

@@ -36,6 +36,18 @@ public interface ICredencialIntegracaoRepository
         string kekId,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Todas as credenciais ativas, de todas as lojas, só para leitura: verificação da chave-mestra na
+    /// subida (I4.2). Cross-tenant, só pela porta de bypass da RLS.
+    /// </summary>
+    Task<IReadOnlyList<CredencialIntegracao>> ListarAtivasAsync(CancellationToken ct = default);
+
     Task AddAsync(CredencialIntegracao credencial, CancellationToken ct = default);
+
+    /// <summary>
+    /// Grava <see cref="CredencialIntegracao.UltimoUsoEm"/> direto no banco, fora do change tracker (#1417): a
+    /// telemetria de leitura não pode comitar o que o chamador ainda tem pendente na unidade de trabalho.
+    /// </summary>
+    Task RegistrarUsoAsync(Guid credencialId, DateTime em, CancellationToken ct = default);
     Task UpdateAsync(CredencialIntegracao credencial, CancellationToken ct = default);
 }

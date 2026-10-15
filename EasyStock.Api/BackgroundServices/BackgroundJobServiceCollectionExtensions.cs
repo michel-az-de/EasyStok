@@ -49,25 +49,6 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableDiagnosticoEmailReport)
             services.AddHostedService<DiagnosticoEmailReportJob>();
 
-        if (options.EnableCobrancaAssinaturaJob)
-            services.AddHostedService<CobrancaAssinaturaJob>();
-
-        // FaturaBackfillJob (F5) — rodada unica para gerar Fatura para
-        // CobrancaAssinatura historicas. Habilitar via env var apenas durante
-        // migracao controlada; uma vez concluida a migracao, desabilitar.
-        if (options.EnableFaturaBackfillJob)
-            services.AddHostedService<FaturaBackfillJob>();
-
-        // FaturaReconciliacaoJob (F6/F11) — consulta gateway hora em hora para
-        // fechar gaps de webhooks perdidos. Pix funciona ponta-a-ponta desde F11
-        // (IEfiPixService.ConsultarCobrancaAsync via GET /v2/cob/{txid}).
-        if (options.EnableFaturaReconciliacaoJob)
-            services.AddHostedService<FaturaReconciliacaoJob>();
-
-        // FaturaVencimentoJob (F6) — diario, processa D-3, D-1 e marca Vencidas.
-        if (options.EnableFaturaVencimentoJob)
-            services.AddHostedService<FaturaVencimentoJob>();
-
         // ContaFinanceiraVencimentoJob (CAP/CAR) — diario 09:30 UTC, marca
         // parcelas vencidas e atualiza status agregado das contas.
         if (options.EnableContaFinanceiraVencimentoJob)
@@ -78,10 +59,53 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableContaReceberPixReconciliacaoJob)
             services.AddHostedService<ContaReceberPixReconciliacaoJob>();
 
+        // CobrancaPedidoJob (S11) — a cada 60 s, expira links do Mercado Pago vencidos, reemite uma vez
+        // para pedido da conversa e cancela os demais (libera a vaga).
+        if (options.EnableCobrancaPedido)
+            services.AddHostedService<CobrancaPedidoJob>();
+
+        // ImpressaoPendenteAlertaJob (S20) — a cada 2 min, canhoto pendente há mais de 3 min vira
+        // impressao.atrasada no SSE de operação (o console avisa a dona).
+        if (options.EnableImpressaoPendenteAlerta)
+            services.AddHostedService<ImpressaoPendenteAlertaJob>();
+
+        // PedidoAtrasoJob (S21) — a cada 60 s, publica pedido.atrasado uma vez por pedido aguardando
+        // com o início previsto vencido (o KDS deriva o card atrasado sozinho; o job é o aviso no SSE).
+        if (options.EnablePedidoAtraso)
+            services.AddHostedService<PedidoAtrasoJob>();
+
         // CaixaEsquecidoJob (#641) — diario 10:00 UTC, detecta caixas abertos nao fechados de
         // dias anteriores e notifica in-app (so notifica, nao fecha).
         if (options.EnableCaixaEsquecidoJob)
             services.AddHostedService<CaixaEsquecidoJob>();
+
+        // Atendimento WhatsApp (S03): drena a fila de midia que o webhook enfileira. Precisa ficar
+        // neste processo porque a fila e em memoria (BackgroundQueueService).
+        services.AddHostedService<AtendimentoFilaMidiaBackgroundService>();
+
+        // S39: mensagens programadas ao cliente, disparadas pelo banco (não é fila em memória).
+        if (options.EnableMensagensProgramadas)
+            services.AddHostedService<MensagensProgramadasBackgroundService>();
+
+        // S57: reenvio das mensagens que falharam por motivo temporário (canal fora, rede).
+        if (options.EnableReenvioMensagens)
+            services.AddHostedService<ReenvioMensagensBackgroundService>();
+
+        // S43: lembretes internos da dona (pagamento sem baixa, cliente sem resposta, manuais vencidos).
+        if (options.EnableAvaliadorLembretes)
+            services.AddHostedService<AvaliadorLembretesBackgroundService>();
+
+        // S30: campanhas — primeira onda no horário agendado, conciliação com o outbox, encerramento e lembrete.
+        if (options.EnableCampanhaJob)
+            services.AddHostedService<CampanhaJob>();
+
+        // Atendimento WhatsApp (S06): drena a fila do turno do agente, mesmo motivo (fila em memoria).
+        if (options.EnableAtendimentoTurnoAgente)
+            services.AddHostedService<AtendimentoFilaTurnoAgenteBackgroundService>();
+
+        // Chat do site (S36): apaga as sessões vencidas.
+        if (options.EnableLimpezaSessoesChatSite)
+            services.AddHostedService<LimpezaSessoesChatSiteBackgroundService>();
 
         return services;
     }

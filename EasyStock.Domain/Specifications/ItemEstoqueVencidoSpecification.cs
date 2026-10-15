@@ -16,6 +16,5 @@ public sealed class ItemEstoqueVencidoSpecification : IEspecificacao<ItemEstoque
     }
 
     public bool EhSatisfeitaPor(ItemEstoque item)
-        => item.ValidadeEm != null &&
-           DateOnly.FromDateTime(item.ValidadeEm.DataValidade) < _dataReferencia;
+        => item.ValidadeEm?.EstaVencido(_dataReferencia) == true;
 }

@@ -1,0 +1,8 @@
+.sugestao { display: grid; grid-template-columns: minmax(0, 1fr) auto 44px; align-items: center; gap: 8px; padding: 6px 10px; font-size: .875rem; }
+.texto { overflow-wrap: anywhere; white-space: pre-wrap; }
+.texto small { display: block; font-size: .75rem; }
+.usar, .fechar { min-height: 44px; min-width: 44px; padding: 8px; color: inherit; border: 1px solid currentColor; border-radius: 8px; background: transparent; cursor: pointer; }
+.fechar { border-color: transparent; font-size: 1.25rem; }
+.usar kbd { margin-left: 4px; font-size: .75rem; }
+.usar:focus-visible, .fechar:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+@media (pointer: coarse) { .usar kbd { display: none; } }

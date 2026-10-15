@@ -68,6 +68,11 @@ public abstract class EasyStockControllerBase : ControllerBase
 
         if (currentUser.Nivel == NivelAcesso.SuperAdmin)
         {
+            // #1434: o console entra como SuperAdmin com o claim da empresa padrão e não manda
+            // ?empresaId=. A query explícita continua tendo precedência.
+            if (empresaId == Guid.Empty)
+                empresaId = currentUser.EmpresaId;
+
             if (empresaId == Guid.Empty)
             {
                 error = DataBadRequest("EmpresaId é obrigatório.");
@@ -90,13 +95,22 @@ public abstract class EasyStockControllerBase : ControllerBase
             return true;
         }
 
-        if (empresaId == Guid.Empty)
+        // Não-SuperAdmin SEM empresa vinculada no token (0 ou 2+ empresas ativas sem
+        // seleção → claim empresaId ausente): fail-closed. NÃO aceitar um empresaId
+        // arbitrário da request — isso permitia acesso cross-tenant, já que o filtro
+        // [ValidateEmpresaId] pula justamente este caso (short-circuit p/ claim vazio).
+        // Todo acesso legítimo carrega o claim empresaId: o signup real (RegistrarEmpresa)
+        // vincula 1 empresa e emite o claim, e o Web recusa login sem claim. Seleção
+        // multi-empresa reemite o token com o claim (cai no ramo anterior).
+        empresaId = Guid.Empty;
+        if (requestedEmpresaId is { } req && req != Guid.Empty)
         {
-            error = DataBadRequest("EmpresaId é obrigatório.");
+            error = Forbid();
             return false;
         }
 
-        return true;
+        error = DataBadRequest("EmpresaId é obrigatório.");
+        return false;
     }
 
     // ── Sorting helpers ──────────────────────────────────────────────────────

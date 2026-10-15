@@ -1,4 +1,4 @@
-﻿using EasyStock.Domain.Entities.Notifications;
+using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Financeiro;
 using EasyStock.Domain.Financeiro.Events;
@@ -10,11 +10,12 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Reporting;
 using EasyStock.Infra.Postgre.Data.Configurations.Mobile;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Postgre.Data
 {
-    public class EasyStockDbContext : DbContext, IUnitOfWork
+    public class EasyStockDbContext : DbContext, IUnitOfWork, IDataProtectionKeyContext
     {
         private readonly ILogger<EasyStockDbContext>? _logger;
         private readonly ICurrentUserAccessor? _currentUser;
@@ -178,6 +179,10 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<Loja> Lojas { get; set; } = null!;
         public DbSet<Fornecedor> Fornecedores { get; set; } = null!;
         public DbSet<Cliente> Clientes { get; set; } = null!;
+        public DbSet<ClienteTag> ClienteTags { get; set; } = null!;
+        public DbSet<ClienteNota> ClienteNotas { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Campanhas.Campanha> Campanhas { get; set; } = null!; // S28
+        public DbSet<EasyStock.Domain.Entities.Campanhas.CampanhaDestinatario> CampanhaDestinatarios { get; set; } = null!; // S28
         public DbSet<Pedido> Pedidos { get; set; } = null!;
         public DbSet<MovimentoCaixa> MovimentosCaixa { get; set; } = null!;
         public DbSet<FechamentoCaixa> FechamentosCaixa { get; set; } = null!;
@@ -190,8 +195,21 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<ListaCompras> ListasCompras { get; set; } = null!;
         public DbSet<PedidoFornecedor> PedidosFornecedor { get; set; } = null!;
         public DbSet<ConfiguracaoLoja> ConfiguracoesLoja { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.ConfiguracaoAtendimento> ConfiguracoesAtendimento { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.ConsentimentoContato> ConsentimentosContato { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.MensagemProgramada> MensagensProgramadas { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Campanhas.InteresseItem> InteressesItem { get; set; } = null!; // S31
+        public DbSet<EasyStock.Domain.Entities.Atendimento.Lembrete> Lembretes { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.RespostaPronta> RespostasProntas { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.TrechoCaderno> CadernoTrechos { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.RegraAutomatica> RegrasAutomaticas { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.Entregador> Entregadores { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.Viagem> Viagens { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.ParadaViagem> ParadasViagem { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.ChamadoEntregador> ChamadosEntregador { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.CorridaExterna> CorridasExternas { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.ExpedienteLoja> ExpedientesLoja { get; set; } = null!;
         public DbSet<PreferenciaMenuUsuario> PreferenciasMenuUsuario { get; set; } = null!;
-        public DbSet<AnuncioIa> AnunciosIa { get; set; } = null!;
         public DbSet<UsoIa> UsoIa { get; set; } = null!;
         public DbSet<ProdutoAlteracao> ProdutoAlteracoes { get; set; } = null!;
         public DbSet<ProdutoComposicao> ProdutosComposicao { get; set; } = null!;
@@ -202,39 +220,25 @@ namespace EasyStock.Infra.Postgre.Data
 
         // Storefront Module DbSets
         public DbSet<EasyStock.Domain.Entities.Storefront.PedidoAvaliacao> PedidoAvaliacoes { get; set; } = null!;
+
+        // Atendimento (S04, ADR-0050): conversa por contato de WhatsApp e suas mensagens.
+        public DbSet<EasyStock.Domain.Entities.Atendimento.SessaoChatSite> SessoesChatSite { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.LinkCardapioConversa> LinksCardapioConversa { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.Conversa> AtendimentoConversas { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.Mensagem> AtendimentoMensagens { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.StorefrontFaleConosco> StorefrontFaleConoscos { get; set; } = null!;
 
         // Admin Module DbSets
         public DbSet<SystemErrorLog> SystemErrorLogs { get; set; } = null!;
         public DbSet<SeedRunLog> SeedRunLogs { get; set; } = null!;
-        public DbSet<AdminTicket> AdminTickets { get; set; } = null!;
-        public DbSet<AdminTicketMensagem> AdminTicketMensagens { get; set; } = null!;
-        public DbSet<TicketAnexo> TicketAnexos { get; set; } = null!;
-        public DbSet<TicketHistorico> TicketHistoricos { get; set; } = null!;
-        public DbSet<AdminTicketTecnicoMeta> AdminTicketTecnicoMetas { get; set; } = null!;
-        public DbSet<SlaConfiguracao> SlaConfiguracoes { get; set; } = null!;
 
-        // FAQ — base global publica (sem multi-tenant)
-        public DbSet<FaqCategoria> FaqCategorias { get; set; } = null!;
-        public DbSet<FaqItem> FaqItens { get; set; } = null!;
-        public DbSet<FaqVisualizacao> FaqVisualizacoes { get; set; } = null!;
-        public DbSet<FaqFeedback> FaqFeedbacks { get; set; } = null!;
-
-        // Banners — broadcast global de plataforma (sem multi-tenant, sem RLS). Ver #869.
-        public DbSet<EasyStock.Domain.Entities.Banners.Banner> Banners { get; set; } = null!;
-        public DbSet<EasyStock.Domain.Entities.Banners.BannerConfirmacao> BannerConfirmacoes { get; set; } = null!;
-
-        public DbSet<AdminImpersonationLog> AdminImpersonationLogs { get; set; } = null!;
         public DbSet<AdminAuditLog> AdminAuditLogs { get; set; } = null!;
-        public DbSet<AdminAcessoPiiLog> AdminAcessosPiiLogs { get; set; } = null!;
-        public DbSet<AdminNotaTenant> AdminNotasTenant { get; set; } = null!;
         public DbSet<Cupom> Cupons { get; set; } = null!;
 
         // Endpoint health monitoring (Worker EndpointHealthMonitorService)
         public DbSet<EndpointHealthState> EndpointHealthStates { get; set; } = null!;
 
         // Releases de APK distribuidos via CapacitorUpdater (Casa da Baba e outros).
-        public DbSet<EasyStock.Domain.Entities.Mobile.ApkRelease> ApkReleases { get; set; } = null!;
 
         // Identity / SaaS DbSets
         public DbSet<Usuario> Usuarios { get; set; } = null!;
@@ -251,6 +255,12 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<CobrancaAssinatura> CobrancasAssinatura { get; set; } = null!;
         public DbSet<ConfiguracaoSistema> ConfiguracoesSistema { get; set; } = null!;
 
+        // Feature flags por tenant (ADR-0048). Isenta do global query filter E do RLS
+        // (ver SkipTenantFilter abaixo e a migration AddRowLevelSecurity): quem consulta
+        // filtra EmpresaId na mao. A entidade ja estava mapeada por convencao — este DbSet
+        // nao altera o schema, so da acesso nomeado.
+        public DbSet<TenantFeatureFlag> TenantFeatureFlags { get; set; } = null!;
+
         // Modulo Financeiro (F1+)
         public DbSet<Fatura> Faturas { get; set; } = null!;
         public DbSet<FaturaItem> FaturaItens { get; set; } = null!;
@@ -261,6 +271,15 @@ namespace EasyStock.Infra.Postgre.Data
 
         // Payment Orchestration (Onda P0)
         public DbSet<PaymentAttempt> PaymentAttempts { get; set; } = null!;
+
+        // S11: cobrança do pedido (Mercado Pago ou na entrega)
+        public DbSet<CobrancaPedido> CobrancasPedido { get; set; } = null!;
+
+        // S20: fila de impressão do canhoto
+        public DbSet<EasyStock.Domain.Entities.Operacao.ImpressaoPendente> ImpressoesPendentes { get; set; } = null!;
+
+        // S27: ocorrência e reembolso
+        public DbSet<EasyStock.Domain.Entities.Atendimento.Ocorrencia> Ocorrencias { get; set; } = null!;
         public DbSet<PaymentAttemptEvent> PaymentAttemptEvents { get; set; } = null!;
         public DbSet<GatewayRoutingRule> GatewayRoutingRules { get; set; } = null!;
         public DbSet<GatewayHealthSnapshot> GatewayHealthSnapshots { get; set; } = null!;
@@ -282,7 +301,6 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<EasyStock.Domain.Entities.Financeiro.ContaFinanceiraEvento> ContasFinanceirasEventos { get; set; } = null!;
 
         // Landing publica — leads capturados sem multi-tenant (sem EmpresaId).
-        public DbSet<LeadPublico> LeadsPublicos { get; set; } = null!;
 
         // Modulo Integration (F3+) — credenciais cifradas (AES-256-GCM) por tenant
         public DbSet<CredencialIntegracao> CredenciaisIntegracao { get; set; } = null!;
@@ -291,7 +309,6 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<OutboxEventoIntegracao> OutboxEventosIntegracao { get; set; } = null!;
 
         // Modulo Fiscal (NFC-e Corte 1) — fundacao Domain pra emissao via Focus/eNotas
-        public DbSet<EmpresaConfiguracaoFiscal> EmpresaConfiguracoesFiscais { get; set; } = null!;
         public DbSet<NfeDocumento> NfeDocumentos { get; set; } = null!;
         public DbSet<NfeItem> NfeItens { get; set; } = null!;
         public DbSet<NfeEvento> NfeEventos { get; set; } = null!;
@@ -312,9 +329,29 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<PreferenciaNotificacaoUsuario> NotifPreferenciasUsuario { get; set; } = null!;
         public DbSet<WebPushSubscription> NotifWebPushSubscriptions { get; set; } = null!;
 
+        // N6: categoria atual de cada template da Meta (recategorização para marketing). Global, sem tenant.
+        public DbSet<TemplateMetaEstado> NotifTemplatesMetaEstado { get; set; } = null!;
+
         // Storefront — autenticação (TASK-EZ-005)
         public DbSet<EasyStock.Domain.Entities.Storefront.ClienteOtp> ClienteOtps { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.ClienteSession> ClienteSessions { get; set; } = null!;
+
+        // Key ring do ASP.NET DataProtection (IDataProtectionKeyContext). Tabela GLOBAL:
+        // nao tem EmpresaId, entao fica fora do query filter de tenant e fora do RLS
+        // (a migration AddRowLevelSecurity so alcanca tabelas com coluna EmpresaId).
+        // Compartilhar o key ring e o que permite a Api cifrar o certificado A1 e o
+        // Worker decifrar o mesmo payload na emissao fiscal.
+        public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
+
+        public void DescartarAlteracoesPendentes() => ChangeTracker.Clear();
+
+        public bool EhViolacaoDeUnicidade(Exception ex)
+        {
+            for (var atual = ex; atual is not null; atual = atual.InnerException)
+                if (atual is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.UniqueViolation })
+                    return true;
+            return false;
+        }
 
         public async Task<int> CommitAsync()
         {
@@ -379,6 +416,16 @@ namespace EasyStock.Infra.Postgre.Data
             Func<CancellationToken, Task<T>> action,
             CancellationToken ct = default)
         {
+            // Composicao de use cases (doc do IUnitOfWork): se ja existe uma transacao
+            // explicita em andamento, o CALLER externo e o dono dela (ex.: um pagamento
+            // registrado dentro de FinalizarVendaBalcaoUseCase, que ja abriu sua propria
+            // ExecuteInTransactionSemRetryAsync) — reusa em vez de tentar abrir uma segunda,
+            // que o Npgsql rejeita com "already in a transaction" (issue 951, achado ao rodar
+            // a integracao contra Postgres real). Mesmo padrao de
+            // VagaOcupadaRepository.OcuparAsync. O commit/rollback fica com quem abriu.
+            if (Database.CurrentTransaction is not null)
+                return action(ct);
+
             // issue 822: blocos nao-reexecutaveis (venda balcao compoe creates com Guids
             // novos). A SemRetryExecutionStrategy HERDA de ExecutionStrategy (a base seta a
             // suspensao que os SaveChanges internos respeitam) com MaxRetryCount=0 —
@@ -531,8 +578,7 @@ namespace EasyStock.Infra.Postgre.Data
             // FaturaContador — tabela auxiliar com PK composta (EmpresaId, Ano).
             // Acesso direto via SQL raw (INSERT...ON CONFLICT) ou lookup por PK no
             // fallback; sem necessidade de filter.
-            return clrType == typeof(AdminImpersonationLog)
-                || clrType == typeof(TenantFeatureFlag)
+            return clrType == typeof(TenantFeatureFlag)
                 || clrType == typeof(GatewayRoutingRule)
                 || clrType == typeof(FaturaContador);
         }

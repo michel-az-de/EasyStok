@@ -109,6 +109,12 @@ public class Storefront
     public DateTime CriadoEm { get; private set; }
     public DateTime AlteradoEm { get; private set; }
 
+    /// <summary>URL pública da imagem do cardápio — o agente (S06) envia como anexo no WhatsApp.</summary>
+    public string? CardapioImagemUrl { get; private set; }
+
+    /// <summary>Perfil do Instagram da loja: convite às redes no agradecimento de pedido entregue (S13).</summary>
+    public string? InstagramUrl { get; private set; }
+
     // EF Core ctor sem parâmetros
     private Storefront() { }
 
@@ -279,6 +285,24 @@ public class Storefront
     public void DefinirLojaPadrao(Guid? lojaId)
     {
         LojaPadraoId = lojaId == Guid.Empty ? null : lojaId;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    public void DefinirCardapioImagemUrl(string? url)
+    {
+        if (url is not null && url.Length > 500)
+            throw new RegraDeDominioVioladaException("URL da imagem do cardápio não pode exceder 500 caracteres.");
+
+        CardapioImagemUrl = string.IsNullOrWhiteSpace(url) ? null : url.Trim();
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    public void DefinirInstagramUrl(string? url)
+    {
+        if (url is not null && url.Trim().Length > 500)
+            throw new RegraDeDominioVioladaException("URL do Instagram não pode exceder 500 caracteres.");
+
+        InstagramUrl = string.IsNullOrWhiteSpace(url) ? null : url.Trim();
         AlteradoEm = DateTime.UtcNow;
     }
 

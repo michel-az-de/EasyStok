@@ -18,6 +18,9 @@ public interface IContagemRepository
     Task AddAsync(Contagem contagem);
     Task UpdateAsync(Contagem contagem);
 
+    /// <summary>Provenance de um ajuste aplicado (ajuste rápido de saldo, S22).</summary>
+    Task AddAjusteAsync(AjusteInventario ajuste, CancellationToken ct = default);
+
     /// <summary>
     /// Lotes (ItemEstoque) do escopo, para materializar a membership no start. Inclui
     /// Esgotado/qty-0 (permite achar sobra e detectar lote zerado); exclui Descartado.

@@ -2,7 +2,7 @@ namespace EasyStock.Domain.Entities;
 
 /// <summary>
 /// Audit trail de eventos de uma <see cref="Fatura"/>. Padrao analogo a
-/// <see cref="TicketHistorico"/>: cada operacao registra um evento com
+/// um historico de ticket: cada operacao registra um evento com
 /// valor antes/depois, autor e payload JSON livre.
 /// </summary>
 public class FaturaEvento

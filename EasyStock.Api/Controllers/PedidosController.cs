@@ -88,7 +88,10 @@ public class PedidosController(
         var result = await finalizarBalcaoUseCase.ExecuteAsync(command with
         {
             EmpresaId = emp,
-            CriadoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null
+            CriadoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            // #1547: mesmo motivo de AddPagamento. O nome vai para o autor do pagamento; o do corpo só
+            // vale quando a sessão não traz nome.
+            CriadoPorNome = NomeDaSessao() ?? command.CriadoPorNome
         });
         return DataCreated($"/api/pedidos/{result.PedidoId}", result);
     }
@@ -104,7 +107,9 @@ public class PedidosController(
             EmpresaId = emp,
             Id = id,
             UsuarioId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
-            Origem = command.Origem ?? "web"
+            UsuarioNome = User?.Identity?.Name,
+            Origem = command.Origem ?? "web",
+            NivelSolicitante = currentUser.Nivel
         });
         return result == null ? DataNotFound("Pedido não encontrado.") : DataOk(result);
     }
@@ -120,7 +125,9 @@ public class PedidosController(
             EmpresaId = emp,
             Id = id,
             UsuarioId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
-            Origem = command.Origem ?? "web"
+            UsuarioNome = User?.Identity?.Name,
+            Origem = command.Origem ?? "web",
+            NivelSolicitante = currentUser.Nivel
         });
         return result == null ? DataNotFound("Pedido não encontrado.") : DataOk(result);
     }
@@ -185,7 +192,11 @@ public class PedidosController(
             EmpresaId = emp,
             PedidoId = id,
             RegistradoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
-            Origem = command.Origem ?? "web"
+            // Autor vem da sessão: o nome do corpo falsificava a trilha e, como "Mercado Pago",
+            // criava um recebimento que nenhuma devolução aceitava.
+            RegistradoPorNome = NomeDaSessao(),
+            Origem = "web",
+            ConfirmadoPeloProvedor = false
         });
         return result == null ? DataNotFound("Pedido não encontrado.") : DataOk(result);
     }
@@ -199,7 +210,14 @@ public class PedidosController(
         var result = await removePagUseCase.ExecuteAsync(new RemoverPagamentoPedidoCommand(
             emp, id, pagamentoId,
             currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
-            null, "web"));
+            null, "web", currentUser.Nivel));
         return result == null ? DataNotFound("Pedido não encontrado.") : DataOk(result);
+    }
+
+    // O nome do usuário aceita 150 caracteres; a coluna do autor do pagamento, 120.
+    private string? NomeDaSessao()
+    {
+        var nome = User?.FindFirst("nome")?.Value;
+        return nome is { Length: > 120 } ? nome[..120] : nome;
     }
 }

@@ -122,14 +122,26 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
             // FifoAtivo=true → FEFO (saída pelo lote mais próximo do vencimento).
             // FifoAtivo=false → FIFO puro (por data de entrada).
             var fefo = configuracao?.FifoAtivo ?? true;
+            // #983 (D2): naturezas de baixa/descarte (Perda/Prejuizo/Vencimento) furam o
+            // guard de lote vencido; as demais (Venda, Doacao, ...) seguem bloqueando.
+            var permitirVencido = command.Natureza.PermiteBaixaDeLoteVencido();
 
-            // ExecuteInTransactionAsync usa IExecutionStrategy do Npgsql (retry
-            // compativel com EnableRetryOnFailure). FOR UPDATE adquirido em
-            // GetByIdComLockAsync/GetLotesDisponiveisParaSaidaAsync mantem o lock
-            // pessimistico ate o commit final do bloco — sem isso, EF abre
-            // transacao implicita so no SaveChanges e o lock libera ao fim do
-            // statement, abrindo race com requests concorrentes.
-            return await unitOfWork.ExecuteInTransactionAsync(async ct =>
+            // issue 952: ERA ExecuteInTransactionAsync (com retry via IExecutionStrategy do
+            // Npgsql). O racional antigo — "retry preserva o lock pessimistico (FOR UPDATE)
+            // ate o commit" — e verdadeiro mas incompleto: numa falha transitoria DEPOIS do
+            // SaveChanges interno (linha ~313) e ANTES do commit externo do wrapper, o retry
+            // reexecuta o delegate INTEIRO no MESMO DbContext, sem ChangeTracker.Clear. Duas
+            // consequencias: (a) Venda/ItemVenda/MovimentacaoEstoque desta tentativa, criadas
+            // com Guid.NewGuid, continuam Added no tracker e sao inseridas de novo junto com
+            // as da tentativa seguinte (venda duplicada); (b) GetByIdComLockAsync e
+            // GetLotesDisponiveisParaSaidaAsync sao queries TRACKED — o identity map devolve
+            // a MESMA instancia de ItemEstoque ja decrementada em memoria pela tentativa
+            // anterior, e a nova tentativa decrementa de novo (uma saida de N un baixa 2N).
+            // ExecuteInTransactionSemRetryAsync (issue 822, ja usado em FinalizarVendaBalcao
+            // pelo mesmo motivo) desarma o retry SEM abrir mao do lock: o FOR UPDATE continua
+            // valendo ate o commit, so que agora uma falha transitoria propaga ao caller
+            // (rollback automatico) em vez de reexecutar o bloco nao-idempotente.
+            return await unitOfWork.ExecuteInTransactionSemRetryAsync(async ct =>
             {
 
             var agora = DateTime.UtcNow;
@@ -179,7 +191,7 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                 var valorUnitario = Dinheiro.FromDecimal(comandoItem.ValorVendaUnitario);
                 var lotes = comandoItem.ItemEstoqueId.HasValue
                     ? [await ObterItemDiretoAsync(command.EmpresaId, comandoItem.ItemEstoqueId.Value)]
-                    : (await itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(command.EmpresaId, comandoItem.ProdutoId, comandoItem.ProdutoVariacaoId, fefo)).ToArray();
+                    : (await itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(command.EmpresaId, comandoItem.ProdutoId, comandoItem.ProdutoVariacaoId, fefo, permitirVencido)).ToArray();
 
                 if (lotes.Length == 0 && comandoItem.ItemEstoqueId.HasValue)
                     throw new UseCaseValidationException("Item de estoque nao encontrado ou nao esta disponivel.");
@@ -212,6 +224,19 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                 if (!new ProdutoAtivoSpecification().EhSatisfeitaPor(produto))
                     throw new ProdutoInativoException(produto.Id);
 
+                // #983 (D3): antes do fix, GetLotesDisponiveisParaSaidaAsync trazia vencidos
+                // junto com validos e "disponivel" somava os dois, superestimando o que dava
+                // pra vender (o vencido ia lancar ItemEstoqueVencidoException no loop mesmo
+                // assim). O filtro agora vive no repositorio (D1): quando permitirVencido e
+                // false, incluirVencidos=false ja exclui os vencidos ANTES de chegar aqui, e
+                // "lotes" so contem o que realmente da pra vender nesse caminho.
+                //
+                // NAO refiltrar aqui por ValidadeEm: no caminho ItemEstoqueId direto (o
+                // caller pediu um lote especifico, sem passar pelo filtro do repositorio),
+                // isso faria "disponivel" cair a zero e trocar o ItemEstoqueVencidoException
+                // informativo (lancado no loop por GarantirDisponivelParaSaida) por um
+                // EstoqueInsuficienteException generico — regressao coberta pelo teste
+                // Deve_falhar_quando_item_esta_vencido.
                 var disponivel = lotes.Sum(i => i.QuantidadeAtual.Value);
                 // #540: com PermitirDescoberto a operacao nao trava — a falta vira descoberto
                 // auditavel no ultimo lote (ver loop). Sem o flag, oversell segue barrado.
@@ -241,16 +266,16 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                         // A saida sai inteira (venda real); a falta vira descoberto auditavel.
                         quantidadeConsumida = restante;
                         quantidadeDoLote = Quantidade.From(quantidadeConsumida);
-                        lote.RegistrarSaidaPermitindoDescoberto(quantidadeDoLote, command.DataSaida, agora);
+                        lote.RegistrarSaidaPermitindoDescoberto(quantidadeDoLote, command.DataSaida, agora, permitirVencido);
                     }
                     else
                     {
-                        lote.GarantirDisponivelParaSaida(command.DataSaida);
+                        lote.GarantirDisponivelParaSaida(command.DataSaida, permitirVencido);
                         quantidadeConsumida = Math.Min(lote.QuantidadeAtual.Value, restante);
                         if (quantidadeConsumida <= 0)
                             continue;
                         quantidadeDoLote = Quantidade.From(quantidadeConsumida);
-                        lote.RegistrarSaida(quantidadeDoLote, command.DataSaida, agora);
+                        lote.RegistrarSaida(quantidadeDoLote, command.DataSaida, agora, permitirVencido);
                     }
 
                     var itemVenda = new ItemVenda

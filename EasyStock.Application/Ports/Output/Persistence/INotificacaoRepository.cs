@@ -9,15 +9,16 @@ namespace EasyStock.Application.Ports.Output.Persistence
             TipoAlertaEstoque? tipo = null,
             SeveridadeNotificacao? severidade = null,
             int page = 1,
-            int pageSize = 20);
-        Task<IEnumerable<Notificacao>> GetRecentesNaoLidasAsync(Guid empresaId, int limit = 5);
-        Task<NotificacaoResumo> GetResumoAsync(Guid empresaId);
+            int pageSize = 20,
+            Guid? usuarioId = null);
+        Task<IEnumerable<Notificacao>> GetRecentesNaoLidasAsync(Guid empresaId, int limit = 5, Guid? usuarioId = null);
+        Task<NotificacaoResumo> GetResumoAsync(Guid empresaId, Guid? usuarioId = null);
         Task<bool> ExisteNotificacaoNaoLidaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid referenciaId);
         Task<bool> ExisteNotificacaoDoDiaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid? referenciaId, DateTime dataReferencia);
-        Task<int> CountNaoLidasAsync(Guid empresaId);
+        Task<int> CountNaoLidasAsync(Guid empresaId, Guid? usuarioId = null);
         Task AddAsync(Notificacao notificacao);
         Task UpdateAsync(Notificacao notificacao);
-        Task MarcarTodasComoLidasAsync(Guid empresaId);
+        Task MarcarTodasComoLidasAsync(Guid empresaId, Guid? usuarioId = null);
         Task DeleteAsync(Guid empresaId, Guid id);
     }
 

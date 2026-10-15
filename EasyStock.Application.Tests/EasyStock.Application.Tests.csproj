@@ -12,6 +12,7 @@
     <!-- DbUpdateConcurrencyException é usada em testes de contrato de infraestrutura -->
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.7" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.0.0" />
     <PackageReference Include="FluentAssertions" Version="8.9.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="NSubstitute" Version="5.3.0" />
@@ -27,6 +28,11 @@
     <ProjectReference Include="..\EasyStock.Application\EasyStock.Application.csproj" />
     <ProjectReference Include="..\EasyStock.Domain\EasyStock.Domain.csproj" />
     <ProjectReference Include="..\EasyStock.TestHelpers\EasyStock.TestHelpers.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Snapshot do system prompt do agente (S06). -->
+    <None Update="Services\Atendimento\*.snapshot.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

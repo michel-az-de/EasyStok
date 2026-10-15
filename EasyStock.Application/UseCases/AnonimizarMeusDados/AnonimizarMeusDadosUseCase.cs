@@ -1,3 +1,5 @@
+using EasyStock.Application.Ports.Output.Notifications;
+
 namespace EasyStock.Application.UseCases.AnonimizarMeusDados;
 
 public sealed record AnonimizarMeusDadosCommand(string ConfirmacaoTexto);
@@ -22,6 +24,8 @@ public sealed class AnonimizarMeusDadosUseCase(
     IRefreshTokenRepository refreshTokenRepository,
     IResetTokenRepository resetTokenRepository,
     IEmailConfirmationTokenRepository emailConfirmationTokenRepository,
+    IConsentimentoRepository consentimentoRepository,
+    IPreferenciaNotificacaoRepository preferenciaRepository,
     ICurrentUserAccessor currentUserAccessor,
     IUnitOfWork unitOfWork,
     ILogger<AnonimizarMeusDadosUseCase> logger)
@@ -45,6 +49,11 @@ public sealed class AnonimizarMeusDadosUseCase(
         var refreshRemovidos = await refreshTokenRepository.DeleteAllByUsuarioIdAsync(usuarioId);
         var resetRemovidos = await resetTokenRepository.DeleteAllByUsuarioIdAsync(usuarioId);
         var confirmacaoRemovidos = await emailConfirmationTokenRepository.DeleteAllByUsuarioIdAsync(usuarioId);
+
+        // N4: o contato some do usuario (Anonimizar) e o consentimento que o acompanhava tambem: opt-ins revogados, sem
+        // o IP de origem, e as preferencias de rotina apagadas.
+        await consentimentoRepository.RevogarPorAnonimizacaoAsync(usuarioId);
+        await preferenciaRepository.RemoverPorUsuarioAsync(usuarioId);
 
         usuario.Anonimizar();
         await usuarioRepository.UpdateAsync(usuario);

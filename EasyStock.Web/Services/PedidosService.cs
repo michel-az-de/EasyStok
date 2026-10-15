@@ -26,7 +26,10 @@ public class PedidosService(ApiClient api, SessionService session) : TenantServi
         string? status = null, Guid? clienteId = null,
         DateTime? desde = null, DateTime? ate = null, string? search = null, string? sort = null)
     {
-        var qs = $"pedidos?empresaId={GetEmpresaId()}&page=1&pageSize=500";
+        // issue 958: pedia 500, mas ListarPedidosUseCase clampa em 200 (Math.Clamp) — o
+        // excedente era truncado silenciosamente, sem erro nem sinal pro cockpit/KDS.
+        // Alinhado ao cap real ate a listagem virar paginacao server-side de verdade.
+        var qs = $"pedidos?empresaId={GetEmpresaId()}&page=1&pageSize=200";
         if (!string.IsNullOrEmpty(status)) qs += $"&status={Uri.EscapeDataString(status)}";
         if (clienteId.HasValue && clienteId.Value != Guid.Empty) qs += $"&clienteId={clienteId}";
         if (desde.HasValue) qs += $"&desde={Uri.EscapeDataString(desde.Value.ToString("o"))}";
@@ -133,8 +136,13 @@ public class PedidosService(ApiClient api, SessionService session) : TenantServi
     public Task<ApiResult<bool>> RemoverItemAsync(string id, string itemId) =>
         api.DeleteAsync($"pedidos/{id}/itens/{itemId}?empresaId={GetEmpresaId()}");
 
+    // issue 962: permitirExcedente=true SOMENTE quando o caller ja mostrou o aviso de
+    // gorjeta/arredondamento (Detail.cshtml). O cockpit chama com o default false --
+    // mantem o bloqueio duro la, onde o valor costuma vir pre-preenchido de uma listagem
+    // que pode estar desatualizada e o risco de fat-finger no balcao e maior.
     public Task<ApiResult<Pedido>> RegistrarPagamentoAsync(string id,
-        string metodo, decimal valor, string? referencia, string? observacao)
+        string metodo, decimal valor, string? referencia, string? observacao,
+        bool permitirExcedente = false, string? idempotencyKey = null)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Pedido>());
@@ -142,8 +150,8 @@ public class PedidosService(ApiClient api, SessionService session) : TenantServi
         return api.PostAsync<Pedido>($"pedidos/{id}/pagamentos", new
         {
             empresaId, pedidoId,
-            metodo, valor, referencia, observacao, origem = "web"
-        });
+            metodo, valor, referencia, observacao, origem = "web", permitirExcedente
+        }, idempotencyKey: idempotencyKey);
     }
 
     public Task<ApiResult<bool>> RemoverPagamentoAsync(string id, string pagamentoId) =>

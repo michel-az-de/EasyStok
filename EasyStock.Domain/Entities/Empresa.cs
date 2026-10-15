@@ -28,6 +28,18 @@ namespace EasyStock.Domain.Entities
         public bool OnboardingCompleto { get; set; } = false;
         public DateTime? OnboardingCompletoEm { get; set; }
 
+        /// <summary>
+        /// phone_number_id da Cloud API da Meta vinculado a esta empresa — usado pelo webhook
+        /// (S03) para rotear metadata.phone_number_id ate o tenant certo.
+        /// </summary>
+        public string? WhatsAppPhoneNumberId { get; set; }
+
+        /// <summary>Id da página do Facebook: roteia o webhook do Messenger pelo <c>recipient.id</c> (S35).</summary>
+        public string? FacebookPageId { get; set; }
+
+        /// <summary>Id da conta profissional do Instagram: roteia o webhook do Instagram pelo <c>recipient.id</c> (S35).</summary>
+        public string? InstagramAccountId { get; set; }
+
         public static Empresa Criar(string nome, string? documento)
         {
             var agora = DateTime.UtcNow;
@@ -46,6 +58,27 @@ namespace EasyStock.Domain.Entities
             if (OnboardingCompleto) return;
             OnboardingCompleto = true;
             OnboardingCompletoEm = DateTime.UtcNow;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
+        public void VincularWhatsApp(string phoneNumberId)
+        {
+            WhatsAppPhoneNumberId = phoneNumberId;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
+        /// <summary>Página do Facebook e conta do Instagram desta empresa (S35). Vazio desvincula.</summary>
+        public void VincularMensageriaMeta(string? facebookPageId, string? instagramAccountId)
+        {
+            FacebookPageId = string.IsNullOrWhiteSpace(facebookPageId) ? null : facebookPageId.Trim();
+            InstagramAccountId = string.IsNullOrWhiteSpace(instagramAccountId) ? null : instagramAccountId.Trim();
+            AlteradoEm = DateTime.UtcNow;
+        }
+
+        /// <summary>Tira o número da Meta da empresa: o webhook deixa de rotear para ela e o envio cai no número global.</summary>
+        public void DesvincularWhatsApp()
+        {
+            WhatsAppPhoneNumberId = null;
             AlteradoEm = DateTime.UtcNow;
         }
 

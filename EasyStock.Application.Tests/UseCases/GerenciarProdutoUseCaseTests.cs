@@ -17,14 +17,6 @@ public class GerenciarProdutoUseCaseTests
     private readonly FakeUnitOfWork _unitOfWork = new();
 
     private GerenciarProdutoUseCase CriarUseCase() => new(
-        _produtoRepository,
-        _categoriaRepository,
-        _variacaoRepository,
-        _caracteristicaRepository,
-        _embalagemRepository,
-        _itemEstoqueRepository,
-        _movimentacaoRepository,
-        _unitOfWork,
         new EasyStock.Application.UseCases.GerenciarProduto.Comandos.AtualizarLimiaresProdutoUseCase(_produtoRepository, _unitOfWork),
         new EasyStock.Application.UseCases.GerenciarProduto.Comandos.RemoverProdutoUseCase(_produtoRepository, _itemEstoqueRepository, _unitOfWork),
         new EasyStock.Application.UseCases.GerenciarProduto.Comandos.RestaurarProdutoUseCase(_produtoRepository, _unitOfWork),
@@ -189,6 +181,55 @@ public class GerenciarProdutoUseCaseTests
 
         await act.Should().ThrowAsync<UseCaseValidationException>()
             .WithMessage("*embalagem*padrao*");
+    }
+
+    [Fact]
+    public async Task Atualizar_com_embalagem_padrao_duplicada_nao_apaga_sub_entidades()
+    {
+        // #927: a validacao de embalagem padrao unica (e a de formato de SKU) roda ANTES
+        // de qualquer DeleteByProdutoAsync (ExecuteDelete auto-commitado). Antes, o delete das
+        // caracteristicas ja tinha rodado quando o Count>1 estourava -> caracteristicas perdidas
+        // e produto sem sub-entidades. Agora nada e apagado se a validacao falha.
+        var useCase = CriarUseCase();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+
+        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        {
+            Id = produtoId,
+            EmpresaId = empresaId,
+            CategoriaId = categoriaId,
+            Nome = "Produto",
+            Status = StatusProduto.Ativo
+        });
+        _categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria
+        {
+            Id = categoriaId,
+            EmpresaId = empresaId,
+            Nome = "Categoria"
+        });
+
+        var command = new AtualizarProdutoCommand(
+            empresaId, produtoId, categoriaId, null, "Produto",
+            null, null, TipoProduto.Fisico, null, null, false, null,
+            null, null, null, null, StatusProduto.Ativo,
+            new[] { new ProdutoCaracteristicaInput("Material", "Algodao", null, null, 0) },
+            new[]
+            {
+                new ProdutoEmbalagemInput("Caixa 1", null, null, true),
+                new ProdutoEmbalagemInput("Caixa 2", null, null, true)
+            },
+            null);
+
+        var act = () => useCase.AtualizarAsync(command);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*embalagem*padrao*");
+        // Nada foi apagado nem atualizado antes da validacao falhar.
+        await _caracteristicaRepository.DidNotReceive().DeleteByProdutoAsync(Arg.Any<Guid>(), Arg.Any<Guid>());
+        await _embalagemRepository.DidNotReceive().DeleteByProdutoAsync(Arg.Any<Guid>(), Arg.Any<Guid>());
+        await _produtoRepository.DidNotReceive().UpdateAsync(Arg.Any<Produto>());
+        _unitOfWork.CommitCount.Should().Be(0);
     }
 
     [Fact]

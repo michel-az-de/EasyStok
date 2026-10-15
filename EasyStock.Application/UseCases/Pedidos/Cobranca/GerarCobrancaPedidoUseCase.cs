@@ -1,0 +1,273 @@
+using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.Services.Pedidos;
+using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Exceptions.Storefront;
+using EasyStock.Domain.Sales;
+
+namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
+
+/// <summary>Reemissão ou cobrança de um pedido já gravado (job, troca de forma, operadora).</summary>
+/// <param name="NaEntregaSemProvedor">Pedido confirmado pela atendente (#1726): sem link possível, a dívida fica a receber na entrega em vez de falhar.</param>
+public sealed record GerarCobrancaPedidoInput(Guid EmpresaId, Guid PedidoId, Guid? ConversaId = null, int Tentativa = 1, bool CobrarSaldo = false,
+    bool NaEntregaSemProvedor = false);
+
+public sealed record CobrancaPedidoResult(
+    Guid CobrancaId,
+    Guid PedidoId,
+    string Provedor,
+    string Status,
+    string? LinkPagamento,
+    decimal Valor,
+    DateTime? ExpiraEm,
+    int Tentativa,
+    bool Reutilizada)
+{
+    public static CobrancaPedidoResult De(CobrancaPedido c, bool reutilizada = false) =>
+        new(c.Id, c.PedidoId, c.Provedor, c.Status.ToString(), c.LinkPagamento, c.Valor, c.ExpiraEm, c.Tentativa, reutilizada);
+}
+
+/// <summary>
+/// Cobra o pedido pelo Mercado Pago (S11): preferência do Checkout Pro com itens e frete,
+/// <c>external_reference = PedidoId</c>, expiração de 30 minutos e <c>X-Idempotency-Key</c>; grava a
+/// <see cref="CobrancaPedido"/> pendente e devolve o link. Um caminho só para o site
+/// (<c>IniciarCheckoutUseCase</c>, fase 3) e para a conversa (ferramenta <c>criar_pedido</c>).
+///
+/// <para>
+/// Idempotente: com uma cobrança online pendente e ainda válida, devolve a mesma sem chamar o Mercado
+/// Pago. Pendente vencida é marcada <c>Expirada</c> e nasce outra. A chave de idempotência é
+/// <c>{PedidoId}-{n}</c>, com <c>n</c> = número da cobrança no pedido: o retry da mesma chamada repete a
+/// chave (o Mercado Pago devolve a mesma preferência) e uma cobrança nova nunca reaproveita a anterior.
+/// </para>
+///
+/// <para>
+/// Falha ou timeout (5 s) do Mercado Pago: <see cref="MercadoPagoIndisponivelException"/>, nenhuma cobrança
+/// gravada. No pedido recém-reservado, a reserva é desfeita antes de relançar (#1301): pedido cancelado com
+/// motivo <c>mercado_pago_indisponivel</c> e vaga liberada, porque sem cobrança nenhum job o alcança.
+/// </para>
+/// </summary>
+public sealed class GerarCobrancaPedidoUseCase(
+    IPedidoRepository pedidoRepository,
+    IStorefrontRepository storefrontRepository,
+    ICobrancaPedidoRepository cobrancaRepository,
+    IMercadoPagoClient mercadoPagoClient,
+    CheckoutCoreService checkoutCore,
+    IUnitOfWork unitOfWork,
+    TimeProvider relogio,
+    ILogger<GerarCobrancaPedidoUseCase> logger,
+    SaldoFinanceiroPedido? saldoFinanceiro = null)
+{
+    public static readonly TimeSpan Validade = TimeSpan.FromMinutes(30);
+
+    /// <summary>Motivo gravado na pendente cancelada porque o total do pedido mudou (#1291).</summary>
+    public const string MotivoValorAlterado = "valor_do_pedido_alterado";
+    private static readonly TimeSpan MpTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Pedido recém-criado pelo núcleo do checkout (site ou conversa). Se o Mercado Pago não responde, desfaz a
+    /// reserva e relança <see cref="MercadoPagoIndisponivelException"/> (#1301).
+    /// </summary>
+    public async Task<CobrancaPedidoResult> ExecuteAsync(PedidoReservado reservado, Guid? conversaId, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(reservado);
+        var itens = reservado.Itens.Append(reservado.ItemFrete).ToList();
+        var dados = new DadosCobranca(
+            reservado.Pedido.EmpresaId, reservado.Pedido.Id, reservado.Storefront.Id,
+            reservado.Storefront.TituloPublico, reservado.Total, itens, reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm);
+        try
+        {
+            return await CobrarAsync(dados, conversaId, tentativa: 1, ct);
+        }
+        catch (MercadoPagoIndisponivelException)
+        {
+            await DesfazerReservaAsync(reservado);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Sem <see cref="CancellationToken"/> da requisição: a compensação roda mesmo se o cliente desistiu. Se ela
+    /// falhar, a resposta segue sendo a indisponibilidade do Mercado Pago e a varredura de abandonados cancela
+    /// o pedido depois de 30 minutos.
+    /// </summary>
+    private async Task DesfazerReservaAsync(PedidoReservado reservado)
+    {
+        try
+        {
+            await checkoutCore.DesfazerReservaAsync(
+                reservado, CheckoutCoreService.MotivoMercadoPagoIndisponivel, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Cobranca reserva-nao-desfeita pedidoId={PedidoId}", reservado.Pedido.Id);
+        }
+    }
+
+    /// <summary>
+    /// Reemissão pedida por uma pessoa (console). Trava o pedido antes de olhar as cobranças (#1724): sem a
+    /// trava, cliques simultâneos liam "sem pendente" e cada um criava um link pagável para o mesmo pedido.
+    /// </summary>
+    public Task<CobrancaPedidoResult> ExecuteComTravaAsync(GerarCobrancaPedidoInput input, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        return unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+        {
+            await pedidoRepository.TravarAsync(input.EmpresaId, input.PedidoId, token);
+            return await ExecuteAsync(input, token);
+        }, ct);
+    }
+
+    /// <summary>Pedido já gravado: carrega itens e frete do banco.</summary>
+    public async Task<CobrancaPedidoResult> ExecuteAsync(GerarCobrancaPedidoInput input, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        UseCaseGuards.EnsureEmpresaId(input.EmpresaId);
+        UseCaseGuards.EnsureNotEmpty(input.PedidoId, "PedidoId");
+
+        var pedido = await pedidoRepository.GetByIdWithDetailsAsync(input.EmpresaId, input.PedidoId)
+            ?? throw new CobrancaPedidoNaoEncontradoException(input.PedidoId);
+        if (PedidoStateMachine.EstaFinalizado(pedido.StatusEnum))
+            throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoFinalizado,
+                "Pedido cancelado ou entregue não recebe cobrança.");
+        // Mesma conta da confirmação (#1289): com os pagamentos cobrindo o total, o webhook trataria
+        // o pagamento deste link como duplicado e o devolveria sozinho.
+        var alocado = saldoFinanceiro is not null
+            ? (await saldoFinanceiro.ConsultarAsync(pedido, ct)).Alocado : pedido.TotalPago;
+        if (pedido.Total.Valor > 0m && alocado >= pedido.Total.Valor)
+            throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
+
+        var storefront = await storefrontRepository.GetByEmpresaAsync(input.EmpresaId, ct);
+        var dados = new DadosCobranca(
+            pedido.EmpresaId, pedido.Id, storefront?.Id ?? Guid.Empty, storefront?.TituloPublico ?? string.Empty,
+            pedido.Total.Valor, pedido.Itens.ToList(), pedido.AgendadoParaEm, pedido.CriadoEm, alocado, input.CobrarSaldo,
+            input.NaEntregaSemProvedor);
+        return await CobrarAsync(dados, input.ConversaId, input.Tentativa, ct);
+    }
+
+    private async Task<CobrancaPedidoResult> CobrarAsync(DadosCobranca dados, Guid? conversaId, int tentativa, CancellationToken ct)
+    {
+        var agora = relogio.GetUtcNow().UtcDateTime;
+        var valorCobrado = dados.CobrarSaldo ? dados.Total - dados.Alocado : PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, dados.CriadoEm)
+            ? PlanoPagamentoEncomenda.Sinal(dados.Total)
+            : dados.Total;
+        var existentes = await cobrancaRepository.ListarDoPedidoAsync(dados.EmpresaId, dados.PedidoId, ct);
+
+        if (!dados.CobrarSaldo && existentes.Any(c => c.Status == Domain.Enums.Pagamentos.StatusCobrancaPedido.Paga))
+            throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
+
+        var pendente = existentes.FirstOrDefault(c => c.EstaPendente);
+        if (pendente is not null && !pendente.EhOnline)
+        {
+            if (PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, dados.CriadoEm))
+            {
+                var saldoManual = dados.Total - dados.Alocado;
+                if (pendente.Valor == saldoManual) return CobrancaPedidoResult.De(pendente, reutilizada: true);
+                pendente.Cancelar(MotivoValorAlterado, agora);
+                var manual = CobrancaPedido.CriarNaEntrega(dados.EmpresaId, dados.PedidoId,
+                    saldoManual, agora, conversaId ?? pendente.ConversaId);
+                await cobrancaRepository.AddAsync(manual, ct);
+                await unitOfWork.CommitAsync();
+                return CobrancaPedidoResult.De(manual);
+            }
+            throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.FormaNaEntrega,
+                "O pedido está combinado para pagar na entrega; troque a forma para gerar link.");
+        }
+        if (pendente is not null && pendente.Venceu(agora))
+            pendente.Expirar(agora);
+        else if (pendente is not null && pendente.Valor != valorCobrado)
+            // #1291: item editado em AguardandoPagamento; o link antigo cobraria o valor velho.
+            pendente.Cancelar(MotivoValorAlterado, agora);
+        else if (pendente is not null)
+            return CobrancaPedidoResult.De(pendente, reutilizada: true);
+
+        var expiraEm = agora.Add(Validade);
+        var command = new CriarPreferenceCommand(
+            PedidoId: dados.PedidoId,
+            StorefrontId: dados.StorefrontId,
+            StorefrontNome: dados.StorefrontNome,
+            ValorTotal: valorCobrado,
+            Items: valorCobrado == dados.Total
+                ? dados.Itens.Where(i => i.PrecoUnitario > 0m).Select(ItemDaPreferencia).ToList()
+                : [new PreferenceItemCommand(dados.CobrarSaldo ? "Saldo da comanda" : "Sinal da encomenda (50%)", 1, valorCobrado)],
+            ExpiraEm: expiraEm,
+            IdempotencyKey: $"{dados.PedidoId:N}-{existentes.Count + 1}");
+
+        PreferenceCriadaResult preferencia;
+        try
+        {
+            preferencia = await CriarPreferenciaAsync(command, ct);
+        }
+        catch (MercadoPagoIndisponivelException ex) when (dados.NaEntregaSemProvedor
+            || (ex.InnerException is MercadoPagoNaoConfiguradoException
+                && PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, dados.CriadoEm)))
+        {
+            // Sem provedor configurado, a encomenda conserva a dívida e aguarda sinal externo, sem prazo de link.
+            // O pedido confirmado pela atendente faz o mesmo com o provedor fora: nunca nasce sem cobrança (#1726).
+            var manual = CobrancaPedido.CriarNaEntrega(dados.EmpresaId, dados.PedidoId,
+                dados.Total - dados.Alocado, agora, conversaId);
+            await cobrancaRepository.AddAsync(manual, ct);
+            await unitOfWork.CommitAsync();
+            return CobrancaPedidoResult.De(manual);
+        }
+
+        var cobranca = CobrancaPedido.CriarOnline(
+            dados.EmpresaId, dados.PedidoId, valorCobrado, preferencia.PreferenceId, preferencia.InitPointUrl,
+            expiraEm, tentativa, agora, conversaId, preferencia.ContaRecebedoraId);
+        if (dados.CobrarSaldo) cobranca.MarcarComplementar();
+        await cobrancaRepository.AddAsync(cobranca, ct);
+        await unitOfWork.CommitAsync();
+
+        logger.LogInformation(
+            "Cobranca pedido criada pedidoId={PedidoId} cobrancaId={CobrancaId} tentativa={Tentativa}",
+            dados.PedidoId, cobranca.Id, tentativa);
+        return CobrancaPedidoResult.De(cobranca);
+    }
+
+    /// <summary>
+    /// Item da preferência. O Mercado Pago só aceita quantidade inteira: item fracionário (1,5 kg) vai como
+    /// 1 unidade com o subtotal arredondado a 2 casas, e a soma da preferência fecha com o total (#1291).
+    /// </summary>
+    private static PreferenceItemCommand ItemDaPreferencia(PedidoItem item)
+    {
+        if (item.Quantidade == decimal.Truncate(item.Quantidade))
+            return new PreferenceItemCommand(item.Nome, (int)item.Quantidade, item.PrecoUnitario);
+
+        var subtotal = Math.Round(item.Quantidade * item.PrecoUnitario, 2, MidpointRounding.AwayFromZero);
+        return new PreferenceItemCommand(item.Nome, 1, subtotal);
+    }
+
+    private async Task<PreferenceCriadaResult> CriarPreferenciaAsync(CriarPreferenceCommand command, CancellationToken ct)
+    {
+        try
+        {
+            using var mpCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            mpCts.CancelAfter(MpTimeout);
+            return await mercadoPagoClient.CriarPreferenceAsync(command, mpCts.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            logger.LogError("Cobranca timeout-mp pedidoId={PedidoId} timeout={Timeout}s",
+                command.PedidoId, MpTimeout.TotalSeconds);
+            throw new MercadoPagoIndisponivelException(
+                "MercadoPago não respondeu no tempo limite. Tente novamente em instantes.");
+        }
+        catch (MercadoPagoNaoConfiguradoException ex)
+        {
+            // I3.1: "não configurado" é dito como tal, não como instabilidade do provedor.
+            logger.LogWarning("Cobranca mp-nao-configurado pedidoId={PedidoId}", command.PedidoId);
+            throw new MercadoPagoIndisponivelException(ex.Message, ex);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Cobranca erro-mp pedidoId={PedidoId}", command.PedidoId);
+            throw new MercadoPagoIndisponivelException("MercadoPago indisponível. Tente novamente em instantes.", ex);
+        }
+    }
+
+    private sealed record DadosCobranca(
+        Guid EmpresaId, Guid PedidoId, Guid StorefrontId, string StorefrontNome, decimal Total,
+        IReadOnlyList<PedidoItem> Itens, DateTime? AgendadoParaEm, DateTime CriadoEm, decimal Alocado = 0m, bool CobrarSaldo = false,
+        bool NaEntregaSemProvedor = false);
+}

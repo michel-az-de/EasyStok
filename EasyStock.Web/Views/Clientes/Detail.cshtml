@@ -71,7 +71,8 @@
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <!-- Coluna esquerda: dados primários (editáveis) ────────────── -->
     <div class="lg:col-span-1 space-y-4">
-        <div class="ws" x-data="{ editando: false }">
+        @* pessoaJuridica no x-data para o form de edição alternar os campos (ADR-0048). *@
+        <div class="ws" x-data="{ editando: false, pessoaJuridica: @(c.EhPessoaJuridica ? "true" : "false") }">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="font-semibold text-slate-900">Dados Cadastrais</h2>
                 <button type="button" @@click="editando = !editando" class="text-sm text-indigo-600 hover:text-indigo-700">
@@ -85,7 +86,9 @@
                     @if (!string.IsNullOrEmpty(c.Endereco)) { <div><dt class="text-slate-500">Endereço</dt><dd class="font-medium">@c.Endereco</dd></div> }
                     @if (!string.IsNullOrEmpty(c.Telefone)) { <div><dt class="text-slate-500">Telefone</dt><dd class="font-medium">@c.Telefone</dd></div> }
                     @if (!string.IsNullOrEmpty(c.Email))    { <div><dt class="text-slate-500">E-mail</dt><dd class="font-medium">@c.Email</dd></div> }
-                    @if (!string.IsNullOrEmpty(c.Documento)){ <div><dt class="text-slate-500">CPF/CNPJ</dt><dd class="font-medium">@c.Documento</dd></div> }
+                    @if (!string.IsNullOrEmpty(c.Documento)){ <div><dt class="text-slate-500">@(c.EhPessoaJuridica ? "CNPJ" : "CPF/CNPJ")</dt><dd class="font-medium">@c.Documento</dd></div> }
+                    @if (c.EhPessoaJuridica && !string.IsNullOrEmpty(c.NomeFantasia)) { <div><dt class="text-slate-500">Nome fantasia</dt><dd class="font-medium">@c.NomeFantasia</dd></div> }
+                    @if (c.EhPessoaJuridica && !string.IsNullOrEmpty(c.InscricaoEstadual)) { <div><dt class="text-slate-500">Inscrição estadual</dt><dd class="font-medium">@c.InscricaoEstadual</dd></div> }
                     @if (!string.IsNullOrEmpty(c.Observacoes)) { <div><dt class="text-slate-500">Observações</dt><dd class="font-medium whitespace-pre-line">@c.Observacoes</dd></div> }
                     @if (string.IsNullOrEmpty(c.Apt) && string.IsNullOrEmpty(c.Endereco) && string.IsNullOrEmpty(c.Telefone)
                         && string.IsNullOrEmpty(c.Email) && string.IsNullOrEmpty(c.Documento) && string.IsNullOrEmpty(c.Observacoes))
@@ -98,12 +101,25 @@
             <form asp-action="Editar" asp-controller="Clientes" asp-route-id="@c.Id" method="post" x-show="editando" x-cloak>
                 @Html.AntiForgeryToken()
                 <div class="space-y-3">
-                    <div><label for="cli-edit-nome" class="block text-xs text-slate-500 mb-1">Nome *</label><input id="cli-edit-nome" type="text" name="nome" value="@c.Nome" required class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    @* O hidden garante que "pessoa física" seja enviado quando o toggle está
+                       desmarcado — checkbox não marcado não vai no POST clássico. *@
+                    <input type="hidden" name="pessoaJuridica" :value="pessoaJuridica ? 'true' : 'false'" />
+                    <div class="flex gap-2">
+                        <button type="button" @@click="pessoaJuridica = false"
+                                :class="!pessoaJuridica ? 'filter-chip active' : 'filter-chip'"
+                                :aria-pressed="!pessoaJuridica ? 'true' : 'false'">Pessoa física</button>
+                        <button type="button" @@click="pessoaJuridica = true"
+                                :class="pessoaJuridica ? 'filter-chip active' : 'filter-chip'"
+                                :aria-pressed="pessoaJuridica ? 'true' : 'false'">Pessoa jurídica</button>
+                    </div>
+                    <div><label for="cli-edit-nome" class="block text-xs text-slate-500 mb-1"><span x-text="pessoaJuridica ? 'Razão social' : 'Nome'">Nome</span> *</label><input id="cli-edit-nome" type="text" name="nome" value="@c.Nome" required class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
                     <div><label for="cli-edit-apt" class="block text-xs text-slate-500 mb-1">Unidade</label><input id="cli-edit-apt" type="text" name="apt" value="@c.Apt" placeholder="Ex: 304B, Bloco 2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
                     <div><label for="cli-edit-endereco" class="block text-xs text-slate-500 mb-1">Endereço</label><input id="cli-edit-endereco" type="text" name="endereco" value="@c.Endereco" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
                     <div><label for="cli-edit-telefone" class="block text-xs text-slate-500 mb-1">Telefone</label><input id="cli-edit-telefone" type="text" name="telefone" value="@c.Telefone" data-mask="phone" inputmode="numeric" autocomplete="tel" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
                     <div><label for="cli-edit-email" class="block text-xs text-slate-500 mb-1">E-mail</label><input id="cli-edit-email" type="email" name="email" value="@c.Email" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
                     <div><label for="cli-edit-documento" class="block text-xs text-slate-500 mb-1">CPF/CNPJ</label><input id="cli-edit-documento" type="text" name="documento" value="@c.Documento" data-mask="doc" inputmode="numeric" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div x-show="pessoaJuridica" x-cloak><label for="cli-edit-fantasia" class="block text-xs text-slate-500 mb-1">Nome fantasia</label><input id="cli-edit-fantasia" type="text" name="nomeFantasia" value="@c.NomeFantasia" placeholder="Ex: Sul Bebidas" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div x-show="pessoaJuridica" x-cloak><label for="cli-edit-ie" class="block text-xs text-slate-500 mb-1">Inscrição estadual</label><input id="cli-edit-ie" type="text" name="inscricaoEstadual" value="@c.InscricaoEstadual" placeholder="ISENTO ou número" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
                     <div><label for="cli-edit-observacoes" class="block text-xs text-slate-500 mb-1">Observações</label><textarea id="cli-edit-observacoes" name="observacoes" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">@c.Observacoes</textarea></div>
                     <button type="submit" class="w-full app-primary-btn px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Salvar alterações</button>
                 </div>

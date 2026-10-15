@@ -1,5 +1,8 @@
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Tests.Helpers;
+using EasyStock.Domain.Enums.Financeiro;
+using EasyStock.Application.UseCases.Financeiro.Integracao;
 using EasyStock.Application.UseCases.Pedido;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Domain.Events;
@@ -11,7 +14,6 @@ namespace EasyStock.Application.Tests.UseCases;
 public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
 {
     private readonly IPedidoFornecedorRepository _pedidoRepository;
-    private readonly IPedidoFornecedorItemRepository _itemRepository;
     private readonly RegistrarEntradaEstoqueUseCase _entradaUseCase;
     private readonly IMovimentacaoEstoqueRepository _movimentacaoRepository;
     private readonly IUnitOfWork _unitOfWork;
@@ -25,9 +27,9 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
     public ProcessarRecebimentoPedidoFornecedorUseCaseTests()
     {
         _pedidoRepository = Substitute.For<IPedidoFornecedorRepository>();
-        _itemRepository = Substitute.For<IPedidoFornecedorItemRepository>();
         // RegistrarEntradaEstoqueUseCase é classe concreta com ExecuteAsync virtual: NSubstitute
         // exige todos os args do ctor (6 obrigatórios + 6 opcionais) para criar o proxy.
+        _unitOfWork = Substitute.For<IUnitOfWork>();
         _entradaUseCase = Substitute.For<RegistrarEntradaEstoqueUseCase>(
             Substitute.For<IProdutoRepository>(),
             Substitute.For<IProdutoVariacaoRepository>(),
@@ -35,15 +37,17 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
             Substitute.For<IMovimentacaoEstoqueRepository>(),
             _unitOfWork,
             Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>(),
-            null, null, null, null, null, null);
-        _unitOfWork = Substitute.For<IUnitOfWork>();
+            null, null, null, null, null);
         _movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         _logger = Substitute.For<ILogger<ProcessarRecebimentoPedidoFornecedorUseCase>>();
         _publicador = Substitute.For<IPublicadorEventos>();
 
+        // #1019: o use case agora envolve o corpo em ExecuteInTransactionSemRetryAsync.
+        // Sem este setup, o mock retorna default(T) e o corpo nunca executa.
+        _unitOfWork.SetupExecuteInTransactionSemRetry<ProcessarRecebimentoPedidoFornecedorResult>();
+
         _useCase = new ProcessarRecebimentoPedidoFornecedorUseCase(
             _pedidoRepository,
-            _itemRepository,
             _entradaUseCase,
             _movimentacaoRepository,
             _unitOfWork,
@@ -59,18 +63,6 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
         var itemId1 = Guid.NewGuid();
         var itemId2 = Guid.NewGuid();
         var dataRecebimento = new DateTime(2026, 5, 2, 12, 0, 0, DateTimeKind.Utc);
-
-        var pedido = new PedidoFornecedor
-        {
-            Id = pedidoId,
-            EmpresaId = _empresaId,
-            FornecedorId = _fornecedorId,
-            DataPedido = dataRecebimento.AddDays(-5),
-            Status = StatusPedidoFornecedor.Aberto,
-            CriadoEm = dataRecebimento.AddDays(-10),
-            AlteradoEm = dataRecebimento.AddDays(-10),
-            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "Fornecedor Teste", EmpresaId = _empresaId }
-        };
 
         var item1 = new PedidoFornecedorItem
         {
@@ -96,6 +88,19 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
             CriadoEm = dataRecebimento.AddDays(-10)
         };
 
+        var pedido = new PedidoFornecedor
+        {
+            Id = pedidoId,
+            EmpresaId = _empresaId,
+            FornecedorId = _fornecedorId,
+            DataPedido = dataRecebimento.AddDays(-5),
+            Status = StatusPedidoFornecedor.Aberto,
+            CriadoEm = dataRecebimento.AddDays(-10),
+            AlteradoEm = dataRecebimento.AddDays(-10),
+            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "Fornecedor Teste", EmpresaId = _empresaId },
+            Itens = { item1, item2 }
+        };
+
         var itensRecebidos = new Dictionary<Guid, decimal>
         {
             { itemId1, 10m },
@@ -108,9 +113,8 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
             dataRecebimento,
             itensRecebidos);
 
-        _pedidoRepository.GetByIdAsync(pedidoId).Returns(pedido);
-        _itemRepository.GetByPedidoIdAsync(pedidoId, Arg.Any<CancellationToken>())
-            .Returns(new[] { item1, item2 });
+        _pedidoRepository.GetByIdWithItensAsync(pedidoId, Arg.Any<CancellationToken>())
+            .Returns(pedido);
 
         var entradaResult = new RegistrarEntradaEstoqueResult(
             Guid.NewGuid(),
@@ -131,14 +135,8 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
         // Verifica chamadas ao entradaUseCase
         await _entradaUseCase.Received(2).ExecuteAsync(Arg.Any<RegistrarEntradaEstoqueCommand>());
 
-        // Verifica atualização dos itens
-        await _itemRepository.Received(2).UpdateAsync(Arg.Any<PedidoFornecedorItem>());
-
         // Verifica atualização do pedido
         await _pedidoRepository.Received(1).UpdateAsync(Arg.Any<PedidoFornecedor>());
-
-        // Verifica commit
-        await _unitOfWork.Received(1).CommitAsync();
 
         // Verifica publicação de eventos
         await _publicador.Received(2).PublicarAsync(Arg.Is<PedidoFornecedorItemRecebido>(e => true));
@@ -153,13 +151,6 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
         var itemId = Guid.NewGuid();
         var data = new DateTime(2026, 5, 2, 12, 0, 0, DateTimeKind.Utc);
 
-        var pedido = new PedidoFornecedor
-        {
-            Id = pedidoId, EmpresaId = _empresaId, FornecedorId = _fornecedorId,
-            DataPedido = data.AddDays(-5), Status = StatusPedidoFornecedor.Aberto,
-            CriadoEm = data.AddDays(-10), AlteradoEm = data.AddDays(-10),
-            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "F", EmpresaId = _empresaId }
-        };
         var item = new PedidoFornecedorItem
         {
             Id = itemId, PedidoFornecedorId = pedidoId, ProdutoId = _produtoId,
@@ -167,8 +158,16 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
             CriadoEm = data.AddDays(-10)
         };
 
-        _pedidoRepository.GetByIdAsync(pedidoId).Returns(pedido);
-        _itemRepository.GetByPedidoIdAsync(pedidoId, Arg.Any<CancellationToken>()).Returns(new[] { item });
+        var pedido = new PedidoFornecedor
+        {
+            Id = pedidoId, EmpresaId = _empresaId, FornecedorId = _fornecedorId,
+            DataPedido = data.AddDays(-5), Status = StatusPedidoFornecedor.Aberto,
+            CriadoEm = data.AddDays(-10), AlteradoEm = data.AddDays(-10),
+            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "F", EmpresaId = _empresaId },
+            Itens = { item }
+        };
+
+        _pedidoRepository.GetByIdWithItensAsync(pedidoId, Arg.Any<CancellationToken>()).Returns(pedido);
 
         var refDoc = $"{pedidoId}:{itemId}:r10";
         _movimentacaoRepository
@@ -182,8 +181,8 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
 
         // Nao recria a entrada (senao dobra estoque), mas persiste o total recebido.
         await _entradaUseCase.DidNotReceive().ExecuteAsync(Arg.Any<RegistrarEntradaEstoqueCommand>());
-        await _itemRepository.Received(1).UpdateAsync(Arg.Is<PedidoFornecedorItem>(i => i.QuantidadeRecebida == 10m));
-        await _unitOfWork.Received(1).CommitAsync();
+        await _pedidoRepository.Received(1).UpdateAsync(Arg.Is<PedidoFornecedor>(p =>
+            p.Itens.Single().QuantidadeRecebida == 10m));
     }
 
     [Fact]
@@ -193,18 +192,6 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
         var pedidoId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
         var dataRecebimento = new DateTime(2026, 5, 2, 12, 0, 0, DateTimeKind.Utc);
-
-        var pedido = new PedidoFornecedor
-        {
-            Id = pedidoId,
-            EmpresaId = _empresaId,
-            FornecedorId = _fornecedorId,
-            DataPedido = dataRecebimento.AddDays(-5),
-            Status = StatusPedidoFornecedor.Aberto,
-            CriadoEm = dataRecebimento.AddDays(-10),
-            AlteradoEm = dataRecebimento.AddDays(-10),
-            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "Fornecedor", EmpresaId = _empresaId }
-        };
 
         var itemSemProduto = new PedidoFornecedorItem
         {
@@ -218,15 +205,26 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
             CriadoEm = dataRecebimento.AddDays(-10)
         };
 
+        var pedido = new PedidoFornecedor
+        {
+            Id = pedidoId,
+            EmpresaId = _empresaId,
+            FornecedorId = _fornecedorId,
+            DataPedido = dataRecebimento.AddDays(-5),
+            Status = StatusPedidoFornecedor.Aberto,
+            CriadoEm = dataRecebimento.AddDays(-10),
+            AlteradoEm = dataRecebimento.AddDays(-10),
+            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "Fornecedor", EmpresaId = _empresaId },
+            Itens = { itemSemProduto }
+        };
+
         var comando = new ProcessarRecebimentoPedidoFornecedorCommand(
             pedidoId,
             _empresaId,
             dataRecebimento,
             new Dictionary<Guid, decimal> { { itemId, 5m } });
 
-        _pedidoRepository.GetByIdAsync(pedidoId).Returns(pedido);
-        _itemRepository.GetByPedidoIdAsync(pedidoId, Arg.Any<CancellationToken>())
-            .Returns(new[] { itemSemProduto });
+        _pedidoRepository.GetByIdWithItensAsync(pedidoId, Arg.Any<CancellationToken>()).Returns(pedido);
 
         // Act
         var resultado = await _useCase.ExecuteAsync(comando);
@@ -237,8 +235,105 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
         // Não deve chamar entradaUseCase
         await _entradaUseCase.DidNotReceive().ExecuteAsync(Arg.Any<RegistrarEntradaEstoqueCommand>());
 
-        // Mas deve atualizar o item com QuantidadeRecebida
-        await _itemRepository.Received(1).UpdateAsync(Arg.Is<PedidoFornecedorItem>(i => i.QuantidadeRecebida == 5m));
+        // O item deve ter QuantidadeRecebida atualizada
+        itemSemProduto.QuantidadeRecebida.Should().Be(5m);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RecusaRecebidoAcimaDoPedido_SemDarEntrada()
+    {
+        var pedidoId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var agora = new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc);
+        var item = new PedidoFornecedorItem
+        {
+            Id = itemId, PedidoFornecedorId = pedidoId, ProdutoId = _produtoId, Nome = "Farinha",
+            Quantidade = 10, QuantidadeRecebida = 0, CustoUnitario = 5m, CriadoEm = agora
+        };
+        var pedido = new PedidoFornecedor
+        {
+            Id = pedidoId, EmpresaId = _empresaId, FornecedorId = _fornecedorId, DataPedido = agora,
+            Status = StatusPedidoFornecedor.Aberto, CriadoEm = agora, AlteradoEm = agora,
+            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "Fornecedor", EmpresaId = _empresaId },
+            Itens = { item }
+        };
+        _pedidoRepository.GetByIdWithItensAsync(pedidoId, Arg.Any<CancellationToken>()).Returns(pedido);
+
+        // Um dígito a mais na tela: 1000 em vez de 10.
+        var acao = () => _useCase.ExecuteAsync(new ProcessarRecebimentoPedidoFornecedorCommand(
+            pedidoId, _empresaId, agora, new Dictionary<Guid, decimal> { { itemId, 1000m } }));
+
+        await acao.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*passa do pedido*");
+        await _entradaUseCase.DidNotReceive().ExecuteAsync(Arg.Any<RegistrarEntradaEstoqueCommand>());
+        item.QuantidadeRecebida.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ItemLegadoSobreRecebido_NaoTravaOutroItem()
+    {
+        var pedidoId = Guid.NewGuid();
+        var agora = new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc);
+        var legado = new PedidoFornecedorItem
+        {
+            Id = Guid.NewGuid(), PedidoFornecedorId = pedidoId, ProdutoId = _produtoId, Nome = "Antigo",
+            Quantidade = 10, QuantidadeRecebida = 12, CustoUnitario = 5m, CriadoEm = agora
+        };
+        var pendente = new PedidoFornecedorItem
+        {
+            Id = Guid.NewGuid(), PedidoFornecedorId = pedidoId, ProdutoId = _produtoId, Nome = "Novo",
+            Quantidade = 4, QuantidadeRecebida = 0, CustoUnitario = 5m, CriadoEm = agora
+        };
+        var pedido = new PedidoFornecedor
+        {
+            Id = pedidoId, EmpresaId = _empresaId, FornecedorId = _fornecedorId, DataPedido = agora,
+            Status = StatusPedidoFornecedor.RecebidoParcial, CriadoEm = agora, AlteradoEm = agora,
+            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "Fornecedor", EmpresaId = _empresaId },
+            Itens = { legado, pendente }
+        };
+        _pedidoRepository.GetByIdWithItensAsync(pedidoId, Arg.Any<CancellationToken>()).Returns(pedido);
+
+        var resultado = await _useCase.ExecuteAsync(new ProcessarRecebimentoPedidoFornecedorCommand(
+            pedidoId, _empresaId, agora, new Dictionary<Guid, decimal> { { pendente.Id, 4m } }));
+
+        resultado.ItensProcessados.Should().Be(1);
+        pendente.QuantidadeRecebida.Should().Be(4);
+    }
+
+    [Theory]
+    [InlineData(10, true)]
+    [InlineData(4, false)]
+    public async Task ExecuteAsync_FechandoORecebimento_GeraAContaAPagar(int recebido, bool deveGerar)
+    {
+        var pedidoId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var agora = new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc);
+        var item = new PedidoFornecedorItem
+        {
+            Id = itemId, PedidoFornecedorId = pedidoId, ProdutoId = _produtoId, Nome = "Farinha",
+            Quantidade = 10, QuantidadeRecebida = 0, CustoUnitario = 5m, CriadoEm = agora
+        };
+        var pedido = new PedidoFornecedor
+        {
+            Id = pedidoId, EmpresaId = _empresaId, FornecedorId = _fornecedorId, DataPedido = agora,
+            Status = StatusPedidoFornecedor.Aberto, CriadoEm = agora, AlteradoEm = agora,
+            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "Fornecedor", EmpresaId = _empresaId },
+            Itens = { item }
+        };
+        _pedidoRepository.GetByIdWithItensAsync(pedidoId, Arg.Any<CancellationToken>()).Returns(pedido);
+        _pedidoRepository.GetByIdAsync(pedidoId).Returns(pedido);
+        var contas = Substitute.For<IContaPagarRepository>();
+        var useCase = new ProcessarRecebimentoPedidoFornecedorUseCase(
+            _pedidoRepository, _entradaUseCase, _movimentacaoRepository, _unitOfWork, _logger, _publicador,
+            new GerarContaPagarDePedidoFornecedorUseCase(
+                contas, Substitute.For<ICategoriaFinanceiraRepository>(), Substitute.For<IConfiguracaoLojaRepository>(),
+                null!, Substitute.For<ILogger<GerarContaPagarDePedidoFornecedorUseCase>>()));
+
+        await useCase.ExecuteAsync(new ProcessarRecebimentoPedidoFornecedorCommand(
+            pedidoId, _empresaId, agora, new Dictionary<Guid, decimal> { { itemId, recebido } }));
+
+        // A primeira coisa que a geração faz é procurar a conta já criada para o pedido.
+        await contas.Received(deveGerar ? 1 : 0).GetByOrigemAsync(
+            _empresaId, OrigemContaFinanceira.PedidoFornecedor, pedidoId, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -248,18 +343,6 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
         var pedidoId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
         var dataRecebimento = new DateTime(2026, 5, 2, 12, 0, 0, DateTimeKind.Utc);
-
-        var pedido = new PedidoFornecedor
-        {
-            Id = pedidoId,
-            EmpresaId = _empresaId,
-            FornecedorId = _fornecedorId,
-            DataPedido = dataRecebimento.AddDays(-5),
-            Status = StatusPedidoFornecedor.Aberto,
-            CriadoEm = dataRecebimento.AddDays(-10),
-            AlteradoEm = dataRecebimento.AddDays(-10),
-            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "Fornecedor", EmpresaId = _empresaId }
-        };
 
         var item = new PedidoFornecedorItem
         {
@@ -273,15 +356,26 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
             CriadoEm = dataRecebimento.AddDays(-10)
         };
 
+        var pedido = new PedidoFornecedor
+        {
+            Id = pedidoId,
+            EmpresaId = _empresaId,
+            FornecedorId = _fornecedorId,
+            DataPedido = dataRecebimento.AddDays(-5),
+            Status = StatusPedidoFornecedor.Aberto,
+            CriadoEm = dataRecebimento.AddDays(-10),
+            AlteradoEm = dataRecebimento.AddDays(-10),
+            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "Fornecedor", EmpresaId = _empresaId },
+            Itens = { item }
+        };
+
         var comando = new ProcessarRecebimentoPedidoFornecedorCommand(
             pedidoId,
             _empresaId,
             dataRecebimento,
             new Dictionary<Guid, decimal> { { itemId, 0m } }); // Quantidade 0
 
-        _pedidoRepository.GetByIdAsync(pedidoId).Returns(pedido);
-        _itemRepository.GetByPedidoIdAsync(pedidoId, Arg.Any<CancellationToken>())
-            .Returns(new[] { item });
+        _pedidoRepository.GetByIdWithItensAsync(pedidoId, Arg.Any<CancellationToken>()).Returns(pedido);
 
         // Act
         var resultado = await _useCase.ExecuteAsync(comando);
@@ -314,7 +408,7 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
             dataRecebimento,
             new Dictionary<Guid, decimal>());
 
-        _pedidoRepository.GetByIdAsync(pedidoId).Returns(pedido);
+        _pedidoRepository.GetByIdWithItensAsync(pedidoId, Arg.Any<CancellationToken>()).Returns(pedido);
 
         // Act
         var resultado = await _useCase.ExecuteAsync(comando);
@@ -324,7 +418,7 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
         resultado.ItensProcessados.Should().Be(0);
 
         // Não deve prosseguir
-        await _itemRepository.DidNotReceive().GetByPedidoIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await _pedidoRepository.DidNotReceive().UpdateAsync(Arg.Any<PedidoFornecedor>());
     }
 
     [Fact]
@@ -347,7 +441,7 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
             DateTime.UtcNow,
             new Dictionary<Guid, decimal>());
 
-        _pedidoRepository.GetByIdAsync(pedidoId).Returns(pedido);
+        _pedidoRepository.GetByIdWithItensAsync(pedidoId, Arg.Any<CancellationToken>()).Returns(pedido);
 
         // Act & Assert
         await Assert.ThrowsAsync<UseCaseValidationException>(
@@ -374,7 +468,7 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
             DateTime.UtcNow,
             new Dictionary<Guid, decimal>());
 
-        _pedidoRepository.GetByIdAsync(pedidoId).Returns(pedido);
+        _pedidoRepository.GetByIdWithItensAsync(pedidoId, Arg.Any<CancellationToken>()).Returns(pedido);
 
         // Act & Assert
         await Assert.ThrowsAsync<RegraDeDominioVioladaException>(
@@ -389,18 +483,6 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
         var itemId = Guid.NewGuid();
         var dataRecebimento = new DateTime(2026, 5, 2, 12, 0, 0, DateTimeKind.Utc);
 
-        var pedido = new PedidoFornecedor
-        {
-            Id = pedidoId,
-            EmpresaId = _empresaId,
-            FornecedorId = _fornecedorId,
-            DataPedido = dataRecebimento.AddDays(-5),
-            Status = StatusPedidoFornecedor.Aberto,
-            CriadoEm = dataRecebimento.AddDays(-10),
-            AlteradoEm = dataRecebimento.AddDays(-10),
-            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "Fornecedor", EmpresaId = _empresaId }
-        };
-
         var item = new PedidoFornecedorItem
         {
             Id = itemId,
@@ -413,15 +495,26 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
             CriadoEm = dataRecebimento.AddDays(-10)
         };
 
+        var pedido = new PedidoFornecedor
+        {
+            Id = pedidoId,
+            EmpresaId = _empresaId,
+            FornecedorId = _fornecedorId,
+            DataPedido = dataRecebimento.AddDays(-5),
+            Status = StatusPedidoFornecedor.Aberto,
+            CriadoEm = dataRecebimento.AddDays(-10),
+            AlteradoEm = dataRecebimento.AddDays(-10),
+            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "Fornecedor", EmpresaId = _empresaId },
+            Itens = { item }
+        };
+
         var comando = new ProcessarRecebimentoPedidoFornecedorCommand(
             pedidoId,
             _empresaId,
             dataRecebimento,
             new Dictionary<Guid, decimal> { { itemId, 10m } });
 
-        _pedidoRepository.GetByIdAsync(pedidoId).Returns(pedido);
-        _itemRepository.GetByPedidoIdAsync(pedidoId, Arg.Any<CancellationToken>())
-            .Returns(new[] { item });
+        _pedidoRepository.GetByIdWithItensAsync(pedidoId, Arg.Any<CancellationToken>()).Returns(pedido);
 
         // Simula falha na entrada de estoque
         _entradaUseCase.ExecuteAsync(Arg.Any<RegistrarEntradaEstoqueCommand>())
@@ -440,18 +533,6 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
         var itemId = Guid.NewGuid();
         var dataRecebimento = new DateTime(2026, 5, 2, 12, 0, 0, DateTimeKind.Utc);
 
-        var pedido = new PedidoFornecedor
-        {
-            Id = pedidoId,
-            EmpresaId = _empresaId,
-            FornecedorId = _fornecedorId,
-            DataPedido = dataRecebimento.AddDays(-5),
-            Status = StatusPedidoFornecedor.Aberto,
-            CriadoEm = dataRecebimento.AddDays(-10),
-            AlteradoEm = dataRecebimento.AddDays(-10),
-            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "Fornecedor", EmpresaId = _empresaId }
-        };
-
         var item = new PedidoFornecedorItem
         {
             Id = itemId,
@@ -464,15 +545,26 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
             CriadoEm = dataRecebimento.AddDays(-10)
         };
 
+        var pedido = new PedidoFornecedor
+        {
+            Id = pedidoId,
+            EmpresaId = _empresaId,
+            FornecedorId = _fornecedorId,
+            DataPedido = dataRecebimento.AddDays(-5),
+            Status = StatusPedidoFornecedor.Aberto,
+            CriadoEm = dataRecebimento.AddDays(-10),
+            AlteradoEm = dataRecebimento.AddDays(-10),
+            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "Fornecedor", EmpresaId = _empresaId },
+            Itens = { item }
+        };
+
         var comando = new ProcessarRecebimentoPedidoFornecedorCommand(
             pedidoId,
             _empresaId,
             dataRecebimento,
             new Dictionary<Guid, decimal> { { itemId, 10m } });
 
-        _pedidoRepository.GetByIdAsync(pedidoId).Returns(pedido);
-        _itemRepository.GetByPedidoIdAsync(pedidoId, Arg.Any<CancellationToken>())
-            .Returns(new[] { item });
+        _pedidoRepository.GetByIdWithItensAsync(pedidoId, Arg.Any<CancellationToken>()).Returns(pedido);
 
         var entradaResult = new RegistrarEntradaEstoqueResult(
             Guid.NewGuid(),

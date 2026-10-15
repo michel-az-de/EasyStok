@@ -11,8 +11,6 @@ namespace EasyStock.Infra.Postgre.Repositories.Reporting;
 /// </summary>
 public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepository
 {
-    private static readonly TimeSpan DefaultLeaseDuration = TimeSpan.FromMinutes(5);
-
     // ── Leitura ───────────────────────────────────────────────────────────────
 
     public Task<ReportRun?> GetByIdAsync(Guid id, CancellationToken ct) =>
@@ -55,7 +53,7 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
             .OrderByDescending(r => r.EnqueuedAt)
             .FirstOrDefaultAsync(ct);
 
-    public Task<IReadOnlyList<ReportRun>> ListMineAsync(
+    public async Task<IReadOnlyList<ReportRun>> ListMineAsync(
         Guid?             empresaId,
         Guid              usuarioId,
         ReportListFilter  filter,
@@ -76,12 +74,11 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
         if (filter.Ate.HasValue)
             q = q.Where(r => r.EnqueuedAt <= filter.Ate.Value);
 
-        return q
+        return await q
             .OrderByDescending(r => r.EnqueuedAt)
             .Skip(skip)
             .Take(take)
-            .ToListAsync(ct)
-            .ContinueWith(t => (IReadOnlyList<ReportRun>)t.Result, ct);
+            .ToListAsync(ct);
     }
 
     public Task<int> CountRunningForOwnerAsync(
@@ -262,24 +259,31 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
 
     // ── GC de artefatos ───────────────────────────────────────────────────────
 
-    public async Task<int> PurgeExpiredArtifactsAsync(int batchSize, CancellationToken ct)
+    public async Task<IReadOnlyList<string>> PurgeExpiredArtifactsAsync(int batchSize, CancellationToken ct)
     {
-        // Carrega as runs elegíveis para GC
+        // Seleciona as runs elegíveis UMA vez, com ordem determinística (#929). Antes o
+        // watchdog fazia uma SEGUNDA query Take(batchSize) sem OrderBy para obter as storage
+        // keys, e o Postgres não garante o mesmo conjunto entre dois Take(N) quando há mais
+        // elegíveis que batchSize — arquivos deletados divergiam das linhas zeradas no DB.
         var expiredRuns = await db.ReportRuns
             .Where(r =>
                 r.Status == ReportStatus.Succeeded &&
                 r.ArtifactStorageKey != null &&
                 r.ExpiresAt < DateTimeOffset.UtcNow)
+            .OrderBy(r => r.ExpiresAt)
             .Take(batchSize)
             .ToListAsync(ct);
 
-        if (expiredRuns.Count == 0) return 0;
+        if (expiredRuns.Count == 0) return Array.Empty<string>();
+
+        // Captura as chaves ANTES de MarkArtifactPurged (que zera ArtifactStorageKey).
+        var storageKeys = expiredRuns.Select(r => r.ArtifactStorageKey!).ToList();
 
         foreach (var run in expiredRuns)
             run.MarkArtifactPurged();
 
         await db.SaveChangesAsync(ct);
-        return expiredRuns.Count;
+        return storageKeys;
     }
 
     public async Task<int> PurgeAllForTenantAsync(Guid empresaId, CancellationToken ct)

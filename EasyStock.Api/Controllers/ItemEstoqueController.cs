@@ -140,6 +140,7 @@ public class ItemEstoqueController(
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [Authorize(Policy = "Operador")]
     [HttpPost("entrada")]
     public async Task<IActionResult> RegistrarEntrada(RegistrarEntradaEstoqueCommand command)
     {
@@ -181,6 +182,7 @@ public class ItemEstoqueController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [Authorize(Policy = "Operador")]
     [HttpPost("saida")]
     public async Task<IActionResult> RegistrarSaida(RegistrarSaidaEstoqueCommand command)
     {
@@ -221,6 +223,7 @@ public class ItemEstoqueController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [Authorize(Policy = "Operador")]
     [HttpPost("reposicao")]
     public async Task<IActionResult> ReporEstoque(ReporEstoqueCommand command)
     {
@@ -236,6 +239,7 @@ public class ItemEstoqueController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [Authorize(Policy = "Gerente")]
     [HttpPost("estorno/{movimentacaoId}")]
     public async Task<IActionResult> Estornar(Guid movimentacaoId, [FromQuery] Guid empresaId, [FromBody] EstornarSaidaBody body)
     {

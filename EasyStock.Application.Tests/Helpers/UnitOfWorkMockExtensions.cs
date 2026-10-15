@@ -37,4 +37,21 @@ internal static class UnitOfWorkMockExtensions
             });
         return uow;
     }
+
+    // issue 952: analogo a SetupExecuteInTransaction<T>, mas pro metodo SEM retry
+    // (ExecuteInTransactionSemRetryAsync) -- usado por use cases com creates de Guid.NewGuid
+    // que nao podem ser reexecutados numa falha transitoria (RegistrarSaidaEstoque, issue 822).
+    public static IUnitOfWork SetupExecuteInTransactionSemRetry<T>(this IUnitOfWork uow)
+    {
+        uow.ExecuteInTransactionSemRetryAsync(
+                Arg.Any<Func<CancellationToken, Task<T>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var action = call.Arg<Func<CancellationToken, Task<T>>>();
+                var ct = call.Arg<CancellationToken>();
+                return action(ct);
+            });
+        return uow;
+    }
 }

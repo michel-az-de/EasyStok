@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Storefront.Pedidos;
+﻿namespace EasyStock.Application.UseCases.Storefront.Pedidos;
 
 /// <summary>
 /// DTO público de um pedido na listagem <c>GET /api/storefront/{slug}/pedidos</c>.
@@ -72,9 +72,12 @@ public sealed record PedidoStorefrontEnderecoDto(
     string? Cep);
 
 /// <summary>Avaliação do cliente — preenchida só quando o cliente respondeu pós-entrega.</summary>
+/// <param name="Estrelas">Null na avaliação de um toque pelo WhatsApp (S26); ver <paramref name="Resultado"/>.</param>
+/// <param name="Resultado">"positiva" | "negativa" na avaliação de um toque; null na de estrelas.</param>
 public sealed record PedidoStorefrontAvaliacaoDto(
-    int Estrelas,
-    string? Comentario);
+    int? Estrelas,
+    string? Comentario,
+    string? Resultado = null);
 
 /// <summary>Pagamento confirmado — o mais antigo de <c>Pedido.Pagamentos</c>. Null se ainda sem pagamento.</summary>
 /// <param name="Metodo">"pix" | "dinheiro" | "credito" | "debito" | "transferencia" | "outro".</param>

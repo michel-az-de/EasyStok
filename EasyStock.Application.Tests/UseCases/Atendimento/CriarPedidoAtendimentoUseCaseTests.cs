@@ -1,0 +1,359 @@
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.Tests.Services.Storefront;
+using EasyStock.Application.Tests.UseCases.Pedidos.Cobranca;
+using EasyStock.Application.UseCases.Atendimento;
+using EasyStock.Application.UseCases.CriarPedido;
+using EasyStock.Application.UseCases.Pedidos.Cobranca;
+using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Sales;
+
+namespace EasyStock.Application.Tests.UseCases.Atendimento;
+
+public class CriarPedidoAtendimentoUseCaseTests
+{
+    private static readonly DateTime Agora = new(2026, 6, 1, 15, 0, 0, DateTimeKind.Utc);
+
+    [Fact]
+    public async Task OrigemWhatsappEObservacaoPorItem()
+    {
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var empresaId = c.Storefront.EmpresaId;
+
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria" };
+        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true,
+            Logradouro = "Rua escolhida", Numero = "42", Bairro = "Centro", Cidade = "São Paulo", Estado = "SP" };
+        cliente.Endereco = "Rua do cadastro antigo, 10";
+        c.EntregaGeocoding.GeocodificarAsync(Arg.Any<EasyStock.Application.Ports.Output.Lookup.GeocodeQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new EasyStock.Application.Ports.Output.Lookup.GeocodeResultado(-23.55, -46.63, true));
+        cliente.Enderecos.Add(endereco);
+        var clienteRepo = Substitute.For<IClienteRepository>();
+        clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
+
+        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
+        var conversaRepo = Substitute.For<IConversaRepository>();
+        conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, unitOfWork);
+
+        var reservado = await useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
+            EmpresaId: empresaId,
+            ConversaId: conversa.Id,
+            ClienteId: cliente.Id,
+            Itens: new List<ItemPedidoCheckout> { new(c.CardapioItemId, 3, "sem granulado") },
+            JanelaId: c.JanelaId,
+            DataEntrega: c.DataEntrega,
+            EnderecoId: endereco.Id,
+            Observacoes: "tocar a campainha"));
+
+        var pedido = reservado.Pedido;
+        pedido.Origem.Should().Be(OrigemPedido.WhatsApp).And.Be("whatsapp");
+        pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+        pedido.ClienteId.Should().Be(cliente.Id);
+        pedido.Observacoes.Should().Be("tocar a campainha");
+        pedido.EnderecoEntrega.Should().Be("Rua escolhida, 42 - Centro, São Paulo - CEP 01310-100");
+        pedido.EntregaLat.Should().Be(-23.55);
+        pedido.EntregaLng.Should().Be(-46.63);
+        pedido.EnderecoConfirmadoEm.Should().Be(c.Relogio.GetUtcNow().UtcDateTime);
+        endereco.Logradouro = "Rua alterada depois";
+        cliente.Endereco = "Outro cadastro";
+        pedido.EnderecoEntrega.Should().Contain("Rua escolhida").And.NotContain("alterada");
+
+        var item = reservado.Itens.Should().ContainSingle().Subject;
+        item.CardapioItemId.Should().Be(c.CardapioItemId);
+        item.Nome.Should().Be("Brigadeiro");
+        item.PrecoUnitario.Should().Be(10m);
+        item.Observacao.Should().Be("sem granulado");
+
+        await c.VagaRepo.Received(1).OcuparAsync(c.JanelaId, c.DataEntrega, pedido.Id, Arg.Any<CancellationToken>());
+        conversa.PedidoEmAndamentoId.Should().Be(pedido.Id);
+        await unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task PedidoNasceComNomeTelefoneEAptoDoCliente()
+    {
+        // #1474 B4: sem o retrato do cliente, o KDS e as Entregas mostravam "Cliente sem nome".
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var empresaId = c.Storefront.EmpresaId;
+
+        var cliente = new Cliente
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria Souza", Telefone = "+5511999998888", Apt = "12B"
+        };
+        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true };
+        cliente.Enderecos.Add(endereco);
+        var clienteRepo = Substitute.For<IClienteRepository>();
+        clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
+
+        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
+        var conversaRepo = Substitute.For<IConversaRepository>();
+        conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, Substitute.For<IUnitOfWork>());
+
+        var reservado = await useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
+            EmpresaId: empresaId,
+            ConversaId: conversa.Id,
+            ClienteId: cliente.Id,
+            Itens: new List<ItemPedidoCheckout> { new(c.CardapioItemId, 1) },
+            JanelaId: c.JanelaId,
+            DataEntrega: c.DataEntrega,
+            EnderecoId: endereco.Id));
+
+        reservado.Pedido.ClienteNome.Should().Be("Maria Souza");
+        reservado.Pedido.ClienteTelefone.Should().Be("+5511999998888");
+        reservado.Pedido.ClienteApt.Should().Be("12B");
+    }
+
+    [Fact]
+    public async Task ConversaDeOutroCliente_RecusaSemCriarPedido()
+    {
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var empresaId = c.Storefront.EmpresaId;
+
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria" };
+        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true };
+        cliente.Enderecos.Add(endereco);
+        var clienteRepo = Substitute.For<IClienteRepository>();
+        clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
+
+        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Joana", Guid.NewGuid());
+        var conversaRepo = Substitute.For<IConversaRepository>();
+        conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, unitOfWork);
+
+        var act = () => useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
+            EmpresaId: empresaId,
+            ConversaId: conversa.Id,
+            ClienteId: cliente.Id,
+            Itens: new List<ItemPedidoCheckout> { new(c.CardapioItemId, 1) },
+            JanelaId: c.JanelaId,
+            DataEntrega: c.DataEntrega,
+            EnderecoId: endereco.Id));
+
+        var erro = await act.Should().ThrowAsync<RegraDeDominioVioladaException>();
+        // #1474: o console mostra o detail para a dona; nada de GUID na mensagem.
+        erro.Which.Message.Should().NotContain(cliente.Id.ToString()).And.NotContain(conversa.Id.ToString());
+        await c.VagaRepo.DidNotReceiveWithAnyArgs().OcuparAsync(default, default, default, default);
+        conversa.PedidoEmAndamentoId.Should().BeNull();
+        await unitOfWork.DidNotReceive().CommitAsync();
+    }
+    [Fact]
+    public async Task EnderecoDeOutroCliente_RecusaComTextoHumano()
+    {
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var empresaId = c.Storefront.EmpresaId;
+
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria" };
+        cliente.Enderecos.Add(new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true });
+        var clienteRepo = Substitute.For<IClienteRepository>();
+        clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
+
+        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
+        var conversaRepo = Substitute.For<IConversaRepository>();
+        conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, Substitute.For<IUnitOfWork>());
+        var enderecoAlheio = Guid.NewGuid();
+
+        var act = () => useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
+            EmpresaId: empresaId,
+            ConversaId: conversa.Id,
+            ClienteId: cliente.Id,
+            Itens: new List<ItemPedidoCheckout> { new(c.CardapioItemId, 1) },
+            JanelaId: c.JanelaId,
+            DataEntrega: c.DataEntrega,
+            EnderecoId: enderecoAlheio));
+
+        var erro = await act.Should().ThrowAsync<RegraDeDominioVioladaException>();
+        erro.Which.Message.Should().Contain("endereço").And.NotContain(enderecoAlheio.ToString());
+    }
+
+    [Fact]
+    public async Task JanelaAbaixoDoPrazoDaConfiguracao_Recusa()
+    {
+        // S16: janela 9-12h no dia da entrega; agora 08:00 em Brasília; padrão 60 + respiro 40 → 09:40.
+        var c = new CheckoutCoreServiceTests.Cenario();
+        c.Relogio.Advance(new DateTimeOffset(2026, 6, 2, 11, 0, 0, TimeSpan.Zero) - c.Relogio.GetUtcNow());
+        var empresaId = c.Storefront.EmpresaId;
+
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria" };
+        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true };
+        cliente.Enderecos.Add(endereco);
+        var clienteRepo = Substitute.For<IClienteRepository>();
+        clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
+
+        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
+        var conversaRepo = Substitute.For<IConversaRepository>();
+        conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, unitOfWork);
+
+        var act = () => useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
+            EmpresaId: empresaId,
+            ConversaId: conversa.Id,
+            ClienteId: cliente.Id,
+            Itens: new List<ItemPedidoCheckout> { new(c.CardapioItemId, 1) },
+            JanelaId: c.JanelaId,
+            DataEntrega: c.DataEntrega,
+            EnderecoId: endereco.Id));
+
+        (await act.Should().ThrowAsync<RegraDeDominioVioladaException>()).WithMessage(CheckoutCoreService.JanelaAbaixoDoPrazo);
+        conversa.PedidoEmAndamentoId.Should().BeNull();
+        await unitOfWork.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task RecusaBloqueado()
+    {
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var empresaId = c.Storefront.EmpresaId;
+
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria" };
+        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true };
+        cliente.Enderecos.Add(endereco);
+        cliente.Bloquear("não pagou", Agora);
+        var clienteRepo = Substitute.For<IClienteRepository>();
+        clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
+
+        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
+        var conversaRepo = Substitute.For<IConversaRepository>();
+        conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, unitOfWork);
+
+        var act = () => useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
+            EmpresaId: empresaId,
+            ConversaId: conversa.Id,
+            ClienteId: cliente.Id,
+            Itens: new List<ItemPedidoCheckout> { new(c.CardapioItemId, 1) },
+            JanelaId: c.JanelaId,
+            DataEntrega: c.DataEntrega,
+            EnderecoId: endereco.Id));
+
+        (await act.Should().ThrowAsync<ClienteBloqueadoException>())
+            .Which.Codigo.Should().Be("cliente_bloqueado");
+        await c.VagaRepo.DidNotReceiveWithAnyArgs().OcuparAsync(default, default, default, default);
+        conversa.PedidoEmAndamentoId.Should().BeNull();
+        await unitOfWork.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task ForaDeAreaLiberado_PedidoRequerAprovacao()
+    {
+        var (reservado, _) = await CriarNaConversa(foraDeAreaLiberado: true);
+
+        reservado.Pedido.RequerAprovacao.Should().BeTrue("a dona liberou o lead fora de área (S14)");
+        reservado.Pedido.MotivoRequerAprovacao.Should().Be(CriarPedidoAtendimentoUseCase.MotivoForaDeArea);
+    }
+
+    [Fact]
+    public async Task SemLiberacao_PedidoNaoRequerAprovacao()
+    {
+        var (reservado, _) = await CriarNaConversa(foraDeAreaLiberado: null);
+
+        reservado.Pedido.RequerAprovacao.Should().BeFalse();
+        reservado.Pedido.MotivoRequerAprovacao.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ForaDeAreaLiberado_PagoVaiParaAprovacaoDaBaba()
+    {
+        var (reservado, _) = await CriarNaConversa(foraDeAreaLiberado: true);
+        var f = new CobrancaPedidoFixture(pedido: reservado.Pedido);
+        f.AdicionarOnline();
+
+        var r = await f.Confirmar().ExecuteAsync(new ConfirmarPagamentoPedidoInput(
+            reservado.Pedido.Id, PagamentoExternoId: "pay-1", StatusPagamento: "approved",
+            ValorPago: reservado.Pedido.Total.Valor, MetodoPagamentoExterno: "pix",
+            TipoPagamentoExterno: "bank_transfer", PagoEm: CobrancaPedidoFixture.Agora));
+
+        r.Confirmado.Should().BeTrue();
+        reservado.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoAprovacaoBaba,
+            "pedido fora de área pago espera a dona, não vai direto para a cozinha");
+    }
+
+    [Fact]
+    public async Task MarcaDestinatarioComoPediu()
+    {
+        // S30: quem recebeu campanha nos últimos 7 dias e pede pela conversa conta como conversão.
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var empresaId = c.Storefront.EmpresaId;
+
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria" };
+        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true };
+        cliente.Enderecos.Add(endereco);
+        var clienteRepo = Substitute.For<IClienteRepository>();
+        clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
+
+        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
+        var conversaRepo = Substitute.For<IConversaRepository>();
+        conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        var agora = c.Relogio.GetUtcNow().UtcDateTime;
+        var campanha = EasyStock.Domain.Entities.Campanhas.Campanha.Criar(empresaId, Guid.NewGuid(),
+            new EasyStock.Domain.Entities.Campanhas.DadosCampanha("Bolo de fubá", "Oi {{nome}}", null, null,
+                EasyStock.Domain.Entities.Campanhas.FiltroCampanha.ParaTodos, [], null, false, null),
+            agora.AddDays(-3));
+        var destinatario = EasyStock.Domain.Entities.Campanhas.CampanhaDestinatario.Criar(campanha, cliente.Id);
+        destinatario.Enfileirar(1, Guid.NewGuid());
+        destinatario.MarcarEnviado(agora.AddDays(-2));
+        c.CampanhaRepo.ObterEnviadoParaAtribuirAsync(empresaId, cliente.Id, agora.AddDays(-7), Arg.Any<CancellationToken>())
+            .Returns(destinatario);
+
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, unitOfWork);
+
+        var reservado = await useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
+            EmpresaId: empresaId,
+            ConversaId: conversa.Id,
+            ClienteId: cliente.Id,
+            Itens: new List<ItemPedidoCheckout> { new(c.CardapioItemId, 1) },
+            JanelaId: c.JanelaId,
+            DataEntrega: c.DataEntrega,
+            EnderecoId: endereco.Id));
+
+        destinatario.Status.Should().Be(EasyStock.Domain.Enums.Campanhas.StatusCampanhaDestinatario.Pediu);
+        destinatario.PedidoId.Should().Be(reservado.Pedido.Id);
+        await unitOfWork.Received(1).CommitAsync();
+    }
+
+    private static async Task<(PedidoReservado Reservado, Conversa Conversa)> CriarNaConversa(bool? foraDeAreaLiberado)
+    {
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var empresaId = c.Storefront.EmpresaId;
+
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria" };
+        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true };
+        cliente.Enderecos.Add(endereco);
+        var clienteRepo = Substitute.For<IClienteRepository>();
+        clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
+
+        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
+        ContextoConversaJson.Gravar(conversa, ContextoConversaJson.ForaDeAreaLiberado, foraDeAreaLiberado);
+        var conversaRepo = Substitute.For<IConversaRepository>();
+        conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, Substitute.For<IUnitOfWork>());
+
+        var reservado = await useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
+            EmpresaId: empresaId,
+            ConversaId: conversa.Id,
+            ClienteId: cliente.Id,
+            Itens: new List<ItemPedidoCheckout> { new(c.CardapioItemId, 2) },
+            JanelaId: c.JanelaId,
+            DataEntrega: c.DataEntrega,
+            EnderecoId: endereco.Id));
+
+        return (reservado, conversa);
+    }
+}

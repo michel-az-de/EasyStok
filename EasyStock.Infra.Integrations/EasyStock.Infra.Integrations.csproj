@@ -12,6 +12,7 @@
          por categoria (payments, fiscal, marketplace, logistics). Logging e
          DependencyInjection.Abstractions vêm transitive via EasyStock.Application
          (10.0.5) — não fixar aqui pra evitar downgrade. -->
+    <PackageReference Include="Google.Apis.Auth" Version="1.77.0" />
     <PackageReference Include="Polly.Core" Version="8.5.2" />
     <PackageReference Include="Microsoft.Extensions.Resilience" Version="10.1.0" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.1.0" />
@@ -19,7 +20,7 @@
     <!-- CVE sweep: DataProtection 9.0.0 traz Xml 9.0.0 transitiva (GHSA-37gx-xxp4-5rgx /
          GHSA-w3x6-4m5h-cxqf, HIGH). Override top-level cobre Api/Worker/IntegrationTests
          que tem este projeto na cadeia. -->
-    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.7" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.13" />
     <PackageReference Include="Scrutor" Version="5.0.2" />
   </ItemGroup>
 

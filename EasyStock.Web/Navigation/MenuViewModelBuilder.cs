@@ -5,7 +5,14 @@ namespace EasyStock.Web.Navigation;
 /// da rota atual, do ActiveMenuItem legado, dos favoritos e dos badges. Toda a
 /// logica testavel do menu vive aqui (ADR-0032). Pipeline na ordem (P1-6):
 /// (1) filtra a arvore pela flag KDS; (2) resolve ativo e favoritos contra a arvore
-/// JA filtrada (favorito orfao some sozinho).
+/// JA filtrada (favorito orfao some sozinho); (2b) filtra os grupos pelo modulo ativo,
+/// so para apresentacao (ADR-0046).
+///
+/// <para>
+/// A ordem importa: o filtro de KDS DESCARTA (item que nao existe para o tenant), o de
+/// modulo apenas ESCONDE. Por isso ativo e favoritos sao resolvidos antes do (2b) —
+/// "Meu dia" e lista de salto cross-modulo e continua clicavel de dentro de qualquer modulo.
+/// </para>
 /// </summary>
 public static class MenuViewModelBuilder
 {
@@ -16,25 +23,44 @@ public static class MenuViewModelBuilder
         string? activeMenuItem,
         IReadOnlyList<string>? favoritosKeys,
         MenuBadges? badges,
-        bool kdsHabilitado)
+        bool kdsHabilitado,
+        string? moduloAtivo = null,
+        IReadOnlySet<string>? featuresAtivas = null)
     {
         badges ??= MenuBadges.Zero;
 
-        // (1) filtra a arvore pela flag KDS — itens de producao somem quando off.
-        bool Visible(MenuItem i) => kdsHabilitado || !i.IsProducaoKds;
+        bool Visible(MenuItem i) => ItemVisivel(i, kdsHabilitado, featuresAtivas);
 
-        var groups = MenuDefinition.Groups
+        var todosGrupos = MenuDefinition.Groups
             .Select(g => (group: g, items: g.Items.Where(Visible).ToList()))
             .ToList();
 
-        // Itens navegaveis visiveis (Dashboard + grupos filtrados + rodape): base do
-        // matching e da resolucao de favoritos.
+        // Itens navegaveis visiveis (Dashboard + TODOS os grupos + rodape): base do
+        // matching e da resolucao de favoritos, ANTES do filtro de modulo.
         var navigable = new List<MenuItem> { MenuDefinition.Dashboard };
-        navigable.AddRange(groups.SelectMany(x => x.items));
+        navigable.AddRange(todosGrupos.SelectMany(x => x.items));
         navigable.AddRange(MenuDefinition.Footer);
 
         // (2) item ativo: rota por segmentos; fallback ActiveMenuItem legado.
         var activeKey = ResolveActive(navigable, currentPath, activeMenuItem);
+
+        // (2b) modulo ativo (ADR-0046): renderiza apenas o grupo daquele modulo.
+        // 'admin' e o rodape, que nao e grupo — nenhum grupo aparece. Modulo nulo ou
+        // desconhecido mantem o menu inteiro (fail-open).
+        var groups = todosGrupos;
+        if (!string.IsNullOrEmpty(moduloAtivo))
+        {
+            if (moduloAtivo == ModuloDefinition.ModuloAdmin)
+            {
+                groups = [];
+            }
+            else
+            {
+                var grupoEsperado = ModuloDefinition.GrupoDoModulo(moduloAtivo);
+                if (!string.IsNullOrEmpty(grupoEsperado))
+                    groups = todosGrupos.Where(x => x.group.Key == grupoEsperado).ToList();
+            }
+        }
 
         // Grupo que contem o ativo (accordion exclusivo abre esse no load).
         var activeGroupKey = groups
@@ -80,6 +106,25 @@ public static class MenuViewModelBuilder
             groupViews,
             MenuDefinition.Footer.Select(ToView).ToList(),
             activeKey);
+    }
+
+    /// <summary>
+    /// Item existe para este tenant? Combina os dois filtros que DESCARTAM (ao contrário do
+    /// filtro de módulo, que só esconde): a flag KDS da loja e as features do tenant
+    /// (ADR-0048). Por serem descarte, favorito órfão some sozinho — a resolução de
+    /// "Meu dia" acontece depois.
+    ///
+    /// <para>
+    /// <paramref name="featuresAtivas"/> null significa que não conseguimos perguntar à Api;
+    /// nesse caso o item gated some (<b>fail-closed</b>). Item sem feature exigida nunca é
+    /// afetado, então uma indisponibilidade não esvazia o menu de quem não usa módulo gated.
+    /// </para>
+    /// </summary>
+    public static bool ItemVisivel(MenuItem item, bool kdsHabilitado, IReadOnlySet<string>? featuresAtivas)
+    {
+        if (item.IsProducaoKds && !kdsHabilitado) return false;
+        if (item.RequerFeature is null) return true;
+        return featuresAtivas?.Contains(item.RequerFeature) ?? false;
     }
 
     /// <summary>

@@ -14,6 +14,11 @@ public class IdempotencyKeyConfiguration : IEntityTypeConfiguration<IdempotencyK
         // cobrir respostas grandes; provider gerencia toast/text.
         builder.Property(x => x.RespostaJson).HasColumnType("text");
 
+        // issue 917 Fase B: colunas do modelo INSERT-first.
+        builder.Property(x => x.Status).HasConversion<int>().IsRequired();
+        builder.Property(x => x.PayloadHash).HasMaxLength(64); // SHA-256 hex = 64 chars
+        builder.Property(x => x.LockedAtUtc).IsRequired();
+
         // Constraint principal: a tripla (Key, EmpresaId, MetodoRecurso) e' unica.
         // Com isso, mesmo cliente reenviando o mesmo Idempotency-Key para um
         // recurso diferente nao faz colisao.

@@ -1,9 +1,17 @@
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
+using EasyStock.Application.Ports.Output.Integration;
+using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.AdicionarItemPedido;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
+using EasyStock.Application.UseCases.Pedidos;
+using EasyStock.Application.UseCases.RemoverItemPedido;
 using EasyStock.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 
@@ -19,22 +27,47 @@ public class PedidoUseCasesTests
     private readonly IPedidoRepository _pedidoRepo = Substitute.For<IPedidoRepository>();
     private readonly IClienteRepository _clienteRepo = Substitute.For<IClienteRepository>();
     private readonly IProdutoRepository _produtoRepo = Substitute.For<IProdutoRepository>();
+    private readonly IItemEstoqueRepository _itemEstoqueRepo = Substitute.For<IItemEstoqueRepository>();
+    private readonly IMovimentacaoEstoqueRepository _movRepo = Substitute.For<IMovimentacaoEstoqueRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IContaReceberRepository _contaReceberRepo = Substitute.For<IContaReceberRepository>();
+    private readonly ICobrancaPedidoRepository _cobrancaRepo = Substitute.For<ICobrancaPedidoRepository>();
+    private readonly IPublicadorEventoIntegracao _publicador = Substitute.For<IPublicadorEventoIntegracao>();
+    private readonly IOperacaoEventPublisher _operacaoEventos = Substitute.For<IOperacaoEventPublisher>();
+    private readonly EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository _vagaRepo =
+        Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>();
+
+    public PedidoUseCasesTests()
+    {
+        // issue 951: RegistrarPagamentoPedidoUseCase passou a rodar dentro de
+        // uow.ExecuteInTransactionSemRetryAsync (flush isolado da abertura automática de
+        // caixa). NSubstitute não invoca o lambda de um método genérico não configurado —
+        // sem isto o corpo da transação nunca roda e os asserts de TotalPago/evento ficam
+        // falso-negativos (mesmo pitfall documentado em EasyStock.TestHelpers.FakeUnitOfWork).
+        _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<PedidoResult>>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task<PedidoResult>>>()(ci.Arg<CancellationToken>()));
+    }
+
+    // Service real com repos de estoque mockados (sealed -> não mockável direto);
+    // permite asserir movimentações de estoque emitidas pelos use cases (#939).
+    private PedidoEstoqueIntegrationService EstoqueSvc() => new(
+        _itemEstoqueRepo, _movRepo,
+        Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(),
+        Microsoft.Extensions.Options.Options.Create(new PedidoEstoqueOptions()),
+        Substitute.For<ILogger<PedidoEstoqueIntegrationService>>());
 
     private CriarPedidoUseCase CriarPedidoUC() => new(_pedidoRepo, _clienteRepo, _produtoRepo, _uow,
-        Substitute.For<ILogger<CriarPedidoUseCase>>());
-    private CancelarPedidoUseCase CancelarUC() => new(_pedidoRepo,
-        new PedidoEstoqueIntegrationService(
-            Substitute.For<IItemEstoqueRepository>(),
-            Substitute.For<IMovimentacaoEstoqueRepository>(),
-            Microsoft.Extensions.Options.Options.Create(new PedidoEstoqueOptions()),
-            Substitute.For<ILogger<PedidoEstoqueIntegrationService>>()),
-        Substitute.For<IContaReceberRepository>(),
-        _uow, Substitute.For<ILogger<CancelarPedidoUseCase>>());
+        Substitute.For<ILogger<CriarPedidoUseCase>>(), new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()), EnderecoEntregaPedidoTeste.Criar());
+    private CancelarPedidoUseCase CancelarUC() => new(_pedidoRepo, EstoqueSvc(),
+        new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(_contaReceberRepo, _vagaRepo,
+            Substitute.For<ILogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>>()),
+        _uow, Substitute.For<ILogger<CancelarPedidoUseCase>>(), _cobrancaRepo, _publicador, _operacaoEventos);
     private RegistrarPagamentoPedidoUseCase PagamentoUC() => new(_pedidoRepo, _uow,
-        Substitute.For<ILogger<RegistrarPagamentoPedidoUseCase>>());
-    private AdicionarItemPedidoUseCase AdicionarItemUC() => new(_pedidoRepo, _produtoRepo, _uow,
+        Substitute.For<ILogger<RegistrarPagamentoPedidoUseCase>>(), new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()), QuitacaoPedidoTeste.Criar(_pedidoRepo));
+    private AdicionarItemPedidoUseCase AdicionarItemUC() => new(_pedidoRepo, _produtoRepo, EstoqueSvc(), _uow,
         Substitute.For<ILogger<AdicionarItemPedidoUseCase>>());
+    private RemoverItemPedidoUseCase RemoverItemUC() => new(_pedidoRepo, EstoqueSvc(), _uow,
+        Substitute.For<ILogger<RemoverItemPedidoUseCase>>());
 
     private static Produto ProdutoComStatus(Guid empresaId, Guid id, StatusProduto status) => new()
     {
@@ -84,6 +117,101 @@ public class PedidoUseCasesTests
         var result = await AdicionarItemUC().ExecuteAsync(cmd);
 
         result.Should().BeNull();
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // #939: mutação de itens em pedido já com estoque descontado ('pronto')
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact] // Adicionar item a pedido 'pronto' (estoque já descontado) deve baixar o item novo.
+    public async Task AdicionarItem_EmPedidoPronto_BaixaEstoqueDoItemNovo()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        _produtoRepo.GetByIdAsync(empresaId, produtoId)
+            .Returns(ProdutoComStatus(empresaId, produtoId, StatusProduto.Ativo));
+
+        var pedido = Pedido.Criar(empresaId, cliente: null, lojaId, "web");
+        pedido.Status = "pronto";
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        _itemEstoqueRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[]
+        {
+            new ItemEstoque { Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId,
+                ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(10) }
+        });
+
+        var cmd = new AdicionarItemPedidoCommand(empresaId, pedido.Id, "Novo", 3, 10m, ProdutoId: produtoId);
+        await AdicionarItemUC().ExecuteAsync(cmd);
+
+        await _movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(
+            m => m.Natureza == NaturezaMovimentacaoEstoque.Venda && m.ProdutoId == produtoId));
+        await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact] // Adicionar item a pedido 'aguardando' (estoque ainda não descontado) NÃO baixa estoque.
+    public async Task AdicionarItem_EmPedidoAguardando_NaoBaixaEstoque()
+    {
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        _produtoRepo.GetByIdAsync(empresaId, produtoId)
+            .Returns(ProdutoComStatus(empresaId, produtoId, StatusProduto.Ativo));
+
+        var pedido = Pedido.Criar(empresaId, cliente: null, Guid.NewGuid(), "web"); // 'aguardando'
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        var cmd = new AdicionarItemPedidoCommand(empresaId, pedido.Id, "Novo", 3, 10m, ProdutoId: produtoId);
+        await AdicionarItemUC().ExecuteAsync(cmd);
+
+        await _movRepo.DidNotReceive().InsertAsync(Arg.Any<MovimentacaoEstoque>());
+    }
+
+    [Fact] // Remover item de pedido 'pronto' (estoque já descontado) deve estornar o item removido.
+    public async Task RemoverItem_EmPedidoPronto_EstornaEstoqueDoItem()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+
+        var pedido = Pedido.Criar(empresaId, cliente: null, lojaId, "web");
+        pedido.Status = "pronto";
+        var item = new PedidoItem { Id = Guid.NewGuid(), PedidoId = pedido.Id, ProdutoId = produtoId,
+            Nome = "X", Quantidade = 2, PrecoUnitario = 10m };
+        pedido.Itens.Add(item);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        // Houve saída (Venda) anterior por este pedido+item (desconto na entrada em 'pronto').
+        _movRepo.ExisteReferenciaAsync(empresaId, produtoId, $"{pedido.Id}:{item.Id}",
+            NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>()).Returns(true);
+        _itemEstoqueRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[]
+        {
+            new ItemEstoque { Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId,
+                ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(0) }
+        });
+
+        await RemoverItemUC().ExecuteAsync(new RemoverItemPedidoCommand(empresaId, pedido.Id, item.Id));
+
+        await _movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(
+            m => m.Natureza == NaturezaMovimentacaoEstoque.Estorno && m.ProdutoId == produtoId));
+        pedido.Itens.Should().NotContain(item);
+        await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact] // Remover item de pedido 'aguardando' (estoque não descontado) NÃO estorna.
+    public async Task RemoverItem_EmPedidoAguardando_NaoEstornaEstoque()
+    {
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = Pedido.Criar(empresaId, cliente: null, Guid.NewGuid(), "web"); // 'aguardando'
+        var item = new PedidoItem { Id = Guid.NewGuid(), PedidoId = pedido.Id, ProdutoId = produtoId,
+            Nome = "X", Quantidade = 2, PrecoUnitario = 10m };
+        pedido.Itens.Add(item);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        await RemoverItemUC().ExecuteAsync(new RemoverItemPedidoCommand(empresaId, pedido.Id, item.Id));
+
+        await _movRepo.DidNotReceive().InsertAsync(Arg.Any<MovimentacaoEstoque>());
+        pedido.Itens.Should().NotContain(item);
     }
 
     [Fact] // Guarda nova: criacao de pedido com item de produto inativo e bloqueada.
@@ -296,6 +424,85 @@ public class PedidoUseCasesTests
     // CancelarPedido
     // ════════════════════════════════════════════════════════════════════
 
+    [Theory]
+    [InlineData(NivelAcesso.Operador, 0, true)]
+    [InlineData(NivelAcesso.Operador, 10, false)]
+    [InlineData(NivelAcesso.Operador, 100, false)]
+    [InlineData(NivelAcesso.Gerente, 10, true)]
+    [InlineData(NivelAcesso.Admin, 100, true)]
+    public async Task CancelarPedido_RespeitaDecisaoD304(NivelAcesso nivel, decimal recebido, bool permitido)
+    {
+        var pedido = Pedido.Criar(Guid.NewGuid());
+        pedido.Total = Dinheiro.FromDecimal(100m);
+        if (recebido > 0) pedido.Pagamentos.Add(new PedidoPagamento { Valor = recebido, Metodo = "dinheiro" });
+        _pedidoRepo.GetByIdWithDetailsAsync(pedido.EmpresaId, pedido.Id).Returns(pedido);
+        var comando = new CancelarPedidoCommand(pedido.EmpresaId, pedido.Id, Motivo: "Cliente desistiu", NivelSolicitante: nivel);
+
+        if (permitido)
+        {
+            var resultado = await CancelarUC().ExecuteAsync(comando);
+            resultado!.Status.Should().Be("cancelado");
+            pedido.TotalPago.Should().Be(recebido, "cancelamento não simula devolução financeira");
+        }
+        else
+        {
+            await FluentActions.Invoking(() => CancelarUC().ExecuteAsync(comando))
+                .Should().ThrowAsync<UnauthorizedAccessException>();
+            pedido.Status.Should().Be("aguardando");
+            await _uow.DidNotReceive().CommitAsync();
+            await _vagaRepo.DidNotReceiveWithAnyArgs().LiberarPorPedidoAsync(default, default!, default);
+        }
+        await _pedidoRepo.Received(1).TravarAsync(pedido.EmpresaId, pedido.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CancelarPedido_NaoAlteraPedidoDeOutraEmpresaMesmoSeRepoDevolver()
+    {
+        var pedido = Pedido.Criar(Guid.NewGuid());
+        var empresaSolicitante = Guid.NewGuid();
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaSolicitante, pedido.Id).Returns(pedido);
+
+        var resultado = await CancelarUC().ExecuteAsync(new CancelarPedidoCommand(empresaSolicitante, pedido.Id));
+
+        resultado.Should().BeNull();
+        pedido.Status.Should().Be("aguardando");
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task CancelarPedido_CancelaCobrancaPendenteEPublicaAposCommitUmaVez()
+    {
+        var pedido = Pedido.Criar(Guid.NewGuid());
+        var cobranca = CobrancaPedido.CriarNaEntrega(pedido.EmpresaId, pedido.Id, 10m, DateTime.UtcNow);
+        _pedidoRepo.GetByIdWithDetailsAsync(pedido.EmpresaId, pedido.Id).Returns(pedido);
+        _cobrancaRepo.ListarDoPedidoAsync(pedido.EmpresaId, pedido.Id, Arg.Any<CancellationToken>()).Returns([cobranca]);
+        var ordem = new List<string>();
+        _uow.CommitAsync().Returns(_ => { ordem.Add("commit"); return Task.FromResult(1); });
+        _operacaoEventos.PublicarAsync(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<object>(), Arg.Any<CancellationToken>())
+            .Returns(_ => { ordem.Add("evento"); return Task.CompletedTask; });
+        var comando = new CancelarPedidoCommand(pedido.EmpresaId, pedido.Id, Motivo: "Desistência");
+
+        await CancelarUC().ExecuteAsync(comando);
+        await CancelarUC().ExecuteAsync(comando);
+
+        cobranca.Status.Should().Be(StatusCobrancaPedido.Cancelada);
+        ordem.Should().Equal("commit", "evento");
+        _publicador.ReceivedCalls().Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task CancelarPedido_CommitFalhoNaoPublicaAtualizacaoNaTela()
+    {
+        var pedido = Pedido.Criar(Guid.NewGuid());
+        _pedidoRepo.GetByIdWithDetailsAsync(pedido.EmpresaId, pedido.Id).Returns(pedido);
+        _uow.CommitAsync().Returns<int>(_ => throw new InvalidOperationException("Banco indisponível"));
+
+        await FluentActions.Invoking(() => CancelarUC().ExecuteAsync(new CancelarPedidoCommand(pedido.EmpresaId, pedido.Id)))
+            .Should().ThrowAsync<InvalidOperationException>();
+
+        _operacaoEventos.ReceivedCalls().Should().BeEmpty();
+    }
+
     [Fact]
     public async Task CancelarPedido_DeveRetornarNull_QuandoNaoEncontrado()
     {
@@ -307,6 +514,21 @@ public class PedidoUseCasesTests
 
         result.Should().BeNull();
         await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task CancelarPedido_LiberaVagaDaJanela()
+    {
+        // #1506: cancelar pelo console deixava a vaga ocupada e a janela "esgotada" no site.
+        var empresaId = Guid.NewGuid();
+        var pedido = Pedido.Criar(empresaId);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        await CancelarUC().ExecuteAsync(new CancelarPedidoCommand(empresaId, pedido.Id, Motivo: "cliente desistiu"));
+
+        await _vagaRepo.Received(1).LiberarPorPedidoAsync(pedido.Id,
+            Arg.Is<string>(m => m.Contains("cliente desistiu")), Arg.Any<CancellationToken>());
+        await _uow.Received(1).CommitAsync();
     }
 
     [Fact]
@@ -326,6 +548,35 @@ public class PedidoUseCasesTests
         await _pedidoRepo.DidNotReceive().AddEventoAsync(Arg.Any<PedidoEvento>());
         await _pedidoRepo.DidNotReceive().UpdateAsync(Arg.Any<Pedido>());
         await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact] // S12: SaiuParaEntrega esta em ComEstoqueDescontado, cancelar devolve o estoque.
+    public async Task CancelarPedido_EmSaiuParaEntrega_DevolveEstoque()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+
+        var pedido = Pedido.Criar(empresaId, cliente: null, lojaId, "web");
+        pedido.Status = "saiu_para_entrega";
+        var item = new PedidoItem { Id = Guid.NewGuid(), PedidoId = pedido.Id, ProdutoId = produtoId,
+            Nome = "X", Quantidade = 2, PrecoUnitario = 10m };
+        pedido.Itens.Add(item);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        _movRepo.ExisteReferenciaAsync(empresaId, produtoId, $"{pedido.Id}:{item.Id}",
+            NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>()).Returns(true);
+        _itemEstoqueRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[]
+        {
+            new ItemEstoque { Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId,
+                ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(0) }
+        });
+
+        await CancelarUC().ExecuteAsync(new CancelarPedidoCommand(empresaId, pedido.Id));
+
+        await _movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(
+            m => m.Natureza == NaturezaMovimentacaoEstoque.Estorno && m.ProdutoId == produtoId));
+        pedido.Status.Should().Be("cancelado");
     }
 
     [Fact]
@@ -397,13 +648,27 @@ public class PedidoUseCasesTests
         await _uow.DidNotReceive().CommitAsync();
     }
 
+    // issue 1029: arranja o repo para pagamento modelando o RELATIONSHIP FIXUP do EF Core. Em
+    // producao o agregado vem rastreado (GetByIdWithDetailsAsync nao usa AsNoTracking) e, quando
+    // AddPagamentoAsync faz db.Set<PedidoPagamento>().Add(pag), o EF sozinho encaixa pag em
+    // pedido.Pagamentos pela FK PedidoId. O substitute nao fazia isso, entao estes testes so
+    // passavam com um pedido.Pagamentos.Add(pag) explicito no use case -- que em producao somava
+    // em cima do fixup e DOBRAVA o TotalPago (a List<> nao deduplica por referencia). Sem este
+    // arranjo, o teste mede um mundo que nao existe.
+    private void ArranjarRepoParaPagamento(Guid empresaId, Pedido pedido)
+    {
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        _pedidoRepo.When(r => r.AddPagamentoAsync(Arg.Any<PedidoPagamento>()))
+                   .Do(ci => pedido.Pagamentos.Add(ci.Arg<PedidoPagamento>()));
+    }
+
     [Fact]
     public async Task RegistrarPagamento_DeveAdicionarPagamentoEEvento_QuandoSucesso()
     {
         var empresaId = Guid.NewGuid();
         var pedido = Pedido.Criar(empresaId);
         pedido.Total = Dinheiro.FromDecimal(100m);
-        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        ArranjarRepoParaPagamento(empresaId, pedido);
 
         PedidoPagamento? pagCapturado = null;
         await _pedidoRepo.AddPagamentoAsync(Arg.Do<PedidoPagamento>(p => pagCapturado = p));
@@ -433,7 +698,7 @@ public class PedidoUseCasesTests
         var pedido = Pedido.Criar(empresaId);
         pedido.Total = Dinheiro.FromDecimal(100m);
         pedido.Pagamentos.Add(new PedidoPagamento { Valor = 30m, Metodo = "dinheiro" });
-        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        ArranjarRepoParaPagamento(empresaId, pedido);
 
         await PagamentoUC().ExecuteAsync(
             new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "credito", 25m));
@@ -450,6 +715,7 @@ public class PedidoUseCasesTests
     [InlineData("rascunho")]
     [InlineData("aguardando_pagamento")]
     [InlineData("aguardando_aprovacao_baba")]
+    [InlineData("cancelado")] // #1506: pedido cancelado nao recebe pagamento manual
     public async Task RegistrarPagamento_DeveRejeitar_QuandoStatusPreOperacional(string statusPre)
     {
         var empresaId = Guid.NewGuid();
@@ -478,7 +744,7 @@ public class PedidoUseCasesTests
         var pedido = Pedido.Criar(empresaId);
         pedido.Total = Dinheiro.FromDecimal(100m);
         pedido.Status = statusOp;
-        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        ArranjarRepoParaPagamento(empresaId, pedido);
 
         await PagamentoUC().ExecuteAsync(
             new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 50m));

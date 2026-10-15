@@ -14,18 +14,18 @@
   // Espelha StatusPedidoMapper (domínio) — manter em sincronia com StatusHelper.cs e
   // statusDisplayLabel (SSR em Pedidos/Index.cshtml). Issue #719 / QA v1.10 BUG-003/014.
   var STATUS_LABEL = {
-    aguardando: 'Aguardando', preparando: 'Em preparo', pronto: 'Pronto', entregue: 'Entregue', cancelado: 'Cancelado',
+    aguardando: 'Aguardando', preparando: 'Em preparo', pronto: 'Pronto', saiu_para_entrega: 'Saiu para entrega', entregue: 'Entregue', cancelado: 'Cancelado',
     rascunho: 'Rascunho', aguardando_pagamento: 'Aguardando pagamento', aguardando_aprovacao_baba: 'Aguardando aprovação', aprovado_baba: 'Aprovado'
   };
   // Avanco operacional (forward-only). aprovado_baba entra na fila ERP em 'preparando'.
   // A aprovacao em si (aguardando_aprovacao_baba -> aprovado_baba) NAO vem por aqui: e a
   // acao dedicada `approve`, com lock/outbox/notificacao no backend (#862).
-  var NEXT = { aguardando: 'preparando', preparando: 'pronto', pronto: 'entregue', aprovado_baba: 'preparando' };
-  var NEXT_LABEL = { aguardando: 'Iniciar preparo', preparando: 'Marcar pronto', pronto: 'Confirmar entrega', aprovado_baba: 'Iniciar preparo' };
+  var NEXT = { aguardando: 'preparando', preparando: 'pronto', pronto: 'entregue', saiu_para_entrega: 'entregue', aprovado_baba: 'preparando' };
+  var NEXT_LABEL = { aguardando: 'Iniciar preparo', preparando: 'Marcar pronto', pronto: 'Confirmar entrega', saiu_para_entrega: 'Confirmar entrega', aprovado_baba: 'Iniciar preparo' };
   // "Em aberto" = não-terminais operacionais. Inclui os pós-pagamento do storefront
   // (aprovacao_baba/aprovado_baba). rascunho/aguardando_pagamento são pré-operacionais
   // e ficam fora. Incluir aprovacao_baba corrige a subcontagem do BUG-009 (issue #719).
-  var OPEN = ['aguardando', 'preparando', 'pronto', 'aguardando_aprovacao_baba', 'aprovado_baba'];
+  var OPEN = ['aguardando', 'preparando', 'pronto', 'saiu_para_entrega', 'aguardando_aprovacao_baba', 'aprovado_baba'];
   // Pre-operacionais: pedido ainda nao entrou na fila de trabalho. Enquanto aqui a acao
   // NAO e receber pagamento (o cardapio guest nem cobra online) — e aprovar/recusar. Por
   // isso o botao "Receber" e o KPI "A receber" ficam suprimidos ate o pedido virar
@@ -122,6 +122,9 @@
       payText: function (p) {
         if (p.status === 'cancelado') return p.totalPago > 0 ? ('Pago · ' + money(p.totalPago)) : 'Sem cobrança';
         if (p.total === 0) return 'Sem cobrança'; // issue 689 / BUG-008b: total R$0 não é "Pendente"
+        // issue 962 (BUG-002 do QA): excedente deliberado (#607) fica visivel na listagem,
+        // nao so no Detail -- "Quitado" sozinho escondia que foi pago em dobro.
+        if (p.quitado && p.excedente > 0) return 'Quitado · +' + money(p.excedente);
         if (p.quitado) return 'Quitado';
         if (p.totalPago > 0) return 'Parcial · ' + money(p.totalPago);
         if (p.status === 'entregue') return 'Verificar';
@@ -252,7 +255,10 @@
       openPay: function (id) {
         var it = this.items[id];
         if (!it) return;
-        this.pay = { open: true, id: id, metodo: 'pix', valor: (it.pendente || 0).toFixed(2), enviando: false };
+        // issue 917 Fase B: chave nasce aqui (abertura do popover = a intencao), nao no
+        // submit -- retry apos timeout/erro de rede reusa a MESMA chave em vez de gerar
+        // uma nova a cada tentativa (sem isso a idempotencia no servidor era ilusoria).
+        this.pay = { open: true, id: id, metodo: 'pix', valor: (it.pendente || 0).toFixed(2), enviando: false, idempotencyKey: crypto.randomUUID() };
         var self = this;
         this.$nextTick(function () { if (self.$refs.payValor) self.$refs.payValor.focus(); });
       },
@@ -277,7 +283,7 @@
         esFetch('/pedidos/' + id + '/pagamentos.json', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
-          body: JSON.stringify({ metodo: this.pay.metodo, valor: valor })
+          body: JSON.stringify({ metodo: this.pay.metodo, valor: valor, idempotencyKey: this.pay.idempotencyKey })
         }).then(function (res) {
           return res.json().catch(function () { return null; }).then(function (data) {
             if (!res.ok || !data || !data.success) {
@@ -290,8 +296,14 @@
             self.closePay();
           });
         }).catch(function () {
+          // issue 917: antes afirmava categoricamente "pagamento não registrado" — mas o
+          // POST pode ter completado no servidor e só a resposta se perdeu na rede (exatamente
+          // o cenario que motivou a chave estavel acima). Sem confirmacao, nao sabemos; a UI
+          // nao pode mentir pra nenhum dos dois lados. Reverte o otimista e forca reload pra
+          // pegar o estado real do servidor em vez de inventar um.
           Object.assign(it, snap);
-          toast('error', 'Sem conexão — pagamento não registrado.');
+          toast('error', 'Não foi possível confirmar se o pagamento foi registrado. Atualizando...');
+          setTimeout(function () { location.reload(); }, 1200);
         }).finally(function () { delete self._inflight[key]; self.pay.enviando = false; });
       },
 

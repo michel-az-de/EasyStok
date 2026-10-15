@@ -1,18 +1,17 @@
 using EasyStock.Application.DependencyInjection;
-using EasyStock.Application.Ports.Output;
-using EasyStock.Infra.Async;
 using EasyStock.Infra.Async.DependencyInjection;
 using EasyStock.Infra.Async.Storage;
 using EasyStock.Infra.Notifications.DependencyInjection;
 using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.DependencyInjection;
+using EasyStock.Infra.Postgre.Integration;
+using EasyStock.Infra.Postgre.Notifications.Agendamento;
 using EasyStock.Worker;
 using EasyStock.Worker.BackgroundServices;
 using EasyStock.Worker.DependencyInjection;
 using EasyStock.Infra.Integrations.DependencyInjection;
-using EasyStock.Infra.Integrations.Fiscal.FocusNFe.DependencyInjection;
-using EasyStock.Infra.Integrations.Fiscal.Mock.DependencyInjection;
+using EasyStock.Infra.Async.Logging;
 using Serilog;
 
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -30,13 +29,33 @@ TaskScheduler.UnobservedTaskException += (_, e) =>
 
 var builder = Host.CreateApplicationBuilder(args);
 
+// I4.1 (#1674): o Worker decifra o token do WhatsApp; a chave-mestra chega por EZ_CRYPTO_*, como na API.
+builder.Configuration.AdicionarChaveMestraDoAmbiente();
+
 // Serilog
-Log.Logger = new LoggerConfiguration()
+var loggerConfiguration = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
-    .Enrich.FromLogContext()
-    .CreateLogger();
+    .Enrich.FromLogContext();
+
+// Logs via OTLP quando ha collector configurado (issue 1002) — correlacionados por
+// trace_id/span_id com os traces do TelemetrySetup. Opt-in: sem a config, sem sink.
+if (builder.Configuration["OpenTelemetry:OtlpEndpoint"] is { Length: > 0 } otlpLogsEndpoint)
+{
+    // I4.5 (#1698): o log sai da maquina por aqui, entao sai redigido.
+    loggerConfiguration = loggerConfiguration.WriteTo.Redigido(sinks => sinks.OpenTelemetry(o =>
+    {
+        o.Endpoint = otlpLogsEndpoint;
+        o.Protocol = Serilog.Sinks.OpenTelemetry.OtlpProtocol.Grpc;
+        o.ResourceAttributes = new Dictionary<string, object> { ["service.name"] = "EasyStock.Worker" };
+    }));
+}
+
+Log.Logger = loggerConfiguration.CreateLogger();
 
 builder.Services.AddSerilog();
+
+// Telemetria OTLP opt-in (issue 1002) — no-op sem OpenTelemetry:OtlpEndpoint.
+builder.AddEasyStockTelemetry("EasyStock.Worker");
 
 // Options — WorkerOptions mantido por retro-compat (lê seção "Worker"); seção canônica é
 // "Notifications:Hosting" lida via AddNotificationsCore.
@@ -47,27 +66,16 @@ builder.Services.Configure<WorkerOptions>(
 var connStr = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection não configurada.");
 
-builder.Services
-    .AddEasyStockPostgreInfrastructure(connStr, builder.Configuration)
-    .AddEasyStockNotificationsRepositories();
+// AddEasyStockPostgreInfrastructure já registra os repositórios de notificação e o coletor (N1: chamar
+// AddEasyStockNotificationsRepositories de novo fazia o coletor rodar duas vezes por rodada).
+builder.Services.AddEasyStockPostgreInfrastructure(connStr, builder.Configuration);
 
-// Email service (reusa Infra.Async, sem chamar AddEasyStockAsyncInfrastructure completo)
-var smtpSection = builder.Configuration.GetSection("Smtp");
-if (smtpSection.Exists())
-{
-    builder.Services.AddSingleton<IEmailService>(sp => new SmtpEmailService(
-        smtpSection["Host"] ?? "localhost",
-        int.Parse(smtpSection["Port"] ?? "587"),
-        smtpSection["Username"] ?? "",
-        smtpSection["Password"] ?? "",
-        smtpSection["FromEmail"] ?? "noreply@easystock.com",
-        smtpSection["FromName"] ?? "EasyStock",
-        bool.Parse(smtpSection["EnableSsl"] ?? "true")));
-}
-else
-{
-    builder.Services.AddSingleton<IEmailService, ConsoleEmailService>();
-}
+// Email service: a mesma fabrica da API (Email:Provider e secao Smtp), para os dois hosts resolverem
+// o mesmo provider e as mesmas opcoes (N3, #1351), sem chamar AddEasyStockAsyncInfrastructure completo.
+builder.Services.AddEasyStockEmail(builder.Configuration);
+
+// WhatsApp de plataforma (N6): mesma validacao da API; com o provider "meta", numero e verify token sao obrigatorios.
+EasyStock.Infra.Notifications.Hosting.WhatsAppPlataformaStartup.Validar(builder.Configuration);
 
 // Notifications infra (canal adapters + Scriban renderer)
 builder.Services.AddNotificationsInfra(builder.Configuration);
@@ -86,22 +94,20 @@ builder.Services
     .AddNotificationsHosting(builder.Configuration)
     .AddPostgresOutboxSignaler(builder.Configuration);
 
-// Jobs de Helpdesk (notificação tem manutenção própria via AddPostgresOutboxSignaler).
-// SlaMonitorService monitora tickets e gera EventoNotificacao — pertence ao Worker mesmo.
-builder.Services.AddHostedService<SlaMonitorService>();
-
 // Lembretes de pedidos agendados (mobile_orders.scheduled_delivery_at):
 // no dia, 1h antes, 10min antes. Idempotencia via colunas agendamento_notificado_*_em.
+builder.Services.AddSingleton<LembretesPedidoAgendadoTick>();
 builder.Services.AddHostedService<AgendamentoNotificacaoService>();
 
-// Fan-out da notificacao opcional de banners de plataforma (#869): guard atomico + BroadcastSuperAdmin por empresa.
-builder.Services.AddHostedService<BannerNotificacaoService>();
-
-// Monitor de saude de endpoints publicos. Abre ticket via /api/ci/tickets
-// quando >threshold falhas consecutivas. Idempotencia via tabela
-// endpoint_health_state + cooldown 24h.
+// Monitor de saude de endpoints publicos (N10). Abre incidente apos N falhas seguidas e avisa os superadmins por
+// IPublicadorIncidenteSistema (e-mail e WhatsApp), com aviso de "normalizado" na recuperacao. Estado em
+// endpoint_health_state; a dedupe de 15 min vem da chave de idempotencia do outbox. Precisa de
+// Auth__Google__EmpresaPadrao no .env do Worker: sem ela nada e publicado e o log nomeia a chave.
 builder.Services.AddHttpClient("endpoint-health");
 builder.Services.AddHostedService<EndpointHealthMonitorService>();
+
+// Limpeza agendada dos reset_tokens expirados ha mais de 24 h (N8, #301), a cada 6 h.
+builder.Services.AddHostedService<LimpezaTokensAcessoService>();
 
 // Outbox de eventos de integração externa (F4.c) — consome
 // OutboxEventoIntegracao e despacha via handlers registrados.
@@ -119,11 +125,8 @@ builder.Services.AddEasyStockFileStorageCore(builder.Configuration);
 // WorkerCurrentUserAccessor (override ADR-R06) + ReportExecutionContext (AsyncLocal).
 builder.Services.AddReportingWorker();
 
-// IMemoryCache: o ConfigFiscalResolver (registrado em AddEasyStockPostgreInfrastructure)
-// faz cache de 60s da config fiscal por tenant. Sem este registro o
-// ReprocessarContingenciaBackgroundService quebrava em runtime ao resolver
-// ReprocessarContingenciaUseCase → IConfigFiscalResolver → IMemoryCache (só a API
-// registrava o cache, via AddEasyStockCache). Singleton consumido por Scoped: OK.
+// IMemoryCache: a API registra via AddEasyStockCache; o Worker registra aqui para os
+// servicos compartilhados que dependem dele. Singleton consumido por Scoped: OK.
 builder.Services.AddMemoryCache();
 
 // #877: registra ICacheService — sem isso o EstoqueSaldoCacheInvalidationInterceptor
@@ -137,23 +140,24 @@ builder.Services.AddMemoryCache();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSingleton<EasyStock.Application.Ports.Output.ICacheService, EasyStock.Infra.Async.RedisCacheService>();
 
-// Modulo Fiscal NFC-e (F4) — Polly pipelines + adapters Focus NFe + Mock + jobs background
+// Polly pipelines compartilhados pelas integracoes HTTP
 builder.Services.AddEasyStockIntegrationResilience();
-builder.Services.AddFocusNFeAdapter(builder.Configuration);
-builder.Services.AddMockFiscalGateway();
-// Scoped (não Singleton): a factory consome IGatewayFiscal Scoped — como Singleton
-// capturava gateways scoped (captive dependency / lifetime mismatch). Mesmo fix da
-// API (#193). Os jobs (hosted services) já resolvem os use cases fiscais via
-// IServiceScope (ex.: ReprocessarContingenciaBackgroundService.CreateScope()), então
-// a factory scoped resolve corretamente dentro do scope.
-builder.Services.AddScoped<EasyStock.Application.Ports.Output.Fiscal.IGatewayFiscalFactory,
-    EasyStock.Infra.Integrations.Fiscal.GatewayFiscalFactory>();
-builder.Services.AddDataProtection();
-builder.Services.AddHostedService<ReprocessarContingenciaBackgroundService>();
-builder.Services.AddHostedService<RenovacaoCertificadoA1BackgroundService>();
+// Atendimento WhatsApp (S02) — cliente da Cloud API que MetaCloudWhatsAppProvider delega.
+builder.Services.AddEasyStockWhatsAppCloudClient(builder.Configuration);
+builder.Services.AddEasyStockMetaMensageria(builder.Configuration);
+// Atendimento WhatsApp (S06) — o Worker reusa AddEasyStockApplication(), que registra o agente.
+builder.Services.AddEasyStockAgenteLlm(builder.Configuration);
+// Key ring compartilhado com a Api via Postgres (#1035) — sem isso o Worker nao
+// decifra o certificado A1 que a Api gravou em credencial_integracao.
+builder.Services.AddEasyStockDataProtection();
 
-// Health checks
-builder.Services.AddHealthChecks();
+// Health checks do motor de notificacoes (N1): heartbeat dos loops e backlog. O Worker nao tem endpoint HTTP: quem
+// consome e o HealthchecksPingService, que pinga o Healthchecks.io enquanto estao saudaveis e chama /fail quando nao.
+builder.Services.AddHealthChecks()
+    .AddNotificationsHosting()
+    .AddNotificacoesBacklog();
+builder.Services.AddHttpClient(HealthchecksPingService.NomeDoCliente);
+builder.Services.AddHostedService<HealthchecksPingService>();
 
 // Validação de DI sob demanda (CI/diagnóstico): `dotnet run -- --validate-di` constrói
 // o grafo com ValidateOnBuild + ValidateScopes, pegando captive dependencies
@@ -162,7 +166,7 @@ builder.Services.AddHealthChecks();
 //
 // Esta ferramenta encontrou e fechamos 2 crashes latentes que dariam "erro genérico":
 //   • IFileStorage  — motor de relatórios (ReportRunner/Watchdog). Realocado p/ Infra.Async.
-//   • IMemoryCache  — cadeia fiscal (ReprocessarContingenciaUseCase → IConfigFiscalResolver).
+//   • IMemoryCache  — cadeia fiscal (removida na poda P04, #1106).
 //
 // Mantido CONDICIONAL (não roda no startup normal): o grafo ainda não é 100% resolvível
 // porque o Worker reusa AddEasyStockApplication() — que registra TODOS os use cases da
@@ -183,4 +187,14 @@ if (args.Contains("--validate-di"))
 }
 
 var host = builder.Build();
+
+// I4.1: sem chave-mestra o Worker sobe e avisa (o fail-fast é da I4.2).
+ChaveMestraConfiguracao.AvisarSeFaltar(
+    host.Services.GetRequiredService<IConfiguration>(),
+    host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("ChaveMestra"),
+    "Worker");
+
+// I4.2: em Production o Worker não sobe sem chave-mestra que leia todas as credenciais ativas.
+await ChaveMestraNaSubida.ExigirAsync(host.Services, builder.Environment.EnvironmentName, "Worker");
+
 host.Run();

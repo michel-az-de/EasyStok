@@ -14,7 +14,6 @@ using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidad
 using EasyStock.Application.UseCases.Admin.Storefront.CriarStorefrontAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.DesativarStorefrontAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.EditarStorefrontAdmin;
-using EasyStock.Application.UseCases.Admin.Storefront.ListarStorefrontsAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.ObterStorefrontAdmin;
 
 namespace EasyStock.Application.DependencyInjection;
@@ -23,13 +22,12 @@ public static partial class ServiceCollectionExtensions
 {
     /// <summary>
     /// Registra os UseCases admin para gestão de Storefront + Cardápio
-    /// (TASK-EZ-ADMIN-001, Fase 7 do plano). Consumidos pelos controllers
-    /// AdminStorefrontController e AdminStorefrontCardapioController.
+    /// (TASK-EZ-ADMIN-001, Fase 7 do plano). Desde a poda P01/P01-B (#1169/#1173)
+    /// quem consome são os controllers tenant de api/minha-vitrine.
     /// </summary>
     public static IServiceCollection AddEasyStockAdminStorefrontUseCases(this IServiceCollection services)
     {
         // Storefront CRUD
-        services.AddScoped<ListarStorefrontsAdminUseCase>();
         services.AddScoped<ObterStorefrontAdminUseCase>();
         services.AddScoped<CriarStorefrontAdminUseCase>();
         services.AddScoped<EditarStorefrontAdminUseCase>();
@@ -43,6 +41,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EditarCardapioItemAdminUseCase>();
         services.AddScoped<ToggleVisibilidadeCardapioItemAdminUseCase>();
         services.AddScoped<ToggleDisponibilidadeCardapioItemAdminUseCase>();
+        services.AddScoped<EasyStock.Application.Services.Campanhas.AvisoItemComInteresse>(); // S31: item voltou → SSE
         services.AddScoped<ReordenarCardapioItemAdminUseCase>();
         services.AddScoped<RemoverCardapioItemAdminUseCase>();
 

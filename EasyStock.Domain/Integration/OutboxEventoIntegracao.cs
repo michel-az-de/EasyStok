@@ -143,9 +143,21 @@ public class OutboxEventoIntegracao
         };
     }
 
+    /// <summary>
+    /// Lease do estado EmEnvio (#928): ao iniciar o dispatch, <see cref="ProximaTentativaEm"/>
+    /// vira now + este lease. Se o worker cair ou o commit pós-handler falhar, o evento fica
+    /// preso em EmEnvio; o watchdog reclama os que passaram do lease. 5min cobre folgado o
+    /// handler mais lento (webhook/NFe) sem prender por muito tempo.
+    /// </summary>
+    public static readonly TimeSpan LeaseEmEnvio = TimeSpan.FromMinutes(5);
+
     public void MarcarEmEnvio()
     {
         Status = StatusOutboxIntegracao.EmEnvio;
+        // Lease anti-stuck: se o processo cair antes de MarcarEnviado/MarcarFalhaTentativa,
+        // o watchdog reclama o evento após ProximaTentativaEm (#928). Em estados terminais
+        // (Enviado/Falhado/Cancelado) ProximaTentativaEm é ignorado.
+        ProximaTentativaEm = DateTime.UtcNow.Add(LeaseEmEnvio);
     }
 
     public void MarcarEnviado()
@@ -165,6 +177,21 @@ public class OutboxEventoIntegracao
         Tentativas++;
         ErroUltimaTentativa = erro;
         ProximaTentativaEm = DateTime.UtcNow.Add(backoff);
+        Status = Tentativas >= MaxTentativas
+            ? StatusOutboxIntegracao.Falhado
+            : StatusOutboxIntegracao.Pendente;
+    }
+
+    /// <summary>
+    /// Watchdog (#928): evento preso em EmEnvio além do lease (worker caiu ou commit
+    /// pós-handler falhou) — reconta como tentativa e volta pra Pendente, ou Falhado se
+    /// esgotou MaxTentativas. Handlers do outbox são idempotentes, então re-despacho é seguro.
+    /// </summary>
+    public void ReclamarEmEnvioExpirado()
+    {
+        Tentativas++;
+        ErroUltimaTentativa = "EmEnvio expirado — reclamado pelo watchdog (worker caiu ou commit pós-handler falhou).";
+        ProximaTentativaEm = DateTime.UtcNow;
         Status = Tentativas >= MaxTentativas
             ? StatusOutboxIntegracao.Falhado
             : StatusOutboxIntegracao.Pendente;

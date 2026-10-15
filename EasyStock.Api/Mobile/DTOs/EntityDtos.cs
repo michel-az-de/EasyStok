@@ -19,8 +19,22 @@ public record ProductDto(
     // C2 (RDC 727/2022): "Avulso" (default) | "Embalado".
     // PWA usa para validar peso obrigatorio em confirmProduction.
     // Inserido 2026-05-16. Lido do Produto(ERP) ligado via ErpProductId.
-    string TipoEmbalagem = "Avulso"
+    string TipoEmbalagem = "Avulso",
+    // #1467 — custo unitario e estoque minimo, nos dois sentidos.
+    decimal? Cost = null,
+    int? MinStock = null,
+    // #1520 (ADR-0060) — true: o aparelho manda cada movimento de estoque em "stock.delta" e o
+    // Stock daqui so vale quando o produto nasce no servidor. Ausente (aparelho antigo,
+    // "Sincronizar tudo"): Stock define o saldo.
+    bool? StockByDelta = null
 );
+
+/// <summary>
+/// #1520 (ADR-0060) — um movimento de estoque do PWA ("stock.delta"). <c>Qty</c> tem sinal:
+/// negativo sai (venda, descarte), positivo entra (producao, cancelamento). Contado uma vez
+/// pelo MutationId; a soma nao depende da ordem de chegada.
+/// </summary>
+public record StockDeltaDto(string Id, string ProductId, int Qty);
 
 public record ClientDto(
     string Id,
@@ -59,7 +73,9 @@ public record OrderDto(
     long? ConfirmedAt = null,
     long? FactAt = null,
     // F5 — agendamento de pedido (MVP). NULL = pedido pra agora (caso padrão).
-    long? ScheduledDeliveryAt = null
+    long? ScheduledDeliveryAt = null,
+    // #1493 — forma de pagamento escolhida no PWA ao entregar. NULL = aparelho antigo.
+    string? Metodo = null
 );
 
 public record BatchItemDto(
@@ -82,7 +98,15 @@ public record BatchDto(
     string? BatchPhoto,
     long CreatedAt,
     // Lote do dia (LOT-YYMMDD). Opcional — APKs antigos omitem.
-    string? Lote = null
+    string? Lote = null,
+    // #1464 — marcas de exclusao e descarte, nos dois sentidos (epoch ms).
+    bool? Deleted = null,
+    long? DeletedAt = null,
+    string? DeletedBy = null,
+    bool? Discarded = null,
+    long? DiscardedAt = null,
+    string? DiscardedBy = null,
+    string? DiscardReason = null
 );
 
 public record CashEntryDto(
@@ -97,6 +121,7 @@ public record CashEntryDto(
     bool? Estornado = null,
     // F7-C — fechamento de caixa pode carregar metodo/categoria. Mobile cria
     // entradas type=income/expense; web tem Metodo (pix/dinheiro/etc) opcional.
+    // #1493 — vale nos dois sentidos: o PWA tambem manda a forma escolhida.
     string? Metodo = null
 );
 

@@ -12,8 +12,11 @@ public class MenuViewModelBuilderTests
     private static MenuViewModel Build(
         string? path = null, string? active = null,
         IReadOnlyList<string>? favoritos = null, MenuBadges? badges = null,
-        bool kds = true) =>
-        MenuViewModelBuilder.Build(path, active, favoritos, badges, kds);
+        bool kds = true, string? modulo = null, IReadOnlySet<string>? features = null) =>
+        MenuViewModelBuilder.Build(path, active, favoritos, badges, kds, modulo, features);
+
+    private static IReadOnlySet<string> Features(params string[] ativas) =>
+        new HashSet<string>(ativas, StringComparer.OrdinalIgnoreCase);
 
     // ── ativo-por-rota ───────────────────────────────────────────────
 
@@ -204,5 +207,124 @@ public class MenuViewModelBuilderTests
         vm.MeuDia.Should().BeEmpty();
         vm.Groups.SelectMany(g => g.Items).Select(i => i.Key)
             .Should().NotContain("kds-operacao");
+    }
+
+    // ── filtro por modulo (shell modular, ADR-0046) ──────────────────
+
+    [Theory]
+    [InlineData("operacao", "operacao")]
+    [InlineData("producao", "producao-estoque")]
+    [InlineData("compras", "compras")]
+    [InlineData("financeiro", "financeiro")]
+    [InlineData("crescimento", "crescimento")]
+    public void Modulo_ativo_deixa_so_o_grupo_daquele_modulo(string modulo, string grupoEsperado)
+    {
+        var vm = Build(modulo: modulo);
+
+        vm.Groups.Should().ContainSingle().Which.Group.Key.Should().Be(grupoEsperado);
+    }
+
+    [Fact]
+    public void Modulo_admin_esconde_todos_os_grupos_mas_mantem_o_rodape()
+    {
+        var vm = Build(modulo: ModuloDefinition.ModuloAdmin);
+
+        vm.Groups.Should().BeEmpty();
+        vm.Footer.Select(i => i.Key).Should().Contain("configuracoes");
+    }
+
+    [Fact]
+    public void Dashboard_e_rodape_sobrevivem_dentro_de_qualquer_modulo()
+    {
+        // Dashboard e a ancora: e o escape de 1 clique de volta ao menu inteiro.
+        var vm = Build(modulo: "financeiro");
+
+        vm.Dashboard.Key.Should().Be("dashboard");
+        vm.Footer.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void Sem_modulo_o_menu_aparece_inteiro()
+    {
+        Build(modulo: null).Groups.Should().HaveCount(MenuDefinition.Groups.Count);
+    }
+
+    [Fact]
+    public void Modulo_desconhecido_nao_esconde_nada()
+    {
+        // Fail-open: rota sem dono nunca deixa o usuario sem navegacao.
+        Build(modulo: "modulo-que-nao-existe").Groups.Should().HaveCount(MenuDefinition.Groups.Count);
+    }
+
+    [Fact]
+    public void Favorito_de_outro_modulo_continua_em_meu_dia()
+    {
+        // "Meu dia" e lista de salto cross-modulo: o filtro de modulo ESCONDE grupo,
+        // nao DESCARTA item (ao contrario do filtro de KDS).
+        var vm = Build(favoritos: new[] { "pedidos" }, modulo: "financeiro");
+
+        vm.MeuDia.Select(v => v.Key).Should().Equal("pedidos");
+        vm.Groups.Should().ContainSingle().Which.Group.Key.Should().Be("financeiro");
+    }
+
+    // ── gating por feature de tenant (ADR-0048) ─────────────────────
+
+    [Fact]
+    public void Menu_sem_item_gated_nao_muda_com_features_vazias()
+    {
+        // Regressão: hoje nenhum item do MenuDefinition exige feature, então ligar o
+        // mecanismo não pode esconder nada de ninguém.
+        var comFeatures = Build(features: Features());
+        var semFeatures = Build(features: null);
+
+        comFeatures.Groups.SelectMany(g => g.Items).Should().HaveCount(
+            semFeatures.Groups.SelectMany(g => g.Items).Count());
+        comFeatures.Groups.Should().HaveCount(MenuDefinition.Groups.Count);
+    }
+
+    [Fact]
+    public void Item_que_exige_feature_some_quando_a_flag_esta_off()
+    {
+        var item = new MenuItem("propostas", "Propostas", "file-text", "/propostas",
+            ["Propostas"], RequerFeature: "modulo.comercial");
+
+        MenuViewModelBuilder.ItemVisivel(item, kdsHabilitado: true, Features()).Should().BeFalse();
+        MenuViewModelBuilder.ItemVisivel(item, kdsHabilitado: true, Features("modulo.comercial")).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Item_que_exige_feature_some_quando_nao_conseguimos_perguntar()
+    {
+        // Fail-closed: features null = Api fora do ar.
+        var item = new MenuItem("propostas", "Propostas", "file-text", "/propostas",
+            ["Propostas"], RequerFeature: "modulo.comercial");
+
+        MenuViewModelBuilder.ItemVisivel(item, kdsHabilitado: true, featuresAtivas: null).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Item_sem_feature_exigida_aparece_mesmo_sem_flags()
+    {
+        var item = new MenuItem("pedidos", "Pedidos", "shopping-cart", "/pedidos", ["Pedidos"]);
+
+        MenuViewModelBuilder.ItemVisivel(item, kdsHabilitado: true, featuresAtivas: null).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Item_gated_perde_para_o_kds_off_tambem()
+    {
+        // Os dois filtros DESCARTAM; basta um recusar.
+        var item = new MenuItem("kds-b2b", "KDS B2B", "chef-hat", "/kds-b2b", [],
+            IsProducaoKds: true, RequerFeature: "modulo.comercial");
+
+        MenuViewModelBuilder.ItemVisivel(item, kdsHabilitado: false, Features("modulo.comercial")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Item_ativo_e_resolvido_mesmo_fora_do_grupo_visivel()
+    {
+        // Se o ativo fosse resolvido pos-filtro, /pedidos dentro do modulo financeiro
+        // devolveria null e a topbar/menu perderiam a referencia.
+        Build(path: "/pedidos", modulo: "financeiro").ActiveKey.Should().Be("pedidos");
     }
 }

@@ -11,12 +11,15 @@ namespace EasyStock.Application.UseCases.Storefront.Checkout;
 /// que o guest acompanhe o pedido em <c>/pedido-status.html?id=...&amp;t=...</c>
 /// sem login (issue #681).</para>
 ///
-/// <para><c>FreteEstimado</c>: opcional. Quando o CEP cobre uma FreteZona ativa,
-/// devolve o valor pra UI exibir. Quando nao cobre, devolve null e Babá
-/// negocia frete via WhatsApp.</para>
+/// <para><c>FreteEstimado</c>: frete da zona do CEP, já somado à cobrança.</para>
+///
+/// <para><c>LinkPagamento</c>: <c>init_point</c> do Checkout Pro (Pix ou cartão), válido por
+/// <c>ExpiresIn</c> segundos (#1254). O site redireciona para ele.</para>
 /// </summary>
 public sealed record IniciarCheckoutGuestResult(
     Guid PedidoId,
     string NumeroCurto,
     string AcompanhamentoToken,
-    decimal? FreteEstimado);
+    decimal? FreteEstimado,
+    string? LinkPagamento = null,
+    int ExpiresIn = 0);

@@ -1,12 +1,12 @@
 # Ambiente local automático (`scripts/local-env/`)
 
 Terceiro ambiente do EasyStok, ao lado do sandbox (VM Azure) e da prod (Fly): roda
-**API (+PWA), Web e Admin** na sua máquina via `dotnet watch` (hot reload). Sobe sozinho
+**API (+PWA) e Web** na sua máquina via `dotnet watch` (hot reload). Sobe sozinho
 **a cada `git push`** (hook `.husky/pre-push`).
 
 ## Topologia desta máquina
 
-- **Apps** (API/Web/Admin): `dotnet` do **Windows**, hot reload nativo. É o que o `up.ps1` lança.
+- **Apps** (API/Web): `dotnet` do **Windows**, hot reload nativo. É o que o `up.ps1` lança.
 - **Postgres**: container **`pg-easystok`** rodando no **Docker do WSL2**, exposto em `localhost:5432`
   (db `easystok_demo`, user/pass `easystok`). O `up.ps1` **só detecta** a 5432 — quem sobe/para o
   Postgres é você, no WSL. O script não gerencia Docker (que não existe no PowerShell do Windows).
@@ -17,7 +17,6 @@ Terceiro ambiente do EasyStok, ao lado do sandbox (VM Azure) e da prod (Fly): ro
 |---|---|---|
 | API + PWA | https://localhost:7039 | Swagger `/swagger` · PWA `/pwa/` · health `/health` |
 | Web (MVC) | https://localhost:7010 | login em `/auth/login` |
-| Admin | https://localhost:7002 | `/` redireciona para `/Auth/Login` |
 | Postgres | localhost:5432 | `pg-easystok` (WSL) · db `easystok_demo` · `easystok/easystok` |
 
 ## Pré-requisitos (uma vez)
@@ -53,8 +52,7 @@ powershell scripts/local-env/down.ps1
   `ASPNETCORE_URLS` (portas fixas, sem abrir browser) e `DOTNET_WATCH_RESTART_ON_RUDE_EDIT=1`
   (rude edits reiniciam sem pedir input).
 - **Env vars injetadas** (precedência sobre `appsettings`): connection string do Postgres
-  (`easystok_demo`) e `Jwt__SecretKey` para a API; `ApiBaseUrl`/`EasyStockWebUrl` para o Admin
-  (cujo `appsettings.json` aponta para 7000/7001 inexistentes). Connection string e JWT podem ser
+  (`easystok_demo`) e `Jwt__SecretKey` para a API. Connection string e JWT podem ser
   sobrescritos por env var já presente no shell — ex.: para usar outro banco/porta.
 - **Logs e PIDs** ficam em `.build/local-env/` (fora do git): `<svc>.out.log`, `<svc>.err.log`, `<svc>.pid`.
 

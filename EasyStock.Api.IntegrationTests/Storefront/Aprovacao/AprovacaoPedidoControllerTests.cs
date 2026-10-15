@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using DotNet.Testcontainers.Builders;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
@@ -15,9 +16,11 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Testcontainers.PostgreSql;
 
 namespace EasyStock.Api.IntegrationTests.Storefront.Aprovacao;
 
@@ -39,26 +42,67 @@ namespace EasyStock.Api.IntegrationTests.Storefront.Aprovacao;
 ///   <item>Motivo inválido em recusar — 422.</item>
 /// </list>
 /// </summary>
-[Collection("ApiIntegration")]
-public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixture)
+public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
 {
-    private readonly SharedApiPostgresFixture _fixture = fixture;
+    private PostgreSqlContainer? _pg;
+    private bool _isAvailable;
 
     private static readonly Guid EmpresaId = Guid.NewGuid();
     private static readonly Guid UsuarioBabaId = Guid.NewGuid();
     private const string UsuarioBabaNome = "Babá Maria";
 
-    private WebApplicationFactory<Program> CriarFactory(bool autenticado = true)
+    public async Task InitializeAsync()
     {
-        // Env vars build-time apontando para o container COMPARTILHADO, logo antes de criar
-        // a factory (execucao serial => sem contaminacao entre classes). Ver ApiTestEnv.
-        ApiTestEnv.Aplicar(_fixture.ConnString
-            ?? throw new InvalidOperationException("Postgres compartilhado indisponível."));
+        try
+        {
+            _pg = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("easystock_aprovacao_tests")
+                .WithUsername("postgres")
+                .WithPassword("senha-de-teste-descartavel")
+                .Build();
+
+            await _pg.StartAsync();
+            _isAvailable = true;
+        }
+        catch (DockerUnavailableException)
+        {
+            _isAvailable = false;
+        }
+    }
+
+    public async Task DisposeAsync()
+    {
+        if (_pg is not null)
+            await _pg.DisposeAsync();
+    }
+
+    private WebApplicationFactory<Program> CriarFactory(bool autenticado = true, NivelAcesso nivel = NivelAcesso.Admin)
+    {
+        if (_pg is null) throw new InvalidOperationException("Postgres test container indisponível.");
 
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(b =>
             {
                 b.UseEnvironment("Development");
+                // UseSetting entra antes do Program ler a configuração (o ConfigureAppConfiguration
+                // chega tarde demais para o DatabaseProviderResolver do startup).
+                b.UseSetting("Database:Provider", "PostgreSql");
+                b.UseSetting("ConnectionStrings:DefaultConnection", _pg!.GetConnectionString());
+                b.ConfigureAppConfiguration((_, cfg) =>
+                {
+                    cfg.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["Database:Provider"] = "PostgreSql",
+                        ["ConnectionStrings:DefaultConnection"] = _pg!.GetConnectionString(),
+                        ["ConnectionStrings:Redis"] = "localhost:6379",
+                        ["Jwt:Issuer"] = "EasyStock",
+                        ["Jwt:Audience"] = "EasyStock",
+                        ["Jwt:SecretKey"] = "EasyStock-Test-SuperSecretKey-Min32Chars!!",
+                        ["Jwt:ExpirationMinutes"] = "60",
+                        ["Anthropic:Enabled"] = "false",
+                        ["FileStorage:Provider"] = "Local",
+                    });
+                });
 
                 b.ConfigureTestServices(services =>
                 {
@@ -68,7 +112,8 @@ public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixt
                     services.AddSingleton<ICurrentUserAccessor>(new StubCurrentUserAccessor(
                         empresaId: autenticado ? EmpresaId : Guid.Empty,
                         usuarioId: autenticado ? UsuarioBabaId : Guid.Empty,
-                        isAuthenticated: autenticado));
+                        isAuthenticated: autenticado,
+                        nivel: nivel));
 
                     // Sobrescreve auth: scheme "TestAuth" sempre vence; sem token → 401.
                     services
@@ -80,7 +125,11 @@ public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixt
                         .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
                             TestAuthHandler.SchemeName, _ => { });
 
-                    services.Configure<TestAuthHandlerOptions>(o => o.Authenticated = autenticado);
+                    services.Configure<TestAuthHandlerOptions>(o =>
+                    {
+                        o.Authenticated = autenticado;
+                        o.Nivel = nivel;
+                    });
                 });
             });
     }
@@ -128,7 +177,7 @@ public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixt
     [SkippableFact]
     public async Task PostAprovar_HappyPath_Retorna200ETransitaPedidoParaAprovadoBaba()
     {
-        Skip.If(!_fixture.Disponivel, "Docker/PostgreSQL unavailable");
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -141,7 +190,8 @@ public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixt
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        // F08 item 6 (#1238): envelope padrão { data, meta } da EasyStock.Api, que o console desembrulha.
+        var body = (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
         body.GetProperty("pedidoId").GetGuid().Should().Be(pedidoId);
         body.GetProperty("status").GetString().Should().Be(StatusPedidoMapper.AprovadoBaba);
         body.GetProperty("notificacaoCliente").GetProperty("enfileirada").GetBoolean().Should().BeTrue();
@@ -158,7 +208,7 @@ public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixt
     [SkippableFact]
     public async Task PostRecusar_HappyPath_Retorna200ECancelaPedido()
     {
-        Skip.If(!_fixture.Disponivel, "Docker/PostgreSQL unavailable");
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -175,7 +225,7 @@ public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixt
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        var body = (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
         body.GetProperty("pedidoId").GetGuid().Should().Be(pedidoId);
         body.GetProperty("status").GetString().Should().Be(StatusPedidoMapper.Cancelado);
         body.GetProperty("motivo").GetString().Should().Be("estoque_insuficiente");
@@ -194,7 +244,7 @@ public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixt
     [SkippableFact]
     public async Task PostAprovar_SemAuth_Retorna401()
     {
-        Skip.If(!_fixture.Disponivel, "Docker/PostgreSQL unavailable");
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory(autenticado: false);
         using var client = factory.CreateClient();
@@ -209,7 +259,7 @@ public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixt
     [SkippableFact]
     public async Task PostAprovar_PedidoInexistente_Retorna404()
     {
-        Skip.If(!_fixture.Disponivel, "Docker/PostgreSQL unavailable");
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -219,12 +269,14 @@ public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixt
             new { observacoes = (string?)null });
 
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var erro = (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error");
+        erro.GetProperty("code").GetString().Should().Be("NOT_FOUND");
     }
 
     [SkippableFact]
     public async Task PostAprovar_TenantMismatch_Retorna404()
     {
-        Skip.If(!_fixture.Disponivel, "Docker/PostgreSQL unavailable");
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -244,7 +296,7 @@ public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixt
     [SkippableFact]
     public async Task PostAprovar_PedidoJaAprovado_Retorna409ComStatusAtual()
     {
-        Skip.If(!_fixture.Disponivel, "Docker/PostgreSQL unavailable");
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -256,14 +308,17 @@ public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixt
             new { observacoes = (string?)null });
 
         resp.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("statusAtual").GetString().Should().Be(StatusPedidoMapper.AprovadoBaba);
+        // Erro no envelope { error: { code, message, details } }: o console lê error.message.
+        var erro = (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error");
+        erro.GetProperty("code").GetString().Should().Be("PEDIDO_JA_RESOLVIDO");
+        erro.GetProperty("message").GetString().Should().NotBeNullOrWhiteSpace();
+        erro.GetProperty("details").GetProperty("statusAtual").GetString().Should().Be(StatusPedidoMapper.AprovadoBaba);
     }
 
     [SkippableFact]
     public async Task PostRecusar_MotivoInvalido_Retorna422()
     {
-        Skip.If(!_fixture.Disponivel, "Docker/PostgreSQL unavailable");
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -275,6 +330,31 @@ public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixt
             new { motivo = "INVALIDO_XYZ", mensagemCliente = "qq" });
 
         resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var erro = (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error");
+        erro.GetProperty("code").GetString().Should().Be("VALIDATION_ERROR");
+    }
+
+    /// <summary>F08 item 2 (#1238): Visualizador não aprova nem recusa (recusar dispara estorno).</summary>
+    [SkippableTheory]
+    [InlineData("aprovar")]
+    [InlineData("recusar")]
+    public async Task Post_Visualizador_Retorna403SemMexerNoPedido(string acao)
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+
+        await using var factory = CriarFactory(nivel: NivelAcesso.Visualizador);
+        using var client = factory.CreateClient();
+
+        var pedidoId = await SeedPedidoAsync(factory);
+
+        var resp = await client.PostAsJsonAsync(
+            $"/api/storefront/pedidos/{pedidoId}/{acao}",
+            new { motivo = "OPERACIONAL", observacoes = (string?)null });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EasyStock.Infra.Postgre.Data.EasyStockDbContext>();
+        (await db.Pedidos.FindAsync(pedidoId))!.Status.Should().Be(StatusPedidoMapper.AguardandoAprovacaoBaba);
     }
 
     // ── Test infrastructure ─────────────────────────────────────────────────
@@ -282,12 +362,13 @@ public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixt
     private sealed class StubCurrentUserAccessor(
         Guid empresaId,
         Guid usuarioId,
-        bool isAuthenticated) : ICurrentUserAccessor
+        bool isAuthenticated,
+        NivelAcesso nivel) : ICurrentUserAccessor
     {
         public Guid EmpresaId { get; } = empresaId;
         public bool IsAuthenticated { get; } = isAuthenticated;
         public Guid UsuarioId { get; } = usuarioId;
-        public NivelAcesso Nivel => NivelAcesso.Admin;
+        public NivelAcesso Nivel { get; } = nivel;
 
         public bool TemPermissao(Permissao permissao) => true;
     }
@@ -295,6 +376,7 @@ public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixt
     public sealed class TestAuthHandlerOptions
     {
         public bool Authenticated { get; set; } = true;
+        public NivelAcesso Nivel { get; set; } = NivelAcesso.Admin;
     }
 
     private sealed class TestAuthHandler(
@@ -318,7 +400,7 @@ public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixt
                 new Claim(ClaimTypes.Name, UsuarioBabaNome),
                 new Claim("sub", UsuarioBabaId.ToString()),
                 new Claim("empresaId", EmpresaId.ToString()),
-                new Claim("nivel", NivelAcesso.Admin.ToString()),
+                new Claim("nivel", _testOptions.CurrentValue.Nivel.ToString()),
             };
             var identity = new ClaimsIdentity(claims, SchemeName);
             var principal = new ClaimsPrincipal(identity);

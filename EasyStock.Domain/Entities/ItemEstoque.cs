@@ -152,9 +152,9 @@ namespace EasyStock.Domain.Entities
             return QuantidadeAtual;
         }
 
-        public Quantidade RegistrarSaida(Quantidade quantidadeSaida, DateTime dataSaida, DateTime alteradoEm)
+        public Quantidade RegistrarSaida(Quantidade quantidadeSaida, DateTime dataSaida, DateTime alteradoEm, bool permitirVencido = false)
         {
-            GarantirDisponivelParaSaida(dataSaida);
+            GarantirDisponivelParaSaida(dataSaida, permitirVencido);
 
             if (QuantidadeAtual.Value < quantidadeSaida.Value)
                 throw new EstoqueInsuficienteException(ProdutoId, quantidadeSaida.Value, QuantidadeAtual.Value);
@@ -167,9 +167,9 @@ namespace EasyStock.Domain.Entities
             return QuantidadeAtual;
         }
 
-        public void GarantirDisponivelParaSaida(DateTime dataReferencia)
+        public void GarantirDisponivelParaSaida(DateTime dataReferencia, bool permitirVencido = false)
         {
-            GarantirOperavelParaSaida(dataReferencia);
+            GarantirOperavelParaSaida(dataReferencia, permitirVencido);
 
             if (QuantidadeAtual.Value <= 0)
                 throw new EstoqueInsuficienteException(ProdutoId, 1, QuantidadeAtual.Value);
@@ -177,14 +177,17 @@ namespace EasyStock.Domain.Entities
 
         /// <summary>
         /// Guards de operabilidade que NÃO dependem de saldo (Bloqueado/Vencido/Descartado).
-        /// Continuam valendo mesmo na saída com descoberto.
+        /// Continuam valendo mesmo na saída com descoberto. <paramref name="permitirVencido"/>
+        /// (#983) fura APENAS o guard de vencido — usado por naturezas de baixa/descarte
+        /// (<see cref="Enums.NaturezaMovimentacaoEstoqueExtensions.PermiteBaixaDeLoteVencido"/>);
+        /// Bloqueado/Descartado seguem barrando incondicionalmente.
         /// </summary>
-        private void GarantirOperavelParaSaida(DateTime dataReferencia)
+        private void GarantirOperavelParaSaida(DateTime dataReferencia, bool permitirVencido = false)
         {
             if (Status == StatusItemEstoque.Bloqueado)
                 throw new ItemEstoqueBloqueadoException(Id);
 
-            if (ValidadeEm?.EstaVencido(OperacionalFuso.DataOperacional(dataReferencia)) == true)
+            if (!permitirVencido && ValidadeEm?.EstaVencido(OperacionalFuso.DataOperacional(dataReferencia)) == true)
                 throw new ItemEstoqueVencidoException(Id, ValidadeEm.DataValidade);
 
             if (Status == StatusItemEstoque.Descartado)
@@ -195,11 +198,12 @@ namespace EasyStock.Domain.Entities
         /// Saída que permite descoberto (#540, decisão Felipe): a operação não trava quando a
         /// quantidade solicitada excede o disponível. O saldo vai a 0 e a falta é somada a
         /// <see cref="QuantidadeDescoberta"/>, auditável, para reposição posterior — sem fabricar
-        /// entrada-fantasma. Bloqueado/Vencido/Descartado continuam barrando.
+        /// entrada-fantasma. Bloqueado/Descartado continuam barrando; Vencido barra a menos que
+        /// <paramref name="permitirVencido"/> seja true (#983).
         /// </summary>
-        public Quantidade RegistrarSaidaPermitindoDescoberto(Quantidade quantidadeSaida, DateTime dataSaida, DateTime alteradoEm)
+        public Quantidade RegistrarSaidaPermitindoDescoberto(Quantidade quantidadeSaida, DateTime dataSaida, DateTime alteradoEm, bool permitirVencido = false)
         {
-            GarantirOperavelParaSaida(dataSaida);
+            GarantirOperavelParaSaida(dataSaida, permitirVencido);
 
             var disponivel = QuantidadeAtual.Value;
             if (quantidadeSaida.Value <= disponivel)
@@ -218,6 +222,27 @@ namespace EasyStock.Domain.Entities
             RecalcularIndicadores(dataSaida);
 
             return QuantidadeAtual;
+        }
+
+        /// <summary>
+        /// Desfaz uma saida (estorno/devolucao). A parte da saida que virou
+        /// <see cref="QuantidadeDescoberta"/> nunca saiu do lote, entao ela e abatida primeiro;
+        /// so o excedente volta a <see cref="QuantidadeAtual"/>. Sem isso o estorno de uma saida
+        /// com descoberto fabricava estoque fantasma.
+        /// </summary>
+        public void RestaurarSaidaEstornada(Quantidade quantidade, DateTime alteradoEm)
+        {
+            var abatida = Math.Min(QuantidadeDescoberta.Value, quantidade.Value);
+            if (abatida > 0m)
+                QuantidadeDescoberta = Quantidade.From(QuantidadeDescoberta.Value - abatida);
+
+            var resto = quantidade.Value - abatida;
+            if (resto > 0m)
+                QuantidadeAtual = QuantidadeAtual.Add(Quantidade.From(resto));
+
+            UltimaMovimentacaoEm = alteradoEm;
+            AlteradoEm = alteradoEm;
+            RecalcularIndicadores(alteradoEm);
         }
 
         public void RestaurarQuantidade(Quantidade quantidade, DateTime alteradoEm)

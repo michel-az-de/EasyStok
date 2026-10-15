@@ -506,6 +506,25 @@ html, body {
 @keyframes tooltip-fade {
   to { opacity: 1; }
 }
+/* Variante: abre para BAIXO. Obrigatoria dentro de wrapper com overflow-x:auto —
+   `overflow-x: auto` computa `overflow-y` para `auto` (nao fica `visible`), entao um
+   tooltip ancorado no <th> ou nas primeiras linhas de tabela rolavel clipa sempre.
+   Tambem serve a elementos no topo da viewport. Ver issue 967. */
+[data-tooltip][data-tooltip-pos="bottom"]:hover::after,
+[data-tooltip][data-tooltip-pos="bottom"]:focus-visible::after {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+/* Variante: texto longo. O default e `nowrap`, que so serve a rotulo curto — explicacao
+   de metrica e prosa e estourava a viewport numa linha unica. Ver issue 967. */
+[data-tooltip][data-tooltip-wide]:hover::after,
+[data-tooltip][data-tooltip-wide]:focus-visible::after {
+  white-space: normal;
+  width: max-content;
+  max-width: 32ch;
+  text-align: left;
+  line-height: 1.45;
+}
 .ui-tooltip {
   display: inline-flex;
   align-items: center;

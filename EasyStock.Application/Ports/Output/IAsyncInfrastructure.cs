@@ -1,3 +1,5 @@
+using EasyStock.Application.Ports.Output.Notifications;
+
 namespace EasyStock.Application.Ports.Output;
 
 /// <summary>
@@ -64,6 +66,14 @@ public interface IEmailService
 
     /// <summary>Envia email usando template.</summary>
     Task SendTemplateAsync(string to, string subject, string templateName, object model, bool isHtml = true);
+
+    /// <summary>
+    /// Envia uma mensagem, uma tentativa por chamada (a retentativa e do outbox). Falha de envio volta como
+    /// desfecho (<see cref="ResultadoEnvio.Desfecho"/>), nunca como excecao; so o cancelamento do
+    /// <paramref name="ct"/> propaga <see cref="OperationCanceledException"/>. Os metodos <c>SendAsync</c>
+    /// acima seguem lancando quando falha, como antes.
+    /// </summary>
+    Task<ResultadoEnvio> EnviarAsync(MensagemEmail mensagem, CancellationToken ct = default);
 }
 
 /// <summary>Anexo de email.</summary>

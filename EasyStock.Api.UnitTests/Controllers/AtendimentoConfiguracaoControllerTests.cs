@@ -1,0 +1,159 @@
+using EasyStock.Api.Controllers;
+using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Atendimento;
+using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Enums.Atendimento;
+using FluentAssertions;
+using Microsoft.AspNetCore.Mvc;
+using NSubstitute;
+
+namespace EasyStock.Api.UnitTests.Controllers;
+
+public class AtendimentoConfiguracaoControllerTests
+{
+    [Fact]
+    public async Task PutRecusaConfiguracaoDeOutraEmpresaMesmoSeRepositorioDevolver()
+    {
+        var alheia = ConfiguracaoAtendimento.CriarPadrao(Guid.NewGuid());
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns(alheia);
+        var resultado = await _controller.Put(new AtualizarConfiguracaoAtendimentoBody(
+            null, null, null, null, null, null, null, null, null, SlaRespostaMinutos: 20));
+        resultado.Should().BeOfType<BadRequestObjectResult>();
+        alheia.SlaRespostaMinutos.Should().Be(5);
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+    private readonly IConfiguracaoAtendimentoRepository _repository = Substitute.For<IConfiguracaoAtendimentoRepository>();
+    private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
+    private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
+    private readonly AtendimentoConfiguracaoController _controller;
+    private readonly Guid _empresaId = Guid.NewGuid();
+
+    public AtendimentoConfiguracaoControllerTests()
+    {
+        var obterUseCase = new ObterConfiguracaoAtendimentoUseCase(_repository);
+        var atualizarUseCase = new AtualizarConfiguracaoAtendimentoUseCase(_repository, _unitOfWork);
+        _currentUser.EmpresaId.Returns(_empresaId);
+        _controller = new AtendimentoConfiguracaoController(obterUseCase, atualizarUseCase,
+            new DefinirModeloRetomadaUseCase(_repository, _unitOfWork), _currentUser);
+    }
+
+    [Fact]
+    public async Task DefineOModeloDeRetomada()
+    {
+        var config = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns(config);
+
+        var result = await _controller.PutModeloRetomada(new ModeloRetomadaBody("retomar_conversa", null));
+
+        result.Should().BeOfType<OkObjectResult>();
+        config.ModeloRetomada.Should().Be(new ModeloRetomada("retomar_conversa", "pt_BR"));
+        await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task ModeloForaDoFormatoDaMeta400()
+    {
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns(ConfiguracaoAtendimento.CriarPadrao(_empresaId));
+
+        var result = await _controller.PutModeloRetomada(new ModeloRetomadaBody("Retomar Conversa", null));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task GetSemRegistroDevolvePadrao()
+    {
+        _repository.GetOrDefaultAsync(_empresaId).Returns(ConfiguracaoAtendimento.CriarPadrao(_empresaId));
+
+        var result = await _controller.Get();
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var data = (ConfiguracaoAtendimentoResult)ok.Value!.GetType().GetProperty("Data")!.GetValue(ok.Value)!;
+        data.RespiroMinutos.Should().Be(40);
+        data.TempoPreparoPadraoMinutos.Should().Be(60);
+        data.SlaRespostaMinutos.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task PutValida()
+    {
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns((ConfiguracaoAtendimento?)null);
+
+        var body = new AtualizarConfiguracaoAtendimentoBody(
+            "direto e simpático", NivelSugestaoAtendimento.Ativo,
+            null, null, null, null, RespiroMinutos: 20, TempoPreparoPadraoMinutos: 90, Ativo: null);
+
+        var result = await _controller.Put(body);
+
+        result.Should().BeOfType<OkObjectResult>();
+        await _repository.Received(1).AddAsync(Arg.Is<ConfiguracaoAtendimento>(c =>
+            c.EmpresaId == _empresaId && c.Tom == "direto e simpático" &&
+            c.NivelSugestao == NivelSugestaoAtendimento.Ativo &&
+            c.RespiroMinutos == 20 && c.TempoPreparoPadraoMinutos == 90));
+        await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task PutComRespiroNegativoDevolveBadRequest()
+    {
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns((ConfiguracaoAtendimento?)null);
+
+        var body = new AtualizarConfiguracaoAtendimentoBody(
+            null, null, null, null, null, null, RespiroMinutos: -1, TempoPreparoPadraoMinutos: null, Ativo: null);
+
+        var result = await _controller.Put(body);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task PutComTempoPreparoZeroDevolveBadRequest()
+    {
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns((ConfiguracaoAtendimento?)null);
+
+        var body = new AtualizarConfiguracaoAtendimentoBody(
+            null, null, null, null, null, null, RespiroMinutos: null, TempoPreparoPadraoMinutos: 0, Ativo: null);
+
+        var result = await _controller.Put(body);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task PutGravaOSlaDeResposta()
+    {
+        var config = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns(config);
+
+        var body = new AtualizarConfiguracaoAtendimentoBody(
+            null, null, null, null, null, null, null, null, null, SlaRespostaMinutos: 15);
+
+        var result = await _controller.Put(body);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var data = (ConfiguracaoAtendimentoResult)ok.Value!.GetType().GetProperty("Data")!.GetValue(ok.Value)!;
+        data.SlaRespostaMinutos.Should().Be(15);
+        config.SlaRespostaMinutos.Should().Be(15);
+        await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(241)]
+    public async Task PutComSlaForaDaFaixaDevolveBadRequest(int minutos)
+    {
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns(ConfiguracaoAtendimento.CriarPadrao(_empresaId));
+
+        var body = new AtualizarConfiguracaoAtendimentoBody(
+            null, null, null, null, null, null, null, null, null, SlaRespostaMinutos: minutos);
+
+        var result = await _controller.Put(body);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+}

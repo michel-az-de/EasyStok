@@ -1,8 +1,12 @@
 using DotNet.Testcontainers.Builders;
+using EasyStock.Api.Data;
+using EasyStock.Infra.Postgre.Data;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using Testcontainers.PostgreSql;
 
@@ -172,5 +176,35 @@ public sealed class SeedFlowIntegrationTests : IAsyncLifetime
         }
         var depois3 = await ContarBaselineAsync();
         depois3.Should().BeEquivalentTo(baseline, "startup 3x deve ser idempotente");
+    }
+
+    /// <summary>
+    /// #1092 — o bootstrap mirava <c>"Empresas"</c> (a tabela e <c>empresas</c>) e
+    /// relancava 42P01, quebrando todo seed pelo painel admin. A coluna IsSeedData foi
+    /// dropada pela migration 20260507011959 e a entidade e [NotMapped]: o bootstrap
+    /// nao pode recria-la.
+    /// </summary>
+    [SkippableFact]
+    public async Task SeedSchemaBootstrap_AposMigrations_NaoFalha_E_NaoRecriaIsSeedData()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+
+        await using var factory = CriarFactoryProduction();
+        using var _ = factory.CreateClient();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+
+        var ensure = () => SeedSchemaBootstrap.EnsureAsync(db, NullLogger.Instance);
+        await ensure.Should().NotThrowAsync();
+
+        await using var conn = new NpgsqlConnection(_pg!.GetConnectionString());
+        await conn.OpenAsync();
+        var colunasSeed = await ScalarIntAsync(conn,
+            "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'empresas' AND column_name = 'IsSeedData'");
+        colunasSeed.Should().Be(0, "IsSeedData foi dropada de proposito e e [NotMapped] no dominio");
+        var seedRunLogs = await ScalarIntAsync(conn,
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'SeedRunLogs'");
+        seedRunLogs.Should().Be(1);
     }
 }

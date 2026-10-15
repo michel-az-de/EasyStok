@@ -32,6 +32,7 @@ public sealed class InAppCanal(
                 mensagem: mensagem.Corpo,
                 referenciaId: mensagem.OutboxId);
 
+            if (!string.IsNullOrWhiteSpace(mensagem.Assunto)) notificacao.Titulo = mensagem.Assunto;
             notificacao.UsuarioId = usuarioId;
             notificacao.OutboxMensagemId = mensagem.OutboxId;
 

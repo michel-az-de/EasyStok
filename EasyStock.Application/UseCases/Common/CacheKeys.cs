@@ -43,6 +43,26 @@ public static class CacheKeys
         "plano:listagem";
 
     /// <summary>
+    /// Sessão do usuário para o validador do JWT (#1352): valor <c>SessaoDoUsuario</c> por 60 s. Chave global
+    /// (usuário não tem empresa) e versionada: mudar o formato do valor sobe o <c>v1</c>.
+    /// </summary>
+    public static string Sessao(Guid usuarioId) =>
+        $"sessao:v1:{usuarioId:N}";
+
+    /// <summary>Validade da entrada <see cref="Sessao"/>: teto de quanto uma revogação demora entre réplicas sem Redis.</summary>
+    public static readonly TimeSpan SessaoTtl = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// SLA de primeira resposta que a inbox do atendimento repete em toda linha (#1566): minutos efetivos, por empresa.
+    /// Salvar a configuração apaga a chave; sem cache compartilhado entre réplicas o valor novo aparece em até
+    /// <see cref="AtendimentoSlaRespostaTtl"/>.
+    /// </summary>
+    public static string AtendimentoSlaResposta(Guid empresaId) =>
+        $"atendimento:sla-resposta:{empresaId}";
+
+    public static readonly TimeSpan AtendimentoSlaRespostaTtl = TimeSpan.FromSeconds(60);
+
+    /// <summary>
     /// Retorna todas as chaves de cache relacionadas a um produto específico.
     /// </summary>
     public static IReadOnlyList<string> ProdutoRelacionadas(Guid empresaId, Guid produtoId) =>

@@ -1,0 +1,139 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8" /><title>Comanda #A7F3C21B</title><style>@page{size:80mm auto;margin:0}@font-face{font-family:"Lora";src:url("https://api.test/impressao/fontes/Lora.ttf") format("truetype");font-weight:400 700;font-style:normal}@font-face{font-family:"Nunito Sans";src:url("https://api.test/impressao/fontes/NunitoSans.ttf") format("truetype");font-weight:200 1000;font-style:normal}/* Impressos "bilhete da casa" (#1632). Layout aprovado: docs/plan/atendimento-whatsapp/impressos/impressos-v4-proposta.html
+   Termica (.termica): so preto, um bloco chapado por via. Jato de tinta (.tinta): papel branco, cor em texto, filete, chip e painel. */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #fff; }
+.im{--lora:"Lora",Georgia,serif;--nunito:"Nunito Sans",system-ui,sans-serif;--f0:.75em;--f2:1.333em;--f3:1.777em;--f4:2.369em;--f5:3.16em;
+  box-sizing:border-box;color:var(--tinta);font:400 var(--u)/1.4 var(--nunito);display:flex;flex-direction:column;gap:var(--s3);padding:var(--mg);width:var(--w);
+  -webkit-print-color-adjust:exact;print-color-adjust:exact;text-align:left}
+.im *{box-sizing:border-box;margin:0}
+.im.tinta{--tinta:#422814;--apoio:#6b523d;--acento:#2F5A45;--marca:#A25803;--linha:#DCC9AD;--fio:.3mm;--fio2:.7mm;--p0:400;background:#fff}
+.im.termica{--tinta:#000;--apoio:#000;--acento:#000;--marca:#000;--linha:#000;--fio:.25mm;--fio2:.75mm;--p0:700;background:#fff}
+.im.s-a4{--w:210mm;min-height:297mm;--mg:13mm 14mm 9mm;--u:12pt;--s1:2mm;--s2:4mm;--s3:8mm;--qr:30mm;--lg:50mm}
+.im.s-a5{--w:148mm;min-height:210mm;--mg:9mm 10mm 7mm;--u:9.4pt;--s1:1.5mm;--s2:3mm;--s3:6mm;--qr:24mm;--lg:38mm}
+.im.s-1015{--w:100mm;min-height:150mm;--mg:4mm 5mm;--u:7.5pt;--s1:.9mm;--s2:1.8mm;--s3:3.4mm;--qr:18.5mm;--lg:34mm}
+.im.s-80{--w:80mm;--mg:4mm 5mm 7mm;--u:8.8pt;--s1:1.2mm;--s2:2.4mm;--s3:4.8mm;--qr:23.125mm;--lg:40mm}
+.im.s-58{--w:58mm;--mg:3mm 6mm 7mm;--u:7.6pt;--s1:1mm;--s2:2mm;--s3:4mm;--qr:18.5mm;--lg:34mm}
+.im .cab{display:flex;flex-direction:column;align-items:center;gap:var(--s1);text-align:center;padding-bottom:var(--s2);border-bottom:calc(var(--fio)*4) double var(--marca)}
+.im .logo{display:block;width:var(--lg);height:auto;max-height:calc(var(--lg)*.72);object-fit:contain}
+.im.termica .logo{filter:grayscale(1) contrast(4.2);margin-bottom:0}
+.im.s-1015.d-agendamento{--lg:26mm;--s3:2.1mm}
+.im .wm{font:700 var(--f4)/.9 var(--lora)}
+.im .wm small{display:block;font:500 .42em/1.25 var(--lora)}
+.im .lema,.im .rot{font:700 var(--f0)/1.3 var(--nunito);letter-spacing:.12em;text-transform:uppercase}
+.im .lema{color:var(--acento)}
+.im .rot{display:block}
+.im .id{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap}
+.im .chip{background:var(--acento);color:#fff;font:700 1em/1.1 var(--nunito);padding:.4em .8em;border-radius:.5em;white-space:nowrap}
+.im .quando{font-weight:700}
+.im h1{font:500 var(--f4)/1.08 var(--lora);text-wrap:balance}
+.im h1.forte{font-weight:700}
+.im h2{font:italic 500 var(--f2)/1.2 var(--lora);color:var(--acento)}
+.im h3{font:700 var(--f2)/1.15 var(--lora)}
+.im p{text-wrap:pretty}
+.im .dado{font-size:var(--f2);line-height:1.25}
+.im .nota{font-size:var(--f0);font-weight:var(--p0);color:var(--apoio)}
+.im .sec{display:flex;flex-direction:column;gap:var(--s2)}
+.im .f{border-top:var(--fio) solid var(--linha);padding-top:var(--s3);display:flex;flex-direction:column;gap:var(--s2)}
+.im .f:empty{display:none}
+.im .its{display:flex;flex-direction:column;gap:var(--s2)}
+.im .it{display:grid;grid-template-columns:minmax(1.7em,auto) 1fr auto;column-gap:.7em;align-items:baseline;break-inside:avoid}
+.im .it .q,.im .kit .q{font:700 var(--f2)/1 var(--lora);text-align:right}
+.im .it .n{font-weight:700;line-height:1.25}
+.im .it .n small{display:block;font:var(--p0) var(--f0)/1.3 var(--nunito);color:var(--apoio)}
+.im .v{white-space:nowrap;font-variant-numeric:tabular-nums}
+.im .tot{border-top:var(--fio2) solid var(--tinta);padding-top:var(--s2);margin-top:var(--s1);display:flex;flex-direction:column;gap:var(--s1)}
+.im .ln{display:flex;justify-content:space-between;gap:1em;align-items:baseline}
+.im .ln.total{font:700 var(--f3)/1.15 var(--lora)}
+.im .pago{font:italic 500 var(--f2)/1.25 var(--lora);color:var(--acento)}
+.im .barra{border-left:var(--fio2) solid var(--marca);padding-left:.6em;font-weight:700}
+.im .alerta{background:#000;color:#fff;padding:var(--s2) var(--s2);border-radius:.35em;font:700 var(--f2)/1.15 var(--nunito);letter-spacing:.03em;break-inside:avoid}
+.im .alerta small{display:block;font:700 .56em/1.4 var(--nunito);letter-spacing:.12em;text-transform:uppercase}
+.im.tinta .alerta{background:#fff;color:var(--tinta);border:var(--fio2) solid var(--tinta)}
+.im.tinta .alerta.frio{background:#E4EDE6;color:var(--acento);border:0}
+.im .qrl{display:flex;gap:var(--s2);align-items:flex-end;justify-content:space-between;break-inside:avoid}
+.im .qrl>div{display:flex;flex-direction:column;gap:var(--s1);min-width:0}
+.im .qr{width:var(--qr);height:var(--qr);flex:none;display:block;background:#fff}
+.im .fecho{display:flex;flex-direction:column;align-items:center;gap:var(--s1);text-align:center;margin-top:auto;padding-top:var(--s2);break-inside:avoid}
+.im .orn{width:46%;min-width:26mm;height:auto;color:var(--marca)}
+.im .frase{font:italic 500 var(--f2)/1.25 var(--lora);text-wrap:balance}
+.im .ass{font:700 var(--f0)/1.3 var(--nunito);letter-spacing:.12em;text-transform:uppercase}
+.im .pe{font:var(--p0) var(--f0)/1.4 var(--nunito);text-align:center;color:var(--apoio);text-wrap:balance}
+/* A4 e A5: folha clara sobre creme e painel de serviço */
+.im .cols{display:grid;grid-template-columns:8fr 4fr;gap:var(--s2);flex:1;align-items:stretch}
+.im .folha{border:var(--fio) solid var(--linha);border-radius:3.5mm;padding:var(--s3);display:flex;flex-direction:column;gap:var(--s3);min-width:0}
+.im .painel{background:#E4EDE6;border-radius:3.5mm;padding:var(--s3) var(--s2);display:flex;flex-direction:column;gap:var(--s3);min-width:0}
+.im .painel .qrl{margin-top:auto;flex-direction:column;align-items:flex-start}
+.im .painel .qr{padding:1.5mm;width:calc(var(--qr) + 3mm);height:calc(var(--qr) + 3mm);border-radius:1.5mm}
+/* entrega: via do entregador */
+.im .via{display:flex;flex-direction:column;gap:var(--s2)}
+.im .duo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s2) var(--s3)}
+.im .duo b{display:block;line-height:1.25}
+.im .corte{border-top:var(--fio) dashed var(--tinta);padding-top:var(--s1);text-align:center;font:700 var(--f0)/1.2 var(--nunito);letter-spacing:.12em;text-transform:uppercase}
+/* canhoto de cozinha */
+.im .kh{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--s3);border-bottom:var(--fio2) solid var(--tinta);padding-bottom:var(--s2)}
+.im .kh b{display:block;font:700 var(--f5)/.92 var(--lora)}
+.im .kh .dir{text-align:right}
+.im .klista{display:flex;flex-direction:column;gap:var(--s2)}
+.im .grp{display:flex;justify-content:space-between;gap:1em;border-bottom:var(--fio) solid var(--tinta);padding-bottom:var(--s1);margin-top:var(--s1)}
+.im.tinta .grp .rot{color:var(--acento)}
+.im .kit{display:grid;grid-template-columns:minmax(1.9em,auto) 1fr auto;column-gap:.7em;align-items:center;break-inside:avoid}
+.im .kit .q{font-size:var(--f3)}
+.im .kit .n{font:700 var(--f2)/1.2 var(--nunito)}
+.im .kit .n small{display:block;font:700 .75em/1.35 var(--nunito);margin-top:.15em}
+.im .chk{width:1.5em;height:1.5em;border:var(--fio2) solid var(--tinta);border-radius:.15em;flex:none}
+.im .ass2{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3)}
+.im .ass2 i{display:block;height:2.2em;border-bottom:var(--fio) solid var(--tinta)}
+.im .painel .ass2{grid-template-columns:1fr}
+.im .un{white-space:nowrap}
+.im .pe span{white-space:nowrap}
+.im .selo{display:inline-block;border:var(--fio2) solid var(--tinta);padding:0 .45em;font:700 .75em/1.5 var(--nunito);letter-spacing:.12em;vertical-align:.1em}
+.im .painel{justify-content:space-between}
+.im .ln.total{flex-wrap:wrap}
+.im .chk{width:max(1.5em,5mm);height:max(1.5em,5mm)}
+.im .via .duo b{font-size:1.15em}
+.im.termica{font-weight:600}
+.im.termica .cab{border-bottom-width:1.125mm}
+.im.termica .alerta small{font-size:.7em}
+.im.s-58 .un{display:block;font-weight:600}
+.im.s-a4.d-cozinha{--u:13.2pt}
+.im.s-1015.v1{justify-content:space-between}
+.im b{font-weight:700}
+.im .duo b{white-space:normal;overflow-wrap:anywhere}
+.im.s-1015.v1 .duo{grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s2)}
+.im.s-1015.v1 .duo b{font-size:1em}
+.im.s-1015.v2{--u:8.4pt}
+.im.s-58 .selo{display:table;margin-bottom:.3em}
+.im.s-1015.v2 h1{font-size:2.2em}
+.im.s-1015.v2 .f{margin-top:auto}
+.im.s-1015.v2 .fecho{margin-top:0}
+/* térmicas: sem caixa, só filete e espaço */
+.im.s-80 .qrl,.im.s-58 .qrl{flex-direction:row-reverse;justify-content:flex-end;align-items:center}
+.im.s-58 h1{font-size:var(--f3)}
+.im.s-58 .duo,.im.s-58 .ass2{grid-template-columns:1fr}
+.im.s-58 .kh b{font-size:2.8em}
+.im.s-1015 h1{font-size:var(--f3)}
+.im.s-1015 .kh b{font-size:2.8em}
+.im.s-1015{--s3:2.8mm}
+.im.s-1015 h1{font-size:1.6em}
+.im.s-1015 .fecho .orn,.im.s-1015 .fecho .ass{display:none}
+.im.s-1015 .fecho{padding-top:0}
+.im.s-1015.d-agendamento .fecho{display:none}
+.im.s-1015.v1{--u:14pt;--s3:6mm;--s2:3.6mm}
+.im .via+.pe{margin-top:auto}
+.im.s-1015 .kit .n{font-size:1.2em}.im.s-1015 .kit .q{font-size:var(--f2)}.im.s-1015.d-cozinha{--s2:1.1mm;--s3:2.2mm}
+.im.s-a5 .cols{grid-template-columns:7fr 5fr}
+.im.s-a5{--s3:4.6mm}
+.im.s-a5.d-pedido{--s3:4mm}
+.im.s-a5.d-entrega{--u:8.6pt;--s3:3.5mm;--lg:26mm}
+.im.s-a4.d-entrega{--s3:6mm;--lg:40mm}
+/* duas vias: a impressora corta a cada pagina */
+.im.v1{break-after:page}
+.im .kh b.cod{font-size:var(--f3);line-height:1.2}
+</style></head><body><article class="im s-80 termica d-cozinha">
+<div class="alerta"><b>ALERGIA: CASTANHA</b><small>cadastro da cliente · confira todos os itens</small></div>
+<div class="kh"><div><span class="rot">Pedido</span><b>042</b></div><div class="dir"><span class="rot">Pronto até · sex 02/10</span><b>09:30</b></div></div>
+<p class="dado"><span class="selo">AGENDADO</span> <b>Mariana Souza</b> · entrega 10–11h · Motoboy · 5 itens</p>
+<div class="klista"><div class="grp"><span class="rot">Preparar em casa</span><span class="rot">3 itens</span></div><div class="kit"><span class="q">2</span><span class="n">Nhoque de batata <span class="un">· 800 g</span><small>MOLHO: SUGO</small></span><i class="chk"></i></div><div class="kit"><span class="q">1</span><span class="n">Lasanha à bolonhesa <span class="un">· Família</span><small class="barra">OBS: cortar em 6 pedaços</small></span><i class="chk"></i></div><div class="kit"><span class="q">0,5 kg</span><span class="n">Massa fresca de espinafre<small>MOLHO: MANTEIGA E SÁLVIA</small></span><i class="chk"></i></div><div class="grp"><span class="rot">Para servir</span><span class="rot">2 itens</span></div><div class="kit"><span class="q">1</span><span class="n">Talharim ao pesto <span class="un">· 400 g</span></span><i class="chk"></i></div><div class="kit"><span class="q">3</span><span class="n">Pão de queijo recheado</span><i class="chk"></i></div></div><div class="f"><div class="sec"><span class="rot">Observação do pedido</span><p class="dado">Embalar os pães separados</p></div></div><div class="ass2"><div><span class="rot">Feito por</span><i></i></div><div><span class="rot">Embalado por</span><i></i></div></div><div class="f"><div class="qrl"><div><h3>Código do pedido</h3><p>#A7F3C21B</p></div><svg class="qr" viewBox="0 0 29 29" shape-rendering="crispEdges" role="img" aria-label="QR code"><path fill="#000" d="M4 4h1v1h-1zM5 4h1v1h-1zM6 4h1v1h-1zM7 4h1v1h-1zM8 4h1v1h-1zM9 4h1v1h-1zM10 4h1v1h-1zM14 4h1v1h-1zM18 4h1v1h-1zM19 4h1v1h-1zM20 4h1v1h-1zM21 4h1v1h-1zM22 4h1v1h-1zM23 4h1v1h-1zM24 4h1v1h-1zM4 5h1v1h-1zM10 5h1v1h-1zM14 5h1v1h-1zM15 5h1v1h-1zM16 5h1v1h-1zM18 5h1v1h-1zM24 5h1v1h-1zM4 6h1v1h-1zM6 6h1v1h-1zM7 6h1v1h-1zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM13 6h1v1h-1zM14 6h1v1h-1zM15 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM21 6h1v1h-1zM22 6h1v1h-1zM24 6h1v1h-1zM4 7h1v1h-1zM6 7h1v1h-1zM7 7h1v1h-1zM8 7h1v1h-1zM10 7h1v1h-1zM12 7h1v1h-1zM15 7h1v1h-1zM16 7h1v1h-1zM18 7h1v1h-1zM20 7h1v1h-1zM21 7h1v1h-1zM22 7h1v1h-1zM24 7h1v1h-1zM4 8h1v1h-1zM6 8h1v1h-1zM7 8h1v1h-1zM8 8h1v1h-1zM10 8h1v1h-1zM12 8h1v1h-1zM13 8h1v1h-1zM14 8h1v1h-1zM15 8h1v1h-1zM16 8h1v1h-1zM18 8h1v1h-1zM20 8h1v1h-1zM21 8h1v1h-1zM22 8h1v1h-1zM24 8h1v1h-1zM4 9h1v1h-1zM10 9h1v1h-1zM12 9h1v1h-1zM14 9h1v1h-1zM16 9h1v1h-1zM18 9h1v1h-1zM24 9h1v1h-1zM4 10h1v1h-1zM5 10h1v1h-1zM6 10h1v1h-1zM7 10h1v1h-1zM8 10h1v1h-1zM9 10h1v1h-1zM10 10h1v1h-1zM12 10h1v1h-1zM14 10h1v1h-1zM16 10h1v1h-1zM18 10h1v1h-1zM19 10h1v1h-1zM20 10h1v1h-1zM21 10h1v1h-1zM22 10h1v1h-1zM23 10h1v1h-1zM24 10h1v1h-1zM12 11h1v1h-1zM14 11h1v1h-1zM15 11h1v1h-1zM16 11h1v1h-1zM4 12h1v1h-1zM6 12h1v1h-1zM7 12h1v1h-1zM8 12h1v1h-1zM9 12h1v1h-1zM10 12h1v1h-1zM16 12h1v1h-1zM18 12h1v1h-1zM19 12h1v1h-1zM20 12h1v1h-1zM21 12h1v1h-1zM22 12h1v1h-1zM4 13h1v1h-1zM7 13h1v1h-1zM11 13h1v1h-1zM12 13h1v1h-1zM14 13h1v1h-1zM16 13h1v1h-1zM19 13h1v1h-1zM21 13h1v1h-1zM22 13h1v1h-1zM23 13h1v1h-1zM4 14h1v1h-1zM8 14h1v1h-1zM10 14h1v1h-1zM12 14h1v1h-1zM13 14h1v1h-1zM15 14h1v1h-1zM17 14h1v1h-1zM20 14h1v1h-1zM21 14h1v1h-1zM22 14h1v1h-1zM24 14h1v1h-1zM5 15h1v1h-1zM7 15h1v1h-1zM12 15h1v1h-1zM19 15h1v1h-1zM20 15h1v1h-1zM21 15h1v1h-1zM22 15h1v1h-1zM4 16h1v1h-1zM5 16h1v1h-1zM6 16h1v1h-1zM10 16h1v1h-1zM15 16h1v1h-1zM17 16h1v1h-1zM20 16h1v1h-1zM22 16h1v1h-1zM23 16h1v1h-1zM24 16h1v1h-1zM12 17h1v1h-1zM13 17h1v1h-1zM15 17h1v1h-1zM16 17h1v1h-1zM17 17h1v1h-1zM18 17h1v1h-1zM19 17h1v1h-1zM21 17h1v1h-1zM23 17h1v1h-1zM4 18h1v1h-1zM5 18h1v1h-1zM6 18h1v1h-1zM7 18h1v1h-1zM8 18h1v1h-1zM9 18h1v1h-1zM10 18h1v1h-1zM16 18h1v1h-1zM18 18h1v1h-1zM19 18h1v1h-1zM22 18h1v1h-1zM4 19h1v1h-1zM10 19h1v1h-1zM12 19h1v1h-1zM14 19h1v1h-1zM15 19h1v1h-1zM16 19h1v1h-1zM17 19h1v1h-1zM18 19h1v1h-1zM19 19h1v1h-1zM4 20h1v1h-1zM6 20h1v1h-1zM7 20h1v1h-1zM8 20h1v1h-1zM10 20h1v1h-1zM12 20h1v1h-1zM13 20h1v1h-1zM14 20h1v1h-1zM16 20h1v1h-1zM19 20h1v1h-1zM22 20h1v1h-1zM23 20h1v1h-1zM4 21h1v1h-1zM6 21h1v1h-1zM7 21h1v1h-1zM8 21h1v1h-1zM10 21h1v1h-1zM12 21h1v1h-1zM16 21h1v1h-1zM19 21h1v1h-1zM21 21h1v1h-1zM22 21h1v1h-1zM4 22h1v1h-1zM6 22h1v1h-1zM7 22h1v1h-1zM8 22h1v1h-1zM10 22h1v1h-1zM12 22h1v1h-1zM13 22h1v1h-1zM14 22h1v1h-1zM15 22h1v1h-1zM17 22h1v1h-1zM20 22h1v1h-1zM21 22h1v1h-1zM4 23h1v1h-1zM10 23h1v1h-1zM24 23h1v1h-1zM4 24h1v1h-1zM5 24h1v1h-1zM6 24h1v1h-1zM7 24h1v1h-1zM8 24h1v1h-1zM9 24h1v1h-1zM10 24h1v1h-1zM12 24h1v1h-1zM13 24h1v1h-1zM15 24h1v1h-1zM17 24h1v1h-1zM19 24h1v1h-1zM22 24h1v1h-1z"/></svg></div></div>
+<footer class="pe"><span>Solicitado 30/09 14:32</span> · <span>#A7F3C21B</span> · <span>impresso 02/10 07:40</span></footer>
+</article>
+</body></html>

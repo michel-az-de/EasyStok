@@ -91,7 +91,7 @@ public class ContaPagarTests
         c.Emitir();
         // Simular conta paga
         var pag = PagamentoParcela.CriarConfirmado(Empresa, TipoLadoFinanceiro.Pagar, 100m, "dinheiro", DateTime.UtcNow);
-        c.Parcelas.First().RegistrarPagamento(pag);
+        c.Parcelas.First().RegistrarPagamento(pag, DateTime.UtcNow);
         c.AtualizarStatusPorParcelas();
         c.Status.Should().Be(StatusContaFinanceira.Paga);
 
@@ -177,7 +177,7 @@ public class ContaPagarTests
         c.Emitir();
 
         var pag = PagamentoParcela.CriarConfirmado(Empresa, TipoLadoFinanceiro.Pagar, 100m, "dinheiro", DateTime.UtcNow);
-        c.Parcelas.First().RegistrarPagamento(pag);
+        c.Parcelas.First().RegistrarPagamento(pag, DateTime.UtcNow);
         c.AtualizarStatusPorParcelas();
         c.Status.Should().Be(StatusContaFinanceira.ParcialmentePaga);
     }

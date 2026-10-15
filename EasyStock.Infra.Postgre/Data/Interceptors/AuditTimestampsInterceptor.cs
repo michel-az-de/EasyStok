@@ -49,12 +49,16 @@ public sealed class AuditTimestampsInterceptor : SaveChangesInterceptor
                 case EntityState.Added:
                     SetIfDefault(entry, "CriadoEm", now);
                     SetIfDefault(entry, "AlteradoEm", now);
+                    // #1520 (ADR-0060): carimbo do servidor das tabelas mobile_*, filtro e cursor
+                    // do pull do PWA. Sempre o relogio daqui, nunca o valor que veio do aparelho.
+                    SetAlways(entry, "ServerUpdatedAt", now);
                     break;
 
                 case EntityState.Modified:
                     // Nunca alterar CriadoEm em update.
                     PreserveOriginal(entry, "CriadoEm");
                     SetAlways(entry, "AlteradoEm", now);
+                    SetAlways(entry, "ServerUpdatedAt", now);
                     break;
 
                 case EntityState.Deleted:

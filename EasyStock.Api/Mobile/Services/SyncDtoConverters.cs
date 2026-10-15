@@ -17,7 +17,7 @@ internal static class SyncDtoConverters
 
     internal static ProductDto ToDto(Product p) =>
         new(p.Id, p.Name, p.Emoji, p.Category, p.Unit, p.Price, p.Stock, p.IsCustom,
-            p.Sku, p.DefaultWeightG, p.DefaultValidityDays);
+            p.Sku, p.DefaultWeightG, p.DefaultValidityDays, Cost: p.Cost, MinStock: p.MinStock);
 
     /// <summary>
     /// Overload C2 (RDC 727/2022): popula TipoEmbalagem sem N+1 no Pull.
@@ -28,7 +28,7 @@ internal static class SyncDtoConverters
         if (p.ErpProductId.HasValue && tipoEmbMap.TryGetValue(p.ErpProductId.Value, out var t))
             tipo = t.ToString();
         return new ProductDto(p.Id, p.Name, p.Emoji, p.Category, p.Unit, p.Price, p.Stock, p.IsCustom,
-            p.Sku, p.DefaultWeightG, p.DefaultValidityDays, tipo);
+            p.Sku, p.DefaultWeightG, p.DefaultValidityDays, tipo, p.Cost, p.MinStock);
     }
 
     internal static ClientDto ToDto(Client c) =>
@@ -52,7 +52,8 @@ internal static class SyncDtoConverters
                 : (long?)null,
             ScheduledDeliveryAt: o.ScheduledDeliveryAt.HasValue
                 ? new DateTimeOffset(o.ScheduledDeliveryAt.Value).ToUnixTimeMilliseconds()
-                : (long?)null);
+                : (long?)null,
+            Metodo: o.Metodo);
 
     internal static BatchDto ToDto(Batch b) =>
         new(b.Id, b.Code,
@@ -64,11 +65,24 @@ internal static class SyncDtoConverters
                     : (long?)null)).ToList(),
             b.BatchPhoto,
             new DateTimeOffset(b.CreatedAt).ToUnixTimeMilliseconds(),
-            b.Lote);
+            b.Lote,
+            Deleted: b.Excluido ? true : null,
+            DeletedAt: EpochMs(b.DeletedAt),
+            DeletedBy: b.DeletedBy,
+            Discarded: b.Descartado ? true : null,
+            DiscardedAt: EpochMs(b.DiscardedAt),
+            DiscardedBy: b.DiscardedBy,
+            DiscardReason: b.DiscardReason);
+
+    private static long? EpochMs(DateTime? d) =>
+        d.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(d.Value, DateTimeKind.Utc)).ToUnixTimeMilliseconds() : null;
 
     internal static CashEntryDto ToDto(CashEntry c) =>
         new(c.Id, c.Type, c.Amount, c.Description,
-            new DateTimeOffset(c.CreatedAt).ToUnixTimeMilliseconds());
+            new DateTimeOffset(c.CreatedAt).ToUnixTimeMilliseconds(),
+            // #1520: excluido no PWA desce como estornado; o aparelho ja some com ele (F7-B).
+            Estornado: c.DeletedAt != null ? true : null,
+            Metodo: c.Metodo);
 
     internal static JsonElement Serialize<T>(T obj)
     {

@@ -1,0 +1,15 @@
+{
+  "_fonte": "Decisão do Felipe em 02/10/2026: terça a sábado, manhã e tarde, 3 vagas por janela (6 entregas por dia, como a agenda de papel). diaDaSemana segue o DayOfWeek do .NET: 0 = domingo, 2 = terça, 6 = sábado.",
+  "janelas": [
+    { "diaDaSemana": 2, "horaInicio": "09:00", "horaFim": "12:00", "capacidade": 3, "label": "Manhã" },
+    { "diaDaSemana": 2, "horaInicio": "14:00", "horaFim": "17:00", "capacidade": 3, "label": "Tarde" },
+    { "diaDaSemana": 3, "horaInicio": "09:00", "horaFim": "12:00", "capacidade": 3, "label": "Manhã" },
+    { "diaDaSemana": 3, "horaInicio": "14:00", "horaFim": "17:00", "capacidade": 3, "label": "Tarde" },
+    { "diaDaSemana": 4, "horaInicio": "09:00", "horaFim": "12:00", "capacidade": 3, "label": "Manhã" },
+    { "diaDaSemana": 4, "horaInicio": "14:00", "horaFim": "17:00", "capacidade": 3, "label": "Tarde" },
+    { "diaDaSemana": 5, "horaInicio": "09:00", "horaFim": "12:00", "capacidade": 3, "label": "Manhã" },
+    { "diaDaSemana": 5, "horaInicio": "14:00", "horaFim": "17:00", "capacidade": 3, "label": "Tarde" },
+    { "diaDaSemana": 6, "horaInicio": "09:00", "horaFim": "12:00", "capacidade": 3, "label": "Manhã" },
+    { "diaDaSemana": 6, "horaInicio": "14:00", "horaFim": "17:00", "capacidade": 3, "label": "Tarde" }
+  ]
+}

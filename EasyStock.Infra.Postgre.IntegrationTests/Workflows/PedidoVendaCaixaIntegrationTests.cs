@@ -1,0 +1,408 @@
+using EasyStock.Application.DependencyInjection;
+using EasyStock.Application.Ports.Output;
+using EasyStock.Application.UseCases.CriarPedido;
+using EasyStock.Application.UseCases.AtualizarStatusPedido;
+using EasyStock.Application.UseCases.CancelarPedido;
+using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
+using EasyStock.Application.UseCases.Common;
+using EasyStock.Domain.Entities;
+using EasyStock.Domain.Entities.Storefront;
+using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
+using EasyStock.Domain.Enums;
+using EasyStock.Domain.ValueObjects;
+using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.DependencyInjection;
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
+
+namespace EasyStock.Infra.Postgre.IntegrationTests.Workflows;
+
+/// <summary>
+/// Pedido → Venda → Caixa ponta a ponta contra Postgres real:
+/// produtos com estoque -> criar pedido -> status Pronto (saida de estoque) ->
+/// pagamentos parciais -> status Entregue -> caixa reflete tudo.
+///
+/// Diferente de <see cref="FinalizarVendaBalcaoIntegrationTests"/>: aqui usamos
+/// produtos EXISTENTES (ja com estoque) e os use cases individuais
+/// (CriarPedido + AtualizarStatusPedido + RegistrarPagamentoPedido) em vez do
+/// orquestrador monolitico do balcao.
+///
+/// Construido via DI de PRODUCAO.
+/// </summary>
+public class PedidoVendaCaixaIntegrationTests(PostgreSqlDatabaseFixture fixture)
+    : IClassFixture<PostgreSqlDatabaseFixture>
+{
+    [SkippableFact]
+    public async Task Pedido_com_produtos_existentes_paga_em_duas_vezes_e_caixa_bate()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId1 = Guid.NewGuid();
+        var produtoId2 = Guid.NewGuid();
+        // issue 1031: os literais de data que existiam aqui nao chegavam ao pagamento — o use case
+        // usa DateTime.UtcNow — e so alimentavam a assercao do caixa, envelhecendo com o relogio.
+
+        // ── 1. Seed: empresa + loja + categoria + 2 produtos com estoque ────
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.Set<Empresa>().Add(new Empresa
+            {
+                Id = empresaId, Nome = "Empresa E2E",
+                Documento = $"{Random.Shared.Next(100000, 999999)}",
+                CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            });
+            seed.Set<Loja>().Add(new Loja
+            {
+                Id = lojaId, EmpresaId = empresaId, Nome = "Loja E2E", Ativa = true,
+                CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            });
+            seed.Set<Categoria>().Add(new Categoria
+            {
+                Id = categoriaId, EmpresaId = empresaId, Nome = "Geral",
+                CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            });
+            seed.Set<Produto>().AddRange(
+                new Produto
+                {
+                    Id = produtoId1, EmpresaId = empresaId, CategoriaId = categoriaId,
+                    Nome = "Produto A", Tipo = TipoProduto.Fisico, Status = StatusProduto.Ativo,
+                    PrecoReferencia = Dinheiro.FromDecimal(50m),
+                    CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+                },
+                new Produto
+                {
+                    Id = produtoId2, EmpresaId = empresaId, CategoriaId = categoriaId,
+                    Nome = "Produto B", Tipo = TipoProduto.Fisico, Status = StatusProduto.Ativo,
+                    PrecoReferencia = Dinheiro.FromDecimal(30m),
+                    CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+                });
+
+            // Estoque inicial: 10 unidades do A a R$20, 5 unidades do B a R$15
+            seed.Set<ItemEstoque>().AddRange(
+                new ItemEstoque
+                {
+                    Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId1,
+                    QuantidadeInicial = Quantidade.From(10m),
+                    QuantidadeAtual = Quantidade.From(10m), CustoUnitario = Dinheiro.FromDecimal(20m),
+                    CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+                },
+                new ItemEstoque
+                {
+                    Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId2,
+                    QuantidadeInicial = Quantidade.From(5m),
+                    QuantidadeAtual = Quantidade.From(5m), CustoUnitario = Dinheiro.FromDecimal(15m),
+                    CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+                });
+
+            await seed.SaveChangesAsync();
+        }
+
+        // ── 2. Orquestrador via DI de producao ─────────────────────────────
+        await using var provider = BuildProductionProvider();
+
+        // ── 3. Criar pedido com 2 itens (2x A a R$50 + 1x B a R$30 = R$130) ─
+        Guid pedidoId;
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(empresaId);
+
+            var useCase = scope.ServiceProvider.GetRequiredService<CriarPedidoUseCase>();
+            var result = await useCase.ExecuteAsync(new CriarPedidoCommand(
+                EmpresaId: empresaId,
+                LojaId: lojaId,
+                ClienteId: null,
+                ClienteNomeAdHoc: "Cliente Balcao",
+                Itens:
+                [
+                    new CriarPedidoItemInput(Nome: "Produto A", Quantidade: 2, PrecoUnitario: 50m, ProdutoId: produtoId1),
+                    new CriarPedidoItemInput(Nome: "Produto B", Quantidade: 1, PrecoUnitario: 30m, ProdutoId: produtoId2)
+                ],
+                Origem: "web"));
+
+            pedidoId = result.Id;
+            result.Total.Should().Be(130m);
+        }
+
+        // ── 4. Status: Aguardando -> Preparando -> Pronto (saida estoque) ──
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(empresaId);
+
+            var useCase = scope.ServiceProvider.GetRequiredService<AtualizarStatusPedidoUseCase>();
+            await useCase.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedidoId, "preparando", null, null, "web"));
+            await useCase.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedidoId, "pronto", null, null, "web"));
+        }
+
+        // ── 5. Pagamento parcial: R$80 (pix) ───────────────────────────────
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(empresaId);
+
+            var useCase = scope.ServiceProvider.GetRequiredService<RegistrarPagamentoPedidoUseCase>();
+            var result = await useCase.ExecuteAsync(new RegistrarPagamentoPedidoCommand(
+                empresaId, pedidoId, "pix", 80m, null, null, null, null, "web"));
+
+            result.Should().NotBeNull();
+            result!.TotalPago.Should().Be(80m);
+        }
+
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(empresaId);
+            await FluentActions.Invoking(() => scope.ServiceProvider.GetRequiredService<CancelarPedidoUseCase>()
+                .ExecuteAsync(new CancelarPedidoCommand(empresaId, pedidoId, NivelSolicitante: NivelAcesso.Operador)))
+                .Should().ThrowAsync<UnauthorizedAccessException>();
+        }
+
+        // ── 6. Pagamento restante: R$50 (dinheiro) ─────────────────────────
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(empresaId);
+
+            var useCase = scope.ServiceProvider.GetRequiredService<RegistrarPagamentoPedidoUseCase>();
+            var result = await useCase.ExecuteAsync(new RegistrarPagamentoPedidoCommand(
+                empresaId, pedidoId, "dinheiro", 50m, null, null, null, null, "web"));
+
+            result.Should().NotBeNull();
+            result!.TotalPago.Should().Be(130m);
+        }
+
+        // ── 7. Status: Pronto -> Entregue ──────────────────────────────────
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(empresaId);
+
+            var useCase = scope.ServiceProvider.GetRequiredService<AtualizarStatusPedidoUseCase>();
+            await useCase.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedidoId, "entregue", null, null, "web"));
+        }
+
+        // ── 8. Asserts ponta a ponta ───────────────────────────────────────
+        await using (var assert = fixture.CreateDbContext())
+        {
+            assert.SetMobileTenantContext(empresaId);
+
+            // Pedido entregue com 2 pagamentos
+            var pedido = await assert.Pedidos
+                .Include(p => p.Pagamentos)
+                .Include(p => p.Itens)
+                .SingleAsync(p => p.Id == pedidoId);
+
+            pedido.Status.Should().Be("entregue");
+            pedido.Total.Valor.Should().Be(130m);
+            pedido.TotalPago.Should().Be(130m);
+            pedido.Pagamentos.Should().HaveCount(2);
+            pedido.Pagamentos.Should().ContainSingle(p => p.Metodo == "pix" && p.Valor == 80m);
+            pedido.Pagamentos.Should().ContainSingle(p => p.Metodo == "dinheiro" && p.Valor == 50m);
+
+            // Estoque descontado: A de 10->8, B de 5->4
+            var estoqueA = await assert.ItensEstoque.SingleAsync(i => i.ProdutoId == produtoId1);
+            var estoqueB = await assert.ItensEstoque.SingleAsync(i => i.ProdutoId == produtoId2);
+            estoqueA.QuantidadeAtual!.Value.Should().Be(8m);
+            estoqueB.QuantidadeAtual!.Value.Should().Be(4m);
+
+            // Movimentacoes de saida (Venda)
+            var movs = await assert.MovimentacoesEstoque.ToListAsync();
+            movs.Should().HaveCount(2);
+            movs.Should().OnlyContain(m => m.Tipo == TipoMovimentacaoEstoque.Saida);
+            movs.Should().OnlyContain(m => m.Natureza == NaturezaMovimentacaoEstoque.Venda);
+            movs.Should().ContainSingle(m => m.ProdutoId == produtoId1 && m.Quantidade.Value == 2m);
+            movs.Should().ContainSingle(m => m.ProdutoId == produtoId2 && m.Quantidade.Value == 1m);
+
+            // Caixa: abertura automatica + saldo = 130
+            var caixaRepo = new EasyStock.Infra.Postgre.Repositories.CaixaRepository(assert);
+            // issue 1031: o dia operacional vem do PagoEm REALMENTE persistido, nao de um literal.
+            // RegistrarPagamentoPedidoUseCase carimba PagoEm = DateTime.UtcNow (nao ha clock
+            // injetavel), enquanto GetTotalPagamentosPedidosDoDiaAsync filtra pela janela UTC do dia
+            // pedido. Derivar de uma data fixa fazia o teste passar so no dia em que foi escrito:
+            // a partir do dia seguinte a janela nao continha mais nenhum pagamento e o total dava 0.
+            // Ler do proprio dado tambem elimina a corrida de meia-noite que HorarioBrasil.Hoje()
+            // ainda teria entre o pagamento e a assercao.
+            var dataOp = EasyStock.Application.Common.HorarioBrasil.DataOperacional(
+                pedido.Pagamentos.Min(p => p.PagoEm));
+            var totalPagamentos = await caixaRepo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, dataOp, lojaId);
+            totalPagamentos.Should().Be(130m);
+
+            var movimentos = await caixaRepo.GetMovimentosDoDiaAsync(empresaId, dataOp, lojaId);
+            movimentos.Should().ContainSingle(m => m.Tipo == "abertura" && m.Origem == "auto-pagamento");
+        }
+
+        // Cancelamento operacional: vaga e estoque voltam uma vez; dinheiro recebido permanece.
+        await using (var db = fixture.CreateDbContext())
+        {
+            var vitrine = StorefrontEntity.Criar(empresaId, "teste-cancelamento", "Teste cancelamento", 0m);
+            var janela = JanelaEntrega.Criar(vitrine.Id, 1, new TimeOnly(12, 0), new TimeOnly(14, 0), 5, "Almoço");
+            db.Set<StorefrontEntity>().Add(vitrine);
+            db.Set<JanelaEntrega>().Add(janela);
+            db.Set<VagaOcupada>().Add(VagaOcupada.Ocupar(janela.Id, DateOnly.FromDateTime(DateTime.UtcNow), pedidoId));
+            await db.SaveChangesAsync();
+        }
+        for (var tentativa = 0; tentativa < 2; tentativa++)
+        {
+            await using var scope = provider.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(empresaId);
+            await scope.ServiceProvider.GetRequiredService<CancelarPedidoUseCase>().ExecuteAsync(
+                new CancelarPedidoCommand(empresaId, pedidoId, Motivo: "Cliente desistiu", NivelSolicitante: NivelAcesso.Gerente));
+        }
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresaId);
+            var pedido = await db.Pedidos.Include(p => p.Pagamentos).Include(p => p.Eventos).SingleAsync(p => p.Id == pedidoId);
+            pedido.Status.Should().Be("cancelado");
+            pedido.TotalPago.Should().Be(130m);
+            pedido.Eventos.Should().ContainSingle(e => e.Tipo == "cancelado" && e.Detalhes == "Cliente desistiu");
+            (await db.ItensEstoque.SingleAsync(i => i.ProdutoId == produtoId1)).QuantidadeAtual!.Value.Should().Be(10m);
+            (await db.ItensEstoque.SingleAsync(i => i.ProdutoId == produtoId2)).QuantidadeAtual!.Value.Should().Be(5m);
+            (await db.MovimentacoesEstoque.CountAsync(m => m.Natureza == NaturezaMovimentacaoEstoque.Estorno)).Should().Be(2);
+            (await db.Set<VagaOcupada>().SingleAsync(v => v.PedidoId == pedidoId)).LiberadoEm.Should().NotBeNull();
+            (await db.OutboxEventosIntegracao.Where(e => e.AggregateId == pedidoId && e.TipoEvento == "pedido.mudou_status")
+                .Select(e => e.PayloadJson).ToListAsync()).Should().ContainSingle(json => json.Contains("cancelado"));
+            var caixa = new EasyStock.Infra.Postgre.Repositories.CaixaRepository(db);
+            (await caixa.GetTotalPagamentosPedidosDoDiaAsync(empresaId,
+                EasyStock.Application.Common.HorarioBrasil.DataOperacional(pedido.Pagamentos.Min(p => p.PagoEm)), lojaId))
+                .Should().Be(130m, "cancelar não equivale a devolver o pagamento");
+        }
+    }
+
+    [SkippableFact]
+    public async Task Pagamento_idempotente_nao_dobra_caixa_nem_pagamentos()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+
+        // ── Seed ───────────────────────────────────────────────────────────
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.Set<Empresa>().Add(new Empresa
+            {
+                Id = empresaId, Nome = "Empresa E2E",
+                Documento = $"{Random.Shared.Next(100000, 999999)}",
+                CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            });
+            seed.Set<Loja>().Add(new Loja
+            {
+                Id = lojaId, EmpresaId = empresaId, Nome = "Loja E2E", Ativa = true,
+                CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            });
+            seed.Set<Categoria>().Add(new Categoria
+            {
+                Id = categoriaId, EmpresaId = empresaId, Nome = "Geral",
+                CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            });
+            seed.Set<Produto>().Add(new Produto
+            {
+                Id = produtoId, EmpresaId = empresaId, CategoriaId = categoriaId,
+                Nome = "Produto Unico", Tipo = TipoProduto.Fisico, Status = StatusProduto.Ativo,
+                PrecoReferencia = Dinheiro.FromDecimal(100m),
+                CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            });
+            seed.Set<ItemEstoque>().Add(new ItemEstoque
+            {
+                Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId,
+                QuantidadeInicial = Quantidade.From(10m), QuantidadeAtual = Quantidade.From(10m), CustoUnitario = Dinheiro.FromDecimal(50m),
+                CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        await using var provider = BuildProductionProvider();
+
+        // ── Criar pedido e ir ate Pronto ───────────────────────────────────
+        Guid pedidoId;
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(empresaId);
+
+            var criar = scope.ServiceProvider.GetRequiredService<CriarPedidoUseCase>();
+            var pedido = await criar.ExecuteAsync(new CriarPedidoCommand(
+                EmpresaId: empresaId, LojaId: lojaId,
+                Itens: [new CriarPedidoItemInput(Nome: "Produto Unico", Quantidade: 1, PrecoUnitario: 100m, ProdutoId: produtoId)],
+                Origem: "web"));
+            pedidoId = pedido.Id;
+
+            var status = scope.ServiceProvider.GetRequiredService<AtualizarStatusPedidoUseCase>();
+            await status.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedidoId, "preparando", null, null, "web"));
+            await status.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedidoId, "pronto", null, null, "web"));
+        }
+
+        // ── 1o pagamento ───────────────────────────────────────────────────
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(empresaId);
+
+            var pagar = scope.ServiceProvider.GetRequiredService<RegistrarPagamentoPedidoUseCase>();
+            await pagar.ExecuteAsync(new RegistrarPagamentoPedidoCommand(
+                empresaId, pedidoId, "pix", 100m, null, null, null, null, "web"));
+        }
+
+        // ── 2o pagamento MESMO valor (deveria falhar por excedente) ────────
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(empresaId);
+
+            var pagar = scope.ServiceProvider.GetRequiredService<RegistrarPagamentoPedidoUseCase>();
+            var act = () => pagar.ExecuteAsync(new RegistrarPagamentoPedidoCommand(
+                empresaId, pedidoId, "dinheiro", 100m, null, null, null, null, "web"));
+
+            await act.Should().ThrowAsync<UseCaseValidationException>()
+                .Where(ex => ex.Message.Contains("excede o pendente"));
+        }
+
+        // ── Asserts: so 1 pagamento, caixa so 100 ──────────────────────────
+        await using (var assert = fixture.CreateDbContext())
+        {
+            assert.SetMobileTenantContext(empresaId);
+
+            var pedido = await assert.Pedidos.Include(p => p.Pagamentos).SingleAsync(p => p.Id == pedidoId);
+            pedido.Pagamentos.Should().HaveCount(1, "sobrepagamento deve ser rejeitado");
+            pedido.TotalPago.Should().Be(100m);
+
+            var caixaRepo = new EasyStock.Infra.Postgre.Repositories.CaixaRepository(assert);
+            // issue 1031: mesmo motivo do outro teste — dia operacional derivado do PagoEm
+            // persistido, nao de um literal que envelhece.
+            var dataOp = EasyStock.Application.Common.HorarioBrasil.DataOperacional(
+                pedido.Pagamentos.Single().PagoEm);
+            var totalPagamentos = await caixaRepo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, dataOp, lojaId);
+            totalPagamentos.Should().Be(100m, "caixa nao deve refletir pagamento rejeitado");
+        }
+    }
+
+    private ServiceProvider BuildProductionProvider()
+    {
+        var config = new ConfigurationBuilder().Build();
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(config);
+        services.AddLogging();
+        services.AddMemoryCache();
+        services.AddHttpContextAccessor();
+        services.AddSingleton(Substitute.For<ICurrentUserAccessor>());
+        services.AddSingleton(Substitute.For<EasyStock.Application.Ports.Output.ICacheService>());
+        services.AddEasyStockPostgreInfrastructure(fixture.ConnectionString, config);
+        services.AddEasyStockApplication();
+        // #1560: criar pedido registra o endereco de entrega; CEP e geocoding sao registrados pela API, nao por este provedor.
+        services.AddSingleton(Substitute.For<EasyStock.Application.Ports.Output.Lookup.ICepLookupClient>());
+        services.AddSingleton(Substitute.For<EasyStock.Application.Ports.Output.Lookup.IGeocodingClient>());
+        return services.BuildServiceProvider();
+    }
+}

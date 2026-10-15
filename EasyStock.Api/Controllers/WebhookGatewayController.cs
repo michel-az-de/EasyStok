@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Seguranca;
 
 namespace EasyStock.Api.Controllers;
 
@@ -40,6 +41,9 @@ public class WebhookGatewayController(
 {
     private readonly IReadOnlyList<IGatewayWebhookProcessor> _processors = processors.ToList();
     private readonly IReadOnlyList<IWebhookSignatureValidator> _validators = validators.ToList();
+
+    // I4.5 (#1698): o erro do provedor fica no banco (WebhookRecebido.Erro) e aparece em tela de suporte.
+    private static string? ErroParaGravar(string? erro) => erro is null ? null : SensitivePatterns.Redact(erro);
 
     [HttpPost("{provedor}")]
     public async Task<IActionResult> Receber(string provedor, CancellationToken ct = default)
@@ -118,14 +122,16 @@ public class WebhookGatewayController(
         // 5) Processa
         try
         {
-            await processor.ProcessarAsync(rawBody, headers, ct);
-            await webhookRepo.MarcarProcessadoAsync(registro.Id, sucesso: true, ct: ct);
+            var resultado = await processor.ProcessarAsync(rawBody, headers, ct);
+            if (!resultado.Sucesso)
+                logger.LogWarning("Webhook {Provedor}: evento nao reconhecido ({Erro}).", validator.Provedor, resultado.Erro);
+            await webhookRepo.MarcarProcessadoAsync(registro.Id, resultado.Sucesso, ErroParaGravar(resultado.Erro), ct);
             return Ok();
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Webhook {Provedor}: falha no processamento.", validator.Provedor);
-            await webhookRepo.MarcarProcessadoAsync(registro.Id, sucesso: false, erro: ex.Message, ct);
+            await webhookRepo.MarcarProcessadoAsync(registro.Id, sucesso: false, erro: ErroParaGravar(ex.Message), ct);
             return StatusCode(500);
         }
     }
@@ -139,8 +145,8 @@ public class WebhookGatewayController(
 
     /// <summary>
     /// Tenta extrair um event ID estavel do payload conforme o provedor.
-    /// Stripe e Mercado Pago tem <c>id</c> no root; Efi nao envia, fica null
-    /// e o caller usa hash do body como fallback.
+    /// Stripe e Mercado Pago tem <c>id</c> no root (no Mercado Pago o id da notificacao e numerico, S32);
+    /// Efi nao envia, fica null e o caller usa hash do body como fallback.
     /// </summary>
     private static string? ExtrairEventIdExterno(string rawBody, string provedor)
     {
@@ -150,12 +156,16 @@ public class WebhookGatewayController(
             using var doc = System.Text.Json.JsonDocument.Parse(rawBody);
             var root = doc.RootElement;
 
-            // Padrao 1: {"id": "evt_..."} no root (Stripe, Mercado Pago)
+            // Padrao 1: {"id": "evt_..."} (Stripe) ou {"id": 123456789} (Mercado Pago) no root
             if (root.ValueKind == System.Text.Json.JsonValueKind.Object
-                && root.TryGetProperty("id", out var idEl)
-                && idEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                && root.TryGetProperty("id", out var idEl))
             {
-                var id = idEl.GetString();
+                var id = idEl.ValueKind switch
+                {
+                    System.Text.Json.JsonValueKind.String => idEl.GetString(),
+                    System.Text.Json.JsonValueKind.Number => idEl.GetRawText(),
+                    _ => null,
+                };
                 if (!string.IsNullOrWhiteSpace(id)) return $"{provedor}:{id}";
             }
         }

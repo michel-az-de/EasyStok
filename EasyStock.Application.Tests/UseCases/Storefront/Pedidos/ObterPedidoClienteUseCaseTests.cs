@@ -195,7 +195,7 @@ public class ObterPedidoClienteUseCaseTests
 
         result.Should().NotBeNull();
         result!.Pedido.PedidoId.Should().Be(PedidoId);
-        result.Pedido.Status.Should().Be("SaiuParaEntrega");   // Pronto → contrato
+        result.Pedido.Status.Should().Be("Pronto");   // Pronto → contrato (S12: SaiuParaEntrega virou estado proprio)
         result.Pedido.Itens.Should().HaveCount(1);
         result.Pedido.Itens[0].Nome.Should().Be("Lasanha");
         result.Pedido.SubtotalCentavos.Should().Be(8400);

@@ -6,8 +6,37 @@ namespace EasyStock.Infra.Postgre.Repositories
 {
     public sealed class PedidoRepository(EasyStockDbContext db) : IPedidoRepository
     {
+        public Task<bool> TemEstornoOnlineAsync(Guid empresaId, Guid pagamentoId, CancellationToken ct = default) =>
+            db.Set<PedidoEstornoOnline>().AnyAsync(e => e.EmpresaId == empresaId && e.PagamentoId == pagamentoId, ct);
+
+        public async Task<IReadOnlyList<PedidoEstornoManual>> ListarEstornosManuaisAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default) =>
+            await db.Set<PedidoEstornoManual>().AsNoTracking()
+                .Where(e => e.EmpresaId == empresaId && e.PedidoId == pedidoId)
+                .OrderBy(e => e.RegistradoEm).ThenBy(e => e.Id).ToListAsync(ct);
+
+        public Task AdicionarEstornoManualAsync(PedidoEstornoManual estorno)
+        {
+            db.Set<PedidoEstornoManual>().Add(estorno);
+            return Task.CompletedTask;
+        }
+
+        public async Task TravarAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default)
+        {
+            if (db.Database.CurrentTransaction is null)
+                throw new InvalidOperationException("Lock do pedido exige transação ativa.");
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT 1 FROM pedidos WHERE \"Id\" = {pedidoId} AND \"EmpresaId\" = {empresaId} FOR UPDATE", ct);
+        }
+
+        public Task<bool> ExisteEventoAsync(Guid empresaId, Guid pedidoId, string tipo, CancellationToken ct = default) =>
+            db.Pedidos.Where(p => p.EmpresaId == empresaId && p.Id == pedidoId)
+                .AnyAsync(p => p.Eventos.Any(e => e.Tipo == tipo), ct);
+
         public Task<Pedido?> GetByIdAsync(Guid empresaId, Guid id) =>
             db.Pedidos.FirstOrDefaultAsync(p => p.EmpresaId == empresaId && p.Id == id);
+
+        public async Task<IReadOnlyList<Pedido>> ListarPorIdsAsync(Guid empresaId, IReadOnlyCollection<Guid> ids, CancellationToken ct = default) =>
+            await db.Pedidos.AsNoTracking().Where(p => p.EmpresaId == empresaId && ids.Contains(p.Id)).ToListAsync(ct);
 
         public Task<Pedido?> GetByIdWithDetailsAsync(Guid empresaId, Guid id) =>
             db.Pedidos
@@ -25,8 +54,16 @@ namespace EasyStock.Infra.Postgre.Repositories
             DateTime? desde = null, DateTime? ate = null,
             string? search = null, string? sort = "criadoem", string? order = "desc")
         {
+            // issue 958 (BUG-003+002 do QA): sem este Include, Pedido.TotalPago (computed
+            // property que soma a colecao Pagamentos em memoria) sempre le 0 aqui — a listagem
+            // mostra "Pendente" enquanto o detalhe (GetByIdWithDetailsAsync, com o Include
+            // correto) mostra "Quitado". Em cascata, o cockpit calcula "pendente" = total cheio
+            // e o guard client-side libera um segundo pagamento integral em pedido ja quitado.
+            // UseQuerySplittingBehavior(SplitQuery) ja e global — vira +1 roundtrip, sem
+            // produto cartesiano; lista capada em 200 (ListarPedidosUseCase.Math.Clamp).
             var query = db.Pedidos.AsNoTracking()
                 .Include(p => p.Itens)
+                .Include(p => p.Pagamentos)
                 .Where(p => p.EmpresaId == empresaId);
 
             if (!string.IsNullOrWhiteSpace(status)) query = query.Where(p => p.Status == status);
@@ -49,7 +86,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
             var agora = DateTime.UtcNow;
 
-            query = sort?.ToLowerInvariant() switch
+            var ordenada = sort?.ToLowerInvariant() switch
             {
                 // Cockpit (#591): abertos antes de terminais → o cap de pagina nunca
                 // descarta pedido ativo; refino atrasado/agendado/recencia por cima.
@@ -60,7 +97,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 _         => desc ? query.OrderByDescending(p => p.CriadoEm)  : query.OrderBy(p => p.CriadoEm),
             };
 
-            var pedidos = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            var pedidos = await ordenada.ThenByDescending(p => p.Id)
+                .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
             return (pedidos, total);
         }
 
@@ -103,6 +141,23 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(p => p.EmpresaId == empresaId && StatusAbertos.Contains(p.Status))
                 .SelectMany(p => p.Itens)
                 .AnyAsync(i => i.ProdutoId == produtoId);
+        }
+
+        private static readonly string[] StatusDemanda = PedidoStateMachine.DemandaAConsumir
+            .Select(StatusPedidoMapper.Format)
+            .ToArray();
+
+        public async Task<IReadOnlyList<DemandaDePedido>> GetDemandaAgendadaAsync(Guid empresaId, DateTime antesDeUtc, CancellationToken ct = default)
+        {
+            var linhas = await db.Pedidos.AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && StatusDemanda.Contains(p.Status)
+                    && p.AgendadoParaEm != null && p.AgendadoParaEm < antesDeUtc)
+                .SelectMany(p => p.Itens)
+                .Where(i => i.CardapioItemId != null || i.ProdutoId != null)
+                .GroupBy(i => new { i.CardapioItemId, i.ProdutoId })
+                .Select(g => new { g.Key.CardapioItemId, g.Key.ProdutoId, Quantidade = g.Sum(i => i.Quantidade) })
+                .ToListAsync(ct);
+            return linhas.Select(l => new DemandaDePedido(l.CardapioItemId, l.ProdutoId, l.Quantidade)).ToList();
         }
     }
 }

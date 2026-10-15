@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -39,7 +40,7 @@ namespace EasyStock.Domain.ValueObjects
         public static implicit operator int(Quantidade q) => (int)q.Value;
         public static implicit operator int?(Quantidade? q) => q == null ? (int?)null : (int)q.Value;
 
-        public override string ToString() => Value.ToString("G");
+        public override string ToString() => Value.ToString("G", CultureInfo.InvariantCulture);
 
         private sealed class QuantidadeJsonConverter : JsonConverter<Quantidade>
         {

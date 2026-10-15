@@ -8,7 +8,7 @@ namespace EasyStock.Application.Services.Notifications.Orchestrators;
 /// </summary>
 public interface INotificacoesAvaliadorOrchestrator
 {
-    /// <param name="janelaAvaliacao">Janela usada como "última execução" para o RotinaScheduler.
-    /// Tipicamente 2× o intervalo do loop. Default 2 min.</param>
+    /// <param name="janelaAvaliacao">Sem efeito desde a N12 (servia ao ramo cron, removido); fica na assinatura
+    /// para os chamadores. O agendamento por horário está no coletor de rotinas agendadas.</param>
     Task ExecutarRodadaAsync(TimeSpan janelaAvaliacao, CancellationToken ct = default);
 }

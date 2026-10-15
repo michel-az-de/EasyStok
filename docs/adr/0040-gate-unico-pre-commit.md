@@ -22,7 +22,9 @@ Medição de 2026-07-03 (sessão de produtividade):
 
 Um único comando canônico `scripts/poka-yoke/gate.ps1` que:
 
-1. Builda o `EasyStok.CI.slnf` incremental para `%TEMP%\easystok-build-check`
+1. Builda o `EasyStok.CI.slnf` incremental para `%TEMP%\easystok-build-check-<hash do worktree>`
+   (pasta unica por worktree desde a issue 1117; antes era compartilhada e sessoes paralelas
+   corriam uma contra a outra)
    (receita idêntica ao build-check: `-o` temp + `-p:UseAppHost=false`, imune ao
    lock de bin do ambiente local, issue 448).
 2. Espelha o output com `robocopy /MIR` para `<repo>\.build\arch-gate\` (~2-4s,

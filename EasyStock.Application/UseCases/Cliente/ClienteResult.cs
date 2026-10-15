@@ -15,7 +15,12 @@ public sealed record ClienteResult(
     DateTime? LastOrderAt,
     bool Ativo,
     DateTime CriadoEm,
-    DateTime AlteradoEm
+    DateTime AlteradoEm,
+    // Pessoa jurídica (ADR-0048): no fim e com default, porque este record é posicional —
+    // inserir no meio quebraria o Map e todos os call-sites de uma vez.
+    string TipoPessoa = "fisica",
+    string? NomeFantasia = null,
+    string? InscricaoEstadual = null
 );
 
 /// <summary>Cliente com sub-coleções (pra tela de detalhe rica).</summary>

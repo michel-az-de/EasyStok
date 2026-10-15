@@ -1,41 +1,45 @@
 # AGENTS.md — EasyStok
 
-Porta de entrada para qualquer agente (Codex, Copilot, etc.) abrindo este repo. Lido automaticamente pelo Codex.
+Regras comuns a qualquer agente (Claude Code, Codex, Kimi, Copilot). Claude Code acrescenta o `CLAUDE.md`.
 
-## Antes de tocar codigo
+## Projeto
 
-**Leia, nesta ordem:**
-1. `.knowledge/README.md` — single source of truth tecnica do projeto. Indexa todos os outros docs.
-2. Conforme a tarefa, abra 1-2 arquivos do `.knowledge/` (mapa em `.knowledge/README.md`, secao "Como usar isso pra economizar tokens").
+- Stack: .NET 10 (`global.json`), PostgreSQL, EF Core, Clean Architecture. Solução `EasyStok.sln`.
+- Frentes: API `EasyStock.Api`, console React `EasyStock.Console/` (ADR-0054, destino dos módulos), PWA em `EasyStock.Api/wwwroot/pwa/` (backup offline, ADR-0059), API mobile em `EasyStock.Api/Mobile` (ADR-0019). `EasyStock.Web` (Razor) não recebe tela nova (ADR-0059).
+- Produção: VPS `/opt/stacks/easystok`, publicada por `scripts/deploy/vps-deploy.sh` (só o Felipe ou sessão autorizada). Fly.io, Render e Azure App Service estão desligados; `fly.toml` e workflows antigos são histórico.
+- Multi-tenant é risco máximo: `EmpresaId` do JWT em toda leitura e escrita, filtro global + checagem no use case, 400 se divergir.
 
-**Toda regra tecnica vive no `.knowledge/`** (in-repo, gitada, evolui com o codigo). Este `AGENTS.md` so resume o critico imediato.
+## Fonte da verdade
 
-## Resumo critico (vale para qualquer turno)
+1. Estado atual vem de Git, `gh`, CI e serviços vivos. Documento é snapshot: `.knowledge/*.md` tem datas de maio a outubro de 2026; não use contagens, plataforma ou bloqueios de lá sem conferir.
+2. Roteador técnico: `.knowledge/README.md`. Abra no máximo 1 ou 2 documentos da área. `audit-brutal.md` não se regenera.
+3. Decisões: `docs/adr/` (fluxo em `0043`, tiers em `0055`). Planos: `docs/plan/README.md`. Pendências: issues e board do GitHub.
+4. Não crie `.md` novo sem pedido. Atualize a fonte canônica que a mudança afetar.
 
-- **Stack**: .NET 9, PostgreSQL, EF Core 9, Clean Architecture estrita.
-- **Solucao**: `EasyStok.sln` — 17 projetos. Pasta MAUI e `EasyStok.Mobile` (com K, sem ponto Maui).
-- **Branch principal**: `master`. **Deploy**: Fly.io via `fly.toml` (operacional). Render foi planejado (PR #128 open) mas bloqueado por billing CI desde 2026-05-11. NAO Azure.
-- **Frontends do operador**: PWA em `EasyStock.Api/wwwroot/pwa/` (fonte da verdade) + copia empacotada em `EasyStok.Mobile/Resources/Raw/pwa/`. **Merge unidirecional `PWA -> MAUI` no MESMO commit + hash SHA-256 conferido** (ver `.knowledge/dual-frontend-policy.md`).
-- **Convencao de branch (v2.1, ADR-0020)**:
-  - **Tasks formais ETK-NNNN** (com YAML em `docs/tasks/`): SEMPRE branch + PR via `scripts/tasks/claim.sh` + `gh pr merge --admin --squash --delete-branch` via `scripts/tasks/complete.sh`. Worktree em `.claude/worktrees/wt-etk-NNNN/` automatico.
-  - **Trabalho informal** (hotfix, typo, doc menor < 1h e < 5 arquivos sem teste novo): commit direto em `master` continua OK. Tarefa grande ou `git status` nao-vazio: use worktree `git worktree add -b <branch> .claude/worktrees/<nome> origin/master`; merge ff em master e delete worktree depois.
-  - **Em duvida**: tem ID/YAML? Formal. Senao: direto.
-- **Ao final de TODA demanda**: commit `tipo(escopo): desc` em PT-BR direto em `master` + `git push origin master`. CI em build-casa-da-baba-apk.yml (e outros workflows) esta bloqueado por billing GitHub Actions desde 2026-05-11 — deploy fly.io eh manual via `fly deploy`. Co-Author `Codex Opus 4.7 <noreply@anthropic.com>` (ou `Claude Opus 4.7 <noreply@anthropic.com>` para sessoes Claude Code).
-- **`git status` mostrando arquivos alheios**: NAO usar `git add -A`/`git add .` — adicionar so os especificos da demanda. Se ha arquivos nao relacionados pendentes, voce esta na branch errada — saia e crie a sua via worktree.
-- **Apos push tocando PWA ou casa-da-baba-mobile/apk**: workflow `build-casa-da-baba-apk.yml` dispara — aguardar e baixar APK pra `C:\rep\EasyStok\builds\app-debug.apk`.
-- **Multi-tenant e RISCO MAXIMO**: `empresaId` do JWT em todo lugar; `ValidateEmpresaId` em body POST/PUT; defesa em camadas = Global Query Filter automatico (`EasyStockDbContext.ApplyTenantQueryFilters`) **+** checagem `entity.EmpresaId == command.EmpresaId` no use case; fail fast 400 se invalido.
-- **NAO criar `.md` de documentacao** salvo se Felipe pedir explicitamente.
-- **Estilo do Felipe**: PT-BR direto, sem floreio, sem virgula sobrando, sem travessoes. Resposta = acao + resultado.
+## Fluxo (ADR-0043, PR-first)
 
-## Atalho de roteamento
+issue -> branch `tipo/slug-N` -> commits -> push -> PR `closes #N` -> CI + review -> merge por tier -> limpeza.
 
-| Tarefa toca... | Abre... |
+| Regra | Conteúdo |
 |---|---|
-| EF Core / migration / VO | `.knowledge/conventions.md` + `.knowledge/do-not-do.md` |
-| multi-tenant / auth | `.knowledge/conventions.md` + `.knowledge/do-not-do.md` |
-| Pedido / Estoque / Caixa / Compras | `.knowledge/domain-glossary.md` + `.knowledge/current-state.md` |
-| PWA ou MAUI | `.knowledge/dual-frontend-policy.md` (SEMPRE, antes de qualquer change) |
-| "estado do projeto" | `.knowledge/current-state.md` + `.knowledge/recent-evolution.md` |
-| deploy | `.knowledge/current-state.md` (Infra) + `.knowledge/gcp-deploy.md` se for migracao |
-| auditoria pessimista | `.knowledge/audit-brutal.md` (nao regenere — usa muitos tokens) |
-| "o que falta" | `.knowledge/tech-debt.md` + `.knowledge/stability-roadmap.md` |
+| Branch | Nada direto no `master`. Hotfix só com urgência real e GO explícito na sessão. |
+| Stage | Arquivo por arquivo. Nunca `git add -A` ou `git add .`. |
+| Commit | `tipo(escopo): descrição` imperativa em PT-BR, `refs #N`. Proibido wip, temp, checkpoint. |
+| Gate | `powershell -File scripts/poka-yoke/gate.ps1` (build + arch-tests, ADR-0040) verde antes de cada commit; é o Husky pre-commit. |
+| Artefatos | bin/, obj/, publish/, dist/, admin/, .claude/projects/, *.dll, *.exe, *.pdb nunca entram no commit. |
+| Assinatura | Mudou assinatura pública: todos os call-sites no mesmo commit (`git grep` antes). |
+| Worktree | Paralelo ou arriscado: `C:\rep\.worktrees\EasyStok\<slug>`, 1 worktree = 1 branch = 1 issue. WIP alheio não se descarta nem se reaproveita. |
+| Inacabado | Fica na branch e na issue aberta. Stash não é memória. |
+| Pronto | Só com PR `MERGEABLE` no instante do relatório, checks verdes e aceite marcado. CI verde não prova integração com o trunk atual. |
+| Medir | Toda afirmação de estado exige comando antes (git, build, gh). Premissa refutada: pare e reporte. |
+| Dúvida | Genuína e com consequência: uma pergunta, decisiva. Tarefa clara segue sem esperar. |
+
+## Comunicação
+
+PT-BR direto, sem floreio, sem travessão. Resposta = ação + resultado. Código, identificadores e commits seguem o padrão do repo.
+
+<!-- BEGIN CASA-BABA-HUB -->
+## Hub da Casa da Baba
+
+Marca, operação, estudos e mapa dos sistemas: [contexto compartilhado](https://github.com/michel-az-de/casa-da-baba-conhecimento/blob/master/hub-projeto/CONTEXTO-COMPARTILHADO.md) e [repositórios vinculados](https://github.com/michel-az-de/casa-da-baba-conhecimento/blob/master/hub-projeto/REPOSITORIOS-VINCULADOS.md). Repo privado `michel-az-de/casa-da-baba-conhecimento`; clone local opcional em `../casa-da-baba-conhecimento/hub-projeto/`. É navegação: código, contratos, decisões e regras continuam neste repositório.
+<!-- END CASA-BABA-HUB -->

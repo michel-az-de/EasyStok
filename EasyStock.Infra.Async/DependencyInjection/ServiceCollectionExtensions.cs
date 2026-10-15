@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Pdf;
 using EasyStock.Infra.Async.Pagamentos;
@@ -13,6 +14,9 @@ namespace EasyStock.Infra.Async.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
+    // Handler unico e reutilizado: evita esgotar sockets e renova DNS periodicamente.
+    private static readonly SocketsHttpHandler EfiHandler = new() { PooledConnectionLifetime = TimeSpan.FromMinutes(5) };
+
     public static IServiceCollection AddEasyStockAsyncInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -30,48 +34,14 @@ public static class ServiceCollectionExtensions
         // Queue Service
         services.AddSingleton<IQueueService, BackgroundQueueService>();
 
-        // Email Service — Onda 1.3: switch por Email:Provider em {smtp, sendgrid, console}.
-        // Compat: se Email:Provider nao setado, mantem comportamento legado (Smtp se existir, senao console).
-        var emailProvider = (configuration["Email:Provider"] ?? "").Trim().ToLowerInvariant();
-        var smtpConfig = configuration.GetSection("Smtp");
-        var sendGridConfig = configuration.GetSection("SendGrid");
-
-        if (string.IsNullOrEmpty(emailProvider))
-            emailProvider = smtpConfig.Exists() ? "smtp" : "console";
-
-        switch (emailProvider)
-        {
-            case "sendgrid":
-                services.AddSingleton<IEmailService>(_ => new SendGridEmailService(
-                    apiKey: sendGridConfig["ApiKey"]
-                        ?? throw new InvalidOperationException("SendGrid:ApiKey eh obrigatorio quando Email:Provider=sendgrid."),
-                    fromEmail: sendGridConfig["FromEmail"] ?? "noreply@easystock.com",
-                    fromName: sendGridConfig["FromName"] ?? "EasyStock",
-                    sandbox: bool.Parse(sendGridConfig["SandboxMode"] ?? "false")));
-                break;
-
-            case "smtp":
-                services.AddSingleton<IEmailService>(_ => new SmtpEmailService(
-                    smtpConfig["Host"] ?? "localhost",
-                    int.Parse(smtpConfig["Port"] ?? "587"),
-                    smtpConfig["Username"] ?? "",
-                    smtpConfig["Password"] ?? "",
-                    smtpConfig["FromEmail"] ?? "noreply@easystock.com",
-                    smtpConfig["FromName"] ?? "EasyStock",
-                    bool.Parse(smtpConfig["EnableSsl"] ?? "true")));
-                break;
-
-            default:
-                // Console — fallback dev. Loga email sem enviar.
-                services.AddSingleton<IEmailService, ConsoleEmailService>();
-                break;
-        }
+        // Email Service (N3, #1351): uma so fabrica para a API e o Worker (Email:Provider em
+        // {smtp, sendgrid, console}; sem ele, smtp quando ha Host e remetente, senao console com aviso).
+        services.AddEasyStockEmail(configuration);
 
         // Storage Service
         services.AddSingleton<IStorageService, S3StorageService>();
 
         // PDF Renderer (Modulo Financeiro F4) — QuestPDF stateless + threadsafe
-        services.AddSingleton<IFaturaPdfRenderer, FaturaPdfRenderer>();
         // PDF de etiqueta + Nota de Entrada (P5) — QuestPDF + QRCoder, stateless/threadsafe
         services.AddSingleton<IDocumentoEntradaPdfRenderer, DocumentoEntradaPdfRenderer>();
         // PDF do extrato de fechamento de caixa (#642) — QuestPDF stateless/threadsafe
@@ -97,7 +67,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IGatewayErrorClassifier, GatewayErrorClassifier>();
         services.AddScoped<IPagamentoOrchestrator, PagamentoOrchestrator>();
 
-        // Webhook processors (scoped — consomem RegistrarPagamentoFaturaUseCase + repos)
+        // Webhook processors (scoped)
         services.AddScoped<IGatewayWebhookProcessor, EfiPixWebhookProcessor>();
 
         // Signature validators (singleton — stateless, leem IConfiguration uma vez por call)
@@ -127,7 +97,7 @@ public static class ServiceCollectionExtensions
             var baseUrl = isSandbox ? "https://pix-h.api.efipay.com.br" : "https://pix.api.efipay.com.br";
             services.AddTransient<IEfiPixService>(sp =>
             {
-                var http = new HttpClient { BaseAddress = new Uri(baseUrl) };
+                var http = new HttpClient(EfiHandler, disposeHandler: false) { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(30) };
                 return new EfiPixService(
                     http,
                     sp.GetRequiredService<IMemoryCache>(),
@@ -148,7 +118,7 @@ public static class ServiceCollectionExtensions
             var baseUrl = isSandbox ? "https://cobrancas-h.api.efipay.com.br" : "https://cobrancas.api.efipay.com.br";
             services.AddTransient<IEfiBoletoService>(sp =>
             {
-                var http = new HttpClient { BaseAddress = new Uri(baseUrl) };
+                var http = new HttpClient(EfiHandler, disposeHandler: false) { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(30) };
                 return new EfiBoletoService(
                     http,
                     sp.GetRequiredService<IMemoryCache>(),
@@ -177,8 +147,12 @@ public static class ServiceCollectionExtensions
         {
             services.AddScoped<MercadoPagoGatewayAdapter>();
             services.AddScoped<IPagamentoGateway>(sp => DecorateGateway(sp, sp.GetRequiredService<MercadoPagoGatewayAdapter>()));
-            services.AddSingleton<IWebhookSignatureValidator, MercadoPagoSignatureValidator>();
         }
+
+        // I3.1 (#1667): o webhook do Mercado Pago existe sempre, com ou sem token. Sem segredo configurado o
+        // validador recusa (401); antes a rota respondia 404 e a falta de configuração passava em silêncio.
+        services.AddSingleton<IWebhookSignatureValidator, MercadoPagoSignatureValidator>();
+        services.AddScoped<IGatewayWebhookProcessor, MercadoPagoWebhookProcessor>();
 
         return services;
     }
@@ -196,33 +170,49 @@ public static class ServiceCollectionExtensions
 /// configurado). O NOME desta classe e contrato: codigo de diagnostico checa
 /// <c>GetType().Name == "ConsoleEmailService"</c> / <c>nameof(...)</c> para detectar
 /// "SMTP nao configurado" — nao renomear sem atualizar esses call-sites.
+/// <para>
+/// Nada sai daqui: <see cref="EnviarAsync"/> devolve <c>Simulado</c> com provider <c>console</c> (N3), e o canal de
+/// e-mail do outbox so repassa o desfecho. A marcadora <c>IEmailServiceSimulado</c> da N2 saiu por isso.
+/// </para>
 /// </summary>
 public sealed class ConsoleEmailService(ILogger<ConsoleEmailService> logger) : IEmailService
 {
     // #288 item 4: era Console.WriteLine (sem nivel, sem estrutura). Agora ILogger em
-    // Debug. NAO loga o corpo do email — e PII potencial (ver #301); so destinatario +
-    // assunto, suficiente para o fallback de dev.
+    // Debug. NAO loga o corpo nem o destinatario — sao PII (ver #301, #1292, N2); so o
+    // assunto (texto fixo dos fluxos que chamam direto), suficiente para o fallback de dev.
     public Task SendAsync(string to, string subject, string body, bool isHtml = false)
     {
-        logger.LogDebug("[EMAIL] Para: {To} | Assunto: {Subject}", to, subject);
+        logger.LogDebug("[EMAIL] simulado, nada foi enviado | Assunto: {Subject}", subject);
         return Task.CompletedTask;
     }
 
     public Task SendAsync(string to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml = false)
     {
-        logger.LogDebug("[EMAIL] Para: {To} | Assunto: {Subject} | Anexos: {Count}", to, subject, attachments.Count());
+        logger.LogDebug("[EMAIL] simulado, nada foi enviado | Assunto: {Subject} | Anexos: {Count}", subject, attachments.Count());
         return Task.CompletedTask;
     }
 
     public Task SendAsync(IEnumerable<string> to, string subject, string body, bool isHtml = false)
     {
-        logger.LogDebug("[EMAIL] Para: {Count} destinatario(s) | Assunto: {Subject}", to.Count(), subject);
+        logger.LogDebug("[EMAIL] simulado, nada foi enviado | {Count} destinatario(s) | Assunto: {Subject}", to.Count(), subject);
         return Task.CompletedTask;
     }
 
     public Task SendTemplateAsync(string to, string subject, string templateName, object model, bool isHtml = true)
     {
-        logger.LogDebug("[EMAIL TEMPLATE] Para: {To} | Assunto: {Subject} | Template: {Template}", to, subject, templateName);
+        logger.LogDebug("[EMAIL TEMPLATE] simulado, nada foi enviado | Assunto: {Subject} | Template: {Template}", subject, templateName);
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Nada sai daqui: o desfecho e <see cref="DesfechoEnvio.Simulado"/> com provider <c>console</c>, nunca <c>smtp</c>.
+    /// Sem endereco nem corpo no log (LGPD, #1292): so o rastro e a categoria.
+    /// </summary>
+    public Task<ResultadoEnvio> EnviarAsync(MensagemEmail mensagem, CancellationToken ct = default)
+    {
+        logger.LogDebug(
+            "[EMAIL] simulado outbox={OutboxId} categoria={Categoria} anexos={Anexos}",
+            mensagem.OutboxId, mensagem.Remetente, mensagem.Anexos?.Count ?? 0);
+        return Task.FromResult(ResultadoEnvio.Simulado("console"));
     }
 }

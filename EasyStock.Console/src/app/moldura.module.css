@@ -1,0 +1,259 @@
+.areaAtendimento {
+  position: relative; height: 100%; min-height: 0;
+  /* A densidade do protótipo, limitada ao Balcão e às suas janelas. */
+  --t-micro: .8125rem;
+  --t-apoio: .9375rem;
+  --t-corpo: 1rem;
+  --t-forte: 1.0625rem;
+  --t-titulo: 1.25rem;
+  --t-valor: 1.5rem;
+  --t-display: 2rem;
+  font-size: var(--t-corpo);
+}
+.estadoAcesso { display: grid; place-items: center; height: 100%; overflow-y: auto; padding: var(--e-4); }
+
+.app { display: flex; flex-direction: column; height: 100%; min-height: 100%; background: var(--fundo); }
+
+/* Topo em material de vidro (rodada 6): marca à esquerda, tema logo ao lado,
+   grupo de controles à direita. Linha fina de 1 px separa a região.
+   #1577: sem `backdrop-filter`. O topo e o rodapé ficam no fluxo da coluna, com o palco rolando
+   por dentro: atrás deles só há o fundo liso, e desfocar cor lisa custava uma camada com filtro
+   no tablet para mudar menos de 1/255 da cor. */
+.topo {
+  position: relative; z-index: 10;
+  display: flex; align-items: center; gap: var(--e-16); flex-wrap: wrap;
+  min-height: 64px;
+  padding: var(--e-2) var(--e-4); padding-top: calc(var(--e-2) + env(safe-area-inset-top, 0px));
+  background: var(--vidro);
+  border-bottom: var(--b-1) solid var(--linha); flex-shrink: 0;
+}
+/* Assinatura oficial completa, com placa clara também no tema escuro. */
+.marca { display: flex; align-items: center; margin: 0; }
+
+/* Grupo de controles com prioridade. margin-left:auto empurra pro fim do
+   topo, sempre à direita, sem precisar de um irmão espaçador antes dele. */
+.controles { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; margin-left: auto; }
+/* Contagem dentro de botão: pastilha arredondada, não número solto. */
+.conta {
+  display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px;
+  border-radius: var(--r-pilula); background: var(--preenchimento-forte);
+  font-family: var(--f-dado); font-weight: 700; color: var(--tinta-2);
+}
+
+/* Estado da loja: um toque, Aberta ou Fechada, sempre visível no topo
+   (pedido do dono, 24/09/2026). Botão sem casca própria, a Pilula já dá cor
+   e texto; só precisa de área de toque e cursor de botão. */
+.controleLoja {
+  display: inline-flex; min-height: var(--toque); padding: 0;
+  border: 0; background: none; cursor: pointer;
+}
+
+/* Palco: nas três colunas, os painéis flutuam sobre o fundo com raio de
+   painel e sombra curta; o vão entre eles é a própria alça de largura. */
+.palco { display: flex; flex: 1; min-height: 0; position: relative; }
+.palcoTres { padding: var(--e-3) var(--e-3) var(--e-3); }
+.palcoTres > .coluna {
+  border-radius: var(--r-2); border: var(--b-1) solid var(--linha);
+  box-shadow: var(--sombra);
+  animation: painelEntra var(--dur-longa) var(--ease-saida) backwards;
+}
+.palcoTres > .coluna:nth-of-type(2) { animation-delay: 40ms; }
+.palcoTres > .coluna:nth-of-type(3) { animation-delay: 80ms; }
+@keyframes painelEntra {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.coluna {
+  display: flex; flex-direction: column; min-height: 0;
+  background: var(--papel); overflow: hidden;
+}
+/* Largura padrão --coluna (320 px); no layout de três colunas a moldura
+   sobrescreve --largura-balcao e --largura-ficha pela alça (seção 9). */
+.entrada { width: var(--largura-balcao, var(--coluna)); flex-shrink: 0; border-right: var(--b-1) solid var(--linha); }
+/* Colunas cedem espaço respeitando a leitura mínima, inclusive após redimensionar.
+   O mínimo antigo de 420 px no centro cortava a Ficha já em 1280 px. */
+.centro { flex: 1; min-width: 0; background: var(--chao-conversa); }
+.palcoTres > .centro { min-width: 320px; }
+.palcoTres > .entrada { min-width: 280px; flex-shrink: 1; }
+.palcoTres > .ficha { min-width: 320px; flex-shrink: 1; }
+.ficha { width: var(--largura-ficha, var(--coluna)); flex-shrink: 0; border-left: var(--b-1) solid var(--linha); }
+.rolavel { overflow-y: auto; flex: 1; min-height: 0; overscroll-behavior: contain; }
+.painelFicha { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
+
+/* Título de coluna: rótulo de seção discreto, no estilo da barra lateral do
+   macOS, sem ícone e sem linha pesada. */
+.tituloColuna {
+  display: flex; align-items: center; gap: var(--e-2); flex-shrink: 0;
+  min-height: 52px; padding: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha);
+  font-family: var(--f-corpo); font-size: var(--t-titulo); color: var(--tinta); font-weight: 700;
+  line-height: var(--lh-compacto); letter-spacing: var(--ls-titulo);
+}
+.tituloColuna .contagem { margin-left: auto; font-family: var(--f-dado); font-weight: 400; color: var(--tinta-3); font-size: var(--t-apoio); }
+/* #1474: pé da Ficha onde a fila de canhotos entra; vazio, não ocupa altura. */
+.slotFila { flex-shrink: 0; }
+.rodape {
+  display: flex; gap: var(--e-3); flex-wrap: wrap; align-items: center; flex-shrink: 0;
+  padding: var(--e-2) var(--e-4); padding-bottom: calc(var(--e-2) + env(safe-area-inset-bottom, 0px));
+  background: var(--vidro);
+  border-top: var(--b-1) solid var(--linha);
+  font-size: var(--t-apoio); color: var(--tinta-3);
+}
+/* Tablet: a ficha vira gaveta sobre o atendimento, deslizando da direita. */
+.gaveta.gaveta {
+  position: fixed; inset: 0 0 0 auto; margin: 0 0 0 auto;
+  height: 100dvh; max-height: 100dvh; max-width: 90vw; border-radius: 0;
+  border: 0; border-left: var(--b-1) solid var(--linha);
+  box-shadow: var(--sombra-alta);
+}
+.gaveta.gaveta[open] { animation: gavetaEntra var(--dur-media) var(--ease-saida) both; }
+/* A Ficha já tem seus próprios recuos e rolagem dentro da janela. */
+.gaveta > h2 + div { padding: 0; }
+/* #1551: o rodapé da gaveta só existe para o aviso da ação da API; sem aviso, some. */
+.gaveta > h2 + div + div:empty { display: none; }
+@keyframes gavetaEntra { from { transform: translateX(100%); } to { transform: none; } }
+.espaco { margin-left: auto; }
+/* Âncora do popover do topo. Sem isto a camada se posiciona pela barra toda. */
+.comPopover { position: relative; display: inline-flex; }
+/* Abaixo de 1024 px o topo já está compacto no JSX, com Lembretes e Automáticas
+   visíveis e o resto no menu Mais. Aqui a assinatura sai, para os controles
+   caberem na MESMA linha da marca. */
+@media (max-width: 1023px) {
+}
+/* Celular: gap mais apertado, o resto do topo já empurra sozinho pra direita. */
+@media (max-width: 759px) {
+  .topo { gap: var(--e-1); padding-inline: var(--e-2); }
+}
+/* Botão "Simular" (seção 7 da direção visual): fixo no canto inferior
+   esquerdo, sempre por cima do resto da tela, nos três arranjos. Pílula de
+   vidro flutuante, discreta até alguém passar o mouse. */
+.botaoSimular {
+  position: fixed; left: var(--e-5); bottom: var(--e-5); z-index: 30;
+  border-radius: var(--r-pilula) !important;
+  background: var(--vidro) !important; -webkit-backdrop-filter: var(--desfoque); backdrop-filter: var(--desfoque);
+  border: var(--b-1) solid var(--linha) !important; box-shadow: var(--sombra-media);
+}
+/* Tablet e celular têm rodapé (botão da Ficha ou barra de abas): a pílula
+   sobe para cima dele em vez de cobrir o botão. */
+.app:has(> footer) .botaoSimular,
+.app:has(> nav) .botaoSimular { bottom: calc(var(--toque) + var(--e-5) + env(safe-area-inset-bottom, 0px)); left: var(--e-4); }
+/* Celular: a pílula só aparece na aba Balcão; na conversa e na ficha ela
+   caía em cima do Enviar. F2 continua abrindo de qualquer aba. */
+.app:has(> nav):not(:has(#painel-da-aba[aria-labelledby='aba-balcao'])) .botaoSimular { display: none; }
+.botaoSimular[aria-pressed='true'] { color: var(--marca); border-color: color-mix(in srgb, var(--marca) 45%, transparent) !important; }
+
+/* --- Trilho lateral do desktop (rodada 6c) ---------------------------------
+   Navegação de app: selo da casa no alto, itens com ícone de 22 px e rótulo
+   curto embaixo, selo de contagem no canto do ícone, tema e Simular no pé.
+   Material de vidro, como a barra lateral do macOS. */
+.appTrilho { flex-direction: row; }
+.appTrilho > .palco { flex: 1; min-width: 0; }
+.appTrilho > .palcoTres { padding-left: 0; }
+.trilho {
+  flex: 0 0 84px; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: var(--e-3) 8px var(--e-4);
+  padding-top: calc(var(--e-3) + env(safe-area-inset-top, 0px));
+  position: relative; z-index: 20;
+}
+.inicioTrilho { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--tinta-2); text-decoration: none; font-size: var(--t-minimo); font-weight: 600; border-radius: var(--r-1); }
+.inicioTrilho:focus-visible { outline: 2px solid var(--marca); outline-offset: 3px; }
+.inicioTrilho:hover { color: var(--marca); }
+.itemTrilho,
+.avisosTrilho > button,
+.sinoTrilho > div > button {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  width: 68px; min-height: 58px; padding: 6px 2px; border: 0; border-radius: 14px;
+  background: transparent; color: var(--tinta-2); box-shadow: none;
+  font-size: var(--t-minimo); font-weight: 600; letter-spacing: 0; line-height: 1.1; text-align: center;
+}
+.itemTrilho:hover:not(:disabled),
+.avisosTrilho > button:hover:not(:disabled),
+.sinoTrilho > div > button:hover:not(:disabled) { background: var(--preenchimento); color: var(--tinta); }
+.itemTrilho svg, .sinoTrilho > div > button svg { transition: transform var(--dur-media) var(--ease-mola); }
+.itemTrilho:hover svg, .sinoTrilho > div > button:hover svg { transform: translateY(-2px) scale(1.06); }
+.itemAtual { color: var(--tinta); background: var(--preenchimento-forte); cursor: default; }
+.itemAtual::before {
+  content: ''; position: absolute; left: -8px; top: 14px; bottom: 14px; width: 3px;
+  border-radius: 0 3px 3px 0; background: var(--tinta);
+}
+.itemTrilho[aria-pressed='true'] { color: var(--tinta); background: var(--preenchimento-forte); }
+.contaTrilho, .seloTrilho {
+  position: absolute; top: 3px; left: calc(50% + 6px);
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-pilula);
+  display: grid; place-items: center; font-size: 11px; font-weight: 700;
+  box-shadow: 0 0 0 2px var(--fundo);
+}
+.contaTrilho { background: var(--preenchimento-forte); color: var(--tinta-2); }
+.seloTrilho {
+  left: calc(50% + 2px); background: var(--erro); color: var(--sobre-erro);
+  white-space: nowrap; animation: seloPulso 2.4s var(--ease-padrao) infinite;
+}
+@keyframes seloPulso {
+  0% { box-shadow: 0 0 0 2px var(--fundo), 0 0 0 2px color-mix(in srgb, var(--erro) 50%, transparent); }
+  70% { box-shadow: 0 0 0 2px var(--fundo), 0 0 0 9px transparent; }
+  100% { box-shadow: 0 0 0 2px var(--fundo), 0 0 0 2px transparent; }
+}
+/* Lembretes no trilho: mesmo desenho de item, rótulo no próprio botão (#1807), e o
+   painel abre para a direita em vez de para baixo. */
+.sinoTrilho { position: relative; }
+.sinoTrilho section[aria-label='Lembretes'] { top: 0; left: calc(100% + 10px); right: auto; transform-origin: top left; }
+.espacoTrilho { flex: 1; }
+/* Controles compactos do Balcão. */
+@media (max-width: 759px) {
+  .topo { flex-wrap: nowrap; }
+  .controles { flex-wrap: nowrap; gap: var(--e-1); }
+  .controles > .comPopover > button { padding: 0; width: var(--toque); }
+}
+@media (max-width: 759px) {
+  .controles > button { font-size: 0; gap: 6px; padding: 0 10px; }
+  .controles .conta { font-size: var(--t-micro); min-width: 22px; height: 22px; }
+}
+@media (max-width: 374px) {
+  .topo { flex-wrap: wrap; }
+  .controleLoja { margin-left: auto; }
+  .controles { flex-basis: 100%; justify-content: space-between; margin-left: 0; }
+}
+
+/* Achado 6, P3 (banca 10): "Automáticas" não pode virar só ícone+número no
+   celular (achado: uma pista a menos pra quem já não achou onde enviar).
+   `.rotuloCurto` tem font-size próprio, então sobrevive ao `font-size: 0` do
+   botão acima mesmo em cascata. */
+.rotuloCurto { display: none; }
+@media (max-width: 759px) {
+  .rotuloLongo { display: none; }
+  .rotuloCurto { display: inline; font-size: var(--t-minimo); }
+}
+
+/* Rodada 6d (banca estética, item 4): UM desenho de contador no app todo.
+   Neutro para quantidade; carmim só para o que está vencido ou estourado. */
+.conta, .contaTrilho { min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-pilula); display: inline-grid; place-items: center; font-size: var(--t-minimo); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; background: var(--preenchimento-forte); color: var(--tinta-2); }
+.seloTrilho { min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-pilula); display: inline-grid; place-items: center; font-size: var(--t-minimo); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; background: var(--preenchimento-forte); color: var(--tinta-2); background: var(--erro); color: var(--sobre-erro); }
+.contaTrilho, .seloTrilho { position: absolute; top: 4px; left: calc(50% + 6px); box-shadow: 0 0 0 2px var(--fundo); }
+
+/* Rodada 6d (banca estética, itens 13, 15 e 12). */
+/* 13: as três colunas com a mesma faixa de título, de 64 px, e ícone antes. */
+.tituloColuna { min-height: 64px; gap: 10px; }
+.tituloColuna > svg { color: var(--tinta-3); }
+.tituloCompacto { min-height: 52px; padding-block: 2px; }
+/* 15: divisor fino antes do Simular e quem atende no pé do trilho. */
+.espacoTrilho { display: flex; align-items: flex-end; justify-content: center; }
+.espacoTrilho::after { content: ''; width: 32px; height: 1px; margin-bottom: 4px; background: var(--linha-media); }
+.atendente { margin-top: var(--e-3); display: grid; place-items: center; }
+/* 12: no celular, o painel que entra desliza brevemente da direita. */
+@keyframes painelDesliza { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+.palco > [role='tabpanel'] > * { animation: painelDesliza var(--dur-media) var(--ease-saida) backwards; }
+
+/* Integração com a rodada 7: o estado da loja mora no trilho do desktop,
+   abaixo da marca. Aberta em verde, fechada em carmim, com o fundo tingido do
+   estado; o rótulo quebra em duas linhas curtas dentro dos 68 px do item. */
+.lojaTrilho { margin-bottom: var(--e-2); }
+.lojaAberta { color: var(--sucesso); background: var(--sucesso-pastel); }
+.lojaFechada { color: var(--erro); background: var(--erro-pastel); }
+.lojaAberta:hover:not(:disabled) { color: var(--sucesso); background: var(--sucesso-pastel); filter: brightness(.97); }
+.lojaFechada:hover:not(:disabled) { color: var(--erro); background: var(--erro-pastel); filter: brightness(.97); }
+
+/* Integração: no celular o controle da loja vira só o ícone, para a linha de
+   cima caber em 390 px; o texto continua no nome acessível. */
+@media (max-width: 759px) {
+  .controleLoja > span { font-size: 0; gap: 0; padding: 6px; }
+  .controleLoja svg { width: 20px; height: 20px; }
+}

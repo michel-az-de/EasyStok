@@ -6,13 +6,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell",
+            "command": "cmd",
             "args": [
-              "-NoProfile",
-              "-ExecutionPolicy",
-              "Bypass",
-              "-File",
-              "${CLAUDE_PROJECT_DIR}/scripts/poka-yoke/pretooluse-block-generated.ps1"
+              "/d",
+              "/c",
+              "${CLAUDE_PROJECT_DIR}\\scripts\\poka-yoke\\pretooluse-gate.cmd"
             ],
             "timeout": 15
           }
@@ -25,13 +23,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell",
+            "command": "cmd",
             "args": [
-              "-NoProfile",
-              "-ExecutionPolicy",
-              "Bypass",
-              "-File",
-              "${CLAUDE_PROJECT_DIR}/scripts/poka-yoke/posttooluse-validate-head.ps1"
+              "/d",
+              "/c",
+              "${CLAUDE_PROJECT_DIR}\\scripts\\poka-yoke\\posttooluse-gate.cmd"
             ],
             "timeout": 30
           }
@@ -70,7 +66,21 @@
       "Bash(gh pr comment:*)",
       "Bash(gh pr edit:*)",
       "Bash(gh run list:*)",
-      "Bash(gh repo view:*)"
+      "Bash(gh repo view:*)",
+      "Bash(dotnet test:*)",
+      "Bash(git grep:*)",
+      "Bash(git rev-list:*)",
+      "Bash(gh run view:*)",
+      "mcp__Claude_Preview__preview_console_logs",
+      "mcp__Claude_Preview__preview_snapshot",
+      "mcp__Claude_Preview__preview_screenshot",
+      "mcp__Claude_Preview__preview_inspect",
+      "mcp__Claude_Browser__preview_console_logs",
+      "mcp__claude-in-chrome__get_page_text",
+      "mcp__claude-in-chrome__find",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "mcp__claude-in-chrome__read_network_requests",
+      "mcp__claude-in-chrome__read_console_messages"
     ]
   }
 }

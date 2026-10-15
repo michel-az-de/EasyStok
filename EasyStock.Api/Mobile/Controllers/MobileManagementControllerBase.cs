@@ -51,11 +51,16 @@ public abstract class MobileManagementControllerBase(ICurrentUserAccessor curren
             return true;
         }
 
-        if (empresaId == Guid.Empty)
+        // Não-SuperAdmin SEM empresa vinculada no token: fail-closed. NÃO aceitar um
+        // empresaId arbitrário da request (era o mesmo furo cross-tenant do guard HTTP
+        // base). Todo acesso legítimo do painel WEB carrega o claim empresaId.
+        empresaId = Guid.Empty;
+        if (requestedEmpresaId is { } req && req != Guid.Empty)
         {
-            error = BadRequest(new { error = "empresaId obrigatório" });
+            error = Forbid();
             return false;
         }
-        return true;
+        error = BadRequest(new { error = "empresaId obrigatório" });
+        return false;
     }
 }

@@ -1,0 +1,128 @@
+using EasyStock.Application.UseCases.Pedidos.Cobranca;
+using EasyStock.Domain.Exceptions.Storefront;
+using Swashbuckle.AspNetCore.Annotations;
+
+namespace EasyStock.Api.Controllers;
+
+public sealed record SolicitarEstornoOnlineRequest(Guid OperacaoId, Guid PagamentoId, decimal Valor, string Motivo, Guid? EmpresaId = null);
+
+public sealed record TrocarFormaPagamentoRequest(string Forma);
+
+public sealed record DesfazerPagamentoManualRequest(string Motivo, Guid? PagamentoId = null);
+
+public sealed record RegistrarEstornoManualRequest(Guid OperacaoId, Guid PagamentoId, decimal Valor,
+    string Metodo, string Motivo, string Referencia, bool ValorJaDevolvido, Guid? EmpresaId = null);
+
+/// <summary>
+/// Cobrança do pedido pela operadora (S11): reemitir o link, trocar a forma de pagamento e desfazer
+/// pagamento registrado à mão. Mesma rota de <see cref="PedidosController"/> (<c>api/pedidos</c>), em
+/// controller próprio para não inflar o construtor daquele.
+///
+/// <para>
+/// Erros: 404 pedido de outro tenant ou inexistente; 409 com <c>error.code</c> =
+/// <c>pedido_ja_pago</c>, <c>use_estorno</c>, <c>preparo_iniciado</c>, <c>pedido_finalizado</c>,
+/// <c>sem_pagamento</c> ou <c>forma_na_entrega</c>; 503 Mercado Pago indisponível.
+/// </para>
+/// </summary>
+[SwaggerTag("Pedidos (encomendas)")]
+[ApiController]
+[Route("api/pedidos")]
+[Authorize]
+[ValidateEmpresaId]
+public sealed class PedidosCobrancaController(
+    GerarCobrancaPedidoUseCase gerarCobranca,
+    TrocarFormaPagamentoPedidoUseCase trocarForma,
+    DesfazerPagamentoManualUseCase desfazerPagamento,
+    ICurrentUserAccessor currentUser,
+    ConsultarEstornosManuaisUseCase consultarEstornos,
+    RegistrarEstornoManualUseCase registrarEstorno,
+    IEstornosOnlineService estornosOnline) : EasyStockControllerBase
+{
+    [HttpGet("{id}/estornos-online")]
+    [Authorize(Policy = "Operador")]
+    public Task<IActionResult> EstornosOnline(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await estornosOnline.ConsultarAsync(emp, id, ct)));
+
+    [HttpPost("{id}/estornos-online")]
+    [Authorize(Policy = "Gerente")]
+    public Task<IActionResult> SolicitarEstornoOnline(Guid id, [FromBody] SolicitarEstornoOnlineRequest request,
+        [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await estornosOnline.SolicitarAsync(new(
+            emp, id, request.OperacaoId, request.PagamentoId, request.Valor, request.Motivo,
+            currentUser.UsuarioId, User.FindFirst("nome")?.Value, currentUser.Nivel), ct)));
+
+    [HttpPost("{id}/estornos-online/{operacaoId:guid}/retomar")]
+    [Authorize(Policy = "Gerente")]
+    public Task<IActionResult> RetomarEstornoOnline(Guid id, Guid operacaoId, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await estornosOnline.RetomarAsync(emp, id, operacaoId, currentUser.Nivel, ct)));
+
+    [SwaggerOperation(Summary = "Descartar solicitação de estorno online ainda não enviada ao Mercado Pago")]
+    [HttpPost("{id}/estornos-online/{operacaoId:guid}/descartar")]
+    [Authorize(Policy = "Gerente")]
+    public Task<IActionResult> DescartarEstornoOnline(Guid id, Guid operacaoId, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await estornosOnline.DescartarAsync(
+            emp, id, operacaoId, UsuarioId(), User.FindFirst("nome")?.Value, currentUser.Nivel, ct)));
+
+    [HttpGet("{id}/estornos-manuais")]
+    [Authorize(Policy = "Operador")]
+    public Task<IActionResult> EstornosManuais(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await consultarEstornos.ExecuteAsync(emp, id, ct)));
+
+    [HttpPost("{id}/estornos-manuais")]
+    [Authorize(Policy = "Gerente")]
+    public Task<IActionResult> RegistrarEstornoManual(Guid id, [FromBody] RegistrarEstornoManualRequest request,
+        [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp => DataOk(await registrarEstorno.ExecuteAsync(new(
+            emp, id, request.OperacaoId, request.PagamentoId, request.Valor, request.Metodo, request.Motivo,
+            request.Referencia, request.ValorJaDevolvido, currentUser.UsuarioId, User.FindFirst("nome")?.Value,
+            currentUser.Nivel), ct)));
+
+    [SwaggerOperation(Summary = "Reemitir o link de pagamento do pedido (Mercado Pago)")]
+    [HttpPost("{id}/cobranca")]
+    [Authorize(Policy = "Operador")]
+    public Task<IActionResult> Reemitir(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp =>
+            DataOk(await gerarCobranca.ExecuteComTravaAsync(new GerarCobrancaPedidoInput(emp, id), ct)));
+
+    [SwaggerOperation(Summary = "Trocar a forma de pagamento do pedido (online | na_entrega)")]
+    [HttpPost("{id}/cobranca/forma")]
+    [Authorize(Policy = "Operador")]
+    public Task<IActionResult> TrocarForma(
+        Guid id, [FromBody] TrocarFormaPagamentoRequest request, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp =>
+            DataOk(await trocarForma.ExecuteAsync(
+                new TrocarFormaPagamentoPedidoInput(emp, id, request.Forma, UsuarioId(), null), ct)));
+
+    [SwaggerOperation(Summary = "Desfazer pagamento registrado à mão (motivo obrigatório)")]
+    [HttpPost("{id}/pagamento-manual/desfazer")]
+    [Authorize(Policy = "Operador")]
+    public Task<IActionResult> DesfazerPagamentoManual(
+        Guid id, [FromBody] DesfazerPagamentoManualRequest request, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        ExecutarAsync(empresaId, async emp =>
+            DataOk(await desfazerPagamento.ExecuteAsync(
+                new DesfazerPagamentoManualInput(emp, id, request.Motivo, UsuarioId(), null, request.PagamentoId), ct)));
+
+    private Guid? UsuarioId() => currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null;
+
+    private async Task<IActionResult> ExecutarAsync(Guid? empresaId, Func<Guid, Task<IActionResult>> acao)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
+        try
+        {
+            return await acao(emp);
+        }
+        catch (CobrancaPedidoNaoEncontradoException)
+        {
+            return DataNotFound("Pedido não encontrado.");
+        }
+        catch (CobrancaPedidoConflitoException ex)
+        {
+            return Conflict(new ApiErrorResponse(new ApiError(ex.Codigo, ex.Message, null, null)));
+        }
+        catch (MercadoPagoIndisponivelException ex)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new ApiErrorResponse(new ApiError("pagamento_indisponivel", ex.Message, null, null)));
+        }
+    }
+}

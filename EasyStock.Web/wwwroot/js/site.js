@@ -1,5 +1,5 @@
 // EasyStok — landing publica
-// Burger menu, newsletter inline, toast dismissal, scroll smooth, tracking simples.
+// Burger menu, toast dismissal, scroll smooth, tracking simples.
 
 (function () {
     'use strict';
@@ -36,34 +36,6 @@
                 if (toast) toast.remove();
             });
         });
-
-        // -------- Newsletter inline --------
-        const form = document.getElementById('site-newsletter');
-        if (form) {
-            const status = document.querySelector('.site-newsletter-status');
-            form.addEventListener('submit', async function (ev) {
-                ev.preventDefault();
-                if (status) { status.className = 'site-newsletter-status'; status.textContent = 'Enviando...'; }
-
-                const fd = new FormData(form);
-                try {
-                    const res = await fetch('/newsletter', {
-                        method: 'POST',
-                        body: fd,
-                        headers: { 'X-Requested-With': 'fetch' }
-                    });
-                    const data = await res.json().catch(() => ({}));
-                    if (res.ok && data.success) {
-                        if (status) { status.className = 'site-newsletter-status ok'; status.textContent = data.message || 'Beleza, você está na lista.'; }
-                        form.reset();
-                    } else {
-                        if (status) { status.className = 'site-newsletter-status err'; status.textContent = data.message || 'Não deu pra inscrever agora. Tenta de novo.'; }
-                    }
-                } catch (err) {
-                    if (status) { status.className = 'site-newsletter-status err'; status.textContent = 'Erro de rede. Tenta de novo.'; }
-                }
-            });
-        }
 
         // -------- Scroll smooth para ancoras --------
         document.querySelectorAll('a[href^="#"]').forEach(function (a) {

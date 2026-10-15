@@ -1,0 +1,37 @@
+/* Escolha de documento e papel da ação "Imprimir" (#1632). */
+.campos { display: grid; gap: var(--e-3); padding-top: var(--e-2); }
+.erro {
+  margin: 0; padding: var(--e-2); border-radius: var(--r-1);
+  background: var(--erro-pastel); color: var(--erro); font-size: var(--t-apoio); font-weight: 600;
+}
+.layout { display: grid; grid-template-columns: 260px minmax(0,1fr); gap: var(--e-5); }
+.opcoes { display: flex; flex-direction: column; gap: var(--e-3); }
+.opcoes, .previa { min-width: 0; }
+.preparada { grid-template-columns: minmax(0, 1fr); }
+.resumoPreparado { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--e-2); padding: var(--e-3); border: 1px solid var(--linha); border-radius: var(--r-1); background: var(--preenchimento); }
+.resumoPreparado div { display: grid; gap: var(--e-1); }
+.resumoPreparado span { color: var(--tinta-2); font-size: var(--t-apoio); }
+.etapa { margin: 0 0 var(--e-2); font-weight: 700; color: var(--tinta); }
+.dica, .resumo { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); line-height: 1.5; }
+.resumo { margin-bottom: var(--e-2); }
+.moldura { height: 460px; overflow: auto; background: white; border: 1px solid var(--linha-forte); border-radius: var(--r-1); }
+.folha { display: block; background: white; border: 0; }
+.zoom { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); margin-bottom: var(--e-2); }
+.vazia { min-height: 280px; display: grid; place-items: center; padding: var(--e-4); border: 1px dashed var(--linha-forte); border-radius: var(--r-1); color: var(--tinta-2); text-align: center; }
+.aviso { padding: var(--e-3); border: 1px solid var(--linha-forte); border-radius: var(--r-1); font-weight: 600; }
+.rodapeImpressao { width: 100%; display: grid; gap: var(--e-2); }
+.rodapeImpressao p { margin: 0; }
+.acoesRodape { display: flex; justify-content: flex-end; gap: var(--e-2); flex-wrap: wrap; }
+.etapa:focus, .rodapeImpressao p:focus { outline: 2px solid var(--tinta); outline-offset: 3px; }
+.erroHistorico { display: grid; justify-items: start; gap: var(--e-2); }
+.detalhes { font-size: var(--t-apoio); color: var(--tinta-2); }
+.detalhes summary { cursor: pointer; padding-block: var(--e-1); }
+.detalhes span { display: block; padding-top: var(--e-1); }
+.historico { margin-top: var(--e-5); border-top: 1px solid var(--linha); padding-top: var(--e-3); }
+.historico h3 { margin: 0 0 var(--e-2); }
+.registros { list-style: none; margin: var(--e-3) 0; padding: 0; }
+.registros li { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); padding: var(--e-3) 0; border-bottom: 1px solid var(--linha); }
+.registros li div { display: grid; gap: var(--e-1); }
+.registros span { font-size: var(--t-apoio); color: var(--tinta-2); }
+.paginas { display: flex; align-items: center; justify-content: flex-end; gap: var(--e-2); }
+@media (max-width: 700px) { .layout { grid-template-columns: minmax(0,1fr); } .registros li { align-items: flex-start; flex-direction: column; } }

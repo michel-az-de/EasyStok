@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Exceptions.Storefront;
 
 namespace EasyStock.Application.UseCases.Storefront.Agendamento;
@@ -25,18 +26,21 @@ namespace EasyStock.Application.UseCases.Storefront.Agendamento;
 /// valida que pelo menos uma <c>FreteZona</c> ativa cobre o CEP; se não cobre →
 /// <see cref="CepSemCoberturaException"/>.
 /// </para>
+///
+/// <para>
+/// <strong>Prazo mínimo</strong> (S16, RN-21): com <c>PrazoMinimoMinutos</c>, janela cujo início seja antes
+/// de agora + prazo (fuso da loja) sai da lista. É o que o agente oferece ao cliente.
+/// </para>
 /// </summary>
 public sealed class ListarJanelasDisponiveisUseCase(
     IStorefrontRepository storefrontRepository,
     IJanelaEntregaRepository janelaRepository,
     IBloqueioEntregaRepository bloqueioRepository,
     IVagaOcupadaRepository vagaOcupadaRepository,
-    IFreteZonaRepository freteZonaRepository)
+    IFreteZonaRepository freteZonaRepository,
+    TimeProvider timeProvider)
 {
     private const int MaxDiasPeriodo = 60;
-    private const int DefaultDiasPeriodo = 14;
-    private static readonly TimeZoneInfo TzBrasilia =
-        TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
     private static readonly Regex CepDigitosRegex = new(@"^\d{8}$", RegexOptions.Compiled);
 
     public async Task<IReadOnlyList<JanelaDisponivelDto>> ExecuteAsync(
@@ -55,14 +59,19 @@ public sealed class ListarJanelasDisponiveisUseCase(
         }
 
         // 2. Calcular período usando timezone de Brasília
-        var hoje = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TzBrasilia));
+        var agoraUtc = timeProvider.GetUtcNow().UtcDateTime;
+        var hoje = HorarioBrasil.DataOperacional(agoraUtc);
         var inicio = input.DataInicio ?? hoje;
-        var fim = input.DataFim ?? hoje.AddDays(DefaultDiasPeriodo);
+        var fim = input.DataFim ?? hoje.AddDays(HorizonteAgendamento.Dias);
+
+        if (fim < inicio)
+            throw new UseCaseValidationException("A data final não pode ser anterior à data inicial.");
 
         // 3. Anti-DoS: período máximo 60 dias
         if (fim.DayNumber - inicio.DayNumber > MaxDiasPeriodo)
             throw new RegraDeDominioVioladaException(
                 $"Período máximo permitido é {MaxDiasPeriodo} dias.");
+        HorizonteAgendamento.Validar(fim, hoje);
 
         // 4. Resolver storefront
         var storefront = await storefrontRepository.GetBySlugAsync(input.Slug, ct);
@@ -114,6 +123,13 @@ public sealed class ListarJanelasDisponiveisUseCase(
                     continue;
 
                 if (bloqueioEspecifico[(data, janela.Id)].Any())
+                    continue;
+
+                if (CalculadoraPrazoPedido.JanelaJaPassou(data, janela.HoraFim, agoraUtc))
+                    continue;
+
+                if (input.PrazoMinimoMinutos is { } prazo
+                    && !CalculadoraPrazoPedido.AtendePrazo(data, janela.HoraInicio, agoraUtc, prazo))
                     continue;
 
                 var ocupadas = contagens.TryGetValue((janela.Id, data), out var c) ? c : 0;

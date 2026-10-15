@@ -66,8 +66,9 @@ internal sealed class GeradorAutoPreenchimentoOpenAI(
             response = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
+            response?.Dispose();
             logger.LogError(ex, "Erro ao iniciar stream OpenAI para auto-preenchimento: {Nome}", nomeProduto);
             errorFallback = $"Descrição não disponível para: {nomeProduto}.";
         }
@@ -83,9 +84,8 @@ internal sealed class GeradorAutoPreenchimentoOpenAI(
             await using var stream = await response!.Content.ReadAsStreamAsync(ct);
             using var reader = new StreamReader(stream, Encoding.UTF8);
 
-            while (!reader.EndOfStream && !ct.IsCancellationRequested)
+            while (await reader.ReadLineAsync(ct) is { } line)
             {
-                var line = await reader.ReadLineAsync(ct);
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 if (!line.StartsWith("data:")) continue;
 
@@ -95,7 +95,7 @@ internal sealed class GeradorAutoPreenchimentoOpenAI(
                 string? text = null;
                 try
                 {
-                    var json = JsonDocument.Parse(data);
+                    using var json = JsonDocument.Parse(data);
                     var choices = json.RootElement.GetProperty("choices");
                     if (choices.GetArrayLength() > 0)
                     {

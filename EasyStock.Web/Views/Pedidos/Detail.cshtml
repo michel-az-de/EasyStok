@@ -10,6 +10,7 @@
         "aguardando"    => "preparando",
         "preparando"    => "pronto",
         "pronto"        => "entregue",
+        "saiu_para_entrega" => "entregue",
         "aprovado_baba" => "preparando",   // pós-aprovação do cardápio entra na fila (issue 862)
         _               => null!
     } ?? "";
@@ -18,6 +19,7 @@
         "aguardando"    => "Iniciar preparo",
         "preparando"    => "Marcar como pronto",
         "pronto"        => "Confirmar entrega",
+        "saiu_para_entrega" => "Confirmar entrega",
         "aprovado_baba" => "Iniciar preparo",
         _               => ""
     };
@@ -40,11 +42,12 @@
     }
 
     // Timeline de status
-    var statusOrder = new[] { "aguardando", "preparando", "pronto", "entregue" };
+    var statusOrder = new[] { "aguardando", "preparando", "pronto", "saiu_para_entrega", "entregue" };
     var statusLabels = new Dictionary<string, string> {
         { "aguardando", "Recebido" },
         { "preparando", "Em preparo" },
         { "pronto",     "Pronto" },
+        { "saiu_para_entrega", "Saiu para entrega" },
         { "entregue",   "Entregue" }
     };
     var currentIdx = Array.IndexOf(statusOrder, p.Status);
@@ -54,7 +57,10 @@
     var progressoPagamento = p.Total > 0 ? Math.Min(100, (int)Math.Round((double)(p.TotalPago / p.Total) * 100)) : 0;
 }
 
-<div class="flex items-center gap-3 mb-4">
+@* issue 977: flex-wrap nos dois niveis. Ate 7 controles podiam coexistir numa linha
+   unica ao lado de um h1 de 24px — em 320-375px isso esmagava ou estourava. A
+   listagem (Pedidos/Index) e o Caixa ja tinham wrap; este header era o outlier. *@
+<div class="flex flex-wrap items-center gap-3 mb-4">
     <a asp-action="Index" asp-controller="Pedidos" class="text-slate-400 hover:text-slate-600" aria-label="Voltar para pedidos">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -62,7 +68,7 @@
     </a>
     <h1 class="text-2xl font-bold text-slate-900">@(p.ClienteNome ?? "Pedido")</h1>
     <span id="ped-status-badge" class="badge @statusInfo.BadgeClass">@statusInfo.Label</span>
-    <div class="ml-auto flex gap-2">
+    <div class="ml-auto flex flex-wrap gap-2">
         <a href="/pedidos/@p.Id/recibo" target="_blank" rel="noopener noreferrer" class="btn-outline-dark">
             🖨 Recibo
         </a>
@@ -162,11 +168,6 @@
                 </div>
             </div>
         }
-        <button type="button" x-data @@click="$dispatch('open-modal', 'reportar-problema')"
-                class="px-3.5 py-2 bg-white border border-amber-300 text-amber-700 text-sm font-semibold rounded-lg hover:bg-amber-50"
-                title="Abre ticket pra EasyStok sobre este pedido">
-            ⚠ Reportar problema
-        </button>
     </div>
 </div>
 
@@ -249,6 +250,13 @@ else
                 else if (p.Quitado)
                 {
                     <span class="text-xs font-medium px-2 py-0.5 bg-green-100 text-green-700 rounded-full">✓ Quitado</span>
+                    @* issue 962 (BUG-002 do QA): excedente deliberado (#607, gorjeta/arredondamento)
+                       fica visivel em vez de sumir atras de "Falta R$ 0,00" (Pendente clampa em zero). *@
+                    if (p.TemExcedente)
+                    {
+                        <span class="text-xs font-medium px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full ml-1"
+                              title="Pago acima do total (gorjeta/arredondamento).">+@p.Excedente.AsMoney()</span>
+                    }
                 }
                 else if (p.TotalPago > 0)
                 {
@@ -270,10 +278,22 @@ else
                         <span class="text-slate-500">Pago</span>
                         <span class="font-semibold text-slate-900 ml-1 tabular-nums">@p.TotalPago.AsMoney()</span>
                     </div>
-                    <div>
-                        <span class="text-slate-500">Falta</span>
-                        <span class="font-semibold ml-1 tabular-nums @(p.Pendente > 0 ? "text-amber-800" : "text-green-700")">@p.Pendente.AsMoney()</span>
-                    </div>
+                    @if (p.TemExcedente)
+                    {
+                        @* issue 962: "Falta R$ 0,00" era a mentira literal do BUG-002 -- o pedido
+                           estava pago em dobro. Mostra o excedente em vez de esconder atras do clamp. *@
+                        <div>
+                            <span class="text-slate-500">Excedente</span>
+                            <span class="font-semibold ml-1 tabular-nums text-blue-700">+@p.Excedente.AsMoney()</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div>
+                            <span class="text-slate-500">Falta</span>
+                            <span class="font-semibold ml-1 tabular-nums @(p.Pendente > 0 ? "text-amber-800" : "text-green-700")">@p.Pendente.AsMoney()</span>
+                        </div>
+                    }
                 </div>
             }
             else if (p.TotalPago > 0)
@@ -479,8 +499,12 @@ else
                 {
                     <form asp-action="AddPagamento" asp-controller="Pedidos" asp-route-id="@p.Id" method="post"
                           class="ped-add-row" aria-label="Registrar pagamento"
-                          x-data="{ valor: @p.Pendente.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) }">
+                          x-data="{ valor: @p.Pendente.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture), idempotencyKey: crypto.randomUUID() }">
                         @Html.AntiForgeryToken()
+                        @* issue 917 Fase B: gerada uma vez na renderizacao do form (a intencao).
+                           Retry apos timeout do proprio browser (reenvio de form) reusa o mesmo
+                           valor; so um novo carregamento da pagina de Detail gera outro. *@
+                        <input type="hidden" name="idempotencyKey" x-model="idempotencyKey" />
                         <div class="flex items-baseline justify-between mb-2">
                             <div class="ped-add-row__title">Registrar pagamento</div>
                             <div class="flex gap-2">
@@ -657,73 +681,6 @@ function trunc(s, n) { return s && s.length > n ? s.substring(0, n) + '…' : s;
         </form>
     </div>
 
-    <!-- Modal: reportar problema -->
-    <div x-data="reportarProblemaModal()"
-         x-show="open" x-cloak
-         x-transition:leave="transition duration-100 ease-in"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         @@keydown.escape.window="close()"
-         @@click.self="close()"
-         class="fm-overlay"
-         role="alertdialog" aria-modal="true" aria-labelledby="fm-report-title">
-        <form x-ref="panel" class="fm-panel" style="max-width: 520px" x-show="open"
-              method="post" action="/pedidos/@p.Id/reportar-problema"
-              x-transition:enter="transition duration-150 ease-out"
-              x-transition:enter-start="opacity-0 scale-95"
-              x-transition:enter-end="opacity-100 scale-100">
-            @Html.AntiForgeryToken()
-            <header class="fm-header">
-                <div>
-                    <h2 id="fm-report-title" class="fm-header__title text-amber-700">Reportar problema deste pedido</h2>
-                    <p class="fm-header__subtitle">
-                        Abre ticket para EasyStok sobre este pedido. Você pode acompanhar a resposta em Suporte.
-                    </p>
-                </div>
-                <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
-            </header>
-            <div class="fm-body">
-                <div class="fm-field">
-                    <label class="fm-field__label" for="report-motivo">Motivo *</label>
-                    <select id="report-motivo" name="motivo" required class="ui-select w-full text-sm">
-                        <option value="">— escolha —</option>
-                        <option value="Pedido travado / nao avancou status">Pedido travado / nao avancou status</option>
-                        <option value="Sync falhou (mobile <-> web)">Sync falhou (mobile <-> web)</option>
-                        <option value="Item duplicado ou faltando">Item duplicado ou faltando</option>
-                        <option value="Pagamento nao registrou">Pagamento nao registrou</option>
-                        <option value="Outro">Outro</option>
-                    </select>
-                </div>
-                <div class="fm-field">
-                    <label class="fm-field__label" for="report-categoria">Categoria</label>
-                    <select id="report-categoria" name="categoria" class="ui-select w-full text-sm">
-                        <option value="Solicitacao">Solicitacao</option>
-                        <option value="Incidente">Incidente</option>
-                        <option value="Bug">Bug</option>
-                        <option value="Duvida">Duvida</option>
-                    </select>
-                </div>
-                <div class="fm-field">
-                    <label class="fm-field__label" for="report-descricao">Descricao (opcional)</label>
-                    <textarea id="report-descricao" name="descricao" rows="4"
-                              placeholder="Detalhes adicionais que ajudem a entender o problema..."
-                              class="ui-textarea w-full text-sm"></textarea>
-                    <span class="fm-field__hint">O ticket vai linkar automaticamente ao pedido @p.Id.Substring(0, 8)</span>
-                </div>
-            </div>
-            <footer class="fm-footer">
-                <button type="button" @@click="close()"
-                        class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
-                    Cancelar
-                </button>
-                <button type="submit"
-                        class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700">
-                    Abrir ticket
-                </button>
-            </footer>
-        </form>
-    </div>
-
     @section Scripts {
     <script>
     // BUG-02: detalhe reativo. Espelha StatusHelper (label/badge) + a ordem da timeline.
@@ -825,26 +782,6 @@ function trunc(s, n) { return s && s.length > n ? s.substring(0, n) + '…' : s;
                     this._previousFocus = document.activeElement;
                     this.open = true;
                     this.$nextTick(() => this.$refs.panel.querySelector('textarea')?.focus());
-                });
-                this.$watch('open', (v) => {
-                    document.body.style.overflow = v ? 'hidden' : '';
-                    if (!v && this._previousFocus) this._previousFocus.focus?.();
-                });
-            },
-            close() { this.open = false; }
-        };
-    }
-
-    function reportarProblemaModal() {
-        return {
-            open: false,
-            _previousFocus: null,
-            init() {
-                window.addEventListener('open-modal', (e) => {
-                    if (e.detail !== 'reportar-problema') return;
-                    this._previousFocus = document.activeElement;
-                    this.open = true;
-                    this.$nextTick(() => this.$refs.panel.querySelector('select[name="motivo"]')?.focus());
                 });
                 this.$watch('open', (v) => {
                     document.body.style.overflow = v ? 'hidden' : '';

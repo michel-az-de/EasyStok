@@ -26,22 +26,26 @@ public class ClientesService(ApiClient api, SessionService session) : TenantServ
     public Task<ApiResult<ClienteDetalhe>> ObterAsync(string id) =>
         api.GetAsync<ClienteDetalhe>($"clientes/{id}?empresaId={GetEmpresaId()}");
 
+    // Os parâmetros de PJ ficam no fim com default para não quebrar os call-sites existentes.
     public Task<ApiResult<Cliente>> CriarAsync(
         string nome, string? apt, string? endereco, string? telefone,
-        string? email, string? documento, string? observacoes)
+        string? email, string? documento, string? observacoes,
+        bool pessoaJuridica = false, string? nomeFantasia = null, string? inscricaoEstadual = null)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Cliente>());
 
         return api.PostAsync<Cliente>("clientes", new
         {
-            empresaId, nome, apt, endereco, telefone, email, documento, observacoes
+            empresaId, nome, apt, endereco, telefone, email, documento, observacoes,
+            pessoaJuridica, nomeFantasia, inscricaoEstadual
         });
     }
 
     public Task<ApiResult<Cliente>> EditarAsync(string id,
         string nome, string? apt, string? endereco, string? telefone,
-        string? email, string? documento, string? observacoes)
+        string? email, string? documento, string? observacoes,
+        bool pessoaJuridica = false, string? nomeFantasia = null, string? inscricaoEstadual = null)
     {
         if (!Guid.TryParse(id, out var cid))
             return Task.FromResult(ApiResult<Cliente>.Fail("INVALID_ID", "ID de cliente inválido."));
@@ -52,6 +56,7 @@ public class ClientesService(ApiClient api, SessionService session) : TenantServ
         return api.PatchAsync<Cliente>($"clientes/{id}", new
         {
             id = cid, empresaId, nome, apt, endereco, telefone, email, documento, observacoes,
+            pessoaJuridica, nomeFantasia, inscricaoEstadual,
             origem = "web"
         });
     }

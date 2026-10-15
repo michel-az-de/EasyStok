@@ -14,6 +14,15 @@ internal static class IdempotencyKeyHelper
         "vendas",
         "movimentacoes",
         "estoque/estorno",
+        // #920: saida/entrada de estoque mutam saldo (e criam venda/movimentacao); sem o header
+        // Idempotency-Key o double-submit debita/credita 2x. Espelha estoque/estorno ja protegido.
+        "estoque/saida",
+        "estoque/entrada",
+        // issue 917 Fase B: fallback de seguranca. As superficies reais (Estoque quick-saida,
+        // Saidas/Nova, Pedidos pagamentos) ja mandam chave ESTAVEL explicita via ApiClient
+        // (gerada no browser na abertura do form/modal); isto so cobre call-sites de "pedidos/"
+        // que ainda nao ganharam chave propria.
+        "pedidos",
     };
 
     public static string? AutoGenerateIfApplicable(string path)

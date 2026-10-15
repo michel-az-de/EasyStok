@@ -1,0 +1,550 @@
+using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.Exceptions;
+using EasyStock.Domain.ValueObjects;
+using FluentAssertions;
+
+namespace EasyStock.Domain.Tests.Entities.Atendimento;
+
+/// <summary>
+/// Testes do agregado <see cref="Conversa"/> (S04, ADR-0050).
+///
+/// Uma conversa e o estado de atendimento de um contato de WhatsApp: nasce
+/// <c>Automatica</c> (o agente responde), passa a <c>Assumida</c> quando a dona
+/// escreve ou o agente escala, e termina <c>Encerrada</c>. A janela de 24 h da
+/// Meta e derivada da ultima mensagem de entrada. O instante vem sempre por
+/// parametro: o dominio nao le relogio ambiente.
+/// </summary>
+public class ConversaTests
+{
+    private static readonly Guid Empresa = Guid.NewGuid();
+    private static readonly DateTime Agora = new(2026, 9, 22, 12, 0, 0, DateTimeKind.Utc);
+    private const string WaId = "5511999990001";
+
+    private static Conversa Nova(DateTime? agora = null) =>
+        Conversa.Abrir(Empresa, WaId, agora ?? Agora, contatoNome: "Tatiana");
+
+    [Fact]
+    public void ReabrirEncerrada_PreservaJanelaPedidoContextoENaoLidas()
+    {
+        var conversa = Nova();
+        var pedido = Guid.NewGuid();
+        conversa.DefinirPedidoEmAndamento(pedido);
+        conversa.DefinirContexto("{\"observacao\":\"sem cebola\"}");
+        conversa.RegistrarEntrada(Agora);
+        conversa.Assumir(Agora.AddMinutes(1), Guid.NewGuid());
+        conversa.Encerrar(Agora.AddMinutes(2));
+
+        conversa.Reabrir(Agora.AddDays(2)).Should().BeTrue();
+
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+        conversa.EncerradaEm.Should().BeNull();
+        conversa.AssumidaPorUsuarioId.Should().BeNull();
+        conversa.MotivoEscalada.Should().Contain("reaberta");
+        conversa.IniciadaEm.Should().Be(Agora);
+        conversa.UltimaMensagemEntradaEm.Should().Be(Agora);
+        conversa.NaoLidas.Should().Be(1);
+        conversa.PedidoEmAndamentoId.Should().Be(pedido);
+        conversa.ContextoJson.Should().Be("{\"observacao\":\"sem cebola\"}");
+        conversa.DentroDaJanela(Agora.AddDays(2)).Should().BeFalse();
+        var enviar = () => conversa.GarantirPodeEnviarTextoLivre(Agora.AddDays(2));
+        enviar.Should().Throw<RegraDeDominioVioladaException>();
+        conversa.RegistrarEntrada(Agora.AddDays(2).AddMinutes(1));
+        conversa.DentroDaJanela(Agora.AddDays(2).AddMinutes(2)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void ReabrirRepetido_NaoTomaConversaAssumidaNemRenovaDatas()
+    {
+        var conversa = Nova();
+        conversa.Encerrar(Agora);
+        conversa.Reabrir(Agora.AddMinutes(1));
+        var atendente = Guid.NewGuid();
+        conversa.Assumir(Agora.AddMinutes(2), atendente);
+
+        conversa.Reabrir(Agora.AddDays(1)).Should().BeFalse();
+
+        conversa.AssumidaPorUsuarioId.Should().Be(atendente);
+        conversa.UltimaMensagemEm.Should().Be(Agora.AddMinutes(2));
+        conversa.MotivoEscalada.Should().BeNull();
+    }
+
+    [Fact]
+    public void Reabrir_ConservaJanelaVigenteENaoRetrocedeUltimaMensagem()
+    {
+        var conversa = Nova();
+        conversa.RegistrarEntrada(Agora);
+        conversa.Encerrar(Agora);
+        conversa.Reabrir(Agora.AddMinutes(-1));
+
+        conversa.UltimaMensagemEm.Should().Be(Agora);
+        conversa.DentroDaJanela(Agora.AddHours(23)).Should().BeTrue();
+    }
+
+    // ── Abrir ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Abrir_NormalizaWaIdEComecaAutomatica()
+    {
+        var conversa = Conversa.Abrir(Empresa, "+55 (11) 99999-0001", Agora, contatoNome: "  Tatiana ");
+
+        conversa.Id.Should().NotBeEmpty();
+        conversa.EmpresaId.Should().Be(Empresa);
+        conversa.ContatoIdExterno.Should().Be(WaId, "so digitos, sem '+', espacos ou mascara");
+        conversa.ContatoNome.Should().Be("Tatiana");
+        conversa.Canal.Should().Be(CanalConversa.WhatsApp);
+        conversa.Situacao.Should().Be(SituacaoConversa.Automatica);
+        conversa.EstaAberta.Should().BeTrue();
+        conversa.IniciadaEm.Should().Be(Agora);
+        conversa.UltimaMensagemEm.Should().Be(Agora);
+        conversa.UltimaMensagemEntradaEm.Should().BeNull();
+        conversa.NaoLidas.Should().Be(0);
+        conversa.ContextoJson.Should().Be("{}");
+        conversa.ClienteId.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("123")]
+    [InlineData("5511999990001234567")]
+    public void Abrir_ComWaIdInvalido_Lanca(string waId)
+    {
+        var act = () => Conversa.Abrir(Empresa, waId, Agora);
+
+        act.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Fact]
+    public void Abrir_SemEmpresa_Lanca()
+    {
+        var act = () => Conversa.Abrir(Guid.Empty, WaId, Agora);
+
+        act.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    // ── Assumir / liberar / encerrar ───────────────────────────────────
+
+    [Fact]
+    public void AssumirEmEncerradaLanca()
+    {
+        var conversa = Nova();
+        conversa.Encerrar(Agora.AddMinutes(5));
+
+        var act = () => conversa.Assumir(Agora.AddMinutes(6), usuarioId: Guid.NewGuid());
+
+        act.Should().Throw<RegraDeDominioVioladaException>();
+        conversa.Situacao.Should().Be(SituacaoConversa.Encerrada);
+    }
+
+    [Fact]
+    public void Assumir_EhIdempotenteEGuardaUsuario()
+    {
+        var conversa = Nova();
+        var dona = Guid.NewGuid();
+
+        conversa.Assumir(Agora.AddMinutes(1), dona);
+        conversa.Assumir(Agora.AddMinutes(2), dona);
+
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+        conversa.AssumidaPorUsuarioId.Should().Be(dona);
+    }
+
+    [Fact]
+    public void LiberarAutomatico_VoltaParaAutomaticaESolta_Usuario()
+    {
+        var conversa = Nova();
+        conversa.Assumir(Agora.AddMinutes(1), Guid.NewGuid());
+
+        conversa.LiberarAutomatico();
+
+        conversa.Situacao.Should().Be(SituacaoConversa.Automatica);
+        conversa.AssumidaPorUsuarioId.Should().BeNull();
+    }
+
+    [Fact]
+    public void LiberarAutomatico_EncerraAjudaSemApagarOutroContextoNemReativarAoAssumir()
+    {
+        var conversa = Nova();
+        conversa.DefinirContexto("""{"comandaAjudaSolicitadaEm":"2026-10-13T03:00:00Z","carrinho":{"itens":[1,2]},"foraDeAreaLiberado":true}""");
+        conversa.Assumir(Agora, Guid.NewGuid());
+
+        conversa.LiberarAutomatico();
+        conversa.Assumir(Agora.AddMinutes(1), Guid.NewGuid());
+
+        using var contexto = System.Text.Json.JsonDocument.Parse(conversa.ContextoJson);
+        contexto.RootElement.TryGetProperty(Conversa.ChaveAjudaComandaSolicitadaEm, out _).Should().BeFalse();
+        contexto.RootElement.GetProperty("carrinho").GetProperty("itens").GetArrayLength().Should().Be(2);
+        contexto.RootElement.GetProperty("foraDeAreaLiberado").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public void LiberarAutomatico_EmEncerrada_Lanca()
+    {
+        var conversa = Nova();
+        conversa.Encerrar(Agora.AddMinutes(1));
+
+        var act = () => conversa.LiberarAutomatico();
+
+        act.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Theory]
+    [InlineData(CanalConversa.Instagram, "17841400000000001")]
+    [InlineData(CanalConversa.Messenger, "6543210987654321")]
+    [InlineData(CanalConversa.ChatSite, "sessao-abc")]
+    public void LiberarAutomatico_EmCanalSemAgente_Lanca(CanalConversa canal, string contato)
+    {
+        // #1288: sem agente no canal, "automatico" deixaria a conversa sem ninguem e fora do lembrete.
+        var conversa = Conversa.Abrir(Empresa, contato, Agora, canal: canal);
+        conversa.Assumir(Agora.AddMinutes(1), Guid.NewGuid());
+
+        var act = () => conversa.LiberarAutomatico();
+
+        act.Should().Throw<RegraDeDominioVioladaException>();
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+        conversa.TemAgente.Should().BeFalse();
+    }
+
+    [Fact]
+    public void TemAgente_SoNoWhatsApp()
+    {
+        Nova().TemAgente.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Encerrar_EhIdempotenteEPreservaPrimeiroCarimbo()
+    {
+        var conversa = Nova();
+
+        conversa.Encerrar(Agora.AddMinutes(1));
+        conversa.Encerrar(Agora.AddMinutes(9));
+
+        conversa.Situacao.Should().Be(SituacaoConversa.Encerrada);
+        conversa.EstaAberta.Should().BeFalse();
+        conversa.EncerradaEm.Should().Be(Agora.AddMinutes(1));
+    }
+
+    // ── Janela de 24 h ─────────────────────────────────────────────────
+
+    [Fact]
+    public void Janela24h()
+    {
+        var conversa = Nova();
+        var entrada = Agora.AddMinutes(10);
+
+        conversa.DentroDaJanela(Agora).Should().BeFalse("sem mensagem de entrada nao ha janela");
+
+        conversa.RegistrarEntrada(entrada);
+
+        conversa.DentroDaJanela(entrada.AddHours(23)).Should().BeTrue();
+        conversa.DentroDaJanela(entrada.AddHours(25)).Should().BeFalse();
+    }
+
+    // ── Canal (S34, ADR-0051) ──────────────────────────────────────────
+
+    [Fact]
+    public void DentroDaJanelaUsaCapacidadeDoCanal()
+    {
+        // Chat do site nao tem janela: a dona responde a qualquer hora.
+        var site = Conversa.Abrir(Empresa, "sessao-abc", Agora, canal: CanalConversa.ChatSite);
+
+        site.DentroDaJanela(Agora.AddDays(30)).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(CanalConversa.Instagram, "  17841400000000001 ", "17841400000000001")]
+    [InlineData(CanalConversa.Messenger, "6543210987654321", "6543210987654321")]
+    [InlineData(CanalConversa.Email, "  Fulana@Exemplo.COM ", "fulana@exemplo.com")]
+    [InlineData(CanalConversa.Sms, "+55 (11) 98888-7777", "5511988887777")]
+    public void Abrir_NormalizaContatoConformeOCanal(CanalConversa canal, string bruto, string esperado)
+    {
+        var conversa = Conversa.Abrir(Empresa, bruto, Agora, canal: canal);
+
+        conversa.ContatoIdExterno.Should().Be(esperado);
+        conversa.Canal.Should().Be(canal);
+    }
+
+    [Fact]
+    public void Abrir_EmailSemArroba_Lanca()
+    {
+        var act = () => Conversa.Abrir(Empresa, "fulana.exemplo.com", Agora, canal: CanalConversa.Email);
+
+        act.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Fact]
+    public void TextoLivreForaDaJanela_SemTag_Recusa()
+    {
+        var conversa = Nova();
+        conversa.RegistrarEntrada(Agora);
+
+        var act = () => conversa.GarantirPodeEnviarTextoLivre(Agora.AddHours(25));
+
+        act.Should().Throw<RegraDeDominioVioladaException>().WithMessage("*modelo aprovado*");
+    }
+
+    [Fact]
+    public void TextoLivreDentroDaJanela_Permite()
+    {
+        var conversa = Nova();
+        conversa.RegistrarEntrada(Agora);
+
+        var act = () => conversa.GarantirPodeEnviarTextoLivre(Agora.AddHours(23));
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void WhatsAppNaoAceitaTagForaDaJanela()
+    {
+        // No WhatsApp o caminho fora da janela e o modelo aprovado, nao tag.
+        var conversa = Nova();
+        conversa.RegistrarEntrada(Agora);
+
+        var act = () => conversa.GarantirPodeEnviarTextoLivre(Agora.AddHours(25), tag: "HUMAN_AGENT");
+
+        act.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Fact]
+    public void InstagramComHumanAgent_PermiteAteSeteDias()
+    {
+        var conversa = Conversa.Abrir(Empresa, "17841400000000001", Agora, canal: CanalConversa.Instagram);
+        conversa.RegistrarEntrada(Agora);
+
+        var comTag25h = () => conversa.GarantirPodeEnviarTextoLivre(Agora.AddHours(25), tag: "HUMAN_AGENT");
+        var semTag25h = () => conversa.GarantirPodeEnviarTextoLivre(Agora.AddHours(25));
+        var comTag8d = () => conversa.GarantirPodeEnviarTextoLivre(Agora.AddDays(8), tag: "HUMAN_AGENT");
+
+        comTag25h.Should().NotThrow();
+        semTag25h.Should().Throw<RegraDeDominioVioladaException>();
+        comTag8d.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Fact]
+    public void CapacidadesDeCanalNaoDeclarado_Lanca()
+    {
+        var act = () => CapacidadesCanal.Para((CanalConversa)99);
+
+        act.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    // ── Mensagens ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void RegistrarEntrada_AtualizaCarimbosEContaNaoLidas()
+    {
+        var conversa = Nova();
+        var t1 = Agora.AddMinutes(1);
+        var t2 = Agora.AddMinutes(2);
+
+        conversa.RegistrarEntrada(t1);
+        conversa.RegistrarEntrada(t2);
+
+        conversa.UltimaMensagemEm.Should().Be(t2);
+        conversa.UltimaMensagemEntradaEm.Should().Be(t2);
+        conversa.NaoLidas.Should().Be(2);
+
+        conversa.MarcarLida();
+
+        conversa.NaoLidas.Should().Be(0);
+    }
+
+    [Fact]
+    public void RegistrarSaida_AtualizaUltimaMensagemMasNaoAJanela()
+    {
+        var conversa = Nova();
+        var entrada = Agora.AddMinutes(1);
+        var saida = Agora.AddMinutes(2);
+        conversa.RegistrarEntrada(entrada);
+
+        conversa.RegistrarSaida(saida);
+
+        conversa.UltimaMensagemEm.Should().Be(saida);
+        conversa.UltimaMensagemEntradaEm.Should().Be(entrada, "a janela de 24 h e contada da ultima mensagem do cliente");
+        conversa.NaoLidas.Should().Be(1, "saida nao mexe no contador de nao lidas");
+    }
+
+    [Fact]
+    public void RegistrarEntrada_EmEncerrada_Lanca()
+    {
+        var conversa = Nova();
+        conversa.Encerrar(Agora.AddMinutes(1));
+
+        var act = () => conversa.RegistrarEntrada(Agora.AddMinutes(2));
+
+        act.Should().Throw<RegraDeDominioVioladaException>("apos encerrar, a proxima mensagem abre conversa nova");
+    }
+
+    // ── Contexto e vinculos ────────────────────────────────────────────
+
+    [Fact]
+    public void DefinirContexto_AceitaJsonEVaziaViraObjeto()
+    {
+        var conversa = Nova();
+
+        conversa.DefinirContexto("{\"etapa\":\"endereco\",\"carrinho\":[]}");
+        conversa.ContextoJson.Should().Contain("\"etapa\"");
+
+        conversa.DefinirContexto(null);
+        conversa.ContextoJson.Should().Be("{}");
+    }
+
+    [Fact]
+    public void DefinirContexto_JsonInvalido_Lanca()
+    {
+        var conversa = Nova();
+
+        var act = () => conversa.DefinirContexto("{etapa:");
+
+        act.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Fact]
+    public void VincularClienteEPedido_GuardamIdsERejeitamVazio()
+    {
+        var conversa = Nova();
+        var cliente = Guid.NewGuid();
+        var pedido = Guid.NewGuid();
+
+        conversa.VincularCliente(cliente);
+        conversa.DefinirPedidoEmAndamento(pedido);
+
+        conversa.ClienteId.Should().Be(cliente);
+        conversa.PedidoEmAndamentoId.Should().Be(pedido);
+
+        var act = () => conversa.VincularCliente(Guid.Empty);
+        act.Should().Throw<RegraDeDominioVioladaException>();
+
+        conversa.DefinirPedidoEmAndamento(null);
+        conversa.PedidoEmAndamentoId.Should().BeNull();
+    }
+
+    // F08 item 13 (#1238): o motivo da escalada aparece no resumo da inbox e some quando alguém pega.
+
+    [Fact]
+    public void Escalar_AssumeSemResponsavelEGuardaOMotivo()
+    {
+        var conversa = Nova();
+
+        conversa.Escalar(Agora.AddMinutes(1), "  cliente pediu desconto  ");
+
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+        conversa.AssumidaPorUsuarioId.Should().BeNull();
+        conversa.MotivoEscalada.Should().Be("cliente pediu desconto");
+    }
+
+    [Fact]
+    public void Escalar_MotivoLongoEhCortado()
+    {
+        var conversa = Nova();
+
+        conversa.Escalar(Agora, new string('x', Conversa.MotivoEscaladaTamanhoMaximo + 50));
+
+        conversa.MotivoEscalada.Should().HaveLength(Conversa.MotivoEscaladaTamanhoMaximo);
+    }
+
+    [Fact]
+    public void AssumirPorUsuario_LimpaOMotivo()
+    {
+        var conversa = Nova();
+        conversa.Escalar(Agora, "falha do LLM");
+
+        conversa.Assumir(Agora.AddMinutes(1), usuarioId: Guid.NewGuid());
+
+        conversa.MotivoEscalada.Should().BeNull();
+    }
+
+    [Fact]
+    public void AssumirSemUsuario_MantemOMotivo()
+    {
+        var conversa = Nova();
+        conversa.Escalar(Agora, "falha do LLM");
+
+        conversa.Assumir(Agora.AddMinutes(1));
+
+        conversa.MotivoEscalada.Should().Be("falha do LLM");
+    }
+
+    [Fact]
+    public void LiberarAutomatico_LimpaOMotivo()
+    {
+        var conversa = Nova();
+        conversa.Escalar(Agora, "falha do LLM");
+
+        conversa.LiberarAutomatico();
+
+        conversa.MotivoEscalada.Should().BeNull();
+    }
+
+    [Fact]
+    public void Transferir_LimpaOMotivo()
+    {
+        var conversa = Nova();
+        conversa.Escalar(Agora, "falha do LLM");
+
+        conversa.Transferir(Guid.NewGuid(), Agora.AddMinutes(1));
+
+        conversa.MotivoEscalada.Should().BeNull();
+    }
+
+    [Fact]
+    public void ContatoWhatsAppPassaParaOWaIdQueEscreveu()
+    {
+        // #1332: conversa aberta sem o nono dígito; a Meta só entrega no wa_id que escreveu.
+        var conversa = Conversa.Abrir(Guid.NewGuid(), "551182254398", DateTime.UtcNow, "Felipe");
+
+        conversa.AtualizarContatoWhatsApp("5511982254398");
+
+        conversa.ContatoIdExterno.Should().Be("5511982254398");
+    }
+
+    [Fact]
+    public void ContatoWhatsAppIgualNaoMuda()
+    {
+        var conversa = Conversa.Abrir(Guid.NewGuid(), "5511982254398", DateTime.UtcNow, "Felipe");
+
+        conversa.AtualizarContatoWhatsApp("+55 11 98225-4398");
+
+        conversa.ContatoIdExterno.Should().Be("5511982254398");
+    }
+
+    // ── Aguarda resposta (SLA de primeira resposta, #1427) ─────────────
+
+    [Fact]
+    public void AguardaResposta_ConversaNovaSemEntrada_Falso()
+    {
+        Nova().AguardaResposta.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AguardaResposta_ClienteFalouPorUltimo_Verdadeiro()
+    {
+        var conversa = Nova();
+        conversa.RegistrarSaida(Agora.AddMinutes(1));
+        conversa.RegistrarEntrada(Agora.AddMinutes(2));
+
+        conversa.AguardaResposta.Should().BeTrue();
+    }
+
+    [Fact]
+    public void AguardaResposta_DepoisDaResposta_Falso()
+    {
+        var conversa = Nova();
+        conversa.RegistrarEntrada(Agora.AddMinutes(1));
+        conversa.RegistrarSaida(Agora.AddMinutes(3));
+
+        conversa.AguardaResposta.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AguardaResposta_ConversaEncerrada_Falso()
+    {
+        var conversa = Nova();
+        conversa.RegistrarEntrada(Agora.AddMinutes(1));
+        conversa.Encerrar(Agora.AddMinutes(2));
+
+        conversa.AguardaResposta.Should().BeFalse();
+    }
+}

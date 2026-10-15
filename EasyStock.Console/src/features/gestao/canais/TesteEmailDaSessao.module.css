@@ -1,0 +1,9 @@
+.ferramenta { border-top: var(--b-1) solid var(--linha); padding-top: var(--e-3); color: var(--tinta); }
+.ferramenta summary { cursor: pointer; font-size: var(--t-apoio); }
+.ferramenta summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 3px; }
+.conteudo, .formulario, .resultado { display: flex; flex-direction: column; gap: var(--e-3); align-items: flex-start; }
+.conteudo { margin-top: var(--e-3); }
+.conteudo p { margin: 0; max-width: 68ch; overflow-wrap: anywhere; }
+.formulario { width: min(100%, 40rem); }
+.formulario > div { width: 100%; }
+.erro { color: var(--erro); }

@@ -1,0 +1,242 @@
+using EasyStock.Application.Events.Pedidos;
+using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Domain.Enums.Pagamentos;
+using EasyStock.Domain.Sales;
+using FluentAssertions;
+using NSubstitute;
+
+namespace EasyStock.Api.UnitTests.Pagamentos;
+
+/// <summary>
+/// S32: processor do webhook do Mercado Pago. O corpo da notificação só traz o id; o estado do pagamento
+/// vem sempre de <c>GET v1/payments/{id}</c> (nunca do corpo). Aprovado com valor cheio confirma o pedido
+/// pela S11; repetido é no-op; valor menor e recusado não mudam o status; estorno marca a cobrança.
+/// </summary>
+public class MercadoPagoWebhookProcessorTests
+{
+    private static readonly Dictionary<string, string?> SemHeaders = new();
+
+    [Fact]
+    public async Task ApprovedConfirmaPedido()
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 25m);
+
+        var r = await f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+
+        r.Sucesso.Should().BeTrue();
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
+        f.Cobranca.Status.Should().Be(StatusCobrancaPedido.Paga);
+        f.Cobranca.PagamentoExternoId.Should().Be(MercadoPagoWebhookFixture.PagamentoId);
+        var pagamento = f.Pedido.Pagamentos.Should().ContainSingle().Subject;
+        pagamento.Referencia.Should().Be(MercadoPagoWebhookFixture.PagamentoId);
+        pagamento.Metodo.Should().Be("credito");
+        await f.MpClient.Received(1).ConsultarPagamentoAsync(MercadoPagoWebhookFixture.PagamentoId, Arg.Any<CancellationToken>());
+        await f.Publicador.Received(1).PublicarAsync(
+            f.EmpresaId, PedidoPagoEvent.TipoEvento, "pedido", f.Pedido.Id, Arg.Any<PedidoPagoEvent>(),
+            Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DuplicadoNoOp()
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 25m);
+        var processor = f.Processor();
+        await processor.ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(action: "payment.created"), SemHeaders);
+        f.Publicador.ClearReceivedCalls();
+
+        await processor.ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(action: "payment.updated"), SemHeaders);
+
+        f.Pedido.Pagamentos.Should().ContainSingle("o mesmo data.id não registra o pagamento duas vezes");
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
+        f.Publicador.ReceivedCalls().Should().BeEmpty("o segundo aviso não publica pedido.pago de novo");
+    }
+
+    [Fact]
+    public async Task SegundoPagamentoAprovado_EstornaEResponde200()
+    {
+        // #1289: outro pagamento aprovado para o pedido já pago. Antes, MarcarPaga lançava e o webhook dava 500 em loop.
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 25m);
+        f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 25m, id: "20359979");
+        f.Estorno.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(EstornoPedidoResult.Ok("estorno-1"));
+        var processor = f.Processor();
+        await processor.ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+
+        var r = await processor.ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(dataId: "20359979"), SemHeaders);
+
+        r.Sucesso.Should().BeTrue();
+        await f.Estorno.Received(1).EstornarAsync("20359979", 25m, "estorno-duplicado-20359979", Arg.Any<CancellationToken>());
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.Referencia.Should().Be(MercadoPagoWebhookFixture.PagamentoId);
+        f.Cobranca.PagamentoExternoId.Should().Be(MercadoPagoWebhookFixture.PagamentoId);
+    }
+
+    [Fact]
+    public async Task ValorMenorNaoConfirma()
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 20m);
+
+        var r = await f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+
+        r.Sucesso.Should().BeTrue("o motivo fica na cobrança; o webhook foi processado");
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+        f.Pedido.Pagamentos.Should().BeEmpty();
+        f.Cobranca.Status.Should().Be(StatusCobrancaPedido.Pendente);
+        f.Cobranca.Motivo.Should().StartWith("valor_menor");
+        f.Eventos.Should().ContainSingle(e => e.Tipo == "pagamento_divergente");
+    }
+
+    [Theory]
+    [InlineData(PagamentoMercadoPago.Rejected)]
+    [InlineData(PagamentoMercadoPago.Cancelled)]
+    public async Task RejectedNaoMudaStatus(string status)
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte(status, 25m);
+
+        await f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+        f.Pedido.Pagamentos.Should().BeEmpty();
+        f.Cobranca.Status.Should().Be(StatusCobrancaPedido.Pendente);
+        f.Cobranca.Motivo.Should().Be($"pagamento_recusado: pagamento {MercadoPagoWebhookFixture.PagamentoId} ({status})");
+    }
+
+    [Theory]
+    [InlineData("approved")]
+    [InlineData("refunded")]
+    public async Task Devolucao_consultada_na_fonte_usa_ledger_sem_exclusao_legada(string status)
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 25m);
+        var processor = f.Processor();
+        await processor.ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+        f.Pagamentos[MercadoPagoWebhookFixture.PagamentoId] = f.Pagamentos[MercadoPagoWebhookFixture.PagamentoId]
+            with { Status = status, TransactionAmountRefunded = 10 };
+        f.EstornosOnline.SincronizarPagamentoAsync(Arg.Any<PagamentoMercadoPago>(), Arg.Any<CancellationToken>()).Returns(true);
+        await processor.ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+        await f.EstornosOnline.Received(1).SincronizarPagamentoAsync(
+            Arg.Is<PagamentoMercadoPago>(p => p.TransactionAmountRefunded == 10 && p.ExternalReference == f.Pedido.Id.ToString()), Arg.Any<CancellationToken>());
+        f.Cobranca.Status.Should().Be(StatusCobrancaPedido.Paga, "o ledger confirma a cobrança somente quando o total foi devolvido");
+    }
+
+    [Fact]
+    public async Task RefundedMarcaEstornoNaCobranca()
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 25m);
+        var processor = f.Processor();
+        await processor.ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+        f.PagamentoNaFonte(PagamentoMercadoPago.Refunded, 25m);
+
+        await processor.ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+
+        f.Cobranca.Status.Should().Be(StatusCobrancaPedido.Estornada);
+    }
+
+    [Fact]
+    public async Task CorpoDizApprovedMasAFonteDizPending_NaoConfirma()
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte(PagamentoMercadoPago.Pending, 25m);
+        var forjado = MercadoPagoWebhookFixture.Notificacao()
+            .Replace("\"type\":\"payment\"", "\"type\":\"payment\",\"status\":\"approved\",\"transaction_amount\":25");
+
+        await f.Processor().ProcessarAsync(forjado, SemHeaders);
+
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento, "o estado vem da consulta, não do corpo");
+        f.Pedido.Pagamentos.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("merchant_order")]
+    [InlineData("subscription_preapproval")]
+    public async Task TopicoDiferenteDePayment_IgnoraSemConsultar(string tipo)
+    {
+        var f = new MercadoPagoWebhookFixture();
+
+        var r = await f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(tipo: tipo), SemHeaders);
+
+        r.Should().Be(ResultadoWebhookGateway.Falha("topico_ignorado"));
+        await f.MpClient.DidNotReceiveWithAnyArgs().ConsultarPagamentoAsync(default!, default);
+    }
+
+    [Theory]
+    [InlineData("../users/me")]
+    [InlineData("12\\n34")]
+    [InlineData("")]
+    public async Task IdForaDoFormato_IgnoraSemConsultar(string dataId)
+    {
+        var f = new MercadoPagoWebhookFixture();
+
+        await f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(dataId: dataId), SemHeaders);
+
+        await f.MpClient.DidNotReceiveWithAnyArgs().ConsultarPagamentoAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task PagamentoDeOutraOrigem_Ignora()
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 25m, externalReference: "fatura-saas-123");
+
+        var r = await f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+
+        r.Should().Be(ResultadoWebhookGateway.Falha("referencia_externa_desconhecida"));
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+        await f.CobrancaRepo.DidNotReceiveWithAnyArgs().ObterEmpresaIdDoPedidoAsync(default, default);
+    }
+
+    [Fact]
+    public async Task PagamentoInexistenteNaFonte_Ignora()
+    {
+        var f = new MercadoPagoWebhookFixture();
+
+        await f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+    }
+
+    // I3.1 (#1667): o Mercado Pago não conhece o pagamento, mas há cobrança online esperando. Responder
+    // 200 faria o provedor parar de reenviar e o pedido pago ficaria sem baixa.
+    [Fact]
+    public async Task Webhook_404_com_pendente_responde_500()
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.CobrancaRepo.ExistePendenteOnlineAsync(Arg.Any<CancellationToken>()).Returns(true);
+
+        var act = () => f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+
+        await act.Should().ThrowAsync<ReconsultaMercadoPagoSemRespostaException>("o controller responde 500 e o Mercado Pago reenvia");
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+    }
+
+    [Theory]
+    [InlineData(System.Net.HttpStatusCode.Unauthorized)]
+    [InlineData(System.Net.HttpStatusCode.Forbidden)]
+    public async Task Webhook_com_credencial_recusada_na_reconsulta_responde_500(System.Net.HttpStatusCode status)
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.MpClient.ConsultarPagamentoAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<Task<PagamentoMercadoPago?>>(_ => throw new HttpRequestException("credencial", null, status));
+
+        var act = () => f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+
+        await act.Should().ThrowAsync<HttpRequestException>();
+    }
+
+    [Fact]
+    public async Task FalhaNaConsulta_Propaga()
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.MpClient.ConsultarPagamentoAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<Task<PagamentoMercadoPago?>>(_ => throw new HttpRequestException("mp fora"));
+
+        var act = () => f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+
+        await act.Should().ThrowAsync<HttpRequestException>("o controller responde 500 e o Mercado Pago reenvia");
+    }
+}

@@ -1,4 +1,3 @@
-using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
@@ -42,7 +41,6 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new MovimentacaoEstoqueRepository(context),
                 context,
                 NullLogger<RegistrarEntradaEstoqueUseCase>.Instance,
-                new GeradorDescricaoFake("Descricao gerada por IA"),
                 publicadorEventos: PublicadorNoOp);
 
             var result = await useCase.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
@@ -63,12 +61,12 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 "Fornecedor XPTO",
                 null,
                 "Primeira entrada",
-                null,
+                "Descricao informada",
                 "DOC-01",
                 new DimensoesInput(0.3m, 10.5m, 5.2m, 8.1m),
                 "Mercado Livre"));
 
-            result.DescricaoAnuncio.Should().Be("Descricao gerada por IA");
+            result.DescricaoAnuncio.Should().Be("Descricao informada");
         }
 
         await using (var assertContext = fixture.CreateDbContext())
@@ -83,7 +81,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
             item.CustoUnitario.Valor.Should().Be(250m);
             item.PrecoVendaSugerido!.Valor.Should().Be(399.90m);
             item.ChavePesquisa.Should().Contain("CAP3426");
-            item.DescricaoAnuncio.Should().Be("Descricao gerada por IA");
+            item.DescricaoAnuncio.Should().Be("Descricao informada");
 
             movimentacao.Tipo.Should().Be(TipoMovimentacaoEstoque.Entrada);
             movimentacao.Natureza.Should().Be(NaturezaMovimentacaoEstoque.Compra);
@@ -287,7 +285,12 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                     // ValidadeEm=null em ambos, o tie-break por EntradaEm
                     // dentro do FromSqlRaw + FOR UPDATE nao sobrevive ao
                     // wrap externo da composicao com o filtro global do EF.
-                    ValidadeEm = Validade.From(entradaBase.AddMonths(2)),
+                    //
+                    // #983: relativas a DateTime.UtcNow (nao a entradaBase, fixo em
+                    // 2026-04-01) -- GetLotesDisponiveisParaSaidaAsync agora exclui
+                    // lote vencido por padrao, e uma data fixa no passado da execucao
+                    // do teste faria loteAntigo ser filtrado como vencido.
+                    ValidadeEm = Validade.From(DateTime.UtcNow.AddYears(1)),
                     Status = StatusItemEstoque.Ok,
                     EntradaEm = entradaBase,
                     UltimaMovimentacaoEm = entradaBase,
@@ -304,7 +307,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                     QuantidadeAtual = Quantidade.From(5),
                     QuantidadeMinima = 5,
                     CustoUnitario = Dinheiro.FromDecimal(255m),
-                    ValidadeEm = Validade.From(entradaBase.AddMonths(6)), // loteNovo: validade mais distante -> FEFO sai depois
+                    ValidadeEm = Validade.From(DateTime.UtcNow.AddYears(2)), // loteNovo: validade mais distante -> FEFO sai depois
                     Status = StatusItemEstoque.Ok,
                     EntradaEm = entradaBase.AddDays(2),
                     UltimaMovimentacaoEm = entradaBase.AddDays(2),
@@ -794,12 +797,6 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
         });
 
         await context.SaveChangesAsync();
-    }
-
-    private sealed class GeradorDescricaoFake(string descricao) : IGeradorDescricaoAnuncio
-    {
-        public Task<string> GerarAsync(Produto produto, ProdutoVariacao? variacao, ItemEstoque? itemEstoque, string? instrucoesComplementares = null) =>
-            Task.FromResult(descricao);
     }
 
     [SkippableFact]

@@ -44,6 +44,15 @@ public class SaidaFormViewModel
     /// </summary>
     public bool PermitirDescoberto { get; set; }
 
+    /// <summary>
+    /// issue 917 Fase B: UUID gerado no BROWSER (não no BFF) quando a intenção nasce —
+    /// abertura do modal/formulário. Retry após timeout reusa o MESMO valor; só uma
+    /// nova intenção do usuário gera uma chave nova. Sem isto, o Guid.NewGuid() por
+    /// request do <see cref="Services.IdempotencyKeyHelper"/> tornava a proteção
+    /// ilusória — dois cliques do browser geravam duas chaves distintas no servidor.
+    /// </summary>
+    public string? IdempotencyKey { get; set; }
+
     // Preenchidos pela view
     public Produto? ProdutoSelecionado { get; set; }
     public int QtyDisponivel { get; set; }

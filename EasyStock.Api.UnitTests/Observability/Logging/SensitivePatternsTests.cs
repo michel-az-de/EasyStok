@@ -1,4 +1,4 @@
-using EasyStock.Api.Observability.Logging;
+using EasyStock.Application.Seguranca;
 using FluentAssertions;
 
 namespace EasyStock.Api.UnitTests.Observability.Logging;
@@ -111,5 +111,27 @@ public class SensitivePatternsTests
     {
         SensitivePatterns.Redact("").Should().BeEmpty();
         SensitivePatterns.Redact(null!).Should().BeNull();
+    }
+
+    // I4.5 (#1698): padrões novos.
+    [Theory]
+    [InlineData("{\"access_token\":\"APP_USR-123\",\"status\":401}", "APP_USR-123")]
+    [InlineData("{ \"client_secret\" : \"abc def\" }", "abc def")]
+    [InlineData("GET https://api.tomtom.com/search/2/geocode/rua.json?limit=1&key=CHAVE-TT", "CHAVE-TT")]
+    [InlineData("https://graph.facebook.com/v20.0/me?access_token=EAAB123&fields=id", "EAAB123")]
+    public void Redact_SegredoEmJsonOuNaQueryDaUrl(string entrada, string segredo)
+    {
+        var saida = SensitivePatterns.Redact(entrada);
+
+        saida.Should().NotContain(segredo).And.Contain(SensitivePatterns.RedactedToken);
+    }
+
+    [Theory]
+    [InlineData("{\"message\":\"invalid_token\",\"status\":401}")]
+    [InlineData("https://loja.test/produtos?monkey=1&pagina=2")]
+    [InlineData("status=approved&fields=id")]
+    public void Redact_NaoMascaraOQueNaoESegredo(string entrada)
+    {
+        SensitivePatterns.Redact(entrada).Should().Be(entrada);
     }
 }

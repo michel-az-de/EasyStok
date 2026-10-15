@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.CriarPedido;
 using Microsoft.Extensions.Logging;
 
@@ -6,13 +7,38 @@ namespace EasyStock.Application.Tests.UseCases;
 
 public class CriarPedidoUseCaseTests
 {
+    [Fact]
+    public async Task Recusa_cliente_de_outra_empresa_antes_de_gravar_snapshot()
+    {
+        var empresaId = Guid.NewGuid();
+        var cliente = Cliente.Criar(Guid.NewGuid(), "Outra empresa");
+        _clienteRepo.GetByIdAsync(empresaId, cliente.Id).Returns(cliente);
+        var executar = () => Sut().ExecuteAsync(new CriarPedidoCommand(empresaId, ClienteId: cliente.Id));
+        await executar.Should().ThrowAsync<EasyStock.Application.UseCases.Common.UseCaseValidationException>();
+        await _pedidoRepo.DidNotReceive().AddAsync(Arg.Any<Pedido>());
+    }
+
+    [Theory]
+    [InlineData("web", "Rua da encomenda, 42")]
+    [InlineData("balcao", null)]
+    public async Task Criacao_preserva_endereco_de_entrega_e_retirada_deixa_nulo(string origem, string? esperado)
+    {
+        var empresaId = Guid.NewGuid();
+        var cliente = Cliente.Criar(empresaId, "Maria");
+        cliente.Endereco = "Rua da encomenda, 42";
+        _clienteRepo.GetByIdAsync(empresaId, cliente.Id).Returns(cliente);
+        await Sut().ExecuteAsync(new CriarPedidoCommand(empresaId, ClienteId: cliente.Id, Origem: origem));
+        await _pedidoRepo.Received(1).AddAsync(Arg.Is<Pedido>(p => p.EnderecoEntrega == esperado));
+    }
+
     private readonly IPedidoRepository _pedidoRepo = Substitute.For<IPedidoRepository>();
     private readonly IClienteRepository _clienteRepo = Substitute.For<IClienteRepository>();
     private readonly IProdutoRepository _produtoRepo = Substitute.For<IProdutoRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IPrazoPreparoPedidoQueries _prazoQueries = Substitute.For<IPrazoPreparoPedidoQueries>();
 
     private CriarPedidoUseCase Sut() => new(_pedidoRepo, _clienteRepo, _produtoRepo, _uow,
-        Substitute.For<ILogger<CriarPedidoUseCase>>());
+        Substitute.For<ILogger<CriarPedidoUseCase>>(), new CalculadoraInicioPrevistoPedido(_prazoQueries), EnderecoEntregaPedidoTeste.Criar());
 
     [Fact]
     public async Task DeveNormalizarAgendadoParaEm_ParaUtc_QuandoClienteEnviaDataSemFuso()
@@ -32,6 +58,33 @@ public class CriarPedidoUseCaseTests
         salvo!.AgendadoParaEm.Should().NotBeNull();
         salvo.AgendadoParaEm!.Value.Kind.Should().Be(DateTimeKind.Utc);
         await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task PedidoAgendadoCriadoNoErp_GravaInicioPrevisto()
+    {
+        // #1230: pedido criado no ERP (ou pela sync do mobile) já nasce na fila; com agendamento, ganha
+        // início previsto num segundo commit (a leitura da janela e dos itens vai ao banco).
+        var empresaId = Guid.NewGuid();
+        Pedido? salvo = null;
+        _pedidoRepo.When(r => r.AddAsync(Arg.Any<Pedido>())).Do(ci => salvo = ci.Arg<Pedido>());
+        _prazoQueries.ObterAsync(empresaId, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new PrazoPreparoPedidoLeitura(null, null, [null], TempoPreparoPadraoMinutos: 60, RespiroMinutos: 40));
+        var entrega = DateTime.SpecifyKind(DateTime.UtcNow.Date.AddDays(2).AddHours(15), DateTimeKind.Utc);
+
+        await Sut().ExecuteAsync(new CriarPedidoCommand(empresaId, AgendadoParaEm: entrega));
+
+        salvo!.InicioPrevistoEm.Should().Be(entrega.AddMinutes(-100));
+        await _uow.Received(2).CommitAsync();
+    }
+
+    [Fact]
+    public async Task PedidoParaJa_NaoConsultaInicioPrevisto()
+    {
+        // #1230: sem agendamento e recém-criado (sem vaga), não há janela; o balcão não paga a consulta.
+        await Sut().ExecuteAsync(new CriarPedidoCommand(Guid.NewGuid()));
+
+        await _prazoQueries.DidNotReceiveWithAnyArgs().ObterAsync(default, default, default);
     }
 
     [Fact]

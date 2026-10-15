@@ -9,6 +9,8 @@ namespace EasyStock.Infra.Integrations.Geocoding;
 /// </summary>
 public sealed class NoOpGeocodingClient : IGeocodingClient
 {
+    public bool Disponivel => false;
+
     public Task<GeocodeResultado?> GeocodificarAsync(GeocodeQuery query, CancellationToken ct = default)
         => Task.FromResult<GeocodeResultado?>(null);
 }

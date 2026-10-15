@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 
 namespace EasyStock.Api.UnitTests.Observability;
@@ -15,10 +16,13 @@ namespace EasyStock.Api.UnitTests.Observability;
 /// montado por <c>AddEasyStockObservability</c> (que precisa do <c>.AddMeter(MetricNames.MeterName)</c>)
 /// e observa o instrumento via InMemoryExporter. Se alguém remover o AddMeter, o counter para
 /// de exportar e este teste falha (um mock <c>.Received(1)</c> não pegaria isso).
+/// Coleta só o reader InMemory do teste, não o MeterProvider inteiro: o provider real também
+/// tem o reader OTLP apontando para localhost:4317, e sem coletor o flush dele bloqueia ~4 s
+/// e consome o orçamento antes do InMemory (issue 1075).
 /// </summary>
 public class ObservabilityMetricsWiringTests
 {
-    private static ServiceProvider BuildProvider(out List<Metric> exported)
+    private static ServiceProvider BuildProvider(out List<Metric> exported, out MetricReader reader)
     {
         var exportedItems = new List<Metric>();
         exported = exportedItems;
@@ -31,7 +35,9 @@ public class ObservabilityMetricsWiringTests
         env.EnvironmentName.Returns("Production");   // evita ConsoleExporter de dev
 
         services.AddEasyStockObservability(config, env);
-        services.ConfigureOpenTelemetryMeterProvider(b => b.AddInMemoryExporter(exportedItems));
+        var inMemoryReader = new BaseExportingMetricReader(new InMemoryExporter<Metric>(exportedItems));
+        reader = inMemoryReader;
+        services.ConfigureOpenTelemetryMeterProvider(b => b.AddReader(inMemoryReader));
 
         return services.BuildServiceProvider();
     }
@@ -39,12 +45,12 @@ public class ObservabilityMetricsWiringTests
     [Fact]
     public void Counter_de_falhas_exporta_pelo_MeterProvider_real()
     {
-        using var sp = BuildProvider(out var exported);
-        var meterProvider = sp.GetRequiredService<MeterProvider>();
+        using var sp = BuildProvider(out var exported, out var reader);
+        _ = sp.GetRequiredService<MeterProvider>();   // materializa o provider que inscreve o meter
         var metrics = sp.GetRequiredService<IOperationalMetrics>();
 
         metrics.IncrementFalhasOperacao("INTERNAL_ERROR");
-        meterProvider.ForceFlush(5000);
+        reader.Collect(5000).Should().BeTrue("a coleta não pode depender de rede nem estourar o orçamento");
 
         var metric = exported.SingleOrDefault(m => m.Name == MetricNames.FalhasOperacaoTotal);
         metric.Should().NotBeNull(
@@ -62,7 +68,7 @@ public class ObservabilityMetricsWiringTests
     public void DI_resolve_IOperationalMetrics_nao_nulo()
     {
         // C7: injeção obrigatória só protege se o container de fato registrar a porta.
-        using var sp = BuildProvider(out _);
+        using var sp = BuildProvider(out _, out _);
 
         var metrics = sp.GetService<IOperationalMetrics>();
         metrics.Should().NotBeNull().And.BeOfType<MetricsService>();

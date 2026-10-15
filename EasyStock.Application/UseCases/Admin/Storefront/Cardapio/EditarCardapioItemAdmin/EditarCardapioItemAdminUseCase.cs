@@ -1,4 +1,5 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Domain.Enums.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 
 namespace EasyStock.Application.UseCases.Admin.Storefront.Cardapio.EditarCardapioItemAdmin;
@@ -28,7 +29,11 @@ public sealed record EditarCardapioItemAdminCommand(
     // ADR-0035 (#652): opções do item guarda-chuva (reconciliação keyed-by-Id) e seção.
     // Opcoes null = não mexe; lista (mesmo vazia) = reconcilia. SecaoId null = não muda.
     IReadOnlyList<CardapioItemVariacaoInput>? Opcoes = null,
-    Guid? SecaoId = null) : ICommand;
+    Guid? SecaoId = null,
+    // S15: linha, preparo numérico e instrução de finalização. null = não mexe.
+    LinhaProduto? Linha = null,
+    int? TempoPreparoMinutos = null,
+    string? InstrucaoFinalizacao = null) : ICommand;
 
 public sealed record EditarCardapioItemAdminResult(Guid ItemId);
 
@@ -77,6 +82,13 @@ public class EditarCardapioItemAdminUseCase(
         if (command.SecaoId.HasValue)
             item.DefinirSecao(command.SecaoId);
         CardapioVariacaoSync.Reconciliar(item, command.Opcoes);
+
+        // S15: linha e preparo numérico.
+        if (command.Linha.HasValue || command.TempoPreparoMinutos.HasValue || command.InstrucaoFinalizacao is not null)
+        {
+            UseCaseGuards.EnsureSemTagsHtml(command.InstrucaoFinalizacao, "Instrução de finalização");
+            item.DefinirPreparo(command.Linha, command.TempoPreparoMinutos, command.InstrucaoFinalizacao);
+        }
 
         await cardapioRepository.UpdateAsync(item);
         await unitOfWork.CommitAsync();

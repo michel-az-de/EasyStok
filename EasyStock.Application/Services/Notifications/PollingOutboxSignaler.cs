@@ -10,11 +10,11 @@ public sealed class PollingOutboxSignaler : IOutboxSignaler, IDisposable
 {
     private readonly PeriodicTimer _timer;
 
-    public PollingOutboxSignaler(TimeSpan intervalo)
+    public PollingOutboxSignaler(TimeSpan intervalo, TimeProvider? timeProvider = null)
     {
         if (intervalo <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(intervalo), "Intervalo deve ser positivo.");
-        _timer = new PeriodicTimer(intervalo);
+        _timer = new PeriodicTimer(intervalo, timeProvider ?? TimeProvider.System);
     }
 
     public async Task WaitAsync(CancellationToken ct)
