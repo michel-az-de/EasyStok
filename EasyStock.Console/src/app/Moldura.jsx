@@ -4,7 +4,7 @@ import { Avatar } from '../componentes/Avatar'
 import { Marca } from '../componentes/Marca'
 import { InterruptorTema } from '../componentes/InterruptorTema'
 import { trocarTema } from '../hooks/useTema'
-import { balcaoComCardapio } from '../hooks/larguras'
+import { balcaoComCardapio, fichaComCardapio } from '../hooks/larguras'
 import { BarraDeAbas } from '../componentes/BarraDeAbas'
 import { Botao } from '../componentes/Botao'
 import { Modal } from '../componentes/Modal'
@@ -359,7 +359,7 @@ function BotaoSimular({ ativo, aoAlternar }) {
 // Três arranjos para o mesmo conteúdo. Os painéis não sabem em qual estão.
 export function Moldura({
   tamanho, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca, aoAbrirCardapio, aoAbrirAutomacoes, aoAbrirGestao,
-  aoAbrirEntregas, aoAbrirAjuda, simulando, aoAlternarSimulacoes, larguras, largurasPadrao = larguras, aoRedimensionar, cardapioAberto = false,
+  aoAbrirEntregas, aoAbrirAjuda, simulando, aoAlternarSimulacoes, larguras, largurasPadrao = larguras, aoRedimensionar, cardapioAberto = null,
 }) {
   const {
     visiveis, selecionada, conversas, regras: regrasDaMassa, agora, aberta, fonteApi, sessao,
@@ -436,8 +436,8 @@ export function Moldura({
     // só aqui elas saem do padrão de 320 px do tokens.css. Alça só existe no
     // layout de três colunas; na gaveta e no celular a largura não se aplica.
     const estiloLarguras = {
-      '--largura-balcao': `${cardapioAberto ? balcaoComCardapio(larguras) : larguras.balcao}px`,
-      '--largura-ficha': `${larguras.ficha}px`,
+      '--largura-balcao': `${cardapioAberto === 'esquerda' ? balcaoComCardapio(larguras) : larguras.balcao}px`,
+      '--largura-ficha': `${cardapioAberto === 'direita' ? fichaComCardapio(larguras) : larguras.ficha}px`,
     }
     return (
       <div className={`${css.app} ${css.appTrilho}`} style={estiloLarguras}>
