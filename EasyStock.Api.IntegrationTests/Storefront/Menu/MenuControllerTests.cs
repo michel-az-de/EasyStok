@@ -44,7 +44,7 @@ public sealed class MenuControllerTests : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_storefront_menu_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                .WithPassword("EasyStock-IT-NonDefault-2026!")
                 .Build();
 
             await _pg.StartAsync();
