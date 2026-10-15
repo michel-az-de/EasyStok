@@ -22,6 +22,7 @@ import { totalDoPedido } from '../../dominio/pedido'
 import { encontrarCupom, validarCupom } from '../../dominio/fidelidade'
 import { EscolhaDeMeio } from './EscolhaDeMeio'
 import { RelogioPix } from './RelogioPix'
+import { ConferirPagamento } from './ConferirPagamento'
 import css from './ficha.module.css'
 
 // Campo "Cupom" da Cobrança (frente Fidelidade e cupons, rodada 13, issue
@@ -436,7 +437,7 @@ export function BlocoCobranca({
         {sinalPendente && (
           <p className={css.corpoBloco}>{recebido > 0 ? `Recebido: ${moeda(recebido)}. ` : ''}O sinal confirma a reserva. Restante na entrega: {moeda(pedido.totalApi - alocado - faltaSinal)}.</p>
         )}
-        {!sinalPendente && fonteApi && pedido.sinalNaReserva && alocado > 0 && alocado < pedido.totalApi && (
+        {!sinalPendente && fonteApi && pedido.estado !== 'cancelado' && pedido.sinalNaReserva && alocado > 0 && alocado < pedido.totalApi && (
           <p className={css.corpoBloco}>Recebido: {moeda(recebido)}. Saldo na entrega: {moeda(pedido.totalApi - alocado)}.</p>
         )}
         {recebendo && (
@@ -498,7 +499,7 @@ export function BlocoCobranca({
         <Pilula tom="neutro" fina>{nome}</Pilula>
         {cobranca.tentativa > 1 && <span className={css.tentativa}>{cobranca.tentativa}ª cobrança</span>}
       </div>
-      {fonteApi && pedido.sinalNaReserva && !cobranca.diferenca && pedido.totalApi > cobranca.valor && !cobranca.pagaEm && (
+      {fonteApi && pedido.estado !== 'cancelado' && pedido.sinalNaReserva && !cobranca.diferenca && pedido.totalApi > cobranca.valor && !cobranca.pagaEm && (
         <p className={css.corpoBloco}>Sinal agora: {moeda(cobranca.valor)}. Restante na entrega: {moeda(pedido.totalApi - cobranca.valor)}.</p>
       )}
 
@@ -539,6 +540,10 @@ export function BlocoCobranca({
         aoAceitarDivergencia={aoAceitarDivergencia}
         aoCobrarDiferenca={() => reenvio.emitir(cobranca.valor - (cobranca.valorPago ?? 0))}
       />
+
+      {fonteApi && editavel && emAberto && pedido.pedidoId && pedido.estado !== 'cancelado' && (
+        <ConferirPagamento key={`${pedido.pedidoId}:${cobranca.id}`} conversaId={conversaId} />
+      )}
 
       <ListaDados itens={[
         { rotulo: pedido.pedidoId ? 'Recebido nesta cobrança' : 'Recebido', valor: cobranca.valorPago != null ? moeda(cobranca.valorPago) : null },

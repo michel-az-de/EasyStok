@@ -54,6 +54,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.ConfirmarPagamentoPedidoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.AtualizarCobrancaPorPagamentoUseCase>(); // S32
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.TrocarFormaPagamentoPedidoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.IConferenciaPagamentoPedido, EasyStock.Application.UseCases.Pedidos.Cobranca.ConferirPagamentoPedidoUseCase>();
         // #1726: a troca de status só materializa a troca de forma no ramo que libera sem pagamento.
         services.AddScoped(sp => new Lazy<EasyStock.Application.UseCases.Pedidos.Cobranca.TrocarFormaPagamentoPedidoUseCase>(
             () => sp.GetRequiredService<EasyStock.Application.UseCases.Pedidos.Cobranca.TrocarFormaPagamentoPedidoUseCase>()));

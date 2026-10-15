@@ -1,7 +1,7 @@
 import * as acao from '../acoes'
 import {
   FORMA_NA_ENTREGA, FORMA_ONLINE, corpoDoPedido, formaDoMeio, gerarPedido, janelaDoId, listarJanelas, obterPedido, pedidoDaApi,
-  reemitirCobranca, trocarFormaPagamento, registrarPagamentoManual, desfazerPagamentoManual, cancelarPedido, trocarJanelaPedido, STATUS_DO_PASSO,
+  reemitirCobranca, conferirPagamentoOnline, trocarFormaPagamento, registrarPagamentoManual, desfazerPagamentoManual, cancelarPedido, trocarJanelaPedido, STATUS_DO_PASSO,
 } from '../../infra/api/comandaApi'
 import { mudarStatusKds } from '../../infra/api/kdsApi'
 import { aprovarPedido as aprovarPedidoApi } from '../../infra/api/entregasApi'
@@ -131,6 +131,16 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
         return recarregar(id).catch(() => avisar(aviso ? `${aviso} Atualizando a tela…` : 'Pedido criado no EasyStok, atualizando a tela…'))
       },
       (erro) => {
+        if (!erro.status || erro.status >= 500 || erro.status === 409) {
+          const mensagem = 'Não foi possível confirmar se o pedido foi criado. Aguarde a atualização da conversa antes de reenviar.'
+          const incerto = () => { avisar(mensagem); return { erro: mensagem } }
+          return recarregar(id).then((atual) => {
+            if (!atual?.pedidoId) return incerto()
+            limparAviso()
+            avisar('Pedido encontrado. Confira a cobrança e o envio do resumo.')
+            return atual
+          }).catch(incerto)
+        }
         const mensagem = motivoDoPedidoNaoCriado(erro)
         avisar(mensagem)
         return { erro: mensagem }
@@ -180,7 +190,10 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
           return recarregar(id).catch(() => avisar('Pagamento registrado. Atualizando a tela…'))
         },
         (erro) => {
-          const naoRegistrado = `Pagamento não registrado: ${erro.message}`
+          const naoRegistrado = erro.codigo === 'pedido_ja_pago' ? erro.message
+            : !erro.status || erro.status >= 500
+              ? 'Não foi possível confirmar o registro do pagamento. Confira o pedido antes de tentar novamente.'
+              : `Pagamento não registrado: ${erro.message}`
           const recusar = (mensagem) => { avisar(mensagem); return { erro: mensagem } }
           if (!cancelarLink) return recusar(naoRegistrado)
           // O link pode já ter sido cancelado: a tela mostra o pedido como o EasyStok ficou. Sem
@@ -261,6 +274,24 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
       })
     },
     confirmarPagamento: receber,
+    conferirPagamento: (id) => {
+      const pedidoId = pedidoCriado(id)
+      if (!pedidoId) return Promise.resolve({ erro: SEM_PEDIDO })
+      return umaPorConversa(id, 'conferirPagamento', async () => {
+        try {
+          const resultado = await conferirPagamentoOnline(pedidoId)
+          limparAviso()
+          if (resultado.confirmado) {
+            await recarregar(id).catch(() => avisar('Pagamento conferido. Não foi possível atualizar a tela; consulte novamente.'))
+          }
+          return resultado
+        } catch (erro) {
+          const mensagem = erro.status && erro.status < 500 ? erro.message
+            : 'Não foi possível conferir o pagamento agora. Tente novamente.'
+          return { erro: mensagem }
+        }
+      })
+    },
     desfazerPagamento: desfazer,
     avancarEsteira: avancar,
     aprovarPedido: aprovar,

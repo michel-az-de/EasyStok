@@ -2,6 +2,9 @@ namespace EasyStock.Application.Ports.Output.Persistence;
 
 public interface IIdempotencyKeyRepository
 {
+    /// <summary>Relê o recibo persistido, por empresa, depois de adquirir o lock da operação financeira.</summary>
+    Task<Domain.Entities.IdempotencyKey?> ObterConcluidoAsync(Guid id, Guid empresaId, CancellationToken ct = default);
+
     /// <summary>
     /// Tenta RESERVAR a chave via INSERT com Status=Pendente (issue 917 Fase B). Se colidir
     /// com uma linha já existente (ativa, mesma tripla Key+EmpresaId+MetodoRecurso — via o

@@ -27,6 +27,16 @@ public sealed class QuitacaoPedido(
 {
     public const string Marco = "quitacao_confirmada";
 
+    public async Task ExigirBaixaSemCobrancaOnlineAsync(Pedido pedido, CancellationToken ct)
+    {
+        var lista = await cobrancas.ListarDoPedidoAsync(pedido.EmpresaId, pedido.Id, ct);
+        if (lista.Any(c => c.EmpresaId != pedido.EmpresaId || c.PedidoId != pedido.Id))
+            throw new UseCaseValidationException("Cobrança não pertence ao pedido.");
+        if (lista.Any(c => c.EhOnline && c.EstaPendente))
+            throw new UseCaseValidationException("cobranca_online_pendente",
+                "Há uma cobrança online pendente. Confira o pagamento antes de receber manualmente.");
+    }
+
     public async Task<bool> PodeReceberSinalManualAsync(Pedido pedido, CancellationToken ct)
     {
         if (pedido.StatusEnum != StatusPedido.AguardandoPagamento
