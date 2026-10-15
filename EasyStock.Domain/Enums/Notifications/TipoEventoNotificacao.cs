@@ -90,5 +90,10 @@ public enum TipoEventoNotificacao
     // Loja fechada na mao dentro do horario de funcionamento (#1443): aviso aos donos com quem fechou e a justificativa.
     LojaFechadaNoHorario = 82,
     PedidoReagendado = 83,
-    ComandaAtualizada = 84
+    ComandaAtualizada = 84,
+
+    // Avisos do Balcão no aparelho (#1807): Web Push para a equipe com o console fechado. Internos: nada sai para o cliente.
+    ContatoNovoNoBalcao = 85,
+    PedidoPagoNoBalcao = 86,
+    PedidoMudouEtapaNoBalcao = 87
 }

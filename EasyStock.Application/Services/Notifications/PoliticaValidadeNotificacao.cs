@@ -53,6 +53,10 @@ public sealed class PoliticaValidadeNotificacao
             [TipoEventoNotificacao.CampanhaLembreteEncerramento] = TimeSpan.FromHours(1),
 
             [TipoEventoNotificacao.ConversaEscalada] = TimeSpan.FromHours(1),
+            // #1807: aviso do Balcão no aparelho; meia hora depois o console já mostrou e o aviso só confunde.
+            [TipoEventoNotificacao.ContatoNovoNoBalcao] = TimeSpan.FromMinutes(30),
+            [TipoEventoNotificacao.PedidoPagoNoBalcao] = TimeSpan.FromMinutes(30),
+            [TipoEventoNotificacao.PedidoMudouEtapaNoBalcao] = TimeSpan.FromMinutes(30),
             [TipoEventoNotificacao.LembreteVencido] = TimeSpan.FromHours(1),
             [TipoEventoNotificacao.LojaFechadaNoHorario] = TimeSpan.FromHours(2),
 
