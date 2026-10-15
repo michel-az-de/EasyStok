@@ -127,7 +127,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
   const etapa = etapaDaSelecao(c)
   const faltaConfirmar = edicao ? 'Salve os ajustes da seleção antes de confirmar o pedido.'
     : !rascunho.itens.length ? 'Adicione e salve os pratos antes de confirmar.'
-      : !rascunho.endereco ? 'Peça ao cliente que informe o endereço na comanda.'
+      : !rascunho.endereco ? 'Peça o endereço ao cliente e registre na Ficha.'
         : !janela || !rotuloJanela ? 'Escolha uma janela de entrega disponível e salve a seleção.'
           : c.freteCombinado == null ? 'Abra “Combinar entrega” e confirme o frete antes de criar o pedido, inclusive se for R$ 0,00.' : null
   const enderecoCompartilhado = c.rascunho.endereco && <details className={css.enderecoCompartilhado}>
@@ -209,7 +209,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
         {!c.entregaACombinar && c.freteCombinado == null && <>
           <Botao disabled={ocupado || Boolean(edicao) || !c.rascunho.endereco || !c.rascunho.itens.length}
             onClick={() => encaminharEntrega(c)}>Combinar entrega desta seleção</Botao>
-          {!c.rascunho.endereco ? <p>Peça ao cliente que informe o endereço na comanda.</p>
+          {!c.rascunho.endereco ? <p>Peça o endereço ao cliente e registre na Ficha.</p>
             : !c.rascunho.itens.length && <p>Adicione e salve os pratos antes de combinar a entrega.</p>}
         </>}
         {c.entregaACombinar && <form className={css.freteCompartilhado} onSubmit={e => { e.preventDefault(); combinarFrete(c, Number(frete)) }}>
