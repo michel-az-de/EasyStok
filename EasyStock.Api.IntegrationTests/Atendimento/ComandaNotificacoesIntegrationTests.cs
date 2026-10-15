@@ -112,7 +112,10 @@ public sealed partial class PedidoConversaConcorrenciaTests
             versoes.Single(t => t.Versao == 1).Ativo.Should().Be(templateHumano);
             if (templateHumano) versoes.Should().ContainSingle(t => t.AtualizadoPor == "operadora");
             else versoes.Single(t => t.Versao == 2).Ativo.Should().BeTrue();
-            var aviso = await db.NotifOutboxMensagens.SingleAsync();
+            // O pagamento também gera um Push interno para a equipe.
+            var aviso = await db.NotifOutboxMensagens.SingleAsync(m => m.EmpresaId == EmpresaId
+                && m.Evento!.Tipo == TipoEventoNotificacao.PedidoPagoConfirmado && m.Evento.RefEntidadeId == envio.PedidoId);
+            aviso.Canal.Should().Be(CanalNotificacao.WhatsApp);
             using var metadata = JsonDocument.Parse(aviso.MetadadosJson!);
             metadata.RootElement.GetProperty("clienteId").GetString().Should().Be(c.ClienteId.ToString());
             metadata.RootElement.GetProperty("template").GetString().Should().Be("pedido_pago");
@@ -125,7 +128,9 @@ public sealed partial class PedidoConversaConcorrenciaTests
         using (var scope = factory.Services.CreateScope())
         {
             await scope.ServiceProvider.GetRequiredService<INotificacoesDispatcherOrchestrator>().ExecutarRodadaAsync(1, 100);
-            var aviso = await scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().NotifOutboxMensagens.AsNoTracking().SingleAsync();
+            var aviso = await scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().NotifOutboxMensagens.AsNoTracking()
+                .SingleAsync(m => m.EmpresaId == EmpresaId && m.Evento!.Tipo == TipoEventoNotificacao.PedidoPagoConfirmado
+                    && m.Evento.RefEntidadeId == envio.PedidoId);
             aviso.Status.Should().Be(StatusOutbox.Falhado);
             aviso.ErroUltimaTentativa.Should().Contain(revogado ? "contato_transacional_revogado" : "cliente_bloqueado_ou_indisponivel");
             aviso.EnviadoEm.Should().BeNull();
