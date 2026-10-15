@@ -35,7 +35,7 @@ import { podeVerItensFora } from '../dominio/acessoModulos'
 import { comApi } from './acoesApi'
 import { criarAcoes } from './criarAcoes'
 import { useSincronizacaoApi } from './useSincronizacaoApi'
-import { deveCarregarDossie } from './planoDeSincronizacao'
+import { precisaLerFicha } from './api/cliente'
 import { useLembretesApi } from './useLembretesApi'
 import { gravarRascunhos, lerRascunhos } from '../infra/api/rascunhosDaSessao'
 import { comRascunhoDoCampo } from './rascunhoLocal'
@@ -346,8 +346,11 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   // #1474: a conversa restaurada na carga (ou escolhida pela sincronização antes de qualquer
   // clique) não passa por `selecionar`; sem isto a Ficha ficava sem telefone, tags e notas.
   // A ação junta pedidos em voo, então o clique e este efeito não duplicam a chamada.
+  // #1430: mesmo critério do clique, que inclui o lead do chat do site (o contato que o visitante
+  // informou só vem no dossiê). Lead sem formulário segue "precisando": o efeito depende do
+  // booleano, então lê uma vez por conversa selecionada e não a cada volta da sincronização.
   const precisaDossie = FONTE_API
-    && deveCarregarDossie(estado.conversas.find((c) => c.id === estado.selecionadaId))
+    && precisaLerFicha(estado.conversas.find((c) => c.id === estado.selecionadaId))
   useEffect(() => {
     if (precisaDossie) acoesAtivas.carregarClienteDaConversa(estado.selecionadaId)
   }, [precisaDossie, estado.selecionadaId, acoesAtivas])

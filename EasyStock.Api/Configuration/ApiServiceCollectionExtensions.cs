@@ -359,6 +359,11 @@ public static class ApiServiceCollectionExtensions
                 RateLimitPartition.GetFixedWindowLimiter(
                     ChatSiteRateLimit.ChaveMensagem(context),
                     _ => new FixedWindowRateLimiterOptions { PermitLimit = ChatSiteRateLimit.MensagensPorMinuto, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            // Identificação do visitante (#1430): por sessão, como a mensagem, e bem mais apertada.
+            options.AddPolicy(ChatSiteRateLimit.Identificacao, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    ChatSiteRateLimit.ChaveMensagem(context),
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = ChatSiteRateLimit.IdentificacoesPorMinuto, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             options.AddPolicy(ChatSiteRateLimit.Stream, context =>
                 RateLimitPartition.GetConcurrencyLimiter(
                     ChatSiteRateLimit.ChaveMensagem(context),

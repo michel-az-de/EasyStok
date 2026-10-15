@@ -268,6 +268,9 @@ public class AtendimentoConversasController(
 
     [SwaggerOperation(Summary = "Register the conversation's customer (name, phone, delivery address)",
         Description = "#1276. Sem cliente vinculado, o telefone é obrigatório: acha o cadastro pelo telefone ou cria, e vincula. " +
+                      "E-mail opcional (#1430): só entra no cadastro que nasce aqui. Telefone informado pelo visitante do chat do " +
+                      "site que já é de um cadastro: 409 TELEFONE_JA_CADASTRADO com o nome, sem ligar nada; repetir com " +
+                      "confirmarVinculoExistente=true liga a conversa a esse cadastro, sem gravar e-mail nem consentimento nele. " +
                       "Com cliente, atualiza nome e telefone. Endereço com CEP vira o padrão de entrega; fora da área é gravado " +
                       "e volta dentroDaArea=false.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -280,7 +283,8 @@ public class AtendimentoConversasController(
         Guid id, [FromBody] CadastrarClienteConversaBody body,
         [FromServices] CadastrarClienteDaConversaUseCase cadastrarUseCase, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await cadastrarUseCase.ExecuteAsync(
-            new CadastrarClienteDaConversaCommand(currentUser.EmpresaId, id, body?.Nome, body?.Telefone, body?.Endereco), ct)));
+            new CadastrarClienteDaConversaCommand(currentUser.EmpresaId, id, body?.Nome, body?.Telefone, body?.Endereco, body?.Email,
+                body?.ConfirmarVinculoExistente ?? false), ct)));
 
     [SwaggerOperation(Summary = "Close the conversation")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -351,6 +355,13 @@ public class AtendimentoConversasController(
         {
             return Conflict(new { erro = ForaDaJanelaAtendimentoException.Codigo, sugestao = ForaDaJanelaAtendimentoException.Sugestao });
         }
+        catch (TelefoneJaCadastradoException ex)
+        {
+            return Conflict(new ApiErrorResponse(new ApiError(TelefoneJaCadastradoException.Codigo, ex.Message, null, null)
+            {
+                Details = new { clienteId = ex.ClienteId, nome = ex.Nome },
+            }));
+        }
         catch (UseCaseValidationException ex)
         {
             return DataBadRequest(ex.Message);
@@ -387,4 +398,5 @@ public sealed record TransferirConversaBody(Guid ParaUsuarioId);
 
 public sealed record LiberarForaDeAreaBody(string? Motivo);
 
-public sealed record CadastrarClienteConversaBody(string? Nome, string? Telefone, EnderecoDaConversaInput? Endereco);
+public sealed record CadastrarClienteConversaBody(
+    string? Nome, string? Telefone, EnderecoDaConversaInput? Endereco, string? Email = null, bool ConfirmarVinculoExistente = false);

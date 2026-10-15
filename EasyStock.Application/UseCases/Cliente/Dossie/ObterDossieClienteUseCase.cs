@@ -98,7 +98,10 @@ public sealed class ObterDossieClienteUseCase(
         var telefone = conversa.Canal is CanalConversa.WhatsApp or CanalConversa.Sms ? conversa.ContatoIdExterno : null;
         return new DossieClienteDto(
             new DossieClienteDados(null, conversa.ContatoNome, telefone, null, null, null),
-            [], [], [], [], null, null, 0, false, null, [], [Resumo(conversa)], null);
+            [], [], [], [], null, null, 0, false, null, [], [Resumo(conversa)], null,
+            conversa.ContatoInformado is { } informado
+                ? new ContatoInformadoDossie(conversa.ContatoNome, informado.Telefone, informado.Email, informado.InformadoEm)
+                : null);
     }
 
     /// <summary>Cancelado e rascunho não são compra: ficam na lista, fora do favorito e da contagem.</summary>

@@ -652,14 +652,25 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid?>("ClienteId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ContatoEmailInformado")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)");
+
                     b.Property<string>("ContatoIdExterno")
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<DateTime?>("ContatoInformadoEm")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("ContatoNome")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
+
+                    b.Property<string>("ContatoTelefoneInformado")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
                     b.Property<string>("ContextoJson")
                         .IsRequired()
@@ -1601,6 +1612,21 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<DateTime>("UltimoUsoEm")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VisitanteEmail")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)");
+
+                    b.Property<DateTime?>("VisitanteInformadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VisitanteNome")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("VisitanteTelefone")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
                     b.HasKey("Id");
 

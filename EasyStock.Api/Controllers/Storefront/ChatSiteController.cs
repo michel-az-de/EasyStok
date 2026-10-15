@@ -57,6 +57,24 @@ public class ChatSiteController(
         [FromBody] MensagemVisitanteBody body, CancellationToken ct) =>
         Tratar(async () => DataOk(await enviarMensagem.ExecuteAsync(slug, token, body?.Texto, ct)));
 
+    [SwaggerOperation(Summary = "Identify the visitor before the chat (name, phone, e-mail, privacy consent)",
+        Description = "#1430. Grava na sessão o que o visitante informou, com o aceite da política de privacidade. " +
+                      "A conversa nasce (ou fica) com o nome e o contato marcados como informados pelo visitante; " +
+                      "nada liga a um cliente existente. 400 sem aceite, nome, ou com telefone/e-mail inválido.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [EnableRateLimiting(ChatSiteRateLimit.Identificacao)]
+    [HttpPost("identificacao")]
+    public Task<IActionResult> Identificar(
+        string slug, [FromHeader(Name = ChatSiteRateLimit.HeaderToken)] string? token,
+        [FromBody] IdentificacaoVisitanteBody body,
+        [FromServices] IdentificarVisitanteChatSiteUseCase identificar, CancellationToken ct) =>
+        Tratar(async () => DataOk(await identificar.ExecuteAsync(slug, token,
+            body is null ? null : new IdentificacaoVisitanteInput(body.Nome, body.Telefone, body.Email, body.AceitePrivacidade), ct)));
+
     [SwaggerOperation(Summary = "List messages after an instant (polling fallback)")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -164,3 +182,5 @@ public class ChatSiteController(
 }
 
 public sealed record MensagemVisitanteBody(string? Texto);
+
+public sealed record IdentificacaoVisitanteBody(string? Nome, string? Telefone, string? Email, bool AceitePrivacidade);

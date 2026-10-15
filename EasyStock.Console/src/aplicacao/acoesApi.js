@@ -19,7 +19,7 @@ import { criarAcoesAgenteApi } from './api/agente'
 import { criarAcoesConsentimentosApi } from './api/consentimentos'
 import { criarAcoesOcorrenciasApi } from './api/ocorrencias'
 import { criarAcoesComandaApi } from './api/comanda'
-import { criarAcoesClienteApi } from './api/cliente'
+import { criarAcoesClienteApi, precisaLerFicha } from './api/cliente'
 import { criarAcoesEncerramentoEMidiaApi } from './api/encerramentoEMidia'
 import { criarAcoesRespostasApi } from './api/respostas'
 import { criarAcoesTagsApi } from './api/tags'
@@ -165,7 +165,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
       marcarLida(id).catch(() => {})
       // Conversa com cliente e Ficha ainda não lida do EasyStok: o dossiê preenche (#1276).
       const c = estadoRef.current.conversas.find((x) => x.id === id)
-      if (deveCarregarDossie(c)) clienteApi.carregarClienteDaConversa(id)
+      if (precisaLerFicha(c)) clienteApi.carregarClienteDaConversa(id)
     },
     assumirAtendimento: (id) => confirmarResponsavel(id, assumir),
     devolverAutomatico: (id) => confirmarResponsavel(id, liberarAutomatico),

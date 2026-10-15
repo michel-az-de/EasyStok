@@ -1,4 +1,5 @@
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Infra.Postgre.Data.Configurations.Atendimento;
 
@@ -14,6 +15,10 @@ public class ConversaConfiguration : IEntityTypeConfiguration<Conversa>
         builder.Property(c => c.EmpresaId).IsRequired();
         builder.Property(c => c.ContatoIdExterno).IsRequired().HasMaxLength(Conversa.ContatoIdExternoTamanhoMaximo);
         builder.Property(c => c.ContatoNome).HasMaxLength(Conversa.ContatoNomeTamanhoMaximo);
+        // Contato informado pelo visitante do chat do site (#1430), até a loja confirmar o cadastro.
+        builder.Ignore(c => c.ContatoInformado);
+        builder.Property(c => c.ContatoTelefoneInformado).HasMaxLength(TelefoneE164.TamanhoMaximo);
+        builder.Property(c => c.ContatoEmailInformado).HasMaxLength(ContatoInformadoVisitante.EmailTamanhoMaximo);
         builder.Property(c => c.Assunto).HasMaxLength(Mensagem.AssuntoTamanhoMaximo); // #1432
         builder.Property(c => c.MotivoEscalada).HasMaxLength(Conversa.MotivoEscaladaTamanhoMaximo);
         builder.Property(c => c.Canal).HasConversion<int>().IsRequired();

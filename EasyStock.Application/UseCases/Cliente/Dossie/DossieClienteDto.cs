@@ -21,7 +21,8 @@ public sealed record DossieClienteDto(
     PreferenciasClienteResult? Preferencias,
     IReadOnlyList<ClienteMesmoDomicilio> Domicilio,
     IReadOnlyList<ConversaRecenteDossie> ConversasRecentes,
-    PedidoResumoCliente? PedidoEmAndamento);
+    PedidoResumoCliente? PedidoEmAndamento,
+    ContatoInformadoDossie? ContatoInformado = null);
 
 /// <summary>
 /// Dados primários. Sem cliente vinculado (conversa de lead), <c>Id</c> é nulo e nome e telefone vêm do
@@ -35,3 +36,9 @@ public sealed record ItemFavoritoDossie(string Nome, int Pedidos, decimal Quanti
 
 public sealed record ConversaRecenteDossie(
     Guid Id, CanalConversa Canal, SituacaoConversa Situacao, DateTime IniciadaEm, DateTime UltimaMensagemEm);
+
+/// <summary>
+/// #1430: o que o visitante do chat do site escreveu no formulário antes de conversar. Só no dossiê de lead
+/// (sem cliente vinculado) e separado de <see cref="DossieClienteDados"/>: não é cadastro até a loja confirmar.
+/// </summary>
+public sealed record ContatoInformadoDossie(string? Nome, string Telefone, string? Email, DateTime InformadoEm);

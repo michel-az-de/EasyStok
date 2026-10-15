@@ -2,7 +2,8 @@ import * as acao from '../acoes'
 import {
   adicionarNotaCliente, bloquearClienteApi, cadastrarClienteDaConversa, desbloquearClienteApi, obterDossie,
 } from '../../infra/api/conversasApi'
-import { clienteDoDossie, enderecoParaApi } from '../../infra/api/traducaoCliente'
+import { clienteDoDossie, contatoInformadoDoDossie, enderecoParaApi } from '../../infra/api/traducaoCliente'
+import { deveCarregarDossie } from '../planoDeSincronizacao'
 import { textoNaoLigado } from './naoLigadas'
 import { recusaDoEndereco } from '../../dominio/cliente'
 
@@ -10,14 +11,26 @@ import { recusaDoEndereco } from '../../dominio/cliente'
 // gera pedido; aqui a dona cadastra nome, telefone e endereço pela Ficha. Nada muda na tela
 // antes da resposta: o que aparece depois é o dossiê relido, a mesma fonte de quem abre a
 // conversa em outra aba.
+// Ao abrir a conversa: cliente ainda não lido do EasyStok (#1276, regra única em
+// `deveCarregarDossie`) ou lead do chat do site, cujo contato informado pelo visitante só vem
+// no dossiê (#1430).
+export const precisaLerFicha = (c) => deveCarregarDossie(c)
+  || Boolean(c && !c.clienteId && c.canal === 'Chat do site' && !c.contatoInformado)
+
+// Código do 409 de `POST .../cliente` quando o telefone informado pelo visitante já é de um cadastro (#1430).
+const TELEFONE_JA_CADASTRADO = 'TELEFONE_JA_CADASTRADO'
+
 export function criarAcoesClienteApi({ despachar, estadoRef }) {
   const avisar = (mensagem) => despachar({ tipo: acao.AVISO_API, mensagem })
   const conversaDe = (id) => estadoRef.current.conversas.find((c) => c.id === id) ?? null
   const lendoDossie = new Map()
 
   async function carregar(id) {
-    const cliente = clienteDoDossie(await obterDossie(id))
+    const dossie = await obterDossie(id)
+    const cliente = clienteDoDossie(dossie)
     if (cliente) despachar({ tipo: acao.CLIENTE_DA_API, id, ...cliente })
+    const contato = contatoInformadoDoDossie(dossie)
+    if (contato) despachar({ tipo: acao.CONTATO_INFORMADO_API, id, contato })
   }
 
   // #1474 (R2): bloquear e desbloquear vão ao cadastro no EasyStok (todos os canais); a Ficha
@@ -35,15 +48,22 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
 
   // #1586: a recusa volta como `{ erro }` para a Ficha mostrar no campo ou ao lado do botão; a
   // tela só diz "Salvo" depois desta resposta.
-  function cadastrar(id, { nome = null, telefone = null, endereco = null }) {
+  // E-mail só vai quando há (#1430): o corpo das outras edições continua o mesmo.
+  // `confirmarVinculoExistente` (#1430): o telefone que o visitante informou já é de um cadastro e
+  // a dona, depois de conferir com o cliente, manda ligar a conversa a ele. Sem isso a API não
+  // liga: responde de quem é o telefone, e isso volta em `jaCadastrado` para o cartão perguntar.
+  function cadastrar(id, { nome = null, telefone = null, endereco = null, email = null, confirmarVinculoExistente = false }) {
     // #1761: texto que não vira endereço não vai como nulo no lugar do que ela digitou.
     const recusa = recusaDoEndereco(endereco)
     if (recusa) return Promise.resolve({ erro: recusa })
     const corpo = { nome: nome?.trim() || null, telefone: telefone || null, endereco: endereco ? enderecoParaApi(endereco) : null }
+    if (email?.trim()) corpo.email = email.trim()
+    if (confirmarVinculoExistente) corpo.confirmarVinculoExistente = true
     return cadastrarClienteDaConversa(id, corpo)
       .then(async (salvo) => {
         // O telefone já era de outro cadastro: a conversa foi ligada a ele, com o nome dele.
-        if (salvo && salvo.novo === false && corpo.nome && salvo.nome !== corpo.nome) {
+        // Quando foi a dona que mandou ligar, ela já sabe.
+        if (!confirmarVinculoExistente && salvo && salvo.novo === false && corpo.nome && salvo.nome !== corpo.nome) {
           avisar(`Este telefone já é de ${salvo.nome}: a conversa foi ligada a esse cadastro.`)
         }
         if (salvo?.dentroDaArea === false) {
@@ -54,6 +74,8 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
         catch (erro) { avisar(`Cadastro salvo, mas a ficha não atualizou: ${erro.message}`) }
         return undefined
       }, (erro) => {
+        // Não é falha, é pergunta: nada foi ligado e a faixa fica quieta.
+        if (erro.codigo === TELEFONE_JA_CADASTRADO) return { erro: erro.message, jaCadastrado: { nome: erro.dados?.nome ?? null } }
         avisar(`Cadastro do cliente: ${erro.message}`)
         return { erro: erro.message }
       })
@@ -63,11 +85,11 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
     bloquearCliente: (_nome, motivo, conversaId) => mudarBloqueio(conversaId, (clienteId) => bloquearClienteApi(clienteId, motivo?.trim() || null), 'bloquear'),
     desbloquearCliente: (_nome, conversaId) => mudarBloqueio(conversaId, desbloquearClienteApi, 'desbloquear'),
 
-    // O nome que vale é o que a dona escreveu no lápis (rascunho do lead). No chat do site o
-    // nome do contato é genérico ("Visitante do site"): sem o dela, não cadastra.
+    // O nome que vale é o que a dona escreveu no lápis (rascunho do lead). No chat do site sem
+    // o formulário (#1430) o nome do contato é genérico ("Visitante do site"): sem o dela, não cadastra.
     salvarCadastroRapido: (id, dados) => {
       const c = conversaDe(id)
-      if (c?.canal === 'Chat do site' && !c.nomeDaDona) {
+      if (c?.canal === 'Chat do site' && !c.nomeDaDona && !c.contatoInformado) {
         const mensagem = 'Escreva o nome do cliente (lápis ao lado do nome) antes de salvar o cadastro.'
         avisar(mensagem)
         return { erro: mensagem }

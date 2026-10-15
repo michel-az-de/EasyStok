@@ -36,6 +36,7 @@ jobs:
       - run: node ferramentas/prova-1683-ficha-comanda.mjs
       - run: node ferramentas/prova-1785-ficha.mjs
       - run: node ferramentas/prova-1426-notificacoes-console.mjs
+      - run: node ferramentas/prova-1430-contato-informado.mjs
       - run: node ferramentas/prova-1255-pagamento-manual-api.mjs
       - run: node ferramentas/prova-1586-encerrar-ficha-ux.mjs
       - run: node ferramentas/prova-1683-operacao.mjs
