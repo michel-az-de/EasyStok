@@ -331,7 +331,7 @@ await confere('9  a baixa à mão também é formulário: Enter registra, Esc vo
 
 await confere('10  receber distingue sinal manual de quitação, com ação secundária no bloco', () => {
   assert.doesNotMatch(bloco, />\s*Recebi\s*</)
-  const naEntrega = trecho(bloco, '{editavel && !recebendo && (', "{disponivel('marcarRecebidoEntrega') && (")
+  const naEntrega = trecho(bloco, '{!cancelado && editavel && !recebendo && (', "{disponivel('marcarRecebidoEntrega') && (")
   assert.match(naEntrega, /variante="secundario"[\s\S]*sinalPendente \? 'Registrar sinal' : 'Marcar pago'/)
   assert.doesNotMatch(naEntrega, /variante="primario"/)
   const baixa = trecho(bloco, 'export function BaixaAMao(', '// "Alterar forma de pagamento"')

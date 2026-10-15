@@ -5,7 +5,7 @@ import css from './ModalNota.module.css'
 
 // #1839: a nota abre como um post-it pequeno logo acima do composer, sem cobrir a conversa. Esc fecha,
 // Ctrl+Enter salva. Salva, ela fica fixa no topo do Resumo, junto das tags e do cadastro.
-export function ModalNota({ nomeCliente, aoSalvar, aoFechar }) {
+export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, outraConversa = false }) {
   const [texto, setTexto] = useState('')
   const [ocupado, setOcupado] = useState(false)
   const [erro, setErro] = useState(null)
@@ -32,13 +32,14 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar }) {
   }
 
   // Foco só ao abrir: `aoFechar` muda de identidade a cada render do App e não pode refazer o foco.
-  useEffect(() => { campo.current?.focus() }, [])
+  useEffect(() => { if (visivel) campo.current?.focus() }, [visivel])
   // Esc só fecha quando o foco está no post-it: o Esc de um modal ou da barra "/" não apaga a nota.
   const aoTeclar = (e) => { if (e.key === 'Escape' && !e.defaultPrevented && !salvando.current) { e.stopPropagation(); aoFechar() } }
 
   return (
-    <dialog open className={css.postit} aria-label="Nota interna" onKeyDown={aoTeclar}>
+    <dialog open={visivel} className={css.postit} aria-label="Nota interna" onKeyDown={aoTeclar}>
       <p className={css.titulo}>Nota interna <span>· {nomeCliente} nunca vê</span></p>
+      {outraConversa && <p role="status">Esta nota continua na ficha de {nomeCliente}.</p>}
       <CampoArea
         rotulo="Texto da nota"
         rotuloOculto

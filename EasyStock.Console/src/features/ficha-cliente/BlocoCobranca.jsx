@@ -307,13 +307,14 @@ export function BlocoCobranca({
   // mesmos quatro chips (pago na maquininha pode completar no Pix e vice-versa).
   const [recebendo, setRecebendo] = useState(false)
   const [meioDaDiferenca, setMeioDaDiferenca] = useState(false)
+  const cancelado = pedido.estado === 'cancelado'
   const cobranca = pedido.cobranca ?? null
   const situacao = situacaoDaCobranca(cobranca, agora)
   const total = totalDoPedido(pedido, cardapio)
   const geracao = useEmissao(aoGerar)
   const reenvio = useEmissao(aoReenviar)
   const troca = useEmissao(aoAlterarMeio)
-  const alterar = editavel && podeAlterarMeio(pedido) && (
+  const alterar = editavel && !cancelado && podeAlterarMeio(pedido) && (
     <AlterarForma cobranca={cobranca} nomeCliente={nomeCliente} fonteApi={fonteApi} aoAlterar={troca.emitir} />
   )
 
@@ -425,21 +426,21 @@ export function BlocoCobranca({
     const alocado = pedido.alocadoApi ?? recebido
     const faltaSinal = valorSugeridoParaBaixa(pedido)
     return (
-      <Bloco titulo="Cobrança">
+      <Bloco titulo={cancelado ? 'Cobrança original' : 'Cobrança'}>
         <div className={css.cabecaCobranca}>
           <span className={css.rotuloTotal}>Total</span>
           <b className={css.valorForte}>{moeda(fonteApi ? pedido.totalApi ?? cobranca.valor : cobranca.valor)}</b>
         </div>
-        <p className={css.linhaNaEntrega}>
+        {cancelado ? <p className={css.corpoBloco}>Pedido cancelado. Forma original: {nome}.</p> : <p className={css.linhaNaEntrega}>
           <Icone nome="credit-card" /> {sinalPendente ? 'Sinal a receber' : 'Receber na entrega'} · {nome} <b>{moeda(faltaSinal)}</b>
-        </p>
-        {sinalPendente && (
+        </p>}
+        {!cancelado && sinalPendente && (
           <p className={css.corpoBloco}>{recebido > 0 ? `Recebido: ${moeda(recebido)}. ` : ''}O sinal confirma a reserva. Restante na entrega: {moeda(pedido.totalApi - alocado - faltaSinal)}.</p>
         )}
-        {!sinalPendente && fonteApi && pedido.sinalNaReserva && alocado > 0 && alocado < pedido.totalApi && (
+        {!cancelado && !sinalPendente && fonteApi && pedido.sinalNaReserva && alocado > 0 && alocado < pedido.totalApi && (
           <p className={css.corpoBloco}>Recebido: {moeda(recebido)}. Saldo na entrega: {moeda(pedido.totalApi - alocado)}.</p>
         )}
-        {recebendo && (
+        {!cancelado && recebendo && (
           <BaixaAMao valorCobrado={valorSugeridoParaBaixa(pedido)}
             pedido={pedido}
             aoAprovar={aprovarPedido ? () => aprovarPedido(conversaId) : null}
@@ -451,7 +452,7 @@ export function BlocoCobranca({
               return resultado
             }} />
         )}
-        {editavel && !recebendo && (
+        {!cancelado && editavel && !recebendo && (
           <div className={css.acoesCobranca}>
             {/* #1683: mesmo rótulo e mesmo formulário do "Marcar pago" da barra; o primário é o dela. */}
             <Botao
@@ -473,7 +474,7 @@ export function BlocoCobranca({
             )}
           </div>
         )}
-        {editavel && disponivel('refazerCobranca') && (
+        {!cancelado && editavel && disponivel('refazerCobranca') && (
           <Botao
             variante="texto"
             className={css.trocarMeio}
@@ -489,7 +490,7 @@ export function BlocoCobranca({
 
   return (
     <Bloco
-      titulo="Cobrança"
+      titulo={cancelado ? 'Cobrança original' : 'Cobrança'}
       destaque={situacao.chave === 'expirada' || situacao.chave === 'divergente' || diferencaPosPagamento > 0}
     >
       <div className={css.cabecaCobranca}>
@@ -498,7 +499,7 @@ export function BlocoCobranca({
         <Pilula tom="neutro" fina>{nome}</Pilula>
         {cobranca.tentativa > 1 && <span className={css.tentativa}>{cobranca.tentativa}ª cobrança</span>}
       </div>
-      {fonteApi && pedido.sinalNaReserva && !cobranca.diferenca && pedido.totalApi > cobranca.valor && !cobranca.pagaEm && (
+      {!cancelado && fonteApi && pedido.sinalNaReserva && !cobranca.diferenca && pedido.totalApi > cobranca.valor && !cobranca.pagaEm && (
         <p className={css.corpoBloco}>Sinal agora: {moeda(cobranca.valor)}. Restante na entrega: {moeda(pedido.totalApi - cobranca.valor)}.</p>
       )}
 

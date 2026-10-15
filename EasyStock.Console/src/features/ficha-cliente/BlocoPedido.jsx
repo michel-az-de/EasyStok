@@ -107,7 +107,7 @@ function ItemComanda({
 }
 
 export function BlocoPedido({
-  pedido, editavel, aoTrocarJanela, aoAbrirCardapio, aoAjustar, aoAjustarObservacao, aoGerarPedido,
+  pedido, editavel, aoTrocarJanela, aoAbrirCardapio, aoAjustar, aoAjustarObservacao, aoGerarPedido, gerarSemEnviar = false,
   aoForcarEncaixe, nomeCliente, endereco, faixa, bloqueado = false, conversaId, numeroComanda,
   clienteEscolhendo = false,
 }) {
@@ -275,7 +275,7 @@ export function BlocoPedido({
                 enviar"); aqui só a linha que diz que a comanda vai junto.
                 #1587: com o pedido já criado ela não vai mais a lugar nenhum; fica só o motivo acima. */}
             {fonteApi && (podeGerar || envio.chave === 'vazia') ? (
-              !itensTravados && <p className={css.situacaoEnvio}>{LINHA_COMANDA_VAI_JUNTO}</p>
+              !itensTravados && <p className={css.situacaoEnvio}>{gerarSemEnviar ? 'A cobrança será gerada sem envio. Copie o link em Pagamento ou use um modelo aprovado.' : LINHA_COMANDA_VAI_JUNTO}</p>
             ) : (podeGerar || envio.chave === 'vazia') ? (
               <Botao
                 largo variante="primario" icone="enviar" disabled={!podeGerar || enviando}
