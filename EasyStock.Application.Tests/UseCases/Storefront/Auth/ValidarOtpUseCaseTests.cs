@@ -182,6 +182,32 @@ public class ValidarOtpUseCaseTests
         f.UnitOfWork.CommitCount.Should().Be(0);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ReservaRecusadaPorqueOutraRequisicaoConsumiu_LancaOtpInvalido()
+    {
+        // Dois códigos certos em paralelo: a requisição que leu o OTP antes do consumo da outra tem a reserva
+        // recusada pelo NOT Consumido. É código usado, não tentativa esgotada (CI da PR #1815, 14/10/2026).
+        var f = BuildFakes();
+        f.ClienteOtpRepository.ReservarTentativaAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
+        f.ClienteOtpRepository.ConsumidoAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await BuildUseCase(f).Invoking(u => u.ExecuteAsync(Input()))
+            .Should().ThrowAsync<OtpInvalidoException>();
+
+        await f.ClienteSessionRepository.DidNotReceive().AddAsync(Arg.Any<ClienteSession>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ReservaRecusadaSemConsumo_LancaOtpTentativasExcedidas()
+    {
+        var f = BuildFakes();
+        f.ClienteOtpRepository.ReservarTentativaAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
+        f.ClienteOtpRepository.ConsumidoAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
+
+        await BuildUseCase(f).Invoking(u => u.ExecuteAsync(Input()))
+            .Should().ThrowAsync<OtpTentativasExcedidasException>();
+    }
+
     // ── Cliente existente ────────────────────────────────────────────────────
 
     [Fact]

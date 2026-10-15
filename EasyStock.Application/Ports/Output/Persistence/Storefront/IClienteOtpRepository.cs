@@ -40,4 +40,10 @@ public interface IClienteOtpRepository
     /// </summary>
     /// <returns><c>false</c> quando outra requisição já consumiu o OTP: não abra sessão.</returns>
     Task<bool> ConsumirAsync(Guid otpId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Lê no banco, sem o rastreamento do contexto, se o OTP já foi consumido. Separa a reserva recusada porque
+    /// outra requisição levou o OTP (código inválido) da recusada porque as tentativas acabaram.
+    /// </summary>
+    Task<bool> ConsumidoAsync(Guid otpId, CancellationToken ct = default);
 }
