@@ -5,7 +5,9 @@ using System.Text.Json.Serialization;
 using DotNet.Testcontainers.Builders;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Storefront;
+using EasyStock.Infra.Postgre.Data;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -41,7 +43,7 @@ public sealed class AgendamentoControllerTests : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_agendamento_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                .WithPassword("senha-de-teste-descartavel")
                 .Build();
 
             await _pg.StartAsync();
@@ -67,6 +69,8 @@ public sealed class AgendamentoControllerTests : IAsyncLifetime
             .WithWebHostBuilder(b =>
             {
                 b.UseEnvironment("Development");
+                b.UseSetting("Database:Provider", "PostgreSql");
+                b.UseSetting("ConnectionStrings:DefaultConnection", _pg!.GetConnectionString());
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
@@ -103,8 +107,16 @@ public sealed class AgendamentoControllerTests : IAsyncLifetime
         var janelaRepo = scope.ServiceProvider.GetRequiredService<IJanelaEntregaRepository>();
         var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        var empresaId = Guid.NewGuid();
+        db.Empresas.Add(new Empresa
+        {
+            Id = empresaId, Nome = "Empresa Agendamento Tests", Documento = empresaId.ToString("N")[..14],
+            CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow,
+        });
+
         var storefront = StorefrontEntity.Criar(
-            empresaId: Guid.NewGuid(),
+            empresaId: empresaId,
             slug: slug,
             tituloPublico: "Casa da Babá (it-agend)",
             pedidoMinimoEntrega: 0m);
@@ -136,12 +148,17 @@ public sealed class AgendamentoControllerTests : IAsyncLifetime
 
     private static async Task SeedVagaOcupadaAsync(
         WebApplicationFactory<Program> factory,
+        Guid empresaId,
         Guid janelaId,
         DateOnly dataEntrega)
     {
         using var scope = factory.Services.CreateScope();
         var vagaRepo = scope.ServiceProvider.GetRequiredService<IVagaOcupadaRepository>();
-        await vagaRepo.OcuparAsync(janelaId, dataEntrega, Guid.NewGuid());
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        var pedido = Pedido.Criar(empresaId, origem: "storefront");
+        db.Pedidos.Add(pedido);
+        await db.SaveChangesAsync();
+        await vagaRepo.OcuparAsync(janelaId, dataEntrega, pedido.Id);
     }
 
     // ── Testes ─────────────────────────────────────────────────────────────
@@ -154,12 +171,11 @@ public sealed class AgendamentoControllerTests : IAsyncLifetime
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
 
-        // Usar data fixa futura (segunda-feira)
-        var data = new DateOnly(2026, 6, 8); // segunda-feira
+        var data = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7);
         var seed = await SeedBaseAsync(factory, "casa-da-baba-agit1", data);
 
         // 1 vaga ocupada de 2
-        await SeedVagaOcupadaAsync(factory, seed.Janela.Id, data);
+        await SeedVagaOcupadaAsync(factory, seed.Storefront.EmpresaId, seed.Janela.Id, data);
 
         var resp = await client.GetAsync(
             $"/api/storefront/{seed.Storefront.Slug}/janelas?dataInicio={data:yyyy-MM-dd}&dataFim={data:yyyy-MM-dd}");
@@ -190,7 +206,7 @@ public sealed class AgendamentoControllerTests : IAsyncLifetime
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
 
-        var data = new DateOnly(2026, 6, 8);
+        var data = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7);
         var seed = await SeedBaseAsync(factory, "casa-da-baba-agit2", data);
 
         // CEP 99000000 fora da zona 01000000-09999999
@@ -209,7 +225,7 @@ public sealed class AgendamentoControllerTests : IAsyncLifetime
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
 
-        var data = new DateOnly(2026, 6, 8);
+        var data = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7);
         var resp = await client.GetAsync(
             $"/api/storefront/slug-inexistente-agit3/janelas?dataInicio={data:yyyy-MM-dd}&dataFim={data:yyyy-MM-dd}");
 
