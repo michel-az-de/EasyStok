@@ -642,6 +642,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid?>("AssumidaPorUsuarioId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Assunto")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
                     b.Property<int>("Canal")
                         .HasColumnType("integer");
 
@@ -1130,6 +1134,10 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<DateTime?>("AguardaClienteDesde")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Assunto")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
 
                     b.Property<int>("Autor")
                         .HasColumnType("integer");

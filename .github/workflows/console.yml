@@ -40,6 +40,7 @@ jobs:
       - run: node ferramentas/prova-1586-encerrar-ficha-ux.mjs
       - run: node ferramentas/prova-1683-operacao.mjs
       - run: node ferramentas/prova-1420-sugestao-agente-api.mjs
+      - run: node ferramentas/prova-1432-atendimento-email.mjs
       - run: node ferramentas/prova-f06-honestidade.mjs
       - run: node ferramentas/prova-f11-lote-papel.mjs
       - run: node ferramentas/prova-f11-cardapio-do-dia.mjs

@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { AssuntoEmail } from '../../componentes/AssuntoEmail'
 import { Avatar } from '../../componentes/Avatar'
 import { Icone } from '../../componentes/Icone'
 import { useCatalogo } from '../../aplicacao/contextos'
@@ -142,6 +143,8 @@ export const CartaoConversa = memo(function CartaoConversa({
             {duracao(agora - new Date(conversa.ultimaEm).getTime())}
           </time>
         </span>
+        {/* #1432: assunto do e-mail, só no canal E-mail (nos outros não desenha nada). */}
+        <AssuntoEmail assunto={conversa.assunto} />
         <span className={css.linhaPrevia}>
           <span className={css.previa}>
             {/* Quem escreveu por último: "Você:" e "Sistema:" por extenso;
