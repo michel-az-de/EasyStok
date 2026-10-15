@@ -158,8 +158,8 @@ confere('4  com o cardápio aberto o Balcão abre espaço: o painel não corta o
   }
   assert.equal(larguras.balcaoComCardapio({ balcao: 480, cardapio: 460 }), 480, 'Balcão já largo não encolhe')
   assert.equal(larguras.balcaoComCardapio({ balcao: 360, cardapio: 400 }), 428, 'vale o mínimo de 440 do painel')
-  assert.match(fonte('app/App.jsx'), /cardapioAberto=\{modal === 'cardapio' && Boolean\(selecionada\) && prefCardapio\.lado === 'esquerda'\}/)
-  assert.match(fonte('app/Moldura.jsx'), /cardapioAberto \? balcaoComCardapio\(larguras\) : larguras\.balcao/)
+  assert.match(fonte('app/App.jsx'), /cardapioAberto=\{modal === 'cardapio' && selecionada \? prefCardapio\.lado : null\}/)
+  assert.match(fonte('app/Moldura.jsx'), /cardapioAberto === 'esquerda' \? balcaoComCardapio\(larguras\) : larguras\.balcao/)
 })
 confere('1  título de seção recolhida não quebra em duas linhas; quem encurta é o resumo', () => {
   assert.match(fonte('componentes/Bloco.module.css'), /\.gatilho > span:first-child \{ flex-shrink: 0; white-space: nowrap; \}/)

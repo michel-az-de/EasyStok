@@ -135,14 +135,15 @@ if (paineis && preferencia && larguras) {
     assert.equal(CONVERSA_MINIMA, 320)
   })
 
-  const telas = [{ tela: 1280, esperado: { cardEsq: 492, cardDir: 544, assEsq: 472, assDir: 524 } },
+  const telas = [{ tela: 1280, esperado: { cardEsq: 492, cardDir: 532, assEsq: 472, assDir: 524 } },
     { tela: 1440, esperado: { cardEsq: 592, cardDir: CARDAPIO.max, assEsq: ASSISTENTE.max, assDir: ASSISTENTE.max } }]
   for (const { tela, esperado } of telas) {
     const { balcao, ficha } = larguras.padraoPorTela(tela)
     const area = { tela, balcao, ficha, colunas: true }
     const casos = [
-      ['cardápio à esquerda', { lado: 'esquerda', empurraBalcao: true, faixa: CARDAPIO }, esperado.cardEsq],
-      ['cardápio à direita', { lado: 'direita', faixa: CARDAPIO }, esperado.cardDir],
+      ['cardápio à esquerda', { lado: 'esquerda', empurra: true, faixa: CARDAPIO }, esperado.cardEsq],
+      // #1828: à direita o cardápio alarga o Resumo, como à esquerda alarga o Balcão.
+      ['cardápio à direita', { lado: 'direita', empurra: true, faixa: CARDAPIO }, esperado.cardDir],
       ['assistente à esquerda', { lado: 'esquerda', margem: MARGEM_ASSISTENTE, faixa: ASSISTENTE }, esperado.assEsq],
       ['assistente à direita', { lado: 'direita', margem: MARGEM_ASSISTENTE, faixa: ASSISTENTE }, esperado.assDir],
     ]
@@ -159,9 +160,24 @@ if (paineis && preferencia && larguras) {
     }
   }
 
+  // #1828: medido na tela, o amplo à direita cobria 156 px da conversa em 1440 (160 em 1280).
+  await confere('3  cardápio à direita alarga o Resumo e não cobre a conversa, compacto ou amplo', () => {
+    for (const tela of [1280, 1440, 1920]) {
+      const padrao = larguras.padraoPorTela(tela)
+      for (const cardapio of [CARDAPIO.min, CARDAPIO.padrao, CARDAPIO.max]) {
+        const ficha = larguras.fichaComCardapio({ ...padrao, cardapio })
+        assert.ok(ficha + VAO >= cardapio, `${tela}/${cardapio}: a conversa termina antes do painel`)
+        assert.ok(ficha >= padrao.ficha, `${tela}/${cardapio}: Resumo já largo não encolhe`)
+      }
+    }
+    assert.equal(larguras.fichaComCardapio({ ficha: 520, cardapio: 460 }), 520)
+    assert.equal(larguras.fichaComCardapio({ ficha: 360, cardapio: 600 }), 588)
+  })
+
   await confere('3  tela pequena: a máxima nunca fica abaixo da mínima do painel', () => {
     const area = { tela: 1180, balcao: 480, ficha: 520, colunas: true }
-    assert.equal(larguraMaxima({ ...area, lado: 'esquerda', empurraBalcao: true, faixa: CARDAPIO }), CARDAPIO.min)
+    assert.equal(larguraMaxima({ ...area, lado: 'esquerda', empurra: true, faixa: CARDAPIO }), CARDAPIO.min)
+    assert.equal(larguraMaxima({ ...area, lado: 'direita', empurra: true, faixa: CARDAPIO }), CARDAPIO.min)
     assert.equal(larguraMaxima({ ...area, lado: 'direita', margem: MARGEM_ASSISTENTE, faixa: ASSISTENTE }), ASSISTENTE.min)
   })
 
@@ -191,11 +207,14 @@ if (paineis && preferencia && larguras) {
   })
 
   // --- 5. Composição -----------------------------------------------------------------------
-  await confere('5  App guarda lado e modo do cardápio e só alarga o Balcão com o cardápio à esquerda', () => {
+  await confere('5  App guarda lado e modo do cardápio e alarga a coluna do lado em que ele abre', () => {
     const app = fonte('app/App.jsx')
     assert.match(app, /usePreferenciaDePainel\(CHAVE_CARDAPIO, normalizarCardapio\)/)
     assert.match(app, /ladoDoBalcao=\{tamanho === DESKTOP && prefCardapio\.lado === 'esquerda'\}/)
-    assert.match(app, /cardapioAberto=\{modal === 'cardapio' && Boolean\(selecionada\) && prefCardapio\.lado === 'esquerda'\}/)
+    assert.match(app, /cardapioAberto=\{modal === 'cardapio' && selecionada \? prefCardapio\.lado : null\}/)
+    const moldura = fonte('app/Moldura.jsx')
+    assert.match(moldura, /cardapioAberto === 'esquerda' \? balcaoComCardapio\(larguras\) : larguras\.balcao/)
+    assert.match(moldura, /cardapioAberto === 'direita' \? fichaComCardapio\(larguras\) : larguras\.ficha/)
     assert.match(app, /larguraDoCardapio\(/)
   })
 

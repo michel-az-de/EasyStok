@@ -34,4 +34,7 @@ export function escolhidasDoSalvo(salvo) {
 // e 12 a alça entre o Balcão e a conversa.
 export const balcaoComCardapio = ({ balcao, cardapio }) => Math.max(balcao, Math.max(cardapio, 440) - 12)
 
+// #1828: do lado do Resumo, o mesmo. Por cima, o amplo cobria 156 px da conversa em 1440 (medido).
+export const fichaComCardapio = ({ ficha, cardapio }) => Math.max(ficha, Math.max(cardapio, 440) - 12)
+
 export const largurasDaTela = (escolhidas, larguraDaTela) => ({ ...padraoPorTela(larguraDaTela), ...escolhidas })

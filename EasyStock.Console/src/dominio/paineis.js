@@ -54,23 +54,26 @@ const conversaSemPainel = ({ tela, balcao, ficha }) => ({
   fim: tela - VAO - ficha - VAO,
 })
 
-// Largura da conversa que fica à vista com o painel aberto. `empurraBalcao`: o cardápio à
-// esquerda alarga a coluna do Balcão em vez de cobri-la (`balcaoComCardapio`, hooks/larguras.js).
-export function conversaVisivel({ tela, balcao, ficha, lado, largura, margem = 0, empurraBalcao = false }) {
+// Largura da conversa que fica à vista com o painel aberto. `empurra`: o cardápio alarga a coluna
+// do lado em que abre em vez de cobri-la, o Balcão à esquerda e o Resumo à direita (#1828;
+// `balcaoComCardapio` e `fichaComCardapio`, hooks/larguras.js).
+export function conversaVisivel({ tela, balcao, ficha, lado, largura, margem = 0, empurra = false }) {
   const { inicio, fim } = conversaSemPainel({ tela, balcao, ficha })
+  if (lado === 'direita' && empurra) return tela - VAO - Math.max(ficha, largura - VAO) - VAO - inicio
   if (lado === 'direita') return Math.min(fim, tela - margem - largura) - inicio
-  if (empurraBalcao) return fim - (TRILHO + Math.max(balcao, largura - VAO) + VAO)
+  if (empurra) return fim - (TRILHO + Math.max(balcao, largura - VAO) + VAO)
   return fim - Math.max(inicio, TRILHO + margem + largura)
 }
 
 // Maior largura do painel que ainda deixa CONVERSA_MINIMA da conversa à vista, dentro da faixa
 // do painel. Sem as três colunas (tablet), o painel só precisa caber na tela com as margens.
-export function larguraMaxima({ tela, balcao = 0, ficha = 0, colunas = true, lado, margem = 0, empurraBalcao = false, faixa }) {
+export function larguraMaxima({ tela, balcao = 0, ficha = 0, colunas = true, lado, margem = 0, empurra = false, faixa }) {
   if (!colunas) return limitar(tela - 2 * margem, faixa.min, faixa.max)
   const { inicio, fim } = conversaSemPainel({ tela, balcao, ficha })
   let maxima
-  if (lado === 'direita') maxima = tela - margem - inicio - CONVERSA_MINIMA
-  else if (empurraBalcao) maxima = fim - CONVERSA_MINIMA - TRILHO
+  if (lado === 'direita' && empurra) maxima = tela - VAO - inicio - CONVERSA_MINIMA
+  else if (lado === 'direita') maxima = tela - margem - inicio - CONVERSA_MINIMA
+  else if (empurra) maxima = fim - CONVERSA_MINIMA - TRILHO
   else maxima = fim - CONVERSA_MINIMA - TRILHO - margem
   return limitar(maxima, faixa.min, faixa.max)
 }

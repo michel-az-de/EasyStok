@@ -20,6 +20,14 @@
   .gatilhoNoCabecalho { width: auto; gap: var(--e-1); padding: 0 var(--e-2); }
   .rotuloGatilho { display: inline; }
 }
+/* #1828: conversa estreita (cardápio amplo aberto em 1280) deixava o "Assistente" sozinho numa
+   segunda linha do cabeçalho. Abaixo de 360 px úteis (Link de compra, Encerrar e Assistente com
+   nome somam ~342) ele fica só com o ícone; o nome segue no aria-label. `topo-conversa` é o
+   container do cabeçalho (atendimento.module.css). */
+@container topo-conversa (max-width: 359px) {
+  .gatilhoNoCabecalho { width: 48px; padding: 0; }
+  .rotuloGatilho { display: none; }
+}
 
 .pontoAtencao {
   position: absolute; top: 4px; right: 4px;

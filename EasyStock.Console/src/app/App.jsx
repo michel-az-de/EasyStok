@@ -129,7 +129,7 @@ function Composicao({ rota, aoSair }) {
   const [prefCardapio, definirPrefCardapio] = usePreferenciaDePainel(CHAVE_CARDAPIO, normalizarCardapio)
   const areaDoBalcao = { tela, balcao: larguras.balcao, ficha: larguras.ficha, colunas: tamanho === DESKTOP }
   const maximaCardapio = larguraMaxima({
-    ...areaDoBalcao, lado: prefCardapio.lado, empurraBalcao: prefCardapio.lado === 'esquerda', faixa: CARDAPIO,
+    ...areaDoBalcao, lado: prefCardapio.lado, empurra: true, faixa: CARDAPIO,
   })
   const larguraCardapio = larguraDoCardapio({ modo: prefCardapio.modo, guardada: larguras.cardapio, maxima: maximaCardapio })
 
@@ -219,8 +219,8 @@ function Composicao({ rota, aoSair }) {
         larguras={{ ...larguras, cardapio: larguraCardapio }}
         largurasPadrao={largurasPadrao}
         aoRedimensionar={aoRedimensionar}
-        // #1806: só o cardápio do lado do Balcão alarga a coluna; à direita ele fica sobre o Resumo.
-        cardapioAberto={modal === 'cardapio' && Boolean(selecionada) && prefCardapio.lado === 'esquerda'}
+        // #1806 e #1828: o cardápio alarga a coluna do lado em que abre (Balcão ou Resumo).
+        cardapioAberto={modal === 'cardapio' && selecionada ? prefCardapio.lado : null}
       />
 
       {modal === 'nota' && selecionada && (
