@@ -2,6 +2,8 @@
 
 > **Levantamento atualizado em 09/10/2026:** [inventário, evidências e plano de continuidade em ondas](11-levantamento-e-ondas-2026-10-09.md). Use esse levantamento para priorizar a execução. As especificações M0–M8 abaixo continuam como referência, com as correções do ADR-0059. Os estados históricos desta página não comprovam merge, publicação ou homologação atuais.
 
+> **Rodada de 15/10/2026:** [spec da homologação gravada](14-homologacao-gravada-2026-10-15.md) (#1839), seis pacotes sem migração.
+
 Issue: #1316 · Decisão: [ADR-0056](../../adr/0056-erp-da-casa-da-baba-front-unico.md) · Data: 2026-10-01
 Base medida: master `0a70eb56` (estudo da #1316). Plano irmão: [atendimento-whatsapp](../atendimento-whatsapp/README.md)
 (dono de S01–S53 e F01–F18; este plano referencia aquelas fatias e não as reescreve).
