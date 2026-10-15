@@ -201,6 +201,17 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 EasyStock.Application.Events.Pedidos.Handlers.NotificarClientePedidoPagoHandler>(
                 EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
 
+            // #1807: avisos do Balcão no aparelho (Web Push para a equipe). Idempotentes pela chave do outbox; ficam
+            // antes das automáticas, que precisam ser as últimas do tipo (#1506).
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.AvisarEquipeEtapaDoPedidoHandler>("pedido.mudou_status");
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.AvisarEquipePedidoPagoHandler>(
+                EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.AvisarEquipeContatoNovoHandler>(
+                EasyStock.Application.Events.Atendimento.ConversaAbertaEvent.TipoEvento);
+
             // #1228: pagamento confirmado fecha os interesses do cliente nos itens comprados (S31).
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Campanhas.FecharInteressesPedidoPagoHandler>(

@@ -33,6 +33,7 @@ public static partial class ServiceCollectionExtensions
         // S38: consentimento do cliente final por canal e opt-out por palavra.
         services.AddScoped<PoliticaEnvioCliente>();
         services.AddScoped<AvisoStatusPedidoCliente>(); // S13: aviso de status ao cliente
+        services.AddScoped<AvisoEquipeNoAparelho>(); // #1807: avisos do Balcão no aparelho (Web Push)
         services.AddScoped<OptOutPorPalavra>();
         services.AddScoped<SaudacaoAtendimento>();
 

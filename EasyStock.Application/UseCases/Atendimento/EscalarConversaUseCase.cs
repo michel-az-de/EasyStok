@@ -61,6 +61,9 @@ public sealed class EscalarConversaUseCase(
             conversaId = conversa.Id.ToString(),
             cliente,
             motivo = motivoLimpo,
+            // #1807: o Push mostra só o primeiro nome (nunca o telefone nem o motivo) com a tag do console.
+            nome = AvisoEquipeNoAparelho.PrimeiroNome(conversa.ContatoNome),
+            tag = AvisoEquipeNoAparelho.Tag(AvisoEquipeNoAparelho.TagPassouParaVoce, conversa.Id),
         });
         await notificador.EnfileirarEventoAsync(TipoEventoNotificacao.ConversaEscalada, empresaId, payload, conversa.Id, ct);
 

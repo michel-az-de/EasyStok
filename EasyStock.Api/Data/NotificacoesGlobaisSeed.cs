@@ -13,6 +13,9 @@ public static class NotificacoesGlobaisSeed
     /// <summary>Autor das linhas que o seed escreve; o que tem outro autor foi mexido por pessoa e o seed não sobrescreve (N13).</summary>
     public const string AutorSistema = "system";
 
+    /// <summary>Metadados dos avisos do Balcão no aparelho (#1807): a tag que o payload traz, a mesma do console.</summary>
+    private const string TagDoBalcao = """{"tag":"{{ tag }}"}""";
+
     /// <param name="templates">Catálogo de templates; omitido, é o <see cref="BuildDefaultTemplates"/>. Existe para o teste subir a versão.</param>
     /// <param name="rotinas">Catálogo de rotinas; omitido, é o <see cref="BuildDefaultRotinas"/>.</param>
     public static async Task ExecutarAsync(
@@ -525,13 +528,43 @@ public static class NotificacoesGlobaisSeed
 
         // ===== Atendimento por WhatsApp (S07): o agente escalou a conversa para a dona. Push para todas
         // as subscriptions da empresa (payload sem usuarioId => destinatario "empresa:{id}"). =====
-        yield return TemplateNotificacao.Criar(
+        // #1807 (v2): só o primeiro nome e o evento, porque aparece na tela de bloqueio (o cliente podia ser o
+        // telefone e o motivo, texto livre); a tag é a da notificação do console, que é substituída e não duplicada.
+        yield return ComMetadados(TemplateNotificacao.Criar(
             codigo: "conversa_escalada_push_v1",
             nome: "Conversa Escalada — Push",
             canal: CanalNotificacao.Push,
             tipoEvento: TipoEventoNotificacao.ConversaEscalada,
-            assuntoTemplate: "{{ cliente }} precisa de você",
-            corpoTemplate: "{{ cliente }} precisa de você: {{ motivo }}");
+            assuntoTemplate: "Precisa de você",
+            corpoTemplate: "{{ nome }} precisa de você no Balcão"),
+            TagDoBalcao).ComVersao(2);
+
+        // ===== Avisos do Balcão no aparelho (#1807): Web Push para todas as inscrições ativas da empresa com o
+        // console fechado. Só primeiro nome e evento; a tag é a da notificação do console. Interno. =====
+        yield return ComMetadados(TemplateNotificacao.Criar(
+            codigo: "contato_novo_balcao_push_v1",
+            nome: "Contato Novo no Balcão — Push",
+            canal: CanalNotificacao.Push,
+            tipoEvento: TipoEventoNotificacao.ContatoNovoNoBalcao,
+            assuntoTemplate: "Contato novo",
+            corpoTemplate: "{{ nome }} entrou em contato"),
+            TagDoBalcao);
+        yield return ComMetadados(TemplateNotificacao.Criar(
+            codigo: "pedido_pago_balcao_push_v1",
+            nome: "Pagamento Confirmado no Balcão — Push",
+            canal: CanalNotificacao.Push,
+            tipoEvento: TipoEventoNotificacao.PedidoPagoNoBalcao,
+            assuntoTemplate: "Pagamento confirmado",
+            corpoTemplate: "{{ nome }} pagou o pedido"),
+            TagDoBalcao);
+        yield return ComMetadados(TemplateNotificacao.Criar(
+            codigo: "etapa_pedido_balcao_push_v1",
+            nome: "Etapa do Pedido no Balcão — Push",
+            canal: CanalNotificacao.Push,
+            tipoEvento: TipoEventoNotificacao.PedidoMudouEtapaNoBalcao,
+            assuntoTemplate: "Pedido mudou de etapa",
+            corpoTemplate: "{{ nome }}: {{ etapa }}"),
+            TagDoBalcao);
 
         // ===== Lembretes da dona (S43): Push para quem e o lembrete (payload com usuarioId) ou para a
         // empresa toda (sem usuarioId). Interno: nada sai para o cliente. =====
@@ -1000,6 +1033,17 @@ public static class NotificacoesGlobaisSeed
         // ===== Atendimento por WhatsApp (S07) =====
         yield return MakeRotina("conversa_escalada_global", "Conversa Escalada para a Dona",
             TipoEventoNotificacao.ConversaEscalada, "conversa_escalada_push_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"Push\"]");
+
+        // ===== Avisos do Balcão no aparelho (#1807). Rollback: Ativa=false. =====
+        yield return MakeRotina("contato_novo_balcao_global", "Contato Novo no Balcão",
+            TipoEventoNotificacao.ContatoNovoNoBalcao, "contato_novo_balcao_push_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"Push\"]");
+        yield return MakeRotina("pedido_pago_balcao_global", "Pagamento Confirmado no Balcão",
+            TipoEventoNotificacao.PedidoPagoNoBalcao, "pedido_pago_balcao_push_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"Push\"]");
+        yield return MakeRotina("etapa_pedido_balcao_global", "Etapa do Pedido no Balcão",
+            TipoEventoNotificacao.PedidoMudouEtapaNoBalcao, "etapa_pedido_balcao_push_v1",
             CategoriaConteudoNotificacao.Operacional, "[\"Push\"]");
 
         // ===== Lembretes da dona (S43) =====

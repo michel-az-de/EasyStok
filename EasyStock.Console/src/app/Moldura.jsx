@@ -98,7 +98,7 @@ function MenuMais({
         { chave: '__gestao', titulo: 'Gestão', detalhe: 'Cardápio, produção e caixa sem sair do Balcão' },
       ].filter((item) => item.chave !== '__entregas' || permite('entregas')),
     },
-    { titulo: 'Ajuda', itens: [{ chave: '__ajuda', titulo: 'Ajuda e diagnóstico', detalhe: 'Orientação para esta tela e dados para a equipe' }] },
+    { titulo: 'Ajuda', itens: [{ chave: '__ajuda', titulo: 'Ajuda e guia do Console', detalhe: 'O que cada módulo faz, primeiros passos e diagnóstico' }] },
     grupoDoDia(emAndamento, naEsteira),
   ]
 
@@ -297,7 +297,7 @@ function Trilho({
           Avisos logo abaixo, e quem clicava em Avisos abria Lembretes. */}
       <div className={css.avisosTrilho}>{notificacoes}</div>
       <div className={css.sinoTrilho}><Sininho comRotulo /></div>
-      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAjuda} aria-haspopup="dialog" title="Ajuda e diagnóstico">
+      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAjuda} aria-haspopup="dialog" title="Ajuda e guia do Console">
         <MarcaIcone nome="informacao" tamanho={22} /><span>Ajuda</span>
       </Botao>
       <span className={css.espacoTrilho} />
