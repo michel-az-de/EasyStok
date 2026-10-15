@@ -24,7 +24,7 @@ public interface IKdsPedidoQueries
 /// <param name="InicioPrevistoEm"><c>Pedido.InicioPrevistoEm</c> (S21).</param>
 /// <param name="Endereco">Endereço do cadastro do cliente (logradouro, bairro, cidade), para a entrega (S14).</param>
 /// <param name="RequerAprovacao"><c>Pedido.RequerAprovacao</c> (S12).</param>
-/// <param name="Total"><c>Pedido.Total</c> e <paramref name="TotalPago"/> (soma dos pagamentos): base do que falta receber (#1776).</param>
+/// <param name="AReceber">Saldo financeiro calculado em lote para os pedidos desta leitura (#1859).</param>
 public sealed record KdsPedidoLeitura(
     Guid Id,
     string Status,
@@ -41,8 +41,7 @@ public sealed record KdsPedidoLeitura(
     string? Endereco = null,
     bool RequerAprovacao = false,
     string? MotivoRequerAprovacao = null,
-    decimal Total = 0m,
-    decimal TotalPago = 0m);
+    decimal? AReceber = null);
 
 public sealed record KdsJanelaLeitura(string Label, DateOnly Data, TimeOnly Inicio, TimeOnly Fim);
 

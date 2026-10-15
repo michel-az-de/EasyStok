@@ -6,6 +6,7 @@ namespace EasyStock.Application.Services.Pedidos;
 public sealed record SaldoFinanceiroComanda(decimal Recebido, decimal Devolvido, decimal ConvertidoEmCupom, decimal CupomAplicado, decimal Reservado)
 {
     public decimal Alocado => Recebido - Devolvido - ConvertidoEmCupom + CupomAplicado;
+    public decimal AReceber(decimal total) => total <= 0m ? 0m : Math.Max(0m, total - Alocado);
     public decimal DinheiroDisponivel => Math.Max(0, Recebido - Devolvido - Math.Max(0, ConvertidoEmCupom - CupomAplicado) - Reservado);
 }
 
@@ -34,7 +35,7 @@ public sealed class SaldoFinanceiroPedido(IPedidoRepository pedidos, IEstornoOnl
         AReceberAsync(pedido.EmpresaId, pedido.Id, pedido.Total.Valor, pedido.TotalPago, ct);
 
     public async Task<decimal> AReceberAsync(Guid empresaId, Guid pedidoId, decimal total, decimal totalPago, CancellationToken ct) =>
-        total <= 0m ? 0m : Math.Max(0m, total - (await ConsultarAsync(empresaId, pedidoId, totalPago, ct)).Alocado);
+        total <= 0m ? 0m : (await ConsultarAsync(empresaId, pedidoId, totalPago, ct)).AReceber(total);
 
     /// <summary>
     /// #1776 (item 19): marcar entregue com saldo a receber só com a confirmação de quem marca (recebeu na
