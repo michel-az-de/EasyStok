@@ -139,6 +139,11 @@ export function erroDoFormularioJanela(f, janelas = [], propria = null) {
   if (capacidade > CAPACIDADE_TETO) return `Uma janela aceita até ${CAPACIDADE_TETO} pedidos.`
   const dias = diasOrdenados(f.dias)
   if (dias.length === 0) return 'Escolha pelo menos um dia da semana.'
+  // Como na API, nome e vagas de uma janela legada não exigem corrigir a sobreposição anterior.
+  const original = (janelas ?? []).find((j) => j.id === propria)
+  if (original && dias.length === 1 && dias[0] === original.diaDaSemana
+    && inicio === minutosDoDia(String(original.horaInicio).slice(0, 5))
+    && fim === minutosDoDia(String(original.horaFim).slice(0, 5))) return null
   const cruza = (janelas ?? []).find((j) => j.id !== propria && dias.includes(j.diaDaSemana)
     && minutosDoDia(String(j.horaInicio).slice(0, 5)) < fim && inicio < minutosDoDia(String(j.horaFim).slice(0, 5)))
   if (cruza) {
