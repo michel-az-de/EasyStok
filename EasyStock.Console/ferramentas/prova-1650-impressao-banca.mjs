@@ -53,73 +53,145 @@ class Tela {
 const nos = a => Array.isArray(a) ? a.flatMap(nos) : !a || typeof a !== 'object' ? [] : [a, ...nos(a.props?.children), ...nos(a.props?.rodape)]
 const texto = a => Array.isArray(a) ? a.map(texto).join('') : !a || typeof a !== 'object' ? String(a ?? '') : texto(a.props?.children)
 const conteudo = t => nos(t.arvore).map(texto).join('')
-const botao = (t, nome) => nos(t.arvore).find(n => n.type?.name === 'Botao' && texto(n) === nome)
+// O gatilho e o primário do modal dizem "Imprimir": o do modal é o último na árvore.
+const botao = (t, nome) => nos(t.arvore).filter(n => n.type?.name === 'Botao' && texto(n) === nome).at(-1)
 const clicar = async (t, nome) => { const b = botao(t, nome); assert.ok(b, nome); assert.ok(!b.props.disabled, nome); await b.props.onClick(); await t.estabilizar() }
+const campo = (t, rotulo) => nos(t.arvore).find(n => n.type?.name === 'CampoSelecao' && n.props.rotulo === rotulo)
+const papelNaTela = t => nos(t.arvore).find(n => n.type?.name === 'PreviaImpresso')?.props
 const original = { id: 'original-58', documento: 'cozinha', modelo: 'cupom-58', codigo: 'barras', perfil: 'Escolher no diálogo do sistema', criadaEm: '2026-10-12T12:00:00Z', versao: 'anterior', status: 'impressa' }
-const props = extra => ({ documentos: [{ valor: 'pedido', rotulo: 'Pedido' }, { valor: 'cozinha', rotulo: 'Canhoto de cozinha' }], papeis: [{ valor: 'a4', rotulo: 'A4' }, { valor: 'cupom-58', rotulo: 'Bobina 58 mm' }], papelPadrao: () => 'a4', preparar: async o => ({ ...o, id: 'nova', html: '<h1>Original guardado</h1>' }), historico: async () => [], confirmar: async () => {}, abrirImpressao: async () => 'dialogo', ...extra })
+const props = extra => ({
+  documentos: [{ valor: 'pedido', rotulo: 'Pedido' }, { valor: 'cozinha', rotulo: 'Canhoto de cozinha' }],
+  papeis: [{ valor: 'a4', rotulo: 'A4' }, { valor: 'cupom-58', rotulo: 'Bobina 58 mm' }], papelPadrao: () => 'a4',
+  obterPrevia: async o => `<p>${o.documento}-${o.modelo}-${o.codigo}</p>`,
+  preparar: async o => ({ ...o, id: 'nova', html: o.originalId ? '<h1>Original guardado</h1>' : '<h1>x</h1>' }),
+  historico: async () => [], confirmar: async () => {}, abrirImpressao: async () => 'dialogo', ...extra,
+})
 let passou = 0
 const provar = async (nome, fn) => { await fn(); passou++; console.log('ok ' + nome) }
-await provar('retentativa preserva o original, todas as opções e o identificador da solicitação', async () => {
-  const chamadas = []
-  const t = new Tela(props({ historico: async () => [original], preparar: async o => { chamadas.push(o); if (chamadas.length === 1) throw new Error('Sem resposta'); return { ...o, id: 'nova', html: '<h1>Original guardado</h1>' } } }))
+await provar('abre com o papel na tela; um clique imprime a prévia e grava a tentativa (#1839)', async () => {
+  const preparadas = [], impressas = []
+  let confirmadas = 0, callbacks = 0
+  const t = new Tela(props({ preparar: async o => { preparadas.push(o); return { ...o, id: 'nova', html: '<h1>x</h1>' } }, abrirImpressao: async html => { impressas.push(html); return 'dialogo' }, confirmar: async () => { confirmadas++ }, aoImprimir: async () => { callbacks++ } }))
+  await clicar(t, 'Imprimir')
+  assert.equal(papelNaTela(t).html, '<p>pedido-a4-qr</p>'); assert.equal(papelNaTela(t).modelo, 'a4')
+  assert.equal(preparadas.length, 0, 'abrir não grava tentativa')
+  await clicar(t, 'Imprimir')
+  assert.deepEqual(impressas, ['<p>pedido-a4-qr</p>'])
+  assert.equal(preparadas.length, 1); assert.deepEqual([preparadas[0].documento, preparadas[0].modelo, preparadas[0].codigo], ['pedido', 'a4', 'qr'])
+  assert.ok(conteudo(t).includes('Saiu certo?')); assert.ok(botao(t, 'Fechar'))
+  await clicar(t, 'Sim, saiu')
+  assert.equal(confirmadas, 1); assert.equal(callbacks, 1); assert.ok(conteudo(t).includes('Saída registrada no histórico'))
+  t.encerrar()
+})
+await provar('trocar o papel pede outra prévia e a resposta atrasada da anterior não aparece', async () => {
+  const pendentes = []
+  const t = new Tela(props({ obterPrevia: o => new Promise(ok => pendentes.push(() => ok(`<p>${o.modelo}</p>`))) }))
+  await clicar(t, 'Imprimir')
+  assert.equal(papelNaTela(t), undefined); assert.ok(conteudo(t).includes('Montando o papel'))
+  assert.equal(botao(t, 'Imprimir').props.disabled, true, 'sem papel na tela não imprime')
+  campo(t, 'Papel').props.onChange({ target: { value: 'cupom-58' } }); await t.estabilizar()
+  pendentes[1](); await t.estabilizar(); pendentes[0](); await t.estabilizar()
+  assert.equal(papelNaTela(t).html, '<p>cupom-58</p>')
+  t.encerrar()
+})
+await provar('falha da prévia mostra o motivo e tenta de novo', async () => {
+  let chamadas = 0
+  const t = new Tela(props({ obterPrevia: async () => { if (++chamadas === 1) throw new Error('API fora'); return '<p>ok</p>' } }))
+  await clicar(t, 'Imprimir')
+  assert.ok(conteudo(t).includes('API fora'))
+  await clicar(t, 'Tentar de novo')
+  assert.equal(papelNaTela(t).html, '<p>ok</p>')
+  t.encerrar()
+})
+await provar('reimprimir original mostra o guardado e imprime sem gravar outra tentativa nem acionar a fila', async () => {
+  const preparadas = [], impressas = []
+  let confirmadas = 0, callbacks = 0
+  const t = new Tela(props({ historico: async () => [original], preparar: async o => { preparadas.push(o); return { ...o, id: 'nova', html: '<h1>Original guardado</h1>' } }, abrirImpressao: async html => { impressas.push(html); return 'dialogo' }, confirmar: async () => { confirmadas++ }, aoImprimir: async () => { callbacks++ } }))
   await clicar(t, 'Imprimir'); await clicar(t, 'Reimprimir original')
   assert.ok(botao(t, 'Reimprimir original').props['aria-label'].startsWith('Reimprimir original: Canhoto de cozinha'))
+  assert.equal(preparadas[0].originalId, original.id)
+  assert.equal(papelNaTela(t).html, '<h1>Original guardado</h1>'); assert.equal(papelNaTela(t).modelo, 'cupom-58')
   assert.ok(texto(t.arvore).includes('Canhoto de cozinha · Bobina 58 mm'))
-  await clicar(t, 'Tentar preparar novamente')
-  assert.deepEqual(chamadas[1], chamadas[0]); assert.equal(chamadas[1].originalId, original.id)
-  const previa = nos(t.arvore).find(n => n.type?.name === 'PreviaImpresso')
-  assert.equal(previa.props.html, '<h1>Original guardado</h1>'); assert.equal(previa.props.modelo, 'cupom-58')
+  await clicar(t, 'Imprimir')
+  assert.deepEqual(impressas, ['<h1>Original guardado</h1>']); assert.equal(preparadas.length, 1)
+  await clicar(t, 'Sim, saiu')
+  assert.equal(confirmadas, 1); assert.equal(callbacks, 0)
   t.encerrar()
 })
-await provar('falha do histórico oferece nova leitura sem perder a prévia', async () => {
-  let leituras = 0
-  const t = new Tela(props({ historico: async () => { if (++leituras <= 2) throw new Error('Histórico indisponível'); return [original] } }))
-  await clicar(t, 'Imprimir'); await clicar(t, 'Preparar prévia')
-  const previa = nos(t.arvore).find(n => n.type?.name === 'PreviaImpresso').props.html
-  await clicar(t, 'Tentar carregar histórico novamente')
-  assert.equal(nos(t.arvore).find(n => n.type?.name === 'PreviaImpresso').props.html, previa)
-  assert.ok(botao(t, 'Reimprimir original')); assert.equal(botao(t, 'Tentar carregar histórico novamente'), undefined)
-  t.encerrar()
-})
-await provar('falha ao registrar permite repetir apenas a confirmação, sem imprimir outra via', async () => {
+await provar('falha ao registrar a confirmação repete só a confirmação, sem imprimir outra via', async () => {
   let impressas = 0, confirmadas = 0, callbacks = 0
   const t = new Tela(props({ abrirImpressao: async () => { impressas++; return 'dialogo' }, confirmar: async () => { if (++confirmadas === 1) throw new Error('Sem conexão') }, aoImprimir: async () => { callbacks++ } }))
-  await clicar(t, 'Imprimir'); await clicar(t, 'Preparar prévia'); await clicar(t, 'Abrir impressão'); await clicar(t, 'Sim, o papel saiu')
+  await clicar(t, 'Imprimir'); await clicar(t, 'Imprimir'); await clicar(t, 'Sim, saiu')
   assert.equal(callbacks, 0); await clicar(t, 'Registrar novamente')
-  assert.equal(impressas, 1); assert.equal(confirmadas, 2); assert.equal(callbacks, 1); assert.ok(conteudo(t).includes('Saída confirmada no histórico'))
+  assert.equal(impressas, 1); assert.equal(confirmadas, 2); assert.equal(callbacks, 1); assert.ok(conteudo(t).includes('Saída registrada no histórico'))
   t.encerrar()
 })
-await provar('ACK confirmado continua confirmado quando só a atualização da lista falha', async () => {
+await provar('o diálogo abre mesmo se o histórico não gravar, e avisa sem pedir confirmação', async () => {
+  let impressas = 0
+  const t = new Tela(props({ preparar: async () => { throw new Error('Sem conexão') }, abrirImpressao: async () => { impressas++; return 'dialogo' } }))
+  await clicar(t, 'Imprimir'); await clicar(t, 'Imprimir')
+  assert.equal(impressas, 1); assert.ok(conteudo(t).includes('o histórico não registrou')); assert.equal(botao(t, 'Sim, saiu'), undefined)
+  t.encerrar()
+})
+await provar('confirmação registrada continua registrada quando só a atualização da lista falha', async () => {
   let confirmadas = 0
   const t = new Tela(props({ confirmar: async () => { confirmadas++ }, aoImprimir: async () => { throw new Error('Lista indisponível') } }))
-  await clicar(t, 'Imprimir'); await clicar(t, 'Preparar prévia'); await clicar(t, 'Abrir impressão'); await clicar(t, 'Sim, o papel saiu')
-  assert.equal(confirmadas, 1); assert.equal(botao(t, 'Registrar novamente'), undefined); assert.ok(conteudo(t).includes('Saída confirmada no histórico'))
+  await clicar(t, 'Imprimir'); await clicar(t, 'Imprimir'); await clicar(t, 'Sim, saiu')
+  assert.equal(confirmadas, 1); assert.equal(botao(t, 'Registrar novamente'), undefined); assert.ok(conteudo(t).includes('Saída registrada no histórico'))
   t.encerrar()
-})
-await provar('cancelar não confirma e reimprimir não aciona a fila operacional novamente', async () => {
-  let confirmadas = 0, callbacks = 0
-  const t = new Tela(props({ historico: async () => [original], confirmar: async () => { confirmadas++ }, aoImprimir: async () => { callbacks++ } }))
-  await clicar(t, 'Imprimir'); await clicar(t, 'Reimprimir original'); await clicar(t, 'Abrir impressão'); await clicar(t, 'Não saiu / cancelei')
-  assert.equal(confirmadas, 0); await clicar(t, 'Abrir impressão'); await clicar(t, 'Sim, o papel saiu')
-  assert.equal(confirmadas, 1); assert.equal(callbacks, 0); t.encerrar()
 })
 await provar('perfil do aparelho por documento escolhe o papel, filtra os papéis e vai ao histórico pelo nome (#1756)', async () => {
-  const chamadas = []
+  const preparadas = [], previas = []
   const perfis = [{ valor: 'sistema', rotulo: 'Escolher no diálogo do sistema', papeis: ['a4', 'cupom-58'] }, { valor: 'termica-58', rotulo: 'Térmica · bobina 58 mm', papeis: ['cupom-58'] }]
-  const t = new Tela(props({ documentoInicial: 'cozinha', perfis, perfilPadrao: d => d === 'cozinha' ? 'termica-58' : 'sistema', papelPadrao: d => d === 'cozinha' ? 'cupom-58' : 'a4', orientacao: p => `Orientação ${p}`, preparar: async o => { chamadas.push(o); return { ...o, id: 'nova', html: '<h1>x</h1>' } } }))
+  const t = new Tela(props({ documentoInicial: 'cozinha', perfis, perfilPadrao: d => d === 'cozinha' ? 'termica-58' : 'sistema', papelPadrao: d => d === 'cozinha' ? 'cupom-58' : 'a4', orientacao: p => `Orientação ${p}`, obterPrevia: async o => { previas.push(o); return '<p>x</p>' }, preparar: async o => { preparadas.push(o); return { ...o, id: 'nova', html: '<h1>x</h1>' } } }))
   await clicar(t, 'Imprimir')
-  const campo = rotulo => nos(t.arvore).find(n => n.type?.name === 'CampoSelecao' && n.props.rotulo === rotulo)
-  assert.equal(campo('Perfil de impressão').props.value, 'termica-58')
-  assert.deepEqual(campo('Papel').props.opcoes.map(p => p.valor), ['cupom-58'])
+  assert.equal(campo(t, 'Perfil de impressão').props.value, 'termica-58')
+  assert.deepEqual(campo(t, 'Papel').props.opcoes.map(p => p.valor), ['cupom-58'])
   assert.ok(conteudo(t).includes('Orientação cupom-58'))
-  campo('Documento').props.onChange({ target: { value: 'pedido' } }); await t.estabilizar()
-  assert.deepEqual([campo('Perfil de impressão').props.value, campo('Papel').props.value], ['sistema', 'a4'])
-  assert.deepEqual(campo('Papel').props.opcoes.map(p => p.valor), ['a4', 'cupom-58'])
-  campo('Perfil de impressão').props.onChange({ target: { value: 'termica-58' } }); await t.estabilizar()
-  assert.equal(campo('Papel').props.value, 'cupom-58', 'perfil dedicado puxa o papel dele')
-  await clicar(t, 'Preparar prévia')
-  assert.deepEqual([chamadas[0].documento, chamadas[0].modelo, chamadas[0].perfil], ['pedido', 'cupom-58', 'Térmica · bobina 58 mm'])
+  assert.deepEqual([previas[0].documento, previas[0].modelo], ['cozinha', 'cupom-58'])
+  campo(t, 'Documento').props.onChange({ target: { value: 'pedido' } }); await t.estabilizar()
+  assert.deepEqual([campo(t, 'Perfil de impressão').props.value, campo(t, 'Papel').props.value], ['sistema', 'a4'])
+  assert.deepEqual(campo(t, 'Papel').props.opcoes.map(p => p.valor), ['a4', 'cupom-58'])
+  campo(t, 'Perfil de impressão').props.onChange({ target: { value: 'termica-58' } }); await t.estabilizar()
+  assert.equal(campo(t, 'Papel').props.value, 'cupom-58', 'perfil dedicado puxa o papel dele')
+  await clicar(t, 'Imprimir')
+  assert.deepEqual([preparadas[0].documento, preparadas[0].modelo, preparadas[0].perfil], ['pedido', 'cupom-58', 'Térmica · bobina 58 mm'])
   t.encerrar()
+})
+await provar('sem gatilho abre direto no documento pedido e o Fechar devolve à tela que chamou (Ver canhoto)', async () => {
+  let fechou = 0
+  const t = new Tela(props({ semGatilho: true, documentoInicial: 'cozinha', papelPadrao: d => d === 'cozinha' ? 'cupom-58' : 'a4', aoFechar: () => { fechou++ } }))
+  await t.estabilizar()
+  assert.equal(papelNaTela(t).html, '<p>cozinha-cupom-58-qr</p>')
+  assert.equal(nos(t.arvore).filter(n => n.type?.name === 'Botao' && texto(n) === 'Imprimir').length, 1, 'só o primário do modal')
+  await clicar(t, 'Fechar')
+  assert.equal(fechou, 1)
+  t.encerrar()
+})
+await provar('resumo sem histórico: não lê histórico, não grava tentativa e não pede conferência (#1839)', async () => {
+  let historicos = 0, preparadas = 0
+  const impressas = []
+  const t = new Tela(props({ semHistorico: true, documentos: [{ valor: 'resumo', rotulo: 'Resumo do atendimento' }], historico: async () => { historicos++; return [] }, preparar: async () => { preparadas++; return null }, abrirImpressao: async html => { impressas.push(html); return 'dialogo' } }))
+  await clicar(t, 'Imprimir')
+  assert.equal(papelNaTela(t).html, '<p>resumo-a4-qr</p>')
+  await clicar(t, 'Imprimir')
+  assert.deepEqual(impressas, ['<p>resumo-a4-qr</p>']); assert.equal(preparadas, 0); assert.equal(historicos, 0)
+  assert.ok(!conteudo(t).includes('Saiu certo?')); assert.ok(!conteudo(t).includes('Histórico deste pedido'))
+  t.encerrar()
+})
+const { resumoParaImpresso } = await import('../src/dominio/resumoAtendimento.js')
+await provar('o corpo do resumo leva o que a folha mostra, com hora local e sem avaliação quando a loja não guarda', async () => {
+  const resumo = { numero: 12, encerradoEm: new Date(2026, 9, 15, 9, 58).toISOString(), ate: null, duracaoTexto: '13 d', faixaHorario: '20:09 a 10:00',
+    mensagens: { cliente: 10, voce: 13, automatico: 8, total: 31 }, receita: { liquido: 263, estorno: 0, faltaReceber: 0 }, converteu: 'sim',
+    vendas: [{ numero: 5, itensTexto: '1x Lasanha', meio: 'Pix', valor: 263, situacao: 'Entregue' }], vendasTotal: 263,
+    marcos: [{ em: new Date(2026, 9, 13, 10, 19).toISOString(), rotulo: 'Pago' }], avaliacaoCliente: 'positiva', autoavaliacao: 'bom', anotacao: 'Tarde' }
+  const corpo = resumoParaImpresso({ nomeCliente: 'Felipe', canalNome: 'WhatsApp', telefone: '+55 11', resumo })
+  assert.deepEqual([corpo.numero, corpo.data, corpo.contato, corpo.converteu, corpo.virouCliente], ['12', '2026-10-15T09:58:00', 'WhatsApp · +55 11', 'Sim', true])
+  assert.deepEqual(corpo.vendas[0], { numero: '5', itens: '1x Lasanha', meio: 'Pix', valor: 263, situacao: 'Entregue' })
+  assert.deepEqual(corpo.marcos, [{ hora: '10:19', rotulo: 'Pago' }])
+  assert.deepEqual([corpo.avaliacaoCliente, corpo.autoavaliacao, corpo.anotacao], ['Positiva', 'Bom', 'Tarde'])
+  const semAvaliacao = resumoParaImpresso({ nomeCliente: 'Felipe', resumo, comAvaliacaoEAnotacao: false })
+  assert.deepEqual([semAvaliacao.avaliacaoCliente, semAvaliacao.autoavaliacao, semAvaliacao.anotacao, semAvaliacao.contato], [null, null, null, null])
 })
 const { historicoDoPedido, obterOriginalImpresso } = await import('../src/infra/api/impressosApi.js')
 await provar('leituras do histórico e original respeitam 20 segundos mesmo com sinal de fechamento', async () => {

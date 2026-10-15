@@ -53,6 +53,7 @@ public class ModulosTests
     [InlineData("Preparar")]
     [InlineData("Historico")]
     [InlineData("Html")]
+    [InlineData("Previa")]
     public void Documento_impresso_exige_operador_e_modulo_como_as_demais_impressoes(string acao)
     {
         var tipo = typeof(Api.Controllers.DocumentosImpressosController);

@@ -259,3 +259,43 @@ export function montarResumoAtendimento(conversa, cardapio, agora, draft = {}) {
     guardarNota: draft.guardarNota ?? true,
   }
 }
+
+const ROTULO_AVALIACAO_CLIENTE = { positiva: 'Positiva', negativa: 'Negativa' }
+const ROTULO_AUTOAVALIACAO = { bom: 'Bom', regular: 'Regular', ruim: 'Ruim' }
+const doisDigitos = (n) => String(n).padStart(2, '0')
+// Hora da loja como o papel mostra: data e hora locais, sem fuso, para a API não converter.
+const dataLocal = (iso) => {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${doisDigitos(d.getMonth() + 1)}-${doisDigitos(d.getDate())}T${doisDigitos(d.getHours())}:${doisDigitos(d.getMinutes())}:00`
+}
+
+// #1839: o corpo que a API desenha no layout dos impressos. A conta continua aqui
+// (`montarResumoAtendimento`); a API só põe no papel o que a folha da tela mostra.
+export function resumoParaImpresso({ nomeCliente, canalNome, telefone, resumo, comAvaliacaoEAnotacao = true }) {
+  const { mensagens, receita } = resumo
+  return {
+    cliente: nomeCliente || 'Cliente',
+    contato: [canalNome, telefone].filter(Boolean).join(' · ') || null,
+    numero: resumo.numero ? String(resumo.numero) : null,
+    data: dataLocal(resumo.encerradoEm ?? resumo.ate),
+    duracao: resumo.duracaoTexto,
+    faixa: resumo.faixaHorario,
+    mensagensCliente: mensagens.cliente,
+    mensagensVoce: mensagens.voce,
+    mensagensAutomatico: mensagens.automatico,
+    receita: receita.liquido,
+    estorno: receita.estorno ?? 0,
+    faltaReceber: receita.faltaReceber ?? 0,
+    converteu: ROTULO_CONVERTEU[resumo.converteu] ?? '',
+    virouCliente: resumo.converteu === 'sim',
+    vendas: resumo.vendas.map((v) => ({ numero: String(v.numero), itens: v.itensTexto, meio: v.meio ?? null, valor: v.valor, situacao: v.situacao })),
+    vendasTotal: resumo.vendasTotal,
+    marcos: resumo.marcos.map((m) => {
+      const d = new Date(m.em)
+      return { hora: `${doisDigitos(d.getHours())}:${doisDigitos(d.getMinutes())}`, rotulo: m.rotulo }
+    }),
+    avaliacaoCliente: comAvaliacaoEAnotacao ? ROTULO_AVALIACAO_CLIENTE[resumo.avaliacaoCliente] ?? null : null,
+    autoavaliacao: comAvaliacaoEAnotacao ? ROTULO_AUTOAVALIACAO[resumo.autoavaliacao] ?? null : null,
+    anotacao: comAvaliacaoEAnotacao ? resumo.anotacao || null : null,
+  }
+}

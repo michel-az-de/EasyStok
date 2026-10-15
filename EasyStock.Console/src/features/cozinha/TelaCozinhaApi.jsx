@@ -5,12 +5,10 @@ import {
 import { useRelogio } from '../../hooks/useRelogio'
 import { dataIsoNoFuso, horaCurta } from '../../dominio/formato'
 import {
-  COLUNAS_KDS, avisoDeFilaNoTeto, canhotoDoKds, diaDaFilaDaCozinha, filtrarPorLinha, impressoesDaCozinha, respostaAoSoltarKds, textoDaCozinhaVazia,
+  COLUNAS_KDS, avisoDeFilaNoTeto, diaDaFilaDaCozinha, filtrarPorLinha, impressoesDaCozinha, respostaAoSoltarKds, textoDaCozinhaVazia,
 } from '../../dominio/kds'
 import { ORDEM_DAS_LINHAS } from '../../dominio/pedido'
-import { pdfDoCanhoto } from '../../dominio/impressao'
 import { useCozinhaApi } from '../../aplicacao/useCozinhaApi'
-import { imprimirPdf } from '../../componentes/pdfNoNavegador'
 import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
 import { Botao } from '../../componentes/Botao'
@@ -67,7 +65,7 @@ export function TelaCozinhaApi({ linhas }) {
   const { amanha, data: dataDaFila } = diaDaFilaDaCozinha(amanhaDesde, agora)
   const {
     pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes,
-    avancar, recarregar, reimprimir, avisar, limparErro,
+    avancar, recarregar, reimprimir, limparErro,
   } = useCozinhaApi({ data: dataDaFila })
   const [linhaFiltro, setLinhaFiltro] = useState(null)
   const [abertoId, setAbertoId] = useState(null)
@@ -88,18 +86,6 @@ export function TelaCozinhaApi({ linhas }) {
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: coordenadasEntreColunas, scrollBehavior: 'auto' }),
   )
-
-  // O MESMO PDF de 80 mm do protótipo: sem preço, "não é cupom fiscal", texto desenhado
-  // pelo próprio PDF (a térmica imprime como imagem, sem a fonte interna).
-  const imprimir = (pedido) => {
-    try {
-      imprimirPdf(pdfDoCanhoto(canhotoDoKds(pedido, linhas)))
-      return true
-    } catch (e) {
-      avisar(`O canhoto não saiu: ${e.message}`)
-      return false
-    }
-  }
 
   const lista = pedidos ?? []
   const filaDeCanhotos = impressoesDaCozinha(impressoes, lista)
@@ -252,7 +238,7 @@ export function TelaCozinhaApi({ linhas }) {
                             recusa={recusa?.id === p.id ? recusa.motivo : null}
                             retomarFoco={feedback?.id === p.id && feedback.confirmado && feedback.porTeclado && !movendo.has(p.id)}
                             aoConsumirFoco={() => setFeedback((atual) => atual === feedback ? { ...atual, porTeclado: false } : atual)}
-                            aoAvancar={avancar} aoImprimir={imprimir} aoAbrir={setAbertoId}
+                            aoAvancar={avancar} aoAbrir={setAbertoId}
                           />
                         ))}
                         {saindoDaqui.map((p) => (
@@ -272,7 +258,7 @@ export function TelaCozinhaApi({ linhas }) {
       {aberto && (
         <ComandaKds
           pedido={aberto} agora={agora} linhas={linhas} movendo={movendo.has(aberto.id)} erro={erro}
-          aoAvancar={avancar} aoImprimir={imprimir} aoReimprimir={reimprimir} aoLimparErro={limparErro}
+          aoAvancar={avancar} aoReimprimir={reimprimir} aoLimparErro={limparErro}
           aoFechar={() => setAbertoId(null)}
         />
       )}

@@ -28,27 +28,7 @@ public sealed class PedidoImpressoQueries(EasyStockDbContext db) : IPedidoImpres
                 select new { v.DataEntrega, j.HoraInicio, j.HoraFim })
             .FirstOrDefaultAsync(ct);
 
-        var empresa = await db.Empresas
-            .AsNoTracking()
-            .Where(e => e.Id == empresaId)
-            .Select(e => new { e.Nome, e.NomeFantasia, e.Documento })
-            .FirstOrDefaultAsync(ct);
-
-        var vitrine = await db.Storefronts
-            .AsNoTracking()
-            .Where(s => s.EmpresaId == empresaId)
-            .OrderByDescending(s => s.Ativo)
-            .ThenBy(s => s.CriadoEm)
-            .Select(s => new { s.TituloPublico, s.DominioCustom, s.WhatsappPedidos, s.LogoUrl })
-            .FirstOrDefaultAsync(ct);
-
-        // #1632: o logo dos impressos é o da loja (Configurações > Impressão); o da vitrine é só reserva.
-        var logoDaLoja = await db.Lojas
-            .AsNoTracking()
-            .Where(l => l.EmpresaId == empresaId && l.LogoUrl != null && l.LogoUrl != "")
-            .OrderByDescending(l => l.Id == p.LojaId)
-            .Select(l => l.LogoUrl)
-            .FirstOrDefaultAsync(ct);
+        var casa = await ObterCasaAsync(empresaId, p.LojaId, ct);
 
         var cliente = p.ClienteId is { } clienteId
             ? await db.Clientes
@@ -109,15 +89,13 @@ public sealed class PedidoImpressoQueries(EasyStockDbContext db) : IPedidoImpres
             .Select(c => (int?)c.TempoPreparoPadraoMinutos)
             .FirstOrDefaultAsync(ct) ?? TempoPreparoPadrao;
 
-        var nomeCasa = vitrine?.TituloPublico ?? empresa?.NomeFantasia ?? empresa?.Nome ?? string.Empty;
-
         return new PedidoImpressoLeitura(
             Id: p.Id,
             CriadoEm: p.CriadoEm,
             AlteradoEm: p.AlteradoEm,
             AgendadoParaEm: p.AgendadoParaEm,
             Janela: janela is null ? null : new PedidoImpressoJanelaLeitura(janela.DataEntrega, janela.HoraInicio, janela.HoraFim),
-            Casa: new PedidoImpressoCasaLeitura(nomeCasa, empresa?.Documento, vitrine?.DominioCustom, vitrine?.WhatsappPedidos, logoDaLoja ?? vitrine?.LogoUrl),
+            Casa: casa,
             Cliente: new PedidoImpressoClienteLeitura(
                 p.ClienteId,
                 string.IsNullOrWhiteSpace(p.ClienteNome) ? cliente?.Nome : p.ClienteNome,
@@ -145,5 +123,33 @@ public sealed class PedidoImpressoQueries(EasyStockDbContext db) : IPedidoImpres
                     Conservacao: i.ConservacaoSnapshot))
                 .ToList(),
             NumeroDoDia: p.NumeroDoDia);
+    }
+
+    public async Task<PedidoImpressoCasaLeitura> ObterCasaAsync(Guid empresaId, Guid? lojaId = null, CancellationToken ct = default)
+    {
+        var empresa = await db.Empresas
+            .AsNoTracking()
+            .Where(e => e.Id == empresaId)
+            .Select(e => new { e.Nome, e.NomeFantasia, e.Documento })
+            .FirstOrDefaultAsync(ct);
+
+        var vitrine = await db.Storefronts
+            .AsNoTracking()
+            .Where(s => s.EmpresaId == empresaId)
+            .OrderByDescending(s => s.Ativo)
+            .ThenBy(s => s.CriadoEm)
+            .Select(s => new { s.TituloPublico, s.DominioCustom, s.WhatsappPedidos, s.LogoUrl })
+            .FirstOrDefaultAsync(ct);
+
+        // #1632: o logo dos impressos é o da loja (Configurações > Impressão); o da vitrine é só reserva.
+        var logoDaLoja = await db.Lojas
+            .AsNoTracking()
+            .Where(l => l.EmpresaId == empresaId && l.LogoUrl != null && l.LogoUrl != "")
+            .OrderByDescending(l => l.Id == lojaId)
+            .Select(l => l.LogoUrl)
+            .FirstOrDefaultAsync(ct);
+
+        var nomeCasa = vitrine?.TituloPublico ?? empresa?.NomeFantasia ?? empresa?.Nome ?? string.Empty;
+        return new PedidoImpressoCasaLeitura(nomeCasa, empresa?.Documento, vitrine?.DominioCustom, vitrine?.WhatsappPedidos, logoDaLoja ?? vitrine?.LogoUrl);
     }
 }

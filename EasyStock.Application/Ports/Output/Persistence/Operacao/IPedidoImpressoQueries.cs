@@ -10,6 +10,9 @@ public interface IPedidoImpressoQueries
 {
     /// <summary>Nulo para pedido inexistente ou de outra empresa.</summary>
     Task<PedidoImpressoLeitura?> ObterAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default);
+
+    /// <summary>Nome, contatos e logo da casa para impresso sem pedido (resumo do atendimento, #1839).</summary>
+    Task<PedidoImpressoCasaLeitura> ObterCasaAsync(Guid empresaId, Guid? lojaId = null, CancellationToken ct = default);
 }
 
 /// <param name="Janela">Vaga ativa (<c>VagaOcupada → JanelaEntrega</c>), a mesma leitura do KDS.</param>
