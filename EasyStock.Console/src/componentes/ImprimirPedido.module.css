@@ -27,8 +27,9 @@
 .detalhes { font-size: var(--t-apoio); color: var(--tinta-2); }
 .detalhes summary { cursor: pointer; padding-block: var(--e-1); }
 .detalhes span { display: block; padding-top: var(--e-1); }
-.historico { margin-top: var(--e-5); border-top: 1px solid var(--linha); padding-top: var(--e-3); }
-.historico h3 { margin: 0 0 var(--e-2); }
+.historico { margin-top: var(--e-4); border-top: 1px solid var(--linha); padding-top: var(--e-3); }
+.historico summary { cursor: pointer; font-weight: 700; color: var(--tinta); padding-block: var(--e-1); }
+.conferir { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--e-2); }
 .registros { list-style: none; margin: var(--e-3) 0; padding: 0; }
 .registros li { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); padding: var(--e-3) 0; border-bottom: 1px solid var(--linha); }
 .registros li div { display: grid; gap: var(--e-1); }
