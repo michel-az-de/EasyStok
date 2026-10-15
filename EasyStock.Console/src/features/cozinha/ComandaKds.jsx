@@ -14,7 +14,7 @@ import css from './cozinha.module.css'
 // #1584: o erro da tela (`erro`) aparece aqui dentro; desenhado só na página, ficava inerte
 // atrás do modal e "Marcar pronto" parecia não ter feito nada.
 export function ComandaKds({
-  pedido, agora, linhas, movendo, erro, aoAvancar, aoImprimir, aoReimprimir, aoLimparErro, aoFechar,
+  pedido, agora, linhas, movendo, erro, aoAvancar, aoReimprimir, aoLimparErro, aoFechar,
 }) {
   const proximo = proximoStatusKds(pedido.status)
   const aviso = avisoDeInicio(pedido, agora)
@@ -38,9 +38,8 @@ export function ComandaKds({
           <Botao variante="texto" disabled={reimpressao === 'enviando'} onClick={reimprimir}>
             {reimpressao === 'enviando' ? 'Reenviando…' : 'Reimprimir na fila'}
           </Botao>
-          {/* #1632: "Imprimir" escolhe documento e papel (impressos da API); o canhoto em PDF segue ao lado. */}
-          <Botao icone="printer" onClick={() => aoImprimir(pedido)}>Imprimir canhoto</Botao>
-          <ImprimirPedido {...impressaoDoPedido(pedido.id, null, nomeNaComanda(pedido))} documentoInicial="cozinha" />
+          {/* #1839: um caminho só, o impresso da API com o papel na tela (o PDF próprio saiu). */}
+          <ImprimirPedido {...impressaoDoPedido(pedido.id, null, nomeNaComanda(pedido))} documentoInicial="cozinha" rotulo="Imprimir canhoto" />
           {proximo && (
             <Botao variante="primario" disabled={movendo} onClick={() => aoAvancar(pedido.id, proximo.status)}>
               {movendo ? 'Enviando…' : proximo.toque}

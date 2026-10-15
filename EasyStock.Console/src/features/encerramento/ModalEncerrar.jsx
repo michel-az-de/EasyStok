@@ -3,6 +3,8 @@ import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { Modal } from '../../componentes/Modal'
 import { FolhaImpressao } from '../../componentes/FolhaImpressao'
+import { ImprimirPedido } from '../../componentes/ImprimirPedido'
+import { impressaoDoResumo } from '../../aplicacao/impressos'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { cancelarNasceMarcado, falhaAoCancelarNoEncerramento, pedidoAoEncerrar, rotuloCancelarAoEncerrar } from '../../aplicacao/api/encerramentoEMidia'
@@ -10,7 +12,7 @@ import { canalDaConversa } from '../../dominio/canal'
 import { conversaEncerrada } from '../../dominio/conversa'
 import { pedidoEncerrado } from '../../dominio/pedido'
 import {
-  PEDE_TEXTO_DA_DESPEDIDA, avisoDoPedidoAoEncerrar, faltaTextoDaDespedida, montarResumoAtendimento,
+  PEDE_TEXTO_DA_DESPEDIDA, avisoDoPedidoAoEncerrar, faltaTextoDaDespedida, montarResumoAtendimento, resumoParaImpresso,
 } from '../../dominio/resumoAtendimento'
 import { GATILHOS, contextoDePrevia, regraDoGatilho, textoDaRegra } from '../../dominio/automacao'
 import { FolhaResumo } from './FolhaResumo'
@@ -159,9 +161,15 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
           <>
             {erroAoEncerrar && <p className={css.erroAoEncerrar} role="alert">{erroAoEncerrar}</p>}
             <Botao variante="texto" onClick={aoFechar}>Voltar</Botao>
-            <Botao variante="secundario" icone="printer" onClick={() => window.print()}>
-              Exportar PDF
-            </Botao>
+            {/* #1839: no EasyStok o resumo sai pelo mesmo modal, papel e prévia dos impressos; o
+                "Salvar como PDF" fica no diálogo. A demonstração segue com a folha da tela. */}
+            {fonteApi
+              ? <ImprimirPedido {...impressaoDoResumo(resumoParaImpresso({ ...propsDaFolha, comAvaliacaoEAnotacao: guardaAvaliacaoEAnotacao }))} rotulo="Imprimir resumo" />
+              : (
+                <Botao variante="secundario" icone="printer" onClick={() => window.print()}>
+                  Exportar PDF
+                </Botao>
+              )}
             {!encerrada && (
               <Botao variante="primario" icone="log-out" disabled={encerrandoAgora} onClick={clicarEncerrar}>
                 {encerrandoAgora ? 'Encerrando…' : 'Encerrar'}
@@ -233,9 +241,9 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
           </div>
         </div>
       </Modal>
-      <FolhaImpressao>
+      {!fonteApi && <FolhaImpressao>
         <FolhaResumo {...propsDaFolha} editavel={false} impresso comAvaliacaoEAnotacao={guardaAvaliacaoEAnotacao} />
-      </FolhaImpressao>
+      </FolhaImpressao>}
     </>
   )
 }

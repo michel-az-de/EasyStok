@@ -14,18 +14,28 @@ const data = (valor) => new Date(valor).toLocaleString('pt-BR')
 const estadoRegistro = (valor) => ({ preparada: 'Prévia guardada', impressa: 'Saída confirmada', falhou: 'Falha informada' })[valor] ?? valor
 const rotuloDe = (opcoes, valor) => opcoes.find((o) => o.valor === valor)?.rotulo ?? valor
 
+// #1839: o modal abre já com o papel na tela (prévia sem registro, `obterPrevia`) e um botão só,
+// "Imprimir", que abre o diálogo do sistema na hora com a prévia que a pessoa está vendo e grava a
+// tentativa no histórico em paralelo (`preparar`). A conferência "saiu certo?" fica no rodapé, sem
+// bloquear o Fechar. `semGatilho` + `aoFechar` deixam a tela que chamou abrir o modal direto
+// (o "Ver canhoto" do Balcão), sem um modal intermediário.
 export function ImprimirPedido({
   documentos, papeis, papelPadrao, perfis = perfilLivre(papeis), perfilPadrao = () => perfis[0].valor, orientacao,
-  preparar, historico, confirmar, documentoInicial, aoImprimir, abrirImpressao = imprimirHtml,
-  rotulo = 'Imprimir', variante = 'secundario', titulo = 'Imprimir pedido', contexto, clienteNome, ...resto
+  preparar, obterPrevia, historico, confirmar, documentoInicial, aoImprimir, aoAbrirImpressao, abrirImpressao = imprimirHtml,
+  rotulo = 'Imprimir', variante = 'secundario', titulo = 'Imprimir pedido', contexto, clienteNome,
+  semGatilho = false, semHistorico = false, semCodigo = false, aoFechar, ...resto
 }) {
-  const [aberto, setAberto] = useState(false)
-  const [documento, setDocumento] = useState(documentoInicial ?? documentos[0].valor)
-  const [papel, setPapel] = useState(null)
+  const inicial = documentoInicial ?? documentos[0].valor
+  const perfilInicial = (perfis.find((p) => p.valor === perfilPadrao(inicial)) ?? perfis[0]).valor
+  const [aberto, setAberto] = useState(semGatilho)
+  const [documento, setDocumento] = useState(inicial)
+  const [papel, setPapel] = useState(semGatilho ? papelPadrao(inicial) : null)
   const [codigo, setCodigo] = useState('qr')
-  const [perfil, setPerfil] = useState('sistema')
+  const [perfil, setPerfil] = useState(semGatilho ? perfilInicial : 'sistema')
+  const [previa, setPrevia] = useState(null)
+  const [recargaPrevia, setRecargaPrevia] = useState(0)
   const [registro, setRegistro] = useState(null)
-  const [opcoesTentativa, setOpcoesTentativa] = useState(null)
+  const [reimpressao, setReimpressao] = useState(null)
   const [situacao, setSituacao] = useState({ estado: 'ocioso' })
   const [lista, setLista] = useState([])
   const [pagina, setPagina] = useState(1)
@@ -34,24 +44,30 @@ export function ImprimirPedido({
   const [carregandoHistorico, setCarregandoHistorico] = useState(false)
   const operacao = useRef(null)
   const solicitacao = useRef(null)
-  const tentativa = useRef(null)
-  const focoPrevia = useRef(null)
   const focoEstado = useRef(null)
   const historicoRef = useRef(historico)
-  useLayoutEffect(() => { historicoRef.current = historico }, [historico])
+  const previaRef = useRef(obterPrevia)
+  useLayoutEffect(() => { historicoRef.current = historico; previaRef.current = obterPrevia }, [historico, obterPrevia])
 
   useEffect(() => () => operacao.current?.abort(), [])
   useEffect(() => {
-    if (!aberto) return
-    if (situacao.estado === 'pronto') {
-      focoPrevia.current?.focus({ preventScroll: true })
-      focoPrevia.current?.scrollIntoView({ block: 'nearest' })
-    } else if (['aguardando', 'confirmando', 'confirmada', 'erro'].includes(situacao.estado)) {
-      focoEstado.current?.focus({ preventScroll: true })
-    }
-  }, [aberto, situacao.estado, registro?.id])
+    if (aberto && ['aguardando', 'confirmando', 'confirmada', 'erro'].includes(situacao.estado)) focoEstado.current?.focus({ preventScroll: true })
+  }, [aberto, situacao.estado])
+  // Prévia viva: cada troca de documento, papel ou código pede o papel de novo; a resposta só vale
+  // para a combinação que a pediu (`chave`), então a anterior nunca aparece como atual.
+  const chavePrevia = `${documento}|${papel}|${codigo}|${recargaPrevia}`
   useEffect(() => {
-    if (!aberto) return
+    if (!aberto || !papel || reimpressao) return undefined
+    const controle = new AbortController()
+    const chave = `${documento}|${papel}|${codigo}|${recargaPrevia}`
+    Promise.resolve(previaRef.current?.({ documento, modelo: papel, codigo }, controle.signal))
+      .then((html) => { if (!controle.signal.aborted) setPrevia(html ? { chave, estado: 'pronta', html, modelo: papel } : { chave, estado: 'erro', mensagem: 'O papel veio vazio.' }) })
+      .catch((erro) => { if (!controle.signal.aborted) setPrevia({ chave, estado: 'erro', mensagem: erro.message }) })
+    return () => controle.abort()
+  }, [aberto, documento, papel, codigo, reimpressao, recargaPrevia])
+  const previaAtual = previa?.chave === chavePrevia ? previa : null
+  useEffect(() => {
+    if (!aberto || semHistorico) return undefined
     const controle = new AbortController()
     setErroHistorico(null)
     setCarregandoHistorico(true)
@@ -61,10 +77,10 @@ export function ImprimirPedido({
     }).catch((erro) => { if (!controle.signal.aborted) setErroHistorico(erro.message) })
       .finally(() => { if (!controle.signal.aborted) setCarregandoHistorico(false) })
     return () => controle.abort()
-  }, [aberto, pagina, revisao])
+  }, [aberto, pagina, revisao, semHistorico])
 
-  const fechar = () => { operacao.current?.abort(); operacao.current = null; setAberto(false) }
-  const limpar = () => { solicitacao.current = null; tentativa.current = null; setOpcoesTentativa(null); setRegistro(null); setSituacao({ estado: 'ocioso' }) }
+  const fechar = () => { operacao.current?.abort(); operacao.current = null; setAberto(false); aoFechar?.() }
+  const limpar = () => { solicitacao.current = null; setRegistro(null); setReimpressao(null); setSituacao({ estado: 'ocioso' }) }
   const perfilDe = (valor) => perfis.find((p) => p.valor === valor) ?? perfis[0]
   // Documento traz o perfil e o papel guardados no aparelho; perfil dedicado puxa o papel dele.
   const escolherDocumento = (valor) => { limpar(); setDocumento(valor); setPerfil(perfilDe(perfilPadrao(valor)).valor); setPapel(papelPadrao(valor)) }
@@ -73,50 +89,53 @@ export function ImprimirPedido({
     const compativeis = perfilDe(valor).papeis
     if (!compativeis.includes(papel)) setPapel(compativeis[0])
   }
-  const abrir = () => { escolherDocumento(documento); setPagina(1); setAberto(true) }
+  // Prévia de uma abertura anterior não vale: o pedido ou o resumo podem ter mudado (#1839).
+  const abrir = () => { escolherDocumento(documento); setPrevia(null); setPagina(1); setAberto(true) }
 
-  async function carregar(original = null) {
-    if (operacao.current) return
-    const controle = new AbortController()
-    operacao.current = controle
-    setSituacao({ estado: 'preparando' })
-    const opcoes = original
-      ? { documento: original.documento, modelo: original.modelo, codigo: original.codigo, perfil: original.perfil, originalId: original.id }
-      : tentativa.current ?? { documento, modelo: papel, codigo, perfil: perfilDe(perfil).rotulo }
-    tentativa.current = opcoes
-    setOpcoesTentativa(opcoes)
-    const chave = JSON.stringify(opcoes)
-    if (solicitacao.current?.chave !== chave) solicitacao.current = { chave, id: crypto.randomUUID() }
-    try {
-      const pronto = await preparar({ ...opcoes, solicitacaoId: solicitacao.current.id }, controle.signal)
-      controle.signal.throwIfAborted()
-      setRegistro(pronto)
-      setSituacao({ estado: 'pronto' })
-      setRevisao((r) => r + 1)
-    } catch (erro) {
-      if (!controle.signal.aborted) setSituacao({ estado: 'erro', mensagem: erro.message })
-    } finally { if (operacao.current === controle) operacao.current = null }
-  }
-
+  // Guarda a tentativa e imprime o documento guardado: o papel e o histórico são o mesmo HTML (#1839).
+  // A prévia é para conferir; se o pedido mudou desde que ela abriu, sai o estado atual. A solicitação
+  // repete o mesmo identificador até dar certo, então rede que cai depois do servidor gravar não duplica.
+  // O resumo do atendimento (`semHistorico`) não é de um pedido: imprime a própria prévia.
   async function imprimir() {
-    if (operacao.current || !registro) return
+    if (operacao.current || !papelNaTela) return
     const controle = new AbortController()
     operacao.current = controle
     setSituacao({ estado: 'imprimindo' })
     try {
-      const destino = await abrirImpressao(registro.html, { sinal: controle.signal })
+      let html
+      if (semHistorico) html = papelNaTela.html
+      else if (reimpressao && registro) html = reimpressao.html
+      else {
+        setRegistro(null)
+        const opcoes = { documento, modelo: papel, codigo, perfil: perfilDe(perfil).rotulo }
+        const pronto = await prepararUmaVez(opcoes, controle.signal)
+        setRegistro(pronto)
+        setRevisao((r) => r + 1)
+        html = pronto.html
+      }
+      const destino = await abrirImpressao(html, { sinal: controle.signal })
       controle.signal.throwIfAborted()
-      setSituacao({ estado: 'aguardando', destino })
+      setSituacao(semHistorico ? { estado: 'ocioso' } : { estado: 'aguardando', destino })
+      await aoAbrirImpressao?.(reimpressao?.documento ?? documento)
     } catch (erro) {
       if (!controle.signal.aborted) setSituacao({ estado: 'erro', mensagem: erro.message })
     } finally { if (operacao.current === controle) operacao.current = null }
   }
 
+  async function prepararUmaVez(opcoes, sinal) {
+    const chave = JSON.stringify(opcoes)
+    if (solicitacao.current?.chave !== chave) solicitacao.current = { chave, id: crypto.randomUUID() }
+    const pronto = await preparar({ ...opcoes, solicitacaoId: solicitacao.current.id }, sinal)
+    sinal.throwIfAborted()
+    solicitacao.current = null
+    return pronto
+  }
+
   async function confirmarSaida() {
-    if (operacao.current) return
+    if (operacao.current || !registro) return
     const controle = new AbortController()
     operacao.current = controle
-    setSituacao({ estado: 'confirmando' })
+    setSituacao((atual) => ({ ...atual, estado: 'confirmando' }))
     let registrada = false
     try {
       await confirmar(registro)
@@ -134,74 +153,91 @@ export function ImprimirPedido({
     } finally { if (operacao.current === controle) operacao.current = null }
   }
 
-  const ocupado = ['preparando', 'imprimindo', 'confirmando'].includes(situacao.estado)
-  const confirmarPapel = ['aguardando', 'confirmando'].includes(situacao.estado)
-  const congelado = ocupado || Boolean(registro)
-  const resumoAtivo = registro ?? (opcoesTentativa?.originalId ? opcoesTentativa : null)
+  // O original guardado volta pelo `preparar` com `originalId`, sem montar o documento de novo.
+  async function reimprimirOriginal(item) {
+    if (operacao.current) return
+    const controle = new AbortController()
+    operacao.current = controle
+    setSituacao({ estado: 'carregando' })
+    try {
+      const pronto = await prepararUmaVez({ documento: item.documento, modelo: item.modelo, codigo: item.codigo, perfil: item.perfil, originalId: item.id }, controle.signal)
+      setRegistro(pronto)
+      setReimpressao({ ...item, html: pronto.html })
+      setRevisao((r) => r + 1)
+      setSituacao({ estado: 'ocioso' })
+    } catch (erro) {
+      if (!controle.signal.aborted) setSituacao({ estado: 'erro', mensagem: erro.message })
+    } finally { if (operacao.current === controle) operacao.current = null }
+  }
+
+  const ocupado = ['imprimindo', 'confirmando', 'carregando'].includes(situacao.estado)
+  const conferir = ['aguardando', 'confirmando'].includes(situacao.estado)
+  const papelNaTela = reimpressao ? { html: reimpressao.html, modelo: reimpressao.modelo } : previaAtual?.estado === 'pronta' ? previaAtual : null
   return (
     <span style={{ display: 'contents' }} onPointerDown={naoPropagar} onMouseDown={naoPropagar} onTouchStart={naoPropagar}>
-      <Botao variante={variante} icone="printer" onClick={abrir} {...resto}>{rotulo}</Botao>
+      {!semGatilho && <Botao variante={variante} icone="printer" onClick={abrir} {...resto}>{rotulo}</Botao>}
       {aberto && <Modal titulo={contexto ? `${titulo} ${contexto}` : titulo} descricao={clienteNome ? `Cliente: ${clienteNome}` : undefined} aoFechar={fechar} largura="min(1060px, calc(100vw - 24px))" rodape={(
         <div className={css.rodapeImpressao}>
           <div aria-live="polite">
-            {confirmarPapel && <p ref={focoEstado} tabIndex={-1} className={situacao.erroConfirmacao ? css.erro : css.aviso}>
-              {situacao.estado === 'confirmando' ? 'Registrando a confirmação…' : situacao.erroConfirmacao
-                ? `O papel saiu, mas não conseguimos registrar a confirmação. Tente registrar novamente. ${situacao.mensagem}`
-                : situacao.destino === 'aba' ? 'Imprima na aba que foi aberta e volte aqui. O papel saiu corretamente?'
-                  : 'O papel saiu corretamente? Confirme depois de conferir a folha.'}
-            </p>}
-            {situacao.estado === 'confirmada' && <p ref={focoEstado} tabIndex={-1} className={css.aviso}>Saída confirmada no histórico.{situacao.mensagem && ` ${situacao.mensagem}`}</p>}
+            {conferir && <div className={css.conferir}>
+              <p ref={focoEstado} tabIndex={-1} className={situacao.erroConfirmacao || situacao.semRegistro ? css.erro : css.dica}>
+                {situacao.estado === 'confirmando' ? 'Registrando…' : situacao.mensagem
+                  ?? (situacao.destino === 'aba' ? 'Imprima na aba que abriu. Saiu certo?' : 'Saiu certo?')}
+              </p>
+              {registro && <>
+                <Botao variante="texto" disabled={ocupado} onClick={() => setSituacao({ estado: 'ocioso' })}>Não saiu</Botao>
+                <Botao variante="secundario" disabled={ocupado} onClick={confirmarSaida}>{situacao.erroConfirmacao ? 'Registrar novamente' : 'Sim, saiu'}</Botao>
+              </>}
+            </div>}
+            {situacao.estado === 'confirmada' && <p ref={focoEstado} tabIndex={-1} className={css.dica}>Saída registrada no histórico.{situacao.mensagem && ` ${situacao.mensagem}`}</p>}
             {situacao.estado === 'erro' && <p ref={focoEstado} tabIndex={-1} className={css.erro} role="alert">{situacao.mensagem}</p>}
           </div>
           <div className={css.acoesRodape}>
-          {!confirmarPapel && <Botao variante="texto" onClick={fechar}>Fechar</Botao>}
-          {confirmarPapel ? <>
-            <Botao variante="secundario" disabled={ocupado} onClick={() => setSituacao({ estado: 'pronto' })}>{situacao.erroConfirmacao ? 'Voltar à prévia' : 'Não saiu / cancelei'}</Botao>
-            <Botao variante="primario" disabled={ocupado} onClick={confirmarSaida}>{ocupado ? 'Registrando…' : situacao.erroConfirmacao ? 'Registrar novamente' : 'Sim, o papel saiu'}</Botao>
-          </> : situacao.estado !== 'confirmada' && <Botao variante="primario" icone={registro ? 'printer' : 'eye'} disabled={ocupado} onClick={() => registro ? imprimir() : carregar()}>
-            {ocupado ? 'Preparando…' : situacao.estado === 'erro' ? registro ? 'Tentar abrir impressão' : 'Tentar preparar novamente' : registro ? 'Abrir impressão' : 'Preparar prévia'}
-          </Botao>}
+            <Botao variante="texto" onClick={fechar}>Fechar</Botao>
+            <Botao variante="primario" icone="printer" disabled={!papelNaTela || ocupado} onClick={imprimir}>
+              {situacao.estado === 'imprimindo' ? 'Abrindo…' : conferir || situacao.estado === 'confirmada' ? 'Imprimir de novo' : 'Imprimir'}
+            </Botao>
           </div>
         </div>
       )}>
-        <div className={[css.layout, resumoAtivo && css.preparada].filter(Boolean).join(' ')}>
+        <div className={css.layout}>
           <div className={css.opcoes}>
-            {resumoAtivo ? <div className={css.resumoPreparado}>
-              <div><strong>{rotuloDe(documentos, resumoAtivo.documento)} · {rotuloDe(papeis, resumoAtivo.modelo)}</strong>
-                <span>{rotuloDe(CODIGOS, resumoAtivo.codigo)} · {resumoAtivo.perfil}{resumoAtivo.originalId ? ' · reimpressão do original' : ''}</span></div>
-              <Botao variante="texto" onClick={limpar} disabled={ocupado || confirmarPapel}>{resumoAtivo.originalId ? 'Nova impressão' : 'Alterar opções'}</Botao>
+            {reimpressao ? <div className={css.resumoPreparado}>
+              <div><strong>{rotuloDe(documentos, reimpressao.documento)} · {rotuloDe(papeis, reimpressao.modelo)}</strong>
+                <span>{rotuloDe(CODIGOS, reimpressao.codigo)} · {reimpressao.perfil} · reimpressão do original</span></div>
+              <Botao variante="texto" onClick={limpar} disabled={ocupado}>Nova impressão</Botao>
             </div> : <>
-            <p className={css.etapa}>1. Documento e destino</p>
-            <CampoSelecao rotulo="Documento" opcoes={documentos} value={documento} disabled={congelado} onChange={(e) => escolherDocumento(e.target.value)} />
-            <CampoSelecao rotulo="Perfil de impressão" opcoes={perfis} value={perfil} disabled={congelado} onChange={(e) => escolherPerfil(e.target.value)} />
-            <CampoSelecao rotulo="Papel" opcoes={papeis.filter((p) => perfilDe(perfil).papeis.includes(p.valor))} value={papel ?? ''} disabled={congelado} onChange={(e) => { limpar(); setPapel(e.target.value) }} />
-            <CampoSelecao rotulo="Código" opcoes={CODIGOS} value={codigo} disabled={congelado} onChange={(e) => { limpar(); setCodigo(e.target.value) }} />
-            <p className={css.dica}>{orientacao?.(papel) ?? 'Escolha a impressora física no diálogo do sistema, com escala 100% e cabeçalhos e rodapés desligados.'}</p>
-            <p className={css.dica}>Uma via por abertura. Defina as cópias no diálogo. Os papéis térmicos aguardam teste nos seus equipamentos.</p>
+              <CampoSelecao rotulo="Documento" opcoes={documentos} value={documento} disabled={ocupado} onChange={(e) => escolherDocumento(e.target.value)} />
+              <CampoSelecao rotulo="Perfil de impressão" opcoes={perfis} value={perfil} disabled={ocupado} onChange={(e) => escolherPerfil(e.target.value)} />
+              <CampoSelecao rotulo="Papel" opcoes={papeis.filter((p) => perfilDe(perfil).papeis.includes(p.valor))} value={papel ?? ''} disabled={ocupado} onChange={(e) => { limpar(); setPapel(e.target.value) }} />
+              {!semCodigo && <CampoSelecao rotulo="Código" opcoes={CODIGOS} value={codigo} disabled={ocupado} onChange={(e) => { limpar(); setCodigo(e.target.value) }} />}
             </>}
+            <p className={css.dica}>{orientacao?.(papelNaTela?.modelo ?? papel) ?? 'No diálogo, escolha a impressora, escala 100% e desligue cabeçalhos e rodapés.'}</p>
+            <p className={css.dica}>Para guardar em PDF, escolha "Salvar como PDF" no diálogo.</p>
           </div>
-          <section className={css.previa} aria-label="Prévia do documento">
-            <h3 ref={focoPrevia} tabIndex={-1} className={css.etapa}>Confira o papel</h3>
-            {registro ? <>
-              <PreviaImpresso html={registro.html} modelo={registro.modelo} />
-              <p className={css.dica}>{orientacao?.(registro.modelo) ?? `No diálogo, selecione ${rotuloDe(papeis, registro.modelo)}, escala 100% e desligue cabeçalhos e rodapés.`} Confira também a paginação.</p>
-            </> : <p className={css.vazia}>Prepare a prévia para conferir o documento antes de imprimir.</p>}
+          <section className={css.previa} aria-label="Prévia do documento" aria-busy={!papelNaTela && previaAtual?.estado !== 'erro'}>
+            {papelNaTela ? <PreviaImpresso html={papelNaTela.html} modelo={papelNaTela.modelo} />
+              : previaAtual?.estado === 'erro' ? <div className={css.vazia}>
+                <p className={css.erro} role="alert">{previaAtual.mensagem}</p>
+                <Botao variante="secundario" onClick={() => setRecargaPrevia((n) => n + 1)}>Tentar de novo</Botao>
+              </div>
+              : <p className={css.vazia}>Montando o papel…</p>}
           </section>
         </div>
-        <section className={css.historico} aria-label="Histórico de impressão deste pedido" aria-busy={carregandoHistorico}>
-          <h3>Histórico deste pedido</h3>
-          <p className={css.dica}>Reimprimir guarda uma nova tentativa e repete o conteúdo original. Uma prévia guardada não comprova a saída do papel.</p>
-          {erroHistorico && <div className={css.erroHistorico}><p className={css.erro} role="alert">{erroHistorico}</p>
-            <Botao variante="secundario" onClick={() => setRevisao((r) => r + 1)} disabled={carregandoHistorico}>Tentar carregar histórico novamente</Botao></div>}
-          {carregandoHistorico && <output className={css.dica}>Carregando histórico…</output>}
-          {!carregandoHistorico && !lista.length && !erroHistorico && <p className={css.dica}>Nenhum documento nesta página do histórico.</p>}
-          <ul className={css.registros}>{lista.map((i, indice) => <li key={i.id}>
-            <div><strong>{rotuloDe(documentos, i.documento)} · {rotuloDe(papeis, i.modelo)}</strong><span>{data(i.criadaEm)} · {estadoRegistro(i.status)}{i.originalId ? ' · reimpressão' : ''}</span>
-              <details className={css.detalhes}><summary>Detalhes do documento</summary><span>{i.perfil} · {rotuloDe(CODIGOS, i.codigo)} · versão {i.versao}</span></details></div>
-            <Botao variante="secundario" aria-label={`Reimprimir original: ${rotuloDe(documentos, i.documento)} de ${data(i.criadaEm)}, registro ${(pagina - 1) * 20 + indice + 1}`} disabled={ocupado || confirmarPapel} onClick={() => { limpar(); carregar(i) }}>Reimprimir original</Botao>
-          </li>)}</ul>
-          <div className={css.paginas}><Botao variante="texto" disabled={pagina === 1 || ocupado} onClick={() => setPagina((p) => p - 1)}>Anterior</Botao><span>Página {pagina}</span><Botao variante="texto" disabled={lista.length < 20 || ocupado} onClick={() => setPagina((p) => p + 1)}>Próxima</Botao></div>
-        </section>
+        {!semHistorico && <details className={css.historico}>
+          <summary>Histórico deste pedido</summary>
+          <div aria-busy={carregandoHistorico}>
+            {erroHistorico && <div className={css.erroHistorico}><p className={css.erro} role="alert">{erroHistorico}</p>
+              <Botao variante="secundario" onClick={() => setRevisao((r) => r + 1)} disabled={carregandoHistorico}>Tentar carregar histórico novamente</Botao></div>}
+            {carregandoHistorico && <output className={css.dica}>Carregando histórico…</output>}
+            {!carregandoHistorico && !lista.length && !erroHistorico && <p className={css.dica}>Nada impresso deste pedido ainda.</p>}
+            <ul className={css.registros}>{lista.map((i, indice) => <li key={i.id}>
+              <div><strong>{rotuloDe(documentos, i.documento)} · {rotuloDe(papeis, i.modelo)}</strong><span>{data(i.criadaEm)} · {estadoRegistro(i.status)}{i.originalId ? ' · reimpressão' : ''}</span></div>
+              <Botao variante="secundario" aria-label={`Reimprimir original: ${rotuloDe(documentos, i.documento)} de ${data(i.criadaEm)}, registro ${(pagina - 1) * 20 + indice + 1}`} disabled={ocupado} onClick={() => reimprimirOriginal(i)}>Reimprimir original</Botao>
+            </li>)}</ul>
+            <div className={css.paginas}><Botao variante="texto" disabled={pagina === 1 || ocupado} onClick={() => setPagina((p) => p - 1)}>Anterior</Botao><span>Página {pagina}</span><Botao variante="texto" disabled={lista.length < 20 || ocupado} onClick={() => setPagina((p) => p + 1)}>Próxima</Botao></div>
+          </div>
+        </details>}
       </Modal>}
     </span>
   )

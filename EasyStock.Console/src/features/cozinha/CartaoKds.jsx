@@ -20,7 +20,7 @@ const corDoCartao = (pedido, urgencia) => COR_DA_URGENCIA[urgencia]
 
 export function CartaoKds({
   pedido, agora, linhas, linhaFiltro, movendo = false, novo = false, mudou = false, saindo = false, recusa = null,
-  aoAvancar, aoImprimir, aoAbrir, retomarFoco = false, aoConsumirFoco,
+  aoAvancar, aoAbrir, retomarFoco = false, aoConsumirFoco,
 }) {
   const proximo = saindo ? null : proximoStatusKds(pedido.status)
   const urgencia = urgenciaDoPedido(pedido, agora)
@@ -74,9 +74,8 @@ export function CartaoKds({
       {!saindo && (
         <div className={css.acoesCartao}>
           <Botao variante="texto" icone="nota" onClick={() => aoAbrir(pedido.id)}>Ver comanda</Botao>
-          <Botao variante="texto" icone="printer" onClick={() => aoImprimir(pedido)}>Canhoto</Botao>
-          {/* #1632: impressos da API, com escolha de documento e papel. */}
-          <ImprimirPedido {...impressaoDoPedido(pedido.id, null, nomeNaComanda(pedido))} documentoInicial="cozinha" variante="texto" />
+          {/* #1839: um caminho só, o impresso da API com o papel na tela (o PDF próprio saiu). */}
+          <ImprimirPedido {...impressaoDoPedido(pedido.id, null, nomeNaComanda(pedido))} documentoInicial="cozinha" variante="texto" rotulo="Canhoto" />
         </div>
       )}
     </li>

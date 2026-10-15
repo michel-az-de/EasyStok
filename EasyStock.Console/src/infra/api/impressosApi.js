@@ -10,6 +10,12 @@ export const obterHtmlDoImpresso = (pedidoId, opcoes) =>
 
 export const prepararImpresso = (pedidoId, corpo, sinal) =>
   chamarApi(`/api/pedidos/${pedidoId}/impressoes`, { metodo: 'POST', corpo, sinal })
+// #1839: o papel para a tela, sem guardar tentativa no histórico.
+export const previaDoImpresso = (pedidoId, corpo, sinal) =>
+  chamarApi(`/api/pedidos/${pedidoId}/impressoes/previa`, { metodo: 'POST', corpo, texto: true, sinal, prazoComCancelamento: true })
+// #1839: o resumo do Encerrar no layout dos impressos; a API não guarda tentativa.
+export const resumoDoAtendimentoImpresso = (modelo, corpo, sinal) =>
+  chamarApi(`/api/impressao/resumo-atendimento?modelo=${encodeURIComponent(modelo)}`, { metodo: 'POST', corpo, texto: true, sinal, prazoComCancelamento: true })
 export const obterOriginalImpresso = (pedidoId, id, sinal) =>
   chamarApi(`/api/pedidos/${pedidoId}/impressoes/${id}/html`, { texto: true, sinal, prazoComCancelamento: true })
 export const historicoDoPedido = (pedidoId, pagina, sinal) =>
