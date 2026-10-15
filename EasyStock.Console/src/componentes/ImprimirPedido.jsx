@@ -102,21 +102,26 @@ export function ImprimirPedido({
     operacao.current = controle
     setSituacao({ estado: 'imprimindo' })
     try {
-      let html
+      let html, tentativa = registro
       if (semHistorico) html = papelNaTela.html
-      else if (reimpressao && registro) html = reimpressao.html
       else {
-        setRegistro(null)
-        const opcoes = { documento, modelo: papel, codigo, perfil: perfilDe(perfil).rotulo }
-        const pronto = await prepararUmaVez(opcoes, controle.signal)
-        setRegistro(pronto)
-        setRevisao((r) => r + 1)
-        html = pronto.html
+        // A seleção do histórico já prepara a primeira via; cada nova abertura ganha outra tentativa.
+        if (!reimpressao || !tentativa || tentativa.aberta) {
+          setRegistro(null)
+          const opcoes = reimpressao
+            ? { documento: reimpressao.documento, modelo: reimpressao.modelo, codigo: reimpressao.codigo, perfil: reimpressao.perfil, originalId: reimpressao.id }
+            : { documento, modelo: papel, codigo, perfil: perfilDe(perfil).rotulo }
+          tentativa = await prepararUmaVez(opcoes, controle.signal)
+          setRegistro(tentativa)
+          setRevisao((r) => r + 1)
+        }
+        html = tentativa.html
       }
       const destino = await abrirImpressao(html, { sinal: controle.signal })
       controle.signal.throwIfAborted()
+      if (!semHistorico) setRegistro({ ...tentativa, aberta: true })
       setSituacao(semHistorico ? { estado: 'ocioso' } : { estado: 'aguardando', destino })
-      await aoAbrirImpressao?.(reimpressao?.documento ?? documento)
+      if (!reimpressao && !tentativa?.originalId) await aoAbrirImpressao?.(documento)
     } catch (erro) {
       if (!controle.signal.aborted) setSituacao({ estado: 'erro', mensagem: erro.message })
     } finally { if (operacao.current === controle) operacao.current = null }
@@ -143,7 +148,7 @@ export function ImprimirPedido({
       registrada = true
       setRegistro({ ...registro, status: 'impressa' })
       setRevisao((r) => r + 1)
-      if (!registro.originalId) await aoImprimir?.(registro.documento)
+      if (!reimpressao && !registro.originalId) await aoImprimir?.(registro.documento)
       controle.signal.throwIfAborted()
       setSituacao({ estado: 'confirmada' })
     } catch (erro) {
@@ -159,6 +164,8 @@ export function ImprimirPedido({
     const controle = new AbortController()
     operacao.current = controle
     setSituacao({ estado: 'carregando' })
+    setRegistro(null)
+    setReimpressao({ ...item, html: null })
     try {
       const pronto = await prepararUmaVez({ documento: item.documento, modelo: item.modelo, codigo: item.codigo, perfil: item.perfil, originalId: item.id }, controle.signal)
       setRegistro(pronto)
@@ -172,7 +179,7 @@ export function ImprimirPedido({
 
   const ocupado = ['imprimindo', 'confirmando', 'carregando'].includes(situacao.estado)
   const conferir = ['aguardando', 'confirmando'].includes(situacao.estado)
-  const papelNaTela = reimpressao ? { html: reimpressao.html, modelo: reimpressao.modelo } : previaAtual?.estado === 'pronta' ? previaAtual : null
+  const papelNaTela = reimpressao ? reimpressao.html ? { html: reimpressao.html, modelo: reimpressao.modelo } : null : previaAtual?.estado === 'pronta' ? previaAtual : null
   return (
     <span style={{ display: 'contents' }} onPointerDown={naoPropagar} onMouseDown={naoPropagar} onTouchStart={naoPropagar}>
       {!semGatilho && <Botao variante={variante} icone="printer" onClick={abrir} {...resto}>{rotulo}</Botao>}
