@@ -26,9 +26,14 @@ self.addEventListener('push', (evento) => {
   })())
 })
 
+// As janelas avulsas da Cozinha, das Entregas e do Cardápio por link não têm a pilha de avisos:
+// com uma delas na frente, o aviso do aparelho fica.
+const JANELAS_SEM_AVISO = ['#/cozinha', '#/entregas', '#/cardapio-link/']
+
 async function consoleNaFrente() {
   const janelas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-  return janelas.some((janela) => janela.url.startsWith(self.registration.scope) && janela.visibilityState === 'visible' && janela.focused)
+  return janelas.some((janela) => janela.url.startsWith(self.registration.scope) && janela.visibilityState === 'visible'
+    && janela.focused && !JANELAS_SEM_AVISO.some((hash) => new URL(janela.url).hash.startsWith(hash)))
 }
 
 // Tocar no aviso traz o console para a frente; sem aba aberta, abre uma.

@@ -16,7 +16,7 @@ namespace EasyStock.Application.Services.Atendimento;
 /// <para>
 /// A carga leva só o primeiro nome e o evento: nada de telefone, valor ou texto do cliente, porque o aviso aparece na
 /// tela de bloqueio. A <c>tag</c> é a mesma da notificação do console (<c>casa-da-baba-{tipo}-{conversa}</c>), então
-/// o aviso do servidor substitui o do console em vez de aparecer duas vezes. A chave <c>referência|marco</c> vira a
+/// o aviso do servidor substitui o do console em vez de aparecer duas vezes. A chave <c>fato|marco</c> (conversa ou pedido) vira a
 /// <c>IdempotencyKey</c> do outbox: o evento de integração reentregue (at-least-once) não repete o aviso.
 /// </para>
 /// </summary>
@@ -46,7 +46,7 @@ public sealed class AvisoEquipeNoAparelho(
             return;
         }
 
-        await EnfileirarAsync(TipoEventoNotificacao.ContatoNovoNoBalcao, empresaId, conversa.Id, TagContatoNovo,
+        await EnfileirarAsync(TipoEventoNotificacao.ContatoNovoNoBalcao, empresaId, conversa.Id, conversa.Id, TagContatoNovo,
             PrimeiroNome(conversa.ContatoNome), "contato-novo", null, ct);
     }
 
@@ -55,7 +55,7 @@ public sealed class AvisoEquipeNoAparelho(
         tenantContext.SetCurrentTenant(empresaId);
         if (await DoPedidoAsync(empresaId, pedidoId, ct) is not { } alvo) return;
 
-        await EnfileirarAsync(TipoEventoNotificacao.PedidoPagoNoBalcao, empresaId, alvo.Referencia, TagPagamento,
+        await EnfileirarAsync(TipoEventoNotificacao.PedidoPagoNoBalcao, empresaId, alvo.Referencia, pedidoId, TagPagamento,
             alvo.Nome, "pago", null, ct);
     }
 
@@ -65,7 +65,7 @@ public sealed class AvisoEquipeNoAparelho(
         tenantContext.SetCurrentTenant(empresaId);
         if (await DoPedidoAsync(empresaId, pedidoId, ct) is not { } alvo) return;
 
-        await EnfileirarAsync(TipoEventoNotificacao.PedidoMudouEtapaNoBalcao, empresaId, alvo.Referencia, TagEtapa,
+        await EnfileirarAsync(TipoEventoNotificacao.PedidoMudouEtapaNoBalcao, empresaId, alvo.Referencia, pedidoId, TagEtapa,
             alvo.Nome, $"etapa:{statusNovo}", rotulo, ct);
     }
 
@@ -108,18 +108,20 @@ public sealed class AvisoEquipeNoAparelho(
         return (conversa?.Id ?? pedido.Id, PrimeiroNome(conversa?.ContatoNome ?? pedido.ClienteNome));
     }
 
+    /// <param name="referencia">De quem é a tag: a conversa (ou o pedido sem conversa), como no console.</param>
+    /// <param name="fato">De quem é a chave de idempotência: o pedido, porque uma conversa tem mais de um pedido.</param>
     private async Task EnfileirarAsync(
-        TipoEventoNotificacao tipo, Guid empresaId, Guid referencia, string tipoTag, string nome, string marco,
+        TipoEventoNotificacao tipo, Guid empresaId, Guid referencia, Guid fato, string tipoTag, string nome, string marco,
         string? etapa, CancellationToken ct)
     {
         var payload = new Dictionary<string, string>
         {
             ["nome"] = nome,
             ["tag"] = Tag(tipoTag, referencia),
-            [NotificadorService.ChaveIdempotenciaPayload] = $"{referencia:N}|{marco}",
+            [NotificadorService.ChaveIdempotenciaPayload] = $"{fato:N}|{marco}",
         };
         if (etapa is not null) payload["etapa"] = etapa;
 
-        await notificador.EnfileirarEventoAsync(tipo, empresaId, JsonSerializer.Serialize(payload), referencia, ct);
+        await notificador.EnfileirarEventoAsync(tipo, empresaId, JsonSerializer.Serialize(payload), fato, ct);
     }
 }

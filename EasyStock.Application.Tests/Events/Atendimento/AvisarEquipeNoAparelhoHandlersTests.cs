@@ -125,6 +125,23 @@ public class AvisarEquipeNoAparelhoHandlersTests
     }
 
     [Fact]
+    public async Task SegundoPedidoDaMesmaConversaTambemAvisa()
+    {
+        // A tag é da conversa (substitui no aparelho), mas a chave de idempotência é do pedido.
+        var segundo = Pedido.Criar(_empresaId, _cliente);
+        _pedidos.GetByIdAsync(_empresaId, segundo.Id).Returns(segundo);
+        _conversas.ObterIdPorPedidoAsync(_empresaId, segundo.Id, Arg.Any<CancellationToken>()).Returns(_conversa.Id);
+
+        await PagarAsync("pay-1");
+        await PagarAsync("pay-2", segundo.Id);
+        await MudarStatusAsync(StatusPedidoMapper.Aguardando, StatusPedidoMapper.Preparando);
+        await MudarStatusAsync(StatusPedidoMapper.Aguardando, StatusPedidoMapper.Preparando, segundo.Id);
+
+        _outbox.Should().HaveCount(4);
+        _outbox.Select(o => o.IdempotencyKey).Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
     public async Task PedidoSemConversaUsaOPedidoNaTag()
     {
         _conversas.ObterIdPorPedidoAsync(_empresaId, _pedido.Id, Arg.Any<CancellationToken>()).Returns((Guid?)null);
@@ -188,19 +205,19 @@ public class AvisarEquipeNoAparelhoHandlersTests
         await AvaliarEventosAsync();
     }
 
-    private async Task PagarAsync(string pagamentoExternoId)
+    private async Task PagarAsync(string pagamentoExternoId, Guid? pedidoId = null)
     {
         var handler = new AvisarEquipePedidoPagoHandler(Aviso());
-        var payload = new PedidoPagoEvent(_pedido.Id, _empresaId, null, _cliente.Id, null, Guid.NewGuid(), "mercadopago",
+        var payload = new PedidoPagoEvent(pedidoId ?? _pedido.Id, _empresaId, null, _cliente.Id, null, Guid.NewGuid(), "mercadopago",
             pagamentoExternoId, "pix", 25m, StatusPedidoMapper.Aguardando, DateTime.UtcNow);
         await handler.HandleAsync(Evento(PedidoPagoEvent.TipoEvento, payload), CancellationToken.None);
         await AvaliarEventosAsync();
     }
 
-    private async Task MudarStatusAsync(string antigo, string novo)
+    private async Task MudarStatusAsync(string antigo, string novo, Guid? pedidoId = null)
     {
         var handler = new AvisarEquipeEtapaDoPedidoHandler(Aviso());
-        var payload = new PedidoMudouStatusEvent(_pedido.Id, _empresaId, null, antigo, novo, "web", null, "Dona", DateTime.UtcNow);
+        var payload = new PedidoMudouStatusEvent(pedidoId ?? _pedido.Id, _empresaId, null, antigo, novo, "web", null, "Dona", DateTime.UtcNow);
         await handler.HandleAsync(Evento("pedido.mudou_status", payload), CancellationToken.None);
         await AvaliarEventosAsync();
     }
