@@ -11,7 +11,8 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir }) {
   const pedidos = cliente.pedidos ?? 0
   // `totalGasto` só existe depois que o dossiê chegou; antes disso os números ainda não valem.
   const dossieLido = cliente.totalGasto !== undefined
-  const resumo = useResumoDoCliente(conversa.id, `${pedidos}|${cliente.notas?.length ?? 0}`, fonteApi && !lead && dossieLido)
+  const notasDoResumo = (cliente.notas ?? []).map((n) => `${n.id}:${n.criadoEm}`).join(',')
+  const resumo = useResumoDoCliente(conversa.id, `${pedidos}|${notasDoResumo}`, fonteApi && !lead && dossieLido)
   const numeros = pedidos > 0
     ? [`${pedidos} ${pedidos === 1 ? 'pedido' : 'pedidos'} no total`,
       cliente.totalGasto > 0 ? `${moeda(cliente.totalGasto)} em compras` : null,

@@ -34,7 +34,8 @@ public sealed class ResumirClienteUseCase(
             ?? throw new ConversaNaoEncontradaException(conversaId);
         if (dossie.TotalPedidos == 0 && dossie.Notas.Count == 0) return new(SemCompra, false);
         if (!llm.Disponivel) return new(null, false);
-        var chave = $"resumo-cliente:{empresaId:N}:{dossie.Cliente.Id ?? conversaId:N}:{dossie.TotalPedidos}:{dossie.UltimaCompraEm:O}:{dossie.Notas.Count}";
+        var notas = string.Join(',', dossie.Notas.Select(n => $"{n.Id:N}:{n.CriadoEm:O}"));
+        var chave = $"resumo-cliente:{empresaId:N}:{dossie.Cliente.Id ?? conversaId:N}:{dossie.TotalPedidos}:{dossie.UltimaCompraEm:O}:{notas}";
         if (await cache.GetAsync<ResumoClienteResult>(chave) is { } guardado) return guardado;
         try
         {

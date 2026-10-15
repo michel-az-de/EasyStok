@@ -11,6 +11,7 @@ using EasyStock.Domain.Entities.Pagamentos;
 namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 
 /// <param name="EnderecoId">Opcional: sem ele vale o endereço padrão (ou o único) do cliente.</param>
+/// <param name="EnviarAoCliente">False cria a cobrança para copiar, sem mensagem ou falsa falha de envio (#1847).</param>
 /// <param name="Forma"><c>online</c> (padrão, link do Mercado Pago) ou <c>na_entrega</c>.</param>
 public sealed record GerarPedidoConversaInput(
     Guid EmpresaId,
@@ -21,7 +22,8 @@ public sealed record GerarPedidoConversaInput(
     Guid? EnderecoId = null,
     string? Forma = null,
     string? Observacoes = null,
-    string? UsuarioNome = null);
+    string? UsuarioNome = null,
+    bool EnviarAoCliente = true);
 
 /// <param name="Cobranca">Cobrança da forma escolhida. Mercado Pago fora: <see cref="MercadoPagoIndisponivelException"/> com o pedido já desfeito (#1301).</param>
 /// <param name="EnviadoAoCliente">O resumo saiu pelo canal da conversa (falso fora da janela ou com o canal fora).</param>
@@ -83,7 +85,7 @@ public sealed class GerarPedidoConversaUseCase(
 
         var cobranca = await CobrarAsync(reservado, conversa.Id, forma, input.UsuarioNome, ct);
         var texto = TextoAoCliente(reservado, input.DataEntrega, forma, cobranca);
-        var enviado = await aviso.EnviarAsync(input.EmpresaId, conversa.Id, texto, relogio.GetUtcNow().UtcDateTime, ct);
+        var enviado = input.EnviarAoCliente && await aviso.EnviarAsync(input.EmpresaId, conversa.Id, texto, relogio.GetUtcNow().UtcDateTime, ct);
 
         return new PedidoConversaGeradoResult(reservado.Pedido.Id, reservado.Total, forma, cobranca, enviado);
     }

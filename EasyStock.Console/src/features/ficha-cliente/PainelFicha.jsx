@@ -101,9 +101,10 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
     : saldo > 0 ? `${moeda(saldo)} a receber` : 'Pagamento completo'
   // #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que se resolve. A barra
   // mostra o motivo e desabilita o botão em vez de deixar o EasyStok recusar depois.
+  const gerarSemEnviar = fonteApi && permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)).motivo?.acao === 'janela'
   const prerequisito = pedido
     ? motivoAntesDeCobrar({ pedido, clienteId: selecionada.clienteId, endereco: cliente.endereco }, {
-      fonteApi, escrita: permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)),
+      fonteApi,
     })
     : null
 
@@ -212,7 +213,8 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           aoAbrirCardapio={abrirCardapio}
           aoAjustar={(sku, delta) => ajustarQuantidade(selecionada.id, sku, delta)}
           aoAjustarObservacao={(sku, texto) => ajustarObservacao(selecionada.id, sku, texto)}
-          aoGerarPedido={(meio) => { escolherMeioPagamento(selecionada.id, meio); return gerarPedido(selecionada.id, meio) }}
+          gerarSemEnviar={gerarSemEnviar}
+          aoGerarPedido={(meio) => { escolherMeioPagamento(selecionada.id, meio); return gerarPedido(selecionada.id, meio, !gerarSemEnviar) }}
           nomeCliente={selecionada.nome}
           endereco={cliente.endereco}
           faixa={faixa}
@@ -279,7 +281,8 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           prerequisito={prerequisito}
           aoAvancar={(passo, entregador) => avancarEsteira(selecionada.id, passo, entregador)}
           aoDesfazer={() => desfazerEsteira(selecionada.id, ultimoAvanco.mensagemId, ultimoAvanco.posEntregaId)}
-          aoGerarPix={(meio) => { escolherMeioPagamento(selecionada.id, meio); return gerarCobranca(selecionada.id, pedido, meio) }}
+          gerarSemEnviar={gerarSemEnviar}
+          aoGerarPix={(meio) => { escolherMeioPagamento(selecionada.id, meio); return gerarCobranca(selecionada.id, pedido, meio, !gerarSemEnviar) }}
           aoReenviarPix={(valorForcado) => reenviarCobranca(selecionada.id, pedido, valorForcado ?? null)}
           aoAprovarPedido={aprovarPedido ? () => aprovarPedido(selecionada.id) : null}
           aoConfirmarPagamento={(valorPago, metodo) => confirmarPagamento(selecionada.id, valorPago ?? null, metodo)}

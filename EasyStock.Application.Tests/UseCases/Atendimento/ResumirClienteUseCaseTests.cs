@@ -117,4 +117,25 @@ public class ResumirClienteUseCaseTests
             .ObterPorConversaAsync(_empresaId, _conversa.Id);
         dossie!.TotalGasto.Should().Be(135m);
     }
+    [Fact]
+    public async Task Vigesima_primeira_nota_invalida_resumo_mesmo_com_dossie_limitado_a_vinte()
+    {
+        ClienteComPedidos();
+        var clienteId = _conversa.ClienteId!.Value;
+        var notas = Enumerable.Range(0, 20).Select(i => ClienteNota.Criar(
+            _empresaId, clienteId, $"Nota {i}", "equipe", Agora.AddMinutes(-i))).ToList();
+        _crm.ListarNotasAsync(_empresaId, clienteId, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(_ => notas);
+        await Criar().ExecuteAsync(_empresaId, _conversa.Id);
+
+        notas = notas.Prepend(ClienteNota.Criar(_empresaId, clienteId,
+            "Restrição nova: sem leite", "equipe", Agora.AddMinutes(1))).Take(20).ToList();
+        await Criar().ExecuteAsync(_empresaId, _conversa.Id);
+
+        await _llm.Received(2).EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
+        await _llm.Received(1).EnviarAsync(Arg.Is<RequisicaoLlm>(r =>
+            r.Mensagens.Single().Conteudo.OfType<BlocoTextoLlm>().Single().Texto.Contains("Restrição nova: sem leite")),
+            Arg.Any<CancellationToken>());
+    }
+
 }
