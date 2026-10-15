@@ -79,6 +79,52 @@ public class CredencialIntegracaoIntegrationTests(PostgreSqlDatabaseFixture fixt
         lida!.AccessToken.Should().Be(Segredo);
     }
 
+    [SkippableTheory]
+    [InlineData("desativar")]
+    [InlineData("substituir")]
+    [InlineData("rotacionar")]
+    public async Task ResultadoDeTestePreservaAlteracaoConcorrenteDaCredencial(string operacao)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = Guid.NewGuid();
+        var kekA = KekNova();
+        var kekIdA = $"kek-a-{empresa:N}";
+        var kekIdB = $"kek-b-{empresa:N}";
+        var config = ConfigComKek(kekIdA, kekA);
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresa);
+        await CriarEmpresaAsync(db, empresa);
+        await Resolver(db, config).SalvarAsync(empresa, CategoriaIntegracao.Payments, "mercadopago",
+            AmbienteIntegracao.Production, new ChaveTeste(Segredo), Guid.NewGuid());
+        var repo = new CredencialIntegracaoRepository(db);
+        var emTeste = (await repo.ListarAtivasDoProviderAsync(empresa, "mercadopago")).Single();
+
+        await using var concorrente = fixture.CreateDbContext();
+        concorrente.SetMobileTenantContext(empresa);
+        var outroResolver = Resolver(concorrente, ConfigComKek(kekIdB, KekNova(), kekIdA, kekA));
+        if (operacao == "rotacionar")
+            await outroResolver.RotacionarKekAsync(kekIdB);
+        else if (operacao == "substituir")
+            await outroResolver.SalvarAsync(empresa, CategoriaIntegracao.Payments, "mercadopago",
+                AmbienteIntegracao.Production, new ChaveTeste("nova-chave"), Guid.NewGuid());
+        else
+            await outroResolver.DesativarAsync(empresa, "mercadopago");
+
+        var esperado = await concorrente.CredenciaisIntegracao.AsNoTracking().SingleAsync(c => c.Id == emTeste.Id);
+        emTeste.RegistrarTeste(DateTime.UtcNow, true, "Conexão confirmada.");
+        await repo.UpdateAsync(emTeste);
+        await db.SaveChangesAsync();
+
+        var atual = await concorrente.CredenciaisIntegracao.AsNoTracking().SingleAsync(c => c.Id == emTeste.Id);
+        atual.Ativo.Should().Be(esperado.Ativo);
+        atual.KekId.Should().Be(esperado.KekId);
+        atual.PayloadCifrado.Should().Equal(esperado.PayloadCifrado);
+        atual.Iv.Should().Equal(esperado.Iv);
+        atual.Tag.Should().Equal(esperado.Tag);
+        atual.UltimoTesteOk.Should().BeTrue();
+        atual.UltimoTesteMensagem.Should().Be("Conexão confirmada.");
+    }
+
     [SkippableFact]
     public async Task DesativarInvalidaOCache()
     {

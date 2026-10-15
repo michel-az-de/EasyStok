@@ -89,7 +89,10 @@ public sealed class CredencialIntegracaoRepository(EasyStockDbContext db) : ICre
 
     public Task UpdateAsync(CredencialIntegracao credencial, CancellationToken ct = default)
     {
-        db.Set<CredencialIntegracao>().Update(credencial);
+        // Preserva a detecção de colunas alteradas nas entidades rastreadas: Update
+        // restauraria estado antigo após desativação ou rotação concorrente.
+        if (db.Entry(credencial).State == EntityState.Detached)
+            db.Set<CredencialIntegracao>().Update(credencial);
         return Task.CompletedTask;
     }
 }
