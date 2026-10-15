@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Repositories;
 using FluentAssertions;
@@ -38,5 +39,18 @@ public sealed class AuditoriaTenantIntegrationTests(PostgreSqlDatabaseFixture fi
         var outra = await repo.ListarPorEmpresaAsync(b.Id, usuario.Id, 1, 20);
         outra.Total.Should().Be(1);
         outra.Itens.Should().ContainSingle().Which.Id.Should().Be(eventoB.Id);
+        await using var rls = fixture.CreateRlsClientDbContext();
+        await rls.Database.OpenConnectionAsync();
+        await rls.Database.ExecuteSqlInterpolatedAsync($"SELECT set_config('app.empresa_id', {a.Id.ToString()}, false)");
+        var visiveis = await rls.AuditLogs.IgnoreQueryFilters().Where(x => x.UsuarioId == usuario.Id).ToListAsync();
+        visiveis.Should().ContainSingle().Which.Id.Should().Be(eventoA.Id);
+        var indevido = AuditLog.Criar(usuario.Id, "perfil-trocado", true, "Outra loja", null, null);
+        indevido.EmpresaId = b.Id;
+        rls.AuditLogs.Add(indevido);
+        await rls.Invoking(x => x.SaveChangesAsync()).Should().ThrowAsync<DbUpdateException>();
+        rls.ChangeTracker.Clear();
+        rls.AuditLogs.Add(AuditLog.Criar(usuario.Id, "login", true, "Evento sem tenant", null, null));
+        await rls.SaveChangesAsync();
+
     }
 }
