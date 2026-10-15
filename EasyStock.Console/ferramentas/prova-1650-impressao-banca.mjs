@@ -103,19 +103,79 @@ await provar('falha da prévia mostra o motivo e tenta de novo', async () => {
   assert.equal(papelNaTela(t).html, '<p>ok</p>')
   t.encerrar()
 })
-await provar('reimprimir original mostra o guardado e imprime sem gravar outra tentativa nem acionar a fila', async () => {
-  const preparadas = [], impressas = []
-  let confirmadas = 0, callbacks = 0
-  const t = new Tela(props({ historico: async () => [original], preparar: async o => { preparadas.push(o); return { ...o, id: 'nova', html: '<h1>Original guardado</h1>' } }, abrirImpressao: async html => { impressas.push(html); return 'dialogo' }, confirmar: async () => { confirmadas++ }, aoImprimir: async () => { callbacks++ } }))
+await provar('original histórico nunca chama avanço da fila ao abrir ou confirmar (#1845)', async () => {
+  const callbacks = []
+  const t = new Tela(props({ historico: async () => [original], aoAbrirImpressao: () => callbacks.push('abriu'), aoImprimir: () => callbacks.push('confirmou') }))
+  await clicar(t, 'Imprimir'); await clicar(t, 'Reimprimir original'); await clicar(t, 'Imprimir')
+  assert.deepEqual(callbacks, [], 'o histórico não conclui a fila atual ao abrir o diálogo')
+  await clicar(t, 'Sim, saiu'); assert.deepEqual(callbacks, [])
+  t.encerrar()
+})
+await provar('original histórico não avança a fila; cada via confirmada tem registro próprio e preserva o original (#1845)', async () => {
+  const preparadas = [], impressas = [], confirmadas = [], callbacks = []
+  const t = new Tela(props({ historico: async () => [original], preparar: async o => { preparadas.push(o); return { ...o, id: 'r' + preparadas.length, html: '<h1>Original guardado</h1>' } }, abrirImpressao: async html => { impressas.push(html); return 'dialogo' }, confirmar: async r => { confirmadas.push(r.id) }, aoImprimir: () => callbacks.push('confirmou'), aoAbrirImpressao: () => callbacks.push('abriu') }))
   await clicar(t, 'Imprimir'); await clicar(t, 'Reimprimir original')
   assert.ok(botao(t, 'Reimprimir original').props['aria-label'].startsWith('Reimprimir original: Canhoto de cozinha'))
   assert.equal(preparadas[0].originalId, original.id)
   assert.equal(papelNaTela(t).html, '<h1>Original guardado</h1>'); assert.equal(papelNaTela(t).modelo, 'cupom-58')
   assert.ok(texto(t.arvore).includes('Canhoto de cozinha · Bobina 58 mm'))
   await clicar(t, 'Imprimir')
-  assert.deepEqual(impressas, ['<h1>Original guardado</h1>']); assert.equal(preparadas.length, 1)
-  await clicar(t, 'Sim, saiu')
-  assert.equal(confirmadas, 1); assert.equal(callbacks, 0)
+  assert.equal(preparadas.length, 1, 'a primeira via usa a tentativa preparada na seleção')
+  await clicar(t, 'Sim, saiu'); await clicar(t, 'Imprimir de novo'); await clicar(t, 'Sim, saiu')
+  assert.deepEqual(impressas, ['<h1>Original guardado</h1>', '<h1>Original guardado</h1>'])
+  assert.deepEqual(confirmadas, ['r1', 'r2']); assert.deepEqual(callbacks, [])
+  assert.equal(preparadas[1].originalId, original.id)
+  assert.notEqual(preparadas[1].solicitacaoId, preparadas[0].solicitacaoId)
+  assert.deepEqual([preparadas[1].documento, preparadas[1].modelo, preparadas[1].codigo, preparadas[1].perfil], [original.documento, original.modelo, original.codigo, original.perfil])
+  t.encerrar()
+})
+await provar('original não confirmado ou rejeitado também recebe outra tentativa ao imprimir novamente (#1845)', async () => {
+  const preparadas = [], confirmadas = []
+  const t = new Tela(props({ historico: async () => [original], preparar: async o => { preparadas.push(o); return { ...o, id: 'r' + preparadas.length, html: '<h1>Original</h1>' } }, confirmar: async r => confirmadas.push(r.id) }))
+  await clicar(t, 'Imprimir'); await clicar(t, 'Reimprimir original'); await clicar(t, 'Imprimir')
+  await clicar(t, 'Imprimir de novo'); await clicar(t, 'Não saiu'); await clicar(t, 'Imprimir'); await clicar(t, 'Sim, saiu')
+  assert.equal(new Set(preparadas.map(o => o.solicitacaoId)).size, 3)
+  assert.deepEqual(preparadas.map(o => o.originalId), [original.id, original.id, original.id])
+  assert.deepEqual(confirmadas, ['r3'])
+  t.encerrar()
+})
+await provar('resposta perdida da nova via repete a solicitação original e confirma somente o novo registro (#1845)', async () => {
+  const chamadas = [], salvas = new Map(), impressas = [], confirmadas = [], callbacks = []
+  const t = new Tela(props({ historico: async () => [original], preparar: async o => {
+    chamadas.push(o)
+    if (!salvas.has(o.solicitacaoId)) salvas.set(o.solicitacaoId, { ...o, id: 'r' + (salvas.size + 1), html: '<h1>Original</h1>' })
+    if (chamadas.length === 2) throw new Error('Resposta perdida')
+    return salvas.get(o.solicitacaoId)
+  }, abrirImpressao: async html => { impressas.push(html); return 'dialogo' }, confirmar: async r => confirmadas.push(r.id), aoAbrirImpressao: () => callbacks.push('abriu') }))
+  await clicar(t, 'Imprimir'); await clicar(t, 'Reimprimir original'); await clicar(t, 'Imprimir'); await clicar(t, 'Sim, saiu')
+  await clicar(t, 'Imprimir de novo')
+  assert.ok(conteudo(t).includes('Resposta perdida')); assert.equal(impressas.length, 1); assert.equal(botao(t, 'Sim, saiu'), undefined)
+  await clicar(t, 'Imprimir'); await clicar(t, 'Sim, saiu')
+  assert.equal(chamadas[1].solicitacaoId, chamadas[2].solicitacaoId)
+  assert.equal(chamadas[2].originalId, original.id); assert.equal(salvas.size, 2)
+  assert.deepEqual(confirmadas, ['r1', 'r2']); assert.equal(impressas.length, 2); assert.deepEqual(callbacks, [])
+  t.encerrar()
+})
+await provar('falha ao selecionar histórico não imprime nem confirma registro anterior; retentativa mantém a solicitação (#1845)', async () => {
+  const originais = [], callbacks = []
+  const t = new Tela(props({ historico: async () => [original], preparar: async o => {
+    if (o.originalId) { originais.push(o); if (originais.length === 1) throw new Error('Histórico indisponível') }
+    return { ...o, id: o.originalId ? 'reimpressao' : 'atual', html: '<h1>Guardado</h1>' }
+  }, aoAbrirImpressao: () => callbacks.push('abriu') }))
+  await clicar(t, 'Imprimir'); await clicar(t, 'Imprimir'); await clicar(t, 'Reimprimir original')
+  assert.ok(conteudo(t).includes('Histórico indisponível')); assert.equal(papelNaTela(t), undefined)
+  assert.equal(botao(t, 'Imprimir').props.disabled, true); assert.equal(botao(t, 'Sim, saiu'), undefined)
+  await clicar(t, 'Reimprimir original'); await clicar(t, 'Imprimir'); await clicar(t, 'Sim, saiu')
+  assert.equal(originais[0].solicitacaoId, originais[1].solicitacaoId); assert.deepEqual(callbacks, ['abriu'])
+  t.encerrar()
+})
+await provar('diálogo bloqueado mantém a tentativa do original e não avança a fila (#1845)', async () => {
+  let preparadas = 0, aberturas = 0, callbacks = 0
+  const t = new Tela(props({ historico: async () => [original], preparar: async o => { preparadas++; return { ...o, id: 'r1', html: '<h1>Original</h1>' } }, abrirImpressao: async () => { if (++aberturas === 1) throw new Error('Pop-up bloqueado'); return 'dialogo' }, aoAbrirImpressao: () => callbacks++ }))
+  await clicar(t, 'Imprimir'); await clicar(t, 'Reimprimir original'); await clicar(t, 'Imprimir')
+  assert.ok(conteudo(t).includes('Pop-up bloqueado')); assert.equal(botao(t, 'Sim, saiu'), undefined)
+  await clicar(t, 'Imprimir'); await clicar(t, 'Sim, saiu')
+  assert.equal(preparadas, 1); assert.equal(aberturas, 2); assert.equal(callbacks, 0)
   t.encerrar()
 })
 await provar('falha ao registrar a confirmação repete só a confirmação, sem imprimir outra via', async () => {
