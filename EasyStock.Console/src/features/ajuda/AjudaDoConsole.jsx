@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { Botao } from '../../componentes/Botao'
+import { IconeDoModulo } from '../../componentes/IconeDoModulo'
 import { MarcaIcone } from '../../componentes/MarcaIcone'
 import { Modal } from '../../componentes/Modal'
+import { guiaDoConsole } from '../../dominio/guiaDoConsole'
 import { HASH_HALL } from '../../dominio/rota'
 import { hashDoModulo } from '../../dominio/modulos'
 import { contextoDaAjuda, copiarDiagnostico, diagnosticoDoConsole } from './diagnosticoDoConsole'
@@ -14,6 +16,7 @@ export function AjudaDoConsole({ rota, fonteApi, aoFechar }) {
   const [diagnostico, setDiagnostico] = useState('')
   const dadosRef = useRef(null)
   const contexto = contextoDaAjuda(rota, fonteApi)
+  const guia = guiaDoConsole({ rota, fonteApi, permite })
 
   async function copiar() {
     const texto = diagnosticoDoConsole({
@@ -39,6 +42,20 @@ export function AjudaDoConsole({ rota, fonteApi, aoFechar }) {
             {permite('atendimento') && rota.tipo !== 'principal' && <a href={hashDoModulo('atendimento', 'balcao')} onClick={aoFechar}><MarcaIcone nome="mensagem" tamanho={20} />Voltar ao Balcão</a>}
             {contexto.atalho && permite(contexto.atalho.modulo) && <a href={hashDoModulo(contexto.atalho.modulo, contexto.atalho.tela)} onClick={aoFechar}><MarcaIcone nome="producao" tamanho={20} />{contexto.atalho.rotulo}</a>}
           </div>
+        </section>
+        <section aria-labelledby="ajuda-guia" className={css.guia}>
+          <h3 id="ajuda-guia" className={css.titulo}><MarcaIcone nome="grade" /> Guia do Console</h3>
+          <p className={css.apoio}>O que cada módulo faz e por onde começar.</p>
+          {guia.map(modulo => (
+            <details key={modulo.id} className={css.modulo} open={modulo.aberto} data-guia-modulo={modulo.id}>
+              <summary><IconeDoModulo modulo={modulo} />{modulo.nome}</summary>
+              <p>{modulo.faz}</p>
+              <h4 className={css.subtitulo}>Primeiros passos</h4>
+              <ol className={css.passos}>{modulo.passos.map(passo => <li key={passo}>{passo}</li>)}</ol>
+              <h4 className={css.subtitulo}>Telas</h4>
+              <ul className={css.telas}>{modulo.telas.map(tela => <li key={tela.id}><a href={tela.href} onClick={aoFechar}>{tela.rotulo}</a></li>)}</ul>
+            </details>
+          ))}
         </section>
         <details className={css.detalhes}>
           <summary>Usar pelo teclado</summary>

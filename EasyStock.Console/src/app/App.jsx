@@ -432,7 +432,7 @@ function NoModulo({ rota, children }) {
 
 function ControleAjuda({ rota }) {
   const [aberta, setAberta] = useState(false)
-  return <><Botao variante="texto" icone="ajuda" data-ajuda-console aria-label="Ajuda" title="Ajuda e diagnóstico" aria-haspopup="dialog" onClick={() => setAberta(true)}>Ajuda</Botao>
+  return <><Botao variante="texto" icone="ajuda" data-ajuda-console aria-label="Ajuda" title="Ajuda e guia do Console" aria-haspopup="dialog" onClick={() => setAberta(true)}>Ajuda</Botao>
     {aberta && <AjudaDoConsole rota={rota} fonteApi={FONTE_API} aoFechar={() => setAberta(false)} />}</>
 }
 
