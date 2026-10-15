@@ -8,6 +8,7 @@ import { useGestaoCardapioApi } from '../../../aplicacao/useGestaoCardapioApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { FILTROS_DO_CARDAPIO, contagensDoCardapio, filtrarCardapio, podeReordenar } from '../../../dominio/filtroDoCardapio'
 import { moeda } from '../../../dominio/formato'
+import { EXPLICACAO_DOS_CONTROLES as EXPLICA, dicaEstatica } from '../../../dominio/dicasDoCardapio'
 import css from './gestaoCardapio.module.css'
 
 const LINHA = { servir: 'Para servir', casa: 'Preparar em casa' }
@@ -18,6 +19,30 @@ function FotoDoPrato({ item }) {
   return item.foto && falhou !== item.foto
     ? <img className={css.foto} src={item.foto} alt="" loading="lazy" onError={() => setFalhou(item.foto)} />
     : <span className={css.semFoto}><Icone nome="imagem" tamanho={28} /><span>{item.foto ? 'Foto indisponível' : 'Sem foto'}</span></span>
+}
+
+// #1808: o que falta no prato (foto, categoria, descrição). Quem edita pede a dica da IA; sem IA o
+// servidor devolve a mesma dica estática e a tela avisa.
+function DicaDoPrato({ item, pedirDica }) {
+  const [resposta, setResposta] = useState(null)
+  const [pedindo, setPedindo] = useState(false)
+  const estatica = dicaEstatica(item.pendencias)
+  if (!estatica && !resposta) return null
+  const pedir = () => {
+    setPedindo(true)
+    Promise.resolve(pedirDica(item.sku))
+      .then((r) => setResposta({ texto: r.texto, porIa: r.porIa === true }))
+      .catch((e) => setResposta({ texto: estatica, erro: e.message }))
+      .finally(() => setPedindo(false))
+  }
+  return (
+    <p className={css.dica} aria-live="polite">
+      <span><strong>{resposta?.porIa ? 'Sugestão da IA: ' : 'Dica: '}</strong>{resposta?.texto || estatica}</span>
+      {resposta && !resposta.porIa && <small>{resposta.erro ? `A IA não respondeu (${resposta.erro}).` : 'IA não configurada; esta é a dica do sistema.'}</small>}
+      {pedirDica && (!resposta || resposta.erro) && <Botao variante="texto" disabled={pedindo} title="Pede à IA uma dica curta para este prato. Nada é alterado."
+        aria-label={`Pedir dica da IA para ${item.nome}`} onClick={pedir}>{pedindo ? 'Pedindo dica…' : 'Dica da IA'}</Botao>}
+    </p>
+  )
 }
 
 // O editor vem do App: a lista e o Balcão usam a mesma ficha sem importar outra feature.
@@ -76,18 +101,18 @@ export function AbaCardapioApi({ renderizarEditor }) {
         <div className={css.faixaFiltros}><fieldset className={css.filtros}>
           <legend>Filtrar pratos</legend>
           {FILTROS_DO_CARDAPIO.map((f) => (
-            <button type="button" key={f.id} aria-pressed={filtro === f.id} className={css.filtro} onClick={() => setFiltro(f.id)}>
+            <button type="button" key={f.id} aria-pressed={filtro === f.id} className={css.filtro} title={EXPLICA.filtros} onClick={() => setFiltro(f.id)}>
               {f.rotulo}{' '}<span className={css.contagem}>{contagens.filtros[f.id]}</span>
             </button>
           ))}
         </fieldset>
         {contagens.categorias.length > 0 && <fieldset className={css.filtros}>
           <legend>Categoria</legend>
-          <button type="button" aria-pressed={!categoria} className={css.filtro} onClick={() => setCategoria(null)}>
+          <button type="button" aria-pressed={!categoria} className={css.filtro} title={EXPLICA.categoria} onClick={() => setCategoria(null)}>
             Todas{' '}<span className={css.contagem}>{contagens.todas}</span>
           </button>
           {contagens.categorias.map((c) => (
-            <button type="button" key={c.nome} aria-pressed={categoria === c.nome} className={css.filtro} onClick={() => setCategoria(c.nome)}>
+            <button type="button" key={c.nome} aria-pressed={categoria === c.nome} className={css.filtro} title={EXPLICA.categoria} onClick={() => setCategoria(c.nome)}>
               {c.nome}{' '}<span className={css.contagem}>{c.total}</span>
             </button>
           ))}
@@ -119,7 +144,7 @@ export function AbaCardapioApi({ renderizarEditor }) {
               <div className={css.cabecalhoPrato}>
                 {temEditor ? (
                   <button type="button" className={css.abrirFoto} disabled={ocupado === item.sku}
-                    title={`${item.foto ? 'Alterar' : 'Adicionar'} foto de ${item.nome}`}
+                    title={EXPLICA.foto}
                     aria-label={`${item.foto ? 'Alterar' : 'Adicionar'} foto de ${item.nome}`} onClick={() => abrirEditor(item, 'foto')}>
                     <FotoDoPrato item={item} />
                   </button>
@@ -136,10 +161,11 @@ export function AbaCardapioApi({ renderizarEditor }) {
                       item.novidadeAte && `Novidade até ${dataCurta(item.novidadeAte)}`,
                     ].filter(Boolean).join(' · ')}</p>
                   )}
+                  <DicaDoPrato item={item} pedirDica={podeEditar ? gestao.dicaDoPrato : null} />
                 </div>
                 <div className={css.valor}>
                   <span className={css.preco}>{item.porcoes > 0 && <small>A partir de </small>}{moeda(item.preco)}</span>
-                  <label className={css.hoje}>
+                  <label className={css.hoje} title={EXPLICA.hoje}>
                     <input type="checkbox" checked={item.hoje} disabled={ocupado === item.sku}
                       aria-label={`Disponível hoje: ${item.nome}`} onChange={() => fazer(item.sku, () => gestao.alternarHoje(item.sku))} />
                     {item.hoje ? 'Hoje' : 'Fora de hoje'}
@@ -148,24 +174,24 @@ export function AbaCardapioApi({ renderizarEditor }) {
               </div>
               <div className={css.rodapePrato}>
                 {temEditor && <div className={css.acoesCadastro}>
-                  <Botao variante="texto" disabled={ocupado === item.sku} title={`Editar prato ${item.nome}`} aria-label={`Editar prato ${item.nome}`} onClick={() => abrirEditor(item)}><MarcaIcone nome="editar" tamanho={20} /></Botao>
+                  <Botao variante="texto" disabled={ocupado === item.sku} title={EXPLICA.editar} aria-label={`Editar prato ${item.nome}`} onClick={() => abrirEditor(item)}><MarcaIcone nome="editar" tamanho={20} /></Botao>
                 </div>}
                 <details className={css.outrasAcoes}>
-                  <summary title={`Mais ações para ${item.nome}`} aria-label={`Mais ações para ${item.nome}`}><span aria-hidden="true">•••</span></summary>
+                  <summary title={EXPLICA.maisAcoes} aria-label={`Mais ações para ${item.nome}`}><span aria-hidden="true">•••</span></summary>
                   <div className={css.painelAcoes}>
-                    <label className={css.chave}>
+                    <label className={css.chave} title={EXPLICA.noSite}>
                       <input type="checkbox" checked={item.noSite} disabled={!podeEditar || ocupado === item.sku}
                         aria-label={`No site: ${item.nome}`} onChange={() => fazer(item.sku, () => gestao.alternarNoSite(item.sku))} />
                       No site
                     </label>
-                    {item.emValidacao && <Botao variante="texto" disabled={!podeEditar || ocupado === item.sku}
+                    {item.emValidacao && <Botao variante="texto" disabled={!podeEditar || ocupado === item.sku} title={EXPLICA.validar}
                       aria-label={`Validar ${item.nome}`} onClick={() => fazer(item.sku, () => gestao.validar(item.sku))}><MarcaIcone nome="confirmar" tamanho={18} />Validar</Botao>}
-                    <Botao variante="texto" disabled={!podeEditar || ocupado === item.sku}
+                    <Botao variante="texto" disabled={!podeEditar || ocupado === item.sku} title={EXPLICA.arquivar}
                       aria-label={`${item.arquivado ? 'Repor' : 'Arquivar'} ${item.nome}`} onClick={() => fazer(item.sku, () => gestao.alternarArquivado(item.sku))}>
                       {item.arquivado ? 'Repor no cardápio' : 'Arquivar'}
                     </Botao>
                     {podeEditar && (ordenando ? (
-                      <span className={css.ordem}>
+                      <span className={css.ordem} title={EXPLICA.ordem}>
                         <span>Ordem</span>
                         <Botao variante="texto" aria-label={`Subir ${item.nome}`} disabled={indice === 0 || ocupado === item.sku} onClick={() => fazer(item.sku, () => gestao.mover(item.sku, 'subir'))}><MarcaIcone nome="acima" tamanho={18} /></Botao>
                         <Botao variante="texto" aria-label={`Descer ${item.nome}`} disabled={indice === itens.length - 1 || ocupado === item.sku} onClick={() => fazer(item.sku, () => gestao.mover(item.sku, 'descer'))}><MarcaIcone nome="abaixo" tamanho={18} /></Botao>

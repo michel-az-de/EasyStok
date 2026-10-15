@@ -48,10 +48,12 @@ public sealed record DetalheItemCardapio(
 /// <summary>Linha da tela de gestão do cardápio (M1.1, M1.2): tudo o que a lista mostra e liga.</summary>
 /// <param name="ControlaSaldo">Item ligado a um produto do estoque (avulso não tem saldo).</param>
 /// <param name="Porcoes">M1.4a: quantas porções o prato tem; com porções, o preço é o "a partir de".</param>
+/// <param name="Pendencias">#1808: o que falta na apresentação (foto, categoria, descrição); a lista mostra a dica.</param>
 public sealed record ItemGestaoCardapio(
     Guid CardapioItemId, string Nome, LinhaProduto Linha, string? Porcao, decimal Preco, string? Categoria,
     string? FotoUrl, bool Visivel, bool Disponivel, double Ordem, bool ControlaSaldo,
-    bool Arquivado = false, bool EmValidacao = false, DateOnly? NovidadeAte = null, Guid? SecaoId = null, int Porcoes = 0);
+    bool Arquivado = false, bool EmValidacao = false, DateOnly? NovidadeAte = null, Guid? SecaoId = null, int Porcoes = 0,
+    IReadOnlyList<string>? Pendencias = null);
 
 public enum DirecaoMover { Subir, Descer }
 
@@ -246,7 +248,7 @@ public sealed class ItensDoCardapioComandaUseCase(
                 i.Id, i.NomeEfetivo() ?? "(sem nome)", i.Linha, i.PesoExibicao,
                 i.TemVariacoes() ? i.Variacoes.Min(v => v.PrecoStorefront) : i.PrecoEfetivo(), i.CategoriaEfetiva(),
                 i.FotoUrl, i.Visivel, i.Disponivel, i.OrdemExibicao, i.ProdutoId.HasValue,
-                i.EstaArquivado, i.EmValidacao, i.NovidadeAte, i.SecaoId, i.Variacoes.Count))
+                i.EstaArquivado, i.EmValidacao, i.NovidadeAte, i.SecaoId, i.Variacoes.Count, i.PendenciasDeApresentacao()))
             .ToList();
     }
 

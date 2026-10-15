@@ -20,7 +20,7 @@ public sealed class AcervoRepository(EasyStockDbContext db) : IAcervoRepository
     }
     public async Task<IReadOnlyList<AcervoImagem>> MapaImagensAsync(Guid empresaId, CancellationToken ct) =>
         await db.Set<AcervoImagem>().AsNoTracking().Where(x => x.EmpresaId == empresaId).Select(x => new AcervoImagem {
-            Id = x.Id, ItensJson = x.ItensJson, Origem = x.Origem, Natureza = x.Natureza, Formato = x.Formato,
+            Id = x.Id, Titulo = x.Titulo, ItensJson = x.ItensJson, Origem = x.Origem, Natureza = x.Natureza, Formato = x.Formato,
             Largura = x.Largura, Altura = x.Altura, AprovadoEm = x.AprovadoEm }).ToListAsync(ct);
     public async Task<IReadOnlyList<CardapioItem>> ItensAsync(Guid empresaId, CancellationToken ct) =>
         await db.CardapioItens.AsNoTracking().Include(x => x.Produto).Where(x => db.Storefronts.Any(sf => sf.Id == x.StorefrontId && sf.EmpresaId == empresaId)).OrderBy(x => x.Id).ToListAsync(ct);

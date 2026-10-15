@@ -343,6 +343,27 @@ public class CardapioItem
     /// </summary>
     public string? CategoriaEfetiva() => Secao?.Nome ?? CategoriaTexto ?? Produto?.Categoria?.Nome;
 
+    public const string PendenciaSemFoto = "SemFoto";
+    public const string PendenciaSemCategoria = "SemCategoria";
+    public const string PendenciaSemDescricao = "SemDescricao";
+    public const string PendenciaDescricaoCurta = "DescricaoCurta";
+    /// <summary>Abaixo disso a descrição não diz o que vem no prato (#1808).</summary>
+    public const int DescricaoMinimaCaracteres = 40;
+
+    /// <summary>
+    /// #1808: o que falta para o prato se apresentar bem no site. A seção conta mesmo sem estar
+    /// carregada (<see cref="SecaoId"/>), para a consulta sem Include não acusar falta de categoria.
+    /// </summary>
+    public IReadOnlyList<string> PendenciasDeApresentacao()
+    {
+        var pendencias = new List<string>(3);
+        if (string.IsNullOrWhiteSpace(FotoUrl)) pendencias.Add(PendenciaSemFoto);
+        if (SecaoId is null && string.IsNullOrWhiteSpace(CategoriaEfetiva())) pendencias.Add(PendenciaSemCategoria);
+        if (string.IsNullOrWhiteSpace(DescricaoPublica)) pendencias.Add(PendenciaSemDescricao);
+        else if (DescricaoPublica.Trim().Length < DescricaoMinimaCaracteres) pendencias.Add(PendenciaDescricaoCurta);
+        return pendencias;
+    }
+
     /// <summary>
     /// Preço efetivo: <see cref="PrecoStorefront"/> override OU
     /// <c>Produto.PrecoReferencia</c> OU zero (caso de borda, produto sem preço).

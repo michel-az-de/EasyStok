@@ -120,4 +120,6 @@ export const itemGestaoDaApi = (i) => ({
   novidadeAte: i.novidadeAte ?? null,
   // #1803: a seção (categoria nova) do item; null = ainda só no texto livre antigo.
   secaoId: i.secaoId ?? null,
+  // #1808: o que falta na apresentação (SemFoto, SemCategoria, SemDescricao, DescricaoCurta).
+  pendencias: i.pendencias ?? [],
 })

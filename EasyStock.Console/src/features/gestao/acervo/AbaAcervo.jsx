@@ -5,6 +5,7 @@ import { Modal } from '../../../componentes/Modal'
 import css from './acervo.module.css'
 import { ProducaoAcervo, canaisAcervo } from './ProducaoAcervo'
 import { FotosCardapio } from './FotosCardapio'
+import { SugestoesDoAcervo } from './SugestoesDoAcervo'
 import { pratosParaUsar } from '../../../dominio/pratosDoAcervo'
 
 function Foto({ imagem }) {
@@ -88,6 +89,7 @@ export function AbaAcervo() {
     {aviso && <p role="status">{aviso}</p>}
     {a.aviso && <p role="status">{a.aviso}</p>}
     <FotosCardapio acervo={a} aoEscolherPrato={escolherImagemParaPrato} />
+    <SugestoesDoAcervo acervo={a} />
     <h3>Originais e versões do acervo</h3>
     <label className={css.campo}>Buscar em todo o acervo<input value={busca} disabled={a.ocupado} onChange={(e) => setBusca(e.target.value)} placeholder="Título da imagem" /></label>
     <div className={css.filtros}>{[

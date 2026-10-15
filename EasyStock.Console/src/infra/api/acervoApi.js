@@ -14,6 +14,9 @@ export const solicitarImagem = (dados) => chamarApi(`${BASE}/solicitacoes`, { me
 export const aprovarImagem = (id) => chamarApi(`${BASE}/imagens/${id}/aprovar`, { metodo: 'POST' })
 export const vincularCanva = (id, url) => chamarApi(`${BASE}/imagens/${id}/canva`, { metodo: 'PUT', corpo: { url } })
 export const publicarImagem = (id, dados) => chamarApi(`${BASE}/imagens/${id}/publicar`, { metodo: 'POST', corpo: dados })
+// #1808: só propõem; a publicação continua em publicarImagem, depois da confirmação.
+export const sugerirAssociacoes = () => chamarApi(`${BASE}/sugestoes`, { metodo: 'POST' })
+export const dicaDoPrato = (itemId) => chamarApi(`${BASE}/itens/${itemId}/dica`, { metodo: 'POST' })
 export const historicoImagem = (id) => chamarApi(`${BASE}/imagens/${id}/historico`)
 export const arquivoImagem = (id) => chamarApi(`${BASE}/imagens/${id}/arquivo`, { arquivo: true })
 export const miniaturaImagem = (id) => chamarApi(`${BASE}/imagens/${id}/miniatura`, { arquivo: true })
