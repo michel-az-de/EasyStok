@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { DndContext, DragOverlay } from '@dnd-kit/core'
 import { rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { Icone } from '../../componentes/Icone'
 import { MarcaIcone } from '../../componentes/MarcaIcone'
 import { Marca } from '../../componentes/Marca'
 import { CampoTexto } from '../../componentes/Campo'
@@ -10,7 +11,7 @@ import { chaveDasPreferenciasHall, gravarPreferenciasHall, lerPreferenciasHall }
 import { Botao } from '../../componentes/Botao'
 import { InterruptorTema } from '../../componentes/InterruptorTema'
 import { Vazio } from '../../componentes/Vazio'
-import { buscarDestinosDoConsole, filtrarModulos, modulosDoHall, saudacaoDoHall } from '../../dominio/modulos'
+import { buscarDestinosDoConsole, filtrarModulos, hashDoModulo, modulosDoHall, saudacaoDoHall } from '../../dominio/modulos'
 import {
   alternarFavoritoDoHall, favoritosDoHall, favoritosPrimeiroNoHall, moverModuloDoHall, moverPainelDoHall,
   ordenarModulosDoHall, ordenarPaineisDoHall, restaurarOrdemDoHall, FOCOS_DO_HALL,
@@ -260,6 +261,10 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
         {!buscando && !organizar && todos.length > 0 && <div className={css.rodapeHall}>
           {anterior && <Botao variante="texto" onClick={() => desfazer(ajustarRef)}>Desfazer</Botao>}
           <Botao ref={ajustarRef} variante="texto" onClick={() => setPersonalizando(true)}><MarcaIcone nome="configuracoes" tamanho={20} />Ajustar tela inicial</Botao>
+          {/* #1839 (F1): as automáticas só abriam pelo trilho do Balcão; fora da grade arrastável. */}
+          {permite('atendimento') && <Botao variante="texto" onClick={() => { window.location.hash = hashDoModulo('atendimento', 'respostas') }}>
+            <Icone nome="raio" tamanho={20} />Automáticas
+          </Botao>}
           <span className={css.dicaArrasto}>Arraste {fonteApi ? 'os números e os cartões' : 'os cartões'} para mudar a ordem.</span>
         </div>}
       </main>
