@@ -18,6 +18,13 @@ export async function lerPedidosDoHub(sinal) {
   return { itens, parcial: itens.length >= 200 }
 }
 
+// #1839 D: pratos com pendência de apresentação, para a linha viva do cartão Cardápio.
+export async function lerCardapioDoHub(sinal) {
+  const itens = (await chamarApi('/api/atendimento/comanda/cardapio/gestao', { sinal })) ?? []
+  if (!Array.isArray(itens)) throw new Error('Não foi possível conferir o cardápio.')
+  return { itens: itens.map((item) => ({ hoje: item.disponivel === true, arquivado: item.arquivado === true, pendencias: item.pendencias ?? [] })) }
+}
+
 export async function lerCaixaDoHub(sinal) {
   const dados = await chamarApi('/api/caixa/dia', { sinal })
   if (!Number.isFinite(dados?.saldoEsperado) || typeof dados.aberto !== 'boolean') throw new Error('O saldo do caixa não foi informado.')

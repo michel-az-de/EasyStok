@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
-import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable'
+import { DndContext, DragOverlay } from '@dnd-kit/core'
+import { rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { MarcaIcone } from '../../componentes/MarcaIcone'
 import { Marca } from '../../componentes/Marca'
@@ -12,20 +12,26 @@ import { InterruptorTema } from '../../componentes/InterruptorTema'
 import { Vazio } from '../../componentes/Vazio'
 import { buscarDestinosDoConsole, filtrarModulos, modulosDoHall, saudacaoDoHall } from '../../dominio/modulos'
 import {
-  alternarFavoritoDoHall, favoritosDoHall, favoritosPrimeiroNoHall, moverModuloDoHall,
+  alternarFavoritoDoHall, favoritosDoHall, favoritosPrimeiroNoHall, moverModuloDoHall, moverPainelDoHall,
   ordenarModulosDoHall, ordenarPaineisDoHall, restaurarOrdemDoHall, FOCOS_DO_HALL,
 } from '../../dominio/preferenciasHall'
+import { pendenciaDoModulo } from '../../dominio/pulsoDoHall'
+import { usePulsoDoHall } from '../../aplicacao/usePulsoDoHall'
 import { IconeDoModulo } from './IconeDoModulo'
+import { IlustracaoDoModulo } from './IlustracaoDoModulo'
+import { alcaDoLink, useCliqueAposArrasto, useSensoresDoHall } from './arrastoDoHall'
 import { colisoesDoHall } from './colisoesDoHall'
 import { PulsoDoHall } from './PulsoDoHall'
 import { PersonalizarHall } from './PersonalizarHall'
 import css from './hall.module.css'
 
-function CartaoModulo({ modulo, favorito, organizar, movimentos, indice, total, aoFavoritar, aoMover }) {
+function CartaoModulo({ modulo, favorito, organizar, arrastavel, movimentos, indice, total, pendencia, aoFavoritar, aoMover }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
-    id: modulo.id, disabled: !organizar,
+    id: modulo.id, disabled: !arrastavel,
     transition: movimentos ? { duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' } : null,
   })
+  // #1839 D: fora do modo Organizar o próprio link é a alça; dentro dele, o botão Mover.
+  const alcaNoLink = arrastavel && !organizar ? { ref: setActivatorNodeRef, ...alcaDoLink(attributes, listeners) } : { draggable: false }
   const mover = (direcao, evento) => {
     aoMover(modulo.id, direcao)
     // O botão pode ficar desabilitado depois de chegar à ponta da grade.
@@ -34,9 +40,9 @@ function CartaoModulo({ modulo, favorito, organizar, movimentos, indice, total, 
   return (
     <li ref={setNodeRef} data-modulo={modulo.id}
       className={[css.cartao, !modulo.disponivel && css.emBreve, isDragging && css.arrastando, organizar && css.organizando].filter(Boolean).join(' ')}
-      style={{ transform: CSS.Transform.toString(transform), transition: organizar ? transition : undefined }}>
-      <div className={css.cabecaCartao}>
-        <span className={css.icone}><IconeDoModulo modulo={modulo} tamanho={32} /></span>
+      style={{ transform: CSS.Transform.toString(transform), transition: arrastavel ? transition : undefined }}>
+      <IlustracaoDoModulo id={modulo.id} className={css.ilustracaoCartao} />
+      {organizar && <div className={css.cabecaCartao}>
         <div className={css.controlesCartao}>
           {organizar && modulo.disponivel && <button type="button" className={css.favoritar} aria-pressed={favorito}
             aria-label={`${favorito ? 'Remover' : 'Adicionar'} ${modulo.nome} ${favorito ? 'dos' : 'aos'} favoritos`}
@@ -45,12 +51,13 @@ function CartaoModulo({ modulo, favorito, organizar, movimentos, indice, total, 
             <span>{favorito ? 'Favorito' : 'Favoritar'}</span>
           </button>}
         </div>
-      </div>
+      </div>}
       {modulo.disponivel ? <>
-        <a className={css.abrir} href={modulo.href}>
+        <a className={css.abrir} href={modulo.href} {...alcaNoLink}>
           <span className={css.nome}>{modulo.nome}</span>
           <MarcaIcone nome="proximo" tamanho={20} />
         </a>
+        {pendencia && <span className={css.pendencia} data-atencao={pendencia.atencao || undefined}>{pendencia.texto}</span>}
         {/* #1810: as telas de cada área ficam na busca e no menu do módulo; o cartão só leva à área. */}
       </> : <>
         <span className={css.nome}>{modulo.nome}</span>
@@ -108,11 +115,14 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   const destaque = foco.ordem.map((id) => modulosPermitidos.find((modulo) => modulo.id === id && modulo.disponivel)).find(Boolean) ?? todos.find((modulo) => modulo.disponivel)
   const idsDoPulso = ordenarPaineisDoHall(preferencia, modulosPermitidos.map((modulo) => modulo.id))
   const podeOrganizar = organizar && !buscando
-  const sensores = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  )
+  const sensores = useSensoresDoHall()
+  const clique = useCliqueAposArrasto()
+  // #1839 D: uma leitura só alimenta os números de cima e a linha viva de cada cartão.
+  const permitido = (id) => modulosPermitidos.some((modulo) => modulo.id === id)
+  const { fontes } = usePulsoDoHall({
+    ativo: fonteApi, atendimento: permitido('atendimento'), pedidos: permitido('cozinha') || permitido('entregas'),
+    financeiro: permitido('financeiro'), cardapio: permitido('cardapio'),
+  })
   const gravar = (proxima, texto, guardarAnterior = true) => {
     if (guardarAnterior && JSON.stringify(proxima) !== JSON.stringify(preferencia)) setAnterior(preferencia)
     setPreferencia(proxima)
@@ -132,7 +142,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
     gravar(proxima, `${modulo.nome} ${proxima.favoritos.includes(id) ? 'adicionado aos' : 'removido dos'} favoritos.`)
   }
   const mover = (id, destino) => {
-    if (!podeOrganizar || !modulos.some((modulo) => modulo.id === id) || !modulos.some((modulo) => modulo.id === destino) || id === destino) return
+    if (buscando || !modulos.some((modulo) => modulo.id === id) || !modulos.some((modulo) => modulo.id === destino) || id === destino) return
     const proxima = moverModuloDoHall(preferencia, id, destino)
     const ordenados = ordenarModulosDoHall(modulosPermitidos, proxima)
     gravar(proxima, `${ordenados.find((modulo) => modulo.id === id).nome} movido para a posição ${ordenados.findIndex((modulo) => modulo.id === id) + 1} de ${ordenados.length}.`)
@@ -140,6 +150,11 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   const moverPorBotao = (id, direcao) => {
     const destino = modulos[modulos.findIndex((modulo) => modulo.id === id) + direcao]?.id
     if (destino) mover(id, destino)
+  }
+  const moverPainel = (id, destino) => {
+    const proxima = moverPainelDoHall(preferencia, id, destino)
+    const ordem = ordenarPaineisDoHall(proxima, modulosPermitidos.map((modulo) => modulo.id))
+    gravar(proxima, `Número movido para a posição ${ordem.indexOf(id) + 1} de ${ordem.length}.`)
   }
   const anuncio = (id) => modulos.find((modulo) => modulo.id === id)?.nome ?? 'Módulo'
   return (
@@ -167,7 +182,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
             {buscando && <Botao variante="texto" onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>}
           </div>
         </div>
-        {!buscando && fonteApi && <PulsoDoHall key={idsDoPulso.join(':')} ids={idsDoPulso} foco={foco.nome} />}
+        {!buscando && fonteApi && <PulsoDoHall ids={idsDoPulso} foco={foco.nome} fontes={fontes} movimentos={preferencia.movimentos} aoMover={moverPainel} />}
         {/* #1810: no modo API o destaque repetia um cartão de área; ficam só os números e as áreas. */}
         {!buscando && destaque && !fonteApi && <section className={css.destaque} aria-labelledby="destaque-hall">
           <div className={css.ilustracao} aria-hidden="true"><IconeDoModulo modulo={destaque} tamanho={40} /></div>
@@ -215,22 +230,23 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
             Tente o nome de uma área ou tela, como insumos, caixa ou entregas.
           </Vazio>}
         </section> : <DndContext sensors={sensores} collisionDetection={colisoesDoHall}
-          onDragStart={({ active }) => setArrastando(active.id)}
-          onDragCancel={() => setArrastando(null)}
+          onDragStart={({ active }) => { clique.aoComecar(); setArrastando(active.id) }}
+          onDragCancel={() => { clique.aoTerminar(); setArrastando(null) }}
           accessibility={{
-            screenReaderInstructions: { draggable: 'No botão Mover, pressione Espaço para pegar o módulo, use as setas para escolher a posição, Espaço para soltar ou Escape para cancelar.' },
+            screenReaderInstructions: { draggable: 'Enter abre o módulo. Para mudar a ordem, pressione Espaço, use as setas para escolher a posição, Espaço de novo para soltar ou Escape para cancelar.' },
             announcements: {
               onDragStart: ({ active }) => `${anuncio(active.id)} selecionado para mover.`,
               onDragOver: ({ active, over }) => over ? `${anuncio(active.id)} sobre a posição ${modulos.findIndex((modulo) => modulo.id === over.id) + 1} de ${modulos.length}.` : `${anuncio(active.id)} fora da grade.`,
               onDragEnd: ({ active, over }) => over ? `${anuncio(active.id)} solto na posição ${modulos.findIndex((modulo) => modulo.id === over.id) + 1} de ${modulos.length}.` : 'Movimento cancelado. A ordem foi mantida.',
               onDragCancel: () => 'Movimento cancelado. A ordem foi mantida.',
             },
-          }} onDragEnd={({ active, over }) => { setArrastando(null); if (over) mover(active.id, over.id) }}>
+          }} onDragEnd={({ active, over }) => { clique.aoTerminar(); setArrastando(null); if (over) mover(active.id, over.id) }}>
           <SortableContext items={modulos.map((modulo) => modulo.id)} strategy={rectSortingStrategy}>
-            <ul className={css.grade} aria-label="Módulos">
+            <ul className={css.grade} aria-label="Módulos" onClickCapture={clique.onClickCapture}>
               {modulos.map((modulo, indice) => <CartaoModulo key={modulo.id} modulo={modulo}
-                favorito={preferencia.favoritos.includes(modulo.id)} organizar={podeOrganizar} movimentos={preferencia.movimentos}
-                indice={indice} total={modulos.length} aoFavoritar={favoritar} aoMover={moverPorBotao} />)}
+                favorito={preferencia.favoritos.includes(modulo.id)} organizar={podeOrganizar} arrastavel={!buscando} movimentos={preferencia.movimentos}
+                indice={indice} total={modulos.length} pendencia={fonteApi ? pendenciaDoModulo(modulo.id, fontes) : null}
+                aoFavoritar={favoritar} aoMover={moverPorBotao} />)}
             </ul>
           </SortableContext>
           <DragOverlay dropAnimation={null}>
@@ -244,6 +260,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
         {!buscando && !organizar && todos.length > 0 && <div className={css.rodapeHall}>
           {anterior && <Botao variante="texto" onClick={() => desfazer(ajustarRef)}>Desfazer</Botao>}
           <Botao ref={ajustarRef} variante="texto" onClick={() => setPersonalizando(true)}><MarcaIcone nome="configuracoes" tamanho={20} />Ajustar tela inicial</Botao>
+          <span className={css.dicaArrasto}>Arraste {fonteApi ? 'os números e os cartões' : 'os cartões'} para mudar a ordem.</span>
         </div>}
       </main>
       {personalizando && <PersonalizarHall preferencia={preferencia} modulos={modulosPermitidos} aoFechar={() => setPersonalizando(false)}

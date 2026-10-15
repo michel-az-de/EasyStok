@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { lerCaixaDoHub, lerInboxDoHub, lerPedidosDoHub } from '../infra/api/hubApi'
+import { lerCaixaDoHub, lerCardapioDoHub, lerInboxDoHub, lerPedidosDoHub } from '../infra/api/hubApi'
 
-export function usePulsoDoHall({ ativo, atendimento, pedidos, financeiro }) {
+export function usePulsoDoHall({ ativo, atendimento, pedidos, financeiro, cardapio = false }) {
   const [fontes, setFontes] = useState({})
   const [tentativa, setTentativa] = useState(0)
   useEffect(() => {
@@ -9,7 +9,7 @@ export function usePulsoDoHall({ ativo, atendimento, pedidos, financeiro }) {
     let encerrado = false
     let lendo = false
     let controle
-    const leitores = [atendimento && ['atendimento', lerInboxDoHub], pedidos && ['pedidos', lerPedidosDoHub], financeiro && ['financeiro', lerCaixaDoHub]].filter(Boolean)
+    const leitores = [atendimento && ['atendimento', lerInboxDoHub], pedidos && ['pedidos', lerPedidosDoHub], financeiro && ['financeiro', lerCaixaDoHub], cardapio && ['cardapio', lerCardapioDoHub]].filter(Boolean)
     const atualizar = async () => {
       if (encerrado || lendo || document.visibilityState === 'hidden') return
       lendo = true
@@ -38,6 +38,6 @@ export function usePulsoDoHall({ ativo, atendimento, pedidos, financeiro }) {
       window.removeEventListener('focus', aoVoltar)
       document.removeEventListener('visibilitychange', aoVoltar)
     }
-  }, [ativo, atendimento, pedidos, financeiro, tentativa])
+  }, [ativo, atendimento, pedidos, financeiro, cardapio, tentativa])
   return { fontes, atualizar: () => setTentativa((valor) => valor + 1) }
 }
