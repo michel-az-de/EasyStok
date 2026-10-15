@@ -65,7 +65,7 @@ provar('ajuda e transporte estão disponíveis antes de existir pedido, na mesma
 provar('endereço ausente explica o requisito e bloqueia encaminhamento', () => {
   const html = renderizar({ rascunho: { ...comanda.rascunho, endereco: null } })
   assert.match(html, /<button[^>]*disabled=""[^>]*>Combinar entrega desta seleção<\/button>/)
-  assert.match(html, /informe o endereço na comanda/)
+  assert.match(html, /registre na Ficha/)
 })
 provar('edição local preservada exige salvar antes de encaminhar ou combinar frete', () => {
   const edicao = { revisao: 4, rascunho: comanda.rascunho }
