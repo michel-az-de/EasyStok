@@ -58,7 +58,9 @@ async function captura(nome) {
   capturas.push({ arquivo, viewport: page.viewportSize() })
 }
 async function abrir(origem, duplo = true) {
-  await page.goto(origem + '/#/m/cardapio')
+  const destino = origem + '/#/m/cardapio'
+  if (page.url() === destino) await page.reload()
+  else await page.goto(destino)
   const editar = page.getByRole('button', { name: `Editar prato ${item.nome}`, exact: true }).first()
   await editar.waitFor()
   if (duplo) await page.getByRole('heading', { name: item.nome, exact: true }).first().dblclick()
@@ -69,6 +71,7 @@ async function abrir(origem, duplo = true) {
 async function escolher() {
   await editor().getByRole('button', { name: 'Escolher do banco de imagens', exact: true }).click()
   const banco = page.getByRole('dialog', { name: 'Escolher foto do banco de imagens', exact: true })
+  await banco.getByLabel('Buscar foto').fill('1841')
   const usar = banco.getByRole('button', { name: `Usar foto ${foto.titulo}`, exact: true })
   await usar.waitFor()
   await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent.includes('Foto aprovada da prova 1841') && !b.disabled))
@@ -86,15 +89,18 @@ try {
     await abrir(consoleUrl)
     await captura(`depois-editor-${largura}`)
     await editor().getByRole('button', { name: 'Escolher do banco de imagens', exact: true }).click()
+    await page.getByRole('dialog', { name: 'Escolher foto do banco de imagens', exact: true }).getByLabel('Buscar foto').fill('1841')
     await page.getByRole('button', { name: `Usar foto ${foto.titulo}`, exact: true }).waitFor()
     await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent.includes('Foto aprovada da prova 1841') && !b.disabled))
     await captura(`banco-${largura}`)
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false)
+    await page.keyboard.press('Tab')
     await page.keyboard.press('Escape')
+    await page.getByRole('dialog', { name: 'Escolher foto do banco de imagens', exact: true }).waitFor({ state: 'hidden' })
     assert.equal(await editor().isVisible(), true)
     assert.equal(await editor().getByRole('button', { name: 'Escolher do banco de imagens', exact: true }).evaluate((b) => b === document.activeElement), true)
   }
-  passa('API real: antes/depois em 1280, 1440 e 1920; duplo clique, Escape e foco preservados')
+  passa('API real: editor em 1280, 1440 e 1920; duplo clique, Escape e foco preservados')
   const nome = editor().getByLabel('Nome do prato', { exact: true })
   const rascunho = item.nome + ' (rascunho preservado)'
   const anterior = await chamar(`${cardapio}/${item.id}`)
