@@ -2,7 +2,6 @@ using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Cliente.Dossie;
-using Microsoft.Extensions.Caching.Memory;
 
 namespace EasyStock.Application.UseCases.Atendimento;
 
@@ -18,7 +17,7 @@ public sealed record ResumoClienteResult(string? Texto, bool PorIa);
 /// em cache por cliente, pedidos, última compra e notas: abrir de novo não paga outra chamada.
 /// </summary>
 public sealed class ResumirClienteUseCase(
-    IAgenteLlmClient llm, ObterDossieClienteUseCase dossies, IMemoryCache cache, ILogger<ResumirClienteUseCase> logger)
+    IAgenteLlmClient llm, ObterDossieClienteUseCase dossies, ICacheService cache, ILogger<ResumirClienteUseCase> logger)
 {
     public const string SystemPrompt =
         "Você resume para a atendente de uma casa de massas artesanais quem é o cliente da conversa, a partir do " +
@@ -36,7 +35,7 @@ public sealed class ResumirClienteUseCase(
         if (dossie.TotalPedidos == 0 && dossie.Notas.Count == 0) return new(SemCompra, false);
         if (!llm.Disponivel) return new(null, false);
         var chave = $"resumo-cliente:{empresaId:N}:{dossie.Cliente.Id ?? conversaId:N}:{dossie.TotalPedidos}:{dossie.UltimaCompraEm:O}:{dossie.Notas.Count}";
-        if (cache.TryGetValue(chave, out ResumoClienteResult? guardado) && guardado is not null) return guardado;
+        if (await cache.GetAsync<ResumoClienteResult>(chave) is { } guardado) return guardado;
         try
         {
             var resposta = await llm.EnviarAsync(new RequisicaoLlm(
@@ -48,7 +47,7 @@ public sealed class ResumirClienteUseCase(
             logger.LogInformation("Resumo do cliente por IA: empresa {EmpresaId}, conversa {ConversaId}, {TokensEntrada}+{TokensSaida} tokens",
                 empresaId, conversaId, resposta.TokensEntrada, resposta.TokensSaida);
             var resultado = new ResumoClienteResult(texto.Length == 0 ? null : texto, texto.Length > 0);
-            if (resultado.PorIa) cache.Set(chave, resultado, TimeSpan.FromHours(12));
+            if (resultado.PorIa) await cache.SetAsync(chave, resultado, TimeSpan.FromHours(12));
             return resultado;
         }
         // O timeout do cliente HTTP também é OperationCanceledException; só o cancelamento de quem pediu sobe.

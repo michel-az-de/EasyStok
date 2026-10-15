@@ -1,10 +1,10 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities.Atendimento;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EasyStock.Application.Tests.UseCases.Atendimento;
@@ -31,7 +31,19 @@ public class ResumirClienteUseCaseTests
             .Returns(new RespostaLlm("end_turn", [new BlocoTextoLlm("Cliente frequente — pede lasanha bolonhesa.")], 300, 30));
     }
 
-    private readonly IMemoryCache _cache = new MemoryCache(new MemoryCacheOptions());
+    private readonly ICacheService _cache = new CacheEmMemoria();
+
+    private sealed class CacheEmMemoria : ICacheService
+    {
+        private readonly Dictionary<string, object?> _itens = [];
+        public Task SetAsync<T>(string key, T value, TimeSpan? ttl = null) { _itens[key] = value; return Task.CompletedTask; }
+        public Task<T?> GetAsync<T>(string key) => Task.FromResult(_itens.TryGetValue(key, out var v) ? (T?)v : default);
+        public Task RemoveAsync(string key) { _itens.Remove(key); return Task.CompletedTask; }
+        public Task<bool> ExistsAsync(string key) => Task.FromResult(_itens.ContainsKey(key));
+        public Task<long> IncrementAsync(string key, long value = 1) => throw new NotSupportedException();
+        public Task SetExpiryAsync(string key, TimeSpan ttl) => Task.CompletedTask;
+        public Task RemoveAsync(IEnumerable<string> keys) { foreach (var k in keys) _itens.Remove(k); return Task.CompletedTask; }
+    }
 
     private ResumirClienteUseCase Criar() => new(_llm,
         new ObterDossieClienteUseCase(_clientes, _crm, _pedidos, Substitute.For<IDomicilioQueries>(), _conversas),
