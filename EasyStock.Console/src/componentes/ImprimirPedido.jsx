@@ -8,14 +8,15 @@ import css from './ImprimirPedido.module.css'
 
 const naoPropagar = (e) => e.stopPropagation()
 const CODIGOS = [{ valor: 'qr', rotulo: 'QR Code' }, { valor: 'barras', rotulo: 'Código de barras · Code128' }]
-const PERFIS = [{ valor: 'sistema', rotulo: 'Escolher no diálogo do sistema' }, { valor: 'hp-a4', rotulo: 'HP · folha A4' }]
-const nomePerfil = (valor) => PERFIS.find((p) => p.valor === valor).rotulo
+// Sem catálogo de perfis (#1756), só o diálogo do sistema, que aceita todo papel.
+const perfilLivre = (papeis) => [{ valor: 'sistema', rotulo: 'Escolher no diálogo do sistema', papeis: papeis.map((p) => p.valor) }]
 const data = (valor) => new Date(valor).toLocaleString('pt-BR')
 const estadoRegistro = (valor) => ({ preparada: 'Prévia guardada', impressa: 'Saída confirmada', falhou: 'Falha informada' })[valor] ?? valor
 const rotuloDe = (opcoes, valor) => opcoes.find((o) => o.valor === valor)?.rotulo ?? valor
 
 export function ImprimirPedido({
-  documentos, papeis, papelPadrao, preparar, historico, confirmar, documentoInicial, aoImprimir, abrirImpressao = imprimirHtml,
+  documentos, papeis, papelPadrao, perfis = perfilLivre(papeis), perfilPadrao = () => perfis[0].valor, orientacao,
+  preparar, historico, confirmar, documentoInicial, aoImprimir, abrirImpressao = imprimirHtml,
   rotulo = 'Imprimir', variante = 'secundario', titulo = 'Imprimir pedido', contexto, clienteNome, ...resto
 }) {
   const [aberto, setAberto] = useState(false)
@@ -64,7 +65,15 @@ export function ImprimirPedido({
 
   const fechar = () => { operacao.current?.abort(); operacao.current = null; setAberto(false) }
   const limpar = () => { solicitacao.current = null; tentativa.current = null; setOpcoesTentativa(null); setRegistro(null); setSituacao({ estado: 'ocioso' }) }
-  const abrir = () => { limpar(); setPapel(perfil === 'hp-a4' ? 'a4' : papelPadrao(documento)); setPagina(1); setAberto(true) }
+  const perfilDe = (valor) => perfis.find((p) => p.valor === valor) ?? perfis[0]
+  // Documento traz o perfil e o papel guardados no aparelho; perfil dedicado puxa o papel dele.
+  const escolherDocumento = (valor) => { limpar(); setDocumento(valor); setPerfil(perfilDe(perfilPadrao(valor)).valor); setPapel(papelPadrao(valor)) }
+  const escolherPerfil = (valor) => {
+    limpar(); setPerfil(valor)
+    const compativeis = perfilDe(valor).papeis
+    if (!compativeis.includes(papel)) setPapel(compativeis[0])
+  }
+  const abrir = () => { escolherDocumento(documento); setPagina(1); setAberto(true) }
 
   async function carregar(original = null) {
     if (operacao.current) return
@@ -73,7 +82,7 @@ export function ImprimirPedido({
     setSituacao({ estado: 'preparando' })
     const opcoes = original
       ? { documento: original.documento, modelo: original.modelo, codigo: original.codigo, perfil: original.perfil, originalId: original.id }
-      : tentativa.current ?? { documento, modelo: papel, codigo, perfil: nomePerfil(perfil) }
+      : tentativa.current ?? { documento, modelo: papel, codigo, perfil: perfilDe(perfil).rotulo }
     tentativa.current = opcoes
     setOpcoesTentativa(opcoes)
     const chave = JSON.stringify(opcoes)
@@ -163,11 +172,11 @@ export function ImprimirPedido({
               <Botao variante="texto" onClick={limpar} disabled={ocupado || confirmarPapel}>{resumoAtivo.originalId ? 'Nova impressão' : 'Alterar opções'}</Botao>
             </div> : <>
             <p className={css.etapa}>1. Documento e destino</p>
-            <CampoSelecao rotulo="Documento" opcoes={documentos} value={registro?.documento ?? documento} disabled={congelado} onChange={(e) => { limpar(); setDocumento(e.target.value); setPapel(perfil === 'hp-a4' ? 'a4' : papelPadrao(e.target.value)) }} />
-            <CampoSelecao rotulo="Perfil de impressão" opcoes={registro ? [{ valor: registro.perfil, rotulo: registro.perfil }] : PERFIS} value={registro?.perfil ?? perfil} disabled={congelado} onChange={(e) => { limpar(); setPerfil(e.target.value); if (e.target.value === 'hp-a4') setPapel('a4') }} />
-            <CampoSelecao rotulo="Papel" opcoes={registro || perfil !== 'hp-a4' ? papeis : papeis.filter((p) => p.valor === 'a4')} value={registro?.modelo ?? papel ?? ''} disabled={congelado} onChange={(e) => { limpar(); setPapel(e.target.value) }} />
-            <CampoSelecao rotulo="Código" opcoes={CODIGOS} value={registro?.codigo ?? codigo} disabled={congelado} onChange={(e) => { limpar(); setCodigo(e.target.value) }} />
-            <p className={css.dica}>Escolha a impressora física no diálogo do sistema. Para a HP: papel A4, escala 100% e cabeçalhos e rodapés desligados.</p>
+            <CampoSelecao rotulo="Documento" opcoes={documentos} value={documento} disabled={congelado} onChange={(e) => escolherDocumento(e.target.value)} />
+            <CampoSelecao rotulo="Perfil de impressão" opcoes={perfis} value={perfil} disabled={congelado} onChange={(e) => escolherPerfil(e.target.value)} />
+            <CampoSelecao rotulo="Papel" opcoes={papeis.filter((p) => perfilDe(perfil).papeis.includes(p.valor))} value={papel ?? ''} disabled={congelado} onChange={(e) => { limpar(); setPapel(e.target.value) }} />
+            <CampoSelecao rotulo="Código" opcoes={CODIGOS} value={codigo} disabled={congelado} onChange={(e) => { limpar(); setCodigo(e.target.value) }} />
+            <p className={css.dica}>{orientacao?.(papel) ?? 'Escolha a impressora física no diálogo do sistema, com escala 100% e cabeçalhos e rodapés desligados.'}</p>
             <p className={css.dica}>Uma via por abertura. Defina as cópias no diálogo. Os papéis térmicos aguardam teste nos seus equipamentos.</p>
             </>}
           </div>
@@ -175,7 +184,7 @@ export function ImprimirPedido({
             <h3 ref={focoPrevia} tabIndex={-1} className={css.etapa}>Confira o papel</h3>
             {registro ? <>
               <PreviaImpresso html={registro.html} modelo={registro.modelo} />
-              <p className={css.dica}>No diálogo, selecione {rotuloDe(papeis, registro.modelo)}, escala 100% e desligue cabeçalhos e rodapés. Confira também a paginação.</p>
+              <p className={css.dica}>{orientacao?.(registro.modelo) ?? `No diálogo, selecione ${rotuloDe(papeis, registro.modelo)}, escala 100% e desligue cabeçalhos e rodapés.`} Confira também a paginação.</p>
             </> : <p className={css.vazia}>Prepare a prévia para conferir o documento antes de imprimir.</p>}
           </section>
         </div>

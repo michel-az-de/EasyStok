@@ -5,6 +5,7 @@ using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Enums.Atendimento;
 using Microsoft.Extensions.Options;
 
 namespace EasyStock.Application.Tests.UseCases.Atendimento;
@@ -38,6 +39,26 @@ public class ListarConversasAtendimentoUseCaseTests
         resumo.AguardaResposta.Should().BeTrue();
         resumo.AssumidaPorNome.Should().Be("Ana");
         resumo.AssumidaPorUsuarioId.Should().Be(conversa.AssumidaPorUsuarioId);
+    }
+
+    [Fact]
+    public async Task InboxLevaOAssuntoDoEmailAoResumo()
+    {
+        // #1432 sobre o #1583: a inbox virou projeção, e o assunto do e-mail tem de atravessar a linha até o cartão.
+        var empresa = Guid.NewGuid();
+        var repo = Substitute.For<IConversaRepository>();
+        var email = Conversa.Abrir(empresa, "maria@exemplo.com", DateTime.UtcNow, canal: CanalConversa.Email);
+        email.DefinirAssunto("Encomenda de bolo");
+        var whatsapp = Conversa.Abrir(empresa, "5511999990001", DateTime.UtcNow);
+        repo.ListarInboxAsync(default, default, default, default, default, default, default)
+            .ReturnsForAnyArgs([ConversaInboxItem.De(email, null), ConversaInboxItem.De(whatsapp, null)]);
+        var caso = new ListarConversasAtendimentoUseCase(
+            repo, Substitute.For<IConfiguracaoAtendimentoRepository>(), Options.Create(new PrazosOptions { ClienteSemRespostaMin = 7 }));
+
+        var resultado = await caso.ExecuteAsync(new ListarConversasAtendimentoQuery(empresa, null, null, 1, 10));
+
+        resultado.Single(r => r.Id == email.Id).Assunto.Should().Be("Encomenda de bolo");
+        resultado.Single(r => r.Id == whatsapp.Id).Assunto.Should().BeNull("assunto é só do canal E-mail");
     }
 
     private static (ListarConversasAtendimentoUseCase Caso, IConfiguracaoAtendimentoRepository Config) Inbox(

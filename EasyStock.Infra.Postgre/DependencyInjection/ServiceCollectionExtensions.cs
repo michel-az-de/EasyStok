@@ -162,6 +162,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IKdsPedidoQueries, KdsPedidoQueries>(); // S19: KDS do console
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Operacao.IPedidoImpressoQueries, PedidoImpressoQueries>(); // S49: impresso do pedido
             services.AddScoped<IPrazoPreparoPedidoQueries, PrazoPreparoPedidoQueries>(); // S21: início previsto
+            services.AddScoped<ISequenciaDiariaPedido, SequenciaDiariaPedidoRepository>(); // S53: número do dia
 
             services.AddScoped<IAdminTenantsQueries, AdminTenantsQueries>();
             services.AddScoped<ITenantFeatureFlagRepository, TenantFeatureFlagRepository>();
@@ -201,6 +202,17 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Pedidos.Handlers.NotificarClientePedidoPagoHandler>(
                 EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+
+            // #1807: avisos do Balcão no aparelho (Web Push para a equipe). Idempotentes pela chave do outbox; ficam
+            // antes das automáticas, que precisam ser as últimas do tipo (#1506).
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.AvisarEquipeEtapaDoPedidoHandler>("pedido.mudou_status");
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.AvisarEquipePedidoPagoHandler>(
+                EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.AvisarEquipeContatoNovoHandler>(
+                EasyStock.Application.Events.Atendimento.ConversaAbertaEvent.TipoEvento);
 
             // #1228: pagamento confirmado fecha os interesses do cliente nos itens comprados (S31).
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
@@ -265,6 +277,11 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             // #1102: número da Meta pelo qual a resposta sai = o da empresa do tenant corrente.
             services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.IRemetenteWhatsApp,
                 Services.Atendimento.RemetenteWhatsAppDoTenant>();
+            // #1432: caixa de suporte da loja (IMAP/SMTP) e o fio do e-mail da conversa.
+            services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.Email.ICaixaEmailDoTenant,
+                Services.Atendimento.CaixaEmailDoTenant>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IEmailAtendimentoQuery,
+                Repositories.Atendimento.EmailAtendimentoQuery>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IStorefrontFaleConoscoRepository,
                 Repositories.Storefront.StorefrontFaleConoscoRepository>();
             // Storefront — autenticação OTP cliente (AUTH-002)

@@ -31,6 +31,7 @@ public sealed class AuthController(
     ValidarOtpUseCase validarOtpUseCase,
     EncerrarSessaoUseCase encerrarSessaoUseCase,
     VincularChatAposLoginUseCase vincularChat,
+    VincularComandaAposOtpUseCase vincularComanda,
     ILogger<AuthController> logger) : EasyStockControllerBase
 {
     [HttpGet("csrf")]
@@ -68,7 +69,8 @@ public sealed class AuthController(
 
     public sealed record ValidarOtpRequest(
         [Required] string Telefone,
-        [Required] string Codigo);
+        [Required] string Codigo,
+        [MaxLength(512)] string? TokenComanda = null);
 
     public sealed record ValidarOtpResponse(
         string TelefoneOfuscado,
@@ -177,6 +179,7 @@ public sealed class AuthController(
     [ProducesResponseType(typeof(ValidarOtpResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status410Gone)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
@@ -203,7 +206,9 @@ public sealed class AuthController(
                 UserAgent: string.IsNullOrWhiteSpace(ua) ? null : ua,
                 AcceptLanguage: string.IsNullOrWhiteSpace(al) ? null : al), ct);
 
-            try
+            if (request.TokenComanda is not null)
+                await vincularComanda.ExecuteAsync(slug, result.SessionId, request.TokenComanda, ct);
+            else try
             {
                 await vincularChat.ExecuteAsync(slug, result.SessionId, Request.Headers["X-Chat-Token"].ToString(), ct);
             }
@@ -243,6 +248,10 @@ public sealed class AuthController(
         catch (OtpInvalidoException ex)
         {
             return Unauthorized(new { error = new { code = "OTP_INVALIDO", message = ex.Message } });
+        }
+        catch (VinculoComandaInvalidoException ex)
+        {
+            return StatusCode(403, new { error = new { code = "COMANDA_VERIFICACAO_INVALIDA", message = ex.Message } });
         }
     }
 }

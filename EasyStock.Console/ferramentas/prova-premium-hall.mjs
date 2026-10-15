@@ -227,4 +227,50 @@ const hallUrl = new URL('../src/features/hall/HallDeModulos.jsx', import.meta.ur
 const compilado = await transformWithOxc(readFileSync(hallUrl, 'utf8'), hallUrl.pathname, { jsx: { runtime: 'automatic' } })
 provar('JSX final do Hall compila com o mesmo transformador do Vite', () => assert.ok(compilado.code))
 
+// #1810: o Hall renderizado no modo API mostra só saudação, busca, números e áreas. Telas de cada
+// área, favoritar, organizar e personalizar saem da primeira vista (ficam em "Ajustar tela inicial").
+{
+  const { readdirSync } = await import('node:fs')
+  const { fileURLToPath, pathToFileURL } = await import('node:url')
+  const { join } = await import('node:path')
+  const raiz = fileURLToPath(new URL('../src/', import.meta.url))
+  const jsx = new Map(await Promise.all(readdirSync(raiz, { recursive: true }).filter((n) => n.endsWith('.jsx')).map(async (nome) => {
+    const arquivo = join(raiz, nome)
+    const codigo = readFileSync(arquivo, 'utf8').replaceAll('import.meta.env', '({ DEV: false })')
+    return [pathToFileURL(arquivo).href, (await transformWithOxc(codigo, arquivo, { jsx: { runtime: 'automatic' } })).code]
+  })))
+  registerHooks({
+    resolve(spec, contexto, proximo) {
+      if (spec.startsWith('.') && !/\.[a-z]+$/i.test(spec)) {
+        for (const ext of ['.js', '.jsx']) { try { return proximo(spec + ext, contexto) } catch { /* próximo formato */ } }
+      }
+      return proximo(spec, contexto)
+    },
+    load(url, contexto, proximo) {
+      if (jsx.has(url)) return { format: 'module', source: jsx.get(url), shortCircuit: true }
+      if (url.endsWith('.css')) return { format: 'module', source: 'export default new Proxy({}, { get: (_, p) => String(p) })', shortCircuit: true }
+      if (url.endsWith('/infra/fonteDados.js')) return { format: 'module', source: 'export const FONTE_API=true;export const API_BASE="";', shortCircuit: true }
+      if (url.endsWith('.json')) return { format: 'module', source: 'export default ' + readFileSync(new URL(url), 'utf8'), shortCircuit: true }
+      return proximo(url, contexto)
+    },
+  })
+  const { createElement: h } = await import('react')
+  const { renderToStaticMarkup } = await import('react-dom/server')
+  const { HallDeModulos } = await import('../src/features/hall/HallDeModulos.jsx')
+  const { ContextoAcessoModulos } = await import('../src/aplicacao/acessoModulos.jsx')
+  // O interruptor de tema lê o tema do documento no render; no Node, o claro.
+  globalThis.document ??= { documentElement: { dataset: { theme: 'light' } } }
+  const html = renderToStaticMarkup(h(ContextoAcessoModulos.Provider, { value: { permite: () => true, acoes: {}, aoSair: () => {} } },
+    h(HallDeModulos, { fonteApi: true, sessao: null, agora: Date.parse('2026-10-14T18:00:00Z') })))
+  provar('#1810: hall mínimo sem telas, favoritar, organizar nem personalizar na primeira vista', () => {
+    assert.doesNotMatch(html, /Personalizar painel|Organizar módulos|Favoritar|Telas de |Em preparação|Atualizado às|Agora na casa ·.*Atualizar/)
+    assert.equal(html.match(/Ajustar tela inicial/g)?.length, 1)
+    for (const modulo of api) assert.match(html, new RegExp(`>${modulo.nome}<`))
+  })
+  provar('#1810: hall mínimo cabe em até 20 controles (eram 54 em 1280x720)', () => {
+    const controles = (html.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
+    assert.ok(controles <= 20, `${controles} controles`)
+  })
+}
+
 console.log(JSON.stringify({ prova: 'premium-hall', aprovados: resultados.length, falhas: 0, combinacoesDeAcesso: 2 ** api.length }))

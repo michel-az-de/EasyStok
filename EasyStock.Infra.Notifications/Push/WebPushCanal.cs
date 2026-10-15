@@ -70,13 +70,7 @@ public sealed class WebPushCanal(
         }
 
         var vapid = new VapidDetails(_opts.Subject, _opts.PublicKey, _opts.PrivateKey);
-        var payload = System.Text.Json.JsonSerializer.Serialize(new
-        {
-            title = mensagem.Assunto,
-            body = mensagem.Corpo,
-            tag = mensagem.OutboxId.ToString(),
-            data = new { outboxId = mensagem.OutboxId, empresaId = mensagem.EmpresaId }
-        });
+        var payload = MontarCarga(mensagem);
 
         var sucessos = 0;
         var falhas = 0;
@@ -136,6 +130,19 @@ public sealed class WebPushCanal(
             // transitoria o outbox tenta de novo, e nenhuma inscricao recebeu, entao nao duplica.
             FalhaPermanente: sucessos == 0 && permanentes == falhas);
     }
+
+    /// <summary>
+    /// Carga que o service worker do console le (<c>sw-avisos.js</c>): titulo, corpo, tag e dados. A tag vem dos metadados
+    /// quando o template a define (#1807: a mesma da notificacao do console, que e substituida em vez de duplicada);
+    /// sem ela, o id do outbox.
+    /// </summary>
+    public static string MontarCarga(MensagemPronta mensagem) => System.Text.Json.JsonSerializer.Serialize(new
+    {
+        title = mensagem.Assunto,
+        body = mensagem.Corpo,
+        tag = mensagem.Metadados?.GetValueOrDefault("tag") is { Length: > 0 } tag ? tag : mensagem.OutboxId.ToString(),
+        data = new { outboxId = mensagem.OutboxId, empresaId = mensagem.EmpresaId }
+    });
 
     private async Task<IReadOnlyList<Domain.Entities.Notifications.WebPushSubscription>> ResolverSubscriptionsAsync(MensagemPronta msg, CancellationToken ct)
     {

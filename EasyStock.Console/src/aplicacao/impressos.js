@@ -1,4 +1,4 @@
-import { DOCUMENTOS, PAPEIS } from '../dominio/impressos'
+import { DOCUMENTOS, PAPEIS, PERFIS_IMPRESSAO, orientacaoDoPapel } from '../dominio/impressos'
 import { confirmarDocumentoImpresso, enviarLogoDaLoja, historicoDoPedido, obterOriginalImpresso, obterLojaDaEmpresa, prepararImpresso } from '../infra/api/impressosApi'
 import { gravarPreferenciasImpressao, lerPreferenciasImpressao } from '../infra/preferenciasImpressao'
 
@@ -14,6 +14,9 @@ export const impressaoDoPedido = (pedidoId, canhotoId = null, clienteNome = null
   documentos: DOCUMENTOS,
   papeis: PAPEIS,
   papelPadrao: (documento) => lerPreferenciasImpressao().papeis[documento],
+  perfis: PERFIS_IMPRESSAO,
+  perfilPadrao: (documento) => lerPreferenciasImpressao().perfis[documento],
+  orientacao: orientacaoDoPapel,
   preparar: async (opcoes, sinal) => {
     const registro = await prepararImpresso(pedidoId, { ...opcoes, logoTermica: lerPreferenciasImpressao().logoTermica }, sinal)
     sinal.throwIfAborted()

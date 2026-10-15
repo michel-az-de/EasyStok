@@ -16,6 +16,7 @@ public class MensagemConfiguration : IEntityTypeConfiguration<Mensagem>
         builder.Property(m => m.Autor).HasConversion<int>().IsRequired();
         builder.Property(m => m.TipoConteudo).HasConversion<int>().IsRequired();
         builder.Property(m => m.Texto).HasMaxLength(Mensagem.TextoTamanhoMaximo);
+        builder.Property(m => m.Assunto).HasMaxLength(Mensagem.AssuntoTamanhoMaximo); // #1432
         builder.Property(m => m.ModeloJson).HasColumnType("jsonb");
         builder.Ignore(m => m.Modelo);
         builder.Property(m => m.BotaoId).HasMaxLength(Mensagem.BotaoIdTamanhoMaximo);

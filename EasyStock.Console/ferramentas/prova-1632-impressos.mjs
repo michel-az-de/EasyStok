@@ -1,4 +1,5 @@
-// Prova da #1632 (F2): impressos do pedido em HTML servidos pela API.
+// Prova da #1632 (F2): impressos do pedido em HTML servidos pela API. Perfis por papel e geometria da
+// bobina entram com a #1756 (seções D e E).
 //
 // Cobre as funções puras e o armazenamento do aparelho:
 //   A. preferências de impressão: padrões, leitura e gravação, valor avariado e storage
@@ -22,9 +23,10 @@ registerHooks({
 })
 
 const {
-  DOCUMENTOS, PAPEIS, PAPEL_PADRAO, caminhoDoImpresso, normalizarPreferenciasImpressao,
-  trocarLogoNaTermica, trocarPapelPadrao,
+  DOCUMENTOS, PAPEIS, PAPEL_PADRAO, PERFIS_IMPRESSAO, caminhoDoImpresso, normalizarPreferenciasImpressao,
+  orientacaoDoPapel, perfilDeImpressao, trocarLogoNaTermica, trocarPapelPadrao, trocarPerfilPadrao,
 } = await import('../src/dominio/impressos.js')
+const { paginaDoImpresso } = await import('../src/componentes/geometriaImpresso.js')
 const { CHAVE_PREFERENCIAS_IMPRESSAO, gravarPreferenciasImpressao, lerPreferenciasImpressao } =
   await import('../src/infra/preferenciasImpressao.js')
 const { moduloPorId, telasDoMenu } = await import('../src/dominio/modulos.js')
@@ -33,7 +35,12 @@ const { rotaDaHash } = await import('../src/dominio/rota.js')
 let passou = 0
 const confere = (descricao, fn) => { fn(); passou += 1; console.log('ok  ' + descricao) }
 
-const PADRAO = { versao: 1, papeis: { pedido: 'cupom-80', agendamento: 'a5', entrega: 'etiqueta-10x15', cozinha: 'cupom-80' }, logoTermica: false }
+const PADRAO = {
+  versao: 2,
+  papeis: { pedido: 'cupom-80', agendamento: 'a5', entrega: 'etiqueta-10x15', cozinha: 'cupom-80' },
+  perfis: { pedido: 'termica-80', agendamento: 'hp-a5', entrega: 'etiqueta-10x15', cozinha: 'termica-80' },
+  logoTermica: false,
+}
 
 function armazenamentoFalso(inicial = {}) {
   const dados = new Map(Object.entries(inicial))
@@ -101,6 +108,9 @@ confere('o que está gravado é normalizado na leitura (JSON quebrado ou papel q
   assert.deepEqual(lerPreferenciasImpressao(armazenamentoFalso({ [CHAVE_PREFERENCIAS_IMPRESSAO]: '{quebrado' })).papeis.agendamento, 'a5')
   const velho = armazenamentoFalso({ [CHAVE_PREFERENCIAS_IMPRESSAO]: JSON.stringify({ papeis: { cozinha: 'cupom-76' }, logoTermica: true }) })
   assert.deepEqual(lerPreferenciasImpressao(velho), { ...PADRAO, logoTermica: true })
+  // Preferência da versão 1 (só papel) ganha o perfil do papel guardado, sem perder a escolha.
+  const v1 = armazenamentoFalso({ [CHAVE_PREFERENCIAS_IMPRESSAO]: JSON.stringify({ versao: 1, papeis: { pedido: 'a4' } }) })
+  assert.deepEqual(lerPreferenciasImpressao(v1).perfis, { ...PADRAO.perfis, pedido: 'hp-a4' })
 })
 
 confere('storage indisponível: gravar avisa que não guardou, mas a escolha vale para a visita', () => {
@@ -171,6 +181,73 @@ confere('Impressão é tela de Configurações, só no modo API, e a rota abre a
   assert.ok(telasDoMenu(configuracoes, { fonteApi: true }).some((t) => t.id === 'impressao' && t.rotulo === 'Impressão'))
   assert.ok(!telasDoMenu(configuracoes, { fonteApi: false }).some((t) => t.id === 'impressao'))
   assert.equal(rotaDaHash('#/m/configuracoes/impressao', { fonteApi: true }).aba, 'impressao')
+})
+
+// --- D. Perfis por papel (#1756) ---------------------------------------------------------------
+confere('perfis: sistema aceita todo papel; cada impressora só o papel que ela tem', () => {
+  assert.deepEqual(PERFIS_IMPRESSAO.map((p) => p.valor), ['sistema', 'hp-a4', 'hp-a5', 'termica-80', 'termica-58', 'etiqueta-10x15'])
+  assert.deepEqual(perfilDeImpressao('sistema').papeis, PAPEIS.map((p) => p.valor))
+  for (const perfil of PERFIS_IMPRESSAO.slice(1)) assert.equal(perfil.papeis.length, 1, perfil.valor)
+  // Todo papel do catálogo tem uma impressora dedicada.
+  for (const { valor } of PAPEIS) assert.ok(PERFIS_IMPRESSAO.slice(1).some((p) => p.papeis.includes(valor)), valor)
+  assert.equal(perfilDeImpressao('fax').valor, 'sistema')
+})
+
+confere('perfil gravado incompatível com o papel volta ao perfil do papel; sistema é sempre aceito', () => {
+  const lido = normalizarPreferenciasImpressao({ papeis: { pedido: 'a4', agendamento: 'a5' }, perfis: { pedido: 'termica-80', agendamento: 'sistema', entrega: 'impressora-x' } })
+  assert.equal(lido.perfis.pedido, 'hp-a4')
+  assert.equal(lido.perfis.agendamento, 'sistema')
+  assert.equal(lido.perfis.entrega, 'etiqueta-10x15')
+})
+
+confere('trocar o perfil leva o papel junto; trocar o papel leva o perfil junto', () => {
+  const termica = trocarPerfilPadrao(PADRAO, 'agendamento', 'termica-58')
+  assert.deepEqual([termica.perfis.agendamento, termica.papeis.agendamento], ['termica-58', 'cupom-58'])
+  const sistema = trocarPerfilPadrao(PADRAO, 'pedido', 'sistema')
+  assert.deepEqual([sistema.perfis.pedido, sistema.papeis.pedido], ['sistema', 'cupom-80'], 'sistema mantém o papel')
+  const a4 = trocarPapelPadrao(PADRAO, 'pedido', 'a4')
+  assert.deepEqual([a4.perfis.pedido, a4.papeis.pedido], ['hp-a4', 'a4'])
+  const noSistema = trocarPapelPadrao(sistema, 'pedido', 'a5')
+  assert.equal(noSistema.perfis.pedido, 'sistema', 'no diálogo do sistema qualquer papel serve')
+  assert.deepEqual(trocarPerfilPadrao(PADRAO, 'pedido', 'fax'), PADRAO)
+  assert.deepEqual(trocarPerfilPadrao(PADRAO, 'recibo', 'hp-a4'), PADRAO)
+})
+
+confere('orientação por formato: medida, escala 100% e sem margens nem cabeçalhos', () => {
+  for (const { valor } of PAPEIS) assert.match(orientacaoDoPapel(valor), /escala 100%/, valor)
+  assert.match(orientacaoDoPapel('cupom-58'), /58 mm/)
+  assert.match(orientacaoDoPapel('cupom-80'), /80 mm/)
+  assert.match(orientacaoDoPapel('cupom-80'), /comprimento acompanha o conteúdo/)
+  assert.match(orientacaoDoPapel('etiqueta-10x15'), /100 × 150 mm/)
+  assert.match(orientacaoDoPapel('a5'), /148 × 210 mm/)
+  assert.match(orientacaoDoPapel('a4'), /210 × 297 mm/)
+})
+
+// --- E. Geometria medida antes do diálogo (#1756) ----------------------------------------------
+const MM = 96 / 25.4
+const folha = (classe, larguraMm, alturaMm, transborda = false) => ({ classes: ['im', classe], largura: larguraMm * MM, altura: alturaMm * MM, transborda })
+
+confere('bobina: @page com a largura do rolo e o comprimento medido da via mais longa', () => {
+  assert.equal(paginaDoImpresso([folha('s-80', 80, 212.3)]), '@page{size:80mm 214mm;margin:0}')
+  assert.equal(paginaDoImpresso([folha('s-58', 58, 120)]), '@page{size:58mm 121mm;margin:0}')
+  assert.equal(paginaDoImpresso([folha('s-80', 80, 90), folha('s-80', 80, 140)]), '@page{size:80mm 141mm;margin:0}')
+})
+
+confere('folha e etiqueta de tamanho fixo não ganham @page novo', () => {
+  assert.equal(paginaDoImpresso([folha('s-a4', 210, 297)]), null)
+  assert.equal(paginaDoImpresso([folha('s-a5', 148, 210)]), null)
+  assert.equal(paginaDoImpresso([folha('s-1015', 100, 150), folha('s-1015', 100, 120)]), null)
+})
+
+confere('conteúdo mais largo que o papel ou etiqueta que não cabe barram a impressão com o motivo', () => {
+  assert.throws(() => paginaDoImpresso([folha('s-58', 58, 100, true)]), /ultrapassa a largura do papel/)
+  assert.throws(() => paginaDoImpresso([folha('s-80', 84, 100)]), /ultrapassa a largura do papel/)
+  assert.throws(() => paginaDoImpresso([folha('s-1015', 100, 151)]), /não cabe em uma etiqueta de 10×15 cm/)
+  assert.throws(() => paginaDoImpresso([folha('s-carta', 216, 279)]), /formato de papel conhecido/)
+})
+
+confere('página sem folha de impresso (HTML antigo ou vazio) segue como veio', () => {
+  assert.equal(paginaDoImpresso([]), null)
 })
 
 console.log(`\n${passou} verificações passaram.`)

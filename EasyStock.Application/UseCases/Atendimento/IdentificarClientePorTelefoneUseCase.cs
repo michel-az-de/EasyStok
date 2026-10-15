@@ -13,6 +13,9 @@ public sealed record IdentificarClientePorTelefoneInput(Guid EmpresaId, string W
 /// <param name="EhNovo">O cadastro foi criado agora, nesta identificação.</param>
 public sealed record IdentificacaoCliente(ClienteEntity Cliente, bool EhLead, bool EhNovo);
 
+public sealed class TelefoneExigeVerificacaoException() : Exception(
+    "Para continuar com este telefone, confirme o código enviado pelo WhatsApp. Sua seleção está salva.");
+
 /// <summary>
 /// RN-02 e RN-03 (S05): acha o <see cref="ClienteEntity"/> do contato pelo telefone ou cria o lead.
 /// Procura, nesta ordem, pelo <c>TelefoneHash</c> (preenchido pelo OTP do storefront) e pelo
@@ -36,7 +39,9 @@ public sealed class IdentificarClientePorTelefoneUseCase(
 
         var candidatos = NormalizadorTelefone.CandidatosDeWaId(input.WaId);
 
-        var existente = input.ReutilizarCadastro ? await ProcurarAsync(input.EmpresaId, candidatos, ct) : null;
+        var existente = await ProcurarAsync(input.EmpresaId, candidatos, input.ReutilizarCadastro, ct);
+        if (existente is not null && !input.ReutilizarCadastro)
+            throw new TelefoneExigeVerificacaoException();
         if (existente is not null)
             return new IdentificacaoCliente(existente, EhLead: existente.OrderCount == 0, EhNovo: false);
 
@@ -50,7 +55,7 @@ public sealed class IdentificarClientePorTelefoneUseCase(
         return new IdentificacaoCliente(novo, EhLead: true, EhNovo: true);
     }
 
-    private async Task<ClienteEntity?> ProcurarAsync(Guid empresaId, IReadOnlyList<string> candidatos, CancellationToken ct)
+    private async Task<ClienteEntity?> ProcurarAsync(Guid empresaId, IReadOnlyList<string> candidatos, bool preencherHash, CancellationToken ct)
     {
         foreach (var e164 in candidatos)
         {
@@ -70,7 +75,7 @@ public sealed class IdentificarClientePorTelefoneUseCase(
                 // #1290: cadastro do ERP não tem TelefoneHash; sem ele o OTP e o checkout guest do site
                 // (que procuram por hash) criam outro cliente. O hash do canônico está livre: nenhum
                 // candidato achou cliente por hash logo acima.
-                porTelefone.TelefoneHash ??= ClienteOtp.CalcularTelefoneHash(candidatos[0]);
+                if (preencherHash) porTelefone.TelefoneHash ??= ClienteOtp.CalcularTelefoneHash(candidatos[0]);
                 return porTelefone;
             }
         }
