@@ -112,14 +112,28 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
     setArquivo(null); setGaleria(false); setErro(null); setFotoSalva(false); setEscolhendoAcervo(false)
   }
 
+  async function relerFoto(salvoId) {
+    const atualizado = await lerFichaDoPrato(salvoId)
+    setDetalhe((d) => ({ ...d, foto: atualizado.foto, fotoOriginal: atualizado.fotoOriginal, fotos: atualizado.fotos }))
+  }
+
+  async function conferirFotoAtual() {
+    if (salvando || !id) return
+    setSalvando(true)
+    try {
+      await relerFoto(id)
+      setImagemAcervo(null); setErro(null); setFotoSalva(false)
+    } catch (e) { setErro(e.message) }
+    finally { setSalvando(false) }
+  }
+
   async function gravarFoto(salvoId) {
     if (imagemAcervo) await salvarFotoDoAcervo(salvoId, imagemAcervo, galeria)
     else await salvarFotoDoPrato(salvoId, arquivo, galeria)
     setArquivo(null); setImagemAcervo(null); setFotoSalva(true)
     // Só atualiza a fotografia. Uma releitura não deve apagar os campos já digitados.
     try {
-      const atualizado = await lerFichaDoPrato(salvoId)
-      setDetalhe((d) => ({ ...d, foto: atualizado.foto, fotoOriginal: atualizado.fotoOriginal, fotos: atualizado.fotos }))
+      await relerFoto(salvoId)
     } catch {
       setErro('A foto foi salva, mas não consegui atualizar a prévia. Feche e reabra a ficha para conferir.')
     }
@@ -211,7 +225,7 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
           <div className={css.foto}>{foto ? <img src={foto} alt={`Foto de ${nome}`} /> : <div className={css.semFoto}><Icone nome="imagem" tamanho={40} /><span>Seu prato começa pela foto</span></div>}</div>
           {fonteApi && podeEditar && <div className={css.fotosEditor}>
             <Botao disabled={salvando || carga !== 'ok'} icone="imagem" aria-label="Escolher do banco de imagens" onClick={() => setEscolhendoAcervo(true)}>Escolher do banco</Botao>
-            <label className={css.escolherFoto}><Icone nome="camera" tamanho={20} />Enviar do computador
+            <label className={css.escolherFoto}><Icone nome="camera" tamanho={20} />Enviar foto
               <input ref={inputFoto} type="file" accept="image/jpeg,image/png,image/webp" disabled={salvando || carga !== 'ok'} onChange={escolherFoto} aria-label="Escolher foto do prato" />
             </label>
             <small className={css.ajuda}>JPG, PNG ou WebP · até 6 MB</small>
@@ -234,7 +248,7 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
         </aside>
         <form ref={formulario} onSubmit={salvar} onChange={() => setAlterado(true)} className={css.formulario} aria-label="Ficha do prato">
           {carga === 'carregando' && <output>Carregando a ficha do prato…</output>}
-          {erro && <div className={css.erro} role="alert" ref={erroRef} tabIndex={-1}>{erro}{carga === 'erro' && <Botao onClick={() => { setCarga('carregando'); setTentativa((t) => t + 1) }}>Tentar novamente</Botao>}</div>}
+          {erro && <div className={css.erro} role="alert" ref={erroRef} tabIndex={-1}>{erro}{carga === 'erro' && <Botao onClick={() => { setCarga('carregando'); setTentativa((t) => t + 1) }}>Tentar novamente</Botao>}{imagemAcervo && id && carga === 'ok' && <Botao disabled={salvando} onClick={conferirFotoAtual}>Conferir foto atual</Botao>}</div>}
           <fieldset disabled={salvando || precisaReler || carga !== 'ok' || !podeEditar} className={css.campos}>
             <section className={css.secao}>
               <h3>Apresentação do prato</h3>
