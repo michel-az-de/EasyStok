@@ -85,6 +85,9 @@ public sealed class OtpStubFlagTests : IAsyncLifetime
                         ["Jwt:ExpirationMinutes"] = "60",
                         ["Anthropic:Enabled"] = "false",
                         ["FileStorage:Provider"] = "Local",
+                        // F16 (#1246): Production nao sobe sem KEK. Gerada aqui, so vale neste teste.
+                        ["Crypto:CurrentKekId"] = "kek-teste",
+                        ["Crypto:Keks:kek-teste"] = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
                         ["Mobile:ApiKey"] = "easystock-integration-test-mobile-key-0001",
                         ["RunMigrationsOnStartup"] = "false",
                     };

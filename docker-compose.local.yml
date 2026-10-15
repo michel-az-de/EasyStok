@@ -99,6 +99,10 @@ services:
       Anthropic__Enabled: "false"
       OpenAI__Enabled: "false"
       FileStorage__Provider: Local
+      # KEK das chaves de integração (F16, #1246). Opcional em Development: sem ela, salvar
+      # chave pela tela responde 503. Gerar: openssl rand -base64 32 (nunca versionar o valor).
+      EZ_CRYPTO_KEK_ID: "${EZ_CRYPTO_KEK_ID:-}"
+      EZ_CRYPTO_KEK: "${EZ_CRYPTO_KEK:-}"
       # E-mail: o Mailpit capta tudo (http://localhost:8025). Texto puro (Modo=Nenhum) so vale fora de
       # Production. Os remetentes sao do dominio .local de proposito: nenhum remetente e inventado em codigo,
       # entao sem FromEmail o provider cairia no console.

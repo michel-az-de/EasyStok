@@ -32,6 +32,13 @@ public class CredencialIntegracaoConfiguration : IEntityTypeConfiguration<Creden
         b.Property(c => c.Ativo).HasColumnName("ativo").IsRequired();
         b.Property(c => c.UltimoUsoEm).HasColumnName("ultimo_uso_em");
 
+        // F16 (#1246): máscara (últimos 4) e o último teste de conexão.
+        b.Property(c => c.Mascara).HasColumnName("mascara").HasMaxLength(CredencialIntegracao.MascaraTamanhoMaximo);
+        b.Property(c => c.UltimoTesteEm).HasColumnName("ultimo_teste_em");
+        b.Property(c => c.UltimoTesteOk).HasColumnName("ultimo_teste_ok");
+        b.Property(c => c.UltimoTesteMensagem).HasColumnName("ultimo_teste_mensagem")
+            .HasMaxLength(CredencialIntegracao.MensagemTesteTamanhoMaximo);
+
         b.Property(c => c.CriadoPorUsuarioId).HasColumnName("criado_por_usuario_id").IsRequired();
         b.Property(c => c.CriadoEm).HasColumnName("criado_em").IsRequired();
         b.Property(c => c.AlteradoEm).HasColumnName("alterado_em").IsRequired();

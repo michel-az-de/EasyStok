@@ -37,6 +37,20 @@ public interface ICredencialIntegracaoRepository
         CancellationToken ct = default);
 
     /// <summary>
+    /// Ativas do provider na empresa, em qualquer ambiente (F16: a tela mostra uma por provider).
+    /// Rastreadas, para desativar ou gravar o resultado do teste.
+    /// </summary>
+    Task<IReadOnlyList<CredencialIntegracao>> ListarAtivasDoProviderAsync(
+        Guid empresaId,
+        string providerKey,
+        CancellationToken ct = default);
+
+    /// <summary>Ativas da empresa, todas as providers. Rastreadas.</summary>
+    Task<IReadOnlyList<CredencialIntegracao>> ListarAtivasDaEmpresaAsync(
+        Guid empresaId,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Todas as credenciais ativas, de todas as lojas, só para leitura: verificação da chave-mestra na
     /// subida (I4.2). Cross-tenant, só pela porta de bypass da RLS.
     /// </summary>

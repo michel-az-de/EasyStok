@@ -5,8 +5,10 @@ namespace EasyStock.Application.UseCases.Atendimento;
 public sealed record ObterStatusIntegracaoWhatsAppQuery(Guid EmpresaId);
 
 /// <summary>
-/// WebhookVerificadoEm e UltimaMensagemRecebidaEm vêm de <c>ConfiguracaoAtendimento</c>; a última mensagem é
-/// gravada pelo webhook a cada entrada (#1474). Nulos enquanto a empresa não tem configuração gravada.
+/// Os dois carimbos vêm da <c>ConfiguracaoAtendimento</c> da empresa (F16, #1246).
+/// <c>UltimaMensagemRecebidaEm</c> é gravado pelo webhook a cada mensagem. <c>WebhookVerificadoEm</c>
+/// continua nulo na prática: a verificação da Meta (<c>hub.challenge</c>) é por app, não por
+/// empresa, e nada grava o campo (registrado na #1246).
 /// </summary>
 public sealed record StatusIntegracaoWhatsAppDto(
     string? PhoneNumberId,

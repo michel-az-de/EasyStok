@@ -21,6 +21,12 @@ namespace EasyStock.Domain.Integration;
 /// </summary>
 public sealed class CredencialIntegracao
 {
+    /// <summary>Teto da mensagem do último teste de conexão (F16, #1246).</summary>
+    public const int MensagemTesteTamanhoMaximo = 300;
+
+    /// <summary>A máscara mostra só os últimos caracteres do segredo, nunca mais que isso.</summary>
+    public const int MascaraTamanhoMaximo = 4;
+
     public Guid Id { get; private set; }
     public Guid EmpresaId { get; private set; }
     public CategoriaIntegracao Categoria { get; private set; }
@@ -63,6 +69,20 @@ public sealed class CredencialIntegracao
     /// </summary>
     public DateTime? UltimoUsoEm { get; private set; }
 
+    /// <summary>
+    /// Últimos caracteres do segredo, para a tela reconhecer qual chave está salva sem que o
+    /// <c>GET</c> precise decifrar nada (F16, #1246). Nulo quando a credencial não tem segredo
+    /// com sentido de máscara.
+    /// </summary>
+    public string? Mascara { get; private set; }
+
+    /// <summary>Último teste de conexão (botão Testar ou vigia). Nulo = nunca testada.</summary>
+    public DateTime? UltimoTesteEm { get; private set; }
+    public bool? UltimoTesteOk { get; private set; }
+
+    /// <summary>Mensagem do provedor em português no último teste, sem segredo.</summary>
+    public string? UltimoTesteMensagem { get; private set; }
+
     public Guid CriadoPorUsuarioId { get; private set; }
     public DateTime CriadoEm { get; private set; }
     public DateTime AlteradoEm { get; private set; }
@@ -82,7 +102,8 @@ public sealed class CredencialIntegracao
         byte[] iv,
         byte[] tag,
         Guid criadoPorUsuarioId,
-        DateTime? validoAte = null)
+        DateTime? validoAte = null,
+        string? mascara = null)
     {
         if (empresaId == Guid.Empty)
             throw new ArgumentException("EmpresaId é obrigatório.", nameof(empresaId));
@@ -98,6 +119,9 @@ public sealed class CredencialIntegracao
             throw new ArgumentException("Tag é obrigatório.", nameof(tag));
         if (criadoPorUsuarioId == Guid.Empty)
             throw new ArgumentException("CriadoPorUsuarioId é obrigatório.", nameof(criadoPorUsuarioId));
+
+        if (mascara is not null && mascara.Length > MascaraTamanhoMaximo)
+            throw new ArgumentException($"Máscara acima de {MascaraTamanhoMaximo} caracteres.", nameof(mascara));
 
         var agora = DateTime.UtcNow;
         if (validoAte.HasValue && validoAte.Value <= agora)
@@ -116,6 +140,7 @@ public sealed class CredencialIntegracao
             Tag = tag,
             ValidoDe = agora,
             ValidoAte = validoAte,
+            Mascara = string.IsNullOrEmpty(mascara) ? null : mascara,
             Ativo = true,
             CriadoPorUsuarioId = criadoPorUsuarioId,
             CriadoEm = agora,
@@ -131,6 +156,26 @@ public sealed class CredencialIntegracao
     {
         UltimoUsoEm = DateTime.UtcNow;
     }
+
+    /// <summary>
+    /// Grava o resultado do teste de conexão (F16). A mensagem é cortada no teto: quem chama
+    /// já a traduziu e tirou qualquer segredo.
+    /// </summary>
+    public void RegistrarTeste(DateTime em, bool ok, string? mensagem)
+    {
+        UltimoTesteEm = DateTime.SpecifyKind(em, DateTimeKind.Utc);
+        UltimoTesteOk = ok;
+        var limpa = string.IsNullOrWhiteSpace(mensagem) ? null : mensagem.Trim();
+        UltimoTesteMensagem = limpa is { Length: > MensagemTesteTamanhoMaximo }
+            ? limpa[..MensagemTesteTamanhoMaximo]
+            : limpa;
+    }
+
+    /// <summary>
+    /// A validade cai até <paramref name="limite"/>? Usado pelo vigia para avisar a dona antes de
+    /// a chave vencer. Sem <see cref="ValidoAte"/>, nunca vence.
+    /// </summary>
+    public bool VenceAte(DateTime limite) => ValidoAte.HasValue && ValidoAte.Value <= limite;
 
     /// <summary>
     /// Desativa a credencial. Resolvers devem ignorar credenciais inativas

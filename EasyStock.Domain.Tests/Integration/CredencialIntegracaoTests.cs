@@ -199,4 +199,52 @@ public class CredencialIntegracaoTests
         Action act = () => c.RotacionarKek(Array.Empty<byte>(), "k2", FakeBytes(12), FakeBytes(16));
         act.Should().Throw<ArgumentException>();
     }
+
+    // ─── F16 (#1246): máscara, último teste e janela de vencimento ───────────
+
+    [Fact]
+    public void Criar_guarda_mascara_so_com_os_ultimos_quatro()
+    {
+        var c = CredencialIntegracao.Criar(
+            Guid.NewGuid(), CategoriaIntegracao.Payments, "mercadopago", AmbienteIntegracao.Production,
+            FakeBytes(), "k", FakeBytes(12), FakeBytes(16), Guid.NewGuid(), mascara: "abcd");
+
+        c.Mascara.Should().Be("abcd");
+        c.UltimoTesteEm.Should().BeNull();
+        c.UltimoTesteOk.Should().BeNull();
+    }
+
+    [Fact]
+    public void Criar_recusa_mascara_maior_que_quatro()
+    {
+        var act = () => CredencialIntegracao.Criar(
+            Guid.NewGuid(), CategoriaIntegracao.Payments, "mercadopago", AmbienteIntegracao.Production,
+            FakeBytes(), "k", FakeBytes(12), FakeBytes(16), Guid.NewGuid(), mascara: "segredo-inteiro");
+
+        act.Should().Throw<ArgumentException>("a máscara nunca pode carregar o segredo");
+    }
+
+    [Fact]
+    public void RegistrarTeste_grava_resultado_e_corta_mensagem_longa()
+    {
+        var c = CriarValida();
+        var em = new DateTime(2026, 9, 30, 12, 0, 0, DateTimeKind.Utc);
+
+        c.RegistrarTeste(em, ok: false, mensagem: new string('x', 400));
+
+        c.UltimoTesteEm.Should().Be(em);
+        c.UltimoTesteOk.Should().BeFalse();
+        c.UltimoTesteMensagem!.Length.Should().Be(CredencialIntegracao.MensagemTesteTamanhoMaximo);
+    }
+
+    [Fact]
+    public void VenceAte_considera_a_janela()
+    {
+        var agora = DateTime.UtcNow;
+        var c = CriarValida(validoAte: agora.AddDays(5));
+
+        c.VenceAte(agora.AddDays(7)).Should().BeTrue();
+        c.VenceAte(agora.AddDays(3)).Should().BeFalse();
+        CriarValida().VenceAte(agora.AddDays(7)).Should().BeFalse("sem validade não vence");
+    }
 }

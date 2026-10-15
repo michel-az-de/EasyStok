@@ -13,6 +13,7 @@ import { AbaCaixaApi } from './caixa/AbaCaixaApi'
 import { PainelFinanceiro } from './financeiro/PainelFinanceiro'
 import { AbaJanelas } from './janelas/AbaJanelas'
 import { AbaFidelidade } from './fidelidade/AbaFidelidade'
+import { AbaIntegracoesApi } from './integracoes/AbaIntegracoesApi'
 import { AbaIntegracoes } from './integracoes/AbaIntegracoes'
 import { AbaAtendimento } from './atendimento/AbaAtendimento'
 import { AbaImpressao } from './impressao/AbaImpressao'
@@ -203,7 +204,6 @@ const AINDA_NAO_LIGADO = {
     saida: { modulo: 'producao', telas: ['producao'] },
   },
   fidelidade: { texto: 'Cupons e fidelidade ainda não estão disponíveis nesta tela.' },
-  integracoes: { texto: 'As integrações de entrega ainda não estão disponíveis nesta tela.' },
 }
 
 function AbaNaoLigada({ texto, saida = null }) {
@@ -233,7 +233,7 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
     caixa: fonteApi ? <AbaCaixaApi /> : <AbaCaixa />,
     janelas: fonteApi && janelasApi ? janelasApi : <AbaJanelas />,
     fidelidade: <AbaFidelidade />,
-    integracoes: <AbaIntegracoes />,
+    integracoes: fonteApi ? <AbaIntegracoesApi /> : <AbaIntegracoes />,
     canais: <TelaCanais />,
     // #1753 (M7.2): usuários e histórico de acesso (só modo API).
     usuarios: <AbaUsuarios />,

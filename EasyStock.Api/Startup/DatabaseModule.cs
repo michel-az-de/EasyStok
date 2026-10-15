@@ -70,6 +70,8 @@ public static class DatabaseModule
                 builder.Services.AddEasyStockMetaMensageria(builder.Configuration);
                 // Atendimento WhatsApp (S06) — LLM do agente (Anthropic:*; desligado sem chave).
                 builder.Services.AddEasyStockAgenteLlm(builder.Configuration);
+                // Integrações por loja (F16, #1246): teste de conexão de cada provider e chaves globais.
+                builder.Services.AddEasyStockTestesIntegracao();
                 // Login com Google (#1324): Auth:Google:ClientId; desligado sem ele.
                 builder.Services.Configure<EasyStock.Infra.Integrations.Auth.GoogleAuthOptions>(
                     builder.Configuration.GetSection(EasyStock.Infra.Integrations.Auth.GoogleAuthOptions.Secao));

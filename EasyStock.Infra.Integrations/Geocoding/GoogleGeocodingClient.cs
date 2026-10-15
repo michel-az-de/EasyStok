@@ -41,16 +41,9 @@ public sealed class GoogleGeocodingClient : IGeocodingClient
         var endereco = MontarEndereco(query);
         if (endereco is null) return null; // sem componente de endereço útil → não bate na rede
 
-        var url = "geocode/json?" + string.Join('&',
-            $"address={Uri.EscapeDataString(endereco)}",
-            $"components={Uri.EscapeDataString("country:BR")}",
-            "region=br",
-            "language=pt-BR",
-            $"key={Uri.EscapeDataString(_apiKey)}");
-
         try
         {
-            using var resp = await _http.GetAsync(url, ct);
+            using var resp = await _http.GetAsync(MontarUrl(endereco), ct);
             if (!resp.IsSuccessStatusCode)
             {
                 _logger.LogDebug("Google Geocoding retornou HTTP {Status}", (int)resp.StatusCode);
@@ -92,6 +85,42 @@ public sealed class GoogleGeocodingClient : IGeocodingClient
             return null;
         }
     }
+
+    /// <summary>
+    /// Status cru da Geocoding API (<c>OK</c>, <c>ZERO_RESULTS</c>, <c>REQUEST_DENIED</c>,
+    /// <c>OVER_QUERY_LIMIT</c>...) para o teste de conexão da F16 (#1246). Erro de transporte vira
+    /// <c>HTTP_{código}</c>, <c>ERRO_REDE</c> ou <c>JSON_INVALIDO</c>; cancelamento do chamador
+    /// propaga. A URL leva a chave e nunca é logada.
+    /// </summary>
+    public async Task<string> ObterStatusAsync(GeocodeQuery query, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var endereco = MontarEndereco(query)
+            ?? throw new ArgumentException("O teste precisa de um endereço.", nameof(query));
+
+        try
+        {
+            using var resp = await _http.GetAsync(MontarUrl(endereco), ct);
+            if (!resp.IsSuccessStatusCode) return $"HTTP_{(int)resp.StatusCode}";
+            var corpo = await resp.Content.ReadFromJsonAsync<GoogleResposta>(ct);
+            return string.IsNullOrWhiteSpace(corpo?.Status) ? "JSON_INVALIDO" : corpo.Status;
+        }
+        catch (HttpRequestException)
+        {
+            return "ERRO_REDE";
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or NotSupportedException)
+        {
+            return "JSON_INVALIDO";
+        }
+    }
+
+    private string MontarUrl(string endereco) => "geocode/json?" + string.Join('&',
+        $"address={Uri.EscapeDataString(endereco)}",
+        $"components={Uri.EscapeDataString("country:BR")}",
+        "region=br",
+        "language=pt-BR",
+        $"key={Uri.EscapeDataString(_apiKey)}");
 
     /// <summary>
     /// Endereço em linha única no formato brasileiro. <see langword="null"/> se não há

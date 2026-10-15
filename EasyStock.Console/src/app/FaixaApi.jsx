@@ -1,3 +1,6 @@
+import { hashDoModulo } from '../dominio/modulos'
+import { useIntegracoesApi } from '../aplicacao/useIntegracoesApi'
+import { textoDaFaixa } from '../dominio/chavesIntegracao'
 import { useEffect, useRef } from 'react'
 import { useAcoes, useAtendimento } from '../aplicacao/contextos'
 import { avisoDeVencimento, rotuloDaSessao } from '../dominio/sessao'
@@ -39,6 +42,8 @@ export function AvisoDaAcaoApi() {
 export function FaixaApi({ aoSair, somenteAvisos = false }) {
   const { fonteApi, sincronizacao, sessao, agora } = useAtendimento()
   const { fecharAvisoApi } = useAcoes()
+  const { lista: integracoes } = useIntegracoesApi({ ativo: fonteApi, intervaloMs: 60_000 })
+  const integracaoParada = textoDaFaixa(integracoes)
   if (!fonteApi) return null
   // F07, item 6: 10 min antes do JWT vencer. Sessão antiga, sem `venceEm`, usa o `expiraEm`.
   const vencimento = !sessao?.persistente && avisoDeVencimento(sessao?.venceEm ?? (sessao?.expiraEm ? sessao.expiraEm + 60000 : null), agora)
@@ -60,6 +65,7 @@ export function FaixaApi({ aoSair, somenteAvisos = false }) {
           <button type="button" className={css.sair} onClick={() => fecharAvisoApi({ fixo: !avisoDeAcao })}>Fechar aviso</button>
         )}
       </span>}
+      {integracaoParada && <span className={css.texto}>{integracaoParada} <a href={hashDoModulo('configuracoes', 'integracoes')}>Ver integrações</a></span>}
       <span className={css.quem}>
         {vencimento && <strong className={css.vence}>{vencimento}</strong>}
         {rotuloDaSessao(sessao)}
