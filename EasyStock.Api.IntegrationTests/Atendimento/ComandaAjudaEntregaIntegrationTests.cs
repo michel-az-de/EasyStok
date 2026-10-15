@@ -169,6 +169,41 @@ public sealed partial class PedidoConversaConcorrenciaTests
     }
 
     [SkippableFact]
+    public async Task Comanda1839_EnderecoIncompletoVaiParaAtendenteSemCadastrarEPreservaRascunho()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var factory = CriarFactory(Provedor(new()));
+        using var client = factory.CreateClient();
+        var c = await SemearAsync(factory);
+        Guid conversaId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            var lead = Conversa.Abrir(EmpresaId, "5511912345603", DateTime.UtcNow, "Lead com rua");
+            db.AtendimentoConversas.Add(lead);
+            await db.SaveChangesAsync();
+            conversaId = lead.Id;
+        }
+        var token = await Link(factory, conversaId);
+        var estado = await Estado(client, token);
+        await Salvar(client, token, estado, new([new(c.CardapioItemId, 1)],
+            Endereco: new("", "Rua sem número", "", "", "", "", "Fundos"), Nome: "Lead com rua", Telefone: "11912345603"));
+        estado = await Estado(client, token);
+        var resposta = await client.PostAsJsonAsync($"{Rota(token)}/encaminhar-entrega", new { estado.Revisao });
+        resposta.StatusCode.Should().Be(HttpStatusCode.OK, await resposta.Content.ReadAsStringAsync());
+        var final = await Estado(client, token);
+        final.EntregaACombinar.Should().BeTrue();
+        final.Pedido.Should().BeNull();
+        final.Rascunho.Endereco!.Logradouro.Should().Be("Rua sem número", "o rascunho incompleto fica para a atendente conferir");
+        using var verificacao = factory.Services.CreateScope();
+        var banco = verificacao.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        var conversa = await banco.AtendimentoConversas.SingleAsync(x => x.Id == conversaId);
+        (await banco.Clientes.Include(x => x.Enderecos).SingleAsync(x => x.Id == conversa.ClienteId)).Enderecos.Should().BeEmpty();
+        (await banco.AtendimentoMensagens.CountAsync(x => x.ConversaId == conversaId && x.Texto!.Contains("Endereço pendente"))).Should().Be(1);
+        (await banco.Pedidos.CountAsync()).Should().Be(0);
+    }
+
+    [SkippableFact]
     public async Task Comanda1712_AjudaSemRascunhoEscalaUmaVezNotificaEPreservaEdicaoConcorrente()
     {
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");

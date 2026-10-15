@@ -351,7 +351,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             if (dados.Itens.Count == 0) throw new UseCaseValidationException("Escolha ao menos um prato.");
             if (string.IsNullOrWhiteSpace(dados.Nome) || string.IsNullOrWhiteSpace(dados.Telefone))
                 throw new UseCaseValidationException("Informe seu nome e telefone para a Casa acompanhar seu pedido.");
-            var endereco = dados.Endereco?.Validar();
+            var endereco = exigirEndereco ? dados.Endereco?.Validar() : Valido(dados.Endereco);
             if (endereco is null && exigirEndereco) throw new UseCaseValidationException("Informe seu endereço de entrega.");
             await cadastrarCliente.ExecuteAsync(new(acesso.EmpresaId, acesso.ConversaId, dados.Nome, dados.Telefone,
                 endereco is null ? null : new(endereco.Cep, endereco.Logradouro, endereco.Numero, endereco.Complemento, endereco.Bairro, endereco.Cidade, endereco.Uf),
@@ -416,7 +416,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             if (!estado.PodeEditar || estado.Pedido is not null) throw new LinkCardapioConversaIndisponivelException();
             Validar(estado.Rascunho);
             if (estado.Rascunho.Itens.Count == 0) throw new UseCaseValidationException("Escolha ao menos um prato.");
-            var endereco = estado.Rascunho.Endereco?.Validar();
+            var endereco = Valido(estado.Rascunho.Endereco);
             if (endereco is not null)
                 await cadastrarCliente.ExecuteAsync(new(acesso.EmpresaId, acesso.ConversaId, null, null,
                     new(endereco.Cep, endereco.Logradouro, endereco.Numero, endereco.Complemento, endereco.Bairro, endereco.Cidade, endereco.Uf)), t);
@@ -427,7 +427,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             ContextoConversaJson.Gravar(conversa, RevisaoEntregaACombinar, new EntregaACombinarComanda(link.Id, revisao));
             await conversas.AddMensagemAsync(Mensagem.Saida(acesso.EmpresaId, acesso.ConversaId, AutorMensagem.Sistema,
                 agora, TipoConteudoMensagem.Texto, endereco is null
-                    ? "Cliente enviou a comanda sem endereço. Endereço pendente: peça o endereço na conversa e registre na Ficha. " +
+                    ? "Cliente enviou a comanda sem endereço completo. Endereço pendente: peça o endereço na conversa e registre na Ficha. " +
                       "Seleção preservada. Frete pendente de decisão humana; não cobrar nem prometer entrega ainda."
                     : "Cliente enviou a comanda para combinar entrega fora da área automática. " +
                       "Seleção e endereço preservados. Frete pendente de decisão humana; não cobrar nem prometer entrega ainda."), t);
@@ -536,6 +536,13 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
 
     public Task AvisarAsync(Guid empresaId, Guid conversaId, CancellationToken ct) =>
         eventos.PublicarAsync(Evento, empresaId, new { conversaId }, ct);
+
+    /// <summary>Na entrega a combinar, endereço incompleto fica no rascunho e a atendente confere na conversa (#1839).</summary>
+    private static EnderecoCheckout? Valido(EnderecoCheckout? e)
+    {
+        try { return e?.Validar(); }
+        catch (RegraDeDominioVioladaException) { return null; }
+    }
 
     private static EnderecoCheckout? Informado(EnderecoCheckout? e) =>
         e is null || new[] { e.Cep, e.Logradouro, e.Numero, e.Bairro, e.Cidade, e.Uf, e.Complemento }.All(string.IsNullOrWhiteSpace) ? null : e;
