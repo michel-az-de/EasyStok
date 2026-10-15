@@ -88,6 +88,19 @@ public class AssistenteDoCardapioUseCaseTests
         await acao.Should().ThrowAsync<KeyNotFoundException>();
     }
 
+    [Theory]
+    [InlineData("null")]
+    [InlineData("[]")]
+    [InlineData("42")]
+    public async Task Ferramenta_com_entrada_que_nao_e_objeto_usa_alternativa_estatica(string json)
+    {
+        _llm.Disponivel.Returns(true);
+        ResponderFerramenta("dar_dica", json);
+        (await Sut().DicaAsync(Empresa, _lasanha.Id, default)).PorIa.Should().BeFalse();
+        ResponderFerramenta("sugerir_associacoes", json);
+        (await Sut().SugerirAssociacoesAsync(Empresa, default)).PorIa.Should().BeFalse();
+    }
+
     [Fact]
     public async Task Sugestao_sem_ia_casa_pelo_nome_so_imagens_aprovadas_de_produto()
     {

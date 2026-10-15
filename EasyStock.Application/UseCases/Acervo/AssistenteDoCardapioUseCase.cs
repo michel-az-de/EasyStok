@@ -95,7 +95,8 @@ public sealed class AssistenteDoCardapioUseCase(IAcervoRepository repo, IAgenteL
                 [new(MensagemLlm.Usuario, [new BlocoTextoLlm(dados)])],
                 [new(nome, descricao, schema)]), ct);
             var usos = resposta.Conteudo.OfType<BlocoUsoFerramentaLlm>().ToArray();
-            return resposta.StopReason == RespostaLlm.StopToolUse && usos.Length == 1 && usos[0].Nome == nome ? usos[0].Entrada : null;
+            return resposta.StopReason == RespostaLlm.StopToolUse && usos.Length == 1 && usos[0].Nome == nome
+                && usos[0].Entrada.ValueKind == JsonValueKind.Object ? usos[0].Entrada : null;
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException or InvalidOperationException
             || ex is OperationCanceledException && !ct.IsCancellationRequested)
