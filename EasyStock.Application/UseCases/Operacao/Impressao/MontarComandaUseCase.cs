@@ -7,21 +7,27 @@ public sealed record MontarComandaInput(Guid EmpresaId, Guid PedidoId);
 
 /// <summary>
 /// Monta a <see cref="ComandaDto"/> (S52) da mesma leitura do impresso do pedido. Grupos na ordem preparar em
-/// casa, para servir, outros; itens na ordem do pedido; frete e taxa ficam fora (não são produção). Alergias vêm
-/// das tags do cadastro com prefixo <see cref="PrefixoAlergia"/>. Devolve <c>null</c> para pedido inexistente ou
-/// de outra empresa.
+/// casa (congelado, refrigerado, o resto: S53), para servir, outros; itens na ordem do pedido; frete e taxa ficam
+/// fora (não são produção). Alergias vêm das tags do cadastro com prefixo <see cref="PrefixoAlergia"/>. Devolve
+/// <c>null</c> para pedido inexistente ou de outra empresa.
 /// </summary>
 public sealed class MontarComandaUseCase(IPedidoImpressoQueries queries, TimeProvider relogio)
 {
     public const string PrefixoAlergia = "alergia_";
     public const string LinhaOutros = "outros";
 
+    private static readonly string PrepararEmCasa = LinhaProduto.PrepararEmCasa.ParaContrato();
+
     private static readonly string[] OrdemLinhas =
     [
-        LinhaProduto.PrepararEmCasa.ParaContrato(),
+        PrepararEmCasa,
         LinhaProduto.ParaServir.ParaContrato(),
         LinhaOutros,
     ];
+
+    /// <summary>Dentro de "preparar em casa", congelado vem antes de refrigerado; o resto (ambiente) por último.</summary>
+    private static readonly string?[] OrdemConservacao =
+        [ConservacaoProdutoExtensions.Congelado, ConservacaoProdutoExtensions.Refrigerado, null];
 
     public async Task<ComandaDto?> ExecuteAsync(MontarComandaInput input, CancellationToken ct = default)
     {
@@ -34,9 +40,10 @@ public sealed class MontarComandaUseCase(IPedidoImpressoQueries queries, TimePro
 
         var grupos = p.Itens
             .Where(i => i.EhProduto)
-            .GroupBy(i => Limpo(i.Linha) ?? LinhaOutros)
-            .OrderBy(g => OrdemDaLinha(g.Key))
-            .Select(g => new ComandaGrupoDto(g.Key, Titulo(g.Key), g
+            .GroupBy(i => (Linha: Limpo(i.Linha) ?? LinhaOutros, Conservacao: ConservacaoDoGrupo(i)))
+            .OrderBy(g => OrdemDaLinha(g.Key.Linha))
+            .ThenBy(g => Array.IndexOf(OrdemConservacao, g.Key.Conservacao))
+            .Select(g => new ComandaGrupoDto(g.Key.Linha, Titulo(g.Key.Linha, g.Key.Conservacao), g
                 .Select(i => new ComandaItemDto(
                     i.Quantidade,
                     Limpo(i.Unidade)?.ToLowerInvariant() ?? MontarPedidoImpressoUseCase.UnidadePadrao,
@@ -44,12 +51,12 @@ public sealed class MontarComandaUseCase(IPedidoImpressoQueries queries, TimePro
                     Limpo(i.Variacao),
                     Limpo(i.Molho),
                     Limpo(i.Observacao)))
-                .ToList()))
+                .ToList(), g.Key.Conservacao))
             .ToList();
 
         return new ComandaDto(
             p.Id.ToString("N")[..8].ToUpperInvariant(),
-            NumeroDoDia: null,
+            p.NumeroDoDia,
             PrazoImpresso.Calcular(p),
             Limpo(p.Cliente.Nome),
             p.Entrega is { } e ? new PedidoImpressoEntregaDto(e.Tipo, Limpo(e.Nome)) : null,
@@ -76,9 +83,16 @@ public sealed class MontarComandaUseCase(IPedidoImpressoQueries queries, TimePro
         return i < 0 ? OrdemLinhas.Length : i;
     }
 
-    private static string Titulo(string linha) => linha switch
+    /// <summary>Só "preparar em casa" se divide; congelado e refrigerado viram grupo próprio, ambiente fica no geral.</summary>
+    private static string? ConservacaoDoGrupo(PedidoImpressoItemLeitura i) =>
+        Limpo(i.Linha) == PrepararEmCasa
+        && Limpo(i.Conservacao)?.ToLowerInvariant() is ConservacaoProdutoExtensions.Congelado or ConservacaoProdutoExtensions.Refrigerado
+            ? i.Conservacao!.Trim().ToLowerInvariant()
+            : null;
+
+    private static string Titulo(string linha, string? conservacao) => linha switch
     {
-        "prepararEmCasa" => "Preparar em casa",
+        "prepararEmCasa" => conservacao is null ? "Preparar em casa" : $"Preparar em casa · {conservacao}",
         "paraServir" => "Para servir",
         _ => "Outros",
     };

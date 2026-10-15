@@ -95,4 +95,21 @@ public class EditarCardapioItemAdminUseCaseTests
             "'&', aspas, hífen, parênteses e '<'/'>' isolados são legítimos");
         await _uow.Received(1).CommitAsync();
     }
+
+    [Fact]
+    public async Task DefineConservacaoSemMexerNaLinha()
+    {
+        // S53: a comanda separa congelado; null não mexe.
+        var storefrontId = Guid.NewGuid();
+        var item = ItemComDetalhes(storefrontId);
+
+        await Sut().ExecuteAsync(new EditarCardapioItemAdminCommand(
+            storefrontId, item.Id,
+            NomePublico: null, CategoriaTexto: null, DescricaoPublica: null, Ingredientes: null, Alergenos: null,
+            SugestaoMolho: null, TempoPreparo: null, FotoUrl: null, PrecoStorefront: null, Tag: null,
+            PesoExibicao: null, FiltrosJson: null, Conservacao: EasyStock.Domain.Enums.Storefront.ConservacaoProduto.Congelado));
+
+        item.Conservacao.Should().Be(EasyStock.Domain.Enums.Storefront.ConservacaoProduto.Congelado);
+        item.Linha.Should().Be(EasyStock.Domain.Enums.Storefront.LinhaProduto.ParaServir);
+    }
 }
