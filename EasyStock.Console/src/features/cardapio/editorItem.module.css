@@ -34,6 +34,14 @@
 .escolherFoto:focus-within { outline: 3px solid var(--marca); outline-offset: 2px; }
 .fotoPendente { display: grid; gap: 8px; font-size: .875rem; overflow-wrap: anywhere; }
 .acoesFoto { display: flex; flex-wrap: wrap; gap: 8px; }
+.acoesFoto > span { align-self: center; }
+.gradeAcervo { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin: 20px 0; }
+.imagemAcervo { min-width: 0; }
+.imagemAcervo > button:first-child { display: grid; gap: 8px; width: 100%; padding: 8px; border: 1px solid var(--linha); border-radius: 8px; background: var(--papel); color: var(--tinta); font: inherit; text-align: left; cursor: pointer; }
+.imagemAcervo img, .imagemAcervo > button > span { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; }
+.imagemAcervo strong { overflow-wrap: anywhere; }
+.imagemAcervo button:focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
+.imagemAcervo button:disabled { cursor: default; opacity: .6; }
 .sucesso { display: flex; align-items: center; gap: 8px; color: var(--sucesso); }
 .galeria { display: grid; gap: 8px; font-size: .875rem; color: var(--tinta-3); }
 .galeria > div { display: flex; flex-wrap: wrap; gap: 6px; }

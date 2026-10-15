@@ -6,12 +6,14 @@ import { MarcaIcone } from '../../componentes/MarcaIcone'
 import { CampoMascarado } from '../../componentes/CampoMascarado'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
-import { lerCategoriasDoPrato, lerEmbalagensDaPorcao, lerFichaDoPrato, salvarFichaDoPrato, salvarFotoDoPrato } from '../../aplicacao/edicaoCardapio'
+import { lerCategoriasDoPrato, lerEmbalagensDaPorcao, lerFichaDoPrato, salvarFichaDoPrato, salvarFotoDoPrato, salvarFotoDoAcervo } from '../../aplicacao/edicaoCardapio'
+import { useMiniaturaAcervo } from '../../aplicacao/useAcervo'
 import { catalogoDeAdicionais } from '../../dominio/cardapio'
 import { fotoDoItem } from '../../dominio/vitrineCardapio'
 import { lerMoeda, mascaraMoeda, moeda, moedaAltaDemais } from '../../dominio/formato'
 import { corpoDasPorcoes, erroDasPorcoes, porcoesMudaram, rascunhoDasPorcoes, resumoDoItem } from '../../dominio/porcoes'
 import { EditorPorcoes } from './EditorPorcoes'
+import { EscolherFotoDoAcervo } from './EscolherFotoDoAcervo'
 import css from './editorItem.module.css'
 
 const VAZIA = { descricao: '', ingredientes: '', alergenos: '', preparo: '', instrucao: '' }
@@ -47,6 +49,9 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
   const [alterado, setAlterado] = useState(false)
   const [confirmaSaida, setConfirmaSaida] = useState(false)
   const [arquivo, setArquivo] = useState(null)
+  const [imagemAcervo, setImagemAcervo] = useState(null)
+  const [escolhendoAcervo, setEscolhendoAcervo] = useState(false)
+  const previaAcervo = useMiniaturaAcervo(imagemAcervo?.id)
   const [galeria, setGaleria] = useState(false)
   const [preview, setPreview] = useState(null)
   const [fotoSalva, setFotoSalva] = useState(false)
@@ -84,10 +89,11 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
 
   useEffect(() => { if (erro) erroRef.current?.focus() }, [erro])
   useEffect(() => { if (confirmaSaida) confirmacaoRef.current?.focus() }, [confirmaSaida])
-  const fechar = () => { if (salvando) return; if (alterado || arquivo) setConfirmaSaida(true); else aoFechar() }
+  const fotoPendente = arquivo || imagemAcervo
+  const fechar = () => { if (salvando) return; if (alterado || fotoPendente) setConfirmaSaida(true); else aoFechar() }
   const mudarFicha = (campo) => (e) => setFicha((atual) => ({ ...atual, [campo]: e.target.value }))
   const resumo = porcoes.length ? resumoDoItem(porcoes) : null
-  const foto = preview ?? detalhe?.foto ?? fotoDoItem(item ?? {})
+  const foto = preview ?? previaAcervo.url ?? detalhe?.foto ?? fotoDoItem(item ?? {})
   const fotosDoPrato = detalhe?.fotos?.length ? detalhe.fotos : detalhe?.foto ? [detalhe.foto] : []
   const extras = catalogoDeAdicionais(cardapio, adicionais, item?.sku ?? null)
 
@@ -98,22 +104,43 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(escolhida.type) || escolhida.size > 6 * 1024 * 1024) {
       setErro('Escolha uma foto JPG, PNG ou WebP de até 6 MB.'); return
     }
-    setArquivo(escolhida); setGaleria(false); setErro(null); setFotoSalva(false)
+    setArquivo(escolhida); setImagemAcervo(null); setGaleria(false); setErro(null); setFotoSalva(false)
+  }
+
+  function escolherDoAcervo(imagem) {
+    setImagemAcervo({ id: imagem.id, titulo: imagem.titulo, capaEsperada: detalhe?.fotoOriginal ?? null, operacaoId: crypto.randomUUID() })
+    setArquivo(null); setGaleria(false); setErro(null); setFotoSalva(false); setEscolhendoAcervo(false)
+  }
+
+  async function relerFoto(salvoId) {
+    const atualizado = await lerFichaDoPrato(salvoId)
+    setDetalhe((d) => ({ ...d, foto: atualizado.foto, fotoOriginal: atualizado.fotoOriginal, fotos: atualizado.fotos }))
+  }
+
+  async function conferirFotoAtual() {
+    if (salvando || !id) return
+    setSalvando(true)
+    try {
+      await relerFoto(id)
+      setImagemAcervo(null); setErro(null); setFotoSalva(false)
+    } catch (e) { setErro(e.message) }
+    finally { setSalvando(false) }
   }
 
   async function gravarFoto(salvoId) {
-    await salvarFotoDoPrato(salvoId, arquivo, galeria)
-    setArquivo(null); setFotoSalva(true)
+    if (imagemAcervo) await salvarFotoDoAcervo(salvoId, imagemAcervo, galeria)
+    else await salvarFotoDoPrato(salvoId, arquivo, galeria)
+    setArquivo(null); setImagemAcervo(null); setFotoSalva(true)
     // Só atualiza a fotografia. Uma releitura não deve apagar os campos já digitados.
     try {
-      const atualizado = await lerFichaDoPrato(salvoId)
-      setDetalhe((d) => ({ ...d, foto: atualizado.foto, fotos: atualizado.fotos }))
+      await relerFoto(salvoId)
     } catch {
       setErro('A foto foi salva, mas não consegui atualizar a prévia. Feche e reabra a ficha para conferir.')
     }
   }
 
   async function salvarSomenteFoto() {
+    if (salvando || !id || !podeEditar || !fotoPendente) return
     setSalvando(true); setErro(null)
     try { await gravarFoto(id); await acoes.recarregarCardapio(); await aoSalvar?.() }
     catch (e) { setErro(e.message) }
@@ -167,7 +194,7 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
         // O cadastro já existe mesmo se a fotografia falhar depois.
         await acoes.recarregarCardapio()
         await aoSalvar?.()
-        if (arquivo) {
+        if (fotoPendente) {
           try { await gravarFoto(salvoId) }
           catch (e) { throw new Error(`O prato foi salvo, mas a foto não: ${e.message} Tente salvar a foto novamente.`) }
           await acoes.recarregarCardapio()
@@ -185,7 +212,7 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
   return (
     <Modal titulo={item ? 'Editar prato' : 'Novo prato'} aoFechar={fechar} largura="min(980px, calc(100vw - 24px))"
       rodape={<>
-        <span className={css.statusRodape}>{salvando ? 'Salvando alterações…' : alterado || arquivo ? 'Alterações ainda não salvas' : 'Ficha do cardápio'}</span>
+        <span className={css.statusRodape}>{salvando ? 'Salvando alterações…' : alterado || fotoPendente ? 'Alterações ainda não salvas' : 'Ficha do cardápio'}</span>
         <Botao disabled={salvando} onClick={fechar}>Cancelar</Botao>
         <Botao variante="primario" disabled={salvando || carga !== 'ok' || !podeEditar} onClick={() => precisaReler ? tentarReler() : formulario.current?.requestSubmit()}>{salvando ? 'Salvando…' : precisaReler ? 'Atualizar ficha salva' : 'Salvar prato'}</Botao>
       </>}>
@@ -197,25 +224,31 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
         <aside className={css.apresentacao}>
           <div className={css.foto}>{foto ? <img src={foto} alt={`Foto de ${nome}`} /> : <div className={css.semFoto}><Icone nome="imagem" tamanho={40} /><span>Seu prato começa pela foto</span></div>}</div>
           {fonteApi && podeEditar && <div className={css.fotosEditor}>
-            <label className={css.escolherFoto}><Icone nome="camera" tamanho={20} />{foto ? 'Escolher outra foto' : 'Adicionar foto'}
+            <Botao disabled={salvando || carga !== 'ok'} icone="imagem" aria-label="Escolher do banco de imagens" onClick={() => setEscolhendoAcervo(true)}>Escolher do banco</Botao>
+            <label className={css.escolherFoto}><Icone nome="camera" tamanho={20} />Enviar foto
               <input ref={inputFoto} type="file" accept="image/jpeg,image/png,image/webp" disabled={salvando || carga !== 'ok'} onChange={escolherFoto} aria-label="Escolher foto do prato" />
             </label>
             <small className={css.ajuda}>JPG, PNG ou WebP · até 6 MB</small>
-            {arquivo && <div className={css.fotoPendente}>
-              <span>{arquivo.name}</span>
-              {id && <label className={css.opcao}><input type="checkbox" checked={galeria} disabled={salvando || fotosDoPrato.length >= 5} onChange={(e) => setGaleria(e.target.checked)} />Adicionar à galeria</label>}
+            {fotoPendente && <div className={css.fotoPendente}>
+              <span>{arquivo?.name ?? imagemAcervo.titulo}</span>
+              {imagemAcervo && !previaAcervo.url && <span>{previaAcervo.erro ? 'Não consegui carregar a prévia.' : 'Carregando prévia…'}</span>}
+              {id && <label className={css.opcao}><input type="checkbox" checked={galeria} disabled={salvando || fotosDoPrato.length >= 5} onChange={(e) => {
+                setGaleria(e.target.checked)
+                if (imagemAcervo) setImagemAcervo({ ...imagemAcervo, operacaoId: crypto.randomUUID() })
+              }} />Adicionar à galeria</label>}
               {galeria && <small>A capa atual será mantida. Você pode ter até 5 fotos por prato.</small>}
-              <div className={css.acoesFoto}>{id && <Botao disabled={salvando} onClick={salvarSomenteFoto}>Salvar foto</Botao>}<Botao variante="texto" disabled={salvando} onClick={() => setArquivo(null)}>Desfazer</Botao></div>
+              <div className={css.acoesFoto}>{id && <Botao disabled={salvando} onClick={salvarSomenteFoto}>Salvar foto</Botao>}<Botao variante="texto" disabled={salvando} onClick={() => { setArquivo(null); setImagemAcervo(null) }}>Desfazer</Botao></div>
               {!id && <small>A foto será enviada ao salvar o prato.</small>}
             </div>}
             {fotoSalva && <output className={css.sucesso}><Icone nome="check" /> Foto salva. Ela já está no cardápio.</output>}
             {fotosDoPrato.length > 1 && <div className={css.galeria}><span>Galeria · {fotosDoPrato.length} de 5 fotos</span><div>{fotosDoPrato.map((url, i) => <img key={url} src={url} alt={`Ângulo ${i + 1} de ${nome}`} />)}</div></div>}
           </div>}
+          {escolhendoAcervo && <EscolherFotoDoAcervo aoEscolher={escolherDoAcervo} aoFechar={() => setEscolhendoAcervo(false)} />}
           <div className={css.previa}><span>{linhas[linha]?.rotulo}</span><strong>{nome || 'Nome do prato'}</strong><b>{Number.isFinite(resumo?.preco ?? centavos / 100) ? moeda(resumo?.preco ?? centavos / 100) : "Defina o preço"}</b><span>{resumo?.porcao ?? porcao}</span></div>
         </aside>
         <form ref={formulario} onSubmit={salvar} onChange={() => setAlterado(true)} className={css.formulario} aria-label="Ficha do prato">
           {carga === 'carregando' && <output>Carregando a ficha do prato…</output>}
-          {erro && <div className={css.erro} role="alert" ref={erroRef} tabIndex={-1}>{erro}{carga === 'erro' && <Botao onClick={() => { setCarga('carregando'); setTentativa((t) => t + 1) }}>Tentar novamente</Botao>}</div>}
+          {erro && <div className={css.erro} role="alert" ref={erroRef} tabIndex={-1}>{erro}{carga === 'erro' && <Botao onClick={() => { setCarga('carregando'); setTentativa((t) => t + 1) }}>Tentar novamente</Botao>}{imagemAcervo && id && carga === 'ok' && <Botao disabled={salvando} onClick={conferirFotoAtual}>Conferir foto atual</Botao>}</div>}
           <fieldset disabled={salvando || precisaReler || carga !== 'ok' || !podeEditar} className={css.campos}>
             <section className={css.secao}>
               <h3>Apresentação do prato</h3>
