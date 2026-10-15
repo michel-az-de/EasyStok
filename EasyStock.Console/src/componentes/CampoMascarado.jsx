@@ -49,6 +49,7 @@ export function CampoMascarado({
       <input
         id={id}
         inputMode="numeric"
+        data-tipo={tipo}
         className={[css.controle, erro ? css.erro : '', className].filter(Boolean).join(' ')}
         value={valor}
         onChange={aoDigitar}

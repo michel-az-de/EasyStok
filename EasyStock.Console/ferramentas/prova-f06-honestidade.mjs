@@ -108,7 +108,7 @@ function montar() {
     chamadas.length = 0
     try { api[nome]('c1', { id: 'x', sku: 'x', numero: '1' }, 'x', 'x') } catch (erro) { mexeram.push(`${nome} (lançou: ${erro.message})`); continue }
     await esvaziar()
-    const soAviso = despachos.length === 1 && despachos[0].tipo === acao.AVISO_API && /ainda não ligado/.test(despachos[0].mensagem)
+    const soAviso = despachos.length === 1 && despachos[0].tipo === acao.AVISO_API && /indisponível nesta versão/.test(despachos[0].mensagem)
     if (!soAviso || chamadas.length > 0) mexeram.push(`${nome} -> ${despachos.map((d) => d.tipo).join('+') || 'nada'}${chamadas.length ? ` + ${chamadas.length} chamada(s)` : ''}`)
   }
   confere(`as ${Object.keys(NAO_LIGADAS).length} ações "avisa" só despacham AVISO_API`, mexeram.length === 0, mexeram.slice(0, 8).join('; '))

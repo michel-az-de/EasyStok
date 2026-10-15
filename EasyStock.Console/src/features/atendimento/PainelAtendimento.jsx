@@ -8,7 +8,7 @@ import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
-import { MOTIVO_BLOQUEIO, permissaoDeEscrita } from '../../dominio/janela'
+import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoNoCabecalho } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { primeiroNome } from '../../dominio/mensagem'
 import { faixaDaJanela, preencherFaixa } from '../../dominio/entrega'
@@ -37,6 +37,9 @@ export function PainelAtendimento({
   const cabecalhoRef = useRef(null)
   const reabrindoRef = useRef(false)
   const [reabrindo, setReabrindo] = useState(false)
+  // #1761: "Modelos aprovados" abre do compositor e da bolha recusada fora da janela de 24 h.
+  // Guardado pelo id da conversa: trocar de conversa fecha.
+  const [modelosDe, setModelosDe] = useState(null)
 
   async function aoReabrir() {
     if (reabrindoRef.current || !selecionada) return
@@ -82,6 +85,9 @@ export function PainelAtendimento({
   // conduzindo. Assumir apaga o "digitando" no mesmo toque.
   const digitando = Boolean(selecionada.respostaPendente?.length) && !pausado && !bloqueada
   const faixa = faixaDaJanela(janelas, selecionada.pedido?.janela)
+  // #1551: modelo aprovado só existe com a API; na demonstração o botão só devolvia erro.
+  const podeEnviarModelo = fonteApi && podeReabrir && canal.aceitaModelo && !encerrada && !bloqueada
+  const prazo = prazoNoCabecalho(janela)
 
   const aplicarTemplate = (template) => definirRascunho(
     selecionada.id,
@@ -100,17 +106,13 @@ export function PainelAtendimento({
           />
           <h2 tabIndex={-1} ref={cabecalhoRef} data-foco-reserva>
             <span className={css.nomeCliente} title={selecionada.nome}>{selecionada.nome}</span>
-            {/* Canal, histórico e janela em uma linha de dado. A janela era uma
-                pílula colorida disputando com o nome; agora é texto. */}
+            {/* Comanda, canal e, quando pede atenção, o prazo da janela, em uma linha.
+                #1761 (L4): a quantidade de pedidos saiu (está em Histórico) e o prazo só aparece
+                perto do fim (`prazoNoCabecalho`); a linha quebrava em duas. */}
             <small>
               {selecionada.numeroComanda && <>Comanda {selecionada.numeroComanda} · </>}
               <Icone nome={canal.icone} className={css['canal_' + canal.icone]} /> {canal.nome}
-              {' · '}{selecionada.cliente.pedidos} {selecionada.cliente.pedidos === 1 ? 'pedido' : 'pedidos'}
-              {' · '}<span title={canal.explicacao[0]}>
-                {/* Rodada 12 (issue #16): "23 h 57 min na janela" não dizia de
-                    que janela. Com prazo correndo, diz o que o prazo permite. */}
-                {janela.restam > 0 && janela.textoLivre ? `escreve livre por ${janela.rotuloCurto}` : janela.rotulo}
-              </span>
+              {prazo && <>{' · '}<span title={canal.explicacao[0]}>{prazo}</span></>}
             </small>
           </h2>
         </span>
@@ -130,11 +132,6 @@ export function PainelAtendimento({
           {!encerrada && !bloqueada && (
             <Botao variante="secundario" icone="log-out" className={css.encerrar} title="Encerrar atendimento" onClick={() => abrirEncerramento(selecionada.id)}>
               Encerrar
-            </Botao>
-          )}
-          {encerrada && !bloqueada && podeReabrir && (
-            <Botao variante="primario" className={css.acaoToque} disabled={reabrindo} onClick={aoReabrir}>
-              {reabrindo ? 'Reabrindo…' : 'Reabrir conversa'}
             </Botao>
           )}
         </div>
@@ -159,6 +156,7 @@ export function PainelAtendimento({
           agora={agora}
           aoAbrirDefinicaoAutomatica={(regra) => aoAbrirBiblioteca(itemDaBibliotecaPelaRegra(regra))}
           aoReenviar={reenviar ? (mensagemId) => reenviar(selecionada.id, mensagemId) : undefined}
+          aoAbrirModelos={podeEnviarModelo ? () => setModelosDe(selecionada.id) : undefined}
           digitando={digitando}
           notas={selecionada.cliente?.notas ?? []}
         />
@@ -177,8 +175,11 @@ export function PainelAtendimento({
         rascunho={rascunho}
         escritaDeFora={escritaDeFora}
         aoEnviar={(texto) => enviar(selecionada.id, texto.trim())}
-        // #1551: modelo aprovado só existe com a API; na demonstração o botão só devolvia erro.
-        podeEnviarModelo={fonteApi && podeReabrir && canal.aceitaModelo && !encerrada && !bloqueada}
+        podeEnviarModelo={podeEnviarModelo}
+        modelosFixos={modelosAVista(janela)}
+        modeloAberto={modelosDe === selecionada.id}
+        aoAbrirModelos={() => setModelosDe(selecionada.id)}
+        aoFecharModelos={() => setModelosDe(null)}
         aoAplicarTemplate={aplicarTemplate}
         aoAbrirNota={aoAbrirNota}
         aoAbrirGaleria={aoAbrirGaleria}

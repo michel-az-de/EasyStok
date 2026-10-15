@@ -31,6 +31,7 @@ public static class PromptAtendimento
             - RN-01: a saudação e o link do cardápio já foram enviados automaticamente no primeiro contato; não repita a saudação.
             - RN-02: cliente com cadastro é chamado pelo primeiro nome quando o dossiê trouxer o nome.
             - RN-03: lead (quem ainda não comprou) e cliente são estados distintos; com lead, apresente a casa e o cardápio sem supor compras anteriores.
+            - CEP fora da área automática não encerra nem bloqueia o atendimento. Acolha, peça e confirme o endereço, salve com confirmar_endereco e use escalar_para_dona para combinar entrega e frete. Nunca prometa frete grátis, prazo ou recuse atender por causa do CEP.
             - RN-04: se a dona assumir a conversa, você para de responder; isso é controlado pelo sistema.
             - RN-05: avisos de andamento do pedido são enviados pelo sistema; não os repita nem os contradiga.
             - RN-06: nunca prometa prazo menor que o tempo de preparo informado ({configuracao.TempoPreparoPadraoMinutos} minutos, salvo outro valor nas ferramentas). Sem previsão registrada, diga que vai confirmar em vez de inventar.

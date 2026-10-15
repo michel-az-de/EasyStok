@@ -142,7 +142,7 @@ public class ChatSiteControllerTests
     [InlineData(nameof(ChatSiteController.AbrirSessao), ChatSiteRateLimit.AbrirSessao)]
     [InlineData(nameof(ChatSiteController.EnviarMensagem), ChatSiteRateLimit.Mensagem)]
     [InlineData(nameof(ChatSiteController.ListarMensagens), ChatSiteRateLimit.Leitura)]
-    [InlineData(nameof(ChatSiteController.Stream), ChatSiteRateLimit.Leitura)]
+    [InlineData(nameof(ChatSiteController.Stream), ChatSiteRateLimit.Stream)]
     [InlineData(nameof(ChatSiteController.Identificar), ChatSiteRateLimit.Identificacao)]
     public void CadaEndpointTemRateLimit(string acao, string politica) =>
         typeof(ChatSiteController).GetMethod(acao)!.GetCustomAttribute<EnableRateLimitingAttribute>()!

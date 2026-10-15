@@ -109,8 +109,9 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(input.EmpresaId, pedido.Id, ct);
         if (cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga))
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
-        if (forma == FormaNaEntrega && PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, agora))
-            throw new UseCaseValidationException("Encomenda futura exige sinal de 50% por link antes da entrega.");
+        if (forma == FormaNaEntrega && PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm)
+            && cobrancas.Any(c => c.EstaPendente && c.EhOnline))
+            throw new UseCaseValidationException("Há uma cobrança online pendente. Confira o pagamento antes de receber manualmente.");
 
         var pendente = cobrancas.FirstOrDefault(c => c.EstaPendente);
         var provedorPedido = forma == FormaOnline ? CobrancaPedido.ProvedorMercadoPago : CobrancaPedido.ProvedorNaEntrega;
@@ -159,6 +160,8 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
     private async Task<PedidoMudouStatusOperacao?> ColocarNaFilaAsync(PedidoEntity pedido, TrocarFormaPagamentoPedidoInput input, DateTime agora, CancellationToken ct)
     {
         if (pedido.StatusEnum != StatusPedido.AguardandoPagamento) return null;
+        if (PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm)
+            && pedido.TotalPago < PlanoPagamentoEncomenda.Sinal(pedido.Total.Valor)) return null;
 
         var statusAntigo = pedido.Status;
         // #1291: pedido de exceção (ex.: lead liberado fora de área) espera a dona, como no pago online.

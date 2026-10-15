@@ -45,6 +45,7 @@ public sealed class EnviarCardapioImagemFerramenta(
             Mensagem.Saida(contexto.EmpresaId, conversa.Id, AutorMensagem.Agente, contexto.Agora,
                 temImagem ? TipoConteudoMensagem.Imagem : TipoConteudoMensagem.Texto, texto, envio.Wamid),
             ct);
+        await contexto.GravarSaidaAsync(ct);
 
         return FerramentaJson.Serializar(new { enviado = true, link });
     }

@@ -3,6 +3,7 @@ using System.Text;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -108,6 +109,7 @@ public sealed class EnviarMensagemVisitanteUseCase(
     EasyStock.Application.Services.Atendimento.ConversaChatSiteService conversaChat)
 {
     public const int TextoTamanhoMaximo = 1000;
+    public const string PrefixoConfirmacaoRecebimento = "chatsite:recepcao:";
 
     public async Task<MensagemChatSiteResult> ExecuteAsync(string slug, string? token, string? texto, CancellationToken ct = default)
     {
@@ -121,16 +123,31 @@ public sealed class EnviarMensagemVisitanteUseCase(
         var sessao = await acesso.ResolverSessaoAsync(slug, token, agora, ct);
         sessao.RegistrarUso(agora);
 
-        var conversa = await conversaChat.ObterOuCriarAsync(sessao, null, agora, ct);
-        var mensagem = Mensagem.Entrada(sessao.EmpresaId, conversa.Id, agora, TipoConteudoMensagem.Texto, limpo);
-        conversa.RegistrarEntrada(agora);
-        await conversaRepository.AddMensagemAsync(mensagem, ct);
-        await unitOfWork.CommitAsync();
+        // A trava de contato do serviço dura até entrada e confirmação estarem persistidas.
+        var mensagem = await unitOfWork.ExecuteInTransactionSemRetryAsync(async tokenCt =>
+        {
+            var conversa = await conversaChat.ObterOuCriarAsync(sessao, null, agora, tokenCt);
+            // #1797: a trava do contato não exclui o console. A linha travada e relida não grava não lidas velhas por cima
+            // do marcar-lida; encerrada enquanto esperava, a mensagem abre outra conversa (nova, ninguém mais a vê).
+            conversa = await conversaRepository.ObterPorIdComLockAsync(sessao.EmpresaId, conversa.Id, tokenCt)
+                ?? throw new ConversaNaoEncontradaException(conversa.Id);
+            if (!conversa.EstaAberta) conversa = await conversaChat.ObterOuCriarAsync(sessao, null, agora, tokenCt);
+            var entrada = Mensagem.Entrada(sessao.EmpresaId, conversa.Id, agora, TipoConteudoMensagem.Texto, limpo);
+            conversa.RegistrarEntrada(agora);
+            await conversaRepository.AddMensagemAsync(entrada, tokenCt);
+            var confirmacaoId = PrefixoConfirmacaoRecebimento + conversa.Id.ToString("N");
+            if (await conversaRepository.ObterMensagemPorExternoIdAsync(sessao.EmpresaId, confirmacaoId, tokenCt) is null)
+                await conversaRepository.AddMensagemAsync(Mensagem.Saida(sessao.EmpresaId, conversa.Id,
+                    AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
+                    "Recebemos sua mensagem. A equipe da loja responde por aqui.", confirmacaoId), tokenCt);
+            await unitOfWork.CommitAsync();
+            return entrada;
+        }, ct);
 
         try
         {
             await eventPublisher.PublicarAsync("conversa.mensagem_recebida", sessao.EmpresaId,
-                new { conversaId = conversa.Id, mensagemId = mensagem.Id }, ct);
+                new { conversaId = mensagem.ConversaId, mensagemId = mensagem.Id }, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

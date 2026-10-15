@@ -24,6 +24,8 @@ public sealed class EntregadorRepository(EasyStockDbContext db) : IEntregadorRep
 
 public sealed class ViagemRepository(EasyStockDbContext db) : IViagemRepository
 {
+    public Task<bool> VinculadaLogisticaAsync(Guid empresaId, Guid viagemId, CancellationToken ct = default) =>
+        db.Set<DespachoLogistica>().AnyAsync(d => d.EmpresaId == empresaId && d.ViagemId == viagemId, ct);
     public Task AddAsync(Viagem viagem, CancellationToken ct = default) =>
         db.Viagens.AddAsync(viagem, ct).AsTask();
 

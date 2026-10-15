@@ -7,7 +7,7 @@ namespace EasyStock.Application.UseCases.Atendimento;
 
 /// <param name="WaId">Dígitos E.164 sem <c>+</c>, como a Meta entrega em <c>contacts[].wa_id</c>.</param>
 /// <param name="NomePerfil">Nome do perfil do WhatsApp; vira o nome do cadastro quando o contato é novo.</param>
-public sealed record IdentificarClientePorTelefoneInput(Guid EmpresaId, string WaId, string? NomePerfil);
+public sealed record IdentificarClientePorTelefoneInput(Guid EmpresaId, string WaId, string? NomePerfil, bool ReutilizarCadastro = true);
 
 /// <param name="EhLead">Ainda não comprou (<c>OrderCount == 0</c>), RN-03.</param>
 /// <param name="EhNovo">O cadastro foi criado agora, nesta identificação.</param>
@@ -36,7 +36,7 @@ public sealed class IdentificarClientePorTelefoneUseCase(
 
         var candidatos = NormalizadorTelefone.CandidatosDeWaId(input.WaId);
 
-        var existente = await ProcurarAsync(input.EmpresaId, candidatos, ct);
+        var existente = input.ReutilizarCadastro ? await ProcurarAsync(input.EmpresaId, candidatos, ct) : null;
         if (existente is not null)
             return new IdentificacaoCliente(existente, EhLead: existente.OrderCount == 0, EhNovo: false);
 

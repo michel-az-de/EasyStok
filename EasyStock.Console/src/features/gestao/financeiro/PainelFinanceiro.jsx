@@ -33,8 +33,8 @@ function ResumoFinanceiro() {
   return <EstadoFinanceiro consulta={consulta}>{resumo && <div className={css.painel}>
     <div className={css.barra}><p className={css.aviso}>Posição atual das contas e valores realizados no mês.</p><Botao icone="refresh-cw" onClick={consulta.recarregar}>Atualizar</Botao></div>
     <div className={css.indicadores}>
-      <Indicador nome="A pagar nos próximos 30 dias" valor={resumo.totalAVencer30dPagar} detalhe={`${resumo.qtdContasPagarAVencer30d} contas`} />
-      <Indicador nome="A receber nos próximos 30 dias" valor={resumo.totalAVencer30dReceber} detalhe={`${resumo.qtdContasReceberAVencer30d} contas`} />
+      <Indicador nome="A pagar nos próximos 30 dias" valor={resumo.totalAVencer30dPagar} detalhe={`${resumo.qtdContasPagarAVencer30d} ${resumo.qtdContasPagarAVencer30d === 1 ? 'conta' : 'contas'}`} />
+      <Indicador nome="A receber nos próximos 30 dias" valor={resumo.totalAVencer30dReceber} detalhe={`${resumo.qtdContasReceberAVencer30d} ${resumo.qtdContasReceberAVencer30d === 1 ? 'conta' : 'contas'}`} />
       <Indicador nome="Pagamentos vencidos" valor={resumo.totalVencidoPagar} />
       <Indicador nome="Recebimentos vencidos" valor={resumo.totalVencidoReceber} />
       <Indicador nome="Pago no mês" valor={resumo.totalPagoMes} />
@@ -174,7 +174,7 @@ function RelatoriosFinanceiros() {
       <CampoSelecao rotulo="Centro de custo" value={rascunho.centroCustoId} onChange={(e) => campo('centroCustoId', e.target.value)} opcoes={[{ valor: '', rotulo: 'Todos' }, ...(cadastros.dados?.centros ?? []).map((item) => ({ valor: item.id, rotulo: item.nome }))]} />
       <Botao tipo="submit">Gerar relatório</Botao>
     </form><ErroFinanceiro erro={cadastros.erro} />
-    <EstadoFinanceiro consulta={consulta}><div className={css.painel}><div className={css.barra}><p className={css.aviso}>Fluxo de caixa por vencimento e pagamentos, apurado pela API.</p><div className={css.acoes}><Botao disabled={!consulta.dados?.length} aria-haspopup="dialog" onClick={() => setAberto(true)}>Ampliar relatório</Botao><Botao disabled={!consulta.dados?.length || exportando} onClick={exportar}>Exportar CSV</Botao></div></div>{tabela}<ErroFinanceiro erro={erroExportacao} /></div></EstadoFinanceiro>
+    <EstadoFinanceiro consulta={consulta}><div className={css.painel}><div className={css.barra}><p className={css.aviso}>Fluxo de caixa por vencimento e pagamentos.</p><div className={css.acoes}><Botao disabled={!consulta.dados?.length} aria-haspopup="dialog" onClick={() => setAberto(true)}>Ampliar relatório</Botao><Botao disabled={!consulta.dados?.length || exportando} onClick={exportar}>Exportar CSV</Botao></div></div>{tabela}<ErroFinanceiro erro={erroExportacao} /></div></EstadoFinanceiro>
     {aberto && <Modal titulo="Relatório de fluxo de caixa" aoFechar={() => setAberto(false)} largura="min(1100px, calc(100vw - 24px))">{tabela}</Modal>}
   </div>
 }

@@ -11,8 +11,9 @@ namespace EasyStock.Application.Services.Atendimento;
 ///
 /// <para>
 /// Best-effort: conversa encerrada, fora da janela de atendimento ou falha do canal não derruba a
-/// operação de cobrança (que já foi gravada); só loga e devolve <c>false</c>. Aviso transacional: não
-/// depende de consentimento de marketing (S38).
+/// operação de cobrança (que já foi gravada) e devolve <c>false</c>. Com a conversa aberta, o aviso que não
+/// saiu fica gravado como mensagem com falha (#1724): aparece no console e segue a regra de reenvio das
+/// demais mensagens, em vez de sumir no log. Aviso transacional: não depende de consentimento de marketing (S38).
 /// </para>
 /// </summary>
 public sealed class AvisoCobrancaConversa(
@@ -55,16 +56,31 @@ public sealed class AvisoCobrancaConversa(
         try
         {
             var conversa = await conversaRepository.ObterPorIdAsync(empresaId, conversaId, ct);
-            if (conversa is null || !conversa.EstaAberta || !conversa.DentroDaJanela(agora))
+            if (conversa is null || !conversa.EstaAberta)
             {
                 logger.LogInformation(
-                    "Aviso de cobranca nao enviado conversaId={ConversaId}: conversa ausente, encerrada ou fora da janela",
+                    "Aviso de cobranca nao enviado conversaId={ConversaId}: conversa ausente ou encerrada",
                     conversaId);
                 return false;
             }
+            if (!conversa.DentroDaJanela(agora))
+            {
+                await RegistrarFalhaAsync(conversa, texto, "Fora da janela de 24 h: o aviso não foi enviado.",
+                    TipoFalhaEnvio.Permanente, agora, ct);
+                return false;
+            }
 
-            var canal = resolvedorCanal.Obter(conversa.Canal);
-            var externoId = await canal.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct);
+            string externoId;
+            try
+            {
+                externoId = await resolvedorCanal.Obter(conversa.Canal).EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Falha ao enviar aviso de cobranca conversaId={ConversaId}", conversaId);
+                await RegistrarFalhaAsync(conversa, texto, ex.Message, ClassificadorFalhaEnvio.Classificar(ex), agora, ct);
+                return false;
+            }
 
             var mensagem = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, agora,
                 TipoConteudoMensagem.Texto, texto, externoId);
@@ -78,5 +94,13 @@ public sealed class AvisoCobrancaConversa(
             logger.LogWarning(ex, "Falha ao enviar aviso de cobranca conversaId={ConversaId}", conversaId);
             return false;
         }
+    }
+
+    private async Task RegistrarFalhaAsync(Conversa conversa, string texto, string erro, TipoFalhaEnvio tipo, DateTime agora, CancellationToken ct)
+    {
+        var falhou = Mensagem.Saida(conversa.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto, texto);
+        falhou.RegistrarFalhaEnvio(erro, tipo, agora);
+        await conversaRepository.AddMensagemAsync(falhou, ct);
+        await unitOfWork.CommitAsync();
     }
 }

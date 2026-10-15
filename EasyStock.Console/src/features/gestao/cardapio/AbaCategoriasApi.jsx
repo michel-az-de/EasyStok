@@ -5,13 +5,15 @@ import { Vazio } from '../../../componentes/Vazio'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useSecoesCardapioApi } from '../../../aplicacao/useSecoesCardapioApi'
+import { resumoCategoriasAntigas } from '../../../aplicacao/gestaoSecoes'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import css from './abaCardapio.module.css'
 
 // M1 › Categorias (M1.3, #1483). As categorias que o cliente vê no site e que agrupam a comanda,
 // na ordem que ela define. Renomear, esconder (sem apagar os pratos), subir/descer e excluir só a
 // vazia. "Converter as categorias antigas" cria uma categoria por texto livre que os pratos já
-// tinham e liga cada prato a ela; pode rodar de novo sem duplicar.
+// tinham e liga cada prato a ela; pode rodar de novo sem duplicar. #1803: enquanto houver prato só
+// com o texto antigo, a tela diz quais categorias são e o que a conversão faz (prévia do servidor).
 function LinhaCategoria({ secao, primeira, ultima, gestao }) {
   const [editando, setEditando] = useState(false)
   const [nome, setNome] = useState(secao.nome)
@@ -82,11 +84,17 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
 
 export function AbaCategoriasApi() {
   const { acoes } = useAcessoModulos()
-  const gestao = useSecoesCardapioApi()
+  const gestao = useSecoesCardapioApi({ comPrevia: acoes.editarCardapio === true })
+  const antigas = resumoCategoriasAntigas(gestao.previa)
   const [nova, setNova] = useState('')
   const [criando, setCriando] = useState(false)
   const [cadastroAberto, setCadastroAberto] = useState(false)
   const [convertendo, setConvertendo] = useState(false)
+
+  const converter = () => {
+    setConvertendo(true)
+    Promise.resolve(gestao.migrar()).finally(() => setConvertendo(false))
+  }
 
   const criar = (evento) => {
     evento.preventDefault()
@@ -130,11 +138,23 @@ export function AbaCategoriasApi() {
           As categorias que o cliente vê no site e que agrupam a comanda, nesta ordem. Ocultar tira a categoria
           inteira do site sem apagar os pratos. Só dá para excluir categoria vazia.
         </p>
-        <Botao disabled={convertendo} onClick={() => {
-          setConvertendo(true)
-          Promise.resolve(gestao.migrar()).finally(() => setConvertendo(false))
-        }}>{convertendo ? 'Convertendo…' : 'Converter as categorias antigas'}</Botao>
+        {!antigas && !gestao.previa && (
+          <Botao disabled={convertendo} onClick={converter}>{convertendo ? 'Convertendo…' : 'Converter as categorias antigas'}</Botao>
+        )}
       </div>
+
+      {antigas && (
+        <section className={css.secao} aria-labelledby="categorias-antigas">
+          <p id="categorias-antigas" className={css.nome}>{antigas.texto}</p>
+          <p id="efeito-conversao" className={css.descricao}>{antigas.efeito}</p>
+          <div>
+            <Botao variante={gestao.secoes.length === 0 ? 'primario' : undefined} disabled={convertendo}
+              aria-describedby="efeito-conversao" onClick={converter}>
+              {convertendo ? 'Convertendo…' : 'Converter as categorias antigas'}
+            </Botao>
+          </div>
+        </section>
+      )}
 
       {gestao.aviso && (
         <output className={css.aviso}>
@@ -156,9 +176,13 @@ export function AbaCategoriasApi() {
         <Botao tipo="submit" variante="primario" icone="plus" disabled={criando || !nova.trim()}>{criando ? 'Criando…' : 'Criar categoria'}</Botao>
       </form></Modal>}
 
-      {gestao.secoes.length === 0 ? (
-        <p className={css.descricao}>Nenhuma categoria ainda. Crie uma ou converta as categorias antigas dos pratos.</p>
-      ) : (
+      {gestao.secoes.length === 0 ? (!antigas && (
+        <p className={css.descricao}>
+          {gestao.previa
+            ? 'Nenhuma categoria ainda, e nenhum prato com categoria antiga. Crie a primeira em Nova categoria.'
+            : 'Nenhuma categoria ainda. Crie uma ou converta as categorias antigas dos pratos.'}
+        </p>
+      )) : (
         <ol className={css.lista}>
           {gestao.secoes.map((secao, indice) => (
             <LinhaCategoria

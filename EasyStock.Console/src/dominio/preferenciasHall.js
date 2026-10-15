@@ -10,7 +10,31 @@ export function normalizarPreferenciasHall(valor) {
     versao: 1,
     ordem: [...ordem, ...idsDoCatalogo.filter((id) => !ordem.includes(id))],
     favoritos: idsValidos(valor?.favoritos),
+    foco: ['atendimento', 'gestao', 'producao'].includes(valor?.foco) ? valor.foco : 'atendimento',
+    compacto: valor?.compacto === true,
+    movimentos: valor?.movimentos !== false,
+    paineis: Array.isArray(valor?.paineis)
+      ? [...new Set(valor.paineis.filter((id) => ['atendimento', 'cozinha', 'entregas', 'financeiro'].includes(id)))]
+      : ['atendimento', 'cozinha', 'entregas', 'financeiro'],
   }
+}
+
+export const FOCOS_DO_HALL = [
+  { id: 'atendimento', nome: 'Cliente primeiro', ordem: ['atendimento', 'entregas', 'cozinha', 'cardapio', 'financeiro', 'producao'] },
+  { id: 'gestao', nome: 'Gestão da casa', ordem: ['financeiro', 'atendimento', 'producao', 'cardapio', 'entregas', 'cozinha'] },
+  { id: 'producao', nome: 'Produção e entregas', ordem: ['producao', 'cozinha', 'entregas', 'atendimento', 'cardapio', 'financeiro'] },
+]
+
+export function aplicarFocoDoHall(preferencia, foco) {
+  const atual = normalizarPreferenciasHall(preferencia)
+  const modelo = FOCOS_DO_HALL.find((item) => item.id === foco)
+  return modelo ? normalizarPreferenciasHall({ ...atual, foco, ordem: modelo.ordem }) : atual
+}
+
+export function ordenarPaineisDoHall(preferencia, permitidos) {
+  const atual = normalizarPreferenciasHall(preferencia)
+  return FOCOS_DO_HALL.find((item) => item.id === atual.foco).ordem
+    .filter((id) => atual.paineis.includes(id) && permitidos.includes(id))
 }
 
 export function ordenarModulosDoHall(modulos, preferencia) {

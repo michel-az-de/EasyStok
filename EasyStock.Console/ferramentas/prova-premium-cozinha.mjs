@@ -44,6 +44,8 @@ registerHooks({
   load(url, ctx, next) {
     if (fontes.has(url)) return inline(fontes.get(url))
     if (url.endsWith('/aplicacao/useCozinhaApi.js')) return inline('export const useCozinhaApi=()=>globalThis.__premiumCozinha.api')
+    // #1632: a ação Imprimir dos impressos da API chega à API real; aqui só o id importa.
+    if (url.endsWith('/aplicacao/impressos.js')) return inline('export const impressaoDoPedido=pedidoId=>({pedidoId})')
     if (url.endsWith('/hooks/useRelogio.js')) return inline('export const useRelogio=()=>Date.parse("2026-10-11T12:00:00Z")')
     if (url.endsWith('.css')) return inline('export default new Proxy({},{get:(_,p)=>p})')
     if (url.endsWith('.json')) return inline('export default ' + readFileSync(new URL(url), 'utf8'))
@@ -98,12 +100,12 @@ provar('API conserva mouse 6 px, toque longo 250 ms e teclado com rolagem instan
 })
 provar('cancelar e soltar fora da fila não enviam PATCH', () => {
   const t = novoApi(); dnd(t.renderizar()).props.onDragCancel(); assert.match(feedback(t.renderizar()).feedback.texto, /cancelado/)
-  dnd(t.renderizar()).props.onDragEnd({ active, over: null }); assert.match(feedback(t.renderizar()).feedback.texto, /ficou em Aguardando/)
+  dnd(t.renderizar()).props.onDragEnd({ active, over: null }); assert.match(feedback(t.renderizar()).feedback.texto, /ficou em Na fila/)
   assert.equal(chamadas.length, 0)
 })
 provar('pular etapa é recusado pelo domínio e não envia PATCH', () => {
   const t = novoApi(); dnd(t.renderizar()).props.onDragEnd({ active, over: { id: 'pronto' } })
-  assert.equal(chamadas.length, 0); assert.match(feedback(t.renderizar()).feedback.texto, /ficou em Aguardando/)
+  assert.equal(chamadas.length, 0); assert.match(feedback(t.renderizar()).feedback.texto, /ficou em Na fila/)
 })
 provar('pedido pendente não dispara segunda operação', () => {
   const t = novoApi(); api.movendo.add('p1'); dnd(t.renderizar()).props.onDragEnd({ active, over: { id: 'preparando' } })

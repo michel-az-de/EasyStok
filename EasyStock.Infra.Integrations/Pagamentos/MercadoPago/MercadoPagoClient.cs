@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Seguranca;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -93,7 +94,22 @@ public sealed partial class MercadoPagoClient(
             "MP preference criada pedidoId={PedidoId} preferenceId={PreferenceId}",
             command.PedidoId, id);
 
-        return new PreferenceCriadaResult(id, initPoint);
+        // I3.2: collector_id é a conta que vai receber; a cobrança guarda para conferir o pagamento depois.
+        return new PreferenceCriadaResult(id, initPoint, Texto(doc.RootElement, "collector_id"));
+    }
+
+    public async Task<string> ObterContaRecebedoraAsync(CancellationToken ct = default)
+    {
+        // Sem cache de propósito: é assim que credencial revogada (401) aparece antes de o job concluir
+        // que não houve pagamento.
+        using var request = Requisicao(HttpMethod.Get, "users/me");
+        using var response = await httpClient.SendAsync(request, ct);
+        await GarantirSucessoAsync(response, ct);
+
+        using var doc = await JsonDocument.ParseAsync(
+            await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        return Texto(doc.RootElement, "id")
+            ?? throw new InvalidOperationException("Mercado Pago não retornou o id da conta.");
     }
 
     public async Task<PagamentoMercadoPago?> ConsultarPagamentoAsync(string pagamentoId, CancellationToken ct = default)
@@ -131,15 +147,16 @@ public sealed partial class MercadoPagoClient(
     }
 
     public async Task<EstornoMercadoPagoResult> EstornarAsync(
-        string pagamentoId, decimal? valor = null, string? idempotencyKey = null, CancellationToken ct = default)
+        string pagamentoId, decimal? valor, string idempotencyKey, CancellationToken ct = default)
     {
         var id = ValidarPagamentoId(pagamentoId);
         if (valor is <= 0m)
             throw new ArgumentOutOfRangeException(nameof(valor), "Valor do estorno deve ser maior que zero.");
 
-        var chave = string.IsNullOrWhiteSpace(idempotencyKey)
-            ? $"estorno-{id}-{(valor.HasValue ? valor.Value.ToString("F2", CultureInfo.InvariantCulture) : "total")}"
-            : idempotencyKey.Trim();
+        // I3.1: a chave vem de quem chama. Derivá-la do valor fazia dois parciais iguais virarem um só.
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+            throw new ArgumentException("Chave de idempotência do estorno é obrigatória.", nameof(idempotencyKey));
+        var chave = idempotencyKey.Trim();
 
         using var request = Requisicao(HttpMethod.Post, $"v1/payments/{id}/refunds");
         request.Headers.Add("X-Idempotency-Key", chave);
@@ -204,9 +221,9 @@ public sealed partial class MercadoPagoClient(
     private async Task GarantirSucessoAsync(HttpResponseMessage response, CancellationToken ct)
     {
         if (response.IsSuccessStatusCode) return;
-        var corpo = await response.Content.ReadAsStringAsync(ct);
-        if (corpo.Length > 500) corpo = corpo[..500];
         var caminho = response.RequestMessage?.RequestUri?.AbsolutePath;
+        // I4.5 (#1698): este texto vai para o log, para a exceção e para WebhookRecebido.Erro.
+        var corpo = CorpoDeProvedor.ParaRegistro(caminho, await response.Content.ReadAsStringAsync(ct));
         logger.LogWarning("MP recusou {Metodo} {Caminho}: {Status} {Corpo}",
             response.RequestMessage?.Method, caminho, (int)response.StatusCode, corpo);
         throw new HttpRequestException(
@@ -237,7 +254,10 @@ public sealed partial class MercadoPagoClient(
         DateApproved: Data(p, "date_approved"),
         PaymentMethodId: Texto(p, "payment_method_id"),
         PaymentTypeId: Texto(p, "payment_type_id"),
-        TransactionAmountRefunded: Numero(p, "transaction_amount_refunded") ?? 0);
+        TransactionAmountRefunded: Numero(p, "transaction_amount_refunded") ?? 0,
+        // collector_id no nível do pagamento; em respostas que só trazem o objeto, collector.id.
+        CollectorId: Texto(p, "collector_id")
+                     ?? (p.TryGetProperty("collector", out var collector) && collector.ValueKind == JsonValueKind.Object ? Texto(collector, "id") : null));
 
     /// <summary>String ou número (o Mercado Pago devolve ids numéricos) como texto; null/ausente = null.</summary>
     private static string? Texto(JsonElement e, string campo)

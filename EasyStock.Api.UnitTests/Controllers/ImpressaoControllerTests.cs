@@ -61,6 +61,10 @@ public class ImpressaoControllerTests
 
         public Fakes()
         {
+            Uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<ImpressaoPendenteDto?>>>(), Arg.Any<CancellationToken>())
+                .Returns(c => c.Arg<Func<CancellationToken, Task<ImpressaoPendenteDto?>>>()(c.Arg<CancellationToken>()));
+            Impressoes.GetByIdComLockAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                .Returns(c => Impressoes.GetByIdAsync(c.ArgAt<Guid>(0), c.ArgAt<Guid>(1), c.Arg<CancellationToken>()));
             Usuario.EmpresaId.Returns(EmpresaId);
             Usuario.Nivel.Returns(NivelAcesso.Operador);
         }

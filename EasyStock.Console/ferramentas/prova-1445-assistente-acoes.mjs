@@ -102,14 +102,21 @@ assert.equal(descreverAcaoDoAssistente(comanda, conversa.nome).botao, 'Ver coman
 chamadas.length = 0
 let telaAberta = null
 const portas = { ...api, abrirTela: (tela) => { telaAberta = tela } }
+let retomada = null
+await executarAcaoDoAssistente({ tipo: ACOES_DO_ASSISTENTE.RETOMAR_AUTOMATICO }, conversa,
+  { devolverAutomatico: id => { retomada = id; return true } })
+assert.equal(retomada, conversa.id, 'pedido para IA assumir executa a retomada na conversa selecionada')
+await assert.rejects(executarAcaoDoAssistente({ tipo: ACOES_DO_ASSISTENTE.RETOMAR_AUTOMATICO }, conversa, api), /Sem confirmação da retomada/,
+  'erro real da API não anuncia que a IA retomou o atendimento')
+chamadas.length = 0
 await executarAcaoDoAssistente(cardapio, conversa, portas)
 await new Promise((r) => setTimeout(r, 0))
 assert.deepEqual(chamadas.map((c) => `${c.metodo} ${c.url}`), [
   'POST /api/atendimento/conversas/c1/link-cardapio',
   'POST /api/atendimento/conversas/c1/mensagens',
 ])
-assert.match(chamadas[1].corpo.texto, /^Oi Maria! Segue o cardápio de hoje/)
-assert.match(chamadas[1].corpo.texto, /https:\/\/loja\.test\/c\/abc$/)
+assert.match(chamadas[1].corpo.texto, /^Aqui está sua comanda:/)
+assert.match(chamadas[1].corpo.texto, /https:\/\/loja\.test\/c\/abc\n/)
 
 // 5. Nota interna: vai ao cadastro do cliente (#1436), não à conversa.
 chamadas.length = 0

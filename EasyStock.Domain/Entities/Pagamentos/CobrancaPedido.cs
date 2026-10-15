@@ -28,6 +28,11 @@ public class CobrancaPedido
     public const int MetodoTamanhoMaximo = 20;
     public const int MotivoTamanhoMaximo = 500;
     public const int TentativaMaxima = 2;
+    public const int ContaRecebedoraTamanhoMaximo = 30;
+    public const int OrigemCredencialTamanhoMaximo = 20;
+
+    /// <summary>Credencial única da plataforma no <c>.env</c> (I3.2). A E6 acrescenta a credencial da loja.</summary>
+    public const string OrigemCredencialGlobal = "global";
 
     public Guid Id { get; private set; }
     public Guid EmpresaId { get; private set; }
@@ -65,6 +70,24 @@ public class CobrancaPedido
     /// <summary>Por que a cobrança foi cancelada ou por que um pagamento não a confirmou.</summary>
     public string? Motivo { get; private set; }
 
+    /// <summary>
+    /// Conta do Mercado Pago que recebe esta cobrança (<c>collector_id</c> da preferência; I3.2, invariantes 3
+    /// e 5). Null na entrega e em cobrança criada antes da I3.2.
+    /// </summary>
+    public string? ContaRecebedoraId { get; private set; }
+
+    /// <summary>De onde veio a credencial que criou a cobrança (<see cref="OrigemCredencialGlobal"/>). Null na entrega.</summary>
+    public string? OrigemCredencial { get; private set; }
+
+    /// <summary>
+    /// Desde quando a cobrança está fora da varredura do job porque a credencial atual não alcança a conta dela
+    /// (trocada, ausente ou recusada; invariante 4). Continua <see cref="StatusCobrancaPedido.Pendente"/>: o
+    /// pedido não é cancelado e o pagamento ainda a confirma. Volta à varredura quando a credencial volta.
+    /// </summary>
+    public DateTime? AguardandoCredencialDesde { get; private set; }
+
+    public bool AguardandoCredencial => AguardandoCredencialDesde is not null;
+
     public bool EhOnline => Provedor == ProvedorMercadoPago;
     public bool EstaPendente => Status == StatusCobrancaPedido.Pendente;
 
@@ -80,7 +103,9 @@ public class CobrancaPedido
         DateTime expiraEm,
         int tentativa,
         DateTime agora,
-        Guid? conversaId = null)
+        Guid? conversaId = null,
+        string? contaRecebedoraId = null,
+        string origemCredencial = OrigemCredencialGlobal)
     {
         if (string.IsNullOrWhiteSpace(referenciaExterna))
             throw new RegraDeDominioVioladaException("Cobrança online exige a referência da preferência.");
@@ -96,7 +121,29 @@ public class CobrancaPedido
         c.LinkPagamento = linkPagamento.Trim();
         c.ExpiraEm = Utc(expiraEm);
         c.Tentativa = tentativa;
+        c.ContaRecebedoraId = Limitado(contaRecebedoraId, ContaRecebedoraTamanhoMaximo, "Conta recebedora");
+        c.OrigemCredencial = Limitado(origemCredencial, OrigemCredencialTamanhoMaximo, "Origem da credencial");
         return c;
+    }
+
+    private static string? Limitado(string? valor, int maximo, string campo)
+    {
+        if (string.IsNullOrWhiteSpace(valor)) return null;
+        var limpo = valor.Trim();
+        if (limpo.Length > maximo) throw new RegraDeDominioVioladaException($"{campo} acima de {maximo} caracteres.");
+        return limpo;
+    }
+
+    /// <summary>
+    /// Tira a cobrança da varredura do job (I3.2): a credencial atual não alcança a conta dela, então não dá
+    /// para saber se o cliente pagou. Só online pendente; repetir mantém a primeira marca.
+    /// </summary>
+    public void AguardarCredencial(DateTime agora)
+    {
+        if (!EstaPendente || !EhOnline)
+            throw new RegraDeDominioVioladaException("Só cobrança online pendente aguarda credencial.");
+        AguardandoCredencialDesde ??= Utc(agora);
+        AtualizadaEm = Utc(agora);
     }
 
     public static CobrancaPedido CriarNaEntrega(
@@ -155,6 +202,7 @@ public class CobrancaPedido
             throw new RegraDeDominioVioladaException("Cobrança estornada não volta a ser paga.");
 
         Status = StatusCobrancaPedido.Paga;
+        AguardandoCredencialDesde = null;
         PagamentoExternoId = pagamentoExternoId.Trim();
         ValorPago = valorPago;
         MetodoPagamento = metodo;

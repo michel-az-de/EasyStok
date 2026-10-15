@@ -144,6 +144,17 @@ const TRACOS = {
   // Lucide, byte a byte como os outros ícones emprestados dele.
   estrela: 'M11.48 3.5a.56.56 0 0 1 1.04 0l2.13 5.11a.56.56 0 0 0 .47.35l5.52.44c.5.04.7.66.32.99l-4.2 3.6a.56.56 0 0 0-.19.56l1.29 5.39a.56.56 0 0 1-.84.6l-4.73-2.88a.56.56 0 0 0-.58 0l-4.73 2.88a.56.56 0 0 1-.84-.6l1.29-5.39a.56.56 0 0 0-.19-.56l-4.2-3.6a.56.56 0 0 1 .32-.99l5.52-.44a.56.56 0 0 0 .47-.35Z',
   presente: 'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7ZM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7Z',
+
+  // #1806 · painéis do Balcão reposicionáveis: ampliar e reduzir (setas nas diagonais), trocar
+  // de lado, encaixar à esquerda ou à direita (janela com a faixa ocupada), solto (janela dentro
+  // da tela) e a pega de arrastar (seis pontos).
+  ampliar: 'M14 4h6v6M20 4l-6 6M10 20H4v-6M4 20l6-6',
+  reduzir: 'M20 10h-6V4M14 10l6-6M4 14h6v6M10 14l-6 6',
+  trocarLado: 'M4 8h15M15 4l4 4-4 4M20 16H5M9 12l-4 4 4 4',
+  encaixarEsquerda: 'M4 4h16v16H4zM9 4v16',
+  encaixarDireita: 'M4 4h16v16H4zM15 4v16',
+  solto: 'M3 5h18v14H3zM11 10h7v6h-7z',
+  pega: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01',
 }
 
 export function Icone({ nome, tamanho = '1.15em', rotulo, className }) {

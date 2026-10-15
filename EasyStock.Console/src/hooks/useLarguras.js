@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { escolhidasDoSalvo, largurasDaTela, padraoPorTela } from './larguras'
 
 // Largura das colunas Balcão e Ficha, e do painel do cardápio (seção 9 da
 // direção visual). Uma chave só no localStorage para as três, lida e escrita
@@ -6,44 +7,45 @@ import { useCallback, useEffect, useState } from 'react'
 // cheia), e a tela precisa continuar de pé sem a memória.
 const CHAVE = 'cdb.larguras.v1'
 
-// Ficha em 420 (rodada 4): 320 espremia o nome do prato a 0 px de largura com
-// a alça de arrastar e o contador na mesma linha (achado do corte na coluna).
-// Balcão em 360 (rodada 5, seção 1): os chips de canal cabem numa linha só a
-// partir de 336 px úteis.
-// Cardápio em 460 (#1474): com foto, preço e o botão de enviar foto, 400 deixava o nome
-// do prato em quatro linhas.
-export const PADRAO = { balcao: 360, ficha: 420, cardapio: 460 }
-
 function ler() {
   try {
-    const bruto = localStorage.getItem(CHAVE)
-    if (!bruto) return { ...PADRAO }
-    const salvo = JSON.parse(bruto)
-    return { ...PADRAO, ...salvo }
+    return escolhidasDoSalvo(JSON.parse(localStorage.getItem(CHAVE) ?? 'null'))
   } catch {
-    return { ...PADRAO }
+    return {}
   }
 }
 
-function gravar(larguras) {
+function gravar(escolhidas) {
   try {
-    localStorage.setItem(CHAVE, JSON.stringify(larguras))
+    localStorage.setItem(CHAVE, JSON.stringify(escolhidas))
   } catch {
     // Sem memória: a largura escolhida vale só até o reload.
   }
 }
 
+const larguraDaJanela = () => window.innerWidth
+
 // Um hook só, chamado uma vez lá em cima (app/App.jsx) e distribuído por
 // prop: duas chamadas separadas lendo a mesma chave se pisariam na hora de
 // gravar, e uma largura resetaria a outra de volta ao padrão.
+// #1697: guarda só o que a pessoa arrastou; o resto acompanha o tamanho da tela (`larguras.js`).
 export function useLarguras() {
-  const [larguras, setLarguras] = useState(ler)
+  const [escolhidas, setEscolhidas] = useState(ler)
+  const [tela, setTela] = useState(larguraDaJanela)
 
-  useEffect(() => { gravar(larguras) }, [larguras])
-
-  const definir = useCallback((chave, valor) => {
-    setLarguras((atual) => ({ ...atual, [chave]: valor }))
+  useEffect(() => {
+    const aoMudarTela = () => setTela(larguraDaJanela())
+    window.addEventListener('resize', aoMudarTela)
+    return () => window.removeEventListener('resize', aoMudarTela)
   }, [])
 
-  return { larguras, definir }
+  const definir = useCallback((chave, valor) => {
+    setEscolhidas((atual) => {
+      const novo = { ...atual, [chave]: valor }
+      gravar(novo)
+      return novo
+    })
+  }, [])
+
+  return { larguras: largurasDaTela(escolhidas, tela), padrao: padraoPorTela(tela), definir, tela }
 }

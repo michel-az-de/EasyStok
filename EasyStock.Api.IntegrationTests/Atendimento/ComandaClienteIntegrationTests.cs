@@ -24,6 +24,126 @@ namespace EasyStock.Api.IntegrationTests.Atendimento;
 public sealed partial class PedidoConversaConcorrenciaTests
 {
     [SkippableFact]
+    public async Task Comanda_RascunhoAnteriorRecebeEnderecoDoCadastro()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var factory = CriarFactory(Provedor(new()));
+        using var client = factory.CreateClient();
+        var c = await SemearAsync(factory);
+        var token = await Link(factory, c.ConversaId);
+        var estado = await Estado(client, token);
+        await Salvar(client, token, estado, new([new(c.CardapioItemId, 1)]));
+        var relido = await Estado(client, token);
+        relido.Rascunho.Endereco.Should().NotBeNull();
+        relido.Rascunho.Endereco!.Cep.Should().Be("01310100");
+        relido.Rascunho.Endereco.Numero.Should().Be("10");
+        relido.PrecisaCadastro.Should().BeFalse();
+    }
+
+    [SkippableTheory]
+    [InlineData("01310100", false)]
+    [InlineData("20040002", true)]
+    public async Task Comanda_LeadCadastraEnderecoEEntregaForaDaAreaVaiParaHumano(string cep, bool fora)
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        var cobrancas = new ConcurrentDictionary<string, CriarPreferenceCommand>();
+        await using var factory = CriarFactory(Provedor(cobrancas));
+        using var client = factory.CreateClient();
+        var c = await SemearAsync(factory);
+        Guid conversaId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            var lead = Conversa.Abrir(EmpresaId, "5511912345678", DateTime.UtcNow, "Cliente da sprint");
+            db.AtendimentoConversas.Add(lead);
+            await db.SaveChangesAsync();
+            conversaId = lead.Id;
+        }
+        var token = await Link(factory, conversaId);
+        var estado = await Estado(client, token);
+        estado.PrecisaCadastro.Should().BeTrue();
+        estado.PodeEditar.Should().BeTrue();
+        await Salvar(client, token, estado, new([new(c.CardapioItemId, 2)], JanelaId: c.JanelaId,
+            DataEntrega: c.DataEntrega, Endereco: new(cep, "Rua da sprint", "42", "Centro", "São Paulo", "SP", "Casa 2"),
+            Nome: "Cliente da sprint", Telefone: "11999998888"));
+        estado = await Estado(client, token);
+        var enviado = await client.PostAsJsonAsync($"{Rota(token)}/confirmar", new { estado.Revisao });
+        enviado.StatusCode.Should().Be(HttpStatusCode.OK, await enviado.Content.ReadAsStringAsync());
+        var final = await Estado(client, token);
+        final.PrecisaCadastro.Should().BeFalse();
+        final.EntregaACombinar.Should().Be(fora);
+        final.Rascunho.Endereco!.Numero.Should().Be("42");
+        using var verificacao = factory.Services.CreateScope();
+        var banco = verificacao.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        var conversa = await banco.AtendimentoConversas.SingleAsync(x => x.Id == conversaId);
+        var cliente = await banco.Clientes.Include(x => x.Enderecos).SingleAsync(x => x.Id == conversa.ClienteId);
+        cliente.Nome.Should().Be("Cliente da sprint");
+        cliente.Id.Should().NotBe(c.ClienteId, "telefone informado em link público não comprova a identidade do cadastro anterior");
+        (await banco.Clientes.SingleAsync(x => x.Id == c.ClienteId)).Nome.Should().Be("Maria");
+        cliente.Enderecos.Should().Contain(x => x.Cep == cep && x.Numero == "42" && x.Cidade == "São Paulo");
+        if (fora)
+        {
+            final.Pedido.Should().BeNull();
+            final.Rascunho.Itens.Should().ContainSingle().Which.Qtd.Should().Be(2);
+            cobrancas.Should().BeEmpty();
+            conversa.Situacao.Should().Be(EasyStock.Domain.Enums.Atendimento.SituacaoConversa.Assumida);
+            var notasAntes = await banco.AtendimentoMensagens.CountAsync(x => x.ConversaId == conversaId);
+            (await client.PostAsJsonAsync($"{Rota(token)}/confirmar", new { final.Revisao })).StatusCode.Should().Be(HttpStatusCode.OK);
+            (await banco.AtendimentoMensagens.CountAsync(x => x.ConversaId == conversaId)).Should().Be(notasAntes);
+            var rotaFrete = $"/api/atendimento/conversas/{conversaId}/comandas-cliente/{final.LinkId}/combinar-frete";
+            (await client.PostAsJsonAsync(rotaFrete, new { final.Revisao })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await client.PostAsJsonAsync(rotaFrete, new { final.Revisao, Valor = -1m })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await client.PostAsJsonAsync($"/api/atendimento/conversas/{c.ConversaId}/comandas-cliente/{final.LinkId}/combinar-frete",
+                new { final.Revisao, Valor = 13.5m })).StatusCode.Should().Be(HttpStatusCode.Gone);
+            (await client.PostAsJsonAsync(rotaFrete, new { final.Revisao, Valor = 13.5m })).StatusCode.Should().Be(HttpStatusCode.OK);
+            (await client.PostAsJsonAsync(rotaFrete, new { final.Revisao, Valor = 13.5m })).StatusCode.Should().Be(HttpStatusCode.OK);
+            var combinado = await Estado(client, token);
+            combinado.EntregaACombinar.Should().BeFalse();
+            combinado.FreteCombinado.Should().Be(13.5m);
+            combinado.TotalPrevisto.Should().Be(33.5m);
+            var janelaAtual = await banco.JanelasEntrega.SingleAsync(j => j.Id == c.JanelaId);
+            var outraJanela = EasyStock.Domain.Entities.Storefront.JanelaEntrega.Criar(janelaAtual.StorefrontId,
+                janelaAtual.DiaDaSemana, new TimeOnly(14, 0), new TimeOnly(17, 0), 10, "Tarde");
+            banco.JanelasEntrega.Add(outraJanela);
+            await banco.SaveChangesAsync();
+            await Salvar(client, token, combinado, combinado.Rascunho with { JanelaId = outraJanela.Id });
+            combinado = await Estado(client, token);
+            combinado.FreteCombinado.Should().Be(13.5m, "trocar somente o horário no mesmo dia preserva o frete combinado");
+            combinado.EntregaACombinar.Should().BeFalse();
+            combinado.TotalPrevisto.Should().Be(33.5m);
+            await Salvar(client, token, combinado, combinado.Rascunho with { Observacoes = "Conferir transporte novamente" });
+            var alterado = await Estado(client, token);
+            alterado.FreteCombinado.Should().BeNull();
+            (await client.PostAsJsonAsync(rotaFrete, new { combinado.Revisao, Valor = 13.5m })).StatusCode.Should().Be(HttpStatusCode.Conflict);
+            (await client.PostAsJsonAsync($"{Rota(token)}/confirmar", new { alterado.Revisao })).StatusCode.Should().Be(HttpStatusCode.OK);
+            cobrancas.Should().BeEmpty();
+            (await client.PostAsJsonAsync(rotaFrete, new { alterado.Revisao, Valor = 13.5m })).StatusCode.Should().Be(HttpStatusCode.OK);
+            combinado = await Estado(client, token);
+            await Salvar(client, token, combinado, combinado.Rascunho with { Endereco = combinado.Rascunho.Endereco! with { Numero = "43" } });
+            alterado = await Estado(client, token);
+            alterado.FreteCombinado.Should().BeNull("mudar o destino exige conferir a cotação novamente");
+            await Salvar(client, token, alterado, combinado.Rascunho);
+            alterado = await Estado(client, token);
+            alterado.FreteCombinado.Should().BeNull("restaurar o destino não recupera uma cotação invalidada");
+            (await client.PostAsJsonAsync($"{Rota(token)}/confirmar", new { alterado.Revisao })).StatusCode.Should().Be(HttpStatusCode.OK);
+            cobrancas.Should().BeEmpty();
+            (await client.PostAsJsonAsync(rotaFrete, new { alterado.Revisao, Valor = 13.5m })).StatusCode.Should().Be(HttpStatusCode.OK);
+            combinado = await Estado(client, token);
+            var confirmado = await Enviar(client, token, combinado.Revisao);
+            confirmado.Total.Should().Be(33.5m);
+            (await Estado(client, token)).Pedido!.Frete.Should().Be(13.5m);
+            cobrancas.Should().ContainSingle();
+        }
+        else
+        {
+            final.Pedido.Should().NotBeNull();
+            final.Pedido!.Frete.Should().Be(5m);
+            final.Pedido.Total.Should().Be(25m);
+            cobrancas.Should().ContainSingle();
+        }
+    }
+
+    [SkippableFact]
     public async Task Comanda_NumeroEstavelNovaEdicaoPreservaSelecaoERecuperaRespostaPerdida()
     {
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
@@ -432,6 +552,14 @@ public sealed partial class PedidoConversaConcorrenciaTests
             var operacao = await db.Set<PedidoEstornoOnline>().SingleAsync();
             operacaoId = operacao.Id;
             operacao.Situacao.Should().Be(PedidoEstornoOnline.Pendente);
+            var avisos = await db.NotifEventos.Where(e => e.RefEntidadeId == envio.PedidoId)
+                .Select(e => e.PayloadJson).ToListAsync();
+            var payload = avisos.Single(p => p.Contains($"comanda:{estado.LinkId:N}:estorno_pendente"));
+            using var aviso = JsonDocument.Parse(payload);
+            aviso.RootElement.GetProperty("mensagem").GetString().Should()
+                .Contain("Seu pedido foi atualizado. Total: R$ 15,00.")
+                .And.Contain("Solicitamos a devolução de R$ 20,00 pelo Mercado Pago. Aguarde a confirmação.")
+                .And.NotContain("foi devolvido");
             operacao.EstornoExternoId.Should().BeNull();
             operacao.MovimentoCaixaId.Should().BeNull();
             operacao.Detalhe.Should().Contain("sem confirmação válida");

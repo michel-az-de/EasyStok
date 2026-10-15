@@ -18,10 +18,11 @@
 /* #1442: seção recolhível. O título vira o gatilho, linha inteira, com a seta
    no fim; recolhida, o resumo aparece entre os dois. */
 .gatilho {
-  display: flex; align-items: center; gap: var(--e-2); width: 100%; min-height: 28px;
+  display: flex; align-items: center; gap: var(--e-2); width: 100%; min-height: var(--toque);
   padding: 0; border: 0; background: none; color: inherit; cursor: pointer;
   font: inherit; text-align: left;
 }
+.gatilho > span:first-child { flex-shrink: 0; white-space: nowrap; }
 .gatilho:hover { color: var(--tinta); }
 .gatilho:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; border-radius: var(--r-ponta); }
 .resumo {

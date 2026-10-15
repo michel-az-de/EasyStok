@@ -1,3 +1,4 @@
+using EasyStock.Api.UnitTests.Helpers;
 using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
@@ -44,7 +45,10 @@ public partial class AtendimentoConversasControllerTests
     private readonly Guid _usuarioId = Guid.NewGuid();
     private readonly ConversaRepositoryEmMemoria _repositorio = new();
     private readonly ICanalMensageria _canal = Substitute.For<ICanalMensageria, ICanalComAudio>();
-    private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
+    // #1792: envio, reenvio e ações do console rodam em transação; o dublê executa o bloco.
+    private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>()
+        .SetupExecuteInTransactionSemRetry<MensagemAtendimentoResult>()
+        .SetupExecuteInTransactionSemRetry<ConversaSituacaoResult>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly IAtendenteRepository _atendentes = Substitute.For<IAtendenteRepository>();
     private readonly ILinkCardapioConversaRepository _links = Substitute.For<ILinkCardapioConversaRepository>();
@@ -66,6 +70,11 @@ public partial class AtendimentoConversasControllerTests
         _currentUser.TemPermissao(Permissao.AtenderConversas).Returns(true);
         _canal.Canal.Returns(CanalConversa.WhatsApp);
         _canal.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns("wamid.dona1");
+        // #1786: reenviar e encerrar rodam numa transação com trava; o corpo precisa executar.
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<MensagemAtendimentoResult>>>(), Arg.Any<CancellationToken>())
+            .Returns(c => c.Arg<Func<CancellationToken, Task<MensagemAtendimentoResult>>>()(c.Arg<CancellationToken>()));
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<ConversaSituacaoResult>>>(), Arg.Any<CancellationToken>())
+            .Returns(c => c.Arg<Func<CancellationToken, Task<ConversaSituacaoResult>>>()(c.Arg<CancellationToken>()));
 
         var resolvedor = new ResolvedorCanal([_canal]);
         var uploads = new GerenciarUploadsUseCase(
@@ -219,6 +228,28 @@ public partial class AtendimentoConversasControllerTests
 
         reenvio.Should().BeOfType<OkObjectResult>();
         gravada.Status.Should().Be(StatusMensagem.Enviada);
+    }
+
+    [Fact]
+    public async Task AbaFechadaDuranteOEnvioAindaGravaAMensagem()
+    {
+        // #1787: o POST à Meta já saiu quando a dona fecha a aba. Sem o registro, o agente seguiria respondendo.
+        var conversa = ConversaComClienteAgora();
+        using var request = new CancellationTokenSource();
+        _canal.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                var ct = ci.ArgAt<CancellationToken>(2);
+                if (!ct.CanBeCanceled) return Task.FromResult("wamid.dona1");
+                request.Cancel();
+                return Task.FromCanceled<string>(ct);
+            });
+
+        await _controller.EnviarMensagem(conversa.Id, new EnviarMensagemConsoleBody("Já sai!"), request.Token);
+
+        _repositorio.Mensagens.Should().ContainSingle(m => m.Direcao == DirecaoMensagem.Saida
+            && m.ExternoId == "wamid.dona1" && m.Status == StatusMensagem.Enviada);
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
     }
 
     [Fact]
@@ -1016,9 +1047,6 @@ public partial class AtendimentoConversasControllerTests
 
         public Task<Mensagem?> ObterMensagemAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
             Task.FromResult(Mensagens.FirstOrDefault(m => m.EmpresaId == empresaId && m.ConversaId == conversaId && m.Id == mensagemId));
-
-        public Task<Mensagem?> ObterMensagemParaAlterarAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
-            ObterMensagemAsync(empresaId, conversaId, mensagemId, ct);
 
         public Task<Mensagem?> ObterMensagemComLockAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
             ObterMensagemAsync(empresaId, conversaId, mensagemId, ct);

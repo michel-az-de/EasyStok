@@ -65,6 +65,10 @@ public sealed class CancelarPedidosAbandonadosIntegrationTests(PostgreSqlDatabas
             .Should().Be(StatusPedidoMapper.Cancelado);
         (await leitura.VagasOcupadas.IgnoreQueryFilters().AsNoTracking().SingleAsync(v => v.PedidoId == pedidoId))
             .LiberadoEm.Should().NotBeNull("a vaga volta para a janela junto com o cancelamento");
+        // #1726: o cancelamento automático não é mais silencioso.
+        (await leitura.Set<PedidoEvento>().IgnoreQueryFilters().AsNoTracking().SingleAsync(e => e.PedidoId == pedidoId))
+            .Should().Match<PedidoEvento>(e => e.Tipo == "cancelado" && e.Origem == "sistema"
+                && e.Detalhes == CancelarPedidosAbandonadosBackgroundService.MotivoAbandonado);
 
         // A capacidade voltou: outro pedido ocupa a única vaga da janela.
         var segundo = Pedido.Criar(empresaId, origem: "storefront-guest");

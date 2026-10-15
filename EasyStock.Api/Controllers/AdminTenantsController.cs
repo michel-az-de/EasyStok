@@ -39,6 +39,9 @@ public class AdminTenantsController(
 
         try
         {
+            // A ação SuperAdmin cria uma empresa que ainda não existe no JWT. Escopo restrito
+            // ao provisionamento: os repositórios precisam gravar os vínculos do novo tenant.
+            using var tenantProvisionamento = db.UseRowLevelSecurityBypass();
             var resultado = await criarTenantUseCase.ExecuteAsync(new CriarTenantPorAdminCommand(
                 NomeEmpresa: req!.NomeEmpresa ?? string.Empty,
                 Documento: req.Documento,

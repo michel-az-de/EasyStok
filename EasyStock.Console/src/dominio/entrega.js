@@ -8,6 +8,11 @@ export const janelaPorId = (janelas, id) => janelas.find((j) => j.id === id) ?? 
 
 export const faixaDaJanela = (janelas, id) => janelaPorId(janelas, id)?.faixa ?? null
 
+// #1802: no modo API a janela do pedido chega como "id|data" com o rótulo pronto do EasyStok;
+// o catálogo local não a conhece e o canhoto saía sem janela com a entrega marcada.
+export const faixaDoPedido = (janelas, pedido) =>
+  pedido?.janelaRotulo ?? faixaDaJanela(janelas, pedido?.janela)
+
 export const janelaLotada = (janela, atual) =>
   janela.ocupadas >= janela.capacidade && janela.id !== atual
 

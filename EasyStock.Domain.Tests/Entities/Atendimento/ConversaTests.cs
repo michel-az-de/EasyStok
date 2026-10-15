@@ -163,6 +163,22 @@ public class ConversaTests
     }
 
     [Fact]
+    public void LiberarAutomatico_EncerraAjudaSemApagarOutroContextoNemReativarAoAssumir()
+    {
+        var conversa = Nova();
+        conversa.DefinirContexto("""{"comandaAjudaSolicitadaEm":"2026-10-13T03:00:00Z","carrinho":{"itens":[1,2]},"foraDeAreaLiberado":true}""");
+        conversa.Assumir(Agora, Guid.NewGuid());
+
+        conversa.LiberarAutomatico();
+        conversa.Assumir(Agora.AddMinutes(1), Guid.NewGuid());
+
+        using var contexto = System.Text.Json.JsonDocument.Parse(conversa.ContextoJson);
+        contexto.RootElement.TryGetProperty(Conversa.ChaveAjudaComandaSolicitadaEm, out _).Should().BeFalse();
+        contexto.RootElement.GetProperty("carrinho").GetProperty("itens").GetArrayLength().Should().Be(2);
+        contexto.RootElement.GetProperty("foraDeAreaLiberado").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
     public void LiberarAutomatico_EmEncerrada_Lanca()
     {
         var conversa = Nova();

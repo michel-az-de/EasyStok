@@ -4,8 +4,10 @@ import { imprimirPdf } from '../../componentes/pdfNoNavegador'
 import { Botao } from '../../componentes/Botao'
 import { FolhaImpressao } from '../../componentes/FolhaImpressao'
 import { Icone } from '../../componentes/Icone'
+import { ImprimirPedido } from '../../componentes/ImprimirPedido'
+import { impressaoDoPedido } from '../../aplicacao/impressos'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
-import { faixaDaJanela } from '../../dominio/entrega'
+import { faixaDoPedido } from '../../dominio/entrega'
 import { pdfDoCanhoto } from '../../dominio/impressao'
 import { itensDetalhados } from '../../dominio/pedido'
 import { PapelCanhoto } from './Canhoto'
@@ -47,7 +49,7 @@ function pedidosRecemPagos(conversas, vistosRef, primeiraRodadaRef) {
 // sem nenhuma modal aberta). Modal bloqueante só nasce do "Ver canhoto"
 // manual, em `BlocoPedido.jsx` — este arquivo nunca abre uma.
 export function FilaCanhotos() {
-  const { conversas } = useAtendimento()
+  const { conversas, fonteApi } = useAtendimento()
   const { marcarCanhotoImpresso } = useAcoes()
   const { cardapio, linhas, janelas } = useCatalogo()
   const [fila, setFila] = useState([])
@@ -77,14 +79,20 @@ export function FilaCanhotos() {
     linhas,
     nomeCliente: conversaAtual.nome,
     endereco: conversaAtual.cliente?.endereco ?? null,
-    faixa: faixaDaJanela(janelas, conversaAtual.pedido.janela),
+    faixa: faixaDoPedido(janelas, conversaAtual.pedido),
+  }
+  const concluir = () => {
+    marcarCanhotoImpresso(numeroAtual)
+    setFila((atual) => atual.slice(1))
   }
   const imprimir = () => {
     if (!numeroAtual) return
     if (dadosDoPapel) imprimirPdf(pdfDoCanhoto(dadosDoPapel), { planoB: () => window.print() })
-    marcarCanhotoImpresso(numeroAtual)
-    setFila((atual) => atual.slice(1))
+    concluir()
   }
+  // #1632: no modo API, com o pedido já no EasyStok, o topo da fila também sai pelo impresso
+  // em HTML da API (documento e papel à escolha). O PDF de 80 mm segue no botão de sempre.
+  const pedidoIdApi = fonteApi ? conversaAtual?.pedido?.pedidoId ?? null : null
 
   // Lugar reservado em cada arranjo, sem cobrir a navegação nem a Cobrança.
   // Redimensionar troca esse nó; a fila global continua montada e conserva os canhotos.
@@ -108,9 +116,16 @@ export function FilaCanhotos() {
           {fila.length === 1 ? '1 canhoto na fila' : `${fila.length} canhotos na fila`}
         </span>
       </span>
-      <Botao variante="primario" icone="printer" className={css.botaoImprimir} onClick={imprimir}>
+      {/* #1761 (L5): o primário da coluna é o próximo passo do pedido; imprimir é apoio. */}
+      <Botao variante="secundario" icone="printer" className={css.botaoImprimir} onClick={imprimir}>
         Imprimir
       </Botao>
+      {pedidoIdApi && (
+        <ImprimirPedido
+          key={pedidoIdApi} {...impressaoDoPedido(pedidoIdApi)} documentoInicial="pedido"
+          rotulo="Escolher papel" aoImprimir={(documento) => { if (documento === 'pedido' || documento === 'cozinha') concluir() }}
+        />
+      )}
     </output>
   )
 

@@ -184,7 +184,6 @@ public class NotificarClienteStatusPedidoHandlerTests
     }
 
     [Theory]
-    [InlineData(StatusPedidoMapper.Cancelado)]
     [InlineData(StatusPedidoMapper.Pronto)]
     [InlineData(StatusPedidoMapper.Aguardando)]
     public async Task StatusSemAvisoNaoGeraNada(string statusNovo)
@@ -233,6 +232,34 @@ public class NotificarClienteStatusPedidoHandlerTests
         mensagem.CorpoRenderizado.Should().Contain("Recebemos seu pagamento").And.Contain("Tarde (14h às 18h), 01/10");
         mensagem.IdempotencyKey.Should().Be(OutboxMensagemNotificacao.ComputarIdempotencyKey(
             $"{_pedido.Id:N}|pagamento:{payload.CobrancaPedidoId:N}:{payload.PagamentoExternoId}", CanalNotificacao.WhatsApp));
+    }
+
+    [Fact]
+    public async Task PagamentoConfirmadoDepoisDoCancelamentoNaoAvisaQuePedidoEstaConfirmado()
+    {
+        _pedido.Cancelar();
+        var payload = new PedidoPagoEvent(_pedido.Id, _empresaId, null, _cliente.Id, null, Guid.NewGuid(), "mercadopago",
+            "pay-atrasado", "pix", 25m, StatusPedidoMapper.Aguardando, DateTime.UtcNow);
+
+        await new NotificarClientePedidoPagoHandler(Aviso()).HandleAsync(Evento(PedidoPagoEvent.TipoEvento, payload), CancellationToken.None);
+        await AvaliarEventosAsync();
+
+        _eventos.Should().BeEmpty();
+        _outbox.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CancelamentoAvisaClienteSemAfirmarDevolucaoFinanceira()
+    {
+        Configurar(TipoEventoNotificacao.ComandaAtualizada, "comanda_atualizada_whatsapp_v1", "{{ mensagem }}");
+        _pedido.Cancelar();
+        _cliente.DefinirAvisosStatus(false, DateTime.UtcNow);
+
+        await MudarStatusAsync(StatusPedidoMapper.Aguardando, StatusPedidoMapper.Cancelado);
+        await MudarStatusAsync(StatusPedidoMapper.Aguardando, StatusPedidoMapper.Cancelado);
+
+        var mensagem = _outbox.Should().ContainSingle().Subject;
+        mensagem.CorpoRenderizado.Should().Contain("pedido foi cancelado").And.NotContain("devolvido").And.NotContain("estornado");
     }
 
     private async Task MudarStatusAsync(string antigo, string novo, DateTime? ocorridoEm = null)

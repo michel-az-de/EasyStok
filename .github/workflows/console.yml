@@ -33,10 +33,13 @@ jobs:
       - run: npm ci
       - run: npm run qualidade
       - run: node ferramentas/prova-comanda-compartilhada.mjs
+      - run: node ferramentas/prova-1683-ficha-comanda.mjs
+      - run: node ferramentas/prova-1785-ficha.mjs
       - run: node ferramentas/prova-1426-notificacoes-console.mjs
       - run: node ferramentas/prova-1430-contato-informado.mjs
       - run: node ferramentas/prova-1255-pagamento-manual-api.mjs
       - run: node ferramentas/prova-1586-encerrar-ficha-ux.mjs
+      - run: node ferramentas/prova-1683-operacao.mjs
       - run: node ferramentas/prova-1420-sugestao-agente-api.mjs
       - run: node ferramentas/prova-f06-honestidade.mjs
       - run: node ferramentas/prova-f11-lote-papel.mjs
@@ -44,6 +47,7 @@ jobs:
       - run: node ferramentas/prova-f11-cardapio-itens.mjs
       - run: node ferramentas/prova-f11-link-na-conversa.mjs
       - run: node ferramentas/prova-1587-conversa-comanda-ux.mjs
+      - run: node ferramentas/prova-1697-ux-desktop.mjs
       - run: node ferramentas/prova-1447-hall-modulos.mjs
       - run: node ferramentas/prova-1608-painel-agora.mjs
       - run: node ferramentas/prova-onda1-shell.mjs
@@ -76,6 +80,7 @@ jobs:
       - run: node ferramentas/prova-1552-receita-por-porcao.mjs
       - run: node ferramentas/prova-1551-delta-console.mjs
       - run: node ferramentas/prova-1565-console-ocioso.mjs
+      - run: node ferramentas/prova-1650-impressao-banca.mjs
       - run: node ferramentas/prova-1577-telas-console.mjs
       - run: node ferramentas/prova-1576-laco-sincronizacao.mjs
       - run: node ferramentas/prova-1577-balcao-render.mjs
@@ -100,8 +105,16 @@ jobs:
       - run: node ferramentas/prova-superbanca-ia.mjs
       - run: node ferramentas/prova-superbanca-navegacao.mjs
       - run: node ferramentas/prova-1616-janela-avulsa-pix.mjs
+      - run: node ferramentas/prova-1683-cobranca.mjs
       - run: node ferramentas/prova-premium-hall.mjs
+      - run: node ferramentas/prova-hub-dinamico.mjs
       - run: node ferramentas/prova-premium-cozinha.mjs
       - run: node ferramentas/prova-premium-comanda.mjs
+      - run: node ferramentas/prova-1632-impressos.mjs
+      - run: node ferramentas/prova-piloto-impressao.mjs
       - run: node ferramentas/prova-1582-navegacao-ux.mjs
       - run: node ferramentas/prova-producao-calculo-ia.mjs
+      - run: node ferramentas/prova-1653-busca.mjs
+      - run: node ferramentas/prova-1653-configuracoes.mjs
+      - run: node ferramentas/prova-1653-configuracao-sessao.mjs
+      - run: node ferramentas/prova-1653-expediente-concorrente.mjs

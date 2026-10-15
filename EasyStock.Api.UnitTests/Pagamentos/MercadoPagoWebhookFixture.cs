@@ -106,6 +106,6 @@ internal sealed class MercadoPagoWebhookFixture
             new CalculadoraInicioPrevistoPedido(Substitute.For<IPrazoPreparoPedidoQueries>()), Estorno, aviso, PedidoRepo);
         var atualizar = new AtualizarCobrancaPorPagamentoUseCase(CobrancaRepo, PedidoStorefrontRepo, aviso, tenant, Uow,
             relogio, NullLogger<AtualizarCobrancaPorPagamentoUseCase>.Instance);
-        return new MercadoPagoWebhookProcessor(MpClient, confirmar, atualizar, NullLogger<MercadoPagoWebhookProcessor>.Instance, EstornosOnline);
+        return new MercadoPagoWebhookProcessor(MpClient, confirmar, atualizar, NullLogger<MercadoPagoWebhookProcessor>.Instance, EstornosOnline, CobrancaRepo);
     }
 }

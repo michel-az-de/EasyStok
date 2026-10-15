@@ -35,7 +35,7 @@ public sealed record CheckoutCoreInput(
     string? Observacoes = null,
     PrazoPreparoCheckout? Prazo = null,
     string? Numero = null,
-    DadosEnderecoEntrega? EnderecoEntrega = null);
+    DadosEnderecoEntrega? EnderecoEntrega = null, decimal? FreteCombinado = null);
 
 /// <summary>
 /// Parâmetros do prazo mínimo (S16, RN-21): com eles o núcleo recusa a janela cujo início seja antes de
@@ -103,6 +103,9 @@ public sealed class CheckoutCoreService(
     /// <summary>Motivo do cancelamento quando a primeira cobrança do pedido não sai (#1301).</summary>
     public const string MotivoMercadoPagoIndisponivel = "mercado_pago_indisponivel";
 
+    /// <summary>Teto por item, o mesmo da comanda do cliente (<c>ComandaClienteUseCase.Validar</c>).</summary>
+    public const int QuantidadeMaximaPorItem = 99;
+
     /// <summary>
     /// Valida CEP e carrinho antes de qualquer consulta. Devolve o CEP só com dígitos.
     /// </summary>
@@ -120,6 +123,9 @@ public sealed class CheckoutCoreService(
             if (qtd <= 0)
                 throw new RegraDeDominioVioladaException(
                     "A quantidade de cada item precisa ser maior que zero.");
+            if (qtd > QuantidadeMaximaPorItem)
+                throw new RegraDeDominioVioladaException(
+                    $"A quantidade de cada item vai até {QuantidadeMaximaPorItem}.");
         }
 
         return cepNormalizado;
@@ -142,13 +148,16 @@ public sealed class CheckoutCoreService(
         // ── Loja fechada na mão (S40) ─────────────────────────────────────
         // Só a pausa manual recusa: o pedido é agendado (data + janela), então o horário
         // de funcionamento governa o atendimento, não o checkout.
-        var expediente = await expedienteLojaRepository.GetPublicoAsync(storefront.EmpresaId, ct);
-        if (expediente?.ControleManual == Domain.Enums.Storefront.ControleManualLoja.ForcarFechada)
-            throw new LojaFechadaException(expediente.MensagemLojaFechada);
+        await GarantirLojaAbertaAsync(storefront.EmpresaId, ct);
 
         // ── Cobertura e valor do frete: a mesma cotação do site (#1291) ───
         // Fora da área (zona ou raio), o CalcularFrete lança CepSemCoberturaException.
-        var frete = await calcularFrete.ExecuteAsync(new CalcularFreteInput(storefront.Slug, cep, input.Numero), ct);
+        if (input.FreteCombinado is < 0 or > 100000 || input.FreteCombinado is { } combinado && decimal.Round(combinado, 2) != combinado)
+            throw new UseCaseValidationException("Informe um frete válido em reais e centavos.");
+        var frete = input.FreteCombinado is { } valorCombinado
+            ? new FreteCalculadoDto(Guid.Empty, checked((int)(valorCombinado * 100)), valorCombinado.ToString("C", Cultura.PtBr),
+                "Entrega combinada com a Casa", "Frete combinado pela equipe")
+            : await calcularFrete.ExecuteAsync(new CalcularFreteInput(storefront.Slug, cep, input.Numero), ct);
         var valorFrete = frete.Valor / 100m;
 
         // ── Validar janela ────────────────────────────────────────────────
@@ -319,6 +328,17 @@ public sealed class CheckoutCoreService(
     /// <summary>
     /// Carrega os itens do cardápio pedidos. Item inexistente, invisível ou esgotado recusa o checkout.
     /// </summary>
+    /// <summary>
+    /// Pausa manual da loja (S40). Pública para o guest sem janela (ponte #1306), que não passa pelo
+    /// <see cref="CriarPedidoComReservaAsync"/> e criava pedido com a loja fechada na mão (#1784).
+    /// </summary>
+    public async Task GarantirLojaAbertaAsync(Guid empresaId, CancellationToken ct)
+    {
+        var expediente = await expedienteLojaRepository.GetPublicoAsync(empresaId, ct);
+        if (expediente?.ControleManual == Domain.Enums.Storefront.ControleManualLoja.ForcarFechada)
+            throw new LojaFechadaException(expediente.MensagemLojaFechada);
+    }
+
     public async Task<IReadOnlyDictionary<Guid, CardapioItem>> CarregarItensCardapioAsync(
         Guid storefrontId,
         IEnumerable<Guid> cardapioItemIds,

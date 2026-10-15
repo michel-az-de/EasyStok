@@ -26,6 +26,10 @@ export const retirarParada = (id, pedidoId) => chamarApi(`${V}/${id}/paradas/${p
 export const reordenarParada = (id, pedidoId, ordem) =>
   chamarApi(`${V}/${id}/paradas/${pedidoId}/ordem`, { metodo: 'PUT', corpo: { ordem } })
 export const sairParaEntrega = (id) => chamarApi(`${V}/${id}/sair`, { metodo: 'POST' })
+// I9.2 (#1691): corrida externa da viagem, com custo.
+export const listarCorridas = (id) => chamarApi(`${V}/${id}/corridas`)
+export const registrarCorrida = (id, corpo) => chamarApi(`${V}/${id}/corridas`, { metodo: 'POST', corpo })
+export const corrigirCorrida = (id, corridaId, corpo) => chamarApi(`${V}/${id}/corridas/${corridaId}`, { metodo: 'PUT', corpo })
 export const marcarParadaEntregue = (id, pedidoId) => chamarApi(`${V}/${id}/paradas/${pedidoId}/entregue`, { metodo: 'POST' })
 export const desfazerViagem = (id) => chamarApi(`${V}/${id}/desfazer`, { metodo: 'POST' })
 
@@ -54,3 +58,7 @@ export const definirZonaAtiva = (id, ativa) => chamarApi(`${E}/zonas/${id}/ativa
 export const listarBloqueios = (de, ate) => chamarApi(`${E}/bloqueios?de=${de}&ate=${ate}`)
 export const criarBloqueio = (corpo) => chamarApi(`${E}/bloqueios`, { metodo: 'POST', corpo })
 export const removerBloqueio = (id) => chamarApi(`${E}/bloqueios/${id}`, { metodo: 'DELETE' })
+// I2.2 (#1651): frete por distância (cozinha, raio e faixas) e o "testar um endereço".
+export const obterFreteRaio = () => chamarApi(`${E}/raio`)
+export const salvarFreteRaio = (corpo) => chamarApi(`${E}/raio`, { metodo: 'PUT', corpo })
+export const testarFreteRaio = (corpo) => chamarApi(`${E}/raio/testar`, { metodo: 'POST', corpo })

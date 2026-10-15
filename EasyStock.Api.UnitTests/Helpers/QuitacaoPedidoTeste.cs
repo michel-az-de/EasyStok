@@ -17,5 +17,6 @@ internal static class QuitacaoPedidoTeste
         IOperacaoEventPublisher? eventos = null) => new(pedidos,
             cobrancas ?? Substitute.For<ICobrancaPedidoRepository>(), conversas ?? Substitute.For<IConversaRepository>(),
             impressoes ?? Substitute.For<IImpressaoPendenteRepository>(), publicador ?? Substitute.For<IPublicadorEventoIntegracao>(),
-            eventos ?? Substitute.For<IOperacaoEventPublisher>());
+            eventos ?? Substitute.For<IOperacaoEventPublisher>(),
+            new CalculadoraInicioPrevistoPedido(Substitute.For<IPrazoPreparoPedidoQueries>()));
 }

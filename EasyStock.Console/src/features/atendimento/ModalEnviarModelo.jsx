@@ -50,7 +50,7 @@ export function ModalEnviarModelo({ conversa, aoFechar }) {
     finally { ocupado.current = false; setEnviando(false) }
   }
   return (
-    <Modal titulo="Enviar modelo aprovado" descricao={`Envie para ${conversa.nome}. O texto livre continua bloqueado fora das 24 horas até o cliente responder.`}
+    <Modal titulo="Enviar modelo aprovado" descricao={`Confira a prévia antes de enviar para ${conversa.nome}. Este modelo é enviado diretamente pelo canal; não entra no rascunho de respostas rápidas.`}
       aoFechar={fechar} rodape={<>
         <Botao disabled={enviando} onClick={fechar}>Fechar</Botao>
         <Botao variante="primario" disabled={enviando || Boolean(falta) || bloqueado || Boolean(resultado)} onClick={enviar}>
@@ -73,7 +73,8 @@ export function ModalEnviarModelo({ conversa, aoFechar }) {
           {escolha !== '' && modelo && <>
             <p>{modelo.categoria === 'MARKETING' ? 'Novidades e promoções: exige autorização de marketing na Ficha.' : 'Aviso transacional: respeita os consentimentos da Ficha.'}</p>
             {modelo.indisponivel && <p role="alert" className={css.programarErro}>{modelo.indisponivel}</p>}
-            {!modelo.indisponivel && parametros.map((p, i) => <CampoTexto key={i} rotulo={`Parâmetro ${i + 1}`} value={p} maxLength={1024}
+            {!modelo.indisponivel && parametros.length > 0 && <p>Preencha os campos numerados e confira cada substituição na prévia abaixo.</p>}
+            {!modelo.indisponivel && parametros.map((p, i) => <CampoTexto key={i} rotulo={`Campo ${i + 1} ({{${i + 1}}})`} value={p} maxLength={1024}
               onChange={e => setParametros(atuais => atuais.map((v, n) => n === i ? e.target.value : v))} />)}
             <p className={css.cardapioRotulo}>Prévia da mensagem</p>
             <p className={css.programadaTexto}>{previa}</p>

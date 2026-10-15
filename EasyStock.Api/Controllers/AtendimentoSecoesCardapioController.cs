@@ -82,6 +82,13 @@ public class AtendimentoSecoesCardapioController(
     public Task<IActionResult> MigrarCategorias(CancellationToken ct)
         => Tratar(async () => DataOk(await secoes.MigrarCategoriasAsync(currentUser.EmpresaId, ct)));
 
+    [SwaggerOperation(Summary = "Preview of the old free-text categories conversion (read only)",
+        Description = "Os textos que a conversão levaria para seções, com quantos pratos cada um ligaria. Não grava.")]
+    [HttpGet("migrar-categorias/previa")]
+    [Authorize(Policy = "Gerente")]
+    public Task<IActionResult> PreviaDaMigracao(CancellationToken ct)
+        => Tratar(async () => DataOk(await secoes.PreviaDaMigracaoAsync(currentUser.EmpresaId, ct)));
+
     private async Task<IActionResult> Tratar(Func<Task<IActionResult>> acao)
     {
         try

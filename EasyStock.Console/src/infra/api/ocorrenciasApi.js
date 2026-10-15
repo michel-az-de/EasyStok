@@ -5,5 +5,6 @@ const rota = (id) => {
   return `/api/ocorrencias/${id}`
 }
 export const listarOcorrencias = (pedidoId) => chamarApi(`/api/ocorrencias?pedidoId=${encodeURIComponent(pedidoId)}`)
+export const abrirOcorrencia = (corpo) => chamarApi('/api/ocorrencias', { metodo: 'POST', corpo })
 export const apurarOcorrencia = (id) => chamarApi(`${rota(id)}/apurar`, { metodo: 'POST', corpo: {} })
 export const resolverOcorrencia = (id, corpo) => chamarApi(`${rota(id)}/resolver`, { metodo: 'POST', corpo })

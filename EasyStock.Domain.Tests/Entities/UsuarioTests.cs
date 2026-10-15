@@ -166,4 +166,30 @@ public class UsuarioConviteTests
         ViaDoConvite.Email.Should().Be("e-mail");
         ViaDoConvite.Google.Should().Be("Google");
     }
+
+    // ── #1781: o e-mail da conta é gravado normalizado (trim + minúsculas), igual ao que o login busca ──
+
+    [Fact]
+    public void CriarGravaOEmailNormalizado()
+    {
+        Usuario.Criar("Ana", "  Ana.Souza@CasaDaBaba.com ", "hash").Email.Should().Be("ana.souza@casadababa.com");
+        Usuario.CriarConvidado("Leo", "LEO@casadababa.com").Email.Should().Be("leo@casadababa.com");
+    }
+
+    [Fact]
+    public void SolicitarTrocaDeEmailGuardaOPendenteNormalizado()
+    {
+        var usuario = Usuario.Criar("Ana", "ana@casadababa.com", "hash");
+
+        usuario.SolicitarTrocaDeEmail("  Nova@CasaDaBaba.COM ");
+        usuario.ConfirmarNovoEmail();
+
+        usuario.Email.Should().Be("nova@casadababa.com");
+    }
+
+    [Theory]
+    [InlineData(" ADMIN@casadababa.demo ", "admin@casadababa.demo")]
+    [InlineData("admin@casadababa.demo", "admin@casadababa.demo")]
+    public void NormalizarEmailAplicaTrimEMinusculas(string informado, string esperado) =>
+        Usuario.NormalizarEmail(informado).Should().Be(esperado);
 }

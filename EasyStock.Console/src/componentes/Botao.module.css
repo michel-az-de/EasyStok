@@ -22,6 +22,13 @@
 }
 .primario:hover:not(:disabled) { background: var(--acao-forte); }
 .primario:active:not(:disabled) { background: var(--acao-forte); box-shadow: inset 0 2px 4px rgba(0, 0, 0, .18); }
+/* #1683: confirmar ação destrutiva. Mesmo peso do primário, na cor de erro; o par
+   --sobre-erro/--erro é conferido em ferramentas/verificar-contraste.mjs. */
+.perigo {
+  background: var(--erro); border: var(--b-1) solid transparent; color: var(--sobre-erro);
+  box-shadow: var(--sombra);
+}
+.perigo:hover:not(:disabled), .perigo:active:not(:disabled) { filter: brightness(.9); }
 .secundario {
   background: var(--papel); border: var(--b-1) solid var(--linha-media); color: var(--tinta);
   box-shadow: var(--sombra);

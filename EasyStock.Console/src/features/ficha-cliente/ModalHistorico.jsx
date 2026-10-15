@@ -11,6 +11,7 @@ import { ehLead } from '../../dominio/conversa'
 import { enviosAutomaticos } from '../../dominio/automacao'
 import { diasEntre, quandoRelativo, resumoFinanceiro } from '../../dominio/cliente'
 import { moeda } from '../../dominio/formato'
+import { rotuloDoEstado } from '../../dominio/pedido'
 import { numeroParaEntregador, textoDoEntregador } from '../../dominio/despacho'
 import css from './cliente.module.css'
 
@@ -48,7 +49,7 @@ function AbaPedidos({ historico, pedidosAnteriores }) {
             <b>{pedido.numero}</b>
             <span className={css.itensPedido}>{pedido.itens.join(', ')}</span>
             <b className={css.totalPedido}>{moeda(pedido.total)}</b>
-            <Pilula tom={pedido.estado === 'entregue' ? 'ok' : 'neutro'} fina>{pedido.estado}</Pilula>
+            <Pilula tom={pedido.estado === 'entregue' ? 'ok' : 'neutro'} fina>{rotuloDoEstado(pedido.estado)}</Pilula>
             <AvaliacaoCliente avaliacao={pedido.avaliacaoCliente} />
           </header>
           {/* Issue #17: quem levou, com veículo, placa e empresa, e o número

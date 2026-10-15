@@ -74,8 +74,9 @@ public sealed class DispararMensagemProgramadaUseCase(
             if (conversa is not null)
                 await RegistrarNoHistoricoAsync(empresaId, conversa, mensagem, idExterno, agora, ct);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
+            // #1787: o timeout do HttpClient também é OperationCanceledException; só o desligamento relança.
             logger.LogWarning(ex, "Mensagem programada {Id} não saiu.", id);
             mensagem.RegistrarFalha(ex.Message, agora);
         }

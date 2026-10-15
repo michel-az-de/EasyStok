@@ -1,5 +1,5 @@
 import { API_BASE } from '../fonteDados'
-import { atualizarTokens, empresaDoToken, gravarSessao, lerSessao, limparSessao } from './sessao'
+import { atualizarTokens, empresaDoToken, gravarSessao, identidadeDaSessao, lerSessao, limparSessao } from './sessao'
 
 // Erro de chamada à API com o que a tela precisa para falar com a dona:
 // status HTTP, código da API (`error.code` ou `erro`), mensagem legível e o detalhe
@@ -104,11 +104,15 @@ const PRAZO_DE_LEITURA_MS = 20000
 const semResposta = () => new ErroApi(0, 'SEM_RESPOSTA', 'O EasyStok demorou a responder.')
 
 export async function chamarApi(caminho, {
-  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null, sinal, envelope = false,
+  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null, sinal, envelope = false, prazoComCancelamento = false, identidadeEsperada = null,
 } = {}) {
   const sessao = autenticado ? await garantirSessao() : null
+  // Uma operação em etapas pertence à conta que a iniciou, mesmo durante a renovação do token.
+  if (identidadeEsperada !== null && (identidadeDaSessao(sessao) !== identidadeEsperada || identidadeDaSessao(lerSessao()) !== identidadeEsperada)) {
+    throw new ErroApi(401, 'SESSAO_ALTERADA', 'A sessão foi encerrada ou trocada.')
+  }
   // Conta a partir daqui: a renovação da sessão não gasta o prazo da leitura.
-  const prazo = !sinal && metodo === 'GET' && !arquivo ? AbortSignal.timeout(PRAZO_DE_LEITURA_MS) : null
+  const prazo = (!sinal || prazoComCancelamento) && metodo === 'GET' && !arquivo ? AbortSignal.timeout(PRAZO_DE_LEITURA_MS) : null
   const cabecalhos = { Accept: arquivo ? '*/*' : 'application/json' }
   if (corpo !== undefined) cabecalhos['Content-Type'] = 'application/json'
   if (chave) cabecalhos['Idempotency-Key'] = chave
@@ -121,10 +125,10 @@ export async function chamarApi(caminho, {
       method: metodo,
       headers: cabecalhos,
       body: formulario ?? (corpo === undefined ? undefined : JSON.stringify(corpo)),
-      signal: sinal ?? prazo ?? undefined,
+      signal: sinal && prazo ? AbortSignal.any([sinal, prazo]) : sinal ?? prazo ?? undefined,
     })
   } catch {
-    if (prazo?.aborted) throw semResposta()
+    if (prazo?.aborted && !sinal?.aborted) throw semResposta()
     throw new ErroApi(0, 'SEM_CONEXAO', 'Sem conexão com o EasyStok.')
   }
   if (resposta.ok && arquivo) return resposta.blob()
@@ -133,7 +137,7 @@ export async function chamarApi(caminho, {
     bruto = await resposta.text()
   } catch {
     // Cortou no meio do corpo: mesmo erro de quando a resposta nem chegou.
-    if (prazo?.aborted) throw semResposta()
+    if (prazo?.aborted && !sinal?.aborted) throw semResposta()
     throw new ErroApi(0, 'SEM_CONEXAO', 'Sem conexão com o EasyStok.')
   }
   if (resposta.ok && texto) return bruto

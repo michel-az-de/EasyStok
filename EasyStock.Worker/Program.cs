@@ -5,11 +5,13 @@ using EasyStock.Infra.Notifications.DependencyInjection;
 using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.DependencyInjection;
+using EasyStock.Infra.Postgre.Integration;
 using EasyStock.Infra.Postgre.Notifications.Agendamento;
 using EasyStock.Worker;
 using EasyStock.Worker.BackgroundServices;
 using EasyStock.Worker.DependencyInjection;
 using EasyStock.Infra.Integrations.DependencyInjection;
+using EasyStock.Infra.Async.Logging;
 using Serilog;
 
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -27,6 +29,9 @@ TaskScheduler.UnobservedTaskException += (_, e) =>
 
 var builder = Host.CreateApplicationBuilder(args);
 
+// I4.1 (#1674): o Worker decifra o token do WhatsApp; a chave-mestra chega por EZ_CRYPTO_*, como na API.
+builder.Configuration.AdicionarChaveMestraDoAmbiente();
+
 // Serilog
 var loggerConfiguration = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
@@ -36,12 +41,13 @@ var loggerConfiguration = new LoggerConfiguration()
 // trace_id/span_id com os traces do TelemetrySetup. Opt-in: sem a config, sem sink.
 if (builder.Configuration["OpenTelemetry:OtlpEndpoint"] is { Length: > 0 } otlpLogsEndpoint)
 {
-    loggerConfiguration = loggerConfiguration.WriteTo.OpenTelemetry(o =>
+    // I4.5 (#1698): o log sai da maquina por aqui, entao sai redigido.
+    loggerConfiguration = loggerConfiguration.WriteTo.Redigido(sinks => sinks.OpenTelemetry(o =>
     {
         o.Endpoint = otlpLogsEndpoint;
         o.Protocol = Serilog.Sinks.OpenTelemetry.OtlpProtocol.Grpc;
         o.ResourceAttributes = new Dictionary<string, object> { ["service.name"] = "EasyStock.Worker" };
-    });
+    }));
 }
 
 Log.Logger = loggerConfiguration.CreateLogger();
@@ -181,4 +187,14 @@ if (args.Contains("--validate-di"))
 }
 
 var host = builder.Build();
+
+// I4.1: sem chave-mestra o Worker sobe e avisa (o fail-fast é da I4.2).
+ChaveMestraConfiguracao.AvisarSeFaltar(
+    host.Services.GetRequiredService<IConfiguration>(),
+    host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("ChaveMestra"),
+    "Worker");
+
+// I4.2: em Production o Worker não sobe sem chave-mestra que leia todas as credenciais ativas.
+await ChaveMestraNaSubida.ExigirAsync(host.Services, builder.Environment.EnvironmentName, "Worker");
+
 host.Run();

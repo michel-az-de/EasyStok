@@ -37,8 +37,16 @@ public class ChatSiteUseCasesTests
         _flags.ListarAtivasAsync(_loja.EmpresaId, Arg.Any<CancellationToken>())
             .Returns([FeatureCatalogo.ModuloAtendimento, FeatureCatalogo.CanalChatSite]);
         _acesso = new AcessoChatSite(_lojas, _flags, _tenant, _sessoes);
+        // #1797: a mensagem relê a conversa travada; no dublê, a já cadastrada ou a recém-criada.
+        var criadas = new List<Conversa>();
+        _conversas.When(x => x.AddAsync(Arg.Any<Conversa>(), Arg.Any<CancellationToken>())).Do(ci => criadas.Add(ci.Arg<Conversa>()));
+        _conversas.ObterPorIdComLockAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(async ci => await _conversas.ObterPorIdAsync(ci.ArgAt<Guid>(0), ci.ArgAt<Guid>(1), ci.ArgAt<CancellationToken>(2))
+                ?? criadas.FirstOrDefault(c => c.Id == ci.ArgAt<Guid>(1)));
         _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<Conversa>>>(), Arg.Any<CancellationToken>())
             .Returns(ci => ci.Arg<Func<CancellationToken, Task<Conversa>>>()(ci.Arg<CancellationToken>()));
+        _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<Mensagem>>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task<Mensagem>>>()(ci.Arg<CancellationToken>()));
     }
 
     private (SessaoChatSite Sessao, string Token) SessaoValida(Guid? storefrontId = null, DateTime? abertaEm = null)
@@ -103,6 +111,7 @@ public class ChatSiteUseCasesTests
         criada.ContatoIdExterno.Should().Be(sessao.ContatoIdExterno);
         criada.Situacao.Should().Be(SituacaoConversa.Assumida);
         criada.AssumidaPorUsuarioId.Should().BeNull();
+        criada.MotivoEscalada.Should().Be(ConversaChatSiteService.MotivoFilaHumana);
         criada.NaoLidas.Should().Be(1);
         sessao.ConversaId.Should().Be(criada.Id);
         resultado.DoVisitante.Should().BeTrue();
@@ -119,11 +128,36 @@ public class ChatSiteUseCasesTests
         var conversa = Conversa.Abrir(_loja.EmpresaId, sessao.ContatoIdExterno, DateTime.UtcNow, canal: CanalConversa.ChatSite);
         sessao.VincularConversa(conversa.Id);
         _conversas.ObterPorIdAsync(_loja.EmpresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        var confirmacao = Mensagem.Saida(_loja.EmpresaId, conversa.Id, AutorMensagem.Sistema, DateTime.UtcNow,
+            TipoConteudoMensagem.Texto, "Recebemos sua mensagem.", EnviarMensagemVisitanteUseCase.PrefixoConfirmacaoRecebimento + conversa.Id.ToString("N"));
+        _conversas.ObterMensagemPorExternoIdAsync(_loja.EmpresaId, confirmacao.ExternoId!, Arg.Any<CancellationToken>()).Returns(confirmacao);
 
         await Enviar().ExecuteAsync(Slug, token, "mais uma");
 
         await _conversas.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
         conversa.NaoLidas.Should().Be(1);
+        await _conversas.DidNotReceive().AddMensagemAsync(Arg.Is<Mensagem>(m => m.Direcao == DirecaoMensagem.Saida), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("Conversa reaberta para atendimento.", false)]
+    [InlineData("Motivo real preservado", false)]
+    [InlineData(null, true)]
+    public async Task Entrada_PreservaMotivoRealEResponsavel(string? motivo, bool assumida)
+    {
+        var (sessao, token) = SessaoValida();
+        var agora = DateTime.UtcNow;
+        var conversa = Conversa.Abrir(_loja.EmpresaId, sessao.ContatoIdExterno, agora, canal: CanalConversa.ChatSite);
+        var dona = assumida ? Guid.NewGuid() : (Guid?)null;
+        if (assumida) conversa.Assumir(agora, dona); else conversa.Escalar(agora, motivo);
+        sessao.VincularConversa(conversa.Id);
+        _conversas.ObterPorIdAsync(_loja.EmpresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        await Enviar().ExecuteAsync(Slug, token, "Mais uma dúvida");
+
+        conversa.MotivoEscalada.Should().Be(motivo);
+        conversa.AssumidaPorUsuarioId.Should().Be(dona);
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
     }
 
     [Fact]

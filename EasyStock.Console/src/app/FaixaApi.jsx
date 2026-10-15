@@ -36,7 +36,7 @@ export function AvisoDaAcaoApi() {
 // Faixa fina do modo API (F01): quem está logado, em qual empresa, se a lista
 // está atualizando e o último aviso de ação recusada ou ainda não ligada. Some no
 // modo demonstração. O aviso fica até a dona fechar (F06): a sincronização não o apaga.
-export function FaixaApi({ aoSair }) {
+export function FaixaApi({ aoSair, somenteAvisos = false }) {
   const { fonteApi, sincronizacao, sessao, agora } = useAtendimento()
   const { fecharAvisoApi } = useAcoes()
   if (!fonteApi) return null
@@ -53,17 +53,17 @@ export function FaixaApi({ aoSair }) {
       ? `Conversas sem atualização: ${sincronizacao.mensagem || 'a consulta não foi concluída.'} A próxima tentativa é automática.`
       : aviso ?? 'Conversas ao vivo do EasyStok'
   return (
-    <output className={`${css.faixa} ${falhou || aviso ? css.alerta : ''}`}>
-      <span className={css.texto}>
+    <output className={`${css.faixa} ${falhou ? css.falha : aviso ? css.aviso : ''}`}>
+      {(!somenteAvisos || carregando || falhou || aviso) && <span className={css.texto}>
         {texto}
         {aviso && (
           <button type="button" className={css.sair} onClick={() => fecharAvisoApi({ fixo: !avisoDeAcao })}>Fechar aviso</button>
         )}
-      </span>
+      </span>}
       <span className={css.quem}>
         {vencimento && <strong className={css.vence}>{vencimento}</strong>}
         {rotuloDaSessao(sessao)}
-        <button type="button" className={css.sair} onClick={aoSair}>Sair</button>
+        {!somenteAvisos && <button type="button" className={css.sair} onClick={aoSair}>Sair</button>}
       </span>
     </output>
   )

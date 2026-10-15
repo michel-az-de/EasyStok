@@ -6,6 +6,7 @@ import { focarResultadoDaAcao } from './focoDaAcao'
 import css from './assistente.module.css'
 
 const ICONE = {
+  [ACOES_DO_ASSISTENTE.RETOMAR_AUTOMATICO]: 'agente',
   [ACOES_DO_ASSISTENTE.ENVIAR_CARDAPIO]: 'cardapio',
   [ACOES_DO_ASSISTENTE.NOTA_INTERNA]: 'nota',
   [ACOES_DO_ASSISTENTE.RASCUNHO]: 'modelo',

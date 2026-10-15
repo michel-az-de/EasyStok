@@ -48,4 +48,8 @@ public sealed record PedidoImpressoItemDto(
 
 /// <param name="Pago">Pagamentos somam o total.</param>
 /// <param name="Forma">Método da cobrança ou do último pagamento (<c>pix</c>, <c>cartao</c>...), cru.</param>
-public sealed record PedidoImpressoCobrancaDto(decimal Total, bool Pago, string? Forma);
+/// <param name="Recebido">Soma do que já entrou (sinal ou pagamento parcial); o entregador cobra só o saldo.</param>
+public sealed record PedidoImpressoCobrancaDto(decimal Total, bool Pago, string? Forma, decimal Recebido = 0m)
+{
+    public decimal Saldo => Pago ? 0m : Math.Max(Total - Recebido, 0m);
+}

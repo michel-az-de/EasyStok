@@ -90,7 +90,7 @@ public class ChatSiteController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [EnableRateLimiting(ChatSiteRateLimit.Leitura)]
+    [EnableRateLimiting(ChatSiteRateLimit.Stream)]
     [HttpGet("stream")]
     public async Task<IActionResult> Stream(
         string slug, [FromHeader(Name = ChatSiteRateLimit.HeaderToken)] string? token,

@@ -173,9 +173,9 @@ export function useCozinhaApi({ data = null } = {}) {
 
   // O canhoto saiu pela aba: tira da gaveta na hora e confirma na API (idempotente).
   const confirmar = useCallback((impressaoId) => {
-    setImpressoes((lista) => lista.filter((i) => i.id !== impressaoId))
     return confirmarImpressao(impressaoId)
-      .catch((e) => setErro(`O canhoto saiu, mas a fila não soube: ${e.message}`))
+      .then(() => setImpressoes((lista) => lista.filter((i) => i.id !== impressaoId)))
+      .catch((e) => { setErro(`O canhoto saiu, mas a fila não soube: ${e.message}`); throw e })
       .finally(() => recarregarImpressoes())
   }, [recarregarImpressoes])
 

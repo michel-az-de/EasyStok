@@ -26,4 +26,24 @@ public interface IClienteOtpRepository
 
     Task AddAsync(ClienteOtp otp, CancellationToken ct = default);
     Task UpdateAsync(ClienteOtp otp, CancellationToken ct = default);
+
+    /// <summary>
+    /// #1781: reserva uma tentativa do OTP num UPDATE atômico (<c>Tentativas + 1</c> só enquanto abaixo de
+    /// <see cref="ClienteOtp.MaxTentativas"/> e não consumido), antes de conferir o código.
+    /// </summary>
+    /// <returns><c>false</c> quando as tentativas acabaram (ou o OTP foi consumido): o código não deve ser conferido.</returns>
+    Task<bool> ReservarTentativaAsync(Guid otpId, CancellationToken ct = default);
+
+    /// <summary>
+    /// #1781: consome o OTP num UPDATE atômico (<c>Consumido = true</c> só se ainda não consumido). Dois códigos certos
+    /// em paralelo: só um afeta a linha.
+    /// </summary>
+    /// <returns><c>false</c> quando outra requisição já consumiu o OTP: não abra sessão.</returns>
+    Task<bool> ConsumirAsync(Guid otpId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Lê no banco, sem o rastreamento do contexto, se o OTP já foi consumido. Separa a reserva recusada porque
+    /// outra requisição levou o OTP (código inválido) da recusada porque as tentativas acabaram.
+    /// </summary>
+    Task<bool> ConsumidoAsync(Guid otpId, CancellationToken ct = default);
 }

@@ -37,7 +37,7 @@ const mmss = (restamMs) => {
 const clamp01 = (v) => Math.min(1, Math.max(0, v))
 
 export function RelogioPix({
-  cobranca, agora, editavel, numeroPedido, nomeCliente,
+  cobranca, agora, editavel, numeroPedido, nomeCliente, statusApi,
   aoReenviar, aoCancelarPedido, aoEncerrarAtendimento, aoAceitarDivergencia, aoCobrarDiferenca,
 }) {
   const situacao = situacaoDaCobranca(cobranca, agora)
@@ -185,8 +185,9 @@ export function RelogioPix({
           <span className={css.legenda}>Venceu</span>
         </Anel>
         {/* #1616: no modo API quem trata o link vencido é o job do EasyStok (segundo link, depois
-            cancelamento). O botão só avisava no rodapé; no lugar dele, o que vai acontecer. */}
-        {fonteApi && <p className={css.legenda}>{avisoDeLinkVencidoApi(cobranca)}</p>}
+            cancelamento). O botão só avisava no rodapé; no lugar dele, o que vai acontecer.
+            #1683: isso só vale com o pedido esperando o pagamento; "Marcar pago" fica na barra. */}
+        {fonteApi && <p className={css.legenda}>{avisoDeLinkVencidoApi(cobranca, statusApi)}</p>}
         {editavel && confirmando === null && (
           <div className={css.botoesZerado}>
             {!fonteApi && (
@@ -208,7 +209,7 @@ export function RelogioPix({
               Cancelar o pedido {numeroPedido}? {nomeCliente} recebe aviso de cancelamento.
             </p>
             <div className={css.botoesZerado}>
-              <Botao variante="primario" onClick={() => { aoCancelarPedido(); setConfirmando(null) }}>
+              <Botao variante="perigo" onClick={() => { aoCancelarPedido(); setConfirmando(null) }}>
                 Cancelar pedido
               </Botao>
               <Botao variante="texto" onClick={() => setConfirmando(null)}>Manter</Botao>

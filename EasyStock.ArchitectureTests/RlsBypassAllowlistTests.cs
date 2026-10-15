@@ -107,6 +107,10 @@ public class RlsBypassAllowlistTests
         // nulo, UsuarioPerfil.EmpresaId = Guid.Empty, sem UsuarioEmpresa): nenhuma consulta por empresa o acha. A leitura
         // e so de Id, nome e contato, num escopo de DI proprio e curto, e so vale em rotina global.
         "EasyStock.Infra.Postgre/Notifications/Audiencia/SuperAdminsDaPlataformaQuery.cs",
+
+        // I4.2, #1708: na subida, em Production, o host confere se a chave-mestra decifra as credenciais ativas de
+        // todas as lojas. Verificacao de plataforma, sem tenant por natureza, num escopo de DI proprio e curto; so le.
+        "EasyStock.Infra.Postgre/Integration/ChaveMestraNaSubida.cs",
     };
 
     [Fact]

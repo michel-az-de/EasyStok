@@ -85,9 +85,11 @@ confere('o seletor de janela da API remonta quando a conversa muda', () => {
 confere('a Ficha entrega o id da conversa à comanda', () => {
   assert.ok(tagDe(painelFicha, 'BlocoPedido').includes('conversaId={selecionada.id}'), '<BlocoPedido> sem conversaId')
 })
-confere('o dia escolhido é estado local do seletor do rascunho (é ele que a remontagem zera)', () => {
+confere('o dia escolhido é estado local reiniciado com a data da comanda, vazia por padrão', () => {
   const seletor = semComentarios(ler('features/ficha-cliente/SeletorJanelaApi.jsx'))
-  assert.ok(corpoDe(seletor, 'EscolhaRascunho').includes("const [data, setData] = useState('')"))
+  assert.ok(corpoDe(seletor, 'SeletorJanelaApi').includes("dataInicial = ''"))
+  assert.ok(tagDe(seletor, 'EscolhaRascunho').includes('dataInicial={dataInicial}'))
+  assert.ok(corpoDe(seletor, 'EscolhaRascunho').includes('const [data, setData] = useState(dataInicial)'))
 })
 
 // --- 3. Modelos aprovados só com a API ----------------------------------------------------
@@ -95,12 +97,14 @@ const painelAtendimento = semComentarios(ler('features/atendimento/PainelAtendim
 const composer = semComentarios(ler('features/atendimento/Composer.jsx'))
 confere('"Modelos aprovados" exige a fonte API', () => {
   assert.ok(
-    tagDe(painelAtendimento, 'Composer').includes('podeEnviarModelo={fonteApi && podeReabrir && canal.aceitaModelo && !encerrada && !bloqueada}'),
+    // #1761: a conta saiu da tag porque a bolha recusada fora da janela usa a mesma.
+    painelAtendimento.includes('const podeEnviarModelo = fonteApi && podeReabrir && canal.aceitaModelo && !encerrada && !bloqueada')
+      && tagDe(painelAtendimento, 'Composer').includes('podeEnviarModelo={podeEnviarModelo}'),
     'podeEnviarModelo sem exigir fonteApi',
   )
 })
 confere('botão e dica do campo dependem do mesmo sinal: sem o botão, a dica não o promete', () => {
-  assert.match(composer, /\{podeEnviarModelo && <Botao className=\{css\.abrirModelos\}/)
+  assert.match(composer, /\{modelosFixos && podeEnviarModelo && <Botao className=\{css\.abrirModelos\}/)
   assert.match(composer, /podeEnviarModelo \? 'Use Modelos aprovados para continuar' : 'Mensagem indisponível nesta conversa'/)
   assert.equal(vezes(composer, 'Modelos aprovados'), 2)
 })
