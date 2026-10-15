@@ -186,7 +186,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         }
         var token = await Link(factory, conversaId);
         var estado = await Estado(client, token);
-        await Salvar(client, token, estado, new([new(c.CardapioItemId, 1)],
+        await Salvar(client, token, estado, new([new(c.CardapioItemId, 1)], JanelaId: c.JanelaId, DataEntrega: c.DataEntrega,
             Endereco: new("", "Rua sem número", "", "", "", "", "Fundos"), Nome: "Lead com rua", Telefone: "11912345603"));
         estado = await Estado(client, token);
         var resposta = await client.PostAsJsonAsync($"{Rota(token)}/encaminhar-entrega", new { estado.Revisao });
@@ -201,6 +201,19 @@ public sealed partial class PedidoConversaConcorrenciaTests
         (await banco.Clientes.Include(x => x.Enderecos).SingleAsync(x => x.Id == conversa.ClienteId)).Enderecos.Should().BeEmpty();
         (await banco.AtendimentoMensagens.CountAsync(x => x.ConversaId == conversaId && x.Texto!.Contains("Endereço pendente"))).Should().Be(1);
         (await banco.Pedidos.CountAsync()).Should().Be(0);
+        // A atendente registra o endereço pela Ficha, combina o frete e a cliente confirma o pedido.
+        (await client.PostAsJsonAsync($"/api/atendimento/conversas/{conversaId}/cliente", new
+        {
+            Endereco = new { Cep = "01310100", Logradouro = "Av. Paulista", Numero = "900", Bairro = "Bela Vista", Cidade = "São Paulo", Uf = "SP" },
+        })).StatusCode.Should().Be(HttpStatusCode.OK);
+        var comFicha = await Estado(client, token);
+        comFicha.Rascunho.Endereco!.Numero.Should().Be("900", "com a comanda na mão da atendente, o endereço da Ficha substitui o parcial");
+        (await client.PostAsJsonAsync($"/api/atendimento/conversas/{conversaId}/comandas-cliente/{comFicha.LinkId}/combinar-frete",
+            new { comFicha.Revisao, Valor = 5m })).StatusCode.Should().Be(HttpStatusCode.OK);
+        var envio = await Enviar(client, token, comFicha.Revisao);
+        envio.Total.Should().Be(15m, "um prato de R$ 10 e o frete combinado de R$ 5");
+        (await banco.Pedidos.CountAsync()).Should().Be(1);
+        (await Estado(client, token)).Pedido!.Frete.Should().Be(5m);
     }
 
     [SkippableFact]

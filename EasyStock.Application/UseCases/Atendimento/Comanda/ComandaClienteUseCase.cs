@@ -135,8 +135,11 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         }
         // Endereço em branco é endereço não informado (#1839): a cliente finaliza sem ele e a atendente registra pela Ficha.
         dados = dados with { Endereco = Informado(dados.Endereco) };
+        // Comanda entregue à atendente com endereço incompleto: vale o que ela registrar na Ficha (#1839).
+        var comAtendente = ContextoConversaJson.Ler<EntregaACombinarComanda>(conversa, RevisaoEntregaACombinar)?.LinkId == link.Id
+            || ContextoConversaJson.Ler<FreteCombinadoComanda>(conversa, FreteCombinadoChave)?.LinkId == link.Id;
         // Rascunhos anteriores podem ter itens e ainda não ter recebido o endereço do cadastro.
-        if (dados.Endereco is null && cliente is not null)
+        if ((dados.Endereco is null || comAtendente && Valido(dados.Endereco) is null) && cliente is not null)
         {
             var endereco = cliente.Enderecos.FirstOrDefault(e => e.Id == CriarPedidoAtendimentoUseCase.EnderecoPadrao(cliente));
             if (endereco is not null) dados = dados with { Endereco = new(endereco.Cep ?? "", endereco.Logradouro ?? "",
@@ -277,6 +280,8 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             if (peloAtendimento && estado.Pedido is not null)
                 throw new ComandaClienteConflitoException("A conversa já tem um pedido. Atualize antes de continuar.");
             var dados = Ler<RascunhoComandaCliente>(link.RascunhoJson) is { Itens: not null } salvo ? salvo : estado.Rascunho;
+            // Endereço parcial no rascunho cede ao que o estado mostra (o da Ficha, quando a atendente registrou).
+            if (Valido(dados.Endereco) is null) dados = dados with { Endereco = Valido(estado.Rascunho.Endereco) };
             Validar(dados);
             if (dados.Itens.Count == 0) throw new UseCaseValidationException("Escolha ao menos um prato.");
             var agora = relogio.GetUtcNow().UtcDateTime;
