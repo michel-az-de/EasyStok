@@ -17,6 +17,7 @@ public static class AgenteLlmServiceCollectionExtensions
     {
         services.Configure<AnthropicAgenteOptions>(configuration.GetSection(AnthropicAgenteOptions.Secao));
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Producao.SugerirReceitaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Acervo.AssistenteDoCardapioUseCase>();
         services.AddHttpClient<IPesquisaProducaoWeb, PesquisaProducaoWeb>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(12);

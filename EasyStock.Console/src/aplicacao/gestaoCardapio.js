@@ -2,10 +2,14 @@ import { podeMover } from '../dominio/cardapio'
 import {
   definirArquivado, definirDisponibilidade, definirVisivel, itemGestaoDaApi, listarGestao, moverItem, validarItem,
 } from '../infra/api/cardapioApi'
+import { dicaDoPrato } from '../infra/api/acervoApi'
 
 // Gestão do cardápio no modo API (M1.1, #1481). A lista vem do EasyStok e é relida depois de cada
 // gravação, certa ou errada: a tela mostra o que ficou salvo. Cada ação devolve `true` quando
 // gravou e entrega o erro a `aoErro` quando não. Separado do hook para a prova rodar sem React.
+// #1808: dica do prato pela IA; sem IA o servidor devolve a dica estática ({ texto, porIa: false }).
+export const pedirDicaDoPrato = (sku) => dicaDoPrato(sku)
+
 export const lerGestao = async () => ((await listarGestao()) ?? []).map(itemGestaoDaApi)
 
 export function criarGestaoCardapio({ obterItens, recarregar, aoErro }) {

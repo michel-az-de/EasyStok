@@ -36,6 +36,9 @@ button.abrirFoto:hover:not(:disabled) { box-shadow: 0 0 0 2px var(--marca-claro)
 .nome { margin: 0; color: var(--tinta); font-size: var(--t-corpo); letter-spacing: var(--ls-titulo); line-height: var(--lh-compacto); font-weight: 750; overflow-wrap: anywhere; }
 .detalhe { margin: var(--e-1) 0 0; color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-corpo); overflow-wrap: anywhere; }
 .situacao { margin: var(--e-1) 0 0; color: var(--tinta-3); font-size: var(--t-micro); line-height: var(--lh-corpo); overflow-wrap: anywhere; }
+/* #1808: dica do prato (estática ou da IA). */
+.dica { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e-1) var(--e-2); margin: var(--e-1) 0 0; color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-corpo); overflow-wrap: anywhere; }
+.dica small { color: var(--tinta-3); }
 .valor { display: grid; justify-items: end; gap: var(--e-1); }
 .preco { display: grid; text-align: right; font-family: var(--f-dado); font-size: var(--t-forte); font-weight: 750; letter-spacing: var(--ls-titulo); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .preco small { font-family: var(--f-corpo); font-size: var(--t-micro); font-weight: 400; color: var(--tinta-2); }

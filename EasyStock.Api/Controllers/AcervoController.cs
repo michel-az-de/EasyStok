@@ -1,5 +1,6 @@
 using System.Text.Json;
 using EasyStock.Application.UseCases.Acervo;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace EasyStock.Api.Controllers;
 
@@ -105,6 +106,15 @@ public sealed class AcervoController(AcervoUseCase acervo, ICurrentUserAccessor 
         DataOk(incluirConcluidas ? await acervo.HistoricoFilaAsync(usuario.EmpresaId, ct) : await acervo.SolicitacoesAsync(usuario.EmpresaId, ct));
     [HttpPost("solicitacoes")]
     public async Task<IActionResult> Solicitar([FromBody] SolicitarImagem req, CancellationToken ct) => DataOk(await acervo.SolicitarAsync(usuario.EmpresaId, usuario.UsuarioId, req, ct));
+    // #1808: dica do prato e pares imagem x prato. Só propõem; publicar segue POST imagens/{id}/publicar.
+    [HttpPost("itens/{itemId:guid}/dica")]
+    [EnableRateLimiting("ai")]
+    public async Task<IActionResult> Dica(Guid itemId, [FromServices] AssistenteDoCardapioUseCase assistente, CancellationToken ct) =>
+        DataOk(await assistente.DicaAsync(usuario.EmpresaId, itemId, ct));
+    [HttpPost("sugestoes")]
+    [EnableRateLimiting("ai")]
+    public async Task<IActionResult> Sugestoes([FromServices] AssistenteDoCardapioUseCase assistente, CancellationToken ct) =>
+        DataOk(await assistente.SugerirAssociacoesAsync(usuario.EmpresaId, ct));
     public sealed record VinculoCanva(string Url, string? AssetId);
     public sealed record OperacaoBriefing(Guid OperacaoId);
     public sealed record ClassificacaoImagem(string Natureza, string NaturezaEsperada);

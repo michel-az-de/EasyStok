@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { criarGestaoCardapio, lerGestao } from './gestaoCardapio'
+import { criarGestaoCardapio, lerGestao, pedirDicaDoPrato } from './gestaoCardapio'
 
 // Lista de gestão do cardápio lida da API (M1.1, #1481). Nada fica no reducer: a lista é da tela
 // de gestão, e o cardápio da comanda continua vindo da sincronização.
@@ -28,5 +28,5 @@ export function useGestaoCardapioApi() {
   }), [itens, recarregar])
 
   const fecharAviso = useCallback(() => setCarga((atual) => ({ ...atual, aviso: null })), [])
-  return { ...carga, recarregar, fecharAviso, ...acoes }
+  return { ...carga, recarregar, fecharAviso, dicaDoPrato: pedirDicaDoPrato, ...acoes }
 }
